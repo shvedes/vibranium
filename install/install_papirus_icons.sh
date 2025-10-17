@@ -21,4 +21,5 @@ curl -s https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders
 chmod +x "$HOME/.local/bin/papirus-folders"
 echo "papirus-folders installed"
 
+rm -rf ~/.cache/papirus-icon-theme
 cd "$CWD"
