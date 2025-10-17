@@ -51,7 +51,7 @@ enable_system_services() {
 
 	echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling systemd services"
 
-	sudo systemctl enable ly power-profiles-daemon
+	sudo systemctl enable ly power-profiles-daemon bluez
 	systemctl --user daemon-reload
 
 	for service in "${user_services[@]}"; do
@@ -99,6 +99,7 @@ create_directories() {
 		"$HOME/.config/qt6ct/colors" \
 		"$HOME/.config/dunst" \
 		"$HOME/.config/hypr" \
+		"$HOME/.config/uwsm" \
 		"$HOME/.config/imv"
 }
 
