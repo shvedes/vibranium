@@ -37,13 +37,8 @@ install_packages() {
 }
 
 enable_system_services() {
-	local system_services
 	local user_services
 
-	system_services=(
-		"power-profiles-daemon"
-		"ly"
-	)
 	user_services=(
 		"waybar"
 		"swayosd"
@@ -55,10 +50,13 @@ enable_system_services() {
 	)
 
 	echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling systemd services"
-# 	sudo systemctl disable display-manager
 
-	sudo systemctl enable "${system_services[@]}"
-	systemctl --user enable "${user_services[@]}"
+	sudo systemctl enable ly power-profiles-daemon
+	systemctl --user daemon-reload
+
+	for service in "${user_services[@]}"; do
+		systemctl --user enable "$service"
+	done
 }
 
 generate_defaults() {
@@ -110,6 +108,7 @@ copy_system_files
 
 bash ./install/install_gtk_themes.sh
 bash ./install/install_papirus_icons.sh
+bash ./install/local_bin.sh
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Generating defaults configs"
 
@@ -133,4 +132,3 @@ cp -rv ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
 
 enable_system_services
 
-# ./install/local_bin.sh
