@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+if ! command -v syncthing > /dev/null; then
+    notify-send -r 4 -u critical -t 5000 "Vibranium" "Syncthing is not installed!"
+    exit 1
+fi
+
+# If the user launches Syncthing, but the service is not active or enabled
+if [ "$(systemctl --user is-active syncthing)" != "active" ]; then
+    systemctl --user enable --now syncthing
+    notify-send -r 1 "Vibranium" -t 6000 "Syncthing wasn’t running.\nThe service has been enabled and started"
+    sleep 0.5 # Wait until the service starts up
+fi
+
+syncthing browser

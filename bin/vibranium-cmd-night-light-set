@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+
+# This script controls the Night Light filter. 
+# We cannot completely enable and disable the hyprsunset service because two 
+# functions for flash border & screen depend on it using gamma change, so we use a state file to implement the on/off state. 
+#
+# This script can also be called via mouse scroll when hovering over the Waybar module when the Night Light filter is active.
+
+# TODO: there is no TODO ┐('～`；)┌
+
+# source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+
+CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
+CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2>/dev/null || echo 5800)
+STATE_FILE="$XDG_STATE_HOME/vibranium/night-light"
+STEP=200
+
+[ ! -f "$STATE_FILE" ] && {
+    echo "Night light is inactive"
+    exit 1
+}
+
+if [[ "$1" =~ ^[+-]$ && $(<"$STATE_FILE") != suspended ]]; then
+    case $1 in
+        +) temp=$(( CURRENT_TEMP + STEP )) ;;
+        -) temp=$(( CURRENT_TEMP - STEP )) ;;
+    esac
+elif [ "$1" = "toggle" ]; then
+	case "$(<"$STATE_FILE")" in
+		"suspended")
+			hyprctl -q hyprsunset temperature "$CURRENT_TEMP"
+			echo "active" > "$STATE_FILE"
+			# notify-send -r 1 "Vibranium" \
+			# 	"Night light <span foreground='${P_GREEN}'><b>resumed</b></span>"
+			;;
+		"active")
+			hyprctl -q hyprsunset identity
+			echo "suspended" > "$STATE_FILE"
+			# notify-send -r 1 "Vibranium" \
+			# 	"Night light <span foreground='${P_RED}'><b>suspended</b></span>"
+			;;
+	esac
+	vibranium-cmd-refresh-waybar-module night-light
+	exit 0
+else
+	[[ ! "$1" =~ ^[0-9]+$ ]] && exit 1
+    TEMP="$1"
+fi
+
+if (( TEMP < 1000 || TEMP > 20000 )); then
+    echo "Temperature must be between 1000K and 20000K"
+    exit 1
+fi
+
+hyprctl -q hyprsunset temperature "$temp"
+printf "# Auto-generated! All changes will be overwritten!\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}" "$temp" > "$XDG_CONFIG_HOME/hypr/hyprsunset.CONF"

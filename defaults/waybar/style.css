@@ -1,0 +1,77 @@
+window#waybar {
+	font-family: 'Symbols Nerd Font Mono', 'Cascadia Code';
+	font-size: 12px;
+
+	background: @background;
+	color: @foreground;
+}
+
+tooltip {
+	color: @foreground;
+	background: @background;
+
+	border: 1px solid @border;
+	border-radius: 0px;
+	font-size: 11px;
+	font-weight: bold;
+}
+
+#workspaces button {
+    color: @foreground;
+    min-width: 12px;
+}
+
+#workspaces button.empty {
+  opacity: 0.5;
+}
+
+@keyframes urgent-workspace {
+	0% { color: @urgent }
+}
+
+#workspaces button.urgent {
+	opacity: 1;
+	animation: urgent-workspace 1s infinite
+}
+
+.modules-right {
+	color: @foreground;
+}
+
+.module {
+	margin: 0px 6px
+}
+
+#traygroup {
+	margin-right: 6px
+}
+
+#tray {
+	margin-right: 10px;
+}
+
+@keyframes recording-animation {
+  0%   { color: @foreground }
+  25%  { color: @foreground }
+  50%  { color: @urgent }
+  75%  { color: @urgent }
+}
+
+/* #custom-logout { */
+/* 	margin: 0px 12px 0px 4px */
+/* } */
+
+#custom-recording-indicator {
+	color: @foreground;
+	animation: recording-animation 1.5s infinite
+}
+
+#custom-separator,
+#custom-dynamic-separator {
+	color: @muted
+}
+
+#network.disconnected {
+	color: @urgent
+}
+

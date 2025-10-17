@@ -1,0 +1,10 @@
+* {
+  background:       #232a2e;
+  background-hard:  #1e2326;
+
+  foreground:       #d3c6aa;
+  foreground-muted: #829181;
+
+  border:    #3a464c;
+  highlight: #7fbbb3;
+}

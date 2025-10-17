@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+gtk_font="$(gsettings get org.gnome.desktop.interface font-name)"
+
+if [[ -n "$gtk_font" ]]; then
+    printf '%s\n' "${gtk_font//\'/}"
+else
+    grep --color=NEVER -oP '(?<=^gtk-font-name=).*' ~/.config/gtk-3.0/settings.ini
+fi

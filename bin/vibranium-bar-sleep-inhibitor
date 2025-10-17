@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+check_enum VIBRANIUM_BAR_INHIBITOR_ICON "lock" lock coffee eye
+
+case "$VIBRANIUM_BAR_INHIBITOR_ICON" in
+	"coffee") icon="\uf0f4" ;;
+	"lock")   icon="\uf023" ;;
+	"eye")    icon="\udb80\ude08" ;;
+esac
+
+tooltip="<span foreground='${P_ACCENT}'><b> Suspend blocked </b></span>"
+tooltip+="\n<span foreground='${P_GRAY}'>------------------</span>"
+tooltip+="\n<span foreground='${P_RED}'> <b>click to disable</b></span>"
+
+if systemd-inhibit | grep Vibranium > /dev/null; then
+    printf '{\"text\": \"%s\", \"tooltip\": \"%s\"}' "$icon" "$tooltip"
+else
+    printf '{\"text\": \"\"}'
+fi

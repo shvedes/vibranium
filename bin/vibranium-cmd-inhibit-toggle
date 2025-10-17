@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+
+pid=$(pgrep -a -f systemd-inhibit | grep "Prevent system suspend is active" | awk '{print $1}')
+
+if [[ -n "$pid" ]]; then
+    kill "$pid"
+	notify-send -r 1 -t 2000 "Vibranium" "<span foreground='${P_GREEN}'><b>Suspend allowed</b></span>"
+else
+    setsid -f systemd-inhibit --what=idle \
+        --why="Prevent system suspend is active" \
+        --who="Vibranium" \
+        sleep infinity
+	notify-send -r 1 -t 2000 "Vibranium" "<span foreground='${P_RED}'><b>Suspend blocked</b></span>"
+fi
+
+vibranium-cmd-refresh-waybar-module inhibitor

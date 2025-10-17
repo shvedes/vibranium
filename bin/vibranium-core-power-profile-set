@@ -1,0 +1,106 @@
+#!/usr/bin/env bash
+
+# Power profile switcher. The code is pretty simple and clean, so I don't think it needs any explanation.
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+if ! missing_str="$(vibranium-utils-is-installed power-profiles-daemon:powerprofilesctl)"; then
+    read -r -a missing <<< "$missing_str"
+    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing cli utilities: ${missing[*]}"
+    exit 1
+fi
+
+profiles=("power-saver" "balanced" "performance")
+current="$(vibranium-utils-power-profile-get)"
+
+notify() {
+    local profile="$1"
+    local icon=""
+    local label=""
+
+    case "$profile" in
+        "performance")
+            icon="power-profile-performance-symbolic"
+            label="Performance"
+            ;;
+        "balanced")
+            icon="power-profile-balanced-symbolic"
+            label="Balanced"
+            ;;
+        "power-saver")
+            icon="power-profile-power-saver-symbolic"
+            label="Powersave"
+            ;;
+    esac
+
+    log "Setting power profile to ${YELLOW}'""${profile}""'${RESET}"
+    check_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD true
+
+    if [ $VIBRANIUM_GLOBAL_USE_OSD = true ] && [ $VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD = true ]; then
+        if ! command -v swayosd-client > /dev/null; then
+            notify-send -r 2 -t 1500 "Vibranium" "Power profile set to <span foreground='${P_ACCENT}'>${label,,}</span>"
+        else
+			if ! pidof swayosd-server >/dev/null; then
+				notify-send -r 2 -t 1500 "Vibranium" "Power profile set to <span foreground='${P_ACCENT}'>${label,,}</span>"
+			else
+				swayosd-client --custom-message "$label" --custom-icon "$icon"
+			fi
+        fi
+    else
+        notify-send -r 2 -t 1500 "Vibranium" "Power profile set to <span foreground='${P_ACCENT}'>${label,,}</span>"
+    fi
+
+	check_bool VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE false
+	if [ $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE = true ]; then
+		log "Updating waybar module"
+		vibranium-cmd-refresh-waybar-module power-profile
+	fi
+}
+
+for i in "${!profiles[@]}"; do
+    if [ "${profiles[$i]}" = "$current" ]; then
+        current_index=$i
+        break
+    fi
+done
+
+case "$1" in
+    "up" | "+")
+        next_index=$(((current_index + 1) % ${#profiles[@]}))
+        ;;
+    "down" | "-")
+        next_index=$(((current_index - 1 + ${#profiles[@]}) % ${#profiles[@]}))
+        ;;
+    "")
+        next_index=$(((current_index + 1) % ${#profiles[@]}))
+		;;
+    *)
+        error "Invalid input"
+        exit 1
+        ;;
+esac
+
+powerprofilesctl set "${profiles[$next_index]}" &
+echo "${profiles[$next_index]}" > "${VIBRANIUM_STATE}/power-profile"
+notify "${profiles[$next_index]}"
+
+# CONF="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
+# BLUR_ENABLED="$(sed -n '/decoration[[:space:]]*{/,/}/{/blur[[:space:]]*{/,/}/{s/.*enabled[[:space:]]*=[[:space:]]*\([^;]*\).*/\1/p}}' "$CONF")"
+
+# If VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE is true, and blur was enabled before switching to power-saver mode,
+# we must remember this state so that we can restore it later when switching to another power profile.
+BLUR_ENABLED="$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')"
+if [ "${profiles[$next_index]}" = "power-saver" ]; then
+	if [ "$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE" = "true" ]; then
+
+		if [[ $BLUR_ENABLED == 1 ]]; then
+			touch "$VIBRANIUM_STATE/blur.restore"
+			vibranium-cmd-toggle-blur
+		fi
+	fi
+else
+	[[ $BLUR_ENABLED == 0 ]] && [ -f "$VIBRANIUM_STATE/blur.restore" ] && {
+		vibranium-cmd-toggle-blur
+		rm "$VIBRANIUM_STATE/blur.state"
+	}
+fi

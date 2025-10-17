@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+history_file="$XDG_CACHE_HOME/vibranium/color-picker.history"
+
+# TODO: support for other formats
+contrast_color() {
+    local hex="$1"
+
+    hex="${hex#\#}"
+    local r=$((16#${hex:0:2}))
+    local g=$((16#${hex:2:2}))
+    local b=$((16#${hex:4:2}))
+
+	# Contrast calculation
+    local lum=$(( (299*r + 587*g + 114*b) / 1000 ))
+    if (( lum > 127 )); then
+        echo "#000000"
+    else
+        echo "#ffffff"
+    fi
+}
+
+tooltip="<span foreground='${P_ACCENT}'><b> Click to pick a color from the screen </b></span>"
+if [[ -s $history_file ]]; then
+	tooltip+="\n     <span foreground='${P_ACCENT}'><b>Right click to</b></span> <span foreground='${P_RED}'><b>clear history</b></span>"
+	tooltip+="\n<span foreground='${P_GRAY}'>---------------------------------------</span>"
+	tooltip+="\\n\\t   <span size='9000'>Recent colors</span>"
+    while IFS= read -r color; do
+        fg=$(contrast_color "$color")
+        tooltip+="\n\t     <span background='$color' foreground='$fg' size='9500'><b> $color </b></span>"
+    done < "$history_file"
+fi
+
+if [[ $VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS == true ]]; then
+	tooltip+="\n<span foreground='${P_GRAY}'>---------------------------------------</span>"
+	tooltip+="\n <span foreground='${P_ACCENT}'><b>CTRL ALT + C:</b></span>"
+	tooltip+=" <span foreground='${P_YELLOW}'><b>pick a color </b></span> "
+fi
+
+case $VIBRANIUM_COLOR_PICKER_WAYBAR_ICON in
+    "droplet")    icon='\uf043' ;;
+    "palette")    icon='\uefcc' ;;
+    "eyedropper") icon='\uf1fb' ;;
+    *)            icon='\uf043' ;; # droplet
+esac
+
+case $VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE in
+    "true")
+        printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
+        ;;
+    *)
+        printf '{"text": ""}'
+        exit 0
+        ;;
+esac

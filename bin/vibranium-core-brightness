@@ -1,0 +1,233 @@
+#!/usr/bin/env bash
+
+# Overcomplicated script that manages brightness control using the standard brightnessctl 
+# as well as the DDC protocol for external monitors. The script uses state files to cache 
+# active values for both methods to speed up subsequent script executions. 
+# This is ESPECIALLY useful for the DDC method, because ddcutil is known to be quite slow.
+# Thanks to the state file, changing brightness with DDC takes milliseconds instead of 500-700-1000ms.
+# This script has not been tested with a dual (or triple) monitor setup (or hybrid), so I have no idea how it will work.
+#
+# The script can accept parameters such as up | down for relative brightness adjustment with dynamic steps using Vibranium settings,
+# as well as absolute values such as 20, 50, 100, etc. 
+#
+# TODO: double / truple / hybrid monitor setup
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+usage() {
+    cat << EOF
+Usage: 
+	$(basename "$0") up|down|value
+EOF
+}
+
+if pidof ddcutil >/dev/null; then
+	exit 0
+fi
+
+if [ -z "$1" ]; then
+    usage
+    exit 1
+elif [[ ! $# =~ ^(up|down|[0-9])$ ]]; then
+    usage
+    exit 1
+fi
+
+if [ -z "$(ls -A /sys/class/backlight)" ]; then
+    check_bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL false
+
+	# If the driver for adjusting the brightness of the built-in screen is not found and DDC control is disabled globally
+    if [[ $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL == false ]]; then
+        error "This feature is disabled in Vibranium settings"
+        exit 1
+    else
+        if ! missing_str="$(vibranium-utils-is-installed ddcutil)"; then
+            read -r -a missing <<< "$missing_str"
+            notify-send -r 4 -t 5000 -u critical "Vibranium - Brightness Control" "Missing dependencies: ${missing[*]}"
+            exit 1
+        fi
+
+        method="DDC"
+		# TODO:
+		# As far as I know, optimal values for --sleep-multiplier can vary from monitor to monitor,
+		# and while it works well on one monitor, it may not work at all on another. 
+		# In this case, we need to create a mini-algorithm that will calculate and record valid values for the monitor and use them.
+        ddcutil_flags=(--sleep-multiplier 0.13 --noverify --skip-ddc-checks --maxtries 1,1,1)
+    fi
+else
+    if ! missing_str="$(vibranium-utils-is-installed brightnessctl)"; then
+        read -r -a missing <<< "$missing_str"
+        notify-send -r 4 -t 5000 -u critical "Vibranium - Brightness Control" "Missing dependencies: ${missing[*]}"
+        exit 1
+    fi
+    method="brightnessctl"
+fi
+
+[[ $VIBRANIUM_GLOBAL_USE_OSD == true ]] && [[ $VIBRANIUM_BRIGHTNESS_USE_OSD == true ]] && {
+    if ! missing_str="$(vibranium-utils-is-installed swayosd:swayosd-client)"; then
+        read -r -a missing <<< "$missing_str"
+        notify-send -r 4 -t 5000 -u critical "Vibranium - Brightness Control" "Missing dependencies: ${missing[*]}"
+    fi
+}
+
+osd() {
+    local value="$1"
+    local icon progress
+
+	# Set specific icons depending on the current brightness level (icons are taken from the active icon pack)
+    if ((value <= 30)); then
+        icon="brightness-low-symbolic"
+    elif ((value <= 70)); then
+        icon="brightness-symbolic"
+    else
+        icon="brightness-high-symbolic"
+    fi
+
+	# Build a brightness value for SwayOSD
+    progress=$(awk -v v="$value" 'BEGIN {p = 0.02 + v * (0.98/100); printf "%.2f", p}')
+
+	# I can't imagine a situation where this service would be turned off, but let it be there just in case
+	[[ ! $(pidof swayosd-server) ]] && systemctl --user enable --now swayosd
+    swayosd-client --custom-icon="$icon" --custom-progress="$progress" || true
+}
+
+check_int VIBRANIUM_BRIGHTNESS_STEP 5 int
+step=$VIBRANIUM_BRIGHTNESS_STEP
+
+case "$method" in
+    "DDC")
+		# If the state file does not exist (and the variable) (usually first-time run), obtain the value using ddcutil. 
+		# Yes, this will take significantly longer than other times, but only once.
+		if [[ ! -f "$VIBRANIUM_STATE/i2c-bus" ]]; then
+			# If (by some magical means) $I2C_BUS is not globally assigned.
+			# See vibranium-utils-startup-functions
+			if [[ -z "$I2C_BUS" ]]; then
+				I2C_BUS="$(ddcutil detect 2> /dev/null | awk -F'i2c-' '/I2C bus/{print $2}' \
+					| tee "$VIBRANIUM_STATE/i2c-bus")"
+			fi
+		else
+			I2C_BUS="$(<"$VIBRANIUM_STATE/i2c-bus")"
+		fi
+
+		if [[ -f "$VIBRANIUM_STATE/brightness" ]]; then
+			current="$(<"$VIBRANIUM_STATE/brightness")"
+		else
+			# Same as above.
+			# -----------------
+			# As I mentioned above, --sleep-multiplier can sometimes fail at very low values,
+			# so we give the command three attempts to get the date from the monitor using the DDC protocol. 
+			retries=3; for ((i = 0; i < retries; i++)); do
+				current=$(ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" getvcp 10 2> /dev/null | awk '/current/ {print int($9)}')
+				if [[ $current =~ ^[0-9]+$ ]] && ((current >= 0 && current <= 100)); then
+					break
+				fi
+			done
+		fi
+
+		# The remaining code at the bottom is generally self-explanatory
+        case "$1" in
+            "up")
+				(( current == 100 )) && exit 0
+                new=$((current + step))
+                ((new > 100)) && new=100
+                ;;
+            "down")
+				(( current == 0 )) && exit 0
+                new=$((current - step))
+                ((new < 0)) && new=0
+                ;;
+            *)
+                if [[ $1 =~ ^[0-9]+$ ]]; then
+					if (( current == 0 && $1 == 0 )); then
+						exit 0
+					elif (( current == 100 && $1 == 100 )); then
+						exit 0
+					fi
+
+					if (($1 >= 0 && $1 <= 100)); then
+						new=$1
+					else
+						error "Out of boundary"
+						exit 1
+					fi
+                else
+                    error "Invalid input!"
+                    exit 1
+                fi
+                ;;
+        esac
+
+		log "Method: ${YELLOW}'""$method""'${RESET}"
+		log "DDC flags: ${YELLOW}'""${ddcutil_flags[*]}""'${RESET}"
+		log "Current brightness: ${YELLOW}'""${current}""'${RESET}"
+		log "New brightness: ${YELLOW}'""$new""'${RESET}"
+
+		# Move the command to the background to show instant OSD / Notification
+        ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &
+
+		# Save state file
+		printf "%s" "$new" > "$VIBRANIUM_STATE/brightness"
+
+        check_bool VIBRANIUM_BRIGHTNESS_USE_OSD true
+        check_bool VIBRANIUM_GLOBAL_USE_OSD true
+
+        if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]] && [[ $VIBRANIUM_BRIGHTNESS_USE_OSD == true ]]; then
+            osd "$new" &
+        else
+            notify-send -r 2 -t 1000 "Brightness" -h int:value:"$new"
+        fi
+        ;;
+	"brightnessctl")
+		if [ -f "$VIBRANIUM_STATE/brightness" ]; then
+			current="$(<"$VIBRANIUM_STATE/brightness")"
+		else
+			current_raw=$(brightnessctl g 2>/dev/null)
+			max_raw=$(brightnessctl m 2>/dev/null)
+			current=$((current_raw * 100 / max_raw))
+		fi
+
+		case "$1" in
+			up)
+				arg="+${step}"
+				new=$(( current + step ))
+				;;
+			down)
+				arg="-${step}"
+				new=$(( current - step ))
+				;;
+			*)
+				if [[ "$1" =~ ^[0-9]+$ && $1 -ge 0 && $1 -le 100 ]]; then
+					arg="$1"
+					new="$arg"
+				else
+					error "Invalid input!"
+					exit 1
+				fi
+				;;
+		esac
+
+		(( new > 100 )) && new=100
+		(( new < 0 )) && new=0
+
+		log "Method: ${YELLOW}'""$method""'${RESET}"
+		log "Current brightness: ${YELLOW}'""${current}""'${RESET}"
+		log "New brightness: ${YELLOW}'""$new""'${RESET}"
+
+		if [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $VIBRANIUM_BRIGHTNESS_USE_OSD == true ]]; then
+			swayosd-client --brightness="$arg"
+		else
+			brightnessctl -q set "${new}%"
+			notify-send -r 1 -t 1000 "Brightness" -h int:value:"$new"
+		fi
+
+		printf "%s" "$new" > "$VIBRANIUM_STATE/brightness"
+		;;
+esac
+
+check_bool VIBRANIUM_BAR_BRIGHTNESS_MODULE_ENABLE false
+
+# Update waybar module
+if [[ $VIBRANIUM_BAR_BRIGHTNESS_MODULE_ENABLE == true ]]; then
+	vibranium-cmd-refresh-waybar-module brightness
+fi
+

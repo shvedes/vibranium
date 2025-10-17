@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+if ! command -v powerprofilesctl > /dev/null; then
+	icon="<span foreground='${P_RED}'>\uf071</span>"
+	tooltip="<span foreground='${P_ACCENT}'>Power profile:</span> "
+	tooltip+="<span foreground='${P_RED}'>command 'powerprofilesctl' not found!</span>"
+    printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
+    exit 0
+fi
+
+check_bool VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS true
+check_bool VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE true
+
+if [ "$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE" = "false" ]; then
+    printf '{"text": ""}'
+    exit 0
+fi
+
+current="$(vibranium-utils-power-profile-get)"
+case "$current" in
+	"power-saver") icon='\uf06c' ;;
+	"balanced")    icon=''       ;;
+	"performance") icon='\uf0e7' ;;
+esac
+
+if [ "$VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS" = "true" ]; then
+	# It is pretty bad right now.
+	# Maybe in the future we'll use seq to calculate separator width based on the rest lines lenght, as well as spacing.
+	profile="<span foreground='${P_ACCENT}'><b> Current profile:</b></span>   <span foreground='${P_YELLOW}'><b>${current}</b></span>"
+	guide="\n<span foreground='${P_GRAY}'>---------------------------------</span>"
+	guide+="\n<span foreground='${P_ACCENT}'><b> Left click:</b></span>        <span foreground='${P_YELLOW}'><b>powersave</b></span>"
+	guide+="\n<span foreground='${P_ACCENT}'><b> Middle click:</b></span>      <span foreground='${P_YELLOW}'><b>balanced</b></span>"
+	guide+="\n<span foreground='${P_ACCENT}'><b> Right click:</b></span>       <span foreground='${P_YELLOW}'><b>performance</b></span>"
+	guide+="\n<span foreground='${P_GRAY}'>--------------------------------</span>"
+	guide+="\n<span foreground='${P_ACCENT}'><b> SUPER + B:</b></span>         <span foreground='${P_YELLOW}'><b>next profile</b></span>"
+	guide+="\n<span foreground='${P_ACCENT}'><b> SUPER + Shift + B:</b></span> <span foreground='${P_YELLOW}'><b>prev profile</b></span>"
+else
+	profile="<span foreground='${P_ACCENT}'><b>Current profile:</b></span> <span foreground='${P_YELLOW}'><b>${current}</b></span>"
+fi
+
+tooltip="${profile} ${guide}"
+
+printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+# vibranium-cmd-get-option <OPTION_NAME>
+# This script reads global and user settings and outputs the value of the variable passed to it.
+# It is mostly a helper script used in other scripts in the Vibranium ecosystem, but you can use it as is.
+
+source "$VIBRANIUM_PATH/vibranium-core-defaults"
+source "$XDG_CONFIG_HOME/vibranium/settings"
+
+if [[ ! -z "$1" && -n "${!1+x}" ]]; then
+    echo "${!1}"
+else
+	exit 1
+fi
+

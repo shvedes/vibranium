@@ -1,0 +1,16 @@
+[Unit]
+Description=Wayland clipboard manager with support for multimedia 
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/wl-paste --watch cliphist store
+ExecStop=/usr/bin/cliphist wipe
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
+
+# vim:ft=systemd

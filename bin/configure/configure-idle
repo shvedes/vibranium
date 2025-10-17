@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+INDEX=0
+CONFIG="$XDG_CONFIG_HOME/hypr/hypridle.conf"
+
+while true; do
+	lock_timeout="$(vibranium-cmd-edit-wm-config -r listener:timeout "$CONFIG")"
+	sleep_timeout="$(vibranium-cmd-edit-wm-config -r listener:timeout:-2 $CONFIG)"
+
+	OPTIONS=(
+		"Lock  after : $(( lock_timeout  / 60 )) min"
+		"Sleep after : $(( sleep_timeout / 60 )) min"
+		"What is this?"
+	)
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Idle timeouts" "ESC to go back")"
+	[ -z "$CHOSEN" ] && break
+
+	case "$CHOSEN" in
+		"Sleep"*)
+			while true; do
+				prompt="Sleep timeout (int)"
+				input="$(printf "%s\n" "$prompt" | rofi_cmd "Sleep timeout" "in minutes")"
+				[ -z "$input" ] && break; [ "$input" = "$prompt" ] && continue
+				[[ ! "$input" =~ ^[0-9]+$ ]] && {
+					notify-send -r 3 -u critical -t 1500 "Vibranium" "Only integers allowed!"
+					continue
+				}
+				
+				if (( input <= lock_timeout )); then
+					notify-send -r 3 -u critical -t 1500 "Vibranium" "Sleep timeout cannot be less or equal than ${lock_timeout}!"
+					continue
+				fi
+				
+				time=$(( input * 60 ))
+				vibranium-cmd-edit-wm-config listener:timeout:${time}:-2 "$CONFIG" 
+				systemctl --user restart hypridle
+				break
+			done
+		;;
+		"Lock"*)
+			while true; do
+				prompt="Lock timeout (int)"
+				input="$(printf "%s\n" "$prompt" | rofi_cmd "Lock timeout" "in minutes")"
+				[ -z "$input" ] && break; [ "$input" = "$prompt" ] && continue
+				[[ ! "$input" =~ ^[0-9]+$ ]] && {
+					notify-send -r 3 -u critical -t 1500 "Vibranium" "Only integers allowed!"
+					continue
+				}
+				
+				time=$(( input * 60 ))
+				vibranium-cmd-edit-wm-config listener:timeout:${time}:-1 "$CONFIG" 
+				systemctl --user restart hypridle
+				break
+			done
+			;;
+		"What"*)
+			msg="\n<span foreground='${P_GREEN}'><b>•</b></span> "
+			msg+="<span foreground='${P_PURPLE}'><b>Time of inactivity until screen lock</b></span>\n"
+			msg+="<span foreground='${P_GREEN}'><b>•</b></span> "
+			msg+="<span foreground='${P_PURPLE}'><b>Time of inactivity before the system sleeps</b></span>"
+			notify-send -r 2 -t 5000 "What is this?" "$msg"
+	esac
+done

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# Toggle window blur in Hyprland.
+# Reads current blur state, flips true/false in config, then reloads Hyprland.
+
+mkdir -p "$XDG_CONFIG_HOME/hypr/hyprland.conf.d"
+
+CONF="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
+
+if ! grep -qE '^[[:space:]]*decoration:blur:enabled[[:space:]]*=' "$CONF"; then
+    VALUE=$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')
+    echo "decoration:blur:enabled = $VALUE" >> "$CONF"
+fi
+
+BLUR_ENABLED=$(sed -n 's/.*decoration:blur:enabled[[:space:]]*=[[:space:]]*\([01]\).*/\1/p' "$CONF")
+
+if [[ "$BLUR_ENABLED" == 1 ]]; then
+    sed -i 's/\(decoration:blur:enabled[[:space:]]*=[[:space:]]*\)1/\10/' "$CONF"
+    echo "disabled"
+else
+    sed -i 's/\(decoration:blur:enabled[[:space:]]*=[[:space:]]*\)0/\11/' "$CONF"
+    echo "enabled"
+fi
+
+hyprctl -q reload config-only &

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+INDEX=0
+
+STATE_FILE="$XDG_STATE_HOME/vibranium/night-light"
+
+if [ ! -f "$STATE_FILE" ]; then
+	if hyprctl hyprsunset &>/dev/null; then
+		echo "active" > "$STATE_FILE"
+	else
+		echo "disabled" > "$STATE_FILE"
+	fi
+fi
+
+while true; do
+	is_active="$(<"$STATE_FILE")"
+	is_active=$([ "$is_active" = "active" ] && echo yes || echo no)
+	temperature_current="$(grep -oP "(?<=temperature = ).*" "$XDG_CONFIG_HOME/hypr/hyprsunset.conf")"
+
+	OPTIONS=(
+		"Running     : $is_active"
+		"Temperature : $temperature_current"
+	)
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Night Light" "ESC to go back" -selected-row "$INDEX")"
+	[ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Running"*)
+			case "$is_active" in
+				"yes"|"no") vibranium-cmd-night-light-set toggle ;;
+			esac
+			vibranium-cmd-refresh-waybar-module night-light
+			;;
+		"Temperature"*)
+			while true; do
+				prompt="New temperature (int)"
+				temperature_chosen="$(printf "%s" "$prompt" | rofi_cmd "Night Light" "1000K-20000K")"
+				[ -z "$temperature_chosen" ] && break; [ "$temperature_chosen" = "$prompt" ] &&  continue
+				
+				if (( temperature_chosen < 1000 || temperature_chosen > 20000 )); then
+					notify-send -r 3 -u critical -t 1500 "Vibranium" "An integer between 1000 and 20000!"
+					continue
+				fi
+				
+				vibranium-cmd-night-light-set "$temperature_chosen"
+				notify-send -r 1 "Vibranium" "Night filter temperature: <span foreground='${P_YELLOW}'><b>${temperature_chosen}K</b></span>"
+				break
+			done
+			;;
+	esac
+done

@@ -1,0 +1,12 @@
+{
+	"bluetooth": {
+		"format": "\udb80\udcaf",
+		"format-connected": "\udb80\udcb1",
+		"on-click": "vibranium-cmd-launch-terminal bluetui",
+
+		"tooltip-format": "Status: {status}",
+		"tooltip-format-connected": "Connected to {device_enumerate}",
+		"tooltip-format-enumerate-connected": "{device_alias}",
+		"tooltip-format-enumerate-connected-battery": "{device_alias} (battery: {device_battery_percentage}%)"
+	}
+}

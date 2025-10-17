@@ -1,0 +1,29 @@
+[global]
+font = "Cascadia Code 9"
+layer              = top
+follow             = none 
+icon_theme         = Papirus
+notification_limit = 3
+
+corner_radius      = 0
+frame_width        = 2
+width              = (300, 600)
+height             = (0, 400)
+origin             = top-right
+offset             = (15, 15)
+
+indicate_hidden	   = false
+separator_height   = 2
+separator_color	   = frame
+sort               = update
+show_indicators	   = false
+mouse_left_click   = do_action
+timeout	           = 3
+
+progress_bar = true
+progress_bar_height = 10
+progress_bar_frame_width = 0
+progress_bar_horizontal_alignment = left
+
+# vim:ft=cfg
+

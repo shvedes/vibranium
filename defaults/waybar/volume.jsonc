@@ -1,0 +1,13 @@
+{
+	"pulseaudio#volume": {
+		"on-click": "vibranium-core-volume vol mute",
+		"on-scroll-up": "vibranium-core-volume vol up",
+		"on-scroll-down": "vibranium-core-volume vol down",
+		"on-click-right": "vibranium-cmd-launch-terminal wiremix --tab output",
+
+		"format": "{icon}",
+		"format-muted": "\udb81\udf5f",
+		"format-icons": [ "\udb81\udd7f", "\udb81\udd80", "\udb81\udd7e" ],
+		"tooltip-format": "Volume: {volume}%\nDevice: {desc}"
+	}
+}

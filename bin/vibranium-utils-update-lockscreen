@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-defaults"
+source "$XDG_CONFIG_HOME/vibranium/settings"
+
+if [ -z "$1" ]; then
+	echo "No input"
+	exit 1
+fi
+
+CURRENT_WALLPAPER="$1"
+HYPRLOCK_CONF="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+
+if [[ $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND == false ]]; then
+	TYPE="dimmed-${VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH}"
+else
+	TYPE="blurred-${VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH}"
+fi
+
+CACHED_IMG="$XDG_CACHE_HOME/hyprlock/$(basename "${CURRENT_WALLPAPER%.*}"-${TYPE}.jpg)"
+
+sed -i "s|^\([[:space:]]*path = \).*|\1$CACHED_IMG|" "$HYPRLOCK_CONF"
+
+# If cached doesn't exists - generate immediately
+if [[ ! -f "$CACHED_IMG" ]]; then
+	vibranium-utils-lockscreen-cache "$CURRENT_WALLPAPER" &
+fi

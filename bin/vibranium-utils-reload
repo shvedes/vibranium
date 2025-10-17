@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+systemd_targets=("waybar" "swayosd" "cliphist" "hyprpaper" "hypridle" "gnome-polkit")
+
+systemctl --user restart "${systemd_targets[@]}"
+vibranium-cmd-refresh-dunst
+
+if [[ "$1" != "-q" ]]; then
+	notify-send -r 1 -t 1500 "Vibranium" "Configuration reloaded"
+fi

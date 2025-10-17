@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+HYRPPAPER_CONF="$XDG_CONFIG_HOME/hypr/hyprpaper.conf"
+
+if [[ "$1" =~ ^(-b|--basename)$ ]]; then
+	basename "$(sed -n 's/^preload = //p' "$HYRPPAPER_CONF")"
+else
+	sed -n 's/^preload = //p' "$HYRPPAPER_CONF"
+fi
+

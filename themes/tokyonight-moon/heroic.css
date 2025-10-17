@@ -1,0 +1,288 @@
+body.vibranium {
+	--background-0: #1b1e2c;
+	--background-1: #222436;
+	--background-2: #2d3042;
+	--background-3: #353848;
+	--background-4: #3e4565;
+	--background-5: #4f5882;
+	--background-6: #616b9e;
+
+	--foreground-0: #c0caf5;
+	--foreground-1: #a9b1d6;
+	--foreground-2: #9aa5ce;
+	--foreground-3: #8b95b9;
+	--foreground-4: #7c85a5;
+
+	--green-0: #9ece6a;
+	--green-1: #b0d785;
+
+	--blue-0: #7aa2f7;
+	--blue-1: #95b2f9;
+	
+	--yellow-0: #e0af68;
+	--yellow-1: #e7bd83;
+
+	--orange-0: #ff9e64;
+	--orange-1: #ffb07f;
+	
+	--red-0: #f7768e;
+	--red-1: #fb91a1;
+
+	--purple-0: #bb9af7;
+	--purple-1: #c8acf9;
+
+	--aqua-0: #7dcfff;
+	--aqua-1: #99d8ff;
+
+	--gray-0: #4f4f5d;
+	--gray-1: #606071;
+
+	--border-0: var(--background-3);
+	--border-1: var(--background-4);
+
+	--border-radius-hard: 8px;
+	--border-radius-mid:  4px;
+	--border-radius-low:  2px;
+
+	/* ============================================== */
+	
+	font-size: 14px;
+
+	/* ============================================== */
+
+    --accent:         var(--blue-0);
+    --accent-overlay: var(--blue-1);
+
+    --success:        var(--green-0);
+    --success-hover:  var(--green-0);
+
+    --primary:        var(--blue-0);
+    --primary-hover:  var(--blue-1);
+	--primary-active: var(--primary-hover);
+
+	--secondary:        var(--aqua-0);
+	--secondary-button: var(--accent);
+	--secondary-hover:  var(--aqua-1);
+	--secondary-active: var(--secondary-hover);
+
+    --danger:         var(--red-0);
+    --danger-hover:   var(--red-1);
+
+	--brand-primary:       var(--accent);
+	--brand-primary-hover: var(--accent-overlay);
+
+	--brand-secondary:       var(--purple-0);
+	--brand-secondary-hover: var(--purple-1);
+
+	--base-06:       var(--foreground-4);
+    --brand-text-01: var(--foreground-1);
+    --brand-text-02: var(--foreground-2);
+    --brand-text-03: var(--foreground-3);
+    --brand-text-04: var(--foreground-4);
+    --brand-text-05: var(--gray-0);
+
+    --neutral-01: var(--background-0);
+    --neutral-02: var(--background-2);
+    --neutral-03: var(--background-3);
+    --neutral-04: var(--background-4);
+    --neutral-05: var(--background-6);
+    --neutral-06: var(--foreground-4);
+    --neutral-07: var(--foreground-3);
+    --neutral-08: var(--foreground-2);
+
+	--status-default:       var(--foreground-1);
+	--status-success:       var(--green-1);
+	--status-success-hover: var(--green-1);
+	--status-info-hover:    var(--purple-1);
+	--status-danger:        var(--red-0);
+	--status-danger-hover:  var(--red-1);
+	--status-info:          var(--aqua-0);
+
+	--status-warning:       var(--orange-0);
+	--status-warning-hover: var(--orange-1);
+
+    --anticheat-denied:    var(--red-0);
+    --anticheat-broken:    var(--orange-0);
+    --anticheat-running:   var(--green-1);
+    --anticheat-supported: var(--green-0);
+    --anticheat-planned:   var(--purple-0);
+
+    --action-icon:         var(--foreground-0);
+
+    --action-icon-hover:   var(--accent);
+    --action-icon-active:  var(--accent-overlay);
+
+    --navbar-accent: var(--foreground-1);
+    --background:    var(--background-2);
+
+	/* Main background */
+    --body-background: var(--background-1);
+
+    --background-darker:        var(--background-0);
+    --current-background:       var(--background-0);
+    --navbar-background:        var(--background-2);
+    --navbar-active-background: var(--background-1);
+
+	--alphabet-filter-bg-hover:     var(--background-1);
+	--alphabet-filter-shadow-color: var(--background-0);
+
+	--gradient-01: linear-gradient(270.36deg, var(--blue-1) 1.57%, var(--aqua-1) 96.46%);
+    --gradient-02: linear-gradient(270.36deg, var(--aqua-1) 1.57%, var(--blue-0) 96.46%);
+
+    --gradient-body-background: linear-gradient(
+        90deg, rgba(0, 0, 0, 0.3) -32px, var(--background-1) 64px,
+        var(--background-0) 100%
+    );
+
+    --input-background: var(--background-2);
+    --modal-background: var(--background-1);
+
+    --modal-border: var(--border-0);
+
+	--text-default:   var(--foreground-1);
+	--text-secondary: var(--foreground-2);
+	--text-tertiary:  var(--background-0);
+
+    --text-title:    var(--foreground-0);
+
+    --icons-background: var(--background-2);
+    --icon-disabled: var(--gray-0);
+}
+
+/* Input fields */
+/* Modal */
+.textInputFieldWrapper input[type=text],
+.selectStyle, .selectFieldWrapper .MuiOutlinedInput-root,
+.textInputFieldWrapper .inputIcon~input,
+.css-1ty026z {
+	border: 2px solid var(--border-1) !important;
+	box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.3)
+
+}
+
+/* System Information tiles */
+/* Warning tiles */
+/* Info boxes */
+.css-frmowj, .css-4ccx3m,
+.settingsWrapper .defaults-hint,
+.Sidebar.collapsed .SidebarItemWithSubmenu .SidebarSubmenu,
+.infoBox {
+	border: 2px solid var(--border-1) !important;
+	border-radius: var(--border-radius-mid) !important;
+	box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.3);
+}
+
+.Sidebar.collapsed .SidebarItemWithSubmenu .SidebarSubmenu {
+	margin-left: 5px
+}
+
+.SearchBar,
+.SearchBar .autoComplete {
+	padding: 5px;
+	border: 2px solid var(--border-1) !important;
+	border-radius: 0.25em;
+	box-shadow: 3px 3px 3px rgba(0, 0, 0, 0.3)
+}
+
+/* Drop down menu */
+/* Pop up text */
+.css-r8u8y9, .dropdown,
+.popover-wrapper .popover,
+.SearchBar .autoComplete {
+	padding: 8px;
+	background: var(--background-0);
+	border: 2px solid var(--border-1) !important;
+	border-radius: var(--border-radius-mid)
+}
+
+/* Drop down menu entry */
+.css-oluo6v {
+	padding: 6px;
+	margin: 8px 0px;
+}
+
+.SearchBar .autoComplete {
+	margin-top: 18px;
+	max-height: 410px
+}
+.SearchBar .autoComplete li {
+	margin: 4px;
+	padding: 8px
+}
+.SearchBar .autoComplete li:hover {
+	border-radius: var(--border-radius-mid)
+}
+
+/* Drop down menu selected item */
+.css-oluo6v.Mui-selected {
+	background: var(--background-3) !important;
+	border-radius: var(--border-radius-mid) !important
+}
+
+/* Hover on an item in drop down menu */
+.css-oluo6v:hover {
+	background: var(--background-2);
+	border-radius: var(--border-radius-mid)
+}
+
+.App .Sidebar {
+	border-right: 2px solid var(--border-1)
+}
+
+/* fill bar background | I don't know how this thing is called */
+/* Settings > System Information > Unused RAM bar background */
+.css-7p5u54 {
+	background: var(--background-5)
+}
+
+/* Section separator */
+hr {
+	border-color: var(--background-5)
+}
+
+/* Self Explanatory */
+.setting.log-box {
+	background: var(--background-2) !important;
+	border: 2px solid var(--border-1) !important;
+	border-radius: var(--border-radius-mid) !important
+}
+/* Logs text color */
+.log-info {
+	color: var(--foreground-2)
+}
+
+/* Text in disabled input field */
+.css-qiwgdb.Mui-disabled {
+	-webkit-text-fill-color: var(--background-6)
+}
+
+.howLongToBeat .circle.green {
+	border: 2px solid var(--accent) !important
+}
+
+::-webkit-scrollbar-thumb {
+	background: var(--accent);
+	border: none
+}
+
+:focus-visible {
+	outline: 1px solid var(--background-5);
+	border-radius: var(--border-radius-mid)
+}
+
+.css-oluo6v.Mui-focusVisible {
+	background: var(--background-1)
+}
+
+/* Virtual Keyboard */
+.hg-theme-default,
+.simple-keyboard-wrapper[open] {
+	background: var(--background-1)
+}
+
+.hg-theme-default .hg-button {
+	background: var(--background-0);
+	border: 1px solid var(--border-1);
+	border-bottom: 2px solid var(--border-1);
+	margin: 2px;
+}

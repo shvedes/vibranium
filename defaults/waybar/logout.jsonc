@@ -1,0 +1,7 @@
+{
+	"custom/logout": {
+		"format": "\uf08b",
+		"tooltip-format": "Log out",
+		"on-click": "vibranium-menu-power"
+	}
+}

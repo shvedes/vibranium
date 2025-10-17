@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+INDEX=0
+
+while true; do
+	source "$VIBRANIUM_USER_SETTINGS"
+	OPTIONS=(
+		"Fade in / out on Next / Previous : ${VIBRANIUM_PLAYERCTL_FADE_DURATION_ON_SWITCH//_/ }"
+		"Fade in / out on Play / Pause    : ${VIBRANIUM_PLAYERCTL_FADE_DURATION//_/ }"
+		"What is this?"
+	)
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Playerctl" "ESC to go back" -selected-row "$INDEX")"
+	[[ -z "$CHOSEN" ]] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+	case "$CHOSEN" in
+		*"Previous"*)
+			while true; do
+				next_prev_options=("very slow" "slow" "normal" "fast" "very fast" "off")
+				next_prev_chosen="$(printf "%s\n" "${next_prev_options[@]}" | rofi_cmd "Next / Prev" "ESC to go back")"
+				[[ -z "$next_prev_chosen" ]] && break
+
+				case "$next_prev_chosen" in
+					"very slow"|"slow"|"normal"|"fast"|"very fast"|"off")
+						option-validate "VIBRANIUM_PLAYERCTL_FADE_DURATION_ON_SWITCH"
+						sed -i "/^VIBRANIUM_PLAYERCTL_FADE_DURATION_ON_SWITCH=/s/=.*/=\"${next_prev_chosen// /_}\"/" "$VIBRANIUM_USER_SETTINGS"
+						break
+						;;
+					*) continue ;;
+				esac
+			done
+			;;
+		*"Play"*)
+			while true; do
+				play_pause_options=("very slow" "slow" "normal" "fast" "very fast" "off")
+				play_pause_chosen="$(printf "%s\n" "${play_pause_options[@]}" | rofi_cmd "Play / Pause" "ESC to go back")"
+				[[ -z "$play_pause_chosen" ]] && break
+
+				case "$play_pause_chosen" in
+					"very slow"|"slow"|"normal"|"fast"|"very fast"|"off")
+						option-validate "VIBRANIUM_PLAYERCTL_FADE_DURATION"
+						sed -i "/^VIBRANIUM_PLAYERCTL_FADE_DURATION=/s/=.*/=\"${play_pause_chosen// /_}\"/" "$VIBRANIUM_USER_SETTINGS"
+						break
+						;;
+					*) continue ;;
+				esac
+			done
+			;;
+		"What is this?")
+			msg="Controls the fade-in/out duration when pausing, resuming, or changing tracks.\n"
+			msg+="It's purely aesthetic - set both options to off if you don't need it"
+			notify-send -r 3 -t 15000 "What is this?" "$msg"
+			INDEX=0
+			;;
+	esac
+done

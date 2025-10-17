@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+if [ $(id -u) -ne 0 ]; then
+	exit 1
+fi
+
+URL='https://github.com/Vendicated/VencordInstaller/releases/latest/download/VencordInstallerCli-Linux'
+CLI="/tmp/vencord-installer"
+wget -q $URL -O "$CLI"
+chmod +x "$CLI"
+
+$CLI -install -install-openasar -location /opt/discord &>/dev/null
+rm "$CLI"

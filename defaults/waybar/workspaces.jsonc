@@ -1,0 +1,7 @@
+{
+	"hyprland/workspaces": { 
+		"format": "{icon}",
+		"persistent-workspaces": { "*": 10 },
+		"format-icons":{ "active": "<span size='small'>\udb85\udcfb</span>" }
+	}
+}

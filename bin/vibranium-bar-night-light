@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+
+state="$(<"$VIBRANIUM_STATE/night-light")"
+
+if [[ "$state" == "active" ]]; then
+	icon="<span foreground='${P_YELLOW}'>\\udb83\\udf65</span>"
+	current="$(grep -oP '(?<=temperature = ).*' "$XDG_CONFIG_HOME/hypr/hyprsunset.conf")"
+
+	# color=$([[ "$state" = "active" ]] && echo "$P_GREEN" || echo "$P_RED")
+	# guide="<span foreground='${P_ACCENT}'>Night Light: </span><span foreground='${color}'>$state</span>\n"
+	guide+="<span foreground='${P_ACCENT}'>Night Light temperature:</span> <span foreground='${P_YELLOW}'>${current}K</span>"
+
+	if [[ $VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS = true ]]; then
+		guide="      $guide"
+		guide+="\n<span foreground='${P_GRAY}'>----------------------------------</span>"
+		guide+="\n <span foreground='${P_ACCENT}'>Scroll wheel:</span> <span foreground='${P_YELLOW}'>adjust temperature</span>"
+		guide+="\n <span foreground='${P_ACCENT}'>Left click:</span>   <span foreground='${P_YELLOW}'>toggle night light</span>"
+	fi
+
+	printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$guide"
+else
+	printf '{"text": ""}'
+fi

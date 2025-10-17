@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+USER="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{print $3}')"
+runuser -l "$USER" -c 'spicetify backup apply &>/dev/null'

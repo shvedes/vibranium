@@ -1,0 +1,9 @@
+{
+	"custom/worker": {
+		"exec": "vibranium-bar-worker",
+		"return-type": "json",
+		"on-click": "true",
+		"format": "{}",
+		"signal": 11
+	}
+}

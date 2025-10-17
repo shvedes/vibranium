@@ -1,0 +1,18 @@
+[font]
+size = 10
+
+[colors]
+draw_bold_text_with_bright_colors = true
+
+[selection]
+save_to_clipboard = true
+
+[window]
+opacity         = 0.95
+dynamic_padding = true
+dynamic_title	= true
+startup_mode	= "Windowed"
+padding         = { x = 10, y = 10 }
+
+[general]
+live_config_reload = true

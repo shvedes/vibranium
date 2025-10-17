@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+fonts=$(fc-list :spacing=100 -f "%{family[0]}\n" | grep -viE 'emoji|signwriting|symbols' | sort -u) # Source: Omarchy
+selected="$(printf '%s' "$fonts" | rofi_cmd "Search fonts" "ESC to go back" )"
+
+if [[ -z "$selected" ]]; then
+	exit 1
+fi
+
+if [[ "$selected" == "$(vibranium-font-get)" ]]; then
+	notify-send -r 1 -t 2000 "Vibranium" "<span foreground='${P_ACCENT}'><b>$selected</b></span> is already the default font!"
+	exit 1
+fi
+
+# GTK
+sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected}/" "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected}/" "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
+gsettings set org.gnome.desktop.interface font-name "${selected}"
+
+# Alacritty
+sed -i -E "s/(family\s*=\s*\").*(\")/\1${selected}\2/" "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+
+# Waybar
+sed -i -E "/window#waybar\s*\{/,/\}/ {
+	s/^\s*font-family:\s*'Symbols Nerd Font Mono',\s*'.*';/    font-family: 'Symbols Nerd Font Mono', '${selected}';/
+}" "$XDG_CONFIG_HOME/waybar/style.css"
+
+# QT6CT
+sed -i -E "/^(fixed|general)=/ s@^([^,\"]*=\")[^,\"]*@\1${selected}@" "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
+
+# Dunst
+if [ ! -f "$XDG_CONFIG_HOME/dunst/dunstrc" ]; then
+	mkdir -p "$XDG_CONFIG_HOME/dunst"
+	printf "[global]\nfont = \"%s 9\"" "$selected" > "$XDG_CONFIG_HOME/dunst/dunstrc"
+elif ! grep font "$XDG_CONFIG_HOME/dunst/dunstrc" &>/dev/null; then
+	printf "\nfont = \"%s 9\"" "$selected" >> "$XDG_CONFIG_HOME/dunst/dunstrc"
+else
+	sed -i -E "/^font[[:space:]]*=/ s/(=\s*\")[^\"]* ([0-9]+\")/\1${selected} \2/" "$XDG_CONFIG_HOME/dunst/dunstrc"
+fi
+
+# Rofi
+sed -i -E "s/(^font:\s*).*/\1\"${selected}\";/" "$XDG_CONFIG_HOME/rofi/config.rasi"
+
+# Discord CSS
+# sed -i -E "s/$(vibranium-font-get)/${selected}/g" "$XDG_CONFIG_HOME/vibranium/theme/current/discord.css"
+
+# Discord theme symlinks
+# for folder in "Vencord" "vesktop"; do
+# 	cfg="$XDG_CONFIG_HOME/${folder}/themes/vibranium.theme.css"
+# 	if [[ -f "$cfg" ]]; then
+# 		rm -f "$cfg"
+# 		ln -s "$XDG_CONFIG_HOME/vibranium/theme/current/discord.css" "$cfg"
+# 	fi
+# done
+
+# Reload dunst
+vibranium-cmd-refresh-dunst
+
+notify-send -r 1 -t 2000 "Vibranium" "Default font changed to <span foreground='${P_ACCENT}'><b>${selected}</b></span>"

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+check_enum VIBRANIUM_GLOBAL_POWER_MENU_STYLE "overlay" overlay menu
+
+case "$VIBRANIUM_GLOBAL_POWER_MENU_STYLE" in
+	"overlay")
+
+		if ! command -v wlogout >/dev/null; then
+			msg="Cannot display power menu with type <span foreground='${P_YELLOW}'>${VIBRANIUM_GLOBAL_POWER_MENU_STYLE}</span>;\n"
+			msg+="Command <span foreground='${P_YELLOW}'>wlogout</span> not found\n"
+			msg+="Using fallback <span foreground='${P_YELLOW}'>menu</span>"
+			notify-send -r 4 -u critical -t 5000 "System" "$msg"
+
+			vibranium-core-launcher --power
+		else
+			if pidof wlogout > /dev/null; then
+				killall wlogout
+				exit 1
+			fi
+			wlogout &>/dev/null
+		fi
+		;;
+	"menu")
+		vibranium-core-launcher --power
+		;;
+esac

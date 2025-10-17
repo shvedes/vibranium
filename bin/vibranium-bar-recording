@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+
+source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+source "$VIBRANIUM_PATH/vibranium-core-defaults"
+source "$XDG_CONFIG_HOME/vibranium/settings"
+
+if ! pidof gpu-screen-recorder &>/dev/null; then
+    printf '{"text": ""}'
+    exit 0
+fi
+
+icon="\uf28d"
+tooltip=" <span foreground='${P_ACCENT}'><b>Screen recording is active</b></span> \n"
+
+if [[ $VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS == true ]]; then
+    tooltip+="<span foreground='${P_GRAY}'>----------------------------</span>\n"
+    tooltip+=" <span foreground='${P_ACCENT}'><b>CTRL ALT + R:</b></span> "
+    tooltip+="<span foreground='${P_RED}'><b>stop recording</b></span>\n "
+    tooltip+="<span foreground='${P_ACCENT}'><b>Left click:</b></span>   "
+    tooltip+="<span foreground='${P_RED}'><b>stop recording</b></span> "
+else
+    tooltip+="<span foreground='${P_GRAY}'>----------------------------</span>\n"
+    tooltip+=" <span foreground='${P_RED}'><b>\tclick to stop</b></span> "
+fi
+
+printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"

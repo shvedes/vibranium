@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+# Move Waybar and Dunst to top or bottom.
+# Usage: ./script.sh [-q] top|bottom
+# -q : quiet mode (no notification)
+# Updates configs, restarts Waybar, refreshes Dunst.
+
+CURRENT_POSITION="$(grep position "$XDG_CONFIG_HOME/waybar/config.jsonc" | awk -F'"' '{print $4}')"
+
+if [ -z "$1" ]; then
+	echo "Usage: ./$(basename "$0") [-q] top|bottom"
+	exit 1
+fi
+
+if [[ "$1" == "-q" ]]; then
+	quiet=true
+	move_to="${2,,}"
+else
+	quiet=false
+	move_to="${1,,}"
+fi
+
+if [[ -z "$move_to" ]]; then
+	echo "Usage: ./$(basename "$0") [-q] top|bottom"
+	exit 1
+fi
+
+if [[ "$CURRENT_POSITION" == "$move_to" ]]; then
+	exit 0
+fi
+
+case ${move_to} in
+	"top")
+		sed -i "/position/s/${CURRENT_POSITION}/top/" \
+			"$XDG_CONFIG_HOME/waybar/config.jsonc"
+		if [ ! -f "$XDG_CONFIG_HOME/dunst/dunstrc" ]; then
+			mkdir -p "$XDG_CONFIG_HOME/dunst"
+			printf "[global]\norigin = top-right" > \
+				"$XDG_CONFIG_HOME/dunst/dunstrc"
+		elif ! grep origin "$XDG_CONFIG_HOME/dunst/dunstrc" &>/dev/null; then
+			printf "\norigin = top-right" >> \
+				"$XDG_CONFIG_HOME/dunst/dunstrc"
+		else
+			sed -i "/origin/s/${CURRENT_POSITION}/top/" \
+				"$XDG_CONFIG_HOME/dunst/dunstrc"
+		fi
+		;;
+	"bottom")
+		sed -i "/position/s/${CURRENT_POSITION}/bottom/" \
+			"$XDG_CONFIG_HOME/waybar/config.jsonc"
+		if [ ! -f "$XDG_CONFIG_HOME/dunst/dunstrc" ]; then
+			mkdir -p "$XDG_CONFIG_HOME/dunst"
+			printf "[global]\norigin = bottom-right" > \
+				"$XDG_CONFIG_HOME/dunst/dunstrc"
+		elif ! grep origin "$XDG_CONFIG_HOME/dunst/dunstrc" &>/dev/null; then
+			printf "\norigin = bottom-right" >> \
+				"$XDG_CONFIG_HOME/dunst/dunstrc"
+		else
+			sed -i "/origin/s/${CURRENT_POSITION}/bottom/" \
+				"$XDG_CONFIG_HOME/dunst/dunstrc"
+		fi
+		;;
+	*)
+		echo "Invalid target: $move_to"
+		exit 1
+		;;
+esac
+
+# At first glance, systemctl --user reload waybar would seem to be the ideal solution, and Waybar supports it
+# but unfortunately, when reloading, Waybar loses its connection to Hyprland's IPC, causing the workspaces module to stop working. 
+# As I understand it, this is a universal problem.
+systemctl --user restart waybar
+vibranium-cmd-refresh-dunst
+
+if [[ "$quiet" != true ]]; then
+	notify-send -r 1 -t 1500 "Vibranium" "Bar moved to ${move_to}"
+fi

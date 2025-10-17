@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+
+# Overcomplicated (as usual) script for creating screenshots. 
+# All-in wrapper for grim & slurp with a bunch of user settings on top.
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+usage() {
+    cat << EOF
+Usage:
+    $(basename "$0") area|window|screen
+EOF
+}
+
+# Require an argument or show usage
+if [ $# -lt 1 ] || [[ $1 =~ ^(-h|--help)$ ]] || [[ ! $1 =~ ^(area|window|screen) ]]; then
+    usage
+    exit 0
+fi
+
+if ! missing_str="$(vibranium-utils-is-installed jq grim slurp)"; then
+    read -r -a missing <<< "$missing_str"
+    notify-send -r 2 -t 0 -u critical "$(basename "$0")" "Missing cli utilities: ${missing[*]}"
+    exit 1
+fi
+
+# Prevent running multiple slurp instances
+if pidof slurp > /dev/null 2>&1; then
+	killall slurp
+    exit 0
+fi
+
+notification() {
+    local target message
+    case "$1" in
+        area)   target="Selected area" ;;
+        window) target="Active window" ;;
+        screen) target="Active screen" ;;
+    esac
+
+    check_bool VIBRANIUM_SCREENSHOT_SAVE_TO_DISK false
+    if [[ $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK == true ]]; then
+        message="saved to disk and copied to clipboard"
+    else
+        message="copied to clipboard"
+    fi
+
+    notify-send -r 1 -t 1500 "Screenshot Tool" "$target $message"
+}
+
+# Load and validate settings
+check_enum VIBRANIUM_SCREENSHOT_FILE_TYPE "png" png jpeg jpg ppm
+
+check_bool VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD true
+check_bool VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR false
+
+# Build grim options
+opt_options=()
+
+# If JPEG is selected, we must check whether its quality is set beyond the possible range (0-100)
+if [[ ${VIBRANIUM_SCREENSHOT_FILE_TYPE} =~ (jpeg|jpg) ]]; then
+    check_int VIBRANIUM_SCREENSHOT_JPEG_QUALITY 80 int
+
+    opt_options+=(-t jpeg -q "${VIBRANIUM_SCREENSHOT_JPEG_QUALITY}")
+    log "Quality: '${YELLOW}${VIBRANIUM_SCREENSHOT_JPEG_QUALITY}${RESET}'"
+
+    if is_fullscreen; then
+		# Let's imagine that you are watching a video or playing a video game
+		# and you want to quickly capture a frame to send to a friend or simply enlarge it in a photo editing program.
+		# JPEG compression is great, of course, but right now we need all the details of the image!
+        check_int VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN 100 int
+        log "Found ${YELLOW}fullscreen${RESET} window! Using ${YELLOW}\$VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN${RESET}"
+
+        # Only use fullscreen quality if it's not a reference and greater than current quality
+        if [[ $VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN != "$VIBRANIUM_SCREENSHOT_JPEG_QUALITY" ]] &&
+            ((VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN > VIBRANIUM_SCREENSHOT_JPEG_QUALITY)); then
+
+            # Validate quality bounds
+            if ((VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN > 100)); then
+                log "The value of ${YELLOW}\$VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN${RESET} (${PURPLE}$VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN${RESET}) must be not greater than '${PURPLE}100${RESET}'. Falling back to '${PURPLE}100${RESET}'"
+                VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN=100
+            fi
+
+            log "${YELLOW}\$VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN${RESET} is greater than ${YELLOW}\$VIBRANIUM_SCREENSHOT_JPEG_QUALITY${RESET}! ${GREEN}Reassigning${RESET}!"
+            VIBRANIUM_SCREENSHOT_JPEG_QUALITY=$VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN
+        else
+            log "${YELLOW}\$VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN${RESET} is equal or less than ${YELLOW}\$VIBRANIUM_SCREENSHOT_JPEG_QUALITY${RESET}. There is no point of reassigning."
+        fi
+    fi
+
+    # Validate quality bounds
+    if ((VIBRANIUM_SCREENSHOT_JPEG_QUALITY < 0 || VIBRANIUM_SCREENSHOT_JPEG_QUALITY > 100)); then
+        log "${YELLOW}\$VIBRANIUM_SCREENSHOT_JPEG_QUALITY${RESET} must be between ${PURPLE}0${RESET} and ${PURPLE}100${RESET}. Falling back to ${PURPLE}80${RESET}"
+        VIBRANIUM_SCREENSHOT_JPEG_QUALITY=80
+    fi
+else
+    opt_options+=(-t "${VIBRANIUM_SCREENSHOT_FILE_TYPE}")
+fi
+
+# Determine output file path (disk or RAM)
+if [[ ${VIBRANIUM_SCREENSHOT_SAVE_TO_DISK} == true ]]; then
+	if [[ "$VIBRANIUM_XDG_DIRS_EXPOSED" == true ]]; then
+		output_dir="$(eval "echo $XDG_PICTURES_DIR/Screenshots")"
+	else
+		output_dir="$HOME/Screenshots"
+	fi
+
+    # Ensure output directory exists
+    mkdir -p "$output_dir"
+
+	# TODO: Allow the user to change the date format in the Vibranium settings. 
+	# Currently, it uses EU time by default.
+    output_file="${output_dir}/screenshot_$(date +"${VIBRANIUM_DATE_FORMAT}").${VIBRANIUM_SCREENSHOT_FILE_TYPE}"
+    log "Saving to: '${YELLOW}disk${RESET}'"
+else
+    output_file="${XDG_RUNTIME_DIR}/latest_screenshot.${VIBRANIUM_SCREENSHOT_FILE_TYPE}"
+    log "Saving to: '${YELLOW}RAM (temporary)${RESET}'"
+fi
+
+log "File type: '${YELLOW}${VIBRANIUM_SCREENSHOT_FILE_TYPE}${RESET}'"
+log "Output file: '${YELLOW}${output_file}${RESET}'"
+
+if [[ ${VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR} == true ]]; then
+    opt_options+=(-c)
+    log "Including cursor: '${YELLOW}yes${RESET}'"
+else
+    log "Including cursor: '${YELLOW}no${RESET}'"
+fi
+
+case "$1" in
+    area)
+        log "Screenshot type: '${YELLOW}area${RESET}'"
+        log "Performing actions"
+
+        # Use slurp to select an area; feed geometry to grim via stdin ("-g -")
+		# Yes, we use gray depending on the active theme. Why instead of the usual black with transparency? Um, I don't know. Why not?
+        if ! slurp -d -w 1 -b "${P_GRAY}"33 -c ffffff66 | grim "${opt_options[@]}" -g - "$output_file"; then
+            exit 1
+        fi
+        ;;
+
+    window)
+        check_bool VIBRANIUM_GLOBAL_FLASH_BORDER true
+        check_bool VIBRANIUM_SCREENSHOT_FLASH_BORDER true
+
+        log "Screenshot type: '${YELLOW}window${RESET}'"
+        # Parse active window geometry
+        if ! window_geometry="$(hyprctl -j activewindow | jq -r '.at[0] as $x | .at[1] as $y | .size[0] as $w | .size[1] as $h | "\($x),\($y) \($w)x\($h)"')"; then
+            error "Failed to determine active window geometry"
+            notify-send -r 4 -u critical "Vibranium" "Failed to determine active window geometry"
+            exit 1
+        fi
+
+        # Optionally flash border to indicate target
+        if [[ $VIBRANIUM_GLOBAL_FLASH_BORDER == true ]] && [[ ${VIBRANIUM_SCREENSHOT_FLASH_BORDER} == true ]]; then
+            flash_border &
+        fi
+        log "Performing actions"
+        grim -g "$window_geometry" "${opt_options[@]}" "$output_file"
+        ;;
+
+    screen)
+        check_bool VIBRANIUM_SCREENSHOT_FLASH_SCREEN true
+        check_bool VIBRANIUM_GLOBAL_FLASH_SCREEN true
+
+        log "Screenshot type: '${YELLOW}whole screen${RESET}'"
+        log "Performing actions"
+        grim "${opt_options[@]}" "$output_file"
+
+		if [[ $VIBRANIUM_GLOBAL_FLASH_SCREEN == true ]] && [[ $VIBRANIUM_SCREENSHOT_FLASH_SCREEN == true ]]; then
+			log "${YELLOW}\$VIBRANIUM_SCREENSHOT_FLASH_SCREEN${RESET} is ${YELLOW}'true'${RESET}. Applying flash effect"
+			flash_screen
+		fi
+        ;;
+    *) usage ;;
+esac
+
+# Ensure output file exists
+if [[ ! -f ${output_file} ]]; then
+    exit 1
+fi
+
+# Show notification
+check_bool VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION true
+if [[ $VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION == true ]]; then
+    notification "$1"
+fi
+
+log "Copying to clipboard"
+
+# Copy the image to the Wayland clipboard with the correct MIME type
+if [[ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD == true ]]; then
+    printf "file://%s" "${output_file}"| wl-copy --type text/uri-list
+fi

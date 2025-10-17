@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+
+file="$XDG_RUNTIME_DIR/worker.active"
+
+if [[ -f $file ]]; then
+	if [[ "$(<"$file")" == "suspended" ]]; then
+		tooltip="<span foreground='${P_ACCENT}'>Cache generation suspended due to power profile</span>"
+	else
+		tooltip="<span foreground='${P_ACCENT}'>Background task in progress</span>\n\n"
+		tooltip+="Processing <span foreground='${P_YELLOW}'>$(<"$file")</span>"
+	fi
+	printf '{"text": "%s", "tooltip": "%s"}' "\uf013" "$tooltip"
+else
+	printf '{"text": ""}'
+fi

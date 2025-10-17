@@ -1,0 +1,128 @@
+@import "../vibranium/theme/current/rofi.rasi"
+
+* {
+	background-color: transparent;
+}
+
+configuration {
+	modes : [ drun, ssh, emoji ];
+
+	drun-reload-desktop-cache : true;
+	drun-use-desktop-cache    : true;
+	transient-window          : true;
+	steal-focus               : true;
+	markup                    : true;
+	sort                      : true;
+	fixed-num-lines           : false;
+
+	display-window      : "Windows";
+	display-run         : "Command";
+	display-combi       : "Search";
+	display-emoji       : "Emoji";
+	display-drun        : "Apps";
+	display-ssh         : "SSH";
+
+	drun-display-format : "{name}";
+	matching            : "prefix";
+	drun-match-fields   : "name";
+	monitor             : "-1";
+}
+
+element normal.normal {
+    background-color: var(background);
+    text-color:       var(foreground-muted);
+}
+
+element selected.normal {
+    background-color: var(background);
+    text-color:       var(highlight);
+}
+
+element alternate.normal {
+    background-color: var(background);
+    text-color:       var(foreground-muted);
+}
+
+element-text {
+    background-color: transparent;
+    cursor:           inherit;
+    highlight:        inherit;
+    text-color:       inherit;
+}
+
+window {
+	width:            300px;
+    padding:          12;
+    background-color: var(background);
+    border:           2px;
+	border-color:     var(border);
+}
+
+mainbox {
+    padding: 8px;
+	border:  2px;
+	border-color: var(border);
+}
+
+textbox {
+    text-color: var(foreground);
+}
+
+listview {
+    padding:      12px 4px 0px ;
+    scrollbar:    true;
+    border-color: var(border);
+    spacing:      2px ;
+    fixed-height: 0;
+    border:       2px dash 0px 0px ;
+}
+
+scrollbar {
+    width:        2px ;
+    handle-width: 2px ;
+    handle-color: var(border);
+}
+
+num-filtered-rows {
+    expand:     false;
+    text-color: var(highlight);
+}
+
+num-rows {
+    expand:     false;
+    text-color: var(foreground-muted);
+}
+
+textbox-num-sep {
+    expand:     false;
+    str:        "/";
+    text-color: var(foreground-muted);
+}
+
+inputbar {
+    padding:    6px 6px 6px 6px;
+    text-color: var(foreground);
+    children:   [ "prompt","textbox-prompt-colon","entry","overlay","num-filtered-rows","textbox-num-sep","num-rows"];
+}
+
+prompt {
+	text-color: inherit;
+}
+
+entry {
+    text-color:        var(foreground);
+    placeholder-color: var(foreground-muted);
+    placeholder:       "search";
+}
+
+element-icon {
+	size: 14px;
+	padding: 2px;
+}
+
+textbox-prompt-colon {
+    margin:     0px 2px 0px 0px;
+    expand:     false;
+    str:        ":";
+    text-color: var(foreground-muted);
+}

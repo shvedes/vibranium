@@ -1,0 +1,60 @@
+#001419 # Black Dim
+#1b3239 # Black
+#245964 # Black Bright
+
+#57100f # Red Dim
+#b7221e # Red
+#dc322f # Red Bright
+
+#25285b # Pink Dim
+#494fb6 # Pink
+#6c71c4 # Pink Bright
+
+#2c3300 # Green Dim
+#596600 # Green
+#859901 # Green Bright
+
+#332700 # Yellow Dim
+#664d00 # Yellow
+#b58900 # Yellow Bright
+
+#5c2309 # Orange Dim
+#a13d11 # Orange
+#cb4a15 # Orange Bright
+
+#113956 # Blue Dim
+#1a6497 # Blue
+#278bd2 # Blue Bright
+
+#25285b # Purple Dim
+#494fb6 # Purple
+#6c71c4 # Purple Bright
+
+#113b3d # Cyan Dim
+#196265 # Cyan
+#2aa198 # Cyan Bright
+
+#c7cc84 # White Dim
+#e4e6c3 # White
+#f3efe2 # White Bright
+
+#455c62# # Gray Dim
+#4d696f # Gray
+#53747b # Gray Bright
+
+#001014 # Background Hard
+#001419 # Background 0
+#1b3239 # Background 1
+#00313d # Background 2
+#19454e # Background 3
+#245964 # Background 4
+#2b6b78 # Background 5
+
+#fdf6e3 # Foreground Hard
+#d3d5b4 # Foreground 0
+#b4b693 # Foreground 1
+#919277 # Foreground 2
+#83846c # Foreground 3
+#767762 # Foreground 4
+
+# vim:ft=bash

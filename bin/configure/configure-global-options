@@ -1,0 +1,652 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+INDEX=0
+
+while true; do
+	source "$VIBRANIUM_USER_SETTINGS"
+
+	power_menu_style="$([ "$VIBRANIUM_GLOBAL_POWER_MENU_STYLE" = "overlay" ] && echo overlay || echo menu)"
+
+	if [[ $VIBRANIUM_GLOBAL_USE_OSD == false ]]; then
+		power_profile_osd="Power profile OSD       : $VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD ()"
+	else
+		power_profile_osd="Power profile OSD       : $VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD"
+	fi
+
+	if [[ -z $terminal_opacity ]]; then
+		terminal_opacity="$(sed -nE '/^\[window\]/,/^\[/{s/^[[:space:]]*opacity[[:space:]]*=[[:space:]]*"?([0-9.]+)"?/\1/p}'\
+			"$VIBRANIUM/defaults/alacritty.toml")"
+	else
+		terminal_opacity="$(sed -nE '/^\[window\]/,/^\[/{s/^[[:space:]]*opacity[[:space:]]*=[[:space:]]*"?([0-9.]+)"?/\1/p}'\
+			"$XDG_CONFIG_HOME/alacritty/alacritty.toml")"
+	fi
+
+	OPTIONS=(
+		"Now playing             : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
+		"OSD enabled             : $VIBRANIUM_GLOBAL_USE_OSD"
+	)
+
+
+	if [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]]; then
+		OPTIONS+=(
+			"Flash border            : $VIBRANIUM_GLOBAL_FLASH_BORDER ()"
+			"Flash screen            : $VIBRANIUM_GLOBAL_FLASH_SCREEN ()"
+		)
+	else
+		OPTIONS+=(
+			"Flash border            : $VIBRANIUM_GLOBAL_FLASH_BORDER"
+			"Flash screen            : $VIBRANIUM_GLOBAL_FLASH_SCREEN"
+		)
+	fi
+
+	OPTIONS+=(
+		"Confirm to kill         : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
+		"Blur lockscreen         : $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND"
+		"Power menu style        : $power_menu_style"
+		"Copy to clipboard       : $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD"
+		"$power_profile_osd"     
+		"Pause music on lock     : $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+		"Welcome notification    : $VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION"
+		"Respect power profile   : $VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
+		"Terminal transparency   : $terminal_opacity"
+		"Video downscale use GPU : $VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU"
+		"========================"
+		"App launcher settings"
+		"Playerctl options"
+		"Notifications"
+		"Edit env vars"
+	)
+
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Global options" "ESC to go back" \
+		-selected-row "$INDEX" -theme-str 'listview{lines: 30;}')"
+	[ -z "$CHOSEN" ] && break
+	
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+			INDEX="$i"
+			break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Playerctl options")
+			configure-playerctl
+			;;
+		"Video downscale"*)
+			while true; do
+				downscale_options=(
+					"Use GPU when possible : $VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU"
+					"README"
+				)
+				downscale_chosen="$(printf "%s\n" "${downscale_options[@]}" | rofi_cmd "Video downscale" "ESC to go back")"
+				[[ -z "$downscale_chosen" ]] && break
+
+				case "$downscale_chosen" in
+					"Use"*)
+						toggle_bool "VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU"
+						break
+						;;
+					"README")
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>"
+						msg+="Whether to use GPU encoders when processing a video</b></span>\n\n"
+						msg+="<span foreground='${P_RED}'>Please ensure that you have installed all necessary GPU drivers</span>\n\n"
+						msg+="Keep in mind that, although using a GPU for video processing may be faster and more power efficient, "
+						msg+="the result is usually slightly worse than with CPU.\n\nIf your goal is to significantly reduce file size "
+						msg+="while losing as little detail as possible, a CPU is better suited for the task."
+						notify-send -r 3 -t 20000 "Vibranium" "$msg"
+						continue
+						;;
+				esac
+			done
+		;;
+		"Edit env vars")
+			vibranium-cmd-launch-terminal "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
+			vibranium-cmd-kill-rofi
+			exit 0
+			;;
+		"Terminal"*)
+			while true; do
+				alacritty_config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+				prompt="Terminal transparency (float)"
+				input="$(printf "%s" "$prompt" | rofi_cmd "Terminal transparency" "0.0 - 1.0")"
+				[[ -z "$input" ]] && break
+				[[ "$prompt" == "$input" ]] && continue
+				if [[ ! "$input" =~ ^[0-9]+(\.[0-9]{1,2})?$ ]]; then
+					notify-send -r 2 -u critical -t 1500 "Vibranium" \
+						"<span foreground='${P_RED}'>A floating point between 0.0 and 1.0!</span>"
+					continue
+				fi
+
+				if awk -v x="$input" 'BEGIN{exit !(x ~ /^[0-9]*\.?[0-9]+$/ && x>=0 && x<=1)}'; then
+					if [[ "$input" == 1 ]]; then
+						input="1.0"
+					fi
+					if ! grep "\[window\]" "$alacritty_config" >/dev/null; then
+						printf "\n\n[window]\nopacity = %s" "$input" >> "$alacritty_config"
+					else
+						sed -i -E '/^\[window\]/,/^\[/{s/^([[:space:]]*opacity[[:space:]]*=[[:space:]]*)"?[0-9.]+("?)/\1'"$input"'\2/}' "$alacritty_config"
+					fi
+					break
+				else
+					notify-send -r 2 -u critical -t 1500 "Vibranium" \
+						"<span foreground='${P_RED}'>A floating point between 0.0 and 1.0!</span>"
+					continue
+				fi
+
+			done
+			;;
+		"Flash"*"()")
+			msg="<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_RED}'><b>"
+			msg+="This option is locked because animations disabled</b></span>"
+			notify-send -r 1 "Vibranium" "$msg"
+			continue
+			;;
+		"Power profile"*"()")
+			msg="<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_RED}'><b>"
+			msg+="This option is locked because <span foreground='${P_YELLOW}'>'OSD enabled'</span> is disabled globally</b></span>"
+			notify-send -r 1 "Vibranium" "$msg"
+			continue
+			;;
+		"Power profile"*)
+			toggle_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD
+			;;
+		"Copy to clipboard"*)
+			while true; do
+				copy_to_clipboard_options=("Copy to clipboard : $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD" "What is this?")
+				copy_to_clipboard_chosen="$(printf "%s\n" "${copy_to_clipboard_options[@]}" | rofi_cmd "Copy to clipboard" "ESC to go back")"
+				[ -z "$copy_to_clipboard_chosen" ] && break
+
+				case "$copy_to_clipboard_chosen" in
+					"Copy"*)
+						toggle_bool "VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD"
+						break
+						;;
+					"What"*)
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>"
+						msg+="Whether to automatically copy to clipboard when working with files</b></span>\n\n"
+						msg+="This could be a <span foreground='${P_YELLOW}'><b>screenshot</b></span>, a recorded or downscaled "
+						msg+="<span foreground='${P_YELLOW}'><b>video</b></span>, or any\nother type of file operation"
+						notify-send -r 3 -t 15000 "What is this?" "$msg"
+						continue
+				esac
+			done
+			;;
+		"Now playing"*)
+
+			now_playing_index=0
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+				now_playing_options=(
+					"Now playing notification : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
+					"Show on lock screen      : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
+					"Include album art        : $VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART"
+					"What is this?"
+				)
+				now_playing_chosen="$(printf "%s\n" "${now_playing_options[@]}" \
+					| rofi_cmd "Now playing" "ESC to go back" -selected-row "$now_playing_index")"
+				[ -z "$now_playing_chosen" ] && break
+
+				for i in "${!now_playing_options[@]}"; do
+					if [ "${now_playing_options[$i]}" = "$now_playing_chosen" ]; then
+						now_playing_index="$i"
+						break
+					fi
+				done
+
+				if [ "$now_playing_index" -eq 2 ]; then
+					now_playing_index=0
+				fi
+
+				case "$now_playing_chosen" in
+					"Show"*)
+						toggle_bool "VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
+						continue
+						;;
+					"Now"*)
+						toggle_bool "VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
+						continue
+						;;
+					"Include"*)
+						toggle_bool "VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART"
+						continue
+						;;
+					"What"*)
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>"
+						msg+="Whether to show 'Now Playing' notification after session unlock</b></span>\n\n"
+						msg+="Note that when '<span foreground='${P_YELLOW}'><b>Include album art</b></span>' is "
+						msg+="'<span foreground='${P_GREEN}'><b>true</b></span>' and a web-based player is used, it\n"
+						msg+="takes some time to download an album art from the internet in order to display"
+						notify-send -r 3 -t 15000 "What is this?" "$msg"
+						continue
+				esac
+			done
+		;;
+		"Blur"*)
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+
+				if [[ $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND == false ]]; then
+					blur_lockscreen_options=(
+						"Blur background : $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND"
+						"Dim strength    : $VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH"
+					)
+				else
+					blur_lockscreen_options=(
+						"Blur background : $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND"
+						"Blur strength   : $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH"
+					)
+				fi
+
+				blur_lockscreen_chosen="$(printf "%s\n" "${blur_lockscreen_options[@]}" | rofi_cmd "Lockscreen background" "ESC to go back")"
+				[[ -z $blur_lockscreen_chosen ]] && break
+
+				case "$blur_lockscreen_chosen" in
+					"Blur background"*)
+						toggle_bool VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND
+						vibranium-cmd-launch-cmd vibranium-utils-lockscreen-cache &
+						continue
+						;;
+					"Blur strength"*)
+						while true; do
+							blur_strength_options=("low" "mid" "hard")
+							blur_strength_chosen="$(printf "%s\n" "${blur_strength_options[@]}" | rofi_cmd "Blur strength" "ESC to go back")"
+							[[ -z $blur_strength_chosen ]] && break; [[ $blur_strength_chosen == "$VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH" ]] && break
+
+							if [[ ! ${blur_strength_options[*]} =~ $blur_strength_chosen ]]; then
+								continue
+							else
+								option-validate VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH
+								sed -i "/VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH/s/=.*/=\"${blur_strength_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+								vibranium-utils-update-lockscreen
+								vibranium-utils-lockscreen-cache &
+								break
+							fi
+						done
+						;;
+					"Dim strength"*)
+						while true; do
+							dim_strength_options=("low" "mid" "hard")
+							dim_strength_chosen="$(printf "%s\n" "${dim_strength_options[@]}" | rofi_cmd "Dim strength" "ESC to go back")"
+							[[ -z $dim_strength_chosen ]] && break; [[ $dim_strength_chosen == "$VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH" ]] && break
+
+							if [[ ! ${dim_strength_options[*]} =~ $dim_strength_chosen ]]; then
+								continue
+							else
+								option-validate VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH
+								sed -i "/VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH/s/=.*/=\"${dim_strength_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+								vibranium-utils-lockscreen-cache &
+								break
+							fi
+						done
+				esac
+			done
+		;;
+		"Pause"*)
+			while true; do
+				pause_on_lock_options=(
+					"Pause music on session lock : $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+					"What is this?"
+				)
+				pause_on_lock_chosen="$(printf "%s\n" "${pause_on_lock_options[@]}" | rofi_cmd "Pause music on lock" "ESC to go back")"
+				[ -z "$pause_on_lock_chosen" ] && break
+
+				case "$pause_on_lock_chosen" in
+					"Pause"*)
+						toggle_bool "VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+						break
+					;;
+					"What"*)
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>Whether to pause "
+						msg+="the active music when locking session</b></span>\n\n"
+						msg+="When enabled, music will fade out when the screen is\nlocked and fade back in when it is unlocked."
+						notify-send -r 3 -t 15000 "What is this?" "$msg"
+						continue
+				esac
+			done
+			;;
+		"Welcome"*)
+			while true; do
+				welcome_back_options=("Welcome notification : $VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION" "What is this?")
+				welcome_back_chosen="$(printf "%s\n" "${welcome_back_options[@]}" | rofi_cmd "Welcome back" "ESC to go back")"
+				[ -z "$welcome_back_chosen" ] && break
+
+				case "$welcome_back_chosen" in
+					"Welcome"*)
+						toggle_bool "VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION"
+						break
+					;;
+					"What"*)
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>Whether to show the "
+						msg+="'<span foreground='${P_YELLOW}'>Welcome back, ${USER}!</span>' "
+						msg+="notification when unlocking session</b></span>\n\n"
+						notify-send -r 3 -t 15000 "What is this?" "$msg"
+						continue
+				esac
+			done
+			;;
+		"App"*)
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+				app_launcher_options=(
+					"Show app icons : $(vibranium-cmd-get-option VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS)"
+					"Auto select    : $(vibranium-cmd-get-option VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT)"
+				)
+				app_launcher_chosen="$(printf "%s\n" "${app_launcher_options[@]}" | rofi_cmd "App launcher" "ESC to go back")"
+				[[ -z $app_launcher_chosen ]] && break;
+
+				case "$app_launcher_chosen" in
+					"Show"*)
+						toggle_bool "VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
+						continue
+						;;
+					"Auto"*)
+						while true; do
+							auto_select_options=("Auto select : $(vibranium-cmd-get-option VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT)" "What is this?")
+							auto_select_chosen="$(printf "%s\n" "${auto_select_options[@]}" | rofi_cmd "Auto select" "ESC to go back")"
+							[[ -z $auto_select_chosen ]] && break
+
+							case "$auto_select_chosen" in
+								"Auto"*)
+									toggle_bool "VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
+									break
+									;;
+								"What"*)
+										msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>Whether to automatically select the last remaining entry</b></span>\n\n"
+										msg+="When only one entry remains in the menu after filtering, automatically launch it.\n"
+										msg+="This can significantly speed up application launch and menu navigation, but may seem inconvenient at first.\n\n"
+										# msg+="<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_RED}'><b>This does not affect the clipboard menu</b></span>"
+										notify-send -r 3 -t 15000 "What is this?" "$msg"
+										continue
+									;;
+							esac
+						done
+						;;
+				esac
+			done
+			;;
+		"Notifications")
+			while true; do
+				if [[ -n $current_height ]]; then
+					unset current_height
+				fi
+
+				current_height="$(sed -n 's/.*progress_bar_height[[:space:]]*=[[:space:]]*\([0-9]\+\).*/\1/p' "$XDG_CONFIG_HOME/dunst/dunstrc")"
+				notification_options=("Progress bar height : ${current_height}px")
+				notification_chosen="$(printf "%s\n" "${notification_options[@]}" | rofi_cmd "Notifications" "")"
+				[[ -z "$notification_chosen" ]] && break
+
+				case "$notification_chosen" in
+					"Progress"*)
+						while true; do
+							prompt="Progress bar height (in px)"
+							input="$(printf "%s" "$prompt" | rofi_cmd "Height" "int (10px-25px)")"
+							[[ -z "$input" ]] && break
+							[[ "$prompt" == "$input" ]] && continue
+							[[ ! "$input" =~ ^[0-9]+$ ]] && continue
+		
+							if (( input < 10 || input > 25 )); then
+								notify-send -r 2 -t 1500 -u critical "Vibranium" "A value between 10px and 25px"
+								continue
+							fi
+							
+							if [ ! -f "$XDG_CONFIG_HOME/dunst/dunstrc" ]; then
+								mkdir -p "$XDG_CONFIG_HOME/dunst"
+								printf "[global]\nprogress_bar_height = %s" "$input" >\
+									"$XDG_CONFIG_HOME/dunst/dunstrc"
+							elif ! grep progress_bar_height &> /dev/null; then
+								printf "\nprogress_bar_height = %s" "$input" >>\
+									"$XDG_CONFIG_HOME/dunst/dunstrc"
+							else
+								sed -i -E "s/(progress_bar_height[[:space:]]*=[[:space:]]*)[0-9]+/\1${input}/" "$XDG_CONFIG_HOME/dunst/dunstrc"
+							fi
+							vibranium-cmd-refresh-dunst
+							break
+						done
+				esac
+			done
+			;;
+		"Respect"*)
+			while true; do
+				respect_power_profile_options=(
+					"Respect power profile : $VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
+					"What is this?"
+				)
+				respect_power_profile_chosen="$(printf "%s\n" "${respect_power_profile_options[@]}" | rofi_cmd "Respect power profile" "ESC to go back")"
+				[ -z "$respect_power_profile_chosen" ] && break
+
+				case "$respect_power_profile_chosen" in
+					"Respect"*)
+						# Ok, so imagine this: user sets VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE to false, then
+						# uses blur for a while in, let’s say, power-saver mode. When the user decides to turn
+						# VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE back on, blur will disappear (if in power-saver,
+						# as expected). That’s fine, that’s how it should work. But when the user switches to a
+						# non–power-saver profile, blur won’t restore on its own. The logic below uses a state
+						# file to handle that.
+						conf="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
+
+						# $ time hyprctl -j getoption decoration:blur:enabled | jq '.set'
+						#
+						# real  0m0.004s
+						# user  0m0.003s
+						# sys   0m0.002s
+						#
+						# $ time <sed command below>
+						#
+						# real  0m0.001s
+						# user  0m0.001s
+						# sys   0m0.000s
+						#
+						# Call me crazy, I don’t care
+						blur_enabled="$(sed -n '/decoration[[:space:]]*{/,/}/{/blur[[:space:]]*{/,/}/{s/.*enabled[[:space:]]*=[[:space:]]*\([^;]*\).*/\1/p}}' "$conf" 2>/dev/null)"
+
+						# One-time execution at this point
+						[ -z "$blur_enabled" ] && blur_enabled="$(vibranium-cmd-edit-wm-config decoration:blur:enabled:"$(hyprctl -j getoption decoration:blur:enabled | jq '.set')" "$conf")"
+
+						if [ "$(toggle_bool -v "VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE")" = "true" ]; then
+							# If on power-saver and blur is on → disable blur and save blur status for later restore
+							if [[ "$(vibranium-utils-power-profile-get)" == "power-saver" && "$blur_enabled" == true ]]; then
+								touch "$VIBRANIUM_STATE/blur.restore"
+								vibranium-cmd-toggle-blur
+							fi
+						else
+							# Coming from VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE = true → false
+							# Restore blur
+							if [[ -f "$VIBRANIUM_STATE/blur.restore" ]] && [[ $blur_enabled = false ]]; then
+								rm "$VIBRANIUM_STATE/blur.restore"
+								vibranium-cmd-toggle-blur
+							fi
+						fi
+						break
+					;;
+					"What"*)
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>Whether to respect the active power profile when processing compute tasks</b></span>\n\n"
+						msg+="When enabled, power and GPU hungry processes like cache generation, blur,\ncompute tasks, etc will be suspended on "
+						msg+="'<span foreground='${P_GREEN}'>power-saver</span>' power profile"
+						# msg+="When enabled, background processes like lockscreen background pre-caching are suspended until the power profile switches to " 
+						# msg+="'<span foreground='${P_YELLOW}'><b>Balanced</b></span>' or '<span foreground='${P_RED}'><b>Performance</b></span>'"
+						notify-send -r 3 -t 15000 "What is this?" "$msg"
+						continue
+				esac
+			done
+			;;
+		"OSD enabled"*)
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+				current_height="$(sed -n 's/.*min-height:[[:space:]]*\([0-9]\+\)px.*/\1/p' "$XDG_CONFIG_HOME/swayosd/style.css")"
+
+				osd_options=(
+					"OSD enabled         : $VIBRANIUM_GLOBAL_USE_OSD"
+				)
+
+				if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == false ]]; then
+					osd_options+=("Progress bar height : ${current_height}px ()")
+				else
+					osd_options+=("Progress bar height : ${current_height}px")
+				fi
+
+				osd_chosen="$(printf "%s\n" "${osd_options[@]}" | rofi_cmd "OSD" "")"
+				[[ -z "$osd_chosen" ]] && break
+
+				case "$osd_chosen" in
+					*"()")
+						continue
+						;;
+					"OSD enabled"*)
+						if [[ "$(toggle_bool -v "VIBRANIUM_GLOBAL_USE_OSD")" == "false" ]]; then
+							systemctl --user disable --now swayosd &
+						else
+							systemctl --user enable --now swayosd &
+						fi
+						;;
+					"Progress"*)
+						while true; do
+							prompt="Progress bar height (in px)"
+							input="$(printf "%s" "$prompt" | rofi_cmd "Height" "int (8px-32px)")"
+							[[ -z "$input" ]] && break; [[ "$prompt" == "$input" ]] && continue
+							[[ ! "$input" =~ ^[0-9]+$  ]] && continue
+
+							if (( input < 8 || input > 32 )); then
+								notify-send -r 2 -t 1500 -u critical "Vibranium" "A value between 8px and 32px!"
+								continue
+							fi
+							
+							sed -i "/min-height/s/:.*/:\t${input}px;/" "$XDG_CONFIG_HOME/swayosd/style.css"
+							systemctl --user restart swayosd
+							break
+						done
+				esac
+			done
+
+			;;
+		"Confirm"*)
+			while true; do
+				confirm_to_kill_options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "What is this?")
+				confirm_to_kill_chosen="$(printf "%s\n" "${confirm_to_kill_options[@]}" | rofi_cmd "Confirm to kill" "ESC to go back")"
+				[ -z "$confirm_to_kill_chosen" ] && break
+
+				case "$confirm_to_kill_chosen" in
+					"Confirm"*)
+						toggle_bool "VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
+						break
+					;;
+					"What"*)
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>Whether to confirm action when triggering the kill window shortcut</b></span>\n"
+						msg+="<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_YELLOW}'><b>Setting it to true helps prevent accidental force window kills</b></span>\n\n"
+						msg+="      When the <span foreground='${P_RED}'><b>force window kill shortcut is triggered</b></span>, this\n      option asks you to press it again to confirm the action"
+						notify-send -r 3 -t 15000 "What is this?" "$msg"
+						continue
+				esac
+			done
+			;;
+		"Flash border"*)
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+				flash_border_options=(
+					"Flash border   : $VIBRANIUM_GLOBAL_FLASH_BORDER"
+					"Duration       : ${VIBRANIUM_GLOBAL_FLASH_BORDER_DURATION}s" "What is this?"
+				)
+				flash_border_chosen="$(printf "%s\n" "${flash_border_options[@]}" | rofi_cmd "Flash border" "ESC to go back")"
+				[ -z "$flash_border_chosen" ] && break
+
+				case "$flash_border_chosen" in
+					"Flash"*)
+						toggle_bool "VIBRANIUM_GLOBAL_FLASH_BORDER"
+						break
+						;;
+					"Duration"*)
+						while true; do
+							prompt="Flashing effect duration (in seconds)"
+							input="$(printf "%s\n" "$prompt" | rofi_cmd "Flash duration" "Duration (0.1s - 1.0s)")"
+							[ -z "$input" ] && break; [ "$input" = "$prompt" ] && continue
+
+							if ! [[ "$input" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+								notify-send -r 5 -u critical -t 1500 "Vibranium" "Only integers or floats allowed!"
+								continue
+							fi
+
+							if ! awk "BEGIN { exit !($input >= 0.1 && $input <= 1.0) }"; then
+								notify-send -r 5 -u critical -t 1500 "Vibranium" "Between 0.1s and 1s!"
+								continue
+							fi
+
+							sed -i "/^VIBRANIUM_GLOBAL_FLASH_BORDER_DURATION/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
+							break
+						done
+						;;
+					"What"*)
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>Whether to flash a window's border when taking a screenshot</b></span>\n"
+						msg+="<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_YELLOW}'><b>This is a global feature that takes priority over local options</b></span>\n\n"
+						msg+="A purely aesthetic feature that indicates the screen was captured.\n\n"
+						msg+="If the global option is set to '<span foreground='${P_RED}'><b>false</b></span>', no flash effect will be applied\n"
+						msg+="even if this option is set to '<span foreground='${P_GREEN}'><b>true</b></span>' in the screenshot settings."
+						notify-send -r 3 -t 15000 "What is this?" "$msg"
+						continue
+				esac
+			done
+			;;
+		"Flash screen"*)
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+				flash_screen_options=(
+					"Flash screen   : $VIBRANIUM_GLOBAL_FLASH_SCREEN"
+					"Duration       : ${VIBRANIUM_GLOBAL_FLASH_SCREEN_DURATION}s"
+					"What is this?"
+				)
+				flash_screen_chosen="$(printf "%s\n" "${flash_screen_options[@]}" | rofi_cmd "Flash screen" "ESC to go back")"
+				[ -z "$flash_screen_chosen" ] && break
+
+				case "$flash_screen_chosen" in
+					"Flash screen"*)
+						toggle_bool "VIBRANIUM_GLOBAL_FLASH_SCREEN"
+						break
+						;;
+					"Duration"*)
+						while true; do
+							prompt="Flashing effect duration (in seconds)"
+							input="$(printf "%s\n" "$prompt" | rofi_cmd "Flash duration" "Duration (0.1s - 1.0s)")"
+							[ -z "$input" ] && break; [ "$input" = "$prompt" ] && continue
+
+							if ! [[ "$input" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
+								notify-send -r 5 -u critical -t 1500 "Vibranium" "Only integers or floats allowed!"
+								continue
+							fi
+
+							if ! awk "BEGIN { exit !($input >= 0.1 && $input <= 1.0) }"; then
+								if [[ "$input" == 1 ]]; then
+									input="1.0"
+								fi
+								notify-send -r 5 -u critical -t 1500 "Vibranium" "Between 0.1s and 1s!"
+								continue
+							fi
+
+							option-validate "VIBRANIUM_GLOBAL_FLASH_SCREEN_DURATION"
+							sed -i "/^VIBRANIUM_GLOBAL_FLASH_SCREEN_DURATION/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
+							break
+						done
+						;;
+					"What"*)
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>Whether to flash the screen when taking a screenshot (in fullscreen mode)</b></span>\n"
+						msg+="<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_YELLOW}'><b>This is a global feature that takes priority over local options</b></span>\n\n"
+						msg+="A purely aesthetic feature that indicates the screen was captured.\n\n"
+						msg+="If the global option is set to '<span foreground='${P_RED}'><b>false</b></span>', no flash effect will be applied\n"
+						msg+="even if this option is set to '<span foreground='${P_GREEN}'><b>true</b></span>' in the screenshot settings."
+						notify-send -r 3 -t 15000 "What is this?" "$msg"
+						continue
+				esac
+			done
+			;;
+		"Power menu style"*)
+			if [ "$VIBRANIUM_GLOBAL_POWER_MENU_STYLE" = "overlay" ]; then
+				option-validate "VIBRANIUM_GLOBAL_POWER_MENU_STYLE"
+				sed -i "/^VIBRANIUM_GLOBAL_POWER_MENU_STYLE/s/=.*/=\"menu\"/" "$VIBRANIUM_USER_SETTINGS"
+			elif [ "$VIBRANIUM_GLOBAL_POWER_MENU_STYLE" = "menu" ]; then
+				option-validate "VIBRANIUM_GLOBAL_POWER_MENU_STYLE"
+				sed -i "/^VIBRANIUM_GLOBAL_POWER_MENU_STYLE/s/=.*/=\"overlay\"/" "$VIBRANIUM_USER_SETTINGS"
+			else
+				continue
+			fi
+	esac
+done

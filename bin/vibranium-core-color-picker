@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+# An overcomplicated script that copies the selected pixel from the screen to the clipboard and logs 
+# the last selected colors in a cache file to be displayed later in the Waybar module tooltip. The cache remains across reboots.
+# See vibranium-bar-color-picker for more info about that.
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+if ! missing_str="$(vibranium-utils-is-installed hyprpicker)"; then
+    read -r -a missing <<< "$missing_str"
+    notify-send -r 4 -t 5000 -u critical "Vibranium - Color Picker" "Missing dependencies: ${missing[*]}"
+    exit 1
+fi
+
+# Do not run multiple instances of hyprpicker
+if pidof hyprpicker > /dev/null; then
+    exit 1
+fi
+
+mkdir -p "$XDG_CACHE_HOME/vibranium"
+
+LAST_USED="$XDG_CACHE_HOME/vibranium/color-picker.history"
+# Clear the cache file if the script received the --clear argument.
+if [[ "$1" == "--clear" ]]; then
+	truncate -s 0 "$LAST_USED"
+	vibranium-cmd-refresh-waybar-module color-picker
+	exit 0
+fi
+
+# Technically, this option works, but:
+# TODO: To fully implement this, we need to write a function that will convert all color formats to HEX 
+# so that the correct background can be displayed in the Waybar tooltip module.
+check_enum VIBRANIUM_COLOR_PICKER_COLOR_FORMAT "hex" rgb cmyk hex hsl hsv
+check_bool VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW true
+check_bool VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY true
+check_bool VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR true
+check_int VIBRANIUM_COLOR_PICKER_HISTORY_SIZE int 10
+
+# Build cmdline flags for hyprpicker
+opt_args=()
+if [[ $VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW == false ]]; then
+    opt_args+=(-d)
+fi
+
+color_format=$VIBRANIUM_COLOR_PICKER_COLOR_FORMAT
+restore_sensitivity=false
+
+# Whether to reduce mouse sensitivity when selecting colors from the screen. 
+# This can be useful on high-resolution monitors or simply when you need to select a specific pixel from the screen.
+if [[ $VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY == true ]]; then
+    check_int VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY_LEVEL 0.5 float
+
+    level=$VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY_LEVEL
+    hyprctl -q keyword input:sensitivity -${level}
+	restore_sensitivity=true
+fi
+
+# Pick color from the screen
+selected_color=$(hyprpicker -a -n -l -r -f "$color_format" "${opt_args[@]}" | grep -v '^\[ERR\]')
+
+# Restore original mouse sensitivity
+if [[ "$restore_sensitivity" == true ]]; then
+	hyprctl -q reload config-only &
+fi
+
+# If no color was selected (e.g., ESC was pressed)
+[[ -z $selected_color ]] && exit 1
+
+# Read the cache file and update it if the selected color is not 
+# a duplicate of one already existing in the cache file.
+if ! grep -Fxq "$selected_color" "$LAST_USED" 2>/dev/null; then
+	# Wipe file if reached limit
+	# NOTE: VIBRANIUM_COLOR_PICKER_HISTORY_SIZE is not yet implemented in Vibranium settings.
+    if [[ "$(wc -l < "$LAST_USED" 2>/dev/null)" -ge $VIBRANIUM_COLOR_PICKER_HISTORY_SIZE ]]; then
+        echo "$selected_color" > "$LAST_USED"
+    else
+        echo "$selected_color" >> "$LAST_USED"
+    fi
+fi
+
+preview_img="$XDG_RUNTIME_DIR/color-picker_recent-color.png"
+
+# Delete the preview file if it (somehow) exists from the previous launch
+if [ -f "$preview_img" ]; then
+	rm "$preview_img"
+fi
+
+# Generate a 1:1px image of the selected color to display in the notification
+if [[ $VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR == true ]]; then
+	if ! command -v magick >/dev/null; then
+		warn "The notification preview was not generated because ImageMagick is not installed"
+	else
+		magick -size 1x1 xc:"${selected_color}" "$preview_img"
+	fi
+fi
+
+# Update the Waybar module so that it receives the current cache in the tooltip
+vibranium-cmd-refresh-waybar-module color-picker
+notify-send -r 1 -t 1500 -i "$preview_img" "Color Picker" "Selected color copied to clipboard"
+
+rm "$preview_img"

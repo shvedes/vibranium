@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+if [ -z "$1" ]; then
+	exit 1
+fi
+
+# Check whether the option is available in the user settings.
+# If not, obtain it from the default settings and save it in the user settings.
+if [ ! -f "$VIBRANIUM_USER_SETTINGS" ]; then
+	printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" > "$VIBRANIUM_USER_SETTINGS"
+fi
+
+if ! grep "${1}=" "$VIBRANIUM_USER_SETTINGS" >/dev/null; then
+	grep "${1}=" "$VIBRANIUM_PATH/vibranium-core-defaults" >> "$VIBRANIUM_USER_SETTINGS"
+fi

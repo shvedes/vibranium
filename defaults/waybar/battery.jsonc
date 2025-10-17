@@ -1,0 +1,41 @@
+{
+	"battery": {
+	"interval": 1,
+	"format": "{icon}",
+	"format-discharging": "{icon}",
+	"format-charging": "{icon}",
+	"format-plugged": "{icon}",
+	"format-full": "\uf240",
+	"states": { "warning": 20, "critical": 5 },
+	"tooltip-format-discharging": "Battery: {capacity}%\nPower draw: {power:>1.0f}W",
+	"tooltip-format-charging": "Charging ({capacity}%)\nPower draw: {power:>1.0f}W",
+	"format-icons": {
+		"default": [
+			"\udb80\udc8e",
+			"\udb80\udc7a",
+			"\udb80\udc7b",
+			"\udb80\udc7c",
+			"\udb80\udc7d",
+			"\udb80\udc7e",
+			"\udb80\udc7f",
+			"\udb80\udc80",
+			"\udb80\udc81",
+			"\udb80\udc82",
+			"\udb80\udc79"
+			],
+		"charging": [
+			"\udb82\udc9f",
+			"\udb82\udc9c",
+			"\udb80\udc86",
+			"\udb80\udc87",
+			"\udb80\udc88",
+			"\udb82\udc9d",
+			"\udb80\udc89",
+			"\udb82\udc9e",
+			"\udb80\udc8a",
+			"\udb80\udc8b",
+			"\udb80\udc85"
+			]
+		}
+	}
+}

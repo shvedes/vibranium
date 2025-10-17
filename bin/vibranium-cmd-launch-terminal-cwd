@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# This simple script launches the default terminal in the folder passed to it as the CWD (current working directory). 
+# Support for other terminals will be added in the future.
+
+source "$VIBRANIUM_PATH/vibranium-core-defaults"
+
+ARGS=()
+
+case "$VIBRANIUM_DEFAULT_TERMINAL" in
+	"alacritty")
+		if pidof alacritty >/dev/null; then
+			echo "Using existing Alacritty process"
+			ARGS+=(msg create-window)
+			ARGS+=(--working-directory)
+		fi
+		;;
+esac
+
+if [ ! -d "$1" ]; then
+	notify-send -r 4 -u critical -t 3000 "Vibranium" "Directory $1 does not exist!"
+	exit 1
+fi
+
+exec setsid uwsm app -- "$VIBRANIUM_DEFAULT_TERMINAL" "${ARGS[@]}" "$1"

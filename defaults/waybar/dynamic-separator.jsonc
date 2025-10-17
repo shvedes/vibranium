@@ -1,0 +1,9 @@
+{
+	"custom/dynamic-separator": {
+		"exec": "vibranium-bar-dynamic-separator",
+		"return-type": "json",
+		"tooltip": false,
+		"format": "{}",
+		"signal": 10
+	}
+}

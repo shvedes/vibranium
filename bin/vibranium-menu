@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+ACTIONS=("Help"  "System" "Utilities" "Vibranium settings")
+
+if pidof gpu-screen-recorder &> /dev/null; then
+	ACTIONS+=("<b><i><u>Stop screen recording</u></i></b>")
+fi
+
+if systemd-inhibit | grep "Prevent system suspend is active" > /dev/null; then
+	ACTIONS+=("<b><i><u>Disable sleep inhibition</u></i></b>")
+fi
+
+while true; do
+    CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Vibranium" "search")"
+    [ -z "$CHOSEN" ] && break
+
+    case "$CHOSEN" in
+        "Vibranium settings")
+            while true; do
+                vibranium_opts=("Configure Waybar" "Configure Vibranium")
+                vibranium_chosen="$(printf "%s\n" "${vibranium_opts[@]}" | rofi_cmd "${CHOSEN[0]}" "ESC to go back")"
+                [ -z "$vibranium_chosen" ] && break
+
+                case "$vibranium_chosen" in
+                    "Configure Waybar")
+						"$VIBRANIUM_PATH/configure/waybar-main-menu"
+						;;
+                    "Configure Vibranium")
+						"$VIBRANIUM_PATH/configure/vibranium-main-menu"
+                        ;;
+                esac
+            done
+            ;;
+		"Help")
+			vibranium-menu-help
+			;;
+        "System")
+            vibranium-menu-system
+            ;;
+        "Utilities")
+            vibranium-menu-utilities
+            ;;
+        *"Stop screen recording"*)
+            vibranium-core-recording
+			exit 0
+            ;;
+        *"Disable sleep inhibition"*)
+            vibranium-cmd-inhibit-toggle
+			exit 0
+            ;;
+        *)
+            continue
+            ;;
+    esac
+done

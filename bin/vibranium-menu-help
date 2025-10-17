@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+INDEX=0
+OPTIONS=( "Hyprland wiki"  "Vibranium wiki"  "Arch Linux wiki" "How to: package manager" )
+
+while true; do
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Help" "ESC to go back" -selected-row "$INDEX")"
+	[[ -z "$CHOSEN" ]] && exit 0
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+			INDEX="$i"
+			break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Hyprland wiki")
+			vibranium-cmd-launch-cmd xdg-open "https://wiki.hypr.land"
+			vibranium-cmd-kill-rofi
+			;;
+		"Arch Linux wiki")
+			vibranium-cmd-launch-cmd xdg-open "https://wiki.archlinux.org"
+			vibranium-cmd-kill-rofi
+			;;
+		"How"*)
+			vibranium-cmd-launch-cmd xdg-open "https://wiki.archlinux.org/title/Pacman"
+			vibranium-cmd-kill-rofi
+			;;
+		"Vibranium wiki")
+			notify-send -r 1 "Vibranium" "Hold up, we're still in beta :D"
+	esac
+done

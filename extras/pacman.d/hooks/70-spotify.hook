@@ -1,0 +1,10 @@
+[Trigger]
+Operation = Install
+Target = spotify
+Target = /opt/spotify
+Type = Package
+
+[Action]
+Description = Upating permissions for Spicetify
+When = PostTransaction
+Exec = /usr/bin/sh -c '/usr/bin/chmod a+wr /opt/spotify; /usr/bin/chmod -R a+wr /opt/spotify/Apps'

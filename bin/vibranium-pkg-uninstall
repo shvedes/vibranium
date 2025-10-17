@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+# This script was written before Vibranium became what it is today, so it probably needs at least some refactoring.
+# shellcheck disable=SC2034
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+# Source: omarchy
+fzf_args=(
+    --multi
+    --preview 'pacman -Qi {1}'
+    --preview-label='alt-p: toggle description, alt-j/k: scroll preview pane, ctrl-j/k: next/prev item, tab: multi-select'
+    --preview-label-pos='bottom'
+    --preview-window 'right:65%:wrap'
+    --bind 'alt-p:toggle-preview'
+    --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
+    --bind 'alt-k:preview-up,alt-j:preview-down'
+    --color 'pointer:blue,marker:white'
+)
+
+if ! sudo -v; then
+    notify-send -r 1 -t 1000 "Vibranium" "Operation aborted"
+    exit 1
+fi
+
+# you don't wanna delete important system packages, aren't you?
+# so keep -Qqe to show only explicitly installed packages
+chosen=("$(pacman -Qqe | fzf "${fzf_args[@]}")")
+
+if [ ${#chosen[@]} -eq 0 ]; then
+    exit 0
+fi
+
+read -p $'\e[1;33mYou are about to remove the following packages and its dependencies:\e[0m \e[1;36m'"${chosen[*]}"$'\e[0m. \e[1;32mProceed? (Y/n): \e[0m' answer
+
+case "$answer" in
+    [Yy]es | y | "")
+        sudo pacman -Rnsc --noconfirm "${chosen[@]}" &> /dev/null &
+        spinner $! "${CYAN}Removing selected packages" "${GREEN}Done"
+        notify-send -r 1 -t 10000 "Vibranium" \
+            "Operation completed successfully\n<span foreground='${P_YELLOW}'>Deleted packages:</span> <span foreground='${P_BLUE}'>${chosen[*]}</span>"
+        exit 0
+        ;;
+    [Nn]o | n)
+		notify-send -r 1 "Vibranium" "<span foreground='${P_RED}'>Operation aborted</span>"
+        exit 1
+        ;;
+esac

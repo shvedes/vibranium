@@ -1,0 +1,13 @@
+{
+	"custom/color-picker": {
+		"format":"{text}",
+		"hide-empty-text": true,
+		"return-type":"json",
+		"interval": "once",
+		"signal": 8,
+
+		"exec": "vibranium-bar-color-picker",
+		"on-click": "vibranium-core-color-picker",
+		"on-click-right": "vibranium-core-color-picker --clear"
+	}
+}

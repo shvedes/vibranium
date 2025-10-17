@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+# Yes, I saved a couple of minutes thanks to AI to write the description below, okay? 
+
+# This script displays the currently playing track from either a Playerctl-compatible
+# media player or MPD (Music Player Daemon). It can:
+# 1. Output the track title and artist to the terminal.
+# 2. Format the output for the Hyprland lock screen if run with --hyprlock.
+# 3. Optionally download and show the album art if enabled in Vibranium settings.
+# 4. Send a desktop notification with the track information and album art.
+# The script checks which player is currently active, retrieves metadata, formats it
+# using Pango markup for notifications or lockscreen display, and cleans up temporary
+# album art files afterward.
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+
+check_bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN true
+
+album_art="$XDG_RUNTIME_DIR/album_art"
+
+# Get player type
+if [[ "$(playerctl status 2>/dev/null)" =~ ^(Playing|Paused)$ ]]; then
+	player="playerctl"
+    IFS='^' read -r title artist <<< "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
+elif [[ "$(mpc status 2>/dev/null | awk 'NR==2 {print $1}')" =~ ^(\[playing\]|\[paused\])$ ]]; then
+	player="mpd"
+    IFS='^' read -r title artist <<< "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
+else
+    echo "No active players" >&2
+    exit 1
+fi
+
+# Build pango formatted message for the lock screen.
+# Reminder: You can turn off the display of the current track on the lock screen in the Vibranium settings.
+if [[ "$1" =~ ^(--hyprlock)$ ]]; then
+	if [[ "$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN" == true ]]; then
+		printf \
+			"<span size='20000' foreground='${P_ACCENT}' rise='-3.5pt'><b>󰝚</b></span> %s <span foreground='${P_YELLOW}'>by</span> %s" \
+			"$title" "$artist"
+		exit 0
+	fi
+else
+	echo "${title} by ${artist}"
+fi
+
+# Reminder:
+# When this option is set to true and a web-based player is used (e.g., Spotify), 
+# displaying the album cover may take some time because it needs to be downloaded from the internet.
+if [ "$VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART" = "true" ]; then
+	case "$player" in
+		"playerctl")
+			album_art_url="$(playerctl metadata mpris:artUrl)"
+			if [[ "$album_art_url" =~ ^https?:// ]]; then
+				curl -s "$album_art_url" -o "$album_art"
+			else
+				album_art="$album_art_url"
+			fi
+			;;
+		"mpd")
+			mpc readpicture "$(mpc --format "%file%" current)" > "$album_art"
+			;;
+	esac
+fi
+
+notify_body="<span foreground='${P_ORANGE}'> ${title}</span>\n"
+notify_body+="<span foreground='${P_YELLOW}'> ${artist}</span>"
+
+# Even if the file inside $album_art does not exist, notify-send will still send a notification,
+# although without the cover art, so we do not check for the existence of the file.
+notify-send -r 5 -i "$album_art" "Now Playing" "$notify_body"
+
+# Even though the image may be small, we don't need junk in RAM.
+rm "$album_art"

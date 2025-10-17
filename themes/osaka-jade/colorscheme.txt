@@ -1,0 +1,60 @@
+# Port of the Osaka Jade colorscheme from Omarchy. Extended and completed version
+
+#202e28 # Black Dim
+#263730 # Black
+#436054 # Black Bright
+
+#6f0606 # Red Dim
+#970808 # Red
+#b04531 # Red Bright
+
+#b3658b # Pink Dim
+#df7cad # Pink
+#eaa0c3 # Pink Bright
+
+#4f8257 # Green Dim
+#5e9a67 # Green
+#7db085 # Green Bright
+
+#7b6017 # Yellow Dim
+#987717 # Yellow
+#cca648 # Yellow Bright
+
+#b67c31 # Orange Dim
+#e39a39 # Orange
+#efb570 # Orange Bright
+
+#113956 # Blue Dim
+#2374af # Blue
+#2a8ed5 # Blue Bright
+
+#6d1c42 # Purple Dim
+#ab2666 # Purple
+#be5580 # Purple Bright
+
+#16747b # Cyan Dim
+#268a93 # Cyan
+#53a7b6 # Cyan Bright
+
+#babbae # White Dim
+#d1d2c3 # White
+#e9ead9 # White Bright
+
+#1f2822 # Gray Dim
+#2f3d34 # Gray
+#505d55 # Gray Bright
+
+#0d1713 # Background Hard
+#111c18 # Background 0
+#1d2f28 # Background 1
+#263c33 # Background 2
+#374c43 # Background 3
+#455f53 # Background 4
+#58796b # Background 5
+
+#e4e5d1 # Foreground Hard
+#d3d5b4 # Foreground 0
+#c1c497 # Foreground 1
+#aeb088 # Foreground 2
+#9b9d7a # Foreground 3
+#888a6c # Foreground 4

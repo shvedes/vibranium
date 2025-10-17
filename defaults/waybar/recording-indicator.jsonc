@@ -1,0 +1,12 @@
+{
+	"custom/recording-indicator": {
+		"format": "{}",
+		"hide-empty-text": true,
+
+		"exec": "vibranium-bar-recording",
+		"on-click": "vibranium-core-recording",
+
+		"signal": 4,
+		"return-type": "json"
+	}
+}

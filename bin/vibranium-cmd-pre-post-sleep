@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+# This script was written before vibranium-core-playerctl-control. The script needs refactoring.
+# It is assumed that this script will be used exclusively in conjunction with hypridle and its options on_lock_cmd and on_unlock_cmd.
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+case "$1" in
+    "before")
+        if [ "$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK" = "false" ]; then
+            exit 0
+        fi
+
+		if [[ "$(playerctl status 2> /dev/null)" == "Playing" ]]; then
+            current_volume=$(playerctl volume | head -c5)
+            echo "playerctl:$current_volume" > "$VIBRANIUM_STATE/player_status"
+
+            while awk "BEGIN {exit !($(playerctl volume) > 0)}"; do
+                playerctl volume 0.002-
+            done
+
+            playerctl pause
+            exit 0
+        fi
+
+        if [[ "$(mpc status 2> /dev/null | awk 'NR==2 {print $1}')" == "[playing]" ]]; then
+            current_vol=$(mpc volume | sed 's/volume: \([0-9]*\)%/\1/')
+            echo "mpd:$current_vol" > "$VIBRANIUM_STATE/player_status"
+
+            for i in {10..1}; do
+                new_vol=$((current_vol * i / 10))
+                mpc -q volume $new_vol
+                sleep 0.05
+            done
+            mpc -q pause
+            exit 0
+        fi
+
+        echo "none" > "$VIBRANIUM_STATE/player_status"
+        exit 0
+        ;;
+
+    "after")
+		if [ "$VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION" = "true" ]; then
+			notify-send -r 5 -t 2500 "Vibranium" "Welcome back, <span foreground='${P_ACCENT}'><b>$USER</b></span>!"
+		fi
+
+        if [ "$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK" = "true" ]; then
+            if [ -f "$VIBRANIUM_STATE/player_status" ]; then
+                content=$(<"$VIBRANIUM_STATE/player_status")
+                player_type=${content%%:*}
+                saved_vol=${content#*:}
+
+				case "$player_type" in
+					"playerctl")
+						playerctl play
+						while awk "BEGIN {exit !($(playerctl volume) < $saved_vol)}"; do
+							playerctl volume 0.002+
+						done
+						;;
+					"mpd")
+						mpc -q volume 0; mpc -q play
+						for i in {1..10}; do
+							new_vol=$((saved_vol * i / 10))
+							mpc -q volume $new_vol
+							sleep 0.05
+						done
+						;;
+				esac
+
+				if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
+					sleep 2
+					vibranium-cmd-now-playing
+				fi
+            fi
+        fi
+        ;;
+esac

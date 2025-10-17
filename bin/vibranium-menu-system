@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+ACTIONS=("System update" "Install a package" "Uninstall a package")
+
+while true; do
+    chosen="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "System" "ESC to go back")"
+
+    case "$chosen" in
+        # "Bluetooth options")
+        #     bluetooth_options=("Connect a known device" "Disconnect a known device" "Pair New Device")
+        #     bluetooth_chosen="$(printf "%s\n" "${bluetooth_options[@]}" | rofi_cmd "Bluetooth" "Choose an option")"
+        #
+        #     case "$bluetooth_chosen" in
+        #         "Connect a known device")
+        #             vibranium-core-bluetooth connect
+        #             exit 0
+        #             ;;
+        #         "Disconnec a known devicet")
+        #             vibranium-core-bluetooth disconnect
+        #             exit 0
+        #             ;;
+        #         "Pair New Device")
+        #             notify-send -r 1 "System" "This feature will be avaiable soon"
+        #             exit 0
+        #             ;;
+        #         *) exit ;;
+        #     esac
+        #     ;;
+		"System update")
+			vibranium-cmd-launch-terminal vibranium-cmd-system-update
+			vibranium-cmd-kill-rofi
+			exit 0
+			;;
+        "Install a package")
+            vibranium-cmd-launch-terminal vibranium-pkg-install
+			vibranium-cmd-kill-rofi
+            exit 0
+            ;;
+		"Uninstall a package")
+			vibranium-cmd-launch-terminal vibranium-pkg-uninstall
+			vibranium-cmd-kill-rofi
+			exit 0
+			;;
+        "" | *)
+            exit 1
+            ;;
+    esac
+done

@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+# This script kills all parent processes that generate rofi menus. 
+# This is useful for cases where the final entry should launch, for example, a window, or be the last in the chain of generated menus.
+# This script is auxiliary and is used in other scripts of the Vibranium ecosystem.
+
+REGEX="configure-|-menu|-downscale|-password-|-launcher"
+mapfile -t pids < <(pgrep -a bash | grep -E "$REGEX" | awk '{print $1}')
+for pid in "${pids[@]}"; do
+    kill "$pid"
+	killall rofi
+done

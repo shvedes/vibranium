@@ -1,0 +1,12 @@
+{
+	"custom/night-light": {
+		"format": "{text}",
+		"return-type": "json",
+		"exec": "vibranium-bar-night-light",
+		"signal": 9,
+
+		"on-click": "vibranium-cmd-night-light-set toggle",
+		"on-scroll-up": "vibranium-cmd-night-light-set +",
+		"on-scroll-down": "vibranium-cmd-night-light-set -"
+	}
+}

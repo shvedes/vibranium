@@ -1,0 +1,31 @@
+{
+	"custom/brightness": {
+		"format": "{icon}",
+		"format-icons": [
+			"\ue3d5",
+			"\ue3d4",
+			"\ue3d3",
+			"\ue3d2",
+			"\ue3d1",
+			"\ue3d0",
+			"\ue3cf",
+			"\ue3ce",
+			"\ue3cc",
+			"\ue3cb",
+			"\ue3ca",
+			"\ue3c9",
+			"\ue3c8",
+			"\ue3e3"
+		],
+		"return-type": "json",
+		"signal": 6,
+
+		"exec": "vibranium-bar-brightness",
+		"on-scroll-up": "vibranium-core-brightness up",
+		"on-scroll-down": "vibranium-core-brightness down",
+
+		"on-click": "vibranium-core-brightness 1",
+		"on-click-right": "vibranium-core-brightness 100",
+		"on-click-middle": "vibranium-core-brightness 50"
+	},
+}

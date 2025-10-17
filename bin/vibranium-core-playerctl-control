@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+
+# This script can make Play/Pause and track switching smoother and more pleasant to the ear,
+# similar to the Play/Pause effect in Spotify on Windows.
+# The duration of the effect is fully customizable, and if the user doesn't like it,
+# they can turn it off in the Vibranium settings.
+#
+# Probably the only drawback of this method is that the speed of the effect depends on the local volume of the player.
+# In theory, this can be fixed by adding logic to calculate from the active volume of the player and then perform actions based on that.
+#
+# TODO: Make this script universal and support both playerctl and MPD
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+check_enum VIBRANIUM_PLAYERCTL_FADE_DURATION "normal" very_slow slow normal fast very_fast off
+check_enum VIBRANIUM_PLAYERCTL_FADE_DURATION_ON_SWITCH "slow" very_slow slow normal fast very_fast off
+
+VOLUME_FILE="$XDG_RUNTIME_DIR/$(basename "$0")"
+STATUS=$(playerctl status 2> /dev/null)
+CURRENT_VOLUME=$(playerctl volume | head -c5)
+TARGET_VOLUME=$(cat "$VOLUME_FILE")
+
+case "$VIBRANIUM_PLAYERCTL_FADE_DURATION" in
+	"very_slow")  TOGGLE_STEP=0.003 ;;
+	"slow")       TOGGLE_STEP=0.005 ;;
+	"normal")     TOGGLE_STEP=0.015 ;;
+	"fast")       TOGGLE_STEP=0.02  ;;
+	"very_fast")  TOGGLE_STEP=0.05  ;;
+	"off")        TOGGLE_STEP="off" ;;
+esac
+
+# Fade the volume in and out.
+# Similar to the Spotify on Windows.
+case "$1" in
+    "toggle")
+
+
+        if [ "$STATUS" = "Playing" ]; then
+			# If the option is disabled, use the default command
+			if [[ "$TOGGLE_STEP" == "off" ]]; then
+				playerctl pause; exit 0
+			fi
+
+			# Record the current volume for later restoration
+            echo "$CURRENT_VOLUME" > "$VOLUME_FILE"
+
+			# The fade effect itself
+            while awk "BEGIN {exit !($(playerctl volume) > 0)}"; do
+                playerctl volume "${TOGGLE_STEP}-"
+            done
+
+            playerctl pause
+
+			# Restore volume when paused in case the user continues to play music manually (e.g., by pressing the UI button).
+			# If this is ignored, the music will continue to play at zero volume, which is not good and can be annoying.
+			playerctl volume "$CURRENT_VOLUME"
+
+        else
+			# If the media is not playing
+            if [ -f "$VOLUME_FILE" ]; then
+				# Get saved before volume level
+
+				if [[ "$VIBRANIUM_PLAYERCTL_FADE_DURATION" == "off" ]]; then
+					playerctl play; rm "$VOLUME_FILE"; exit 0
+				fi
+
+				# Start fade-in effect
+                playerctl volume 0
+                playerctl play
+
+                while awk "BEGIN {exit !($(playerctl volume) < $TARGET_VOLUME)}"; do
+                    playerctl volume "${TOGGLE_STEP}+"
+                done
+
+                rm "$VOLUME_FILE"
+            else
+                playerctl play
+            fi
+        fi
+        ;;
+    "next" | "previous")
+		case "$VIBRANIUM_PLAYERCTL_FADE_DURATION_ON_SWITCH" in
+			"very_slow")  switch_step=0.003 ;;
+			"slow")       switch_step=0.005 ;;
+			"normal")     switch_step=0.015 ;;
+			"fast")       switch_step=0.02  ;;
+			"very_fast")  switch_step=0.05  ;;
+		esac
+
+        # current_volume=$(playerctl volume | head -c5)
+
+		if [[ "$VIBRANIUM_PLAYERCTL_FADE_DURATION_ON_SWITCH" == "off" ]]; then
+			playerctl "$1"; exit 0
+		fi
+
+		# If Next/Prev was called from a paused state, apply the same fade effect as for toggle.
+		# It just looks cool, idk :D
+		if [[ "$STATUS" == "Paused" ]]; then
+            while awk "BEGIN {exit !($(playerctl volume) > 0)}"; do
+                playerctl volume "${TOGGLE_STEP}-"
+            done
+			playerctl play
+
+            while awk "BEGIN {exit !($(playerctl volume) > 0)}"; do
+                playerctl volume "${TOGGLE_STEP}-"
+            done
+		fi
+
+        while awk "BEGIN {exit !($(playerctl volume) > 0)}"; do
+            playerctl volume "${switch_step}-"
+        done
+
+        playerctl "$1"
+
+        while awk "BEGIN {exit !($(playerctl volume) < $CURRENT_VOLUME)}"; do
+            playerctl volume "${switch_step}+"
+        done
+        ;;
+
+    *)
+        echo "Usage: $(basename "$0") <toggle|next|previous>"
+        exit 1
+        ;;
+esac

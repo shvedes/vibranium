@@ -1,0 +1,21 @@
+{
+	"network": {
+		"interval": 1,
+		"format-wifi": "{icon}",
+		"format-ethernet": "\uef09",
+		"format-disconnected": "\udb82\udd2d",
+
+		"format-icons": [
+			"\udb82\udd2f",
+			"\udb82\udd1f",
+			"\udb82\udd22",
+			"\udb82\udd25",
+			"\udb82\udd28"
+		],
+
+		"on-click": "vibranium-utils-nm",
+		"tooltip-format": "Connected to {essid}\nSignal strenght: {signalStrength}%\n\uf063 {bandwidthDownBytes:<} \uf062 {bandwidthUpBytes:>}",
+		"tooltip-format-ethernet": "<span size='12000' rise='-2pt'>\uf063</span> {bandwidthDownBytes:<} <span size='12000' rise='-2pt'>\uf062</span> {bandwidthUpBytes:=}",
+		"tooltip-format-disconnected": "Click here to connect to a network"
+	}
+}

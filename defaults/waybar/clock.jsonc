@@ -1,0 +1,20 @@
+{
+	"clock": {
+		"format": "{:%A %I:%M %p}",
+		"format-alt": "{:%B %d, %Y}",
+		"tooltip-format": "<tt>{calendar}</tt>",
+		"calendar": {
+			"mode"          : "month",
+			"mode-mon-col"  : 3,
+			"weeks-pos"     : "right",
+			"on-scroll"     : 1,
+			"format": {
+				  "months":     "<b>{}</b>",
+				  "days":       "<b>{}</b>",
+				  "weeks":      "<b>W{}</b>",
+				  "weekdays":   "<b>{}</b>",
+				  "today":      "<b><u>{}</u></b>"
+				}
+		}
+	}
+}

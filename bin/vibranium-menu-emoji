@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+if ! pacman -Qq rofi-emoji 2>/dev/null; then
+	msg="The emoji menu requires <u>rofi-emoji</u>, which is not installed.\n"
+	msg+="<b><i>Click here to install</i></b>"
+	if [ "$(notify-send -A true -r 4 -t 5000 -u critical "Vibranium" "$msg")" ]; then
+		alacritty -e sudo pacman -S --noconfirm rofi-emoji
+	else
+		exit 1
+	fi
+fi
+
+if pidof rofi >/dev/null; then
+	killall rofi
+	exit 0
+fi
+
+rofi -modi emoji -show emoji -p "Emoji" \
+	-theme-str "window{width: 400px;}" \
+	-emoji-format "{emoji} {name}"

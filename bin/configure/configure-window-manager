@@ -1,0 +1,240 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+INDEX=0
+
+HYPR_CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
+
+while true; do
+	mapfile -t lines < <(
+		hyprctl --batch -j \
+			"getoption decoration:rounding; \
+			 getoption animations:enabled; \
+			 getoption decoration:blur:enabled; \
+			 getoption decoration:dim_inactive; \
+			 getoption decoration:shadow:enabled" \
+		| jq -r '
+			if .option == "decoration:rounding" then
+				.int
+			else
+				if .int == 1 then "true" else "false" end
+			end'
+	)
+	current_rounding="${lines[0]}"
+	current_animations="${lines[1]}"
+	current_blur="${lines[2]}"
+	current_dim="${lines[3]}"
+	current_shadow="${lines[4]}"
+
+	OPTIONS=(
+		"Dim inactive window : ${current_dim}"
+		"Drop window shadow  : ${current_shadow}"
+		"Border rounding     : ${current_rounding}px"
+		"Animations enabled  : ${current_animations}"
+	)
+
+	if [ "$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE" = "true" ] && [ "$(<$VIBRANIUM_STATE/power-profile)" = "power-saver" ]; then
+		OPTIONS+=("Blur enabled        : ${current_blur} ()")
+	else
+		OPTIONS+=("Blur enabled        : ${current_blur}")
+	fi
+
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "WM" "ESC to go back" -selected-row "$INDEX")"
+	[ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Drop"*)
+			if [[ $current_shadow == true ]]; then
+				vibranium-cmd-edit-wm-config decoration:shadow:enabled:false "$HYPR_CONFIG"
+			else
+				vibranium-cmd-edit-wm-config decoration:shadow:enabled:true "$HYPR_CONFIG"
+			fi
+			hyprctl -q reload config-only
+			;;
+		"Dim"*)
+			if [[ $current_dim == true ]]; then
+				vibranium-cmd-edit-wm-config decoration:dim_inactive:false "$HYPR_CONFIG"
+			else
+				vibranium-cmd-edit-wm-config decoration:dim_inactive:true "$HYPR_CONFIG"
+			fi
+			hyprctl -q reload config-only
+			;;
+		"Border rounding"*)
+			while true; do
+				prompt="Border rounding (int)"
+				input="$(printf "%s\n" "$prompt" | rofi_cmd "Border rounding" "0-16px")"
+
+				[ -z "$input" ] && break;
+
+				[[ ! "$input" =~ ^[0-9]+$ || "$input" == "$prompt" ]] && continue
+
+				if (( input < 0 || input > 16 )); then
+					notify-send -r 3 -t 1500 "Vibranium" "<span foreground='${P_RED}'>An integer between 0 and 16!</span>"
+					continue
+				fi
+
+				vibranium-cmd-edit-wm-config decoration:rounding:"$input" "$HYPR_CONFIG"
+				sed -i "/border-radius/s/:.*/:\t${input}px;/" \
+					"$XDG_CONFIG_HOME/rofi/config.rasi" \
+					"$XDG_CONFIG_HOME/swayosd/style.css"
+				sed -i "/corner_radius/s/=.*/= ${input}/" "$XDG_CONFIG_HOME/dunst/dunstrc"
+				hyprctl -q reload config-only
+				systemctl --user restart swayosd
+				vibranium-cmd-refresh-dunst
+				break
+			done
+			;;
+		"Animations"*)
+			vibranium-cmd-toggle-animations
+			;;
+		*"()")
+			msg="This option is <span foreground='${P_RED}'><b>locked</b></span> "
+			msg+="because the global\noption '<span foreground='${P_YELLOW}'><b>Respect Power Profile</b></span>' "
+			msg+="is '<span foreground='${P_GREEN}'><b>true</b></span>'\n"
+			msg+="and current power profile is '<span foreground='${P_YELLOW}'><b>Powersave</b></span>'"
+			notify-send -r 1 -t 5000 "This option is locked" "$msg"
+			continue
+			;;
+		"Blur"*)
+			while true; do
+				blur_strength="$(hyprctl -j getoption decoration:blur:passes | jq -r '.int')"
+				blur_radius="$(hyprctl -j getoption decoration:blur:size | jq -r '.int')"
+				blur_enabled="$([[ "$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')" == 1 ]] && echo true || echo false)"
+				blur_contrast="$(hyprctl -j getoption decoration:blur:contrast | jq -r '.float')"
+				blur_brightness="$(hyprctl -j getoption decoration:blur:brightness | jq -r '.float')"
+				blur_saturation="$(hyprctl -j getoption decoration:blur:vibrancy | jq -r '.float')"
+
+				blur_options=("Enabled    : $blur_enabled")
+
+				if [[ $blur_enabled == false ]]; then
+					blur_options+=(
+						"Radius     : $blur_radius ()"
+						"Strength   : $blur_strength ()"
+						"Contrast   : $blur_contrast ()"
+						"Brightness : $blur_brightness ()"
+						"Saturation : $blur_saturation ()"
+					)
+				else
+					blur_options+=(
+						"Radius     : $blur_radius"
+						"Strength   : $blur_strength"
+						"Contrast   : $blur_contrast"
+						"Brightness : $blur_brightness"
+						"Saturation : $blur_saturation"
+					)
+				fi
+
+				blur_chosen="$(printf "%s\n" "${blur_options[@]}" | rofi_cmd "Blur" "ESC to go back")"
+				[[ -z $blur_chosen ]] && break
+
+				case "$blur_chosen" in
+					*"()")
+						msg="<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_RED}'><b>"
+						msg+="This option is locked because blur is disabled globally</b></span>"
+						notify-send -r 1 "Vibranium" "$msg"
+						continue
+						;;
+					"Saturation"*)
+						while true; do
+							prompt="Blur saturation (float)"
+							input="$(printf "$prompt" | rofi_cmd "Blur saturation"  "0.0 - 1.0")"
+							[[ -z $input ]] && break; [[ "$prompt" == "$input" ]] && continue
+
+							if awk -v x="$input" 'BEGIN{exit !(x ~ /^[0-9]*\.?[0-9]+$/ && x>=0 && x<=1)}'; then
+								vibranium-cmd-edit-wm-config decoration:blur:vibrancy:$input "$HYPR_CONFIG"
+								break
+							else
+								notify-send -r 2 -u critical -t 1500 "Vibranium" \
+									"<span foreground='${P_RED}'>A floating point between 0.0 and 1.0!</span>"
+								continue
+							fi
+						done
+					;;
+					"Brightness"*)
+						while true; do
+							prompt="Blur brightness (float)"
+							input="$(printf "$prompt" | rofi_cmd "Blur brightness"  "0.0 - 2.0")"
+							[[ -z $input ]] && break; [[ "$prompt" == "$input" ]] && continue
+
+							if awk -v x="$input" 'BEGIN{exit !(x ~ /^[0-9]*\.?[0-9]+$/ && x>=0 && x<=2)}'; then
+								vibranium-cmd-edit-wm-config decoration:blur:brightness:$input "$HYPR_CONFIG"
+								break
+							else
+								notify-send -r 2 -u critical -t 1500 "Vibranium" \
+									"<span foreground='${P_RED}'>A floating point between 0.0 and 2.0!</span>"
+								continue
+							fi
+						done
+					;;
+					"Contrast"*)
+						while true; do
+							prompt="Blur contrast (float)"
+							input="$(printf "$prompt" | rofi_cmd "Blur contrast"  "0.0 - 2.0")"
+							[[ -z $input ]] && break; [[ "$prompt" == "$input" ]] && continue
+
+							if awk -v x="$input" 'BEGIN{exit !(x ~ /^[0-9]*\.?[0-9]+$/ && x>=0 && x<=2)}'; then
+								vibranium-cmd-edit-wm-config decoration:blur:contrast:$input "$HYPR_CONFIG"
+								break
+							else
+								notify-send -r 2 -u critical -t 1500 "Vibranium" \
+									"<span foreground='${P_RED}'>A floating point between 0.0 and 2.0!</span>"
+								continue
+							fi
+						done
+					;;
+					"Enabled"*)
+						if [[ $current_blur == true ]]; then
+							rm "$VIBRANIUM_STATE/blur.restore"
+						else
+							touch "$VIBRANIUM_STATE/blur.restore"
+						fi
+						vibranium-cmd-toggle-blur
+						;;
+					"Radius"*)
+						while true; do
+							prompt="Blur radius (int)"
+							input="$(printf "$prompt" | rofi_cmd "Blur radius"  "ESC to go back")"
+							[[ -z $input ]] && break; [[ "$prompt" == "$input" ]] && continue
+
+							if [[ ! $input =~ ^[0-9]+$ ]]; then
+								continue
+							else
+								vibranium-cmd-edit-wm-config decoration:blur:size:$input "$HYPR_CONFIG"
+
+								if (( input > 10 )); then
+									notify-send -r 1 -u critical -t 2000 "Vibranium" "Please note that large values may affect overall performance"
+								fi
+								break
+							fi
+						done
+						;;
+					"Strength"*)
+						while true; do
+							prompt="Blur strength (int)"
+							input="$(printf "$prompt" | rofi_cmd "Blur strength"  "ESC to go back")"
+							[[ -z $input ]] && break; [[ "$prompt" == "$input" ]] && continue
+
+							if [[ ! $input =~ ^[0-9]+$ ]]; then
+								continue
+							else
+								vibranium-cmd-edit-wm-config decoration:blur:passes:$input "$HYPR_CONFIG"
+
+								if (( input > 10 )); then
+									notify-send -r 1 -u critical -t 2000 "Vibranium" "Please note that large values may affect overall performance"
+								fi
+								break
+							fi
+						done
+				esac
+			done
+	esac
+done

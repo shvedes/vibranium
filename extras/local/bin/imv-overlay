@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# This file is symlinked to $VIBRANIUM
+# DO NOT EDIT
+
+file=''"$1"''
+
+human_size() {
+    local bytes=$1
+    [[ -z "$bytes" || ! "$bytes" =~ ^[0-9]+$ ]] && { echo "-"; return; }
+
+    local kib=$((1024))
+    local mib=$((1024 * 1024))
+    local gib=$((1024 * 1024 * 1024))
+
+    if ((bytes >= gib)); then
+        awk -v b="$bytes" -v g="$gib" 'BEGIN {printf "%.2f GiB", b/g}'
+    elif ((bytes >= mib)); then
+        awk -v b="$bytes" -v m="$mib" 'BEGIN {printf "%.2f MiB", b/m}'
+    elif ((bytes >= kib)); then
+        awk -v b="$bytes" -v k="$kib" 'BEGIN {printf "%.2f KiB", b/k}'
+    else
+        printf "%d B" "$bytes"
+    fi
+}
+
+IFS=$'\t' read -r filename filesize resolution colorspace compression < <(
+  mediainfo --Output=JSON "$file" |
+  jq -r '{
+      filename: .media["@ref"],
+      filesize: (.media.track[]? | select(.["@type"]=="General") | .FileSize // ""),
+      resolution: (.media.track[]? | select(.["@type"]=="Image") | (.Width + "x" + .Height) // ""),
+      colorspace: (.media.track[]? | select(.["@type"]=="Image") | .ColorSpace // ""),
+      compression: (.media.track[]? | select(.["@type"]=="Image") | .Compression_Mode // "")
+    } | [.filename, .filesize, .resolution, .colorspace, .compression] | @tsv'
+)
+
+printf "\n"
+printf " filename: %s \n" "$filename"
+printf " filesize: %sB (%s) \n" "$filesize" "$(human_size "$filesize")"
+printf " resolution: %s \n" "$resolution"
+printf " colorspace: %s \n" "$colorspace"
+printf " compression: %s \n" "${compression,,}"

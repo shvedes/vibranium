@@ -1,0 +1,182 @@
+#!/usr/bin/env bash
+
+# This script was written before Vibranium became what it is today, so it probably needs at least some refactoring.
+# shellcheck disable=SC2034
+
+source "$VIBRANIUM_PATH/vibranium-core-env"
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+if ! sudo -v; then
+    notify-send -r 1 -t 1000 "Vibranium" "Operation aborted"
+    exit 1
+fi
+
+# Source: omarchy
+fzf_args=(
+    --multi
+    --preview 'pacman -Sii {1} 2>/dev/null || yay -Sii {1}'
+    --preview-label='alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select'
+    --preview-label-pos='bottom'
+    --preview-window 'right:75%:wrap'
+    --bind 'alt-p:toggle-preview'
+    --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
+    --bind 'alt-k:preview-up,alt-j:preview-down'
+    --color 'pointer:blue,marker:white'
+)
+
+# yay -Sy --noconfirm &> /dev/null &
+# spinner $! "${CYAN}Refreshing mirrorlist" "${GREEN}Done"
+
+arch_file=$(mktemp)
+yay_file=$(mktemp)
+
+(pacman -Slq > "$arch_file") &
+spinner $! "${CYAN}Fetching Arch packages" "${GREEN}Done"
+mapfile -t arch_packages < "$arch_file"
+total_packages=("${arch_packages[@]}")
+
+(yay -Slqa > "$yay_file") &> /dev/null &
+spinner $! "${CYAN}Fetching AUR packages" "${GREEN}Done"
+mapfile -t aur_packages < "$yay_file"
+total_packages+=("${aur_packages[@]}")
+
+rm "$arch_file"
+rm "$yay_file"
+
+chosen=("$(printf "%s\n" "${total_packages[@]}" | fzf "${fzf_args[@]}")")
+
+if [ ${#chosen[@]} -eq 0 ]; then
+    exit 1
+fi
+
+filtered=()
+for package in "${chosen[@]}"; do
+    if ! pacman -Qq "$package" &> /dev/null; then
+        filtered+=("$package")
+    fi
+done
+
+if [ ${#filtered[@]} -eq 0 ]; then
+    notify-send -r 1 "Vibranium" "<span foreground='${P_BLUE}'>Selected packages are already installed</span>"
+    exit 1
+fi
+
+read -p $'\e[1;34mYou are about to install the following packages: \e[1;33m'"${chosen[*]}"$'\e[0m\e[1;34m. \e[1;32mProceed? (Y/n): \e[0m' answer
+
+case "$answer" in
+    [Yy][Ee][Ss] | [Yy] | "")
+        yay -S --noconfirm "${filtered[@]}" &> /dev/null &
+        spinner $! "${CYAN}Installing packages" "${GREEN}Done"
+
+        services=()                 # system-wide services or sockets
+        provides_systemd_service=() # packages that provide systemd units
+        user_units=()               # user-level units (services or sockets)
+        unit_types=()               # type of unit corresponding to each package: "service" or "socket"
+
+        # Iterate over filtered packages
+        for pkg in "${filtered[@]}"; do
+            # List all systemd unit files provided by the package
+            units=$(pacman -Ql "$pkg" | grep -E '/systemd/.+\.(service|socket)$' | awk '{print $2}')
+            [[ -z $units ]] && continue # Skip package if it provides no systemd units
+
+            # --- Check for user units first ---
+            # Prioritize user socket > user service
+            user_socket=$(echo "$units" | grep "/systemd/user/" | grep '\.socket$' | sort | head -n1)
+            user_service=$(echo "$units" | grep "/systemd/user/" | grep '\.service$' | sort | head -n1)
+
+            if [[ -n $user_socket ]]; then
+                provides_systemd_service+=("$pkg")         # mark package as providing systemd unit
+                user_units+=("$(basename "$user_socket")") # save socket unit filename
+                unit_types+=("socket")                     # record type for display
+                continue
+            elif [[ -n $user_service ]]; then
+                provides_systemd_service+=("$pkg")
+                user_units+=("$(basename "$user_service")")
+                unit_types+=("service")
+                continue
+            fi
+
+            # --- Check system-wide units if no user unit exists ---
+            # Prioritize socket > service
+            sys_socket=$(echo "$units" | grep '/systemd/system/' | grep '\.socket$' | sort | head -n1)
+            sys_service=$(echo "$units" | grep '/systemd/system/' | grep '\.service$' | sort | head -n1)
+
+            if [[ -n $sys_socket ]]; then
+                provides_systemd_service+=("$pkg")
+                services+=("$(basename "$sys_socket")")
+                unit_types+=("socket")
+                continue
+            elif [[ -n $sys_service ]]; then
+                provides_systemd_service+=("$pkg")
+                services+=("$(basename "$sys_service")")
+                unit_types+=("service")
+            fi
+        done
+
+        # Exit if no systemd units found
+        if [[ ${#provides_systemd_service[@]} -eq 0 ]]; then
+            notify-send -r 1 "Vibranium" "Operation completed successfully"
+            read -pr "Press any key to close this window" dummy
+            exit 0
+        fi
+
+        # Determine the header text based on found unit types
+        has_socket=false
+        has_service=false
+        for type in "${unit_types[@]}"; do
+            [[ $type == "socket" ]] && has_socket=true
+            [[ $type == "service" ]] && has_service=true
+        done
+
+        if $has_socket && $has_service; then
+            unit_label="systemd ${YELLOW}services${CYAN} and ${YELLOW}sockets${CYAN}"
+        elif $has_socket; then
+            unit_label="systemd ${YELLOW}sockets${CYAN}"
+        else
+            unit_label="systemd ${YELLOW}services${CYAN}"
+        fi
+
+        # Print the list of packages and indicate which type will be enabled
+        echo -e "${CYAN}The following packages provide ${unit_label}:${RESET}"
+        for i in "${!provides_systemd_service[@]}"; do
+            pkg="${provides_systemd_service[$i]}"
+            type="${unit_types[$i]}"
+            if [[ $type == "socket" ]]; then
+                # Explain why enabling socket is preferred: systemd will start service on-demand
+                # echo "  - $pkg (enabling socket — more efficient, service starts on demand)"
+                echo "  - ${YELLOW}$pkg${CYAN} (socket)${RESET}"
+            else
+                echo "  - ${YELLOW}$pkg${CYAN} (service)${RESET}"
+            fi
+        done
+
+        # Ask the user for confirmation
+        read -rp $'\e[0;32mDo you wish to enable and start them now? (Y/n): \e[0m' answer
+
+        case "$answer" in
+            [Yy][Ee][Ss] | [Yy] | "")
+                # Enable user units first
+                if [[ ${#user_units[@]} -gt 0 ]]; then
+                    echo "${CYAN}Enabling user units...${RESET} "
+                    systemctl --user --now enable "${user_units[@]}"
+                    echo "${GREEN}Done${RESET}"
+                fi
+
+                # Enable system-wide units
+                if [[ ${#services[@]} -gt 0 ]]; then
+                    echo "${CYAN}Enabling system units...${RESET} "
+                    pkexec systemctl enable --now "${services[@]}"
+                    echo "${GREEN}Done${RESET}"
+                fi
+                ;;
+        esac
+
+        notify-send -r 1 "Vibranium" "Operation completed successfully"
+        read -pr "Press any key to close this window" dummy
+        exit 0
+        ;;
+    *)
+        notify-send -r 1 -t 1000 "Vibranium" "<span foreground='${P_RED}'>Operation aborted</span>"
+        exit 1
+        ;;
+esac

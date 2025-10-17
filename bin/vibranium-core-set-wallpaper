@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+CONF="$XDG_CONFIG_HOME/hypr/hyprpaper.conf"
+
+if ! missing_str="$(vibranium-utils-is-installed hyprpaper jq)"; then
+    read -r -a missing <<< "$missing_str"
+    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
+    exit 1
+fi
+
+# Currently broken
+toggle_wallpaper() {
+    local mode="$1"
+    local current
+    local files
+    local idx next prev
+	local walls
+
+	# Get an array of all available wallpapers for the current theme
+	walls="$XDG_CONFIG_HOME/vibranium/theme/current/backgrounds"
+    mapfile -t files < <(find "${walls}/" -type f,l | sort)
+	# If it is empty (somehow) - exit
+    [ ${#files[@]} -eq 0 ] && return 1
+
+	current="$(vibranium-utils-wallpaper-get)"
+    idx=-1
+
+    for i in "${!files[@]}"; do
+        if [ "${files[$i]}" = "$current" ]; then
+            idx=$i
+            break
+        fi
+    done
+
+	# Next / Prev
+    case "$mode" in
+        --next)
+            next=$(( (idx + 1) % ${#files[@]} ))
+            printf "%s\n" "${files[$next]}"
+            ;;
+        --prev)
+            prev=$(( (idx - 1 + ${#files[@]}) % ${#files[@]} ))
+            printf "%s\n" "${files[$prev]}"
+            ;;
+    esac
+}
+
+case "$1" in
+    "--next"|"--prev") WALLPAPER_PATH="$(toggle_wallpaper "$1")" ;;
+	*)                 WALLPAPER_PATH="$(realpath "$1")"         ;;
+esac
+
+if [ -z "$1" ] || [[ ! $WALLPAPER_PATH =~ \.(png|jp(e)?g|webp)$ ]]; then
+    echo "Usage:"
+    echo "    $(basename "$0") <image>.[png/jpg/webp]"
+    echo "    $(basename "$0") --next | --prev"
+    exit 0
+fi
+
+if [[ "$(systemctl --user is-active hyprpaper)" != "active" ]]; then
+	msg="For some reason, the Wallpaper Daemon wasn't enabled.\nThe system service was enabled and the wallpaper was set"
+	notify-send -r 1 -t 5000 "Vibranium" "$msg"
+	systemctl --user enable --now hyprpaper
+fi
+
+# Update on all monitors
+hyprctl -q hyprpaper reload ", $WALLPAPER_PATH"
+
+# Save hyprpaper config
+printf "# Auto-generated file! All changes will be overwritten.\n" > "$CONF"
+printf "preload = %s\nwallpaper = , %s" "${WALLPAPER_PATH}" "$WALLPAPER_PATH" >> "$CONF"
+
+# Save to state file for further restpre on theme switch
+STATE_FILE="$VIBRANIUM_STATE/wallpaper/$(vibranium-theme-get)"; mkdir -p "$VIBRANIUM_STATE/wallpaper"
+printf "%s" "$WALLPAPER_PATH" > "$STATE_FILE"
+
+# Update lockscreen background
+vibranium-utils-update-lockscreen "$WALLPAPER_PATH"

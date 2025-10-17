@@ -1,0 +1,255 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+INDEX=0
+LIMIT_FPS_MIN=24
+LIMIT_FPS_MAX="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .refreshRate' | awk '{print int($1)==$1 ? $1 : int($1)+1}')"
+
+
+while true; do
+	source "$VIBRANIUM_USER_SETTINGS"
+
+	[ "$VIBRANIUM_RECORDING_QUALITY" = "very_high" ] && {
+		quality="very high"
+	} || quality="$VIBRANIUM_RECORDING_QUALITY"
+
+	capture_vol="$([ "$VIBRANIUM_RECORDING_CAPTURE_SINK" = true ] && echo yes || echo no)"
+	capture_mic="$([ "$VIBRANIUM_RECORDING_CAPTURE_SOURCE" = true ] && echo yes || echo no)"
+
+	OPTIONS=(
+		"Video FPS          : $VIBRANIUM_RECORDING_FPS"
+		"Video quality      : $quality"
+		"Capture volume     : $capture_vol"
+		"Capture microphone : $capture_mic"
+		"Advanced"
+	)
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Recording" "ESC to go back" -selected-row "$INDEX")"
+	[ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Video FPS"*)
+			while true; do
+				prompt="Video FPS to record at (int)"
+				input="$(printf "%s" "$prompt" | rofi_cmd "FPS" "ESC to go back")"
+				[ -z "$input" ] && break; [ "$input" = "$prompt" ] && continue
+				[[ ! "$input" =~ ^[0-9]+$ ]] && {
+					notify-send -r 3 -u critical -t 1500 "Vibranium" "Only integers allowed!"
+					continue
+				}
+
+				if awk "BEGIN{exit !($input > $LIMIT_FPS_MAX)}"; then
+					notify-send -r 3 -u critical -t 5000 "Vibranium" \
+						"Entered value exceeds the refresh rate of the active monitor ($LIMIT_FPS_MAX)!<span foreground='${P_GRAY}'>\nAre you sure you want this?</span>"
+					continue
+				elif awk "BEGIN{exit !($input < $LIMIT_FPS_MIN)}"; then
+					notify-send -r 3 -u critical -t 5000 "Vibranium" \
+						"Value cannot be less than ${LIMIT_FPS_MIN}!"
+					continue
+				else
+					option-validate "VIBRANIUM_RECORDING_FPS"
+					sed -i "/^VIBRANIUM_RECORDING_FPS/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
+					break
+				fi
+			done
+			;;
+		"Video quality"*)
+			quality_options=("medium" "high" "very high" "ultra")
+			quality_chosen="$(printf "%s\n" "${quality_options[@]}" | rofi_cmd "Quality" "ESC to go back")"
+			[ -z "$quality_chosen" ] && continue
+
+			option="VIBRANIUM_RECORDING_QUALITY"
+			option-validate "$option"
+			case "$quality_chosen" in
+				"medium")      sed -i "/^${option}/s/=.*/=\"${quality_chosen}\"/" "$VIBRANIUM_USER_SETTINGS" ;;
+				"high")        sed -i "/^${option}/s/=.*/=\"${quality_chosen}\"/" "$VIBRANIUM_USER_SETTINGS" ;;
+				"very high")   sed -i "/^${option}/s/=.*/=\"very_high\"/"         "$VIBRANIUM_USER_SETTINGS" ;;
+				"ultra")       sed -i "/^${option}/s/=.*/=\"${quality_chosen}\"/" "$VIBRANIUM_USER_SETTINGS" ;;
+			esac
+			;;
+		"Capture volume"*)
+				toggle_bool "VIBRANIUM_RECORDING_CAPTURE_SINK"
+			;;
+		"Capture microphone"*)
+				toggle_bool "VIBRANIUM_RECORDING_CAPTURE_SOURCE"
+			;;
+		"Advanced")
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+				advanced_options=(
+					"Container type : $VIBRANIUM_RECORDING_CONTAINER_TYPE"
+					"Recording mode : $VIBRANIUM_RECORDING_FRAMERATE_MODE"
+					"Video codec    : $VIBRANIUM_RECORDING_VIDEO_CODEC"
+					"Flash screen   : $VIBRANIUM_RECORDING_FLASH_SCREEN"
+					"In-Game FPS    : $VIBRANIUM_RECORDING_FPS_IN_GAME"
+				)
+				advanced_chosen="$(printf "%s\n" "${advanced_options[@]}" | rofi_cmd "Advanced" "ESC to go back")"
+				[ -z "$advanced_chosen" ] && break
+
+				case "$advanced_chosen" in
+					"Container type"*)
+						container_type_options=("mp4" "mkv" "webm")
+						container_type_chosen="$(printf "%s\n" "${container_type_options[@]}" | rofi_cmd "Container type" "ESC to go back")"
+						[ -z "$container_type_chosen" ] && continue
+
+						option="VIBRANIUM_RECORDING_CONTAINER_TYPE"
+						option-validate "$option"
+						case "$container_type_chosen" in
+							"mp4"|"mkv")
+								sed -i "/^${option}/s/=.*/=\"${container_type_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+								;;
+							"webm")
+								# When the container type is webm, gpu-screen-recorder automatically uses the vp8 codec.
+								# Therefore, to avoid later confusion for the user, we will explicitly change the codec.
+								option-validate "VIBRANIUM_RECORDING_VIDEO_CODEC"
+								if [ ! "$VIBRANIUM_RECORDING_VIDEO_CODEC" = "vp8" ]; then
+									sed -i "/^VIBRANIUM_RECORDING_VIDEO_CODEC/s/=.*/=\"vp8\"/" "$VIBRANIUM_USER_SETTINGS"
+									# You selected the WEBM format. 
+									# The VP8 is always used in this format, so it is set by default explicitly.
+									#
+									# Make sure your GPU supports VP8 encoding. If not, recording will fail.
+									# In that case, choose a supported codec or leave the option on auto.
+									msg="You selected the <span foreground='${P_YELLOW}'><b>WEBM</b></span> format. "
+									msg+="\nThe <span foreground='${P_YELLOW}'>VP8</span> is always used in this format, so it is set by default explicitly.\n\n"
+									msg+="<span foreground='${P_RED}'>Make sure your GPU supports </span>"
+									msg+="<span foreground='${P_YELLOW}'><b>VP8</b></span> <span foreground='${P_RED}'>encoding. If not, recording will fail.\n"
+									msg+="In that case, choose a supported codec or leave the option on auto.</span>"
+									notify-send -r 3 -u critical -t 30000 "Vibranium" "$msg"
+								fi
+								sed -i "/^${option}/s/=.*/=\"${container_type_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+						esac
+						;;
+					"Recording mode"*)
+						mode_options=("Constant Frame Rate" "Variable Frame Rate" "What is this?")
+						mode_chosen="$(printf "%s\n" "${mode_options[@]}" | rofi_cmd "Mode" "ESC to go back")"
+
+						option="VIBRANIUM_RECORDING_FRAMERATE_MODE"
+						case "$mode_chosen" in
+							"Constant"*) option-validate "$option"; sed -i "/^${option}/s/=.*/=\"cfr\"/" "$VIBRANIUM_USER_SETTINGS" ;;
+							"Variable"*) option-validate "$option"; sed -i "/^${option}/s/=.*/=\"vfr\"/" "$VIBRANIUM_USER_SETTINGS" ;;
+							"What"*)
+								# Constant Frame Rate (CFR): Each frame is stored at a fixed interval  
+								# • Pros: best for editing, audio sync, and compatibility  
+								# • Cons: if hardware struggles, frames may drop  
+								#  
+								# Variable Frame Rate (VFR): Intervals between frames can vary  
+								# • Pros: smoother recording under load, fewer frame drops  
+								# • Cons: some editors and players handle it poorly, sync can drift  
+								#  
+								# Use CFR if you plan to edit the video. Use VFR for lighter, adaptive recording  
+
+								msg="\n<span foreground='${P_YELLOW}'><b>Constant Frame Rate (CFR)</b></span>: "
+								msg+="Each frame is stored at a fixed interval\n"
+								msg+="• <span foreground='${P_GREEN}'><b>Pros</b></span>: best for editing, audio sync, and compatibility\n"
+								msg+="• <span foreground='${P_RED}'><b>Cons</b></span>: if hardware struggles, frames may drop\n\n"
+
+								msg+="<span foreground='${P_YELLOW}'><b>Variable Frame Rate (VFR)</b></span>: "
+								msg+="Intervals between frames can vary\n"
+								msg+="• <span foreground='${P_GREEN}'><b>Pros</b></span>: smoother recording under load, fewer frame drops\n"
+								msg+="• <span foreground='${P_RED}'><b>Cons</b></span>: some editors and players handle it poorly, sync can drift\n\n"
+
+								msg+="<span foreground='${P_YELLOW}'>Use CFR if you plan to edit the video. Use VFR for lighter, adaptive recording</span>"
+								notify-send -r 3 -t 25000 "What is this?" "$msg"
+								continue
+								;;
+						esac
+						;;
+					"Video codec"*)
+						video_codec_options=("auto" "h264" "hevc" "av1" "vp8" "vp9" "hevc_hdr" "av1_hdr" "hevc_10bit" "av1_10bit")
+						video_codec_chosen="$(printf "%s\n" "${video_codec_options[@]}" | rofi_cmd "Video Codec" "ESC to go back")"
+
+						if printf '%s\n' "${video_codec_options[@]}" | grep -qx "$video_codec_chosen"; then
+							option-validate "VIBRANIUM_RECORDING_VIDEO_CODEC"
+							current_codec="$(grep -oP '(?<=^VIBRANIUM_RECORDING_VIDEO_CODEC=").*(?="$)' "$VIBRANIUM_USER_SETTINGS")"
+							[ "$video_codec_chosen" = "$current_codec" ] && continue
+							
+							if [[ $video_codec_chosen != "auto" ]]; then
+								msg="Ensure the selected codec (<span foreground='${P_YELLOW}'><b>${video_codec_chosen^^}</b></span>) is supported by your GPU.\n"
+								msg+="If not, the <span foreground='${P_YELLOW}'><b>CPU</b></span> will be used as a fallback, which is less efficient"
+								notify-send -r 5 -u critical -t 10000 "Vibranium" "$msg"
+							fi
+							sed -i "/^VIBRANIUM_RECORDING_VIDEO_CODEC/s/=.*/=\"${video_codec_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+						fi
+						;;
+					"Flash screen"*)
+						while true; do
+							flash_screen_options=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN" "What is this?")
+							flash_screen_chosen="$(printf "%s\n" "${flash_screen_options[@]}" | rofi_cmd "Flash screen" "ESC to go back")"
+							[ -z "$flash_screen_chosen" ] && break
+							
+							case "$flash_screen_chosen" in
+								"Flash"*)
+									toggle_bool "VIBRANIUM_RECORDING_FLASH_SCREEN"
+									break
+									;;
+								"What"*)
+									# When the active window is fullscreen, a brief flash effect will be
+									# shown to indicate when recording starts or stops.
+									msg="When the active window is <span foreground='${P_YELLOW}'><b>fullscreen</b></span>, a brief flash effect will be\n"
+									msg+="shown to indicate when recording <span foreground='${P_GREEN}'><b>starts</b></span> "
+									msg+="or <span foreground='${P_RED}'><b>stops</b></span>."
+									notify-send -r 3 -t 7500 "What is this?" "$msg"
+									continue
+							esac
+						done
+						;;
+					"In-Game"*)
+						while true; do
+							source "$VIBRANIUM_USER_SETTINGS"
+							in_game_options=(
+								"Enabled        : $VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME"
+								"In-Game FPS    : $VIBRANIUM_RECORDING_FPS_IN_GAME"
+								"What is this?"
+							)
+							in_game_chosen="$(printf "%s\n" "${in_game_options[@]}" | rofi_cmd "In-Game FPS" "ESC to go back")"
+							[ -z "$in_game_chosen" ] && break
+
+							case "$in_game_chosen" in
+								"Enabled"*)
+									toggle_bool "VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME"
+									;;
+								"In-Game FPS"*)
+									while true; do
+										source "$VIBRANIUM_USER_SETTINGS"
+										prompt="In-Game FPS (int)"
+										input="$(printf "%s\n" "$prompt" | rofi_cmd "In-Game FPS" "${VIBRANIUM_RECORDING_FPS}-${LIMIT_FPS_MAX}")"
+										[ -z "$input" ] && break; [ "$input" = "$prompt" ] && continue
+										
+										if awk "BEGIN{exit !($input > $LIMIT_FPS_MAX)}"; then
+											notify-send -r 3 -u critical -t 5000 "Vibranium" \
+												"Entered value exceeds the refresh rate of the active monitor ($LIMIT_FPS_MAX)!<span foreground='${P_GRAY}'>\nAre you sure you want this?</span>"
+											continue
+										elif awk "BEGIN{exit !($input < $VIBRANIUM_RECORDING_FPS)}"; then
+											notify-send -r 3 -u critical -t 5000 "Vibranium" \
+												"Value cannot be less than ${VIBRANIUM_RECORDING_FPS}!"
+											continue
+										else
+											option-validate "VIBRANIUM_RECORDING_FPS_IN_GAME"
+											sed -i "/^VIBRANIUM_RECORDING_FPS_IN_GAME/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
+											break
+										fi
+									done
+									;;
+								"What"*)
+									# • Whether to increase recording FPS when the active window at start is a game.
+									#
+									# Note that this heavily depends on the WM's window rules, and if the regex does not match the title or class of your current game, it will not work as expected, which means the default FPS value will be used.
+									msg="• <span foreground='${P_YELLOW}'>Whether to increase recording FPS when the active window at start is a game.</span>\n\n"
+									msg+="Note that this heavily depends on the WM's window rules, and if the regex does not match the title or class of your "
+									msg+="current game, <span foreground='${P_RED}'><b>it will not work as expected</b></span>, which means the default <span foreground='${P_YELLOW}'><b>FPS</b></span> value will be used."
+									notify-send -r 3 -t 15000 "What is this?" "$msg"
+									continue
+							esac
+						done
+				esac
+			done
+	esac
+done

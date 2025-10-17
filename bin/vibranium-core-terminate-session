@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+
+# When terminating a session correctly (systemd-way), some applications freeze completely, 
+# and sometimes you have to wait for logind to time out to completely terminate the session.
+# I don't know why this happens, but it's annoying, so we take a rough approach with these applications.
+
+APPS=("Discord" "vesktop" "spotify" "steam" "steamwebhelper")
+
+for app in "${APPS[@]}"; do
+	kill -s KILL "$app"
+done
+
+# killall -s KILL Discord
+# killall -s KILL spotify
+# killall -S KILL steam steamwebhelper
+
+uwsm stop
+# loginctl terminate-user ""

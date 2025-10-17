@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+function disconnect_devices {
+    mapfile -t devices < <(bluetoothctl devices Connected | grep '^Device' | awk '{$1=""; mac=$2; $1=""; $2=""; name=substr($0,3); print mac "|" name}')
+
+    if ((${#devices[@]} == 0)); then
+        notify-send -r 1 "Bluetooth Manager" "Nothing to disconnect!"
+        exit 0
+    fi
+
+    if ((${#devices[@]} == 1)); then
+        mac="${devices[0]%%|*}"
+        name="${devices[0]#*|}"
+        bluetoothctl disconnect "$mac"
+        notify-send -r 1 "Bluetooth Manager" "${name} disconnected"
+        exit 0
+    fi
+
+    names=()
+    for entry in "${devices[@]}"; do
+        name="${entry#*|}"
+        names+=("$name")
+    done
+
+    chosen_name=$(printf '%s\n' "${names[@]}" | rofi_cmd "Bluetooth: " " Choose an action")
+
+    [[ -z $chosen_name ]] && exit 1
+
+    for entry in "${devices[@]}"; do
+        mac="${entry%%|*}"
+        name="${entry#*|}"
+        if [[ $name == "$chosen_name" ]]; then
+            bluetoothctl disconnect "$mac"
+            notify-send -r 1 "Bluetooth Manager" "${name} disconnected"
+            break
+        fi
+    done
+}
+
+function connect_known_devices {
+    mapfile -t devices < <(bluetoothctl devices | grep '^Device' | awk '{$1=""; mac=$2; $1=""; $2=""; name=substr($0,3); print mac "|" name}')
+
+    ((${#devices[@]} == 0)) && {
+        notify-send -r 1 "Bluetooth Manager" "No known Bluetooth devices"
+        exit 1
+    }
+
+    names=()
+    for entry in "${devices[@]}"; do
+        name="${entry#*|}"
+        names+=("$name")
+    done
+
+    chosen_name=$(printf '%s\n' "${names[@]}" | rofi_cmd "Bluetooth: " " Choose device")
+
+    [[ -z $chosen_name ]] && exit 1
+
+    for entry in "${devices[@]}"; do
+        mac="${entry%%|*}"
+        name="${entry#*|}"
+        if [[ $name == "$chosen_name" ]]; then
+            if bluetoothctl connect "$mac"; then
+                notify-send "Bluetooth Manager" "Connected to ${name}"
+                exit 0
+            else
+                notify-send -r 1 -u critical "Bluetooth Manager" "${name} - connection failed"
+                exit 1
+            fi
+        fi
+    done
+}
+
+case "$1" in
+    disconnect)
+        disconnect_devices
+        ;;
+    connect)
+        connect_known_devices
+        ;;
+    *)
+        echo "Usage: $0 connect|disconnect"
+        exit 1
+        ;;
+esac

@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+INDEX=0
+
+while true; do
+	source "$VIBRANIUM_USER_SETTINGS"
+
+	if [ "$VIBRANIUM_GLOBAL_USE_OSD" = false ]; then
+		osd="$VIBRANIUM_VOLUME_USE_OSD ()"
+	else
+		osd="$VIBRANIUM_VOLUME_USE_OSD"
+	fi
+
+	OPTIONS=()
+
+	if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
+		OPTIONS+=("Visual feedback  : <span foreground='${P_GREEN}'>$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK</span>")
+	else
+		OPTIONS+=("Visual feedback  : <span foreground='${P_RED}'>$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK</span>")
+	fi
+
+	if [[ "$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK" == true ]]; then
+		OPTIONS+=("Audio  feedback  : <span foreground='${P_GREEN}'>$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK</span>")
+	else
+		OPTIONS+=("Audio  feedback  : <span foreground='${P_RED}'>$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK</span>")
+	fi
+
+	if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+		OPTIONS+=("OSD    feedback  : <span foreground='${P_GREEN}'>$VIBRANIUM_VOLUME_USE_OSD</span>")
+	else
+		OPTIONS+=("OSD    feedback  : <span foreground='${P_GRAY}'>$VIBRANIUM_VOLUME_USE_OSD</span> <span foreground='${P_RED}'><b>()</b></span>")
+	fi
+
+	OPTIONS+=("Allow above 100% : $VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED")
+	OPTIONS+=(
+		"Adjustment step  : <span foreground='${P_ACCENT}'>$VIBRANIUM_VOLUME_ADJUSTMENT_STEP</span>"
+		"Open volume control app"
+	)
+
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Audio" "ESC to go back" -selected-row "$INDEX")"
+	[ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Open volume control app")
+			notify-send -r 3 "Vibranium" "Press '<span foreground='${P_YELLOW}'><b>?</b></span>' to see available keyboard shortcuts"
+			vibranium-cmd-launch-terminal wiremix
+			vibranium-cmd-kill-rofi
+			exit 0
+			;;
+		"Allow"*)
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+				allow_above_hundred_options=(
+					"Allow above 100% : $VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED"
+					"What is this?"
+				)
+				allow_above_hundred_chosen="$(printf "%s\n" "${allow_above_hundred_options[@]}" | rofi_cmd "Above 100%" "")"
+				[[ -z $allow_above_hundred_chosen ]] && break
+
+				case "$allow_above_hundred_chosen" in
+					"Allow"*)
+						if [[ "$(toggle_bool -v VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED)" == false ]]; then
+							current_volume=$(wpctl get-volume "@DEFAULT_AUDIO_SINK@" | awk '{print $2}')
+							if awk -v v="$current_volume" 'BEGIN {exit !(v > 1.0)}'; then
+								wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.00
+								# notify-send -r 1 "Vibranium" "The volume level set to 100%"
+								break
+							fi
+						fi
+						;;
+					"What is this?")
+						msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'>"
+						msg+="Allow volume levels above 100%</span>\n\n"
+						msg+="When enabled, maximum volume can reach 150%"
+						notify-send -r 3 -t 7000 "What is this?" "$msg"
+						;;
+				esac
+			done
+			;;
+		"Visual"*)
+			toggle_bool "VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK"
+			;;
+		"OSD"*)
+			# The VIBRANIUM_GLOBAL_USE_OSD option takes precedence over all other options that use the OSD.
+			# Therefore, if VIBRANIUM_GLOBAL_USE_OSD is set to false at the global level,
+			# no other option that uses the OSD will be active, even if its value is true.
+			[ "$VIBRANIUM_GLOBAL_USE_OSD" = "false" ] && {
+				msg="\nTo enable OSD feedback for volume changes, go to:\n"
+				msg+="<span foreground='${P_YELLOW}'>Vibranium settings</span> <span foreground='${P_BLUE}'>→</span> "
+				msg+="<span foreground='${P_YELLOW}'>Configure Vibranium</span> <span foreground='${P_BLUE}'>→</span> "
+				msg+="<span foreground='${P_YELLOW}'>General</span>"
+				notify-send -r 3 -t 10000 "This Option Is Disabled Globally" "$msg"
+				continue
+			}
+
+			toggle_bool "VIBRANIUM_VOLUME_USE_OSD"
+			;;
+		"Audio"*)
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+				audio_feedback_options=(
+					"Audio  feedback : <b><i><span foreground='${P_ACCENT}'>$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK</span></i></b>"
+				)
+
+				if [[ "$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK" == false ]]; then
+					audio_feedback_options+=(
+						"Variant         : <b><i><span foreground='${P_GRAY}'>${VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT%?} ${VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT: -1}</span></i></b> <span foreground='${P_RED}'>()</span>"
+					)
+				else
+					audio_feedback_options+=(
+						"Variant         : <b><i><span foreground='${P_ACCENT}'>${VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT%?} ${VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT: -1}</span></i></b>"
+					)
+				fi
+
+				audio_feedback_chosen="$(printf "%s\n" "${audio_feedback_options[@]}" | rofi_cmd "Audio feedback" "ESC to go back")"
+				[[ -z "$audio_feedback_chosen" ]] && break
+
+				case "$audio_feedback_chosen" in
+					*"()")
+						continue
+						;;
+					"Audio"*) 
+						toggle_bool "VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK"
+						;;
+					"Variant"*)
+						audio_variant_options=("variant 1" "variant 2" "variant 3" "variant 4")
+						audio_variant_chosen="$(printf "%s\n" "${audio_variant_options[@]}" | rofi_cmd "Audio variant" "ESC to go back")"
+						[[ -z "$audio_variant_chosen" ]] && break
+						[[ "$audio_variant_chosen" == "$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT" ]] && break
+
+						if [[ ! "${audio_variant_options[*]}" =~ "$audio_variant_chosen" ]]; then
+							continue
+						fi
+
+						option-validate "VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
+						sed -i "/^VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT/s/=.*/=\"${audio_variant_chosen// /}\"/" "$VIBRANIUM_USER_SETTINGS"
+				esac
+			done
+			;;
+		"Adjustment"*)
+			option-validate "VIBRANIUM_VOLUME_ADJUSTMENT_STEP"
+			while true; do
+				prompt="Volume adjustment step (int)"
+				current_value="$VIBRANIUM_VOLUME_ADJUSTMENT_STEP"
+				input="$(printf "%s\n" "$prompt" | rofi_cmd "Volume:" "1-25")"
+
+				[ -z "$input" ] && break
+				[ "$input" = "$prompt" ] && continue
+				[ "$input" = "$current_value" ] && break
+
+				if (( input < 1 || input > 25 )); then
+					notify-send -r 5 -u critical "Vibranium" "An integer between 1 and 25!"
+					continue
+				fi
+
+				sed -i "/^VIBRANIUM_VOLUME_ADJUSTMENT_STEP/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
+				break
+			done
+			
+	esac
+done

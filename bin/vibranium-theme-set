@@ -1,0 +1,370 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=SC2206
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+# Assign a theme name to the GTK theme folder name
+declare -A FAMILIES=(
+    [Gruvbox]="Hard Medium Soft Light"
+    [Everforest]="Hard Medium Soft"
+    [Tokyonight]="Night Moon"
+    [Catppuccin]="Mocha Macchiato Frappe Latte"
+    [Nightfox]="Nightfox Nordfox Carbonfox Terafox"
+    [Rosepine]="Rosepine Moon Dawn"
+    [Osaka]="Osaka Jade Solarized Light"
+)
+
+declare -A STANDALONE_THEMES=(
+    # ["My-Cool-Theme-Name"]="MyCoolGTKTheme1 MyCoolGTKTheme2 MyCoolGTKTheme3"
+)
+
+# Map theme to GTK theme name if special
+declare -A GTK_MAP=(
+    [Osaka-Jade]="Nightfox-Terafox"
+    [Osaka-Osaka]="Osaka-Dark"
+    [Osaka-Solarized]="Osaka-Solarized"
+    [Osaka-Light]="Osaka-Light"
+    [Nightfox-Nightfox]="Nightfox"
+)
+
+# Capitalized folder name = papirus icon color name
+# Temporarily set to blue for all; user will adjust manually
+declare -A PAPIRUS_COLORS=(
+    [Gruvbox-Hard]=yaru
+    [Gruvbox-Medium]=yaru
+    [Gruvbox-Soft]=yaru
+    [Gruvbox-Light]=palebrown
+
+    [Everforest-Hard]=green
+    [Everforest-Medium]=green
+    [Everforest-Soft]=green
+
+    [Catppuccin-Mocha]=indigo
+    [Catppuccin-Macchiato]=indigo
+    [Catppuccin-Frappe]=nordic
+    [Catppuccin-Latte]=blue
+
+    [Nightfox-Nightfox]=bluegrey
+    [Nightfox-Carbonfox]=black
+    [Nightfox-Nordfox]=nordic
+    [Nightfox-Terafox]=yeal
+
+    [Rosepine]=violet
+    [Rosepine-Moon]=violet
+    [Rosepine-Dawn]=pink
+
+    [Tokyonight-Night]=blue
+    [Tokyonight-Moon]=blue
+
+    [Osaka-Osaka]=teal
+    [Osaka-Jade]=teal
+    [Osaka-Solarized]=darkcyan
+    [Osaka-Light]=green
+)
+
+LINK_TARGET="$XDG_CONFIG_HOME/vibranium/theme/current"
+CURRENT_LINK="$LINK_TARGET"
+
+to_display_name() { echo "${1//-/ }"; }
+to_theme_name()   { echo "${1// /-}"; }
+
+capitalize() {
+    echo "$1" | awk -F- '{ for (i=1; i<=NF; i++) $i = toupper(substr($i,1,1)) substr($i,2); }1' OFS="-"
+}
+
+get_current_target_basename() {
+    if [ -e "$CURRENT_LINK" ] || [ -L "$CURRENT_LINK" ]; then
+        local realpath
+        realpath="$(readlink -f "$CURRENT_LINK" 2>/dev/null || true)"
+        if [ -n "$realpath" ]; then
+            basename "$realpath"
+            return 0
+        fi
+    fi
+    echo ""
+}
+
+is_current_theme() {
+    local theme="$1"
+    local curr_basename
+    curr_basename="$(get_current_target_basename)"
+
+    if [ -z "$curr_basename" ]; then
+        return 1
+    fi
+
+    if [[ "${curr_basename,,}" == "${theme,,}" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+pick_family() {
+    local keys=("${!FAMILIES[@]}")
+    local i j temp
+
+    for ((i=0; i<${#keys[@]}; i++)); do
+        for ((j=i+1; j<${#keys[@]}; j++)); do
+            if (( ${#keys[i]} < ${#keys[j]} )); then
+                temp="${keys[i]}"
+                keys[i]="${keys[j]}"
+                keys[j]="$temp"
+            fi
+        done
+    done
+
+    local family_chosen
+    family_chosen="$(printf "%s\n" "${keys[@]}" | rofi_cmd "Select theme" "")"
+    [[ -z "$family_chosen" ]] && exit 0
+    echo "$family_chosen"
+}
+
+pick_variant() {
+    local family="$1"
+    local variants=(${FAMILIES[$family]})
+    local i j temp
+
+    for ((i=0; i<${#variants[@]}; i++)); do
+        for ((j=i+1; j<${#variants[@]}; j++)); do
+            if (( ${#variants[i]} < ${#variants[j]} )); then
+                temp="${variants[i]}"
+                variants[i]="${variants[j]}"
+                variants[j]="$temp"
+            fi
+        done
+    done
+
+    local display
+    display="$(for v in "${variants[@]}"; do to_display_name "$v"; done | rofi_cmd "$family variants" "search")"
+	if [[ -z "$display" ]]; then
+		return 1
+	else
+		echo "$display"
+	fi
+    # [[ -z "$display" ]] && exit 0
+    # echo "$display"
+}
+
+# Thank you to the Omarchy team for this wonderful fork
+apply_chromium_colors() {
+    local current_theme; current_theme="$(vibranium-theme-get)"
+    case "$current_theme" in
+        "catppuccin-mocha")      color="30, 30, 46"    ;;
+        "catppuccin-macchiato")  color="36, 39, 58"    ;;
+        "catppuccin-frappe")     color="48, 52, 70"    ;;
+        "catppuccin-latte")      color="239, 241, 245" ;;
+
+        "everforest-hard")       color="39, 46, 51" ;;
+        "everforest-medium")     color="45, 53, 59" ;;
+        "everforest-soft")       color="51, 60, 67" ;;
+
+        "gruvbox-hard")          color="29, 32, 33" ;;
+        "gruvbox-medium")        color="40, 40, 40" ;;
+        "gruvbox-soft")          color="50, 48, 47" ;;
+        "gruvbox-light")         color="251, 241, 199" ;;
+
+        "nightfox-carbonfox")    color="22, 22, 22" ;;
+        "nightfox-nightfox")     color="25, 35, 48" ;;
+        "nightfox-nordfox")      color="46, 52, 64" ;;
+        "nightfox-terafox")      color="21, 37, 40" ;;
+
+        "osaka-jade")            color="13, 23, 19" ;;
+        "osaka-osaka")           color="0, 20, 25"  ;;
+        "osaka-solarized")       color="0, 43, 54"  ;;
+        "osaka-light")           color="253, 245, 226" ;;
+
+        "rosepine")              color="25, 23, 36" ;;
+        "rosepine-moon")         color="35, 33, 54" ;;
+        "rosepine-dawn")         color="250, 244, 237" ;;
+
+        "tokyonight-moon")       color="34, 36, 54" ;;
+        "tokyonight-night")      color="26, 27, 38" ;;
+    esac
+
+    chromium --no-startup-window --set-theme-color="$color"
+}
+
+apply_theme() {
+    local chosen="$1"
+    local folder_name="${chosen,,}"
+    if [[ $folder_name == "rosepine-rosepine" ]]; then
+        folder_name="rosepine"
+    fi
+    local theme_capital; theme_capital=$(capitalize "$chosen")
+    local color="${PAPIRUS_COLORS[$theme_capital]}"
+    local theme_path="$VIBRANIUM/themes/$folder_name"
+
+    if [ ! -d "$theme_path" ]; then
+        error "Theme folder $theme_path does not exist."
+        exit 1
+    fi
+
+    if is_current_theme "$folder_name"; then
+        error "Already on $theme_capital"
+		notify-send -r 1 -t 1500 "Vibranium" "Already on $theme_capital"
+        exit 1
+    fi
+
+    log "Target theme $theme_capital"
+
+    log "Updating symlinks"
+    rm -f "$LINK_TARGET"
+    ln -sf "$theme_path" "$LINK_TARGET"
+
+    local gtk_theme="${GTK_MAP[$chosen]:-$chosen}"
+
+    log "Applying GTK 4 settings"
+    sed -i -e "/gtk-theme-name/s/=.*/=$gtk_theme/" "$XDG_CONFIG_HOME/gtk-{3,4}.0/settings.ini"
+
+    # Update GTK 4 symlinks
+    find "$XDG_CONFIG_HOME/gtk-4.0" -type l -printf "%f\n" | while read -r link; do
+        ln -sf "$XDG_DATA_HOME/themes/$gtk_theme/gtk-4.0/$link" \
+            "$XDG_CONFIG_HOME/gtk-4.0/${link}"
+    done
+
+    log "Updating cursor theme"
+    gsettings set org.gnome.desktop.interface cursor-theme "$VIBRANIUM_CURSOR_THEME"
+
+    log "Applying GTK 3 settings"
+    gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
+
+    local icon_theme="Papirus-Dark"
+    local papirus_theme="Papirus-Dark"
+    if [[ $folder_name =~ (light|latte|dawn)$ ]]; then
+        log "Setting light icon theme"
+        icon_theme="Papirus-Light"
+        papirus_theme="Papirus-Light"
+    else
+        log "Setting dark icon theme"
+    fi
+    gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
+    papirus-folders --theme "$papirus_theme" --color "${color:-blue}" &>/dev/null &
+    # papirus_pid=$!
+    apply_chromium_colors &
+}
+
+get_wallpaper() {
+    local state_dir="$VIBRANIUM_STATE/wallpaper"
+    local state_file="$state_dir/${1,,}"
+
+    # If state folder doesn't exists ->
+    # Use first available wallpaper for the theme
+    if [[ ! -d $state_dir ]]; then
+        mkdir -p "$state_dir"
+        find "$LINK_TARGET/backgrounds/" -type f,l | head -n1
+        return 0
+    else 
+        if [[ -f "$state_file" ]]; then
+            cat "$state_file"
+        else
+            find "$LINK_TARGET/backgrounds/" -type f,l | head -n1
+            return 0
+        fi
+    fi
+}
+
+while true; do
+    FAMILY="$(pick_family)" || exit 1
+    [ -z "$FAMILY" ] && exit 1
+
+    if [[ ! ${FAMILIES[$FAMILY]+_} ]]; then
+        error "Invalid theme family selected."
+        exit 1
+    fi
+
+    if [[ -n "${STANDALONE_THEMES[$FAMILY]}" ]]; then
+        CHOSEN="${STANDALONE_THEMES[$FAMILY]}"   # slug
+        break
+    else
+        VARIANT_DISPLAY="$(pick_variant "$FAMILY")"
+        if [[ -z "$VARIANT_DISPLAY" ]]; then
+            # Пользователь нажал ESC на втором меню — возвращаемся к выбору семьи
+            continue
+        fi
+
+        VARIANT="$(to_theme_name "$VARIANT_DISPLAY")"
+        if ! echo "${FAMILIES[$FAMILY]}" | grep -qw "$VARIANT"; then
+            error "Invalid variant selected for $FAMILY."
+            exit 1
+        fi
+        CHOSEN="${FAMILY}-${VARIANT}"
+        if [[ $FAMILY == "Rosepine" && $VARIANT == "Rosepine" ]]; then
+            CHOSEN="Rosepine"
+        fi
+        break
+    fi
+done
+
+log "Applying GTK theme"
+apply_theme "$CHOSEN"
+
+log "Reloading WM configuration"
+hyprctl -q reload
+
+log "Updating terminal colors"
+if pidof kitty > /dev/null; then
+    # Todo: kitty live update
+    :
+elif pidof alacritty > /dev/null; then
+    touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+fi
+
+log "Restoring previously used wallpaper"
+vibranium-core-set-wallpaper "$(get_wallpaper "$CHOSEN")"
+
+log "Updating Waybar"
+systemctl --user --force restart waybar
+
+if [[ "$(vibranium-cmd-get-option VIBRANIUM_GLOBAL_USE_OSD)" == true ]]; then
+    systemctl --user --force restart swayosd
+fi
+
+log "Updating Dunst"
+vibranium-cmd-refresh-dunst
+
+log "Updating QT colors"
+touch "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
+
+log "Updating Discord"
+discord_folders=("Vencord" "vesktop")
+for folder in "${discord_folders[@]}"; do
+    if [[ -f "$XDG_CONFIG_HOME/${folder}/themes/vibranium.theme.css" ]]; then
+        rm -f "$XDG_CONFIG_HOME/${folder}/themes/vibranium.theme.css"
+        ln -s "${CURRENT_LINK}/discord.css" "$XDG_CONFIG_HOME/${folder}/themes/vibranium.theme.css"
+    fi
+done
+
+if pgrep -a electron | grep heroic > /dev/null; then
+    log "Active Heroic process found! Refreshing live.."
+    hyprctl -q dispatch sendshortcut CTRL, R, class:heroic
+fi
+
+log "Updating Spicetify"
+spicetify --quiet refresh
+
+if pidof spotify > /dev/null; then
+    log "Active Spotify process found! Refreshing live.."
+    hyprctl -q dispatch sendshortcut CTRL, R, class:[Ss]potify
+fi
+
+if pidof btop > /dev/null; then
+    log "Updating active btop process"
+    pkill -SIGUSR2 btop
+fi
+
+log "Updating custom svg icons"
+vibranium-theme-update-svgs
+
+log "Updating GTK icon cache"
+warn "Note that some icons still might have previous colors."; warn "If that's the case then restart or refresh an app"
+#waitpid $papirus_pid; 
+gtk-update-icon-cache -tfq "$XDG_DATA_HOME"/icons/Papirus-{Dark,Light} &
+
+if pidof thunar > /dev/null; then
+    log "Reloading thunar"
+    hyprctl -q dispatch sendshortcut CTRL, R, class:[Tt]hunar
+fi
+
+vibranium-utils-lockscreen-cache &

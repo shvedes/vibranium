@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+
+# A simple script that launches the TUI utility for the active network manager. 
+# This script is usually called via the Waybar module.
+
+case "$(basename "$(command -v nmtui iwctl)")" in
+    "nmtui") vibranium-cmd-launch-terminal nmtui ;;
+    "iwctl")
+        case "$(basename "$(command -v impala iwmenu iwgtk)")" in
+            "impala") vibranium-cmd-launch-terminal impala ;;
+            "iwmenu") vibranium-cmd-launch-terminal iwmenu ;;
+            "iwgtk") vibranium-cmd-launch-terminal iwgtk ;;
+            *) vibranium-cmd-launch-terminal iwctl ;;
+        esac
+        ;;
+    *)
+		msg="<b>systemd-networkd</b> doesn't provide a TUI frontend. Use CLI instead"
+		notify-send -r 1 -t 5000 "Vibranium" "$msg"
+		vibranium-cmd-launch-terminal 
+		sleep 0.1; wtype "networkctl --help" -k Return
+esac

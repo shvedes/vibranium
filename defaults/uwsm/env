@@ -1,0 +1,48 @@
+# This file linked to $VIBRANIUM. DO NOT EDIT!!!
+
+# If you want to edit / add / remove environment variables, 
+# consider using "$XDG_CONFIG_HOME/vibranium/environment",
+# which will take priority over this file.
+
+# shellcheck source=/dev/null
+
+if [[ -f "$XDG_CONFIG_HOME/user-dirs.dirs" ]]; then
+	while IFS='=' read -r var val; do
+		[[ -z "$var" || "$var" == \#* ]] && continue
+
+		val="${val//\"/}"
+		[[ "$val" == ~* ]] && {
+			val="$HOME${val:1}"
+		} 
+
+		export "$var"="$val"
+	done < "$XDG_CONFIG_HOME/user-dirs.dirs"
+	export VIBRANIUM_XDG_DIRS_EXPOSED=true
+else
+	export VIBRANIUM_XDG_DIRS_EXPOSED=false
+fi
+
+export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
+export VIBRANIUM="$XDG_DATA_HOME/vibranium"
+export VIBRANIUM_PATH="$VIBRANIUM/bin"
+export PATH="$HOME/.local/bin:$VIBRANIUM_PATH:$PATH"
+
+# Export user-defined environment
+source "$XDG_CONFIG_HOME/vibranium/environment"
+
+# Startup functions
+source "$VIBRANIUM_PATH/vibranium-utils-startup-functions"
+
+# Theming
+export XCURSOR_THEME="macOS"
+export XCURSOR_SIZE=22
+export QT_QPA_PLATFORMTHEME="qt6ct" # QT applications style
+
+# Use Wayland where possible
+export ELECTRON_OZONE_PLATFORM_HINT="auto"
+export SDV_VIDEODRIVER="wayland"
+export GDK_BACKEND="wayland,x11"
+export QT_QPA_PLATFORM="wayland;xcb"
+export CLUTTER_BACKEND="wayland"
+
+# vim:ft=bash

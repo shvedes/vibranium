@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+if [[ $VIBRANIUM_BAR_WEATHER_MODULE_ENABLE == false ]]; then
+	error "Disabled in Vibranium settings"
+	printf '{"text": ""}'
+    exit 0
+fi
+
+# Require XDG_RUNTIME_DIR (no fallback)
+if [[ -z $XDG_RUNTIME_DIR ]]; then
+    echo "XDG_RUNTIME_DIR is not set" >&2
+    exit 1
+fi
+
+# Validate config options
+check_bool VIBRANIUM_BAR_WEATHER_MODULE_ENABLE true
+check_bool VIBRANIUM_BAR_SHOW_ANIMATION true
+check_bool VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC true
+check_bool VIBRANIUM_BAR_SHOW_SEPARATOR true
+
+if [[ $VIBRANIUM_BAR_SHOW_SEPARATOR == true ]]; then
+    separator=" <span foreground='${P_GRAY}'>|</span>"
+else
+    separator=''
+fi
+
+fetch_weather() {
+    local city="$1"
+    if [[ -z $city ]]; then
+        curl -s "wttr.in/?format=%t\n"
+    else
+        curl -s "wttr.in/${city}?format=%t\n"
+    fi
+}
+
+# Find ancestor process named "waybar" and return its PID; fallback to PPID
+get_waybar_pid() {
+    pid="$PPID"
+    while [[ -n $pid && $pid -ne 1 ]]; do
+        comm=$(ps -p "$pid" -o comm= 2> /dev/null | tr -d ' ')
+        if [[ $comm == "waybar" ]]; then
+            printf '%s' "$pid"
+            return 0
+        fi
+        pid=$(ps -p "$pid" -o ppid= 2> /dev/null | tr -d ' ')
+    done
+    printf '%s' "$PPID"
+}
+
+waybar_pid=$(get_waybar_pid)
+marker="$XDG_RUNTIME_DIR/vibranium_bar_weather_has_run.${waybar_pid}"
+
+# temporary file for download; unique per invocation, placed in XDG_RUNTIME_DIR
+tmpfile=$(mktemp "${XDG_RUNTIME_DIR}/vibranium_weather.XXXXXX") || exit 1
+trap 'rm -f "$tmpfile"' EXIT
+
+# Decide whether to show spinner:
+# - if global animation disabled -> never show
+# - else if ON_REEXEC true -> always show
+# - else show only when marker for current waybar PID is absent
+show_spinner=false
+if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == true ]]; then
+    if [[ $VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC == true ]]; then
+        show_spinner=true
+    else
+        if [[ ! -f $marker ]]; then
+            show_spinner=true
+        fi
+    fi
+fi
+
+if [[ $show_spinner == true ]]; then
+    # run fetch in background and animate while it runs
+    fetch_weather "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" > "$tmpfile" &
+    curl_pid=$!
+
+    spinner_chars=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    i=0
+    while kill -0 "$curl_pid" 2> /dev/null; do
+        ch=${spinner_chars[i]}
+        ch_escaped=${ch//\\/\\\\}
+        printf '{"text":"<span foreground='\'"${P_GRAY}"\'' rise='\''-2pt'\'' size='\''12000'\''>%s</span>%s","tooltip":"Fetching weather..."}\n' "$ch_escaped" "$separator"
+        sleep 0.1
+        i=$(((i + 1) % ${#spinner_chars[@]}))
+    done
+
+    wait "$curl_pid"
+else
+    # synchronous fetch without animation
+    fetch_weather "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" > "$tmpfile"
+fi
+
+if [[ $? != 0 ]]; then
+    printf '{"text":"<span rise='\''1pt'\'' foreground='\'"${P_RED}"\''>\\uf071</span> %s","tooltip":"<span foreground='\'"${P_RED}"\''>Unable to fetch weather</span>\\n<span foreground='\'"${P_ACCENT}"\''>Click to try again</span>"}' "$separator"
+    exit 0
+fi
+raw_data=$(< "$tmpfile")
+# normalize wttr.in output: remove +, add space after C, move temp after condition
+data=$(printf "$raw_data" | sed 's/+//g; s/C/C /g; s/ //g' | sed -E 's/([0-9]+°C)(.*)/\2 \1/')
+
+# mark that we've run for this waybar PID (so reexec of same waybar won't re-show animation)
+: > "$marker" 2> /dev/null || true
+
+if [[ -z $VIBRANIUM_BAR_WEATHER_MODULE_CITY ]]; then
+    printf '{"text":"<span foreground='\'"${P_ACCENT}"\'' rise='\''0.5pt'\''>%s</span>%s%s"}\n' "\uf0c2" "$data" "$separator"
+else
+    city=$VIBRANIUM_BAR_WEATHER_MODULE_CITY
+    printf '{"text":"<span foreground='\'"${P_ACCENT}"\'' rise='\''0.5pt'\''>%s</span>%s%s", "tooltip":"%s"}' "\uf0c2" "$data" "$separator" "$city"
+fi

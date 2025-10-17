@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+INDEX=0
+
+while true; do
+	source "$VIBRANIUM_USER_SETTINGS"
+
+	BAR_POSITION="$(grep position "$XDG_CONFIG_HOME/waybar/config.jsonc" | awk -F'"' '{print $4}')"
+
+	if [[ "$BAR_POSITION" == "top" ]]; then
+		OPTIONS=("Move top bar to bottom")
+	else
+		OPTIONS=("Move bottom bar to top")
+	fi
+
+	if [[ "$VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS" == true ]]; then
+		OPTIONS+=("Hide shortcut hints")
+	else
+		OPTIONS+=("Show shortcut hints")
+	fi
+
+	OPTIONS+=("Configure modules" "Enabled modules")
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Waybar options" "ESC to go back" -selected-row "$INDEX")"
+	[[ -z $CHOSEN ]] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Move"*)
+			case "$BAR_POSITION" in
+				top)    vibranium-cmd-set-waybar-position "bottom" ;;
+				bottom) vibranium-cmd-set-waybar-position "top"    ;;
+			esac
+			;;
+		"Enabled"*)
+			waybar-toggle-modules
+			;;
+		"Show"*|"Hide"*)
+			vibranium-cmd-toggle-waybar-hints
+			;;
+		"Configure modules")
+			configure-waybar-module
+			;;
+	esac
+done

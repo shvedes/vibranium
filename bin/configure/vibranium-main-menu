@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+export PATH="$PATH:$VIBRANIUM_PATH/configure"
+
+OPTIONS=("WM" "Idle" "Audio" "General" "Set font" "Set theme" "Recording" "Brightness" "Screenshots" "Night Light" "Color Picker" "Factory Reset")
+INDEX=0
+
+while true; do
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Vibranium" "ESC to go back" -selected-row "$INDEX"  -theme-str 'listview{lines: 15;}')"
+	[ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Set font")         vibranium-font-set          ;;
+		"Idle")             configure-idle              ;;
+		"Audio")            configure-audio             ;;
+		"Screenshots")      configure-screenshots       ;;
+		"Brightness")       configure-brightness        ;;
+		"Recording")        configure-recording         ;;
+		"Night Light")      configure-night-light       ;;
+		"Color Picker")     configure-color-picker      ;;
+		"Set theme")        vibranium-theme-set         ;;
+		"General")          configure-global-options    ;;
+		"WM")               configure-window-manager    ;;
+		"Factory Reset")    factory-reset
+	esac
+done
+
+

@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=SC2162,SC2034
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+# echo "${YELLOW}Starting system update..."
+
+if yay -Suy --noconfirm; then
+	vibranium-cmd-refresh-waybar-module pacman
+	echo "${GREEN}Done!"
+	echo "${BLUE}Press any key to close this window..."
+	read x
+fi

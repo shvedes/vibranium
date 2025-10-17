@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+INDEX=0
+
+change_jpg_quality() {
+    local setting_name="$1"
+    local min="$2"
+    local current_value
+    
+	# Create an option in user settings if it does not already exist.
+	# Only then perfom action
+    option-validate "$setting_name"
+    eval "current_value=\$$setting_name"
+    
+    while true; do
+        prompt="Enter new value (int)"
+        new_value="$(printf "%s" "$prompt" | rofi_cmd "JPEG quality" "${min}-100")"
+        [ -z "$new_value" ] && break
+        [ "$new_value" = "$prompt" ] && continue
+        [ "$new_value" = "$current_value" ] && break
+        
+        if [[ ! "$new_value" =~ ^[0-9]+$ ]]; then
+            notify-send -r 1 -u critical -t 1500 "Vibranium" "Only integers allowed!"
+            continue
+        fi
+
+        if [ "$new_value" -gt 100 ] || [ "$new_value" -lt "$min" ]; then
+            notify-send -r 1 -u critical -t 1500 "Vibranium" "An integer between ${min}-100"
+            continue
+        fi
+
+        sed -i "/^${setting_name}/s/=.*/=${new_value}/" "$VIBRANIUM_USER_SETTINGS"
+        break
+    done
+}
+
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+    OPTIONS=("File format    : ${VIBRANIUM_SCREENSHOT_FILE_TYPE^^}")
+
+    if [[ "$VIBRANIUM_SCREENSHOT_FILE_TYPE" =~ ^(jpg|jpeg)$ ]]; then
+        OPTIONS+=(
+			"JPG quality    : $VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
+		)
+    fi
+
+    OPTIONS+=(
+        "Save to disk   : $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK"
+        "Flash screen   : $VIBRANIUM_SCREENSHOT_FLASH_SCREEN"
+        "Flash border   : $VIBRANIUM_SCREENSHOT_FLASH_BORDER"
+        "Notification   : $VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION"
+        "Include cursor : $VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR"
+    )
+
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Screenshots" "ESC to go back" -selected-row "$INDEX")"
+    [ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        "File format"*)
+			# Create an option in user settings if it does not already exist.
+			# Only then perfom action
+            option-validate "VIBRANIUM_SCREENSHOT_FILE_TYPE"
+            while true; do
+                file_types=("PNG" "JPG" "JPEG" "PPM")
+                chosen_file_type="$(printf "%s\n" "${file_types[@]}" | rofi_cmd "File format" "ESC to go back")"
+                [ -z "$chosen_file_type" ] && break
+
+                case "${chosen_file_type,,}" in
+                    png|jpg|jpeg|ppm)
+                        [ "$VIBRANIUM_SCREENSHOT_FILE_TYPE" = "${chosen_file_type,,}" ] && break
+                        sed -i "/^VIBRANIUM_SCREENSHOT_FILE_TYPE/s/=.*/=\"${chosen_file_type,,}\"/" "$VIBRANIUM_USER_SETTINGS"
+                        break
+                        ;;
+                esac
+            done
+            ;;
+        "JPG quality"*)
+			while true; do
+				source "$VIBRANIUM_USER_SETTINGS"
+				jpg_quality_options=(
+					"Default quality    : $VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
+					"Fullscreen quality : $VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN"
+				)
+				jpg_quality_chosen="$(printf "%s\n" "${jpg_quality_options[@]}" | rofi_cmd "JPG Quality" "ESC to go back")"
+				[ -z "$jpg_quality_chosen" ] && break
+
+				case "$jpg_quality_chosen" in
+					"Default quality"*)
+						while true; do
+							prompt="Default JPG quality (int)"
+							input="$(printf "%s\n" "$prompt" | rofi_cmd "JPG Quality" "1-100(%)")"
+							[ -z "$input" ] && break; [ "$input" = "$prompt" ] && continue
+
+							if (( input < 1 || input > 100 )); then
+								notify-send -r 3 -u critical -t 1500 "Vibranium" "An integer between 1-100"
+								break
+							fi
+							option-validate "VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
+							sed -i "/^VIBRANIUM_SCREENSHOT_JPEG_QUALITY/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
+							break
+						done
+						;;
+					"Fullscreen quality"*)
+						while true; do
+							fullscreen_quality_options=("Fullscreen quality : $VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN" "What is this?")
+							fullscreen_quality_chosen="$(printf "%s\n" "${fullscreen_quality_options[@]}" | rofi_cmd "Fullscreen quality" "${VIBRANIUM_SCREENSHOT_JPEG_QUALITY}-100(%)")"
+							[ -z "$fullscreen_quality_chosen" ] && break
+
+							case "$fullscreen_quality_chosen" in
+								"Fullscreen"*)
+									prompt="Fullscreen quality (int)" 
+									input="$(printf "%s\n" "$prompt" | rofi_cmd "JPG Fullscreen Quality" "$VIBRANIUM_SCREENSHOT_JPEG_QUALITY-100(%)")"
+									[ -z "$input" ] && break; [ "$input" = "$prompt" ] && continue
+
+									if (( input < VIBRANIUM_SCREENSHOT_JPEG_QUALITY || input > 100 )); then
+										notify-send -r 3 -u critical -t 1500 "Vibranium" "An integer between ${VIBRANIUM_SCREENSHOT_JPEG_QUALITY}-100"
+										continue
+									elif (( input = VIBRANIUM_SCREENSHOT_JPEG_QUALITY )); then
+										break
+									fi
+
+									option-validate "VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN"
+									sed -i "/^VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
+								;;
+								"What"*)
+									msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>JPG compression quality to use when the active window is full screen</b></span>\n\n"
+									msg+="The active window could be a <span foreground='${P_YELLOW}'><b>video</b></span> game or, for example, just"
+									msg+="<span foreground='${P_YELLOW}'><b> a video</b></span>. "
+									msg+="In both cases, preserving as much detail as possible from the image is very <span foreground='${P_RED}'><b>important</b></span>.\n\n"
+									msg+="The default value is <span foreground='${P_YELLOW}'><b>100</b></span>, which is the maximum for <span foreground='${P_YELLOW}'><b>JPG</b></span>."
+									notify-send -r 3 -t 15000 "Whats is this?" "$msg"
+							esac
+						done
+						;;
+				esac
+			done
+			;;
+		"Flash screen"*)
+			while true; do
+				flash_screen_options=("Flash screen : $VIBRANIUM_SCREENSHOT_FLASH_SCREEN" "What is this?")
+				flash_screen_chosen="$(printf "%s\n" "${flash_screen_options[@]}" | rofi_cmd "Flash screen" "ESC to go back")"
+				[ -z "$flash_screen_chosen" ] && break
+
+				case "$flash_screen_chosen" in
+					"Flash screen"*)
+						toggle_bool "VIBRANIUM_SCREENSHOT_FLASH_SCREEN"
+						break
+						;;
+					"What"*)
+						msg="• Whether to flash the screen briefly to indicate that a screenshot was taken.\n\n"
+						msg+="<span foreground='${P_YELLOW}'>Applies only to fullscreen windows.</span>"
+						notify-send -r 3 -t 10000 "What is this?" "$msg"
+						continue
+				esac
+			done
+			;;
+        "Include cursor"*) toggle_bool "VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR"    ;;
+        "Save to disk"*)   toggle_bool "VIBRANIUM_SCREENSHOT_SAVE_TO_DISK"      ;;
+        "Flash border"*)   toggle_bool "VIBRANIUM_SCREENSHOT_FLASH_BORDER"      ;;
+        "Notification"*)   toggle_bool "VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION" ;;
+    esac
+done

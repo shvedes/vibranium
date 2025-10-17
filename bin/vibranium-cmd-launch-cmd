@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+
+# This script is a simple wrapper for launching applications.
+
+if [ -z "$1" ]; then
+    exit 1
+fi
+
+cmd=$1
+shift
+
+if ! command -v "$cmd" > /dev/null; then
+    echo "Not found: $cmd"
+    exit 1
+fi
+
+exec setsid uwsm app -S err -- "$cmd" "$@"

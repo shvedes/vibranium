@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# I don't know if it's just me, but in my case, suspend happens literally instantly. 
+# So fast that the lock screen animation is only visible for a fraction of a second. 
+# That's why we use sleep.
+loginctl lock-session; sleep 1
+systemctl suspend

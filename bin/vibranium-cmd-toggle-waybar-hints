@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# This script hides tooltips with key combinations in custom module tooltips without reloading Waybar itself,
+# using Kill signals that modules accept.
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+option-validate "VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS"
+case "$VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS" in
+	true)
+		echo "Shortcut hints disabled"
+		sed -i "/^VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS/s/=.*/=false/" \
+			"$VIBRANIUM_USER_SETTINGS"
+		;;
+    false)
+		echo "Shortcut hints enabled"
+		sed -i "/^VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS/s/=.*/=true/" \
+			"$VIBRANIUM_USER_SETTINGS"
+		;;
+esac
+
+for i in $(seq 1 12); do
+	pkill -RTMIN+"${i}" waybar &
+done

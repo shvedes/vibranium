@@ -1,0 +1,94 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+reset_settings() {
+    local name="$1"
+    local pattern="$2"
+    local message="$3"
+    local callback="$4"
+    local stages=("confirm" "confirm x2" "confirm x3")
+    local prompt input
+
+    for stage in "${stages[@]}"; do
+        if [ "$name" = "FACTORY RESET" ]; then
+            prompt="$name ($stage)"
+        else
+            prompt="Reset $name settings ($stage)"
+        fi
+        input="$(printf "%s" "$prompt" | rofi_cmd "Factory reset" "ESC to cancel")"
+        [ -z "$input" ] && return 1
+        [ "$input" != "$prompt" ] && return 1
+    done
+
+    [ -n "$pattern" ] && sed -i "/$pattern/d" "$VIBRANIUM_USER_SETTINGS"
+
+    [ -n "$callback" ] && eval "$callback"
+
+    notify-send -r 1 -t 5000 "Vibranium" "<span foreground='${P_RED}'><b>${message}</b></span>"
+}
+
+while true; do
+    OPTIONS=(
+        "Reset audio settings"
+        "Reset global settings"
+        "Reset Waybar settings"
+        "Reset brightness settings"
+        "Reset screenshot settings"
+		"Reset appearance settings"
+		"Reset color picker settings"
+        "Reset screen recording settings"
+		"<b><i><u>FACTORY RESET</u></i></b>"
+    )
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Factory reset" "ESC to go back")"
+    [ -z "$CHOSEN" ] && break
+
+    case "$CHOSEN" in
+		"Reset appearance"*)
+			reset_settings "appearance" "" "Appearance settings have been restored to defaults!" \
+			"
+				truncate -s 0 "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
+				sed -i '/border-radius/s/:.*/: 0px;/g' "$XDG_CONFIG_HOME/rofi/config.rasi"
+				sed -i '/corner_radius/s/=.*/= 0/' "$XDG_CONFIG_HOME/dunst/dunstrc"
+				vibranium-cmd-refresh-dunst
+				hyprctl -q reload config-only
+			"
+			;;
+        "Reset audio"*)
+            reset_settings "audio" "VIBRANIUM_VOLUME" "Audio settings have been restored to defaults!"
+        ;;
+        "Reset global"*)
+            reset_settings "global" "VIBRANIUM_GLOBAL" "Global settings have been restored to defaults!"
+        ;;
+        "Reset Waybar"*)
+			vibranium-cmd-set-waybar-position -q top; systemctl --user restart waybar
+            reset_settings "Waybar" "VIBRANIUM_BAR" "Waybar settings have been restored to defaults!"
+        ;;
+        "Reset brightness"*)
+            reset_settings "brightness" "VIBRANIUM_BRIGHTNESS" "Brightness settings have been restored to defaults!"
+        ;;
+        "Reset screenshot"*)
+            reset_settings "screenshot" "VIBRANIUM_SCREENSHOT" "Screenshot settings have been restored to defaults!"
+        ;;
+		"Reset color picker settings")
+            reset_settings "color picker" "VIBRANIUM_COLOR_PICKER" "Color picker settings have been restored to defaults!"
+			vibranium-cmd-refresh-waybar-module color-picker
+		;;
+        "Reset screen recording"*)
+            reset_settings "screen recording" "VIBRANIUM_RECORDING" "Screen recording settings have been restored to defaults!"
+        ;;
+		*"FACTORY RESET"*)
+            reset_settings "FACTORY RESET" "VIBRANIUM_" "All settings have been reset to defaults!"
+			rm "$VIBRANIUM_STATE"/{night-light,wallpaper,power-profile,blur.restore}
+			rm "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
+			vibranium-cmd-set-waybar-position -q top; systemctl --user restart waybar
+			vibranium-cmd-edit-wm-config decoration:rounding:0 "$HYPR_CONFIG"
+			sed -i "/border-radius/s/:.*/:\t0px;/g" "$XDG_CONFIG_HOME/rofi/config.rasi"
+			sed -i "/corner_radius/s/=.*/= 0/" "$XDG_CONFIG_HOME/dunst/dunstrc"
+			vibranium-cmd-refresh-dunst
+			hyprctl -q reload config-only
+
+			printf "suspended" > "$VIBRANIUM_STATE/night-light"
+    esac
+done

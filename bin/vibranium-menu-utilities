@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+if command -v pass >/dev/null; then
+	ACTIONS=("Password manager")
+fi
+
+ACTIONS+=("Downscale a video")
+
+if systemd-inhibit | grep "Prevent system suspend is active" > /dev/null; then
+	ACTIONS+=("<b><i><u>Disable sleep inhibition</u></i></b>")
+else
+	ACTIONS+=("Enable sleep inhibition")
+fi
+
+ACTIONS+=("Reload Vibranium configuration")
+ACTIONS+=("===============================")
+
+read -r PID NAME <<< "$(hyprctl -j activewindow | jq -r '[.pid,.initialTitle]|@tsv')"
+if [[ -n "$PID" && "$(ps -o state= -p "$PID" | tr -d '[:space:]')" != T ]]; then
+	ACTIONS+=("Freeze <span foreground='${P_YELLOW}'><b><i><u>${NAME}</u></i></b></span>")
+elif [[ -n "$NAME" ]]; then
+	ACTIONS+=("Unfreeze <span foreground='${P_YELLOW}'><b><i><u>${NAME}</u></i></b></span>")
+fi
+
+while true; do
+    chosen="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "ESC to go back")"
+
+    case "$chosen" in
+		"Reload Vibranium configuration")
+			vibranium-utils-reload
+			vibranium-cmd-kill-rofi
+			exit 0
+			;;
+        *"sleep inhibition"*)
+			vibranium-cmd-inhibit-toggle
+			vibranium-cmd-kill-rofi
+			exit 0
+            ;;
+        "Downscale a video")
+            if ! vibranium-utils-video-downscale; then
+				exit 0
+			fi
+            ;;
+		"Freeze"*|"Unfreeze"*)
+			vibranium-cmd-freeze-pid-toggle
+			vibranium-cmd-kill-rofi
+			exit 0
+			;;
+		"Password manager")
+			vibranium-utils-password-manager
+			;;
+        "" | *)
+            exit 1
+            ;;
+    esac
+done

@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+# Open the file directly in the mpd client and start playing.
+# There is no interface for this function, and there are no plans to create one.
+# The end user can use it however they want; yazi, ranger, lf, custom actions for thunar, mime type, whatever.
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+if ! command -v mpd > /dev/null; then
+	notify-send -r 4 -u critical -t 2000 "Vibranium" "<span foreground='${P_RED}'>MPD is not installed!</span>"
+	error "MPD is not installed!"
+    exit 1
+fi
+
+if ! systemctl --user is-active mpd.socket mpd.service &>/dev/null; then
+    error "MPD systemd service / socket is not enabled! To enable, run ${YELLOW}'systemctl --user enable --now mpd.socket'${RESET}"
+	notify-send -r 4 -u critical -t 1500 "Vibranium" "<span foreground='${P_RED}'>MPD systemd service / socket is not enabled!</span>"
+    exit 1
+fi
+
+MPD_CONF="$XDG_CONFIG_HOME/mpd/mpd.conf"
+MUSIC_DIR=$(grep -E '^music_directory' "$MPD_CONF" | awk '{print $2}' | sed 's/^"//;s/"$//')
+MUSIC_DIR="${MUSIC_DIR/#\~/$HOME}"
+
+if [[ $1 =~ ^file:// ]]; then
+    INPUT="${1#file://}"
+else
+    INPUT="$1"
+fi
+
+REL="${INPUT#"$MUSIC_DIR"/}"
+
+if ! vibranium-cmd-launch-mpd-client; then
+	notify-send -r 4 -u critical -t 2000 "Vibranium" "<span foreground='${P_RED}'>No MPD players were found</span>"
+	exit 1
+fi
+
+# Load selected track and instanly play
+mpc insert "$REL"; mpc next; mpc play
+
+vibranium-cmd-now-playing

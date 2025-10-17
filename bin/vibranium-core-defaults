@@ -1,0 +1,653 @@
+# vim:ft=bash
+# shellcheck disable=all
+# 
+#           VIBRANIUM GLOBAL OPTIONS           #
+# ============================================ #
+#                                              #
+
+# A binary name of your preferred terminal
+#
+# Available options: string
+VIBRANIUM_DEFAULT_TERMINAL=alacritty
+
+# Self explanatory
+# Available options: string
+VIBRANIUM_CURSOR_THEME="macOS"
+
+# Which date format to use for the output files
+# Used in tools like screen recording and screenshots
+# Available options: string, see 'man date'
+#
+# Default is '%Y-%m-%d-%H-%M-%S' which is ISO 8601 (AKA EU time)
+VIBRANIUM_DATE_FORMAT="%Y-%m-%d-%H-%M-%S"
+
+# Whether to flash border of an active window when (usually) taking screenshots.
+# Available options: bool
+#
+# Note: This is a global setting that takes precedence over the settings of specific actions.
+#
+# Default is true
+VIBRANIUM_GLOBAL_FLASH_BORDER=true
+
+# How many seconds should take border flashing animation
+# Available options: int <seconds>
+#
+# Note fractional integer are supported
+#
+# Default is 0.2
+VIBRANIUM_GLOBAL_FLASH_BORDER_DURATION=0.2
+
+# Whether to flash screen when (usually) taking screenshots and starting screen recording.
+# Available options: bool
+#
+# Note: This is a global setting that takes precedence over the settings of specific actions.
+#
+# Default is true
+VIBRANIUM_GLOBAL_FLASH_SCREEN=true
+
+# How many seconds should take screen flashing animation
+# Available options: float <seconds>
+#
+# Default is 0.15
+VIBRANIUM_GLOBAL_FLASH_SCREEN_DURATION=0.15
+
+# Whether to use OSD
+# Available options: bool
+#
+# Note: This is a global setting that takes precedence over the settings of specific actions.
+#
+# Default is true
+VIBRANIUM_GLOBAL_USE_OSD=true
+
+# Whether to use OSD when changing power profiles
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD=true
+
+# Whether to use special function in app launcher, which will swap cyrillic
+# layout to latin to use search properly and back to cyrillic when menu is closed.
+# If you have no idea what you just read then you probably don't need this.
+#
+# Note: the code is not complete yet and some things kinda hardcoded, so probably
+#		you have to edit 'vibranium-core-launcher' by yourself
+#
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_MENU_SWAP_LAYOUT=false
+
+# Whether to copy processed item (a screenshot, a video) to clipboard.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD=true
+
+# Whether to pause music when locking session. The music will be restored later
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK=true
+
+# Whether to show "Welcome back, user" notification on session unlock.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION=true
+
+# Whether to show "Now Playing" notification on session unlock.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING=true
+
+# Whether to show curret track on lock screen
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN=true
+
+# Whether to include album art into notification.
+# Available options: bool
+#
+# Note: In case of web-based player (e.g. Spotify) the art will be downloaded from
+#       the web, which will take some time (it is highly depends on your network speed).
+#       If the player if offline (e.g. MPD) - action will be instant
+#
+# Default is true
+VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART=true
+
+# Whether to show app icons in app launcher
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS=true
+
+# Whether to automatically select the last remaining entry
+# Available options: bool
+#
+# Default: false
+VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT=false
+
+# Whether to respect the current power profile when performing compute-intensive actions.
+# If set to 'true' and the current power profile is 'power' (which prioritizes energy saving),
+# scripts like 'vibranium-core-set-wallpaper' will skip heavy blur processing for the lock screen background,
+# applying only dimming instead.
+# Available options: bool
+#
+# Default: true
+VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE=true
+
+# Whether to apply a Gaussian blur to the lock screen background.
+# If set to 'true', the lock screen wallpaper will be blurred according to the current power profile
+# and the VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE setting.
+# Available options: bool
+#
+# Note: Changes are applied instantly
+#
+# Default: true
+VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND=true
+
+# The amount of blur to apply to the lockscreen background.
+# Available options: string 'low' 'mid' 'hard'
+#
+# Default is 'mid'
+VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH="mid"
+
+# How much to dim the lockscreen background when VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND is false. 
+# Available options: string 'low' 'mid' 'hard'
+#
+# Default is 'mid'
+VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH="mid"
+
+# Whether to require the user to repeat the shortcut to kill the active window.
+# Available options: bool
+#
+# Note: kill the window, not to close
+#
+# Default is true
+VIBRANIUM_GLOBAL_CONFIRM_TO_KILL=true
+
+# Which type of power menu to use.
+# Available options: string 'overlay' 'menu'
+#
+# Default is 'overlay'
+VIBRANIUM_GLOBAL_POWER_MENU_STYLE="overlay"
+
+#           VOLUME CONTROL OPTIONS             #
+# ============================================ #
+#                                              #
+
+# Whether to use visual feedback on volume actions (volume up / down, mute, etc).
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK=true
+
+# Whether to use OSD as visual feedback for option above.
+# Available options: bool
+#
+# Note: if set to false and VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK is set to true,
+#       a notification will be used instead.
+#
+# Default is true
+VIBRANIUM_VOLUME_USE_OSD=true
+
+# Whether to play a 'pop' sound when changing volume, aka audio feedback (GNOME-like)
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK=false
+
+# Which sound to play.
+# Available options: string 'variant1' 'variant2'
+#
+# Default is 'variant1'
+VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT="variant1"
+
+# Self explanatory.
+# Available options: int
+#
+# Default is 5
+VIBRANIUM_VOLUME_ADJUSTMENT_STEP=5
+
+# Whether to allow adjusting the volume above 100%
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED=false
+
+
+#      VIBRANIUM MEDIA DOWNLOADER OPTIONS      #
+# ============================================ #
+#                                              #
+
+# Note: Neither of the options below is working yet.
+
+# Which format to use for video files.
+# Available options: string 'mp4' 'webm' 'gif'
+#
+# Default is 'mp4'
+VIBRANIUM_MEDIA_DOWNLOADER_VIDEO_FORMAT="mp4"
+
+# Whether to keep original file after post-processing downloaded video (e.g. converting to aduio or changing video container format).
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_MEDIA_DOWNLOADER_KEEP_ORIGINAL=false
+
+# Which format to use for audio files.
+# Available options: string 'aac' 'alac' 'flac' 'm4a' 'mp3' 'oups' 'wav' 'vorbis'
+#
+# When empty the best available quality is used.
+# Default is 'mp3' for best compatibility
+VIBRANIUM_MEDIA_DOWNLOADER_AUDIO_FORMAT="mp3"
+
+# Quality level for audio files.
+# Available options: int between 0 and 10, where 0 is the best and 10 is the worst quality
+#
+# Default is 5
+VIBRANIUM_MEDIA_DOWNLOADER_AUDIO_QUAILITY=5
+
+# Whether to use aria2 as a downloader backend.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_MEDIA_DOWNLOADER_USE_ARIA2=true
+
+# A directory where all downloaded files will be saved.
+# Available options: string <path>
+#
+# Default (empty string) attempts to scan $HOME/.config/user-dirs.dirs for the downloads folder,
+# If this file does not exist, $HOME is used.
+VIBRANIUM_MEDIA_DOWNLOADER_OUTPUT_PATH=""
+
+#       VIBRANIUM VIDEO DOWNSCALE OPTIONS      #
+# ============================================ #
+#                                              #
+
+# A directory where all processed videos will be saved.
+# Available options: string, a path without trailing slashes (/)
+#
+# Default (empty string) attempts to scan $HOME/.config/user-dirs.dirs for the videos folder,
+# If this file does not exist, $HOME/downscaled_videos is used.
+VIBRANIUM_VIDEO_DOWNSCALE_OUTPUT_DIR=""
+
+# Default compression level for processed videos.
+# Available options: 'low' 'mid' 'high' 'ultra'
+#
+# Default is 'mid'
+# VIBRANIUM_VIDEO_DOWNSCALE_LEVEL="mid"
+
+# Whether to use GPU for processing.
+# Available options: bool
+#
+# Note: only AMDGPU tested
+#
+# Default is false
+VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU=false
+
+#                SCREENSHOT OPTIONS            #
+# ============================================ #
+#                                              #
+
+# Which file type to use when taking a screenshot
+# Available options limits to `man grim` file type support, so:
+# Available options: string 'png' 'jpg' 'jpeg' 'ppm'
+#
+# Note: 'jpg' and 'jpeg' map to the same grim's CLI flag; the screenshot script normalizes them.
+#
+# Default is 'png'
+VIBRANIUM_SCREENSHOT_FILE_TYPE="png"
+
+# JPEG quality
+# Available options: int between 0 and 100
+#
+# Default is 50
+VIBRANIUM_SCREENSHOT_JPEG_QUALITY=50
+
+# Basically the same as above, but in fullscreen. Why?
+# Let's imagine that you are watching a video or playing a video game
+# and you want to quickly capture a frame to send to a friend
+# or simply enlarge it in a photo editing program.
+# JPEG compression is great, of course, but right now we need all the details of the image!
+#
+# Available options: int between 0 and 100
+#
+# Default is 100
+VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN=100
+
+# Whether to include cursor into screenshot image
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR=false
+
+# Whether to save taken screenshot to disk
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_SCREENSHOT_SAVE_TO_DISK=true
+
+# A directory where all screenshots will be saved.
+# Available options: string, a path without trailing slashes (/)
+#
+# Default (empty string) attempts to scan $HOME/.config/user-dirs.dirs for the pictures folder,
+# If this file does not exist, $HOME is used.
+VIBRANIUM_SCREENSHOT_OUTPUT_DIR=""
+
+# When set to true and taking a fullscreen screenshot,
+# a temporary compositor shader is applied to create a flash effect.
+# Available options: bool
+#
+# Note: VIBRANIUM_GLOBAL_FLASH_SCREEN takes precedence over this option, so
+#       if VIBRANIUM_GLOBAL_FLASH_SCREEN is false but this is true, no effect
+#       will be applied.
+#
+# Default is true
+VIBRANIUM_SCREENSHOT_FLASH_SCREEN=true
+
+# Whether to flash border of active window when taking a screenshot
+# Available options: bool
+#
+# Note: VIBRANIUM_GLOBAL_FLASH_BORDER takes precedence over this option, so
+#       if VIBRANIUM_GLOBAL_FLASH_BORDER is false and this is true, no effect
+#       will be applied.
+#
+# Note: Also check out VIBRANIUM_GLOBAL_FLASH_BORDER_DURATION
+# Default is true
+VIBRANIUM_SCREENSHOT_FLASH_BORDER=true
+
+# Whether to show a notification to indicate that screenshot was taken
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION=true
+
+#             BRIGHTNESS OPTIONS               #
+# ============================================ #
+#                                              #
+
+# Whether to use DDC (Display Data Channel) protocol to control brightness of external monitors.
+# Available options: bool
+#
+# Note: Only single monitor setup is tested.
+#
+# Default is true
+VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL=true
+
+# Whether to use OSD to show current brightness
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_BRIGHTNESS_USE_OSD=true
+
+# Brightness adjustment step
+# Available options: int
+#
+# Default: 5
+VIBRANIUM_BRIGHTNESS_STEP=5
+
+#             COLOR PICKER OPTIONS             #
+# ============================================ #
+#                                              #
+
+# Which color format to use when using color picker.
+# Available options: string 'cmyk' 'hex' 'rgb' 'hsl' 'hsv'
+#
+# Default is 'hex'
+VIBRANIUM_COLOR_PICKER_COLOR_FORMAT="hex"
+
+# Whether to show live HEX preview.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW=true
+
+# Whether to lower mouse sensetivitiy when picking a color with hex preview enabled.
+# Since zoom level is pretty high, this helps to choose exact pixel precisely.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY=true
+
+# How much to reduce mouse sensitivity. Highly depends on your current mouse sensetivitiy.
+# available options: float
+#
+# Default is 0.5
+VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY_LEVEL=0.5
+
+# Whether to display selected color in the notification body.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR=true
+
+# The number of recent colors in the Waybar module tooltip.
+# Available options: int
+#
+# Default is 10
+VIBRANIUM_COLOR_PICKER_HISTORY_SIZE=10
+
+# Which icon to use in Waybar module.
+# Available options: string 'droplet' 'palette' 'eyedropper'
+#
+# Default is 'droplet'
+VIBRANIUM_COLOR_PICKER_WAYBAR_ICON="droplet"
+
+#                WAYBAR OPTIONS                #
+# ============================================ #
+#                                              #
+
+# Note: Changes in this section take effect after reloading Waybar, unless stated otherwise.
+#       To do so, you can reload whole Vibranium configuration by pressing Super+Shift+R.
+
+# Whether to show tooltips with available shortcuts when hovering over a module.
+# Available option: bool
+#
+# Default is true
+VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS=true
+
+# Which icon to use for 'inhibitor' module.
+# Reminder: This module will appear automatically when user
+# selects 'Enable sleep inhibition' option in Vibranium Utils Menu (Ctrl + Alt + U | Vibranium menu > Utilities)
+# Available options: string 'coffee' 'lock' 'eye'
+#
+# Default is 'lock'
+VIBRANIUM_BAR_INHIBITOR_ICON="lock"
+
+# Whether to enable color picker module.
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE=false
+
+# Whether to enable power profile module.
+# Available options: bool
+#
+# Note: setting this to false doesn't disable ability to change power profile systemwide.
+#
+# Default is true
+VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE=true
+
+# Whether to enable brightness module.
+# Available options: bool
+#
+# Note: setting this to false doesn't disable systemwide brightness control.
+#
+# Default is false
+VIBRANIUM_BAR_BRIGHTNESS_MODULE_ENABLE=false
+
+# Whether to enable a Waybar module which will track package updates.
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_BAR_PACMAN_MODULE_ENABLE=false
+
+# A number of packages required for the update icon to appear in the bar.
+# Available options: int
+#
+# For example, if the value is 25 and the number of available updates is 20, the module will not be displayed in the bar.
+#
+# Default is 25
+VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED=25
+
+# Whether to enable weather module in Waybar.
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_BAR_WEATHER_MODULE_ENABLE=false
+
+# Which city to use for displaying the weather.
+# Available options: string
+#
+# Examples: 'Madrid' 'Lisbon' 'Paris' 'Moscow' 'Chicago'
+#
+# Default is empty string, which means auto detect
+VIBRANIUM_BAR_WEATHER_MODULE_CITY=""
+
+# Time in SECONDS that is going to be waited between updates pull.
+# Available options: int
+#
+# Note: Applies only after re-login.
+# Note: Does nothing for now.
+#
+# Default is 1800 (30m)
+# VIBRANIUM_BAR_PACMAN_MODULE_PULL_INTERVAL=1800
+
+# Whether to display loading animation for custom modules at startup (e.g. pacman / weather).
+# Available option: bool
+#
+# Note: see option below this one
+#
+# Default is true
+VIBRANIUM_BAR_SHOW_ANIMATION=true
+
+# Whether to show a loading animation when pulling data for module updates.
+#
+# When launching custom modules that need to pull data, a small animation usually displays,
+# which will remain active until the necessary data is received and displayed (see the setting above).
+# These modules are usually updated every 30 minutes (an option to control the interval is planned for the future)
+# by fully restarting the scripts behind these modules, which means that the loading animation will be displayed again.
+# Sometimes this can be distracting and a little annoying. This option controls the display of the
+# animation only when the modules are updated. If you want to turn off the animation completely, see VIBRANIUM_BAR_SHOW_ANIMATION
+# If you want to see the effect set "restart-interval" option to, lets say 3 seconds in Waybar's config.jsonc.
+# Changes are applied instantly.
+#
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC=true
+
+# Whether to show separator for pacman and weather modules. This might be useful when the users wants
+# to separate them visually with the clock module.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_BAR_SHOW_SEPARATOR=true
+
+#         SCREEN RECORDING OPTIONS             #
+# ============================================ #
+#                                              #
+
+# FPS to record video at.
+# Available options: integer value
+# Recommended up to 30 to save resources.
+#
+# Default is 30
+VIBRANIUM_RECORDING_FPS=30
+
+# Whether to increase FPS in a game.
+# Available options: bool
+#
+# Note: If set to true, the recording script will determine if the active window is flagged as a game.
+#       If so, the value in VIBRANIUM_RECORDING_FPS_IN_GAME will set the FPS for the current recording.
+#
+# Note: The current FPS won't change during recording if you switch windows, workspaces, or similar.
+#       This is a one-time setting, valid until the next screen recording.
+#
+# Default is false
+VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME=false
+
+# Does nothing if VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME is set to false.
+# Available options: int
+#
+# Default is 60
+VIBRANIUM_RECORDING_FPS_IN_GAME=60
+
+# Video recording quality level.
+# Available options: 'medium', 'high', 'very_high', 'ultra'
+#
+# Default is 'medium'
+VIBRANIUM_RECORDING_QUALITY="medium"
+
+# Container format for the output file.
+# Available options: 'mp4', 'mkv', 'webm'
+#
+# Note: If 'webm' is used, gpu-screen-recorder will force the codec to 'vp8'.
+#       So if you want to use 'webm', make sure your GPU supports 'vp8'.
+#       Otherwise, choose a different container format.
+#
+# Default is 'mp4'
+VIBRANIUM_RECORDING_CONTAINER_TYPE="mp4"
+
+# Framerate mode to record with.
+# Available options: 'cfr' (constant frame rate), 'vfr' (variable frame rate)
+#
+# Note: While 'cfr' provides better quality, it increases the final file size.
+#       'vfr' is more resource-efficient, but some video players may not handle it properly.
+#
+# Default is 'cfr'
+VIBRANIUM_RECORDING_FRAMERATE_MODE="cfr"
+
+# Video codec to use.
+# Available options: 'auto', 'h264', 'hevc', 'av1', 'vp8', 'vp9', 'hevc_hdr', 'av1_hdr', 'hevc_10bit', 'av1_10bit'
+#
+# Note: Make sure that your hardware supports the selected codec. For more info, see 'gpu-screen-recorder -h | less'.
+# Note: If 'av1' is used but your GPU does not support it, 'h264' will be used as fallback.
+#
+# Default is 'auto'
+VIBRANIUM_RECORDING_VIDEO_CODEC="auto"
+
+# Whether to capture your source device (e.g., microphone).
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_RECORDING_CAPTURE_SOURCE=false
+
+# Whether to capture your output device.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_RECORDING_CAPTURE_SINK=true
+
+# When set to true and starting screen recording in fullscreen mode,
+# a temporary compositor shader is applied to create a flash effect.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_RECORDING_FLASH_SCREEN=true
+
+# A directory where all recordings will be saved.
+# Available options: string, a path without trailing slashes (/)
+#
+# Default (empty string) attempts to scan $HOME/.config/user-dirs.dirs for the videos folder,
+# If this file does not exist, $HOME is used.
+VIBRANIUM_RECORDING_OUTPUT_DIR=""
+
+# 
+#             PLAYERCTL OPTIONS                #
+# ============================================ #
+#                                              #
+
+# How fast should the fade effect be when playing/pausing
+# Available options: string 'very_slow' 'slow' 'normal' 'fast' 'very_fast' 'off'
+#
+# Default is 'normal'
+VIBRANIUM_PLAYERCTL_FADE_DURATION="normal"
+
+# How fast should the fade effect be when switching to the next / prev track
+# Available options: string 'very_slow' 'slow' 'normal' 'fast' 'very_fast' 'off'
+#
+# Default is 'slow'
+VIBRANIUM_PLAYERCTL_FADE_DURATION_ON_SWITCH="slow"

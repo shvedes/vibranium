@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+read -r pid name <<< "$(hyprctl -j activewindow | jq -r '[.pid,.initialTitle]|@tsv')"
+
+if [ -z "$pid" ]; then
+	notify-send -r 1 "Vibranium" "There is no active window on current workspace"
+	exit 1
+fi
+
+if [[ -z $1 && $(ps -o state= -p "$pid" | tr -d '[:space:]') != T ]]; then
+    kill -STOP "$pid"
+    msg="suspended"
+else
+    kill -CONT "$pid"
+    msg="restored"
+fi
+
+notify-send -r 1 "Vibranium" "<span foreground='${P_YELLOW}'>${name}</span> $msg"

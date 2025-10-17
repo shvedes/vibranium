@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+case "$1" in
+	"-d")
+		readlink "$XDG_CONFIG_HOME/vibranium/theme/current"
+		;;
+	*)
+		basename $(readlink "$XDG_CONFIG_HOME/vibranium/theme/current")
+		;;
+esac

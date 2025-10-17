@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+# If the state file exists, retrieve data from it. 
+# Each request to powerprofilectl takes ~100ms. Using the state file, we can reduce this to 1.5-2ms.
+# This plays a huge role in vibranium-core-power-profile-set, making power profile switching virtually instantaneous. 
+if [[ -f "$XDG_STATE_HOME/vibranium/power-profile" ]]; then
+	cat "$XDG_STATE_HOME/vibranium/power-profile"
+else
+	# If (somehow) the file does not exist, get the current profile, output it to stdout, and write it to the state file
+	powerprofilesctl get | tee "$XDG_STATE_HOME/vibranium/power-profile"
+fi

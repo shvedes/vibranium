@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+
+# A small piece of logic that runs when the session starts.
+# Nothing much is happening here right now, but in the future, 
+# I think it will be possible to implement something like self-check for the entire setup.
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+if [[ ! -d "$VIBRANIUM_STATE" ]]; then
+	mkdir -p "$VIBRANIUM_STATE"/wallpaper
+	vibranium-utils-wallpaper-get > "$VIBRANIUM_STATE/wallpaper/$(vibranium-theme-get)"
+fi
+
+# ddcutil (external monitor brightness control)
+if [[ $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL == true ]]; then
+	export I2C_BUS; I2C_BUS=$(ddcutil detect 2> /dev/null | awk -F'i2c-' '/I2C bus/{print $2}')
+fi
+
+# So far, this variable has little use
+if [[ "$(</sys/class/dmi/id/chassis_type)" == "10" ]]; then
+	export VIBRANIUM_IS_LAPTOP=true
+else
+	export VIBRANIUM_IS_LAPTOP=false
+fi
+

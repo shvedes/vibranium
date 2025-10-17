@@ -1,0 +1,58 @@
+#303030 # Black Dim
+#292929 # Black
+#696969 # Black Bright
+
+#96262d # Red Dim
+#bf2a37 # Red
+#e25c5c # Red Brigt
+
+#cc6792 # Pink Dim
+#ff7eb6 # Pink
+#ff97c3 # Pink Bright
+
+#25864d # Green Dim
+#25be6a # Green
+#74d192 # Green Bright
+
+#c19150 # Yellow Dim
+#f1b562 # Yellow
+#f8c98d # Yellow Bright
+
+#b17421 # Orange Dim
+#dd9024 # Orange
+#e7a450 # Orange Bright
+
+#667bbe # Blue Dark
+#78a9ff # Blue
+#a2c0ff # Blue Bright
+
+#9978cb # Purple Dim
+#be95ff # Purple
+#d1b2ff # Purple Bright
+
+#1a9895 # Cyan Dim
+#08bdba # Cyan
+#72d0cc # Cyan Bright
+
+#93939a # White Dim
+#dfdfe0 # White
+#f2f2f3 # White Bright
+
+#2a2a2a # Gray Dim
+#525253 # Gray
+#7e7e7e # Gray Bright
+
+#141414 # Background Hard
+#161616 # Background 0
+#333333 # Background 1
+#3d3d3d # Background 2
+#484848 # Background 3
+#525252 # Background 4
+#696969 # Background 5
+
+#f2f4f8 # Foreground Hard
+#e6e8eb # Foreground 0
+#c1c3c6 # Foreground 1
+#aaabae # Foreground 2
+#939496 # Foreground 3
+#7c7d7f # Foreground 4

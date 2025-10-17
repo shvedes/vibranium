@@ -1,0 +1,12 @@
+{
+	"custom/inhibitor": {
+		"format": "{text}",
+		"hide-empty-text": true,
+
+		"exec": "vibranium-bar-sleep-inhibitor",
+		"on-click": "vibranium-cmd-inhibit-toggle",
+
+		"signal": 3,
+		"return-type": "json"
+	}
+}

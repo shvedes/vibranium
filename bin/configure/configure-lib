@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+export PATH="$PATH:$VIBRANIUM_PATH/configure"
+
+toggle_bool() {
+	local verbose
+	local setting_name
+    local current_value
+
+	if [ "$1" = "-v" ]; then
+		verbose=true
+		setting_name="$2"
+	else
+		verbose=false
+		setting_name="$1"
+	fi
+
+	option-validate "$setting_name"
+    eval "current_value=\$$setting_name"
+    
+    case "$current_value" in
+        "true")
+			sed -i "/^${setting_name}=/s/=.*/=false/" "$VIBRANIUM_USER_SETTINGS"
+		 	[ "$verbose" = "true" ] && echo "false"
+			;;
+        "false")
+			sed -i "/^${setting_name}=/s/=.*/=true/" "$VIBRANIUM_USER_SETTINGS"
+		 	[ "$verbose" = "true" ] && echo "true"
+			;;
+    esac
+}

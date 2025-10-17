@@ -1,0 +1,24 @@
+{
+	// TODO: Wait for the Waybar commit which will add the ability to assign a special set of icons, 
+	// and then make a monochrome version for a huge number of applications.
+	"tray": {
+		"icon-size": 12,
+		"show-passive-items": true,
+		"spacing": 8,
+		"icons": {
+			"TelegramDesktop": "telegram-desktop",
+			"discordcanary": "discord-canary",
+			"virt-manager": "virtualbox",
+			"syncthing-gtk": "syncthing",
+			"qBittorrent": "qbittorrent",
+			"spotify-client": "spotify",
+			"flameshot": "flameshot",
+			"blueman": "bluetooth",
+			"discord": "discord",
+			"vesktop": "vesktop",
+			"lutris": "lutris",
+			"heroic": "heroic",
+			"steam": "steam"
+		}
+	}
+}

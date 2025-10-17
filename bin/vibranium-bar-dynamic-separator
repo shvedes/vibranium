@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Draw a separator when some modules or conditions are active.
+
+source "$VIBRANIUM_PATH/vibranium-core-defaults"
+source "$XDG_CONFIG_HOME/vibranium/settings"
+
+NIGHT_LIGHT_STATE="$(<"$VIBRANIUM_STATE/night-light")"
+
+show() { printf '{"text": "|"}'; exit; }
+
+[[ -f "$XDG_RUNTIME_DIR/worker.active" ]] && show
+[[ $VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE == true ]] && show
+[[ $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE == true ]] && {
+	[[ $(vibranium-utils-power-profile-get) != "balanced" ]] && show
+}
+
+# Active systemd inhibitors 
+for f in /run/systemd/inhibit/*; do
+	[[ -f $f ]] || continue 
+	while IFS= read -r line; do 
+		case $line in 
+			*=Vibranium) show ;; 
+		esac
+	done < "$f"
+done
+
+# Night light
+# pidof hyprsunset >/dev/null && show
+[[ "$NIGHT_LIGHT_STATE" != "suspended" ]] && show
+
+# Screen recorder
+pidof gpu-screen-recorder &>/dev/null && show
+pidof magick &>/dev/null && show
+
+printf '{"text": ""}'

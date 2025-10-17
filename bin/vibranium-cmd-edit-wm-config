@@ -1,0 +1,342 @@
+#!/usr/bin/env python3
+
+"""
+Config file parser and editor for Hyprland-style configuration files.
+Supports nested sections, comments, and in-place editing.
+"""
+
+import sys
+import re
+import argparse
+from typing import List, Tuple, Optional
+
+
+def parse_path(path: str) -> Tuple[List[str], Optional[str], Optional[int]]:
+    """
+    Parse path like 'section:subsection:option:value:-2'
+    Returns: (path_parts, value, index)
+    """
+    # Check for index suffix like :-1, :-2
+    index = None
+    value = None
+    if ':-' in path:
+        path, index_str = path.rsplit(':-', 1)
+        try:
+            index = int(index_str)
+        except ValueError:
+            pass
+    
+    parts = path.split(':')
+    
+    # Last part might be value (for write mode)
+    return parts, value, index
+
+
+def find_section_bounds(lines: List[str], path: List[str], start_line: int = 0, occurrence: int = 1) -> Optional[Tuple[int, int, int]]:
+    """
+    Find the bounds of a section in the file.
+    Returns: (section_start_line, section_end_line, indent_level) or None
+    occurrence: which occurrence to find (1-indexed)
+    """
+    current_occurrence = 0
+    depth = 0
+    search_depth = len(path)
+    current_path = []
+    indent_stack = [0]
+    
+    i = start_line
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.lstrip()
+        
+        # Skip comments and empty lines
+        if not stripped or stripped.startswith('#'):
+            i += 1
+            continue
+        
+        # Calculate current indentation level
+        indent = len(line) - len(stripped)
+        
+        # Handle closing braces
+        if stripped.startswith('}'):
+            if current_path:
+                current_path.pop()
+                indent_stack.pop()
+            i += 1
+            continue
+        
+        # Check for section opening
+        section_match = re.match(r'^(\w+)\s*\{', stripped)
+        if section_match:
+            section_name = section_match.group(1)
+            current_path.append(section_name)
+            indent_stack.append(indent)
+            
+            # Check if this matches our search path
+            if current_path == path[:len(current_path)] and len(current_path) == search_depth:
+                current_occurrence += 1
+                if current_occurrence == occurrence:
+                    # Find the closing brace
+                    brace_depth = 1
+                    j = i + 1
+                    while j < len(lines) and brace_depth > 0:
+                        if '{' in lines[j]:
+                            brace_depth += lines[j].count('{')
+                        if '}' in lines[j]:
+                            brace_depth -= lines[j].count('}')
+                        j += 1
+                    return (i, j - 1, indent)
+            
+            i += 1
+            continue
+        
+        # Regular option line
+        i += 1
+    
+    return None
+
+
+def find_option_in_section(lines: List[str], section_start: int, section_end: int, option_name: str) -> Optional[int]:
+    """
+    Find an option within a section.
+    Returns line number or None.
+    """
+    for i in range(section_start + 1, section_end):
+        line = lines[i]
+        stripped = line.lstrip()
+        
+        # Skip comments, empty lines, and subsections
+        if not stripped or stripped.startswith('#') or '{' in stripped:
+            continue
+        
+        # Check if this is our option
+        option_match = re.match(r'^(\w+)\s*=', stripped)
+        if option_match and option_match.group(1) == option_name:
+            return i
+    
+    return None
+
+
+def get_indent(level: int) -> str:
+    """Get indentation string for a given level."""
+    return '\t' * level
+
+
+def read_value(lines: List[str], path: List[str], file_path: str, occurrence: int = 1) -> str:
+    """
+    Read a value from the config file.
+    """
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+    
+    # Try to find as a section first
+    section_bounds = find_section_bounds(lines, path, occurrence=occurrence)
+    if section_bounds:
+        # This is a section, return it whole
+        section_start, section_end, _ = section_bounds
+        result = []
+        for i in range(section_start, section_end + 1):
+            result.append(lines[i].rstrip())
+        return '\n'.join(result)
+    
+    # Not a section, try as an option
+    if len(path) < 1:
+        sys.exit(1)
+    
+    # Navigate to the deepest section
+    section_path = path[:-1]  # All but the last element
+    option_name = path[-1]
+    
+    if not section_path:
+        # Top-level option
+        for i, line in enumerate(lines):
+            stripped = line.lstrip()
+            if stripped.startswith('#') or not stripped:
+                continue
+            option_match = re.match(r'^(\w+)\s*=\s*(.+)', stripped)
+            if option_match and option_match.group(1) == option_name:
+                return option_match.group(2).strip()
+        sys.exit(1)
+    
+    # Find the section
+    section_bounds = find_section_bounds(lines, section_path, occurrence=occurrence)
+    if not section_bounds:
+        sys.exit(1)
+    
+    section_start, section_end, _ = section_bounds
+    
+    # Look for the option in this section
+    option_line = find_option_in_section(lines, section_start, section_end, option_name)
+    if option_line is not None:
+        line = lines[option_line]
+        match = re.match(r'^[^=]+=\s*(.+)', line.lstrip())
+        if match:
+            return match.group(1).strip()
+    
+    sys.exit(1)
+
+
+def write_value(lines: List[str], path: List[str], value: str, file_path: str, occurrence: int = 1):
+    """
+    Write a value to the config file.
+    """
+    # Validate value is not empty
+    if value == '""' or value == "''":
+        sys.exit(1)
+    
+    # Remove quotes if present
+    if (value.startswith('"') and value.endswith('"')) or (value.startswith("'") and value.endswith("'")):
+        value = value[1:-1]
+    
+    if not value:
+        sys.exit(1)
+    
+    section_path = path[:-1]
+    option_name = path[-1]
+    
+    # Handle top-level option
+    if not section_path:
+        # Find if option exists at top level
+        for i, line in enumerate(lines):
+            stripped = line.lstrip()
+            if stripped.startswith('#') or not stripped:
+                continue
+            option_match = re.match(r'^(\w+)\s*=', stripped)
+            if option_match and option_match.group(1) == option_name:
+                # Update existing option
+                indent = len(line) - len(stripped)
+                lines[i] = get_indent(0) + f"{option_name} = {value}\n"
+                with open(file_path, 'w') as f:
+                    f.writelines(lines)
+                return
+        
+        # Create new top-level option
+        lines.insert(0, f"{option_name} = {value}\n")
+        with open(file_path, 'w') as f:
+            f.writelines(lines)
+        return
+    
+    # Navigate through sections, creating as needed
+    current_indent = 0
+    current_line = 0
+    
+    for depth, section_name in enumerate(section_path):
+        section_bounds = find_section_bounds(lines, section_path[:depth+1], start_line=current_line, occurrence=occurrence if depth == len(section_path) - 1 else 1)
+        
+        if section_bounds:
+            # Section exists
+            section_start, section_end, indent = section_bounds
+            current_line = section_start
+            current_indent = indent
+        else:
+            # Need to create this section and all remaining nested sections
+            # Find where to insert
+            if depth == 0:
+                # Create at top level
+                insert_pos = len(lines)
+                current_indent = 0
+            else:
+                # Create inside parent section
+                parent_bounds = find_section_bounds(lines, section_path[:depth], start_line=0)
+                if parent_bounds:
+                    _, parent_end, parent_indent = parent_bounds
+                    insert_pos = parent_end
+                    current_indent = parent_indent + 1
+                else:
+                    # This shouldn't happen if we're iterating correctly
+                    insert_pos = len(lines)
+                    current_indent = depth
+            
+            # Build the nested structure for remaining sections
+            to_insert = []
+            
+            # Add blank line if inserting after a section
+            if insert_pos > 0 and insert_pos <= len(lines):
+                prev_line_idx = insert_pos - 1
+                if prev_line_idx >= 0 and lines[prev_line_idx].strip() == '}':
+                    to_insert.append('\n')
+            
+            for i in range(depth, len(section_path)):
+                indent_str = get_indent(current_indent + (i - depth))
+                to_insert.append(f"{indent_str}{section_path[i]} {{\n")
+            
+            # Add the option
+            option_indent = get_indent(current_indent + (len(section_path) - depth))
+            to_insert.append(f"{option_indent}{option_name} = {value}\n")
+            
+            # Close all braces
+            for i in range(len(section_path) - depth - 1, -1, -1):
+                indent_str = get_indent(current_indent + i)
+                to_insert.append(f"{indent_str}}}\n")
+            
+            # Insert into file
+            for line_to_insert in reversed(to_insert):
+                lines.insert(insert_pos, line_to_insert)
+            
+            with open(file_path, 'w') as f:
+                f.writelines(lines)
+            return
+    
+    # All sections exist, now handle the option
+    section_bounds = find_section_bounds(lines, section_path, occurrence=occurrence)
+    if not section_bounds:
+        sys.exit(1)
+    
+    section_start, section_end, base_indent = section_bounds
+    
+    # Look for existing option
+    option_line = find_option_in_section(lines, section_start, section_end, option_name)
+    
+    if option_line is not None:
+        # Update existing option - use proper indentation relative to section
+        option_indent = get_indent(base_indent + 1)
+        lines[option_line] = f"{option_indent}{option_name} = {value}\n"
+    else:
+        # Add new option before closing brace
+        option_indent = get_indent(base_indent + 1)
+        lines.insert(section_end, f"{option_indent}{option_name} = {value}\n")
+    
+    with open(file_path, 'w') as f:
+        f.writelines(lines)
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Parse and edit configuration files')
+    parser.add_argument('-r', '--read', action='store_true', help='Read mode')
+    parser.add_argument('path', help='Path to option (section:subsection:option[:value])')
+    parser.add_argument('file', help='Configuration file path')
+    
+    args = parser.parse_args()
+    
+    # Read the file
+    try:
+        with open(args.file, 'r') as f:
+            lines = f.readlines()
+    except FileNotFoundError:
+        # Create empty file for write mode
+        if not args.read:
+            lines = []
+        else:
+            sys.exit(1)
+    
+    # Parse the path
+    path_and_value, _, index = parse_path(args.path)
+    occurrence = int(index) if index is not None else 1
+    
+    if args.read:
+        # Read mode
+        result = read_value(lines, path_and_value, args.file, occurrence)
+        print(result)
+    else:
+        # Write mode - last element is the value
+        if len(path_and_value) < 2:
+            sys.exit(1)
+        
+        path = path_and_value[:-1]
+        value = path_and_value[-1]
+        
+        write_value(lines, path, value, args.file, occurrence)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+# vibranium-core-force-kill
+# This script forcibly closes the active window if it is frozen, for example, 
+# using a secure confirmation mechanism involving a repeat call (shortcut) via a state file.
+# If the initial call was made on window A and the confirmation on window B, no action will be taken. 
+
+read -r CURRENT_CLASS PID < <(hyprctl -j activewindow | jq -r '[.class, .pid] | @tsv')
+STATE_FILE="$XDG_RUNTIME_DIR/$(basename "$0").confirm"
+
+# First, check whether the confirmation function is enabled globally. 
+# If not, forcefully close the window immediately (no confirmation)
+if [[ "$(vibranium-cmd-get-option VIBRANIUM_GLOBAL_CONFIRM_TO_KILL)" == false ]]; then
+	# Steam automatically restores its processes, so we need to take a rough approach
+	if [[ "$CURRENT_CLASS" == "steam" ]]; then
+		killall -s SIGKILL steam steamwebhelper
+	else
+		hyprctl -q dispatch forcekillactive
+	fi
+    exit 0
+fi
+
+# If the state file exists, we confirm the forced closure of the window
+if [ -f "$STATE_FILE" ]; then
+    PREV_PID=$(< "$STATE_FILE")
+	# We must compare the recorded PID and the PID of the active window. 
+	# If they do not match, it means that the user has launched confirmation in another window. 
+	# In this case, we terminate the process to avoid accidentally killing it
+    if [ "$PREV_PID" -ne "$PID" ] 2>/dev/null; then
+        rm -f "$STATE_FILE"
+        exit 1
+    fi
+    # second press → confirmed
+    rm -f "$STATE_FILE"
+else
+	# If the state file does not exist, it means that this is the first time the script has been run (before confirmation).
+	# We record the PID of the active window for subsequent confirmation and wait three seconds. 
+	# If during this time the script does not run a second time with the existing PID file (confirmation), 
+	# we process this case as a cancellation of the action by deleting the state file
+    echo "$PID" >"$STATE_FILE"
+    notify-send -r 5 -t 2000 -u critical "Vibranium" "Press again to confirm kill"
+    sleep 3
+    if [ -f "$STATE_FILE" ]; then
+        rm -f "$STATE_FILE"
+        exit 1
+    fi
+    exit 0
+fi
+
+# confirmed kill
+if [[ "$CURRENT_CLASS" =~ [Ss]team ]]; then
+    kill -s SIGKILL "$PID"
+else
+    hyprctl -q dispatch forcekillactive
+fi

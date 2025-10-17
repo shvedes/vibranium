@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+
+USER="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{print $3}')"
+USER_ID="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{print $2}')"
+
+export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus"
+
+# helper: check if partition looks like EFI (returns 0 if EFI)
+is_efi_partition() {
+    local part="$1" # /dev/sdXN
+    # PARTTYPE GUID for EFI: c12a7328-f81f-11d2-ba4b-00a0c93ec93b (case-insensitive)
+    local ptype
+    ptype="$(lsblk -no PARTTYPE "$part" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+    if [[ -n "$ptype" && "$ptype" == *"c12a7328-f81f-11d2-ba4b-00a0c93ec93b"* ]]; then
+        return 0
+    fi
+
+    # PARTFLAGS can contain 'esp' or 'boot'
+    local pflags
+    pflags="$(lsblk -no PARTFLAGS "$part" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+    if [[ -n "$pflags" && ( "$pflags" == *"esp"* || "$pflags" == *"boot"* ) ]]; then
+        return 0
+    fi
+
+    # FSTYPE vfat + PARTLABEL mentioning EFI
+    local fstype partlabel
+    fstype="$(lsblk -no FSTYPE "$part" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+    partlabel="$(lsblk -no PARTLABEL "$part" 2>/dev/null | tr '[:upper:]' '[:lower:]')"
+    if [[ "$fstype" == "vfat" && -n "$partlabel" && "$partlabel" == *"efi"* ]]; then
+        return 0
+    fi
+
+    return 1
+}
+
+# helper: list partitions on disk (returns paths /dev/sdXN)
+list_partitions_on_disk() {
+    local disk="$1" # /dev/sdX
+    # lsblk: list children of disk and filter parts
+    lsblk -ln -o NAME,TYPE "$disk" 2>/dev/null | awk '$2=="part"{print "/dev/" $1}'
+}
+
+# helper: find parent disk for DEVNAME
+get_parent_disk() {
+    local dev="$1"
+    # if dev is partition -> PKNAME else itself
+    local pk
+    pk="$(lsblk -no PKNAME "$dev" 2>/dev/null)"
+    if [[ -n "$pk" ]]; then
+        echo "/dev/$pk"
+    else
+        echo "$dev"
+    fi
+}
+
+# safe defaults from udev env
+DEVNAME="${DEVNAME:-}"
+DEVTYPE="${DEVTYPE:-}"   # partition or disk
+ID_MODEL="${ID_MODEL:-USB device}"
+
+# determine disk and partitions
+disk="$(get_parent_disk "$DEVNAME")"
+parts=( $(list_partitions_on_disk "$disk") )
+part_count=${#parts[@]}
+
+# detect if disk has any EFI partition
+has_efi=0
+for p in "${parts[@]}"; do
+    if is_efi_partition "$p"; then
+        has_efi=1
+        break
+    fi
+done
+
+# If event is for a partition and that partition is EFI -> ignore
+if [[ "$DEVTYPE" == "partition" ]]; then
+    if is_efi_partition "$DEVNAME"; then
+        # ignore EFI partition events
+        echo "$(date) udev: ignoring EFI partition event: dev=$DEVNAME model=$ID_MODEL" >> /tmp/usb-udev.log
+        exit 0
+    fi
+fi
+
+# Decide whether to include dev path in notification
+# Rules:
+# - If disk has EFI -> include dev path for non-EFI partitions
+# - Else (no EFI) and part_count > 1 -> do NOT include dev path (show only model)
+# - Else include dev path (single partition or raw disk)
+include_devpath=1
+if [[ "$has_efi" -eq 0 && "$part_count" -gt 1 ]]; then
+    include_devpath=0
+fi
+
+# If event was for disk (not partition), try to pick a sensible non-EFI partition
+target_dev="$DEVNAME"
+if [[ "$DEVTYPE" == "disk" ]]; then
+    # if there are partitions, choose:
+    # - if has_efi -> pick first non-efi partition
+    # - else if only one partition -> use that partition
+    # - else if multiple partitions and no EFI -> we won't include dev path (behavior above)
+    if [[ "${#parts[@]}" -gt 0 ]]; then
+        if [[ "$has_efi" -eq 1 ]]; then
+            # find first non-efi
+            for p in "${parts[@]}"; do
+                if ! is_efi_partition "$p"; then
+                    target_dev="$p"
+                    break
+                fi
+            done
+        else
+            # no EFI
+            if [[ "${#parts[@]}" -eq 1 ]]; then
+                target_dev="${parts[0]}"
+            else
+                # multiple partitions, no EFI -> choose to not mention path
+                target_dev=""
+            fi
+        fi
+    else
+        # no partitions -> keep disk device path
+        target_dev="$DEVNAME"
+    fi
+fi
+
+source "/home/${USER}/.config/vibranium/theme/current/vibranium-lib-theme" 2>/dev/null || true
+
+case "$1" in
+    add)
+        if [[ -n "$target_dev" && "$include_devpath" -eq 1 ]]; then
+            msg="<span foreground='${P_PURPLE}'><b>•</b></span> <span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> connected as <span foreground='${P_YELLOW}'><b>${target_dev}</b></span>"
+            echo "$(date) action=add model=${ID_MODEL} dev=${target_dev} disk=${disk} efi=$has_efi parts=$part_count" >> /tmp/usb-udev.log
+        else
+            msg="<span foreground='${P_PURPLE}'><b>•</b></span> <span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> connected"
+            echo "$(date) action=add model=${ID_MODEL} disk=${disk} efi=$has_efi parts=$part_count (no devpath shown)" >> /tmp/usb-udev.log
+        fi
+        runuser -l "$USER" -c "notify-send -r 5 'Vibranium' \"${msg}\""
+        ;;
+    remove)
+        # For remove: if DEVNAME was EFI -> we already ignored earlier. Use same logic to show dev if desired.
+        if [[ -n "$target_dev" && "$include_devpath" -eq 1 ]]; then
+            msg="<span foreground='${P_PURPLE}'><b>•</b></span> <span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> <span foreground='${P_RED}'><b>disconnected</b></span>" 
+            echo "$(date) action=remove model=${ID_MODEL} dev=${target_dev} disk=${disk} efi=$has_efi parts=$part_count" >> /tmp/usb-udev.log
+        else
+            msg="<span foreground='${P_PURPLE}'><b>•</b></span> <span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> <span foreground='${P_RED}'><b>disconnected</b></span>"
+            echo "$(date) action=remove model=${ID_MODEL} disk=${disk} efi=$has_efi parts=$part_count (no devpath shown)" >> /tmp/usb-udev.log
+        fi
+        runuser -l "$USER" -c "notify-send -r 5 'Vibranium' \"${msg}\""
+        ;;
+    *)
+        echo "$(date) udev: unknown action: $1" >> /tmp/usb-udev.log
+        exit 0
+        ;;
+esac
+
+exit 0

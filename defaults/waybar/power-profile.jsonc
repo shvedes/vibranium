@@ -1,0 +1,15 @@
+{
+	"custom/power-profile": {
+		"format": "{text}",
+		"hide-empty-text": true,
+
+		"on-scroll-up": "vibranium-core-power-profile up",
+		"on-scroll-down": "vibranium-core-power-profile down",
+		"on-click": "vibranium-core-power-profile up",
+		"on-click-right": "vibranium-core-power-profile down",
+
+		"exec": "vibranium-bar-power-profile",
+		"signal": 7,
+		"return-type": "json"
+	}
+}

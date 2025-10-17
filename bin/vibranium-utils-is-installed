@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# Usage: <package_name>:<binary_associated_with>
+# We use this syntax because the name of the package may differ from the name of
+# the binary that the package provides. For example, if we want to check for the
+# presence of the swayosd package, the 'command -v swayosd' will fail because
+# swayosd provides binaries with a name different from the package name.
+#
+# Despite the above, this syntax is not mandatory. In this case, a binary name should
+# be the same as the package name
+
+missing=()
+
+for entry in "$@"; do
+    package="${entry%%:*}"
+    binaries="${entry#*:}"
+    [[ $binaries == "$package" ]] && binaries="$package"
+
+    for binary in ${binaries//,/ }; do
+        if ! command -v "$binary" &> /dev/null; then
+            missing+=("$binary")
+        fi
+    done
+done
+
+if [[ ${#missing[@]} -eq 0 ]]; then
+    exit 0
+else
+    printf '%s\n' "${missing[@]}"
+    exit 1
+fi

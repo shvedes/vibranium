@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# P - pango
+P_RED='#b4637a'
+P_BLUE='#d7826e'
+P_GREEN='#286983'
+P_PURPLE='#907aa9'
+P_ORANGE='#e79118'
+P_YELLOW='#ea9d34'
+P_GRAY='#7d787c'
+P_TEXT='#575279'
+
+P_ACCENT=$P_BLUE

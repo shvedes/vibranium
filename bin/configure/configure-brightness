@@ -1,0 +1,71 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+INDEX=0
+
+while true; do
+	source "$VIBRANIUM_USER_SETTINGS"
+	
+	use_ddc="$([ $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL = true ] && echo yes || echo no)"
+	use_osd="$([ $VIBRANIUM_BRIGHTNESS_USE_OSD = true ] && echo yes || echo no)"
+	step="$VIBRANIUM_BRIGHTNESS_STEP"
+
+	if [ "$VIBRANIUM_GLOBAL_USE_OSD" = false ]; then
+		use_osd="() $use_osd"
+	fi
+
+	OPTIONS=(
+		"Include DDC protocol : $use_ddc"
+		"OSD feedback         : $use_osd"
+		"Adjustment step      : $step"
+	)
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Brightness" "ESC to go back" -selected-row "$INDEX")"
+	[ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Include DDC"*) toggle_bool "VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL" ;;
+		"OSD"*)
+			# The VIBRANIUM_GLOBAL_USE_OSD option takes precedence over all other options that use the OSD.
+			# Therefore, if VIBRANIUM_GLOBAL_USE_OSD is set to false at the global level,
+			# no other option that uses the OSD will be active, even if its value is true.
+			[ "$VIBRANIUM_GLOBAL_USE_OSD" = "false" ] && {
+				msg="\nTo enable OSD feedback for brightness changes, go to:\n"
+				msg+="<span foreground='${P_YELLOW}'>Vibranium settings</span> <span foreground='${P_BLUE}'>→</span> "
+				msg+="<span foreground='${P_YELLOW}'>Configure Vibranium</span> <span foreground='${P_BLUE}'>→</span> "
+				msg+="<span foreground='${P_YELLOW}'>General</span>"
+				notify-send -r 3 -t 10000 "This Option Is Disabled Globally" "$msg"
+				continue
+			}
+
+			toggle_bool "VIBRANIUM_BRIGHTNESS_USE_OSD"
+			;;
+		"Adjustment"*)
+			option-validate "VIBRANIUM_BRIGHTNESS_STEP"
+			while true; do
+				prompt="Brightness adjustment step (int)"
+				current_value="$VIBRANIUM_BRIGHTNESS_STEP"
+				input="$(printf "%s\n" "$prompt" | rofi_cmd "Brightness:" "2-20")"
+
+				[ -z "$input" ] && break
+				[ "$input" = "$prompt" ] && continue
+				[ "$input" = "$current_value" ] && break
+
+				if (( input < 2 || input > 25 )); then
+					notify-send -r 5 -u critical -t 1500 "Vibranium" "An integer between 2 and 20!"
+					continue
+				fi
+
+				sed -i "/^VIBRANIUM_BRIGHTNESS_STEP/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
+				break
+			done
+	esac
+done

@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+
+# A fairly simple script that manages the clipboard
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+if ! missing_str="$(vibranium-utils-is-installed cliphist rofi)"; then
+    read -r -a missing <<< "$missing_str"
+    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
+    exit 1
+fi
+
+usage() {
+    cat << EOF
+Usage: 
+	$(basename "$0") show|clear
+EOF
+}
+
+is_empty() {
+    if [[ "$(cliphist list | wc -l)" == "0" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+if [ -z "$1" ]; then
+    usage
+    exit 1
+fi
+
+case "$1" in
+    show)
+        # notify if clipboard is empty
+        is_empty && notify-send -r 1 -t 1500 "Vibranium" "Clipboard is empty!" && exit 1
+        chosen="$(cliphist list | rofi_cmd "Clipboard" "search" -display-columns 2)"
+
+        # if nothing was chosen - exit the menu, otherwise choose selected
+        [ -z "$chosen" ] && exit 1
+        printf "%s\n" "$chosen"| cliphist decode | wl-copy -n
+        ;;
+    clear)
+        # in case if this invokes within rofi window opened > close (kill) the window and then perform actions
+        killall rofi
+        # notify if clipboard is already empty
+        is_empty && notify-send -r 1 -t 1500 "Vibranium" "Clipboard is already empty!" && exit 1
+        cliphist wipe; wl-copy --clear
+        notify-send -r 1 -t 1500 "Vibranium" "Clipboard cleared"
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac

@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+# A simple script that zooms the entire desktop. 
+# It is activated by a key combination or SUPER + mouse scroll.
+
+step=0.3
+current="$(hyprctl -j getoption cursor:zoom_factor | jq -r '.float')"
+current="$(awk -v val="$current" 'BEGIN { printf "%.2f", val }')"
+
+set_zoom() {
+	local new_value="$1"
+
+	hyprctl keyword cursor:zoom_factor "$new_value" >/dev/null
+
+	# Hyprctl returns a value with a large number of digits after the decimal point, so we round it off for ease of calculation.
+	if awk -v val="$new_value" 'BEGIN { exit (val != 1.00) ? 0 : 1 }'; then
+		hyprctl -q keyword cursor:no_warps true >/dev/null
+	else
+		hyprctl -q keyword cursor:no_warps false >/dev/null
+	fi
+}
+
+case "$1" in
+	+)
+		new_value="$(awk -v val="$current" -v step="$step" 'BEGIN { printf "%.2f", val + step }')"
+		set_zoom "$new_value"
+		;;
+	-)
+		# If you decrease the zoom when it is already 1, hyprctl will still apply this change,
+		# which means that when you zoom in again, it will not be visually applied until the zoom_factor value is higher than 1.
+		# For this reason, we do not perform a zoom out if the zoom_factor is already 1.
+		new_value="$(awk -v val="$current" -v step="$step" 'BEGIN {
+			val -= step
+			if (val < 1.00) val = 1.00
+			printf "%.2f", val
+		}')"
+		set_zoom "$new_value"
+		;;
+	"-r"|"--reset")
+		set_zoom 1.00
+		;;
+	*)
+		printf "Usage: %s <+|-|--reset|-r>\n" "$(basename "$0")" >&2
+		exit 1
+		;;
+esac

@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+# Automatically detect and open a viable MPD client
+# Can be used in your favourite file manager; mime types; etc
+
+# TODO: Automatically find and focus on the already active window.
+# Somehow we need to find the specific window where the MPD's player PID is located. 
+# hyprctl does not provide this information (as far as I understand, otherwise I'm just stupid).
+
+clients=("ncmpcpp" "rmpc" "cmus" "vimpc")
+
+if command -v mpd >/dev/null; then
+	# Should we?
+	# if [ "$(systemctl --user is-enabled mpd.socket)" = "disabled" ]; then
+	# 	systemctl --user enable --now mpd.socket
+	# fi
+
+	for client in "${clients[@]}"; do
+		if command -v "$client" >/dev/null; then
+			if ! pidof "$client" >/dev/null; then
+				vibranium-cmd-launch-terminal "$client"
+				exit 0
+			fi
+		fi
+	done
+fi
+
+exit 1

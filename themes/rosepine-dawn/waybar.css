@@ -1,0 +1,11 @@
+
+@define-color background         #faf4ed;
+@define-color foreground         #575279;
+
+@define-color border             #cecacd;
+@define-color urgent             #b4637a;
+@define-color muted              #aaa6b5;
+
+@define-color accent             #d7827e;
+@define-color accent-active      #e09994;
+

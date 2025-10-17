@@ -1,0 +1,377 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=all
+
+# Load defaults first
+source "$VIBRANIUM_PATH/vibranium-core-defaults"
+source "$XDG_CONFIG_HOME/vibranium/settings"
+source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+
+export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
+export VIBRANIUM_USER_SETTINGS="$XDG_CONFIG_HOME/vibranium/settings"
+export VIBRANIUM_SUDO_PROMPT
+
+RED=$'\e[0;31m'
+YELLOW=$'\e[0;33m'
+BLUE=$'\e[0;34m'
+PURPLE=$'\e[0;35m'
+GREEN=$'\e[0;32m'
+CYAN=$'\e[0;36m'
+GRAY=$'\e[90m'
+RESET=$'\e[0m'
+
+# A custom rofi theme settings, which will apply to custom menus by default.
+# It is also will be used to generate menu entries
+#
+# Usage: <print array of options> | rofi_cmd "MyPrompt" "MyPlaceholder" -theme-str '<opt rofi theme settings>'
+#
+# For example: printf "%s\n" "${custom_actions[@]}" | rofi_cmd "Utilities" "Search Utilities..."
+# Will create a custom menu with the contents of ${custom_actions[@]} (entry per line)
+# Optional -theme-str 'configuration {show-icons: true;}' will enable icons for each entry.
+rofi_cmd() {
+	local -a opt_args=()
+
+	# Rofi's window width map
+	local -A map=(
+		[66]=863
+		[64]=834 [63]=805
+		[61]=777 [60]=748
+		[59]=719 [58]=690
+		[57]=662 [56]=633
+		[53]=604 [50]=575
+		[47]=546 [45]=518
+		[42]=489 [40]=460
+		[37]=449 [35]=437
+		[34]=403
+		[33]=397 [32]=391
+		[31]=383 [30]=374
+		[27]=366 [25]=357
+		[22]=340 [20]=322
+		[18]=305 [17]=288
+		[8]=259  [0]=230
+	)
+
+	if pidof rofi > /dev/null; then
+		killall rofi
+		exit 1
+	fi
+
+	local prompt="$1"
+	local placeholder=" ${2}"
+	shift $(($# > 1 ? 2 : 1))
+
+	# Read stdin into variable (so we can count lines and also pass to rofi)
+	local input
+	input="$(cat)"
+
+	# --- strip Pango markup for width/line calculations only ---
+	# Note: this removes anything between angle brackets (e.g. <span weight='bold'>, </span>, <b>, ...)
+	local input_plain
+	input_plain="$(printf "%s" "$input" | sed -E 's/<[^>]*>//g')"
+
+	# local lines (count lines from stripped input)
+	local lines
+	lines=$(printf "%s" "$input_plain" | grep -c '^')
+
+	if [[ $lines -eq 0 ]]; then
+		lines=0
+	elif [[ $lines -ge 10 ]]; then
+		lines=11
+	fi
+
+	# longest line length from stripped input
+	local maxlen_input
+	maxlen_input=$(printf "%s\n" "$input_plain" | awk '{print length}' | sort -nr | head -n1)
+
+	# Make the window width dynamic, based on the width of the longest entry or prompt
+	local promptlen=$(( ${#prompt} + ${#placeholder} ))
+	local maxlen=$(( maxlen_input > promptlen ? maxlen_input : promptlen ))
+	local width=$(( maxlen ))
+
+	for k in 66 63 60 58 56 50 45 40 35 34 32 30 25 20 17 0; do
+		if (( width >= k )); then
+			width=${map[$k]}
+			break
+		fi
+	done
+
+	if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT == true ]]; then
+		if (( lines > 1 )); then
+			opt_args+=(-auto-select true)
+		fi
+	fi
+
+	# pass original input (with Pango) to rofi so markup is rendered,
+	# but sizes were calculated from input_plain (without markup)
+	printf "%s\n" "$input" | rofi -i -dmenu -p "$prompt" \
+		-markup -markup-rows -sync "${opt_args[@]}" \
+		-theme "$XDG_CONFIG_HOME/rofi/config.rasi" \
+		-theme-str 'configuration {show-icons: false;} entry {placeholder: "'"${placeholder}"'";}' \
+		-theme-str 'window {width: '"${width}px"';}' \
+		-theme-str 'listview {lines: '"${lines}"';}' "$@" 2>/dev/null
+}
+
+# A spinner utility function.
+# Displays an animated spinner in the terminal while a given process (PID) is running.
+#
+# Usage: long_running_command & spinner $! "Doing stuff..." "Done"
+#
+# Parameters:
+#   $1 - PID of the process to wait for.
+#   $2 - Message to display alongside the spinner.
+#   $3 - (Optional) Final message to display when the process completes.
+#
+# The spinner uses Unicode braille characters for a smooth animation.
+# It clears itself once the process finishes, and optionally prints a success message.
+#
+# Some more examples for spinstr:
+# local spinstr=('-' '\' '|' '/')
+# local spinstr=('▁' '▃' '▄' '▅' '▆' '▇' '▆' '▅' '▄' '▃')
+# local spinstr=('⠁' '⠂' '⠄' '⠂')
+# local spinstr=('←' '↖' '↑' '↗' '→' '↘' '↓' '↙')
+spinner() {
+    # The PID of the process to watch
+    local pid=$1
+    # The message to show while spinning
+    local msg="$2"
+    # Delay between spinner frames (seconds)
+    local delay=0.1
+    # Spinner frames (this actually can be any symbol)
+    local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    # ANSI sequence to clear the current line
+    local clear_line="\r\033[K"
+
+    # While the process exists, animate the spinner
+    while kill -0 "$pid" 2> /dev/null; do
+        for i in "${spinstr[@]}"; do
+            printf "\r${msg} %s" "• ${i} "
+            sleep $delay
+        done
+    done
+
+    # Clear the spinner once finished
+    printf "%b" "$clear_line"
+
+    # Print the final message if provided
+    if [ -n "$3" ]; then
+        printf "%s %s\n" "$msg" "$3"
+    else
+        printf "%s\n" "$msg"
+    fi
+
+    # Small delay to avoid overlapping outputs
+    sleep 1
+}
+
+# Validate that a named variable contains a numeric value (int or float) and
+# substitute a default when necessary.
+#
+# Usage:
+#   check_int <var_name> <default> [type]
+#
+# Parameters:
+#   var_name - name of the variable to check (string). The function uses indirect
+#              expansion (${!var_name}) to read/write the value.
+#   default  - value to assign if the variable is unset or invalid.
+#   type     - "int" (default) or "float" — determines the allowed numeric format.
+#
+# Behavior:
+# - If the variable is empty -> warns and writes the default into the variable.
+# - Supports comma as decimal separator (e.g. "1,5" -> normalized to "1.5").
+# - Uses regex to validate the value; if validation fails -> fallback to default.
+# - Writes the normalized string back into the named variable via printf -v.
+check_int() {
+    local var_name=$1
+    local default=$2
+    local type=${3:-int}     # Default: int
+    local val="${!var_name}" # indirect expansion: value of variable named in $var_name
+
+    # If the variable is empty — warn and set default
+    if [[ -z $val ]]; then
+        warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+        return 0
+    fi
+
+    # Replace comma with dot to handle locales using comma as decimal separator
+    local normalized="${val//,/.}"
+
+    # Regex for float (accepts integers and fractional values: "1", "1.5", ".5", "-0.2")
+    local float_re='^-?([0-9]+([.][0-9]+)?|[.][0-9]+)$'
+    # Regex for int (only whole numbers, optional leading minus)
+    local int_re='^-?[0-9]+$'
+
+    # Choose proper regex based on requested type
+    local number_re
+    if [[ $type == "float" ]]; then
+        number_re=$float_re
+    else
+        number_re=$int_re
+    fi
+
+    # If the value doesn't match the regex — warn and set default
+    if ! [[ $normalized =~ $number_re ]]; then
+        warn "Invalid value for ${YELLOW}${var_name}${RESET}. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+    else
+        # Write the normalized numeric string back into the variable
+        printf -v "$var_name" '%s' "$normalized"
+    fi
+}
+
+# Validate that a named variable contains a boolean value ("true" or "false")
+# and substitute a default when necessary.
+#
+# Usage:
+#   check_bool <var_name> <default>
+#
+# Parameters:
+#   var_name - name of the variable to check (string). The function uses indirect
+#              expansion (${!var_name}) to read and printf -v to write the value.
+#   default  - value to assign if the variable is unset or invalid; should be
+#              either "true" or "false".
+#
+# Behavior:
+# - If the variable is empty -> warns and writes the default into the variable.
+# - Normalizes common case variations by converting the value to lowercase.
+# - If the normalized value is not "true" or "false" -> warns and writes default.
+check_bool() {
+    local var_name=$1
+    local default=$2
+    local val="${!var_name}"
+
+    # If the variable is empty — warn and set default
+    if [[ -z $val ]]; then
+        warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+        return 0
+    fi
+
+    # Normalize to lowercase to accept True/TRUE/False etc.
+    local normalized="${val,,}"
+
+    # Validate allowed boolean strings
+    if [[ $normalized != "true" && $normalized != "false" ]]; then
+        warn "Invalid value for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+    else
+        # Write normalized value back (preserves predictable canonical form)
+        printf -v "$var_name" '%s' "$normalized"
+    fi
+}
+
+# Validate that a named variable contains one of a set of allowed values (enum)
+# and substitute a default when necessary.
+#
+# Usage:
+#   check_enum <var_name> <default> <allowed1> [allowed2 ... allowedN]
+#
+# Parameters:
+#   var_name - name of the variable to check (string). Function uses indirect
+#              expansion (${!var_name}) to read and printf -v to write.
+#   default  - fallback value to assign if variable is unset or invalid.
+#   allowed* - one or more allowed values; comparison is exact (case-sensitive).
+#
+# Behavior:
+# - If no allowed values are supplied -> warns and writes the default.
+# - If the variable is empty -> warns and writes the default.
+# - If the variable value is not exactly one of the allowed values -> warns and writes the default.
+# - On success the (possibly normalized) value is written back to the named variable.
+check_enum() {
+    local var_name=$1
+    local default=$2
+    shift 2
+    local allowed=("$@")
+    local val="${!var_name}"
+
+    # If the caller passed no allowed values, treat that as an error and fall back.
+    if [[ ${#allowed[@]} -eq 0 ]]; then
+        warn "No allowed values provided for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+        return 0
+    fi
+
+    # If the variable is empty — warn and set default
+    if [[ -z $val ]]; then
+        warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+        return 0
+    fi
+
+    # Check if the variable matches one of the allowed values (exact match)
+    local ok=false
+    for a in "${allowed[@]}"; do
+        if [[ $val == "$a" ]]; then
+            ok=true
+            break
+        fi
+    done
+
+    # If not allowed — warn and set default; otherwise keep the value as-is
+    if [[ $ok != true ]]; then
+        warn "${var_name} has invalid value! Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+    else
+        printf -v "$var_name" '%s' "$val"
+    fi
+}
+
+log() {
+    printf "\e[0;34m[INFO]\e[0m ${*}\n"
+}
+
+warn() {
+    printf "\e[0;33m[WARNING]\e[0m ${*}\n"
+}
+
+error() {
+    printf "\e[0;31m[ERROR]\e[0m ${*}\n"
+}
+
+flash_border() {
+    check_int VIBRANIUM_GLOBAL_FLASH_BORDER_DURATION 0.2 float
+    # sleep $VIBRANIUM_GLOBAL_FLASH_BORDER_DURATION
+
+	if [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]]; then
+		return 0
+	fi
+
+	for i in $(seq 1 2); do
+		hyprctl -q "keyword general:col.active_border rgb(ffffff)"
+		sleep 0.15
+		hyprctl -q reload
+		i=$(( i + 1 ))
+	done
+}
+
+flash_screen() {
+    check_int VIBRANIUM_GLOBAL_FLASH_SCREEN_DURATION 0.15 float
+	if [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]]; then
+		return 0
+	fi
+	
+	hyprctl -q hyprsunset gamma 150
+	sleep 0.1
+	hyprctl -q hyprsunset gamma 100
+}
+
+# Self-explanatory
+is_fullscreen() {
+    if [ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# This feature relies heavily on the “game” tag, which is assigned manually.
+# Although a relatively large regex is currently used (which could potentially capture thousands of games),
+# it will still not be enough. Since I cannot install and test all existing games (who can, hehe), all my hope lies in PRs
+is_in_game() {
+    tag="$(hyprctl -j activewindow | jq -r '.tags.[0]')"
+    if [[ $tag =~ "game" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}

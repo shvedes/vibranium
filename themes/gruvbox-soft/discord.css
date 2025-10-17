@@ -1,0 +1,103 @@
+/**
+ * @name system24 for Vibranium
+ * @description a tui-style discord theme.
+ * @author refact0r
+ * @version 2.0.0
+ * @invite nz87hXyvcy
+ * @website https://github.com/refact0r/system24
+ * @source https://github.com/refact0r/system24/blob/master/theme/system24.theme.css
+ * @authorId 508863359777505290
+ * @authorLink https://www.refact0r.dev
+*/
+
+@import url('https://refact0r.github.io/system24/build/system24.css');
+
+/* Vibranium customs */
+body {
+	--font:             'Cascadia Code' !important;
+	--code-font:        'Cascadia Code' !important;
+	letter-spacing:     0ch !important;
+	--border-thickness: 3px !important;
+}
+
+:root {
+    --colors: on;
+
+    --text-0: var(--bg-4);
+    --text-1: #bdae93;
+    --text-2: #ebdbb2;
+    --text-3: #d5c4a1;
+    --text-4: #a89984;
+    --text-5: var(--text-4);
+
+    /* background and dark colors */
+    --bg-1: #665c54;
+    --bg-2: #504945;
+    --bg-3: #3c3836;
+    --bg-4: #32302f;
+    --hover: var(--bg-2);
+    --active: var(--bg-1);
+    --active-2: var(--bg-3);
+    --message-hover: var(--hover);
+
+    /* accent colors */
+    --accent-1: var(--green-1);
+    --accent-2: var(--green-2);
+    --accent-3: var(--green-3);
+    --accent-4: var(--green-4);
+    --accent-5: var(--green-5);
+    --accent-new: var(--red-2);
+    --mention: linear-gradient(to right, color-mix(in hsl, var(--accent-2), transparent 90%) 40%, transparent);
+    --mention-hover: linear-gradient(to right, color-mix(in hsl, var(--accent-2), transparent 95%) 40%, transparent);
+    --reply: linear-gradient(to right, color-mix(in hsl, var(--text-3), transparent 90%) 40%, transparent);
+    --reply-hover: linear-gradient(to right, color-mix(in hsl, var(--text-3), transparent 95%) 40%, transparent);
+
+    /* status indicator colors */
+    --online: var(--green-2);
+    --dnd: var(--red-2);
+    --idle: var(--yellow-2);
+    --streaming: var(--purple-2);
+    --offline: var(--text-4);
+
+    /* border colors */
+    --border-light: var(--hover);
+    --border: var(--active);
+    --border-hover: var(--accent-2);
+    --button-border: hsl(220, 0%, 100%, 0.1);
+
+    /* base colors */
+    --red-1: #cc241d;
+    --red-2: #cc241d;
+    --red-3: #cc241d;
+    --red-4: #fb4934;
+    --red-5: #fb4934;
+
+    --green-1: #98971a;
+    --green-2: #98971a;
+    --green-3: #98971a;
+    --green-4: #b8bb26;
+    --green-5: #b8bb26;
+
+    --blue-1: #458588;
+    --blue-2: #458588;
+    --blue-3: #458588;
+    --blue-4: #83a598;
+    --blue-5: #83a598;
+
+    --yellow-1: #d79921;
+    --yellow-2: #d79921;
+    --yellow-3: #d79921;
+    --yellow-4: #fabd2f;
+    --yellow-5: #fabd2f;
+
+    --purple-1: #b16286;
+    --purple-2: #b16286;
+    --purple-3: #b16286;
+    --purple-4: #d3869b;
+    --purple-5: #d3869b;
+}
+
+.vc-shiki-root {
+	background-color: var(--bg-3) !important;
+	border: 1px solid var(--bg-1) !important
+}

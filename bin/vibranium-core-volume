@@ -1,0 +1,232 @@
+#!/usr/bin/env bash
+
+# Script for setting the volume with the ability to set the volume up to 150%
+# TODO: Allow absolute volume levels to be transmitted instead of relative ones
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+check_bool VIBRANIUM_GLOBAL_USE_OSD true
+check_bool VIBRANIUM_VOLUME_USE_OSD true
+check_int VIBRANIUM_VOLUME_ADJUSTMENT_STEP 5 int
+check_bool VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK true
+check_bool VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED false
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") <vol|mic> <up|down|mute>
+EOF
+}
+
+should_use_osd() {
+    [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $VIBRANIUM_VOLUME_USE_OSD == true ]]
+}
+
+show_volume_notification() {
+    local device="$1"
+    local type="$2"
+    local vol_info muted vol display_vol bar_value max_vol_factor
+    vol_info=$(wpctl get-volume "$device")
+    vol=$(awk '{print $2}' <<< "$vol_info") # float 0.00–1.50
+    muted=$(awk '{print $3}' <<< "$vol_info")
+
+    if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
+        max_vol_factor=1.5
+    else
+        max_vol_factor=1.0
+    fi
+
+	# To display the progress bar, libnotify only accepts values from 0 to 100. If the user has enabled above 100%, 
+	# we need to convert the volume values to a 100% scale in order to display the progress bar correctly.
+    display_vol=$(awk -v v="$vol" 'BEGIN {printf "%d", v*100}')
+    bar_value=$(awk -v v="$vol" -v max="$max_vol_factor" 'BEGIN {printf "%d", (v/max)*100}')
+
+    if [[ "$muted" == "[MUTED]" ]]; then
+        notify-send -r 2 -t 1000 "$type Muted"
+    else
+        notify-send -r 2 -t 1000 "$type ${display_vol}%" -h "int:value:$bar_value"
+    fi
+}
+
+adjust_volume() {
+    local direction="$1"
+    local device_type="$2"
+    local device=""
+    local osd_arg=""
+    local notification_type=""
+    local max_volume
+    local osd_max_flag=""
+
+    # Determine maximum allowed volume and OSD behavior
+    if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
+        max_volume=1.5
+        osd_max_flag="--max-volume=150"
+    else
+        max_volume=1.0
+    fi
+
+    case "$device_type" in
+        vol)
+            device="@DEFAULT_AUDIO_SINK@"
+            osd_arg="--output-volume"
+            notification_type="Volume"
+            ;;
+        mic)
+            device="@DEFAULT_AUDIO_SOURCE@"
+            osd_arg="--input-volume"
+            notification_type="Microphone"
+            ;;
+    esac
+
+    current_volume=$(wpctl get-volume "$device" | awk '{print $2}')
+
+    # Stop if already at limits
+	if [[ "$direction" == "+" ]] && awk "BEGIN {exit !($current_volume >= $max_volume)}"; then
+		exit 0
+	elif [[ "$direction" == "-" ]] && awk "BEGIN {exit !($current_volume <= 0.00)}"; then
+		exit 0
+	fi
+
+    if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
+        if should_use_osd; then
+            if [[ -n "$osd_max_flag" ]]; then
+                swayosd-client "$osd_arg" "${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}" "$osd_max_flag"
+            else
+                swayosd-client "$osd_arg" "${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}"
+            fi
+        else
+            if [[ "$direction" == "+" ]]; then
+                new_volume=$(awk -v cv="$current_volume" -v step="$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" -v max="$max_volume" \
+                    'BEGIN {new = cv + step/100; if (new > max) new = max; printf "%.2f", new}')
+            else
+                new_volume=$(awk -v cv="$current_volume" -v step="$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" \
+                    'BEGIN {new = cv - step/100; if (new < 0.0) new = 0.0; printf "%.2f", new}')
+            fi
+            wpctl set-volume "$device" "$new_volume"
+            show_volume_notification "$device" "$notification_type"
+        fi
+    else
+        if [[ "$direction" == "+" ]]; then
+            new_volume=$(awk -v cv="$current_volume" -v step="$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" -v max="$max_volume" \
+                'BEGIN {new = cv + step/100; if (new > max) new = max; printf "%.2f", new}')
+        else
+            new_volume=$(awk -v cv="$current_volume" -v step="$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" \
+                'BEGIN {new = cv - step/100; if (new < 0.0) new = 0.0; printf "%.2f", new}')
+        fi
+        wpctl set-volume "$device" "$new_volume"
+    fi
+}
+
+toggle_mute() {
+    local device_type="$1"
+    local device=""
+    local osd_arg=""
+    local type=""
+
+    case "$device_type" in
+        vol)
+            device="@DEFAULT_AUDIO_SINK@"
+            osd_arg="--output-volume"
+            type="Volume"
+            ;;
+        mic)
+            device="@DEFAULT_AUDIO_SOURCE@"
+            osd_arg="--input-volume"
+            type="Microphone"
+            ;;
+    esac
+
+    if [ $VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK = true ]; then
+        if should_use_osd; then
+            swayosd-client "$osd_arg" mute-toggle
+        else
+            wpctl set-mute "$device" toggle
+            show_volume_notification "$device" "$type"
+        fi
+    else
+        wpctl set-mute "$device" toggle
+    fi
+}
+
+# Process audio feedback if the user has enabled this option
+feedback() {
+    local variant
+	local dir
+
+    check_bool VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK true
+    if [ $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK = true ]; then
+        check_enum VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT "variant1" variant1 variant2 variant3 variant4
+        variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
+
+        case "$variant" in
+            "variant1"|"variant4") dir="/usr/share/sounds/freedesktop/stereo" ;;
+            "variant2")            dir="/usr/share/sounds/Yaru/stereo"        ;;
+			"variant3")            dir="/usr/share/sounds/Pop/stereo/action"  ;;
+        esac
+
+		if [ ! -d "$dir" ]; then
+			error "$dir does not exist! Using the default one!"
+			dir="/usr/share/sounds/freedesktop/stereo"
+			return 0
+		fi
+
+		if [[ "$variant" == "variant4" ]]; then
+			paplay "${dir}/bell.oga" &
+		else
+			paplay "${dir}/audio-volume-change.oga" &
+		fi
+    else
+        return 0
+    fi
+}
+
+if [ $# -lt 2 ]; then
+    usage
+    exit 0
+fi
+
+device_type="$1"
+action="$2"
+
+# TODO: Allow passing volume values directly (e.g. vol 140)
+case "${device_type}" in
+    "vol")
+        case "${action}" in
+            "up")
+                adjust_volume "+" "vol"
+                feedback
+                ;;
+            "down")
+                adjust_volume "-" "vol"
+                feedback
+                ;;
+            "mute")
+                toggle_mute "vol"
+                ;;
+            *)
+                usage
+                exit 0
+                ;;
+        esac
+        ;;
+    "mic")
+        case "${action}" in
+            "up")
+                adjust_volume "+" "mic"
+                ;;
+            "down")
+                adjust_volume "-" "mic"
+                ;;
+            "mute")
+                toggle_mute "mic"
+                ;;
+            *)
+                usage
+                exit 0
+                ;;
+        esac
+        ;;
+    *)
+        usage
+        exit 0
+        ;;
+esac

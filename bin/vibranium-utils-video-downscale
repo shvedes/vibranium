@@ -1,0 +1,144 @@
+#!/usr/bin/env bash
+
+# vibranium-utils-video-downscale
+# This script allows you to reduce the size of a video file by cutting the bitrate, resolution, and audio quality. 
+#
+# It can be useful for 
+# - Simply reducing the amount of space used
+# - If you need to send a video to a service that has a limit on the size of files that can be sent
+# - You name it
+
+# TODO: 
+# - Verify that all necessary drivers are installed
+# - Download a video from web and downscale to local machine (why?)
+# - Batch processing?
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+STATE_FILE="$XDG_RUNTIME_DIR/worker.active"
+
+if ! missing_str="$(vibranium-utils-is-installed ffmpeg)"; then
+    read -r -a missing <<< "$missing_str"
+    notify-send -r 3 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
+    exit 1
+fi
+
+check_bool VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU false
+check_bool VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD true
+
+# Get file.
+# TODO: Read the last copied entry in the clipboard and, if it is a supported file, 
+# insert it into the input field automatically
+while true; do
+	prompt="Enter file path"
+	input="$(printf "%s" "$prompt" | rofi_cmd "Video downscale" "input file")"
+	[[ -z $input ]] && exit 0; [[ $prompt == "$input" ]] && continue
+
+	# If the path to the file has a mime prefix, format it into a real path for further use.
+	if [[ $input =~ ^file:// ]]; then
+		input="$(echo "$input" | sed 's/file\:\/\///')"
+	fi
+
+	# Check if file exists
+	if [[ ! -f $input ]]; then
+		error "'${YELLOW}$input${RESET}' not found."
+		notify-send -r 4 -t 5000 "Vibranium" "${input} not found!"
+		continue
+	fi
+	break
+done
+
+# Allowed MIME types
+whitelist=("video/mp4" "video/webm")
+type="$(xdg-mime query filetype "$input")"
+
+# Check MIME type
+allowed_type=false
+for allowed in "${whitelist[@]}"; do
+    if [[ $type == "$allowed" ]]; then
+        allowed_type=true
+        break
+    fi
+done
+
+# If the entered file does not match the list of allowed file types
+if [[ $allowed_type == false ]]; then
+    error "Unsupported file type '${YELLOW}$type${RESET}' for file '${YELLOW}$input${RESET}'"
+    notify-send -r 4 -t 5000 "Vibranium" "Unsupported file type for <span foreground='${P_YELLOW}'><b>${input}</b></span>"
+    exit 1
+fi
+
+# Convert human text into a set of parameters for ffmpeg
+compression_levels=("low" "mid" "high" "ultra")
+compression_level="$(printf "%s\n" "${compression_levels[@]}" | rofi_cmd "Video downscale" "compression level")"
+
+case "$compression_level" in
+    "low")   compression=15 ;;
+    "mid")   compression=25 ;;
+    "high")  compression=35 ;;
+    "ultra") compression=45 ;;
+    *) exit 0 ;;
+esac
+
+log "Compression level: ${YELLOW}'$compression_level'${RESET}"
+# Build input / output flags
+input_flags=()
+output_flags=()
+
+# If the GPU usage option is set to true and a supported GPU is installed, build ffmpeg flags for working with the GPU.
+# TODO: Use external utilities for more accurate determination, such as vainfo from libva-utils
+if [[ $VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU == true ]] && lspci | grep -E "AMD/ATI|Intel"; then
+    input_flags=(-hwaccel vaapi -vaapi_device /dev/dri/renderD128)
+	# Some software does not work well or does not support H265/X265/HEVC at all (for example, Discord clients), so we use H264/X264 for compatibility
+    output_flags=(-c:v h264_vaapi -qp "$compression" -preset 4 -vf "format=nv12,hwupload")
+    log "Using GPU: ${YELLOW}'yes'${RESET}"
+else
+    output_flags=(-c:v libx264 -preset medium -crf "$compression")
+    log "Using GPU: ${YELLOW}'no'${RESET}"
+fi
+
+output_flags+=(-c:a aac -b:a 96k -movflags +faststart)
+
+# Get output directory
+if [[ "$VIBRANIUM_XDG_DIRS_EXPOSED" == true ]]; then
+	output_dir="$(eval "echo $XDG_VIDEOS_DIR/Downscaled")"
+else
+	output_dir="$HOME/Downscaled Videos"
+fi
+
+mkdir -p "$output_dir"
+# Rename the file with the original file name, but with the prefix downscaled_
+# TODO: Allow the user to select several variations of prefixes/suffixes for the output file
+output_file="${output_dir}/downscaled_${compression_level}_$(basename -- "$(realpath -- "$input")")"
+
+# Just in case
+if [ -f "$output_file" ]; then
+    notify-send -r 1 -t 1500 "Vibranium" "Processed file already exists!"
+    error "Processed file already exists!"
+    exit 1
+fi
+
+notify-send -r 1 -t 2000 "Vibranium" "Processing $(basename "$output_file")"
+log "Output file: ${YELLOW}'$output_file'${RESET}"
+
+# Populate the state file with the name of the file currently being processed.
+# This information will be displayed in the worker waybar module in real time
+basename "$input" > "$STATE_FILE"
+vibranium-cmd-refresh-waybar-module worker
+
+# Finally, start processing
+ffmpeg -y "${input_flags[@]}" -i "$input" "${output_flags[@]}" "$output_file" &> /dev/null
+
+# After processing, delete the state file and hide the waybar module
+rm "$STATE_FILE"
+vibranium-cmd-refresh-waybar-module worker
+
+if [[ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD == true ]]; then
+    printf "file://%s" "$output_file" | wl-copy --type text/uri-list
+    notify-send -r 1 "Vibranium" "Processing complete. <span foreground='${P_ACCENT}'>File copied to clipboard</span>"
+else
+    notify-send -r 1 "Vibranium" "Processing complete. File saved to <span foreground='${P_ACCENT}'>${output_dir}</span>>"
+fi
+
+log "File saved to: ${YELLOW}'$output_file'${RESET}"
+# Kill all parent menus
+vibranium-cmd-kill-rofi

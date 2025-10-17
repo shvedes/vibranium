@@ -1,0 +1,39 @@
+set default-fg                "#c6d0f5"
+set default-bg 			      "#303446"
+
+set completion-bg		      "#51576d"
+set completion-fg		      "#b5bfe2"
+set completion-highlight-bg	  "#5b6078"
+set completion-highlight-fg	  "#b5bfe2"
+set completion-group-bg		  "#5b6078"
+set completion-group-fg		  "#b5bfe2"
+
+set statusbar-fg		      "#c6d0f5"
+set statusbar-bg		      "#414559"
+
+set notification-bg		      "#414559"
+set notification-fg		      "#c6d0f5"
+set notification-error-bg	  "#51576d"
+set notification-error-fg	  "#c6d0f5"
+set notification-warning-bg	  "#313244"
+set notification-warning-fg	  "#fab387"
+
+set inputbar-fg			      "#c6d0f5"
+set inputbar-bg 		      "#414559"
+
+set recolor                   "true"
+set recolor-lightcolor		  "#303446"
+set recolor-darkcolor		  "#c6d0f5"
+
+set index-fg			      "#c6d0f5"
+set index-bg			      "#414559"
+set index-active-fg		      "#c6d0f5"
+set index-active-bg		      "#51576d"
+
+set render-loading-bg		  "#414559"
+set render-loading-fg		  "#ca9ee6"
+
+set highlight-color		      "rgba(98,104,128,0.5)"
+set highlight-fg              "#c6d0f5"
+set highlight-active-color	  "#c6d0f5"
+

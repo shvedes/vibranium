@@ -1,0 +1,13 @@
+{
+	"custom/pacman": {
+		"format": "{text}",
+		"hide-empty-text":  true,
+
+		"exec": "vibranium-bar-pacman",
+		"on-click": "true", // update pacman data
+		"on-click-right": "vibranium-cmd-launch-terminal vibranium-cmd-system-update",
+		"restart-interval": 1800,
+		"signal": 5,
+		"return-type": "json"
+	}
+}

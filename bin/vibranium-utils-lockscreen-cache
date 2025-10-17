@@ -1,0 +1,224 @@
+#!/usr/bin/env bash
+
+# This script preprocesses and caches background images for Hyprlock, applying
+# blur or dim filters depending on user settings and power profile. It detects
+# when GPU acceleration is available, limits ImageMagick threads accordingly,
+# and dynamically pauses or resumes caching if the system enters power-saver mode.
+# Can process all backgrounds, or a single image if passed as an argument.
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+# Enable GPU acceleration for ImageMagick if available (falls back to CPU).
+# For AMD GPUs, ensure rocm-opencl-sdk is installed.
+export MAGICK_THREAD_LIMIT
+
+# We don't want to OOM on VRAM, right?
+if [[ $VIBRANIUM_IS_LAPTOP == false ]]; then
+	export MAGICK_OCL_DEVICE=GPU
+fi
+
+# Load all background images from the current theme's backgrounds directory
+backgrounds=("$XDG_CONFIG_HOME/vibranium/theme/current/backgrounds/"*)
+backgrounds+=("$(sed -n 's/^preload = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")")
+
+# Define the cache directory for processed images.
+# Create it if it doesn't exist to avoid errors later.
+cache_dir="$XDG_CACHE_HOME/hyprlock"
+mkdir -p "$cache_dir"
+
+declare -A filters=()  # Global associative array for filters.
+
+# Check if blur is enabled for lockscreen backgrounds.
+if [[ $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND == true ]]; then
+	case "$VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH" in
+		"low")  filters[blurred-low]="-colorize 50% -resize 70% -blur 0x16"  ;;
+		"mid")  filters[blurred-mid]="-colorize 50% -resize 50% -blur 0x32"  ;;
+		"hard") filters[blurred-hard]="-colorize 50% -resize 30% -blur 0x64" ;;
+	esac
+else
+	# If blur is disabled, apply dimming based on strength.
+	case "$VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH" in
+		"low")  filters[dimmed-low]="-colorize 30%"  ;;
+		"mid")  filters[dimmed-mid]="-colorize 50%"  ;;
+		"hard") filters[dimmed-hard]="-colorize 70%" ;;
+	esac
+fi
+
+precached=0
+needed=0
+
+# Parse command-line arguments.
+# Supports -f/--force to regenerate all caches, or a single file path for processing one image.
+force=false
+single_file=false
+if [[ "$1" == "-f" || "$1" == "--force" ]]; then
+    force=true  # Force regeneration of all caches, ignoring existing ones.
+elif [[ -n "$1" && -f "$1" ]]; then
+    single_file=true
+    backgrounds=("$1")
+fi
+
+# Function to check if an image needs processing.
+# Returns 0 (true) if cache is missing, outdated, or force is enabled.
+needs_processing() {
+    local file="$1"
+    local type="$2"
+    local cached
+
+	cached="${cache_dir}/$(basename "${file%.*}")-${type}.jpg"
+    # Compare timestamps: if source is newer or cache missing, or force=true.
+    if [[ ! -f "$cached" || "$file" -nt "$cached" || "$force" == true ]]; then
+        return 0
+    fi
+    return 1
+}
+
+# Function to set ImageMagick thread limit based on current power profile.
+# This limits CPU usage to respect power modes.
+set_thread_limit() {
+    case "$(vibranium-utils-power-profile-get)" in
+        "power-saver")   MAGICK_THREAD_LIMIT=$(( $(nproc) / 4 )) ;;
+        "balanced")      MAGICK_THREAD_LIMIT=$(( $(nproc) / 2 )) ;;
+        "performance")   MAGICK_THREAD_LIMIT=$(nproc) ;;
+    esac
+}
+
+
+# First pass: Count how many images require processing without doing the work.
+# This optimizes early exit if cache is already up-to-date.
+for file in "${backgrounds[@]}"; do
+    for type in "${!filters[@]}"; do
+        if needs_processing "$file" "$type"; then
+            ((needed++))
+        fi
+    done
+done
+
+# Early exit if no processing is needed.
+if (( needed == 0 )); then
+    log "Hyprlock cache is up to date"  # Assuming 'log' is defined in the sourced lib.
+    exit 0
+fi
+
+# Function to process a specific file forcibly for all types.
+process_file_forcibly() {
+    local file="$1"
+    set_thread_limit
+    for type in "${!filters[@]}"; do
+        filter="${filters[$type]}"
+        cached="${cache_dir}/$(basename "${file%.*}")-${type}.jpg"
+        if [[ "$single_file" == false ]]; then
+            # Update Waybar with current processing file.
+            basename "$cached" > "$XDG_RUNTIME_DIR/worker.active"
+            vibranium-cmd-refresh-waybar-module worker
+        fi
+        echo "${GRAY}[$(date)] ${BLUE}Processing ($type): ${YELLOW}${cached}${RESET}"
+		# DO NOT QUOTE THIS
+        magick "$file" $filter "$cached"
+		vibranium-utils-update-lockscreen "$(sed -n 's/^preload = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")"
+        ((precached++))
+    done
+}
+
+# Function to handle pausing based on power profile.
+# Only applies if not in single_file mode and respect_power is true.
+handle_power_pause() {
+    if [[ "$single_file" == true ]]; then
+		# Ignore current power profile for single file
+        return
+    fi
+
+	if [[ "$(vibranium-cmd-get-option VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE)" == true ]]; then
+        local current_profile
+        current_profile="$(vibranium-utils-power-profile-get)"
+
+        if [[ "$current_profile" == "power-saver" ]]; then
+            # Forcibly generate cache for the current wallpaper before pausing.
+            local current_bg
+            current_bg="$(sed -n 's/^preload = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")"
+            if [[ -f "$current_bg" ]]; then
+                process_file_forcibly "$current_bg"
+            fi
+
+            # notify-send -r 1 -t 10000 "Vibranium" "Background cache generation paused due to powersave profile.\nIt will resume once the profile changes or respect option is disabled."
+
+			if [[ "$single_file" == false ]]; then
+				echo "suspended" > "$XDG_RUNTIME_DIR/worker.active"
+				vibranium-cmd-refresh-waybar-module worker
+			fi
+
+            local was_paused=true
+
+            # Loop until conditions change: either respect_power=false or profile != power-saver.
+            while true; do
+				if [[ "$(vibranium-cmd-get-option VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE)" == false ]]; then
+                    break
+                fi
+
+                current_profile="$(vibranium-utils-power-profile-get)"
+                if [[ "$current_profile" != "power-saver" ]]; then
+                    break
+                fi
+                sleep 3
+            done
+
+            if [[ "$was_paused" == true ]]; then
+                # notify-send -r 1 -t 5000 "Vibranium" "Background cache generation resumed"
+                unset was_paused
+            fi
+        fi
+    fi
+}
+
+# Initial power pause check before starting processing.
+handle_power_pause
+
+if [[ "$single_file" == false ]]; then
+	# Update Waybar module to indicate worker is active.
+	touch "$XDG_RUNTIME_DIR/worker.active"
+	vibranium-cmd-refresh-waybar-module worker
+fi
+
+for file in "${backgrounds[@]}"; do
+    for type in "${!filters[@]}"; do
+        # Check for pause before each
+        # This allows dynamic response to profile changes mid-process.
+        handle_power_pause
+
+        # Set thread limit fresh for each image, in case profile changed.
+        set_thread_limit
+
+        if needs_processing "$file" "$type"; then
+            filter="${filters[$type]}"
+            cached="${cache_dir}/$(basename "${file%.*}")-${type}.jpg"
+
+			if [[ "$single_file" == false ]]; then
+				# Update Waybar with current processing file.
+				basename "$cached" > "$XDG_RUNTIME_DIR/worker.active"
+				vibranium-cmd-refresh-waybar-module worker
+			fi
+
+            echo "${GRAY}[$(date)] ${BLUE}Processing ($type): ${YELLOW}${cached}${RESET}"
+			# DO NOT QUOTE THIS
+            magick "$file" $filter "$cached"
+
+            ((precached++))
+        fi
+    done
+done
+
+if [[ "$single_file" == false ]]; then
+	# Cleanup: Remove worker active file and refresh Waybar.
+	rm "$XDG_RUNTIME_DIR/worker.active"
+	vibranium-cmd-refresh-waybar-module worker
+fi
+
+vibranium-utils-update-lockscreen "$(sed -n 's/^preload = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")"
+
+# if [[ "$single_file" == false ]]; then
+# 	if (( precached == 1 )); then
+# 		notify-send -r 2 -t 5000 "Vibranium" "Successfully precached $precached lockscreen image"
+# 	elif (( precached > 1 )); then
+# 		notify-send -r 2 -t 5000 "Vibranium" "Successfully precached $precached lockscreen images"
+# 	fi
+# fi

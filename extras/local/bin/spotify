@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+# This file is symlinked to $VIBRANIUM
+# DO NOT EDIT
+
+if [[ ! -f /opt/spotify/spotify ]]; then
+	echo "Spotify is not installed!"
+	exit 1
+fi
+
+if pidof spotify >/dev/null; then
+	hyprctl -q dispatch workspace "$(hyprctl -j clients | jq -r '.[] | select(.class=="Spotify") | .workspace.name')"
+	exit 1
+fi
+
+loop() {
+	local msg
+
+	while [[ ! -f $prefs ]]; do
+		sleep 1
+	done
+
+	echo "Patchung Spotify client" > "$XDG_RUNTIME_DIR/worker.active"
+	vibranium-cmd-refresh-waybar-module worker
+	vibranium-cmd-refresh-waybar-module dynamic-separator
+
+	msg="Spotify login detected!\n"
+	msg+="Patching Spotify in the background, please wait...\n"
+	msg+="The Spotify window will restart automatically."
+	notify-send -r 1 -t 5000 "Vibranium" "$msg"
+
+	spicetify backup
+	spicetify apply
+
+	rm "$XDG_RUNTIME_DIR/worker.active"
+	vibranium-cmd-refresh-waybar-module worker
+	vibranium-cmd-refresh-waybar-module dynamic-separator
+
+	msg="Spotify has been patched successfully!"
+	notify-send -r 1 -t 5000 "Vibranium" "$msg"
+	exit 0
+}
+
+if command -v spicetify >/dev/null; then
+	prefs="${XDG_CONFIG_HOME:-$HOME/.config}/spotify/prefs"
+	if [ ! -f "$prefs" ]; then
+		msg="It looks like you’ve launched Spotify for the first time.\n"
+		msg+="Live theming will be applied after you log in to your account."
+		notify-send -r 1 -t 10000 "Vibranium" "$msg"
+
+		setsid uwsm app -- /opt/spotify/spotify --debug-level=OFF &
+
+		# Give user some time to read the notification
+		sleep 3
+		loop
+	else
+		if pgrep spicetify >/dev/null; then
+			killall spicetify
+			wait
+		fi
+		setsid uwsm app -- spicetify --quiet watch -s &
+		# sleep 1; killall spicetify
+	fi
+else
+	setsid uwsm app -- /opt/spotify/spotify --debug-level=OFF
+fi
+

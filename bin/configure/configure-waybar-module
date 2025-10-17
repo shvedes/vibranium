@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
+
+OPTIONS=("Pacman" "Weather" "Color Picker" "Sleep inhibitor")
+INDEX=0
+
+while true; do
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Module settings" "ESC to go back" -selected-row "$INDEX")"
+	[ -z "$CHOSEN" ] && exit 0
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+			INDEX="$i"
+			break
+        fi
+    done
+
+	case "$CHOSEN" in
+		"Sleep inhibitor")
+			while true; do
+				inhibitor_options=("coffee" "lock" "eye")
+				inhibitor_chosen="$(printf "%s\n" "${inhibitor_options[@]}" | rofi_cmd "Sleep inhibitor" "ESC to go back")"
+				[[ -z "$inhibitor_chosen" ]] && break
+
+				case "$inhibitor_chosen" in
+					"coffee"|"lock"|"eye")
+						option-validate "VIBRANIUM_BAR_INHIBITOR_ICON"
+						sed -i "/^VIBRANIUM_BAR_INHIBITOR_ICON/s/=.*/=\"${inhibitor_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+						vibranium-cmd-refresh-waybar-module inhibitor
+						break
+						;;
+					*) continue
+				esac
+			done
+			;;
+		"Pacman")
+			while true; do
+				new_value="$(printf "Enter new value (int)" | rofi_cmd "Display if ≥ {int} updates" "ESC to go back" -theme-str 'window {width: 22%;}')"
+				[ -z "$new_value" ] && break
+
+				if [[ "$new_value" =~ ^[0-9]+$ ]]; then
+					option-validate "VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED"
+					sed -i "/^VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED/s/=.*/=${new_value}/" "$VIBRANIUM_USER_SETTINGS"
+
+					if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == "true" ]]; then
+						vibranium-cmd-refresh-waybar-module pacman
+					else
+						notify-send -r 1 -t 5000 "Vibranium" "The value was successfully changed, but the module is disabled!"
+					fi
+					exit 0
+				fi
+			done
+			;;
+		"Color Picker")
+			color_picker_index=0
+
+			while true; do
+				icon_options=("droplet" "palette" "eyedropper")
+				icon_chosen="$(printf "%s\n" "${icon_options[@]}" | rofi_cmd "Icon" "ESC to go back" -selected-row "$color_picker_index")"
+				[ -z "$icon_chosen" ] && break
+
+				for i in "${!icon_options[@]}"; do
+					if [ "${icon_options[$i]}" = "$icon_chosen" ]; then
+						color_picker_index="$i"
+						break
+					fi
+				done
+
+				if [[ "${icon_options[*]}" =~ "$icon_chosen" ]]; then
+					option-validate "VIBRANIUM_COLOR_PICKER_WAYBAR_ICON"
+					sed -i "/^VIBRANIUM_COLOR_PICKER_WAYBAR_ICON/s/=.*/=\"${icon_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+					vibranium-cmd-refresh-waybar-module color-picker
+					continue
+				fi
+			done
+			;;
+		"Weather")
+			while true; do
+				new_value="$(printf "Enter new value (string)" | rofi_cmd "City" "ESC to go back")"
+				[ -z "$new_value" ] && break
+				[[ ! "$new_value" =~ ^[A-Za-z]+$ ]] && {
+					notify-send -r 1 -u critical -t 2000 "Vibranium" "Invalid city name!"
+					break 2
+				}
+
+				# Create an option in user settings if it does not already exist.
+				# Only then perfom action
+				opt_name="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
+				option-validate "$opt_name"
+
+				sed -i "s|^${opt_name}=.*|${opt_name}=\"${new_value}\"|" "$VIBRANIUM_USER_SETTINGS"
+				notify-send -r 1 "City updated!" "Monitoring weather in $new_value"
+
+				if [ $(vibranium-cmd-get-option VIBRANIUM_BAR_WEATHER_MODULE_ENABLE) = "true" ]; then
+					vibranium-cmd-refresh-waybar-module weather
+				fi
+				exit 0
+			done
+			;;
+	esac
+done

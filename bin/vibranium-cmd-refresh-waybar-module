@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+
+# Usage: ./vibranium-cmd-refresh-waybar-module <module-name>
+# The script goes through all Waybar custom modules and searches for the string "signal":. If the string is found, the script sends a kill signal, which the module accepts.
+# This method is much more convenient than manually writing kill for each required module
+
+if [ -z "$1" ]; then
+	exit 1
+fi
+
+declare -A signals
+while IFS=":" read -r file rest; do
+    name="$(basename "$file" .jsonc)"
+    sig="$(grep -o '[0-9]\+' <<< "$rest")"
+    signals["$name"]="$sig"
+done < <(grep '"signal":' "$VIBRANIUM"/defaults/waybar/*)
+
+module_name="$1"
+module_signal="${signals[$module_name]}"
+
+if [ -n "$module_signal" ]; then
+    pkill -RTMIN+"$module_signal" waybar &
+	pkill -RTMIN+"${signals[dynamic-separator]}" waybar &
+else
+    echo "Unknown module: $module_name" >&2
+    exit 1
+fi
+

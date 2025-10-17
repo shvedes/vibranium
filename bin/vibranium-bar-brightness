@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+# TODO: parse output from 'vibranium-cmd-keybindings --list' and display actual shortcuts, not hardcoded one
+
+source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme" # Colors of the active theme
+source "$VIBRANIUM_PATH/vibranium-core-defaults" # Defaults first
+source "$XDG_CONFIG_HOME/vibranium/settings" # Then user's overrides
+
+if [[ $VIBRANIUM_BAR_BRIGHTNESS_MODULE_ENABLE == false ]]; then
+    exit 0
+fi
+
+brightness="$(<"$VIBRANIUM_STATE/brightness")"
+if [[ $VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS == true ]]; then
+	# It is pretty bad right now.
+	# Maybe in the future we'll use seq to calculate separator width based on the rest lines lenght, as well as spacing.
+	guide="<span foreground='${P_GRAY}'>---------------------------------------------</span>"
+	guide+="\n<span foreground='${P_ACCENT}'> Scroll wheel:</span>        <span foreground='${P_YELLOW}'><b>adjust  brightness </b></span>"
+	guide+="\n<span foreground='${P_ACCENT}'> Right  click:</span>        <span foreground='${P_YELLOW}'><b>maximum brightness </b></span>"
+	guide+="\n<span foreground='${P_ACCENT}'> Left   click:</span>        <span foreground='${P_YELLOW}'><b>minimum brightness </b></span>"
+	guide+="\n<span foreground='${P_ACCENT}'> Middle click:</span>        <span foreground='${P_YELLOW}'><b>half of the brightness </b></span>"
+
+	guide+="<span foreground='${P_GRAY}'>---------------------------------------------</span>"
+	guide+="\n<span foreground='${P_ACCENT}'> Brightness keys:    </span> <span foreground='${P_YELLOW}'><b>adjust brightness </b></span>"
+	guide+="\n<span foreground='${P_ACCENT}'> SUPER + SHIFT + F11:</span> <span foreground='${P_YELLOW}'><b>brightness up</b></span>"
+	guide+="\n<span foreground='${P_ACCENT}'> SUPER + SHIFT + F10:</span> <span foreground='${P_YELLOW}'><b>brightness down</b></span>"
+
+	tooltip="\t<span foreground='${P_ACCENT}'><b>       Brightness:</b></span> ${brightness}%\n${guide}"
+else
+	tooltip="<span foreground='${P_ACCENT}'><b>Brightness:</b></span> ${brightness}%${guide}"
+fi
+
+printf '{"text": "", "tooltip": "%s", "percentage": %s}' "$tooltip" "$brightness"
