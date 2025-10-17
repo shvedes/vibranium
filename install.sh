@@ -125,6 +125,7 @@ echo "${YELLOW}[VIBRANIUM]${RESET} Copying defaults configs"
 cp -rf ./config/systemd "$HOME/.config/"
 cp -rf ./config/waybar "$HOME/.config"
 cp -rf ./config/alacritty "$HOME/.config"
+cp -rf ./config/rofi "$HOME/.config"
 cp -rf ./config/hypr/hyprland.conf.d "$HOME/.config/hypr"
 
 download_spicetify_theme
