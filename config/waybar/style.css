@@ -1,0 +1,8 @@
+
+@import url("../vibranium/theme/current/waybar.css");
+@import url("../../.local/share/vibranium/defaults/waybar/style.css");
+
+window#waybar {
+    font-family: 'Symbols Nerd Font Mono', 'Cascadia Code';
+}
+

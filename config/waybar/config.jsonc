@@ -1,0 +1,60 @@
+[
+	{
+		// DO NOT EDIT THIS MANUALLY
+		"position": "top",
+
+		"layer": "bottom",
+		"fixed-center": true,
+		"reload_style_on_change": true,
+
+		"include": [
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/battery.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/bluetooth.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/brightness.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/clock.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/color-picker.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/dynamic-separator.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/night-light.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/inhibitor.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/language.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/logout.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/microphone.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/network.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/pacman.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/power-profile.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/recording-indicator.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/separator.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/tray.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/group-tray.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/volume.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/weather.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/worker.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/workspaces.jsonc"
+		],
+ 
+		// All custom modules provided here can and should be enabled or disabled directly
+		// in Vibranium settings.
+		"modules-left": ["hyprland/workspaces"],
+		"modules-center": ["custom/weather","clock","custom/pacman"],
+		"modules-right": [
+			"custom/night-light",
+			"custom/worker",
+			"custom/recording-indicator",
+			"custom/color-picker",
+			"custom/inhibitor",
+			"custom/power-profile",
+			"custom/dynamic-separator",
+			// "hyprland/language",
+			"custom/brightness",
+			"pulseaudio#volume",
+			"pulseaudio#microphone",
+			"bluetooth",
+			"network",
+			"battery",
+			"custom/separator",
+			"group/traygroup"
+		]
+	}
+]
+
+// vim:ft=jsonc

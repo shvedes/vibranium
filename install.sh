@@ -69,6 +69,14 @@ copy_configs() {
 generate_defaults() {
 	./install/gtk_themes.sh
 	./install/papirus_icons.sh
+
+	mkdir -p "$HOME/.config/vibranium/theme"
+
+	printf "# vim:ft=bash\n# Place your environment variables here\n" \
+		> "$HOME/.config/vibranium/environment"
+	printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
+		> "$HOME/.config/vibranium/environment"
+	ln -s "$HOME/.local/share/vibranium/defaults/uwsm/env" "$HOME/.config/uwsm/env"
 }
 
 install_yay
