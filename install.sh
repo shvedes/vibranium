@@ -108,7 +108,7 @@ copy_system_files
 
 bash ./install/install_gtk_themes.sh
 bash ./install/install_papirus_icons.sh
-bash ./install/local_bin.sh
+bash ./install/install_local_bin.sh
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Generating defaults configs"
 
@@ -131,4 +131,3 @@ mkdir -p "$HOME/.local/share/icons"
 cp -rv ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
 
 enable_system_services
-
