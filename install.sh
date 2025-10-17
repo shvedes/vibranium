@@ -95,12 +95,18 @@ copy_system_files() {
 create_directories() {
 	mkdir -pv \
 		"$HOME/.config/spicetify/Themes/text" \
+		"$HOME/.config/hypr/hyprland.conf.d" \
+		"$HOME/.local/state/vibranium/" \
 		"$HOME/.config/vibranium/theme" \
 		"$HOME/.config/qt6ct/colors" \
 		"$HOME/.config/dunst" \
-		"$HOME/.config/hypr" \
 		"$HOME/.config/uwsm" \
 		"$HOME/.config/imv"
+}
+
+post_install() {
+	echo "suspended" > \
+		"$HOME/.local/state/vibranium/night-light"
 }
 
 install_yay
