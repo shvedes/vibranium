@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-cat <<EOF > "$XDG_CONFIG_HOME/dunst/dunstrc"
+cat <<EOF > "$HOME/.config/dunst/dunstrc"
 [general]
 font = "Cascadia Code 9"
 origin = top-right
