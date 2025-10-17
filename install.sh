@@ -61,20 +61,7 @@ enable_system_services() {
 	systemctl --user enable "${user_services[@]}"
 }
 
-copy_configs() {
-	echo "${YELLOW}[VIBRANIUM]${RESET} Copying defaults configs"
-	cp -rf ./config/systemd "$HOME/.config/"
-	cp -rf ./config/waybar "$HOME/.config"
-	cp -rf ./config/alacritty "$HOME/.config"
-}
-
 generate_defaults() {
-	mkdir -pv \
-		"$HOME/.config/vibranium/theme" \
-		"$HOME/.config/qt6ct/colors" \
-		"$HOME/.config/dunst" \
-		"$HOME/.config/imv"
-
 	printf "# vim:ft=bash\n# Place your environment variables here\n" \
 		> "$HOME/.config/vibranium/environment"
 	printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
@@ -107,20 +94,36 @@ copy_system_files() {
 	sudo cp -rv ./extras/usr/local/bin/* /usr/local/bin
 }
 
+create_directories() {
+	mkdir -pv \
+		"$HOME/.config/spicetify/Themes/text" \
+		"$HOME/.config/vibranium/theme" \
+		"$HOME/.config/qt6ct/colors" \
+		"$HOME/.config/dunst" \
+		"$HOME/.config/hypr" \
+		"$HOME/.config/imv"
+}
+
 install_yay
 install_packages
 copy_system_files
 
-./install/install_gtk_themes.sh
-./install/install_papirus_icons.sh
+bash ./install/install_gtk_themes.sh
+bash ./install/install_papirus_icons.sh
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Generating defaults configs"
 
-copy_configs
+create_directories
+
+echo "${YELLOW}[VIBRANIUM]${RESET} Copying defaults configs"
+cp -rf ./config/systemd "$HOME/.config/"
+cp -rf ./config/waybar "$HOME/.config"
+cp -rf ./config/alacritty "$HOME/.config"
+
 download_spicetify_theme
 generate_defaults
 
-for file in ./install/generate_*.sh; do
+for file in ./install/generate_*; do
 	bash "$file"
 done
 
