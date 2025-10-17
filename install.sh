@@ -55,7 +55,7 @@ enable_system_services() {
 	)
 
 	echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling systemd services"
-	sudo systemctl disable display-manager
+# 	sudo systemctl disable display-manager
 
 	sudo systemctl enable "${system_services[@]}"
 	systemctl --user enable "${user_services[@]}"
