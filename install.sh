@@ -33,7 +33,7 @@ install_yay() {
 }
 
 install_packages() {
-	yay -Suy --needed --noconfirm "$(cat ./pkg_list.txt)"
+	yay -Suy --needed --noconfirm - < ./pkg_list.txt
 }
 
 enable_system_services() {
@@ -63,7 +63,7 @@ enable_system_services() {
 
 install_yay
 install_packages
-enable_system_services
-./install/local_bin.sh
-./install/gtk_themes.sh
-./install/papirus_icons.sh
+# enable_system_services
+# ./install/local_bin.sh
+# ./install/gtk_themes.sh
+# ./install/papirus_icons.sh
