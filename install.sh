@@ -79,6 +79,9 @@ apply_default_theme() {
 
 	echo -e "${YELLOW}[VIBRANIUM]${RESET} Applying the default theme"
 	ln -s "${theme_path}" "$HOME/.config/vibranium/theme/current"
+	ln -s "$HOME/.config/vibranium/theme/current/btop.theme" \
+		"$HOME/.config/btop/themes/current.theme"
+
 	gsettings set org.gnome.desktop.interface gtk-theme "Nightfox"
 	gsettings set org.gnome.desktop.interface cursor-theme "macOS"
 	gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
@@ -103,6 +106,7 @@ create_directories() {
 		"$HOME/.local/state/vibranium/" \
 		"$HOME/.config/vibranium/theme" \
 		"$HOME/.config/qt6ct/colors" \
+		"$HOME/.config/btop/themes/" \
 		"$HOME/.config/dunst" \
 		"$HOME/.config/uwsm" \
 		"$HOME/.config/imv"
@@ -132,6 +136,7 @@ cp -rf ./config/alacritty "$HOME/.config"
 cp -rf ./config/rofi "$HOME/.config"
 cp -rf ./config/hypr/hyprland.conf.d "$HOME/.config/hypr"
 cp -rf ./config/qt6ct.conf "$HOME/.config/qt6ct"
+cp -rf ./config/btop.conf "$HOME/.config/btop"
 
 sed -i "s/user/\$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
 
