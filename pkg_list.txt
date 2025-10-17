@@ -41,6 +41,7 @@ tumbler
 swayosd
 ddcutil
 catfish
+wlogout
 waybar
 thunar
 wtype

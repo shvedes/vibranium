@@ -79,6 +79,9 @@ apply_default_theme() {
 
 	echo -e "${YELLOW}[VIBRANIUM]${RESET} Applying the default theme"
 	ln -s "${theme_path}" "$HOME/.config/vibranium/theme/current"
+	gsettings set org.gnome.desktop.interface gtk-theme "Nightfox"
+	gsettings set org.gnome.desktop.interface cursor-theme "macOS"
+	gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 }
 
 download_spicetify_theme() {
@@ -96,6 +99,7 @@ create_directories() {
 	mkdir -pv \
 		"$HOME/.config/spicetify/Themes/text" \
 		"$HOME/.config/hypr/hyprland.conf.d" \
+		"$HOME/.local/share/applications" \
 		"$HOME/.local/state/vibranium/" \
 		"$HOME/.config/vibranium/theme" \
 		"$HOME/.config/qt6ct/colors" \
@@ -127,6 +131,12 @@ cp -rf ./config/waybar "$HOME/.config"
 cp -rf ./config/alacritty "$HOME/.config"
 cp -rf ./config/rofi "$HOME/.config"
 cp -rf ./config/hypr/hyprland.conf.d "$HOME/.config/hypr"
+cp -rf ./config/qt6ct.conf "$HOME/.config/qt6ct"
+
+sed -i "s/user/\$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
+
+ln -sf ./applications/hidden/* "$HOME"/.local/share/applications/
+ln -sf ./applications/custom "$HOME"/.local/share/applications/
 
 download_spicetify_theme
 generate_defaults
