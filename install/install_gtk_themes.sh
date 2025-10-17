@@ -13,6 +13,7 @@ REPOS=(
 
 # Destination directory
 DEST_DIR="$HOME/.local/share/themes"
+mkdir -p "$DEST_DIR"
 
 # Associative array for accents ("" for no -t flag and no accent in name)
 declare -A accents
