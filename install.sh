@@ -51,7 +51,7 @@ enable_system_services() {
 
 	echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling systemd services"
 
-	sudo systemctl enable ly power-profiles-daemon bluez
+	sudo systemctl enable ly power-profiles-daemon bluetooth
 	systemctl --user daemon-reload
 
 	for service in "${user_services[@]}"; do
@@ -63,7 +63,7 @@ generate_defaults() {
 	printf "# vim:ft=bash\n# Place your environment variables here\n" \
 		> "$HOME/.config/vibranium/environment"
 	printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
-		> "$HOME/.config/vibranium/environment"
+		> "$HOME/.config/vibranium/settings"
 	ln -s "$HOME/.local/share/vibranium/defaults/uwsm/env" "$HOME/.config/uwsm/env"
 
 	ln -s "$HOME/.local/share/vibranium/defaults/imv" \
