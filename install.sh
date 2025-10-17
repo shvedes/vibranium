@@ -63,13 +63,13 @@ enable_system_services() {
 
 copy_configs() {
 	echo "${YELLOW}[VIBRANIUM]${RESET} Copying defaults configs"
-	cp -rf ./config/systemd "$HOME/.config/systemd/user"
+	cp -rf ./config/systemd "$HOME/.config/"
 	cp -rf ./config/waybar "$HOME/.config"
 	cp -rf ./config/alacritty "$HOME/.config"
 }
 
 generate_defaults() {
-	mkdir -p \
+	mkdir -pv \
 		"$HOME/.config/vibranium/theme" \
 		"$HOME/.config/qt6ct/colors" \
 		"$HOME/.config/dunst" \
@@ -101,8 +101,15 @@ download_spicetify_theme() {
 		-o "${XDG_CONFIG_HOME:-$HOME/.config}/spicetify/Themes/text/user.css"
 }
 
+copy_system_files() {
+	sudo cp -rv ./extras/udev/rules.d/*  /etc/udev/rules.d
+	sudo cp -rv ./extras/pacman.d/hooks  /etc/pacman.d
+	sudo cp -rv ./extras/usr/local/bin/* /usr/local/bin
+}
+
 install_yay
 install_packages
+copy_system_files
 
 ./install/install_gtk_themes.sh
 ./install/install_papirus_icons.sh
@@ -110,6 +117,7 @@ install_packages
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Generating defaults configs"
 
 copy_configs
+download_spicetify_theme
 generate_defaults
 
 for file in ./install/generate_*.sh; do
@@ -117,6 +125,9 @@ for file in ./install/generate_*.sh; do
 done
 
 apply_default_theme
+mkdir -p "$HOME/.local/share/icons"
+cp -rv ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
+
 enable_system_services
 
 # ./install/local_bin.sh

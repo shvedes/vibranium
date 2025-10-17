@@ -12,7 +12,7 @@ REPOS=(
 )
 
 # Destination directory
-DEST_DIR="$HOME/.local/share/themes"
+DEST_DIR="$HOME/.themes"
 mkdir -p "$DEST_DIR"
 
 # Associative array for accents ("" for no -t flag and no accent in name)
@@ -233,4 +233,5 @@ for repo in "${REPOS[@]}"; do
   install_theme "$repo"
 done
 
+ln -s "$HOME/.themes" "$HOME/.local/share/themes"
 echo "All installations complete."
