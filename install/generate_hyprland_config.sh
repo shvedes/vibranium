@@ -1,3 +1,6 @@
+#!/usr/bin/env bash
+
+cat << EOF > "$HOME/.config/hypr/hyprland.conf"
 # Load current theme
 source = ../vibranium/theme/current/hyprland.conf
 
@@ -13,3 +16,4 @@ source = ~/.local/share/vibranium/defaults/hypr/input.conf
 
 # Load user's overrides
 source = ./hyprland.conf.d/*.conf
+EOF

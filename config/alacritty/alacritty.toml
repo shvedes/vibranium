@@ -1,0 +1,13 @@
+[general]
+import = [ 
+	"../../.local/share/vibranium/defaults/alacritty.toml",
+	"../vibranium/theme/current/alacritty.toml"
+]
+
+[font.normal]
+family = "Cascadia Code"
+style  = "Regular"
+
+
+[window]
+opacity = 0.95

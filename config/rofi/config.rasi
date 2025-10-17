@@ -1,0 +1,7 @@
+
+@import "~/.local/share/vibranium/defaults/rofi.rasi"
+
+window, mainbox {
+	border-radius:	0px;
+	font: "Cascadia Code 10";
+}

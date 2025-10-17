@@ -6,6 +6,10 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
+if [[ ! -f "$VIBRANIUM_STATE/night-light" ]]; then
+	echo "suspended" "$VIBRANIUM_STATE/night-light"
+fi
+
 if [[ ! -d "$VIBRANIUM_STATE" ]]; then
 	mkdir -p "$VIBRANIUM_STATE"/wallpaper
 	vibranium-utils-wallpaper-get > "$VIBRANIUM_STATE/wallpaper/$(vibranium-theme-get)"

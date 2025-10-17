@@ -12,7 +12,7 @@ REPOS=(
 )
 
 # Destination directory
-DEST_DIR="$HOME/.themes"
+DEST_DIR="$HOME/.local/share/themes"
 
 # Associative array for accents ("" for no -t flag and no accent in name)
 declare -A accents

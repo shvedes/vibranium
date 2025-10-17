@@ -53,4 +53,4 @@ if (( TEMP < 1000 || TEMP > 20000 )); then
 fi
 
 hyprctl -q hyprsunset temperature "$temp"
-printf "# Auto-generated! All changes will be overwritten!\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}" "$temp" > "$XDG_CONFIG_HOME/hypr/hyprsunset.CONF"
+printf "# Auto-generated! All changes will be overwritten!\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}" "$temp" > "$XDG_CONFIG_HOME/hypr/hyprsunset.conf"

@@ -1,4 +1,5 @@
 xdg-desktop-portal-hyprland
+ttf-nerd-fonts-symbols-mono
 thunar-media-tags-plugin
 thunar-archive-plugin
 power-profiles-daemon
@@ -33,6 +34,7 @@ hyprland
 hypridle
 gvfs-mtp
 cliphist
+firefox
 zathura
 wiremix
 tumbler

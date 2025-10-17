@@ -62,28 +62,61 @@ enable_system_services() {
 }
 
 copy_configs() {
-	cp -r ./config/systemd "$HOME/.config/systemd/user"
-	cp -r ./config/hypr "$HOME/.config/hypr"
+	echo "${YELLOW}[VIBRANIUM]${RESET} Copying defaults configs"
+	cp -rf ./config/systemd "$HOME/.config/systemd/user"
+	cp -rf ./config/waybar "$HOME/.config"
+	cp -rf ./config/alacritty "$HOME/.config"
 }
 
 generate_defaults() {
-	./install/gtk_themes.sh
-	./install/papirus_icons.sh
-
-	mkdir -p "$HOME/.config/vibranium/theme"
+	mkdir -p \
+		"$HOME/.config/vibranium/theme" \
+		"$HOME/.config/qt6ct/colors" \
+		"$HOME/.config/dunst" \
+		"$HOME/.config/imv"
 
 	printf "# vim:ft=bash\n# Place your environment variables here\n" \
 		> "$HOME/.config/vibranium/environment"
 	printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
 		> "$HOME/.config/vibranium/environment"
 	ln -s "$HOME/.local/share/vibranium/defaults/uwsm/env" "$HOME/.config/uwsm/env"
+
+	ln -s "$HOME/.local/share/vibranium/defaults/imv" \
+		"$HOME/.config/imv/config"
+
+	ln -s "$HOME/.local/share/vibranium/themes/nightfox-nightfox/qt6ct.conf" \
+		"$HOME/.config/qt6ct/colors/vibranium.conf"
+}
+
+apply_default_theme() {
+	local theme_path
+	theme_path="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
+
+	echo -e "${YELLOW}[VIBRANIUM]${RESET} Applying the default theme"
+	ln -s "${theme_path}" "$HOME/.config/vibranium/theme/current"
+}
+
+download_spicetify_theme() {
+	curl -s "https://raw.githubusercontent.com/spicetify/spicetify-themes/refs/heads/master/text/user.css" \
+		-o "${XDG_CONFIG_HOME:-$HOME/.config}/spicetify/Themes/text/user.css"
 }
 
 install_yay
 install_packages
 
+./install/install_gtk_themes.sh
+./install/install_papirus_icons.sh
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Generating defaults configs"
+
 copy_configs
+generate_defaults
+
+for file in ./install/generate_*.sh; do
+	bash "$file"
+done
+
+apply_default_theme
 enable_system_services
 
-generate_defaults
-./install/local_bin.sh
+# ./install/local_bin.sh
