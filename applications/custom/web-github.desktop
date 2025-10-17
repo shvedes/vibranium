@@ -1,13 +1,13 @@
 [Desktop Entry]
 Version=1.0
-Name=Google Gemini
+Name=GitHub
 # vibranium-core-app-launcher:
 # if [[ "$expanded_input" =~ ^https?:// ]]; then
 #     vibranium-cmd-launch-cmd xdg-open "$expanded_input"
 #     exit 0
 # fi
-Exec=https://gemini.google.com
+Exec=https://github.com
 Terminal=false
 Type=Application
-Icon=gemini
-Categories=Network;
+Icon=github
+Categories=WebApp;

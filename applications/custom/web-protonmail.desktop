@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Protonmail
+Icon=protonmail
+Keywords=Proton;Prvicary;Private
+Exec=https://proton.me/mail
+Terminal=false
+Categories=WebApp;

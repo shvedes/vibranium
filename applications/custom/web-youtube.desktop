@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=YouTube
+Icon=youtube
+Keywords=Google;Youtube;Video;Hosting;Content
+Exec=https://youtube.com
+Terminal=false
+Categories=WebApp;

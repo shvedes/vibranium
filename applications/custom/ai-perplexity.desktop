@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Perplexity
+Icon=perplexity
+Keywords=PerplexityAI;Labs;
+Exec=https://www.perplexity.ai
+Terminal=false
+Categories=AI;

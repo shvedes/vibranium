@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Suspend
+Icon=suspend
+Keywords=Sleep;Standby
+Exec=vibranium-cmd-suspend
+Terminal=false
+Categories=Power;

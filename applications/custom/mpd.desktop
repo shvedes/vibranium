@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=MPD
+Icon=mpd
+Keywords=MPD;MPC;Music;Player;Server;ncmpcpp;rmpc;vimpc;cmus;
+Exec=vibranium-cmd-launch-mpd-client
+Terminal=true
+Categories=Multimedia

@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Google Gemini
+Icon=google-gemini
+Keywords=AI;Google;Gemini
+Exec=https://gemini.google.com
+Terminal=false
+Categories=AI;

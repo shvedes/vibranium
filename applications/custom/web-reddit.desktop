@@ -1,0 +1,9 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Reddit
+Icon=reddit
+Keywords=Reddit;Forum;Social;Media;
+Exec=https://reddit.com
+Terminal=false
+Categories=WebApp;
