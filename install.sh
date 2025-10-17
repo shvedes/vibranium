@@ -61,9 +61,21 @@ enable_system_services() {
 	systemctl --user enable "${user_services[@]}"
 }
 
+copy_configs() {
+	cp -r ./config/systemd "$HOME/.config/systemd/user"
+	cp -r ./config/hypr "$HOME/.config/hypr"
+}
+
+generate_defaults() {
+	./install/gtk_themes.sh
+	./install/papirus_icons.sh
+}
+
 install_yay
 install_packages
+
+copy_configs
 enable_system_services
+
+generate_defaults
 ./install/local_bin.sh
-./install/gtk_themes.sh
-./install/papirus_icons.sh
