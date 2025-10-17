@@ -64,3 +64,6 @@ enable_system_services() {
 install_yay
 install_packages
 enable_system_services
+./install/local_bin.sh
+./install/gtk_themes.sh
+./install/papirus_icons.sh
