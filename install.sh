@@ -52,6 +52,8 @@ edit_system_configs() {
 			-e '/^OPTIONS=/ s/\bdebug\b/!debug/' "$makepkg_conf"
 	fi
 
+	sudo pacman -Suy --noconfirm &>/dev/null
+
 	printf "\n%s[VIBRANIUM]%s Editing /etc/sudoers" "${YELLOW}" "${RESET}"
 	if sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$sudoers_conf"; then
 		printf "\n%s[VIBRANIUM]%s /etc/sudoers already configured, skipping" "${YELLOW}" "${RESET}"
