@@ -149,10 +149,10 @@ cp -r ./config/btop.conf "$HOME/.config/btop"
 
 sed -i "s/user/\$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
 
+ln -sf "$(realpath ./applications/custom)" "$HOME"/.local/share/applications/ >/dev/null
 for entry in ./applications/hidden/*; do
 	ln -sf "$(realpath "$entry")" "$HOME"/.local/share/applications/
 done
-ln -sf ./applications/custom "$HOME"/.local/share/applications/ >/dev/null
 
 apply_default_theme
 generate_defaults
@@ -167,4 +167,4 @@ enable_system_services
 
 printf "\n%s[VIBRANIUM]%s Installation complete%s" "${YELLOW}" "${GREEN}" "${RESET}"
 printf "\n%s[VIBRANIUM]%s You can start using Vibranium by typying 'uwsm start hyprland'" "${YELLOW}" "${RESET}"
-printf "\n%s[VIBRANIUM]%s Or you can reboot the machine and then select 'Hyprland (uwsm-managed)' in DM" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Or you can reboot the machine and then select 'Hyprland (uwsm-managed)' in DM\n" "${YELLOW}" "${RESET}"
