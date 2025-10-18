@@ -1,4 +1,12 @@
 #!/usr/bin/env bash
 
+source "$VIBRANIUM_PATH/vibranium-core-lib"
+
+msg="Welcome to Vibranium, an Omarchy-like configuration focused on affordable customization and speed!\n"
+msg+="To open the Vibranium menu, press <span foreground='${P_YELLOW}'><b>CTRL ALT + V</b></span>\n"
+msg+="To see all available key combinations, press <span foreground='${P_YELLOW}'><b>CTRL ALT + K</b></span>\n\n"
+msg+="Right click to close this notification"
+notify-send -r 1 "Vibranium" "$msg"
+
 chromium --no-startup-window --set-theme-color="25, 35, 48"
 rm "$VIBRANIUM_STATE/first-boot"
