@@ -7,6 +7,12 @@ SUDO_PROMPT="$(printf '\n\033[1;31m[sudo]\033[0m Password for %s: ' "$USER")"
 
 THEME_PATH="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
 
+PACMAN_CONF="/etc/pacman.conf"
+MAKEPKG_CONF="/etc/makepkg.conf"
+SUDOERS_CONF="/etc/sudoers"
+FAILLOCK_CONF="/etc/security/faillock.conf"
+SYSTEM_AUTH_CONF="/etc/pam.d/system-auth"
+
 RED=$'\e[0;31m'
 YELLOW=$'\e[0;33m'
 GREEN=$'\e[0;32m'
@@ -134,21 +140,15 @@ sudo -v; clear
 printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
 cat ./logo.txt
 
-printf "%s[VIBRANIUM]%s Copying system files" "${YELLOW}" "${RESET}"
+printf "%s[VIBRANIUM]%s Setting up system files" "${YELLOW}" "${RESET}"
 sudo cp -r ./extras/udev/rules.d/*  /etc/udev/rules.d
 sudo cp -r ./extras/pacman.d/hooks  /etc/pacman.d
 sudo cp -r ./extras/usr/local/bin/* /usr/local/bin
 
-PACMAN_CONF="/etc/pacman.conf"
-MAKEPKG_CONF="/etc/makepkg.conf"
-SUDOERS_CONF="/etc/sudoers"
-FAILLOCK_CONF="/etc/security/faillock.conf"
-SYSTEM_AUTH_CONF="/etc/pam.d/system-auth"
-
-if grep -q '^\[multilib\]' "$PACMAN_CONF" && grep -q '^Color' "$PACMAN_CONF" && grep -q '^VerbosePkgLists' "$PACMAN_CONF" && grep -q '^ParallelDownloads = 10' "$PACMAN_CONF"; then
-	printf "\n%s[VIBRANIUM]%s /etc/pacman.conf %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
-else
-	printf "\n%s[VIBRANIUM]%s Editing %s/etc/pacman.conf%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
+if ! (grep -q '^\[multilib\]' "$PACMAN_CONF" && \
+      grep -q '^Color' "$PACMAN_CONF" && \
+      grep -q '^VerbosePkgLists' "$PACMAN_CONF" && \
+      grep -q '^ParallelDownloads = 10' "$PACMAN_CONF"); then
 	sudo sed -i -e '/\[multilib\]/,/^$/s/^#//' \
 		-e '/^\s*#Color/s/^#//' \
 		-e '/^\s*#VerbosePkgLists/s/^#//' \
@@ -156,36 +156,26 @@ else
 		-e 's/^\s*ParallelDownloads\s*=.*/ParallelDownloads = 10/' "$PACMAN_CONF"
 fi
 
-if grep -q "-march=native" "$MAKEPKG_CONF" &>/dev/null && ! \
-	grep -qE "^OPTIONS([^#]*[^!]debug)" "$MAKEPKG_CONF" &>/dev/null; then
-	printf "\n%s[VIBRANIUM]%s /etc/makepkg.conf %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
+if grep -q "-march=native" "$MAKEPKG_CONF" &>/dev/null && \
+   ! grep -qE "^OPTIONS([^#]*[^!]debug)" "$MAKEPKG_CONF" &>/dev/null; then
+	:
 else
-	printf "\n%s[VIBRANIUM]%s Editing %s/etc/makepkg.conf%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
 	sudo sed -i -e 's/-march=x86-64/-march=native/' \
 		-e '/^OPTIONS=/ s/\bdebug\b/!debug/' "$MAKEPKG_CONF"
 fi
 
 sudo pacman -Suy --noconfirm &>/dev/null
 
-if sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$SUDOERS_CONF"; then
-	printf "\n%s[VIBRANIUM]%s /etc/sudoers %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
-else
-	printf "\n%s[VIBRANIUM]%s Editing %s/etc/sudoers%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
+if ! sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$SUDOERS_CONF"; then
 	echo -e '\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback' \
 		| sudo tee -a "$SUDOERS_CONF" &>/dev/null
 fi
 
-if grep -qxF 'nodelay' "$FAILLOCK_CONF"; then
-	printf "\n%s[VIBRANIUM]%s /etc/security/faillock.conf %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
-else
-	printf "\n%s[VIBRANIUM]%s Editing %s/etc/security/faillock.conf%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
+if ! grep -qxF 'nodelay' "$FAILLOCK_CONF"; then
 	echo -e 'deny = 5\nnodelay' | sudo tee -a "$FAILLOCK_CONF" &>/dev/null
 fi
 
-if sudo grep -q '^auth.*pam_unix\.so.*try_first_pass nullok nodelay' "$SYSTEM_AUTH_CONF"; then
-	printf "\n%s[VIBRANIUM]%s /etc/pam.d/system-auth %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
-else
-	printf "\n%s[VIBRANIUM]%s Editing %s/etc/pam.d/system-auth%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
+if ! sudo grep -q '^auth.*pam_unix\.so.*try_first_pass nullok nodelay' "$SYSTEM_AUTH_CONF"; then
 	sudo sed -i '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\(try_first_pass nullok\)/\1 nodelay/' "$SYSTEM_AUTH_CONF"
 fi
 
@@ -196,7 +186,7 @@ create_directories
 ./install/install_papirus_icons.sh
 ./install/install_local_bin.sh
 
-printf "\n%s[VIBRANIUM]%s Copying configs" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Setting up config files" "${YELLOW}" "${RESET}"
 cp -r ./config/* "$HOME/.config"
 sed -i "s/user/$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
 
@@ -210,7 +200,6 @@ for file in ./install/generate_*; do
 done
 
 
-printf "\n%s[VIBRANIUM]%s Generating defaults" "${YELLOW}" "${RESET}"
 printf "# vim:ft=bash\n# Place your environment variables here\n" \
 	> "$HOME/.config/vibranium/environment"
 printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
@@ -231,10 +220,6 @@ ln -s "$HOME/.local/share/vibranium/defaults/wlogout/layout" \
 
 ln -s "$HOME/.config/vibranium/theme/current/spicetify.ini" \
 	"$HOME/.config/spicetify/Themes/text/color.ini" >/dev/null
-
-
-printf "\n%s[VIBRANIUM]%s Applying the default theme" "${YELLOW}" "${RESET}"
-
 
 ln -s "${THEME_PATH}" "$HOME/.config/vibranium/theme/current" >/dev/null
 ln -s "$HOME/.config/vibranium/theme/current/btop.theme" \
