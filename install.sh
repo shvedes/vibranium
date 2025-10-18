@@ -263,7 +263,9 @@ post_install
 cleanup
 
 printf "\n%s[VIBRANIUM]%s Installation complete%s" "${YELLOW}" "${GREEN}" "${RESET}"
-printf "\n%s[VIBRANIUM]%s You can start using Vibranium by typying 'uwsm start hyprland'" "${YELLOW}" "${RESET}"
-printf "\n%s[VIBRANIUM]%s Or you can reboot the machine and then select 'Hyprland (uwsm-managed)' in DM\n" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Launching vibranium..." "${YELLOW}" "${RESET}"
+uwsm start hyprland &>/dev/null
+# printf "\n%s[VIBRANIUM]%s You can start using Vibranium by typying 'uwsm start hyprland'" "${YELLOW}" "${RESET}"
+# printf "\n%s[VIBRANIUM]%s Or you can reboot the machine and then select 'Hyprland (uwsm-managed)' in DM\n" "${YELLOW}" "${RESET}"
 
 printf '\e[?25h'  # show cursor
