@@ -1,0 +1,74 @@
+
+@import url("../vibranium/theme/current/wlogout/wlogout.css");
+
+* {
+	background-image: none;
+	box-shadow: none;
+}
+
+window {
+	background-color: @background;
+}
+
+button {
+    border-radius: 8px;
+    border-color: @border;
+	border-style: solid;
+	border-width: 3px;
+
+	margin: 8px;
+
+    color: @foreground;
+	background-color: transparent;
+	box-shadow: 5px 5px 5px rgba(0, 0, 0, 0.5);
+
+	font-family: "Noto Sans";
+	font-weight: 600;
+	font-size: 18px;
+
+	background-repeat: no-repeat;
+	background-position: center;
+	background-size: 25%;
+	transition: border-color 0.3s ease, background-color 0.5s ease
+}
+
+button:active,
+button:focus {
+    border-color: @accent;
+}
+
+button:hover {
+    border-color: @muted;
+	background-color: @background-hover;
+	transition: border-color 0.3s ease
+}
+
+button:active:hover,
+button:focus:hover {
+    border-color: @accent-active;
+}
+
+#lock {
+    background-image: image(url("../vibranium/theme/current/wlogout/icons/lock.png"));
+}
+
+#logout {
+    background-image: image(url("../vibranium/theme/current/wlogout/icons/logout.png"));
+}
+
+#suspend {
+    background-image: image(url("../vibranium/theme/current/wlogout/icons/suspend.png"));
+}
+
+#uefi {
+    background-image: image(url("../vibranium/theme/current/wlogout/icons/uefi.png"));
+}
+
+#shutdown {
+    background-image: image(url("../vibranium/theme/current/wlogout/icons/shutdown.png"));
+}
+
+#reboot {
+    background-image: image(url("../vibranium/theme/current/wlogout/icons/reboot.png"));
+}
+

@@ -71,6 +71,9 @@ generate_defaults() {
 
 	ln -s "$HOME/.local/share/vibranium/themes/nightfox-nightfox/qt6ct.conf" \
 		"$HOME/.config/qt6ct/colors/vibranium.conf"
+
+	ln -s "$HOME/.local/share/vibranium/defaults/wlogout/style.css" \
+		"$HOME/.config/wlogout"
 }
 
 apply_default_theme() {
@@ -107,6 +110,7 @@ create_directories() {
 		"$HOME/.config/vibranium/theme" \
 		"$HOME/.config/qt6ct/colors" \
 		"$HOME/.config/btop/themes/" \
+		"$HOME/.config/wlogout" \
 		"$HOME/.config/dunst" \
 		"$HOME/.config/uwsm" \
 		"$HOME/.config/imv"
@@ -140,7 +144,9 @@ cp -rf ./config/btop.conf "$HOME/.config/btop"
 
 sed -i "s/user/\$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
 
-ln -sf ./applications/hidden/* "$HOME"/.local/share/applications/
+for entry in ./applications/hidden/*; do
+	ln -sf "$(realpath "$entry")" "$HOME"/.local/share/applications/
+done
 ln -sf ./applications/custom "$HOME"/.local/share/applications/
 
 download_spicetify_theme
