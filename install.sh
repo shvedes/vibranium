@@ -27,27 +27,45 @@ edit_system_configs() {
 	system_auth_conf="/etc/pam.d/system-auth"
 
 	printf "\n%s[VIBRANIUM]%s Editing /etc/pacman.conf" "${YELLOW}" "${RESET}"
-	sudo sed -i -e '/\[multilib\]/,/^$/s/^#//' \
-		-e '/^\s*#Color/s/^#//' \
-		-e '/^\s*#VerbosePkgLists/s/^#//' \
-		-e '/^\s*#ParallelDownloads/s/^#//' \
-		-e 's/^\s*ParallelDownloads\s*=.*/ParallelDownloads = 10/' "$pacman_conf"
+	if grep -q '^\[multilib\]' "$pacman_conf" && grep -q '^Color' "$pacman_conf" && grep -q '^VerbosePkgLists' "$pacman_conf" && grep -q '^ParallelDownloads = 10' "$pacman_conf"; then
+		printf "\n%s[VIBRANIUM]%s /etc/pacman.conf already configured, skipping" "${YELLOW}" "${RESET}"
+	else
+		sudo sed -i -e '/\[multilib\]/,/^$/s/^#//' \
+			-e '/^\s*#Color/s/^#//' \
+			-e '/^\s*#VerbosePkgLists/s/^#//' \
+			-e '/^\s*#ParallelDownloads/s/^#//' \
+			-e 's/^\s*ParallelDownloads\s*=.*/ParallelDownloads = 10/' "$pacman_conf"
+	fi
 
 	printf "\n%s[VIBRANIUM]%s Editing /etc/makepkg.conf" "${YELLOW}" "${RESET}"
-	sudo sed -i -e 's/-march=x86-64/-march=native/' \
-		-e '/^OPTIONS=/ s/\bdebug\b/!debug/' "$makepkg_conf"
+	if grep -q '-march=native' "$makepkg_conf" && ! grep -q '\bdebug\b' "$makepkg_conf"; then
+		printf "\n%s[VIBRANIUM]%s /etc/makepkg.conf already configured, skipping" "${YELLOW}" "${RESET}"
+	else
+		sudo sed -i -e 's/-march=x86-64/-march=native/' \
+			-e '/^OPTIONS=/ s/\bdebug\b/!debug/' "$makepkg_conf"
+	fi
 
 	printf "\n%s[VIBRANIUM]%s Editing /etc/sudoers" "${YELLOW}" "${RESET}"
-	sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$sudoers_conf" || \
+	if sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$sudoers_conf"; then
+		printf "\n%s[VIBRANIUM]%s /etc/sudoers already configured, skipping" "${YELLOW}" "${RESET}"
+	else
 		echo -e '\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback' \
-		| sudo tee -a "$sudoers_conf" &>/dev/null
+			| sudo tee -a "$sudoers_conf" &>/dev/null
+	fi
 
 	printf "\n%s[VIBRANIUM]%s Editing /etc/security/faillock.conf" "${YELLOW}" "${RESET}"
-	grep -qxF 'deny = 5, nodelay' "$faillock_conf" || \
-		echo 'deny = 5, nodelay' | sudo tee -a "$faillock_conf" &>/dev/null
+	if grep -qxF 'nodelay' "$faillock_conf"; then
+		printf "\n%s[VIBRANIUM]%s /etc/security/faillock.conf already configured, skipping" "${YELLOW}" "${RESET}"
+	else
+		echo -e 'deny = 5\nnodelay' | sudo tee -a "$faillock_conf" &>/dev/null
+	fi
 
 	printf "\n%s[VIBRANIUM]%s Editing /etc/pam.d/system-auth" "${YELLOW}" "${RESET}"
-	sudo sed -i '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\(try_first_pass nullok\)/\1 nodelay/' "$system_auth_conf"
+	if sudo grep -q '^auth.*pam_unix\.so.*try_first_pass nullok nodelay' "$system_auth_conf"; then
+		printf "\n%s[VIBRANIUM]%s /etc/pam.d/system-auth already configured, skipping" "${YELLOW}" "${RESET}"
+	else
+		sudo sed -i '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\(try_first_pass nullok\)/\1 nodelay/' "$system_auth_conf"
+	fi
 }
 
 install_yay() {
@@ -119,7 +137,7 @@ apply_default_theme() {
 	local theme_path
 	theme_path="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
 
-	printf "\n%s[VIBRANIUM | THEMES]%s Applying the default theme" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Applying the default theme" "${YELLOW}" "${RESET}"
 	ln -s "${theme_path}" "$HOME/.config/vibranium/theme/current" >/dev/null
 	ln -s "$HOME/.config/vibranium/theme/current/btop.theme" \
 		"$HOME/.config/btop/themes/current.theme" >/dev/null
@@ -180,11 +198,11 @@ bash ./install/install_gtk_themes.sh
 bash ./install/install_papirus_icons.sh
 bash ./install/install_local_bin.sh
 
-printf "\n%s[VIBRANIUM | CONFIGS]%s Generating defaults configs" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Generating defaults configs" "${YELLOW}" "${RESET}"
 
 create_directories
 
-printf "\n%s[VIBRANIUM | CONFIGS]%s Copying configs" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Copying configs" "${YELLOW}" "${RESET}"
 cp -r ./config/systemd "$HOME/.config/"
 cp -r ./config/waybar "$HOME/.config"
 cp -r ./config/alacritty "$HOME/.config"
@@ -204,12 +222,12 @@ done
 apply_default_theme
 generate_defaults
 
-printf "\n%s[VIBRANIUM | CONFIGS]%s Generating defaults" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Generating defaults" "${YELLOW}" "${RESET}"
 for file in ./install/generate_*; do
 	bash "$file"
 done
 
-printf "\n%s[VIBRANIUM | CONFIGS]%s Installing systemd services" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Installing systemd services" "${YELLOW}" "${RESET}"
 enable_system_services
 
 printf "\n%s[VIBRANIUM]%s Installation complete%s" "${YELLOW}" "${GREEN}" "${RESET}"
