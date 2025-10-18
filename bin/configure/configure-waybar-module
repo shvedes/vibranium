@@ -19,17 +19,24 @@ while true; do
 
 	case "$CHOSEN" in
 		"Sleep inhibitor")
+			inhibitor_index=0
 			while true; do
 				inhibitor_options=("coffee" "lock" "eye")
-				inhibitor_chosen="$(printf "%s\n" "${inhibitor_options[@]}" | rofi_cmd "Sleep inhibitor" "ESC to go back")"
+				inhibitor_chosen="$(printf "%s\n" "${inhibitor_options[@]}" | rofi_cmd "Sleep inhibitor" "ESC to go back" -selected-row "$inhibitor_index")"
 				[[ -z "$inhibitor_chosen" ]] && break
+
+				for i in "${!inhibitor_options[@]}"; do
+					if [ "${inhibitor_options[$i]}" = "$inhibitor_chosen" ]; then
+						inhibitor_index="$i"
+						break
+					fi
+				done
 
 				case "$inhibitor_chosen" in
 					"coffee"|"lock"|"eye")
 						option-validate "VIBRANIUM_BAR_INHIBITOR_ICON"
 						sed -i "/^VIBRANIUM_BAR_INHIBITOR_ICON/s/=.*/=\"${inhibitor_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
 						vibranium-cmd-refresh-waybar-module inhibitor
-						break
 						;;
 					*) continue
 				esac

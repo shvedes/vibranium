@@ -211,7 +211,7 @@ while true; do
 								vibranium-cmd-edit-wm-config decoration:blur:size:$input "$HYPR_CONFIG"
 
 								if (( input > 10 )); then
-									notify-send -r 1 -u critical -t 2000 "Vibranium" "Please note that large values may affect overall performance"
+									notify-send -r 1 "Vibranium" "Please note that large values may affect overall performance"
 								fi
 								break
 							fi
@@ -229,7 +229,7 @@ while true; do
 								vibranium-cmd-edit-wm-config decoration:blur:passes:$input "$HYPR_CONFIG"
 
 								if (( input > 10 )); then
-									notify-send -r 1 -u critical -t 2000 "Vibranium" "Please note that large values may affect overall performance"
+									notify-send -r 1 "Vibranium" "Please note that large values may affect overall performance"
 								fi
 								break
 							fi

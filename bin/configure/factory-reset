@@ -89,6 +89,7 @@ while true; do
 			vibranium-cmd-refresh-dunst
 			hyprctl -q reload config-only
 
+			vibranium-cmd-refresh-waybar-module worker
 			printf "suspended" > "$VIBRANIUM_STATE/night-light"
     esac
 done

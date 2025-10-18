@@ -16,6 +16,10 @@ if [[ "$(id -u)" == 0 ]]; then
 	exit 1
 fi
 
+cleanup() {
+	yay -Ycc --noconfirm &>/dev/null
+}
+
 edit_system_configs() {
 	local pacman_conf makepkg_conf system_auth_conf
 	local sudoers_conf faillock_conf 
@@ -38,7 +42,7 @@ edit_system_configs() {
 	fi
 
 	printf "\n%s[VIBRANIUM]%s Editing /etc/makepkg.conf" "${YELLOW}" "${RESET}"
-	if grep -q '-march=native' "$makepkg_conf" && ! grep -q '\bdebug\b' "$makepkg_conf"; then
+	if grep -q '-march=native' "$makepkg_conf" && ! grep -qE "^OPTIONS([^#]*[^!]debug)" "$makepkg_conf"; then
 		printf "\n%s[VIBRANIUM]%s /etc/makepkg.conf already configured, skipping" "${YELLOW}" "${RESET}"
 	else
 		sudo sed -i -e 's/-march=x86-64/-march=native/' \
@@ -147,6 +151,8 @@ apply_default_theme() {
 	gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 	gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
+	chromium --no-startup-window --set-theme-color="25, 35, 48" &>/dev/null
+
 	ln -s "$HOME/.themes/Nightfox/gtk-4.0/assets" \
 		"$HOME/.config/gtk-4.0/"
 	ln -s "$HOME/.themes/Nightfox/gtk-4.0/gtk-dark.css" \
@@ -190,9 +196,9 @@ post_install() {
 }
 
 install_yay
-install_packages
 copy_system_files
 edit_system_configs
+install_packages
 
 bash ./install/install_gtk_themes.sh
 bash ./install/install_papirus_icons.sh
@@ -229,6 +235,7 @@ done
 
 printf "\n%s[VIBRANIUM]%s Installing systemd services" "${YELLOW}" "${RESET}"
 enable_system_services
+cleanup
 
 printf "\n%s[VIBRANIUM]%s Installation complete%s" "${YELLOW}" "${GREEN}" "${RESET}"
 printf "\n%s[VIBRANIUM]%s You can start using Vibranium by typying 'uwsm start hyprland'" "${YELLOW}" "${RESET}"

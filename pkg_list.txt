@@ -1,6 +1,7 @@
 xdg-desktop-portal-hyprland
 ttf-nerd-fonts-symbols-mono
 thunar-media-tags-plugin
+sound-theme-freedesktop
 thunar-archive-plugin
 power-profiles-daemon
 omarchy-chromium-bin
@@ -14,13 +15,17 @@ noto-fonts-extra
 noto-fonts-emoji
 pop-sound-theme
 pacman-contrib
+pipewire-pulse
 noto-fonts-cjk
 xdg-user-dirs
 thunar-volman
+pipewire-jack
+pipewire-alsa
 polkit-gnome
 apple_cursor
 imagemagick
 file-roller
+wireplumber
 bluez-utils
 rofi-emoji
 noto-fonts
@@ -29,6 +34,8 @@ hyprpicker
 trash-cli
 mediainfo
 hyprpaper
+fastfetch
+pipewire
 nwg-look
 hyprlock
 hyprland
@@ -44,6 +51,7 @@ ddcutil
 catfish
 wlogout
 man-db
+neovim
 waybar
 thunar
 wtype

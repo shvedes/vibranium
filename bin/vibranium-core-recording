@@ -17,8 +17,7 @@ fi
 
 if [[ "$VIBRANIUM_IS_VIRTUAL_MACHINE" == true ]]; then
 	msg="Screen recording does not work in virtual machines.\n"
-	msg+="Support is unavailable and will not be added.\n"
-	msg+="<span foreground='${P_RED}'><b>Aborting</b></span>"
+	msg+="Support is unavailable and will not be added"
 	notify-send -r 4 -u critical -t 5000 "Vibranium" "$msg"
 	exit 1
 fi

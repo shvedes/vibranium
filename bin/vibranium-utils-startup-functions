@@ -37,3 +37,8 @@ else
 	export VIBRANIUM_IS_VIRTUAL_MACHINE=false
 fi
 
+if lspci | grep -qE "AMD/ATI|Intel"; then
+	export VIBRANIUM_GPU_IS_SUPPORTED=true
+else
+	export VIBRANIUM_GPU_IS_SUPPORTED=false
+fi

@@ -7,15 +7,25 @@ CONFIG="$XDG_CONFIG_HOME/hypr/hypridle.conf"
 
 while true; do
 	lock_timeout="$(vibranium-cmd-edit-wm-config -r listener:timeout "$CONFIG")"
-	sleep_timeout="$(vibranium-cmd-edit-wm-config -r listener:timeout:-2 $CONFIG)"
+	sleep_timeout="$(vibranium-cmd-edit-wm-config -r listener:timeout:-2 "$CONFIG")"
+
+	lock_timeout=$(( lock_timeout / 60 ))
+	sleep_timeout=$(( sleep_timeout / 60 ))
 
 	OPTIONS=(
-		"Lock  after : $(( lock_timeout  / 60 )) min"
-		"Sleep after : $(( sleep_timeout / 60 )) min"
+		"Lock  after : $lock_timeout min"
+		"Sleep after : $sleep_timeout min"
 		"What is this?"
 	)
-	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Idle timeouts" "ESC to go back")"
+	CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Idle timeouts" "ESC to go back" -selected-row "$INDEX")"
 	[ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
 
 	case "$CHOSEN" in
 		"Sleep"*)
@@ -28,8 +38,8 @@ while true; do
 					continue
 				}
 				
-				if (( input <= lock_timeout )); then
-					notify-send -r 3 -u critical -t 1500 "Vibranium" "Sleep timeout cannot be less or equal than ${lock_timeout}!"
+				if (( input <= lock_timeout + 1 )); then
+					notify-send -r 3 -u critical -t 3000 "Vibranium" "Sleep timeout must be greater than $(( sleep_timeout + 1 ))!"
 					continue
 				fi
 				

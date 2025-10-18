@@ -18,19 +18,43 @@ while true; do
     done
 
 	case "$CHOSEN" in
-		"Set font")         vibranium-font-set          ;;
-		"Idle")             configure-idle              ;;
-		"Audio")            configure-audio             ;;
-		"Screenshots")      configure-screenshots       ;;
-		"Brightness")       configure-brightness        ;;
-		"Recording")        configure-recording         ;;
-		"Night Light")      configure-night-light       ;;
-		"Color Picker")     configure-color-picker      ;;
-		"Set theme")        vibranium-theme-set         ;;
-		"General")          configure-global-options    ;;
-		"WM")               configure-window-manager    ;;
-		"Factory Reset")    factory-reset
+		"Set font")
+			vibranium-font-set
+			;;
+		"Idle")
+			configure-idle
+			;;
+		"Audio")
+			configure-audio
+			;;
+		"Screenshots")
+			configure-screenshots
+			;;
+		"Brightness")
+			configure-brightness
+			;;
+		"Recording")
+			configure-recording
+			;;
+		"Night Light")
+			configure-night-light
+			;;
+		"Color Picker")
+			configure-color-picker
+			;;
+		"Set theme")
+			vibranium-theme-set
+			vibranium-cmd-kill-rofi
+			exit 0
+			;;
+		"General")
+			configure-global-options
+			;;
+		"WM")
+			configure-window-manager
+			;;
+		"Factory Reset")
+			factory-reset
+			;;
 	esac
 done
-
-

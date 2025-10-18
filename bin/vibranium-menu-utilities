@@ -15,12 +15,13 @@ else
 fi
 
 ACTIONS+=("Reload Vibranium configuration")
-ACTIONS+=("===============================")
 
 read -r PID NAME <<< "$(hyprctl -j activewindow | jq -r '[.pid,.initialTitle]|@tsv')"
 if [[ -n "$PID" && "$(ps -o state= -p "$PID" | tr -d '[:space:]')" != T ]]; then
+	ACTIONS+=("===============================")
 	ACTIONS+=("Freeze <span foreground='${P_YELLOW}'><b><i><u>${NAME}</u></i></b></span>")
 elif [[ -n "$NAME" ]]; then
+	ACTIONS+=("===============================")
 	ACTIONS+=("Unfreeze <span foreground='${P_YELLOW}'><b><i><u>${NAME}</u></i></b></span>")
 fi
 

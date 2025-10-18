@@ -41,7 +41,7 @@ else
 fi
 
 # Rofi
-sed -i -E "s/(^font:\s*).*/\1\"${selected}\";/" "$XDG_CONFIG_HOME/rofi/config.rasi"
+sed -i -E "s/(font:\s*\")[^\"]+([0-9]+\")/\1${selected} \2/" "$XDG_CONFIG_HOME/rofi/config.rasi"
 
 # Discord CSS
 # sed -i -E "s/$(vibranium-font-get)/${selected}/g" "$XDG_CONFIG_HOME/vibranium/theme/current/discord.css"
