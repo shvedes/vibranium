@@ -117,6 +117,8 @@ enable_system_services() {
 }
 
 generate_defaults() {
+	printf "\n%s[VIBRANIUM]%s Generating defaults configs" "${YELLOW}" "${RESET}"
+
 	printf "# vim:ft=bash\n# Place your environment variables here\n" \
 		> "$HOME/.config/vibranium/environment"
 	printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
@@ -201,14 +203,11 @@ install_yay
 copy_system_files
 edit_system_configs
 install_packages
+create_directories
 
 bash ./install/install_gtk_themes.sh
 bash ./install/install_papirus_icons.sh
 bash ./install/install_local_bin.sh
-
-printf "\n%s[VIBRANIUM]%s Generating defaults configs" "${YELLOW}" "${RESET}"
-
-create_directories
 
 printf "\n%s[VIBRANIUM]%s Copying configs" "${YELLOW}" "${RESET}"
 cp -r ./config/systemd "$HOME/.config/"
