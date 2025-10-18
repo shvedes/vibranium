@@ -111,6 +111,7 @@ create_directories() {
 		"$HOME/.config/qt6ct/colors" \
 		"$HOME/.config/btop/themes/" \
 		"$HOME/.config/wlogout" \
+		"$HOME/.config/swayosd" \
 		"$HOME/.config/dunst" \
 		"$HOME/.config/uwsm" \
 		"$HOME/.config/imv"
