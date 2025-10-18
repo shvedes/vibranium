@@ -155,7 +155,7 @@ apply_default_theme() {
 	gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 	gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
-	chromium --no-startup-window --set-theme-color="25, 35, 48" &>/dev/null
+	# chromium --no-startup-window --set-theme-color="25, 35, 48" &>/dev/null
 
 	ln -s "$HOME/.themes/Nightfox/gtk-4.0/assets" \
 		"$HOME/.config/gtk-4.0/"

@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+chromium --no-startup-window --set-theme-color="25, 35, 48"
+rm "$VIBRANIUM_STATE/first-boot"

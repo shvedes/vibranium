@@ -8,6 +8,10 @@ source "$VIBRANIUM_PATH/vibranium-core-lib"
 
 [[ ! -d "$VIBRANIUM_STATE" ]] && mkdir "$VIBRANIUM_STATE"
 
+if [[ -f "$VIBRANIUM_STATE/first-boot" ]]; then
+	vibranium-utils-first-boot
+fi
+
 if [[ ! -f "$VIBRANIUM_STATE/night-light" ]]; then
 	echo "suspended" > "$VIBRANIUM_STATE/night-light"
 fi
