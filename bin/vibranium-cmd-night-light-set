@@ -11,7 +11,7 @@
 # source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
 CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
-CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2>/dev/null || echo 5800)
+CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2>/dev/null || echo 5500)
 STATE_FILE="$XDG_STATE_HOME/vibranium/night-light"
 STEP=200
 
@@ -22,8 +22,8 @@ STEP=200
 
 if [[ "$1" =~ ^[+-]$ && $(<"$STATE_FILE") != suspended ]]; then
     case $1 in
-        +) temp=$(( CURRENT_TEMP + STEP )) ;;
-        -) temp=$(( CURRENT_TEMP - STEP )) ;;
+        +) TEMP=$(( CURRENT_TEMP + STEP )) ;;
+        -) TEMP=$(( CURRENT_TEMP - STEP )) ;;
     esac
 elif [ "$1" = "toggle" ]; then
 	case "$(<"$STATE_FILE")" in
@@ -52,5 +52,5 @@ if (( TEMP < 1000 || TEMP > 20000 )); then
     exit 1
 fi
 
-hyprctl -q hyprsunset temperature "$temp"
-printf "# Auto-generated! All changes will be overwritten!\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}" "$temp" > "$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
+hyprctl -q hyprsunset temperature "$TEMP"
+printf "# Auto-generated! All changes will be overwritten!\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}" "$TEMP" > "$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
