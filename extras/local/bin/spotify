@@ -30,6 +30,7 @@ loop() {
 	notify-send -r 1 -t 5000 "Vibranium" "$msg"
 
 	spicetify backup
+	spicetify config current_theme text color_scheme main
 	spicetify apply
 
 	rm "$XDG_RUNTIME_DIR/worker.active"

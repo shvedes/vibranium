@@ -76,6 +76,9 @@ generate_defaults() {
 		"$HOME/.config/wlogout"
 	ln -s "$HOME/.local/share/vibranium/defaults/wlogout/layout" \
 		"$HOME/.config/wlogout"
+
+	ln -s "$HOME/.config/vibranium/theme/current/spicetify.ini" \
+		"$HOME/.config/spicetify/Themes/text/color.ini"
 }
 
 apply_default_theme() {
@@ -97,6 +100,7 @@ download_spicetify_theme() {
 	curl -s "https://raw.githubusercontent.com/spicetify/spicetify-themes/refs/heads/master/text/user.css" \
 		-o "${XDG_CONFIG_HOME:-$HOME/.config}/spicetify/Themes/text/user.css"
 }
+
 
 copy_system_files() {
 	sudo cp -rv ./extras/udev/rules.d/*  /etc/udev/rules.d
@@ -154,13 +158,13 @@ done
 ln -sf ./applications/custom "$HOME"/.local/share/applications/
 
 download_spicetify_theme
+apply_default_theme
 generate_defaults
 
 for file in ./install/generate_*; do
 	bash "$file"
 done
 
-apply_default_theme
 mkdir -p "$HOME/.local/share/icons"
 cp -rv ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
 
