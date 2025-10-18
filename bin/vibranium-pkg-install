@@ -3,7 +3,6 @@
 # This script was written before Vibranium became what it is today, so it probably needs at least some refactoring.
 # shellcheck disable=SC2034
 
-source "$VIBRANIUM_PATH/vibranium-core-env"
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
 if ! sudo -v; then
@@ -173,6 +172,10 @@ case "$answer" in
 
         notify-send -r 1 "Vibranium" "Operation completed successfully"
         read -pr "Press any key to close this window" dummy
+
+		if [[ "${#filtered[@]}" -eq 1 ]]; then
+			vibranium-cmd-launch-cmd "${filtered[0]}"
+		fi
         exit 0
         ;;
     *)

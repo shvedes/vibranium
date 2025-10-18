@@ -160,6 +160,7 @@ cp -r ./config/btop.conf "$HOME/.config/btop"
 sed -i "s/user/\$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
 
 ln -sf "$(realpath ./applications/custom)" "$HOME"/.local/share/applications/ >/dev/null
+ln -sf "$(realpath ./applications/*.desktop)" "$HOME"/.local/share/applications
 for entry in ./applications/hidden/*; do
 	ln -sf "$(realpath "$entry")" "$HOME"/.local/share/applications/
 done

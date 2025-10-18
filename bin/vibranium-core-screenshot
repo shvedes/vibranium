@@ -147,7 +147,7 @@ case "$1" in
         # Parse active window geometry
         if ! window_geometry="$(hyprctl -j activewindow | jq -r '.at[0] as $x | .at[1] as $y | .size[0] as $w | .size[1] as $h | "\($x),\($y) \($w)x\($h)"')"; then
             error "Failed to determine active window geometry"
-            notify-send -r 4 -u critical "Vibranium" "Failed to determine active window geometry"
+            notify-send -r 4 -u critical -t 2000 "Vibranium" "Failed to determine active window geometry"
             exit 1
         fi
 

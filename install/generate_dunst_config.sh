@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 cat <<EOF > "$HOME/.config/dunst/dunstrc"
-[general]
+[global]
 origin = top-right
 font = "Cascadia Code 9"
 

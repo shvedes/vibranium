@@ -52,6 +52,7 @@ while true; do
 					continue
 				fi
 				
+				[[ "$is_active" == "no" ]] && vibranium-cmd-night-light-set toggle
 				vibranium-cmd-night-light-set "$temperature_chosen"
 				notify-send -r 1 "Vibranium" "Night filter temperature: <span foreground='${P_YELLOW}'><b>${temperature_chosen}K</b></span>"
 				break

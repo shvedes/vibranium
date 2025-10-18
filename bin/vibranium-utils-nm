@@ -17,5 +17,6 @@ case "$(basename "$(command -v nmtui iwctl)")" in
 		msg="<b>systemd-networkd</b> doesn't provide a TUI frontend. Use CLI instead"
 		notify-send -r 1 -t 5000 "Vibranium" "$msg"
 		vibranium-cmd-launch-terminal 
-		sleep 0.1; wtype "networkctl --help" -k Return
+		# Give some time to open the terminal on odler and slower machines
+		sleep 0.5; wtype "networkctl --help" -k Return
 esac
