@@ -19,6 +19,7 @@ fi
 sudo -v
 
 cleanup() {
+	touch "$HOME/.local/state/vibranium/first-boot"
 	yay -Ycc --noconfirm &>/dev/null
 }
 
