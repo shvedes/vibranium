@@ -2,11 +2,11 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
-msg="Welcome to Vibranium – an Omarchy-inspired configuration designed to be fast and highly customizable!\n\n"
+msg="Vibranium is an Omarchy-inspired configuration designed to be fast and highly customizable!\n\n"
 msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + V</b></span> to open the Vibranium menu.\n"
 msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + K</b></span> to view all available keybindings.\n\n"
 msg+="Right-click to dismiss this notification."
-notify-send -r 1 -t 1800000 "Vibranium" "$msg"
+notify-send -r 1 -t 1800000 "Welcome to Vibranium" "$msg"
 
 chromium --no-startup-window --set-theme-color="25, 35, 48"
 rm "$VIBRANIUM_STATE/first-boot"
