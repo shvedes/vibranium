@@ -2,12 +2,12 @@
 
 set -euo pipefail
 
+export SUDO_PROMPT
+SUDO_PROMPT="$(printf '\n\033[1;31m[sudo]\033[0m Password for %s: ' "$USER")"
+
 RED=$'\e[0;31m'
 YELLOW=$'\e[0;33m'
-BLUE=$'\e[0;34m'
-PURPLE=$'\e[0;35m'
 GREEN=$'\e[0;32m'
-CYAN=$'\e[0;36m'
 GRAY=$'\e[90m'
 RESET=$'\e[0m'
 
@@ -75,27 +75,31 @@ edit_system_configs() {
 	fi
 }
 
-install_yay() {
-	if ! command -v yay >/dev/null; then
-		echo -e "${YELLOW}[VIBRANIUM]${RESET} Installing yay"
-		if ! command -v git >/dev/null; then
-			sudo pacman -S git --noconfirm
-		fi
-		
-		local cwd; cwd="$(pwd)"
-		cd "$(mktemp -d)"
-		git clone https://aur.archlinux.org/yay; cd yay
-		makepkg -sirc --noconfirm
-		printf "\n%s[VIBRANIUM]%s %sYay installed%s" "${YELLOW}" "${RESET}" "${GREEN}" "${RESET}"
-		cd "$cwd"
-	fi
-}
-
 install_packages() {
+	clear; printf '\e[2J\e[%d;1H' "$LINES"
+    printf '\e[?25l'  # hide cursor
+
+    if ! command -v yay >/dev/null; then
+        printf "%s[VIBRANIUM]%s Installing %syay%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
+        if ! command -v git >/dev/null; then
+            sudo pacman -S git --noconfirm
+        fi
+
+        local cwd; cwd="$(pwd)"
+        cd "$(mktemp -d)" || exit
+        git clone -q https://aur.archlinux.org/yay
+        cd yay || exit
+        makepkg -sirc --noconfirm &> /dev/null
+        printf "\n%s[VIBRANIUM]%s %sYay installed%s" "${YELLOW}" "${RESET}" "${GREEN}" "${RESET}"
+        cd "$cwd" || exit
+    fi
+
+	clear; printf '\e[2J\e[%d;1H' "$LINES"
+    # Install packages from list
     local packages
     mapfile -t packages < ./pkg_list.txt
 
-    printf '\e[?25l'
+    # printf '\e[?25l'  # hide cursor
 
     for pkg in "${packages[@]}"; do
         [[ -z "${pkg//[[:space:]]/}" ]] && continue
@@ -106,7 +110,7 @@ install_packages() {
     done
 
     printf "\r\033[K%s[VIBRANIUM]%s All packages installed%s\n" "$YELLOW" "${GREEN}" "$RESET"
-    printf '\e[?25h'
+    printf '\e[?25h'  # show cursor
 }
 
 enable_system_services() {
@@ -216,7 +220,6 @@ post_install() {
 # Clear VT
 printf '\e[2J\e[%d;1H' "$LINES"
 
-install_yay
 copy_system_files
 edit_system_configs
 install_packages
