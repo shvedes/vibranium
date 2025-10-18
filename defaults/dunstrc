@@ -7,14 +7,13 @@ notification_limit = 3
 
 corner_radius      = 0
 frame_width        = 2
+gap_size           = 10
 width              = (300, 600)
 height             = (0, 400)
 origin             = top-right
 offset             = (15, 15)
 
 indicate_hidden	   = false
-separator_height   = 2
-separator_color	   = frame
 sort               = update
 show_indicators	   = false
 mouse_left_click   = do_action

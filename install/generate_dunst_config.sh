@@ -2,10 +2,12 @@
 
 cat <<EOF > "$HOME/.config/dunst/dunstrc"
 [general]
-font = "Cascadia Code 9"
 origin = top-right
-progress_bar_height = 15
+font = "Cascadia Code 9"
+
 corner_radius = 0
+progress_bar_height = 15
+progress_bar_corner_radius = 0
 
 # vim:ft=cfg
 EOF

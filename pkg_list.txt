@@ -15,6 +15,7 @@ noto-fonts-emoji
 pop-sound-theme
 pacman-contrib
 noto-fonts-cjk
+xdg-user-dirs
 thunar-volman
 polkit-gnome
 apple_cursor
@@ -42,6 +43,7 @@ swayosd
 ddcutil
 catfish
 wlogout
+man-db
 waybar
 thunar
 wtype
