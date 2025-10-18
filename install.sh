@@ -140,7 +140,7 @@ sudo -v; clear
 printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
 cat ./logo.txt
 
-printf "%s\n[VIBRANIUM]%s Setting up system files" "${YELLOW}" "${RESET}"
+printf "%s[VIBRANIUM]%s Setting up system files\n" "${YELLOW}" "${RESET}"
 sudo cp -r ./extras/udev/rules.d/*  /etc/udev/rules.d
 sudo cp -r ./extras/pacman.d/hooks  /etc/pacman.d
 sudo cp -r ./extras/usr/local/bin/* /usr/local/bin
