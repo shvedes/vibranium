@@ -32,9 +32,6 @@ if ! command -v yay >/dev/null; then
 	sudo -v; clear
 fi
 
-# Move VT to the bottom
-printf '\e[2J\e[%d;1H' "$LINES"
-
 cleanup() {
 	touch "$HOME/.local/state/vibranium/first-boot"
 	yay -Ycc --noconfirm &>/dev/null
@@ -245,6 +242,9 @@ post_install() {
 	echo "suspended" > \
 		"$HOME/.local/state/vibranium/night-light"
 }
+
+# Move VT to the bottom
+printf '\e[2J\e[%d;1H' "$LINES"
 
 copy_system_files
 edit_system_configs
