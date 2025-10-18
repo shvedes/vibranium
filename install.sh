@@ -145,7 +145,7 @@ SUDOERS_CONF="/etc/sudoers"
 FAILLOCK_CONF="/etc/security/faillock.conf"
 SYSTEM_AUTH_CONF="/etc/pam.d/system-auth"
 
-if grep -q '^\[multilib\]' "$PACMAN_CONF" && grep -q '^Color' "$pacman_conf" && grep -q '^VerbosePkgLists' "$pacman_conf" && grep -q '^ParallelDownloads = 10' "$pacman_conf"; then
+if grep -q '^\[multilib\]' "$PACMAN_CONF" && grep -q '^Color' "$PACMAN_CONF" && grep -q '^VerbosePkgLists' "$PACMAN_CONF" && grep -q '^ParallelDownloads = 10' "$PACMAN_CONF"; then
 	printf "\n%s[VIBRANIUM]%s /etc/pacman.conf %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
 else
 	printf "\n%s[VIBRANIUM]%s Editing /etc/pacman.conf" "${YELLOW}" "${RESET}"
