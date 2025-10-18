@@ -39,6 +39,8 @@ colors["Tokyonight-GTK-Theme"]="dark"
 colors["Everforest-GTK-Theme"]="dark"
 colors["Catppuccin-GTK-Theme"]="dark light"
 
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Installing GTK themes"
+
 # Function to install a theme repo
 install_theme() {
   local repo="$1"
@@ -195,7 +197,7 @@ install_theme() {
       # echo "Installing $repo variant $variant color $color with accent $accent..."
 
 	  install_opts="-s compact -c $color $tweaks -t $accent_param"
-	  eval "./install.sh $install_opts"  || { echo "Install failed for $repo $variant $color"; continue; }
+	  eval "./install.sh $install_opts" &>/dev/null  || { echo "Install failed for $repo $variant $color"; continue; }
 
       # Rename if directories exist
       if [ -d "$DEST_DIR/$generated_base" ]; then
@@ -231,7 +233,7 @@ install_theme() {
   # Clean up
   cd ../..
   rm -rf "$clone_dir"
-  echo "Cleaned up $repo"
+  # echo "Cleaned up $repo"
 }
 
 # Main loop

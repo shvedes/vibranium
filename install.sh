@@ -49,13 +49,11 @@ enable_system_services() {
 		"gnome-polkit"
 	)
 
-	echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling systemd services"
-
-	sudo systemctl enable ly power-profiles-daemon bluetooth
-	systemctl --user daemon-reload
+	sudo systemctl -q enable ly power-profiles-daemon bluetooth
+	systemctl -q --user daemon-reload
 
 	for service in "${user_services[@]}"; do
-		systemctl --user enable "$service"
+		systemctl -q --user enable "$service"
 	done
 }
 
@@ -95,6 +93,9 @@ apply_default_theme() {
 	gsettings set org.gnome.desktop.interface cursor-theme "macOS"
 	gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 	gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
+
+	mkdir -p "$HOME/.local/share/icons"
+	cp -r ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
 }
 
 copy_system_files() {
@@ -155,11 +156,10 @@ ln -sf ./applications/custom "$HOME"/.local/share/applications/ >/dev/null
 apply_default_theme
 generate_defaults
 
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Generating default configs"
 for file in ./install/generate_*; do
 	bash "$file"
 done
 
-mkdir -p "$HOME/.local/share/icons"
-cp -r ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
-
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Installing systemd services"
 enable_system_services
