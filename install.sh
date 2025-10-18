@@ -84,7 +84,7 @@ install_packages() {
         [[ "${pkg:0:1}" == "#" ]] && continue
 
         printf "\r\033[K%s[VIBRANIUM]%s Installing %s%s%s" "$YELLOW" "$RESET" "$GRAY" "$pkg" "$RESET"
-        yay -Suy --noconfirm --needed "$pkg" >/dev/null 2>&1
+        yay -S --noconfirm --needed "$pkg" >/dev/null 2>&1
     done
 
     printf "\r\033[K%s[VIBRANIUM]%s Packages installed\n" "$YELLOW" "$RESET"
