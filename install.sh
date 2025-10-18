@@ -29,7 +29,7 @@ if ! command -v yay >/dev/null; then
 	makepkg -sirc --noconfirm &> /dev/null
 	# printf "\n%s[VIBRANIUM]%s %sYay installed%s" "${YELLOW}" "${RESET}" "${GREEN}" "${RESET}"
 	cd "$CWD" || exit
-	sudo -v; clear
+	sudo -v
 fi
 
 # Move VT to the bottom
