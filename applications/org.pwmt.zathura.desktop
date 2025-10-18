@@ -4,3 +4,4 @@ Name=Document Viewer
 Icon=org.pwmt.zathura
 Categories=Office;Viewer;
 Exec=zathura %U
+MimeType=application/pdf;application/epub+zip;
