@@ -144,11 +144,11 @@ bash ./install/install_gtk_themes.sh
 bash ./install/install_papirus_icons.sh
 bash ./install/install_local_bin.sh
 
-printf "\n%s[VIBRANIUM]%s Generating defaults configs" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM | CONFIGS]%s Generating defaults configs" "${YELLOW}" "${RESET}"
 
 create_directories
 
-printf "\n%s[VIBRANIUM]%s Copying configs" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM | CONFIGS]%s Copying configs" "${YELLOW}" "${RESET}"
 cp -r ./config/systemd "$HOME/.config/"
 cp -r ./config/waybar "$HOME/.config"
 cp -r ./config/alacritty "$HOME/.config"
@@ -167,12 +167,12 @@ done
 apply_default_theme
 generate_defaults
 
-printf "\n%s[VIBRANIUM]%s Generating defaults" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM | CONFIGS]%s Generating defaults" "${YELLOW}" "${RESET}"
 for file in ./install/generate_*; do
 	bash "$file"
 done
 
-printf "\n%s[VIBRANIUM]%s Installing systemd services" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM | CONFIGS]%s Installing systemd services" "${YELLOW}" "${RESET}"
 enable_system_services
 
 printf "\n%s[VIBRANIUM]%s Installation complete%s" "${YELLOW}" "${GREEN}" "${RESET}"

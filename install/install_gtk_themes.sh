@@ -39,7 +39,7 @@ colors["Tokyonight-GTK-Theme"]="dark"
 colors["Everforest-GTK-Theme"]="dark"
 colors["Catppuccin-GTK-Theme"]="dark light"
 
-printf "\n%s[VIBRANIUM]%s Installing GTK themes" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM | THEMES]%s Installing GTK themes" "${YELLOW}" "${RESET}"
 
 # Function to install a theme repo
 install_theme() {
@@ -228,7 +228,7 @@ install_theme() {
     done
   done
 
-  printf "\n%s[VIBRANIUM | GTK]%s Installed ${desired_name%%-*} GTK theme" "${YELLOW}" "${RESET}"
+  printf "\n%s[VIBRANIUM | THEMES]%s Installed ${desired_name%%-*} GTK theme" "${YELLOW}" "${RESET}"
 
   # Clean up
   cd ../..
@@ -242,4 +242,4 @@ for repo in "${REPOS[@]}"; do
 done
 
 ln -s "$HOME/.themes" "$HOME/.local/share/themes"
-# echo -e "${GREEN}[VIBRANIUM]${RESET} GTK themes installed"
+printf "\n%s[VIBRANIUM] %sGTK themes installed%s" "${GREEN}" "${GREEN}" "${RESET}"
