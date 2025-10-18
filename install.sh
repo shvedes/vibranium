@@ -165,6 +165,6 @@ done
 printf "\n%s[VIBRANIUM]%s Installing systemd services" "${YELLOW}" "${RESET}"
 enable_system_services
 
-printf "\n%s[VIBRANIUM] Installation complete%s" "${GREEN}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Installation complete%s" "${YELLOW}" "${GREEN}" "${RESET}"
 printf "\n%s[VIBRANIUM]%s You can start using Vibranium by typying 'uwsm start hyprland'" "${YELLOW}" "${RESET}"
 printf "\n%s[VIBRANIUM]%s Or you can reboot the machine and then select 'Hyprland (uwsm-managed)' in DM" "${YELLOW}" "${RESET}"
