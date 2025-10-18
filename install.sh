@@ -64,21 +64,22 @@ generate_defaults() {
 		> "$HOME/.config/vibranium/environment"
 	printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
 		> "$HOME/.config/vibranium/settings"
-	ln -s "$HOME/.local/share/vibranium/defaults/uwsm/env" "$HOME/.config/uwsm/env"
+	ln -s "$HOME/.local/share/vibranium/defaults/uwsm/env" \
+		"$HOME/.config/uwsm/env" >/dev/null
 
 	ln -s "$HOME/.local/share/vibranium/defaults/imv" \
-		"$HOME/.config/imv/config"
+		"$HOME/.config/imv/config" >/dev/null
 
 	ln -s "$HOME/.local/share/vibranium/themes/nightfox-nightfox/qt6ct.conf" \
-		"$HOME/.config/qt6ct/colors/vibranium.conf"
+		"$HOME/.config/qt6ct/colors/vibranium.conf" >/dev/null
 
 	ln -s "$HOME/.local/share/vibranium/defaults/wlogout/style.css" \
-		"$HOME/.config/wlogout"
+		"$HOME/.config/wlogout" >/dev/null
 	ln -s "$HOME/.local/share/vibranium/defaults/wlogout/layout" \
-		"$HOME/.config/wlogout"
+		"$HOME/.config/wlogout" >/dev/null
 
 	ln -s "$HOME/.config/vibranium/theme/current/spicetify.ini" \
-		"$HOME/.config/spicetify/Themes/text/color.ini"
+		"$HOME/.config/spicetify/Themes/text/color.ini" >/dev/null
 }
 
 apply_default_theme() {
@@ -86,9 +87,9 @@ apply_default_theme() {
 	theme_path="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
 
 	echo -e "${YELLOW}[VIBRANIUM]${RESET} Applying the default theme"
-	ln -s "${theme_path}" "$HOME/.config/vibranium/theme/current"
+	ln -s "${theme_path}" "$HOME/.config/vibranium/theme/current" >/dev/null
 	ln -s "$HOME/.config/vibranium/theme/current/btop.theme" \
-		"$HOME/.config/btop/themes/current.theme"
+		"$HOME/.config/btop/themes/current.theme" >/dev/null
 
 	gsettings set org.gnome.desktop.interface gtk-theme "Nightfox"
 	gsettings set org.gnome.desktop.interface cursor-theme "macOS"
@@ -97,13 +98,13 @@ apply_default_theme() {
 }
 
 copy_system_files() {
-	sudo cp -rv ./extras/udev/rules.d/*  /etc/udev/rules.d
-	sudo cp -rv ./extras/pacman.d/hooks  /etc/pacman.d
-	sudo cp -rv ./extras/usr/local/bin/* /usr/local/bin
+	sudo cp -r ./extras/udev/rules.d/*  /etc/udev/rules.d
+	sudo cp -r ./extras/pacman.d/hooks  /etc/pacman.d
+	sudo cp -r ./extras/usr/local/bin/* /usr/local/bin
 }
 
 create_directories() {
-	mkdir -pv \
+	mkdir -p \
 		"$HOME/.config/spicetify/Themes/text" \
 		"$HOME/.config/hypr/hyprland.conf.d" \
 		"$HOME/.local/share/applications" \
@@ -136,20 +137,20 @@ echo -e "${YELLOW}[VIBRANIUM]${RESET} Generating defaults configs"
 create_directories
 
 echo "${YELLOW}[VIBRANIUM]${RESET} Copying defaults configs"
-cp -rf ./config/systemd "$HOME/.config/"
-cp -rf ./config/waybar "$HOME/.config"
-cp -rf ./config/alacritty "$HOME/.config"
-cp -rf ./config/rofi "$HOME/.config"
-cp -rf ./config/hypr/hyprland.conf.d "$HOME/.config/hypr"
-cp -rf ./config/qt6ct.conf "$HOME/.config/qt6ct"
-cp -rf ./config/btop.conf "$HOME/.config/btop"
+cp -r ./config/systemd "$HOME/.config/"
+cp -r ./config/waybar "$HOME/.config"
+cp -r ./config/alacritty "$HOME/.config"
+cp -r ./config/rofi "$HOME/.config"
+cp -r ./config/hypr/hyprland.conf.d "$HOME/.config/hypr"
+cp -r ./config/qt6ct.conf "$HOME/.config/qt6ct"
+cp -r ./config/btop.conf "$HOME/.config/btop"
 
 sed -i "s/user/\$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
 
 for entry in ./applications/hidden/*; do
 	ln -sf "$(realpath "$entry")" "$HOME"/.local/share/applications/
 done
-ln -sf ./applications/custom "$HOME"/.local/share/applications/
+ln -sf ./applications/custom "$HOME"/.local/share/applications/ >/dev/null
 
 apply_default_theme
 generate_defaults
@@ -159,6 +160,6 @@ for file in ./install/generate_*; do
 done
 
 mkdir -p "$HOME/.local/share/icons"
-cp -rv ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
+cp -r ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
 
 enable_system_services
