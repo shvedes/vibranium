@@ -29,9 +29,8 @@ if ! command -v yay >/dev/null; then
 	makepkg -sirc --noconfirm &> /dev/null
 	# printf "\n%s[VIBRANIUM]%s %sYay installed%s" "${YELLOW}" "${RESET}" "${GREEN}" "${RESET}"
 	cd "$CWD" || exit
+	sudo -v; clear
 fi
-
-sudo -v
 
 cleanup() {
 	touch "$HOME/.local/state/vibranium/first-boot"
