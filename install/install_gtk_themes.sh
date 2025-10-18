@@ -228,7 +228,7 @@ install_theme() {
     done
   done
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Installed ${desired_name}"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Installed ${desired_name%%-*}"
 
   # Clean up
   cd ../..
@@ -242,4 +242,4 @@ for repo in "${REPOS[@]}"; do
 done
 
 ln -s "$HOME/.themes" "$HOME/.local/share/themes"
-echo -e "${GREEN}[VIBRANIUM]${RESET} GTK themes installed"
+# echo -e "${GREEN}[VIBRANIUM]${RESET} GTK themes installed"

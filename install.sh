@@ -27,7 +27,7 @@ install_yay() {
 		cd "$(mktemp -d)"
 		git clone https://aur.archlinux.org/yay; cd yay
 		makepkg -sirc --noconfirm
-		echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}Yay installed${RESET}"
+		printf "\n%s[VIBRANIUM]%s %sYay installed%s" "${YELLOW}" "${RESET}" "${GREEN}" "${RESET}"
 		cd "$cwd"
 	fi
 }
@@ -134,11 +134,11 @@ bash ./install/install_gtk_themes.sh
 bash ./install/install_papirus_icons.sh
 bash ./install/install_local_bin.sh
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Generating defaults configs"
+printf "\n%s[VIBRANIUM]%s Generating defaults configs" "${YELLOW}" "${RESET}"
 
 create_directories
 
-echo "${YELLOW}[VIBRANIUM]${RESET} Copying defaults configs"
+printf "\n%s[VIBRANIUM]%s Copying defaults configs" "${YELLOW}" "${RESET}"
 cp -r ./config/systemd "$HOME/.config/"
 cp -r ./config/waybar "$HOME/.config"
 cp -r ./config/alacritty "$HOME/.config"
@@ -157,10 +157,14 @@ ln -sf ./applications/custom "$HOME"/.local/share/applications/ >/dev/null
 apply_default_theme
 generate_defaults
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Generating default configs"
+printf "\n%s[VIBRANIUM]%s Generating default configs" "${YELLOW}" "${RESET}"
 for file in ./install/generate_*; do
 	bash "$file"
 done
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Installing systemd services"
+printf "\n%s[VIBRANIUM]%s Installing systemd services" "${YELLOW}" "${RESET}"
 enable_system_services
+
+printf "\n%s[VIBRANIUM] Installation complete%s" "${GREEN}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s You can start using Vibranium by typying 'uwsm start hyprland'" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Or you can reboot the machine and then select 'Hyprland (uwsm-managed)' in DM" "${YELLOW}" "${RESET}"
