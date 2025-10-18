@@ -85,7 +85,7 @@ apply_default_theme() {
 	local theme_path
 	theme_path="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
 
-	echo -e "${YELLOW}[VIBRANIUM]${RESET} Applying the default theme"
+	printf "\n%s[VIBRANIUM]%s Applying the default theme" "${YELLOW}" "${RESET}"
 	ln -s "${theme_path}" "$HOME/.config/vibranium/theme/current" >/dev/null
 	ln -s "$HOME/.config/vibranium/theme/current/btop.theme" \
 		"$HOME/.config/btop/themes/current.theme" >/dev/null

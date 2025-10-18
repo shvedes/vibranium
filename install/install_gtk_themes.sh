@@ -228,7 +228,7 @@ install_theme() {
     done
   done
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Installed ${desired_name%%-*}"
+  printf "\n%s[VIBRANIUM|GTK]%s Installed ${desired_name%%-*}" "${YELLOW}" "${RESET}"
 
   # Clean up
   cd ../..
