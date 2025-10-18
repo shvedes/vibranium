@@ -26,27 +26,27 @@ edit_system_configs() {
 	faillock_conf="/etc/security/faillock.conf"
 	system_auth_conf="/etc/pam.d/system-auth"
 
-	printf "%s[VIBRANIUM]%s Editing /etc/pacman.conf\n" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing /etc/pacman.conf" "${YELLOW}" "${RESET}"
 	sudo sed -i -e '/\[multilib\]/,/^$/s/^#//' \
 		-e '/^\s*#Color/s/^#//' \
 		-e '/^\s*#VerbosePkgLists/s/^#//' \
 		-e '/^\s*#ParallelDownloads/s/^#//' \
 		-e 's/^\s*ParallelDownloads\s*=.*/ParallelDownloads = 10/' "$pacman_conf"
 
-	printf "%s[VIBRANIUM]%s Editing /etc/makepkg.conf\n" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing /etc/makepkg.conf" "${YELLOW}" "${RESET}"
 	sudo sed -i -e 's/-march=x86-64/-march=native/' \
 		-e '/^OPTIONS=/ s/\bdebug\b/!debug/' "$makepkg_conf"
 
-	printf "%s[VIBRANIUM]%s Editing /etc/sudoers\n" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing /etc/sudoers" "${YELLOW}" "${RESET}"
 	sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$sudoers_conf" || \
 		echo -e '\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback' \
 		| sudo tee -a "$sudoers_conf" &>/dev/null
 
-	printf "%s[VIBRANIUM]%s Editing /etc/security/faillock.conf\n" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing /etc/security/faillock.conf" "${YELLOW}" "${RESET}"
 	grep -qxF 'deny = 5, nodelay' "$faillock_conf" || \
 		echo 'deny = 5, nodelay' | sudo tee -a "$faillock_conf" &>/dev/null
 
-	printf "%s[VIBRANIUM]%s Editing /etc/pam.d/system-auth\n" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing /etc/pam.d/system-auth" "${YELLOW}" "${RESET}"
 	sudo sed -i '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\(try_first_pass nullok\)/\1 nodelay/' "$system_auth_conf"
 }
 
