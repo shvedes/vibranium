@@ -244,7 +244,7 @@ post_install() {
 }
 
 # Move VT to the bottom
-printf '\e[2J\e[%d;1H' "$LINES"
+printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
 
 copy_system_files
 edit_system_configs
