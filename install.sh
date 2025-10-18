@@ -96,8 +96,39 @@ install_packages() {
 
 	clear; printf '\e[2J\e[%d;1H' "$LINES"
     # Install packages from list
-    local packages
-    mapfile -t packages < ./pkg_list.txt
+
+	local packages
+	mapfile -t packages < ./pkg_list.txt
+
+	case "$(lspci | grep VGA)" in
+		*Radeon*|*AMD*|*ATI*)
+			packages+=(
+				"mesa"
+				"lib32-mesa"
+				"mesa-vdpau"
+				"lib32-mesa-vdpau"
+				"vulkan-radeon"
+				"lib32-vulkan-radeon"
+				"libvdpau-va-gl"
+			)
+			;;
+		*Intel*|*UHD*|*Iris*|*Arc*)
+			packages+=(
+				"mesa"
+				"lib32-mesa"
+				"libvpl"
+				"mesa-vdpau"
+				"lib32-mesa-vdpau"
+				"vulkan-intel"
+				"lib32-vulkan-intel"
+				"libvdpau-va-gl"
+				"vpl-gpu-rt"
+			)
+			;;
+	esac
+
+	# Сортировка массива, безопасная для элементов с пробелами
+	mapfile -t packages < <(printf "%s\n" "${packages[@]}" | sort -u)
 
     # printf '\e[?25l'  # hide cursor
 
@@ -106,7 +137,7 @@ install_packages() {
         [[ "${pkg:0:1}" == "#" ]] && continue
 
         printf "\r\033[K%s[VIBRANIUM]%s Installing %s%s%s" "$YELLOW" "$RESET" "$GRAY" "$pkg" "$RESET"
-        yay -S --noconfirm --needed "$pkg" >/dev/null 2>&1
+        yay -Suy --noconfirm --needed "$pkg" >/dev/null 2>&1
     done
 
     printf "\r\033[K%s[VIBRANIUM]%s All packages installed%s\n" "$YELLOW" "${GREEN}" "$RESET"

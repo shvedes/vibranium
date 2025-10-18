@@ -3,6 +3,7 @@
 YELLOW=$'\e[0;33m'
 GREEN=$'\e[0;32m'
 RESET=$'\e[0m'
+GRAY=$'\e[90m'
 
 # Array of repositories
 REPOS=(
@@ -39,7 +40,9 @@ colors["Tokyonight-GTK-Theme"]="dark"
 colors["Everforest-GTK-Theme"]="dark"
 colors["Catppuccin-GTK-Theme"]="dark light"
 
-printf "\n%s[VIBRANIUM]%s Installing GTK themes" "${YELLOW}" "${RESET}"
+printf "\r\033%s[VIBRANIUM]%s Installing GTK themes" "${YELLOW}"  "${RESET}"
+# Hide cursor
+printf '\e[?25l'
 
 # Function to install a theme repo
 install_theme() {
@@ -195,6 +198,8 @@ install_theme() {
       generated_base+="-$color_upper-Compact$generated_variant_suffix"
 
       # echo "Installing $repo variant $variant color $color with accent $accent..."
+	  printf "\r\033%s[VIBRANIUM]%s Installing %s${desired_name%%-*} GTK theme%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
+
 
 	  install_opts="-s compact -c $color $tweaks -t $accent_param"
 	  eval "./install.sh $install_opts" &>/dev/null  || { echo "Install failed for $repo $variant $color"; continue; }
@@ -228,7 +233,7 @@ install_theme() {
     done
   done
 
-  printf "\n%s[VIBRANIUM]%s Installed ${desired_name%%-*} GTK theme" "${YELLOW}" "${RESET}"
+  # printf "\r\033%s[VIBRANIUM]%s Installed ${desired_name%%-*} GTK theme" "${YELLOW}" "${RESET}"
 
   # Clean up
   cd ../..
@@ -242,4 +247,5 @@ for repo in "${REPOS[@]}"; do
 done
 
 ln -s "$HOME/.themes" "$HOME/.local/share/themes"
-printf "\n%s[VIBRANIUM]%s Installed GTK themes" "${YELLOW}" "${RESET}"
+printf "\r\033%s[VIBRANIUM]%s GTK themes successfully installed%s" "${YELLOW}" "${GREEN}" "${RESET}"
+sleep 0.5
