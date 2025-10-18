@@ -199,18 +199,18 @@ for file in ./install/generate_*; do
 	bash "$file"
 done
 
+ln -s "$THEME_PATH" "$HOME/.config/vibranium/theme/current" >/dev/null
 
-printf "# vim:ft=bash\n# Place your environment variables here\n" \
-	> "$HOME/.config/vibranium/environment"
-printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
-	> "$HOME/.config/vibranium/settings"
+ln -s "$HOME/.config/vibranium/theme/current/btop.theme" \
+	"$HOME/.config/btop/themes/current.theme" >/dev/null
+
 ln -s "$HOME/.local/share/vibranium/defaults/uwsm/env" \
 	"$HOME/.config/uwsm/env" >/dev/null
 
 ln -s "$HOME/.local/share/vibranium/defaults/imv" \
 	"$HOME/.config/imv/config" >/dev/null
 
-ln -s "$HOME/.local/share/vibranium/themes/nightfox-nightfox/qt6ct.conf" \
+ln -s "$HOME/.config/vibranium/theme/current/qt6ct.conf" \
 	"$HOME/.config/qt6ct/colors/vibranium.conf" >/dev/null
 
 ln -s "$HOME/.local/share/vibranium/defaults/wlogout/style.css" \
@@ -221,9 +221,10 @@ ln -s "$HOME/.local/share/vibranium/defaults/wlogout/layout" \
 ln -s "$HOME/.config/vibranium/theme/current/spicetify.ini" \
 	"$HOME/.config/spicetify/Themes/text/color.ini" >/dev/null
 
-ln -s "${THEME_PATH}" "$HOME/.config/vibranium/theme/current" >/dev/null
-ln -s "$HOME/.config/vibranium/theme/current/btop.theme" \
-	"$HOME/.config/btop/themes/current.theme" >/dev/null
+printf "# vim:ft=bash\n# Place your environment variables here\n" \
+	> "$HOME/.config/vibranium/environment"
+printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
+	> "$HOME/.config/vibranium/settings"
 
 gsettings set org.gnome.desktop.interface gtk-theme "Nightfox"
 gsettings set org.gnome.desktop.interface cursor-theme "macOS"
