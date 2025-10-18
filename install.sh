@@ -87,7 +87,7 @@ install_packages() {
         yay -Suy --noconfirm --needed "$pkg" >/dev/null 2>&1
     done
 
-    printf "\r\033[K%s[VIBRANIUM]%s All packages installed%s\n" "$YELLOW" "${GREEN}" "$RESET"
+    printf "\r\033[K%s[VIBRANIUM]%s Packages installed\n" "$YELLOW" "$RESET"
 }
 
 enable_system_services() {

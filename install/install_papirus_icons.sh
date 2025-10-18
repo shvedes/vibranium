@@ -22,7 +22,7 @@ mkdir -p "$HOME/.local/bin"
 curl -s https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders/refs/heads/master/install.sh \
 	-o "$HOME/.local/bin/papirus-folders"
 chmod +x "$HOME/.local/bin/papirus-folders"
-printf "\r\033%s[VIBRANIUM]%s Icon theme succsessfully installed%s" "${YELLOW}" "${GREEN}" "${RESET}"
+printf "\r\033%s[VIBRANIUM]%s Icon theme installed%s" "${YELLOW}" "${GREEN}" "${RESET}"
 sleep 0.5
 
 rm -rf "$HOME"/.cache/papirus-icon-theme

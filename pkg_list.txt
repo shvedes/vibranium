@@ -31,7 +31,6 @@ rofi-emoji
 noto-fonts
 hyprsunset
 hyprpicker
-trash-cli
 mediainfo
 hyprpaper
 fastfetch
