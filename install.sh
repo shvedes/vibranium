@@ -29,7 +29,6 @@ if ! command -v yay >/dev/null; then
 	makepkg -sirc --noconfirm &> /dev/null
 	# printf "\n%s[VIBRANIUM]%s %sYay installed%s" "${YELLOW}" "${RESET}" "${GREEN}" "${RESET}"
 	cd "$CWD" || exit
-	sudo -v; clear
 fi
 
 cleanup() {
@@ -242,6 +241,8 @@ post_install() {
 	echo "suspended" > \
 		"$HOME/.local/state/vibranium/night-light"
 }
+
+sudo -v; clear
 
 # Move VT to the bottom
 printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
