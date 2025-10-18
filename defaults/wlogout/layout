@@ -1,0 +1,36 @@
+{
+    "label" : "lock",
+    "action" : "vibranium-core-lock-session",
+    "text" : "Lock session",
+    "keybind" : "l"
+}
+{
+    "label" : "uefi",
+    "action" : "systemctl reboot --firmware-setup",
+    "text" : "UEFI (BIOS) Setup",
+    "keybind" : "f"
+}
+{
+    "label" : "logout",
+    "action" : "vibranium-core-terminate-session",
+    "text" : "End session",
+    "keybind" : "e"
+}
+{
+    "label" : "shutdown",
+    "action" : "systemctl poweroff",
+    "text" : "Shutdown this PC",
+    "keybind" : "s"
+}
+{
+    "label" : "suspend",
+    "action" : "vibranium-core-lock-session; systemctl suspend",
+    "text" : "Suspend this PC",
+    "keybind" : "u"
+}
+{
+    "label" : "reboot",
+    "action" : "systemctl reboot",
+    "text" : "Reboot this PC",
+    "keybind" : "r"
+}

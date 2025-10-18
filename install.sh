@@ -74,6 +74,8 @@ generate_defaults() {
 
 	ln -s "$HOME/.local/share/vibranium/defaults/wlogout/style.css" \
 		"$HOME/.config/wlogout"
+	ln -s "$HOME/.local/share/vibranium/defaults/wlogout/layout" \
+		"$HOME/.config/wlogout"
 }
 
 apply_default_theme() {
