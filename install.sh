@@ -16,6 +16,21 @@ if [[ "$(id -u)" == 0 ]]; then
 	exit 1
 fi
 
+if ! command -v yay >/dev/null; then
+	printf "%s[VIBRANIUM]%s Installing %syay%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
+	if ! command -v git >/dev/null; then
+		sudo pacman -S git --noconfirm
+	fi
+
+	CWD="$(pwd)"
+	cd "$(mktemp -d)" || exit
+	git clone -q https://aur.archlinux.org/yay
+	cd yay || exit
+	makepkg -sirc --noconfirm &> /dev/null
+	# printf "\n%s[VIBRANIUM]%s %sYay installed%s" "${YELLOW}" "${RESET}" "${GREEN}" "${RESET}"
+	cd "$CWD" || exit
+fi
+
 sudo -v
 
 cleanup() {
@@ -80,21 +95,6 @@ edit_system_configs() {
 install_packages() {
 	clear; printf '\e[2J\e[%d;1H' "$LINES"
     printf '\e[?25l'  # hide cursor
-
-    if ! command -v yay >/dev/null; then
-        printf "%s[VIBRANIUM]%s Installing %syay%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
-        if ! command -v git >/dev/null; then
-            sudo pacman -S git --noconfirm
-        fi
-
-        local cwd; cwd="$(pwd)"
-        cd "$(mktemp -d)" || exit
-        git clone -q https://aur.archlinux.org/yay
-        cd yay || exit
-        makepkg -sirc --noconfirm &> /dev/null
-        printf "\n%s[VIBRANIUM]%s %sYay installed%s" "${YELLOW}" "${RESET}" "${GREEN}" "${RESET}"
-        cd "$cwd" || exit
-    fi
 
 	clear; printf '\e[2J\e[%d;1H' "$LINES"
     # Install packages from list
@@ -258,9 +258,11 @@ edit_system_configs
 install_packages
 create_directories
 
-bash ./install/install_gtk_themes.sh
-bash ./install/install_papirus_icons.sh
-bash ./install/install_local_bin.sh
+./install/install_gtk_themes.sh
+./install/install_papirus_icons.sh
+
+printf "\n%s[VIBRANIUM]%s Copying binaries" "${YELLOW}" "${RESET}"
+./install/install_local_bin.sh
 
 printf "\n%s[VIBRANIUM]%s Copying configs" "${YELLOW}" "${RESET}"
 cp -r ./config/systemd "$HOME/.config/"

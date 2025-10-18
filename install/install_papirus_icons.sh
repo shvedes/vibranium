@@ -17,15 +17,12 @@ git clone -q https://github.com/PapirusDevelopmentTeam/papirus-icon-theme
 cd papirus-icon-theme
 mkdir -p "$HOME/.local/share/icons"
 cp -r Papirus* "$HOME"/.local/share/icons
-printf "\r\033%s[VIBRANIUM]%s Icon theme succsessfully installed%s" "${YELLOW}" "${GREEN}" "${RESET}"
-sleep 0.5
 
-printf "\r\033%s[VIBRANIUM]%s Installing icon theme patcher" "${YELLOW}" "${RESET}"
 mkdir -p "$HOME/.local/bin"
 curl -s https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders/refs/heads/master/install.sh \
 	-o "$HOME/.local/bin/papirus-folders"
 chmod +x "$HOME/.local/bin/papirus-folders"
-printf "\r\033%s[VIBRANIUM]%s Icon theme patcher succsessfully installed%s" "${YELLOW}" "${GREEN}" "${RESET}"
+printf "\r\033%s[VIBRANIUM]%s Icon theme succsessfully installed%s" "${YELLOW}" "${GREEN}" "${RESET}"
 sleep 0.5
 
 rm -rf "$HOME"/.cache/papirus-icon-theme

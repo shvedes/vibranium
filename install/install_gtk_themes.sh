@@ -41,8 +41,6 @@ colors["Everforest-GTK-Theme"]="dark"
 colors["Catppuccin-GTK-Theme"]="dark light"
 
 printf "\r\033%s[VIBRANIUM]%s Installing GTK themes" "${YELLOW}"  "${RESET}"
-# Hide cursor
-printf '\e[?25l'
 
 # Function to install a theme repo
 install_theme() {
@@ -52,7 +50,6 @@ install_theme() {
   local variants=()
 
   # Clone the repo
-  # echo "Cloning $repo..."
   git clone -q "https://github.com/Fausto-Korpsvart/$repo" || { echo "Failed to clone $repo"; return 1; }
   cd "$clone_dir/themes" || { echo "Failed to cd into $clone_dir/themes"; cd ..; rm -rf "$clone_dir"; return 1; }
   git switch -q --detach HEAD~1
@@ -122,7 +119,7 @@ install_theme() {
 
       local generated_variant_suffix=""
       if [ "$variant" != "default" ]; then
-        local cap_variant="$(tr '[:lower:]' '[:upper:]' <<< ${variant:0:1})${variant:1}"
+        local cap_variant; cap_variant="$(tr '[:lower:]' '[:upper:]' <<< ${variant:0:1})${variant:1}"
         generated_variant_suffix="-$cap_variant"
       fi
 
@@ -197,7 +194,6 @@ install_theme() {
       fi
       generated_base+="-$color_upper-Compact$generated_variant_suffix"
 
-      # echo "Installing $repo variant $variant color $color with accent $accent..."
 	  printf "\r\033%s[VIBRANIUM]%s Installing %s${desired_name%%-*} GTK theme%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
 
 
@@ -207,7 +203,6 @@ install_theme() {
       # Rename if directories exist
       if [ -d "$DEST_DIR/$generated_base" ]; then
         mv "$DEST_DIR/$generated_base" "$DEST_DIR/$desired_name"
-        # echo "Renamed $generated_base to $desired_name"
 		sed -i -e "/^Name=/s/=.*/=${desired_name}/" \
 			-e "/^GtkTheme=/s/=.*/=${desired_name}/" \
 			-e "/^MetacityTheme=/s/=.*/=${desired_name}/" \
@@ -221,24 +216,19 @@ install_theme() {
       local desired_hdpi="$desired_name-hdpi"
       if [ -d "$DEST_DIR/$generated_hdpi" ]; then
         mv "$DEST_DIR/$generated_hdpi" "$DEST_DIR/$desired_hdpi"
-        # echo "Renamed $generated_hdpi to $desired_hdpi"
       fi
 
       local generated_xhdpi="$generated_base-xhdpi"
       local desired_xhdpi="$desired_name-xhdpi"
       if [ -d "$DEST_DIR/$generated_xhdpi" ]; then
         mv "$DEST_DIR/$generated_xhdpi" "$DEST_DIR/$desired_xhdpi"
-        # echo "Renamed $generated_xhdpi to $desired_xhdpi"
       fi
     done
   done
 
-  # printf "\r\033%s[VIBRANIUM]%s Installed ${desired_name%%-*} GTK theme" "${YELLOW}" "${RESET}"
-
   # Clean up
   cd ../..
   rm -rf "$clone_dir"
-  # echo "Cleaned up $repo"
 }
 
 # Main loop
