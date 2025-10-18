@@ -93,7 +93,6 @@ edit_system_configs() {
 }
 
 install_packages() {
-	clear; printf '\e[2J\e[%d;1H' "$LINES"
     printf '\e[?25l'  # hide cursor
 
 	clear; printf '\e[2J\e[%d;1H' "$LINES"
