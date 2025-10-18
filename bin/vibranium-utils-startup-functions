@@ -22,10 +22,18 @@ if [[ $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL == true ]]; then
 	export I2C_BUS; I2C_BUS=$(ddcutil detect 2> /dev/null | awk -F'i2c-' '/I2C bus/{print $2}')
 fi
 
+CHASSIS="$(</sys/class/dmi/id/chassis_type)"
+
 # So far, this variable has little use
-if [[ "$(</sys/class/dmi/id/chassis_type)" == "10" ]]; then
+if [[ "$CHASSIS" == "10" ]]; then
 	export VIBRANIUM_IS_LAPTOP=true
 else
 	export VIBRANIUM_IS_LAPTOP=false
+fi
+
+if [[ "$CHASSIS" == "1" ]]; then
+	export VIBRANIUM_IS_VIRTUAL_MACHINE=true
+else
+	export VIBRANIUM_IS_VIRTUAL_MACHINE=false
 fi
 

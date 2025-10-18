@@ -45,7 +45,7 @@ notification() {
         message="copied to clipboard"
     fi
 
-    notify-send -r 1 -t 1500 "Screenshot Tool" "$target $message"
+    notify-send -r 1 -t 1500 "Vibranium" "$target $message"
 }
 
 # Load and validate settings

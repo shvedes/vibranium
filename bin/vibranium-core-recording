@@ -15,6 +15,13 @@ if ! missing_str="$(vibranium-utils-is-installed gpu-screen-recorder)"; then
     exit 1
 fi
 
+if [[ "$VIBRANIUM_IS_VIRTUAL_MACHINE" == true ]]; then
+	msg="Screen recording does not work in virtual machines.\n"
+	msg+="Support is unavailable and will not be added. Aborting."
+	notify-send -r 4 -u critical -t 5000 "Vibranium" "$msg"
+	exit 1
+fi
+
 # First, verify all essential settings and fall back to the defaults if they have invalid values
 check_bool VIBRANIUM_GLOBAL_FLASH_SCREEN true
 check_bool VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD true
