@@ -130,10 +130,9 @@ post_install() {
 }
 
 sudo -v; clear
-cat ./logo.txt
-
 # Move VT to the bottom
 printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
+cat ./logo.txt
 
 printf "%s[VIBRANIUM]%s Copying system files" "${YELLOW}" "${RESET}"
 sudo cp -r ./extras/udev/rules.d/*  /etc/udev/rules.d
