@@ -11,7 +11,7 @@ RESET=$'\e[0m'
 
 CWD="$(pwd)"
 
-printf "\r\033%s[VIBRANIUM]%s Installing icon theme" "${YELLOW}" "${RESET}"
+printf "\r\033[K%s[VIBRANIUM]%s Installing icon theme" "${YELLOW}" "${RESET}"
 cd ~/.cache
 git clone -q https://github.com/PapirusDevelopmentTeam/papirus-icon-theme
 cd papirus-icon-theme
@@ -22,7 +22,7 @@ mkdir -p "$HOME/.local/bin"
 curl -s https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders/refs/heads/master/install.sh \
 	-o "$HOME/.local/bin/papirus-folders"
 chmod +x "$HOME/.local/bin/papirus-folders"
-printf "\r\033%s[VIBRANIUM]%s Icon theme installed%s" "${YELLOW}" "${GREEN}" "${RESET}"
+printf "\r\033[K%s[VIBRANIUM]%s Icon theme installed" "${YELLOW}" "${RESET}"
 sleep 0.5
 
 rm -rf "$HOME"/.cache/papirus-icon-theme

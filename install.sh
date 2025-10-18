@@ -42,7 +42,6 @@ fi
 printf '\e[?25l'
 
 cleanup() {
-	touch "$HOME/.local/state/vibranium/first-boot"
 	yay -Ycc --noconfirm &>/dev/null
 }
 
@@ -131,6 +130,7 @@ create_directories() {
 }
 
 post_install() {
+	touch "$HOME/.local/state/vibranium/first-boot"
 	echo "suspended" > \
 		"$HOME/.local/state/vibranium/night-light"
 }
