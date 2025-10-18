@@ -32,6 +32,9 @@ if ! command -v yay >/dev/null; then
 	sudo -v; clear
 fi
 
+# Move VT to the bottom
+printf '\e[2J\e[%d;1H' "$LINES"
+
 cleanup() {
 	touch "$HOME/.local/state/vibranium/first-boot"
 	yay -Ycc --noconfirm &>/dev/null
@@ -137,7 +140,6 @@ install_packages() {
     done
 
     printf "\r\033[K%s[VIBRANIUM]%s All packages installed%s\n" "$YELLOW" "${GREEN}" "$RESET"
-    printf '\e[?25h'  # show cursor
 }
 
 enable_system_services() {
@@ -244,9 +246,6 @@ post_install() {
 		"$HOME/.local/state/vibranium/night-light"
 }
 
-# Clear VT
-printf '\e[2J\e[%d;1H' "$LINES"
-
 copy_system_files
 edit_system_configs
 install_packages
@@ -290,3 +289,5 @@ cleanup
 printf "\n%s[VIBRANIUM]%s Installation complete%s" "${YELLOW}" "${GREEN}" "${RESET}"
 printf "\n%s[VIBRANIUM]%s You can start using Vibranium by typying 'uwsm start hyprland'" "${YELLOW}" "${RESET}"
 printf "\n%s[VIBRANIUM]%s Or you can reboot the machine and then select 'Hyprland (uwsm-managed)' in DM\n" "${YELLOW}" "${RESET}"
+
+printf '\e[?25h'  # show cursor
