@@ -57,7 +57,8 @@ edit_system_configs() {
 			-e 's/^\s*ParallelDownloads\s*=.*/ParallelDownloads = 10/' "$pacman_conf"
 	fi
 
-	if grep -q "-march=native" "$makepkg_conf" && ! grep -qE "^OPTIONS([^#]*[^!]debug)" "$makepkg_conf"; then
+	if grep -q "-march=native" "$makepkg_conf" &>/dev/null && ! \
+		grep -qE "^OPTIONS([^#]*[^!]debug)" "$makepkg_conf" &>/dev/null; then
 		printf "\n%s[VIBRANIUM]%s /etc/makepkg.conf already configured, skipping" "${YELLOW}" "${RESET}"
 	else
 		printf "\n%s[VIBRANIUM]%s Editing /etc/makepkg.conf" "${YELLOW}" "${RESET}"
