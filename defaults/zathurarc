@@ -1,0 +1,15 @@
+set selection-clipboard "clipboard"
+
+set recolor "false"
+
+map j feedkeys "<C-Down>"
+map k feedkeys "<C-Up>"
+
+map J page-bottom
+map K page-top
+
+map o file_chooser
+
+map [normal] l follow
+map [index] l feedkeys <Return>
+

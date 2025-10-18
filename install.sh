@@ -95,6 +95,13 @@ apply_default_theme() {
 	gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 	gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
+	ln -s "$HOME/.themes/Nightfox/gtk-4.0/assets" \
+		"$HOME/.config/gtk-4.0/"
+	ln -s "$HOME/.themes/Nightfox/gtk-4.0/gtk-dark.css" \
+		"$HOME/.config/gtk-4.0/"
+	ln -s "$HOME/.themes/Nightfox/gtk-4.0/gtk.css" \
+		"$HOME/.config/gtk-4.0/"
+
 	mkdir -p "$HOME/.local/share/icons"
 	cp -r ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
 }
@@ -115,6 +122,7 @@ create_directories() {
 		"$HOME/.config/qt6ct/colors" \
 		"$HOME/.config/btop/themes/" \
 		"$HOME/.config/wlogout" \
+		"$HOME/.config/zathura" \
 		"$HOME/.config/swayosd" \
 		"$HOME/.config/dunst" \
 		"$HOME/.config/uwsm" \
@@ -138,7 +146,7 @@ printf "\n%s[VIBRANIUM]%s Generating defaults configs" "${YELLOW}" "${RESET}"
 
 create_directories
 
-printf "\n%s[VIBRANIUM]%s Copying defaults configs" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Copying configs" "${YELLOW}" "${RESET}"
 cp -r ./config/systemd "$HOME/.config/"
 cp -r ./config/waybar "$HOME/.config"
 cp -r ./config/alacritty "$HOME/.config"
@@ -157,7 +165,7 @@ done
 apply_default_theme
 generate_defaults
 
-printf "\n%s[VIBRANIUM]%s Generating default configs" "${YELLOW}" "${RESET}"
+printf "\n%s[VIBRANIUM]%s Generating defaults" "${YELLOW}" "${RESET}"
 for file in ./install/generate_*; do
 	bash "$file"
 done

@@ -216,11 +216,11 @@ apply_theme() {
     local gtk_theme="${GTK_MAP[$chosen]:-$chosen}"
 
     log "Applying GTK 4 settings"
-    sed -i -e "/gtk-theme-name/s/=.*/=$gtk_theme/" "$XDG_CONFIG_HOME/gtk-{3,4}.0/settings.ini"
+    sed -i -e "/gtk-theme-name/s/=.*/=$gtk_theme/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
 
     # Update GTK 4 symlinks
     find "$XDG_CONFIG_HOME/gtk-4.0" -type l -printf "%f\n" | while read -r link; do
-        ln -sf "$XDG_DATA_HOME/themes/$gtk_theme/gtk-4.0/$link" \
+        ln -sf "$HOME/.themes/$gtk_theme/gtk-4.0/$link" \
             "$XDG_CONFIG_HOME/gtk-4.0/${link}"
     done
 
