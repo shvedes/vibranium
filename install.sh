@@ -34,6 +34,8 @@ install_yay() {
 
 install_packages() {
 	yay -Suy --needed --noconfirm - < ./pkg_list.txt
+	clear
+	printf '\e[2J\e[%d;1H' $((LINES/2))
 }
 
 enable_system_services() {
