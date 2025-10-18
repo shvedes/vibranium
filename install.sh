@@ -39,11 +39,12 @@ edit_system_configs() {
 
 	printf "%s[VIBRANIUM]%s Editing /etc/sudoers\n" "${YELLOW}" "${RESET}"
 	sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$sudoers_conf" || \
-		echo -e '\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback' | sudo tee -a "$sudoers_conf"
+		echo -e '\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback' \
+		| sudo tee -a "$sudoers_conf" &>/dev/null
 
 	printf "%s[VIBRANIUM]%s Editing /etc/security/faillock.conf\n" "${YELLOW}" "${RESET}"
 	grep -qxF 'deny = 5, nodelay' "$faillock_conf" || \
-		echo 'deny = 5, nodelay' | sudo tee -a "$faillock_conf"
+		echo 'deny = 5, nodelay' | sudo tee -a "$faillock_conf" &>/dev/null
 
 	printf "%s[VIBRANIUM]%s Editing /etc/pam.d/system-auth\n" "${YELLOW}" "${RESET}"
 	sudo sed -i '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\(try_first_pass nullok\)/\1 nodelay/' "$system_auth_conf"
