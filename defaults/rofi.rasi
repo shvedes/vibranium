@@ -22,6 +22,7 @@ configuration {
 	display-drun        : "Apps";
 	display-ssh         : "SSH";
 
+	icon-theme          : "Papirus";
 	drun-display-format : "{name}";
 	matching            : "prefix";
 	drun-match-fields   : "name";

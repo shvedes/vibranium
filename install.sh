@@ -90,6 +90,7 @@ apply_default_theme() {
 	gsettings set org.gnome.desktop.interface gtk-theme "Nightfox"
 	gsettings set org.gnome.desktop.interface cursor-theme "macOS"
 	gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
+	gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 }
 
 download_spicetify_theme() {
