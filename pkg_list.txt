@@ -35,7 +35,6 @@ hyprland
 hypridle
 gvfs-mtp
 cliphist
-firefox
 zathura
 wiremix
 tumbler

@@ -16,6 +16,39 @@ if [[ "$(id -u)" == 0 ]]; then
 	exit 1
 fi
 
+edit_system_configs() {
+	local pacman_conf makepkg_conf system_auth_conf
+	local sudoers_conf faillock_conf 
+
+	pacman_conf="/etc/pacman.conf"
+	makepkg_conf="/etc/makepkg.conf"
+	sudoers_conf="/etc/sudoers"
+	faillock_conf="/etc/security/faillock.conf"
+	system_auth_conf="/etc/pam.d/system-auth"
+
+	printf "%s[VIBRANIUM]%s Editing /etc/pacman.conf\n" "${YELLOW}" "${RESET}"
+	sudo sed -i -e '/\[multilib\]/,/^$/s/^#//' \
+		-e '/^\s*#Color/s/^#//' \
+		-e '/^\s*#VerbosePkgLists/s/^#//' \
+		-e '/^\s*#ParallelDownloads/s/^#/' \
+		-e 's/^\s*ParallelDownloads\s*=.*/ParallelDownloads = 10/' "$pacman_conf"
+
+	printf "%s[VIBRANIUM]%s Editing /etc/makepkg.conf\n" "${YELLOW}" "${RESET}"
+	sudo sed -i -e 's/-march=x86-64/-march=native/' \
+		-e '/^OPTIONS=/ s/\bdebug\b/!debug/' "$makepkg_conf"
+
+	printf "%s[VIBRANIUM]%s Editing /etc/sudoers\n" "${YELLOW}" "${RESET}"
+	sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$sudoers_conf" || \
+		echo -e '\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback' | sudo tee -a "$sudoers_conf"
+
+	printf "%s[VIBRANIUM]%s Editing /etc/security/faillock.conf\n" "${YELLOW}" "${RESET}"
+	grep -qxF 'deny = 5, nodelay' "$faillock_conf" || \
+		echo 'deny = 5, nodelay' | sudo tee -a "$faillock_conf"
+
+	printf "%s[VIBRANIUM]%s Editing /etc/pam.d/system-auth\n" "${YELLOW}" "${RESET}"
+	sudo sed -i '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\(try_first_pass nullok\)/\1 nodelay/' "$system_auth_conf"
+}
+
 install_yay() {
 	if ! command -v yay >/dev/null; then
 		echo -e "${YELLOW}[VIBRANIUM]${RESET} Installing yay"
@@ -139,6 +172,7 @@ post_install() {
 install_yay
 install_packages
 copy_system_files
+edit_system_configs
 
 bash ./install/install_gtk_themes.sh
 bash ./install/install_papirus_icons.sh

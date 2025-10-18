@@ -18,18 +18,19 @@ while true; do
 
 	case "$CHOSEN" in
 		"Hyprland wiki")
-			vibranium-cmd-launch-cmd xdg-open "https://wiki.hypr.land"
-			vibranium-cmd-kill-rofi
+			LINK="https://wiki.hypr.land"
 			;;
 		"Arch Linux wiki")
-			vibranium-cmd-launch-cmd xdg-open "https://wiki.archlinux.org"
-			vibranium-cmd-kill-rofi
+			LINK="https://wiki.archlinux.org"
 			;;
 		"How"*)
-			vibranium-cmd-launch-cmd xdg-open "https://wiki.archlinux.org/title/Pacman"
-			vibranium-cmd-kill-rofi
+			LINK="https://wiki.archlinux.org/title/Pacman"
 			;;
 		"Vibranium wiki")
-			notify-send -r 1 "Vibranium" "Hold up, we're still in beta :D"
+			notify-send -r 1 "Vibranium" "Hold on, Vibranium is still in beta"
+			break
 	esac
+
+	vibranium-cmd-launch-cmd chromium --app="$LINK"
+	vibranium-cmd-kill-rofi
 done
