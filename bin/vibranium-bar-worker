@@ -9,7 +9,7 @@ if [[ -f $file ]]; then
 		tooltip="<span foreground='${P_ACCENT}'>Cache generation suspended due to power profile</span>"
 	else
 		tooltip="<span foreground='${P_ACCENT}'>Background task in progress</span>\n\n"
-		tooltip+="Processing <span foreground='${P_YELLOW}'>$(<"$file")</span>"
+		tooltip+="<span foreground='${P_YELLOW}'>$(<"$file")</span>"
 	fi
 	printf '{"text": "%s", "tooltip": "%s"}' "\uf013" "$tooltip"
 else

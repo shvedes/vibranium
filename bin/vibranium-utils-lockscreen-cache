@@ -109,7 +109,7 @@ process_file_forcibly() {
         cached="${cache_dir}/$(basename "${file%.*}")-${type}.jpg"
         if [[ "$single_file" == false ]]; then
             # Update Waybar with current processing file.
-            basename "$cached" > "$XDG_RUNTIME_DIR/worker.active"
+				echo "Caching $(basename "$cached")" > "$XDG_RUNTIME_DIR/worker.active"
             vibranium-cmd-refresh-waybar-module worker
         fi
         echo "${GRAY}[$(date)] ${BLUE}Processing ($type): ${YELLOW}${cached}${RESET}"
@@ -194,7 +194,7 @@ for file in "${backgrounds[@]}"; do
 
 			if [[ "$single_file" == false ]]; then
 				# Update Waybar with current processing file.
-				basename "$cached" > "$XDG_RUNTIME_DIR/worker.active"
+				echo "Caching $(basename "$cached")" > "$XDG_RUNTIME_DIR/worker.active"
 				vibranium-cmd-refresh-waybar-module worker
 			fi
 

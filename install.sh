@@ -96,12 +96,6 @@ apply_default_theme() {
 	gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 }
 
-download_spicetify_theme() {
-	curl -s "https://raw.githubusercontent.com/spicetify/spicetify-themes/refs/heads/master/text/user.css" \
-		-o "${XDG_CONFIG_HOME:-$HOME/.config}/spicetify/Themes/text/user.css"
-}
-
-
 copy_system_files() {
 	sudo cp -rv ./extras/udev/rules.d/*  /etc/udev/rules.d
 	sudo cp -rv ./extras/pacman.d/hooks  /etc/pacman.d
@@ -157,7 +151,6 @@ for entry in ./applications/hidden/*; do
 done
 ln -sf ./applications/custom "$HOME"/.local/share/applications/
 
-download_spicetify_theme
 apply_default_theme
 generate_defaults
 

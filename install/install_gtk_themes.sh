@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+YELLOW=$'\e[0;33m'
+GREEN=$'\e[0;32m'
+RESET=$'\e[0m'
+
 # Array of repositories
 REPOS=(
   "Osaka-GTK-Theme"
@@ -43,8 +47,8 @@ install_theme() {
   local variants=()
 
   # Clone the repo
-  echo "Cloning $repo..."
-  git clone "https://github.com/Fausto-Korpsvart/$repo" || { echo "Failed to clone $repo"; return 1; }
+  # echo "Cloning $repo..."
+  git clone -q "https://github.com/Fausto-Korpsvart/$repo" || { echo "Failed to clone $repo"; return 1; }
   cd "$clone_dir/themes" || { echo "Failed to cd into $clone_dir/themes"; cd ..; rm -rf "$clone_dir"; return 1; }
   git switch --detach HEAD~1
 
@@ -188,7 +192,7 @@ install_theme() {
       fi
       generated_base+="-$color_upper-Compact$generated_variant_suffix"
 
-      echo "Installing $repo variant $variant color $color with accent $accent..."
+      # echo "Installing $repo variant $variant color $color with accent $accent..."
 
 	  install_opts="-s compact -c $color $tweaks -t $accent_param"
 	  eval "./install.sh $install_opts"  || { echo "Install failed for $repo $variant $color"; continue; }
@@ -196,7 +200,7 @@ install_theme() {
       # Rename if directories exist
       if [ -d "$DEST_DIR/$generated_base" ]; then
         mv "$DEST_DIR/$generated_base" "$DEST_DIR/$desired_name"
-        echo "Renamed $generated_base to $desired_name"
+        # echo "Renamed $generated_base to $desired_name"
 		sed -i -e "/^Name=/s/=.*/=${desired_name}/" \
 			-e "/^GtkTheme=/s/=.*/=${desired_name}/" \
 			-e "/^MetacityTheme=/s/=.*/=${desired_name}/" \
@@ -210,17 +214,19 @@ install_theme() {
       local desired_hdpi="$desired_name-hdpi"
       if [ -d "$DEST_DIR/$generated_hdpi" ]; then
         mv "$DEST_DIR/$generated_hdpi" "$DEST_DIR/$desired_hdpi"
-        echo "Renamed $generated_hdpi to $desired_hdpi"
+        # echo "Renamed $generated_hdpi to $desired_hdpi"
       fi
 
       local generated_xhdpi="$generated_base-xhdpi"
       local desired_xhdpi="$desired_name-xhdpi"
       if [ -d "$DEST_DIR/$generated_xhdpi" ]; then
         mv "$DEST_DIR/$generated_xhdpi" "$DEST_DIR/$desired_xhdpi"
-        echo "Renamed $generated_xhdpi to $desired_xhdpi"
+        # echo "Renamed $generated_xhdpi to $desired_xhdpi"
       fi
     done
   done
+
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Installed ${desired_name}"
 
   # Clean up
   cd ../..
@@ -234,4 +240,4 @@ for repo in "${REPOS[@]}"; do
 done
 
 ln -s "$HOME/.themes" "$HOME/.local/share/themes"
-echo "All installations complete."
+echo -e "${GREEN}[VIBRANIUM]${RESET} GTK themes installed"

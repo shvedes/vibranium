@@ -13,6 +13,14 @@ if pidof spotify >/dev/null; then
 	exit 1
 fi
 
+download_theme() {
+	mkdir -p "$XDG_CONFIG_HOME/spicetify/Themes/text"
+	curl -s "https://raw.githubusercontent.com/spicetify/spicetify-themes/refs/heads/master/text/user.css" \
+		-o "$XDG_CONFIG_HOME/spicetify/Themes/text/user.css"
+	ln -s "$XDG_CONFIG_HOME/vibranium/theme/current/spicetify.ini" \
+		"$XDG_CONFIG_HOME/spicetify/Themes/text/color.ini"
+}
+
 loop() {
 	local msg
 
@@ -45,7 +53,7 @@ loop() {
 if command -v spicetify >/dev/null; then
 	prefs="${XDG_CONFIG_HOME:-$HOME/.config}/spotify/prefs"
 	if [ ! -f "$prefs" ]; then
-		msg="It looks like you’ve launched Spotify for the first time.\n"
+		msg="Looks like Spotify hasn't been patched yet.\n"
 		msg+="Live theming will be applied after you log in to your account."
 		notify-send -r 1 -t 10000 "Vibranium" "$msg"
 

@@ -54,6 +54,7 @@ bluez
 uwsm
 rofi
 nano
+wget
 gvfs
 grim
 btop
