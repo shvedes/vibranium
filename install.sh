@@ -92,8 +92,21 @@ install_yay() {
 }
 
 install_packages() {
-	yay -Suy --needed --noconfirm - < ./pkg_list.txt
-	clear; printf '\e[2J\e[%d;1H' "$LINES"
+    local packages
+    mapfile -t packages < ./pkg_list.txt
+
+    printf '\e[?25l'
+
+    for pkg in "${packages[@]}"; do
+        [[ -z "${pkg//[[:space:]]/}" ]] && continue
+        [[ "${pkg:0:1}" == "#" ]] && continue
+
+        printf "\r\033[K%s[VIBRANIUM]%s Installing %s%s%s" "$YELLOW" "$RESET" "$GRAY" "$pkg" "$RESET"
+        yay -S --noconfirm --needed "$pkg" >/dev/null 2>&1
+    done
+
+    printf "\r\033[K%s[VIBRANIUM]%s All packages installed%s\n" "$YELLOW" "${GREEN}" "$RESET"
+    printf '\e[?25h'
 }
 
 enable_system_services() {
@@ -199,6 +212,9 @@ post_install() {
 	echo "suspended" > \
 		"$HOME/.local/state/vibranium/night-light"
 }
+
+# Clear VT
+printf '\e[2J\e[%d;1H' "$LINES"
 
 install_yay
 copy_system_files

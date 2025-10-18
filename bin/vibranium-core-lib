@@ -144,7 +144,7 @@ spinner() {
     # While the process exists, animate the spinner
     while kill -0 "$pid" 2> /dev/null; do
         for i in "${spinstr[@]}"; do
-            printf "\r${msg} %s" "• ${i} "
+            printf "\r${msg} %s" "${i} "
             sleep $delay
         done
     done
