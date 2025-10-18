@@ -130,6 +130,7 @@ post_install() {
 }
 
 sudo -v; clear
+cat ./logo.txt
 
 # Move VT to the bottom
 printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
@@ -148,7 +149,7 @@ SYSTEM_AUTH_CONF="/etc/pam.d/system-auth"
 if grep -q '^\[multilib\]' "$PACMAN_CONF" && grep -q '^Color' "$PACMAN_CONF" && grep -q '^VerbosePkgLists' "$PACMAN_CONF" && grep -q '^ParallelDownloads = 10' "$PACMAN_CONF"; then
 	printf "\n%s[VIBRANIUM]%s /etc/pacman.conf %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
 else
-	printf "\n%s[VIBRANIUM]%s Editing /etc/pacman.conf" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing %s/etc/pacman.conf%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
 	sudo sed -i -e '/\[multilib\]/,/^$/s/^#//' \
 		-e '/^\s*#Color/s/^#//' \
 		-e '/^\s*#VerbosePkgLists/s/^#//' \
@@ -160,7 +161,7 @@ if grep -q "-march=native" "$MAKEPKG_CONF" &>/dev/null && ! \
 	grep -qE "^OPTIONS([^#]*[^!]debug)" "$MAKEPKG_CONF" &>/dev/null; then
 	printf "\n%s[VIBRANIUM]%s /etc/makepkg.conf %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
 else
-	printf "\n%s[VIBRANIUM]%s Editing /etc/makepkg.conf" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing %s/etc/makepkg.conf%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
 	sudo sed -i -e 's/-march=x86-64/-march=native/' \
 		-e '/^OPTIONS=/ s/\bdebug\b/!debug/' "$MAKEPKG_CONF"
 fi
@@ -170,22 +171,22 @@ sudo pacman -Suy --noconfirm &>/dev/null
 if sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$SUDOERS_CONF"; then
 	printf "\n%s[VIBRANIUM]%s /etc/sudoers %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
 else
-	printf "\n%s[VIBRANIUM]%s Editing /etc/sudoers" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing %s/etc/sudoers%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
 	echo -e '\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback' \
 		| sudo tee -a "$SUDOERS_CONF" &>/dev/null
 fi
 
 if grep -qxF 'nodelay' "$FAILLOCK_CONF"; then
-	printf "\n%s[VIBRANIUM]%s /etc/security/faillock.conf already configured, skipping" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s /etc/security/faillock.conf %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
 else
-	printf "\n%s[VIBRANIUM]%s Editing /etc/security/faillock.conf" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing %s/etc/security/faillock.conf%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
 	echo -e 'deny = 5\nnodelay' | sudo tee -a "$FAILLOCK_CONF" &>/dev/null
 fi
 
 if sudo grep -q '^auth.*pam_unix\.so.*try_first_pass nullok nodelay' "$SYSTEM_AUTH_CONF"; then
 	printf "\n%s[VIBRANIUM]%s /etc/pam.d/system-auth %salready configured, skipping" "${YELLOW}" "${GRAY}" "${RESET}"
 else
-	printf "\n%s[VIBRANIUM]%s Editing /etc/pam.d/system-auth" "${YELLOW}" "${RESET}"
+	printf "\n%s[VIBRANIUM]%s Editing %s/etc/pam.d/system-auth%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
 	sudo sed -i '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\(try_first_pass nullok\)/\1 nodelay/' "$SYSTEM_AUTH_CONF"
 fi
 
