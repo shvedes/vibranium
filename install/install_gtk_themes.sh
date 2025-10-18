@@ -237,5 +237,5 @@ for repo in "${REPOS[@]}"; do
 done
 
 ln -s "$HOME/.themes" "$HOME/.local/share/themes"
-printf "\r\033%s[VIBRANIUM]%s GTK themes installed\n" "${YELLOW}" "${RESET}"
+printf "\r\033[K%s[VIBRANIUM]%s GTK themes installed\n" "${YELLOW}" "${RESET}"
 sleep 0.5
