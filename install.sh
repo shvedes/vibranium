@@ -16,6 +16,8 @@ if [[ "$(id -u)" == 0 ]]; then
 	exit 1
 fi
 
+sudo -v
+
 cleanup() {
 	yay -Ycc --noconfirm &>/dev/null
 }
