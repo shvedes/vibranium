@@ -94,10 +94,6 @@ edit_system_configs() {
 
 install_packages() {
     printf '\e[?25l'  # hide cursor
-
-	clear; printf '\e[2J\e[%d;1H' "$LINES"
-    # Install packages from list
-
 	local packages
 	mapfile -t packages < ./pkg_list.txt
 
