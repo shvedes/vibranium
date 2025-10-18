@@ -122,6 +122,8 @@ create_directories() {
 		"$HOME/.config/qt6ct/colors" \
 		"$HOME/.config/btop/themes/" \
 		"$HOME/.config/wlogout" \
+		"$HOME/.config/gtk-3.0" \
+		"$HOME/.config/gtk-4.0" \
 		"$HOME/.config/zathura" \
 		"$HOME/.config/swayosd" \
 		"$HOME/.config/dunst" \
