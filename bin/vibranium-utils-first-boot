@@ -2,6 +2,8 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
+sleep 3
+
 msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + V</b></span> to open the Vibranium menu.\n"
 msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + K</b></span> to view all available keybindings.\n\n"
 msg+="Right-click to dismiss this notification."
