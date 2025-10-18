@@ -30,7 +30,7 @@ edit_system_configs() {
 	sudo sed -i -e '/\[multilib\]/,/^$/s/^#//' \
 		-e '/^\s*#Color/s/^#//' \
 		-e '/^\s*#VerbosePkgLists/s/^#//' \
-		-e '/^\s*#ParallelDownloads/s/^#/' \
+		-e '/^\s*#ParallelDownloads/s/^#//' \
 		-e 's/^\s*ParallelDownloads\s*=.*/ParallelDownloads = 10/' "$pacman_conf"
 
 	printf "%s[VIBRANIUM]%s Editing /etc/makepkg.conf\n" "${YELLOW}" "${RESET}"
@@ -140,6 +140,7 @@ apply_default_theme() {
 }
 
 copy_system_files() {
+	printf "%s[VIBRANIUM]%s Copying system files" "${YELLOW}" "${RESET}"
 	sudo cp -r ./extras/udev/rules.d/*  /etc/udev/rules.d
 	sudo cp -r ./extras/pacman.d/hooks  /etc/pacman.d
 	sudo cp -r ./extras/usr/local/bin/* /usr/local/bin
