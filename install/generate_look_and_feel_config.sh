@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-cat << EOF > "$HOME/.config/hypr/hyprlock.conf"
+cat << EOF > "$HOME/.config/hypr/hyprland.conf.d/look-and-feel.conf"
 animations {
 	enabled = true
 }
