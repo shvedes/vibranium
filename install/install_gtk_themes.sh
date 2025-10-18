@@ -39,7 +39,7 @@ colors["Tokyonight-GTK-Theme"]="dark"
 colors["Everforest-GTK-Theme"]="dark"
 colors["Catppuccin-GTK-Theme"]="dark light"
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Installing GTK themes"
+printf "\n%s[VIBRANIUM]%s Installing GTK themes" "${YELLOW}" "${RESET}"
 
 # Function to install a theme repo
 install_theme() {
