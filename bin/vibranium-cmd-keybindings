@@ -92,6 +92,6 @@ case "$1" in
 		dynamic_bindings | sort -u | parse_bindings
 		;;
 	*)
-		dynamic_bindings | sort -u | parse_bindings | rofi_cmd "Keybindings" "search shortcuts" -auto-select false
+		dynamic_bindings | sort -u | parse_bindings | rofi_cmd "Keybindings" "search shortcuts" -no-auto-select
 		;;
 esac
