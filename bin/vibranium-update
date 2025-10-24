@@ -24,6 +24,8 @@ _update() {
 	rm "$VIBRANIUM_STATE/update.available"
 	vibranium-cmd-refresh-waybar-module vibranium-update
 
+	vibranium-update-migrate
+
     echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated"
     read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
 }

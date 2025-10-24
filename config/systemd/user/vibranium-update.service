@@ -1,0 +1,15 @@
+[Unit]
+Description=Vibranium update service
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/vibranium/bin/vibranium-update-fetch
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
+
+# vim:ft=systemd

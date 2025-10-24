@@ -7,7 +7,4 @@ LOCAL_LATEST=$(git -C "$VIBRANIUM" describe --tags --abbrev=0 2>/dev/null)
 if [[ "$REMOTE_LATEST" != "$LOCAL_LATEST" ]]; then
 	echo "$REMOTE_LATEST" > "$VIBRANIUM_STATE/update.available"
 	vibranium-cmd-refresh-waybar-module vibranium-update
-	exit 0 # update available
-else
-	exit 1 # up to date
 fi

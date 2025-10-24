@@ -1,0 +1,10 @@
+[Unit]
+Description=Check Vibranium updates hourly
+
+[Timer]
+OnCalendar=hourly
+Persistent=true
+Unit=vibranium-update.service
+
+[Install]
+WantedBy=default.target
