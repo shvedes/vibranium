@@ -41,12 +41,7 @@ case "$1" in
         printf "%s\n" "$chosen"| cliphist decode | wl-copy -n
         ;;
     clear)
-        # in case if this invokes within rofi window opened > close (kill) the window and then perform actions
-        killall rofi
-        # notify if clipboard is already empty
-        is_empty && notify-send -r 1 -t 1500 "Vibranium" "Clipboard is already empty!" && exit 1
-        cliphist wipe; wl-copy --clear
-        notify-send -r 1 -t 1500 "Vibranium" "Clipboard cleared"
+        killall rofi; cliphist wipe; wl-copy --clear
         ;;
     *)
         usage
