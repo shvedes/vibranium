@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+
+# Source: omarchy
+
+STATE_DIR="$VIBRANIUM_STATE/migrations"
+
+mkdir -p "$STATE_DIR/skipped"
+for file in "$STATE_DIR"/migrations/*.sh; do
+    filename=$(basename "$file")
+
+    if [[ ! -f "$STATE_DIR/$filename" && ! -f "$STATE_DIR/skipped/$filename" ]]; then
+        echo -e "\e[32m\nRunning migration (${filename%.sh})\e[0m"
+
+        if bash "$file"; then
+            touch "$STATE_DIR/$filename"
+        else
+            printf "%s[VIBRANIUM]%s Migration %s failed. Skip and continue? (y/N): " $'\e[0;31m' $'\e[0m' "${filename%.sh}"
+            read -r response
+            case "$response" in
+            [yY][eE][sS] | [yY])
+                touch "$STATE_DIR/skipped/$filename"
+                ;;
+            *)
+                exit 1
+                ;;
+            esac
+        fi
+    fi
+done
