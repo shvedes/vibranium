@@ -130,10 +130,8 @@ fi
 # nvim +:$(grep -nm1 user-dirs $XDG_CONFIG_HOME/uwsm/env | awk '{print int($1)}') $XDG_CONFIG_HOME/uwsm/env
 if [[ $VIBRANIUM_XDG_DIRS_EXPOSED == true ]]; then
     output_dir=$(eval "echo $XDG_VIDEOS_DIR/Screencasts")
-    output_dir="${output_dir/#$HOME/\$HOME}"
 else
     output_dir=$HOME/Screencasts
-    output_dir="${output_dir/#$HOME/\$HOME}"
 fi
 
 mkdir -p "$output_dir"
@@ -150,7 +148,8 @@ if pid=$(pidof gpu-screen-recorder); then
     vibranium-cmd-refresh-waybar-module recording-indicator
 
     log "Copying video to clipboard"
-    msg="File saved to <span foreground='${P_YELLOW}'>$output_dir</span> "
+    output_dir_reformatted="${output_dir/#$HOME/\$HOME}"
+    msg="File saved to <span foreground='${P_YELLOW}'>$output_dir_reformatted</span> "
     if [ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD = true ]; then
         msg+="and copied to clipboard"
         # Copy just recorded video into clipboard with its mime type (not just file path)
