@@ -21,7 +21,6 @@ _set_city() {
 
 msg+="\nPress <span foreground='${P_YELLOW}'><b>SUPER + A</b></span>      to open app launcher\n"
 msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + V</b></span> to open Vibranium menu\n"
-msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + K</b></span> to view all keyboard shortcuts\n\n"
 msg+="<b>Right-click</b> to dismiss this notification"
 notify-send -r 1 -t 1800000 "Welcome to Vibranium" "$msg"
 
