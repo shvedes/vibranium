@@ -12,7 +12,6 @@ show() {
 [[ -f "$XDG_RUNTIME_DIR/worker.active" ]] && show
 [[ -f "$VIBRANIUM_STATE/update.available" ]] && show
 [[ -f "$XDG_RUNTIME_DIR/vibranium-core-force-kill.confirm" ]] && show
-[[ "$(< $VIBRANIUM_STATE/night-light)" == "active" ]] && show
 [[ $VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE == true ]] && show
 [[ $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE == true ]] && {
     [[ $(vibranium-utils-power-profile-get) != "balanced" ]] && show
