@@ -39,7 +39,7 @@ spinner "$!" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" ""
 mapfile -t pkg_list < <(yay -Qqu)
 
 if [[ -z "${pkg_list[*]}" ]]; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date "
+    echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date"
     read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
     exit 0
 fi

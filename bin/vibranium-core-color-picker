@@ -87,7 +87,7 @@ fi
 
 # Generate a 1:1px image of the selected color to display in the notification
 if [[ $VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR == true ]]; then
-    if [[ ! -f /usr/bin/magick ]]; then
+    if ! command -v magick > /dev/null; then
         warn "The notification preview was not generated because ImageMagick is not installed"
     else
         magick -size 1x1 xc:"${selected_color}" "$preview_img"

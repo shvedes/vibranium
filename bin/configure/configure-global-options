@@ -182,6 +182,11 @@ _lockscreen_blur_menu() {
     done
 }
 
+get_active_rofi_theme() {
+     local rofi_cfg="$XDG_CONFIG_HOME/rofi/config.rasi"
+     sed -n 's|@import ".*/\(rofi[-a-z]*\)\.rasi"|\1|p' "$rofi_cfg" | sed 's|^rofi-||; s|^rofi$|text|'
+}
+
 while :; do
     source "$VIBRANIUM_USER_SETTINGS"
 
@@ -529,6 +534,7 @@ while :; do
             while :; do
                 source "$VIBRANIUM_USER_SETTINGS"
                 app_launcher_options=(
+                    "Theme                 : $(get_active_rofi_theme)"
                     "Auto select           : $VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
                     "Search engine         : $VIBRANIUM_GLOBAL_SEARCH_ENGINE"
                     "Show app icons        : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
@@ -545,6 +551,20 @@ while :; do
                 done
 
                 case "$app_launcher_chosen" in
+                    "Theme"*)
+                        while :; do
+                            rofi_cfg="$XDG_CONFIG_HOME/rofi/config.rasi"
+                            themes=("Text" "Modern")
+                            themes_chosen="$(printf "%s\n" "${themes[@]}" | rofi_cmd "Theme" "ESC to go back")"
+                            [[ -z $themes_chosen ]] && break
+
+                            case "${themes_chosen,}" in
+                                "text")   sed -i 's|\(@import "~/.local/share/vibranium/defaults/\)[^"]*|\1rofi-text.rasi|' "$rofi_cfg"   ;;
+                                "modern") sed -i 's|\(@import "~/.local/share/vibranium/defaults/\)[^"]*|\1rofi-modern.rasi|' "$rofi_cfg" ;;
+                            esac
+                            break
+                        done
+                        ;;
                     "Show on session"*)
                         toggle_bool "VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START"
                         ;;
