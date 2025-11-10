@@ -17,7 +17,7 @@ _touchpad_options() {
 				 getoption input:touchpad:disable_while_typing" |
                 jq -r ' .option as $o |
 			if ($o | test("scroll_factor")) then
-				(.float * 10 | round / 10)
+				((.float * 100 | round) | tostring | (if length < 3 then ("0" * (3 - length)) + . else . end) | .[0:-2] + "." + .[-2:])
 			  elif ($o | test("accel_profile")) then
 				.str
 			  else
