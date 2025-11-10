@@ -31,9 +31,9 @@ fi
 ACTIVE_MONITOR="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
 
 get_i2c_bus() {
-    STATE_FILE="$VIBRANIUM_STATE/i2c-bus"
+    local state_file; state_file="$VIBRANIUM_STATE/i2c-bus"
 
-    NEW_INFO="$(ddcutil detect 2>/dev/null | awk '
+    new_info="$(ddcutil detect 2>/dev/null | awk '
         /I2C bus:/          { bus=$NF; sub("/dev/i2c-", "", bus); skip=0 }
         /DRM_connector:/    {
             name=$2
@@ -44,22 +44,22 @@ get_i2c_bus() {
         /VCP version/ && !skip { print name ":" bus }
     ')"
 
-    declare -A OLD_INFO
-    if [[ -f "$STATE_FILE" ]]; then
+    declare -A old_info
+    if [[ -f "$state_file" ]]; then
         while IFS=: read -r name bus; do
-            [[ -n "$name" && -n "$bus" ]] && OLD_INFO["$name"]="$bus"
-        done < "$STATE_FILE"
+            [[ -n "$name" && -n "$bus" ]] && old_info["$name"]="$bus"
+        done < "$state_file"
     fi
 
     while IFS=: read -r name bus; do
-        [[ -n "$name" && -n "$bus" ]] && OLD_INFO["$name"]="$bus"
-    done <<< "$NEW_INFO"
+        [[ -n "$name" && -n "$bus" ]] && old_info["$name"]="$bus"
+    done <<< "$new_info"
 
     {
-        for name in "${!OLD_INFO[@]}"; do
-            printf '%s:%s\n' "$name" "${OLD_INFO[$name]}"
+        for name in "${!old_info[@]}"; do
+            printf '%s:%s\n' "$name" "${old_info[$name]}"
         done
-    } > "$STATE_FILE"
+    } > "$state_file"
 }
 
 set_i2c_bus() {
@@ -89,37 +89,38 @@ set_i2c_bus() {
 }
 
 get_brightness_cache() {
-    STATE_FILE="$VIBRANIUM_STATE/brightness"
+    local state_file; state_file="$VIBRANIUM_STATE/brightness"
 
-    declare -A OLD_INFO
-    if [[ -f "$STATE_FILE" ]]; then
+    declare -A old_info
+    if [[ -f "$state_file" ]]; then
         while IFS=: read -r name value; do
-            [[ -n "$name" && -n "$value" ]] && OLD_INFO["$name"]="$value"
-        done < "$STATE_FILE"
+            [[ -n "$name" && -n "$value" ]] && old_info["$name"]="$value"
+        done < "$state_file"
     fi
 
     # If no entry for the active monitor, return empty to trigger a fresh fetch
-    echo "${OLD_INFO["$ACTIVE_MONITOR"]}"
+    echo "${old_info["$ACTIVE_MONITOR"]}"
 }
 
 update_brightness_cache() {
     local new_value="$1"
-    STATE_FILE="$VIBRANIUM_STATE/brightness"
+    local state_file
+    state_file="$VIBRANIUM_STATE/brightness"
 
-    declare -A INFO
-    if [[ -f "$STATE_FILE" ]]; then
+    declare -A info
+    if [[ -f "$state_file" ]]; then
         while IFS=: read -r name value; do
-            [[ -n "$name" && -n "$value" ]] && INFO["$name"]="$value"
-        done < "$STATE_FILE"
+            [[ -n "$name" && -n "$value" ]] && info["$name"]="$value"
+        done < "$state_file"
     fi
 
-    INFO["$ACTIVE_MONITOR"]="$new_value"
+    info["$ACTIVE_MONITOR"]="$new_value"
 
     {
-        for name in "${!INFO[@]}"; do
-            printf '%s:%s\n' "$name" "${INFO[$name]}"
+        for name in "${!info[@]}"; do
+            printf '%s:%s\n' "$name" "${info[$name]}"
         done
-    } > "$STATE_FILE"
+    } > "$state_file"
 }
 
 if ! compgen -G "/sys/class/backlight/*" > /dev/null; then
@@ -132,7 +133,7 @@ if ! compgen -G "/sys/class/backlight/*" > /dev/null; then
     else
         if ! missing_str="$(vibranium-utils-is-installed ddcutil)"; then
             read -r -a missing <<< "$missing_str"
-            notify-send -r 4 -t 5000 -u critical "Vibranium - Brightness Control" "Missing dependencies: ${missing[*]}"
+            notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
             exit 1
         fi
 
@@ -145,7 +146,7 @@ if ! compgen -G "/sys/class/backlight/*" > /dev/null; then
         ddcutil_flags=(--sleep-multiplier 0.13 --noverify --skip-ddc-checks --maxtries 1,1,1)
     fi
 else
-    if [[ ! -z "$ACTIVE_MONITOR" ]] && [[ ! "$ACTIVE_MONITOR" =~ eDP* ]]; then
+    if [[ -n "$ACTIVE_MONITOR" ]] && [[ ! "$ACTIVE_MONITOR" =~ ^eDP* ]]; then
         method="DDC"
         I2C_BUS="$(set_i2c_bus)"
     else
@@ -156,13 +157,15 @@ fi
 [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]] && [[ $VIBRANIUM_BRIGHTNESS_USE_OSD == true ]] && {
     if ! missing_str="$(vibranium-utils-is-installed swayosd:swayosd-client)"; then
         read -r -a missing <<< "$missing_str"
-        notify-send -r 4 -t 5000 -u critical "Vibranium - Brightness Control" "Missing dependencies: ${missing[*]}"
+        notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
+        exit 1
     fi
 }
 
 osd() {
     local value="$1"
     local icon progress
+    local service_status
 
     # Set specific icons depending on the current brightness level (icons are taken from the active icon pack)
     if ((value <= 30)); then
@@ -177,7 +180,11 @@ osd() {
     progress=$(awk -v v="$value" 'BEGIN {p = 0.02 + v * (0.98/100); printf "%.2f", p}')
 
     # I can't imagine a situation where this service would be turned off, but let it be there just in case
-    [[ ! $(pidof swayosd-server) ]] && systemctl --user enable --now swayosd
+    service_status="$(systemctl --user is-active swayosd)"
+    [[ "$service_status" == "inactive" ]] && {
+        systemctl --user enable --now swayosd
+        sleep 1.5 # Let the service start
+    }
     swayosd-client --custom-icon="$icon" --custom-progress="$progress" || true
 }
 
@@ -199,7 +206,7 @@ case "$method" in
                     break
                 fi
             done
-            update_brightness_cache "$current"
+            update_brightness_cache "$current" &
         fi
 
         # The remaining code at the bottom is generally self-explanatory
@@ -228,21 +235,12 @@ case "$method" in
                         error "Out of boundary"
                         exit 1
                     fi
-                else
-                    error "Invalid input!"
-                    exit 1
                 fi
                 ;;
         esac
 
-        log "Method: ${YELLOW}'""$method""'${RESET}"
-        log "DDC flags: ${YELLOW}'""${ddcutil_flags[*]}""'${RESET}"
-        log "Current brightness: ${YELLOW}'""${current}""'${RESET}"
-        log "New brightness: ${YELLOW}'""$new""'${RESET}"
-
         ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &
-
-        update_brightness_cache "$new"
+        update_brightness_cache "$new" &
 
         check_bool VIBRANIUM_BRIGHTNESS_USE_OSD true
         check_bool VIBRANIUM_GLOBAL_USE_OSD true
@@ -277,9 +275,6 @@ case "$method" in
             *)
                 if [[ "$1" =~ ^[0-9]+$ && $1 -ge 0 && $1 -le 100 ]]; then
                     new_raw=$(( $1 * max_raw / 100 ))
-                else
-                    error "Invalid input!"
-                    exit 1
                 fi
                 ;;
         esac
@@ -288,12 +283,8 @@ case "$method" in
         ((new_raw > max_raw)) && new_raw=$max_raw
         ((new_raw < 0)) && new_raw=0
 
-        # Convert back to percent for logs/OSD
+        # Convert back to percent for OSD
         new=$((new_raw * 100 / max_raw))
-
-        log "Method: ${YELLOW}'$method'${RESET}"
-        log "Current brightness: ${YELLOW}'$current'${RESET}"
-        log "New brightness: ${YELLOW}'$new'${RESET}"
 
         # Apply new brightness
         echo "$new_raw" > /sys/class/backlight/*/brightness

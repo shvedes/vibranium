@@ -55,11 +55,11 @@ cleanup() {
     # Flash screen to indicate that recording is complete
     if [ $VIBRANIUM_GLOBAL_FLASH_SCREEN = true ] && [ $VIBRANIUM_RECORDING_FLASH_SCREEN = true ]; then
         log "Flashing screen"
-        _flash screen
+        _flash screen &
     fi
 
     log "Updating waybar module"
-    vibranium-cmd-refresh-waybar-module recording-indicator
+    vibranium-cmd-refresh-waybar-module recording-indicator &
 
     # Notify the user if the recording was made in fallback mode
     if [ "$FALLBACK_CPU_USED" = true ]; then
@@ -145,7 +145,7 @@ if pid=$(pidof gpu-screen-recorder); then
     kill -s SIGINT "$pid"
 
     log "Hidding waybar module"
-    vibranium-cmd-refresh-waybar-module recording-indicator
+    vibranium-cmd-refresh-waybar-module recording-indicator &
 
     log "Copying video to clipboard"
     output_dir_reformatted="${output_dir/#$HOME/\$HOME}"
@@ -208,7 +208,7 @@ fi
 
 log "Updating waybar module"
 notify-send -r 1 -t 1000 "Vibranium" "<i>Screen recording is active</i>"
-vibranium-cmd-refresh-waybar-module recording-indicator
+vibranium-cmd-refresh-waybar-module recording-indicator &
 
 # Wait for the recording process to complete
 wait "$pid"

@@ -45,8 +45,9 @@ notification() {
         message="captured"
     fi
 
-    [[ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD == true ]] &&
+    [[ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD == true ]] && {
         message+="${message:+ and }copied to clipboard"
+    }
 
     notify-send -r 1 -t 1500 "Vibranium" "$target $message"
 }
@@ -111,8 +112,6 @@ if [[ ${VIBRANIUM_SCREENSHOT_SAVE_TO_DISK} == true ]]; then
     # Ensure output directory exists
     mkdir -p "$output_dir"
 
-    # TODO: Allow the user to change the date format in the Vibranium settings.
-    # Currently, it uses EU time by default.
     output_file="${output_dir}/screenshot_$(date +"%Y-%m-%d_%H:%M").${VIBRANIUM_SCREENSHOT_FILE_TYPE}"
     log "Saving to: '${YELLOW}disk${RESET}'"
 else
@@ -154,12 +153,13 @@ case "$1" in
             exit 1
         fi
 
+        log "Performing actions"
+        grim -g "$window_geometry" "${opt_options[@]}" "$output_file" &
+
         # Optionally flash border to indicate target
         if [[ $VIBRANIUM_GLOBAL_FLASH_BORDER == true ]] && [[ ${VIBRANIUM_SCREENSHOT_FLASH_BORDER} == true ]]; then
             _flash border &
         fi
-        log "Performing actions"
-        grim -g "$window_geometry" "${opt_options[@]}" "$output_file"
         ;;
 
     screen)
@@ -168,11 +168,11 @@ case "$1" in
 
         log "Screenshot type: '${YELLOW}whole screen${RESET}'"
         log "Performing actions"
-        grim "${opt_options[@]}" "$output_file"
+        grim "${opt_options[@]}" "$output_file" &
 
         if [[ $VIBRANIUM_GLOBAL_FLASH_SCREEN == true ]] && [[ $VIBRANIUM_SCREENSHOT_FLASH_SCREEN == true ]]; then
             log "${YELLOW}\$VIBRANIUM_SCREENSHOT_FLASH_SCREEN${RESET} is ${YELLOW}'true'${RESET}. Applying flash effect"
-            _flash screen
+            _flash screen &
         fi
         ;;
     *) usage ;;

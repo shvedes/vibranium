@@ -54,10 +54,10 @@ notify() {
 
     if [ "$VIBRANIUM_GLOBAL_USE_OSD" = true ] && [ "$VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD" = true ]; then
         if ! command -v swayosd-client > /dev/null || ! pidof swayosd-server > /dev/null; then
-            notify-send -r 2 -t 1500 "Vibranium" "Power profile set to <span foreground='${P_ACCENT}'>${label,,}</span>"
-        else
-            swayosd-client --custom-message "$label" --custom-icon "$icon"
+            systemctl --user enable --now swayosd; sleep 1
+            warn "swayosd.service was inactive!"
         fi
+        swayosd-client --custom-message "$label" --custom-icon "$icon"
     else
         notify-send -r 2 -t 1500 "Vibranium" "Power profile set to <span foreground='${P_ACCENT}'>${label,,}</span>"
     fi
@@ -82,15 +82,12 @@ else
     done
 
     case "$arg" in
-        "up" | "+")
+        "up" | "+" | "")
             next_index=$(((current_index + 1) % ${#profiles[@]}))
             ;;
         # No UX planned for this
         "down" | "-")
             next_index=$(((current_index - 1 + ${#profiles[@]}) % ${#profiles[@]}))
-            ;;
-        "")
-            next_index=$(((current_index + 1) % ${#profiles[@]}))  # default: cycle up
             ;;
         *)
             error "Invalid input: '$raw_input'"
@@ -108,7 +105,7 @@ notify "$target_profile"
 check_bool VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE false
 if [ "$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE" = true ]; then
     log "Updating waybar module"
-    vibranium-cmd-refresh-waybar-module power-profile
+    vibranium-cmd-refresh-waybar-module power-profile &
 fi
 
 BLUR_ENABLED="$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')"
@@ -123,6 +120,6 @@ if [ "$target_profile" = "power-saver" ]; then
 else
     if [[ "$BLUR_ENABLED" == 0 ]] && [ -f "$VIBRANIUM_STATE/blur.restore" ]; then
         vibranium-cmd-toggle-blur
-        rm "$VIBRANIUM_STATE/blur.state"
+        rm "$VIBRANIUM_STATE/blur.restore"
     fi
 fi
