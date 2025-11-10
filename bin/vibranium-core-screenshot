@@ -112,7 +112,7 @@ if [[ ${VIBRANIUM_SCREENSHOT_SAVE_TO_DISK} == true ]]; then
     # Ensure output directory exists
     mkdir -p "$output_dir"
 
-    output_file="${output_dir}/screenshot_$(date +"%Y-%m-%d_%H:%M").${VIBRANIUM_SCREENSHOT_FILE_TYPE}"
+    output_file="${output_dir}/screenshot_$(date +"%Y-%m-%d_%H:%M:%S").${VIBRANIUM_SCREENSHOT_FILE_TYPE}"
     log "Saving to: '${YELLOW}disk${RESET}'"
 else
     output_file="${XDG_RUNTIME_DIR}/latest_screenshot.${VIBRANIUM_SCREENSHOT_FILE_TYPE}"
