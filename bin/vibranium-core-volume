@@ -26,8 +26,9 @@ show_volume_notification() {
     local type="$2"
     local vol_info muted vol display_vol bar_value max_vol_factor
     vol_info=$(wpctl get-volume "$device")
-    vol=$(awk '{print $2}' <<< "$vol_info") # float 0.00–1.50
-    muted=$(awk '{print $3}' <<< "$vol_info")
+    # vol=$(awk '{print $2}' <<< "$vol_info") # float 0.00–1.50
+    # muted=$(awk '{print $3}' <<< "$vol_info")
+    read -r _ vol muted <<< "$vol_info"
 
     if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
         max_vol_factor=1.5
