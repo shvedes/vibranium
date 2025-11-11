@@ -60,6 +60,7 @@ echo $$ > "$pid_file"
 
 # Load all background images from the current theme's backgrounds directory
 backgrounds=("$XDG_CONFIG_HOME/vibranium/theme/current/backgrounds/"*)
+backgrounds+=("$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vibranium-theme-get)"/*)
 backgrounds+=("$(sed -n 's/^preload = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")")
 
 # Define the cache directory for processed images.
