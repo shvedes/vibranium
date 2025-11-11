@@ -14,6 +14,8 @@ sudo sed -Ei '/^#?HandlePowerKey=/s/^#//;s/=.*/=ignore/' "$LOGIND_CONF"
 
 grep -qE '^\[multilib\]' "$PACMAN_CONF" ||
 sudo sed -Ei '/\[multilib\]/,/^$/s/^#//' "$PACMAN_CONF"
+sudo sed -i '/^#NoExtract/ s/^#//' "$PACMAN_CONF"
+sudo sed -i '/^NoExtract/ s|$| usr/lib/thunarx-3/thunar-wallpaper-plugin.so|' "$PACMAN_CONF"
 
 grep -q '^Color' "$PACMAN_CONF" ||
 sudo sed -Ei 's/^\s*#?Color/Color/' "$PACMAN_CONF"
