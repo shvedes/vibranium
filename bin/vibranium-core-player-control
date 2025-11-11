@@ -40,7 +40,14 @@ get_player_status() {
         fi
     elif [ "$player" = "mpd" ]; then
         local stat
-        stat=$(mpc status 2> /dev/null | grep -oP '\[\K(playing|paused)')
+        # stat=$(mpc status 2> /dev/null | grep -oP '\[\K(playing|paused)')
+        while IFS= read -r line; do
+            case "$line" in
+                *"[playing]"*) stat="playing" ;;
+                *"[paused]"*)  stat="paused" ;;
+            esac
+        done < <(mpc status 2> /dev/null)
+
         if [ -n "$stat" ]; then
             echo "${stat^}"  # Capitalize first letter
             return 0
