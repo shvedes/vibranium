@@ -56,7 +56,7 @@ fi
 vibranium-cmd-refresh-waybar-module pacman
 printf "\r\033[K%s[VIBRANIUM]%s System update complete\n" "$GREEN" "$RESET"
 
-important_regex='^(systemd|linux(-.*)?|networkmanager|iwd)$'
+important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
 for pkg in "${pkg_list[@]}"; do
     if [[ $pkg =~ $important_regex ]]; then
         echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
