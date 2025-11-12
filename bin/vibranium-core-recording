@@ -40,7 +40,7 @@ check_enum VIBRANIUM_RECORDING_FRAMERATE_MODE "cfr" cfr vfr
 check_enum VIBRANIUM_RECORDING_VIDEO_CODEC "auto" auto h264 hevc av1 vp8 vp9 hevc_hdr av1_hdr hevc_10bit av1_10bit
 
 opt_flags=()
-log_file="$XDG_CACHE_HOME/$(basename "$0").log"
+log_file="$XDG_CACHE_HOME/vibranium/$(basename "$0").log"
 
 [ $VIBRANIUM_RECORDING_CAPTURE_SOURCE = true ] && opt_flags+=(-a 'default_input')
 [ $VIBRANIUM_RECORDING_CAPTURE_SINK = true ] && opt_flags+=(-a 'default_output')

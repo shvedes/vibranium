@@ -28,6 +28,7 @@ imagemagick
 file-roller
 wireplumber
 bluez-utils
+dosfstools
 rofi-emoji
 noto-fonts
 hyprsunset

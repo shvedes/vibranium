@@ -30,20 +30,41 @@ if [ -z "$1" ]; then
     exit 1
 fi
 
+service_status="$(systemctl --user is-active cliphist)"
+if [[ "$service_status" == "inactive" ]]; then
+    systemctl --user enable --now cliphist; sleep 1
+
+    warn "cliphist.service was inactive!"
+    msg="The service <span foreground='${P_YELLOW}'>cliphist.service</span> "
+    msg+="wasn't active for some reason!\nIt was enabled and activated!"
+    notify-send -r 5 -t 7000 -u critical "Vibranium" "$msg"
+fi
+
 case "$1" in
     show)
-        # notify if clipboard is empty
-        is_empty && notify-send -r 1 -t 1500 "Vibranium" "Clipboard is empty!" && exit 1
+        is_empty && {
+            notify-send -r 1 -t 1500 "Vibranium" "Clipboard is empty!"
+            error "Nothing to show"
+            exit 1
+        }
         chosen="$(cliphist list | rofi_cmd "Clipboard" "search" -display-columns 2)"
 
-        # if nothing was chosen - exit the menu, otherwise choose selected
-        [ -z "$chosen" ] && exit 1
-        printf "%s\n" "$chosen" | cliphist decode | wl-copy -n
+        [ -z "$chosen" ] && {
+            log "Nothing was chosen"
+            exit 0
+        }
+        if printf "%s\n" "$chosen" | cliphist decode | wl-copy -n; then
+            log "Copied chosen item to clipboard"
+        else
+            error "Something went wrong"
+            exit 1
+        fi
         ;;
     clear)
-        killall rofi
+        killall rofi &>/dev/null
         cliphist wipe
         wl-copy --clear
+        log "Cleared the clipboard"
         ;;
     *)
         usage

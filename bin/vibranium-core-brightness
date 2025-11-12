@@ -31,7 +31,9 @@ fi
 ACTIVE_MONITOR="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
 
 get_i2c_bus() {
-    local state_file; state_file="$VIBRANIUM_STATE/i2c-bus"
+    local state_file
+    local new_info
+    declare -A old_info
 
     new_info="$(ddcutil detect 2>/dev/null | awk '
         /I2C bus:/          { bus=$NF; sub("/dev/i2c-", "", bus); skip=0 }
@@ -44,7 +46,8 @@ get_i2c_bus() {
         /VCP version/ && !skip { print name ":" bus }
     ')"
 
-    declare -A old_info
+    state_file="$VIBRANIUM_STATE/i2c-bus"
+
     if [[ -f "$state_file" ]]; then
         while IFS=: read -r name bus; do
             [[ -n "$name" && -n "$bus" ]] && old_info["$name"]="$bus"
@@ -73,7 +76,9 @@ set_i2c_bus() {
     i2c_info="$(< "$VIBRANIUM_STATE/i2c-bus")"
     if [[ ! "$i2c_info" =~ $ACTIVE_MONITOR ]]; then
         get_i2c_bus
-        unset i2c_info; i2c_info="$(< "$VIBRANIUM_STATE/i2c-bus")"
+
+        unset i2c_info
+        i2c_info="$(< "$VIBRANIUM_STATE/i2c-bus")"
     fi
 
     while IFS= read -r line; do
@@ -90,8 +95,8 @@ set_i2c_bus() {
 
 get_brightness_cache() {
     local state_file; state_file="$VIBRANIUM_STATE/brightness"
-
     declare -A old_info
+
     if [[ -f "$state_file" ]]; then
         while IFS=: read -r name value; do
             [[ -n "$name" && -n "$value" ]] && old_info["$name"]="$value"
@@ -105,9 +110,9 @@ get_brightness_cache() {
 update_brightness_cache() {
     local new_value="$1"
     local state_file
-    state_file="$VIBRANIUM_STATE/brightness"
-
     declare -A info
+
+    state_file="$VIBRANIUM_STATE/brightness"
     if [[ -f "$state_file" ]]; then
         while IFS=: read -r name value; do
             [[ -n "$name" && -n "$value" ]] && info["$name"]="$value"
@@ -123,10 +128,38 @@ update_brightness_cache() {
     } > "$state_file"
 }
 
-if ! compgen -G "/sys/class/backlight/*" > /dev/null; then
-    check_bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL false
+osd() {
+    local value="$1"
+    local icon progress
+    local service_status
 
+    # Set specific icons depending on the current brightness level (icons are taken from the active icon pack)
+    if ((value <= 30)); then
+        icon="brightness-low-symbolic"
+    elif ((value <= 70)); then
+        icon="brightness-symbolic"
+    else
+        icon="brightness-high-symbolic"
+    fi
+
+    # Build a brightness value for SwayOSD
+    progress=$(awk -v v="$value" 'BEGIN {p = 0.02 + v * (0.98/100); printf "%.2f", p}')
+
+    # I can't imagine a situation where this service would be turned off, but let it be there just in case
+    service_status="$(systemctl --user is-active swayosd)"
+    [[ "$service_status" == "inactive" ]] && {
+        warn "swayosd.service wasn't active!"
+        if ! systemctl --user enable --now swayosd; then
+            warn "Failed to start swayosd.service!"
+        fi
+        sleep 0.5 # Let the service start
+    }
+    swayosd-client --custom-icon="$icon" --custom-progress="$progress" || true
+}
+
+if ! compgen -G "/sys/class/backlight/*" > /dev/null; then
     # If the driver for adjusting the brightness of the built-in screen is not found and DDC control is disabled globally
+    check_bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL false
     if [[ $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL == false ]]; then
         error "This feature is disabled in Vibranium settings"
         exit 1
@@ -154,6 +187,9 @@ else
     fi
 fi
 
+check_bool VIBRANIUM_GLOBAL_USE_OSD true
+check_bool VIBRANIUM_BRIGHTNESS_USE_OSD true
+
 [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]] && [[ $VIBRANIUM_BRIGHTNESS_USE_OSD == true ]] && {
     if ! missing_str="$(vibranium-utils-is-installed swayosd:swayosd-client)"; then
         read -r -a missing <<< "$missing_str"
@@ -162,31 +198,7 @@ fi
     fi
 }
 
-osd() {
-    local value="$1"
-    local icon progress
-    local service_status
-
-    # Set specific icons depending on the current brightness level (icons are taken from the active icon pack)
-    if ((value <= 30)); then
-        icon="brightness-low-symbolic"
-    elif ((value <= 70)); then
-        icon="brightness-symbolic"
-    else
-        icon="brightness-high-symbolic"
-    fi
-
-    # Build a brightness value for SwayOSD
-    progress=$(awk -v v="$value" 'BEGIN {p = 0.02 + v * (0.98/100); printf "%.2f", p}')
-
-    # I can't imagine a situation where this service would be turned off, but let it be there just in case
-    service_status="$(systemctl --user is-active swayosd)"
-    [[ "$service_status" == "inactive" ]] && {
-        systemctl --user enable --now swayosd
-        sleep 1.5 # Let the service start
-    }
-    swayosd-client --custom-icon="$icon" --custom-progress="$progress" || true
-}
+log "Method: ${YELLOW}$method${RESET} for ${YELLOW}$ACTIVE_MONITOR${RESET}"
 
 check_int VIBRANIUM_BRIGHTNESS_STEP 5 int
 step=$VIBRANIUM_BRIGHTNESS_STEP
@@ -207,7 +219,11 @@ case "$method" in
                 fi
             done
             update_brightness_cache "$current" &
+        else
+            log "Found cached value"
         fi
+
+        log "I2C bus in use: ${YELLOW}$I2C_BUS${RESET}"
 
         # The remaining code at the bottom is generally self-explanatory
         case "$1" in
@@ -239,16 +255,16 @@ case "$method" in
                 ;;
         esac
 
-        ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &
-        update_brightness_cache "$new" &
+        log "Updating brightness"
+        ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &>/dev/null &
 
-        check_bool VIBRANIUM_BRIGHTNESS_USE_OSD true
-        check_bool VIBRANIUM_GLOBAL_USE_OSD true
+        log "Updating cache"
+        update_brightness_cache "$new" &
 
         if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]] && [[ $VIBRANIUM_BRIGHTNESS_USE_OSD == true ]]; then
             osd "$new" &
         else
-            if [[ ! "$ACTIVE_MONITOR" =~ eDP* ]]; then
+            if [[ ! "$ACTIVE_MONITOR" =~ ^eDP* ]]; then
                 source="($ACTIVE_MONITOR) "
             else
                 source=""
@@ -281,12 +297,14 @@ case "$method" in
 
         # Clamp raw value
         ((new_raw > max_raw)) && new_raw=$max_raw
-        ((new_raw < 0)) && new_raw=0
+        ((new_raw < 0))       && new_raw=0
 
         # Convert back to percent for OSD
         new=$((new_raw * 100 / max_raw))
 
         # Apply new brightness
+        log "Updating brightness"
+        log "Updating brightness"
         echo "$new_raw" > /sys/class/backlight/*/brightness
 
         if [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $VIBRANIUM_BRIGHTNESS_USE_OSD == true ]]; then

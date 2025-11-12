@@ -8,17 +8,17 @@ source "$VIBRANIUM_PATH/vibranium-core-lib"
 
 if ! missing_str="$(vibranium-utils-is-installed hyprpicker)"; then
     read -r -a missing <<< "$missing_str"
-    notify-send -r 4 -t 5000 -u critical "Vibranium - Color Picker" "Missing dependencies: ${missing[*]}"
+    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
     exit 1
 fi
 
 # Do not run multiple instances of hyprpicker
 if pidof hyprpicker > /dev/null; then
+    killall hyprpicker
     exit 1
 fi
 
 mkdir -p "$XDG_CACHE_HOME/vibranium"
-
 LAST_USED="$XDG_CACHE_HOME/vibranium/color-picker.history"
 
 # Clear the cache file if the script received the --clear argument.
