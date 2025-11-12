@@ -51,7 +51,10 @@ cleanup() {
 }
 
 install_packages() {
-	local packages pkg start_time elapsed pid aur_flag
+	local packages pkg start_time
+    local elapsed pid aur_flag fs
+
+    fs="$(lsblk -f | grep -E \/\$ | awk '{print $2}')"
 
 	mapfile -t packages < ./pkg_list.txt
 
@@ -92,6 +95,25 @@ install_packages() {
 			printf "%s[VIBRANIUM]%s Think this is a mistake? Open an issue!\n" "$RED" "$RESET"
 			printf "%s[VIBRANIUM]%s This will not affect the installation\n" "$YELLOW" "$RESET"
 	esac
+
+    case "$fs" in
+        btrfs)
+            printf "%s[VIBRANIUM]%s BTRFS root found. Adding required drivers to the queue\n" "$YELLOW" "$RESET"
+            packages+=("btrfs-progs")
+            ;;
+    esac
+
+    if lsblk -f | grep -qi ntfs; then
+        printf "%s[VIBRANIUM]%s NTFS partition found. Adding required drivers to the queue\n" "$YELLOW" "$RESET"
+        packages+=(
+            "ntfs-3g"
+            # Efibootmgr might be useful
+            # when dealing with multiple OSes.
+            # So if we found ntfs - we're
+            # probably dealing with Windows.
+            "efibootmgr"
+        )
+    fi
 
 	mapfile -t packages < <(printf "%s\n" "${packages[@]}" | sort -u)
 
@@ -213,9 +235,7 @@ post_install() {
 
 	if [ -z "$(find /sys/class/backlight -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
 		sudo systemctl mask upower.service
-	fi
-
-	if [ -n "$(find /sys/class/backlight -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
+    else
 		sudo usermod -aG video "$USER"
 	fi
 }
