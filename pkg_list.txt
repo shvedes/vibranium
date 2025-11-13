@@ -49,7 +49,6 @@ tumbler
 swayosd
 bluetui
 ddcutil
-catfish
 wlogout
 man-db
 neovim
