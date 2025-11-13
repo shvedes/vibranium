@@ -135,7 +135,7 @@ else
 fi
 
 mkdir -p "$output_dir"
-output_file="${output_dir}/$(date +"screencast-%Y-%m-%d_%H:%M".${VIBRANIUM_RECORDING_CONTAINER_TYPE})"
+output_file="${output_dir}/$(date +"screencast-%Y-%m-%d_%H:%S".${VIBRANIUM_RECORDING_CONTAINER_TYPE})"
 
 log "Output dir: '${YELLOW}$output_dir${RESET}'"
 log "Output file: '${YELLOW}$output_file${RESET}'"
