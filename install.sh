@@ -234,7 +234,7 @@ post_install() {
 		> "$HOME/.config/discord/settings.json"
 
 	if [ -z "$(find /sys/class/backlight -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-		sudo systemctl mask upower.service
+		sudo systemctl -q mask upower.service
     else
 		sudo usermod -aG video "$USER"
 	fi
