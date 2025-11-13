@@ -62,3 +62,7 @@ elif [ "$(< "$VIBRANIUM_STATE/night-light")" = "suspended" ]; then
     done
     hyprctl -q hyprsunset identity
 fi
+
+if [[ ! -d $XDG_CACHE_HOME/vibranium ]]; then
+    mkdir $XDG_CACHE_HOME/vibranium
+fi
