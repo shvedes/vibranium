@@ -39,6 +39,13 @@ fi
 while :; do
     CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "ESC to go back" -selected-row "$INDEX")"
 
+    for i in "${!ACTIONS[@]}"; do
+        if [ "${ACTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
     case "$CHOSEN" in
         "Launch Syncthing")
             vibranium-app-syncthing
