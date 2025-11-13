@@ -10,7 +10,7 @@ case "$VIBRANIUM_BAR_INHIBITOR_ICON" in
     "eye") icon="<span size='10500'>\udb80\ude08</span>" ;;
 esac
 
-tooltip="<span foreground='${P_ACCENT}'><b> Suspend blocked </b></span>"
+tooltip="<span foreground='${P_ACCENT}'><b>  Sleep blocked </b></span>"
 tooltip+="\n<span foreground='${P_GRAY}'>------------------</span>"
 tooltip+="\n<span foreground='${P_RED}'> <b>click to disable</b></span>"
 

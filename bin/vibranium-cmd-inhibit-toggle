@@ -6,13 +6,13 @@ pid=$(pgrep -a -f systemd-inhibit | grep "Prevent system suspend is active" | aw
 
 if [[ -n "$pid" ]]; then
     kill "$pid"
-    notify-send -r 1 -t 2000 "Vibranium" "Suspend <span foreground='${P_GREEN}'><b>allowed</b></span>"
+    notify-send -r 1 -t 2000 "Vibranium" "Sleep <span foreground='${P_GREEN}'>allowed</span>"
 else
     setsid -f systemd-inhibit --what=idle \
         --why="Prevent system suspend is active" \
         --who="Vibranium" \
         sleep infinity
-    notify-send -r 1 -t 2000 "Vibranium" "Suspend <span foreground='${P_RED}'><b>blocked</b></span>"
+    notify-send -r 1 -t 2000 "Vibranium" "Sleep <span foreground='${P_RED}'>blocked</span>"
 fi
 
 vibranium-cmd-refresh-waybar-module inhibitor
