@@ -28,7 +28,7 @@ fi
 if ! command -v yay >/dev/null; then
 	printf "%s[VIBRANIUM]%s Installing %syay%s\n" \
 		"$YELLOW" "$RESET" "$YELLOW" "$RESET"
-	printf "%s[VIBRANIUM]%s You might be asked for sudo several times" \
+	printf "%s[VIBRANIUM]%s You might be asked for sudo several times\n" \
 		"$YELLOW" "$RESET"
 	if ! command -v git >/dev/null; then
 		sudo pacman -S git --noconfirm
