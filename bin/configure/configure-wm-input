@@ -151,7 +151,6 @@ toggle_module() {
     systemctl --user restart waybar
 }
 
-
 add_layout() {
     local layouts
     local chosen
@@ -178,7 +177,7 @@ add_layout() {
     done
 
     local number_layouts
-    number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str' | awk -F, '{print NF}')"
+    number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str | split(",") | length')"
 
     # Enable layout waybar module automatically if
     # more then 1 layout
@@ -220,7 +219,7 @@ remove_layout() {
     done
 
     local number_layouts
-    number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str' | awk -F, '{print NF}')"
+    number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str | split(",") | length')"
     if (( number_layouts == 1 )); then
         if ! check_module 'hyprland/language'; then
             toggle_module 'hyprland/language'
@@ -228,14 +227,64 @@ remove_layout() {
     fi
 }
 
+declare -A KB_GROUPS=(
+    [grp:caps_toggle]="Caps Lock"
+    [grp:ctrl_alt_toggle]="Ctrl + Alt"
+    [grp:win_space_toggle]="Win + Space"
+    [grp:alt_space_toggle]="Alt + Space"
+    [grp:rshift_toggle]="Right Shift"
+    [grp:ctrl_shift_toggle]="Ctrl + Shift"
+    [grp:alt_shift_toggle]="Alt + Shift"
+    [grp:rctrl_rshift_toggle]="Right Ctrl + Right Shift"
+)
+
+declare -A XKB_OPTS
+for key in "${!KB_GROUPS[@]}"; do
+    suffix="${key#grp:}"  # Remove 'grp:' prefix
+    XKB_OPTS["${KB_GROUPS[$key]}"]="$suffix"
+done
+
+set_layout_shortcut() {
+    local placeholder chosen selected_key option
+
+    chosen="$(printf "%s\n" "${KB_GROUPS[@]}" | rofi_cmd "Switch shortcut" "ESC to go back")"
+    [[ -z "$chosen" ]] && return
+
+    for key in "${!KB_GROUPS[@]}"; do
+        [[ "${KB_GROUPS[$key]}" == "$chosen" ]] && selected_key="$key" && break
+    done
+
+    [[ -z "$selected_key" ]] && return
+
+    placeholder="__COLON__"
+    option="grp${placeholder}${XKB_OPTS[$chosen]}"
+
+    vibranium-cmd-edit-wm-config "input:kb_options:${option}" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+    sed -i "s/${placeholder}/:/" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+    sleep 0.03
+}
+
 layouts_menu() {
-    local layouts_opts
-    local prompt
+    local layouts_opts=()
+    local current_shortcut
+    local readable_shortcut
+    local number_layouts
+    local layouts_chosen
 
     while :; do
         layouts_opts=("Add new" "Remove existing")
+
+        current_shortcut="$(hyprctl -j getoption input:kb_options | jq -r .str)"
+        readable_shortcut="${KB_GROUPS[$current_shortcut]:-Unknown}"
+        number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str | split(",") | length')"
+        if (( number_layouts > 1 )); then
+            layouts_opts+=("Change layout with : $readable_shortcut")
+        fi
+
         layouts_chosen="$(printf "%s\n" "${layouts_opts[@]}" | rofi_cmd "Keyboard layouts" "ESC to go back")"
-        [[ -z $layouts_chosen ]] && break
+        [[ -z "$layouts_chosen" ]] && break
 
         case "$layouts_chosen" in
             "Add new")
@@ -243,6 +292,9 @@ layouts_menu() {
                 ;;
             "Remove existing")
                 remove_layout
+                ;;
+            "Change"*)
+                set_layout_shortcut
                 ;;
         esac
     done
@@ -326,7 +378,6 @@ while :; do
                     vibranium-cmd-edit-wm-config "cursor:hide_on_key_press:true" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                     ;;
-
             esac
             ;;
         "Hide cursor after"*)
@@ -364,7 +415,7 @@ while :; do
                 prompt="Scrolling speed (int / float, (multiplier))"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Scrolling speed" "ESC to go back")"
                 [[ -z $input ]] && break
-                              [[ "$prompt" == "$input" ]] && continue
+                [[ "$prompt" == "$input" ]] && continue
 
                 if [[ ! "$input" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
                     notify-send -r 1 -t 2000 "Vibranium" "Only integers or floats allowed"
@@ -381,7 +432,7 @@ while :; do
                 prompt="Repeat delay (int, in ms)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Repeat delay" "200ms - 1000ms")"
                 [[ -z $input ]] && break
-                              [[ "$prompt" == "$input" ]] && continue
+                [[ "$prompt" == "$input" ]] && continue
 
                 if [[ ! "$input" =~ ^[0-9]+$ ]]; then
                     notify-send -r 1 -t 2000 "Vibranium" "Only integers allowed"
@@ -400,7 +451,7 @@ while :; do
                 prompt="Repeat rate (int, in ms)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Repeat rate" "10ms - 50ms")"
                 [[ -z $input ]] && break
-                              [[ "$prompt" == "$input" ]] && continue
+                [[ "$prompt" == "$input" ]] && continue
 
                 if [[ ! "$input" =~ ^[0-9]+$ ]]; then
                     notify-send -r 1 -t 2000 "Vibranium" "Only integers allowed"
