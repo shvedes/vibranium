@@ -216,6 +216,10 @@ handle_power_pause() {
 handle_power_pause
 
 for file in "${backgrounds[@]}"; do
+    if [[ ! -f $file ]]; then
+        continue
+    fi
+
     for type in "${!filters[@]}"; do
         # Check for pause before each
         # This allows dynamic response to profile changes mid-process.
