@@ -14,7 +14,7 @@ In this case, some functionality will be unavailable. You can still install Vibr
 
 ## Testers Needed!
 
-Even though the project is still in beta testing, it is more than stable. In any case, even though I am a user of my own creation, it is practically impossible for one person to identify all possible bugs and shortcomings,
+Even though the project is still in beta testing, it is more than stable. Anyways, even though I am a user of my own creation, it is practically impossible for one person to identify all possible bugs and shortcomings,
 simply because of my use case. If you happen to be a Vibranium user, first of all, thank you very much, it means a lot to me. Second, please send any feedback to issues (for now), whether it's just a review of your experience
 using it, or reports of bugs, ux/ui/problems, or anything else.
 
