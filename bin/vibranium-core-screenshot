@@ -8,12 +8,12 @@ source "$VIBRANIUM_PATH/vibranium-core-lib"
 usage() {
     cat << EOF
 Usage:
-    $(basename "$0") area|window|screen
+    $(basename "$0") region|window|screen
 EOF
 }
 
 # Require an argument or show usage
-if [ $# -lt 1 ] || [[ $1 =~ ^(-h|--help)$ ]] || [[ ! $1 =~ ^(area|window|screen) ]]; then
+if [ $# -lt 1 ] || [[ $1 =~ ^(-h|--help)$ ]] || [[ ! $1 =~ ^(region|window|screen) ]]; then
     usage
     exit 0
 fi
@@ -33,21 +33,16 @@ fi
 notification() {
     local target message
     case "$1" in
-        area)   target="Selected area" ;;
+        region) target="Selected region" ;;
         window) target="Active window" ;;
         screen) target="Active screen" ;;
     esac
 
-    check_bool VIBRANIUM_SCREENSHOT_SAVE_TO_DISK false
     if [[ $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK == true ]]; then
         message="saved to disk"
     else
         message="captured"
     fi
-
-    [[ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD == true ]] && {
-        message+="${message:+ and }copied to clipboard"
-    }
 
     notify-send -r 1 -t 1500 "Vibranium" "$target $message"
 }
@@ -130,11 +125,11 @@ else
 fi
 
 case "$1" in
-    area)
-        log "Screenshot type: '${YELLOW}area${RESET}'"
+    region)
+        log "Screenshot type: '${YELLOW}region${RESET}'"
         log "Performing actions"
 
-        # Use slurp to select an area; feed geometry to grim via stdin ("-g -")
+        # Use slurp to select a region; feed geometry to grim via stdin ("-g -")
         # Yes, we use gray depending on the active theme. Why instead of the usual black with transparency? Um, I don't know. Why not?
         if ! slurp -d -w 1 -b "${P_GRAY}"33 -c ffffff66 | grim "${opt_options[@]}" -g - "$output_file"; then
             exit 1
@@ -153,29 +148,34 @@ case "$1" in
             exit 1
         fi
 
-        log "Performing actions"
-        grim -g "$window_geometry" "${opt_options[@]}" "$output_file" &
-
         # Optionally flash border to indicate target
-        if [[ $VIBRANIUM_GLOBAL_FLASH_BORDER == true ]] && [[ ${VIBRANIUM_SCREENSHOT_FLASH_BORDER} == true ]]; then
+        if [[ $VIBRANIUM_SCREENSHOT_FLASH_BORDER == true ]]; then
             _flash border &
         fi
+
+        log "Performing actions"
+        grim -g "$window_geometry" "${opt_options[@]}" "$output_file" &
+        # Wait for the final file write so that
+        # the statement below does not evaluate to false.
+        wait $!
         ;;
 
     screen)
         check_bool VIBRANIUM_SCREENSHOT_FLASH_SCREEN true
         check_bool VIBRANIUM_GLOBAL_FLASH_SCREEN true
 
-        log "Screenshot type: '${YELLOW}whole screen${RESET}'"
-        log "Performing actions"
-        grim "${opt_options[@]}" "$output_file" &
-
-        if [[ $VIBRANIUM_GLOBAL_FLASH_SCREEN == true ]] && [[ $VIBRANIUM_SCREENSHOT_FLASH_SCREEN == true ]]; then
-            log "${YELLOW}\$VIBRANIUM_SCREENSHOT_FLASH_SCREEN${RESET} is ${YELLOW}'true'${RESET}. Applying flash effect"
+        if [[ $VIBRANIUM_SCREENSHOT_FLASH_SCREEN == true ]]; then
             _flash screen &
         fi
+
+        log "Screenshot type: '${YELLOW}whole screen${RESET}'"
+        log "Performing actions"
+
+        grim "${opt_options[@]}" "$output_file" &
+        # Wait for the final file write so that
+        # the statement below does not evaluate to false.
+        wait $!
         ;;
-    *) usage ;;
 esac
 
 # Ensure output file exists
@@ -189,9 +189,8 @@ if [[ $VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION == true ]]; then
     notification "$1"
 fi
 
-log "Copying to clipboard"
-
 # Copy the image to the Wayland clipboard with the correct MIME type
 if [[ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD == true ]]; then
+    log "Copying to clipboard"
     printf "file://%s" "${output_file}" | wl-copy --type text/uri-list
 fi

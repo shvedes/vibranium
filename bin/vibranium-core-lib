@@ -367,7 +367,6 @@ _flash() {
     case "$type" in
         border) speed_var=VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED ;;
         screen) speed_var=VIBRANIUM_GLOBAL_FLASH_SCREEN_SPEED ;;
-        *) return 1 ;;
     esac
 
     seconds=${speed_map[${!speed_var}]}
