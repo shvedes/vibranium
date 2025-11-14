@@ -9,16 +9,16 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
-if ! missing_str="$(vibranium-utils-is-installed gpu-screen-recorder)"; then
-    read -r -a missing <<< "$missing_str"
-    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing cli utilities: ${missing[*]}"
-    exit 1
-fi
-
 if [[ "$VIBRANIUM_IS_VIRTUAL_MACHINE" == true ]]; then
     msg="Screen recording does not work in virtual machines.\n"
     msg+="Support is unavailable and will not be added"
-    notify-send -r 4 -u critical -t 5000 "Vibranium" "$msg"
+    notify-send -r 4 -u critical -t 10000 "Vibranium" "$msg"
+    exit 0
+fi
+
+if ! missing_str="$(vibranium-utils-is-installed gpu-screen-recorder)"; then
+    read -r -a missing <<< "$missing_str"
+    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing cli utilities: ${missing[*]}"
     exit 1
 fi
 
@@ -148,10 +148,9 @@ if pid=$(pidof gpu-screen-recorder); then
     vibranium-cmd-refresh-waybar-module recording-indicator &
 
     log "Copying video to clipboard"
-    output_dir_reformatted="${output_dir/#$HOME/\$HOME}"
-    msg="File saved to <span foreground='${P_YELLOW}'>$output_dir_reformatted</span> "
+    output_dir_reformatted="${output_dir/#$HOME/\~}"
+    msg="<i>File saved to <span foreground='${P_YELLOW}'>$output_dir_reformatted</span></i>"
     if [ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD = true ]; then
-        msg+="and copied to clipboard"
         # Copy just recorded video into clipboard with its mime type (not just file path)
         # We filter by content screencast-*, in case there are recordings from other software (e.g., OBS)
         # in the same folder that uses a different date format.
