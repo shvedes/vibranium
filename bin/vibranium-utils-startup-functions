@@ -6,16 +6,8 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
-get_i2c_bus() {
-    ddcutil detect 2>/dev/null | awk '
-         /I2C bus/ { bus=$NF; skip=0 }
-         /This is a laptop display/ { skip=1 }
-         /VCP version/ && !skip { sub("/dev/i2c-", "", bus); print bus }'
-}
-
 check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START false
-
-if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START" == true ]]; then
+if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START == true ]]; then
     setsid -f vibranium-core-launcher
 fi
 
@@ -25,17 +17,14 @@ if [ -f "$VIBRANIUM_STATE/first-boot" ]; then
     vibranium-utils-first-boot
 fi
 
+if [[ ! -d $XDG_CACHE_HOME/vibranium ]]; then
+    mkdir $XDG_CACHE_HOME/vibranium
+fi
+
 if [ ! -d "$VIBRANIUM_STATE/wallpaper" ]; then
     mkdir -p "$VIBRANIUM_STATE"/wallpaper
     vibranium-utils-wallpaper-get \
         > "$VIBRANIUM_STATE/wallpaper/$(vibranium-theme-get)"
-fi
-
-# ddcutil (external monitor brightness control)
-if [[ $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL == true ]]; then
-    if [ ! -f "$VIBRANIUM_STATE/i2c-bus" ]; then
-        get_i2c_bus > "$VIBRANIUM_STATE/i2c-bus"
-    fi
 fi
 
 if [ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" = true ]; then
@@ -63,6 +52,3 @@ elif [ "$(< "$VIBRANIUM_STATE/night-light")" = "suspended" ]; then
     hyprctl -q hyprsunset identity
 fi
 
-if [[ ! -d $XDG_CACHE_HOME/vibranium ]]; then
-    mkdir $XDG_CACHE_HOME/vibranium
-fi
