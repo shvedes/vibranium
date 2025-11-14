@@ -180,6 +180,7 @@ esac
 
 # Ensure output file exists
 if [[ ! -f ${output_file} ]]; then
+    notify-send -r 3 -t 3000 -u critical "Vibranium" "Screenshot failed!"
     exit 1
 fi
 
