@@ -102,4 +102,4 @@ mkdir -p "$VIBRANIUM_STATE/wallpaper"
 printf "%s" "$WALLPAPER_PATH" > "$STATE_FILE"
 
 # Update lockscreen background
-vibranium-utils-update-lockscreen "$WALLPAPER_PATH" &
+vibranium-utils-update-lockscreen &

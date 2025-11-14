@@ -20,3 +20,7 @@ fi
 CACHED_IMG="$XDG_CACHE_HOME/hyprlock/$(basename "${CURRENT_WALLPAPER%.*}"-${TYPE}.jpg)"
 
 sed -i "s|^\([[:space:]]*path = \).*|\1$CACHED_IMG|" "$HYPRLOCK_CONF"
+
+if [[ ! -f $CACHED_IMG ]]; then
+    exec setsid vibranium-utils-lockscreen-cache "$CURRENT_WALLPAPER"
+fi
