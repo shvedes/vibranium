@@ -12,4 +12,9 @@ if [ "$(systemctl --user is-active syncthing)" != "active" ]; then
     sleep 0.5 # Wait until the service starts up
 fi
 
-syncthing browser
+if command -v chromium > /dev/null; then
+    vibranium-cmd-launch-cmd chromium --app="https://127.0.0.1:8384"
+else
+    syncthing browser
+fi
+
