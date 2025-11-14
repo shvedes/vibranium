@@ -95,10 +95,12 @@ rofi_cmd() {
         fi
     fi
 
-    rofi -i -dmenu -p "$prompt" \
-        -markup -markup-rows -sync \
-        -theme "$XDG_CONFIG_HOME/rofi/config.rasi" \
-        -theme-str 'configuration {show-icons: false;}' \
+    # Do not parse clipboard input as pango
+    if [[ ! "${BASH_SOURCE[1]}" =~ clipboard ]]; then
+        rofi_opts=(-markup -markup-rows)
+    fi
+
+    rofi -i -dmenu -p "$prompt" -sync \
         -theme-str 'entry {placeholder: "'"${placeholder}"'";}' \
         -theme-str 'window {width: '"${width}px"';}' \
         -matching-negate-char '' "${rofi_opts[@]}" \
