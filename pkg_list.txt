@@ -54,7 +54,6 @@ man-db
 neovim
 waybar
 thunar
-wtype
 unzip
 slurp
 qt6ct
