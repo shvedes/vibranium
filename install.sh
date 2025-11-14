@@ -181,6 +181,7 @@ enable_system_services() {
 		"hyprpaper"
 		"hyprsunset"
 		"gnome-polkit"
+        "vibranium-startup"
 	)
 
 	user_timers=(
