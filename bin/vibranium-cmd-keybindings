@@ -91,7 +91,7 @@ parse_bindings() {
     }
 
     if (action != "") {
-        printf "%-28s : %s\n", key_combo, action;
+        printf "%-20s : %s\n", key_combo, action;
     }
 }'
 }
@@ -144,6 +144,8 @@ case "$1" in
     *)
         dynamic_bindings | sort -u | parse_bindings | rofi_cmd \
             "Keybindings" "search shortcuts" -no-auto-select \
-            -theme-str 'listview{lines: 30;}'
+            -theme-str 'configuration{scroll-method: 0;}' \
+            -theme-str 'listview{lines: 30;columns: 2;}' \
+            -theme-str 'window{width: 85%;height: 85%;}'
         ;;
 esac
