@@ -3,16 +3,15 @@
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
 check_enum VIBRANIUM_BAR_INHIBITOR_ICON "lock" lock coffee eye
-
 case "$VIBRANIUM_BAR_INHIBITOR_ICON" in
     "coffee") icon="<span rise='3pt' size='11000'>\uf0f4</span>" ;;
-    "lock") icon="\uf023" ;;
-    "eye") icon="<span size='10500'>\udb80\ude08</span>" ;;
+    "lock")   icon="\uf023" ;;
+    "eye")    icon="<span size='10500'>\udb80\ude08</span>" ;;
 esac
 
-tooltip="<span foreground='${P_ACCENT}'><b>  Sleep blocked </b></span>"
-tooltip+="\n<span foreground='${P_GRAY}'>------------------</span>"
-tooltip+="\n<span foreground='${P_RED}'> <b>click to disable</b></span>"
+tooltip="<span foreground='${WAYBAR_ACCENT}'><b>  Sleep blocked </b></span>"
+tooltip+="\n<span foreground='${WAYBAR_MUTED}'>------------------</span>"
+tooltip+="\n<span foreground='${WAYBAR_RED}'> <b>click to disable</b></span>"
 
 if systemd-inhibit | grep Vibranium > /dev/null; then
     printf '{\"text\": \"%s\", \"tooltip\": \"%s\"}' "$icon" "$tooltip"

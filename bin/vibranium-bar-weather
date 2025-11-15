@@ -26,7 +26,7 @@ check_bool VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC true
 check_bool VIBRANIUM_BAR_SHOW_SEPARATOR true
 
 if [[ $VIBRANIUM_BAR_SHOW_SEPARATOR == true ]]; then
-    separator=" <span foreground='${P_GRAY}'>|</span>"
+    separator=" <span foreground='${WAYBAR_MUTED}'>|</span>"
 else
     separator=''
 fi
@@ -86,7 +86,7 @@ if [[ $show_spinner == true ]]; then
     while kill -0 "$curl_pid" 2> /dev/null; do
         ch=${spinner_chars[i]}
         ch_escaped=${ch//\\/\\\\}
-        printf '{"text":"<span foreground='\'"${P_GRAY}"\'' rise='\''-2pt'\'' size='\''12000'\''>%s</span>%s","tooltip":"Fetching weather..."}\n' "$ch_escaped" "$separator"
+        printf '{"text":"<span foreground='\'"${WAYBAR_MUTED}"\'' rise='\''-3pt'\'' size='\''12000'\''>%s</span>%s","tooltip":"Fetching weather..."}\n' "$ch_escaped" "$separator"
         sleep 0.1
         i=$(((i + 1) % ${#spinner_chars[@]}))
     done
@@ -98,7 +98,7 @@ else
 fi
 
 if [[ $? != 0 ]]; then
-    printf '{"text":"<span rise='\''1pt'\'' foreground='\'"${P_RED}"\''>\\uf071</span> %s","tooltip":"<span foreground='\'"${P_RED}"\''>Unable to fetch weather</span>\\n<span foreground='\'"${P_ACCENT}"\''>Click to try again</span>"}' "$separator"
+    printf '{"text":"<span rise='\''1pt'\'' foreground='\'"$WAYBAR_RED"\''>\\uf071</span> %s","tooltip":"<span foreground='\''red'\''>Unable to fetch weather</span>\\n<span foreground='\''blue'\''>Click to try again</span>"}' "$separator"
     exit 0
 fi
 raw_data=$(< "$tmpfile")
@@ -109,8 +109,7 @@ data=$(printf "$raw_data" | sed 's/+//g; s/C/C /g; s/ //g' | sed -E 's/([0-9]+°
 : > "$marker" 2> /dev/null || true
 
 if [[ -z $VIBRANIUM_BAR_WEATHER_MODULE_CITY ]]; then
-    printf '{"text":"<span foreground='\'"${P_ACCENT}"\'' rise='\''0.5pt'\''>%s</span>%s%s"}\n' "\uf0c2" "$data" "$separator"
+    printf '{"text":"<span foreground='\'"$WAYBAR_ACCENT"\'' rise='\''0.5pt'\''>%s</span>%s%s"}\n' "\uf0c2" "$data" "$separator"
 else
-    city=$VIBRANIUM_BAR_WEATHER_MODULE_CITY
-    printf '{"text":"<span foreground='\'"${P_ACCENT}"\'' rise='\''0.5pt'\''>%s</span>%s%s", "tooltip":"%s"}' "\uf0c2" "$data" "$separator" "$city"
+    printf '{"text":"<span foreground='\'"$WAYBAR_ACCENT"\'' rise='\''0.5pt'\''>%s</span>%s%s", "tooltip":"%s"}' "\uf0c2" "$data" "$separator" "$VIBRANIUM_BAR_WEATHER_MODULE_CITY"
 fi

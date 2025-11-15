@@ -26,10 +26,10 @@ contrast_color() {
     fi
 }
 
-tooltip="<span foreground='${P_ACCENT}'><b> Click to pick a color from the screen </b></span>"
+tooltip="<span foreground='${WAYBAR_ACCENT}'><b> Click to pick a color from the screen </b></span>"
 if [[ -s $history_file ]]; then
-    tooltip+="\n     <span foreground='${P_ACCENT}'><b>Right click to</b></span> <span foreground='${P_RED}'><b>clear history</b></span>"
-    tooltip+="\n<span foreground='${P_GRAY}'>---------------------------------------</span>"
+    tooltip+="\n     <span foreground='${WAYBAR_ACCENT}'><b>Right click to</b></span> <span foreground='${P_RED}'><b>clear history</b></span>"
+    tooltip+="\n<span foreground='${WAYBAR_MUTED}'>---------------------------------------</span>"
     tooltip+="\\n\\t   <span size='9000'>Recent colors</span>"
     while IFS= read -r color; do
         fg=$(contrast_color "$color")
@@ -39,8 +39,8 @@ fi
 
 if [[ $VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS == true ]]; then
     bind="$(vibranium-cmd-keybindings -i 'Color picker' | sed -n '1s/^[0-9]\.\s*//p')"
-    tooltip+="\n<span foreground='${P_GRAY}'>---------------------------------------</span>"
-    tooltip+="\n<span foreground='${P_ACCENT}'><b>${bind}</b></span>: pick a color"
+    tooltip+="\n<span foreground='${WAYBAR_MUTED}'>---------------------------------------</span>"
+    tooltip+="\n<span foreground='${WAYBAR_ACCENT}'><b>${bind}</b></span>: pick a color"
 fi
 
 case $VIBRANIUM_COLOR_PICKER_WAYBAR_ICON in

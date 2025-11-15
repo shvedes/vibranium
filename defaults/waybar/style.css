@@ -1,9 +1,15 @@
+@define-color background #000000;
+@define-color foreground #ffffff;
+@define-color urgent     #f77069;
+
+* {
+	background: @background;
+	color:      @foreground;
+}
+
 window#waybar {
 	font-family: 'Symbols Nerd Font Mono', 'Cascadia Code';
 	font-size: 12px;
-
-	background: @background;
-	color: @foreground;
 }
 
 tooltip {
@@ -66,7 +72,8 @@ tooltip {
 
 #custom-separator,
 #custom-dynamic-separator {
-	color: @muted
+	color: @foreground;
+    opacity: 0.4
 }
 
 #network.disconnected {

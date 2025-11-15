@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+source "$VIBRANIUM_PATH/vibranium-core-lib"
 
 if [ -f "$VIBRANIUM_STATE/update.available" ]; then
 
@@ -9,12 +9,12 @@ if [ -f "$VIBRANIUM_STATE/update.available" ]; then
         sleep 1
     done
 
-    icon="<span foreground='${P_GREEN}'>\uf071</span>"
+    icon="<span foreground='${WAYBAR_GREEN}'>\uf071</span>"
     tag="$(< "$VIBRANIUM_STATE/update.available")"
-    tooltip="<span foreground='${P_ACCENT}'><b>Vibranium</b></span> "
+    tooltip="<span foreground='${WAYBAR_ACCENT}'><b>Vibranium</b></span> "
     tooltip+="update available!\n"
-    tooltip+="<span foreground='${P_ACCENT}'><b>New version</b></span>: <b>${tag}</b>\n"
-    tooltip+="<span foreground='${P_YELLOW}'><b>Click here to update</b></span>"
+    tooltip+="<span foreground='${WAYBAR_ACCENT}'><b>New version</b></span>: <b>${tag}</b>\n"
+    tooltip+="<span foreground='${WAYBAR_YELLOW}'><b>Click here to update</b></span>"
     printf '{"text": "%s", "tooltip": "%s" }' "$icon" "$tooltip"
     exit 0
 fi
