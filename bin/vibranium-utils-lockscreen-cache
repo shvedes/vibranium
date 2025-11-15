@@ -248,7 +248,7 @@ done
 # Cleanup: Remove worker active file and refresh Waybar.
 if [[ "$single_file" == false ]]; then
     rm "$XDG_RUNTIME_DIR/worker.active"
-    vibranium-cmd-refresh-waybar-module worker
 fi
 
+vibranium-cmd-refresh-waybar-module worker
 vibranium-utils-update-lockscreen

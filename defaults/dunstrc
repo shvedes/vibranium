@@ -1,7 +1,7 @@
 [global]
-font = "Cascadia Code 9"
+font               = "Cascadia Code 9"
 layer              = top
-follow             = none 
+follow             = none
 icon_theme         = Papirus
 notification_limit = 3
 
