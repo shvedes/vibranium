@@ -271,21 +271,23 @@ apply_theme() {
 get_wallpaper() {
     local state_dir="$VIBRANIUM_STATE/wallpaper"
     local state_file="$state_dir/${1,,}"
+    local saved_wallpaper
 
     # If state folder doesn't exists ->
     # Use first available wallpaper for the theme
     if [[ ! -d $state_dir ]]; then
         mkdir -p "$state_dir"
-        find "$LINK_TARGET/backgrounds/" -type f,l | sort | head -n1
-        return 0
     else
         if [[ -f "$state_file" ]]; then
-            cat "$state_file"
-        else
-            find "$LINK_TARGET/backgrounds/" -type f,l | sort | head -n1
-            return 0
+            saved_wallpaper="$(<"$state_file")"
+            if [[ -f "$saved_wallpaper" ]]; then
+                echo "$saved_wallpaper"
+                return 0
+            fi
         fi
     fi
+
+    find "$LINK_TARGET/backgrounds/" -type f,l | sort | head -n1
 }
 
 if [[ -n "$1" ]]; then

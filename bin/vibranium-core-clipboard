@@ -43,7 +43,7 @@ fi
 case "$1" in
     show)
         is_empty && {
-            notify-send -r 1 -t 1500 "Vibranium" "Clipboard is empty!"
+            notify-send -r 1 -t 1500 "Vibranium" "<i>Clipboard is empty!</i>"
             error "Nothing to show"
             exit 1
         }
