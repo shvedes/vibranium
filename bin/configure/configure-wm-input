@@ -338,11 +338,17 @@ while :; do
     current_hide_key_press="${lines[7]}"
     current_layouts="${lines[8]}"
 
+    if [[ "$current_cursor_hide" == 0 ]]; then
+        current_cursor_hide="never"
+    else
+        current_cursor_hide+="s"
+    fi
+
     OPTIONS=(
         "Keyboard repeat delay : ${current_repeat_delay}ms"
         "Keyboard repeat rate  : ${current_repeat_rate}"
         "Mouse acceleration    : ${current_accel_profile}"
-        "Hide cursor after     : ${current_cursor_hide}s"
+        "Hide cursor after     : ${current_cursor_hide}"
         "Hide on key press     : ${current_hide_key_press}"
         "Natural scrolling     : ${current_natural_scroll}"
         "Mouse sensitivity     : ${current_sensitivity}"
