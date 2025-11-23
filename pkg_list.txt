@@ -17,6 +17,7 @@ noto-fonts-emoji
 zram-generator
 pacman-contrib
 pipewire-pulse
+python-gobject
 noto-fonts-cjk
 xdg-user-dirs
 thunar-volman
