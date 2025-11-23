@@ -7,61 +7,15 @@ INDEX=0
 WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"
 WAYBAR_STYLE="$XDG_CONFIG_HOME/waybar/style.css"
 
-_black_background() {
-    local option="$1"
-    local config="$WAYBAR_STYLE"
-    local keys="background-color|color"
-
-    case "$option" in
-        get)
-            awk -v keys="$keys" '
-                $0 ~ keys {
-                    if ($0 ~ /^[[:space:]]*\/\*/) {
-                        print "false"
-                        exit
-                    } else {
-                        print "true"
-                        exit
-                    }
-                }
-            ' "$config"
-            ;;
-        set)
-            awk -v keys="$keys" '
-                BEGIN { changed = 0 }
-                {
-                    if ($0 ~ keys) {
-                        indent = gensub(/^([[:space:]]*).*/, "\\1", 1)
-                        if ($0 ~ /^[[:space:]]*\/\*/) {
-                            sub(/^[[:space:]]*\/\*[[:space:]]*/, "", $0)
-                            sub(/[[:space:]]*\*\/[[:space:]]*$/, "", $0)
-                            $0 = indent $0
-                        } else {
-                            $0 = indent "/* " gensub(/^[[:space:]]*/, "", 1, $0) " */"
-                        }
-                        changed = 1
-                    }
-                    print
-                }
-                END {
-                    if (!changed)
-                        print "/* keys not found */" > "/dev/stderr"
-                }
-            ' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
-            ;;
-    esac
-}
-
 while :; do
     source "$VIBRANIUM_USER_SETTINGS"
 
     BAR_POSITION="$(sed -n 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WAYBAR_CONFIG")"
     BAR_HEIGHT="$(sed -n 's/.*"height"[[:space:]]*:[[:space:]]*\([^"]*\),.*/\1/p' "$WAYBAR_CONFIG")"
-    OPTIONS=("Black background : $(_black_background get)")
 
     case "$BAR_POSITION" in
-        "top") OPTIONS+=("Move top bar to bottom") ;;
-        "bottom") OPTIONS+=("Move bottom bar to top") ;;
+        "top") OPTIONS=("Move top bar to bottom") ;;
+        "bottom") OPTIONS=("Move bottom bar to top") ;;
     esac
 
     case "$VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS" in
@@ -81,9 +35,6 @@ while :; do
     done
 
     case "$CHOSEN" in
-        "Black background"*)
-            _black_background set
-            ;;
         "Height"*)
             while :; do
                 prompt="Waybar height (int)"
