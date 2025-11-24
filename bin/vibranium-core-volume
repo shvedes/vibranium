@@ -150,11 +150,10 @@ toggle_mute() {
 
 # Process audio feedback if the user has enabled this option
 feedback() {
-    local variant
-    local dir
+    local variant dir
 
     check_bool VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK true
-    if [ $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK = true ]; then
+    if [[ $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK = true ]]; then
         check_enum VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT "variant1" variant1 variant2 variant3
         variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
 
@@ -163,7 +162,7 @@ feedback() {
                 dir="/usr/share/sounds/freedesktop/stereo"
                 ;;
             "variant2")
-                dir="/usr/share/sounds/Yaru/stereo"
+                dir="$XDG_DATA_HOME/sounds/Vibranium/stereo"
                 ;;
         esac
 
