@@ -159,12 +159,6 @@ VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH="hard"
 # Default is true
 VIBRANIUM_GLOBAL_CONFIRM_TO_KILL=true
 
-# Which type of power menu to use.
-# Available options: string 'overlay' 'menu'
-#
-# Default is 'menu'
-VIBRANIUM_GLOBAL_POWER_MENU_STYLE="menu"
-
 # Whether to show desktop & lockscreen background
 # Available options: bool
 #

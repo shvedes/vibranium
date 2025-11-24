@@ -49,7 +49,6 @@ tumbler
 swayosd
 bluetui
 ddcutil
-wlogout
 man-db
 neovim
 waybar

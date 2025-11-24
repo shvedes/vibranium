@@ -199,7 +199,6 @@ while :; do
         "Show status bar          : $bar_enabled"
         "Confirm to kill          : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
         "Blur lockscreen          : $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND"
-        "Power menu style         : $VIBRANIUM_GLOBAL_POWER_MENU_STYLE"
         "Copy to clipboard        : $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD"
         "Pause music on lock      : $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
         "Welcome notification     : $VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION"
@@ -770,15 +769,6 @@ while :; do
                     "Border") _flash_submenu VIBRANIUM_GLOBAL_FLASH_BORDER VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED "Border" ;;
                 esac
             done
-            ;;
-        "Power menu style"*)
-            option-validate "VIBRANIUM_GLOBAL_POWER_MENU_STYLE"
-
-            if [[ "$VIBRANIUM_GLOBAL_POWER_MENU_STYLE" == "overlay" ]]; then
-                sed -i "/^VIBRANIUM_GLOBAL_POWER_MENU_STYLE/s/=.*/=\"menu\"/" "$VIBRANIUM_USER_SETTINGS"
-            else
-                sed -i "/^VIBRANIUM_GLOBAL_POWER_MENU_STYLE/s/=.*/=\"overlay\"/" "$VIBRANIUM_USER_SETTINGS"
-            fi
             ;;
     esac
 done
