@@ -1,0 +1,2 @@
+SUBSYSTEM=="input", ENV{ID_BUS}=="bluetooth", ACTION=="add", RUN+="/usr/local/bin/vibranium-bt-notify"
+SUBSYSTEM=="input", ENV{ID_BUS}=="bluetooth", ACTION=="remove", RUN+="/usr/local/bin/vibranium-bt-notify"
