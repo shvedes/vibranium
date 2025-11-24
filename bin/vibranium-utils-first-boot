@@ -25,7 +25,7 @@ _get_power_profile() {
     if [[ "$VIBRANIUM_IS_LAPTOP" == false ]]; then
         echo "performance"
     else
-        battery_status=$(</sys/class/power_supply/BAT0/status)
+        battery_status=$(< /sys/class/power_supply/BAT0/status)
 
         if [[ "$battery_status" == "Charging" ]]; then
             echo "performance"
@@ -39,6 +39,27 @@ msg+="\nPress <span foreground='${P_YELLOW}'><b>SUPER + A</b></span>      to ope
 msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + V</b></span> to open Vibranium menu\n"
 msg+="<b>Right-click</b> to dismiss this notification"
 notify-send -r 1 -t 1800000 "Welcome to Vibranium" "$msg"
+
+if [[ "$VIBRANIUM_IS_VIRTUAL_MACHINE" == true ]]; then
+    msg="\n<span foreground='${P_YELLOW}'><b><i>You need to be aware of certain things</i></b></span>:\n\n"
+    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+    msg+="<span foreground='${P_RED}'><b>Screen recording is not available</b></span>\n"
+    msg+="  <span foreground='${P_ACCENT}'><b>•</b></span> "
+    msg+="<i>If you still want this feature, please create an MR</i>\n"
+    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+    msg+="<span foreground='${P_RED}'><b>Do not expect power profiles to work as expected</b></span>\n"
+    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+    msg+="<span foreground='${P_RED}'><b>Some effects will not work due to the nature of the virtual GPU</b></span>\n"
+    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+    msg+="<span foreground='${P_RED}'><b>Overall performance will be worse than on real hardware</b></span>\n\n"
+    msg+="Use <span foreground='${P_YELLOW}'><b>Vibranium</b></span> on a virtual machine for informational purposes only.\n"
+    msg+="Many things have not been tested, so there may be unexpected surprises.\n"
+    msg+="Only <span foreground='${P_YELLOW}'><b>QEMU</b></span> has been tested; "
+    msg+="<span foreground='${P_YELLOW}'><b>Virtualbox</b></span> & "
+    msg+="<span foreground='${P_YELLOW}'><b>VMware</b></span> are not supported.\n\n"
+    msg+="<b>Right-click</b> to dismiss this notification"
+    notify-send -r 2 -t 1800000 "Vibranium Is Running On a Virtual Machine" "$msg"
+fi
 
 chromium --no-startup-window --set-theme-color="25, 35, 48" &
 vibranium-core-power-profile-set "$(_get_power_profile)"

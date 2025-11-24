@@ -2,7 +2,7 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
-if command -v spotify > /dev/null && command -v spicetify; then
+if command -v spotify > /dev/null && command -v spicetify > /dev/null; then
     if ! grep -q "adblock" "$XDG_CONFIG_HOME/spicetify/config-xpui.ini"; then
         OPTIONS=("Install Spotify adblock")
     else
