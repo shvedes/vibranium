@@ -5,6 +5,17 @@ source "$VIBRANIUM_PATH/configure/configure-lib"
 
 INDEX=0
 
+_grayscale_enabled() {
+    local opt=
+    opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
+
+    if [[ "$opt" == "[[EMPTY]]" || "$opt" =~ ^()$ ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
 _terminal_opacity() {
     local action
     local value
@@ -192,9 +203,16 @@ while :; do
 
     bar_enabled="$([ "$(systemctl --user is-active waybar)" = "active" ] && echo true || echo false)"
 
+    if _grayscale_enabled; then
+        current_grayscale=true
+    else
+        current_grayscale=false
+    fi
+
     OPTIONS=(
         "Now playing              : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
         "OSD enabled              : $VIBRANIUM_GLOBAL_USE_OSD"
+        "Reading mode             : $current_grayscale"
         "Show wallpaper           : $VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
         "Show status bar          : $bar_enabled"
         "Confirm to kill          : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
@@ -231,6 +249,23 @@ while :; do
     done
 
     case "$CHOSEN" in
+        "Reading mode"*)
+            shader="$VIBRANIUM/defaults/hypr/grayscale.frag"
+            case "$current_grayscale" in
+                "true")
+                    hyprctl -q keyword decoration:screen_shader ""
+                    rm -f "$VIBRANIUM_STATE/reading-mode.active"
+                    ;;
+                "false")
+                    hyprctl -q keyword decoration:screen_shader "$shader"
+                    touch "$VIBRANIUM_STATE/reading-mode.active"
+                    msg="Note that grayscale effect will be "
+                    msg+="visible on screenshots and screen records"
+                    notify-send -r 5 -t 5000 "Vibranium" "$msg"
+                    ;;
+            esac
+            vibranium-cmd-refresh-waybar-module reading-mode
+            ;;
         "Show status bar"*)
             case "$bar_enabled" in
                 "true") systemctl --user disable --now waybar ;;

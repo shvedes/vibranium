@@ -1,0 +1,12 @@
+{
+	"custom/reading-mode": {
+		"format": "{text}",
+		"hide-empty-text": true,
+
+		"exec": "vibranium-bar-reading-mode",
+		"on-click": "vibranium-bar-reading-mode disable",
+
+		"signal": 14,
+		"return-type": "json"
+	}
+}

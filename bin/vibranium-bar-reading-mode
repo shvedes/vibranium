@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+if [[ "$1" == "disable" ]]; then
+    hyprctl -q keyword decoration:screen_shader ""
+
+    rm -f "$VIBRANIUM_STATE/reading-mode.active"
+    vibranium-cmd-refresh-waybar-module reading-mode
+
+    notify-send -r 2 "Vibranium" "Reading mode has been disabled"
+    exit
+fi
+
+if [[ -f "$VIBRANIUM_STATE/reading-mode.active" ]]; then
+    icon="\uede2"
+    tooltip="Reading mode is active"
+    printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
+else
+    printf '{"text": ""}'
+fi

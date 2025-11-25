@@ -11,6 +11,7 @@ show() {
 
 [[ -f "$XDG_RUNTIME_DIR/worker.active" ]] && show
 [[ -f "$VIBRANIUM_STATE/update.available" ]] && show
+[[ -f "$VIBRANIUM_STATE/reading-mode.active" ]] && show
 [[ -f "$XDG_RUNTIME_DIR/vibranium-core-force-kill.confirm" ]] && show
 [[ $VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE == true ]] && show
 [[ $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE == true ]] && {
