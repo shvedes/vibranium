@@ -14,11 +14,11 @@ export EDITOR="nvim"
 export SYSTEMD_EDITOR="\$EDITOR"
 export MANPAGER="\$EDITOR +Man!"
 
-# You can also reassign the default folders for userspace package managers. 
+# You can also reassign the default folders for userspace package managers.
 # Golang, for example, likes to create its home folder directly right in \$HOME,
 # which can sometimes be annoying. You can reassign this directory to anywhere you want.
 # export GOPATH="\$XDG_DATA_HOME/go"
-# export CARGO_HOME="\$XDG_DATA_HOME/cargo" 
+# export CARGO_HOME="\$XDG_DATA_HOME/cargo"
 
 # And then you can add the application to \$PATH in this way
 # export PATH="\$HOME/.local/bin:\$VIBRANIUM_PATH:\$GOPATH/bin:\$PATH"
@@ -29,4 +29,9 @@ export MANPAGER="\$EDITOR +Man!"
 
 # If you are a pass user (https://www.passwordstore.org/), you can specify a specific folder that pass will use to look for passwords. For example:
 # export PASSWORD_STORE_DIR="\$XDG_DATA_HOME/password-store"
+
+# You can set and customize your cursor theme and its size.
+# Note that Vibranium comes only with a single cursor theme.
+# XCURSOR_THEME="myCoolCursor"
+# XCURSOR_SIZE=22
 EOF
