@@ -8,12 +8,12 @@ INDEX=0
 while :; do
     mapfile -t LINES < <(
         hyprctl --batch -j \
-            "getoption misc:vrr; \
+        "getoption misc:vrr; \
          getoption misc:vfr; \
          getoption misc:middle_click_paste; \
          getoption render:direct_scanout; \
          getoption misc:disable_autoreload" |
-            jq -s -r '.[] | 
+            jq -s -r '.[] |
         if .option == "misc:vrr" then
             if .int == 0 then "false"
             elif .int == 1 then "true"
@@ -128,6 +128,4 @@ while :; do
             done
             ;;
     esac
-
-    hyprctl -q reload
 done

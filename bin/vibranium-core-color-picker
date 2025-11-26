@@ -18,6 +18,11 @@ if pidof hyprpicker > /dev/null; then
     exit 1
 fi
 
+if [[ -f "$VIBRANIUM_STATE/reading-mode.active" ]]; then
+    warn "Reading mode is active. Aborting"
+    exit 1
+fi
+
 mkdir -p "$XDG_CACHE_HOME/vibranium"
 LAST_USED="$XDG_CACHE_HOME/vibranium/color-picker.history"
 

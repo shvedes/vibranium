@@ -6,7 +6,7 @@ file="$XDG_RUNTIME_DIR/worker.active"
 
 if [[ -f $file ]]; then
     if [[ "$(< "$file")" == "suspended" ]]; then
-        tooltip="<span foreground='${WAYBAR_ACCENT}'>Cache generation suspended due to power profile</span>"
+        tooltip="<span foreground='${WAYBAR_ACCENT}'>Background task suspended due to power profile</span>"
     else
         tooltip="<span foreground='${WAYBAR_ACCENT}'>Background task in progress</span>\n\n"
         tooltip+="<span foreground='${WAYBAR_YELLOW}'>$(< "$file")</span>"
