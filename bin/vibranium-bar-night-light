@@ -5,7 +5,7 @@ source "$VIBRANIUM_PATH/vibranium-core-lib"
 state="$(< "$VIBRANIUM_STATE/night-light")"
 
 if [[ "$state" == "active" ]]; then
-    icon="<span foreground='${WAYBAR_YELLOW}'>\udb80\udf35</span>"
+    icon="\udb80\udf35"
     current="$(grep -oP '(?<=temperature = ).*' "$XDG_CONFIG_HOME/hypr/hyprsunset.conf")"
     guide="<span foreground='${WAYBAR_ACCENT}'>Night Light temperature:</span> <span foreground='${WAYBAR_YELLOW}'>${current}K</span>"
 

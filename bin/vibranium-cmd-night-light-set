@@ -13,7 +13,7 @@
 CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
 CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2> /dev/null || echo 5500)
 STATE_FILE="$XDG_STATE_HOME/vibranium/night-light"
-STEP=200
+STEP=100
 
 [ ! -f "$STATE_FILE" ] && {
     echo "Night light is inactive"
