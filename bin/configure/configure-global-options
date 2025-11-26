@@ -785,7 +785,7 @@ while :; do
         *"Screen / Border flash"*)
             index=0
             while :; do
-                f_opts=("Screen" "Border")
+                f_opts=("Screen" "Border" "What is this?")
                 f_chosen="$(printf "%s\n" "${f_opts[@]}" | rofi_cmd "Flash effect" "ESC to go back" -selected-row "$index")"
                 [[ -z "$f_chosen" ]] && break
 
@@ -797,6 +797,14 @@ while :; do
                 done
 
                 case "$f_chosen" in
+                    "What is this?")
+                        msg="When enabled, actions such as <span foreground='${P_YELLOW}'><b>full-screen screenshot</b></span>, "
+                        msg+="<span foreground='${P_YELLOW}'><b>window screenshot</b></span>, \n"
+                        msg+="or <span foreground='${P_YELLOW}'><b>start/end of screen recording</b></span> "
+                        msg+="will cause the screen to <span foreground='${P_YELLOW}'><b>flash slightly</b></span>,\n"
+                        msg+="indicating that the action has been performed"
+                        notify-send -r 3 -t 10000 "What is this?" "$msg"
+                        ;;
                     "Screen") _flash_submenu VIBRANIUM_GLOBAL_FLASH_SCREEN VIBRANIUM_GLOBAL_FLASH_SCREEN_SPEED "Screen" ;;
                     "Border") _flash_submenu VIBRANIUM_GLOBAL_FLASH_BORDER VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED "Border" ;;
                 esac
