@@ -365,11 +365,6 @@ fi
 log "Restoring previously used wallpaper"
 vibranium-core-set-wallpaper "$(get_wallpaper "$CHOSEN")"
 
-log "Updating Waybar"
-if [[ "$(systemctl --user is-active waybar)" == "active" ]]; then
-    systemctl --user --force restart waybar
-fi
-
 if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
     systemctl --user --force restart swayosd
 fi
