@@ -39,10 +39,11 @@ export XCURSOR_THEME="macOS"
 export XCURSOR_SIZE=22
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
-# Use Wayland where possible. Fallback to XWayland otherwise
+# Use Wayland when possible. Fallback to XWayland otherwise
 export ELECTRON_OZONE_PLATFORM_HINT="auto"
 export QT_QPA_PLATFORM="wayland;xcb"
-export SDL_VIDEODRIVER="wayland"
+# https://github.com/basecamp/omarchy/issues/2564#issuecomment-3450877034
+# export SDL_VIDEODRIVER="wayland"
 export GDK_BACKEND="wayland,x11"
 export CLUTTER_BACKEND="wayland"
 
@@ -50,12 +51,8 @@ export VIBRANIUM_IS_LAPTOP=false
 export VIBRANIUM_IS_VIRTUAL_MACHINE=false
 
 case "$(</sys/class/dmi/id/chassis_type)" in
-	"10")
-        export VIBRANIUM_IS_LAPTOP=true
-        ;;
-    "1")
-        export VIBRANIUM_IS_VIRTUAL_MACHINE=true
-        ;;
+	"10") export VIBRANIUM_IS_LAPTOP=true          ;;
+    "1")  export VIBRANIUM_IS_VIRTUAL_MACHINE=true ;;
 esac
 
 # https://wiki.archlinux.org/title/Hardware_video_acceleration#Configuration
