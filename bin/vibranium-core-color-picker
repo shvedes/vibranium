@@ -19,7 +19,8 @@ if pidof hyprpicker > /dev/null; then
 fi
 
 if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
-    warn "Reading mode is active. Aborting"
+    error "Reading mode is active. Aborting"
+    notify-send -r 3 -t 3000 "Vibranium" "<b>Color Picker</b> isn't available while <b>Reading Mode</b> is active!"
     exit 1
 fi
 
