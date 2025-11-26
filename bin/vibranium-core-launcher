@@ -86,13 +86,16 @@ case "$1" in
     "--web")
         opt_args+=(-drun-categories WebApp -display-drun "Web Apps" -no-fixed-num-lines true -disable-history)
         opt_args+=(-icon-theme Vibranium -theme-str 'window {width: 300;}')
+        opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
         ;;
     "--ai")
         opt_args+=(-drun-categories AI -display-drun "AIs" -no-fixed-num-lines true -disable-history)
         opt_args+=(-icon-theme Vibranium -theme-str 'window {width: 250;}')
+        opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
         ;;
     "--power")
         opt_args+=(-drun-categories Power -display-drun "Power" -no-fixed-num-lines true -disable-history)
+        opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
         opt_args+=(-icon-theme Vibranium)
         ;;
     *)
