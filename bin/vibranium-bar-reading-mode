@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 
+CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+
 if [[ "$1" == "disable" ]]; then
-    hyprctl -q keyword decoration:screen_shader ""
-
-    rm -f "$VIBRANIUM_STATE/reading-mode.active"
+    rm -f "$CONFIG"; hyprctl -q reload
     vibranium-cmd-refresh-waybar-module reading-mode
-
     notify-send -r 2 "Vibranium" "Reading mode has been disabled"
     exit
 fi
 
-if [[ -f "$VIBRANIUM_STATE/reading-mode.active" ]]; then
+if [[ -f "$CONFIG" ]]; then
     icon="\uede2"
-    tooltip="Reading mode is active"
+    tooltip="\tReading mode is active\n\n"
+    tooltip+="   Note that grayscale effect will be\n"
+    tooltip+="visible on screenshots and screen records"
     printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
 else
     printf '{"text": ""}'

@@ -251,19 +251,16 @@ while :; do
     case "$CHOSEN" in
         "Reading mode"*)
             shader="$VIBRANIUM/defaults/hypr/grayscale.frag"
+            config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
             case "$current_grayscale" in
                 "true")
-                    hyprctl -q keyword decoration:screen_shader ""
-                    rm -f "$VIBRANIUM_STATE/reading-mode.active"
+                    rm -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
                     ;;
                 "false")
-                    hyprctl -q keyword decoration:screen_shader "$shader"
-                    touch "$VIBRANIUM_STATE/reading-mode.active"
-                    msg="Note that grayscale effect will be "
-                    msg+="visible on screenshots and screen records"
-                    notify-send -r 5 -t 5000 "Vibranium" "$msg"
+                    echo "decoration:screen_shader = $shader" > "$config"
                     ;;
             esac
+            hyprctl -q reload
             vibranium-cmd-refresh-waybar-module reading-mode
             ;;
         "Show status bar"*)
