@@ -114,14 +114,6 @@ if [ ${#filtered[@]} -eq 0 ]; then
 fi
 
 printf '\e[?25l' # Hide cursor
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Validating packages"
-for package in "${filtered[@]}"; do
-    if ! yay -Si "$package" &> /dev/null; then
-        echo -e "${RED}[VIBRANIUM]${RESET} ${package} does not exist!"
-        _operation_canceled ""
-    fi
-done
-
 if [[ ${#chosen[@]} -gt 5 ]]; then
     output="${YELLOW}[VIBRANIUM]${RESET} You're about to install the following packages:\n"
     for pkg in "${chosen[@]}"; do
