@@ -6,7 +6,7 @@ USER_ID="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{p
 export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus"
 
 if [[ "$ACTION" == "add" ]]; then
-	runuser -l "$USER" -c "notify-send -r 1 \"Vibranium\" \"Bluetooth device has been connected\""
+	runuser -l "$USER" -c "notify-send -r 1 \"Vibranium\" \"A bluetooth device has been connected\""
 else
-	runuser -l "$USER" -c "notify-send -r 1 \"Vibranium\" \"Bluetooth device has been disconnected\""
+	runuser -l "$USER" -c "notify-send -r 1 \"Vibranium\" \"A bluetooth device has been disconnected\""
 fi
