@@ -65,8 +65,8 @@ fi
 if [[ "$1" =~ ^(--hyprlock)$ ]]; then
     if [[ "$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN" == true ]]; then
         printf "<span size='20000' foreground='${P_ACCENT}' rise='-3.5pt'><b>󰝚</b></span> %s" "$pango_output"
-        exit 0
     fi
+    exit 0
 else
     echo "$plain_output"
 fi

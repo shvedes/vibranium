@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
-source "$VIBRANIUM_USER_SETTINGS"
 
-check_bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK true
-restore_flag="$XDG_RUNTIME_DIR/restore-player"
+RESTORE_FLAG="$XDG_RUNTIME_DIR/restore-player"
 
 player_is_playing() {
     [[ "$(playerctl status 2>/dev/null)" == "Playing" ]] || \
@@ -13,11 +11,12 @@ player_is_playing() {
 
 case "$1" in
     before)
-        [[ $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == true ]] || exit 0
+        check_bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK true
+        [[ $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == false ]] && exit 0
 
         if player_is_playing; then
             vibranium-core-player-control toggle &
-            : > "$restore_flag"
+            : > "$RESTORE_FLAG"
         fi
         ;;
     after)
@@ -27,14 +26,15 @@ case "$1" in
             delay=2
         fi
 
-        if [[ -f $restore_flag ]]; then
+        if [[ -f $RESTORE_FLAG ]]; then
+            rm -f "$RESTORE_FLAG"
             vibranium-core-player-control toggle &
             check_bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING false
+
             if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
                 [[ -n $delay ]] && sleep "$delay"
                 vibranium-cmd-now-playing
             fi
-            rm -f "$restore_flag"
         fi
         ;;
 esac
