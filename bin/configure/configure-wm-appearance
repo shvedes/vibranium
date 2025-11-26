@@ -32,35 +32,82 @@ edit_int() {
 edit_float() {
     local name="$1" # prompt title
     local key="$2" # hyprland config key
-    local min="$3" # min (display only)
-    local max="$4" # max (display only)
+    local min="$3" # min
+    local max="$4" # max
     local input prompt regex
 
     regex='^[0-9]*\.?[0-9]+$'
 
+    float_le() {
+        local a="$1" b="$2" a_int a_frac b_int b_frac
+
+        if [[ ! $a =~ \. ]]; then
+            a_int="${a##0}"
+            [ -z "$a_int" ] && a_int=0
+            a_frac=0
+        else
+            if [[ $a =~ ^\.[0-9]+$ ]]; then
+                a_int=0
+                a_frac="${a#\.}"
+            else
+                a_int="${a%%.*}"
+                a_int="${a_int##0}"
+                [ -z "$a_int" ] && a_int=0
+                a_frac="${a#*.}"
+            fi
+        fi
+
+        if [[ ! $b =~ \. ]]; then
+            b_int="${b##0}"
+            [ -z "$b_int" ] && b_int=0
+            b_frac=0
+        else
+            if [[ $b =~ ^\.[0-9]+$ ]]; then
+                b_int=0
+                b_frac="${b#\.}"
+            else
+                b_int="${b%%.*}"
+                b_int="${b_int##0}"
+                [ -z "$b_int" ] && b_int=0
+                b_frac="${b#*.}"
+            fi
+        fi
+
+        a_frac="${a_frac%%0*}"
+        [ -z "$a_frac" ] && a_frac=0
+        b_frac="${b_frac%%0*}"
+
+        [ -z "$b_frac" ] && b_frac=0
+
+        if [ "$a_int" -lt "$b_int" ]; then
+            return 0
+        elif [ "$a_int" -gt "$b_int" ]; then
+            return 1
+        fi
+
+        local len_a="${#a_frac}"
+        local len_b="${#b_frac}"
+        local max_len
+
+        max_len=$(( len_a > len_b ? len_a : len_b ))
+
+        if [ "$len_a" -lt "$max_len" ]; then
+            a_frac="$(printf "%s%0*$((max_len - len_a))d" "$a_frac" 0)"
+        fi
+
+        if [ "$len_b" -lt "$max_len" ]; then
+            b_frac="$(printf "%s%0*$((max_len - len_b))d" "$b_frac" 0)"
+        fi
+        [ "$a_frac" -le "$b_frac" ]
+    }
+
     while :; do
         prompt="$name (float)"
         input="$(printf "%s" "$prompt" | rofi_cmd "$name" "$min - $max")"
-
         [[ -z $input ]] && break
         [[ "$input" == "$prompt" ]] && continue
 
-        # If plain integer and within range, convert to float
         if [[ $input =~ ^[0-9]+$ ]]; then
-            case "$max" in
-                1.*)
-                    [[ $input -ge 0 && $input -le 1 ]] || {
-                        notify-send -r 4 -u critical -t 2000 "Vibranium" "Value must be between 0.0 and 1.0"
-                        continue
-                    }
-                    ;;
-                2.*)
-                    [[ $input -ge 0 && $input -le 2 ]] || {
-                        notify-send -r 4 -u critical -t 2000 "Vibranium" "Value must be between 0.0 and 2.0"
-                        continue
-                    }
-                    ;;
-            esac
             input="${input}.0"
         fi
 
@@ -69,26 +116,10 @@ edit_float() {
             continue
         fi
 
-        case "$max" in
-            1.*)
-                [[ $input =~ ^0*(0(\.[0-9]+)?|1(\.0*)?)$ ]] || {
-                    notify-send -r 4 -u critical -t 2000 "Vibranium" "Value must be between 0.0 and 1.0"
-                    continue
-                }
-                ;;
-            2.*)
-                [[ $input =~ ^0*(0(\.[0-9]+)?|1(\.[0-9]+)?|2(\.0*)?)$ ]] || {
-                    notify-send -r 4 -u critical -t 2000 "Vibranium" "Value must be between 0.0 and 2.0"
-                    continue
-                }
-                ;;
-            *)
-                [[ $input =~ ^0*[0-9]+(\.[0-9]+)?$ ]] || {
-                    notify-send -r 4 -u critical -t 2000 "Vibranium" "Invalid value"
-                    continue
-                }
-                ;;
-        esac
+        if ! float_le "$min" "$input" || ! float_le "$input" "$max"; then
+            notify-send -r 4 -u critical -t 2000 "Vibranium" "Value must be between <b>$min</b> and <b>$max</b>"
+            continue
+        fi
 
         vibranium-cmd-edit-wm-config "$key:$input" "$HYPR_CONFIG"
         break
@@ -143,12 +174,14 @@ while :; do
 			 getoption decoration:dim_inactive;     \
 			 getoption decoration:shadow:enabled;   \
 			 getoption decoration:active_opacity;   \
-			 getoption decoration:inactive_opacity" |
+			 getoption decoration:inactive_opacity; \
+             getoption decoration:dim_strength; \
+             getoption decoration:dim_special" |
             jq -r '
 		  .option as $o |
 		  if   ($o | test("rounding|border_size")) then
 			.int
-          elif ($o | test(".*_opacity")) then
+          elif ($o | test(".*_opacity|dim_strength|dim_special")) then
 			  (.float * 10 | round / 10)
 		  elif ($o | test("gaps_in|gaps_out")) then
 			(.custom | split(" ")[0])
@@ -171,11 +204,21 @@ while :; do
     current_inactive_opacity="${lines[9]}"
     current_animations_preset="$(basename "$(readlink "$HOME/.config/hypr/hyprland.conf.d/animations.conf")")"
     current_animations_preset="${current_animations_preset%.conf}"
+    current_dim_strength="${lines[10]}"
+    current_dim_special="${lines[11]}"
 
     OPTIONS=(
         "Inactive window opacity : ${current_inactive_opacity}"
         "Active window opacity   : ${current_active_opacity}"
-        "Dim inactive window     : ${current_dim}"
+        "Scratchpad dim strength : ${current_dim_special}"
+        "Dim inactive   window   : ${current_dim}"
+    )
+
+    if [[ "$current_dim" == "true" ]]; then
+        OPTIONS+=("Dim inactive strength   : ${current_dim_strength}")
+    fi
+
+    OPTIONS+=(
         "Drop window shadow      : ${current_shadow}"
         "Animations enabled      : ${current_animations}"
         "Animations preset       : ${current_animations_preset}"
@@ -256,6 +299,12 @@ while :; do
             ;;
         "Inactive window opacity"*)
             edit_float "Inactive opacity" "decoration:inactive_opacity" 0.0 1.0
+            ;;
+        "Dim inactive strength"*)
+            edit_float "Dim inactive strength" "decoration:dim_strength" 0.0 0.5
+            ;;
+        "Scratchpad dim strength"*)
+            edit_float "Scratchpad dim" "decoration:dim_special" 0.2 0.8
             ;;
         "Active window opacity"*)
             edit_float "Active opacity" "decoration:active_opacity" 0.0 1.0
