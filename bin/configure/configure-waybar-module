@@ -3,10 +3,61 @@
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
-OPTIONS=("Pacman" "Weather" "Color Picker" "Sleep inhibitor")
 INDEX=0
 
+_pacman_weather_specific() {
+    local options chosen index animate_loading \
+        show_separators animate_updates
+
+    index=0
+
+    while :; do
+        source "$VIBRANIUM_USER_SETTINGS"
+
+        animate_loading="$VIBRANIUM_BAR_SHOW_ANIMATION"
+        show_separators="$VIBRANIUM_BAR_SHOW_SEPARATOR"
+        animate_updates="$VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC"
+
+        options=(
+            "Animate loading : $animate_loading"
+            "Animate updates : $animate_updates"
+            "Show separators : $show_separators"
+        )
+        chosen="$(printf "%s\n" "${options[@]}" | rofi_cmd "Extras" "ESC to go back" -selected-row "$index")"
+        [[ -z "$chosen" ]] && return
+
+        for i in "${!options[@]}"; do
+            if [ "${options[$i]}" = "$chosen" ]; then
+                index="$i"
+                break
+            fi
+        done
+
+        case "$chosen" in
+            "Animate loading"*)
+                option-validate "VIBRANIUM_BAR_SHOW_ANIMATION"
+                toggle_bool     "VIBRANIUM_BAR_SHOW_ANIMATION"
+                ;;
+            "Show separators"*)
+                option-validate "VIBRANIUM_BAR_SHOW_SEPARATOR"
+                toggle_bool     "VIBRANIUM_BAR_SHOW_SEPARATOR"
+                ;;
+            "Animate updates"*)
+                option-validate "VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC"
+                toggle_bool     "VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC"
+                ;;
+            *) continue
+        esac
+
+        vibranium-cmd-refresh-waybar-module pacman
+        vibranium-cmd-refresh-waybar-module weather
+    done
+
+}
+
 while :; do
+
+    OPTIONS=("Pacman" "Weather" "Color Picker" "Sleep inhibitor" "<b>Pacman / Weather specific</b>")
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Module settings" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && exit 0
 
@@ -18,6 +69,9 @@ while :; do
     done
 
     case "$CHOSEN" in
+        "<b>Pacman / Weather"*)
+            _pacman_weather_specific
+            ;;
         "Sleep inhibitor")
             inhibitor_index=0
             while :; do

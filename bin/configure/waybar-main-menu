@@ -5,7 +5,6 @@ source "$VIBRANIUM_PATH/configure/configure-lib"
 
 INDEX=0
 WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"
-WAYBAR_STYLE="$XDG_CONFIG_HOME/waybar/style.css"
 
 while :; do
     source "$VIBRANIUM_USER_SETTINGS"
@@ -14,12 +13,12 @@ while :; do
     BAR_HEIGHT="$(sed -n 's/.*"height"[[:space:]]*:[[:space:]]*\([^"]*\),.*/\1/p' "$WAYBAR_CONFIG")"
 
     case "$BAR_POSITION" in
-        "top") OPTIONS=("Move top bar to bottom") ;;
+        "top")    OPTIONS=("Move top bar to bottom") ;;
         "bottom") OPTIONS=("Move bottom bar to top") ;;
     esac
 
     case "$VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS" in
-        "true") OPTIONS+=("Hide shortcut hints") ;;
+        "true")  OPTIONS+=("Hide shortcut hints") ;;
         "false") OPTIONS+=("Show shortcut hints") ;;
     esac
 
@@ -40,13 +39,15 @@ while :; do
                 prompt="Waybar height (int)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Bar height" "30-45")"
                 [[ -z "$input" ]] && break
-                                [[ ! "$input" =~ ^[0-9]+$ ]] && {
-                    notify-send -r 1 "Vibranium" "An integer between 30-45"
+
+                [[ ! "$input" =~ ^[0-9]+$ ]] && {
+                    notify-send -r 1 -t 2000 "Vibranium" "An integer between 30-50"
                     continue
                 }
 
-                if ((input > 45 || input < 30)); then
-                    notify-send -r 1 "Vibranium" "An integer between 30-45"
+                # 30 is minimum allowed height due to specific modules
+                if ((input > 50 || input < 30)); then
+                    notify-send -r 1 -t 2000 "Vibranium" "An integer between 30-50"
                     continue
                 fi
 
@@ -61,14 +62,8 @@ while :; do
                 bottom) vibranium-cmd-set-waybar-position "top" ;;
             esac
             ;;
-        "Enabled"*)
-            waybar-toggle-modules
-            ;;
-        "Show"* | "Hide"*)
-            vibranium-cmd-toggle-waybar-hints
-            ;;
-        "Configure modules")
-            configure-waybar-module
-            ;;
+        "Enabled"*)          waybar-toggle-modules             ;;
+        "Show"* | "Hide"*)   vibranium-cmd-toggle-waybar-hints ;;
+        "Configure modules") configure-waybar-module           ;;
     esac
 done

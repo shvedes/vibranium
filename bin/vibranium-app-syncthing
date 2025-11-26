@@ -5,13 +5,14 @@ if ! command -v syncthing > /dev/null; then
     exit 1
 fi
 
-# If the user launches Syncthing, but the service is not active or enabled
+# If the user launches Syncthing, but the service is not active / not enabled
 if [ "$(systemctl --user is-active syncthing)" != "active" ]; then
     systemctl --user enable --now syncthing
-    notify-send -r 1 "Vibranium" -t 6000 "Syncthing wasn’t running.\nThe service has been enabled and started"
+    notify-send -r 1 "Vibranium" -t 5000 "Syncthing wasn’t running.\nThe service has been enabled and started"
     sleep 0.5 # Wait until the service starts up
 fi
 
+# Open as web app if chromium is installed
 if command -v chromium > /dev/null; then
     vibranium-cmd-launch-cmd chromium --app="https://127.0.0.1:8384"
 else
