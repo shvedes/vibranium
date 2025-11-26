@@ -56,8 +56,18 @@ _pacman_weather_specific() {
 }
 
 while :; do
+    OPTIONS=("Pacman" "Weather" "Color Picker")
 
-    OPTIONS=("Pacman" "Weather" "Color Picker" "Sleep inhibitor" "<b>Pacman / Weather specific</b>")
+    if systemd-inhibit | grep -q Vibranium; then
+        OPTIONS+=("Sleep inhibitor")
+    fi
+
+    if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == true ]]; then
+        OPTIONS+=("<b>Pacman and Weather specific</b>")
+    elif [[ "$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE" == true ]]; then
+        OPTIONS+=("<b>Pacman and Weather specific</b>")
+    fi
+
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Module settings" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && exit 0
 
@@ -69,7 +79,7 @@ while :; do
     done
 
     case "$CHOSEN" in
-        "<b>Pacman / Weather"*)
+        "<b>Pacman and Weather"*)
             _pacman_weather_specific
             ;;
         "Sleep inhibitor")

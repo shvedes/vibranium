@@ -13,7 +13,7 @@ tooltip="<span foreground='${WAYBAR_ACCENT}'><b>  Sleep blocked </b></span>"
 tooltip+="\n<span foreground='${WAYBAR_MUTED}'>------------------</span>"
 tooltip+="\n<span foreground='${WAYBAR_RED}'> <b>click to disable</b></span>"
 
-if systemd-inhibit | grep Vibranium > /dev/null; then
+if systemd-inhibit | grep -q Vibranium; then
     printf '{\"text\": \"%s\", \"tooltip\": \"%s\"}' "$icon" "$tooltip"
 else
     printf '{\"text\": \"\"}'
