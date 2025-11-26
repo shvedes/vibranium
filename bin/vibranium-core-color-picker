@@ -18,7 +18,7 @@ if pidof hyprpicker > /dev/null; then
     exit 1
 fi
 
-if [[ -f "$VIBRANIUM_STATE/reading-mode.active" ]]; then
+if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
     warn "Reading mode is active. Aborting"
     exit 1
 fi
