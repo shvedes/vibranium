@@ -1,7 +1,6 @@
 [Default Applications]
 application/epub+zip=org.pwmt.zathura.desktop
 application/pdf=org.pwmt.zathura.desktop
-application/x-xz=org.gnome.FileRoller.desktop
 inode/directory=thunar.desktop
 image/jpeg=imv-dir.desktop
 image/png=imv-dir.desktop

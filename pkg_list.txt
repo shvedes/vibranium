@@ -37,7 +37,6 @@ mediainfo
 hyprpaper
 fastfetch
 pipewire
-nwg-look
 hyprlock
 hyprland
 hypridle
