@@ -86,8 +86,6 @@ else
     esac
 fi
 
-needed=0
-
 # Parse command-line arguments.
 # Supports -f/--force to regenerate all caches, or a single file path for processing one image.
 force=false
@@ -114,6 +112,18 @@ needs_processing() {
     return 1
 }
 
+# Function to count how many images require processing.
+count_needed() {
+    needed=0
+    for file in "${backgrounds[@]}"; do
+        for type in "${!filters[@]}"; do
+            if needs_processing "$file" "$type"; then
+                ((needed++))
+            fi
+        done
+    done
+}
+
 # Function to set ImageMagick thread limit based on current power profile.
 # This limits CPU usage to respect power modes.
 set_thread_limit() {
@@ -124,40 +134,37 @@ set_thread_limit() {
     esac
 }
 
-# First pass: Count how many images require processing without doing the work.
-# This optimizes early exit if cache is already up-to-date.
-for file in "${backgrounds[@]}"; do
+# Function to process a specific file if needed.
+process_file() {
+    local file="$1"
     for type in "${!filters[@]}"; do
         if needs_processing "$file" "$type"; then
-            ((needed++))
+            filter="${filters[$type]}"
+            cached="${cache_dir}/$(basename "${file%.*}")-${type}.jpg"
+            if [[ "$single_file" == false ]]; then
+                # Update Waybar with current processing file.
+                echo "Pre-caching $(basename "$cached")" > "$XDG_RUNTIME_DIR/worker.active"
+                vibranium-cmd-refresh-waybar-module worker
+            fi
+            echo "${GRAY}[$(date)] ${BLUE}Processing ($type): ${YELLOW}${cached}${RESET}"
+            # imagemagick will not recognize commands
+            # if we wrap $filter variable in quotation marks
+            # shellcheck disable=SC2086
+            magick "$file" $filter "$cached"
+            vibranium-utils-update-lockscreen
         fi
     done
-done
+}
+
+# First pass: Count how many images require processing without doing the work.
+# This optimizes early exit if cache is already up-to-date.
+count_needed
 
 # Early exit if no processing is needed.
 if ((needed == 0)); then
     log "Hyprlock cache is up to date"  # Assuming 'log' is defined in the sourced lib.
     exit 0
 fi
-
-# Function to process a specific file forcibly for all types.
-process_file_forcibly() {
-    local file="$1"
-    set_thread_limit
-    for type in "${!filters[@]}"; do
-        filter="${filters[$type]}"
-        cached="${cache_dir}/$(basename "${file%.*}")-${type}.jpg"
-        if [[ "$single_file" == false ]]; then
-            # Update Waybar with current processing file.
-            echo "Pre-caching $(basename "$cached")" > "$XDG_RUNTIME_DIR/worker.active"
-            vibranium-cmd-refresh-waybar-module worker
-        fi
-        echo "${GRAY}[$(date)] ${BLUE}Processing ($type): ${YELLOW}${cached}${RESET}"
-        # DO NOT QUOTE THIS
-        magick "$file" $filter "$cached"
-        vibranium-utils-update-lockscreen
-    done
-}
 
 # Function to handle pausing based on power profile.
 # Only applies if not in single_file mode and respect_power is true.
@@ -172,82 +179,77 @@ handle_power_pause() {
         current_profile="$(vibranium-utils-power-profile-get)"
 
         if [[ "$current_profile" == "power-saver" ]]; then
-            # Forcibly generate cache for the current wallpaper before pausing.
+            # Generate cache for the current wallpaper if needed before pausing.
             local current_bg
             current_bg="$(sed -n 's/^preload = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")"
             if [[ -f "$current_bg" ]]; then
-                process_file_forcibly "$current_bg"
+                set_thread_limit
+                process_file "$current_bg"
             fi
 
-            # notify-send -r 1 -t 10000 "Vibranium" "Background cache generation paused due to powersave profile.\nIt will resume once the profile changes or respect option is disabled."
+            # Re-count needed after processing current_bg
+            count_needed
 
-            if [[ "$single_file" == false ]]; then
-                echo "suspended" > "$XDG_RUNTIME_DIR/worker.active"
-                vibranium-cmd-refresh-waybar-module worker
-            fi
+            if (( needed > 0 )); then
+                # notify-send -r 1 -t 10000 "Vibranium" "Background cache generation paused due to powersave profile.\nIt will resume once the profile changes or respect option is disabled."
 
-            local was_paused=true
-
-            echo "${GRAY}[$(date)] ${YELLOW}Pausing due to power-saver${RESET}"
-
-            # Loop until conditions change: either respect_power=false or profile != power-saver.
-            while :; do
-                if [[ "$(vibranium-cmd-get-option VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE)" == false ]]; then
-                    break
+                if [[ "$single_file" == false ]]; then
+                    echo "suspended" > "$XDG_RUNTIME_DIR/worker.active"
+                    vibranium-cmd-refresh-waybar-module worker
                 fi
 
-                current_profile="$(vibranium-utils-power-profile-get)"
-                if [[ "$current_profile" != "power-saver" ]]; then
-                    break
-                fi
-                sleep 1
-            done
+                local was_paused=true
 
-            if [[ "$was_paused" == true ]]; then
-                # notify-send -r 1 -t 5000 "Vibranium" "Background cache generation resumed"
-                unset was_paused
+                echo "${GRAY}[$(date)] ${YELLOW}Pausing due to power-saver${RESET}"
+
+                # Loop until conditions change: either respect_power=false or profile != power-saver.
+                while :; do
+                    if [[ "$(vibranium-cmd-get-option VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE)" == false ]]; then
+                        break
+                    fi
+
+                    current_profile="$(vibranium-utils-power-profile-get)"
+                    if [[ "$current_profile" != "power-saver" ]]; then
+                        break
+                    fi
+                    sleep 1
+                done
+
+                if [[ "$was_paused" == true ]]; then
+                    # notify-send -r 1 -t 5000 "Vibranium" "Background cache generation resumed"
+                    unset was_paused
+                fi
+                echo "${GRAY}[$(date)] ${GREEN}Resuming cache generation${RESET}"
             fi
-            echo "${GRAY}[$(date)] ${GREEN}Resuming cache generation${RESET}"
         fi
     fi
 }
 
-# Initial power pause check before starting processing.
-handle_power_pause
-
 for file in "${backgrounds[@]}"; do
-    if [[ ! -f $file ]]; then
+    if [[ ! -f "$file" ]]; then
         continue
     fi
 
+    file_needs=0
     for type in "${!filters[@]}"; do
-        # Check for pause before each
-        # This allows dynamic response to profile changes mid-process.
-        handle_power_pause
-
-        # Set thread limit fresh for each image, in case profile changed.
-        set_thread_limit
-
         if needs_processing "$file" "$type"; then
-            filter="${filters[$type]}"
-            cached="${cache_dir}/$(basename "${file%.*}")-${type}.jpg"
-
-            if [[ "$single_file" == false ]]; then
-                # Update Waybar with current processing file.
-                echo "Pre-caching $(basename "$cached")" > "$XDG_RUNTIME_DIR/worker.active"
-                vibranium-cmd-refresh-waybar-module worker
-            fi
-
-            echo "${GRAY}[$(date)] ${BLUE}Processing ($type): ${YELLOW}${cached}${RESET}"
-            # DO NOT QUOTE THIS
-            magick "$file" $filter "$cached"
+            ((file_needs++))
         fi
     done
+
+    if (( file_needs == 0 )); then
+        continue
+    fi
+
+    handle_power_pause
+    set_thread_limit
+
+    process_file "$file"
 done
 
 # Cleanup: Remove worker active file and refresh Waybar.
 if [[ "$single_file" == false ]]; then
-    rm "$XDG_RUNTIME_DIR/worker.active"
+    rm -f "$XDG_RUNTIME_DIR/worker.active"
 fi
 
 vibranium-cmd-refresh-waybar-module worker
