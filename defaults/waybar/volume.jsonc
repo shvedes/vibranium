@@ -7,7 +7,16 @@
 
 		"format": "{icon}",
 		"format-muted": "\udb81\udf5f",
-		"format-icons": [ "\udb81\udd7f", "\udb81\udd80", "\udb81\udd7e" ],
-		"tooltip-format": "Volume: {volume}%\nDevice: {desc}"
+		"format-icons": {
+            "headset": "\udb80\udecb",
+            "portable": "\udb82\udda2",
+            "default": [
+                "\udb81\udd7f",
+                "\udb81\udd80",
+                "\udb81\udd7e"
+            ]
+        },
+		"tooltip-format": "Volume: {volume}%\nDevice: {desc}",
+        "ignored-sinks": [ "Easy Effects Sink" ]
 	}
 }
