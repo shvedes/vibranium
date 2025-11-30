@@ -2,6 +2,10 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
+if [[ $VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE == false ]]; then
+    exit 0
+fi
+
 state="$(< "$VIBRANIUM_STATE/night-light")"
 
 if [[ "$state" == "active" ]]; then

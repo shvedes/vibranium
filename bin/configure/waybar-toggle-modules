@@ -63,6 +63,7 @@ while :; do
         "Keyboard layout : $KEYBOARD_LAYOUT_STATUS"
         "Power profile   : $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
         "Color picker    : $VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE"
+        "Night light     : $VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE"
         "Microphone      : $MICROPHONE_ENABLED"
         "Bluetooth       : $BLUETOOTH_ENABLED"
         "Weather         : $VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
@@ -96,6 +97,10 @@ while :; do
             ;;
         "Keyboard layout"*)
             toggle_module 'hyprland/language'
+            ;;
+        "Night light"*)
+            toggle_bool "VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE"
+            vibranium-cmd-refresh-waybar-module night-light
             ;;
         "Color picker"*)
             toggle_bool "VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE"

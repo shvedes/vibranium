@@ -435,8 +435,11 @@ VIBRANIUM_COLOR_PICKER_WAYBAR_ICON="droplet"
 # ============================================ #
 #                                              #
 
-# Note: Changes in this section take effect after reloading Waybar, unless stated otherwise.
-#       To do so, you can reload whole Vibranium configuration by pressing Super+Shift+R.
+# Whether to show the Night Light indicator.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE=true
 
 # Whether to show tooltips with available shortcuts when hovering over a module.
 # Available option: bool
