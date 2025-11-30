@@ -39,6 +39,7 @@ if ! command -v yay >/dev/null; then
 	git clone -q https://aur.archlinux.org/yay
 	cd yay || exit
 	makepkg -sirc --noconfirm &> /dev/null
+    sudo pacman -Rnsc --noconfirm yay-debug &> /dev/null
 	cd "$CWD" || exit
 fi
 
