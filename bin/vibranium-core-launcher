@@ -69,7 +69,6 @@ process_input() {
             elif command -v "$cmd" > /dev/null 2>&1; then
                 vibranium-cmd-launch-cmd "$cmd" $args &
             else
-                # TODO: give the user the option to choose a search engine
                 [ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT" = true ] && exit 1
                 vibranium-cmd-launch-cmd xdg-open "$(search_engine)${input}" &
             fi

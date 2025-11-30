@@ -233,9 +233,7 @@ post_install() {
 	printf '{\n\t"SKIP_HOST_UPDATE": true\n}' \
 		> "$HOME/.config/discord/settings.json"
 
-	if [ -z "$(find /sys/class/backlight -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
-		sudo systemctl -q mask upower.service
-    else
+	if [ ! -z "$(find /sys/class/backlight -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
 		sudo usermod -aG video "$USER"
 	fi
 }
@@ -268,6 +266,7 @@ sudo pacman -Suy --noconfirm &>/dev/null
 install_packages
 create_directories
 
+./install/install_core_pkgs.sh
 ./install/install_gtk_themes.sh
 ./install/install_papirus_icons.sh
 ./install/install_local_bin.sh

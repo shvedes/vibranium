@@ -383,6 +383,13 @@ fi
 log "Updating Spicetify"
 spicetify --quiet refresh
 
+if pidof nvim > /dev/null; then
+    if [ -f "$XDG_CONFIG_HOME/nvim/lua/config/colorscheme.lua" ]; then
+        log "Updaing nvim"
+        pkill -SIGUSR1 nvim
+    fi
+fi
+
 if pidof spotify > /dev/null; then
     log "Active Spotify process found! Refreshing live.."
     hyprctl -q dispatch sendshortcut CTRL, R, class:[Ss]potify
