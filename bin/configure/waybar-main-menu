@@ -9,10 +9,11 @@ WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"
 while :; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    BAR_POSITION="$(sed -n 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WAYBAR_CONFIG")"
-    BAR_HEIGHT="$(sed -n 's/.*"height"[[:space:]]*:[[:space:]]*\([^"]*\),.*/\1/p' "$WAYBAR_CONFIG")"
+    POSITION="$(sed -n 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WAYBAR_CONFIG")"
+    HEIGHT="$(sed -n 's/.*"height"[[:space:]]*:[[:space:]]*\([^"]*\),.*/\1/p' "$WAYBAR_CONFIG")"
+    ICON_SPACING="$(sed -n 's/.*"spacing"[[:space:]]*:[[:space:]]*\([^"]*\),.*/\1/p' "$WAYBAR_CONFIG")"
 
-    case "$BAR_POSITION" in
+    case "$POSITION" in
         "top")    OPTIONS=("Move top bar to bottom") ;;
         "bottom") OPTIONS=("Move bottom bar to top") ;;
     esac
@@ -22,7 +23,7 @@ while :; do
         "false") OPTIONS+=("Show shortcut hints") ;;
     esac
 
-    OPTIONS+=("Configure modules" "Enabled modules" "Height: $BAR_HEIGHT")
+    OPTIONS+=("Configure modules" "Icon spacing : ${ICON_SPACING:-?}" "Enabled modules" "Height : ${HEIGHT:-?}" )
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Waybar options" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
 
@@ -34,6 +35,27 @@ while :; do
     done
 
     case "$CHOSEN" in
+        "Icon spacing"*)
+            while :; do
+                prompt="Icon spacing (int)"
+                input="$(printf "%s" "$prompt" | rofi_cmd "Icon spacing" "-6 - 16")"
+                [[ -z "$input" ]] && break
+
+                [[ ! "$input" =~ ^-?[0-9]+$ ]] && {
+                    notify-send -r 1 -t 2000 "Vibranium" "An integer between -6 and 16"
+                    continue
+                }
+
+                if ((input > 16 || input < -6)); then
+                    notify-send -r 1 -t 2000 "Vibranium" "An integer between -6 and 16"
+                    continue
+                fi
+
+                sed -i -E "s/(\"spacing\"\s*:\s*)-?[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
+                systemctl --user restart waybar
+                break
+            done
+            ;;
         "Height"*)
             while :; do
                 prompt="Waybar height (int)"
@@ -57,7 +79,7 @@ while :; do
             done
             ;;
         "Move"*)
-            case "$BAR_POSITION" in
+            case "$POSITION" in
                 top) vibranium-cmd-set-waybar-position "bottom" ;;
                 bottom) vibranium-cmd-set-waybar-position "top" ;;
             esac

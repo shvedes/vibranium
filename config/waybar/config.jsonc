@@ -2,6 +2,7 @@
 	{
 		// DO NOT EDIT THIS MANUALLY
 		"position": "top",
+        "spacing": 0,
 		"height": 30,
 
 		"layer": "bottom",
