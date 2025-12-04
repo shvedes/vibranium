@@ -119,18 +119,12 @@ rofi_cmd() {
 # Usage: long_running_command & spinner $! "Doing stuff..." "Done"
 #
 # Parameters:
-#   $1 - PID of the process to wait for.
-#   $2 - Message to display alongside the spinner.
-#   $3 - (Optional) Final message to display when the process completes.
+# $1 - PID of the process to wait for.
+# $2 - Message to display alongside the spinner.
+# $3 - (Optional) Final message to display when the process completes.
 #
 # The spinner uses Unicode braille characters for a smooth animation.
 # It clears itself once the process finishes, and optionally prints a success message.
-#
-# Some more examples for spinstr:
-# local spinstr=('-' '\' '|' '/')
-# local spinstr=('▁' '▃' '▄' '▅' '▆' '▇' '▆' '▅' '▄' '▃')
-# local spinstr=('⠁' '⠂' '⠄' '⠂')
-# local spinstr=('←' '↖' '↑' '↗' '→' '↘' '↓' '↙')
 spinner() {
     # The PID of the process to watch
     local pid=$1
@@ -138,8 +132,19 @@ spinner() {
     local msg="$2"
     # Delay between spinner frames (seconds)
     local delay=0.07
-    # Spinner frames (this actually can be any symbol)
-    local spinstr=('-' '\' '|' '/')
+    # Randomly select a spinner style
+    local style=$((RANDOM % 5))
+
+    local spinstr
+
+    case $style in
+        0) spinstr=('▁' '▃' '▄' '▅' '▆' '▇' '▆' '▅' '▄' '▃');;
+        1) spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏');;
+        2) spinstr=('←' '↖' '↑' '↗' '→' '↘' '↓' '↙');;
+        3) spinstr=('-' '\' '|' '/');;
+        4) spinstr=('⠁' '⠂' '⠄' '⠂');;
+    esac
+
     # ANSI sequence to clear the current line
     local clear_line="\r\033[K"
 
