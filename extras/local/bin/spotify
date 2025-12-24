@@ -43,7 +43,7 @@ loop() {
 
 	spicetify --quiet watch -s &
 	sleep 1; killall spotify
-	sleep 1; setsid uwsm app -- /usr/bin/spotify &
+	sleep 1; exec setsid -- /usr/bin/spotify &
 
 	rm "$XDG_RUNTIME_DIR/worker.active"
 	vibranium-cmd-refresh-waybar-module worker
@@ -61,7 +61,8 @@ if command -v spicetify >/dev/null; then
 		msg+="Live theming will be applied after you log in to your account."
 		notify-send -r 1 -t 10000 "Vibranium" "$msg"
 
-		setsid uwsm app -- /usr/bin/spotify &
+		exec setsid -- /usr/bin/spotify &
+
 
 		# Give user some time to read the notification
 		sleep 3
@@ -71,9 +72,9 @@ if command -v spicetify >/dev/null; then
 			killall spicetify
 			wait
 		fi
-		setsid uwsm app -- /usr/bin/spotify
+		exec setsid -- /usr/bin/spotify
 	fi
 else
-	setsid uwsm app -- /usr/bin/spotify
+	exec setsid -- /usr/bin/spotify
 fi
 
