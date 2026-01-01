@@ -20,6 +20,12 @@ if command -v pass > /dev/null; then
     ACTIONS+=("Password manager")
 fi
 
+if [[ -f "$XDG_RUNTIME_DIR/vibranium-timer.remaining" ]]; then
+    ACTIONS+=("<span foreground='${P_YELLOW}'><b>Stop active timer</b></span>")
+else
+    ACTIONS+=("Start new timer")
+fi
+
 ACTIONS+=("Reload Vibranium")
 INDEX=0
 
@@ -47,6 +53,15 @@ while :; do
     done
 
     case "$CHOSEN" in
+        *"Stop active timer"*)
+            pkill --signal TERM -f vibranium-utils-timer
+            notify-send -r 1 "Vibranium" -r 2 "The active timer has been disabled"
+            exit 0
+            ;;
+        "Start new timer")
+            setsid vibranium-utils-timer
+            exit 0
+            ;;
         "Launch Syncthing")
             vibranium-app-syncthing
             vibranium-cmd-kill-rofi

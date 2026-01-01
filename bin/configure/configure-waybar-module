@@ -206,7 +206,7 @@ while :; do
                 msg="Monitoring weather in <span foreground='${P_ACCENT}'><b>$new_value</b></span>"
 
                 if [ "$(vibranium-cmd-get-option VIBRANIUM_BAR_WEATHER_MODULE_ENABLE)" = "true" ]; then
-                    notify-send -r 1 "City updated!" "$msg"
+                    notify-send -r 1 "City updated" "$msg"
                     vibranium-cmd-refresh-waybar-module weather
                 else
                     notify-send -r 1 "City updated, but you forgot to enable the module" "$msg"

@@ -14,4 +14,4 @@ if ! command -v "$cmd" > /dev/null; then
     exit 1
 fi
 
-exec setsid uwsm app -S err -- "$cmd" "$@"
+exec setsid "$cmd" "$@"

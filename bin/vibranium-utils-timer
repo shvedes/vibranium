@@ -1,0 +1,84 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM/bin/vibranium-core-lib"
+
+options=("Seconds" "Minutes" "Hours")
+state="$XDG_RUNTIME_DIR/vibranium-timer.remaining"
+ring="/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
+pw_play_pid=""
+
+cleanup() {
+    local inhibit_pid
+    inhibit_pid="$(pgrep -f "Timer is active")"
+
+    kill -s TERM "$pw_play_pid" 2>/dev/null
+    kill "$inhibit_pid"
+    rm -f "$state"
+
+    vibranium-cmd-refresh-waybar-module timer
+    exit 0
+}
+
+format_time() {
+    local remaining="$1"
+    local hours minutes seconds out=""
+
+    hours=$((remaining / 3600))
+    minutes=$(((remaining % 3600) / 60))
+    seconds=$((remaining % 60))
+
+    (( hours > 0 )) && out+="${hours}h "
+    (( minutes > 0 )) && out+="${minutes}m "
+
+    if (( seconds > 0 || (hours == 0 && minutes == 0) )); then
+        out+="${seconds}s"
+    fi
+
+    printf "%s" "$out"
+}
+
+trap cleanup EXIT INT TERM
+
+while :; do
+    chosen="$(printf "%s\n" "${options[@]}" | rofi_cmd "Set timer for" "ESC to go back")"
+    [[ -z "$chosen" ]] && exit 1
+    [[ " ${options[*]} " == *" $chosen "* ]] || continue
+
+    while :; do
+        prompt="Int, in ${chosen,}"
+        sub_chosen="$(printf "%s" "$prompt" | rofi_cmd "ESC to go back" "${chosen,}")"
+        [[ -z "$sub_chosen" ]] && break
+        [[ "$sub_chosen" =~ ^[0-9]+$ ]] || continue
+
+        case "$chosen" in
+            Seconds) sleep_time="$sub_chosen" ;;
+            Minutes) sleep_time=$(( sub_chosen * 60 )) ;;
+            Hours)   sleep_time=$(( sub_chosen * 3600 )) ;;
+        esac
+        break 2
+    done
+done
+
+[[ -z "$sleep_time" ]] && exit 0
+
+formatted_time="$(format_time "$sleep_time")"
+notify-send -r 2 "Vibranium" "Timer set for <span foreground='${P_YELLOW}'><b>${formatted_time}</b></span>"
+setsid -f systemd-inhibit --what=idle --why="Timer is active" \
+    --who="Vibranium" sleep infinity
+
+time_remaining=$sleep_time
+while (( time_remaining > 0 )); do
+    echo "$time_remaining" > "$state"
+    vibranium-cmd-refresh-waybar-module timer
+    ((time_remaining--))
+    sleep 1
+done
+
+echo "timed out" > "$state"
+vibranium-cmd-refresh-waybar-module timer
+
+while :; do
+    pw-play "$ring" &
+    pw_play_pid=$!
+    wait "$pw_play_pid"
+done

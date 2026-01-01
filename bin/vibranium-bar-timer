@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM/bin/vibranium-core-lib"
+
+state_file="$XDG_RUNTIME_DIR/vibranium-timer.remaining"
+
+if [[ -f "$state_file" ]]; then
+    remaining="$(<"$state_file")"
+else
+    printf '{"text": ""}'
+    exit 1
+fi
+
+tooltip="<span foreground='${WAYBAR_ACCENT}'>Timer is active</span>\n"
+
+if [[ $remaining =~ ^[0-9]+$ ]]; then
+    hours=$((remaining / 3600))
+    minutes=$(((remaining % 3600) / 60))
+    seconds=$((remaining % 60))
+
+    formatted=""
+    [[ $hours -gt 0 ]] && formatted+="${hours}h "
+    [[ $minutes -gt 0 ]] && formatted+="${minutes}m "
+    formatted+="${seconds}s"
+
+    tooltip+="<span foreground='${WAYBAR_YELLOW}'><b>$formatted</b></span> remaining"
+else
+    tooltip+="<span foreground='${WAYBAR_YELLOW}'><b>Time is out!</b></span>"
+fi
+
+printf '{"text": "\uf2f2", "tooltip": "%s"}' "$tooltip"
