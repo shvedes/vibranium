@@ -239,7 +239,11 @@ post_install() {
 	fi
 }
 
-git checkout -q --detach "$(git tag --sort=-creatordate | head -n 1)"
+if ! $(git branch | grep -q detached); then
+    git checkout -q --detach "$(git tag --sort=-creatordate | head -n 1)"
+    exec "$0"
+    exit 0
+fi
 
 sudo -v; clear
 # Move VT to the bottom
