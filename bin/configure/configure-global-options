@@ -5,6 +5,68 @@ source "$VIBRANIUM_PATH/configure/configure-lib"
 
 INDEX=0
 
+_user_wallpapers() {
+    local folder files
+
+    _action() {
+        local target options chosen
+        target="$1"
+        options=("Open" "Delete")
+        while :; do
+            chosen="$(printf "%s\n" "${options[@]}" | rofi_cmd "$target" "ESC to go back")"
+            [[ -z "$chosen" ]] && return # ESC pressed, go back
+
+            # Check if chosen is in options (using space-separated check for simplicity)
+            if ! [[ " ${options[*]} " =~ " $chosen " ]]; then
+                continue
+            fi
+
+            case "$chosen" in
+                "Open")
+                    vibranium-cmd-launch-cmd imv "$folder/$target"
+                    ;;
+                "Delete")
+                    rm "$folder/$target"
+
+                    if [[ "$(basename $(vibranium-utils-wallpaper-get))" == "$target" ]]; then
+                        vibranium-core-set-wallpaper --next
+                    fi
+
+                    # Refresh files list after delete
+                    files=()
+                    for f in "$folder"/*; do
+                        [[ -f "$f" ]] && files+=("$(basename "$f")")
+                    done
+                    ;;
+            esac
+            break
+        done
+    }
+
+    folder="$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vibranium-theme-get)"
+    files=()
+
+    for f in "$folder"/*; do
+        [[ -f "$f" ]] && files+=("$(basename "$f")")
+    done
+
+    while :; do
+        if [[ ${#files[@]} -eq 0 ]]; then
+            return
+        fi
+
+        chosen="$(printf "%s\n" "${files[@]}" | rofi_cmd "User wallpapers" "ESC to go back")"
+        [[ -z "$chosen" ]] && return
+
+        # Check if chosen is in files
+        if ! [[ " ${files[*]} " =~ " $chosen " ]]; then
+            continue
+        fi
+
+        _action "$chosen"
+    done
+}
+
 _grayscale_enabled() {
     local opt=
     opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
@@ -225,6 +287,12 @@ while :; do
         "<b>App launcher settings</b>"
     )
 
+    for f in "$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vibranium-theme-get)"/*; do
+        [[ -e $f ]] || continue
+        OPTIONS+=("<b>Manage user wallpapers</b>")
+        break
+    done
+
     if [[ "$(hyprctl -j getoption animations:enabled | jq -r .int)" == 1 ]]; then
         OPTIONS+=("<b>Screen / Border flash</b>")
     else
@@ -249,6 +317,9 @@ while :; do
     done
 
     case "$CHOSEN" in
+        *"Manage"*)
+            _user_wallpapers
+        ;;
         "Reading mode"*)
             shader="$VIBRANIUM/defaults/hypr/grayscale.frag"
             config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
