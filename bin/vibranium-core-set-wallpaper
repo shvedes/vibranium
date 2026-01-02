@@ -53,6 +53,8 @@ toggle_wallpaper() {
     esac
 }
 
+mkdir -p "$USER_WALLPAPERS"
+
 if [[ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" == true ]]; then
     if [[ "$(systemctl --user is-active hyprpaper)" != "active" ]]; then
         msg="For some reason, the Wallpaper Daemon wasn't enabled.\n"
@@ -90,16 +92,18 @@ if [[ ! -f "$WALLS/$(basename "$WALLPAPER_PATH")" ]]; then
 fi
 
 # Update on all monitors
-hyprctl -q hyprpaper reload ", $WALLPAPER_PATH"
+hyprctl -q hyprpaper wallpaper ", $WALLPAPER_PATH"
 
 # Save hyprpaper config
 printf "# Auto-generated file! All changes will be overwritten.\n" > "$CONF"
-printf "preload = %s\nwallpaper = , %s" "${WALLPAPER_PATH}" "$WALLPAPER_PATH" >> "$CONF"
+printf "wallpaper:monitor = \nwallpaper:path = %s" "$WALLPAPER_PATH" >> "$CONF"
+#printf "wallpaper {\n\tmonitor = \n\tpath = %s\n\}" "$WALLPAPER_PATH" >> "$CONF"
+# printf "preload = %s\nwallpaper = , %s" "${WALLPAPER_PATH}" "$WALLPAPER_PATH" >> "$CONF"
 
 # Save to state file for further restpre on theme switch
-STATE_FILE="$VIBRANIUM_STATE/wallpaper/$(vibranium-theme-get)"
+STATE_FILE="$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME"
 mkdir -p "$VIBRANIUM_STATE/wallpaper"
 printf "%s" "$WALLPAPER_PATH" > "$STATE_FILE"
 
 # Update lockscreen background
-vibranium-utils-update-lockscreen &
+vibranium-utils-update-lockscreen

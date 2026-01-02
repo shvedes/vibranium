@@ -61,7 +61,7 @@ echo $$ > "$pid_file"
 # Load all background images from the current theme's backgrounds directory
 backgrounds=("$XDG_CONFIG_HOME/vibranium/theme/current/backgrounds/"*)
 backgrounds+=("$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vibranium-theme-get)"/*)
-backgrounds+=("$(sed -n 's/^preload = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")")
+backgrounds+=("$(sed -n 's/wallpaper:path = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")")
 
 # Define the cache directory for processed images.
 # Create it if it doesn't exist to avoid errors later.
@@ -181,7 +181,7 @@ handle_power_pause() {
         if [[ "$current_profile" == "power-saver" ]]; then
             # Generate cache for the current wallpaper if needed before pausing.
             local current_bg
-            current_bg="$(sed -n 's/^preload = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")"
+            current_bg="$(sed -n 's/^wallpaper:path = //p' "$XDG_CONFIG_HOME/hypr/hyprpaper.conf")"
             if [[ -f "$current_bg" ]]; then
                 set_thread_limit
                 process_file "$current_bg"
@@ -253,4 +253,4 @@ if [[ "$single_file" == false ]]; then
 fi
 
 vibranium-cmd-refresh-waybar-module worker
-vibranium-utils-update-lockscreen
+#vibranium-utils-update-lockscreen

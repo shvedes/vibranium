@@ -3,7 +3,7 @@
 HYRPPAPER_CONF="$XDG_CONFIG_HOME/hypr/hyprpaper.conf"
 
 if [[ "$1" =~ ^(-b|--basename)$ ]]; then
-    basename "$(sed -n 's/^preload = //p' "$HYRPPAPER_CONF")"
+    basename "$(sed -n 's/^wallpaper:path = //p' "$HYRPPAPER_CONF")"
 else
-    sed -n 's/^preload = //p' "$HYRPPAPER_CONF"
+    sed -n 's/^wallpaper:path = //p' "$HYRPPAPER_CONF"
 fi
