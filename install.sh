@@ -169,7 +169,7 @@ enable_system_services() {
 	local user_services
 
 	system_services=(
-		"ly"
+		"ly@tty1"
 		"power-profiles-daemon"
 		"bluetooth"
 	)
