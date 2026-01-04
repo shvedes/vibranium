@@ -1,5 +1,4 @@
 
-@import url("../vibranium/theme/current/waybar.css");
 @import url("../../.local/share/vibranium/defaults/waybar/style.css");
 
 window#waybar {
