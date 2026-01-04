@@ -95,10 +95,8 @@ fi
 hyprctl -q hyprpaper wallpaper ", $WALLPAPER_PATH"
 
 # Save hyprpaper config
-printf "# Auto-generated file! All changes will be overwritten.\n" > "$CONF"
+printf "# Auto-generated file! All changes will be overwritten.\nsplash = false\n" > "$CONF"
 printf "wallpaper:monitor = \nwallpaper:path = %s" "$WALLPAPER_PATH" >> "$CONF"
-#printf "wallpaper {\n\tmonitor = \n\tpath = %s\n\}" "$WALLPAPER_PATH" >> "$CONF"
-# printf "preload = %s\nwallpaper = , %s" "${WALLPAPER_PATH}" "$WALLPAPER_PATH" >> "$CONF"
 
 # Save to state file for further restpre on theme switch
 STATE_FILE="$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME"
