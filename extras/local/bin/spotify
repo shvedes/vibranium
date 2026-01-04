@@ -9,8 +9,8 @@ if [[ ! -f /opt/spotify/spotify ]]; then
 fi
 
 if pidof spotify >/dev/null; then
-	hyprctl -q dispatch workspace "$(hyprctl -j clients | jq -r '.[] | select(.class=="Spotify") | .workspace.name')"
-	exit 1
+	hyprctl -q dispatch workspace "$(hyprctl -j clients | jq -r '.[] | select(.class=="spotify") | .workspace.name')"
+	exit 0
 fi
 
 download_theme() {
