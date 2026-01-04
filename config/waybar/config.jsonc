@@ -28,6 +28,7 @@
 			"$XDG_DATA_HOME/vibranium/defaults/waybar/reading-mode.jsonc",
 			"$XDG_DATA_HOME/vibranium/defaults/waybar/recording-indicator.jsonc",
 			"$XDG_DATA_HOME/vibranium/defaults/waybar/separator.jsonc",
+			"$XDG_DATA_HOME/vibranium/defaults/waybar/timer.jsonc",
 			"$XDG_DATA_HOME/vibranium/defaults/waybar/tray.jsonc",
 			"$XDG_DATA_HOME/vibranium/defaults/waybar/group-tray.jsonc",
 			"$XDG_DATA_HOME/vibranium/defaults/waybar/volume.jsonc",
@@ -43,6 +44,7 @@
 		"modules-center": ["custom/weather","clock","custom/pacman"],
 		"modules-right": [
 			"custom/vibranium-update",
+            "custom/timer",
 			"custom/confirm-kill",
 			"custom/worker",
 			"custom/reading-mode",
