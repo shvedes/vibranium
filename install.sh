@@ -179,6 +179,7 @@ enable_system_services() {
 		"cliphist"
 		"hypridle"
 		"hyprpaper"
+        "alacritty"
 		"hyprsunset"
 		"gnome-polkit"
         "vibranium-startup"

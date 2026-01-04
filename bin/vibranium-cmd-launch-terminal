@@ -9,15 +9,13 @@ args=()
 
 case "$VIBRANIUM_DEFAULT_TERMINAL" in
     "alacritty")
-        # If at least one active Alacritty window already exists,
-        # send an IPC signal to create a new window in the same process to save RAM.
-        if pidof alacritty > /dev/null; then
-            args+=(msg create-window)
+        args+=(msg create-window)
+
+        if [[ ! "$(systemctl --user is-active alacritty)" == "active" ]]; then
+            systemctl -q --user enable --now alacritty
         fi
 
-        if command -v "$1" > /dev/null; then
-            args+=(-e)
-        fi
+        command -v "$1" > /dev/null && args+=(-e)
         ;;
 esac
 
