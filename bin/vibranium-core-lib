@@ -388,7 +388,7 @@ _flash() {
         for _ in 1 2; do
             hyprctl -q "keyword general:col.active_border rgb(ffffff)"
             sleep "$seconds"
-            hyprctl -q reload
+            hyprctl -q reload config-only
         done
     else
         hyprctl -q hyprsunset gamma 150

@@ -186,7 +186,42 @@ while :; do
             done
             ;;
         "Include cursor"*) toggle_bool "VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR"    ;;
-        "Save to disk"*)   toggle_bool "VIBRANIUM_SCREENSHOT_SAVE_TO_DISK"      ;;
+        "Save to disk"*)
+            if [[ "$(toggle_bool -v "VIBRANIUM_SCREENSHOT_SAVE_TO_DISK")" == "false" ]]; then
+                if [[ ! -z "$(ls -A "$HOME/Pictures/Screenshots")" ]]; then
+                    prompt="Would you like to delete existing screenshots?"
+
+                    while :; do
+                        input="$(printf "Yes\nNo" | rofi_cmd "$prompt")"
+
+                        case "$input" in
+                            "Yes")
+                                confirm="$(printf "DELETE\nCancel" | rofi_cmd "This will permanently remove all screenshots")"
+                                [[ "$confirm" != "DELETE" ]] && break
+
+                                msg+="<span foreground='${P_PURPLE}'><i>\$HOME</i></span>"
+                                msg+="<span foreground='${P_YELLOW}'><i>/Pictures/Screenshots/</i></span>"
+                                msg+="<span foreground='${P_PURPLE}'><b><i>*</i></b></span> "
+
+                                # Prefer trash first, if available
+                                if command -v trash > /dev/null; then
+                                    trash "$HOME"/Pictures/Screenshots/*
+                                    msg+="moved to trash"
+                                else
+                                    rm -rf "$HOME"/Pictures/Screenshots/*
+                                    msg+="successfully deleted"
+                                fi
+                                notify-send -r 1 -t 5000 "Vibranium" "$msg"
+                                break
+                                ;;
+                            "No"|"") break ;;
+                            *) continue ;;
+                        esac
+                    done
+
+                fi
+            fi
+            ;;
         "Flash border"*)   toggle_bool "VIBRANIUM_SCREENSHOT_FLASH_BORDER"      ;;
         "Notification"*)   toggle_bool "VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION" ;;
     esac
