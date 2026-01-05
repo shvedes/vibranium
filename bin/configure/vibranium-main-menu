@@ -70,7 +70,6 @@ while :; do
         "General"
         "Set font"
         "Hyprland"
-        "Set theme"
         "Recording"
         "Brightness"
         "Screenshots"
@@ -125,12 +124,6 @@ while :; do
             ;;
         "Color Picker")
             configure-color-picker
-            ;;
-        "Set theme")
-            if vibranium-theme-set; then
-                vibranium-cmd-kill-rofi
-                exit 0
-            fi
             ;;
         "General")
             configure-global-options

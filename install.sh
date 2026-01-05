@@ -240,7 +240,7 @@ post_install() {
 	fi
 }
 
-if ! $(git branch | grep -q detached); then
+if ! git branch | grep -q detached; then
     git checkout -q --detach "$(git tag --sort=-creatordate | head -n 1)"
     exec "$0"
     exit 0
