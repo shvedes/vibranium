@@ -83,11 +83,19 @@ fi
 # Split for readability
 case "$1" in
     "--web")
+        if ! command -v chromium > /dev/null; then
+            notify-send -r 3 -t 5000 "Vibranium" "The web apps are unavailable because the Chromium web browser is not found"
+            exit 1
+        fi
         opt_args+=(-drun-categories WebApp -display-drun "Web Apps" -no-fixed-num-lines true -disable-history)
         opt_args+=(-icon-theme Vibranium -theme-str 'window {width: 300;}')
         opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
         ;;
     "--ai")
+        if ! command -v chromium > /dev/null; then
+            notify-send -r 3 -t 5000 "Vibranium" "The web apps are unavailable because the Chromium web browser is not found"
+            exit 1
+        fi
         opt_args+=(-drun-categories AI -display-drun "AIs" -no-fixed-num-lines true -disable-history)
         opt_args+=(-icon-theme Vibranium -theme-str 'window {width: 250;}')
         opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
