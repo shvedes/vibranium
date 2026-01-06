@@ -1,37 +1,25 @@
 #!/usr/bin/env bash
 
 # Move Waybar and Dunst to top or bottom.
-# Usage: ./script.sh [-q] top|bottom
-# -q : quiet mode (no notification)
+# Usage: ./script.sh top|bottom
 # Updates configs, restarts Waybar, refreshes Dunst.
 
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
 CURRENT_POSITION="$(grep position "$XDG_CONFIG_HOME/waybar/config.jsonc" | awk -F'"' '{print $4}')"
 
-if [ -z "$1" ]; then
-    echo "Usage: ./$(basename "$0") [-q] top|bottom"
-    exit 1
-fi
+usage() {
+    echo "Usage: ./$(basename "$0") top|bottom"
+}
 
-if [[ "$1" == "-q" ]]; then
-    quiet=true
-    move_to="${2,,}"
-else
-    quiet=false
-    move_to="${1,,}"
-fi
-
-if [[ -z "$move_to" ]]; then
-    echo "Usage: ./$(basename "$0") [-q] top|bottom"
-    exit 1
-fi
-
-if [[ "$CURRENT_POSITION" == "$move_to" ]]; then
+if [[ "$CURRENT_POSITION" == "$1" ]]; then
     exit 0
+elif [ -z "$1" ]; then
+    usage
+    exit 1
 fi
 
-case ${move_to} in
+case $1 in
     "top")
         sed -i "/position/s/${CURRENT_POSITION}/top/" \
             "$XDG_CONFIG_HOME/waybar/config.jsonc"
@@ -63,17 +51,14 @@ case ${move_to} in
         fi
         ;;
     *)
-        echo "Invalid target: $move_to"
+        echo "Invalid target: $1"
         exit 1
         ;;
 esac
 
 # At first glance, systemctl --user reload waybar would seem to be the ideal solution, and Waybar supports it
-# but unfortunately, when reloading, Waybar loses its connection to Hyprland's IPC, causing the workspaces module to stop working.
-# As I understand it, this is a universal problem.
+# but unfortunately, when reloading, Waybar loses its connection to Hyprland's IPC, causing the workspaces and language modules to stop working.
+# As I understand it, this is a problem on Hyprland's side.
 systemctl --user restart waybar
 vibranium-cmd-refresh-dunst
 
-if [[ "$quiet" != true ]]; then
-    notify-send -r 1 -t 1500 "Vibranium" "Bar moved to <span foreground='$P_ACCENT'>${move_to}</span>"
-fi
