@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+
+# In case if Hyprlock crashed, you can switch to another tty and
+# log in then call this script (available in $PATH)
+# in order to unlock "crashed session"
+pkill --signal USR1 hyprlock || true
