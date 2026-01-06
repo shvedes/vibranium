@@ -58,7 +58,7 @@ mkdir -p "$USER_WALLPAPERS"
 if [[ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" == true ]]; then
     if [[ "$(systemctl --user is-active hyprpaper)" != "active" ]]; then
         msg="For some reason, the Wallpaper Daemon wasn't enabled.\n"
-        msg+="The system service was enabled and the wallpaper was set"
+        msg+="The system service has been enabled"
         notify-send -r 1 -t 5000 "Vibranium" "$msg"
         systemctl -q --user enable --now hyprpaper &
     fi
