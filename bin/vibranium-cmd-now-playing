@@ -18,26 +18,35 @@ source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 check_bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN true
 
 album_art="$XDG_RUNTIME_DIR/album_art"
+state_file="$XDG_RUNTIME_DIR/now_playing.cache"
 
 pc_status="$(playerctl status 2>/dev/null || true)"
 mpd_status="$(mpc status 2>/dev/null | awk 'NR==2 {print $1}' || true)"
 
 if [[ "$pc_status" == "Playing" ]]; then
     player="playerctl"
-    IFS='^' read -r title artist <<< "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
-
+    mkdir -p "$(dirname "$state_file")"
+    echo "$player" > "$state_file"
+    IFS='^' read -r title artist <<< \
+        "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
 elif [[ "$mpd_status" == "[playing]" ]]; then
     player="mpd"
-    IFS='^' read -r title artist <<< "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
-
-elif [[ "$pc_status" == "Paused" ]]; then
-    player="playerctl"
-    IFS='^' read -r title artist <<< "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
-
-elif [[ "$mpd_status" == "[paused]" ]]; then
-    player="mpd"
-    IFS='^' read -r title artist <<< "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
-
+    mkdir -p "$(dirname "$state_file")"
+    echo "$player" > "$state_file"
+    IFS='^' read -r title artist <<< \
+        "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
+elif [[ -f "$state_file" ]]; then
+    player="$(<"$state_file")"
+    case "$player" in
+        playerctl)
+            IFS='^' read -r title artist <<< \
+                "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
+            ;;
+        mpd)
+            IFS='^' read -r title artist <<< \
+                "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
+            ;;
+    esac
 else
     echo "No active players" >&2
     exit 1
