@@ -14,7 +14,7 @@
 
 #4f8257 # Green Dim
 #5e9a67 # Green
-#7db085 # Green Bright
+#75b9a4 # Green Bright
 
 #7b6017 # Yellow Dim
 #987717 # Yellow

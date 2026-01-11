@@ -13,18 +13,18 @@ body.vibranium {
 	--foreground-3: #9b9d7a;
 	--foreground-4: #888a6c;
 
-	--green-0: #5e9a67;
+	--green-0: #a0c5a5;
 	--green-1: #7db085;
 
 	--blue-0: #2374af;
 	--blue-1: #2a8ed5;
-	
+
 	--yellow-0: #987717;
 	--yellow-1: #cca648;
 
 	--orange-0: #e39a39;
 	--orange-1: #efb570;
-	
+
 	--red-0: #970808;
 	--red-1: #b04531;
 
@@ -45,7 +45,7 @@ body.vibranium {
 	--border-radius-low:  2px;
 
 	/* ============================================== */
-	
+
 	font-size: 14px;
 
 	/* ============================================== */

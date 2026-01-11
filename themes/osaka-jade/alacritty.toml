@@ -2,7 +2,7 @@
 background = "#111c18"
 foreground = "#c1c497" # Slightly datrker than the default foreground color
 dim_foreground    = "#9b9d7a"
-bright_foreground = "#7db085"
+bright_foreground = "#75b9a4"
 
 [colors.cursor]
 text   = "#111c18"
@@ -10,7 +10,7 @@ cursor = "#e4e5d1"
 
 [colors.vi_mode_cursor]
 text   = "#e6eaea"
-cursor = "#5e9a67"
+cursor = "#75b9a4"
 
 [colors.search.matches]
 background = "#263c33"
@@ -49,7 +49,7 @@ white   = "#d3d5b4"
 [colors.bright]
 black   = "#436054"
 red     = "#b04531"
-green   = "#7db085"
+green   = "#75b9a4"
 yellow  = "#cca648"
 blue    = "#2a8ed5"
 magenta = "#be5580"
