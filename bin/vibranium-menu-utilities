@@ -10,7 +10,15 @@ else
     ACTIONS+=("Block sleep")
 fi
 
-ACTIONS+=("Apply tweaks" "Video downscaler")
+ACTIONS+=("Apply tweaks")
+
+if [[ -f "$XDG_RUNTIME_DIR/vibranium-timer.remaining" ]]; then
+    ACTIONS+=("<span foreground='${P_YELLOW}'><b>Stop active timer</b></span>")
+else
+    ACTIONS+=("Start new timer")
+fi
+
+ACTIONS+=("Video downscaler")
 
 if command -v syncthing > /dev/null; then
     ACTIONS+=("Launch Syncthing")
@@ -20,11 +28,6 @@ if command -v pass > /dev/null; then
     ACTIONS+=("Password manager")
 fi
 
-if [[ -f "$XDG_RUNTIME_DIR/vibranium-timer.remaining" ]]; then
-    ACTIONS+=("<span foreground='${P_YELLOW}'><b>Stop active timer</b></span>")
-else
-    ACTIONS+=("Start new timer")
-fi
 
 ACTIONS+=("Reload Vibranium")
 INDEX=0
