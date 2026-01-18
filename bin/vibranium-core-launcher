@@ -69,8 +69,10 @@ process_input() {
             elif command -v "$cmd" > /dev/null 2>&1; then
                 vibranium-cmd-launch-cmd "$cmd" $args &
             else
-                [ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT" = true ] && exit 1
-                vibranium-cmd-launch-cmd xdg-open "$(search_engine)${input}" &
+                if [[ "$LAUNCHER_MODE" == "default" ]]; then
+                    [ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT" = true ] && exit 1
+                    vibranium-cmd-launch-cmd xdg-open "$(search_engine)${input}" &
+                fi
             fi
             ;;
     esac
@@ -90,6 +92,7 @@ case "$1" in
         opt_args+=(-drun-categories WebApp -display-drun "Web Apps" -no-fixed-num-lines true -disable-history)
         opt_args+=(-icon-theme Vibranium -theme-str 'window {width: 300;}')
         opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
+        LAUNCHER_MODE="web"
         ;;
     "--ai")
         if ! command -v chromium > /dev/null; then
@@ -99,14 +102,17 @@ case "$1" in
         opt_args+=(-drun-categories AI -display-drun "AIs" -no-fixed-num-lines true -disable-history)
         opt_args+=(-icon-theme Vibranium -theme-str 'window {width: 250;}')
         opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
+        LAUNCHER_MODE="ai"
         ;;
     "--power")
         opt_args+=(-drun-categories Power -display-drun "Power" -no-fixed-num-lines true -disable-history)
         opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
         opt_args+=(-icon-theme Vibranium)
+        LAUNCHER_MODE="power"
         ;;
     *)
         opt_args+=(-drun-exclude-categories 'WebApp,AI,Power')
+        LAUNCHER_MODE="default"
         ;;
 esac
 
