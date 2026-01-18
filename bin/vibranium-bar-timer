@@ -11,7 +11,10 @@ else
     exit 1
 fi
 
-tooltip="<span foreground='${WAYBAR_ACCENT}'>Timer is active</span>\n"
+icon="\uf2f2"
+text="$icon"
+tooltip="<span foreground='${WAYBAR_ACCENT}'>Timer is active</span>"
+class="active"
 
 if [[ $remaining =~ ^[0-9]+$ ]]; then
     hours=$((remaining / 3600))
@@ -23,9 +26,12 @@ if [[ $remaining =~ ^[0-9]+$ ]]; then
     [[ $minutes -gt 0 ]] && formatted+="${minutes}m "
     formatted+="${seconds}s"
 
-    tooltip+="<span foreground='${WAYBAR_YELLOW}'><b>$formatted</b></span> remaining"
+    text+="  <span foreground='gray'>${formatted}</span>"
+    tooltip+="\n<span foreground='${WAYBAR_YELLOW}'><b>${formatted}</b></span> remaining"
 else
-    tooltip+="<span foreground='${WAYBAR_YELLOW}'><b>Time is out!</b></span>"
+    text+=" !"
+    tooltip="<span foreground='${WAYBAR_YELLOW}'><b>Time is out!</b></span>"
+    class="expired"
 fi
 
-printf '{"text": "\uf2f2", "tooltip": "%s"}' "$tooltip"
+printf '{"text": "%s", "tooltip": "%s", "class": "%s"}' "$text" "$tooltip" "$class"
