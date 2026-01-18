@@ -6,7 +6,7 @@ check_enum VIBRANIUM_BAR_INHIBITOR_ICON "lock" lock coffee eye
 case "$VIBRANIUM_BAR_INHIBITOR_ICON" in
     "coffee") icon="<span rise='3pt' size='11000'>\uf0f4</span>" ;;
     "lock")   icon="\uf023" ;;
-    "eye")    icon="<span size='10500'>\udb80\ude08</span>" ;;
+    "eye")    icon="<span size='10500'>\udb80\ude09</span>" ;;
 esac
 
 tooltip="<span foreground='${WAYBAR_ACCENT}'><b>  Sleep blocked </b></span>"
