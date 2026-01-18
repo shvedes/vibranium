@@ -80,3 +80,18 @@ tooltip {
 	color: @urgent
 }
 
+#custom-timer.expired {
+    animation: timer-flash 1.05s infinite;
+}
+
+@keyframes timer-flash {
+    0% {
+        color: @foreground;
+    }
+    50% {
+        color: @urgent;
+    }
+    100% {
+        color: @foreground;
+    }
+}

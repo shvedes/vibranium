@@ -19,7 +19,7 @@ configuration {
 	display-run         : "Command";
 	display-combi       : "Search";
 	display-emoji       : "Emoji";
-	display-drun        : "Apps";
+	display-drun        : "Search";
 	display-ssh         : "SSH";
 
 	icon-theme          : "Papirus";
@@ -115,7 +115,7 @@ prompt {
 entry {
     text-color:        var(foreground);
     placeholder-color: var(foreground-muted);
-    placeholder:       "search";
+    placeholder:       " apps & web";
 }
 
 element-icon {
