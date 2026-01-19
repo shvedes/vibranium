@@ -4,6 +4,6 @@ Version=1.0
 Name=Lock session
 Icon=lock
 Keywords=Session;Lock;Screensaver
-Exec=vibranium-core-lock-session
+Exec=loginctl lock-session
 Terminal=false
 Categories=Power;

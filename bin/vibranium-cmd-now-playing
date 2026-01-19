@@ -113,7 +113,7 @@ fi
 
 # Even if the file inside $album_art does not exist, notify-send will still send a notification,
 # although without the cover art, so we do not check for the existence of the file.
-notify-send -r 5 -i "$album_art" "Now Playing" "$notify_body"
+notify-send -r 5 -t 5000 -i "$album_art" "Now Playing" "$notify_body"
 
 # Even though the image may be small, we don't need junk in RAM.
 rm -f "$album_art"
