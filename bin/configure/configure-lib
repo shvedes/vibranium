@@ -30,3 +30,254 @@ toggle_bool() {
             ;;
     esac
 }
+
+align_options() {
+    local options=("$@")
+    local max_len=0
+    local has_colon_options=()
+
+    for option in "${options[@]}"; do
+        if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
+            local label="${BASH_REMATCH[1]}"
+
+            local clean_label
+            clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
+
+            local len=${#clean_label}
+            if (( len > max_len )); then
+                max_len=$len
+            fi
+            has_colon_options+=("$option")
+        fi
+    done
+
+    local aligned_options=()
+    for option in "${options[@]}"; do
+        if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
+            local label="${BASH_REMATCH[1]}"
+            local value="${BASH_REMATCH[2]}"
+
+            local clean_label
+            clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
+
+            local len=${#clean_label}
+            local padding=$((max_len - len))
+            local padded_label="$label"
+
+            for ((j=0; j<padding; j++)); do
+                padded_label+=" "
+            done
+
+            if [[ "${value,,}" == "true" ]]; then
+                value="yes"
+            elif [[ "${value,,}" == "false" ]]; then
+                value="no"
+            fi
+            aligned_options+=("$padded_label : $value")
+        else
+            aligned_options+=("$option")
+        fi
+    done
+
+    for aligned in "${aligned_options[@]}"; do
+        echo "$aligned"
+    done
+}
+
+# Usage:
+# edit_digit [--verify] "Prompt base" "Rofi title" "int|float" min max [OPTION_NAME] [SETTINGS_FILE]
+#
+# --verify  check-only mode: validate input and print it, do not call option-validate
+#     and do not modify any files
+edit_digit() {
+    local check_only=false
+
+    # parse flags
+    while [[ "$1" == -* ]]; do
+        case "$1" in
+            --verify) check_only=true ;;
+            *) return 1 ;;
+        esac
+        shift
+    done
+
+    local prompt_base="$1"
+    local rofi_title="$2"
+    local type="$3"    # "int" or "float"
+    local min_val="$4"
+    local max_val="$5"
+    local opt_name="${6:-}"
+    local settings_file="$VIBRANIUM_USER_SETTINGS"
+
+    local range_text="${min_val}-${max_val}"
+    local prompt="${prompt_base} (${type})"
+
+    while true; do
+        local input
+        input="$(printf "%s\n" "$prompt" | rofi_cmd "$rofi_title" "$range_text")"
+
+        # rofi cancelled
+        [[ -z "$input" ]] && return 1
+        [[ "$input" = "$prompt" ]] && continue
+
+        # trim whitespace
+        input="${input#"${input%%[![:space:]]*}"}"
+        input="${input%"${input##*[![:space:]]}"}"
+
+        local valid=true
+
+        if [[ "$type" == "int" ]]; then
+            if ! [[ "$input" =~ ^[0-9]+$ ]]; then
+                valid=false
+            else
+                local inrange
+                inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
+                          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
+                [[ "$inrange" != 1 ]] && valid=false
+            fi
+
+        elif [[ "$type" == "float" ]]; then
+            if ! [[ "$input" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+                valid=false
+            else
+                local inrange
+                inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
+                          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
+                [[ "$inrange" != 1 ]] && valid=false
+
+                if [[ "$valid" == true ]]; then
+                    input=$(awk -v v="$input" '
+                        BEGIN {
+                            v+=0
+                            if (v == int(v)) printf "%d.0", int(v)
+                            else printf "%g", v
+                        }')
+                fi
+            fi
+        else
+            return 1
+        fi
+
+        if [[ "$valid" == false ]]; then
+            notify-send -r 5 -u critical -t 1500 "Vibranium" \
+                "A ${type} between ${min_val} and ${max_val}!"
+            continue
+        fi
+
+        # check-only mode: just return the validated value
+        if [[ "$check_only" == true ]]; then
+            printf "%s" "$input"
+            return 0
+        fi
+
+        # full edit mode
+        if [[ -n "$opt_name" ]]; then
+            option-validate "$opt_name" || return 1
+
+            if grep -qE "^${opt_name}=" "$settings_file" 2>/dev/null; then
+                sed -i "/^${opt_name}/s/=.*/=${input}/" "$settings_file"
+            else
+                printf "%s=%s\n" "$opt_name" "$input" >> "$settings_file"
+            fi
+        fi
+
+        printf "%s" "$input"
+        return 0
+    done
+}
+
+# check_digit() {
+#     local prompt_base="$1"
+#     local rofi_title="$2"
+#     local type="$3"    # "int" or "float"
+#     local min_val="$4"
+#     local max_val="$5"
+#
+#     # auto-generated range hint for rofi
+#     local range_text="${min_val}-${max_val}"
+#     local prompt="$prompt_base ($type)"
+#
+#     while true; do
+#         local input
+#         input="$(printf "%s\n" "$prompt" | rofi_cmd "$rofi_title" "$range_text")"
+#
+#         [[ -z "$input" ]] && return 1
+#         [[ "$input" = "$prompt" ]] && continue
+#
+#         # trim leading/trailing whitespace
+#         input="${input#"${input%%[![:space:]]*}"}"
+#         input="${input%"${input##*[![:space:]]}"}"
+#
+#         local valid=true
+#
+#         if [[ "$type" == "int" ]]; then
+#             # allow only digits for integer
+#             if ! [[ "$input" =~ ^[0-9]+$ ]]; then
+#                 valid=false
+#             else
+#                 # range check for integers via awk
+#                 local inrange
+#                 inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
+#                           'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
+#                 [[ "$inrange" != 1 ]] && valid=false
+#             fi
+#
+#         elif [[ "$type" == "float" ]]; then
+#             # allow floats like "1", "1.0", ".5", "0.5"
+#             if ! [[ "$input" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+#                 valid=false
+#             else
+#                 # range check for floats via awk
+#                 local inrange
+#                 inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
+#                           'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
+#                 [[ "$inrange" != 1 ]] && valid=false
+#
+#                 # if user entered an integer while float expected, convert to float (add .0)
+#                 if [[ "$valid" == true && "$input" =~ ^[0-9]+$ ]]; then
+#                     # ensure we return a float representation like "1.0"
+#                     input="$(awk -v v="$input" 'BEGIN { printf "%d.0", v }')"
+#                 else
+#                     # normalize float formatting (remove leading zeros where appropriate)
+#                     input="$(awk -v v="$input" '
+#                         BEGIN { v+=0; # print minimal decimal representation
+#                         s = sprintf("%g", v);
+#                         # if value is integer, force one decimal place
+#                         if (v == int(v)) printf "%d.0", int(v);
+#                         else printf "%s", s }'
+#                     )"
+#                 fi
+#             fi
+#         else
+#             return 1
+#         fi
+#
+#         if [[ "$valid" == false ]]; then
+#             notify-send -r 5 -u critical -t 1500 "Vibranium" "A $type between $min_val and $max_val!"
+#             continue
+#         fi
+#
+#         echo "$input"
+#         return 0
+#     done
+# }
+
+# update_enum "VAR_NAME" "rofi_title" "opt1" "[opt2...opt6]"
+update_enum() {
+    local var_name="$1"
+    local title="$2"
+    local options=("${@:3}")
+
+    while true; do
+        chosen="$(printf "%s\n" "${options[@]}" | rofi_cmd "$title" "ESC to go back")"
+        [[ -z "$chosen" ]] && break
+
+        # Check if the chosen option is in the list
+        if [[ " ${options[*]} " =~ " ${chosen} " ]]; then
+            option-validate "$var_name"
+            sed -i "/^${var_name}=/s/=.*/=\"${chosen// /_}\"/" "$VIBRANIUM_USER_SETTINGS"
+            break
+        fi
+    done
+}
+

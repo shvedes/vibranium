@@ -5,14 +5,15 @@ cat << EOF > "$HOME/.config/hypr/hyprland.conf"
 source = ../vibranium/theme/current/hyprland.conf
 
 # Load defaults
-source = ~/.local/share/vibranium/defaults/hypr/autostart.conf
-source = ~/.local/share/vibranium/defaults/hypr/general.conf
-source = ~/.local/share/vibranium/defaults/hypr/layer-rules.conf
-source = ~/.local/share/vibranium/defaults/hypr/look-and-feel.conf
-source = ~/.local/share/vibranium/defaults/hypr/window-rules.conf
-source = ~/.local/share/vibranium/defaults/hypr/persmissions.conf
-source = ~/.local/share/vibranium/defaults/hypr/binds.conf
-source = ~/.local/share/vibranium/defaults/hypr/input.conf
+# NOTE: Under no circumstances should you delete these lines of code!
+source = ~/.local/share/vibranium/default/hypr/autostart.conf
+source = ~/.local/share/vibranium/default/hypr/general.conf
+source = ~/.local/share/vibranium/default/hypr/layer-rules.conf
+source = ~/.local/share/vibranium/default/hypr/look-and-feel.conf
+source = ~/.local/share/vibranium/default/hypr/window-rules.conf
+source = ~/.local/share/vibranium/default/hypr/persmissions.conf
+source = ~/.local/share/vibranium/default/hypr/binds.conf
+source = ~/.local/share/vibranium/default/hypr/input.conf
 
 # Load user's overrides
 source = ./hyprland.conf.d/*.conf

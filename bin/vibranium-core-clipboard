@@ -1,62 +1,71 @@
 #!/usr/bin/env bash
 
-# A fairly simple script that manages the clipboard
-
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
-if ! missing_str="$(vibranium-utils-is-installed cliphist rofi)"; then
-    read -r -a missing <<< "$missing_str"
-    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
+missing="$(vibranium-utils-is-installed cliphist rofi)"
+if [[ -n "$missing" ]]; then
+    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: $missing"
     exit 1
 fi
 
 usage() {
     cat << EOF
 Usage:
-	$(basename "$0") show|clear
+    $(basename "$0") [--show|--clear]
+
+Options:
+    --show      Display clipboard history and select an entry
+    --clear     Clear clipboard history and current clipboard
+    -h, --help  Show this help and exit
 EOF
 }
 
 is_empty() {
-    if [[ "$(cliphist list | wc -l)" == "0" ]]; then
-        return 0
-    else
-        return 1
-    fi
+    [[ "$(cliphist list | wc -l)" == "0" ]]
 }
 
-if [ -z "$1" ]; then
+if [[ "$(systemctl --user is-active cliphist)" != "active" ]]; then
+    systemctl --user enable --now cliphist
+    warn "${YELLOW}cliphist.service${RESET} was inactive!"
+    msg="The service <span foreground='${P_YELLOW}'>cliphist.service</span> "
+    msg+="wasn't active for some reason!\nIt has been enabled and started."
+    notify-send -r 5 -t 7000 -u critical "Vibranium" "$msg"
+fi
+
+ACTION=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --show) ACTION="show"; shift ;;
+        --clear) ACTION="clear"; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
+    esac
+done
+
+if [[ -z "$ACTION" ]]; then
+    echo "Error: no action specified" >&2
     usage
     exit 1
 fi
 
-service_status="$(systemctl --user is-active cliphist)"
-if [[ "$service_status" == "inactive" ]]; then
-    systemctl --user enable --now cliphist; sleep 1
-
-    warn "cliphist.service was inactive!"
-    msg="The service <span foreground='${P_YELLOW}'>cliphist.service</span> "
-    msg+="wasn't active for some reason!\nIt was enabled and activated!"
-    notify-send -r 5 -t 7000 -u critical "Vibranium" "$msg"
-fi
-
-case "$1" in
+case "$ACTION" in
     show)
-        is_empty && {
-            notify-send -r 1 -t 1500 "Vibranium" "<i>Clipboard is empty!</i>"
-            error "Nothing to show"
+        if is_empty; then
+            is_headless && notify-send -r 1 -t 1500 "Vibranium" "<i>Clipboard is empty!</i>"
+            warn "Nothing to show"
             exit 1
-        }
-        chosen="$(cliphist list | rofi_cmd "Clipboard" "search" -display-columns 2)"
+        fi
 
-        [ -z "$chosen" ] && {
-            log "Nothing was chosen"
+        chosen="$(cliphist list | rofi_cmd "Clipboard" "search" -display-columns 2)"
+        if [[ -z "$chosen" ]]; then
+            warn "Nothing was chosen"
             exit 0
-        }
-        if printf "%s\n" "$chosen" | cliphist decode | wl-copy -n; then
-            log "Copied chosen item to clipboard"
+        fi
+
+        if printf "%s\n" "$chosen" | cliphist decode | wl-copy -t text/uri-list; then
+            log "Chosen item copied to clipboard"
         else
-            error "Something went wrong"
+            error "Unable to copy selected entry:\n$chosen"
             exit 1
         fi
         ;;
@@ -64,10 +73,6 @@ case "$1" in
         killall rofi &>/dev/null
         cliphist wipe
         wl-copy --clear
-        log "Cleared the clipboard"
-        ;;
-    *)
-        usage
-        exit 1
+        log "Clipboard has been cleared"
         ;;
 esac

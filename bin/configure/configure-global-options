@@ -12,7 +12,7 @@ _user_wallpapers() {
         local target options chosen
         target="$1"
         options=("Open" "Delete")
-        while :; do
+        while true; do
             chosen="$(printf "%s\n" "${options[@]}" | rofi_cmd "$target" "ESC to go back")"
             [[ -z "$chosen" ]] && return # ESC pressed, go back
 
@@ -50,7 +50,7 @@ _user_wallpapers() {
         [[ -f "$f" ]] && files+=("$(basename "$f")")
     done
 
-    while :; do
+    while true; do
         if [[ ${#files[@]} -eq 0 ]]; then
             return
         fi
@@ -65,17 +65,6 @@ _user_wallpapers() {
 
         _action "$chosen"
     done
-}
-
-_grayscale_enabled() {
-    local opt=
-    opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
-
-    if [[ "$opt" == "[[EMPTY]]" || "$opt" =~ ^()$ ]]; then
-        return 1
-    else
-        return 0
-    fi
 }
 
 _terminal_opacity() {
@@ -104,7 +93,7 @@ _flash_submenu() {
     local enabled_var="$1" speed_var="$2" title="$3"
     local index=0
 
-    while :; do
+    while true; do
         source "$VIBRANIUM_USER_SETTINGS"
 
         local chosen
@@ -135,7 +124,7 @@ _flash_submenu() {
                 ;;
             "Speed"*)
                 s_index=0
-                while :; do
+                while true; do
                     spd_opts=("Slow" "Medium" "Fast" "Very fast")
                     spd_chosen="$(printf "%s\n" "${spd_opts[@]}" | rofi_cmd "Effect speed" "ESC to go back" -selected-row "$s_index")"
                     [[ -z "$spd_chosen" ]] && break
@@ -167,7 +156,7 @@ _lockscreen_blur_menu() {
     local blur_lockscreen_options
     local blur_lockscreen_chosen
 
-    while :; do
+    while true; do
         source "$VIBRANIUM_USER_SETTINGS"
 
         if [[ $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND == false ]]; then
@@ -188,20 +177,20 @@ _lockscreen_blur_menu() {
         case "$blur_lockscreen_chosen" in
             "Blur background"*)
                 toggle_bool VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND
-                if [ -f "$XDG_RUNTIME_DIR/vibranium-lockscreen-cache.pid" ]; then
+                if [ -f "$XDG_RUNTIME_DIR/vibranium-cmd-refresh-cache.pid" ]; then
                     local pid
-                    pid=$(< "$XDG_RUNTIME_DIR/vibranium-lockscreen-cache.pid")
+                    pid=$(< "$XDG_RUNTIME_DIR/vibranium-cmd-refresh-cache.pid")
                     if kill -0 "$pid" 2> /dev/null; then
                         kill -TERM "$pid"
                     fi
                 fi
-                (setsid vibranium-utils-lockscreen-cache) &
+                (setsid vibranium-cmd-refresh-cache) &
                 ;;
             "Blur strength"*)
                 local blur_strength_options
                 local blur_strength_options
 
-                while :; do
+                while true; do
                     blur_strength_options=("low" "mid" "hard")
                     blur_strength_chosen="$(printf "%s\n" "${blur_strength_options[@]}" | rofi_cmd "Blur strength" "ESC to go back")"
                     [[ -z $blur_strength_chosen ]] && break
@@ -212,14 +201,14 @@ _lockscreen_blur_menu() {
                     else
                         option-validate "VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH"
                         sed -i "/VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH/s/=.*/=\"${blur_strength_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
-                        if [ -f "$XDG_RUNTIME_DIR/vibranium-lockscreen-cache.pid" ]; then
+                        if [ -f "$XDG_RUNTIME_DIR/vibranium-cmd-refresh-cache.pid" ]; then
                             local pid
-                            pid=$(< "$XDG_RUNTIME_DIR/vibranium-lockscreen-cache.pid")
+                            pid=$(< "$XDG_RUNTIME_DIR/vibranium-cmd-refresh-cache.pid")
                             if kill -0 "$pid" 2> /dev/null; then
                                 kill -TERM "$pid"
                             fi
                         fi
-                        (setsid vibranium-utils-lockscreen-cache) &
+                        (setsid vibranium-cmd-refresh-cache) &
                         break
                     fi
                 done
@@ -228,7 +217,7 @@ _lockscreen_blur_menu() {
                 local dim_strength_options
                 local dim_strength_chosen
 
-                while :; do
+                while true; do
                     dim_strength_options=("low" "mid" "hard")
                     dim_strength_chosen="$(printf "%s\n" "${dim_strength_options[@]}" | rofi_cmd "Dim strength" "ESC to go back")"
                     [[ -z $dim_strength_chosen ]] && break
@@ -246,7 +235,7 @@ _lockscreen_blur_menu() {
                                 kill -TERM "$pid"
                             fi
                         fi
-                        (setsid vibranium-utils-lockscreen-cache) &
+                        (setsid vibranium-cmd-refresh-cache) &
                         break
                     fi
                 done
@@ -257,24 +246,17 @@ _lockscreen_blur_menu() {
 
 get_active_rofi_theme() {
      local rofi_cfg="$XDG_CONFIG_HOME/rofi/config.rasi"
-     sed -n 's|@import ".*/\(rofi[-a-z]*\)\.rasi"|\1|p' "$rofi_cfg" | sed 's|^rofi-||; s|^rofi$|text|'
+     sed -n 's|@import ".*/\(theme[-a-z]*\)\.rasi"|\1|p' "$rofi_cfg" | sed 's|^theme-||; s|^rofi$|text|'
 }
 
-while :; do
+while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
     bar_enabled="$([ "$(systemctl --user is-active waybar)" = "active" ] && echo true || echo false)"
 
-    if _grayscale_enabled; then
-        current_grayscale=true
-    else
-        current_grayscale=false
-    fi
-
     OPTIONS=(
         "Now playing              : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
         "OSD enabled              : $VIBRANIUM_GLOBAL_USE_OSD"
-        "Reading mode             : $current_grayscale"
         "Show wallpaper           : $VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
         "Show status bar          : $bar_enabled"
         "Confirm to kill          : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
@@ -320,20 +302,6 @@ while :; do
         *"Manage"*)
             _user_wallpapers
         ;;
-        "Reading mode"*)
-            shader="$VIBRANIUM/defaults/hypr/grayscale.frag"
-            config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
-            case "$current_grayscale" in
-                "true")
-                    rm -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
-                    ;;
-                "false")
-                    echo "decoration:screen_shader = $shader" > "$config"
-                    ;;
-            esac
-            hyprctl -q reload
-            vibranium-cmd-refresh-waybar-module reading-mode
-            ;;
         "Show status bar"*)
             case "$bar_enabled" in
                 "true") systemctl --user disable --now waybar ;;
@@ -343,18 +311,21 @@ while :; do
         "Show wallpaper"*)
             case "$(toggle_bool -v "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
                 false)
+                    sed -i 's/path/# path/' "${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock.conf"
                     systemctl -q --user disable --now hyprpaper
                     # In case we were in powersave mode and the cache generator was waiting for its turn
-                    if [ -f "$XDG_RUNTIME_DIR/vibranium-lockscreen-cache.pid" ]; then
-                        pid=$(< "$XDG_RUNTIME_DIR/vibranium-lockscreen-cache.pid")
+                    if [ -f "$XDG_RUNTIME_DIR/vibranium-cmd-refresh-cache.pid" ]; then
+                        pid=$(< "$XDG_RUNTIME_DIR/vibranium-cmd-refresh-cache.pid")
                         if kill -0 "$pid" 2> /dev/null; then
                             kill -TERM "$pid"
                         fi
+                        vibranium-cmd-refresh-waybar-module worker &
                     fi
                     ;;
                 true)
+                    sed -i 's/# path/path/' "${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock.conf"
                     systemctl -q --user enable --now hyprpaper &
-                    vibranium-utils-lockscreen-cache &
+                    vibranium-cmd-refresh-cache &
                     ;;
             esac
             ;;
@@ -362,7 +333,7 @@ while :; do
             configure-player
             ;;
         "Video downscale"*)
-            while :; do
+            while true; do
                 downscale_options=(
                     "Use GPU when possible : $VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU"
                     "README"
@@ -388,12 +359,12 @@ while :; do
             done
             ;;
         *"Edit env vars"*)
-            vibranium-cmd-launch-terminal "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
+            vibranium-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
             vibranium-cmd-kill-rofi
             exit 0
             ;;
         "Terminal"*)
-            while :; do
+            while true; do
                 prompt="Terminal transparency (float)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Terminal transparency" "0.0 - 1.0")"
                 [[ -z "$input" ]] && break
@@ -452,7 +423,7 @@ while :; do
                         notify-send -r 1 "This option is locked" "$msg"
                         ;;
                     "Respect"*)
-                        while :; do
+                        while true; do
                             respect_power_profile_options=(
                                 "Respect power profile : $VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
                                 "What is this?"
@@ -519,7 +490,7 @@ while :; do
             done
             ;;
         "Copy to clipboard"*)
-            while :; do
+            while true; do
                 copy_to_clipboard_options=("Copy to clipboard : $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD" "What is this?")
                 copy_to_clipboard_chosen="$(printf "%s\n" "${copy_to_clipboard_options[@]}" | rofi_cmd "Copy to clipboard" "ESC to go back")"
                 [ -z "$copy_to_clipboard_chosen" ] && break
@@ -541,7 +512,7 @@ while :; do
             ;;
         "Now playing"*)
             now_playing_index=0
-            while :; do
+            while true; do
                 source "$VIBRANIUM_USER_SETTINGS"
                 now_playing_options=(
                     "Now playing notification : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
@@ -589,7 +560,7 @@ while :; do
             _lockscreen_blur_menu
             ;;
         "Pause"*)
-            while :; do
+            while true; do
                 pause_on_lock_options=(
                     "Pause music on session lock : $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
                     "What is this?"
@@ -613,7 +584,7 @@ while :; do
             done
             ;;
         "Welcome"*)
-            while :; do
+            while true; do
                 welcome_back_options=("Welcome notification : $VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION" "What is this?")
                 welcome_back_chosen="$(printf "%s\n" "${welcome_back_options[@]}" | rofi_cmd "Welcome back" "ESC to go back")"
                 [ -z "$welcome_back_chosen" ] && break
@@ -633,7 +604,7 @@ while :; do
             ;;
         *"App launcher"*)
             index=0
-            while :; do
+            while true; do
                 source "$VIBRANIUM_USER_SETTINGS"
                 app_launcher_options=(
                     "Theme                 : $(get_active_rofi_theme)"
@@ -654,15 +625,15 @@ while :; do
 
                 case "$app_launcher_chosen" in
                     "Theme"*)
-                        while :; do
+                        while true; do
                             rofi_cfg="$XDG_CONFIG_HOME/rofi/config.rasi"
                             themes=("Text" "Modern")
                             themes_chosen="$(printf "%s\n" "${themes[@]}" | rofi_cmd "Theme" "ESC to go back")"
                             [[ -z $themes_chosen ]] && break
 
                             case "${themes_chosen,}" in
-                                "text")   sed -i 's|\(@import "~/.local/share/vibranium/defaults/\)[^"]*|\1rofi-text.rasi|' "$rofi_cfg"   ;;
-                                "modern") sed -i 's|\(@import "~/.local/share/vibranium/defaults/\)[^"]*|\1rofi-modern.rasi|' "$rofi_cfg" ;;
+                                "text")   sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/\)[^"]*|\1theme-text.rasi|' "$rofi_cfg"   ;;
+                                "modern") sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/\)[^"]*|\1theme-modern.rasi|' "$rofi_cfg" ;;
                             esac
                             break
                         done
@@ -674,7 +645,7 @@ while :; do
                         toggle_bool "VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
                         ;;
                     "Search engine"*)
-                        while :; do
+                        while true; do
                             srch_engns=("Google" "DuckDuckGo" "Microsoft Bing")
                             srch_engns_chsn="$(printf "%s\n" "${srch_engns[@]}" | rofi_cmd "Search engine" "ESC to go back")"
                             [[ -z "$srch_engns_chsn" ]] && break
@@ -694,7 +665,7 @@ while :; do
                         done
                         ;;
                     "Auto"*)
-                        while :; do
+                        while true; do
                             auto_select_options=("Auto select : $VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT" "What is this?")
                             auto_select_chosen="$(printf "%s\n" "${auto_select_options[@]}" | rofi_cmd "Auto select" "ESC to go back")"
                             [[ -z $auto_select_chosen ]] && break
@@ -718,7 +689,7 @@ while :; do
             done
             ;;
         *"Notifications"*)
-            while :; do
+            while true; do
                 dunst_cfg="$XDG_CONFIG_HOME/dunst/dunstrc"
                 current_height="$(sed -n 's/.*progress_bar_height[[:space:]]*=[[:space:]]*\([0-9]\+\).*/\1/p' "$dunst_cfg")"
                 current_timeout="$(sed -n 's/.*timeout[[:space:]]*=[[:space:]]*\([0-9]\+\).*/\1/p' "$dunst_cfg")"
@@ -731,7 +702,7 @@ while :; do
 
                 case "$notification_chosen" in
                     "Progress"*)
-                        while :; do
+                        while true; do
                             prompt="Progress bar height (in px)"
                             input="$(printf "%s" "$prompt" | rofi_cmd "Height" "int (10px-25px)")"
                             [[ -z "$input" ]] && break
@@ -756,7 +727,7 @@ while :; do
                         done
                         ;;
                     "Notification timeout"*)
-                        while :; do
+                        while true; do
                             input="$(printf "Timeout (in seconds)" | rofi_cmd "Timeout" "ESC to go back")"
                             [[ -z "$input" ]] && break
 
@@ -776,7 +747,7 @@ while :; do
             done
             ;;
         "OSD enabled"*)
-            while :; do
+            while true; do
                 source "$VIBRANIUM_USER_SETTINGS"
                 current_height="$(sed -n 's/.*min-height:[[:space:]]*\([0-9]\+\)px.*/\1/p' "$XDG_CONFIG_HOME/swayosd/style.css")"
 
@@ -807,7 +778,7 @@ while :; do
                         fi
                         ;;
                     "Progress"*)
-                        while :; do
+                        while true; do
                             prompt="Progress bar height (in px)"
                             input="$(printf "%s" "$prompt" | rofi_cmd "Height" "int (8px-32px)")"
                             [[ -z "$input" ]] && break
@@ -829,7 +800,7 @@ while :; do
 
             ;;
         "Confirm"*)
-            while :; do
+            while true; do
                 confirm_to_kill_options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "What is this?")
                 confirm_to_kill_chosen="$(printf "%s\n" "${confirm_to_kill_options[@]}" | rofi_cmd "Confirm to kill" "ESC to go back")"
                 [ -z "$confirm_to_kill_chosen" ] && break
@@ -855,7 +826,7 @@ while :; do
             ;;
         *"Screen / Border flash"*)
             index=0
-            while :; do
+            while true; do
                 f_opts=("Screen" "Border" "What is this?")
                 f_chosen="$(printf "%s\n" "${f_opts[@]}" | rofi_cmd "Flash effect" "ESC to go back" -selected-row "$index")"
                 [[ -z "$f_chosen" ]] && break

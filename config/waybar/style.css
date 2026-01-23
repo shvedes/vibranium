@@ -1,5 +1,5 @@
 
-@import url("../../.local/share/vibranium/defaults/waybar/style.css");
+@import url("../../.local/share/vibranium/default/waybar/style.css");
 
 window#waybar {
     font-family: 'Symbols Nerd Font Mono', 'Cascadia Code';

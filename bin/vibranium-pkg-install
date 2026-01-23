@@ -18,7 +18,7 @@ YAY_FLAGS=(
 )
 
 if ! tty -s; then
-    exec setsid vibranium-cmd-launch-terminal "$0" "$@"
+    exec setsid vibranium-cmd-terminal "$0" "$@"
     exit 0
 fi
 
@@ -107,7 +107,7 @@ for package in "${chosen[@]}"; do
 done
 
 if [ ${#filtered[@]} -eq 0 ]; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Selected packages are already installed"
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Selected packages already installed"
     read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
     printf '\e[?25h' # show cursor
     exit 0

@@ -42,7 +42,8 @@ while :; do
     # Check if file exists
     if [[ ! -f $input ]]; then
         error "'${YELLOW}$input${RESET}' not found."
-        notify-send -r 4 -t 5000 "Vibranium" "${input} not found!"
+        notify-send -r 4 -t 5000 "Vibranium" \
+            "<i><span foreground='${P_ORANGE}'>${input}</span> not found!</i>"
         continue
     fi
     break

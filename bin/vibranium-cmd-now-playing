@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-# Yes, I saved a couple of minutes thanks to AI to write the description below, okay?
-
 # This script displays the currently playing track from either a Playerctl-compatible
 # media player or MPD (Music Player Daemon). It can:
 # 1. Output the track title and artist to the terminal.
@@ -12,10 +10,36 @@
 # using Pango markup for notifications or lockscreen display, and cleans up temporary
 # album art files afterward.
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+progname=$(basename "$0")
 
-check_bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN true
+usage() {
+    cat <<EOF
+Usage: $progname [OPTION]
+
+Display information about the currently playing track.
+
+Options:
+  --hyprlock    Format the output for the Hyprland lock screen
+  --help        Display this help and exit
+EOF
+    exit 0
+}
+
+TEMP=$(getopt -o '' --long hyprlock,help -- "$@")
+if [ $? != 0 ] ; then usage ; fi
+eval set -- "$TEMP"
+
+hyprlock=false
+while true; do
+    case "$1" in
+        --hyprlock ) hyprlock=true; shift ;;
+        --help ) usage ;;
+        -- ) shift; break ;;
+        * ) break ;;
+    esac
+done
+
+source "$VIBRANIUM_PATH/vibranium-core-lib"
 
 album_art="$XDG_RUNTIME_DIR/album_art"
 state_file="$XDG_RUNTIME_DIR/now_playing.cache"
@@ -83,9 +107,12 @@ else
 fi
 
 # Build pango formatted message for the lock screen.
-if [[ "$1" =~ ^(--hyprlock)$ ]]; then
-    if [[ "$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN" == true ]]; then
-        printf "<span size='20000' foreground='${P_ACCENT}' rise='-3.5pt'><b>󰝚</b></span> %s" "$pango_output"
+if [[ "$hyprlock" == true ]]; then
+    check_bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN true
+    show_on_lockscreen="$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
+
+    if [[ "$show_on_lockscreen" == true ]]; then
+        printf "<span size='20000' foreground='%s' rise='-3.5pt'><b>󰝚</b></span> %s" "$P_ACCENT" "$pango_output"
     fi
     exit 0
 else
@@ -95,7 +122,10 @@ fi
 # Reminder:
 # When this option is set to true and a web-based player is used (e.g., Spotify),
 # displaying the album cover may take some time because it needs to be downloaded from the internet.
-if [ "$VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART" = "true" ]; then
+check_bool VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART false
+show_album_art="$VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART"
+
+if [[ "$show_album_art" = true ]]; then
     case "$player" in
         "playerctl")
             album_art_url="$(playerctl metadata mpris:artUrl)"

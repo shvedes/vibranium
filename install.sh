@@ -282,6 +282,7 @@ create_directories
 ./install/install_gtk_themes.sh
 ./install/install_papirus_icons.sh
 ./install/install_local_bin.sh
+./install/install_sound_theme.sh
 
 printf "\n%s[VIBRANIUM]%s Setting up config files" "${YELLOW}" "${RESET}"
 

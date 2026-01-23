@@ -8,8 +8,8 @@
 read -r CURRENT_CLASS PID < <(hyprctl -j activewindow | jq -r '[.class, .pid] | @tsv')
 STATE_FILE="$XDG_RUNTIME_DIR/$(basename "$0").confirm"
 
+# There are no windows on current workspace
 if [[ -z "$PID" ]]; then
-    # There are no windows on current workspace
     exit 1
 fi
 
@@ -17,7 +17,7 @@ fi
 # If not, forcefully close the window immediately (no confirmation)
 if [[ "$(vibranium-cmd-get-option VIBRANIUM_GLOBAL_CONFIRM_TO_KILL)" == false ]]; then
     # Steam automatically restores its processes, so we need to take a rough approach
-    if [[ "$CURRENT_CLASS" == "steam" ]]; then
+    if [[ "$CURRENT_CLASS" =~ [Ss]team ]]; then
         killall -s SIGKILL steam steamwebhelper
     else
         hyprctl -q dispatch forcekillactive

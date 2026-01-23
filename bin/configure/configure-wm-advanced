@@ -5,7 +5,7 @@ source "$VIBRANIUM_PATH/vibranium-core-lib"
 CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.conf"
 INDEX=0
 
-while :; do
+while true; do
     mapfile -t LINES < <(
         hyprctl --batch -j \
         "getoption misc:vrr; \
@@ -68,7 +68,7 @@ while :; do
             esac
             ;;
         "Direct Scanout"*)
-            while :; do
+            while true; do
                 ds_opts=("Direct Scanout : $current_direct_scanout" "What is this?")
                 ds_chosen="$(printf "%s\n" "${ds_opts[@]}" | rofi_cmd "Direct Scanout" "ESC to go back")"
                 [[ -z "$ds_chosen" ]] && break
@@ -97,7 +97,7 @@ while :; do
             done
             ;;
         "Variable Refresh Rate"*)
-            while :; do
+            while true; do
                 vrr_opts=("Enable" "Disable" "Fullscreen only" "What is this?")
                 vrr_chosen="$(printf "%s\n" "${vrr_opts[@]}" | rofi_cmd "VRR" "ESC to go back")"
                 [[ -z "$vrr_chosen" ]] && break

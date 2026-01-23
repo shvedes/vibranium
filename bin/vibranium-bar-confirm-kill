@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-STATE_FILE="$XDG_RUNTIME_DIR/vibranium-core-force-kill.confirm"
-ICON="\\udb84\\udf98"
-TOOLTIP="Repeat shortcut to confirm kill"
+state_file="$XDG_RUNTIME_DIR/vibranium-core-force-kill.confirm"
+icon="\\udb84\\udf98"
+tooltip="Repeat shortcut to confirm kill"
 
-if [[ -f "$STATE_FILE" ]]; then
-    printf '{"text": "%s", "tooltip": "%s"}' "$ICON" "$TOOLTIP"
+if [[ -f "$state_file" ]]; then
+    printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
 else
     printf '{"text": ""}'
 fi

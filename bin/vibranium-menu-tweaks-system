@@ -40,6 +40,7 @@ while :; do
                         msg+="<span foreground='${P_GREEN}'><b>performance</b></span> "
                         msg+="and <span foreground='${P_GREEN}'><b>responsiveness</b></span>"
                         notify-send -r 1 -t 20000 "Vibranium" "$msg"
+                        break
                         ;;
                     *)
                         continue

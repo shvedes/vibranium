@@ -6,7 +6,7 @@ export PATH="$PATH:$VIBRANIUM_PATH/configure"
 _hyprland() {
     local hypr_index=0
 
-    while :; do
+    while true; do
         hyprland_opts=("Input" "Appearance" "Edit configs" "<b><i>Advanced</i></b>")
         hyprland_chosen="$(printf "%s\n" "${hyprland_opts[@]}" | rofi_cmd "Hyprland" "ESC to go back" -selected-row "$hypr_index")"
         [[ -z $hyprland_chosen ]] && break
@@ -29,7 +29,7 @@ _hyprland() {
                 configure-wm-input
                 ;;
             "Edit configs")
-                while :; do
+                while true; do
                     edit_configs_opts=(
                         "<b><i>Input devices</i></b>"
                         "<b><i>Window rules</i></b>"
@@ -40,10 +40,10 @@ _hyprland() {
                     [[ -z $edit_configs_chosen ]] && break
 
                     case "$edit_configs_chosen" in
-                        *"Input devices"*) vibranium-cmd-launch-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf" ;;
-                        *"Window rules"*) vibranium-cmd-launch-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
-                        *"Keybindings"*) vibranium-cmd-launch-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf" ;;
-                        *"Monitors"*) vibranium-cmd-launch-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf" ;;
+                        *"Input devices"*) vibranium-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf" ;;
+                        *"Window rules"*) vibranium-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
+                        *"Keybindings"*) vibranium-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf" ;;
+                        *"Monitors"*) vibranium-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf" ;;
                     esac
                     vibranium-cmd-kill-rofi
                 done
@@ -54,7 +54,7 @@ _hyprland() {
 
 INDEX=0
 
-while :; do
+while true; do
     OPTIONS=(
         "Idle"
         "Audio"
@@ -75,7 +75,6 @@ while :; do
         "Screenshots"
         "Night Light"
         "Color Picker"
-        "<b><big>FACTORY RESET</big></b>"
     )
 
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Vibranium" "ESC to go back" -selected-row "$INDEX")"
@@ -120,7 +119,7 @@ while :; do
             configure-recording
             ;;
         "Night Light")
-            configure-night-light
+            configure-nightshift
             ;;
         "Color Picker")
             configure-color-picker
@@ -130,12 +129,6 @@ while :; do
             ;;
         "Hyprland")
             _hyprland
-            ;;
-        *"FACTORY RESET"*)
-            msg="Sorry, this needs some polishing and bug fixes, "
-            msg+="so it's not available at the moment"
-            notify-send -r 1 -t 5000 "Vibranium" "$msg"
-            # factory-reset
             ;;
     esac
 done

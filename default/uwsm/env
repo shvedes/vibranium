@@ -1,0 +1,82 @@
+# This file linked to $VIBRANIUM. DO NOT EDIT!!!
+
+# If you want to edit / add / remove environment variables,
+# consider using "$XDG_CONFIG_HOME/vibranium/environment",
+# which will take priority over this file.
+
+# shellcheck source=/dev/null
+
+# https://specifications.freedesktop.org/basedir-spec/latest
+export XDG_DATA_DIRS="/usr/local/share:/usr/share"
+export XDG_STATE_HOME="$HOME/.local/state"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_CACHE_HOME="$HOME/.cache"
+export XDG_CONFIG_DIRS="/etc/xdg"
+
+export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
+export VIBRANIUM_PATH="$XDG_DATA_HOME/vibranium/bin"
+export VIBRANIUM="$XDG_DATA_HOME/vibranium"
+export PATH="$HOME/.local/bin:$VIBRANIUM_PATH:$PATH"
+
+export XCURSOR_THEME="macOS"
+export XCURSOR_SIZE=22
+export QT_QPA_PLATFORMTHEME="qt6ct"
+
+# Use Wayland when possible. Fallback to XWayland otherwise
+export ELECTRON_OZONE_PLATFORM_HINT="auto"
+export QT_QPA_PLATFORM="wayland;xcb"
+# https://github.com/basecamp/omarchy/issues/2564#issuecomment-3450877034
+# export SDL_VIDEODRIVER="wayland"
+export GDK_BACKEND="wayland,x11"
+export CLUTTER_BACKEND="wayland"
+
+export VIBRANIUM_IS_LAPTOP=false
+export VIBRANIUM_IS_VIRTUAL_MACHINE=false
+
+case "$(</sys/class/dmi/id/chassis_type)" in
+	"10") export VIBRANIUM_IS_LAPTOP=true          ;;
+    "1")  export VIBRANIUM_IS_VIRTUAL_MACHINE=true ;;
+esac
+
+# https://wiki.archlinux.org/title/Hardware_video_acceleration#Configuration
+# GPU="$(lspci | grep -E "VGA compatible controller.*(Radeon RX|ATI|UHD|Iris|Arc|Nvidia)")"
+# case "$GPU" in
+#     # Check Nvidia first in case of a laptop with hybrid graphics.
+# 	*"Nvidia"*)
+# 		export VIBRANIUM_GPU_IS_SUPPORTED=true
+# 		export LIBVA_DRIVER_NAME="nvidia"
+# 		export VDPAU_DRIVER="nvidia"
+# 		;;
+# 	*"Radeon RX"*|*"ATI"*)
+# 		export VIBRANIUM_GPU_IS_SUPPORTED=true
+# 		export LIBVA_DRIVER_NAME="radeonsi"
+# 		export VDPAU_DRIVER="radeonsi"
+# 		;;
+# 	*"UHD"*|*"Iris"*|*"Arc"*)
+# 		export VIBRANIUM_GPU_IS_SUPPORTED=true
+# 		export LIBVA_DRIVER_NAME="i965"
+# 		export VDPAU_DRIVER="va_gl"
+# 		;;
+# 	*)
+# 		export VIBRANIUM_GPU_IS_SUPPORTED=false
+# 		;;
+# esac
+
+if [[ -f "$HOME/.config/user-dirs.dirs" ]]; then
+	while IFS='=' read -r var val; do
+		[[ -z "$var" || "$var" == \#* ]] && continue
+
+		val="${val//\"/}"
+		[[ "$val" == ~* ]] && {
+			val="$HOME${val:1}"
+		}
+
+		export "$var"="$val"
+	done < "$HOME/.config/user-dirs.dirs"
+fi
+
+# Export user-defined environment
+source "$XDG_CONFIG_HOME/vibranium/environment"
+
+# vim:ft=bash

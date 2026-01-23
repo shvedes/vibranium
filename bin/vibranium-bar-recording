@@ -2,7 +2,7 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
-if ! pidof gpu-screen-recorder &> /dev/null; then
+if ! pid_is_alive gpu-screen-recorder; then
     printf '{"text": ""}'
     exit 0
 fi

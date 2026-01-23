@@ -1,6 +1,6 @@
 [general]
 import = [
-	"../../.local/share/vibranium/defaults/alacritty.toml",
+	"../../.local/share/vibranium/default/alacritty.toml",
 	"../vibranium/theme/current/alacritty.toml"
 ]
 

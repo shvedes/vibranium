@@ -4,21 +4,21 @@
 
 # Load defaults first
 source "$VIBRANIUM_PATH/vibranium-core-defaults"
-source "$XDG_CONFIG_HOME/vibranium/settings"
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+source "${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/settings"
+source "${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/theme/current/vibranium-lib-theme"
 
-export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
-export VIBRANIUM_USER_SETTINGS="$XDG_CONFIG_HOME/vibranium/settings"
+export VIBRANIUM_STATE="${XDG_STATE_HOME:-$HOME/.local/share}/vibranium"
+export VIBRANIUM_USER_SETTINGS="${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/settings"
 export VIBRANIUM_SUDO_PROMPT
 
-RED="\033[1;31m"
-YELLOW="\033[1;33m"
-BLUE="\033[1;34m"
-PURPLE="\033[1;35m"
-GREEN="\033[1;32m"
-CYAN="\033[1;36m"
-GRAY="\033[1;90m"
-RESET="\033[0m"
+RED=$'\e[0;31m'
+YELLOW=$'\e[0;33m'
+BLUE=$'\e[0;34m'
+PURPLE=$'\e[0;35m'
+GREEN=$'\e[0;32m'
+CYAN=$'\e[0;36m'
+GRAY=$'\e[90m'
+RESET=$'\e[0m'
 
 WAYBAR_ACCENT="#90c2ff"
 WAYBAR_YELLOW="#ffef90"
@@ -132,18 +132,21 @@ spinner() {
     local msg="$2"
     # Delay between spinner frames (seconds)
     local delay=0.07
-    # Randomly select a spinner style
-    local style=$((RANDOM % 5))
-
     local spinstr
 
-    case $style in
-        0) spinstr=('▁' '▃' '▄' '▅' '▆' '▇' '▆' '▅' '▄' '▃');;
-        1) spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏');;
-        2) spinstr=('←' '↖' '↑' '↗' '→' '↘' '↓' '↙');;
-        3) spinstr=('-' '\' '|' '/');;
-        4) spinstr=('⠁' '⠂' '⠄' '⠂');;
-    esac
+    # We can randomize spinner characters.
+    # Randomly select a spinner style
+    # local style=$((RANDOM % 5))
+
+    # case $style in
+    #     0) spinstr=('▁' '▃' '▄' '▅' '▆' '▇' '▆' '▅' '▄' '▃');;
+    #     1) spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏');;
+    #     2) spinstr=('←' '↖' '↑' '↗' '→' '↘' '↓' '↙');;
+    #     3) spinstr=('-' '\' '|' '/');;
+    #     4) spinstr=('⠁' '⠂' '⠄' '⠂');;
+    # esac
+
+    spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
     # ANSI sequence to clear the current line
     local clear_line="\r\033[K"
@@ -172,18 +175,6 @@ spinner() {
 #
 # Usage:
 #   check_int <var_name> <default> [type]
-#
-# Parameters:
-#   var_name - name of the variable to check (string). The function uses indirect
-#              expansion (${!var_name}) to read/write the value.
-#   default  - value to assign if the variable is unset or invalid.
-#   type     - "int" (default) or "float" — determines the allowed numeric format.
-#
-# Behavior:
-# - If the variable is empty -> warns and writes the default into the variable.
-# - Supports comma as decimal separator (e.g. "1,5" -> normalized to "1.5").
-# - Uses regex to validate the value; if validation fails -> fallback to default.
-# - Writes the normalized string back into the named variable via printf -v.
 check_int() {
     local var_name=$1
     local default=$2
@@ -228,17 +219,6 @@ check_int() {
 #
 # Usage:
 #   check_bool <var_name> <default>
-#
-# Parameters:
-#   var_name - name of the variable to check (string). The function uses indirect
-#              expansion (${!var_name}) to read and printf -v to write the value.
-#   default  - value to assign if the variable is unset or invalid; should be
-#              either "true" or "false".
-#
-# Behavior:
-# - If the variable is empty -> warns and writes the default into the variable.
-# - Normalizes common case variations by converting the value to lowercase.
-# - If the normalized value is not "true" or "false" -> warns and writes default.
 check_bool() {
     local var_name=$1
     local default=$2
@@ -269,18 +249,6 @@ check_bool() {
 #
 # Usage:
 #   check_enum <var_name> <default> <allowed1> [allowed2 ... allowedN]
-#
-# Parameters:
-#   var_name - name of the variable to check (string). Function uses indirect
-#              expansion (${!var_name}) to read and printf -v to write.
-#   default  - fallback value to assign if variable is unset or invalid.
-#   allowed* - one or more allowed values; comparison is exact (case-sensitive).
-#
-# Behavior:
-# - If no allowed values are supplied -> warns and writes the default.
-# - If the variable is empty -> warns and writes the default.
-# - If the variable value is not exactly one of the allowed values -> warns and writes the default.
-# - On success the (possibly normalized) value is written back to the named variable.
 check_enum() {
     local var_name=$1
     local default=$2
@@ -322,6 +290,7 @@ check_enum() {
 
 # Self-explanatory
 is_fullscreen() {
+    # https://wiki.hypr.land/Configuring/Dispatchers/#fullscreenstate
     if [ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]; then
         return 0
     else
@@ -341,6 +310,11 @@ is_in_game() {
     fi
 }
 
+# Used in functions below.
+# If a running script doesn't have a console to output to - do
+# not even try to display any logs.
+#
+# Possible TODO: universal log files
 is_headless() {
     if [ -t 0 ] && [ -c /dev/tty ]; then
         return 1
@@ -350,15 +324,15 @@ is_headless() {
 }
 
 log() {
-    ! is_headless && echo -e "${BLUE}log${RESET}: ${*}"
+    ! is_headless && echo -e "${BLUE}LOG${RESET}: ${*}"
 }
 
 warn() {
-    ! is_headless && echo -e "${YELLOW}warning${RESET}: ${*}"
+    ! is_headless && echo -e "${YELLOW}WARN${RESET}: ${*}"
 }
 
 error() {
-    ! is_headless && echo -e "${RED}error${RESET}: ${*}"
+    ! is_headless && echo -e "${RED}ERROR${RESET}: ${*}"
 }
 
 # Usage: _flash <border|screen>
@@ -382,17 +356,36 @@ _flash() {
 
     seconds=${speed_map[${!speed_var}]}
 
+    # Do nothing if animations disabled
     [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]] && return 0
 
     if [[ $type == border ]]; then
         for _ in 1 2; do
+            # Briefly flash active window's border
             hyprctl -q "keyword general:col.active_border rgb(ffffff)"
             sleep "$seconds"
+            # Use 'config-only' to avoid display reloads
+            # (therefore possible graphical micro-artifacts when shadow / blur is enabled)
             hyprctl -q reload config-only
         done
     else
+        # Briefly flash entire screen by increasing gamma value.
+        # It is not visible on screenshots / records.
         hyprctl -q hyprsunset gamma 150
         sleep "$seconds"
         hyprctl -q hyprsunset gamma 100
     fi
 }
+
+pid_is_alive() {
+    for d in /proc/[0-9]*; do
+        if read -r -d '' n < "$d/cmdline" 2>/dev/null; then
+            n=${n##*/}
+            if [[ $n == "$1" ]]; then
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+

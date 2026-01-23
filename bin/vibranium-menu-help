@@ -32,6 +32,7 @@ while :; do
             ;;
     esac
 
+    # exec setsid uwsm app -- chromium --app="$LINK" &
     vibranium-cmd-launch-cmd chromium --app="$LINK"
     vibranium-cmd-kill-rofi
 done

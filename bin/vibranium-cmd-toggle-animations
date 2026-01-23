@@ -1,32 +1,55 @@
 #!/usr/bin/env bash
 
 # Toggle Hyprland animations on/off.
-# Ensures config block exists, reads current state, flips it, and reloads config.
-# Outputs 'enabled' or 'disabled'.
+# Ensures the config block exists, reads the current state, flips it, reloads config,
+# and optionally outputs 'enabled' or 'disabled'.
 
-mkdir -p "$XDG_CONFIG_HOME/hypr/hyprland.conf.d"
+CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d"
+CONF="$CONF_DIR/look-and-feel.conf"
 
-CONF="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [--quiet] [--help]
 
-# Check if animations {  } exists in config
-if ! grep -qE '^[[:space:]]*animations[[:space:]]*{' "$CONF"; then
-    # If not - get current value via IPC and write into the config file
+Toggle Hyprland animations on/off.
+
+Options:
+  --quiet     Do not print 'enabled' or 'disabled'.
+  -h, --help  Show this help and exit
+EOF
+}
+
+QUIET=false
+
+# CLI parsing
+for arg in "$@"; do
+    case "$arg" in
+        --quiet) QUIET=true ;;
+        -h|--help) usage; exit 0 ;;
+        *) ;;
+    esac
+done
+
+# Ensure animations block exists
+if ! grep -qE '^[[:space:]]*animations[[:space:]]*{' "$CONF" 2>/dev/null; then
     VALUE=$(hyprctl -j getoption animations:enabled | jq -r '.set')
     printf "\n\nanimations {\n\tenabled = %s\n}" "$VALUE" >> "$CONF"
 fi
 
-# Then get the value
-# animations_enabled="$(hyprctl -j getoption animations:enabled | jq -r '.set')"
-# Stream text editors generally faster than IPC calls. Try yourself
+# Read current state from config
 ANIMATIONS_ENABLED="$(sed -n '/animations[[:space:]]*{/,/}/{s/.*enabled[[:space:]]*=[[:space:]]*\([^;]*\).*/\1/p}' "$CONF")"
 
-# Then toggle
-if [ "$ANIMATIONS_ENABLED" = true ]; then
-    sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1false/}' "$CONF"
-    echo "disabled"
-elif [ "$ANIMATIONS_ENABLED" = false ]; then
-    sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1true/}' "$CONF"
-    echo "enabled"
-fi
+# Toggle
+case "$ANIMATIONS_ENABLED" in
+    true)
+        sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1false/}' "$CONF"
+        [[ "$QUIET" = false ]] && echo "disabled"
+        ;;
+    false)
+        sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1true/}' "$CONF"
+        [[ "$QUIET" = false ]] && echo "enabled"
+        ;;
+esac
 
+# Reload config asynchronously
 hyprctl -q reload config-only &

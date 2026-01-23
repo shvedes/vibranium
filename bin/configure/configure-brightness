@@ -5,20 +5,19 @@ source "$VIBRANIUM_PATH/configure/configure-lib"
 
 INDEX=0
 
-while :; do
+while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
     OPTIONS=(
         "Use DDC protocol : $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
-        "Adjustment step  : $VIBRANIUM_BRIGHTNESS_STEP"
+        "Brightnes step : $VIBRANIUM_BRIGHTNESS_STEP"
     )
 
-    if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == "false" ]]; then
-        OPTIONS+=("<span alpha='70%'>OSD feedback     : $VIBRANIUM_BRIGHTNESS_USE_OSD</span> <span foreground='${P_RED}'>()</span>")
-    else
-        OPTIONS+=("OSD feedback	 : $VIBRANIUM_BRIGHTNESS_USE_OSD")
+    if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+        OPTIONS+=("OSD feedback	: $VIBRANIUM_BRIGHTNESS_USE_OSD")
     fi
 
+    mapfile -t OPTIONS < <(align_options "${OPTIONS[@]}")
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Brightness" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
 
@@ -30,40 +29,15 @@ while :; do
     done
 
     case "$CHOSEN" in
-        "Use DDC"*) toggle_bool "VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL" ;;
+        "Use DDC"*)
+            toggle_bool "VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
+            ;;
         *"OSD"*)
-            # The VIBRANIUM_GLOBAL_USE_OSD option takes precedence over all other options that use the OSD.
-            # Therefore, if VIBRANIUM_GLOBAL_USE_OSD is set to false at the global level,
-            # no other option that uses the OSD will be active, even if its value is true.
-            [ "$VIBRANIUM_GLOBAL_USE_OSD" = "false" ] && {
-                msg="\nTo enable OSD feedback for brightness changes, go to:\n"
-                msg+="<span foreground='${P_YELLOW}'>Vibranium settings</span> <span foreground='${P_BLUE}'>→</span> "
-                msg+="<span foreground='${P_YELLOW}'>General</span>"
-                notify-send -r 3 -t 10000 "This Option Is Disabled Globally" "$msg"
-                continue
-            }
-
             toggle_bool "VIBRANIUM_BRIGHTNESS_USE_OSD"
             ;;
-        "Adjustment"*)
-            option-validate "VIBRANIUM_BRIGHTNESS_STEP"
-            while :; do
-                prompt="Brightness adjustment step (int)"
-                current_value="$VIBRANIUM_BRIGHTNESS_STEP"
-                input="$(printf "%s\n" "$prompt" | rofi_cmd "Brightness:" "2-20")"
-
-                [ -z "$input" ] && break
-                [ "$input" = "$prompt" ] && continue
-                [ "$input" = "$current_value" ] && break
-
-                if ((input < 2 || input > 25)); then
-                    notify-send -r 5 -u critical -t 1500 "Vibranium" "An integer between 2 and 20!"
-                    continue
-                fi
-
-                sed -i "/^VIBRANIUM_BRIGHTNESS_STEP/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
-                break
-            done
+        "Brightnes step"*)
+            edit_digit "Brightness adjustment step" "Brightness" \
+                "int" 2 20 "VIBRANIUM_BRIGHTNESS_STEP"
             ;;
     esac
 done

@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+# Launch the TUI for the active network manager.
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [OPTION]
+
+Launch the text-based interface for the active network manager.
+
+Options:
+  -h, --help  Display this help and exit
+EOF
+}
+
+case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    "" )
+        ;;
+    * )
+        echo "$(basename "$0"): invalid option '$1'" >&2
+        echo "Try '$(basename "$0") --help' for more information." >&2
+        exit 1
+        ;;
+esac
+
+# Detect primary network interface utility
+if command -v nmtui >/dev/null 2>&1; then
+    exec vibranium-cmd-terminal nmtui
+elif command -v iwctl >/dev/null 2>&1; then
+    if command -v impala >/dev/null 2>&1; then
+        exec vibranium-cmd-terminal impala
+    elif command -v iwmenu >/dev/null 2>&1; then
+        exec vibranium-cmd-terminal iwmenu
+    elif command -v iwgtk >/dev/null 2>&1; then
+        exec vibranium-cmd-terminal iwgtk
+    else
+        exec vibranium-cmd-terminal iwctl
+    fi
+else
+    msg="'<i>systemd-networkd</i>' doesn't provide a TUI frontend. Use CLI instead.\n\n"
+    msg+="See '<i>networkctl --help</i>' for more info"
+    notify-send -r 1 -t 10000 "Vibranium" "$msg"
+    exit 1
+fi

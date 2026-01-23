@@ -1,17 +1,36 @@
 #!/usr/bin/env bash
 
-# This script is a simple wrapper for launching applications.
+# Launch a command in a new session.
 
-if [ -z "$1" ]; then
-    exit 1
-fi
+usage() {
+    cat << EOF
+Usage: $(basename "$0") COMMAND [ARGUMENTS...]
 
-cmd=$1
+Launch COMMAND in a new session using setsid.
+
+Options:
+  -h, --help  Display this help and exit
+EOF
+}
+
+case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    "")
+        echo "$(basename "$0"): missing COMMAND" >&2
+        echo "Try '$(basename "$0") --help' for more information." >&2
+        exit 1
+        ;;
+esac
+
+cmd="$1"
 shift
 
-if ! command -v "$cmd" > /dev/null; then
-    echo "Not found: $cmd"
-    exit 1
+if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "$(basename "$0"): command not found: $cmd" >&2
+    exit 127
 fi
 
 exec setsid "$cmd" "$@"

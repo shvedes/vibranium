@@ -1,5 +1,5 @@
 
-@import "~/.local/share/vibranium/defaults/rofi-text.rasi"
+@import "~/.local/share/vibranium/default/rofi/theme-modern.rasi"
 
 window, mainbox {
 	font: "Cascadia Code 10";

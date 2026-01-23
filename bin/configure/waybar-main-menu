@@ -6,7 +6,7 @@ source "$VIBRANIUM_PATH/configure/configure-lib"
 INDEX=0
 WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"
 
-while :; do
+while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
     POSITION="$(sed -n 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WAYBAR_CONFIG")"
@@ -36,7 +36,7 @@ while :; do
 
     case "$CHOSEN" in
         "Icon spacing"*)
-            while :; do
+            while true; do
                 prompt="Icon spacing (int)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Icon spacing" "-6 - 16")"
                 [[ -z "$input" ]] && break
@@ -57,7 +57,7 @@ while :; do
             done
             ;;
         "Height"*)
-            while :; do
+            while true; do
                 prompt="Waybar height (int)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Bar height" "30-45")"
                 [[ -z "$input" ]] && break
@@ -80,8 +80,8 @@ while :; do
             ;;
         "Move"*)
             case "$POSITION" in
-                top) vibranium-cmd-set-waybar-position "bottom" ;;
-                bottom) vibranium-cmd-set-waybar-position "top" ;;
+                top) vibranium-cmd-waybar-position --bottom ;;
+                bottom) vibranium-cmd-waybar-position --top ;;
             esac
             ;;
         "Enabled"*)          waybar-toggle-modules             ;;

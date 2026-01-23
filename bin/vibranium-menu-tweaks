@@ -28,19 +28,19 @@ CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "App tweaks" "ESC to go back"
 
 case "$CHOSEN" in
     "Install Spotify adblock")
-        vibranium-tweaks-spicetify-adblock install
+        vibranium-tweaks-spotify install
         vibranium-cmd-kill-rofi
         exit 0
         ;;
     "Remove Spotify adblock")
-        vibranium-tweaks-spicetify-adblock remove
+        vibranium-tweaks-spotify remove
         vibranium-cmd-kill-rofi
         exit 0
         ;;
     "Enable Google sync for Chromium")
-        vibranium-tweaks-chromium-sync enable
+        vibranium-tweaks-chromium enable
         ;;
     "Disable Google sync for Chromium")
-        vibranium-tweaks-chromium-sync disable
+        vibranium-tweaks-chromium disable
         ;;
 esac

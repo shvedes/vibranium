@@ -15,7 +15,7 @@ change_jpg_quality() {
     option-validate "$setting_name"
     eval "current_value=\$$setting_name"
 
-    while :; do
+    while true; do
         prompt="Enter new value (int)"
         new_value="$(printf "%s" "$prompt" | rofi_cmd "JPEG quality" "${min}-100")"
         [ -z "$new_value" ] && break
@@ -37,35 +37,40 @@ change_jpg_quality() {
     done
 }
 
-while :; do
-    source "$VIBRANIUM_USER_SETTINGS"
-    OPTIONS=("File format    : ${VIBRANIUM_SCREENSHOT_FILE_TYPE^^}")
+animations_enabled="$(hyprctl -j getoption animations:enabled | jq '.int')"
 
-    if [[ "$VIBRANIUM_SCREENSHOT_FILE_TYPE" =~ ^(jpg|jpeg)$ ]]; then
-        OPTIONS+=(
-            "JPG quality    : $VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
-        )
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    cursor="$VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR"
+    format="${VIBRANIUM_SCREENSHOT_FILE_TYPE^^}"
+    notify="$VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION"
+    save="$VIBRANIUM_SCREENSHOT_SAVE_TO_DISK"
+
+    OPTIONS=("File format : $format")
+
+    if [[ "$format" =~ ^(JPG|JPEG)$ ]]; then
+        jpg_q="$VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
+        OPTIONS+=("JPG quality : $jpg_q")
     fi
 
     OPTIONS+=(
-        "Save to disk   : $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK"
-        "Notification   : $VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION"
+        "Save to disk : $save"
+        "Notification : $notify"
     )
 
-    if [ "$(hyprctl -j getoption animations:enabled | jq '.int')" = "0" ]; then
+    if [[ "$animations_enabled" = "1" ]]; then
+        flash_b="$VIBRANIUM_SCREENSHOT_FLASH_BORDER"
+        flash_s="$VIBRANIUM_SCREENSHOT_FLASH_SCREEN"
         OPTIONS+=(
-            "<span alpha='70%'>Flash screen   : $VIBRANIUM_SCREENSHOT_FLASH_SCREEN</span> <span foreground='${P_RED}'>()</span>"
-            "<span alpha='70%'>Flash border   : $VIBRANIUM_SCREENSHOT_FLASH_BORDER</span> <span foreground='${P_RED}'>()</span>"
-        )
-    else
-        OPTIONS+=(
-            "Flash screen   : $VIBRANIUM_SCREENSHOT_FLASH_SCREEN"
-            "Flash border   : $VIBRANIUM_SCREENSHOT_FLASH_BORDER"
+            "Flash screen : $flash_s"
+            "Flash border : $flash_b"
         )
     fi
 
-    OPTIONS+=("Include cursor : $VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR")
+    OPTIONS+=("Capture cursor : $cursor")
 
+    mapfile -t OPTIONS < <(align_options "${OPTIONS[@]}")
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Screenshots" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
 
@@ -77,35 +82,14 @@ while :; do
     done
 
     case "$CHOSEN" in
-        *"()"*)
-            msg="This option is <span foreground='${P_RED}'><b>locked</b></span> because "
-            msg+="animations is <span foreground='${P_RED}'><b>disabled</b></span>"
-            notify-send -r 1 "Vibranium" "$msg"
-            continue
-            ;;
         "File format"*)
-            # Create an option in user settings if it does not already exist.
-            # Only then perfom action
-            option-validate "VIBRANIUM_SCREENSHOT_FILE_TYPE"
-            while :; do
-                file_types=("PNG" "JPG" "JPEG" "PPM")
-                chosen_file_type="$(printf "%s\n" "${file_types[@]}" | rofi_cmd "File format" "ESC to go back")"
-                [ -z "$chosen_file_type" ] && break
-
-                case "${chosen_file_type,,}" in
-                    png | jpg | jpeg | ppm)
-                        [ "$VIBRANIUM_SCREENSHOT_FILE_TYPE" = "${chosen_file_type,,}" ] && break
-                        sed -i "/^VIBRANIUM_SCREENSHOT_FILE_TYPE/s/=.*/=\"${chosen_file_type,,}\"/" "$VIBRANIUM_USER_SETTINGS"
-                        break
-                        ;;
-                esac
-            done
+            update_enum "VIBRANIUM_SCREENSHOT_FILE_TYPE" "Filetype" "png" "jpg" "jpeg" "ppm"
             ;;
         "JPG quality"*)
-            while :; do
+            while true; do
                 source "$VIBRANIUM_USER_SETTINGS"
                 jpg_quality_options=(
-                    "Default quality    : $VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
+                    "Default quality : $VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
                     "Fullscreen quality : $VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN"
                 )
                 jpg_quality_chosen="$(printf "%s\n" "${jpg_quality_options[@]}" | rofi_cmd "JPG Quality" "ESC to go back")"
@@ -113,23 +97,11 @@ while :; do
 
                 case "$jpg_quality_chosen" in
                     "Default quality"*)
-                        while :; do
-                            prompt="Default JPG quality (int)"
-                            input="$(printf "%s\n" "$prompt" | rofi_cmd "JPG Quality" "1-100(%)")"
-                            [ -z "$input" ] && break
-                                 [ "$input" = "$prompt" ] && continue
-
-                            if ((input < 1 || input > 100)); then
-                                notify-send -r 3 -u critical -t 1500 "Vibranium" "An integer between 1-100"
-                                break
-                            fi
-                            option-validate "VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
-                            sed -i "/^VIBRANIUM_SCREENSHOT_JPEG_QUALITY/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
-                            break
-                        done
+                        edit_digit "JPG Quality" "Quality" \
+                            "int" 1 100 "VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
                         ;;
                     "Fullscreen quality"*)
-                        while :; do
+                        while true; do
                             fullscreen_quality_options=("Fullscreen quality : $VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN" "What is this?")
                             fullscreen_quality_chosen="$(printf "%s\n" "${fullscreen_quality_options[@]}" | rofi_cmd "Fullscreen quality" "${VIBRANIUM_SCREENSHOT_JPEG_QUALITY}-100(%)")"
                             [ -z "$fullscreen_quality_chosen" ] && break
@@ -166,7 +138,7 @@ while :; do
             done
             ;;
         "Flash screen"*)
-            while :; do
+            while true; do
                 flash_screen_options=("Flash screen : $VIBRANIUM_SCREENSHOT_FLASH_SCREEN" "What is this?")
                 flash_screen_chosen="$(printf "%s\n" "${flash_screen_options[@]}" | rofi_cmd "Flash screen" "ESC to go back")"
                 [ -z "$flash_screen_chosen" ] && break
@@ -185,13 +157,13 @@ while :; do
                 esac
             done
             ;;
-        "Include cursor"*) toggle_bool "VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR"    ;;
+        "Capture cursor"*) toggle_bool "VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR"    ;;
         "Save to disk"*)
             if [[ "$(toggle_bool -v "VIBRANIUM_SCREENSHOT_SAVE_TO_DISK")" == "false" ]]; then
                 if [[ ! -z "$(ls -A "$HOME/Pictures/Screenshots")" ]]; then
                     prompt="Would you like to delete existing screenshots?"
 
-                    while :; do
+                    while true; do
                         input="$(printf "Yes\nNo" | rofi_cmd "$prompt")"
 
                         case "$input" in

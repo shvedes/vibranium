@@ -1,0 +1,12 @@
+{
+	"custom/vibranium-update": {
+		"format": "{text}",
+		"hide-empty-text": true,
+
+		"exec": "vibranium-bar-update",
+		"on-click": "vibranium-cmd-launch-terminal vibranium-update",
+
+		"signal": 12,
+		"return-type": "json"
+	}
+}

@@ -2,7 +2,7 @@
 
 cat << EOF > "$HOME/.config/hypr/hyprlock.conf"
 source = ../vibranium/theme/current/hyprland.conf
-source = ~/.local/share/vibranium/defaults/hypr/hyprlock.conf
+source = ~/.local/share/vibranium/default/hypr/hyprlock.conf
 
 background {
 	# Auto generated. Do not edit!

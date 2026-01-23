@@ -12,7 +12,7 @@ case "$(</sys/class/dmi/id/chassis_type)" in
 esac
 
 cat <<EOF > "$HOME/.config/hypr/hypridle.conf"
-source = ~/.local/share/vibranium/defaults/hypr/hypridle.conf
+source = ~/.local/share/vibranium/default/hypr/hypridle.conf
 
 listener {
 	timeout = $LOCK_AFTER

@@ -8,7 +8,7 @@ INDEX=0
 _touchpad_options() {
     local index=0
 
-    while :; do
+    while true; do
         mapfile -t lines < <(
             hyprctl --batch -j \
                 "getoption input:touchpad:scroll_factor; \
@@ -87,7 +87,7 @@ _touchpad_options() {
                 esac
                 ;;
             "Scrolling speed"*)
-                while :; do
+                while true; do
                     prompt="Scrolling speed (int / float)"
                     input="$(printf "%s" "$prompt" | rofi_cmd "Scrolling speed" "0.0 - 1.0")"
                     [[ -z $input ]] && break
@@ -159,7 +159,7 @@ add_layout() {
 
     mapfile -t layouts < <(get_layouts)
 
-    while :; do
+    while true; do
         chosen="$(printf "%s\n" "${layouts[@]}" | rofi_cmd "Layouts" "ESC to go back")"
 
         [[ -z $chosen ]] && break
@@ -193,7 +193,7 @@ remove_layout() {
     local chosen
     local final_layouts
 
-    while :; do
+    while true; do
         IFS=',' read -r -a layouts < <(hyprctl -j getoption input:kb_layout | jq -r '.str')
 
         chosen="$(printf "%s\n" "${layouts[@]}" | rofi_cmd "Remove layouts" "ESC to go back")"
@@ -273,7 +273,7 @@ layouts_menu() {
     local number_layouts
     local layouts_chosen
 
-    while :; do
+    while true; do
         layouts_opts=("Add new" "Remove existing")
 
         current_shortcut="$(hyprctl -j getoption input:kb_options | jq -r .str)"
@@ -300,7 +300,7 @@ layouts_menu() {
     done
 }
 
-while :; do
+while true; do
     mapfile -t lines < <(
         hyprctl --batch -j \
             "getoption input:sensitivity;    \
@@ -387,7 +387,7 @@ while :; do
             esac
             ;;
         "Hide cursor after"*)
-            while :; do
+            while true; do
                 prompt="Hide cursor after (int, in seconds)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Inactivity timeout" "0 to disable")"
                 [[ -z "$input" ]] && break
@@ -417,7 +417,7 @@ while :; do
             esac
             ;;
         "Scrolling speed"*)
-            while :; do
+            while true; do
                 prompt="Scrolling speed (int / float, (multiplier))"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Scrolling speed" "ESC to go back")"
                 [[ -z $input ]] && break
@@ -434,7 +434,7 @@ while :; do
             done
             ;;
         "Keyboard repeat delay"*)
-            while :; do
+            while true; do
                 prompt="Repeat delay (int, in ms)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Repeat delay" "200ms - 1000ms")"
                 [[ -z $input ]] && break
@@ -453,7 +453,7 @@ while :; do
             done
             ;;
         "Keyboard repeat rate"*)
-            while :; do
+            while true; do
                 prompt="Repeat rate (int, in ms)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Repeat rate" "10ms - 50ms")"
                 [[ -z $input ]] && break
@@ -484,7 +484,7 @@ while :; do
             esac
             ;;
         "Mouse sensitivity"*)
-            while :; do
+            while true; do
                 prompt="Sensitivity (int / float)"
                 input="$(printf "%s\n" "$prompt" | rofi_cmd "Sensitivity" "-1 to 1")"
                 [[ -z $input ]] && break

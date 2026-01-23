@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+
+LOGFILE="${XDG_CACHE_HOME:-$HOME/.cache}/vibranium/spotify_adblock_installer.log"
+EXT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/spicetify/Extensions"
+FILE="$EXT_DIR/adblock.js"
+ACTION="$1"
+
+notify() {
+    local urgency="$1" title="Vibranium" msg="$2"
+    notify-send -r 1 -u "$urgency" "$title" "$msg"
+}
+
+progress() {
+    local msg="$1"
+    case "$msg" in
+        clear)
+            rm -f "$XDG_RUNTIME_DIR/worker.active"
+            ;;
+        *)
+            echo "$msg" > "$XDG_RUNTIME_DIR/worker.active"
+            ;;
+    esac
+    vibranium-cmd-refresh-waybar-module worker dynamic-separator
+}
+
+fail() {
+    local msg
+
+    msg="Adblock installation failed"
+    msg+="\n<b><i>Click here to see logs</i></b>"
+
+    if [ "$(notify-send -A true -r 1 -t 10000 -u critical 'Vibranium' "$msg")" = "0" ]; then
+        vibranium-cmd-terminal "$EDITOR" "$LOGFILE"
+    fi
+    progress clear
+    exit 1
+}
+
+install_adblock() {
+    progress "Applying Spotify adblock"
+    mkdir -p "$EXT_DIR"
+
+    if [ ! -f "$FILE" ]; then
+        curl -fsSL "https://raw.githubusercontent.com/rxri/spicetify-extensions/refs/heads/main/adblock/adblock.js" \
+            -o "$FILE" &> "$LOGFILE" || fail
+    fi
+
+    spicetify -q config extensions adblock.js
+    spicetify -n apply &> "$LOGFILE" || fail
+
+    progress clear
+    if pkill -0 spotify; then
+        notify normal "Adblock installed successfully\n<b><i>Spotify restart required</i></b>"
+    else
+        notify normal "Adblock installed successfully"
+    fi
+    rm -f "$LOGFILE"
+}
+
+remove_adblock() {
+    progress "Removing Spotify adblock"
+    rm -f "$FILE"
+    spicetify -q config extensions adblock.js-
+    spicetify -qn apply
+    progress clear
+
+    if pkill -0 spotify; then
+        notify normal "Removed Spotify adblock\n<b><i>Spotify restart required</i></b>"
+    else
+        notify normal "Removed Spotify adblock"
+    fi
+}
+
+case "$ACTION" in
+    install) install_adblock ;;
+    remove)  remove_adblock  ;;
+    *)
+        echo "Usage: $0 {install|remove}" >&2
+        exit 1
+        ;;
+esac

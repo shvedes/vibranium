@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 # Script for setting the volume with the ability to set the volume up to 150%
-# TODO: Allow absolute volume levels to be transmitted instead of relative ones
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
@@ -25,9 +24,8 @@ show_volume_notification() {
     local device="$1"
     local type="$2"
     local vol_info muted vol display_vol bar_value max_vol_factor
+
     vol_info=$(wpctl get-volume "$device")
-    # vol=$(awk '{print $2}' <<< "$vol_info") # float 0.00–1.50
-    # muted=$(awk '{print $3}' <<< "$vol_info")
     read -r _ vol muted <<< "$vol_info"
 
     if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
@@ -190,7 +188,6 @@ fi
 device_type="$1"
 action="$2"
 
-# TODO: Allow passing volume values directly (e.g. vol 140)
 case "${device_type}" in
     "vol")
         case "${action}" in

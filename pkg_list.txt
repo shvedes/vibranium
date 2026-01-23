@@ -58,6 +58,7 @@ qt6ct
 nvtop
 dunst
 bluez
+wtype
 uwsm
 rofi
 wget

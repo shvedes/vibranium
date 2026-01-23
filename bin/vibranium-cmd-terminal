@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+
+# Launch the default terminal (Alacritty) via UWSM.
+# If a command is passed, it will be executed inside the terminal.
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [COMMAND [ARGS...]]
+
+Open the default terminal (Alacritty). If COMMAND is provided,
+it will be executed inside the terminal.
+
+Options:
+  -h, --help   Show this help and exit
+EOF
+}
+
+# CLI parsing
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
+
+# ensure Alacritty service is running
+# if [[ "$(systemctl --user is-active alacritty)" != "active" ]]; then
+#     systemctl --user enable --now alacritty
+# fi
+
+args=()
+
+# If a command is provided, pass -e and the command; otherwise just open terminal
+if [[ $# -ge 1 ]]; then
+    args+=(-e "$@")
+fi
+
+# exec setsid uwsm app -- alacritty msg create-window "${args[@]}"
+alacritty msg create-window "${args[@]}"

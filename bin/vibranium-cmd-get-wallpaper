@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+hyprpaper_conf="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprpaper.conf"
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [OPTION]
+
+Print current hyprpaper wallpaper path.
+
+Options:
+  -b, --basename  Print only the file name
+  -h, --help      Display this help and exit
+EOF
+}
+
+get_wallpaper() {
+    sed -n 's/^wallpaper:path = //p' "$hyprpaper_conf"
+}
+
+case "$1" in
+    -b|--basename)
+        get_wallpaper | xargs -r basename
+        ;;
+    -h|--help)
+        usage
+        ;;
+    "" )
+        get_wallpaper
+        ;;
+    * )
+        echo "$(basename "$0"): invalid option '$1'" >&2
+        echo "Try '$(basename "$0") --help' for more information." >&2
+        exit 1
+        ;;
+esac

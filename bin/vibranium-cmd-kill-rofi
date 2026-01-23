@@ -6,6 +6,7 @@
 
 REGEX="configure-|-menu|-downscale|-password-|-launcher|-pkg-install-|-package"
 mapfile -t pids < <(pgrep -a bash | grep -E "$REGEX" | awk '{print $1}')
+
 for pid in "${pids[@]}"; do
     kill "$pid"
     killall rofi

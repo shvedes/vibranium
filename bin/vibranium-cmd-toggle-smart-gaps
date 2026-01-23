@@ -1,8 +1,23 @@
 #!/usr/bin/env bash
 
-FILE="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.conf"
+FILE="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/smart-gaps.conf"
 
-if [ -f "$FILE" ]; then
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [--help]
+
+Toggle Hyprland smart gaps configuration.
+
+Options:
+  -h, --help   Show this help and exit
+EOF
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit 0
+esac
+
+if [[ -f "$FILE" ]]; then
     rm "$FILE"
 else
     cat > "$FILE" << EOF
@@ -16,4 +31,4 @@ windowrule = rounding 0, match:float 0, match:workspace f[1]s[false]
 EOF
 fi
 
-hyprctl -q reload config-only
+hyprctl -q reload config-only &

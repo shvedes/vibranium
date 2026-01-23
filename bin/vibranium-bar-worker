@@ -2,14 +2,14 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
-file="$XDG_RUNTIME_DIR/worker.active"
+state="$XDG_RUNTIME_DIR/worker.active"
 
-if [[ -f $file ]]; then
-    if [[ "$(< "$file")" == "suspended" ]]; then
+if [[ -f $state ]]; then
+    if [[ "$(< "$state")" == "suspended" ]]; then
         tooltip="<span foreground='${WAYBAR_ACCENT}'>Background task suspended due to power profile</span>"
     else
         tooltip="<span foreground='${WAYBAR_ACCENT}'>Background task in progress</span>\n\n"
-        tooltip+="<span foreground='${WAYBAR_YELLOW}'>$(< "$file")</span>"
+        tooltip+="<span foreground='${WAYBAR_YELLOW}'>$(< "$state")</span>"
     fi
     printf '{"text": "%s", "tooltip": "%s"}' "\uf013" "$tooltip"
 else

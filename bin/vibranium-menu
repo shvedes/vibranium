@@ -5,7 +5,8 @@ source "$VIBRANIUM_PATH/vibranium-core-lib"
 OPTIONS=(
     "Package Management"
     "Vibranium Settings"
-    "Utilities" "Help"
+    "Utilities" "Tweaks"
+    "Help"
 )
 
 INDEX=0
@@ -29,10 +30,26 @@ while :; do
             vibranium-menu-help
             ;;
         "Package Management")
-            vibranium-menu-package-management
+            vibranium-menu-pkg
             ;;
         "Utilities")
             vibranium-menu-utilities
+            ;;
+        "Tweaks")
+            while :; do
+                tweaks_opts=("System" "Apps")
+                tweaks_chosen="$(printf "%s\n" "${tweaks_opts[@]}" | rofi_cmd "Tweaks" "ESC to go back")"
+                [[ -z $tweaks_chosen ]] && break
+
+                case "$tweaks_chosen" in
+                    "Apps")
+                        vibranium-menu-tweaks
+                        ;;
+                    "System")
+                        vibranium-menu-tweaks-system
+                        ;;
+                esac
+            done
             ;;
         *)
             continue

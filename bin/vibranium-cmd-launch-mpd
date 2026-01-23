@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+# Automatically detect and launch an available MPD client.
+
+CLIENTS=(ncmpcpp rmpc cmus vimpc)
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [OPTION]
+
+Detect and launch an available MPD client in a terminal.
+
+Options:
+  -h, --help  Display this help and exit
+EOF
+}
+
+case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    "")
+        ;;
+    *)
+        echo "$(basename "$0"): invalid option '$1'" >&2
+        echo "Try '$(basename "$0") --help' for more information." >&2
+        exit 1
+        ;;
+esac
+
+if ! command -v mpd >/dev/null 2>&1; then
+    exit 1
+fi
+
+for client in "${CLIENTS[@]}"; do
+    if command -v "$client" >/dev/null 2>&1; then
+        exec vibranium-cmd-terminal "$client"
+    fi
+done
+
+exit 1

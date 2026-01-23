@@ -20,6 +20,6 @@ case "$VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS" in
         ;;
 esac
 
-for i in $(seq 1 12); do
+for i in $(seq 1 20); do
     pkill -RTMIN+"${i}" waybar &
 done

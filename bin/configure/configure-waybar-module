@@ -3,7 +3,37 @@
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
-INDEX=0
+_color_picker_menu() {
+    local index opts chosen
+
+    index=0
+    opts=("History size" "Change icon")
+
+    while true; do
+        chosen="$(printf "%s\n" "${opts[@]}" | rofi_cmd "$CHOSEN" "ESC to go back" -selected-row "$index")"
+        [[ -z "$chosen" ]] && break
+
+        for i in "${!opts[@]}"; do
+            if [ "${opts[$i]}" = "$chosen" ]; then
+                index="$i"
+                break
+            fi
+        done
+
+        case "$chosen" in
+            "Change icon")
+                update_enum "VIBRANIUM_COLOR_PICKER_WAYBAR_ICON" \
+                    "Statusbar icon" "droplet" "palette" "eyedropper"
+                vibranium-cmd-refresh-waybar-module color-picker
+                ;;
+            "History size")
+                update_enum "VIBRANIUM_COLOR_PICKER_HISTORY_SIZE" \
+                    "History size" "3" "5" "10" "15"
+                vibranium-cmd-refresh-waybar-module color-picker
+                ;;
+        esac
+    done
+}
 
 _pacman_weather_specific() {
     local options chosen index animate_loading \
@@ -11,7 +41,7 @@ _pacman_weather_specific() {
 
     index=0
 
-    while :; do
+    while true; do
         source "$VIBRANIUM_USER_SETTINGS"
 
         animate_loading="$VIBRANIUM_BAR_SHOW_ANIMATION"
@@ -34,37 +64,67 @@ _pacman_weather_specific() {
         done
 
         case "$chosen" in
-            "Animate loading"*)
-                option-validate "VIBRANIUM_BAR_SHOW_ANIMATION"
-                toggle_bool     "VIBRANIUM_BAR_SHOW_ANIMATION"
-                ;;
-            "Show separators"*)
-                option-validate "VIBRANIUM_BAR_SHOW_SEPARATOR"
-                toggle_bool     "VIBRANIUM_BAR_SHOW_SEPARATOR"
-                ;;
-            "Animate updates"*)
-                option-validate "VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC"
-                toggle_bool     "VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC"
-                ;;
-            *) continue
+            "Animate loading"*) toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION" ;;
+            "Show separators"*) toggle_bool "VIBRANIUM_BAR_SHOW_SEPARATOR" ;;
+            "Animate updates"*) toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC"
         esac
 
-        vibranium-cmd-refresh-waybar-module pacman
-        vibranium-cmd-refresh-waybar-module weather
+        vibranium-cmd-refresh-waybar-module pacman &
+        vibranium-cmd-refresh-waybar-module weather &
     done
-
 }
 
-while :; do
+_update_module_setting() {
+    local var="$1"
+    local type="$2"
+    local rofi_title="$3"
+    local rofi_subtitle="$4"
+    local validation_regex="$5"
+    local error_message="$6"
+    local quote_value="$7"
+    local module_name="$8"
+    local enabled_var="$9"
+
+    local current_value="${!var}"
+    rofi_subtitle="${rofi_subtitle//\{current\}/$current_value}"
+
+    while true; do
+        new_value="$(printf "Enter new value ($type)" | rofi_cmd "$rofi_title" "$rofi_subtitle")"
+        [ -z "$new_value" ] && break
+        if [[ ! "$new_value" =~ $validation_regex ]]; then
+            if [[ -n "$error_message" ]]; then
+                notify-send -r 1 -u critical -t 2000 "Vibranium" "$error_message"
+            fi
+            continue
+        fi
+        option-validate "$var"
+        if [[ "$quote_value" == "yes" ]]; then
+            sed -i "s|^${var}=.*|${var}=\"${new_value}\"|" "$VIBRANIUM_USER_SETTINGS"
+        else
+            sed -i "/^${var}/s/=.*/=${new_value}/" "$VIBRANIUM_USER_SETTINGS"
+        fi
+        if [[ "${!enabled_var}" == false ]]; then
+            notify-send -r 1 -t 5000 "Vibranium" \
+                "The value has been changed. Don't forget to enable the module."
+        fi
+        vibranium-cmd-refresh-waybar-module "$module_name" &
+        break
+    done
+}
+
+INDEX=0
+
+while true; do
     OPTIONS=("Pacman" "Weather" "Color Picker")
 
     if systemd-inhibit | grep -q Vibranium; then
         OPTIONS+=("Sleep inhibitor")
     fi
 
-    if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == true ]]; then
-        OPTIONS+=("<b>Pacman and Weather specific</b>")
-    elif [[ "$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE" == true ]]; then
+    pacman_enabled="$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
+    weather_enabled="$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
+
+    if [[ "$pacman_enabled" == true && "$weather_enabled" == true ]]; then
         OPTIONS+=("<b>Pacman and Weather specific</b>")
     fi
 
@@ -83,136 +143,20 @@ while :; do
             _pacman_weather_specific
             ;;
         "Sleep inhibitor")
-            inhibitor_index=0
-            while :; do
-                inhibitor_options=("coffee" "lock" "eye")
-                inhibitor_chosen="$(printf "%s\n" "${inhibitor_options[@]}" | rofi_cmd "Icon" "ESC to go back" -selected-row "$inhibitor_index")"
-                [[ -z "$inhibitor_chosen" ]] && break
-
-                for i in "${!inhibitor_options[@]}"; do
-                    if [ "${inhibitor_options[$i]}" = "$inhibitor_chosen" ]; then
-                        inhibitor_index="$i"
-                        break
-                    fi
-                done
-
-                case "$inhibitor_chosen" in
-                    "coffee" | "lock" | "eye")
-                        option-validate "VIBRANIUM_BAR_INHIBITOR_ICON"
-                        sed -i "/^VIBRANIUM_BAR_INHIBITOR_ICON/s/=.*/=\"${inhibitor_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
-                        vibranium-cmd-refresh-waybar-module inhibitor
-                        ;;
-                esac
-            done
-            ;;
-        "Pacman")
-            while :; do
-                new_value="$(printf "Enter new value (int)" | rofi_cmd "Display if ≥ N updates" "ESC to go back")"
-                [ -z "$new_value" ] && break
-
-                if [[ "$new_value" =~ ^[0-9]+$ ]]; then
-                    option-validate "VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED"
-                    sed -i "/^VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED/s/=.*/=${new_value}/" "$VIBRANIUM_USER_SETTINGS"
-
-                    if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == "true" ]]; then
-                        vibranium-cmd-refresh-waybar-module pacman
-                    else
-                        notify-send -r 1 -t 5000 "Vibranium" "The value was successfully changed, but the module is disabled!"
-                    fi
-                    exit 0
-                fi
-            done
+            update_enum "VIBRANIUM_BAR_INHIBITOR_ICON" "Statusbar icon" "Icon" "coffee" "lock" "eye"
+            vibranium-cmd-refresh-waybar-module inhibitor
             ;;
         "Color Picker")
-            cp_index=0
-            cp_options=("History size" "Change icon")
-
-            while :; do
-                cp_chosen="$(printf "%s\n" "${cp_options[@]}" | rofi_cmd "$CHOSEN" "ESC to go back" -selected-row "$cp_index")"
-                [[ -z "$cp_chosen" ]] && break
-
-                for i in "${!cp_options[@]}"; do
-                    if [ "${cp_options[$i]}" = "$cp_chosen" ]; then
-                        cp_index="$i"
-                        break
-                    fi
-                done
-
-                case "$cp_chosen" in
-                    "Change icon")
-                        icon_index=0
-                        while :; do
-                            icon_options=("droplet" "palette" "eyedropper")
-                            icon_chosen="$(printf "%s\n" "${icon_options[@]}" | rofi_cmd "Icon" "ESC to go back" -selected-row "$icon_index")"
-                            [ -z "$icon_chosen" ] && break
-
-                            for i in "${!icon_options[@]}"; do
-                                if [ "${icon_options[$i]}" = "$icon_chosen" ]; then
-                                    icon_index="$i"
-                                    break
-                                fi
-                            done
-
-                            if [[ "${icon_options[*]}" =~ $icon_chosen ]]; then
-                                option-validate "VIBRANIUM_COLOR_PICKER_WAYBAR_ICON"
-                                sed -i "/^VIBRANIUM_COLOR_PICKER_WAYBAR_ICON/s/=.*/=\"${icon_chosen}\"/" \
-                                    "$VIBRANIUM_USER_SETTINGS"
-                                vibranium-cmd-refresh-waybar-module color-picker
-                                break
-                            fi
-                        done
-                        ;;
-                    "History size")
-                        history_file="$XDG_CACHE_HOME/vibranium/color-picker.history"
-                        while :; do
-                            hs_opts=("3" "5" "10" "15")
-                            hs_chosen="$(printf "%s entries\n" "${hs_opts[@]}" | rofi_cmd "$cp_chosen" "ESC to go back")"
-                            [[ -z "$hs_chosen" ]] && break
-                                       hs_chosen="${hs_chosen%% *}"
-
-                            if [[ "${hs_opts[*]}" =~ $hs_chosen ]]; then
-                                option-validate "VIBRANIUM_COLOR_PICKER_HISTORY_SIZE"
-                                sed -i "/^VIBRANIUM_COLOR_PICKER_HISTORY_SIZE/s/=.*/=\"${hs_chosen}\"/" \
-                                    "$VIBRANIUM_USER_SETTINGS"
-
-                                if [[ -f "$history_file" ]]; then
-                                    line_count=$(wc -l < "$history_file")
-                                    if ((line_count > hs_chosen)); then
-                                        tail -n "$hs_chosen" "$history_file" > "${history_file}.tmp" &&
-                                            mv "${history_file}.tmp" "$history_file"
-                                    fi
-                                fi
-
-                                vibranium-cmd-refresh-waybar-module color-picker
-                                break
-                            fi
-                        done
-                        ;;
-                esac
-            done
+            _color_picker_menu
             ;;
         "Weather")
-            while :; do
-                new_value="$(printf "Enter new value (string)" | rofi_cmd "City" "current is ${VIBRANIUM_BAR_WEATHER_MODULE_CITY}")"
-                [ -z "$new_value" ] && break
-                                  [[ ! "$new_value" =~ ^[A-Za-z]+$ ]] && {
-                    notify-send -r 1 -u critical -t 2000 "Vibranium" "Invalid city name!"
-                    continue
-                }
+            update_module_setting "VIBRANIUM_BAR_WEATHER_MODULE_CITY" "string" \
+                "City" "current is {current}" '^[A-Za-z]+$' "Invalid city name!" "yes" "weather" "weather_enabled"
+            ;;
 
-                opt_name="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
-                                                  option-validate "$opt_name"
-                sed -i "s|^${opt_name}=.*|${opt_name}=\"${new_value}\"|" "$VIBRANIUM_USER_SETTINGS"
-                msg="Monitoring weather in <span foreground='${P_ACCENT}'><b>$new_value</b></span>"
-
-                if [ "$(vibranium-cmd-get-option VIBRANIUM_BAR_WEATHER_MODULE_ENABLE)" = "true" ]; then
-                    notify-send -r 1 "City updated" "$msg"
-                    vibranium-cmd-refresh-waybar-module weather
-                else
-                    notify-send -r 1 "City updated, but you forgot to enable the module" "$msg"
-                fi
-                break
-            done
+        "Pacman")
+            update_module_setting "VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED" "int" \
+                "Display if ≥ N updates" "ESC to go back" '^[0-9]+$' "" "no" "pacman" "pacman_enabled"
             ;;
     esac
 done

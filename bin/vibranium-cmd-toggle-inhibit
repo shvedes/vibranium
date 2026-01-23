@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# Toggle a persistent systemd-inhibit to prevent idle suspend.
+# If an inhibitor is already running, kills it; otherwise starts a new one.
+# Refreshes the Vibranium Waybar inhibitor module after action.
+
+source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [--help]
+
+Toggle systemd idle inhibitor for Vibranium.
+
+Options:
+  -h, --help   Show this help and exit
+EOF
+}
+
+case "${1:-}" in
+    -h|--help) usage; exit 0
+esac
+
+pid=""
+for d in /proc/[0-9]*; do
+    [[ -r "$d/comm" ]] || continue
+    read -r comm < "$d/comm"
+    [[ $comm == systemd-inhibit ]] || continue
+    pid=${d##*/}
+    break
+done
+
+if [[ -n "$pid" ]]; then
+    kill "$pid"
+else
+    setsid -f systemd-inhibit \
+        --what=idle \
+        --who="Vibranium" \
+        --why="Prevent system suspend is active" \
+        sleep infinity &
+fi
+
+vibranium-cmd-refresh-waybar-module inhibitor &

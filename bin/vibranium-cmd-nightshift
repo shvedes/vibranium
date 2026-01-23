@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+
+# Control the Night Light (hyprsunset) temperature with a cached state file.
+# Uses a state file to represent on/off because hyprsunset is relied upon by
+# other features that change gamma.
+
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprsunset.conf"
+STATE_FILE="${VIBRANIUM_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/vibranium}/nightshift"
+STEP=100
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [OPTIONS]
+
+Options:
+  --toggle             Toggle night light
+  --inc, --increase    Increase temperature by STEP (or +)
+  --dec, --decrease    Decrease temperature by STEP (or -)
+  --set TEMPERATURE    Set absolute temperature (in Kelvin)
+  --step N             Use step N (default $STEP)
+  -h, --help           Show this help and exit
+
+Notes:
+  Temperature must be between 1000 and 20000.
+  The script expects a state file at: $STATE_FILE
+EOF
+}
+
+lockfile="$XDG_RUNTIME_DIR/$(basename "$0").lock"
+exec 10> "$lockfile" || {
+    error "Anoter instance of ${YELLOW}$(basename "$0")${RESET} already running!"
+    exit 1
+}
+
+flock -n 10 || exit 0
+
+if [[ $# -eq 0 ]]; then
+    usage
+    exit 0
+fi
+
+# read current temperature from config, fallback to 5500
+CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2>/dev/null | head -n1 || echo 5500)
+
+action=""
+ARG_TEMP=""
+
+# parse args (simple, supports long options)
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        --toggle) action="toggle"; shift ;;
+        --inc|--increase|+) action="inc"; shift ;;
+        --dec|--decrease|-) action="dec"; shift ;;
+        --set) action="set"; shift; ARG_TEMP="$1"; shift ;;
+        --step) shift; STEP="$1"; shift ;;
+        # allow bare numeric as set
+        [0-9]*)
+            action="set"
+            ARG_TEMP="$1"
+            shift
+            ;;
+        *)
+            printf '%s\n' "$(basename "$0"): invalid option: $1" >&2
+            printf 'Try "%s --help" for more information.\n' "$(basename "$0")" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# require the state file to exist (script's design uses it)
+if [[ ! -f "$STATE_FILE" ]]; then
+    printf '%s\n' "Night light state file not found: $STATE_FILE" >&2
+    exit 1
+fi
+
+state="$(<"$STATE_FILE")"
+
+# Toggle mode
+if [[ "$action" == "toggle" ]]; then
+    case "$state" in
+        suspended)
+            hyprctl -q hyprsunset temperature "$CURRENT_TEMP" &
+            printf '%s\n' "active" > "$STATE_FILE"
+            ;;
+        active)
+            hyprctl -q hyprsunset identity &
+            printf '%s\n' "suspended" > "$STATE_FILE"
+            ;;
+        *)
+            printf '%s\n' "Unknown state in $STATE_FILE: '$state'" >&2
+            exit 1
+            ;;
+    esac
+
+    vibranium-cmd-refresh-waybar-module nightshift &
+    exit 0
+fi
+
+# +/- operations only when not suspended
+if [[ "$action" == "inc" || "$action" == "dec" ]]; then
+    if [[ "$state" == "suspended" ]]; then
+        printf '%s\n' "Night light is suspended; cannot adjust with +/-" >&2
+        exit 1
+    fi
+
+    case "$action" in
+        inc) TEMP=$((CURRENT_TEMP + STEP)) ;;
+        dec) TEMP=$((CURRENT_TEMP - STEP)) ;;
+    esac
+fi
+
+# explicit set
+if [[ "$action" == "set" ]]; then
+    if ! [[ "$ARG_TEMP" =~ ^[0-9]+$ ]]; then
+        printf '%s\n' "Invalid temperature: $ARG_TEMP" >&2
+        exit 1
+    fi
+    TEMP="$ARG_TEMP"
+fi
+
+# If no action produced a TEMP, nothing to do
+if [[ -z "${TEMP:-}" ]]; then
+    printf '%s\n' "No operation performed." >&2
+    exit 0
+fi
+
+# check bounds
+if (( TEMP < 1000 || TEMP > 20000 )); then
+    printf '%s\n' "Temperature must be between 1000K and 20000K" >&2
+    exit 1
+fi
+
+# Apply and persist
+hyprctl -q hyprsunset temperature "$TEMP" &
+
+mkdir -p "$(dirname "$CONF")"
+printf '# Auto-generated! All changes will be overwritten!\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" > "$CONF"
+
+# optionally refresh UI module (useful after changing temperature)
+vibranium-cmd-refresh-waybar-module nightshift &
+
+exit 0

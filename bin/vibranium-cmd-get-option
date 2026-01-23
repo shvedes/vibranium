@@ -1,14 +1,38 @@
 #!/usr/bin/env bash
 
-# vibranium-cmd-get-option <OPTION_NAME>
-# This script reads global and user settings and outputs the value of the variable passed to it.
-# It is mostly a helper script used in other scripts in the Vibranium ecosystem, but you can use it as is.
+# vibranium-cmd-get-option [OPTION_NAME]
+# Print the value of a Vibranium option.
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") OPTION_NAME
+
+Print the value of the specified Vibranium option.
+
+Options:
+  -h, --help  Display this help and exit
+EOF
+}
+
+case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    "")
+        echo "$(basename "$0"): missing OPTION_NAME" >&2
+        echo "Try '$(basename "$0") --help' for more information." >&2
+        exit 1
+        ;;
+esac
 
 source "$VIBRANIUM_PATH/vibranium-core-defaults"
 source "$XDG_CONFIG_HOME/vibranium/settings"
 
-if [[ ! -z "$1" && -n "${!1+x}" ]]; then
-    echo "${!1}"
-else
-    exit 1
+if [[ -n "${!1+x}" ]]; then
+    printf '%s\n' "${!1}"
+    exit 0
 fi
+
+echo "$(basename "$0"): option '$1' is not set" >&2
+exit 1

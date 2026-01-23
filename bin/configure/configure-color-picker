@@ -3,16 +3,68 @@
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
+_lower_sense() {
+    local opt="VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY"
+    local level_opt="${opt}_LEVEL"
+
+    local ls_index=0
+    local ls_options ls_chosen i new_value msg
+
+    while true; do
+        source "$VIBRANIUM_USER_SETTINGS"
+
+        ls_options=("Lower sensitivity : ${!opt}")
+
+        if [[ "${!opt}" == true ]]; then
+            ls_options+=("Level : ${!level_opt}")
+        fi
+
+        ls_options+=("What is this?")
+
+        mapfile -t ls_options < <(align_options "${ls_options[@]}")
+        ls_chosen="$(printf "%s\n" "${ls_options[@]}" |
+            rofi_cmd "Lower sensitivity" "ESC to go back" -selected-row "$ls_index")"
+
+        [[ -z "$ls_chosen" ]] && return 0
+
+        for i in "${!ls_options[@]}"; do
+            [[ "${ls_options[$i]}" == "$ls_chosen" ]] && {
+                ls_index="$i"
+                break
+            }
+        done
+
+        case "$ls_chosen" in
+            "Lower sensitivity"*)
+                toggle_bool "$opt"
+                ;;
+            "Level"*)
+                edit_digit "Sensitivity level" "Lower sensitivity" \
+                    "float" 0.1 1.0 "${level_opt}"
+                ;;
+            "What"*)
+                msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> "
+                msg+="<b>Whether to lower the mouse sensitivity when picking a color</b>\n\n"
+                msg+="This can be useful when you need to select the color precisely"
+                notify-send -r 3 -t 15000 "What is this?" "$msg"
+                ;;
+        esac
+    done
+}
+
 INDEX=0
 
-while :; do
+while true; do
     source "$VIBRANIUM_USER_SETTINGS"
+
     OPTIONS=(
-        "Show live preview    : $VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
-        "Lower sensitivity    : $VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY"
+        "Show HEX preview : $VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
+        "Lower sensitivity : $VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY"
         "Show in notification : $VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
-        "<span alpha='70%' ><i>Color format         : ${VIBRANIUM_COLOR_PICKER_COLOR_FORMAT^^}</i></span>"
+        # "<span alpha='70%' ><i>Color format         : ${VIBRANIUM_COLOR_PICKER_COLOR_FORMAT^^}</i></span>"
     )
+
+    mapfile -t OPTIONS < <(align_options "${OPTIONS[@]}")
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Color picker" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
 
@@ -24,93 +76,14 @@ while :; do
     done
 
     case "$CHOSEN" in
-        "Show live preview"*) toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW" ;;
-        "Show in no"*)  toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR" ;;
-        # We don't have format support other than hex in color picker waybar module, so..
-        # I think at the moment we can convert non hex to hex on the fly in ../vibranium-bar-color-picker,
-        # but it's just an idea for now
-        "Color format"*)
-            # while :; do
-            # 	color_format_options=("hex" "rgb" "hsl" "hsv" "cmyk")
-            # 	color_format_chosen="$(printf "%s\n" "${color_format_options[@]}" | rofi_cmd "Color format" "ESC to go back")"
-            # 	[ -z "$color_format_chosen" ] && break
-            #
-            # 	if [[ "${color_format_options[*]}" =~ "$color_format_chosen" ]]; then
-            # 		option-validate "VIBRANIUM_COLOR_PICKER_COLOR_FORMAT"
-            # 		sed -i "/^VIBRANIUM_COLOR_PICKER_COLOR_FORMAT/s/=.*/=\"${color_format_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
-            # 		break
-            # 	fi
-            # done
+        "Show HEX preview"*)
+            toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
             ;;
-        "<"*)
-            notify-send -r 1 "Vibranium" "Sorry, this option is not ready yet"
+        "Show in no"*)
+            toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
             ;;
         "Lower sensitivity"*)
-            ls_index=0
-
-            while :; do
-                source "$VIBRANIUM_USER_SETTINGS"
-
-                ls_options=(
-                    "Lower sensitivity     : $VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY"
-                )
-
-                if [[ "$VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY" == false ]]; then
-                    ls_options+=(
-                        "<span alpha='70%'>By how much to reduce : $VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY_LEVEL</span> <span foreground='${P_RED}'>()</span>"
-                    )
-                else
-                    ls_options+=(
-                        "By how much to reduce : $VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY_LEVEL"
-                    )
-                fi
-
-                ls_options+=("What is this?")
-                ls_chosen="$(printf "%s\n" "${ls_options[@]}" | rofi_cmd "Lower sensitivity" "ESC to go back" -selected-row "$ls_index")"
-                [[ -z "$ls_chosen" ]] && break
-
-                for i in "${!ls_options[@]}"; do
-                    if [ "${ls_options[$i]}" = "$ls_chosen" ]; then
-                        ls_index="$i"
-                        break
-                    fi
-                done
-
-                case "$ls_chosen" in
-                    *"()"*)
-                        ls_index=0
-                        continue
-                        ;;
-                    "Lower sensitivity"*)
-                        toggle_bool "VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY"
-                        ;;
-                    "By how"*)
-                        prompt="Reducing level (float)"
-
-                        while :; do
-                            input="$(printf "%s" "$prompt" | rofi_cmd "Lower sensitivity" "0.1-1.0")"
-                            [[ -z "$input" ]] && break
-                                   [[ "$input" = "$prompt" ]] && continue
-
-                            if [[ "$input" =~ ^0*(0\.[0-9]+|1(\.0*)?)$ ]]; then
-                                [[ "$input" == 1 ]] && input="1.0"
-                                option-validate "VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY_LEVEL"
-                                sed -i "/^VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY_LEVEL/s/=.*/=${input}/" "$VIBRANIUM_USER_SETTINGS"
-                                break
-                            else
-                                notify-send -r 3 -t 1500 -u critical "Vibranium" "A number between 0.1 and 1.0"
-                                continue
-                            fi
-                        done
-                        ;;
-                    "What"*)
-                        msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> "
-                        msg+="<b>Whether to lower the mouse sensitivity when picking a color</b>\n\n"
-                        msg+="This can be useful when you need to select the color precisely"
-                        notify-send -r 3 -t 15000 "What is this?" "$msg"
-                        ;;
-                esac
-            done
+            _lower_sense
             ;;
     esac
 done

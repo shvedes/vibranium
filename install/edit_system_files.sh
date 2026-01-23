@@ -30,7 +30,7 @@ grep -q '\-march=native' "$MAKEPKG_CONF" ||
 sudo sed -Ei 's/-march=x86-64/-march=native/' "$MAKEPKG_CONF"
 
 grep -Eq '^OPTIONS=.*\bdebug\b' "$MAKEPKG_CONF" &&
-sudo sed -Ei '/^OPTIONS=/ s/\b!*\bdebug\b/!debug/' "$MAKEPKG_CONF"
+sudo sed -Ei '/^OPTIONS=/ s/(^|[[:space:]])!?debug(\b)/\1!debug\2/' "$MAKEPKG_CONF"
 
 sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$SUDOERS_CONF" ||
 echo -e '\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback' |

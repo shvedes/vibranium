@@ -2,7 +2,25 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
+_grayscale_enabled() {
+    local opt
+
+    opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
+
+    if [[ "$opt" == "[[EMPTY]]" || "$opt" =~ ^()$ ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
 ACTIONS=()
+
+if [[ -f "$XDG_RUNTIME_DIR/vibranium-timer.remaining" ]]; then
+    ACTIONS+=("<span foreground='${P_YELLOW}'><b>Stop timer</b></span>")
+else
+    ACTIONS+=("New timer")
+fi
 
 if systemd-inhibit | grep "Prevent system suspend is active" > /dev/null; then
     ACTIONS+=("Allow sleep")
@@ -10,24 +28,18 @@ else
     ACTIONS+=("Block sleep")
 fi
 
-ACTIONS+=("Apply tweaks")
-
-if [[ -f "$XDG_RUNTIME_DIR/vibranium-timer.remaining" ]]; then
-    ACTIONS+=("<span foreground='${P_YELLOW}'><b>Stop active timer</b></span>")
-else
-    ACTIONS+=("Start new timer")
-fi
-
-ACTIONS+=("Video downscaler")
-
-if command -v syncthing > /dev/null; then
-    ACTIONS+=("Launch Syncthing")
-fi
-
 if command -v pass > /dev/null; then
     ACTIONS+=("Password manager")
 fi
 
+ACTIONS+=(
+    "Toggle read mode"
+    "Video downscaler"
+)
+
+if command -v syncthing > /dev/null; then
+    ACTIONS+=("Launch Syncthing")
+fi
 
 ACTIONS+=("Reload Vibranium")
 INDEX=0
@@ -36,17 +48,23 @@ read -r PID CLASS <<< "$(hyprctl -j activewindow | jq -r '[.pid,.class]|@tsv')"
 if [[ -n "$PID" && -r "/proc/$PID/stat" ]]; then
     read -r _ _ state _ < "/proc/$PID/stat"
     if [[ $state != T ]]; then
-        ACTIONS+=("Freeze <span foreground='${P_YELLOW}'><b>${CLASS,,}</b></span>")
+        ACTIONS+=("Freeze <span foreground='${P_YELLOW}'>${CLASS,,}</span>")
     elif [[ -n "$CLASS" ]]; then
-        ACTIONS+=("Unfreeze <span foreground='${P_YELLOW}'><b>${CLASS,,}</b></span>")
+        ACTIONS+=("Unfreeze <span foreground='${P_YELLOW}'>${CLASS,,}</span>")
         # So, if the current window is frozen, we'll automatically select
         # this option, assuming that the user most probably wanted to unfreeze it.
         INDEX=$(( ${#ACTIONS[@]} - 1 ))
     fi
 fi
 
+mpd_status="$(mpc status 2>/dev/null)"
+spotify_status="$(playerctl -p spotify status)"
+if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
+    ACTIONS+=("Copy playing track")
+fi
+
 while :; do
-    CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "ESC to go back" -selected-row "$INDEX")"
+    CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "search..." -selected-row "$INDEX")"
 
     for i in "${!ACTIONS[@]}"; do
         if [ "${ACTIONS[$i]}" = "$CHOSEN" ]; then
@@ -56,12 +74,30 @@ while :; do
     done
 
     case "$CHOSEN" in
-        *"Stop active timer"*)
-            pkill --signal TERM -f vibranium-utils-timer
-            notify-send -r 1 "Vibranium" -r 2 "The active timer has been disabled"
+        "Toggle read mode")
+            shader="$VIBRANIUM/default/hypr/grayscale.frag"
+            config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+
+            if _grayscale_enabled; then
+                rm -f "$config"
+            else
+                echo "decoration:screen_shader = $shader" > "$config"
+            fi
+
+            hyprctl -q reload config-only
+            vibranium-cmd-refresh-waybar-module reading-mode
             exit 0
             ;;
-        "Start new timer")
+        "Copy playing track")
+            vibranium-cmd-copy-track --notify
+            exit 0
+            ;;
+        *"Stop timer"*)
+            pkill --signal TERM -f vibranium-utils-timer
+            notify-send -r 1 "Vibranium" -r 2 "The timer has been stopped"
+            exit 0
+            ;;
+        "New timer")
             setsid vibranium-utils-timer
             exit 0
             ;;
@@ -70,29 +106,13 @@ while :; do
             vibranium-cmd-kill-rofi
             exit 0
             ;;
-        "Apply tweaks")
-            while :; do
-                tweaks_opts=("System" "Apps")
-                tweaks_chosen="$(printf "%s\n" "${tweaks_opts[@]}" | rofi_cmd "Tweaks" "ESC to go back")"
-                [[ -z $tweaks_chosen ]] && break
-
-                case "$tweaks_chosen" in
-                    "Apps")
-                        vibranium-menu-tweaks
-                        ;;
-                    "System")
-                        vibranium-menu-tweaks-system
-                        ;;
-                esac
-            done
-            ;;
         "Reload Vibranium")
             vibranium-utils-reload
             vibranium-cmd-kill-rofi
             exit 0
             ;;
         *"sleep"*)
-            vibranium-cmd-inhibit-toggle
+            vibranium-cmd-toggle-inhibit
             vibranium-cmd-kill-rofi
             exit 0
             ;;
@@ -102,7 +122,7 @@ while :; do
             fi
             ;;
         "Freeze"* | "Unfreeze"*)
-            vibranium-cmd-freeze-pid-toggle
+            vibranium-cmd-toggle-pid
             vibranium-cmd-kill-rofi
             exit 0
             ;;

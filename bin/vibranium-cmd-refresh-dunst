@@ -5,6 +5,6 @@
 
 systemctl --user restart dunst
 dunstctl reload \
-    "$VIBRANIUM/defaults/dunstrc" \
+    "$VIBRANIUM/default/dunstrc" \
     "$XDG_CONFIG_HOME/dunst/dunstrc" \
     "$XDG_CONFIG_HOME/vibranium/theme/current/dunst"

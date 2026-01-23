@@ -26,7 +26,7 @@ toggle_module() {
 
 INDEX=0
 
-while :; do
+while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
     if check_module 'hyprland/language'; then
@@ -100,7 +100,7 @@ while :; do
             ;;
         "Night light"*)
             toggle_bool "VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE"
-            vibranium-cmd-refresh-waybar-module night-light
+            vibranium-cmd-refresh-waybar-module nightshift
             ;;
         "Color picker"*)
             toggle_bool "VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE"

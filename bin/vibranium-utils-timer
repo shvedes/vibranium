@@ -9,10 +9,19 @@ pw_play_pid=""
 
 cleanup() {
     local inhibit_pid
-    inhibit_pid="$(pgrep -f "Timer is active")"
+
+    for d in /proc/[0-9]*; do
+        [[ -r "$d/comm" ]] || continue
+        read -r comm < "$d/comm"
+
+        [[ $comm == "Timer is active" ]] || continue
+
+        inhibit_pid=${d##*/}
+        break
+    done
 
     kill -s TERM "$pw_play_pid" 2>/dev/null
-    kill "$inhibit_pid"
+    kill -s TERM "$inhibit_pid" 2>/dev/null
     rm -f "$state"
 
     vibranium-cmd-refresh-waybar-module timer
@@ -62,19 +71,25 @@ done
 [[ -z "$sleep_time" ]] && exit 0
 
 formatted_time="$(format_time "$sleep_time")"
-notify-send -r 2 "Vibranium" "Timer set for <span foreground='${P_YELLOW}'><b>${formatted_time}</b></span>"
-setsid -f systemd-inhibit --what=idle --why="Timer is active" \
-    --who="Vibranium" sleep infinity
+log "Timer set for ${BLUE}$formatted_time${RESET}"
+notify-send -r 2 "Vibranium" \
+    "Timer set for <span foreground='${P_YELLOW}'><b>${formatted_time}</b></span>"
+
+setsid -f systemd-inhibit --what=idle --why="Timer is active" --who="Vibranium" sleep "$sleep_time"
+log "Sleep inhibition is active"
 
 time_remaining=$sleep_time
 while (( time_remaining > 0 )); do
     echo "$time_remaining" > "$state"
+    printf "\r\033[K%s[Timer]%s Seconds remaining: %s%s%s " \
+        "$YELLOW" "$RESET" "$BLUE" "$time_remaining" "$RESET"
     vibranium-cmd-refresh-waybar-module timer
     ((time_remaining--))
     sleep 1
 done
 
 echo "timed out" > "$state"
+printf "\r\033[K%s[Timer]%s Time is out!%s " "$YELLOW" "$RED" "$RESET"
 vibranium-cmd-refresh-waybar-module timer
 
 while :; do

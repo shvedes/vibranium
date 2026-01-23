@@ -28,11 +28,11 @@ printf '{\n\t"theme": "vibranium.css"\n}' \
 
 # Misc symlinks
 declare -A links=(
-	["$HOME/.local/share/vibranium/defaults/uwsm/env"]="$HOME/.config/uwsm/env"
-	["$HOME/.local/share/vibranium/defaults/imv"]="$HOME/.config/imv/config"
+	["$HOME/.local/share/vibranium/default/uwsm/env"]="$HOME/.config/uwsm/env"
+	["$HOME/.local/share/vibranium/default/imv"]="$HOME/.config/imv/config"
 	["$HOME/.config/vibranium/theme/current/qt6ct.conf"]="$HOME/.config/qt6ct/colors/vibranium.conf"
-	["$HOME/.local/share/vibranium/defaults/wlogout/style.css"]="$HOME/.config/wlogout"
-	["$HOME/.local/share/vibranium/defaults/wlogout/layout"]="$HOME/.config/wlogout"
+	["$HOME/.local/share/vibranium/default/wlogout/style.css"]="$HOME/.config/wlogout"
+	["$HOME/.local/share/vibranium/default/wlogout/layout"]="$HOME/.config/wlogout"
 	["$HOME/.config/vibranium/theme/current/spicetify.ini"]="$HOME/.config/spicetify/Themes/text/color.ini"
 )
 
@@ -64,5 +64,5 @@ printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not e
 cp -r ./config/* "$HOME/.config"
 sed -i "s/user/$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
 
-ln -sf "$HOME/.local/share/vibranium/defaults/hypr/animations/default.conf" \
+ln -sf "$HOME/.local/share/vibranium/default/hypr/animations/default.conf" \
 	"$HOME/.config/hypr/hyprland.conf.d/animations.conf"
