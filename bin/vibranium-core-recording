@@ -156,8 +156,13 @@ log "============================================"
 
 # ====================================================================================================================== #
 
-[[ $capture_source == true ]] && opt_flags+=(-a 'default_input')
-[[ $capture_output == true ]] && opt_flags+=(-a 'default_output')
+if [[ $capture_source && $capture_output ]]; then
+    opt_flags+=(-a 'default_input|default_output')
+elif [[ $capture_source ]]; then
+    opt_flags+=(-a 'default_input')
+elif [[ $capture_output ]]; then
+    opt_flags+=(-a 'default_output')
+fi
 
 # Use portal picker only for window mode
 case "$1" in
