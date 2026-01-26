@@ -1,0 +1,74 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+ACTIONS=()
+
+if [[ -f "$XDG_RUNTIME_DIR/vb-timer.remaining" ]]; then
+    ACTIONS+=("Stop timer")
+else
+    ACTIONS+=("Set timer")
+fi
+
+ACTIONS+=(
+    "Toggle read mode"
+    "Toggle inhibitor"
+)
+
+if command -v syncthing > /dev/null; then
+    ACTIONS+=("Launch Syncthing")
+fi
+
+ACTIONS+=("Reload Vibranium")
+
+if command -v pass > /dev/null; then
+    ACTIONS+=("Password manager")
+fi
+
+if [[ "$(systemctl --user is-active mpd)" == "active" ]]; then
+    mpd_status="$(mpc status 2>/dev/null)"
+fi
+
+spotify_status="$(playerctl -p spotify status)"
+if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
+    ACTIONS+=("Copy playing track")
+fi
+
+CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "search...")"
+
+case "$CHOSEN" in
+    "Toggle read mode")
+        vb-cmd-toggle-readmode
+        exit 0
+        ;;
+    "Copy playing track")
+        vb-cmd-copy-track --notify
+        exit 0
+        ;;
+    *"Stop timer"*)
+        pkill -f vb-util-timer
+        exit 0
+        ;;
+    "Set timer")
+        setsid vb-util-timer
+        exit 0
+        ;;
+    "Launch Syncthing")
+        vb-app-syncthing
+        exit 0
+        ;;
+    "Reload Vibranium")
+        vb-cmd-reload
+        exit 0
+        ;;
+    "Toggle inhibitor")
+        vb-cmd-toggle-inhibit
+        exit 0
+        ;;
+    "Password manager")
+        vb-util-password-manager
+        ;;
+    "" | *)
+        exit 1
+        ;;
+esac

@@ -1,9 +1,9 @@
 {
 	"pulseaudio#volume": {
-		"on-click": "vibranium-core-volume vol mute",
-		"on-scroll-up": "vibranium-core-volume vol up",
-		"on-scroll-down": "vibranium-core-volume vol down",
-		"on-click-right": "vibranium-cmd-launch-terminal wiremix --tab output",
+		"on-click": "vb-core-volume vol mute",
+		"on-scroll-up": "vb-core-volume vol up",
+		"on-scroll-down": "vb-core-volume vol down",
+		"on-click-right": "vb-cmd-launch-terminal wiremix --tab output",
 
 		"format": "{icon}",
 		"format-muted": "\udb81\udf5f",

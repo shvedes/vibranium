@@ -5,7 +5,7 @@
 	<name>Open Terminal Here</name>
 	<submenu></submenu>
 	<unique-id>1761167642911348-1</unique-id>
-	<command>vibranium-cmd-terminal-cwd %f</command>
+	<command>vb-cmd-terminal-cwd %f</command>
 	<description>Open terminal in selected directory</description>
 	<range></range>
 	<patterns>*</patterns>
@@ -17,7 +17,7 @@
 	<name>Set as wallpaper</name>
 	<submenu></submenu>
 	<unique-id>1761243531064717-1</unique-id>
-	<command>vibranium-core-wallpaper %f</command>
+	<command>vb-core-wallpaper %f</command>
 	<description>Set selected image as desktop background</description>
 	<range>*</range>
 	<patterns>*</patterns>

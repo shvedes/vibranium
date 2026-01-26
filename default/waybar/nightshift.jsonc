@@ -2,11 +2,11 @@
 	"custom/nightshift": {
 		"format": "{text}",
 		"return-type": "json",
-		"exec": "vibranium-bar-nightshift",
+		"exec": "vb-bar-nightshift",
 		"signal": 9,
 
-		"on-click": "vibranium-cmd-nightshift --toggle",
-		"on-scroll-up": "vibranium-cmd-nightshift --increase",
-		"on-scroll-down": "vibranium-cmd-nightshift --decrease"
+		"on-click": "vb-cmd-nightshift --toggle",
+		"on-scroll-up": "vb-cmd-nightshift --increase",
+		"on-scroll-down": "vb-cmd-nightshift --decrease"
 	}
 }

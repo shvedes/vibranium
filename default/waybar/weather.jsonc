@@ -3,7 +3,7 @@
 		"format": "{text}",
 		"hide-empty-text":  true,
 
-		"exec": "vibranium-bar-weather",
+		"exec": "vb-bar-weather",
 		"signal": 1,
 		"on-click": "true", // update weather data
 		"restart-interval": 1800,

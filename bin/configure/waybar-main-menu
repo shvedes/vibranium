@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
 INDEX=0
@@ -80,12 +80,12 @@ while true; do
             ;;
         "Move"*)
             case "$POSITION" in
-                top) vibranium-cmd-waybar-position --bottom ;;
-                bottom) vibranium-cmd-waybar-position --top ;;
+                top) vb-cmd-waybar-position --bottom ;;
+                bottom) vb-cmd-waybar-position --top ;;
             esac
             ;;
         "Enabled"*)          waybar-toggle-modules             ;;
-        "Show"* | "Hide"*)   vibranium-cmd-toggle-waybar-hints ;;
+        "Show"* | "Hide"*)   vb-cmd-toggle-waybar-hints ;;
         "Configure modules") configure-waybar-module           ;;
     esac
 done

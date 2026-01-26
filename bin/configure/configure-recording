@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
 _flash_screen_submenu() {
@@ -37,7 +37,7 @@ _set_codec() {
         "av1_hdr" "hevc_10bit" \
         "av1_10bit"
 
-    new_val="$(vibranium-cmd-get-option "$var")"
+    new_val="$(vb-cmd-get-option "$var")"
     if [[ "$new_val" != "auto" ]]; then
         msg="Ensure the selected codec (<span foreground='${P_YELLOW}'><b>${new_val^^}</b></span>) is supported by your GPU.\n"
         msg+="If not, the <span foreground='${P_YELLOW}'><b>CPU</b></span> will be used as a fallback, which is less efficient"

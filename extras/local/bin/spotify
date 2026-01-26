@@ -29,15 +29,15 @@ loop() {
 	done
 
 	echo "Patchung Spotify client" > "$XDG_RUNTIME_DIR/worker.active"
-	vibranium-cmd-refresh-waybar-module worker
-	vibranium-cmd-refresh-waybar-module dynamic-separator
+	vb-cmd-refresh-waybar-module worker
+	vb-cmd-refresh-waybar-module dynamic-separator
 
 	msg="Spotify login detected!\n"
 	msg+="Patching Spotify in the background, please wait...\n"
 	msg+="The Spotify window will restart automatically."
 	notify-send -r 1 -t 5000 "Vibranium" "$msg"
 
-        download_theme
+    download_theme
 	spicetify config current_theme text color_scheme main
 	spicetify -q backup apply
 
@@ -46,8 +46,8 @@ loop() {
 	sleep 1; exec setsid -- /usr/bin/spotify &
 
 	rm "$XDG_RUNTIME_DIR/worker.active"
-	vibranium-cmd-refresh-waybar-module worker
-	vibranium-cmd-refresh-waybar-module dynamic-separator
+	vb-cmd-refresh-waybar-module worker
+	vb-cmd-refresh-waybar-module dynamic-separator
 
 	msg="Spotify has been patched successfully!"
 	notify-send -r 1 -t 5000 "Vibranium" "$msg"

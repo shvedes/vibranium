@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 export PATH="$PATH:$VIBRANIUM_PATH/configure"
 
 toggle_bool() {

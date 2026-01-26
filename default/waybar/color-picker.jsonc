@@ -6,8 +6,8 @@
 		"interval": "once",
 		"signal": 8,
 
-		"exec": "vibranium-bar-color-picker",
-		"on-click": "vibranium-core-color-picker",
-		"on-click-right": "vibranium-core-color-picker --clear"
+		"exec": "vb-bar-color-picker",
+		"on-click": "vb-core-color-picker",
+		"on-click-right": "vb-core-color-picker --clear"
 	}
 }

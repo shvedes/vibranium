@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+
+# Toggle window blur in Hyprland.
+# Reads current blur state, flips true/false in config, and reloads Hyprland.
+
+CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/look-and-feel.conf"
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [--quiet] [--help]
+
+Toggle window blur in Hyprland.
+
+Options:
+  -q, --quiet  Do not print 'enabled' or 'disabled'.
+  -h, --help   Show this help and exit
+EOF
+}
+
+QUIET=false
+
+# CLI parsing
+for arg in "$@"; do
+    case "$arg" in
+        -q|--quiet) QUIET=true ;;
+        -h|--help) usage; exit 0 ;;
+        *) ;;
+    esac
+done
+
+# Read current blur state
+case "$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')" in
+    0) BLUR_ENABLED=false ;;
+    1) BLUR_ENABLED=true ;;
+    *) BLUR_ENABLED=false ;;
+esac
+
+# Power profile checks
+POWER_PROFILE="$(vb-cmd-get-power)"
+RESPECT_PP="$(vb-cmd-get-option "VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE")"
+
+if [[ $BLUR_ENABLED == false ]]; then
+    if [[ $RESPECT_PP == true && $POWER_PROFILE != "power-saver" ]]; then
+        vb-cmd-edit-wm-config decoration:blur:enabled:true "$CONF"
+        [[ "$QUIET" = false ]] && echo "enabled"
+    elif [[ $RESPECT_PP == true && $POWER_PROFILE == "power-saver" ]]; then
+        [[ "$QUIET" = false ]] && echo "\$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE is set to true"
+    else
+        vb-cmd-edit-wm-config decoration:blur:enabled:true "$CONF"
+        [[ "$QUIET" = false ]] && echo "enabled"
+    fi
+else
+    vb-cmd-edit-wm-config decoration:blur:enabled:false "$CONF"
+    [[ "$QUIET" = false ]] && echo "disabled"
+fi
+
+# Reload Hyprland config asynchronously
+hyprctl -q reload config-only &

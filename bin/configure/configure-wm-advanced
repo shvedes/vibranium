@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 
 CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.conf"
 INDEX=0
@@ -51,20 +51,20 @@ while true; do
     case "$CHOSEN" in
         "Disable Auto Reload"*)
             case "$current_autoreload" in
-                "true") vibranium-cmd-edit-wm-config "misc:disable_autoreload:false" "$CONFIG" ;;
-                "false") vibranium-cmd-edit-wm-config "misc:disable_autoreload:true" "$CONFIG" ;;
+                "true") vb-cmd-edit-wm-config "misc:disable_autoreload:false" "$CONFIG" ;;
+                "false") vb-cmd-edit-wm-config "misc:disable_autoreload:true" "$CONFIG" ;;
             esac
             ;;
         "Middle Click Paste"*)
             case "$current_middle_click" in
-                "true") vibranium-cmd-edit-wm-config "misc:middle_click_paste:false" "$CONFIG" ;;
-                "false") vibranium-cmd-edit-wm-config "misc:middle_click_paste:true" "$CONFIG" ;;
+                "true") vb-cmd-edit-wm-config "misc:middle_click_paste:false" "$CONFIG" ;;
+                "false") vb-cmd-edit-wm-config "misc:middle_click_paste:true" "$CONFIG" ;;
             esac
             ;;
         "Variable Frame Rate"*)
             case "$current_vfr" in
-                "true") vibranium-cmd-edit-wm-config "misc:vfr:false" "$CONFIG" ;;
-                "false") vibranium-cmd-edit-wm-config "misc:vfr:true" "$CONFIG" ;;
+                "true") vb-cmd-edit-wm-config "misc:vfr:false" "$CONFIG" ;;
+                "false") vb-cmd-edit-wm-config "misc:vfr:true" "$CONFIG" ;;
             esac
             ;;
         "Direct Scanout"*)
@@ -77,10 +77,10 @@ while true; do
                     "Direct Scanout"*)
                         case "$current_direct_scanout" in
                             "true")
-                                vibranium-cmd-edit-wm-config "render:direct_scanout:false" "$CONFIG"
+                                vb-cmd-edit-wm-config "render:direct_scanout:false" "$CONFIG"
                                 ;;
                             "false")
-                                vibranium-cmd-edit-wm-config "render:direct_scanout:true" "$CONFIG"
+                                vb-cmd-edit-wm-config "render:direct_scanout:true" "$CONFIG"
                                 ;;
                         esac
                         ;;
@@ -104,13 +104,13 @@ while true; do
 
                 case "$vrr_chosen" in
                     "Enable")
-                        vibranium-cmd-edit-wm-config "misc:vrr:1" "$CONFIG"
+                        vb-cmd-edit-wm-config "misc:vrr:1" "$CONFIG"
                         ;;
                     "Disable")
-                        vibranium-cmd-edit-wm-config "misc:vrr:0" "$CONFIG"
+                        vb-cmd-edit-wm-config "misc:vrr:0" "$CONFIG"
                         ;;
                     "Fullscreen only")
-                        vibranium-cmd-edit-wm-config "misc:vrr:2" "$CONFIG"
+                        vb-cmd-edit-wm-config "misc:vrr:2" "$CONFIG"
                         ;;
                     "What is this?")
                         msg="<span foreground='${P_ACCENT}'><b>•</b></span> "

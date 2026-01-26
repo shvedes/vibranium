@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+if ! command -v syncthing > /dev/null; then
+    if is_headless; then
+        notify-send -r 4 -u critical -t 5000 "Vibranium" "Syncthing is not installed!"
+    fi
+    error "Syncthing is not installed!"
+    exit 1
+fi
+
+# If the user launches Syncthing, but the service is not active / not enabled
+if ! pid_is_alive syncthing; then
+    if [ "$(systemctl --user is-active syncthing)" != "active" ]; then
+        systemctl --user enable --now syncthing
+        # Wait until the service starts up
+        sleep 0.5
+
+        msg="<b>Syncthing</b> systemd service wasn't active.\n"
+        msg+="The service has been enabled and started for you.\n\n"
+        msg+="This notification is one-time event.\nIf you see this every time you launch <b>Syncthing</b>,\n"
+        msg+="then consider checking logs by executing:\n\n"
+        msg+="<span foreground='${P_GREEN}'>systemctl</span> <span foreground='${P_YELLOW}'>--user</span> "
+        msg+="<span foreground='${P_ORANGE}'>status</span> <span foreground='${P_BLUE}'>syncthing.service</span>"
+        notify-send -r 1 "Vibranium" -t 15000 "$msg"
+    fi
+fi
+
+if command -v chromium > /dev/null; then
+    vb-cmd-launch-cmd chromium --app="https://127.0.0.1:8384"
+    # exec setsid uwsm app -- chromium --app="https://127.0.0.1:8384"
+else
+    syncthing browser
+fi
+

@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+
+# Overcomplicated script for screen recording in three modes: full screen, selected window, and selected screen region.
+# The script has a huge number of settings that are accessible through Vibranium settings.
+#
+# The script can also handle failed launches and uses a fallback method in the form of a CPU encoder for such cases.
+# Technically, your system would have to be really fucked up for the script to fail twice.
+# The main task is to record the screen no matter what. Fixing problems comes later.
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+if [[ "$VIBRANIUM_IS_VIRTUAL_MACHINE" == true ]]; then
+    notify-send -r 4 -u critical -t 10000 "Vibranium" \
+        "Vibranium does not support screen recordings inside a virtual machine"
+    exit 0
+fi
+
+if ! missing_str="$(vb-cmd-is-present gpu-screen-recorder)"; then
+    read -r -a missing <<< "$missing_str"
+    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing cli utilities: ${missing[*]}"
+    exit 1
+fi
+
+cleanup() {
+    # If the recording process exists, we terminate it (kill switch)
+    if pid=$(pidof gpu-screen-recorder); then
+        kill -s SIGINT "$pid" 2> /dev/null
+    fi
+
+    # Flash screen to indicate that recording is complete.
+    # Keep in mind that this works only when animations enabled.
+    if [[ $flash_global == "true" && $flash_local == "true" ]]; then
+        _flash screen &
+    fi
+
+    vb-cmd-refresh-waybar-module recording-indicator &
+
+    output_dir_formatted="${output_dir/#$HOME/\~}"
+    msg="<i>File saved to <span foreground='${P_YELLOW}'>$output_dir_formatted</span></i>"
+    notify-send -r 1 "Screen Recording" "$msg"
+
+    if [[ $copy_to_clipboard == true ]]; then
+        # Filter by content screencast-*, in case there are recordings from other software (e.g., OBS)
+        last_file=$(find "$output_dir" -type f -name 'recording-*' -printf "%T@ %p\n" | sort -n | tail -1 | cut -d' ' -f2-)
+        [ -n "$last_file" ] && printf "file://%s" "$last_file" | wl-copy -t text/uri-list
+    fi
+
+    # Notify the user if the recording was made in fallback mode
+    if [ "$FALLBACK_CPU_USED" = true ]; then
+        warn "Fallback mode was used! Check the logs!"
+
+        msg="\n<span foreground='${P_GREEN}'><b>•</b></span> "
+        msg+="<span foreground='${P_RED}'><b>Hardware codec failed, CPU was used as fallback!</b></span>\n\n"
+        msg+="The screen recording could not use the selected hardware encoder.\n"
+        msg+="Recording proceeded using CPU-based encoding as a fallback,\nwhich may impact performance or increase file size.\n\n"
+        msg+="Please ensure your GPU supports the chosen video codec, or try\nselecting a different codec in the settings.\n\n"
+        msg+="<span foreground='${P_YELLOW}'><b>Click here to open log file</b></span>"
+
+        # If the user clicked on the notification, open the log file for further investigation
+        if [ "$(notify-send -A true -r 4 -u critical -t 30000 "Recording was saved, but.." "$msg")" = "0" ]; then
+            vb-cmd-terminal "$EDITOR" "${XDG_CACHE_HOME:-$HOME/.cache}/VIBRANIUM_FAILED_RECORDING.log"
+        fi
+    fi
+
+    exit 0
+}
+
+start_recording() {
+    local codec="${1:-$codec}"
+
+    gpu-screen-recorder \
+        -w "$area" \
+        -c "$ext" \
+        -f "$fps" \
+        -k "$codec" \
+        -q "$quality" \
+        -fm "$fps_mode" \
+        "${opt_flags[@]}" -o "$output_file" &> "$log_file" &
+
+    # Record the PID of the screen recording process and wait 100 milliseconds to let the process to start
+    pid=$!
+    sleep 0.1
+
+    # If the process does not exist after the specified time,
+    # the recording did not start due to some error (by default, we assume that this is due to the GPU codec).
+    if ! kill -0 "$pid" 2> /dev/null; then
+        return 1
+    fi
+
+    # If the process is still running, the recording proceeds as expected
+    return 0
+}
+
+# Catch Ctrl+C and kill signals
+trap cleanup INT TERM
+
+if pid_is_alive gpu-screen-recorder; then
+    cleanup
+fi
+
+# ====================================================================================================================== #
+
+# First, verify all essential settings and fall back to the defaults if they have invalid values
+check_bool VIBRANIUM_GLOBAL_FLASH_SCREEN true
+check_bool VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD true
+
+check_int VIBRANIUM_RECORDING_FPS 30
+check_int VIBRANIUM_RECORDING_FPS_IN_GAME 60
+
+check_bool VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME false
+check_bool VIBRANIUM_RECORDING_CAPTURE_SOURCE false
+check_bool VIBRANIUM_RECORDING_CAPTURE_SINK true
+check_bool VIBRANIUM_RECORDING_FLASH_SCREEN true
+
+check_enum VIBRANIUM_RECORDING_QUALITY "medium" medium high very_high ultra
+check_enum VIBRANIUM_RECORDING_CONTAINER_TYPE "mp4" mp4 mkv webm flv
+check_enum VIBRANIUM_RECORDING_FRAMERATE_MODE "cfr" cfr vfr
+check_enum VIBRANIUM_RECORDING_VIDEO_CODEC "auto" auto h264 hevc av1 vp8 vp9 hevc_hdr av1_hdr hevc_10bit av1_10bit
+
+# ====================================================================================================================== #
+
+opt_flags=()
+log_file="$XDG_CACHE_HOME/vibranium/$(basename "$0").log"
+
+copy_to_clipboard="$VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD"
+
+fps_mode="$VIBRANIUM_RECORDING_FRAMERATE_MODE"
+quality="$VIBRANIUM_RECORDING_QUALITY"
+codec="$VIBRANIUM_RECORDING_VIDEO_CODEC"
+ext="$VIBRANIUM_RECORDING_CONTAINER_TYPE"
+fps="$VIBRANIUM_RECORDING_FPS"
+
+flash_global="$VIBRANIUM_GLOBAL_FLASH_SCREEN"
+flash_local="$VIBRANIUM_RECORDING_FLASH_SCREEN"
+
+capture_source="$VIBRANIUM_RECORDING_CAPTURE_SOURCE"
+capture_output="$VIBRANIUM_RECORDING_CAPTURE_SINK"
+
+high_fps_ingame="$VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME"
+ingame_fps="$VIBRANIUM_RECORDING_FPS_IN_GAME"
+
+# ====================================================================================================================== #
+
+print_log "\t\t\tSettings"
+print_log "============================================"
+print_log "FPS: ${YELLOW}$fps${RESET}"
+print_log "Mode: ${YELLOW}$fps_mode${RESET}"
+print_log "Codec: ${YELLOW}$codec${RESET}"
+print_log "Quality: ${YELLOW}$quality${RESET}"
+print_log "Container: ${YELLOW}$ext${RESET}"
+print_log "Capture Sound: ${YELLOW}$capture_output${RESET}"
+print_log "Capture Microhpone: ${YELLOW}$capture_source${RESET}"
+print_log "Increased in-game FPS: ${YELLOW}$high_fps_ingame${RESET}"
+print_log "Flash screen: ${YELLOW}$flash_local${RESET} (globally: ${YELLOW}$flash_global${RESET})"
+print_log "============================================"
+
+# ====================================================================================================================== #
+
+if [[ $capture_source && $capture_output ]]; then
+    opt_flags+=(-a 'default_input|default_output')
+elif [[ $capture_source ]]; then
+    opt_flags+=(-a 'default_input')
+elif [[ $capture_output ]]; then
+    opt_flags+=(-a 'default_output')
+fi
+
+# Use portal picker only for window mode
+case "$1" in
+    "window")
+        area="portal"
+        ;;
+    "region")
+        area="$(slurp -f "%wx%h+%x+%y" -b "${P_GRAY}"33 -c "${P_ACCENT}" 2>/dev/null)"
+        [[ -z "$area" ]] && {
+            error "Nothing was chosen!"
+            exit 1
+        }
+        ;;
+    *) area="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
+esac
+
+# Self-explanatory
+if [[ $high_fps_ingame == true ]]; then
+    # nvim +:$(grep -n is_in_game $VIBRANIUM_PATH/vb-core-lib | awk '{print int($1)}') $VIBRANIUM_PATH/vb-core-lib
+    if is_in_game; then
+        fps="$ingame_fps"
+    fi
+fi
+
+# nvim +:$(grep -nm1 user-dirs $XDG_CONFIG_HOME/uwsm/env | awk '{print int($1)}') $XDG_CONFIG_HOME/uwsm/env
+if [[ $VIBRANIUM_XDG_DIRS_EXPOSED == true ]]; then
+    output_dir=$(eval "echo $XDG_VIDEOS_DIR/Screencasts")
+else
+    output_dir=$HOME/Screencasts
+fi
+
+mkdir -p "$output_dir"
+output_file="${output_dir}/$(date +"recording-%Y-%m-%d_%H-%M-%S".${ext})"
+
+print_log "Output file: ${YELLOW}$output_file${RESET}"
+
+# If recording has not started (see above), reassign the video codec and encoder as a fallback
+if ! start_recording "$codec"; then
+    warn "Hardware codec failed, switching to CPU encoder"
+    unset codec; codec="auto"
+    FALLBACK_CPU_USED=true
+    opt_flags+=(-encoder cpu)
+
+    # Since the second attempt to start recording will overwrite the log that has just been generated,
+    # which may contain useful debugging information, we rename the file for further use (see above)
+    mv "$log_file" "$XDG_CACHE_HOME/VIBRANIUM_FAILED_RECORDING.log"
+
+    # If the recording failed to start the second time, then the user has serious problems :D
+    if ! start_recording; then
+        msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> "
+        msg+="<span foreground='${P_RED}'><b>Recording failed on both GPU and CPU encoders!</b></span>\n\n"
+        msg+="The screen recording could not start using the selected hardware encoder,\n"
+        msg+="nor could it fall back to CPU-based encoding.\n"
+        msg+="No recording was created.\n\n"
+        msg+="Please ensure your GPU supports the chosen video codec, and that your CPU\ncan handle encoding, or try selecting a different codec in the settings.\n\n"
+        msg+="<span foreground='${P_YELLOW}'><b>Click here to open log file</b></span>"
+
+        if [ "$(notify-send -A true -r 4 -u critical -t 30000 "Recording failed" "$msg")" = "0" ]; then
+            vb-cmd-terminal "$EDITOR" "$log_file"
+        fi
+
+        error "Failed to start screen recording!"
+        error "Screen recording failed to start with both GPU and CPU encoders (fallback)!"
+        exit 1
+    fi
+fi
+
+if [[ "$area" == "portal" ]]; then
+    print_log "Recording ${YELLOW}selected window${RESET}"
+else
+    print_log "Recording ${YELLOW}$area${RESET}"
+fi
+
+# Keep in mind that this works only when animations enabled.
+if [[ $flash_global = true && $flash_local = true ]]; then
+    _flash screen
+    if [[ $(hyprctl -j getoption animations:enabled | jq -r '.int') == "0" ]]; then
+        warn "Ignoring screen flashing effect due to disabled animations"
+    fi
+fi
+
+notify-send -r 1 -t 1000 "Vibranium" "<i>Screen recording is active</i>"
+print_log "Updating Waybar module"
+vb-cmd-refresh-waybar-module recording-indicator &
+
+# Wait for the recording process to complete
+wait "$pid"
+cleanup

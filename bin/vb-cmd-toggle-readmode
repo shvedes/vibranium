@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+#!/usr/bin/env bash
+
+help() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTION]...
+
+Toggle grayscale reading mode in Hyprland by applying or removing a screen shader.
+
+Options:
+  --help        Display this help and exit
+
+EOF
+}
+
+_grayscale_enabled() {
+    local opt
+    opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
+    if [[ "$opt" == "[[EMPTY]]" || "$opt" =~ ^()$ ]]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+if [ "$1" = "--help" ]; then
+    help
+    exit 0
+fi
+
+shader="$VIBRANIUM/default/hypr/grayscale.frag"
+config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+
+if _grayscale_enabled; then
+    rm -f "$config"
+else
+    echo "decoration:screen_shader = $shader" > "$config"
+fi
+
+hyprctl -q reload config-only &
+vb-cmd-refresh-waybar-module reading-mode

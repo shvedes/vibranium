@@ -5,10 +5,10 @@
 		"format": "{format_source}",
 
 
-		"on-click": "vibranium-core-volume mic mute",
-		"on-scroll-up": "vibranium-core-volume mic up",
-		"on-scroll-down": "vibranium-core-volume mic down",
-		"on-click-right": "vibranium-cmd-launch-terminal 'wiremix --tab input'",
+		"on-click": "vb-core-volume mic mute",
+		"on-scroll-up": "vb-core-volume mic up",
+		"on-scroll-down": "vb-core-volume mic down",
+		"on-click-right": "vb-cmd-launch-terminal 'wiremix --tab input'",
 
 		"scroll-step": 1,
 		"tooltip": false

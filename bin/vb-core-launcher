@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=SC2086
+# Overcomplicated launcher based on rofi, which can:
+#	- Launch applications
+#	- Open local files in default applications
+#	- Open links
+#	- Search the internet
+#
+# Please note that internet search may often be unavailable when VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT is set to true.
+# This script can also open three additional menus with custom categories to open:
+#	- AI
+#	- Common websites
+#	- Power menu
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+if pid_is_alive rofi; then
+    killall rofi
+    exit 0
+fi
+
+check_enum VIBRANIUM_GLOBAL_SEARCH_ENGINE "google" google duckduckgo bing
+check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS true
+check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT false
+
+show_icons="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
+auto_select="$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
+search_engine="$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
+
+search_engine() {
+
+    case "$search_engine" in
+        "google")     echo "https://www.google.com/search?q=" ;;
+        "duckduckgo") echo "https://duckduckgo.com/?q=" ;;
+        "bing")       echo "https://bing.com/search?q=" ;;
+    esac
+}
+
+process_input() {
+    local input="$*"
+
+    case "$input" in
+        "file://"*)
+            # Open in default app (media viewer, text editor, whatever)
+            print_log "Input is a local file. Opening in default app"
+            input="${input#file://}"
+            exec setsid xdg-open "$input" &> /dev/null &
+            ;;
+        "https://"*)
+            # Open in default browser
+            print_log "Input is a link. Opening in default browser"
+            exec setsid xdg-open "$input" &> /dev/null &
+            ;;
+        "DBus launch")
+            # org.telegram.desktop.desktop for example
+            # Let DBus do its thing
+            print_log "Input is a DBus service"
+            exit 0
+            ;;
+        *)
+            local cmd="${input%% *}"
+            local args="${input#"$cmd"}"
+
+            if [[ -x "$cmd" ]] || command -v "$cmd" > /dev/null 2>&1; then
+                print_log "Input ${YELLOW}is${RESET} an executable. Executing with args"
+                vb-cmd-launch-cmd "$cmd" $args
+                # exec setsid uwsm app -- "$cmd" $args
+            elif [[ -e "$input" ]]; then
+                print_log "Input ${YELLOW}is${RESET} a file. Opening using ${YELLOW}xdg-open${RESET}"
+                exec setsid xdg-open "$input" &> /dev/null &
+            else
+                if [[ "$LAUNCHER_MODE" == "default" ]]; then
+                    [[ "$auto_select" = true ]] && {
+                        print_log "Auto select enabled. Ignoring web search"
+                        exit 1
+                    }
+                    print_log "Input ${YELLOW}is${RESET} a web search query"
+                    print_log "Searching ${YELLOW}$input${RESET} on ${BLUE}${search_engine^}${RESET}"
+                    exec setsid xdg-open "$(search_engine)${input}" &> /dev/null &
+                fi
+            fi
+            ;;
+    esac
+}
+
+check_chromium() {
+    if ! command -v chromium > /dev/null; then
+        notify-send -r 3 -t 5000 -u critical \
+            "Web Apps Unavailable" "The Chromium web browser was not found"
+        exit 1
+    fi
+}
+
+set_rofi_flags() {
+    local mode="$1"
+    local -n _out="$2"
+
+    _out=()
+
+    case "$mode" in
+        --web|--ai|--power)
+            _out+=(
+                -disable-history
+                -icon-theme Vibranium
+                -no-fixed-num-lines true
+                -theme-str 'configuration {show-icons: true;}'
+                -theme-str 'element-icon {enabled: true;}'
+            )
+        ;;
+    esac
+
+    case "$mode" in
+        --power) _out+=(-drun-categories Power -display-drun "Power") ;;
+        --web)   _out+=(-drun-categories WebApp -display-drun "Web Apps") ;;
+        --ai)    _out+=(-drun-categories AI -display-drun "AIs") ;;
+    esac
+}
+
+if [[ "$auto_select" == true ]]; then
+    print_log "Auto select enabled"
+    opt_args+=(-auto-select true)
+fi
+
+case "$1" in
+    --web|--ai|--power)
+        if [[ "$1" != "--power" ]]; then
+            check_chromium
+        fi
+        set_rofi_flags "$1" opt_args
+        LAUNCHER_MODE="${1/--/}"
+        ;;
+    *)
+        opt_args+=(-drun-exclude-categories 'WebApp,AI,Power')
+        LAUNCHER_MODE="default"
+        ;;
+esac
+
+print_log "Launcher mode: ${YELLOW}$LAUNCHER_MODE${RESET}"
+
+if [[ "$show_icons" = true ]]; then
+    opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
+fi
+
+input=$(rofi -show drun -run-command "echo {cmd} {args}" "${opt_args[@]}" 2> /dev/null)
+
+if [[ ! -z "$input" ]]; then
+    process_input "${input[@]}"
+fi

@@ -13,7 +13,7 @@
 			"\udb82\udd28"
 		],
 
-		"on-click": "vibranium-cmd-networkmanager",
+		"on-click": "vb-cmd-networkmanager",
 		"tooltip-format": "Connected to {essid}\nSignal strenght: {signalStrength}%\n\uf063 {bandwidthDownBytes:<} \uf062 {bandwidthUpBytes:>}",
 		"tooltip-format-ethernet": "<span size='12000' rise='-2pt'>\uf063</span> {bandwidthDownBytes:<} <span size='12000' rise='-2pt'>\uf062</span> {bandwidthUpBytes:=}",
 		"tooltip-format-disconnected": "Click here to connect to a network"

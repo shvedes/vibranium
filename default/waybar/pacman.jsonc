@@ -3,9 +3,9 @@
 		"format": "{text}",
 		"hide-empty-text":  true,
 
-		"exec": "vibranium-bar-pacman",
+		"exec": "vb-bar-pacman",
 		"on-click": "true", // update pacman data
-		"on-click-right": "vibranium-cmd-launch-terminal vibranium-cmd-system-update",
+		"on-click-right": "vb-cmd-launch-terminal vb-cmd-system-update",
 		"restart-interval": 1800,
 		"signal": 5,
 		"return-type": "json"

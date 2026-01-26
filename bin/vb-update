@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+
+set -e
+
+RED=$'\e[0;31m'
+RESET=$'\e[0m'
+GREEN=$'\e[0;32m'
+YELLOW=$'\e[0;33m'
+
+_update() {
+    local latest_tag current_tag current_commit latest_commit stashed
+
+    printf '\e[?25l' # Hide cursor
+
+    # Pull from remote with pruning
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Getting updates from remote..."
+    git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags || {
+        echo -e "${RED}[VIBRANIUM]${RESET} Failed to fetch updates. Check your network or repository permissions."
+        read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+        printf '\e[?25h' # Show cursor
+        exit 1
+    }
+
+    latest_tag=$(git -C "$VIBRANIUM" tag --sort=-creatordate | head -n 1)
+    current_tag=$(git -C "$VIBRANIUM" describe --tags --exact-match 2> /dev/null ||
+        git -C "$VIBRANIUM" rev-parse --short HEAD)
+
+    latest_commit=$(git -C "$VIBRANIUM" rev-parse "$latest_tag" 2> /dev/null)
+    current_commit=$(git -C "$VIBRANIUM" rev-parse HEAD)
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Local: $current_tag ($current_commit)"
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Remote: ${latest_tag} ($latest_commit)"
+
+    if [[ "$current_commit" == "$latest_commit" ]]; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date"
+        read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+        printf '\e[?25h' # Show cursor
+        exit 0
+    fi
+
+    if ! git -C "$VIBRANIUM" diff --quiet HEAD || ! git -C "$VIBRANIUM" diff --cached --quiet ||
+        [[ -n "$(git -C "$VIBRANIUM" ls-files --others --exclude-standard)" ]]; then
+        echo -e "${YELLOW}[VIBRANIUM]${RESET} Stashing local changes..."
+        git -C "$VIBRANIUM" stash push --include-untracked -m "autostash before update to $latest_tag" -q || {
+            echo -e "${RED}[VIBRANIUM]${RESET} Failed to stash changes."
+            read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+            printf '\e[?25h' # Show cursor
+            exit 1
+        }
+        stashed=true
+        echo -e "${GREEN}[VIBRANIUM]${RESET} Local changes stashed"
+    else
+        echo -e "${GREEN}[VIBRANIUM]${RESET} No local changes to stash"
+    fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Updating to ${latest_tag}..."
+    git -C "$VIBRANIUM" checkout -q "$latest_tag" || {
+        echo -e "${RED}[VIBRANIUM]${RESET} Failed to checkout $latest_tag."
+        if [ "$stashed" = true ]; then
+            git -C "$VIBRANIUM" stash apply -q || true
+            git -C "$VIBRANIUM" stash drop -q || true
+        fi
+        read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+        printf '\e[?25h' # Show cursor
+        exit 1
+    }
+
+    if [[ "$stashed" == true ]]; then
+        if git -C "$VIBRANIUM" stash list | grep -q "autostash before update to $latest_tag"; then
+            git -C "$VIBRANIUM" stash apply -q
+            if [[ $? -ne 0 ]]; then
+                echo -e "${RED}[VIBRANIUM]${RESET} Stash apply failed due to conflicts. Please resolve manually."
+                read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+                printf '\e[?25h' # Show cursor
+                exit 1
+            fi
+            git -C "$VIBRANIUM" stash drop -q
+            echo -e "${GREEN}[VIBRANIUM]${RESET} Stash applied"
+        fi
+    fi
+
+    vb-update-migrate
+    rm -f "$VIBRANIUM_STATE/update.available" || true
+    vb-cmd-refresh-waybar-module vb-update
+
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $latest_tag"
+    read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+    printf '\e[?25h' # Show cursor
+}
+
+printf "\n\e[33m%s\e[0m\n\n" "$(< "$VIBRANIUM/logo.txt")"
+PROMPT=$'\e[0;33m[VIBRANIUM]\e[0m Proceed with update? (Y/n): '
+
+while true; do
+    printf "%s" "$PROMPT"
+    read -r answer
+    case "$answer" in
+        [Yy][Ee][Ss] | [Yy] | "")
+            _update
+            exit 0
+            ;;
+        [Nn] | [Nn][Oo])
+            echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
+            read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+            exit 1
+            ;;
+        *)
+            continue
+            ;;
+    esac
+done

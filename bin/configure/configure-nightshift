@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
 INDEX=0
@@ -39,13 +39,13 @@ while true; do
 
     case "$CHOSEN" in
         "State"*)
-            vibranium-cmd-nightshift --toggle
-            vibranium-cmd-refresh-waybar-module nightshift
+            vb-cmd-nightshift --toggle
+            vb-cmd-refresh-waybar-module nightshift
             ;;
         "Temperature"*)
             new_value="$(edit_digit --verify "Night Light Temperature (K)" "Temperature" "int" 1000 20000)"
             if [[ -n "$new_value" ]]; then
-                vibranium-cmd-nightshift --set "$new_value"
+                vb-cmd-nightshift --set "$new_value"
             fi
             ;;
     esac

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+if pid_is_alive gpu-screen-recorder; then
+    vb-core-recording
+    exit 0
+fi
+
+OPTIONS=("Screen" "Window" "Region")
+CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Record" "ESC to exit")"
+
+[ -z "$CHOSEN" ] && exit 0
+printf "%s\n" "${OPTIONS[@]}" | grep -qxF "$CHOSEN" || exit 0
+exec setsid vb-core-recording "${CHOSEN,,}"

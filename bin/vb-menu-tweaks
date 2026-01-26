@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+if command -v spotify > /dev/null && command -v spicetify > /dev/null; then
+    if ! grep -q "adblock" "$XDG_CONFIG_HOME/spicetify/config-xpui.ini"; then
+        OPTIONS=("Install Spotify adblock")
+    else
+        OPTIONS=("Remove Spotify adblock")
+    fi
+fi
+
+if command -v chromium > /dev/null; then
+    if ! grep -q "oauth2-client-id" "$XDG_CONFIG_HOME/chromium-flags.conf"; then
+        OPTIONS+=("Enable Google sync for Chromium")
+    else
+        OPTIONS+=("Disable Google sync for Chromium")
+    fi
+fi
+
+if [ "${#OPTIONS[@]}" -eq 0 ]; then
+    notify-send -r 4 -t 5000 -u critical "Vibranium" "There are no tweaks available"
+    exit 1
+fi
+
+CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "App tweaks" "ESC to go back")"
+[[ -z "$CHOSEN" ]] && exit
+
+case "$CHOSEN" in
+    "Install Spotify adblock")
+        vb-tweak-spotify install
+        vb-cmd-kill-rofi
+        exit 0
+        ;;
+    "Remove Spotify adblock")
+        vb-tweak-spotify remove
+        vb-cmd-kill-rofi
+        exit 0
+        ;;
+    "Enable Google sync for Chromium")
+        vb-tweak-chromium enable
+        ;;
+    "Disable Google sync for Chromium")
+        vb-tweak-chromium disable
+        ;;
+esac

@@ -3,7 +3,7 @@
 		"format": "{text}",
 		"hide-empty-text": true,
 
-		"exec": "vibranium-bar-power",
+		"exec": "vb-bar-power",
 		"return-type": "json",
 		"signal": 7
 	}

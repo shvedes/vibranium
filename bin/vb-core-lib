@@ -1,0 +1,397 @@
+#!/usr/bin/env bash
+
+# shellcheck disable=all
+
+# Load defaults first
+source "$VIBRANIUM_PATH/vb-core-defaults"
+source "${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/settings"
+source "${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/theme/current/vibranium-lib-theme"
+
+export VIBRANIUM_STATE="${XDG_STATE_HOME:-$HOME/.local/share}/vibranium"
+export VIBRANIUM_USER_SETTINGS="${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/settings"
+export VIBRANIUM_SUDO_PROMPT
+
+RED=$'\e[0;31m'
+YELLOW=$'\e[0;33m'
+BLUE=$'\e[0;34m'
+PURPLE=$'\e[0;35m'
+GREEN=$'\e[0;32m'
+CYAN=$'\e[0;36m'
+GRAY=$'\e[90m'
+RESET=$'\e[0m'
+
+WAYBAR_ACCENT="#90c2ff"
+WAYBAR_YELLOW="#ffef90"
+WAYBAR_GREEN="#a9edab"
+WAYBAR_MUTED="#555555"
+WAYBAR_RED="#f77069"
+
+# A custom rofi theme settings, which will apply to custom menus by default.
+# It is also will be used to generate menu entries
+#
+# Usage: <print array of options> | rofi_cmd "MyPrompt" "MyPlaceholder" -theme-str '<opt rofi theme settings>'
+#
+# For example: printf "%s\n" "${custom_actions[@]}" | rofi_cmd "Utilities" "Search Utilities..."
+# Will create a custom menu with the contents of ${custom_actions[@]} (entry per line)
+# Optional -theme-str 'configuration {show-icons: true;}' will enable icons for each entry.
+rofi_cmd() {
+    # This associative array maps text lengths to window pixel widths.
+    # It is used to keep Rofi window size visually proportional to content width.
+    # More variations make window resizing smoother between small and long menus.
+    local -A map=(
+         [80]=816 [78]=799 [76]=782 [74]=765 [72]=748 [70]=731
+         [68]=714 [66]=697 [64]=680 [62]=663 [60]=646
+         [58]=629 [56]=612 [54]=595 [52]=578 [50]=561
+         [48]=544 [46]=527 [44]=510 [42]=493 [40]=476
+         [38]=459 [36]=442 [34]=425 [32]=408 [30]=391
+         [28]=374 [26]=357 [24]=340 [22]=323 [20]=306
+         [18]=289 [16]=272 [14]=255 [12]=238 [10]=221
+         [8]=208 [6]=200 [0]=196
+    )
+
+    if pgrep -x rofi > /dev/null; then
+        pkill -x rofi
+        exit 1
+    fi
+
+    # Read prompt and optional placeholder.
+    local prompt="$1"
+    local placeholder=" ${2}"
+    shift $(($# > 1 ? 2 : 1))
+
+    # Get input.
+    local input
+    input="$(< /dev/stdin)"
+
+    # Remove Pango markup tags for text length calculations.
+    # We only need plain text width for layout, not formatted text.
+    local input_plain="${input//<*>/}"
+
+    # Determine the longest line length among menu entries.
+    # This decides how wide the window should be.
+    local maxlen_input=0 line
+    while IFS= read -r line; do
+        ((${#line} > maxlen_input))   && maxlen_input=${#line}
+    done <<< "$input_plain"
+
+    # Compare longest entry with prompt + placeholder length.
+    # Choose whichever is longer as the base width reference.
+    local promptlen=$((${#prompt} + ${#placeholder}))
+    local maxlen=$((maxlen_input > promptlen ? maxlen_input : promptlen))
+
+    # Find appropriate window width from the map.
+    local width=$((maxlen))
+    for k in 80 78 76 74 72 70 68 66 64 62 60 58 56 54 52 50 48 46 44 42 40 38 36 34 32 30 28 26 24 22 20 18 16 14 12 10 8 6 0; do
+        if ((width >= k)); then
+            width=${map[$k]}
+            break
+        fi
+    done
+
+    local lines
+    while IFS= read -r _; do
+        ((lines++))
+    done <<< "$input_plain"
+
+    if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT" == true ]]; then
+        if (( lines > 1 )); then
+            if [[ ! "${BASH_SOURCE[1]}" =~ clipboard ]]; then
+                rofi_opts=(-auto-select)
+            fi
+        fi
+    fi
+
+    # Do not parse clipboard input as pango
+    if [[ ! "${BASH_SOURCE[1]}" =~ clipboard ]]; then
+        rofi_opts=(-markup -markup-rows)
+    fi
+
+    rofi -i -dmenu -p "$prompt" -sync \
+        -theme-str 'entry {placeholder: "'"${placeholder}"'";}' \
+        -theme-str 'window {width: '"${width}px"';}' \
+        -matching-negate-char '' "${rofi_opts[@]}" \
+        "$@" 2> /dev/null <<< "$input"
+}
+
+# A spinner utility function.
+# Displays an animated spinner in the terminal while a given process (PID) is running.
+#
+# Usage: long_running_command & spinner $! "Doing stuff..." "Done"
+#
+# Parameters:
+# $1 - PID of the process to wait for.
+# $2 - Message to display alongside the spinner.
+# $3 - (Optional) Final message to display when the process completes.
+#
+# The spinner uses Unicode braille characters for a smooth animation.
+# It clears itself once the process finishes, and optionally prints a success message.
+spinner() {
+    # The PID of the process to watch
+    local pid=$1
+    # The message to show while spinning
+    local msg="$2"
+    # Delay between spinner frames (seconds)
+    local delay=0.07
+    local spinstr
+
+    # We can randomize spinner characters.
+    # Randomly select a spinner style
+    # local style=$((RANDOM % 5))
+
+    # case $style in
+    #     0) spinstr=('▁' '▃' '▄' '▅' '▆' '▇' '▆' '▅' '▄' '▃');;
+    #     1) spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏');;
+    #     2) spinstr=('←' '↖' '↑' '↗' '→' '↘' '↓' '↙');;
+    #     3) spinstr=('-' '\' '|' '/');;
+    #     4) spinstr=('⠁' '⠂' '⠄' '⠂');;
+    # esac
+
+    spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+
+    # ANSI sequence to clear the current line
+    local clear_line="\r\033[K"
+
+    # While the process exists, animate the spinner
+    while kill -0 "$pid" 2> /dev/null; do
+        for i in "${spinstr[@]}"; do
+            printf "\r${msg} %s" "${i} "
+            sleep $delay
+        done
+    done
+
+    # Clear the spinner once finished
+    printf "%b" "$clear_line"
+
+    # Print the final message if provided
+    if [ -n "$3" ]; then
+        printf "%s %s\n" "$msg" "$3"
+    else
+        printf "%s\n" "$msg"
+    fi
+}
+
+# Validate that a named variable contains a numeric value (int or float) and
+# substitute a default when necessary.
+#
+# Usage:
+#   check_int <var_name> <default> [type]
+check_int() {
+    local var_name=$1
+    local default=$2
+    local type=${3:-int}     # Default: int
+    local val="${!var_name}" # indirect expansion: value of variable named in $var_name
+
+    # If the variable is empty — warn and set default
+    if [[ -z $val ]]; then
+        warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+        return 0
+    fi
+
+    # Replace comma with dot to handle locales using comma as decimal separator
+    local normalized="${val//,/.}"
+
+    # Regex for float (accepts integers and fractional values: "1", "1.5", ".5", "-0.2")
+    local float_re='^-?([0-9]+([.][0-9]+)?|[.][0-9]+)$'
+    # Regex for int (only whole numbers, optional leading minus)
+    local int_re='^-?[0-9]+$'
+
+    # Choose proper regex based on requested type
+    local number_re
+    if [[ $type == "float" ]]; then
+        number_re=$float_re
+    else
+        number_re=$int_re
+    fi
+
+    # If the value doesn't match the regex — warn and set default
+    if ! [[ $normalized =~ $number_re ]]; then
+        warn "Invalid value for ${YELLOW}${var_name}${RESET}. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+    else
+        # Write the normalized numeric string back into the variable
+        printf -v "$var_name" '%s' "$normalized"
+    fi
+}
+
+# Validate that a named variable contains a boolean value ("true" or "false")
+# and substitute a default when necessary.
+#
+# Usage:
+#   check_bool <var_name> <default>
+check_bool() {
+    local var_name=$1
+    local default=$2
+    local val="${!var_name}"
+
+    # If the variable is empty — warn and set default
+    if [[ -z $val ]]; then
+        warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+        return 0
+    fi
+
+    # Normalize to lowercase to accept True/TRUE/False etc.
+    local normalized="${val,,}"
+
+    # Validate allowed boolean strings
+    if [[ $normalized != "true" && $normalized != "false" ]]; then
+        warn "Invalid value for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+    else
+        # Write normalized value back (preserves predictable canonical form)
+        printf -v "$var_name" '%s' "$normalized"
+    fi
+}
+
+# Validate that a named variable contains one of a set of allowed values (enum)
+# and substitute a default when necessary.
+#
+# Usage:
+#   check_enum <var_name> <default> <allowed1> [allowed2 ... allowedN]
+check_enum() {
+    local var_name=$1
+    local default=$2
+    shift 2
+    local allowed=("$@")
+    local val="${!var_name}"
+
+    # If the caller passed no allowed values, treat that as an error and fall back.
+    if [[ ${#allowed[@]} -eq 0 ]]; then
+        warn "No allowed values provided for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+        return 0
+    fi
+
+    # If the variable is empty — warn and set default
+    if [[ -z $val ]]; then
+        warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+        return 0
+    fi
+
+    # Check if the variable matches one of the allowed values (exact match)
+    local ok=false
+    for a in "${allowed[@]}"; do
+        if [[ $val == "$a" ]]; then
+            ok=true
+            break
+        fi
+    done
+
+    # If not allowed — warn and set default; otherwise keep the value as-is
+    if [[ $ok != true ]]; then
+        warn "${var_name} has invalid value! Falling back to ${PURPLE}'${default}'${RESET}."
+        printf -v "$var_name" '%s' "$default"
+    else
+        printf -v "$var_name" '%s' "$val"
+    fi
+}
+
+# Self-explanatory
+is_fullscreen() {
+    # https://wiki.hypr.land/Configuring/Dispatchers/#fullscreenstate
+    if [ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# This feature relies heavily on the “game” tag, which is assigned manually.
+# Although a relatively large regex is currently used (which could potentially capture thousands of games),
+# it will still not be enough. Since I cannot install and test all existing games (who can, hehe), all my hope lies in PRs
+is_in_game() {
+    tag="$(hyprctl -j activewindow | jq -r '.tags.[0]')"
+    if [[ $tag =~ "game" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Used in functions below.
+# If a running script doesn't have a console to output to - do
+# not even try to display any logs.
+#
+# Possible TODO: universal log files
+is_headless() {
+    if [ -t 0 ] && [ -c /dev/tty ]; then
+        return 1
+    else
+        return 0
+    fi
+}
+
+print_error() {
+    if [[ -t 2 ]]; then
+        printf "error: %s\n" "$*" >&2
+    fi
+}
+
+print_warn() {
+    if [[ -t 1 ]]; then
+        printf "warn: %s\n" "$*"
+    fi
+}
+
+print_log() {
+    if [[ -t 1 ]]; then
+        printf "log: %s\n" "$*"
+    fi
+}
+
+# Usage: _flash <border|screen>
+_flash() {
+    local type speed_var seconds
+
+    type="$1"
+
+    check_enum VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED "medium" slow medium fast very_fast
+    check_enum VIBRANIUM_GLOBAL_FLASH_SCREEN_SPEED "medium" slow medium fast very_fast
+
+    declare -A speed_map=(
+         [slow]=0.35 [medium]=0.25
+         [fast]=0.15 [very_fast]=0.05
+    )
+
+    case "$type" in
+        border) speed_var=VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED ;;
+        screen) speed_var=VIBRANIUM_GLOBAL_FLASH_SCREEN_SPEED ;;
+    esac
+
+    seconds=${speed_map[${!speed_var}]}
+
+    # Do nothing if animations disabled
+    [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]] && return 0
+
+    if [[ $type == border ]]; then
+        for _ in 1 2; do
+            # Briefly flash active window's border
+            hyprctl -q "keyword general:col.active_border rgb(ffffff)"
+            sleep "$seconds"
+            # Use 'config-only' to avoid display reloads
+            # (therefore possible graphical micro-artifacts when shadow / blur is enabled)
+            hyprctl -q reload config-only
+        done
+    else
+        # Briefly flash entire screen by increasing gamma value.
+        # It is not visible on screenshots / records.
+        hyprctl -q hyprsunset gamma 150
+        sleep "$seconds"
+        hyprctl -q hyprsunset gamma 100
+    fi
+}
+
+pid_is_alive() {
+    for d in /proc/[0-9]*; do
+        if read -r -d '' n < "$d/cmdline" 2>/dev/null; then
+            n=${n##*/}
+            if [[ $n == "$1" ]]; then
+                return 0
+            fi
+        fi
+    done
+    return 1
+}
+

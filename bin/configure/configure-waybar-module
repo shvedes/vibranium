@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
 _pacman_weather_specific() {
@@ -37,8 +37,8 @@ _pacman_weather_specific() {
             "Animate updates"*) toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC"
         esac
 
-        vibranium-cmd-refresh-waybar-module pacman &
-        vibranium-cmd-refresh-waybar-module weather &
+        vb-cmd-refresh-waybar-module pacman &
+        vb-cmd-refresh-waybar-module weather &
     done
 }
 
@@ -75,7 +75,7 @@ _update_module_setting() {
             notify-send -r 1 -t 5000 "Vibranium" \
                 "The value has been changed. Don't forget to enable the module."
         fi
-        vibranium-cmd-refresh-waybar-module "$module_name" &
+        vb-cmd-refresh-waybar-module "$module_name" &
         break
     done
 }

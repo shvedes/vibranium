@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+usage() {
+    cat << EOF
+Usage:
+  $(basename "$0") [OPTION]
+
+Options:
+  --show      Show clipboard history
+  --clear     Clear clipboard history
+  -h, --help  Show this help and exit
+EOF
+}
+
+is_empty() {
+    local entries
+    mapfile -t entries < <(cliphist list)
+
+    (( ${#entries[@]} == 0 )) && {
+        echo a
+        # print_warn "clipboard is empty"
+    }
+}
+
+show_clipboard() {
+    local chosen
+    chosen="$(cliphist list | rofi_cmd "Clipboard" "search" -display-columns 2)"
+    if [[ ! -z $chosen ]]; then
+        printf "%s" "$chosen" | cliphist decode | wl-copy -t text/uri-list
+    fi
+}
+
+clear_clipboard() {
+    cliphist wipe
+    killall -q rofi
+    wl-copy --clear
+}
+
+restart_service() {
+    print_print_log "starting systemd service..."
+    systemctl --quiet --user enable --now cliphist
+}
+
+if ! missing="$(vb-cmd-is-present rofi cliphist)"; then
+    print_error "missing required dependencies: $missing"
+
+    [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
+    exit 1
+fi
+
+if [[ "$(systemctl --user is-active cliphist)" != "active" ]]; then
+    print_warn "systemd service not active!"
+    start_service
+fi
+
+case "$1" in
+    --show)
+        is_empty || show_clipboard
+        ;;
+    --clear)
+        clear_clipboard
+        ;;
+    -h|--help|*)
+        usage
+        exit 0
+        ;;
+    *)
+        usage
+        exit 1
+esac

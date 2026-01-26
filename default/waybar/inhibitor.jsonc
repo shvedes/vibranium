@@ -3,8 +3,8 @@
 		"format": "{text}",
 		"hide-empty-text": true,
 
-		"exec": "vibranium-bar-inhibitor",
-		"on-click": "vibranium-cmd-toggle-inhibit",
+		"exec": "vb-bar-inhibitor",
+		"on-click": "vb-cmd-toggle-inhibit",
 
 		"signal": 3,
 		"return-type": "json"

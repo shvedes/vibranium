@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 export PATH="$PATH:$VIBRANIUM_PATH/configure"
 
 _hyprland() {
@@ -40,12 +40,12 @@ _hyprland() {
                     [[ -z $edit_configs_chosen ]] && break
 
                     case "$edit_configs_chosen" in
-                        *"Input devices"*) vibranium-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf" ;;
-                        *"Window rules"*) vibranium-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
-                        *"Keybindings"*) vibranium-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf" ;;
-                        *"Monitors"*) vibranium-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf" ;;
+                        *"Input devices"*) vb-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf" ;;
+                        *"Window rules"*) vb-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
+                        *"Keybindings"*) vb-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf" ;;
+                        *"Monitors"*) vb-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf" ;;
                     esac
-                    vibranium-cmd-kill-rofi
+                    vb-cmd-kill-rofi
                 done
                 ;;
         esac
@@ -101,7 +101,7 @@ while true; do
             notify-send -r 3 -t 10000 "Locked" "$msg"
             ;;
         "Set font")
-            vibranium-font-set
+            vb-font-set
             ;;
         "Idle")
             configure-idle

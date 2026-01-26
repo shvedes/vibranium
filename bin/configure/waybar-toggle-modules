@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
 WAYBAR_CFG="$XDG_CONFIG_HOME/waybar/config.jsonc"
@@ -100,16 +100,16 @@ while true; do
             ;;
         "Night light"*)
             toggle_bool "VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE"
-            vibranium-cmd-refresh-waybar-module nightshift
+            vb-cmd-refresh-waybar-module nightshift
             ;;
         "Color picker"*)
             toggle_bool "VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE"
-            vibranium-cmd-refresh-waybar-module color-picker
+            vb-cmd-refresh-waybar-module color-picker
             ;;
         "Power profile"*)
             toggle_bool "VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
-            vibranium-cmd-refresh-waybar-module power-profile
-            if [ "$(vibranium-cmd-get-option VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE)" = "true" ] && [ "$(vibranium-utils-power-profile-get)" = "balanced" ]; then
+            vb-cmd-refresh-waybar-module power-profile
+            if [ "$(vb-cmd-get-option VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE)" = "true" ] && [ "$(vb-util-power-profile-get)" = "balanced" ]; then
                 # • Don't be confused! The module you just enabled is active, actually.
                 #
                 #   It isn’t shown in the bar because you’re on the "balanced" power profile,
@@ -124,11 +124,11 @@ while true; do
             ;;
         "Pacman"*)
             toggle_bool "VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
-            vibranium-cmd-refresh-waybar-module pacman
+            vb-cmd-refresh-waybar-module pacman
             ;;
         "Weather"*)
             toggle_bool "VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
-            vibranium-cmd-refresh-waybar-module weather
+            vb-cmd-refresh-waybar-module weather
             ;;
     esac
 done

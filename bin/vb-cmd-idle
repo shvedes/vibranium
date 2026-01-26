@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+# Handle music playback on session lock/unlock.
+# Intended to be called by hypridle.
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$UID}"
+RESTORE_FLAG="$RUNTIME_DIR/vibranium/restore-player"
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") OPTION
+
+Handle media playback on session lock/unlock events.
+
+Options:
+  --before     Handle session lock
+  --after      Handle session unlock
+  -h, --help   Display this help and exit
+EOF
+}
+
+player_is_playing() {
+    [[ "$(playerctl status 2>/dev/null)" == "Playing" ]] || \
+    [[ "$(mpc status 2>/dev/null | awk 'NR==2 {print $1}')" == "[playing]" ]]
+}
+
+case "$1" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+
+    --before)
+        check_bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK true
+
+        [[ $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == false ]] && exit 0
+
+        if player_is_playing; then
+            mkdir -p "$(dirname "$RESTORE_FLAG")"
+            vb-core-mediacontrol toggle &
+            : > "$RESTORE_FLAG"
+        fi
+        ;;
+
+    --after)
+        check_bool VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION false
+
+        if [[ $VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION == true ]]; then
+            notify-send -r "$RANDOM" -t 2500 \
+                "Vibranium" \
+                "Welcome back, <span foreground='${P_ACCENT}'><b>$USER</b></span>!"
+        fi
+
+        if [[ -f "$RESTORE_FLAG" ]]; then
+            rm -f "$RESTORE_FLAG"
+            vb-core-mediacontrol toggle &
+
+            check_bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING false
+            if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
+                vb-cmd-now-playing
+            fi
+        fi
+        ;;
+
+    "")
+        echo "$(basename "$0"): missing option" >&2
+        echo "Try '$(basename "$0") --help' for more information." >&2
+        exit 1
+        ;;
+
+    *)
+        echo "$(basename "$0"): invalid option '$1'" >&2
+        echo "Try '$(basename "$0") --help' for more information." >&2
+        exit 1
+        ;;
+esac

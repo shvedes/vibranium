@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+ACTIONS=("System update" "Install a package" "Uninstall a package")
+
+while true; do
+    CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Packages" "ESC to go back")"
+    [[ -z $CHOSEN ]] && break
+
+    case "$CHOSEN" in
+        "System update")
+            vb-cmd-terminal vb-pkg-sysupdate
+            vb-cmd-kill-rofi
+            exit 0
+            ;;
+        "Install a package")
+            vb-cmd-terminal vb-pkg-install
+            vb-cmd-kill-rofi
+            exit 0
+            ;;
+        "Uninstall a package")
+            vb-cmd-terminal vb-pkg-uninstall
+            vb-cmd-kill-rofi
+            exit 0
+            ;;
+        *)
+            continue
+            ;;
+    esac
+done

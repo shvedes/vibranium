@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
 _vol_boost() {
@@ -126,8 +126,8 @@ while true; do
 
     case "$CHOSEN" in
         *"Open volume mixer"*)
-            vibranium-cmd-terminal wiremix
-            vibranium-cmd-kill-rofi
+            vb-cmd-terminal wiremix
+            vb-cmd-kill-rofi
             exit 0
             ;;
         "Boost up to"*)

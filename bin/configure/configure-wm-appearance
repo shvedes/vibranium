@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
 _edit_int() {
@@ -50,7 +50,7 @@ _edit_int() {
             continue
         }
 
-        vibranium-cmd-edit-wm-config "$key:$input" "$HYPR_CONFIG"
+        vb-cmd-edit-wm-config "$key:$input" "$HYPR_CONFIG"
         break
     done
 }
@@ -147,7 +147,7 @@ _edit_float() {
             continue
         fi
 
-        vibranium-cmd-edit-wm-config "$key:$input" "$HYPR_CONFIG"
+        vb-cmd-edit-wm-config "$key:$input" "$HYPR_CONFIG"
         break
     done
 }
@@ -179,8 +179,8 @@ _set_animations_preset() {
 
 _edit_bool() {
     case "$(hyprctl -j getoption "$1" | jq -r '.int')" in
-        1) vibranium-cmd-edit-wm-config "${1}:false" "$HYPR_CONFIG" ;;
-        0) vibranium-cmd-edit-wm-config "${1}:true"  "$HYPR_CONFIG" ;;
+        1) vb-cmd-edit-wm-config "${1}:false" "$HYPR_CONFIG" ;;
+        0) vb-cmd-edit-wm-config "${1}:true"  "$HYPR_CONFIG" ;;
     esac
     hyprctl -q reload config-only
 }
@@ -245,7 +245,7 @@ _blur_submenu() {
                 else
                     touch "$VIBRANIUM_STATE/blur.restore"
                 fi
-                vibranium-cmd-toggle-blur --quiet
+                vb-cmd-toggle-blur --quiet
                 ;;
             "Noise"*)      _edit_float "Blur noise"      "decoration:blur:noise"      0.0 1.0 ;;
             "Vibrancy"*)   _edit_float "Blur vibrancy"   "decoration:blur:vibrancy"   0.0 1.0 ;;
@@ -303,7 +303,7 @@ _shadow_submenu() {
         done
 
         case "$chosen" in
-            "Enabled"*) vibranium-cmd-toggle-shadows ;;
+            "Enabled"*) vb-cmd-toggle-shadows ;;
             "Power"*)   _edit_int "Render power" "decoration:shadow:render_power" 1 4    ;;
             "Sharp"*)   _edit_bool               "decoration:shadow:sharp"               ;;
 
@@ -422,7 +422,7 @@ _animations_submenu() {
         [[ -z $chosen ]] && break
 
         case "$chosen" in
-            "Enabled"*) vibranium-cmd-toggle-animations --quiet ;;
+            "Enabled"*) vb-cmd-toggle-animations --quiet ;;
             "Preset"*)  _set_animations_preset ;;
         esac
     done
@@ -470,7 +470,7 @@ _gaps_submenu() {
         case "$chosen" in
             "Inner gaps"*) _edit_int "Inner gaps" "general:gaps_in"  0 50 ;;
             "Outer gaps"*) _edit_int "Outer gaps" "general:gaps_out" 0 50 ;;
-            "Smart gaps"*) vibranium-cmd-toggle-smart-gaps ;;
+            "Smart gaps"*) vb-cmd-toggle-smart-gaps ;;
         esac
     done
 }

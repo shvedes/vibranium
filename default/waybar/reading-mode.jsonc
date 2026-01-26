@@ -3,8 +3,8 @@
 		"format": "{text}",
 		"hide-empty-text": true,
 
-		"exec": "vibranium-bar-reading-mode",
-		"on-click": "vibranium-bar-reading-mode disable",
+		"exec": "vb-bar-reading-mode",
+		"on-click": "vb-bar-reading-mode disable",
 
 		"signal": 14,
 		"return-type": "json"

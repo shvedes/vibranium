@@ -1,0 +1,52 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+if [[ "$(sysctl -n kernel.core_pattern)" == "|/bin/false" ]]; then
+    OPTIONS=("Enable systemd coredump")
+else
+    OPTIONS=("Disable systemd coredump")
+fi
+
+OPTIONS+=("What is ...")
+
+while true; do
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "System tweaks" "ESC to go back")"
+    [[ -z $CHOSEN ]] && break
+
+    case "$CHOSEN" in
+        *"coredump")
+            if vb-tweak-coredump; then
+                vb-cmd-kill-rofi
+                exit 0
+            fi
+            ;;
+        "What is ...")
+            while true; do
+                what_is_this_opts=("Coredump")
+                what_is_this_chosen="$(printf "%s\n" "${what_is_this_opts[@]}" | rofi_cmd "What is" "ESC to go back")"
+                [[ -z $what_is_this_chosen ]] && break
+
+                case "$what_is_this_chosen" in
+                    "Coredump")
+                        msg="<span foreground='${P_ACCENT}'><b>systemd-coredump</b></span> collects "
+                        msg+="<span foreground='${P_ACCENT}'><b>memory dumps</b></span> "
+                        msg+="from <span foreground='${P_RED}'><b>crashed</b></span> processes\n\n"
+                        msg+="Useful for debugging, but generating dumps can use \n"
+                        msg+="<span foreground='${P_YELLOW}'>high CPU</span>, "
+                        msg+="<span foreground='${P_RED}'><b>drain laptop battery</b></span>, "
+                        msg+="and <span foreground='${P_YELLOW}'>take disk space</span>"
+                        msg+="\n\nDisable it for better "
+                        msg+="<span foreground='${P_GREEN}'><b>performance</b></span> "
+                        msg+="and <span foreground='${P_GREEN}'><b>responsiveness</b></span>"
+                        notify-send -r 1 -t 20000 "Vibranium" "$msg"
+                        break
+                        ;;
+                    *)
+                        continue
+                        ;;
+                esac
+            done
+            ;;
+    esac
+done

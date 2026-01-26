@@ -1,8 +1,8 @@
 {
 	"custom/timer": {
-		"exec": "vibranium-bar-timer",
+		"exec": "vb-bar-timer",
 		"return-type": "json",
-        "on-click": "pkill --signal TERM -f vibranium-utils-timer",
+        "on-click": "pkill --signal TERM -f vb-utils-timer",
 		"format": "{}",
 		"signal": 15
 	}

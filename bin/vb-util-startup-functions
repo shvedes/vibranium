@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+# A small piece of logic that runs when the session starts.
+# Nothing much is happening here right now, but in the future,
+# I think it will be possible to implement something like self-check for the entire setup.
+
+source "$VIBRANIUM_PATH/vb-core-lib"
+
+# This function handles cases where the monitor brightness might have been changed
+# manually, dual-boot (e.g. Monitorian), or through any external means outside the script.
+# It checks the current brightness via DDC, compares it with the cached value,
+# and updates it if there's a discrepancy.
+_set_ddc_brightness() {
+    local feature_enabled
+    local current_brightness current_monitor cached_brightness
+
+    check_bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL true
+    feature_enabled="$VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
+
+    [[ "$feature_enabled" == false ]] && return
+
+    current_brightness="$(ddcutil getvcp 10 2>/dev/null \
+        | sed -n 's/.*current value = *\([0-9]\+\).*/\1/p'
+    )"
+    [[ -z "$current_brightness" ]] && return
+
+    current_monitor="$(hyprctl -j monitors \
+        | jq -r '.[] | select(.focused == true) | .name'
+    )"
+
+    cached_brightness="$(
+        sed -n "s/^${current_monitor}:\([0-9]\+\)$/\1/p" \
+            "$VIBRANIUM_STATE/brightness"
+    )"
+    [[ -z "$current_brightness" ]] && return
+
+    if [[ -n "$cached_brightness" && "$cached_brightness" != "$current_brightness" ]]; then
+        vb-core-brightness "$current_brightness"
+    fi
+}
+
+check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START false
+if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START == true ]]; then
+    setsid -f vb-core-launcher
+fi
+
+if [ -f "$VIBRANIUM_STATE/first-boot" ]; then
+    vb-util-first-boot
+fi
+
+mkdir -p \
+    "$VIBRANIUM_STATE/wallpaper" \
+    "${XDG_CACHE_HOME:-$HOME/.cache/}/vibranium"
+
+wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"
+[[ -f "$wallpaper_file" ]] || \
+    vb-cmd-get-wallpaper > "$wallpaper_file"
+
+if [ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" = true ]; then
+    case "$(systemctl --user show hyprpaper -p UnitFileState --value)" in
+        disabled) systemctl --user enable --now hyprpaper ;;
+    esac
+else
+    case "$(systemctl --user show hyprpaper -p UnitFileState --value)" in
+        enabled) systemctl --user disable --now hyprpaper ;;
+    esac
+fi
+
+_set_ddc_brightness &
+
+# If state file doesn't exist - create one and disable
+# night light (by default). We still need hyprsunset
+# running in background because screen flashing effect
+# depends on it. It is not the best solution though, and
+# because of the while loop we must keep this check at the end
+if [ ! -f "$VIBRANIUM_STATE/nightshift" ]; then
+    echo "suspended" > "$VIBRANIUM_STATE/nightshift"
+    hyprctl -q hyprsunset identity
+elif [ "$(< "$VIBRANIUM_STATE/nightshift")" = "suspended" ]; then
+    while ! pid_is_alive hyprsunset; do
+        sleep 0.05
+    done
+    hyprctl -q hyprsunset identity
+fi
+

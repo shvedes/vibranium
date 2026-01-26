@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
+source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
 INDEX=0
@@ -53,11 +53,11 @@ _touchpad_options() {
             "Disable while typing"*)
                 case "$current_disable_while_typing" in
                     true)
-                        vibranium-cmd-edit-wm-config input:touchpad:disable_while_typing:false \
+                        vb-cmd-edit-wm-config input:touchpad:disable_while_typing:false \
                             "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                         ;;
                     false)
-                        vibranium-cmd-edit-wm-config input:touchpad:disable_while_typing:true \
+                        vb-cmd-edit-wm-config input:touchpad:disable_while_typing:true \
                             "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                         ;;
                 esac
@@ -65,11 +65,11 @@ _touchpad_options() {
             "Natural scrolling"*)
                 case "$current_natural_scroll" in
                     true)
-                        vibranium-cmd-edit-wm-config input:touchpad:natural_scroll:false \
+                        vb-cmd-edit-wm-config input:touchpad:natural_scroll:false \
                             "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                         ;;
                     false)
-                        vibranium-cmd-edit-wm-config input:touchpad:natural_scroll:true \
+                        vb-cmd-edit-wm-config input:touchpad:natural_scroll:true \
                             "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                         ;;
                 esac
@@ -77,11 +77,11 @@ _touchpad_options() {
             "Tap to click"*)
                 case "$current_tap_to_click" in
                     true)
-                        vibranium-cmd-edit-wm-config input:touchpad:tap-to-click:false \
+                        vb-cmd-edit-wm-config input:touchpad:tap-to-click:false \
                             "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                         ;;
                     false)
-                        vibranium-cmd-edit-wm-config input:touchpad:tap-to-click:true \
+                        vb-cmd-edit-wm-config input:touchpad:tap-to-click:true \
                             "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                         ;;
                 esac
@@ -100,7 +100,7 @@ _touchpad_options() {
                         continue
                     fi
 
-                    vibranium-cmd-edit-wm-config "input:touchpad:scroll_factor:$input" \
+                    vb-cmd-edit-wm-config "input:touchpad:scroll_factor:$input" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                     break
                 done
@@ -170,7 +170,7 @@ add_layout() {
 
         active_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str')"
         final_layouts="${active_layouts},${chosen}"
-        vibranium-cmd-edit-wm-config "input:kb_layout:$final_layouts" \
+        vb-cmd-edit-wm-config "input:kb_layout:$final_layouts" \
             "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
         notify-send -r 1 "Vibranium" "Added new keyboard layout: <b>${chosen^^}</b>"
         break
@@ -212,7 +212,7 @@ remove_layout() {
         done
 
         final_layouts_str=$(IFS=,; echo "${final_layouts[*]}")
-        vibranium-cmd-edit-wm-config "input:kb_layout:$final_layouts_str" \
+        vb-cmd-edit-wm-config "input:kb_layout:$final_layouts_str" \
             "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
         notify-send -r 1 "Vibranium" "Removed existing keyboard layout: <b>${chosen^^}</b>"
         break
@@ -259,7 +259,7 @@ set_layout_shortcut() {
     placeholder="__COLON__"
     option="grp${placeholder}${XKB_OPTS[$chosen]}"
 
-    vibranium-cmd-edit-wm-config "input:kb_options:${option}" \
+    vb-cmd-edit-wm-config "input:kb_options:${option}" \
         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
     sed -i "s/${placeholder}/:/" \
         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
@@ -377,11 +377,11 @@ while true; do
         "Hide on key press"*)
             case "$current_natural_scroll" in
                 true)
-                    vibranium-cmd-edit-wm-config "cursor:hide_on_key_press:false" \
+                    vb-cmd-edit-wm-config "cursor:hide_on_key_press:false" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                     ;;
                 false)
-                    vibranium-cmd-edit-wm-config "cursor:hide_on_key_press:true" \
+                    vb-cmd-edit-wm-config "cursor:hide_on_key_press:true" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                     ;;
             esac
@@ -398,7 +398,7 @@ while true; do
                     continue
                 fi
 
-                vibranium-cmd-edit-wm-config "cursor:inactive_timeout:$input" \
+                vb-cmd-edit-wm-config "cursor:inactive_timeout:$input" \
                     "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                 break
             done
@@ -406,11 +406,11 @@ while true; do
         "Natural scrolling"*)
             case "$current_natural_scroll" in
                 true)
-                    vibranium-cmd-edit-wm-config "input:natural_scroll:false" \
+                    vb-cmd-edit-wm-config "input:natural_scroll:false" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                     ;;
                 false)
-                    vibranium-cmd-edit-wm-config "input:natural_scroll:true" \
+                    vb-cmd-edit-wm-config "input:natural_scroll:true" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                     ;;
 
@@ -428,7 +428,7 @@ while true; do
                     continue
                 fi
 
-                vibranium-cmd-edit-wm-config "input:scroll_factor:$input" \
+                vb-cmd-edit-wm-config "input:scroll_factor:$input" \
                     "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                 break
             done
@@ -447,7 +447,7 @@ while true; do
                     continue
                 fi
 
-                vibranium-cmd-edit-wm-config "input:repeat_delay:$input" \
+                vb-cmd-edit-wm-config "input:repeat_delay:$input" \
                     "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                 break
             done
@@ -466,7 +466,7 @@ while true; do
                     continue
                 fi
 
-                vibranium-cmd-edit-wm-config "input:repeat_rate:$input" \
+                vb-cmd-edit-wm-config "input:repeat_rate:$input" \
                     "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                 break
             done
@@ -474,11 +474,11 @@ while true; do
         "Mouse acceleration"*)
             case "${current_accel_profile}" in
                 true)
-                    vibranium-cmd-edit-wm-config "input:accel_profile:flat" \
+                    vb-cmd-edit-wm-config "input:accel_profile:flat" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                     ;;
                 false)
-                    vibranium-cmd-edit-wm-config "input:accel_profile:adaptive" \
+                    vb-cmd-edit-wm-config "input:accel_profile:adaptive" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                     ;;
             esac
@@ -494,7 +494,7 @@ while true; do
                 fi
 
                 if [[ "$input" =~ ^-?(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
-                    vibranium-cmd-edit-wm-config "input:sensitivity:$input" \
+                    vb-cmd-edit-wm-config "input:sensitivity:$input" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
                     break
                 else
