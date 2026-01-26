@@ -32,8 +32,8 @@ _set_ddc_brightness() {
         sed -n "s/^${current_monitor}:\([0-9]\+\)$/\1/p" \
             "$VIBRANIUM_STATE/brightness"
     )"
-    [[ -z "$current_brightness" ]] && return
 
+    [[ -z "$current_brightness" ]] && return
     if [[ -n "$cached_brightness" && "$cached_brightness" != "$current_brightness" ]]; then
         vb-core-brightness "$current_brightness"
     fi
@@ -44,19 +44,15 @@ if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START == true ]]; then
     setsid -f vb-core-launcher
 fi
 
-if [ -f "$VIBRANIUM_STATE/first-boot" ]; then
+if [[ -f "$VIBRANIUM_STATE/first-boot" ]]; then
     vb-util-first-boot
 fi
-
-mkdir -p \
-    "$VIBRANIUM_STATE/wallpaper" \
-    "${XDG_CACHE_HOME:-$HOME/.cache/}/vibranium"
 
 wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"
 [[ -f "$wallpaper_file" ]] || \
     vb-cmd-get-wallpaper > "$wallpaper_file"
 
-if [ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" = true ]; then
+if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
     case "$(systemctl --user show hyprpaper -p UnitFileState --value)" in
         disabled) systemctl --user enable --now hyprpaper ;;
     esac
@@ -66,6 +62,10 @@ else
     esac
 fi
 
+case "$(systemctl --user show alacritty -p ActiveState --value)" in
+    inactive) systemctl --user start alacritty ;;
+esac
+
 _set_ddc_brightness &
 
 # If state file doesn't exist - create one and disable
@@ -73,10 +73,10 @@ _set_ddc_brightness &
 # running in background because screen flashing effect
 # depends on it. It is not the best solution though, and
 # because of the while loop we must keep this check at the end
-if [ ! -f "$VIBRANIUM_STATE/nightshift" ]; then
+if [[ ! -f "$VIBRANIUM_STATE/nightshift" ]]; then
     echo "suspended" > "$VIBRANIUM_STATE/nightshift"
     hyprctl -q hyprsunset identity
-elif [ "$(< "$VIBRANIUM_STATE/nightshift")" = "suspended" ]; then
+elif [[ "$(< "$VIBRANIUM_STATE/nightshift")" = "suspended" ]]; then
     while ! pidof -q hyprsunset; do
         sleep 0.05
     done
