@@ -260,31 +260,6 @@ VIBRANIUM_MEDIA_DOWNLOADER_USE_ARIA2=true
 # If this file does not exist, $HOME is used.
 VIBRANIUM_MEDIA_DOWNLOADER_OUTPUT_PATH=""
 
-#       VIBRANIUM VIDEO DOWNSCALE OPTIONS      #
-# ============================================ #
-#                                              #
-
-# A directory where all processed videos will be saved.
-# Available options: string, a path without trailing slashes (/)
-#
-# Default (empty string) attempts to scan $HOME/.config/user-dirs.dirs for the videos folder,
-# If this file does not exist, $HOME/downscaled_videos is used.
-VIBRANIUM_VIDEO_DOWNSCALE_OUTPUT_DIR=""
-
-# Default compression level for processed videos.
-# Available options: 'low' 'mid' 'high' 'ultra'
-#
-# Default is 'mid'
-# VIBRANIUM_VIDEO_DOWNSCALE_LEVEL="mid"
-
-# Whether to use GPU for processing.
-# Available options: bool
-#
-# Note: only AMDGPU tested
-#
-# Default is false
-VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU=false
-
 #                SCREENSHOT OPTIONS            #
 # ============================================ #
 #                                              #
