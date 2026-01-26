@@ -110,14 +110,9 @@ fi
 
 # Determine output file path (disk or RAM)
 if [[ $save_file == true ]]; then
-    if [[ "$VIBRANIUM_XDG_DIRS_EXPOSED" == true ]]; then
-        output_dir="$(eval "echo $XDG_PICTURES_DIR/Screenshots")"
-    else
-        output_dir="$HOME/Screenshots"
-    fi
-
-    mkdir -p "$output_dir"
+    output_dir="${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"
     output_file="${output_dir}/$(date +"screenshot-%Y-%m-%d_%H-%M-%S").${filetype}"
+    mkdir -p "$output_dir"
 else
     output_file="${XDG_RUNTIME_DIR}/screenshot.${filetype}"
 fi

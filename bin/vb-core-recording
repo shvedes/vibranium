@@ -187,15 +187,9 @@ if [[ $high_fps_ingame == true ]]; then
     fi
 fi
 
-# nvim +:$(grep -nm1 user-dirs $XDG_CONFIG_HOME/uwsm/env | awk '{print int($1)}') $XDG_CONFIG_HOME/uwsm/env
-if [[ $VIBRANIUM_XDG_DIRS_EXPOSED == true ]]; then
-    output_dir=$(eval "echo $XDG_VIDEOS_DIR/Screencasts")
-else
-    output_dir=$HOME/Screencasts
-fi
-
-mkdir -p "$output_dir"
+output_dir="${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts"
 output_file="${output_dir}/$(date +"recording-%Y-%m-%d_%H-%M-%S".${ext})"
+mkdir -p "$output_dir"
 
 print_log "Output file: ${YELLOW}$output_file${RESET}"
 
