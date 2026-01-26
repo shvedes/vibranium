@@ -4,7 +4,7 @@ source "$VIBRANIUM_PATH/vibranium-core-lib"
 
 ACTIONS=("System update" "Install a package" "Uninstall a package")
 
-while :; do
+while true; do
     CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Packages" "ESC to go back")"
     [[ -z $CHOSEN ]] && break
 

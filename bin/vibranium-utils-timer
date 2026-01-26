@@ -27,7 +27,7 @@ while true; do
     [[ -z "$chosen" ]] && exit 1
     [[ " ${options[*]} " == *" $chosen "* ]] || continue
 
-    while :; do
+    while true; do
         prompt="Int, in ${chosen,}"
         sub_chosen="$(printf "%s" "$prompt" | rofi_cmd "ESC to go back" "${chosen,}")"
 

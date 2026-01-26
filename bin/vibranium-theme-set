@@ -319,7 +319,7 @@ if [[ -n "$1" ]]; then
             ;;
     esac
 else
-    while :; do
+    while true; do
         FAMILY="$(pick_family)" || exit 1
         [ -z "$FAMILY" ] && exit 1
 

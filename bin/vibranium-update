@@ -91,7 +91,7 @@ _update() {
 printf "\n\e[33m%s\e[0m\n\n" "$(< "$VIBRANIUM/logo.txt")"
 PROMPT=$'\e[0;33m[VIBRANIUM]\e[0m Proceed with update? (Y/n): '
 
-while :; do
+while true; do
     printf "%s" "$PROMPT"
     read -r answer
     case "$answer" in

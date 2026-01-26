@@ -38,7 +38,7 @@ fi
 
 prompt2=$'\e[0;33m[VIBRANIUM]\e[0m You are about to remove the following packages: \e[0;33m'"${chosen[*]}"$'\e[0m. Proceed? (Y/n): '
 
-while :; do
+while true; do
     printf '\e[?25h'  # show cursor
     printf "%s" "$prompt2"
     read -r answer

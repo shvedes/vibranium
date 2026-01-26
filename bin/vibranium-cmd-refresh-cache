@@ -203,7 +203,7 @@ handle_power_pause() {
                 echo "${GRAY}[$(date)] ${YELLOW}Pausing due to power-saver${RESET}"
 
                 # Loop until conditions change: either respect_power=false or profile != power-saver.
-                while :; do
+                while true; do
                     if [[ "$(vibranium-cmd-get-option VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE)" == false ]]; then
                         break
                     fi

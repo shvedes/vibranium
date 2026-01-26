@@ -125,7 +125,7 @@ else
     prompt=$'\e[0;33m[VIBRANIUM]\e[0m You are about to install the following packages: \e[0;33m'"${chosen[*]}"$'\e[0m. Proceed? (Y/n): '
 fi
 
-while :; do
+while true; do
     printf '\e[?25h' # show cursor
     printf "%s" "$prompt"
     read -r answer
@@ -225,7 +225,7 @@ while :; do
             done
 
             prompt2=$'\e[0;33m[VIBRANIUM]\e[0m Do you wish to enable and start them now? (Y/n): '
-            while :; do
+            while true; do
                 printf '\e[?25h' # show cursor
                 printf "%s" "$prompt2"
                 read -r answer

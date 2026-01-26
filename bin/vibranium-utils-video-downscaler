@@ -28,7 +28,7 @@ check_bool VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD true
 # Get file.
 # TODO: Read the last copied entry in the clipboard and, if it is a supported file,
 # insert it into the input field automatically
-while :; do
+while true; do
     prompt="Enter file path"
     input="$(printf "%s" "$prompt" | rofi_cmd "Video downscale" "input file")"
     [[ -z $input ]] && exit 0

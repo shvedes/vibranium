@@ -62,7 +62,7 @@ for pkg in "${pkg_list[@]}"; do
         echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
         prompt=$'\e[0;33m[VIBRANIUM]\e[0m System restart is recommended. Restart now? (Y/n): '
 
-        while :; do
+        while true; do
             printf "%s\e[?25h" "$prompt"
             read -r answer
             printf '\e[?25l'

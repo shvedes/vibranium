@@ -10,7 +10,7 @@ fi
 
 OPTIONS+=("What is ...")
 
-while :; do
+while true; do
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "System tweaks" "ESC to go back")"
     [[ -z $CHOSEN ]] && break
 
@@ -22,7 +22,7 @@ while :; do
             fi
             ;;
         "What is ...")
-            while :; do
+            while true; do
                 what_is_this_opts=("Coredump")
                 what_is_this_chosen="$(printf "%s\n" "${what_is_this_opts[@]}" | rofi_cmd "What is" "ESC to go back")"
                 [[ -z $what_is_this_chosen ]] && break

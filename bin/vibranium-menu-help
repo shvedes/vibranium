@@ -5,7 +5,7 @@ source "$VIBRANIUM_PATH/vibranium-core-lib"
 INDEX=0
 OPTIONS=("Hyprland" "Vibranium" "Arch Linux" "<i>Keybindings</i>")
 
-while :; do
+while true; do
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Help" "ESC to go back" -selected-row "$INDEX")"
     [[ -z "$CHOSEN" ]] && exit 0
 

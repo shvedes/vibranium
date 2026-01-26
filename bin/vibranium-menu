@@ -5,13 +5,14 @@ source "$VIBRANIUM_PATH/vibranium-core-lib"
 OPTIONS=(
     "Package Management"
     "Vibranium Settings"
-    "Utilities" "Tweaks"
+    "Utilities"
+    "Tweaks"
     "Help"
 )
 
 INDEX=0
 
-while :; do
+while true; do
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Vibranium" "ESC to exit" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
 
@@ -36,7 +37,7 @@ while :; do
             vibranium-menu-utilities
             ;;
         "Tweaks")
-            while :; do
+            while true; do
                 tweaks_opts=("System" "Apps")
                 tweaks_chosen="$(printf "%s\n" "${tweaks_opts[@]}" | rofi_cmd "Tweaks" "ESC to go back")"
                 [[ -z $tweaks_chosen ]] && break
