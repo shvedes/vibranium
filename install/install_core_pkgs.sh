@@ -8,11 +8,6 @@ PACKAGES=(
     "7zip"
     "arj"
     "bzip3"
-    "cdrtools"
-    "dpkg" # Debian packages
-    "lhasa"
-    "lrzip"
-    "rpmextract" # RPM packages
     "squashfs-tools"
     "unace"
     "unrar"
@@ -20,7 +15,6 @@ PACKAGES=(
     "zip"
 
     # Other
-    "speedtest-cli"
     "ncdu"
 )
 

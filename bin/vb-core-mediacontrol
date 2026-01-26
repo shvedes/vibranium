@@ -36,6 +36,30 @@ case "$VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH" in
     "off")       NUM_STEPS_SWITCH="off" ;;
 esac
 
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTION]
+
+Media control script with smooth volume fade effects for playerctl and MPD.
+
+Options:
+  --toggle       Toggle play/pause
+  --play         Start/resume playback
+  --pause        Pause playback
+  --next         Switch to next track
+  --previous     Switch to previous track
+  -h, --help     Display this help and exit
+EOF
+}
+
+mpd_service_status() {
+    local status="$(systemctl --user is-active mpd)"
+    if [[ "$status" == "active" ]]; then
+        return 0
+    fi
+    return 1
+}
+
 # Function to check if a player is active and get its status
 get_player_status() {
     local player="$1"
@@ -47,14 +71,14 @@ get_player_status() {
             return 0
         fi
     elif [ "$player" = "mpd" ]; then
+        # Do not trigger socket activation
+        # in case if MPD is inactive
+        if ! mpd_service_status; then
+            return
+        fi
+
         local stat
-        # stat=$(mpc status 2> /dev/null | grep -oP '\[\K(playing|paused)')
-        while IFS= read -r line; do
-            case "$line" in
-                *"[playing]"*) stat="playing" ;;
-                *"[paused]"*)  stat="paused" ;;
-            esac
-        done < <(mpc status 2> /dev/null)
+        stat=$(mpc status 2> /dev/null | grep -oP '\[\K(playing|paused)')
 
         if [ -n "$stat" ]; then
             echo "${stat^}"  # Capitalize first letter
@@ -220,7 +244,7 @@ fade_in() {
 CURRENT_VOLUME=$(get_volume)
 
 case "$1" in
-    "toggle")
+    "--toggle")
         if [ "$STATUS" = "Playing" ]; then
             if [ "$NUM_STEPS" != "off" ]; then
                 echo "$CURRENT_VOLUME" > "$VOLUME_FILE"
@@ -247,7 +271,7 @@ case "$1" in
             fi
         fi
         ;;
-    "play")
+    "--play")
         if [ "$STATUS" != "Playing" ]; then
             if [ -f "$VOLUME_FILE" ]; then
                 TARGET_VOLUME=$(< "$VOLUME_FILE")
@@ -265,7 +289,7 @@ case "$1" in
             fi
         fi
         ;;
-    "pause")
+    "--pause")
         if [ "$STATUS" = "Playing" ]; then
             if [ "$NUM_STEPS" != "off" ]; then
                 echo "$CURRENT_VOLUME" > "$VOLUME_FILE"
@@ -277,9 +301,9 @@ case "$1" in
             fi
         fi
         ;;
-    "next" | "previous")
+    "--next" | "--previous")
         if [ "$NUM_STEPS_SWITCH" = "off" ]; then
-            if [ "$1" = "next" ]; then
+            if [ "$1" = "--next" ]; then
                 next_track
             else
                 previous_track
@@ -295,15 +319,25 @@ case "$1" in
 
         original_volume="$CURRENT_VOLUME"
         fade_out "$NUM_STEPS_SWITCH"
-        if [ "$1" = "next" ]; then
+        if [ "$1" = "--next" ]; then
             next_track
         else
             previous_track
         fi
         fade_in "$NUM_STEPS_SWITCH" "$original_volume"
         ;;
+    "-h"|"--help")
+        usage
+        exit 0
+        ;;
+    "")
+        echo -e "Expected OPTION, got nothing\n"
+        usage
+        exit 1
+        ;;
     *)
-        echo "Usage: $(basename "$0") <toggle|play|pause|next|previous>"
+        echo -e "Uknown argument: $@\n"
+        usage
         exit 1
         ;;
 esac

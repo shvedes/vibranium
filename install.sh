@@ -71,7 +71,6 @@ install_packages() {
 				"mesa"
 				"lib32-mesa"
 				"rocm-smi-lib" # Needed for btop gpu load monitoring
-                "opencl-mesa"
 				"vulkan-radeon"
 				"libvdpau-va-gl"
 				"lib32-vulkan-radeon"
@@ -84,7 +83,6 @@ install_packages() {
 				"libvpl"
 				"lib32-mesa"
 				"vpl-gpu-rt"
-                "opencl-mesa"
 				"vulkan-intel"
 				"libvdpau-va-gl"
 				"libva-intel-driver"
