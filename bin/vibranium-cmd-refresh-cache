@@ -162,7 +162,7 @@ count_needed
 
 # Early exit if no processing is needed.
 if ((needed == 0)); then
-    log "Hyprlock cache is up to date"  # Assuming 'log' is defined in the sourced lib.
+    print_log "Hyprlock cache is up to date"  # Assuming 'log' is defined in the sourced lib.
     exit 0
 fi
 

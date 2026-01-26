@@ -23,7 +23,7 @@ done
 profiles=("power-saver" "balanced" "performance")
 current="$(vibranium-cmd-get-power)"
 
-log "Current profile: ${YELLOW}$current${RESET}"
+print_log "Current profile: ${YELLOW}$current${RESET}"
 
 notify() {
     local feedback_enabled gl_use_osd pp_use_osd
@@ -57,7 +57,7 @@ notify() {
             ;;
     esac
 
-    log "Setting power profile to ${YELLOW}${profile}${RESET}"
+    print_log "Setting power profile to ${YELLOW}${profile}${RESET}"
 
     check_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD true
 
@@ -116,7 +116,7 @@ check_bool VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE false
 bar_module_enabled="$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
 
 if [[ $bar_module_enabled == true ]]; then
-    log "Updating waybar module"
+    print_log "Updating waybar module"
     vibranium-cmd-refresh-waybar-module power-profile &
 fi
 
@@ -128,14 +128,14 @@ respect_pp="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
 if [[ "$target_profile" = "power-saver" ]]; then
     if [[ $respect_pp == true ]]; then
         if [[ "$blur_enabled" == 1 ]]; then
-            log "Saving current blur state"
+            print_log "Saving current blur state"
             touch "$VIBRANIUM_STATE/blur.restore"
             vibranium-cmd-toggle-blur --quiet
         fi
     fi
 else
     if [[ $blur_enabled == 0 && -f $VIBRANIUM_STATE/blur.restore ]]; then
-        log "Restoring previuous blur state"
+        print_log "Restoring previuous blur state"
         vibranium-cmd-toggle-blur --quiet
         rm "$VIBRANIUM_STATE/blur.restore"
     fi

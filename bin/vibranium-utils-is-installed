@@ -14,18 +14,20 @@ missing=()
 for entry in "$@"; do
     package="${entry%%:*}"
     binaries="${entry#*:}"
-    [[ $binaries == "$package" ]] && binaries="$package"
+
+    if [[ $binaries == "$package" ]]; then
+        binaries="$package"
+    fi
 
     for binary in ${binaries//,/ }; do
-        if ! command -v "$binary" &> /dev/null; then
+        if ! command -v "$binary" > /dev/null; then
             missing+=("$binary")
         fi
     done
 done
 
-if [[ ${#missing[@]} -eq 0 ]]; then
-    exit 0
-else
+if (( ${#missing[@]} != 0 )); then
     printf '%s\n' "${missing[@]}"
     exit 1
 fi
+

@@ -141,18 +141,18 @@ ingame_fps="$VIBRANIUM_RECORDING_FPS_IN_GAME"
 
 # ====================================================================================================================== #
 
-log "\t\t\tSettings"
-log "============================================"
-log "FPS: ${YELLOW}$fps${RESET}"
-log "Mode: ${YELLOW}$fps_mode${RESET}"
-log "Codec: ${YELLOW}$codec${RESET}"
-log "Quality: ${YELLOW}$quality${RESET}"
-log "Container: ${YELLOW}$ext${RESET}"
-log "Capture Sound: ${YELLOW}$capture_output${RESET}"
-log "Capture Microhpone: ${YELLOW}$capture_source${RESET}"
-log "Increased in-game FPS: ${YELLOW}$high_fps_ingame${RESET}"
-log "Flash screen: ${YELLOW}$flash_local${RESET} (globally: ${YELLOW}$flash_global${RESET})"
-log "============================================"
+print_log "\t\t\tSettings"
+print_log "============================================"
+print_log "FPS: ${YELLOW}$fps${RESET}"
+print_log "Mode: ${YELLOW}$fps_mode${RESET}"
+print_log "Codec: ${YELLOW}$codec${RESET}"
+print_log "Quality: ${YELLOW}$quality${RESET}"
+print_log "Container: ${YELLOW}$ext${RESET}"
+print_log "Capture Sound: ${YELLOW}$capture_output${RESET}"
+print_log "Capture Microhpone: ${YELLOW}$capture_source${RESET}"
+print_log "Increased in-game FPS: ${YELLOW}$high_fps_ingame${RESET}"
+print_log "Flash screen: ${YELLOW}$flash_local${RESET} (globally: ${YELLOW}$flash_global${RESET})"
+print_log "============================================"
 
 # ====================================================================================================================== #
 
@@ -197,7 +197,7 @@ fi
 mkdir -p "$output_dir"
 output_file="${output_dir}/$(date +"recording-%Y-%m-%d_%H-%M-%S".${ext})"
 
-log "Output file: ${YELLOW}$output_file${RESET}"
+print_log "Output file: ${YELLOW}$output_file${RESET}"
 
 # If recording has not started (see above), reassign the video codec and encoder as a fallback
 if ! start_recording "$codec"; then
@@ -231,9 +231,9 @@ if ! start_recording "$codec"; then
 fi
 
 if [[ "$area" == "portal" ]]; then
-    log "Recording ${YELLOW}selected window${RESET}"
+    print_log "Recording ${YELLOW}selected window${RESET}"
 else
-    log "Recording ${YELLOW}$area${RESET}"
+    print_log "Recording ${YELLOW}$area${RESET}"
 fi
 
 # Keep in mind that this works only when animations enabled.
@@ -245,7 +245,7 @@ if [[ $flash_global = true && $flash_local = true ]]; then
 fi
 
 notify-send -r 1 -t 1000 "Vibranium" "<i>Screen recording is active</i>"
-log "Updating Waybar module"
+print_log "Updating Waybar module"
 vibranium-cmd-refresh-waybar-module recording-indicator &
 
 # Wait for the recording process to complete

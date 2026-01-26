@@ -2,77 +2,71 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
-missing="$(vibranium-utils-is-installed cliphist rofi)"
-if [[ -n "$missing" ]]; then
-    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: $missing"
-    exit 1
-fi
-
 usage() {
     cat << EOF
 Usage:
-    $(basename "$0") [--show|--clear]
+  $(basename "$0") [OPTION]
 
 Options:
-    --show      Display clipboard history and select an entry
-    --clear     Clear clipboard history and current clipboard
-    -h, --help  Show this help and exit
+  --show      Show clipboard history
+  --clear     Clear clipboard history
+  -h, --help  Show this help and exit
 EOF
 }
 
 is_empty() {
-    [[ "$(cliphist list | wc -l)" == "0" ]]
+    local entries
+    mapfile -t entries < <(cliphist list)
+
+    (( ${#entries[@]} == 0 )) && {
+        echo a
+        # print_warn "clipboard is empty"
+    }
 }
 
-if [[ "$(systemctl --user is-active cliphist)" != "active" ]]; then
-    systemctl --user enable --now cliphist
-    warn "${YELLOW}cliphist.service${RESET} was inactive!"
-    msg="The service <span foreground='${P_YELLOW}'>cliphist.service</span> "
-    msg+="wasn't active for some reason!\nIt has been enabled and started."
-    notify-send -r 5 -t 7000 -u critical "Vibranium" "$msg"
-fi
+show_clipboard() {
+    local chosen
+    chosen="$(cliphist list | rofi_cmd "Clipboard" "search" -display-columns 2)"
+    if [[ ! -z $chosen ]]; then
+        printf "%s" "$chosen" | cliphist decode | wl-copy -t text/uri-list
+    fi
+}
 
-ACTION=""
-while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --show) ACTION="show"; shift ;;
-        --clear) ACTION="clear"; shift ;;
-        -h|--help) usage; exit 0 ;;
-        *) echo "Unknown option: $1" >&2; usage; exit 1 ;;
-    esac
-done
+clear_clipboard() {
+    cliphist wipe
+    killall -q rofi
+    wl-copy --clear
+}
 
-if [[ -z "$ACTION" ]]; then
-    echo "Error: no action specified" >&2
-    usage
+restart_service() {
+    print_print_log "starting systemd service..."
+    systemctl --quiet --user enable --now cliphist
+}
+
+if ! missing="$(vibranium-utils-is-installed rofi cliphist)"; then
+    print_error "missing required dependencies: $missing"
+
+    [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
     exit 1
 fi
 
-case "$ACTION" in
-    show)
-        if is_empty; then
-            is_headless && notify-send -r 1 -t 1500 "Vibranium" "<i>Clipboard is empty!</i>"
-            warn "Nothing to show"
-            exit 1
-        fi
+if [[ "$(systemctl --user is-active cliphist)" != "active" ]]; then
+    print_warn "systemd service not active!"
+    start_service
+fi
 
-        chosen="$(cliphist list | rofi_cmd "Clipboard" "search" -display-columns 2)"
-        if [[ -z "$chosen" ]]; then
-            warn "Nothing was chosen"
-            exit 0
-        fi
-
-        if printf "%s\n" "$chosen" | cliphist decode | wl-copy -t text/uri-list; then
-            log "Chosen item copied to clipboard"
-        else
-            error "Unable to copy selected entry:\n$chosen"
-            exit 1
-        fi
+case "$1" in
+    --show)
+        is_empty || show_clipboard
         ;;
-    clear)
-        killall rofi &>/dev/null
-        cliphist wipe
-        wl-copy --clear
-        log "Clipboard has been cleared"
+    --clear)
+        clear_clipboard
         ;;
+    -h|--help|*)
+        usage
+        exit 0
+        ;;
+    *)
+        usage
+        exit 1
 esac

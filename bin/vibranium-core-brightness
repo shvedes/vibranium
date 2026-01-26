@@ -264,11 +264,11 @@ step=$VIBRANIUM_BRIGHTNESS_STEP
 
 case "$method" in
     "DDC")
-        log "Method: ${YELLOW}${method}${RESET} for ${YELLOW}$ACTIVE_MONITOR${RESET}"
+        print_log "Method: ${YELLOW}${method}${RESET} for ${YELLOW}$ACTIVE_MONITOR${RESET}"
         current="$(get_brightness_cache)"
         if [[ ! $current =~ ^[0-9]+$ ]]; then
             warn "Cached brightness value not found!"
-            log "Trying to get brightness level via ${YELLOW}ddcutil${RESET}"
+            print_log "Trying to get brightness level via ${YELLOW}ddcutil${RESET}"
 
             for ((i = 0; i < 5; i++)); do
                 # Same as above.
@@ -280,11 +280,11 @@ case "$method" in
                     break
                 fi
             done
-            log "Got new brightness level via ${YELLOW}ddcutil${RESET}"
-            log "Caching new brightness level ($current)"
+            print_log "Got new brightness level via ${YELLOW}ddcutil${RESET}"
+            print_log "Caching new brightness level ($current)"
             update_brightness_cache "$current" &
         else
-            log "Found cached brightness level (${YELLOW}$current${RESET})"
+            print_log "Found cached brightness level (${YELLOW}$current${RESET})"
         fi
 
         # The remaining code at the bottom is generally self-explanatory
@@ -320,24 +320,24 @@ case "$method" in
                 ;;
         esac
 
-        log "New brightness level: ${YELLOW}$new${RESET}"
+        print_log "New brightness level: ${YELLOW}$new${RESET}"
         ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &>/dev/null &
 
-        log "Updating caches"
+        print_log "Updating caches"
         update_brightness_cache "$new" &
 
         if [[ $gl_osd == true && $br_osd == true ]]; then
             if [[ ! $2 =~ ^[0-9]+$ ]]; then
-                log "Showing OSD overlay"
+                print_log "Showing OSD overlay"
                 osd "$new" &
             fi
         else
             # Do not display the monitor name if it is only one.
             if [[ ! $(hyprctl -j monitors | jq 'length') == "1" ]]; then
-                log "More than 1 monitor found. Displaying monitor name in the notification title"
+                print_log "More than 1 monitor found. Displaying monitor name in the notification title"
                 source="($ACTIVE_MONITOR) "
             else
-                log "Only one monitor found. Not showing monitor name in the notification title"
+                print_log "Only one monitor found. Not showing monitor name in the notification title"
             fi
             if [[ ! $2 =~ ^[0-9]+$ ]]; then
                 notify-send -r 2 -t 1000 "Brightness $source${new}%" -h int:value:"$new"
@@ -382,11 +382,11 @@ case "$method" in
         new=$((new_raw * 100 / max_raw))
 
         # Apply new brightness
-        log "New brightness level: ${YELLOW}$new${RESET}"
+        print_log "New brightness level: ${YELLOW}$new${RESET}"
         echo "$new_raw" > /sys/class/backlight/*/brightness
 
         if [[ $gl_osd == true && $br_osd == true ]]; then
-            log "Showing OSD overlay"
+            print_log "Showing OSD overlay"
             swayosd-client --brightness="$new"
         else
             notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"

@@ -323,16 +323,22 @@ is_headless() {
     fi
 }
 
-log() {
-    ! is_headless && echo -e "${BLUE}LOG${RESET}: ${*}"
+print_error() {
+    if [[ -t 2 ]]; then
+        printf "error: %s\n" "$*" >&2
+    fi
 }
 
-warn() {
-    ! is_headless && echo -e "${YELLOW}WARN${RESET}: ${*}"
+print_warn() {
+    if [[ -t 1 ]]; then
+        printf "warn: %s\n" "$*"
+    fi
 }
 
-error() {
-    ! is_headless && echo -e "${RED}ERROR${RESET}: ${*}"
+print_log() {
+    if [[ -t 1 ]]; then
+        printf "log: %s\n" "$*"
+    fi
 }
 
 # Usage: _flash <border|screen>

@@ -81,7 +81,7 @@ case "$compression_level" in
     *) exit 0 ;;
 esac
 
-log "Compression level: ${YELLOW}'$compression_level'${RESET}"
+print_log "Compression level: ${YELLOW}'$compression_level'${RESET}"
 # Build input / output flags
 input_flags=()
 output_flags=()
@@ -91,10 +91,10 @@ if [[ $VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU == true && $VIBRANIUM_GPU_IS_SUPPORTED 
     input_flags=(-hwaccel vaapi -vaapi_device /dev/dri/renderD128)
     # Some software does not work well or does not support H265/X265/HEVC at all (for example, Discord clients), so we use H264/X264 for compatibility
     output_flags=(-c:v h264_vaapi -qp "$compression" -preset 4 -vf "format=nv12,hwupload")
-    log "Using GPU: ${YELLOW}'yes'${RESET}"
+    print_log "Using GPU: ${YELLOW}'yes'${RESET}"
 else
     output_flags=(-c:v libx264 -preset medium -crf "$compression")
-    log "Using GPU: ${YELLOW}'no'${RESET}"
+    print_log "Using GPU: ${YELLOW}'no'${RESET}"
 fi
 
 output_flags+=(-c:a aac -b:a 96k -movflags +faststart)
@@ -119,7 +119,7 @@ if [ -f "$output_file" ]; then
 fi
 
 notify-send -r 1 -t 2000 "Vibranium" "Processing $(basename "$output_file")"
-log "Output file: ${YELLOW}'$output_file'${RESET}"
+print_log "Output file: ${YELLOW}'$output_file'${RESET}"
 
 # Populate the state file with the name of the file currently being processed.
 # This information will be displayed in the worker waybar module in real time
@@ -143,6 +143,6 @@ else
     notify-send -r 1 "Vibranium" "Processing complete. File saved to <span foreground='${P_YELLOW}'>${output_dir}</span>>"
 fi
 
-log "File saved to: ${YELLOW}'$output_file'${RESET}"
+print_log "File saved to: ${YELLOW}'$output_file'${RESET}"
 # Kill all parent menus
 vibranium-cmd-kill-rofi

@@ -43,19 +43,19 @@ process_input() {
     case "$input" in
         "file://"*)
             # Open in default app (media viewer, text editor, whatever)
-            log "Input is a local file. Opening in default app"
+            print_log "Input is a local file. Opening in default app"
             input="${input#file://}"
             exec setsid xdg-open "$input" &> /dev/null &
             ;;
         "https://"*)
             # Open in default browser
-            log "Input is a link. Opening in default browser"
+            print_log "Input is a link. Opening in default browser"
             exec setsid xdg-open "$input" &> /dev/null &
             ;;
         "DBus launch")
             # org.telegram.desktop.desktop for example
             # Let DBus do its thing
-            log "Input is a DBus service"
+            print_log "Input is a DBus service"
             exit 0
             ;;
         *)
@@ -63,20 +63,20 @@ process_input() {
             local args="${input#"$cmd"}"
 
             if [[ -x "$cmd" ]] || command -v "$cmd" > /dev/null 2>&1; then
-                log "Input ${YELLOW}is${RESET} an executable. Executing with args"
+                print_log "Input ${YELLOW}is${RESET} an executable. Executing with args"
                 vibranium-cmd-launch-cmd "$cmd" $args
                 # exec setsid uwsm app -- "$cmd" $args
             elif [[ -e "$input" ]]; then
-                log "Input ${YELLOW}is${RESET} a file. Opening using ${YELLOW}xdg-open${RESET}"
+                print_log "Input ${YELLOW}is${RESET} a file. Opening using ${YELLOW}xdg-open${RESET}"
                 exec setsid xdg-open "$input" &> /dev/null &
             else
                 if [[ "$LAUNCHER_MODE" == "default" ]]; then
                     [[ "$auto_select" = true ]] && {
-                        log "Auto select enabled. Ignoring web search"
+                        print_log "Auto select enabled. Ignoring web search"
                         exit 1
                     }
-                    log "Input ${YELLOW}is${RESET} a web search query"
-                    log "Searching ${YELLOW}$input${RESET} on ${BLUE}${search_engine^}${RESET}"
+                    print_log "Input ${YELLOW}is${RESET} a web search query"
+                    print_log "Searching ${YELLOW}$input${RESET} on ${BLUE}${search_engine^}${RESET}"
                     exec setsid xdg-open "$(search_engine)${input}" &> /dev/null &
                 fi
             fi
@@ -118,7 +118,7 @@ set_rofi_flags() {
 }
 
 if [[ "$auto_select" == true ]]; then
-    log "Auto select enabled"
+    print_log "Auto select enabled"
     opt_args+=(-auto-select true)
 fi
 
@@ -136,7 +136,7 @@ case "$1" in
         ;;
 esac
 
-log "Launcher mode: ${YELLOW}$LAUNCHER_MODE${RESET}"
+print_log "Launcher mode: ${YELLOW}$LAUNCHER_MODE${RESET}"
 
 if [[ "$show_icons" = true ]]; then
     opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')

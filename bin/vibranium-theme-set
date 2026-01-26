@@ -215,9 +215,9 @@ apply_theme() {
         exit 1
     fi
 
-    log "Target theme $theme_capital"
+    print_log "Target theme $theme_capital"
 
-    log "Updating symlinks"
+    print_log "Updating symlinks"
     rm -f "$LINK_TARGET"
     ln -sf "$theme_path" "$LINK_TARGET"
 
@@ -236,7 +236,7 @@ apply_theme() {
             ;;
     esac
 
-    log "Applying GTK 4 settings"
+    print_log "Applying GTK 4 settings"
     sed -i -e "/gtk-theme-name/s/=.*/=$gtk_theme/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
 
     # Update GTK 4 symlinks
@@ -245,20 +245,20 @@ apply_theme() {
             "$XDG_CONFIG_HOME/gtk-4.0/${link}"
     done
 
-    log "Updating cursor theme"
+    print_log "Updating cursor theme"
     gsettings set org.gnome.desktop.interface cursor-theme "$VIBRANIUM_CURSOR_THEME"
 
-    log "Applying GTK 3 settings"
+    print_log "Applying GTK 3 settings"
     gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
 
     local icon_theme="Papirus-Dark"
     local papirus_theme="Papirus-Dark"
     if [[ $folder_name =~ (light|latte|dawn)$ ]]; then
-        log "Setting light icon theme"
+        print_log "Setting light icon theme"
         icon_theme="Papirus-Light"
         papirus_theme="Papirus-Light"
     else
-        log "Setting dark icon theme"
+        print_log "Setting dark icon theme"
     fi
     gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
     papirus-folders --theme "$papirus_theme" --color "${color:-blue}" -u &> /dev/null &
@@ -346,66 +346,66 @@ if [ ! -d "$VIBRANIUM/themes/$folder_name" ]; then
     exit 1
 fi
 
-log "Applying GTK theme"
+print_log "Applying GTK theme"
 apply_theme "$CHOSEN"
 
-log "Reloading WM configuration"
+print_log "Reloading WM configuration"
 hyprctl -q reload
 
-log "Updating terminal colors"
+print_log "Updating terminal colors"
 if pid_is_alive alacritty; then
     touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
 fi
 
-log "Restoring previously used wallpaper"
+print_log "Restoring previously used wallpaper"
 vibranium-core-wallpaper "$(get_wallpaper "$CHOSEN")"
 
 if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
     systemctl --user restart swayosd
 fi
 
-log "Updating Dunst"
+print_log "Updating Dunst"
 vibranium-cmd-refresh-dunst
 
-log "Updating QT colors"
+print_log "Updating QT colors"
 touch "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
 
 if pgrep -a electron | grep heroic > /dev/null; then
-    log "Active Heroic process found! Refreshing live.."
+    print_log "Active Heroic process found! Refreshing live.."
     hyprctl -q dispatch sendshortcut CTRL, R, class:heroic
 fi
 
-log "Updating Spicetify"
+print_log "Updating Spicetify"
 spicetify --quiet refresh
 
 if [[ -f "$XDG_CONFIG_HOME/nvim/lua/config/colorscheme.lua" ]]; then
     if pid_is_alive nvim; then
-        log "Updaing nvim colorscheme"
+        print_log "Updaing nvim colorscheme"
         pkill -SIGUSR1 nvim
     fi
 fi
 
 if pid_is_alive spotify; then
-    log "Active Spotify process found! Refreshing live.."
+    print_log "Active Spotify process found! Refreshing live.."
     hyprctl -q dispatch sendshortcut CTRL, R, class:[Ss]potify
 fi
 
 if pid_is_alive btop; then
-    log "Updating colorscheme for the active btop session"
+    print_log "Updating colorscheme for the active btop session"
     pkill -SIGUSR2 btop
 fi
 
-log "Updating custom svg icons"
+print_log "Updating custom svg icons"
 vibranium-theme-svgs
 
-log "Updating GTK icon cache"
+print_log "Updating GTK icon cache"
 warn "Note that some icons still might have previous colors."
 warn "If that's the case then restart or refresh an app"
 #waitpid $papirus_pid;
 gtk-update-icon-cache -tfq "$XDG_DATA_HOME"/icons/Papirus-{Dark,Light} &> /dev/null &
 
 if pid_is_alive Thunar; then
-    log "Reloading Thunar"
+    print_log "Reloading Thunar"
     hyprctl -q dispatch sendshortcut CTRL, R, class:[Tt]hunar
 fi
 
