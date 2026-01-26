@@ -418,12 +418,6 @@ VIBRANIUM_COLOR_PICKER_WAYBAR_ICON="droplet"
 # Default is true
 VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE=true
 
-# Whether to show tooltips with available shortcuts when hovering over a module.
-# Available option: bool
-#
-# Default is true
-VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS=true
-
 # Which icon to use for 'inhibitor' module.
 # Reminder: This module will appear automatically when user
 # selects 'Enable sleep inhibition' option in Vibranium Utils Menu (Ctrl + Alt + U | Vibranium menu > Utilities)
