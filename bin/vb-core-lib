@@ -8,7 +8,6 @@ source "$XDG_CONFIG_HOME/vibranium/settings"
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
 export VIBRANIUM_USER_SETTINGS="$XDG_CONFIG_HOME/vibranium/settings"
-export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
 export VIBRANIUM_SUDO_PROMPT
 
 RED=$'\e[0;31m'
