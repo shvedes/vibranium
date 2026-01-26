@@ -18,7 +18,7 @@ YAY_FLAGS=(
 )
 
 if ! tty -s; then
-    exec setsid vb-cmd-terminal "$0" "$@"
+    exec setsid vb-core-term "$0" "$@"
     exit 0
 fi
 

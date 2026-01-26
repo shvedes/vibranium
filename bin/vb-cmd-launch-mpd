@@ -35,7 +35,7 @@ fi
 
 for client in "${CLIENTS[@]}"; do
     if command -v "$client" >/dev/null 2>&1; then
-        exec vb-cmd-terminal "$client"
+        exec vb-core-term "$client"
     fi
 done
 

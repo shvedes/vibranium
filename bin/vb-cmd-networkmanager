@@ -29,16 +29,16 @@ esac
 
 # Detect primary network interface utility
 if command -v nmtui >/dev/null 2>&1; then
-    exec vb-cmd-terminal nmtui
+    exec vb-core-term nmtui
 elif command -v iwctl >/dev/null 2>&1; then
     if command -v impala >/dev/null 2>&1; then
-        exec vb-cmd-terminal impala
+        exec vb-core-term impala
     elif command -v iwmenu >/dev/null 2>&1; then
-        exec vb-cmd-terminal iwmenu
+        exec vb-core-term iwmenu
     elif command -v iwgtk >/dev/null 2>&1; then
-        exec vb-cmd-terminal iwgtk
+        exec vb-core-term iwgtk
     else
-        exec vb-cmd-terminal iwctl
+        exec vb-core-term iwctl
     fi
 else
     msg="'<i>systemd-networkd</i>' doesn't provide a TUI frontend. Use CLI instead.\n\n"

@@ -40,10 +40,10 @@ _hyprland() {
                     [[ -z $edit_configs_chosen ]] && break
 
                     case "$edit_configs_chosen" in
-                        *"Input devices"*) vb-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf" ;;
-                        *"Window rules"*) vb-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
-                        *"Keybindings"*) vb-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf" ;;
-                        *"Monitors"*) vb-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf" ;;
+                        *"Input devices"*) vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf" ;;
+                        *"Window rules"*) vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
+                        *"Keybindings"*) vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf" ;;
+                        *"Monitors"*) vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf" ;;
                     esac
                     vb-cmd-kill-rofi
                 done

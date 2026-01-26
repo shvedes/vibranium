@@ -5,7 +5,7 @@
 	<name>Open Terminal Here</name>
 	<submenu></submenu>
 	<unique-id>1761167642911348-1</unique-id>
-	<command>vb-cmd-terminal-cwd %f</command>
+	<command>vb-core-term-cwd %f</command>
 	<description>Open terminal in selected directory</description>
 	<range></range>
 	<patterns>*</patterns>

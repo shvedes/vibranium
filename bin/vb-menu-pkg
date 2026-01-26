@@ -10,17 +10,17 @@ while true; do
 
     case "$CHOSEN" in
         "System update")
-            vb-cmd-terminal vb-pkg-sysupdate
+            vb-core-term vb-pkg-sysupdate
             vb-cmd-kill-rofi
             exit 0
             ;;
         "Install a package")
-            vb-cmd-terminal vb-pkg-install
+            vb-core-term vb-pkg-install
             vb-cmd-kill-rofi
             exit 0
             ;;
         "Uninstall a package")
-            vb-cmd-terminal vb-pkg-uninstall
+            vb-core-term vb-pkg-uninstall
             vb-cmd-kill-rofi
             exit 0
             ;;

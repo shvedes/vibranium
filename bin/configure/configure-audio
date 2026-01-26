@@ -126,7 +126,7 @@ while true; do
 
     case "$CHOSEN" in
         *"Open volume mixer"*)
-            vb-cmd-terminal wiremix
+            vb-core-term wiremix
             vb-cmd-kill-rofi
             exit 0
             ;;

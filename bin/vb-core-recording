@@ -58,7 +58,7 @@ cleanup() {
 
         # If the user clicked on the notification, open the log file for further investigation
         if [ "$(notify-send -A true -r 4 -u critical -t 30000 "Recording was saved, but.." "$msg")" = "0" ]; then
-            vb-cmd-terminal "$EDITOR" "${XDG_CACHE_HOME:-$HOME/.cache}/VIBRANIUM_FAILED_RECORDING.log"
+            vb-core-term "$EDITOR" "${XDG_CACHE_HOME:-$HOME/.cache}/VIBRANIUM_FAILED_RECORDING.log"
         fi
     fi
 
@@ -215,7 +215,7 @@ if ! start_recording "$codec"; then
         msg+="<span foreground='${P_YELLOW}'><b>Click here to open log file</b></span>"
 
         if [ "$(notify-send -A true -r 4 -u critical -t 30000 "Recording failed" "$msg")" = "0" ]; then
-            vb-cmd-terminal "$EDITOR" "$log_file"
+            vb-core-term "$EDITOR" "$log_file"
         fi
 
         error "Failed to start screen recording!"

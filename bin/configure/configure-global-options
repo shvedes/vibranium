@@ -258,7 +258,7 @@ while true; do
             done
             ;;
         *"Edit env vars"*)
-            vb-cmd-terminal "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
+            vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
             vb-cmd-kill-rofi
             exit 0
             ;;
