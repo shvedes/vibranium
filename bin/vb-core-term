@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+
+usage() {
+    cat << EOF
+Usage: $(basename "$0") [COMMAND [ARGS...]]
+
+Open the default terminal (Alacritty). If COMMAND is provided,
+it will be executed inside the terminal.
+
+Options:
+  -h, --help   Show this help and exit
+EOF
+}
+
+case "${1:-}" in
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
+
+args=()
+
+if [[ $# -ge 1 ]]; then
+    cmd="$1"
+
+    if ! command -v "$cmd" > /dev/null; then
+        echo "$cmd: command not found"
+        exit 1
+    fi
+
+    shift
+    class="$(basename -- "$cmd")"
+    args=(-e "$cmd" "$@")
+fi
+
+if [[ "$(systemctl --user is-active alacritty)" == "inactive" ]]; then
+    systemctl --user enable --now alacritty; sleep 0.3
+    if [[ ! -t 1 ]]; then
+        notify-send \
+            -r 1 \
+            -t 2000 \
+            "Vibranium" \
+            "Alacritty daemon has been started"
+    fi
+fi
+
+alacritty msg create-window --class "$class" --title "$class" "${args[@]}"
