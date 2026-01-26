@@ -2,30 +2,17 @@
 
 source "$VIBRANIUM_PATH/vb-core-lib"
 
-current_theme="$(vb-theme-get)"
-
-conf="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprpaper.conf"
-user_wallpapers="${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/theme/wallpapers/$current_theme"
-walls="${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/theme/current/backgrounds"
-state_file="$VIBRANIUM_STATE/wallpaper/$current_theme"
-hyprlock_conf="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
-
-if ! missing_str="$(vb-cmd-is-present hyprpaper jq)"; then
-    read -r -a missing <<< "$missing_str"
-    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
-    exit 1
-fi
+CURRENT_THEME="$(vb-theme-get)"
+WALLS="$XDG_CONFIG_HOME/vibranium/theme/current/backgrounds"
+USER_WALLPAPERS="$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$CURRENT_THEME"
 
 toggle_wallpaper() {
     local mode="$1"
-    local current
-    local files
-    local idx next prev
+    local current files
+    local idx next prev found
 
-    mapfile -t files < <(find "${walls}/" -type f,l | sort)
-
-    # Sort user wallpapers after builtins
-    mapfile -t user_files < <(find "${user_wallpapers}/" -type f,l | sort)
+    mapfile -t files < <(find "$WALLS/" -maxdepth 1 -type f,l | sort)
+    mapfile -t user_files < <(find "$USER_WALLPAPERS/" -maxdepth 1 -type f,l | sort)
 
     files+=("${user_files[@]}")
 
@@ -33,87 +20,115 @@ toggle_wallpaper() {
     [ ${#files[@]} -eq 0 ] && return 1
 
     current="$(vb-cmd-get-wallpaper)"
-    idx=0
 
-    for i in "${!files[@]}"; do
-        if [ "${files[$i]}" = "$current" ]; then
-            idx=$i
-            break
-        fi
-    done
+    # If current is empty, treat as not found
+    if [ -z "$current" ]; then
+        found=0
+    else
+        found=0
+        idx=0
+        for i in "${!files[@]}"; do
+            if [ "${files[$i]}" = "$current" ]; then
+                idx=$i
+                found=1
+                break
+            fi
+        done
+    fi
 
-    # Next / Prev
     case "$mode" in
         --next)
-            next=$(((idx + 1) % ${#files[@]}))
-            printf "%s\n" "${files[$next]}"
+            if (( found )); then
+                next=$(((idx + 1) % ${#files[@]}))
+                printf "%s\n" "${files[$next]}"
+            else
+                printf "%s\n" "${files[0]}"
+            fi
             ;;
         --prev)
-            prev=$(((idx - 1 + ${#files[@]}) % ${#files[@]}))
-            printf "%s\n" "${files[$prev]}"
+            if (( found )); then
+                prev=$(((idx - 1 + ${#files[@]}) % ${#files[@]}))
+                printf "%s\n" "${files[$prev]}"
+            else
+                printf "%s\n" "${files[${#files[@]}-1]}"
+            fi
+            ;;
+        *)
+            return 2
             ;;
     esac
 }
 
+update_configs() {
+    local hyprlock_conf hyprpaper_conf state_file
+    local wallpaper="$1"
+
+    hyprlock_conf="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+    hyprpaper_conf="$XDG_CONFIG_HOME/hypr/hyprpaper.conf"
+    state_file="$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME"
+
+    printf "splash = false\n" > "$hyprpaper_conf"
+    printf "wallpaper:monitor = \nwallpaper:path = %s" "$wallpaper" >> "$hyprpaper_conf"
+
+    printf "%s" "$wallpaper" > "$state_file"
+    sed -i "s|^\([[:space:]]*path = \).*|\1$wallpaper|" "$hyprlock_conf"
+}
+
 usage() {
-    cat << EOF
+    cat <<EOF
 Usage:
-    $(basename "$0") <image>.[png/jpg/webp]
-    $(basename "$0") --next | --prev
+  $(basename "$0") [OPTION] <image>
+
+Options:
+  --next          Set the next wallpaper
+  --prev          Set the previous wallpaper
+  <image>         Path to an image file (.png, .jpg, .jpeg, .webp) to set as wallpaper
+
+If no OPTION is provided, the script expects an image file as an argument.
 EOF
 }
 
-if [[ -z "$1" ]]; then
-    usage
-    exit 1
-elif [[ "$1" =~ --(next|prev) ]]; then
-    wallpaper_path="$(toggle_wallpaper "$1")"
-elif [[ "$1" =~ \.(png|jp(e)?g|webp)$ ]]; then
-    wallpaper_path="$(realpath "$1")"
-else
-    usage
-fi
-
-mkdir -p "$user_wallpapers" "$VIBRANIUM_STATE/wallpaper"
+case "$1" in
+    "")
+        usage
+        exit 0
+        ;;
+    --next|--prev)
+        WALLPAPER_PATH="$(toggle_wallpaper "$1")"
+        ;;
+    *.png|*.jpg|*.jpeg|*.webp)
+        WALLPAPER_PATH="$(realpath "$1")"
+        if [[ ! -f "$WALLPAPER_PATH" ]]; then
+            print_error "$WALLPAPER_PATH does not exist"
+            exit 1
+        fi
+        ;;
+    *)
+        usage
+        exit 1
+        ;;
+esac
 
 check_bool VIBRANIUM_GLOBAL_SHOW_WALLPAPER true
-wallpaper_enabled="$VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
-
-if [[ $wallpaper_enabled == true ]]; then
+if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
     if [[ "$(systemctl --user is-active hyprpaper)" != "active" ]]; then
-        warn "${YELLOW}hyprpaper.service${RESET} wasn't active!"
-        msg="For some reason, the wallpaper daemon wasn't enabled.\n"
-        msg+="The system service has been enabled"
-        notify-send -r 1 -t 5000 "Vibranium" "$msg"
         systemctl -q --user enable --now hyprpaper &
     fi
 else
     exit 0
 fi
 
-print_log "New wallpaper: ${YELLOW}$wallpaper_path${RESET}"
-
 # In case if user set new wallpaper via thunar context menu
 # (e,g. user's own picture, downloaded from the internet) we
 # should copy this file to the folder that contains user wallpapers
 # only. Why copy? In case if original file gets deleted
-if [[ ! -f "$walls/$(basename "$wallpaper_path")" ]]; then
-    print_log "Copying new custom user wallpaper"
-    cp "$wallpaper_path" "$user_wallpapers/"
-    wallpaper_path="$user_wallpapers/$(basename "$WALLPAPER_PATH")"
+if [[ ! -f "$WALLS/$(basename "$WALLPAPER_PATH")" ]]; then
+    if [[ ! -f "$USER_WALLPAPERS/$(basename "$WALLPAPER_PATH")" ]]; then
+        cp "$WALLPAPER_PATH" "$USER_WALLPAPERS/"
+        WALLPAPER_PATH="$USER_WALLPAPERS/$(basename "$WALLPAPER_PATH")"
+    fi
 fi
 
-# Update on all monitors
-print_log "Setting new wallpaper via ${YELLOW}hyprctl${RESET}"
-hyprctl -q hyprpaper wallpaper ", $wallpaper_path"
+hyprctl -q hyprpaper wallpaper ", $WALLPAPER_PATH"
+update_configs "$WALLPAPER_PATH"
 
-# Save hyprpaper config
-print_log "Generating config file"
-printf "# Auto-generated file! All changes will be overwritten.\nsplash = false\n" > "$conf"
-printf "wallpaper:monitor = \nwallpaper:path = %s" "$wallpaper_path" >> "$conf"
-
-print_log "Updating state file"
-printf "%s" "$wallpaper_path" > "$state_file"
-
-print_log "Updating lockscreen background"
-sed -i "s|^\([[:space:]]*path = \).*|\1$wallpaper_path|" "$hyprlock_conf"
