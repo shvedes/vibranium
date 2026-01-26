@@ -8,6 +8,8 @@ background {
 	# Auto generated. Do not edit!
 	path = "$HOME/.config/vibranium/theme/current/backgrounds/01-nightfox-bg.jpg"
 	color = \$background
+    brightness = 0.5
+    blur_passes = 2
 }
 
 # vim:ft=hyprlang

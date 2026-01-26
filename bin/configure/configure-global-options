@@ -152,98 +152,6 @@ _flash_submenu() {
     done
 }
 
-_lockscreen_blur_menu() {
-    local blur_lockscreen_options
-    local blur_lockscreen_chosen
-
-    while true; do
-        source "$VIBRANIUM_USER_SETTINGS"
-
-        if [[ $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND == false ]]; then
-            blur_lockscreen_options=(
-                "Blur background : $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND"
-                "Dim strength    : $VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH"
-            )
-        else
-            blur_lockscreen_options=(
-                "Blur background : $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND"
-                "Blur strength   : $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH"
-            )
-        fi
-
-        blur_lockscreen_chosen="$(printf "%s\n" "${blur_lockscreen_options[@]}" | rofi_cmd "Lockscreen background" "ESC to go back")"
-        [[ -z $blur_lockscreen_chosen ]] && break
-
-        case "$blur_lockscreen_chosen" in
-            "Blur background"*)
-                toggle_bool VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND
-                if [ -f "$XDG_RUNTIME_DIR/vb-cmd-refresh-cache.pid" ]; then
-                    local pid
-                    pid=$(< "$XDG_RUNTIME_DIR/vb-cmd-refresh-cache.pid")
-                    if kill -0 "$pid" 2> /dev/null; then
-                        kill -TERM "$pid"
-                    fi
-                fi
-                (setsid vb-cmd-refresh-cache) &
-                ;;
-            "Blur strength"*)
-                local blur_strength_options
-                local blur_strength_options
-
-                while true; do
-                    blur_strength_options=("low" "mid" "hard")
-                    blur_strength_chosen="$(printf "%s\n" "${blur_strength_options[@]}" | rofi_cmd "Blur strength" "ESC to go back")"
-                    [[ -z $blur_strength_chosen ]] && break
-                    [[ $blur_strength_chosen == "$VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH" ]] && break
-
-                    if [[ ! ${blur_strength_options[*]} =~ $blur_strength_chosen ]]; then
-                        continue
-                    else
-                        option-validate "VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH"
-                        sed -i "/VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH/s/=.*/=\"${blur_strength_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
-                        if [ -f "$XDG_RUNTIME_DIR/vb-cmd-refresh-cache.pid" ]; then
-                            local pid
-                            pid=$(< "$XDG_RUNTIME_DIR/vb-cmd-refresh-cache.pid")
-                            if kill -0 "$pid" 2> /dev/null; then
-                                kill -TERM "$pid"
-                            fi
-                        fi
-                        (setsid vb-cmd-refresh-cache) &
-                        break
-                    fi
-                done
-                ;;
-            "Dim strength"*)
-                local dim_strength_options
-                local dim_strength_chosen
-
-                while true; do
-                    dim_strength_options=("low" "mid" "hard")
-                    dim_strength_chosen="$(printf "%s\n" "${dim_strength_options[@]}" | rofi_cmd "Dim strength" "ESC to go back")"
-                    [[ -z $dim_strength_chosen ]] && break
-                    [[ $dim_strength_chosen == "$VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH" ]] && break
-
-                    if [[ ! ${dim_strength_options[*]} =~ $dim_strength_chosen ]]; then
-                        continue
-                    else
-                        option-validate "VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH"
-                        sed -i "/VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH/s/=.*/=\"${dim_strength_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
-                        if [ -f "$XDG_RUNTIME_DIR/vb-lockscreen-cache.pid" ]; then
-                            local pid
-                            pid=$(< "$XDG_RUNTIME_DIR/vb-lockscreen-cache.pid")
-                            if kill -0 "$pid" 2> /dev/null; then
-                                kill -TERM "$pid"
-                            fi
-                        fi
-                        (setsid vb-cmd-refresh-cache) &
-                        break
-                    fi
-                done
-                ;;
-        esac
-    done
-}
-
 get_active_rofi_theme() {
      local rofi_cfg="$XDG_CONFIG_HOME/rofi/config.rasi"
      sed -n 's|@import ".*/\(theme[-a-z]*\)\.rasi"|\1|p' "$rofi_cfg" | sed 's|^theme-||; s|^rofi$|text|'
@@ -311,21 +219,12 @@ while true; do
         "Show wallpaper"*)
             case "$(toggle_bool -v "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
                 false)
-                    sed -i 's/path/# path/' "${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock.conf"
-                    systemctl -q --user disable --now hyprpaper
-                    # In case we were in powersave mode and the cache generator was waiting for its turn
-                    if [ -f "$XDG_RUNTIME_DIR/vb-cmd-refresh-cache.pid" ]; then
-                        pid=$(< "$XDG_RUNTIME_DIR/vb-cmd-refresh-cache.pid")
-                        if kill -0 "$pid" 2> /dev/null; then
-                            kill -TERM "$pid"
-                        fi
-                        vb-cmd-refresh-waybar-module worker &
-                    fi
+                    sed -i 's/path/# path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+                    systemctl -q --user disable --now hyprpaper &
                     ;;
                 true)
-                    sed -i 's/# path/path/' "${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock.conf"
+                    sed -i 's/# path/path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
                     systemctl -q --user enable --now hyprpaper &
-                    vb-cmd-refresh-cache &
                     ;;
             esac
             ;;
@@ -479,7 +378,7 @@ while true; do
                                     ;;
                                 "What"*)
                                     msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> <b>Whether to respect the active power profile when processing compute tasks</b>\n\n"
-                                    msg+="When enabled, power and GPU hungry processes like cache generation, blur,\ncompute tasks, etc will be suspended on "
+                                    msg+="When enabled, power and GPU hungry processes like, blur,\ncompute tasks, etc will be suspended on "
                                     msg+="'<span foreground='${P_GREEN}'>power-saver</span>' power profile"
                                     notify-send -r 3 -t 15000 "What is this?" "$msg"
                                     ;;

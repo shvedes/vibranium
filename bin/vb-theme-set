@@ -408,5 +408,3 @@ if pid_is_alive Thunar; then
     print_log "Reloading Thunar"
     hyprctl -q dispatch sendshortcut CTRL, R, class:[Tt]hunar
 fi
-
-vb-cmd-refresh-cache &

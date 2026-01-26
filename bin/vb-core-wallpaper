@@ -8,6 +8,7 @@ conf="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprpaper.conf"
 user_wallpapers="${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/theme/wallpapers/$current_theme"
 walls="${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/theme/current/backgrounds"
 state_file="$VIBRANIUM_STATE/wallpaper/$current_theme"
+hyprlock_conf="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 
 if ! missing_str="$(vb-cmd-is-present hyprpaper jq)"; then
     read -r -a missing <<< "$missing_str"
@@ -115,4 +116,4 @@ print_log "Updating state file"
 printf "%s" "$wallpaper_path" > "$state_file"
 
 print_log "Updating lockscreen background"
-vb-cmd-refresh-lockscreen
+sed -i "s|^\([[:space:]]*path = \).*|\1$wallpaper_path|" "$hyprlock_conf"
