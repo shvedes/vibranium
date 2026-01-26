@@ -2,39 +2,17 @@
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 
-_grayscale_enabled() {
-    local opt
-
-    opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
-
-    if [[ "$opt" == "[[EMPTY]]" || "$opt" =~ ^()$ ]]; then
-        return 1
-    else
-        return 0
-    fi
-}
-
 ACTIONS=()
 
 if [[ -f "$XDG_RUNTIME_DIR/vibranium-timer.remaining" ]]; then
-    ACTIONS+=("<span foreground='${P_YELLOW}'><b>Stop timer</b></span>")
+    ACTIONS+=("Stop timer")
 else
-    ACTIONS+=("New timer")
-fi
-
-if systemd-inhibit | grep "Prevent system suspend is active" > /dev/null; then
-    ACTIONS+=("Allow sleep")
-else
-    ACTIONS+=("Block sleep")
-fi
-
-if command -v pass > /dev/null; then
-    ACTIONS+=("Password manager")
+    ACTIONS+=("Set timer")
 fi
 
 ACTIONS+=(
     "Toggle read mode"
-    "Video downscaler"
+    "Toggle inhibitor"
 )
 
 if command -v syncthing > /dev/null; then
@@ -42,94 +20,55 @@ if command -v syncthing > /dev/null; then
 fi
 
 ACTIONS+=("Reload Vibranium")
-INDEX=0
 
-read -r PID CLASS <<< "$(hyprctl -j activewindow | jq -r '[.pid,.class]|@tsv')"
-if [[ -n "$PID" && -r "/proc/$PID/stat" ]]; then
-    read -r _ _ state _ < "/proc/$PID/stat"
-    if [[ $state != T ]]; then
-        ACTIONS+=("Freeze <span foreground='${P_YELLOW}'>${CLASS,,}</span>")
-    elif [[ -n "$CLASS" ]]; then
-        ACTIONS+=("Unfreeze <span foreground='${P_YELLOW}'>${CLASS,,}</span>")
-        # So, if the current window is frozen, we'll automatically select
-        # this option, assuming that the user most probably wanted to unfreeze it.
-        INDEX=$(( ${#ACTIONS[@]} - 1 ))
-    fi
+if command -v pass > /dev/null; then
+    ACTIONS+=("Password manager")
 fi
 
-mpd_status="$(mpc status 2>/dev/null)"
+if [[ "$(systemctl --user is-active mpd)" == "active" ]]; then
+    mpd_status="$(mpc status 2>/dev/null)"
+fi
+
 spotify_status="$(playerctl -p spotify status)"
 if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
     ACTIONS+=("Copy playing track")
 fi
 
-while :; do
-    CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "search..." -selected-row "$INDEX")"
+CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "search...")"
 
-    for i in "${!ACTIONS[@]}"; do
-        if [ "${ACTIONS[$i]}" = "$CHOSEN" ]; then
-            INDEX="$i"
-            break
-        fi
-    done
-
-    case "$CHOSEN" in
-        "Toggle read mode")
-            shader="$VIBRANIUM/default/hypr/grayscale.frag"
-            config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
-
-            if _grayscale_enabled; then
-                rm -f "$config"
-            else
-                echo "decoration:screen_shader = $shader" > "$config"
-            fi
-
-            hyprctl -q reload config-only
-            vibranium-cmd-refresh-waybar-module reading-mode
-            exit 0
-            ;;
-        "Copy playing track")
-            vibranium-cmd-copy-track --notify
-            exit 0
-            ;;
-        *"Stop timer"*)
-            pkill --signal TERM -f vibranium-utils-timer
-            exit 0
-            ;;
-        "New timer")
-            setsid vibranium-utils-timer
-            exit 0
-            ;;
-        "Launch Syncthing")
-            vibranium-app-syncthing
-            vibranium-cmd-kill-rofi
-            exit 0
-            ;;
-        "Reload Vibranium")
-            vibranium-utils-reload
-            vibranium-cmd-kill-rofi
-            exit 0
-            ;;
-        *"sleep"*)
-            vibranium-cmd-toggle-inhibit
-            vibranium-cmd-kill-rofi
-            exit 0
-            ;;
-        "Video downscaler")
-            if ! vibranium-utils-video-downscaler; then
-                exit 0
-            fi
-            ;;
-        "Freeze"* | "Unfreeze"*)
-            vibranium-cmd-toggle-pid
-            vibranium-cmd-kill-rofi
-            exit 0
-            ;;
-        "Password manager")
-            vibranium-utils-password-manager
-            ;;
-        "" | *)
-            exit 1
-            ;;
-    esac
-done
+case "$CHOSEN" in
+    "Toggle read mode")
+        vibranium-cmd-toggle-readmode
+        exit 0
+        ;;
+    "Copy playing track")
+        vibranium-cmd-copy-track --notify
+        exit 0
+        ;;
+    *"Stop timer"*)
+        pkill -f vibranium-utils-timer
+        exit 0
+        ;;
+    "Set timer")
+        setsid vibranium-utils-timer
+        exit 0
+        ;;
+    "Launch Syncthing")
+        vibranium-app-syncthing
+        exit 0
+        ;;
+    "Reload Vibranium")
+        vibranium-utils-reload
+        exit 0
+        ;;
+    "Toggle inhibitor")
+        vibranium-cmd-toggle-inhibit
+        exit 0
+        ;;
+    "Password manager")
+        vibranium-utils-password-manager
+        ;;
+    "" | *)
+        exit 1
+        ;;
+esac
