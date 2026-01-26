@@ -8,47 +8,21 @@ ring="/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 pw_play_pid=""
 
 cleanup() {
-    local inhibit_pid
+    kill $(pgrep -f -- '--who=Timer')
+    kill -s KILL "$pw_play_pid" & >/dev/null
 
-    for d in /proc/[0-9]*; do
-        [[ -r "$d/comm" ]] || continue
-        read -r comm < "$d/comm"
-
-        [[ $comm == "Timer is active" ]] || continue
-
-        inhibit_pid=${d##*/}
-        break
-    done
-
-    kill -s TERM "$pw_play_pid" 2>/dev/null
-    kill -s TERM "$inhibit_pid" 2>/dev/null
     rm -f "$state"
-
     vibranium-cmd-refresh-waybar-module timer
     exit 0
 }
 
-format_time() {
-    local remaining="$1"
-    local hours minutes seconds out=""
-
-    hours=$((remaining / 3600))
-    minutes=$(((remaining % 3600) / 60))
-    seconds=$((remaining % 60))
-
-    (( hours > 0 )) && out+="${hours}h "
-    (( minutes > 0 )) && out+="${minutes}m "
-
-    if (( seconds > 0 || (hours == 0 && minutes == 0) )); then
-        out+="${seconds}s"
-    fi
-
-    printf "%s" "$out"
-}
-
 trap cleanup EXIT INT TERM
 
-while :; do
+if pgrep -f -- '--why=Timer' > /dev/null; then
+    cleanup
+fi
+
+while true; do
     chosen="$(printf "%s\n" "${options[@]}" | rofi_cmd "Set timer for" "ESC to go back")"
     [[ -z "$chosen" ]] && exit 1
     [[ " ${options[*]} " == *" $chosen "* ]] || continue
@@ -56,13 +30,20 @@ while :; do
     while :; do
         prompt="Int, in ${chosen,}"
         sub_chosen="$(printf "%s" "$prompt" | rofi_cmd "ESC to go back" "${chosen,}")"
+
         [[ -z "$sub_chosen" ]] && break
         [[ "$sub_chosen" =~ ^[0-9]+$ ]] || continue
 
         case "$chosen" in
-            Seconds) sleep_time="$sub_chosen" ;;
-            Minutes) sleep_time=$(( sub_chosen * 60 )) ;;
-            Hours)   sleep_time=$(( sub_chosen * 3600 )) ;;
+            Seconds)
+                sleep_time="$sub_chosen"
+                ;;
+            Minutes)
+                sleep_time=$(( sub_chosen * 60 ))
+                ;;
+            Hours)
+                sleep_time=$(( sub_chosen * 3600 ))
+                ;;
         esac
         break 2
     done
@@ -70,28 +51,22 @@ done
 
 [[ -z "$sleep_time" ]] && exit 0
 
-formatted_time="$(format_time "$sleep_time")"
-log "Timer set for ${BLUE}$formatted_time${RESET}"
-
-setsid -f systemd-inhibit --what=idle --why="Timer is active" --who="Timer" sleep "$sleep_time"
-log "Sleep inhibition is active"
+setsid -f systemd-inhibit --what=idle --why="Timer is active" --who="Timer" sleep $sleep_time
 
 time_remaining=$sleep_time
 while (( time_remaining > 0 )); do
     echo "$time_remaining" > "$state"
-    printf "\r\033[K%s[Timer]%s Seconds remaining: %s%s%s " \
-        "$YELLOW" "$RESET" "$BLUE" "$time_remaining" "$RESET"
     vibranium-cmd-refresh-waybar-module timer
     ((time_remaining--))
     sleep 1
 done
 
 echo "timed out" > "$state"
-printf "\r\033[K%s[Timer]%s Time is out!%s " "$YELLOW" "$RED" "$RESET"
 vibranium-cmd-refresh-waybar-module timer
 
-while :; do
+while true; do
     pw-play "$ring" &
     pw_play_pid=$!
     wait "$pw_play_pid"
 done
+
