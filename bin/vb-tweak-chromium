@@ -23,7 +23,7 @@ case "$1" in
 
             notify-send -r 1 "Vibranium" "$msg"
         else
-            warn "You already have Google sync enabled!"
+            print_warn "You already have Google sync enabled!"
             exit 1
         fi
         ;;
@@ -39,7 +39,7 @@ case "$1" in
 
             notify-send -r 1 "Vibranium" "$msg"
         else
-            warn "You already have Google sync disabled!"
+            print_warn "You already have Google sync disabled!"
             exit 1
         fi
         ;;

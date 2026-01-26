@@ -112,7 +112,7 @@ if [[ -s $arch_tmp ]]; then arch_updates=$(< "$arch_tmp"); fi
 if [[ -s $aur_tmp ]]; then aur_updates=$(< "$aur_tmp"); fi
 
 if [[ $aur_status -gt 1 ]]; then
-    warn "Failed to fetch updates from AUR. AUR is probably down"
+    print_warn "Failed to fetch updates from AUR. AUR is probably down"
     aur_updates=0
 elif [[ $aur_status -eq 1 ]]; then
     aur_updates=0

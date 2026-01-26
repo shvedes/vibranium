@@ -182,7 +182,7 @@ check_int() {
 
     # If the variable is empty — warn and set default
     if [[ -z $val ]]; then
-        warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
@@ -205,7 +205,7 @@ check_int() {
 
     # If the value doesn't match the regex — warn and set default
     if ! [[ $normalized =~ $number_re ]]; then
-        warn "Invalid value for ${YELLOW}${var_name}${RESET}. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "Invalid value for ${YELLOW}${var_name}${RESET}. Falling back to ${PURPLE}'${default}'${RESET}."
         printf -v "$var_name" '%s' "$default"
     else
         # Write the normalized numeric string back into the variable
@@ -225,7 +225,7 @@ check_bool() {
 
     # If the variable is empty — warn and set default
     if [[ -z $val ]]; then
-        warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
@@ -235,7 +235,7 @@ check_bool() {
 
     # Validate allowed boolean strings
     if [[ $normalized != "true" && $normalized != "false" ]]; then
-        warn "Invalid value for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "Invalid value for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
         printf -v "$var_name" '%s' "$default"
     else
         # Write normalized value back (preserves predictable canonical form)
@@ -257,14 +257,14 @@ check_enum() {
 
     # If the caller passed no allowed values, treat that as an error and fall back.
     if [[ ${#allowed[@]} -eq 0 ]]; then
-        warn "No allowed values provided for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "No allowed values provided for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
 
     # If the variable is empty — warn and set default
     if [[ -z $val ]]; then
-        warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
@@ -280,7 +280,7 @@ check_enum() {
 
     # If not allowed — warn and set default; otherwise keep the value as-is
     if [[ $ok != true ]]; then
-        warn "${var_name} has invalid value! Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "${var_name} has invalid value! Falling back to ${PURPLE}'${default}'${RESET}."
         printf -v "$var_name" '%s' "$default"
     else
         printf -v "$var_name" '%s' "$val"

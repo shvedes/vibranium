@@ -3,7 +3,7 @@
 source "$VIBRANIUM_PATH/vb-core-lib"
 
 if [[ $VIBRANIUM_BAR_WEATHER_MODULE_ENABLE == false ]]; then
-    error "Disabled in Vibranium settings"
+    print_error "Disabled in Vibranium settings"
     printf '{"text": ""}'
     exit 0
 fi

@@ -47,7 +47,7 @@ cleanup() {
 
     # Notify the user if the recording was made in fallback mode
     if [ "$FALLBACK_CPU_USED" = true ]; then
-        warn "Fallback mode was used! Check the logs!"
+        print_warn "Fallback mode was used! Check the logs!"
 
         msg="\n<span foreground='${P_GREEN}'><b>•</b></span> "
         msg+="<span foreground='${P_RED}'><b>Hardware codec failed, CPU was used as fallback!</b></span>\n\n"
@@ -172,7 +172,7 @@ case "$1" in
     "region")
         area="$(slurp -f "%wx%h+%x+%y" -b "${P_GRAY}"33 -c "${P_ACCENT}" 2>/dev/null)"
         [[ -z "$area" ]] && {
-            error "Nothing was chosen!"
+            print_error "Nothing was chosen!"
             exit 1
         }
         ;;
@@ -195,7 +195,7 @@ print_log "Output file: ${YELLOW}$output_file${RESET}"
 
 # If recording has not started (see above), reassign the video codec and encoder as a fallback
 if ! start_recording "$codec"; then
-    warn "Hardware codec failed, switching to CPU encoder"
+    print_warn "Hardware codec failed, switching to CPU encoder"
     unset codec; codec="auto"
     FALLBACK_CPU_USED=true
     opt_flags+=(-encoder cpu)
@@ -218,8 +218,8 @@ if ! start_recording "$codec"; then
             vb-core-term "$EDITOR" "$log_file"
         fi
 
-        error "Failed to start screen recording!"
-        error "Screen recording failed to start with both GPU and CPU encoders (fallback)!"
+        print_error "Failed to start screen recording!"
+        print_error "Screen recording failed to start with both GPU and CPU encoders (fallback)!"
         exit 1
     fi
 fi
@@ -234,7 +234,7 @@ fi
 if [[ $flash_global = true && $flash_local = true ]]; then
     _flash screen
     if [[ $(hyprctl -j getoption animations:enabled | jq -r '.int') == "0" ]]; then
-        warn "Ignoring screen flashing effect due to disabled animations"
+        print_warn "Ignoring screen flashing effect due to disabled animations"
     fi
 fi
 

@@ -205,12 +205,12 @@ apply_theme() {
     local theme_path="$VIBRANIUM/themes/$folder_name"
 
     if [ ! -d "$theme_path" ]; then
-        error "Theme folder $theme_path does not exist."
+        print_error "Theme folder $theme_path does not exist."
         exit 1
     fi
 
     if is_current_theme "$folder_name"; then
-        error "Already on $theme_capital"
+        print_error "Already on $theme_capital"
         notify-send -r 1 -t 1500 "Vibranium" "Already on $theme_capital"
         exit 1
     fi
@@ -294,7 +294,7 @@ if [[ -n "$1" ]]; then
     VARIANT="${INPUT_THEME#*-}"
 
     if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
-        error "Family '$FAMILY' not found."
+        print_error "Family '$FAMILY' not found."
         exit 1
     fi
 
@@ -307,7 +307,7 @@ if [[ -n "$1" ]]; then
     done
 
     if ! $VARIANT_FOUND; then
-        error "Variant '$VARIANT' not found in family '$FAMILY'."
+        print_error "Variant '$VARIANT' not found in family '$FAMILY'."
         exit 1
     fi
 
@@ -342,7 +342,7 @@ fi
 
 folder_name="${CHOSEN,,}"
 if [ ! -d "$VIBRANIUM/themes/$folder_name" ]; then
-    error "Theme '$CHOSEN' does not exist in $VIBRANIUM/themes."
+    print_error "Theme '$CHOSEN' does not exist in $VIBRANIUM/themes."
     exit 1
 fi
 
@@ -399,8 +399,8 @@ print_log "Updating custom svg icons"
 vb-theme-svgs
 
 print_log "Updating GTK icon cache"
-warn "Note that some icons still might have previous colors."
-warn "If that's the case then restart or refresh an app"
+print_warn "Note that some icons still might have previous colors."
+print_warn "If that's the case then restart or refresh an app"
 #waitpid $papirus_pid;
 gtk-update-icon-cache -tfq "$XDG_DATA_HOME"/icons/Papirus-{Dark,Light} &> /dev/null &
 

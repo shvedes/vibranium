@@ -165,7 +165,7 @@ feedback() {
         esac
 
         if [ ! -d "$dir" ]; then
-            error "$dir does not exist! Using the default one!"
+            print_error "$dir does not exist! Using the default one!"
             dir="/usr/share/sounds/freedesktop/stereo"
             return 0
         fi

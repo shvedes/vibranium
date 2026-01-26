@@ -6,7 +6,7 @@ if ! command -v syncthing > /dev/null; then
     if is_headless; then
         notify-send -r 4 -u critical -t 5000 "Vibranium" "Syncthing is not installed!"
     fi
-    error "Syncthing is not installed!"
+    print_error "Syncthing is not installed!"
     exit 1
 fi
 

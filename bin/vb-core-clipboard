@@ -20,7 +20,7 @@ is_empty() {
 
     (( ${#entries[@]} == 0 )) && {
         echo a
-        # print_warn "clipboard is empty"
+        # print_print_warn "clipboard is empty"
     }
 }
 
@@ -44,14 +44,14 @@ restart_service() {
 }
 
 if ! missing="$(vb-cmd-is-present rofi cliphist)"; then
-    print_error "missing required dependencies: $missing"
+    print_print_error "missing required dependencies: $missing"
 
     [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
     exit 1
 fi
 
 if [[ "$(systemctl --user is-active cliphist)" != "active" ]]; then
-    print_warn "systemd service not active!"
+    print_print_warn "systemd service not active!"
     start_service
 fi
 

@@ -28,7 +28,7 @@ EOF
 
 lockfile="$XDG_RUNTIME_DIR/$(basename "$0").lock"
 exec 10> "$lockfile" || {
-    error "Anoter instance of ${YELLOW}$(basename "$0")${RESET} already running!"
+    print_error "Anoter instance of ${YELLOW}$(basename "$0")${RESET} already running!"
     exit 1
 }
 

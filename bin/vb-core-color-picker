@@ -40,7 +40,7 @@ if [[ -f "$reading_mode_conf" ]]; then
     if is_headless; then
         notify-send -r 3 -t 3000 "Vibranium" "<b>Color Picker</b> isn't available while <b>Reading Mode</b> is active!"
     fi
-    error "Reading mode is active. Aborting"
+    print_error "Reading mode is active. Aborting"
     exit 1
 fi
 
@@ -103,7 +103,7 @@ fi
 print_log "Picking color"
 selected_color=$(hyprpicker -a -n -l -r -f "$color_format" "${opt_args[@]}" | grep -v '^\[ERR\]')
 [[ -z "$selected_color" ]] && {
-    warn "No color was chosen"
+    print_warn "No color was chosen"
 }
 
 # Restore original mouse sensitivity
@@ -137,7 +137,7 @@ fi
 if ! grep -Fxq "$selected_color" "$LAST_USED" 2> /dev/null; then
     # Wipe file if reached limit
     if [[ "$(wc -l < "$LAST_USED" 2> /dev/null)" -ge $hist_size ]]; then
-        warn "Too many entries in history file!"
+        print_warn "Too many entries in history file!"
         echo "$selected_color" > "$LAST_USED"
     else
         print_log "Updating history file"
@@ -150,12 +150,12 @@ preview_img="$XDG_RUNTIME_DIR/color-picker_recent-color.png"
 # Generate a 1:1px image of the selected color to display in the notification
 if [[ $show_selected == true ]]; then
     if ! command -v magick > /dev/null; then
-        warn "The notification preview was not generated because ImageMagick is not installed"
+        print_warn "The notification preview was not generated because ImageMagick is not installed"
     else
         if magick -size 1x1 xc:"${selected_color}" "$preview_img"; then
             print_log "Created 1x1 color preview"
         else
-            warn "Unable to create color preview via ImageMagick"
+            print_warn "Unable to create color preview via ImageMagick"
         fi
     fi
 fi
