@@ -1,5 +1,5 @@
 [Desktop Entry]
 Type=Application
 Name=Bluetooth Configuration
-Exec=vibranium-cmd-terminal bluetui
+Exec=vb-cmd-terminal bluetui
 Icon=bluetooth-active-symbolic

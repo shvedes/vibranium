@@ -37,7 +37,7 @@ f = fullscreen
 <minus> = zoom -5%
 
 c = exec imv-copy ''"$imv_current_file"''
-w = exec vibranium-core-set-wallpaper "$imv_current_file"
+w = exec vb-core-wallpaper "$imv_current_file"
 <Ctrl+h> = exec imv-cheatsheet
 
 # vim:ft=dosini

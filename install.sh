@@ -242,7 +242,7 @@ post_install() {
     # https://www.reddit.com/r/linuxquestions/comments/t7ze3c/thunar_open_file_in_neovim/
     cp /usr/share/applications/nvim.desktop "$HOME"/.local/share/applications
     sed -e '/Terminal/s/true/false/' \
-        -e '/^Exec/s/=/=vibranium-cmd-launch-terminal /' \
+        -e '/^Exec/s/=/=vb-cmd-terminal /' \
         -i "$HOME"/.local/share/applications/nvim.desktop
 }
 
@@ -292,7 +292,7 @@ for entry in ./applications/*.desktop ./applications/hidden/*; do
 done
 
 for opt in "${LOOKNFEEL_OPTS[@]}"; do
-	./bin/vibranium-cmd-edit-wm-config "$opt" "$LOOKNFEEL_CONF"
+	./bin/vb-cmd-edit-wm-config "$opt" "$LOOKNFEEL_CONF"
 done
 
 for file in ./install/generate_*; do
