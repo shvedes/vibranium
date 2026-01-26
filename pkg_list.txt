@@ -35,6 +35,7 @@ hyprsunset
 hyprpicker
 mediainfo
 hyprpaper
+rofi-calc
 fastfetch
 pipewire
 hyprlock

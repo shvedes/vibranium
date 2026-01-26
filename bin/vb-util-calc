@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+if [[ ! -f /usr/lib/rofi/libcalc.so ]]; then
+    print_error "missing required dependencies: rofi-calac"
+    [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Calculator" --deps "rofi-calac"
+    exit 1
+fi
+
+theme_str="$(cat <<EOF
+window {
+    width: 500;
+}
+entry {
+    placeholder: " expression";
+}
+listview, num-rows, textbox-num-sep, num-filtered-rows {
+    enabled: false;
+}
+EOF
+)"
+
+rofi \
+    -no-sort \
+    -lines 0 \
+    -show calc \
+    -modi calc \
+    -no-history \
+    -no-show-match \
+    -theme-str "$theme_str" \
+    -calc-command "echo -n '{result}' | wl-copy"

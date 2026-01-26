@@ -11,6 +11,7 @@ else
 fi
 
 ACTIONS+=(
+    "Open calculator"
     "Toggle read mode"
     "Toggle inhibitor"
 )
@@ -37,6 +38,10 @@ fi
 CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "search...")"
 
 case "$CHOSEN" in
+    "Open calculator")
+        vb-util-calc
+        exit 0
+        ;;
     "Toggle read mode")
         vb-cmd-toggle-readmode
         exit 0

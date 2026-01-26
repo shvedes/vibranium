@@ -16,6 +16,7 @@ configuration {
     sort:                     true;
     fixed-num-lines:          false;
 
+    display-calc:   "Calculator";
     display-window: "Windows";
     display-run:    "Command";
     display-combi:  "Search";
@@ -31,6 +32,11 @@ configuration {
     monitor:       "-1";
     scroll-method: 1;
     sorting-method: "fzf";
+
+    calc {
+        hint-result: "";
+        hint-welcome: "";
+    }
 }
 
 /* ─── Base Layout ─────────────────────────────────────────────────────────── */
@@ -47,6 +53,13 @@ window {
 mainbox {
     padding:          4px;
     background-color: var(background);
+}
+
+message {
+    border: 0.15em;
+    margin: 18px 2px 0px 2px;
+    padding: 8px 8px 8px 8px;
+    border-color: var(border);
 }
 
 /* ─── Elements ────────────────────────────────────────────────────────────── */
@@ -93,7 +106,6 @@ listview {
     padding:      20px 0 0 0;
     spacing:      4px;
     scrollbar:    true;
-    border:       0;
     border:       2px solid 0px 0px;
     border-color: var(border);
     margin:       10px 0 0 0;

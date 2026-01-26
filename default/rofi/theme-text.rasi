@@ -15,6 +15,7 @@ configuration {
 	sort                      : true;
 	fixed-num-lines           : false;
 
+    display-calc        : "Calculator";
 	display-window      : "Windows";
 	display-run         : "Command";
 	display-combi       : "Search";
@@ -29,6 +30,11 @@ configuration {
 	monitor             : "-1";
 	scroll-method       : 1;
 	sorting-method      : "fzf";
+
+    calc {
+        hint-result: "";
+        hint-welcome: "";
+    }
 }
 
 element normal.normal {
@@ -65,6 +71,13 @@ mainbox {
     padding: 8px;
 	border:  2px;
 	border-color: var(border);
+}
+
+message {
+    border: 0.15em dash;
+    margin: 2px 2px 0px 2px;
+    padding: 8px 8px 8px 8px;
+    border-color: var(border);
 }
 
 textbox {
