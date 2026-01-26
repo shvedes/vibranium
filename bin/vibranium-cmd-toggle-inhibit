@@ -36,7 +36,7 @@ else
     setsid -f systemd-inhibit \
         --what=idle \
         --who="Vibranium" \
-        --why="Prevent system suspend is active" \
+        --why="Vibranium wants to delay system sleep" \
         sleep infinity &
 fi
 

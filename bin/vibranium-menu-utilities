@@ -94,7 +94,6 @@ while :; do
             ;;
         *"Stop timer"*)
             pkill --signal TERM -f vibranium-utils-timer
-            notify-send -r 1 "Vibranium" -r 2 "The timer has been stopped"
             exit 0
             ;;
         "New timer")

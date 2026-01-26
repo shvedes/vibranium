@@ -8,7 +8,6 @@ fi
 
 history_file="$XDG_CACHE_HOME/vibranium/color-picker.history"
 
-# TODO: support for other formats
 contrast_color() {
     local hex="$1"
 
@@ -26,28 +25,16 @@ contrast_color() {
     fi
 }
 
-tooltip="<span foreground='${WAYBAR_ACCENT}'><b> Click to pick a color from the screen </b></span>"
+tooltip="Click to pick a color from the screen"
 if [[ -s $history_file ]]; then
-    tooltip+="\n     <span foreground='${WAYBAR_ACCENT}'><b>Right click to</b></span> <span foreground='${P_RED}'><b>clear history</b></span>"
-    tooltip+="\n<span foreground='${WAYBAR_MUTED}'>---------------------------------------</span>"
+    tooltip+="\n     Right click to <span foreground='red3'><b>clear history</b></span>"
+    tooltip+="\n<span foreground='gray'>---------------------------------------</span>"
     tooltip+="\\n\\t   <span size='9000'>Recent colors</span>"
+
     while IFS= read -r color; do
         fg=$(contrast_color "$color")
         tooltip+="\n\t     <span background='$color' foreground='$fg' size='9500'><b> $color </b></span>"
     done < "$history_file"
 fi
 
-if [[ $VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS == true ]]; then
-    bind="$(vibranium-cmd-keybindings -i 'Color picker' | sed -n '1s/^[0-9]\.\s*//p')"
-    tooltip+="\n<span foreground='${WAYBAR_MUTED}'>---------------------------------------</span>"
-    tooltip+="\n<span foreground='${WAYBAR_ACCENT}'><b>${bind}</b></span>: pick a color"
-fi
-
-case $VIBRANIUM_COLOR_PICKER_WAYBAR_ICON in
-    "droplet")    icon='\uf043' ;;
-    "palette")    icon='\uefcc' ;;
-    "eyedropper") icon='\uf1fb' ;;
-    *)            icon='\uf043' ;; # droplet
-esac
-
-printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
+printf '{"text": "%s", "tooltip": "%s"}' "\uf1fb" "$tooltip"

@@ -3,15 +3,8 @@
 		"format": "{text}",
 		"hide-empty-text": true,
 
-		"on-scroll-up": "vibranium-core-power up",
-		"on-scroll-down": "vibranium-core-power down",
-
-		"on-click": "vibranium-core-power power-saver",
-		"on-click-middle": "vibranium-core-power balanced",
-		"on-click-right": "vibranium-core-power performance",
-
 		"exec": "vibranium-bar-power",
-		"signal": 7,
-		"return-type": "json"
+		"return-type": "json",
+		"signal": 7
 	}
 }

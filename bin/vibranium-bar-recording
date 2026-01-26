@@ -1,24 +1,8 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vibranium-core-lib"
-
-if ! pid_is_alive gpu-screen-recorder; then
-    printf '{"text": ""}'
-    exit 0
-fi
-
-icon="\uf28d"
-tooltip=" <span foreground='${WAYBAR_ACCENT}'><b>Screen recording is active</b></span> \n"
-
-if [[ $VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS == true ]]; then
-    tooltip+="<span foreground='${WAYBAR_MUTED}'>----------------------------</span>\n"
-    tooltip+=" <span foreground='${WAYBAR_ACCENT}'><b>CTRL ALT + R:</b></span> "
-    tooltip+="<span foreground='${WAYBAR_RED}'><b>stop recording</b></span>\n "
-    tooltip+="<span foreground='${WAYBAR_ACCENT}'><b>Left click:</b></span>   "
-    tooltip+="<span foreground='${WAYBAR_RED}'><b>stop recording</b></span> "
+if pidof -q gpu-screen-recorder; then
+    printf '{"text": "%s", "tooltip": "%s"}' \
+        "\uf28d" "Screen recording is active"
 else
-    tooltip+="<span foreground='${WAYBAR_MUTED}'>----------------------------</span>\n"
-    tooltip+=" <span foreground='${WAYBAR_RED}'><b>\tclick to stop</b></span> "
+    printf '{"text": ""}'
 fi
-
-printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"

@@ -53,7 +53,7 @@ tooltip {
 	margin-right: 8px;
 }
 
-@keyframes recording-animation {
+@keyframes flashing-animation {
   0%   { color: @foreground }
   25%  { color: @foreground }
   50%  { color: @urgent }
@@ -62,12 +62,11 @@ tooltip {
 
 #custom-confirm-kill {
 	color: @foreground;
-	animation: recording-animation 1s infinite
+	animation: flashing-animation 1s infinite
 }
 
 #custom-recording-indicator {
-	color: @foreground;
-	animation: recording-animation 1.5s infinite
+	color: @urgent;
 }
 
 #custom-separator,

@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# Draw a separator when some modules or conditions are active.
 
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 source "$VIBRANIUM_PATH/vibranium-core-defaults"
@@ -10,7 +9,6 @@ show() {
     exit
 }
 
-# Active systemd inhibitors
 for f in /run/systemd/inhibit/*; do
     [[ -f $f ]] || continue
     while IFS= read -r line; do
@@ -20,23 +18,18 @@ for f in /run/systemd/inhibit/*; do
     done < "$f"
 done
 
-# cheap filesystem checks
-[[ -e "$XDG_RUNTIME_DIR/worker.active" ]] && show
-[[ -e "$VIBRANIUM_STATE/update.available" ]] && show
-[[ -e "$XDG_RUNTIME_DIR/vibranium-timer.remaining" ]] && show
-[[ -e "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]] && show
-[[ -e "$XDG_RUNTIME_DIR/vibranium-core-force-kill.confirm" ]] && show
+paths=(
+  # "$XDG_RUNTIME_DIR/worker.active"
+  "$VIBRANIUM_STATE/update.available"
+  "$XDG_RUNTIME_DIR/vibranium-timer.remaining"
+  "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+  "$XDG_RUNTIME_DIR/vibranium-core-force-kill.confirm"
+)
 
-# pure shell flags
+for p in "${paths[@]}"; do
+  [[ -e "$p" ]] && show
+done
+
 [[ $VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE == true ]] && show
-
-# expensive call guarded by flag
-if [[ $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE == true ]]; then
-    [[ $(vibranium-cmd-get-power) != balanced ]] && show
-fi
-
-# process existence checks last
-pid_is_alive gpu-screen-recorder &>/dev/null && show
-pid_is_alive magick &>/dev/null && show
 
 printf '{"text": ""}'

@@ -75,7 +75,7 @@ log "Timer set for ${BLUE}$formatted_time${RESET}"
 notify-send -r 2 "Vibranium" \
     "Timer set for <span foreground='${P_YELLOW}'><b>${formatted_time}</b></span>"
 
-setsid -f systemd-inhibit --what=idle --why="Timer is active" --who="Vibranium" sleep "$sleep_time"
+setsid -f systemd-inhibit --what=idle --why="Timer is active" --who="Timer" sleep "$sleep_time"
 log "Sleep inhibition is active"
 
 time_remaining=$sleep_time

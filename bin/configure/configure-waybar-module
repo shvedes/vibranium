@@ -3,38 +3,6 @@
 source "$VIBRANIUM_PATH/vibranium-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
-_color_picker_menu() {
-    local index opts chosen
-
-    index=0
-    opts=("History size" "Change icon")
-
-    while true; do
-        chosen="$(printf "%s\n" "${opts[@]}" | rofi_cmd "$CHOSEN" "ESC to go back" -selected-row "$index")"
-        [[ -z "$chosen" ]] && break
-
-        for i in "${!opts[@]}"; do
-            if [ "${opts[$i]}" = "$chosen" ]; then
-                index="$i"
-                break
-            fi
-        done
-
-        case "$chosen" in
-            "Change icon")
-                update_enum "VIBRANIUM_COLOR_PICKER_WAYBAR_ICON" \
-                    "Statusbar icon" "droplet" "palette" "eyedropper"
-                vibranium-cmd-refresh-waybar-module color-picker
-                ;;
-            "History size")
-                update_enum "VIBRANIUM_COLOR_PICKER_HISTORY_SIZE" \
-                    "History size" "3" "5" "10" "15"
-                vibranium-cmd-refresh-waybar-module color-picker
-                ;;
-        esac
-    done
-}
-
 _pacman_weather_specific() {
     local options chosen index animate_loading \
         show_separators animate_updates
@@ -115,11 +83,7 @@ _update_module_setting() {
 INDEX=0
 
 while true; do
-    OPTIONS=("Pacman" "Weather" "Color Picker")
-
-    if systemd-inhibit | grep -q Vibranium; then
-        OPTIONS+=("Sleep inhibitor")
-    fi
+    OPTIONS=("Pacman" "Weather")
 
     pacman_enabled="$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
     weather_enabled="$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
@@ -141,13 +105,6 @@ while true; do
     case "$CHOSEN" in
         "<b>Pacman and Weather"*)
             _pacman_weather_specific
-            ;;
-        "Sleep inhibitor")
-            update_enum "VIBRANIUM_BAR_INHIBITOR_ICON" "Statusbar icon" "Icon" "coffee" "lock" "eye"
-            vibranium-cmd-refresh-waybar-module inhibitor
-            ;;
-        "Color Picker")
-            _color_picker_menu
             ;;
         "Weather")
             update_module_setting "VIBRANIUM_BAR_WEATHER_MODULE_CITY" "string" \

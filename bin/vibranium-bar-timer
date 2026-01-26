@@ -13,7 +13,7 @@ fi
 
 icon="\uf2f2"
 text="$icon"
-tooltip="<span foreground='${WAYBAR_ACCENT}'>Timer is active</span>"
+tooltip="Timer is active"
 class="active"
 
 if [[ $remaining =~ ^[0-9]+$ ]]; then
@@ -26,11 +26,10 @@ if [[ $remaining =~ ^[0-9]+$ ]]; then
     [[ $minutes -gt 0 ]] && formatted+="${minutes}m "
     formatted+="${seconds}s"
 
-    text+="  <span foreground='gray'>${formatted}</span>"
-    tooltip+="\n<span foreground='${WAYBAR_YELLOW}'><b>${formatted}</b></span> remaining"
+    text+="  <span foreground='gray'>$formatted</span>"
 else
     text+=" !"
-    tooltip="<span foreground='${WAYBAR_YELLOW}'><b>Time is out!</b></span>"
+    tooltip="<b>Time is out!</b>"
     class="expired"
 fi
 
