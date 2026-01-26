@@ -2,15 +2,8 @@
 
 CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
 
-if [[ "$1" == "disable" ]]; then
-    rm -f "$CONFIG"; hyprctl -q reload
-    vb-cmd-refresh-waybar-module reading-mode
-    notify-send -r 2 "Vibranium" "Reading mode has been disabled"
-    exit
-fi
-
 if [[ -f "$CONFIG" ]]; then
-    icon="\uede2"
+    icon="\udb82\udfc2"
     tooltip="\tReading mode is active\n\n"
     tooltip+="   Note that grayscale effect will be\n"
     tooltip+="visible on screenshots and screen records"
