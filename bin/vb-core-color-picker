@@ -31,7 +31,7 @@ if ! missing_str="$(vb-cmd-is-present hyprpicker)"; then
 fi
 
 # Do not run multiple instances of hyprpicker
-if pid_is_alive hyprpicker; then
+if pidof -q hyprpicker; then
     exit 1
 fi
 

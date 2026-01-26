@@ -17,7 +17,7 @@ case "$1" in
 
             msg="Google sync has been enabled."
 
-            if pid_is_alive chromium; then
+            if pidof -q chromium; then
                 msg+="\n\n<b>Please restart your browser</b>"
             fi
 
@@ -33,7 +33,7 @@ case "$1" in
 
             msg="Google sync has been disbaled."
 
-            if pid_is_alive chromium; then
+            if pidof -q chromium; then
                 msg+="\n\n<b>Please restart your browser</b>"
             fi
 

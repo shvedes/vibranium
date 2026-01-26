@@ -2,7 +2,7 @@
 
 source "$VIBRANIUM_PATH/vb-core-lib"
 
-if pid_is_alive gpu-screen-recorder; then
+if pidof -q gpu-screen-recorder; then
     vb-core-recording
     exit 0
 fi

@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
 source "$VIBRANIUM_PATH/vb-core-lib"
-source "$VIBRANIUM_PATH/vb-core-defaults"
-source "$XDG_CONFIG_HOME/vibranium/settings"
 
 show() {
     printf '{"text": "|"}'
@@ -19,7 +17,6 @@ for f in /run/systemd/inhibit/*; do
 done
 
 paths=(
-  # "$XDG_RUNTIME_DIR/worker.active"
   "$VIBRANIUM_STATE/update.available"
   "$XDG_RUNTIME_DIR/vb-timer.remaining"
   "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"

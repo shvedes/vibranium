@@ -4,11 +4,9 @@
 # If an inhibitor is already running, kills it; otherwise starts a new one.
 # Refreshes the Vibranium Waybar inhibitor module after action.
 
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
-
 usage() {
     cat << EOF
-Usage: $(basename "$0") [--help]
+Usage: $(basename "$0") [OPTION]
 
 Toggle systemd idle inhibitor for Vibranium.
 

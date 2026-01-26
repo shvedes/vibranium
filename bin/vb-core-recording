@@ -94,7 +94,7 @@ start_recording() {
 # Catch Ctrl+C and kill signals
 trap cleanup INT TERM
 
-if pid_is_alive gpu-screen-recorder; then
+if pidof -q gpu-screen-recorder; then
     cleanup
 fi
 

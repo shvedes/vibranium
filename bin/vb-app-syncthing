@@ -11,7 +11,7 @@ if ! command -v syncthing > /dev/null; then
 fi
 
 # If the user launches Syncthing, but the service is not active / not enabled
-if ! pid_is_alive syncthing; then
+if ! pidof -q syncthing; then
     if [ "$(systemctl --user is-active syncthing)" != "active" ]; then
         systemctl --user enable --now syncthing
         # Wait until the service starts up

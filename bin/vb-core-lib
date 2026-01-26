@@ -4,11 +4,11 @@
 
 # Load defaults first
 source "$VIBRANIUM_PATH/vb-core-defaults"
-source "${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/settings"
-source "${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/theme/current/vibranium-lib-theme"
+source "$XDG_CONFIG_HOME/vibranium/settings"
+source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
-export VIBRANIUM_STATE="${XDG_STATE_HOME:-$HOME/.local/share}/vibranium"
-export VIBRANIUM_USER_SETTINGS="${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/settings"
+export VIBRANIUM_USER_SETTINGS="$XDG_CONFIG_HOME/vibranium/settings"
+export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
 export VIBRANIUM_SUDO_PROMPT
 
 RED=$'\e[0;31m'
@@ -381,17 +381,5 @@ _flash() {
         sleep "$seconds"
         hyprctl -q hyprsunset gamma 100
     fi
-}
-
-pid_is_alive() {
-    for d in /proc/[0-9]*; do
-        if read -r -d '' n < "$d/cmdline" 2>/dev/null; then
-            n=${n##*/}
-            if [[ $n == "$1" ]]; then
-                return 0
-            fi
-        fi
-    done
-    return 1
 }
 

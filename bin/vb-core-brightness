@@ -38,7 +38,7 @@ if [[ "$1" == "--value" && ! "$2" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
-if pid_is_alive ddcutil; then
+if pidof -q ddcutil; then
     error "Found another instance of ddcutil!"
     exit 1
 fi
