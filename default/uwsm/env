@@ -31,13 +31,7 @@ export QT_QPA_PLATFORM="wayland;xcb"
 export GDK_BACKEND="wayland,x11"
 export CLUTTER_BACKEND="wayland"
 
-export VIBRANIUM_IS_LAPTOP=false
-export VIBRANIUM_IS_VIRTUAL_MACHINE=false
-
-case "$(</sys/class/dmi/id/chassis_type)" in
-	"10") export VIBRANIUM_IS_LAPTOP=true          ;;
-    "1")  export VIBRANIUM_IS_VIRTUAL_MACHINE=true ;;
-esac
+export CHASSIS_TYPE="$(hostnamectl chassis)"
 
 # https://wiki.archlinux.org/title/Hardware_video_acceleration#Configuration
 # GPU="$(lspci | grep -E "VGA compatible controller.*(Radeon RX|ATI|UHD|Iris|Arc|Nvidia)")"
