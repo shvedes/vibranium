@@ -17,15 +17,27 @@ tooltip="Timer is active"
 class="active"
 
 if [[ $remaining =~ ^[0-9]+$ ]]; then
-    hours=$((remaining / 3600))
-    minutes=$(((remaining % 3600) / 60))
-    seconds=$((remaining % 60))
-
+    rem=$remaining
     formatted=""
+
+    years=$((rem / 31557600))
+    rem=$((rem % 31557600))
+
+    days=$((rem / 86400))
+    rem=$((rem % 86400))
+
+    hours=$((rem / 3600))
+    rem=$((rem % 3600))
+
+    minutes=$((rem / 60))
+    seconds=$((rem % 60))
+
+    [[ $years -gt 0 ]] && formatted+="${years}y "
+    [[ $days -gt 0 ]] && formatted+="${days}d "
     [[ $hours -gt 0 ]] && formatted+="${hours}h "
     [[ $minutes -gt 0 ]] && formatted+="${minutes}m "
-    formatted+="${seconds}s"
 
+    formatted+="${seconds}s"
     text+="  <span foreground='gray'>$formatted</span>"
 else
     text+=" !"

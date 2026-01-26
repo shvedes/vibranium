@@ -72,8 +72,6 @@ done
 
 formatted_time="$(format_time "$sleep_time")"
 log "Timer set for ${BLUE}$formatted_time${RESET}"
-notify-send -r 2 "Vibranium" \
-    "Timer set for <span foreground='${P_YELLOW}'><b>${formatted_time}</b></span>"
 
 setsid -f systemd-inhibit --what=idle --why="Timer is active" --who="Timer" sleep "$sleep_time"
 log "Sleep inhibition is active"
