@@ -17,6 +17,7 @@ export XDG_CONFIG_DIRS="/etc/xdg"
 export VIBRANIUM_RUNTIME="$XDG_RUNTIME_DIR/vibranium"
 export VIBRANIUM_PATH="$XDG_DATA_HOME/vibranium/bin"
 export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
+export VIBRANIUM_CACHE="$XDG_CACHE_HOME/vibranium"
 export VIBRANIUM="$XDG_DATA_HOME/vibranium"
 export PATH="$HOME/.local/bin:$VIBRANIUM_PATH:$PATH"
 
@@ -33,30 +34,6 @@ export GDK_BACKEND="wayland,x11"
 export CLUTTER_BACKEND="wayland"
 
 export CHASSIS_TYPE="$(hostnamectl chassis)"
-
-# https://wiki.archlinux.org/title/Hardware_video_acceleration#Configuration
-# GPU="$(lspci | grep -E "VGA compatible controller.*(Radeon RX|ATI|UHD|Iris|Arc|Nvidia)")"
-# case "$GPU" in
-#     # Check Nvidia first in case of a laptop with hybrid graphics.
-# 	*"Nvidia"*)
-# 		export VIBRANIUM_GPU_IS_SUPPORTED=true
-# 		export LIBVA_DRIVER_NAME="nvidia"
-# 		export VDPAU_DRIVER="nvidia"
-# 		;;
-# 	*"Radeon RX"*|*"ATI"*)
-# 		export VIBRANIUM_GPU_IS_SUPPORTED=true
-# 		export LIBVA_DRIVER_NAME="radeonsi"
-# 		export VDPAU_DRIVER="radeonsi"
-# 		;;
-# 	*"UHD"*|*"Iris"*|*"Arc"*)
-# 		export VIBRANIUM_GPU_IS_SUPPORTED=true
-# 		export LIBVA_DRIVER_NAME="i965"
-# 		export VDPAU_DRIVER="va_gl"
-# 		;;
-# 	*)
-# 		export VIBRANIUM_GPU_IS_SUPPORTED=false
-# 		;;
-# esac
 
 if [[ -f "$HOME/.config/user-dirs.dirs" ]]; then
 	while IFS='=' read -r var val; do
