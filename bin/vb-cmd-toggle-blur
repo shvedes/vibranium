@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 
-# Toggle window blur in Hyprland.
-# Reads current blur state, flips true/false in config, and reloads Hyprland.
+if [[ $CHASSIS_TYPE == "vm" ]]; then
+    notify-send -r 734 -t 5000 -u critical "Vibranium" \
+        "For the sake of VM's performance keep blur disabled, please"
+    exit 1
+fi
 
 CONF="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
 
