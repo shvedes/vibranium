@@ -18,9 +18,9 @@ is_empty() {
     local entries
     mapfile -t entries < <(cliphist list)
 
-    (( ${#entries[@]} == 0 )) && {
-        echo a
-        # print_print_warn "clipboard is empty"
+    (( ! ${#entries[@]} >= 1 )) && {
+        print_warn "clipboard is empty"
+        return 0
     }
 }
 
@@ -39,19 +39,18 @@ clear_clipboard() {
 }
 
 restart_service() {
-    print_print_log "starting systemd service..."
+    print_log "starting systemd service..."
     systemctl --quiet --user enable --now cliphist
 }
 
 if ! missing="$(vb-cmd-is-present rofi cliphist)"; then
-    print_print_error "missing required dependencies: $missing"
-
+    print_error "missing required dependencies: $missing"
     is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
     exit 1
 fi
 
 if [[ "$(systemctl --user is-active cliphist)" != "active" ]]; then
-    print_print_warn "systemd service not active!"
+    print_warn "systemd service not active!"
     start_service
 fi
 
