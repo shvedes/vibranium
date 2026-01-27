@@ -45,14 +45,18 @@ album_art="/tmp/$(basename "$0").art"
 state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
 
 pc_status="$(playerctl status 2>/dev/null || true)"
-mpd_status="$(mpc status 2>/dev/null | awk 'NR==2 {print $1}' || true)"
+
+mpd_unit="$(systemctl --user is-active mpd)"
+if [[ "$mpd_unit" == "active" ]]; then
+    mpd_status="$(mpc status 2>/dev/null)"
+fi
 
 if [[ "$pc_status" == "Playing" ]]; then
     player="playerctl"
     echo "$player" > "$state_file"
     IFS='^' read -r title artist <<< \
         "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
-elif [[ "$mpd_status" == "[playing]" ]]; then
+elif [[ "$mpd_status" == *"[playing]"* ]]; then
     player="mpd"
     echo "$player" > "$state_file"
     IFS='^' read -r title artist <<< \
