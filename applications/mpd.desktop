@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=MPD
+TryExec=mpd
+Exec=vb-cmd-launch-mpd
+Icon=mpd
+Keywords=ncmpcpp;music;player;rmpc;mpc;
