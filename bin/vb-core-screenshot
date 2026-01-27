@@ -30,7 +30,7 @@ EOF
 copy() {
     check_bool VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD true
     if [[ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD == false ]]; then
-        return
+        return 1
     fi
 
     local what="$1"

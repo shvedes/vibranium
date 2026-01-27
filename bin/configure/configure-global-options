@@ -160,20 +160,15 @@ get_active_rofi_theme() {
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    bar_enabled="$([ "$(systemctl --user is-active waybar)" = "active" ] && echo true || echo false)"
-
     OPTIONS=(
         "Now playing              : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
         "OSD enabled              : $VIBRANIUM_GLOBAL_USE_OSD"
         "Show wallpaper           : $VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
-        "Show status bar          : $bar_enabled"
         "Confirm to kill          : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
-        "Blur lockscreen          : $VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND"
         "Copy to clipboard        : $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD"
         "Pause music on lock      : $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
         "Welcome notification     : $VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION"
         "Terminal transparency    : $(_terminal_opacity get)"
-        "Video downscale use GPU  : $VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU"
         "<b>App launcher settings</b>"
     )
 
@@ -210,12 +205,6 @@ while true; do
         *"Manage"*)
             _user_wallpapers
         ;;
-        "Show status bar"*)
-            case "$bar_enabled" in
-                "true") systemctl --user disable --now waybar ;;
-                "false") systemctl --user enable --now waybar ;;
-            esac
-            ;;
         "Show wallpaper"*)
             case "$(toggle_bool -v "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
                 false)
@@ -230,32 +219,6 @@ while true; do
             ;;
         *"Player options"*)
             configure-player
-            ;;
-        "Video downscale"*)
-            while true; do
-                downscale_options=(
-                    "Use GPU when possible : $VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU"
-                    "README"
-                )
-                downscale_chosen="$(printf "%s\n" "${downscale_options[@]}" | rofi_cmd "Video downscale" "ESC to go back")"
-                [[ -z "$downscale_chosen" ]] && break
-
-                case "$downscale_chosen" in
-                    "Use"*)
-                        toggle_bool "VIBRANIUM_VIDEO_DOWNSCALE_USE_GPU"
-                        break
-                        ;;
-                    "README")
-                        msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> "
-                        msg+="<b>Whether to use GPU encoders when processing a video</b>\n\n"
-                        msg+="<span foreground='${P_RED}'>Please ensure that you have installed all necessary GPU drivers</span>\n\n"
-                        msg+="Keep in mind that, although using a GPU for video processing may be faster and more power efficient, "
-                        msg+="the result is usually slightly worse than with CPU\n\nIf your goal is to significantly reduce file size "
-                        msg+="while losing as little detail as possible, a CPU is better suited for the task"
-                        notify-send -r 3 -t 20000 "Vibranium" "$msg"
-                        ;;
-                esac
-            done
             ;;
         *"Edit env vars"*)
             vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
@@ -402,7 +365,7 @@ while true; do
                     "What"*)
                         msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> "
                         msg+="<b>Whether to automatically copy to clipboard when working with files</b>\n\n"
-                        msg+="This could be a <span foreground='${P_YELLOW}'><b>screenshot</b></span>, a recorded or downscaled "
+                        msg+="This could be a <span foreground='${P_YELLOW}'><b>screenshot</b></span>, a recorded "
                         msg+="<span foreground='${P_YELLOW}'><b>video</b></span>,\nor any other type of file operation"
                         notify-send -r 3 -t 15000 "What is this?" "$msg"
                         ;;
@@ -454,9 +417,6 @@ while true; do
                         ;;
                 esac
             done
-            ;;
-        "Blur"*)
-            _lockscreen_blur_menu
             ;;
         "Pause"*)
             while true; do

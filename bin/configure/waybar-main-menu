@@ -9,21 +9,28 @@ WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
+    unit_ststus="$(systemctl --user is-active waybar)"
+    [[ $unit_ststus == active ]] && ENABLED=true || ENABLED=false
+
+
     POSITION="$(sed -n 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WAYBAR_CONFIG")"
     HEIGHT="$(sed -n 's/.*"height"[[:space:]]*:[[:space:]]*\([^"]*\),.*/\1/p' "$WAYBAR_CONFIG")"
     ICON_SPACING="$(sed -n 's/.*"spacing"[[:space:]]*:[[:space:]]*\([^"]*\),.*/\1/p' "$WAYBAR_CONFIG")"
 
-    case "$POSITION" in
-        "top")    OPTIONS=("Move top bar to bottom") ;;
-        "bottom") OPTIONS=("Move bottom bar to top") ;;
-    esac
+    OPTIONS=("Enabled : $ENABLED")
 
-    case "$VIBRANIUM_BAR_SHOW_SHORTCUT_HINTS" in
-        "true")  OPTIONS+=("Hide shortcut hints") ;;
-        "false") OPTIONS+=("Show shortcut hints") ;;
-    esac
+    if [[ "$ENABLED" == true ]]; then
+        OPTIONS+=(
+            "Position : $POSITION"
+            "Spacing : ${ICON_SPACING:-?}"
+            "Height : ${HEIGHT:-?}"
+            "<b>Module list</b>"
+            "<b>Module settings</b>"
+        )
+    fi
 
-    OPTIONS+=("Configure modules" "Icon spacing : ${ICON_SPACING:-?}" "Enabled modules" "Height : ${HEIGHT:-?}" )
+
+    mapfile -t OPTIONS < <(align_options "${OPTIONS[@]}")
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Waybar options" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
 
@@ -35,7 +42,13 @@ while true; do
     done
 
     case "$CHOSEN" in
-        "Icon spacing"*)
+        "Enabled"*)
+            case "$ENABLED" in
+                "true") systemctl --user disable --now waybar ;;
+                "false") systemctl --user enable --now waybar ;;
+            esac
+        ;;
+        "Spacing"*)
             while true; do
                 prompt="Icon spacing (int)"
                 input="$(printf "%s" "$prompt" | rofi_cmd "Icon spacing" "-6 - 16")"
@@ -78,14 +91,13 @@ while true; do
                 break
             done
             ;;
-        "Move"*)
+        "Position"*)
             case "$POSITION" in
-                top) vb-cmd-waybar-position --bottom ;;
+                top)    vb-cmd-waybar-position --bottom ;;
                 bottom) vb-cmd-waybar-position --top ;;
             esac
             ;;
-        "Enabled"*)          waybar-toggle-modules             ;;
-        "Show"* | "Hide"*)   vb-cmd-toggle-waybar-hints ;;
-        "Configure modules") configure-waybar-module           ;;
+        *"Module list"*)    waybar-toggle-modules   ;;
+        *"Module settings"*) configure-waybar-module ;;
     esac
 done

@@ -14,11 +14,9 @@ _pacman_weather_specific() {
 
         animate_loading="$VIBRANIUM_BAR_SHOW_ANIMATION"
         show_separators="$VIBRANIUM_BAR_SHOW_SEPARATOR"
-        animate_updates="$VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC"
 
         options=(
             "Animate loading : $animate_loading"
-            "Animate updates : $animate_updates"
             "Show separators : $show_separators"
         )
         chosen="$(printf "%s\n" "${options[@]}" | rofi_cmd "Extras" "ESC to go back" -selected-row "$index")"
@@ -34,7 +32,6 @@ _pacman_weather_specific() {
         case "$chosen" in
             "Animate loading"*) toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION" ;;
             "Show separators"*) toggle_bool "VIBRANIUM_BAR_SHOW_SEPARATOR" ;;
-            "Animate updates"*) toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC"
         esac
 
         vb-cmd-refresh-waybar-module pacman &
