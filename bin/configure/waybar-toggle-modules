@@ -68,7 +68,7 @@ while true; do
         "Bluetooth       : $BLUETOOTH_ENABLED"
         "Weather         : $VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
         "Network         : $NETWORK_ENABLED"
-        "Pacman          : $VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
+        "Updates         : $VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
         "Volume          : $VOLUME_ENABLED"
     )
 
@@ -122,7 +122,7 @@ while true; do
                 notify-send -r 1 -t 18000 "Vibranium" "$msg"
             fi
             ;;
-        "Pacman"*)
+        "Updates"*)
             toggle_bool "VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
             vb-cmd-refresh-waybar-module pacman
             ;;

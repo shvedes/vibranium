@@ -42,7 +42,7 @@ spinner() {
     done
 }
 
-is_connected() {
+wait_for_connection() {
     while ! ping 8.8.8.8 -c 1 &> /dev/null; do
         sleep 1
     done
@@ -102,15 +102,20 @@ make_tooltip() {
 get_arch_updates() { checkupdates --nocolor; }
 get_aur_updates() { yay -Qua 2> /dev/null; }
 
-is_connected
+wait_for_connection
 
-marker="$VIBRANIUM_RUNTIME/bar_updates.$(pidof waybar)"
-if [[ -f $marker ]]; then
+check_bool VIBRANIUM_BAR_SHOW_ANIMATION true
+if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == false ]]; then
     show_spinner=false
 else
-    show_spinner=true
-    rm -f "${marker%.*}".*
-    : > $marker
+    marker="$VIBRANIUM_RUNTIME/bar_updates.$(pidof waybar)"
+    if [[ -f $marker ]]; then
+        show_spinner=false
+    else
+        show_spinner=true
+        rm -f "${marker%.*}".*
+        : > $marker
+    fi
 fi
 
 (get_arch_updates > $VIBRANIUM_RUNTIME/bar_updates.arch) &
@@ -129,6 +134,15 @@ wait $arch_pid $aur_pid
 
 arch_count="$(wc -l < $VIBRANIUM_RUNTIME/bar_updates.arch)"
 aur_count="$(wc -l < $VIBRANIUM_RUNTIME/bar_updates.aur)"
+
+check_bool VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES
+if [[ $VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES == false ]] ; then
+    total_count=$(( arch_count + aur_count ))
+    if [[ $total_count -eq 0 ]]; then
+        printf '{"text": ""}'
+        exit 0
+    fi
+fi
 
 arch_info="$VIBRANIUM_RUNTIME/bar_updates.arch"
 aur_info="$VIBRANIUM_RUNTIME/bar_updates.aur"

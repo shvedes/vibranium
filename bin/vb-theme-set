@@ -121,7 +121,7 @@ pick_family() {
     done
 
     local family_chosen
-    family_chosen="$(printf "%s\n" "${keys[@]}" | rofi_cmd "Select theme" "")"
+    family_chosen="$(printf "%s\n" "${keys[@]}" | rofi_cmd "Set theme" "")"
     [[ -z "$family_chosen" ]] && exit 0
     echo "$family_chosen"
 }
@@ -142,7 +142,7 @@ pick_variant() {
     done
 
     local display
-    display="$(for v in "${variants[@]}"; do to_display_name "$v"; done | rofi_cmd "$family variants" "search")"
+    display="$(for v in "${variants[@]}"; do to_display_name "$v"; done | rofi_cmd "$family" "flavor")"
     if [[ -z "$display" ]]; then
         return 1
     else
@@ -375,7 +375,8 @@ if pgrep -a electron | grep heroic > /dev/null; then
     hyprctl -q dispatch sendshortcut CTRL, R, class:heroic
 fi
 
-if [[ -f "$XDG_CONFIG_HOME/nvim/lua/config/colorscheme.lua" ]]; then
+# This is my personal setup (yet), so..
+if [[ -f "$XDG_CONFIG_HOME/nvim/lua/config/colorscheme.lua" && $USER == shved ]]; then
     if pidof -q nvim; then
         print_log "Updaing nvim colorscheme"
         pkill -SIGUSR1 nvim

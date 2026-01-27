@@ -370,13 +370,11 @@ VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE=true
 # Default is false
 VIBRANIUM_BAR_PACMAN_MODULE_ENABLE=false
 
-# A number of packages required for the update icon to appear in the bar.
-# Available options: int
+# Whether to show the module even if there are no updates available
+# Available options: bool
 #
-# For example, if the value is 25 and the number of available updates is 20, the module will not be displayed in the bar.
-#
-# Default is 25
-VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED=25
+# Default is true
+VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES=true
 
 # Whether to enable weather module in Waybar.
 # Available options: bool
@@ -408,22 +406,6 @@ VIBRANIUM_BAR_WEATHER_MODULE_CITY=""
 #
 # Default is true
 VIBRANIUM_BAR_SHOW_ANIMATION=true
-
-# Whether to show a loading animation when pulling data for module updates.
-#
-# When launching custom modules that need to pull data, a small animation usually displays,
-# which will remain active until the necessary data is received and displayed (see the setting above).
-# These modules are usually updated every 30 minutes (an option to control the interval is planned for the future)
-# by fully restarting the scripts behind these modules, which means that the loading animation will be displayed again.
-# Sometimes this can be distracting and a little annoying. This option controls the display of the
-# animation only when the modules are updated. If you want to turn off the animation completely, see VIBRANIUM_BAR_SHOW_ANIMATION
-# If you want to see the effect set "restart-interval" option to, lets say 3 seconds in Waybar's config.jsonc.
-# Changes are applied instantly.
-#
-# Available options: bool
-#
-# Default is true
-VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC=true
 
 # Whether to show separator for pacman and weather modules. This might be useful when the users wants
 # to separate them visually with the clock module.

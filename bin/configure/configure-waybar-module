@@ -3,7 +3,7 @@
 source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
-_pacman_weather_specific() {
+_updates_weather_specific() {
     local options chosen index animate_loading \
         show_separators animate_updates
 
@@ -16,8 +16,8 @@ _pacman_weather_specific() {
         show_separators="$VIBRANIUM_BAR_SHOW_SEPARATOR"
 
         options=(
-            "Animate loading : $animate_loading"
-            "Show separators : $show_separators"
+            "Animate first run : $animate_loading"
+            "Show separators   : $show_separators"
         )
         chosen="$(printf "%s\n" "${options[@]}" | rofi_cmd "Extras" "ESC to go back" -selected-row "$index")"
         [[ -z "$chosen" ]] && return
@@ -30,8 +30,8 @@ _pacman_weather_specific() {
         done
 
         case "$chosen" in
-            "Animate loading"*) toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION" ;;
-            "Show separators"*) toggle_bool "VIBRANIUM_BAR_SHOW_SEPARATOR" ;;
+            "Animate first run"*) toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION" ;;
+            "Show separators"*)   toggle_bool "VIBRANIUM_BAR_SHOW_SEPARATOR" ;;
         esac
 
         vb-cmd-refresh-waybar-module pacman &
@@ -56,37 +56,66 @@ _update_module_setting() {
     while true; do
         new_value="$(printf "Enter new value ($type)" | rofi_cmd "$rofi_title" "$rofi_subtitle")"
         [ -z "$new_value" ] && break
+
         if [[ ! "$new_value" =~ $validation_regex ]]; then
             if [[ -n "$error_message" ]]; then
                 notify-send -r 1 -u critical -t 2000 "Vibranium" "$error_message"
             fi
             continue
         fi
+
         option-validate "$var"
+
         if [[ "$quote_value" == "yes" ]]; then
             sed -i "s|^${var}=.*|${var}=\"${new_value}\"|" "$VIBRANIUM_USER_SETTINGS"
         else
             sed -i "/^${var}/s/=.*/=${new_value}/" "$VIBRANIUM_USER_SETTINGS"
         fi
+
         if [[ "${!enabled_var}" == false ]]; then
             notify-send -r 1 -t 5000 "Vibranium" \
                 "The value has been changed. Don't forget to enable the module."
         fi
+
         vb-cmd-refresh-waybar-module "$module_name" &
         break
+    done
+}
+
+_updates_submenu() {
+    local opts
+    local show_on_zero
+
+    while true; do
+        source "$VIBRANIUM_USER_SETTINGS"
+
+        show_on_zero="$VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES"
+
+        opts=(
+            "Display zero updates : $show_on_zero"
+        )
+        chosen="$(printf "%s\n" "${opts[@]}" | rofi_cmd "Updates" "ESC to go back")"
+        [ -z "$chosen" ] && break
+
+        case "$chosen" in
+            "Display"*)
+                toggle_bool "VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES"
+                vb-cmd-refresh-waybar-module pacman &
+                ;;
+        esac
     done
 }
 
 INDEX=0
 
 while true; do
-    OPTIONS=("Pacman" "Weather")
+    OPTIONS=("Updates" "Weather")
 
-    pacman_enabled="$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
+    updates_enabled="$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
     weather_enabled="$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
 
-    if [[ "$pacman_enabled" == true && "$weather_enabled" == true ]]; then
-        OPTIONS+=("<b>Pacman and Weather specific</b>")
+    if [[ "$updates_enabled" == true && "$weather_enabled" == true ]]; then
+        OPTIONS+=("<b>Updates and Weather specific</b>")
     fi
 
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Module settings" "ESC to go back" -selected-row "$INDEX")"
@@ -100,17 +129,15 @@ while true; do
     done
 
     case "$CHOSEN" in
-        "<b>Pacman and Weather"*)
-            _pacman_weather_specific
+        "<b>Updates and Weather"*)
+            _updates_weather_specific
             ;;
         "Weather")
             _update_module_setting "VIBRANIUM_BAR_WEATHER_MODULE_CITY" "string" \
                 "City" "current is {current}" '^[A-Za-z]+$' "Invalid city name!" "yes" "weather" "weather_enabled"
             ;;
-
-        "Pacman")
-            _update_module_setting "VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED" "int" \
-                "Display if ≥ N updates" "ESC to go back" '^[0-9]+$' "" "no" "pacman" "pacman_enabled"
+        "Updates")
+            _updates_submenu
             ;;
     esac
 done
