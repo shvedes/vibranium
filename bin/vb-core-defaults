@@ -216,50 +216,6 @@ VIBRANIUM_VOLUME_ADJUSTMENT_STEP=5
 # Default is false
 VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED=false
 
-#      VIBRANIUM MEDIA DOWNLOADER OPTIONS      #
-# ============================================ #
-#                                              #
-
-# Note: Neither of the options below is working yet.
-
-# Which format to use for video files.
-# Available options: string 'mp4' 'webm' 'gif'
-#
-# Default is 'mp4'
-VIBRANIUM_MEDIA_DOWNLOADER_VIDEO_FORMAT="mp4"
-
-# Whether to keep original file after post-processing downloaded video (e.g. converting to aduio or changing video container format).
-# Available options: bool
-#
-# Default is false
-VIBRANIUM_MEDIA_DOWNLOADER_KEEP_ORIGINAL=false
-
-# Which format to use for audio files.
-# Available options: string 'aac' 'alac' 'flac' 'm4a' 'mp3' 'oups' 'wav' 'vorbis'
-#
-# When empty the best available quality is used.
-# Default is 'mp3' for best compatibility
-VIBRANIUM_MEDIA_DOWNLOADER_AUDIO_FORMAT="mp3"
-
-# Quality level for audio files.
-# Available options: int between 0 and 10, where 0 is the best and 10 is the worst quality
-#
-# Default is 5
-VIBRANIUM_MEDIA_DOWNLOADER_AUDIO_QUAILITY=5
-
-# Whether to use aria2 as a downloader backend.
-# Available options: bool
-#
-# Default is true
-VIBRANIUM_MEDIA_DOWNLOADER_USE_ARIA2=true
-
-# A directory where all downloaded files will be saved.
-# Available options: string <path>
-#
-# Default (empty string) attempts to scan $HOME/.config/user-dirs.dirs for the downloads folder,
-# If this file does not exist, $HOME is used.
-VIBRANIUM_MEDIA_DOWNLOADER_OUTPUT_PATH=""
-
 #                SCREENSHOT OPTIONS            #
 # ============================================ #
 #                                              #
@@ -290,24 +246,11 @@ VIBRANIUM_SCREENSHOT_JPEG_QUALITY=80
 # Default is 100
 VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN=100
 
-# Whether to include cursor into screenshot image
-# Available options: bool
-#
-# Default is false
-VIBRANIUM_SCREENSHOT_INCLUDE_CURSOR=false
-
 # Whether to save taken screenshot to disk
 # Available options: bool
 #
 # Default is true
 VIBRANIUM_SCREENSHOT_SAVE_TO_DISK=true
-
-# A directory where all screenshots will be saved.
-# Available options: string, a path without trailing slashes (/)
-#
-# Default (empty string) attempts to scan $HOME/.config/user-dirs.dirs for the pictures folder,
-# If this file does not exist, $HOME is used.
-VIBRANIUM_SCREENSHOT_OUTPUT_DIR=""
 
 # When set to true and taking a fullscreen screenshot,
 # a temporary compositor shader is applied to create a flash effect.
@@ -570,13 +513,6 @@ VIBRANIUM_RECORDING_CAPTURE_SINK=true
 #
 # Default is true
 VIBRANIUM_RECORDING_FLASH_SCREEN=true
-
-# A directory where all recordings will be saved.
-# Available options: string, a path without trailing slashes (/)
-#
-# Default (empty string) attempts to scan $HOME/.config/user-dirs.dirs for the videos folder,
-# If this file does not exist, $HOME is used.
-VIBRANIUM_RECORDING_OUTPUT_DIR=""
 
 #
 #                PLAYER OPTIONS                #
