@@ -46,13 +46,13 @@ spinner() {
     done
 }
 
-waybar_pid="$(pidof waybar)"
-if [[ -f /tmp/weather.$waybar_pid ]]; then
+marker="$VIBRANIUM_RUNTIME/bar_weather.$(pidof waybar)"
+if [[ -f $marker ]]; then
     show_spinner=false
 else
     show_spinner=true
-    rm -f /tmp/weather.*
-    : > /tmp/weather.$waybar_pid
+    rm -f "${marker%.*}".*
+    : > $marker
 fi
 
 temp_data="$VIBRANIUM_RUNTIME/waybar_weather.json"

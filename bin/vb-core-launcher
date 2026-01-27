@@ -64,8 +64,7 @@ process_input() {
 
             if [[ -x "$cmd" ]] || command -v "$cmd" > /dev/null 2>&1; then
                 print_log "Input ${YELLOW}is${RESET} an executable. Executing with args"
-                vb-cmd-launch-cmd "$cmd" $args
-                # exec setsid uwsm app -- "$cmd" $args
+                exec setsid "$cmd" $args
             elif [[ -e "$input" ]]; then
                 print_log "Input ${YELLOW}is${RESET} a file. Opening using ${YELLOW}xdg-open${RESET}"
                 exec setsid xdg-open "$input" &> /dev/null &

@@ -1,137 +1,149 @@
 #!/usr/bin/env bash
 
-# This is the worst code ever produced.
-# It's definitely should be rewrited (in rust :D)
+source $VIBRANIUM_PATH/vb-core-defaults
+source $XDG_CONFIG_HOME/vibranium/settings
 
-source "$VIBRANIUM_PATH/vb-core-lib"
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
-
-check_bool VIBRANIUM_BAR_PACMAN_MODULE_ENABLE true
-if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == "false" ]]; then
+if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == false ]]; then
     printf '{"text": ""}'
     exit 0
 fi
 
-while ! ping 8.8.8.8 -c 1 &> /dev/null; do
-    # No internet connection
-    sleep 1
-done
-
-if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == "true" ]]; then
-    separator="<span foreground='${WAYBAR_MUTED}'>|</span> "
-else
-    separator=
-fi
-
-# If dependency checkreports missing, show tooltip and exit (original behaviour)
-if ! missing_str="$(vb-cmd-is-present pacman-contrib:checkupdates)"; then
-    read -r -a missing <<< "$missing_str"
-    printf '{"text":"%s<span rise='\''1pt'\'' foreground='\''red'\''>\\uf071</span>","tooltip":"<span foreground='\'"${WAYBAR_RED}"\''>Unable to fetch updates</span>\\n<span foreground='\'"${WAYBAR_ACCENT}"\''>Missing required dependencies</span>: %s"}' "$separator" "${missing[@]}"
+if ! command -v checkupdates > /dev/null; then
+    text="<span  foreground='red2'>\uf071</span>"
+    tooltip="Unable to fetch updates!\n"
+    tooltip="Missing dependencies: pacman-contrib"
+    printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
     exit 0
 fi
 
-# Validate configuration
-check_int VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED 25 int
-check_bool VIBRANIUM_BAR_SHOW_ANIMATION true
-check_bool VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC true
-check_bool VIBRANIUM_BAR_SHOW_SEPARATOR true
+spinner() {
+    local tooltip="$1"
+    local delay=0.1
+    local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
-# Find the ancestor process named "waybar" and return its PID.
-# If not found, fall back to PPID.
-get_waybar_pid() {
-    pid="$PPID"
-    while [[ -n $pid && $pid -ne 1 ]]; do
-        comm=$(ps -p "$pid" -o comm= 2> /dev/null | tr -d ' ')
-        if [[ "$comm" == "waybar" ]]; then
-            printf '%s' "$pid"
-            return 0
+    format_text() {
+        local text="$1"
+        if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
+            text="<span foreground='DimGray'>|</span> "
+            text+="$1"
         fi
-        pid=$(ps -p "$pid" -o ppid= 2> /dev/null | tr -d ' ')
+        printf '%s' "$text"
+    }
+
+    for i in "${spinstr[@]}"; do
+        frame="$(format_text "<span foreground='gray'>$i</span>")"
+
+        jq -nc \
+          --arg text "$frame" \
+          --arg tooltip "$tooltip" \
+          '{text:$text, tooltip:$tooltip}'
+
+        sleep "$delay"
     done
-    printf '%s' "$PPID"
 }
 
-waybar_pid=$(get_waybar_pid)
-marker="$XDG_RUNTIME_DIR/vibranium_bar_pacman_has_run.${waybar_pid}"
-
-# temp files for counts (created in XDG_RUNTIME_DIR)
-arch_tmp=$(mktemp "${XDG_RUNTIME_DIR}/vibranium_pacman_arch.XXXXXX") || exit 1
-aur_tmp=$(mktemp "${XDG_RUNTIME_DIR}/vibranium_pacman_aur.XXXXXX") || {
-    rm -f "$arch_tmp"
-    exit 1
+is_connected() {
+    while ! ping 8.8.8.8 -c 1 &> /dev/null; do
+        sleep 1
+    done
 }
-trap 'rm -f "$arch_tmp" "$aur_tmp"' EXIT
 
-# launch update checks in background
-(checkupdates 2> /dev/null | wc -l > "$arch_tmp") &
+make_tooltip() {
+    local files=("$@")
+    local any=false
+    for f in "${files[@]}"; do
+        [[ -s "$f" ]] && any=true && break
+    done
+    $any || { echo ""; return; }
+
+    awk '
+    function trim(s) { sub(/^[ \t\r\n]+/, "", s); sub(/[ \t\r\n]+$/, "", s); return s }
+    {
+        arrow = index($0, "->")
+        if (arrow) {
+            left = trim(substr($0, 1, arrow-1))
+            right = trim(substr($0, arrow+2))
+            split(left, a, /[ \t]+/)
+            pkg = a[1]
+            old = (length(a) >= 2 ? a[2] : "")
+            new = right
+        } else {
+            pkg = $1
+            old = $2
+            new = $4
+        }
+        pkgs[NR]=pkg
+        olds[NR]=old
+        news[NR]=new
+        if (length(pkg) > max_pkg) max_pkg = length(pkg)
+        if (length(old) > max_old) max_old = length(old)
+        n = NR
+    }
+    END {
+        arrow_colored = "<span foreground=\"gray\">-></span>"
+        for (i=1; i<=n; i++) {
+            if (pkgs[i] == "") {
+                if (olds[i] != "" || news[i] != "") {
+                    printf "%s %s %s\n", olds[i], arrow_colored, news[i]
+                }
+            } else {
+                pkg_fmt = sprintf("%-*s", max_pkg, pkgs[i])
+                old_fmt = sprintf("%-*s", max_old, olds[i])
+                gsub(/.*/, "<span foreground=\"CornflowerBlue\">&</span>", pkg_fmt)
+                gsub(/.*/, "<span foreground=\"red2\">&</span>", old_fmt)
+                new_colored = "<span foreground=\"green3\">" news[i] "</span>"
+                printf "%s %s %s %s\n", pkg_fmt, old_fmt, arrow_colored, new_colored
+            }
+        }
+    }
+    ' "${files[@]}"
+}
+
+get_arch_updates() { checkupdates --nocolor; }
+get_aur_updates() { yay -Qua 2> /dev/null; }
+
+is_connected
+
+marker="$VIBRANIUM_RUNTIME/bar_updates.$(pidof waybar)"
+if [[ -f $marker ]]; then
+    show_spinner=false
+else
+    show_spinner=true
+    rm -f "${marker%.*}".*
+    : > $marker
+fi
+
+(get_arch_updates > $VIBRANIUM_RUNTIME/bar_updates.arch) &
 arch_pid=$!
-(yay -Qua 2> /dev/null | wc -l > "$aur_tmp") &
+
+(get_aur_updates > $VIBRANIUM_RUNTIME/bar_updates.aur) &
 aur_pid=$!
 
-# decide whether to show spinner
-show_spinner=false
-if [[ "$VIBRANIUM_BAR_SHOW_ANIMATION" == "true" ]]; then
-    if [[ "$VIBRANIUM_BAR_SHOW_ANIMATION_ON_REEXEC" == "true" ]]; then
-        show_spinner=true
-    else
-        # show spinner only if marker for current waybar PID is absent
-        if [[ ! -f $marker ]]; then
-            show_spinner=true
-        fi
-    fi
-fi
-
-spinner_chars=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-i=0
-     delay=0.1
-
 if [[ $show_spinner == true ]]; then
-    # spinner while either background job is running
-    while kill -0 "$arch_pid" 2> /dev/null || kill -0 "$aur_pid" 2> /dev/null; do
-        ch=${spinner_chars[i]}
-        ch_escaped=${ch//\\/\\\\}
-        printf '{"text":"%s <span foreground='\'"${WAYBAR_MUTED}"\'' size='\''11000'\'' rise='\''-2pt'\''>%s</span>","tooltip":"<span foreground='${WAYBAR_ACCENT}'>Fetching updates...</span>"}\n' "$separator" "$ch_escaped"
-        sleep "$delay"
-        i=$(((i + 1) % ${#spinner_chars[@]}))
+    while kill -0 $arch_pid 2> /dev/null || kill -0 $aur_pid 2> /dev/null; do
+        spinner "Fetching updates..."
     done
-
-    # collect statuses after both finished
-    wait "$arch_pid"
-    wait "$aur_pid"
-    aur_status=$?
-else
-    # no spinner — wait synchronously and capture statuses exactly once
-    wait "$arch_pid"
-    wait "$aur_pid"
-    aur_status=$? || true
 fi
 
-arch_updates=0
-aur_updates=0
-if [[ -s $arch_tmp ]]; then arch_updates=$(< "$arch_tmp"); fi
-if [[ -s $aur_tmp ]]; then aur_updates=$(< "$aur_tmp"); fi
+wait $arch_pid $aur_pid
 
-if [[ $aur_status -gt 1 ]]; then
-    print_warn "Failed to fetch updates from AUR. AUR is probably down"
-    aur_updates=0
-elif [[ $aur_status -eq 1 ]]; then
-    aur_updates=0
+arch_count="$(wc -l < $VIBRANIUM_RUNTIME/bar_updates.arch)"
+aur_count="$(wc -l < $VIBRANIUM_RUNTIME/bar_updates.aur)"
+
+arch_info="$VIBRANIUM_RUNTIME/bar_updates.arch"
+aur_info="$VIBRANIUM_RUNTIME/bar_updates.aur"
+
+tooltip="$(make_tooltip "$arch_info" "$aur_info")"
+
+if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
+    text="<span foreground='DimGray'>|</span> "
 fi
 
-count=$((arch_updates + aur_updates))
+icon="<span rise='1pt' foreground='CornflowerBlue'>󰏔</span>"
+text+="$icon $((arch_count + aur_count))"
 
-# mark that we've run for this waybar PID (so reexec of same waybar won't re-show animation)
-: > "$marker" 2> /dev/null || true
+jq -nc \
+    --arg text "$text" \
+    --arg tooltip "$tooltip" \
+    '{text: $text, tooltip: $tooltip}'
 
-if [[ $count =~ [0-9] ]] && [[ "$count" -ge "$VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED" ]]; then
-    printf '{"text":"%s<span foreground=\\"%s\\" rise=\\"0.5pt\\">\\uf021</span> %s","tooltip":"<span foreground=\\"%s\\">Arch updates</span>: %s\\n<span foreground=\\"%s\\">AUR updates</span>: %s\\n%s\\n%s"}' \
-        "$separator" "$WAYBAR_ACCENT" "$count" \
-        "$WAYBAR_ACCENT" "$arch_updates" \
-        "$WAYBAR_ACCENT" "$aur_updates" \
-        "Click to <span foreground='${WAYBAR_YELLOW}'>fetch</span> updates" \
-        "Right click to <span foreground='${WAYBAR_GREEN}'>install</span> updates"
-    exit 0
-else
-    printf '{"text": ""}'
-    exit 0
-fi
