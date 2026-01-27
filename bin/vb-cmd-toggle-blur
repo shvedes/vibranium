@@ -37,7 +37,7 @@ RESPECT_PP="$(vb-cmd-get-option "VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE")"
 
 if [[ $BLUR_ENABLED == false ]]; then
     if [[ $RESPECT_PP == true && $POWER_PROFILE != "power-saver" ]]; then
-        vb-cmd-edit-wm-config decoration:blur:enabled:true "$CONF" &
+        vb-cmd-edit-wm-config decoration:blur:enabled:true "$CONF"
         [[ "$QUIET" = false ]] && echo "enabled"
     elif [[ $RESPECT_PP == true && $POWER_PROFILE == "power-saver" ]]; then
         if [[ -t 1 ]]; then
@@ -45,11 +45,11 @@ if [[ $BLUR_ENABLED == false ]]; then
             exit 1
         fi
     else
-        vb-cmd-edit-wm-config decoration:blur:enabled:true "$CONF" &
+        vb-cmd-edit-wm-config decoration:blur:enabled:true "$CONF"
         [[ "$QUIET" = false ]] && echo "enabled"
     fi
 else
-    vb-cmd-edit-wm-config decoration:blur:enabled:false "$CONF" &
+    vb-cmd-edit-wm-config decoration:blur:enabled:false "$CONF"
     [[ "$QUIET" = false ]] && echo "disabled"
 fi
 
