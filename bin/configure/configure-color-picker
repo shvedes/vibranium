@@ -3,55 +3,6 @@
 source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
-_lower_sense() {
-    local opt="VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY"
-    local level_opt="${opt}_LEVEL"
-
-    local ls_index=0
-    local ls_options ls_chosen i new_value msg
-
-    while true; do
-        source "$VIBRANIUM_USER_SETTINGS"
-
-        ls_options=("Lower sensitivity : ${!opt}")
-
-        if [[ "${!opt}" == true ]]; then
-            ls_options+=("Level : ${!level_opt}")
-        fi
-
-        ls_options+=("What is this?")
-
-        mapfile -t ls_options < <(align_options "${ls_options[@]}")
-        ls_chosen="$(printf "%s\n" "${ls_options[@]}" |
-            rofi_cmd "Lower sensitivity" "ESC to go back" -selected-row "$ls_index")"
-
-        [[ -z "$ls_chosen" ]] && return 0
-
-        for i in "${!ls_options[@]}"; do
-            [[ "${ls_options[$i]}" == "$ls_chosen" ]] && {
-                ls_index="$i"
-                break
-            }
-        done
-
-        case "$ls_chosen" in
-            "Lower sensitivity"*)
-                toggle_bool "$opt"
-                ;;
-            "Level"*)
-                edit_digit "Sensitivity level" "Lower sensitivity" \
-                    "float" 0.1 1.0 "${level_opt}"
-                ;;
-            "What"*)
-                msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> "
-                msg+="<b>Whether to lower the mouse sensitivity when picking a color</b>\n\n"
-                msg+="This can be useful when you need to select the color precisely"
-                notify-send -r 3 -t 15000 "What is this?" "$msg"
-                ;;
-        esac
-    done
-}
-
 INDEX=0
 
 while true; do
@@ -59,9 +10,7 @@ while true; do
 
     OPTIONS=(
         "Show HEX preview : $VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
-        "Lower sensitivity : $VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY"
-        "Show in notification : $VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
-        # "<span alpha='70%' ><i>Color format         : ${VIBRANIUM_COLOR_PICKER_COLOR_FORMAT^^}</i></span>"
+        "Preview in notification : $VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
     )
 
     mapfile -t OPTIONS < <(align_options "${OPTIONS[@]}")
@@ -79,11 +28,8 @@ while true; do
         "Show HEX preview"*)
             toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
             ;;
-        "Show in no"*)
+        "Preview in notification"*)
             toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
-            ;;
-        "Lower sensitivity"*)
-            _lower_sense
             ;;
     esac
 done

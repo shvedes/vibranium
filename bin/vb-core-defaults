@@ -365,30 +365,11 @@ VIBRANIUM_BRIGHTNESS_STEP=5
 # ============================================ #
 #                                              #
 
-# Which color format to use when using color picker.
-# Available options: string 'cmyk' 'hex' 'rgb' 'hsl' 'hsv'
-#
-# Default is 'hex'
-VIBRANIUM_COLOR_PICKER_COLOR_FORMAT="hex"
-
 # Whether to show live HEX preview.
 # Available options: bool
 #
 # Default is true
 VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW=true
-
-# Whether to lower mouse sensetivitiy when picking a color with hex preview enabled.
-# Since zoom level is pretty high, this helps to choose exact pixel precisely.
-# Available options: bool
-#
-# Default is true
-VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY=true
-
-# How much to reduce mouse sensitivity. Highly depends on your current mouse sensetivitiy.
-# available options: float
-#
-# Default is 0.5
-VIBRANIUM_COLOR_PICKER_LOWER_SENSETIVITY_LEVEL=0.5
 
 # Whether to display selected color in the notification body.
 # Available options: bool

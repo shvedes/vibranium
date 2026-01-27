@@ -28,7 +28,7 @@ fi
 
 spotify_status="$(playerctl -p spotify status)"
 if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
-    ACTIONS+=("Copy playing track")
+    ACTIONS+=("Copy current track")
 fi
 
 CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "search...")"
@@ -42,7 +42,7 @@ case "$CHOSEN" in
         vb-cmd-toggle-readmode
         exit 0
         ;;
-    "Copy playing track")
+    "Copy current track")
         vb-cmd-copy-track --notify
         exit 0
         ;;
