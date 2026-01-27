@@ -45,7 +45,7 @@ case "$1" in
         :
         ;;
     *)
-        echo -e "Unknown option: $@\n"
+        echo -e "Unknown option: $@\n" >&2
         usage
         exit 1
 esac

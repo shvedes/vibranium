@@ -1,40 +1,35 @@
 #!/usr/bin/env bash
 
-# Power profile switcher. The code is pretty simple and clean, so I don't think it needs any explanation.
-
 source "$VIBRANIUM_PATH/vb-core-lib"
 
-if ! missing_str="$(vb-cmd-is-present power-profiles-daemon:powerprofilesctl)"; then
-    read -r -a missing <<< "$missing_str"
-    notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing cli utilities: ${missing[*]}"
+if ! missing="$(vb-cmd-is-present powerprofilesctl)"; then
+    print_error "missing required dependencies: power-profiles-daemon"
+    is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "power-profiles-daemon"
     exit 1
 fi
 
-QUIET=false
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTION]
 
-USER_ARGS=()
-for a in "$@"; do
-    case "${a,,}" in
-        -q | --quiet) QUIET=true ;;
-        *) USER_ARGS+=("$a")     ;;
-    esac
-done
+Set power profiles in Vibranium.
 
-profiles=("power-saver" "balanced" "performance")
-current="$(vb-cmd-get-power)"
+Options:
+  --next       Next power profile
+  --prev       Previous power profile
+  -q, --quiet  Do not output in console
 
-print_log "Current profile: ${YELLOW}$current${RESET}"
+  [profile]    Set specified profile. Can be power-saver,balanced,performance
+EOF
+}
 
 notify() {
     local feedback_enabled gl_use_osd pp_use_osd
 
-    check_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK true
-
+    check_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK false
     feedback_enabled="$VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK"
 
-    if [[ $QUIET = true ]]; then
-        return 0
-    elif [[ $feedback_enabled  == false ]]; then
+    if [[ $feedback_enabled  == false ]]; then
         return 0
     fi
 
@@ -57,86 +52,109 @@ notify() {
             ;;
     esac
 
-    print_log "Setting power profile to ${YELLOW}${profile}${RESET}"
-
     check_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD true
 
     pp_use_osd="$VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD"
     gl_use_osd="$VIBRANIUM_GLOBAL_USE_OSD"
 
-    if [[ $gl_use_osd = true ]] && [[ $pp_use_osd = true ]]; then
+    if [[ $gl_use_osd = true && $pp_use_osd = true ]]; then
         swayosd-client --custom-message "$label" --custom-icon "$icon"
     else
-        notify-send -r 2 -t 1500 "Vibranium" \
-            "Power profile set to <span foreground='${P_ACCENT}'><b>${label,,}</b></span>"
+        notify-send -r 2 -t 1500 "Vibranium" "Power profile set to <b>${label,,}</b>"
     fi
 }
 
-raw_input="${USER_ARGS[0]:-}"
+update_cache() { echo "$1" > "$VIBRANIUM_STATE/power-profile"; }
 
-if [[ ${#USER_ARGS[@]} -gt 0 ]]; then
-    arg="${raw_input,,}"
-else
-    arg=""
-fi
+toggle_blur() {
+    local respect_pp blur_enabled
 
-if [[ " ${profiles[*]} " == *" $arg "* ]]; then
-    target_profile="$arg"
-else
+    check_bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE true
+    respect_pp="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
+
+    blur_enabled="$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')"
+
+    if [[ "$TARGET_PROFILE" == "power-saver" ]]; then
+        if [[ $respect_pp == true ]]; then
+            if [[ "$blur_enabled" == 1 ]]; then
+                touch "$VIBRANIUM_STATE/blur.restore"
+                vb-cmd-toggle-blur --quiet
+            fi
+        fi
+    else
+        if [[ $blur_enabled == 0 && -f $VIBRANIUM_STATE/blur.restore ]]; then
+            vb-cmd-toggle-blur --quiet
+            rm "$VIBRANIUM_STATE/blur.restore"
+        fi
+    fi
+}
+
+ACTION="next"
+QUIET="false"
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -q|--quiet)
+            QUIET=true
+            shift
+            ;;
+        --next|--prev)
+            ACTION="${1/--/}"
+            shift
+            ;;
+        power-saver|balanced|performance)
+            TARGET_PROFILE="$1"
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --*)
+            echo "Unknown option: $@." >&2
+            echo "Use flag --help to see available options." >&2
+            exit 1
+            ;;
+        *)
+            echo "Unknown profile: $1." >&2
+            echo "Use flag --help to see available options." >&2
+            exit 1
+            ;;
+    esac
+done
+
+USER_ARGS=()
+PROFILES=("power-saver" "balanced" "performance")
+CURRENT="$(vb-cmd-get-power)"
+
+if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
     current_index=0
-    for i in "${!profiles[@]}"; do
-        if [[ "${profiles[$i]}" == "$current" ]]; then
+
+    for i in "${!PROFILES[@]}"; do
+        if [[ "${PROFILES[$i]}" == "$CURRENT" ]]; then
             current_index=$i
             break
         fi
     done
 
-    case "$arg" in
-        "up" | "+" | "")
-            next_index=$(((current_index + 1) % ${#profiles[@]}))
+    case "$ACTION" in
+        "next")
+            next_index=$(((current_index + 1) % ${#PROFILES[@]}))
             ;;
-        # No UX planned for this
-        "down" | "-")
-            next_index=$(((current_index - 1 + ${#profiles[@]}) % ${#profiles[@]}))
-            ;;
-        *)
-            print_error "Invalid input: '$raw_input'"
-            exit 1
+        "prev")
+            next_index=$(((current_index - 1 + ${#PROFILES[@]}) % ${#PROFILES[@]}))
             ;;
     esac
 
-    target_profile="${profiles[$next_index]}"
-fi
+    TARGET_PROFILE="${PROFILES[$next_index]}"
 
-powerprofilesctl set "$target_profile" &
-echo "$target_profile" > "${VIBRANIUM_STATE}/power-profile"
-notify "$target_profile"
-
-check_bool VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE false
-bar_module_enabled="$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
-
-if [[ $bar_module_enabled == true ]]; then
-    print_log "Updating waybar module"
-    vb-cmd-refresh-waybar-module power-profile &
-fi
-
-blur_enabled="$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')"
-
-check_bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE true
-respect_pp="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
-
-if [[ "$target_profile" = "power-saver" ]]; then
-    if [[ $respect_pp == true ]]; then
-        if [[ "$blur_enabled" == 1 ]]; then
-            print_log "Saving current blur state"
-            touch "$VIBRANIUM_STATE/blur.restore"
-            vb-cmd-toggle-blur --quiet
-        fi
-    fi
-else
-    if [[ $blur_enabled == 0 && -f $VIBRANIUM_STATE/blur.restore ]]; then
-        print_log "Restoring previuous blur state"
-        vb-cmd-toggle-blur --quiet
-        rm "$VIBRANIUM_STATE/blur.restore"
+    if [[ $QUIET == false ]]; then
+        echo "$TARGET_PROFILE"
     fi
 fi
+
+vb-cmd-refresh-waybar-module power-profile &
+powerprofilesctl set "$TARGET_PROFILE" &
+update_cache "$TARGET_PROFILE"
+notify "$TARGET_PROFILE"
+toggle_blur

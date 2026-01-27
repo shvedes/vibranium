@@ -13,7 +13,7 @@ flock -n 9 || exit 0
 check_enum VIBRANIUM_PLAYER_FADE_DURATION "normal" very_slow slow normal fast very_fast off
 check_enum VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH "slow" very_slow slow normal fast very_fast off
 
-VOLUME_FILE="$VIBRANIUM_RUNTIME/$(basename "$0")"
+VOLUME_FILE="$VIBRANIUM_RUNTIME/$(basename "$0").volume"
 PLAYER_CACHE_FILE="$VIBRANIUM_RUNTIME/$(basename "$0").player"
 SLEEP_TIME=0.005  # Adjust this for overall speed; smaller = faster loops, but may strain CPU
 
@@ -341,3 +341,5 @@ case "$1" in
         exit 1
         ;;
 esac
+
+rm -f "$lockfile"

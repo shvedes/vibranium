@@ -61,8 +61,8 @@ VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD=true
 # Whether to use visual feedback when changing power profiles
 # Available options: bool
 #
-# Default is true
-VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK=true
+# Default is false
+VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK=false
 
 # Whether to copy processed item (a screenshot, a video) to clipboard.
 # Available options: bool

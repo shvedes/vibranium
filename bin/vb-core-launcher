@@ -15,8 +15,8 @@
 
 source "$VIBRANIUM_PATH/vb-core-lib"
 
-if pidof -q rofi; then
-    killall rofi
+if pid=$(pidof rofi); then
+    kill $pid
     exit 0
 fi
 
@@ -117,7 +117,7 @@ set_rofi_flags() {
 }
 
 if [[ "$auto_select" == true ]]; then
-    print_log "Auto select enabled"
+    echo "info: auto select enabled"
     opt_args+=(-auto-select true)
 fi
 
@@ -134,8 +134,6 @@ case "$1" in
         LAUNCHER_MODE="default"
         ;;
 esac
-
-print_log "Launcher mode: ${YELLOW}$LAUNCHER_MODE${RESET}"
 
 if [[ "$show_icons" = true ]]; then
     opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
