@@ -4,9 +4,8 @@
 		"hide-empty-text":  true,
 
 		"exec": "vb-bar-weather",
-		"signal": 1,
-		"on-click": "true", // update weather data
-		"restart-interval": 1800,
-		"return-type": "json"
+		"restart-interval": 900, // 15 min
+		"return-type": "json",
+		"signal": 1
 	}
 }

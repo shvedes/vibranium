@@ -4,6 +4,6 @@ Version=1.0
 Name=Log out
 Icon=logout
 Keywords=Session;Logout;Screensaver
-Exec=vb-coreterminate-session
+Exec=vb-core-stop-session
 Terminal=false
 Categories=Power;

@@ -46,15 +46,28 @@ spinner() {
     done
 }
 
-tmp="$XDG_RUNTIME_DIR/waybar_weather_data"
-wttrbar --location $VIBRANIUM_BAR_WEATHER_MODULE_CITY > "$tmp" &
+waybar_pid="$(pidof waybar)"
+if [[ -f /tmp/weather.$waybar_pid ]]; then
+    show_spinner=false
+else
+    show_spinner=true
+    rm -f /tmp/weather.*
+    : > /tmp/weather.$waybar_pid
+fi
+
+temp_data="$VIBRANIUM_RUNTIME/waybar_weather.json"
+wttrbar --location $VIBRANIUM_BAR_WEATHER_MODULE_CITY > "$temp_data" &
 pid=$!
 
-spinner "$pid" " " "Fetching weather..."
+if [[ $show_spinner == true ]]; then
+    spinner "$pid" " " "Fetching weather..."
+fi
+
 wait "$pid"
 
-weather_json="$(< "$tmp")"
-rm -f "$tmp"
+weather_json="$(< "$temp_data")"
+
+rm -f "$temp_data"
 
 text="$(jq -r '.text' <<<"$weather_json")"
 tooltip="$(jq -r '.tooltip' <<<"$weather_json")"
@@ -67,4 +80,3 @@ jq -nc \
   --arg text "$text" \
   --arg tooltip "$tooltip" \
   '{text: $text, tooltip: $tooltip}'
-

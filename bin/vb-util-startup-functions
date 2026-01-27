@@ -39,6 +39,8 @@ _set_ddc_brightness() {
     fi
 }
 
+mkdir -p $VIBRANIUM_RUNTIME
+
 check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START false
 if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START == true ]]; then
     setsid -f vb-core-launcher

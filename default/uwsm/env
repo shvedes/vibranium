@@ -14,8 +14,9 @@ export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_CACHE_HOME="$HOME/.cache"
 export XDG_CONFIG_DIRS="/etc/xdg"
 
-export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
+export VIBRANIUM_RUNTIME="$XDG_RUNTIME_DIR/vibranium"
 export VIBRANIUM_PATH="$XDG_DATA_HOME/vibranium/bin"
+export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
 export VIBRANIUM="$XDG_DATA_HOME/vibranium"
 export PATH="$HOME/.local/bin:$VIBRANIUM_PATH:$PATH"
 
