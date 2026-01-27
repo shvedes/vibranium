@@ -470,7 +470,6 @@ while true; do
                     "Auto select           : $VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
                     "Search engine         : $VIBRANIUM_GLOBAL_SEARCH_ENGINE"
                     "Show app icons        : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
-                    "Show on session start : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START"
                 )
                 app_launcher_chosen="$(printf "%s\n" "${app_launcher_options[@]}" | rofi_cmd "App launcher" "ESC to go back" -selected-row "$index")"
                 [[ -z $app_launcher_chosen ]] && break
@@ -496,9 +495,6 @@ while true; do
                             esac
                             break
                         done
-                        ;;
-                    "Show on session"*)
-                        toggle_bool "VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START"
                         ;;
                     "Show app icons"*)
                         toggle_bool "VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"

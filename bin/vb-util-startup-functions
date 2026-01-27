@@ -41,11 +41,6 @@ _set_ddc_brightness() {
 
 mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
 
-check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START false
-if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START == true ]]; then
-    setsid -f vb-core-launcher
-fi
-
 if [[ -f "$VIBRANIUM_STATE/first-boot" ]]; then
     vb-util-first-boot
 fi
@@ -54,19 +49,16 @@ wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"
 [[ -f "$wallpaper_file" ]] || \
     vb-cmd-get-wallpaper > "$wallpaper_file"
 
+hyprpaper_unit="$(systemctl --user is-enabled hyprpaper)"
 if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
-    case "$(systemctl --user show hyprpaper -p UnitFileState --value)" in
+    case "$hyprpaper_unit" in
         disabled) systemctl --user enable --now hyprpaper ;;
     esac
 else
-    case "$(systemctl --user show hyprpaper -p UnitFileState --value)" in
+    case "$hyprpaper_unit" in
         enabled) systemctl --user disable --now hyprpaper ;;
     esac
 fi
-
-case "$(systemctl --user show alacritty -p ActiveState --value)" in
-    inactive) systemctl --user start alacritty ;;
-esac
 
 _set_ddc_brightness &
 
@@ -84,4 +76,3 @@ elif [[ "$(< "$VIBRANIUM_STATE/nightshift")" = "suspended" ]]; then
     done
     hyprctl -q hyprsunset identity
 fi
-
