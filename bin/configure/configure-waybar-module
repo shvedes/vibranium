@@ -107,12 +107,12 @@ while true; do
             _pacman_weather_specific
             ;;
         "Weather")
-            update_module_setting "VIBRANIUM_BAR_WEATHER_MODULE_CITY" "string" \
+            _update_module_setting "VIBRANIUM_BAR_WEATHER_MODULE_CITY" "string" \
                 "City" "current is {current}" '^[A-Za-z]+$' "Invalid city name!" "yes" "weather" "weather_enabled"
             ;;
 
         "Pacman")
-            update_module_setting "VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED" "int" \
+            _update_module_setting "VIBRANIUM_BAR_PACMAN_MODULE_MINIMUM_PACKAGES_REQUIRED" "int" \
                 "Display if ≥ N updates" "ESC to go back" '^[0-9]+$' "" "no" "pacman" "pacman_enabled"
             ;;
     esac

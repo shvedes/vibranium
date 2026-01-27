@@ -48,6 +48,7 @@ wiremix
 tumbler
 swayosd
 bluetui
+wttrbar
 ddcutil
 man-db
 neovim

@@ -127,23 +127,13 @@ rofi_cmd() {
 spinner() {
     # The PID of the process to watch
     local pid=$1
+
     # The message to show while spinning
     local msg="$2"
+
     # Delay between spinner frames (seconds)
-    local delay=0.07
+    local delay=0.1
     local spinstr
-
-    # We can randomize spinner characters.
-    # Randomly select a spinner style
-    # local style=$((RANDOM % 5))
-
-    # case $style in
-    #     0) spinstr=('▁' '▃' '▄' '▅' '▆' '▇' '▆' '▅' '▄' '▃');;
-    #     1) spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏');;
-    #     2) spinstr=('←' '↖' '↑' '↗' '→' '↘' '↓' '↙');;
-    #     3) spinstr=('-' '\' '|' '/');;
-    #     4) spinstr=('⠁' '⠂' '⠄' '⠂');;
-    # esac
 
     spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
@@ -168,6 +158,74 @@ spinner() {
         printf "%s\n" "$msg"
     fi
 }
+
+spinner() {
+    local pid msg final_msg mode tooltip
+
+    # --- arg parsing ---
+    while [[ "$1" == --* ]]; do
+        case "$1" in
+            --waybar)
+                mode="waybar"
+                shift
+                ;;
+            --tooltip)
+                [[ "$mode" != "waybar" ]] && {
+                    echo "--tooltip можно использовать только с --waybar" >&2
+                    return 1
+                }
+                tooltip="$2"
+                shift 2
+                ;;
+            *)
+                echo "Unknown flag: $1" >&2
+                return 1
+                ;;
+        esac
+    done
+
+    pid=$1
+    msg=$2
+    final_msg=$3
+
+    local delay=0.07
+    local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local clear_line="\r\033[K"
+
+    # --- main loop ---
+    while kill -0 "$pid" 2>/dev/null; do
+        for i in "${spinstr[@]}"; do
+            if [[ "$mode" == "waybar" ]]; then
+                if [[ -n "$tooltip" ]]; then
+                    printf '{"text":"%s %s","tooltip":"%s"}\n' "$msg" "$i" "$tooltip"
+                else
+                    printf '{"text":"%s %s"}\n' "$msg" "$i"
+                fi
+            else
+                printf "\r%s %s " "$msg" "$i"
+            fi
+            sleep "$delay"
+        done
+    done
+
+    # --- finish ---
+    if [[ "$mode" == "waybar" ]]; then
+        local out="${final_msg:-$msg}"
+        if [[ -n "$tooltip" ]]; then
+            printf '{"text":"%s","tooltip":"%s"}\n' "$out" "$tooltip"
+        else
+            printf '{"text":"%s"}\n' "$out"
+        fi
+    else
+        printf "%b" "$clear_line"
+        if [[ -n "$final_msg" ]]; then
+            printf "%s %s\n" "$msg" "$final_msg"
+        else
+            printf "%s\n" "$msg"
+        fi
+    fi
+}
+
 
 # Validate that a named variable contains a numeric value (int or float) and
 # substitute a default when necessary.

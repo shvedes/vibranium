@@ -5,7 +5,7 @@
 
 		"exec": "vb-bar-pacman",
 		"on-click": "true", // update pacman data
-		"on-click-right": "vb-cmd-launch-terminal vb-cmd-system-update",
+		"on-click-right": "vb-core-term vb-pkg-sysupdate",
 		"restart-interval": 1800,
 		"signal": 5,
 		"return-type": "json"
