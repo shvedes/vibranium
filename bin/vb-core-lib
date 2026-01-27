@@ -19,12 +19,6 @@ CYAN=$'\e[0;36m'
 GRAY=$'\e[90m'
 RESET=$'\e[0m'
 
-WAYBAR_ACCENT="#90c2ff"
-WAYBAR_YELLOW="#ffef90"
-WAYBAR_GREEN="#a9edab"
-WAYBAR_MUTED="#555555"
-WAYBAR_RED="#f77069"
-
 # A custom rofi theme settings, which will apply to custom menus by default.
 # It is also will be used to generate menu entries
 #
