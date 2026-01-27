@@ -1,5 +1,5 @@
 [Desktop Entry]
 Type=Application
 Name=Bluetooth Configuration
-Exec=vb-cmd-terminal bluetui
+Exec=vb-core-term bluetui
 Icon=bluetooth-active-symbolic

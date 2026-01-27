@@ -1,11 +1,7 @@
 #!/usr/bin/env bash
 
-# Control the Night Light (hyprsunset) temperature with a cached state file.
-# Uses a state file to represent on/off because hyprsunset is relied upon by
-# other features that change gamma.
-
-CONF="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprsunset.conf"
-STATE_FILE="${VIBRANIUM_STATE:-${XDG_STATE_HOME:-$HOME/.local/state}/vibranium}/nightshift"
+CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
+STATE_FILE="$VIBRANIUM_STATE/nightshift"
 STEP=100
 
 usage() {
@@ -28,7 +24,7 @@ EOF
 
 lockfile="$XDG_RUNTIME_DIR/$(basename "$0").lock"
 exec 10> "$lockfile" || {
-    print_error "Anoter instance of ${YELLOW}$(basename "$0")${RESET} already running!"
+    echo "error: another instance of $(basename "$0") already running!"
     exit 1
 }
 
@@ -39,13 +35,11 @@ if [[ $# -eq 0 ]]; then
     exit 0
 fi
 
-# read current temperature from config, fallback to 5500
 CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2>/dev/null | head -n1 || echo 5500)
 
 action=""
 ARG_TEMP=""
 
-# parse args (simple, supports long options)
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help) usage; exit 0 ;;
@@ -54,7 +48,6 @@ while [[ $# -gt 0 ]]; do
         --dec|--decrease|-) action="dec"; shift ;;
         --set) action="set"; shift; ARG_TEMP="$1"; shift ;;
         --step) shift; STEP="$1"; shift ;;
-        # allow bare numeric as set
         [0-9]*)
             action="set"
             ARG_TEMP="$1"
@@ -68,7 +61,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# require the state file to exist (script's design uses it)
 if [[ ! -f "$STATE_FILE" ]]; then
     printf '%s\n' "Night light state file not found: $STATE_FILE" >&2
     exit 1
@@ -76,7 +68,6 @@ fi
 
 state="$(<"$STATE_FILE")"
 
-# Toggle mode
 if [[ "$action" == "toggle" ]]; then
     case "$state" in
         suspended)
@@ -97,10 +88,9 @@ if [[ "$action" == "toggle" ]]; then
     exit 0
 fi
 
-# +/- operations only when not suspended
 if [[ "$action" == "inc" || "$action" == "dec" ]]; then
     if [[ "$state" == "suspended" ]]; then
-        printf '%s\n' "Night light is suspended; cannot adjust with +/-" >&2
+        printf '%s\n' "Night light is suspended" >&2
         exit 1
     fi
 
@@ -110,7 +100,6 @@ if [[ "$action" == "inc" || "$action" == "dec" ]]; then
     esac
 fi
 
-# explicit set
 if [[ "$action" == "set" ]]; then
     if ! [[ "$ARG_TEMP" =~ ^[0-9]+$ ]]; then
         printf '%s\n' "Invalid temperature: $ARG_TEMP" >&2
@@ -119,25 +108,18 @@ if [[ "$action" == "set" ]]; then
     TEMP="$ARG_TEMP"
 fi
 
-# If no action produced a TEMP, nothing to do
 if [[ -z "${TEMP:-}" ]]; then
     printf '%s\n' "No operation performed." >&2
     exit 0
 fi
 
-# check bounds
 if (( TEMP < 1000 || TEMP > 20000 )); then
     printf '%s\n' "Temperature must be between 1000K and 20000K" >&2
     exit 1
 fi
 
-# Apply and persist
+printf '# Auto-generated! All changes will be overwritten!\n' > "$CONF"
+printf '\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" >> "$CONF"
 hyprctl -q hyprsunset temperature "$TEMP" &
 
-mkdir -p "$(dirname "$CONF")"
-printf '# Auto-generated! All changes will be overwritten!\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" > "$CONF"
-
-# optionally refresh UI module (useful after changing temperature)
 vb-cmd-refresh-waybar-module nightshift &
-
-exit 0

@@ -1,6 +1,6 @@
 [Desktop Entry]
 Type=Application
 Name=Sound Configuration
-Exec=vb-cmd-terminal wiremix
+Exec=vb-core-term wiremix
 Icon=audio-volume-high
 Keywords=audio;sound;headset;speakers;bluetooth;pipewire;pulseaudio;mixer;wiremix

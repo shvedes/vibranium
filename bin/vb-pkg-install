@@ -25,7 +25,6 @@ fi
 _operation_canceled() {
     case "$1" in
         quit)
-            notify-send -r 1 "Vibranium" "Operation canceled"
             kill 0
             ;;
         *)

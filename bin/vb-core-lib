@@ -309,13 +309,8 @@ is_in_game() {
     fi
 }
 
-# Used in functions below.
-# If a running script doesn't have a console to output to - do
-# not even try to display any logs.
-#
-# Possible TODO: universal log files
 is_headless() {
-    if [ -t 0 ] && [ -c /dev/tty ]; then
+    if [[ -t 1 ]]; then
         return 1
     else
         return 0

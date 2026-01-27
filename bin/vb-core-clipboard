@@ -46,7 +46,7 @@ restart_service() {
 if ! missing="$(vb-cmd-is-present rofi cliphist)"; then
     print_print_error "missing required dependencies: $missing"
 
-    [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
+    is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
     exit 1
 fi
 

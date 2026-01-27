@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+exec 9> "$XDG_RUNTIME_DIR/$(basename "$0").pid"
+
+if ! flock -n 9; then
+    pkill -f "rofi.*-show calc" 2>/dev/null
+    exit 0
+fi
 
 if [[ ! -f /usr/lib/rofi/libcalc.so ]]; then
-    print_error "missing required dependencies: rofi-calac"
-    [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Calculator" --deps "rofi-calac"
+    echo "error: missing required dependencies: rofi-calc"
+    [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Calculator" --deps "rofi-calc"
     exit 1
 fi
 

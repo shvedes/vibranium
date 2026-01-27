@@ -1,46 +1,106 @@
 #!/usr/bin/env bash
 
-# A simple script that zooms the entire desktop.
-# It is activated by a key combination or SUPER + mouse scroll.
+STEP_DEFAULT="0.20"
+ACTION=""
+STEP="$STEP_DEFAULT"
 
-step=0.3
-current="$(hyprctl -j getoption cursor:zoom_factor | jq -r '.float')"
-current="$(awk -v val="$current" 'BEGIN { printf "%.2f", val }')"
+usage() {
+    cat <<EOF
+Usage: $(basename "$0") [OPTION]
 
-set_zoom() {
-    local new_value="$1"
+Options:
+  -i, --increase         increase zoom by step
+  -d, --decrease         decrease zoom by step (floor 1.00)
+  -r, --reset            reset zoom to 1.00
+  -s, --step <value>     set step (default: ${STEP_DEFAULT})
+  -h, --help             display this help and exit
 
-    hyprctl keyword cursor:zoom_factor "$new_value" > /dev/null
+Short forms: you may also pass a single argument "+" or "-" for increase/decrease.
+EOF
+}
 
-    # Hyprctl returns a value with a large number of digits after the decimal point, so we round it off for ease of calculation.
-    if awk -v val="$new_value" 'BEGIN { exit (val != 1.00) ? 0 : 1 }'; then
-        hyprctl -q keyword cursor:no_warps true > /dev/null
+if ! PARSED="$(getopt -o idrs:h -l increase,decrease,reset,step:,help -- "$@")"; then
+    usage
+    exit 2
+fi
+
+eval set -- "$PARSED"
+
+while true; do
+    case "$1" in
+        -i|--increase) ACTION="increase"; shift ;;
+        -d|--decrease) ACTION="decrease"; shift ;;
+        -r|--reset) ACTION="reset"; shift ;;
+        -s|--step) STEP="$2"; shift 2 ;;
+        -h|--help) usage; exit 0 ;;
+        --) shift; break ;;
+        *) break ;;
+    esac
+done
+
+if [[ -z "$ACTION" && $# -ge 1 ]]; then
+    case "$1" in
+        "+") ACTION="increase" ;;
+        "-") ACTION="decrease" ;;
+        *) : ;;
+    esac
+fi
+
+if [[ -z "$ACTION" ]]; then
+    usage
+    exit 1
+fi
+
+get_current() {
+    local cur
+    if cur="$(hyprctl -j getoption cursor:zoom_factor 2>/dev/null | jq -r '.float' 2>/dev/null)"; then
+        awk -v val="$cur" 'BEGIN { printf "%.2f", val }'
     else
-        hyprctl -q keyword cursor:no_warps false > /dev/null
+        printf "1.00"
     fi
 }
 
-case "$1" in
-    +)
-        new_value="$(awk -v val="$current" -v step="$step" 'BEGIN { printf "%.2f", val + step }')"
+set_zoom() {
+    local new_value="$1"
+    hyprctl -q keyword cursor:zoom_factor "$new_value" >/dev/null 2>&1 || {
+        printf "Failed to set zoom factor to %s\n" "$new_value" >&2
+        return 1
+    }
+
+    if awk -v val="$new_value" 'BEGIN { exit (val != 1.00) ? 0 : 1 }'; then
+        hyprctl -q keyword cursor:no_warps true >/dev/null 2>&1 || true
+    else
+        hyprctl -q keyword cursor:no_warps false >/dev/null 2>&1 || true
+    fi
+
+    printf "%s\n" "$new_value"
+}
+
+if ! awk -v s="$STEP" 'BEGIN { if (s+0 == s) exit 0; exit 1 }'; then
+    printf "Invalid step value: %s\n" "$STEP" >&2
+    exit 2
+fi
+
+current="$(get_current)"
+
+case "$ACTION" in
+    increase)
+        new_value="$(awk -v val="$current" -v step="$STEP" 'BEGIN { printf "%.2f", val + step }')"
         set_zoom "$new_value"
         ;;
-    -)
-        # If you decrease the zoom when it is already 1, hyprctl will still apply this change,
-        # which means that when you zoom in again, it will not be visually applied until the zoom_factor value is higher than 1.
-        # For this reason, we do not perform a zoom out if the zoom_factor is already 1.
-        new_value="$(awk -v val="$current" -v step="$step" 'BEGIN {
-			val -= step
-			if (val < 1.00) val = 1.00
-			printf "%.2f", val
-		}')"
+    decrease)
+        new_value="$(awk -v val="$current" -v step="$STEP" 'BEGIN {
+            val -= step
+            if (val < 1.00) val = 1.00
+            printf "%.2f", val
+        }')"
         set_zoom "$new_value"
         ;;
-    "-r" | "--reset")
-        set_zoom 1.00
+    reset)
+        set_zoom "1.00"
         ;;
     *)
-        printf "Usage: %s <+|-|--reset|-r>\n" "$(basename "$0")" >&2
+        usage
         exit 1
         ;;
 esac

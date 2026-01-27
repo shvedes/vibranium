@@ -3,8 +3,6 @@
 # Source: Omarchy.
 # Adapted for Vibranium
 
-source "$VIBRANIUM_PATH/vb-core-lib"
-
 # A script to display Hyprland keybindings defined in your configuration
 # using rofi for an interactive search menu.
 
@@ -91,7 +89,7 @@ parse_bindings() {
     }
 
     if (action != "") {
-        printf "%-20s : %s\n", key_combo, action;
+        printf "%-25s : %s\n", key_combo, action;
     }
 }'
 }
@@ -142,10 +140,11 @@ case "$1" in
         by_index "$2"
         ;;
     *)
-        dynamic_bindings | sort -u | parse_bindings | rofi_cmd \
-            "Keybindings" "search shortcuts" -no-auto-select \
-            -theme-str 'configuration{scroll-method: 0;}' \
-            -theme-str 'listview{lines: 30;columns: 2;}' \
-            -theme-str 'window{width: 85%;height: 85%;}'
+        dynamic_bindings | sort -u | parse_bindings | rofi -dmenu -sync \
+            -theme-str 'entry { placeholder: " search shortucts"; }' \
+            -theme-str 'listview { lines: 30; columns: 1; }' \
+            -theme "$XDG_CONFIG_HOME/rofi/config.rasi" \
+            -theme-str 'window { width:500; }' \
+            -p "Keybindings" -no-auto-select
         ;;
 esac
