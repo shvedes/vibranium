@@ -1,6 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=Archive Manager
+TryExec=file-roller
 Exec=file-roller %U
 Icon=org.gnome.FileRoller
 Keywords=Archive;zip;tar;zstd;FileRoller;GNOME
