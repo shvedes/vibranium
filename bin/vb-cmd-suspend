@@ -1,4 +1,18 @@
 #!/usr/bin/env bash
 
+killall rofi
+
 loginctl lock-session
+
+animations_enabled="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
+if [[ $animations_enabled == 1 ]]; then
+    hyprctl -q hyprsunset gamma 0
+    sleep 1
+fi
+
 systemctl suspend
+
+if [[ $animations_enabled == 1 ]]; then
+    sleep 1
+    hyprctl -q hyprsunset gamma 100
+fi
