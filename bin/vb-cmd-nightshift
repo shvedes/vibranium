@@ -22,7 +22,7 @@ Notes:
 EOF
 }
 
-lockfile="$XDG_RUNTIME_DIR/$(basename "$0").lock"
+lockfile="$VIBRANIUM_RUNTIME/$(basename "$0").lock"
 exec 10> "$lockfile" || {
     echo "error: another instance of $(basename "$0") already running!"
     exit 1

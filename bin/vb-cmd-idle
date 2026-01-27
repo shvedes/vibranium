@@ -5,8 +5,7 @@
 
 source "$VIBRANIUM_PATH/vb-core-lib"
 
-RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$UID}"
-RESTORE_FLAG="$RUNTIME_DIR/vibranium/restore-player"
+RESTORE_FLAG="$VIBRANIUM_RUNTIME/restore-player"
 
 usage() {
     cat << EOF

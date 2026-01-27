@@ -2,7 +2,7 @@
 
 source "$VIBRANIUM_PATH/vb-core-lib"
 
-lockfile="$XDG_RUNTIME_DIR/$(basename "$0").lock"
+lockfile="$VIBRANIUM_RUNTIME/$(basename "$0").lock"
 exec 9> "$lockfile" || {
     print_error "Anoter instance of ${YELLOW}$(basename "$0")${RESET} is already running!"
     exit 1
@@ -13,8 +13,8 @@ flock -n 9 || exit 0
 check_enum VIBRANIUM_PLAYER_FADE_DURATION "normal" very_slow slow normal fast very_fast off
 check_enum VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH "slow" very_slow slow normal fast very_fast off
 
-VOLUME_FILE="$XDG_RUNTIME_DIR/$(basename "$0")"
-PLAYER_CACHE_FILE="$XDG_RUNTIME_DIR/$(basename "$0").player"
+VOLUME_FILE="$VIBRANIUM_RUNTIME/$(basename "$0")"
+PLAYER_CACHE_FILE="$VIBRANIUM_RUNTIME/$(basename "$0").player"
 SLEEP_TIME=0.005  # Adjust this for overall speed; smaller = faster loops, but may strain CPU
 
 # Map fade durations to number of steps (higher steps = slower fade, longer duration)

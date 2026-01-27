@@ -7,7 +7,7 @@ source "$VIBRANIUM_PATH/vb-core-lib"
 export SUDO_PROMPT TMPDIR
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
-TMPDIR="$XDG_RUNTIME_DIR"
+TMPDIR="/tmp"
 YAY_FLAGS=(
     "--answerclean" "Y"
     "--answerdiff" "N"

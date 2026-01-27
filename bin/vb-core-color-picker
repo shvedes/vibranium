@@ -145,7 +145,7 @@ if ! grep -Fxq "$selected_color" "$LAST_USED" 2> /dev/null; then
     fi
 fi
 
-preview_img="$XDG_RUNTIME_DIR/color-picker_recent-color.png"
+preview_img="/tmp/latest_color.png"
 
 # Generate a 1:1px image of the selected color to display in the notification
 if [[ $show_selected == true ]]; then

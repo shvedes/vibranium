@@ -114,7 +114,7 @@ if [[ $save_file == true ]]; then
     output_file="${output_dir}/$(date +"screenshot-%Y-%m-%d_%H-%M-%S").${filetype}"
     mkdir -p "$output_dir"
 else
-    output_file="${XDG_RUNTIME_DIR}/screenshot.${filetype}"
+    output_file="/tmp/screenshot.${filetype}"
 fi
 
 if [[ $show_cursor == true ]]; then

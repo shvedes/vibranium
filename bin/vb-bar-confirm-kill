@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-if [[ -f "$XDG_RUNTIME_DIR/vb-core-force-kill.confirm" ]]; then
+if [[ -f "$VIBRANIUM_RUNTIME/confirm-kill" ]]; then
     printf '{"text": "%s", "tooltip": "%s"}' "\uee15" "Confirm force kill"
 else
     printf '{"text": ""}'

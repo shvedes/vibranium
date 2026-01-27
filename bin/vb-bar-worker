@@ -2,7 +2,7 @@
 
 source "$VIBRANIUM_PATH/vb-core-lib"
 
-state="$XDG_RUNTIME_DIR/worker.active"
+state="$VIBRANIUM_RUNTIME/worker.active"
 
 if [[ -f $state ]]; then
     if [[ "$(< "$state")" == "suspended" ]]; then

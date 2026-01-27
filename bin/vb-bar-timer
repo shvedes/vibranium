@@ -2,7 +2,7 @@
 
 source "$VIBRANIUM/bin/vb-core-lib"
 
-state_file="$XDG_RUNTIME_DIR/vb-timer.remaining"
+state_file="$VIBRANIUM_RUNTIME/timer.remaining"
 
 if [[ -f "$state_file" ]]; then
     remaining="$(<"$state_file")"

@@ -3,7 +3,7 @@
 source "$VIBRANIUM/bin/vb-core-lib"
 
 options=("Seconds" "Minutes" "Hours")
-state="$XDG_RUNTIME_DIR/vb-timer.remaining"
+state="$VIBRANIUM_RUNTIME/vb-timer.remaining"
 ring="/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 pw_play_pid=""
 

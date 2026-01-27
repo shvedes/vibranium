@@ -41,21 +41,19 @@ done
 
 source "$VIBRANIUM_PATH/vb-core-lib"
 
-album_art="$XDG_RUNTIME_DIR/album_art"
-state_file="$XDG_RUNTIME_DIR/now_playing.cache"
+album_art="/tmp/$(basename "$0").art"
+state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
 
 pc_status="$(playerctl status 2>/dev/null || true)"
 mpd_status="$(mpc status 2>/dev/null | awk 'NR==2 {print $1}' || true)"
 
 if [[ "$pc_status" == "Playing" ]]; then
     player="playerctl"
-    mkdir -p "$(dirname "$state_file")"
     echo "$player" > "$state_file"
     IFS='^' read -r title artist <<< \
         "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
 elif [[ "$mpd_status" == "[playing]" ]]; then
     player="mpd"
-    mkdir -p "$(dirname "$state_file")"
     echo "$player" > "$state_file"
     IFS='^' read -r title artist <<< \
         "$(mpc current -f '%title%^%artist%' 2>/dev/null)"

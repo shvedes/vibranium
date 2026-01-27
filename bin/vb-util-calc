@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-exec 9> "$XDG_RUNTIME_DIR/$(basename "$0").pid"
+exec 9> "$VIBRANIUM_RUNTIME/$(basename "$0").lock"
 
 if ! flock -n 9; then
     pkill -f "rofi.*-show calc" 2>/dev/null

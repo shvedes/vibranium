@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-LOGFILE="${XDG_CACHE_HOME:-$HOME/.cache}/vibranium/spotify_adblock_installer.log"
-EXT_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/spicetify/Extensions"
+LOGFILE="$XDG_CACHE_HOME/vibranium/spotify_adblock_installer.log"
+EXT_DIR="$XDG_CONFIG_HOME/spicetify/Extensions"
 FILE="$EXT_DIR/adblock.js"
 ACTION="$1"
 
@@ -14,10 +14,10 @@ progress() {
     local msg="$1"
     case "$msg" in
         clear)
-            rm -f "$XDG_RUNTIME_DIR/worker.active"
+            rm -f "$VIBRNAIUM_RUNTIME/worker.active"
             ;;
         *)
-            echo "$msg" > "$XDG_RUNTIME_DIR/worker.active"
+            echo "$msg" > "$VIBRNAIUM_RUNTIME/worker.active"
             ;;
     esac
     vb-cmd-refresh-waybar-module worker dynamic-separator

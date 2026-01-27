@@ -6,7 +6,7 @@
 # If the initial call was made on window A and the confirmation on window B, no action will be taken.
 
 read -r CURRENT_CLASS PID < <(hyprctl -j activewindow | jq -r '[.class, .pid] | @tsv')
-STATE_FILE="$XDG_RUNTIME_DIR/$(basename "$0").confirm"
+STATE_FILE="$VIBRANIUM_RUNTIME/confirm-kill"
 
 # There are no windows on current workspace
 if [[ -z "$PID" ]]; then

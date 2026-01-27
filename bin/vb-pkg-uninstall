@@ -5,7 +5,7 @@
 source "$VIBRANIUM_PATH/vb-core-lib"
 
 export SUDO_PROMPT
-                    SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
+SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 
 if ! tty -s; then
     exec setsid vb-core-term "$0"
