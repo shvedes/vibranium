@@ -228,6 +228,20 @@ VIBRANIUM_VOLUME_ADJUSTMENT_STEP=5
 # Default is false
 VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED=false
 
+# Whether to enable loopback for the default microphone.
+# Default Microphone > Defalut Output
+# Aka "Hear my voice"
+# Available options: bool
+#
+# Defalut is  false
+VIBRANIUM_VOLUME_SOURCE_LOOPBACK=false
+
+# Volume to apply to the loopback device
+# Available options: int
+#
+# Defalut is 50
+VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME=50
+
 #                SCREENSHOT OPTIONS            #
 # ============================================ #
 #                                              #

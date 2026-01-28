@@ -102,8 +102,14 @@ while true; do
         "Boost up to 150% : $VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED"
         "Visual feedback : $VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK"
         "Audio feedback : $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK"
-        "Volume step : $VIBRANIUM_VOLUME_ADJUSTMENT_STEP"
+        "Hear my voice : $VIBRANIUM_VOLUME_SOURCE_LOOPBACK"
     )
+
+    if [[ $VIBRANIUM_VOLUME_SOURCE_LOOPBACK == true ]]; then
+        OPTIONS+=("Hear my voice volume : $(vb-cmd-toggle-loopback --get-volume)%")
+    fi
+
+    OPTIONS+=("Volume step : $VIBRANIUM_VOLUME_ADJUSTMENT_STEP")
 
     if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
         if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
@@ -125,6 +131,15 @@ while true; do
     done
 
     case "$CHOSEN" in
+        "Hear my voice volume"*)
+            edit_digit "Hear my voice volume" "Volume" \
+                "int" 10 100 "VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME"
+            vb-cmd-toggle-loopback
+            ;;
+        "Hear my voice"*)
+            toggle_bool "VIBRANIUM_VOLUME_SOURCE_LOOPBACK"
+            vb-cmd-toggle-loopback
+            ;;
         *"Open volume mixer"*)
             vb-core-term wiremix
             vb-cmd-kill-rofi
