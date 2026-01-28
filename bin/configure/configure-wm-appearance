@@ -4,6 +4,24 @@ source "$VIBRANIUM_PATH/vb-core-lib"
 source "$VIBRANIUM_PATH/configure/configure-lib"
 
 _edit_int() {
+    local print=0
+
+    while [[ "$1" == -* ]]; do
+        case "$1" in
+            -p|--print)
+                print=1
+                shift
+                ;;
+            --)
+                shift
+                break
+                ;;
+            *)
+                break
+                ;;
+        esac
+    done
+
     local name="$1"
     local key="$2"
     local min="$3"
@@ -51,6 +69,7 @@ _edit_int() {
         }
 
         vb-cmd-edit-wm-config "$key:$input" "$HYPR_CONFIG"
+        (( print )) && printf '%s\n' "$input"
         break
     done
 }
@@ -150,6 +169,20 @@ _edit_float() {
         vb-cmd-edit-wm-config "$key:$input" "$HYPR_CONFIG"
         break
     done
+}
+
+_edit_roundness() {
+    local input
+    local dunstrc
+    local config_rasi
+
+    input=$(_edit_int -p "Border roundness" "decoration:rounding" 0 16)
+
+    dunstrc="$XDG_CONFIG_HOME/dunst/dunstrc"
+    sed -i "/corner_radius/s/=.*/= $input/" "$dunstrc"
+
+    config_rasi="$XDG_CONFIG_HOME/rofi/config.rasi"
+    sed -i "/border-radius/s/: .*/: ${input}px;/" "$config_rasi"
 }
 
 _set_animations_preset() {
@@ -385,7 +418,7 @@ _decoration_submenu() {
 
         case "$chosen" in
             "Border size"*)               _edit_int   "Border size"        "general:border_size"           0 24     ;;
-            "Border roundness"*)          _edit_int   "Border roundness"   "decoration:rounding"           0 16     ;;
+            "Border roundness"*)          _edit_roundness                                                           ;;
             "Rounding power"*)            _edit_float "Rounding power"     "decoration:rounding_power"     1.0 10.0 ;;
             "Active window opacity"*)     _edit_float "Active opacity"     "decoration:active_opacity"     0.0 1.0  ;;
             "Inactive window opacity"*)   _edit_float "Inactive opacity"   "decoration:inactive_opacity"   0.0 1.0  ;;
