@@ -1,6 +1,6 @@
 [colors.primary]
 background = "#111c18"
-foreground = "#c1c497" # Slightly datrker than the default foreground color
+foreground = "#e4e5d1" # Slightly datrker than the default foreground color
 dim_foreground    = "#9b9d7a"
 bright_foreground = "#75b9a4"
 

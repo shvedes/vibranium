@@ -1,6 +1,6 @@
 theme[main_bg]="#111c18"
-theme[main_fg]="#c1c497"
-theme[title]="#c1c497"
+theme[main_fg]="#e4e5d1"
+theme[title]="#e4e5d1"
 theme[hi_fg]="#970808"
 
 theme[selected_bg]="#263c33"
