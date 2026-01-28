@@ -4,8 +4,8 @@
 # Ensures the config block exists, reads the current state, flips it, reloads config,
 # and optionally outputs 'enabled' or 'disabled'.
 
-CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d"
-CONF="$CONF_DIR/look-and-feel.conf"
+CONF="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
+HYPRLOCK_CONF="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 
 usage() {
     cat << EOF
@@ -42,11 +42,11 @@ ANIMATIONS_ENABLED="$(sed -n '/animations[[:space:]]*{/,/}/{s/.*enabled[[:space:
 # Toggle
 case "$ANIMATIONS_ENABLED" in
     true)
-        sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1false/}' "$CONF"
+        sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1false/}' "$CONF" "$HYPRLOCK_CONF"
         [[ "$QUIET" = false ]] && echo "disabled"
         ;;
     false)
-        sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1true/}' "$CONF"
+        sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1true/}' "$CONF" "$HYPRLOCK_CONF"
         [[ "$QUIET" = false ]] && echo "enabled"
         ;;
 esac

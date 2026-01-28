@@ -12,5 +12,9 @@ background {
     blur_passes = 2
 }
 
+animations {
+    enabled = true
+}
+
 # vim:ft=hyprlang
 EOF
