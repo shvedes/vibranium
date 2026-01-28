@@ -451,24 +451,6 @@ VIBRANIUM_BAR_SHOW_SEPARATOR=true
 # Default is 30
 VIBRANIUM_RECORDING_FPS=30
 
-# Whether to increase FPS in a game.
-# Available options: bool
-#
-# Note: If set to true, the recording script will determine if the active window is flagged as a game.
-#       If so, the value in VIBRANIUM_RECORDING_FPS_IN_GAME will set the FPS for the current recording.
-#
-# Note: The current FPS won't change during recording if you switch windows, workspaces, or similar.
-#       This is a one-time setting, valid until the next screen recording.
-#
-# Default is false
-VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME=false
-
-# Does nothing if VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME is set to false.
-# Available options: int
-#
-# Default is 60
-VIBRANIUM_RECORDING_FPS_IN_GAME=60
-
 # Video recording quality level.
 # Available options: 'medium', 'high', 'very_high', 'ultra'
 #

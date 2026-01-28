@@ -119,47 +119,6 @@ _set_container_type() {
     esac
 }
 
-_ingame_menu() {
-    local var opts chosen
-    local ingame_fps_enabled ingame_fps new_value
-
-    while true; do
-        source "$VIBRANIUM_USER_SETTINGS"
-
-        ingame_fps_enabled="$VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME"
-        ingame_fps="$VIBRANIUM_RECORDING_FPS_IN_GAME"
-
-        opts=("Enabled : $ingame_fps_enabled")
-        [[ "$ingame_fps_enabled" == true ]] && {
-            opts+=("FPS : $ingame_fps")
-        }
-
-        opts+=("What is this?")
-
-        mapfile -t opts < <(align_options "${opts[@]}")
-        chosen="$(printf "%s\n" "${opts[@]}" | rofi_cmd "In-Game FPS" "ESC to go back")"
-        [ -z "$chosen" ] && break
-
-        case "$chosen" in
-            "Enabled"*)
-                toggle_bool "VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME"
-                ;;
-            "FPS"*)
-                edit_digit "In-Game FPS" "Game Recording" "int" \
-                    $VIBRANIUM_RECORDING_FPS $LIMIT_FPS_MAX \
-                    "VIBRANIUM_RECORDING_FPS_IN_GAME"
-                ;;
-            "What"*)
-                msg="• <span foreground='${P_YELLOW}'>Whether to increase recording FPS when the active window at start is a game.</span>\n\n"
-                msg+="Note that this heavily depends on the WM's window rules, and if the regex does not match the title or class of your "
-                msg+="current game, <span foreground='${P_RED}'><b>it will not work as expected</b></span>, which means the default <span foreground='${P_YELLOW}'><b>FPS</b></span> value will be used."
-                notify-send -r 3 -t 15000 "What is this?" "$msg"
-                continue
-                ;;
-        esac
-    done
-}
-
 _advanced_menu() {
     local opts chosen
 
@@ -174,12 +133,6 @@ _advanced_menu() {
             opts+=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN")
         fi
 
-        if [[ "$VIBRANIUM_RECORDING_HIGHER_FPS_IN_GAME" == false ]]; then
-            opts+=("In-Game FPS : disabled")
-        else
-            opts+=("In-Game FPS : $VIBRANIUM_RECORDING_FPS_IN_GAME")
-        fi
-
         opts+=("Codec : $VIBRANIUM_RECORDING_VIDEO_CODEC")
 
         mapfile -t opts < <(align_options "${opts[@]}")
@@ -191,7 +144,6 @@ _advanced_menu() {
             "Recording mode"*) _set_recording_mode   ;;
             "Codec"*)          _set_codec            ;;
             "Flash screen"*)   _flash_screen_submenu ;;
-            "In-Game"*)        _ingame_menu          ;;
         esac
     done
 }

@@ -7,9 +7,9 @@ if pidof -q gpu-screen-recorder; then
     exit 0
 fi
 
-OPTIONS=("Screen" "Window" "Region")
+OPTIONS=("Screen" "Region")
 CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Record" "ESC to exit")"
 
 [ -z "$CHOSEN" ] && exit 0
 printf "%s\n" "${OPTIONS[@]}" | grep -qxF "$CHOSEN" || exit 0
-exec setsid vb-core-recording "${CHOSEN,,}"
+exec setsid vb-core-recording "--${CHOSEN,,}"
