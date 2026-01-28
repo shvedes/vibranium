@@ -130,7 +130,22 @@ case "$1" in
         LAUNCHER_MODE="${1/--/}"
         ;;
     *)
-        opt_args+=(-drun-exclude-categories 'WebApp,AI,Power')
+        check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS false
+        check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI false
+
+        WEB_APPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
+        AI="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
+
+        EXCLUDE="Power"
+
+        [[ $WEB_APPS != true ]] && EXCLUDE+=",WebApp"
+        [[ $AI != true ]]       && EXCLUDE+=",AI"
+
+        opt_args+=(-drun-exclude-categories "$exclude")
+
+        [[ $WEB_APPS == true || $AI == true ]] && {
+            opt_args+=(-icon-theme Vibranium)
+        }
         LAUNCHER_MODE="default"
         ;;
 esac

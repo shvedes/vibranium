@@ -110,6 +110,18 @@ VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART=false
 # Default is true
 VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS=true
 
+# Whether to show pre-installed web apps in app launcher
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS=false
+
+# Whether to show pre-installed AI web apps in app launcher
+# Available options: bool
+#
+# Default is false
+VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI=false
+
 # Whether to automatically select the last remaining entry
 # Available options: bool
 #

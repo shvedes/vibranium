@@ -466,10 +466,12 @@ while true; do
             while true; do
                 source "$VIBRANIUM_USER_SETTINGS"
                 app_launcher_options=(
-                    "Theme                 : $(get_active_rofi_theme)"
-                    "Auto select           : $VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
-                    "Search engine         : $VIBRANIUM_GLOBAL_SEARCH_ENGINE"
-                    "Show app icons        : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
+                    "Theme            : $(get_active_rofi_theme)"
+                    "Auto select      : $VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
+                    "Search engine    : $VIBRANIUM_GLOBAL_SEARCH_ENGINE"
+                    "Show web apps    : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
+                    "Show app icons   : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
+                    "Show AI web apps : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
                 )
                 app_launcher_chosen="$(printf "%s\n" "${app_launcher_options[@]}" | rofi_cmd "App launcher" "ESC to go back" -selected-row "$index")"
                 [[ -z $app_launcher_chosen ]] && break
@@ -482,6 +484,12 @@ while true; do
                 done
 
                 case "$app_launcher_chosen" in
+                    "Show AI web apps"*)
+                        toggle_bool "VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
+                        ;;
+                    "Show web apps"*)
+                        toggle_bool "VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
+                        ;;
                     "Theme"*)
                         while true; do
                             rofi_cfg="$XDG_CONFIG_HOME/rofi/config.rasi"
