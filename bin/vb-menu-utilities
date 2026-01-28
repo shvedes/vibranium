@@ -20,7 +20,10 @@ if command -v syncthing > /dev/null; then
     ACTIONS+=("Launch Syncthing")
 fi
 
-ACTIONS+=("Reload Vibranium")
+ACTIONS+=(
+    "Reload Vibranium"
+    "Close all windows"
+)
 
 if [[ "$(systemctl --user is-active mpd)" == "active" ]]; then
     mpd_status="$(mpc status 2>/dev/null)"
@@ -34,37 +37,32 @@ fi
 CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "search...")"
 
 case "$CHOSEN" in
+    "Close all windows")
+        vb-cmd-close-windows
+        ;;
     "Open calculator")
         vb-util-calc
-        exit 0
         ;;
     "Toggle read mode")
         vb-cmd-toggle-readmode
-        exit 0
         ;;
     "Copy current track")
         vb-cmd-copy-track --notify
-        exit 0
         ;;
     *"Stop timer"*)
         pkill -f vb-util-timer
-        exit 0
         ;;
     "Set timer")
         setsid vb-util-timer
-        exit 0
         ;;
     "Launch Syncthing")
         vb-app-syncthing
-        exit 0
         ;;
     "Reload Vibranium")
         vb-cmd-reload
-        exit 0
         ;;
     "Toggle inhibitor")
         vb-cmd-toggle-inhibit
-        exit 0
         ;;
     "" | *)
         exit 1
