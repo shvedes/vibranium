@@ -2,6 +2,6 @@
 	"custom/logout": {
 		"format": "\uf08b",
 		"tooltip-format": "Log out",
-		"on-click": "vb-core-launcher --power"
+		"on-click": "vb-cmd-ask-logout"
 	}
 }

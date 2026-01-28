@@ -1,0 +1,5 @@
+#!/bin/bash
+
+if [[ "$(printf "Yes\nNo" | rofi -dmenu -sync -p "Log out?")" == "Yes" ]]; then
+    vb-core-stop-session
+fi

@@ -102,7 +102,7 @@ entry {
     text-color:        var(foreground-muted);
     placeholder-color: var(foreground-muted);
     cursor:            text;
-    placeholder:       " apps & web";
+    placeholder:       "";
 }
 
 case-indicator {

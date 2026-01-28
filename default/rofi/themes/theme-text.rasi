@@ -96,7 +96,7 @@ prompt {
 entry {
     text-color:        var(foreground);
     placeholder-color: var(foreground-muted);
-    placeholder:       " apps & web";
+    placeholder:       "";
 }
 
 element-icon {
