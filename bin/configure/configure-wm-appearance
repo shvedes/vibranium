@@ -300,17 +300,20 @@ _shadow_submenu() {
             "getoption decoration:shadow:enabled;
              getoption decoration:shadow:render_power;
              getoption decoration:shadow:range;
-             getoption decoration:shadow:sharp
+             getoption decoration:shadow:sharp;
+             getoption decoration:shadow:ignore_window
              " | jq -sr '.[] | .option as $o |
                 if ($o | test("enabled|sharp")) then
                     (if .int == 1 then "true" else "false" end)
+                elif ($o | test("ignore_window")) then
+                    (if .int == 1 then "false" else "true" end)
                 else
                     .int
                 end
             '
         )
 
-        read -r enabled render_power range sharp <<< "${parameters[*]}"
+        read -r enabled render_power range sharp ignore_window <<< "${parameters[*]}"
 
         labels=(
             "Enabled : $enabled"
@@ -321,6 +324,7 @@ _shadow_submenu() {
                 "Power : $render_power"
                 "Range : ${range}px"
                 "Sharp : $sharp"
+                "Behind the window : $ignore_window"
             )
         fi
 
@@ -339,7 +343,7 @@ _shadow_submenu() {
             "Enabled"*) vb-cmd-toggle-shadows ;;
             "Power"*)   _edit_int "Render power" "decoration:shadow:render_power" 1 4    ;;
             "Sharp"*)   _edit_bool               "decoration:shadow:sharp"               ;;
-
+            "Behind"*)  _edit_bool               "decoration:shadow:ignore_window"       ;;
             "Range"*)
                 if [[ "$sharp" == true ]]; then
                     _edit_int "Shadow range" "decoration:shadow:range" 1 128
