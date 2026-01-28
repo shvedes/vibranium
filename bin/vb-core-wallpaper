@@ -109,15 +109,6 @@ case "$1" in
         ;;
 esac
 
-check_bool VIBRANIUM_GLOBAL_SHOW_WALLPAPER true
-if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
-    if [[ "$(systemctl --user is-active hyprpaper)" != "active" ]]; then
-        systemctl -q --user enable --now hyprpaper &
-    fi
-else
-    exit 0
-fi
-
 # In case if user set new wallpaper via thunar context menu
 # (e,g. user's own picture, downloaded from the internet) we
 # should copy this file to the folder that contains user wallpapers
@@ -129,6 +120,14 @@ if [[ ! -f "$WALLS/$(basename "$WALLPAPER_PATH")" ]]; then
     fi
 fi
 
-hyprctl -q hyprpaper wallpaper ", $WALLPAPER_PATH"
+check_bool VIBRANIUM_GLOBAL_SHOW_WALLPAPER true
+if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
+    if [[ "$(systemctl --user is-active hyprpaper)" != "active" ]]; then
+        systemctl -q --user enable --now hyprpaper
+        wait $!
+    fi
+    hyprctl -q hyprpaper wallpaper ", $WALLPAPER_PATH"
+fi
+
 update_configs "$WALLPAPER_PATH"
 
