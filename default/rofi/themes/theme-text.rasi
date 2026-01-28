@@ -1,40 +1,8 @@
 @import "../vibranium/theme/current/rofi.rasi"
+@import "~/.local/share/vibranium/default/rofi/configuration.rasi"
 
 * {
 	background-color: transparent;
-}
-
-configuration {
-	modes : [ drun, ssh ];
-
-	drun-reload-desktop-cache : true;
-	drun-use-desktop-cache    : true;
-	transient-window          : true;
-	steal-focus               : true;
-	markup                    : true;
-	sort                      : true;
-	fixed-num-lines           : false;
-
-    display-calc        : "Calculator";
-	display-window      : "Windows";
-	display-run         : "Command";
-	display-combi       : "Search";
-	display-emoji       : "Emoji";
-	display-drun        : "Search";
-	display-ssh         : "SSH";
-
-	icon-theme          : "Papirus";
-	drun-display-format : "{name}";
-	matching            : "prefix";
-	drun-match-fields   : "name,keywords,categories";
-	monitor             : "-1";
-	scroll-method       : 1;
-	sorting-method      : "fzf";
-
-    calc {
-        hint-result: "";
-        hint-welcome: "";
-    }
 }
 
 element normal.normal {
