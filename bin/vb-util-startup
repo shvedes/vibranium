@@ -39,10 +39,25 @@ _set_ddc_brightness() {
     fi
 }
 
+_set_ddc_brightness &
+
+_toggle_loopback() {
+    while ! pidof -q pipewire; do
+        sleep 0.1
+    done
+
+    if [[ $VIBRANIUM_VOLUME_SOURCE_LOOPBACK == true ]]; then
+        vb-cmd-toggle-loopback &
+    fi
+}
+
+_toggle_loopback &
+
 mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
 
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
     vb-util-first-run
+    exit 0
 fi
 
 wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"
@@ -59,8 +74,6 @@ else
         enabled) systemctl --user disable --now hyprpaper ;;
     esac
 fi
-
-_set_ddc_brightness &
 
 # If state file doesn't exist - create one and disable
 # night light (by default). We still need hyprsunset
