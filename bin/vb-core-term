@@ -20,6 +20,7 @@ case "${1:-}" in
 esac
 
 args=()
+class="alacritty"
 
 if [[ $# -ge 1 ]]; then
     cmd="$1"
