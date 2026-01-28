@@ -29,7 +29,7 @@ if [ "$1" = "--help" ]; then
     exit 0
 fi
 
-shader="$VIBRANIUM/default/hypr/grayscale.frag"
+shader="$VIBRANIUM/default/hypr/shaders/grayscale.frag"
 config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
 
 if _grayscale_enabled; then
