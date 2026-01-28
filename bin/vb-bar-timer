@@ -1,11 +1,9 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM/bin/vb-core-lib"
-
-state_file="$VIBRANIUM_RUNTIME/timer.remaining"
+state_file="$VIBRANIUM_RUNTIME/vb-timer.remaining"
 
 if [[ -f "$state_file" ]]; then
-    remaining="$(<"$state_file")"
+    remaining="$(< "$state_file")"
 else
     printf '{"text": ""}'
     exit 1

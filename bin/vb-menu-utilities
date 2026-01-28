@@ -4,7 +4,7 @@ source "$VIBRANIUM_PATH/vb-core-lib"
 
 ACTIONS=()
 
-if [[ -f "$VIBRANIUM_RUNTIME/timer.remaining" ]]; then
+if [[ -f "$VIBRANIUM_RUNTIME/vb-timer.remaining" ]]; then
     ACTIONS+=("Stop timer")
 else
     ACTIONS+=("Set timer")

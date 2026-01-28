@@ -17,7 +17,7 @@ for f in /run/systemd/inhibit/*; do
 done
 
 paths=(
-  "$VIBRANIUM_RUNTIME/timer.remaining"
+  "$VIBRANIUM_RUNTIME/vb-timer.remaining"
   "$VIBRANIUM_RUNTIME/confirm-kill"
 
   "$VIBRANIUM_STATE/update.available"
