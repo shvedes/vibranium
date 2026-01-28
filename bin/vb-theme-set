@@ -17,7 +17,7 @@ declare -A FAMILIES=(
 )
 
 declare -A STANDALONE_THEMES=(
-    # ["My-Cool-Theme-Name"]="MyCoolGTKTheme1 MyCoolGTKTheme2 MyCoolGTKTheme3"
+    ["Evergarden"]="Evergarden"
 )
 
 # Map theme to GTK theme name if special
@@ -27,6 +27,7 @@ declare -A GTK_MAP=(
      [Osaka-Solarized]="Osaka-Solarized"
      [Osaka-Light]="Osaka-Light"
      [Nightfox-Nightfox]="Nightfox"
+     [Evergarden]="Everforest-Hard"
 )
 
 # Capitalized folder name = papirus icon color name
@@ -66,6 +67,8 @@ declare -A PAPIRUS_COLORS=(
      [Kanagawa-Wave]=yaru
      [Kanagawa-Dragon]=yaru
      [Kanagawa-Lotus]=palebrown
+
+     [Evergarden]=bluegrey
 )
 
 LINK_TARGET="$XDG_CONFIG_HOME/vibranium/theme/current"
@@ -107,7 +110,10 @@ is_current_theme() {
 }
 
 pick_family() {
-    local keys=("${!FAMILIES[@]}")
+    local keys=(
+        "${!FAMILIES[@]}"
+        "${!STANDALONE_THEMES[@]}"
+    )
     local i j temp
 
     for ((i = 0; i < ${#keys[@]}; i++)); do
@@ -188,17 +194,21 @@ apply_chromium_colors() {
 
         "kanagawa-wave") color="31, 31, 40" ;;
         "kanagawa-dragon") color="24, 22, 22" ;;
+
+        "evergarden") color="105, 128, 129" ;;
     esac
 
-    chromium --no-startup-window --set-theme-color="$color"
+    chromium --no-startup-window --set-theme-color="$color" &> /dev/null
 }
 
 apply_theme() {
     local chosen="$1"
     local folder_name="${chosen,,}"
+
     if [[ $folder_name == "rosepine-rosepine" ]]; then
         folder_name="rosepine"
     fi
+
     local theme_capital
     theme_capital=$(capitalize "$chosen")
     local color="${PAPIRUS_COLORS[$theme_capital]}"
@@ -215,14 +225,10 @@ apply_theme() {
         exit 1
     fi
 
-    print_log "Target theme $theme_capital"
-
-    print_log "Updating symlinks"
     rm -f "$LINK_TARGET"
     ln -sf "$theme_path" "$LINK_TARGET"
 
     local gtk_theme="${GTK_MAP[$chosen]:-$chosen}"
-    echo "GTK THEME $gtk_theme"
 
     case "$gtk_theme" in
         "Nightfox-Nightfox")
@@ -236,7 +242,6 @@ apply_theme() {
             ;;
     esac
 
-    print_log "Applying GTK 4 settings"
     sed -i -e "/gtk-theme-name/s/=.*/=$gtk_theme/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
 
     # Update GTK 4 symlinks
@@ -245,24 +250,20 @@ apply_theme() {
             "$XDG_CONFIG_HOME/gtk-4.0/${link}"
     done
 
-    print_log "Updating cursor theme"
     gsettings set org.gnome.desktop.interface cursor-theme "$VIBRANIUM_CURSOR_THEME"
 
-    print_log "Applying GTK 3 settings"
     gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
 
     local icon_theme="Papirus-Dark"
     local papirus_theme="Papirus-Dark"
+
     if [[ $folder_name =~ (light|latte|dawn)$ ]]; then
-        print_log "Setting light icon theme"
         icon_theme="Papirus-Light"
         papirus_theme="Papirus-Light"
-    else
-        print_log "Setting dark icon theme"
     fi
+
     gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
     papirus-folders --theme "$papirus_theme" --color "${color:-blue}" -u &> /dev/null &
-    # papirus_pid=$!
     apply_chromium_colors &
 }
 
@@ -346,58 +347,29 @@ if [ ! -d "$VIBRANIUM/themes/$folder_name" ]; then
     exit 1
 fi
 
-print_log "Applying GTK theme"
 apply_theme "$CHOSEN"
 
-print_log "Reloading WM configuration"
-hyprctl -q reload
+hyprctl -q reload config-only
+vb-cmd-refresh-dunst
 
-print_log "Updating terminal colors"
-if pidof -q alacritty; then
-    touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-fi
-
-print_log "Restoring previously used wallpaper"
 vb-core-wallpaper "$(get_wallpaper "$CHOSEN")"
+touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+
+# This is my personal setup (yet), so..
+if [[ -f "$XDG_CONFIG_HOME/nvim/lua/config/colorscheme.lua" && $USER == shved ]]; then
+    if pidof -q nvim; then
+        pkill -SIGUSR1 nvim
+    fi
+fi
 
 if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
     systemctl --user restart swayosd
 fi
 
-print_log "Updating Dunst"
-vb-cmd-refresh-dunst
-
-print_log "Updating QT colors"
+hyprctl -q dispatch sendshortcut CTRL, R, class:heroic
+hyprctl -q dispatch sendshortcut CTRL, R, class:[Tt]hunar
 touch "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
+pkill -SIGUSR2 btop 2> /dev/null
 
-if pgrep -a electron | grep heroic > /dev/null; then
-    print_log "Active Heroic process found! Refreshing live.."
-    hyprctl -q dispatch sendshortcut CTRL, R, class:heroic
-fi
-
-# This is my personal setup (yet), so..
-if [[ -f "$XDG_CONFIG_HOME/nvim/lua/config/colorscheme.lua" && $USER == shved ]]; then
-    if pidof -q nvim; then
-        print_log "Updaing nvim colorscheme"
-        pkill -SIGUSR1 nvim
-    fi
-fi
-
-if pidof -q btop; then
-    print_log "Updating colorscheme for the active btop session"
-    pkill -SIGUSR2 btop
-fi
-
-print_log "Updating custom svg icons"
 vb-theme-svgs
-
-print_log "Updating GTK icon cache"
-print_warn "Note that some icons still might have previous colors."
-print_warn "If that's the case then restart or refresh an app"
-#waitpid $papirus_pid;
 gtk-update-icon-cache -tfq "$XDG_DATA_HOME"/icons/Papirus-{Dark,Light} &> /dev/null &
-
-if pidof -q Thunar; then
-    print_log "Reloading Thunar"
-    hyprctl -q dispatch sendshortcut CTRL, R, class:[Tt]hunar
-fi
