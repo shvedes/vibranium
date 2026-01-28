@@ -52,7 +52,11 @@ if [[ "$1" =~ ^(-h|--help)$ ]]; then
     exit 0
 fi
 
-printf "\n%s%s%s\n\n" "$YELLOW" "$(cat "$VIBRANIUM/logo.txt")" "$RESET"
+if [[ ! "$1" == "--no-logo" ]]; then
+    printf "\n%s%s%s\n\n" "$YELLOW" "$(cat "$VIBRANIUM/logo.txt")" "$RESET"
+else
+    shift
+fi
 printf '\e[?25l' # Hide cursor
 
 # Source: omarchy
@@ -134,7 +138,9 @@ while true; do
                 _operation_canceled ""
             fi
 
-            yay -S "${YAY_FLAGS[@]}" "${filtered[@]}"
+            if ! yay -S "${YAY_FLAGS[@]}" "${filtered[@]}"; then
+                _operation_canceled
+            fi
 
             services=()
             provides_systemd_service=()

@@ -2,13 +2,18 @@
 
 source "$VIBRANIUM_PATH/vb-core-lib"
 
-ACTIONS=("System update" "Install a package" "Uninstall a package")
+ACTIONS=("System update" "Install a font" "Install a package" "Uninstall a package")
 
 while true; do
     CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Packages" "ESC to go back")"
     [[ -z $CHOSEN ]] && break
 
     case "$CHOSEN" in
+        "Install a font")
+            vb-core-term vb-pkg-font
+            vb-cmd-kill-rofi
+            exit 0
+            ;;
         "System update")
             vb-core-term vb-pkg-sysupdate
             vb-cmd-kill-rofi
