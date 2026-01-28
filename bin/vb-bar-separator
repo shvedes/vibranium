@@ -17,11 +17,11 @@ for f in /run/systemd/inhibit/*; do
 done
 
 paths=(
-  "$VIBRANIUM_RUNTIME/vb-timer.remaining"
-  "$VIBRANIUM_RUNTIME/confirm-kill"
-
-  "$VIBRANIUM_STATE/update.available"
-  "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+    "$VIBRANIUM_RUNTIME/password-manager.action"
+    "$VIBRANIUM_RUNTIME/vb-timer.remaining"
+    "$VIBRANIUM_STATE/update.available"
+    "$VIBRANIUM_RUNTIME/confirm-kill"
 )
 
 for p in "${paths[@]}"; do

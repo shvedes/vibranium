@@ -34,6 +34,7 @@
 			"$XDG_DATA_HOME/vibranium/default/waybar/weather.jsonc",
 			"$XDG_DATA_HOME/vibranium/default/waybar/worker.jsonc",
 			"$XDG_DATA_HOME/vibranium/default/waybar/workspaces.jsonc",
+			"$XDG_DATA_HOME/vibranium/default/waybar/password-manager.jsonc",
 			"$XDG_DATA_HOME/vibranium/default/waybar/vibranium-update.jsonc"
 		],
 
@@ -48,6 +49,7 @@
 			"custom/worker",
 			"custom/reading-mode",
 			"custom/inhibitor",
+            "custom/password-manager",
 			"custom/dynamic-separator",
 			// "hyprland/language",
 			"custom/recording-indicator",

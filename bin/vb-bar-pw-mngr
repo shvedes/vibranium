@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+state="$VIBRANIUM_RUNTIME/password-manager.action"
+
+if [[ -f "$state" ]]; then
+    icon="\udb80\udf06"
+    icon="<span size='11000'>$icon</span>"
+    tooltip="$(< "$state")"
+    printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
+else
+    printf '{"text": ""}'
+fi
