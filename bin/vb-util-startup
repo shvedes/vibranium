@@ -89,3 +89,7 @@ elif [[ "$(< "$VIBRANIUM_STATE/nightshift")" = "suspended" ]]; then
     done
     hyprctl -q hyprsunset identity
 fi
+
+if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START = true ]]; then
+    setsid -f vb-core-launcher
+fi
