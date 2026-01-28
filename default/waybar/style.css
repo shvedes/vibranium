@@ -1,5 +1,5 @@
 @define-color background #000000;
-@define-color foreground #ffffff;
+@define-color foreground #eee6e4;
 @define-color urgent     #f77069;
 
 * {
@@ -12,14 +12,8 @@ window#waybar {
 	font-size: 12px;
 }
 
-tooltip {
-	color: @foreground;
-	background: @background;
-
-	border: 1px solid @border;
-	border-radius: 0px;
+tooltip label {
 	font-size: 12px;
-	font-weight: bold;
 }
 
 #workspaces button {
