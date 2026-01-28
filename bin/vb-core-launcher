@@ -141,7 +141,7 @@ case "$1" in
         [[ $WEB_APPS != true ]] && EXCLUDE+=",WebApp"
         [[ $AI != true ]]       && EXCLUDE+=",AI"
 
-        opt_args+=(-drun-exclude-categories "$exclude")
+        opt_args+=(-drun-exclude-categories "$EXCLUDE")
 
         [[ $WEB_APPS == true || $AI == true ]] && {
             opt_args+=(-icon-theme Vibranium)
