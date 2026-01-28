@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-source $VIBRANIUM_PATH/vb-core-defaults
-source $XDG_CONFIG_HOME/vibranium/settings
+source vb-core-lib
 
 if [[ $VIBRANIUM_BAR_WEATHER_MODULE_ENABLE == false ]]; then
     printf '{"text": ""}'
@@ -56,7 +55,7 @@ else
     else
         show_spinner=true
         rm -f "${marker%.*}".*
-        : > $marker
+        touch "$marker"
     fi
 fi
 

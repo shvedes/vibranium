@@ -1,10 +1,10 @@
 {
-	"custom/vb-update": {
+	"custom/vibranium-update": {
 		"format": "{text}",
 		"hide-empty-text": true,
 
 		"exec": "vb-bar-update",
-		"on-click": "vb-cmd-launch-terminal vb-update",
+		"on-click": "vb-core-term vb-update",
 
 		"signal": 12,
 		"return-type": "json"

@@ -12,7 +12,6 @@
 		"include": [
 			"$XDG_DATA_HOME/vibranium/default/waybar/battery.jsonc",
 			"$XDG_DATA_HOME/vibranium/default/waybar/bluetooth.jsonc",
-			"$XDG_DATA_HOME/vibranium/default/waybar/brightness.jsonc",
 			"$XDG_DATA_HOME/vibranium/default/waybar/clock.jsonc",
 			"$XDG_DATA_HOME/vibranium/default/waybar/confirm-kill.jsonc",
 			"$XDG_DATA_HOME/vibranium/default/waybar/color-picker.jsonc",

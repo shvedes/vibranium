@@ -8,7 +8,7 @@
 		"on-click": "vb-core-volume mic mute",
 		"on-scroll-up": "vb-core-volume mic up",
 		"on-scroll-down": "vb-core-volume mic down",
-		"on-click-right": "vb-cmd-launch-terminal 'wiremix --tab input'",
+		"on-click-right": "vb-core-term wiremix --tab input",
 
 		"scroll-step": 1,
 		"tooltip": false
