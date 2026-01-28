@@ -7,6 +7,8 @@ fi
 
 source vb-core-lib
 
+LOG_FILE="$VIBRANIUM_CACHE/$(basename "$0").log"
+
 usage() {
     cat << EOF
 Usage: $(basename "$0") [OPTION]
@@ -108,8 +110,7 @@ init_recording() {
         -fm "$FRM" \
         -c "$EXT" \
         -f "$FPS" \
-        -o "$(output_file)" \
-            &> "$VIBRANIUM_CACHE/$(basename "$0").log" &
+        -o "$(output_file)" &> "$LOG_FILE" &
 
     local pid=$!
     sleep 0.1
@@ -128,17 +129,22 @@ fallback_notification() {
     msg+="Video was encoded on the CPU instead of the GPU.\n"
     msg+="This may reduce quality and system performance.\n\n"
     msg+="Please make sure your GPU supports selected codec.\n"
+    msg+="Click here to see the logs"
 
-    notify-send -r 2 -u critical -t 25000 "Screen Recording" "$msg"
+    if notify-send -A true -r 2 -u critical -t 25000 "Screen Recording" "$msg"; then
+        vb-core-term "$EDITOR" "${LOG_FILE}.latest_fallback"
+    fi
 }
 
 both_failed_notification() {
     local msg
 
     msg="Failed to start screen recording in both normal and fallback modes.\n"
-    msg+="Please make sure your GPU supports selected codec."
+    msg+="Click here to see the lock."
 
-    notify-send -r 2 -u critical -t 25000 "Screen Recording" "$msg"
+    if notify-send -A true -r 2 -u critical -t 25000 "Screen Recording" "$msg"; then
+        vb-core-term "$EDITOR" "${LOG_FILE}.latest_failed"
+    fi
 }
 
 start_rec() {
@@ -157,7 +163,10 @@ start_rec() {
         VIBRANIUM_RECORDING_VIDEO_CODEC="h264"
         VIBRANIUM_RECORDING_CONTAINER_TYPE="mp4"
 
+        mv "$LOG_FILE" "${LOG_FILE}.latest_fallback"
+
         if ! init_recording --fallback; then
+            mv "$LOG_FILE" "${LOG_FILE}.latest_failed"
             print_error "failed to start recording in fallback mode"
             both_failed_notification
             exit 1
