@@ -499,8 +499,8 @@ while true; do
                             [[ -z $themes_chosen ]] && break
 
                             case "${themes_chosen,}" in
-                                "text")   sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/\)[^"]*|\1theme-text.rasi|' "$rofi_cfg"   ;;
-                                "modern") sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/\)[^"]*|\1theme-modern.rasi|' "$rofi_cfg" ;;
+                                "text")   sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-text.rasi|' "$rofi_cfg"   ;;
+                                "modern") sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-modern.rasi|' "$rofi_cfg" ;;
                             esac
                             break
                         done
