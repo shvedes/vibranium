@@ -28,6 +28,4 @@ for p in "${paths[@]}"; do
   [[ -e "$p" ]] && show
 done
 
-[[ $VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE == true ]] && show
-
 printf '{"text": ""}'
