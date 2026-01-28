@@ -4,6 +4,7 @@
 		"on-scroll-up": "vb-core-volume vol up",
 		"on-scroll-down": "vb-core-volume vol down",
 		"on-click-right": "vb-core-term wiremix --tab output",
+        "on-click-middle": "vb-cmd-output-switch",
 
 		"format": "{icon}",
 		"format-muted": "\udb81\udf5f",
