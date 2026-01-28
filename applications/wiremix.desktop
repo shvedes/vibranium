@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-Name=Sound Configuration
+Name=Volume Mixer
 TryExec=wiremix
 Exec=vb-core-term wiremix
-Icon=audio-volume-high
-Keywords=audio;sound;headset;speakers;bluetooth;pipewire;pulseaudio;mixer;wiremix
+Icon=org.pulseaudio.pavucontrol
+Keywords=audio;sound;headset;speakers;bluetooth;pipewire;pulseaudio;mixer;wiremix;pavucontrol;
