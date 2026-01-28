@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Calculator
+TryExec=vb-util-calc
+Exec=vb-util-calc
+Icon=gnome-calculator
