@@ -29,7 +29,7 @@ EOF
 
 clear_history() {
     : > "$HISTORY"
-    vb-cmd-refresh-waybar-module color-picker
+    vb-cmd-refresh-bar-module color-picker
 }
 
 case "$1" in
@@ -99,5 +99,5 @@ if [[ $show_selected == true ]]; then
 fi
 
 notify-send -r 1 -t 1500 -i "$preview_img" "Color Picker" "Selected color copied to clipboard"
-vb-cmd-refresh-waybar-module color-picker &
+vb-cmd-refresh-bar-module color-picker &
 rm -f /tmp/latest_color.png

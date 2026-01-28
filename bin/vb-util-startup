@@ -41,8 +41,8 @@ _set_ddc_brightness() {
 
 mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
 
-if [[ -f "$VIBRANIUM_STATE/first-boot" ]]; then
-    vb-util-first-boot
+if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
+    vb-util-first-run
 fi
 
 wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"

@@ -84,7 +84,7 @@ if [[ "$action" == "toggle" ]]; then
             ;;
     esac
 
-    vb-cmd-refresh-waybar-module nightshift &
+    vb-cmd-refresh-bar-module nightshift &
     exit 0
 fi
 
@@ -122,4 +122,4 @@ printf '# Auto-generated! All changes will be overwritten!\n' > "$CONF"
 printf '\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" >> "$CONF"
 hyprctl -q hyprsunset temperature "$TEMP" &
 
-vb-cmd-refresh-waybar-module nightshift &
+vb-cmd-refresh-bar-module nightshift &

@@ -6,7 +6,7 @@ Requisite=graphical-session.target
 
 [Service]
 Type=oneshot
-ExecStart=%h/.local/share/vibranium/bin/vb-util-startup-functions
+ExecStart=%h/.local/share/vibranium/bin/vb-util-startup
 Restart=on-failure
 
 [Install]

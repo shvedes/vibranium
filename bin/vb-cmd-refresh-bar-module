@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Refresh a Waybar custom module by sending its configured signal.
-# Usage: vb-cmd-refresh-waybar-module <module-name>
+# Usage: vb-cmd-refresh-bar-module <module-name>
 
 usage() {
     cat << EOF

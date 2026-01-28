@@ -12,7 +12,7 @@ cleanup() {
     kill -s KILL "$pw_play_pid" & >/dev/null
 
     rm -f "$state"
-    vb-cmd-refresh-waybar-module timer
+    vb-cmd-refresh-bar-module timer
     exit 0
 }
 
@@ -56,13 +56,13 @@ setsid -f systemd-inhibit --what=idle --why="Timer is active" --who="Timer" slee
 time_remaining=$sleep_time
 while (( time_remaining > 0 )); do
     echo "$time_remaining" > "$state"
-    vb-cmd-refresh-waybar-module timer
+    vb-cmd-refresh-bar-module timer
     ((time_remaining--))
     sleep 1
 done
 
 echo "timed out" > "$state"
-vb-cmd-refresh-waybar-module timer
+vb-cmd-refresh-bar-module timer
 
 while true; do
     pw-play "$ring" &

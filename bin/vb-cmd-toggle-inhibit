@@ -38,4 +38,4 @@ else
         sleep infinity &
 fi
 
-vb-cmd-refresh-waybar-module inhibitor &
+vb-cmd-refresh-bar-module inhibitor &

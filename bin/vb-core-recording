@@ -33,7 +33,7 @@ cleanup() {
         _flash screen &
     fi
 
-    vb-cmd-refresh-waybar-module recording-indicator &
+    vb-cmd-refresh-bar-module recording-indicator &
 
     output_dir_formatted="${output_dir/#$HOME/\~}"
     msg="<i>File saved to <span foreground='${P_YELLOW}'>$output_dir_formatted</span></i>"
@@ -240,7 +240,7 @@ fi
 
 notify-send -r 1 -t 1000 "Vibranium" "<i>Screen recording is active</i>"
 print_log "Updating Waybar module"
-vb-cmd-refresh-waybar-module recording-indicator &
+vb-cmd-refresh-bar-module recording-indicator &
 
 # Wait for the recording process to complete
 wait "$pid"

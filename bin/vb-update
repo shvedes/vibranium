@@ -81,7 +81,7 @@ _update() {
 
     vb-update-migrate
     rm -f "$VIBRANIUM_STATE/update.available" || true
-    vb-cmd-refresh-waybar-module vb-update
+    vb-cmd-refresh-bar-module vb-update
 
     echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $latest_tag"
     read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy

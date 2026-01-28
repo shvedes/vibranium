@@ -100,15 +100,15 @@ while true; do
             ;;
         "Night light"*)
             toggle_bool "VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE"
-            vb-cmd-refresh-waybar-module nightshift
+            vb-cmd-refresh-bar-module nightshift
             ;;
         "Color picker"*)
             toggle_bool "VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE"
-            vb-cmd-refresh-waybar-module color-picker
+            vb-cmd-refresh-bar-module color-picker
             ;;
         "Power profile"*)
             toggle_bool "VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
-            vb-cmd-refresh-waybar-module power-profile
+            vb-cmd-refresh-bar-module power-profile
             if [ "$(vb-cmd-get-option VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE)" = "true" ] && [ "$(vb-util-power-profile-get)" = "balanced" ]; then
                 # • Don't be confused! The module you just enabled is active, actually.
                 #
@@ -124,11 +124,11 @@ while true; do
             ;;
         "Updates"*)
             toggle_bool "VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
-            vb-cmd-refresh-waybar-module pacman
+            vb-cmd-refresh-bar-module pacman
             ;;
         "Weather"*)
             toggle_bool "VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
-            vb-cmd-refresh-waybar-module weather
+            vb-cmd-refresh-bar-module weather
             ;;
     esac
 done

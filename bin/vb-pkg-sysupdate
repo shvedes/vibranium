@@ -53,7 +53,7 @@ if ! yay --noconfirm --sudoloop; then
     exit 1
 fi
 
-vb-cmd-refresh-waybar-module pacman
+vb-cmd-refresh-bar-module pacman
 
 important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
 restart_required=false

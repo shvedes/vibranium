@@ -34,8 +34,8 @@ _updates_weather_specific() {
             "Show separators"*)   toggle_bool "VIBRANIUM_BAR_SHOW_SEPARATOR" ;;
         esac
 
-        vb-cmd-refresh-waybar-module pacman &
-        vb-cmd-refresh-waybar-module weather &
+        vb-cmd-refresh-bar-module pacman &
+        vb-cmd-refresh-bar-module weather &
     done
 }
 
@@ -77,7 +77,7 @@ _update_module_setting() {
                 "The value has been changed. Don't forget to enable the module."
         fi
 
-        vb-cmd-refresh-waybar-module "$module_name" &
+        vb-cmd-refresh-bar-module "$module_name" &
         break
     done
 }
@@ -100,7 +100,7 @@ _updates_submenu() {
         case "$chosen" in
             "Display"*)
                 toggle_bool "VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES"
-                vb-cmd-refresh-waybar-module pacman &
+                vb-cmd-refresh-bar-module pacman &
                 ;;
         esac
     done

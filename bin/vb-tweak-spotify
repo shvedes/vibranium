@@ -20,7 +20,7 @@ progress() {
             echo "$msg" > "$VIBRNAIUM_RUNTIME/worker.active"
             ;;
     esac
-    vb-cmd-refresh-waybar-module worker dynamic-separator
+    vb-cmd-refresh-bar-module worker
 }
 
 fail() {

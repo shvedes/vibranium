@@ -40,7 +40,7 @@ while true; do
     case "$CHOSEN" in
         "State"*)
             vb-cmd-nightshift --toggle
-            vb-cmd-refresh-waybar-module nightshift
+            vb-cmd-refresh-bar-module nightshift
             ;;
         "Temperature"*)
             new_value="$(edit_digit --verify "Night Light Temperature (K)" "Temperature" "int" 1000 20000)"

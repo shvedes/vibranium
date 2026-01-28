@@ -226,7 +226,7 @@ post_install() {
 	sudo sed -i '/^session_log/s/=.*/= .cache\/display_manager.log/' "$ly_ini"
 	cp ./config/mimeapps.list "$HOME/.config"
 
-	touch "$HOME/.local/state/vibranium/first-boot"
+	touch "$HOME/.local/state/vibranium/first-run"
 	echo "suspended" > \
 		"$HOME/.local/state/vibranium/night-light"
 
