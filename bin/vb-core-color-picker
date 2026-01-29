@@ -91,8 +91,9 @@ fi
 
 # Generate a 1:1px image of the selected color to display in the notification
 if [[ $show_selected == true ]]; then
+    preview_img="/tmp/latest_color.png"
     if command -v magick > /dev/null; then
-        magick -size 1x1 xc:"${selected_color}" /tmp/latest_color.png
+        magick -size 1x1 xc:"${selected_color}" "$preview_img"
     else
         print_warn "ImageMagick is not installed!"
     fi
@@ -100,4 +101,4 @@ fi
 
 notify-send -r 1 -t 1500 -i "$preview_img" "Color Picker" "Selected color copied to clipboard"
 vb-cmd-refresh-bar-module color-picker &
-rm -f /tmp/latest_color.png
+rm -f "$preview_img"
