@@ -19,22 +19,15 @@ case "${1:-}" in
     -h|--help) usage; exit 0
 esac
 
-pid=""
-for d in /proc/[0-9]*; do
-    [[ -r "$d/comm" ]] || continue
-    read -r comm < "$d/comm"
-    [[ $comm == systemd-inhibit ]] || continue
-    pid=${d##*/}
-    break
-done
+pid="$(systemd-inhibit --no-pager | awk '/Vibranium/ {print $4}')"
 
 if [[ -n "$pid" ]]; then
     kill "$pid"
 else
     setsid -f systemd-inhibit \
-        --what=idle \
+        --what=sleep \
         --who="Vibranium" \
-        --why="Vibranium wants to delay system sleep" \
+        --why="Manual sleep inhibition" \
         sleep infinity &
 fi
 
