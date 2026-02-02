@@ -20,7 +20,7 @@ if pid=$(pidof rofi); then
     exit 0
 fi
 
-check_enum VIBRANIUM_GLOBAL_SEARCH_ENGINE "google" google duckduckgo bing
+check_enum VIBRANIUM_GLOBAL_SEARCH_ENGINE "google" google duckduckgo bing brave
 check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS true
 check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT false
 
@@ -34,6 +34,7 @@ search_engine() {
         "google")     echo "https://www.google.com/search?q=" ;;
         "duckduckgo") echo "https://duckduckgo.com/?q=" ;;
         "bing")       echo "https://bing.com/search?q=" ;;
+        "brave")      echo "https://search.brave.com/search?q=" ;;
     esac
 }
 

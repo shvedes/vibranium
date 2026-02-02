@@ -181,7 +181,7 @@ VIBRANIUM_GLOBAL_CONFIRM_TO_KILL=true
 VIBRANIUM_GLOBAL_SHOW_WALLPAPER=true
 
 # What search engine to use when performing web search (app launcher)
-# Available options: string 'google' 'duckduckgo' 'bing'
+# Available options: string 'google' 'duckduckgo' 'bing' 'brave'
 #
 # Default is 'google'
 VIBRANIUM_GLOBAL_SEARCH_ENGINE="google"
