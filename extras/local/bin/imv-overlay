@@ -42,4 +42,4 @@ IFS=$'\t' read -r filename filesize resolution colorspace compression < <(
 
 
 printf " filename: %s \n filesize: %sB (%s) \n resolution: %s \n colorspace: %s \n compression: %s \n\n See keyboard shortcuts: Ctrl + H" \
-	"$filename" "$filesize" "$(human_size "$filesize")" "$resolution" "$colorspace" "${compression,,}"
+    "$(basename "$filename")" "$filesize" "$(human_size "$filesize")" "$resolution" "$colorspace" "${compression,,}"
