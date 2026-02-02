@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 source "$VIBRANIUM_PATH/vb-core-lib"
+source "$VIBRANIUM_PATH/configure/configure-lib"
 
 INDEX=0
-CONFIG="$XDG_CONFIG_HOME/hypr/hypridle.conf"
 
 _set_idle_timeout() {
     local title="$1"          # "Lock" / "Sleep"
@@ -33,17 +33,24 @@ _set_idle_timeout() {
     done
 }
 
+get_timeouts() {
+    local config
+    config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
+
+    awk '
+        /^\s*listener\s*{/{f=1; next}
+        /^\s*}/{f=0; next}
+        f && /^\s*timeout\s*=/ {
+            match($0, /timeout\s*=\s*([0-9]+)/, a)
+            print a[1]
+        }
+    ' "$config"
+}
+
 while true; do
-    readarray -t timeouts < <(
-        awk '
-			/^\s*listener\s*{/{f=1; next}
-			/^\s*}/{f=0; next}
-			f && /^\s*timeout\s*=/ {
-				match($0, /timeout\s*=\s*([0-9]+)/, a)
-				print a[1]
-			}
-		' "$CONFIG"
-    )
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    mapfile -t timeouts < <(get_timeouts)
 
     lock_timeout="${timeouts[0]}"
     sleep_timeout="${timeouts[1]}"
@@ -51,11 +58,16 @@ while true; do
     lock_timeout=$((lock_timeout / 60))
     sleep_timeout=$((sleep_timeout / 60))
 
+    inhibit_type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+
     OPTIONS=(
         "Lock  after : $lock_timeout min"
         "Sleep after : $sleep_timeout min"
+        "<b>Inhibit type</b> : $inhibit_type"
         "What is this?"
     )
+
+    mapfile -t OPTIONS < <(align_options "${OPTIONS[@]}")
 
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Idle timeouts" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
@@ -68,6 +80,9 @@ while true; do
     done
 
     case "$CHOSEN" in
+        *"Inhibit"*)
+            update_enum VIBRANIUM_GLOBAL_INHIBIT_TYPE "Sleep type" idle sleep
+            ;;
         "Lock"*)
             _set_idle_timeout "Lock" "Lock timeout (int)" 1
             ;;
@@ -79,8 +94,17 @@ while true; do
             msg="<span foreground='${P_ACCENT}'><b>•</b></span> "
             msg+="<b>Time of inactivity until screen lock</b>\n"
             msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-            msg+="<b>Time of inactivity before the system sleeps</b>"
-            notify-send -r 2 -t 5000 "What is this?" "$msg"
+            msg+="<b>Time of inactivity before the system sleeps</b>\n\n"
+
+            msg+="<b>Inhibit types:</b>\n"
+
+            msg+="<span foreground='${P_ACCENT}'><b>sleep</b></span> — "
+            msg+="The session may lock normally, but the PC is prevented from going to sleep.\n"
+
+            msg+="<span foreground='${P_ACCENT}'><b>idle</b></span> — "
+            msg+="The system thinks you are active, so automatic locking does not trigger."
+
+            notify-send -r 2 -t 15000 "What is this?" "$msg"
             ;;
     esac
 done

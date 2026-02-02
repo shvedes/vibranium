@@ -28,8 +28,8 @@ _user_wallpapers() {
                 "Delete")
                     rm "$folder/$target"
 
-                    if [[ "$(basename $(vb-util-wallpaper-get))" == "$target" ]]; then
-                        vb-core-set-wallpaper --next
+                    if [[ "$(basename $(vb-cmd-get-wallpaper))" == "$target" ]]; then
+                        vb-core-wallpaper --next
                     fi
 
                     # Refresh files list after delete

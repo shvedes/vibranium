@@ -7,14 +7,15 @@
 # ============================================ #
 #                                              #
 
-# A binary name of your preferred terminal
+# Which inhibition type to use when using sleep inhibitor.
+# Available options: string 'idle' 'sleep'
 #
-# Available options: string
-VIBRANIUM_DEFAULT_TERMINAL=alacritty
-
-# Self explanatory
-# Available options: string
-VIBRANIUM_CURSOR_THEME="macOS"
+# Note: when 'sleep' is used, the session can lock automatically like normal,
+#       but the PC won't go to sleep. When idle is selected, the session won't
+#       lock automatically.
+#
+# Defalut is 'idle'
+VIBRANIUM_GLOBAL_INHIBIT_TYPE="idle"
 
 # Whether to flash border of an active window when (usually) taking screenshots.
 # Available options: bool

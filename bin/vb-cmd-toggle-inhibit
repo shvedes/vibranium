@@ -4,6 +4,8 @@
 # If an inhibitor is already running, kills it; otherwise starts a new one.
 # Refreshes the Vibranium Waybar inhibitor module after action.
 
+source vb-core-lib
+
 usage() {
     cat << EOF
 Usage: $(basename "$0") [OPTION]
@@ -24,8 +26,11 @@ pid="$(systemd-inhibit --no-pager | awk '/Vibranium/ {print $4}')"
 if [[ -n "$pid" ]]; then
     kill "$pid"
 else
+    check_enum VIBRANIUM_GLOBAL_INHIBIT_TYPE "idle" idle sleep
+    type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+
     setsid -f systemd-inhibit \
-        --what=sleep \
+        --what="$type" \
         --who="Vibranium" \
         --why="Manual sleep inhibition" \
         sleep infinity &
