@@ -3,9 +3,8 @@
 source "$VIBRANIUM_PATH/vb-core-lib"
 
 OPTIONS=(
-    "Package Management"
-    "Vibranium Settings"
-    "Utilities"
+    "Settings"
+    "Packages"
     "Tweaks"
     "Help"
 )
@@ -24,17 +23,14 @@ while true; do
     done
 
     case "$CHOSEN" in
-        "Vibranium Settings")
+        "Settings")
             "$VIBRANIUM_PATH/configure/vibranium-main-menu"
             ;;
         "Help")
             vb-menu-help
             ;;
-        "Package Management")
+        "Packages")
             vb-menu-pkg
-            ;;
-        "Utilities")
-            vb-menu-utilities
             ;;
         "Tweaks")
             while true; do

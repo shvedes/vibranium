@@ -18,7 +18,7 @@ EOF
 mpd_music_dir() {
     local conf dir
 
-    conf="${XDG_CONFIG_HOME:-$HOME/.config}/mpd/mpd.conf"
+    conf="$XDG_CONFIG_HOME/mpd/mpd.conf"
     dir="$(sed -n 's/^[[:space:]]*music_directory[[:space:]]*"\(.*\)"/\1/p' "$conf" | head -n1)"
     [[ -z "$dir" ]] && return 1
 
@@ -49,7 +49,6 @@ esac
 
 file=""
 
-# MPD
 if mpc status 2>/dev/null | grep -q '\[playing\]'; then
     track="$(mpc current -f '%file%')"
     music_dir="$(mpd_music_dir)"
@@ -57,13 +56,12 @@ if mpc status 2>/dev/null | grep -q '\[playing\]'; then
     if [[ -n "$track" && -n "$music_dir" ]]; then
         file="file://$music_dir/$track"
     fi
-# Spotify
 elif playerctl -p spotify status 2>/dev/null | grep -iq playing; then
     file="$(playerctl metadata --format '{{xesam:url}}' 2>/dev/null)"
 fi
 
 if [[ -z "$file" ]]; then
-    echo "$(basename "$0"): no track is currently playing" >&2
+    echo "error: no track is currently playing" >&2
     if $notify; then
         notify-send -r 1 "Vibranium" "No track is currently playing"
     fi
@@ -73,6 +71,6 @@ fi
 printf '%s' "$file" | wl-copy --type text/uri-list
 
 if $notify && [[ ! "$file" =~ ^https?:// ]]; then
-    notify-send -r 1 "Vibranium" "<i><b>$(basename "$file")</b> copied to clipboard</i>"
+    notify-send -r 1 "Vibranium" "<i><b>$(basename "$file")</b></i> copied to clipboard"
 fi
 

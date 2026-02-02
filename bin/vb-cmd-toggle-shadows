@@ -1,47 +1,41 @@
 #!/usr/bin/env bash
 
-CONF_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d"
-CONF="$CONF_DIR/look-and-feel.conf"
-
 usage() {
     cat << EOF
-Usage: $(basename "$0") [--quiet] [--help]
+Usage: $(basename "$0") [OPTION]
 
 Toggle Hyprland shadow on/off.
 
 Options:
-  --quiet     Do not print 'enabled' or 'disabled'.
-  -h, --help  Show this help and exit
+  -q, --quiet  Do not print 'enabled' or 'disabled'.
+  -h, --help   Show this help and exit
 EOF
 }
 
 QUIET=false
-for arg in "$@"; do
-    case "$arg" in
-        --quiet) QUIET=true ;;
-        -h|--help) usage; exit 0 ;;
-        *) ;;
-    esac
-done
+CONF="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
 
-if ! grep -qE '^[[:space:]]*decoration[[:space:]]*{' "$CONF" 2>/dev/null; then
-    printf "\n\ndecoration {\n}\n" >> "$CONF"
-fi
+case "$1" in
+    -q|--quiet)
+        QUIET=true
+        ;;
+    -h|--help)
+        usage
+        exit 0
+        ;;
+    -*|--*)
+        echo "Unkown option: $1" >&2
+        echo "Try '$(basename "$0") --help' for more information." >&2
+        exit 1
+esac
 
-if ! grep -qE '^[[:space:]]*shadow[[:space:]]*{' "$CONF" 2>/dev/null; then
-    VALUE=$(hyprctl -j getoption decoration:shadow:enabled | jq -r '.int')
-    if [ "$VALUE" = 1 ]; then VALUE=true; else VALUE=false; fi
-    sed -i '/^[[:space:]]*decoration[[:space:]]*[{]/,/^[[:space:]]*[}]/ s/^[[:space:]]*[}][[:space:]]*/    shadow {\n        enabled = '"$VALUE"'\n    }\n&/' "$CONF"
-fi
-
-SHADOW_ENABLED="$(sed -n '/shadow[[:space:]]*[{]/,/}/{s/.*enabled[[:space:]]*=[[:space:]]*\([^;]*\).*/\1/p}' "$CONF")"
-case "$SHADOW_ENABLED" in
-    true)
-        sed -i '/shadow[[:space:]]*[{]/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1false/}' "$CONF"
+case "$(hyprctl -j getoption decoration:shadow:enabled | jq -r '.int')" in
+    1)
+        vb-cmd-edit-wm-config "decoration:shadow:enabled:false" "$CONF"
         [[ "$QUIET" = false ]] && echo "disabled"
         ;;
-    false)
-        sed -i '/shadow[[:space:]]*[{]/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1true/}' "$CONF"
+    0)
+        vb-cmd-edit-wm-config "decoration:shadow:enabled:true" "$CONF"
         [[ "$QUIET" = false ]] && echo "enabled"
         ;;
 esac

@@ -2,12 +2,18 @@
 
 # shellcheck disable=SC2034
 
+if ! tty -s; then
+    exec setsid vb-core-term "$0" "$@"
+    exit 0
+fi
+
 source "$VIBRANIUM_PATH/vb-core-lib"
 
 export SUDO_PROMPT TMPDIR
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 TMPDIR="/tmp"
+
 YAY_FLAGS=(
     "--answerclean" "Y"
     "--answerdiff" "N"
@@ -16,11 +22,6 @@ YAY_FLAGS=(
     "--cleanafter"
     "--sudoloop"
 )
-
-if ! tty -s; then
-    exec setsid vb-core-term "$0" "$@"
-    exit 0
-fi
 
 _operation_canceled() {
     case "$1" in
@@ -62,7 +63,7 @@ printf '\e[?25l' # Hide cursor
 # Source: omarchy
 fzf_args=(
     --multi
-    --preview 'yay -Sii {1} 2>/dev/null || yay -Sii {1}'
+    --preview 'yay -Si {1} 2>/dev/null || yay -Si {1}'
     --preview-label='alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select'
     --preview-label-pos='bottom'
     --preview-window 'right:75%:wrap'
@@ -84,12 +85,12 @@ else
     yay_file=$(mktemp)
 
     (pacman -Slq > "$arch_file") &
-    spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching Arch packages" ""
+    spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching Arch packages" "${GREEN}Done${RESET}"
     mapfile -t arch_packages < "$arch_file"
     total_packages=("${arch_packages[@]}")
 
     (yay -Slqa > "$yay_file") &> /dev/null &
-    spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching AUR packages" ""
+    spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching AUR packages" "${GREEN}Done${RESET}"
     mapfile -t aur_packages < "$yay_file"
     total_packages+=("${aur_packages[@]}")
 
@@ -133,9 +134,9 @@ while true; do
     printf "%s" "$prompt"
     read -r answer
     case "$answer" in
-        [Yy][Ee][Ss] | [Yy] | "")
+        [Yy][Ee][Ss]|[Yy]|"")
             if ! sudo -v; then
-                _operation_canceled ""
+                _operation_canceled
             fi
 
             if ! yay -S "${YAY_FLAGS[@]}" "${filtered[@]}"; then
@@ -229,13 +230,13 @@ while true; do
                 echo -e " - ${YELLOW}$pkg${RESET} (${scope} ${type})"
             done
 
-            prompt2=$'\e[0;33m[VIBRANIUM]\e[0m Do you wish to enable and start them now? (Y/n): '
+            prompt2=$'\e[0;33m[VIBRANIUM]\e[0m Do you wish to enable and start them now? (y/N): '
             while true; do
                 printf '\e[?25h' # show cursor
                 printf "%s" "$prompt2"
                 read -r answer
                 case "$answer" in
-                    [Yy][Ee][Ss] | [Yy] | "")
+                    [Yy][Ee][Ss]|[Yy])
                         printf '\e[?25l' # Hide cursor
                         if [[ ${#user_units[@]} -gt 0 ]]; then
                             echo -e "${GREEN}[VIBRANIUM]${RESET} Enabled ${YELLOW}${user_units[*]}${RESET}"
@@ -251,11 +252,11 @@ while true; do
                         fi
                         break
                         ;;
-                    [Nn][Oo] | [Nn])
+                    [Nn][Oo]|[Nn]|"")
                         printf '\e[?25l' # Hide cursor
                         break
                         ;;
-                    *)              # Wrong input
+                    *)  # Wrong input
                         printf '\e[A\r\e[K' # Go up, to start, clear line
                         ;;
                 esac
@@ -263,7 +264,7 @@ while true; do
 
             _installation_complete
             ;;
-        [Nn][Oo] | [Nn])
+        [Nn][Oo]|[Nn])
             _operation_canceled ""
             ;;
         *)                  # Wrong input

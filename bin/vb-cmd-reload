@@ -1,15 +1,14 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-defaults"
-source "$XDG_CONFIG_HOME/vibranium/settings"
+source vb-core-lib
 
 SYSTEMD_TARGETS=("cliphist" "hypridle" "gnome-polkit")
 
-[ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" = "true" ] && SYSTEMD_TARGETS+=("hyprpaper")
-[ "$VIBRANIUM_GLOBAL_USE_OSD" = "true" ] && SYSTEMD_TARGETS+=("swayosd")
+[[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]             && SYSTEMD_TARGETS+=("swayosd")
+[[ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" == true ]]      && SYSTEMD_TARGETS+=("hyprpaper")
 [ "$(systemctl --user is-active waybar)" = "active" ] && SYSTEMD_TARGETS+=("waybar")
 
-systemctl --user restart "${SYSTEMD_TARGETS[@]}"
+systemctl --user restart "${SYSTEMD_TARGETS[@]}" &
 vb-cmd-refresh-dunst
 
 if [[ "$1" != "-q|--qiuet" ]]; then

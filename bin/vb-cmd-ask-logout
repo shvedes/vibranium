@@ -1,5 +1,15 @@
 #!/bin/bash
 
-if [[ "$(printf "Yes\nNo" | rofi -dmenu -sync -p "Log out?")" == "Yes" ]]; then
+rofi_opts=(
+  -sync
+  -dmenu
+  -p "Log out?"
+  -hover-select
+  -me-select-entry ''
+  -me-accept-entry MousePrimary
+  -theme-str 'window{width: 250px;}'
+)
+
+if [[ "$(printf "Yes\nNo" | rofi "${rofi_opts[@]}")" == "Yes" ]]; then
     vb-core-stop-session
 fi

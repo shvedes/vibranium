@@ -64,7 +64,7 @@ tmp="$VIBRANIUM_RUNTIME/$(basename "$0".list)"
 (_get_fonts > $tmp) &
 
 pid=$!
-spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting font packages" ""
+spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting font packages" "${GREEN}Done${RESET}"
 wait $pid
 
 list="$(< $tmp)"

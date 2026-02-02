@@ -27,7 +27,7 @@ message {
 }
 
 element {
-    padding: 4px;
+    padding: 8px;
     spacing: 16px;
     cursor:  pointer;
 }

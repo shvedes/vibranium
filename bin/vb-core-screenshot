@@ -146,11 +146,11 @@ capture() {
             [[ -z "$geometry" ]] && exit 1
 
             grim ${GRIM_OPTS[@]} -g "$geometry" "$output_file"
-            [[ $FLASH_BORDER ==  true ]] && _flash border
+            [[ $FLASH_BORDER ==  true ]] && _flash border &
             ;;
         screen)
             grim ${GRIM_OPTS[@]} "$output_file"
-            [[ $FLASH_SCREEN == true ]] && _flash screen
+            [[ $FLASH_SCREEN == true ]] && _flash screen &
             ;;
     esac
 

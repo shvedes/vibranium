@@ -42,8 +42,8 @@ rofi_cmd() {
          [8]=208 [6]=200 [0]=196
     )
 
-    if pgrep -x rofi > /dev/null; then
-        pkill -x rofi
+    if pidof -q rofi; then
+        killall rofi
         exit 1
     fi
 
@@ -153,101 +153,27 @@ spinner() {
     fi
 }
 
-spinner() {
-    local pid msg final_msg mode tooltip
-
-    # --- arg parsing ---
-    while [[ "$1" == --* ]]; do
-        case "$1" in
-            --waybar)
-                mode="waybar"
-                shift
-                ;;
-            --tooltip)
-                [[ "$mode" != "waybar" ]] && {
-                    echo "--tooltip можно использовать только с --waybar" >&2
-                    return 1
-                }
-                tooltip="$2"
-                shift 2
-                ;;
-            *)
-                echo "Unknown flag: $1" >&2
-                return 1
-                ;;
-        esac
-    done
-
-    pid=$1
-    msg=$2
-    final_msg=$3
-
-    local delay=0.07
-    local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-    local clear_line="\r\033[K"
-
-    # --- main loop ---
-    while kill -0 "$pid" 2>/dev/null; do
-        for i in "${spinstr[@]}"; do
-            if [[ "$mode" == "waybar" ]]; then
-                if [[ -n "$tooltip" ]]; then
-                    printf '{"text":"%s %s","tooltip":"%s"}\n' "$msg" "$i" "$tooltip"
-                else
-                    printf '{"text":"%s %s"}\n' "$msg" "$i"
-                fi
-            else
-                printf "\r%s %s " "$msg" "$i"
-            fi
-            sleep "$delay"
-        done
-    done
-
-    # --- finish ---
-    if [[ "$mode" == "waybar" ]]; then
-        local out="${final_msg:-$msg}"
-        if [[ -n "$tooltip" ]]; then
-            printf '{"text":"%s","tooltip":"%s"}\n' "$out" "$tooltip"
-        else
-            printf '{"text":"%s"}\n' "$out"
-        fi
-    else
-        printf "%b" "$clear_line"
-        if [[ -n "$final_msg" ]]; then
-            printf "%s %s\n" "$msg" "$final_msg"
-        else
-            printf "%s\n" "$msg"
-        fi
-    fi
-}
-
-
 # Validate that a named variable contains a numeric value (int or float) and
 # substitute a default when necessary.
 #
 # Usage:
 #   check_int <var_name> <default> [type]
 check_int() {
-    local var_name=$1
-    local default=$2
-    local type=${3:-int}     # Default: int
-    local val="${!var_name}" # indirect expansion: value of variable named in $var_name
+    local var_name="$1"
+    local default="$2"
+    local type="${3:-int}"
+    local val="${!var_name}"
 
-    # If the variable is empty — warn and set default
     if [[ -z $val ]]; then
-        print_warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "$var_name is unset. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
 
-    # Replace comma with dot to handle locales using comma as decimal separator
     local normalized="${val//,/.}"
-
-    # Regex for float (accepts integers and fractional values: "1", "1.5", ".5", "-0.2")
     local float_re='^-?([0-9]+([.][0-9]+)?|[.][0-9]+)$'
-    # Regex for int (only whole numbers, optional leading minus)
     local int_re='^-?[0-9]+$'
 
-    # Choose proper regex based on requested type
     local number_re
     if [[ $type == "float" ]]; then
         number_re=$float_re
@@ -255,12 +181,10 @@ check_int() {
         number_re=$int_re
     fi
 
-    # If the value doesn't match the regex — warn and set default
     if ! [[ $normalized =~ $number_re ]]; then
-        print_warn "Invalid value for ${YELLOW}${var_name}${RESET}. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "Invalid value for ${var_name}. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
     else
-        # Write the normalized numeric string back into the variable
         printf -v "$var_name" '%s' "$normalized"
     fi
 }
@@ -275,22 +199,18 @@ check_bool() {
     local default=$2
     local val="${!var_name}"
 
-    # If the variable is empty — warn and set default
     if [[ -z $val ]]; then
-        print_warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "$var_name is unset. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
 
-    # Normalize to lowercase to accept True/TRUE/False etc.
     local normalized="${val,,}"
 
-    # Validate allowed boolean strings
     if [[ $normalized != "true" && $normalized != "false" ]]; then
-        print_warn "Invalid value for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "Invalid value for $var_name. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
     else
-        # Write normalized value back (preserves predictable canonical form)
         printf -v "$var_name" '%s' "$normalized"
     fi
 }
@@ -307,21 +227,18 @@ check_enum() {
     local allowed=("$@")
     local val="${!var_name}"
 
-    # If the caller passed no allowed values, treat that as an error and fall back.
     if [[ ${#allowed[@]} -eq 0 ]]; then
-        print_warn "No allowed values provided for ${var_name}. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "Invalid value for $var_name. Falling to defaults."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
 
-    # If the variable is empty — warn and set default
     if [[ -z $val ]]; then
-        print_warn "${var_name} is unset. Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "$var_name is unset. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
 
-    # Check if the variable matches one of the allowed values (exact match)
     local ok=false
     for a in "${allowed[@]}"; do
         if [[ $val == "$a" ]]; then
@@ -330,9 +247,8 @@ check_enum() {
         fi
     done
 
-    # If not allowed — warn and set default; otherwise keep the value as-is
     if [[ $ok != true ]]; then
-        print_warn "${var_name} has invalid value! Falling back to ${PURPLE}'${default}'${RESET}."
+        print_warn "Invalid value for $var_name. Falling to defaults."
         printf -v "$var_name" '%s' "$default"
     else
         printf -v "$var_name" '%s' "$val"
@@ -340,58 +256,34 @@ check_enum() {
 }
 
 # Self-explanatory
+# https://wiki.hypr.land/Configuring/Dispatchers/#fullscreenstate
 is_fullscreen() {
-    # https://wiki.hypr.land/Configuring/Dispatchers/#fullscreenstate
-    if [ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# This feature relies heavily on the “game” tag, which is assigned manually.
-# Although a relatively large regex is currently used (which could potentially capture thousands of games),
-# it will still not be enough. Since I cannot install and test all existing games (who can, hehe), all my hope lies in PRs
-is_in_game() {
-    tag="$(hyprctl -j activewindow | jq -r '.tags.[0]')"
-    if [[ $tag =~ "game" ]]; then
-        return 0
-    else
-        return 1
-    fi
+    [[ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]]
 }
 
 is_headless() {
-    if [[ -t 1 ]]; then
-        return 1
-    else
-        return 0
-    fi
+    [[ -t 1 ]] || return 0 && return 1
 }
 
 print_error() {
-    if [[ -t 2 ]]; then
-        printf "error: %s\n" "$*" >&2
-    fi
+    [[ -t 2 ]] && printf "error: %s\n" "$*" >&2
 }
 
 print_warn() {
-    if [[ -t 1 ]]; then
-        printf "warn: %s\n" "$*"
-    fi
+    [[ -t 1 ]] && printf "warn: %s\n" "$*"
 }
 
 print_log() {
-    if [[ -t 1 ]]; then
-        printf "log: %s\n" "$*"
-    fi
+    [[ -t 1 ]] && printf "log: %s\n" "$*"
 }
 
 # Usage: _flash <border|screen>
 _flash() {
-    local type speed_var seconds
+    local type="$1"
+    local speed_var
+    local seconds
 
-    type="$1"
+    [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]] && return 0
 
     check_enum VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED "medium" slow medium fast very_fast
     check_enum VIBRANIUM_GLOBAL_FLASH_SCREEN_SPEED "medium" slow medium fast very_fast
@@ -408,13 +300,11 @@ _flash() {
 
     seconds=${speed_map[${!speed_var}]}
 
-    # Do nothing if animations disabled
-    [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]] && return 0
 
     if [[ $type == border ]]; then
         for _ in 1 2; do
             # Briefly flash active window's border
-            hyprctl -q "keyword general:col.active_border rgb(ffffff)"
+            hyprctl -q "keyword general:col.active_border rgb(cdcecf)"
             sleep "$seconds"
             # Use 'config-only' to avoid display reloads
             # (therefore possible graphical micro-artifacts when shadow / blur is enabled)
