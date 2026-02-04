@@ -31,6 +31,7 @@ declare -A links=(
 	["$HOME/.local/share/vibranium/default/uwsm/env"]="$HOME/.config/uwsm/env"
 	["$HOME/.local/share/vibranium/default/imv"]="$HOME/.config/imv/config"
 	["$HOME/.config/vibranium/theme/current/qt6ct.conf"]="$HOME/.config/qt6ct/colors/vibranium.conf"
+	["$HOME/.config/vibranium/theme/current/qt6ct.conf"]="$HOME/.config/qt5ct/colors/vibranium.conf"
 	["$HOME/.local/share/vibranium/default/wlogout/style.css"]="$HOME/.config/wlogout"
 	["$HOME/.local/share/vibranium/default/wlogout/layout"]="$HOME/.config/wlogout"
 	["$HOME/.config/vibranium/theme/current/spicetify.ini"]="$HOME/.config/spicetify/Themes/text/color.ini"

@@ -57,6 +57,7 @@ thunar
 unzip
 slurp
 qt6ct
+qt5ct
 nvtop
 dunst
 bluez

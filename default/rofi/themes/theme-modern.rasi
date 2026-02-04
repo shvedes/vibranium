@@ -55,6 +55,7 @@ element-text {
     background-color: transparent;
     text-color:       inherit;
     cursor:           inherit;
+    margin:           6px 0 0 0;
 }
 
 element-icon {
