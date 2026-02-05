@@ -15,10 +15,6 @@ ACTIONS+=(
     "Toggle inhibitor"
 )
 
-if command -v syncthing > /dev/null; then
-    ACTIONS+=("Launch Syncthing")
-fi
-
 ACTIONS+=(
     "Reload Vibranium"
     "Close all windows"
@@ -50,9 +46,6 @@ case "$CHOSEN" in
         ;;
     "Set timer")
         setsid vb-util-timer
-        ;;
-    "Launch Syncthing")
-        vb-app-syncthing
         ;;
     "Reload Vibranium")
         vb-cmd-reload

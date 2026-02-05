@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Syncthing
+Icon=syncthing
+TryExec=syncthing
+Exec=vb-app-syncthing
+Comment=Open Source Continuous File Synchronization
