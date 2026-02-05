@@ -14,5 +14,5 @@ if [[ $state == "active" ]]; then
     tooltip="Night Light temperature: ${current}K"
     printf '{"text": "%s", "tooltip": "%s"}' "\\udb80\\udf35" "$tooltip"
 else
-    printf '{"text": ""}'
+    printf '{"text": "%s", "tooltip": "Night Light is suspended"}' "\\udb80\\udf35"
 fi
