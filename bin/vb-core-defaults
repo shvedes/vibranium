@@ -7,6 +7,12 @@
 # ============================================ #
 #                                              #
 
+# Which shader to use with reading mode.
+# Available options: string 'grayscale' 'e-ink'
+#
+# Default is e-ink
+VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE="e-ink"
+
 # Which inhibition type to use when using sleep inhibitor.
 # Available options: string 'idle' 'sleep'
 #

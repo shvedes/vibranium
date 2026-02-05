@@ -189,6 +189,7 @@ while true; do
         "<b>Power profiles</b>"
         "<b>Notifications</b>"
         "<b>Edit env vars</b>"
+        "<b>Reading mode</b>"
     )
 
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Global options" "ESC to go back" -selected-row "$INDEX")"
@@ -718,6 +719,13 @@ while true; do
                     "Border") _flash_submenu VIBRANIUM_GLOBAL_FLASH_BORDER VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED "Border" ;;
                 esac
             done
+            ;;
+        *"Reading mode"*)
+            update_enum VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE "Choose shader type" "grayscale" "e-ink"
+            if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
+                vb-cmd-toggle-readmode
+                vb-cmd-toggle-readmode
+            fi
             ;;
     esac
 done
