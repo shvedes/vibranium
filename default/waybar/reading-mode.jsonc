@@ -4,7 +4,7 @@
 		"hide-empty-text": true,
 
 		"exec": "vb-bar-reading-mode",
-		"on-click": "vb-cmd-toggle-readmode",
+		"on-click": "vb-cmd-toggle-reading-mode",
 
 		"signal": 14,
 		"return-type": "json"

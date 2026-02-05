@@ -40,7 +40,7 @@ case "$CHOSEN" in
         vb-cmd-close-windows
         ;;
     "Toggle read mode")
-        vb-cmd-toggle-readmode
+        vb-cmd-toggle-reading-mode
         ;;
     "Copy current track")
         vb-cmd-copy-track --notify
