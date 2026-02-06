@@ -39,7 +39,12 @@ _installation_complete() {
     exit 0
 }
 
-_get_fonts() { yay -Ssq | grep -E "^(ttf|otf).*(-nerd(-mono)?)?"; }
+_get_fonts() {
+    pacman -Slq | grep -E "^(ttf|otf).*(-nerd(-mono)?)?"
+    yay -Slqa | grep -E "^(ttf|otf).*(-nerd(-mono)?)?"
+}
+
+_update_fc_cache() { fc-cache -sf ;}
 
 trap '_operation_canceled quit' SIGHUP
 trap 'exit 1' SIGINT
@@ -77,3 +82,4 @@ if [ ${#chosen[@]} -eq 0 ]; then
 fi
 
 vb-pkg-install --no-logo "$chosen"
+_update_fc_cache
