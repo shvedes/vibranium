@@ -34,10 +34,6 @@ tooltip label {
 	animation: urgent-workspace 1s infinite
 }
 
-#clock {
-    font-weight: bold;
-}
-
 .modules-right {
 	color: @foreground;
 	margin-right: 8px
