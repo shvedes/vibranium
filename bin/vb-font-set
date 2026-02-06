@@ -43,7 +43,16 @@ fi
 # Rofi
 sed -i -E "s/(font:\s*\")[^\"]* ([0-9]+)\"/\1${selected} \2\"/" "$XDG_CONFIG_HOME/rofi/config.rasi"
 
-# Reload dunst
 vb-cmd-refresh-dunst
+
+waybar_status="$(systemctl --user is-active waybar)"
+if [[ $waybar_status == active ]]; then
+    systemctl --user restart waybar
+fi
+
+check_bool VIBRANIUM_GLOBAL_USE_OSD false
+if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
+    systemctl --user restart swayosd
+fi
 
 notify-send -r 1 -t 2000 "Vibranium" "Default font changed to <span foreground='${P_ACCENT}'><b>${selected}</b></span>"
