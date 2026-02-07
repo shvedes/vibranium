@@ -93,12 +93,23 @@ init_recording() {
 
     CAPTURE_SINK="$VIBRANIUM_RECORDING_CAPTURE_SINK"
     CAPTURE_SOURCE="$VIBRANIUM_RECORDING_CAPTURE_SOURCE"
+    USE_RNNOISE=$VIBRANIUM_RECORDING_USE_RNNOISE
 
-    if [[ $CAPTURE_SINK && $CAPTURE_SINK ]]; then
-        opt_flags+=(-a 'default_input|default_output')
-    elif [[ $CAPTURE_SOURCE ]]; then
-        opt_flags+=(-a 'default_input')
-    elif [[ $CAPTURE_SINK ]]; then
+    local rnnoise_present=$(pactl list short sources | grep -q rnnoise_source && echo true || echo false)
+
+    if [[ $CAPTURE_SOURCE == true ]]; then
+        if [[ $USE_RNNOISE == true && $rnnoise_present == true ]]; then
+            input_node='rnnoise_source'
+        else
+            input_node='default_input'
+        fi
+    fi
+
+    if [[ $CAPTURE_SOURCE == true && $CAPTURE_SINK == true ]]; then
+        opt_flags+=(-a "${input_node}|default_output")
+    elif [[ $CAPTURE_SOURCE == true ]]; then
+        opt_flags+=(-a "${input_node}")
+    elif [[ $CAPTURE_SINK == true ]]; then
         opt_flags+=(-a 'default_output')
     fi
 
@@ -152,6 +163,7 @@ start_rec() {
 
     check_bool VIBRANIUM_RECORDING_CAPTURE_SOURCE false
     check_bool VIBRANIUM_RECORDING_CAPTURE_SINK true
+    check_bool VIBRANIUM_RECORDING_USE_RNNOISE true
 
     check_enum VIBRANIUM_RECORDING_QUALITY "medium" medium high very_high ultra
     check_enum VIBRANIUM_RECORDING_CONTAINER_TYPE "mp4" mp4 mkv webm flv

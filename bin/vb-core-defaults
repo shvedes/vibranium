@@ -498,6 +498,12 @@ VIBRANIUM_RECORDING_VIDEO_CODEC="auto"
 # Default is false
 VIBRANIUM_RECORDING_CAPTURE_SOURCE=false
 
+# Whether to use RNNoise when available.
+# Available options: bool
+#
+# Default is true
+VIBRANIUM_RECORDING_USE_RNNOISE=true
+
 # Whether to capture your output device.
 # Available options: bool
 #

@@ -151,6 +151,7 @@ _advanced_menu() {
 INDEX=0
 LIMIT_FPS_MIN=24
 REFRESH_RATE="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .refreshRate')"
+RNNOISE_MODULE_ENABLED="$(pactl list short sources | grep -q rnnoise_source && echo true || echo false)"
 
 [[ $REFRESH_RATE =~ ^([0-9]+)(\.[0-9]+)?$ ]] && LIMIT_FPS_MAX="${BASH_REMATCH[1]}"
 
@@ -163,12 +164,22 @@ while true; do
 
     capture_vol="$VIBRANIUM_RECORDING_CAPTURE_SINK"
     capture_mic="$VIBRANIUM_RECORDING_CAPTURE_SOURCE"
+    use_rnnoise="$VIBRANIUM_RECORDING_USE_RNNOISE"
 
     OPTIONS=(
         "FPS : $VIBRANIUM_RECORDING_FPS"
         "Quality : $quality"
         "Capture volume : $capture_vol"
         "Capture microphone : $capture_mic"
+    )
+
+    if [[ $capture_mic == true ]]; then
+        if [[ $RNNOISE_MODULE_ENABLED == true ]]; then
+            OPTIONS+=("Noise cancelattion : $use_rnnoise")
+        fi
+    fi
+
+    OPTIONS+=(
         "<b><i>Advanced</i></b>"
     )
 
@@ -198,6 +209,9 @@ while true; do
             ;;
         "Capture microphone"*)
             toggle_bool "VIBRANIUM_RECORDING_CAPTURE_SOURCE"
+            ;;
+        "Noise"*)
+            toggle_bool VIBRANIUM_RECORDING_USE_RNNOISE
             ;;
         *"Advanced"*)
             _advanced_menu
