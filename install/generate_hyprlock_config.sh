@@ -8,8 +8,9 @@ background {
 	# Auto generated. Do not edit!
 	path = "$HOME/.config/vibranium/theme/current/backgrounds/01-nightfox-bg.jpg"
 	color = \$background
+    blur_size = 1
+    blur_passes = 1
     brightness = 0.5
-    blur_passes = 2
 }
 
 animations {

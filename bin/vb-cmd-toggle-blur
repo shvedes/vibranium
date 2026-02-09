@@ -20,6 +20,30 @@ Options:
 EOF
 }
 
+_toggle_hyprlock() {
+    local hyprlock_conf="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+
+    # current blur_passes (first occurrence)
+    local current
+    current=$(grep -m1 -E '^[[:space:]]*blur_passes[[:space:]]*=' "$hyprlock_conf" \
+              | sed -E 's/.*=[[:space:]]*([0-9]+).*/\1/')
+
+    # decide target state
+    if [[ "$current" == "3" ]]; then
+        new_passes=1
+        new_size=1
+    else
+        new_passes=3
+        new_size=5
+    fi
+
+    # replace values, keep indentation
+    sed -i -E \
+        -e "s|^([[:space:]]*blur_passes[[:space:]]*=[[:space:]]*).*$|\1$new_passes|" \
+        -e "s|^([[:space:]]*blur_size[[:space:]]*=[[:space:]]*).*$|\1$new_size|" \
+        "$hyprlock_conf"
+}
+
 QUIET=false
 
 for arg in "$@"; do
@@ -59,3 +83,5 @@ fi
 if [[ "$(hyprctl -j getoption misc:disable_autoreload | jq -r '.int')" == "1" ]]; then
     hyprctl -q reload config-only &
 fi
+
+_toggle_hyprlock

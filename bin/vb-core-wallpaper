@@ -130,4 +130,3 @@ if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
 fi
 
 update_configs "$WALLPAPER_PATH"
-
