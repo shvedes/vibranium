@@ -54,7 +54,9 @@ case "$1" in
 
         if [[ -f "$RESTORE_FLAG" ]]; then
             rm -f "$RESTORE_FLAG"
-            vb-core-mediacontrol --toggle &
+            if ! player_is_playing; then
+                vb-core-mediacontrol --toggle &
+            fi
 
             check_bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING false
             if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
