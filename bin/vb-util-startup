@@ -6,6 +6,8 @@
 
 source "$VIBRANIUM_PATH/vb-core-lib"
 
+LOGFILE="$VIBRANIUM_CACHE/$(basename "$0".errors)"
+
 # This function handles cases where the monitor brightness might have been changed
 # manually, dual-boot (e.g. Monitorian), or through any external means outside the script.
 # It checks the current brightness via DDC, compares it with the cached value,
@@ -39,7 +41,10 @@ _set_ddc_brightness() {
     fi
 }
 
-_set_ddc_brightness &
+{ _set_ddc_brightness || {
+        print_error "unable to restore brightness level for the external monitor(s)" >> "$LOGFILE" 2>&1
+    }
+} &
 
 _toggle_loopback() {
     while ! pidof -q pipewire; do
