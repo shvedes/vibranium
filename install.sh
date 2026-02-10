@@ -98,7 +98,7 @@ install_packages() {
     case "$fs" in
         btrfs)
             printf "%s[VIBRANIUM]%s BTRFS root found. Adding required drivers to the queue\n" "$YELLOW" "$RESET"
-            packages+=("btrfs-progs")
+            packages+=("btrfs-progs" "compsize")
             ;;
     esac
 
