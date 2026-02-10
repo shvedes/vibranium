@@ -139,7 +139,7 @@ while true; do
                 _operation_canceled
             fi
 
-            if ! yes | yay -S "${YAY_FLAGS[@]}" "${filtered[@]}"; then
+            if ! yes | yay -S --noconfirm "${YAY_FLAGS[@]}" "${filtered[@]}"; then
                 _operation_canceled
             fi
 
