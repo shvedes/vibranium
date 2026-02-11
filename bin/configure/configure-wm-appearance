@@ -545,8 +545,15 @@ while true; do
     )
 
     mapfile -t OPTIONS < <(align_options "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Look & Feel" "ESC to go back")"
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Look & Feel" "ESC to go back" -selected-row "$INDEX")"
     [[ -z $CHOSEN ]] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
 
     case "$CHOSEN" in
         *"Blur"*)
