@@ -60,7 +60,7 @@ _a_feedback() {
                 toggle_bool "VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK"
                 ;;
             "Variant"*)
-                handle_audio_variant
+                _a_feedback_variant
                 ;;
         esac
     done
