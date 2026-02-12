@@ -1,66 +1,342 @@
 #!/usr/bin/env bash
 
-# shellcheck disable=SC2034
-
 source vb-core-lib
 
-export SUDO_PROMPT
+_usage() {
+    local progname="${0##*/}"
+
+    cat <<EOF
+Usage: $progname [OPTION]... [PACKAGE]...
+
+Uninstall packages in Vibranium
+
+Options:
+  --no-logo         Do not display the logo at startup
+  --no-dummy        Do not wait for a key press after completion or cancellation
+
+If no PACKAGE is provided, list explicitly installed packages and use fzf for interactive selection.
+Packages are filtered to those installed. Before removal, detects and disables enabled systemd units (services/sockets)
+from the packages to clean up broken symlinks to systemd folders.
+EOF
+}
+
+_handle_systemd() {
+    user_enabled_units=()
+    system_enabled_units=()
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Getting systemd service information..."
+
+    declare -A seen_system=()
+    declare -A seen_user=()
+    # map unit -> package for user and system scope
+    declare -A unit_pkg_user=()
+    declare -A unit_pkg_system=()
+
+    for pkg in "${PACKAGES[@]}"; do
+        while IFS= read -r file; do
+            [[ -z "$file" ]] && continue
+
+            # extract the path (second field). pacman -Ql uses a single space separator.
+            path="${file#* }"
+            case "$path" in
+                */systemd/*.service|*/systemd/*.socket)
+                    unit="$(basename "$path")"
+                    # classify user vs system by presence of "systemd/user"
+                    if [[ "$path" == *"/systemd/user/"* ]]; then
+                        # dedupe
+                        [[ -n "${seen_user[$unit]}" ]] && continue
+                        seen_user[$unit]=1
+                        # record which package provided this unit
+                        unit_pkg_user[$unit]="$pkg"
+                        # check enabled state for user unit
+                        if systemctl -q --user is-enabled "$unit" 2>/dev/null; then
+                            user_enabled_units+=("$unit")
+                        fi
+                    else
+                        # system-level unit (includes /usr/lib/systemd/system and /etc/systemd/system)
+                        [[ -n "${seen_system[$unit]}" ]] && continue
+                        seen_system[$unit]=1
+                        # record which package provided this unit
+                        unit_pkg_system[$unit]="$pkg"
+                        # check enabled state for system unit; use sudo as systemctl --system may require privileges
+                        if sudo systemctl -q is-enabled "$unit" 2>/dev/null; then
+                            system_enabled_units+=("$unit")
+                        fi
+                    fi
+                    ;;
+                *)
+                    # ignore other files
+                    ;;
+            esac
+        done < <(pacman -Ql "$pkg" 2>/dev/null)
+    done
+
+    # export maps so other functions can see them (declare -g for bash)
+    # if your bash does not support declare -gA, make these global by other means
+    declare -gA VIB_unit_pkg_user=()
+    declare -gA VIB_unit_pkg_system=()
+    for k in "${!unit_pkg_user[@]}"; do VIB_unit_pkg_user[$k]="${unit_pkg_user[$k]}"; done
+    for k in "${!unit_pkg_system[@]}"; do VIB_unit_pkg_system[$k]="${unit_pkg_system[$k]}"; done
+}
+
+# Disables detected systemd units (services or sockets) for each package individually if they are enabled.
+# It checks if the unit is enabled, prompts the user for confirmation before disabling each unit.
+_disable_systemd_units() {
+    local pids=()
+    local task_units=()
+    local task_pkgs=()
+    local task_scopes=()
+
+    # user scope units
+    for unit in "${user_enabled_units[@]}"; do
+        pkg="${VIB_unit_pkg_user[$unit]:-unknown}"
+        if _ask_yes_no Y "Disable unit '${BLUE}${unit}${RESET}' from package '${GREEN}${pkg}${RESET}' (user scope) before removal?"; then
+            systemctl -q --user --now disable "$unit" &
+            pids+=("$!")
+            task_units+=("$unit")
+            task_pkgs+=("$pkg")
+            task_scopes+=("user")
+        fi
+    done
+
+    # system scope units
+    for unit in "${system_enabled_units[@]}"; do
+        pkg="${VIB_unit_pkg_system[$unit]:-unknown}"
+        if _ask_yes_no Y "Disable unit '${BLUE}${unit}${RESET}' from package '${GREEN}${pkg}${RESET}' (system scope) before removal?"; then
+            sudo systemctl -q --now disable "$unit" &
+            pids+=("$!")
+            task_units+=("$unit")
+            task_pkgs+=("$pkg")
+            task_scopes+=("system")
+        fi
+    done
+
+    # wait for background disable commands to finish and report results
+    local idx=0
+    for pid in "${pids[@]}"; do
+        if wait "$pid"; then
+            printf "%s[VIBRANIUM]%s Disabled '%s' (%s scope) from package '%s'\n" "$GREEN" "$RESET" "${task_units[$idx]}" "${task_scopes[$idx]}" "${task_pkgs[$idx]}"
+        else
+            printf "%s[VIBRANIUM]%s Failed to disable '%s' (%s scope) from package '%s'\n" "$RED" "$RESET" "${task_units[$idx]}" "${task_scopes[$idx]}" "${task_pkgs[$idx]}"
+        fi
+        idx=$((idx + 1))
+    done
+}
+
+_operation_canceled() {
+    local color="$RED"
+    local exit_after=false
+
+    case "$1" in
+        --positive)
+            color="$GREEN"
+            ;;
+        --exit)
+            exit_after=true
+            ;;
+    esac
+
+    printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
+
+    if [[ $NO_DUMMY == false ]]; then
+        read -n1 -r -s -p $'. Press any key to exit' dummy
+        printf '\e[?25h' # Show cursor
+    fi
+
+    if [[ $exit_after == true ]]; then
+        exit 1
+    fi
+}
+
+_uninstallation_complete() {
+    printf "%s[VIBRANIUM]%s Uninstallation complete" "$GREEN" "$RESET"
+
+    if [[ $NO_DUMMY == false ]]; then
+        printf '\e[?25h' # Show cursor
+        read -n1 -r -p $'. Press any key to exit' dummy
+    fi
+}
+
+_ask_yes_no() {
+    local default="${1:-Y}"
+    local message="$2"
+    local input prompt hint
+
+    default="${default^^}"
+
+    # Set hint based on default
+    case "$default" in
+        Y) hint="(Y/n)" ;;
+        N) hint="(y/N)" ;;
+        *) hint="(Y/n)"; default="Y" ;;
+    esac
+
+    while true; do
+        # Show cursor
+        printf '\e[?25h'
+
+        prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
+
+        printf "%s" "$prompt"
+        read -r input
+
+        # Use default if empty
+        [[ -z "$input" ]] && input="$default"
+
+        case "$input" in
+            [Yy][Ee][Ss]|[Yy])
+                # Hide cursor before returning
+                printf '\e[?25l'
+                return 0
+                ;;
+            [Nn][Oo]|[Nn])
+                # Hide cursor before returning
+                printf '\e[?25l'
+                return 1
+                ;;
+            *)
+                # Clear line and retry
+                printf "\r\e[K"
+                ;;
+        esac
+    done
+}
+
+# Displays an overview of packages about to be uninstalled.
+# Formats differently based on the number of packages for readability.
+_show_overview() {
+    local packages=("${PACKAGES[@]}")
+
+    if [[ "${#packages[@]}" -gt 0 ]]; then
+        if [[ "${#packages[@]}" -le 3 ]]; then
+            echo -e "${BLUE}[VIBRANIUM]${RESET} You're about to uninstall the following packages: ${YELLOW}${packages[@]}${RESET}"
+        else
+            echo -e "${BLUE}[VIBRANIUM]${RESET} You're about to uninstall the following packages:"
+            for pkg in "${packages[@]}"; do
+                echo -e "\t   - ${YELLOW}${pkg}${RESET}"
+            done
+        fi
+    fi
+}
+
+_uninstall_packages() {
+    if ! sudo -v; then
+        _operation_canceled
+        exit 1
+    fi
+
+    if sudo pacman -Rns "${PACKAGES[@]}"; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+_get_installed_packages() {
+    mapfile -t PACKAGES < <(pacman -Qqe)
+}
+
+_choose_packages() {
+    local chosen=()
+
+    mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | fzf "${FZF_ARGS[@]}")
+
+    [[ "${#chosen[@]}" -eq 0 ]] && return 1
+    PACKAGES=("${chosen[@]}")
+}
+
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
+export SUDO_PROMPT
 
-if ! tty -s; then
-    exec setsid vb-core-term "$0"
-    exit 0
-fi
+NO_LOGO=false
+NO_DUMMY=false
+PACKAGES=()
 
-printf "\n\e[33m%s\e[0m\n\n" "$(cat "$VIBRANIUM/logo.txt")"
-
-# Source: omarchy
-fzf_args=(
+FZF_ARGS=(
     --multi
-    --preview 'pacman -Qi {1}'
-    --preview-label='alt-p: toggle description, alt-j/k: scroll preview pane, ctrl-j/k: next/prev item, tab: multi-select'
+    --preview 'pacman -Qi {1} 2>/dev/null || pacman -Qi {1}'
+    --preview-label='alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select'
     --preview-label-pos='bottom'
-    --preview-window 'right:65%:wrap'
+    --preview-window 'right:75%:wrap'
     --bind 'alt-p:toggle-preview'
     --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
     --bind 'alt-k:preview-up,alt-j:preview-down'
     --color 'pointer:blue,marker:white'
 )
 
-# you don't wanna delete important system packages, do you?
-# so keep -Qqe to show only explicitly installed packages
-mapfile -t chosen < <(pacman -Qqe | fzf "${fzf_args[@]}")
+trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT
 
-if [ ${#chosen[@]} -eq 0 ]; then
-    echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
-    exit 1
-fi
-
-prompt2=$'\e[0;33m[VIBRANIUM]\e[0m You are about to remove the following packages: \e[0;33m'"${chosen[*]}"$'\e[0m. Proceed? (Y/n): '
-
-while true; do
-    printf '\e[?25h'  # show cursor
-    printf "%s" "$prompt2"
-    read -r answer
-    case "$answer" in
-        [Yy][Ee][Ss] | [Yy] | "")
-            if ! sudo -v; then
-                echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
-                exit 1
-            fi
-
-            sudo pacman -Rns "${chosen[@]}"
-            echo -e "${GREEN}[VIBRANIUM]${RESET} Operation completed successfully"
-            read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
-            exit 0
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --no-logo)
+            NO_LOGO=true
+            shift
             ;;
-        [Nn][Oo] | [Nn])
-            printf '\e[?25l'  # hide cursor
-            echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
+        --no-dummy)
+            NO_DUMMY=true
+            shift
+            ;;
+        --help)
+            _usage
+            ;;
+        --)
+            shift
+            break
+            ;;
+        --*)
+            echo "Unknown option: $1" >&2
             exit 1
             ;;
-        *)  # Wrong input
-            printf '\e[A\r\e[K'  # move up, clear line
+        *)
+            break
             ;;
     esac
 done
+
+if [[ $NO_LOGO == false ]]; then
+    printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo acces in order to delete packages"
+sudo -v
+
+# Hide cursor
+printf '\e[?25l'
+
+if [[ $# -gt 0 ]]; then
+    PACKAGES=("$@")
+else
+    if ! command -v fzf > /dev/null; then
+        if term::is_headless; then
+            notify-send -r 4 "Vibranium" "<b><i>fzf</i></b> not found!"
+        fi
+
+        log::error "fzf is not installed!"
+        exit 1
+    fi
+
+    _get_installed_packages
+
+    if _choose_packages; then
+        : # Proceed
+    else
+        _operation_canceled --positive
+        exit 0
+    fi
+fi
+
+_show_overview
+
+if _ask_yes_no Y "Proceed with uninstallation?"; then
+    _handle_systemd
+    _disable_systemd_units
+
+    if _uninstall_packages; then
+        _uninstallation_complete
+    else
+        _operation_canceled
+        exit 1
+    fi
+else
+    _operation_canceled
+fi
