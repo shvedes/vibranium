@@ -5,11 +5,7 @@ cat <<EOF > "$HOME/.config/swayosd/style.css"
 @import url("../../.local/share/vibranium/default/swayosd.css");
 
 window#osd, progressbar {
-	border-radius:	0px;
-}
-
-progressbar {
-	min-height:	12px;
+	border-radius: 0px;
 }
 EOF
 

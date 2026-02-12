@@ -70,6 +70,8 @@ if [[ $BLUR_ENABLED == false ]]; then
         if [[ -t 1 ]]; then
             echo "\$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE set to true"
             exit 1
+        else
+            notify-send -r 4 -u critical -t 3000 "Vibranium" "<b>Respect Power Profile</b> is set. Ignoring selected option"
         fi
     else
         vb-cmd-edit-wm-config decoration:blur:enabled:true "$CONF"

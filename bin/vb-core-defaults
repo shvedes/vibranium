@@ -23,34 +23,6 @@ VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE="e-ink"
 # Defalut is 'idle'
 VIBRANIUM_GLOBAL_INHIBIT_TYPE="idle"
 
-# Whether to flash border of an active window when (usually) taking screenshots.
-# Available options: bool
-#
-# Note: This is a global setting that takes precedence over the settings of specific actions.
-#
-# Default is true
-VIBRANIUM_GLOBAL_FLASH_BORDER=true
-
-# How many seconds should take border flashing animation
-# Available options: string 'slow' 'medium' 'fast' 'very_fast'
-#
-# Default is 'medium'
-VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED="medium"
-
-# Whether to flash screen when (usually) taking screenshots and starting screen recording.
-# Available options: bool
-#
-# Note: This is a global setting that takes precedence over the settings of specific actions.
-#
-# Default is true
-VIBRANIUM_GLOBAL_FLASH_SCREEN=true
-
-# How many seconds should take screen flashing animation
-# Available options: string 'slow' 'medium' 'fast' 'very_fast'
-#
-# Default is 'medium'
-VIBRANIUM_GLOBAL_FLASH_SCREEN_SPEED="medium"
-
 # Whether to use OSD
 # Available options: bool
 #
@@ -82,12 +54,6 @@ VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD=true
 #
 # Default is true
 VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK=true
-
-# Whether to show "Welcome back, $USER!" notification on session unlock.
-# Available options: bool
-#
-# Default is false
-VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION=false
 
 # Whether to show "Now Playing" notification on session unlock.
 # Available options: bool
@@ -149,28 +115,6 @@ VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START=false
 #
 # Default: true
 VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE=true
-
-# Whether to apply a Gaussian blur to the lock screen background.
-# If set to 'true', the lock screen wallpaper will be blurred according to the current power profile
-# and the VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE setting.
-# Available options: bool
-#
-# Note: Changes are applied instantly
-#
-# Default: false
-VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND=false
-
-# The amount of blur to apply to the lockscreen background.
-# Available options: string 'low' 'mid' 'hard'
-#
-# Default is 'mid'
-VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_STRENGTH="mid"
-
-# How much to dim the lockscreen background when VIBRANIUM_GLOBAL_BLUR_LOCKSCREEN_BACKGROUND is false.
-# Available options: string 'low' 'mid' 'hard'
-#
-# Default is 'hard'
-VIBRANIUM_GLOBAL_DIM_LOCKSCREEN_STRENGTH="hard"
 
 # Whether to require the user to repeat the shortcut to kill the active window.
 # Available options: bool
@@ -268,17 +212,6 @@ VIBRANIUM_SCREENSHOT_FILE_TYPE="jpg"
 # Default is 80
 VIBRANIUM_SCREENSHOT_JPEG_QUALITY=80
 
-# Basically the same as above, but in fullscreen. Why?
-# Let's imagine that you are watching a video or playing a video game
-# and you want to quickly capture a frame to send to a friend
-# or simply enlarge it in a photo editing program.
-# JPEG compression is great, of course, but right now we need all the details of the image!
-#
-# Available options: int between 50 and 100
-#
-# Default is 100
-VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN=100
-
 # Whether to save taken screenshot to disk
 # Available options: bool
 #
@@ -289,21 +222,12 @@ VIBRANIUM_SCREENSHOT_SAVE_TO_DISK=true
 # a temporary compositor shader is applied to create a flash effect.
 # Available options: bool
 #
-# Note: VIBRANIUM_GLOBAL_FLASH_SCREEN takes precedence over this option, so
-#       if VIBRANIUM_GLOBAL_FLASH_SCREEN is false but this is true, no effect
-#       will be applied.
-#
 # Default is true
 VIBRANIUM_SCREENSHOT_FLASH_SCREEN=true
 
 # Whether to flash border of active window when taking a screenshot
 # Available options: bool
 #
-# Note: VIBRANIUM_GLOBAL_FLASH_BORDER takes precedence over this option, so
-#       if VIBRANIUM_GLOBAL_FLASH_BORDER is false and this is true, no effect
-#       will be applied.
-#
-# Note: Also check out VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED
 # Default is true
 VIBRANIUM_SCREENSHOT_FLASH_BORDER=true
 
@@ -359,12 +283,6 @@ VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR=true
 # Default is 10
 VIBRANIUM_COLOR_PICKER_HISTORY_SIZE=10
 
-# Which icon to use in Waybar module.
-# Available options: string 'droplet' 'palette' 'eyedropper'
-#
-# Default is 'droplet'
-VIBRANIUM_COLOR_PICKER_WAYBAR_ICON="droplet"
-
 #                WAYBAR OPTIONS                #
 # ============================================ #
 #                                              #
@@ -375,19 +293,11 @@ VIBRANIUM_COLOR_PICKER_WAYBAR_ICON="droplet"
 # Default is true
 VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE=true
 
-# Which icon to use for 'inhibitor' module.
-# Reminder: This module will appear automatically when user
-# selects 'Enable sleep inhibition' option in Vibranium Utils Menu (Ctrl + Alt + U | Vibranium menu > Utilities)
-# Available options: string 'coffee' 'lock' 'eye'
-#
-# Default is 'eye'
-VIBRANIUM_BAR_INHIBITOR_ICON="eye"
-
 # Whether to enable color picker module.
 # Available options: bool
 #
-# Default is false
-VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE=false
+# Default is true
+VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE=true
 
 # Whether to enable power profile module.
 # Available options: bool
@@ -422,15 +332,6 @@ VIBRANIUM_BAR_WEATHER_MODULE_ENABLE=false
 #
 # Default is empty string, which means auto detect
 VIBRANIUM_BAR_WEATHER_MODULE_CITY=""
-
-# Time in SECONDS that is going to be waited between updates pull.
-# Available options: int
-#
-# Note: Applies only after re-login.
-# Note: Does nothing for now.
-#
-# Default is 1800 (30m)
-# VIBRANIUM_BAR_PACMAN_MODULE_PULL_INTERVAL=1800
 
 # Whether to display loading animation for custom modules at startup (e.g. pacman / weather).
 # Available option: bool

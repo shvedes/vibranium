@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 CURRENT_THEME="$(vb-theme-get)"
 WALLS="$XDG_CONFIG_HOME/vibranium/theme/current/backgrounds"
@@ -99,7 +99,7 @@ case "$1" in
     *.png|*.jpg|*.jpeg|*.webp)
         WALLPAPER_PATH="$(realpath "$1")"
         if [[ ! -f "$WALLPAPER_PATH" ]]; then
-            print_error "$WALLPAPER_PATH does not exist"
+            log::error "$WALLPAPER_PATH does not exist"
             exit 1
         fi
         ;;
@@ -120,7 +120,7 @@ if [[ ! -f "$WALLS/$(basename "$WALLPAPER_PATH")" ]]; then
     fi
 fi
 
-check_bool VIBRANIUM_GLOBAL_SHOW_WALLPAPER true
+helpers::check::bool VIBRANIUM_GLOBAL_SHOW_WALLPAPER true
 if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
     if [[ "$(systemctl --user is-active hyprpaper)" != "active" ]]; then
         systemctl -q --user enable --now hyprpaper

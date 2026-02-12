@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 fonts=$(fc-list :spacing=100 -f "%{family[0]}\n" | grep -viE 'emoji|signwriting|symbols' | sort -u) # Source: Omarchy
-selected="$(printf '%s' "$fonts" | rofi_cmd "Search fonts" "ESC to go back")"
+selected="$(printf '%s' "$fonts" | helpers::ui::menu "Search fonts" "ESC to go back")"
 
 if [[ -z "$selected" ]]; then
     exit 1
@@ -50,7 +50,7 @@ if [[ $waybar_status == active ]]; then
     systemctl --user restart waybar
 fi
 
-check_bool VIBRANIUM_GLOBAL_USE_OSD false
+helpers::check::bool VIBRANIUM_GLOBAL_USE_OSD false
 if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
     systemctl --user restart swayosd
 fi

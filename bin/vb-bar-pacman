@@ -103,7 +103,7 @@ get_aur_updates() { yay -Qua 2> /dev/null; }
 
 wait_for_connection
 
-check_bool VIBRANIUM_BAR_SHOW_ANIMATION true
+helpers::check::bool VIBRANIUM_BAR_SHOW_ANIMATION true
 if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == false ]]; then
     show_spinner=false
 else
@@ -134,7 +134,7 @@ wait $arch_pid $aur_pid
 arch_count="$(wc -l < $VIBRANIUM_RUNTIME/bar_updates.arch)"
 aur_count="$(wc -l < $VIBRANIUM_RUNTIME/bar_updates.aur)"
 
-check_bool VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES
+helpers::check::bool VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES
 if [[ $VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES == false ]] ; then
     total_count=$(( arch_count + aur_count ))
     if [[ $total_count -eq 0 ]]; then

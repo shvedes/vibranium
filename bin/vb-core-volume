@@ -2,13 +2,13 @@
 
 # Script for setting the volume with the ability to set the volume up to 150%
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
-check_bool VIBRANIUM_GLOBAL_USE_OSD true
-check_bool VIBRANIUM_VOLUME_USE_OSD true
-check_int VIBRANIUM_VOLUME_ADJUSTMENT_STEP 5 int
-check_bool VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK true
-check_bool VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED false
+helpers::check::bool VIBRANIUM_GLOBAL_USE_OSD true
+helpers::check::bool VIBRANIUM_VOLUME_USE_OSD true
+helpers::check::digit VIBRANIUM_VOLUME_ADJUSTMENT_STEP 5 int
+helpers::check::bool VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK true
+helpers::check::bool VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED false
 
 usage() {
     cat << EOF
@@ -150,9 +150,9 @@ toggle_mute() {
 feedback() {
     local variant dir
 
-    check_bool VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK true
+    helpers::check::bool VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK true
     if [[ $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK = true ]]; then
-        check_enum VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT "variant1" variant1 variant2 variant3
+        helpers::check::strings VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT "variant1" variant1 variant2 variant3
         variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
 
         case "$variant" in
@@ -165,7 +165,7 @@ feedback() {
         esac
 
         if [ ! -d "$dir" ]; then
-            print_error "$dir does not exist! Using the default one!"
+            log::error "$dir does not exist! Using the default one!"
             dir="/usr/share/sounds/freedesktop/stereo"
             return 0
         fi

@@ -61,9 +61,9 @@ elif playerctl -p spotify status 2>/dev/null | grep -iq playing; then
 fi
 
 if [[ -z "$file" ]]; then
-    echo "error: no track is currently playing" >&2
+    echo "error: no track currently playing" >&2
     if $notify; then
-        notify-send -r 1 "Vibranium" "No track is currently playing"
+        notify-send -u critical -t 3000 -r 4 "Vibranium" "No track currently playing"
     fi
     exit 1
 fi
@@ -71,6 +71,6 @@ fi
 printf '%s' "$file" | wl-copy --type text/uri-list
 
 if $notify && [[ ! "$file" =~ ^https?:// ]]; then
-    notify-send -r 1 "Vibranium" "<i><b>$(basename "$file")</b></i> copied to clipboard"
+    notify-send -r 3 "Vibranium" "<i><b>$(basename "$file")</b></i> copied to clipboard"
 fi
 

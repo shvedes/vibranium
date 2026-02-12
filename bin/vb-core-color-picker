@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 if pid=$(pidof hyprpicker); then
     kill $pid
@@ -8,12 +8,12 @@ if pid=$(pidof hyprpicker); then
 fi
 
 if ! missing="$(vb-cmd-is-present hyprpicker)"; then
-    print_error "missing required dependencies: $missing"
-    is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
+    log::error "missing required dependencies: $missing"
+    term::is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
     exit 1
 fi
 
-HISTORY="$VIBRANIUM_CACHE/color-picker-history"
+HISTORY="$VIBRANIUM_CACHE/color-picker.history"
 
 usage() {
     cat <<EOF
@@ -51,17 +51,17 @@ case "$1" in
 esac
 
 if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
-    if is_headless; then
+    if term::is_headless; then
         msg="<b>Color Picker</b> isn't available while <b>Reading Mode</b> is active!"
-        notify-send -r 3 -t 3000 "Color Picker" "$msg"
+        notify-send -r 2 -t 3000 "Color Picker" "$msg"
     fi
-    print_error "Reading Mode is active. Aborting"
+    log::error "Reading Mode is active. Aborting"
     exit 1
 fi
 
-check_bool VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW true
-check_bool VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR true
-check_int VIBRANIUM_COLOR_PICKER_HISTORY_SIZE int 10
+helpers::check::bool VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW true
+helpers::check::bool VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR true
+helpers::check::digit VIBRANIUM_COLOR_PICKER_HISTORY_SIZE int 10
 
 hex_preview="$VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
 show_selected="$VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
@@ -95,10 +95,10 @@ if [[ $show_selected == true ]]; then
     if command -v magick > /dev/null; then
         magick -size 1x1 xc:"${selected_color}" "$preview_img"
     else
-        print_warn "ImageMagick is not installed!"
+        log::warn "ImageMagick is not installed!"
     fi
 fi
 
-notify-send -r 1 -t 1500 -i "$preview_img" "Color Picker" "Selected color copied to clipboard"
-vb-cmd-refresh-bar-module color-picker &
+notify-send -r 3 -t 1500 -i "$preview_img" "Color Picker" "Color copied to clipboard"
+vb-cmd-refresh-bar-module color-picker
 rm -f "$preview_img"

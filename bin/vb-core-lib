@@ -3,7 +3,6 @@
 # shellcheck disable=all
 
 # Load defaults first
-source "$VIBRANIUM_PATH/vb-core-defaults"
 source "$XDG_CONFIG_HOME/vibranium/settings"
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
@@ -22,12 +21,12 @@ RESET=$'\e[0m'
 # A custom rofi theme settings, which will apply to custom menus by default.
 # It is also will be used to generate menu entries
 #
-# Usage: <print array of options> | rofi_cmd "MyPrompt" "MyPlaceholder" -theme-str '<opt rofi theme settings>'
+# Usage: <print array of options> | helpers::ui::menu "MyPrompt" "MyPlaceholder" -theme-str '<opt rofi theme settings>'
 #
-# For example: printf "%s\n" "${custom_actions[@]}" | rofi_cmd "Utilities" "Search Utilities..."
+# For example: printf "%s\n" "${custom_actions[@]}" | helpers::ui::menu "Utilities" "Search Utilities..."
 # Will create a custom menu with the contents of ${custom_actions[@]} (entry per line)
 # Optional -theme-str 'configuration {show-icons: true;}' will enable icons for each entry.
-rofi_cmd() {
+helpers::ui::menu() {
     # This associative array maps text lengths to window pixel widths.
     # It is used to keep Rofi window size visually proportional to content width.
     # More variations make window resizing smoother between small and long menus.
@@ -106,101 +105,111 @@ rofi_cmd() {
         "$@" 2> /dev/null <<< "$input"
 }
 
-# A spinner utility function.
-# Displays an animated spinner in the terminal while a given process (PID) is running.
-#
-# Usage: long_running_command & spinner $! "Doing stuff..." "Done"
-#
-# Parameters:
-# $1 - PID of the process to wait for.
-# $2 - Message to display alongside the spinner.
-# $3 - (Optional) Final message to display when the process completes.
-#
-# The spinner uses Unicode braille characters for a smooth animation.
-# It clears itself once the process finishes, and optionally prints a success message.
-spinner() {
-    # The PID of the process to watch
-    local pid=$1
+# Not used yet. Questionable.
+helpers::ui::notify() {
+    local type="$1"
+    shift || return 2
 
-    # The message to show while spinning
-    local msg="$2"
+    local timeout=""
+    local OPTIND opt
 
-    # Delay between spinner frames (seconds)
-    local delay=0.1
-    local spinstr
-
-    spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-
-    # ANSI sequence to clear the current line
-    local clear_line="\r\033[K"
-
-    # While the process exists, animate the spinner
-    while kill -0 "$pid" 2> /dev/null; do
-        for i in "${spinstr[@]}"; do
-            printf "\r${msg} %s" "${i} "
-            sleep $delay
-        done
+    while getopts ":t:" opt; do
+        case "$opt" in
+            t) timeout="$OPTARG" ;;
+            *) return 2 ;;
+        esac
     done
+    shift $((OPTIND - 1))
 
-    # Clear the spinner once finished
-    printf "%b" "$clear_line"
+    local replace_id urgency
+    local title body
 
-    # Print the final message if provided
-    if [ -n "$3" ]; then
-        printf "%s %s\n" "$msg" "$3"
-    else
-        printf "%s\n" "$msg"
+    case "$type" in
+        normal)        replace_id=1; urgency=normal ;;
+        status)        replace_id=2; urgency=low ;;
+        tool)          replace_id=3; urgency=normal ;;
+        error)         replace_id=4; urgency=critical ;;
+        missing-dep)   replace_id=5; urgency=critical ;;
+        invalid-input) replace_id=6; urgency=normal ;;
+        alert)         replace_id=7; urgency=normal ;;
+        *) return 2 ;;
+    esac
+
+    title="$(basename "${BASH_SOURCE[0]}")"
+
+    if (($# == 1)); then
+        body="$1"
+    elif (($# > 1)); then
+        title="$1"
+        shift
+        body="$*"
     fi
+
+    local args=(-a Vibranium -u "$urgency" -r "$replace_id")
+
+    [[ -n "$timeout" && "$timeout" =~ ^[0-9]+$ ]] && args+=(-t "$timeout")
+
+    notify-send "${args[@]}" "$title" "$body"
 }
 
 # Validate that a named variable contains a numeric value (int or float) and
 # substitute a default when necessary.
 #
 # Usage:
-#   check_int <var_name> <default> [type]
-check_int() {
+#   helpers::check::digit <var_name> <default>
+helpers::check::digit() {
     local var_name="$1"
     local default="$2"
-    local type="${3:-int}"
     local val="${!var_name}"
 
     if [[ -z $val ]]; then
-        print_warn "$var_name is unset. Falling back to defaults."
+        log::warn "$var_name is unset. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
 
     local normalized="${val//,/.}"
-    local float_re='^-?([0-9]+([.][0-9]+)?|[.][0-9]+)$'
+
     local int_re='^-?[0-9]+$'
+    local float_re='^-?([0-9]+[.][0-9]+|[.][0-9]+)$'
 
-    local number_re
-    if [[ $type == "float" ]]; then
-        number_re=$float_re
-    else
-        number_re=$int_re
-    fi
-
-    if ! [[ $normalized =~ $number_re ]]; then
-        print_warn "Invalid value for ${var_name}. Falling back to defaults."
+    if ! [[ $normalized =~ $int_re || $normalized =~ $float_re ]]; then
+        log::warn "Invalid numeric value for ${var_name}. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
-    else
-        printf -v "$var_name" '%s' "$normalized"
+        return 0
     fi
+
+    local sign=""
+    [[ $normalized == -* ]] && sign="-" normalized="${normalized#-}"
+
+    local int_part frac_part
+
+    if [[ $normalized == *.* ]]; then
+        int_part="${normalized%%.*}"
+        frac_part=".${normalized#*.}"
+    else
+        int_part="$normalized"
+        frac_part=""
+    fi
+
+    int_part="${int_part##+(0)}"
+    [[ -z $int_part ]] && int_part="0"
+
+    printf -v "$var_name" '%s' "${sign}${int_part}${frac_part}"
 }
 
 # Validate that a named variable contains a boolean value ("true" or "false")
 # and substitute a default when necessary.
 #
 # Usage:
-#   check_bool <var_name> <default>
-check_bool() {
+#   helpers::check::bool <var_name> <default>
+helpers::check::bool() {
     local var_name=$1
     local default=$2
     local val="${!var_name}"
 
     if [[ -z $val ]]; then
-        print_warn "$var_name is unset. Falling back to defaults."
+        log::warn "$var_name is unset. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
@@ -208,7 +217,7 @@ check_bool() {
     local normalized="${val,,}"
 
     if [[ $normalized != "true" && $normalized != "false" ]]; then
-        print_warn "Invalid value for $var_name. Falling back to defaults."
+        log::warn "Invalid value for $var_name. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
     else
         printf -v "$var_name" '%s' "$normalized"
@@ -219,8 +228,8 @@ check_bool() {
 # and substitute a default when necessary.
 #
 # Usage:
-#   check_enum <var_name> <default> <allowed1> [allowed2 ... allowedN]
-check_enum() {
+#   helpers::check::strings <var_name> <default> <allowed1> [allowed2 ... allowedN]
+helpers::check::strings() {
     local var_name=$1
     local default=$2
     shift 2
@@ -228,13 +237,13 @@ check_enum() {
     local val="${!var_name}"
 
     if [[ ${#allowed[@]} -eq 0 ]]; then
-        print_warn "Invalid value for $var_name. Falling to defaults."
+        log::warn "Invalid value for $var_name. Falling to defaults."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
 
     if [[ -z $val ]]; then
-        print_warn "$var_name is unset. Falling back to defaults."
+        log::warn "$var_name is unset. Falling back to defaults."
         printf -v "$var_name" '%s' "$default"
         return 0
     fi
@@ -248,74 +257,370 @@ check_enum() {
     done
 
     if [[ $ok != true ]]; then
-        print_warn "Invalid value for $var_name. Falling to defaults."
+        log::warn "Invalid value for $var_name. Falling to defaults."
         printf -v "$var_name" '%s' "$default"
     else
         printf -v "$var_name" '%s' "$val"
     fi
 }
 
-# Self-explanatory
-# https://wiki.hypr.land/Configuring/Dispatchers/#fullscreenstate
-is_fullscreen() {
-    [[ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]]
-}
+# A term::spinner utility function.
+# Displays an animated term::spinner in the terminal while a given process (PID) is running.
+#
+# Usage: long_running_command & term::spinner $! "Doing stuff..." "Done"
+#
+# Parameters:
+# $1 - PID of the process to wait for.
+# $2 - Message to display alongside the term::spinner.
+# $3 - (Optional) Final message to display when the process completes.
+#
+# The term::spinner uses Unicode braille characters for a smooth animation.
+# It clears itself once the process finishes, and optionally prints a success message.
+term::spinner() {
+    # The PID of the process to watch
+    local pid=$1
 
-is_headless() {
-    [[ -t 1 ]] || return 0 && return 1
-}
+    # The message to show while spinning
+    local msg="$2"
 
-print_error() {
-    [[ -t 2 ]] && printf "error: %s\n" "$*" >&2
-}
+    # Delay between term::spinner frames (seconds)
+    local delay=0.1
+    local spinstr
 
-print_warn() {
-    [[ -t 1 ]] && printf "warn: %s\n" "$*"
-}
+    spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
-print_log() {
-    [[ -t 1 ]] && printf "log: %s\n" "$*"
-}
+    # ANSI sequence to clear the current line
+    local clear_line="\r\033[K"
 
-# Usage: _flash <border|screen>
-_flash() {
-    local type="$1"
-    local speed_var
-    local seconds
-
-    [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]] && return 0
-
-    check_enum VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED "medium" slow medium fast very_fast
-    check_enum VIBRANIUM_GLOBAL_FLASH_SCREEN_SPEED "medium" slow medium fast very_fast
-
-    declare -A speed_map=(
-         [slow]=0.35 [medium]=0.25
-         [fast]=0.15 [very_fast]=0.05
-    )
-
-    case "$type" in
-        border) speed_var=VIBRANIUM_GLOBAL_FLASH_BORDER_SPEED ;;
-        screen) speed_var=VIBRANIUM_GLOBAL_FLASH_SCREEN_SPEED ;;
-    esac
-
-    seconds=${speed_map[${!speed_var}]}
-
-
-    if [[ $type == border ]]; then
-        for _ in 1 2; do
-            # Briefly flash active window's border
-            hyprctl -q "keyword general:col.active_border rgb(cdcecf)"
-            sleep "$seconds"
-            # Use 'config-only' to avoid display reloads
-            # (therefore possible graphical micro-artifacts when shadow / blur is enabled)
-            hyprctl -q reload config-only
+    # While the process exists, animate the term::spinner
+    while kill -0 "$pid" 2> /dev/null; do
+        for i in "${spinstr[@]}"; do
+            printf "\r${msg} %s" "${i} "
+            sleep $delay
         done
+    done
+
+    # Clear the term::spinner once finished
+    printf "%b" "$clear_line"
+
+    # Print the final message if provided
+    if [ -n "$3" ]; then
+        printf "%s %s\n" "$msg" "$3"
     else
-        # Briefly flash entire screen by increasing gamma value.
-        # It is not visible on screenshots / records.
-        hyprctl -q hyprsunset gamma 150
-        sleep "$seconds"
-        hyprctl -q hyprsunset gamma 100
+        printf "%s\n" "$msg"
     fi
 }
 
+
+term::is_headless() {
+    [[ -t 1 ]] || return 0 && return 1
+}
+
+log::error() {
+    [[ -t 2 ]] && printf "[ERROR] %s\n" "$*" >&2
+}
+
+log::warn() {
+    [[ -t 1 ]] && printf "[WARN] %s\n" "$*"
+}
+
+log::info() {
+    [[ -t 1 ]] && printf "[INFO] %s\n" "$*"
+}
+
+# Self-explanatory
+# https://wiki.hypr.land/Configuring/Dispatchers/#fullscreenstate
+hypr::is_fullscreen() {
+    [[ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]]
+}
+
+hypr::flash::border() {
+    [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]] && return 0
+
+    hyprctl -q "keyword general:col.active_border rgb(cdcecf)"
+    sleep 0.2
+    hyprctl -q reload config-only
+}
+
+hypr::flash::screen() {
+    local anim_status="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
+    [[ $anim_status == 0 ]] && return 0
+
+    hyprctl -q hyprsunset gamma 150
+    hyprctl -q hyprsunset gamma 100
+}
+
+#############################
+##### Configure helpers #####
+#############################
+
+# Ensures that a given option exists in the user settings file.
+# If it's missing, appends the default value from the defaults file.
+helpers::configure::verify_option() {
+    local var="$1"
+    [[ -z $var ]] && return 2
+
+    local settings_file="$VIBRANIUM_USER_SETTINGS"
+    local defaults_file="$VIBRANIUM_PATH/vb-core-defaults"
+
+    local def_line
+    def_line="$(awk -F= -v v="$var" '$1==v{print; exit}' "$defaults_file")" || return 1
+    [[ -z $def_line ]] && return 1
+
+    awk -v var="$var" -v newline="$def_line" '
+        BEGIN { inserted=0 }
+
+        # Preserve header/comments exactly as-is until first VIBRANIUM_ var
+        !vars_started && !/^VIBRANIUM_/ { header[++h]=$0; next }
+
+        {
+            vars_started=1
+
+            # Collect only VIBRANIUM_* assignments
+            if ($0 ~ /^VIBRANIUM_[A-Za-z_]+=/) {
+                split($0,a,"=")
+                key=a[1]
+                vars[key]=$0
+                next
+            }
+        }
+
+        END {
+            # Overwrite or add the required variable
+            split(newline,a,"=")
+            vars[a[1]]=newline
+
+            # Print header first
+            for (i=1;i<=h;i++) print header[i]
+
+            # Sort keys (I am a bit a perfectionist)
+            n=asorti(vars, idx)
+            for (i=1;i<=n;i++) print vars[idx[i]]
+        }
+    ' "$settings_file" > "$settings_file.tmp" && mv "$settings_file.tmp" "$settings_file"
+}
+
+# Flips a boolean value of a passed variable.
+# Flag '-v' returns the new value
+helpers::configure::toggle_bool() {
+    local verbose
+    local setting_name
+    local current_value
+
+    if [ "$1" = "-v" ]; then
+        verbose=true
+        setting_name="$2"
+    else
+        verbose=false
+        setting_name="$1"
+    fi
+
+    helpers::configure::verify_option "$setting_name"
+    eval "current_value=\$$setting_name"
+
+    case "$current_value" in
+        "true")
+            sed -i "/^${setting_name}=/s/=.*/=false/" "$VIBRANIUM_USER_SETTINGS"
+            [ "$verbose" = "true" ] && echo "false"
+            ;;
+        "false")
+            sed -i "/^${setting_name}=/s/=.*/=true/" "$VIBRANIUM_USER_SETTINGS"
+            [ "$verbose" = "true" ] && echo "true"
+            ;;
+    esac
+}
+
+# Aligns menu option labels to the same width for pretty column output.
+# Expects items in "label : value" format, ignores HTML tags when measuring
+# label length, pads shorter labels with spaces, and normalizes boolean
+# values (true/false -> yes/no). Non-matching lines are passed through unchanged.
+helpers::configure::build_menu() {
+    local options=("$@")
+    local max_len=0
+    local has_colon_options=()
+
+    for option in "${options[@]}"; do
+        if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
+            local label="${BASH_REMATCH[1]}"
+
+            local clean_label
+            clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
+
+            local len=${#clean_label}
+            if (( len > max_len )); then
+                max_len=$len
+            fi
+            has_colon_options+=("$option")
+        fi
+    done
+
+    local aligned_options=()
+    for option in "${options[@]}"; do
+        if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
+            local label="${BASH_REMATCH[1]}"
+            local value="${BASH_REMATCH[2]}"
+
+            local clean_label
+            clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
+
+            local len=${#clean_label}
+            local padding=$((max_len - len))
+            local padded_label="$label"
+
+            for ((j=0; j<padding; j++)); do
+                padded_label+=" "
+            done
+
+            if [[ "${value,,}" == "true" ]]; then
+                value="yes"
+            elif [[ "${value,,}" == "false" ]]; then
+                value="no"
+            fi
+            aligned_options+=("$padded_label : $value")
+        else
+            aligned_options+=("$option")
+        fi
+    done
+
+    for aligned in "${aligned_options[@]}"; do
+        echo "$aligned"
+    done
+}
+
+# Prompts the user for a numeric value via menu, validates type and range,
+# optionally runs in verification-only mode, and can persist the result
+# to the user settings file under the given option name. Supports integers
+# and floats, trims whitespace, normalizes float formatting, and retries
+# on invalid input with an error notification.
+helpers::configure::set_digit() {
+    local check_only=false
+
+    # parse flags
+    while [[ "$1" == -* ]]; do
+        case "$1" in
+            --verify) check_only=true ;;
+            *) return 1 ;;
+        esac
+        shift
+    done
+
+    local prompt_base="$1"
+    local rofi_title="$2"
+    local type="$3"    # "int" or "float"
+    local min_val="$4"
+    local max_val="$5"
+    local opt_name="${6:-}"
+    local settings_file="$VIBRANIUM_USER_SETTINGS"
+
+    local range_text="${min_val}-${max_val}"
+    local prompt="${prompt_base} (${type})"
+
+    while true; do
+        local input
+        input="$(printf "%s\n" "$prompt" | helpers::ui::menu "$rofi_title" "$range_text")"
+
+        [[ -z "$input" ]] && return 1
+        [[ "$input" = "$prompt" ]] && continue
+
+        input="${input#"${input%%[![:space:]]*}"}"
+        input="${input%"${input##*[![:space:]]}"}"
+
+        local valid=true
+
+        if [[ "$type" == "int" ]]; then
+            if ! [[ "$input" =~ ^[0-9]+$ ]]; then
+                valid=false
+            else
+                local inrange
+                inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
+                          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
+                [[ "$inrange" != 1 ]] && valid=false
+            fi
+
+        elif [[ "$type" == "float" ]]; then
+            if ! [[ "$input" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+                valid=false
+            else
+                local inrange
+                inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
+                          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
+                [[ "$inrange" != 1 ]] && valid=false
+
+                if [[ "$valid" == true ]]; then
+                    input=$(awk -v v="$input" '
+                        BEGIN {
+                            v+=0
+                            if (v == int(v)) printf "%d.0", int(v)
+                            else printf "%g", v
+                        }')
+                fi
+            fi
+        else
+            return 1
+        fi
+
+        if [[ "$valid" == false ]]; then
+            notify-send -r 6 -u critical -t 1500 "Vibranium" \
+                "A ${type} between ${min_val} and ${max_val}!"
+            continue
+        fi
+
+        # check-only mode: just return the validated value
+        if [[ "$check_only" == true ]]; then
+            printf "%s" "$input"
+            return 0
+        fi
+
+        if [[ -n "$opt_name" ]]; then
+            helpers::configure::verify_option "$opt_name" || return 1
+
+            if grep -qE "^${opt_name}=" "$settings_file" 2>/dev/null; then
+                sed -i "/^${opt_name}/s/=.*/=${input}/" "$settings_file"
+            else
+                printf "%s=%s\n" "$opt_name" "$input" >> "$settings_file"
+            fi
+        fi
+
+        printf "%s" "$input"
+        return 0
+    done
+}
+
+# Presents a menu of string options to the user, validates the selection,
+# and saves the chosen value to the user settings file under the given
+# variable name.
+helpers::configure::set_string() {
+    local var_name="$1"
+    local title="$2"
+    shift 2
+    local raw_options=("$@")
+
+    local labels=()
+    local values=()
+
+    # Split Pretty:Value
+    for opt in "${raw_options[@]}"; do
+        if [[ "$opt" == *:* ]]; then
+            labels+=("${opt%%:*}")
+            values+=("${opt#*:}")
+        else
+            labels+=("$opt")
+            values+=("$opt")
+        fi
+    done
+
+    while true; do
+        chosen_label="$(printf "%s\n" "${labels[@]}" | helpers::ui::menu "$title" "ESC to go back")"
+        [[ -z "$chosen_label" ]] && break
+
+        # Find index of selected label
+        for i in "${!labels[@]}"; do
+            if [[ "${labels[$i]}" == "$chosen_label" ]]; then
+                chosen_value="${values[$i]}"
+                helpers::configure::verify_option "$var_name"
+                sed -i "/^${var_name}=/s|=.*|=\"${chosen_value// /_}\"|" "$VIBRANIUM_USER_SETTINGS"
+                return
+            fi
+        done
+    done
+}

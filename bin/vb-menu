@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 OPTIONS=(
     "Settings"
@@ -12,7 +12,7 @@ OPTIONS=(
 INDEX=0
 
 while true; do
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Vibranium" "ESC to exit" -selected-row "$INDEX")"
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Vibranium" "ESC to exit" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do
@@ -24,7 +24,7 @@ while true; do
 
     case "$CHOSEN" in
         "Settings")
-            "$VIBRANIUM_PATH/configure/vibranium-main-menu"
+            bash "$VIBRANIUM/configure/cfgr-menu"
             ;;
         "Help")
             vb-menu-help
@@ -35,7 +35,7 @@ while true; do
         "Tweaks")
             while true; do
                 tweaks_opts=("System" "Apps")
-                tweaks_chosen="$(printf "%s\n" "${tweaks_opts[@]}" | rofi_cmd "Tweaks" "ESC to go back")"
+                tweaks_chosen="$(printf "%s\n" "${tweaks_opts[@]}" | helpers::ui::menu "Tweaks" "ESC to go back")"
                 [[ -z $tweaks_chosen ]] && break
 
                 case "$tweaks_chosen" in

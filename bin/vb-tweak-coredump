@@ -14,8 +14,8 @@ _is_enabled() {
 
 if ! _is_enabled; then
     pkexec bash -c 'printf "kernel.core_pattern=|/bin/false\n" > /etc/sysctl.d/99-coredump.conf; sysctl --system'
-    notify-send -r 1 "Vibranium" "<b>systemd-coredump</b> disabled\nNo reboot required"
+    notify-send -r 3 "Vibranium" "<b>systemd-coredump</b> disabled\nNo reboot required"
 else
     pkexec bash -c 'rm -f /etc/sysctl.d/99-coredump.conf; sysctl --system'
-    notify-send -r 1 "Vibranium" "<b>systemd-coredump</b> enabled\nNo reboot required"
+    notify-send -r 3 "Vibranium" "<b>systemd-coredump</b> enabled\nNo reboot required"
 fi

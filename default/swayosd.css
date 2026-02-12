@@ -16,7 +16,7 @@ progressbar:disabled, image:disabled {
 }
 
 progressbar {
-	min-height: 8px;
+	min-height: 16px;
 	border-radius: 0px;
 }
 

@@ -24,8 +24,8 @@ WORKDIR="${1:-$HOME}"
 
 if [[ ! -d "$WORKDIR" ]]; then
     notify-send \
-        -r 2 \
-        -t 5000 \
+        -r 4 \
+        -t 4000 \
         -u critical \
         "Terminal Emulator" \
         "Directory <i><b>$WORKDIR</b></i> does not exist!"

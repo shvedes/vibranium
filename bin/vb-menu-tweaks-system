@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 if [[ "$(sysctl -n kernel.core_pattern)" == "|/bin/false" ]]; then
     OPTIONS=("Enable systemd coredump")
@@ -11,7 +11,7 @@ fi
 OPTIONS+=("What is ...")
 
 while true; do
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "System tweaks" "ESC to go back")"
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "System tweaks" "ESC to go back")"
     [[ -z $CHOSEN ]] && break
 
     case "$CHOSEN" in
@@ -24,7 +24,7 @@ while true; do
         "What is ...")
             while true; do
                 what_is_this_opts=("Coredump")
-                what_is_this_chosen="$(printf "%s\n" "${what_is_this_opts[@]}" | rofi_cmd "What is" "ESC to go back")"
+                what_is_this_chosen="$(printf "%s\n" "${what_is_this_opts[@]}" | helpers::ui::menu "What is" "ESC to go back")"
                 [[ -z $what_is_this_chosen ]] && break
 
                 case "$what_is_this_chosen" in

@@ -12,5 +12,5 @@ systemctl --user restart "${SYSTEMD_TARGETS[@]}" &
 vb-cmd-refresh-dunst
 
 if [[ "$1" != "-q|--qiuet" ]]; then
-    notify-send -r 1 -t 1500 "Vibranium" "Configuration reloaded"
+    notify-send -r 2 -t 1500 "Vibranium" "Configuration reloaded"
 fi

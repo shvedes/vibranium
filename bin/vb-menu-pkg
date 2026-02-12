@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 ACTIONS=("System update" "Install a font" "Install a package" "Uninstall a package")
 
 while true; do
-    CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Packages" "ESC to go back")"
+    CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | helpers::ui::menu "Packages" "ESC to go back")"
     [[ -z $CHOSEN ]] && break
 
     case "$CHOSEN" in

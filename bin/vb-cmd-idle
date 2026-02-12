@@ -3,7 +3,7 @@
 # Handle music playback on session lock/unlock.
 # Intended to be called by hypridle.
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 RESTORE_FLAG="$VIBRANIUM_RUNTIME/restore-player"
 
@@ -32,7 +32,7 @@ case "$1" in
         ;;
 
     --before)
-        check_bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK true
+        helpers::check::bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK true
 
         [[ $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == false ]] && exit 0
 
@@ -44,21 +44,13 @@ case "$1" in
         ;;
 
     --after)
-        check_bool VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION false
-
-        if [[ $VIBRANIUM_GLOBAL_SHOW_WELCOME_BACK_NOTIFICATION == true ]]; then
-            notify-send -r "$RANDOM" -t 2500 \
-                "Vibranium" \
-                "Welcome back, <span foreground='${P_ACCENT}'><b>$USER</b></span>!"
-        fi
-
         if [[ -f "$RESTORE_FLAG" ]]; then
             rm -f "$RESTORE_FLAG"
             if ! player_is_playing; then
                 vb-core-mediacontrol --toggle &
             fi
 
-            check_bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING false
+            helpers::check::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING false
             if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
                 vb-cmd-now-playing
             fi

@@ -2,7 +2,7 @@
 
 # shellcheck disable=SC2206
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 # Assign a theme name to the GTK theme folder name
 declare -A FAMILIES=(
@@ -127,7 +127,7 @@ pick_family() {
     done
 
     local family_chosen
-    family_chosen="$(printf "%s\n" "${keys[@]}" | rofi_cmd "Set theme" "")"
+    family_chosen="$(printf "%s\n" "${keys[@]}" | helpers::ui::menu "Set theme" "")"
     [[ -z "$family_chosen" ]] && exit 0
     echo "$family_chosen"
 }
@@ -148,7 +148,7 @@ pick_variant() {
     done
 
     local display
-    display="$(for v in "${variants[@]}"; do to_display_name "$v"; done | rofi_cmd "$family" "flavor")"
+    display="$(for v in "${variants[@]}"; do to_display_name "$v"; done | helpers::ui::menu "$family" "flavor")"
     if [[ -z "$display" ]]; then
         return 1
     else
@@ -215,13 +215,13 @@ apply_theme() {
     local theme_path="$VIBRANIUM/themes/$folder_name"
 
     if [ ! -d "$theme_path" ]; then
-        print_error "Theme folder $theme_path does not exist."
+        log::error "Theme folder $theme_path does not exist."
         exit 1
     fi
 
     if is_current_theme "$folder_name"; then
-        print_error "Already on $theme_capital"
-        notify-send -r 1 -t 1500 "Vibranium" "Already on $theme_capital"
+        log::error "Already on $theme_capital"
+        notify-send -r 4 -u critical -t 1500 "Vibranium - Themes" "Already on $theme_capital"
         exit 1
     fi
 
@@ -295,7 +295,7 @@ if [[ -n "$1" ]]; then
     VARIANT="${INPUT_THEME#*-}"
 
     if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
-        print_error "Family '$FAMILY' not found."
+        log::error "Family '$FAMILY' not found."
         exit 1
     fi
 
@@ -308,7 +308,7 @@ if [[ -n "$1" ]]; then
     done
 
     if ! $VARIANT_FOUND; then
-        print_error "Variant '$VARIANT' not found in family '$FAMILY'."
+        log::error "Variant '$VARIANT' not found in family '$FAMILY'."
         exit 1
     fi
 
@@ -343,7 +343,7 @@ fi
 
 folder_name="${CHOSEN,,}"
 if [ ! -d "$VIBRANIUM/themes/$folder_name" ]; then
-    print_error "Theme '$CHOSEN' does not exist in $VIBRANIUM/themes."
+    log::error "Theme '$CHOSEN' does not exist in $VIBRANIUM/themes."
     exit 1
 fi
 

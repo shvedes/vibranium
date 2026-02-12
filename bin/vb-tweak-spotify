@@ -5,11 +5,6 @@ EXT_DIR="$XDG_CONFIG_HOME/spicetify/Extensions"
 FILE="$EXT_DIR/adblock.js"
 ACTION="$1"
 
-notify() {
-    local urgency="$1" title="Vibranium" msg="$2"
-    notify-send -r 1 -u "$urgency" "$title" "$msg"
-}
-
 progress() {
     local msg="$1"
     case "$msg" in
@@ -29,7 +24,7 @@ fail() {
     msg="Adblock installation failed"
     msg+="\n<b><i>Click here to see logs</i></b>"
 
-    if [ "$(notify-send -A true -r 1 -t 10000 -u critical 'Vibranium' "$msg")" = "0" ]; then
+    if [[ "$(notify-send -A true -r 4 -t 10000 -u critical 'Vibranium' "$msg")" == 0 ]]; then
         vb-core-term "$EDITOR" "$LOGFILE"
     fi
     progress clear
@@ -50,9 +45,11 @@ install_adblock() {
 
     progress clear
     if pkill -0 spotify; then
-        notify normal "Adblock installed successfully\n<b><i>Spotify restart required</i></b>"
+        local msg="Adblock installed successfully\n<b><i>Spotify restart required</i></b>"
+        notify-send -a Vibranium -r 3 "Vibranium" "$msg"
     else
-        notify normal "Adblock installed successfully"
+        local msg="Adblock installed successfully"
+        notify-send -a Vibranium -r 3 "Vibranium" "$msg"
     fi
     rm -f "$LOGFILE"
 }
@@ -65,9 +62,11 @@ remove_adblock() {
     progress clear
 
     if pkill -0 spotify; then
-        notify normal "Removed Spotify adblock\n<b><i>Spotify restart required</i></b>"
+        local msg="Removed Spotify adblock\n<b><i>Spotify restart required</i></b>"
+        notify-send -a Vibranium -r 3 "Vibranium" "$msg"
     else
-        notify normal "Removed Spotify adblock"
+        local msg="Removed Spotify adblock"
+        notify-send -a Vibranium -r 3 "Vibranium" "$msg"
     fi
 }
 

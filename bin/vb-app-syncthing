@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 if ! command -v syncthing > /dev/null; then
-    if is_headless; then
+    if term::is_headless; then
         notify-send -r 4 -u critical -t 5000 "Vibranium" "Syncthing is not installed!"
     fi
-    print_error "Syncthing is not installed!"
+    log::error "Syncthing is not installed!"
     exit 1
 fi
 

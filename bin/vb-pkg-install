@@ -7,7 +7,7 @@ if ! tty -s; then
     exit 0
 fi
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 export SUDO_PROMPT TMPDIR
 
@@ -85,12 +85,12 @@ else
     yay_file=$(mktemp)
 
     (pacman -Slq > "$arch_file") &
-    spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching Arch packages" "${GREEN}Done${RESET}"
+    term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching Arch packages" "${GREEN}Done${RESET}"
     mapfile -t arch_packages < "$arch_file"
     total_packages=("${arch_packages[@]}")
 
     (yay -Slqa > "$yay_file") &> /dev/null &
-    spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching AUR packages" "${GREEN}Done${RESET}"
+    term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching AUR packages" "${GREEN}Done${RESET}"
     mapfile -t aur_packages < "$yay_file"
     total_packages+=("${aur_packages[@]}")
 

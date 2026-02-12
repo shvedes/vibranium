@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 if [[ "$VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE" == false ]]; then
     exit 0
 fi
 
-history_file="$XDG_CACHE_HOME/vibranium/color-picker.history"
+history_file="$VIBRANIUM_CACHE/color-picker.history"
 
 contrast_color() {
     local hex="$1"

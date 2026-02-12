@@ -11,7 +11,7 @@
 #
 # TODO: allow setting brightness below 0% by adjusting gamma level below 100% via hyprsunset.
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 usage() {
     cat << EOF
@@ -39,25 +39,26 @@ if [[ "$1" == "--value" && ! "$2" =~ ^[0-9]+$ ]]; then
 fi
 
 if pidof -q ddcutil; then
-    print_error "Found another instance of ddcutil!"
+    log::error "Found another instance of ddcutil!"
     exit 1
 fi
 
 ensure_user_group() {
     if [[ ! "$(groups)" =~ video ]]; then
-        print_error "The ${YELLOW}raw${RESET} method requires to be in the ${YELLOW}video${RESET} user group!"
-        print_error "To add yourself to the ${YELLOW}video${RESET} group, run:"
-        print_error "'${RED}sudo ${CYAN}usermod ${YELLOW}-aG ${GREEN}video ${PURPLE}$USER${RESET}' and reboot your PC"
-        if is_headless; then
+        log::error "The ${YELLOW}raw${RESET} method requires the user to be in the ${YELLOW}video${RESET} user group!"
+        log::error "To add yourself to the ${YELLOW}video${RESET} group, run:"
+        log::error "'${RED}sudo ${CYAN}usermod ${YELLOW}-aG ${GREEN}video ${PURPLE}$USER${RESET}' and reboot your PC"
+        if term::is_headless; then
             msg="To add yourself to the <span foreground='${P_YELLOW}'>video</span> group, run:\n\n"
             msg+="<b><span foreground='${P_RED}'>sudo</span> <span foreground='${P_ACCENT}'>usermod</span> "
             msg+="<span foreground='${P_YELLOW}'>-aG</span> <span foreground='${P_GREEN}'>video</span> "
             msg+="<span foreground='${P_PURPLE}'>$USER</span></b>\n\n"
             msg+="and reboot your laptop"
-            notify-send -r 1 -t 30000 -u critical "Vibranium - Brightness" "$msg"
+            notify-send -r 100 -t 30000 -u critical "Vibranium - Brightness" "$msg"
+
             msg="The <span foreground='${P_YELLOW}'><b>raw</b></span> "
             msg+="method (laptop screen) requires you to be in the <span foreground='${P_YELLOW}'><b>video</b></span> user group!"
-            notify-send -r 2 -t 10000 -u critical "Vibranium - Brightness" "$msg"
+            notify-send -r 200 -t 10000 -u critical "Vibranium - Brightness" "$msg"
         fi
         return 1
     fi
@@ -111,8 +112,8 @@ ensure_i2c_cache() {
     target="$VIBRANIUM_STATE/i2c-bus"
 
     if [[ ! -f "$target" ]] || ! grep -qF "$ACTIVE_MONITOR" "$target"; then
-        print_warn "I2C bus cache for the active monitor not found. Getting one..."
-        print_warn "The script will run a bit longer than usual"
+        log::warn "I2C bus cache for the active monitor not found. Getting one..."
+        log::warn "The script will run a bit longer than usual"
         get_i2c_bus
     fi
 }
@@ -194,18 +195,15 @@ osd() {
     # I can't imagine a situation where this service would be turned off, but let it be there just in case
     service_status="$(systemctl --user is-active swayosd)"
     [[ "$service_status" == "inactive" ]] && {
-        print_warn "swayosd.service wasn't active!"
-        if ! systemctl --user enable --now swayosd; then
-            print_warn "Failed to start swayosd.service!"
-        fi
-        sleep 0.5 # Let the service start
+        log::warn "swayosd.service wasn't active!"
+        systemctl --user enable --now swayosd
     }
     swayosd-client --custom-icon="$icon" --custom-progress="$progress" || true
 }
 
 if ! ACTIVE_MONITOR="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"; then
-    print_error "Cannot determine the active monitor!"
-    if is_headless; then
+    log::error "Cannot determine the active monitor!"
+    if term::is_headless; then
         notify-send -r 1 -t 10000 -u critical "Vibranium - Brightness" \
             "The brightness script unable to get the active monitor!"
     fi
@@ -214,16 +212,15 @@ fi
 
 if ! compgen -G "/sys/class/backlight/*" > /dev/null; then
     # If the driver for adjusting the brightness of the built-in screen is not found and DDC control is disabled globally
-    check_bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL true
+    helpers::check::bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL true
     use_ddc="$VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
 
     if [[ $use_ddc == false ]]; then
-        print_error "This feature is disabled in Vibranium settings"
+        log::error "This feature is disabled in Vibranium settings"
         exit 1
     else
-        if ! missing_str="$(vb-cmd-is-present ddcutil)"; then
-            read -r -a missing <<< "$missing_str"
-            notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
+        if ! vb-cmd-is-present ddcutil; then
+            vb-cmd-dep-notify --name "Brightness Control" --deps ddcutil
             exit 1
         fi
 
@@ -244,47 +241,45 @@ else
     fi
 fi
 
-check_bool VIBRANIUM_GLOBAL_USE_OSD true
-check_bool VIBRANIUM_BRIGHTNESS_USE_OSD true
+helpers::check::bool VIBRANIUM_GLOBAL_USE_OSD true
+helpers::check::bool VIBRANIUM_BRIGHTNESS_USE_OSD true
 
 gl_osd="$VIBRANIUM_GLOBAL_USE_OSD"
 br_osd="$VIBRANIUM_BRIGHTNESS_USE_OSD"
 
 [[ "$gl_osd" == true && "$br_osd" == true ]] && {
-    if ! missing_str="$(vb-cmd-is-present swayosd:swayosd-client)"; then
-        # Maybe just warn and use notify-send as fallback?
-        read -r -a missing <<< "$missing_str"
-        notify-send -r 4 -t 5000 -u critical "$(basename "$0")" "Missing dependencies: ${missing[*]}"
+    if ! vb-cmd-is-present swayosd:swayosd-client; then
+        vb-cmd-dep-notify --name "Brightness Control" --deps swayosd
         exit 1
     fi
 }
 
-check_int VIBRANIUM_BRIGHTNESS_STEP 5 int
+helpers::check::digit VIBRANIUM_BRIGHTNESS_STEP 5 int
 step=$VIBRANIUM_BRIGHTNESS_STEP
 
 case "$method" in
     "DDC")
-        print_log "Method: ${YELLOW}${method}${RESET} for ${YELLOW}$ACTIVE_MONITOR${RESET}"
+        log::info "Method: ${YELLOW}${method}${RESET} for ${YELLOW}$ACTIVE_MONITOR${RESET}"
         current="$(get_brightness_cache)"
         if [[ ! $current =~ ^[0-9]+$ ]]; then
-            print_warn "Cached brightness value not found!"
-            print_log "Trying to get brightness level via ${YELLOW}ddcutil${RESET}"
+            log::warn "Cached brightness value not found!"
+            log::info "Trying to get brightness level via ${YELLOW}ddcutil${RESET}"
 
             for ((i = 0; i < 5; i++)); do
                 # Same as above.
                 # -----------------
                 # As mentioned above, --sleep-multiplier can sometimes fail at very low values,
-                # so we give the command three attempts to get the date from the monitor using the DDC protocol.
+                # so we give the command three attempts to get the data from the monitor using the DDC protocol.
                 current=$(ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" getvcp 10 2> /dev/null | awk '/current/ {print int($9)}')
                 if [[ $current =~ ^[0-9]+$ ]] && ((current >= 0 && current <= 100)); then
                     break
                 fi
             done
-            print_log "Got new brightness level via ${YELLOW}ddcutil${RESET}"
-            print_log "Caching new brightness level ($current)"
+            log::info "Got new brightness level via ${YELLOW}ddcutil${RESET}"
+            log::info "Caching new brightness level ($current)"
             update_brightness_cache "$current" &
         else
-            print_log "Found cached brightness level (${YELLOW}$current${RESET})"
+            log::info "Found cached brightness level (${YELLOW}$current${RESET})"
         fi
 
         # The remaining code at the bottom is generally self-explanatory
@@ -306,38 +301,38 @@ case "$method" in
                     elif ((current == 100 && $2 == 100)); then
                         exit 0
                     elif ((current == $2 )); then
-                        print_warn "Brightness level is already on ${current}%. Aborting"
+                        log::warn "Brightness level is already on ${current}%. Aborting"
                         exit 0
                     fi
 
                     if (($2 >= 0 && $2 <= 100)); then
                         new=$2
                     else
-                        print_error "Out of boundary!"
+                        log::error "Out of boundary!"
                         exit 1
                     fi
                 fi
                 ;;
         esac
 
-        print_log "New brightness level: ${YELLOW}$new${RESET}"
+        log::info "New brightness level: ${YELLOW}$new${RESET}"
         ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &>/dev/null &
 
-        print_log "Updating caches"
+        log::info "Updating caches"
         update_brightness_cache "$new" &
 
         if [[ $gl_osd == true && $br_osd == true ]]; then
             if [[ ! $2 =~ ^[0-9]+$ ]]; then
-                print_log "Showing OSD overlay"
+                log::info "Showing OSD overlay"
                 osd "$new" &
             fi
         else
             # Do not display the monitor name if it is only one.
             if [[ ! $(hyprctl -j monitors | jq 'length') == "1" ]]; then
-                print_log "More than 1 monitor found. Displaying monitor name in the notification title"
+                log::info "More than 1 monitor found. Displaying monitor name in the notification title"
                 source="($ACTIVE_MONITOR) "
             else
-                print_log "Only one monitor found. Not showing monitor name in the notification title"
+                log::info "Only one monitor found. Not showing monitor name in the notification title"
             fi
             if [[ ! $2 =~ ^[0-9]+$ ]]; then
                 notify-send -r 2 -t 1000 "Brightness $source${new}%" -h int:value:"$new"
@@ -366,7 +361,7 @@ case "$method" in
                 ;;
             "--value")
                 if ((current == $2 )); then
-                    print_warn "Brightness level is already on ${current}%. Aborting"
+                    log::warn "Brightness level is already on ${current}%. Aborting"
                     exit 0
                 elif (($2 => 0 && $2 <= 100)); then
                     new_raw=$(( $2 * max_raw / 100 ))
@@ -382,11 +377,11 @@ case "$method" in
         new=$((new_raw * 100 / max_raw))
 
         # Apply new brightness
-        print_log "New brightness level: ${YELLOW}$new${RESET}"
+        log::info "New brightness level: ${YELLOW}$new${RESET}"
         echo "$new_raw" > /sys/class/backlight/*/brightness
 
         if [[ $gl_osd == true && $br_osd == true ]]; then
-            print_log "Showing OSD overlay"
+            log::info "Showing OSD overlay"
             swayosd-client --brightness="$new"
         else
             notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"

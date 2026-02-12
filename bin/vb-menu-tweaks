@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
+
+SPICETIFY_FILE="$XDG_CONFIG_HOME/spicetify/config-xpui.ini"
+CHROMIUM_FILE="$XDG_CONFIG_HOME/chromium-flags.conf"
 
 if command -v spotify > /dev/null && command -v spicetify > /dev/null; then
-    if ! grep -q "adblock" "$XDG_CONFIG_HOME/spicetify/config-xpui.ini"; then
+    if ! grep -q "adblock" "$SPICETIFY_FILE"; then
         OPTIONS=("Install Spotify adblock")
     else
         OPTIONS=("Remove Spotify adblock")
@@ -11,7 +14,7 @@ if command -v spotify > /dev/null && command -v spicetify > /dev/null; then
 fi
 
 if command -v chromium > /dev/null; then
-    if ! grep -q "oauth2-client-id" "$XDG_CONFIG_HOME/chromium-flags.conf"; then
+    if ! grep -q "oauth2-client-id" "$CHROMIUM_FILE"; then
         OPTIONS+=("Enable Google sync for Chromium")
     else
         OPTIONS+=("Disable Google sync for Chromium")
@@ -23,7 +26,7 @@ if [ "${#OPTIONS[@]}" -eq 0 ]; then
     exit 1
 fi
 
-CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "App tweaks" "ESC to go back")"
+CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "App tweaks" "ESC to go back")"
 [[ -z "$CHOSEN" ]] && exit
 
 case "$CHOSEN" in
@@ -44,3 +47,4 @@ case "$CHOSEN" in
         vb-tweak-chromium disable
         ;;
 esac
+

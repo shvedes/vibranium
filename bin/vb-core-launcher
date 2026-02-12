@@ -13,16 +13,16 @@
 #	- Common websites
 #	- Power menu
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 if pid=$(pidof rofi); then
     kill $pid
     exit 0
 fi
 
-check_enum VIBRANIUM_GLOBAL_SEARCH_ENGINE "google" google duckduckgo bing brave
-check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS true
-check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT false
+helpers::check::strings VIBRANIUM_GLOBAL_SEARCH_ENGINE "google" google duckduckgo bing brave
+helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS true
+helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT false
 
 show_icons="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
 auto_select="$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
@@ -44,19 +44,19 @@ process_input() {
     case "$input" in
         "file://"*)
             # Open in default app (media viewer, text editor, whatever)
-            print_log "Input is a local file. Opening in default app"
+            log::info "Input is a local file. Opening in default app"
             input="${input#file://}"
             exec setsid xdg-open "$input" &> /dev/null &
             ;;
         "https://"*)
             # Open in default browser
-            print_log "Input is a link. Opening in default browser"
+            log::info "Input is a link. Opening in default browser"
             exec setsid xdg-open "$input" &> /dev/null &
             ;;
         "DBus launch")
             # org.telegram.desktop.desktop for example
             # Let DBus do its thing
-            print_log "Input is a DBus service"
+            log::info "Input is a DBus service"
             exit 0
             ;;
         *)
@@ -64,19 +64,19 @@ process_input() {
             local args="${input#"$cmd"}"
 
             if [[ -x "$cmd" ]] || command -v "$cmd" > /dev/null 2>&1; then
-                print_log "Input ${YELLOW}is${RESET} an executable. Executing with args"
+                log::info "Input ${YELLOW}is${RESET} an executable. Executing with args"
                 exec setsid "$cmd" $args
             elif [[ -e "$input" ]]; then
-                print_log "Input ${YELLOW}is${RESET} a file. Opening using ${YELLOW}xdg-open${RESET}"
+                log::info "Input ${YELLOW}is${RESET} a file. Opening using ${YELLOW}xdg-open${RESET}"
                 exec setsid xdg-open "$input" &> /dev/null &
             else
                 if [[ "$LAUNCHER_MODE" == "default" ]]; then
                     [[ "$auto_select" = true ]] && {
-                        print_log "Auto select enabled. Ignoring web search"
+                        log::info "Auto select enabled. Ignoring web search"
                         exit 1
                     }
-                    print_log "Input ${YELLOW}is${RESET} a web search query"
-                    print_log "Searching ${YELLOW}$input${RESET} on ${BLUE}${search_engine^}${RESET}"
+                    log::info "Input ${YELLOW}is${RESET} a web search query"
+                    log::info "Searching ${YELLOW}$input${RESET} on ${BLUE}${search_engine^}${RESET}"
                     exec setsid xdg-open "$(search_engine)${input}" &> /dev/null &
                 fi
             fi
@@ -131,8 +131,8 @@ case "$1" in
         LAUNCHER_MODE="${1/--/}"
         ;;
     *)
-        check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS false
-        check_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI false
+        helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS false
+        helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI false
 
         WEB_APPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
         AI="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"

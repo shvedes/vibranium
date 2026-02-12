@@ -2,7 +2,7 @@
 
 # shellcheck disable=SC2034
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 export SUDO_PROMPT
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
@@ -34,7 +34,7 @@ fi
 printf '\e[?25l'
 
 yay -Sy &> /dev/null &
-spinner "$!" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" ""
+term::spinner "$!" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" ""
 
 mapfile -t pkg_list < <(yay -Qqu)
 

@@ -23,13 +23,13 @@ if pgrep -f -- '--why=Timer' > /dev/null; then
 fi
 
 while true; do
-    chosen="$(printf "%s\n" "${options[@]}" | rofi_cmd "Set timer for" "ESC to go back")"
+    chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Set timer for" "ESC to go back")"
     [[ -z "$chosen" ]] && exit 1
     [[ " ${options[*]} " == *" $chosen "* ]] || continue
 
     while true; do
         prompt="Int, in ${chosen,}"
-        sub_chosen="$(printf "%s" "$prompt" | rofi_cmd "ESC to go back" "${chosen,}")"
+        sub_chosen="$(printf "%s" "$prompt" | helpers::ui::menu "ESC to go back" "${chosen,}")"
 
         [[ -z "$sub_chosen" ]] && break
         [[ "$sub_chosen" =~ ^[0-9]+$ ]] || continue

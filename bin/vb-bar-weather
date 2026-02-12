@@ -45,7 +45,7 @@ spinner() {
     done
 }
 
-check_bool VIBRANIUM_BAR_SHOW_ANIMATION true
+helpers::check::bool VIBRANIUM_BAR_SHOW_ANIMATION true
 if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == false ]]; then
     show_spinner=false
 else

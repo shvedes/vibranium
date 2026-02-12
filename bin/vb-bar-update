@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 state="$VIBRANIUM_STATE/update.available"
 

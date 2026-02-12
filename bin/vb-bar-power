@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 if ! [[ $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE == true ]]; then
     printf '{"text": ""}'

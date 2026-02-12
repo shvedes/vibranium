@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 if ! missing="$(vb-cmd-is-present grim slurp jq)"; then
-    print_error "missing required dependencies: $missing"
-    is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
+    log::error "missing required dependencies: $missing"
+    term::is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
     exit 1
 fi
 
@@ -28,7 +28,7 @@ EOF
 }
 
 copy() {
-    check_bool VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD true
+    helpers::check::bool VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD true
     if [[ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD == false ]]; then
         return 1
     fi
@@ -40,7 +40,7 @@ copy() {
 notify() {
     local target message is_on_disk
 
-    check_bool VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION true
+    helpers::check::bool VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION true
     if [[ $VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION == false ]]; then
         return 0
     fi
@@ -59,17 +59,17 @@ notify() {
         message="captured"
     fi
 
-    notify-send -r 1 -t 1500 "Screenshot Utility" "$target $message"
+    notify-send -r 3 -t 1500 "Screenshot" "$target $message"
 }
 
 set_jpg_quality() {
     local fs_quality quality opts
 
-    check_int VIBRANIUM_SCREENSHOT_JPEG_QUALITY 80 int
+    helpers::check::digit VIBRANIUM_SCREENSHOT_JPEG_QUALITY 80 int
     quality=$VIBRANIUM_SCREENSHOT_JPEG_QUALITY
 
-    if is_fullscreen && [[ "$1" == "--screen" ]]; then
-        check_int VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN 100 int
+    if hypr::is_fullscreen && [[ "$1" == "--screen" ]]; then
+        helpers::check::digit VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN 100 int
         fs_quality="$VIBRANIUM_SCREENSHOT_JPEG_QUALITY_FULLSCREEN"
 
         if [[ $fs_quality != $quality ]] && (( fs_quality > quality )); then
@@ -95,7 +95,7 @@ set_output_dir() {
 }
 
 set_output_file() {
-    check_bool VIBRANIUM_SCREENSHOT_SAVE_TO_DISK true
+    helpers::check::bool VIBRANIUM_SCREENSHOT_SAVE_TO_DISK true
     if [[ $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK == false ]]; then
         printf "/tmp/screenshot.%s" "$FILETYPE"
         return
@@ -146,11 +146,11 @@ capture() {
             [[ -z "$geometry" ]] && exit 1
 
             grim ${GRIM_OPTS[@]} -g "$geometry" "$output_file"
-            [[ $FLASH_BORDER ==  true ]] && _flash border &
+            [[ $FLASH_BORDER ==  true ]] && hypr::flash::border &
             ;;
         screen)
             grim ${GRIM_OPTS[@]} "$output_file"
-            [[ $FLASH_SCREEN == true ]] && _flash screen &
+            [[ $FLASH_SCREEN == true ]] && hypr::flash::screen &
             ;;
     esac
 
@@ -159,10 +159,10 @@ capture() {
 }
 
 init() {
-    check_bool VIBRANIUM_SCREENSHOT_FLASH_BORDER true
-    check_bool VIBRANIUM_SCREENSHOT_FLASH_SCREEN true
+    helpers::check::bool VIBRANIUM_SCREENSHOT_FLASH_BORDER true
+    helpers::check::bool VIBRANIUM_SCREENSHOT_FLASH_SCREEN true
 
-    check_enum VIBRANIUM_SCREENSHOT_FILE_TYPE "jpeg" png jpeg ppm
+    helpers::check::strings VIBRANIUM_SCREENSHOT_FILE_TYPE "jpeg" png jpeg ppm
     FILETYPE="$VIBRANIUM_SCREENSHOT_FILE_TYPE"
 
     GRIM_OPTS+=(-t $FILETYPE)

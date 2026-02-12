@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 TARGET="$XDG_CONFIG_HOME/chromium-flags.conf"
 
@@ -21,9 +21,9 @@ case "$1" in
                 msg+="\n\n<b>Please restart your browser</b>"
             fi
 
-            notify-send -r 1 "Vibranium" "$msg"
+            notify-send -r 3 "Vibranium" "$msg"
         else
-            print_warn "You already have Google sync enabled!"
+            log::warn "You already have Google sync enabled!"
             exit 1
         fi
         ;;
@@ -37,9 +37,9 @@ case "$1" in
                 msg+="\n\n<b>Please restart your browser</b>"
             fi
 
-            notify-send -r 1 "Vibranium" "$msg"
+            notify-send -r 3 "Vibranium" "$msg"
         else
-            print_warn "You already have Google sync disabled!"
+            log::warn "You already have Google sync disabled!"
             exit 1
         fi
         ;;

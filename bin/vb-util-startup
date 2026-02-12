@@ -4,7 +4,7 @@
 # Nothing much is happening here right now, but in the future,
 # I think it will be possible to implement something like self-check for the entire setup.
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 LOGFILE="$VIBRANIUM_CACHE/$(basename "$0".errors)"
 
@@ -16,7 +16,7 @@ _set_ddc_brightness() {
     local feature_enabled
     local current_brightness current_monitor cached_brightness
 
-    check_bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL true
+    helpers::check::bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL true
     feature_enabled="$VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
 
     [[ "$feature_enabled" == false ]] && return
@@ -42,7 +42,7 @@ _set_ddc_brightness() {
 }
 
 { _set_ddc_brightness || {
-        print_error "unable to restore brightness level for the external monitor(s)" >> "$LOGFILE" 2>&1
+        log::error "unable to restore brightness level for the external monitor(s)" >> "$LOGFILE" 2>&1
     }
 } &
 

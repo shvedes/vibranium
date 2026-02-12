@@ -16,7 +16,7 @@ if [ "$sinks_count" -eq 0 ]; then
             --monitor "$focused_monitor" \
             --custom-message "No audio devices found"
     else
-        notify-send -r 5 "Vibranium" "No audio devices found"
+        notify-send -r 2 "Vibranium" "No audio devices found"
     fi
     exit 1
 fi
@@ -66,5 +66,5 @@ if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
 else
     icons="$XDG_DATA_HOME/icons/Papirus"
     next_sink_volume_icon="$(find "$icons" -name "${next_sink_volume_icon}.svg" | head -n1)"
-    notify-send -r 5 -t 2000 -i $next_sink_volume_icon "Output Device" "$next_sink_description"
+    notify-send -r 2 -t 2000 -i $next_sink_volume_icon "Output Device" "$next_sink_description"
 fi

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+source vb-core-lib
 
 _set_city() {
     local opt city
@@ -14,9 +14,8 @@ _set_city() {
 
     city="$(curl -s --max-time 5 http://ip-api.com/json | jq -r '.city')"
 
-    "$VIBRANIUM_PATH"/configure/option-validate "$opt"
-    sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" \
-        "$XDG_CONFIG_HOME/vibranium/settings"
+    helpers::configure::verify_option "$opt"
+    sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$XDG_CONFIG_HOME/vibranium/settings"
 }
 
 _get_power_profile() {

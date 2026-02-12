@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 usage() {
     cat << EOF
@@ -19,14 +19,14 @@ is_empty() {
     mapfile -t entries < <(cliphist list)
 
     (( ! ${#entries[@]} >= 1 )) && {
-        print_warn "clipboard is empty"
+        log::warn "clipboard is empty"
         return 0
     }
 }
 
 show_clipboard() {
     local chosen
-    chosen="$(cliphist list | rofi_cmd "Clipboard" "search" -display-columns 2)"
+    chosen="$(cliphist list | helpers::ui::menu "Clipboard" "search" -display-columns 2)"
     if [[ ! -z $chosen ]]; then
         printf "%s" "$chosen" | cliphist decode | wl-copy -t text/uri-list
     fi
@@ -39,18 +39,18 @@ clear_clipboard() {
 }
 
 restart_service() {
-    print_log "starting systemd service..."
+    log::info "starting systemd service..."
     systemctl --quiet --user enable --now cliphist
 }
 
 if ! missing="$(vb-cmd-is-present rofi cliphist)"; then
-    print_error "missing required dependencies: $missing"
-    is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
+    log::error "missing required dependencies: $missing"
+    term::is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
     exit 1
 fi
 
 if [[ "$(systemctl --user is-active cliphist)" != "active" ]]; then
-    print_warn "systemd service not active!"
+    log::warn "systemd service not active!"
     start_service
 fi
 

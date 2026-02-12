@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 INDEX=0
 OPTIONS=("Hyprland" "Vibranium" "Arch Linux" "<i>Keybindings</i>")
 
 while true; do
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | rofi_cmd "Help" "ESC to go back" -selected-row "$INDEX")"
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Help" "ESC to go back" -selected-row "$INDEX")"
     [[ -z "$CHOSEN" ]] && exit 0
 
     for i in "${!OPTIONS[@]}"; do

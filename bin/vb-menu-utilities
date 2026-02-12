@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM_PATH/vb-core-lib"
+source vb-core-lib
 
 ACTIONS=()
 
@@ -29,7 +29,7 @@ if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
     ACTIONS+=("Copy current track")
 fi
 
-CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | rofi_cmd "Utilities" "search...")"
+CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | helpers::ui::menu "Utilities" "search...")"
 
 case "$CHOSEN" in
     "Close all windows")
