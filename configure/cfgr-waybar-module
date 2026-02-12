@@ -11,8 +11,8 @@ _updates_weather_specific() {
     while true; do
         source "$VIBRANIUM_USER_SETTINGS"
 
-        helpers::check::bool VIBRANIUM_BAR_SHOW_ANIMATION true
-        helpers::check::bool VIBRANIUM_BAR_SHOW_SEPARATOR true
+        helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
+        helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
 
         animate_loading="$VIBRANIUM_BAR_SHOW_ANIMATION"
         show_separators="$VIBRANIUM_BAR_SHOW_SEPARATOR"
@@ -91,7 +91,7 @@ _updates_submenu() {
     while true; do
         source "$VIBRANIUM_USER_SETTINGS"
 
-        helpers::check::bool VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES true
+        helpers::check VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES
         show_on_zero="$VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES"
 
         opts=(
@@ -111,11 +111,14 @@ _updates_submenu() {
 
 INDEX=0
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 while true; do
     OPTIONS=("Updates" "Weather")
 
-    helpers::check::bool VIBRANIUM_BAR_PACMAN_MODULE_ENABLE false
-    helpers::check::bool VIBRANIUM_BAR_WEATHER_MODULE_ENABLE false
+    helpers::check VIBRANIUM_BAR_PACMAN_MODULE_ENABLE
+    helpers::check VIBRANIUM_BAR_WEATHER_MODULE_ENABLE
 
     updates_enabled="$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
     weather_enabled="$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"

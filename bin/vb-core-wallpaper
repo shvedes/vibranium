@@ -120,7 +120,9 @@ if [[ ! -f "$WALLS/$(basename "$WALLPAPER_PATH")" ]]; then
     fi
 fi
 
-helpers::check::bool VIBRANIUM_GLOBAL_SHOW_WALLPAPER true
+helpers::parse_defaults
+helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
+
 if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
     if [[ "$(systemctl --user is-active hyprpaper)" != "active" ]]; then
         systemctl -q --user enable --now hyprpaper

@@ -29,8 +29,8 @@ _set_audio_feedback() {
     while true; do
         source "$VIBRANIUM_USER_SETTINGS"
 
-        helpers::check::bool VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK false
-        helpers::check::bool VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT "variant1" "variant2" "variant3"
+        helpers::check VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
+        helpers::check VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
 
         options=("Audio feedback : $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK")
 
@@ -91,17 +91,19 @@ _set_audio_feedback_variant() {
     done
 }
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
 
 INDEX=0
 
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check::digit VIBRANIUM_VOLUME_ADJUSTMENT_STEP        5
-    helpers::check::bool  VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK     false
-    helpers::check::bool  VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED    false
-    helpers::check::bool  VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK    true
-    helpers::check::bool  VIBRANIUM_VOLUME_SOURCE_LOOPBACK        false
+    helpers::check VIBRANIUM_VOLUME_ADJUSTMENT_STEP
+    helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK
+    helpers::check VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
+    helpers::check VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
+    helpers::check VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK
 
     OPTIONS=(
         "Boost up to 150% : $VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED"
@@ -114,17 +116,10 @@ while true; do
         OPTIONS+=("Hear my voice volume : $(vb-cmd-toggle-loopback --get-volume)%")
     fi
 
-    OPTIONS+=("Volume step : ${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}%")
-
-    if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
-        helpers::check::bool VIBRANIUM_GLOBAL_USE_OSD false
-        if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-            helpers::check::bool VIBRANIUM_VOLUME_USE_OSD true
-            OPTIONS+=("Use OSD : $VIBRANIUM_VOLUME_USE_OSD")
-        fi
-    fi
-
-    OPTIONS+=("<b>Open volume mixer</b>")
+    OPTIONS+=(
+        "Volume step : ${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}%"
+        "<b>Open volume mixer</b>"
+    )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Audio" "ESC to go back" -selected-row "$INDEX")"

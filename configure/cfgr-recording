@@ -124,10 +124,9 @@ _advanced_menu() {
     while true; do
         source "$VIBRANIUM_USER_SETTINGS"
 
-        helpers::check::strings VIBRANIUM_RECORDING_CONTAINER_TYPE mp4 "mp4" "mkv" "webm"
-        helpers::check::strings VIBRANIUM_RECORDING_FRAMERATE_MODE cfr "cfr" "vfr"
-        helpers::check::strings VIBRANIUM_RECORDING_VIDEO_CODEC auto \
-            "auto" "hd64" "hevc" "av1" "vp8" "vp9" "hevc_hdr" "hevc_10bit" "av1_10bit"
+        helpers::check VIBRANIUM_RECORDING_CONTAINER_TYPE
+        helpers::check VIBRANIUM_RECORDING_FRAMERATE_MODE
+        helpers::check VIBRANIUM_RECORDING_VIDEO_CODEC
 
         opts=(
             "Container type : $VIBRANIUM_RECORDING_CONTAINER_TYPE"
@@ -135,7 +134,7 @@ _advanced_menu() {
         )
 
         if [ "$(hyprctl -j getoption animations:enabled | jq '.int')" = "1" ]; then
-            helpers::check::bool  VIBRANIUM_RECORDING_FLASH_SCREEN true
+            helpers::check  VIBRANIUM_RECORDING_FLASH_SCREEN true
             opts+=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN")
         fi
 
@@ -165,20 +164,22 @@ else
     LIMIT_FPS_MAX=60
 fi
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check::strings VIBRANIUM_RECORDING_QUALITY high "medium" "high" "very_high" "ultra"
-    helpers::check::strings VIBRANIUM_RECORDING_CONTAINER_TYPE mp4 "mp4" "mkv" "webm"
-    helpers::check::strings VIBRANIUM_RECORDING_FRAMERATE_MODE cfr "cfr" "vfr"
-    helpers::check::strings VIBRANIUM_RECORDING_VIDEO_CODEC auto \
-        "auto" "hd64" "hevc" "av1" "vp8" "vp9" "hevc_hdr" "hevc_10bit" "av1_10bit"
+    helpers::check VIBRANIUM_RECORDING_QUALITY
+    helpers::check VIBRANIUM_RECORDING_CONTAINER_TYPE
+    helpers::check VIBRANIUM_RECORDING_FRAMERATE_MODE
+    helpers::check VIBRANIUM_RECORDING_VIDEO_CODEC
 
-    helpers::check::digit VIBRANIUM_RECORDING_FPS 30
-    helpers::check::bool  VIBRANIUM_RECORDING_USE_RNNOISE true
-    helpers::check::bool  VIBRANIUM_RECORDING_CAPTURE_SINK true
-    helpers::check::bool  VIBRANIUM_RECORDING_FLASH_SCREEN true
-    helpers::check::bool  VIBRANIUM_RECORDING_CAPTURE_SOURCE false
+    helpers::check VIBRANIUM_RECORDING_FPS
+    helpers::check VIBRANIUM_RECORDING_USE_RNNOISE
+    helpers::check VIBRANIUM_RECORDING_CAPTURE_SINK
+    helpers::check VIBRANIUM_RECORDING_FLASH_SCREEN
+    helpers::check VIBRANIUM_RECORDING_CAPTURE_SOURCE
 
     if [[ "$VIBRANIUM_RECORDING_QUALITY" == "very_high" ]]; then
         QUALITY="Very High"

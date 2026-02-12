@@ -10,8 +10,11 @@ exec 9> "$lockfile" || {
 
 flock -n 9 || exit 0
 
-helpers::check::strings VIBRANIUM_PLAYER_FADE_DURATION "normal" very_slow slow normal fast very_fast off
-helpers::check::strings VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH "slow" very_slow slow normal fast very_fast off
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
+helpers::check VIBRANIUM_PLAYER_FADE_DURATION
+helpers::check VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH
 
 VOLUME_FILE="$VIBRANIUM_RUNTIME/$(basename "$0").volume"
 PLAYER_CACHE_FILE="$VIBRANIUM_RUNTIME/$(basename "$0").player"

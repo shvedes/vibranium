@@ -35,18 +35,13 @@ output_file() {
 visualize() {
     vb-cmd-refresh-bar-module recording-indicator
 
-    helpers::check::bool VIBRANIUM_RECORDING_FLASH_SCREEN true
+    helpers::check VIBRANIUM_RECORDING_FLASH_SCREEN
     if [[ $VIBRANIUM_RECORDING_FLASH_SCREEN == true ]]; then
         hypr::flash::screen &
     fi
 }
 
 copy() {
-    helpers::check::bool VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD true
-    if [[ $VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD == false ]]; then
-        return 1
-    fi
-
     local last_file
     last_file="$(find "$(get_output_dir)" -type f -name 'recording-*' -printf "%T@ %p\n" | sort -n | tail -1 | cut -d' ' -f2-)"
     [[ -n "$last_file" ]] && {
@@ -159,16 +154,14 @@ both_failed_notification() {
 }
 
 start_rec() {
-    helpers::check::digit VIBRANIUM_RECORDING_FPS 30
-
-    helpers::check::bool VIBRANIUM_RECORDING_CAPTURE_SOURCE false
-    helpers::check::bool VIBRANIUM_RECORDING_CAPTURE_SINK true
-    helpers::check::bool VIBRANIUM_RECORDING_USE_RNNOISE true
-
-    helpers::check::strings VIBRANIUM_RECORDING_QUALITY "medium" medium high very_high ultra
-    helpers::check::strings VIBRANIUM_RECORDING_CONTAINER_TYPE "mp4" mp4 mkv webm flv
-    helpers::check::strings VIBRANIUM_RECORDING_FRAMERATE_MODE "cfr" cfr vfr
-    helpers::check::strings VIBRANIUM_RECORDING_VIDEO_CODEC "auto" auto h264 hevc av1 vp8 vp9 hevc_hdr av1_hdr hevc_10bit av1_10bit
+    helpers::check VIBRANIUM_RECORDING_FPS
+    helpers::check VIBRANIUM_RECORDING_QUALITY
+    helpers::check VIBRANIUM_RECORDING_VIDEO_CODEC
+    helpers::check VIBRANIUM_RECORDING_USE_RNNOISE
+    helpers::check VIBRANIUM_RECORDING_CAPTURE_SINK
+    helpers::check VIBRANIUM_RECORDING_CAPTURE_SOURCE
+    helpers::check VIBRANIUM_RECORDING_CONTAINER_TYPE
+    helpers::check VIBRANIUM_RECORDING_FRAMERATE_MODE
 
     if ! init_recording; then
         log::warn "failed to start recording. Using fallback mode"
@@ -192,6 +185,9 @@ start_rec() {
         log::info "recording started"
     fi
 }
+
+# Cache defaults (for further validation)
+helpers::parse_defaults
 
 if pid="$(pidof gpu-screen-recorder)"; then
     log::info "recording saved"

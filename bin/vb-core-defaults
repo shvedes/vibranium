@@ -43,12 +43,6 @@ VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD=true
 # Default is false
 VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK=false
 
-# Whether to copy processed item (a screenshot, a video) to clipboard.
-# Available options: bool
-#
-# Default is true
-VIBRANIUM_GLOBAL_COPY_TO_CLIPBOARD=true
-
 # Whether to pause music when locking session. The music will be restored later
 # Available options: bool
 #
@@ -146,15 +140,6 @@ VIBRANIUM_GLOBAL_SEARCH_ENGINE="google"
 # Default is true
 VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK=true
 
-# Whether to use OSD as visual feedback for option above.
-# Available options: bool
-#
-# Note: if set to false and VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK is set to true,
-#       a notification will be used instead.
-#
-# Default is true
-VIBRANIUM_VOLUME_USE_OSD=true
-
 # Whether to play a 'pop' sound when changing volume, aka audio feedback (GNOME-like)
 # Available options: bool
 #
@@ -199,12 +184,10 @@ VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME=50
 
 # Which file type to use when taking a screenshot
 # Available options limits to `man grim` file type support, so:
-# Available options: string 'png' 'jpg' 'jpeg' 'ppm'
+# Available options: string 'png' 'jpeg' 'ppm'
 #
-# Note: 'jpg' and 'jpeg' map to the same grim's CLI flag; the screenshot script normalizes them.
-#
-# Default is 'jpg'
-VIBRANIUM_SCREENSHOT_FILE_TYPE="jpg"
+# Default is 'jpeg'
+VIBRANIUM_SCREENSHOT_FILE_TYPE="jpeg"
 
 # JPEG quality
 # Available options: int between 0 and 100
@@ -248,12 +231,6 @@ VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION=true
 #
 # Default is true
 VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL=true
-
-# Whether to use OSD to show current brightness
-# Available options: bool
-#
-# Default is true
-VIBRANIUM_BRIGHTNESS_USE_OSD=true
 
 # Brightness adjustment step
 # Available options: int

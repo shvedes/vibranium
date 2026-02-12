@@ -34,14 +34,17 @@ _power_profile_notify() {
 
 INDEX=0
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check::bool VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE true
-    helpers::check::bool VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE true
-    helpers::check::bool VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE false
-    helpers::check::bool VIBRANIUM_BAR_WEATHER_MODULE_ENABLE true
-    helpers::check::bool VIBRANIUM_BAR_PACMAN_MODULE_ENABLE false
+    helpers::check VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE
+    helpers::check VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE
+    helpers::check VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE
+    helpers::check VIBRANIUM_BAR_WEATHER_MODULE_ENABLE
+    helpers::check VIBRANIUM_BAR_PACMAN_MODULE_ENABLE
 
     if _check_module 'hyprland/language'; then
         KEYBOARD_LAYOUT_ENABLED="false"

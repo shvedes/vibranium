@@ -31,11 +31,14 @@ _toggle_respect_pp_option() {
 
 INDEX=0
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check::bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE true
-    helpers::check::bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK true
+    helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
+    helpers::check VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
 
     OPTIONS=(
         "Respect power profile : $VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"

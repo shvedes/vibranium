@@ -201,6 +201,9 @@ osd() {
     swayosd-client --custom-icon="$icon" --custom-progress="$progress" || true
 }
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 if ! ACTIVE_MONITOR="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"; then
     log::error "Cannot determine the active monitor!"
     if term::is_headless; then
@@ -212,7 +215,7 @@ fi
 
 if ! compgen -G "/sys/class/backlight/*" > /dev/null; then
     # If the driver for adjusting the brightness of the built-in screen is not found and DDC control is disabled globally
-    helpers::check::bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL true
+    helpers::check VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL
     use_ddc="$VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
 
     if [[ $use_ddc == false ]]; then
@@ -241,20 +244,18 @@ else
     fi
 fi
 
-helpers::check::bool VIBRANIUM_GLOBAL_USE_OSD true
-helpers::check::bool VIBRANIUM_BRIGHTNESS_USE_OSD true
+helpers::check VIBRANIUM_GLOBAL_USE_OSD
 
 gl_osd="$VIBRANIUM_GLOBAL_USE_OSD"
-br_osd="$VIBRANIUM_BRIGHTNESS_USE_OSD"
 
-[[ "$gl_osd" == true && "$br_osd" == true ]] && {
+[[ "$gl_osd" == true ]] && {
     if ! vb-cmd-is-present swayosd:swayosd-client; then
         vb-cmd-dep-notify --name "Brightness Control" --deps swayosd
         exit 1
     fi
 }
 
-helpers::check::digit VIBRANIUM_BRIGHTNESS_STEP 5 int
+helpers::check VIBRANIUM_BRIGHTNESS_STEP
 step=$VIBRANIUM_BRIGHTNESS_STEP
 
 case "$method" in
@@ -321,7 +322,7 @@ case "$method" in
         log::info "Updating caches"
         update_brightness_cache "$new" &
 
-        if [[ $gl_osd == true && $br_osd == true ]]; then
+        if [[ $gl_osd == true ]]; then
             if [[ ! $2 =~ ^[0-9]+$ ]]; then
                 log::info "Showing OSD overlay"
                 osd "$new" &
@@ -380,7 +381,7 @@ case "$method" in
         log::info "New brightness level: ${YELLOW}$new${RESET}"
         echo "$new_raw" > /sys/class/backlight/*/brightness
 
-        if [[ $gl_osd == true && $br_osd == true ]]; then
+        if [[ $gl_osd == true ]]; then
             log::info "Showing OSD overlay"
             swayosd-client --brightness="$new"
         else

@@ -4,20 +4,10 @@
 
 source vb-core-lib
 
-helpers::check::bool VIBRANIUM_GLOBAL_USE_OSD true
-helpers::check::bool VIBRANIUM_VOLUME_USE_OSD true
-helpers::check::digit VIBRANIUM_VOLUME_ADJUSTMENT_STEP 5 int
-helpers::check::bool VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK true
-helpers::check::bool VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED false
-
 usage() {
     cat << EOF
 Usage: $(basename "$0") <vol|mic> <up|down|mute>
 EOF
-}
-
-should_use_osd() {
-    [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $VIBRANIUM_VOLUME_USE_OSD == true ]]
 }
 
 show_volume_notification() {
@@ -86,7 +76,7 @@ adjust_volume() {
     fi
 
     if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
-        if should_use_osd; then
+        if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
             if [[ -n "$osd_max_flag" ]]; then
                 swayosd-client "$osd_arg" "${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}" "$osd_max_flag"
             else
@@ -135,7 +125,7 @@ toggle_mute() {
     esac
 
     if [ $VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK = true ]; then
-        if should_use_osd; then
+        if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
             swayosd-client "$osd_arg" mute-toggle
         else
             wpctl set-mute "$device" toggle
@@ -150,9 +140,9 @@ toggle_mute() {
 feedback() {
     local variant dir
 
-    helpers::check::bool VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK false
+    helpers::check VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
     if [[ $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK = true ]]; then
-        helpers::check::strings VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT "variant1" variant1 variant2 variant3
+        helpers::check VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
         variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
 
         case "$variant" in
@@ -184,6 +174,14 @@ if [ $# -lt 2 ]; then
     usage
     exit 0
 fi
+
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
+helpers::check VIBRANIUM_GLOBAL_USE_OSD
+helpers::check VIBRANIUM_VOLUME_ADJUSTMENT_STEP
+helpers::check VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK
+helpers::check VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
 
 device_type="$1"
 action="$2"

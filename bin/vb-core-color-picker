@@ -59,12 +59,15 @@ if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
     exit 1
 fi
 
-helpers::check::bool VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW true
-helpers::check::bool VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR true
-helpers::check::digit VIBRANIUM_COLOR_PICKER_HISTORY_SIZE int 10
+# Cache defaults (for further validation)
+helpers::parse_defaults
 
-hex_preview="$VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
+helpers::check VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR
+helpers::check VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW
+helpers::check VIBRANIUM_COLOR_PICKER_HISTORY_SIZE
+
 show_selected="$VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
+hex_preview="$VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
 hist_size="$VIBRANIUM_COLOR_PICKER_HISTORY_SIZE"
 
 opt_args=()

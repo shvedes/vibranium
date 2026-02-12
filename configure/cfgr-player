@@ -4,11 +4,14 @@ source vb-core-lib
 
 INDEX=0
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check::strings VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH normal "very_slow" "slow" "normal" "fast" "very_fast" "off"
-    helpers::check::strings VIBRANIUM_PLAYER_FADE_DURATION normal "very_slow" "slow" "normal" "fast" "very_fast" "off"
+    helpers::check VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH
+    helpers::check VIBRANIUM_PLAYER_FADE_DURATION
 
     OPTIONS=(
         "Fade in / out on Next / Previous : ${VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH//_/ }"

@@ -4,11 +4,14 @@ source vb-core-lib
 
 INDEX=0
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check::bool VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW true
-    helpers::check::bool VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR true
+    helpers::check VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW
+    helpers::check VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR
 
     OPTIONS=(
         "Show HEX preview : $VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"

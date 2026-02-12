@@ -23,13 +23,16 @@ _help_notification() {
 
 INDEX=0
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check::bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK true
-    helpers::check::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN true
-    helpers::check::bool VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART true
-    helpers::check::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING true
+    helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
+    helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN
+    helpers::check VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART
+    helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
 
     OPTIONS=("Show Now Playing notification : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING")
 

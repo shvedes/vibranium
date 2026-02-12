@@ -4,21 +4,19 @@ source vb-core-lib
 
 INDEX=0
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check::bool  VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL true
-    helpers::check::digit VIBRANIUM_BRIGHTNESS_STEP 5
+    helpers::check VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL
+    helpers::check VIBRANIUM_BRIGHTNESS_STEP
 
     OPTIONS=(
         "Use DDC protocol : $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
         "Brightnes step : $VIBRANIUM_BRIGHTNESS_STEP"
     )
-
-    if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-        helpers::check::bool VIBRANIUM_GLOBAL_USE_OSD false
-        OPTIONS+=("OSD feedback	: $VIBRANIUM_BRIGHTNESS_USE_OSD")
-    fi
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Brightness" "ESC to go back" -selected-row "$INDEX")"

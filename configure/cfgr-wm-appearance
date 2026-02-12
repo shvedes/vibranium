@@ -251,7 +251,7 @@ _blur_submenu() {
         read -r enabled size passes contrast brightness vibrancy noise <<< "${parameters[*]}"
 
 
-        helpers::check::bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE true
+        helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
         local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
         local power_profile="$(vb-cmd-get-power)"
 
@@ -328,7 +328,7 @@ _shadow_submenu() {
 
         read -r enabled render_power range sharp ignore_window <<< "${parameters[*]}"
 
-        helpers::check::bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE true
+        helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
         local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
         local power_profile="$(vb-cmd-get-power)"
 
@@ -534,6 +534,9 @@ _gaps_submenu() {
 INDEX=0
 SMART_GAPS_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/smart-gaps.conf"
 HYPR_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/look-and-feel.conf"
+
+# Cache defaults (for further validation)
+helpers::parse_defaults
 
 while true; do
     mapfile -t PARAMETERS < <(

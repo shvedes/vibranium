@@ -79,7 +79,7 @@ while true; do
     LOCK_TIMEOUT=$((LOCK_TIMEOUT / 60))
     SLEEP_TIMEOUT=$((SLEEP_TIMEOUT / 60))
 
-    helpers::check::strings VIBRANIUM_GLOBAL_INHIBIT_TYPE idle "sleep" "idle"
+    helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
     INHIBIT_TYPE="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
 
     OPTIONS=(

@@ -107,163 +107,419 @@ helpers::ui::menu() {
 }
 
 # Not used yet. Questionable.
-helpers::ui::notify() {
-    local type="$1"
-    shift || return 2
+# helpers::ui::notify() {
+#     local type="$1"
+#     shift || return 2
+#
+#     local timeout=""
+#     local OPTIND opt
+#
+#     while getopts ":t:" opt; do
+#         case "$opt" in
+#             t) timeout="$OPTARG" ;;
+#             *) return 2 ;;
+#         esac
+#     done
+#     shift $((OPTIND - 1))
+#
+#     local replace_id urgency
+#     local title body
+#
+#     case "$type" in
+#         normal)        replace_id=1; urgency=normal ;;
+#         status)        replace_id=2; urgency=low ;;
+#         tool)          replace_id=3; urgency=normal ;;
+#         error)         replace_id=4; urgency=critical ;;
+#         missing-dep)   replace_id=5; urgency=critical ;;
+#         invalid-input) replace_id=6; urgency=normal ;;
+#         alert)         replace_id=7; urgency=normal ;;
+#         *) return 2 ;;
+#     esac
+#
+#     title="$(basename "${BASH_SOURCE[0]}")"
+#
+#     if (($# == 1)); then
+#         body="$1"
+#     elif (($# > 1)); then
+#         title="$1"
+#         shift
+#         body="$*"
+#     fi
+#
+#     local args=(-a Vibranium -u "$urgency" -r "$replace_id")
+#
+#     [[ -n "$timeout" && "$timeout" =~ ^[0-9]+$ ]] && args+=(-t "$timeout")
+#
+#     notify-send "${args[@]}" "$title" "$body"
+# }
 
-    local timeout=""
-    local OPTIND opt
+#####################################
+### VIBRANIUM SETTINGS VALIDATION ###
+#####################################
 
-    while getopts ":t:" opt; do
-        case "$opt" in
-            t) timeout="$OPTARG" ;;
-            *) return 2 ;;
-        esac
+# Provides a unified configuration validation system for Vibranium options.
+# It parses a defaults file to extract metadata (types, defaults, allowed values, ranges)
+# for each configuration variable and caches this information in associative arrays.
+# This caching allows for efficient validation of multiple variables without re-reading
+# the file each time, significantly improving performance for scripts that check many options.
+#
+# Purpose:
+# - Centralize validation logic to avoid hard-coded defaults in multiple functions.
+# - Enable easy updates to defaults by editing the file without changing code.
+# - Support bool, int (with optional range), and string (with optional enums) types.
+#
+# How it works:
+# - At script initialization, `helpers::parse_defaults` reads and parses the entire defaults file once.
+# - Metadata is stored in global associative arrays for quick access.
+# - `helpers::check_option` uses this cache to validate and normalize a given variable.
+# - If invalid or unset, it falls back to the default value and logs a warning.
+
+# Declare global associative arrays to cache parsed metadata
+declare -A OPTION_DEFAULTS OPTION_TYPES OPTION_ALLOWEDS OPTION_MINS OPTION_MAXS
+
+# This function parses the defaults file once at startup to cache all option metadata.
+# It scans the file line-by-line, extracting type, default, allowed values, and ranges
+# for each variable. This single-pass parsing optimizes for multiple subsequent validations.
+#
+# Usage: no arguments needed.
+helpers::parse_defaults() {
+
+    local -a lines
+    # Read the entire defaults file into an array for processing
+    mapfile -t lines < "$VIBRANIUM_PATH/vb-core-defaults"
+
+    # Initialize temporary variables for accumulating metadata per option block
+    local current_var=""
+    local options_line=""
+    local default_value=""
+    local type=""
+    local -a allowed
+    local min_range="" max_range=""
+
+    # Loop through each line in the file
+    for line in "${lines[@]}"; do
+        # Check if the line is a variable assignment (e.g., VIBRANIUM_VAR="value")
+        if [[ "$line" =~ ^VIBRANIUM_[A-Z_]+=\"?.*\"?$ ]]; then
+            # Extract the variable name from the assignment
+            current_var="${line%%=*}"
+            current_var="${current_var%%\"}"
+
+            # If we have accumulated metadata for the previous variable, store it in cache
+            if [[ -n "$current_var" && -n "$default_value" ]]; then
+                OPTION_DEFAULTS["$current_var"]="$default_value"
+                OPTION_TYPES["$current_var"]="$type"
+
+                # Store allowed values as space-separated string if present
+                if [[ -n "${allowed[*]}" ]]; then
+                    OPTION_ALLOWEDS["$current_var"]="${allowed[*]}"
+                fi
+
+                # Store range if present
+                if [[ -n "$min_range" ]]; then
+                    OPTION_MINS["$current_var"]="$min_range"
+                    OPTION_MAXS["$current_var"]="$max_range"
+                fi
+            fi
+
+            # Reset accumulators for the new variable block
+            options_line=""
+            default_value=""
+            type=""
+            allowed=()
+            min_range=""
+            max_range=""
+
+        # Extract default value from comment line
+        elif [[ "$line" == "# Default is "* ]]; then
+            default_value="${line#*# Default is }"
+            default_value="${default_value## }"
+            default_value="${default_value%% }"
+
+        # Extract and parse options line for type and constraints
+        elif [[ "$line" == "# Available options:"* ]]; then
+            options_line="${line#*# Available options: }"
+            options_line="${options_line## }"
+            options_line="${options_line%% }"
+
+            # Split options line into words
+            local -a options_words
+            IFS=' ' read -r -a options_words <<< "$options_line"
+
+            # Normalize type to lowercase and handle synonyms
+            type="${options_words[0],,}"
+            [[ "$type" == "integer" ]] && type="int"
+
+            # Parse allowed values for string type
+            if [[ "$type" == "string" ]]; then
+                for ((k=1; k<${#options_words[@]}; k++)); do
+                    local opt="${options_words[k]}"
+                    opt="${opt//\'/}"
+                    opt="${opt//\"/}"
+                    allowed+=("$opt")
+                done
+
+            # Parse range for int type
+            elif [[ "$type" == "int" ]]; then
+                for ((k=1; k<${#options_words[@]}; k++)); do
+                    if [[ "${options_words[k]}" == "between" && -n "${options_words[k+1]}" ]]; then
+                        if [[ "${options_words[k+2]}" == "and" && -n "${options_words[k+3]}" ]]; then
+                            min_range="${options_words[k+1]}"
+                            max_range="${options_words[k+3]}"
+                            break
+                        fi
+                    fi
+                done
+            fi
+        fi
     done
-    shift $((OPTIND - 1))
 
-    local replace_id urgency
-    local title body
+    # Store metadata for the last variable if the file ends with one
+    if [[ -n "$current_var" && -n "$default_value" ]]; then
+        OPTION_DEFAULTS["$current_var"]="$default_value"
+        OPTION_TYPES["$current_var"]="$type"
 
-    case "$type" in
-        normal)        replace_id=1; urgency=normal ;;
-        status)        replace_id=2; urgency=low ;;
-        tool)          replace_id=3; urgency=normal ;;
-        error)         replace_id=4; urgency=critical ;;
-        missing-dep)   replace_id=5; urgency=critical ;;
-        invalid-input) replace_id=6; urgency=normal ;;
-        alert)         replace_id=7; urgency=normal ;;
-        *) return 2 ;;
-    esac
+        # Store allowed values as space-separated string if present
+        if [[ -n "${allowed[*]}" ]]; then
+            OPTION_ALLOWEDS["$current_var"]="${allowed[*]}"
+        fi
 
-    title="$(basename "${BASH_SOURCE[0]}")"
+        # Store range if present
+        if [[ -n "$min_range" ]]; then
+            OPTION_MINS["$current_var"]="$min_range"
+            OPTION_MAXS["$current_var"]="$max_range"
+        fi
+    fi
+}
 
-    if (($# == 1)); then
-        body="$1"
-    elif (($# > 1)); then
-        title="$1"
-        shift
-        body="$*"
+# This function validates a single variable using cached metadata.
+# It checks if the variable is set and valid based on its type and constraints.
+# If unset or invalid, it sets the default and logs a warning.
+# Normalization is applied where applicable (e.g., lowercase bool, clean int).
+#
+# Usage: helpers::check_option <var_name>
+# Returns: 0 on success (validated or fallback), 1 if not found in cache.
+helpers::check() {
+    # Get the current value of the variable
+    local var_name="$1"
+    local val="${!var_name}"
+
+    # Check if metadata exists in cache
+    if [[ -z "${OPTION_DEFAULTS[$var_name]}" ]]; then
+        log::warn "Variable $var_name not found in defaults."
+        return 1
     fi
 
-    local args=(-a Vibranium -u "$urgency" -r "$replace_id")
+    # Retrieve cached metadata
+    local default_value="${OPTION_DEFAULTS[$var_name]}"
+    local type="${OPTION_TYPES[$var_name]}"
+    local allowed_str="${OPTION_ALLOWEDS[$var_name]}"
+    local -a allowed=($allowed_str)
+    local min_range="${OPTION_MINS[$var_name]}"
+    local max_range="${OPTION_MAXS[$var_name]}"
 
-    [[ -n "$timeout" && "$timeout" =~ ^[0-9]+$ ]] && args+=(-t "$timeout")
+    # Handle unset variable by falling back to default
+    if [[ -z "$val" ]]; then
+        log::warn "$var_name is unset. Falling back to defaults."
+        printf -v "$var_name" '%s' "$default_value"
+        return 0
+    fi
 
-    notify-send "${args[@]}" "$title" "$body"
+    # Prepare normalized value and validity flag
+    local normalized_val="$val"
+    local is_valid=true
+
+    # Validate and normalize based on type
+    case "$type" in
+        bool)
+            # Normalize to lowercase
+            normalized_val="${val,,}"
+
+            # Check for valid boolean values
+            if [[ "$normalized_val" != "true" && "$normalized_val" != "false" ]]; then
+                is_valid=false
+            fi
+            ;;
+
+        int)
+            # Normalize comma to dot for decimal
+            normalized_val="${val//,/.}"
+
+            # Define regex for numeric validation
+            local num_re='^-?[0-9]+(\.[0-9]+)?$'
+
+            # Check if matches numeric pattern
+            if ! [[ "$normalized_val" =~ $num_re ]]; then
+                is_valid=false
+            else
+                # Extract sign
+                local sign=""
+                [[ "$normalized_val" == -* ]] && sign="-" normalized_val="${normalized_val#-}"
+
+                # Split integer and fractional parts
+                local int_part="${normalized_val%%.*}"
+                local frac_part="${normalized_val#*.}"
+                if [[ "$frac_part" == "$normalized_val" ]]; then frac_part=""; else frac_part=".${frac_part}"; fi
+
+                # Remove leading zeros from integer part
+                int_part="${int_part##+(0)}"
+                [[ -z "$int_part" ]] && int_part="0"
+
+                # Reassemble normalized value
+                normalized_val="${sign}${int_part}${frac_part}"
+
+                # Check range if defined
+                if [[ -n "$min_range" && -n "$max_range" ]]; then
+                    if (( ${normalized_val%%.*} < min_range || ${normalized_val%%.*} > max_range )); then
+                        is_valid=false
+                    fi
+                fi
+            fi
+            ;;
+
+        string)
+            # If enums are defined, check against them
+            if [[ ${#allowed[@]} -gt 0 ]]; then
+                local ok=false
+                for a in "${allowed[@]}"; do
+                    if [[ "$val" == "$a" ]]; then
+                        ok=true
+                        break
+                    fi
+                done
+
+                if [[ "$ok" != true ]]; then
+                    is_valid=false
+                fi
+            fi
+            # No enums: any non-empty string is valid (unset already handled)
+            ;;
+
+        *)
+            # Unsupported type: skip validation
+            ;;
+    esac
+
+    # Apply fallback if invalid, else set normalized value
+    if [[ "$is_valid" != true ]]; then
+        log::warn "Invalid value for $var_name. Falling back to defaults."
+        printf -v "$var_name" '%s' "$default_value"
+    else
+        printf -v "$var_name" '%s' "$normalized_val"
+    fi
 }
+
 
 # Validate that a named variable contains a numeric value (int or float) and
 # substitute a default when necessary.
 #
 # Usage:
 #   helpers::check::digit <var_name> <default>
-helpers::check::digit() {
-    local var_name="$1"
-    local default="$2"
-    local val="${!var_name}"
-
-    if [[ -z $val ]]; then
-        log::warn "$var_name is unset. Falling back to defaults."
-        printf -v "$var_name" '%s' "$default"
-        return 0
-    fi
-
-    local normalized="${val//,/.}"
-
-    local int_re='^-?[0-9]+$'
-    local float_re='^-?([0-9]+[.][0-9]+|[.][0-9]+)$'
-
-    if ! [[ $normalized =~ $int_re || $normalized =~ $float_re ]]; then
-        log::warn "Invalid numeric value for ${var_name}. Falling back to defaults."
-        printf -v "$var_name" '%s' "$default"
-        return 0
-    fi
-
-    local sign=""
-    [[ $normalized == -* ]] && sign="-" normalized="${normalized#-}"
-
-    local int_part frac_part
-
-    if [[ $normalized == *.* ]]; then
-        int_part="${normalized%%.*}"
-        frac_part=".${normalized#*.}"
-    else
-        int_part="$normalized"
-        frac_part=""
-    fi
-
-    int_part="${int_part##+(0)}"
-    [[ -z $int_part ]] && int_part="0"
-
-    printf -v "$var_name" '%s' "${sign}${int_part}${frac_part}"
-}
+# helpers::check::digit() {
+#     local var_name="$1"
+#     local default="$2"
+#     local val="${!var_name}"
+#
+#     if [[ -z $val ]]; then
+#         log::warn "$var_name is unset. Falling back to defaults."
+#         printf -v "$var_name" '%s' "$default"
+#         return 0
+#     fi
+#
+#     local normalized="${val//,/.}"
+#
+#     local int_re='^-?[0-9]+$'
+#     local float_re='^-?([0-9]+[.][0-9]+|[.][0-9]+)$'
+#
+#     if ! [[ $normalized =~ $int_re || $normalized =~ $float_re ]]; then
+#         log::warn "Invalid numeric value for ${var_name}. Falling back to defaults."
+#         printf -v "$var_name" '%s' "$default"
+#         return 0
+#     fi
+#
+#     local sign=""
+#     [[ $normalized == -* ]] && sign="-" normalized="${normalized#-}"
+#
+#     local int_part frac_part
+#
+#     if [[ $normalized == *.* ]]; then
+#         int_part="${normalized%%.*}"
+#         frac_part=".${normalized#*.}"
+#     else
+#         int_part="$normalized"
+#         frac_part=""
+#     fi
+#
+#     int_part="${int_part##+(0)}"
+#     [[ -z $int_part ]] && int_part="0"
+#
+#     printf -v "$var_name" '%s' "${sign}${int_part}${frac_part}"
+# }
 
 # Validate that a named variable contains a boolean value ("true" or "false")
 # and substitute a default when necessary.
 #
 # Usage:
 #   helpers::check::bool <var_name> <default>
-helpers::check::bool() {
-    local var_name=$1
-    local default=$2
-    local val="${!var_name}"
-
-    if [[ -z $val ]]; then
-        log::warn "$var_name is unset. Falling back to defaults."
-        printf -v "$var_name" '%s' "$default"
-        return 0
-    fi
-
-    local normalized="${val,,}"
-
-    if [[ $normalized != "true" && $normalized != "false" ]]; then
-        log::warn "Invalid value for $var_name. Falling back to defaults."
-        printf -v "$var_name" '%s' "$default"
-    else
-        printf -v "$var_name" '%s' "$normalized"
-    fi
-}
+# helpers::check::bool() {
+#     local var_name=$1
+#     local default=$2
+#     local val="${!var_name}"
+#
+#     if [[ -z $val ]]; then
+#         log::warn "$var_name is unset. Falling back to defaults."
+#         printf -v "$var_name" '%s' "$default"
+#         return 0
+#     fi
+#
+#     local normalized="${val,,}"
+#
+#     if [[ $normalized != "true" && $normalized != "false" ]]; then
+#         log::warn "Invalid value for $var_name. Falling back to defaults."
+#         printf -v "$var_name" '%s' "$default"
+#     else
+#         printf -v "$var_name" '%s' "$normalized"
+#     fi
+# }
 
 # Validate that a named variable contains one of a set of allowed values (enum)
 # and substitute a default when necessary.
 #
 # Usage:
 #   helpers::check::strings <var_name> <default> <allowed1> [allowed2 ... allowedN]
-helpers::check::strings() {
-    local var_name=$1
-    local default=$2
-    shift 2
-    local allowed=("$@")
-    local val="${!var_name}"
-
-    if [[ ${#allowed[@]} -eq 0 ]]; then
-        log::warn "Invalid value for $var_name. Falling to defaults."
-        printf -v "$var_name" '%s' "$default"
-        return 0
-    fi
-
-    if [[ -z $val ]]; then
-        log::warn "$var_name is unset. Falling back to defaults."
-        printf -v "$var_name" '%s' "$default"
-        return 0
-    fi
-
-    local ok=false
-    for a in "${allowed[@]}"; do
-        if [[ $val == "$a" ]]; then
-            ok=true
-            break
-        fi
-    done
-
-    if [[ $ok != true ]]; then
-        log::warn "Invalid value for $var_name. Falling to defaults."
-        printf -v "$var_name" '%s' "$default"
-    else
-        printf -v "$var_name" '%s' "$val"
-    fi
-}
+# helpers::check::strings() {
+#     local var_name=$1
+#     local default=$2
+#     shift 2
+#     local allowed=("$@")
+#     local val="${!var_name}"
+#
+#     if [[ ${#allowed[@]} -eq 0 ]]; then
+#         log::warn "Invalid value for $var_name. Falling to defaults."
+#         printf -v "$var_name" '%s' "$default"
+#         return 0
+#     fi
+#
+#     if [[ -z $val ]]; then
+#         log::warn "$var_name is unset. Falling back to defaults."
+#         printf -v "$var_name" '%s' "$default"
+#         return 0
+#     fi
+#
+#     local ok=false
+#     for a in "${allowed[@]}"; do
+#         if [[ $val == "$a" ]]; then
+#             ok=true
+#             break
+#         fi
+#     done
+#
+#     if [[ $ok != true ]]; then
+#         log::warn "Invalid value for $var_name. Falling to defaults."
+#         printf -v "$var_name" '%s' "$default"
+#     else
+#         printf -v "$var_name" '%s' "$val"
+#     fi
+# }
 
 # A term::spinner utility function.
 # Displays an animated term::spinner in the terminal while a given process (PID) is running.

@@ -26,7 +26,7 @@ EOF
 notify() {
     local feedback_enabled gl_use_osd pp_use_osd
 
-    helpers::check::bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK false
+    helpers::check VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
     feedback_enabled="$VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK"
 
     if [[ $feedback_enabled  == false ]]; then
@@ -52,7 +52,7 @@ notify() {
             ;;
     esac
 
-    helpers::check::bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD true
+    helpers::check VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD
 
     pp_use_osd="$VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD"
     gl_use_osd="$VIBRANIUM_GLOBAL_USE_OSD"
@@ -69,7 +69,7 @@ update_cache() { echo "$1" > "$VIBRANIUM_STATE/power-profile"; }
 toggle_blur() {
     local respect_pp blur_enabled
 
-    helpers::check::bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE true
+    helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
     respect_pp="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
 
     blur_enabled="$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')"
@@ -122,6 +122,9 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# Cache defaults (for further validation)
+helpers::parse_defaults
 
 USER_ARGS=()
 PROFILES=("power-saver" "balanced" "performance")

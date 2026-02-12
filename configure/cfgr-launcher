@@ -4,15 +4,18 @@ source vb-core-lib
 
 INDEX=0
 
+# Cache defaults (for further validation)
+helpers::parse_defaults
+
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI false
-    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS true
-    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT false
-    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS false
-    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START false
-    helpers::check::strings VIBRANIUM_GLOBAL_SEARCH_ENGINE google "google" "bing" "duckduckgo" "brave"
+    helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI
+    helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS
+    helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
+    helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS
+    helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START
+    helpers::check VIBRANIUM_GLOBAL_SEARCH_ENGINE google
 
     OPTIONS=(
         "Search engine : $VIBRANIUM_GLOBAL_SEARCH_ENGINE"
