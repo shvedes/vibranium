@@ -30,10 +30,10 @@ trap 'printf "\n"; _operation_canceled; exit 1' SIGINT
 printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
 printf '\e[?25l' # Hide cursor
 
-(_get_fonts > "$VIBRANIUM_CACHE/$(basename "$0").list") &
+(_get_fonts > "$VIBRANIUM_CACHE/${0##*/}.list") &
 term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting font packages"
 
-LIST="$(< "$VIBRANIUM_CACHE/$(basename "$0").list")"
+LIST="$(< "$VIBRANIUM_CACHE/${0##*/}.list")"
 mapfile -t chosen < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
 
 rm -f "$TMP"

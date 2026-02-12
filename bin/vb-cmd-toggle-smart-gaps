@@ -4,7 +4,7 @@ FILE="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/smart-gaps.conf"
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [--help]
+Usage: ${0##*/} [--help]
 
 Toggle Hyprland smart gaps configuration.
 

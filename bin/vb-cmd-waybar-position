@@ -5,7 +5,7 @@ DUNST_CONF="${XDG_CONFIG_HOME-:$HOME/.config}/dunst/dunstrc"
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [--top|--bottom] [--help]
+Usage: ${0##*/} [--top|--bottom] [--help]
 
 Move Waybar and Dunst notifications to the top or bottom of the screen.
 

@@ -12,7 +12,7 @@ VOL="${VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME}%"
 
 print_help() {
     cat <<EOF
-Usage: $(basename "$0") [OPTIONS]
+Usage: ${0##*/} [OPTIONS]
 
 Enable default microphone loopback (aka hear my voice)
 

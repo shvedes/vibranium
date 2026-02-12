@@ -1,5 +1,24 @@
 #!/usr/bin/env bash
 
+_usage() {
+    cat <<EOF
+Usage: ${0##*/} [OPTION]...
+
+Update font cache and notify Vibranium worker module.
+
+Options:
+  -h, --help      display this help and exit
+
+This command forces a rebuild of the fontconfig cache using fc-cache -f.
+EOF
+}
+
+case "$1" in
+    "")                true   ;;
+    -h|--help) _usage; exit 0 ;;
+    *)         _usage; exit 1 ;;
+esac
+
 printf "Updating font cache. This might take some time" > "$VIBRANIUM_RUNTIME/worker.active"
 vb-cmd-refresh-bar-module worker
 

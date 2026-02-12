@@ -7,11 +7,11 @@ fi
 
 source vb-core-lib
 
-LOG_FILE="$VIBRANIUM_CACHE/$(basename "$0").log"
+LOG_FILE="$VIBRANIUM_CACHE/${0##*/}.log"
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [OPTION]
+Usage: ${0##*/} [OPTION]
 
 Options:
   --region    Record region

@@ -9,7 +9,7 @@ RESTORE_FLAG="$VIBRANIUM_RUNTIME/restore-player"
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") OPTION
+Usage: ${0##*/} OPTION
 
 Handle media playback on session lock/unlock events.
 
@@ -60,14 +60,14 @@ case "$1" in
         ;;
 
     "")
-        echo "$(basename "$0"): missing option" >&2
-        echo "Try '$(basename "$0") --help' for more information." >&2
+        echo "${0##*/}: missing option" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
         exit 1
         ;;
 
     *)
-        echo "$(basename "$0"): invalid option '$1'" >&2
-        echo "Try '$(basename "$0") --help' for more information." >&2
+        echo "${0##*/}: invalid option '$1'" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
         exit 1
         ;;
 esac

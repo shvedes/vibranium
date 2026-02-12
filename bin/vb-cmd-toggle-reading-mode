@@ -4,7 +4,7 @@ source vb-core-lib
 
 help() {
     cat <<EOF
-Usage: $(basename "$0") [OPTION]...
+Usage: ${0##*/} [OPTION]...
 
 Toggle reading mode in Hyprland by applying or removing a screen shader.
 

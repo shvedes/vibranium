@@ -8,7 +8,7 @@ source vb-core-lib
 
 helpers::parse_defaults
 
-LOGFILE="$VIBRANIUM_CACHE/$(basename "$0".errors)"
+LOGFILE="$VIBRANIUM_CACHE/${0##*/}.errors"
 
 # This function handles cases where the monitor brightness might have been changed
 # manually, dual-boot (e.g. Monitorian), or through any external means outside the script.

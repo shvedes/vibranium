@@ -76,8 +76,7 @@ update_configs() {
 
 usage() {
     cat <<EOF
-Usage:
-  $(basename "$0") [OPTION] <image>
+Usage: ${0##*/} [OPTION] <image>
 
 Options:
   --next          Set the next wallpaper

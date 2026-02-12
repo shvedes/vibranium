@@ -3,10 +3,8 @@
 source vb-core-lib
 
 _usage() {
-    local progname="${0##*/}"
-
     cat <<EOF
-Usage: $progname [OPTION]... [PACKAGE]...
+Usage: ${0##*/} [OPTION]... [PACKAGE]...
 
 Uninstall packages in Vibranium
 

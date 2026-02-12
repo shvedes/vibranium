@@ -2,7 +2,7 @@
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [COMMAND [ARGS...]]
+Usage: ${0##*/} [COMMAND [ARGS...]]
 
 Open the default terminal (Alacritty). If COMMAND is provided,
 it will be executed inside the terminal.

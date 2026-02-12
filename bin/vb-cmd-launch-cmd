@@ -4,7 +4,7 @@
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") COMMAND [ARGUMENTS...]
+Usage: ${0##*/} COMMAND [ARGUMENTS...]
 
 Launch COMMAND in a new session using setsid.
 
@@ -19,8 +19,8 @@ case "$1" in
         exit 0
         ;;
     "")
-        echo "$(basename "$0"): missing COMMAND" >&2
-        echo "Try '$(basename "$0") --help' for more information." >&2
+        echo "${0##*/}: missing COMMAND" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
         exit 1
         ;;
 esac
@@ -29,7 +29,7 @@ cmd="$1"
 shift
 
 if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "$(basename "$0"): command not found: $cmd" >&2
+    echo "${0##*/}: command not found: $cmd" >&2
     exit 127
 fi
 

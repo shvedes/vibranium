@@ -8,7 +8,7 @@ source vb-core-lib
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [OPTION]
+Usage: ${0##*/} [OPTION]
 
 Toggle systemd idle inhibitor for Vibranium.
 

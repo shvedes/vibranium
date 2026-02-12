@@ -7,7 +7,7 @@ DEPS=()
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [OPTIONS]
+Usage: ${0##*/} [OPTIONS]
 
 Checks that required dependencies are installed and shows a notification if something is missing.
 

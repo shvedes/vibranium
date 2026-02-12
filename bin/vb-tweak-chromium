@@ -5,7 +5,7 @@ source vb-core-lib
 TARGET="$XDG_CONFIG_HOME/chromium-flags.conf"
 
 [[ -z "$1" || ! "$1" =~ ^(en|dis)able$ ]] && {
-    echo "Usage: $(basename "$0") enable|disable"
+    echo "Usage: ${0##*/} enable|disable"
     exit 1
 }
 

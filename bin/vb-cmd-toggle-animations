@@ -9,7 +9,7 @@ HYPRLOCK_CONF="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [--quiet] [--help]
+Usage: ${0##*/} [--quiet] [--help]
 
 Toggle Hyprland animations on/off.
 

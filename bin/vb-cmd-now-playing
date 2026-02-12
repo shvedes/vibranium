@@ -10,7 +10,7 @@
 # using Pango markup for notifications or lockscreen display, and cleans up temporary
 # album art files afterward.
 
-progname=$(basename "$0")
+progname=${0##*/}
 
 usage() {
     cat <<EOF
@@ -41,7 +41,7 @@ done
 
 source vb-core-lib
 
-album_art="/tmp/$(basename "$0").art"
+album_art="/tmp/${0##*/}.art"
 state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
 
 pc_status="$(playerctl status 2>/dev/null || true)"

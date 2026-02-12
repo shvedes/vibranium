@@ -5,7 +5,7 @@
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") MODULE_NAME
+Usage: ${0##*/} MODULE_NAME
 
 Send a refresh signal to the Waybar module MODULE_NAME.
 

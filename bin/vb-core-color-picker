@@ -17,7 +17,7 @@ HISTORY="$VIBRANIUM_CACHE/color-picker.history"
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [OPTION]
+Usage: ${0##*/} [OPTION]
 
 Simple color picker for Vibranium.
 

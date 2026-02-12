@@ -6,7 +6,7 @@ STEP=100
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [OPTIONS]
+Usage: ${0##*/} [OPTIONS]
 
 Options:
   --toggle             Toggle night light
@@ -22,9 +22,9 @@ Notes:
 EOF
 }
 
-lockfile="$VIBRANIUM_RUNTIME/$(basename "$0").lock"
+lockfile="$VIBRANIUM_RUNTIME/${0##*/}.lock"
 exec 10> "$lockfile" || {
-    echo "error: another instance of $(basename "$0") already running!"
+    echo "error: another instance of ${0##*/} already running!"
     exit 1
 }
 
@@ -54,8 +54,8 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         *)
-            printf '%s\n' "$(basename "$0"): invalid option: $1" >&2
-            printf 'Try "%s --help" for more information.\n' "$(basename "$0")" >&2
+            printf '%s\n' "${0##*/}: invalid option: $1" >&2
+            printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
             exit 1
             ;;
     esac

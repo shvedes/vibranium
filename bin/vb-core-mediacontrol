@@ -2,9 +2,10 @@
 
 source vb-core-lib
 
-lockfile="$VIBRANIUM_RUNTIME/$(basename "$0").lock"
+lockfile="$VIBRANIUM_RUNTIME/${0##*/}.lock"
+
 exec 9> "$lockfile" || {
-    log::error "Anoter instance of ${YELLOW}$(basename "$0")${RESET} is already running!"
+    log::error "Anoter instance of ${YELLOW}${0##*/}${RESET} is already running!"
     exit 1
 }
 
@@ -16,8 +17,8 @@ helpers::parse_defaults
 helpers::check VIBRANIUM_PLAYER_FADE_DURATION
 helpers::check VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH
 
-VOLUME_FILE="$VIBRANIUM_RUNTIME/$(basename "$0").volume"
-PLAYER_CACHE_FILE="$VIBRANIUM_RUNTIME/$(basename "$0").player"
+VOLUME_FILE="$VIBRANIUM_RUNTIME/${0##*/}.volume"
+PLAYER_CACHE_FILE="$VIBRANIUM_RUNTIME/${0##*/}.player"
 SLEEP_TIME=0.005  # Adjust this for overall speed; smaller = faster loops, but may strain CPU
 
 # Map fade durations to number of steps (higher steps = slower fade, longer duration)
@@ -41,7 +42,7 @@ esac
 
 usage() {
     cat <<EOF
-Usage: $(basename "$0") [OPTION]
+Usage: ${0##*/}  [OPTION]
 
 Media control script with smooth volume fade effects for playerctl and MPD.
 

@@ -5,7 +5,7 @@ source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [--help]
+Usage: ${0##*/} [--help]
 
 Suspend or resume the currently active window in Hyprland.
 Sends a desktop notification with the window name and new state.

@@ -2,7 +2,7 @@
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [DIRECTORY]
+Usage: ${0##*/} [DIRECTORY]
 
 Open a new Alacritty terminal window with specified working directory.
 

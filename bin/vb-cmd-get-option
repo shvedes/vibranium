@@ -4,7 +4,7 @@ source vb-core-lib
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") OPTION_NAME
+Usage: ${0##*/} OPTION_NAME
 
 Print the value of the specified Vibranium option.
 
@@ -19,8 +19,8 @@ case "$1" in
         exit 0
         ;;
     "")
-        echo "$(basename "$0"): missing OPTION_NAME" >&2
-        echo "Try '$(basename "$0") --help' for more information." >&2
+        echo "${0##*/}: missing OPTION_NAME" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
         exit 1
         ;;
 esac
@@ -30,5 +30,5 @@ if [[ -n "${!1+x}" ]]; then
     exit 0
 fi
 
-echo "$(basename "$0"): option '$1' is not set" >&2
+echo "${0##*/}: option '$1' is not set" >&2
 exit 1

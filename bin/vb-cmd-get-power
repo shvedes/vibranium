@@ -4,7 +4,7 @@ STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/vibranium/power-profile"
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [OPTION]
+Usage: ${0##*/} [OPTION]
 
 Print current power profile.
 Uses a cached state file to avoid slow powerprofilesctl calls.
@@ -22,8 +22,8 @@ case "$1" in
     "")
         ;;
     *)
-        echo "$(basename "$0"): invalid option '$1'" >&2
-        echo "Try '$(basename "$0") --help' for more information." >&2
+        echo "${0##*/}: invalid option '$1'" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
         exit 1
         ;;
 esac
@@ -39,5 +39,5 @@ if powerprofilesctl get | tee "$STATE_FILE"; then
     exit 0
 fi
 
-echo "$(basename "$0"): failed to read power profile" >&2
+echo "${0##*/}: failed to read power profile" >&2
 exit 1

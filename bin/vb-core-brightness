@@ -15,8 +15,7 @@ source vb-core-lib
 
 usage() {
     cat << EOF
-Usage:
-    $(basename "$0") [--up|--down|--value N]
+Usage: ${0##*/} [--up|--down|--value N]
 
 Adjust screen brightness.
 

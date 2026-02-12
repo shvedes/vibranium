@@ -6,7 +6,7 @@ CLIENTS=(ncmpcpp rmpc cmus vimpc)
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [OPTION]
+Usage: ${0##*/} [OPTION]
 
 Detect and launch an available MPD client in a terminal.
 
@@ -23,8 +23,8 @@ case "$1" in
     "")
         ;;
     *)
-        echo "$(basename "$0"): invalid option '$1'" >&2
-        echo "Try '$(basename "$0") --help' for more information." >&2
+        echo "${0##*/}: invalid option '$1'" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
         exit 1
         ;;
 esac

@@ -2,20 +2,9 @@
 
 source vb-core-lib
 
-if ! missing="$(vb-cmd-is-present grim slurp jq)"; then
-    log::error "missing required dependencies: $missing"
-    term::is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
-    exit 1
-fi
-
-if slurp_pid="$(pidof slurp)"; then
-    kill $slurp_pid
-    exit 1
-fi
-
 usage() {
     cat << EOF
-Usage: $(basename "$0") [OPTION]
+Usage: ${0##*/} [OPTION]
 
 A basic screenshot utility for Vibranium.
 
@@ -126,26 +115,24 @@ capture() {
 }
 
 init() {
+    # Cache defaults (for further validation)
+    helpers::parse_defaults
+
     helpers::check VIBRANIUM_SCREENSHOT_FILE_TYPE
+    helpers::check VIBRANIUM_SCREENSHOT_FLASH_SCREEN
+    helpers::check VIBRANIUM_SCREENSHOT_FLASH_BORDER
+
+    FLASH_SCREEN=$VIBRANIUM_SCREENSHOT_FLASH_SCREEN
+    FLASH_BORDER=$VIBRANIUM_SCREENSHOT_FLASH_BORDER
 
     FILETYPE="$VIBRANIUM_SCREENSHOT_FILE_TYPE"
-    GRIM_OPTS+=(-t $FILETYPE)
+    GRIM_OPTS=(-t $FILETYPE)
 
     if [[ $FILETYPE =~ jp(e)?g ]]; then
         helpers::check VIBRANIUM_SCREENSHOT_JPEG_QUALITY
         GRIM_OPTS+=(-q $VIBRANIUM_SCREENSHOT_JPEG_QUALITY)
     fi
 }
-
-# Cache defaults (for further validation)
-helpers::parse_defaults
-
-helpers::check VIBRANIUM_SCREENSHOT_FLASH_SCREEN
-helpers::check VIBRANIUM_SCREENSHOT_FLASH_BORDER
-
-FLASH_SCREEN=$VIBRANIUM_SCREENSHOT_FLASH_SCREEN
-FLASH_BORDER=$VIBRANIUM_SCREENSHOT_FLASH_BORDER
-GRIM_OPTS=()
 
 case "$1" in
     --region|--window|--screen)
@@ -162,4 +149,15 @@ case "$1" in
         exit 1
         ;;
 esac
+
+if ! missing="$(vb-cmd-is-present grim slurp jq)"; then
+    log::error "missing required dependencies: $missing"
+    term::is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
+    exit 1
+fi
+
+if slurp_pid="$(pidof slurp)"; then
+    kill $slurp_pid
+    exit 1
+fi
 

@@ -4,7 +4,7 @@ hyprpaper_conf="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprpaper.conf"
 
 usage() {
     cat << EOF
-Usage: $(basename "$0") [OPTION]
+Usage: ${0##*/} [OPTION]
 
 Print current hyprpaper wallpaper path.
 
@@ -29,8 +29,8 @@ case "$1" in
         get_wallpaper
         ;;
     * )
-        echo "$(basename "$0"): invalid option '$1'" >&2
-        echo "Try '$(basename "$0") --help' for more information." >&2
+        echo "${0##*/}: invalid option '$1'" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
         exit 1
         ;;
 esac
