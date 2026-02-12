@@ -5,6 +5,9 @@ source vb-core-lib
 if [[ $VIBRANIUM_BAR_WEATHER_MODULE_ENABLE == false ]]; then
     printf '{"text": ""}'
     exit 0
+elif ! pidof -q waybar; then
+    log::error "Waybar is not active!"
+    exit 1
 fi
 
 if ! command -v wttrbar > /dev/null; then
@@ -15,7 +18,23 @@ if ! command -v wttrbar > /dev/null; then
     exit 0
 fi
 
-spinner() {
+_set_city() {
+    local opt city
+
+    opt="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
+
+    # Wait for the internet connection
+    while ! curl -s --max-time 5 -I --fail https://clients3.google.com/generate_204 > /dev/null; do
+        sleep 1
+    done
+
+    city="$(curl -s --max-time 5 http://ip-api.com/json | jq -r '.city')"
+
+    helpers::configure::verify_option "$opt"
+    sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$XDG_CONFIG_HOME/vibranium/settings"
+}
+
+_spinner() {
     local pid="$1"
     local msg="$2"
     local tooltip="$3"
@@ -59,12 +78,20 @@ else
     fi
 fi
 
+if [[ -z $VIBRANIUM_BAR_WEATHER_MODULE_CITY ]]; then
+    _set_city &
+    set_city_pid="$!"
+    _spinner "$set_city_pid" " " "Getting location..."
+    # Source user settings with weather location set
+    source $VIBRANIUM_USER_SETTINGS
+fi
+
 temp_data="$VIBRANIUM_RUNTIME/waybar_weather.json"
 wttrbar --location $VIBRANIUM_BAR_WEATHER_MODULE_CITY > "$temp_data" &
 pid=$!
 
 if [[ $show_spinner == true ]]; then
-    spinner "$pid" " " "Fetching weather..."
+    _spinner "$pid" " " "Fetching weather..."
 fi
 
 wait "$pid"

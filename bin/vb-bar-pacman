@@ -5,6 +5,9 @@ source vb-core-lib
 if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == false ]]; then
     printf '{"text": ""}'
     exit 0
+elif ! pidof -q waybar; then
+    log::error "Waybar is not active!"
+    exit 1
 fi
 
 if ! command -v checkupdates > /dev/null; then
@@ -15,7 +18,7 @@ if ! command -v checkupdates > /dev/null; then
     exit 0
 fi
 
-spinner() {
+_spinner() {
     local tooltip="$1"
     local delay=0.1
     local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
@@ -125,7 +128,7 @@ aur_pid=$!
 
 if [[ $show_spinner == true ]]; then
     while kill -0 $arch_pid 2> /dev/null || kill -0 $aur_pid 2> /dev/null; do
-        spinner "Fetching updates..."
+        _spinner "Fetching updates..."
     done
 fi
 

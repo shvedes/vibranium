@@ -2,22 +2,6 @@
 
 source vb-core-lib
 
-_set_city() {
-    local opt city
-
-    opt="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
-
-    # Wait for the internet connection
-    while ! curl -s --max-time 5 -I --fail https://clients3.google.com/generate_204 > /dev/null; do
-        sleep 1
-    done
-
-    city="$(curl -s --max-time 5 http://ip-api.com/json | jq -r '.city')"
-
-    helpers::configure::verify_option "$opt"
-    sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$XDG_CONFIG_HOME/vibranium/settings"
-}
-
 _get_power_profile() {
     local battery_status
 
@@ -63,5 +47,4 @@ fi
 chromium --no-startup-window --set-theme-color="25, 35, 48" &
 vb-core-power "$(_get_power_profile)"
 
-_set_city
 rm -f "$VIBRANIUM_STATE/first-boot"

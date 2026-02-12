@@ -150,7 +150,7 @@ toggle_mute() {
 feedback() {
     local variant dir
 
-    helpers::check::bool VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK true
+    helpers::check::bool VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK false
     if [[ $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK = true ]]; then
         helpers::check::strings VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT "variant1" variant1 variant2 variant3
         variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"

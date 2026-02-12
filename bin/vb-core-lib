@@ -3,6 +3,7 @@
 # shellcheck disable=all
 
 # Load defaults first
+source "$VIBRANIUM_PATH/vb-core-defaults"
 source "$XDG_CONFIG_HOME/vibranium/settings"
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
