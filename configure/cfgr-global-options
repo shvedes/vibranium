@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+_confirm_kill_submenu() {
+    local options chosen
+    while true; do
+        options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "What is this?")
+        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Kill Confirm" "ESC to go back")"
+        [[ -z "$chosen" ]] && break
+
+        case "$confirm_to_kill_chosen" in
+            "Confirm"*)
+                helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
+                break
+                ;;
+            "What"*)
+                msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> <b>Whether to confirm action when triggering the kill window shortcut</b>\n"
+                msg+="<span foreground='${P_ACCENT}'><b>•</b></span> <b>Setting it to true helps prevent accidental force window kills</b>\n\n"
+                msg+="When the <span foreground='${P_RED}'><b>force window kill</b></span> shortcut is triggered, this\n"
+                msg+="option asks you to press it again to confirm the action"
+                notify-send -r 8 -t 15000 "What is this?" "$msg"
+                ;;
+        esac
+    done
+}
+
+INDEX=0
+
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    OPTIONS=(
+        "Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
+        "OSD enabled : $VIBRANIUM_GLOBAL_USE_OSD"
+        "<b>App launcher</b>"
+        "<b>Player options</b>"
+        "<b>Power profiles</b>"
+    )
+
+    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "General options" "ESC to go back" -selected-row "$INDEX")"
+    [ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        *"App launcher"*)
+            cfgr-launcher
+            ;;
+        *"Player options"*)
+            cfgr-player
+            ;;
+        *"Power profiles"*)
+            cfgr-power-profile
+            ;;
+        "OSD enabled"*)
+            if [[ "$(helpers::configure::toggle_bool -v "VIBRANIUM_GLOBAL_USE_OSD")" == "false" ]]; then
+                systemctl --user disable --now swayosd &
+            else
+                systemctl --user enable --now swayosd &
+            fi
+            ;;
+        "Confirm"*)
+            _confirm_kill_submenu
+            ;;
+    esac
+done

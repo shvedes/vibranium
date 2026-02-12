@@ -1,0 +1,243 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+_flash_screen_submenu() {
+    local opts chosen msg var
+
+    while true; do
+        opts=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN" "What is this?")
+        chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Flash screen" "ESC to go back")"
+        [ -z "$chosen" ] && break
+
+        case "$chosen" in
+            "Flash"*)
+                helpers::configure::toggle_bool "VIBRANIUM_RECORDING_FLASH_SCREEN"
+                break
+                ;;
+            "What"*)
+                msg="Whether to <span foreground='${P_YELLOW}'><b>flash</b></span> the whole screen when recording "
+                msg+="<span foreground='${P_GREEN}'><b>starts</b></span> or <span foreground='${P_RED}'><b>stops</b></span>.\n"
+                msg+="Purely aesthetic feature. The flashing effect isn't shown in the video itself"
+                notify-send -r 8 -t 10000 "What is this?" "$msg"
+                continue
+                ;;
+        esac
+    done
+}
+
+_set_codec() {
+    local var new_val msg
+
+    var="VIBRANIUM_RECORDING_VIDEO_CODEC"
+    helpers::configure::set_string "$var" "Video Codec" \
+        "Auto:auto" "H264:h264" "HEVC:hevc" "AV1:av1" \
+        "VP8:vp8" "VP9:vp9" "HEVC (HDR):hevc_hdr" \
+        "AV1 (HDR):av1_hdr" "HEVC (10 bit color):hevc_10bit" \
+        "AV1 (10 bit color):av1_10bit"
+
+    new_val="$(vb-cmd-get-option "$var")"
+    if [[ "$new_val" != "auto" ]]; then
+        msg="Ensure the selected codec (<span foreground='${P_YELLOW}'><b>${new_val^^}</b></span>) is supported by your GPU.\n"
+        msg+="If not, the <span foreground='${P_YELLOW}'><b>CPU</b></span> will be used as a fallback, which is less efficient"
+        notify-send -r 7 -t 10000 "Vibranium" "$msg"
+    fi
+}
+
+_set_recording_mode() {
+    local opts chosen var msg
+
+    while true; do
+        opts=("Constant Frame Rate" "Variable Frame Rate" "What is this?")
+        chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Mode" "ESC to go back")"
+        [[ -z "$chosen" ]] && break
+
+        var="VIBRANIUM_RECORDING_FRAMERATE_MODE"
+
+        case "$chosen" in
+            "Constant"*)
+                helpers::configure::verify_option "$var"
+                sed -i "/^${var}/s/=.*/=\"cfr\"/" "$VIBRANIUM_USER_SETTINGS"
+                break
+                ;;
+            "Variable"*)
+                helpers::configure::verify_option "$var"
+                sed -i "/^${var}/s/=.*/=\"vfr\"/" "$VIBRANIUM_USER_SETTINGS"
+                break
+                ;;
+            "What"*)
+                msg="\n<span foreground='${P_YELLOW}'><b>Constant Frame Rate (CFR)</b></span>: "
+                msg+="Each frame is stored at a fixed interval\n"
+                msg+="• <span foreground='${P_GREEN}'><b>Pros</b></span>: best for editing, audio sync, and compatibility\n"
+                msg+="• <span foreground='${P_RED}'><b>Cons</b></span>: if hardware struggles, frames may drop\n\n"
+
+                msg+="<span foreground='${P_YELLOW}'><b>Variable Frame Rate (VFR)</b></span>: "
+                msg+="Intervals between frames can vary\n"
+                msg+="• <span foreground='${P_GREEN}'><b>Pros</b></span>: smoother recording under load, fewer frame drops\n"
+                msg+="• <span foreground='${P_RED}'><b>Cons</b></span>: some editors and players handle it poorly, sync can drift\n\n"
+
+                msg+="Use <span foreground='${P_ACCENT}'><b>CFR</b></span> if you plan to edit the video. "
+                msg+="Use <span foreground='${P_ACCENT}'><b>VFR</b></span> for lighter, adaptive recording"
+                notify-send -r 8 -t 25000 "What is this?" "$msg"
+                continue
+                ;;
+        esac
+    done
+}
+
+_set_container_type() {
+    local var1 var2 opts chosen
+
+    opts=("mp4" "mkv" "webm")
+    chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Container type" "ESC to go back")"
+    [ -z "$chosen" ] && continue
+
+    var1="VIBRANIUM_RECORDING_CONTAINER_TYPE"
+    var2="VIBRANIUM_RECORDING_VIDEO_CODEC"
+
+    case "$chosen" in
+        "mp4" | "mkv")
+            helpers::configure::verify_option "$var1"
+            sed -i "/^${var1}/s/=.*/=\"${chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+            ;;
+        "webm")
+            # When the container type is webm, gpu-screen-recorder automatically uses the vp8 codec.
+            # Therefore, to avoid later confusion for the user, we will explicitly change the codec.
+            helpers::configure::verify_option "$var2"
+            if [ ! "$var2" = "vp8" ]; then
+                sed -i "/^${var2}/s/=.*/=\"vp8\"/" "$VIBRANIUM_USER_SETTINGS"
+                msg="You selected the <span foreground='${P_YELLOW}'><b>WEBM</b></span> format. "
+                msg+="\nThe <span foreground='${P_YELLOW}'>VP8</span> codec is used in this format, so it is set by default explicitly.\n\n"
+                msg+="<span foreground='${P_RED}'>Make sure your GPU supports </span>"
+                msg+="<span foreground='${P_YELLOW}'><b>VP8</b></span> <span foreground='${P_RED}'>encoding. If not, recording will fail.\n"
+                msg+="In that case, choose a supported codec or leave the option on auto.</span>"
+                notify-send -r 7 -t 30000 "Vibranium" "$msg"
+            fi
+            sed -i "/^${var1}/s/=.*/=\"${chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+            ;;
+    esac
+}
+
+_advanced_menu() {
+    local opts chosen
+
+    while true; do
+        source "$VIBRANIUM_USER_SETTINGS"
+
+        helpers::check::strings VIBRANIUM_RECORDING_CONTAINER_TYPE mp4 "mp4" "mkv" "webm"
+        helpers::check::strings VIBRANIUM_RECORDING_FRAMERATE_MODE cfr "cfr" "vfr"
+        helpers::check::strings VIBRANIUM_RECORDING_VIDEO_CODEC auto \
+            "auto" "hd64" "hevc" "av1" "vp8" "vp9" "hevc_hdr" "hevc_10bit" "av1_10bit"
+
+        opts=(
+            "Container type : $VIBRANIUM_RECORDING_CONTAINER_TYPE"
+            "Recording mode : ${VIBRANIUM_RECORDING_FRAMERATE_MODE^^}"
+        )
+
+        if [ "$(hyprctl -j getoption animations:enabled | jq '.int')" = "1" ]; then
+            helpers::check::bool  VIBRANIUM_RECORDING_FLASH_SCREEN true
+            opts+=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN")
+        fi
+
+        opts+=("Codec : $VIBRANIUM_RECORDING_VIDEO_CODEC")
+
+        mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
+        chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Advanced" "ESC to go back")"
+        [ -z "$chosen" ] && break
+
+        case "$chosen" in
+            "Container type"*) _set_container_type   ;;
+            "Recording mode"*) _set_recording_mode   ;;
+            "Codec"*)          _set_codec            ;;
+            "Flash screen"*)   _flash_screen_submenu ;;
+        esac
+    done
+}
+
+INDEX=0
+LIMIT_FPS_MIN=24
+REFRESH_RATE="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .refreshRate')"
+RNNOISE_MODULE_ENABLED="$(pactl list short sources | grep -q rnnoise_source && echo true || echo false)"
+
+if [[ $REFRESH_RATE =~ ^([0-9]+)(\.[0-9]+)?$ ]]; then
+    LIMIT_FPS_MAX="${BASH_REMATCH[1]}"
+else
+    LIMIT_FPS_MAX=60
+fi
+
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    helpers::check::strings VIBRANIUM_RECORDING_QUALITY high "medium" "high" "very_high" "ultra"
+    helpers::check::strings VIBRANIUM_RECORDING_CONTAINER_TYPE mp4 "mp4" "mkv" "webm"
+    helpers::check::strings VIBRANIUM_RECORDING_FRAMERATE_MODE cfr "cfr" "vfr"
+    helpers::check::strings VIBRANIUM_RECORDING_VIDEO_CODEC auto \
+        "auto" "hd64" "hevc" "av1" "vp8" "vp9" "hevc_hdr" "hevc_10bit" "av1_10bit"
+
+    helpers::check::digit VIBRANIUM_RECORDING_FPS 30
+    helpers::check::bool  VIBRANIUM_RECORDING_USE_RNNOISE true
+    helpers::check::bool  VIBRANIUM_RECORDING_CAPTURE_SINK true
+    helpers::check::bool  VIBRANIUM_RECORDING_FLASH_SCREEN true
+    helpers::check::bool  VIBRANIUM_RECORDING_CAPTURE_SOURCE false
+
+    if [[ "$VIBRANIUM_RECORDING_QUALITY" == "very_high" ]]; then
+        QUALITY="Very High"
+    else
+        QUALITY="${VIBRANIUM_RECORDING_QUALITY^}"
+    fi
+
+    FPS="$VIBRANIUM_RECORDING_FPS"
+    CAPTURE_VOL="$VIBRANIUM_RECORDING_CAPTURE_SINK"
+    CAPTURE_MIC="$VIBRANIUM_RECORDING_CAPTURE_SOURCE"
+    USE_RNNOISE="$VIBRANIUM_RECORDING_USE_RNNOISE"
+
+    OPTIONS=(
+        "FPS : $FPS"
+        "Quality : $QUALITY"
+        "Capture volume : $CAPTURE_VOL"
+        "Capture microphone : $CAPTURE_MIC"
+    )
+
+    if [[ $CAPTURE_MIC == true ]]; then
+        if [[ $RNNOISE_MODULE_ENABLED == true ]]; then
+            OPTIONS+=("Noise cancelattion : $USE_RNNOISE")
+        fi
+    fi
+
+    OPTIONS+=("<b>Advanced</b>")
+
+    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Recording" "ESC to go back" -selected-row "$INDEX")"
+    [ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        "FPS"*)
+            helpers::configure::set_digit "FPS to record with" "FPS" \
+                "int" $LIMIT_FPS_MIN $LIMIT_FPS_MAX \
+                "VIBRANIUM_RECORDING_FPS"
+            ;;
+        "Quality"*)
+            helpers::configure::set_string "VIBRANIUM_RECORDING_QUALITY" "Quality" \
+                "Medium:medium" "High:high" "Very High:very_high" "Ultra:ultra"
+            ;;
+        "Capture volume"*)
+            helpers::configure::toggle_bool "VIBRANIUM_RECORDING_CAPTURE_SINK"
+            ;;
+        "Capture microphone"*)
+            helpers::configure::toggle_bool "VIBRANIUM_RECORDING_CAPTURE_SOURCE"
+            ;;
+        "Noise"*)
+            helpers::configure::toggle_bool VIBRANIUM_RECORDING_USE_RNNOISE
+            ;;
+        *"Advanced"*)
+            _advanced_menu
+            ;;
+    esac
+done

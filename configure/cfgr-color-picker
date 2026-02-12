@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+INDEX=0
+
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    helpers::check::bool VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW true
+    helpers::check::bool VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR true
+
+    OPTIONS=(
+        "Show HEX preview : $VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
+        "Preview in notification : $VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
+    )
+
+    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Color picker" "ESC to go back" -selected-row "$INDEX")"
+    [ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        "Show HEX preview"*)
+            helpers::configure::toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
+            ;;
+        "Preview in notification"*)
+            helpers::configure::toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
+            ;;
+    esac
+done

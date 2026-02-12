@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+_help_notification() {
+    local msg
+
+    msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> <b>"
+    msg+="Whether to show 'Now Playing' notification after screen unlock</b>\n\n"
+    msg+="Note that when '<span foreground='${P_YELLOW}'><b>Include album art</b></span>' is "
+    msg+="'<span foreground='${P_GREEN}'><b>true</b></span>' and a web-based player is used, it\n"
+    msg+="takes some time to download an album art from the internet in order to display"
+
+    msg+="\n\n"
+
+    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> <b>Whether to pause "
+    msg+="the active music when locking session</b>\n\n"
+    msg+="When <span foreground='${P_GREEN}'><b>enabled</b></span>, "
+    msg+="music will fade out when the screen is\nlocked and fade back in when it is unlocked."
+
+    notify-send -r 8 -t 15000 "What is this?" "$msg"
+}
+
+INDEX=0
+
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    helpers::check::bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK true
+    helpers::check::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN true
+    helpers::check::bool VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART true
+    helpers::check::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING true
+
+    OPTIONS=("Show Now Playing notification : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING")
+
+    if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
+        OPTIONS+=("Show album art : $VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART")
+    fi
+
+    OPTIONS+=(
+        "Show Now Playing on lockscreen : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
+        "Pause music when locking screen : $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+        "Help"
+    )
+
+    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Now Playing" "ESC to go back" -selected-row "$INDEX")"
+    [[ -z "$CHOSEN" ]] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        "Show Now Playing notification"*)
+            helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
+            ;;
+        "Show album art"*)
+            helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART"
+            ;;
+        "Show Now Playing on lockscreen"*)
+            helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
+            ;;
+        "Pause music when locking"*)
+            helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+            ;;
+        "Help")
+            _help_notification
+            INDEX=0
+            ;;
+    esac
+
+done

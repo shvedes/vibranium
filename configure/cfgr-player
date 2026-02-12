@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+INDEX=0
+
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    helpers::check::strings VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH normal "very_slow" "slow" "normal" "fast" "very_fast" "off"
+    helpers::check::strings VIBRANIUM_PLAYER_FADE_DURATION normal "very_slow" "slow" "normal" "fast" "very_fast" "off"
+
+    OPTIONS=(
+        "Fade in / out on Next / Previous : ${VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH//_/ }"
+        "Fade in / out on Play / Pause    : ${VIBRANIUM_PLAYER_FADE_DURATION//_/ }"
+        "What is this?"
+    )
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Player" "ESC to go back" -selected-row "$INDEX")"
+    [[ -z "$CHOSEN" ]] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        *"Previous"*)
+            helpers::configure::set_string "VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH" \
+                "Next / Prev" "very slow" "slow" "normal" "fast" "very fast" "off"
+            ;;
+        *"Play"*)
+            helpers::configure::set_string "VIBRANIUM_PLAYER_FADE_DURATION" \
+                "Play / Pause" "very slow" "slow" "normal" "fast" "very fast" "off"
+            ;;
+        "What is this?")
+            msg="Controls the fade-in/out duration when pausing, resuming, or changing tracks.\n"
+            msg+="Supports both <b>playerctl</b> and <b>MPD</b>.\n"
+            msg+="It's purely aesthetic - set both options to off if you don't need it"
+            notify-send -r 8 -t 15000 "What is this?" "$msg"
+            ;;
+    esac
+done

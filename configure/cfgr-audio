@@ -1,0 +1,172 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+_toggle_volume_boost() {
+    local var
+
+    var="VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED"
+
+    if [[ "$(helpers::configure::toggle_bool -v "$var")" == false ]]; then
+        local current_vol
+        current_vol=$(wpctl get-volume "@DEFAULT_AUDIO_SINK@")
+
+        [[ $current_vol =~ ([0-9]+\.[0-9]+) ]] && {
+            current_vol="${BASH_REMATCH[1]}"
+        }
+
+        [[ $current_vol =~ ^(1\.[1-4][0-9]|1\.50|[2-9]) ]] && {
+            wpctl set-volume @DEFAULT_AUDIO_SINK@ 1.00
+            notify-send -r 2 -t 5000 "Vibranium" \
+                "The volume level has been restored"
+        }
+    fi
+}
+
+_set_audio_feedback() {
+    local var chosen options variant index
+
+    while true; do
+        source "$VIBRANIUM_USER_SETTINGS"
+
+        helpers::check::bool VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK false
+        helpers::check::bool VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT "variant1" "variant2" "variant3"
+
+        options=("Audio feedback : $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK")
+
+        # Add variant option IF audio feedback is enabled
+        if [[ "$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK" == true ]]; then
+            # Split for the sake of the line width
+            variant="${VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT%?} "
+            variant+="${VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT: -1}"
+            options+=("Variant : $variant")
+        fi
+
+        mapfile -t options < <(helpers::configure::build_menu "${options[@]}")
+        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Audio feedback" "ESC to go back" -selected-row "$index")"
+
+        for i in "${!options[@]}"; do
+            if [ "${options[$i]}" = "$chosen" ]; then
+                index="$i"
+                break
+            fi
+        done
+
+        case "$chosen" in
+            *"Audio"*)
+                helpers::configure::toggle_bool "VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK"
+                ;;
+            "Variant"*)
+                _set_audio_feedback_variant
+                ;;
+            "")
+                break
+        esac
+    done
+}
+
+_set_audio_feedback_variant() {
+    while true; do
+        local variant_options=("variant 1" "variant 2" "variant 3")
+        local current_option opt
+
+        opt="VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
+        current_option="\$$opt"
+
+        local chosen
+        chosen="$(printf "%s\n" "${variant_options[@]}" | helpers::ui::menu "Audio variant" "ESC to go back")"
+        [[ -z "$chosen" ]] && break
+
+        # Skip if choice matches current variant
+        [[ "$chosen" == "$current_option" ]] && break
+
+        if [[ ! "${variant_options[*]}" =~ $chosen ]]; then
+            continue
+        fi
+
+        helpers::configure::verify_option "$opt"
+        sed -i "/^${opt}/s/=.*/=\"${chosen// /}\"/" \
+            "$VIBRANIUM_USER_SETTINGS"
+        break
+    done
+}
+
+
+INDEX=0
+
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    helpers::check::digit VIBRANIUM_VOLUME_ADJUSTMENT_STEP        5
+    helpers::check::bool  VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK     false
+    helpers::check::bool  VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED    false
+    helpers::check::bool  VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK    true
+    helpers::check::bool  VIBRANIUM_VOLUME_SOURCE_LOOPBACK        false
+
+    OPTIONS=(
+        "Boost up to 150% : $VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED"
+        "Visual feedback : $VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK"
+        "Audio feedback : $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK"
+        "Hear my voice : $VIBRANIUM_VOLUME_SOURCE_LOOPBACK"
+    )
+
+    if [[ $VIBRANIUM_VOLUME_SOURCE_LOOPBACK == true ]]; then
+        OPTIONS+=("Hear my voice volume : $(vb-cmd-toggle-loopback --get-volume)%")
+    fi
+
+    OPTIONS+=("Volume step : ${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}%")
+
+    if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
+        helpers::check::bool VIBRANIUM_GLOBAL_USE_OSD false
+        if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+            helpers::check::bool VIBRANIUM_VOLUME_USE_OSD true
+            OPTIONS+=("Use OSD : $VIBRANIUM_VOLUME_USE_OSD")
+        fi
+    fi
+
+    OPTIONS+=("<b>Open volume mixer</b>")
+
+    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Audio" "ESC to go back" -selected-row "$INDEX")"
+    [ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        "Hear my voice volume"*)
+            helpers::configure::set_digit "Hear my voice volume" "Volume" \
+                "int" 10 100 "VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME"
+            vb-cmd-toggle-loopback
+            ;;
+        "Hear my voice"*)
+            helpers::configure::toggle_bool "VIBRANIUM_VOLUME_SOURCE_LOOPBACK"
+            vb-cmd-toggle-loopback
+            ;;
+        *"Open volume mixer"*)
+            vb-core-term wiremix
+            vb-cmd-kill-rofi
+            exit 0
+            ;;
+        "Boost up to"*)
+            _toggle_volume_boost
+            ;;
+        "Visual"*)
+            helpers::configure::toggle_bool "VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK"
+            ;;
+        "Use OSD"*)
+            helpers::configure::toggle_bool "VIBRANIUM_VOLUME_USE_OSD"
+            ;;
+        "Audio"*)
+            _set_audio_feedback
+            ;;
+        "Volume step"*)
+            helpers::configure::set_digit "Volume adjustment step" "Volume step" \
+                "int" 1 25 "VIBRANIUM_VOLUME_ADJUSTMENT_STEP"
+            ;;
+    esac
+done

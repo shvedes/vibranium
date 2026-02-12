@@ -1,0 +1,237 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+export PATH="$PATH:$VIBRANIUM/configure"
+
+_get_term_opacity() {
+    local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+    sed -nE '/^\[window\]/,/^\[/{s/^[[:space:]]*opacity[[:space:]]*=[[:space:]]*"?([0-9.]+)"?/\1/p}' "$config"
+}
+
+_set_term_opacity() {
+    local value="$1"
+    local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+    sed -i -E '/^\[window\]/,/^\[/{s/^([[:space:]]*opacity[[:space:]]*=[[:space:]]*)"?[0-9.]+("?)/\1'"$value"'\2/}' "$config"
+}
+
+_term_opacity_menu() {
+    while true; do
+        prompt="Background opacity level (float)"
+        input="$(printf "%s" "$prompt" | helpers::ui::menu "Terminal opacity" "0.0 - 1.0")"
+        [[ -z "$input" ]] && break
+        [[ "$prompt" == "$input" ]] && continue
+
+        if [[ "$input" =~ ^0(\.[0-9]+)?$ || "$input" == "1" || "$input" == "1.0" ]]; then
+            [[ "$input" == 1 ]] && input="1.0"
+            _set_term_opacity "$input"
+            break
+        else
+            notify-send -r 6 -u critical -t 1500 "Vibranium" \
+                "A floating point between 0.0 and 1.0!"
+        fi
+    done
+}
+
+_get_rofi_theme() {
+     local config="$XDG_CONFIG_HOME/rofi/config.rasi"
+     sed -n 's|@import ".*/\(theme[-a-z]*\)\.rasi"|\1|p' "$config" | sed 's|^theme-||; s|^rofi$|text|'
+}
+
+_set_rofi_theme() {
+    local options chosen
+    local config="$XDG_CONFIG_HOME/rofi/config.rasi"
+
+    while true; do
+        options=("Text" "Modern")
+        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Theme" "ESC to go back")"
+        [[ -z $chosen ]] && break
+
+        case "${chosen,}" in
+            "text")   sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-text.rasi|' "$config"   ;;
+            "modern") sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-modern.rasi|' "$config" ;;
+        esac
+        break
+    done
+}
+
+_manage_user_wallpapers() {
+    if [[ -z "$(ls -A $XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vb-theme-get))" ]]; then
+        notify-send -r 1 "Vibranium" "No user wallpapers found for current theme"
+        return
+    fi
+
+    local folder files chosen
+
+    _action() {
+        local target options chosen
+        target="$1"
+        options=("Open" "Delete")
+        while true; do
+            chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "$target" "ESC to go back")"
+            [[ -z "$chosen" ]] && return
+
+            if ! [[ " ${options[*]} " =~ " $chosen " ]]; then
+                continue
+            fi
+
+            case "$chosen" in
+                "Open")
+                    vb-cmd-launch-cmd imv "$folder/$target"
+                    ;;
+                "Delete")
+                    rm -f "$folder/$target"
+
+                    if [[ "$(basename $(vb-cmd-get-wallpaper))" == "$target" ]]; then
+                        vb-core-wallpaper --next
+                    fi
+
+                    # Refresh files list after delete
+                    files=()
+                    for f in "$folder"/*; do
+                        [[ -f "$f" ]] && files+=("$(basename "$f")")
+                    done
+                    ;;
+            esac
+            break
+        done
+    }
+
+    folder="$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vb-theme-get)"
+    files=()
+
+    for f in "$folder"/*; do
+        [[ -f "$f" ]] && files+=("$(basename "$f")")
+    done
+
+    while true; do
+        if [[ ${#files[@]} -eq 0 ]]; then
+            return
+        fi
+
+        chosen="$(printf "%s\n" "${files[@]}" | helpers::ui::menu "User wallpapers" "ESC to go back")"
+        [[ -z "$chosen" ]] && return
+
+        # Check if chosen is in files
+        if ! [[ " ${files[*]} " =~ " $chosen " ]]; then
+            continue
+        fi
+
+        _action "$chosen"
+    done
+}
+
+_toggle_wallpaper() {
+    case "$(helpers::configure::toggle_bool -v "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
+        false)
+            sed -i 's/path/# path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+            systemctl -q --user disable --now hyprpaper &
+            ;;
+        true)
+            sed -i 's/# path/path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+            systemctl -q --user enable --now hyprpaper &
+            ;;
+    esac
+}
+
+_get_notification_timeout() {
+    local config="$XDG_CONFIG_HOME/dunst/dunstrc"
+    sed -n 's/.*timeout[[:space:]]*=[[:space:]]*\([0-9]\+\).*/\1/p' "$config"
+}
+
+_set_notification_timeout() {
+    local config="$XDG_CONFIG_HOME/dunst/dunstrc"
+
+    while true; do
+        input="$(printf "Timeout (in seconds)" | helpers::ui::menu "Timeout" "ESC to go back")"
+        [[ -z "$input" ]] && break
+
+        if [[ ! "$input" =~ ^[0-9]+$ ]]; then
+            notify-send -r 6 -t 2000 -u critical "Vibranium" "Only integers allowed"
+              continue
+        fi
+
+        sed -iE "s/\(timeout[[:space:]]*=[[:space:]]*\)[0-9]\+/\1${input}/" "$config"
+            vb-cmd-refresh-dunst
+        break
+    done
+}
+
+_update_reading_mode() {
+    local shader="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
+    if [[ ! $shader = \[\[EMPTY\]\] ]]; then
+        shader="$(basename "$shader")"
+        local config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+
+        case "$shader" in
+            "e-ink"*)
+                sed -i "s/${shader}/grayscale.glsl/" "$config"
+                ;;
+            "grayscale"*)
+                sed -i "s/${shader}/e-ink.glsl/" "$config"
+                ;;
+        esac
+
+        hyprctl -q reload config-only
+    fi
+}
+
+INDEX=0
+
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    helpers::check::bool VIBRANIUM_GLOBAL_SHOW_WALLPAPER true
+
+    OPTIONS=(
+        "Menus theme : $(_get_rofi_theme)"
+        "Show wallpaper : $VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
+        "Terminal opacity : $(_get_term_opacity)"
+        "Notification timeout : $(_get_notification_timeout)s"
+        "<b>Manage user wallpapers</b>"
+        "<b>Reading mode</b>"
+        "<b>Now Playing</b>"
+        "<b>Edit env</b>"
+    )
+
+    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Misc" "ESC to go back" -selected-row "$INDEX")"
+    [[ -z "$CHOSEN" ]] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        *"Now Playing"*)
+            cfgr-now-playing
+            ;;
+        "Notification"*)
+            _set_notification_timeout
+            ;;
+        "Show wallpaper"*)
+            _toggle_wallpaper
+            ;;
+        "Terminal opacity"*)
+            _term_opacity_menu
+            ;;
+        "Menus theme"*)
+            _set_rofi_theme
+            ;;
+        *"Manage user wallpapers"*)
+            _manage_user_wallpapers
+            ;;
+        *"Edit env"*)
+            vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
+            vb-cmd-kill-rofi
+            exit 0
+            ;;
+        *"Reading mode"*)
+            helpers::configure::set_string VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE \
+                "Shader type" "Grayscale:grayscale" "E-Ink like:e-ink"
+            _update_reading_mode &
+            ;;
+    esac
+done

@@ -1,0 +1,149 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+_updates_weather_specific() {
+    local options chosen index animate_loading \
+        show_separators animate_updates
+
+    index=0
+
+    while true; do
+        source "$VIBRANIUM_USER_SETTINGS"
+
+        helpers::check::bool VIBRANIUM_BAR_SHOW_ANIMATION true
+        helpers::check::bool VIBRANIUM_BAR_SHOW_SEPARATOR true
+
+        animate_loading="$VIBRANIUM_BAR_SHOW_ANIMATION"
+        show_separators="$VIBRANIUM_BAR_SHOW_SEPARATOR"
+
+        options=(
+            "Animate first run : $animate_loading"
+            "Show separators   : $show_separators"
+        )
+        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Extras" "ESC to go back" -selected-row "$index")"
+        [[ -z "$chosen" ]] && return
+
+        for i in "${!options[@]}"; do
+            if [ "${options[$i]}" = "$chosen" ]; then
+                index="$i"
+                break
+            fi
+        done
+
+        case "$chosen" in
+            "Animate first run"*) helpers::configure::toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION" ;;
+            "Show separators"*)   helpers::configure::toggle_bool "VIBRANIUM_BAR_SHOW_SEPARATOR" ;;
+        esac
+
+        vb-cmd-refresh-bar-module pacman &
+        vb-cmd-refresh-bar-module weather &
+    done
+}
+
+_update_module_setting() {
+    local var="$1"
+    local type="$2"
+    local rofi_title="$3"
+    local rofi_subtitle="$4"
+    local validation_regex="$5"
+    local error_message="$6"
+    local quote_value="$7"
+    local module_name="$8"
+    local enabled_var="$9"
+
+    local current_value="${!var}"
+    rofi_subtitle="${rofi_subtitle//\{current\}/$current_value}"
+
+    while true; do
+        new_value="$(printf "Enter new value ($type)" | helpers::ui::menu "$rofi_title" "$rofi_subtitle")"
+        [ -z "$new_value" ] && break
+
+        if [[ ! "$new_value" =~ $validation_regex ]]; then
+            if [[ -n "$error_message" ]]; then
+                notify-send -r 1 -u critical -t 2000 "Vibranium" "$error_message"
+            fi
+            continue
+        fi
+
+        helpers::configure::verify_option "$var"
+
+        if [[ "$quote_value" == "yes" ]]; then
+            sed -i "s|^${var}=.*|${var}=\"${new_value}\"|" "$VIBRANIUM_USER_SETTINGS"
+        else
+            sed -i "/^${var}/s/=.*/=${new_value}/" "$VIBRANIUM_USER_SETTINGS"
+        fi
+
+        if [[ "${!enabled_var}" == false ]]; then
+            notify-send -r 1 -t 5000 "Vibranium" \
+                "The value has been changed. Don't forget to enable the module."
+        fi
+
+        vb-cmd-refresh-bar-module "$module_name" &
+        break
+    done
+}
+
+_updates_submenu() {
+    local opts
+    local show_on_zero
+
+    while true; do
+        source "$VIBRANIUM_USER_SETTINGS"
+
+        helpers::check::bool VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES true
+        show_on_zero="$VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES"
+
+        opts=(
+            "Display zero updates : $show_on_zero"
+        )
+        chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Updates" "ESC to go back")"
+        [ -z "$chosen" ] && break
+
+        case "$chosen" in
+            "Display"*)
+                helpers::configure::toggle_bool "VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES"
+                vb-cmd-refresh-bar-module pacman &
+                ;;
+        esac
+    done
+}
+
+INDEX=0
+
+while true; do
+    OPTIONS=("Updates" "Weather")
+
+    helpers::check::bool VIBRANIUM_BAR_PACMAN_MODULE_ENABLE false
+    helpers::check::bool VIBRANIUM_BAR_WEATHER_MODULE_ENABLE false
+
+    updates_enabled="$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
+    weather_enabled="$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
+
+    if [[ "$updates_enabled" == true && "$weather_enabled" == true ]]; then
+        OPTIONS+=("<b>Updates and Weather specific</b>")
+    fi
+
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Module settings" "ESC to go back" -selected-row "$INDEX")"
+    [ -z "$CHOSEN" ] && exit 0
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        "<b>Updates and Weather"*)
+            _updates_weather_specific
+            ;;
+        "Weather")
+            _update_module_setting "VIBRANIUM_BAR_WEATHER_MODULE_CITY" "string" \
+                "City" "current is {current}" '^[A-Za-z]+$' "Invalid city name!" "yes" "weather" "weather_enabled"
+            ;;
+        "Updates")
+            _updates_submenu
+            ;;
+    esac
+done

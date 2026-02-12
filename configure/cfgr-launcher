@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+INDEX=0
+
+while true; do
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI false
+    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS true
+    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT false
+    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS false
+    helpers::check::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START false
+    helpers::check::strings VIBRANIUM_GLOBAL_SEARCH_ENGINE google "google" "bing" "duckduckgo" "brave"
+
+    OPTIONS=(
+        "Search engine : $VIBRANIUM_GLOBAL_SEARCH_ENGINE"
+        "Show web apps : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
+        "Show AI web apps : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
+        "Show app icons : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
+        "Open on startup : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START"
+        "Auto select : $VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
+    )
+
+    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "App Launcher" "ESC to go back" -selected-row "$INDEX")"
+    [ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        "Search engine"*)
+            helpers::configure::set_string VIBRANIUM_GLOBAL_SEARCH_ENGINE "Search Engine" \
+                "Google:google" \
+                "DuckDuckGo:duckduckgo" \
+                "Brave Search:brave" \
+                "Microsoft Bing:bing"
+            ;;
+        "Show web apps"*)
+            helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS
+            ;;
+        "Show AI"*)
+            helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI
+            ;;
+        "Show app icons"*)
+            helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS
+            ;;
+        "Open on startup"*)
+            helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START
+            ;;
+        "Auto select"*)
+            helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
+            ;;
+    esac
+done

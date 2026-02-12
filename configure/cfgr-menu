@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+export PATH="$PATH:$VIBRANIUM/configure"
+
+INDEX=0
+
+while true; do
+    OPTIONS=(
+        "Idle"
+        "Audio"
+        "Waybar"
+        "General"
+        "Set font"
+        "Hyprland"
+        "Recording"
+        "Brightness"
+        "Screenshots"
+        "Night Light"
+        "Color Picker"
+        "Miscellaneous"
+    )
+
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Vibranium" "ESC to go back" -selected-row "$INDEX")"
+    [ -z "$CHOSEN" ] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
+            INDEX="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        "Waybar")
+            cfgr-waybar-menu
+            ;;
+        "Set font")
+            vb-font-set
+            ;;
+        "Idle")
+            cfgr-idle
+            ;;
+        "Audio")
+            cfgr-audio
+            ;;
+        "Screenshots")
+            cfgr-screenshots
+            ;;
+        "Brightness")
+            cfgr-brightness
+            ;;
+        "Recording")
+            cfgr-recording
+            ;;
+        "Night Light")
+            cfgr-nightshift
+            ;;
+        "Color Picker")
+            cfgr-color-picker
+            ;;
+        "General")
+            cfgr-global-options
+            ;;
+        "Hyprland")
+            cfgr-wm-menu
+            ;;
+        "Miscellaneous")
+            cfgr-misc
+            ;;
+    esac
+done

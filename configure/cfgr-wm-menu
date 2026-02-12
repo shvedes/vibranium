@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+export PATH="$PATH:$VIBRANIUM/configure"
+
+INDEX=0
+
+while true; do
+    OPTIONS=("<b>Input</b>" "<b>Appearance</b>" "<b>Edit configs</b>" "<b>Advanced</b>")
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Hyprland" "ESC to go back" -selected-row "$INDEX")"
+    [[ -z $CHOSEN ]] && break
+
+    for i in "${!OPTIONS[@]}"; do
+        if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
+            hypr_index="$i"
+            break
+        fi
+    done
+
+    case "$CHOSEN" in
+        *"Appearance"*)
+            cfgr-wm-appearance
+            ;;
+        *"Advanced"*)
+            cfgr-wm-advanced
+            ;;
+        *"Input"*)
+            cfgr-wm-input
+            ;;
+        *"Edit configs"*)
+            while true; do
+                edit_configs_opts=(
+                    "<b><i>Input</i></b>"
+                    "<b><i>Window rules</i></b>"
+                    "<b><i>Keybindings</i></b>"
+                    "<b><i>Monitors</i></b>"
+                )
+                edit_configs_chosen="$(printf "%s\n" "${edit_configs_opts[@]}" | helpers::ui::menu "Edit" "ESC to go back")"
+                [[ -z $edit_configs_chosen ]] && break
+
+                case "$edit_configs_chosen" in
+                    *"Window rules"*)  vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
+                    *"Keybindings"*)   vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf"        ;;
+                    *"Monitors"*)      vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf"     ;;
+                    *"Input"*)         vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"        ;;
+                esac
+                vb-cmd-kill-rofi
+            done
+            ;;
+    esac
+done
