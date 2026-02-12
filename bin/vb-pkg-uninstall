@@ -114,11 +114,7 @@ _disable_systemd_units() {
     # wait for background disable commands to finish and report results
     local idx=0
     for pid in "${pids[@]}"; do
-        if wait "$pid"; then
-            printf "%s[VIBRANIUM]%s Disabled '%s' (%s scope) from package '%s'\n" "$GREEN" "$RESET" "${task_units[$idx]}" "${task_scopes[$idx]}" "${task_pkgs[$idx]}"
-        else
-            printf "%s[VIBRANIUM]%s Failed to disable '%s' (%s scope) from package '%s'\n" "$RED" "$RESET" "${task_units[$idx]}" "${task_scopes[$idx]}" "${task_pkgs[$idx]}"
-        fi
+        wait "$pid"
         idx=$((idx + 1))
     done
 }
