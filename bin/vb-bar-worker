@@ -6,8 +6,7 @@ if [[ -f $state ]]; then
     if [[ "$(< "$state")" == "suspended" ]]; then
         tooltip="<span foreground='CornflowerBlue'>Background task suspended due to power profile</span>"
     else
-        tooltip="<span foreground='CornflowerBlue'>Background task in progress</span>\n\n"
-        tooltip+="<span foreground='yellow'>$(< "$state")</span>"
+        tooltip="$(< "$state")"
     fi
     printf '{"text": "%s", "tooltip": "%s"}' "\uf013" "$tooltip"
 else

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+
+printf "Updating font cache. This might take some time" > "$VIBRANIUM_RUNTIME/worker.active"
+vb-cmd-refresh-bar-module worker
+
+fc-cache -f
+
+rm "$VIBRANIUM_RUNTIME/worker.active"
+vb-cmd-refresh-bar-module worker

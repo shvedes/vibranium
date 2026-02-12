@@ -2,57 +2,7 @@
 
 source vb-core-lib
 
-SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
-
-YAY_FLAGS=(
-    "--answerclean" "Y"
-    "--answerdiff" "N"
-    "--answeredit" "N"
-    "--removemake"
-    "--cleanafter"
-    "--sudoloop"
-)
-
-if ! tty -s; then
-    exec setsid vb-core-term "$0" "$@"
-    exit 0
-fi
-
-_operation_canceled() {
-    case "$1" in
-        quit)
-            kill 0
-            ;;
-        *)
-            echo -e "${RED}[VIBRANIUM]${RESET} Operation canceled"
-            read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
-            printf '\e[?25h' # show cursor
-            ;;
-    esac
-    exit 1
-}
-
-_installation_complete() {
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Installation complete"
-    read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
-    printf '\e[?25h' # show cursor
-    exit 0
-}
-
-_get_fonts() {
-    pacman -Slq | grep -E "^(ttf|otf).*(-nerd(-mono)?)?"
-    yay -Slqa | grep -E "^(ttf|otf).*(-nerd(-mono)?)?"
-}
-
-_update_fc_cache() { fc-cache -sf ;}
-
-trap '_operation_canceled quit' SIGHUP
-trap 'exit 1' SIGINT
-
-printf "\n%s%s%s\n\n" "$YELLOW" "$(cat "$VIBRANIUM/logo.txt")" "$RESET"
-printf '\e[?25l' # Hide cursor
-
-fzf_args=(
+FZF_ARGS=(
     --multi
     --preview 'yay -Sii {1} 2>/dev/null || yay -Sii {1}'
     --preview-label='alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select'
@@ -64,22 +14,36 @@ fzf_args=(
     --color 'pointer:blue,marker:white'
 )
 
-tmp="$VIBRANIUM_RUNTIME/$(basename "$0".list)"
+_operation_canceled() {
+    echo -e "${RED}[VIBRANIUM]${RESET} Operation canceled"
+    read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to exit' dummy
+    printf '\e[?25h' # show cursor
+}
 
-(_get_fonts > $tmp) &
+_get_fonts() {
+    pacman -Slq | grep -E "^(ttf|otf).*(-nerd(-mono)?)?"
+    yay -Slqa | grep -E "^(ttf|otf).*(-nerd(-mono)?)?"
+}
 
-pid=$!
+trap 'printf "\n"; _operation_canceled; exit 1' SIGINT
+
+printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+printf '\e[?25l' # Hide cursor
+
+(_get_fonts > "$VIBRANIUM_CACHE/$(basename "$0").list") &
 term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting font packages"
-wait $pid
 
-list="$(< $tmp)"
-mapfile -t chosen < <(printf "%s\n" "${list[@]}" | fzf "${fzf_args[@]}")
+LIST="$(< "$VIBRANIUM_CACHE/$(basename "$0").list")"
+mapfile -t chosen < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
 
-rm -f "$tmp"
+rm -f "$TMP"
 
-if [ ${#chosen[@]} -eq 0 ]; then
-    _operation_canceled ""
+if [[ ${#chosen[@]} -eq 0 ]]; then
+    _operation_canceled
+    exit 1
 fi
 
-vb-pkg-install --no-logo "$chosen"
-_update_fc_cache
+if vb-pkg-install --no-dummy --no-logo --no-verify "${chosen[@]}"; then
+    # notify-send -r 3 "Vibranium" "Selected font(s) have been installed"
+    setsid -f vb-cmd-font-cache
+fi
