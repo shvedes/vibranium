@@ -32,7 +32,8 @@ case "$1" in
         ;;
 
     --before)
-        helpers::check::bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK true
+        helpers::parse_defaults
+        helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
 
         [[ $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == false ]] && exit 0
 
@@ -50,7 +51,8 @@ case "$1" in
                 vb-core-mediacontrol --toggle &
             fi
 
-            helpers::check::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING false
+            helpers::parse_defaults
+            helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
             if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
                 vb-cmd-now-playing
             fi

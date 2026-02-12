@@ -6,6 +6,8 @@
 
 source vb-core-lib
 
+helpers::parse_defaults
+
 LOGFILE="$VIBRANIUM_CACHE/$(basename "$0".errors)"
 
 # This function handles cases where the monitor brightness might have been changed
@@ -16,7 +18,7 @@ _set_ddc_brightness() {
     local feature_enabled
     local current_brightness current_monitor cached_brightness
 
-    helpers::check::bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL true
+    helpers::check VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL
     feature_enabled="$VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
 
     [[ "$feature_enabled" == false ]] && return

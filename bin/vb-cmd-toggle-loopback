@@ -4,8 +4,9 @@ source vb-core-lib
 
 LOOP_NAME="mic_loop"
 
-helpers::check::digit VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME int 50
-helpers::check::bool VIBRANIUM_VOLUME_SOURCE_LOOPBACK false
+helpers::parse_defaults
+helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME
+helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK
 
 VOL="${VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME}%"
 

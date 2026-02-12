@@ -50,7 +50,9 @@ if [[ $waybar_status == active ]]; then
     systemctl --user restart waybar
 fi
 
-helpers::check::bool VIBRANIUM_GLOBAL_USE_OSD false
+helpers::parse_defaults
+helpers::check VIBRANIUM_GLOBAL_USE_OSD
+
 if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
     systemctl --user restart swayosd
 fi

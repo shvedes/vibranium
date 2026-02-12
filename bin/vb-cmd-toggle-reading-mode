@@ -28,7 +28,8 @@ if [ "$1" = "--help" ]; then
     exit 0
 fi
 
-helpers::check::strings VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE "e-ink" e-ink grayscale
+helpers::parse_defaults
+helpers::check VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE
 
 shader="$VIBRANIUM/default/hypr/shaders/${VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE}.glsl"
 config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
