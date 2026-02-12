@@ -143,7 +143,7 @@ while true; do
             ;;
         "Weather")
             _update_module_setting "VIBRANIUM_BAR_WEATHER_MODULE_CITY" "string" \
-                "City" "current is {current}" '^[A-Za-z]+$' "Invalid city name!" "yes" "weather" "weather_enabled"
+                "City" "e.g. Chicago" '^[A-Za-z]+$' "Invalid city name!" "yes" "weather" "weather_enabled"
             ;;
         "Updates")
             _updates_submenu
