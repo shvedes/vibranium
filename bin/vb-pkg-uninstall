@@ -364,7 +364,7 @@ if [[ $NO_LOGO == false ]]; then
     printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
 fi
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo acces in order to delete packages"
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to uninstall packages"
 sudo -v
 
 # Hide cursor

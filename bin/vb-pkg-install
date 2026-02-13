@@ -389,7 +389,7 @@ if [[ $NO_LOGO == false ]]; then
 fi
 
 # Validate sudo access early
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo acces in order to update repos"
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
 sudo -v
 
 # Hide cursor

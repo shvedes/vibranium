@@ -23,65 +23,20 @@ _operation_canceled() {
     echo -e "${RED}[VIBRANIUM]${RESET} Operation canceled"
 
     if [[ $NO_DUMMY == false ]]; then
-        printf '\e[?25h' # Show cursor
         read -n1 -r -s -p $'. Press any key to exit' dummy
+        printf '\e[?25h' # Show cursor
     fi
 }
 
-# Prints a completion message with optional restart note.
 _update_complete() {
     local msg="$1"
 
     printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$msg"
 
     if [[ $NO_DUMMY == false ]]; then
-        printf '\e[?25h' # Show cursor
         read -n1 -r -p $'. Press any key to exit' dummy
+        printf '\e[?25h' # Show cursor
     fi
-}
-
-term::ask_yes_no() {
-    local default="${1:-Y}"
-    local message="$2"
-    local input prompt hint
-
-    default="${default^^}"
-
-    # Set hint based on default
-    case "$default" in
-        Y) hint="(Y/n)" ;;
-        N) hint="(y/N)" ;;
-        *) hint="(Y/n)"; default="Y" ;;
-    esac
-
-    while true; do
-        # Show cursor
-        printf '\e[?25h'
-
-        prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
-
-        printf "%s" "$prompt"
-        read -r input
-
-        [[ -z "$input" ]] && input="$default"
-
-        case "$input" in
-            [Yy][Ee][Ss]|[Yy])
-                # Hide cursor before returning
-                printf '\e[?25l'
-                return 0
-                ;;
-            [Nn][Oo]|[Nn])
-                # Hide cursor before returning
-                printf '\e[?25l'
-                return 1
-                ;;
-            *)
-                # Clear line and retry
-                printf "\r\e[K"
-                ;;
-        esac
-    done
 }
 
 _refresh_repos() {
@@ -110,14 +65,16 @@ _check_reboot() {
 
     for pkg in "${PKG_LIST[@]}"; do
         if [[ $pkg =~ $important_regex ]]; then
-            if term::ask_yes_no Y "Important system components updated. Restart now?"; then
+            if term::ask_yes_no Y "Important system components have been updated. Restart now?"; then
+
                 # Countdown to reboot
-                for i in {3..1}; do
+                for i in {5..1}; do
                     for dots in "" "." ".." "..."; do
                         printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$YELLOW" "$RESET" "$i" "$dots"
                         sleep 0.25
                     done
                 done
+
                 systemctl reboot
                 exit 0
             else
@@ -136,19 +93,15 @@ _check_reboot() {
 
 source vb-core-lib
 
-# Set sudo prompt
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 export SUDO_PROMPT
 
-# Initialize flags and arrays
 NO_LOGO=false
 NO_DUMMY=false
 PKG_LIST=()
 
-# Trap signals for graceful cancellation
 trap 'printf "\n"; _operation_canceled; exit 1' SIGHUP SIGINT
 
-# Parse command-line options
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --no-logo)
@@ -180,6 +133,7 @@ if [[ $NO_LOGO == false ]]; then
     printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
 fi
 
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
 if ! sudo -v; then
     echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
     exit 1
@@ -195,19 +149,16 @@ if ! _check_updates; then
     exit 0
 fi
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} packages are awaiting updates"
+echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} package(s) are awaiting updates"
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting system update..."
 
 if ! _perform_update; then
     echo -e "${RED}[VIBRANIUM]${RESET} Something went wrong"
-    if [[ $NO_DUMMY == false ]]; then
-        printf '\e[?25h' # Show cursor
-        read -n1 -r -p $'. Press any key to exit' dummy
-    fi
+    _operation_canceled
     exit 1
 fi
 
 vb-cmd-refresh-bar-module pacman
 
-msg=$(_check_reboot)
+_check_reboot
 _update_complete "$msg"
