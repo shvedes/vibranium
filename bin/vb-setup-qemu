@@ -1,0 +1,101 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+_operation_canceled() {
+    printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+    read -n1 -r -s -p $'. Press any key to exit' dummy
+
+    printf '\e[?25h' # Show cursor
+}
+
+_operation_complete() {
+    printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+
+    read -n1 -r -p $'. Press any key to exit ' dummy
+    printf '\e[?25h' # Show cursor
+}
+
+_ensure_group() {
+    local user_groups="$(groups)"
+
+    if [[ "$user_groups" =~ libvirt ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+# Add current $USER to the libvirt
+# group to allow unprivileged usage.
+_set_user_group() {
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up user group"
+    sudo usermod -aG libvirt "$USER"
+}
+
+_enable_systemd_units() {
+    local sockets=()
+
+    mapfile -t sockets < <(pacman -Ql libvirt | awk '/\/systemd\/.*\.(socket)$/ && $2 !~ /@/ {print $2}')
+
+    for socket in "${sockets[@]}"; do
+        sudo systemctl -q enable --now "$(basename "$socket")" &
+    done
+}
+
+_set_virsh_network() {
+    # Redirect to /dev/null in case if it's already active
+    sudo virsh -q net-autostart default 2> /dev/null || true
+    sudo virsh -q net-start default 2> /dev/null || true
+}
+
+# Show logo
+printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup QEMU virtual machine."
+echo -e "${YELLOW}[VIBRANIUM]${RESET} In order to initialize the setup process, you'll need to install required packages first."
+
+if ! term::ask_yes_no Y "Proceed with installation?"; then
+    _operation_canceled
+    exit 1
+fi
+
+deps_list=(
+    libvirt
+    dnsmasq
+    virt-manager
+    qemu-desktop
+)
+
+install_flags=(
+    --no-logo
+    --no-dummy
+    --no-verify
+    --no-systemd
+    --conservative
+)
+
+if ! vb-pkg-install "${install_flags[@]}" "${deps_list[@]}"; then
+    _operation_canceled
+    exit 1
+fi
+
+if ! _ensure_group; then
+    _set_user_group
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up systemd units..."
+_enable_systemd_units
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up virtual network..."
+_set_virsh_network
+
+echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU setup complete!"
+echo -e "${GREEN}[VIBRANIUM]${RESET} You may need to re-login or restart your PC to fully take effect."
+
+if term::ask_yes_no Y "Launch VM Manager now?"; then
+    exec setsid -f virt-manager &> /dev/null
+else
+    _operation_complete
+fi
+

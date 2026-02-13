@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+OPTIONS=(
+    "QEMU"
+)
+
+while true; do
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Setup" "ESC to go back")"
+    [[ -z "$CHOSEN" ]] && break
+
+    case "$CHOSEN" in
+        "QEMU")
+            vb-core-term vb-setup-qemu
+            vb-cmd-kill-rofi
+            ;;
+    esac
+done

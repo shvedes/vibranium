@@ -33,4 +33,4 @@ if ! command -v "$cmd" >/dev/null 2>&1; then
     exit 127
 fi
 
-exec setsid "$cmd" "$@"
+exec setsid "$cmd" "$@" &> /dev/null

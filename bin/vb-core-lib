@@ -408,118 +408,51 @@ helpers::check() {
     fi
 }
 
+term::ask_yes_no() {
+    local default="${1:-Y}"
+    local message="$2"
+    local input prompt hint
 
-# Validate that a named variable contains a numeric value (int or float) and
-# substitute a default when necessary.
-#
-# Usage:
-#   helpers::check::digit <var_name> <default>
-# helpers::check::digit() {
-#     local var_name="$1"
-#     local default="$2"
-#     local val="${!var_name}"
-#
-#     if [[ -z $val ]]; then
-#         log::warn "$var_name is unset. Falling back to defaults."
-#         printf -v "$var_name" '%s' "$default"
-#         return 0
-#     fi
-#
-#     local normalized="${val//,/.}"
-#
-#     local int_re='^-?[0-9]+$'
-#     local float_re='^-?([0-9]+[.][0-9]+|[.][0-9]+)$'
-#
-#     if ! [[ $normalized =~ $int_re || $normalized =~ $float_re ]]; then
-#         log::warn "Invalid numeric value for ${var_name}. Falling back to defaults."
-#         printf -v "$var_name" '%s' "$default"
-#         return 0
-#     fi
-#
-#     local sign=""
-#     [[ $normalized == -* ]] && sign="-" normalized="${normalized#-}"
-#
-#     local int_part frac_part
-#
-#     if [[ $normalized == *.* ]]; then
-#         int_part="${normalized%%.*}"
-#         frac_part=".${normalized#*.}"
-#     else
-#         int_part="$normalized"
-#         frac_part=""
-#     fi
-#
-#     int_part="${int_part##+(0)}"
-#     [[ -z $int_part ]] && int_part="0"
-#
-#     printf -v "$var_name" '%s' "${sign}${int_part}${frac_part}"
-# }
+    default="${default^^}"
 
-# Validate that a named variable contains a boolean value ("true" or "false")
-# and substitute a default when necessary.
-#
-# Usage:
-#   helpers::check::bool <var_name> <default>
-# helpers::check::bool() {
-#     local var_name=$1
-#     local default=$2
-#     local val="${!var_name}"
-#
-#     if [[ -z $val ]]; then
-#         log::warn "$var_name is unset. Falling back to defaults."
-#         printf -v "$var_name" '%s' "$default"
-#         return 0
-#     fi
-#
-#     local normalized="${val,,}"
-#
-#     if [[ $normalized != "true" && $normalized != "false" ]]; then
-#         log::warn "Invalid value for $var_name. Falling back to defaults."
-#         printf -v "$var_name" '%s' "$default"
-#     else
-#         printf -v "$var_name" '%s' "$normalized"
-#     fi
-# }
+    # Set hint based on default
+    case "$default" in
+        Y) hint="(Y/n)" ;;
+        N) hint="(y/N)" ;;
+        *) hint="(Y/n)"; default="Y" ;;
+    esac
 
-# Validate that a named variable contains one of a set of allowed values (enum)
-# and substitute a default when necessary.
-#
-# Usage:
-#   helpers::check::strings <var_name> <default> <allowed1> [allowed2 ... allowedN]
-# helpers::check::strings() {
-#     local var_name=$1
-#     local default=$2
-#     shift 2
-#     local allowed=("$@")
-#     local val="${!var_name}"
-#
-#     if [[ ${#allowed[@]} -eq 0 ]]; then
-#         log::warn "Invalid value for $var_name. Falling to defaults."
-#         printf -v "$var_name" '%s' "$default"
-#         return 0
-#     fi
-#
-#     if [[ -z $val ]]; then
-#         log::warn "$var_name is unset. Falling back to defaults."
-#         printf -v "$var_name" '%s' "$default"
-#         return 0
-#     fi
-#
-#     local ok=false
-#     for a in "${allowed[@]}"; do
-#         if [[ $val == "$a" ]]; then
-#             ok=true
-#             break
-#         fi
-#     done
-#
-#     if [[ $ok != true ]]; then
-#         log::warn "Invalid value for $var_name. Falling to defaults."
-#         printf -v "$var_name" '%s' "$default"
-#     else
-#         printf -v "$var_name" '%s' "$val"
-#     fi
-# }
+    while true; do
+        # Show cursor
+        printf '\e[?25h'
+
+        prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
+
+        printf "%s" "$prompt"
+        read -r input
+
+        # Use default if empty
+        [[ -z "$input" ]] && input="$default"
+
+        case "$input" in
+            [Yy][Ee][Ss]|[Yy])
+                # Hide cursor before returning
+                printf '\e[?25l'
+                return 0
+                ;;
+            [Nn][Oo]|[Nn])
+                # Hide cursor before returning
+                printf '\e[?25l'
+                return 1
+                ;;
+            *)
+                # Clear line and retry
+                printf "\r\e[K"
+                ;;
+        esac
+    done
+}
+
 
 # A term::spinner utility function.
 # Displays an animated term::spinner in the terminal while a given process (PID) is running.

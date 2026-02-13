@@ -6,6 +6,7 @@ OPTIONS=(
     "Settings"
     "Packages"
     "Tweaks"
+    "Setup"
     "Help"
 )
 
@@ -23,6 +24,9 @@ while true; do
     done
 
     case "$CHOSEN" in
+        "Setup")
+            vb-menu-setup
+            ;;
         "Settings")
             bash "$VIBRANIUM/configure/cfgr-menu"
             ;;

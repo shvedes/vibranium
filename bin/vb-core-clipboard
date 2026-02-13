@@ -35,7 +35,7 @@ _show_() {
     if [[ ! -z "$chosen" ]]; then
         printf "%s" "$chosen" \
             | cliphist decode \
-            | wl-copy -t text-uri-list
+            | wl-copy -t text/uri-list
     fi
 }
 
