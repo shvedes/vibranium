@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# Set keyboard layout to default (first layout)
+hyprctl -q switchxkblayout all 0
+
+pidof hyprlock || hyprlock
+
