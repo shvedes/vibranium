@@ -42,7 +42,7 @@ element normal.active {
 }
 
 element selected.normal {
-    background-color: var(background);
+    background-color: var(border);
     text-color:       var(foreground);
 }
 
@@ -55,12 +55,10 @@ element-text {
     background-color: transparent;
     text-color:       inherit;
     cursor:           inherit;
-    margin:           6px 0 0 0;
 }
 
 element-icon {
     background-color: transparent;
-    size:             1.7em;
 }
 
 listview {
