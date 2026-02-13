@@ -1,0 +1,13 @@
+[Desktop Entry]
+Name=Image Editor
+GenericName=Modern Screenshot Annotation.
+TryExec=satty
+Exec=vb-util-image-editor
+Terminal=false
+Type=Application
+Keywords=wayland;snapshot;annotation;editing;
+Icon=satty
+Categories=Utility;Graphics;
+StartupNotify=true
+MimeType=image/png;image/jpeg;
+StartupWMClass=com.gabm.satty

@@ -1,6 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Photo Editor
-TryExec=satty
-Exec=vb-util-photo-editor
-Icon=010editor

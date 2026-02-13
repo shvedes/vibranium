@@ -115,7 +115,7 @@ capture() {
     copy "$output_file"
 
     if [[ $ANNOTATE == true ]]; then
-        vb-cmd-launch-cmd vb-util-photo-editor "$output_file"
+        vb-cmd-launch-cmd vb-util-image-editor "$output_file"
     fi
 }
 
