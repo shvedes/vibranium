@@ -80,6 +80,7 @@ _manage_user_wallpapers() {
                     ;;
                 "Delete")
                     rm -f "$folder/$target"
+                    notify-send -r 2 "Vibranium" "$target has been deleted"
 
                     if [[ "$(basename $(vb-cmd-get-wallpaper))" == "$target" ]]; then
                         vb-core-wallpaper --next
@@ -88,7 +89,7 @@ _manage_user_wallpapers() {
                     # Refresh files list after delete
                     files=()
                     for f in "$folder"/*; do
-                        [[ -f "$f" ]] && files+=("$(basename "$f")")
+                        [[ -f "$f" ]] && files+=(${f##*/})
                     done
                     ;;
             esac
@@ -100,16 +101,25 @@ _manage_user_wallpapers() {
     files=()
 
     for f in "$folder"/*; do
-        [[ -f "$f" ]] && files+=("$(basename "$f")")
+        [[ -f "$f" ]] && files+=(${f##*/})
     done
+
+    local index=0
 
     while true; do
         if [[ ${#files[@]} -eq 0 ]]; then
             return
         fi
 
-        chosen="$(printf "%s\n" "${files[@]}" | helpers::ui::menu "User wallpapers" "ESC to go back")"
+        chosen="$(printf "%s\n" "${files[@]}" | helpers::ui::menu "Your wallpapers" "ESC to go back" -selected-row "$index")"
         [[ -z "$chosen" ]] && return
+
+        for i in "${!files[@]}"; do
+            if [[ "${files[$i]}" == "$chosen" ]]; then
+                index="$i"
+                break
+            fi
+        done
 
         # Check if chosen is in files
         if ! [[ " ${files[*]} " =~ " $chosen " ]]; then
@@ -117,6 +127,11 @@ _manage_user_wallpapers() {
         fi
 
         _action "$chosen"
+
+        # reset index if chosen file was deleted
+        if [[ ! -f "$folder/$chosen" ]]; then
+            index=0
+        fi
     done
 }
 
