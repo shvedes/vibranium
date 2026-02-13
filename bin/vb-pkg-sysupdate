@@ -1,29 +1,184 @@
 #!/usr/bin/env bash
 
-# shellcheck disable=SC2034
+_usage() {
+    local progname="${0##*/}"
 
-source vb-core-lib
+    cat <<EOF
+Usage: $progname [OPTION]...
 
-export SUDO_PROMPT
-SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
+Perform system update using yay, check for important updates, and prompt for reboot if necessary.
 
-_operation_canceled() {
-    echo -e "${RED}[VIBRANIUM]${RESET} Operation canceled"
-    read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
-    printf '\e[?25h' # show cursor
+Options:
+  --no-logo         Do not display the logo at startup
+  --no-dummy        Do not wait for a key press after completion or cancellation
 
-    # Here we use code 0 because system update
-    # already has been performed successfuly,
-    # we just canceling system reboot
+Refreshes repositories, lists outdated packages, performs the update, and checks if a reboot is recommended based on updated packages.
+
+Report bugs to <your-bug-report-email-or-url>.
+EOF
     exit 0
 }
 
-if ! tty -s; then
-    exec setsid vb-core-term "$0" "$@"
-    exit 0
-fi
+_operation_canceled() {
+    echo -e "${RED}[VIBRANIUM]${RESET} Operation canceled"
 
-printf "\n\e[33m%s\e[0m\n\n" "$(cat "$VIBRANIUM/logo.txt")"
+    if [[ $NO_DUMMY == false ]]; then
+        printf '\e[?25h' # Show cursor
+        read -n1 -r -s -p $'. Press any key to exit' dummy
+    fi
+}
+
+# Prints a completion message with optional restart note.
+_update_complete() {
+    local msg="$1"
+
+    printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$msg"
+
+    if [[ $NO_DUMMY == false ]]; then
+        printf '\e[?25h' # Show cursor
+        read -n1 -r -p $'. Press any key to exit' dummy
+    fi
+}
+
+_ask_yes_no() {
+    local default="${1:-Y}"
+    local message="$2"
+    local input prompt hint
+
+    default="${default^^}"
+
+    # Set hint based on default
+    case "$default" in
+        Y) hint="(Y/n)" ;;
+        N) hint="(y/N)" ;;
+        *) hint="(Y/n)"; default="Y" ;;
+    esac
+
+    while true; do
+        # Show cursor
+        printf '\e[?25h'
+
+        prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
+
+        printf "%s" "$prompt"
+        read -r input
+
+        [[ -z "$input" ]] && input="$default"
+
+        case "$input" in
+            [Yy][Ee][Ss]|[Yy])
+                # Hide cursor before returning
+                printf '\e[?25l'
+                return 0
+                ;;
+            [Nn][Oo]|[Nn])
+                # Hide cursor before returning
+                printf '\e[?25l'
+                return 1
+                ;;
+            *)
+                # Clear line and retry
+                printf "\r\e[K"
+                ;;
+        esac
+    done
+}
+
+_refresh_repos() {
+    yay -Sy &> /dev/null &
+    local pid="$!"
+    term::spinner "$pid" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories"
+}
+
+_check_updates() {
+    mapfile -t PKG_LIST < <(yay -Qqu)
+
+    if [[ ${#PKG_LIST[@]} -eq 0 ]]; then
+        return 1
+    fi
+}
+
+_perform_update() {
+    if ! yes | yay --noconfirm --sudoloop; then
+        return 1
+    fi
+}
+
+_check_reboot() {
+    local important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
+    local restart_required=false
+
+    for pkg in "${PKG_LIST[@]}"; do
+        if [[ $pkg =~ $important_regex ]]; then
+            if _ask_yes_no Y "Important system components updated. Restart now?"; then
+                # Countdown to reboot
+                for i in {3..1}; do
+                    for dots in "" "." ".." "..."; do
+                        printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$YELLOW" "$RESET" "$i" "$dots"
+                        sleep 0.25
+                    done
+                done
+                systemctl reboot
+                exit 0
+            else
+                restart_required=true
+            fi
+            break
+        fi
+    done
+
+    if [[ "$restart_required" == true ]]; then
+        echo "System update complete. Restart required"
+    else
+        echo "System update complete. No restart required"
+    fi
+}
+
+source vb-core-lib
+
+# Set sudo prompt
+SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
+export SUDO_PROMPT
+
+# Initialize flags and arrays
+NO_LOGO=false
+NO_DUMMY=false
+PKG_LIST=()
+
+# Trap signals for graceful cancellation
+trap 'printf "\n"; _operation_canceled; exit 1' SIGHUP SIGINT
+
+# Parse command-line options
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --no-logo)
+            NO_LOGO=true
+            shift
+            ;;
+        --no-dummy)
+            NO_DUMMY=true
+            shift
+            ;;
+        --help)
+            _usage
+            ;;
+        --)
+            shift
+            break
+            ;;
+        --*)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if [[ $NO_LOGO == false ]]; then
+    printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+fi
 
 if ! sudo -v; then
     echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
@@ -33,74 +188,26 @@ fi
 # Hide cursor
 printf '\e[?25l'
 
-yay -Sy &> /dev/null &
-term::spinner "$!" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" ""
+_refresh_repos
 
-mapfile -t pkg_list < <(yay -Qqu)
-
-if [[ -z "${pkg_list[*]}" ]]; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date"
-    read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+if ! _check_updates; then
+    _update_complete "You are up to date"
     exit 0
 fi
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#pkg_list[@]} packages are awaiting updates"
+echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} packages are awaiting updates"
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting system update..."
 
-if ! yay --noconfirm --sudoloop; then
+if ! _perform_update; then
     echo -e "${RED}[VIBRANIUM]${RESET} Something went wrong"
-    read -n1 -r -p $'\e[0;31m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+    if [[ $NO_DUMMY == false ]]; then
+        printf '\e[?25h' # Show cursor
+        read -n1 -r -p $'. Press any key to exit' dummy
+    fi
     exit 1
 fi
 
 vb-cmd-refresh-bar-module pacman
 
-important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
-restart_required=false
-for pkg in "${pkg_list[@]}"; do
-    if [[ $pkg =~ $important_regex ]]; then
-        echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
-        prompt=$'\e[0;33m[VIBRANIUM]\e[0m System restart is recommended. Restart now? (Y/n): '
-
-        while true; do
-            printf "%s\e[?25h" "$prompt"
-            read -r answer
-            printf '\e[?25l'
-            case "$answer" in
-                [Yy][Ee][Ss] | [Yy] | "")
-                    printf '\e[?25l'
-
-                    # Cancel countdown & system reboot on CTRL C
-                    trap '_operation_canceled' INT
-
-                    for i in {3..1}; do
-                        for dots in "" "." ".." "..."; do
-                            printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$YELLOW" "$RESET" "$i" "$dots"
-                            sleep 0.25
-                        done
-                    done
-                    systemctl reboot
-                    exit 0
-                    ;;
-                [Nn][Oo] | [Nn])
-                    restart_required=true
-                    break
-                    ;;
-                *)
-                    printf '\r\e[K'
-                    ;;
-            esac
-        done
-
-        break
-    fi
-done
-
-if [[ "$restart_required" == true ]]; then
-    final_msg="System update complete. Restart required"
-else
-    final_msg="System update complete. No restart required"
-fi
-
-printf "\r\033[K%s[VIBRANIUM]%s %s\n" "$GREEN" "$RESET" "$final_msg"
-read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to close this window' dummy
+msg=$(_check_reboot)
+_update_complete "$msg"
