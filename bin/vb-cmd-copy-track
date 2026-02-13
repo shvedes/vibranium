@@ -62,7 +62,7 @@ fi
 
 if [[ -z "$file" ]]; then
     echo "error: no track currently playing" >&2
-    if $notify; then
+    if [[ "$notify" == true ]]; then
         notify-send -u critical -t 3000 -r 4 "Vibranium" "No track currently playing"
     fi
     exit 1
@@ -70,7 +70,12 @@ fi
 
 printf '%s' "$file" | wl-copy --type text/uri-list
 
-if $notify && [[ ! "$file" =~ ^https?:// ]]; then
-    notify-send -r 3 "Vibranium" "<i><b>$(basename "$file")</b></i> copied to clipboard"
+if [[ "$notify" == true ]]; then
+    if [[ "$file" =~ ^https?:// ]]; then
+        msg="Link copied to clipboard"
+    else
+        msg="<i><b>${file##*/}</b></i> copied to clipboard"
+    fi
+    notify-send -r 3 "Vibranium" "$msg"
 fi
 
