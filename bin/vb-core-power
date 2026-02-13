@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
-
-if ! missing="$(vb-cmd-is-present powerprofilesctl)"; then
-    log::error "missing required dependencies: power-profiles-daemon"
-    term::is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "power-profiles-daemon"
-    exit 1
-fi
-
 usage() {
     cat <<EOF
 Usage: ${0##*/} [OPTION]
@@ -89,6 +81,14 @@ toggle_blur() {
     fi
 }
 
+_ensure_deps() {
+    if ! command -v powerprofilesctl > /dev/null; then
+        echo "[ERROR] Missing required dependencies: power-profiles-daemon"
+        vb-cmd-dep-notify --name "Power Management" --deps "power-profiles-daemon"
+        exit 1
+    fi
+}
+
 ACTION="next"
 QUIET="false"
 
@@ -122,6 +122,10 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+_ensure_deps
+
+source vb-core-lib
 
 # Cache defaults (for further validation)
 helpers::parse_defaults

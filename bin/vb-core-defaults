@@ -92,7 +92,7 @@ VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI=false
 # Whether to automatically select the last remaining entry
 # Available options: bool
 #
-# Default: false
+# Default is false
 VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT=false
 
 # Whether to automatically show app launcher when starting the session
@@ -107,7 +107,7 @@ VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START=false
 # applying only dimming instead.
 # Available options: bool
 #
-# Default: true
+# Default is true
 VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE=true
 
 # Whether to require the user to repeat the shortcut to kill the active window.
@@ -235,7 +235,7 @@ VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL=true
 # Brightness adjustment step
 # Available options: int
 #
-# Default: 5
+# Default is 5
 VIBRANIUM_BRIGHTNESS_STEP=5
 
 #             COLOR PICKER OPTIONS             #

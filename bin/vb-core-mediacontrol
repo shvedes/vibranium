@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
-
 lockfile="$VIBRANIUM_RUNTIME/${0##*/}.lock"
 
 exec 9> "$lockfile" || {
@@ -10,6 +8,8 @@ exec 9> "$lockfile" || {
 }
 
 flock -n 9 || exit 0
+
+source vb-core-lib
 
 # Cache defaults (for further validation)
 helpers::parse_defaults

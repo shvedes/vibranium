@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
-
-usage() {
+_usage() {
     cat << EOF
 Usage: ${0##*/} [OPTION]
 
@@ -13,58 +11,82 @@ Options:
 EOF
 }
 
-is_empty() {
-    local entries
+_is_empty() {
+    local entries=()
     mapfile -t entries < <(cliphist list)
 
-    (( ! ${#entries[@]} >= 1 )) && {
-        log::warn "clipboard is empty"
+    if (( ${#entries[@]} == 0 )); then
         return 0
-    }
-}
-
-show_clipboard() {
-    local chosen
-    chosen="$(cliphist list | helpers::ui::menu "Clipboard" "search" -display-columns 2)"
-    if [[ ! -z $chosen ]]; then
-        printf "%s" "$chosen" | cliphist decode | wl-copy -t text/uri-list
+    else
+        return 1
     fi
 }
 
-clear_clipboard() {
-    cliphist wipe
+_show_() {
+    source vb-core-lib
+
+    local chosen
+    chosen="$(cliphist list \
+        | helpers::ui::menu \
+        "Clipboard" "search" \
+        -display-columns 2
+    )"
+
+    if [[ ! -z "$chosen" ]]; then
+        printf "%s" "$chosen" \
+            | cliphist decode \
+            | wl-copy -t text-uri-list
+    fi
+}
+
+_clear() {
+    # if open it's
+    # at the moment
+    # of invocation
     killall -q rofi
+
+    cliphist wipe
     wl-copy --clear
 }
 
-restart_service() {
-    log::info "starting systemd service..."
-    systemctl --quiet --user enable --now cliphist
+_ensure_service() {
+    local status
+    status="$(systemctl --user is-active cliphist)"
+
+    if [[ ! "$status" == "active" ]]; then
+        systemctl -q --user enable --now cliphist
+    fi
 }
 
-if ! missing="$(vb-cmd-is-present rofi cliphist)"; then
-    log::error "missing required dependencies: $missing"
-    term::is_headless && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
-    exit 1
-fi
-
-if [[ "$(systemctl --user is-active cliphist)" != "active" ]]; then
-    log::warn "systemd service not active!"
-    start_service
-fi
+_ensure_deps() {
+    if ! missing="$(vb-cmd-is-present rofi cliphist)"; then
+        [[ -t 1 ]] && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
+        exit 1
+    fi
+}
 
 case "$1" in
-    --show)
-        is_empty || show_clipboard
+    "--show")
+        _ensure_deps
+        _ensure_service
+
+        # showo only if not empty
+        if ! _is_empty; then
+            _show_
+        fi
         ;;
-    --clear)
-        clear_clipboard
+    "--clear")
+        _ensure_deps
+        _ensure_service
+
+        _clear
         ;;
-    -h|--help|*)
-        usage
+    "-h"|"--help"|"")
+        _usage
         exit 0
         ;;
     *)
-        usage
+        _usage
         exit 1
+        ;;
 esac
