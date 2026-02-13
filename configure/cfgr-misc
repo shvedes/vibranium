@@ -188,10 +188,8 @@ _get_cursor_theme() {
 }
 
 _set_cursor_theme() {
-    local line folder pretty
-    local -a OPTIONS=()
-    local CHOSEN
-    local INDEX=0
+    local line folder pretty chosen
+    local -a options=()
 
     declare -A CURSOR_FOLDER_TO_NAME=()
     declare -A CURSOR_NAME_TO_FOLDER=()
@@ -205,15 +203,15 @@ _set_cursor_theme() {
         CURSOR_FOLDER_TO_NAME["$folder"]="$pretty"
         CURSOR_NAME_TO_FOLDER["$pretty"]="$folder"
 
-        OPTIONS+=("$pretty")
+        options+=("$pretty")
     done < <(vb-theme-cursor-list)
 
-    [[ ${#OPTIONS[@]} -eq 0 ]] && return
+    [[ ${#options[@]} -eq 0 ]] && return
 
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Misc" "ESC to go back")"
-    [[ -z "$CHOSEN" ]] && return
+    chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Misc" "ESC to go back")"
+    [[ -z "$chosen" ]] && return
 
-    local selected_folder="${CURSOR_NAME_TO_FOLDER[$CHOSEN]}"
+    local selected_folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
 
     [[ -z "$selected_folder" ]] && return
 
