@@ -39,7 +39,7 @@ _enable_systemd_units() {
     mapfile -t sockets < <(pacman -Ql libvirt | awk '/\/systemd\/.*\.(socket)$/ && $2 !~ /@/ {print $2}')
 
     for socket in "${sockets[@]}"; do
-        sudo systemctl -q enable --now "$(basename "$socket")" &
+        sudo systemctl -q enable --now "${socket##*/}" &
     done
 }
 

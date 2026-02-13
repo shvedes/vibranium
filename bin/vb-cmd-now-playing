@@ -83,9 +83,10 @@ if [[ -z "$title" ]]; then
     if [[ "$player" == "playerctl" ]]; then
         url="$(playerctl metadata --format '{{xesam:url}}' 2> /dev/null)"
         if [[ "$url" =~ ^file:// ]]; then
-            filename="$(basename "${url#file://}")"
+            filename="${url#file://}"
+            filename="${filename##*/}"
         else
-            filename="$(basename "$url")"  # Fallback for non-file URLs, e.g., spotify:track:id
+            filename="${url##*/}"  # Fallback for non-file URLs, e.g., spotify:track:id
         fi
     else
         filename="$(mpc current -f "%file%" 2> /dev/null)"

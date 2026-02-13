@@ -136,7 +136,8 @@ helpers::ui::menu() {
 #         *) return 2 ;;
 #     esac
 #
-#     title="$(basename "${BASH_SOURCE[0]}")"
+#     title="${BASH_SOURCE[0]}"
+#     title="${title##*/}"
 #
 #     if (($# == 1)); then
 #         body="$1"

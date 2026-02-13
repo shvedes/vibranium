@@ -112,10 +112,10 @@ esac
 # (e,g. user's own picture, downloaded from the internet) we
 # should copy this file to the folder that contains user wallpapers
 # only. Why copy? In case if original file gets deleted
-if [[ ! -f "$WALLS/$(basename "$WALLPAPER_PATH")" ]]; then
-    if [[ ! -f "$USER_WALLPAPERS/$(basename "$WALLPAPER_PATH")" ]]; then
+if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
+    if [[ ! -f "$USER_WALLPAPERS/${WALLPAPER_PATH##*/}" ]]; then
         cp "$WALLPAPER_PATH" "$USER_WALLPAPERS/"
-        WALLPAPER_PATH="$USER_WALLPAPERS/$(basename "$WALLPAPER_PATH")"
+        WALLPAPER_PATH="$USER_WALLPAPERS/${WALLPAPER_PATH##*/}"
     fi
 fi
 

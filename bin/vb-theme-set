@@ -86,7 +86,7 @@ get_current_target_basename() {
         local realpath
         realpath="$(readlink -f "$CURRENT_LINK" 2> /dev/null || true)"
         if [ -n "$realpath" ]; then
-            basename "$realpath"
+            echo "${realpath##*/}"
             return 0
         fi
     fi

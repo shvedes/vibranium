@@ -40,7 +40,7 @@ _handle_systemd() {
 
             case "$path" in
                 */systemd/*.service|*/systemd/*.socket)
-                    unit="$(basename "$path")"
+                    unit="${path##*/}"
 
                     # classify user vs system by presence of "systemd/user"
                     if [[ "$path" == *"/systemd/user/"* ]]; then

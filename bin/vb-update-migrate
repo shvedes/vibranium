@@ -10,7 +10,7 @@ RESET=$'\e[0m'
 
 mkdir -p "$STATE_DIR/skipped"
 for file in "$VIBRANIUM"/migrations/*.sh; do
-    filename=$(basename "$file")
+    filename="${file##*/}"
 
     if [[ ! -f "$STATE_DIR/$filename" && ! -f "$STATE_DIR/skipped/$filename" ]]; then
         echo -e "${YELLOW}[VIBRANIUM]${RESET} Running migration ${GREEN}${filename%.sh}${RESET}"

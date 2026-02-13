@@ -26,24 +26,17 @@ if [[ $# -ge 1 ]]; then
     cmd="$1"
 
     if ! command -v "$cmd" > /dev/null; then
-        echo "$cmd: command not found"
+        echo "$cmd: command not found" >&2
         exit 1
     fi
 
     shift
-    class="$(basename -- "$cmd")"
+    class="${cmd##*/}"
     args=(-e "$cmd" "$@")
 fi
 
 if [[ "$(systemctl --user is-active alacritty)" == "inactive" ]]; then
-    systemctl --user enable --now alacritty; sleep 0.3
-    if [[ ! -t 1 ]]; then
-        notify-send \
-            -r 1 \
-            -t 2000 \
-            "Vibranium" \
-            "Alacritty daemon has been started"
-    fi
+    systemctl --user enable --now alacritty
 fi
 
 alacritty msg create-window --class "$class" --title "$class" "${args[@]}"

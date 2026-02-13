@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-STATE_FILE="${XDG_STATE_HOME:-$HOME/.local/state}/vibranium/power-profile"
+STATE_FILE="$VIBRANIUM_STATE/power-profile"
 
 usage() {
     cat << EOF
@@ -20,10 +20,11 @@ case "$1" in
         exit 0
         ;;
     "")
+        :
         ;;
     *)
         echo "${0##*/}: invalid option '$1'" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
+        echo "Try '--help' for more information." >&2
         exit 1
         ;;
 esac
@@ -33,9 +34,10 @@ if [[ -f "$STATE_FILE" ]]; then
     exit 0
 fi
 
-mkdir -p "$(dirname "$STATE_FILE")"
+mkdir -p "${STATE_FILE%/*}"
 
-if powerprofilesctl get | tee "$STATE_FILE"; then
+if output=$(powerprofilesctl get); then
+    printf '%s' "$output" > "$STATE_FILE"
     exit 0
 fi
 

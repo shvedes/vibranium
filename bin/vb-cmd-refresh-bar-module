@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# Refresh a Waybar custom module by sending its configured signal.
-# Usage: vb-cmd-refresh-bar-module <module-name>
-
 usage() {
     cat << EOF
 Usage: ${0##*/} MODULE_NAME
@@ -14,7 +11,6 @@ Options:
 EOF
 }
 
-# CLI parsing
 case "${1:-}" in
     -h|--help)
         usage
@@ -24,20 +20,27 @@ esac
 
 [[ -z "${1:-}" ]] && { usage; exit 1; }
 
-module_name="$1"
-
 declare -A signals
-while IFS=":" read -r file rest; do
-    name="$(basename "$file" .jsonc)"
-    sig="$(grep -o '[0-9]\+' <<< "$rest")"
-    signals["$name"]="$sig"
-done < <(grep '"signal":' "$VIBRANIUM"/default/waybar/*)
 
+for file in "$VIBRANIUM"/default/waybar/*; do
+    while IFS= read -r line; do
+        [[ $line == *'"signal"'* ]] || continue
+
+        name="${file##*/}" # remove path
+        name="${name%.jsonc}" # remove file extension
+        sig="${line//[^0-9]/}" # keep kill signals only
+
+        signals["$name"]="$sig"
+    done < "$file"
+done
+
+module_name="$1"
 module_signal="${signals[$module_name]}"
+waybar_pid=$(systemctl --user show waybar -p MainPID --value)
 
 if [ -n "$module_signal" ]; then
-    pkill -RTMIN+"$module_signal" waybar &
-    pkill -RTMIN+"${signals[dynamic-separator]}" waybar &
+    kill -RTMIN+"$module_signal" "$waybar_pid"
+    kill -RTMIN+"${signals[dynamic-separator]}" "$waybar_pid"
 else
     echo "Unknown module: $module_name" >&2
     exit 1

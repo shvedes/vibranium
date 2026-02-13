@@ -82,7 +82,10 @@ _manage_user_wallpapers() {
                     rm -f "$folder/$target"
                     notify-send -r 2 "Vibranium" "$target has been deleted"
 
-                    if [[ "$(basename $(vb-cmd-get-wallpaper))" == "$target" ]]; then
+                    local current="$(vb-cmd-get-wallpaper)"
+                    local current_basename="${current##*/}"
+
+                    if [[ "$current_basename" == "$target" ]]; then
                         vb-core-wallpaper --next
                     fi
 
@@ -174,7 +177,7 @@ _set_notification_timeout() {
 _update_reading_mode() {
     local shader="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
     if [[ ! $shader = \[\[EMPTY\]\] ]]; then
-        shader="$(basename "$shader")"
+        shader="${shader##*/}"
         local config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
 
         case "$shader" in

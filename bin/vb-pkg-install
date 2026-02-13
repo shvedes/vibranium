@@ -41,34 +41,34 @@ _handle_systemd() {
     services=()
 
     for pkg in "${FILTERED[@]}"; do
-        # Get list of .service or .socket files from the package, excluding templated units (@)
         units=$(pacman -Ql "$pkg" 2>/dev/null | awk '/\/systemd\/.*\.(service|socket)$/ && $2 !~ /@/ {print $2}')
-
         [[ -z $units ]] && continue
 
-        # Reset per-package arrays
         pkg_user_sockets=()
         pkg_user_services=()
         pkg_sys_sockets=()
         pkg_sys_services=()
 
-        # associative array to record socket basenames for this package
         declare -A pkg_socket_basenames=()
 
-        # Classify each unit path into per-package arrays
         while IFS= read -r unit; do
             case "$unit" in
                 */systemd/user/*.socket)
                     pkg_user_sockets+=("$unit")
-                    # record basename without suffix for socket/service matching
-                    pkg_socket_basenames["$(basename "$unit" .socket)"]=1
+                    local name
+                    name="${unit##*/}"      # remove path
+                    name="${name%.socket}"  # remove suffix
+                    pkg_socket_basenames["$name"]=1
                     ;;
                 */systemd/user/*.service)
                     pkg_user_services+=("$unit")
                     ;;
                 */systemd/system/*.socket|/lib/systemd/system/*.socket)
                     pkg_sys_sockets+=("$unit")
-                    pkg_socket_basenames["$(basename "$unit" .socket)"]=1
+                    local name
+                    name="${unit##*/}"
+                    name="${name%.socket}"
+                    pkg_socket_basenames["$name"]=1
                     ;;
                 */systemd/system/*.service|/lib/systemd/system/*.service)
                     pkg_sys_services+=("$unit")
@@ -76,47 +76,45 @@ _handle_systemd() {
             esac
         done <<< "$units"
 
-        # Append entries in priority order: user sockets, user services, system sockets, system services
-        if [[ ${#pkg_user_sockets[@]} -gt 0 ]]; then
+        if (( ${#pkg_user_sockets[@]} )); then
             for unit in "${pkg_user_sockets[@]}"; do
                 provides_systemd_service+=("$pkg")
                 unit_types+=("socket")
                 unit_scope+=("user")
-                user_units+=("$(basename "$unit")")
+                user_units+=("${unit##*/}")
             done
         fi
 
-        if [[ ${#pkg_user_services[@]} -gt 0 ]]; then
+        if (( ${#pkg_user_services[@]} )); then
             for unit in "${pkg_user_services[@]}"; do
-                # skip service if there is a socket with the same basename
-                local base
-                base="$(basename "$unit" .service)"
+                local base name
+                name="${unit##*/}"
+                base="${name%.service}"
                 if [[ -n "${pkg_socket_basenames[$base]:-}" ]]; then
-                    # socket exists, skip proposing the service
                     continue
                 fi
 
                 provides_systemd_service+=("$pkg")
                 unit_types+=("service")
                 unit_scope+=("user")
-                user_units+=("$(basename "$unit")")
+                user_units+=("${unit##*/}")
             done
         fi
 
-        if [[ ${#pkg_sys_sockets[@]} -gt 0 ]]; then
+        if (( ${#pkg_sys_sockets[@]} )); then
             for unit in "${pkg_sys_sockets[@]}"; do
                 provides_systemd_service+=("$pkg")
                 unit_types+=("socket")
                 unit_scope+=("system")
-                services+=("$(basename "$unit")")
+                services+=("${unit##*/}")
             done
         fi
 
-        if [[ ${#pkg_sys_services[@]} -gt 0 ]]; then
+        if (( ${#pkg_sys_services[@]} )); then
             for unit in "${pkg_sys_services[@]}"; do
-                # skip service if there is a socket with the same basename
-                local base
-                base="$(basename "$unit" .service)"
+                local base name
+                name="${unit##*/}"
+                base="${name%.service}"
                 if [[ -n "${pkg_socket_basenames[$base]:-}" ]]; then
                     continue
                 fi
@@ -124,7 +122,7 @@ _handle_systemd() {
                 provides_systemd_service+=("$pkg")
                 unit_types+=("service")
                 unit_scope+=("system")
-                services+=("$(basename "$unit")")
+                services+=("${unit##*/}")
             done
         fi
     done
