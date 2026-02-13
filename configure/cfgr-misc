@@ -185,6 +185,9 @@ _get_cursor_theme() {
             return
         fi
     done <<< "$(vb-theme-cursor-list)"
+
+    # Fallback: if the list above is empty (e.g. not found)
+    printf "defalut"
 }
 
 _set_cursor_theme() {
