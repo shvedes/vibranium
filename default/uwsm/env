@@ -21,15 +21,14 @@ export VIBRANIUM_CACHE="$XDG_CACHE_HOME/vibranium"
 export VIBRANIUM="$XDG_DATA_HOME/vibranium"
 export PATH="$HOME/.local/bin:$VIBRANIUM_PATH:$PATH"
 
-export XCURSOR_THEME="macOS"
-export XCURSOR_SIZE=22
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
 # Use Wayland when possible. Fallback to XWayland otherwise
 export ELECTRON_OZONE_PLATFORM_HINT="auto"
 export QT_QPA_PLATFORM="wayland;xcb"
+# Keep in mind!
 # https://github.com/basecamp/omarchy/issues/2564#issuecomment-3450877034
-# export SDL_VIDEODRIVER="wayland"
+export SDL_VIDEODRIVER="wayland"
 export GDK_BACKEND="wayland,x11"
 export CLUTTER_BACKEND="wayland"
 

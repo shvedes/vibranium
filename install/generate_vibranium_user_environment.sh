@@ -4,9 +4,9 @@ cat <<EOF > "$HOME/.config/vibranium/environment"
 # vim:ft=bash
 # Place your environment variables here.
 # The text below is just an example. Feel free to delete or change it
+# All changes are applied only after re-login!
 
-export SUDO_PROMPT
-SUDO_PROMPT="\$(tput setaf 1)\$(tput bold)[sudo]\$(tput sgr0) Password for \$USER: "
+export SUDO_PROMPT="\$(tput setaf 1)\$(tput bold)[sudo]\$(tput sgr0) Password for \$USER: "
 
 # Set your default editor
 # This could be nvim, nano, emacs, kate or whatever you want
@@ -30,8 +30,4 @@ export MANPAGER="\$EDITOR +Man!"
 # If you are a pass user (https://www.passwordstore.org/), you can specify a specific folder that pass will use to look for passwords. For example:
 # export PASSWORD_STORE_DIR="\$XDG_DATA_HOME/password-store"
 
-# You can set and customize your cursor theme and its size.
-# Note that Vibranium comes only with a single cursor theme.
-# XCURSOR_THEME="myCoolCursor"
-# XCURSOR_SIZE=22
 EOF

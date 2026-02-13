@@ -175,6 +175,52 @@ _update_reading_mode() {
     fi
 }
 
+_get_cursor_theme() {
+    local current
+    current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
+
+    while IFS='|' read -r key value; do
+        if [[ "$key" == "$current" ]]; then
+            printf "%s" "$value"
+            return
+        fi
+    done <<< "$(vb-theme-cursor-list)"
+}
+
+_set_cursor_theme() {
+    local line folder pretty
+    local -a OPTIONS=()
+    local CHOSEN
+    local INDEX=0
+
+    declare -A CURSOR_FOLDER_TO_NAME=()
+    declare -A CURSOR_NAME_TO_FOLDER=()
+
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+
+        folder=${line%%|*}
+        pretty=${line#*|}
+
+        CURSOR_FOLDER_TO_NAME["$folder"]="$pretty"
+        CURSOR_NAME_TO_FOLDER["$pretty"]="$folder"
+
+        OPTIONS+=("$pretty")
+    done < <(vb-theme-cursor-list)
+
+    [[ ${#OPTIONS[@]} -eq 0 ]] && return
+
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Misc" "ESC to go back")"
+    [[ -z "$CHOSEN" ]] && return
+
+    local selected_folder="${CURSOR_NAME_TO_FOLDER[$CHOSEN]}"
+
+    [[ -z "$selected_folder" ]] && return
+
+    hyprctl -q setcursor "$selected_folder" 24
+    gsettings set org.gnome.desktop.interface cursor-theme "$selected_folder"
+}
+
 INDEX=0
 
 # Cache defaults (for further validation)
@@ -187,6 +233,7 @@ while true; do
 
     OPTIONS=(
         "Menus theme : $(_get_rofi_theme)"
+        "Cursor theme : $(_get_cursor_theme)"
         "Show wallpaper : $VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
         "Terminal opacity : $(_get_term_opacity)"
         "Notification timeout : $(_get_notification_timeout)s"
@@ -208,6 +255,9 @@ while true; do
     done
 
     case "$CHOSEN" in
+        "Cursor theme"*)
+            _set_cursor_theme
+            ;;
         *"Now Playing"*)
             cfgr-now-playing
             ;;

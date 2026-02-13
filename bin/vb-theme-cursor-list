@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+
+
+SEARCH_DIRS=(
+    "/usr/share/icons"
+    "$XDG_DATA_HOME/icons"
+    "$HOME/.icons"
+)
+
+declare -A THEMES
+
+_usage() {
+    cat <<EOF
+Usage: ${0##*/} [OPTION]...
+
+List available X11 cursor themes.
+
+The script scans standard icon directories and prints themes in the format:
+  directory|theme name
+
+Options:
+  -h, --help     display this help and exit
+EOF
+}
+
+parse_cursor_theme() {
+    local file="$1"
+    local line
+    local in_section=false
+    local name
+
+    # parse "Name=" inside [Icon Theme] section
+    while IFS= read -r line; do
+        case "$line" in
+            "[Icon Theme]")
+                in_section=true
+                ;;
+            "["*)
+                in_section=false
+                ;;
+            Name=*)
+                if [[ $in_section == true ]]; then
+                    name=${line#Name=}
+                    break
+                fi
+                ;;
+        esac
+    done < "$file"
+
+    # if name found, store under theme directory name
+    [[ -n "$name" ]] || return
+
+    local dir=${file%/*}
+    dir=${dir##*/}
+
+    THEMES["$dir"]="$name"
+}
+
+if [[ "$1" =~ ^(-h|--help)$ ]]; then
+    _usage
+    exit 0
+fi
+
+for base in "${SEARCH_DIRS[@]}"; do
+    [[ -d "$base" ]] || continue
+
+    # iterate theme directories (one level deep)
+    while IFS= read -r -d '' theme_dir; do
+        # check whether this theme actually contains cursors
+        if [[ -d "$theme_dir/cursors" ]] && find "$theme_dir/cursors" -type f -print -quit >/dev/null 2>&1; then
+            # prefer explicit cursor.theme if present, otherwise try index.theme
+            if [[ -f "$theme_dir/cursor.theme" ]]; then
+                parse_cursor_theme "$theme_dir/cursor.theme"
+            elif [[ -f "$theme_dir/index.theme" ]]; then
+                parse_cursor_theme "$theme_dir/index.theme"
+            else
+                # no theme file to parse, but cursors exist - use directory name as fallback
+                dir_name=${theme_dir##*/}
+                THEMES["$dir_name"]="$dir_name"
+            fi
+        fi
+    done < <(find "$base" -mindepth 1 -maxdepth 1 -type d -print0 2>/dev/null)
+done
+
+for dir in "${!THEMES[@]}"; do
+    printf "%s|%s\n" "$dir" "${THEMES[$dir]}"
+done
+
