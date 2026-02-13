@@ -96,6 +96,7 @@ capture() {
             [[ -z "$region" ]] && exit 1
 
             grim ${GRIM_OPTS[@]} -g "$region" "$output_file"
+
             ;;
         window)
             geometry="$(get_window_geometry)"
@@ -112,6 +113,10 @@ capture() {
 
     notify "$target"
     copy "$output_file"
+
+    if [[ $ANNOTATE == true ]]; then
+        vb-cmd-launch-cmd vb-util-photo-editor "$output_file"
+    fi
 }
 
 init() {
@@ -121,11 +126,13 @@ init() {
     helpers::check VIBRANIUM_SCREENSHOT_FILE_TYPE
     helpers::check VIBRANIUM_SCREENSHOT_FLASH_SCREEN
     helpers::check VIBRANIUM_SCREENSHOT_FLASH_BORDER
+    helpers::check VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE
 
+    FILETYPE="$VIBRANIUM_SCREENSHOT_FILE_TYPE"
+    ANNOTATE=$VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE
     FLASH_SCREEN=$VIBRANIUM_SCREENSHOT_FLASH_SCREEN
     FLASH_BORDER=$VIBRANIUM_SCREENSHOT_FLASH_BORDER
 
-    FILETYPE="$VIBRANIUM_SCREENSHOT_FILE_TYPE"
     GRIM_OPTS=(-t $FILETYPE)
 
     if [[ $FILETYPE =~ jp(e)?g ]]; then

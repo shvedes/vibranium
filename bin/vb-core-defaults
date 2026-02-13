@@ -220,6 +220,13 @@ VIBRANIUM_SCREENSHOT_FLASH_BORDER=true
 # Default is true
 VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION=true
 
+# Whether to automatically open annotation window
+# after taking a screenshot.
+# Available options: bool
+#
+# Defalut is true
+VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE=true
+
 #             BRIGHTNESS OPTIONS               #
 # ============================================ #
 #                                              #

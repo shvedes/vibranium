@@ -55,6 +55,7 @@ neovim
 waybar
 thunar
 unzip
+satty
 slurp
 qt6ct
 qt5ct

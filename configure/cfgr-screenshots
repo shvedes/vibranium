@@ -44,8 +44,10 @@ while true; do
 
     helpers::check VIBRANIUM_SCREENSHOT_FILE_TYPE
     helpers::check VIBRANIUM_SCREENSHOT_SAVE_TO_DISK
+    helpers::check VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE
     helpers::check VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION
 
+    ANNOTATE="$VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE"
     FILETYPE="${VIBRANIUM_SCREENSHOT_FILE_TYPE^^}"
     SHOW_NOTIFICATION="$VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION"
     SAVE_ON_DISK="$VIBRANIUM_SCREENSHOT_SAVE_TO_DISK"
@@ -76,6 +78,10 @@ while true; do
         )
     fi
 
+    OPTIONS+=(
+        "Auto annotate : $ANNOTATE"
+    )
+
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
     CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Screenshots" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
@@ -88,6 +94,9 @@ while true; do
     done
 
     case "$CHOSEN" in
+        "Auto annotate"*)
+            helpers::configure::toggle_bool "VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE"
+            ;;
         "JPEG quality"*)
             helpers::configure::set_digit "JPG Quality" "Quality" "int" 1 100 "VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
             ;;
