@@ -274,14 +274,14 @@ VIBRANIUM_COLOR_PICKER_HISTORY_SIZE=10
 # Whether to show the Night Light indicator.
 # Available options: bool
 #
-# Default is true
-VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE=true
+# Default is false
+VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE=false
 
 # Whether to enable color picker module.
 # Available options: bool
 #
-# Default is true
-VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE=true
+# Default is false
+VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE=false
 
 # Whether to enable power profile module.
 # Available options: bool

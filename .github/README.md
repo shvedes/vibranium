@@ -5,6 +5,9 @@ configure almost every aspect of your typical desktop usage: appearance of the W
 
 ## Installation
 
+```bash
+curl -fsSL https://raw.githubusercontent.com/shvedes/vibranium/master/install.sh | bash
+```
 See [wiki page](https://github.com/shvedes/vibranium/wiki#installation)
 
 ## Currenet State

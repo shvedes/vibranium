@@ -10,7 +10,7 @@ source "$SCRIPT_DIR/lib/helpers.sh"
 
 if [[ "$ROOT_FS" == "btrfs" ]]; then
     _log_info "BTRFS on root detected"
-    PACKAGES+=(btrfs-progs)
+    PACKAGES+=(btrfs-progs compsize)
 fi
 
 if [[ "$(lsblk -f)" =~ ntfs ]]; then
@@ -61,8 +61,7 @@ case "$(lspci | grep VGA)" in
         ;;
     *)
         _log_error "No supported GPU detected. Please install GPU drivers manually"
-        _log_error "Think this is a mistake? Open an issue!"
-        _log_info "This will not affect the installation"
+        _log_error "This will not affect the installation process"
 esac
 
 if (( ! ${#PACKAGES[@]} == 0 )); then

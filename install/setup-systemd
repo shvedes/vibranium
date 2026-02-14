@@ -14,7 +14,6 @@ user_services=(
     "alacritty"
     "hyprsunset"
     "gnome-polkit"
-    "vibranium-startup"
 )
 
 user_timers=(
