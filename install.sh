@@ -8,11 +8,6 @@ set -e
 INSTALL_DIR="$HOME/.local/share/vibranium"
 REPO_URL="https://github.com/shvedes/vibranium"
 
-echo "=============="
-echo "Dotfiles Setup"
-echo "=============="
-echo
-
 # Check if vibranium directory already exists
 if [ -d "$INSTALL_DIR" ]; then
     echo "ERROR: $INSTALL_DIR already exists!" >&2

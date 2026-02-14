@@ -65,12 +65,10 @@ mapfile -t PACKAGES < "$SCRIPT_DIR/pkgs.txt"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
-{
-    bash "$SCRIPT_DIR/setup-system"
-    bash "$SCRIPT_DIR/setup-tmpfiles"
-    bash "$SCRIPT_DIR/setup-sysctl"
-    bash "$SCRIPT_DIR/setup-zram"
-}
+bash "$SCRIPT_DIR/setup-system"
+bash "$SCRIPT_DIR/setup-tmpfiles"
+bash "$SCRIPT_DIR/setup-sysctl"
+bash "$SCRIPT_DIR/setup-zram"
 
 # I want to install yay first,
 # but we have to keep this step here for now
