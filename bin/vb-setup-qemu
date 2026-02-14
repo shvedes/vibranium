@@ -63,7 +63,7 @@ fi
 deps_list=(
     libvirt
     dnsmasq
-    qemu-common
+    qemu-desktop
     virt-manager
 )
 
