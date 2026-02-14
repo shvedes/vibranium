@@ -95,3 +95,7 @@ textbox-num-sep {
     str:        "/";
     text-color: var(border);
 }
+
+prompt {
+    text-color: var(foreground);
+}

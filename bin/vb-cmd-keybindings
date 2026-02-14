@@ -142,7 +142,7 @@ case "$1" in
     *)
         dynamic_bindings | sort -u | parse_bindings | rofi -dmenu -sync \
             -theme-str 'entry { placeholder: " search shortucts"; }' \
-            -theme-str 'listview { lines: 30; columns: 1; }' \
+            -theme-str 'listview { lines: 20; columns: 1; }' \
             -theme "$XDG_CONFIG_HOME/rofi/config.rasi" \
             -theme-str 'window { width:500; }' \
             -p "Keybindings" -no-auto-select
