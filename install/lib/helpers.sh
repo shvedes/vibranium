@@ -32,6 +32,8 @@ _log_error() {
 }
 
 _install_yay() {
+  sudo pacman -Sy --noconfirm &> /dev/null
+
   if ! _is_installed "base-devel"; then
     _log_info "Installing base-devel..."
     sudo pacman --noconfirm -S base-devel

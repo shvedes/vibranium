@@ -47,12 +47,12 @@ colors["Kanagawa-GKT-Theme"]="dark"
 # Function to install a theme repo
 install_theme() {
   local repo="$1"
-  local clone_dir="./$repo"
+  local clone_dir="$HOME/.cache/$repo"
   local base_name=""
   local variants=()
 
   # Clone the repo
-  git clone -q "https://github.com/Fausto-Korpsvart/$repo" || { echo "Failed to clone $repo"; return 1; }
+  git clone -q "https://github.com/Fausto-Korpsvart/$repo" "$clone_dir" || { echo "Failed to clone $repo"; return 1; }
   cd "$clone_dir/themes" || { echo "Failed to cd into $clone_dir/themes"; cd ..; rm -rf "$clone_dir"; return 1; }
   git switch -q --detach HEAD~3
 
@@ -253,5 +253,4 @@ for repo in "${REPOS[@]}"; do
 done
 
 ln -s "$HOME/.themes" "$HOME/.local/share/themes"
-printf "\r\033[K%s[VIBRANIUM]%s GTK themes installed\n" "${YELLOW}" "${RESET}"
 

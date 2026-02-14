@@ -1,5 +1,6 @@
 [Trigger]
-Operation = Install|Upgrade
+Operation = Install
+Operation = Upgrade
 Target = spotify
 Target = /opt/spotify
 Type = Package
