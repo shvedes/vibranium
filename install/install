@@ -21,11 +21,11 @@ SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER
 export SUDO_PROMPT
 
 # Switch to the latest release and re-exec
-if ! git branch | grep -q detached; then
-    git checkout -q --detach "$(git tag --sort=-creatordate | head -n 1)"
-    exec "$0"
-    exit 0
-fi
+# if ! git branch | grep -q detached; then
+#     git checkout -q --detach "$(git tag --sort=-creatordate | head -n 1)"
+#     exec "$0"
+#     exit 0
+# fi
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Vibranium needs sudo to install packages"
 if ! sudo -v; then
@@ -43,6 +43,14 @@ CURRENT_STEP=0
 
 mapfile -t PACKAGES < "$VIBRANIUM/pkg_list.txt"
 
+CURRENT_STEP=$((CURRENT_STEP + 1))
+_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
+
+bash "$SCRIPT_DIR/setup-system"
+bash "$SCRIPT_DIR/setup-tmpfiles"
+bash "$SCRIPT_DIR/setup-sysctl"
+bash "$SCRIPT_DIR/setup-zram"
+
 if ! _is_installed "yay"; then
     TOTAL_STEPS=9
     CURRENT_STEP=$((CURRENT_STEP + 1))
@@ -53,14 +61,6 @@ fi
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing packages"
 _install_packages "${PACKAGES[@]}"
-
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
-
-bash "$SCRIPT_DIR/setup-system"
-bash "$SCRIPT_DIR/setup-tmpfiles"
-bash "$SCRIPT_DIR/setup-sysctl"
-bash "$SCRIPT_DIR/setup-zram"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up hardware"

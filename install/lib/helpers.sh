@@ -54,7 +54,7 @@ _install_yay() {
   cd ~
   rm -rf /tmp/yay
 
-  log_success "Yay installed successfully"
+  _log_success "Yay installed successfully"
 }
 
 _install_packages() {
