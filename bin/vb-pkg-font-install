@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+FZF_ARGS=(
+    --multi
+    --preview 'yay -Sii {1} 2>/dev/null || yay -Sii {1}'
+    --preview-label='alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select'
+    --preview-label-pos='bottom'
+    --preview-window 'right:75%:wrap'
+    --bind 'alt-p:toggle-preview'
+    --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
+    --bind 'alt-k:preview-up,alt-j:preview-down'
+    --color 'pointer:blue,marker:white'
+)
+
+_operation_canceled() {
+    echo -e "${RED}[VIBRANIUM]${RESET} Operation canceled"
+    read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to exit' dummy
+    printf '\e[?25h' # show cursor
+}
+
+_get_fonts() {
+    local pkg
+
+    while IFS= read -r pkg; do
+        case "$pkg" in
+            ttf* | ttf*-nerd | ttf*-nerd-mono | \
+            otf* | otf*-nerd | otf*-nerd-mono)
+                printf '%s\n' "$pkg"
+                ;;
+        esac
+    done < <(pacman -Slq)
+
+    while IFS= read -r pkg; do
+        case "$pkg" in
+            ttf* | ttf*-nerd | ttf*-nerd-mono | \
+            otf* | otf*-nerd | otf*-nerd-mono)
+                printf '%s\n' "$pkg"
+                ;;
+        esac
+    done < <(yay -Slqa)
+}
+
+trap 'printf "\n"; _operation_canceled; exit 1' SIGINT
+
+printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+printf '\e[?25l' # Hide cursor
+
+(_get_fonts > "$VIBRANIUM_CACHE/${0##*/}.list") &
+term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting font packages"
+
+LIST="$(< "$VIBRANIUM_CACHE/${0##*/}.list")"
+mapfile -t chosen < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
+
+rm -f "$TMP"
+
+if [[ ${#chosen[@]} -eq 0 ]]; then
+    _operation_canceled
+    exit 1
+fi
+
+if vb-pkg-install --no-logo --no-verify "${chosen[@]}"; then
+    setsid -f vb-cmd-font-cache
+fi
