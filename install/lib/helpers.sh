@@ -32,16 +32,11 @@ _log_error() {
 }
 
 _install_yay() {
-  sudo pacman -Sy --noconfirm &> /dev/null
+  sudo pacman -Suy --noconfirm &> /dev/null
 
   if ! _is_installed "base-devel"; then
     _log_info "Installing base-devel..."
     sudo pacman --noconfirm -S base-devel
-  fi
-
-  if ! _is_installed "git"; then
-    _log_info "Installing git..."
-    sudo pacman --noconfirm -S git
   fi
 
   _log_info "Cloning yay from AUR..."

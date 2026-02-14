@@ -76,7 +76,7 @@ _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
 # then yay is installed,
 # and only after that system files / configs are set up.
 
-[[ "$YAY_PRESENT" == true ]] && {
+[[ "$YAY_PRESENT" == false ]] && {
     CURRENT_STEP=$((CURRENT_STEP + 1))
     _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing yay AUR helper"
     _install_yay
