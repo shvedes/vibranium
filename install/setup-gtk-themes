@@ -44,8 +44,6 @@ colors["Everforest-GTK-Theme"]="dark"
 colors["Catppuccin-GTK-Theme"]="dark light"
 colors["Kanagawa-GKT-Theme"]="dark"
 
-printf "\r\033%s[VIBRANIUM]%s Installing GTK themes" "${YELLOW}"  "${RESET}"
-
 # Function to install a theme repo
 install_theme() {
   local repo="$1"

@@ -38,7 +38,7 @@ clear
 printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
 _show_logo
 
-TOTAL_STEPS=8
+TOTAL_STEPS=10
 CURRENT_STEP=0
 
 mapfile -t PACKAGES < "$VIBRANIUM/pkg_list.txt"
@@ -52,7 +52,7 @@ bash "$SCRIPT_DIR/setup-sysctl"
 bash "$SCRIPT_DIR/setup-zram"
 
 if ! _is_installed "yay"; then
-    TOTAL_STEPS=9
+    TOTAL_STEPS=11
     CURRENT_STEP=$((CURRENT_STEP + 1))
     _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing yay AUR helper"
     _install_yay
@@ -79,6 +79,13 @@ _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up directories"
 bash "$SCRIPT_DIR/setup-dirs"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
+_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Copying configs"
+
+mkdir -p "$HOME/.local/bin"
+cp -r "$VIBRANIUM/config/*" "$HOME/.config/"
+cp -r "$VIBRANIUM/extras/local/bin/*" "$HOME/.local/bin"
+
+CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up systemd services"
 bash "$SCRIPT_DIR/setup-systemd"
 
@@ -89,13 +96,6 @@ bash "$SCRIPT_DIR/setup-migrations"
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing default theme"
 bash "$SCRIPT_DIR/setup-theme"
-
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Copying configs"
-
-mkdir -p "$HOME/.local/bin"
-cp -r "$VIBRANIUM/config/*" "$HOME/.config/"
-cp -r "$VIBRANIUM/extras/local/bin/*" "$HOME/.local/bin"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Finishing up"
