@@ -66,7 +66,7 @@ _install_packages() {
     local pkg
 
     # Update OS first
-    yay --noconfirm --needed -Syu
+    yay --noconfirm -Syu
 
     # Hide cursor
     printf '\e[?25l'

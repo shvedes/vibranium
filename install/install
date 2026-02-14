@@ -14,13 +14,6 @@ if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   exit 1
 fi
 
-_sudo_loop() {
-    while true; do
-        sudo -v
-        sleep 10
-    done
-}
-
 # Source helpers
 source "$SCRIPT_DIR/lib/helpers.sh"
 
@@ -49,11 +42,13 @@ printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
 printf '\e[?25l'
 
 _show_logo
-_sudo_loop &
 
-YAY_PRESENT="$(_is_installed yay && echo true || echo false)"
-
+YAY_PRESENT=false
 CURRENT_STEP=0
+
+if _is_installed "yay"; then
+    YAY_PRESENT=true
+fi
 
 if [[ "$YAY_PRESENT" == true ]]; then
     TOTAL_STEPS=12
@@ -80,6 +75,7 @@ _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
 # and makepkg.conf are updated first,
 # then yay is installed,
 # and only after that system files / configs are set up.
+
 [[ "$YAY_PRESENT" == true ]] && {
     CURRENT_STEP=$((CURRENT_STEP + 1))
     _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing yay AUR helper"
