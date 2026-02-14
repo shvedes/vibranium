@@ -21,6 +21,11 @@ Systemd units (services/sockets) from installed packages are detected and enable
 EOF
 }
 
+_ask_for_sudo() {
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
+    sudo -v
+}
+
 # Detects systemd units (services and sockets) provided by a list of packages.
 # Populates global arrays:
 #   - provides_systemd_service: Packages that provide a systemd unit (indexes match with unit_types and unit_scope).
@@ -386,10 +391,6 @@ if [[ $NO_LOGO == false ]]; then
     printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
 fi
 
-# Validate sudo access early
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
-sudo -v
-
 # Hide cursor
 printf '\e[?25l'
 
@@ -403,7 +404,11 @@ if [[ $# -gt 0 ]]; then
         fi
     fi
 
-    _refresh_repos
+    if ! _ask_for_sudo; then
+        _operation_canceled
+        exit 1
+    fi
+
     _filter_packages
 else
     if ! command -v fzf > /dev/null; then
@@ -415,7 +420,6 @@ else
         exit 1
     fi
 
-    _refresh_repos
     _get_packages
 
     if _choose_packages; then
@@ -430,6 +434,13 @@ _show_overview
 
 # Proceed with installation after confirmation
 if term::ask_yes_no Y "Proceed with installation?"; then
+    if ! _ask_for_sudo; then
+        _operation_canceled
+        exit 1
+    fi
+
+    _refresh_repos
+
     if _install_packages; then
 
         if [[ "$NO_SYSTEMD" == false ]]; then

@@ -2,15 +2,26 @@
 
 source vb-core-lib
 
-ACTIONS=("System update" "Install a font" "Install a package" "Uninstall a package")
+ACTIONS=(
+    "System update"
+    "Install a font"
+    "Uninstall a font"
+    "Install a package"
+    "Uninstall a package"
+)
 
 while true; do
     CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | helpers::ui::menu "Packages" "ESC to go back")"
     [[ -z $CHOSEN ]] && break
 
     case "$CHOSEN" in
+        "Uninstall a font")
+            vb-core-term vb-pkg-font-remove
+            vb-cmd-kill-rofi
+            exit 0
+            ;;
         "Install a font")
-            vb-core-term vb-pkg-font
+            vb-core-term vb-pkg-font-install
             vb-cmd-kill-rofi
             exit 0
             ;;
