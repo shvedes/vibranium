@@ -17,6 +17,13 @@ fi
 # Source helpers
 source "$SCRIPT_DIR/lib/helpers.sh"
 
+if [[ $(hostnamectl chassis) == vm ]]; then
+    _log_error "You're trying to install Vibranium inside of a virtual machine."
+    _log_error "Expect unexpected bugs, slow performance, or not working setup at all."
+    _log_error "You've been warned."
+    echo
+fi
+
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 export SUDO_PROMPT
 
@@ -51,9 +58,9 @@ if _is_installed "yay"; then
 fi
 
 if [[ "$YAY_PRESENT" == true ]]; then
-    TOTAL_STEPS=12
-else
     TOTAL_STEPS=11
+else
+    TOTAL_STEPS=10
 fi
 
 mapfile -t PACKAGES < "$SCRIPT_DIR/pkgs.txt"
@@ -99,15 +106,8 @@ _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing icon theme"
 bash "$SCRIPT_DIR/setup-icons"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up directories"
-bash "$SCRIPT_DIR/setup-dirs"
-
-CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Copying configs"
-
-mkdir -p "$HOME/.local/bin"
-cp -r "$VIBRANIUM/config/"* "$HOME/.config/"
-cp -r "$VIBRANIUM/extras/local/bin/"* "$HOME/.local/bin"
+bash "$SCRIPT_DIR/setup-configs"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up systemd services"

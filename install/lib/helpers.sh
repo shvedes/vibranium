@@ -31,6 +31,13 @@ _log_error() {
     echo -e "${RED}[VIBRANIUM]${RESET} ${*}"
 }
 
+_get_machine_type() {
+    case "$(< /sys/class/dmi/id/chassis_type)" in
+        9|10|14) echo laptop ;;
+        *) echo desktop ;;
+    esac
+}
+
 _install_yay() {
   sudo pacman -Suy --noconfirm &> /dev/null
 

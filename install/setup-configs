@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+VIBRANIUM="$HOME/.local/share/vibranium"
+
 mkdir -p \
     "$HOME"/.config/{Vencord,vesktop}/{themes,settings} \
     "$HOME"/.config/heroic/{themes,store} \
@@ -18,4 +20,8 @@ mkdir -p \
     "$HOME/.config/swayosd" \
     "$HOME/.config/dunst" \
     "$HOME/.config/uwsm" \
-    "$HOME/.config/imv"
+    "$HOME/.config/imv" \
+    "$HOME/.local/bin"
+
+cp -r "$VIBRANIUM/config/"* "$HOME/.config/"
+cp -r "$VIBRANIUM/extras/local/bin/"* "$HOME/.local/bin"

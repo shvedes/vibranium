@@ -30,9 +30,8 @@ _generate_hypridle_config() {
     local lock_after
     local sleep_after
 
-    case "$(</sys/class/dmi/id/chassis_type)" in
-        # Laptop, Notebook, Sub-Notebook
-        9|10|14)
+    case "$(hostnamectl chassis)" in
+        laptop|tablet|convertible)
             # 2 minutes
             lock_after=120
             # 5 minutes
