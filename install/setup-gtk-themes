@@ -209,7 +209,7 @@ install_theme() {
       fi
       generated_base+="-$color_upper-Compact$generated_variant_suffix"
 
-	  printf "\r\033%s[VIBRANIUM]%s Installing %s${desired_name%%-*} GTK theme%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
+	  # printf "\r\033%s[VIBRANIUM]%s Installing %s${desired_name%%-*} GTK theme%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
 
 	  install_opts="-s compact -c $color $tweaks -t $accent_param"
 	  eval "./install.sh $install_opts" &>/dev/null  || { echo "Install failed for $repo $variant $color"; continue; }

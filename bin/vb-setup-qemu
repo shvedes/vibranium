@@ -63,8 +63,8 @@ fi
 deps_list=(
     libvirt
     dnsmasq
+    qemu-common
     virt-manager
-    qemu-desktop
 )
 
 install_flags=(
