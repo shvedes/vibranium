@@ -126,12 +126,13 @@ _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Finishing up"
 bash "$SCRIPT_DIR/post-install"
 
 _log_success "Installation complete. System restart required"
+_log_success "You have to pick Hyprland (uwsm-managed) in your login manager. Otherwise Vibranium will NOT WORK"
 
-sleep 1
+if _ask_yes_no Y "Reboot now?"; then
+    for i in {5..1}; do
+        printf "\r\033[K%s[VIBRANIUM]%s Restarting PC in %d..." "$YELLOW" "$RESET" "$i"
+        sleep 0.25
+    done
+    systemctl reboot
+fi
 
-for i in {5..1}; do
-    printf "\r\033[K%s[VIBRANIUM]%s Restarting PC in %d..." "$YELLOW" "$RESET" "$i"
-    sleep 0.25
-done
-
-systemctl reboot

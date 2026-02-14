@@ -81,3 +81,48 @@ _install_packages() {
     printf '\e[?25h\n'
 }
 
+_ask_yes_no() {
+    local default="${1:-Y}"
+    local message="$2"
+    local input prompt hint
+
+    default="${default^^}"
+
+    # Set hint based on default
+    case "$default" in
+        Y) hint="(Y/n)" ;;
+        N) hint="(y/N)" ;;
+        *) hint="(Y/n)"; default="Y" ;;
+    esac
+
+    while true; do
+        # Show cursor
+        printf '\e[?25h'
+
+        prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
+
+        printf "%s" "$prompt"
+        read -r input
+
+        # Use default if empty
+        [[ -z "$input" ]] && input="$default"
+
+        case "$input" in
+            [Yy][Ee][Ss]|[Yy])
+                # Hide cursor before returning
+                printf '\e[?25l'
+                return 0
+                ;;
+            [Nn][Oo]|[Nn])
+                # Hide cursor before returning
+                printf '\e[?25l'
+                return 1
+                ;;
+            *)
+                # Clear line and retry
+                printf "\r\e[K"
+                ;;
+        esac
+    done
+}
+
