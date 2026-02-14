@@ -82,8 +82,8 @@ CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Copying configs"
 
 mkdir -p "$HOME/.local/bin"
-cp -r "$VIBRANIUM/config/*" "$HOME/.config/"
-cp -r "$VIBRANIUM/extras/local/bin/*" "$HOME/.local/bin"
+cp -r "$VIBRANIUM/config/"* "$HOME/.config/"
+cp -r "$VIBRANIUM/extras/local/bin/"* "$HOME/.local/bin"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up systemd services"

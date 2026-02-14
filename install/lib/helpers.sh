@@ -66,7 +66,6 @@ _install_packages() {
     local pkg
 
     # Update OS first
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting system update"
     yay --noconfirm --needed -Syu
 
     # Hide cursor
