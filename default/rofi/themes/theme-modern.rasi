@@ -8,27 +8,14 @@
 window {
     width:            350px;
     padding:          20;
-    background-color: var(background);
-	transparency:     "real";
     border:           2;
     border-color:     var(border);
-}
-
-mainbox {
-    padding:          4px;
     background-color: var(background);
-}
-
-message {
-    border: 0.15em;
-    margin: 18px 2px 0px 2px;
-    padding: 8px 8px 8px 8px;
-    border-color: var(border);
 }
 
 element {
-    padding: 8px;
-    spacing: 16px;
+    padding: 10px;
+    spacing: 0px 8px;
     cursor:  pointer;
 }
 
@@ -53,8 +40,6 @@ element alternate.normal {
 
 element-text {
     background-color: transparent;
-    text-color:       inherit;
-    cursor:           inherit;
 }
 
 element-icon {
@@ -62,39 +47,24 @@ element-icon {
 }
 
 listview {
-    padding:      20px 0 0 0;
-    spacing:      4px;
-    scrollbar:    true;
+    padding:      16px 0 0 0;
     border:       2px solid 0px 0px;
-    border-color: var(border);
-    margin:       10px 0 0 0;
-	lines:        10;
+    border-color: var(highlight);
+    margin:       12px 0 0 0;
+	lines:        9;
 }
 
 scrollbar {
-    width:        2px;
-    padding:      0;
+    padding:      1px 0px 0px 4px;
     handle-width: 2px;
-    border:       0;
-    handle-color: var(border);
+    handle-color: var(highlight);
 }
 
-inputbar {
-    text-color: var(foreground);
-    children: [
-        "prompt",
-        "textbox-prompt-colon",
-        "entry",
-        "overlay",
-        "num-filtered-rows",
-        "textbox-num-sep",
-        "num-rows",
-        "case-indicator"
-    ];
-}
-
-prompt {
-    text-color: inherit;
+message {
+    border: 0.15em;
+    margin: 18px 2px 0px 2px;
+    padding: 8px 8px 8px 8px;
+    border-color: var(border);
 }
 
 entry {
@@ -122,11 +92,4 @@ textbox-num-sep {
     expand:     false;
     str:        "/";
     text-color: var(border);
-}
-
-textbox-prompt-colon {
-    margin:     0 2px 0 0;
-    expand:     false;
-    str:        ":";
-    text-color: var(foreground-muted);
 }

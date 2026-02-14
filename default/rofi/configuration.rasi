@@ -1,6 +1,6 @@
 
 configuration {
-	modes : [ drun, ssh ];
+	modes : [ drun ];
 
 	drun-reload-desktop-cache : true;
 	drun-use-desktop-cache    : true;
@@ -23,8 +23,12 @@ configuration {
 	matching            : "prefix";
 	drun-match-fields   : "name,keywords,categories";
 	monitor             : "-1";
-	scroll-method       : 1;
+	// scroll-method       : 1;
 	sorting-method      : "fzf";
+
+    hover-select    : true;
+    me-select-entry : "";
+    me-accept-entry: [ MousePrimary ];
 
     calc {
         hint-result: "";

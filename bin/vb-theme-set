@@ -127,7 +127,7 @@ pick_family() {
     done
 
     local family_chosen
-    family_chosen="$(printf "%s\n" "${keys[@]}" | helpers::ui::menu "Set theme" "")"
+    family_chosen="$(printf "%s\n" "${keys[@]}" | helpers::ui::menu "Theme" "")"
     [[ -z "$family_chosen" ]] && exit 0
     echo "$family_chosen"
 }
