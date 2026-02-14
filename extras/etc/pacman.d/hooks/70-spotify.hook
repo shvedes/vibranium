@@ -1,10 +1,11 @@
 [Trigger]
-Operation = Install
+Operation = Install|Upgrade
 Target = spotify
 Target = /opt/spotify
 Type = Package
 
 [Action]
 Description = Upating permissions for Spicetify
+Depends = spicetify-cli
 When = PostTransaction
 Exec = /usr/bin/sh -c '/usr/bin/chmod a+wr /opt/spotify; /usr/bin/chmod -R a+wr /opt/spotify/Apps'

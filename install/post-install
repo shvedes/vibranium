@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+
+VIBRANIUM="$HOME/.local/share/vibranium"
+
+_generate_gtk_bookmarks() {
+    cat <<EOF > "$HOME/.config/gtk-3.0/bookmarks"
+file:///home/$USER/Documents
+file:///home/$USER/Downloads
+file:///home/$USER/Pictures
+file:///home/$USER/Videos
+file:///home/$USER/Music
+EOF
+}
+
+_generate_dirs() {
+    cat <<EOF > "$HOME/.config/user-dirs.dirs"
+XDG_DESKTOP_DIR="$HOME/"
+XDG_DOWNLOAD_DIR="$HOME/Downloads"
+XDG_TEMPLATES_DIR="$HOME/Templates"
+XDG_PUBLICSHARE_DIR="$HOME/"
+XDG_DOCUMENTS_DIR="$HOME/Documents"
+XDG_MUSIC_DIR="$HOME/Music"
+XDG_PICTURES_DIR="$HOME/Pictures"
+XDG_VIDEOS_DIR="$HOME/Videos"
+EOF
+}
+
+# Dynamically adjust idle times based on the machine type
+_generate_hypridle_config() {
+    local lock_after
+    local sleep_after
+
+    case "$(</sys/class/dmi/id/chassis_type)" in
+        # Laptop, Notebook, Sub-Notebook
+        9|10|14)
+            # 2 minutes
+            lock_after=120
+            # 5 minutes
+            sleep_after=300
+            ;;
+
+        # Desktop / Other
+        *)
+            # 10 minutes
+            lock_after=600
+            # 15 minutes
+            sleep_after=900
+            ;;
+    esac
+
+    cat <<EOF > "$HOME/.config/hypr/hypridle.conf"
+source = ~/.local/share/vibranium/default/hypr/hypridle.conf
+
+listener {
+	timeout = $lock_after
+	on-timeout = loginctl lock-session
+}
+
+listener {
+	timeout = $sleep_after
+	on-timeout = systemctl suspend
+}
+
+# vim:ft=hyprlang
+EOF
+}
+
+_generate_dirs
+_generate_gtk_bookmarks
+_generate_hypridle_config

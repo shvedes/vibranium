@@ -7,5 +7,5 @@ MIGRATIONS_DIR="$VIBRANIUM/migrations"
 mkdir -p "$STATE_DIR"
 
 for file in "$MIGRATIONS_DIR"/*.sh; do
-    touch "$STATE_DIR/$(basename "$file")"
+    : > "$STATE_DIR/"${file##*/}""
 done

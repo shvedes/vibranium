@@ -3,7 +3,8 @@ Version=1.0
 Type=Application
 Name=YouTube Music
 Icon=youtube
-Keywrods=Google;Youtube;Music
+Keywords=Google;Youtube;Music
+TryExec=chromium
 Exec=chromium --app='https://music.youtube.com'
 Terminal=false
 Categories=WebApp;

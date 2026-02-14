@@ -4,6 +4,7 @@ Type=Application
 Name=Protonmail
 Icon=protonmail
 Keywords=Proton;Prvicary;Private
+TryExec=chromium
 Exec=chromium --app='https://proton.me/mail'
 Terminal=false
 Categories=WebApp;

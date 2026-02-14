@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+
+system_services=(
+    "ly@tty1"
+    "power-profiles-daemon"
+    "bluetooth"
+)
+
+user_services=(
+    "waybar"
+    "cliphist"
+    "hypridle"
+    "hyprpaper"
+    "alacritty"
+    "hyprsunset"
+    "gnome-polkit"
+    "vibranium-startup"
+)
+
+user_timers=(
+    "vibranium-update"
+)
+
+for service in "${system_services[@]}"; do
+    sudo systemctl -q enable "$service"
+done
+
+for service in "${user_services[@]}"; do
+    systemctl -q --user enable "$service"
+done
+
+for timer in "${user_timers[@]}"; do
+    systemctl -q --user enable "${timer}.timer"
+done
+
+override_services=("waybar" "hyprpaper" "hypridle" "swyaosd" "alacritty" "cliphist")
+
+for unit in "${override_services[@]}"; do
+    mkdir -p "$HOME/.config/systemd/user/${unit}.service.d"
+    cat > "$HOME/.config/systemd/user/${unit}.service.d/override.conf" <<'EOF'
+[Unit]
+StartLimitIntervalSec=1
+EOF
+done

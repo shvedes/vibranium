@@ -1,5 +1,5 @@
 [Trigger]
-Operation = Upgrade
+Operation = Install|Upgrade
 Target = spotify
 Type = Package
 

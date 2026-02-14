@@ -14,3 +14,4 @@ sudo tee /etc/systemd/zram-generator.conf >/dev/null <<EOF
 zram-size = $ZRAM_SIZE
 compression-algorithm = lzo-rle zstd(level=3) (type=idle)
 EOF
+

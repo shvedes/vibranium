@@ -2,6 +2,7 @@
 Type=Application
 Name=File Manager
 Icon=org.xfce.thunar
+TryExec=thunar
 Exec=thunar %U
 MimeType=inode/directory;
 Keywords=Explorer;Thunar;xfce

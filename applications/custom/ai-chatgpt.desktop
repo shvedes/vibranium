@@ -4,6 +4,7 @@ Version=1.0
 Name=ChatGPT
 Icon=chatgpt
 Keywords=AI;ChatGPT;GPT;OpenAI
+TryExec=chromium
 Exec=chromium --app='https://chatgpt.com'
 Terminal=false
 Categories=AI;

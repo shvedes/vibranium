@@ -7,7 +7,7 @@ source "$VIBRANIUM_PATH/vb-core-defaults"
 source "$XDG_CONFIG_HOME/vibranium/settings"
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
-export VIBRANIUM_USER_SETTINGS="$XDG_CONFIG_HOME/vibranium/settings"
+# PKG / Font Install / Removal scripts
 export VIBRANIUM_SUDO_PROMPT
 
 RED=$'\e[0;31m'
@@ -64,7 +64,7 @@ helpers::ui::menu() {
     # This decides how wide the window should be.
     local maxlen_input=0 line
     while IFS= read -r line; do
-        ((${#line} > maxlen_input))   && maxlen_input=${#line}
+        ((${#line} > maxlen_input)) && maxlen_input=${#line}
     done <<< "$input_plain"
 
     # Compare longest entry with prompt + placeholder length.
@@ -491,7 +491,7 @@ term::spinner() {
         done
     done
 
-    # Clear the term::spinner once finished
+    # Clear the spinner once finished
     printf "%b" "$clear_line"
 
     # Print the final message if provided

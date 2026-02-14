@@ -1,6 +1,38 @@
 #!/usr/bin/env bash
 
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+
 THEME_PATH="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
+
+cat <<EOF > "$HOME/.config/gtk-3.0/settings.ini"
+[Settings]
+gtk-theme-name=Nightfox
+gtk-icon-theme-name=Papirus-Dark
+gtk-font-name=Cascadia Code
+gtk-cursor-theme-name=macOS
+gtk-cursor-theme-size=22
+gtk-toolbar-style=GTK_TOOLBAR_ICONS
+gtk-toolbar-icon-size=GTK_ICON_SIZE_LARGE_TOOLBAR
+gtk-button-images=0
+gtk-menu-images=0
+gtk-enable-event-sounds=1
+gtk-enable-input-feedback-sounds=0
+gtk-xft-antialias=1
+gtk-xft-hinting=1
+gtk-xft-hintstyle=hintmedium
+gtk-xft-rgba=rgb
+gtk-application-prefer-dark-theme=1
+EOF
+
+cat <<EOF > "$HOME/.config/gtk-4.0/settings.ini"
+[Settings]
+gtk-theme-name=Nightfox
+gtk-icon-theme-name=Papirus-Dark
+gtk-font-name=Cascadia Code
+gtk-cursor-theme-name=macOS
+gtk-cursor-theme-size=22
+gtk-application-prefer-dark-theme=0
+EOF
 
 # Symlinks
 ln -sf "$THEME_PATH" "$HOME/.config/vibranium/theme/current" >/dev/null
@@ -55,15 +87,16 @@ for f in assets gtk-dark.css gtk.css; do
 	ln -sf "$HOME/.themes/Nightfox/gtk-4.0/$f" "$HOME/.config/gtk-4.0/"
 done
 
-# Icon theme
-mkdir -p "$HOME/.local/share/icons"
-cp -r ./extras/icon_theme/Vibranium "$HOME/.local/share/icons"
+# The settings file
+cat > "$HOME/.config/vibranium/settings" <<'EOF'
+# vim:ft=bash
+# shellcheck disable=all
+# Auto-generated file. Do not edit!
+EOF
 
-printf "# vim:ft=bash\n# shellcheck disable=all\n# Auto-generated file. Do not edit!\n\n" \
-	> "$HOME/.config/vibranium/settings"
-
-cp -r ./config/* "$HOME/.config"
+# QTCT
 sed -i "s/user/$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
+sed -i "s/user/$USER/" "$HOME/.config/qt5ct/qt5ct.conf"
 
 ln -sf "$HOME/.local/share/vibranium/default/hypr/animations/default.conf" \
 	"$HOME/.config/hypr/hyprland.conf.d/animations.conf"

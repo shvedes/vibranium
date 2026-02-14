@@ -2,9 +2,11 @@
 
 USER="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{print $3}')"
 USER_ID="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{print $2}')"
+
 export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus"
 
 ONLINE_FILE="/sys/class/power_supply/ACAD/online"
+
 if [[ -f "$ONLINE_FILE" ]]; then
     ONLINE="$(<"$ONLINE_FILE")"
 else

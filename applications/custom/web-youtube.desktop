@@ -4,6 +4,7 @@ Type=Application
 Name=YouTube
 Icon=youtube
 Keywords=Google;Youtube;Video;Hosting;Content
+TryExec=chromium
 Exec=chromium --app='https://youtube.com'
 Terminal=false
 Categories=WebApp;

@@ -2,6 +2,8 @@
 
 source vb-core-lib
 
+FIRSTBOOT_SCRIPTS="$VIBRANIUM/install/first-boot"
+
 _get_power_profile() {
     local battery_status
 
@@ -17,6 +19,9 @@ _get_power_profile() {
         fi
     fi
 }
+
+echo "Finishing instllation..." > "$VIBRANIUM_RUNTIME/worker.active"
+vb-cmd-refresh-bar-module worker
 
 msg+="\nPress <span foreground='${P_YELLOW}'><b>SUPER + A</b></span>      to open app launcher\n"
 msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + V</b></span> to open Vibranium menu\n"
@@ -48,3 +53,11 @@ chromium --no-startup-window --set-theme-color="25, 35, 48" &
 vb-core-power "$(_get_power_profile)"
 
 rm -f "$VIBRANIUM_STATE/first-boot"
+
+for script in ${FIRSTBOOT_SCRIPTS}/*.sh; do
+    bash "$script"
+done
+
+rm -f "$VIBRANIUM_RUNTIME/worker.active"
+vb-cmd-refresh-bar-module worker
+

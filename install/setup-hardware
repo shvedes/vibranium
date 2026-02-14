@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+NVIDIA_SETUP_NEEDED=false
+ROOT_FS="$(lsblk -f | grep -E \/\$ | awk '{print $2}')"
+PACKAGES=()
+
+source "$SCRIPT_DIR/lib/helpers.sh"
+
+if [[ "$ROOT_FS" == "btrfs" ]]; then
+    _log_info "BTRFS on root detected"
+    PACKAGES+=(btrfs-progs)
+fi
+
+if [[ "$(lsblk -f)" =~ ntfs ]]; then
+    _log_info "NTFS partition found"
+    _log_info "You'll be able to acces your NTFS drive without any issues"
+    _log_info "Please make sure you disabled fast boot in Windows control panel"
+    _log_info "Otherwise your NTFS drive will be read only"
+    PACKAGES+=(ntfs-3g)
+fi
+
+case "$(lspci | grep VGA)" in
+    *Nvidia*)
+        _log_info "Nvidia GPU detected"
+        NVIDIA_SETUP_NEEDED=true
+        PACKAGES+=(
+            "egl-wayland"
+            "nvidia-dkms"
+            "nvidia-utils"
+            "linux-headers"
+            "nvidia-settings"
+            "lib32-nvidia-utils"
+            "libva-nvidia-driver"
+        )
+        ;;
+    *Radeon*|*ATI*)
+        _log_info "AMD GPU detected"
+        PACKAGES+=(
+            "mesa"
+            "lib32-mesa"
+            "rocm-smi-lib" # Needed for btop gpu load monitoring
+            "vulkan-radeon"
+            "libvdpau-va-gl"
+            "lib32-vulkan-radeon"
+        )
+        ;;
+    *UHD*|*Iris*|*Arc*)
+        _log_info "Intel GPU detected"
+        PACKAGES+=(
+            "mesa"
+            "libvpl"
+            "lib32-mesa"
+            "vpl-gpu-rt"
+            "vulkan-intel"
+            "libvdpau-va-gl"
+            "libva-intel-driver"
+            "lib32-vulkan-intel"
+        )
+        ;;
+    *)
+        _log_error "No supported GPU detected. Please install GPU drivers manually"
+        _log_error "Think this is a mistake? Open an issue!"
+        _log_info "This will not affect the installation"
+esac
+
+if (( ! ${#PACKAGES[@]} == 0 )); then
+    _install_packages "${PACKAGES[@]}"
+fi
+
+if [[ "$NVIDIA_SETUP_NEEDED" == true ]]; then
+    bash "$SCRIPT_DIR/setup-nvidia"
+fi
+

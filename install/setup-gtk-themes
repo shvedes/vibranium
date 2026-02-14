@@ -13,7 +13,7 @@ REPOS=(
   "Tokyonight-GTK-Theme"
   "Everforest-GTK-Theme"
   "Catppuccin-GTK-Theme"
-  "Kanagawa-GKT-Theme" 
+  "Kanagawa-GKT-Theme"
   #          ^
   # This is hilarious
 )
@@ -256,3 +256,4 @@ done
 
 ln -s "$HOME/.themes" "$HOME/.local/share/themes"
 printf "\r\033[K%s[VIBRANIUM]%s GTK themes installed\n" "${YELLOW}" "${RESET}"
+

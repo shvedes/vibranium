@@ -1,3 +1,1 @@
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ACTION=="change", RUN+="/usr/local/bin/vibranium-ac-notify"
-
-# vim:ft=udev
+SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ACTION=="change", RUN+="/usr/local/bin/vb-ac-notify"
