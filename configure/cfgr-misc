@@ -193,24 +193,9 @@ _update_reading_mode() {
     fi
 }
 
-_get_cursor_theme() {
-    local current
-    current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
-
-    while IFS='|' read -r key value; do
-        if [[ "$key" == "$current" ]]; then
-            printf "%s" "$value"
-            return
-        fi
-    done <<< "$(vb-theme-cursor-list)"
-
-    # Fallback: if the list above is empty (e.g. not found)
-    printf "defalut"
-}
-
-_set_cursor_theme() {
-    local line folder pretty chosen
-    local -a options=()
+_pick_cursor_theme() {
+    local options=()
+    local chosen
 
     declare -A CURSOR_FOLDER_TO_NAME=()
     declare -A CURSOR_NAME_TO_FOLDER=()
@@ -229,15 +214,36 @@ _set_cursor_theme() {
 
     [[ ${#options[@]} -eq 0 ]] && return
 
-    chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Misc" "ESC to go back")"
-    [[ -z "$chosen" ]] && return
+    while true; do
+        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Misc" "ESC to go back")"
+        [[ -z "$chosen" ]] && break
 
-    local selected_folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
+        if [[ ! " ${options[*]} " == *" $chosen "* ]]; then
+            break
+        fi
 
-    [[ -z "$selected_folder" ]] && return
+        folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
+        echo "$folder" > "$VIBRANIUM_STATE/cursor-theme"
 
-    hyprctl -q setcursor "$selected_folder" 24
-    gsettings set org.gnome.desktop.interface cursor-theme "$selected_folder"
+        vb-theme-cursor-set
+        break
+    done
+
+}
+
+_get_cursor_theme() {
+    local current
+    current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
+
+    while IFS='|' read -r key value; do
+        if [[ "$key" == "$current" ]]; then
+            printf "%s" "$value"
+            return
+        fi
+    done <<< "$(vb-theme-cursor-list)"
+
+    # Fallback: if the list above is empty (e.g. not found)
+    printf "defalut"
 }
 
 INDEX=0
@@ -275,7 +281,7 @@ while true; do
 
     case "$CHOSEN" in
         "Cursor theme"*)
-            _set_cursor_theme
+            _pick_cursor_theme
             ;;
         *"Now Playing"*)
             cfgr-now-playing

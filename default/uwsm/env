@@ -28,9 +28,12 @@ export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
 export VIBRANIUM_CACHE="$XDG_CACHE_HOME/vibranium"
 export VIBRANIUM="$XDG_DATA_HOME/vibranium"
 
-path_add $HOME/.local/bin
-path_add $VIBRANIUM_PATH
+path_add "$HOME/.local/bin"
+path_add "$VIBRANIUM_PATH"
 
+# Theming
+# https://wiki.archlinux.org/title/Cursor_themes#Environment_variable
+export XCURSOR_PATH="$XDG_DATA_HOME/icons:/usr/share/icons"
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
 # Use Wayland when possible. Fallback to XWayland otherwise

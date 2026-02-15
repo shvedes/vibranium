@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+STATE="$VIBRANIUM_STATE/cursor-theme"
+
+if [[ ! -z "$1" ]]; then
+    SELECTED_FOLDER="$1"
+else
+    if [[ -f "$STATE" ]]; then
+        SELECTED_FOLDER="$(< "$STATE")"
+    else
+        SELECTED_FOLDER="Adwaita"
+    fi
+fi
+
+GTK_SETTINGS=(
+    "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+    "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
+    "$HOME/.gtkrc-2.0"
+)
+
+if [[ ! -d "$XDG_DATA_HOME/icons/default" ]]; then
+    mkdir -p "$XDG_DATA_HOME/icons/default"
+fi
+
+sed -i "/Inherits/s/=.*/=${SELECTED_FOLDER}/" "$XDG_DATA_HOME/icons/default/index.theme"
+sed -i "/gtk-cursor-theme-name/s/=.*/=${SELECTED_FOLDER}/" "${GTK_SETTINGS[@]}"
+
+printf "%S" "$SELECTED_FOLDER" > "$VIBRANIUM_STATE/cursor-theme"
+
+hyprctl -q setcursor "$SELECTED_FOLDER" 24
+gsettings set org.gnome.desktop.interface cursor-size 24
+gsettings set org.gnome.desktop.interface cursor-theme "$SELECTED_FOLDER"
+
+notify-send -r 3 -t 7000 "Vibranium" "Some X11 apps (e.g. Steam) need a full restart to apply the new cursor theme"
