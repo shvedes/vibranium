@@ -96,7 +96,7 @@ _ask_yes_no() {
         # Show cursor
         printf '\e[?25h'
 
-        prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
+        prompt=$'\e[0;34m[VIBRANIUM]\e[0m '"${message} ${hint}: "
 
         printf "%s" "$prompt"
         read -r input
