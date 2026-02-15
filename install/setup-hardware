@@ -59,7 +59,7 @@ case "$(lspci | grep VGA)" in
             "lib32-vulkan-intel"
         )
         ;;
-    *Red Hat*|*Virtio*)
+    "*Red Hat*"|*Virtio*)
         :
         ;;
     *)
