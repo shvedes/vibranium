@@ -314,8 +314,8 @@ VIBRANIUM_BAR_WEATHER_MODULE_ENABLE=false
 #
 # Examples: 'Madrid' 'Lisbon' 'Paris' 'Moscow' 'Chicago'
 #
-# Default is empty string, which means auto detect
-VIBRANIUM_BAR_WEATHER_MODULE_CITY=""
+# Default is 'Dublin'
+VIBRANIUM_BAR_WEATHER_MODULE_CITY="Dublin"
 
 # Whether to display loading animation for custom modules at startup (e.g. pacman / weather).
 # Available option: bool
