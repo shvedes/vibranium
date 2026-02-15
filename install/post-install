@@ -6,16 +6,21 @@ declare -A LINKS=(
     ["$HOME/.local/share/vibranium/default/uwsm/env"]="$HOME/.config/uwsm/env"
 )
 
+LINKS_PERMS=(
+    "$HOME/.config/hypr/hyprland.conf"
+)
+
 for src in "${!links[@]}"; do
 	ln -sf "$src" "${links[$src]}" >/dev/null
+done
+
+for f in "${LINKS_PERMS[@]}"; do
+    chmod ug-w "$f"
 done
 
 yay -Rnsc yay-debug --noconfirm &> /dev/null || true
 yay -Scc --noconfirm &> /dev/null
 yay -Ycc --noconfirm &> /dev/null
-
-# First run marker
-touch "$HOME/.local/state/vibranium/first-run"
 
 # Initial state for the hyprsunset
 printf "suspended" > "$HOME/.local/state/vibranium/night-light"
@@ -42,3 +47,7 @@ cat > "$HOME/.config/vibranium/settings" <<'EOF'
 # shellcheck disable=all
 # Auto-generated file. Do not edit!
 EOF
+
+# First run marker
+: > "$HOME/.local/state/vibranium/first-run"
+

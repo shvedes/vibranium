@@ -1,4 +1,4 @@
-# vim:ft=bash
+
 # Place your environment variables here.
 # The text below is just an example. Feel free to delete or change it
 # All changes are applied only after re-login!
@@ -17,7 +17,7 @@ export MANPAGER="$EDITOR +Man!"
 # export GOPATH="$XDG_DATA_HOME/go"
 # export CARGO_HOME="$XDG_DATA_HOME/cargo"
 
-# And then you can add the application to the $PATH in this way
+# And then you can add the these folders to the $PATH in this way
 #
 # path_add $GOPATH/bin
 #
@@ -32,3 +32,5 @@ export MANPAGER="$EDITOR +Man!"
 
 # If you are a pass user (https://www.passwordstore.org/), you can specify a specific folder that pass will use to look for passwords. For example:
 # export PASSWORD_STORE_DIR="$XDG_DATA_HOME/password-store"
+
+# vim:ft=bash

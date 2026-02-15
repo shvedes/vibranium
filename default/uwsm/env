@@ -6,6 +6,20 @@
 
 # shellcheck source=/dev/null
 
+# We have two environment files:
+# 1) a mandatory (this one) that is always sourced
+# 2) an optional user env file that may also modify PATH
+#
+# Because both files can add the same directories,
+# PATH updates must be idempotent.
+#
+# A naive `PATH="$DIR:$PATH"` would prepend the directory twice
+# when both env files are loaded.
+#
+# `path_add` checks whether the directory is already present
+# and only prepends it if it is missing, preventing duplication
+# and keeping PATH stable regardless of load order.
+
 path_add() {
   case ":$PATH:" in
     *":$1:"*) ;;
@@ -37,27 +51,30 @@ export XCURSOR_PATH="$XDG_DATA_HOME/icons:/usr/share/icons"
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
 # Use Wayland when possible. Fallback to XWayland otherwise
-export ELECTRON_OZONE_PLATFORM_HINT="auto"
-export QT_QPA_PLATFORM="wayland;xcb"
-# Keep in mind!
-# https://github.com/basecamp/omarchy/issues/2564#issuecomment-3450877034
-export SDL_VIDEODRIVER="wayland"
 export GDK_BACKEND="wayland,x11"
 export CLUTTER_BACKEND="wayland"
+export QT_QPA_PLATFORM="wayland;xcb"
+export ELECTRON_OZONE_PLATFORM_HINT="auto"
+
+# Keep in mind
+# https://github.com/basecamp/omarchy/issues/2564#issuecomment-3450877034
+export SDL_VIDEODRIVER="wayland"
 
 export CHASSIS_TYPE="$(hostnamectl chassis)"
 
-if [[ -f "$HOME/.config/user-dirs.dirs" ]]; then
+# Load standard user directories from ~/.config/user-dirs.dirs
+# This can be useful when these directories are exported globally
+# or needed in shells outside a desktop session (e.g., scripts).
+
+if [[ -f "$XDG_CONFIG_HOME/user-dirs.dirs" ]]; then
 	while IFS='=' read -r var val; do
 		[[ -z "$var" || "$var" == \#* ]] && continue
 
 		val="${val//\"/}"
-		[[ "$val" == ~* ]] && {
-			val="$HOME${val:1}"
-		}
+		[[ "$val" == ~* ]] && val="$HOME${val:1}"
 
 		export "$var"="$val"
-	done < "$HOME/.config/user-dirs.dirs"
+	done < "$XDG_CONFIG_HOME/user-dirs.dirs"
 fi
 
 # Export user-defined environment
