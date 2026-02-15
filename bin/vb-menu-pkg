@@ -3,11 +3,9 @@
 source vb-core-lib
 
 ACTIONS=(
+    "Install"
+    "Uninstall"
     "System update"
-    "Install a font"
-    "Uninstall a font"
-    "Install a package"
-    "Uninstall a package"
 )
 
 while true; do
@@ -15,28 +13,52 @@ while true; do
     [[ -z $CHOSEN ]] && break
 
     case "$CHOSEN" in
-        "Uninstall a font")
-            vb-core-term vb-pkg-font-remove
-            vb-cmd-kill-rofi
-            exit 0
+        "Install")
+            while true; do
+                install_chosen="$(printf "Package\nFont" | helpers::ui::menu "Install" "ESC to go back")"
+                [[ -z "$install_chosen" ]] && break
+
+                case "$install_chosen" in
+                    "Package")
+                        vb-core-term vb-pkg-install
+                        vb-cmd-kill-rofi
+                        exit 0
+                        ;;
+                    "Font")
+                        vb-core-term vb-pkg-font-install
+                        vb-cmd-kill-rofi
+                        exit 0
+                        ;;
+                    *)
+                        continue
+                        ;;
+                esac
+            done
             ;;
-        "Install a font")
-            vb-core-term vb-pkg-font-install
-            vb-cmd-kill-rofi
-            exit 0
+        "Uninstall")
+            while true; do
+                uninstall_chosen="$(printf "Package\nFont" | helpers::ui::menu "Uninstall" "ESC to go back")"
+                [[ -z "$uninstall_chosen" ]] && break
+
+                case "$uninstall_chosen" in
+                    "Package")
+                        vb-core-term vb-pkg-uninstall
+                        vb-cmd-kill-rofi
+                        exit 0
+                        ;;
+                    "Font")
+                        vb-core-term vb-pkg-font-remove
+                        vb-cmd-kill-rofi
+                        exit 0
+                        ;;
+                    *)
+                        continue
+                        ;;
+                esac
+            done
             ;;
         "System update")
             vb-core-term vb-pkg-sysupdate
-            vb-cmd-kill-rofi
-            exit 0
-            ;;
-        "Install a package")
-            vb-core-term vb-pkg-install
-            vb-cmd-kill-rofi
-            exit 0
-            ;;
-        "Uninstall a package")
-            vb-core-term vb-pkg-uninstall
             vb-cmd-kill-rofi
             exit 0
             ;;
