@@ -6,6 +6,13 @@
 
 # shellcheck source=/dev/null
 
+path_add() {
+  case ":$PATH:" in
+    *":$1:"*) ;;
+    *) PATH="$1:$PATH" ;;
+  esac
+}
+
 # https://specifications.freedesktop.org/basedir-spec/latest
 export XDG_DATA_DIRS="/usr/local/share:/usr/share"
 export XDG_STATE_HOME="$HOME/.local/state"
@@ -20,7 +27,9 @@ export VIBRANIUM_PATH="$XDG_DATA_HOME/vibranium/bin"
 export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
 export VIBRANIUM_CACHE="$XDG_CACHE_HOME/vibranium"
 export VIBRANIUM="$XDG_DATA_HOME/vibranium"
-export PATH="$HOME/.local/bin:$VIBRANIUM_PATH:$PATH"
+
+path_add $HOME/.local/bin
+path_add $VIBRANIUM_PATH
 
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
@@ -50,5 +59,7 @@ fi
 
 # Export user-defined environment
 source "$XDG_CONFIG_HOME/vibranium/environment"
+
+export PATH
 
 # vim:ft=bash

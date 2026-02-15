@@ -17,8 +17,14 @@ export MANPAGER="$EDITOR +Man!"
 # export GOPATH="$XDG_DATA_HOME/go"
 # export CARGO_HOME="$XDG_DATA_HOME/cargo"
 
-# And then you can add the application to $PATH in this way
-# export PATH="$VIBRANIUM_PATH:$GOPATH/bin:$PATH"
+# And then you can add the application to the $PATH in this way
+#
+# path_add $GOPATH/bin
+#
+# This exact form is required.
+# path_add is a special command available only in environment files.
+# It appends entries to $PATH without duplicating existing ones,
+# which is necessary given how the environment is built.
 
 # If you actively use mangohud, you can specify its entire configuration in a single variable,
 # instead of a special file in the root folder of each game:
