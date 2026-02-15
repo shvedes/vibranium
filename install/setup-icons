@@ -30,3 +30,5 @@ curl -fsSL "$PAPIRUS_FOLDERS_URL" -o "$BIN_DIR/papirus-folders"
 chmod +x "$BIN_DIR/papirus-folders"
 
 cp -r "$VIBRANIUM_DIR/extras/icon_theme/Vibranium" "$ICONS_DIR"
+
+ln -sf "$HOME/.local/share/icons" "$HOME/.icons"
