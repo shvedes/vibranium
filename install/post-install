@@ -100,3 +100,11 @@ cp /usr/share/applications/nvim.desktop "$HOME"/.local/share/applications
 sed -e '/Terminal/s/true/false/' \
     -e '/^Exec/s/=/=vb-cmd-terminal /' \
     -i "$HOME"/.local/share/applications/nvim.desktop
+
+
+# The settings file
+cat > "$HOME/.config/vibranium/settings" <<'EOF'
+# vim:ft=bash
+# shellcheck disable=all
+# Auto-generated file. Do not edit!
+EOF

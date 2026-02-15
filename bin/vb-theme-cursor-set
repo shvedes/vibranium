@@ -37,7 +37,7 @@ GTK_SETTINGS=(
     "$HOME/.gtkrc-2.0"
 )
 
-if [[ ! -d "$XDG_DATA_HOME/icons/default" ]]; then
+if [[ ! -f "$XDG_DATA_HOME/icons/default/index.theme" ]]; then
     mkdir -p "$XDG_DATA_HOME/icons/default"
     printf "[Icon Theme]\nInherits=" \
         > "$XDG_DATA_HOME/icons/default/index.theme"

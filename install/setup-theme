@@ -34,6 +34,25 @@ gtk-cursor-theme-size=22
 gtk-application-prefer-dark-theme=0
 EOF
 
+cat <<EOF > "$HOME./gtkrc-2.0"
+include "/home/$USER/.gtkrc-2.0.mine"
+gtk-theme-name="Nightfox"
+gtk-icon-theme-name="Papirus-Dark"
+gtk-font-name="Cascadia Code NF 10"
+gtk-cursor-theme-name=macOS
+gtk-cursor-theme-size=22
+gtk-toolbar-style=GTK_TOOLBAR_ICONS
+gtk-toolbar-icon-size=GTK_ICON_SIZE_LARGE_TOOLBAR
+gtk-button-images=0
+gtk-menu-images=0
+gtk-enable-event-sounds=1
+gtk-enable-input-feedback-sounds=0
+gtk-xft-antialias=1
+gtk-xft-hinting=1
+gtk-xft-hintstyle="hintslight"
+gtk-xft-rgba="rgb"
+EOF
+
 # Symlinks
 ln -sf "$THEME_PATH" "$HOME/.config/vibranium/theme/current" >/dev/null
 
@@ -86,13 +105,6 @@ mkdir -p "$HOME/.config/gtk-4.0"
 for f in assets gtk-dark.css gtk.css; do
 	ln -sf "$HOME/.themes/Nightfox/gtk-4.0/$f" "$HOME/.config/gtk-4.0/"
 done
-
-# The settings file
-cat > "$HOME/.config/vibranium/settings" <<'EOF'
-# vim:ft=bash
-# shellcheck disable=all
-# Auto-generated file. Do not edit!
-EOF
 
 # QTCT
 sed -i "s/user/$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
