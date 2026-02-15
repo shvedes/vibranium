@@ -47,6 +47,8 @@ if [[ $(hostnamectl chassis) == vm ]]; then
         _log_error "Installation aborted"
         exit 1
     fi
+
+    printf "\n"
 fi
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"

@@ -4,6 +4,7 @@ YELLOW=$'\e[0;33m'
 RESET=$'\e[0m'
 GRAY=$'\e[90m'
 
+# Array of repositories
 REPOS=(
   "Osaka-GTK-Theme"
   "Gruvbox-GTK-Theme"
@@ -18,7 +19,7 @@ REPOS=(
 )
 
 # Destination directory
-DEST_DIR="$HOME/.local/share/themes"
+DEST_DIR="$HOME/.themes"
 mkdir -p "$DEST_DIR"
 
 # Associative array for accents ("" for no -t flag and no accent in name)
@@ -46,12 +47,12 @@ colors["Kanagawa-GKT-Theme"]="dark"
 # Function to install a theme repo
 install_theme() {
   local repo="$1"
-  local clone_dir="$HOME/.cache/$repo"
+  local clone_dir="./$repo"
   local base_name=""
   local variants=()
 
   # Clone the repo
-  git clone -q "https://github.com/Fausto-Korpsvart/$repo" "$clone_dir" || { echo "Failed to clone $repo"; return 1; }
+  git clone -q "https://github.com/Fausto-Korpsvart/$repo" || { echo "Failed to clone $repo"; return 1; }
   cd "$clone_dir/themes" || { echo "Failed to cd into $clone_dir/themes"; cd ..; rm -rf "$clone_dir"; return 1; }
   git switch -q --detach HEAD~3
 
@@ -209,7 +210,6 @@ install_theme() {
       fi
       generated_base+="-$color_upper-Compact$generated_variant_suffix"
 
-	  # printf "\r\033%s[VIBRANIUM]%s Installing %s${desired_name%%-*} GTK theme%s" "${YELLOW}" "${RESET}" "${GRAY}" "${RESET}"
 
 	  install_opts="-s compact -c $color $tweaks -t $accent_param"
 	  eval "./install.sh $install_opts" &>/dev/null  || { echo "Install failed for $repo $variant $color"; continue; }
@@ -252,3 +252,4 @@ done
 
 ln -sf "$HOME/.local/share/themes" "$HOME/.themes"
 printf "\n"
+
