@@ -44,12 +44,12 @@ cat <<EOF > "$XDG_CONFIG_HOME/hypr/hypridle.conf"
 source = ~/.local/share/vibranium/default/hypr/hypridle.conf
 
 listener {
-timeout = $lock_after
+timeout = $LOCK_AFTER
 on-timeout = loginctl lock-session
 }
 
 listener {
-	timeout = $sleep_after
+	timeout = $SLEEP_AFTER
 	on-timeout = systemctl suspend
 }
 EOF
