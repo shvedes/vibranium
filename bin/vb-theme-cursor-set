@@ -31,4 +31,6 @@ hyprctl -q setcursor "$SELECTED_FOLDER" 24
 gsettings set org.gnome.desktop.interface cursor-size 24
 gsettings set org.gnome.desktop.interface cursor-theme "$SELECTED_FOLDER"
 
-notify-send -r 3 -t 7000 "Vibranium" "Some X11 apps (e.g. Steam) need a full restart to apply the new cursor theme"
+if [[ ! "$1" == "--quiet" ]]; then
+    notify-send -r 3 -t 7000 "Vibranium" "Some X11 apps (e.g. Steam) need a full restart to apply the new cursor theme"
+fi
