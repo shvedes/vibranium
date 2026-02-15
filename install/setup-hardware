@@ -3,7 +3,7 @@
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
 NVIDIA_SETUP_NEEDED=false
-ROOT_FS="$(lsblk -f | grep -E \/\$ | awk '{print $2}')"
+ROOT_FS="$(findmnt -n -o FSTYPE /)"
 PACKAGES=()
 
 source "$SCRIPT_DIR/lib/helpers.sh"
