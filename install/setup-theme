@@ -34,7 +34,7 @@ gtk-cursor-theme-size=22
 gtk-application-prefer-dark-theme=0
 EOF
 
-cat <<EOF > "$HOME./gtkrc-2.0"
+cat <<EOF > "$HOME/.gtkrc-2.0"
 include "/home/$USER/.gtkrc-2.0.mine"
 gtk-theme-name="Nightfox"
 gtk-icon-theme-name="Papirus-Dark"
