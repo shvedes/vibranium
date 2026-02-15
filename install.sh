@@ -39,4 +39,4 @@ echo "Starting installation..."
 echo
 
 # Run the installer
-bash "$INSTALL_DIR/install/install"
+exec bash "$INSTALL_DIR/install/install"

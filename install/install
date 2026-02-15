@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+exec </dev/tty
+
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 EXPECTED_PATH="$HOME/.local/share/vibranium/install"
