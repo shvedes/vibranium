@@ -71,11 +71,12 @@ if [[ $# -eq 1 ]]; then
 else
     # No file provided; try to use zenity for selection.
     if ! command -v zenity >/dev/null; then
+        [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Editor" --deps zenity
         echo "[ERROR] No image file provided and zenity not available for selection." >&2
         exit 1
     fi
 
-    image="$(zenity --title="Select File" --file-selection --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2> /dev/null 2> /dev/null)"
+    image="$(zenity --title="Select File" --file-selection --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2> /dev/null)"
 
     if [[ -z "$image" ]]; then
         exit 0  # User canceled selection; exit quietly.

@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+if [[ -z "$1" ]]; then
+    if ! command -v zenity > /dev/null; then
+        [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Viewer" --deps zenity
+        echo "error: zenity not found" >&2
+        exit 1
+    fi
+
+    file="$(zenity --title="Select File" --file-selection --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2> /dev/null)"
+else
+    file="$1"
+fi
+
+exec setsid -f imv-dir "$file"

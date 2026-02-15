@@ -2,7 +2,7 @@
 Type=Application
 Name=Image Viewer
 TryExec=imv
-Exec=imv-dir %F
+Exec=vb-app-imv %F
 Icon=multimedia-photo-viewer
 MimeType=image/jpeg;image/png;image/svg+xml;
 Keywords=image;png;jpeg;jpg;avif;media;imv;
