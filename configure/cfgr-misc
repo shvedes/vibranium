@@ -219,7 +219,7 @@ _pick_cursor_theme() {
         [[ -z "$chosen" ]] && break
 
         if [[ ! " ${options[*]} " == *" $chosen "* ]]; then
-            break
+            continue
         fi
 
         folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
@@ -246,6 +246,91 @@ _get_cursor_theme() {
     printf "defalut"
 }
 
+_get_default_browser() {
+    local browser
+
+    if [[ ! -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
+        printf "(mimeapps.list not found)"
+        return
+    fi
+
+    if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
+        while IFS='=' read -r key value; do
+            if [[ "$key" != "x-scheme-handler/http" ]]; then
+                continue
+            fi
+
+            browser="${value%%;*}"
+            break
+        done < "$XDG_CONFIG_HOME/mimeapps.list"
+    fi
+
+    if [[ -z "$browser" ]]; then
+        browser=$(xdg-mime query default x-scheme-handler/http 2>/dev/null)
+    fi
+
+    if [[ -z "$browser" ]]; then
+        printf "No browsers installed"
+        return
+    fi
+
+    case "$browser" in
+        opera.desktop) printf "Opera" ;;
+        chromium.desktop) printf "Chromium" ;;
+        vivaldi.desktop) printf "Vivaldi" ;;
+        google-chrome.desktop) printf "Google Chrome" ;;
+        microsoft-edge.desktop) printf "Microsoft Edge" ;;
+        brave-browser.desktop) printf "Brave" ;;
+        org.qutebrowser.qutebrowser.desktop) printf "Qutebrowser" ;;
+    esac
+}
+
+_pick_browser() {
+    declare -A browsers_map=()
+
+    [[ $(command -v firefox) ]] && browsers_map["Firefox"]="firefox.desktop"
+    [[ $(command -v chromium) ]] && browsers_map["Chromium"]="chromium.desktop"
+    [[ $(command -v google-chrome-stable) ]] && browsers_map["Google Chrome"]="google-chrome.desktop"
+    [[ $(command -v brave-browser) ]] && browsers_map["Brave"]="brave-browser.desktop"
+    [[ $(command -v vivaldi) ]] && browsers_map["Vivaldi"]="vivaldi.desktop"
+    [[ $(command -v opera) ]] && browsers_map["Opera"]="opera.desktop"
+    [[ $(command -v microsoft-edge) ]] && browsers_map["Microsoft Edge"]="microsoft-edge.desktop"
+    [[ $(command -v qutebrowser) ]] && browsers_map["QuteBrowser"]="org.qutebrowser.qutebrowser.desktop"
+
+
+    local options=("${!browsers_map[@]}")
+
+    if (( "${#options[@]}" <= 1 )); then
+        notify-send -r 2 "Vibranium" "Only ${options[0]} detected. Nothing to choose from!"
+        return
+    fi
+
+    mapfile -t options < <(helpers::configure::build_menu "${options[@]}")
+
+    local chosen
+    local valid=false
+
+    while true; do
+        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Default browser" "ESC to go back")"
+        [[ -z "$chosen" ]] && return
+
+        for opt in "${options[@]}"; do
+            if [[ "$chosen" == "$opt" ]]; then
+                valid=true
+                break
+            fi
+        done
+
+        if [[ $valid == false ]]; then
+            continue
+        fi
+
+        break
+    done
+
+    xdg-mime default "${browsers_map[$chosen]}" x-scheme-handler/https x-scheme-handler/http
+}
+
 INDEX=0
 
 # Cache defaults (for further validation)
@@ -260,6 +345,7 @@ while true; do
         "Menus theme : $(_get_rofi_theme)"
         "Cursor theme : $(_get_cursor_theme)"
         "Show wallpaper : $VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
+        "Default browser : $(_get_default_browser)"
         "Terminal opacity : $(_get_term_opacity)"
         "Notification timeout : $(_get_notification_timeout)s"
         "<b>Manage user wallpapers</b>"
@@ -280,6 +366,9 @@ while true; do
     done
 
     case "$CHOSEN" in
+        "Default browser"*)
+            _pick_browser
+            ;;
         "Cursor theme"*)
             _pick_cursor_theme
             ;;
