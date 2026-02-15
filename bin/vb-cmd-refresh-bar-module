@@ -38,6 +38,11 @@ module_name="$1"
 module_signal="${signals[$module_name]}"
 waybar_pid=$(systemctl --user show waybar -p MainPID --value)
 
+if (( $waybar_pid == 0 )); then
+    # waybar inactive
+    exit 0
+fi
+
 if [ -n "$module_signal" ]; then
     kill -RTMIN+"$module_signal" "$waybar_pid"
     kill -RTMIN+"${signals[dynamic-separator]}" "$waybar_pid"
