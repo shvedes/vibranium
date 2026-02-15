@@ -87,7 +87,7 @@ _install_packages() {
     done
 
     # Show cursor
-    printf '\e[?25h\n'
+    # printf '\e[?25h\n'
 }
 
 _ask_yes_no() {

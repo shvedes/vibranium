@@ -251,5 +251,3 @@ for repo in "${REPOS[@]}"; do
 done
 
 ln -sf "$HOME/.local/share/themes" "$HOME/.themes"
-printf "\n"
-
