@@ -19,12 +19,12 @@
 # `path_add` checks whether the directory is already present
 # and only prepends it if it is missing, preventing duplication
 # and keeping PATH stable regardless of load order.
+# https://wiki.archlinux.org/title/Environment_variables#Using_shell_initialization_files
 
 path_add() {
-  case ":$PATH:" in
-    *":$1:"*) ;;
-    *) PATH="$1:$PATH" ;;
-  esac
+  for d in "$@"; do
+    [[ -d "$d" && ! "$PATH" =~ (^|:)$d(:|$) ]] && PATH="$PATH:$d"
+  done
 }
 
 # https://specifications.freedesktop.org/basedir-spec/latest
