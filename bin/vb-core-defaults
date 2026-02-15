@@ -224,8 +224,8 @@ VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION=true
 # after taking a screenshot.
 # Available options: bool
 #
-# Defalut is true
-VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE=true
+# Defalut is false
+VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE=false
 
 #             BRIGHTNESS OPTIONS               #
 # ============================================ #
