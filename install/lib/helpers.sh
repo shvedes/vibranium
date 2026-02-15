@@ -51,7 +51,7 @@ _install_yay() {
     _log_info "Building and installing yay (this may take a moment)"
     _log_info "You may be asked for sudo multiple times"
 
-    if ! makepkg -sirc --noconfirm &> /dev/null
+    if ! makepkg -sirc --noconfirm &> /dev/null; then
         _log_error "Failed to install yay"
         _log_error "Aborting installation"
         cd $HOME; rm -rf $tmp_dir
