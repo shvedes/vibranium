@@ -67,14 +67,14 @@ export CHASSIS_TYPE="$(hostnamectl chassis)"
 # or needed in shells outside a desktop session (e.g., scripts).
 
 if [[ -f "$XDG_CONFIG_HOME/user-dirs.dirs" ]]; then
-	while IFS='=' read -r var val; do
-		[[ -z "$var" || "$var" == \#* ]] && continue
+    while IFS='=' read -r var val; do
+        [[ -z "$var" || "$var" == \#* ]] && continue
 
-		val="${val//\"/}"
-		[[ "$val" == ~* ]] && val="$HOME${val:1}"
+        val="${val//\"/}"
+        val="${val//\$HOME/$HOME}"
 
-		export "$var"="$val"
-	done < "$XDG_CONFIG_HOME/user-dirs.dirs"
+        export "$var"="$val"
+    done < "$XDG_CONFIG_HOME/user-dirs.dirs"
 fi
 
 # Export user-defined environment
