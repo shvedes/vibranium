@@ -65,6 +65,7 @@ dunst
 bluez
 wtype
 uwsm
+ncdu
 rofi
 wget
 gvfs
