@@ -39,13 +39,12 @@ GTK_SETTINGS=(
 
 if [[ ! -d "$XDG_DATA_HOME/icons/default" ]]; then
     mkdir -p "$XDG_DATA_HOME/icons/default"
+    printf "[Icon Theme]\nInherits=" \
+        > "$XDG_DATA_HOME/icons/default/index.theme"
 fi
 
-sed -i "/Inherits/s/=.*/=${SELECTED_FOLDER}/" \
-    "$XDG_DATA_HOME/icons/default/index.theme"
-
-sed -i "/gtk-cursor-theme-name/s/=.*/=${SELECTED_FOLDER}/" \
-    "${GTK_SETTINGS[@]}"
+sed -i "/Inherits/s/=.*/=${SELECTED_FOLDER}/" "$XDG_DATA_HOME/icons/default/index.theme"
+sed -i "/gtk-cursor-theme-name/s/=.*/=${SELECTED_FOLDER}/" "${GTK_SETTINGS[@]}"
 
 printf "%s" "$SELECTED_FOLDER" > "$STATE"
 
@@ -53,13 +52,7 @@ hyprctl -q setcursor "$SELECTED_FOLDER" 24
 gsettings set org.gnome.desktop.interface cursor-size 24
 gsettings set org.gnome.desktop.interface cursor-theme "$SELECTED_FOLDER"
 
-<<<<<<< HEAD
 if [[ ! "$1" == "--quiet" ]]; then
     notify-send -r 3 -t 7000 "Vibranium" "Some X11 apps (e.g. Steam) need a full restart to apply the new cursor theme"
 fi
-=======
-if [[ $QUIET -eq 0 ]]; then
-    notify-send -r 3 -t 7000 "Vibranium" "Some X11 apps (e.g. Steam) need a full restart to apply the new cursor theme"
-fi
 
->>>>>>> 96d7580 (fix: don't show notification on session start)
