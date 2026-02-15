@@ -59,6 +59,9 @@ case "$(lspci | grep VGA)" in
             "lib32-vulkan-intel"
         )
         ;;
+    *Red Hat*|*Virtio*)
+        :
+        ;;
     *)
         _log_error "No supported GPU detected. Please install GPU drivers manually"
         _log_error "This will not affect the installation process"
