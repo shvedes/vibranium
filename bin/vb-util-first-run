@@ -28,6 +28,8 @@ _get_power_profile() {
     fi
 }
 
+rm -f "$VIBRANIUM_STATE/first-run"
+
 echo "Finishing installation..." > "$VIBRANIUM_RUNTIME/worker.active"
 vb-cmd-refresh-bar-module worker
 
@@ -72,10 +74,8 @@ if [[ "$POWER_PROFILE" == "performance" ]]; then
         msg="You're running off AC. Performance power profile was set explicitly"
     fi
 
-    notify-send -r 3 "Vibranium" "$msg"
+    notify-send -r 3 -t 5000 "Vibranium" "$msg"
 fi
-
-rm -f "$VIBRANIUM_STATE/first-boot"
 
 echo "Running post-install hooks..." > "$VIBRANIUM_RUNTIME/worker.active"
 vb-cmd-refresh-bar-module worker
@@ -86,4 +86,3 @@ done
 
 rm -f "$VIBRANIUM_RUNTIME/worker.active"
 vb-cmd-refresh-bar-module worker
-

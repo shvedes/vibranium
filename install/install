@@ -144,7 +144,7 @@ _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing default theme"
 bash "$SCRIPT_DIR/setup-theme"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Finishing up"
+_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Running post-install scripts"
 bash "$SCRIPT_DIR/post-install"
 
 _log_success "Installation complete. System restart required"
