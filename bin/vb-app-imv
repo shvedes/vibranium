@@ -8,6 +8,11 @@ if [[ -z "$1" ]]; then
     fi
 
     file="$(zenity --title="Select File" --file-selection --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2> /dev/null)"
+
+    # no files were chosen
+    if [[ ! -f "$file" ]]; then
+        exit 1
+    fi
 else
     file="$1"
 fi
