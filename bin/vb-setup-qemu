@@ -90,6 +90,12 @@ _enable_systemd_units
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up virtual network..."
 _set_virsh_network
 
+if command -v ufw > /dev/null; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring firewall..."
+    echo -e "\n\n# Vibranium settings below" | sudo tee -a /etc/libvirt/network.conf > /dev/null
+    echo -e "firewall_backend = \"iptables\"" | sudo tee -a /etc/libvirt/network.conf > /dev/null
+fi
+
 echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU setup complete!"
 echo -e "${GREEN}[VIBRANIUM]${RESET} You may need to re-login or restart your PC to fully take effect."
 
