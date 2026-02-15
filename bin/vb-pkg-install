@@ -28,12 +28,11 @@ _ask_for_sudo() {
 
 # Detects systemd units (services and sockets) provided by a list of packages.
 # Populates global arrays:
-#   - provides_systemd_service: Packages that provide a systemd unit (indexes match with unit_types and unit_scope).
-#   - unit_types: Type of unit for each entry ("service" or "socket").
-#   - unit_scope: Scope of unit for each entry ("user" or "system").
-#   - user_units: List of user unit basenames (for enabling with --user).
-#   - services: List of system unit basenames (for enabling as root).
-# This function prioritizes sockets over services and user scope over system scope for each package.
+# - provides_systemd_service: Packages that provide a systemd unit (indexes match with unit_types, unit_scope, and unit_names).
+# - unit_types: Type of unit for each entry ("service" or "socket").
+# - unit_scope: Scope of unit for each entry ("user" or "system").
+# - unit_names: List of unit basenames.
+# This function collects all units without skipping services, maintaining addition order for priority.
 # It uses 'pacman -Ql' to list files and filters for .service or .socket files in systemd directories.
 _handle_systemd() {
     local pkg units unit
@@ -42,8 +41,7 @@ _handle_systemd() {
     provides_systemd_service=()
     unit_types=()
     unit_scope=()
-    user_units=()
-    services=()
+    unit_names=()
 
     for pkg in "${FILTERED[@]}"; do
         units=$(pacman -Ql "$pkg" 2>/dev/null | awk '/\/systemd\/.*\.(service|socket)$/ && $2 !~ /@/ {print $2}')
@@ -54,26 +52,16 @@ _handle_systemd() {
         pkg_sys_sockets=()
         pkg_sys_services=()
 
-        declare -A pkg_socket_basenames=()
-
         while IFS= read -r unit; do
             case "$unit" in
                 */systemd/user/*.socket)
                     pkg_user_sockets+=("$unit")
-                    local name
-                    name="${unit##*/}"      # remove path
-                    name="${name%.socket}"  # remove suffix
-                    pkg_socket_basenames["$name"]=1
                     ;;
                 */systemd/user/*.service)
                     pkg_user_services+=("$unit")
                     ;;
                 */systemd/system/*.socket|/lib/systemd/system/*.socket)
                     pkg_sys_sockets+=("$unit")
-                    local name
-                    name="${unit##*/}"
-                    name="${name%.socket}"
-                    pkg_socket_basenames["$name"]=1
                     ;;
                 */systemd/system/*.service|/lib/systemd/system/*.service)
                     pkg_sys_services+=("$unit")
@@ -86,23 +74,16 @@ _handle_systemd() {
                 provides_systemd_service+=("$pkg")
                 unit_types+=("socket")
                 unit_scope+=("user")
-                user_units+=("${unit##*/}")
+                unit_names+=("${unit##*/}")
             done
         fi
 
         if (( ${#pkg_user_services[@]} )); then
             for unit in "${pkg_user_services[@]}"; do
-                local base name
-                name="${unit##*/}"
-                base="${name%.service}"
-                if [[ -n "${pkg_socket_basenames[$base]:-}" ]]; then
-                    continue
-                fi
-
                 provides_systemd_service+=("$pkg")
                 unit_types+=("service")
                 unit_scope+=("user")
-                user_units+=("${unit##*/}")
+                unit_names+=("${unit##*/}")
             done
         fi
 
@@ -111,48 +92,53 @@ _handle_systemd() {
                 provides_systemd_service+=("$pkg")
                 unit_types+=("socket")
                 unit_scope+=("system")
-                services+=("${unit##*/}")
+                unit_names+=("${unit##*/}")
             done
         fi
 
         if (( ${#pkg_sys_services[@]} )); then
             for unit in "${pkg_sys_services[@]}"; do
-                local base name
-                name="${unit##*/}"
-                base="${name%.service}"
-                if [[ -n "${pkg_socket_basenames[$base]:-}" ]]; then
-                    continue
-                fi
-
                 provides_systemd_service+=("$pkg")
                 unit_types+=("service")
                 unit_scope+=("system")
-                services+=("${unit##*/}")
+                unit_names+=("${unit##*/}")
             done
         fi
     done
 }
 
 # Enables detected systemd units (services or sockets) for each package individually.
+# For each package, asks in priority order (user socket > user service > sys socket > sys service).
+# If the user agrees to enable a unit, it enables it and skips lower-priority units for that package.
 _enable_systemd_units() {
-    local index=0
-    local pkg unit_name type scope
+    if (( ${#provides_systemd_service[@]} == 0 )); then
+        return
+    fi
 
-    # Iterate over packages that provide systemd units
-    for pkg in "${provides_systemd_service[@]}"; do
-        type="${unit_types[$index]}"
-        scope="${unit_scope[$index]}"
-        unit_name="${user_units[$index]:-${services[$index]}}"
+    local -a unique_pkgs=($(printf '%s\n' "${provides_systemd_service[@]}" | sort -u))
+    local pkg index unit_type scope unit_name
 
-        if term::ask_yes_no Y "Enable $type '${BLUE}${unit_name}${RESET}' from package '${YELLOW}${pkg}${RESET}' ($scope scope)?"; then
-            if [[ "$scope" == "user" ]]; then
-                systemctl -q --user --now enable "$unit_name" &
-            else
-                sudo systemctl -q --now enable "$unit_name" &
+    for pkg in "${unique_pkgs[@]}"; do
+        local -a pkg_indices=()
+
+        for i in "${!provides_systemd_service[@]}"; do
+            [[ "${provides_systemd_service[$i]}" == "$pkg" ]] && pkg_indices+=("$i")
+        done
+
+        for index in "${pkg_indices[@]}"; do
+            unit_type="${unit_types[$index]}"
+            scope="${unit_scope[$index]}"
+            unit_name="${unit_names[$index]}"
+
+            if term::ask_yes_no Y "Enable $unit_type '${BLUE}${unit_name}${RESET}' from package '${YELLOW}${pkg}${RESET}' ($scope scope)?"; then
+                if [[ "$scope" == "user" ]]; then
+                    systemctl -q --user --now enable "$unit_name" &
+                else
+                    sudo systemctl -q --now enable "$unit_name" &
+                fi
+                break
             fi
-        fi
-
-        ((index++))
+        done
     done
 }
 
