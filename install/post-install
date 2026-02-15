@@ -10,8 +10,8 @@ LINKS_PERMS=(
     "$HOME/.config/hypr/hyprland.conf"
 )
 
-for src in "${!links[@]}"; do
-	ln -sf "$src" "${links[$src]}" >/dev/null
+for src in "${!LINKS[@]}"; do
+	ln -sf "$src" "${LINKS[$src]}" >/dev/null
 done
 
 for f in "${LINKS_PERMS[@]}"; do
