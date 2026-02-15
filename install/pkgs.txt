@@ -25,7 +25,6 @@ pipewire-alsa
 polkit-gnome
 apple_cursor
 imagemagick
-file-roller
 wireplumber
 bluez-utils
 dosfstools
@@ -42,6 +41,7 @@ hyprlock
 hyprland
 hypridle
 gvfs-mtp
+engrampa
 cliphist
 zathura
 wiremix
