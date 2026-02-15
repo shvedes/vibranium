@@ -28,7 +28,7 @@ fi
 
 # Don't let systemd habdle hardware power button.
 # We will map it in WM's settings
-sudo sed -Ei '/^#?HandlePowerKey=/s/^#//;s/=.*/=ignore/' "$LOGIND_CONF"
+sudo sed -Ei '/^#?HandlePowerKey=/s/^#//;/HandlePowerKey/s/=.*/=ignore/' "$LOGIND_CONF"
 
 # Enable 32-bit support
 grep -qE '^\[multilib\]' "$PACMAN_CONF" ||
