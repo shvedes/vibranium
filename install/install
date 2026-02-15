@@ -67,15 +67,14 @@ fi
 
 YAY_PRESENT=false
 CURRENT_STEP=0
+TOTAL_STEPS=11
 
 if _is_installed "yay"; then
     YAY_PRESENT=true
 fi
 
 if [[ "$YAY_PRESENT" == false ]]; then
-    TOTAL_STEPS=11
-else
-    TOTAL_STEPS=10
+    TOTAL_STEPS=$((TOTAL_STEPS + 1))
 fi
 
 mapfile -t PACKAGES < "$SCRIPT_DIR/pkgs.txt"
@@ -142,6 +141,10 @@ bash "$SCRIPT_DIR/setup-migrations"
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing default theme"
 bash "$SCRIPT_DIR/setup-theme"
+
+CURRENT_STEP=$((CURRENT_STEP + 1))
+_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing mime types"
+bash "$SCRIPT_DIR/setup-mimetypes"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Running post-install scripts"
