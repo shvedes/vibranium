@@ -1,10 +1,29 @@
 #!/usr/bin/env bash
 
 STATE="$VIBRANIUM_STATE/cursor-theme"
+QUIET=0
+SELECTED_FOLDER=""
 
-if [[ ! -z "$1" ]]; then
-    SELECTED_FOLDER="$1"
-else
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -q|--quiet)
+            QUIET=1
+            shift
+            ;;
+        -*)
+            echo "Unknown option: $1" >&2
+            exit 1
+            ;;
+        *)
+            if [[ -z "$SELECTED_FOLDER" ]]; then
+                SELECTED_FOLDER="$1"
+            fi
+            shift
+            ;;
+    esac
+done
+
+if [[ -z "$SELECTED_FOLDER" ]]; then
     if [[ -f "$STATE" ]]; then
         SELECTED_FOLDER="$(< "$STATE")"
     else
@@ -22,15 +41,25 @@ if [[ ! -d "$XDG_DATA_HOME/icons/default" ]]; then
     mkdir -p "$XDG_DATA_HOME/icons/default"
 fi
 
-sed -i "/Inherits/s/=.*/=${SELECTED_FOLDER}/" "$XDG_DATA_HOME/icons/default/index.theme"
-sed -i "/gtk-cursor-theme-name/s/=.*/=${SELECTED_FOLDER}/" "${GTK_SETTINGS[@]}"
+sed -i "/Inherits/s/=.*/=${SELECTED_FOLDER}/" \
+    "$XDG_DATA_HOME/icons/default/index.theme"
 
-printf "%S" "$SELECTED_FOLDER" > "$VIBRANIUM_STATE/cursor-theme"
+sed -i "/gtk-cursor-theme-name/s/=.*/=${SELECTED_FOLDER}/" \
+    "${GTK_SETTINGS[@]}"
+
+printf "%s" "$SELECTED_FOLDER" > "$STATE"
 
 hyprctl -q setcursor "$SELECTED_FOLDER" 24
 gsettings set org.gnome.desktop.interface cursor-size 24
 gsettings set org.gnome.desktop.interface cursor-theme "$SELECTED_FOLDER"
 
+<<<<<<< HEAD
 if [[ ! "$1" == "--quiet" ]]; then
     notify-send -r 3 -t 7000 "Vibranium" "Some X11 apps (e.g. Steam) need a full restart to apply the new cursor theme"
 fi
+=======
+if [[ $QUIET -eq 0 ]]; then
+    notify-send -r 3 -t 7000 "Vibranium" "Some X11 apps (e.g. Steam) need a full restart to apply the new cursor theme"
+fi
+
+>>>>>>> 96d7580 (fix: don't show notification on session start)
