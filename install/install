@@ -2,7 +2,6 @@
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
-# Ensure the dotfiles folder is in the correct location
 EXPECTED_PATH="$HOME/.local/share/vibranium/install"
 VIBRANIUM="$HOME/.local/share/vibranium"
 
@@ -17,11 +16,26 @@ fi
 # Source helpers
 source "$SCRIPT_DIR/lib/helpers.sh"
 
+_log_info "Welcome to Vibranium, an Omarchy-like Arch Linux configuration"
+_log_info "aimed to be simple, bazingly fast and highly customizable."
+_log_info ""
+_log_info "The installer will edit system files, install needed packages"
+_log_info "and configure Vibranium specifically for your hardware."
+
+if ! _ask_yes_no Y "Proceed with Installation?"; then
+    _log_error "Installation aborted"
+    exit 1
+fi
+
 if [[ $(hostnamectl chassis) == vm ]]; then
-    _log_error "You're trying to install Vibranium inside of a virtual machine."
-    _log_error "Expect unexpected bugs, slow performance, or not working setup at all."
-    _log_error "You've been warned."
-    echo
+    _log_error "You are trying to install Vibranium inside of a virtual machine."
+    _log_error "You may encounter unexpected bugs, slow performance, or not working WM at all."
+    _log_error "You have been warned."
+
+    if ! _ask_yes_no Y "I understand this."; then
+        _log_error "Installation aborted"
+        exit 1
+    fi
 fi
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"

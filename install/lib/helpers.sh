@@ -31,34 +31,36 @@ _log_error() {
     echo -e "${RED}[VIBRANIUM]${RESET} ${*}"
 }
 
-_get_machine_type() {
-    case "$(< /sys/class/dmi/id/chassis_type)" in
-        9|10|14) echo laptop ;;
-        *) echo desktop ;;
-    esac
-}
-
 _install_yay() {
-  sudo pacman -Suy --noconfirm &> /dev/null
+    local tmp_dir="/tmp/yay"
 
-  if ! _is_installed "base-devel"; then
-    _log_info "Installing base-devel..."
-    sudo pacman --noconfirm -S base-devel
-  fi
+    sudo pacman -Suy --noconfirm &> /dev/null
 
-  _log_info "Cloning yay from AUR..."
-  rm -rf /tmp/yay
+    if ! _is_installed "base-devel"; then
+        _log_info "Installing base-devel"
+        sudo pacman --noconfirm -S base-devel &> /dev/null
+    fi
 
-  git clone "https://aur.archlinux.org/yay.git" /tmp/yay
-  cd /tmp/yay
+    if [[ -d $tmp_dir ]]; then
+        rm -rf $tmp_dir
+    fi
 
-  _log_info "Building and installing yay (this may take a moment)"
-  makepkg -si --noconfirm
+    git clone -q "https://aur.archlinux.org/yay.git" $tmp_dir
+    cd $tmp_dir
 
-  cd ~
-  rm -rf /tmp/yay
+    _log_info "Building and installing yay (this may take a moment)"
+    _log_info "You may be asked for sudo multiple times"
 
-  _log_success "Yay installed successfully"
+    if ! makepkg -sirc --noconfirm &> /dev/null
+        _log_error "Failed to install yay"
+        _log_error "Aborting installation"
+        cd $HOME; rm -rf $tmp_dir
+        exit 1
+    fi
+
+    cd $HOME; rm -rf $tmp_dir
+
+    _log_success "Yay installed successfully"
 }
 
 _install_packages() {
