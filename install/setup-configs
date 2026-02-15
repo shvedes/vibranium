@@ -3,6 +3,7 @@
 VIBRANIUM="$HOME/.local/share/vibranium"
 
 mkdir -p \
+    "$HOME"/{Downloads,Pictures,Videos,Music,Documents} \
     "$HOME"/.config/{Vencord,vesktop}/{themes,settings} \
     "$HOME"/.config/heroic/{themes,store} \
     "$HOME"/.config/qt{5,6}ct/colors \
