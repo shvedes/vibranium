@@ -50,6 +50,7 @@ swayosd
 bluetui
 wttrbar
 ddcutil
+zenity
 man-db
 neovim
 waybar
