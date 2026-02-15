@@ -3,9 +3,7 @@
 RED=$'\e[0;31m'
 YELLOW=$'\e[0;33m'
 BLUE=$'\e[0;34m'
-PURPLE=$'\e[0;35m'
 GREEN=$'\e[0;32m'
-CYAN=$'\e[0;36m'
 GRAY=$'\e[90m'
 RESET=$'\e[0m'
 
@@ -75,6 +73,7 @@ _install_packages() {
         yay --noconfirm --needed -S "$pkg" &> /dev/null
     done
 
+    printf "\r\033[K%s[VIBRANIUM]%s %d packages installed" "$YELLOW" "$RESET" "$total"
     printf "\n"
 }
 
