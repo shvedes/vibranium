@@ -2,38 +2,42 @@
 
 source vb-core-lib
 
-FIRSTBOOT_SCRIPTS="$VIBRANIUM/install/first-boot"
+FIRSTBOOT_SCRIPTS="$VIBRANIUM/install/first-run"
 
 _get_power_profile() {
-    local battery_status
-
-    if [[ "$VIBRANIUM_IS_LAPTOP" == false ]]; then
+    if [[ "$CHASSIS_TYPE" == desktop ]]; then
         echo "performance"
     else
-        battery_status=$(< /sys/class/power_supply/BAT0/status)
+        local battery_file
+        local battery_status
 
-        if [[ "$battery_status" == "Charging" ]]; then
-            echo "performance"
+        battery_file="/sys/class/power_supply/BAT0/status"
+
+        if [[ -f "$battery_file" ]]; then
+            battery_status=$(< "$battery_file")
+
+            if [[ "$battery_status" == "Charging" ]]; then
+                echo "performance"
+            else
+                echo "balanced"
+            fi
         else
             echo "balanced"
         fi
+
     fi
 }
 
-echo "Finishing instllation..." > "$VIBRANIUM_RUNTIME/worker.active"
+echo "Finishing installation..." > "$VIBRANIUM_RUNTIME/worker.active"
 vb-cmd-refresh-bar-module worker
 
-msg+="\nPress <span foreground='${P_YELLOW}'><b>SUPER + A</b></span>      to open app launcher\n"
-msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + V</b></span> to open Vibranium menu\n"
-msg+="<b>Right-click</b> to dismiss this notification"
-notify-send -r 1 -t 1800000 "Welcome to Vibranium" "$msg"
+vb-theme-cursor-set --quiet macOS
+xdg-user-dirs-update --force
 
-if [[ "$VIBRANIUM_IS_VIRTUAL_MACHINE" == true ]]; then
+if [[ "$CHASSIS_TYPE" == vm ]]; then
     msg="\n<span foreground='${P_YELLOW}'><b><i>You need to be aware of certain things</i></b></span>:\n\n"
     msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
     msg+="<span foreground='${P_RED}'><b>Screen recording is not available</b></span>\n"
-    msg+="  <span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<i>If you still want this feature, please create a MR</i>\n"
     msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
     msg+="<span foreground='${P_RED}'><b>Do not expect power profiles to work as expected</b></span>\n"
     msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
@@ -46,15 +50,37 @@ if [[ "$VIBRANIUM_IS_VIRTUAL_MACHINE" == true ]]; then
     msg+="<span foreground='${P_YELLOW}'><b>Virtualbox</b></span> & "
     msg+="<span foreground='${P_YELLOW}'><b>VMware</b></span> are not supported.\n\n"
     msg+="<b>Right-click</b> to dismiss this notification"
-    notify-send -r 2 -t 1800000 "Vibranium Is Running On a Virtual Machine" "$msg"
+
+    notify-send -r 2 -t 1800000 "Vibranium Is Running In a Virtual Machine" "$msg"
 fi
 
-chromium --no-startup-window --set-theme-color="25, 35, 48" &
-vb-core-power "$(_get_power_profile)"
+msg="\nPress <span foreground='${P_YELLOW}'><b>SUPER + A</b></span>      to open app launcher\n"
+msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + V</b></span> to open Vibranium menu\n\n"
+msg+="<b>Right-click</b> to dismiss this notification\n"
+notify-send -r 1 -t 1800000 "Welcome to Vibranium" "$msg"
+
+chromium --no-startup-window --set-theme-color="25, 35, 48" &> /dev/null &
+
+POWER_PROFILE="$(_get_power_profile)"
+
+vb-core-power "$POWER_PROFILE"
+
+if [[ "$POWER_PROFILE" == "performance" ]]; then
+    if [[ "$CHASSIS_TYPE" == desktop ]]; then
+        msg="Vibranium is running on a desktop. Performance power profile was set explicitly"
+    else
+        msg="You're running off AC. Performance power profile was set explicitly"
+    fi
+
+    notify-send -r 3 "Vibranium" "$msg"
+fi
 
 rm -f "$VIBRANIUM_STATE/first-boot"
 
-for script in ${FIRSTBOOT_SCRIPTS}/*.sh; do
+echo "Running post-install hooks..." > "$VIBRANIUM_RUNTIME/worker.active"
+vb-cmd-refresh-bar-module worker
+
+for script in "${FIRSTBOOT_SCRIPTS}"/*.sh; do
     bash "$script"
 done
 

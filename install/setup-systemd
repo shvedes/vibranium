@@ -9,7 +9,6 @@ system_services=(
 user_services=(
     "waybar"
     "cliphist"
-    "hypridle"
     "hyprpaper"
     "alacritty"
     "hyprsunset"

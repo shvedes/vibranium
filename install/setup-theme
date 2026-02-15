@@ -4,88 +4,46 @@ SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 THEME_PATH="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
 
-cat <<EOF > "$HOME/.config/gtk-3.0/settings.ini"
-[Settings]
-gtk-theme-name=Nightfox
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Cascadia Code
-gtk-cursor-theme-name=macOS
-gtk-cursor-theme-size=22
-gtk-toolbar-style=GTK_TOOLBAR_ICONS
-gtk-toolbar-icon-size=GTK_ICON_SIZE_LARGE_TOOLBAR
-gtk-button-images=0
-gtk-menu-images=0
-gtk-enable-event-sounds=1
-gtk-enable-input-feedback-sounds=0
-gtk-xft-antialias=1
-gtk-xft-hinting=1
-gtk-xft-hintstyle=hintmedium
-gtk-xft-rgba=rgb
-gtk-application-prefer-dark-theme=1
-EOF
+cp -r "$VIBRANIUM/config/.gtkrc-2.0" "$HOME"
 
-cat <<EOF > "$HOME/.config/gtk-4.0/settings.ini"
-[Settings]
-gtk-theme-name=Nightfox
-gtk-icon-theme-name=Papirus-Dark
-gtk-font-name=Cascadia Code
-gtk-cursor-theme-name=macOS
-gtk-cursor-theme-size=22
-gtk-application-prefer-dark-theme=0
-EOF
+# Symlink the default theme.
+# Color for other apps are in there
+ln -sf "$THEME_PATH" \
+    "$HOME/.config/vibranium/theme/current" >/dev/null
 
-cat <<EOF > "$HOME/.gtkrc-2.0"
-include "/home/$USER/.gtkrc-2.0.mine"
-gtk-theme-name="Nightfox"
-gtk-icon-theme-name="Papirus-Dark"
-gtk-font-name="Cascadia Code NF 10"
-gtk-cursor-theme-name=macOS
-gtk-cursor-theme-size=22
-gtk-toolbar-style=GTK_TOOLBAR_ICONS
-gtk-toolbar-icon-size=GTK_ICON_SIZE_LARGE_TOOLBAR
-gtk-button-images=0
-gtk-menu-images=0
-gtk-enable-event-sounds=1
-gtk-enable-input-feedback-sounds=0
-gtk-xft-antialias=1
-gtk-xft-hinting=1
-gtk-xft-hintstyle="hintslight"
-gtk-xft-rgba="rgb"
-EOF
-
-# Symlinks
-ln -sf "$THEME_PATH" "$HOME/.config/vibranium/theme/current" >/dev/null
-
-# btop
+# Symlink the btop theme as well
 ln -sf "$HOME/.config/vibranium/theme/current/btop.theme" \
 	"$HOME/.config/btop/themes/current.theme" >/dev/null
 
-# Discord / Vesktop / Vencord
-for dir in Vencord vesktop; do
-	target="$HOME/.config/$dir/themes/vibranium.theme.css"
-	ln -sf "$HOME/.config/vibranium/theme/current/discord.css" "$target"
-	printf '{\n\t"enabledThemes": ["vibranium.theme.css"]\n}' \
-		> "$HOME/.config/$dir/settings/settings.json"
-done
+# Heroic. It is not installed by default, but it will
+# automatically apply the active theme on first launch
+############################################################
 
-# Heroic
-mkdir -p "$HOME/.config/heroic/store" "$HOME/.config/heroic/themes"
+mkdir -p "$HOME"/.config/heroic/{store,themes}
+
 ln -sf "$HOME/.config/vibranium/theme/current/heroic.css" \
-	"$HOME/.config/heroic/themes/vibranium.css"
-printf '{\n\t"defaultSettings": {"customThemesPath": "%s/.config/heroic/themes"}\n}' "$HOME" \
-	> "$HOME/.config/heroic/config.json"
-printf '{\n\t"theme": "vibranium.css"\n}' \
-	> "$HOME/.config/heroic/store/config.json"
+	"$HOME/.config/heroic/themes/vibranium.css" >/dev/null
+
+cat > "$HOME/.config/heroic/config.json" <<EOF
+{
+    "defaultSettings": {
+        "customThemesPath": "$HOME/.config/heroic/themes"
+    }
+}
+EOF
+
+cat > "$HOME/.config/heroic/store/config.json" <<EOF
+{
+    "theme": "vibranium.css"
+}
+EOF
+
+############################################################
 
 # Misc symlinks
 declare -A links=(
-	["$HOME/.local/share/vibranium/default/uwsm/env"]="$HOME/.config/uwsm/env"
-	["$HOME/.local/share/vibranium/default/imv"]="$HOME/.config/imv/config"
 	["$HOME/.config/vibranium/theme/current/qt6ct.conf"]="$HOME/.config/qt6ct/colors/vibranium.conf"
 	["$HOME/.config/vibranium/theme/current/qt6ct.conf"]="$HOME/.config/qt5ct/colors/vibranium.conf"
-	["$HOME/.local/share/vibranium/default/wlogout/style.css"]="$HOME/.config/wlogout"
-	["$HOME/.local/share/vibranium/default/wlogout/layout"]="$HOME/.config/wlogout"
-	["$HOME/.config/vibranium/theme/current/spicetify.ini"]="$HOME/.config/spicetify/Themes/text/color.ini"
 )
 
 for src in "${!links[@]}"; do
@@ -98,12 +56,11 @@ gsettings set org.gnome.desktop.interface cursor-theme "macOS"
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
-papirus-folders --theme "Papirus-Dark" --color nordic &>/dev/null
+$HOME/.local/bin/papirus-folders --theme "Papirus-Dark" --color nordic &>/dev/null
 
 # GTK symlinks
-mkdir -p "$HOME/.config/gtk-4.0"
 for f in assets gtk-dark.css gtk.css; do
-	ln -sf "$HOME/.themes/Nightfox/gtk-4.0/$f" "$HOME/.config/gtk-4.0/"
+	ln -sf "$HOME/.local/share/themes/Nightfox/gtk-4.0/$f" "$HOME/.config/gtk-4.0/"
 done
 
 # QTCT
@@ -112,3 +69,4 @@ sed -i "s/user/$USER/" "$HOME/.config/qt5ct/qt5ct.conf"
 
 ln -sf "$HOME/.local/share/vibranium/default/hypr/animations/default.conf" \
 	"$HOME/.config/hypr/hyprland.conf.d/animations.conf"
+

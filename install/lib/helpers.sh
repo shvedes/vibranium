@@ -37,7 +37,6 @@ _install_yay() {
     sudo pacman -Suy --noconfirm &> /dev/null
 
     if ! _is_installed "base-devel"; then
-        _log_info "Installing base-devel"
         sudo pacman --noconfirm -S base-devel &> /dev/null
     fi
 
@@ -48,19 +47,12 @@ _install_yay() {
     git clone -q "https://aur.archlinux.org/yay.git" $tmp_dir
     cd $tmp_dir
 
-    _log_info "Building and installing yay (this may take a moment)"
-    _log_info "You may be asked for sudo multiple times"
-
     if ! makepkg -sirc --noconfirm &> /dev/null; then
-        _log_error "Failed to install yay"
-        _log_error "Aborting installation"
         cd $HOME; rm -rf $tmp_dir
-        exit 1
+        return 1
     fi
 
     cd $HOME; rm -rf $tmp_dir
-
-    _log_success "Yay installed successfully"
 }
 
 _install_packages() {
@@ -69,11 +61,8 @@ _install_packages() {
     local current=0
     local pkg
 
-    # Update OS first
-    yay --noconfirm -Syu
-
-    # Hide cursor
-    printf '\e[?25l'
+    _log_info "Refreshing repositories"
+    yay --noconfirm -Sy &> /dev/null
 
     for pkg in "${packages[@]}"; do
         [[ -z $pkg || $pkg == \#* ]] && continue
@@ -86,8 +75,7 @@ _install_packages() {
         yay --noconfirm --needed -S "$pkg" &> /dev/null
     done
 
-    # Show cursor
-    # printf '\e[?25h\n'
+    printf "\n"
 }
 
 _ask_yes_no() {

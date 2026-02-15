@@ -72,7 +72,7 @@ if _is_installed "yay"; then
     YAY_PRESENT=true
 fi
 
-if [[ "$YAY_PRESENT" == true ]]; then
+if [[ "$YAY_PRESENT" == false ]]; then
     TOTAL_STEPS=11
 else
     TOTAL_STEPS=10
@@ -100,8 +100,15 @@ _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
 
 [[ "$YAY_PRESENT" == false ]] && {
     CURRENT_STEP=$((CURRENT_STEP + 1))
-    _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing yay AUR helper"
-    _install_yay
+
+    _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Building and installing Yay AUR helper (this may take a moment)"
+    _log_info "You may be asked for sudo multiple times"
+
+    if ! _install_yay; then
+        _log_error "Failed to install yay"
+        _log_error "Aborting installation"
+        exit 1
+    fi
 }
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
@@ -146,8 +153,10 @@ _log_success "You have to pick Hyprland (uwsm-managed) in your login manager. Ot
 if _ask_yes_no Y "Reboot now?"; then
     for i in {5..1}; do
         printf "\r\033[K%s[VIBRANIUM]%s Restarting PC in %d..." "$YELLOW" "$RESET" "$i"
-        sleep 0.25
+        sleep 1
     done
     systemctl reboot
 fi
 
+# Show cursor
+printf '\e[?25h'

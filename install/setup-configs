@@ -3,28 +3,19 @@
 VIBRANIUM="$HOME/.local/share/vibranium"
 
 mkdir -p \
-    "$HOME"/{Downloads,Pictures,Videos,Music,Documents} \
-    "$HOME"/.config/{Vencord,vesktop}/{themes,settings} \
     "$HOME"/.config/heroic/{themes,store} \
     "$HOME"/.config/qt{5,6}ct/colors \
-    "$HOME/.config/spicetify/Themes/text" \
+    "$HOME"/.config/gtk-{3,4}.0 \
     "$HOME/.config/hypr/hyprland.conf.d" \
     "$HOME/.local/share/applications" \
-    "$HOME/.local/state/vibranium/" \
+    "$HOME/.local/state/vibranium" \
     "$HOME/.config/vibranium/theme" \
-    "$HOME/.config/btop/themes/" \
+    "$HOME/.config/btop/themes" \
     "$HOME/.config/discord" \
-    "$HOME/.config/wlogout" \
-    "$HOME/.config/gtk-3.0" \
-    "$HOME/.config/gtk-4.0" \
-    "$HOME/.config/zathura" \
-    "$HOME/.config/swayosd" \
-    "$HOME/.config/dunst" \
     "$HOME/.config/uwsm" \
-    "$HOME/.config/imv" \
     "$HOME/.local/bin"
 
-cp -r "$VIBRANIUM/config/"* "$HOME/.config/"
+cp -r "$VIBRANIUM/config/"*           "$HOME/.config/"
 cp -r "$VIBRANIUM/extras/local/bin/"* "$HOME/.local/bin"
 
 ln -sf "$VIBRANIUM/applications/hidden/"*.desktop "$HOME/.local/share/applications"

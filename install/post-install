@@ -2,83 +2,17 @@
 
 VIBRANIUM="$HOME/.local/share/vibranium"
 
-_generate_gtk_bookmarks() {
-    cat <<EOF > "$HOME/.config/gtk-3.0/bookmarks"
-file:///home/$USER/Documents
-file:///home/$USER/Downloads
-file:///home/$USER/Pictures
-file:///home/$USER/Videos
-file:///home/$USER/Music
-EOF
-}
+declare -A LINKS=(
+    ["$HOME/.local/share/vibranium/default/uwsm/env"]="$HOME/.config/uwsm/env"
+)
 
-_generate_dirs() {
-    cat <<EOF > "$HOME/.config/user-dirs.dirs"
-XDG_DESKTOP_DIR="$HOME/"
-XDG_DOWNLOAD_DIR="$HOME/Downloads"
-XDG_TEMPLATES_DIR="$HOME/Templates"
-XDG_PUBLICSHARE_DIR="$HOME/"
-XDG_DOCUMENTS_DIR="$HOME/Documents"
-XDG_MUSIC_DIR="$HOME/Music"
-XDG_PICTURES_DIR="$HOME/Pictures"
-XDG_VIDEOS_DIR="$HOME/Videos"
-EOF
-}
+for src in "${!links[@]}"; do
+	ln -sf "$src" "${links[$src]}" >/dev/null
+done
 
-# Dynamically adjust idle times based on the machine type
-_generate_hypridle_config() {
-    local lock_after
-    local sleep_after
-
-    case "$(hostnamectl chassis)" in
-        laptop|tablet|convertible)
-            # 2 minutes
-            lock_after=120
-            # 5 minutes
-            sleep_after=300
-            ;;
-
-        # Desktop / Other
-        *)
-            # 10 minutes
-            lock_after=600
-            # 15 minutes
-            sleep_after=900
-            ;;
-    esac
-
-    cat <<EOF > "$HOME/.config/hypr/hypridle.conf"
-source = ~/.local/share/vibranium/default/hypr/hypridle.conf
-
-listener {
-	timeout = $lock_after
-	on-timeout = loginctl lock-session
-}
-
-listener {
-	timeout = $sleep_after
-	on-timeout = systemctl suspend
-}
-
-# vim:ft=hyprlang
-EOF
-}
-
-_cleanup() {
-    if yay -Qq yay-debug &> /dev/null; then
-        yay -Rnsc yay-debug --noconfirm &> /dev/null
-    fi
-
-	yay -Scc --noconfirm &> /dev/null
-    yay -Ycc --noconfirm &> /dev/null
-}
-
-_cleanup
-_generate_dirs
-_generate_gtk_bookmarks
-_generate_hypridle_config
-
-mkdir -p "$HOME/.local/state/vibranium"
+yay -Rnsc yay-debug --noconfirm &> /dev/null || true
+yay -Scc --noconfirm &> /dev/null
+yay -Ycc --noconfirm &> /dev/null
 
 # First run marker
 touch "$HOME/.local/state/vibranium/first-run"
@@ -87,20 +21,20 @@ touch "$HOME/.local/state/vibranium/first-run"
 printf "suspended" > "$HOME/.local/state/vibranium/night-light"
 
 # Disable Discord's update checks
+# https://wiki.archlinux.org/title/Discord#Discord_asks_for_an_update_not_yet_available_in_the_repository
+mkdir -p "$HOME/.config/discord"
 printf '{\n\t"SKIP_HOST_UPDATE": true\n}' > "$HOME/.config/discord/settings.json"
 
 # Vibranium does not depend on the brightnessctl tool.
-# We're using sysfs directly, so we need video group
+# It uses sysfs directly, so we need video group
 if [ ! -z "$(find /sys/class/backlight -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
     sudo usermod -aG video "$USER"
 fi
 
 # https://www.reddit.com/r/linuxquestions/comments/t7ze3c/thunar_open_file_in_neovim/
 cp /usr/share/applications/nvim.desktop "$HOME"/.local/share/applications
-sed -e '/Terminal/s/true/false/' \
-    -e '/^Exec/s/=/=vb-core-term /' \
+sed -e '/Terminal/s/true/false/' -e '/^Exec/s/=/=vb-core-term /' \
     -i "$HOME"/.local/share/applications/nvim.desktop
-
 
 # The settings file
 cat > "$HOME/.config/vibranium/settings" <<'EOF'
