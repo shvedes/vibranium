@@ -52,7 +52,7 @@ notify() {
     if [[ $gl_use_osd = true && $pp_use_osd = true ]]; then
         swayosd-client --custom-message "$label" --custom-icon "$icon"
     else
-        notify-send -r 3 -t 1500 "Power Profiles" "Power profile set to <b>${label,,}</b>"
+        notify-send -r 3 -t 1500 "Power Management" "Power profile set to <b>${label,,}</b>"
     fi
 }
 
