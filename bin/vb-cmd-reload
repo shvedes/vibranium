@@ -2,7 +2,7 @@
 
 source vb-core-lib
 
-SYSTEMD_TARGETS=("cliphist" "hypridle" "gnome-polkit")
+SYSTEMD_TARGETS=("cliphist" "hypridle")
 
 [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]             && SYSTEMD_TARGETS+=("swayosd")
 [[ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" == true ]]      && SYSTEMD_TARGETS+=("hyprpaper")
