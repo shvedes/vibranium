@@ -27,18 +27,11 @@ sed -i -E "/window#waybar\s*\{/,/\}/ {
 	s/^\s*font-family:\s*'Symbols Nerd Font Mono',\s*'.*';/    font-family: 'Symbols Nerd Font Mono', '${selected}';/
 }" "$XDG_CONFIG_HOME/waybar/style.css"
 
-# QT6CT
-sed -i -E "/^(fixed|general)=/ s@^([^,\"]*=\")[^,\"]*@\1${selected}@" "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
+# qtct
+sed -i -E "/^(fixed|general)=/ s@^([^,\"]*=\")[^,\"]*@\1${selected}@" "$XDG_CONFIG_HOME"/qt{5,6}ct/qt{5,6}ct.conf
 
 # Dunst
-if [ ! -f "$XDG_CONFIG_HOME/dunst/dunstrc" ]; then
-    mkdir -p "$XDG_CONFIG_HOME/dunst"
-    printf "[global]\nfont = \"%s 9\"" "$selected" > "$XDG_CONFIG_HOME/dunst/dunstrc"
-elif ! grep font "$XDG_CONFIG_HOME/dunst/dunstrc" &> /dev/null; then
-    printf "\nfont = \"%s 9\"" "$selected" >> "$XDG_CONFIG_HOME/dunst/dunstrc"
-else
-    sed -i -E "/^font[[:space:]]*=/ s/(=\s*\")[^\"]* ([0-9]+\")/\1${selected} \2/" "$XDG_CONFIG_HOME/dunst/dunstrc"
-fi
+sed -i -E "/^font[[:space:]]*=/ s/(=\s*\")[^\"]* ([0-9]+\")/\1${selected} \2/" "$XDG_CONFIG_HOME/dunst/dunstrc"
 
 # Rofi
 sed -i -E "s/(font:\s*\")[^\"]* ([0-9]+)\"/\1${selected} \2\"/" "$XDG_CONFIG_HOME/rofi/config.rasi"
@@ -47,14 +40,14 @@ vb-cmd-refresh-dunst
 
 waybar_status="$(systemctl --user is-active waybar)"
 if [[ $waybar_status == active ]]; then
-    systemctl --user restart waybar
+    systemctl --user restart waybar &
 fi
 
 helpers::parse_defaults
 helpers::check VIBRANIUM_GLOBAL_USE_OSD
 
 if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
-    systemctl --user restart swayosd
+    systemctl --user restart swayosd &
 fi
 
-notify-send -r 1 -t 2000 "Vibranium" "Default font changed to <span foreground='${P_ACCENT}'><b>${selected}</b></span>"
+notify-send -r 1 -t 2000 "Vibranium" "Default font has been set to <span foreground='${P_ACCENT}'><b>${selected}</b></span>"

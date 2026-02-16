@@ -32,7 +32,9 @@ show_volume_notification() {
     if [[ "$muted" == "[MUTED]" ]]; then
         notify-send -r 2 -t 1000 "$type Muted"
     else
-        notify-send -r 2 -t 1000 "$type ${display_vol}%" -h "int:value:$bar_value"
+        if [[ ! "$type" == "Microphone" ]]; then
+            notify-send -r 2 -t 1000 "$type ${display_vol}%" -h "int:value:$bar_value"
+        fi
     fi
 }
 

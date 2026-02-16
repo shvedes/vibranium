@@ -40,15 +40,8 @@ EOF
 
 ############################################################
 
-# Misc symlinks
-declare -A links=(
-	["$HOME/.config/vibranium/theme/current/qt6ct.conf"]="$HOME/.config/qt6ct/colors/vibranium.conf"
-	["$HOME/.config/vibranium/theme/current/qt6ct.conf"]="$HOME/.config/qt5ct/colors/vibranium.conf"
-)
-
-for src in "${!links[@]}"; do
-	ln -sf "$src" "${links[$src]}" >/dev/null
-done
+ln -sf "$HOME/.config/vibranium/theme/current/qt6ct.conf" "$HOME"/.config/qt5ct/colors/vibranium.conf
+ln -sf "$HOME/.config/vibranium/theme/current/qt6ct.conf" "$HOME"/.config/qt6ct/colors/vibranium.conf
 
 # GNOME appearance
 gsettings set org.gnome.desktop.interface gtk-theme "Nightfox"
