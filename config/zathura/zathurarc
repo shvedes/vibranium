@@ -1,4 +1,11 @@
 include ../vibranium/theme/current/zathura
-include ../../.local/share/vibranium/default/zathurarc
 
 set font "Cascadia Code 9"
+
+set selection-clipboard "clipboard"
+set recolor "false"
+
+map o file_chooser
+
+map [normal] l follow
+map [index] l feedkeys <Return>
