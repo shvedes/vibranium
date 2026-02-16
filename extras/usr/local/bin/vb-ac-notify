@@ -6,15 +6,20 @@ USER_ID="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{p
 export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus"
 
 ONLINE_FILE="/sys/class/power_supply/ACAD/online"
+STATE_FILE="/run/vb-ac.state"
 
-if [[ -f "$ONLINE_FILE" ]]; then
-    ONLINE="$(<"$ONLINE_FILE")"
-else
-    ONLINE=0
-fi
+CURRENT=0
+[[ -f "$ONLINE_FILE" ]] && CURRENT="$(<"$ONLINE_FILE")"
 
-if [[ "$ONLINE" == "1" ]]; then
-    runuser -l "$USER" -c 'notify-send -r 5 "Vibranium" "AC connected"'
+PREV=""
+[[ -f "$STATE_FILE" ]] && PREV="$(<"$STATE_FILE")"
+
+[[ "$CURRENT" == "$PREV" ]] && exit 0
+
+echo "$CURRENT" > "$STATE_FILE"
+
+if [[ "$CURRENT" == "1" ]]; then
+    runuser -l "$USER" -c 'notify-send -r 5 "Power Management" "Power source: AC"'
 else
-    runuser -l "$USER" -c 'notify-send -r 5 "Vibranium" "AC disconnected"'
+    runuser -l "$USER" -c 'notify-send -r 5 "Power Management" "Power source: battery"'
 fi
