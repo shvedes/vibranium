@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-USER="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{print $3}')"
-USER_ID="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{print $2}')"
-
-export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus"
-
 # helper: check if partition looks like EFI (returns 0 if EFI)
 is_efi_partition() {
     local part="$1" # /dev/sdXN
@@ -76,7 +71,6 @@ done
 if [[ "$DEVTYPE" == "partition" ]]; then
     if is_efi_partition "$DEVNAME"; then
         # ignore EFI partition events
-        echo "$(date) udev: ignoring EFI partition event: dev=$DEVNAME model=$ID_MODEL" >> /tmp/usb-udev.log
         exit 0
     fi
 fi
@@ -122,34 +116,26 @@ if [[ "$DEVTYPE" == "disk" ]]; then
     fi
 fi
 
-source "/home/${USER}/.config/vibranium/theme/current/vibranium-lib-theme" 2>/dev/null || true
+source "/home/user_placeholder/.config/vibranium/theme/current/vibranium-lib-theme" 2>/dev/null || true
 
 case "$1" in
     add)
         if [[ -n "$target_dev" && "$include_devpath" -eq 1 ]]; then
             msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> connected as <span foreground='${P_YELLOW}'><b>${target_dev}</b></span>"
-            echo "$(date) action=add model=${ID_MODEL} dev=${target_dev} disk=${disk} efi=$has_efi parts=$part_count" >> /tmp/usb-udev.log
         else
             msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> connected"
-            echo "$(date) action=add model=${ID_MODEL} disk=${disk} efi=$has_efi parts=$part_count (no devpath shown)" >> /tmp/usb-udev.log
         fi
-        runuser -l "$USER" -c "notify-send -r 5 'Vibranium' \"${msg}\""
+
         ;;
     remove)
         # For remove: if DEVNAME was EFI -> we already ignored earlier. Use same logic to show dev if desired.
         if [[ -n "$target_dev" && "$include_devpath" -eq 1 ]]; then
-            msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> <span foreground='${P_RED}'><b>disconnected</b></span>" 
-            echo "$(date) action=remove model=${ID_MODEL} dev=${target_dev} disk=${disk} efi=$has_efi parts=$part_count" >> /tmp/usb-udev.log
+            msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> <span foreground='${P_RED}'><b>disconnected</b></span>"
         else
             msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> <span foreground='${P_RED}'><b>disconnected</b></span>"
-            echo "$(date) action=remove model=${ID_MODEL} disk=${disk} efi=$has_efi parts=$part_count (no devpath shown)" >> /tmp/usb-udev.log
         fi
-        runuser -l "$USER" -c "notify-send -r 5 'Vibranium' \"${msg}\""
-        ;;
-    *)
-        echo "$(date) udev: unknown action: $1" >> /tmp/usb-udev.log
-        exit 0
         ;;
 esac
 
-exit 0
+systemd-run -M user_placeholder@.host --user notify-send -r 10 "Vibranium" "$msg"
+

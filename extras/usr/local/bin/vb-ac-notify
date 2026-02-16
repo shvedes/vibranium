@@ -1,25 +1,27 @@
 #!/usr/bin/env bash
 
-USER="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{print $3}')"
-USER_ID="$(loginctl list-sessions --no-legend | awk '$4=="seat0" && $6=="user"{print $2}')"
-
-export DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$USER_ID/bus"
-
 ONLINE_FILE="/sys/class/power_supply/ACAD/online"
 STATE_FILE="/run/vb-ac.state"
 
 CURRENT=0
-[[ -f "$ONLINE_FILE" ]] && CURRENT="$(<"$ONLINE_FILE")"
-
 PREV=""
-[[ -f "$STATE_FILE" ]] && PREV="$(<"$STATE_FILE")"
 
-[[ "$CURRENT" == "$PREV" ]] && exit 0
+if [[ -f "$ONLINE_FILE" ]]; then
+    CURRENT="$(<"$ONLINE_FILE")"
+fi
+
+if [[ -f "$STATE_FILE" ]]; then
+    PREV="$(<"$STATE_FILE")"
+fi
+
+if [[ "$CURRENT" == "$PREV" ]]; then
+    exit 0
+fi
 
 echo "$CURRENT" > "$STATE_FILE"
 
 if [[ "$CURRENT" == "1" ]]; then
-    runuser -l "$USER" -c 'notify-send -r 5 "Power Management" "Power source: AC"'
+    systemd-run -M user_placeholder@.host --user notify-send -r 5 "Power Management" "Power source: AC"
 else
-    runuser -l "$USER" -c 'notify-send -r 5 "Power Management" "Power source: battery"'
+    systemd-run -M user_placeholder@.host --user notify-send -r 5 "Power Management" "Power source: battery"
 fi

@@ -20,6 +20,8 @@ sudo cp -r "$VIBRANIUM"/extras/etc/udev/rules.d /etc/udev/
 # Auxiliary scripts (executed in the udev rules)
 sudo cp -r "$VIBRANIUM"/extras/usr/local/bin/* /usr/local/bin/
 
+sudo sed -i "s/user_placeholder/$USER/g" /usr/local/bin/*
+
 ####################################################################
 
 if [[ ! -d /etc/sudoers.d ]]; then
