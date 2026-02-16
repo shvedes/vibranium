@@ -1,0 +1,7 @@
+heroic-games-launcher
+retroarch
+gamescope
+gamemode
+mangohud
+lutris
+steam

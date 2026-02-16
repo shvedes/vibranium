@@ -1,6 +1,5 @@
 xdg-desktop-portal-hyprland
 ttf-nerd-fonts-symbols-mono
-thunar-media-tags-plugin
 sound-theme-freedesktop
 thunar-archive-plugin
 power-profiles-daemon

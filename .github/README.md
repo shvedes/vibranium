@@ -3,6 +3,8 @@
 Vibranium is an Arch Linux configuration, which aims to provide beautiful-looking set of configs and themes, while being very customizable and very fast. It provides a set of overlay-based menus (rofi) where you can
 configure almost every aspect of your typical desktop usage: appearance of the WM & status bar, general behavior, like package management or how certain things work together.
 
+![themes](./media/themes.gif)
+
 ## Installation
 
 ```bash
