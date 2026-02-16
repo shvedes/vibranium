@@ -256,7 +256,7 @@ _blur_submenu() {
         local power_profile="$(vb-cmd-get-power)"
 
         if [[ $respect_power_profile == true && $power_profile == power-saver ]]; then
-            labels=("<span alpha='70%'>Enabled : (locked)</span>")
+            labels=("<span alpha='70%'>Enabled : (on power-saver!)</span>")
         else
             labels=("Enabled : $enabled")
         fi
@@ -333,7 +333,7 @@ _shadow_submenu() {
         local power_profile="$(vb-cmd-get-power)"
 
         if [[ $respect_power_profile == true && $power_profile == power-saver ]]; then
-            labels=("<span alpha='70%'>Enabled : (locked)</span>")
+            labels=("<span alpha='70%'>Enabled : (on power-saver!)</span>")
         else
             labels=("Enabled : $enabled")
         fi

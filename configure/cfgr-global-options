@@ -39,7 +39,7 @@ while true; do
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "General options" "ESC to go back" -selected-row "$INDEX")"
+    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "General" "ESC to go back" -selected-row "$INDEX")"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do
