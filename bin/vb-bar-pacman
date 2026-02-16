@@ -58,10 +58,11 @@ make_tooltip() {
     done
     $any || { echo ""; return; }
 
-    awk '
+awk '
     function trim(s) { sub(/^[ \t\r\n]+/, "", s); sub(/[ \t\r\n]+$/, "", s); return s }
     {
         arrow = index($0, "->")
+
         if (arrow) {
             left = trim(substr($0, 1, arrow-1))
             right = trim(substr($0, arrow+2))
@@ -74,6 +75,7 @@ make_tooltip() {
             old = $2
             new = $4
         }
+
         pkgs[NR]=pkg
         olds[NR]=old
         news[NR]=new
@@ -83,10 +85,64 @@ make_tooltip() {
     }
     END {
         arrow_colored = "<span foreground=\"gray\">-></span>"
+        LINE_LIMIT = 80
+        MAX_LINES = 25
+
+        for (i=1; i<=n; i++) include[i] = 1
+
+        changed = 1
+
+        while (changed) {
+            changed = 0
+
+            cur_max_pkg = 0
+            cur_max_old = 0
+            for (i=1; i<=n; i++) if (include[i]) {
+                if (length(pkgs[i]) > cur_max_pkg) cur_max_pkg = length(pkgs[i])
+                if (length(olds[i]) > cur_max_old) cur_max_old = length(olds[i])
+            }
+
+            for (i=1; i<=n; i++) if (include[i]) {
+                if (pkgs[i] == "") {
+                    vis_len = length(olds[i]) + 4 + length(news[i])  # old + " " + "->" + " " + new
+                } else {
+                    vis_len = cur_max_pkg + 1 + cur_max_old + 1 + 2 + 1 + length(news[i])
+                }
+
+                if (vis_len > LINE_LIMIT) {
+                    include[i] = 0
+                    changed = 1
+                }
+            }
+        }
+
+        displayed = 0
+
         for (i=1; i<=n; i++) {
+            if (include[i]) {
+                displayed++
+                if (displayed > MAX_LINES) {
+                    include[i] = 0
+                }
+            }
+        }
+
+        max_pkg = 0
+        max_old = 0
+
+        for (i=1; i<=n; i++) if (include[i]) {
+            if (length(pkgs[i]) > max_pkg) max_pkg = length(pkgs[i])
+            if (length(olds[i]) > max_old) max_old = length(olds[i])
+        }
+
+        skipped = 0
+        for (i=1; i<=n; i++) if (!include[i]) skipped++
+
+        for (i=1; i<=n; i++) if (include[i]) {
             if (pkgs[i] == "") {
                 if (olds[i] != "" || news[i] != "") {
-                    printf "%s %s %s\n", olds[i], arrow_colored, news[i]
+                    new_colored = "<span foreground=\"green3\">" news[i] "</span>"
+                    printf "%s %s %s\n", olds[i], arrow_colored, new_colored
                 }
             } else {
                 pkg_fmt = sprintf("%-*s", max_pkg, pkgs[i])
@@ -96,6 +152,10 @@ make_tooltip() {
                 new_colored = "<span foreground=\"green3\">" news[i] "</span>"
                 printf "%s %s %s %s\n", pkg_fmt, old_fmt, arrow_colored, new_colored
             }
+        }
+
+        if (skipped > 0) {
+            printf "<span foreground=\"gray\">...and </span><span foreground=\"green3\">%d</span><span foreground=\"gray\"> more</span>\n", skipped
         }
     }
     ' "${files[@]}"
