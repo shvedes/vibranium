@@ -326,14 +326,31 @@ PACKAGES=()
 
 FZF_ARGS=(
     --multi
-    --preview 'pacman -Qi {1} 2>/dev/null || pacman -Qi {1}'
-    --preview-label='alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select'
-    --preview-label-pos='bottom'
+    --ignore-case
+    --highlight-line
+
+    --info 'hidden'
+    --border 'bold'
+
+    --border-label ' alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select '
+    --border-label-pos 'bottom'
+
+    --list-label 'Package list'
+    --list-border 'bold'
+
+    --input-label 'Filter packages'
+    --input-border 'bold'
+
+    --preview 'pacman -Qii {1}'
+    --preview-border 'bold'
     --preview-window 'right:75%:wrap'
+    --preview-label 'Package Information'
+
     --bind 'alt-p:toggle-preview'
     --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
     --bind 'alt-k:preview-up,alt-j:preview-down'
-    --color 'pointer:blue,marker:white'
+
+    --color 'pointer:white,marker:green'
 )
 
 trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT
