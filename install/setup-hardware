@@ -19,17 +19,20 @@ if [[ "$ROOT_FS" == "btrfs" ]]; then
 fi
 
 if [[ "$(lsblk -f)" =~ ntfs ]]; then
-    _log_info "NTFS partition detected."
-    _log_info "You will be able to access it without issues."
-    _log_info "Make sure Fast Boot is disabled in Windows settings,"
-    _log_info "otherwise the partition will be mounted as read-only."
+    _log_info "NTFS partition detected"
 
-    PACKAGES+=(ntfs-3g)
+    if _ask_yes_no Y "Do you want to enable NTFS support?"; then
+        _log_success "You will be able to access your NTFS partition without issues."
+        _log_success "Make sure Fast Boot is disabled in Windows settings,"
+        _log_success "otherwise the partition will be mounted as read-only."
+
+        PACKAGES+=(ntfs-3g)
+    fi
 fi
 
 case "$(lspci | grep VGA)" in
     *Nvidia*)
-        _log_info "Nvidia GPU detected"
+        _log_info "Installing NVIDIA GPU drivers"
         NVIDIA_SETUP_NEEDED=true
         PACKAGES+=(
             "egl-wayland"
@@ -42,7 +45,7 @@ case "$(lspci | grep VGA)" in
         )
         ;;
     *Radeon*|*ATI*)
-        _log_info "AMD GPU detected"
+        _log_info "Installing AMD GPU drivers"
         PACKAGES+=(
             "mesa"
             "lib32-mesa"
@@ -53,7 +56,7 @@ case "$(lspci | grep VGA)" in
         )
         ;;
     *UHD*|*Iris*|*Arc*)
-        _log_info "Intel GPU detected"
+        _log_info "Installing Intel GPU drivers"
         PACKAGES+=(
             "mesa"
             "libvpl"
@@ -81,6 +84,8 @@ if (( ! ${#PACKAGES[@]} == 0 )); then
 fi
 
 if [[ "$NVIDIA_SETUP_NEEDED" == true ]]; then
+    _log_info "Configuring NVIDIA drivers (this may take a moment)"
+
     bash "$SCRIPT_DIR/setup-nvidia"
 fi
 

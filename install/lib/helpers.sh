@@ -59,7 +59,6 @@ _install_packages() {
     local current=0
     local pkg
 
-    _log_info "Refreshing repositories"
     yay --noconfirm -Sy &> /dev/null
 
     for pkg in "${packages[@]}"; do
@@ -73,7 +72,7 @@ _install_packages() {
         yay --noconfirm --needed -S "$pkg" &> /dev/null
     done
 
-    printf "\r\033[K%s[VIBRANIUM]%s %d packages installed" "$YELLOW" "$RESET" "$total"
+    printf "\r\032[K%s[VIBRANIUM]%s %d packages installed" "$YELLOW" "$RESET" "$total"
     printf "\n"
 }
 
