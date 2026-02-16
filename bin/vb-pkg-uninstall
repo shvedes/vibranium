@@ -256,7 +256,7 @@ _operation_canceled() {
 
     printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
 
-    if [[ $NO_DUMMY == false ]]; then
+    if [[ $NO_DUMMY == false && -t 0 ]]; then
         read -n1 -r -s -p $'. Press any key to exit' dummy
         printf '\e[?25h' # Show cursor
     fi

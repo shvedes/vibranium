@@ -193,7 +193,7 @@ _operation_canceled() {
 
     printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
 
-    if [[ $NO_DUMMY == false ]]; then
+    if [[ $NO_DUMMY == false && -t 0 ]]; then
         read -n1 -r -s -p $'. Press any key to exit' dummy
         printf '\e[?25h' # Show cursor
     fi
@@ -206,8 +206,8 @@ _operation_canceled() {
 _installation_complete() {
     printf "%s[VIBRANIUM]%s Installation complete" "$GREEN" "$RESET"
 
-    if [[ $NO_DUMMY == false ]]; then
-        read -n1 -r -p $'. Press any key to exit ' dummy
+    if [[ $NO_DUMMY == false && -t 0 ]]; then
+        read -n1 -r -s -p $'. Press any key to exit' dummy
         printf '\e[?25h' # Show cursor
     fi
 }
@@ -351,7 +351,7 @@ FZF_ARGS=(
     --color 'pointer:white,marker:green'
 )
 
-trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT
+trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
