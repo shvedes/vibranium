@@ -80,7 +80,7 @@ else
     fi
 fi
 
-if [[ -z $VIBRANIUM_BAR_WEATHER_MODULE_CITY ]]; then
+if [[ $VIBRANIUM_BAR_WEATHER_MODULE_CITY == "Dublin" ]]; then
     _set_city &
     set_city_pid="$!"
     _spinner "$set_city_pid" " " "Getting location..."
