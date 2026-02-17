@@ -13,9 +13,6 @@ fi
 ACTIONS+=(
     "Toggle read mode"
     "Toggle inhibitor"
-)
-
-ACTIONS+=(
     "Reload Vibranium"
     "Close all windows"
 )
@@ -35,24 +32,31 @@ while true; do
     case "$CHOSEN" in
         "Close all windows")
             vb-cmd-close-windows
+            exit 0
             ;;
         "Toggle read mode")
             vb-cmd-toggle-reading-mode
+            exit 0
             ;;
         "Copy current track")
             vb-cmd-copy-track --notify
+            exit 0
             ;;
         *"Stop timer"*)
             pkill -f vb-util-timer
+            exit 0
             ;;
         "Set timer")
             setsid vb-util-timer
+            exit 0
             ;;
         "Reload Vibranium")
             vb-cmd-reload
+            exit 0
             ;;
         "Toggle inhibitor")
             vb-cmd-toggle-inhibit
+            exit 0
             ;;
         "")
             exit 1
