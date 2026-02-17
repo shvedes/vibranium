@@ -33,8 +33,13 @@ _term_opacity_menu() {
 }
 
 _get_rofi_theme() {
-     local config="$XDG_CONFIG_HOME/rofi/config.rasi"
-     sed -n 's|@import ".*/\(theme[-a-z]*\)\.rasi"|\1|p' "$config" | sed 's|^theme-||; s|^rofi$|text|'
+    sed -n '/@import/ {
+        s|.*@import "[^"]*/\(theme[-a-z]*\)\.rasi".*|\1|
+        s|^theme-||
+        s|^rofi$|text|
+        s|^\(.\)|\U\1|
+        p
+    }' "$XDG_CONFIG_HOME/rofi/config.rasi"
 }
 
 _set_rofi_theme() {
@@ -250,7 +255,7 @@ _get_cursor_theme() {
     done <<< "$(vb-theme-cursor-list)"
 
     # Fallback: if the list above is empty (e.g. not found)
-    printf "defalut"
+    printf "Defalut"
 }
 
 _get_default_browser() {

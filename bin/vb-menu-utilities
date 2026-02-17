@@ -29,31 +29,37 @@ if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
     ACTIONS+=("Copy current track")
 fi
 
-CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | helpers::ui::menu "Utilities" "search...")"
+while true; do
+    CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | helpers::ui::menu "Utilities" "search...")"
 
-case "$CHOSEN" in
-    "Close all windows")
-        vb-cmd-close-windows
-        ;;
-    "Toggle read mode")
-        vb-cmd-toggle-reading-mode
-        ;;
-    "Copy current track")
-        vb-cmd-copy-track --notify
-        ;;
-    *"Stop timer"*)
-        pkill -f vb-util-timer
-        ;;
-    "Set timer")
-        setsid vb-util-timer
-        ;;
-    "Reload Vibranium")
-        vb-cmd-reload
-        ;;
-    "Toggle inhibitor")
-        vb-cmd-toggle-inhibit
-        ;;
-    "" | *)
-        exit 1
-        ;;
-esac
+    case "$CHOSEN" in
+        "Close all windows")
+            vb-cmd-close-windows
+            ;;
+        "Toggle read mode")
+            vb-cmd-toggle-reading-mode
+            ;;
+        "Copy current track")
+            vb-cmd-copy-track --notify
+            ;;
+        *"Stop timer"*)
+            pkill -f vb-util-timer
+            ;;
+        "Set timer")
+            setsid vb-util-timer
+            ;;
+        "Reload Vibranium")
+            vb-cmd-reload
+            ;;
+        "Toggle inhibitor")
+            vb-cmd-toggle-inhibit
+            ;;
+        "")
+            exit 1
+            ;;
+        *)
+            continue
+            ;;
+    esac
+done
+
