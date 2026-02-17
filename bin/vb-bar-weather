@@ -52,7 +52,7 @@ if (( WAYBAR_PID == 0 )); then
     fi
 fi
 
-if ! command -v checkupdates > /dev/null; then
+if ! command -v wttrbar > /dev/null; then
     # The script has stdout
     # (e.g. executed manually from a terminal window)
     [[ -t 1 ]] && {
@@ -86,14 +86,14 @@ _spinner() {
         local text="$1"
 
         [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]] && {
-            text="<span foreground='DimGray'>|</span> "
-            text+="$1"
+            text="$1"
+            text+=" <span foreground='DimGray'>|</span>"
         }
         printf '%s' "$text"
     }
 
     for i in "${spinstr[@]}"; do
-        frame="$(format_text "<span foreground='gray'>$i</span>")"
+        frame="$(format_text "<span rise='-2pt' foreground='gray'>$i</span>")"
 
         jq -nc --unbuffered \
           --arg text "$frame" \
@@ -120,6 +120,8 @@ _set_city() {
 # Wait for the internet connection first.
 # Try 3 times for different IPs (Cloudflare & Google)
 while true; do
+    _spinner "Waiting for the internet connection..."
+
     for attempt in {1..3}; do
         if ping -c 1 -W 1 1.1.1.1 &> /dev/null; then
             break 2
@@ -129,8 +131,6 @@ while true; do
             break 2
         fi
     done
-
-    _spinner "Waiting for the internet connection..."
 done
 
 marker="${VIBRANIUM_RUNTIME}/bar.weather.pid.${WAYBAR_PID}"
@@ -163,6 +163,9 @@ else
 fi
 
 if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" == "not_set" ]]; then
+    # Edge use case. Just a layer of protection
+    rm -f "${marker%.*}".*
+
     _set_city &
     set_city_pid=$!
 
@@ -170,10 +173,14 @@ if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" == "not_set" ]]; then
         while kill -0 $set_city_pid 2> /dev/null; do
             _spinner "Getting your location..."
         done
+    else
+        wait $set_city_pid
     fi
 
     # Read the settings file with the updated city for monitoring
     source $VIBRANIUM_USER_SETTINGS
+
+    : > "$marker"
 fi
 
 temp_data="$VIBRANIUM_RUNTIME/bar.weather.json"

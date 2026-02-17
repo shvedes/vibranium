@@ -93,7 +93,7 @@ _spinner() {
     }
 
     for i in "${spinstr[@]}"; do
-        frame="$(format_text "<span foreground='gray'>$i</span>")"
+        frame="$(format_text "<span rise='-2pt' foreground='gray'>$i</span>")"
 
         jq -nc --unbuffered \
           --arg text "$frame" \
