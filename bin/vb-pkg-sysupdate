@@ -61,7 +61,6 @@ _perform_update() {
 
 _check_reboot() {
     local important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
-    local restart_required=false
 
     for pkg in "${PKG_LIST[@]}"; do
         if [[ $pkg =~ $important_regex ]]; then
@@ -77,18 +76,12 @@ _check_reboot() {
 
                 systemctl reboot
                 exit 0
-            else
-                restart_required=true
             fi
             break
         fi
     done
 
-    if [[ "$restart_required" == true ]]; then
-        echo "System update complete. Restart required"
-    else
-        echo "System update complete. No restart required"
-    fi
+    _update_complete "System update complete"
 }
 
 if ! tty -s; then
