@@ -45,6 +45,7 @@ notify() {
     esac
 
     helpers::check VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD
+    helpers::check VIBRANIUM_GLOBAL_USE_OSD
 
     pp_use_osd="$VIBRANIUM_GLOBAL_POWER_PROFILE_USE_OSD"
     gl_use_osd="$VIBRANIUM_GLOBAL_USE_OSD"
@@ -61,7 +62,6 @@ update_cache() { echo "$1" > "$VIBRANIUM_STATE/power-profile"; }
 toggle_blur() {
     local respect_pp blur_enabled
 
-    helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
     respect_pp="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
 
     blur_enabled="$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')"
@@ -69,7 +69,7 @@ toggle_blur() {
     if [[ "$TARGET_PROFILE" == "power-saver" ]]; then
         if [[ $respect_pp == true ]]; then
             if [[ "$blur_enabled" == 1 ]]; then
-                touch "$VIBRANIUM_STATE/blur.restore"
+                : > "$VIBRANIUM_STATE/blur.restore"
                 vb-cmd-toggle-blur --quiet
             fi
         fi
@@ -77,6 +77,28 @@ toggle_blur() {
         if [[ $blur_enabled == 0 && -f $VIBRANIUM_STATE/blur.restore ]]; then
             vb-cmd-toggle-blur --quiet
             rm "$VIBRANIUM_STATE/blur.restore"
+        fi
+    fi
+}
+
+toggle_shadow() {
+    local respect_pp blur_enabled
+
+    respect_pp="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
+
+    blur_enabled="$(hyprctl -j getoption decoration:shadow:enabled | jq -r '.int')"
+
+    if [[ "$TARGET_PROFILE" == "power-saver" ]]; then
+        if [[ $respect_pp == true ]]; then
+            if [[ "$blur_enabled" == 1 ]]; then
+                : > "$VIBRANIUM_STATE/shadow.restore"
+                vb-cmd-toggle-shadows --quiet
+            fi
+        fi
+    else
+        if [[ $blur_enabled == 0 && -f $VIBRANIUM_STATE/shadow.restore ]]; then
+            vb-cmd-toggle-shadows --quiet
+            rm "$VIBRANIUM_STATE/shadow.restore"
         fi
     fi
 }
@@ -160,8 +182,12 @@ if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
     fi
 fi
 
+helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
+
 vb-cmd-refresh-bar-module power-profile &
 powerprofilesctl set "$TARGET_PROFILE" &
 update_cache "$TARGET_PROFILE"
 notify "$TARGET_PROFILE"
-toggle_blur
+
+toggle_blur &
+toggle_shadow &

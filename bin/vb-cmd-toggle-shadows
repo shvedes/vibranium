@@ -40,4 +40,4 @@ case "$(hyprctl -j getoption decoration:shadow:enabled | jq -r '.int')" in
         ;;
 esac
 
-hyprctl -q reload config-only &
+hyprctl -q reload config-only
