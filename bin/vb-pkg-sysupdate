@@ -91,6 +91,11 @@ _check_reboot() {
     fi
 }
 
+if ! tty -s; then
+    exec setsid vb-core-term "$0"
+    exit
+fi
+
 source vb-core-lib
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
