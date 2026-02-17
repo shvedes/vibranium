@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
 
 _usage() {
-    local progname="${0##*/}"
-
     cat <<EOF
-Usage: $progname [OPTION]...
+Usage: ${0##*/} [OPTION]...
 
 Perform system update using yay, check for important updates, and prompt for reboot if necessary.
 
@@ -16,39 +14,32 @@ Refreshes repositories, lists outdated packages, performs the update, and checks
 
 Report bugs to <your-bug-report-email-or-url>.
 EOF
-    exit 0
 }
 
 _operation_canceled() {
     echo -e "${RED}[VIBRANIUM]${RESET} Operation canceled"
 
-    if [[ $NO_DUMMY == false ]]; then
+    if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
         read -n1 -r -s -p $'. Press any key to exit' dummy
-        printf '\e[?25h' # Show cursor
     fi
+
+    printf '\e[?25h' # Show cursor
 }
 
 _update_complete() {
-    local msg="$*"
+    printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$@"
 
-    printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$msg"
-
-    if [[ $NO_DUMMY == false ]]; then
+    if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
         read -n1 -r -p $'. Press any key to exit' dummy
-        printf '\e[?25h' # Show cursor
     fi
-}
 
-_refresh_repos() {
-    yay -Sy &> /dev/null &
-    local pid="$!"
-    term::spinner "$pid" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories"
+    printf '\e[?25h' # Show cursor
 }
 
 _check_updates() {
     mapfile -t PKG_LIST < <(yay -Qqu)
 
-    if [[ ${#PKG_LIST[@]} -eq 0 ]]; then
+    if (( ${#PKG_LIST[@]} == 0 )); then
         return 1
     fi
 }
@@ -59,32 +50,19 @@ _perform_update() {
     fi
 }
 
-_check_reboot() {
+_check_important() {
     local important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
 
     for pkg in "${PKG_LIST[@]}"; do
         if [[ $pkg =~ $important_regex ]]; then
-            if term::ask_yes_no Y "Important system components have been updated. Restart now?"; then
-
-                # Countdown to reboot
-                for i in {5..1}; do
-                    for dots in "" "." ".." "..."; do
-                        printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$YELLOW" "$RESET" "$i" "$dots"
-                        sleep 0.25
-                    done
-                done
-
-                systemctl reboot
-                exit 0
-            fi
-            break
+            return 0
+        else
+            return 1
         fi
     done
-
-    _update_complete "System update complete"
 }
 
-if ! tty -s; then
+if [[ ! -t 1 ]]; then
     exec setsid vb-core-term "$0"
     exit
 fi
@@ -98,9 +76,9 @@ NO_LOGO=false
 NO_DUMMY=false
 PKG_LIST=()
 
-trap 'printf "\n"; _operation_canceled; exit 1' SIGHUP SIGINT
+trap 'printf "\n"; _operation_canceled; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
 
-while [[ $# -gt 0 ]]; do
+while (( $# > 0 )); do
     case "$1" in
         --no-logo)
             NO_LOGO=true
@@ -112,6 +90,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help)
             _usage
+            exit 0
             ;;
         --)
             shift
@@ -140,7 +119,10 @@ fi
 # Hide cursor
 printf '\e[?25l'
 
-_refresh_repos
+yay -Sy &> /dev/null &
+pid=$!
+
+term::spinner $pid "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories"
 
 if ! _check_updates; then
     _update_complete "You are up to date"
@@ -152,11 +134,31 @@ echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting system update..."
 
 if ! _perform_update; then
     echo -e "${RED}[VIBRANIUM]${RESET} Something went wrong"
+
     _operation_canceled
     exit 1
 fi
 
-vb-cmd-refresh-bar-module pacman
+vb-cmd-refresh-bar-module pacman &
 
-_check_reboot
-_update_complete "$msg"
+if _check_important; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
+
+    if term::ask_yes_no Y "Restart now?"; then
+
+        for i in {5..1}; do
+            for dots in "" "." ".." "..."; do
+                printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$YELLOW" "$RESET" "$i" "$dots"
+                sleep 0.25
+            done
+        done
+
+        systemctl reboot
+        exit 0
+    else
+        _update_complete "System update complete. Restart required"
+    fi
+else
+    _update_complete "System update complete"
+fi
+
