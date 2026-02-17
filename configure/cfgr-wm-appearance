@@ -292,7 +292,21 @@ _blur_submenu() {
         done
 
         case "$chosen" in
-            "Enabled"*)    _edit_bool                    "decoration:blur:enabled"            ;;
+            "Enabled"*)
+                _edit_bool "decoration:blur:enabled"
+
+                case "$enabled" in
+                    "true")
+                        sed -i '/blur_size/s/ =.*/ = 1/' "$HYPRLOCK_CONFIG"
+                        sed -i '/blur_passes/s/ =.*/ = 1/' "$HYPRLOCK_CONFIG"
+                        ;;
+                    "false")
+                        sed -i '/blur_size/s/ =.*/ = 5/' "$HYPRLOCK_CONFIG"
+                        sed -i '/blur_passes/s/ =.*/ = 3/' "$HYPRLOCK_CONFIG"
+                        ;;
+                esac
+
+                ;;
             "Noise"*)      _edit_float "Blur noise"      "decoration:blur:noise"      0.0 1.0 ;;
             "Vibrancy"*)   _edit_float "Blur vibrancy"   "decoration:blur:vibrancy"   0.0 1.0 ;;
             "Brightness"*) _edit_float "Blur brightness" "decoration:blur:brightness" 0.0 2.0 ;;
@@ -550,6 +564,7 @@ _gaps_submenu() {
 INDEX=0
 SMART_GAPS_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/smart-gaps.conf"
 HYPR_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/look-and-feel.conf"
+HYPRLOCK_CONFIG="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 AUTORELOAD_DISABLED="$(hyprctl -j getoption 'misc:disable_autoreload' | jq -r '.int')"
 
 # Cache defaults (for further validation)
