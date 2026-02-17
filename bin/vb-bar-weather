@@ -2,6 +2,10 @@
 
 source vb-core-lib
 
+helpers::parse_defaults
+helpers::check VIBRANIUM_BAR_WEATHER_MODULE_ENABLE
+helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
+
 if [[ $VIBRANIUM_BAR_WEATHER_MODULE_ENABLE == false ]]; then
     printf '{"text": ""}'
     exit 0
@@ -11,9 +15,15 @@ elif ! pidof -q waybar; then
 fi
 
 if ! command -v wttrbar > /dev/null; then
-    text="<span  foreground='red2'>\uf071</span>"
+    text="<span foreground='red2'>\uf071</span>"
+
+    if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" ]]; then
+        text+="   <span foreground='DimGray'>|</span>"
+    fi
+
     tooltip="Unable to fetch weather!\n"
     tooltip+="Missing dependencies: wttrbar"
+
     printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
     exit 0
 fi
@@ -64,7 +74,6 @@ _spinner() {
     done
 }
 
-helpers::parse_defaults
 helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
 
 if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == false ]]; then
