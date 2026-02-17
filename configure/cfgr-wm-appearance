@@ -210,7 +210,11 @@ _set_animations_preset() {
         [[ -z "$anim_chosen" ]] && break
 
         ln -sf "$folder/$anim_chosen.conf" "$target"
-        hyprctl -q reload config-only
+
+        if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
+            hyprctl -q reload config-only
+        fi
+
         break
     done
 }
@@ -220,7 +224,10 @@ _edit_bool() {
         1) vb-cmd-edit-wm-config "${1}:false" "$HYPR_CONFIG" ;;
         0) vb-cmd-edit-wm-config "${1}:true"  "$HYPR_CONFIG" ;;
     esac
-    hyprctl -q reload config-only
+
+    if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
+        hyprctl -q reload config-only
+    fi
 }
 
 _blur_submenu() {
@@ -293,6 +300,10 @@ _blur_submenu() {
             "Size"*)       _edit_int   "Blur size"       "decoration:blur:size"   ;;
             "Passes"*)     _edit_int   "Blur passes"     "decoration:blur:passes" ;;
         esac
+
+        if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
+            hyprctl -q reload config-only
+        fi
     done
 }
 
@@ -363,6 +374,10 @@ _shadow_submenu() {
                     _edit_int "Shadow range" "decoration:shadow:range" 8 128
                 fi
         esac
+
+        if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
+            hyprctl -q reload config-only
+        fi
     done
 }
 
@@ -445,6 +460,10 @@ _decoration_submenu() {
             "Dim strength"*)              _edit_float "Dim strength"       "decoration:dim_strength"       0.0 1.0  ;;
             "Border part of window"*)     _edit_bool                       "decoration:border_part_of_window"       ;;
         esac
+
+        if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
+            hyprctl -q reload config-only
+        fi
     done
 }
 
@@ -521,12 +540,17 @@ _gaps_submenu() {
             "Outer gaps"*) _edit_int "Outer gaps" "general:gaps_out" 0 50 ;;
             "Smart gaps"*) vb-cmd-toggle-smart-gaps ;;
         esac
+
+        if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
+            hyprctl -q reload config-only
+        fi
     done
 }
 
 INDEX=0
 SMART_GAPS_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/smart-gaps.conf"
 HYPR_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/look-and-feel.conf"
+AUTORELOAD_DISABLED="$(hyprctl -j getoption 'misc:disable_autoreload' | jq -r '.int')"
 
 # Cache defaults (for further validation)
 helpers::parse_defaults
