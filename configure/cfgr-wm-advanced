@@ -55,7 +55,7 @@ while true; do
                 "false") vb-cmd-edit-wm-config "misc:disable_autoreload:true" "$CONFIG" ;;
             esac
 
-            hyprctl reload config-only
+            hyprctl -q reload config-only
             ;;
         "Middle Click Paste"*)
             case "$current_middle_click" in

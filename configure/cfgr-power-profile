@@ -2,33 +2,6 @@
 
 source vb-core-lib
 
-_toggle_respect_pp_option() {
-    local config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
-    local blur_status="$(hyprctl -j getoption decoration:blur:enabled | jq -r '.int')"
-    local shadow_status="$(hyprctl -j getoption decoration:shadow:enabled | jq -r '.int')"
-    local current_power_profile="$(vb-cmd-get-power)"
-
-    if [[ $(helpers::configure::toggle_bool -v VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE) == true ]]; then
-        [[ $current_power_profile == power-saver && $blur_status == 1 ]] && {
-            : > "$VIBRANIUM_STATE/blur.restore"
-            vb-cmd-toggle-blur -q &
-        }
-        [[ $shadow_status == 1 ]] && {
-            : > "$VIBRANIUM_STATE/shadow.restore"
-            vb-cmd-toggle-shadows -q &
-        }
-    else
-        [[ -f "$VIBRANIUM_STATE/blur.restore" && $blur_status == 0 ]] && {
-            rm -f "$VIBRANIUM_STATE/blur.restore"
-            vb-cmd-toggle-blur -q &
-        }
-        [[ -f "$VIBRANIUM_STATE/shadow.restore" && $shadow_status == 0 ]] && {
-            rm -f "$VIBRANIUM_STATE/shadow.restore"
-            vb-cmd-toggle-shadows -q &
-        }
-    fi
-}
-
 INDEX=0
 
 # Cache defaults (for further validation)
@@ -58,7 +31,8 @@ while true; do
 
     case "$CHOSEN" in
         "Respect"*)
-            _toggle_respect_pp_option
+            helpers::configure::toggle_bool -v VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
+            vb-cmd-toggle-decorations
             ;;
         "Visual"*)
             helpers::configure::toggle_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK

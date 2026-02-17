@@ -2,6 +2,9 @@
 
 source vb-core-lib
 
+helpers::parse_defaults
+helpers::check VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE
+
 if ! [[ $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE == true ]]; then
     printf '{"text": ""}'
     exit 0

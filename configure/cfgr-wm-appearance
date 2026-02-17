@@ -285,14 +285,7 @@ _blur_submenu() {
         done
 
         case "$chosen" in
-            "Enabled"*)
-                if [[ $enabled == true ]]; then
-                    rm -f "$VIBRANIUM_STATE/blur.restore"
-                else
-                    touch "$VIBRANIUM_STATE/blur.restore"
-                fi
-                vb-cmd-toggle-blur --quiet
-                ;;
+            "Enabled"*)    _edit_bool                    "decoration:blur:enabled"            ;;
             "Noise"*)      _edit_float "Blur noise"      "decoration:blur:noise"      0.0 1.0 ;;
             "Vibrancy"*)   _edit_float "Blur vibrancy"   "decoration:blur:vibrancy"   0.0 1.0 ;;
             "Brightness"*) _edit_float "Blur brightness" "decoration:blur:brightness" 0.0 2.0 ;;
@@ -359,10 +352,10 @@ _shadow_submenu() {
         done
 
         case "$chosen" in
-            "Enabled"*) vb-cmd-toggle-shadows ;;
-            "Power"*)   _edit_int "Render power" "decoration:shadow:render_power" 1 4    ;;
-            "Sharp"*)   _edit_bool               "decoration:shadow:sharp"               ;;
-            "Behind"*)  _edit_bool               "decoration:shadow:ignore_window"       ;;
+            "Enabled"*) _edit_bool               "decoration:shadow:enabled"           ;;
+            "Sharp"*)   _edit_bool               "decoration:shadow:sharp"             ;;
+            "Behind"*)  _edit_bool               "decoration:shadow:ignore_window"     ;;
+            "Power"*)   _edit_int  "Render power" "decoration:shadow:render_power" 1 4 ;;
             "Range"*)
                 if [[ "$sharp" == true ]]; then
                     _edit_int "Shadow range" "decoration:shadow:range" 1 128
