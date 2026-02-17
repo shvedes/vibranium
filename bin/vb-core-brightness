@@ -339,6 +339,20 @@ case "$method" in
             else
                 log::info "Only one monitor found. Not showing monitor name in the notification title"
             fi
+
+            # Suppress the notification when the active window is fullscreen.
+            # Dunst queues notifications during fullscreen and shows them only
+            # after exiting fullscreen, which makes them stale and irrelevant.
+            #
+            # We don't apply this rule to OSD notifications because
+            # it defeats the purpose of OSDs
+
+            fullscreen_state="$(hyprctl -j activewindow | jq -r '.fullscreen')"
+
+            if (( "$fullscreen_state" == 2 )); then
+                exit
+            fi
+
             if [[ ! $2 =~ ^[0-9]+$ ]]; then
                 notify-send -r 2 -t 1000 "Brightness $source${new}%" -h int:value:"$new"
             fi

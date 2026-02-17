@@ -13,21 +13,35 @@ EOF
 show_volume_notification() {
     local device="$1"
     local type="$2"
-    local vol_info muted vol display_vol bar_value max_vol_factor
+    local vol_info muted vol display_vol bar_value max_vol
+
+    # Suppress the notification when the active window is fullscreen.
+    # Dunst queues notifications during fullscreen and shows them only
+    # after exiting fullscreen, which makes them stale and irrelevant.
+    #
+    # We don't apply this rule to OSD notifications because
+    # it defeats the purpose of OSDs
+
+    local fullscreen_state
+    fullscreen_state="$(hyprctl -j activewindow | jq -r '.fullscreen')"
+
+    if (( "$fullscreen_state" == 2 )); then
+        return
+    fi
 
     vol_info=$(wpctl get-volume "$device")
     read -r _ vol muted <<< "$vol_info"
 
     if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
-        max_vol_factor=1.5
+        max_vol=1.5
     else
-        max_vol_factor=1.0
+        max_vol=1.0
     fi
 
     # To display the progress bar, libnotify only accepts values from 0 to 100. If the user has enabled above 100%,
     # we need to convert the volume values to a 100% scale in order to display the progress bar correctly.
     display_vol=$(awk -v v="$vol" 'BEGIN {printf "%d", v*100}')
-    bar_value=$(awk -v v="$vol" -v max="$max_vol_factor" 'BEGIN {printf "%d", (v/max)*100}')
+    bar_value=$(awk -v v="$vol" -v max="$max_vol" 'BEGIN {printf "%d", (v/max)*100}')
 
     if [[ "$muted" == "[MUTED]" ]]; then
         notify-send -r 2 -t 1000 "$type Muted"
