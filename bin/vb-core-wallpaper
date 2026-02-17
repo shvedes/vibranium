@@ -113,6 +113,9 @@ esac
 # should copy this file to the folder that contains user wallpapers
 # only. Why copy? In case if original file gets deleted
 if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
+
+    mkdir -p "$USER_WALLPAPERS"
+
     if [[ ! -f "$USER_WALLPAPERS/${WALLPAPER_PATH##*/}" ]]; then
         cp "$WALLPAPER_PATH" "$USER_WALLPAPERS/"
         WALLPAPER_PATH="$USER_WALLPAPERS/${WALLPAPER_PATH##*/}"

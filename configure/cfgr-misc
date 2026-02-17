@@ -64,8 +64,10 @@ _manage_user_wallpapers() {
 
     _action() {
         local target options chosen
+
         target="$1"
         options=("Open" "Delete")
+
         while true; do
             chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "$target" "ESC to go back")"
             [[ -z "$chosen" ]] && return
@@ -92,7 +94,9 @@ _manage_user_wallpapers() {
                     # Refresh files list after delete
                     files=()
                     for f in "$folder"/*; do
-                        [[ -f "$f" ]] && files+=(${f##*/})
+                        if [[ -f "$f" ]]; then
+                            files+=(${f##*/})
+                        fi
                     done
                     ;;
             esac
@@ -104,13 +108,16 @@ _manage_user_wallpapers() {
     files=()
 
     for f in "$folder"/*; do
-        [[ -f "$f" ]] && files+=(${f##*/})
+        if [[ -f "$f" ]]; then
+            files+=(${f##*/})
+        fi
     done
 
     local index=0
 
     while true; do
         if [[ ${#files[@]} -eq 0 ]]; then
+            rmdir "$folder"
             return
         fi
 
