@@ -3,8 +3,10 @@
 		"format": "{text}",
 		"hide-empty-text":  true,
 
+        "exec-on-event": true,
 		"exec": "vb-bar-pacman",
-		"on-click": "vb-pkg-sysupdate",
+		"on-click": "vb-bar-pacman --refresh",
+		"on-click-right": "vb-pkg-sysupdate",
 		"restart-interval": 900, // 15 min
 		"return-type": "json",
 		"signal": 5

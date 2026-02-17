@@ -9,45 +9,93 @@ helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
 if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == false ]]; then
     printf '{"text": ""}'
     exit 0
-elif ! pidof -q waybar; then
-    log::error "Waybar is not active!"
-    exit 1
+fi
+
+# See comments below
+IGNORE_SYSTEMD=false
+
+# Decide whether to animate the 'on-click' event
+REFRESH=false
+
+while (( $# != 0 )); do
+    case "$1" in
+        --ignore-systemd)
+            IGNORE_SYSTEMD=true
+            shift
+            ;;
+        --refresh)
+            REFRESH=true
+            shift
+            ;;
+        # Ignore invalid flags
+        *) : ;;
+    esac
+done
+
+# Waybar is launched via systemd, so ideally we get its PID
+# via a systemctl call (this is also slightly faster than calling pidof).
+# If Waybar was launched via a terminal, the module will not work,
+# as systemctl will return PID 0 (not found).
+WAYBAR_PID="$(systemctl --user show waybar -p MainPID --value)"
+
+# Why am I writing this logic?
+# Like, really, dude...
+if (( WAYBAR_PID == 0 )); then
+    # Got PID 0, which means that Waybar is either
+    # inactive or was launched from a terminal.
+    if [[ "$IGNORE_SYSTEMD" == false ]]; then
+        [[ -t 1 ]] && {
+            log::error "Waybar should be launched as systemd service!"
+            log::error "Use flag --ignore-systemd to bypass this restriction."
+        }
+        exit 1
+    fi
 fi
 
 if ! command -v checkupdates > /dev/null; then
-    text=""
+    # The script has stdout
+    # (e.g. executed manually from a terminal window)
+    [[ -t 1 ]] && {
+        log::error "Missing required dependencies: pacman-contrib"
+        log::error "To install, run 'sudo pacman -S pacman-contrib'"
+        exit 1
+    }
 
+    # Build error message
+    text=""
     if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" ]]; then
         text+="<span foreground='DimGray'>|</span>   "
     fi
 
     text+="<span foreground='red2'>\uf071</span>"
-
-    tooltip="Unable to fetch updates!\n"
-    tooltip+="Missing dependencies: pacman-contrib"
+    tooltip="Missing required dependencies: pacman-contrib"
 
     printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
+
+    # Exit with code 0.
+    # Otherwise Waybar won't display json string
     exit 0
 fi
 
 _spinner() {
-    local tooltip="$1"
+    local tooltip="$@"
     local delay=0.1
     local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
     format_text() {
         local text="$1"
-        if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
+
+        [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]] && {
             text="<span foreground='DimGray'>|</span> "
             text+="$1"
-        fi
+        }
         printf '%s' "$text"
     }
 
     for i in "${spinstr[@]}"; do
         frame="$(format_text "<span foreground='gray'>$i</span>")"
 
-        jq -nc \
+        jq -nc --unbuffered \
           --arg text "$frame" \
           --arg tooltip "$tooltip" \
           '{text:$text, tooltip:$tooltip}'
@@ -56,82 +104,121 @@ _spinner() {
     done
 }
 
-wait_for_connection() {
-    while ! ping 8.8.8.8 -c 1 &> /dev/null; do
-        sleep 1
-    done
-}
-
 make_tooltip() {
     local files=("$@")
     local any=false
-    for f in "${files[@]}"; do
-        [[ -s "$f" ]] && any=true && break
-    done
-    $any || { echo ""; return; }
 
+    # Sort if there are any lines in cache files.
+    for f in "${files[@]}"; do
+        # If found at least one.
+        if [[ -s "$f" ]]; then
+            any=true
+            break
+        fi
+    done
+
+    # If not then there's no updates available.
+    if [[ "$any" == false ]]; then
+        printf "You're up to date! Click to refresh"
+        return
+    fi
+
+    # Parse updates list.
+    # See the vb-bar-pacman.awk for explanation.
     awk -f "$VIBRANIUM/awk/vb-bar-pacman.awk" "${files[@]}"
 }
 
-get_arch_updates() { checkupdates --nocolor; }
+get_arch_updates() { checkupdates --nocolor 2> /dev/null; }
 get_aur_updates() { yay -Qua 2> /dev/null; }
 
-wait_for_connection
+# Wait for the internet connection first.
+# Try 3 times for different IPs (Cloudflare & Google)
+while true; do
+    for attempt in {1..3}; do
+        if ping -c 1 -W 1 1.1.1.1 &> /dev/null; then
+            break 2
+        fi
 
-helpers::check VIBRANIUM_BAR_SHOW_ANIMATION true
+        if ping -c 1 -W 1 8.8.8.8 &> /dev/null; then
+            break 2
+        fi
+    done
 
-if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == false ]]; then
-    show_spinner=false
+    _spinner "Waiting for the internet connection..."
+done
+
+marker="${VIBRANIUM_RUNTIME}/bar.updates.pid.${WAYBAR_PID}"
+
+# Forcefully show loading animation if executed with --refresh flag.
+# This is used in the 'on-click' event.
+if [[ "$REFRESH" == "true" ]]; then
+    # Forcefully remove old marker.
+    rm -f "${marker%.*}".*
+    show_spinner=true
 else
-    marker="$VIBRANIUM_RUNTIME/bar_updates.$(pidof waybar)"
-    if [[ -f $marker ]]; then
+    helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
+
+    if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == false ]]; then
         show_spinner=false
     else
-        show_spinner=true
-        rm -f "${marker%.*}".*
-        touch "$marker"
+
+        if [[ -f "$marker" ]]; then
+            show_spinner=false
+        else
+            show_spinner=true
+
+            # Remove old markers
+            rm -f "${marker%.*}".*
+
+            # Create new one
+            : > "$marker"
+        fi
     fi
 fi
 
-(get_arch_updates > $VIBRANIUM_RUNTIME/bar_updates.arch) &
+arch_cache="$VIBRANIUM_RUNTIME/bar.updates.arch"
+aur_cache="$VIBRANIUM_RUNTIME/bar.updates.aur"
+
+(get_arch_updates > "$arch_cache") &
 arch_pid=$!
 
-(get_aur_updates > $VIBRANIUM_RUNTIME/bar_updates.aur) &
+(get_aur_updates > "$aur_cache") &
 aur_pid=$!
 
-if [[ $show_spinner == true ]]; then
+if [[ "$show_spinner" == "true" ]]; then
     while kill -0 $arch_pid 2> /dev/null || kill -0 $aur_pid 2> /dev/null; do
-        _spinner "Fetching updates..."
+        _spinner "Getting updates..."
     done
+else
+    # Wait for pids (if no animation used)
+    wait $arch_pid $aur_pid
 fi
 
-wait $arch_pid $aur_pid
-
-arch_count="$(wc -l < $VIBRANIUM_RUNTIME/bar_updates.arch)"
-aur_count="$(wc -l < $VIBRANIUM_RUNTIME/bar_updates.aur)"
+arch_count="$(wc -l < "$arch_cache")"
+aur_count="$(wc -l < "$aur_cache")"
 
 helpers::check VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES
-if [[ $VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES == false ]] ; then
+if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES" == "false" ]] ; then
     total_count=$(( arch_count + aur_count ))
-    if [[ $total_count -eq 0 ]]; then
+
+    if (( $total_count == 0 )); then
         printf '{"text": ""}'
         exit 0
     fi
 fi
 
-arch_info="$VIBRANIUM_RUNTIME/bar_updates.arch"
-aur_info="$VIBRANIUM_RUNTIME/bar_updates.aur"
-
-tooltip="$(make_tooltip "$arch_info" "$aur_info")"
-
-if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
+if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == "true" ]]; then
     text="<span foreground='DimGray'>|</span> "
 fi
 
 icon="<span rise='1pt' foreground='CornflowerBlue'>󰏔</span>"
 text+="$icon $((arch_count + aur_count))"
+tooltip="$(make_tooltip "$arch_cache" "$aur_cache")"
 
-jq -nc \
+# We don't need clutter, right?
+rm -f "$arch_cache" "$aur_cache"
+
+jq -nc --unbuffered \
     --arg text "$text" \
     --arg tooltip "$tooltip" \
     '{text: $text, tooltip: $tooltip}'

@@ -6,119 +6,204 @@ helpers::parse_defaults
 helpers::check VIBRANIUM_BAR_WEATHER_MODULE_ENABLE
 helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
 
-if [[ $VIBRANIUM_BAR_WEATHER_MODULE_ENABLE == false ]]; then
+if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE" == false ]]; then
     printf '{"text": ""}'
     exit 0
-elif ! pidof -q waybar; then
-    log::error "Waybar is not active!"
-    exit 1
 fi
 
-if ! command -v wttrbar > /dev/null; then
-    text="<span foreground='red2'>\uf071</span>"
+# See comments below
+IGNORE_SYSTEMD=false
 
+# Decide whether to animate the 'on-click' event
+REFRESH=false
+
+while (( $# != 0 )); do
+    case "$1" in
+        --ignore-systemd)
+            IGNORE_SYSTEMD=true
+            shift
+            ;;
+        --refresh)
+            REFRESH=true
+            shift
+            ;;
+        # Ignore invalid flags
+        *) : ;;
+    esac
+done
+
+# Waybar is launched via systemd, so ideally we get its PID
+# via a systemctl call (this is also slightly faster than calling pidof).
+# If Waybar was launched via a terminal, the module will not work,
+# as systemctl will return PID 0 (not found).
+WAYBAR_PID="$(systemctl --user show waybar -p MainPID --value)"
+
+# Why am I writing this logic?
+# Like, really, dude...
+if (( WAYBAR_PID == 0 )); then
+    # Got PID 0, which means that Waybar is either
+    # inactive or was launched from a terminal.
+    if [[ "$IGNORE_SYSTEMD" == false ]]; then
+        [[ -t 1 ]] && {
+            log::error "Waybar should be launched as systemd service!"
+            log::error "Use flag --ignore-systemd to bypass this restriction."
+        }
+        exit 1
+    fi
+fi
+
+if ! command -v checkupdates > /dev/null; then
+    # The script has stdout
+    # (e.g. executed manually from a terminal window)
+    [[ -t 1 ]] && {
+        log::error "Missing required dependencies: wttrbar"
+        log::error "To install, run 'yay -S wttrbar'"
+        exit 1
+    }
+
+    # Build error message
+    text=""
     if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" ]]; then
-        text+="   <span foreground='DimGray'>|</span>"
+        text+="<span foreground='DimGray'>|</span>   "
     fi
 
-    tooltip="Unable to fetch weather!\n"
-    tooltip+="Missing dependencies: wttrbar"
+    text+="<span foreground='red2'>\uf071</span>"
+    tooltip="Missing required dependencies: wttrbar"
 
     printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
+
+    # Exit with code 0.
+    # Otherwise Waybar won't display json string
     exit 0
 fi
 
-_set_city() {
-    local opt city
-
-    opt="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
-
-    # Wait for the internet connection
-    while ! curl -s --max-time 5 -I --fail https://clients3.google.com/generate_204 > /dev/null; do
-        sleep 1
-    done
-
-    city="$(curl -s --max-time 5 http://ip-api.com/json | jq -r '.city')"
-
-    helpers::configure::verify_option "$opt"
-    sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$XDG_CONFIG_HOME/vibranium/settings"
-}
-
 _spinner() {
-    local pid="$1"
-    local msg="$2"
-    local tooltip="$3"
-
+    local tooltip="$@"
     local delay=0.1
     local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
     format_text() {
         local text="$1"
-        if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
-            text+="<span foreground='DimGray'> |</span>"
-        fi
+
+        [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]] && {
+            text="<span foreground='DimGray'>|</span> "
+            text+="$1"
+        }
         printf '%s' "$text"
     }
 
-    while kill -0 "$pid" 2>/dev/null; do
-        for i in "${spinstr[@]}"; do
-            frame="$(format_text "$msg <span foreground='gray'>$i</span>")"
+    for i in "${spinstr[@]}"; do
+        frame="$(format_text "<span foreground='gray'>$i</span>")"
 
-            jq -nc \
-              --arg text "$frame" \
-              --arg tooltip "$tooltip" \
-              '{text:$text, tooltip:$tooltip}'
+        jq -nc --unbuffered \
+          --arg text "$frame" \
+          --arg tooltip "$tooltip" \
+          '{text:$text, tooltip:$tooltip}'
 
-            sleep "$delay"
-        done
+        sleep "$delay"
     done
 }
 
-helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
+_set_city() {
+    local opt city cfg
 
-if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == false ]]; then
-    show_spinner=false
+    opt="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
+    cfg="$XDG_CONFIG_HOME/vibranium/settings"
+
+    city="$(curl -s --max-time 5 http://ip-api.com/json | jq -r '.city')"
+
+    # Verify and populate user settings file.
+    helpers::configure::verify_option "$opt"
+    sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$cfg"
+}
+
+# Wait for the internet connection first.
+# Try 3 times for different IPs (Cloudflare & Google)
+while true; do
+    for attempt in {1..3}; do
+        if ping -c 1 -W 1 1.1.1.1 &> /dev/null; then
+            break 2
+        fi
+
+        if ping -c 1 -W 1 8.8.8.8 &> /dev/null; then
+            break 2
+        fi
+    done
+
+    _spinner "Waiting for the internet connection..."
+done
+
+marker="${VIBRANIUM_RUNTIME}/bar.weather.pid.${WAYBAR_PID}"
+
+# Forcefully show loading animation if executed with --refresh flag.
+# This is used in the 'on-click' event.
+if [[ "$REFRESH" == "true" ]]; then
+    # Forcefully remove old marker.
+    rm -f "${marker%.*}".*
+    show_spinner=true
 else
-    marker="$VIBRANIUM_RUNTIME/bar_weather.$(pidof waybar)"
-    if [[ -f $marker ]]; then
+    helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
+
+    if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == false ]]; then
         show_spinner=false
     else
-        show_spinner=true
-        rm -f "${marker%.*}".*
-        touch "$marker"
+
+        if [[ -f "$marker" ]]; then
+            show_spinner=false
+        else
+            show_spinner=true
+
+            # Remove old markers
+            rm -f "${marker%.*}".*
+
+            # Create new one
+            : > "$marker"
+        fi
     fi
 fi
 
-if [[ $VIBRANIUM_BAR_WEATHER_MODULE_CITY == "Dublin" ]]; then
+if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" == "not_set" ]]; then
     _set_city &
-    set_city_pid="$!"
-    _spinner "$set_city_pid" " " "Getting location..."
-    # Source user settings with weather location set
+    set_city_pid=$!
+
+    if [[ "$show_spinner" == "true" ]]; then
+        while kill -0 $set_city_pid 2> /dev/null; do
+            _spinner "Getting your location..."
+        done
+    fi
+
+    # Read the settings file with the updated city for monitoring
     source $VIBRANIUM_USER_SETTINGS
 fi
 
-temp_data="$VIBRANIUM_RUNTIME/waybar_weather.json"
-wttrbar --location $VIBRANIUM_BAR_WEATHER_MODULE_CITY > "$temp_data" &
+temp_data="$VIBRANIUM_RUNTIME/bar.weather.json"
+
+wttrbar --location "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" > "$temp_data" &
 pid=$!
 
-if [[ $show_spinner == true ]]; then
-    _spinner "$pid" " " "Fetching weather..."
+if [[ "$show_spinner" == "true" ]]; then
+    while pkill -0 $pid 2> /dev/null; do
+        _spinner "Fetching weather..."
+    done
+else
+    # Wait for pid (if no animation used)
+    wait $pid
 fi
-
-wait "$pid"
 
 weather_json="$(< "$temp_data")"
 
-rm -f "$temp_data"
-
-text="$(jq -r '.text' <<<"$weather_json")"
-tooltip="$(jq -r '.tooltip' <<<"$weather_json")"
+# Build json output
+text="$(jq -r '.text' <<< "$weather_json")"
+tooltip="$(jq -r '.tooltip' <<< "$weather_json")"
 
 if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
     text+="<span foreground='DimGray'> |</span>"
 fi
 
+rm -f "$temp_data"
+
 jq -nc \
   --arg text "$text" \
   --arg tooltip "$tooltip" \
   '{text: $text, tooltip: $tooltip}'
+

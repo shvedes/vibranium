@@ -130,10 +130,22 @@ while true; do
             ;;
         "Updates"*)
             helpers::configure::toggle_bool "VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
+
+            # Remove any existing PID marker to allow the loading animation
+            # to restart. This is necessary when modules are toggled while
+            # reusing the same Waybar PID.
+            rm -f "$VIBRANIUM_RUNTIME"/bar_updates.*
+
             vb-cmd-refresh-bar-module pacman
             ;;
         "Weather"*)
             helpers::configure::toggle_bool "VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
+
+            # Remove any existing PID marker to allow the loading animation
+            # to restart. This is necessary when modules are toggled while
+            # reusing the same Waybar PID.
+            rm -f "$VIBRANIUM_RUNTIME"/bar_weather.*
+
             vb-cmd-refresh-bar-module weather
             ;;
     esac

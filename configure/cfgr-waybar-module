@@ -32,12 +32,15 @@ _updates_weather_specific() {
         done
 
         case "$chosen" in
-            "Animate first run"*) helpers::configure::toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION" ;;
-            "Show separators"*)   helpers::configure::toggle_bool "VIBRANIUM_BAR_SHOW_SEPARATOR" ;;
+            "Animate first run"*)
+                helpers::configure::toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION"
+                ;;
+            "Show separators"*)
+                helpers::configure::toggle_bool "VIBRANIUM_BAR_SHOW_SEPARATOR"
+                vb-cmd-refresh-bar-module pacman &
+                vb-cmd-refresh-bar-module weather &
+                ;;
         esac
-
-        vb-cmd-refresh-bar-module pacman &
-        vb-cmd-refresh-bar-module weather &
     done
 }
 
