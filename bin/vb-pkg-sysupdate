@@ -29,7 +29,7 @@ _operation_canceled() {
 }
 
 _update_complete() {
-    local msg="$1"
+    local msg="$*"
 
     printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$msg"
 
