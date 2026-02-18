@@ -26,7 +26,6 @@ pid="$(systemd-inhibit --no-pager | awk '/Vibranium/ {print $4}')"
 if [[ -n "$pid" ]]; then
     kill "$pid"
 else
-    helpers::parse_defaults
     helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
     type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
 

@@ -109,7 +109,6 @@ else
     fi
 fi
 
-helpers::parse_defaults
 
 # Build pango formatted message for the lock screen.
 if [[ "$hyprlock" == true ]]; then

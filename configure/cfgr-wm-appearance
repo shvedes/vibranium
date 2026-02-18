@@ -567,8 +567,6 @@ HYPR_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/look-and-fee
 HYPRLOCK_CONFIG="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 AUTORELOAD_DISABLED="$(hyprctl -j getoption 'misc:disable_autoreload' | jq -r '.int')"
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 while true; do
     mapfile -t PARAMETERS < <(

@@ -191,8 +191,6 @@ if [ $# -lt 2 ]; then
     exit 0
 fi
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 helpers::check VIBRANIUM_GLOBAL_USE_OSD
 helpers::check VIBRANIUM_VOLUME_ADJUSTMENT_STEP

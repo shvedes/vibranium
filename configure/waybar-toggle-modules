@@ -34,8 +34,6 @@ _power_profile_notify() {
 
 INDEX=0
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"

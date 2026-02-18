@@ -205,8 +205,6 @@ osd() {
     swayosd-client --custom-icon="$icon" --custom-progress="$progress" || true
 }
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 if ! ACTIVE_MONITOR="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"; then
     log::error "Cannot determine the active monitor!"

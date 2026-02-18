@@ -20,8 +20,6 @@ if pid=$(pidof rofi); then
     exit 0
 fi
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS
@@ -120,8 +118,6 @@ set_rofi_flags() {
     esac
 }
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 if [[ "$auto_select" == true ]]; then
     echo "info: auto select enabled"

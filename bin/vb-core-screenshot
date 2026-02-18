@@ -120,9 +120,6 @@ capture() {
 }
 
 init() {
-    # Cache defaults (for further validation)
-    helpers::parse_defaults
-
     helpers::check VIBRANIUM_SCREENSHOT_FILE_TYPE
     helpers::check VIBRANIUM_SCREENSHOT_FLASH_SCREEN
     helpers::check VIBRANIUM_SCREENSHOT_FLASH_BORDER

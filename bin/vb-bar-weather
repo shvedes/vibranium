@@ -2,7 +2,6 @@
 
 source vb-core-lib
 
-helpers::parse_defaults
 helpers::check VIBRANIUM_BAR_WEATHER_MODULE_ENABLE
 helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
 

@@ -98,8 +98,6 @@ _ensure_deps
 
 source vb-core-lib
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 USER_ARGS=()
 PROFILES=("power-saver" "balanced" "performance")

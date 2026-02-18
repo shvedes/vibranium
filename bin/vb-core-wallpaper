@@ -122,7 +122,6 @@ if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
     fi
 fi
 
-helpers::parse_defaults
 helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
 
 if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then

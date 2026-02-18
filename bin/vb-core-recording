@@ -187,8 +187,6 @@ start_rec() {
     fi
 }
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 if pid="$(pidof gpu-screen-recorder)"; then
     log::info "recording saved"

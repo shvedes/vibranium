@@ -114,8 +114,6 @@ _updates_submenu() {
 
 INDEX=0
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 while true; do
     OPTIONS=("Updates" "Weather")

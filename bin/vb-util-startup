@@ -6,7 +6,6 @@
 
 source vb-core-lib
 
-helpers::parse_defaults
 
 LOGFILE="$VIBRANIUM_CACHE/${0##*/}.errors"
 

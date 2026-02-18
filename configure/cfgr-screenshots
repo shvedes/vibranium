@@ -36,8 +36,6 @@ _delete_existing_screenshots() {
 
 ANIMATIONS_ENABLED="$(hyprctl -j getoption animations:enabled | jq '.int')"
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"

@@ -63,8 +63,6 @@ if pid=$(pidof hyprpicker); then
     exit 1
 fi
 
-# Cache defaults (for further validation)
-helpers::parse_defaults
 
 helpers::check VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR
 helpers::check VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW
