@@ -186,25 +186,6 @@ _set_notification_timeout() {
     done
 }
 
-_update_reading_mode() {
-    local shader="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
-    if [[ ! $shader = \[\[EMPTY\]\] ]]; then
-        shader="${shader##*/}"
-        local config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
-
-        case "$shader" in
-            "e-ink"*)
-                sed -i "s/${shader}/grayscale.glsl/" "$config"
-                ;;
-            "grayscale"*)
-                sed -i "s/${shader}/e-ink.glsl/" "$config"
-                ;;
-        esac
-
-        hyprctl -q reload config-only
-    fi
-}
-
 _pick_cursor_theme() {
     local options=()
     local chosen
@@ -361,7 +342,6 @@ while true; do
         "Terminal opacity : $(_get_term_opacity)"
         "Notification timeout : $(_get_notification_timeout)s"
         "<b>Manage user wallpapers</b>"
-        "<b>Reading mode</b>"
         "<b>Now Playing</b>"
         "<b>Edit env</b>"
     )
@@ -406,11 +386,6 @@ while true; do
             vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
             vb-cmd-kill-rofi
             exit 0
-            ;;
-        *"Reading mode"*)
-            helpers::configure::set_string VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE \
-                "Shader type" "Grayscale:grayscale" "E-Ink like:e-ink"
-            _update_reading_mode &
             ;;
     esac
 done
