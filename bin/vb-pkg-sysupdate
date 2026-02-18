@@ -17,7 +17,7 @@ EOF
 }
 
 _operation_canceled() {
-    echo -e "${RED}[VIBRANIUM]${RESET} Operation canceled"
+    printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
 
     if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
         read -n1 -r -s -p $'. Press any key to exit' dummy
