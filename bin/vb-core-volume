@@ -155,6 +155,22 @@ set_volume() {
     local float_val mute_state
     float_val=$(awk -v v="$int_val" 'BEGIN {printf "%.2f", v/100}')
 
+    if (( int_val == 0 )); then
+        wpctl set-volume "$device" 0
+        wpctl set-mute "$device" 1
+
+        if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true && "$quiet" != true ]]; then
+            if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+                swayosd-client \
+                    --custom-icon="audio-volume-muted-symbolic" \
+                    --custom-progress="0.0001"
+            else
+                show_volume_notification "$device" "Volume"
+            fi
+        fi
+        return
+    fi
+
     read -r _ _ mute_state <<< "$(wpctl get-volume "$device")"
     if [[ "$mute_state" == "[MUTED]" ]]; then
         wpctl set-mute "$device" 0
@@ -169,10 +185,8 @@ set_volume() {
             # a label showing the real percentage.
             local osd_progress osd_icon
             osd_progress=$(awk -v v="$int_val" -v max="$max_volume" \
-                'BEGIN {p = v/max; printf "%.4f", (p < 0.001 ? 0.001 : p)}')
-            if (( int_val == 0 )); then
-                osd_icon="audio-volume-muted-symbolic"
-            elif (( int_val <= 33 )); then
+                'BEGIN {printf "%.4f", v/max}')
+            if (( int_val <= 33 )); then
                 osd_icon="audio-volume-low-symbolic"
             elif (( int_val <= 66 )); then
                 osd_icon="audio-volume-medium-symbolic"
