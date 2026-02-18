@@ -162,13 +162,29 @@ set_volume() {
 
     wpctl set-volume "$device" "$float_val"
 
-    # swayosd-client has no absolute-set command, so it cannot reflect an
-    # absolute volume change. When OSD is active we skip visual feedback
-    # entirely; notify-send must not be used as a silent fallback here.
-    if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true \
-        && "$VIBRANIUM_GLOBAL_USE_OSD" != true \
-        && "$quiet" != true ]]; then
-        show_volume_notification "$device" "Volume"
+    if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true && "$quiet" != true ]]; then
+        if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+            # swayosd-client has no absolute-set command, so we approximate with
+            # --custom-progress (0.0-1.0 scale), a matching freedesktop icon, and
+            # a label showing the real percentage.
+            local osd_progress osd_icon
+            osd_progress=$(awk -v v="$int_val" -v max="$max_volume" \
+                'BEGIN {p = v/max; printf "%.4f", (p < 0.001 ? 0.001 : p)}')
+            if (( int_val == 0 )); then
+                osd_icon="audio-volume-muted-symbolic"
+            elif (( int_val <= 33 )); then
+                osd_icon="audio-volume-low-symbolic"
+            elif (( int_val <= 66 )); then
+                osd_icon="audio-volume-medium-symbolic"
+            else
+                osd_icon="audio-volume-high-symbolic"
+            fi
+            swayosd-client \
+                --custom-icon="$osd_icon" \
+                --custom-progress="$osd_progress"
+        else
+            show_volume_notification "$device" "Volume"
+        fi
     fi
 }
 
