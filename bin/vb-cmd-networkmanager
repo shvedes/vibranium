@@ -29,16 +29,16 @@ esac
 
 # Detect primary network interface utility
 if command -v nmtui >/dev/null 2>&1; then
-    exec vb-core-term nmtui
+    exec vb-core-term -- nmtui
 elif command -v iwctl >/dev/null 2>&1; then
     if command -v impala >/dev/null 2>&1; then
-        exec vb-core-term impala
+        exec vb-core-term -- impala
     elif command -v iwmenu >/dev/null 2>&1; then
-        exec vb-core-term iwmenu
+        exec vb-core-term -- iwmenu
     elif command -v iwgtk >/dev/null 2>&1; then
-        exec vb-core-term iwgtk
+        exec vb-core-term -- iwgtk
     else
-        exec vb-core-term iwctl
+        exec vb-core-term -- iwctl
     fi
 else
     if [[ $(systemctl is-active systemd-networkd) == "active" ]]; then

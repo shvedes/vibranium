@@ -32,8 +32,8 @@ FZF_ARGS=(
 )
 
 _operation_canceled() {
-    echo -e "${RED}[VIBRANIUM]${RESET} Operation canceled"
-    read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to exit' dummy
+    printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+    read -n1 -r -s -p $'. Press any key to exit' dummy
     printf '\e[?25h' # show cursor
 }
 
@@ -69,6 +69,10 @@ term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting font packages"
 
 LIST="$(< "$VIBRANIUM_CACHE/${0##*/}.list")"
 mapfile -t chosen < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
+
+# fzf restores cursor visibility,
+# so we re-hide it again.
+printf '\e[?25l'
 
 rm -f "$TMP"
 

@@ -195,12 +195,13 @@ _operation_canceled() {
 
     if [[ $NO_DUMMY == false && -t 0 ]]; then
         read -n1 -r -s -p $'. Press any key to exit' dummy
-        printf '\e[?25h' # Show cursor
     fi
 
     if [[ $exit_after == true ]]; then
         exit 1
     fi
+
+    printf '\e[?25h' # Show cursor
 }
 
 _installation_complete() {
@@ -296,6 +297,10 @@ _choose_packages() {
 
     # Use fzf for multi-select with preview
     mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | sort | fzf "${FZF_ARGS[@]}")
+
+    # fzf restores cursor visibility,
+    # so we re-hide it again.
+    printf '\e[?25l'
 
     [[ "${#chosen[@]}" -eq 0 ]] && return 1
     PACKAGES=("${chosen[@]}")

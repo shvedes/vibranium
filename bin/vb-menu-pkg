@@ -20,12 +20,12 @@ while true; do
 
                 case "$install_chosen" in
                     "Package")
-                        vb-core-term vb-pkg-install
+                        vb-core-term --floating -- vb-pkg-install
                         vb-cmd-kill-rofi
                         exit 0
                         ;;
                     "Font")
-                        vb-core-term vb-pkg-font-install
+                        vb-core-term --floating -- vb-pkg-font-install
                         vb-cmd-kill-rofi
                         exit 0
                         ;;
@@ -42,12 +42,12 @@ while true; do
 
                 case "$uninstall_chosen" in
                     "Package")
-                        vb-core-term vb-pkg-uninstall
+                        vb-core-term --floating -- vb-pkg-uninstall
                         vb-cmd-kill-rofi
                         exit 0
                         ;;
                     "Font")
-                        vb-core-term vb-pkg-font-remove
+                        vb-core-term --floating -- vb-pkg-font-remove
                         vb-cmd-kill-rofi
                         exit 0
                         ;;
@@ -58,7 +58,7 @@ while true; do
             done
             ;;
         "System update")
-            vb-core-term vb-pkg-sysupdate
+            vb-core-term --floating -- vb-pkg-sysupdate
             vb-cmd-kill-rofi
             exit 0
             ;;

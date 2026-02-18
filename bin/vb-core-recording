@@ -139,7 +139,7 @@ fallback_notification() {
     msg+="Click here to see the logs"
 
     if notify-send -A true -r 4 -u critical -t 25000 "Screen Recording" "$msg"; then
-        vb-core-term "$EDITOR" "${LOG_FILE}.latest_fallback"
+        vb-core-term -- "$EDITOR" "${LOG_FILE}.latest_fallback"
     fi
 }
 
@@ -150,7 +150,7 @@ both_failed_notification() {
     msg+="Click here to see the lock."
 
     if notify-send -A true -r 4 -u critical -t 25000 "Screen Recording" "$msg"; then
-        vb-core-term "$EDITOR" "${LOG_FILE}.latest_failed"
+        vb-core-term -- "$EDITOR" "${LOG_FILE}.latest_failed"
     fi
 }
 

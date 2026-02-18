@@ -246,6 +246,7 @@ _operation_canceled() {
     local exit_after=false
 
     case "$1" in
+        # Not in use yet
         --positive)
             color="$GREEN"
             ;;
@@ -312,6 +313,10 @@ _choose_packages() {
     local chosen=()
 
     mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | fzf "${FZF_ARGS[@]}")
+
+    # fzf restores cursor visibility,
+    # so we re-hide it again.
+    printf '\e[?25l'
 
     [[ "${#chosen[@]}" -eq 0 ]] && return 1
     PACKAGES=("${chosen[@]}")
@@ -389,13 +394,8 @@ fi
 # Hide cursor
 printf '\e[?25l'
 
-if [[ $# -gt 0 ]]; then
+if (( $# > 0 )); then
     PACKAGES=("$@")
-
-    if ! _ask_for_sudo; then
-        _operation_canceled
-        exit 1
-    fi
 else
     if ! command -v fzf > /dev/null; then
         if term::is_headless; then
@@ -408,10 +408,8 @@ else
 
     _get_installed_packages
 
-    if _choose_packages; then
-        : # Proceed
-    else
-        _operation_canceled --positive
+    if ! _choose_packages; then
+        _operation_canceled
         exit 0
     fi
 fi

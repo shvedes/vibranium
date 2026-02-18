@@ -12,7 +12,7 @@ while true; do
 
     case "$CHOSEN" in
         "QEMU")
-            vb-core-term vb-setup-qemu
+            vb-core-term --floating -- vb-setup-qemu
             vb-cmd-kill-rofi
             ;;
     esac

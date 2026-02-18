@@ -25,7 +25,7 @@ fail() {
     msg+="\n<b><i>Click here to see logs</i></b>"
 
     if [[ "$(notify-send -A true -r 4 -t 10000 -u critical 'Vibranium' "$msg")" == 0 ]]; then
-        vb-core-term "$EDITOR" "$LOGFILE"
+        vb-core-term -- "$EDITOR" "$LOGFILE"
     fi
     progress clear
     exit 1

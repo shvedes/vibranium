@@ -62,8 +62,9 @@ _check_important() {
     done
 }
 
+# e.g. clicked on the updates waybar module
 if [[ ! -t 1 ]]; then
-    exec setsid vb-core-term "$0"
+    exec setsid vb-core-term --floating -- "$0"
     exit
 fi
 

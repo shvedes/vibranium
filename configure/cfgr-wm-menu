@@ -39,10 +39,10 @@ while true; do
                 [[ -z $edit_configs_chosen ]] && break
 
                 case "$edit_configs_chosen" in
-                    *"Window rules"*)  vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
-                    *"Keybindings"*)   vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf"        ;;
-                    *"Monitors"*)      vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf"     ;;
-                    *"Input"*)         vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"        ;;
+                    *"Window rules"*)  vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
+                    *"Keybindings"*)   vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf"        ;;
+                    *"Monitors"*)      vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf"     ;;
+                    *"Input"*)         vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"        ;;
                 esac
                 vb-cmd-kill-rofi
             done

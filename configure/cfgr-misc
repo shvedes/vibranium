@@ -381,7 +381,7 @@ while true; do
             _manage_user_wallpapers
             ;;
         *"Edit env"*)
-            vb-core-term "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
+            vb-core-term --floating -- "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
             vb-cmd-kill-rofi
             exit 0
             ;;

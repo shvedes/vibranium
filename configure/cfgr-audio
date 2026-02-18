@@ -141,7 +141,7 @@ while true; do
             vb-cmd-toggle-loopback
             ;;
         *"Open volume mixer"*)
-            vb-core-term wiremix
+            vb-core-term -- wiremix
             vb-cmd-kill-rofi
             exit 0
             ;;

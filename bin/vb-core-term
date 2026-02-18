@@ -2,41 +2,128 @@
 
 usage() {
     cat << EOF
-Usage: ${0##*/} [COMMAND [ARGS...]]
+Usage: ${0##*/} [--floating] [--directory DIR] [--] [COMMAND [ARGS...]]
 
 Open the default terminal (Alacritty). If COMMAND is provided,
 it will be executed inside the terminal.
 
 Options:
-  -h, --help   Show this help and exit
+  -h, --help        Show this help and exit
+  --floating        Open terminal as a floating window
+  --directory DIR   Set the working directory for the new terminal window
+  --hold            Keep the window open after the command exits
+  --                End of options; next token is COMMAND even if it starts with -
 EOF
 }
 
-case "${1:-}" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
-esac
+FLOATING=false
+WORKDIR=""
+HOLD=false
 
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --floating)
+            FLOATING=true
+            shift
+            ;;
+        --directory)
+            if [[ -z "${2-}" ]]; then
+                echo "--directory requires an argument" >&2
+                exit 1
+            fi
+            WORKDIR="$2"
+            shift 2
+            ;;
+        --hold)
+            HOLD=true
+            shift
+            ;;
+        --) # End of options marker
+            shift
+            break
+            ;;
+        *)
+            echo "Unknown option: $1" >&2
+            echo "Use '--' to separate options from a command, e.g.: ${0##*/} --floating -- btop" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# Validate working directory if provided
+if [[ -n "$WORKDIR" ]]; then
+    if [[ ! -d "$WORKDIR" ]]; then
+        notify-send \
+            -r 4 \
+            -t 4000 \
+            -u critical \
+            "Terminal Emulator" \
+            "Directory <i><b>$WORKDIR</b></i> does not exist!"
+        exit 1
+    fi
+fi
+
+# Defaults
 args=()
-class="alacritty"
+title="Vibranium Terminal"
+class="org.vb.term"
 
+# Build --working-directory flag if needed
+dir_args=()
+if [[ -n "$WORKDIR" ]]; then
+    dir_args=(--working-directory "$WORKDIR")
+fi
+
+# Build --hold flag if needed
+hold_args=()
+if [[ "$HOLD" == "true" ]]; then
+    hold_args=(--hold)
+fi
+
+# validate and prepare alacritty arguments
 if [[ $# -ge 1 ]]; then
     cmd="$1"
 
+    # Ensure the command exists in PATH
     if ! command -v "$cmd" > /dev/null; then
         echo "$cmd: command not found" >&2
         exit 1
     fi
 
     shift
-    class="${cmd##*/}"
-    args=(-e "$cmd" "$@")
+    title="${cmd##*/}"    # use command name as title
+    args=(-e "$cmd" "$@") # arguments to pass to alacritty
 fi
 
-if [[ "$(systemctl --user is-active alacritty)" == "inactive" ]]; then
-    systemctl --user enable --now alacritty
+# Ensure alacritty user service is running if present
+if [[ "$(systemctl --user is-active alacritty 2>/dev/null || true)" == "inactive" ]]; then
+    systemctl --user enable --now alacritty 2>/dev/null || true
 fi
 
-alacritty msg create-window --class "$class" --title "$class" "${args[@]}"
+# Floating branch: run via hyprctl with float rules
+if [[ "$FLOATING" == "true" ]]; then
+    class="${class}.float"   # separate window class for floating terminal
+
+    # Build the alacritty command as an array to preserve arguments
+    exec_cmd=(alacritty msg create-window --class "$class" --title "$title" "${hold_args[@]}" "${dir_args[@]}" "${args[@]}")
+
+    # Safely quote each element to a single shell string
+    # remove trailing space afterwards
+    cmdline="$(printf '%q ' "${exec_cmd[@]}")"
+    cmdline="${cmdline% }"
+
+    # Hyprland exec rule and size. The entire string after the rule
+    # is passed to hyprctl as the command to execute
+    rule="[float; size monitor_w*0.7 monitor_h*0.7; move center]"
+
+    # Execute via hyprctl. Quote the combined argument so it's passed as a single command.
+    hyprctl -q dispatch exec "$rule $cmdline"
+    exit 0
+fi
+
+# Non-floating branch: create an alacritty window via its IPC
+alacritty msg create-window --class "$class" --title "$title" "${hold_args[@]}" "${dir_args[@]}" "${args[@]}"
