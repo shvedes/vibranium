@@ -103,6 +103,16 @@ while true; do
     case "$CHOSEN" in
         *"Inhibit"*)
             helpers::configure::set_string VIBRANIUM_GLOBAL_INHIBIT_TYPE "Sleep type" idle sleep
+            (
+                pid="$(systemd-inhibit --no-pager | awk '/Vibranium/ {print $4}')"
+
+                if [[ ! -z "$pid" ]]; then
+                    # Disable active
+                    vb-cmd-toggle-inhibit
+                    # Start new with the new value
+                    vb-cmd-toggle-inhibit
+                fi
+            ) &
             ;;
         "Lock"*)
             _set_timeouts "Lock" "Lock timeout (int)" 1

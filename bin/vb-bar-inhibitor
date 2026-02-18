@@ -9,7 +9,18 @@ for f in /run/systemd/inhibit/*; do
 done
 
 if [[ -n "$shown" ]]; then
-    printf '{"text": "%s", "tooltip": "%s"}' "\uf023" "Sleep blocked"
+    source vb-core-lib
+
+    helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
+    type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+
+    if [[ "$type" == "idle" ]]; then
+        tooltip="Blocking screen lock"
+    else
+        tooltip="Blocking system sleep"
+    fi
+
+    printf '{"text": "%s", "tooltip": "%s"}' "\uf023" "$tooltip"
 else
     printf '{"text": ""}'
 fi
