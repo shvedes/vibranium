@@ -79,7 +79,7 @@ if [[ "$hex_preview" == false ]]; then
     opt_args+=(-d)
 fi
 
-selected_color=$(hyprpicker -a -n -l -r -f hex "${opt_args[@]}" | grep -v '^\[ERR\]')
+selected_color=$(hyprpicker -a -b -l -r -f hex "${opt_args[@]}" | grep -v '^\[ERR\]')
 [[ -z "$selected_color" ]] && {
     echo "selection canceled"
     exit 1
