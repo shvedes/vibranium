@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
 
-# Script for setting the volume with the ability to set the volume up to 150%
-
 source vb-core-lib
 
 usage() {
     cat << EOF
-Usage: ${0##*/} <vol|mic> <up|down|mute>
+Usage: ${0##*/} [OPTION]...
+
+Control system volume and microphone.
+
+Options:
+      --volume-up          raise volume by one step
+      --volume-down        lower volume by one step
+      --volume-toggle      toggle mute on the default audio sink
+      --microphone-up      raise microphone volume by one step
+      --microphone-down    lower microphone volume by one step
+      --microphone-toggle  toggle mute on the default audio source
+      --volume INT         set volume to INT percent
+      -q,--quiet           suppress desktop notifications (notify-send only)
+      -h,--help            display this help and exit
+
 EOF
 }
 
@@ -25,7 +37,7 @@ show_volume_notification() {
     local fullscreen_state
     fullscreen_state="$(hyprctl -j activewindow | jq -r '.fullscreen')"
 
-    if (( "$fullscreen_state" == 2 )); then
+    if (( fullscreen_state == 2 )); then
         return
     fi
 
@@ -46,7 +58,7 @@ show_volume_notification() {
     if [[ "$muted" == "[MUTED]" ]]; then
         notify-send -r 2 -t 1000 "$type Muted"
     else
-        if [[ ! "$type" == "Microphone" ]]; then
+        if [[ "$type" != "Microphone" ]]; then
             notify-send -r 2 -t 1000 "$type ${display_vol}%" -h "int:value:$bar_value"
         fi
     fi
@@ -55,18 +67,14 @@ show_volume_notification() {
 adjust_volume() {
     local direction="$1"
     local device_type="$2"
-    local device=""
-    local osd_arg=""
-    local notification_type=""
-    local max_volume
-    local osd_max_flag=""
+    local device osd_arg notification_type max_volume osd_max_flag current_volume new_volume
 
-    # Determine maximum allowed volume and OSD behavior
     if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
         max_volume=1.5
         osd_max_flag="--max-volume=150"
     else
         max_volume=1.0
+        osd_max_flag=""
     fi
 
     case "$device_type" in
@@ -82,7 +90,14 @@ adjust_volume() {
             ;;
     esac
 
-    current_volume=$(wpctl get-volume "$device" | awk '{print $2}')
+    # Parse volume and mute state from a single wpctl call
+    local vol_info mute_state
+    read -r _ current_volume mute_state <<< "$(wpctl get-volume "$device")"
+
+    # Unmute before adjusting so the volume change isn't silently swallowed
+    if [[ "$mute_state" == "[MUTED]" ]]; then
+        wpctl set-mute "$device" 0
+    fi
 
     # Stop if already at limits
     if [[ "$direction" == "+" ]] && awk "BEGIN {exit !($current_volume >= $max_volume)}"; then
@@ -92,7 +107,7 @@ adjust_volume() {
     fi
 
     if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
-        if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
+        if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
             if [[ -n "$osd_max_flag" ]]; then
                 swayosd-client "$osd_arg" "${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}" "$osd_max_flag"
             else
@@ -107,7 +122,7 @@ adjust_volume() {
                     'BEGIN {new = cv - step/100; if (new < 0.0) new = 0.0; printf "%.2f", new}')
             fi
             wpctl set-volume "$device" "$new_volume"
-            show_volume_notification "$device" "$notification_type"
+            [[ "$quiet" != true ]] && show_volume_notification "$device" "$notification_type"
         fi
     else
         if [[ "$direction" == "+" ]]; then
@@ -121,11 +136,45 @@ adjust_volume() {
     fi
 }
 
+set_volume() {
+    local int_val="${1%%%}"  # Strip optional trailing '%'
+    local device="@DEFAULT_AUDIO_SINK@"
+    local max_volume
+
+    if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
+        max_volume=150
+    else
+        max_volume=100
+    fi
+
+    if ! [[ "$int_val" =~ ^[0-9]+$ ]] || (( int_val < 0 || int_val > max_volume )); then
+        echo "${0##*/}: invalid volume value '${1}' (expected integer 0-${max_volume})" >&2
+        exit 1
+    fi
+
+    local float_val mute_state
+    float_val=$(awk -v v="$int_val" 'BEGIN {printf "%.2f", v/100}')
+
+    read -r _ _ mute_state <<< "$(wpctl get-volume "$device")"
+    if [[ "$mute_state" == "[MUTED]" ]]; then
+        wpctl set-mute "$device" 0
+    fi
+
+    wpctl set-volume "$device" "$float_val"
+
+    # swayosd-client has no absolute-set command, so it cannot reflect an
+    # absolute volume change. When OSD is active we skip visual feedback
+    # entirely; notify-send must not be used as a silent fallback here.
+    if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true \
+        && "$VIBRANIUM_GLOBAL_USE_OSD" != true \
+        && "$quiet" != true ]]; then
+        show_volume_notification "$device" "Volume"
+    fi
+}
+
 toggle_mute() {
     local device_type="$1"
-    local device=""
-    local osd_arg=""
-    local type=""
+    local device osd_arg type
 
     case "$device_type" in
         vol)
@@ -140,12 +189,12 @@ toggle_mute() {
             ;;
     esac
 
-    if [ $VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK = true ]; then
-        if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
+    if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
+        if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
             swayosd-client "$osd_arg" mute-toggle
         else
             wpctl set-mute "$device" toggle
-            show_volume_notification "$device" "$type"
+            [[ "$quiet" != true ]] && show_volume_notification "$device" "$type"
         fi
     else
         wpctl set-mute "$device" toggle
@@ -157,7 +206,7 @@ feedback() {
     local variant dir
 
     helpers::check VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
-    if [[ $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK = true ]]; then
+    if [[ "$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK" == true ]]; then
         helpers::check VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
         variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
 
@@ -170,7 +219,7 @@ feedback() {
                 ;;
         esac
 
-        if [ ! -d "$dir" ]; then
+        if [[ ! -d "$dir" ]]; then
             log::error "$dir does not exist! Using the default one!"
             dir="/usr/share/sounds/freedesktop/stereo"
             return 0
@@ -181,64 +230,118 @@ feedback() {
         else
             paplay "${dir}/audio-volume-change.oga" &
         fi
-    else
-        return 0
     fi
 }
 
-if [ $# -lt 2 ]; then
+# --- Lockfile ---
+
+# Prevent concurrent invocations (e.g. rapid key repeats or external triggers)
+# from racing against each other. flock acquires an exclusive lock on the file
+# descriptor; any second instance will exit immediately (-n) rather than queue.
+exec 9>"/tmp/${0##*/}.lock"
+flock -n 9 || exit 0
+
+# --- Argument parsing ---
+
+if [[ $# -eq 0 ]]; then
     usage
     exit 0
 fi
 
+action=""
+volume_value=""
+quiet=false
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        -q|--quiet)
+            quiet=true
+            ;;
+        --volume-up)
+            action="vol-up"
+            ;;
+        --volume-down)
+            action="vol-down"
+            ;;
+        --volume-toggle)
+            action="vol-toggle"
+            ;;
+        --microphone-up)
+            action="mic-up"
+            ;;
+        --microphone-down)
+            action="mic-down"
+            ;;
+        --microphone-toggle)
+            action="mic-toggle"
+            ;;
+        --volume)
+            if [[ -z "$2" || "$2" == --* ]]; then
+                echo "${0##*/}: option '--volume' requires an argument" >&2
+                echo "Try '${0##*/} --help' for more information." >&2
+                exit 1
+            fi
+            action="vol-set"
+            volume_value="$2"
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            echo "${0##*/}: unrecognized option '$1'" >&2
+            echo "Try '${0##*/} --help' for more information." >&2
+            exit 1
+            ;;
+        *)
+            echo "${0##*/}: unexpected argument '$1'" >&2
+            echo "Try '${0##*/} --help' for more information." >&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
+if [[ -z "$action" ]]; then
+    echo "${0##*/}: no action specified" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+fi
 
 helpers::check VIBRANIUM_GLOBAL_USE_OSD
 helpers::check VIBRANIUM_VOLUME_ADJUSTMENT_STEP
 helpers::check VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK
 helpers::check VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
 
-device_type="$1"
-action="$2"
-
-case "${device_type}" in
-    "vol")
-        case "${action}" in
-            "up")
-                adjust_volume "+" "vol"
-                feedback
-                ;;
-            "down")
-                adjust_volume "-" "vol"
-                feedback
-                ;;
-            "mute")
-                toggle_mute "vol"
-                ;;
-            *)
-                usage
-                exit 0
-                ;;
-        esac
+case "$action" in
+    vol-up)
+        adjust_volume "+" "vol"
+        feedback
         ;;
-    "mic")
-        case "${action}" in
-            "up")
-                adjust_volume "+" "mic"
-                ;;
-            "down")
-                adjust_volume "-" "mic"
-                ;;
-            "mute")
-                toggle_mute "mic"
-                ;;
-            *)
-                usage
-                exit 0
-                ;;
-        esac
+    vol-down)
+        adjust_volume "-" "vol"
+        feedback
         ;;
-    *)
-        usage
-        exit 0
+    vol-set)
+        set_volume "$volume_value"
+        feedback
+        ;;
+    vol-toggle)
+        toggle_mute "vol"
+        ;;
+    mic-up)
+        adjust_volume "+" "mic"
+        ;;
+    mic-down)
+        adjust_volume "-" "mic"
+        ;;
+    mic-toggle)
+        toggle_mute "mic"
         ;;
 esac
+

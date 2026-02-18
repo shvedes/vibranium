@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 
-# Launch the TUI for the active network manager.
-
 usage() {
     cat << EOF
 Usage: ${0##*/} [OPTION]
 
-Launch the text-based interface for the active network manager.
+Launch UI / TUI for the active network manager.
 
 Options:
   -h, --help  Display this help and exit
@@ -29,16 +27,16 @@ esac
 
 # Detect primary network interface utility
 if command -v nmtui >/dev/null 2>&1; then
-    exec vb-core-term -- nmtui
+    exec vb-core-term --floating -- nmtui
 elif command -v iwctl >/dev/null 2>&1; then
     if command -v impala >/dev/null 2>&1; then
-        exec vb-core-term -- impala
+        exec vb-core-term --floating -- impala
     elif command -v iwmenu >/dev/null 2>&1; then
-        exec vb-core-term -- iwmenu
+        vb-cmd-launch-cmd iwmenu
     elif command -v iwgtk >/dev/null 2>&1; then
-        exec vb-core-term -- iwgtk
+        vb-cmd-launch-cmd iwgtk
     else
-        exec vb-core-term -- iwctl
+        exec vb-core-term --floating -- iwctl
     fi
 else
     if [[ $(systemctl is-active systemd-networkd) == "active" ]]; then

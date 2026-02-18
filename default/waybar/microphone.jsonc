@@ -5,9 +5,9 @@
 		"format": "{format_source}",
 
 
-		"on-click": "vb-core-volume mic mute",
-		"on-scroll-up": "vb-core-volume mic up",
-		"on-scroll-down": "vb-core-volume mic down",
+		"on-click": "vb-core-volume --quiet --microphone-toggle",
+		"on-scroll-up": "vb-core-volume --microphone-up",
+		"on-scroll-down": "vb-core-volume --microphone-down",
 		"on-click-right": "vb-core-term --floating -- wiremix --tab input",
 
 		"scroll-step": 1,

@@ -1,8 +1,8 @@
 {
 	"pulseaudio#volume": {
-		"on-click": "vb-core-volume vol mute",
-		"on-scroll-up": "vb-core-volume vol up",
-		"on-scroll-down": "vb-core-volume vol down",
+		"on-click": "vb-core-volume --volume-toggle",
+		"on-scroll-up": "vb-core-volume --volume-up",
+		"on-scroll-down": "vb-core-volume --volume-down",
 		"on-click-right": "vb-core-term --floating -- wiremix --tab output",
         "on-click-middle": "vb-cmd-output-switch",
 
