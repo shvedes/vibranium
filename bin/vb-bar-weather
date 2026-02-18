@@ -11,63 +11,33 @@ if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE" == false ]]; then
     exit 0
 fi
 
-# See comments below
-IGNORE_SYSTEMD=false
-
-# Decide whether to animate the 'on-click' event
-REFRESH=false
-
-while (( $# != 0 )); do
-    case "$1" in
-        --ignore-systemd)
-            IGNORE_SYSTEMD=true
-            shift
-            ;;
-        --refresh)
-            REFRESH=true
-            shift
-            ;;
-        # Ignore invalid flags
-        *) : ;;
-    esac
-done
-
 # Waybar is launched via systemd, so ideally we get its PID
 # via a systemctl call (this is also slightly faster than calling pidof).
-# If Waybar was launched via a terminal, the module will not work,
-# as systemctl will return PID 0 (not found).
 WAYBAR_PID="$(systemctl --user show waybar -p MainPID --value)"
 
-# Why am I writing this logic?
-# Like, really, dude...
-if (( WAYBAR_PID == 0 )); then
-    # Got PID 0, which means that Waybar is either
-    # inactive or was launched from a terminal.
-    if [[ "$IGNORE_SYSTEMD" == false ]]; then
-        [[ -t 1 ]] && {
-            log::error "Waybar should be launched as systemd service!"
-            log::error "Use flag --ignore-systemd to bypass this restriction."
-        }
-        exit 1
+if (( WAYBAR_PID == 0 )) ; then
+    # Not launched via systemd or inactive.
+    # Try to get with pidof instead.
+    WAYBAR_PID="$(pidof waybar)"
+
+    # If empty - the process doesn't exist.
+    if [[ -z "$WAYBAR_PID" ]]; then
+        if ! term::is_headless; then
+            log::error "Waybar isn't active!"
+            exit 1
+        fi
     fi
 fi
 
 if ! command -v wttrbar > /dev/null; then
-    # The script has stdout
-    # (e.g. executed manually from a terminal window)
-    [[ -t 1 ]] && {
+    # If executed from a terminal
+    if ! term::is_headless; then
         log::error "Missing required dependencies: wttrbar"
         log::error "To install, run 'yay -S wttrbar'"
         exit 1
-    }
-
-    # Build error message
-    text=""
-    if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" ]]; then
-        text+="<span foreground='DimGray'>|</span>   "
     fi
 
-    text+="<span foreground='red2'>\uf071</span>"
+    text="<span foreground='red2'>\uf071</span>"
     tooltip="Missing required dependencies: wttrbar"
 
     printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
@@ -76,33 +46,6 @@ if ! command -v wttrbar > /dev/null; then
     # Otherwise Waybar won't display json string
     exit 0
 fi
-
-_spinner() {
-    local tooltip="$@"
-    local delay=0.1
-    local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-
-    format_text() {
-        local text="$1"
-
-        [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]] && {
-            text="$1"
-            text+=" <span foreground='DimGray'>|</span>"
-        }
-        printf '%s' "$text"
-    }
-
-    for i in "${spinstr[@]}"; do
-        frame="$(format_text "<span rise='-2pt' foreground='gray'>$i</span>")"
-
-        jq -nc --unbuffered \
-          --arg text "$frame" \
-          --arg tooltip "$tooltip" \
-          '{text:$text, tooltip:$tooltip}'
-
-        sleep "$delay"
-    done
-}
 
 _set_city() {
     local opt city cfg
@@ -117,91 +60,71 @@ _set_city() {
     sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$cfg"
 }
 
-# Wait for the internet connection first.
-# Try 3 times for different IPs (Cloudflare & Google)
-while true; do
-    _spinner "Waiting for the internet connection..."
-
-    for attempt in {1..3}; do
-        if ping -c 1 -W 1 1.1.1.1 &> /dev/null; then
-            break 2
-        fi
-
-        if ping -c 1 -W 1 8.8.8.8 &> /dev/null; then
-            break 2
-        fi
+_wait_for_connection() {
+    while ! ping -c 1 1.1.1.1 &> /dev/null; do
+        sleep 1
     done
-done
+}
 
 marker="${VIBRANIUM_RUNTIME}/bar.weather.pid.${WAYBAR_PID}"
 
-# Forcefully show loading animation if executed with --refresh flag.
-# This is used in the 'on-click' event.
-if [[ "$REFRESH" == "true" ]]; then
-    # Forcefully remove old marker.
-    rm -f "${marker%.*}".*
-    show_spinner=true
+helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
+if [[ "$VIBRANIUM_BAR_SHOW_ANIMATION" == false ]]; then
+    show_spinner=false
 else
-    helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
-
-    if [[ $VIBRANIUM_BAR_SHOW_ANIMATION == false ]]; then
+    if [[ -f "$marker" ]]; then
         show_spinner=false
     else
+        show_spinner=true
 
-        if [[ -f "$marker" ]]; then
-            show_spinner=false
-        else
-            show_spinner=true
+        # Remove old markers
+        rm -f "${marker%.*}".*
 
-            # Remove old markers
-            rm -f "${marker%.*}".*
-
-            # Create new one
-            : > "$marker"
-        fi
+        # Create new one
+        : > "$marker"
     fi
 fi
 
-if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" == "not_set" ]]; then
-    # Edge use case. Just a layer of protection
-    rm -f "${marker%.*}".*
+_wait_for_connection &
+connection_pid=$!
 
+if [[ "$show_spinner" == true ]]; then
+    helpers::bar::spinner "Waiting for the internet connection..." $connection_pid
+else
+    wait $connection_pid
+fi
+
+if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" == "not_set" ]]; then
     _set_city &
     set_city_pid=$!
 
     if [[ "$show_spinner" == "true" ]]; then
-        while kill -0 $set_city_pid 2> /dev/null; do
-            _spinner "Getting your location..."
-        done
+        helpers::bar::spinner "Getting your location..." $set_city_pid
     else
         wait $set_city_pid
     fi
 
     # Read the settings file with the updated city for monitoring
     source $VIBRANIUM_USER_SETTINGS
-
-    : > "$marker"
 fi
 
-temp_data="$VIBRANIUM_RUNTIME/bar.weather.json"
+TEMP_DATA="$VIBRANIUM_RUNTIME/bar.weather.json"
 
-wttrbar --location "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" > "$temp_data" &
+wttrbar --location "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" > "$TEMP_DATA" &
 pid=$!
 
 if [[ "$show_spinner" == "true" ]]; then
-    while pkill -0 $pid 2> /dev/null; do
-        _spinner "Fetching weather..."
-    done
+    helpers::bar::spinner "Fetching weather..." $pid
 else
     # Wait for pid (if no animation used)
     wait $pid
 fi
 
-weather_json="$(< "$temp_data")"
+WEATHER_JSON="$(< "$TEMP_DATA")"
 
 # Build json output
-text="$(jq -r '.text' <<< "$weather_json")"
-tooltip="$(jq -r '.tooltip' <<< "$weather_json")"
+text="$(jq -r '.text' <<< "$WEATHER_JSON")"
+tooltip="$(jq -r '.tooltip' <<< "$WEATHER_JSON")"
 
 if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
     text+="<span foreground='DimGray'> |</span>"
@@ -213,4 +136,3 @@ jq -nc \
   --arg text "$text" \
   --arg tooltip "$tooltip" \
   '{text: $text, tooltip: $tooltip}'
-

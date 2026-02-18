@@ -3,7 +3,7 @@
 lockfile="$VIBRANIUM_RUNTIME/${0##*/}.lock"
 
 exec 9> "$lockfile" || {
-    log::error "Anoter instance of ${YELLOW}${0##*/}${RESET} is already running!"
+    echo "error: anoter instance of ${0##*/} is already running!" >&2
     exit 1
 }
 

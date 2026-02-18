@@ -106,6 +106,60 @@ helpers::ui::menu() {
         "$@" 2> /dev/null <<< "$input"
 }
 
+helpers::bar::spinner() {
+    local tooltip="$1"
+    shift
+
+    local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+    local delay=0.1
+
+    local sep_pos="right" left_pad=0 right_pad=1
+    case "${BASH_SOURCE[1]##*/}" in
+        vb-bar-pacman)  sep_pos="left"  left_pad=0  right_pad=1 ;;
+        vb-bar-weather) sep_pos="right" left_pad=2  right_pad=0 ;;
+    esac
+
+    local sep=""
+    [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]] && sep="<span foreground='DimGray'>|</span>"
+
+    print_frame() {
+        local ch="$1"
+        local inner="<span rise='-2pt' foreground='gray'>$ch</span>"
+
+        if [[ "$sep" ]]; then
+            if [[ "$sep_pos" == "left" ]]; then
+                printf '{"text":"%*s%s%*s%s","tooltip":"%s"}\n' \
+                    "$left_pad" "" "$sep" "$right_pad" "" "$inner" "$tooltip"
+            else
+                printf '{"text":"%*s%s%*s%s","tooltip":"%s"}\n' \
+                    "$left_pad" "" "$inner" "$right_pad" "" "$sep" "$tooltip"
+            fi
+        else
+            printf '{"text":"%s","tooltip":"%s"}\n' "$inner" "$tooltip"
+        fi
+    }
+
+    if (( $# > 0 )); then
+        # Main loop: PID-waiting mode
+        while kill -0 "$@" 2>/dev/null; do
+            for ch in "${spinstr[@]}"; do
+                print_frame "$ch"
+                sleep "$delay"
+
+                if ! kill -0 "$@" 2>/dev/null; then
+                    return
+                fi
+            done
+        done
+    else
+        # Single-pass mode (no PIDs) — exactly one full rotation
+        for ch in "${spinstr[@]}"; do
+            print_frame "$ch"
+            sleep "$delay"
+        done
+    fi
+}
+
 # Not used yet. Questionable.
 # helpers::ui::notify() {
 #     local type="$1"
