@@ -213,303 +213,168 @@ helpers::bar::spinner() {
 #####################################
 
 # Provides a unified configuration validation system for Vibranium options.
-# It parses a defaults file to extract metadata (types, defaults, allowed values, ranges)
-# for each configuration variable and caches this information in associative arrays.
-# This caching allows for efficient validation of multiple variables without re-reading
-# the file each time, significantly improving performance for scripts that check many options.
+# Metadata (types, defaults, allowed values, ranges) is parsed from vb-core-defaults
+# by vb-defaults.awk on the first call and cached in associative arrays.
+# This caching allows efficient validation of many variables with a single awk fork.
 #
 # Purpose:
 # - Centralize validation logic to avoid hard-coded defaults in multiple functions.
-# - Enable easy updates to defaults by editing the file without changing code.
-# - Support bool, int (with optional range), and string (with optional enums) types.
+# - Enable easy updates by editing vb-core-defaults without touching this code.
+# - Support bool, int (with optional range), and string (with required enum list) types.
 #
 # How it works:
-# - Metadata is stored in global associative arrays for quick access.
-# - `helpers::check` uses this cache to validate and normalize a given variable.
+# - On the first call to helpers::check, awk parses vb-core-defaults and emits
+#   bash assignments that are eval'd directly into the global associative arrays.
+# - helpers::check uses the cache to validate and normalize a given variable.
 # - If invalid or unset, it falls back to the default value and logs a warning.
 
 # Declare global associative arrays to cache parsed metadata
 declare -A OPTION_DEFAULTS OPTION_TYPES OPTION_ALLOWEDS OPTION_MINS OPTION_MAXS
 
-# This function parses the defaults file once at startup to cache all option metadata.
-# It scans the file line-by-line, extracting type, default, allowed values, and ranges
-# for each variable. This single-pass parsing optimizes for multiple subsequent validations.
-#
-# Usage: no arguments needed.
-helpers::parse_defaults() {
-    local line
-    # cur_var tracks the most recently seen variable name — used as the associative array key
-    local cur_var="" cur_type="" cur_default="" cur_min="" cur_max=""
-    # cur_allowed is an array because a string enum can have multiple valid values
-    local -a cur_allowed=()
-    # words is a scratch array for splitting constraint lines into tokens
-    local -a words=()
+# Precompiled regex stored in a variable so bash reuses the compiled form across
+# calls rather than recompiling the pattern from a string literal every time.
+# _RE_INT: matches an optional-sign, optional-leading-zeros integer with optional fraction.
+declare -r _RE_INT='^(-?)0*([0-9]+)(\.[0-9]+)?$'
 
-    # IFS= + read -r: preserves leading whitespace and backslashes exactly as-is in the file
-    # The `|| [[ -n $line ]]` guard catches the last line if the file has no trailing newline
-    while IFS= read -r line || [[ -n $line ]]; do
-
-        # Variable assignment — metadata accumulated above belongs to this variable.
-        # The comment block PRECEDES the assignment in the defaults file, so by the time
-        # we hit `VAR=`, we've already collected its type/default/constraints in cur_* vars.
-        if [[ $line =~ ^(VIBRANIUM_[A-Z_]+)= ]]; then
-            cur_var=${BASH_REMATCH[1]}   # BASH_REMATCH[1] is the first capture group
-
-            # Only store if we actually found a default — guards against malformed entries
-            if [[ -n $cur_default ]]; then
-                OPTION_DEFAULTS[$cur_var]=$cur_default
-                OPTION_TYPES[$cur_var]=$cur_type
-
-                # ${#cur_allowed[@]} -gt 0: only write the allowed list if it's non-empty.
-                # We join the array into a space-delimited string for storage because bash
-                # associative arrays can't hold arrays as values — it gets split back out later.
-                [[ ${#cur_allowed[@]} -gt 0 ]] && OPTION_ALLOWEDS[$cur_var]="${cur_allowed[*]}"
-
-                # Only store min/max if a range was actually defined for this variable
-                if [[ -n $cur_min ]]; then
-                    OPTION_MINS[$cur_var]=$cur_min
-                    OPTION_MAXS[$cur_var]=$cur_max
-                fi
-            fi
-
-            # Reset accumulator state for the next variable's comment block.
-            # cur_var is intentionally NOT reset here — it's needed by the end-of-file
-            # safety net below in case the file ends without a blank line after the last assignment.
-            cur_type="" cur_default="" cur_min="" cur_max=""
-            cur_allowed=()
-
-        # Type and constraints line — expected format in the defaults file:
-        #   # Available options: string 'val1' 'val2'
-        #   # Available options: integer between 1 and 100
-        #   # Available options: bool
-        elif [[ $line == '# Available options: '* ]]; then
-            # Strip the prefix, then split on whitespace into an indexed array
-            read -ra words <<< "${line#'# Available options: '}"
-
-            # Normalize to lowercase so "Integer"/"INTEGER" all become "int"
-            cur_type=${words[0],,}
-
-            # The defaults file uses "integer" but internally we shorten it to "int"
-            # to keep the case statements tidy
-            [[ $cur_type == integer ]] && cur_type=int
-
-            # Always reset these — a previous variable's constraints must not bleed through
-            cur_allowed=()
-            cur_min="" cur_max=""
-
-            case $cur_type in
-                string)
-                    local w
-                    # words[0] is the type itself; everything from index 1 onward are enum values.
-                    # The slice "${words[@]:1}" gives us all elements starting at index 1.
-                    for w in "${words[@]:1}"; do
-                        # Strip surrounding single or double quotes from each enum value
-                        # (the defaults file wraps string enums in quotes for readability)
-                        cur_allowed+=("${w//[\'\"]}")
-                    done
-                    ;;
-                int)
-                    # Expect: "int between N and M"
-                    # words[1]="between", words[2]=N, words[3]="and", words[4]=M
-                    # The -} default on words[1] and words[3] avoids unbound variable errors
-                    # if the line is malformed and shorter than expected
-                    if [[ ${words[1]-} == between && ${words[3]-} == and ]]; then
-                        cur_min=${words[2]}
-                        cur_max=${words[4]}
-                    fi
-                    ;;
-                # bool has no extra constraints — presence of the type is sufficient
-            esac
-
-        # Default value line — expected format:
-        #   # Default is 'some_value'   (strings are quoted)
-        #   # Default is 42             (ints/bools are bare)
-        elif [[ $line == '# Default is '* ]]; then
-            cur_default=${line#'# Default is '}
-            # Remove any surrounding quotes used for readability in the file.
-            # Two separate substitutions because bash parameter expansion can't
-            # match alternation (i.e. no single `//['"]` that removes both in one pass cleanly).
-            cur_default=${cur_default//\'/}
-            cur_default=${cur_default//\"}
-        fi
-
-    done < "$VIBRANIUM_PATH/vb-core-defaults"
-
-    # Safety net: if the file ends without a trailing newline after the last assignment,
-    # the while loop exits before we get a chance to flush cur_* into the arrays.
-    # cur_var was preserved from the reset block above precisely for this case.
-    if [[ -n $cur_var && -n $cur_default ]]; then
-        OPTION_DEFAULTS[$cur_var]=$cur_default
-        OPTION_TYPES[$cur_var]=$cur_type
-
-        [[ ${#cur_allowed[@]} -gt 0 ]] && OPTION_ALLOWEDS[$cur_var]="${cur_allowed[*]}"
-
-        if [[ -n $cur_min ]]; then
-            OPTION_MINS[$cur_var]=$cur_min
-            OPTION_MAXS[$cur_var]=$cur_max
-        fi
-    fi
-}
-
-# This function validates a single variable using cached metadata.
-# It checks if the variable is set and valid based on its type and constraints.
+# This function validates one or more variables using cached metadata.
+# It checks if each variable is set and valid based on its type and constraints.
 # If unset or invalid, it sets the default and logs a warning.
 # Normalization is applied where applicable (e.g., lowercase bool, clean int).
 #
-# Usage: helpers::check_option <var_name>
-# Returns: 0 on success (validated or fallback), 1 if not found in cache.
+# Usage: helpers::check <var_name> [<var_name> ...]
+# Returns: 0 on success (all validated or fallback), 1 if any not found in cache.
 helpers::check() {
-    # Lazy-load: only parse the defaults file on the very first call.
+    # Lazy-load: only run awk on the very first call.
     # ${#OPTION_DEFAULTS[@]} gives the number of keys — 0 means the cache is cold.
     if [[ ${#OPTION_DEFAULTS[@]} -eq 0 ]]; then
-        helpers::parse_defaults
+        local awk_script="$VIBRANIUM/awk/vb-parse-defaults.awk"
+
+        eval "$(awk -f "$awk_script" "$VIBRANIUM_PATH/vb-core-defaults")"
     fi
 
-    local var_name=$1
-    # Indirect expansion: ${!var_name} reads the value of the variable whose *name*
-    # is stored in var_name — effectively a runtime dereference / pointer follow
-    local val=${!var_name}
+    # all_found uses 1/0 integers rather than "true"/"false" strings to avoid repeated
+    # string comparisons in the hot path — (( all_found )) at the end converts to exit code.
+    local all_found=1
 
-    # ${OPTION_DEFAULTS[$var_name]+x}: the +x trick tests key *existence* in the associative
-    # array without caring about the value. Without +x, an empty string would look like unset.
-    if [[ -z ${OPTION_DEFAULTS[$var_name]+x} ]]; then
-        log::warn "Variable $var_name not found in defaults"
-        return 1
-    fi
+    # All scalars hoisted above the loop so bash doesn't re-execute the `local`
+    # declaration and allocation on every iteration.
+    local var_name val normalized is_valid type default_value
+    local min max sign int_part frac_part signed_int
+    local allowed_str
 
-    local default_value=${OPTION_DEFAULTS[$var_name]}
-    local type=${OPTION_TYPES[$var_name]}
+    # Iterate $@ directly — no need to copy into a local array first.
+    for var_name in "$@"; do
 
-    # If the variable is completely empty/unset, skip validation and just apply the default
-    if [[ -z $val ]]; then
-        log::warn "$var_name is unset. Using defalut ($default_value)"
-        # printf -v writes into a variable by name — the only portable way to do indirect
-        # assignment in bash without eval. Equivalent to: declare $var_name="$default_value"
-        printf -v "$var_name" '%s' "$default_value"
-        return 0
-    fi
+        # declare -n creates a transparent nameref alias to the caller's variable.
+        # All subsequent reads (val=$ref) and writes (ref=...) go directly through it,
+        # paying the indirection cost once here rather than on every ${!var_name} read
+        # and printf -v write throughout the loop body.
+        declare -n ref="$var_name"
 
-    # normalized will hold the cleaned-up version of val to write back if valid.
-    # We don't mutate val itself so we can still reference the original in error messages.
-    local normalized=$val
-    local is_valid=true
+        val=$ref
 
-    case $type in
-        bool)
-            # Lowercase via ,, operator so "True"/"TRUE"/"true" all pass
-            normalized=${val,,}
-            # Booleans must be exactly "true" or "false" — nothing else
-            [[ $normalized != true && $normalized != false ]] && is_valid=false
-            ;;
+        # ${OPTION_DEFAULTS[$var_name]+x}: the +x trick tests key *existence* in the associative
+        # array without caring about the value. Without +x, an empty string would look like unset.
+        if [[ -z ${OPTION_DEFAULTS[$var_name]+x} ]]; then
+            log::warn "Variable $var_name not found in defaults"
+            all_found=0
+            unset -n ref   # must release before continue — rebinding a live nameref is undefined
+            continue
+        fi
 
-        int)
-            # Normalize comma-as-decimal-separator (e.g. European locale "3,14" → "3.14")
-            normalized=${val//,/.}
+        default_value=${OPTION_DEFAULTS[$var_name]}
 
-            # The regex does several things at once:
-            #   ^(-?)       — optional leading minus, captured so we can reconstruct the sign
-            #   0*          — consume (discard) any leading zeros to avoid octal misparse later
-            #   ([0-9]+)    — the actual integer digits
-            #   (\.[0-9]+)? — optional fractional part (we keep it but ignore it for range checks)
-            if [[ ! $normalized =~ ^(-?)0*([0-9]+)(\.[0-9]+)?$ ]]; then
-                is_valid=false
-            else
-                local sign=${BASH_REMATCH[1]}
-                local int_part=${BASH_REMATCH[2]}   # leading zeros already stripped by 0* group
-                local frac_part=${BASH_REMATCH[3]}  # empty or ".digits"
+        type=${OPTION_TYPES[$var_name]}
 
-                # Rebuild a clean normalized form: sign + stripped-zero int + optional fraction
-                normalized="${sign}${int_part}${frac_part}"
+        # If the variable is completely empty/unset, skip validation and just apply the default
+        if [[ -z $val ]]; then
+            log::warn "$var_name is unset. Using default ($default_value)"
 
-                # Only do range check if a min was defined for this variable
-                local min=${OPTION_MINS[$var_name]-}  # -} gives empty string if key absent
+            # Direct assignment through the nameref — no printf -v overhead.
+            ref=$default_value
+            unset -n ref
+            continue
+        fi
 
-                if [[ -n $min ]]; then
-                    local max=${OPTION_MAXS[$var_name]}
+        # normalized will hold the cleaned-up version of val to write back if valid.
+        # We don't mutate val itself so we can still reference the original in error messages.
+        normalized=$val
 
-                    # 10# prefix forces base-10 interpretation so "08" and "09" don't
-                    # trigger bash's "invalid octal" arithmetic error.
-                    # The sign is prepended *outside* the 10# to handle negatives correctly.
-                    local signed_int=$(( ${sign}10#$int_part ))
-                    (( signed_int < 10#$min || signed_int > 10#$max )) && is_valid=false
+        # is_valid as integer — 1=valid, 0=invalid. Avoids string comparisons at the
+        # bottom of the loop where we decide whether to apply the default or write back.
+        is_valid=1
+
+        case $type in
+            bool)
+                # Lowercase via ,, operator so "True"/"TRUE"/"true" all pass
+                normalized=${val,,}
+
+                # Booleans must be exactly "true" or "false" — nothing else
+                [[ $normalized != true && $normalized != false ]] && is_valid=0
+                ;;
+            int)
+                # Normalize comma-as-decimal-separator (e.g. European locale "3,14" → "3.14")
+                normalized=${val//,/.}
+
+                # _RE_INT is a precompiled variable reference — bash reuses its compiled form
+                # across calls, unlike an inline string literal which is recompiled each time.
+                if [[ ! $normalized =~ $_RE_INT ]]; then
+                    is_valid=0
+                else
+                    sign=${BASH_REMATCH[1]}
+                    int_part=${BASH_REMATCH[2]} # leading zeros already stripped by 0* group
+                    frac_part=${BASH_REMATCH[3]} # empty or ".digits"
+
+                    # Rebuild a clean normalized form: sign + stripped-zero int + optional fraction
+                    normalized="${sign}${int_part}${frac_part}"
+
+                    # Only do range check if a min was defined for this variable
+                    min=${OPTION_MINS[$var_name]-} # -} gives empty string if key absent
+                    if [[ -n $min ]]; then
+                        max=${OPTION_MAXS[$var_name]}
+
+                        # 10# prefix forces base-10 interpretation so "08" and "09" don't
+                        # trigger bash's "invalid octal" arithmetic error.
+                        # The sign is prepended *outside* the 10# to handle negatives correctly.
+                        signed_int=$(( ${sign}10#$int_part ))
+                        (( signed_int < 10#$min || signed_int > 10#$max )) && is_valid=0
+                    fi
                 fi
-            fi
-            ;;
-
-        string)
-            # Pull the space-joined allowed list back out of the associative array.
-            # The -} provides an empty string default so the variable is never unbound.
-            local allowed_str=${OPTION_ALLOWEDS[$var_name]-}
-            if [[ -n $allowed_str ]]; then
-                # Word-split the stored string back into an array — reverses the join done in parse_defaults
-                local -a allowed=($allowed_str)
-                local a found=false
-
-                # Linear scan: compare val against every allowed value.
-                # Quoted "$a" prevents glob expansion on the right-hand side of ==.
-                for a in "${allowed[@]}"; do
-                    [[ $val == "$a" ]] && found=true && break
-                done
-
-                [[ $found == false ]] && is_valid=false
-            fi
-            # If no allowed list exists, any non-empty string is considered valid
-            ;;
-    esac
-
-    if [[ $is_valid == false ]]; then
-        log::warn "Invalid value for $var_name. Using defalut ($default_value)"
-        printf -v "$var_name" '%s' "$default_value"
-    else
-        # Write the normalized form back — this is the important part for int/bool:
-        # the caller's variable ends up with leading zeros stripped, correct case, etc.
-        printf -v "$var_name" '%s' "$normalized"
-    fi
-}
-
-term::ask_yes_no() {
-    local default="${1:-Y}"
-    local message="$2"
-    local input prompt hint
-
-    default="${default^^}"
-
-    # Set hint based on default
-    case "$default" in
-        Y) hint="(Y/n)" ;;
-        N) hint="(y/N)" ;;
-        *) hint="(Y/n)"; default="Y" ;;
-    esac
-
-    while true; do
-        # Show cursor
-        printf '\e[?25h'
-
-        prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
-
-        printf "%s" "$prompt"
-        read -r input
-
-        # Use default if empty
-        [[ -z "$input" ]] && input="$default"
-
-        case "$input" in
-            [Yy][Ee][Ss]|[Yy])
-                # Hide cursor before returning
-                printf '\e[?25l'
-                return 0
                 ;;
-            [Nn][Oo]|[Nn])
-                # Hide cursor before returning
-                printf '\e[?25l'
-                return 1
-                ;;
-            *)
-                # Clear line and retry
-                printf "\r\e[K"
+            string)
+                # OPTION_ALLOWEDS stores values as |val1|val2|valN| (pipe-delimited with
+                # sentinel pipes at both ends, set by vb-defaults.awk).
+                # A single glob test replaces the former read-ra + for loop entirely:
+                # O(1) regardless of how many allowed values there are.
+                allowed_str=${OPTION_ALLOWEDS[$var_name]-}
+
+                if [[ -n $allowed_str ]]; then
+                    [[ $allowed_str == *"|${val}|"* ]] || is_valid=0
+                fi
+
+                # If no allowed list exists, any non-empty string is considered valid
                 ;;
         esac
+        # (( is_valid )) exits 0 when is_valid=1 (valid), 1 when is_valid=0 (invalid)
+        if (( is_valid )); then
+            # Write the normalized form back through the nameref — this is the important part
+            # for int/bool: the caller's variable ends up with leading zeros stripped, correct
+            # case, etc.
+            ref=$normalized
+        else
+            log::warn "Invalid value for $var_name. Using default ($default_value)"
+            ref=$default_value
+        fi
+
+        # Release the nameref before the next iteration — without this, the next
+        # `declare -n ref=...` would re-bind an already-live nameref, which in some
+        # bash versions causes the old target to linger or the new bind to be skipped.
+        unset -n ref
     done
+
+    # (( all_found )) exits 0 when all_found=1 (every variable found), 1 when any was missing.
+    # Cleaner than return $(( 1 - all_found )) — no arithmetic expansion subshell, just a test.
+    (( all_found ))
 }
 
 

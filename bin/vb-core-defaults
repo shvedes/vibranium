@@ -1,424 +1,406 @@
 # vim:ft=bash
 # shellcheck disable=all
 #
-# This file follows a strict format parsed by helpers::parse_defaults.
+# This file follows a strict format parsed by vb-defaults.awk.
 # Deviating from it will break option validation. Follow these rules exactly:
 #
-# Booleans — not quoted, no constraints:
-#   # Available options: bool
+# Each managed variable must be preceded by an annotation block using @-tags.
+# The block must have no blank lines between it and the assignment.
+# Blank lines between blocks are required — they act as hard resets for the parser.
+#
+# # @type   — required. One of: bool  int  string
+# # @range  — int only, optional. Format: N..M  (e.g. 0..100). N must be strictly less than M.
+# # @values — string only, required. Space-separated list of allowed values, unquoted.
+# # @desc   — optional, repeatable. Free-form human description. Ignored by the parser.
+#             Use multiple @desc lines for longer descriptions — each line is ignored
+#             individually, so line count has no effect on parsing.
+# # @note   — optional, repeatable. Free-form human notes. Ignored by the parser.
+#             Use multiple @note lines for longer descriptions — each line is ignored
+#             individually, so line count has no effect on parsing.
+# # @ignore - ignores the variable.
+#
+# Booleans — unquoted value, no @range or @values:
+#   # @type bool
+#   # @desc Whether to show OSD notifications.
+#   # @note Note: spawns a new process!
 #   VIBRANIUM_FOO=true
 #
-# Integers — not quoted, optionally range-constrained:
-#   # Available options: int
-#   # Available options: int between 0 and 100
-#   VIBRANIUM_FOO=5
+# Integers — unquoted value, @range is optional:
+#   # @type int
+#   # @range 0..100
+#   # @desc JPEG quality for screenshots (higher = larger file).
+#   # @note Stay within the range!
+#   VIBRANIUM_FOO=80
 #
-# Strings — double-quoted value, enum values in single quotes, space-separated:
-#   # Available options: string 'value1' 'value2' 'valueN'
+# Strings — double-quoted value, @values required:
+#   # @type string
+#   # @values value1 value2 valueN
+#   # @desc Which search engine to use for the search shortcut.
 #   VIBRANIUM_FOO="value1"
 #
-# Every option block must also include:
-#   # Default is <value>        ← unquoted for bool/int
-#   # Default is 'value'        ← single-quoted for string (for readability)
+# The default value is read directly from the assignment (VAR=value).
+# Do not add a separate comment for the default — it is not parsed.
+#
+# Variables without a @type annotation are ignored by the validator entirely.
 #
 
 #           VIBRANIUM GLOBAL OPTIONS           #
 # ============================================ #
 #                                              #
 
-# Which inhibition type to use when using sleep inhibitor.
-# Available options: string 'idle' 'sleep'
-#
-# Note: when 'sleep' is used, the session can lock automatically like normal,
-#       but the PC won't go to sleep. When idle is selected, the session won't
-#       lock automatically.
-#
-# Default is 'idle'
+# @type string
+# @values idle sleep
+# @desc Which inhibition type to use when using sleep inhibitor.
+# @note When 'sleep' is used, the session can lock automatically like normal,
+# @note but the PC won't go to sleep. When idle is selected, the session won't
+# @note lock automatically.
 VIBRANIUM_GLOBAL_INHIBIT_TYPE="idle"
 
-# Whether to use OSD
-# Available options: bool
-#
-# Note: This is a global setting that takes precedence over the settings of specific actions.
-#
-# Default is false
+
+# @type bool
+# @desc Whether to use OSD for events like:
+# @desc volume / brightness / power profiles.
 VIBRANIUM_GLOBAL_USE_OSD=false
 
-# Whether to use visual feedback when changing power profiles
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to show notification (or OSD) when
+# @desc changing power profile.
 VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK=false
 
-# Whether to pause music when locking session. The music will be restored later
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to pause music when locking session.
+# @note The music will be restored later.
 VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK=true
 
-# Whether to show "Now Playing" notification on session unlock.
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to show the "Now Playing"
+# @desc notification when unlocking session.
 VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING=false
 
-# Whether to show curret track on lock screen
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to show currently playing
+# @desc (or paused) track on the lockscreen.
 VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN=true
 
-# Whether to include album art into notification.
-# Available options: bool
-#
-# Note: In case of web-based player (e.g. Spotify) the art will be downloaded from
-#       the web, which will take some time (it is highly depends on your network speed).
-#       If the player if offline (e.g. MPD) - action will be instant
-#
-# Default is false
+
+# @type bool
+# @desc Whether to include album art into notification.
+# @note In case of web-based player (e.g. Spotify) the art will be downloaded from
+# @note the web, which will take some time (it is highly depends on your network speed).
+# @note If the player if offline (e.g. MPD) - action will be instant.
 VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART=false
 
-# Whether to show app icons in app launcher
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to show app icons in the app launcher.
 VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS=true
 
-# Whether to show pre-installed web apps in app launcher
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to show pre-installed web apps in app launcher.
 VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS=false
 
-# Whether to show pre-installed AI web apps in app launcher
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to show pre-installed AI web apps in app launcher.
 VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI=false
 
-# Whether to automatically select the last remaining entry
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc man rofi(1): When one entry is left, automatically select it.
 VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT=false
 
-# Whether to automatically show app launcher when starting the session
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @note Whether to automatically show app launcher when logging in.
 VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START=false
 
-# Whether to respect the current power profile when performing compute-intensive actions.
-# If set to 'true' and the current power profile is 'power' (which prioritizes energy saving),
-# scripts like 'vb-core-set-wallpaper' will skip heavy blur processing for the lock screen background,
-# applying only dimming instead.
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to respect the 'power-saver' profile.
+# @note If true, things like blur / shadows / heavy background
+# @note processes will be suspended til the power profile change.
 VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE=true
 
-# Whether to require the user to repeat the shortcut to kill the active window.
-# Available options: bool
-#
-# Note: kill the window, not to close
-#
-# Default is true
+
+# @type bool
+# @desc Whether to require the user to repeat the shortcut to kill the active window.
+# @note Not used.
 VIBRANIUM_GLOBAL_CONFIRM_TO_KILL=true
 
-# Whether to show desktop & lockscreen background
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to show desktop and lockscreen background.
 VIBRANIUM_GLOBAL_SHOW_WALLPAPER=true
 
-# What search engine to use when performing web search (app launcher)
-# Available options: string 'google' 'duckduckgo' 'bing' 'brave'
-#
-# Default is 'google'
+
+# @type string
+# @values google duckduckgo bing brave
+# @desc What search engine to use (app launcher).
 VIBRANIUM_GLOBAL_SEARCH_ENGINE="google"
+
 
 #           VOLUME CONTROL OPTIONS             #
 # ============================================ #
 #                                              #
 
-# Whether to use visual feedback on volume actions (volume up / down, mute, etc).
-# Available options: bool
-#
-# Default is true
+# @type bool
+# @desc Whether to show notification (or OSD)
+# @desc for status changes (vol up / down / mute).
 VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK=true
 
-# Whether to play a 'pop' sound when changing volume, aka audio feedback (GNOME-like)
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to play a 'pop' sound when changing volume,
+# @desc aka audio feedback (like DEs do).
 VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK=false
 
-# Which sound to play.
-# Available options: string 'variant1' 'variant2'
-#
-# Default is 'variant1'
+
+# @type string
+# @values variant1 variant2
+# @desc Which sound to play (option above).
 VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT="variant1"
 
-# Self explanatory.
-# Available options: int
-#
-# Default is 5
+
+# @type int
 VIBRANIUM_VOLUME_ADJUSTMENT_STEP=5
 
-# Whether to allow adjusting the volume above 100%
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Allow volume level up to 150%.
 VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED=false
 
-# Whether to enable loopback for the default microphone.
-# Default Microphone > Default Output
-# Aka "Hear my voice"
-# Available options: bool
-#
-# Default is  false
+
+# @type bool
+# @desc Whether to enable loopback for the default microphone.
+# @desc Also known as "Hear my voice".
 VIBRANIUM_VOLUME_SOURCE_LOOPBACK=false
 
-# Volume to apply to the loopback device
-# Available options: int
-#
-# Default is 50
+
+# @type int
+# @desc Volume level of the loopback device.
 VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME=50
+
 
 #                SCREENSHOT OPTIONS            #
 # ============================================ #
 #                                              #
 
-# Which file type to use when taking a screenshot
-# Available options: string 'png' 'jpeg' 'ppm'
-#
-# Default is 'jpeg'
+# @type string
+# @values png jpeg ppm
+# @desc File type to use when taking a screenshot.
 VIBRANIUM_SCREENSHOT_FILE_TYPE="jpeg"
 
-# JPEG quality
-# Available options: int between 0 and 100
-#
-# Default is 80
+
+# @type int
+# @range 0..100
+# @desc JPEG compression level.
+# @desc AKA JPEG quality.
 VIBRANIUM_SCREENSHOT_JPEG_QUALITY=80
 
-# Whether to save taken screenshot to disk
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to save taken screenshot to disk.
 VIBRANIUM_SCREENSHOT_SAVE_TO_DISK=true
 
-# When set to true and taking a fullscreen screenshot,
-# a temporary compositor shader is applied to create a flash effect.
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to briefly flash the screen when taking
+# @desc a screenshot with the --screen flag.
+# @note Works only when animations enabled.
 VIBRANIUM_SCREENSHOT_FLASH_SCREEN=true
 
-# Whether to flash border of active window when taking a screenshot
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Same as above, but for window borders.
 VIBRANIUM_SCREENSHOT_FLASH_BORDER=true
 
-# Whether to show a notification to indicate that screenshot was taken
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to show a notification to
+# @desc indicate that screenshot was taken.
 VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION=true
 
-# Whether to automatically open annotation window after taking a screenshot.
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to automatically open annotation
+# @desc tool (satty) after taking a screenshot.
 VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE=false
+
 
 #             BRIGHTNESS OPTIONS               #
 # ============================================ #
 #                                              #
 
-# Whether to use DDC (Display Data Channel) protocol to control brightness of external monitors.
-# Available options: bool
-#
-# Note: Only single monitor setup is tested.
-#
-# Default is true
+# @type bool
+# @desc Whether to use DDC (Display Data Channel) protocol
+# @desc to control brightness of external monitors.
 VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL=true
 
-# Brightness adjustment step
-# Available options: int
-#
-# Default is 5
+
+# @type int
 VIBRANIUM_BRIGHTNESS_STEP=5
+
 
 #             COLOR PICKER OPTIONS             #
 # ============================================ #
 #                                              #
 
-# Whether to show live HEX preview.
-# Available options: bool
-#
-# Default is true
+# @type bool
+# @desc Whether to show live HEX preview.
 VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW=true
 
-# Whether to display selected color in the notification body.
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to display selected color in the notification.
 VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR=true
 
-# The number of recent colors in the Waybar module tooltip.
-# Available options: int
-#
-# Default is 10
+
+# @type int
+# @desc The number of recent colors in the Waybar module tooltip.
 VIBRANIUM_COLOR_PICKER_HISTORY_SIZE=10
+
+# @type bool
+# @desc Whether to show notification.
+# @note Not used.
+VIBRANIUM_COLOR_PICKER_NOTIFY=true
+
 
 #                WAYBAR OPTIONS                #
 # ============================================ #
 #                                              #
 
-# Whether to show the Night Light indicator.
-# Available options: bool
-#
-# Default is false
+# @type bool
+# @desc Whether to show the Night Light module.
 VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE=false
 
-# Whether to enable color picker module.
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to enable the color picker module.
 VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE=false
 
-# Whether to enable power profile module.
-# Available options: bool
-#
-# Note: setting this to false doesn't disable ability to change power profile systemwide.
-#
-# Default is true
+
+# @type bool
+# @desc Whether to enable the power profile module.
 VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE=true
 
-# Whether to enable a Waybar module which will track package updates.
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to enable the updates module.
 VIBRANIUM_BAR_PACMAN_MODULE_ENABLE=false
 
-# Whether to show the module even if there are no updates available
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to show the updates module
+# @desc even if there is no updates available.
 VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES=true
 
-# Whether to enable weather module in Waybar.
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to enable weather the module.
 VIBRANIUM_BAR_WEATHER_MODULE_ENABLE=false
 
-# Which city to use for displaying the weather.
-# Available options: string
-#
-# Examples: 'Madrid' 'Lisbon' 'Paris' 'Moscow' 'Chicago'
-#
-# Default is 'not_set'
+
+# @ignore
+# @desc Which city to use for displaying the weather.
+# @desc Examples: 'Madrid' 'Lisbon' 'Paris' 'Moscow' 'Chicago'
+# @note The weather script will detect "not_set" value
+# @note and will try to get your location by your IP address.
 VIBRANIUM_BAR_WEATHER_MODULE_CITY="not_set"
 
-# Whether to display loading animation for custom modules at startup (e.g. pacman / weather).
-# Available option: bool
-#
-# Note: see option below this one
-#
-# Default is true
+
+# @type bool
+# @desc Whether to display loading animation at first run.
+# @desc Applicable to updates and weather only.
 VIBRANIUM_BAR_SHOW_ANIMATION=true
 
-# Whether to show separator for pacman and weather modules. This might be useful when the users wants
-# to separate them visually with the clock module.
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to show separator
+# @desc for updates and weather modules.
 VIBRANIUM_BAR_SHOW_SEPARATOR=true
+
 
 #         SCREEN RECORDING OPTIONS             #
 # ============================================ #
 #                                              #
 
-# FPS to record video at.
-# Available options: int
-#
-# Default is 30
+# @type int
+# @desc FPS to record video at.
 VIBRANIUM_RECORDING_FPS=30
 
-# Video recording quality level.
-# Available options: string 'medium' 'high' 'very_high' 'ultra'
-#
-# Default is 'high'
+
+# @type string
+# @values medium high very_high ultra
+# @desc Recording quality.
 VIBRANIUM_RECORDING_QUALITY="high"
 
-# Container format for the output file.
-# Available options: string 'mp4' 'mkv' 'webm'
-#
-# Note: If 'webm' is used, gpu-screen-recorder will force the codec to 'vp8'.
-#       So if you want to use 'webm', make sure your GPU supports 'vp8'.
-#       Otherwise, choose a different container format.
-#
-# Default is 'mp4'
+
+# @type string
+# @values mp4 mkv webm
+# @desc Container format for the output file.
+# @note Note: If 'webm' is used, gpu-screen-recorder will force the codec to 'vp8'.
+# @note So if you want to use 'webm', make sure your GPU supports 'vp8'.
+# @note Otherwise, choose a different container format in the Vibranium settings.
 VIBRANIUM_RECORDING_CONTAINER_TYPE="mp4"
 
-# Framerate mode to record with.
-# Available options: string 'cfr' (constant frame rate), 'vfr' (variable frame rate)
-#
-# Note: While 'cfr' provides better quality, it increases the final file size.
-#       'vfr' is more resource-efficient, but some video players may not handle it properly.
-#
-# Default is 'cfr'
+
+# @type string
+# @values cfr vfr
+# @desc Framerate mode to record with.
+# @note cfr - Constant Frame Rate.
+# @note vfr - Variable Frame Rate.
+# @note While cfr provides better quality, it increases the final file size.
+# @note vfr is more resource-efficient, but some video players may not handle it properly.
 VIBRANIUM_RECORDING_FRAMERATE_MODE="cfr"
 
-# Video codec to use.
-# Available options: string 'auto' 'h264' 'hevc' 'av1' 'vp8' 'vp9' 'hevc_hdr' 'av1_hdr' 'hevc_10bit' 'av1_10bit'
-#
-# Note: Make sure that your hardware supports the selected codec. For more info, see 'gpu-screen-recorder -h | less'.
-# Note: If 'av1' is used but your GPU does not support it, 'h264' will be used as fallback.
-#
-# Default is 'auto'
+
+# @type string
+# @values auto h264 hevc av1 vp8 vp9 hevc_hdr av1_hdr hevc_10bit av1_10bit
+# @desc Video codec to use.
+# @note Make sure that your hardware supports the selected codec.
+# @note See 'man gpu-screen-recorder'.
 VIBRANIUM_RECORDING_VIDEO_CODEC="auto"
 
-# Whether to capture your source device (e.g., microphone).
-# Available options: bool
-#
-# Default is false
+
+# @type bool
+# @desc Whether to capture your source device (microphone).
 VIBRANIUM_RECORDING_CAPTURE_SOURCE=false
 
-# Whether to use RNNoise when available.
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to use RNNoise when available.
 VIBRANIUM_RECORDING_USE_RNNOISE=true
 
-# Whether to capture your output device.
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to capture your output device.
 VIBRANIUM_RECORDING_CAPTURE_SINK=true
 
-# When set to true and starting screen recording in fullscreen mode,
-# a temporary compositor shader is applied to create a flash effect.
-# Available options: bool
-#
-# Default is true
+
+# @type bool
+# @desc Whether to flash the screen when
+# @desc starting or finishing recording.
 VIBRANIUM_RECORDING_FLASH_SCREEN=true
+
 
 #
 #                PLAYER OPTIONS                #
 # ============================================ #
 #                                              #
 
-# How fast should the fade effect be when playing/pausing
-# Available options: string 'very_slow' 'slow' 'normal' 'fast' 'very_fast' 'off'
-#
-# Default is 'normal'
+# @type string
+# @values very_slow slow normal fast very_fast off
+# @desc How fast should the fade effect be when playing/pausing
 VIBRANIUM_PLAYER_FADE_DURATION="normal"
 
-# How fast should the fade effect be when switching to the next / prev track
-# Available options: string 'very_slow' 'slow' 'normal' 'fast' 'very_fast' 'off'
-#
-# Default is 'slow'
+
+# @type string
+# @values very_slow slow normal fast very_fast off
+# @desc How fast should the fade effect be when switching to the next / prev track
 VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH="slow"
+
