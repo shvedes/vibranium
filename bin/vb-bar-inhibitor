@@ -15,9 +15,9 @@ if [[ -n "$shown" ]]; then
     type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
 
     if [[ "$type" == "idle" ]]; then
-        tooltip="Blocking screen lock"
+        tooltip="Screen lock blocked"
     else
-        tooltip="Blocking system sleep"
+        tooltip="System sleep blocked"
     fi
 
     printf '{"text": "%s", "tooltip": "%s"}' "\uf023" "$tooltip"
