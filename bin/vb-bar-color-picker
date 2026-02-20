@@ -2,6 +2,7 @@
 
 source vb-core-lib
 
+helpers::check VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE
 if [[ "$VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE" == false ]]; then
     exit 0
 fi
@@ -25,15 +26,16 @@ contrast_color() {
     fi
 }
 
-tooltip="Click to pick a color from the screen"
+tooltip="\tClick to pick a color"
+
 if [[ -s $history_file ]]; then
     tooltip+="\n     Right click to <span foreground='red3'><b>clear history</b></span>"
     tooltip+="\n<span foreground='gray'>---------------------------------------</span>"
-    tooltip+="\\n\\t   <span size='9000'>Recent colors</span>"
+    tooltip+="\\n\\t    <span size='9000'>Recent colors</span>"
 
     while IFS= read -r color; do
         fg=$(contrast_color "$color")
-        tooltip+="\n\t     <span background='$color' foreground='$fg' size='9500'><b> $color </b></span>"
+        tooltip+="\n\t      <span background='$color' foreground='$fg' size='9500'><b> $color </b></span>"
     done < "$history_file"
 fi
 

@@ -830,6 +830,9 @@ term::spinner() {
     fi
 }
 
+term::show_header() {
+    printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+}
 
 term::is_headless() {
     [[ -t 1 ]] || return 0 && return 1

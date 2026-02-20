@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
-
-help() {
+usage() {
     cat <<EOF
 Usage: ${0##*/} [OPTION]...
 
-Toggle reading mode in Hyprland by applying or removing a screen shader.
+Toggle reading mode in Hyprland by toggling a screen shader.
 
 Options:
-  --help    Display this help and exit
+  -h,--help    Display this help and exit
 EOF
 }
 
 _grayscale_enabled() {
-    local opt
-    opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
+    local opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
+
     if [[ "$opt" == "[[EMPTY]]" || "$opt" =~ ^()$ ]]; then
         return 1
     else
@@ -23,14 +21,12 @@ _grayscale_enabled() {
     fi
 }
 
-if [ "$1" = "--help" ]; then
-    help
+if [[ "$1" =~ ^(-h|--help)$ ]]; then
+    usage
     exit 0
 fi
 
-helpers::check VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE
-
-shader="$VIBRANIUM/default/hypr/shaders/${VIBRANIUM_GLOBAL_READING_MODE_SHADER_TYPE}.glsl"
+shader="$VIBRANIUM/default/hypr/shaders/grayscale.glsl"
 config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
 
 if _grayscale_enabled; then

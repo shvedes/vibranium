@@ -4,16 +4,18 @@ source vb-core-lib
 
 _usage() {
     cat <<EOF
-Usage: "${0##*/}" [OPTION]... [PACKAGE]...
+Usage: ${0##*/} [OPTION]... [PACKAGE]...
 
 Install packages in Vibranium
 
 Options:
-  --no-logo         Do not display the Vibranium logo at startup
-  --no-dummy        Do not request a key press after completion or cancellation
+  --no-logo         Do not display the Vibranium logo
+  --no-dummy        Do not wait for a key press after completion or cancellation
   --no-verify       Skip verification of package existence in repositories
   --no-systemd      Skip systemd post-install hook
   --conservative    Do not print any success / fail messages
+  -h,--help         Show this help and exit
+  --                End of options. Everything after is PACKAGE
 
 If no PACKAGE is provided, refresh repositories and use fzf for interactive package selection.
 Packages are filtered to install only those not already present.
@@ -27,16 +29,15 @@ _ask_for_sudo() {
 }
 
 # Detects systemd units (services and sockets) provided by a list of packages.
-# Populates global arrays:
-# - provides_systemd_service: Packages that provide a systemd unit (indexes match with unit_types, unit_scope, and unit_names).
-# - unit_types: Type of unit for each entry ("service" or "socket").
-# - unit_scope: Scope of unit for each entry ("user" or "system").
-# - unit_names: List of unit basenames.
-# This function collects all units without skipping services, maintaining addition order for priority.
-# It uses 'pacman -Ql' to list files and filters for .service or .socket files in systemd directories.
+# Delegates all categorization and ordering to the external awk script:
+#   "${VIBRANIUM}/systemd-units.awk"
+# Populates global arrays (indexes are aligned across all four):
+#   - provides_systemd_service: Package that owns the unit.
+#   - unit_types:  "service" or "socket".
+#   - unit_scope:  "user" or "system".
+#   - unit_names:  Basename of the unit file.
 _handle_systemd() {
-    local pkg units unit
-    local -a pkg_user_sockets pkg_user_services pkg_sys_sockets pkg_sys_services
+    local pkg unit_type scope unit_path
 
     provides_systemd_service=()
     unit_types=()
@@ -44,68 +45,14 @@ _handle_systemd() {
     unit_names=()
 
     for pkg in "${FILTERED[@]}"; do
-        units=$(pacman -Ql "$pkg" 2>/dev/null | awk '/\/systemd\/.*\.(service|socket)$/ && $2 !~ /@/ {print $2}')
-        if [[ -z $units ]]; then
-            continue
-        fi
-
-        pkg_user_sockets=()
-        pkg_user_services=()
-        pkg_sys_sockets=()
-        pkg_sys_services=()
-
-        while IFS= read -r unit; do
-            case "$unit" in
-                */systemd/user/*.socket)
-                    pkg_user_sockets+=("$unit")
-                    ;;
-                */systemd/user/*.service)
-                    pkg_user_services+=("$unit")
-                    ;;
-                */systemd/system/*.socket|/lib/systemd/system/*.socket)
-                    pkg_sys_sockets+=("$unit")
-                    ;;
-                */systemd/system/*.service|/lib/systemd/system/*.service)
-                    pkg_sys_services+=("$unit")
-                    ;;
-            esac
-        done <<< "$units"
-
-        if (( ${#pkg_user_sockets[@]} )); then
-            for unit in "${pkg_user_sockets[@]}"; do
-                provides_systemd_service+=("$pkg")
-                unit_types+=("socket")
-                unit_scope+=("user")
-                unit_names+=("${unit##*/}")
-            done
-        fi
-
-        if (( ${#pkg_user_services[@]} )); then
-            for unit in "${pkg_user_services[@]}"; do
-                provides_systemd_service+=("$pkg")
-                unit_types+=("service")
-                unit_scope+=("user")
-                unit_names+=("${unit##*/}")
-            done
-        fi
-
-        if (( ${#pkg_sys_sockets[@]} )); then
-            for unit in "${pkg_sys_sockets[@]}"; do
-                provides_systemd_service+=("$pkg")
-                unit_types+=("socket")
-                unit_scope+=("system")
-                unit_names+=("${unit##*/}")
-            done
-        fi
-
-        if (( ${#pkg_sys_services[@]} )); then
-            for unit in "${pkg_sys_services[@]}"; do
-                provides_systemd_service+=("$pkg")
-                unit_types+=("service")
-                unit_scope+=("system")
-                unit_names+=("${unit##*/}")
-            done
-        fi
+        # Process substitution: awk reads pacman output, emits prioritized "type scope path" lines.
+        # The while loop simply won't execute if awk produces no output (pkg has no units).
+        while read -r unit_type scope unit_path; do
+            provides_systemd_service+=("$pkg")
+            unit_types+=("$unit_type")
+            unit_scope+=("$scope")
+            unit_names+=("${unit_path##*/}")
+        done < <(pacman -Ql "$pkg" 2>/dev/null | awk -f "$VIBRANIUM/awk/vb-pkg-parse-systemd.awk")
     done
 }
 
@@ -117,20 +64,18 @@ _enable_systemd_units() {
         return
     fi
 
-    local -a unique_pkgs=($(printf '%s\n' "${provides_systemd_service[@]}" | sort -u))
-    local pkg index unit_type scope unit_name
+    local -a unique_pkgs
+    mapfile -t unique_pkgs < <(printf '%s\n' "${provides_systemd_service[@]}" | sort -u)
+
+    local pkg unit_type scope unit_name
 
     for pkg in "${unique_pkgs[@]}"; do
-        local -a pkg_indices=()
-
         for i in "${!provides_systemd_service[@]}"; do
-            [[ "${provides_systemd_service[$i]}" == "$pkg" ]] && pkg_indices+=("$i")
-        done
+            [[ "${provides_systemd_service[$i]}" != "$pkg" ]] && continue
 
-        for index in "${pkg_indices[@]}"; do
-            unit_type="${unit_types[$index]}"
-            scope="${unit_scope[$index]}"
-            unit_name="${unit_names[$index]}"
+            unit_type="${unit_types[$i]}"
+            scope="${unit_scope[$i]}"
+            unit_name="${unit_names[$i]}"
 
             if term::ask_yes_no Y "Enable $unit_type '${BLUE}${unit_name}${RESET}' from package '${YELLOW}${pkg}${RESET}' ($scope scope)?"; then
                 if [[ "$scope" == "user" ]]; then
@@ -138,7 +83,7 @@ _enable_systemd_units() {
                 else
                     sudo systemctl -q --now enable "$unit_name" &
                 fi
-                break
+                break  # Skip lower-priority units for this package
             fi
         done
     done
@@ -150,14 +95,13 @@ _refresh_repos() {
     term::spinner "$pid" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repos" "- ${GREEN}Done!${RESET}"
 }
 
-# Verifies if the given packages exist in the repositories
+# Verifies if the given packages exist in the repositories.
 # Collects missing packages and reports them. Returns 1 if any are missing.
 _ensure_if_exist() {
     local total="${#PACKAGES[@]}"
-    local missing=()
+    local -a missing=()
     local index=1
 
-    # Check each package
     for pkg in "${PACKAGES[@]}"; do
         printf "\r\033[K%s[VIBRANIUM]%s Verifying package [%s/%s]" "$BLUE" "$RESET" "$index" "$total"
 
@@ -165,13 +109,12 @@ _ensure_if_exist() {
             missing+=("$pkg")
         fi
 
-        ((index++))
+        (( index++ ))
     done
 
     printf "\n"
 
-    # Report missing packages
-    if [[ "${#missing[@]}" -gt 0 ]]; then
+    if (( ${#missing[@]} > 0 )); then
         echo -e "${RED}[VIBRANIUM]${RESET} Could not find the following packages:"
         for pkg in "${missing[@]}"; do
             echo -e "\t   - ${RED}${pkg}${RESET}"
@@ -180,17 +123,25 @@ _ensure_if_exist() {
     fi
 }
 
+# Prints a cancellation (or positive-outcome) message, optionally waits for a keypress,
+# and optionally exits. Always re-enables terminal input before returning or exiting.
+#
+# Flags (at most one):
+#   --positive  Use green color instead of red (e.g. "already installed" is not an error).
+#   --exit      Exit with status 1 after the message.
 _operation_canceled() {
+    # Launched with --conservative.
+    # Don't show anything.
+    if [[ "$CONSERVATIVE" == true ]]; then
+        return
+    fi
+
     local color="$RED"
     local exit_after=false
 
     case "$1" in
-        --positive)
-            color="$GREEN"
-            ;;
-        --exit)
-            exit_after=true
-            ;;
+        --positive) color="$GREEN" ;;
+        --exit)     exit_after=true ;;
     esac
 
     printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
@@ -199,122 +150,124 @@ _operation_canceled() {
         read -n1 -r -s -p $'. Press any key to exit' dummy
     fi
 
+    # Always re-enable input regardless of exit path (fixes trap leaving terminal broken)
+    term::enable_input
+
     if [[ $exit_after == true ]]; then
         exit 1
     fi
-
-    term::enable_input
 }
 
 _installation_complete() {
-    term::disable_input
+    # Launched with --conservative.
+    # Don't show anything.
+    if [[ "$CONSERVATIVE" == true ]]; then
+        return
+    fi
 
     printf "%s[VIBRANIUM]%s Installation complete" "$GREEN" "$RESET"
 
     if [[ $NO_DUMMY == false && -t 0 ]]; then
         read -n1 -r -s -p $'. Press any key to exit' dummy
-        term::enable_input
     fi
+
+    term::enable_input
 }
 
-# Filters out already installed packages from PACKAGES and populates $FILTERED
+# Filters out already-installed packages from PACKAGES and populates FILTERED.
 _filter_packages() {
     for pkg in "${PACKAGES[@]}"; do
-        # Check if package is not installed
         if ! pacman -Qq "$pkg" &> /dev/null; then
             FILTERED+=("$pkg")
         fi
     done
 
-    # Handle cases where all or some are already installed
-    if [[ "${#FILTERED[@]}" -eq 0 ]]; then
+    if (( ${#FILTERED[@]} == 0 )); then
         echo -e "${GREEN}[VIBRANIUM]${RESET} Selected package(s) are already installed"
-
-        if [[ "$CONSERVATIVE" == false ]]; then
-            _operation_canceled --positive
-        fi
-
+        _operation_canceled --positive
         exit 0
-    elif [[ ! ${#PACKAGES[@]} -eq ${#FILTERED[@]} ]]; then
-        local pkgs_num="${#PACKAGES[@]}"
-        local filtered_num="${#FILTERED[@]}"
-        local diff=$((pkgs_num - filtered_num))
+    elif (( ${#PACKAGES[@]} != ${#FILTERED[@]} )); then
+        local diff=$(( ${#PACKAGES[@]} - ${#FILTERED[@]} ))
         echo -e "${BLUE}[VIBRANIUM]${RESET} $diff package(s) are already installed"
     fi
 }
 
 # Displays an overview of packages about to be installed.
 # Formats differently based on the number of packages for readability.
+# For long lists, calculates whether the output exceeds the terminal height
+# (accounting for the header and the overview title line) and shows a
+# terminal-specific scrolling hint if it does.
 _show_overview() {
     local packages=("${FILTERED[@]}")
 
-    if [[ "${#packages[@]}" -gt 0 ]]; then
-        if [[ "${#packages[@]}" -le 3 ]]; then
-            echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to install the following packages: ${YELLOW}${packages[@]}${RESET}"
-        else
-            echo -e "${BLUE}[VIBRANIUM]${RESET} You're about to install the following packages:"
-            for pkg in "${packages[@]}"; do
-                echo -e "\t   - ${YELLOW}${pkg}${RESET}"
-            done
+    if (( ${#packages[@]} == 0 )); then
+        return
+    fi
+
+    if (( ${#packages[@]} <= 5 )); then
+        echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to install the following packages: ${YELLOW}${packages[*]}${RESET}"
+        return
+    fi
+
+    echo -e "${BLUE}[VIBRANIUM]${RESET} You're about to install the following packages:"
+    for pkg in "${packages[@]}"; do
+        echo -e "\t   - ${YELLOW}${pkg}${RESET}"
+    done
+
+    # Lines printed above this overview in the normal flow:
+    #   - header (if shown)
+    #   - 1 title line ("You're about to install...")
+    #   - N package lines
+    local overhead=$(( SHOW_LOGO == true ? HEADER_LINES : 0 ))
+    local total=$(( overhead + 1 + ${#packages[@]} ))
+
+    if (( total > $(tput lines) )); then
+        if [[ "$TERM" == "alacritty" ]]; then
+            local msg="Use ${BLUE}Ctrl${RESET}+${BLUE}Shift${RESET}+${BLUE}Space${RESET} to enter ${GREEN}Vim${RESET} mode. "
+            msg+="Use ${YELLOW}k${RESET}/${YELLOW}j${RESET} to scroll ${YELLOW}up${RESET}/${YELLOW}down${RESET}"
+            echo -e "${YELLOW}[VIBRANIUM]${RESET} Your list is long — scroll up to review it. $msg"
         fi
     fi
 }
 
 _install_packages() {
-    if ! sudo -v; then
-        _operation_canceled
-        exit 1
-    fi
-
-    # Pipe 'yes' to confirm all prompts
-    if yes | yay -S "${YAY_FLAGS[@]}" "${FILTERED[@]}"; then
-        return 0
-    else
-        return 1
-    fi
+    yes | yay -S "${YAY_FLAGS[@]}" "${FILTERED[@]}"
 }
 
-# Fetches lists of all available packages from Arch repos and AUR. Populates PACKAGES array
+# Fetches lists of all available packages from Arch repos and AUR. Populates PACKAGES.
 _get_packages() {
-    local aur_temp=$(mktemp)
-    local arch_temp=$(mktemp)
-    local pkgs_list=()
+    local aur_temp arch_temp
+    aur_temp=$(mktemp)
+    arch_temp=$(mktemp)
 
     (pacman -Slq > "$arch_temp") &
     term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching packages" "- ${GREEN}Done!${RESET}"
 
-    (yay -Slqa > "$aur_temp") &> /dev/null &
+    (yay -Slqa > "$aur_temp" 2>/dev/null) &
     term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching packages (${BLUE}AUR${RESET})" "- ${GREEN}Done!${RESET}"
 
     mapfile -t arch_packages < "$arch_temp"
-    pkgs_list+=("${arch_packages[@]}")
+    mapfile -t aur_packages  < "$aur_temp"
 
-    mapfile -t aur_packages < "$aur_temp"
-    pkgs_list+=("${aur_packages[@]}")
+    PACKAGES+=("${arch_packages[@]}" "${aur_packages[@]}")
 
-    PACKAGES+=("${pkgs_list[@]}")
-
-    rm "$arch_temp"
-    rm "$aur_temp"
+    rm -f "$arch_temp" "$aur_temp"
 }
 
-# Allows user to select packages using fzf with preview.
+# Allows the user to select packages using fzf with preview.
 # Populates PACKAGES with selected items. Returns 1 if none selected.
 _choose_packages() {
-    local chosen=()
+    local -a chosen
 
     term::enable_input
-
-    # Use fzf for multi-select with preview
     mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | sort | fzf "${FZF_ARGS[@]}")
-
     term::disable_input
 
-    [[ "${#chosen[@]}" -eq 0 ]] && return 1
+    (( ${#chosen[@]} == 0 )) && return 1
     PACKAGES=("${chosen[@]}")
 }
 
-if [[ ! -t 1 ]]; then
+if term::is_headless; then
     exec setsid vb-core-term --floating -- "$0" "$@"
     exit
 fi
@@ -330,10 +283,12 @@ CONSERVATIVE=false
 PACKAGES=()
 FILTERED=()
 
+HEADER_LINES=10  # Height of the logo/header block in lines
+
 YAY_FLAGS=(
     "--answerclean" "Y"
-    "--answerdiff" "N"
-    "--answeredit" "N"
+    "--answerdiff"  "N"
+    "--answeredit"  "N"
     "--removemake"
     "--cleanafter"
     "--noconfirm"
@@ -373,41 +328,25 @@ trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --help|-h)
-            _usage
-            exit 0
-            ;;
-        --no-logo)
-            NO_LOGO=true
-            shift
-            ;;
-        --no-dummy)
-            NO_DUMMY=true
-            shift
-            ;;
-        --no-verify)
-            NO_VERIFY=true
-            shift
-            ;;
-        --no-systemd)
-            NO_SYSTEMD=true
-            shift
-            ;;
-        --conservative)
-            CONSERVATIVE=true
-            shift
-            ;;
+        --help|-h)      _usage;             exit ;;
+        --no-logo)      NO_LOGO=true;      shift ;;
+        --no-dummy)     NO_DUMMY=true;     shift ;;
+        --no-verify)    NO_VERIFY=true;    shift ;;
+        --no-systemd)   NO_SYSTEMD=true;   shift ;;
+        --conservative) CONSERVATIVE=true; shift ;;
         --)
             shift
+            if [[ $# -eq 0 ]]; then
+                _usage
+                exit 1
+            fi
             break
             ;;
         --*)
             echo "Unknown option: $1" >&2
             exit 1
             ;;
-        *)
-            break
-            ;;
+        *) break ;;
     esac
 done
 
@@ -447,8 +386,6 @@ else
     _show_overview
 fi
 
-
-# Proceed with installation after confirmation
 if term::ask_yes_no Y "Proceed with installation?"; then
     if ! _ask_for_sudo; then
         _operation_canceled
@@ -458,25 +395,18 @@ if term::ask_yes_no Y "Proceed with installation?"; then
     _refresh_repos
 
     if _install_packages; then
-
         if [[ "$NO_SYSTEMD" == false ]]; then
             _handle_systemd
             _enable_systemd_units
         fi
 
-        if [[ "$CONSERVATIVE" == false ]]; then
-            _installation_complete
-        fi
+        _installation_complete
     else
-        if [[ "$CONSERVATIVE" == false ]]; then
-            _operation_canceled
-        fi
+        _operation_canceled
         exit 1
     fi
 else
-    if [[ "$CONSERVATIVE" == false ]]; then
-        _operation_canceled
-    fi
+    _operation_canceled
     exit 1
 fi
 

@@ -125,7 +125,7 @@ pick_family() {
     done
 
     local family_chosen
-    helpers::ui::menu family_chosen "Theme" "" -- "${keys[@]}"
+    helpers::ui::menu family_chosen "Set theme" "" -- "${keys[@]}"
 
     [[ -z "$family_chosen" ]] && exit 0
     echo "$family_chosen"

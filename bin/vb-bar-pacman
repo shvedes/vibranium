@@ -58,7 +58,7 @@ make_tooltip() {
 
     # If not then there's no updates available.
     if [[ ! -s "$PKG_LIST" ]]; then
-        printf "You're up to date! Click to refresh"
+        printf "You're up to date!"
         return
     fi
 
