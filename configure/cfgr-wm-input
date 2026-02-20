@@ -300,6 +300,8 @@ layouts_menu() {
 }
 
 while true; do
+    hyprctl -q reload config-only
+
     mapfile -t lines < <(
         hyprctl --batch -j \
             "getoption input:sensitivity;    \
@@ -374,7 +376,7 @@ while true; do
             layouts_menu
             ;;
         "Hide on key press"*)
-            case "$current_natural_scroll" in
+            case "$current_hide_key_press" in
                 true)
                     vb-cmd-edit-wm-config "cursor:hide_on_key_press:false" \
                         "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"

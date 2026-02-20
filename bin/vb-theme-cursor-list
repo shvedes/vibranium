@@ -2,29 +2,57 @@
 
 _usage() {
     cat <<EOF
-Usage: ${0##*/} [OPTION]...
+Usage: ${0##*/} [--pretty] [--size] [THEME]
 
 List available X11 cursor themes.
 
-The script scans standard icon directories and prints themes in the format:
-  directory|theme name
+  THEME      folder name of a single cursor theme
+
+Without flags scans for cursor themes and prints folder names
 
 Options:
-  -h, --help     display this help and exit
+  --pretty   use human-readable name from .theme file instead of folder name
+  --size     append available cursor pixel sizes
+  -h, --help display this help and exit
 EOF
 }
 
-if [[ "$1" =~ ^(-h|--help)$ ]]; then
-    _usage
-    exit 0
-fi
+FLAG_PRETTY=false
+FLAG_SIZE=false
+THEME_ARG=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help)
+            _usage
+            exit 0
+            ;;
+        --pretty)
+            FLAG_PRETTY=true
+            ;;
+        --size)
+            FLAG_SIZE=true
+            ;;
+        -*)
+            echo "unknown option: $1" >&2
+            exit 1
+            ;;
+        *)
+            if [[ -n "$THEME_ARG" ]]; then
+                echo "error: unexpected argument: $1" >&2
+                exit 1
+            fi
+            THEME_ARG="$1"
+            ;;
+    esac
+    shift
+done
 
 parse_cursor_theme() {
     local file="$1"
     local line name
     local in_section=false
 
-    # parse "Name=" inside [Icon Theme] section
     while IFS= read -r line; do
         case "$line" in
             "[Icon Theme]")
@@ -35,55 +63,124 @@ parse_cursor_theme() {
                 ;;
             Name=*)
                 if [[ $in_section == true ]]; then
-                    name=${line#Name=}
+                    name="${line#Name=}"
                     break
                 fi
                 ;;
         esac
     done < "$file"
 
-    # if name found, store under theme directory name
-    [[ -n "$name" ]] || return
+    local dir="${file%/*}"
+    dir="${dir##*/}"
 
-    local dir=${file%/*}
-    dir=${dir##*/}
+    THEMES["$dir"]="${name:-$dir}"
+}
 
-    THEMES["$dir"]="$name"
+print_all_sizes() {
+    python3 - "$@" <<'PYEOF'
+import sys, struct
+
+args = sys.argv[1:]
+pairs = zip(args[0::2], args[1::2])
+
+for name, path in pairs:
+    try:
+        with open(path, 'rb') as fh:
+            if fh.read(4) != b'Xcur':
+                print(name)
+                continue
+            fh.read(8)
+            ntoc, = struct.unpack('<I', fh.read(4))
+            sizes = set()
+            for _ in range(ntoc):
+                typ, sub = struct.unpack('<II', fh.read(8))
+                fh.read(4)
+                if typ == 0xfffd0002:
+                    sizes.add(sub)
+            if sizes:
+                print(name, *sorted(sizes))
+            else:
+                print(name)
+    except Exception:
+        print(name)
+PYEOF
+}
+
+register_theme() {
+    local theme_path="$1"
+    local dir_name="${theme_path##*/}"
+
+    THEME_DIRS["$dir_name"]="$theme_path/cursors"
+
+    if [[ -f "$theme_path/cursor.theme" ]]; then
+        parse_cursor_theme "$theme_path/cursor.theme"
+    elif [[ -f "$theme_path/index.theme" ]]; then
+        parse_cursor_theme "$theme_path/index.theme"
+    else
+        THEMES["$dir_name"]="$dir_name"
+    fi
 }
 
 SEARCH_DIRS=(
     "/usr/share/icons"
-    "$XDG_DATA_HOME/icons"
+    "${XDG_DATA_HOME:-$HOME/.local/share}/icons"
     "$HOME/.icons"
 )
 
 declare -A THEMES
+declare -A THEME_DIRS
 
-for base in "${SEARCH_DIRS[@]}"; do
-    [[ -d "$base" ]] || continue
-
-    # iterate theme directories (one level deep) using glob
-    for theme_dir in "$base"/*/; do
-        [[ -d "$theme_dir" ]] || continue
-
-        # remove trailing slash for consistent naming
-        theme_dir="${theme_dir%/}"
-
-        # check whether this theme actually contains cursors
-        if [[ -d "$theme_dir/cursors" ]]; then
-            if [[ -f "$theme_dir/cursor.theme" ]]; then
-                parse_cursor_theme "$theme_dir/cursor.theme"
-            elif [[ -f "$theme_dir/index.theme" ]]; then
-                parse_cursor_theme "$theme_dir/index.theme"
-            else
-                dir_name=${theme_dir##*/}
-                THEMES["$dir_name"]="$dir_name"
-            fi
+if [[ -n "$THEME_ARG" ]]; then
+    # Fast path: locate the named theme without scanning everything
+    for base in "${SEARCH_DIRS[@]}"; do
+        if [[ -d "$base/$THEME_ARG/cursors" ]]; then
+            register_theme "$base/$THEME_ARG"
+            break
         fi
     done
-done
 
-for dir in "${!THEMES[@]}"; do
-    printf "%s|%s\n" "$dir" "${THEMES[$dir]}"
-done
+    if [[ ${#THEMES[@]} -eq 0 ]]; then
+        echo "error: theme not found $THEME_ARG" >&2
+        exit 1
+    fi
+else
+    # Full scan
+    for base in "${SEARCH_DIRS[@]}"; do
+        if [[ -d "$base" ]]; then
+            for theme_dir in "$base"/*/; do
+                if [[ -d "$theme_dir" ]]; then
+                    theme_dir="${theme_dir%/}"
+                    if [[ -d "$theme_dir/cursors" ]]; then
+                        register_theme "$theme_dir"
+                    fi
+                fi
+            done
+        fi
+    done
+fi
 
+if [[ $FLAG_SIZE == true ]]; then
+    size_args=()
+    for dir in "${!THEMES[@]}"; do
+        if [[ $FLAG_PRETTY == true ]]; then
+            display="${THEMES[$dir]}"
+        else
+            display="$dir"
+        fi
+        for f in "${THEME_DIRS[$dir]}"/*; do
+            if [[ -f "$f" ]]; then
+                size_args+=("$display" "$f")
+                break
+            fi
+        done
+    done
+    print_all_sizes "${size_args[@]}"
+else
+    for dir in "${!THEMES[@]}"; do
+        if [[ $FLAG_PRETTY == true ]]; then
+            printf "%s\n" "${THEMES[$dir]}"
+        else
+            printf "%s\n" "$dir"
+        fi
+    done
+fi

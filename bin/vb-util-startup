@@ -6,7 +6,6 @@
 
 source vb-core-lib
 
-
 LOGFILE="$VIBRANIUM_CACHE/${0##*/}.errors"
 
 # This function handles cases where the monitor brightness might have been changed
@@ -56,6 +55,14 @@ _toggle_loopback() {
         vb-cmd-toggle-loopback &
     fi
 }
+
+CURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme")"
+CURSOR_THEME="${CURSOR_THEME:-Adwaita}"
+
+CURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size")"
+CURSOR_SIZE="${CURSOR_SIZE:-24}"
+
+vb-theme-cursor-set "$CURSOR_THEME" --size "$CURSOR_SIZE" &
 
 _toggle_loopback &
 
