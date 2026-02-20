@@ -258,15 +258,17 @@ apply_theme() {
     done
 
     gsettings set org.gnome.desktop.interface cursor-theme "$VIBRANIUM_CURSOR_THEME"
-
     gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
 
     local icon_theme="Papirus-Dark"
     local papirus_theme="Papirus-Dark"
 
     if [[ $folder_name =~ (light|latte|dawn)$ ]]; then
+        gsettings set org.gnome.desktop.interface color-scheme 'prefer-light'
         icon_theme="Papirus-Light"
         papirus_theme="Papirus-Light"
+    else
+        gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
     fi
 
     gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
