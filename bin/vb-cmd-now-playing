@@ -46,8 +46,7 @@ state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
 
 pc_status="$(playerctl status 2>/dev/null || true)"
 
-mpd_unit="$(systemctl --user is-active mpd)"
-if [[ "$mpd_unit" == "active" ]]; then
+if systemctl -q --user is-active mpd; then
     mpd_status="$(mpc status 2>/dev/null)"
 fi
 

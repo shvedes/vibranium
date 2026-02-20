@@ -3,17 +3,16 @@
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
 if [[ ! -f /usr/lib/rofi/emoji.so ]]; then
-    msg="The emoji menu requires <span foreground='${P_YELLOW}'><b>rofi-emoji</b></span>, which is not installed.\n\n"
-    msg+="<b><i>Click here to install</i></b>"
-    if [ "$(notify-send -A true -r 4 -t 5000 -u critical "Vibranium" "$msg")" ]; then
-        vb-pkg-install rofi-emoji
-        exit 0
-    else
-        exit 1
-    fi
+    msg="The emoji menu requires "
+    msg+="<span foreground='${P_YELLOW}'><b>rofi-emoji</b></span>, "
+    msg+="which is not installed.\n\n"
+
+    notify-send -r 4 -t 5000 "Vibranium" "$msg"
+    vb-pkg-install rofi-emoji
+    exit 0
 fi
 
-if pidof rofi > /dev/null; then
+if pidof -q rofi; then
     killall rofi
     exit 0
 fi

@@ -245,21 +245,32 @@ _operation_canceled() {
     local color="$RED"
     local exit_after=false
 
-    case "$1" in
-        # Not in use yet
-        --positive)
-            color="$GREEN"
-            ;;
-        --exit)
-            exit_after=true
-            ;;
-    esac
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            # Not in use yet
+            --positive)
+                color="$GREEN"
+                shift
+                ;;
+            --exit)
+                exit_after=true
+                shift
+                ;;
+            --newline)
+                printf '\n'
+                shift
+        esac
+    done
 
     printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
 
     if [[ $NO_DUMMY == false && -t 0 ]]; then
+        # Hide cursor
+        printf '\e[?25l'
+        # Read the dummy key
         read -n1 -r -s -p $'. Press any key to exit' dummy
-        printf '\e[?25h' # Show cursor
+        # Show cursor
+        printf '\e[?25h'
     fi
 
     if [[ $exit_after == true ]]; then
@@ -271,8 +282,12 @@ _uninstallation_complete() {
     printf "%s[VIBRANIUM]%s Uninstallation complete" "$GREEN" "$RESET"
 
     if [[ $NO_DUMMY == false ]]; then
-        read -n1 -r -p $'. Press any key to exit' dummy
-        printf '\e[?25h' # Show cursor
+        # Hide cursor
+        printf '\e[?25l'
+        # Read the dummy key
+        read -n1 -r -s -p $'. Press any key to exit' dummy
+        # Show cursor
+        printf '\e[?25h'
     fi
 }
 
@@ -292,11 +307,9 @@ _show_overview() {
         fi
     fi
 }
+
 _uninstall_packages() {
-    if ! sudo -v; then
-        _operation_canceled
-        exit 1
-    fi
+    term::enable_input
 
     if sudo pacman -Rns "${PACKAGES[@]}"; then
         return 0
@@ -312,11 +325,14 @@ _get_installed_packages() {
 _choose_packages() {
     local chosen=()
 
+    term::enable_input
+
     mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | fzf "${FZF_ARGS[@]}")
 
+    term::disable_input
     # fzf restores cursor visibility,
     # so we re-hide it again.
-    printf '\e[?25l'
+    # printf '\e[?25l'
 
     [[ "${#chosen[@]}" -eq 0 ]] && return 1
     PACKAGES=("${chosen[@]}")
@@ -372,6 +388,7 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help)
             _usage
+            exit 0
             ;;
         --)
             shift
@@ -392,16 +409,13 @@ if [[ $NO_LOGO == false ]]; then
 fi
 
 # Hide cursor
-printf '\e[?25l'
+# printf '\e[?25l'
+term::disable_input
 
 if (( $# > 0 )); then
     PACKAGES=("$@")
 else
     if ! command -v fzf > /dev/null; then
-        if term::is_headless; then
-            notify-send -r 4 "Vibranium" "<b><i>fzf</i></b> not found!"
-        fi
-
         log::error "fzf is not installed!"
         exit 1
     fi

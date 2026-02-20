@@ -1,11 +1,19 @@
 #!/usr/bin/env bash
 
+if pidof -q rofi; then
+    killall rofi
+    exit 0
+fi
+
 if pidof -q gpu-screen-recorder; then
     vb-core-recording
     exit 0
 fi
 
-CHOSEN="$(printf "Screen\nRegion" | rofi -dmenu -sync -p "Record")"
-[[ -z $CHOSEN ]] || [[ ! $CHOSEN =~ ^(Screen|Region)$ ]] && exit 1
+read -r CHOSEN < <(rofi -dmenu -sync -p "Record" <<< $'Screen\nRegion')
+
+if [[ -z $CHOSEN ]] || [[ ! $CHOSEN =~ ^(Screen|Region)$ ]]; then
+    exit 1
+fi
 
 exec setsid vb-core-recording "--${CHOSEN,,}"

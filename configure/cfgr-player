@@ -16,7 +16,8 @@ while true; do
         "Fade in / out on Play / Pause    : ${VIBRANIUM_PLAYER_FADE_DURATION//_/ }"
         "What is this?"
     )
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Player" "ESC to go back" -selected-row "$INDEX")"
+
+    helpers::ui::menu CHOSEN "Player" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [[ -z "$CHOSEN" ]] && break
 
     for i in "${!OPTIONS[@]}"; do

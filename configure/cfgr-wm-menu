@@ -7,12 +7,12 @@ INDEX=0
 
 while true; do
     OPTIONS=("<b>Input</b>" "<b>Appearance</b>" "<b>Edit configs</b>" "<b>Advanced</b>")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Hyprland" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Hyprland" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [[ -z $CHOSEN ]] && break
 
     for i in "${!OPTIONS[@]}"; do
         if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
-            hypr_index="$i"
+            INDEX="$i"
             break
         fi
     done
@@ -35,7 +35,7 @@ while true; do
                     "<b><i>Keybindings</i></b>"
                     "<b><i>Monitors</i></b>"
                 )
-                edit_configs_chosen="$(printf "%s\n" "${edit_configs_opts[@]}" | helpers::ui::menu "Edit" "ESC to go back")"
+                helpers::ui::menu edit_configs_chosen "Edit" "ESC to go back" -- "${edit_configs_opts[@]}"
                 [[ -z $edit_configs_chosen ]] && break
 
                 case "$edit_configs_chosen" in
@@ -44,7 +44,7 @@ while true; do
                     *"Monitors"*)      vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf"     ;;
                     *"Input"*)         vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"        ;;
                 esac
-                vb-cmd-kill-rofi
+                helpers::ui::close_menus
             done
             ;;
     esac

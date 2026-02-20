@@ -11,31 +11,14 @@ Options:
 EOF
 }
 
-_is_empty() {
-    local entries=()
-    mapfile -t entries < <(cliphist list)
-
-    if (( ${#entries[@]} == 0 )); then
-        return 0
-    else
-        return 1
-    fi
-}
-
-_show_() {
+_show() {
     source vb-core-lib
 
     local chosen
-    chosen="$(cliphist list \
-        | helpers::ui::menu \
-        "Clipboard" "search" \
-        -display-columns 2
-    )"
+    helpers::ui::menu chosen "Clipboard" "search..." -display-columns 2 -- "${ENTRIES[@]}"
 
     if [[ ! -z "$chosen" ]]; then
-        printf "%s" "$chosen" \
-            | cliphist decode \
-            | wl-copy -t text/uri-list
+        printf "%s" "$chosen" | cliphist decode | wl-copy -t text/uri-list
     fi
 }
 
@@ -50,10 +33,7 @@ _clear() {
 }
 
 _ensure_service() {
-    local status
-    status="$(systemctl --user is-active cliphist)"
-
-    if [[ ! "$status" == "active" ]]; then
+    if ! systemctl -q --user is-active cliphist; then
         systemctl -q --user enable --now cliphist
     fi
 }
@@ -70,15 +50,18 @@ case "$1" in
         _ensure_deps
         _ensure_service
 
-        # showo only if not empty
-        if ! _is_empty; then
-            _show_
+        ENTRIES=()
+        mapfile -t ENTRIES < <(cliphist list)
+
+        if (( ${#ENTRIES[@]} == 0 )); then
+            notify-send -t 1000 -r 3 "Clipboard Manager" "<i>Clipboard is empty!</i>"
+            exit 1
         fi
+
+        _show
         ;;
     "--clear")
-        _ensure_deps
         _ensure_service
-
         _clear
         ;;
     "-h"|"--help"|"")

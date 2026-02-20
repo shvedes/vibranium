@@ -5,13 +5,13 @@ source vb-core-lib
 SPICETIFY_FILE="$XDG_CONFIG_HOME/spicetify/config-xpui.ini"
 CHROMIUM_FILE="$XDG_CONFIG_HOME/chromium-flags.conf"
 
-if command -v spotify > /dev/null && command -v spicetify > /dev/null; then
-    if ! grep -q "adblock" "$SPICETIFY_FILE"; then
-        OPTIONS=("Install Spotify adblock")
-    else
-        OPTIONS=("Remove Spotify adblock")
-    fi
-fi
+# if command -v spotify > /dev/null && command -v spicetify > /dev/null; then
+#     if ! grep -q "adblock" "$SPICETIFY_FILE"; then
+#         OPTIONS=("Install Spotify adblock")
+#     else
+#         OPTIONS=("Remove Spotify adblock")
+#     fi
+# fi
 
 if command -v chromium > /dev/null; then
     if ! grep -q "oauth2-client-id" "$CHROMIUM_FILE"; then
@@ -21,23 +21,23 @@ if command -v chromium > /dev/null; then
     fi
 fi
 
-if [ "${#OPTIONS[@]}" -eq 0 ]; then
+if [[ "${#OPTIONS[@]}" -eq 0 ]]; then
     notify-send -r 4 -t 5000 -u critical "Vibranium" "There are no tweaks available"
     exit 1
 fi
 
-CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "App tweaks" "ESC to go back")"
+helpers::ui::menu CHOSEN "App Tweaks" "ESC to go back" -- "${OPTIONS[@]}"
 [[ -z "$CHOSEN" ]] && exit
 
 case "$CHOSEN" in
     "Install Spotify adblock")
         vb-tweak-spotify install
-        vb-cmd-kill-rofi
+        helpers::ui::close_menus
         exit 0
         ;;
     "Remove Spotify adblock")
         vb-tweak-spotify remove
-        vb-cmd-kill-rofi
+        helpers::ui::close_menus
         exit 0
         ;;
     "Enable Google sync for Chromium")

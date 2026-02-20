@@ -21,7 +21,7 @@ while true; do
         "Miscellaneous"
     )
 
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Vibranium" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Vibranium" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do
@@ -60,7 +60,7 @@ while true; do
             cfgr-color-picker
             ;;
         "General")
-            cfgr-global-options
+            cfgr-general
             ;;
         "Hyprland")
             cfgr-wm-menu
@@ -70,3 +70,4 @@ while true; do
             ;;
     esac
 done
+

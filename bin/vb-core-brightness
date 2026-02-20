@@ -197,8 +197,7 @@ osd() {
     progress=$(awk -v v="$value" 'BEGIN {p = 0.02 + v * (0.98/100); printf "%.2f", p}')
 
     # I can't imagine a situation where this service would be turned off, but let it be there just in case
-    service_status="$(systemctl --user is-active swayosd)"
-    [[ "$service_status" == "inactive" ]] && {
+    systemctl -q --user is-active swayosd || {
         log::warn "swayosd.service wasn't active!"
         systemctl --user enable --now swayosd
     }

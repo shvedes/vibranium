@@ -12,7 +12,7 @@ Options:
   --no-logo         Do not display the Vibranium logo at startup
   --no-dummy        Do not request a key press after completion or cancellation
   --no-verify       Skip verification of package existence in repositories
-  --no-systemd      Skip optional systemd post-install hook
+  --no-systemd      Skip systemd post-install hook
   --conservative    Do not print any success / fail messages
 
 If no PACKAGE is provided, refresh repositories and use fzf for interactive package selection.
@@ -45,7 +45,9 @@ _handle_systemd() {
 
     for pkg in "${FILTERED[@]}"; do
         units=$(pacman -Ql "$pkg" 2>/dev/null | awk '/\/systemd\/.*\.(service|socket)$/ && $2 !~ /@/ {print $2}')
-        [[ -z $units ]] && continue
+        if [[ -z $units ]]; then
+            continue
+        fi
 
         pkg_user_sockets=()
         pkg_user_services=()
@@ -145,7 +147,7 @@ _enable_systemd_units() {
 _refresh_repos() {
     yay -Sy &> /dev/null &
     local pid="$!"
-    term::spinner "$pid" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repos" ""
+    term::spinner "$pid" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repos" "- ${GREEN}Done!${RESET}"
 }
 
 # Verifies if the given packages exist in the repositories
@@ -201,15 +203,17 @@ _operation_canceled() {
         exit 1
     fi
 
-    printf '\e[?25h' # Show cursor
+    term::enable_input
 }
 
 _installation_complete() {
+    term::disable_input
+
     printf "%s[VIBRANIUM]%s Installation complete" "$GREEN" "$RESET"
 
     if [[ $NO_DUMMY == false && -t 0 ]]; then
         read -n1 -r -s -p $'. Press any key to exit' dummy
-        printf '\e[?25h' # Show cursor
+        term::enable_input
     fi
 }
 
@@ -225,7 +229,11 @@ _filter_packages() {
     # Handle cases where all or some are already installed
     if [[ "${#FILTERED[@]}" -eq 0 ]]; then
         echo -e "${GREEN}[VIBRANIUM]${RESET} Selected package(s) are already installed"
-        _operation_canceled --positive
+
+        if [[ "$CONSERVATIVE" == false ]]; then
+            _operation_canceled --positive
+        fi
+
         exit 0
     elif [[ ! ${#PACKAGES[@]} -eq ${#FILTERED[@]} ]]; then
         local pkgs_num="${#PACKAGES[@]}"
@@ -273,10 +281,10 @@ _get_packages() {
     local pkgs_list=()
 
     (pacman -Slq > "$arch_temp") &
-    term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching packages" ""
+    term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching packages" "- ${GREEN}Done!${RESET}"
 
     (yay -Slqa > "$aur_temp") &> /dev/null &
-    term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching packages (AUR)" ""
+    term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching packages (${BLUE}AUR${RESET})" "- ${GREEN}Done!${RESET}"
 
     mapfile -t arch_packages < "$arch_temp"
     pkgs_list+=("${arch_packages[@]}")
@@ -295,16 +303,21 @@ _get_packages() {
 _choose_packages() {
     local chosen=()
 
+    term::enable_input
+
     # Use fzf for multi-select with preview
     mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | sort | fzf "${FZF_ARGS[@]}")
 
-    # fzf restores cursor visibility,
-    # so we re-hide it again.
-    printf '\e[?25l'
+    term::disable_input
 
     [[ "${#chosen[@]}" -eq 0 ]] && return 1
     PACKAGES=("${chosen[@]}")
 }
+
+if [[ ! -t 1 ]]; then
+    exec setsid vb-core-term --floating -- "$0" "$@"
+    exit
+fi
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 export SUDO_PROMPT
@@ -402,8 +415,7 @@ if [[ $NO_LOGO == false ]]; then
     printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
 fi
 
-# Hide cursor
-printf '\e[?25l'
+term::disable_input
 
 if [[ $# -gt 0 ]]; then
     PACKAGES=("$@")
@@ -415,18 +427,10 @@ if [[ $# -gt 0 ]]; then
         fi
     fi
 
-    if ! _ask_for_sudo; then
-        _operation_canceled
-        exit 1
-    fi
-
     _filter_packages
+    _show_overview
 else
     if ! command -v fzf > /dev/null; then
-        if term::is_headless; then
-            notify-send -r 4 "Vibranium" "<b><i>fzf</i></b> not found!"
-        fi
-
         log::error "fzf not found!"
         exit 1
     fi
@@ -439,9 +443,10 @@ else
         _operation_canceled
         exit 0
     fi
+
+    _show_overview
 fi
 
-_show_overview
 
 # Proceed with installation after confirmation
 if term::ask_yes_no Y "Proceed with installation?"; then

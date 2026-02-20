@@ -43,7 +43,8 @@ _set_audio_feedback() {
         fi
 
         mapfile -t options < <(helpers::configure::build_menu "${options[@]}")
-        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Audio feedback" "ESC to go back" -selected-row "$index")"
+
+        helpers::ui::menu chosen "Audio feedback" "ESC to go back" -selected-row "$index" -- "${options[@]}"
 
         for i in "${!options[@]}"; do
             if [ "${options[$i]}" = "$chosen" ]; then
@@ -74,7 +75,7 @@ _set_audio_feedback_variant() {
         current_option="\$$opt"
 
         local chosen
-        chosen="$(printf "%s\n" "${variant_options[@]}" | helpers::ui::menu "Audio variant" "ESC to go back")"
+        helpers::ui::menu chosen "Audio variant" "ESC to go back" -- "${variant_options[@]}"
         [[ -z "$chosen" ]] && break
 
         # Skip if choice matches current variant
@@ -97,11 +98,12 @@ INDEX=0
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check VIBRANIUM_VOLUME_ADJUSTMENT_STEP
-    helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK
-    helpers::check VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
-    helpers::check VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
-    helpers::check VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK
+    helpers::check \
+        VIBRANIUM_VOLUME_ADJUSTMENT_STEP \
+        VIBRANIUM_VOLUME_SOURCE_LOOPBACK \
+        VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK \
+        VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
+        VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK
 
     OPTIONS=(
         "Boost up to 150% : $VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED"
@@ -120,7 +122,7 @@ while true; do
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Audio" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Audio" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do
@@ -141,9 +143,8 @@ while true; do
             vb-cmd-toggle-loopback
             ;;
         *"Open volume mixer"*)
-            vb-core-term -- wiremix
-            vb-cmd-kill-rofi
-            exit 0
+            vb-core-term --floating -- wiremix
+            helpers::ui::close_menus
             ;;
         "Boost up to"*)
             _toggle_volume_boost

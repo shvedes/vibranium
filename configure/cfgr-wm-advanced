@@ -38,7 +38,7 @@ while true; do
         "Direct Scanout        : $current_direct_scanout"
     )
 
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Advanced" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Advanced" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [[ -z "$CHOSEN" ]] && break
 
     for i in "${!OPTIONS[@]}"; do
@@ -72,7 +72,7 @@ while true; do
         "Direct Scanout"*)
             while true; do
                 ds_opts=("Direct Scanout : $current_direct_scanout" "What is this?")
-                ds_chosen="$(printf "%s\n" "${ds_opts[@]}" | helpers::ui::menu "Direct Scanout" "ESC to go back")"
+                helpers::ui::menu ds_chosen "Direct Scanout" "ESC to go back" -- "${ds_opts[@]}"
                 [[ -z "$ds_chosen" ]] && break
 
                 case "$ds_chosen" in
@@ -101,7 +101,7 @@ while true; do
         "Variable Refresh Rate"*)
             while true; do
                 vrr_opts=("Enable" "Disable" "Fullscreen only" "What is this?")
-                vrr_chosen="$(printf "%s\n" "${vrr_opts[@]}" | helpers::ui::menu "VRR" "ESC to go back")"
+                helpers::ui::menu vrr_chosen "VRR" "ESC to go back" -- "${vrr_opts[@]}"
                 [[ -z "$vrr_chosen" ]] && break
 
                 case "$vrr_chosen" in

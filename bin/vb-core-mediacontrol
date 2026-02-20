@@ -54,14 +54,6 @@ Options:
 EOF
 }
 
-mpd_service_status() {
-    local status="$(systemctl --user is-active mpd)"
-    if [[ "$status" == "active" ]]; then
-        return 0
-    fi
-    return 1
-}
-
 # Function to check if a player is active and get its status
 get_player_status() {
     local player="$1"
@@ -75,7 +67,7 @@ get_player_status() {
     elif [ "$player" = "mpd" ]; then
         # Do not trigger socket activation
         # in case if MPD is inactive
-        if ! mpd_service_status; then
+        if ! systemctl -q --user is-active mpd; then
             return
         fi
 

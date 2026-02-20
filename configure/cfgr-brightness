@@ -4,7 +4,6 @@ source vb-core-lib
 
 INDEX=0
 
-
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
@@ -17,7 +16,7 @@ while true; do
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Brightness" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Brightness" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do

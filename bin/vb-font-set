@@ -2,51 +2,65 @@
 
 source vb-core-lib
 
-fonts=$(fc-list :spacing=100 -f "%{family[0]}\n" | grep -viE 'emoji|signwriting|symbols' | sort -u) # Source: Omarchy
-selected="$(printf '%s' "$fonts" | helpers::ui::menu "Search fonts" "ESC to go back")"
+mapfile -t fonts < <(
+  fc-list :spacing=100 family |
+  gawk '{
+    split($0,a,",")
+    f=a[1]
+    if (f !~ /emoji|signwriting|symbols/i)
+      seen[f]
+  }
+  END {
+    n = asorti(seen, sorted)
+    for (i = 1; i <= n; i++)
+      print sorted[i]
+  }'
+)
 
-if [[ -z "$selected" ]]; then
+helpers::ui::menu selected_font "Search fonts" "ESC to go back" -- "${fonts[@]}"
+
+if [[ -z "$selected_font" ]]; then
+    log::error "Selection cancelled"
     exit 1
 fi
 
-if [[ "$selected" == "$(vb-font-get)" ]]; then
-    notify-send -r 1 -t 2000 "Vibranium" "<span foreground='${P_ACCENT}'><b>$selected</b></span> is already the default font!"
+if [[ "$selected_font" == "$(vb-font-get)" ]]; then
+    notify-send -r 1 -t 2000 "Vibranium" \
+        "<span foreground='${P_ACCENT}'><b>$selected_font</b></span> is already the default font!"
     exit 1
 fi
 
 # GTK
-sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected}/" "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
-sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected}/" "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
-gsettings set org.gnome.desktop.interface font-name "${selected}"
+sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected_font}/" "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected_font}/" "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
+gsettings set org.gnome.desktop.interface font-name "${selected_font}"
 
 # Alacritty
-sed -i -E "s/(family\s*=\s*\").*(\")/\1${selected}\2/" "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+sed -i -E "s/(family\s*=\s*\").*(\")/\1${selected_font}\2/" "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
 
 # Waybar
 sed -i -E "/window#waybar\s*\{/,/\}/ {
-	s/^\s*font-family:\s*'Symbols Nerd Font Mono',\s*'.*';/    font-family: 'Symbols Nerd Font Mono', '${selected}';/
+	s/^\s*font-family:\s*'Symbols Nerd Font Mono',\s*'.*';/    font-family: 'Symbols Nerd Font Mono', '${selected_font}';/
 }" "$XDG_CONFIG_HOME/waybar/style.css"
 
 # qtct
-sed -i -E "/^(fixed|general)=/ s@^([^,\"]*=\")[^,\"]*@\1${selected}@" "$XDG_CONFIG_HOME"/qt{5,6}ct/qt{5,6}ct.conf
+sed -i -E "/^(fixed|general)=/ s@^([^,\"]*=\")[^,\"]*@\1${selected_font}@" "$XDG_CONFIG_HOME"/qt{5,6}ct/qt*ct.conf
 
 # Dunst
-sed -i -E "/^font[[:space:]]*=/ s/(=\s*\")[^\"]* ([0-9]+\")/\1${selected} \2/" "$XDG_CONFIG_HOME/dunst/dunstrc"
+sed -i -E "/^font[[:space:]]*=/ s/(=\s*\")[^\"]* ([0-9]+\")/\1${selected_font} \2/" "$XDG_CONFIG_HOME/dunst/dunstrc"
 
 # Rofi
-sed -i -E "s/(font:\s*\")[^\"]* ([0-9]+)\"/\1${selected} \2\"/" "$XDG_CONFIG_HOME/rofi/config.rasi"
+sed -i -E "s/(font:\s*\")[^\"]* ([0-9]+)\"/\1${selected_font} \2\"/" "$XDG_CONFIG_HOME/rofi/config.rasi"
 
 vb-cmd-refresh-dunst
 
-waybar_status="$(systemctl --user is-active waybar)"
-if [[ $waybar_status == active ]]; then
-    systemctl --user restart waybar &
+if ! systemctl -q --user is-active waybar; then
+    systemctl -q --user restart waybar &
 fi
 
 helpers::check VIBRANIUM_GLOBAL_USE_OSD
-
 if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
     systemctl --user restart swayosd &
 fi
 
-notify-send -r 1 -t 2000 "Vibranium" "Default font has been set to <span foreground='${P_ACCENT}'><b>${selected}</b></span>"
+notify-send -r 1 -t 2000 "Vibranium" "Default font set to <span foreground='${P_ACCENT}'><b>${selected_font}</b></span>"

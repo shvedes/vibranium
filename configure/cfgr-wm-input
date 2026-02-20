@@ -38,7 +38,7 @@ _touchpad_options() {
             "Tap to click         : ${current_tap_to_click}"
         )
 
-        touchpad_chosen="$(printf "%s\n" "${touchpad_options[@]}" | helpers::ui::menu "Touchpad" "ESC to go back" -selected-row "$index")"
+        helpers::ui::menu touchpad_options "Touchpad" "ESC to go back" -selected-row "$index" -- "${touchpad_options[@]}"
         [[ -z $touchpad_chosen ]] && break
 
         for i in "${!touchpad_options[@]}"; do
@@ -88,7 +88,7 @@ _touchpad_options() {
             "Scrolling speed"*)
                 while true; do
                     prompt="Scrolling speed (int / float)"
-                    input="$(printf "%s" "$prompt" | helpers::ui::menu "Scrolling speed" "0.0 - 1.0")"
+                    helpers::ui::menu input "Scrolling speed" "0.0 - 1.0" -- "$prompt"
                     [[ -z $input ]] && break
                     if [[ "$prompt" == "$input" ]]; then
                         continue
@@ -159,7 +159,7 @@ add_layout() {
     mapfile -t layouts < <(get_layouts)
 
     while true; do
-        chosen="$(printf "%s\n" "${layouts[@]}" | helpers::ui::menu "Layouts" "ESC to go back")"
+        helpers::ui::menu chosen "Layouts" "ESC to go back" -- "${layouts[@]}"
 
         [[ -z $chosen ]] && break
         if [[ ! " ${layouts[*]} " =~ $chosen ]]; then
@@ -195,7 +195,7 @@ remove_layout() {
     while true; do
         IFS=',' read -r -a layouts < <(hyprctl -j getoption input:kb_layout | jq -r '.str')
 
-        chosen="$(printf "%s\n" "${layouts[@]}" | helpers::ui::menu "Remove layouts" "ESC to go back")"
+        helpers::ui::menu chosen "Remove layouts" "ESC to go back" -- "${layouts[@]}"
 
         [[ -z $chosen ]] && break
         if [[ ! " ${layouts[*]} " =~ $chosen ]]; then
@@ -246,7 +246,7 @@ done
 set_layout_shortcut() {
     local placeholder chosen selected_key option
 
-    chosen="$(printf "%s\n" "${KB_GROUPS[@]}" | helpers::ui::menu "Switch shortcut" "ESC to go back")"
+    helpers::ui::menu chosen "Switch shortcut" "ESC to go back" -- "${KB_GROUPS[@]}"
     [[ -z "$chosen" ]] && return
 
     for key in "${!KB_GROUPS[@]}"; do
@@ -282,7 +282,7 @@ layouts_menu() {
             layouts_opts+=("Change layout with : $readable_shortcut")
         fi
 
-        layouts_chosen="$(printf "%s\n" "${layouts_opts[@]}" | helpers::ui::menu "Keyboard layouts" "ESC to go back")"
+        helpers::ui::menu layouts_chosen "Keyboard layouts" "ESC to go back" -- "${layouts_opts[@]}"
         [[ -z "$layouts_chosen" ]] && break
 
         case "$layouts_chosen" in
@@ -359,7 +359,7 @@ while true; do
         OPTIONS+=("<b>Touchpad options</b>")
     fi
 
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Input" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Input" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do
@@ -388,7 +388,7 @@ while true; do
         "Hide cursor after"*)
             while true; do
                 prompt="Hide cursor after (int, in seconds)"
-                input="$(printf "%s" "$prompt" | helpers::ui::menu "Inactivity timeout" "0 to disable")"
+                helpers::ui::menu input "Inactivity timeout" "0 to disable" -- "$prompt"
                 [[ -z "$input" ]] && break
                 [[ "$prompt" == "$input" ]] && continue
 
@@ -418,7 +418,7 @@ while true; do
         "Scrolling speed"*)
             while true; do
                 prompt="Scrolling speed (int / float, (multiplier))"
-                input="$(printf "%s" "$prompt" | helpers::ui::menu "Scrolling speed" "ESC to go back")"
+                helpers::ui::menu input "Scrolling speed" "ESC to go back" -- "$prompt"
                 [[ -z $input ]] && break
                 [[ "$prompt" == "$input" ]] && continue
 
@@ -435,7 +435,7 @@ while true; do
         "Keyboard repeat delay"*)
             while true; do
                 prompt="Repeat delay (int, in ms)"
-                input="$(printf "%s" "$prompt" | helpers::ui::menu "Repeat delay" "200ms - 1000ms")"
+                helpers::ui::menu input "Repeat delay" "200ms - 1000ms" -- "$prompt"
                 [[ -z $input ]] && break
                 [[ "$prompt" == "$input" ]] && continue
 
@@ -454,7 +454,7 @@ while true; do
         "Keyboard repeat rate"*)
             while true; do
                 prompt="Repeat rate (int, in ms)"
-                input="$(printf "%s" "$prompt" | helpers::ui::menu "Repeat rate" "10ms - 50ms")"
+                helpers::ui::menu input "Repeat rate" "10ms - 50ms" -- "$prompt"
                 [[ -z $input ]] && break
                 [[ "$prompt" == "$input" ]] && continue
 
@@ -485,7 +485,7 @@ while true; do
         "Mouse sensitivity"*)
             while true; do
                 prompt="Sensitivity (int / float)"
-                input="$(printf "%s\n" "$prompt" | helpers::ui::menu "Sensitivity" "-1 to 1")"
+                helpers::ui::menu input "Sensitivity" "-1 to 1" -- "$prompt"
                 [[ -z $input ]] && break
 
                 if [[ "$input" == "$prompt" ]]; then

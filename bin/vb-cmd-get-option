@@ -25,10 +25,9 @@ case "$1" in
         ;;
 esac
 
+helpers::check "$1" &> /dev/null
+
 if [[ -n "${!1+x}" ]]; then
     printf '%s\n' "${!1}"
     exit 0
 fi
-
-echo "${0##*/}: option '$1' is not set" >&2
-exit 1

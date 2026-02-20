@@ -47,7 +47,7 @@ _edit_int() {
     fi
 
     while true; do
-        input="$(printf "%s" "$prompt" | helpers::ui::menu "$name" "$hint")"
+        helpers::ui::menu input "$name" "$hint" -- "$prompt"
 
         [[ -z $input ]] && break
         [[ "$input" == "$prompt" ]] && continue
@@ -147,7 +147,7 @@ _edit_float() {
 
     while true; do
         prompt="$name (float)"
-        input="$(printf "%s" "$prompt" | helpers::ui::menu "$name" "$min - $max")"
+        helpers::ui::menu input "$name" "$min - $max" -- "$prompt"
         [[ -z $input ]] && break
         [[ "$input" == "$prompt" ]] && continue
 
@@ -187,7 +187,11 @@ _edit_roundness() {
 
     swayosd_css="$XDG_CONFIG_HOME/swayosd/style.css"
     sed -i "/border-radius/s/: .*/: ${input}px;/" "$swayosd_css"
-    systemctl --user restart swayosd &
+
+    helpers::check VIBRANIUM_GLOBAL_USE_OSD
+    if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+        systemctl --user restart swayosd &
+    fi
 }
 
 _set_animations_preset() {
@@ -206,7 +210,7 @@ _set_animations_preset() {
     fi
 
     while true; do
-        anim_chosen="$(printf "%s\n" "${anim_opts[@]}" | helpers::ui::menu "Animations" "ESC to go back")"
+        helpers::ui::menu anim_chosen "Animations" "ESC to go back" -- "${anim_opts[@]}"
         [[ -z "$anim_chosen" ]] && break
 
         ln -sf "$folder/$anim_chosen.conf" "$target"
@@ -281,7 +285,7 @@ _blur_submenu() {
         fi
 
         mapfile -t labels < <(helpers::configure::build_menu "${labels[@]}")
-        chosen="$(printf "%s\n" "${labels[@]}" | helpers::ui::menu "Blur" "ESC to go back" -selected-row "$index")"
+        helpers::ui::menu chosen "Blur" "ESC to go back" -selected-row "$index" -- "${labels[@]}"
         [[ -z $chosen ]] && break
 
         for i in "${!labels[@]}"; do
@@ -366,7 +370,7 @@ _shadow_submenu() {
         fi
 
         mapfile -t labels < <(helpers::configure::build_menu "${labels[@]}")
-        chosen="$(printf "%s\n" "${labels[@]}" | helpers::ui::menu "Shadows" "ESC to go back" -selected-row "$index")"
+        helpers::ui::menu chosen "Shadows" "ESC to go back" -selected-row "$index" -- "${labels[@]}"
         [[ -z $chosen ]] && break
 
         for i in "${!labels[@]}"; do
@@ -451,7 +455,7 @@ _decoration_submenu() {
         )
 
         mapfile -t labels < <(helpers::configure::build_menu "${labels[@]}")
-        chosen="$(printf "%s\n" "${labels[@]}" | helpers::ui::menu "Decoration" "ESC to go back" -selected-row "$index")"
+        helpers::ui::menu chosen "Decoration" "ESC to go back" -selected-row "$index" -- "${labels[@]}"
         [[ -z $chosen ]] && break
 
         for i in "${!labels[@]}"; do
@@ -500,7 +504,7 @@ _animations_submenu() {
         fi
 
         mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
-        chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Animations" "ESC to go back")"
+        helpers::ui::menu chosen "Animations" "ESC to go back" -- "${opts[@]}"
         [[ -z $chosen ]] && break
 
         case "$chosen" in
@@ -524,7 +528,7 @@ _gaps_submenu() {
             hyprctl -j --batch \
                 "getoption general:gaps_in;
                  getoption general:gaps_out
-                " | jq -r '.custom | split(" ")[0] | tonumber'
+                " | jq -r '.custom | split(" ")[0]'
         )
 
         read -r gaps_in gaps_out <<< "${parameters[*]}"
@@ -539,7 +543,7 @@ _gaps_submenu() {
         }
 
         mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
-        chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Gaps" "ESC to go back" -selected-row "$index")"
+        helpers::ui::menu chosen "Gaps" "ESC to go back" -selected-row "$index" -- "${opts[@]}"
         [[ -z $chosen ]] && break
 
         for i in "${!opts[@]}"; do
@@ -597,7 +601,7 @@ while true; do
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Look & Feel" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Look & Feel" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [[ -z $CHOSEN ]] && break
 
     for i in "${!OPTIONS[@]}"; do

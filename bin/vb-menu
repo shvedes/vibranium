@@ -13,7 +13,7 @@ OPTIONS=(
 INDEX=0
 
 while true; do
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Vibranium" "ESC to exit" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Vibranium" "ESC to exit" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do
@@ -25,29 +25,44 @@ while true; do
 
     case "$CHOSEN" in
         "Setup")
-            vb-menu-setup
+            bash vb-menu-setup
             ;;
         "Settings")
             bash "$VIBRANIUM/configure/cfgr-menu"
             ;;
         "Help")
-            vb-menu-help
+            help_opts=("Hyprland" "Vibranium" "Arch Linux" "<i>Keybindings</i>")
+            while true; do
+                helpers::ui::menu help_chosen "Help" "ESC to go back" -- "${help_opts[@]}"
+
+                case "$help_chosen" in
+                    "Hyprland") help_link="https://wiki.hypr.land" ;;
+                    "Vibranium") help_link="https://github.com/shvedes/vibranium/wiki" ;;
+                    "Arch Linux") help_link="https://wiki.archlinux.org" ;;
+                    *"Keybindings"*) vb-cmd-keybindings; exit 0 ;;
+                    *) continue ;;
+                esac
+
+                if command -v chromium > /dev/null; then
+                    vb-cmd-launch-cmd chromium --app="$help_link"
+                    helpers::ui::close_menus
+                fi
+            done
             ;;
         "Packages")
-            vb-menu-pkg
+            bash vb-menu-pkg
             ;;
         "Tweaks")
             while true; do
-                tweaks_opts=("System" "Apps")
-                tweaks_chosen="$(printf "%s\n" "${tweaks_opts[@]}" | helpers::ui::menu "Tweaks" "ESC to go back")"
+                helpers::ui::menu tweaks_chosen "Tweaks" "ESC to go back" -- "System" "Apps"
                 [[ -z $tweaks_chosen ]] && break
 
                 case "$tweaks_chosen" in
                     "Apps")
-                        vb-menu-tweaks
+                        bash vb-menu-tweaks
                         ;;
                     "System")
-                        vb-menu-tweaks-system
+                        bash vb-menu-tweaks-system
                         ;;
                 esac
             done

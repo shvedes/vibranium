@@ -2,18 +2,20 @@
 
 source vb-core-lib
 
+REBOOT_NEEDED=false
+
 _operation_canceled() {
     printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
     read -n1 -r -s -p $'. Press any key to exit' dummy
 
-    printf '\e[?25h' # Show cursor
+    term::enable_input
 }
 
 _operation_complete() {
     printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
-
     read -n1 -r -p $'. Press any key to exit ' dummy
-    printf '\e[?25h' # Show cursor
+
+    term::enable_input
 }
 
 _ensure_group() {
@@ -31,6 +33,7 @@ _ensure_group() {
 _set_user_group() {
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up user group"
     sudo usermod -aG libvirt "$USER"
+    REBOOT_NEEDED=true
 }
 
 _enable_systemd_units() {
@@ -92,12 +95,16 @@ _set_virsh_network
 
 if command -v ufw > /dev/null; then
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring firewall..."
-    echo -e "\n\n# Vibranium settings below" | sudo tee -a /etc/libvirt/network.conf > /dev/null
+    echo -e "\n\n# Vibranium overrides below" | sudo tee -a /etc/libvirt/network.conf > /dev/null
     echo -e "firewall_backend = \"iptables\"" | sudo tee -a /etc/libvirt/network.conf > /dev/null
 fi
 
 echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU setup complete!"
-echo -e "${GREEN}[VIBRANIUM]${RESET} You may need to re-login or restart your PC to fully take effect."
+
+if [[ "$REBOOT_NEEDED" == true ]]; then
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Your user groups have been updated"
+    echo -e "${GREEN}[VIBRANIUM]${RESET} System restart required"
+fi
 
 if term::ask_yes_no Y "Launch VM Manager now?"; then
     exec setsid -f virt-manager &> /dev/null

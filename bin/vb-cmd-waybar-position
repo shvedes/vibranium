@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-WAYBAR_CONF="${XDG_CONFIG_HOME-:$HOME/.config}/waybar/config.jsonc"
-DUNST_CONF="${XDG_CONFIG_HOME-:$HOME/.config}/dunst/dunstrc"
+WAYBAR_CONF="$XDG_CONFIG_HOME/waybar/config.jsonc"
+DUNST_CONF="$XDG_CONFIG_HOME/dunst/dunstrc"
 
 usage() {
     cat << EOF
@@ -27,7 +27,7 @@ for arg in "$@"; do
     esac
 done
 
-CURRENT_POSITION="$(grep position "$WAYBAR_CONF" | awk -F'"' '{print $4}')"
+CURRENT_POSITION="$(awk -F'"' '/"position"[[:space:]]*:/ {print $4}' "$WAYBAR_CONF")"
 
 [[ "$CURRENT_POSITION" == "$TARGET" ]] && exit 0
 

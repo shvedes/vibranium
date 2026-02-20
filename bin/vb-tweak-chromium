@@ -45,4 +45,4 @@ case "$1" in
         ;;
 esac
 
-vb-cmd-kill-rofi
+helpers::ui::close_menus

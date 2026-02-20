@@ -17,7 +17,7 @@ ACTIONS+=(
     "Close all windows"
 )
 
-if [[ "$(systemctl --user is-active mpd)" == "active" ]]; then
+if systemctl -q --user is-active mpd; then
     mpd_status="$(mpc status 2>/dev/null)"
 fi
 
@@ -27,7 +27,7 @@ if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
 fi
 
 while true; do
-    CHOSEN="$(printf "%s\n" "${ACTIONS[@]}" | helpers::ui::menu "Utilities" "search...")"
+    helpers::ui::menu CHOSEN "Utilities" "Search..." -- "${ACTIONS[@]}"
 
     case "$CHOSEN" in
         "Close all windows")

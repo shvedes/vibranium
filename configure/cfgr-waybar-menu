@@ -8,13 +8,18 @@ WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    unit_ststus="$(systemctl --user is-active waybar)"
-    [[ $unit_ststus == active ]] && ENABLED=true || ENABLED=false
+    if systemctl -q --user is-active waybar; then
+        ENABLED=true
+    else
+        ENABLED=false
+    fi
 
-
-    POSITION="$(sed -n 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$WAYBAR_CONFIG")"
-    HEIGHT="$(sed -n 's/.*"height"[[:space:]]*:[[:space:]]*\([^"]*\),.*/\1/p' "$WAYBAR_CONFIG")"
-    ICON_SPACING="$(sed -n 's/.*"spacing"[[:space:]]*:[[:space:]]*\([^"]*\),.*/\1/p' "$WAYBAR_CONFIG")"
+    eval "$(sed -n \
+      -e 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/POSITION=\1/p' \
+      -e 's/.*"height"[[:space:]]*:[[:space:]]*\([^,]*\).*/HEIGHT=\1/p' \
+      -e 's/.*"spacing"[[:space:]]*:[[:space:]]*\([^,]*\).*/ICON_SPACING=\1/p' \
+      "$WAYBAR_CONFIG"
+    )"
 
     OPTIONS=("Enabled : $ENABLED")
 
@@ -28,9 +33,8 @@ while true; do
         )
     fi
 
-
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Waybar" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Waybar" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do
@@ -50,7 +54,7 @@ while true; do
         "Spacing"*)
             while true; do
                 prompt="Icon spacing (int)"
-                input="$(printf "%s" "$prompt" | helpers::ui::menu "Icon spacing" "-6 - 16")"
+                helpers::ui::menu input "Icon spacing" "-6 - 16" -- "$prompt"
                 [[ -z "$input" ]] && break
 
                 [[ ! "$input" =~ ^-?[0-9]+$ ]] && {
@@ -71,22 +75,22 @@ while true; do
         "Height"*)
             while true; do
                 prompt="Waybar height (int)"
-                input="$(printf "%s" "$prompt" | helpers::ui::menu "Bar height" "30-45")"
+                helpers::ui::menu input "Bar height" "30-100" -- "$prompt"
                 [[ -z "$input" ]] && break
 
                 [[ ! "$input" =~ ^[0-9]+$ ]] && {
-                    notify-send -r 1 -t 2000 "Vibranium" "An integer between 30-50"
+                    notify-send -r 1 -t 2000 "Vibranium" "An integer between 30-65"
                     continue
                 }
 
                 # 30 is minimum allowed height due to specific modules
-                if ((input > 50 || input < 30)); then
+                if ((input > 100 || input < 30)); then
                     notify-send -r 1 -t 2000 "Vibranium" "An integer between 30-50"
                     continue
                 fi
 
                 sed -i -E "s/(\"height\"\s*:\s*)[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
-                systemctl --user restart waybar
+                systemctl --user restart waybar &
                 break
             done
             ;;

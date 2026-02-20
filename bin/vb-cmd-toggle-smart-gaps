@@ -17,6 +17,21 @@ case "${1:-}" in
     -h|--help) usage; exit 0
 esac
 
+mapfile -t gaps < <(
+    hyprctl -j --batch \
+        'getoption general:gaps_in;
+         getoption general:gaps_out' | \
+    jq -r '.custom | split(" ")[0]'
+)
+
+gaps_in=${gaps[0]}
+gaps_out=${gaps[1]}
+
+if (( gaps_in == 0 && gaps_out == 0 )); then
+    notify-send -r 3 "Vibranium" "You don't have any gaps at all!"
+    exit 1
+fi
+
 if [[ -f "$FILE" ]]; then
     rm "$FILE"
 else

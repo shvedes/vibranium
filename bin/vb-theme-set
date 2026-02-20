@@ -74,19 +74,17 @@ declare -A PAPIRUS_COLORS=(
 LINK_TARGET="$XDG_CONFIG_HOME/vibranium/theme/current"
 CURRENT_LINK="$LINK_TARGET"
 
-to_display_name() { echo "${1//-/ }"; }
-to_theme_name() { echo "${1// /-}"; }
-
 capitalize() {
     echo "$1" | awk -F- '{ for (i=1; i<=NF; i++) $i = toupper(substr($i,1,1)) substr($i,2); }1' OFS="-"
 }
 
 get_current_target_basename() {
     if [ -e "$CURRENT_LINK" ] || [ -L "$CURRENT_LINK" ]; then
-        local realpath
-        realpath="$(readlink -f "$CURRENT_LINK" 2> /dev/null || true)"
-        if [ -n "$realpath" ]; then
-            echo "${realpath##*/}"
+        local real_path
+        real_path="$(readlink -f "$CURRENT_LINK" 2> /dev/null || true)"
+
+        if [ -n "$real_path" ]; then
+            echo "${real_path##*/}"
             return 0
         fi
     fi
@@ -127,7 +125,8 @@ pick_family() {
     done
 
     local family_chosen
-    family_chosen="$(printf "%s\n" "${keys[@]}" | helpers::ui::menu "Theme" "")"
+    helpers::ui::menu family_chosen "Theme" "" -- "${keys[@]}"
+
     [[ -z "$family_chosen" ]] && exit 0
     echo "$family_chosen"
 }
@@ -148,7 +147,14 @@ pick_variant() {
     done
 
     local display
-    display="$(for v in "${variants[@]}"; do to_display_name "$v"; done | helpers::ui::menu "$family" "flavor")"
+    local items=()
+
+    for v in "${variants[@]}"; do
+        items+=("${v//-/ }")
+    done
+
+    helpers::ui::menu display "$family" "flavor" -- "${items[@]}"
+
     if [[ -z "$display" ]]; then
         return 1
     else
@@ -291,7 +297,7 @@ get_wallpaper() {
 }
 
 if [[ -n "$1" ]]; then
-    INPUT_THEME="$(to_theme_name "$1")"
+    INPUT_THEME="${1// /-}"
     FAMILY="${INPUT_THEME%%-*}"
     VARIANT="${INPUT_THEME#*-}"
 
@@ -333,7 +339,7 @@ else
         VARIANT_DISPLAY="$(pick_variant "$FAMILY")"
         [[ -z "$VARIANT_DISPLAY" ]] && continue
 
-        VARIANT="$(to_theme_name "$VARIANT_DISPLAY")"
+        VARIANT="${VARIANT_DISPLAY// /-}"
         CHOSEN="${FAMILY}-${VARIANT}"
         if [[ $FAMILY == "Rosepine" && $VARIANT == "Rosepine" ]]; then
             CHOSEN="Rosepine"

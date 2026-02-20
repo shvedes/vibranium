@@ -6,7 +6,7 @@ _confirm_kill_submenu() {
     local options chosen
     while true; do
         options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "What is this?")
-        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Kill Confirm" "ESC to go back")"
+        helpers::ui::menu chosen "Kill Confirm" "ESC to go back" -- "${options[@]}"
         [[ -z "$chosen" ]] && break
 
         case "$confirm_to_kill_chosen" in
@@ -39,7 +39,7 @@ while true; do
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "General" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "General" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do

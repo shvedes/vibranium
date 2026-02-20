@@ -8,11 +8,11 @@ USER_WALLPAPERS="$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$CURRENT_THEME"
 
 toggle_wallpaper() {
     local mode="$1"
-    local current files
+    local current files user_files
     local idx next prev found
 
-    mapfile -t files < <(find "$WALLS/" -maxdepth 1 -type f,l | sort)
-    mapfile -t user_files < <(find "$USER_WALLPAPERS/" -maxdepth 1 -type f,l | sort)
+    mapfile -t files < <(find "$WALLS" -maxdepth 1 -type f,l | sort)
+    mapfile -t user_files < <(find "$USER_WALLPAPERS" -maxdepth 1 -type f,l | sort)
 
     files+=("${user_files[@]}")
 
@@ -21,12 +21,10 @@ toggle_wallpaper() {
 
     current="$(vb-cmd-get-wallpaper)"
 
-    # If current is empty, treat as not found
-    if [ -z "$current" ]; then
-        found=0
-    else
-        found=0
-        idx=0
+    found=0
+    idx=0
+
+    if [ -n "$current" ]; then
         for i in "${!files[@]}"; do
             if [ "${files[$i]}" = "$current" ]; then
                 idx=$i
@@ -87,6 +85,17 @@ If no OPTION is provided, the script expects an image file as an argument.
 EOF
 }
 
+helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
+
+if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
+    if ! systemctl -q --user is-active hyprpaper; then
+        systemctl -q --user enable --now hyprpaper
+    fi
+else
+    log::error "Wallpaper daemon isn't running!"
+    exit 1
+fi
+
 case "$1" in
     "")
         usage
@@ -97,8 +106,9 @@ case "$1" in
         ;;
     *.png|*.jpg|*.jpeg|*.webp)
         WALLPAPER_PATH="$(realpath "$1")"
+
         if [[ ! -f "$WALLPAPER_PATH" ]]; then
-            log::error "$WALLPAPER_PATH does not exist"
+            log::error "$WALLPAPER_PATH doesn't exist!"
             exit 1
         fi
         ;;
@@ -107,6 +117,8 @@ case "$1" in
         exit 1
         ;;
 esac
+
+hyprctl -q hyprpaper wallpaper ", $WALLPAPER_PATH"
 
 # In case if user set new wallpaper via thunar context menu
 # (e,g. user's own picture, downloaded from the internet) we
@@ -120,16 +132,6 @@ if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
         cp "$WALLPAPER_PATH" "$USER_WALLPAPERS/"
         WALLPAPER_PATH="$USER_WALLPAPERS/${WALLPAPER_PATH##*/}"
     fi
-fi
-
-helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
-
-if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
-    if [[ "$(systemctl --user is-active hyprpaper)" != "active" ]]; then
-        systemctl -q --user enable --now hyprpaper
-        wait $!
-    fi
-    hyprctl -q hyprpaper wallpaper ", $WALLPAPER_PATH"
 fi
 
 update_configs "$WALLPAPER_PATH"

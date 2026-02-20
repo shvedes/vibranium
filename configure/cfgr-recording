@@ -7,7 +7,7 @@ _flash_screen_submenu() {
 
     while true; do
         opts=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN" "What is this?")
-        chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Flash screen" "ESC to go back")"
+        helpers::ui::menu chosen "Flash screen" "ESC to go back" -- "${opts[@]}"
         [ -z "$chosen" ] && break
 
         case "$chosen" in
@@ -49,7 +49,7 @@ _set_recording_mode() {
 
     while true; do
         opts=("Constant Frame Rate" "Variable Frame Rate" "What is this?")
-        chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Mode" "ESC to go back")"
+        helpers::ui::menu chosen "Mode" "ESC to go back" -- "${opts[@]}"
         [[ -z "$chosen" ]] && break
 
         var="VIBRANIUM_RECORDING_FRAMERATE_MODE"
@@ -89,7 +89,7 @@ _set_container_type() {
     local var1 var2 opts chosen
 
     opts=("mp4" "mkv" "webm")
-    chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Container type" "ESC to go back")"
+    helpers::ui::menu chosen "Container type" "ESC to go back" -- "$chosen"
     [ -z "$chosen" ] && continue
 
     var1="VIBRANIUM_RECORDING_CONTAINER_TYPE"
@@ -141,7 +141,7 @@ _advanced_menu() {
         opts+=("Codec : $VIBRANIUM_RECORDING_VIDEO_CODEC")
 
         mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
-        chosen="$(printf "%s\n" "${opts[@]}" | helpers::ui::menu "Advanced" "ESC to go back")"
+        helpers::ui::menu chosen "Advanced" "ESC to go back" -- "${opts[@]}"
         [ -z "$chosen" ] && break
 
         case "$chosen" in
@@ -206,7 +206,7 @@ while true; do
     OPTIONS+=("<b>Advanced</b>")
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Recording" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Recording" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do

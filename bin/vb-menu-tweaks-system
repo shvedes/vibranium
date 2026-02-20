@@ -8,26 +8,27 @@ else
     OPTIONS=("Disable systemd coredump")
 fi
 
-OPTIONS+=("What is ...")
+OPTIONS+=("Help")
 
 while true; do
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "System tweaks" "ESC to go back")"
+    helpers::ui::menu CHOSEN "System Tweaks" "ESC to go back" -- "${OPTIONS[@]}"
     [[ -z $CHOSEN ]] && break
 
     case "$CHOSEN" in
         *"coredump")
             if vb-tweak-coredump; then
-                vb-cmd-kill-rofi
+                helpers::ui::close_menus
                 exit 0
             fi
             ;;
-        "What is ...")
+        "Help")
             while true; do
-                what_is_this_opts=("Coredump")
-                what_is_this_chosen="$(printf "%s\n" "${what_is_this_opts[@]}" | helpers::ui::menu "What is" "ESC to go back")"
-                [[ -z $what_is_this_chosen ]] && break
+                # what_is_this_opts=("Coredump")
+                help_opts=("Coredump")
+                helpers::ui::menu help_chosen "Help me with.." "ESC to go back" -- "${help_opts[@]}"
+                [[ -z $help_chosen ]] && break
 
-                case "$what_is_this_chosen" in
+                case "$help_chosen" in
                     "Coredump")
                         msg="<span foreground='${P_ACCENT}'><b>systemd-coredump</b></span> collects "
                         msg+="<span foreground='${P_ACCENT}'><b>memory dumps</b></span> "

@@ -33,7 +33,7 @@ _set_timeouts() {
     local min_value="$4"      # empty or lock_timeout
 
     while true; do
-        input="$(printf "%s\n" "$prompt" | helpers::ui::menu "$title timeout" "in minutes")"
+        helpers::ui::menu input "$title timeout" "in minutes" -- "$prompt"
         [ -z "$input" ] && break
         [ "$input" = "$prompt" ] && continue
 
@@ -90,7 +90,7 @@ while true; do
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Idle" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Idle" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do

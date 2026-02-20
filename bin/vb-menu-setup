@@ -7,13 +7,13 @@ OPTIONS=(
 )
 
 while true; do
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Setup" "ESC to go back")"
+    helpers::ui::menu CHOSEN "Setup" "ESC to go back" -- "${OPTIONS[@]}"
     [[ -z "$CHOSEN" ]] && break
 
     case "$CHOSEN" in
         "QEMU")
             vb-core-term --floating -- vb-setup-qemu
-            vb-cmd-kill-rofi
+            helpers::ui::close_menus
             ;;
     esac
 done

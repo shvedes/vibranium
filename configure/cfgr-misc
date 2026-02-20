@@ -17,7 +17,7 @@ _set_term_opacity() {
 _term_opacity_menu() {
     while true; do
         prompt="Background opacity level (float)"
-        input="$(printf "%s" "$prompt" | helpers::ui::menu "Terminal opacity" "0.0 - 1.0")"
+        helpers::ui::menu input "Terminal opacity" "0.0 - 1.0" -- "$prompt"
         [[ -z "$input" ]] && break
         [[ "$prompt" == "$input" ]] && continue
 
@@ -48,7 +48,7 @@ _set_rofi_theme() {
 
     while true; do
         options=("Text" "Modern")
-        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Theme" "ESC to go back")"
+        helpers::ui::menu chosen "Theme" "ESC to go back" -- "${options[@]}"
         [[ -z $chosen ]] && break
 
         case "${chosen,}" in
@@ -74,7 +74,7 @@ _manage_user_wallpapers() {
         options=("Open" "Delete")
 
         while true; do
-            chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "$target" "ESC to go back")"
+            helpers::ui::menu chosen "$target" "ESC to go back" -- "${options[@]}"
             [[ -z "$chosen" ]] && return
 
             if ! [[ " ${options[*]} " =~ " $chosen " ]]; then
@@ -126,7 +126,7 @@ _manage_user_wallpapers() {
             return
         fi
 
-        chosen="$(printf "%s\n" "${files[@]}" | helpers::ui::menu "Your wallpapers" "ESC to go back" -selected-row "$index")"
+        helpers::ui::menu chosen "Your wallpapers" "ESC to go back" -selected-row "$index" -- "${files[@]}"
         [[ -z "$chosen" ]] && return
 
         for i in "${!files[@]}"; do
@@ -172,7 +172,7 @@ _set_notification_timeout() {
     local config="$XDG_CONFIG_HOME/dunst/dunstrc"
 
     while true; do
-        input="$(printf "Timeout (in seconds)" | helpers::ui::menu "Timeout" "ESC to go back")"
+        helpers::ui::menu input "Timeout" "ESC to go back" -- "Timeout (in seconds)"
         [[ -z "$input" ]] && break
 
         if [[ ! "$input" =~ ^[0-9]+$ ]]; then
@@ -208,7 +208,7 @@ _pick_cursor_theme() {
     [[ ${#options[@]} -eq 0 ]] && return
 
     while true; do
-        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Misc" "ESC to go back")"
+        helpers::ui::menu chosen "Misc" "ESC to go back" -- "${options[@]}"
         [[ -z "$chosen" ]] && break
 
         if [[ ! " ${options[*]} " == *" $chosen "* ]]; then
@@ -226,7 +226,12 @@ _pick_cursor_theme() {
 
 _get_cursor_theme() {
     local current
-    current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
+    local settings
+    settings="$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+
+    # gsettings returns "Defalut" most of the time, so just use gtk settings file instead.
+    # current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
+    current="$(sed -n 's/^gtk-cursor-theme-name=//p' "$settings")"
 
     while IFS='|' read -r key value; do
         if [[ "$key" == "$current" ]]; then
@@ -241,11 +246,6 @@ _get_cursor_theme() {
 
 _get_default_browser() {
     local browser
-
-    if [[ ! -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
-        printf "(mimeapps.list not found)"
-        return
-    fi
 
     if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
         while IFS='=' read -r key value; do
@@ -263,7 +263,7 @@ _get_default_browser() {
     fi
 
     if [[ -z "$browser" ]]; then
-        printf "No browsers installed"
+        printf "(no browsers found)"
         return
     fi
 
@@ -304,7 +304,7 @@ _pick_browser() {
     local valid=false
 
     while true; do
-        chosen="$(printf "%s\n" "${options[@]}" | helpers::ui::menu "Default browser" "ESC to go back")"
+        helpers::ui::menu chosen "Default browser" "ESC to go back" -- "${options[@]}"
         [[ -z "$chosen" ]] && return
 
         for opt in "${options[@]}"; do
@@ -345,7 +345,7 @@ while true; do
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Misc" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Misc" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [[ -z "$CHOSEN" ]] && break
 
     for i in "${!OPTIONS[@]}"; do
@@ -381,8 +381,8 @@ while true; do
             _manage_user_wallpapers
             ;;
         *"Edit env"*)
-            vb-core-term --floating -- "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
-            vb-cmd-kill-rofi
+            vb-core-term --floating --title 'vb-env' -- "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
+            helpers::ui::close_menus
             exit 0
             ;;
     esac

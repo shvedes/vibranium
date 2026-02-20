@@ -6,44 +6,50 @@ INDEX=0
 
 _delete_existing_screenshots() {
     local prompt input confirm
+    local dir="$XDG_PICTURES_DIR/Screenshots"
+    local files=()
 
-    if [[ ! -z "$(ls -A "$HOME/Pictures/Screenshots")" ]]; then
-        prompt="Would you like to delete existing screenshots?"
+    shopt -s nullglob
 
-        while true; do
-            input="$(printf "Yes\nNo" | helpers::ui::menu "$prompt")"
+    files=("$dir"/*)
 
-            case "$input" in
-                "Yes")
-                    confirm="$(printf "DELETE\nCancel" | helpers::ui::menu "This will permanently remove all screenshots")"
-                    [[ "$confirm" != "DELETE" ]] && break
+    shopt -u nullglob
 
-                    rm -f "$HOME"/Pictures/Screenshots/*
-                    notify-send -r 1 -t 5000 "Vibranium" "Existing screenshots have been deleted"
-                    break
-                    ;;
-                "No"|"")
-                    break
-                    ;;
-                *)
-                    continue
-                    ;;
-            esac
-        done
+    (( ${#files[@]} == 0 )) && return 0
 
-    fi
+    prompt="Would you like to delete existing screenshots?"
+
+    while true; do
+        helpers::ui::menu input "$prompt" "" -- "Yes" "No"
+
+        case "$input" in
+            Yes)
+                prompt="This will permanently remove all screenshots"
+                helpers::ui::menu confirm "$prompt" "" -- "DELETE" "Cancel"
+
+                [[ "$confirm" != "DELETE" ]] && break
+
+                rm -f -- "${files[@]}"
+                notify-send -r 1 -t 5000 "Vibranium" "Screenshots have been deleted"
+                break
+                ;;
+            No|"")
+                break
+                ;;
+        esac
+    done
 }
 
 ANIMATIONS_ENABLED="$(hyprctl -j getoption animations:enabled | jq '.int')"
 
-
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check VIBRANIUM_SCREENSHOT_FILE_TYPE
-    helpers::check VIBRANIUM_SCREENSHOT_SAVE_TO_DISK
-    helpers::check VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE
-    helpers::check VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION
+    helpers::check \
+        VIBRANIUM_SCREENSHOT_FILE_TYPE \
+        VIBRANIUM_SCREENSHOT_SAVE_TO_DISK \
+        VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE \
+        VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION
 
     ANNOTATE="$VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE"
     FILETYPE="${VIBRANIUM_SCREENSHOT_FILE_TYPE^^}"
@@ -64,8 +70,9 @@ while true; do
     )
 
     if [[ "$ANIMATIONS_ENABLED" = "1" ]]; then
-        helpers::check VIBRANIUM_SCREENSHOT_FLASH_SCREEN
-        helpers::check VIBRANIUM_SCREENSHOT_FLASH_BORDER
+        helpers::check \
+            VIBRANIUM_SCREENSHOT_FLASH_SCREEN \
+            VIBRANIUM_SCREENSHOT_FLASH_BORDER
 
         FLASH_BORDER="$VIBRANIUM_SCREENSHOT_FLASH_BORDER"
         FLASH_SCREEN="$VIBRANIUM_SCREENSHOT_FLASH_SCREEN"
@@ -81,7 +88,7 @@ while true; do
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    CHOSEN="$(printf "%s\n" "${OPTIONS[@]}" | helpers::ui::menu "Screenshots" "ESC to go back" -selected-row "$INDEX")"
+    helpers::ui::menu CHOSEN "Screenshots" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do

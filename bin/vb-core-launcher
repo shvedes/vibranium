@@ -15,15 +15,15 @@
 
 source vb-core-lib
 
-if pid=$(pidof rofi); then
-    kill $pid
+if pidof -q rofi; then
+    killall rofi
     exit 0
 fi
 
-
-helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
-helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS
-helpers::check VIBRANIUM_GLOBAL_SEARCH_ENGINE
+helpers::check \
+    VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
+    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
+    VIBRANIUM_GLOBAL_SEARCH_ENGINE
 
 auto_select="$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
 show_icons="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
@@ -85,14 +85,6 @@ process_input() {
     esac
 }
 
-check_chromium() {
-    if ! command -v chromium > /dev/null; then
-        notify-send -r 3 -t 5000 -u critical \
-            "Web Apps Unavailable" "The Chromium web browser was not found"
-        exit 1
-    fi
-}
-
 set_rofi_flags() {
     local mode="$1"
     local -n _out="$2"
@@ -126,9 +118,6 @@ fi
 
 case "$1" in
     --web|--ai|--power)
-        if [[ "$1" != "--power" ]]; then
-            check_chromium
-        fi
         set_rofi_flags "$1" opt_args
         LAUNCHER_MODE="${1/--/}"
         ;;
@@ -157,8 +146,9 @@ if [[ "$show_icons" = true ]]; then
     opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
 fi
 
-input=$(rofi -show drun -run-command "echo {cmd} {args}" "${opt_args[@]}" 2> /dev/null)
+read -r input < <(rofi -show drun -run-command "echo {cmd} {args}" "${opt_args[@]}" 2> /dev/null)
 
 if [[ ! -z "$input" ]]; then
     process_input "${input[@]}"
 fi
+

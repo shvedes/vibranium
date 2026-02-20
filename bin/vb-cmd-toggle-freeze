@@ -23,7 +23,7 @@ esac
 read -r PID NAME <<< "$(hyprctl -j activewindow | jq -r '[.pid,.class]|@tsv')"
 
 if [[ -z $PID ]]; then
-    notify-send -r 4 -t 3000 -u critical "Vibranium - PID Freezer" "There is no focused windows!"
+    notify-send -r 4 -t 3000 -u critical "PID Freezer" "There are no focused windows!"
     exit 1
 fi
 

@@ -14,18 +14,29 @@ Options:
 EOF
 }
 
+
 get_wallpaper() {
     sed -n 's/^wallpaper:path = //p' "$hyprpaper_conf"
 }
 
 case "$1" in
     -b|--basename)
+        if ! systemctl -q --user is-active hyprpaper; then
+            echo "error: wallpaper deamon is not active!" >&2
+            exit 1
+        fi
+
         get_wallpaper | xargs -r basename
         ;;
     -h|--help)
         usage
         ;;
     "" )
+        if ! systemctl -q --user is-active hyprpaper; then
+            echo "error: wallpaper deamon is not active!" >&2
+            exit 1
+        fi
+
         get_wallpaper
         ;;
     * )

@@ -14,8 +14,7 @@ LOCAL_LATEST=$(git -C "$VIBRANIUM" describe --tags --abbrev=0 2> /dev/null)
 
 if [[ "$REMOTE_LATEST" != "$LOCAL_LATEST" ]]; then
     echo "$REMOTE_LATEST" > "$VIBRANIUM_STATE/update.available"
-    # Since it launches from the systemd service, we can't
-    # use external scripts from here.
+
     pkill -RTMIN+12 waybar
-                         pkill -RTMIN+10 waybar
+    pkill -RTMIN+10 waybar
 fi

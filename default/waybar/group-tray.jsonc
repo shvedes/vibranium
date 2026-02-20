@@ -1,7 +1,7 @@
 {
 	"group/traygroup": {
 		"orientation": "horizontal",
-		"modules": [ "custom/logout", "tray", "custom/separator" ],
+		"modules": [ "custom/logout", "tray" ],
 		"drawer": {
 			"transition-duration": 350,
 			"transition-left-to-right": false,

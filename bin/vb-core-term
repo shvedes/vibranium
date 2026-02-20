@@ -2,7 +2,7 @@
 
 usage() {
     cat << EOF
-Usage: ${0##*/} [--floating] [--directory DIR] [--] [COMMAND [ARGS...]]
+Usage: ${0##*/} [OPTIONS] [--] [COMMAND [ARGS...]]
 
 Open the default terminal (Alacritty). If COMMAND is provided,
 it will be executed inside the terminal.
@@ -12,6 +12,7 @@ Options:
   --floating        Open terminal as a floating window
   --directory DIR   Set the working directory for the new terminal window
   --hold            Keep the window open after the command exits
+  --title TITLE     Set the window title (default is COMMAND basename)
   --                End of options; next token is COMMAND even if it starts with -
 EOF
 }
@@ -19,6 +20,7 @@ EOF
 FLOATING=false
 WORKDIR=""
 HOLD=false
+TITLE=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -41,6 +43,14 @@ while [[ $# -gt 0 ]]; do
         --hold)
             HOLD=true
             shift
+            ;;
+        --title)
+            if [[ -z "${2-}" ]]; then
+                echo "--title requires an argument" >&2
+                exit 1
+            fi
+            TITLE="$2"
+            shift 2
             ;;
         --) # End of options marker
             shift
@@ -99,9 +109,14 @@ if [[ $# -ge 1 ]]; then
     args=(-e "$cmd" "$@") # arguments to pass to alacritty
 fi
 
+# Override title if --title was provided
+if [[ -n "$TITLE" ]]; then
+    title="$TITLE"
+fi
+
 # Ensure alacritty user service is running if present
-if [[ "$(systemctl --user is-active alacritty 2>/dev/null || true)" == "inactive" ]]; then
-    systemctl --user enable --now alacritty 2>/dev/null || true
+if ! systemctl -q --user is-active alacritty; then
+    systemctl -q --user enable --now alacritty
 fi
 
 # Floating branch: run via hyprctl with float rules
