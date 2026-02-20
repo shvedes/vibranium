@@ -2,9 +2,10 @@
   background:       #192330;
   background-hard:  #131a24;
 
-  foreground:       #cdcecf;
-  foreground-muted: #8c8d8d;
+  foreground:       #e5e5e5;
+  foreground-muted: #5a6b84;
 
-  border:    #4a4d59;
+  border:    #39506d;
+  selected:  #29394f;
   highlight: #8dadde;
 }

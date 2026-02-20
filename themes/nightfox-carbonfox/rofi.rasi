@@ -2,9 +2,10 @@
   background:       #161616;
   background-hard:  #141414;
 
-  foreground:       #e6e8eb;
-  foreground-muted: #939496;
+  foreground:       white;
+  foreground-muted: gray;
 
   border:    #525253;
+  selected:  #2a2a2a;
   highlight: #78a9ff;
 }

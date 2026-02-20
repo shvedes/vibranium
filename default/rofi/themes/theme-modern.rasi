@@ -29,7 +29,7 @@ element normal.active {
 }
 
 element selected.normal {
-    background-color: var(border);
+    background-color: var(selected);
     text-color:       var(foreground);
 }
 

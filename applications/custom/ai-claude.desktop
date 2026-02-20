@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Claude AI
+Name=Claude
 Icon=claude
 Keywords=AI;Claude;Anthropic
 TryExec=chromium

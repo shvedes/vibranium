@@ -1,7 +1,7 @@
 [Desktop Entry]
 Version=1.0
 Type=Application
-Name=Grok AI
+Name=Grok
 Icon=grok
 Keywords=Grok;Twitter;X;Elon;Musk;Tesla
 TryExec=chromium

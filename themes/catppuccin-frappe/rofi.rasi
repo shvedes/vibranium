@@ -6,5 +6,6 @@
   foreground-muted: #737994;
 
   border:    #51576d;
+  selected:  #424861;
   highlight: #ca9ee6;
 }
