@@ -2,5 +2,5 @@
 Type=Application
 Name=Bluetooth Manager
 TryExec=bluetui
-Exec=vb-core-term bluetui
+Exec=vb-core-term -- bluetui
 Icon=bluetooth-active-symbolic
