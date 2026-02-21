@@ -22,7 +22,6 @@ thunar-volman
 pipewire-jack
 pipewire-alsa
 polkit-gnome
-apple_cursor
 imagemagick
 wireplumber
 bluez-utils

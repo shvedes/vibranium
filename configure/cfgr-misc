@@ -235,7 +235,11 @@ _pick_cursor_theme() {
         options+=("$pretty")
     done < <(vb-theme-cursor-list)
 
-    [[ ${#options[@]} -eq 0 ]] && return
+    if (( ${#lines[@]} <= 1 )); then
+        notify-send -r 3 "Vibranium" \
+            "No curosr themes found"
+        return
+    fi
 
     while true; do
         helpers::ui::menu chosen "Cursor theme" "ESC to go back" -- "${options[@]}"
