@@ -55,7 +55,7 @@ case "$(lspci | grep VGA)" in
             "lib32-vulkan-radeon"
         )
         ;;
-    *UHD*|*Iris*|*Arc*)
+    *UHD*|*Iris*|*Arc*|*HD Graphics*)
         _log_info "Installing Intel GPU drivers"
         PACKAGES+=(
             "mesa"
