@@ -3,23 +3,19 @@
 source vb-core-lib
 
 _confirm_kill_submenu() {
-    local options chosen
+    local options confirm_to_kill_chosen
     while true; do
-        options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "What is this?")
-        helpers::ui::menu chosen "Kill Confirm" "ESC to go back" -- "${options[@]}"
-        [[ -z "$chosen" ]] && break
+        options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "<b>Help</b>")
+        helpers::ui::menu confirm_to_kill_chosen "Kill Confirm" "ESC to go back" -- "${options[@]}"
+        [[ -z "$confirm_to_kill_chosen" ]] && break
 
         case "$confirm_to_kill_chosen" in
             "Confirm"*)
                 helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
                 break
                 ;;
-            "What"*)
-                msg="\n<span foreground='${P_ACCENT}'><b>•</b></span> <b>Whether to confirm action when triggering the kill window shortcut</b>\n"
-                msg+="<span foreground='${P_ACCENT}'><b>•</b></span> <b>Setting it to true helps prevent accidental force window kills</b>\n\n"
-                msg+="When the <span foreground='${P_RED}'><b>force window kill</b></span> shortcut is triggered, this\n"
-                msg+="option asks you to press it again to confirm the action"
-                notify-send -r 8 -t 15000 "What is this?" "$msg"
+            *"Help"*)
+                vb-cmd-show-help confirm-kill
                 ;;
         esac
     done
@@ -35,7 +31,7 @@ while true; do
         "OSD enabled : $VIBRANIUM_GLOBAL_USE_OSD"
         "<b>App launcher</b>"
         "<b>Player options</b>"
-        "<b>Power profiles</b>"
+        # "<b>Power profiles</b>"
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")

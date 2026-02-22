@@ -134,11 +134,3 @@ notify "$TARGET_PROFILE"
 
 powerprofilesctl set "$TARGET_PROFILE" &
 vb-cmd-refresh-bar-module power-profile &
-
-helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
-if [[ "$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE" == true ]]; then
-    if [[ "$TARGET_PROFILE" =~ ^(power-saver|balanced)$ ]]; then
-        vb-cmd-toggle-decorations
-    fi
-fi
-

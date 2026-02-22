@@ -4,7 +4,6 @@ source vb-core-lib
 
 INDEX=0
 
-
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
@@ -29,8 +28,7 @@ while true; do
 
     case "$CHOSEN" in
         "Respect"*)
-            helpers::configure::toggle_bool -v VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
-            vb-cmd-toggle-decorations
+            helpers::configure::toggle_bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
             ;;
         "Visual"*)
             helpers::configure::toggle_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
