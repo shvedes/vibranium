@@ -1,0 +1,185 @@
+# Guard: refuse to run as a subprocess (sourcing sets BASH_SOURCE[0] != $0)
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    printf '%s\n' \
+        "detect_va_driver.sh must be sourced, not executed:" \
+        "  source ${BASH_SOURCE[0]}" >&2
+    exit 1
+fi
+
+_va_exports=$(
+# Run the heavy lifting in a subshell so local functions and variables do not
+# pollute the caller's environment. We export back only the two variables.
+# set -u inside the subshell; -e and -o pipefail for early-exit on errors.
+set -euo pipefail
+
+# Arch Linux only ships DRI drivers under /usr/lib/dri.
+readonly _VA_DRI_PATH="/usr/lib/dri"
+
+# _driver_so_exists NAME
+# Returns 0 if ${_VA_DRI_PATH}/${NAME}_drv_video.so exists, 1 otherwise.
+_driver_so_exists() {
+    [[ -f "${_VA_DRI_PATH}/${1}_drv_video.so" ]]
+}
+
+# _active_display_vendor
+#
+# Inspect /sys/class/drm/card[0-9]* (top-level GPU nodes only) and look for
+# cards that have at least one connected display.  Among those, return the
+# vendor string of the first match in priority order: nvidia > intel > amd.
+#
+# Falls back to any detected vendor (connected or not) when no connected
+# display is found — handles headless / offload scenarios.
+#
+# Outputs one of: nvidia  intel  amd  (empty string if nothing detected)
+_active_display_vendor() {
+    local card drv_path drv
+
+    declare -A connected_vendors=()   # vendors with a connected display
+    declare -A present_vendors=()     # vendors present at all
+
+    for card in /sys/class/drm/card[0-9]*; do
+        [[ -e "$card/device/driver" ]] || continue
+
+        drv_path=$(readlink -f "$card/device/driver" 2>/dev/null) || continue
+        drv="${drv_path##*/}"
+
+        local vendor=""
+        case "$drv" in
+            nvidia)           vendor="nvidia" ;;
+            i915|xe)          vendor="intel"  ;;   # xe = new Intel DG/Meteor driver
+            amdgpu|radeon)    vendor="amd"    ;;
+            *)                continue        ;;
+        esac
+
+        present_vendors["$vendor"]=1
+
+        # Check for at least one connected connector on this card.
+        local connector
+        for connector in "$card/"*; do
+            local status_file="$connector/status"
+            [[ -f "$status_file" ]] || continue
+            if [[ "$(< "$status_file")" == "connected" ]]; then
+                connected_vendors["$vendor"]=1
+                break
+            fi
+        done
+    done
+
+    # Prefer a vendor that has a live display; fall back to mere presence.
+    local priority=(nvidia intel amd)
+    for v in "${priority[@]}"; do
+        if [[ -n "${connected_vendors[$v]:-}" ]]; then
+            printf '%s' "$v"
+            return 0
+        fi
+    done
+    for v in "${priority[@]}"; do
+        if [[ -n "${present_vendors[$v]:-}" ]]; then
+            printf '%s' "$v"
+            return 0
+        fi
+    done
+
+    printf ''   # nothing found
+}
+
+# _pick_va_driver VENDOR out_driver_var out_vdpau_var
+#
+# Given a vendor string (nvidia|intel|amd|""), set the two named variables to
+# the best available VA driver name and its VDPAU counterpart.
+_pick_va_driver() {
+    local vendor="$1"
+    local -n _out_driver="$2"
+    local -n _out_vdpau="$3"
+
+    _out_driver=""
+    _out_vdpau=""
+
+    case "$vendor" in
+        nvidia)
+            if _driver_so_exists nvidia; then
+                _out_driver="nvidia"
+                _out_vdpau="nvidia"
+            fi
+            ;;
+        intel)
+            # iHD (modern, gen8+) preferred over legacy i965.
+            if _driver_so_exists iHD; then
+                _out_driver="iHD"
+                _out_vdpau="va_gl"
+            elif _driver_so_exists i965; then
+                _out_driver="i965"
+                _out_vdpau="va_gl"
+            fi
+            ;;
+        amd)
+            if _driver_so_exists radeonsi; then
+                _out_driver="radeonsi"
+                _out_vdpau="radeonsi"
+            fi
+            ;;
+    esac
+
+    # Vendor-agnostic fallback: scan in priority order.
+    if [[ -z "$_out_driver" ]]; then
+        local candidates=(nvidia iHD i965 radeonsi)
+        local d
+        for d in "${candidates[@]}"; do
+            if _driver_so_exists "$d"; then
+                _out_driver="$d"
+                case "$d" in
+                    nvidia)    _out_vdpau="nvidia"   ;;
+                    iHD|i965)  _out_vdpau="va_gl"    ;;
+                    radeonsi)  _out_vdpau="radeonsi"  ;;
+                    *)         _out_vdpau=""          ;;
+                esac
+                break
+            fi
+        done
+    fi
+}
+
+_main() {
+    # If both are already exported by the caller, respect them and exit.
+    if [[ -n "${LIBVA_DRIVER_NAME:-}" && -n "${VDPAU_DRIVER:-}" ]]; then
+        printf 'detect_va_driver: both variables already set, skipping.\n' >&2
+        return 0
+    fi
+
+    local vendor
+    vendor=$(_active_display_vendor)
+
+    local chosen_driver="" chosen_vdpau=""
+    _pick_va_driver "$vendor" chosen_driver chosen_vdpau
+
+    if [[ -z "$chosen_driver" ]]; then
+        printf 'detect_va_driver: no matching driver .so found; nothing exported.\n' >&2
+        return 0
+    fi
+
+    # Print export statements for the parent shell to eval.
+    if [[ -z "${LIBVA_DRIVER_NAME:-}" && -n "$chosen_driver" ]]; then
+        printf 'export LIBVA_DRIVER_NAME=%q\n' "$chosen_driver"
+        printf 'detect_va_driver: LIBVA_DRIVER_NAME=%s\n' "$chosen_driver" >&2
+    fi
+
+    if [[ -z "${VDPAU_DRIVER:-}" && -n "$chosen_vdpau" ]]; then
+        printf 'export VDPAU_DRIVER=%q\n' "$chosen_vdpau"
+        printf 'detect_va_driver: VDPAU_DRIVER=%s\n' "$chosen_vdpau" >&2
+    fi
+}
+
+_main
+)
+
+# eval must run here — in the top-level scope of the sourced script — so that
+# the exports land in UWSM's env shell (or any other caller).
+# A pipe ( subshell | while-eval ) would create a second subshell for the
+# eval, making the exports invisible to the caller. $() + eval avoids that.
+#
+# Only lines starting with "export " are eval'd as a safety allowlist;
+# printf %q in the subshell ensures values are already shell-quoted.
+while IFS= read -r _va_line; do
+    [[ "$_va_line" == export\ * ]] && eval "$_va_line"
+done <<< "$_va_exports"
+unset _va_exports _va_line

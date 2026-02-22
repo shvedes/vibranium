@@ -77,31 +77,9 @@ if [[ -f "$XDG_CONFIG_HOME/user-dirs.dirs" ]]; then
     done < "$XDG_CONFIG_HOME/user-dirs.dirs"
 fi
 
-has_va_driver() {
-    [[ -f "/usr/lib/dri/${1}_drv_video.so" ]] || {
-        [[ -f "/usr/lib64/dri/${1}_drv_video.so" ]]
-    }
-}
-
-if has_va_driver nvidia; then
-    export LIBVA_DRIVER_NAME=nvidia
-    export VDPAU_DRIVER=nvidia
-fi
-
-if has_va_driver iHD; then
-    export LIBVA_DRIVER_NAME=iHD
-    export VDPAU_DRIVER=va_gl
-fi
-
-if has_va_driver i965; then
-    export LIBVA_DRIVER_NAME=i965
-    export VDPAU_DRIVER=va_gl
-fi
-
-if has_va_driver radeonsi; then
-    export LIBVA_DRIVER_NAME=radeonsi
-    export VDPAU_DRIVER=radeonsi
-fi
+# Properly detect and export
+# LIBVA_DRIVER_NAME & VDPAU_DRIVER
+source "$VIBRANIUM/default/uwsm/gpu-env"
 
 # Export user-defined environment
 source "$XDG_CONFIG_HOME/vibranium/environment"
