@@ -28,6 +28,7 @@ while true; do
 
     OPTIONS=(
         "Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
+        "Update channel : $(< "$VIBRANIUM_STATE/update.channel")"
         "OSD enabled : $VIBRANIUM_GLOBAL_USE_OSD"
         "<b>App launcher</b>"
         "<b>Player options</b>"
@@ -46,6 +47,9 @@ while true; do
     done
 
     case "$CHOSEN" in
+        "Update channel"*)
+            vb-dev-switch-channel
+            ;;
         *"App launcher"*)
             cfgr-launcher
             ;;

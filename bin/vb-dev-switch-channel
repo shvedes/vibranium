@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+GIT="git -C $VIBRANIUM"   # reusable alias
+
+CURRENT="$($GIT branch --show-current)"
+
+if [[ ! "$CURRENT" =~ ^v ]]; then
+    CHANGES="$($GIT status --porcelain | wc -l)"
+
+    if (( CHANGES > 0 )); then
+        echo "Error: you have unsaved changes." >&2
+        echo "Commit them first or stash them with: git stash" >&2
+
+        if [[ ! -t 2 ]]; then
+            notify-send -r 4 -u critical -t 7000 "Vibranium" \
+                "Error: you have unsaved changes.\nCommit them first or stash them with: git stash"
+        fi
+
+        exit 1
+    fi
+fi
+
+if [[ "$CURRENT" == "master" ]]; then
+    LATEST="$($GIT tag --sort=-creatordate | head -n 1)"
+
+    if $GIT switch "$LATEST"; then
+        echo "release" > "$VIBRANIUM_STATE/update.channel"
+        echo "Switched to $LATEST."
+
+        if [[ ! -t 1 ]]; then
+            notify-send -r 1 "Vibranium" "Switched to $LATEST"
+        fi
+    else
+        echo "Error: failed to switch to '$LATEST'." >&2
+
+        if [[ ! -t 1 ]]; then
+            notify-send -r 4 -u critical \
+                "Vibranium" \
+                "Failed to switch to $LATEST"
+        fi
+        exit 1
+    fi
+else
+    if $GIT switch master; then
+        echo "upstream" > "$VIBRANIUM_STATE/update.channel"
+        echo "Switched to upstream."
+
+        if [[ ! -t 1 ]]; then
+            notify-send -r 1 \
+                "Vibranium" "Switched to upstream"
+        fi
+    else
+        echo "Error: failed to switch to 'master'." >&2
+
+        if [[ ! -t 1 ]]; then
+            notify-send -r 1 \
+                "Vibranium" "Switched to upstream"
+        fi
+
+        exit 1
+    fi
+fi
+

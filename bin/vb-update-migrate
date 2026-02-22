@@ -2,6 +2,8 @@
 
 # Source: omarchy
 
+source vb-core-lib
+
 STATE_DIR="$VIBRANIUM_STATE/migrations"
 
 YELLOW=$'\e[0;33m'
@@ -9,26 +11,19 @@ GREEN=$'\e[0;32m'
 RESET=$'\e[0m'
 
 mkdir -p "$STATE_DIR/skipped"
-for file in "$VIBRANIUM"/migrations/*.sh; do
-    filename="${file##*/}"
 
+for file in "$VIBRANIUM"/migrations/*.sh; do
     if [[ ! -f "$STATE_DIR/$filename" && ! -f "$STATE_DIR/skipped/$filename" ]]; then
-        echo -e "${YELLOW}[VIBRANIUM]${RESET} Running migration ${GREEN}${filename%.sh}${RESET}"
+        echo -e "${YELLOW}[VIBRANIUM]${RESET} Running migration ${GREEN}${file##*/}${RESET}"
 
         if bash "$file"; then
-            touch "$STATE_DIR/$filename"
+            : > "$STATE_DIR/$filename"
         else
-            printf "%s[VIBRANIUM]%s Migration %s failed. Skip and continue? (y/N): " \
-                "$YELLOW" "$RESET" "$file"
-            read -r response
-            case "$response" in
-                [yY][eE][sS] | [yY])
-                    touch "$STATE_DIR/skipped/$filename"
-                    ;;
-                *)
-                    exit 1
-                    ;;
-            esac
+            if term::ask_yes_no Y "Migration $file failed. Skip and continue?"; then
+                : > "$STATE_DIR/skipped/$filename"
+            else
+                exit 1
+            fi
         fi
     fi
 done
