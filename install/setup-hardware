@@ -30,7 +30,9 @@ if [[ "$(lsblk -f)" =~ ntfs ]]; then
     fi
 fi
 
-case "$(lspci | grep VGA)" in
+VGA_STR="$(lspci | grep -iE "vga|3d")"
+
+case "$VGA_STR" in
     *Nvidia*)
         _log_info "Installing NVIDIA GPU drivers"
         NVIDIA_SETUP_NEEDED=true
@@ -49,7 +51,7 @@ case "$(lspci | grep VGA)" in
         PACKAGES+=(
             "mesa"
             "lib32-mesa"
-            "rocm-smi-lib" # Needed for btop gpu load monitoring
+            "rocm-smi-lib" # Needed for btop's gpu usage graph
             "vulkan-radeon"
             "libvdpau-va-gl"
             "lib32-vulkan-radeon"
@@ -59,14 +61,33 @@ case "$(lspci | grep VGA)" in
         _log_info "Installing Intel GPU drivers"
         PACKAGES+=(
             "mesa"
-            "libvpl"
             "lib32-mesa"
-            "vpl-gpu-rt"
             "vulkan-intel"
-            "libvdpau-va-gl"
-            "libva-intel-driver"
             "lib32-vulkan-intel"
         )
+
+        case "$VGA_STR" in
+            # Broadwell (2014) and newer
+            *Broadwell*|*Skylake*|*Kaby Lake*|*Coffee Lake*|\
+            *Comet Lake*|*Ice Lake*|*Tiger Lake*|*Alder Lake*|\
+            *Raptor Lake*|*Arc*)
+                PACKAGES+=("intel-media-driver")
+                ;;
+            # GMA 4500 (2008) up to pre-Broadwell
+            *Penryn*|*Nehalem*|*Westmere*|\
+            *Sandy Bridge*|*Ivy Bridge*|*Haswell*)
+                PACKAGES+=("libva-intel-driver")
+                ;;
+        esac
+
+        case "$VGA_STR" in
+            *Tiger Lake*|*Alder Lake*|*Raptor Lake*)
+                PACKAGES+=("vpl-gpu-rt")
+                ;;
+            *)
+                PACKAGES+=("intel-media-sdk")
+                ;;
+        esac
         ;;
     "*Red Hat*"|*Virtio*)
         _log_info "Running inside of a Virtual Machine"
