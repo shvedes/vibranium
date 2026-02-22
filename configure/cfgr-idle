@@ -86,7 +86,7 @@ while true; do
         "Lock  after : $LOCK_TIMEOUT min"
         "Sleep after : $SLEEP_TIMEOUT min"
         "Inhibit type : $INHIBIT_TYPE"
-        "What is this?"
+        "<b>Help</b>"
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
@@ -114,28 +114,9 @@ while true; do
                 fi
             ) &
             ;;
-        "Lock"*)
-            _set_timeouts "Lock" "Lock timeout (int)" 1
-            ;;
-        "Sleep"*)
-            _set_timeouts "Sleep" "Sleep timeout (int)" 2 "$LOCK_TIMEOUT"
-            ;;
-        "What"*)
-            msg="<span foreground='${P_ACCENT}'><b>•</b></span> "
-            msg+="<b>Time of inactivity until screen lock</b>\n"
-            msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-            msg+="<b>Time of inactivity before the system sleeps</b>\n\n"
-
-            msg+="<b>Inhibit types:</b>\n"
-
-            msg+="<span foreground='${P_ACCENT}'><b>sleep</b></span> — "
-            msg+="The session may lock normally, but the PC is prevented from going to sleep\n"
-
-            msg+="<span foreground='${P_ACCENT}'><b>idle</b></span> — "
-            msg+="The system thinks you are active, so automatic locking does not trigger"
-
-            notify-send -r 6 -t 15000 "What is this?" "$msg"
-            ;;
+        "Lock"*) _set_timeouts "Lock" "Lock timeout (int)" 1 ;;
+        "Sleep"*) _set_timeouts "Sleep" "Sleep timeout (int)" 2 "$LOCK_TIMEOUT" ;;
+        *"Help"*) vb-cmd-show-help idle ;;
     esac
 done
 

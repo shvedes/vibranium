@@ -3,10 +3,10 @@
 source vb-core-lib
 
 _flash_screen_submenu() {
-    local opts chosen msg var
+    local opts chosen var
 
     while true; do
-        opts=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN" "What is this?")
+        opts=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN" "<b>Help</b>")
         helpers::ui::menu chosen "Flash screen" "ESC to go back" -- "${opts[@]}"
         [ -z "$chosen" ] && break
 
@@ -15,11 +15,8 @@ _flash_screen_submenu() {
                 helpers::configure::toggle_bool "VIBRANIUM_RECORDING_FLASH_SCREEN"
                 break
                 ;;
-            "What"*)
-                msg="Whether to <span foreground='${P_YELLOW}'><b>flash</b></span> the whole screen when recording "
-                msg+="<span foreground='${P_GREEN}'><b>starts</b></span> or <span foreground='${P_RED}'><b>stops</b></span>.\n"
-                msg+="Purely aesthetic feature. The flashing effect isn't shown in the video itself"
-                notify-send -r 8 -t 10000 "What is this?" "$msg"
+            *"Help"*)
+                vb-cmd-show-help recording-flash-screen
                 continue
                 ;;
         esac
@@ -27,7 +24,7 @@ _flash_screen_submenu() {
 }
 
 _set_codec() {
-    local var new_val msg
+    local var new_val
 
     var="VIBRANIUM_RECORDING_VIDEO_CODEC"
     helpers::configure::set_string "$var" "Video Codec" \
@@ -37,18 +34,17 @@ _set_codec() {
         "AV1 (10 bit color):av1_10bit"
 
     new_val="$(vb-cmd-get-option "$var")"
+
     if [[ "$new_val" != "auto" ]]; then
-        msg="Ensure the selected codec (<span foreground='${P_YELLOW}'><b>${new_val^^}</b></span>) is supported by your GPU.\n"
-        msg+="If not, the <span foreground='${P_YELLOW}'><b>CPU</b></span> will be used as a fallback, which is less efficient"
-        notify-send -r 7 -t 10000 "Vibranium" "$msg"
+        vb-cmd-show-help recording-codec-warning
     fi
 }
 
 _set_recording_mode() {
-    local opts chosen var msg
+    local opts chosen var
 
     while true; do
-        opts=("Constant Frame Rate" "Variable Frame Rate" "What is this?")
+        opts=("Constant Frame Rate" "Variable Frame Rate" "<b>Help</b>")
         helpers::ui::menu chosen "Mode" "ESC to go back" -- "${opts[@]}"
         [[ -z "$chosen" ]] && break
 
@@ -65,20 +61,8 @@ _set_recording_mode() {
                 sed -i "/^${var}/s/=.*/=\"vfr\"/" "$VIBRANIUM_USER_SETTINGS"
                 break
                 ;;
-            "What"*)
-                msg="\n<span foreground='${P_YELLOW}'><b>Constant Frame Rate (CFR)</b></span>: "
-                msg+="Each frame is stored at a fixed interval\n"
-                msg+="• <span foreground='${P_GREEN}'><b>Pros</b></span>: best for editing, audio sync, and compatibility\n"
-                msg+="• <span foreground='${P_RED}'><b>Cons</b></span>: if hardware struggles, frames may drop\n\n"
-
-                msg+="<span foreground='${P_YELLOW}'><b>Variable Frame Rate (VFR)</b></span>: "
-                msg+="Intervals between frames can vary\n"
-                msg+="• <span foreground='${P_GREEN}'><b>Pros</b></span>: smoother recording under load, fewer frame drops\n"
-                msg+="• <span foreground='${P_RED}'><b>Cons</b></span>: some editors and players handle it poorly, sync can drift\n\n"
-
-                msg+="Use <span foreground='${P_ACCENT}'><b>CFR</b></span> if you plan to edit the video. "
-                msg+="Use <span foreground='${P_ACCENT}'><b>VFR</b></span> for lighter, adaptive recording"
-                notify-send -r 8 -t 25000 "What is this?" "$msg"
+            *"Help"*)
+                vb-cmd-show-help recording-record-type
                 continue
                 ;;
         esac
@@ -86,19 +70,19 @@ _set_recording_mode() {
 }
 
 _set_container_type() {
-    local var1 var2 opts chosen
+    local var1 var2 opts _chosen
 
     opts=("mp4" "mkv" "webm")
-    helpers::ui::menu chosen "Container type" "ESC to go back" -- "$chosen"
-    [ -z "$chosen" ] && continue
+    helpers::ui::menu _chosen "Container type" "ESC to go back" -- "${opts[@]}"
+    [ -z "$_chosen" ] && continue
 
     var1="VIBRANIUM_RECORDING_CONTAINER_TYPE"
     var2="VIBRANIUM_RECORDING_VIDEO_CODEC"
 
-    case "$chosen" in
+    case "$_chosen" in
         "mp4" | "mkv")
             helpers::configure::verify_option "$var1"
-            sed -i "/^${var1}/s/=.*/=\"${chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+            sed -i "/^${var1}/s/=.*/=\"${_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
             ;;
         "webm")
             # When the container type is webm, gpu-screen-recorder automatically uses the vp8 codec.
@@ -106,14 +90,9 @@ _set_container_type() {
             helpers::configure::verify_option "$var2"
             if [ ! "$var2" = "vp8" ]; then
                 sed -i "/^${var2}/s/=.*/=\"vp8\"/" "$VIBRANIUM_USER_SETTINGS"
-                msg="You selected the <span foreground='${P_YELLOW}'><b>WEBM</b></span> format. "
-                msg+="\nThe <span foreground='${P_YELLOW}'>VP8</span> codec is used in this format, so it is set by default explicitly.\n\n"
-                msg+="<span foreground='${P_RED}'>Make sure your GPU supports </span>"
-                msg+="<span foreground='${P_YELLOW}'><b>VP8</b></span> <span foreground='${P_RED}'>encoding. If not, recording will fail.\n"
-                msg+="In that case, choose a supported codec or leave the option on auto.</span>"
-                notify-send -r 7 -t 30000 "Vibranium" "$msg"
+                vb-cmd-show-help recording-vp8-warn
             fi
-            sed -i "/^${var1}/s/=.*/=\"${chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
+            sed -i "/^${var1}/s/=.*/=\"${_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
             ;;
     esac
 }
@@ -124,9 +103,10 @@ _advanced_menu() {
     while true; do
         source "$VIBRANIUM_USER_SETTINGS"
 
-        helpers::check VIBRANIUM_RECORDING_CONTAINER_TYPE
-        helpers::check VIBRANIUM_RECORDING_FRAMERATE_MODE
-        helpers::check VIBRANIUM_RECORDING_VIDEO_CODEC
+        helpers::check \
+            VIBRANIUM_RECORDING_CONTAINER_TYPE \
+            VIBRANIUM_RECORDING_FRAMERATE_MODE \
+            VIBRANIUM_RECORDING_VIDEO_CODEC
 
         opts=(
             "Container type : $VIBRANIUM_RECORDING_CONTAINER_TYPE"

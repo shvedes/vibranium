@@ -6,6 +6,8 @@ CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.conf"
 INDEX=0
 
 while true; do
+    hyprctl -q reload config-only
+
     mapfile -t LINES < <(
         hyprctl --batch -j \
         "getoption misc:vrr; \
@@ -32,12 +34,13 @@ while true; do
 
     OPTIONS=(
         "Variable Refresh Rate : $current_vrr"
-        "Variable Frame Rate   : $current_vfr"
-        "Disable Auto Reload   : $current_autoreload"
-        "Middle Click Paste    : $current_middle_click"
-        "Direct Scanout        : $current_direct_scanout"
+        "Variable Frame Rate : $current_vfr"
+        "Disable Auto Reload : $current_autoreload"
+        "Middle Click Paste : $current_middle_click"
+        "Direct Scanout : $current_direct_scanout"
     )
 
+    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
     helpers::ui::menu CHOSEN "Advanced" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [[ -z "$CHOSEN" ]] && break
 
@@ -54,8 +57,6 @@ while true; do
                 "true")vb-cmd-edit-wm-config "misc:disable_autoreload:false" "$CONFIG" ;;
                 "false") vb-cmd-edit-wm-config "misc:disable_autoreload:true" "$CONFIG" ;;
             esac
-
-            hyprctl -q reload config-only
             ;;
         "Middle Click Paste"*)
             case "$current_middle_click" in
@@ -70,61 +71,22 @@ while true; do
             esac
             ;;
         "Direct Scanout"*)
-            while true; do
-                ds_opts=("Direct Scanout : $current_direct_scanout" "What is this?")
-                helpers::ui::menu ds_chosen "Direct Scanout" "ESC to go back" -- "${ds_opts[@]}"
-                [[ -z "$ds_chosen" ]] && break
-
-                case "$ds_chosen" in
-                    "Direct Scanout"*)
-                        case "$current_direct_scanout" in
-                            "true")
-                                vb-cmd-edit-wm-config "render:direct_scanout:false" "$CONFIG"
-                                ;;
-                            "false")
-                                vb-cmd-edit-wm-config "render:direct_scanout:true" "$CONFIG"
-                                ;;
-                        esac
-                        ;;
-                    "What is this?")
-                        msg+="Direct Scanout lets the GPU send frames of a fullscreen app "
-                        msg+="<span foreground='${P_ACCENT}'><b>straight to the monitor</b></span>, "
-                        msg+="bypassing the compositor\n\nThis <span foreground='${P_GREEN}'><b>reduces input latency and improves performance</b></span>, "
-                        msg+="but some effects may not display correctly, so disable if glitches appear"
-                        notify-send -r 3 -t 15000 "Direct Scanout" "$msg"
-                        continue
-                        ;;
-                esac
-                break
-            done
+            case "$current_direct_scanout" in
+                "true") vb-cmd-edit-wm-config "render:direct_scanout:false" "$CONFIG" ;;
+                "false") vb-cmd-edit-wm-config "render:direct_scanout:true" "$CONFIG" ;;
+            esac
             ;;
         "Variable Refresh Rate"*)
             while true; do
-                vrr_opts=("Enable" "Disable" "Fullscreen only" "What is this?")
+                vrr_opts=("Enable" "Disable" "Fullscreen only" "<b>Help</b>")
                 helpers::ui::menu vrr_chosen "VRR" "ESC to go back" -- "${vrr_opts[@]}"
                 [[ -z "$vrr_chosen" ]] && break
 
                 case "$vrr_chosen" in
-                    "Enable")
-                        vb-cmd-edit-wm-config "misc:vrr:1" "$CONFIG"
-                        ;;
-                    "Disable")
-                        vb-cmd-edit-wm-config "misc:vrr:0" "$CONFIG"
-                        ;;
-                    "Fullscreen only")
-                        vb-cmd-edit-wm-config "misc:vrr:2" "$CONFIG"
-                        ;;
-                    "What is this?")
-                        msg="<span foreground='${P_ACCENT}'><b>•</b></span> "
-                        msg+="<b>Adjusts the monitor's refresh rate to match the GPU output</b>\n\n"
-                        msg+="This <span foreground='${P_GREEN}'><b>prevents</b></span> "
-                        msg+="<span foreground='${P_ACCENT}'><b>tearing</b></span> and "
-                        msg+="<span foreground='${P_ACCENT}'><b>stuttering</b></span>, but can sometimes cause \n"
-                        msg+="visible <span foreground='${P_ACCENT}'><b>flickering</b></span> and may "
-                        msg+="<span foreground='${P_YELLOW}'><b>slightly increase eye fatigue</b></span> in some cases"
-                        notify-send -r 3 -t 10000 "VRR (Variable Refresh Rate)" "$msg"
-                        continue
-                        ;;
+                    "Enable") vb-cmd-edit-wm-config "misc:vrr:1" "$CONFIG" ;;
+                    "Disable") vb-cmd-edit-wm-config "misc:vrr:0" "$CONFIG" ;;
+                    "Fullscreen only") vb-cmd-edit-wm-config "misc:vrr:2" "$CONFIG" ;;
+                    *"Help"*) vb-cmd-show-help hyprland-vrr; continue ;;
                 esac
                 break
             done
