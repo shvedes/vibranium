@@ -235,7 +235,7 @@ _pick_cursor_theme() {
         options+=("$pretty")
     done < <(vb-theme-cursor-list)
 
-    if (( ${#lines[@]} <= 1 )); then
+    if (( ${#options[@]} <= 1 )); then
         notify-send -r 3 "Vibranium" \
             "No curosr themes found"
         return
