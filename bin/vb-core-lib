@@ -519,7 +519,7 @@ declare -r _RE_INT='^(-?)0*([0-9]+)(\.[0-9]+)?$'
 helpers::check() {
     # Lazy-load: only run awk on the very first call.
     # ${#OPTION_DEFAULTS[@]} gives the number of keys — 0 means the cache is cold.
-    if [[ ${#OPTION_DEFAULTS[@]} -eq 0 ]]; then
+    if (( ${#OPTION_DEFAULTS[@]} == 0 )); then
         local awk_script="$VIBRANIUM/awk/vb-parse-defaults.awk"
 
         eval "$(awk -f "$awk_script" "$VIBRANIUM_PATH/vb-core-defaults")"
@@ -537,6 +537,10 @@ helpers::check() {
 
     # Iterate $@ directly — no need to copy into a local array first.
     for var_name in "$@"; do
+        # Cpecial var; it has no predetermined values. Just skip.
+        if [[ "$var_name" == "VIBRANIUM_BAR_WEATHER_MODULE_CITY" ]]; then
+            continue
+        fi
 
         # declare -n creates a transparent nameref alias to the caller's variable.
         # All subsequent reads (val=$ref) and writes (ref=...) go directly through it,
@@ -835,19 +839,32 @@ term::show_header() {
 }
 
 term::is_headless() {
-    [[ -t 1 ]] || return 0 && return 1
+    if [[ -t 1 ]]; then
+        return 1
+    else
+        return 0
+    fi
 }
 
 log::error() {
-    [[ -t 2 ]] && printf "[ERROR] %s\n" "$*" >&2
+    if [[ -t 2 ]]; then
+        printf "%s[ERROR]%s %s\n" \
+            "$RED" "$RESET" "$*" >&2
+    fi
 }
 
 log::warn() {
-    [[ -t 1 ]] && printf "[WARN] %s\n" "$*"
+    if [[ -t 1 ]]; then
+        printf "%s[WARN]%s %s\n" \
+            "$YELLOW" "$RESET" "$*"
+    fi
 }
 
 log::info() {
-    [[ -t 1 ]] && printf "[INFO] %s\n" "$*"
+    if [[ -t 1 ]]; then
+        printf "%s[INFO]%s %s\n" \
+            "$BLUE" "$RESET" "$*"
+    fi
 }
 
 # Self-explanatory

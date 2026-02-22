@@ -14,7 +14,7 @@ window {
 }
 
 element {
-    padding: 10px;
+    padding: 8px;
     spacing: 0px 8px;
     cursor:  pointer;
 }
