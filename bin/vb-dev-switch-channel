@@ -25,7 +25,7 @@ fi
 if [[ "$CURRENT" == "master" ]]; then
     LATEST="$($GIT tag --sort=-creatordate | head -n 1)"
 
-    if $GIT switch "$LATEST"; then
+    if $GIT switch --detach "$LATEST"; then
         echo "release" > "$VIBRANIUM_STATE/update.channel"
         echo "Switched to $LATEST."
 
