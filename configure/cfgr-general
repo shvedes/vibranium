@@ -26,9 +26,12 @@ INDEX=0
 while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
+    UPDATE_CHANNEL="$(< "$VIBRANIUM_STATE/update.channel")"
+    UPDATE_CHANNEL="${UPDATE_CHANNEL:-release}"
+
     OPTIONS=(
         "Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
-        "Update channel : $(< "$VIBRANIUM_STATE/update.channel")"
+        "Update channel : ${UPDATE_CHANNEL^}"
         "OSD enabled : $VIBRANIUM_GLOBAL_USE_OSD"
         "<b>App launcher</b>"
         "<b>Player options</b>"

@@ -6,10 +6,6 @@ source vb-core-lib
 
 STATE_DIR="$VIBRANIUM_STATE/migrations"
 
-YELLOW=$'\e[0;33m'
-GREEN=$'\e[0;32m'
-RESET=$'\e[0m'
-
 mkdir -p "$STATE_DIR/skipped"
 
 for file in "$VIBRANIUM"/migrations/*.sh; do

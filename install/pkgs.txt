@@ -67,6 +67,7 @@ ncdu
 rofi
 wget
 gvfs
+foot
 grim
 btop
 wev

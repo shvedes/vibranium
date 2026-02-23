@@ -13,6 +13,6 @@ vb-cmd-refresh-dunst
 
 hyprctl -q reload config-only &
 
-if [[ "$1" != "-q|--qiuet" ]]; then
+if [[ ! "$1" =~ ^(-q|--quiet)$ ]]; then
     notify-send -r 2 -t 1500 "Vibranium" "Configuration reloaded"
 fi

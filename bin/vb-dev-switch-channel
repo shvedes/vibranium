@@ -33,7 +33,7 @@ if [[ "$CURRENT" == "master" ]]; then
             notify-send -r 1 "Vibranium" "Switched to $LATEST"
         fi
 
-        vb-cmd-reload
+        vb-cmd-reload --quiet
     else
         echo "Error: failed to switch to '$LATEST'." >&2
 
@@ -54,7 +54,8 @@ else
                 "Vibranium" "Switched to upstream"
         fi
 
-        vb-cmd-reload
+        vb-cmd-reload --quiet
+        systemctl -q --user start vibranium-update.service &
     else
         echo "Error: failed to switch to 'master'." >&2
 

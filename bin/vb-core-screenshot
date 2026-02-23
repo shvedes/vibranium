@@ -46,8 +46,8 @@ notify() {
 }
 
 set_output_dir() {
-    mkdir -p "${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"
-    printf "%s" "${XDG_PICTURES_DIR:-$HOME/Pictures}/Screenshots"
+    mkdir -p "${XDG_PICTURES_DIR:-$HOME}/Screenshots"
+    printf "%s" "${XDG_PICTURES_DIR:-$HOME}/Screenshots"
 }
 
 set_output_file() {
@@ -120,10 +120,11 @@ capture() {
 }
 
 init() {
-    helpers::check VIBRANIUM_SCREENSHOT_FILE_TYPE
-    helpers::check VIBRANIUM_SCREENSHOT_FLASH_SCREEN
-    helpers::check VIBRANIUM_SCREENSHOT_FLASH_BORDER
-    helpers::check VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE
+    helpers::check \
+        VIBRANIUM_SCREENSHOT_FILE_TYPE \
+        VIBRANIUM_SCREENSHOT_FLASH_SCREEN \
+        VIBRANIUM_SCREENSHOT_FLASH_BORDER \
+        VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE
 
     FILETYPE="$VIBRANIUM_SCREENSHOT_FILE_TYPE"
     ANNOTATE=$VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE
