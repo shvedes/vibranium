@@ -40,3 +40,9 @@ for unit in "${override_services[@]}"; do
 StartLimitIntervalSec=1
 EOF
 done
+
+masked_u_services=("at-spi-dbus-bus")
+
+for unit in "${masked_u_services[@]}"; do
+    systemctl --user mask "$unit"
+done
