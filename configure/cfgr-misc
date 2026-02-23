@@ -370,7 +370,9 @@ while true; do
     CURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size")"
     CURSOR_SIZE="${CURSOR_SIZE:-unknown}"
 
-    helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
+    helpers::check \
+        VIBRANIUM_GLOBAL_SHOW_WALLPAPER \
+        VIBRANIUM_GLOBAL_TERMINAL
 
     OPTIONS=(
         "Menus theme : $(_get_rofi_theme)"
@@ -378,6 +380,7 @@ while true; do
         "Cursor size : $CURSOR_SIZE"
         "Show wallpaper : $VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
         "Default browser : $(_get_default_browser)"
+        "Default terminal : ${VIBRANIUM_GLOBAL_TERMINAL^}"
         "Terminal opacity : $(_get_term_opacity)"
         "Notification timeout : $(_get_notification_timeout)s"
         "<b>Manage user wallpapers</b>"
@@ -397,6 +400,20 @@ while true; do
     done
 
     case "$CHOSEN" in
+        "Default terminal"*)
+            helpers::configure::set_string \
+                "VIBRANIUM_GLOBAL_TERMINAL" "Default Terminal" \
+                "Alacritty:alacritty" "Foot:foot"
+
+            (
+                out="$(vb-cmd-get-option VIBRANIUM_GLOBAL_TERMINAL)"
+                if [[ "$out" == foot ]]; then
+                    systemctl -q --user disable alacritty.service
+                else
+                    systemctl -q --user disable foot-server.socket
+                fi
+            ) &
+            ;;
         "Default browser"*)
             _pick_browser
             ;;

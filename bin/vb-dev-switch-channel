@@ -32,6 +32,8 @@ if [[ "$CURRENT" == "master" ]]; then
         if [[ ! -t 1 ]]; then
             notify-send -r 1 "Vibranium" "Switched to $LATEST"
         fi
+
+        vb-cmd-reload
     else
         echo "Error: failed to switch to '$LATEST'." >&2
 
@@ -51,6 +53,8 @@ else
             notify-send -r 1 \
                 "Vibranium" "Switched to upstream"
         fi
+
+        vb-cmd-reload
     else
         echo "Error: failed to switch to 'master'." >&2
 

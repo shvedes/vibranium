@@ -1,19 +1,31 @@
 #!/usr/bin/env bash
 
+source vb-core-lib
+
+helpers::check VIBRANIUM_GLOBAL_TERMINAL
+
+# Supported terminal backends.
+# Order matters for auto-detection.
+readonly ALLOWED_TERMINALS=(alacritty foot)
+
 usage() {
     cat << EOF
 Usage: ${0##*/} [OPTIONS] [--] [COMMAND [ARGS...]]
 
-Open the default terminal (Alacritty). If COMMAND is provided,
-it will be executed inside the terminal.
+Open the default terminal. If COMMAND is provided, it will be
+executed inside the terminal.
+
+Supported terminals: ${ALLOWED_TERMINALS[*]}
+Terminal precedence: --terminal flag > VIBRANIUM_GLOBAL_TERMINAL env var > auto-detect
 
 Options:
-  -h, --help        Show this help and exit
-  --floating        Open terminal as a floating window
-  --directory DIR   Set the working directory for the new terminal window
-  --hold            Keep the window open after the command exits
-  --title TITLE     Set the window title (default is COMMAND basename)
-  --                End of options; next token is COMMAND even if it starts with -
+  -h, --help              Show this help and exit
+  --terminal TERM         Terminal to use (${ALLOWED_TERMINALS[*]})
+  --floating              Open terminal as a floating window
+  --directory DIR         Set the working directory for the new terminal window
+  --hold                  Keep the window open after the command exits
+  --title TITLE           Set the window title (default is COMMAND basename)
+  --                      End of options; next token is COMMAND even if it starts with -
 EOF
 }
 
@@ -21,12 +33,21 @@ FLOATING=false
 WORKDIR=""
 HOLD=false
 TITLE=""
+TERMINAL_FLAG=""
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -h|--help)
             usage
             exit 0
+            ;;
+        --terminal)
+            if [[ -z "${2-}" ]]; then
+                echo "--terminal requires an argument" >&2
+                exit 1
+            fi
+            TERMINAL_FLAG="$2"
+            shift 2
             ;;
         --floating)
             FLOATING=true
@@ -52,7 +73,8 @@ while [[ $# -gt 0 ]]; do
             TITLE="$2"
             shift 2
             ;;
-        --) # End of options marker
+        # Everything after -- is treated as the command, even if it looks like a flag
+        --)
             shift
             break
             ;;
@@ -64,7 +86,58 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Validate working directory if provided
+# Check whether a given terminal name is in the allowed list
+is_allowed_terminal() {
+    local t="$1"
+    local allowed
+    for allowed in "${ALLOWED_TERMINALS[@]}"; do
+        if [[ "$t" == "$allowed" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+# Walk the allowed list and return the first terminal found in PATH
+detect_terminal() {
+    local t
+    for t in "${ALLOWED_TERMINALS[@]}"; do
+        if command -v "$t" > /dev/null 2>&1; then
+            echo "$t"
+            return
+        fi
+    done
+    echo ""
+}
+
+# Resolve which terminal to use.
+# --terminal flag takes priority, then the VIBRANIUM_GLOBAL_TERMINAL env var, then auto-detect.
+# Both explicit sources are validated so bad values fail loudly instead of silently falling through.
+if [[ -n "$TERMINAL_FLAG" ]]; then
+    if ! is_allowed_terminal "$TERMINAL_FLAG"; then
+        echo "Unsupported terminal: '$TERMINAL_FLAG'" >&2
+        echo "Allowed terminals: ${ALLOWED_TERMINALS[*]}" >&2
+        exit 1
+    fi
+    TERMINAL="$TERMINAL_FLAG"
+elif [[ -n "${VIBRANIUM_GLOBAL_TERMINAL-}" ]]; then
+    if ! is_allowed_terminal "$VIBRANIUM_GLOBAL_TERMINAL"; then
+        echo "Unsupported terminal in VIBRANIUM_GLOBAL_TERMINAL: '$VIBRANIUM_GLOBAL_TERMINAL'" >&2
+        echo "Allowed terminals: ${ALLOWED_TERMINALS[*]}" >&2
+        exit 1
+    fi
+    TERMINAL="$VIBRANIUM_GLOBAL_TERMINAL"
+else
+    TERMINAL="$(detect_terminal)"
+fi
+
+if [[ -z "$TERMINAL" ]]; then
+    echo "No supported terminal emulator found (${ALLOWED_TERMINALS[*]})" >&2
+    exit 1
+fi
+
+# Reject a non-existent working directory early so the user gets a visible
+# notification rather than a silent failure inside the terminal process
 if [[ -n "$WORKDIR" ]]; then
     if [[ ! -d "$WORKDIR" ]]; then
         notify-send \
@@ -77,68 +150,116 @@ if [[ -n "$WORKDIR" ]]; then
     fi
 fi
 
-# Defaults
-args=()
+# Default window title and app class used across all backends
 title="Vibranium Terminal"
 class="org.vb.term"
+cmd_args=()
 
-# Build --working-directory flag if needed
-dir_args=()
-if [[ -n "$WORKDIR" ]]; then
-    dir_args=(--working-directory "$WORKDIR")
-fi
-
-# Build --hold flag if needed
-hold_args=()
-if [[ "$HOLD" == "true" ]]; then
-    hold_args=(--hold)
-fi
-
-# validate and prepare alacritty arguments
+# If a command was given, verify it exists and collect it together with its
+# arguments. The command basename becomes the window title unless --title overrides it.
 if [[ $# -ge 1 ]]; then
     cmd="$1"
 
-    # Ensure the command exists in PATH
     if ! command -v "$cmd" > /dev/null; then
         echo "$cmd: command not found" >&2
         exit 1
     fi
 
     shift
-    title="${cmd##*/}"    # use command name as title
-    args=(-e "$cmd" "$@") # arguments to pass to alacritty
+    title="${cmd##*/}"
+    cmd_args=("$cmd" "$@")
 fi
 
-# Override title if --title was provided
+# --title always wins over the auto-derived command name
 if [[ -n "$TITLE" ]]; then
     title="$TITLE"
 fi
 
-# Ensure alacritty user service is running if present
-if ! systemctl -q --user is-active alacritty; then
-    systemctl -q --user enable --now alacritty
-fi
+# Populate the global term_args array for alacritty.
+# Alacritty runs as a persistent user service and accepts new windows
+# through IPC via "alacritty msg create-window", so we start the service
+# if it isn't already active. The command is passed with -e.
+build_alacritty_args() {
+    local wclass="$1"
 
-# Floating branch: run via hyprctl with float rules
+    if ! systemctl -q --user is-active alacritty 2>/dev/null; then
+        systemctl -q --user enable --now alacritty 2>/dev/null || true
+    fi
+
+    term_args=(
+        alacritty msg create-window
+        --class "$wclass"
+        --title "$title"
+    )
+
+    if [[ "$HOLD" == "true" ]]; then
+        term_args+=(--hold)
+    fi
+
+    if [[ -n "$WORKDIR" ]]; then
+        term_args+=(--working-directory "$WORKDIR")
+    fi
+
+    if [[ ${#cmd_args[@]} -gt 0 ]]; then
+        term_args+=(-e "${cmd_args[@]}")
+    fi
+}
+
+# Populate the global term_args array for foot.
+# Foot also runs as a persistent user service; clients connect to it via
+# footclient. The command is passed as plain trailing arguments with no -e flag.
+build_foot_args() {
+    local wclass="$1"
+
+    if ! systemctl -q --user is-active foot-server.socket 2>/dev/null; then
+        systemctl -q --user enable --now foot-server.socket 2>/dev/null || true
+    fi
+
+    term_args=(footclient
+        --app-id "$wclass"
+        --title "$title"
+    )
+
+    if [[ "$HOLD" == "true" ]]; then
+        term_args+=(--hold)
+    fi
+
+    if [[ -n "$WORKDIR" ]]; then
+        term_args+=(--working-directory "$WORKDIR")
+    fi
+
+    if [[ ${#cmd_args[@]} -gt 0 ]]; then
+        term_args+=("${cmd_args[@]}")
+    fi
+}
+
+# Floating windows get a distinct app class so Hyprland window rules can
+# target them separately. The built command is shell-quoted into a single
+# string and handed to hyprctl, which spawns it with the float rule applied.
 if [[ "$FLOATING" == "true" ]]; then
-    class="${class}.float"   # separate window class for floating terminal
+    float_class="${class}.float"
+    term_args=()
 
-    # Build the alacritty command as an array to preserve arguments
-    exec_cmd=(alacritty msg create-window --class "$class" --title "$title" "${hold_args[@]}" "${dir_args[@]}" "${args[@]}")
+    case "$TERMINAL" in
+        alacritty) build_alacritty_args "$float_class" ;;
+        foot)      build_foot_args      "$float_class" ;;
+    esac
 
-    # Safely quote each element to a single shell string
-    # remove trailing space afterwards
-    cmdline="$(printf '%q ' "${exec_cmd[@]}")"
+    cmdline="$(printf '%q ' "${term_args[@]}")"
     cmdline="${cmdline% }"
 
-    # Hyprland exec rule and size. The entire string after the rule
-    # is passed to hyprctl as the command to execute
     rule="[float; size monitor_w*0.7 monitor_h*0.7; move center]"
-
-    # Execute via hyprctl. Quote the combined argument so it's passed as a single command.
     hyprctl -q dispatch exec "$rule $cmdline"
     exit 0
 fi
 
-# Non-floating branch: create an alacritty window via its IPC
-alacritty msg create-window --class "$class" --title "$title" "${hold_args[@]}" "${dir_args[@]}" "${args[@]}"
+# Non-floating: build and exec the terminal command directly
+term_args=()
+
+case "$TERMINAL" in
+    alacritty) build_alacritty_args "$class" ;;
+    foot)      build_foot_args      "$class" ;;
+esac
+
+exec "${term_args[@]}"
+

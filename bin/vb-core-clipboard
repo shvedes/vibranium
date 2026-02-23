@@ -18,12 +18,16 @@ _show() {
     helpers::ui::menu chosen "Clipboard" "search..." -display-columns 2 -- "${ENTRIES[@]}"
 
     if [[ ! -z "$chosen" ]]; then
-        printf "%s" "$chosen" | cliphist decode | wl-copy -t text/uri-list
+        if [[ "$chosen" =~ ^file:// ]]; then
+            printf "%s" "$chosen" | cliphist decode | wl-copy -t text/uri-list
+        else
+            printf "%s" "$chosen" | cliphist decode | wl-copy
+        fi
     fi
 }
 
 _clear() {
-    # if open it's
+    # if it's open
     # at the moment
     # of invocation
     killall -q rofi
