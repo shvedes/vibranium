@@ -324,6 +324,11 @@ _choose_packages() {
     PACKAGES=("${chosen[@]}")
 }
 
+_remove_orphans() {
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Removing orphan packages..."
+    yay -Ycc --noconfirm &> /dev/null
+}
+
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 export SUDO_PROMPT
 
@@ -451,6 +456,7 @@ if term::ask_yes_no Y "Proceed with uninstallation?"; then
             _disable_systemd_units
         fi
 
+        _remove_orphans
         _uninstallation_complete
     else
         _operation_canceled
