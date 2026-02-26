@@ -8,3 +8,4 @@ TryExec=chromium
 Exec=chromium --app='https://proton.me/mail'
 Terminal=false
 Categories=WebApp;
+OnlyShowIn=Hyprland;

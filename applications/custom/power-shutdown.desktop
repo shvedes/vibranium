@@ -7,3 +7,4 @@ Keywords=Poweroff;Shut;Stop;
 Exec=systemctl poweroff
 Terminal=false
 Categories=Power;
+OnlyShowIn=Hyprland;

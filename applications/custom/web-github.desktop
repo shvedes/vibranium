@@ -7,3 +7,4 @@ Terminal=false
 Type=Application
 Icon=github
 Categories=WebApp;
+OnlyShowIn=Hyprland;

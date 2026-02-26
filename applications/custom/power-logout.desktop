@@ -7,3 +7,4 @@ Keywords=Session;Logout;Screensaver
 Exec=vb-core-stop-session
 Terminal=false
 Categories=Power;
+OnlyShowIn=Hyprland;

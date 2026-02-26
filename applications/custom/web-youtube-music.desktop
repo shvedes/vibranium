@@ -8,3 +8,4 @@ TryExec=chromium
 Exec=chromium --app='https://music.youtube.com'
 Terminal=false
 Categories=WebApp;
+OnlyShowIn=Hyprland;

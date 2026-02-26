@@ -8,3 +8,4 @@ TryExec=chromium
 Exec=chromium --app='https://claude.ai/chats'
 Terminal=false
 Categories=AI;
+OnlyShowIn=Hyprland;

@@ -5,3 +5,4 @@ Icon=syncthing
 TryExec=syncthing
 Exec=vb-app-syncthing
 Comment=Open Source Continuous File Synchronization
+OnlyShowIn=Hyprland;

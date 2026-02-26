@@ -8,3 +8,4 @@ TryExec=chromium
 Exec=chromium --app='https://www.perplexity.ai'
 Terminal=false
 Categories=AI;
+OnlyShowIn=Hyprland;

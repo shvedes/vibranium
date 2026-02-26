@@ -8,3 +8,4 @@ TryExec=chromium
 Exec=chromium --app='https://gemini.google.com'
 Terminal=false
 Categories=AI;
+OnlyShowIn=Hyprland;

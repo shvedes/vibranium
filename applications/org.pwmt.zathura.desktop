@@ -7,3 +7,4 @@ TryExec=zathura
 Exec=zathura %U
 Keywords=Zathura;PDF;EPub;Book;
 MimeType=application/pdf;application/epub+zip;
+OnlyShowIn=Hyprland;

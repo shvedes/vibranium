@@ -5,3 +5,4 @@ TryExec=mpd
 Exec=vb-cmd-launch-mpd
 Icon=mpd
 Keywords=ncmpcpp;music;player;rmpc;mpc;Music Player Daemon
+OnlyShowIn=Hyprland;

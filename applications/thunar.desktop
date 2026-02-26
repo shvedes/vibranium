@@ -6,3 +6,4 @@ TryExec=thunar
 Exec=thunar %U
 MimeType=inode/directory;
 Keywords=Explorer;Thunar;xfce
+OnlyShowIn=Hyprland;

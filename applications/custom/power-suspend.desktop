@@ -7,3 +7,4 @@ Keywords=Sleep;Standby
 Exec=vb-cmd-suspend
 Terminal=false
 Categories=Power;
+OnlyShowIn=Hyprland;

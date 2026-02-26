@@ -5,3 +5,4 @@ TryExec=wiremix
 Exec=vb-core-term -- wiremix
 Icon=org.pulseaudio.pavucontrol
 Keywords=audio;sound;headset;speakers;bluetooth;pipewire;pulseaudio;mixer;wiremix;pavucontrol;
+OnlyShowIn=Hyprland;

@@ -5,3 +5,4 @@ TryExec=engrampa
 Exec=engrampa %U
 Type=Application
 Icon=engrampa
+OnlyShowIn=Hyprland;
