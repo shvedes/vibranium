@@ -8,11 +8,11 @@ ring="/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 pw_play_pid=""
 
 cleanup() {
-    kill $(pgrep -f -- '--who=Timer')
-    kill -s KILL "$pw_play_pid" & >/dev/null
-
     rm -f "$state"
     vb-cmd-refresh-bar-module timer
+
+    kill $(pgrep -f -- '--who=Timer')
+    kill -s KILL "$pw_play_pid" & >/dev/null
     exit 0
 }
 
@@ -58,7 +58,8 @@ while (( time_remaining > 0 )); do
     echo "$time_remaining" > "$state"
     vb-cmd-refresh-bar-module timer
     ((time_remaining--))
-    sleep 1
+    sleep 1 &
+    wait $!
 done
 
 echo "timed out" > "$state"
