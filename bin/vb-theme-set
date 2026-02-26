@@ -125,10 +125,20 @@ pick_family() {
     done
 
     local family_chosen
-    helpers::ui::menu family_chosen "Set theme" "" -- "${keys[@]}"
 
-    [[ -z "$family_chosen" ]] && exit 0
-    echo "$family_chosen"
+    while true; do
+        helpers::ui::menu family_chosen "Set theme" "" -- "${keys[@]}"
+
+        [[ -z "$family_chosen" ]] && exit 0
+
+        local k
+        for k in "${keys[@]}"; do
+            [[ "$k" == "$family_chosen" ]] && {
+                echo "$family_chosen"
+                return 0
+            }
+        done
+    done
 }
 
 pick_variant() {
@@ -146,20 +156,25 @@ pick_variant() {
         done
     done
 
-    local display
     local items=()
-
+    local v
     for v in "${variants[@]}"; do
         items+=("${v//-/ }")
     done
 
-    helpers::ui::menu display "$family" "flavor" -- "${items[@]}"
+    local display
+    while true; do
+        helpers::ui::menu display "$family" "flavor" -- "${items[@]}"
 
-    if [[ -z "$display" ]]; then
-        return 1
-    else
-        echo "$display"
-    fi
+        [[ -z "$display" ]] && return 1
+
+        for v in "${items[@]}"; do
+            [[ "$v" == "$display" ]] && {
+                echo "$display"
+                return 0
+            }
+        done
+    done
 }
 
 # Thank you to the Omarchy team for this wonderful fork
