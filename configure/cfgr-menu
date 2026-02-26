@@ -21,7 +21,7 @@ while true; do
         "Miscellaneous"
     )
 
-    helpers::ui::menu CHOSEN "Vibranium" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+    helpers::ui::menu CHOSEN "Settings" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
     [ -z "$CHOSEN" ] && break
 
     for i in "${!OPTIONS[@]}"; do
