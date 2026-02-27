@@ -6,18 +6,18 @@
 }
 
 element normal.normal {
-    background-color: var(background);
-    text-color:       var(foreground-muted);
+    background-color: @background;
+    text-color:       @foreground-muted;
 }
 
 element selected.normal {
-    background-color: var(background);
-    text-color:       var(highlight);
+    background-color: @background;
+    text-color:       @highlight;
 }
 
 element alternate.normal {
-    background-color: var(background);
-    text-color:       var(foreground-muted);
+    background-color: @background;
+    text-color:       @foreground-muted;
 }
 
 element-text {
@@ -30,32 +30,32 @@ element-text {
 window {
 	width:            300px;
     padding:          12;
-    background-color: var(background);
+    background-color: @background;
     border:           2px;
-	border-color:     var(border);
+	border-color:     @border;
 }
 
 mainbox {
     padding: 8px;
 	border:  2px;
-	border-color: var(border);
+	border-color: @border;
 }
 
 message {
     border: 0.15em dash;
     margin: 2px 2px 0px 2px;
     padding: 8px 8px 8px 8px;
-    border-color: var(border);
+    border-color: @border;
 }
 
 textbox {
-    text-color: var(foreground);
+    text-color: @foreground;
 }
 
 listview {
     padding:      12px 4px 0px ;
     scrollbar:    true;
-    border-color: var(border);
+    border-color: @border;
     spacing:      2px ;
     fixed-height: 0;
     border:       2px dash 0px 0px ;
@@ -64,28 +64,28 @@ listview {
 scrollbar {
     width:        2px ;
     handle-width: 2px ;
-    handle-color: var(border);
+    handle-color: @border;
 }
 
 num-filtered-rows {
     expand:     false;
-    text-color: var(highlight);
+    text-color: @highlight;
 }
 
 num-rows {
     expand:     false;
-    text-color: var(foreground-muted);
+    text-color: @foreground-muted;
 }
 
 textbox-num-sep {
     expand:     false;
     str:        "/";
-    text-color: var(foreground-muted);
+    text-color: @foreground-muted;
 }
 
 inputbar {
     padding:    6px 6px 6px 6px;
-    text-color: var(foreground);
+    text-color: @foreground;
     children:   [ "prompt","textbox-prompt-colon","entry","overlay","num-filtered-rows","textbox-num-sep","num-rows"];
 }
 
@@ -94,8 +94,8 @@ prompt {
 }
 
 entry {
-    text-color:        var(foreground);
-    placeholder-color: var(foreground-muted);
+    text-color:        @foreground;
+    placeholder-color: @foreground-muted;
     placeholder:       "";
 }
 
@@ -108,5 +108,5 @@ textbox-prompt-colon {
     margin:     0px 2px 0px 0px;
     expand:     false;
     str:        ":";
-    text-color: var(foreground-muted);
+    text-color: @foreground-muted;
 }

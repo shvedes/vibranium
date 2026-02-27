@@ -195,19 +195,14 @@ _edit_roundness() {
 }
 
 _set_animations_preset() {
-    local folder target current anim_opts anim_chosen
+    local folder target anim_opts anim_chosen
 
     folder="$VIBRANIUM/default/hypr/animations"
     target="$HOME/.config/hypr/hyprland.conf.d/animations.conf"
 
-    mapfile -t anim_opts < <(basename -a "$folder"/*.conf | sed 's/\.conf$//')
-
-    if [[ -L "$target" ]]; then
-        current="$(basename "$(readlink "$target")")"
-        current="${current%.conf}"
-    else
-        current=""
-    fi
+    anim_opts=("$folder"/*.conf)
+    anim_opts=("${anim_opts[@]##*/}")   # strip leading path
+    anim_opts=("${anim_opts[@]%.conf}") # strip extension
 
     while true; do
         helpers::ui::menu anim_chosen "Animations" "ESC to go back" -- "${anim_opts[@]}"
@@ -218,7 +213,6 @@ _set_animations_preset() {
         if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
             hyprctl -q reload config-only
         fi
-
         break
     done
 }
@@ -489,21 +483,25 @@ _animations_submenu() {
     local opts chosen
     local enabled anim_file anim_preset
 
-    anim_file="${XDG_CONFIG_HOME:-HOME/.config}/hypr/hyprland.conf.d/animations.conf"
+    anim_file="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/animations.conf"
 
     while true; do
         enabled="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
-        anim_preset="$(basename $(readlink "$anim_file"))"
+
+        anim_preset="$(readlink "$anim_file")"
+        anim_preset="${anim_preset##*/}"    # strip path
+        anim_preset="${anim_preset%.conf}"  # strip extension
 
         [[ "$enabled" == "1" ]] && enabled="true" || enabled="false"
 
         opts=("Enabled : $enabled")
 
         if [[ "$enabled" == true ]]; then
-            opts+=("Preset : ${anim_preset%.conf}")
+            opts+=("Preset : $anim_preset")
         fi
 
         mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
+
         helpers::ui::menu chosen "Animations" "ESC to go back" -- "${opts[@]}"
         [[ -z $chosen ]] && break
 

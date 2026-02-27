@@ -2,55 +2,113 @@
 
 source vb-core-lib
 
+usage() {
+    cat <<EOF
+Usage: vb-font-set [OPTION] [FONT]
+
+Set the system-wide default font across GTK, Alacritty, Waybar, Rofi, Dunst,
+and Qt applications.
+
+When FONT is supplied and found in the available font list, it is applied
+directly without opening the interactive picker.
+
+Options:
+  -h, --help     Show this help message and exit
+
+Examples:
+  vb-font-set                    Open interactive font picker
+  vb-font-set "Noto Sans"        Apply "Noto Sans" directly
+EOF
+}
+
+case "$1" in
+    -h | --help)
+        usage
+        exit 0
+        ;;
+    -*)
+        log::error "Unknown option: $1"
+        usage >&2
+        exit 1
+        ;;
+esac
+
 mapfile -t fonts < <(
-  fc-list :spacing=100 family |
-  gawk '{
-    split($0,a,",")
-    f=a[1]
-    if (f !~ /emoji|signwriting|symbols/i)
-      seen[f]
-  }
-  END {
-    n = asorti(seen, sorted)
-    for (i = 1; i <= n; i++)
-      print sorted[i]
-  }'
+    fc-list :spacing=100 family |
+    gawk '{
+        split($0, a, ",")
+        f = a[1]
+        if (f !~ /emoji|signwriting|symbols/i)
+            seen[f]
+    }
+    END {
+        n = asorti(seen, sorted)
+        for (i = 1; i <= n; i++)
+            print sorted[i]
+    }'
 )
 
-helpers::ui::menu selected_font "Search fonts" "ESC to go back" -- "${fonts[@]}"
+from_arg=0
+
+if [[ -n "$1" ]]; then
+    if [[ " ${fonts[*]} " =~ " $1 " ]]; then
+        selected_font="$1"
+        from_arg=1
+    else
+        log::warn "Font '$1' not found in available fonts — falling back to picker"
+        helpers::ui::menu selected_font "Search fonts" "ESC to go back" -- "${fonts[@]}"
+    fi
+else
+    helpers::ui::menu selected_font "Search fonts" "ESC to go back" -- "${fonts[@]}"
+fi
 
 if [[ -z "$selected_font" ]]; then
-    log::error "Selection cancelled"
+    log::error "No font selected — operation cancelled"
     exit 1
 fi
 
+# Emit a desktop notification only when running headlessly (i.e. not from a
+# terminal) and the font was not supplied as a CLI argument.
+notify() {
+    local message="$1"
+    if (( from_arg == 0 )) && term::is_headless; then
+        notify-send -r 1 -t 2000 "Vibranium" "$message"
+    fi
+}
+
 if [[ "$selected_font" == "$(vb-font-get)" ]]; then
-    notify-send -r 1 -t 2000 "Vibranium" \
-        "<span foreground='${P_ACCENT}'><b>$selected_font</b></span> is already the default font!"
+    log::warn "'$selected_font' is already the default font"
+    notify "<span foreground='${P_ACCENT}'><b>${selected_font}</b></span> is already the default font!"
     exit 1
 fi
 
 # GTK
-sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected_font}/" "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
-sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected_font}/" "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
+sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected_font}/" \
+    "$XDG_CONFIG_HOME/gtk-3.0/settings.ini" \
+    "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
 gsettings set org.gnome.desktop.interface font-name "${selected_font}"
 
 # Alacritty
-sed -i -E "s/(family\s*=\s*\").*(\")/\1${selected_font}\2/" "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+sed -i -E "s/(family\s*=\s*\").*(\")/\1${selected_font}\2/" \
+    "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
 
 # Waybar
 sed -i -E "/window#waybar\s*\{/,/\}/ {
-	s/^\s*font-family:\s*'Symbols Nerd Font Mono',\s*'.*';/    font-family: 'Symbols Nerd Font Mono', '${selected_font}';/
+    s/^(\s*font-family:\s*)'Symbols Nerd Font Mono',\s*'.*';/\1'Symbols Nerd Font Mono', '${selected_font}';/
 }" "$XDG_CONFIG_HOME/waybar/style.css"
 
-# qtct
-sed -i -E "/^(fixed|general)=/ s@^([^,\"]*=\")[^,\"]*@\1${selected_font}@" "$XDG_CONFIG_HOME"/qt{5,6}ct/qt*ct.conf
+# Qt
+sed -i -E "/^(fixed|general)=/ s@^([^,\"]*=\")[^\",]*@\1${selected_font}@" \
+    "$XDG_CONFIG_HOME"/qt{5,6}ct/qt*ct.conf
 
 # Dunst
-sed -i -E "/^font[[:space:]]*=/ s/(=\s*\")[^\"]* ([0-9]+\")/\1${selected_font} \2/" "$XDG_CONFIG_HOME/dunst/dunstrc"
+sed -i -E "/^font[[:space:]]*=/ s/(=\s*\")[^\"]* ([0-9]+\")/\1${selected_font} \2/" \
+    "$XDG_CONFIG_HOME/dunst/dunstrc"
 
 # Rofi
-sed -i -E "s/(font:\s*\")[^\"]* ([0-9]+)\"/\1${selected_font} \2\"/" "$XDG_CONFIG_HOME/rofi/config.rasi"
+sed -i -E "s/(font:\s*\")[^\"]* ([0-9]+)\"/\1${selected_font} \2\"/" \
+    "$XDG_CONFIG_HOME/rofi/config.rasi"
+
 
 vb-cmd-refresh-dunst
 
@@ -59,8 +117,8 @@ if ! systemctl -q --user is-active waybar; then
 fi
 
 helpers::check VIBRANIUM_GLOBAL_USE_OSD
-if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
+if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
     systemctl --user restart swayosd &
 fi
 
-notify-send -r 1 -t 2000 "Vibranium" "Default font set to <span foreground='${P_ACCENT}'><b>${selected_font}</b></span>"
+notify "Default font set to <span foreground='${P_ACCENT}'><b>${selected_font}</b></span>"

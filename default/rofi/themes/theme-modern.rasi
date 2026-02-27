@@ -9,8 +9,8 @@ window {
     width:            350px;
     padding:          20;
     border:           2;
-    border-color:     var(border);
-    background-color: var(background);
+    border-color:     @border;
+    background-color: @background;
 }
 
 element {
@@ -20,22 +20,22 @@ element {
 }
 
 element normal.normal {
-    background-color: var(background);
-    text-color:       var(foreground-muted);
+    background-color: transparent;
+    text-color:       @foreground-muted;
 }
 
 element normal.active {
-    background-color: var(border);
+    background-color: @border;
 }
 
 element selected.normal {
-    background-color: var(selected);
-    text-color:       var(foreground);
+    background-color: @selected;
+    text-color:       @foreground;
 }
 
 element alternate.normal {
-    background-color: var(background);
-    text-color:       var(foreground-muted);
+    background-color: transparent;
+    text-color:       @foreground-muted;
 }
 
 element-text {
@@ -51,7 +51,7 @@ element-icon {
 listview {
     padding:      16px 0 0 0;
     border:       2px solid 0px 0px;
-    border-color: var(highlight);
+    border-color: @highlight;
     margin:       12px 0 0 0;
 	lines:        9;
 }
@@ -59,19 +59,19 @@ listview {
 scrollbar {
     padding:      1px 0px 0px 4px;
     handle-width: 2px;
-    handle-color: var(highlight);
+    handle-color: @highlight;
 }
 
 message {
     border: 0.15em;
     margin: 18px 2px 0px 2px;
     padding: 8px 8px 8px 8px;
-    border-color: var(border);
+    border-color: @border;
 }
 
 entry {
-    text-color:        var(foreground-muted);
-    placeholder-color: var(foreground-muted);
+    text-color:        @foreground-muted;
+    placeholder-color: @foreground-muted;
     cursor:            text;
     placeholder:       "";
 }
@@ -82,20 +82,20 @@ case-indicator {
 
 num-filtered-rows {
     expand:     false;
-    text-color: var(foreground-muted);
+    text-color: @foreground-muted;
 }
 
 num-rows {
     expand:     false;
-    text-color: var(border);
+    text-color: @border;
 }
 
 textbox-num-sep {
     expand:     false;
     str:        "/";
-    text-color: var(border);
+    text-color: @border;
 }
 
 prompt {
-    text-color: var(foreground);
+    text-color: @foreground;
 }
