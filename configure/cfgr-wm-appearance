@@ -260,12 +260,7 @@ _blur_submenu() {
         local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
         local power_profile="$(vb-cmd-get-power)"
 
-        if [[ $respect_power_profile == true && $power_profile == power-saver ]]; then
-            labels=("<span alpha='70%'>Enabled : (on power-saver!)</span>")
-        else
-            labels=("Enabled : $enabled")
-        fi
-
+        labels=("Enabled : $enabled")
 
         if [[ "$enabled" == true ]]; then
             labels+=(
@@ -348,11 +343,7 @@ _shadow_submenu() {
         local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
         local power_profile="$(vb-cmd-get-power)"
 
-        if [[ $respect_power_profile == true && $power_profile == power-saver ]]; then
-            labels=("<span alpha='70%'>Enabled : (on power-saver!)</span>")
-        else
-            labels=("Enabled : $enabled")
-        fi
+        labels=("Enabled : $enabled")
 
         if [[ "$enabled" == true ]]; then
             labels+=(
