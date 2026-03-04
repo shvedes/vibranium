@@ -31,12 +31,16 @@ mkdir -p "$HOME/.local/share/vibranium"
 
 # Clone the vibranium repository
 echo "Cloning vibranium repository..."
-git clone "$REPO_URL" "$INSTALL_DIR"
+latest_ver="$(git ls-remote --tags --sort="v:refname" "$REPO_URL" | tail -n1)"
+latest_ver="$(sed 's|.*refs/tags/||;s|\^{}||' <<< "$latest_ver")"
+git clone --branch "$latest_ver" "$REPO_URL" "$INSTALL_DIR"
 
 echo
 echo "Repository cloned successfully!"
 echo "Starting installation..."
 echo
+
+sleep 2
 
 # Run the installer
 exec bash "$INSTALL_DIR/install/install"
