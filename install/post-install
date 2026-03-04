@@ -51,3 +51,5 @@ EOF
 # First run marker
 : > "$HOME/.local/state/vibranium/first-run"
 
+mkdir -p "$HOME"/.config/vibranium/{startup/shutdown}
+

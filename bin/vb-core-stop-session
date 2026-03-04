@@ -4,11 +4,22 @@
 # and sometimes you have to wait for logind to time out to completely terminate the session.
 # I don't know why this happens, but it's annoying, so we take a rough approach with these applications.
 
+shopt -s nullglob
+
 APPS=("Discord" "vesktop" "spotify" "steam" "steamwebhelper")
 
 for app in "${APPS[@]}"; do
     killall -s KILL "$app"
 done
+
+
+HOOKS=("$XDG_CONFIG_HOME"/vibranium/shutdown/*.sh)
+
+if (( ${#HOOKS[@]} )); then
+    for hook in "${HOOKS[@]}"; do
+        bash "$hook"
+    done
+fi
 
 # Properly stop session
 uwsm stop

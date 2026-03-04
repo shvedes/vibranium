@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=System Monitor
+TryExec=btop
+Exec=vb-core-term -- btop
+Icon=utilities-system-monitor
+Keywords=btop;disk;network;cpu;gpu;process;monitor
+OnlyShowIn=Hyprland;

@@ -107,3 +107,15 @@ helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START
 if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START = true ]]; then
     setsid -f vb-core-launcher
 fi
+
+vb-core-power "$(powerprofilesctl get)" &
+
+shopt -s nullglob
+
+HOOKS=("$XDG_CONFIG_HOME"/vibranium/startup/*.sh)
+
+if (( ${#HOOKS[@]} )); then
+    for hook in "${HOOKS[@]}"; do
+        bash "$hook"
+    done
+fi
