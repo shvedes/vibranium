@@ -31,13 +31,23 @@ for timer in "${user_timers[@]}"; do
     systemctl -q --user enable "${timer}.timer"
 done
 
-override_services=("waybar" "hyprpaper" "hypridle" "swyaosd" "alacritty" "cliphist")
+override_services=(
+    "waybar"
+    "hyprpaper"
+    "hypridle"
+    "hyprsunset"
+    "swyaosd"
+    "alacritty"
+    "cliphist"
+    "gnome-polkit"
+)
 
 for unit in "${override_services[@]}"; do
     mkdir -p "$HOME/.config/systemd/user/${unit}.service.d"
     cat > "$HOME/.config/systemd/user/${unit}.service.d/override.conf" <<'EOF'
 [Unit]
 StartLimitIntervalSec=1
+ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland
 EOF
 done
 
