@@ -10,7 +10,10 @@ configure almost every aspect of your typical desktop usage: appearance of the W
 ```bash
 curl -fsSL https://raw.githubusercontent.com/shvedes/vibranium/master/install.sh | bash
 ```
-See [wiki page](https://github.com/shvedes/vibranium/wiki#installation)
+
+See [wiki page](https://github.com/shvedes/vibranium/wiki#installation).
+
+Note: wiki hasn't been updated in months and my have irrelevant info.
 
 ## Currenet State
 
@@ -22,8 +25,3 @@ In this case, some functionality will be unavailable. You can still install Vibr
 Even though the project is still in beta testing, it is more than stable. Anyways, even though I am a user of my own creation, it is practically impossible for one person to identify all possible bugs and shortcomings,
 simply because of my use case. If you happen to be a Vibranium user, first of all, thank you very much, it means a lot to me. Second, please send any feedback to issues (for now), whether it's just a review of your experience
 using it, or reports of bugs, ux/ui/problems, or anything else.
-
-### Code Quality
-
-The code is currently focused on functionality rather than structure. Refactoring and performance improvements will come once all core features are implemented. The project’s architecture wasn’t planned from the start, so rewriting
-from scratch wasn’t practical-hence the current state of the code. For further information visit [**Vibranium wiki**](https://github.com/shvedes/vibranium/wiki)
