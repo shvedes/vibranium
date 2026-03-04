@@ -1,0 +1,138 @@
+#!/usr/bin/env bash
+
+STEP="5"
+ACTION=""
+LOCKFILE="$VIBRANIUM_RUNTIME/${0##*/}.lock"
+
+source vb-core-lib
+
+usage() {
+  cat <<USAGE
+Usage: ${0##*/} [OPTIONS]
+
+Adjust the volume of the currently focused Hyprland window.
+
+Options:
+  -u, --up             Window volume up
+  -d, --down           Window volume down
+  -t, --toggle         Window volume toggle
+  -s, --step PERCENT   Volume step size in percent (default: $STEP)
+  -h, --help           Show this help message and exit
+
+Actions:
+  up      Raise volume by STEP%
+  down    Lower volume by STEP%
+  toggle  Toggle mute on all matching audio nodes
+USAGE
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -s|--step)
+      STEP="$2"
+      shift 2
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -u|-d|-t)
+      ACTION="${1/-/}"
+      shift
+        ;;
+    --up|--down|--toggle)
+      ACTION="${1/--/}"
+      shift
+      ;;
+    *)
+      echo "${0##*/}: unknown option '$1'" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$ACTION" ]]; then
+  echo "${0##*/}: action required (--up|--down|--toggle)" >&2
+  usage >&2
+  exit 1
+fi
+
+# killswitch — only one instance may run at a time;
+# scroll events can fire faster than pw-dump finishes
+exec 9>"$LOCKFILE"
+flock -n 9 || exit 0
+
+ACTIVE_WINDOW=$(hyprctl -j activewindow)
+ACTIVE_PID=$(jq '.pid' <<< "$ACTIVE_WINDOW")
+WINDOW_TITLE=$(jq -r '.title' <<< "$ACTIVE_WINDOW")
+
+# guard: hyprctl returns {} on an empty workspace, jq yields null for .pid
+if [[ -z "$ACTIVE_PID" || "$ACTIVE_PID" == "null" ]]; then
+  log::error "no active window found"
+  exit 1
+fi
+
+# collect the focused pid and all its descendants into a flat list
+# so that apps which emit audio from a child process are also matched
+collect_pids() {
+  # TODO: recurse through the process tree rooted at $1
+  # hint: `pgrep -P <pid>` gives direct children; recurse until pgrep returns nothing
+  echo "$1"
+}
+mapfile -t ALL_PIDS < <(collect_pids "$ACTIVE_PID")
+
+# build a jq-compatible JSON array of all pids to match against pw-dump
+# PID_ARRAY=$(printf '%s\n' "${ALL_PIDS[@]}" | jq -R -s 'split("\n")[:-1] | map(tonumber)')
+PID_ARRAY=$(jq -n '$ARGS.positional | map(tonumber)' --args "${ALL_PIDS[@]}")
+
+# find all PipeWire output audio nodes whose application pid is anywhere in the collected pid set
+mapfile -t NODES < <(pw-dump | jq -r --argjson pids "$PID_ARRAY" '
+  .[] |
+  select(.type == "PipeWire:Interface:Node") |
+  select(.info.props."media.class" == "Stream/Output/Audio") |
+  select((.info.props."application.process.id" | tonumber?) as $p | $pids | index($p) != null) |
+  .id
+')
+
+if [[ ${#NODES[@]} -eq 0 ]]; then
+  exit 0
+fi
+
+# apply the action to every matching node (e.g. multiple browser tabs share one pid)
+for NODE_ID in "${NODES[@]}"; do
+  case "$ACTION" in
+    up)
+      if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
+        wpctl set-volume "$NODE_ID" "${STEP}%+" --limit 1.5
+      else
+        wpctl set-volume "$NODE_ID" "${STEP}%+" --limit 1.0
+      fi
+      ;;
+    down)   wpctl set-volume "$NODE_ID" "${STEP}%-" ;;
+    toggle) wpctl set-mute   "$NODE_ID" toggle ;;
+  esac
+done
+
+helpers::check VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
+
+# read back current state from the first matched node after adjustment
+read -r _ node_vol node_muted <<< "$(wpctl get-volume "${NODES[0]}")"
+
+# max_vol drives the progress bar scale; wired to the above-100% boost flag so the
+# bar stays proportional when VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED is enabled
+if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
+  max_vol=1.5
+else
+  max_vol=1.0
+fi
+
+# bar_value scales it into 0-100 relative to max_vol so the bar stays proportional
+bar_value=$(awk -v v="$node_vol" -v max="$max_vol" 'BEGIN {printf "%d", (v/max)*100}')
+icons_folder="$XDG_DATA_HOME/icons/Papirus/24x24/symbolic/status"
+
+if [[ "$node_muted" == "[MUTED]" ]]; then
+  notify-send -r 2 -i "$icons_folder/audio-volume-muted-symbolic.svg" -t 1000 "$WINDOW_TITLE Muted"
+else
+  notify-send -r 2 -i "$icons_folder/audio-volume-high-symbolic.svg" -t 1000 "$WINDOW_TITLE" -h "int:value:$bar_value"
+fi
