@@ -11,8 +11,6 @@ Options:
   --no-dummy        Do not wait for a key press after completion or cancellation
 
 Refreshes repositories, lists outdated packages, performs the update, and checks if a reboot is recommended based on updated packages.
-
-Report bugs to <your-bug-report-email-or-url>.
 EOF
 }
 
@@ -123,7 +121,7 @@ printf '\e[?25l'
 yay -Sy &> /dev/null &
 pid=$!
 
-term::spinner $pid "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories"
+term::spinner $pid "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"
 
 if ! _check_updates; then
     _update_complete "You are up to date"

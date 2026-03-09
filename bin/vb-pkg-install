@@ -92,7 +92,7 @@ _enable_systemd_units() {
 _refresh_repos() {
     yay -Sy &> /dev/null &
     local pid="$!"
-    term::spinner "$pid" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repos" "- ${GREEN}Done!${RESET}"
+    term::spinner "$pid" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"
 }
 
 # Verifies if the given packages exist in the repositories.
