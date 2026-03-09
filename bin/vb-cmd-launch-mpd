@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
 
-# Automatically detect and launch an available MPD client.
-
 CLIENTS=(ncmpcpp rmpc cmus vimpc)
 
 usage() {
     cat << EOF
 Usage: ${0##*/} [OPTION]
 
-Detect and launch an available MPD client in a terminal.
+Detect an installed MPD client.
+If a window exists, focus it. Otherwise launch it.
 
 Options:
   -h, --help  Display this help and exit
@@ -29,14 +28,37 @@ case "$1" in
         ;;
 esac
 
-if ! command -v mpd >/dev/null 2>&1; then
-    exit 1
-fi
+command -v mpd >/dev/null 2>&1 || exit 1
 
-for client in "${CLIENTS[@]}"; do
-    if command -v "$client" >/dev/null 2>&1; then
-        exec vb-core-term -- "$client"
+CLIENT=""
+
+for c in "${CLIENTS[@]}"; do
+    if command -v "$c" >/dev/null 2>&1; then
+        CLIENT="$c"
+        break
     fi
 done
 
-exit 1
+if [[ -z $CLIENT ]]; then
+    exit 1
+fi
+
+WINDOW_ADDRESS=$(
+    hyprctl clients -j | jq -r --arg p "$CLIENT" '
+        first(
+            .[]
+            | select(
+                (.class | test("\\b" + $p + "\\b"; "i")) or
+                (.title | test("\\b" + $p + "\\b"; "i"))
+            )
+            | .address
+        )
+    '
+)
+
+if [[ -n $WINDOW_ADDRESS ]]; then
+    hyprctl dispatch focuswindow "address:$WINDOW_ADDRESS"
+else
+    exec setsid vb-core-term -- "$CLIENT"
+fi
+
