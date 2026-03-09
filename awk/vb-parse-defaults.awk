@@ -300,10 +300,9 @@ function warn(msg) {
 # END block is currently disabled. When re-enabled it would print a summary line
 # to stderr: either a green "passed all checks" or a red count of issues found.
 # Kept as a reference for future debugging or CI reporting needs.
-END {
-    if (warnings == 0)
-        printf "%s[SETTINGS PARSER]%s Default settings passed all checks\n", GREEN, RESET > "/dev/stdin"
-    else
-        printf "%s[SETTINGS PARSER]%s %d issue(s) found in default settings\n", RED, RESET, warnings > "/dev/stderr"
-}
-
+# END {
+#     if (warnings == 0)
+#         printf "%s[SETTINGS PARSER]%s Default settings passed all checks\n", GREEN, RESET > "/dev/stdin"
+#     else
+#         printf "%s[SETTINGS PARSER]%s %d issue(s) found in default settings\n", RED, RESET, warnings > "/dev/stderr"
+# }

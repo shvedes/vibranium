@@ -150,6 +150,31 @@ if [[ -n "$WORKDIR" ]]; then
     fi
 fi
 
+# If a terminal window whose title matches PATTERN already exists, focus it
+# and return 0. Returns 1 when no match is found so the caller can proceed
+# with a normal launch.
+focus_if_running() {
+    local pattern="$1"
+    local address
+    address=$(
+        hyprctl clients -j | jq -r --arg p "$pattern" '
+            first(
+                .[]
+                | select(
+                    (.class | test("\\b" + $p + "\\b"; "i")) or
+                    (.title | test("\\b" + $p + "\\b"; "i"))
+                )
+                | .address
+            )
+        '
+    )
+
+    if [[ -z "$address" ]]; then
+        return 1
+    fi
+    hyprctl -q dispatch focuswindow "address:$address"
+}
+
 # Default window title and app class used across all backends
 title="Vibranium Terminal"
 class="org.vb.term"
@@ -232,6 +257,15 @@ build_foot_args() {
         term_args+=("${cmd_args[@]}")
     fi
 }
+
+# If a window for this TUI command is already open, focus it and stop —
+# all other flags (--floating, --directory, --hold, …) are ignored.
+if [[ ${#cmd_args[@]} -gt 0 ]]; then
+    if focus_if_running "$title"; then
+        echo "Focusing existing window"
+        exit 0
+    fi
+fi
 
 # Floating windows get a distinct app class so Hyprland window rules can
 # target them separately. The built command is shell-quoted into a single
