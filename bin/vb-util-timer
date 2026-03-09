@@ -5,14 +5,14 @@ source "$VIBRANIUM/bin/vb-core-lib"
 options=("Seconds" "Minutes" "Hours")
 state="$VIBRANIUM_RUNTIME/vb-timer.remaining"
 ring="/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
-pw_play_pid=""
+paplay_pid=""
 
 cleanup() {
     rm -f "$state"
     vb-cmd-refresh-bar-module timer
 
     kill $(pgrep -f -- '--who=Timer')
-    kill -s KILL "$pw_play_pid" & >/dev/null
+    kill -s KILL "$paplay_pid" & >/dev/null
     exit 0
 }
 
@@ -66,8 +66,8 @@ echo "timed out" > "$state"
 vb-cmd-refresh-bar-module timer
 
 while true; do
-    pw-play "$ring" &
-    pw_play_pid=$!
-    wait "$pw_play_pid"
+    paplay --volume 32500 "$ring" &
+    paplay_pid=$!
+    wait "$paplay_pid"
 done
 
