@@ -75,7 +75,7 @@ NO_LOGO=false
 NO_DUMMY=false
 PKG_LIST=()
 
-trap 'printf "\n"; _operation_canceled; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
+trap 'printf "\n"; kill -- -$$ 2>/dev/null; _operation_canceled; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
 
 while (( $# > 0 )); do
     case "$1" in
@@ -110,7 +110,10 @@ if [[ $NO_LOGO == false ]]; then
 fi
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
-if ! sudo -v; then
+sudo -v &
+_sudo_pid=$!
+wait $_sudo_pid
+if (( $? != 0 )); then
     echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
     exit 1
 fi
