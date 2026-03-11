@@ -16,6 +16,7 @@ Options:
   --no-systemd      Skip systemd post-install hook
   --conservative    Do not print any success / fail messages
 
+  --force-install   Forefully install already installed packages
   --keep-cache      Do not remove cached packages after install
   --embedded        Run in embedded mode. Usually called from inside another script
   -h,--help         Show this help and exit
@@ -113,7 +114,7 @@ _ensure_if_exist() {
     local index=1
 
     for pkg in "${PACKAGES[@]}"; do
-        printf "\r\033[K%s[VIBRANIUM]%s Verifying package [%s/%s]" "$BLUE" "$RESET" "$index" "$total"
+        printf "\r\033[K%s[VIBRANIUM]%s Verifying packages [%s/%s]" "$BLUE" "$RESET" "$index" "$total"
 
         if ! yay -Si "$pkg" &> /dev/null; then
             missing+=("$pkg")
@@ -186,6 +187,11 @@ _installation_complete() {
 
 # Filters out already-installed packages from PACKAGES and populates FILTERED.
 _filter_packages() {
+    if [[ "$FORCE_INSTALL" == true ]]; then
+        FILTERED=(${PACKAGES[@]})
+        return
+    fi
+
     for pkg in "${PACKAGES[@]}"; do
         if ! pacman -Qq "$pkg" &> /dev/null; then
             FILTERED+=("$pkg")
@@ -193,14 +199,14 @@ _filter_packages() {
     done
 
     if (( ${#FILTERED[@]} == 0 )); then
-        if [[ $EMBEDDED == false ]]; then
-            _operation_canceled --positive
-        fi
-
         if (( ${#PACKAGES[@]} == 1 )); then
             echo -e "${GREEN}[VIBRANIUM]${RESET} Selected package is already installed"
         else
             echo -e "${GREEN}[VIBRANIUM]${RESET} Selected package(s) are already installed"
+        fi
+
+        if [[ $EMBEDDED == false ]]; then
+            _operation_canceled --positive
         fi
         exit 0
     elif (( ${#PACKAGES[@]} != ${#FILTERED[@]} )); then
@@ -260,20 +266,32 @@ _embed_install() {
     local current=0
     local pkg
 
-    term::disable_input
     yay --noconfirm -Sy &> /dev/null
+
+    if [[ "$FORCE_INSTALL" == false ]]; then
+        if (( ${#FILTERED[@]} == 1 )); then
+            printf "\r\e[K%s[VIBRANIUM]%s %d package installed\n" "$BLUE" "$RESET" "$total"
+        else
+            printf "\r\e[K%s[VIBRANIUM]%s %d packages installed\n" "$BLUE" "$RESET" "$total"
+        fi
+    fi
 
     for pkg in "${FILTERED[@]}"; do
         ((current++))
         printf "\r\033[K%s[VIBRANIUM]%s Installing %s [%d/%d]" \
-          "$YELLOW" "$RESET" "${GRAY}${pkg}${RESET}" "$current" "$total"
-        yay --noconfirm --needed -S "$pkg" &> /dev/null
+          "$YELLOW" "$RESET" "${YELLOW}${pkg}${RESET}" "$current" "$total"
+
+        if [[ "$FORCE_INSTALL" == true ]]; then
+            yay --noconfirm -S "$pkg" &> /dev/null
+        else
+            yay --noconfirm --needed -S "$pkg" &> /dev/null
+        fi
     done
 
-    if (( ${#FILTERED[@]} == 1 )); then
-        printf "\r\e[K%s[VIBRANIUM]%s %d package installed\n" "$BLUE" "$RESET" "$total"
+    if (( total == 1 )); then
+        printf "\n%s[VIBRANIUM]%s %s installed" "$GREEN" "$RESET" "${YELLOW}$FILTERED${RESET}"
     else
-        printf "\r\e[K%s[VIBRANIUM]%s %d packages installed\n" "$BLUE" "$RESET" "$total"
+        printf "\n%s[VIBRANIUM]%s %d packages installed" "$GREEN" "$RESET" "$total"
     fi
 }
 
@@ -311,18 +329,21 @@ _choose_packages() {
 }
 
 _cleanup() {
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Removing orphan packages"
+    echo -e "${BLUE}[VIBRANIUM]${RESET} Removing orphan packages"
     yay -Ycc --noconfirm &> /dev/null
 
     if [[ "$KEEP_CACHE" == false ]]; then
-        echo -e "${GREEN}[VIBRANIUM]${RESET} Removing cached packaghes"
+        echo -e "${BLUE}[VIBRANIUM]${RESET} Removing cached packaghes"
         yay -Scc --noconfirm &> /dev/null
     fi
 }
 
 _embedded_early=false
 for _arg in "$@"; do
-    [[ "$_arg" == "--embedded" ]] && _embedded_early=true && break
+    if  [[ "$_arg" == "--embedded" ]]; then
+        _embedded_early=true
+        break
+    fi
 done
 
 if [[ $_embedded_early == false ]] && term::is_headless; then
@@ -339,6 +360,7 @@ NO_VERIFY=false
 NO_SYSTEMD=false
 KEEP_CACHE=false
 CONSERVATIVE=false
+FORCE_INSTALL=false
 EMBEDDED=false
 PACKAGES=()
 FILTERED=()
@@ -388,15 +410,16 @@ trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --help|-h)      _usage;             exit ;;
-        --embedded)     EMBEDDED=true;     shift ;;
-        --no-ask)       NO_ASK=true;       shift ;;
-        --no-logo)      NO_LOGO=true;      shift ;;
-        --no-dummy)     NO_DUMMY=true;     shift ;;
-        --no-verify)    NO_VERIFY=true;    shift ;;
-        --no-systemd)   NO_SYSTEMD=true;   shift ;;
-        --keep-cache)   KEEP_CACHE=true;   shift ;;
-        --conservative) CONSERVATIVE=true; shift ;;
+        --help|-h)       _usage;             exit  ;;
+        --embedded)      EMBEDDED=true;      shift ;;
+        --no-ask)        NO_ASK=true;        shift ;;
+        --no-logo)       NO_LOGO=true;       shift ;;
+        --no-dummy)      NO_DUMMY=true;      shift ;;
+        --no-verify)     NO_VERIFY=true;     shift ;;
+        --no-systemd)    NO_SYSTEMD=true;    shift ;;
+        --keep-cache)    KEEP_CACHE=true;    shift ;;
+        --conservative)  CONSERVATIVE=true;  shift ;;
+        --force-install) FORCE_INSTALL=true; shift ;;
         --)
             shift
             if [[ $# -eq 0 ]]; then
@@ -421,13 +444,19 @@ if [[ $EMBEDDED == true ]]; then
     fi
 
     PACKAGES=("$@")
+    term::disable_input
+
+    if ! _ensure_if_exist; then
+        exit 1
+    fi
+
     _filter_packages
     _embed_install
     exit 0
 fi
 
 if [[ $NO_LOGO == false ]]; then
-    printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+    term::show_header
 fi
 
 term::disable_input
