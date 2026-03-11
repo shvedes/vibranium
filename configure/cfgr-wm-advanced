@@ -1,8 +1,29 @@
 #!/usr/bin/env bash
 
 source vb-core-lib
-
 CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.conf"
+
+
+_layout_submenu() {
+    local opts chosen
+    opts=("Dwindle" "Master" "Scrolling" "Monocle")
+
+    while true; do
+        mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
+        helpers::ui::menu chosen "Layout" "ESC to go back" -- "${opts[@]}"
+        [[ -z "$chosen" ]] && break
+
+        case "$chosen" in
+            "Dwindle") vb-cmd-edit-wm-config "general:layout:dwindle" "$CONFIG" ;;
+            "Master") vb-cmd-edit-wm-config "general:layout:master" "$CONFIG" ;;
+            "Scrolling") vb-cmd-edit-wm-config "general:layout:scrolling" "$CONFIG" ;;
+            "Monocle") vb-cmd-edit-wm-config "general:layout:monocle" "$CONFIG" ;;
+            *) continue
+        esac
+        break
+    done
+}
+
 INDEX=0
 
 while true; do
@@ -14,13 +35,16 @@ while true; do
          getoption misc:vfr; \
          getoption misc:middle_click_paste; \
          getoption render:direct_scanout; \
-         getoption misc:disable_autoreload" |
+         getoption misc:disable_autoreload;
+         getoption general:layout" |
             jq -s -r '.[] |
         if .option == "misc:vrr" then
             if .int == 0 then "false"
             elif .int == 1 then "true"
             else "fullscreen"
             end
+        elif .option == "general:layout" then
+            .str
         else
             if .int == 1 then "true" else "false" end
         end'
@@ -31,6 +55,7 @@ while true; do
     current_middle_click="${LINES[2]}"
     current_direct_scanout="${LINES[3]}"
     current_autoreload="${LINES[4]}"
+    current_layout="${LINES[5]^}"
 
     OPTIONS=(
         "Variable Refresh Rate : $current_vrr"
@@ -38,6 +63,7 @@ while true; do
         "Disable Auto Reload : $current_autoreload"
         "Middle Click Paste : $current_middle_click"
         "Direct Scanout : $current_direct_scanout"
+        "Layout : $current_layout"
     )
 
     mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
@@ -52,6 +78,9 @@ while true; do
     done
 
     case "$CHOSEN" in
+        "Layout"*)
+            _layout_submenu
+            ;;
         "Disable Auto Reload"*)
             case "$current_autoreload" in
                 "true")vb-cmd-edit-wm-config "misc:disable_autoreload:false" "$CONFIG" ;;
