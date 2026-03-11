@@ -259,8 +259,9 @@ build_foot_args() {
 }
 
 # If a window for this TUI command is already open, focus it and stop —
-# all other flags (--floating, --directory, --hold, …) are ignored.
-if [[ ${#cmd_args[@]} -gt 0 ]]; then
+# only when no extra arguments are passed (e.g. bare "btop", not "nvim file.txt").
+# Commands with arguments (like opening a specific file) should always spawn a new window.
+if [[ ${#cmd_args[@]} -eq 1 ]]; then
     if focus_if_running "$title"; then
         echo "Focusing existing window"
         exit 0
