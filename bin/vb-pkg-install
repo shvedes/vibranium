@@ -14,8 +14,10 @@ Options:
   --no-dummy        Do not wait for a key press after completion or cancellation
   --no-verify       Skip verification of package existence in repositories
   --no-systemd      Skip systemd post-install hook
-  --keep-cache      Do not remove cached packages after install
   --conservative    Do not print any success / fail messages
+
+  --keep-cache      Do not remove cached packages after install
+  --embedded        Run in embedded mode. Usually called from inside another script
   -h,--help         Show this help and exit
   --                End of options. Everything after is PACKAGE
 
@@ -26,11 +28,11 @@ EOF
 }
 
 _ask_for_sudo() {
-    term::enable_input
+    sudo -n true 2>/dev/null && return
 
+    term::enable_input
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
     sudo -v
-
     term::disable_input
 }
 
@@ -191,12 +193,23 @@ _filter_packages() {
     done
 
     if (( ${#FILTERED[@]} == 0 )); then
-        echo -e "${GREEN}[VIBRANIUM]${RESET} Selected package(s) are already installed"
-        _operation_canceled --positive
+        if [[ $EMBEDDED == false ]]; then
+            _operation_canceled --positive
+        fi
+
+        if (( ${#PACKAGES[@]} == 1 )); then
+            echo -e "${GREEN}[VIBRANIUM]${RESET} Selected package is already installed"
+        else
+            echo -e "${GREEN}[VIBRANIUM]${RESET} Selected package(s) are already installed"
+        fi
         exit 0
     elif (( ${#PACKAGES[@]} != ${#FILTERED[@]} )); then
         local diff=$(( ${#PACKAGES[@]} - ${#FILTERED[@]} ))
-        echo -e "${BLUE}[VIBRANIUM]${RESET} $diff package(s) are already installed"
+        if (( diff == 1 )); then
+            echo -e "${BLUE}[VIBRANIUM]${RESET} $diff package is already installed"
+        else
+            echo -e "${BLUE}[VIBRANIUM]${RESET} $diff packages are already installed"
+        fi
     fi
 }
 
@@ -242,6 +255,28 @@ _install_packages() {
     yes | yay -S "${YAY_FLAGS[@]}" "${FILTERED[@]}"
 }
 
+_embed_install() {
+    local total=${#FILTERED[@]}
+    local current=0
+    local pkg
+
+    term::disable_input
+    yay --noconfirm -Sy &> /dev/null
+
+    for pkg in "${FILTERED[@]}"; do
+        ((current++))
+        printf "\r\033[K%s[VIBRANIUM]%s Installing %s [%d/%d]" \
+          "$YELLOW" "$RESET" "${GRAY}${pkg}${RESET}" "$current" "$total"
+        yay --noconfirm --needed -S "$pkg" &> /dev/null
+    done
+
+    if (( ${#FILTERED[@]} == 1 )); then
+        printf "\r\e[K%s[VIBRANIUM]%s %d package installed\n" "$BLUE" "$RESET" "$total"
+    else
+        printf "\r\e[K%s[VIBRANIUM]%s %d packages installed\n" "$BLUE" "$RESET" "$total"
+    fi
+}
+
 # Fetches lists of all available packages from Arch repos and AUR. Populates PACKAGES.
 _get_packages() {
     local aur_temp arch_temp
@@ -285,7 +320,12 @@ _cleanup() {
     fi
 }
 
-if term::is_headless; then
+_embedded_early=false
+for _arg in "$@"; do
+    [[ "$_arg" == "--embedded" ]] && _embedded_early=true && break
+done
+
+if [[ $_embedded_early == false ]] && term::is_headless; then
     exec setsid vb-core-term --floating -- "$0" "$@"
     exit
 fi
@@ -299,6 +339,7 @@ NO_VERIFY=false
 NO_SYSTEMD=false
 KEEP_CACHE=false
 CONSERVATIVE=false
+EMBEDDED=false
 PACKAGES=()
 FILTERED=()
 
@@ -348,6 +389,7 @@ trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)      _usage;             exit ;;
+        --embedded)     EMBEDDED=true;     shift ;;
         --no-ask)       NO_ASK=true;       shift ;;
         --no-logo)      NO_LOGO=true;      shift ;;
         --no-dummy)     NO_DUMMY=true;     shift ;;
@@ -370,6 +412,19 @@ while [[ $# -gt 0 ]]; do
         *) break ;;
     esac
 done
+
+if [[ $EMBEDDED == true ]]; then
+    trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
+
+    if [[ $# -eq 0 ]]; then
+        exit 1
+    fi
+
+    PACKAGES=("$@")
+    _filter_packages
+    _embed_install
+    exit 0
+fi
 
 if [[ $NO_LOGO == false ]]; then
     printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"

@@ -27,7 +27,7 @@ if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
 fi
 
 while true; do
-    helpers::ui::menu CHOSEN "Utilities" "Search..." -- "${ACTIONS[@]}"
+    helpers::ui::menu CHOSEN "Utilities" "search..." -- "${ACTIONS[@]}"
 
     case "$CHOSEN" in
         "Close all windows")
