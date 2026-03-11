@@ -16,23 +16,106 @@ _operation_complete() {
     term::enable_input
 }
 
-_docker_tweaks() {
-    local ufw_docker_url="https://raw.githubusercontent.com/chaifeng/ufw-docker/refs/heads/master/ufw-docker"
-    sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 comment 'allow-docker-dns' &> /dev/null
-    curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &> /dev/null
+_configure_ssh() {
+    command -v ssh &>/dev/null || return 2      # ssh absent
+    # systemctl -q is-enabled sshd || return 2   # sshd not enabled
 
-    # Just a little notice.
-    if ! id -nG "$USER" | grep -qw docker; then
-        echo -e "${BLUE}[VIBRANIUM]${RESET} You are not in the '${BLUE}docker${RESET}' group."
-        echo -e "${BLUE}[VIBRANIUM]${RESET} This is not required, but it allows running Docker without sudo."
-        echo -e "${BLUE}[VIBRANIUM]${RESET} You can add yourself with:"
-        echo -e "${BLUE}[VIBRANIUM]${RESET} ${RED}sudo ${GREEN}usermod ${YELLOW}-aG ${CYAN}docker ${BLUE}${USER}${RESET}"
+    local port
+    port=$(grep -Po '^Port\s+\K\d+' /etc/ssh/sshd_config)
+    port=${port:-22}
+
+    # Check if a rule for this port/subnet already exists
+    if sudo ufw status verbose 2>/dev/null | grep -qP "${port}/tcp.*192\.168\.1\.0/24|192\.168\.1\.0/24.*${port}/tcp"; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} SSH rule: already in place, skipping"
+        return 1   # unchanged
     fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Allowing SSH on port ${CYAN}${port}/tcp${RESET} from LAN"
+    sudo ufw allow from 192.168.1.0/24 to any port "$port" proto tcp &>/dev/null
+    return 0       # applied
 }
 
-term::show_header
+_configure_localsend() {
+    command -v localsend &>/dev/null || return 2   # localsend absent
 
-if systemctl -q is-enabled ufw; then
+    if sudo ufw status verbose 2>/dev/null | grep -q '53317'; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} LocalSend rules: already in place, skipping"
+        return 1   # unchanged
+    fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Allowing LocalSend (port ${CYAN}53317${RESET})"
+    sudo ufw allow 53317/udp &>/dev/null
+    sudo ufw allow 53317/tcp &>/dev/null
+    return 0       # applied
+}
+
+_configure_docker() {
+    command -v docker &>/dev/null || return 2   # docker absent
+
+    local dns_rule_present=false
+    local ufw_docker_present=false
+
+    sudo ufw status verbose 2>/dev/null | grep -q 'allow-docker-dns' && dns_rule_present=true
+    grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2>/dev/null && ufw_docker_present=true
+
+    if $dns_rule_present && $ufw_docker_present; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} Docker UFW rules: already in place, skipping"
+        return 1   # unchanged
+    fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring UFW for Docker"
+
+    if ! $dns_rule_present; then
+        sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 \
+            comment 'allow-docker-dns' &>/dev/null
+    fi
+
+    if ! $ufw_docker_present; then
+        local ufw_docker_url="https://raw.githubusercontent.com/chaifeng/ufw-docker/refs/heads/master/ufw-docker"
+        curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &>/dev/null
+    fi
+
+    return 0       # applied
+}
+
+_configure_libvirt() {
+    command -v virsh &>/dev/null || return 2   # libvirt absent
+
+    local changed=false
+
+    if ! grep -q '^firewall_backend' /etc/libvirt/network.conf 2>/dev/null; then
+        echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting libvirt firewall backend to iptables"
+        printf '\n\n# Vibranium overrides below\nfirewall_backend = "iptables"\n' \
+            | sudo tee -a /etc/libvirt/network.conf >/dev/null
+        changed=true
+    else
+        echo -e "${GREEN}[VIBRANIUM]${RESET} Libvirt firewall config: already up to date, skipping"
+    fi
+
+    if ! id -nG "$USER" | grep -qw libvirt; then
+        echo -e "${BLUE}[VIBRANIUM]${RESET} You are not in the '${BLUE}libvirt${RESET}' group."
+        echo -e "${BLUE}[VIBRANIUM]${RESET} This is not required, but it allows running VMs without sudo."
+        echo -e "${BLUE}[VIBRANIUM]${RESET} You can add yourself with:"
+        echo -e "${BLUE}[VIBRANIUM]${RESET} ${RED}sudo ${GREEN}usermod ${YELLOW}-aG ${CYAN}libvirt ${BLUE}${USER}${RESET}"
+    fi
+
+    $changed && return 0
+    return 1       # unchanged
+}
+
+_configure_syncthing() {
+    command -v syncthing > /dev/null || return 2 # syncthing absent
+
+    sudo ufw allow syncthing &> /dev/null
+    sudo ufw allow syncthing-gui &> /dev/null
+}
+
+# ─────────────────────────────────────────────────────────────
+
+term::show_header
+term::disable_input
+
+if command -v ufw &>/dev/null && systemctl -q is-enabled ufw; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall is already set up and working"
     _operation_complete
     exit 0
@@ -45,79 +128,74 @@ if ! term::ask_yes_no Y "Proceed with setup?"; then
     exit 1
 fi
 
-install_flags=(
-    --no-ask
-    --no-logo
-    --no-dummy
-    --no-verify
-    --no-systemd
-    --conservative
-)
-
-if ! vb-pkg-install "${install_flags[@]}" ufw; then
+if ! vb-pkg-install --no-verify --embedded -- ufw; then
     _operation_canceled
     exit 1
 fi
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up firewall rules"
-
 summary_rules=()
 
-# Allow nothing in, everything out
-sudo ufw default deny incoming &> /dev/null
-sudo ufw default allow outgoing &> /dev/null
+# ── Default policies ──────────────────────────────────────────
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting default firewall policies"
+sudo ufw default deny incoming &>/dev/null
+sudo ufw default allow outgoing &>/dev/null
 summary_rules+=("Default policy: ${RED}deny incoming${RESET}, ${GREEN}allow outgoing${RESET}")
 
-if command -v ssh > /dev/null; then
-    if systemctl -q is-enabled sshd; then
-        echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up ssh ports"
+# ── SSH ───────────────────────────────────────────────────────
+_configure_ssh
+case $? in
+    0)
         port=$(grep -Po '^Port\s+\K\d+' /etc/ssh/sshd_config)
+        port=${port:-22}
+        summary_rules+=("SSH: allowed from ${CYAN}192.168.1.0/24${RESET} on port ${CYAN}${port}/tcp${RESET}")
+        ;;
+    1) summary_rules+=("SSH: ${CYAN}unchanged${RESET}") ;;
+esac
 
-        if [[ -n "$port" ]]; then
-            echo -e "${YELLOW}[VIBRANIUM]${RESET} Using custom port: ${BLUE}$port${RESET}"
-        else
-            port=22
-        fi
+# ── LocalSend ─────────────────────────────────────────────────
+_configure_localsend
+case $? in
+    0) summary_rules+=("LocalSend: allowed ${CYAN}53317/tcp${RESET} and ${CYAN}53317/udp${RESET}") ;;
+    1) summary_rules+=("LocalSend: ${CYAN}unchanged${RESET}") ;;
+esac
 
-        # Allow from any device in LAN only.
-        sudo ufw allow from 192.168.1.0/24 to any port $port proto tcp &> /dev/null
-        summary_rules+=("SSH: allowed from ${CYAN}192.168.1.0/24${RESET} on port ${CYAN}$port/tcp${RESET}")
-    fi
-fi
+# ── Docker ────────────────────────────────────────────────────
+_configure_docker
+case $? in
+    0) summary_rules+=("Docker: DNS stub rule added, ufw-docker hook installed") ;;
+    1) summary_rules+=("Docker: ${CYAN}unchanged${RESET}") ;;
+esac
 
-# Allow ports for LocalSend
-if command -v localsend > /dev/null; then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring LocalSend"
-    sudo ufw allow 53317/udp &> /dev/null
-    sudo ufw allow 53317/tcp &> /dev/null
-    summary_rules+=("LocalSend: allowed ${CYAN}53317/tcp${RESET} and ${CYAN}53317/udp${RESET}")
-fi
+# ── Libvirt ───────────────────────────────────────────────────
+_configure_libvirt
+case $? in
+    0) summary_rules+=("Libvirt: iptables backend set") ;;
+    1) summary_rules+=("Libvirt: ${CYAN}unchanged${RESET}") ;;
+esac
 
-if command -v docker > /dev/null; then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring docker..."
-    _docker_tweaks
-    summary_rules+=("Docker: DNS rule added for ${CYAN}172.16.0.0/12${RESET}, ufw-docker hook installed")
-fi
+# ── Syncthing ───────────────────────────────────────────────────
+_configure_syncthing
+case $? in
+    0) summary_rules+=("Syncthing: firewall profile set") ;;
+    1) summary_rules+=("Syncthing: ${CYAN}unchanged${RESET}") ;;
+esac
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up systemd unit"
+# ── Enable ────────────────────────────────────────────────────
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling UFW"
 sudo systemctl -q enable ufw
+sudo ufw --force enable &>/dev/null
+sudo ufw reload &>/dev/null
+summary_rules+=("UFW service: ${GREEN}enabled${RESET} and ${GREEN}active${RESET}")
 
-sudo ufw --force enable &> /dev/null
-sudo ufw reload &> /dev/null
-
-echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall setup complete and working. System restart is recommended."
-echo -e "${BLUE}[VIBRANIUM]${RESET} If you want to fine-tune your firewall rules, consider reading '${BLUE}ufw(8)${RESET}'"
+echo -e "${BLUE}[VIBRANIUM]${RESET} System restart is recommended."
+echo -e "${BLUE}[VIBRANIUM]${RESET} If you want to fine-tune your firewall rules, consider reading ${BLUE}ufw(8)${RESET}"
 
 echo ""
 echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"
-
 for rule in "${summary_rules[@]}"; do
     echo -e "${BLUE}[VIBRANIUM]${RESET}  • $rule"
 done
-
-echo -e "${BLUE}[VIBRANIUM]${RESET}  • UFW service: ${GREEN}enabled${RESET} and ${GREEN}active${RESET}"
 echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
 echo ""
 
 _operation_complete
-

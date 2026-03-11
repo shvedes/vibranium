@@ -258,7 +258,11 @@ _show_overview() {
 }
 
 _install_packages() {
-    yes | yay -S "${YAY_FLAGS[@]}" "${FILTERED[@]}"
+    if [[ "$FORCE_INSTALL" == true ]]; then
+        yes | yay -S "${YAY_FLAGS[@]}" "${FILTERED[@]}"
+    else
+        yes | yay --needed -S "${YAY_FLAGS[@]}" "${FILTERED[@]}"
+    fi
 }
 
 _embed_install() {
@@ -267,14 +271,6 @@ _embed_install() {
     local pkg
 
     yay --noconfirm -Sy &> /dev/null
-
-    if [[ "$FORCE_INSTALL" == false ]]; then
-        if (( ${#FILTERED[@]} == 1 )); then
-            printf "\r\e[K%s[VIBRANIUM]%s %d package installed\n" "$BLUE" "$RESET" "$total"
-        else
-            printf "\r\e[K%s[VIBRANIUM]%s %d packages installed\n" "$BLUE" "$RESET" "$total"
-        fi
-    fi
 
     for pkg in "${FILTERED[@]}"; do
         ((current++))
@@ -289,9 +285,9 @@ _embed_install() {
     done
 
     if (( total == 1 )); then
-        printf "\n%s[VIBRANIUM]%s %s installed" "$GREEN" "$RESET" "${YELLOW}$FILTERED${RESET}"
+        printf "\r\033[K%s[VIBRANIUM]%s %s installed\n" "$GREEN" "$RESET" "${YELLOW}$FILTERED${RESET}"
     else
-        printf "\n%s[VIBRANIUM]%s %d packages installed" "$GREEN" "$RESET" "$total"
+        printf "\r\033[K%s[VIBRANIUM]%s Installed %d packages\n" "$GREEN" "$RESET" "$total"
     fi
 }
 
@@ -446,11 +442,8 @@ if [[ $EMBEDDED == true ]]; then
     PACKAGES=("$@")
     term::disable_input
 
-    if ! _ensure_if_exist; then
-        exit 1
-    fi
-
     _filter_packages
+    _ask_for_sudo || exit 1
     _embed_install
     exit 0
 fi

@@ -144,15 +144,6 @@ if ! term::ask_yes_no Y "Proceed with setup?"; then
     exit 1
 fi
 
-install_flags=(
-    --no-ask
-    --no-logo
-    --no-dummy
-    --no-verify
-    --no-systemd
-    --conservative
-)
-
 if ! vb-pkg-install "${install_flags[@]}" docker docker-compose; then
     _operation_canceled
     exit 1
