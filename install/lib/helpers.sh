@@ -72,7 +72,7 @@ _install_packages() {
         yay --noconfirm --needed -S "$pkg" &> /dev/null
     done
 
-    printf "\r\032[K%s[VIBRANIUM]%s %d packages installed" "$YELLOW" "$RESET" "$total"
+    printf "\r\e[K%s[VIBRANIUM]%s %d packages installed" "$YELLOW" "$RESET" "$total"
     printf "\n"
 }
 
