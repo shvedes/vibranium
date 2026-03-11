@@ -9,10 +9,12 @@ Usage: ${0##*/} [OPTION]... [PACKAGE]...
 Install packages in Vibranium
 
 Options:
+  --no-ask          Do not ask for confirmation
   --no-logo         Do not display the Vibranium logo
   --no-dummy        Do not wait for a key press after completion or cancellation
   --no-verify       Skip verification of package existence in repositories
   --no-systemd      Skip systemd post-install hook
+  --keep-cache      Do not remove cached packages after install
   --conservative    Do not print any success / fail messages
   -h,--help         Show this help and exit
   --                End of options. Everything after is PACKAGE
@@ -24,8 +26,12 @@ EOF
 }
 
 _ask_for_sudo() {
+    term::enable_input
+
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
     sudo -v
+
+    term::disable_input
 }
 
 # Detects systemd units (services and sockets) provided by a list of packages.
@@ -71,7 +77,9 @@ _enable_systemd_units() {
 
     for pkg in "${unique_pkgs[@]}"; do
         for i in "${!provides_systemd_service[@]}"; do
-            [[ "${provides_systemd_service[$i]}" != "$pkg" ]] && continue
+            if [[ "${provides_systemd_service[$i]}" != "$pkg" ]]; then
+                continue
+            fi
 
             unit_type="${unit_types[$i]}"
             scope="${unit_scope[$i]}"
@@ -267,9 +275,14 @@ _choose_packages() {
     PACKAGES=("${chosen[@]}")
 }
 
-_remove_orphans() {
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Removing orphan packages..."
+_cleanup() {
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Removing orphan packages"
     yay -Ycc --noconfirm &> /dev/null
+
+    if [[ "$KEEP_CACHE" == false ]]; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} Removing cached packaghes"
+        yay -Scc --noconfirm &> /dev/null
+    fi
 }
 
 if term::is_headless; then
@@ -277,13 +290,14 @@ if term::is_headless; then
     exit
 fi
 
-SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
-export SUDO_PROMPT
+export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
 
+NO_ASK=false
 NO_LOGO=false
 NO_DUMMY=false
 NO_VERIFY=false
 NO_SYSTEMD=false
+KEEP_CACHE=false
 CONSERVATIVE=false
 PACKAGES=()
 FILTERED=()
@@ -334,10 +348,12 @@ trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --help|-h)      _usage;             exit ;;
+        --no-ask)       NO_ASK=true;       shift ;;
         --no-logo)      NO_LOGO=true;      shift ;;
         --no-dummy)     NO_DUMMY=true;     shift ;;
         --no-verify)    NO_VERIFY=true;    shift ;;
         --no-systemd)   NO_SYSTEMD=true;   shift ;;
+        --keep-cache)   KEEP_CACHE=true;   shift ;;
         --conservative) CONSERVATIVE=true; shift ;;
         --)
             shift
@@ -391,26 +407,28 @@ else
     _show_overview
 fi
 
-if term::ask_yes_no Y "Proceed with installation?"; then
-    if ! _ask_for_sudo; then
+if [[ "$NO_ASK" == false ]] ; then
+    if ! term::ask_yes_no Y "Proceed with installation?"; then
         _operation_canceled
         exit 1
     fi
+fi
 
-    _refresh_repos
+if ! _ask_for_sudo; then
+    _operation_canceled
+    exit 1
+fi
 
-    if _install_packages; then
-        if [[ "$NO_SYSTEMD" == false ]]; then
-            _handle_systemd
-            _enable_systemd_units
-        fi
+_refresh_repos
 
-        _remove_orphans
-        _installation_complete
-    else
-        _operation_canceled
-        exit 1
+if _install_packages; then
+    if [[ "$NO_SYSTEMD" == false ]]; then
+        _handle_systemd
+        _enable_systemd_units
     fi
+
+    _cleanup
+    _installation_complete
 else
     _operation_canceled
     exit 1

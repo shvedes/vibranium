@@ -100,8 +100,6 @@ _update() {
         _apply_stash
 
         vb-update-migrate
-        rm -f "$VIBRANIUM_STATE/update.available" || true
-        vb-cmd-refresh-bar-module vb-update
 
         echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $latest_tag"
 
@@ -137,8 +135,6 @@ _update() {
         _apply_stash
 
         vb-update-migrate
-        rm -f "$VIBRANIUM_STATE/update.available" || true
-        vb-cmd-refresh-bar-module vb-update
 
         echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $remote_short"
     fi
@@ -148,6 +144,9 @@ _update() {
 
 term::show_header
 term::disable_input
+
+rm -f "$VIBRANIUM_STATE/update.available" || true
+vb-cmd-refresh-bar-module vibranium-update
 
 if term::ask_yes_no Y "Proceed with update?"; then
     _update

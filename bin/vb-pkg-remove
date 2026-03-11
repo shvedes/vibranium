@@ -23,8 +23,12 @@ EOF
 }
 
 _ask_for_sudo() {
+    term::enable_input
+
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to uninstall packages"
     sudo -v
+
+    term::disable_input
 }
 
 # Detects which systemd units provided by PACKAGES are currently enabled.
