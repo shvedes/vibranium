@@ -41,6 +41,7 @@ hypridle
 gvfs-mtp
 engrampa
 cliphist
+firefox
 zathura
 wiremix
 tumbler
