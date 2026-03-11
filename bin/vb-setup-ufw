@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+_operation_canceled() {
+    printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+    read -n1 -r -s -p $'. Press any key to exit' dummy
+
+    term::enable_input
+}
+
+_operation_complete() {
+    printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+    read -n1 -r -p $'. Press any key to exit ' dummy
+
+    term::enable_input
+}
+
+_docker_tweaks() {
+    local ufw_docker_url="https://raw.githubusercontent.com/chaifeng/ufw-docker/refs/heads/master/ufw-docker"
+    sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 comment 'allow-docker-dns' &> /dev/null
+    curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &> /dev/null
+
+    # Just a little notice.
+    if ! id -nG "$USER" | grep -qw docker; then
+        echo -e "${BLUE}[VIBRANIUM]${RESET} You are not in the '${BLUE}docker${RESET}' group."
+        echo -e "${BLUE}[VIBRANIUM]${RESET} This is not required, but it allows running Docker without sudo."
+        echo -e "${BLUE}[VIBRANIUM]${RESET} You can add yourself with:"
+        echo -e "${BLUE}[VIBRANIUM]${RESET} ${RED}sudo ${GREEN}usermod ${YELLOW}-aG ${CYAN}docker ${BLUE}${USER}${RESET}"
+    fi
+}
+
+term::show_header
+
+if systemctl -q is-enabled ufw; then
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall is already set up and working"
+    _operation_complete
+    exit 0
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup ufw (Uncomplicated Firewall)"
+
+if ! term::ask_yes_no Y "Proceed with setup?"; then
+    _operation_canceled
+    exit 1
+fi
+
+install_flags=(
+    --no-ask
+    --no-logo
+    --no-dummy
+    --no-verify
+    --no-systemd
+    --conservative
+)
+
+if ! vb-pkg-install "${install_flags[@]}" ufw; then
+    _operation_canceled
+    exit 1
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up firewall rules"
+
+summary_rules=()
+
+# Allow nothing in, everything out
+sudo ufw default deny incoming &> /dev/null
+sudo ufw default allow outgoing &> /dev/null
+summary_rules+=("Default policy: ${RED}deny incoming${RESET}, ${GREEN}allow outgoing${RESET}")
+
+if command -v ssh > /dev/null; then
+    if systemctl -q is-enabled sshd; then
+        echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up ssh ports"
+        port=$(grep -Po '^Port\s+\K\d+' /etc/ssh/sshd_config)
+
+        if [[ -n "$port" ]]; then
+            echo -e "${YELLOW}[VIBRANIUM]${RESET} Using custom port: ${BLUE}$port${RESET}"
+        else
+            port=22
+        fi
+
+        # Allow from any device in LAN only.
+        sudo ufw allow from 192.168.1.0/24 to any port $port proto tcp &> /dev/null
+        summary_rules+=("SSH: allowed from ${CYAN}192.168.1.0/24${RESET} on port ${CYAN}$port/tcp${RESET}")
+    fi
+fi
+
+# Allow ports for LocalSend
+if command -v localsend > /dev/null; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring LocalSend"
+    sudo ufw allow 53317/udp &> /dev/null
+    sudo ufw allow 53317/tcp &> /dev/null
+    summary_rules+=("LocalSend: allowed ${CYAN}53317/tcp${RESET} and ${CYAN}53317/udp${RESET}")
+fi
+
+if command -v docker > /dev/null; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring docker..."
+    _docker_tweaks
+    summary_rules+=("Docker: DNS rule added for ${CYAN}172.16.0.0/12${RESET}, ufw-docker hook installed")
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up systemd unit"
+sudo systemctl -q enable ufw
+
+sudo ufw --force enable &> /dev/null
+sudo ufw reload &> /dev/null
+
+echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall setup complete and working. System restart is recommended."
+echo -e "${BLUE}[VIBRANIUM]${RESET} If you want to fine-tune your firewall rules, consider reading '${BLUE}ufw(8)${RESET}'"
+
+echo ""
+echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"
+
+for rule in "${summary_rules[@]}"; do
+    echo -e "${BLUE}[VIBRANIUM]${RESET}  • $rule"
+done
+
+echo -e "${BLUE}[VIBRANIUM]${RESET}  • UFW service: ${GREEN}enabled${RESET} and ${GREEN}active${RESET}"
+echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
+echo ""
+
+_operation_complete
+

@@ -53,7 +53,7 @@ _set_virsh_network() {
 }
 
 # Show logo
-printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+term::show_header
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup QEMU virtual machine."
 echo -e "${YELLOW}[VIBRANIUM]${RESET} In order to initialize the setup process, you'll need to install required packages first."
@@ -71,6 +71,7 @@ deps_list=(
 )
 
 install_flags=(
+    --no-ask
     --no-logo
     --no-dummy
     --no-verify

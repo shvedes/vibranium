@@ -3,6 +3,8 @@
 source vb-core-lib
 
 OPTIONS=(
+    "Firewall"
+    "Docker"
     "QEMU"
 )
 
@@ -11,9 +13,10 @@ while true; do
     [[ -z "$CHOSEN" ]] && break
 
     case "$CHOSEN" in
-        "QEMU")
-            vb-core-term --floating -- vb-setup-qemu
-            helpers::ui::close_menus
-            ;;
+        "QEMU") vb-core-term --floating -- vb-setup-qemu ;;
+        "Docker") vb-core-term --floating -- vb-setup-docker ;;
+        "Firewall") vb-core-term --floating -- vb-setup-ufw ;;
     esac
+
+    helpers::ui::close_menus
 done

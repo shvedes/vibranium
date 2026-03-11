@@ -1,0 +1,222 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
+
+_operation_canceled() {
+    printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+    read -n1 -r -s -p $'. Press any key to exit' dummy
+
+    term::enable_input
+}
+
+_operation_complete() {
+    printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+    read -n1 -r -p $'. Press any key to exit ' dummy
+
+    term::enable_input
+}
+
+_add_user_to_group() {
+    if ! id -nG "$USER" | grep -qw docker; then
+        echo -e "${YELLOW}[VIBRANIUM]${RESET} Adding ${CYAN}${USER}${RESET} to the '${CYAN}docker${RESET}' group"
+        sudo usermod -aG docker "$USER"
+        return 0   # was added
+    fi
+    return 1       # already a member
+}
+
+_configure_daemon() {
+    local desired
+    desired=$(cat <<'EOF'
+{
+    "log-driver": "json-file",
+    "log-opts": { "max-size": "10m", "max-file": "5" },
+    "dns": ["172.17.0.1"],
+    "bip": "172.17.0.1/16"
+}
+EOF
+)
+
+    if [ -f /etc/docker/daemon.json ] && \
+       diff -q <(echo "$desired") /etc/docker/daemon.json &>/dev/null; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} Docker daemon config: already up to date, skipping"
+        return 1   # unchanged
+    fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring Docker daemon (log rotation + DNS)"
+    sudo mkdir -p /etc/docker
+    echo "$desired" | sudo tee /etc/docker/daemon.json >/dev/null
+    return 0       # written
+}
+
+_configure_resolved() {
+    local conf=/etc/systemd/resolved.conf.d/20-docker-dns.conf
+    local desired=$'[Resolve]\nDNSStubListenerExtra=172.17.0.1'
+
+    if [ -f "$conf" ] && \
+       diff -q <(echo "$desired") "$conf" &>/dev/null; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} systemd-resolved config: already up to date, skipping"
+        return 1   # unchanged
+    fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Exposing systemd-resolved to the Docker network"
+    sudo mkdir -p /etc/systemd/resolved.conf.d
+    echo -e "$desired" | sudo tee "$conf" >/dev/null
+    sudo systemctl restart systemd-resolved
+    return 0       # written
+}
+
+_configure_no_block_boot() {
+    local conf=/etc/systemd/system/docker.service.d/no-block-boot.conf
+    local desired=$'[Unit]\nDefaultDependencies=no'
+
+    if [ -f "$conf" ] && \
+       diff -q <(echo "$desired") "$conf" &>/dev/null; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} Boot-block prevention drop-in: already up to date, skipping"
+        return 1   # unchanged
+    fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Preventing Docker from blocking boot (network-online.target)"
+    sudo mkdir -p /etc/systemd/system/docker.service.d
+    echo -e "$desired" | sudo tee "$conf" >/dev/null
+    return 0       # written
+}
+
+_configure_ufw() {
+    # Skip entirely if ufw is not installed or not active
+    if ! command -v ufw &>/dev/null; then
+        return 2   # ufw absent
+    fi
+    if ! sudo ufw status 2>/dev/null | grep -q "^Status: active"; then
+        return 2   # ufw inactive
+    fi
+
+    local dns_rule_present=false
+    local ufw_docker_present=false
+
+    # DNS rule: look for our comment tag in the ruleset
+    if sudo ufw status verbose 2>/dev/null | grep -q 'allow-docker-dns'; then
+        dns_rule_present=true
+    fi
+
+    # ufw-docker: it appends a clearly-marked block to /etc/ufw/after.rules
+    if grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2>/dev/null; then
+        ufw_docker_present=true
+    fi
+
+    if $dns_rule_present && $ufw_docker_present; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} UFW Docker rules: already in place, skipping"
+        return 1   # unchanged
+    fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring UFW for Docker"
+
+    if ! $dns_rule_present; then
+        sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 \
+            comment 'allow-docker-dns' &>/dev/null
+    fi
+
+    if ! $ufw_docker_present; then
+        local ufw_docker_url="https://raw.githubusercontent.com/chaifeng/ufw-docker/refs/heads/master/ufw-docker"
+        curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &>/dev/null
+    fi
+
+    return 0       # applied
+}
+
+# ─────────────────────────────────────────────────────────────
+
+term::show_header
+
+if systemctl -q is-enabled docker.socket 2>/dev/null || \
+   systemctl -q is-enabled docker.service 2>/dev/null; then
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Docker is already set up and working"
+    _operation_complete
+    exit 0
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup Docker"
+
+if ! term::ask_yes_no Y "Proceed with setup?"; then
+    _operation_canceled
+    exit 1
+fi
+
+install_flags=(
+    --no-ask
+    --no-logo
+    --no-dummy
+    --no-verify
+    --no-systemd
+    --conservative
+)
+
+if ! vb-pkg-install "${install_flags[@]}" docker docker-compose; then
+    _operation_canceled
+    exit 1
+fi
+
+summary_rules=()
+
+# ── Systemd unit ──────────────────────────────────────────────
+if term::ask_yes_no Y "Enable systemd socket? (recommended — starts Docker on first use)"; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling docker.socket"
+    sudo systemctl -q enable --now docker.socket
+    summary_rules+=("Docker unit: ${GREEN}docker.socket${RESET} enabled and started")
+else
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling docker.service"
+    sudo systemctl -q enable --now docker.service
+    summary_rules+=("Docker unit: ${GREEN}docker.service${RESET} enabled and started")
+fi
+
+# ── Daemon configuration ──────────────────────────────────────
+if _configure_daemon; then
+    summary_rules+=("Daemon config: ${GREEN}written${RESET} (log rotation, DNS bridge)")
+else
+    summary_rules+=("Daemon config: ${CYAN}unchanged${RESET}")
+fi
+
+# ── systemd-resolved DNS stub ─────────────────────────────────
+if _configure_resolved; then
+    summary_rules+=("systemd-resolved: ${GREEN}updated${RESET} (172.17.0.1 stub listener added)")
+else
+    summary_rules+=("systemd-resolved: ${CYAN}unchanged${RESET}")
+fi
+
+# ── Boot-block prevention ─────────────────────────────────────
+if _configure_no_block_boot; then
+    sudo systemctl daemon-reload
+    summary_rules+=("Boot-block drop-in: ${GREEN}written${RESET}")
+else
+    summary_rules+=("Boot-block drop-in: ${CYAN}unchanged${RESET}")
+fi
+
+# ── UFW firewall rules ────────────────────────────────────────
+_configure_ufw
+case $? in
+    0) summary_rules+=("UFW: ${GREEN}Docker rules applied${RESET} (DNS stub + ufw-docker)") ;;
+    1) summary_rules+=("UFW: ${CYAN}unchanged${RESET}") ;;
+    2) summary_rules+=("UFW: ${YELLOW}not active${RESET}, skipped") ;;
+esac
+
+# ── Docker group ──────────────────────────────────────────────
+if _add_user_to_group; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} A re-login is needed for the group change to take effect"
+    summary_rules+=("User ${CYAN}${USER}${RESET}: ${GREEN}added${RESET} to the ${CYAN}docker${RESET} group (re-login required)")
+else
+    summary_rules+=("User ${CYAN}${USER}${RESET}: already in the ${CYAN}docker${RESET} group")
+fi
+
+echo -e "${BLUE}[VIBRANIUM]${RESET} If you want to fine-tune your Docker configuration, consider reading '${BLUE}dockerd(8)${RESET}'"
+
+echo ""
+echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"
+for rule in "${summary_rules[@]}"; do
+    echo -e "${BLUE}[VIBRANIUM]${RESET}  • $rule"
+done
+echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
+echo ""
+
+_operation_complete

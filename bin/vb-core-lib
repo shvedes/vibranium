@@ -7,9 +7,6 @@ source "$VIBRANIUM_PATH/vb-core-defaults"
 source "$XDG_CONFIG_HOME/vibranium/settings"
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
-# PKG / Font Install / Removal scripts
-export VIBRANIUM_SUDO_PROMPT
-
 RED=$'\e[0;31m'
 YELLOW=$'\e[0;33m'
 BLUE=$'\e[0;34m'
@@ -18,6 +15,10 @@ GREEN=$'\e[0;32m'
 CYAN=$'\e[0;36m'
 GRAY=$'\e[90m'
 RESET=$'\e[0m'
+
+# PKG / Font Install / Removal scripts
+VIBRANIUM_SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
+export VIBRANIUM_SUDO_PROMPT
 
 # helpers::ui::menu — Dynamic rofi dmenu wrapper with automatic window sizing
 #
