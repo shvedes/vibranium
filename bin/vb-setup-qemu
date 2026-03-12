@@ -69,14 +69,14 @@ _configure_ufw() {
 term::show_header
 term::disable_input
 
-# if command -v virsh > /dev/null; then
-#     if systemctl -q is-enabled libvirtd.socket ||
-#         systemctl -q is-enabled libvirtd.service; then
-#         echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU is already set up and running"
-#         _operation_complete
-#         exit 0
-#     fi
-# fi
+if command -v virsh > /dev/null; then
+    if systemctl -q is-enabled libvirtd.socket ||
+        systemctl -q is-enabled libvirtd.service; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU is already set up and running"
+        _operation_complete
+        exit 0
+    fi
+fi
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup QEMU VM (${BLUE}libvirt${RESET})"
 
