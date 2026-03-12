@@ -10,6 +10,10 @@ OPTIONS=(
     "Help"
 )
 
+if [[ "$VIBRANIUM_STATE/update.available" ]]; then
+    OPTIONS+=("<b>Update Vibranium</b>")
+fi
+
 INDEX=0
 
 while true; do
@@ -66,6 +70,10 @@ while true; do
                         ;;
                 esac
             done
+            ;;
+        *"Update Vibranium"*)
+            vb-core-term --floating -- vb-update
+            exit 0
             ;;
         *)
             continue
