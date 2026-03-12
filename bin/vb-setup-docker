@@ -78,7 +78,7 @@ _configure_no_block_boot() {
         return 1   # unchanged
     fi
 
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Preventing Docker from blocking boot (network-online.target)"
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Preventing Docker from blocking boot (${BLUE}network-online.target${RESET})"
     sudo mkdir -p /etc/systemd/system/docker.service.d
     echo -e "$desired" | sudo tee "$conf" >/dev/null
     return 0       # written
@@ -129,6 +129,7 @@ _configure_ufw() {
 # ─────────────────────────────────────────────────────────────
 
 term::show_header
+term::disable_input
 
 if systemctl -q is-enabled docker.socket 2>/dev/null || \
    systemctl -q is-enabled docker.service 2>/dev/null; then
@@ -144,7 +145,7 @@ if ! term::ask_yes_no Y "Proceed with setup?"; then
     exit 1
 fi
 
-if ! vb-pkg-install "${install_flags[@]}" docker docker-compose; then
+if ! vb-pkg-install --embedded -- docker docker-compose; then
     _operation_canceled
     exit 1
 fi
@@ -152,7 +153,7 @@ fi
 summary_rules=()
 
 # ── Systemd unit ──────────────────────────────────────────────
-if term::ask_yes_no Y "Enable systemd socket? (recommended — starts Docker on first use)"; then
+if term::ask_yes_no Y "Enable systemd socket? (${GREEN}recommended${RESET} — starts Docker on first use)"; then
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling docker.socket"
     sudo systemctl -q enable --now docker.socket
     summary_rules+=("Docker unit: ${GREEN}docker.socket${RESET} enabled and started")
@@ -200,7 +201,7 @@ else
     summary_rules+=("User ${CYAN}${USER}${RESET}: already in the ${CYAN}docker${RESET} group")
 fi
 
-echo -e "${BLUE}[VIBRANIUM]${RESET} If you want to fine-tune your Docker configuration, consider reading '${BLUE}dockerd(8)${RESET}'"
+echo -e "${BLUE}[VIBRANIUM]${RESET} If you want to fine-tune your Docker configuration, consider reading ${BLUE}docker(1)${RESET}"
 
 echo ""
 echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"

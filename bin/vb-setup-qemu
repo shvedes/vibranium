@@ -2,7 +2,7 @@
 
 source vb-core-lib
 
-REBOOT_NEEDED=false
+export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
 
 _operation_canceled() {
     printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
@@ -18,22 +18,14 @@ _operation_complete() {
     term::enable_input
 }
 
-_ensure_group() {
-    local user_groups="$(groups)"
-
-    if [[ "$user_groups" =~ libvirt ]]; then
-        return 0
-    else
-        return 1
+_add_user_to_group() {
+    if groups | grep -qw libvirt; then
+        return 1   # already a member
     fi
-}
 
-# Add current $USER to the libvirt
-# group to allow unprivileged usage.
-_set_user_group() {
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up user group"
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Adding ${CYAN}${USER}${RESET} to the '${CYAN}libvirt${RESET}' group"
     sudo usermod -aG libvirt "$USER"
-    REBOOT_NEEDED=true
+    return 0   # was added
 }
 
 _enable_systemd_units() {
@@ -44,72 +36,98 @@ _enable_systemd_units() {
     for socket in "${sockets[@]}"; do
         sudo systemctl -q enable --now "${socket##*/}" &
     done
+
+    sudo systemctl -q enable --now dnsmasq.service &
 }
 
-_set_virsh_network() {
-    # Redirect to /dev/null in case if it's already active
-    sudo virsh -q net-autostart default 2> /dev/null || true
-    sudo virsh -q net-start default 2> /dev/null || true
+_configure_virsh_network() {
+    # Redirect to /dev/null in case it's already active
+    sudo virsh -q net-autostart default 2>/dev/null || true
+    sudo virsh -q net-start default 2>/dev/null || true
 }
 
-# Show logo
+_configure_ufw() {
+    if ! command -v ufw &>/dev/null; then
+        return 2   # ufw absent
+    fi
+
+    local conf=/etc/libvirt/network.conf
+    local desired=$'# Vibranium overrides below\nfirewall_backend = "iptables"'
+
+    if grep -q 'firewall_backend' "$conf" 2>/dev/null; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} UFW libvirt config: already up to date, skipping"
+        return 1   # unchanged
+    fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring firewall for libvirt"
+    echo -e "\n\n$desired" | sudo tee -a "$conf" >/dev/null
+    return 0       # applied
+}
+
+# ─────────────────────────────────────────────────────────────
+
 term::show_header
+term::disable_input
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup QEMU virtual machine."
-echo -e "${YELLOW}[VIBRANIUM]${RESET} In order to initialize the setup process, you'll need to install required packages first."
+if command -v virsh > /dev/null; then
+    if systemctl -q is-enabled libvirtd.socket ||
+        systemctl -q is-enabled libvirtd.service; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU is already set up and running"
+        _operation_complete
+        exit 0
+    fi
+fi
 
-if ! term::ask_yes_no Y "Proceed with installation?"; then
+echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup QEMU VM (${BLUE}libvirt${RESET})"
+
+if ! term::ask_yes_no Y "Proceed with setup?"; then
     _operation_canceled
     exit 1
 fi
 
-deps_list=(
-    libvirt
-    dnsmasq
-    qemu-desktop
-    virt-manager
-)
-
-install_flags=(
-    --no-ask
-    --no-logo
-    --no-dummy
-    --no-verify
-    --no-systemd
-    --conservative
-)
-
-if ! vb-pkg-install "${install_flags[@]}" "${deps_list[@]}"; then
+if ! vb-pkg-install --embedded -- libvirt dnsmasq qemu-desktop virt-manager; then
     _operation_canceled
     exit 1
 fi
 
-if ! _ensure_group; then
-    _set_user_group
+summary_rules=()
+
+# ── User group ────────────────────────────────────────────────
+if _add_user_to_group; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} A system restart is recommended for the group change to take effect"
+    summary_rules+=("User ${CYAN}${USER}${RESET}: ${GREEN}added${RESET} to the ${CYAN}libvirt${RESET} group (restart recommended)")
+else
+    summary_rules+=("User ${CYAN}${USER}${RESET}: already in the ${CYAN}libvirt${RESET} group")
 fi
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up systemd units..."
+# ── Systemd units ─────────────────────────────────────────────
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling systemd units"
 _enable_systemd_units
+summary_rules+=("Systemd units: ${GREEN}enabled and started${RESET}")
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up virtual network..."
-_set_virsh_network
+# ── Virtual network ───────────────────────────────────────────
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up virtual network"
+_configure_virsh_network
+summary_rules+=("Virtual network: ${GREEN}default network autostart configured${RESET}")
 
-if command -v ufw > /dev/null; then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring firewall..."
-    echo -e "\n\n# Vibranium overrides below" | sudo tee -a /etc/libvirt/network.conf > /dev/null
-    echo -e "firewall_backend = \"iptables\"" | sudo tee -a /etc/libvirt/network.conf > /dev/null
-fi
+# ── UFW firewall rules ────────────────────────────────────────
+_configure_ufw
+case $? in
+    0) summary_rules+=("UFW: ${GREEN}libvirt iptables backend configured${RESET}") ;;
+    1) summary_rules+=("UFW: ${CYAN}unchanged${RESET}") ;;
+    2) summary_rules+=("UFW: ${YELLOW}not present${RESET}, skipped") ;;
+esac
 
-echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU setup complete!"
-
-if [[ "$REBOOT_NEEDED" == true ]]; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Your user groups have been updated"
-    echo -e "${GREEN}[VIBRANIUM]${RESET} System restart required"
-fi
+echo ""
+echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"
+for rule in "${summary_rules[@]}"; do
+    echo -e "${BLUE}[VIBRANIUM]${RESET}  • $rule"
+done
+echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
+echo ""
 
 if term::ask_yes_no Y "Launch VM Manager now?"; then
-    exec setsid -f virt-manager &> /dev/null
+    exec setsid -f virt-manager &>/dev/null
 else
     _operation_complete
 fi
-
