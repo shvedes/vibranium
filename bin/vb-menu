@@ -10,7 +10,7 @@ OPTIONS=(
     "Help"
 )
 
-if [[ "$VIBRANIUM_STATE/update.available" ]]; then
+if [[ -f "$VIBRANIUM_STATE/update.available" ]]; then
     OPTIONS+=("<b>Update Vibranium</b>")
 fi
 
