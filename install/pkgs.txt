@@ -17,6 +17,7 @@ pacman-contrib
 pipewire-pulse
 python-gobject
 noto-fonts-cjk
+wireless-regdb
 xdg-user-dirs
 thunar-volman
 pipewire-jack

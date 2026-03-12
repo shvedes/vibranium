@@ -2,11 +2,8 @@
 
 # WARN: at the moment, it doesn't work as expected.
 
-<<<<<<< Updated upstream
 exit 0
 
-=======
->>>>>>> Stashed changes
 firefox -CreateProfile default-release
 
 PROFILE_DIR=$(echo "$HOME/.config/mozilla/firefox/"*.default-release)

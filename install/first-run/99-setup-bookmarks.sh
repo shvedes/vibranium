@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# Automatically populate sidebar menu (bookmarks)
+# with the default XDG folders.
+
 _parse_user_dirs() {
     local file="$XDG_CONFIG_HOME/user-dirs.dirs"
 

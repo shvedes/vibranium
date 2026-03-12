@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+if [[ "$(id -u)" == 0 ]]; then
+    echo "Do not run this script as root!" >&2
+    exit 1
+fi
+
 exec </dev/tty
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
@@ -26,13 +31,31 @@ printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
 
 _show_logo
 
-_log_info "Welcome to Vibranium, an Omarchy-like Arch Linux configuration"
-_log_info "aimed to be simple, bazingly fast and highly customizable."
+_log_info "Welcome to Vibranium, an Omarchy-like Arch Linux configuration."
+_log_info "It is designed to be simple, extremely fast, and highly customizable."
 _log_info ""
-_log_info "The installer will edit system files, install needed packages"
-_log_info "and configure Vibranium specifically for your hardware."
+_log_info "This installer will directly modify system files, install packages,"
+_log_info "change configuration across the system, and tune everything"
+_log_info "specifically for your hardware."
+_log_info ""
+_log_info "WARNING: This installer creates NO backups."
+_log_info "Existing configuration files may be overwritten without notice."
+_log_info ""
+_log_info "Vibranium is NOT intended to be installed on an existing system."
+_log_info "Running it on a system that already contains data, custom configs,"
+_log_info "or another setup may break your environment or cause data loss."
+_log_info ""
+_log_info "Only proceed if this is a fresh Arch Linux installation created"
+_log_info "manually or with archinstall."
+_log_info ""
+_log_info "If you are unsure, STOP now and create a clean installation first."
 
-if ! _ask_yes_no Y "Proceed with Installation?"; then
+if _ask_yes_no Y "Proceed with Installation?"; then
+    if ! _ask_yes_no Y "Proceed with Installation? (double check)"; then
+        _log_error "Installation aborted"
+        exit 1
+    fi
+else
     _log_error "Installation aborted"
     exit 1
 fi
@@ -42,7 +65,7 @@ if [[ $(hostnamectl chassis) == vm ]]; then
     _log_error "You may encounter unexpected bugs, slow performance, or not working WM at all."
     _log_error "You have been warned."
 
-    if ! _ask_yes_no Y "I understand this."; then
+    if ! _ask_yes_no Y "Continue?"; then
         _log_error "Installation aborted"
         exit 1
     fi
@@ -60,7 +83,7 @@ fi
 
 YAY_PRESENT=false
 CURRENT_STEP=0
-TOTAL_STEPS=11
+TOTAL_STEPS=10
 
 if _is_installed "yay"; then
     YAY_PRESENT=true
@@ -71,24 +94,6 @@ if [[ "$YAY_PRESENT" == false ]]; then
 fi
 
 mapfile -t PACKAGES < "$SCRIPT_DIR/pkgs.txt"
-
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
-{
-    bash "$SCRIPT_DIR/setup-system"
-    bash "$SCRIPT_DIR/setup-tmpfiles"
-    bash "$SCRIPT_DIR/setup-sysctl"
-    bash "$SCRIPT_DIR/setup-zram"
-}
-
-# I want to install yay first,
-# but we have to keep this step here for now
-# because we're modifying the main pacman config above.
-#
-# Later I’ll reorder this so that pacman.conf
-# and makepkg.conf are updated first,
-# then yay is installed,
-# and only after that system files / configs are set up.
 
 [[ "$YAY_PRESENT" == false ]] && {
     CURRENT_STEP=$((CURRENT_STEP + 1))
@@ -102,6 +107,12 @@ _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
         exit 1
     fi
 }
+
+CURRENT_STEP=$((CURRENT_STEP + 1))
+_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
+for script in "$SCRIPT_DIR/config"/*.sh; do
+    bash "$script"
+done
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing packages"
@@ -136,10 +147,6 @@ _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing default theme"
 bash "$SCRIPT_DIR/setup-theme"
 
 CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up mime types"
-bash "$SCRIPT_DIR/setup-mimetypes"
-
-CURRENT_STEP=$((CURRENT_STEP + 1))
 _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Running post-install scripts"
 bash "$SCRIPT_DIR/post-install"
 
@@ -150,7 +157,7 @@ if _ask_yes_no Y "Reboot now?"; then
     for sec in {5..1}; do
         for step in {0..3}; do
             dots=$(printf "%.*s" "$step" "...")
-            printf "\r\033[K%s[VIBRANIUM]%s Restarting PC in %d%s" \
+            printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" \
                 "$YELLOW" "$RESET" "$sec" "$dots"
             sleep 0.25
         done

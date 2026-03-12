@@ -1,88 +1,25 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+WORKER="$VIBRANIUM_RUNTIME/worker.active"
+FIRSTBOOT_HOOKS="$VIBRANIUM/install/first-run"
 
-FIRSTBOOT_SCRIPTS="$VIBRANIUM/install/first-run"
-
-_get_power_profile() {
-    if [[ "$CHASSIS_TYPE" == desktop ]]; then
-        echo "performance"
-    else
-        local battery_file
-        local battery_status
-
-        battery_file="/sys/class/power_supply/BAT0/status"
-
-        if [[ -f "$battery_file" ]]; then
-            battery_status=$(< "$battery_file")
-
-            if [[ "$battery_status" == "Charging" ]]; then
-                echo "performance"
-            else
-                echo "balanced"
-            fi
-        else
-            echo "balanced"
-        fi
-
-    fi
-}
-
-rm -f "$VIBRANIUM_STATE/first-run"
-
-echo "Finishing installation..." > "$VIBRANIUM_RUNTIME/worker.active"
+# Set Waybar icon
+echo "Finishing installation..." > "$WORKER"
 vb-cmd-refresh-bar-module worker
 
-vb-theme-cursor-set --quiet macOS
+# Generate XDG directories
 xdg-user-dirs-update --force
 
-if [[ "$CHASSIS_TYPE" == vm ]]; then
-    msg="\n<span foreground='${P_YELLOW}'><b><i>You need to be aware of certain things</i></b></span>:\n\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Screen recording is not available</b></span>\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Do not expect power profiles to work as expected</b></span>\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Some effects will not work due to the nature of the virtual GPU</b></span>\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Overall performance will be worse than on real hardware</b></span>\n\n"
-    msg+="Use <span foreground='${P_YELLOW}'><b>Vibranium</b></span> on a virtual machine for informational purposes only.\n"
-    msg+="Many things have not been tested, so there may be unexpected surprises.\n"
-    msg+="Only <span foreground='${P_YELLOW}'><b>QEMU</b></span> has been tested; "
-    msg+="<span foreground='${P_YELLOW}'><b>Virtualbox</b></span> & "
-    msg+="<span foreground='${P_YELLOW}'><b>VMware</b></span> are not supported.\n\n"
-    msg+="<b>Right-click</b> to dismiss this notification"
+for hook in "${FIRSTBOOT_HOOKS}"/*.sh; do
+    echo "Running "${hook##*/}"." > "$WORKER"
+    vb-cmd-refresh-bar-module worker
 
-    notify-send -r 2 -t 1800000 "Vibranium Is Running In a Virtual Machine" "$msg"
-fi
-
-msg="\nPress <span foreground='${P_YELLOW}'><b>SUPER + A</b></span>      to open app launcher\n"
-msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + V</b></span> to open Vibranium menu\n\n"
-msg+="<b>Right-click</b> to dismiss this notification\n"
-notify-send -r 1 -t 1800000 "Welcome to Vibranium" "$msg"
-
-chromium --no-startup-window --set-theme-color="25, 35, 48" &> /dev/null &
-
-POWER_PROFILE="$(_get_power_profile)"
-
-vb-core-power "$POWER_PROFILE"
-
-if [[ "$POWER_PROFILE" == "performance" ]]; then
-    if [[ "$CHASSIS_TYPE" == desktop ]]; then
-        msg="Vibranium is running on a desktop. Performance power profile was set explicitly"
-    else
-        msg="You're running off AC. Performance power profile was set explicitly"
-    fi
-
-    notify-send -r 3 -t 5000 "Vibranium" "$msg"
-fi
-
-echo "Running post-install hooks..." > "$VIBRANIUM_RUNTIME/worker.active"
-vb-cmd-refresh-bar-module worker
-
-for script in "${FIRSTBOOT_SCRIPTS}"/*.sh; do
-    bash "$script"
+    bash "$hook"
 done
 
+# Remove Waybar icon
 rm -f "$VIBRANIUM_RUNTIME/worker.active"
 vb-cmd-refresh-bar-module worker
+
+# Remove first run marker
+rm -f "$VIBRANIUM_STATE/first-run"

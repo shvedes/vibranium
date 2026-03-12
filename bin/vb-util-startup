@@ -74,8 +74,7 @@ if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
 fi
 
 wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"
-[[ -f "$wallpaper_file" ]] || \
-    vb-cmd-get-wallpaper > "$wallpaper_file"
+[[ -f "$wallpaper_file" ]] || vb-cmd-get-wallpaper > "$wallpaper_file"
 
 hyprpaper_unit="$(systemctl --user is-enabled hyprpaper)"
 if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then

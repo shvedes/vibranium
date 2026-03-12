@@ -20,6 +20,17 @@ user_timers=(
     "vibranium-update"
 )
 
+masked_services=(
+    "systemd-networkd-wait-online.service"
+)
+
+for service in "${masked_services[@]}"; do
+    if systemctl -q is-enabled "$service"; then
+        sudo systemctl -q disable "$service"
+        sudo systemctl -q mask "$service"
+    fi
+done
+
 for service in "${system_services[@]}"; do
     sudo systemctl -q enable "$service"
 done

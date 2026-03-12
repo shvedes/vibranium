@@ -3,6 +3,7 @@
 VIBRANIUM="$HOME/.local/share/vibranium"
 
 declare -A LINKS=(
+    # It's probably not the best practice...
     ["$HOME/.local/share/vibranium/default/uwsm/env"]="$HOME/.config/uwsm/env"
 )
 
@@ -25,31 +26,14 @@ yay -Ycc --noconfirm &> /dev/null
 # Initial state for the hyprsunset
 printf "suspended" > "$HOME/.local/state/vibranium/night-light"
 
-# Disable Discord's update checks
-# https://wiki.archlinux.org/title/Discord#Discord_asks_for_an_update_not_yet_available_in_the_repository
-mkdir -p "$HOME/.config/discord"
-printf '{\n\t"SKIP_HOST_UPDATE": true\n}' > "$HOME/.config/discord/settings.json"
-
 # Vibranium does not depend on the brightnessctl tool.
 # It uses sysfs directly, so we need video group
 if [ ! -z "$(find /sys/class/backlight -mindepth 1 -maxdepth 1 2>/dev/null)" ]; then
     sudo usermod -aG video "$USER"
 fi
 
-# https://www.reddit.com/r/linuxquestions/comments/t7ze3c/thunar_open_file_in_neovim/
-cp /usr/share/applications/nvim.desktop "$HOME"/.local/share/applications
-sed -e '/Terminal/s/true/false/' -e '/^Exec/s/=/=vb-core-term -- /' \
-    -i "$HOME"/.local/share/applications/nvim.desktop
-
-# The settings file
-cat > "$HOME/.config/vibranium/settings" <<'EOF'
-# vim:ft=bash
-# shellcheck disable=all
-# Auto-generated file. Do not edit!
-EOF
-
 # First run marker
 : > "$HOME/.local/state/vibranium/first-run"
 
-mkdir -p "$HOME"/.config/vibranium/{startup/shutdown}
-
+mkdir -p "$HOME/.config/vibranium/startup"
+mkdir -p "$HOME/.config/vibranium/shutdown"

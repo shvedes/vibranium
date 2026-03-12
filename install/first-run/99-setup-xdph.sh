@@ -9,10 +9,10 @@ cat <<EOF > "$XDG_CONFIG_HOME/hypr/xdph.conf"
 # You can safely change it if needed.
 
 screencopy {
-    max_fps = "$REFRESH_RATE"
+    max_fps = $REFRESH_RATE
 	allow_token_by_default = true
 }
 EOF
 
 killall -e xdg-desktop-portal-hyprland
-exec setsid -f /usr/lib/xdg-desktop-portal-hyprland
+exec setsid -f /usr/lib/xdg-desktop-portal-hyprland &> /dev/null

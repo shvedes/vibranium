@@ -37,7 +37,7 @@ _enable_systemd_units() {
         sudo systemctl -q enable --now "${socket##*/}" &
     done
 
-    sudo systemctl -q enable --now dnsmasq.service &
+    # sudo systemctl -q enable --now dnsmasq.service &
 }
 
 _configure_virsh_network() {
