@@ -26,9 +26,10 @@ contrast_color() {
     fi
 }
 
-tooltip="\tClick to pick a color"
+tooltip="Click to pick a color"
 
 if [[ -s $history_file ]]; then
+    tooltip="\tClick to pick a color"
     tooltip+="\n     Right click to <span foreground='red3'><b>clear history</b></span>"
     tooltip+="\n<span foreground='gray'>---------------------------------------</span>"
     tooltip+="\\n\\t    <span size='9000'>Recent colors</span>"
