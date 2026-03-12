@@ -25,7 +25,7 @@ yay -Scc --noconfirm &> /dev/null
 yay -Ycc --noconfirm &> /dev/null
 
 # Initial state for the hyprsunset
-printf "suspended" > "$HOME/.local/state/vibranium/night-light"
+printf "suspended" > "$HOME/.local/state/vibranium/nightshift"
 
 # Vibranium does not depend on the brightnessctl tool.
 # It uses sysfs directly, so we need video group
