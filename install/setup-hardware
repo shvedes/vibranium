@@ -57,7 +57,7 @@ case "$VGA_STR" in
             "lib32-vulkan-radeon"
         )
         ;;
-    *UHD*|*Iris*|*Arc*|*HD Graphics*)
+    *UHD*|*Iris*|*Arc*|*"HD Graphics"*)
         _log_info "Installing Intel GPU drivers"
         PACKAGES+=(
             "mesa"
@@ -68,25 +68,22 @@ case "$VGA_STR" in
 
         case "$VGA_STR" in
             # Broadwell (2014) and newer
-            *Broadwell*|*Skylake*|*Kaby Lake*|*Coffee Lake*|*Comet Lake*|*Ice Lake*|*Tiger Lake*|*Alder Lake*|*Raptor Lake*|*Arc*)
+            *Broadwell*|*Skylake*|*"Kaby Lake"*|*"Coffee Lake"*|*"Comet Lake"*|*"Ice Lake"*|*"Tiger Lake"*|*"Alder Lake"*|*"Raptor Lake"*|*Arc*)
                 PACKAGES+=("intel-media-driver")
                 ;;
             # GMA 4500 (2008) up to pre-Broadwell
-            *Penryn*|*Nehalem*|*Westmere*|*Sandy Bridge*|*Ivy Bridge*|*Haswell*)
+            *Penryn*|*Nehalem*|*Westmere*|*"Sandy Bridge"*|*"Ivy Bridge"*|*Haswell*)
                 PACKAGES+=("libva-intel-driver")
                 ;;
         esac
 
         case "$VGA_STR" in
-            *Tiger Lake*|*Alder Lake*|*Raptor Lake*)
-                PACKAGES+=("vpl-gpu-rt")
-                ;;
-            *)
-                PACKAGES+=("intel-media-sdk")
-                ;;
+            *"Tiger Lake"*|*"Alder Lake"*|*"Raptor Lake"*)
+                PACKAGES+=("vpl-gpu-rt") ;;
+            *) PACKAGES+=("intel-media-sdk") ;;
         esac
         ;;
-    "*Red Hat*"|*Virtio*)
+    *"Red Hat"*|*Virtio*)
         _log_info "Running inside of a Virtual Machine"
         _log_info "Skipping GPU drivers check"
         :
