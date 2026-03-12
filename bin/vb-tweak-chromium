@@ -31,7 +31,7 @@ case "$1" in
         if grep -q "oauth2" "$TARGET"; then
             sed -i '/--oauth2/d' "$TARGET"
 
-            msg="Google sync has been disbaled."
+            msg="Google sync has been disbaled"
 
             if pidof -q chromium; then
                 msg+="\n\n<b>Please restart your browser</b>"

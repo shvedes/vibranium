@@ -329,7 +329,7 @@ _cleanup() {
     yay -Ycc --noconfirm &> /dev/null
 
     if [[ "$KEEP_CACHE" == false ]]; then
-        echo -e "${BLUE}[VIBRANIUM]${RESET} Removing cached packaghes"
+        echo -e "${BLUE}[VIBRANIUM]${RESET} Removing package cache"
         yay -Scc --noconfirm &> /dev/null
     fi
 }
