@@ -157,11 +157,11 @@ focus_if_running() {
     local pattern="$1"
     local address
     address=$(
-        hyprctl clients -j | jq -r --arg p "$pattern" '
+        hyprctl clients -j | jq -r --arg p "$pattern" --arg c "$class" '
             first(
                 .[]
                 | select(
-                    (.class | test("\\b" + $p + "\\b"; "i")) or
+                    (.class | startswith($c)) and
                     (.title | test("\\b" + $p + "\\b"; "i"))
                 )
                 | .address
