@@ -32,7 +32,7 @@ echo "  [1] release  - latest stable release (default)"
 echo "  [2] dev      - development branch"
 echo "  [3] upstream - master branch"
 while true; do
-    read -rp "Enter your choice [1/2/3] or press Enter for default: " branch_choice
+    read -rp "Enter your choice [1/2/3] or press Enter for default: " branch_choice < /dev/tty
 
     case "${branch_choice:-1}" in
         1|"release")
@@ -67,4 +67,3 @@ sleep 2
 
 # Run the installer
 exec bash "$INSTALL_DIR/install/install"
-
