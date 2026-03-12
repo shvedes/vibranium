@@ -20,7 +20,7 @@ if ! command -v pass > /dev/null; then
     notify-send -r 1 -t 5000 \
         "Password Manager" \
         "The password manager package is not installed!"
-    vb-pkg-install pass
+    vb-pkg-install --no-verify -- pass
     exit 0
 fi
 
