@@ -424,11 +424,14 @@ while [[ $# -gt 0 ]]; do
             fi
             break
             ;;
-        --*)
+        --*|-*)
             echo "Unknown option: $1" >&2
             exit 1
             ;;
-        *) break ;;
+        *)
+            echo "Unexpected argument: '$1'. Use '--' to separate options from packages." >&2
+            exit 1
+            ;;
     esac
 done
 
