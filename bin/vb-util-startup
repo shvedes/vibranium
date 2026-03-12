@@ -113,8 +113,9 @@ shopt -s nullglob
 
 HOOKS=("$XDG_CONFIG_HOME"/vibranium/startup/*.sh)
 
-if (( ${#HOOKS[@]} )); then
+if (( ${#HOOKS[@]} >= 1 )); then
     for hook in "${HOOKS[@]}"; do
         bash "$hook"
     done
 fi
+

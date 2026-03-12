@@ -6,7 +6,7 @@ P_YELLOW='#e0af68'
 P_ACCENT='#7aa2f7'
 P_RED='#f7768e'
 
-if [[ "$CHASSIS_TYPE" == desktop ]]; then
+if [[ "$CHASSIS_TYPE" == vm ]]; then
     msg="\n<span foreground='${P_YELLOW}'><b><i>You need to be aware of certain things</i></b></span>:\n\n"
     msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
     msg+="<span foreground='${P_RED}'><b>Screen recording is not available</b></span>\n"

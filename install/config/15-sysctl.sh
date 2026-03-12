@@ -70,5 +70,4 @@ vm.dirty_background_bytes = $DIRTY_BACKGROUND_BYTES
 # hundredths of a second. Default is 500.
 # vm.dirty_writeback_centisecs = $DIRTY_WRITEBACK_CENTISECS
 EOF
-EOF
 

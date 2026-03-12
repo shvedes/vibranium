@@ -10,7 +10,6 @@ exec </dev/tty
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 EXPECTED_PATH="$HOME/.local/share/vibranium/install"
-VIBRANIUM="$HOME/.local/share/vibranium"
 
 if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   echo "ERROR: This script must be run from $EXPECTED_PATH" >&2

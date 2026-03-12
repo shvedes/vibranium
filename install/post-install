@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 VIBRANIUM="$HOME/.local/share/vibranium"
+CURRENT_BRANCH="$(git -C "$VIBRANIUM" branch --show-current)"
 
 declare -A LINKS=(
     # It's probably not the best practice...
@@ -37,3 +38,16 @@ fi
 
 mkdir -p "$HOME/.config/vibranium/startup"
 mkdir -p "$HOME/.config/vibranium/shutdown"
+
+
+if [[ "$CURRENT_BRANCH" =~ v* ]]; then
+    printf "%s" "release" > \
+        "$HOME/.local/state/vibranium/update.channel"
+elif [[ "$CURRENT_BRANCH" == "dev" ]]; then
+    printf "%s" "dev" > \
+        "$HOME/.local/state/vibranium/update.channel"
+else
+    printf "%s" "upstream" > \
+        "$HOME/.local/state/vibranium/update.channel"
+fi
+
