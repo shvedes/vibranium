@@ -21,6 +21,24 @@ _confirm_kill_submenu() {
     done
 }
 
+_update_channel_submenu() {
+    local options chosen
+    options=("Release" "Upstream" "Dev")
+
+    while true; do
+        helpers::ui::menu chosen "Update Channel" "ESC to go back" -- "${options[@]}"
+        [[ -z "$chosen" ]] && break
+
+        case "$chosen" in
+            "Upstream") vb-dev-switch-channel upstream ;;
+            "Release")  vb-dev-switch-channel release ;;
+            "Dev")      vb-dev-switch-channel dev ;;
+            *) continue ;;
+        esac
+        break
+    done
+}
+
 INDEX=0
 
 while true; do
@@ -51,7 +69,7 @@ while true; do
 
     case "$CHOSEN" in
         "Update channel"*)
-            vb-dev-switch-channel
+            _update_channel_submenu
             ;;
         *"App launcher"*)
             cfgr-launcher
@@ -74,3 +92,4 @@ while true; do
             ;;
     esac
 done
+
