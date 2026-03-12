@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# This script has been copy-pasted from https://github.com/Maciejonos/dotfiles.git.
-# All credits to the owner of the repo
-
 set -e
 
 INSTALL_DIR="$HOME/.local/share/vibranium"
@@ -29,11 +26,37 @@ mkdir -p "$HOME/.config"
 # Create .local/share/vibranium directory
 mkdir -p "$HOME/.local/share/vibranium"
 
-# Clone the vibranium repository
-echo "Cloning vibranium repository..."
-latest_ver="$(git ls-remote --tags --sort="v:refname" "$REPO_URL" | tail -n1)"
-latest_ver="$(sed 's|.*refs/tags/||;s|\^{}||' <<< "$latest_ver")"
-git clone --branch "$latest_ver" "$REPO_URL" "$INSTALL_DIR"
+# Ask user which branch to clone
+echo "Which version would you like to install?"
+echo "  [1] release  - latest stable release (default)"
+echo "  [2] dev      - development branch"
+echo "  [3] upstream - master branch"
+while true; do
+    read -rp "Enter your choice [1/2/3] or press Enter for default: " branch_choice
+
+    case "${branch_choice:-1}" in
+        1|"release")
+            echo "Cloning vibranium repository (latest release)..."
+            latest_ver="$(git ls-remote --tags --sort="v:refname" "$REPO_URL" | tail -n1)"
+            latest_ver="$(sed 's|.*refs/tags/||;s|\^{}||' <<< "$latest_ver")"
+            git clone --branch "$latest_ver" "$REPO_URL" "$INSTALL_DIR"
+            break
+            ;;
+        2|"dev")
+            echo "Cloning vibranium repository (dev branch)..."
+            git clone --branch dev "$REPO_URL" "$INSTALL_DIR"
+            break
+            ;;
+        3|"upstream")
+            echo "Cloning vibranium repository (master branch)..."
+            git clone --branch master "$REPO_URL" "$INSTALL_DIR"
+            break
+            ;;
+        *)
+            echo "Invalid choice: '$branch_choice'. Please enter 1, 2, or 3."
+            ;;
+    esac
+done
 
 echo
 echo "Repository cloned successfully!"
@@ -44,3 +67,4 @@ sleep 2
 
 # Run the installer
 exec bash "$INSTALL_DIR/install/install"
+
