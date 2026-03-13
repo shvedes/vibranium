@@ -6,6 +6,7 @@ ACTIONS=(
     "Install"
     "Uninstall"
     "System update"
+    "Vibranium update"
 )
 
 while true; do
@@ -49,6 +50,10 @@ while true; do
             ;;
         "System update")
             vb-core-term --floating -- vb-pkg-update
+            helpers::ui::close_menus
+            ;;
+        "Vibranium update")
+            vb-core-term --floating -- vb-update
             helpers::ui::close_menus
             ;;
         *)
