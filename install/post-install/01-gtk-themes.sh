@@ -1,8 +1,35 @@
 #!/usr/bin/env bash
 
 YELLOW=$'\e[0;33m'
+GREEN=$'\e[0;32m'
 RESET=$'\e[0m'
 GRAY=$'\e[90m'
+CYAN=$'\e[0;36m'
+
+spinner_frames=(
+    '[=           ]' '[==          ]' '[===         ]' '[====        ]'
+    '[ ====       ]' '[  ====      ]' '[   ====     ]' '[    ====    ]'
+    '[     ====   ]' '[      ====  ]' '[       ==== ]' '[        ====]'
+    '[         ===]' '[          ==]' '[           =]'
+)
+
+# Create frame file once — persists across all install_theme() calls
+frame_file=$(mktemp)
+echo 0 > "$frame_file"
+
+_spinner() {
+  local name="$1"
+  local file="$2"
+  local i
+  i=$(cat "$file")           # seed from previous run
+  while true; do
+    printf "\r\033[K%s[GTK THEMES]%s Installing %s%s%s %s" \
+      "$YELLOW" "$RESET" "$CYAN" "$name" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
+    echo "$i" > "$file"      # persist current index
+    i=$(( (i + 1) % ${#spinner_frames[@]} ))
+    sleep 0.15
+  done
+}
 
 # Array of repositories
 REPOS=(
@@ -51,9 +78,27 @@ install_theme() {
   local base_name=""
   local variants=()
 
-  # Clone the repo
-  git clone -q "https://github.com/Fausto-Korpsvart/$repo" || { echo "Failed to clone $repo"; return 1; }
-  cd "$clone_dir/themes" || { echo "Failed to cd into $clone_dir/themes"; cd ..; rm -rf "$clone_dir"; return 1; }
+  # Strip "-GTK-Theme" / "-GKT-Theme" suffix for display
+  local display_name="${repo//-GTK-Theme/}"
+  display_name="${display_name//-GKT-Theme/}"
+
+  # Start a single spinner that runs from clone through all variants
+  local spinner_pid
+  _spinner "$display_name" "$frame_file" &
+  spinner_pid=$!
+
+  git clone -q "https://github.com/Fausto-Korpsvart/$repo"
+  if (( $? != 0 )); then
+    kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
+    printf "\r\033[K%s[GTK THEMES]%s Failed to clone %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
+    return 1
+  fi
+
+  cd "$clone_dir/themes" || {
+    kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
+    printf "\r\033[K%s[GTK THEMES]%s Failed to enter %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
+    cd ..; rm -rf "$clone_dir"; return 1
+  }
   git switch -q --detach HEAD~3
 
   # Set base_name and variants based on repo
@@ -91,7 +136,8 @@ install_theme() {
       variants=("default" "dragon")
       ;;
     *)
-      echo "No configuration for $repo"
+      kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
+      printf "\r\033[K%s[GTK THEMES]%s No configuration for %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
       cd ../..
       rm -rf "$clone_dir"
       return 1
@@ -179,14 +225,14 @@ install_theme() {
           esac
           ;;
         "Kanagawa-GKT-Theme")
-		  if [ "$color" = "light" ]; then
-			desired_name="$base_name-Lotus"
-		  else
+          if [ "$color" = "light" ]; then
+            desired_name="$base_name-Lotus"
+          else
             case "$variant" in
               "default") desired_name="Kanagawa-Wave" ;;
               "dragon") desired_name="Kanagawa-Dragon" ;;
             esac
-		  fi
+          fi
           ;;
         "Osaka-GTK-Theme")
           case "$variant" in
@@ -210,18 +256,17 @@ install_theme() {
       fi
       generated_base+="-$color_upper-Compact$generated_variant_suffix"
 
-
-	  install_opts="-s compact -c $color $tweaks -t $accent_param"
-	  eval "./install.sh $install_opts" &>/dev/null  || { echo "Install failed for $repo $variant $color"; continue; }
+      install_opts="-s compact -c $color $tweaks -t $accent_param"
+      eval "./install.sh $install_opts" &>/dev/null || { echo "Install failed for $repo $variant $color"; continue; }
 
       # Rename if directories exist
       if [ -d "$DEST_DIR/$generated_base" ]; then
         mv "$DEST_DIR/$generated_base" "$DEST_DIR/$desired_name"
-		sed -i -e "/^Name=/s/=.*/=${desired_name}/" \
-			-e "/^GtkTheme=/s/=.*/=${desired_name}/" \
-			-e "/^MetacityTheme=/s/=.*/=${desired_name}/" \
-			-e "/^CursorTheme/s/=.*/=macOS/" \
-			"$DEST_DIR/${desired_name}/index.theme"
+        sed -i -e "/^Name=/s/=.*/=${desired_name}/" \
+            -e "/^GtkTheme=/s/=.*/=${desired_name}/" \
+            -e "/^MetacityTheme=/s/=.*/=${desired_name}/" \
+            -e "/^CursorTheme/s/=.*/=macOS/" \
+            "$DEST_DIR/${desired_name}/index.theme"
       else
         echo "Warning: $generated_base not found"
       fi
@@ -240,6 +285,9 @@ install_theme() {
     done
   done
 
+  # All variants done -- kill spinner and print final settled line
+  kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
+
   # Clean up
   cd ../..
   rm -rf "$clone_dir"
@@ -250,4 +298,9 @@ for repo in "${REPOS[@]}"; do
   install_theme "$repo"
 done
 
-ln -sf "$HOME/.local/share/themes" "$HOME/.themes"
+rm -f "$frame_file"
+mv "$HOME/.themes" "$HOME/.local/share"
+ln -sf "$HOME/.local/share/.themes" "$HOME/.themes"
+
+printf "\r\033[K%s[GTK THEMES]%s GTK themes installed\n" "$GREEN" "$RESET"
+

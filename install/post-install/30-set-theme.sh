@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
-
 THEME_PATH="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
 
 cp -r "$HOME/.local/share/vibranium/config/.gtkrc-2.0" "$HOME"

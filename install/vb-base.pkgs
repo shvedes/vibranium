@@ -1,0 +1,77 @@
+# vim:ft=cfg
+
+# Hyprland
+hyprland
+hyprlock
+hypridle
+hyprpicker
+xdg-desktop-portal-hyprland
+
+# Essentials
+sound-theme-freedesktop
+omarchy-chromium-bin
+alacritty-sixel-git
+cliphist
+zenity
+slurp
+satty
+grim
+foot
+wev
+
+# Zathura
+zathura
+zathura-pdf-mupdf
+
+# CLIs
+fastfetch
+mediainfo
+wttrbar
+neovim
+man-db
+wtype
+ncdu
+wget
+btop
+fzf
+jq
+
+# Thunar
+thunar
+thunar-archive-plugin
+thunar-volman
+engrampa
+ffmpegthumbnailer
+gvfs
+
+# Rofi
+rofi
+rofi-calc
+rofi-emoji
+
+# Other
+polkit-gnome
+swayosd
+waybar
+dunst
+qt5ct
+qt6ct
+mpv
+
+# System
+power-profiles-daemon
+python-gobject
+zram-generator
+pacman-contrib
+xdg-user-dirs
+uwsm
+ly
+
+# Sound
+pipewire
+pipewire-pulse
+pipewire-jack
+pipewire-alsa
+wireplumber
+wiremix
+

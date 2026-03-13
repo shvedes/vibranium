@@ -715,7 +715,12 @@ term::ask_yes_no() {
     term::enable_input
 
     while true; do
-        prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
+        if [[ -f /tmp/vb-install-ongoing ]]; then
+            prompt=$'\e[0;34m[QSTN]\e[0m '"${message} ${hint}: "
+        else
+            prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
+        fi
+
 
         printf "%s" "$prompt"
         read -r input
@@ -836,7 +841,24 @@ term::spinner() {
 }
 
 term::show_header() {
-    printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+    if [[ -n "$1" && "$1" == "--color" ]]; then
+        local color
+
+        if [[ ! -n "$2" ]]; then
+            color="$YELLOW"
+        else
+            case "$2" in
+                purple) color="$PURPLE" ;;
+                green) color="$GREEN" ;;
+                blue) color="$BLUE" ;;
+                cyan) color="$CYAN" ;;
+                red) color="$RED" ;;
+                *) color="$YELLOW"
+            esac
+        fi
+    fi
+
+    printf "\n%s%s%s\n\n" "${color:-$YELLOW}" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
 }
 
 term::is_headless() {

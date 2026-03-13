@@ -15,6 +15,7 @@ while ! ping -c 1 -W 2 8.8.8.8 &> /dev/null; do
 done
 
 channel="release"
+
 if [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
     channel="$(< "$VIBRANIUM_STATE/update.channel")"
 fi
@@ -39,12 +40,18 @@ if [[ "$channel" == "release" ]]; then
         else
             notify-send -r 1 -t 180000 \
                 "New Version Available" \
-                "To update, go to Vibranium Settings"
+                "To update, open Vibranium Menu"
         fi
     fi
 else
     # upstream/dev channel: count how many commits local is behind origin/<master/dev>
     branch="$(git -C "$VIBRANIUM" branch --show-current)"
+
+    # Uknown branch - do nothing
+    if [[ ! "$branch" =~ ^(master|dev)$ ]]; then
+        exit 0
+    fi
+
     behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/$branch --count 2>/dev/null || echo 0)
 
     if (( behind > 0 )); then

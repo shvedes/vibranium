@@ -12,7 +12,8 @@
 # TODO: allow setting brightness below 0% by adjusting gamma level below 100% via hyprsunset.
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
-    notify-send -r 4 "Vibranium - Brightness" "Brightness control is not available inside of a Virtual Machine"
+    notify-send -r 4 "Vibranium - Brightness" -u critical -t 5000 \
+        "Brightness control is not available inside of a Virtual Machine"
     exit 1
 fi
 

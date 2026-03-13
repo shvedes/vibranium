@@ -1,34 +1,7 @@
 #!/usr/bin/env bash
 
-SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-
 NVIDIA_SETUP_NEEDED=false
-ROOT_FS="$(findmnt -n -o FSTYPE /)"
 PACKAGES=()
-
-source "$SCRIPT_DIR/lib/helpers.sh"
-
-if [[ "$ROOT_FS" == "btrfs" ]]; then
-    _log_info "Detected BTRFS on root partition."
-    _log_info "It's recommended to install extra tools for your filesystem."
-    _log_info "These can be useful for maintenance and troubleshooting tasks."
-
-    if _ask_yes_no Y "Would you like to install them?"; then
-        PACKAGES+=(btrfs-progs compsize)
-    fi
-fi
-
-if [[ "$(lsblk -f)" =~ ntfs ]]; then
-    _log_info "NTFS partition detected"
-
-    if _ask_yes_no Y "Do you want to enable NTFS support?"; then
-        _log_success "You will be able to access your NTFS partition without issues."
-        _log_success "Make sure Fast Boot is disabled in Windows settings,"
-        _log_success "otherwise the partition will be mounted as read-only."
-
-        PACKAGES+=(ntfs-3g)
-    fi
-fi
 
 VGA_STR="$(lspci | grep -iE "vga|3d")"
 
@@ -37,6 +10,7 @@ case "$VGA_STR" in
         _log_info "Installing NVIDIA GPU drivers"
         NVIDIA_SETUP_NEEDED=true
         PACKAGES+=(
+            "nvtop"
             "egl-wayland"
             "nvidia-dkms"
             "nvidia-utils"
@@ -50,6 +24,7 @@ case "$VGA_STR" in
         _log_info "Installing AMD GPU drivers"
         PACKAGES+=(
             "mesa"
+            "nvtop"
             "lib32-mesa"
             "rocm-smi-lib" # Needed for btop's gpu usage graph
             "vulkan-radeon"
@@ -61,6 +36,7 @@ case "$VGA_STR" in
         _log_info "Installing Intel GPU drivers"
         PACKAGES+=(
             "mesa"
+            "nvtop"
             "lib32-mesa"
             "vulkan-intel"
             "lib32-vulkan-intel"
@@ -79,28 +55,23 @@ case "$VGA_STR" in
 
         case "$VGA_STR" in
             *"Tiger Lake"*|*"Alder Lake"*|*"Raptor Lake"*)
-                PACKAGES+=("vpl-gpu-rt") ;;
+               PACKAGES+=("vpl-gpu-rt") ;;
             *) PACKAGES+=("intel-media-sdk") ;;
         esac
         ;;
     *"Red Hat"*|*Virtio*)
-        _log_info "Running inside of a Virtual Machine"
-        _log_info "Skipping GPU drivers check"
         :
         ;;
     *)
-        _log_error "No supported GPU detected. Please install the drivers manually."
-        _log_error "If you believe this is an error, consider opening an issue."
-        _log_error "This will not prevent the installation from proceeding."
+        _log_warn "No supported GPU detected. Please install the drivers manually."
+        _log_warn "If you believe this is an error, consider opening an issue."
 esac
 
-if (( ! ${#PACKAGES[@]} == 0 )); then
-    _install_packages "${PACKAGES[@]}"
+if (( ${#PACKAGES[@]} > 0 )); then
+    InstallPackages "${PACKAGES[@]}"
 fi
 
 if [[ "$NVIDIA_SETUP_NEEDED" == true ]]; then
-    _log_info "Configuring NVIDIA drivers (this may take a moment)"
-
-    bash "$SCRIPT_DIR/setup-nvidia"
+    touch /tmp/nvidia-setup-needed
 fi
 

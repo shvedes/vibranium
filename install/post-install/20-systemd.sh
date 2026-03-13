@@ -1,20 +1,27 @@
 #!/usr/bin/env bash
 
+CHASSIS="$(hostnamectl chassis)"
+
 system_services=(
     "ly@tty1"
     "power-profiles-daemon"
-    "bluetooth"
 )
+
+if [[ "$CHASSIS" != vm ]]; then
+    system_services+=("bluetooth")
+fi
 
 user_services=(
     "waybar"
     "hypridle"
     "cliphist"
-    "hyprpaper"
     "alacritty"
-    "hyprsunset"
     "gnome-polkit"
 )
+
+if [[ "$CHASSIS" != vm ]]; then
+    system_services+=("hyprpaper" "hyprsunset")
+fi
 
 user_timers=(
     "vibranium-update"

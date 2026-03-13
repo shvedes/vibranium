@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 
-if [[ $CHASSIS_TYPE == "vm" ]]; then
-    notify-send -r 4 -t 10000 -u critical "Vibranium" "Screen recording isn't available inside of a VM"
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+    if [[ -t 1 ]]; then
+        echo "Screen recording is not available inside of a VM" >&2
+    else
+        notify-send -r 4 -t 10000 -u critical "Vibranium" \
+            "Screen recording isn't available inside of a VM"
+    fi
     exit 1
 fi
 

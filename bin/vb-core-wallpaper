@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+    if [[ -t 1 ]]; then
+        echo "not available in a VM" >&2
+    else
+        notify-send -r 3 -u critical -t 5000 "Wallpaper Manager" \
+            "This feature isn't available in a VM"
+    fi
+    exit 1
+fi
+
 source vb-core-lib
 
 CURRENT_THEME="$(vb-theme-get)"

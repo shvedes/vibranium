@@ -1,9 +1,11 @@
 #!/bin/bash
 
-# This script has been copy-pasted from https://github.com/Maciejonos/dotfiles.git.
-# All credits to the owner of the repo
-
 set -e
+
+if [[ "$(id -u)" == 0 ]]; then
+    echo "do not run this as root!" >&2
+    exit 1
+fi
 
 INSTALL_DIR="$HOME/.local/share/vibranium"
 REPO_URL="https://github.com/shvedes/vibranium"
@@ -71,3 +73,4 @@ sleep 2
 
 # Run the installer
 exec bash "$INSTALL_DIR/install/install"
+

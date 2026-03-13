@@ -54,10 +54,10 @@ _check_important() {
     for pkg in "${PKG_LIST[@]}"; do
         if [[ $pkg =~ $important_regex ]]; then
             return 0
-        else
-            return 1
         fi
     done
+
+    return 1
 }
 
 # e.g. clicked on the updates waybar module

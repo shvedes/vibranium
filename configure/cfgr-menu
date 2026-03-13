@@ -14,9 +14,17 @@ while true; do
         "Set font"
         "Hyprland"
         "Recording"
-        "Brightness"
+    )
+
+    if [[ "$CHASSIS_TYPE" != vm ]]; then
+        OPTIONS+=(
+            "Brightness"
+            "Night Light"
+        )
+    fi
+
+    OPTIONS+=(
         "Screenshots"
-        "Night Light"
         "Color Picker"
         "Miscellaneous"
     )
@@ -32,42 +40,18 @@ while true; do
     done
 
     case "$CHOSEN" in
-        "Waybar")
-            cfgr-waybar-menu
-            ;;
-        "Set font")
-            vb-font-set
-            ;;
-        "Idle")
-            cfgr-idle
-            ;;
-        "Audio")
-            cfgr-audio
-            ;;
-        "Screenshots")
-            cfgr-screenshots
-            ;;
-        "Brightness")
-            cfgr-brightness
-            ;;
-        "Recording")
-            cfgr-recording
-            ;;
-        "Night Light")
-            cfgr-nightshift
-            ;;
-        "Color Picker")
-            cfgr-color-picker
-            ;;
-        "General")
-            cfgr-general
-            ;;
-        "Hyprland")
-            cfgr-wm-menu
-            ;;
-        "Miscellaneous")
-            cfgr-misc
-            ;;
+        "Waybar")        cfgr-waybar-menu      ;;
+        "Set font")      vb-font-set           ;;
+        "Idle")          cfgr-idle             ;;
+        "Audio")         cfgr-audio            ;;
+        "Screenshots")   cfgr-screenshots      ;;
+        "Brightness")    cfgr-brightness       ;;
+        "Recording")     cfgr-recording        ;;
+        "Night Light")   cfgr-nightshift       ;;
+        "Color Picker")  cfgr-color-picker     ;;
+        "General")       cfgr-general          ;;
+        "Hyprland")      cfgr-wm-menu          ;;
+        "Miscellaneous") cfgr-misc             ;;
     esac
 done
 

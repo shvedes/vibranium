@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # Dynamically adjust idle times based on the machine type
-case "$(hostnamectl chassis)" in
+case "$CHASSIS_TYPE" in
     laptop|tablet|convertible)
         # 2 minutes
         LOCK_AFTER=120
@@ -55,4 +55,5 @@ listener {
 
 EOF
 
-systemctl --user restart hypridle
+systemctl -q --user restart hypridle
+

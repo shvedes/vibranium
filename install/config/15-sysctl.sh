@@ -1,16 +1,21 @@
 #!/usr/bin/env bash
 
-case "$(</sys/class/dmi/id/chassis_type)" in
-	9|10|14)  # Laptop, Notebook, Sub-Notebook
+case "$(hostnamectl chassis)" in
+    laptop|convertible|tablet)
 		DIRTY_BYTES="134217728"
 		DIRTY_BACKGROUND_BYTES="33554432"
 		DIRTY_WRITEBACK_CENTISECS="1000"
-	;;
-	*)  # Desktop
+        ;;
+
+	desktop)  # Desktop
 		DIRTY_BYTES="268435456"
 		DIRTY_BACKGROUND_BYTES="67108864"
 		DIRTY_WRITEBACK_CENTISECS="1500"
-	;;
+        ;;
+
+    vm)
+        exit 0
+        ;;
 esac
 
 sudo tee /etc/sysctl.d/vibranium-sysctl.conf >/dev/null <<EOF

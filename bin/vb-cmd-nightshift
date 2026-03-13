@@ -22,6 +22,11 @@ Notes:
 EOF
 }
 
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+    echo "not available in a VM" >&2
+    exit 1
+fi
+
 lockfile="$VIBRANIUM_RUNTIME/${0##*/}.lock"
 exec 10> "$lockfile" || {
     echo "error: another instance of ${0##*/} already running!"

@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 
 # Source: Omarchy
+# Slightly adapted for Vibranium.
+
+if [[ "$(hostnamectl chassis)" == vm ]]; then
+    exit 0
+fi
 
 # First check that wireless-regdb is there
 if [[ -f "/etc/conf.d/wireless-regdom" ]]; then
@@ -27,6 +32,8 @@ if [[ ! -n ${WIRELESS_REGDOM} ]]; then
         if [[ $COUNTRY =~ ^[A-Z]{2}$ ]]; then
             # Append it to the wireless-regdom conf file that is used at boot
             echo "WIRELESS_REGDOM=\"$COUNTRY\"" | sudo tee -a /etc/conf.d/wireless-regdom >/dev/null
+        else
+            _log_warn "No configured timezone found. Regulatory domain remains unchanged"
         fi
     fi
 fi

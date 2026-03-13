@@ -5,30 +5,52 @@ if [[ "$(id -u)" == 0 ]]; then
     exit 1
 fi
 
-exec </dev/tty
-
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+# ========================================================================================== #
 
 EXPECTED_PATH="$HOME/.local/share/vibranium/install"
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   echo "ERROR: This script must be run from $EXPECTED_PATH" >&2
   echo "Current location: $SCRIPT_DIR" >&2
-  echo ""
   echo "Please move the vibranium folder to ~/.local/share/vibranium and try again" >&2
   exit 1
 fi
 
-# Hide cursor
-printf '\e[?25l'
+export VIBRANIUM="$HOME/.local/share/vibranium"
+export PATH="$PATH:$VIBRANIUM/bin"
+
+# ========================================== #
+
+source vb-core-lib &> /dev/null
+
+export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
+
+export -f term::discard_buffer
+export -f term::disable_input
+export -f term::enable_input
+export -f term::show_header
+export -f term::ask_yes_no
+
+export PURPLE GREEN CYAN
+export RED YELLOW BLUE
+export GRAY RESET
 
 # Source helpers
-source "$SCRIPT_DIR/lib/helpers.sh"
+for helper in "$SCRIPT_DIR/helpers"/*.sh; do
+    source "$helper"
+done
 
-# Move VT to the bottom
-printf '\e[2J\e[%d;1H' "${LINES:-$(tput lines)}"
+# ========================================== #
 
-_show_logo
+exec </dev/tty
+
+# Clear TTY and move prompt
+# to the bottom
+clear; tput cup 9999 0
+
+term::disable_input
+term::show_header
 
 _log_info "Welcome to Vibranium, an Omarchy-like Arch Linux configuration."
 _log_info "It is designed to be simple, extremely fast, and highly customizable."
@@ -49,8 +71,8 @@ _log_info "manually or with archinstall."
 _log_info ""
 _log_info "If you are unsure, STOP now and create a clean installation first."
 
-if _ask_yes_no Y "Proceed with Installation?"; then
-    if ! _ask_yes_no Y "Proceed with Installation? (double check)"; then
+if term::ask_yes_no Y "Proceed with Installation?"; then
+    if ! term::ask_yes_no Y "Proceed with Installation? (double check)"; then
         _log_error "Installation aborted"
         exit 1
     fi
@@ -59,100 +81,72 @@ else
     exit 1
 fi
 
-if [[ $(hostnamectl chassis) == vm ]]; then
-    _log_error "You are trying to install Vibranium inside of a virtual machine."
-    _log_error "You may encounter unexpected bugs, slow performance, or not working WM at all."
-    _log_error "You have been warned."
-
-    if ! _ask_yes_no Y "Continue?"; then
-        _log_error "Installation aborted"
-        exit 1
-    fi
-fi
-
-SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
-export SUDO_PROMPT
-
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Vibranium needs sudo to install packages"
+# ========================================== #
 
 if ! sudo -v; then
     _log_error "Installation aborted"
     exit 1
 fi
 
-YAY_PRESENT=false
-CURRENT_STEP=0
-TOTAL_STEPS=10
+(
+    while true; do
+        sudo -v
+        sleep 5
+    done
+) &
 
-if _is_installed "yay"; then
+touch /tmp/vb-install-ongoing
+
+YAY_PRESENT=false
+
+if pacman -Qq "yay" &> /dev/null; then
     YAY_PRESENT=true
 fi
 
-if [[ "$YAY_PRESENT" == false ]]; then
-    TOTAL_STEPS=$((TOTAL_STEPS + 1))
-fi
-
-mapfile -t PACKAGES < "$SCRIPT_DIR/pkgs.txt"
-
 [[ "$YAY_PRESENT" == false ]] && {
-    CURRENT_STEP=$((CURRENT_STEP + 1))
+    _log_info "Installing Yay AUR helper"
 
-    _log_info "[$CURRENT_STEP/$TOTAL_STEPS] Building and installing Yay AUR helper (this may take a moment)"
-    _log_info "You may be asked for sudo multiple times"
-
-    if ! _install_yay; then
+    if ! InstallYay; then
         _log_error "Failed to install yay"
         _log_error "Aborting installation"
         exit 1
     fi
 }
 
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up system"
+_log_info "Setting up system and configs"
 for script in "$SCRIPT_DIR/config"/*.sh; do
     bash "$script"
 done
 
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing packages"
-_install_packages "${PACKAGES[@]}"
+_log_info "Initializing package installation"
+for script in "$SCRIPT_DIR/packaging"/*.sh; do
+    bash "$script"
+done
 
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up hardware"
-bash "$SCRIPT_DIR/setup-hardware"
+_log_info "Setting up hardware & GPU drivers"
+for script in "$SCRIPT_DIR/config/hardware"/*.sh; do
+    bash "$script"
+done
 
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing themes (this may take a moment)"
-bash "$SCRIPT_DIR/setup-gtk-themes"
+_log_info "Basic installation complete"
+_log_info "Executing post-install hooks..."
+for script in "$SCRIPT_DIR/post-install"/*.sh; do
+    bash "$script"
+done
 
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing icons (this may take a moment)"
-bash "$SCRIPT_DIR/setup-icons"
+# Clear TTY and move prompt
+# to the bottom
+clear; tput cup 9999 0
 
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Copying configs"
-bash "$SCRIPT_DIR/setup-configs"
+rm -f /tmp/vb-install-ongoing
 
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up systemd services"
-bash "$SCRIPT_DIR/setup-systemd"
-
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Setting up migrations"
-bash "$SCRIPT_DIR/setup-migrations"
-
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Installing default theme"
-bash "$SCRIPT_DIR/setup-theme"
-
-CURRENT_STEP=$((CURRENT_STEP + 1))
-_log_info "[$CURRENT_STEP/$TOTAL_STEPS] Running post-install scripts"
-bash "$SCRIPT_DIR/post-install"
+term::show_header --color green
 
 _log_success "Installation complete. System restart required"
-_log_success "You have to pick Hyprland (uwsm-managed) in your login manager. Otherwise Vibranium will NOT WORK"
+_log_success "You have to pick Hyprland (uwsm-managed) in the login manager"
+_log_success "Otherwise Vibranium will NOT WORK"
 
-if _ask_yes_no Y "Reboot now?"; then
+if term::ask_yes_no Y "Reboot now?"; then
     for sec in {5..1}; do
         for step in {0..3}; do
             dots=$(printf "%.*s" "$step" "...")
@@ -165,5 +159,4 @@ if _ask_yes_no Y "Reboot now?"; then
     systemctl reboot
 fi
 
-# Show cursor
-printf '\e[?25h'
+term::enable_input
