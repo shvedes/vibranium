@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 _usage() {
-    cat <<EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]...
 
 Perform system update using yay, check for important updates, and prompt for reboot if necessary.
@@ -15,55 +15,55 @@ EOF
 }
 
 _operation_canceled() {
-    printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
 
-    if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
-        read -n1 -r -s -p $'. Press any key to exit' dummy
-    fi
+  if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
+    read -n1 -r -s -p $'. Press any key to exit' dummy
+  fi
 
-    printf '\e[?25h' # Show cursor
+  printf '\e[?25h' # Show cursor
 }
 
 _update_complete() {
-    printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$@"
+  printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$@"
 
-    if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
-        read -n1 -r -p $'. Press any key to exit' dummy
-    fi
+  if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
+    read -n1 -r -p $'. Press any key to exit' dummy
+  fi
 
-    printf '\e[?25h' # Show cursor
+  printf '\e[?25h' # Show cursor
 }
 
 _check_updates() {
-    mapfile -t PKG_LIST < <(yay -Qqu)
+  mapfile -t PKG_LIST < <(yay -Qqu)
 
-    if (( ${#PKG_LIST[@]} == 0 )); then
-        return 1
-    fi
+  if ((${#PKG_LIST[@]} == 0)); then
+    return 1
+  fi
 }
 
 _perform_update() {
-    if ! yes | yay --noconfirm --sudoloop; then
-        return 1
-    fi
+  if ! yes | yay --noconfirm --sudoloop; then
+    return 1
+  fi
 }
 
 _check_important() {
-    local important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
+  local important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
 
-    for pkg in "${PKG_LIST[@]}"; do
-        if [[ $pkg =~ $important_regex ]]; then
-            return 0
-        fi
-    done
+  for pkg in "${PKG_LIST[@]}"; do
+    if [[ $pkg =~ $important_regex ]]; then
+      return 0
+    fi
+  done
 
-    return 1
+  return 1
 }
 
 # e.g. clicked on the updates waybar module
 if [[ ! -t 1 ]]; then
-    exec setsid vb-core-term --floating -- "$0"
-    exit
+  exec setsid vb-core-term --floating -- "$0"
+  exit
 fi
 
 source vb-core-lib
@@ -77,45 +77,45 @@ PKG_LIST=()
 
 trap 'printf "\n"; kill -- -$$ 2>/dev/null; _operation_canceled; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
 
-while (( $# > 0 )); do
-    case "$1" in
-        --no-logo)
-            NO_LOGO=true
-            shift
-            ;;
-        --no-dummy)
-            NO_DUMMY=true
-            shift
-            ;;
-        --help)
-            _usage
-            exit 0
-            ;;
-        --)
-            shift
-            break
-            ;;
-        --*)
-            echo "Unknown option: $1" >&2
-            exit 1
-            ;;
-        *)
-            break
-            ;;
-    esac
+while (($# > 0)); do
+  case "$1" in
+    --no-logo)
+      NO_LOGO=true
+      shift
+      ;;
+    --no-dummy)
+      NO_DUMMY=true
+      shift
+      ;;
+    --help)
+      _usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    --*)
+      echo "Unknown option: $1" >&2
+      exit 1
+      ;;
+    *)
+      break
+      ;;
+  esac
 done
 
 if [[ $NO_LOGO == false ]]; then
-    printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+  printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
 fi
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
 sudo -v &
 _sudo_pid=$!
 wait $_sudo_pid
-if (( $? != 0 )); then
-    echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
-    exit 1
+if (($? != 0)); then
+  echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
+  exit 1
 fi
 
 # Hide cursor
@@ -127,40 +127,39 @@ pid=$!
 term::spinner $pid "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"
 
 if ! _check_updates; then
-    _update_complete "You are up to date"
-    exit 0
+  _update_complete "You are up to date"
+  exit 0
 fi
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} package(s) are awaiting updates"
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting system update..."
 
 if ! _perform_update; then
-    echo -e "${RED}[VIBRANIUM]${RESET} Something went wrong"
+  echo -e "${RED}[VIBRANIUM]${RESET} Something went wrong"
 
-    _operation_canceled
-    exit 1
+  _operation_canceled
+  exit 1
 fi
 
 vb-cmd-refresh-bar-module pacman &
 
 if _check_important; then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
 
-    if term::ask_yes_no Y "Restart now?"; then
+  if term::ask_yes_no Y "Restart now?"; then
 
-        for i in {5..1}; do
-            for dots in "" "." ".." "..."; do
-                printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$YELLOW" "$RESET" "$i" "$dots"
-                sleep 0.25
-            done
-        done
+    for i in {5..1}; do
+      for dots in "" "." ".." "..."; do
+        printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$YELLOW" "$RESET" "$i" "$dots"
+        sleep 0.25
+      done
+    done
 
-        systemctl reboot
-        exit 0
-    else
-        _update_complete "System update complete. Restart required"
-    fi
+    systemctl reboot
+    exit 0
+  else
+    _update_complete "System update complete. Restart required"
+  fi
 else
-    _update_complete "System update complete"
+  _update_complete "System update complete"
 fi
-

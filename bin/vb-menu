@@ -3,80 +3,83 @@
 source vb-core-lib
 
 OPTIONS=(
-    "Settings"
-    "Packages"
-    "Tweaks"
-    "Setup"
-    "Help"
+  "Settings"
+  "Packages"
+  "Tweaks"
+  "Setup"
+  "Help"
 )
 
 if [[ -f "$VIBRANIUM_STATE/update.available" ]]; then
-    OPTIONS+=("<b>Update Vibranium</b>")
+  OPTIONS+=("<b>Update Vibranium</b>")
 fi
 
 INDEX=0
 
 while true; do
-    helpers::ui::menu CHOSEN "Vibranium" "ESC to exit" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-    [ -z "$CHOSEN" ] && break
+  helpers::ui::menu CHOSEN "Vibranium" "ESC to exit" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+  [ -z "$CHOSEN" ] && break
 
-    for i in "${!OPTIONS[@]}"; do
-        if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
-            INDEX="$i"
-            break
-        fi
-    done
+  for i in "${!OPTIONS[@]}"; do
+    if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
+      INDEX="$i"
+      break
+    fi
+  done
 
-    case "$CHOSEN" in
-        "Setup")
-            bash vb-menu-setup
-            ;;
-        "Settings")
-            bash "$VIBRANIUM/configure/cfgr-menu"
-            ;;
-        "Help")
-            help_opts=("Hyprland" "Vibranium" "Arch Linux" "<i>Keybindings</i>")
-            while true; do
-                helpers::ui::menu help_chosen "Help" "ESC to go back" -- "${help_opts[@]}"
+  case "$CHOSEN" in
+    "Setup")
+      bash vb-menu-setup
+      ;;
+    "Settings")
+      bash "$VIBRANIUM/configure/cfgr-menu"
+      ;;
+    "Help")
+      help_opts=("Hyprland" "Vibranium" "Arch Linux" "<i>Keybindings</i>")
+      while true; do
+        helpers::ui::menu help_chosen "Help" "ESC to go back" -- "${help_opts[@]}"
 
-                case "$help_chosen" in
-                    "Hyprland") help_link="https://wiki.hypr.land" ;;
-                    "Vibranium") help_link="https://github.com/shvedes/vibranium/wiki" ;;
-                    "Arch Linux") help_link="https://wiki.archlinux.org" ;;
-                    *"Keybindings"*) vb-cmd-keybindings; exit 0 ;;
-                    *) continue ;;
-                esac
-
-                if command -v chromium > /dev/null; then
-                    vb-cmd-launch-cmd chromium --app="$help_link"
-                    helpers::ui::close_menus
-                fi
-            done
-            ;;
-        "Packages")
-            bash vb-menu-pkg
-            ;;
-        "Tweaks")
-            while true; do
-                helpers::ui::menu tweaks_chosen "Tweaks" "ESC to go back" -- "System" "Apps"
-                [[ -z $tweaks_chosen ]] && break
-
-                case "$tweaks_chosen" in
-                    "Apps")
-                        bash vb-menu-tweaks
-                        ;;
-                    "System")
-                        bash vb-menu-tweaks-system
-                        ;;
-                esac
-            done
-            ;;
-        *"Update Vibranium"*)
-            vb-core-term --floating -- vb-update
+        case "$help_chosen" in
+          "Hyprland") help_link="https://wiki.hypr.land" ;;
+          "Vibranium") help_link="https://github.com/shvedes/vibranium/wiki" ;;
+          "Arch Linux") help_link="https://wiki.archlinux.org" ;;
+          *"Keybindings"*)
+            vb-cmd-keybindings
             exit 0
             ;;
-        *)
-            continue
+          *) continue ;;
+        esac
+
+        if command -v chromium > /dev/null; then
+          vb-cmd-launch-cmd chromium --app="$help_link"
+          helpers::ui::close_menus
+        fi
+      done
+      ;;
+    "Packages")
+      bash vb-menu-pkg
+      ;;
+    "Tweaks")
+      while true; do
+        helpers::ui::menu tweaks_chosen "Tweaks" "ESC to go back" -- "System" "Apps"
+        [[ -z $tweaks_chosen ]] && break
+
+        case "$tweaks_chosen" in
+          "Apps")
+            bash vb-menu-tweaks
             ;;
-    esac
+          "System")
+            bash vb-menu-tweaks-system
+            ;;
+        esac
+      done
+      ;;
+    *"Update Vibranium"*)
+      vb-core-term --floating -- vb-update
+      exit 0
+      ;;
+    *)
+      continue
+      ;;
+  esac
 done

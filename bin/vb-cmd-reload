@@ -5,17 +5,17 @@ source vb-core-lib
 SYSTEMD_TARGETS=("cliphist" "hypridle")
 
 if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-    SYSTEMD_TARGETS+=("swayosd")
+  SYSTEMD_TARGETS+=("swayosd")
 fi
 
 if [[ "$CHASSIS_TYPE" != vm ]]; then
-    if [[ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" == true ]]; then
-        SYSTEMD_TARGETS+=("hyprpaper")
-    fi
+  if [[ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" == true ]]; then
+    SYSTEMD_TARGETS+=("hyprpaper")
+  fi
 fi
 
 if systemctl -q --user is-active waybar; then
-    SYSTEMD_TARGETS+=("waybar")
+  SYSTEMD_TARGETS+=("waybar")
 fi
 
 systemctl --user restart "${SYSTEMD_TARGETS[@]}" &
@@ -24,6 +24,5 @@ vb-cmd-refresh-dunst
 hyprctl -q reload config-only &
 
 if [[ ! "$1" =~ ^(-q|--quiet)$ ]]; then
-    notify-send -r 2 -t 1500 "Vibranium" "Configuration reloaded"
+  notify-send -r 2 -t 1500 "Vibranium" "Configuration reloaded"
 fi
-

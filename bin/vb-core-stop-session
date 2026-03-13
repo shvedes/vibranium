@@ -9,16 +9,15 @@ shopt -s nullglob
 APPS=("Discord" "vesktop" "spotify" "steam" "steamwebhelper")
 
 for app in "${APPS[@]}"; do
-    killall -s KILL "$app"
+  killall -s KILL "$app"
 done
-
 
 HOOKS=("$XDG_CONFIG_HOME"/vibranium/shutdown/*.sh)
 
-if (( ${#HOOKS[@]} )); then
-    for hook in "${HOOKS[@]}"; do
-        bash "$hook"
-    done
+if ((${#HOOKS[@]})); then
+  for hook in "${HOOKS[@]}"; do
+    bash "$hook"
+  done
 fi
 
 # Properly stop session

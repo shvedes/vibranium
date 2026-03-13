@@ -3,17 +3,18 @@
 exec 9> "$VIBRANIUM_RUNTIME/${0##*/}.lock"
 
 if ! flock -n 9; then
-    pkill -f "rofi.*-show calc" 2>/dev/null
-    exit 0
+  pkill -f "rofi.*-show calc" 2> /dev/null
+  exit 0
 fi
 
 if [[ ! -f /usr/lib/rofi/libcalc.so ]]; then
-    echo "error: missing required dependencies: rofi-calc"
-    [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Calculator" --deps "rofi-calc"
-    exit 1
+  echo "error: missing required dependencies: rofi-calc"
+  [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Calculator" --deps "rofi-calc"
+  exit 1
 fi
 
-theme_str="$(cat <<EOF
+theme_str="$(
+  cat << EOF
 window {
     width: 500;
 }
@@ -27,11 +28,11 @@ EOF
 )"
 
 rofi \
-    -no-sort \
-    -lines 0 \
-    -show calc \
-    -modi calc \
-    -no-history \
-    -no-show-match \
-    -theme-str "$theme_str" \
-    -calc-command "echo -n '{result}' | wl-copy"
+  -no-sort \
+  -lines 0 \
+  -show calc \
+  -modi calc \
+  -no-history \
+  -no-show-match \
+  -theme-str "$theme_str" \
+  -calc-command "echo -n '{result}' | wl-copy"

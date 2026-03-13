@@ -8,21 +8,21 @@ PAPIRUS_REPO="https://github.com/PapirusDevelopmentTeam/papirus-icon-theme.git"
 PAPIRUS_FOLDERS_URL="https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders/refs/heads/master/papirus-folders"
 
 spinner_frames=(
-    '[=           ]'
-    '[==          ]'
-    '[===         ]'
-    '[====        ]'
-    '[ ====       ]'
-    '[  ====      ]'
-    '[   ====     ]'
-    '[    ====    ]'
-    '[     ====   ]'
-    '[      ====  ]'
-    '[       ==== ]'
-    '[        ====]'
-    '[         ===]'
-    '[          ==]'
-    '[           =]'
+  '[=           ]'
+  '[==          ]'
+  '[===         ]'
+  '[====        ]'
+  '[ ====       ]'
+  '[  ====      ]'
+  '[   ====     ]'
+  '[    ====    ]'
+  '[     ====   ]'
+  '[      ====  ]'
+  '[       ==== ]'
+  '[        ====]'
+  '[         ===]'
+  '[          ==]'
+  '[           =]'
 )
 
 _spinner() {
@@ -32,13 +32,13 @@ _spinner() {
     printf "\r\033[K%s[ICON THEME]%s Installing icons %s" \
       "$YELLOW" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
 
-    i=$(( (i + 1) % ${#spinner_frames[@]} ))
+    i=$(((i + 1) % ${#spinner_frames[@]}))
     sleep 0.15
   done
 }
 
 cleanup() {
-    [[ -n "${PAPIRUS_TMP_DIR:-}" && -d "$PAPIRUS_TMP_DIR" ]] && rm -rf "$PAPIRUS_TMP_DIR"
+  [[ -n "${PAPIRUS_TMP_DIR:-}" && -d "$PAPIRUS_TMP_DIR" ]] && rm -rf "$PAPIRUS_TMP_DIR"
 }
 
 trap cleanup EXIT
@@ -59,6 +59,6 @@ chmod +x "$BIN_DIR/papirus-folders"
 cp -r "$VIBRANIUM/extras/icon_theme/Vibranium" "$ICONS_DIR"
 ln -sf "$ICONS_DIR" "$HOME/.icons"
 
-kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
+kill "$spinner_pid" 2> /dev/null
+wait "$spinner_pid" 2> /dev/null
 printf "\r\033[K%s[INFO]%s Icons installed\n" "$CYAN" "$RESET"
-

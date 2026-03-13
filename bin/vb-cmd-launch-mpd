@@ -3,7 +3,7 @@
 CLIENTS=(ncmpcpp rmpc cmus vimpc)
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]
 
 Detect an installed MPD client.
@@ -15,36 +15,35 @@ EOF
 }
 
 case "$1" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
-    "")
-        ;;
-    *)
-        echo "${0##*/}: invalid option '$1'" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
-        exit 1
-        ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  "") ;;
+  *)
+    echo "${0##*/}: invalid option '$1'" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
 esac
 
-command -v mpd >/dev/null 2>&1 || exit 1
+command -v mpd > /dev/null 2>&1 || exit 1
 
 CLIENT=""
 
 for c in "${CLIENTS[@]}"; do
-    if command -v "$c" >/dev/null 2>&1; then
-        CLIENT="$c"
-        break
-    fi
+  if command -v "$c" > /dev/null 2>&1; then
+    CLIENT="$c"
+    break
+  fi
 done
 
 if [[ -z $CLIENT ]]; then
-    exit 1
+  exit 1
 fi
 
 WINDOW_ADDRESS=$(
-    hyprctl clients -j | jq -r --arg p "$CLIENT" '
+  hyprctl clients -j | jq -r --arg p "$CLIENT" '
         first(
             .[]
             | select(
@@ -57,8 +56,7 @@ WINDOW_ADDRESS=$(
 )
 
 if [[ -n $WINDOW_ADDRESS ]]; then
-    hyprctl dispatch focuswindow "address:$WINDOW_ADDRESS"
+  hyprctl dispatch focuswindow "address:$WINDOW_ADDRESS"
 else
-    exec setsid vb-core-term -- "$CLIENT"
+  exec setsid vb-core-term -- "$CLIENT"
 fi
-

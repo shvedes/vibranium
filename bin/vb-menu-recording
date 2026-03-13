@@ -1,30 +1,29 @@
 #!/usr/bin/env bash
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
-    if [[ -t 1 ]]; then
-        echo "Screen recording is not available inside of a VM" >&2
-    else
-        notify-send -r 4 -t 10000 -u critical "Vibranium" \
-            "Screen recording isn't available inside of a VM"
-    fi
-    exit 1
+  if [[ -t 1 ]]; then
+    echo "Screen recording is not available inside of a VM" >&2
+  else
+    notify-send -r 4 -t 10000 -u critical "Vibranium" \
+      "Screen recording isn't available inside of a VM"
+  fi
+  exit 1
 fi
 
 if pidof -q rofi; then
-    killall rofi
-    exit 0
+  killall rofi
+  exit 0
 fi
 
 if pidof -q gpu-screen-recorder; then
-    vb-core-recording
-    exit 0
+  vb-core-recording
+  exit 0
 fi
 
 read -r CHOSEN < <(rofi -dmenu -sync -p "Record" <<< $'Screen\nRegion')
 
 if [[ -z $CHOSEN ]] || [[ ! $CHOSEN =~ ^(Screen|Region)$ ]]; then
-    exit 1
+  exit 1
 fi
 
 exec setsid vb-core-recording "--${CHOSEN,,}"
-

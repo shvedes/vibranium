@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 usage() {
-    cat <<EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]
 
 Set power profiles in Vibranium.
@@ -17,116 +17,115 @@ EOF
 
 notify() {
 
-    helpers::check VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
-    if [[ $VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK  == false ]]; then
-        return 0
-    fi
+  helpers::check VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
+  if [[ $VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK == false ]]; then
+    return 0
+  fi
 
-    local profile="$1"
-    local icon=""
-    local label=""
+  local profile="$1"
+  local icon=""
+  local label=""
 
-    case "$profile" in
-        "performance")
-            icon="power-profile-performance-symbolic"
-            label="Performance"
-            ;;
-        "balanced")
-            icon="power-profile-balanced-symbolic"
-            label="Balanced"
-            ;;
-        "power-saver")
-            icon="power-profile-power-saver-symbolic"
-            label="Powersave"
-            ;;
-    esac
+  case "$profile" in
+    "performance")
+      icon="power-profile-performance-symbolic"
+      label="Performance"
+      ;;
+    "balanced")
+      icon="power-profile-balanced-symbolic"
+      label="Balanced"
+      ;;
+    "power-saver")
+      icon="power-profile-power-saver-symbolic"
+      label="Powersave"
+      ;;
+  esac
 
-    helpers::check VIBRANIUM_GLOBAL_USE_OSD
+  helpers::check VIBRANIUM_GLOBAL_USE_OSD
 
-    if [[ $VIBRANIUM_GLOBAL_USE_OSD == "true" ]]; then
-        swayosd-client --custom-message "$label" --custom-icon "$icon"
-    else
-        notify-send -r 3 -t 1500 "Power Management" "Power profile set to <b>${label,,}</b>"
-    fi
+  if [[ $VIBRANIUM_GLOBAL_USE_OSD == "true" ]]; then
+    swayosd-client --custom-message "$label" --custom-icon "$icon"
+  else
+    notify-send -r 3 -t 1500 "Power Management" "Power profile set to <b>${label,,}</b>"
+  fi
 }
 
 update_cache() { echo "$1" > "$VIBRANIUM_STATE/power-profile"; }
 
 _ensure_deps() {
-    if ! command -v powerprofilesctl > /dev/null; then
-        echo "[ERROR] Missing required dependencies: power-profiles-daemon"
-        vb-cmd-dep-notify --name "Power Management" --deps "power-profiles-daemon"
-        exit 1
-    fi
+  if ! command -v powerprofilesctl > /dev/null; then
+    echo "[ERROR] Missing required dependencies: power-profiles-daemon"
+    vb-cmd-dep-notify --name "Power Management" --deps "power-profiles-daemon"
+    exit 1
+  fi
 }
 
 ACTION="next"
 QUIET="false"
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -q|--quiet)
-            QUIET=true
-            shift
-            ;;
-        --next|--prev)
-            ACTION="${1/--/}"
-            shift
-            ;;
-        power-saver|balanced|performance)
-            TARGET_PROFILE="$1"
-            shift
-            ;;
-        -h|--help)
-            usage
-            exit 0
-            ;;
-        --*)
-            echo "Unknown option: $@." >&2
-            echo "Use flag --help to see available options." >&2
-            exit 1
-            ;;
-        *)
-            echo "Unknown profile: $1." >&2
-            echo "Use flag --help to see available options." >&2
-            exit 1
-            ;;
-    esac
+  case "$1" in
+    -q | --quiet)
+      QUIET=true
+      shift
+      ;;
+    --next | --prev)
+      ACTION="${1/--/}"
+      shift
+      ;;
+    power-saver | balanced | performance)
+      TARGET_PROFILE="$1"
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --*)
+      echo "Unknown option: $@." >&2
+      echo "Use flag --help to see available options." >&2
+      exit 1
+      ;;
+    *)
+      echo "Unknown profile: $1." >&2
+      echo "Use flag --help to see available options." >&2
+      exit 1
+      ;;
+  esac
 done
 
 _ensure_deps
 
 source vb-core-lib
 
-
 USER_ARGS=()
 PROFILES=("power-saver" "balanced" "performance")
 CURRENT="$(vb-cmd-get-power)"
 
 if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
-    current_index=0
+  current_index=0
 
-    for i in "${!PROFILES[@]}"; do
-        if [[ "${PROFILES[$i]}" == "$CURRENT" ]]; then
-            current_index=$i
-            break
-        fi
-    done
-
-    case "$ACTION" in
-        "next")
-            next_index=$(((current_index + 1) % ${#PROFILES[@]}))
-            ;;
-        "prev")
-            next_index=$(((current_index - 1 + ${#PROFILES[@]}) % ${#PROFILES[@]}))
-            ;;
-    esac
-
-    TARGET_PROFILE="${PROFILES[$next_index]}"
-
-    if [[ $QUIET == false ]]; then
-        echo "$TARGET_PROFILE"
+  for i in "${!PROFILES[@]}"; do
+    if [[ "${PROFILES[$i]}" == "$CURRENT" ]]; then
+      current_index=$i
+      break
     fi
+  done
+
+  case "$ACTION" in
+    "next")
+      next_index=$(((current_index + 1) % ${#PROFILES[@]}))
+      ;;
+    "prev")
+      next_index=$(((current_index - 1 + ${#PROFILES[@]}) % ${#PROFILES[@]}))
+      ;;
+  esac
+
+  TARGET_PROFILE="${PROFILES[$next_index]}"
+
+  if [[ $QUIET == false ]]; then
+    echo "$TARGET_PROFILE"
+  fi
 fi
 
 update_cache "$TARGET_PROFILE"

@@ -14,37 +14,36 @@ CHROMIUM_FILE="$XDG_CONFIG_HOME/chromium-flags.conf"
 # fi
 
 if command -v chromium > /dev/null; then
-    if ! grep -q "oauth2-client-id" "$CHROMIUM_FILE"; then
-        OPTIONS+=("Enable Google sync for Chromium")
-    else
-        OPTIONS+=("Disable Google sync for Chromium")
-    fi
+  if ! grep -q "oauth2-client-id" "$CHROMIUM_FILE"; then
+    OPTIONS+=("Enable Google sync for Chromium")
+  else
+    OPTIONS+=("Disable Google sync for Chromium")
+  fi
 fi
 
 if [[ "${#OPTIONS[@]}" -eq 0 ]]; then
-    notify-send -r 4 -t 5000 -u critical "Vibranium" "There are no tweaks available"
-    exit 1
+  notify-send -r 4 -t 5000 -u critical "Vibranium" "There are no tweaks available"
+  exit 1
 fi
 
 helpers::ui::menu CHOSEN "App Tweaks" "ESC to go back" -- "${OPTIONS[@]}"
 [[ -z "$CHOSEN" ]] && exit
 
 case "$CHOSEN" in
-    "Install Spotify adblock")
-        vb-tweak-spotify install
-        helpers::ui::close_menus
-        exit 0
-        ;;
-    "Remove Spotify adblock")
-        vb-tweak-spotify remove
-        helpers::ui::close_menus
-        exit 0
-        ;;
-    "Enable Google sync for Chromium")
-        vb-tweak-chromium enable
-        ;;
-    "Disable Google sync for Chromium")
-        vb-tweak-chromium disable
-        ;;
+  "Install Spotify adblock")
+    vb-tweak-spotify install
+    helpers::ui::close_menus
+    exit 0
+    ;;
+  "Remove Spotify adblock")
+    vb-tweak-spotify remove
+    helpers::ui::close_menus
+    exit 0
+    ;;
+  "Enable Google sync for Chromium")
+    vb-tweak-chromium enable
+    ;;
+  "Disable Google sync for Chromium")
+    vb-tweak-chromium disable
+    ;;
 esac
-

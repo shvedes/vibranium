@@ -6,4 +6,3 @@ msg="\nPress <span foreground='${P_YELLOW}'><b>SUPER + A</b></span>      to open
 msg+="Press <span foreground='${P_YELLOW}'><b>CTRL + ALT + V</b></span> to open Vibranium menu\n\n"
 msg+="<b>Right-click</b> to dismiss all notifications\n"
 notify-send -r $RANDOM -t 1800000 "Welcome to Vibranium" "$msg"
-

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 _usage() {
-    cat <<EOF
+  cat << EOF
 Usage: ${0##*/} [--pretty] [--size] [THEME]
 
 List available X11 cursor themes.
@@ -22,62 +22,62 @@ FLAG_SIZE=false
 THEME_ARG=""
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help)
-            _usage
-            exit 0
-            ;;
-        --pretty)
-            FLAG_PRETTY=true
-            ;;
-        --size)
-            FLAG_SIZE=true
-            ;;
-        -*)
-            echo "unknown option: $1" >&2
-            exit 1
-            ;;
-        *)
-            if [[ -n "$THEME_ARG" ]]; then
-                echo "error: unexpected argument: $1" >&2
-                exit 1
-            fi
-            THEME_ARG="$1"
-            ;;
-    esac
-    shift
+  case "$1" in
+    -h | --help)
+      _usage
+      exit 0
+      ;;
+    --pretty)
+      FLAG_PRETTY=true
+      ;;
+    --size)
+      FLAG_SIZE=true
+      ;;
+    -*)
+      echo "unknown option: $1" >&2
+      exit 1
+      ;;
+    *)
+      if [[ -n "$THEME_ARG" ]]; then
+        echo "error: unexpected argument: $1" >&2
+        exit 1
+      fi
+      THEME_ARG="$1"
+      ;;
+  esac
+  shift
 done
 
 parse_cursor_theme() {
-    local file="$1"
-    local line name
-    local in_section=false
+  local file="$1"
+  local line name
+  local in_section=false
 
-    while IFS= read -r line; do
-        case "$line" in
-            "[Icon Theme]")
-                in_section=true
-                ;;
-            "["*)
-                in_section=false
-                ;;
-            Name=*)
-                if [[ $in_section == true ]]; then
-                    name="${line#Name=}"
-                    break
-                fi
-                ;;
-        esac
-    done < "$file"
+  while IFS= read -r line; do
+    case "$line" in
+      "[Icon Theme]")
+        in_section=true
+        ;;
+      "["*)
+        in_section=false
+        ;;
+      Name=*)
+        if [[ $in_section == true ]]; then
+          name="${line#Name=}"
+          break
+        fi
+        ;;
+    esac
+  done < "$file"
 
-    local dir="${file%/*}"
-    dir="${dir##*/}"
+  local dir="${file%/*}"
+  dir="${dir##*/}"
 
-    THEMES["$dir"]="${name:-$dir}"
+  THEMES["$dir"]="${name:-$dir}"
 }
 
 print_all_sizes() {
-    python3 - "$@" <<'PYEOF'
+  python3 - "$@" << 'PYEOF'
 import sys, struct
 
 args = sys.argv[1:]
@@ -107,80 +107,80 @@ PYEOF
 }
 
 register_theme() {
-    local theme_path="$1"
-    local dir_name="${theme_path##*/}"
+  local theme_path="$1"
+  local dir_name="${theme_path##*/}"
 
-    THEME_DIRS["$dir_name"]="$theme_path/cursors"
+  THEME_DIRS["$dir_name"]="$theme_path/cursors"
 
-    if [[ -f "$theme_path/cursor.theme" ]]; then
-        parse_cursor_theme "$theme_path/cursor.theme"
-    elif [[ -f "$theme_path/index.theme" ]]; then
-        parse_cursor_theme "$theme_path/index.theme"
-    else
-        THEMES["$dir_name"]="$dir_name"
-    fi
+  if [[ -f "$theme_path/cursor.theme" ]]; then
+    parse_cursor_theme "$theme_path/cursor.theme"
+  elif [[ -f "$theme_path/index.theme" ]]; then
+    parse_cursor_theme "$theme_path/index.theme"
+  else
+    THEMES["$dir_name"]="$dir_name"
+  fi
 }
 
 SEARCH_DIRS=(
-    "/usr/share/icons"
-    "${XDG_DATA_HOME:-$HOME/.local/share}/icons"
-    "$HOME/.icons"
+  "/usr/share/icons"
+  "${XDG_DATA_HOME:-$HOME/.local/share}/icons"
+  "$HOME/.icons"
 )
 
 declare -A THEMES
 declare -A THEME_DIRS
 
 if [[ -n "$THEME_ARG" ]]; then
-    # Fast path: locate the named theme without scanning everything
-    for base in "${SEARCH_DIRS[@]}"; do
-        if [[ -d "$base/$THEME_ARG/cursors" ]]; then
-            register_theme "$base/$THEME_ARG"
-            break
-        fi
-    done
-
-    if [[ ${#THEMES[@]} -eq 0 ]]; then
-        echo "error: theme not found $THEME_ARG" >&2
-        exit 1
+  # Fast path: locate the named theme without scanning everything
+  for base in "${SEARCH_DIRS[@]}"; do
+    if [[ -d "$base/$THEME_ARG/cursors" ]]; then
+      register_theme "$base/$THEME_ARG"
+      break
     fi
+  done
+
+  if [[ ${#THEMES[@]} -eq 0 ]]; then
+    echo "error: theme not found $THEME_ARG" >&2
+    exit 1
+  fi
 else
-    # Full scan
-    for base in "${SEARCH_DIRS[@]}"; do
-        if [[ -d "$base" ]]; then
-            for theme_dir in "$base"/*/; do
-                if [[ -d "$theme_dir" ]]; then
-                    theme_dir="${theme_dir%/}"
-                    if [[ -d "$theme_dir/cursors" ]]; then
-                        register_theme "$theme_dir"
-                    fi
-                fi
-            done
+  # Full scan
+  for base in "${SEARCH_DIRS[@]}"; do
+    if [[ -d "$base" ]]; then
+      for theme_dir in "$base"/*/; do
+        if [[ -d "$theme_dir" ]]; then
+          theme_dir="${theme_dir%/}"
+          if [[ -d "$theme_dir/cursors" ]]; then
+            register_theme "$theme_dir"
+          fi
         fi
-    done
+      done
+    fi
+  done
 fi
 
 if [[ $FLAG_SIZE == true ]]; then
-    size_args=()
-    for dir in "${!THEMES[@]}"; do
-        if [[ $FLAG_PRETTY == true ]]; then
-            display="${THEMES[$dir]}"
-        else
-            display="$dir"
-        fi
-        for f in "${THEME_DIRS[$dir]}"/*; do
-            if [[ -f "$f" ]]; then
-                size_args+=("$display" "$f")
-                break
-            fi
-        done
+  size_args=()
+  for dir in "${!THEMES[@]}"; do
+    if [[ $FLAG_PRETTY == true ]]; then
+      display="${THEMES[$dir]}"
+    else
+      display="$dir"
+    fi
+    for f in "${THEME_DIRS[$dir]}"/*; do
+      if [[ -f "$f" ]]; then
+        size_args+=("$display" "$f")
+        break
+      fi
     done
-    print_all_sizes "${size_args[@]}"
+  done
+  print_all_sizes "${size_args[@]}"
 else
-    for dir in "${!THEMES[@]}"; do
-        if [[ $FLAG_PRETTY == true ]]; then
-            printf "%s\n" "${THEMES[$dir]}"
-        else
-            printf "%s\n" "$dir"
-        fi
-    done
+  for dir in "${!THEMES[@]}"; do
+    if [[ $FLAG_PRETTY == true ]]; then
+      printf "%s\n" "${THEMES[$dir]}"
+    else
+      printf "%s\n" "$dir"
+    fi
+  done
 fi

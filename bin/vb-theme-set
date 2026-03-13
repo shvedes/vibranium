@@ -6,301 +6,304 @@ source vb-core-lib
 
 # Assign a theme name to the GTK theme folder name
 declare -A FAMILIES=(
-     [Gruvbox]="Hard Medium Soft Light"
-     [Everforest]="Hard Medium Soft"
-     [Tokyonight]="Night Moon"
-     [Catppuccin]="Mocha Macchiato Frappe Latte"
-     [Nightfox]="Nightfox Nordfox Carbonfox Terafox"
-     [Rosepine]="Rosepine Moon Dawn"
-     [Osaka]="Osaka Jade Solarized Light"
-     [Kanagawa]="Wave Dragon"
+   [Gruvbox]="Hard Medium Soft Light"
+   [Everforest]="Hard Medium Soft"
+   [Tokyonight]="Night Moon"
+   [Catppuccin]="Mocha Macchiato Frappe Latte"
+   [Nightfox]="Nightfox Nordfox Carbonfox Terafox"
+   [Rosepine]="Rosepine Moon Dawn"
+   [Osaka]="Osaka Jade Solarized Light"
+   [Kanagawa]="Wave Dragon"
 )
 
 declare -A STANDALONE_THEMES=(
-    ["Evergarden"]="Evergarden"
+   ["Evergarden"]="Evergarden"
 )
 
 # Map theme to GTK theme name if special
 declare -A GTK_MAP=(
-     [Osaka-Jade]="Nightfox-Terafox"
-     [Osaka-Osaka]="Osaka-Dark"
-     [Osaka-Solarized]="Osaka-Solarized"
-     [Osaka-Light]="Osaka-Light"
-     [Nightfox-Nightfox]="Nightfox"
-     [Evergarden]="Everforest-Hard"
+   [Osaka - Jade]="Nightfox-Terafox"
+   [Osaka - Osaka]="Osaka-Dark"
+   [Osaka - Solarized]="Osaka-Solarized"
+   [Osaka - Light]="Osaka-Light"
+   [Nightfox - Nightfox]="Nightfox"
+   [Evergarden]="Everforest-Hard"
 )
 
 declare -A PAPIRUS_COLORS=(
-     [Gruvbox-Hard]=yaru
-     [Gruvbox-Medium]=yaru
-     [Gruvbox-Soft]=yaru
-     [Gruvbox-Light]=palebrown
+   [Gruvbox - Hard]=yaru
+   [Gruvbox - Medium]=yaru
+   [Gruvbox - Soft]=yaru
+   [Gruvbox - Light]=palebrown
 
-     [Everforest-Hard]=green
-     [Everforest-Medium]=green
-     [Everforest-Soft]=green
+   [Everforest - Hard]=green
+   [Everforest - Medium]=green
+   [Everforest - Soft]=green
 
-     [Catppuccin-Mocha]=indigo
-     [Catppuccin-Macchiato]=indigo
-     [Catppuccin-Frappe]=nordic
-     [Catppuccin-Latte]=blue
+   [Catppuccin - Mocha]=indigo
+   [Catppuccin - Macchiato]=indigo
+   [Catppuccin - Frappe]=nordic
+   [Catppuccin - Latte]=blue
 
-     [Nightfox-Nightfox]=bluegrey
-     [Nightfox-Carbonfox]=black
-     [Nightfox-Nordfox]=nordic
-     [Nightfox-Terafox]=teal
+   [Nightfox - Nightfox]=bluegrey
+   [Nightfox - Carbonfox]=black
+   [Nightfox - Nordfox]=nordic
+   [Nightfox - Terafox]=teal
 
-     [Rosepine]=violet
-     [Rosepine-Moon]=violet
-     [Rosepine-Dawn]=indigo
+   [Rosepine]=violet
+   [Rosepine - Moon]=violet
+   [Rosepine - Dawn]=indigo
 
-     [Tokyonight-Night]=blue
-     [Tokyonight-Moon]=blue
+   [Tokyonight - Night]=blue
+   [Tokyonight - Moon]=blue
 
-     [Osaka-Osaka]=teal
-     [Osaka-Jade]=teal
-     [Osaka-Solarized]=darkcyan
-     [Osaka-Light]=green
+   [Osaka - Osaka]=teal
+   [Osaka - Jade]=teal
+   [Osaka - Solarized]=darkcyan
+   [Osaka - Light]=green
 
-     [Kanagawa-Wave]=yaru
-     [Kanagawa-Dragon]=yaru
-     [Kanagawa-Lotus]=palebrown
+   [Kanagawa - Wave]=yaru
+   [Kanagawa - Dragon]=yaru
+   [Kanagawa - Lotus]=palebrown
 
-     [Evergarden]=bluegrey
+   [Evergarden]=bluegrey
 )
 
 LINK_TARGET="$XDG_CONFIG_HOME/vibranium/theme/current"
 
 # "tokyonight-night" -> "Tokyonight-Night"
 capitalize() {
-    local IFS=- parts result=()
-    read -ra parts <<< "$1"
-    local part
-    for part in "${parts[@]}"; do
-        result+=("${part^}")
-    done
-    echo "${result[*]}"
+  local IFS=- parts result=()
+  read -ra parts <<< "$1"
+  local part
+  for part in "${parts[@]}"; do
+    result+=("${part^}")
+  done
+  echo "${result[*]}"
 }
 
 get_current_target_basename() {
-    if [ -e "$LINK_TARGET" ] || [ -L "$LINK_TARGET" ]; then
-        local real_path
-        real_path="$(readlink -f "$LINK_TARGET" 2>/dev/null || true)"
+  if [ -e "$LINK_TARGET" ] || [ -L "$LINK_TARGET" ]; then
+    local real_path
+    real_path="$(readlink -f "$LINK_TARGET" 2> /dev/null || true)"
 
-        if [ -n "$real_path" ]; then
-            echo "${real_path##*/}"
-            return 0
-        fi
+    if [ -n "$real_path" ]; then
+      echo "${real_path##*/}"
+      return 0
     fi
-    echo ""
+  fi
+  echo ""
 }
 
 is_current_theme() {
-    local theme="$1"
-    local curr_basename
-    curr_basename="$(get_current_target_basename)"
+  local theme="$1"
+  local curr_basename
+  curr_basename="$(get_current_target_basename)"
 
-    [[ -z "$curr_basename" ]] && return 1
-    [[ "${curr_basename,,}" == "${theme,,}" ]]
+  [[ -z "$curr_basename" ]] && return 1
+  [[ "${curr_basename,,}" == "${theme,,}" ]]
 }
 
 # Sort keys descending by length via sort, not O(n²) bubble sort
 _sort_by_length_desc() {
-    local -n _arr="$1"
-    local key
-    mapfile -t _arr < <(
-        for key in "${_arr[@]}"; do
-            printf '%d %s\n' "${#key}" "$key"
-        done | sort -rn | cut -d' ' -f2-
-    )
+  local -n _arr="$1"
+  local key
+  mapfile -t _arr < <(
+    for key in "${_arr[@]}"; do
+      printf '%d %s\n' "${#key}" "$key"
+    done | sort -rn | cut -d' ' -f2-
+  )
 }
 
 _build_family_keys() {
-    # Populate the nameref array with sorted family+standalone keys
-    local -n _keys="$1"
-    _keys=(
-        "${!FAMILIES[@]}"
-        "${!STANDALONE_THEMES[@]}"
-    )
-    _sort_by_length_desc _keys
+  # Populate the nameref array with sorted family+standalone keys
+  local -n _keys="$1"
+  _keys=(
+    "${!FAMILIES[@]}"
+    "${!STANDALONE_THEMES[@]}"
+  )
+  _sort_by_length_desc _keys
 }
 
 _find_index() {
-    # Echo the 0-based index of $2 in array named $1, or 0 if not found
-    local -n _arr="$1"
-    local needle="$2"
-    local i
-    for i in "${!_arr[@]}"; do
-        [[ "${_arr[$i]}" == "$needle" ]] && { echo "$i"; return; }
-    done
-    echo 0
+  # Echo the 0-based index of $2 in array named $1, or 0 if not found
+  local -n _arr="$1"
+  local needle="$2"
+  local i
+  for i in "${!_arr[@]}"; do
+    [[ "${_arr[$i]}" == "$needle" ]] && {
+      echo "$i"
+      return
+    }
+  done
+  echo 0
 }
 
 pick_family() {
-    local selected_row="${1:-0}"
-    local keys=()
-    _build_family_keys keys
+  local selected_row="${1:-0}"
+  local keys=()
+  _build_family_keys keys
 
-    local family_chosen
-    while true; do
-        helpers::ui::menu family_chosen "Set theme" "" -selected-row "$selected_row" -- "${keys[@]}"
-        [[ -z "$family_chosen" ]] && exit 0
+  local family_chosen
+  while true; do
+    helpers::ui::menu family_chosen "Set theme" "" -selected-row "$selected_row" -- "${keys[@]}"
+    [[ -z "$family_chosen" ]] && exit 0
 
-        local k
-        for k in "${keys[@]}"; do
-            [[ "$k" == "$family_chosen" ]] && {
-                echo "$family_chosen"
-                return 0
-            }
-        done
+    local k
+    for k in "${keys[@]}"; do
+      [[ "$k" == "$family_chosen" ]] && {
+        echo "$family_chosen"
+        return 0
+      }
     done
+  done
 }
 
 pick_variant() {
-    local family="$1"
-    local selected_row="${2:-0}"
-    local variants=(${FAMILIES[$family]})
-    _sort_by_length_desc variants
+  local family="$1"
+  local selected_row="${2:-0}"
+  local variants=(${FAMILIES[$family]})
+  _sort_by_length_desc variants
 
-    local items=() v
-    for v in "${variants[@]}"; do
-        items+=("${v//-/ }")
+  local items=() v
+  for v in "${variants[@]}"; do
+    items+=("${v//-/ }")
+  done
+
+  local display
+  while true; do
+    helpers::ui::menu display "$family" "flavor" -selected-row "$selected_row" -- "${items[@]}"
+    [[ -z "$display" ]] && return 1
+
+    for v in "${items[@]}"; do
+      [[ "$v" == "$display" ]] && {
+        echo "$display"
+        return 0
+      }
     done
-
-    local display
-    while true; do
-        helpers::ui::menu display "$family" "flavor" -selected-row "$selected_row" -- "${items[@]}"
-        [[ -z "$display" ]] && return 1
-
-        for v in "${items[@]}"; do
-            [[ "$v" == "$display" ]] && {
-                echo "$display"
-                return 0
-            }
-        done
-    done
+  done
 }
 
 # Thank you to the Omarchy team for this wonderful fork
 apply_chromium_colors() {
-    local current_theme="${1,,}"
-    local color
+  local current_theme="${1,,}"
+  local color
 
-    case "$current_theme" in
-        "catppuccin-mocha")      color="30, 30, 46"      ;;
-        "catppuccin-macchiato")  color="36, 39, 58"      ;;
-        "catppuccin-frappe")     color="48, 52, 70"      ;;
-        "catppuccin-latte")      color="239, 241, 245"   ;;
+  case "$current_theme" in
+    "catppuccin-mocha") color="30, 30, 46" ;;
+    "catppuccin-macchiato") color="36, 39, 58" ;;
+    "catppuccin-frappe") color="48, 52, 70" ;;
+    "catppuccin-latte") color="239, 241, 245" ;;
 
-        "everforest-hard")       color="39, 46, 51"      ;;
-        "everforest-medium")     color="45, 53, 59"      ;;
-        "everforest-soft")       color="51, 60, 67"      ;;
+    "everforest-hard") color="39, 46, 51" ;;
+    "everforest-medium") color="45, 53, 59" ;;
+    "everforest-soft") color="51, 60, 67" ;;
 
-        "gruvbox-hard")          color="29, 32, 33"      ;;
-        "gruvbox-medium")        color="40, 40, 40"      ;;
-        "gruvbox-soft")          color="50, 48, 47"      ;;
-        "gruvbox-light")         color="251, 241, 199"   ;;
+    "gruvbox-hard") color="29, 32, 33" ;;
+    "gruvbox-medium") color="40, 40, 40" ;;
+    "gruvbox-soft") color="50, 48, 47" ;;
+    "gruvbox-light") color="251, 241, 199" ;;
 
-        "nightfox-carbonfox")    color="22, 22, 22"      ;;
-        "nightfox-nightfox")     color="25, 35, 48"      ;;
-        "nightfox-nordfox")      color="46, 52, 64"      ;;
-        "nightfox-terafox")      color="21, 37, 40"      ;;
+    "nightfox-carbonfox") color="22, 22, 22" ;;
+    "nightfox-nightfox") color="25, 35, 48" ;;
+    "nightfox-nordfox") color="46, 52, 64" ;;
+    "nightfox-terafox") color="21, 37, 40" ;;
 
-        "osaka-jade")            color="13, 23, 19"      ;;
-        "osaka-osaka")           color="0, 20, 25"       ;;
-        "osaka-solarized")       color="0, 43, 54"       ;;
-        "osaka-light")           color="253, 245, 226"   ;;
+    "osaka-jade") color="13, 23, 19" ;;
+    "osaka-osaka") color="0, 20, 25" ;;
+    "osaka-solarized") color="0, 43, 54" ;;
+    "osaka-light") color="253, 245, 226" ;;
 
-        "rosepine")              color="25, 23, 36"      ;;
-        "rosepine-moon")         color="35, 33, 54"      ;;
-        "rosepine-dawn")         color="250, 244, 237"   ;;
+    "rosepine") color="25, 23, 36" ;;
+    "rosepine-moon") color="35, 33, 54" ;;
+    "rosepine-dawn") color="250, 244, 237" ;;
 
-        "tokyonight-moon")       color="34, 36, 54"      ;;
-        "tokyonight-night")      color="26, 27, 38"      ;;
+    "tokyonight-moon") color="34, 36, 54" ;;
+    "tokyonight-night") color="26, 27, 38" ;;
 
-        "kanagawa-wave")         color="31, 31, 40"      ;;
-        "kanagawa-dragon")       color="24, 22, 22"      ;;
+    "kanagawa-wave") color="31, 31, 40" ;;
+    "kanagawa-dragon") color="24, 22, 22" ;;
 
-        "evergarden")            color="105, 128, 129"   ;;
-    esac
+    "evergarden") color="105, 128, 129" ;;
+  esac
 
-    chromium --no-startup-window --set-theme-color="$color" &>/dev/null || true
+  chromium --no-startup-window --set-theme-color="$color" &> /dev/null || true
 }
 
 apply_theme() {
-    local chosen="$1"
-    local folder_name="${chosen,,}"
+  local chosen="$1"
+  local folder_name="${chosen,,}"
 
-    local theme_capital
-    theme_capital="$(capitalize "$chosen")"
+  local theme_capital
+  theme_capital="$(capitalize "$chosen")"
 
-    local color="${PAPIRUS_COLORS[$theme_capital]}"
-    local theme_path="$VIBRANIUM/themes/$folder_name"
+  local color="${PAPIRUS_COLORS[$theme_capital]}"
+  local theme_path="$VIBRANIUM/themes/$folder_name"
 
-    if [ ! -d "$theme_path" ]; then
-        log::error "Theme folder $theme_path does not exist."
-        exit 1
-    fi
+  if [ ! -d "$theme_path" ]; then
+    log::error "Theme folder $theme_path does not exist."
+    exit 1
+  fi
 
-    if is_current_theme "$folder_name"; then
-        log::error "Already on $theme_capital"
-        notify-send -r 4 -u critical -t 1500 "Vibranium - Themes" "Already on $theme_capital"
-        exit 1
-    fi
+  if is_current_theme "$folder_name"; then
+    log::error "Already on $theme_capital"
+    notify-send -r 4 -u critical -t 1500 "Vibranium - Themes" "Already on $theme_capital"
+    exit 1
+  fi
 
-    rm -f "$LINK_TARGET"
-    ln -sf "$theme_path" "$LINK_TARGET"
+  rm -f "$LINK_TARGET"
+  ln -sf "$theme_path" "$LINK_TARGET"
 
-    local gtk_theme="${GTK_MAP[$chosen]:-$chosen}"
+  local gtk_theme="${GTK_MAP[$chosen]:-$chosen}"
 
-    sed -i -e "/gtk-theme-name/s/=.*/=$gtk_theme/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
-    sed -i -e "/gtk-theme-name/s/=.*/=\"$gtk_theme\"/" "$HOME/.gtkrc-2.0"
+  sed -i -e "/gtk-theme-name/s/=.*/=$gtk_theme/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
+  sed -i -e "/gtk-theme-name/s/=.*/=\"$gtk_theme\"/" "$HOME/.gtkrc-2.0"
 
-    # Update GTK 4 symlinks — process substitution keeps a single bash process
-    while read -r link; do
-        ln -sf "$HOME/.themes/$gtk_theme/gtk-4.0/$link" \
-            "$XDG_CONFIG_HOME/gtk-4.0/${link}"
-    done < <(find "$XDG_CONFIG_HOME/gtk-4.0" -type l -printf "%f\n")
+  # Update GTK 4 symlinks — process substitution keeps a single bash process
+  while read -r link; do
+    ln -sf "$HOME/.themes/$gtk_theme/gtk-4.0/$link" \
+      "$XDG_CONFIG_HOME/gtk-4.0/${link}"
+  done < <(find "$XDG_CONFIG_HOME/gtk-4.0" -type l -printf "%f\n")
 
-    gsettings set org.gnome.desktop.interface cursor-theme "$VIBRANIUM_CURSOR_THEME"
-    gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
+  gsettings set org.gnome.desktop.interface cursor-theme "$VIBRANIUM_CURSOR_THEME"
+  gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
 
-    local icon_theme="Papirus-Dark"
+  local icon_theme="Papirus-Dark"
 
-    if [[ $folder_name =~ (light|latte|dawn)$ ]]; then
-        gsettings set org.gnome.desktop.interface color-scheme 'prefer-light'
-        icon_theme="Papirus-Light"
-    else
-        gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
-    fi
+  if [[ $folder_name =~ (light|latte|dawn)$ ]]; then
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-light'
+    icon_theme="Papirus-Light"
+  else
+    gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+  fi
 
-    gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
-    papirus-folders --update-caches --theme "$icon_theme" --color "${color:-blue}" &>/dev/null &
-    apply_chromium_colors "$chosen" &
+  gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
+  papirus-folders --update-caches --theme "$icon_theme" --color "${color:-blue}" &> /dev/null &
+  apply_chromium_colors "$chosen" &
 }
 
 get_wallpaper() {
-    local state_dir="$VIBRANIUM_STATE/wallpaper"
-    local state_file="$state_dir/${1,,}"
+  local state_dir="$VIBRANIUM_STATE/wallpaper"
+  local state_file="$state_dir/${1,,}"
 
-    if [[ ! -d $state_dir ]]; then
-        mkdir -p "$state_dir"
-    else
-        if [[ -f "$state_file" ]]; then
-            local saved_wallpaper
-            saved_wallpaper="$(<"$state_file")"
-            if [[ -f "$saved_wallpaper" ]]; then
-                echo "$saved_wallpaper"
-                return 0
-            fi
-        fi
+  if [[ ! -d $state_dir ]]; then
+    mkdir -p "$state_dir"
+  else
+    if [[ -f "$state_file" ]]; then
+      local saved_wallpaper
+      saved_wallpaper="$(< "$state_file")"
+      if [[ -f "$saved_wallpaper" ]]; then
+        echo "$saved_wallpaper"
+        return 0
+      fi
     fi
+  fi
 
-    find "$LINK_TARGET/backgrounds/" -type f,l | sort | head -n1
+  find "$LINK_TARGET/backgrounds/" -type f,l | sort | head -n1
 }
 
 show_help() {
-    cat <<EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]... [THEME]
 
 Apply a Vibranium theme. With no THEME argument an interactive picker is
@@ -328,100 +331,106 @@ EOF
 }
 
 list_themes() {
-    local family variant
-    local -a names=()
+  local family variant
+  local -a names=()
 
-    for family in "${!FAMILIES[@]}"; do
-        for variant in ${FAMILIES[$family]}; do
-            local name="${family}-${variant}"
-            # Collapse the Rosepine-Rosepine special case in the listing too
-            [[ "$name" == "Rosepine-Rosepine" ]] && name="Rosepine"
-            names+=("${name,,}")
-        done
+  for family in "${!FAMILIES[@]}"; do
+    for variant in ${FAMILIES[$family]}; do
+      local name="${family}-${variant}"
+      # Collapse the Rosepine-Rosepine special case in the listing too
+      [[ "$name" == "Rosepine-Rosepine" ]] && name="Rosepine"
+      names+=("${name,,}")
     done
+  done
 
-    for family in "${!STANDALONE_THEMES[@]}"; do
-        names+=("${family,,}")
-    done
+  for family in "${!STANDALONE_THEMES[@]}"; do
+    names+=("${family,,}")
+  done
 
-    # Sort alphabetically and print
-    printf '%s\n' "${names[@]}" | sort
+  # Sort alphabetically and print
+  printf '%s\n' "${names[@]}" | sort
 }
 
 case "${1-}" in
-    -h|--help)  show_help; exit 0 ;;
-    -l|--list)  list_themes; exit 0 ;;
+  -h | --help)
+    show_help
+    exit 0
+    ;;
+  -l | --list)
+    list_themes
+    exit 0
+    ;;
 esac
 
 if [[ -n "$1" ]]; then
-    # Normalise spaces to hyphens ("Tokyonight Night" -> "Tokyonight-Night")
-    INPUT_THEME="${1// /-}"
+  # Normalise spaces to hyphens ("Tokyonight Night" -> "Tokyonight-Night")
+  INPUT_THEME="${1// /-}"
 
-    # Fast path: $1 is already a valid theme folder name
-    # Check before any family/variant parsing so callers can pass folder names
-    # directly (e.g. from scripts, dmenu, rofi, etc.) without extra ceremony.
-    if [[ -d "$VIBRANIUM/themes/${INPUT_THEME,,}" ]]; then
-        CHOSEN="$(capitalize "${INPUT_THEME,,}")"
-    else
-        # Structured path: Family[-Variant] parsing
-        FAMILY="${INPUT_THEME%%-*}"
-        VARIANT="${INPUT_THEME#*-}"
+  # Fast path: $1 is already a valid theme folder name
+  # Check before any family/variant parsing so callers can pass folder names
+  # directly (e.g. from scripts, dmenu, rofi, etc.) without extra ceremony.
+  if [[ -d "$VIBRANIUM/themes/${INPUT_THEME,,}" ]]; then
+    CHOSEN="$(capitalize "${INPUT_THEME,,}")"
+  else
+    # Structured path: Family[-Variant] parsing
+    FAMILY="${INPUT_THEME%%-*}"
+    VARIANT="${INPUT_THEME#*-}"
 
-        if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
-            log::error "Family '$FAMILY' not found. Run '${0##*/} --list' to see available themes."
-            exit 1
-        fi
-
-        VARIANT_FOUND=false
-        for v in ${FAMILIES[$FAMILY]}; do
-            if [[ "${v,,}" == "${VARIANT,,}" ]]; then
-                VARIANT_FOUND=true
-                break
-            fi
-        done
-
-        if ! $VARIANT_FOUND; then
-            log::error "Variant '$VARIANT' not found in family '$FAMILY'. Run '${0##*/} --list' to see available themes."
-            exit 1
-        fi
-
-        CHOSEN="${FAMILY}-${VARIANT}"
+    if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
+      log::error "Family '$FAMILY' not found. Run '${0##*/} --list' to see available themes."
+      exit 1
     fi
-else
-    declare -A _last_variant_row=()
-    _family_row=0
 
-    while true; do
-        FAMILY="$(pick_family "$_family_row")" || exit 1
-        [ -z "$FAMILY" ] && exit 1
-
-        # Remember which row this family sits on for when we return
-        _fkeys=()
-        _build_family_keys _fkeys
-        _family_row="$(_find_index _fkeys "$FAMILY")"
-
-        if [[ -n "${STANDALONE_THEMES[$FAMILY]}" ]]; then
-            CHOSEN="${STANDALONE_THEMES[$FAMILY]}"
-            break
-        fi
-
-        VARIANT_DISPLAY="$(pick_variant "$FAMILY" "${_last_variant_row[$FAMILY]:-0}")"
-        if [[ -z "$VARIANT_DISPLAY" ]]; then
-            # Escape pressed — go back to family menu with cursor restored
-            continue
-        fi
-
-        # Remember which variant row was chosen for this family
-        _vvariants=(${FAMILIES[$FAMILY]})
-        _sort_by_length_desc _vvariants
-        _vitems=()
-        for _vv in "${_vvariants[@]}"; do _vitems+=("${_vv//-/ }"); done
-        _last_variant_row[$FAMILY]="$(_find_index _vitems "$VARIANT_DISPLAY")"
-
-        VARIANT="${VARIANT_DISPLAY// /-}"
-        CHOSEN="${FAMILY}-${VARIANT}"
+    VARIANT_FOUND=false
+    for v in ${FAMILIES[$FAMILY]}; do
+      if [[ "${v,,}" == "${VARIANT,,}" ]]; then
+        VARIANT_FOUND=true
         break
+      fi
     done
+
+    if ! $VARIANT_FOUND; then
+      log::error "Variant '$VARIANT' not found in family '$FAMILY'. Run '${0##*/} --list' to see available themes."
+      exit 1
+    fi
+
+    CHOSEN="${FAMILY}-${VARIANT}"
+  fi
+else
+  declare -A _last_variant_row=()
+  _family_row=0
+
+  while true; do
+    FAMILY="$(pick_family "$_family_row")" || exit 1
+    [ -z "$FAMILY" ] && exit 1
+
+    # Remember which row this family sits on for when we return
+    _fkeys=()
+    _build_family_keys _fkeys
+    _family_row="$(_find_index _fkeys "$FAMILY")"
+
+    if [[ -n "${STANDALONE_THEMES[$FAMILY]}" ]]; then
+      CHOSEN="${STANDALONE_THEMES[$FAMILY]}"
+      break
+    fi
+
+    VARIANT_DISPLAY="$(pick_variant "$FAMILY" "${_last_variant_row[$FAMILY]:-0}")"
+    if [[ -z "$VARIANT_DISPLAY" ]]; then
+      # Escape pressed — go back to family menu with cursor restored
+      continue
+    fi
+
+    # Remember which variant row was chosen for this family
+    _vvariants=(${FAMILIES[$FAMILY]})
+    _sort_by_length_desc _vvariants
+    _vitems=()
+    for _vv in "${_vvariants[@]}"; do _vitems+=("${_vv//-/ }"); done
+    _last_variant_row[$FAMILY]="$(_find_index _vitems "$VARIANT_DISPLAY")"
+
+    VARIANT="${VARIANT_DISPLAY// /-}"
+    CHOSEN="${FAMILY}-${VARIANT}"
+    break
+  done
 fi
 
 # Normalize Rosepine-Rosepine -> Rosepine in one place
@@ -429,8 +438,8 @@ fi
 
 folder_name="${CHOSEN,,}"
 if [ ! -d "$VIBRANIUM/themes/$folder_name" ]; then
-    log::error "Theme '$CHOSEN' does not exist in $VIBRANIUM/themes."
-    exit 1
+  log::error "Theme '$CHOSEN' does not exist in $VIBRANIUM/themes."
+  exit 1
 fi
 
 apply_theme "$CHOSEN"
@@ -443,20 +452,20 @@ touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
 
 # This is my personal setup (yet), so..
 if [[ -f "$XDG_CONFIG_HOME/nvim/lua/config/colorscheme.lua" && $USER == shved ]]; then
-    if pidof -q nvim; then
-        pkill -SIGUSR1 nvim
-    fi
+  if pidof -q nvim; then
+    pkill -SIGUSR1 nvim
+  fi
 fi
 
 if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
-    systemctl --user restart swayosd
+  systemctl --user restart swayosd
 fi
 
 hyprctl -q dispatch sendshortcut CTRL, R, class:heroic
 hyprctl -q dispatch sendshortcut CTRL, R, class:[Tt]hunar
 
 touch "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
-pkill -SIGUSR2 btop 2>/dev/null
+pkill -SIGUSR2 btop 2> /dev/null
 
 vb-theme-svgs
 setsid -f gtk-update-icon-cache -tfq "$XDG_DATA_HOME"/icons/Papirus-{Dark,Light} &> /dev/null

@@ -4,4 +4,3 @@
 hyprctl -q switchxkblayout all 0
 
 pidof hyprlock || hyprlock
-

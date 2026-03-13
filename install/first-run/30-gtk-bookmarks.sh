@@ -6,29 +6,29 @@
 file="$XDG_CONFIG_HOME/user-dirs.dirs"
 
 if [[ ! "$file" ]]; then
-    msg="$file does not exists! No default folder & bookmarks were created.\n"
+  msg="$file does not exists! No default folder & bookmarks were created.\n"
 
-    if command -v xdg-user-dir > /dev/null; then
-        msg=+"To fix, run 'systemctl --user enable --now xdg-user-dirs'"
-    else
-        msg+="To fix, install xdg-user-dirs and run\n"
-        msg=+"'systemctl --user start xdg-user-dirs'"
-    fi
+  if command -v xdg-user-dir > /dev/null; then
+    msg=+"To fix, run 'systemctl --user enable --now xdg-user-dirs'"
+  else
+    msg+="To fix, install xdg-user-dirs and run\n"
+    msg=+"'systemctl --user start xdg-user-dirs'"
+  fi
 
-    notify-send -r $RANDOM -t 30000 -u critical \
-        "Vibranium - First Run Hooks" "$msg"
+  notify-send -r $RANDOM -t 30000 -u critical \
+    "Vibranium - First Run Hooks" "$msg"
 fi
 
 _parse_user_dirs() {
-    while IFS='=' read -r key value; do
-        [[ $key == XDG_*_DIR ]] || continue
+  while IFS='=' read -r key value; do
+    [[ $key == XDG_*_DIR ]] || continue
 
-        value=${value#\"}
-        value=${value%\"}
-        value=${value/\$HOME/$HOME}
+    value=${value#\"}
+    value=${value%\"}
+    value=${value/\$HOME/$HOME}
 
-        echo "file://$value"
-    done < "$file"
+    echo "file://$value"
+  done < "$file"
 }
 
 _parse_user_dirs > "$XDG_CONFIG_HOME/gtk-3.0/bookmarks"

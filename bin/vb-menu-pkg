@@ -3,61 +3,61 @@
 source vb-core-lib
 
 ACTIONS=(
-    "Install"
-    "Uninstall"
-    "System update"
-    "Vibranium update"
+  "Install"
+  "Uninstall"
+  "System update"
+  "Vibranium update"
 )
 
 while true; do
-    helpers::ui::menu CHOSEN "Packages" "ESC to go back" -- "${ACTIONS[@]}"
-    [[ -z $CHOSEN ]] && break
+  helpers::ui::menu CHOSEN "Packages" "ESC to go back" -- "${ACTIONS[@]}"
+  [[ -z $CHOSEN ]] && break
 
-    case "$CHOSEN" in
-        "Install")
-            while true; do
-                helpers::ui::menu install_chosen "Install" "ESC to go back" -- "Package" "Font"
-                [[ -z "$install_chosen" ]] && break
+  case "$CHOSEN" in
+    "Install")
+      while true; do
+        helpers::ui::menu install_chosen "Install" "ESC to go back" -- "Package" "Font"
+        [[ -z "$install_chosen" ]] && break
 
-                case "$install_chosen" in
-                    "Package") vb-core-term --floating -- vb-pkg-install ;;
-                    "Font") vb-core-term --floating -- vb-pkg-font-install ;;
-                    *) continue ;;
-                esac
+        case "$install_chosen" in
+          "Package") vb-core-term --floating -- vb-pkg-install ;;
+          "Font") vb-core-term --floating -- vb-pkg-font-install ;;
+          *) continue ;;
+        esac
 
-                helpers::ui::close_menus
-            done
+        helpers::ui::close_menus
+      done
+      ;;
+    "Uninstall")
+      while true; do
+        helpers::ui::menu uninstall_chosen "Install" "ESC to go back" -- "Package" "Font"
+        [[ -z "$uninstall_chosen" ]] && break
+
+        case "$uninstall_chosen" in
+          "Package")
+            vb-core-term --floating -- vb-pkg-remove
             ;;
-        "Uninstall")
-            while true; do
-                helpers::ui::menu uninstall_chosen "Install" "ESC to go back" -- "Package" "Font"
-                [[ -z "$uninstall_chosen" ]] && break
-
-                case "$uninstall_chosen" in
-                    "Package")
-                        vb-core-term --floating -- vb-pkg-remove
-                        ;;
-                    "Font")
-                        vb-core-term --floating -- vb-pkg-font-remove
-                        ;;
-                    *)
-                        continue
-                        ;;
-                esac
-
-                helpers::ui::close_menus
-            done
+          "Font")
+            vb-core-term --floating -- vb-pkg-font-remove
             ;;
-        "System update")
-            vb-core-term --floating -- vb-pkg-update
-            helpers::ui::close_menus
-            ;;
-        "Vibranium update")
-            vb-core-term --floating -- vb-update
-            helpers::ui::close_menus
-            ;;
-        *)
+          *)
             continue
             ;;
-    esac
+        esac
+
+        helpers::ui::close_menus
+      done
+      ;;
+    "System update")
+      vb-core-term --floating -- vb-pkg-update
+      helpers::ui::close_menus
+      ;;
+    "Vibranium update")
+      vb-core-term --floating -- vb-update
+      helpers::ui::close_menus
+      ;;
+    *)
+      continue
+      ;;
+  esac
 done

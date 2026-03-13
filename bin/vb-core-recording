@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
-    if [[ -t 1 ]]; then
-        echo "Screen recording is not available inside of a VM" >&2
-    else
-        notify-send -r 4 -t 10000 -u critical "Vibranium" \
-            "Screen recording isn't available inside of a VM"
-    fi
-    exit 1
+  if [[ -t 1 ]]; then
+    echo "Screen recording is not available inside of a VM" >&2
+  else
+    notify-send -r 4 -t 10000 -u critical "Vibranium" \
+      "Screen recording isn't available inside of a VM"
+  fi
+  exit 1
 fi
 
 source vb-core-lib
@@ -15,7 +15,7 @@ source vb-core-lib
 LOG_FILE="$VIBRANIUM_CACHE/${0##*/}.log"
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]
 
 Options:
@@ -27,210 +27,212 @@ EOF
 }
 
 get_output_dir() {
-    mkdir -p "${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts"
-    printf "%s" "${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts"
+  mkdir -p "${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts"
+  printf "%s" "${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts"
 }
 
 output_file() {
-    printf "%s/recording-%s.%s" \
-        "$(get_output_dir)" \
-        "$(date +"%Y-%m-%d_%H-%M-%S")" "$EXT"
+  printf "%s/recording-%s.%s" \
+    "$(get_output_dir)" \
+    "$(date +"%Y-%m-%d_%H-%M-%S")" "$EXT"
 }
 
 visualize() {
-    vb-cmd-refresh-bar-module recording-indicator
+  vb-cmd-refresh-bar-module recording-indicator
 
-    helpers::check VIBRANIUM_RECORDING_FLASH_SCREEN
-    if [[ $VIBRANIUM_RECORDING_FLASH_SCREEN == true ]]; then
-        hypr::flash::screen &
-    fi
+  helpers::check VIBRANIUM_RECORDING_FLASH_SCREEN
+  if [[ $VIBRANIUM_RECORDING_FLASH_SCREEN == true ]]; then
+    hypr::flash::screen &
+  fi
 }
 
 copy() {
-    local last_file
-    last_file="$(find "$(get_output_dir)" -type f -name 'recording-*' -printf "%T@ %p\n" | sort -n | tail -1 | cut -d' ' -f2-)"
-    [[ -n "$last_file" ]] && {
-        printf "file://%s" "$last_file" | wl-copy -t text/uri-list
-    }
+  local last_file
+  last_file="$(find "$(get_output_dir)" -type f -name 'recording-*' -printf "%T@ %p\n" | sort -n | tail -1 | cut -d' ' -f2-)"
+  [[ -n "$last_file" ]] && {
+    printf "file://%s" "$last_file" | wl-copy -t text/uri-list
+  }
 }
 
 set_rec_area() {
-    local target="${1/--/}"
+  local target="${1/--/}"
 
-    case "$target" in
-        portal)
-            printf '%s' "$target"
-            ;;
-        region)
-            local slurp_flags=(-b ${P_GRAY}33 -c $P_ACCENT -f '%wx%h+%x+%y')
-            local selected_region="$(slurp ${slurp_flags[@]} 2> /dev/null)"
+  case "$target" in
+    portal)
+      printf '%s' "$target"
+      ;;
+    region)
+      local slurp_flags=(-b ${P_GRAY}33 -c $P_ACCENT -f '%wx%h+%x+%y')
+      local selected_region="$(slurp ${slurp_flags[@]} 2> /dev/null)"
 
-            printf "%s" "$selected_region"
-            return 0
-            ;;
-        screen)
-            local monitor
-            monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
-            printf '%s' "$monitor"
-            ;;
-    esac
+      printf "%s" "$selected_region"
+      return 0
+      ;;
+    screen)
+      local monitor
+      monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
+      printf '%s' "$monitor"
+      ;;
+  esac
 }
 
 init_recording() {
-    if [[ ! -z ${1:-} ]]; then
-        local opt_flags=(-encoder cpu)
+  if [[ ! -z ${1:-} ]]; then
+    local opt_flags=(-encoder cpu)
+  fi
+
+  if [[ -z "$AREA" ]]; then
+    exit 1
+  fi
+
+  FPS="$VIBRANIUM_RECORDING_FPS"
+  EXT="$VIBRANIUM_RECORDING_CONTAINER_TYPE"
+  FRM="$VIBRANIUM_RECORDING_FRAMERATE_MODE"
+  CODEC="$VIBRANIUM_RECORDING_VIDEO_CODEC"
+  QUALITY="$VIBRANIUM_RECORDING_QUALITY"
+
+  CAPTURE_SINK="$VIBRANIUM_RECORDING_CAPTURE_SINK"
+  CAPTURE_SOURCE="$VIBRANIUM_RECORDING_CAPTURE_SOURCE"
+  USE_RNNOISE=$VIBRANIUM_RECORDING_USE_RNNOISE
+
+  local rnnoise_present=$(pactl list short sources | grep -q rnnoise_source && echo true || echo false)
+
+  if [[ $CAPTURE_SOURCE == true ]]; then
+    if [[ $USE_RNNOISE == true && $rnnoise_present == true ]]; then
+      input_node='rnnoise_source'
+    else
+      input_node='default_input'
     fi
+  fi
 
-    if [[ -z "$AREA" ]]; then
-        exit 1
-    fi
+  if [[ $CAPTURE_SOURCE == true && $CAPTURE_SINK == true ]]; then
+    opt_flags+=(-a "${input_node}|default_output")
+  elif [[ $CAPTURE_SOURCE == true ]]; then
+    opt_flags+=(-a "${input_node}")
+  elif [[ $CAPTURE_SINK == true ]]; then
+    opt_flags+=(-a 'default_output')
+  fi
 
-    FPS="$VIBRANIUM_RECORDING_FPS"
-    EXT="$VIBRANIUM_RECORDING_CONTAINER_TYPE"
-    FRM="$VIBRANIUM_RECORDING_FRAMERATE_MODE"
-    CODEC="$VIBRANIUM_RECORDING_VIDEO_CODEC"
-    QUALITY="$VIBRANIUM_RECORDING_QUALITY"
+  gpu-screen-recorder \
+    ${opt_flags[@]} \
+    -q "$QUALITY" \
+    -w "$AREA" \
+    -k "$CODEC" \
+    -fm "$FRM" \
+    -c "$EXT" \
+    -f "$FPS" \
+    -o "$(output_file)" &> "$LOG_FILE" &
 
-    CAPTURE_SINK="$VIBRANIUM_RECORDING_CAPTURE_SINK"
-    CAPTURE_SOURCE="$VIBRANIUM_RECORDING_CAPTURE_SOURCE"
-    USE_RNNOISE=$VIBRANIUM_RECORDING_USE_RNNOISE
+  local pid=$!
+  sleep 0.2
 
-    local rnnoise_present=$(pactl list short sources | grep -q rnnoise_source && echo true || echo false)
-
-    if [[ $CAPTURE_SOURCE == true ]]; then
-        if [[ $USE_RNNOISE == true && $rnnoise_present == true ]]; then
-            input_node='rnnoise_source'
-        else
-            input_node='default_input'
-        fi
-    fi
-
-    if [[ $CAPTURE_SOURCE == true && $CAPTURE_SINK == true ]]; then
-        opt_flags+=(-a "${input_node}|default_output")
-    elif [[ $CAPTURE_SOURCE == true ]]; then
-        opt_flags+=(-a "${input_node}")
-    elif [[ $CAPTURE_SINK == true ]]; then
-        opt_flags+=(-a 'default_output')
-    fi
-
-    gpu-screen-recorder \
-        ${opt_flags[@]} \
-        -q "$QUALITY" \
-        -w "$AREA" \
-        -k "$CODEC" \
-        -fm "$FRM" \
-        -c "$EXT" \
-        -f "$FPS" \
-        -o "$(output_file)" &> "$LOG_FILE" &
-
-    local pid=$!
-    sleep 0.2
-
-    # process's alive; recording started
-    if kill -0 $pid 2> /dev/null; then
-        return 0
-    else #  recording failed
-        return 1
-    fi
+  # process's alive; recording started
+  if kill -0 $pid 2> /dev/null; then
+    return 0
+  else #  recording failed
+    return 1
+  fi
 }
 
 fallback_notification() {
-    local msg
+  local msg
 
-    msg="Screen recording completed in fallback mode.\n"
-    msg+="Video was encoded on the CPU instead of the GPU.\n"
-    msg+="This may reduce quality and system performance.\n\n"
-    msg+="Please make sure your GPU supports selected codec.\n"
-    msg+="Click here to see the logs"
+  msg="Screen recording completed in fallback mode.\n"
+  msg+="Video was encoded on the CPU instead of the GPU.\n"
+  msg+="This may reduce quality and system performance.\n\n"
+  msg+="Please make sure your GPU supports selected codec.\n"
+  msg+="Click here to see the logs"
 
-    if notify-send -A true -r 4 -u critical -t 25000 "Screen Recording" "$msg"; then
-        vb-core-term -- "$EDITOR" "${LOG_FILE}.latest_fallback"
-    fi
+  if notify-send -A true -r 4 -u critical -t 25000 "Screen Recording" "$msg"; then
+    vb-core-term -- "$EDITOR" "${LOG_FILE}.latest_fallback"
+  fi
 }
 
 both_failed_notification() {
-    local msg
+  local msg
 
-    msg="Failed to start screen recording in both normal and fallback modes.\n"
-    msg+="Click here to see the lock."
+  msg="Failed to start screen recording in both normal and fallback modes.\n"
+  msg+="Click here to see the lock."
 
-    if notify-send -A true -r 4 -u critical -t 25000 "Screen Recording" "$msg"; then
-        vb-core-term -- "$EDITOR" "${LOG_FILE}.latest_failed"
-    fi
+  if notify-send -A true -r 4 -u critical -t 25000 "Screen Recording" "$msg"; then
+    vb-core-term -- "$EDITOR" "${LOG_FILE}.latest_failed"
+  fi
 }
 
 start_rec() {
-    helpers::check VIBRANIUM_RECORDING_FPS
-    helpers::check VIBRANIUM_RECORDING_QUALITY
-    helpers::check VIBRANIUM_RECORDING_VIDEO_CODEC
-    helpers::check VIBRANIUM_RECORDING_USE_RNNOISE
-    helpers::check VIBRANIUM_RECORDING_CAPTURE_SINK
-    helpers::check VIBRANIUM_RECORDING_CAPTURE_SOURCE
-    helpers::check VIBRANIUM_RECORDING_CONTAINER_TYPE
-    helpers::check VIBRANIUM_RECORDING_FRAMERATE_MODE
+  helpers::check VIBRANIUM_RECORDING_FPS
+  helpers::check VIBRANIUM_RECORDING_QUALITY
+  helpers::check VIBRANIUM_RECORDING_VIDEO_CODEC
+  helpers::check VIBRANIUM_RECORDING_USE_RNNOISE
+  helpers::check VIBRANIUM_RECORDING_CAPTURE_SINK
+  helpers::check VIBRANIUM_RECORDING_CAPTURE_SOURCE
+  helpers::check VIBRANIUM_RECORDING_CONTAINER_TYPE
+  helpers::check VIBRANIUM_RECORDING_FRAMERATE_MODE
 
-    if ! init_recording; then
-        log::warn "failed to start recording. Using fallback mode"
-        VIBRANIUM_RECORDING_VIDEO_CODEC="h264"
-        VIBRANIUM_RECORDING_CONTAINER_TYPE="mp4"
+  if ! init_recording; then
+    log::warn "failed to start recording. Using fallback mode"
+    VIBRANIUM_RECORDING_VIDEO_CODEC="h264"
+    VIBRANIUM_RECORDING_CONTAINER_TYPE="mp4"
 
-        mv "$LOG_FILE" "${LOG_FILE}.latest_fallback"
+    mv "$LOG_FILE" "${LOG_FILE}.latest_fallback"
 
-        if ! init_recording --fallback; then
-            mv "$LOG_FILE" "${LOG_FILE}.latest_failed"
-            log::error "failed to start recording in fallback mode"
-            both_failed_notification
-            exit 1
-        fi
-
-        touch "$VIBRANIUM_CACHE/fallback_mode"
-        visualize
-        log::info "recording started in fallback mode"
-    else
-        visualize
-        log::info "recording started"
+    if ! init_recording --fallback; then
+      mv "$LOG_FILE" "${LOG_FILE}.latest_failed"
+      log::error "failed to start recording in fallback mode"
+      both_failed_notification
+      exit 1
     fi
+
+    touch "$VIBRANIUM_CACHE/fallback_mode"
+    visualize
+    log::info "recording started in fallback mode"
+  else
+    visualize
+    log::info "recording started"
+  fi
 }
 
-
 if pid="$(pidof gpu-screen-recorder)"; then
-    log::info "recording saved"
-    visualize; kill $pid
+  log::info "recording saved"
+  visualize
+  kill $pid
 
-    if [ -f "$VIBRANIUM_CACHE/fallback_mode" ]; then
-        fallback_notification
-        rm "$VIBRANIUM_CACHE/fallback_mode"
-    else
-        # Do not show "Recording saved" when ran in fallback
-        notify-send -r 3 "Screen Recorder" "Recording saved"
-    fi
+  if [ -f "$VIBRANIUM_CACHE/fallback_mode" ]; then
+    fallback_notification
+    rm "$VIBRANIUM_CACHE/fallback_mode"
+  else
+    # Do not show "Recording saved" when ran in fallback
+    notify-send -r 3 "Screen Recorder" "Recording saved"
+  fi
 
-    vb-cmd-refresh-bar-module recording-indicator
-    copy; exit 0
+  vb-cmd-refresh-bar-module recording-indicator
+  copy
+  exit 0
 fi
 
 if ! missing="$(vb-cmd-is-present gpu-screen-recorder jq)"; then
-    log::error "missing required dependencies: $missing"
+  log::error "missing required dependencies: $missing"
 
-    if term::is_headless; then
-        vb-cmd-dep-notify \
-            --name "Screen Recording" \
-            --deps "$missing"
-    fi
-    exit 1
+  if term::is_headless; then
+    vb-cmd-dep-notify \
+      --name "Screen Recording" \
+      --deps "$missing"
+  fi
+  exit 1
 fi
 
 case "$1" in
-    --region|--screen|--portal)
-        AREA="$(set_rec_area "$1")"
-        start_rec
-        ;;
-    -h|--help|"")
-        usage
-        exit 0
-        ;;
-    *)
-        usage
-        exit 1
+  --region | --screen | --portal)
+    AREA="$(set_rec_area "$1")"
+    start_rec
+    ;;
+  -h | --help | "")
+    usage
+    exit 0
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
 esac
 

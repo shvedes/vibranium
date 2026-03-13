@@ -6,18 +6,18 @@ LOGIND_CONF="/etc/systemd/logind.conf"
 sudo sed -Ei '/^#?HandlePowerKey=/s/^#//;/HandlePowerKey/s/=.*/=ignore/' "$LOGIND_CONF"
 
 sudo mkdir -p /etc/tmpfiles.d
-sudo tee /etc/tmpfiles.d/coredump.conf >/dev/null <<EOF
+sudo tee /etc/tmpfiles.d/coredump.conf > /dev/null << EOF
 # Clear all coredumps that were created more than 3 days ago
 d /var/lib/systemd/coredump 0755 root root 3d
 EOF
 
-sudo tee /etc/tmpfiles.d/thp.conf >/dev/null <<EOF
+sudo tee /etc/tmpfiles.d/thp.conf > /dev/null << EOF
 # Improve performance for applications that use tcmalloc
 # https://github.com/google/tcmalloc/blob/master/docs/tuning.md#system-level-optimizations
 w! /sys/kernel/mm/transparent_hugepage/defrag - - - - defer+madvise
 EOF
 
-sudo tee /etc/tmpfiles.d/thp-shrinker.conf >/dev/null <<EOF
+sudo tee /etc/tmpfiles.d/thp-shrinker.conf > /dev/null << EOF
 # THP Shrinker  has  been  added  in  the  6.12 Kernel.  Default   Value   is  511
 # THP=always          policy          vastly          overprovisions          THPs
 # in sparsely  accessed  memory  areas, resulting in excessive memory pressure and
@@ -27,4 +27,3 @@ sudo tee /etc/tmpfiles.d/thp-shrinker.conf >/dev/null <<EOF
 # madvise   is  used,  while  still  providing  an  equal  performance improvement
 w! /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none - - - - 409
 EOF
-

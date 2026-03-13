@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 if [[ ! -f /tmp/nvidia-setup-needed ]]; then
-    exit 0
+  exit 0
 fi
 
 MKINITCPIO_CONF="/etc/mkinitcpio.conf"
@@ -23,10 +23,9 @@ sudo sed -i -E 's/  +/ /g' "$MKINITCPIO_CONF"
 
 _log_info "Generating mkinitcpio image"
 if ! sudo mkinitcpio -P &> /dev/null; then
-    _log_error "mkinitcpio -P failed"
-    rm -f /tmp/nvidia-setup-needed
-    exit 1
+  _log_error "mkinitcpio -P failed"
+  rm -f /tmp/nvidia-setup-needed
+  exit 1
 fi
 
 rm -f /tmp/nvidia-setup-needed
-

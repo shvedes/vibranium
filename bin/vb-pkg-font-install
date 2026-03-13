@@ -3,60 +3,60 @@
 source vb-core-lib
 
 FZF_ARGS=(
-    --multi
-    --ignore-case
-    --highlight-line
+  --multi
+  --ignore-case
+  --highlight-line
 
-    --info 'hidden'
-    --border 'bold'
+  --info 'hidden'
+  --border 'bold'
 
-    --border-label ' alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select '
-    --border-label-pos 'bottom'
+  --border-label ' alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select '
+  --border-label-pos 'bottom'
 
-    --list-label 'Package list'
-    --list-border 'bold'
+  --list-label 'Package list'
+  --list-border 'bold'
 
-    --input-label 'Filter packages'
-    --input-border 'bold'
+  --input-label 'Filter packages'
+  --input-border 'bold'
 
-    --preview 'yay -Sii {1}'
-    --preview-border 'bold'
-    --preview-window 'right:75%:wrap'
-    --preview-label 'Package Information'
+  --preview 'yay -Sii {1}'
+  --preview-border 'bold'
+  --preview-window 'right:75%:wrap'
+  --preview-label 'Package Information'
 
-    --bind 'alt-p:toggle-preview'
-    --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
-    --bind 'alt-k:preview-up,alt-j:preview-down'
+  --bind 'alt-p:toggle-preview'
+  --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
+  --bind 'alt-k:preview-up,alt-j:preview-down'
 
-    --color 'pointer:white,marker:green'
+  --color 'pointer:white,marker:green'
 )
 
 _operation_canceled() {
-    printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
-    read -n1 -r -s -p $'. Press any key to exit' dummy
-    printf '\e[?25h' # show cursor
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+  printf '\e[?25h' # show cursor
 }
 
 _get_fonts() {
-    local pkg
+  local pkg
 
-    while IFS= read -r pkg; do
-        case "$pkg" in
-            ttf* | ttf*-nerd | ttf*-nerd-mono | \
-            otf* | otf*-nerd | otf*-nerd-mono)
-                printf '%s\n' "$pkg"
-                ;;
-        esac
-    done < <(pacman -Slq)
+  while IFS= read -r pkg; do
+    case "$pkg" in
+      ttf* | ttf*-nerd | ttf*-nerd-mono | \
+        otf* | otf*-nerd | otf*-nerd-mono)
+        printf '%s\n' "$pkg"
+        ;;
+    esac
+  done < <(pacman -Slq)
 
-    while IFS= read -r pkg; do
-        case "$pkg" in
-            ttf* | ttf*-nerd | ttf*-nerd-mono | \
-            otf* | otf*-nerd | otf*-nerd-mono)
-                printf '%s\n' "$pkg"
-                ;;
-        esac
-    done < <(yay -Slqa)
+  while IFS= read -r pkg; do
+    case "$pkg" in
+      ttf* | ttf*-nerd | ttf*-nerd-mono | \
+        otf* | otf*-nerd | otf*-nerd-mono)
+        printf '%s\n' "$pkg"
+        ;;
+    esac
+  done < <(yay -Slqa)
 }
 
 trap 'printf "\n"; _operation_canceled; exit 1' SIGINT
@@ -77,10 +77,10 @@ printf '\e[?25l'
 rm -f "$TMP"
 
 if [[ ${#chosen[@]} -eq 0 ]]; then
-    _operation_canceled
-    exit 1
+  _operation_canceled
+  exit 1
 fi
 
 if vb-pkg-install --no-logo --no-verify "${chosen[@]}"; then
-    setsid -f vb-cmd-font-cache
+  setsid -f vb-cmd-font-cache
 fi

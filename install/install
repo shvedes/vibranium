@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
 if [[ "$(id -u)" == 0 ]]; then
-    echo "Do not run this script as root!" >&2
-    exit 1
+  echo "Do not run this script as root!" >&2
+  exit 1
 fi
 
 # ========================================================================================== #
 
 EXPECTED_PATH="$HOME/.local/share/vibranium/install"
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   echo "ERROR: This script must be run from $EXPECTED_PATH" >&2
@@ -38,18 +38,19 @@ export GRAY RESET
 
 # Source helpers
 for helper in "$SCRIPT_DIR/helpers"/*.sh; do
-    source "$helper"
+  source "$helper"
 done
 
 # ========================================== #
 
 touch /tmp/vb-install-ongoing
 
-exec </dev/tty
+exec < /dev/tty
 
 # Clear TTY and move prompt
 # to the bottom
-clear; tput cup 9999 0
+clear
+tput cup 9999 0
 
 term::disable_input
 term::show_header
@@ -74,63 +75,64 @@ _log_info ""
 _log_info "If you are unsure, STOP now and create a clean installation first."
 
 if term::ask_yes_no Y "Proceed with Installation?"; then
-    if ! term::ask_yes_no Y "Proceed with Installation? (double check)"; then
-        _log_error "Installation aborted"
-        exit 1
-    fi
-else
+  if ! term::ask_yes_no Y "Proceed with Installation? (double check)"; then
     _log_error "Installation aborted"
     exit 1
+  fi
+else
+  _log_error "Installation aborted"
+  exit 1
 fi
 
 # ========================================== #
 
 if ! sudo -v; then
-    _log_error "Installation aborted"
-    exit 1
+  _log_error "Installation aborted"
+  exit 1
 fi
 
 (
-    while true; do
-        sudo -v
-        sleep 5
-    done
+  while true; do
+    sudo -v
+    sleep 5
+  done
 ) &
 
 if ! pacman -Qq "yay" &> /dev/null; then
-    _log_info "Installing AUR helper"
+  _log_info "Installing AUR helper"
 
-    if ! InstallYay; then
-        _log_error "Failed to install AUR helper"
-        _log_error "Aborting installation"
-        exit 1
-    fi
+  if ! InstallYay; then
+    _log_error "Failed to install AUR helper"
+    _log_error "Aborting installation"
+    exit 1
+  fi
 fi
 
 _log_info "Setting up system and configs"
 for script in "$SCRIPT_DIR/config"/*.sh; do
-    bash "$script"
+  bash "$script"
 done
 
 _log_info "Initializing package installation"
 for script in "$SCRIPT_DIR/packaging"/*.sh; do
-    bash "$script"
+  bash "$script"
 done
 
 _log_info "Setting up hardware & GPU drivers"
 for script in "$SCRIPT_DIR/config/hardware"/*.sh; do
-    bash "$script"
+  bash "$script"
 done
 
 _log_info "Basic installation complete"
 _log_info "Executing post-install hooks..."
 for script in "$SCRIPT_DIR/post-install"/*.sh; do
-    bash "$script"
+  bash "$script"
 done
 
 # Clear TTY and move prompt
 # to the bottom
-clear; tput cup 9999 0
+clear
+tput cup 9999 0
 
 term::show_header --color green
 
@@ -139,19 +141,18 @@ _log_success "You have to pick Hyprland (uwsm-managed) in the login manager"
 _log_success "Otherwise Vibranium will NOT WORK"
 
 if term::ask_yes_no Y "Reboot now?"; then
-    rm -f /tmp/vb-install-ongoing
-    for sec in {5..1}; do
-        for step in {0..3}; do
-            dots=$(printf "%.*s" "$step" "...")
-            printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" \
-                "$GREEN" "$RESET" "$sec" "$dots"
-            sleep 0.25
-        done
+  rm -f /tmp/vb-install-ongoing
+  for sec in {5..1}; do
+    for step in {0..3}; do
+      dots=$(printf "%.*s" "$step" "...")
+      printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" \
+        "$GREEN" "$RESET" "$sec" "$dots"
+      sleep 0.25
     done
+  done
 
-    systemctl reboot
+  systemctl reboot
 fi
 
 rm -f /tmp/vb-install-ongoing
 term::enable_input
-

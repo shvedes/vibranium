@@ -10,7 +10,7 @@ _touchpad_options() {
     while true; do
         mapfile -t lines < <(
             hyprctl --batch -j \
-                "getoption input:touchpad:scroll_factor; \
+         "getoption input:touchpad:scroll_factor; \
 				 getoption input:touchpad:tap-to-click; \
 				 getoption input:touchpad:natural_scroll; \
 				 getoption input:touchpad:disable_while_typing" |
@@ -304,7 +304,7 @@ while true; do
 
     mapfile -t lines < <(
         hyprctl --batch -j \
-            "getoption input:sensitivity;    \
+       "getoption input:sensitivity;   \
 			 getoption input:accel_profile;  \
 			 getoption input:repeat_rate;    \
 			 getoption input:repeat_delay;   \

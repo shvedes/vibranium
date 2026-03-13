@@ -5,65 +5,64 @@ source vb-core-lib
 ACTIONS=()
 
 if [[ -f "$VIBRANIUM_RUNTIME/vb-timer.remaining" ]]; then
-    ACTIONS+=("Stop timer")
+  ACTIONS+=("Stop timer")
 else
-    ACTIONS+=("Set timer")
+  ACTIONS+=("Set timer")
 fi
 
 ACTIONS+=(
-    "Toggle read mode"
-    "Toggle inhibitor"
-    "Reload Vibranium"
-    "Close all windows"
+  "Toggle read mode"
+  "Toggle inhibitor"
+  "Reload Vibranium"
+  "Close all windows"
 )
 
 if systemctl -q --user is-active mpd; then
-    mpd_status="$(mpc status 2>/dev/null)"
+  mpd_status="$(mpc status 2> /dev/null)"
 fi
 
 spotify_status="$(playerctl -p spotify status)"
 if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
-    ACTIONS+=("Copy current track")
+  ACTIONS+=("Copy current track")
 fi
 
 while true; do
-    helpers::ui::menu CHOSEN "Utilities" "search..." -- "${ACTIONS[@]}"
+  helpers::ui::menu CHOSEN "Utilities" "search..." -- "${ACTIONS[@]}"
 
-    case "$CHOSEN" in
-        "Close all windows")
-            vb-cmd-close-windows
-            exit 0
-            ;;
-        "Toggle read mode")
-            vb-cmd-toggle-reading-mode
-            exit 0
-            ;;
-        "Copy current track")
-            vb-cmd-copy-track --notify
-            exit 0
-            ;;
-        *"Stop timer"*)
-            pkill -f vb-util-timer
-            exit 0
-            ;;
-        "Set timer")
-            setsid vb-util-timer
-            exit 0
-            ;;
-        "Reload Vibranium")
-            vb-cmd-reload
-            exit 0
-            ;;
-        "Toggle inhibitor")
-            vb-cmd-toggle-inhibit
-            exit 0
-            ;;
-        "")
-            exit 1
-            ;;
-        *)
-            continue
-            ;;
-    esac
+  case "$CHOSEN" in
+    "Close all windows")
+      vb-cmd-close-windows
+      exit 0
+      ;;
+    "Toggle read mode")
+      vb-cmd-toggle-reading-mode
+      exit 0
+      ;;
+    "Copy current track")
+      vb-cmd-copy-track --notify
+      exit 0
+      ;;
+    *"Stop timer"*)
+      pkill -f vb-util-timer
+      exit 0
+      ;;
+    "Set timer")
+      setsid vb-util-timer
+      exit 0
+      ;;
+    "Reload Vibranium")
+      vb-cmd-reload
+      exit 0
+      ;;
+    "Toggle inhibitor")
+      vb-cmd-toggle-inhibit
+      exit 0
+      ;;
+    "")
+      exit 1
+      ;;
+    *)
+      continue
+      ;;
+  esac
 done
-

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]
 
 Launch UI / TUI for the active network manager.
@@ -12,40 +12,39 @@ EOF
 }
 
 case "$1" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
-    "" )
-        ;;
-    * )
-        echo "${0##*/}: invalid option '$1'" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
-        exit 1
-        ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  "") ;;
+  *)
+    echo "${0##*/}: invalid option '$1'" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
 esac
 
 # Detect primary network interface utility
-if command -v nmtui >/dev/null 2>&1; then
-    exec vb-core-term --floating -- nmtui
-elif command -v iwctl >/dev/null 2>&1; then
-    if command -v impala >/dev/null 2>&1; then
-        exec vb-core-term --floating -- impala
-    elif command -v iwmenu >/dev/null 2>&1; then
-        vb-cmd-launch-cmd iwmenu
-    elif command -v iwgtk >/dev/null 2>&1; then
-        vb-cmd-launch-cmd iwgtk
-    else
-        exec vb-core-term --floating -- iwctl
-    fi
+if command -v nmtui > /dev/null 2>&1; then
+  exec vb-core-term --floating -- nmtui
+elif command -v iwctl > /dev/null 2>&1; then
+  if command -v impala > /dev/null 2>&1; then
+    exec vb-core-term --floating -- impala
+  elif command -v iwmenu > /dev/null 2>&1; then
+    vb-cmd-launch-cmd iwmenu
+  elif command -v iwgtk > /dev/null 2>&1; then
+    vb-cmd-launch-cmd iwgtk
+  else
+    exec vb-core-term --floating -- iwctl
+  fi
 else
-    if systemctl -q is-active systemd-networkd; then
-        msg="'<i>systemd-networkd</i>' doesn't provide a TUI frontend. Use CLI instead.\n"
-        msg+="See '<i>networkctl --help</i>' for more info"
-    else
-        msg="Network manager provider not found"
-    fi
+  if systemctl -q is-active systemd-networkd; then
+    msg="'<i>systemd-networkd</i>' doesn't provide a TUI frontend. Use CLI instead.\n"
+    msg+="See '<i>networkctl --help</i>' for more info"
+  else
+    msg="Network manager provider not found"
+  fi
 
-    notify-send -r 1 -t 10000 "Vibranium - Networking" "$msg"
-    exit 1
+  notify-send -r 1 -t 10000 "Vibranium - Networking" "$msg"
+  exit 1
 fi

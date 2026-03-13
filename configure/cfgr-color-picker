@@ -5,33 +5,33 @@ source vb-core-lib
 INDEX=0
 
 while true; do
-    source "$VIBRANIUM_USER_SETTINGS"
+  source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW
-    helpers::check VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR
+  helpers::check VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW
+  helpers::check VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR
 
-    OPTIONS=(
-        "Show HEX preview : $VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
-        "Preview in notification : $VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
-    )
+  OPTIONS=(
+    "Show HEX preview : $VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
+    "Preview in notification : $VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
+  )
 
-    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    helpers::ui::menu CHOSEN "Color picker" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-    [ -z "$CHOSEN" ] && break
+  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+  helpers::ui::menu CHOSEN "Color picker" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+  [ -z "$CHOSEN" ] && break
 
-    for i in "${!OPTIONS[@]}"; do
-        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-            INDEX="$i"
-            break
-        fi
-    done
+  for i in "${!OPTIONS[@]}"; do
+    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+      INDEX="$i"
+      break
+    fi
+  done
 
-    case "$CHOSEN" in
-        "Show HEX preview"*)
-            helpers::configure::toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
-            ;;
-        "Preview in notification"*)
-            helpers::configure::toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
-            ;;
-    esac
+  case "$CHOSEN" in
+    "Show HEX preview"*)
+      helpers::configure::toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
+      ;;
+    "Preview in notification"*)
+      helpers::configure::toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
+      ;;
+  esac
 done

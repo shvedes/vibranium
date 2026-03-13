@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
-hyprpaper_conf="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprpaper.conf"
+hyprpaper_conf="$XDG_CONFIG_HOME/hypr/hyprpaper.conf"
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]
 
 Print current hyprpaper wallpaper path.
@@ -14,34 +14,33 @@ Options:
 EOF
 }
 
-
 get_wallpaper() {
-    sed -n 's/^wallpaper:path = //p' "$hyprpaper_conf"
+  sed -n 's/^wallpaper:path = //p' "$hyprpaper_conf"
 }
 
 case "$1" in
-    -b|--basename)
-        if ! systemctl -q --user is-active hyprpaper; then
-            echo "error: wallpaper deamon is not active!" >&2
-            exit 1
-        fi
+  -b | --basename)
+    if ! systemctl -q --user is-active hyprpaper; then
+      echo "error: wallpaper deamon is not active!" >&2
+      exit 1
+    fi
 
-        get_wallpaper | xargs -r basename
-        ;;
-    -h|--help)
-        usage
-        ;;
-    "" )
-        if ! systemctl -q --user is-active hyprpaper; then
-            echo "error: wallpaper deamon is not active!" >&2
-            exit 1
-        fi
+    get_wallpaper | xargs -r basename
+    ;;
+  -h | --help)
+    usage
+    ;;
+  "")
+    if ! systemctl -q --user is-active hyprpaper; then
+      echo "error: wallpaper deamon is not active!" >&2
+      exit 1
+    fi
 
-        get_wallpaper
-        ;;
-    * )
-        echo "${0##*/}: invalid option '$1'" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
-        exit 1
-        ;;
+    get_wallpaper
+    ;;
+  *)
+    echo "${0##*/}: invalid option '$1'" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
 esac

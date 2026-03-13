@@ -3,7 +3,7 @@
 # Launch a command in a new session.
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} COMMAND [ARGUMENTS...]
 
 Launch COMMAND in a new session using setsid.
@@ -14,23 +14,23 @@ EOF
 }
 
 case "$1" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
-    "")
-        echo "${0##*/}: missing COMMAND" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
-        exit 1
-        ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  "")
+    echo "${0##*/}: missing COMMAND" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
 esac
 
 cmd="$1"
 shift
 
-if ! command -v "$cmd" >/dev/null 2>&1; then
-    echo "${0##*/}: command not found: $cmd" >&2
-    exit 127
+if ! command -v "$cmd" > /dev/null 2>&1; then
+  echo "${0##*/}: command not found: $cmd" >&2
+  exit 127
 fi
 
 exec setsid "$cmd" "$@" &> /dev/null

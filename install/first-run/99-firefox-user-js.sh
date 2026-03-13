@@ -10,7 +10,7 @@ PROFILE_DIR=$(echo "$HOME/.config/mozilla/firefox/"*.default-release)
 
 # Source: BetterFox
 # https://github.com/yokoffing/Betterfox/blob/main/Smoothfox.js
-cat > "$PROFILE_DIR/user.js" <<EOF
+cat > "$PROFILE_DIR/user.js" << EOF
 user_pref("apz.overscroll.enabled", true); // DEFAULT NON-LINUX
 user_pref("general.smoothScroll", true); // DEFAULT
 user_pref("general.smoothScroll.msdPhysics.continuousMotionMaxDeltaMS", 12);

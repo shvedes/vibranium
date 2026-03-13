@@ -4,40 +4,39 @@ source vb-core-lib
 
 INDEX=0
 
-
 while true; do
-    source "$VIBRANIUM_USER_SETTINGS"
+  source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH
-    helpers::check VIBRANIUM_PLAYER_FADE_DURATION
+  helpers::check VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH
+  helpers::check VIBRANIUM_PLAYER_FADE_DURATION
 
-    OPTIONS=(
-        "Fade in / out on Next / Previous : ${VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH//_/ }"
-        "Fade in / out on Play / Pause    : ${VIBRANIUM_PLAYER_FADE_DURATION//_/ }"
-        "<b>Help</b>"
-    )
+  OPTIONS=(
+    "Fade in / out on Next / Previous : ${VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH//_/ }"
+    "Fade in / out on Play / Pause    : ${VIBRANIUM_PLAYER_FADE_DURATION//_/ }"
+    "<b>Help</b>"
+  )
 
-    helpers::ui::menu CHOSEN "Player" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-    [[ -z "$CHOSEN" ]] && break
+  helpers::ui::menu CHOSEN "Player" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+  [[ -z "$CHOSEN" ]] && break
 
-    for i in "${!OPTIONS[@]}"; do
-        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-            INDEX="$i"
-            break
-        fi
-    done
+  for i in "${!OPTIONS[@]}"; do
+    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+      INDEX="$i"
+      break
+    fi
+  done
 
-    case "$CHOSEN" in
-        *"Previous"*)
-            helpers::configure::set_string "VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH" \
-                "Next / Prev" "very slow" "slow" "normal" "fast" "very fast" "off"
-            ;;
-        *"Play"*)
-            helpers::configure::set_string "VIBRANIUM_PLAYER_FADE_DURATION" \
-                "Play / Pause" "very slow" "slow" "normal" "fast" "very fast" "off"
-            ;;
-        *"Help"*)
-            vb-cmd-show-help player-fade
-            ;;
-    esac
+  case "$CHOSEN" in
+    *"Previous"*)
+      helpers::configure::set_string "VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH" \
+        "Next / Prev" "very slow" "slow" "normal" "fast" "very fast" "off"
+      ;;
+    *"Play"*)
+      helpers::configure::set_string "VIBRANIUM_PLAYER_FADE_DURATION" \
+        "Play / Pause" "very slow" "slow" "normal" "fast" "very fast" "off"
+      ;;
+    *"Help"*)
+      vb-cmd-show-help player-fade
+      ;;
+  esac
 done

@@ -6,7 +6,7 @@ NAME=""
 DEPS=()
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [OPTIONS]
 
 Checks that required dependencies are installed and shows a notification if something is missing.
@@ -19,42 +19,42 @@ EOF
 }
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        --name)
-            [[ $# -ge 2 ]] || usage
-            NAME=$2
-            shift 2
-            ;;
-        --deps)
-            shift
-            if [[ $# -eq 0 || $1 == --* ]]; then
-                echo "error: expected at least one dependency after --deps" >&2
-                exit 1
-            fi
-            while [[ $# -gt 0 && $1 != --* ]]; do
-                DEPS+=("$1")
-                shift
-            done
-            ;;
-        -h|--help|"")
-            usage
-            ;;
-        *)
-            echo "error: unknown argument: $1" >&2
-            usage
-            exit 1
-            ;;
-    esac
+  case "$1" in
+    --name)
+      [[ $# -ge 2 ]] || usage
+      NAME=$2
+      shift 2
+      ;;
+    --deps)
+      shift
+      if [[ $# -eq 0 || $1 == --* ]]; then
+        echo "error: expected at least one dependency after --deps" >&2
+        exit 1
+      fi
+      while [[ $# -gt 0 && $1 != --* ]]; do
+        DEPS+=("$1")
+        shift
+      done
+      ;;
+    -h | --help | "")
+      usage
+      ;;
+    *)
+      echo "error: unknown argument: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
 done
 
 if [[ -z $NAME ]]; then
-    echo "error: expected --name, got nothing" >&2
-    exit 1
+  echo "error: expected --name, got nothing" >&2
+  exit 1
 fi
 
 if [[ ${#DEPS[@]} -eq 0 ]]; then
-    echo "error: expected --deps, got nothing" >&2
-    exit 1
+  echo "error: expected --deps, got nothing" >&2
+  exit 1
 fi
 
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"

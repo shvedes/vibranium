@@ -3,7 +3,7 @@
 # Copy currently playing MPD or Spotify track URI to clipboard
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]
 
 Copy URI of the currently playing track to the clipboard.
@@ -16,66 +16,64 @@ EOF
 }
 
 mpd_music_dir() {
-    local conf dir
+  local conf dir
 
-    conf="$XDG_CONFIG_HOME/mpd/mpd.conf"
-    dir="$(sed -n 's/^[[:space:]]*music_directory[[:space:]]*"\(.*\)"/\1/p' "$conf" | head -n1)"
-    [[ -z "$dir" ]] && return 1
+  conf="$XDG_CONFIG_HOME/mpd/mpd.conf"
+  dir="$(sed -n 's/^[[:space:]]*music_directory[[:space:]]*"\(.*\)"/\1/p' "$conf" | head -n1)"
+  [[ -z "$dir" ]] && return 1
 
-    if [[ "$dir" == "~"* ]]; then
-        dir="${dir/#\~/$HOME}"
-    fi
-    printf '%s\n' "$dir"
+  if [[ "$dir" == "~"* ]]; then
+    dir="${dir/#\~/$HOME}"
+  fi
+  printf '%s\n' "$dir"
 }
 
 notify=false
 
 case "$1" in
-    -n|--notify)
-        notify=true
-        ;;
-    -h|--help)
-        usage
-        exit 0
-        ;;
-    "")
-        ;;
-    *)
-        echo "${0##*/}: invalid option '$1'" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
-        exit 1
-        ;;
+  -n | --notify)
+    notify=true
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  "") ;;
+  *)
+    echo "${0##*/}: invalid option '$1'" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
 esac
 
 file=""
 
-if mpc status 2>/dev/null | grep -q '\[playing\]'; then
-    track="$(mpc current -f '%file%')"
-    music_dir="$(mpd_music_dir)"
+if mpc status 2> /dev/null | grep -q '\[playing\]'; then
+  track="$(mpc current -f '%file%')"
+  music_dir="$(mpd_music_dir)"
 
-    if [[ -n "$track" && -n "$music_dir" ]]; then
-        file="file://$music_dir/$track"
-    fi
-elif playerctl -p spotify status 2>/dev/null | grep -iq playing; then
-    file="$(playerctl metadata --format '{{xesam:url}}' 2>/dev/null)"
+  if [[ -n "$track" && -n "$music_dir" ]]; then
+    file="file://$music_dir/$track"
+  fi
+elif playerctl -p spotify status 2> /dev/null | grep -iq playing; then
+  file="$(playerctl metadata --format '{{xesam:url}}' 2> /dev/null)"
 fi
 
 if [[ -z "$file" ]]; then
-    echo "error: no track currently playing" >&2
-    if [[ "$notify" == true ]]; then
-        notify-send -u critical -t 3000 -r 4 "Vibranium" "No track currently playing"
-    fi
-    exit 1
+  echo "error: no track currently playing" >&2
+  if [[ "$notify" == true ]]; then
+    notify-send -u critical -t 3000 -r 4 "Vibranium" "No track currently playing"
+  fi
+  exit 1
 fi
 
 printf '%s' "$file" | wl-copy --type text/uri-list
 
 if [[ "$notify" == true ]]; then
-    if [[ "$file" =~ ^https?:// ]]; then
-        msg="Link copied to clipboard"
-    else
-        msg="<i><b>${file##*/}</b></i> copied to clipboard"
-    fi
-    notify-send -r 3 "Vibranium" "$msg"
+  if [[ "$file" =~ ^https?:// ]]; then
+    msg="Link copied to clipboard"
+  else
+    msg="<i><b>${file##*/}</b></i> copied to clipboard"
+  fi
+  notify-send -r 3 "Vibranium" "$msg"
 fi
-

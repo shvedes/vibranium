@@ -8,7 +8,7 @@ CONF="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
 HYPRLOCK_CONF="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [--quiet] [--help]
 
 Toggle Hyprland animations on/off.
@@ -23,17 +23,20 @@ QUIET=false
 
 # CLI parsing
 for arg in "$@"; do
-    case "$arg" in
-        --quiet) QUIET=true ;;
-        -h|--help) usage; exit 0 ;;
-        *) ;;
-    esac
+  case "$arg" in
+    --quiet) QUIET=true ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *) ;;
+  esac
 done
 
 # Ensure animations block exists
-if ! grep -qE '^[[:space:]]*animations[[:space:]]*{' "$CONF" 2>/dev/null; then
-    VALUE=$(hyprctl -j getoption animations:enabled | jq -r '.set')
-    printf "\n\nanimations {\n\tenabled = %s\n}" "$VALUE" >> "$CONF"
+if ! grep -qE '^[[:space:]]*animations[[:space:]]*{' "$CONF" 2> /dev/null; then
+  VALUE=$(hyprctl -j getoption animations:enabled | jq -r '.set')
+  printf "\n\nanimations {\n\tenabled = %s\n}" "$VALUE" >> "$CONF"
 fi
 
 # Read current state from config
@@ -41,14 +44,14 @@ ANIMATIONS_ENABLED="$(sed -n '/animations[[:space:]]*{/,/}/{s/.*enabled[[:space:
 
 # Toggle
 case "$ANIMATIONS_ENABLED" in
-    true)
-        sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1false/}' "$CONF" "$HYPRLOCK_CONF"
-        [[ "$QUIET" = false ]] && echo "disabled"
-        ;;
-    false)
-        sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1true/}' "$CONF" "$HYPRLOCK_CONF"
-        [[ "$QUIET" = false ]] && echo "enabled"
-        ;;
+  true)
+    sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1false/}' "$CONF" "$HYPRLOCK_CONF"
+    [[ "$QUIET" = false ]] && echo "disabled"
+    ;;
+  false)
+    sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1true/}' "$CONF" "$HYPRLOCK_CONF"
+    [[ "$QUIET" = false ]] && echo "enabled"
+    ;;
 esac
 
 # Reload config asynchronously

@@ -3,51 +3,51 @@
 source vb-core-lib
 
 if [[ "$(sysctl -n kernel.core_pattern)" == "|/bin/false" ]]; then
-    OPTIONS=("Enable systemd coredump")
+  OPTIONS=("Enable systemd coredump")
 else
-    OPTIONS=("Disable systemd coredump")
+  OPTIONS=("Disable systemd coredump")
 fi
 
 OPTIONS+=("Help")
 
 while true; do
-    helpers::ui::menu CHOSEN "System Tweaks" "ESC to go back" -- "${OPTIONS[@]}"
-    [[ -z $CHOSEN ]] && break
+  helpers::ui::menu CHOSEN "System Tweaks" "ESC to go back" -- "${OPTIONS[@]}"
+  [[ -z $CHOSEN ]] && break
 
-    case "$CHOSEN" in
-        *"coredump")
-            if vb-tweak-coredump; then
-                helpers::ui::close_menus
-                exit 0
-            fi
-            ;;
-        "Help")
-            while true; do
-                # what_is_this_opts=("Coredump")
-                help_opts=("Coredump")
-                helpers::ui::menu help_chosen "Help me with.." "ESC to go back" -- "${help_opts[@]}"
-                [[ -z $help_chosen ]] && break
+  case "$CHOSEN" in
+    *"coredump")
+      if vb-tweak-coredump; then
+        helpers::ui::close_menus
+        exit 0
+      fi
+      ;;
+    "Help")
+      while true; do
+        # what_is_this_opts=("Coredump")
+        help_opts=("Coredump")
+        helpers::ui::menu help_chosen "Help me with.." "ESC to go back" -- "${help_opts[@]}"
+        [[ -z $help_chosen ]] && break
 
-                case "$help_chosen" in
-                    "Coredump")
-                        msg="<span foreground='${P_ACCENT}'><b>systemd-coredump</b></span> collects "
-                        msg+="<span foreground='${P_ACCENT}'><b>memory dumps</b></span> "
-                        msg+="from <span foreground='${P_RED}'><b>crashed</b></span> processes\n\n"
-                        msg+="Useful for debugging, but generating dumps can use \n"
-                        msg+="<span foreground='${P_YELLOW}'>high CPU</span>, "
-                        msg+="<span foreground='${P_RED}'><b>drain laptop battery</b></span>, "
-                        msg+="and <span foreground='${P_YELLOW}'>take disk space</span>"
-                        msg+="\n\nDisable it for better "
-                        msg+="<span foreground='${P_GREEN}'><b>performance</b></span> "
-                        msg+="and <span foreground='${P_GREEN}'><b>responsiveness</b></span>"
-                        notify-send -r 1 -t 20000 "Vibranium" "$msg"
-                        break
-                        ;;
-                    *)
-                        continue
-                        ;;
-                esac
-            done
+        case "$help_chosen" in
+          "Coredump")
+            msg="<span foreground='${P_ACCENT}'><b>systemd-coredump</b></span> collects "
+            msg+="<span foreground='${P_ACCENT}'><b>memory dumps</b></span> "
+            msg+="from <span foreground='${P_RED}'><b>crashed</b></span> processes\n\n"
+            msg+="Useful for debugging, but generating dumps can use \n"
+            msg+="<span foreground='${P_YELLOW}'>high CPU</span>, "
+            msg+="<span foreground='${P_RED}'><b>drain laptop battery</b></span>, "
+            msg+="and <span foreground='${P_YELLOW}'>take disk space</span>"
+            msg+="\n\nDisable it for better "
+            msg+="<span foreground='${P_GREEN}'><b>performance</b></span> "
+            msg+="and <span foreground='${P_GREEN}'><b>responsiveness</b></span>"
+            notify-send -r 1 -t 20000 "Vibranium" "$msg"
+            break
             ;;
-    esac
+          *)
+            continue
+            ;;
+        esac
+      done
+      ;;
+  esac
 done

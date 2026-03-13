@@ -3,12 +3,12 @@
 state="$VIBRANIUM_RUNTIME/worker.active"
 
 if [[ -f $state ]]; then
-    if [[ "$(< "$state")" == "suspended" ]]; then
-        tooltip="<span foreground='CornflowerBlue'>Background task suspended due to power profile</span>"
-    else
-        tooltip="$(< "$state")"
-    fi
-    printf '{"text": "%s", "tooltip": "%s"}' "\uf013" "$tooltip"
+  if [[ "$(< "$state")" == "suspended" ]]; then
+    tooltip="<span foreground='CornflowerBlue'>Background task suspended due to power profile</span>"
+  else
+    tooltip="$(< "$state")"
+  fi
+  printf '{"text": "%s", "tooltip": "%s"}' "\uf013" "$tooltip"
 else
-    printf '{"text": ""}'
+  printf '{"text": ""}'
 fi

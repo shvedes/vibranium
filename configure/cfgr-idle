@@ -5,16 +5,16 @@ source vb-core-lib
 INDEX=0
 
 _update_timeout() {
-    local index="$1"   # 1 = lock, 2 = sleep
-    local seconds="$2"
-    local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
+  local index="$1" # 1 = lock, 2 = sleep
+  local seconds="$2"
+  local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
 
-    local timeouts
-    timeouts=($(_get_timeouts))
+  local timeouts
+  timeouts=($(_get_timeouts))
 
-    timeouts[$((index-1))]="$seconds"
+  timeouts[$((index - 1))]="$seconds"
 
-    awk -v lock="${timeouts[0]}" -v sleep="${timeouts[1]}" '
+  awk -v lock="${timeouts[0]}" -v sleep="${timeouts[1]}" '
         /^\s*listener\s*{/{f=1; print; next}
         /^\s*}/{f=0; print; next}
         f && /^\s*timeout\s*=/ {
@@ -27,38 +27,38 @@ _update_timeout() {
 }
 
 _set_timeouts() {
-    local title="$1"          # "Lock" / "Sleep"
-    local prompt="$2"         # prompt text
-    local timer_index="$3"    # 1 = lock, 2 = sleep
-    local min_value="$4"      # empty or lock_timeout
+  local title="$1"       # "Lock" / "Sleep"
+  local prompt="$2"      # prompt text
+  local timer_index="$3" # 1 = lock, 2 = sleep
+  local min_value="$4"   # empty or lock_timeout
 
-    while true; do
-        helpers::ui::menu input "$title timeout" "in minutes" -- "$prompt"
-        [ -z "$input" ] && break
-        [ "$input" = "$prompt" ] && continue
+  while true; do
+    helpers::ui::menu input "$title timeout" "in minutes" -- "$prompt"
+    [ -z "$input" ] && break
+    [ "$input" = "$prompt" ] && continue
 
-        [[ ! "$input" =~ ^[0-9]+$ ]] && {
-            notify-send -r 6 -u critical -t 1500 "Vibranium" "Only integers allowed!"
-            continue
-        }
+    [[ ! "$input" =~ ^[0-9]+$ ]] && {
+      notify-send -r 6 -u critical -t 1500 "Vibranium" "Only integers allowed!"
+      continue
+    }
 
-        if [[ -n "$min_value" ]] && (( input <= min_value )); then
-            notify-send -r 6 -u critical -t 3000 "Vibranium" \
-                "$title timeout must be greater than $min_value!"
-            continue
-        fi
+    if [[ -n "$min_value" ]] && ((input <= min_value)); then
+      notify-send -r 6 -u critical -t 3000 "Vibranium" \
+        "$title timeout must be greater than $min_value!"
+      continue
+    fi
 
-        _update_timeout "$timer_index" $((input * 60))
-        systemctl --user restart hypridle &
-        break
-    done
+    _update_timeout "$timer_index" $((input * 60))
+    systemctl --user restart hypridle &
+    break
+  done
 }
 
 _get_timeouts() {
-    local config
-    config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
+  local config
+  config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
 
-    awk '
+  awk '
         /^\s*listener\s*{/{f=1; next}
         /^\s*}/{f=0; next}
         f && /^\s*timeout\s*=/ {
@@ -69,54 +69,53 @@ _get_timeouts() {
 }
 
 while true; do
-    source "$VIBRANIUM_USER_SETTINGS"
+  source "$VIBRANIUM_USER_SETTINGS"
 
-    mapfile -t TIMEOUTS < <(_get_timeouts)
+  mapfile -t TIMEOUTS < <(_get_timeouts)
 
-    LOCK_TIMEOUT="${TIMEOUTS[0]}"
-    SLEEP_TIMEOUT="${TIMEOUTS[1]}"
+  LOCK_TIMEOUT="${TIMEOUTS[0]}"
+  SLEEP_TIMEOUT="${TIMEOUTS[1]}"
 
-    LOCK_TIMEOUT=$((LOCK_TIMEOUT / 60))
-    SLEEP_TIMEOUT=$((SLEEP_TIMEOUT / 60))
+  LOCK_TIMEOUT=$((LOCK_TIMEOUT / 60))
+  SLEEP_TIMEOUT=$((SLEEP_TIMEOUT / 60))
 
-    helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
-    INHIBIT_TYPE="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+  helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
+  INHIBIT_TYPE="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
 
-    OPTIONS=(
-        "Lock  after : $LOCK_TIMEOUT min"
-        "Sleep after : $SLEEP_TIMEOUT min"
-        "Inhibit type : $INHIBIT_TYPE"
-        "<b>Help</b>"
-    )
+  OPTIONS=(
+    "Lock  after : $LOCK_TIMEOUT min"
+    "Sleep after : $SLEEP_TIMEOUT min"
+    "Inhibit type : $INHIBIT_TYPE"
+    "<b>Help</b>"
+  )
 
-    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    helpers::ui::menu CHOSEN "Idle" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-    [ -z "$CHOSEN" ] && break
+  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+  helpers::ui::menu CHOSEN "Idle" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+  [ -z "$CHOSEN" ] && break
 
-    for i in "${!OPTIONS[@]}"; do
-        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-            INDEX="$i"
-            break
+  for i in "${!OPTIONS[@]}"; do
+    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+      INDEX="$i"
+      break
+    fi
+  done
+
+  case "$CHOSEN" in
+    *"Inhibit"*)
+      helpers::configure::set_string VIBRANIUM_GLOBAL_INHIBIT_TYPE "Sleep type" idle sleep
+      (
+        pid="$(systemd-inhibit --no-pager | awk '/Vibranium/ {print $4}')"
+
+        if [[ ! -z "$pid" ]]; then
+          # Disable active
+          vb-cmd-toggle-inhibit
+          # Start new with the new value
+          vb-cmd-toggle-inhibit
         fi
-    done
-
-    case "$CHOSEN" in
-        *"Inhibit"*)
-            helpers::configure::set_string VIBRANIUM_GLOBAL_INHIBIT_TYPE "Sleep type" idle sleep
-            (
-                pid="$(systemd-inhibit --no-pager | awk '/Vibranium/ {print $4}')"
-
-                if [[ ! -z "$pid" ]]; then
-                    # Disable active
-                    vb-cmd-toggle-inhibit
-                    # Start new with the new value
-                    vb-cmd-toggle-inhibit
-                fi
-            ) &
-            ;;
-        "Lock"*) _set_timeouts "Lock" "Lock timeout (int)" 1 ;;
-        "Sleep"*) _set_timeouts "Sleep" "Sleep timeout (int)" 2 "$LOCK_TIMEOUT" ;;
-        *"Help"*) vb-cmd-show-help idle ;;
-    esac
+      ) &
+      ;;
+    "Lock"*) _set_timeouts "Lock" "Lock timeout (int)" 1 ;;
+    "Sleep"*) _set_timeouts "Sleep" "Sleep timeout (int)" 2 "$LOCK_TIMEOUT" ;;
+    *"Help"*) vb-cmd-show-help idle ;;
+  esac
 done
-

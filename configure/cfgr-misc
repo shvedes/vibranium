@@ -4,36 +4,36 @@ source vb-core-lib
 export PATH="$PATH:$VIBRANIUM/configure"
 
 _get_term_opacity() {
-    local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-    sed -nE '/^\[window\]/,/^\[/{s/^[[:space:]]*opacity[[:space:]]*=[[:space:]]*"?([0-9.]+)"?/\1/p}' "$config"
+  local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+  sed -nE '/^\[window\]/,/^\[/{s/^[[:space:]]*opacity[[:space:]]*=[[:space:]]*"?([0-9.]+)"?/\1/p}' "$config"
 }
 
 _set_term_opacity() {
-    local value="$1"
-    local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-    sed -i -E '/^\[window\]/,/^\[/{s/^([[:space:]]*opacity[[:space:]]*=[[:space:]]*)"?[0-9.]+("?)/\1'"$value"'\2/}' "$config"
+  local value="$1"
+  local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+  sed -i -E '/^\[window\]/,/^\[/{s/^([[:space:]]*opacity[[:space:]]*=[[:space:]]*)"?[0-9.]+("?)/\1'"$value"'\2/}' "$config"
 }
 
 _term_opacity_menu() {
-    while true; do
-        prompt="Background opacity level (float)"
-        helpers::ui::menu input "Terminal opacity" "0.0 - 1.0" -- "$prompt"
-        [[ -z "$input" ]] && break
-        [[ "$prompt" == "$input" ]] && continue
+  while true; do
+    prompt="Background opacity level (float)"
+    helpers::ui::menu input "Terminal opacity" "0.0 - 1.0" -- "$prompt"
+    [[ -z "$input" ]] && break
+    [[ "$prompt" == "$input" ]] && continue
 
-        if [[ "$input" =~ ^0(\.[0-9]+)?$ || "$input" == "1" || "$input" == "1.0" ]]; then
-            [[ "$input" == 1 ]] && input="1.0"
-            _set_term_opacity "$input"
-            break
-        else
-            notify-send -r 6 -u critical -t 1500 "Vibranium" \
-                "A floating point between 0.0 and 1.0!"
-        fi
-    done
+    if [[ "$input" =~ ^0(\.[0-9]+)?$ || "$input" == "1" || "$input" == "1.0" ]]; then
+      [[ "$input" == 1 ]] && input="1.0"
+      _set_term_opacity "$input"
+      break
+    else
+      notify-send -r 6 -u critical -t 1500 "Vibranium" \
+        "A floating point between 0.0 and 1.0!"
+    fi
+  done
 }
 
 _get_rofi_theme() {
-    sed -n '/@import/ {
+  sed -n '/@import/ {
         s|.*@import "[^"]*/\(theme[-a-z]*\)\.rasi".*|\1|
         s|^theme-||
         s|^rofi$|text|
@@ -43,409 +43,408 @@ _get_rofi_theme() {
 }
 
 _set_rofi_theme() {
-    local options chosen
-    local config="$XDG_CONFIG_HOME/rofi/config.rasi"
+  local options chosen
+  local config="$XDG_CONFIG_HOME/rofi/config.rasi"
 
-    while true; do
-        options=("Text" "Modern")
-        helpers::ui::menu chosen "Theme" "ESC to go back" -- "${options[@]}"
-        [[ -z $chosen ]] && break
+  while true; do
+    options=("Text" "Modern")
+    helpers::ui::menu chosen "Theme" "ESC to go back" -- "${options[@]}"
+    [[ -z $chosen ]] && break
 
-        case "${chosen,}" in
-            "text")   sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-text.rasi|' "$config"   ;;
-            "modern") sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-modern.rasi|' "$config" ;;
-        esac
-        break
-    done
+    case "${chosen,}" in
+      "text") sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-text.rasi|' "$config" ;;
+      "modern") sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-modern.rasi|' "$config" ;;
+    esac
+    break
+  done
 }
 
 _manage_user_wallpapers() {
-    if [[ -z "$(ls -A $XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vb-theme-get))" ]]; then
-        notify-send -r 1 "Vibranium" "No user wallpapers found for current theme"
-        return
-    fi
+  if [[ -z "$(ls -A $XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vb-theme-get))" ]]; then
+    notify-send -r 1 "Vibranium" "No user wallpapers found for current theme"
+    return
+  fi
 
-    local folder files chosen
+  local folder files chosen
 
-    _action() {
-        local target options chosen
+  _action() {
+    local target options chosen
 
-        target="$1"
-        options=("Open" "Delete")
-
-        while true; do
-            helpers::ui::menu chosen "$target" "ESC to go back" -- "${options[@]}"
-            [[ -z "$chosen" ]] && return
-
-            if ! [[ " ${options[*]} " =~ " $chosen " ]]; then
-                continue
-            fi
-
-            case "$chosen" in
-                "Open")
-                    vb-cmd-launch-cmd imv "$folder/$target"
-                    ;;
-                "Delete")
-                    rm -f "$folder/$target"
-                    notify-send -r 2 "Vibranium" "$target has been deleted"
-
-                    local current="$(vb-cmd-get-wallpaper)"
-                    local current_basename="${current##*/}"
-
-                    if [[ "$current_basename" == "$target" ]]; then
-                        vb-core-wallpaper --next
-                    fi
-
-                    # Refresh files list after delete
-                    files=()
-                    for f in "$folder"/*; do
-                        if [[ -f "$f" ]]; then
-                            files+=(${f##*/})
-                        fi
-                    done
-                    ;;
-            esac
-            break
-        done
-    }
-
-    folder="$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vb-theme-get)"
-    files=()
-
-    for f in "$folder"/*; do
-        if [[ -f "$f" ]]; then
-            files+=(${f##*/})
-        fi
-    done
-
-    local index=0
+    target="$1"
+    options=("Open" "Delete")
 
     while true; do
-        if [[ ${#files[@]} -eq 0 ]]; then
-            rmdir "$folder"
-            return
-        fi
+      helpers::ui::menu chosen "$target" "ESC to go back" -- "${options[@]}"
+      [[ -z "$chosen" ]] && return
 
-        helpers::ui::menu chosen "Your wallpapers" "ESC to go back" -selected-row "$index" -- "${files[@]}"
-        [[ -z "$chosen" ]] && return
+      if ! [[ " ${options[*]} " =~ " $chosen " ]]; then
+        continue
+      fi
 
-        for i in "${!files[@]}"; do
-            if [[ "${files[$i]}" == "$chosen" ]]; then
-                index="$i"
-                break
+      case "$chosen" in
+        "Open")
+          vb-cmd-launch-cmd imv "$folder/$target"
+          ;;
+        "Delete")
+          rm -f "$folder/$target"
+          notify-send -r 2 "Vibranium" "$target has been deleted"
+
+          local current="$(vb-cmd-get-wallpaper)"
+          local current_basename="${current##*/}"
+
+          if [[ "$current_basename" == "$target" ]]; then
+            vb-core-wallpaper --next
+          fi
+
+          # Refresh files list after delete
+          files=()
+          for f in "$folder"/*; do
+            if [[ -f "$f" ]]; then
+              files+=(${f##*/})
             fi
-        done
-
-        # Check if chosen is in files
-        if ! [[ " ${files[*]} " =~ " $chosen " ]]; then
-            continue
-        fi
-
-        _action "$chosen"
-
-        # reset index if chosen file was deleted
-        if [[ ! -f "$folder/$chosen" ]]; then
-            index=0
-        fi
+          done
+          ;;
+      esac
+      break
     done
+  }
+
+  folder="$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vb-theme-get)"
+  files=()
+
+  for f in "$folder"/*; do
+    if [[ -f "$f" ]]; then
+      files+=(${f##*/})
+    fi
+  done
+
+  local index=0
+
+  while true; do
+    if [[ ${#files[@]} -eq 0 ]]; then
+      rmdir "$folder"
+      return
+    fi
+
+    helpers::ui::menu chosen "Your wallpapers" "ESC to go back" -selected-row "$index" -- "${files[@]}"
+    [[ -z "$chosen" ]] && return
+
+    for i in "${!files[@]}"; do
+      if [[ "${files[$i]}" == "$chosen" ]]; then
+        index="$i"
+        break
+      fi
+    done
+
+    # Check if chosen is in files
+    if ! [[ " ${files[*]} " =~ " $chosen " ]]; then
+      continue
+    fi
+
+    _action "$chosen"
+
+    # reset index if chosen file was deleted
+    if [[ ! -f "$folder/$chosen" ]]; then
+      index=0
+    fi
+  done
 }
 
 _toggle_wallpaper() {
-    case "$(helpers::configure::toggle_bool -v "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
-        false)
-            sed -i 's/path/# path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
-            systemctl -q --user disable --now hyprpaper &
-            ;;
-        true)
-            sed -i 's/# path/path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
-            systemctl -q --user enable --now hyprpaper &
-            ;;
-    esac
+  case "$(helpers::configure::toggle_bool -v "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
+    false)
+      sed -i 's/path/# path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+      systemctl -q --user disable --now hyprpaper &
+      ;;
+    true)
+      sed -i 's/# path/path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+      systemctl -q --user enable --now hyprpaper &
+      ;;
+  esac
 }
 
 _get_notification_timeout() {
-    local config="$XDG_CONFIG_HOME/dunst/dunstrc"
-    sed -n 's/.*timeout[[:space:]]*=[[:space:]]*\([0-9]\+\).*/\1/p' "$config"
+  local config="$XDG_CONFIG_HOME/dunst/dunstrc"
+  sed -n 's/.*timeout[[:space:]]*=[[:space:]]*\([0-9]\+\).*/\1/p' "$config"
 }
 
 _set_notification_timeout() {
-    local config="$XDG_CONFIG_HOME/dunst/dunstrc"
+  local config="$XDG_CONFIG_HOME/dunst/dunstrc"
 
-    while true; do
-        helpers::ui::menu input "Timeout" "ESC to go back" -- "Timeout (in seconds)"
-        [[ -z "$input" ]] && break
+  while true; do
+    helpers::ui::menu input "Timeout" "ESC to go back" -- "Timeout (in seconds)"
+    [[ -z "$input" ]] && break
 
-        if [[ ! "$input" =~ ^[0-9]+$ ]]; then
-            notify-send -r 6 -t 2000 -u critical "Vibranium" "Only integers allowed"
-              continue
-        fi
+    if [[ ! "$input" =~ ^[0-9]+$ ]]; then
+      notify-send -r 6 -t 2000 -u critical "Vibranium" "Only integers allowed"
+      continue
+    fi
 
-        sed -iE "s/\(timeout[[:space:]]*=[[:space:]]*\)[0-9]\+/\1${input}/" "$config"
-            vb-cmd-refresh-dunst
-        break
-    done
+    sed -iE "s/\(timeout[[:space:]]*=[[:space:]]*\)[0-9]\+/\1${input}/" "$config"
+    vb-cmd-refresh-dunst
+    break
+  done
 }
 
 _pick_cursor_size() {
-    local -a sizes=()
-    local chosen_size
-    local line
+  local -a sizes=()
+  local chosen_size
+  local line
 
-    read -r line < <(vb-theme-cursor-list --size "${CURSOR_THEME:-Adwaita}")
-    [[ -z "$line" ]] && return
-    line=${line#* } # remove first (theme name) word and following space
+  read -r line < <(vb-theme-cursor-list --size "${CURSOR_THEME:-Adwaita}")
+  [[ -z "$line" ]] && return
+  line=${line#* } # remove first (theme name) word and following space
 
-    # Split remaining sizes into array
-    read -r -a sizes <<< "$line"
+  # Split remaining sizes into array
+  read -r -a sizes <<< "$line"
 
-    while true; do
-        helpers::ui::menu chosen_size "Cursor size" "ESC to go back" -- "${sizes[@]}"
-        [[ -z "$chosen_size" ]] && return
+  while true; do
+    helpers::ui::menu chosen_size "Cursor size" "ESC to go back" -- "${sizes[@]}"
+    [[ -z "$chosen_size" ]] && return
 
-        if [[ ! "$chosen_size" =~ ^[0-9]+$ ]]; then
-            continue
-        fi
+    if [[ ! "$chosen_size" =~ ^[0-9]+$ ]]; then
+      continue
+    fi
 
-        if [[ ! " ${sizes[*]} " =~ " $chosen_size " ]]; then
-            continue
-        fi
+    if [[ ! " ${sizes[*]} " =~ " $chosen_size " ]]; then
+      continue
+    fi
 
-        break
-    done
+    break
+  done
 
-    vb-theme-cursor-set --size "$chosen_size"
+  vb-theme-cursor-set --size "$chosen_size"
 }
 
 _pick_cursor_theme() {
-    local options=()
-    local chosen
+  local options=()
+  local chosen
 
-    declare -A CURSOR_FOLDER_TO_NAME=()
-    declare -A CURSOR_NAME_TO_FOLDER=()
+  declare -A CURSOR_FOLDER_TO_NAME=()
+  declare -A CURSOR_NAME_TO_FOLDER=()
 
-    while IFS= read -r line; do
-        [[ -z "$line" ]] && continue
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
 
-        folder=${line%%|*}
-        pretty=${line#*|}
+    folder=${line%%|*}
+    pretty=${line#*|}
 
-        CURSOR_FOLDER_TO_NAME["$folder"]="$pretty"
-        CURSOR_NAME_TO_FOLDER["$pretty"]="$folder"
+    CURSOR_FOLDER_TO_NAME["$folder"]="$pretty"
+    CURSOR_NAME_TO_FOLDER["$pretty"]="$folder"
 
-        options+=("$pretty")
-    done < <(vb-theme-cursor-list)
+    options+=("$pretty")
+  done < <(vb-theme-cursor-list)
 
-    if (( ${#options[@]} <= 1 )); then
-        notify-send -r 3 "Vibranium" \
-            "No curosr themes found"
-        return
+  if ((${#options[@]} <= 1)); then
+    notify-send -r 3 "Vibranium" \
+      "No curosr themes found"
+    return
+  fi
+
+  while true; do
+    helpers::ui::menu chosen "Cursor theme" "ESC to go back" -- "${options[@]}"
+    [[ -z "$chosen" ]] && break
+
+    if [[ ! " ${options[*]} " == *" $chosen "* ]]; then
+      continue
     fi
 
-    while true; do
-        helpers::ui::menu chosen "Cursor theme" "ESC to go back" -- "${options[@]}"
-        [[ -z "$chosen" ]] && break
+    folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
+    echo "$folder" > "$VIBRANIUM_STATE/cursor-theme"
 
-        if [[ ! " ${options[*]} " == *" $chosen "* ]]; then
-            continue
-        fi
-
-        folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
-        echo "$folder" > "$VIBRANIUM_STATE/cursor-theme"
-
-        vb-theme-cursor-set
-        break
-    done
+    vb-theme-cursor-set
+    break
+  done
 
 }
 
 _get_cursor_theme() {
-    local current
-    local settings
-    settings="$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+  local current
+  local settings
+  settings="$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
 
-    # gsettings returns "Defalut" most of the time, so just use gtk settings file instead.
-    # current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
-    current="$(sed -n 's/^gtk-cursor-theme-name=//p' "$settings")"
+  # gsettings returns "Defalut" most of the time, so just use gtk settings file instead.
+  # current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
+  current="$(sed -n 's/^gtk-cursor-theme-name=//p' "$settings")"
 
-    while IFS='|' read -r key value; do
-        if [[ "$key" == "$current" ]]; then
-            printf "%s" "$value"
-            return
-        fi
-    done <<< "$(vb-theme-cursor-list)"
+  while IFS='|' read -r key value; do
+    if [[ "$key" == "$current" ]]; then
+      printf "%s" "$value"
+      return
+    fi
+  done <<< "$(vb-theme-cursor-list)"
 
-    # Fallback: if the list above is empty (e.g. not found)
-    printf "Adwaita"
+  # Fallback: if the list above is empty (e.g. not found)
+  printf "Adwaita"
 }
 
 _get_default_browser() {
-    local browser
+  local browser
 
-    if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
-        while IFS='=' read -r key value; do
-            if [[ "$key" != "x-scheme-handler/http" ]]; then
-                continue
-            fi
+  if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
+    while IFS='=' read -r key value; do
+      if [[ "$key" != "x-scheme-handler/http" ]]; then
+        continue
+      fi
 
-            browser="${value%%;*}"
-            break
-        done < "$XDG_CONFIG_HOME/mimeapps.list"
-    fi
+      browser="${value%%;*}"
+      break
+    done < "$XDG_CONFIG_HOME/mimeapps.list"
+  fi
 
-    if [[ -z "$browser" ]]; then
-        browser=$(xdg-mime query default x-scheme-handler/http 2>/dev/null)
-    fi
+  if [[ -z "$browser" ]]; then
+    browser=$(xdg-mime query default x-scheme-handler/http 2> /dev/null)
+  fi
 
-    if [[ -z "$browser" ]]; then
-        printf "(no browsers found)"
-        return
-    fi
+  if [[ -z "$browser" ]]; then
+    printf "(no browsers found)"
+    return
+  fi
 
-    case "$browser" in
-        opera.desktop) printf "Opera" ;;
-        firefox.desktop) printf "Firefox" ;;
-        chromium.desktop) printf "Chromium" ;;
-        vivaldi.desktop) printf "Vivaldi" ;;
-        google-chrome.desktop) printf "Google Chrome" ;;
-        microsoft-edge.desktop) printf "Microsoft Edge" ;;
-        brave-browser.desktop) printf "Brave" ;;
-        org.qutebrowser.qutebrowser.desktop) printf "Qutebrowser" ;;
-    esac
+  case "$browser" in
+    opera.desktop) printf "Opera" ;;
+    firefox.desktop) printf "Firefox" ;;
+    chromium.desktop) printf "Chromium" ;;
+    vivaldi.desktop) printf "Vivaldi" ;;
+    google-chrome.desktop) printf "Google Chrome" ;;
+    microsoft-edge.desktop) printf "Microsoft Edge" ;;
+    brave-browser.desktop) printf "Brave" ;;
+    org.qutebrowser.qutebrowser.desktop) printf "Qutebrowser" ;;
+  esac
 }
 
 _pick_browser() {
-    declare -A browsers_map=()
+  declare -A browsers_map=()
 
-    [[ $(command -v firefox) ]] && browsers_map["Firefox"]="firefox.desktop"
-    [[ $(command -v chromium) ]] && browsers_map["Chromium"]="chromium.desktop"
-    [[ $(command -v google-chrome-stable) ]] && browsers_map["Google Chrome"]="google-chrome.desktop"
-    [[ $(command -v brave-browser) ]] && browsers_map["Brave"]="brave-browser.desktop"
-    [[ $(command -v vivaldi) ]] && browsers_map["Vivaldi"]="vivaldi.desktop"
-    [[ $(command -v opera) ]] && browsers_map["Opera"]="opera.desktop"
-    [[ $(command -v microsoft-edge) ]] && browsers_map["Microsoft Edge"]="microsoft-edge.desktop"
-    [[ $(command -v qutebrowser) ]] && browsers_map["QuteBrowser"]="org.qutebrowser.qutebrowser.desktop"
+  [[ $(command -v firefox) ]] && browsers_map["Firefox"]="firefox.desktop"
+  [[ $(command -v chromium) ]] && browsers_map["Chromium"]="chromium.desktop"
+  [[ $(command -v google-chrome-stable) ]] && browsers_map["Google Chrome"]="google-chrome.desktop"
+  [[ $(command -v brave-browser) ]] && browsers_map["Brave"]="brave-browser.desktop"
+  [[ $(command -v vivaldi) ]] && browsers_map["Vivaldi"]="vivaldi.desktop"
+  [[ $(command -v opera) ]] && browsers_map["Opera"]="opera.desktop"
+  [[ $(command -v microsoft-edge) ]] && browsers_map["Microsoft Edge"]="microsoft-edge.desktop"
+  [[ $(command -v qutebrowser) ]] && browsers_map["QuteBrowser"]="org.qutebrowser.qutebrowser.desktop"
 
-    local options=("${!browsers_map[@]}")
+  local options=("${!browsers_map[@]}")
 
-    if (( "${#options[@]}" <= 1 )); then
-        notify-send -r 2 "Vibranium" "Only ${options[0]} detected. Nothing to choose from!"
-        return
-    fi
+  if (("${#options[@]}" <= 1)); then
+    notify-send -r 2 "Vibranium" "Only ${options[0]} detected. Nothing to choose from!"
+    return
+  fi
 
-    mapfile -t options < <(helpers::configure::build_menu "${options[@]}")
+  mapfile -t options < <(helpers::configure::build_menu "${options[@]}")
 
-    local chosen
-    local valid=false
+  local chosen
+  local valid=false
 
-    while true; do
-        helpers::ui::menu chosen "Default browser" "ESC to go back" -- "${options[@]}"
-        [[ -z "$chosen" ]] && return
+  while true; do
+    helpers::ui::menu chosen "Default browser" "ESC to go back" -- "${options[@]}"
+    [[ -z "$chosen" ]] && return
 
-        for opt in "${options[@]}"; do
-            if [[ "$chosen" == "$opt" ]]; then
-                valid=true
-                break
-            fi
-        done
-
-        if [[ $valid == false ]]; then
-            continue
-        fi
-
+    for opt in "${options[@]}"; do
+      if [[ "$chosen" == "$opt" ]]; then
+        valid=true
         break
+      fi
     done
 
-    xdg-mime default "${browsers_map[$chosen]}" x-scheme-handler/https x-scheme-handler/http
+    if [[ $valid == false ]]; then
+      continue
+    fi
+
+    break
+  done
+
+  xdg-mime default "${browsers_map[$chosen]}" x-scheme-handler/https x-scheme-handler/http
 }
 
 INDEX=0
 
-
 while true; do
-    source "$VIBRANIUM_USER_SETTINGS"
+  source "$VIBRANIUM_USER_SETTINGS"
 
-    # CURSOR_THEME="$(_get_cursor_theme)"
-    CURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme")"
-    CURSOR_THEME="${CURSOR_THEME:-Default}"
+  # CURSOR_THEME="$(_get_cursor_theme)"
+  CURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme")"
+  CURSOR_THEME="${CURSOR_THEME:-Default}"
 
-    CURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size")"
-    CURSOR_SIZE="${CURSOR_SIZE:-unknown}"
+  CURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size")"
+  CURSOR_SIZE="${CURSOR_SIZE:-unknown}"
 
-    helpers::check \
-        VIBRANIUM_GLOBAL_SHOW_WALLPAPER \
-        VIBRANIUM_GLOBAL_TERMINAL
+  helpers::check \
+    VIBRANIUM_GLOBAL_SHOW_WALLPAPER \
+    VIBRANIUM_GLOBAL_TERMINAL
 
-    OPTIONS=(
-        "Menus theme : $(_get_rofi_theme)"
-        "Cursor theme : $CURSOR_THEME"
-        "Cursor size : $CURSOR_SIZE"
-        "Show wallpaper : $VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
-        "Default browser : $(_get_default_browser)"
-        "Default terminal : ${VIBRANIUM_GLOBAL_TERMINAL^}"
-        "Terminal opacity : $(_get_term_opacity)"
-        "Notification timeout : $(_get_notification_timeout)s"
-        "<b>Manage user wallpapers</b>"
-        "<b>Now Playing</b>"
-        "<b>Edit env</b>"
-    )
+  OPTIONS=(
+    "Menus theme : $(_get_rofi_theme)"
+    "Cursor theme : $CURSOR_THEME"
+    "Cursor size : $CURSOR_SIZE"
+    "Show wallpaper : $VIBRANIUM_GLOBAL_SHOW_WALLPAPER"
+    "Default browser : $(_get_default_browser)"
+    "Default terminal : ${VIBRANIUM_GLOBAL_TERMINAL^}"
+    "Terminal opacity : $(_get_term_opacity)"
+    "Notification timeout : $(_get_notification_timeout)s"
+    "<b>Manage user wallpapers</b>"
+    "<b>Now Playing</b>"
+    "<b>Edit env</b>"
+  )
 
-    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    helpers::ui::menu CHOSEN "Misc" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-    [[ -z "$CHOSEN" ]] && break
+  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+  helpers::ui::menu CHOSEN "Misc" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+  [[ -z "$CHOSEN" ]] && break
 
-    for i in "${!OPTIONS[@]}"; do
-        if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
-            INDEX="$i"
-            break
+  for i in "${!OPTIONS[@]}"; do
+    if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
+      INDEX="$i"
+      break
+    fi
+  done
+
+  case "$CHOSEN" in
+    "Default terminal"*)
+      helpers::configure::set_string \
+        "VIBRANIUM_GLOBAL_TERMINAL" "Default Terminal" \
+        "Alacritty:alacritty" "Foot:foot"
+
+      (
+        out="$(vb-cmd-get-option VIBRANIUM_GLOBAL_TERMINAL)"
+        if [[ "$out" == foot ]]; then
+          systemctl -q --user disable alacritty.service
+        else
+          systemctl -q --user disable foot-server.socket
         fi
-    done
-
-    case "$CHOSEN" in
-        "Default terminal"*)
-            helpers::configure::set_string \
-                "VIBRANIUM_GLOBAL_TERMINAL" "Default Terminal" \
-                "Alacritty:alacritty" "Foot:foot"
-
-            (
-                out="$(vb-cmd-get-option VIBRANIUM_GLOBAL_TERMINAL)"
-                if [[ "$out" == foot ]]; then
-                    systemctl -q --user disable alacritty.service
-                else
-                    systemctl -q --user disable foot-server.socket
-                fi
-            ) &
-            ;;
-        "Default browser"*)
-            _pick_browser
-            ;;
-        "Cursor theme"*)
-            _pick_cursor_theme
-            ;;
-        "Cursor size"*)
-            _pick_cursor_size
-            ;;
-        *"Now Playing"*)
-            cfgr-now-playing
-            ;;
-        "Notification"*)
-            _set_notification_timeout
-            ;;
-        "Show wallpaper"*)
-            _toggle_wallpaper
-            ;;
-        "Terminal opacity"*)
-            _term_opacity_menu
-            ;;
-        "Menus theme"*)
-            _set_rofi_theme
-            ;;
-        *"Manage user wallpapers"*)
-            _manage_user_wallpapers
-            ;;
-        *"Edit env"*)
-            vb-core-term --floating --title 'vb-env' -- "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
-            helpers::ui::close_menus
-            exit 0
-            ;;
-    esac
+      ) &
+      ;;
+    "Default browser"*)
+      _pick_browser
+      ;;
+    "Cursor theme"*)
+      _pick_cursor_theme
+      ;;
+    "Cursor size"*)
+      _pick_cursor_size
+      ;;
+    *"Now Playing"*)
+      cfgr-now-playing
+      ;;
+    "Notification"*)
+      _set_notification_timeout
+      ;;
+    "Show wallpaper"*)
+      _toggle_wallpaper
+      ;;
+    "Terminal opacity"*)
+      _term_opacity_menu
+      ;;
+    "Menus theme"*)
+      _set_rofi_theme
+      ;;
+    *"Manage user wallpapers"*)
+      _manage_user_wallpapers
+      ;;
+    *"Edit env"*)
+      vb-core-term --floating --title 'vb-env' -- "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
+      helpers::ui::close_menus
+      exit 0
+      ;;
+  esac
 done

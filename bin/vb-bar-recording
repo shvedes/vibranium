@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 if pidof -q gpu-screen-recorder; then
-    printf '{"text": "%s", "tooltip": "%s"}' \
-        "\uf28d" "Screen recording is active"
+  printf '{"text": "%s", "tooltip": "%s"}' \
+    "\uf28d" "Screen recording is active"
 else
-    printf '{"text": ""}'
+  printf '{"text": ""}'
 fi

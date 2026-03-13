@@ -11,5 +11,5 @@ rofi_opts=(
 )
 
 if [[ "$(printf "Yes\nNo" | rofi "${rofi_opts[@]}")" == "Yes" ]]; then
-    vb-core-stop-session
+  vb-core-stop-session
 fi

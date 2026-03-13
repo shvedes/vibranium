@@ -8,18 +8,18 @@ STATE_DIR="$VIBRANIUM_STATE/migrations"
 mkdir -p "$STATE_DIR/skipped"
 
 for file in "$VIBRANIUM"/migrations/*.sh; do
-    name="${file##*/}"
-    if [[ ! -f "$STATE_DIR/$name" && ! -f "$STATE_DIR/skipped/$name" ]]; then
-        echo -e "${YELLOW}[VIBRANIUM]${RESET} Running migration ${GREEN}${name}${RESET}"
+  name="${file##*/}"
+  if [[ ! -f "$STATE_DIR/$name" && ! -f "$STATE_DIR/skipped/$name" ]]; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Running migration ${GREEN}${name}${RESET}"
 
-        if bash "$file"; then
-            : > "$STATE_DIR/$name"
-        else
-            if term::ask_yes_no Y "Migration $file failed. Skip and continue?"; then
-                : > "$STATE_DIR/skipped/$name"
-            else
-                exit 1
-            fi
-        fi
+    if bash "$file"; then
+      : > "$STATE_DIR/$name"
+    else
+      if term::ask_yes_no Y "Migration $file failed. Skip and continue?"; then
+        : > "$STATE_DIR/skipped/$name"
+      else
+        exit 1
+      fi
     fi
+  fi
 done

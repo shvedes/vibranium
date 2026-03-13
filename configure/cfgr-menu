@@ -6,52 +6,51 @@ export PATH="$PATH:$VIBRANIUM/configure"
 INDEX=0
 
 while true; do
-    OPTIONS=(
-        "Idle"
-        "Audio"
-        "Waybar"
-        "General"
-        "Set font"
-        "Hyprland"
-        "Recording"
-    )
+  OPTIONS=(
+    "Idle"
+    "Audio"
+    "Waybar"
+    "General"
+    "Set font"
+    "Hyprland"
+    "Recording"
+  )
 
-    if [[ "$CHASSIS_TYPE" != vm ]]; then
-        OPTIONS+=(
-            "Brightness"
-            "Night Light"
-        )
-    fi
-
+  if [[ "$CHASSIS_TYPE" != vm ]]; then
     OPTIONS+=(
-        "Screenshots"
-        "Color Picker"
-        "Miscellaneous"
+      "Brightness"
+      "Night Light"
     )
+  fi
 
-    helpers::ui::menu CHOSEN "Settings" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-    [ -z "$CHOSEN" ] && break
+  OPTIONS+=(
+    "Screenshots"
+    "Color Picker"
+    "Miscellaneous"
+  )
 
-    for i in "${!OPTIONS[@]}"; do
-        if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
-            INDEX="$i"
-            break
-        fi
-    done
+  helpers::ui::menu CHOSEN "Settings" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+  [ -z "$CHOSEN" ] && break
 
-    case "$CHOSEN" in
-        "Waybar")        cfgr-waybar-menu      ;;
-        "Set font")      vb-font-set           ;;
-        "Idle")          cfgr-idle             ;;
-        "Audio")         cfgr-audio            ;;
-        "Screenshots")   cfgr-screenshots      ;;
-        "Brightness")    cfgr-brightness       ;;
-        "Recording")     cfgr-recording        ;;
-        "Night Light")   cfgr-nightshift       ;;
-        "Color Picker")  cfgr-color-picker     ;;
-        "General")       cfgr-general          ;;
-        "Hyprland")      cfgr-wm-menu          ;;
-        "Miscellaneous") cfgr-misc             ;;
-    esac
+  for i in "${!OPTIONS[@]}"; do
+    if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
+      INDEX="$i"
+      break
+    fi
+  done
+
+  case "$CHOSEN" in
+    "Waybar") cfgr-waybar-menu ;;
+    "Set font") vb-font-set ;;
+    "Idle") cfgr-idle ;;
+    "Audio") cfgr-audio ;;
+    "Screenshots") cfgr-screenshots ;;
+    "Brightness") cfgr-brightness ;;
+    "Recording") cfgr-recording ;;
+    "Night Light") cfgr-nightshift ;;
+    "Color Picker") cfgr-color-picker ;;
+    "General") cfgr-general ;;
+    "Hyprland") cfgr-wm-menu ;;
+    "Miscellaneous") cfgr-misc ;;
+  esac
 done
-

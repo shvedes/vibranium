@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} MODULE_NAME
 
 Send a refresh signal to the Waybar module MODULE_NAME.
@@ -12,41 +12,44 @@ EOF
 }
 
 case "${1:-}" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
 esac
 
-[[ -z "${1:-}" ]] && { usage; exit 1; }
+[[ -z "${1:-}" ]] && {
+  usage
+  exit 1
+}
 
 declare -A signals
 
 for file in "$VIBRANIUM"/default/waybar/*; do
-    while IFS= read -r line; do
-        [[ $line == *'"signal"'* ]] || continue
+  while IFS= read -r line; do
+    [[ $line == *'"signal"'* ]] || continue
 
-        name="${file##*/}" # remove path
-        name="${name%.jsonc}" # remove file extension
-        sig="${line//[^0-9]/}" # keep kill signals only
+    name="${file##*/}"     # remove path
+    name="${name%.jsonc}"  # remove file extension
+    sig="${line//[^0-9]/}" # keep kill signals only
 
-        signals["$name"]="$sig"
-    done < "$file"
+    signals["$name"]="$sig"
+  done < "$file"
 done
 
 module_name="$1"
 module_signal="${signals[$module_name]}"
 waybar_pid=$(systemctl --user show waybar -p MainPID --value)
 
-if (( $waybar_pid == 0 )); then
-    # waybar inactive
-    exit 0
+if (($waybar_pid == 0)); then
+  # waybar inactive
+  exit 0
 fi
 
 if [ -n "$module_signal" ]; then
-    kill -RTMIN+"$module_signal" "$waybar_pid"
-    kill -RTMIN+"${signals[dynamic-separator]}" "$waybar_pid"
+  kill -RTMIN+"$module_signal" "$waybar_pid"
+  kill -RTMIN+"${signals[dynamic - separator]}" "$waybar_pid"
 else
-    echo "Unknown module: $module_name" >&2
-    exit 1
+  echo "Unknown module: $module_name" >&2
+  exit 1
 fi

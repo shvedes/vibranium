@@ -13,47 +13,50 @@ LOGFILE="$VIBRANIUM_CACHE/${0##*/}.errors"
 # It checks the current brightness via DDC, compares it with the cached value,
 # and updates it if there's a discrepancy.
 _set_ddc_brightness() {
-    local feature_enabled
-    local current_brightness current_monitor cached_brightness
+  local feature_enabled
+  local current_brightness current_monitor cached_brightness
 
-    helpers::check VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL
-    feature_enabled="$VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
+  helpers::check VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL
+  feature_enabled="$VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
 
-    [[ "$feature_enabled" == false ]] && return
+  [[ "$feature_enabled" == false ]] && return
 
-    current_brightness="$(ddcutil getvcp 10 2>/dev/null \
-        | sed -n 's/.*current value = *\([0-9]\+\).*/\1/p'
-    )"
-    [[ -z "$current_brightness" ]] && return
+  current_brightness="$(
+    ddcutil getvcp 10 2> /dev/null |
+      sed -n 's/.*current value = *\([0-9]\+\).*/\1/p'
+  )"
+  [[ -z "$current_brightness" ]] && return
 
-    current_monitor="$(hyprctl -j monitors \
-        | jq -r '.[] | select(.focused == true) | .name'
-    )"
+  current_monitor="$(
+    hyprctl -j monitors |
+      jq -r '.[] | select(.focused == true) | .name'
+  )"
 
-    cached_brightness="$(
-        sed -n "s/^${current_monitor}:\([0-9]\+\)$/\1/p" \
-            "$VIBRANIUM_STATE/brightness"
-    )"
+  cached_brightness="$(
+    sed -n "s/^${current_monitor}:\([0-9]\+\)$/\1/p" \
+      "$VIBRANIUM_STATE/brightness"
+  )"
 
-    [[ -z "$current_brightness" ]] && return
-    if [[ -n "$cached_brightness" && "$cached_brightness" != "$current_brightness" ]]; then
-        vb-core-brightness "$current_brightness"
-    fi
+  [[ -z "$current_brightness" ]] && return
+  if [[ -n "$cached_brightness" && "$cached_brightness" != "$current_brightness" ]]; then
+    vb-core-brightness "$current_brightness"
+  fi
 }
 
-{ _set_ddc_brightness || {
-        log::error "unable to restore brightness level for the external monitor(s)" >> "$LOGFILE" 2>&1
-    }
+{
+  _set_ddc_brightness || {
+    log::error "unable to restore brightness level for the external monitor(s)" >> "$LOGFILE" 2>&1
+  }
 } &
 
 _toggle_loopback() {
-    while ! pidof -q pipewire; do
-        sleep 0.1
-    done
+  while ! pidof -q pipewire; do
+    sleep 0.1
+  done
 
-    if [[ $VIBRANIUM_VOLUME_SOURCE_LOOPBACK == true ]]; then
-        vb-cmd-toggle-loopback &
-    fi
+  if [[ $VIBRANIUM_VOLUME_SOURCE_LOOPBACK == true ]]; then
+    vb-cmd-toggle-loopback &
+  fi
 }
 
 CURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme")"
@@ -69,8 +72,8 @@ _toggle_loopback &
 mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
 
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
-    vb-util-first-run
-    exit 0
+  vb-util-first-run
+  exit 0
 fi
 
 wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"
@@ -78,13 +81,13 @@ wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"
 
 hyprpaper_unit="$(systemctl --user is-enabled hyprpaper)"
 if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
-    case "$hyprpaper_unit" in
-        disabled) systemctl --user enable --now hyprpaper ;;
-    esac
+  case "$hyprpaper_unit" in
+    disabled) systemctl --user enable --now hyprpaper ;;
+  esac
 else
-    case "$hyprpaper_unit" in
-        enabled) systemctl --user disable --now hyprpaper ;;
-    esac
+  case "$hyprpaper_unit" in
+    enabled) systemctl --user disable --now hyprpaper ;;
+  esac
 fi
 
 # If state file doesn't exist - create one and disable
@@ -93,18 +96,18 @@ fi
 # depends on it. It is not the best solution though, and
 # because of the while loop we must keep this check at the end
 if [[ ! -f "$VIBRANIUM_STATE/nightshift" ]]; then
-    echo "suspended" > "$VIBRANIUM_STATE/nightshift"
-    hyprctl -q hyprsunset identity
+  echo "suspended" > "$VIBRANIUM_STATE/nightshift"
+  hyprctl -q hyprsunset identity
 elif [[ "$(< "$VIBRANIUM_STATE/nightshift")" = "suspended" ]]; then
-    while ! pidof -q hyprsunset; do
-        sleep 0.05
-    done
-    hyprctl -q hyprsunset identity
+  while ! pidof -q hyprsunset; do
+    sleep 0.05
+  done
+  hyprctl -q hyprsunset identity
 fi
 
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START
 if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START = true ]]; then
-    setsid -f vb-core-launcher
+  setsid -f vb-core-launcher
 fi
 
 vb-core-power "$(powerprofilesctl get)" &
@@ -113,9 +116,8 @@ shopt -s nullglob
 
 HOOKS=("$XDG_CONFIG_HOME"/vibranium/startup/*.sh)
 
-if (( ${#HOOKS[@]} >= 1 )); then
-    for hook in "${HOOKS[@]}"; do
-        bash "$hook"
-    done
+if ((${#HOOKS[@]} >= 1)); then
+  for hook in "${HOOKS[@]}"; do
+    bash "$hook"
+  done
 fi
-

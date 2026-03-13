@@ -11,10 +11,10 @@ vb-cmd-refresh-bar-module worker
 xdg-user-dirs-update --force
 
 for hook in "${FIRSTBOOT_HOOKS}"/*.sh; do
-    echo "Running "${hook##*/}"." > "$WORKER"
-    vb-cmd-refresh-bar-module worker
+  echo "Running "${hook##*/}"." > "$WORKER"
+  vb-cmd-refresh-bar-module worker
 
-    bash "$hook"
+  bash "$hook"
 done
 
 # Remove Waybar icon

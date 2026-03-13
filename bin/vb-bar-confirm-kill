@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 if [[ -f "$VIBRANIUM_RUNTIME/confirm-kill" ]]; then
-    printf '{"text": "%s", "tooltip": "%s"}' "\uee15" "Confirm force kill"
+  printf '{"text": "%s", "tooltip": "%s"}' "\uee15" "Confirm force kill"
 else
-    printf '{"text": ""}'
+  printf '{"text": ""}'
 fi

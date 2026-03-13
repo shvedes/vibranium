@@ -4,40 +4,40 @@ HYPR_CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
 HYPRLOCK_CONFIG="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 
 for feature in blur shadow; do
-    RESTORE_FILE="$VIBRANIUM_STATE/${feature}.restore"
-    ENABLED="$(hyprctl -j getoption decoration:${feature}:enabled | jq -r '.int')"
+  RESTORE_FILE="$VIBRANIUM_STATE/${feature}.restore"
+  ENABLED="$(hyprctl -j getoption decoration:${feature}:enabled | jq -r '.int')"
 
-    if (( ENABLED == 1 )); then
-        # Restore marker
-        : > "$RESTORE_FILE"
+  if ((ENABLED == 1)); then
+    # Restore marker
+    : > "$RESTORE_FILE"
 
-        # Update decorations visually instantly
-        hyprctl -q keyword decoration:${feature}:enabled false
+    # Update decorations visually instantly
+    hyprctl -q keyword decoration:${feature}:enabled false
 
-        # Update hyprlock blur intensity as well
-        if [[ "$feature" == "blur" ]]; then
-            sed -i '/blur_size/s/ =.*/ = 1/' "$HYPRLOCK_CONFIG"
-            sed -i '/blur_passes/s/ =.*/ = 1/' "$HYPRLOCK_CONFIG"
-        fi
-
-        # Only then make the change permanent
-        vb-cmd-edit-wm-config "decoration:${feature}:enabled:false" "$HYPR_CONFIG"
-    else
-        if [[ -f "$RESTORE_FILE" ]]; then
-            # Delete restore marker
-            rm -f "$RESTORE_FILE"
-
-            # Update decorations visually instantly
-            hyprctl -q keyword decoration:${feature}:enabled true
-
-            # Update hyprlock blur intensity as well
-            if [[ "$feature" == "blur" ]]; then
-                sed -i '/blur_size/s/ =.*/ = 5/' "$HYPRLOCK_CONFIG"
-                sed -i '/blur_passes/s/ =.*/ = 3/' "$HYPRLOCK_CONFIG"
-            fi
-
-            # Only then make the change permanent
-            vb-cmd-edit-wm-config "decoration:${feature}:enabled:true" "$HYPR_CONFIG"
-        fi
+    # Update hyprlock blur intensity as well
+    if [[ "$feature" == "blur" ]]; then
+      sed -i '/blur_size/s/ =.*/ = 1/' "$HYPRLOCK_CONFIG"
+      sed -i '/blur_passes/s/ =.*/ = 1/' "$HYPRLOCK_CONFIG"
     fi
+
+    # Only then make the change permanent
+    vb-cmd-edit-wm-config "decoration:${feature}:enabled:false" "$HYPR_CONFIG"
+  else
+    if [[ -f "$RESTORE_FILE" ]]; then
+      # Delete restore marker
+      rm -f "$RESTORE_FILE"
+
+      # Update decorations visually instantly
+      hyprctl -q keyword decoration:${feature}:enabled true
+
+      # Update hyprlock blur intensity as well
+      if [[ "$feature" == "blur" ]]; then
+        sed -i '/blur_size/s/ =.*/ = 5/' "$HYPRLOCK_CONFIG"
+        sed -i '/blur_passes/s/ =.*/ = 3/' "$HYPRLOCK_CONFIG"
+      fi
+
+      # Only then make the change permanent
+      vb-cmd-edit-wm-config "decoration:${feature}:enabled:true" "$HYPR_CONFIG"
+    fi
+  fi
 done

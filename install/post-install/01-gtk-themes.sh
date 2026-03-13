@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 spinner_frames=(
-    '[=           ]' '[==          ]' '[===         ]' '[====        ]'
-    '[ ====       ]' '[  ====      ]' '[   ====     ]' '[    ====    ]'
-    '[     ====   ]' '[      ====  ]' '[       ==== ]' '[        ====]'
-    '[         ===]' '[          ==]' '[           =]'
+  '[=           ]' '[==          ]' '[===         ]' '[====        ]'
+  '[ ====       ]' '[  ====      ]' '[   ====     ]' '[    ====    ]'
+  '[     ====   ]' '[      ====  ]' '[       ==== ]' '[        ====]'
+  '[         ===]' '[          ==]' '[           =]'
 )
 
 # Create frame file once — persists across all install_theme() calls
@@ -15,12 +15,12 @@ _spinner() {
   local name="$1"
   local file="$2"
   local i
-  i=$(cat "$file")           # seed from previous run
+  i=$(cat "$file") # seed from previous run
   while true; do
     printf "\r\033[K%s[GTK THEMES]%s Installing %s%s%s %s" \
       "$YELLOW" "$RESET" "$CYAN" "$name" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
-    echo "$i" > "$file"      # persist current index
-    i=$(( (i + 1) % ${#spinner_frames[@]} ))
+    echo "$i" > "$file" # persist current index
+    i=$(((i + 1) % ${#spinner_frames[@]}))
     sleep 0.15
   done
 }
@@ -82,16 +82,20 @@ install_theme() {
   spinner_pid=$!
 
   git clone -q "https://github.com/Fausto-Korpsvart/$repo"
-  if (( $? != 0 )); then
-    kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
+  if (($? != 0)); then
+    kill "$spinner_pid" 2> /dev/null
+    wait "$spinner_pid" 2> /dev/null
     printf "\r\033[K%s[GTK THEMES]%s Failed to clone %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
     return 1
   fi
 
   cd "$clone_dir/themes" || {
-    kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
+    kill "$spinner_pid" 2> /dev/null
+    wait "$spinner_pid" 2> /dev/null
     printf "\r\033[K%s[GTK THEMES]%s Failed to enter %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
-    cd ..; rm -rf "$clone_dir"; return 1
+    cd ..
+    rm -rf "$clone_dir"
+    return 1
   }
   git switch -q --detach HEAD~3
 
@@ -130,7 +134,8 @@ install_theme() {
       variants=("default" "dragon")
       ;;
     *)
-      kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
+      kill "$spinner_pid" 2> /dev/null
+      wait "$spinner_pid" 2> /dev/null
       printf "\r\033[K%s[GTK THEMES]%s No configuration for %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
       cd ../..
       rm -rf "$clone_dir"
@@ -153,7 +158,7 @@ install_theme() {
   for color in "${repo_colors[@]}"; do
     local this_variants=("${variants[@]}")
     if [ "$color" == "light" ]; then
-      this_variants=("default")  # Only default for light
+      this_variants=("default") # Only default for light
     fi
 
     # Loop over variants
@@ -165,7 +170,8 @@ install_theme() {
 
       local generated_variant_suffix=""
       if [ "$variant" != "default" ]; then
-        local cap_variant; cap_variant="$(tr '[:lower:]' '[:upper:]' <<< ${variant:0:1})${variant:1}"
+        local cap_variant
+        cap_variant="$(tr '[:lower:]' '[:upper:]' <<< ${variant:0:1})${variant:1}"
         generated_variant_suffix="-$cap_variant"
       fi
 
@@ -199,7 +205,10 @@ install_theme() {
         "Nightfox-GTK-Theme")
           case "$variant" in
             "default") desired_name="Nightfox" ;;
-            *) desired_suffix="-$(tr '[:lower:]' '[:upper:]' <<< ${variant:0:1})${variant:1}" ; desired_name="$base_name$desired_suffix" ;;
+            *)
+              desired_suffix="-$(tr '[:lower:]' '[:upper:]' <<< ${variant:0:1})${variant:1}"
+              desired_name="$base_name$desired_suffix"
+              ;;
           esac
           ;;
         "Rose-Pine-GTK-Theme")
@@ -233,7 +242,8 @@ install_theme() {
             "default") desired_suffix="" ;;
             "solarized") desired_suffix="-Solarized" ;;
           esac
-          local color_upper; color_upper="$(tr '[:lower:]' '[:upper:]' <<< "${color:0:1}")${color:1}"
+          local color_upper
+          color_upper="$(tr '[:lower:]' '[:upper:]' <<< "${color:0:1}")${color:1}"
 
           desired_name="$base_name$desired_suffix"
           if [ "$color" == "light" ] || [ "$variant" == "default" ]; then
@@ -251,16 +261,19 @@ install_theme() {
       generated_base+="-$color_upper-Compact$generated_variant_suffix"
 
       install_opts="-s compact -c $color $tweaks -t $accent_param"
-      eval "./install.sh $install_opts" &>/dev/null || { echo "Install failed for $repo $variant $color"; continue; }
+      eval "./install.sh $install_opts" &> /dev/null || {
+        echo "Install failed for $repo $variant $color"
+        continue
+      }
 
       # Rename if directories exist
       if [ -d "$DEST_DIR/$generated_base" ]; then
         mv "$DEST_DIR/$generated_base" "$DEST_DIR/$desired_name"
         sed -i -e "/^Name=/s/=.*/=${desired_name}/" \
-            -e "/^GtkTheme=/s/=.*/=${desired_name}/" \
-            -e "/^MetacityTheme=/s/=.*/=${desired_name}/" \
-            -e "/^CursorTheme/s/=.*/=macOS/" \
-            "$DEST_DIR/${desired_name}/index.theme"
+          -e "/^GtkTheme=/s/=.*/=${desired_name}/" \
+          -e "/^MetacityTheme=/s/=.*/=${desired_name}/" \
+          -e "/^CursorTheme/s/=.*/=macOS/" \
+          "$DEST_DIR/${desired_name}/index.theme"
       else
         echo "Warning: $generated_base not found"
       fi
@@ -280,7 +293,8 @@ install_theme() {
   done
 
   # All variants done -- kill spinner and print final settled line
-  kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
+  kill "$spinner_pid" 2> /dev/null
+  wait "$spinner_pid" 2> /dev/null
 
   # Clean up
   cd ../..
@@ -297,4 +311,3 @@ mv "$HOME/.themes" "$HOME/.local/share"
 ln -sf "$HOME/.local/share/.themes" "$HOME/.themes"
 
 printf "\r\033[K%s[INFO]%s GTK themes installed\n" "$CYAN" "$RESET"
-

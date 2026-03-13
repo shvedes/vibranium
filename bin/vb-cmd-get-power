@@ -3,7 +3,7 @@
 STATE_FILE="$VIBRANIUM_STATE/power-profile"
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]
 
 Print current power profile.
@@ -15,30 +15,30 @@ EOF
 }
 
 case "$1" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
-    "")
-        :
-        ;;
-    *)
-        echo "${0##*/}: invalid option '$1'" >&2
-        echo "Try '--help' for more information." >&2
-        exit 1
-        ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  "")
+    :
+    ;;
+  *)
+    echo "${0##*/}: invalid option '$1'" >&2
+    echo "Try '--help' for more information." >&2
+    exit 1
+    ;;
 esac
 
 if [[ -f "$STATE_FILE" ]]; then
-    cat "$STATE_FILE"
-    exit 0
+  cat "$STATE_FILE"
+  exit 0
 fi
 
 mkdir -p "${STATE_FILE%/*}"
 
 if output=$(powerprofilesctl get); then
-    printf '%s' "$output" > "$STATE_FILE"
-    exit 0
+  printf '%s' "$output" > "$STATE_FILE"
+  exit 0
 fi
 
 echo "${0##*/}: failed to read power profile" >&2

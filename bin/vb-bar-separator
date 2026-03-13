@@ -3,25 +3,25 @@
 source vb-core-lib
 
 show() {
-    printf '{"text": "|"}'
-    exit
+  printf '{"text": "|"}'
+  exit
 }
 
 for f in /run/systemd/inhibit/*; do
-    [[ -f $f ]] || continue
-    while IFS= read -r line; do
-        case $line in
-            *=Vibranium) show ;;
-        esac
-    done < "$f"
+  [[ -f $f ]] || continue
+  while IFS= read -r line; do
+    case $line in
+      *=Vibranium) show ;;
+    esac
+  done < "$f"
 done
 
 paths=(
-    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
-    "$VIBRANIUM_RUNTIME/password-manager.action"
-    "$VIBRANIUM_RUNTIME/vb-timer.remaining"
-    "$VIBRANIUM_STATE/update.available"
-    "$VIBRANIUM_RUNTIME/confirm-kill"
+  "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+  "$VIBRANIUM_RUNTIME/password-manager.action"
+  "$VIBRANIUM_RUNTIME/vb-timer.remaining"
+  "$VIBRANIUM_STATE/update.available"
+  "$VIBRANIUM_RUNTIME/confirm-kill"
 )
 
 for p in "${paths[@]}"; do

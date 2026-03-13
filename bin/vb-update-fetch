@@ -5,65 +5,64 @@ set -euo pipefail
 # Wait for network, bail out after 60 attempts
 attempts=0
 while ! ping -c 1 -W 2 8.8.8.8 &> /dev/null; do
-    attempts=$(( attempts + 1 ))
+  attempts=$((attempts + 1))
 
-    if (( attempts >= 60 )); then
-        exit 1
-    fi
+  if ((attempts >= 60)); then
+    exit 1
+  fi
 
-    sleep 1
+  sleep 1
 done
 
 channel="release"
 
 if [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
-    channel="$(< "$VIBRANIUM_STATE/update.channel")"
+  channel="$(< "$VIBRANIUM_STATE/update.channel")"
 fi
 
 # Fetch once so both release and upstream comparisons work locally
 git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &> /dev/null || exit 1
 
 if [[ "$channel" == "release" ]]; then
-    remote_latest=$(git -C "$VIBRANIUM" tag --sort=-creatordate | head -n 1)
-    if [[ -z "$remote_latest" ]]; then
-        exit 0
-    fi
+  remote_latest=$(git -C "$VIBRANIUM" tag --sort=-creatordate | head -n 1)
+  if [[ -z "$remote_latest" ]]; then
+    exit 0
+  fi
 
-    local_latest=$(git -C "$VIBRANIUM" describe --tags --exact-match 2>/dev/null || \
-        git -C "$VIBRANIUM" rev-parse --short HEAD)
+  local_latest=$(git -C "$VIBRANIUM" describe --tags --exact-match 2> /dev/null ||
+    git -C "$VIBRANIUM" rev-parse --short HEAD)
 
-    if [[ "$remote_latest" != "$local_latest" ]]; then
-        echo "$remote_latest" > "$VIBRANIUM_STATE/update.available"
-        if systemctl -q --user is-active waybar; then
-            pkill -RTMIN+12 waybar || true
-            pkill -RTMIN+10 waybar || true
-        else
-            notify-send -r 1 -t 180000 \
-                "New Version Available" \
-                "To update, open Vibranium Menu"
-        fi
+  if [[ "$remote_latest" != "$local_latest" ]]; then
+    echo "$remote_latest" > "$VIBRANIUM_STATE/update.available"
+    if systemctl -q --user is-active waybar; then
+      pkill -RTMIN+12 waybar || true
+      pkill -RTMIN+10 waybar || true
+    else
+      notify-send -r 1 -t 180000 \
+        "New Version Available" \
+        "To update, open Vibranium Menu"
     fi
+  fi
 else
-    # upstream/dev channel: count how many commits local is behind origin/<master/dev>
-    branch="$(git -C "$VIBRANIUM" branch --show-current)"
+  # upstream/dev channel: count how many commits local is behind origin/<master/dev>
+  branch="$(git -C "$VIBRANIUM" branch --show-current)"
 
-    # Uknown branch - do nothing
-    if [[ ! "$branch" =~ ^(master|dev)$ ]]; then
-        exit 0
+  # Uknown branch - do nothing
+  if [[ ! "$branch" =~ ^(master|dev)$ ]]; then
+    exit 0
+  fi
+
+  behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/$branch --count 2> /dev/null || echo 0)
+
+  if ((behind > 0)); then
+    echo "$behind" > "$VIBRANIUM_STATE/update.available"
+    if systemctl -q --user is-active waybar; then
+      pkill -RTMIN+12 waybar || true
+      pkill -RTMIN+10 waybar || true
+    else
+      notify-send -r 1 -t 180000 \
+        "New Version Available" \
+        "To update, go to Vibranium Menu"
     fi
-
-    behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/$branch --count 2>/dev/null || echo 0)
-
-    if (( behind > 0 )); then
-        echo "$behind" > "$VIBRANIUM_STATE/update.available"
-        if systemctl -q --user is-active waybar; then
-            pkill -RTMIN+12 waybar || true
-            pkill -RTMIN+10 waybar || true
-        else
-            notify-send -r 1 -t 180000 \
-                "New Version Available" \
-                "To update, go to Vibranium Menu"
-        fi
-    fi
+  fi
 fi
-

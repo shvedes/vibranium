@@ -1,26 +1,26 @@
 #!/usr/bin/env bash
 
 for f in /run/systemd/inhibit/*; do
-    [[ -f $f ]] || continue
-    if grep -q '=Vibranium' "$f"; then
-        shown=true
-        break
-    fi
+  [[ -f $f ]] || continue
+  if grep -q '=Vibranium' "$f"; then
+    shown=true
+    break
+  fi
 done
 
 if [[ -n "$shown" ]]; then
-    source vb-core-lib
+  source vb-core-lib
 
-    helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
-    type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+  helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
+  type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
 
-    if [[ "$type" == "idle" ]]; then
-        tooltip="Screen lock blocked"
-    else
-        tooltip="System sleep blocked"
-    fi
+  if [[ "$type" == "idle" ]]; then
+    tooltip="Screen lock blocked"
+  else
+    tooltip="System sleep blocked"
+  fi
 
-    printf '{"text": "%s", "tooltip": "%s"}' "\uf023" "$tooltip"
+  printf '{"text": "%s", "tooltip": "%s"}' "\uf023" "$tooltip"
 else
-    printf '{"text": ""}'
+  printf '{"text": ""}'
 fi

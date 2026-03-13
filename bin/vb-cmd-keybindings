@@ -14,29 +14,29 @@
 # - Map numeric modifier key mask to a textual rendition
 # - Output comma-separated values that the parser can understand
 dynamic_bindings() {
-    hyprctl -j binds |
-        jq -r '.[] | {modmask, key, keycode, description, dispatcher, arg} | "\(.modmask),\(.key)@\(.keycode),\(.description),\(.dispatcher),\(.arg)"' |
-        sed -r \
-            -e 's/null//' \
-            -e 's,uwsm app -- ,,' \
-            -e 's/@0//' \
-            -e 's/,@/,code:/' \
-            -e 's/^0,/,/' \
-            -e 's/^1,/SHIFT,/' \
-            -e 's/^4,/CTRL,/' \
-            -e 's/^5,/SHIFT CTRL,/' \
-            -e 's/^8,/ALT,/' \
-            -e 's/^9,/SHIFT ALT,/' \
-            -e 's/^12,/CTRL ALT,/' \
-            -e 's/^13,/SHIFT CTRL ALT,/' \
-            -e 's/^64,/SUPER,/' \
-            -e 's/^65,/SUPER SHIFT,/' \
-            -e 's/^68,/SUPER CTRL,/' \
-            -e 's/^69,/SUPER SHIFT CTRL,/' \
-            -e 's/^72,/SUPER ALT,/' \
-            -e 's/^73,/SUPER SHIFT ALT,/' \
-            -e 's/^76,/SUPER CTRL ALT,/' \
-            -e 's/^77,/SUPER SHIFT CTRL ALT,/'
+  hyprctl -j binds |
+    jq -r '.[] | {modmask, key, keycode, description, dispatcher, arg} | "\(.modmask),\(.key)@\(.keycode),\(.description),\(.dispatcher),\(.arg)"' |
+    sed -r \
+      -e 's/null//' \
+      -e 's,uwsm app -- ,,' \
+      -e 's/@0//' \
+      -e 's/,@/,code:/' \
+      -e 's/^0,/,/' \
+      -e 's/^1,/SHIFT,/' \
+      -e 's/^4,/CTRL,/' \
+      -e 's/^5,/SHIFT CTRL,/' \
+      -e 's/^8,/ALT,/' \
+      -e 's/^9,/SHIFT ALT,/' \
+      -e 's/^12,/CTRL ALT,/' \
+      -e 's/^13,/SHIFT CTRL ALT,/' \
+      -e 's/^64,/SUPER,/' \
+      -e 's/^65,/SUPER SHIFT,/' \
+      -e 's/^68,/SUPER CTRL,/' \
+      -e 's/^69,/SUPER SHIFT CTRL,/' \
+      -e 's/^72,/SUPER ALT,/' \
+      -e 's/^73,/SUPER SHIFT ALT,/' \
+      -e 's/^76,/SUPER CTRL ALT,/' \
+      -e 's/^77,/SUPER SHIFT CTRL ALT,/'
 }
 
 # Parse and format keybindings
@@ -47,7 +47,7 @@ dynamic_bindings() {
 # - Joins the command that the key executes.
 # - Prints everything in a nicely aligned format.
 parse_bindings() {
-    awk -F, '
+  awk -F, '
 {
     # Ignore specific cases
     if ($0 ~ /switch:on:Lid Switch/ || $0 ~ /XF86/) next;
@@ -95,9 +95,9 @@ parse_bindings() {
 }
 
 by_index() {
-    local desc="$1"
-    hyprctl -j binds |
-        jq -r --arg d "$desc" '
+  local desc="$1"
+  hyprctl -j binds |
+    jq -r --arg d "$desc" '
 	  def modmap(x):
 		if x == 0 then ""
 		elif x == 1 then "SHIFT"
@@ -129,22 +129,22 @@ by_index() {
 }
 
 case "$1" in
-    "--list" | "-l")
-        dynamic_bindings | sort -u | parse_bindings
-        ;;
-    "--index" | "-i")
-        if [[ -z "$2" ]]; then
-            echo "--index requires an argument"
-            exit 1
-        fi
-        by_index "$2"
-        ;;
-    *)
-        dynamic_bindings | sort -u | parse_bindings | rofi -dmenu -sync \
-            -theme-str 'entry { placeholder: " search shortucts"; }' \
-            -theme-str 'listview { lines: 20; columns: 1; }' \
-            -theme "$XDG_CONFIG_HOME/rofi/config.rasi" \
-            -theme-str 'window { width:500; }' \
-            -p "Keybindings" -no-auto-select
-        ;;
+  "--list" | "-l")
+    dynamic_bindings | sort -u | parse_bindings
+    ;;
+  "--index" | "-i")
+    if [[ -z "$2" ]]; then
+      echo "--index requires an argument"
+      exit 1
+    fi
+    by_index "$2"
+    ;;
+  *)
+    dynamic_bindings | sort -u | parse_bindings | rofi -dmenu -sync \
+      -theme-str 'entry { placeholder: " search shortucts"; }' \
+      -theme-str 'listview { lines: 20; columns: 1; }' \
+      -theme "$XDG_CONFIG_HOME/rofi/config.rasi" \
+      -theme-str 'window { width:500; }' \
+      -p "Keybindings" -no-auto-select
+    ;;
 esac

@@ -13,29 +13,29 @@ SELECTED_SIZE=""
 #   Sets key=value inside [section].  Adds the key if absent; creates the
 #   file (with the section header) if it doesn't exist at all.
 ini_upsert() {
-    local file="$1" section="$2" key="$3" value="$4"
+  local file="$1" section="$2" key="$3" value="$4"
 
-    if [[ ! -f "$file" ]]; then
-        mkdir -p "$(dirname "$file")"
-        printf '[%s]\n%s=%s\n' "$section" "$key" "$value" > "$file"
-        return
-    fi
+  if [[ ! -f "$file" ]]; then
+    mkdir -p "$(dirname "$file")"
+    printf '[%s]\n%s=%s\n' "$section" "$key" "$value" > "$file"
+    return
+  fi
 
-    if grep -q "^${key}\s*=" "$file"; then
-        # key exists – update in-place
-        sed -i "s|^${key}\s*=.*|${key}=${value}|" "$file"
+  if grep -q "^${key}\s*=" "$file"; then
+    # key exists – update in-place
+    sed -i "s|^${key}\s*=.*|${key}=${value}|" "$file"
+  else
+    # key absent – append after the section header, or at end of file
+    if grep -q "^\[${section}\]" "$file"; then
+      sed -i "/^\[${section}\]/a ${key}=${value}" "$file"
     else
-        # key absent – append after the section header, or at end of file
-        if grep -q "^\[${section}\]" "$file"; then
-            sed -i "/^\[${section}\]/a ${key}=${value}" "$file"
-        else
-            printf '\n[%s]\n%s=%s\n' "$section" "$key" "$value" >> "$file"
-        fi
+      printf '\n[%s]\n%s=%s\n' "$section" "$key" "$value" >> "$file"
     fi
+  fi
 }
 
 _usage() {
-    cat <<EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]... [THEME]
 
 Set cursor themes in Vibranium
@@ -50,78 +50,83 @@ EOF
 }
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help)  _usage; exit 0 ;;
-        -s|--size)
-            if ! [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
-                echo "error: --size requires a numeric argument" >&2
-                exit 1
-            fi
-            SELECTED_SIZE="$2"; shift 2 ;;
-        -*)
-            echo "unknown option: $1" >&2
-            exit 1
-            ;;
-        *)
-            if [[ -z "$SELECTED_THEME" ]]; then
-                SELECTED_THEME="$1"
-            fi
-            shift
-            ;;
-    esac
+  case "$1" in
+    -h | --help)
+      _usage
+      exit 0
+      ;;
+    -s | --size)
+      if ! [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
+        echo "error: --size requires a numeric argument" >&2
+        exit 1
+      fi
+      SELECTED_SIZE="$2"
+      shift 2
+      ;;
+    -*)
+      echo "unknown option: $1" >&2
+      exit 1
+      ;;
+    *)
+      if [[ -z "$SELECTED_THEME" ]]; then
+        SELECTED_THEME="$1"
+      fi
+      shift
+      ;;
+  esac
 done
 
 # fall back to state values, then built-in defaults
 if [[ -z "$SELECTED_THEME" ]]; then
-    if [[ -f "$STATE_THEME" ]]; then
-        SELECTED_THEME="$(< "$STATE_THEME")"
-    fi
+  if [[ -f "$STATE_THEME" ]]; then
+    SELECTED_THEME="$(< "$STATE_THEME")"
+  fi
 
-    SELECTED_THEME="${SELECTED_THEME:-$DEFAULT_THEME}"
+  SELECTED_THEME="${SELECTED_THEME:-$DEFAULT_THEME}"
 fi
 
 if [[ -z "$SELECTED_SIZE" ]]; then
-    if [[ -f "$STATE_SIZE" ]]; then
-        SELECTED_SIZE="$(< "$STATE_SIZE")"
-    fi
+  if [[ -f "$STATE_SIZE" ]]; then
+    SELECTED_SIZE="$(< "$STATE_SIZE")"
+  fi
 
-    SELECTED_SIZE="${SELECTED_SIZE:-$DEFAULT_SIZE}"
+  SELECTED_SIZE="${SELECTED_SIZE:-$DEFAULT_SIZE}"
 fi
 
 SEARCH_DIRS=(
-    "$XDG_DATA_HOME/icons"
-    "$HOME/.icons"
-    "/usr/share/icons"
+  "$XDG_DATA_HOME/icons"
+  "$HOME/.icons"
+  "/usr/share/icons"
 )
 
 theme_found=0
 for d in "${SEARCH_DIRS[@]}"; do
-    if [[ -d "$d/$SELECTED_THEME/cursors" ]]; then
-        theme_found=1
-        break
-    fi
+  if [[ -d "$d/$SELECTED_THEME/cursors" ]]; then
+    theme_found=1
+    break
+  fi
 done
 
-if ! (( theme_found )); then
-    echo "error: '$SELECTED_THEME' not found" >&2
-    exit 1
+if ! ((theme_found)); then
+  echo "error: '$SELECTED_THEME' not found" >&2
+  exit 1
 fi
 
 # Validate that the resolved size exists in this theme using vb-theme-cursor-list.
-available_sizes=$(vb-theme-cursor-list --size "$SELECTED_THEME" 2>/dev/null | awk '{$1=""; print}')
+available_sizes=$(vb-theme-cursor-list --size "$SELECTED_THEME" 2> /dev/null | awk '{$1=""; print}')
 
 if [[ -n "$available_sizes" ]] && ! grep -qw "$SELECTED_SIZE" <<< "$available_sizes"; then
-    msg="Size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME' — falling back to ${DEFAULT_SIZE}px"
+  msg="Size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME' — falling back to ${DEFAULT_SIZE}px"
 
-    if [[ -t 1 ]]; then
-        msg="size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME'"$'\n'"Run: vb-theme-cursor-list --size '$SELECTED_THEME'"
-        echo "error: $msg" >&2
-        exit 1
-    fi
+  if [[ -t 1 ]]; then
+    msg="size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME'"$'\n'"Run: vb-theme-cursor-list --size '$SELECTED_THEME'"
+    echo "error: $msg" >&2
+    exit 1
+  fi
 
-    notify-send -r 4 -t 10000 "Vibranium - Cursor Themes" "$msg"
-    # Carried-over size doesn't fit the new theme — silently use the default.
-    SELECTED_SIZE="$DEFAULT_SIZE"
+  notify-send -r 4 -t 10000 "Vibranium - Cursor Themes" "$msg"
+  # Carried-over size doesn't fit the new theme — silently use the default.
+  SELECTED_SIZE="$DEFAULT_SIZE"
 fi
 
 # X cursor default (used by legacy X11 apps)
@@ -134,26 +139,26 @@ GTK4_INI="$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
 
 # GTK 2 uses a flat key="value" file with no section headers
 if [[ -f "$GTK2_RC" ]]; then
-    if grep -q "^gtk-cursor-theme-name" "$GTK2_RC"; then
-        sed -i 's|^gtk-cursor-theme-name\s*=.*|gtk-cursor-theme-name="'"$SELECTED_THEME"'"|' "$GTK2_RC"
-        sed -i 's|^gtk-cursor-theme-size\s*=.*|gtk-cursor-theme-size='"$SELECTED_SIZE"'|'   "$GTK2_RC"
-    else
-        printf 'gtk-cursor-theme-name="%s"\ngtk-cursor-theme-size=%s\n' \
-            "$SELECTED_THEME" "$SELECTED_SIZE" >> "$GTK2_RC"
-    fi
+  if grep -q "^gtk-cursor-theme-name" "$GTK2_RC"; then
+    sed -i 's|^gtk-cursor-theme-name\s*=.*|gtk-cursor-theme-name="'"$SELECTED_THEME"'"|' "$GTK2_RC"
+    sed -i 's|^gtk-cursor-theme-size\s*=.*|gtk-cursor-theme-size='"$SELECTED_SIZE"'|' "$GTK2_RC"
+  else
+    printf 'gtk-cursor-theme-name="%s"\ngtk-cursor-theme-size=%s\n' \
+      "$SELECTED_THEME" "$SELECTED_SIZE" >> "$GTK2_RC"
+  fi
 fi
 
 for ini in "$GTK3_INI" "$GTK4_INI"; do
-    ini_upsert "$ini" "Settings" "gtk-cursor-theme-name" "$SELECTED_THEME"
-    ini_upsert "$ini" "Settings" "gtk-cursor-theme-size" "$SELECTED_SIZE"
+  ini_upsert "$ini" "Settings" "gtk-cursor-theme-name" "$SELECTED_THEME"
+  ini_upsert "$ini" "Settings" "gtk-cursor-theme-size" "$SELECTED_SIZE"
 done
 
 # X resources (makes the change live for new X11 windows immediately)
 XRESOURCES="$HOME/.Xresources"
 
 if [[ -f "$XRESOURCES" ]]; then
-    # remove any previous Xcursor lines, then append a fresh one
-    sed -i '/^Xcursor\.\(theme\|size\)/d' "$XRESOURCES"
+  # remove any previous Xcursor lines, then append a fresh one
+  sed -i '/^Xcursor\.\(theme\|size\)/d' "$XRESOURCES"
 fi
 
 printf 'Xcursor.theme: %s\n' "$SELECTED_THEME" >> "$XRESOURCES"
@@ -166,17 +171,16 @@ hyprctl -q setcursor "$SELECTED_THEME" "$SELECTED_SIZE"
 
 # GNOME / gsettings
 gsettings set org.gnome.desktop.interface cursor-theme "$SELECTED_THEME"
-gsettings set org.gnome.desktop.interface cursor-size  "$SELECTED_SIZE"
+gsettings set org.gnome.desktop.interface cursor-size "$SELECTED_SIZE"
 
 # propagate env vars to the systemd user session and D-Bus
 # so newly spawned processes inherit the correct values
 export XCURSOR_THEME="$SELECTED_THEME"
 export XCURSOR_SIZE="$SELECTED_SIZE"
 
-systemctl --user import-environment XCURSOR_THEME XCURSOR_SIZE 2>/dev/null || true
-dbus-update-activation-environment --systemd XCURSOR_THEME XCURSOR_SIZE 2>/dev/null || true
+systemctl --user import-environment XCURSOR_THEME XCURSOR_SIZE 2> /dev/null || true
+dbus-update-activation-environment --systemd XCURSOR_THEME XCURSOR_SIZE 2> /dev/null || true
 
 # update state files
 printf '%s' "$SELECTED_THEME" > "$STATE_THEME"
-printf '%s' "$SELECTED_SIZE"  > "$STATE_SIZE"
-
+printf '%s' "$SELECTED_SIZE" > "$STATE_SIZE"

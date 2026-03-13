@@ -3,101 +3,100 @@
 source vb-core-lib
 
 _confirm_kill_submenu() {
-    local options confirm_to_kill_chosen
-    while true; do
-        options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "<b>Help</b>")
-        helpers::ui::menu confirm_to_kill_chosen "Kill Confirm" "ESC to go back" -- "${options[@]}"
-        [[ -z "$confirm_to_kill_chosen" ]] && break
+  local options confirm_to_kill_chosen
+  while true; do
+    options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "<b>Help</b>")
+    helpers::ui::menu confirm_to_kill_chosen "Kill Confirm" "ESC to go back" -- "${options[@]}"
+    [[ -z "$confirm_to_kill_chosen" ]] && break
 
-        case "$confirm_to_kill_chosen" in
-            "Confirm"*)
-                helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
-                break
-                ;;
-            *"Help"*)
-                vb-cmd-show-help confirm-kill
-                ;;
-        esac
-    done
+    case "$confirm_to_kill_chosen" in
+      "Confirm"*)
+        helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
+        break
+        ;;
+      *"Help"*)
+        vb-cmd-show-help confirm-kill
+        ;;
+    esac
+  done
 }
 
 _update_channel_submenu() {
-    local options chosen
-    options=("Release" "Upstream" "Dev")
+  local options chosen
+  options=("Release" "Upstream" "Dev")
 
-    while true; do
-        helpers::ui::menu chosen "Update Channel" "ESC to go back" -- "${options[@]}"
-        [[ -z "$chosen" ]] && break
+  while true; do
+    helpers::ui::menu chosen "Update Channel" "ESC to go back" -- "${options[@]}"
+    [[ -z "$chosen" ]] && break
 
-        case "$chosen" in
-            "Upstream") vb-dev-switch-channel upstream ;;
-            "Release")  vb-dev-switch-channel release ;;
-            "Dev")      vb-dev-switch-channel dev ;;
-            *) continue ;;
-        esac
-        break
-    done
+    case "$chosen" in
+      "Upstream") vb-dev-switch-channel upstream ;;
+      "Release") vb-dev-switch-channel release ;;
+      "Dev") vb-dev-switch-channel dev ;;
+      *) continue ;;
+    esac
+    break
+  done
 }
 
 INDEX=0
 
 while true; do
-    source "$VIBRANIUM_USER_SETTINGS"
+  source "$VIBRANIUM_USER_SETTINGS"
 
-    OPTIONS=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL")
+  OPTIONS=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL")
 
-    UPDATE_CHANNEL="$(< "$VIBRANIUM_STATE/update.channel")"
+  UPDATE_CHANNEL="$(< "$VIBRANIUM_STATE/update.channel")"
 
-    # Self-check: do not show anything
-    # if on unknown branch.
-    if [[ -z "$UPDATE_CHANNEL" ]]; then
-        branch="$(git -C "$VIBRANIUM" branch --show-current)"
-        if [[ "$branch" =~ ^(master|dev|v*)$ ]]; then
-            OPTIONS+=("Update channel : ${UPDATE_CHANNEL^}")
-        fi
+  # Self-check: do not show anything
+  # if on unknown branch.
+  if [[ -z "$UPDATE_CHANNEL" ]]; then
+    branch="$(git -C "$VIBRANIUM" branch --show-current)"
+    if [[ "$branch" =~ ^(master|dev|v*)$ ]]; then
+      OPTIONS+=("Update channel : ${UPDATE_CHANNEL^}")
     fi
+  fi
 
-    OPTIONS+=(
-        "OSD enabled : $VIBRANIUM_GLOBAL_USE_OSD"
-        "<b>App launcher</b>"
-        "<b>Player options</b>"
-        # "<b>Power profiles</b>"
-    )
+  OPTIONS+=(
+    "OSD enabled : $VIBRANIUM_GLOBAL_USE_OSD"
+    "<b>App launcher</b>"
+    "<b>Player options</b>"
+    # "<b>Power profiles</b>"
+  )
 
-    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    helpers::ui::menu CHOSEN "General" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-    [ -z "$CHOSEN" ] && break
+  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+  helpers::ui::menu CHOSEN "General" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+  [ -z "$CHOSEN" ] && break
 
-    for i in "${!OPTIONS[@]}"; do
-        if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
-            INDEX="$i"
-            break
-        fi
-    done
+  for i in "${!OPTIONS[@]}"; do
+    if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
+      INDEX="$i"
+      break
+    fi
+  done
 
-    case "$CHOSEN" in
-        "Update channel"*)
-            _update_channel_submenu
-            ;;
-        *"App launcher"*)
-            cfgr-launcher
-            ;;
-        *"Player options"*)
-            cfgr-player
-            ;;
-        *"Power profiles"*)
-            cfgr-power-profile
-            ;;
-        "OSD enabled"*)
-            if [[ "$(helpers::configure::toggle_bool -v "VIBRANIUM_GLOBAL_USE_OSD")" == "false" ]]; then
-                systemctl --user disable --now swayosd &
-            else
-                systemctl --user enable --now swayosd &
-            fi
-            ;;
-        "Confirm"*)
-            _confirm_kill_submenu
-            ;;
-    esac
+  case "$CHOSEN" in
+    "Update channel"*)
+      _update_channel_submenu
+      ;;
+    *"App launcher"*)
+      cfgr-launcher
+      ;;
+    *"Player options"*)
+      cfgr-player
+      ;;
+    *"Power profiles"*)
+      cfgr-power-profile
+      ;;
+    "OSD enabled"*)
+      if [[ "$(helpers::configure::toggle_bool -v "VIBRANIUM_GLOBAL_USE_OSD")" == "false" ]]; then
+        systemctl --user disable --now swayosd &
+      else
+        systemctl --user enable --now swayosd &
+      fi
+      ;;
+    "Confirm"*)
+      _confirm_kill_submenu
+      ;;
+  esac
 done
-

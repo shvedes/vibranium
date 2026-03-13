@@ -4,40 +4,40 @@ source vb-core-lib
 
 helpers::check VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE
 if [[ "$VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE" == false ]]; then
-    exit 0
+  exit 0
 fi
 
 history_file="$VIBRANIUM_CACHE/color-picker.history"
 
 contrast_color() {
-    local hex="$1"
+  local hex="$1"
 
-    hex="${hex#\#}"
-    local r=$((16#${hex:0:2}))
-    local g=$((16#${hex:2:2}))
-    local b=$((16#${hex:4:2}))
+  hex="${hex#\#}"
+  local r=$((16#${hex:0:2}))
+  local g=$((16#${hex:2:2}))
+  local b=$((16#${hex:4:2}))
 
-    # Contrast calculation
-    local lum=$(((299 * r + 587 * g + 114 * b) / 1000))
-    if ((lum > 127)); then
-        echo "#000000"
-    else
-        echo "#ffffff"
-    fi
+  # Contrast calculation
+  local lum=$(((299 * r + 587 * g + 114 * b) / 1000))
+  if ((lum > 127)); then
+    echo "#000000"
+  else
+    echo "#ffffff"
+  fi
 }
 
 tooltip="Click to pick a color"
 
 if [[ -s $history_file ]]; then
-    tooltip="\tClick to pick a color"
-    tooltip+="\n     Right click to <span foreground='red3'><b>clear history</b></span>"
-    tooltip+="\n<span foreground='gray'>---------------------------------------</span>"
-    tooltip+="\\n\\t    <span size='9000'>Recent colors</span>"
+  tooltip="\tClick to pick a color"
+  tooltip+="\n     Right click to <span foreground='red3'><b>clear history</b></span>"
+  tooltip+="\n<span foreground='gray'>---------------------------------------</span>"
+  tooltip+="\\n\\t    <span size='9000'>Recent colors</span>"
 
-    while IFS= read -r color; do
-        fg=$(contrast_color "$color")
-        tooltip+="\n\t      <span background='$color' foreground='$fg' size='9500'><b> $color </b></span>"
-    done < "$history_file"
+  while IFS= read -r color; do
+    fg=$(contrast_color "$color")
+    tooltip+="\n\t      <span background='$color' foreground='$fg' size='9500'><b> $color </b></span>"
+  done < "$history_file"
 fi
 
 printf '{"text": "%s", "tooltip": "%s"}' "\uf1fb" "$tooltip"

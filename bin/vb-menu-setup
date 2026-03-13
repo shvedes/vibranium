@@ -3,20 +3,20 @@
 source vb-core-lib
 
 OPTIONS=(
-    "Firewall"
-    "Docker"
-    "QEMU"
+  "Firewall"
+  "Docker"
+  "QEMU"
 )
 
 while true; do
-    helpers::ui::menu CHOSEN "Setup" "ESC to go back" -- "${OPTIONS[@]}"
-    [[ -z "$CHOSEN" ]] && break
+  helpers::ui::menu CHOSEN "Setup" "ESC to go back" -- "${OPTIONS[@]}"
+  [[ -z "$CHOSEN" ]] && break
 
-    case "$CHOSEN" in
-        "QEMU") vb-core-term --floating -- vb-setup-qemu ;;
-        "Docker") vb-core-term --floating -- vb-setup-docker ;;
-        "Firewall") vb-core-term --floating -- vb-setup-ufw ;;
-    esac
+  case "$CHOSEN" in
+    "QEMU") vb-core-term --floating -- vb-setup-qemu ;;
+    "Docker") vb-core-term --floating -- vb-setup-docker ;;
+    "Firewall") vb-core-term --floating -- vb-setup-ufw ;;
+  esac
 
-    helpers::ui::close_menus
+  helpers::ui::close_menus
 done

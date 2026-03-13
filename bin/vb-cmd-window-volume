@@ -7,7 +7,7 @@ LOCKFILE="$VIBRANIUM_RUNTIME/${0##*/}.lock"
 source vb-core-lib
 
 usage() {
-  cat <<USAGE
+  cat << USAGE
 Usage: ${0##*/} [OPTIONS]
 
 Adjust the volume of the currently focused Hyprland window.
@@ -28,19 +28,19 @@ USAGE
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -s|--step)
+    -s | --step)
       STEP="$2"
       shift 2
       ;;
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
-    -u|-d|-t)
+    -u | -d | -t)
       ACTION="${1/-/}"
       shift
-        ;;
-    --up|--down|--toggle)
+      ;;
+    --up | --down | --toggle)
       ACTION="${1/--/}"
       shift
       ;;
@@ -60,7 +60,7 @@ fi
 
 # killswitch — only one instance may run at a time;
 # scroll events can fire faster than pw-dump finishes
-exec 9>"$LOCKFILE"
+exec 9> "$LOCKFILE"
 flock -n 9 || exit 0
 
 ACTIVE_WINDOW=$(hyprctl -j activewindow)
@@ -109,8 +109,8 @@ for NODE_ID in "${NODES[@]}"; do
         wpctl set-volume "$NODE_ID" "${STEP}%+" --limit 1.0
       fi
       ;;
-    down)   wpctl set-volume "$NODE_ID" "${STEP}%-" ;;
-    toggle) wpctl set-mute   "$NODE_ID" toggle ;;
+    down) wpctl set-volume "$NODE_ID" "${STEP}%-" ;;
+    toggle) wpctl set-mute "$NODE_ID" toggle ;;
   esac
 done
 

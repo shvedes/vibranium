@@ -4,7 +4,7 @@ source vb-core-lib
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [--help]
 
 Suspend or resume the currently active window in Hyprland.
@@ -16,26 +16,29 @@ EOF
 }
 
 case "${1:-}" in
-    -h|--help) usage; exit 0
+  -h | --help)
+    usage
+    exit 0
+    ;;
 esac
 
 # Get active window PID and class
 read -r PID NAME <<< "$(hyprctl -j activewindow | jq -r '[.pid,.title]|@tsv')"
 
 if [[ -z $PID ]]; then
-    notify-send -r 4 -t 3000 -u critical "PID Freezer" "There are no focused windows!"
-    exit 1
+  notify-send -r 4 -t 3000 -u critical "PID Freezer" "There are no focused windows!"
+  exit 1
 fi
 
 # Read process state
 read _ _ state _ < /proc/$PID/stat
 
 if [[ $state != T ]]; then
-    kill -STOP "$PID"
-    msg="suspended"
+  kill -STOP "$PID"
+  msg="suspended"
 else
-    kill -CONT "$PID"
-    msg="restored"
+  kill -CONT "$PID"
+  msg="restored"
 fi
 
 notify-send -r 3 "Vibranium" "<span foreground='${P_YELLOW}'>${NAME}</span> $msg"

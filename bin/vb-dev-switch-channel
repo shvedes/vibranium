@@ -3,7 +3,7 @@
 set -euo pipefail
 
 usage() {
-    cat <<EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]... CHANNEL
 Switch the Vibranium update channel to CHANNEL.
 
@@ -20,98 +20,98 @@ EOF
 CHANNEL=""
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h | --help)
-            usage
-            exit 0
-            ;;
-        -*)
-            echo "${0##*/}: unrecognized option '$1'" >&2
-            echo "Try '${0##*/} --help' for more information." >&2
-            exit 1
-            ;;
-        *)
-            if [[ -n "$CHANNEL" ]]; then
-                echo "${0##*/}: too many arguments" >&2
-                echo "Try '${0##*/} --help' for more information." >&2
-                exit 1
-            fi
-            CHANNEL="$1"
-            ;;
-    esac
-    shift
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -*)
+      echo "${0##*/}: unrecognized option '$1'" >&2
+      echo "Try '${0##*/} --help' for more information." >&2
+      exit 1
+      ;;
+    *)
+      if [[ -n "$CHANNEL" ]]; then
+        echo "${0##*/}: too many arguments" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
+        exit 1
+      fi
+      CHANNEL="$1"
+      ;;
+  esac
+  shift
 done
 
 if [[ -z "$CHANNEL" ]]; then
-    echo "${0##*/}: missing operand" >&2
-    echo "Try '${0##*/} --help' for more information." >&2
-    exit 1
+  echo "${0##*/}: missing operand" >&2
+  echo "Try '${0##*/} --help' for more information." >&2
+  exit 1
 fi
 
 case "$CHANNEL" in
-    release | upstream | dev) ;;
-    *)
-        echo "${0##*/}: invalid channel '$CHANNEL'" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
-        exit 1
-        ;;
+  release | upstream | dev) ;;
+  *)
+    echo "${0##*/}: invalid channel '$CHANNEL'" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
 esac
 
 GIT="git -C $VIBRANIUM"
 
 notify() {
-    local urgency="${1:-normal}" message="$2"
+  local urgency="${1:-normal}" message="$2"
 
-    if [[ ! -t 1 ]]; then
-        notify-send -r 1 ${urgency:+-u "$urgency"} "Vibranium" "$message"
-    fi
+  if [[ ! -t 1 ]]; then
+    notify-send -r 1 ${urgency:+-u "$urgency"} "Vibranium" "$message"
+  fi
 }
 
 die() {
-    echo "${0##*/}: $*" >&2
-    notify critical "$*"
-    exit 1
+  echo "${0##*/}: $*" >&2
+  notify critical "$*"
+  exit 1
 }
 
 CURRENT="$($GIT branch --show-current)"
 
 if [[ ! "$CURRENT" =~ ^v ]]; then
-    CHANGES="$($GIT status --porcelain | wc -l)"
+  CHANGES="$($GIT status --porcelain | wc -l)"
 
-    if (( CHANGES > 0 )); then
-        MSG="you have unsaved changes. Commit them first or stash them with: git stash"
-        echo "${0##*/}: $MSG" >&2
-        if [[ ! -t 2 ]]; then
-            notify-send -r 4 -u critical -t 7000 "Vibranium" "$MSG"
-        fi
-        exit 1
+  if ((CHANGES > 0)); then
+    MSG="you have unsaved changes. Commit them first or stash them with: git stash"
+    echo "${0##*/}: $MSG" >&2
+    if [[ ! -t 2 ]]; then
+      notify-send -r 4 -u critical -t 7000 "Vibranium" "$MSG"
     fi
+    exit 1
+  fi
 fi
 
 case "$CHANNEL" in
-    release)
-        LATEST="$($GIT tag --sort=-creatordate | head -n 1)"
-        $GIT switch --detach "$LATEST" || die "failed to switch to '$LATEST'"
+  release)
+    LATEST="$($GIT tag --sort=-creatordate | head -n 1)"
+    $GIT switch --detach "$LATEST" || die "failed to switch to '$LATEST'"
 
-        echo "release" > "$VIBRANIUM_STATE/update.channel"
-        echo "Switched to $LATEST."
-        notify "" "Switched to $LATEST"
-        ;;
-    upstream)
-        $GIT switch master || die "failed to switch to 'master'"
+    echo "release" > "$VIBRANIUM_STATE/update.channel"
+    echo "Switched to $LATEST."
+    notify "" "Switched to $LATEST"
+    ;;
+  upstream)
+    $GIT switch master || die "failed to switch to 'master'"
 
-        echo "upstream" > "$VIBRANIUM_STATE/update.channel"
-        echo "Switched to upstream."
-        notify "" "Switched to upstream"
-        ;;
-    dev)
-        $GIT switch dev || die "failed to switch to 'dev'"
+    echo "upstream" > "$VIBRANIUM_STATE/update.channel"
+    echo "Switched to upstream."
+    notify "" "Switched to upstream"
+    ;;
+  dev)
+    $GIT switch dev || die "failed to switch to 'dev'"
 
-        echo "dev" > "$VIBRANIUM_STATE/update.channel"
-        echo "Switched to dev."
-        notify "" "Switched to dev"
-        vb-cmd-reload --quiet
-        ;;
+    echo "dev" > "$VIBRANIUM_STATE/update.channel"
+    echo "Switched to dev."
+    notify "" "Switched to dev"
+    vb-cmd-reload --quiet
+    ;;
 esac
 
 vb-cmd-reload -q &

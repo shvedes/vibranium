@@ -6,32 +6,35 @@
 file=''"$1"''
 
 if [[ ! -f "$file" ]]; then
-	printf ""
-	exit 0
+  printf ""
+  exit 0
 fi
 
 human_size() {
-    local bytes=$1
-    [[ -z "$bytes" || ! "$bytes" =~ ^[0-9]+$ ]] && { echo "-"; return; }
+  local bytes=$1
+  [[ -z "$bytes" || ! "$bytes" =~ ^[0-9]+$ ]] && {
+    echo "-"
+    return
+  }
 
-    local kib=$((1024))
-    local mib=$((1024 * 1024))
-    local gib=$((1024 * 1024 * 1024))
+  local kib=$((1024))
+  local mib=$((1024 * 1024))
+  local gib=$((1024 * 1024 * 1024))
 
-    if ((bytes >= gib)); then
+  if ((bytes >= gib)); then
         awk -v b="$bytes" -v g="$gib" 'BEGIN {printf "%.2f GiB", b/g}'
-    elif ((bytes >= mib)); then
+  elif   ((bytes >= mib)); then
         awk -v b="$bytes" -v m="$mib" 'BEGIN {printf "%.2f MiB", b/m}'
-    elif ((bytes >= kib)); then
+  elif   ((bytes >= kib)); then
         awk -v b="$bytes" -v k="$kib" 'BEGIN {printf "%.2f KiB", b/k}'
-    else
+  else
         printf "%d B" "$bytes"
-    fi
+  fi
 }
 
 IFS=$'\t' read -r filename filesize resolution colorspace compression < <(
   mediainfo --Output=JSON "$file" |
-  jq -r '{
+    jq -r '{
       filename: .media["@ref"],
       filesize: (.media.track[]? | select(.["@type"]=="General") | .FileSize // ""),
       resolution: (.media.track[]? | select(.["@type"]=="Image") | (.Width + "x" + .Height) // ""),
@@ -39,7 +42,6 @@ IFS=$'\t' read -r filename filesize resolution colorspace compression < <(
       compression: (.media.track[]? | select(.["@type"]=="Image") | .Compression_Mode // "")
     } | [.filename, .filesize, .resolution, .colorspace, .compression] | @tsv'
 )
-
 
 printf " filename: %s \n filesize: %sB (%s) \n resolution: %s \n colorspace: %s \n compression: %s \n\n See keyboard shortcuts: Ctrl + H" \
     "$(basename "$filename")" "$filesize" "$(human_size "$filesize")" "$resolution" "$colorspace" "${compression,,}"

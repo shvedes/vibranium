@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 
 case "$CHASSIS_TYPE" in
-    laptop|convertible|tablet)
-		DIRTY_BYTES="134217728"
-		DIRTY_BACKGROUND_BYTES="33554432"
-		DIRTY_WRITEBACK_CENTISECS="1000"
-        ;;
+  laptop | convertible | tablet)
+    DIRTY_BYTES="134217728"
+    DIRTY_BACKGROUND_BYTES="33554432"
+    DIRTY_WRITEBACK_CENTISECS="1000"
+    ;;
 
-	desktop)  # Desktop
-		DIRTY_BYTES="268435456"
-		DIRTY_BACKGROUND_BYTES="67108864"
-		DIRTY_WRITEBACK_CENTISECS="1500"
-        ;;
+  desktop)
+    DIRTY_BYTES="268435456"
+    DIRTY_BACKGROUND_BYTES="67108864"
+    DIRTY_WRITEBACK_CENTISECS="1500"
+    ;;
 
-    vm)
-        exit 0
-        ;;
+  vm)
+    exit 0
+    ;;
 esac
 
-sudo tee /etc/sysctl.d/vibranium-sysctl.conf >/dev/null <<EOF
+sudo tee /etc/sysctl.d/vibranium-sysctl.conf > /dev/null << EOF
 # Enable the sysctl setting kernel.unprivileged_userns_clone to allow normal users to run unprivileged containers.
 kernel.unprivileged_userns_clone = 1
 
@@ -39,7 +39,7 @@ net.core.netdev_max_backlog = 4096
 fs.file-max = 2097152
 EOF
 
-sudo tee /etc/sysctl.d/vibranium-vm.conf >/dev/null <<EOF
+sudo tee /etc/sysctl.d/vibranium-vm.conf > /dev/null << EOF
 # The sysctl swappiness parameter determines the kernel's preference for
 # pushing anonymous pages or page cache to disk in memory-starved situations.
 # A low value causes the kernel to prefer freeing up open files (page cache).
@@ -75,4 +75,3 @@ vm.dirty_background_bytes = $DIRTY_BACKGROUND_BYTES
 # hundredths of a second. Default is 500.
 # vm.dirty_writeback_centisecs = $DIRTY_WRITEBACK_CENTISECS
 EOF
-

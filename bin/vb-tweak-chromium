@@ -5,44 +5,44 @@ source vb-core-lib
 TARGET="$XDG_CONFIG_HOME/chromium-flags.conf"
 
 [[ -z "$1" || ! "$1" =~ ^(en|dis)able$ ]] && {
-    echo "Usage: ${0##*/} enable|disable"
-    exit 1
+  echo "Usage: ${0##*/} enable|disable"
+  exit 1
 }
 
 case "$1" in
-    enable)
-        if ! grep -q "oauth2" "$TARGET"; then
-            echo "--oauth2-client-id=77185425430.apps.googleusercontent.com" >> "$TARGET"
-            echo "--oauth2-client-secret=OTJgUOQcT7lO7GsGZq2G4IlT" >> "$TARGET"
+  enable)
+    if ! grep -q "oauth2" "$TARGET"; then
+      echo "--oauth2-client-id=77185425430.apps.googleusercontent.com" >> "$TARGET"
+      echo "--oauth2-client-secret=OTJgUOQcT7lO7GsGZq2G4IlT" >> "$TARGET"
 
-            msg="Google sync has been enabled."
+      msg="Google sync has been enabled."
 
-            if pidof -q chromium; then
-                msg+="\n\n<b>Please restart your browser</b>"
-            fi
+      if pidof -q chromium; then
+        msg+="\n\n<b>Please restart your browser</b>"
+      fi
 
-            notify-send -r 3 "Vibranium" "$msg"
-        else
-            log::warn "You already have Google sync enabled!"
-            exit 1
-        fi
-        ;;
-    disable)
-        if grep -q "oauth2" "$TARGET"; then
-            sed -i '/--oauth2/d' "$TARGET"
+      notify-send -r 3 "Vibranium" "$msg"
+    else
+      log::warn "You already have Google sync enabled!"
+      exit 1
+    fi
+    ;;
+  disable)
+    if grep -q "oauth2" "$TARGET"; then
+      sed -i '/--oauth2/d' "$TARGET"
 
-            msg="Google sync has been disbaled"
+      msg="Google sync has been disbaled"
 
-            if pidof -q chromium; then
-                msg+="\n\n<b>Please restart your browser</b>"
-            fi
+      if pidof -q chromium; then
+        msg+="\n\n<b>Please restart your browser</b>"
+      fi
 
-            notify-send -r 3 "Vibranium" "$msg"
-        else
-            log::warn "You already have Google sync disabled!"
-            exit 1
-        fi
-        ;;
+      notify-send -r 3 "Vibranium" "$msg"
+    else
+      log::warn "You already have Google sync disabled!"
+      exit 1
+    fi
+    ;;
 esac
 
 helpers::ui::close_menus

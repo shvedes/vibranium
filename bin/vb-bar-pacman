@@ -7,127 +7,127 @@ helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
 
 # Module disabled - exit
 if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == false ]]; then
-    printf '{"text":""}'
-    exit 0
+  printf '{"text":""}'
+  exit 0
 fi
 
 # Waybar is launched via systemd, so ideally we get its PID
 # via a systemctl call (this is also slightly faster than calling pidof).
 WAYBAR_PID="$(systemctl --user show waybar -p MainPID --value)"
 
-if (( WAYBAR_PID == 0 )) ; then
-    # Not launched via systemd or inactive.
-    # Try to get with pidof instead.
-    WAYBAR_PID="$(pidof waybar)"
+if ((WAYBAR_PID == 0)); then
+  # Not launched via systemd or inactive.
+  # Try to get with pidof instead.
+  WAYBAR_PID="$(pidof waybar)"
 
-    # If empty - the process doesn't exist.
-    if [[ -z "$WAYBAR_PID" ]]; then
-        if ! term::is_headless; then
-            log::error "Waybar isn't active!"
-            exit 1
-        fi
+  # If empty - the process doesn't exist.
+  if [[ -z "$WAYBAR_PID" ]]; then
+    if ! term::is_headless; then
+      log::error "Waybar isn't active!"
+      exit 1
     fi
+  fi
 fi
 
 if ! command -v checkupdates > /dev/null; then
-    # If executed from a terminal
-    if ! term::is_headless; then
-        log::error "Missing required dependencies: pacman-contrib"
-        log::error "To install, run 'sudo pacman -S pacman-contrib'"
-        exit 1
-    fi
+  # If executed from a terminal
+  if ! term::is_headless; then
+    log::error "Missing required dependencies: pacman-contrib"
+    log::error "To install, run 'sudo pacman -S pacman-contrib'"
+    exit 1
+  fi
 
-    text="<span foreground='red2'>\uf071</span>"
-    tooltip="Missing required dependencies: pacman-contrib"
+  text="<span foreground='red2'>\uf071</span>"
+  tooltip="Missing required dependencies: pacman-contrib"
 
-    printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
+  printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
 
-    # Exit with code 0.
-    # Otherwise Waybar won't display json string
-    exit 0
+  # Exit with code 0.
+  # Otherwise Waybar won't display json string
+  exit 0
 fi
 
 _wait_for_connection() {
-    while ! ping -c 1 1.1.1.1 &> /dev/null; do
-        sleep 1
-    done
+  while ! ping -c 1 1.1.1.1 &> /dev/null; do
+    sleep 1
+  done
 }
 
 make_tooltip() {
-    local any=false
+  local any=false
 
-    # If not then there's no updates available.
-    if [[ ! -s "$PKG_LIST" ]]; then
-        printf "You're up to date!"
-        return
-    fi
+  # If not then there's no updates available.
+  if [[ ! -s "$PKG_LIST" ]]; then
+    printf "You're up to date!"
+    return
+  fi
 
-    # Parse updates list.
-    # See the vb-bar-pacman.awk for explanation.
-    awk -f "$VIBRANIUM/awk/vb-bar-pacman.awk" "$PKG_LIST"
+  # Parse updates list.
+  # See the vb-bar-pacman.awk for explanation.
+  awk -f "$VIBRANIUM/awk/vb-bar-pacman.awk" "$PKG_LIST"
 }
 
 MARKER="$VIBRANIUM_RUNTIME/bar.updates.pid.${WAYBAR_PID}"
 
 helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
 if [[ "$VIBRANIUM_BAR_SHOW_ANIMATION" == false ]]; then
-    show_spinner=false
+  show_spinner=false
 else
-    # If started before with
-    # the same waybar pid
-    if [[ -f "$MARKER" ]]; then
-        # Triggered by 'restart-interval'
-        # option - dont' animate.
-        show_spinner=false
-    else
-        # Marker doesn't exist -
-        # most likely first run
-        show_spinner=true
+  # If started before with
+  # the same waybar pid
+  if [[ -f "$MARKER" ]]; then
+    # Triggered by 'restart-interval'
+    # option - dont' animate.
+    show_spinner=false
+  else
+    # Marker doesn't exist -
+    # most likely first run
+    show_spinner=true
 
-        # Remove old markers
-        # if exist
-        rm -f "${MARKER%.*}".*
+    # Remove old markers
+    # if exist
+    rm -f "${MARKER%.*}".*
 
-        # Create new one
-        : > "$MARKER"
-    fi
+    # Create new one
+    : > "$MARKER"
+  fi
 fi
 
 _wait_for_connection &
 connection_pid=$!
 
 if [[ "$show_spinner" == true ]]; then
-    helpers::bar::spinner "Waiting for the internet connection..." $connection_pid
+  helpers::bar::spinner "Waiting for the internet connection..." $connection_pid
 else
-    wait $connection_pid
+  wait $connection_pid
 fi
 
 PKG_LIST="$VIBRANIUM_CACHE/bar.updates.list"
 
-(
-    checkupdates --nocolor 2> /dev/null
-    yay -Qua --color=never 2> /dev/null
+( 
+  checkupdates --nocolor 2> /dev/null
+  yay -Qua --color=never 2> /dev/null
 ) > "$PKG_LIST" &
 get_updates_pid=$!
 
 if [[ "$show_spinner" == true ]]; then
-    helpers::bar::spinner "Getting updates..." $get_updates_pid
+  helpers::bar::spinner "Getting updates..." $get_updates_pid
 else
-    wait $get_updates_pid
+  wait $get_updates_pid
 fi
 
 TOTAL_COUNT="$(wc -l < "$PKG_LIST")"
 
 helpers::check VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES
-if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES" == false ]] ; then
-    if (( TOTAL_COUNT == 0 )); then
-        printf '{"text": ""}'
-        exit 0
-    fi
+if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES" == false ]]; then
+  if ((TOTAL_COUNT == 0)); then
+    printf '{"text": ""}'
+    exit 0
+  fi
 fi
 
 if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
-    text="<span foreground='DimGray'>|</span> "
+  text="<span foreground='DimGray'>|</span> "
 fi
 
 icon="<span rise='1pt' foreground='CornflowerBlue'>󰏔</span>"

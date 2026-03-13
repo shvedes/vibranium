@@ -3,7 +3,7 @@
 FILE="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.conf"
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [--help]
 
 Toggle Hyprland smart gaps configuration.
@@ -14,28 +14,31 @@ EOF
 }
 
 case "${1:-}" in
-    -h|--help) usage; exit 0
+  -h | --help)
+    usage
+    exit 0
+    ;;
 esac
 
 mapfile -t gaps < <(
-    hyprctl -j --batch \
-        'getoption general:gaps_in;
-         getoption general:gaps_out' | \
+  hyprctl -j --batch \
+    'getoption general:gaps_in;
+         getoption general:gaps_out' |
     jq -r '.custom | split(" ")[0]'
 )
 
 gaps_in=${gaps[0]}
 gaps_out=${gaps[1]}
 
-if (( gaps_in == 0 && gaps_out == 0 )); then
-    notify-send -r 3 "Vibranium" "You don't have any gaps at all!"
-    exit 1
+if ((gaps_in == 0 && gaps_out == 0)); then
+  notify-send -r 3 "Vibranium" "You don't have any gaps at all!"
+  exit 1
 fi
 
 if [[ -f "$FILE" ]]; then
-    rm "$FILE"
+  rm "$FILE"
 else
-    cat > "$FILE" << EOF
+  cat > "$FILE" << EOF
 workspace = w[tv1]s[false], gapsout:0, gapsin:0
 workspace = f[1]s[false], gapsout:0, gapsin:0
 

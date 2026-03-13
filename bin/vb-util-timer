@@ -8,45 +8,46 @@ ring="/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 paplay_pid=""
 
 cleanup() {
-    rm -f "$state"
-    vb-cmd-refresh-bar-module timer
+  rm -f "$state"
+  vb-cmd-refresh-bar-module timer
 
-    kill $(pgrep -f -- '--who=Timer')
-    kill -s KILL "$paplay_pid" & >/dev/null
-    exit 0
+  kill $(pgrep -f -- '--who=Timer')
+  kill -s KILL "$paplay_pid" &
+  > /dev/null
+  exit 0
 }
 
 trap cleanup EXIT INT TERM
 
 if pgrep -f -- '--why=Timer' > /dev/null; then
-    cleanup
+  cleanup
 fi
 
 while true; do
-    helpers::ui::menu chosen "Set timer for" "ESC to go back" -- "${options[@]}"
-    [[ -z "$chosen" ]] && exit 1
-    [[ " ${options[*]} " == *" $chosen "* ]] || continue
+  helpers::ui::menu chosen "Set timer for" "ESC to go back" -- "${options[@]}"
+  [[ -z "$chosen" ]] && exit 1
+  [[ " ${options[*]} " == *" $chosen "* ]] || continue
 
-    while true; do
-        prompt="Int, in ${chosen,}"
-        helpers::ui::menu sub_chosen "Set timer" "ESC to go back" -- "$prompt"
+  while true; do
+    prompt="Int, in ${chosen,}"
+    helpers::ui::menu sub_chosen "Set timer" "ESC to go back" -- "$prompt"
 
-        [[ -z "$sub_chosen" ]] && break
-        [[ "$sub_chosen" =~ ^[0-9]+$ ]] || continue
+    [[ -z "$sub_chosen" ]] && break
+    [[ "$sub_chosen" =~ ^[0-9]+$ ]] || continue
 
-        case "$chosen" in
-            Seconds)
-                sleep_time="$sub_chosen"
-                ;;
-            Minutes)
-                sleep_time=$(( sub_chosen * 60 ))
-                ;;
-            Hours)
-                sleep_time=$(( sub_chosen * 3600 ))
-                ;;
-        esac
-        break 2
-    done
+    case "$chosen" in
+      Seconds)
+        sleep_time="$sub_chosen"
+        ;;
+      Minutes)
+        sleep_time=$((sub_chosen * 60))
+        ;;
+      Hours)
+        sleep_time=$((sub_chosen * 3600))
+        ;;
+    esac
+    break 2
+  done
 done
 
 [[ -z "$sleep_time" ]] && exit 0
@@ -54,20 +55,19 @@ done
 setsid -f systemd-inhibit --what=idle --why="Timer is active" --who="Timer" sleep $sleep_time
 
 time_remaining=$sleep_time
-while (( time_remaining > 0 )); do
-    echo "$time_remaining" > "$state"
-    vb-cmd-refresh-bar-module timer
-    ((time_remaining--))
-    sleep 1 &
-    wait $!
+while ((time_remaining > 0)); do
+  echo "$time_remaining" > "$state"
+  vb-cmd-refresh-bar-module timer
+  ((time_remaining--))
+  sleep 1 &
+  wait $!
 done
 
 echo "timed out" > "$state"
 vb-cmd-refresh-bar-module timer
 
 while true; do
-    paplay --volume 32500 "$ring" &
-    paplay_pid=$!
-    wait "$paplay_pid"
+  paplay --volume 32500 "$ring" &
+  paplay_pid=$!
+  wait "$paplay_pid"
 done
-

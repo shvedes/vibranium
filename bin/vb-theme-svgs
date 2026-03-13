@@ -8,5 +8,5 @@ source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 icons_dir="${XDG_DATA_HOME:-$HOME/.local/share}/icons/Vibranium/scalable/apps"
 
 for file in "${icons_dir}"/*; do
-    sed -i "/style=/s/fill: #.*\"/fill: ${P_TEXT}\"/g" "$file"
+  sed -i "/style=/s/fill: #.*\"/fill: ${P_TEXT}\"/g" "$file"
 done

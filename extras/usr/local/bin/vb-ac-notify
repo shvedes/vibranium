@@ -7,11 +7,11 @@ CURRENT=0
 PREV=""
 
 if [[ -f "$ONLINE_FILE" ]]; then
-    CURRENT="$(<"$ONLINE_FILE")"
+    CURRENT="$(< "$ONLINE_FILE")"
 fi
 
 if [[ -f "$STATE_FILE" ]]; then
-    PREV="$(<"$STATE_FILE")"
+    PREV="$(< "$STATE_FILE")"
 fi
 
 if [[ "$CURRENT" == "$PREV" ]]; then

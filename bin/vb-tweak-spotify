@@ -6,75 +6,75 @@ FILE="$EXT_DIR/adblock.js"
 ACTION="$1"
 
 progress() {
-    local msg="$1"
-    case "$msg" in
-        clear)
-            rm -f "$VIBRNAIUM_RUNTIME/worker.active"
-            ;;
-        *)
-            echo "$msg" > "$VIBRNAIUM_RUNTIME/worker.active"
-            ;;
-    esac
-    vb-cmd-refresh-bar-module worker
+  local msg="$1"
+  case "$msg" in
+    clear)
+      rm -f "$VIBRNAIUM_RUNTIME/worker.active"
+      ;;
+    *)
+      echo "$msg" > "$VIBRNAIUM_RUNTIME/worker.active"
+      ;;
+  esac
+  vb-cmd-refresh-bar-module worker
 }
 
 fail() {
-    local msg
+  local msg
 
-    msg="Adblock installation failed"
-    msg+="\n<b><i>Click here to see logs</i></b>"
+  msg="Adblock installation failed"
+  msg+="\n<b><i>Click here to see logs</i></b>"
 
-    if [[ "$(notify-send -A true -r 4 -t 10000 -u critical 'Vibranium' "$msg")" == 0 ]]; then
-        vb-core-term -- "$EDITOR" "$LOGFILE"
-    fi
-    progress clear
-    exit 1
+  if [[ "$(notify-send -A true -r 4 -t 10000 -u critical 'Vibranium' "$msg")" == 0 ]]; then
+    vb-core-term -- "$EDITOR" "$LOGFILE"
+  fi
+  progress clear
+  exit 1
 }
 
 install_adblock() {
-    progress "Applying Spotify adblock"
-    mkdir -p "$EXT_DIR"
+  progress "Applying Spotify adblock"
+  mkdir -p "$EXT_DIR"
 
-    if [ ! -f "$FILE" ]; then
-        curl -fsSL "https://raw.githubusercontent.com/rxri/spicetify-extensions/refs/heads/main/adblock/adblock.js" \
-            -o "$FILE" &> "$LOGFILE" || fail
-    fi
+  if [ ! -f "$FILE" ]; then
+    curl -fsSL "https://raw.githubusercontent.com/rxri/spicetify-extensions/refs/heads/main/adblock/adblock.js" \
+      -o "$FILE" &> "$LOGFILE" || fail
+  fi
 
-    spicetify -q config extensions adblock.js
-    spicetify -n apply &> "$LOGFILE" || fail
+  spicetify -q config extensions adblock.js
+  spicetify -n apply &> "$LOGFILE" || fail
 
-    progress clear
-    if pkill -0 spotify; then
-        local msg="Adblock installed successfully\n<b><i>Spotify restart required</i></b>"
-        notify-send -a Vibranium -r 3 "Vibranium" "$msg"
-    else
-        local msg="Adblock installed successfully"
-        notify-send -a Vibranium -r 3 "Vibranium" "$msg"
-    fi
-    rm -f "$LOGFILE"
+  progress clear
+  if pkill -0 spotify; then
+    local msg="Adblock installed successfully\n<b><i>Spotify restart required</i></b>"
+    notify-send -a Vibranium -r 3 "Vibranium" "$msg"
+  else
+    local msg="Adblock installed successfully"
+    notify-send -a Vibranium -r 3 "Vibranium" "$msg"
+  fi
+  rm -f "$LOGFILE"
 }
 
 remove_adblock() {
-    progress "Removing Spotify adblock"
-    rm -f "$FILE"
-    spicetify -q config extensions adblock.js-
-    spicetify -qn apply
-    progress clear
+  progress "Removing Spotify adblock"
+  rm -f "$FILE"
+  spicetify -q config extensions adblock.js-
+  spicetify -qn apply
+  progress clear
 
-    if pkill -0 spotify; then
-        local msg="Removed Spotify adblock\n<b><i>Spotify restart required</i></b>"
-        notify-send -a Vibranium -r 3 "Vibranium" "$msg"
-    else
-        local msg="Removed Spotify adblock"
-        notify-send -a Vibranium -r 3 "Vibranium" "$msg"
-    fi
+  if pkill -0 spotify; then
+    local msg="Removed Spotify adblock\n<b><i>Spotify restart required</i></b>"
+    notify-send -a Vibranium -r 3 "Vibranium" "$msg"
+  else
+    local msg="Removed Spotify adblock"
+    notify-send -a Vibranium -r 3 "Vibranium" "$msg"
+  fi
 }
 
 case "$ACTION" in
-    install) install_adblock ;;
-    remove)  remove_adblock  ;;
-    *)
-        echo "Usage: $0 {install|remove}" >&2
-        exit 1
-        ;;
+  install) install_adblock ;;
+  remove) remove_adblock ;;
+  *)
+    echo "Usage: $0 {install|remove}" >&2
+    exit 1
+    ;;
 esac

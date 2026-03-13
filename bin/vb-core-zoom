@@ -5,7 +5,7 @@ ACTION=""
 STEP="$STEP_DEFAULT"
 
 usage() {
-    cat <<EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]
 
 Options:
@@ -20,87 +20,105 @@ EOF
 }
 
 if ! PARSED="$(getopt -o idrs:h -l increase,decrease,reset,step:,help -- "$@")"; then
-    usage
-    exit 2
+  usage
+  exit 2
 fi
 
 eval set -- "$PARSED"
 
 while true; do
-    case "$1" in
-        -i|--increase) ACTION="increase"; shift ;;
-        -d|--decrease) ACTION="decrease"; shift ;;
-        -r|--reset) ACTION="reset"; shift ;;
-        -s|--step) STEP="$2"; shift 2 ;;
-        -h|--help) usage; exit 0 ;;
-        --) shift; break ;;
-        *) break ;;
-    esac
+  case "$1" in
+    -i | --increase)
+      ACTION="increase"
+      shift
+      ;;
+    -d | --decrease)
+      ACTION="decrease"
+      shift
+      ;;
+    -r | --reset)
+      ACTION="reset"
+      shift
+      ;;
+    -s | --step)
+      STEP="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *) break ;;
+  esac
 done
 
 if [[ -z "$ACTION" && $# -ge 1 ]]; then
-    case "$1" in
-        "+") ACTION="increase" ;;
-        "-") ACTION="decrease" ;;
-        *) : ;;
-    esac
+  case "$1" in
+    "+") ACTION="increase" ;;
+    "-") ACTION="decrease" ;;
+    *) : ;;
+  esac
 fi
 
 if [[ -z "$ACTION" ]]; then
-    usage
-    exit 1
+  usage
+  exit 1
 fi
 
 get_current() {
-    local cur
-    if cur="$(hyprctl -j getoption cursor:zoom_factor 2>/dev/null | jq -r '.float' 2>/dev/null)"; then
-        awk -v val="$cur" 'BEGIN { printf "%.2f", val }'
-    else
-        printf "1.00"
-    fi
+  local cur
+  if cur="$(hyprctl -j getoption cursor:zoom_factor 2> /dev/null | jq -r '.float' 2> /dev/null)"; then
+    awk -v val="$cur" 'BEGIN { printf "%.2f", val }'
+  else
+    printf "1.00"
+  fi
 }
 
 set_zoom() {
-    local new_value="$1"
-    hyprctl -q keyword cursor:zoom_factor "$new_value" >/dev/null 2>&1 || {
-        printf "Failed to set zoom factor to %s\n" "$new_value" >&2
-        return 1
-    }
+  local new_value="$1"
+  hyprctl -q keyword cursor:zoom_factor "$new_value" > /dev/null 2>&1 || {
+    printf "Failed to set zoom factor to %s\n" "$new_value" >&2
+    return 1
+  }
 
-    if awk -v val="$new_value" 'BEGIN { exit (val != 1.00) ? 0 : 1 }'; then
-        hyprctl -q keyword cursor:no_warps true >/dev/null 2>&1 || true
-    else
-        hyprctl -q keyword cursor:no_warps false >/dev/null 2>&1 || true
-    fi
+  if awk -v val="$new_value" 'BEGIN { exit (val != 1.00) ? 0 : 1 }'; then
+    hyprctl -q keyword cursor:no_warps true > /dev/null 2>&1 || true
+  else
+    hyprctl -q keyword cursor:no_warps false > /dev/null 2>&1 || true
+  fi
 
-    printf "%s\n" "$new_value"
+  printf "%s\n" "$new_value"
 }
 
 if ! awk -v s="$STEP" 'BEGIN { if (s+0 == s) exit 0; exit 1 }'; then
-    printf "Invalid step value: %s\n" "$STEP" >&2
-    exit 2
+  printf "Invalid step value: %s\n" "$STEP" >&2
+  exit 2
 fi
 
 current="$(get_current)"
 
 case "$ACTION" in
-    increase)
-        new_value="$(awk -v val="$current" -v step="$STEP" 'BEGIN { printf "%.2f", val + step }')"
-        set_zoom "$new_value"
-        ;;
-    decrease)
-        new_value="$(awk -v val="$current" -v step="$STEP" 'BEGIN {
+  increase)
+    new_value="$(awk -v val="$current" -v step="$STEP" 'BEGIN { printf "%.2f", val + step }')"
+    set_zoom "$new_value"
+    ;;
+  decrease)
+    new_value="$(awk -v val="$current" -v step="$STEP" 'BEGIN {
             val -= step
             if (val < 1.00) val = 1.00
             printf "%.2f", val
         }')"
-        set_zoom "$new_value"
-        ;;
-    reset)
-        set_zoom "1.00"
-        ;;
-    *)
-        usage
-        exit 1
-        ;;
+    set_zoom "$new_value"
+    ;;
+  reset)
+    set_zoom "1.00"
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
 esac

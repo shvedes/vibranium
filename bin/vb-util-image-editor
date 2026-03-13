@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: vb-util-photo-editor [OPTION] [FILE]
 
 Launch a photo editor for the given image file using satty.
@@ -16,38 +16,41 @@ EOF
 }
 
 ensure_deps() {
-    if ! command -v satty >/dev/null; then
-        echo "[ERROR] satty not found!" >&2
-        vb-cmd-dep-notify --name "Image Editor" --deps "satty"
-        exit 1
-    fi
+  if ! command -v satty > /dev/null; then
+    echo "[ERROR] satty not found!" >&2
+    vb-cmd-dep-notify --name "Image Editor" --deps "satty"
+    exit 1
+  fi
 }
 
 get_mime_type() {
-    local ext="$1"
+  local ext="$1"
 
-    case "$ext" in
-        jpg|jpeg) echo "image/jpeg" ;;
-        png)      echo "image/png" ;;
-        webp)     echo "image/webp" ;;
-        ppm)      echo "image/x-portable-pixmap" ;;
-        *)        echo "[ERROR] Unsupported file type: $ext" >&2; exit 1 ;;
-    esac
+  case "$ext" in
+    jpg | jpeg) echo "image/jpeg" ;;
+    png) echo "image/png" ;;
+    webp) echo "image/webp" ;;
+    ppm) echo "image/x-portable-pixmap" ;;
+    *)
+      echo "[ERROR] Unsupported file type: $ext" >&2
+      exit 1
+      ;;
+  esac
 }
 
 copy() {
-    printf 'file://%s' "$1" | wl-copy -t text/uri-list
+  printf 'file://%s' "$1" | wl-copy -t text/uri-list
 }
 
 if [[ $# -gt 1 ]]; then
-    echo "[ERROR] Too many arguments. Expected at most one FILE." >&2
-    echo "Try --help for more information." >&2
-    exit 1
+  echo "[ERROR] Too many arguments. Expected at most one FILE." >&2
+  echo "Try --help for more information." >&2
+  exit 1
 fi
 
 if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    usage
-    exit 0
+  usage
+  exit 0
 fi
 
 ensure_deps
@@ -57,32 +60,32 @@ overwrite=false
 from_zenity=false
 
 if [[ $# -eq 1 ]]; then
-    if [[ ! -f "$1" ]]; then
-        echo "[ERROR] '$1' is not a valid file." >&2
-        exit 1
-    fi
+  if [[ ! -f "$1" ]]; then
+    echo "[ERROR] '$1' is not a valid file." >&2
+    exit 1
+  fi
 
-    if [[ ! "$1" =~ \.(png|jpg|jpeg|ppm|webp)$ ]]; then
-        echo "[ERROR] '$1' does not have a supported image extension." >&2
-        exit 1
-    fi
+  if [[ ! "$1" =~ \.(png|jpg|jpeg|ppm|webp)$ ]]; then
+    echo "[ERROR] '$1' does not have a supported image extension." >&2
+    exit 1
+  fi
 
-    image="$1"
+  image="$1"
 else
-    # No file provided; try to use zenity for selection.
-    if ! command -v zenity >/dev/null; then
-        [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Editor" --deps zenity
-        echo "[ERROR] No image file provided and zenity not available for selection." >&2
-        exit 1
-    fi
+  # No file provided; try to use zenity for selection.
+  if ! command -v zenity > /dev/null; then
+    [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Editor" --deps zenity
+    echo "[ERROR] No image file provided and zenity not available for selection." >&2
+    exit 1
+  fi
 
-    image="$(zenity --title="Select File" --file-selection --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2> /dev/null)"
+  image="$(zenity --title="Select File" --file-selection --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2> /dev/null)"
 
-    if [[ -z "$image" ]]; then
-        exit 0  # User canceled selection; exit quietly.
-    fi
+  if [[ -z "$image" ]]; then
+    exit 0 # User canceled selection; exit quietly.
+  fi
 
-    from_zenity=true
+  from_zenity=true
 fi
 
 # Extract file extension and MIME type.
@@ -90,13 +93,13 @@ filetype="${image##*.}"
 mime_type=$(get_mime_type "$filetype")
 
 if [[ "$from_zenity" == true ]]; then
-    save_dir="${XDG_PICTURES_DIR:-$HOME/Pictures}/Annotations"
+  save_dir="${XDG_PICTURES_DIR:-$HOME/Pictures}/Annotations"
 else
-    if [[ "$image" =~ screenshot- ]]; then
-        overwrite=true
-    fi
+  if [[ "$image" =~ screenshot- ]]; then
+    overwrite=true
+  fi
 
-    save_dir="$(dirname "$image")"
+  save_dir="$(dirname "$image")"
 fi
 
 mkdir -p "$save_dir"
@@ -105,19 +108,19 @@ basename="${image##*/}"
 name_without_ext="${basename%.*}"
 
 if [[ "$overwrite" == true ]]; then
-    output_filename="$image"
+  output_filename="$image"
 else
-    output_filename="${save_dir}/${name_without_ext}.${filetype}"
+  output_filename="${save_dir}/${name_without_ext}.${filetype}"
 fi
 
 satty_flags=(
-    --copy-command "$(copy "$output_filename")"
-    --output-filename "$output_filename"
-    --font-family "$(vb-font-get)"
-    --focus-toggles-toolbars
-    --disable-notifications
-    --initial-tool "brush"
-    --filename "$image"
+  --copy-command "$(copy "$output_filename")"
+  --output-filename "$output_filename"
+  --font-family "$(vb-font-get)"
+  --focus-toggles-toolbars
+  --disable-notifications
+  --initial-tool "brush"
+  --filename "$image"
 )
 
 satty "${satty_flags[@]}" &> /dev/null
@@ -125,17 +128,16 @@ satty "${satty_flags[@]}" &> /dev/null
 saved_file="$output_filename"
 
 if [[ -f "$saved_file" ]]; then
-    if cmp -s "$image" "$saved_file"; then
-        if [[ "$overwrite" == true ]]; then
-            exit 1
-        fi
-
-        # Files are identical, no changes made; remove the duplicate.
-        rm "$saved_file"
-    else
-        # Changes made; notify and copy to clipboard.
-        notify-send -r 3 "Photo Editor" "File saved to $save_dir"
-        wl-copy -t "$mime_type" < "$saved_file"
+  if cmp -s "$image" "$saved_file"; then
+    if [[ "$overwrite" == true ]]; then
+      exit 1
     fi
-fi
 
+    # Files are identical, no changes made; remove the duplicate.
+    rm "$saved_file"
+  else
+    # Changes made; notify and copy to clipboard.
+    notify-send -r 3 "Photo Editor" "File saved to $save_dir"
+    wl-copy -t "$mime_type" < "$saved_file"
+  fi
+fi

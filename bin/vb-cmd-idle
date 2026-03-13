@@ -8,7 +8,7 @@ source vb-core-lib
 RESTORE_FLAG="$VIBRANIUM_RUNTIME/restore-player"
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} OPTION
 
 Handle media playback on session lock/unlock events.
@@ -21,51 +21,51 @@ EOF
 }
 
 player_is_playing() {
-    [[ "$(playerctl status 2>/dev/null)" == "Playing" ]] || \
-    [[ "$(mpc status 2>/dev/null | awk 'NR==2 {print $1}')" == "[playing]" ]]
+  [[ "$(playerctl status 2> /dev/null)" == "Playing" ]] ||
+    [[ "$(mpc status 2> /dev/null | awk 'NR==2 {print $1}')" == "[playing]" ]]
 }
 
 case "$1" in
-    -h|--help)
-        usage
-        exit 0
-        ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
 
-    --before)
-        helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
+  --before)
+    helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
 
-        [[ $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == false ]] && exit 0
+    [[ $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == false ]] && exit 0
 
-        if player_is_playing; then
-            mkdir -p "$(dirname "$RESTORE_FLAG")"
-            vb-core-mediacontrol --toggle &
-            : > "$RESTORE_FLAG"
-        fi
-        ;;
+    if player_is_playing; then
+      mkdir -p "$(dirname "$RESTORE_FLAG")"
+      vb-core-mediacontrol --toggle &
+      : > "$RESTORE_FLAG"
+    fi
+    ;;
 
-    --after)
-        if [[ -f "$RESTORE_FLAG" ]]; then
-            rm -f "$RESTORE_FLAG"
-            if ! player_is_playing; then
-                vb-core-mediacontrol --toggle &
-            fi
+  --after)
+    if [[ -f "$RESTORE_FLAG" ]]; then
+      rm -f "$RESTORE_FLAG"
+      if ! player_is_playing; then
+        vb-core-mediacontrol --toggle &
+      fi
 
-            helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
-            if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
-                vb-cmd-now-playing
-            fi
-        fi
-        ;;
+      helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
+      if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
+        vb-cmd-now-playing
+      fi
+    fi
+    ;;
 
-    "")
-        echo "${0##*/}: missing option" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
-        exit 1
-        ;;
+  "")
+    echo "${0##*/}: missing option" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
 
-    *)
-        echo "${0##*/}: invalid option '$1'" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
-        exit 1
-        ;;
+  *)
+    echo "${0##*/}: invalid option '$1'" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
 esac

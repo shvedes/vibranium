@@ -13,7 +13,7 @@
 progname=${0##*/}
 
 usage() {
-    cat <<EOF
+  cat << EOF
 Usage: $progname [OPTION]
 
 Display information about the currently playing track.
@@ -22,21 +22,27 @@ Options:
   --hyprlock    Format the output for the Hyprland lock screen
   --help        Display this help and exit
 EOF
-    exit 0
+  exit 0
 }
 
 TEMP=$(getopt -o '' --long hyprlock,help -- "$@")
-if [ $? != 0 ] ; then usage ; fi
+if [ $? != 0 ]; then usage; fi
 eval set -- "$TEMP"
 
 hyprlock=false
 while true; do
-    case "$1" in
-        --hyprlock ) hyprlock=true; shift ;;
-        --help ) usage ;;
-        -- ) shift; break ;;
-        * ) break ;;
-    esac
+  case "$1" in
+    --hyprlock)
+      hyprlock=true
+      shift
+      ;;
+    --help) usage ;;
+    --)
+      shift
+      break
+      ;;
+    *) break ;;
+  esac
 done
 
 source vb-core-lib
@@ -44,82 +50,81 @@ source vb-core-lib
 album_art="/tmp/${0##*/}.art"
 state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
 
-pc_status="$(playerctl status 2>/dev/null || true)"
+pc_status="$(playerctl status 2> /dev/null || true)"
 
 if systemctl -q --user is-active mpd; then
-    mpd_status="$(mpc status 2>/dev/null)"
+  mpd_status="$(mpc status 2> /dev/null)"
 fi
 
 if [[ "$pc_status" == "Playing" ]]; then
-    player="playerctl"
-    echo "$player" > "$state_file"
-    IFS='^' read -r title artist <<< \
-        "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
+  player="playerctl"
+  echo "$player" > "$state_file"
+  IFS='^' read -r title artist <<< \
+    "$(playerctl metadata --format '{{title}}^{{artist}}' 2> /dev/null)"
 elif [[ "$mpd_status" == *"[playing]"* ]]; then
-    player="mpd"
-    echo "$player" > "$state_file"
-    IFS='^' read -r title artist <<< \
-        "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
+  player="mpd"
+  echo "$player" > "$state_file"
+  IFS='^' read -r title artist <<< \
+    "$(mpc current -f '%title%^%artist%' 2> /dev/null)"
 elif [[ -f "$state_file" ]]; then
-    player="$(<"$state_file")"
-    case "$player" in
-        playerctl)
-            IFS='^' read -r title artist <<< \
-                "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
-            ;;
-        mpd)
-            IFS='^' read -r title artist <<< \
-                "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
-            ;;
-    esac
+  player="$(< "$state_file")"
+  case "$player" in
+    playerctl)
+      IFS='^' read -r title artist <<< \
+        "$(playerctl metadata --format '{{title}}^{{artist}}' 2> /dev/null)"
+      ;;
+    mpd)
+      IFS='^' read -r title artist <<< \
+        "$(mpc current -f '%title%^%artist%' 2> /dev/null)"
+      ;;
+  esac
 else
-    echo "No active players" >&2
-    exit 1
+  echo "No active players" >&2
+  exit 1
 fi
 
 # If $artist & (or) $title does not exist
 if [[ -z "$title" ]]; then
-    if [[ "$player" == "playerctl" ]]; then
-        url="$(playerctl metadata --format '{{xesam:url}}' 2> /dev/null)"
-        if [[ "$url" =~ ^file:// ]]; then
-            filename="${url#file://}"
-            filename="${filename##*/}"
-        else
-            filename="${url##*/}"  # Fallback for non-file URLs, e.g., spotify:track:id
-        fi
+  if [[ "$player" == "playerctl" ]]; then
+    url="$(playerctl metadata --format '{{xesam:url}}' 2> /dev/null)"
+    if [[ "$url" =~ ^file:// ]]; then
+      filename="${url#file://}"
+      filename="${filename##*/}"
     else
-        filename="$(mpc current -f "%file%" 2> /dev/null)"
+      filename="${url##*/}" # Fallback for non-file URLs, e.g., spotify:track:id
     fi
-    if [[ -z "$filename" ]]; then
-        filename="Unknown track"
-    fi
-    pango_output="$filename"
-    plain_output="$filename"
-    notify_body="<span foreground='${P_ORANGE}'> $filename</span>"
+  else
+    filename="$(mpc current -f "%file%" 2> /dev/null)"
+  fi
+  if [[ -z "$filename" ]]; then
+    filename="Unknown track"
+  fi
+  pango_output="$filename"
+  plain_output="$filename"
+  notify_body="<span foreground='${P_ORANGE}'> $filename</span>"
 else
-    if [[ -z "$artist" ]]; then
-        pango_output="$title"
-        plain_output="$title"
-        notify_body="<span foreground='${P_ORANGE}'> $title</span>"
-    else
-        pango_output="$title <span foreground='${P_YELLOW}'>by</span> $artist"
-        plain_output="$title by $artist"
-        notify_body="<span foreground='${P_ORANGE}'> $title</span>\n<span foreground='${P_YELLOW}'> $artist</span>"
-    fi
+  if [[ -z "$artist" ]]; then
+    pango_output="$title"
+    plain_output="$title"
+    notify_body="<span foreground='${P_ORANGE}'> $title</span>"
+  else
+    pango_output="$title <span foreground='${P_YELLOW}'>by</span> $artist"
+    plain_output="$title by $artist"
+    notify_body="<span foreground='${P_ORANGE}'> $title</span>\n<span foreground='${P_YELLOW}'> $artist</span>"
+  fi
 fi
-
 
 # Build pango formatted message for the lock screen.
 if [[ "$hyprlock" == true ]]; then
-    helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN
-    show_on_lockscreen="$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
+  helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN
+  show_on_lockscreen="$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
 
-    if [[ "$show_on_lockscreen" == true ]]; then
-        printf "<span size='20000' foreground='%s' rise='-3.5pt'><b>󰝚</b></span> %s" "$P_ACCENT" "$pango_output"
-    fi
-    exit 0
+  if [[ "$show_on_lockscreen" == true ]]; then
+    printf "<span size='20000' foreground='%s' rise='-3.5pt'><b>󰝚</b></span> %s" "$P_ACCENT" "$pango_output"
+  fi
+  exit 0
 else
-    echo "$plain_output"
+  echo "$plain_output"
 fi
 
 # Reminder:
@@ -129,19 +134,19 @@ helpers::check VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART
 show_album_art="$VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART"
 
 if [[ "$show_album_art" = true ]]; then
-    case "$player" in
-        "playerctl")
-            album_art_url="$(playerctl metadata mpris:artUrl)"
-            if [[ "$album_art_url" =~ ^https?:// ]]; then
-                curl -s "$album_art_url" -o "$album_art"
-            else
-                album_art="$album_art_url"
-            fi
-            ;;
-        "mpd")
-            mpc readpicture "$(mpc --format "%file%" current)" > "$album_art"
-            ;;
-    esac
+  case "$player" in
+    "playerctl")
+      album_art_url="$(playerctl metadata mpris:artUrl)"
+      if [[ "$album_art_url" =~ ^https?:// ]]; then
+        curl -s "$album_art_url" -o "$album_art"
+      else
+        album_art="$album_art_url"
+      fi
+      ;;
+    "mpd")
+      mpc readpicture "$(mpc --format "%file%" current)" > "$album_art"
+      ;;
+  esac
 fi
 
 # Even if the file inside $album_art does not exist, notify-send will still send a notification,

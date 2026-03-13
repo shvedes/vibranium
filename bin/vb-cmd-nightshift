@@ -5,7 +5,7 @@ STATE_FILE="$VIBRANIUM_STATE/nightshift"
 STEP=100
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [OPTIONS]
 
 Options:
@@ -23,104 +23,125 @@ EOF
 }
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
-    echo "not available in a VM" >&2
-    exit 1
+  echo "not available in a VM" >&2
+  exit 1
 fi
 
 lockfile="$VIBRANIUM_RUNTIME/${0##*/}.lock"
 exec 10> "$lockfile" || {
-    echo "error: another instance of ${0##*/} already running!"
-    exit 1
+  echo "error: another instance of ${0##*/} already running!"
+  exit 1
 }
 
 flock -n 10 || exit 0
 
 if [[ $# -eq 0 ]]; then
-    usage
-    exit 0
+  usage
+  exit 0
 fi
 
-CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2>/dev/null | head -n1 || echo 5500)
+CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2> /dev/null | head -n1 || echo 5500)
 
 action=""
 ARG_TEMP=""
 
 while [[ $# -gt 0 ]]; do
-    case "$1" in
-        -h|--help) usage; exit 0 ;;
-        --toggle) action="toggle"; shift ;;
-        --inc|--increase|+) action="inc"; shift ;;
-        --dec|--decrease|-) action="dec"; shift ;;
-        --set) action="set"; shift; ARG_TEMP="$1"; shift ;;
-        --step) shift; STEP="$1"; shift ;;
-        [0-9]*)
-            action="set"
-            ARG_TEMP="$1"
-            shift
-            ;;
-        *)
-            printf '%s\n' "${0##*/}: invalid option: $1" >&2
-            printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
-            exit 1
-            ;;
-    esac
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --toggle)
+      action="toggle"
+      shift
+      ;;
+    --inc | --increase | +)
+      action="inc"
+      shift
+      ;;
+    --dec | --decrease | -)
+      action="dec"
+      shift
+      ;;
+    --set)
+      action="set"
+      shift
+      ARG_TEMP="$1"
+      shift
+      ;;
+    --step)
+      shift
+      STEP="$1"
+      shift
+      ;;
+    [0-9]*)
+      action="set"
+      ARG_TEMP="$1"
+      shift
+      ;;
+    *)
+      printf '%s\n' "${0##*/}: invalid option: $1" >&2
+      printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
+      exit 1
+      ;;
+  esac
 done
 
 if [[ ! -f "$STATE_FILE" ]]; then
-    printf '%s\n' "Night light state file not found: $STATE_FILE" >&2
-    exit 1
+  printf '%s\n' "Night light state file not found: $STATE_FILE" >&2
+  exit 1
 fi
 
-state="$(<"$STATE_FILE")"
+state="$(< "$STATE_FILE")"
 
 if [[ "$action" == "toggle" ]]; then
-    case "$state" in
-        suspended)
-            hyprctl -q hyprsunset temperature "$CURRENT_TEMP" &
-            printf '%s\n' "active" > "$STATE_FILE"
-            ;;
-        active)
-            hyprctl -q hyprsunset identity &
-            printf '%s\n' "suspended" > "$STATE_FILE"
-            ;;
-        *)
-            printf '%s\n' "Unknown state in $STATE_FILE: '$state'" >&2
-            exit 1
-            ;;
-    esac
+  case "$state" in
+    suspended)
+      hyprctl -q hyprsunset temperature "$CURRENT_TEMP" &
+      printf '%s\n' "active" > "$STATE_FILE"
+      ;;
+    active)
+      hyprctl -q hyprsunset identity &
+      printf '%s\n' "suspended" > "$STATE_FILE"
+      ;;
+    *)
+      printf '%s\n' "Unknown state in $STATE_FILE: '$state'" >&2
+      exit 1
+      ;;
+  esac
 
-    vb-cmd-refresh-bar-module nightshift &
-    exit 0
+  vb-cmd-refresh-bar-module nightshift &
+  exit 0
 fi
 
 if [[ "$action" == "inc" || "$action" == "dec" ]]; then
-    if [[ "$state" == "suspended" ]]; then
-        printf '%s\n' "Night light is suspended" >&2
-        exit 1
-    fi
+  if [[ "$state" == "suspended" ]]; then
+    printf '%s\n' "Night light is suspended" >&2
+    exit 1
+  fi
 
-    case "$action" in
-        inc) TEMP=$((CURRENT_TEMP + STEP)) ;;
-        dec) TEMP=$((CURRENT_TEMP - STEP)) ;;
-    esac
+  case "$action" in
+    inc) TEMP=$((CURRENT_TEMP + STEP)) ;;
+    dec) TEMP=$((CURRENT_TEMP - STEP)) ;;
+  esac
 fi
 
 if [[ "$action" == "set" ]]; then
-    if ! [[ "$ARG_TEMP" =~ ^[0-9]+$ ]]; then
-        printf '%s\n' "Invalid temperature: $ARG_TEMP" >&2
-        exit 1
-    fi
-    TEMP="$ARG_TEMP"
+  if ! [[ "$ARG_TEMP" =~ ^[0-9]+$ ]]; then
+    printf '%s\n' "Invalid temperature: $ARG_TEMP" >&2
+    exit 1
+  fi
+  TEMP="$ARG_TEMP"
 fi
 
 if [[ -z "${TEMP:-}" ]]; then
-    printf '%s\n' "No operation performed." >&2
-    exit 0
+  printf '%s\n' "No operation performed." >&2
+  exit 0
 fi
 
-if (( TEMP < 1000 || TEMP > 20000 )); then
-    printf '%s\n' "Temperature must be between 1000K and 20000K" >&2
-    exit 1
+if ((TEMP < 1000 || TEMP > 20000)); then
+  printf '%s\n' "Temperature must be between 1000K and 20000K" >&2
+  exit 1
 fi
 
 printf '# Auto-generated! All changes will be overwritten!\n' > "$CONF"

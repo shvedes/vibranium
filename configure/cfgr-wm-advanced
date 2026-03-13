@@ -3,41 +3,40 @@
 source vb-core-lib
 CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.conf"
 
-
 _layout_submenu() {
-    local opts chosen
-    opts=("Dwindle" "Master" "Scrolling" "Monocle")
+  local opts chosen
+  opts=("Dwindle" "Master" "Scrolling" "Monocle")
 
-    while true; do
-        mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
-        helpers::ui::menu chosen "Layout" "ESC to go back" -- "${opts[@]}"
-        [[ -z "$chosen" ]] && break
+  while true; do
+    mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
+    helpers::ui::menu chosen "Layout" "ESC to go back" -- "${opts[@]}"
+    [[ -z "$chosen" ]] && break
 
-        case "$chosen" in
-            "Dwindle") vb-cmd-edit-wm-config "general:layout:dwindle" "$CONFIG" ;;
-            "Master") vb-cmd-edit-wm-config "general:layout:master" "$CONFIG" ;;
-            "Scrolling") vb-cmd-edit-wm-config "general:layout:scrolling" "$CONFIG" ;;
-            "Monocle") vb-cmd-edit-wm-config "general:layout:monocle" "$CONFIG" ;;
-            *) continue
-        esac
-        break
-    done
+    case "$chosen" in
+      "Dwindle") vb-cmd-edit-wm-config "general:layout:dwindle" "$CONFIG" ;;
+      "Master") vb-cmd-edit-wm-config "general:layout:master" "$CONFIG" ;;
+      "Scrolling") vb-cmd-edit-wm-config "general:layout:scrolling" "$CONFIG" ;;
+      "Monocle") vb-cmd-edit-wm-config "general:layout:monocle" "$CONFIG" ;;
+      *) continue ;;
+    esac
+    break
+  done
 }
 
 INDEX=0
 
 while true; do
-    hyprctl -q reload config-only
+  hyprctl -q reload config-only
 
-    mapfile -t LINES < <(
-        hyprctl --batch -j \
-        "getoption misc:vrr; \
+  mapfile -t LINES < <(
+    hyprctl --batch -j \
+      "getoption misc:vrr; \
          getoption misc:vfr; \
          getoption misc:middle_click_paste; \
          getoption render:direct_scanout; \
          getoption misc:disable_autoreload;
          getoption general:layout" |
-            jq -s -r '.[] |
+      jq -s -r '.[] |
         if .option == "misc:vrr" then
             if .int == 0 then "false"
             elif .int == 1 then "true"
@@ -48,77 +47,80 @@ while true; do
         else
             if .int == 1 then "true" else "false" end
         end'
-    )
+  )
 
-    current_vrr="${LINES[0]}"
-    current_vfr="${LINES[1]}"
-    current_middle_click="${LINES[2]}"
-    current_direct_scanout="${LINES[3]}"
-    current_autoreload="${LINES[4]}"
-    current_layout="${LINES[5]^}"
+  current_vrr="${LINES[0]}"
+  current_vfr="${LINES[1]}"
+  current_middle_click="${LINES[2]}"
+  current_direct_scanout="${LINES[3]}"
+  current_autoreload="${LINES[4]}"
+  current_layout="${LINES[5]^}"
 
-    OPTIONS=(
-        "Variable Refresh Rate : $current_vrr"
-        "Variable Frame Rate : $current_vfr"
-        "Disable Auto Reload : $current_autoreload"
-        "Middle Click Paste : $current_middle_click"
-        "Direct Scanout : $current_direct_scanout"
-        "Layout : $current_layout"
-    )
+  OPTIONS=(
+    "Variable Refresh Rate : $current_vrr"
+    "Variable Frame Rate : $current_vfr"
+    "Disable Auto Reload : $current_autoreload"
+    "Middle Click Paste : $current_middle_click"
+    "Direct Scanout : $current_direct_scanout"
+    "Layout : $current_layout"
+  )
 
-    mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-    helpers::ui::menu CHOSEN "Advanced" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-    [[ -z "$CHOSEN" ]] && break
+  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+  helpers::ui::menu CHOSEN "Advanced" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+  [[ -z "$CHOSEN" ]] && break
 
-    for i in "${!OPTIONS[@]}"; do
-        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-            INDEX="$i"
-            break
-        fi
-    done
+  for i in "${!OPTIONS[@]}"; do
+    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+      INDEX="$i"
+      break
+    fi
+  done
 
-    case "$CHOSEN" in
-        "Layout"*)
-            _layout_submenu
-            ;;
-        "Disable Auto Reload"*)
-            case "$current_autoreload" in
-                "true")vb-cmd-edit-wm-config "misc:disable_autoreload:false" "$CONFIG" ;;
-                "false") vb-cmd-edit-wm-config "misc:disable_autoreload:true" "$CONFIG" ;;
-            esac
-            ;;
-        "Middle Click Paste"*)
-            case "$current_middle_click" in
-                "true") vb-cmd-edit-wm-config "misc:middle_click_paste:false" "$CONFIG" ;;
-                "false") vb-cmd-edit-wm-config "misc:middle_click_paste:true" "$CONFIG" ;;
-            esac
-            ;;
-        "Variable Frame Rate"*)
-            case "$current_vfr" in
-                "true") vb-cmd-edit-wm-config "misc:vfr:false" "$CONFIG" ;;
-                "false") vb-cmd-edit-wm-config "misc:vfr:true" "$CONFIG" ;;
-            esac
-            ;;
-        "Direct Scanout"*)
-            case "$current_direct_scanout" in
-                "true") vb-cmd-edit-wm-config "render:direct_scanout:false" "$CONFIG" ;;
-                "false") vb-cmd-edit-wm-config "render:direct_scanout:true" "$CONFIG" ;;
-            esac
-            ;;
-        "Variable Refresh Rate"*)
-            while true; do
-                vrr_opts=("Enable" "Disable" "Fullscreen only" "<b>Help</b>")
-                helpers::ui::menu vrr_chosen "VRR" "ESC to go back" -- "${vrr_opts[@]}"
-                [[ -z "$vrr_chosen" ]] && break
+  case "$CHOSEN" in
+    "Layout"*)
+      _layout_submenu
+      ;;
+    "Disable Auto Reload"*)
+      case "$current_autoreload" in
+        "true") vb-cmd-edit-wm-config "misc:disable_autoreload:false" "$CONFIG" ;;
+        "false") vb-cmd-edit-wm-config "misc:disable_autoreload:true" "$CONFIG" ;;
+      esac
+      ;;
+    "Middle Click Paste"*)
+      case "$current_middle_click" in
+        "true") vb-cmd-edit-wm-config "misc:middle_click_paste:false" "$CONFIG" ;;
+        "false") vb-cmd-edit-wm-config "misc:middle_click_paste:true" "$CONFIG" ;;
+      esac
+      ;;
+    "Variable Frame Rate"*)
+      case "$current_vfr" in
+        "true") vb-cmd-edit-wm-config "misc:vfr:false" "$CONFIG" ;;
+        "false") vb-cmd-edit-wm-config "misc:vfr:true" "$CONFIG" ;;
+      esac
+      ;;
+    "Direct Scanout"*)
+      case "$current_direct_scanout" in
+        "true") vb-cmd-edit-wm-config "render:direct_scanout:false" "$CONFIG" ;;
+        "false") vb-cmd-edit-wm-config "render:direct_scanout:true" "$CONFIG" ;;
+      esac
+      ;;
+    "Variable Refresh Rate"*)
+      while true; do
+        vrr_opts=("Enable" "Disable" "Fullscreen only" "<b>Help</b>")
+        helpers::ui::menu vrr_chosen "VRR" "ESC to go back" -- "${vrr_opts[@]}"
+        [[ -z "$vrr_chosen" ]] && break
 
-                case "$vrr_chosen" in
-                    "Enable") vb-cmd-edit-wm-config "misc:vrr:1" "$CONFIG" ;;
-                    "Disable") vb-cmd-edit-wm-config "misc:vrr:0" "$CONFIG" ;;
-                    "Fullscreen only") vb-cmd-edit-wm-config "misc:vrr:2" "$CONFIG" ;;
-                    *"Help"*) vb-cmd-show-help hyprland-vrr; continue ;;
-                esac
-                break
-            done
+        case "$vrr_chosen" in
+          "Enable") vb-cmd-edit-wm-config "misc:vrr:1" "$CONFIG" ;;
+          "Disable") vb-cmd-edit-wm-config "misc:vrr:0" "$CONFIG" ;;
+          "Fullscreen only") vb-cmd-edit-wm-config "misc:vrr:2" "$CONFIG" ;;
+          *"Help"*)
+            vb-cmd-show-help hyprland-vrr
+            continue
             ;;
-    esac
+        esac
+        break
+      done
+      ;;
+  esac
 done

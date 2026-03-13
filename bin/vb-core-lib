@@ -59,190 +59,190 @@ export VIBRANIUM_SUDO_PROMPT
 #   - Clipboard-sourced calls (detected via BASH_SOURCE[1]) disable Pango parsing
 #     because clipboard content is raw text and angle-bracket chars would break markup.
 helpers::ui::menu() {
-    # See function declaration below.
-    helpers::ui::register_menu
+  # See function declaration below.
+  helpers::ui::register_menu
 
-    # Capture the caller's variable name first.
-    local var_name="$1"
-    shift
+  # Capture the caller's variable name first.
+  local var_name="$1"
+  shift
 
-    # Lookup table: character-count thresholds → pixel widths for the rofi window.
-    # Each key is the minimum text length that maps to the paired pixel value.
-    # The values were empirically derived for the configured rofi font/theme so that
-    # the window is never too narrow to display the longest entry without clipping.
-    local -A map=(
-         [80]=816 [78]=799 [76]=782 [74]=765 [72]=748 [70]=731
-         [68]=714 [66]=697 [64]=680 [62]=663 [60]=646
-         [58]=629 [56]=612 [54]=595 [52]=578 [50]=561
-         [48]=544 [46]=527 [44]=510 [42]=493 [40]=476
-         [38]=459 [36]=442 [34]=425 [32]=408 [30]=391
-         [28]=374 [26]=357 [24]=340 [22]=323 [20]=306
-         [18]=289 [16]=272 [14]=255 [12]=238 [10]=221
-         [8]=208 [6]=200 [0]=196
-    )
+  # Lookup table: character-count thresholds → pixel widths for the rofi window.
+  # Each key is the minimum text length that maps to the paired pixel value.
+  # The values were empirically derived for the configured rofi font/theme so that
+  # the window is never too narrow to display the longest entry without clipping.
+  local -A map=(
+     [80]=816 [78]=799 [76]=782 [74]=765 [72]=748 [70]=731
+     [68]=714 [66]=697 [64]=680 [62]=663 [60]=646
+     [58]=629 [56]=612 [54]=595 [52]=578 [50]=561
+     [48]=544 [46]=527 [44]=510 [42]=493 [40]=476
+     [38]=459 [36]=442 [34]=425 [32]=408 [30]=391
+     [28]=374 [26]=357 [24]=340 [22]=323 [20]=306
+     [18]=289 [16]=272 [14]=255 [12]=238 [10]=221
+     [8]=208 [6]=200 [0]=196
+  )
 
-    # Guard against multiple concurrent rofi instances.
-    # This lets the menu act as a toggle: invoking it while open closes it instead
-    # of stacking a second window on top.
-    local lock_file="$VIBRANIUM_RUNTIME/menu.lock"
+  # Guard against multiple concurrent rofi instances.
+  # This lets the menu act as a toggle: invoking it while open closes it instead
+  # of stacking a second window on top.
+  local lock_file="$VIBRANIUM_RUNTIME/menu.lock"
 
-    if [[ -f "$lock_file" ]]; then
-        rm -f "$lock_file"
-        killall rofi
-        return 1
-    fi
-
-    : > "$lock_file"
-
-    trap "rm -f "$lock_file"" EXIT INT HUP
-
-    # The prompt is the label rofi renders to the left of the text input field.
-    local prompt="$1"
-    shift
-
-    # Placeholder is always the third positional argument.
-    # Pass "" to omit it. Previously this was detected heuristically
-    # by checking whether the argument started with '-', which broke
-    # any value containing a leading dash (e.g. ranges like "-5 -10").
-    local placeholder=""
-    if [[ $# -gt 0 ]]; then
-        [[ -n "$1" ]] && placeholder=" $1"
-        shift
-    fi
-
-    # Collect any caller-supplied rofi flags into an array, stopping at '--' or end of args.
-    # Stored as an array (not a string) so flags with spaces or special chars survive
-    # word-splitting when we later expand "${user_rofi_args[@]}".
-    local user_rofi_args=()
-    while [[ $# -gt 0 && "$1" != "--" ]]; do
-        user_rofi_args+=("$1")
-        shift
-    done
-
-    # Build the newline-delimited list of menu entries.
-    # Two modes:
-    #   1. '--' sentinel found → entries come from remaining positional arguments.
-    #      We prepend '\n' before each item *except the first* to avoid a trailing
-    #      newline, which rofi would render as a blank phantom entry at the bottom.
-    #   2. No '--' → entries are read wholesale from stdin via `read -r -d ''`.
-    #      The -d '' trick sets the delimiter to NUL, so read slurps everything
-    #      until EOF rather than stopping at the first newline. `|| true` suppresses
-    #      the non-zero exit code that read returns when it hits EOF without a NUL.
-    local rofi_input=""
-    if [[ "$1" == "--" ]]; then
-        shift
-        local first=true
-        for arg in "$@"; do
-            if $first; then
-                rofi_input="$arg"        # First entry: set directly, no leading newline.
-                first=false
-            else
-                rofi_input+=$'\n'"$arg"  # Subsequent entries: prepend newline as separator.
-            fi                           # This way the string never ends with a bare newline.
-        done
-    else
-        IFS= read -r -d '' rofi_input || true
-        # IFS= prevents leading/trailing whitespace from being stripped by read.
-        # -r disables backslash interpretation so entries with '\' are preserved literally.
-    fi
-
-    # Strip all Pango XML tags from a copy of the input before measuring text lengths.
-    # The pattern <*> matches any tag (greedy glob, not regex), removing e.g. <b>, </b>,
-    # <span weight="bold">, etc. This gives us the visible character count rather than
-    # the raw byte count including invisible markup, which is what determines visual width.
-    local input_plain="${rofi_input//<*>/}"
-
-    # Walk every line of the stripped input to find the longest visible entry.
-    # The counter is incremented only when the current line's length exceeds the running maximum.
-    local maxlen_input=0 line
-    while IFS= read -r line; do
-        if ((${#line} > maxlen_input)); then
-            maxlen_input=${#line}
-        fi
-    done <<< "$input_plain"
-
-    # The window must also be wide enough to show the prompt label + placeholder hint,
-    # so we take the maximum of the two lengths. If entries are short but the prompt
-    # is long, the window should still be sized for the prompt.
-    local promptlen=$((${#prompt} + ${#placeholder}))
-    local maxlen=$((maxlen_input > promptlen ? maxlen_input : promptlen))
-
-    # Walk the map keys in descending order to find the first threshold ≤ maxlen.
-    # The keys are listed explicitly (not via iteration) to guarantee descending order,
-    # since associative arrays in bash have no defined iteration order.
-    # Once we find a key where maxlen >= key, that key's pixel value becomes our width.
-    local width=$((maxlen))
-    for k in 80 78 76 74 72 70 68 66 64 62 60 58 56 54 52 50 48 46 44 42 40 38 36 34 32 30 28 26 24 22 20 18 16 14 12 10 8 6 0; do
-        if ((width >= k)); then
-            width=${map[$k]}
-            break
-        fi
-    done
-
-    # Count the total number of lines in the (plain) input so we can conditionally
-    # enable rofi's -auto-select.
-    local lines=0
-    while IFS= read -r _; do
-        ((lines++))
-    done <<< "$input_plain"
-
-    # We don't need it anymore.
-    unset input_plain
-
-    # Build the dynamic portion of the rofi option list.
-    local rofi_opts=()
-
-    # -auto-select makes rofi immediately confirm the entry if only one matches the
-    # current search string. We only enable it when:
-    #   a) The user opted in via the global config flag.
-    #   b) There are multiple entries (auto-select on a single entry would close them enu instantly).
-    #   c) This isn't a clipboard menu, where auto-selection would be jarring.
-    helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
-    if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT" == true ]]; then
-        if (( lines > 1 )); then
-            if [[ ! "${BASH_SOURCE[1]}" =~ vb-core-clipboard ]]; then
-                rofi_opts+=(-auto-select)
-            fi
-        fi
-    fi
-
-    # Enable Pango markup rendering unless the caller is the clipboard script.
-    # Clipboard content is arbitrary text; if it contains '<' or '>' characters rofi
-    # would try to parse them as tags and either mangle the display or throw an error.
-    # BASH_SOURCE[1] is the path of the script that called this function (index 0 is
-    # this file itself), so matching "vb-core-clipboard" in it is a reliable caller-identity check.
-    if [[ ! "${BASH_SOURCE[1]}" =~ vb-core-clipboard ]]; then
-        rofi_opts+=(-markup -markup-rows)
-    fi
-
-    # Run rofi and capture its output via a temp file rather than command substitution.
-    # Command substitution $(...) spawns a subshell, which is what we're avoiding here.
-    # The PID ($$) is embedded in the filename to prevent collisions if multiple
-    # instances of this function somehow run concurrently (e.g. from different terminals).
-    local selected=""
-
-    read -r selected < <(rofi -i -dmenu -p "$prompt" -sync \
-        -theme-str 'entry {placeholder: "'"${placeholder}"'";}' \
-        -theme-str 'window {width: '"${width}px"';}' \
-        -matching-negate-char '' "${rofi_opts[@]}" \
-        "${user_rofi_args[@]}" <<< "$rofi_input" 2>/dev/null)
-
-    # Write the result into the caller's named variable without a subshell.
-    # printf -v <name> is bash's built-in way to assign to a variable by name;
-    # it's equivalent to eval "$var_name='$selected'" but safe against injection
-    # because the variable name and value are handled as separate printf arguments.
-    printf -v "$var_name" '%s' "$selected"
-
+  if [[ -f "$lock_file" ]]; then
     rm -f "$lock_file"
+    killall rofi
+    return 1
+  fi
 
-    # Exit status doubles as a boolean: 0 (success) means something was selected,
-    # 1 (failure) means the user hit Escape or the input was empty. Callers can
-    # branch on this with a plain `if helpers::ui::menu result "Pick" -- a b c; then`.
-    [[ -n "$selected" ]] && {
-        return 0
-    } || {
-        return 1
-    }
+  : > "$lock_file"
+
+  trap "rm -f "$lock_file"" EXIT INT HUP
+
+  # The prompt is the label rofi renders to the left of the text input field.
+  local prompt="$1"
+  shift
+
+  # Placeholder is always the third positional argument.
+  # Pass "" to omit it. Previously this was detected heuristically
+  # by checking whether the argument started with '-', which broke
+  # any value containing a leading dash (e.g. ranges like "-5 -10").
+  local placeholder=""
+  if [[ $# -gt 0 ]]; then
+    [[ -n "$1" ]] && placeholder=" $1"
+    shift
+  fi
+
+  # Collect any caller-supplied rofi flags into an array, stopping at '--' or end of args.
+  # Stored as an array (not a string) so flags with spaces or special chars survive
+  # word-splitting when we later expand "${user_rofi_args[@]}".
+  local user_rofi_args=()
+  while [[ $# -gt 0 && "$1" != "--" ]]; do
+    user_rofi_args+=("$1")
+    shift
+  done
+
+  # Build the newline-delimited list of menu entries.
+  # Two modes:
+  #   1. '--' sentinel found → entries come from remaining positional arguments.
+  #      We prepend '\n' before each item *except the first* to avoid a trailing
+  #      newline, which rofi would render as a blank phantom entry at the bottom.
+  #   2. No '--' → entries are read wholesale from stdin via `read -r -d ''`.
+  #      The -d '' trick sets the delimiter to NUL, so read slurps everything
+  #      until EOF rather than stopping at the first newline. `|| true` suppresses
+  #      the non-zero exit code that read returns when it hits EOF without a NUL.
+  local rofi_input=""
+  if [[ "$1" == "--" ]]; then
+    shift
+    local first=true
+    for arg in "$@"; do
+      if $first; then
+        rofi_input="$arg" # First entry: set directly, no leading newline.
+        first=false
+      else
+        rofi_input+=$'\n'"$arg" # Subsequent entries: prepend newline as separator.
+      fi                        # This way the string never ends with a bare newline.
+    done
+  else
+    IFS= read -r -d '' rofi_input || true
+    # IFS= prevents leading/trailing whitespace from being stripped by read.
+    # -r disables backslash interpretation so entries with '\' are preserved literally.
+  fi
+
+  # Strip all Pango XML tags from a copy of the input before measuring text lengths.
+  # The pattern <*> matches any tag (greedy glob, not regex), removing e.g. <b>, </b>,
+  # <span weight="bold">, etc. This gives us the visible character count rather than
+  # the raw byte count including invisible markup, which is what determines visual width.
+  local input_plain="${rofi_input//<*>/}"
+
+  # Walk every line of the stripped input to find the longest visible entry.
+  # The counter is incremented only when the current line's length exceeds the running maximum.
+  local maxlen_input=0 line
+  while IFS= read -r line; do
+    if ((${#line} > maxlen_input)); then
+      maxlen_input=${#line}
+    fi
+  done <<< "$input_plain"
+
+  # The window must also be wide enough to show the prompt label + placeholder hint,
+  # so we take the maximum of the two lengths. If entries are short but the prompt
+  # is long, the window should still be sized for the prompt.
+  local promptlen=$((${#prompt} + ${#placeholder}))
+  local maxlen=$((maxlen_input > promptlen ? maxlen_input : promptlen))
+
+  # Walk the map keys in descending order to find the first threshold ≤ maxlen.
+  # The keys are listed explicitly (not via iteration) to guarantee descending order,
+  # since associative arrays in bash have no defined iteration order.
+  # Once we find a key where maxlen >= key, that key's pixel value becomes our width.
+  local width=$((maxlen))
+  for k in 80 78 76 74 72 70 68 66 64 62 60 58 56 54 52 50 48 46 44 42 40 38 36 34 32 30 28 26 24 22 20 18 16 14 12 10 8 6 0; do
+    if ((width >= k)); then
+      width=${map[$k]}
+      break
+    fi
+  done
+
+  # Count the total number of lines in the (plain) input so we can conditionally
+  # enable rofi's -auto-select.
+  local lines=0
+  while IFS= read -r _; do
+    ((lines++))
+  done <<< "$input_plain"
+
+  # We don't need it anymore.
+  unset input_plain
+
+  # Build the dynamic portion of the rofi option list.
+  local rofi_opts=()
+
+  # -auto-select makes rofi immediately confirm the entry if only one matches the
+  # current search string. We only enable it when:
+  #   a) The user opted in via the global config flag.
+  #   b) There are multiple entries (auto-select on a single entry would close them enu instantly).
+  #   c) This isn't a clipboard menu, where auto-selection would be jarring.
+  helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
+  if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT" == true ]]; then
+    if ((lines > 1)); then
+      if [[ ! "${BASH_SOURCE[1]}" =~ vb-core-clipboard ]]; then
+        rofi_opts+=(-auto-select)
+      fi
+    fi
+  fi
+
+  # Enable Pango markup rendering unless the caller is the clipboard script.
+  # Clipboard content is arbitrary text; if it contains '<' or '>' characters rofi
+  # would try to parse them as tags and either mangle the display or throw an error.
+  # BASH_SOURCE[1] is the path of the script that called this function (index 0 is
+  # this file itself), so matching "vb-core-clipboard" in it is a reliable caller-identity check.
+  if [[ ! "${BASH_SOURCE[1]}" =~ vb-core-clipboard ]]; then
+    rofi_opts+=(-markup -markup-rows)
+  fi
+
+  # Run rofi and capture its output via a temp file rather than command substitution.
+  # Command substitution $(...) spawns a subshell, which is what we're avoiding here.
+  # The PID ($$) is embedded in the filename to prevent collisions if multiple
+  # instances of this function somehow run concurrently (e.g. from different terminals).
+  local selected=""
+
+  read -r selected < <(rofi -i -dmenu -p "$prompt" -sync \
+    -theme-str 'entry {placeholder: "'"${placeholder}"'";}' \
+    -theme-str 'window {width: '"${width}px"';}' \
+    -matching-negate-char '' "${rofi_opts[@]}" \
+    "${user_rofi_args[@]}" <<< "$rofi_input" 2> /dev/null)
+
+  # Write the result into the caller's named variable without a subshell.
+  # printf -v <name> is bash's built-in way to assign to a variable by name;
+  # it's equivalent to eval "$var_name='$selected'" but safe against injection
+  # because the variable name and value are handled as separate printf arguments.
+  printf -v "$var_name" '%s' "$selected"
+
+  rm -f "$lock_file"
+
+  # Exit status doubles as a boolean: 0 (success) means something was selected,
+  # 1 (failure) means the user hit Escape or the input was empty. Callers can
+  # branch on this with a plain `if helpers::ui::menu result "Pick" -- a b c; then`.
+  [[ -n "$selected" ]] && {
+    return 0
+  } || {
+    return 1
+  }
 }
 
 # helpers::ui::register_menu - Sanitize and export PID ancestry for menu chains
@@ -289,36 +289,36 @@ helpers::ui::menu() {
 #   - Lightweight and safe: it removes dead entries but does not attempt to
 #     resurrect or otherwise modify process state.
 helpers::ui::register_menu() {
-    local pid
-    local clean=""
+  local pid
+  local clean=""
 
-    # Walk the inherited PID list from the parent environment.
-    # Each menu script in the chain has appended its PID to this var before launching the next,
-    # so it represents the full ancestry of the current menu session.
-    for pid in $VIBRANIUM_MENU_PIDS; do
+  # Walk the inherited PID list from the parent environment.
+  # Each menu script in the chain has appended its PID to this var before launching the next,
+  # so it represents the full ancestry of the current menu session.
+  for pid in $VIBRANIUM_MENU_PIDS; do
 
-        # kill -0 doesn't actually send a signal — it's a "probe" that just checks
-        # whether the process exists and we have permission to signal it.
-        # If it returns 0 (success), the process is alive; we keep it in the clean list.
-        # If it returns non-zero, the process is dead; we silently drop it.
-        if kill -0 "$pid" 2>/dev/null; then
-            # ${clean:+$clean } expands to "$clean " only when $clean is non-empty,
-            # giving us space-separated PIDs without a leading space.
-            clean="${clean:+$clean }$pid"
-        fi
-    done
-
-    # $$ is the PID of the current (sub)shell running this script.
-    # We pad both sides of $clean with spaces so the pattern match is unambiguous
-    # (e.g. PID "22" won't falsely match inside "222").
-    # Only append self if not already in the list, guarding against re-registration
-    # when a script loops back to its own top (e.g. a menu that redisplays itself).
-    if [[ " $clean " != *" $$ "* ]]; then
-        clean="${clean:+$clean }$$"
+    # kill -0 doesn't actually send a signal — it's a "probe" that just checks
+    # whether the process exists and we have permission to signal it.
+    # If it returns 0 (success), the process is alive; we keep it in the clean list.
+    # If it returns non-zero, the process is dead; we silently drop it.
+    if kill -0 "$pid" 2> /dev/null; then
+      # ${clean:+$clean } expands to "$clean " only when $clean is non-empty,
+      # giving us space-separated PIDs without a leading space.
+      clean="${clean:+$clean }$pid"
     fi
+  done
 
-    # Write the sanitised list back to the environment so child processes inherit it.
-    export VIBRANIUM_MENU_PIDS="$clean"
+  # $$ is the PID of the current (sub)shell running this script.
+  # We pad both sides of $clean with spaces so the pattern match is unambiguous
+  # (e.g. PID "22" won't falsely match inside "222").
+  # Only append self if not already in the list, guarding against re-registration
+  # when a script loops back to its own top (e.g. a menu that redisplays itself).
+  if [[ " $clean " != *" $$ "* ]]; then
+    clean="${clean:+$clean }$$"
+  fi
+
+  # Write the sanitised list back to the environment so child processes inherit it.
+  export VIBRANIUM_MENU_PIDS="$clean"
 }
 
 # helpers::ui::close_menus - Graceful teardown of registered menu chain
@@ -358,80 +358,80 @@ helpers::ui::register_menu() {
 #   - Function silently skips PIDs that are already gone or not signalable by
 #     the current user.
 helpers::ui::close_menus() {
-    # Nothing to do if no menu chain was ever registered.
-    if [[ -z "$VIBRANIUM_MENU_PIDS" ]]; then
-        return
-    fi
+  # Nothing to do if no menu chain was ever registered.
+  if [[ -z "$VIBRANIUM_MENU_PIDS" ]]; then
+    return
+  fi
 
-    for pid in $VIBRANIUM_MENU_PIDS; do
+  for pid in $VIBRANIUM_MENU_PIDS; do
 
-        # Probe the PID before attempting to kill it — it may have already exited
-        # naturally (e.g. user closed rofi manually) between registration and now.
-        # If it's gone, skip it rather than letting kill emit a spurious error.
-        kill -0 "$pid" 2>/dev/null || continue
+    # Probe the PID before attempting to kill it — it may have already exited
+    # naturally (e.g. user closed rofi manually) between registration and now.
+    # If it's gone, skip it rather than letting kill emit a spurious error.
+    kill -0 "$pid" 2> /dev/null || continue
 
-        # Now kill the menu script itself. This is safe to do last because the
-        # child (rofi) is already gone, and the script is just sitting in wait/read.
-        kill "$pid" 2>/dev/null
-    done
+    # Now kill the menu script itself. This is safe to do last because the
+    # child (rofi) is already gone, and the script is just sitting in wait/read.
+    kill "$pid" 2> /dev/null
+  done
 }
 
 helpers::bar::spinner() {
-    local tooltip="$1"
-    shift
+  local tooltip="$1"
+  shift
 
-    local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-    local delay=0.1
+  local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  local delay=0.1
 
-    local sep_pos="right" left_pad=0 right_pad=1
-    case "${BASH_SOURCE[1]##*/}" in
-        vb-bar-pacman)  sep_pos="left"  left_pad=0  right_pad=1 ;;
-        vb-bar-weather) sep_pos="right" left_pad=0  right_pad=1 ;;
-    esac
+  local sep_pos="right" left_pad=0 right_pad=1
+  case "${BASH_SOURCE[1]##*/}" in
+    vb-bar-pacman) sep_pos="left" left_pad=0 right_pad=1 ;;
+    vb-bar-weather) sep_pos="right" left_pad=0 right_pad=1 ;;
+  esac
 
-    local sep=""
+  local sep=""
 
-    helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
-    if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
-        sep="<span foreground='DimGray'>|</span>"
-    fi
+  helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
+  if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
+    sep="<span foreground='DimGray'>|</span>"
+  fi
 
-    print_frame() {
-        local ch="$1"
-        local inner="<span rise='-2pt' foreground='gray'>$ch</span>"
+  print_frame() {
+    local ch="$1"
+    local inner="<span rise='-2pt' foreground='gray'>$ch</span>"
 
-        if [[ "$sep" ]]; then
-            if [[ "$sep_pos" == "left" ]]; then
-                printf '{"text":"%*s%s%*s%s","tooltip":"%s"}\n' \
-                    "$left_pad" "" "$sep" "$right_pad" "" "$inner" "$tooltip"
-            else
-                printf '{"text":"%*s%s%*s%s","tooltip":"%s"}\n' \
-                    "$left_pad" "" "$inner" "$right_pad" "" "$sep" "$tooltip"
-            fi
-        else
-            printf '{"text":"%s","tooltip":"%s"}\n' "$inner" "$tooltip"
-        fi
-    }
-
-    if (( $# > 0 )); then
-        # Main loop: PID-waiting mode
-        while kill -0 "$@" 2>/dev/null; do
-            for ch in "${spinstr[@]}"; do
-                print_frame "$ch"
-                sleep "$delay"
-
-                if ! kill -0 "$@" 2>/dev/null; then
-                    return
-                fi
-            done
-        done
+    if [[ "$sep" ]]; then
+      if [[ "$sep_pos" == "left" ]]; then
+        printf '{"text":"%*s%s%*s%s","tooltip":"%s"}\n' \
+          "$left_pad" "" "$sep" "$right_pad" "" "$inner" "$tooltip"
+      else
+        printf '{"text":"%*s%s%*s%s","tooltip":"%s"}\n' \
+          "$left_pad" "" "$inner" "$right_pad" "" "$sep" "$tooltip"
+      fi
     else
-        # Single-pass mode (no PIDs) — exactly one full rotation
-        for ch in "${spinstr[@]}"; do
-            print_frame "$ch"
-            sleep "$delay"
-        done
+      printf '{"text":"%s","tooltip":"%s"}\n' "$inner" "$tooltip"
     fi
+  }
+
+  if (($# > 0)); then
+    # Main loop: PID-waiting mode
+    while kill -0 "$@" 2> /dev/null; do
+      for ch in "${spinstr[@]}"; do
+        print_frame "$ch"
+        sleep "$delay"
+
+        if ! kill -0 "$@" 2> /dev/null; then
+          return
+        fi
+      done
+    done
+  else
+    # Single-pass mode (no PIDs) — exactly one full rotation
+    for ch in "${spinstr[@]}"; do
+      print_frame "$ch"
+      sleep "$delay"
+    done
+  fi
 }
 
 # Not used yet. Questionable.
@@ -518,141 +518,141 @@ declare -r _RE_INT='^(-?)0*([0-9]+)(\.[0-9]+)?$'
 # Usage: helpers::check <var_name> [<var_name> ...]
 # Returns: 0 on success (all validated or fallback), 1 if any not found in cache.
 helpers::check() {
-    # Lazy-load: only run awk on the very first call.
-    # ${#OPTION_DEFAULTS[@]} gives the number of keys — 0 means the cache is cold.
-    if (( ${#OPTION_DEFAULTS[@]} == 0 )); then
-        local awk_script="$VIBRANIUM/awk/vb-parse-defaults.awk"
+  # Lazy-load: only run awk on the very first call.
+  # ${#OPTION_DEFAULTS[@]} gives the number of keys — 0 means the cache is cold.
+  if ((${#OPTION_DEFAULTS[@]} == 0)); then
+    local awk_script="$VIBRANIUM/awk/vb-parse-defaults.awk"
 
-        eval "$(awk -f "$awk_script" "$VIBRANIUM_PATH/vb-core-defaults")"
+    eval "$(awk -f "$awk_script" "$VIBRANIUM_PATH/vb-core-defaults")"
+  fi
+
+  # all_found uses 1/0 integers rather than "true"/"false" strings to avoid repeated
+  # string comparisons in the hot path — (( all_found )) at the end converts to exit code.
+  local all_found=1
+
+  # All scalars hoisted above the loop so bash doesn't re-execute the `local`
+  # declaration and allocation on every iteration.
+  local var_name val normalized is_valid type default_value
+  local min max sign int_part frac_part signed_int
+  local allowed_str
+
+  # Iterate $@ directly — no need to copy into a local array first.
+  for var_name in "$@"; do
+    # Cpecial var; it has no predetermined values. Just skip.
+    if [[ "$var_name" == "VIBRANIUM_BAR_WEATHER_MODULE_CITY" ]]; then
+      continue
     fi
 
-    # all_found uses 1/0 integers rather than "true"/"false" strings to avoid repeated
-    # string comparisons in the hot path — (( all_found )) at the end converts to exit code.
-    local all_found=1
+    # declare -n creates a transparent nameref alias to the caller's variable.
+    # All subsequent reads (val=$ref) and writes (ref=...) go directly through it,
+    # paying the indirection cost once here rather than on every ${!var_name} read
+    # and printf -v write throughout the loop body.
+    declare -n ref="$var_name"
 
-    # All scalars hoisted above the loop so bash doesn't re-execute the `local`
-    # declaration and allocation on every iteration.
-    local var_name val normalized is_valid type default_value
-    local min max sign int_part frac_part signed_int
-    local allowed_str
+    val=$ref
 
-    # Iterate $@ directly — no need to copy into a local array first.
-    for var_name in "$@"; do
-        # Cpecial var; it has no predetermined values. Just skip.
-        if [[ "$var_name" == "VIBRANIUM_BAR_WEATHER_MODULE_CITY" ]]; then
-            continue
-        fi
+    # ${OPTION_DEFAULTS[$var_name]+x}: the +x trick tests key *existence* in the associative
+    # array without caring about the value. Without +x, an empty string would look like unset.
+    if [[ -z ${OPTION_DEFAULTS[$var_name]+x} ]]; then
+      log::warn "Variable $var_name not found in defaults"
+      all_found=0
+      unset -n ref # must release before continue — rebinding a live nameref is undefined
+      continue
+    fi
 
-        # declare -n creates a transparent nameref alias to the caller's variable.
-        # All subsequent reads (val=$ref) and writes (ref=...) go directly through it,
-        # paying the indirection cost once here rather than on every ${!var_name} read
-        # and printf -v write throughout the loop body.
-        declare -n ref="$var_name"
+    default_value=${OPTION_DEFAULTS[$var_name]}
 
-        val=$ref
+    type=${OPTION_TYPES[$var_name]}
 
-        # ${OPTION_DEFAULTS[$var_name]+x}: the +x trick tests key *existence* in the associative
-        # array without caring about the value. Without +x, an empty string would look like unset.
-        if [[ -z ${OPTION_DEFAULTS[$var_name]+x} ]]; then
-            log::warn "Variable $var_name not found in defaults"
-            all_found=0
-            unset -n ref   # must release before continue — rebinding a live nameref is undefined
-            continue
-        fi
+    # If the variable is completely empty/unset, skip validation and just apply the default
+    if [[ -z $val ]]; then
+      log::warn "$var_name is unset. Using default ($default_value)"
 
-        default_value=${OPTION_DEFAULTS[$var_name]}
+      # Direct assignment through the nameref — no printf -v overhead.
+      ref=$default_value
+      unset -n ref
+      continue
+    fi
 
-        type=${OPTION_TYPES[$var_name]}
+    # normalized will hold the cleaned-up version of val to write back if valid.
+    # We don't mutate val itself so we can still reference the original in error messages.
+    normalized=$val
 
-        # If the variable is completely empty/unset, skip validation and just apply the default
-        if [[ -z $val ]]; then
-            log::warn "$var_name is unset. Using default ($default_value)"
+    # is_valid as integer — 1=valid, 0=invalid. Avoids string comparisons at the
+    # bottom of the loop where we decide whether to apply the default or write back.
+    is_valid=1
 
-            # Direct assignment through the nameref — no printf -v overhead.
-            ref=$default_value
-            unset -n ref
-            continue
-        fi
+    case $type in
+      bool)
+        # Lowercase via ,, operator so "True"/"TRUE"/"true" all pass
+        normalized=${val,,}
 
-        # normalized will hold the cleaned-up version of val to write back if valid.
-        # We don't mutate val itself so we can still reference the original in error messages.
-        normalized=$val
+        # Booleans must be exactly "true" or "false" — nothing else
+        [[ $normalized != true && $normalized != false ]] && is_valid=0
+        ;;
+      int)
+        # Normalize comma-as-decimal-separator (e.g. European locale "3,14" → "3.14")
+        normalized=${val//,/.}
 
-        # is_valid as integer — 1=valid, 0=invalid. Avoids string comparisons at the
-        # bottom of the loop where we decide whether to apply the default or write back.
-        is_valid=1
-
-        case $type in
-            bool)
-                # Lowercase via ,, operator so "True"/"TRUE"/"true" all pass
-                normalized=${val,,}
-
-                # Booleans must be exactly "true" or "false" — nothing else
-                [[ $normalized != true && $normalized != false ]] && is_valid=0
-                ;;
-            int)
-                # Normalize comma-as-decimal-separator (e.g. European locale "3,14" → "3.14")
-                normalized=${val//,/.}
-
-                # _RE_INT is a precompiled variable reference — bash reuses its compiled form
-                # across calls, unlike an inline string literal which is recompiled each time.
-                if [[ ! $normalized =~ $_RE_INT ]]; then
-                    is_valid=0
-                else
-                    sign=${BASH_REMATCH[1]}
-                    int_part=${BASH_REMATCH[2]} # leading zeros already stripped by 0* group
-                    frac_part=${BASH_REMATCH[3]} # empty or ".digits"
-
-                    # Rebuild a clean normalized form: sign + stripped-zero int + optional fraction
-                    normalized="${sign}${int_part}${frac_part}"
-
-                    # Only do range check if a min was defined for this variable
-                    min=${OPTION_MINS[$var_name]-} # -} gives empty string if key absent
-                    if [[ -n $min ]]; then
-                        max=${OPTION_MAXS[$var_name]}
-
-                        # 10# prefix forces base-10 interpretation so "08" and "09" don't
-                        # trigger bash's "invalid octal" arithmetic error.
-                        # The sign is prepended *outside* the 10# to handle negatives correctly.
-                        signed_int=$(( ${sign}10#$int_part ))
-                        (( signed_int < 10#$min || signed_int > 10#$max )) && is_valid=0
-                    fi
-                fi
-                ;;
-            string)
-                # OPTION_ALLOWEDS stores values as |val1|val2|valN| (pipe-delimited with
-                # sentinel pipes at both ends, set by vb-defaults.awk).
-                # A single glob test replaces the former read-ra + for loop entirely:
-                # O(1) regardless of how many allowed values there are.
-                allowed_str=${OPTION_ALLOWEDS[$var_name]-}
-
-                if [[ -n $allowed_str ]]; then
-                    [[ $allowed_str == *"|${val}|"* ]] || is_valid=0
-                fi
-
-                # If no allowed list exists, any non-empty string is considered valid
-                ;;
-        esac
-        # (( is_valid )) exits 0 when is_valid=1 (valid), 1 when is_valid=0 (invalid)
-        if (( is_valid )); then
-            # Write the normalized form back through the nameref — this is the important part
-            # for int/bool: the caller's variable ends up with leading zeros stripped, correct
-            # case, etc.
-            ref=$normalized
+        # _RE_INT is a precompiled variable reference — bash reuses its compiled form
+        # across calls, unlike an inline string literal which is recompiled each time.
+        if [[ ! $normalized =~ $_RE_INT ]]; then
+          is_valid=0
         else
-            log::warn "Invalid value for $var_name. Using default ($default_value)"
-            ref=$default_value
+          sign=${BASH_REMATCH[1]}
+          int_part=${BASH_REMATCH[2]} # leading zeros already stripped by 0* group
+          frac_part=${BASH_REMATCH[3]} # empty or ".digits"
+
+          # Rebuild a clean normalized form: sign + stripped-zero int + optional fraction
+          normalized="${sign}${int_part}${frac_part}"
+
+          # Only do range check if a min was defined for this variable
+          min=${OPTION_MINS[$var_name]-} # -} gives empty string if key absent
+          if [[ -n $min ]]; then
+            max=${OPTION_MAXS[$var_name]}
+
+            # 10# prefix forces base-10 interpretation so "08" and "09" don't
+            # trigger bash's "invalid octal" arithmetic error.
+            # The sign is prepended *outside* the 10# to handle negatives correctly.
+            signed_int=$((${sign}10#$int_part))
+            ((signed_int < 10#$min || signed_int > 10#$max)) && is_valid=0
+          fi
+        fi
+        ;;
+      string)
+        # OPTION_ALLOWEDS stores values as |val1|val2|valN| (pipe-delimited with
+        # sentinel pipes at both ends, set by vb-defaults.awk).
+        # A single glob test replaces the former read-ra + for loop entirely:
+        # O(1) regardless of how many allowed values there are.
+        allowed_str=${OPTION_ALLOWEDS[$var_name]-}
+
+        if [[ -n $allowed_str ]]; then
+          [[ $allowed_str == *"|${val}|"* ]] || is_valid=0
         fi
 
-        # Release the nameref before the next iteration — without this, the next
-        # `declare -n ref=...` would re-bind an already-live nameref, which in some
-        # bash versions causes the old target to linger or the new bind to be skipped.
-        unset -n ref
-    done
+        # If no allowed list exists, any non-empty string is considered valid
+        ;;
+    esac
+    # (( is_valid )) exits 0 when is_valid=1 (valid), 1 when is_valid=0 (invalid)
+    if ((is_valid)); then
+      # Write the normalized form back through the nameref — this is the important part
+      # for int/bool: the caller's variable ends up with leading zeros stripped, correct
+      # case, etc.
+      ref=$normalized
+    else
+      log::warn "Invalid value for $var_name. Using default ($default_value)"
+      ref=$default_value
+    fi
 
-    # (( all_found )) exits 0 when all_found=1 (every variable found), 1 when any was missing.
-    # Cleaner than return $(( 1 - all_found )) — no arithmetic expansion subshell, just a test.
-    (( all_found ))
+    # Release the nameref before the next iteration — without this, the next
+    # `declare -n ref=...` would re-bind an already-live nameref, which in some
+    # bash versions causes the old target to linger or the new bind to be skipped.
+    unset -n ref
+  done
+
+  # (( all_found )) exits 0 when all_found=1 (every variable found), 1 when any was missing.
+  # Cleaner than return $(( 1 - all_found )) — no arithmetic expansion subshell, just a test.
+  ((all_found))
 }
 
 # Loop to discard buffered input: reads 1 char at a time non-blockingly.
@@ -661,9 +661,9 @@ helpers::check() {
 # Use larger -n (e.g., 100) for efficiency: reads up to 100 chars per iteration.
 # Adjust if buffers are very large, but 100 balances speed and safety.
 term::discard_buffer() {
-    while IFS= read -r -n 100 -t 0.001 discard; do
-        :
-    done
+  while IFS= read -r -n 100 -t 0.001 discard; do
+    :
+  done
 }
 
 # Function to disable terminal input echoing.
@@ -671,14 +671,14 @@ term::discard_buffer() {
 # Saves original stty settings in a global variable for later restoration.
 # Uses stty -echo to disable local echo; input is still buffered but not displayed.
 term::disable_input() {
-    # Capture and store current terminal settings globally.
-    term_original_settings=$(stty -g)
-    # Export the variable to make it accessible in subshells or sourced scripts if needed.
-    export term_original_settings
-    # Disable echoing: keystrokes are accepted but not shown.
-    stty -echo
-    # Hide cursor
-    printf '\e[?25l'
+  # Capture and store current terminal settings globally.
+  term_original_settings=$(stty -g)
+  # Export the variable to make it accessible in subshells or sourced scripts if needed.
+  export term_original_settings
+  # Disable echoing: keystrokes are accepted but not shown.
+  stty -echo
+  # Hide cursor
+  printf '\e[?25l'
 }
 
 # Function to enable terminal input echoing and flush buffered input.
@@ -686,65 +686,68 @@ term::disable_input() {
 # and reverts to original stty settings for full reset.
 # The flush loop lives here to clear the buffer after disable period.
 term::enable_input() {
-    # Restore echoing first to allow normal display if needed post-flush.
-    stty echo
-    # Restore original settings from global variable for complete reset.
-    stty "$term_original_settings"
-    # Unset the global variable to clean up.
-    unset term_original_settings
-    # Clear input buffer first
-    term::discard_buffer
-    # Show curosr
-    printf '\e[?25h'
+  # Restore echoing first to allow normal display if needed post-flush.
+  stty echo
+  # Restore original settings from global variable for complete reset.
+  stty "$term_original_settings"
+  # Unset the global variable to clean up.
+  unset term_original_settings
+  # Clear input buffer first
+  term::discard_buffer
+  # Show curosr
+  printf '\e[?25h'
 }
 
 term::ask_yes_no() {
-    local default="${1:-Y}"
-    local message="$2"
-    local input prompt hint
+  local default="${1:-Y}"
+  local message="$2"
+  local input prompt hint
 
-    default="${default^^}"
+  default="${default^^}"
 
-    # Set hint based on default
-    case "$default" in
-        Y) hint="(Y/n)" ;;
-        N) hint="(y/N)" ;;
-        *) hint="(Y/n)"; default="Y" ;;
+  # Set hint based on default
+  case "$default" in
+    Y) hint="(Y/n)" ;;
+    N) hint="(y/N)" ;;
+    *)
+      hint="(Y/n)"
+      default="Y"
+      ;;
+  esac
+
+  term::enable_input
+
+  while true; do
+    if [[ -f /tmp/vb-install-ongoing ]]; then
+      # Used once when installing Vibranium. Nowhere else.
+      prompt=$'\e[0;36m[QSTN]\e[0m '"${message} ${hint}: "
+    else
+      prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
+    fi
+
+    printf "%s" "$prompt"
+    read -r input
+
+    # Use default if empty
+    if [[ -z "$input" ]]; then
+      input="$default"
+    fi
+
+    case "$input" in
+      [Yy][Ee][Ss] | [Yy])
+        term::disable_input
+        return 0
+        ;;
+      [Nn][Oo] | [Nn])
+        term::disable_input
+        return 1
+        ;;
+      *)
+        # Clear line and retry
+        printf "\r\e[K"
+        ;;
     esac
-
-    term::enable_input
-
-    while true; do
-        if [[ -f /tmp/vb-install-ongoing ]]; then
-            # Used once when installing Vibranium. Nowhere else.
-            prompt=$'\e[0;36m[QSTN]\e[0m '"${message} ${hint}: "
-        else
-            prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
-        fi
-
-        printf "%s" "$prompt"
-        read -r input
-
-        # Use default if empty
-        if [[ -z "$input" ]]; then
-            input="$default"
-        fi
-
-        case "$input" in
-            [Yy][Ee][Ss]|[Yy])
-                term::disable_input
-                return 0
-                ;;
-            [Nn][Oo]|[Nn])
-                term::disable_input
-                return 1
-                ;;
-            *)
-                # Clear line and retry
-                printf "\r\e[K"
-                ;;
-        esac
-    done
+  done
 }
 
 # A term::spinner utility function.
@@ -760,107 +763,107 @@ term::ask_yes_no() {
 # The term::spinner uses Unicode braille characters for a smooth animation.
 # It clears itself once the process finishes, and optionally prints a success message.
 term::spinner() {
-    # The PID of the process to watch
-    local pid=$1
+  # The PID of the process to watch
+  local pid=$1
 
-    # The message to show while spinning
-    local msg="$2"
+  # The message to show while spinning
+  local msg="$2"
 
-    # Delay between term::spinner frames (seconds)
-    local delay=0.1
-    local spinstr
+  # Delay between term::spinner frames (seconds)
+  local delay=0.1
+  local spinstr
 
-    spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
 
-    # ANSI sequence to clear the current line
-    local clear_line="\r\033[K"
+  # ANSI sequence to clear the current line
+  local clear_line="\r\033[K"
 
-    # While the process exists, animate the term::spinner
-    while kill -0 "$pid" 2> /dev/null; do
-        for i in "${spinstr[@]}"; do
-            printf "\r${msg} %s" "${i} "
-            sleep $delay
-        done
+  # While the process exists, animate the term::spinner
+  while kill -0 "$pid" 2> /dev/null; do
+    for i in "${spinstr[@]}"; do
+      printf "\r${msg} %s" "${i} "
+      sleep $delay
     done
+  done
 
-    # Clear the spinner once finished
-    printf "%b" "$clear_line"
+  # Clear the spinner once finished
+  printf "%b" "$clear_line"
 
-    # Print the final message if provided
-    if [ -n "$3" ]; then
-        printf "%s %s\n" "$msg" "$3"
-    else
-        printf "%s\n" "$msg"
-    fi
+  # Print the final message if provided
+  if [ -n "$3" ]; then
+    printf "%s %s\n" "$msg" "$3"
+  else
+    printf "%s\n" "$msg"
+  fi
 }
 
 term::show_header() {
-    local color
+  local color
 
-    if [[ "${1-}" == "--color" ]]; then
-        case "${2-}" in
-            purple) color="$PURPLE" ;;
-            green)  color="$GREEN" ;;
-            blue)   color="$BLUE" ;;
-            cyan)   color="$CYAN" ;;
-            red)    color="$RED" ;;
-            *)      color="$YELLOW" ;;
-        esac
-    fi
+  if [[ "${1-}" == "--color" ]]; then
+    case "${2-}" in
+      purple) color="$PURPLE" ;;
+      green) color="$GREEN" ;;
+      blue) color="$BLUE" ;;
+      cyan) color="$CYAN" ;;
+      red) color="$RED" ;;
+      *) color="$YELLOW" ;;
+    esac
+  fi
 
-    printf "\n%s%s%s\n\n" "${color:-$YELLOW}" \
-        "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+  printf "\n%s%s%s\n\n" "${color:-$YELLOW}" \
+    "$(< "$VIBRANIUM/logo.txt")" "$RESET"
 }
 
 term::is_headless() {
-    if [[ -t 1 ]]; then
-        return 1
-    else
-        return 0
-    fi
+  if [[ -t 1 ]]; then
+    return 1
+  else
+    return 0
+  fi
 }
 
 log::error() {
-    if [[ -t 2 ]]; then
-        printf "%s[ERROR]%s %s\n" \
-            "$RED" "$RESET" "$*" >&2
-    fi
+  if [[ -t 2 ]]; then
+    printf "%s[ERROR]%s %s\n" \
+      "$RED" "$RESET" "$*" >&2
+  fi
 }
 
 log::warn() {
-    if [[ -t 1 ]]; then
-        printf "%s[WARN]%s %s\n" \
-            "$YELLOW" "$RESET" "$*"
-    fi
+  if [[ -t 1 ]]; then
+    printf "%s[WARN]%s %s\n" \
+      "$YELLOW" "$RESET" "$*"
+  fi
 }
 
 log::info() {
-    if [[ -t 1 ]]; then
-        printf "%s[INFO]%s %s\n" \
-            "$BLUE" "$RESET" "$*"
-    fi
+  if [[ -t 1 ]]; then
+    printf "%s[INFO]%s %s\n" \
+      "$BLUE" "$RESET" "$*"
+  fi
 }
 
 # Self-explanatory
 # https://wiki.hypr.land/Configuring/Dispatchers/#fullscreenstate
 hypr::is_fullscreen() {
-    [[ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]]
+  [[ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]]
 }
 
 hypr::flash::border() {
-    [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]] && return 0
+  [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]] && return 0
 
-    hyprctl -q "keyword general:col.active_border rgb(cdcecf)"
-    sleep 0.2
-    hyprctl -q reload config-only
+  hyprctl -q "keyword general:col.active_border rgb(cdcecf)"
+  sleep 0.2
+  hyprctl -q reload config-only
 }
 
 hypr::flash::screen() {
-    local anim_status="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
-    [[ $anim_status == 0 ]] && return 0
+  local anim_status="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
+  [[ $anim_status == 0 ]] && return 0
 
-    hyprctl -q hyprsunset gamma 150
-    hyprctl -q hyprsunset gamma 100
+  hyprctl -q hyprsunset gamma 150
+  hyprctl -q hyprsunset gamma 100
 }
 
 #############################
@@ -870,17 +873,17 @@ hypr::flash::screen() {
 # Ensures that a given option exists in the user settings file.
 # If it's missing, appends the default value from the defaults file.
 helpers::configure::verify_option() {
-    local var="$1"
-    [[ -z $var ]] && return 2
+  local var="$1"
+  [[ -z $var ]] && return 2
 
-    local settings_file="$VIBRANIUM_USER_SETTINGS"
-    local defaults_file="$VIBRANIUM_PATH/vb-core-defaults"
+  local settings_file="$VIBRANIUM_USER_SETTINGS"
+  local defaults_file="$VIBRANIUM_PATH/vb-core-defaults"
 
-    local def_line
-    def_line="$(awk -F= -v v="$var" '$1==v{print; exit}' "$defaults_file")" || return 1
-    [[ -z $def_line ]] && return 1
+  local def_line
+  def_line="$(awk -F= -v v="$var" '$1==v{print; exit}' "$defaults_file")" || return 1
+  [[ -z $def_line ]] && return 1
 
-    awk -v var="$var" -v newline="$def_line" '
+  awk -v var="$var" -v newline="$def_line" '
         BEGIN { inserted=0 }
 
         # Preserve header/comments exactly as-is until first VIBRANIUM_ var
@@ -916,31 +919,31 @@ helpers::configure::verify_option() {
 # Flips a boolean value of a passed variable.
 # Flag '-v' returns the new value
 helpers::configure::toggle_bool() {
-    local verbose
-    local setting_name
-    local current_value
+  local verbose
+  local setting_name
+  local current_value
 
-    if [ "$1" = "-v" ]; then
-        verbose=true
-        setting_name="$2"
-    else
-        verbose=false
-        setting_name="$1"
-    fi
+  if [ "$1" = "-v" ]; then
+    verbose=true
+    setting_name="$2"
+  else
+    verbose=false
+    setting_name="$1"
+  fi
 
-    helpers::configure::verify_option "$setting_name"
-    eval "current_value=\$$setting_name"
+  helpers::configure::verify_option "$setting_name"
+  eval "current_value=\$$setting_name"
 
-    case "$current_value" in
-        "true")
-            sed -i "/^${setting_name}=/s/=.*/=false/" "$VIBRANIUM_USER_SETTINGS"
-            [ "$verbose" = "true" ] && echo "false"
-            ;;
-        "false")
-            sed -i "/^${setting_name}=/s/=.*/=true/" "$VIBRANIUM_USER_SETTINGS"
-            [ "$verbose" = "true" ] && echo "true"
-            ;;
-    esac
+  case "$current_value" in
+    "true")
+      sed -i "/^${setting_name}=/s/=.*/=false/" "$VIBRANIUM_USER_SETTINGS"
+      [ "$verbose" = "true" ] && echo "false"
+      ;;
+    "false")
+      sed -i "/^${setting_name}=/s/=.*/=true/" "$VIBRANIUM_USER_SETTINGS"
+      [ "$verbose" = "true" ] && echo "true"
+      ;;
+  esac
 }
 
 # Aligns menu option labels to the same width for pretty column output.
@@ -948,56 +951,56 @@ helpers::configure::toggle_bool() {
 # label length, pads shorter labels with spaces, and normalizes boolean
 # values (true/false -> yes/no). Non-matching lines are passed through unchanged.
 helpers::configure::build_menu() {
-    local options=("$@")
-    local max_len=0
-    local has_colon_options=()
+  local options=("$@")
+  local max_len=0
+  local has_colon_options=()
 
-    for option in "${options[@]}"; do
-        if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
-            local label="${BASH_REMATCH[1]}"
+  for option in "${options[@]}"; do
+    if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
+      local label="${BASH_REMATCH[1]}"
 
-            local clean_label
-            clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
+      local clean_label
+      clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
 
-            local len=${#clean_label}
-            if (( len > max_len )); then
-                max_len=$len
-            fi
-            has_colon_options+=("$option")
-        fi
-    done
+      local len=${#clean_label}
+      if ((len > max_len)); then
+        max_len=$len
+      fi
+      has_colon_options+=("$option")
+    fi
+  done
 
-    local aligned_options=()
-    for option in "${options[@]}"; do
-        if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
-            local label="${BASH_REMATCH[1]}"
-            local value="${BASH_REMATCH[2]}"
+  local aligned_options=()
+  for option in "${options[@]}"; do
+    if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
+      local label="${BASH_REMATCH[1]}"
+      local value="${BASH_REMATCH[2]}"
 
-            local clean_label
-            clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
+      local clean_label
+      clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
 
-            local len=${#clean_label}
-            local padding=$((max_len - len))
-            local padded_label="$label"
+      local len=${#clean_label}
+      local padding=$((max_len - len))
+      local padded_label="$label"
 
-            for ((j=0; j<padding; j++)); do
-                padded_label+=" "
-            done
+      for ((j = 0; j < padding; j++)); do
+        padded_label+=" "
+      done
 
-            if [[ "${value,,}" == "true" ]]; then
-                value="yes"
-            elif [[ "${value,,}" == "false" ]]; then
-                value="no"
-            fi
-            aligned_options+=("$padded_label : $value")
-        else
-            aligned_options+=("$option")
-        fi
-    done
+      if [[ "${value,,}" == "true" ]]; then
+        value="yes"
+      elif [[ "${value,,}" == "false" ]]; then
+        value="no"
+      fi
+      aligned_options+=("$padded_label : $value")
+    else
+      aligned_options+=("$option")
+    fi
+  done
 
-    for aligned in "${aligned_options[@]}"; do
-        echo "$aligned"
-    done
+  for aligned in "${aligned_options[@]}"; do
+    echo "$aligned"
+  done
 }
 
 # Prompts the user for a numeric value via menu, validates type and range,
@@ -1006,134 +1009,134 @@ helpers::configure::build_menu() {
 # and floats, trims whitespace, normalizes float formatting, and retries
 # on invalid input with an error notification.
 helpers::configure::set_digit() {
-    local check_only=false
+  local check_only=false
 
-    # parse flags
-    while [[ "$1" == -* ]]; do
-        case "$1" in
-            --verify) check_only=true ;;
-            *) return 1 ;;
-        esac
-        shift
-    done
+  # parse flags
+  while [[ "$1" == -* ]]; do
+    case "$1" in
+      --verify) check_only=true ;;
+      *) return 1 ;;
+    esac
+    shift
+  done
 
-    local prompt_base="$1"
-    local rofi_title="$2"
-    local type="$3"    # "int" or "float"
-    local min_val="$4"
-    local max_val="$5"
-    local opt_name="${6:-}"
-    local settings_file="$VIBRANIUM_USER_SETTINGS"
+  local prompt_base="$1"
+  local rofi_title="$2"
+  local type="$3" # "int" or "float"
+  local min_val="$4"
+  local max_val="$5"
+  local opt_name="${6:-}"
+  local settings_file="$VIBRANIUM_USER_SETTINGS"
 
-    local range_text="${min_val}-${max_val}"
-    local prompt="${prompt_base} (${type})"
+  local range_text="${min_val}-${max_val}"
+  local prompt="${prompt_base} (${type})"
 
-    while true; do
-        local input
-        helpers::ui::menu input "$rofi_title" "$range_text" -- "$prompt"
+  while true; do
+    local input
+    helpers::ui::menu input "$rofi_title" "$range_text" -- "$prompt"
 
-        [[ -z "$input" ]] && return 1
-        [[ "$input" = "$prompt" ]] && continue
+    [[ -z "$input" ]] && return 1
+    [[ "$input" = "$prompt" ]] && continue
 
-        input="${input#"${input%%[![:space:]]*}"}"
-        input="${input%"${input##*[![:space:]]}"}"
+    input="${input#"${input%%[![:space:]]*}"}"
+    input="${input%"${input##*[![:space:]]}"}"
 
-        local valid=true
+    local valid=true
 
-        if [[ "$type" == "int" ]]; then
-            if ! [[ "$input" =~ ^[0-9]+$ ]]; then
-                valid=false
-            else
-                local inrange
-                inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
-                          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
-                [[ "$inrange" != 1 ]] && valid=false
-            fi
+    if [[ "$type" == "int" ]]; then
+      if ! [[ "$input" =~ ^[0-9]+$ ]]; then
+        valid=false
+      else
+        local inrange
+        inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
+          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
+        [[ "$inrange" != 1 ]] && valid=false
+      fi
 
-        elif [[ "$type" == "float" ]]; then
-            if ! [[ "$input" =~ ^[0-9]*\.?[0-9]+$ ]]; then
-                valid=false
-            else
-                local inrange
-                inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
-                          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
-                [[ "$inrange" != 1 ]] && valid=false
+    elif [[ "$type" == "float" ]]; then
+      if ! [[ "$input" =~ ^[0-9]*\.?[0-9]+$ ]]; then
+        valid=false
+      else
+        local inrange
+        inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
+          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
+        [[ "$inrange" != 1 ]] && valid=false
 
-                if [[ "$valid" == true ]]; then
-                    input=$(awk -v v="$input" '
+        if [[ "$valid" == true ]]; then
+          input=$(awk -v v="$input" '
                         BEGIN {
                             v+=0
                             if (v == int(v)) printf "%d.0", int(v)
                             else printf "%g", v
                         }')
-                fi
-            fi
-        else
-            return 1
         fi
+      fi
+    else
+      return 1
+    fi
 
-        if [[ "$valid" == false ]]; then
-            notify-send -r 6 -u critical -t 1500 "Vibranium" \
-                "A ${type} between ${min_val} and ${max_val}!"
-            continue
-        fi
+    if [[ "$valid" == false ]]; then
+      notify-send -r 6 -u critical -t 1500 "Vibranium" \
+        "A ${type} between ${min_val} and ${max_val}!"
+      continue
+    fi
 
-        # check-only mode: just return the validated value
-        if [[ "$check_only" == true ]]; then
-            printf "%s" "$input"
-            return 0
-        fi
+    # check-only mode: just return the validated value
+    if [[ "$check_only" == true ]]; then
+      printf "%s" "$input"
+      return 0
+    fi
 
-        if [[ -n "$opt_name" ]]; then
-            helpers::configure::verify_option "$opt_name" || return 1
+    if [[ -n "$opt_name" ]]; then
+      helpers::configure::verify_option "$opt_name" || return 1
 
-            if grep -qE "^${opt_name}=" "$settings_file" 2>/dev/null; then
-                sed -i "/^${opt_name}/s/=.*/=${input}/" "$settings_file"
-            else
-                printf "%s=%s\n" "$opt_name" "$input" >> "$settings_file"
-            fi
-        fi
+      if grep -qE "^${opt_name}=" "$settings_file" 2> /dev/null; then
+        sed -i "/^${opt_name}/s/=.*/=${input}/" "$settings_file"
+      else
+        printf "%s=%s\n" "$opt_name" "$input" >> "$settings_file"
+      fi
+    fi
 
-        printf "%s" "$input"
-        return 0
-    done
+    printf "%s" "$input"
+    return 0
+  done
 }
 
 # Presents a menu of string options to the user, validates the selection,
 # and saves the chosen value to the user settings file under the given
 # variable name.
 helpers::configure::set_string() {
-    local var_name="$1"
-    local title="$2"
-    shift 2
-    local raw_options=("$@")
+  local var_name="$1"
+  local title="$2"
+  shift 2
+  local raw_options=("$@")
 
-    local labels=()
-    local values=()
+  local labels=()
+  local values=()
 
-    # Split Pretty:Value
-    for opt in "${raw_options[@]}"; do
-        if [[ "$opt" == *:* ]]; then
-            labels+=("${opt%%:*}")
-            values+=("${opt#*:}")
-        else
-            labels+=("$opt")
-            values+=("$opt")
-        fi
+  # Split Pretty:Value
+  for opt in "${raw_options[@]}"; do
+    if [[ "$opt" == *:* ]]; then
+      labels+=("${opt%%:*}")
+      values+=("${opt#*:}")
+    else
+      labels+=("$opt")
+      values+=("$opt")
+    fi
+  done
+
+  while true; do
+    helpers::ui::menu chosen_label "$title" "ESC to go back" -- "${labels[@]}"
+    [[ -z "$chosen_label" ]] && break
+
+    # Find index of selected label
+    for i in "${!labels[@]}"; do
+      if [[ "${labels[$i]}" == "$chosen_label" ]]; then
+        chosen_value="${values[$i]}"
+        helpers::configure::verify_option "$var_name"
+        sed -i "/^${var_name}=/s|=.*|=\"${chosen_value// /_}\"|" "$VIBRANIUM_USER_SETTINGS"
+        return
+      fi
     done
-
-    while true; do
-        helpers::ui::menu chosen_label "$title" "ESC to go back" -- "${labels[@]}"
-        [[ -z "$chosen_label" ]] && break
-
-        # Find index of selected label
-        for i in "${!labels[@]}"; do
-            if [[ "${labels[$i]}" == "$chosen_label" ]]; then
-                chosen_value="${values[$i]}"
-                helpers::configure::verify_option "$var_name"
-                sed -i "/^${var_name}=/s|=.*|=\"${chosen_value// /_}\"|" "$VIBRANIUM_USER_SETTINGS"
-                return
-            fi
-        done
-    done
+  done
 }

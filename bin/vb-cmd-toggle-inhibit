@@ -7,7 +7,7 @@
 source vb-core-lib
 
 usage() {
-    cat << EOF
+  cat << EOF
 Usage: ${0##*/} [OPTION]
 
 Toggle systemd idle inhibitor for Vibranium.
@@ -18,22 +18,25 @@ EOF
 }
 
 case "${1:-}" in
-    -h|--help) usage; exit 0
+  -h | --help)
+    usage
+    exit 0
+    ;;
 esac
 
 pid="$(systemd-inhibit --no-pager | awk '/Vibranium/ {print $4}')"
 
 if [[ -n "$pid" ]]; then
-    kill "$pid"
+  kill "$pid"
 else
-    helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
-    type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+  helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
+  type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
 
-    setsid -f systemd-inhibit \
-        --what="$type" \
-        --who="Vibranium" \
-        --why="Manual sleep inhibition" \
-        sleep infinity &
+  setsid -f systemd-inhibit \
+    --what="$type" \
+    --who="Vibranium" \
+    --why="Manual sleep inhibition" \
+    sleep infinity &
 fi
 
 vb-cmd-refresh-bar-module inhibitor &

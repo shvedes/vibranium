@@ -7,11 +7,11 @@ cp -r "$HOME/.local/share/vibranium/config/.gtkrc-2.0" "$HOME"
 # Symlink the default theme.
 # Color for other apps are in there
 ln -sf "$THEME_PATH" \
-    "$HOME/.config/vibranium/theme/current" >/dev/null
+  "$HOME/.config/vibranium/theme/current" > /dev/null
 
 # Symlink the btop theme as well
 ln -sf "$HOME/.config/vibranium/theme/current/btop.theme" \
-	"$HOME/.config/btop/themes/current.theme" >/dev/null
+  "$HOME/.config/btop/themes/current.theme" > /dev/null
 
 # Heroic. It is not installed by default, but it will
 # automatically apply the active theme on first launch
@@ -20,9 +20,9 @@ ln -sf "$HOME/.config/vibranium/theme/current/btop.theme" \
 mkdir -p "$HOME"/.config/heroic/{store,themes}
 
 ln -sf "$HOME/.config/vibranium/theme/current/heroic.css" \
-	"$HOME/.config/heroic/themes/vibranium.css" >/dev/null
+  "$HOME/.config/heroic/themes/vibranium.css" > /dev/null
 
-cat > "$HOME/.config/heroic/config.json" <<EOF
+cat > "$HOME/.config/heroic/config.json" << EOF
 {
     "defaultSettings": {
         "customThemesPath": "$HOME/.config/heroic/themes"
@@ -30,7 +30,7 @@ cat > "$HOME/.config/heroic/config.json" <<EOF
 }
 EOF
 
-cat > "$HOME/.config/heroic/store/config.json" <<EOF
+cat > "$HOME/.config/heroic/store/config.json" << EOF
 {
     "theme": "vibranium.css"
 }
@@ -47,11 +47,11 @@ gsettings set org.gnome.desktop.interface cursor-theme "macOS"
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
-$HOME/.local/bin/papirus-folders --theme "Papirus-Dark" --color nordic &>/dev/null
+$HOME/.local/bin/papirus-folders --theme "Papirus-Dark" --color nordic &> /dev/null
 
 # GTK symlinks
 for f in assets gtk-dark.css gtk.css; do
-	ln -sf "$HOME/.local/share/themes/Nightfox/gtk-4.0/$f" "$HOME/.config/gtk-4.0/"
+  ln -sf "$HOME/.local/share/themes/Nightfox/gtk-4.0/$f" "$HOME/.config/gtk-4.0/"
 done
 
 # QTCT
@@ -59,5 +59,4 @@ sed -i "s/user/$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
 sed -i "s/user/$USER/" "$HOME/.config/qt5ct/qt5ct.conf"
 
 ln -sf "$HOME/.local/share/vibranium/default/hypr/animations/default.conf" \
-	"$HOME/.config/hypr/hyprland.conf.d/animations.conf"
-
+  "$HOME/.config/hypr/hyprland.conf.d/animations.conf"
