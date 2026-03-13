@@ -17,6 +17,7 @@ if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   exit 1
 fi
 
+export CHASSIS_TYPE="$(hostnamectl chassis)"
 export VIBRANIUM="$HOME/.local/share/vibranium"
 export PATH="$PATH:$VIBRANIUM/bin"
 

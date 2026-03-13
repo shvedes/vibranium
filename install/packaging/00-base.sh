@@ -2,7 +2,7 @@
 
 mapfile -t packages < <(grep -Ev '^(#|$)' "$VIBRANIUM/install/vb-base.pkgs")
 
-if [[ "$(hostnamectl chassis)" != vm ]]; then
+if [[ "$CHASSIS_TYPE" != vm ]]; then
     packages+=(
         gpu-screen-recorder bluez bluez-utils
         bluetui hyprsunset hyprpaper ddcutil

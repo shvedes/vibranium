@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-case "$(hostnamectl chassis)" in
+case "$CHASSIS_TYPE" in
     laptop|convertible|tablet)
 		DIRTY_BYTES="134217728"
 		DIRTY_BACKGROUND_BYTES="33554432"

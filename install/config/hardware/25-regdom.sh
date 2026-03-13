@@ -3,7 +3,7 @@
 # Source: Omarchy
 # Slightly adapted for Vibranium.
 
-if [[ "$(hostnamectl chassis)" == vm ]]; then
+if [[ "$CHASSIS_TYPE" == vm ]]; then
     exit 0
 fi
 

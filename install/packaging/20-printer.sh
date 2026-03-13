@@ -4,7 +4,7 @@
 # All cretids to the Omarchy contributors, not me.
 # This is just an adoptation.
 
-if [[ "$(hostnamectl chassis)" == vm ]]; then
+if [[ "$CHASSIS_TYPE" == vm ]]; then
     exit 0
 fi
 
