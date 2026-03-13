@@ -795,24 +795,21 @@ term::spinner() {
 }
 
 term::show_header() {
-    if [[ -n "$1" && "$1" == "--color" ]]; then
-        local color
+    local color
 
-        if [[ ! -n "$2" ]]; then
-            color="$YELLOW"
-        else
-            case "$2" in
-                purple) color="$PURPLE" ;;
-                green) color="$GREEN" ;;
-                blue) color="$BLUE" ;;
-                cyan) color="$CYAN" ;;
-                red) color="$RED" ;;
-                *) color="$YELLOW"
-            esac
-        fi
+    if [[ "${1-}" == "--color" ]]; then
+        case "${2-}" in
+            purple) color="$PURPLE" ;;
+            green)  color="$GREEN" ;;
+            blue)   color="$BLUE" ;;
+            cyan)   color="$CYAN" ;;
+            red)    color="$RED" ;;
+            *)      color="$YELLOW" ;;
+        esac
     fi
 
-    printf "\n%s%s%s\n\n" "${color:-$YELLOW}" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+    printf "\n%s%s%s\n\n" "${color:-$YELLOW}" \
+        "$(< "$VIBRANIUM/logo.txt")" "$RESET"
 }
 
 term::is_headless() {
