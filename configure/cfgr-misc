@@ -303,6 +303,7 @@ _get_default_browser() {
 
     case "$browser" in
         opera.desktop) printf "Opera" ;;
+        firefox.desktop) printf "Firefox" ;;
         chromium.desktop) printf "Chromium" ;;
         vivaldi.desktop) printf "Vivaldi" ;;
         google-chrome.desktop) printf "Google Chrome" ;;
