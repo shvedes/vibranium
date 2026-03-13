@@ -30,7 +30,7 @@ _configure_ssh() {
         return 1   # unchanged
     fi
 
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Allowing SSH on port ${CYAN}${port}/tcp${RESET} from LAN"
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Allowing SSH on port ${CYAN}${port}/tcp${RESET} from ${GREEN}LAN${RESET}"
     sudo ufw allow from 192.168.1.0/24 to any port "$port" proto tcp &>/dev/null
     return 0       # applied
 }
@@ -112,14 +112,34 @@ _configure_syncthing() {
 
 # ─────────────────────────────────────────────────────────────
 
-term::show_header
 term::disable_input
 
-if command -v ufw &>/dev/null && systemctl -q is-enabled ufw; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall is already set up and working"
+if command -v ufw &>/dev/null; then
+    if systemctl -q is-enabled ufw; then
+        term::show_header --color green
+        echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall is already set up and running"
+    else
+        term::show_header --color green
+        echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall service is down"
+        if term::ask_yes_no Y "Would you like to fix it now?"; then
+            if sudo systemctl -q enable --now ufw; then
+                echo -e "${GREEN}[VIBRANIUM]${RESET} Enabled and started ${YELLOW}ufw.service${RESET}"
+            else
+                echo -e "${RED}[VIBRANIUM]${RESET} ${YELLOW}systemctl${RESET} failed"
+                _operation_canceled
+                exit 1
+            fi
+        fi
+    fi
+
+    echo -e "${BLUE}[VIBRANIUM]${RESET} Use ${RED}sudo ${GREEN}ufw${YELLOW} status${RESET} to see current profiles"
+    echo -e "${BLUE}[VIBRANIUM]${RESET} Use ${GREEN}man ${YELLOW}ufw${RESET} to see the documentation"
+    echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/Uncomplicated_Firewall${RESET} for further, advanced configuration"
     _operation_complete
     exit 0
 fi
+
+term::show_header
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup ufw (Uncomplicated Firewall)"
 
@@ -198,4 +218,8 @@ done
 echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
 echo ""
 
+echo -e "${BLUE}[VIBRANIUM]${RESET} Use ${RED}sudo ${GREEN}ufw${YELLOW} status${RESET} to see current profiles"
+echo -e "${BLUE}[VIBRANIUM]${RESET} Use ${GREEN}man ${YELLOW}ufw${RESET} to see the documentation"
+echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/Uncomplicated_Firewall${RESET} for further, advanced configuration"
 _operation_complete
+

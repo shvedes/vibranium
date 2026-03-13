@@ -97,21 +97,15 @@ fi
     done
 ) &
 
-YAY_PRESENT=false
-
-if pacman -Qq "yay" &> /dev/null; then
-    YAY_PRESENT=true
-fi
-
-[[ "$YAY_PRESENT" == false ]] && {
-    _log_info "Installing Yay AUR helper"
+if ! pacman -Qq "yay" &> /dev/null; then
+    _log_info "Installing AUR helper"
 
     if ! InstallYay; then
-        _log_error "Failed to install yay"
+        _log_error "Failed to install AUR helper"
         _log_error "Aborting installation"
         exit 1
     fi
-}
+fi
 
 _log_info "Setting up system and configs"
 for script in "$SCRIPT_DIR/config"/*.sh; do

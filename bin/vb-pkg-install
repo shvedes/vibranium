@@ -32,7 +32,11 @@ _ask_for_sudo() {
     sudo -n true 2>/dev/null && return
 
     term::enable_input
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
+
+    if [[ "$EMBEDDED" == false ]]; then
+        echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
+    fi
+
     sudo -v
     term::disable_input
 }
@@ -269,25 +273,34 @@ _embed_install() {
     local total=${#FILTERED[@]}
     local current=0
     local pkg
+    local yay_opts="--needed"
+
+    if [[ "$FORCE_INSTALL" == true ]]; then
+        yay_opts=""
+    fi
 
     yay --noconfirm -Sy &> /dev/null
 
     for pkg in "${FILTERED[@]}"; do
         ((current++))
-        printf "\r\033[K%s[VIBRANIUM]%s Installing %s [%d/%d]" \
-          "$YELLOW" "$RESET" "${YELLOW}${pkg}${RESET}" "$current" "$total"
 
-        if [[ "$FORCE_INSTALL" == true ]]; then
-            yay --noconfirm -S "$pkg" &> /dev/null
+        if (( total == 1 )); then
+            printf "\r\033[K%s[VIBRANIUM]%s Installing %s" \
+                "$YELLOW" "$RESET" "${YELLOW}${pkg}${RESET}"
         else
-            yay --noconfirm --needed -S "$pkg" &> /dev/null
+            printf "\r\033[K%s[VIBRANIUM]%s Installing %s [%d/%d]" \
+                "$YELLOW" "$RESET" "${YELLOW}${pkg}${RESET}" "$current" "$total"
         fi
+
+        yay --noconfirm $needed_flag -S "$pkg" &> /dev/null
     done
 
     if (( total == 1 )); then
-        printf "\r\033[K%s[VIBRANIUM]%s %s installed\n" "$GREEN" "$RESET" "${YELLOW}$FILTERED${RESET}"
+        printf "\r\033[K%s[VIBRANIUM]%s %s installed\n" \
+            "$GREEN" "$RESET" "${YELLOW}${FILTERED[0]}${RESET}"
     else
-        printf "\r\033[K%s[VIBRANIUM]%s Installed %d packages\n" "$GREEN" "$RESET" "$total"
+        printf "\r\033[K%s[VIBRANIUM]%s Installed %d packages\n" \
+            "$GREEN" "$RESET" "$total"
     fi
 }
 

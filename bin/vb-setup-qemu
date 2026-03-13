@@ -72,9 +72,28 @@ _configure_ufw() {
     return 0       # applied
 }
 
+# Overengineered protection layer
+_ensure_virt_manager() {
+    if ! command -v virt-manager > /dev/null; then
+        echo -e "${RED}[VIBRANIUM]${RESET} However, you're missing the ${YELLOW}VM Manager${RESET} app"
+        if term::ask_yes_no Y "Install it now?"; then
+            if vb-pkg-install --embedded -- virt-manager; then
+                if term::ask_yes_no Y "Launch it now?"; then
+                    exec setsid -f virt-manager &>/dev/null
+                fi
+            else
+                echo -e "${RED}[VIBRANIUM]${RESET} Failed to install ${YELLOW}virt-manager${RESET}"
+            fi
+        else
+            echo -e "${YELLOW}[VIBRANIUM]${RESET} Remember that you need the ${YELLOW}virt-manager${RESET} package to manage virtual machines"
+        fi
+    else
+        echo -e "${BLUE}[VIBRANIUM]${RESET} You can start using it by launching ${YELLOW}Virtual Machine Manager${RESET} in App Launcher"
+    fi
+}
+
 # ─────────────────────────────────────────────────────────────
 
-term::show_header
 term::disable_input
 
 if [[ "$CHASSIS_TYPE" == vm ]] && [[ "$_allow_paravirtualization" == false ]]; then
@@ -88,11 +107,42 @@ fi
 if command -v virsh > /dev/null; then
     if systemctl -q is-enabled libvirtd.socket ||
         systemctl -q is-enabled libvirtd.service; then
+
+        # Show green logo as indication of success
+        term::show_header --color green
+
         echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU is already set up and running"
-        _operation_complete
-        exit 0
+        _ensure_virt_manager
+    else
+        term::show_header
+        echo -e "${YELLOW}[VIBRANIUM]${RESET} The QEMU was set up before, but looks like required service is down"
+
+        if term::ask_yes_no Y "Would you like to fix it now?"; then
+            term::enable_input
+
+            if ! sudo systemctl -q enable --now libvirtd.socket; then
+                log::error "Failed to enable systemd unit"
+                term::disable_input
+                _operation_canceled
+                exit 1
+            fi
+
+            echo -e "${GREEN}[VIBRANIUM]${RESET} Enabled and started ${YELLOW}libvirtd.socket${RESET}"
+
+            term::disable_input
+            _ensure_virt_manager
+        else
+            echo -e "${YELLOW}[VIBRANIUM]${RESET} You've set up QEMU before. Don't forget to enable ${YELLOW}libvirtd.socket${RESET} manually"
+        fi
     fi
+
+    echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/QEMU${RESET} for further, advanced configuration"
+    _operation_complete
+    exit 0
 fi
+
+# And the default yellow otherwise
+term::show_header
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup QEMU VM (${BLUE}libvirt${RESET})"
 
@@ -141,9 +191,11 @@ for rule in "${summary_rules[@]}"; do
 done
 echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
 echo ""
+echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/QEMU${RESET} for further, advanced configuration"
 
 if term::ask_yes_no Y "Launch VM Manager now?"; then
     exec setsid -f virt-manager &>/dev/null
 else
     _operation_complete
 fi
+
