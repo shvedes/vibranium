@@ -53,8 +53,11 @@ while true; do
   if [[ -z "$UPDATE_CHANNEL" ]]; then
     branch="$(git -C "$VIBRANIUM" branch --show-current)"
     if [[ "$branch" =~ ^(master|dev|v*)$ ]]; then
+      UPDATE_CHANNEL="$branch"
       OPTIONS+=("Update channel : ${UPDATE_CHANNEL^}")
     fi
+  else
+    OPTIONS+=("Update channel : ${UPDATE_CHANNEL^}")
   fi
 
   OPTIONS+=(
