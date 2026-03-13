@@ -17,6 +17,7 @@ if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   exit 1
 fi
 
+export SUDO_PROMPT="$(printf '%s[SUDO]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 export CHASSIS_TYPE="$(hostnamectl chassis)"
 export VIBRANIUM="$HOME/.local/share/vibranium"
 export PATH="$PATH:$VIBRANIUM/bin"
@@ -24,8 +25,6 @@ export PATH="$PATH:$VIBRANIUM/bin"
 # ========================================== #
 
 source vb-core-lib &> /dev/null
-
-export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
 
 export -f term::discard_buffer
 export -f term::disable_input
@@ -43,6 +42,8 @@ for helper in "$SCRIPT_DIR/helpers"/*.sh; do
 done
 
 # ========================================== #
+
+touch /tmp/vb-install-ongoing
 
 exec </dev/tty
 
@@ -95,8 +96,6 @@ fi
         sleep 5
     done
 ) &
-
-touch /tmp/vb-install-ongoing
 
 YAY_PRESENT=false
 

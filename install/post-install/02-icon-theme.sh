@@ -7,12 +7,6 @@ CACHE_DIR="$HOME/.cache"
 PAPIRUS_REPO="https://github.com/PapirusDevelopmentTeam/papirus-icon-theme.git"
 PAPIRUS_FOLDERS_URL="https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders/refs/heads/master/papirus-folders"
 
-YELLOW=$'\e[0;33m'
-GREEN=$'\e[0;32m'
-CYAN=$'\e[0;36m'
-RESET=$'\e[0m'
-GRAY=$'\e[90m'
-
 spinner_frames=(
     '[=           ]'
     '[==          ]'
@@ -35,7 +29,7 @@ _spinner() {
   local i=0
 
   while true; do
-    printf "\r\033[K%s[ICONS]%s Installing icons %s" \
+    printf "\r\033[K%s[ICON THEME]%s Installing icons %s" \
       "$YELLOW" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
 
     i=$(( (i + 1) % ${#spinner_frames[@]} ))
@@ -66,5 +60,5 @@ cp -r "$VIBRANIUM/extras/icon_theme/Vibranium" "$ICONS_DIR"
 ln -sf "$ICONS_DIR" "$HOME/.icons"
 
 kill "$spinner_pid" 2>/dev/null; wait "$spinner_pid" 2>/dev/null
-printf "\r\033[K%s[ICONS]%s Icons installed\n" "$GREEN" "$RESET"
+printf "\r\033[K%s[INFO]%s Icons installed\n" "$CYAN" "$RESET"
 

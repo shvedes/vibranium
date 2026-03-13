@@ -1,11 +1,5 @@
 #!/usr/bin/env bash
 
-YELLOW=$'\e[0;33m'
-GREEN=$'\e[0;32m'
-RESET=$'\e[0m'
-GRAY=$'\e[90m'
-CYAN=$'\e[0;36m'
-
 spinner_frames=(
     '[=           ]' '[==          ]' '[===         ]' '[====        ]'
     '[ ====       ]' '[  ====      ]' '[   ====     ]' '[    ====    ]'
@@ -302,5 +296,5 @@ rm -f "$frame_file"
 mv "$HOME/.themes" "$HOME/.local/share"
 ln -sf "$HOME/.local/share/.themes" "$HOME/.themes"
 
-printf "\r\033[K%s[GTK THEMES]%s GTK themes installed\n" "$GREEN" "$RESET"
+printf "\r\033[K%s[INFO]%s GTK themes installed\n" "$CYAN" "$RESET"
 
