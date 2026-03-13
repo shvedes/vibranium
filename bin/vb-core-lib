@@ -716,17 +716,19 @@ term::ask_yes_no() {
 
     while true; do
         if [[ -f /tmp/vb-install-ongoing ]]; then
-            prompt=$'\e[0;34m[QSTN]\e[0m '"${message} ${hint}: "
+            # Used once when installing Vibranium. Nowhere else.
+            prompt=$'\e[0;36m[QSTN]\e[0m '"${message} ${hint}: "
         else
             prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
         fi
-
 
         printf "%s" "$prompt"
         read -r input
 
         # Use default if empty
-        [[ -z "$input" ]] && input="$default"
+        if [[ -z "$input" ]]; then
+            input="$default"
+        fi
 
         case "$input" in
             [Yy][Ee][Ss]|[Yy])
@@ -743,54 +745,6 @@ term::ask_yes_no() {
                 ;;
         esac
     done
-}
-
-
-# A term::spinner utility function.
-# Displays an animated term::spinner in the terminal while a given process (PID) is running.
-#
-# Usage: long_running_command & term::spinner $! "Doing stuff..." "Done"
-#
-# Parameters:
-# $1 - PID of the process to wait for.
-# $2 - Message to display alongside the term::spinner.
-# $3 - (Optional) Final message to display when the process completes.
-#
-# The term::spinner uses Unicode braille characters for a smooth animation.
-# It clears itself once the process finishes, and optionally prints a success message.
-term::spinner() {
-    # The PID of the process to watch
-    local pid=$1
-
-    # The message to show while spinning
-    local msg="$2"
-
-    # Delay between term::spinner frames (seconds)
-    local delay=0.1
-    local spinstr
-
-    spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-
-    # ANSI sequence to clear the current line
-    local clear_line="\r\033[K"
-
-    # While the process exists, animate the term::spinner
-    while kill -0 "$pid" 2> /dev/null; do
-        for i in "${spinstr[@]}"; do
-            printf "\r${msg} %s" "${i} "
-            sleep $delay
-        done
-    done
-
-    # Clear the spinner once finished
-    printf "%b" "$clear_line"
-
-    # Print the final message if provided
-    if [ -n "$3" ]; then
-        printf "%s %s\n" "$msg" "$3"
-    else
-        printf "%s\n" "$msg"
-    fi
 }
 
 # A term::spinner utility function.

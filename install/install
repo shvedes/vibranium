@@ -138,8 +138,6 @@ done
 # to the bottom
 clear; tput cup 9999 0
 
-rm -f /tmp/vb-install-ongoing
-
 term::show_header --color green
 
 _log_success "Installation complete. System restart required"
@@ -147,11 +145,12 @@ _log_success "You have to pick Hyprland (uwsm-managed) in the login manager"
 _log_success "Otherwise Vibranium will NOT WORK"
 
 if term::ask_yes_no Y "Reboot now?"; then
+    rm -f /tmp/vb-install-ongoing
     for sec in {5..1}; do
         for step in {0..3}; do
             dots=$(printf "%.*s" "$step" "...")
             printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" \
-                "$YELLOW" "$RESET" "$sec" "$dots"
+                "$GREEN" "$RESET" "$sec" "$dots"
             sleep 0.25
         done
     done
@@ -159,4 +158,6 @@ if term::ask_yes_no Y "Reboot now?"; then
     systemctl reboot
 fi
 
+rm -f /tmp/vb-install-ongoing
 term::enable_input
+
