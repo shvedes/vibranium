@@ -72,6 +72,7 @@ _toggle_loopback &
 mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
 
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
+  vb-menu
   vb-util-first-run
   exit 0
 fi
