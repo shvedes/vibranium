@@ -48,7 +48,7 @@ fi
 
 if [ -n "$module_signal" ]; then
   kill -RTMIN+"$module_signal" "$waybar_pid"
-  kill -RTMIN+"${signals[dynamic - separator]}" "$waybar_pid"
+  kill -RTMIN+"${signals[dynamic-separator]}" "$waybar_pid"
 else
   echo "Unknown module: $module_name" >&2
   exit 1
