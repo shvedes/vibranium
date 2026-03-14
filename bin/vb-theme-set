@@ -22,49 +22,49 @@ declare -A STANDALONE_THEMES=(
 
 # Map theme to GTK theme name if special
 declare -A GTK_MAP=(
-   [Osaka - Jade]="Nightfox-Terafox"
-   [Osaka - Osaka]="Osaka-Dark"
-   [Osaka - Solarized]="Osaka-Solarized"
-   [Osaka - Light]="Osaka-Light"
-   [Nightfox - Nightfox]="Nightfox"
+   [Osaka-Jade]="Nightfox-Terafox"
+   [Osaka-Osaka]="Osaka-Dark"
+   [Osaka-Solarized]="Osaka-Solarized"
+   [Osaka-Light]="Osaka-Light"
+   [Nightfox-Nightfox]="Nightfox"
    [Evergarden]="Everforest-Hard"
 )
 
 declare -A PAPIRUS_COLORS=(
-   [Gruvbox - Hard]=yaru
-   [Gruvbox - Medium]=yaru
-   [Gruvbox - Soft]=yaru
-   [Gruvbox - Light]=palebrown
+   [Gruvbox-Hard]=yaru
+   [Gruvbox-Medium]=yaru
+   [Gruvbox-Soft]=yaru
+   [Gruvbox-Light]=palebrown
 
-   [Everforest - Hard]=green
-   [Everforest - Medium]=green
-   [Everforest - Soft]=green
+   [Everforest-Hard]=green
+   [Everforest-Medium]=green
+   [Everforest-Soft]=green
 
-   [Catppuccin - Mocha]=indigo
-   [Catppuccin - Macchiato]=indigo
-   [Catppuccin - Frappe]=nordic
-   [Catppuccin - Latte]=blue
+   [Catppuccin-Mocha]=indigo
+   [Catppuccin-Macchiato]=indigo
+   [Catppuccin-Frappe]=nordic
+   [Catppuccin-Latte]=blue
 
-   [Nightfox - Nightfox]=bluegrey
-   [Nightfox - Carbonfox]=black
-   [Nightfox - Nordfox]=nordic
-   [Nightfox - Terafox]=teal
+   [Nightfox-Nightfox]=bluegrey
+   [Nightfox-Carbonfox]=black
+   [Nightfox-Nordfox]=nordic
+   [Nightfox-Terafox]=teal
 
    [Rosepine]=violet
-   [Rosepine - Moon]=violet
-   [Rosepine - Dawn]=indigo
+   [Rosepine-Moon]=violet
+   [Rosepine-Dawn]=indigo
 
-   [Tokyonight - Night]=blue
-   [Tokyonight - Moon]=blue
+   [Tokyonight-Night]=blue
+   [Tokyonight-Moon]=blue
 
-   [Osaka - Osaka]=teal
-   [Osaka - Jade]=teal
-   [Osaka - Solarized]=darkcyan
-   [Osaka - Light]=green
+   [Osaka-Osaka]=teal
+   [Osaka-Jade]=teal
+   [Osaka-Solarized]=darkcyan
+   [Osaka-Light]=green
 
-   [Kanagawa - Wave]=yaru
-   [Kanagawa - Dragon]=yaru
-   [Kanagawa - Lotus]=palebrown
+   [Kanagawa-Wave]=yaru
+   [Kanagawa-Dragon]=yaru
+   [Kanagawa-Lotus]=palebrown
 
    [Evergarden]=bluegrey
 )
@@ -315,9 +315,9 @@ Options:
 
 Arguments:
   THEME             Theme to apply. Accepted formats (case-insensitive):
-                      gruvbox-hard          folder name  (fastest)
-                      Gruvbox-Hard          capitalized folder name
-                      "Gruvbox Hard"        space-separated family + variant
+                    gruvbox-hard      folder name
+                    Gruvbox-Hard      capitalized folder name
+                    "Gruvbox Hard"    space-separated family + variant
 
                     Standalone themes (no variant) are passed as a single
                     word, e.g.: evergarden
