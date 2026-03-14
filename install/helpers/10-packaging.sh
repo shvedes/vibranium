@@ -29,9 +29,10 @@ InstallPackages() {
     local i
     i=$(cat "$5")
     while true; do
-      printf "\r\033[K%s[PKGS]%s Installing %s%s [%d/%d] %s" \
-        "$CYAN" "$RESET" "${CYAN}${1}${RESET}" "${4}" "$2" "$3" \
-        "${GRAY}${spinner_frames[$i]}${RESET}"
+      printf "\r\033[K%s[PKGS]%s %s Installing %s%s [%d/%d]" \
+        "$CYAN" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}" \
+        "${CYAN}${1}${RESET}" "${4}" "$2" "$3"
+
       echo "$i" > "$5"
       i=$(((i + 1) % ${#spinner_frames[@]}))
       sleep 0.15
