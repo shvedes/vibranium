@@ -110,24 +110,24 @@ if ! pacman -Qq "yay" &> /dev/null; then
   fi
 fi
 
-_log_info "Setting up system and configs"
+echo -e "${YELLOW}[INFO]${RESET} Setting up system and configs"
 for script in "$SCRIPT_DIR/config"/*.sh; do
   bash "$script"
 done
 
-_log_info "Initializing package installation"
+echo -e "${YELLOW}[INFO]${RESET} Initializing package installation"
 for script in "$SCRIPT_DIR/packaging"/*.sh; do
   yay --noconfirm -Sy &> /dev/null
   bash "$script"
 done
 
-_log_info "Setting up hardware & GPU drivers"
+echo -e "${YELLOW}[INFO]${RESET} Setting up hardware"
 for script in "$SCRIPT_DIR/config/hardware"/*.sh; do
   bash "$script"
 done
 
-_log_info "Basic installation complete"
-_log_info "Executing post-install hooks..."
+echo -e "${YELLOW}[INFO]${RESET} Basic installation complete"
+echo -e "${YELLOW}[INFO]${RESET} Executing post-install hooks..."
 for script in "$SCRIPT_DIR/post-install"/*.sh; do
   bash "$script"
 done

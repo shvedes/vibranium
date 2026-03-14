@@ -18,6 +18,7 @@ _operation_complete() {
 
 _configure_ssh() {
   command -v ssh &> /dev/null || return 2 # ssh absent
+  # Create the rule anyway
   # systemctl -q is-enabled sshd || return 2   # sshd not enabled
 
   local port
