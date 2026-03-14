@@ -60,7 +60,15 @@ _set_rofi_theme() {
 }
 
 _manage_user_wallpapers() {
-  if [[ -z "$(ls -A $XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vb-theme-get))" ]]; then
+  local wallpaper_dir files
+
+  wallpaper_dir="$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$(vb-theme-get)"
+
+  shopt -s nullglob
+  files=("$wallpaper_dir"/*)
+  shopt -u nullglob
+
+  if (( ${#files[@]} == 0 )); then
     notify-send -r 1 "Vibranium" "No user wallpapers found for current theme"
     return
   fi
