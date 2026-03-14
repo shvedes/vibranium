@@ -28,7 +28,5 @@ sudo tee /etc/tmpfiles.d/thp-shrinker.conf > /dev/null << EOF
 w! /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none - - - - 409
 EOF
 
-
-UpdateSummary "tmpfiles.d/coredump.conf: clear all coredumps that were created more than 3 days ago"
-UpdateSummary "tmpfiles.d/thp-shrinker.conf: added THP Shrinker"
-
+UpdateSummary "System / tmpfiles.d: coredump cleanup policy for >3 days applied"
+UpdateSummary "System / tmpfiles.d: THP Shrinker configuration applied (source: CachyOS)"

@@ -78,9 +78,10 @@ vm.dirty_background_bytes = $DIRTY_BACKGROUND_BYTES
 # vm.dirty_writeback_centisecs = $DIRTY_WRITEBACK_CENTISECS
 EOF
 
-
-UpdateSummary "/etc/sysctl.d/vibranium-vm.conf: adjusted virtual memory management based on machine type. Your machine type: $MACHINE_TYPE"
-UpdateSummary "/etc/sysctl.d/vibranium-sysctl.conf: kernel messages (not to be confused with systemd messages) are hidden by default."
-UpdateSummary "/etc/sysctl.d/vibranium-sysctl.conf:         It's mostly not that useful information"
-UpdateSummary "/etc/sysctl.d/vibranium-sysctl.conf: increased netdev receive queue. May help with packet losses"
-UpdateSummary "/etc/sysctl.d/vibranium-sysctl.conf: and some more minor changes"
+UpdateSummary "System / sysctl: virtual memory management tuned for machine type ($MACHINE_TYPE)"
+UpdateSummary "System / sysctl: kernel messages hidden and printk output suppressed"
+UpdateSummary "System / sysctl: kernel pointer restrictions and kexec disabled"
+UpdateSummary "System / sysctl: netdev receive queue increased to 4096"
+UpdateSummary "System / sysctl: file handle and inode cache increased to 2097152"
+UpdateSummary "System / sysctl: swappiness set to 100, vfs cache pressure to 50, page-cluster to 0"
+UpdateSummary "System / sysctl: dirty page limits configured based on machine type"

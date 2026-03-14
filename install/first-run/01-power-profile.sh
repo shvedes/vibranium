@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  exit 0
+fi
+
 _get_power_profile() {
   if [[ "$CHASSIS_TYPE" == desktop ]]; then
     echo "performance"

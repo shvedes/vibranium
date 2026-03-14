@@ -10,4 +10,4 @@ for file in "$MIGRATIONS_DIR"/*.sh; do
   : > "$STATE_DIR/"${file##*/}""
 done
 
-UpdateSummary "general: generated existing migrations"
+UpdateSummary "Migrations: created state tracking files for all available migration scripts"

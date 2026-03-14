@@ -4,8 +4,6 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 0
 fi
 
-
-
 shopt -s nullglob
 
 units=(
@@ -23,12 +21,13 @@ base_url="https://gitlab.archlinux.org/archlinux/archiso/-/raw/master/configs/re
 echo -e "${CYAN}[INFO]${RESET} Setting up networking"
 
 InstallPackages iwd impala
+UpdateSummary "System / network: installed iwd as wireless backend. Use 'impala' as user TUI frontend"
 
 if pacman -Qq networkmanager &> /dev/null; then
   echo -e "${CYAN}[INFO]${RESET} Removing ${YELLOW}NetworkManager${RESET}"
   sudo pacman -Rnsc --noconfirm networkmanager &> /dev/null
   sudo systemctl -q disable NetworkManager
-  UpdateSummary "/etc/systemd/network: removed NetworkManager"
+  UpdateSummary "System / network: replaced NetworkManager with systemd-networkd and iwd"
 fi
 
 echo -e "${CYAN}[INFO]${RESET} Configuring network settings"
@@ -59,7 +58,6 @@ for unit in ${m_units[@]}; do
   sudo systemctl -q mask $unit
 done
 
-UpdateSummary "/etc/systemd/network: installed iwd as wireless backend"
-UpdateSummary "/etc/systemd/network: set up systemd-networkd .network configs"
-UpdateSummary "/etc/systemd/network: archiso releng branch used as reference for .network files"
-UpdateSummary "/etc/systemd/network: systemd-resolved as system DNS resolver"
+UpdateSummary "System / network: configured systemd-networkd with Arch ISO reference profiles"
+UpdateSummary "System / network: enabled systemd-resolved as system DNS resolver"
+UpdateSummary "System / network: masked systemd-networkd-wait-online to prevent boot delays"

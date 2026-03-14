@@ -16,4 +16,4 @@ else
   fi
 fi
 
-UpdateSummary "general: set update channel to $CURRENT_BRANCH"
+UpdateSummary "Configuration: set Vibranium update channel to $CURRENT_BRANCH"

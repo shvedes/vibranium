@@ -20,7 +20,6 @@ grep -qxF 'nodelay' "$FAILLOCK_CONF" ||
 sudo grep -q '^auth.*pam_unix\.so.*try_first_pass nullok nodelay' "$SYSTEM_AUTH_CONF" ||
   sudo sed -Ei '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\bnullok\b/& nodelay/' "$SYSTEM_AUTH_CONF"
 
-
-UpdateSummary "sudoers.d/vibranium: enabled interactive prompt"
-UpdateSummary "sudoers.d/vibranium: removed sudo delay when entering wrong password"
-UpdateSummary "sudoers.d/vibranium: increased failed tries to 5"
+UpdateSummary "Security / sudo: interactive prompt enabled"
+UpdateSummary "Security / faillock: failed attempts increased to 5"
+UpdateSummary "Security / faillock: sudo delay on wrong password removed"

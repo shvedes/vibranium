@@ -9,4 +9,4 @@ for src in "${!LINKS[@]}"; do
   ln -sf "$src" "${LINKS[$src]}" > /dev/null
 done
 
-UpdateSummary "general: set up special symlinks"
+UpdateSummary "Configuration: created UWSM environment symlink from Vibranium defaults"

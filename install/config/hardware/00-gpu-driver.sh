@@ -8,7 +8,9 @@ VGA_STR="$(lspci | grep -iE "vga|3d")"
 case "$VGA_STR" in
   *Nvidia*)
     _log_info "Installing NVIDIA GPU drivers"
-    UpdateSummary "gpu driver: installed nvidia gpu driver"
+    UpdateSummary "GPU / NVIDIA: installed drivers (nvidia-dkms, nvidia-utils, nvidia-settings)"
+    UpdateSummary "GPU / NVIDIA: enabled Wayland support (egl-wayland)"
+    UpdateSummary "GPU / NVIDIA: added VA-API acceleration (libva-nvidia-driver)"
     NVIDIA_SETUP_NEEDED=true
     PACKAGES+=(
       "nvtop"
@@ -24,7 +26,9 @@ case "$VGA_STR" in
 
   *Radeon* | *ATI*)
     _log_info "Installing AMD GPU drivers"
-    UpdateSummary "gpu driver: installed amd gpu driver"
+    UpdateSummary "GPU / AMD: installed drivers (mesa, vulkan-radeon)"
+    UpdateSummary "GPU / AMD: enabled 32-bit support (lib32-mesa, lib32-vulkan-radeon)"
+    UpdateSummary "GPU / AMD: added ROCm support for GPU monitoring (rocm-smi-lib)"
     PACKAGES+=(
       "mesa"
       "nvtop"
@@ -37,9 +41,10 @@ case "$VGA_STR" in
     ;;
 
   *UHD* | *Iris* | *Arc* | *"HD Graphics"*)
-    UpdateSummary "gpu driver: installed basic intel gpu driver"
-    UpdateSummary "gpu driver: detected intel's iGPU generation and installed appropriate driver packages"
     _log_info "Installing Intel GPU drivers"
+    UpdateSummary "GPU / Intel: installed base drivers (mesa, vulkan-intel)"
+    UpdateSummary "GPU / Intel: enabled 32-bit support (lib32-mesa, lib32-vulkan-intel)"
+
     PACKAGES+=(
       "mesa"
       "nvtop"
@@ -52,21 +57,25 @@ case "$VGA_STR" in
       # Broadwell (2014) and newer
       *Broadwell* | *Skylake* | *"Kaby Lake"* | *"Coffee Lake"* | *"Comet Lake"* | *"Ice Lake"* | *"Tiger Lake"* | *"Alder Lake"* | *"Raptor Lake"* | *Arc*)
         PACKAGES+=("intel-media-driver")
+        UpdateSummary "GPU / Intel: installed media driver for hardware video acceleration (Broadwell+)"
         ;;
 
       # GMA 4500 (2008) up to pre-Broadwell
       *Penryn* | *Nehalem* | *Westmere* | *"Sandy Bridge"* | *"Ivy Bridge"* | *Haswell*)
         PACKAGES+=("libva-intel-driver")
+        UpdateSummary "GPU / Intel: installed legacy VA-API driver for hardware video (pre-Broadwell)"
         ;;
     esac
 
     case "$VGA_STR" in
       *"Tiger Lake"* | *"Alder Lake"* | *"Raptor Lake"*)
         PACKAGES+=("vpl-gpu-rt")
+        UpdateSummary "GPU / Intel: installed VPL runtime for hardware encoding on Xe architecture"
         ;;
 
       *)
         PACKAGES+=("intel-media-sdk")
+        UpdateSummary "GPU / Intel: installed Media SDK for hardware encoding"
         ;;
     esac
     ;;

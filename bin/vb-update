@@ -139,6 +139,7 @@ _update() {
     echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $remote_short"
   fi
 
+  vb-cmd-reload --quiet
   _pause
 }
 

@@ -30,4 +30,5 @@ fi
 
 rm -f /tmp/nvidia-setup-needed
 
-UpdateSummary "nvidia: set up nvidia driver (kernel modules, mkinitcpio.conf edits)"
+UpdateSummary "GPU / NVIDIA: added nvidia modules to mkinitcpio.conf (nvidia, nvidia_modeset, nvidia_uvm, nvidia_drm)"
+UpdateSummary "GPU / NVIDIA: backed up original mkinitcpio.conf to /etc/mkinitcpio.conf.bak"

@@ -14,5 +14,7 @@ sudo cp -r "$VIBRANIUM"/extras/etc/udev/rules.d /etc/udev/
 sudo cp -r "$VIBRANIUM"/extras/usr/local/bin/* /usr/local/bin/
 sudo sed -i "s/user_placeholder/$USER/g" /usr/local/bin/*
 
-
-UpdateSummary "/etc/udev/rules.d: added custom udev rules"
+UpdateSummary "System / pacman: added custom pacman hooks"
+UpdateSummary "System / polkit: added rules for sudoless mounting"
+UpdateSummary "System / udev: added power plug and USB notification rules"
+UpdateSummary "System / scripts: added auxiliary udev scripts"

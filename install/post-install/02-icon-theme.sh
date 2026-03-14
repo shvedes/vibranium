@@ -29,7 +29,7 @@ _spinner() {
   local i=0
 
   while true; do
-    printf "\r\033[K%s[INFO]%s Installing icons %s" \
+    printf "\r\033[K%s[INFO]%s %s Installing icon theme" \
       "$CYAN" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
 
     i=$(((i + 1) % ${#spinner_frames[@]}))

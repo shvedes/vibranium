@@ -12,9 +12,7 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   sed -i '/\"bluetooth\"/s/\"/\/\/ /' "$waybar_cfg"
   sed -i '/\"custom\/nightshift\"/s/\"/\/\/ /' "$waybar_cfg"
 
-  UpdateSummary "vm branch: disbaled animations by default"
-  UpdateSummary "vm branch: removed night light"
-  UpdateSummary "vm branch: removed bluetooth app"
-  UpdateSummary "vm branch: removed bluetooth waybar module"
-  UpdateSummary "vm branch: removed night light waybar module"
+  UpdateSummary "VM environment: disabled Hyprland animations"
+  UpdateSummary "VM environment: removed Bluetooth application and Waybar module"
+  UpdateSummary "VM environment: removed night light Waybar module"
 fi

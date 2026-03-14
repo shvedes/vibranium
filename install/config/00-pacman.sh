@@ -24,7 +24,6 @@ grep -q '^ParallelDownloads = 10' "$PACMAN_CONF" ||
 # Remove the default wallpaper plugin, which works only in XFCE
 # It will be replaced with the vibranium script
 sudo sed -i '/^NoExtract/ s|$| usr/lib/thunarx-3/thunar-wallpaper-plugin.so|' "$PACMAN_CONF"
-sudo rm -f /usr/lib/thunarx-3/thunar-wallpaper-plugin.so
 
 # Always compile AUR packages for native CPU microarchitecture
 grep -q '\-march=native' "$MAKEPKG_CONF" ||
@@ -36,10 +35,10 @@ grep -Eq '^OPTIONS=.*\bdebug\b' "$MAKEPKG_CONF" &&
 
 sudo pacman -Sy --noconfirm &> /dev/null
 
-UpdateSummary "pacman.conf: enabled colorized output"
-UpdateSummary "pacman.conf: enabled multilib repository"
-UpdateSummary "pacman.conf: enabled verbose packages list"
-UpdateSummary "pacman.conf: enabled and increased parallel downloads to 10"
-UpdateSummary "pacman.conf: added thunar's wallpaper plugin .so file to NoExtract list"
-UpdateSummary "makepkg.conf: set -march to 'native'"
-UpdateSummary "makepkg.conf: <pkg>-debug is disabled by default"
+UpdateSummary "System / pacman: colorized output enabled"
+UpdateSummary "System / pacman: multilib repository enabled"
+UpdateSummary "System / pacman: verbose package list enabled"
+UpdateSummary "System / pacman: parallel downloads set to 10"
+UpdateSummary "System / pacman: thunar wallpaper plugin excluded via NoExtract"
+UpdateSummary "System / pacman: compilation optimized with -march=native (makepkg.conf)"
+UpdateSummary "System / pacman: debug package generation disabled (makepkg.conf)"

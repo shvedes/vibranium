@@ -8,4 +8,4 @@ for f in "${FILES[@]}"; do
   chmod ug-w "$f"
 done
 
-UpdateSummary "configs: set specific file permissions"
+UpdateSummary "Security: removed write permissions for user/group on Hyprland's main config"

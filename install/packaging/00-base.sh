@@ -18,6 +18,7 @@ unset packages
 
 if term::ask_yes_no Y "Enable MTP (Android / Digital Cameras)?"; then
   packages+=(gvfs-mtp)
+  UpdateSummary "User choice: installed gvfs-mtp for Android and camera support"
 fi
 
 if ((${#packages[@]} > 0)); then

@@ -65,8 +65,16 @@ ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland
 EOF
 done
 
+UpdateSummary "Systemd: masked systemd-networkd-wait-online to prevent boot delays"
+UpdateSummary "Systemd: enabled system services (display manager, power profiles)"
+UpdateSummary "Systemd: enabled user services (Waybar, idle daemon, clipboard, etc.)"
+UpdateSummary "Systemd: enabled vibranium-update timer for automatic updates"
+UpdateSummary "Systemd: created service overrides with Hyprland environment condition"
+
 masked_u_services=("at-spi-dbus-bus")
 
 for unit in "${masked_u_services[@]}"; do
   systemctl -q --user mask "$unit"
 done
+
+UpdateSummary "Systemd: masked at-spi-dbus-bus user service (not needed in a wm environment)"

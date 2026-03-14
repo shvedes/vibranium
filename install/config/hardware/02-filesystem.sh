@@ -10,6 +10,7 @@ if [[ "$ROOT_FS" == "btrfs" ]]; then
 
   if term::ask_yes_no Y "Would you like to install them?"; then
     PACKAGES+=(btrfs-progs compsize)
+    UpdateSummary "System / Storage: installed BTRFS tools (btrfs-progs, compsize) - user choice"
   fi
 fi
 
@@ -22,10 +23,10 @@ if [[ "$(lsblk -f)" =~ ntfs ]]; then
     _log_success "otherwise the partition will be mounted as read-only."
 
     PACKAGES+=(ntfs-3g)
+    UpdateSummary "System / Storage: installed NTFS-3G driver for NTFS partition access - user choice"
   fi
 fi
 
 if ((${#PACKAGES[@]} > 0)); then
-  UpdateSummary "general: installed ${PACKAGES[@]} (user's choise)"
   InstallPackages "${PACKAGES[@]}"
 fi

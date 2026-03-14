@@ -17,8 +17,16 @@ _log_error() {
 }
 
 UpdateSummary() {
-  local file="$HOME/Vibranium Installation Summary"
-  printf "%s\n" "$*" >> "$file"
+  local file="$HOME/Installation Summary.txt"
+  local lines=0
+
+  if [[ -f "$file" ]]; then
+    while IFS= read -r; do
+      ((lines++))
+    done < "$file"
+  fi
+
+  printf "%d. %s\n" "$((lines + 1))" "$*" >> "$file"
 }
 
 export -f _log_info
