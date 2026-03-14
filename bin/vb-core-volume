@@ -268,7 +268,7 @@ feedback() {
 # Prevent concurrent invocations (e.g. rapid key repeats or external triggers)
 # from racing against each other. flock acquires an exclusive lock on the file
 # descriptor; any second instance will exit immediately (-n) rather than queue.
-exec 9> "/tmp/${0##*/}.lock"
+exec 9> "$VIBRANIUM_RUNTIME/${0##*/}.lock"
 flock -n 9 || exit 0
 
 # --- Argument parsing ---
@@ -343,10 +343,11 @@ if [[ -z "$action" ]]; then
   exit 1
 fi
 
-helpers::check VIBRANIUM_GLOBAL_USE_OSD
-helpers::check VIBRANIUM_VOLUME_ADJUSTMENT_STEP
-helpers::check VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK
-helpers::check VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
+helpers::check \
+  VIBRANIUM_GLOBAL_USE_OSD \
+  VIBRANIUM_VOLUME_ADJUSTMENT_STEP \
+  VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK \
+  VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
 
 case "$action" in
   vol-up)

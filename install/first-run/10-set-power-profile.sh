@@ -10,7 +10,6 @@ _get_power_profile() {
   else
     local battery_file
     local battery_status
-
     battery_file="/sys/class/power_supply/BAT0/status"
 
     if [[ -f "$battery_file" ]]; then
@@ -19,12 +18,11 @@ _get_power_profile() {
       if [[ "$battery_status" == "Charging" ]]; then
         echo "performance"
       else
-        echo "balanced"
+        echo "power-saver"
       fi
     else
       echo "balanced"
     fi
-
   fi
 }
 
@@ -33,10 +31,14 @@ vb-core-power "$POWER_PROFILE"
 
 if [[ "$POWER_PROFILE" == "performance" ]]; then
   if [[ "$CHASSIS_TYPE" == desktop ]]; then
-    msg="Vibranium is running on a desktop. Performance power profile was set explicitly"
+    msg="Vibranium is running on a desktop PC"
   else
-    msg="You're running off AC. Performance power profile was set explicitly"
+    msg="You're running off AC"
   fi
 
-  notify-send -r $RANDOM -t 10000 "Power Management" "$msg"
+  notify-send -r $RANDOM -t 10000 "Power Management" "${msg}.\
+    Performance profile set explicitly"
+elif [[ "$POWER_PROFILE" == "power-saver" ]]; then
+  notify-send -r $RANDOM -t 10000 "Power Management" \
+    "You're running off battery. Power-saver profile set explicitly"
 fi

@@ -4,6 +4,10 @@ Version=1.0
 Name=Suspend
 Icon=suspend
 Keywords=Sleep;Standby
+# VM specific: we don't installl ddcutil in a virtual machine,
+# so this is relatively safe way to hide the suspend option
+# from the power menu.
+TryExec=ddcutil
 Exec=vb-cmd-suspend
 Terminal=false
 Categories=Power;

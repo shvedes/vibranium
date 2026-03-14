@@ -10,7 +10,7 @@ cat << EOF > "$XDG_CONFIG_HOME/hypr/xdph.conf"
 
 screencopy {
   max_fps = $REFRESH_RATE
-	allow_token_by_default = true
+  allow_token_by_default = true
 }
 EOF
 

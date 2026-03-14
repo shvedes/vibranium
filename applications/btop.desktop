@@ -4,5 +4,5 @@ Name=System Monitor
 TryExec=btop
 Exec=vb-core-term -- btop
 Icon=utilities-system-monitor
-Keywords=btop;disk;network;cpu;gpu;process;monitor
+Keywords=btop;disk;network;cpu;gpu;process;monitor;resource;manager;
 OnlyShowIn=Hyprland;
