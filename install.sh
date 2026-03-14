@@ -7,6 +7,13 @@ if [[ "$(id -u)" == 0 ]]; then
     exit 1
 fi
 
+. /etc/os-release
+
+if [[ "$NAME" != "Arch Linux" ]]; then
+  echo "Only vanilla Arch supported!" >&2
+  exit 1
+fi
+
 INSTALL_DIR="$HOME/.local/share/vibranium"
 REPO_URL="https://github.com/shvedes/vibranium"
 

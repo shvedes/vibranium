@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+_log_info "Setting up systemd units"
+
 system_services=(
   "ly@tty1"
   "power-profiles-daemon"

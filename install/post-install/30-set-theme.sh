@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+_log_info "Applying default theme"
+
 THEME_PATH="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
 
 cp -r "$HOME/.local/share/vibranium/config/.gtkrc-2.0" "$HOME"

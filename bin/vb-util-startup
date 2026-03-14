@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
 
+LOGFILE="$VIBRANIUM_CACHE/${0##*/}.errors"
+
 # A small piece of logic that runs when the session starts.
 # Nothing much is happening here right now, but in the future,
 # I think it will be possible to implement something like self-check for the entire setup.
-
-source vb-core-lib
-
-LOGFILE="$VIBRANIUM_CACHE/${0##*/}.errors"
 
 # This function handles cases where the monitor brightness might have been changed
 # manually, dual-boot (e.g. Monitorian), or through any external means outside the script.
@@ -61,19 +59,21 @@ _toggle_loopback() {
 
 mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
 
+source vb-core-lib
+
+CURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme" 2> /dev/null)"
+CURSOR_THEME="${CURSOR_THEME:-Adwaita}"
+
+CURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size" 2> /dev/null)"
+CURSOR_SIZE="${CURSOR_SIZE:-24}"
+
+vb-theme-cursor-set "$CURSOR_THEME" --size "$CURSOR_SIZE" &
+
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
-  setsid -f vb-menu
   vb-util-first-run
   exit 0
 fi
 
-CURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme")"
-CURSOR_THEME="${CURSOR_THEME:-Adwaita}"
-
-CURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size")"
-CURSOR_SIZE="${CURSOR_SIZE:-24}"
-
-vb-theme-cursor-set "$CURSOR_THEME" --size "$CURSOR_SIZE" &
 _toggle_loopback &
 
 wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"

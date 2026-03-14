@@ -4,6 +4,8 @@ waybar_cfg="$HOME/.config/waybar/config.jsonc"
 hypr_cfg="$HOME/.config/hypr/hyprland.conf.d/look-and-feel.conf"
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
+  _log_info "Setting VM-specific options"
+
   # Disable animations
   vb-cmd-edit-wm-config "animations:enabled:false" "$hypr_cfg"
 

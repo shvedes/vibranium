@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+_log_info "Copying configs"
+
 mkdir -p \
   "$HOME"/.config/vibranium/{theme,startup,shutdown} \
   "$HOME"/.config/heroic/{themes,store} \
@@ -15,7 +17,3 @@ mkdir -p \
 
 cp -r "$VIBRANIUM/config/"* "$HOME/.config/"
 cp -r "$VIBRANIUM/extras/local/bin/"* "$HOME/.local/bin"
-
-ln -sf "$VIBRANIUM/applications/hidden/"*.desktop "$HOME/.local/share/applications"
-ln -sf "$VIBRANIUM/applications/"*.desktop "$HOME/.local/share/applications"
-ln -sf "$VIBRANIUM/applications/custom" "$HOME/.local/share/applications"
