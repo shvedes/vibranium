@@ -57,24 +57,24 @@ tput cup 9999 0
 term::disable_input
 term::show_header
 
-_log_info "Welcome to Vibranium, an Omarchy-like Arch Linux configuration."
+_log_info "Welcome to ${CYAN}Vibranium${RESET}, an ${GREEN}Omarchy${RESET}-like ${CYAN}Arch Linux${RESET} configuration."
 _log_info "It is designed to be simple, extremely fast, and highly customizable."
 _log_info ""
 _log_info "This installer will directly modify system files, install packages,"
 _log_info "change configuration across the system, and tune everything"
 _log_info "specifically for your hardware."
 _log_info ""
-_log_info "WARNING: This installer creates NO backups."
+_log_info "${YELLOW}WARNING${RESET}: This installer creates ${RED}NO${RESET} backups."
 _log_info "Existing configuration files may be overwritten without notice."
 _log_info ""
-_log_info "Vibranium is NOT intended to be installed on an existing system."
+_log_info "Vibranium is ${RED}NOT${RESET} intended to be installed on an existing system."
 _log_info "Running it on a system that already contains data, custom configs,"
 _log_info "or another setup may break your environment or cause data loss."
 _log_info ""
 _log_info "Only proceed if this is a fresh Arch Linux installation created"
 _log_info "manually or with archinstall."
 _log_info ""
-_log_info "If you are unsure, STOP now and create a clean installation first."
+_log_info "If you are unsure, ${RED}STOP${RESET} now and create a clean installation first."
 
 if term::ask_yes_no Y "Proceed with Installation?"; then
   if ! term::ask_yes_no Y "Proceed with Installation? (double check)"; then
