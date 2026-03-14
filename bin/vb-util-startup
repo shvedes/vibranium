@@ -59,6 +59,8 @@ _toggle_loopback() {
   fi
 }
 
+mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
+
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
   setsid -f vb-menu
   vb-util-first-run
@@ -72,10 +74,7 @@ CURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size")"
 CURSOR_SIZE="${CURSOR_SIZE:-24}"
 
 vb-theme-cursor-set "$CURSOR_THEME" --size "$CURSOR_SIZE" &
-
 _toggle_loopback &
-
-mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
 
 wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"
 [[ -f "$wallpaper_file" ]] || vb-cmd-get-wallpaper > "$wallpaper_file"
