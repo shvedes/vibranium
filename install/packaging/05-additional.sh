@@ -2,6 +2,7 @@
 
 packages=()
 user_pkgs=()
+user_pkgs_present=false
 
 if term::ask_yes_no Y "Install optional but not mandatory packages?"; then
   packages+=(wev nwg-look)
@@ -13,6 +14,7 @@ if term::ask_yes_no Y "Install some cursor themes?"; then
 fi
 
 if term::ask_yes_no Y "Any additional packages you want to install?"; then
+  user_pkgs_present=true
   printf "%s[>>>>]%s Enter packages (space-separated): %s" "$CYAN" "$RESET" "$YELLOW"
   trap 'printf "%s" "$RESET"' INT
 
@@ -26,10 +28,14 @@ if term::ask_yes_no Y "Any additional packages you want to install?"; then
   trap - INT
 fi
 
-if ((${#packages[@]} > 0)); then
-  InstallPackages "${packages[@]}"
+if [[ "$user_pkgs_present" == true ]]; then
+  packages+=(${user_pkgs[@]})
 fi
 
-if ((${#user_pkgs[@]} > 0)); then
-  InstallPackages --verify "${user_pkgs[@]}"
+if ((${#packages[@]} > 0)); then
+  if [[ "$user_pkgs_present" == true ]]; then
+    InstallPackages --verify "${packages[@]}"
+  else
+    InstallPackages "${packages[@]}"
+  fi
 fi
