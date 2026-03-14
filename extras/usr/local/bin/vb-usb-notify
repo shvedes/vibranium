@@ -121,6 +121,7 @@ source "/home/user_placeholder/.config/vibranium/theme/current/vibranium-lib-the
 
 case "$1" in
   add)
+    what="Connected"
     if [[ -n "$target_dev" && "$include_devpath" -eq 1 ]]; then
       msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> connected as <span foreground='${P_YELLOW}'><b>${target_dev}</b></span>"
     else
@@ -128,6 +129,7 @@ case "$1" in
     fi
   ;;
   remove)
+    what="Disconnected"
     # For remove: if DEVNAME was EFI -> we already ignored earlier. Use same logic to show dev if desired.
     if [[ -n "$target_dev" && "$include_devpath" -eq 1 ]]; then
         msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> <span foreground='${P_RED}'><b>disconnected</b></span>"
@@ -137,5 +139,5 @@ case "$1" in
   ;;
 esac
 
-systemd-run -M user_placeholder@.host --user notify-send -r 10 "USB Storage Connected" "$msg"
+systemd-run -M user_placeholder@.host --user notify-send -r 10 "USB Storage $what" "$msg"
 
