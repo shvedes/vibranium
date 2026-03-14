@@ -8,3 +8,5 @@ declare -A LINKS=(
 for src in "${!LINKS[@]}"; do
   ln -sf "$src" "${LINKS[$src]}" > /dev/null
 done
+
+UpdateSummary "general: set up special symlinks"

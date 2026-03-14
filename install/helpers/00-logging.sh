@@ -16,7 +16,13 @@ _log_error() {
   echo -e "\e[0;31m[ERROR]\e[0m ${*}"
 }
 
+UpdateSummary() {
+  local file="$HOME/Vibranium Installation Summary"
+  printf "%s\n" "$*" >> "$file"
+}
+
 export -f _log_info
 export -f _log_warn
 export -f _log_error
 export -f _log_success
+export -f UpdateSummary

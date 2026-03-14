@@ -7,3 +7,5 @@ FILES=(
 for f in "${FILES[@]}"; do
   chmod ug-w "$f"
 done
+
+UpdateSummary "configs: set specific file permissions"

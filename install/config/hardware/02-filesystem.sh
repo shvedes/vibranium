@@ -26,5 +26,6 @@ if [[ "$(lsblk -f)" =~ ntfs ]]; then
 fi
 
 if ((${#PACKAGES[@]} > 0)); then
+  UpdateSummary "general: installed ${PACKAGES[@]} (user's choise)"
   InstallPackages "${PACKAGES[@]}"
 fi

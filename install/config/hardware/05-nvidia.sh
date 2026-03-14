@@ -29,3 +29,5 @@ if ! sudo mkinitcpio -P &> /dev/null; then
 fi
 
 rm -f /tmp/nvidia-setup-needed
+
+UpdateSummary "nvidia: set up nvidia driver (kernel modules, mkinitcpio.conf edits)"

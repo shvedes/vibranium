@@ -8,6 +8,7 @@ VGA_STR="$(lspci | grep -iE "vga|3d")"
 case "$VGA_STR" in
   *Nvidia*)
     _log_info "Installing NVIDIA GPU drivers"
+    UpdateSummary "gpu driver: installed nvidia gpu driver"
     NVIDIA_SETUP_NEEDED=true
     PACKAGES+=(
       "nvtop"
@@ -23,6 +24,7 @@ case "$VGA_STR" in
 
   *Radeon* | *ATI*)
     _log_info "Installing AMD GPU drivers"
+    UpdateSummary "gpu driver: installed amd gpu driver"
     PACKAGES+=(
       "mesa"
       "nvtop"
@@ -35,6 +37,8 @@ case "$VGA_STR" in
     ;;
 
   *UHD* | *Iris* | *Arc* | *"HD Graphics"*)
+    UpdateSummary "gpu driver: installed basic intel gpu driver"
+    UpdateSummary "gpu driver: detected intel's iGPU generation and installed appropriate driver packages"
     _log_info "Installing Intel GPU drivers"
     PACKAGES+=(
       "mesa"

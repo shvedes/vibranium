@@ -9,3 +9,5 @@ mkdir -p "$STATE_DIR"
 for file in "$MIGRATIONS_DIR"/*.sh; do
   : > "$STATE_DIR/"${file##*/}""
 done
+
+UpdateSummary "general: generated existing migrations"

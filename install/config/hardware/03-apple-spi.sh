@@ -14,4 +14,5 @@ if [[ $product_name =~ MacBook[89],1|MacBook1[02],1|MacBookPro13,[123]|MacBookPr
   else
     echo "MODULES=(applespi intel_lpss_pci spi_pxa2xx_platform)" | sudo tee /etc/mkinitcpio.conf.d/macbook_spi_modules.conf > /dev/null
   fi
+  UpdateSummary "apple: set up apple's spi keyboard (fix)"
 fi

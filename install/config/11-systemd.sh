@@ -27,3 +27,8 @@ sudo tee /etc/tmpfiles.d/thp-shrinker.conf > /dev/null << EOF
 # madvise   is  used,  while  still  providing  an  equal  performance improvement
 w! /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none - - - - 409
 EOF
+
+
+UpdateSummary "tmpfiles.d/coredump.conf: clear all coredumps that were created more than 3 days ago"
+UpdateSummary "tmpfiles.d/thp-shrinker.conf: added THP Shrinker"
+

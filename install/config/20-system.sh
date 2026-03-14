@@ -13,3 +13,6 @@ sudo cp -r "$VIBRANIUM"/extras/etc/udev/rules.d /etc/udev/
 # Auxiliary scripts (executed by the udev)
 sudo cp -r "$VIBRANIUM"/extras/usr/local/bin/* /usr/local/bin/
 sudo sed -i "s/user_placeholder/$USER/g" /usr/local/bin/*
+
+
+UpdateSummary "/etc/udev/rules.d: added custom udev rules"

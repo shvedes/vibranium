@@ -2,12 +2,14 @@
 
 case "$CHASSIS_TYPE" in
   laptop | convertible | tablet)
+    MACHINE_TYPE="Laptop / Tablet / Convertible"
     DIRTY_BYTES="134217728"
     DIRTY_BACKGROUND_BYTES="33554432"
     DIRTY_WRITEBACK_CENTISECS="1000"
     ;;
 
   desktop)
+    MACHINE_TYPE="Desktop"
     DIRTY_BYTES="268435456"
     DIRTY_BACKGROUND_BYTES="67108864"
     DIRTY_WRITEBACK_CENTISECS="1500"
@@ -75,3 +77,10 @@ vm.dirty_background_bytes = $DIRTY_BACKGROUND_BYTES
 # hundredths of a second. Default is 500.
 # vm.dirty_writeback_centisecs = $DIRTY_WRITEBACK_CENTISECS
 EOF
+
+
+UpdateSummary "/etc/sysctl.d/vibranium-vm.conf: adjusted virtual memory management based on machine type. Your machine type: $MACHINE_TYPE"
+UpdateSummary "/etc/sysctl.d/vibranium-sysctl.conf: kernel messages (not to be confused with systemd messages) are hidden by default."
+UpdateSummary "/etc/sysctl.d/vibranium-sysctl.conf:         It's mostly not that useful information"
+UpdateSummary "/etc/sysctl.d/vibranium-sysctl.conf: increased netdev receive queue. May help with packet losses"
+UpdateSummary "/etc/sysctl.d/vibranium-sysctl.conf: and some more minor changes"

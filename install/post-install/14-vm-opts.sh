@@ -11,4 +11,10 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   rm ~/.local/share/applications/bluetui.desktop
   sed -i '/\"bluetooth\"/s/\"/\/\/ /' "$waybar_cfg"
   sed -i '/\"custom\/nightshift\"/s/\"/\/\/ /' "$waybar_cfg"
+
+  UpdateSummary "vm branch: disbaled animations by default"
+  UpdateSummary "vm branch: removed night light"
+  UpdateSummary "vm branch: removed bluetooth app"
+  UpdateSummary "vm branch: removed bluetooth waybar module"
+  UpdateSummary "vm branch: removed night light waybar module"
 fi

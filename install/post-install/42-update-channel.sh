@@ -15,3 +15,5 @@ else
     printf "%s" "$CURRENT_BRANCH" > "$STATE_FILE"
   fi
 fi
+
+UpdateSummary "general: set update channel to $CURRENT_BRANCH"

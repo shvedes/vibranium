@@ -24,4 +24,5 @@ if term::ask_yes_no N "Would you like to setup CUPS printing service?"; then
   fi
 
   sudo systemctl -q enable cups cups-browsed avahi-daemon
+  UpdateSummary "printing: Set up CUPS (user's choise)"
 fi

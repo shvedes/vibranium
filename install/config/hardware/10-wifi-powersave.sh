@@ -8,9 +8,11 @@ if vb-cmd-battery-present; then
 SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="0", RUN+="$HOME/.local/share/vibranium/bin/vb-cmd-wifi-powersave --on"
 SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="1", RUN+="$HOME/.local/share/vibranium/bin/vb-cmd-wifi-powersave --off"
 EOF
+UpdateSummary "wifi(laptop branch): added custom udev rule corresponding for automatic powersave state"
 else
   cat << EOF | sudo tee "/etc/udev/rules.d/99-wifi-powersave.rules" > /dev/null
 # Desktop specific: disable Wifi's powersave mode on every boot
 ACTION=="add", SUBSYSTEM=="net", KERNEL=="wl*", RUN+="$HOME/.local/share/vibranium/bin/vb-cmd-wifi-powersave --off"
 EOF
+UpdateSummary "wifi(desktop branch): added custom udev rule that removes powersave completely"
 fi

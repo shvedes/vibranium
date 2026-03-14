@@ -4,6 +4,8 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 0
 fi
 
+
+
 shopt -s nullglob
 
 units=(
@@ -26,6 +28,7 @@ if pacman -Qq networkmanager &> /dev/null; then
   echo -e "${CYAN}[INFO]${RESET} Removing ${YELLOW}NetworkManager${RESET}"
   sudo pacman -Rnsc --noconfirm networkmanager &> /dev/null
   sudo systemctl -q disable NetworkManager
+  UpdateSummary "/etc/systemd/network: removed NetworkManager"
 fi
 
 echo -e "${CYAN}[INFO]${RESET} Configuring network settings"
@@ -56,3 +59,7 @@ for unit in ${m_units[@]}; do
   sudo systemctl -q mask $unit
 done
 
+UpdateSummary "/etc/systemd/network: installed iwd as wireless backend"
+UpdateSummary "/etc/systemd/network: set up systemd-networkd .network configs"
+UpdateSummary "/etc/systemd/network: archiso releng branch used as reference for .network files"
+UpdateSummary "/etc/systemd/network: systemd-resolved as system DNS resolver"
