@@ -2,6 +2,10 @@
 
 # Source: Omarchy
 
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  exit 0
+fi
+
 if vb-cmd-battery-present; then
   cat << EOF | sudo tee "/etc/udev/rules.d/99-wifi-powersave.rules" > /dev/null
 # Laptop specific: toggle Wifi powersave based on charging state

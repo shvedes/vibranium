@@ -8,29 +8,18 @@ PAPIRUS_REPO="https://github.com/PapirusDevelopmentTeam/papirus-icon-theme.git"
 PAPIRUS_FOLDERS_URL="https://raw.githubusercontent.com/PapirusDevelopmentTeam/papirus-folders/refs/heads/master/papirus-folders"
 
 spinner_frames=(
-  '[=           ]'
-  '[==          ]'
-  '[===         ]'
-  '[====        ]'
-  '[ ====       ]'
-  '[  ====      ]'
-  '[   ====     ]'
-  '[    ====    ]'
-  '[     ====   ]'
-  '[      ====  ]'
-  '[       ==== ]'
-  '[        ====]'
-  '[         ===]'
-  '[          ==]'
-  '[           =]'
+  '[=   ]'
+  '[ =  ]'
+  '[  = ]'
+  '[   =]'
 )
 
 _spinner() {
   local i=0
 
   while true; do
-    printf "\r\033[K%s[INFO]%s %s Installing icon theme" \
-      "$CYAN" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
+    printf "\r\033[K%s Installing icon theme" \
+      "${GRAY}${spinner_frames[$i]}${RESET}"
 
     i=$(((i + 1) % ${#spinner_frames[@]}))
     sleep 0.15

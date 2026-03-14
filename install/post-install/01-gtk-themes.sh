@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 
 spinner_frames=(
-  '[=           ]' '[==          ]' '[===         ]' '[====        ]'
-  '[ ====       ]' '[  ====      ]' '[   ====     ]' '[    ====    ]'
-  '[     ====   ]' '[      ====  ]' '[       ==== ]' '[        ====]'
-  '[         ===]' '[          ==]' '[           =]'
+  '[=   ]'
+  '[ =  ]'
+  '[  = ]'
+  '[   =]'
 )
 
 # Create frame file once — persists across all install_theme() calls
@@ -17,8 +17,8 @@ _spinner() {
   local i
   i=$(cat "$file") # seed from previous run
   while true; do
-  printf "\r\033[K%s[INFO]%s %s Installing GTK theme: %s" \
-    "$CYAN" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}" "${CYAN}$name${RESET}"
+  printf "\r\033[K%s Installing GTK theme: %s" \
+    "${GRAY}${spinner_frames[$i]}${RESET}" "${CYAN}$name${RESET}"
     echo "$i" > "$file" # persist current index
     i=$(((i + 1) % ${#spinner_frames[@]}))
     sleep 0.15

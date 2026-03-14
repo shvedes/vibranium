@@ -14,11 +14,11 @@ InstallPackages() {
   local spinner_pid
   local pkg
   local aur_tag
-  local spinner_frames=(
-    '[=           ]' '[==          ]' '[===         ]' '[====        ]'
-    '[ ====       ]' '[  ====      ]' '[   ====     ]' '[    ====    ]'
-    '[     ====   ]' '[      ====  ]' '[       ==== ]' '[        ====]'
-    '[         ===]' '[          ==]' '[           =]'
+  spinner_frames=(
+    '[=   ]'
+    '[ =  ]'
+    '[  = ]'
+    '[   =]'
   )
 
   local frame_file
@@ -29,8 +29,8 @@ InstallPackages() {
     local i
     i=$(cat "$5")
     while true; do
-      printf "\r\033[K%s[PKGS]%s %s Installing %s%s [%d/%d]" \
-        "$CYAN" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}" \
+      printf "\r\033[K%s Installing %s%s [%d/%d]" \
+        "${GRAY}${spinner_frames[$i]}${RESET}" \
         "${CYAN}${1}${RESET}" "${4}" "$2" "$3"
 
       echo "$i" > "$5"

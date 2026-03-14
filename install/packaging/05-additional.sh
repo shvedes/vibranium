@@ -9,6 +9,7 @@ fi
 
 if term::ask_yes_no Y "Install some cursor themes?"; then
   packages+=(apple_cursor bibata-cursor-git xcursor-vanilla-dmz banana-cursor-bin)
+  touch /tmp/vibranium-set-cursor
 fi
 
 if term::ask_yes_no Y "Any additional packages you want to install?"; then
