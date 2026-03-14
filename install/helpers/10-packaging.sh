@@ -29,8 +29,8 @@ InstallPackages() {
     local i
     i=$(cat "$5")
     while true; do
-      printf "\r\033[K%s[PACKAGES]%s Installing %s%s [%d/%d] %s" \
-        "$YELLOW" "$RESET" "${CYAN}${1}${RESET}" "${4}" "$2" "$3" \
+      printf "\r\033[K%s[PKGS]%s Installing %s%s [%d/%d] %s" \
+        "$CYAN" "$RESET" "${CYAN}${1}${RESET}" "${4}" "$2" "$3" \
         "${GRAY}${spinner_frames[$i]}${RESET}"
       echo "$i" > "$5"
       i=$(((i + 1) % ${#spinner_frames[@]}))
@@ -53,7 +53,7 @@ InstallPackages() {
       if ! yay -Si "$pkg" &> /dev/null; then
         kill "$spinner_pid" 2> /dev/null
         wait "$spinner_pid" 2> /dev/null
-        printf "\r\033[K%s[PACKAGES]%s %s not found!" \
+        printf "\r\033[K%s[PKGS]%s %s not found!" \
           "$RED" "$RESET" "$pkg"
         sleep 1
         continue

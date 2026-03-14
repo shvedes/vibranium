@@ -29,8 +29,8 @@ _spinner() {
   local i=0
 
   while true; do
-    printf "\r\033[K%s[ICON THEME]%s Installing icons %s" \
-      "$YELLOW" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
+    printf "\r\033[K%s[INFO]%s Installing icons %s" \
+      "$CYAN" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
 
     i=$(((i + 1) % ${#spinner_frames[@]}))
     sleep 0.15
@@ -61,4 +61,5 @@ ln -sf "$ICONS_DIR" "$HOME/.icons"
 
 kill "$spinner_pid" 2> /dev/null
 wait "$spinner_pid" 2> /dev/null
+
 printf "\r\033[K%s[INFO]%s Icons installed\n" "$CYAN" "$RESET"

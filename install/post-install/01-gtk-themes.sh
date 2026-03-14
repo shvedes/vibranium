@@ -17,8 +17,8 @@ _spinner() {
   local i
   i=$(cat "$file") # seed from previous run
   while true; do
-    printf "\r\033[K%s[GTK THEMES]%s Installing %s%s%s %s" \
-      "$YELLOW" "$RESET" "$CYAN" "$name" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
+    printf "\r\033[K%s[INFO]%s Installing %s%s%s %s" \
+      "$CYAN" "$RESET" "$CYAN" "$name" "$RESET" "${GRAY}${spinner_frames[$i]}${RESET}"
     echo "$i" > "$file" # persist current index
     i=$(((i + 1) % ${#spinner_frames[@]}))
     sleep 0.15
@@ -85,14 +85,14 @@ install_theme() {
   if (($? != 0)); then
     kill "$spinner_pid" 2> /dev/null
     wait "$spinner_pid" 2> /dev/null
-    printf "\r\033[K%s[GTK THEMES]%s Failed to clone %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
+    printf "\r\033[K%s[INFO]%s Failed to clone %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
     return 1
   fi
 
   cd "$clone_dir/themes" || {
     kill "$spinner_pid" 2> /dev/null
     wait "$spinner_pid" 2> /dev/null
-    printf "\r\033[K%s[GTK THEMES]%s Failed to enter %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
+    printf "\r\033[K%s[INFO]%s Failed to enter %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
     cd ..
     rm -rf "$clone_dir"
     return 1
@@ -136,7 +136,7 @@ install_theme() {
     *)
       kill "$spinner_pid" 2> /dev/null
       wait "$spinner_pid" 2> /dev/null
-      printf "\r\033[K%s[GTK THEMES]%s No configuration for %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
+      printf "\r\033[K%s[INFO]%s No configuration for %s%s%s\n" "$RED" "$RESET" "$CYAN" "$display_name" "$RESET"
       cd ../..
       rm -rf "$clone_dir"
       return 1

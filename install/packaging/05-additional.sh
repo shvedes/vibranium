@@ -12,7 +12,7 @@ if term::ask_yes_no Y "Install some cursor themes?"; then
 fi
 
 if term::ask_yes_no Y "Any additional packages you want to install?"; then
-  printf "%s[INPUT]%s Enter packages (space-separated): %s" "$CYAN" "$RESET" "$YELLOW"
+  printf "%s[>>>>]%s Enter packages (space-separated): %s" "$CYAN" "$RESET" "$YELLOW"
   trap 'printf "%s" "$RESET"' INT
 
   # Handle input

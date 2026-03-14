@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-waybar_cfg="$XDG_CONFIG_HOME/waybar/config.jsonc"
+waybar_cfg="$HOME/.config/waybar/config.jsonc"
 hypr_cfg="$HOME/.config/hypr/hyprland.conf.d/look-and-feel.conf"
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
