@@ -9,7 +9,6 @@ fi
 
 EXPECTED_PATH="$HOME/.local/share/vibranium/install"
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
-SUDO_PROMPT="$(printf '%s[SUDO]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 
 if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   echo "ERROR: This script must be run from $EXPECTED_PATH" >&2
@@ -35,6 +34,8 @@ export -f term::ask_yes_no
 export PURPLE GREEN CYAN
 export RED YELLOW BLUE
 export GRAY RESET
+
+SUDO_PROMPT="$(printf '%s[SUDO]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 export SUDO_PROMPT
 
 # Source helpers
