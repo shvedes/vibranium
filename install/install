@@ -115,6 +115,7 @@ done
 
 _log_info "Initializing package installation"
 for script in "$SCRIPT_DIR/packaging"/*.sh; do
+  yay --noconfirm -Sy &> /dev/null
   bash "$script"
 done
 
