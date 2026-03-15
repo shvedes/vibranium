@@ -29,6 +29,8 @@ for i in "${!browsers[@]}"; do
   printf "%s[QSTN]%s %s%d)%s %s\n" "$CYAN" "$RESET" "$YELLOW" "$((i + 1))" "$RESET" "${browsers[$i]}"
 done
 
+echo -e "${CYAN}[QSTN]${RESET} Hint: ${CYAN}Chromium${RESET} is already included"
+
 while true; do
   printf "%s[>>>>]%s Enter number (1-%d): %s" "$CYAN" "$RESET" "${#browsers[@]}" "$YELLOW"
   trap 'printf "%s" "$RESET"' INT
