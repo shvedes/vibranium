@@ -17,6 +17,7 @@ Options:
   --conservative    Do not print any success / fail messages
 
   --force-install   Forefully install already installed packages
+  --skip-overview   Skip the pre-installation overview
   --keep-cache      Do not remove cached packages after install
   --embedded        Run in embedded mode. Usually called from inside another script
   -h,--help         Show this help and exit
@@ -237,9 +238,19 @@ _filter_packages() {
 
   if ((${#FILTERED[@]} == 0)); then
     if ((${#PACKAGES[@]} == 1)); then
-      echo -e "${GREEN}[VIBRANIUM]${RESET} Selected package is already installed"
+      # Since ${PACKAGES[@]} is a single package, we can refer it as a regular variable.
+      echo -e "${GREEN}[VIBRANIUM]${RESET} ${YELLOW}$PACKAGES${RESET} is already installed"
+
+      # Only single package branch
+      if term::ask_yes_no Y "Install it anyway?"; then
+        NO_ASK=true
+        SKIP_OVERVIEW=true
+        FORCE_INSTALL=true
+        FILTERED=(neovim)
+        return
+      fi
     else
-      echo -e "${GREEN}[VIBRANIUM]${RESET} Selected package(s) are already installed"
+      echo -e "${GREEN}[VIBRANIUM]${RESET} Selected packages are already installed"
     fi
 
     if [[ $EMBEDDED == false ]]; then
@@ -262,6 +273,10 @@ _filter_packages() {
 # (accounting for the header and the overview title line) and shows a
 # terminal-specific scrolling hint if it does.
 _show_overview() {
+  if [[ "$SKIP_OVERVIEW" == true ]]; then
+    return
+  fi
+
   local packages=("${FILTERED[@]}")
 
   if ((${#packages[@]} == 0)); then
@@ -413,6 +428,7 @@ NO_SYSTEMD=false
 KEEP_CACHE=false
 CONSERVATIVE=false
 FORCE_INSTALL=false
+SKIP_OVERVIEW=false
 EMBEDDED=false
 PACKAGES=()
 FILTERED=()
@@ -500,6 +516,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --force-install)
       FORCE_INSTALL=true
+      shift
+      ;;
+    --skip-overview)
+      SKIP_OVERVIEW=true
       shift
       ;;
     --)
