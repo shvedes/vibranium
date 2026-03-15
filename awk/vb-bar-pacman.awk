@@ -185,7 +185,7 @@ END {
     }
 
     # Build header text using the number of displayed updates
-    header_text = sprintf("%d update available", displayed)
+    header_text = sprintf("%d updates available", displayed)
 
     # Calculate padding to center the header within the longest line width
     pad = int((max_line - length(header_text)) / 2)

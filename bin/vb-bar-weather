@@ -109,7 +109,7 @@ fi
 
 TEMP_DATA="$VIBRANIUM_RUNTIME/bar.weather.json"
 
-wttrbar --location "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" > "$TEMP_DATA" &
+wttrbar --location "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" > "$TEMP_DATA" 2> /dev/null &
 pid=$!
 
 if [[ "$show_spinner" == "true" ]]; then
@@ -120,6 +120,18 @@ else
 fi
 
 WEATHER_JSON="$(< "$TEMP_DATA")"
+
+if [[ -z "$WEATHER_JSON" ]]; then
+  icon="<span foreground='red2'>\uf071</span>"
+
+  if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
+    icon+="  <span foreground='DimGray'>|</span>"
+  fi
+
+  tooltip="wttrbar exited with an error"
+  printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
+  exit 0
+fi
 
 # Build json output
 text="$(jq -r '.text' <<< "$WEATHER_JSON")"
