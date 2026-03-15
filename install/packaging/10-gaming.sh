@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  exit 0
+fi
+
 if ! term::ask_yes_no N "Would you like to install gaming-related packages?"; then
   exit 0
 fi
