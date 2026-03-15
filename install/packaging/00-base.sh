@@ -15,6 +15,8 @@ else
   _log_info "Running in a VM: excluding hardware-specific packages"
 fi
 
+rm -f /tmp/vibranium.packages
+
 for pkg in "${packages[@]}"; do
   printf "%s\n" "$pkg" >> /tmp/vibranium.packages
 done
