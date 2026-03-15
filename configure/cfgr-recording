@@ -118,7 +118,7 @@ _advanced_menu() {
       opts+=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN")
     fi
 
-    opts+=("Codec : $VIBRANIUM_RECORDING_VIDEO_CODEC")
+    opts+=("Video codec : $VIBRANIUM_RECORDING_VIDEO_CODEC")
 
     mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
     helpers::ui::menu chosen "Advanced" "ESC to go back" -- "${opts[@]}"

@@ -29,6 +29,7 @@ if pacman -Qq networkmanager &> /dev/null; then
   echo -e "${CYAN}[INFO]${RESET} Removing ${YELLOW}NetworkManager${RESET}"
   sudo pacman -Rnsc --noconfirm networkmanager &> /dev/null
   sudo systemctl -q disable NetworkManager
+  touch /tmp/vibranium-nm.removed
   UpdateSummary "System / network: replaced NetworkManager with systemd-networkd and iwd"
 fi
 

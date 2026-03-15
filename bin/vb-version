@@ -11,7 +11,7 @@ if [ "$HEAD" = "$TAG_COMMIT" ]; then
 else
   COMMITS_AHEAD=$(git -C "$VIBRANIUM" rev-list --count "$TAG"..HEAD)
 
-  echo "Vibranium ${TAG}+"
+  echo "Vibranium dev ${TAG}+"
   echo "Branch: ${BRANCH} @ ${HEAD} (${DATE})"
   echo "${COMMITS_AHEAD} commits ahead of ${TAG}"
 
