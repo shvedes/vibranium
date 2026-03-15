@@ -41,6 +41,39 @@ _ask_for_sudo() {
   term::disable_input
 }
 
+_spinner() {
+  local spinner_frames=(
+    '[=     ]'
+    '[==    ]'
+    '[ ==   ]'
+    '[  ==  ]'
+    '[   == ]'
+    '[    ==]'
+    '[     =]'
+  )
+
+  local i
+  i=$(cat "$5")
+
+  while true; do
+    if [[ "$3" == "1" ]]; then
+      printf "\r\033[K%s[VIBRANIUM]%s %s Installing %s%s" \
+        "$YELLOW" "$RESET" \
+        "${GRAY}${spinner_frames[$i]}${RESET}" \
+        "${YELLOW}${1}${RESET}" "${4}"
+    else
+      printf "\r\033[K%s[VIBRANIUM]%s %s Installing %s%s [%d/%d]" \
+        "$YELLOW" "$RESET" \
+        "${GRAY}${spinner_frames[$i]}${RESET}" \
+        "${YELLOW}${1}${RESET}" "${4}" "$2" "$3"
+    fi
+    echo "$i" > "$5"
+
+    i=$(( (i + 1) % ${#spinner_frames[@]} ))
+    sleep 0.15
+  done
+}
+
 # Detects systemd units (services and sockets) provided by a list of packages.
 # Delegates all categorization and ordering to the external awk script:
 #   "${VIBRANIUM}/systemd-units.awk"
@@ -273,27 +306,37 @@ _embed_install() {
   local total=${#FILTERED[@]}
   local current=0
   local pkg
-  local yay_opts="--needed"
+  local aur_tag
+  local spinner_pid
+  local frame_file
+  frame_file=$(mktemp)
+  echo 0 > "$frame_file"
 
+  local yay_opts="--needed"
   if [[ "$FORCE_INSTALL" == true ]]; then
     yay_opts=""
   fi
 
-  yay --noconfirm -Sy &> /dev/null
+  _is_aur() {
+    pacman -Si "$1" &> /dev/null && return 1 || return 0
+  }
 
   for pkg in "${FILTERED[@]}"; do
     ((current++))
 
-    if ((total == 1)); then
-      printf "\r\033[K%s[VIBRANIUM]%s Installing %s" \
-        "$YELLOW" "$RESET" "${YELLOW}${pkg}${RESET}"
-    else
-      printf "\r\033[K%s[VIBRANIUM]%s Installing %s [%d/%d]" \
-        "$YELLOW" "$RESET" "${YELLOW}${pkg}${RESET}" "$current" "$total"
-    fi
+    aur_tag=""
+    _is_aur "$pkg" && aur_tag=" [AUR]"
 
-    yay --noconfirm $needed_flag -S "$pkg" &> /dev/null
+    _spinner "$pkg" "$current" "$total" "$aur_tag" "$frame_file" &
+    spinner_pid=$!
+
+    yay --noconfirm $yay_opts -Sy "$pkg" &> /dev/null
+
+    kill "$spinner_pid" 2> /dev/null
+    wait "$spinner_pid" 2> /dev/null
   done
+
+  rm -f "$frame_file"
 
   if ((total == 1)); then
     printf "\r\033[K%s[VIBRANIUM]%s %s installed\n" \
