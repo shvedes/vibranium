@@ -1,8 +1,8 @@
 [Desktop Entry]
-Name=Image Editor
-GenericName=Modern Screenshot Annotation.
+Name=Image Annotator
+GenericName=Modern Screenshot Annotation
 TryExec=satty
-Exec=vb-util-image-editor
+Exec=vb-util-image-annotator
 Terminal=false
 Type=Application
 Keywords=wayland;snapshot;annotation;editing;
