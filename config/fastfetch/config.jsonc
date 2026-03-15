@@ -35,6 +35,13 @@
 			"format": "OS age {} days",
             "keyColor": "yellow"
 		},
+		{
+			"type": "command",
+			"text": "birth_install=$(stat -c %W $VIBRANIUM); current=$(date +%s); days_difference=$(( (current - birth_install) / 86400 )); echo $days_difference",
+            "key": "\uf111",
+			"format": "Vibranium age {} days",
+            "keyColor": "yellow"
+		},
         {
             "type": "packages",
             "key": "\uf111",
