@@ -33,7 +33,9 @@ else
   fi
 fi
 
-touch /tmp/vb-uncomment-mangohud
-InstallPackages "${packages[@]}"
+for pkg in "${packages[@]}"; do
+  printf "%s\n" "$pkg" >> /tmp/vibranium.packages
+done
 
+touch /tmp/vb-uncomment-mangohud
 UpdateSummary "User choice: installed gaming packages"

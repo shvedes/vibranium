@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 
 mapfile -t packages < <(grep -Ev '^(#|$)' "$VIBRANIUM/install/vb-base.pkgs")
+mapfile -t fonts < <(grep -Ev '^(#|$)' "$VIBRANIUM/install/vb-fonts.pkgs")
+
+packages+=(${fonts[@]})
 
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   packages+=(
@@ -12,15 +15,6 @@ else
   _log_info "Running in a VM: excluding hardware-specific packages"
 fi
 
-InstallPackages "${packages[@]}"
-
-unset packages
-
-if term::ask_yes_no Y "Enable MTP (Android / Digital Cameras)?"; then
-  packages+=(gvfs-mtp)
-  UpdateSummary "User choice: installed gvfs-mtp for Android and camera support"
-fi
-
-if ((${#packages[@]} > 0)); then
-  InstallPackages "${packages[@]}"
-fi
+for pkg in "${packages[@]}"; do
+  printf "%s\n" "$pkg" >> /tmp/vibranium.packages
+done
