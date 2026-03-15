@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  echo "Not available in a VM" >&2
+  exit 1
+fi
+
 source vb-core-lib
 
 _operation_canceled() {

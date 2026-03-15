@@ -97,6 +97,7 @@ _ensure_virt_manager() {
 term::disable_input
 
 if [[ "$CHASSIS_TYPE" == vm ]] && [[ "$_allow_paravirtualization" == false ]]; then
+  term::show_header --color red
   echo -e "${RED}[VIBRANIUM]${RESET} Running in a VM!"
   echo -e "${RED}[VIBRANIUM]${RESET} Paravirtualization is not recommended"
   echo -e "${RED}[VIBRANIUM]${RESET} Use ${CYAN}${0##*/} --allow-paravirtualization${RESET} to bypass this check"
