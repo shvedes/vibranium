@@ -68,6 +68,7 @@ fi
 
 echo -e "${CYAN}[INFO]${RESET} Symlinking ${CYAN}/etc/resolv.conf${RESET}"
 sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+sudo systemctl -q restart systemd-resolved
 
 UpdateSummary "System / network: configured systemd-networkd with Arch ISO reference profiles"
 UpdateSummary "System / network: enabled systemd-resolved as system DNS resolver"
