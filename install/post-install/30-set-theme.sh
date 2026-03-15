@@ -42,9 +42,11 @@ EOF
 # QT colors
 mkdir -p "$HOME"/.config/qt{5,6}ct/colors
 # Keep line width relatively short
-qt_target="$HOME"/.config/qt{5,6}ct/colors/vibranium.conf
-ln -sf "$HOME/.config/vibranium/theme/current/qt6ct.conf" $qt_target
-sed -i "s/user/$USER/" "$HOME"/.config/qt{5,6}ct/qt{5,6}ct.conf
+ln -sf "$HOME/.config/vibranium/theme/current/qt5ct.conf" \
+  "$HOME"/.config/qt5ct/colors/vibranium.conf
+ln -sf "$HOME/.config/vibranium/theme/current/qt6ct.conf" \
+  "$HOME"/.config/qt6ct/colors/vibranium.conf
+sed -i "s/user/$USER/" "$HOME"/.config/qt*ct/qt*ct.conf
 
 # GNOME appearance
 gsettings set org.gnome.desktop.interface gtk-theme "Nightfox"
