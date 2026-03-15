@@ -12,6 +12,8 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
 
   # Bluetooth & Night Light
   rm ~/.local/share/applications/bluetui.desktop
+  rm ~/.local/share/applications/impala.desktop
+
   sed -i '/\"bluetooth\"/s/\"/\/\/ /' "$waybar_cfg"
   sed -i '/\"custom\/nightshift\"/s/\"/\/\/ /' "$waybar_cfg"
 

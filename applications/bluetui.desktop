@@ -4,4 +4,5 @@ Name=Bluetooth Manager
 TryExec=bluetui
 Exec=vb-core-term -- bluetui
 Icon=bluetooth-active-symbolic
+Keywords=bluetooth;connection;
 OnlyShowIn=Hyprland;
