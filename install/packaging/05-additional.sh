@@ -4,8 +4,10 @@ packages=()
 user_pkgs=()
 user_pkgs_present=false
 
-if term::ask_yes_no Y "Install optional but not mandatory packages?"; then
-  packages+=(wev nwg-look)
+if term::ask_yes_no Y "Install optional general-purpose packages?"; then
+  packages+=(
+    wev usbutils smartmontools
+  )
 fi
 
 if term::ask_yes_no Y "Install some cursor themes?"; then
