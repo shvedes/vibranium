@@ -1,0 +1,191 @@
+#!/usr/bin/env bash
+
+source vb-core-lib
+
+_operation_canceled() {
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+
+  term::enable_input
+}
+
+_operation_complete() {
+  printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  read -n1 -r -p $'Setup complete. Press any key to exit ' dummy
+
+  term::enable_input
+}
+
+trap '_operation_canceled; exit 1' INT TERM HUP
+
+if [[ ! -f /sys/firmware/efi/fw_platform_size ]]; then
+  term::show_header --color red
+  echo -e "${RED}[VIBRANIUM]${RESET} Not in ${CYAN}UEFI${RESET} mode"
+  _operation_canceled
+  exit 1
+fi
+
+term::disable_input
+
+# Get the current boot entry via bootctl.
+# If it has a .efi extension, systemd-boot is using a UKI.
+# If it's a .conf file, it's a standard Boot Loader Specification (BLS) entry.
+# This single check tells us both:
+#   1) that systemd-boot is active,
+#   2) which boot type is in use (UKI or BLS).
+CURRENT_ENTRY=$(bootctl status | awk -F': ' '/Current Entry/ {print $2}')
+
+if [[ ! "$CURRENT_ENTRY" == *.efi ]]; then
+  term::show_header --color red
+  echo -e "${RED}[VIBRANIUM]${RESET} Only ${CYAN}UKI${RESET} method is supported"
+  echo -e "${RED}[VIBRANIUM]${RESET} A ${CYAN}Unified Kernel Image (UKI)${RESET} is a single ${CYAN}.efi${RESET} file bundling the kernel, initramfs,"
+  echo -e "${RED}[VIBRANIUM]${RESET} and boot parameters — required for Secure Boot signing to work end-to-end."
+  echo -e "${RED}[VIBRANIUM]${RESET} See: ${CYAN}https://wiki.archlinux.org/title/Unified_kernel_image${RESET}"
+  _operation_canceled
+  exit 1
+fi
+
+SECUREBOOT_EFIVAR=(/sys/firmware/efi/efivars/SecureBoot-*)
+SETUP_MODE_EFIVAR=(/sys/firmware/efi/efivars/SetupMode-*)
+
+if [[ ! -f "${SECUREBOOT_EFIVAR[0]}" || ! -f "${SETUP_MODE_EFIVAR[0]}" ]]; then
+  term::show_header --color red
+  echo -e "${RED}[VIBRANIUM]${RESET} Could not read Secure Boot EFI variables"
+  _operation_canceled
+  exit 1
+fi
+
+SECUREBOOT_RAW=$(od -An -t u1 -j4 -N1 "${SECUREBOOT_EFIVAR[0]}")
+SETUP_MODE_RAW=$(od -An -t u1 -j4 -N1 "${SETUP_MODE_EFIVAR[0]}")
+
+if (( SECUREBOOT_RAW == 1 )); then
+  term::show_header --color green
+  echo -e "${GREEN}[VIBRANIUM]${RESET} ${CYAN}Secure Boot${RESET} is already active"
+  _operation_complete
+  exit 0
+fi
+
+if (( SETUP_MODE_RAW == 0 )); then
+  term::show_header --color red
+  echo -e "${RED}[VIBRANIUM]${RESET} Secure Boot cannot be enabled: firmware locked (Setup mode off)"
+  echo -e "${RED}[VIBRANIUM]${RESET} Enable it in BIOS first"
+  _operation_canceled
+  exit 1
+fi
+
+# Use bootctl (already required) as the primary and most reliable ESP locator.
+# Fall back to well-known mount points only when bootctl comes up empty.
+ESP_MOUNT=$(bootctl --print-esp-path 2>/dev/null)
+
+if [[ -z "$ESP_MOUNT" ]]; then
+  if [[ -d /boot/efi ]]; then
+    ESP_MOUNT=/boot/efi
+  elif [[ -d /efi ]]; then
+    ESP_MOUNT=/efi
+  fi
+fi
+
+if [[ -z "$ESP_MOUNT" ]] || [[ ! -d "$ESP_MOUNT" ]]; then
+  term::show_header --color red
+  echo -e "${RED}[VIBRANIUM]${RESET} Could not locate a valid ESP mount point"
+  _operation_canceled
+  exit 1
+fi
+
+term::show_header
+
+if ! term::ask_yes_no Y "You're about to setup Secure Boot. Continue?"; then
+  _operation_canceled
+  exit 1
+fi
+
+(
+  while true; do
+    sudo -v
+    sleep 5
+  done
+) &
+
+sudo_pid=$!
+
+if ! command -v sbctl > /dev/null; then
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${CYAN}sbctl${RESET} not found"
+  vb-pkg-install --embedded -- sbctl
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Creating Secure Boot keys"
+if ! sudo sbctl --quiet create-keys; then
+  echo -e "${RED}[VIBRANIUM]${RESET} Failed to create keys"
+  _operation_canceled
+  exit 1
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Enrolling keys into firmware"
+if ! sudo sbctl --quiet enroll-keys --microsoft --firmware-builtin; then
+  echo -e "${RED}[VIBRANIUM]${RESET} Key enrollment failed"
+  _operation_canceled
+  exit 1
+fi
+
+EFI_FILES=()
+
+# Find all ESP files to sign
+while IFS= read -r f; do
+    EFI_FILES+=("$f")
+done < <(find "$ESP_MOUNT" -type f \( -iname '*.efi' \) )
+
+for file in "${EFI_FILES[@]}"; do
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Signing ${CYAN}$file${RESET}"
+  if ! sudo sbctl --quiet sign --save "$file"; then
+    echo -e "${RED}[VIBRANIUM]${RESET} Failed to sign $file"
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Rolling back: unenrolling keys from firmware"
+    sudo sbctl --quiet reset
+    _operation_canceled
+    exit 1
+  fi
+done
+
+sudo mkinitcpio -P &>/dev/null &
+if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Regenerating mkinitcpio" " - ${GREEN}Done${RESET}"; then
+  echo -e "${RED}[VIBRANIUM]${RESET} Failed to regenerate initramfs"
+  echo -e "${RED}[VIBRANIUM]${RESET} ${YELLOW}Warning${RESET}: your system may be unbootable without a valid initramfs."
+  echo -e "${RED}[VIBRANIUM]${RESET} Before rebooting, open another terminal and run: ${RED}sudo ${GREEN}mkinitcpio ${YELLOW}-P${RESET}"
+  _operation_canceled
+  exit 1
+fi
+
+for file in "${EFI_FILES[@]}"; do
+  if [[ "$file" == */Microsoft/* ]]; then
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Microsoft keys were enrolled alongside yours,"
+    echo -e "${GREEN}[VIBRANIUM]${RESET} so your Windows installation will continue to boot as usual"
+    break
+  fi
+done
+
+QUIRK_URLS=$(sudo sbctl status 2>/dev/null | grep -oP 'https://\S+')
+
+if [[ -n "$QUIRK_URLS" ]]; then
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Your firmware has known quirks that may affect security:"
+  while IFS= read -r url; do
+    echo -e "             ${CYAN}$url${RESET}"
+  done <<< "$QUIRK_URLS"
+fi
+
+kill $sudo_pid
+
+echo -e "${GREEN}[VIBRANIUM]${RESET} Secure Boot setup complete"
+if term::ask_yes_no Y "Restart is required. Reboot now?"; then
+  for sec in {5..1}; do
+    for step in {0..3}; do
+      dots=$(printf "%.*s" "$step" "...")
+      printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" \
+        "$GREEN" "$RESET" "$sec" "$dots"
+      sleep 0.25
+    done
+  done
+
+  systemctl reboot
+else
+  _operation_complete
+fi
+

@@ -3,6 +3,7 @@
 source vb-core-lib
 
 OPTIONS=(
+  "Secure Boot"
   "Firewall"
   "Docker"
   "QEMU"
@@ -16,6 +17,7 @@ while true; do
     "QEMU") vb-core-term --floating -- vb-setup-qemu ;;
     "Docker") vb-core-term --floating -- vb-setup-docker ;;
     "Firewall") vb-core-term --floating -- vb-setup-ufw ;;
+    "Secure Boot") vb-core-term --floating -- vb-setup-secure-boot ;;
   esac
 
   helpers::ui::close_menus
