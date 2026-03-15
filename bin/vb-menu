@@ -6,9 +6,13 @@ OPTIONS=(
   "Settings"
   "Packages"
   "Tweaks"
-  "Setup"
-  "Help"
 )
+
+if [[ "$CHASSIS_TYPE" != vm ]]; then
+  OPTIONS+=("Setup")
+fi
+
+OPTIONS+=("Help")
 
 if [[ -f "$VIBRANIUM_STATE/update.available" ]]; then
   OPTIONS+=("<b>Update Vibranium</b>")
