@@ -37,6 +37,13 @@ kernel.kexec_load_disabled = 1
 # May help prevent losing packets
 net.core.netdev_max_backlog = 4096
 
+# Work around Path MTU discovery failures ("PMTU black holes").
+# Some networks drop ICMP "fragmentation needed" messages, which
+# prevents proper MTU discovery and can cause stalls in long-lived
+# TCP sessions (SSH is a common victim). Enabling MTU probing lets
+# the kernel gradually reduce packet size until packets get through.
+net.ipv4.tcp_mtu_probing = 1
+
 # Set size of file handles and inode cache
 fs.file-max = 2097152
 EOF
@@ -85,3 +92,4 @@ UpdateSummary "System / sysctl: netdev receive queue increased to 4096"
 UpdateSummary "System / sysctl: file handle and inode cache increased to 2097152"
 UpdateSummary "System / sysctl: swappiness set to 100, vfs cache pressure to 50, page-cluster to 0"
 UpdateSummary "System / sysctl: dirty page limits configured based on machine type"
+UpdateSummary "System / sysctl: enabled TCP MTU probing to mitigate PMTU black holes""
