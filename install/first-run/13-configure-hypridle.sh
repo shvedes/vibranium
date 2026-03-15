@@ -11,6 +11,10 @@ case "$CHASSIS_TYPE" in
     MACHINE_TYPE="Portable (laptop/tablet)"
     ;;
 
+  vm)
+    exit 0
+    ;;
+
   # Desktop / Other
   *)
     # 10 minutes
@@ -18,7 +22,7 @@ case "$CHASSIS_TYPE" in
     # 15 minutes
     SLEEP_AFTER=900
     # set type
-    MACHINE_TYPE="Desktop/VM/any other"
+    MACHINE_TYPE="Desktop/Any other"
     ;;
 esac
 

@@ -9,7 +9,6 @@ system_services=(
 
 user_services=(
   "waybar"
-  "hypridle"
   "cliphist"
   "alacritty"
   "gnome-polkit"
@@ -17,7 +16,7 @@ user_services=(
 
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   system_services+=("bluetooth")
-  user_services+=("hyprpaper" "hyprsunset")
+  user_services+=("hyprpaper" "hyprsunset" "hypridle")
 fi
 
 user_timers=(

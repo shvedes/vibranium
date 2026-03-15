@@ -46,6 +46,8 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
     msg+="<span foreground='${P_RED}'><b>Bluetooth support is disabled</b></span>\n"
     msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
     msg+="<span foreground='${P_RED}'><b>Media Player app won't work at all</b></span>\n"
+    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+    msg+="<span foreground='${P_RED}'><b>Lockscreen isn't available</b></span>\n"
     notify-send -r $RANDOM -t 1800000 "Vibranium Is Running In a Virtual Machine (2)" "$msg"
   ) &
 fi

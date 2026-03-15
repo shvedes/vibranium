@@ -4,6 +4,10 @@ Version=1.0
 Name=Lock session
 Icon=lock
 Keywords=Session;Lock;Screensaver
+# VM specific: we don't installl ddcutil in a virtual machine,
+# so this is relatively safe way to hide the suspend option
+# from the power menu.
+TryExec=ddcutil
 Exec=loginctl lock-session
 Terminal=false
 Categories=Power;
