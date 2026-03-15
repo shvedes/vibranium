@@ -64,6 +64,7 @@ while true; do
     "OSD enabled : $VIBRANIUM_GLOBAL_USE_OSD"
     "<b>App launcher</b>"
     "<b>Player options</b>"
+    "<b>fgsfds!</b>"
     # "<b>Power profiles</b>"
   )
 
@@ -100,6 +101,11 @@ while true; do
       ;;
     "Confirm"*)
       _confirm_kill_submenu
+      ;;
+    *"fgsfds!"*)
+      curl -s https://0x0.st/PL_C.jpg --output /tmp/fgsfds!.jpg
+      imv /tmp/fgsfds!.jpg
+      helpers::ui::close_menus
       ;;
   esac
 done
