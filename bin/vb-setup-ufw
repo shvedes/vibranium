@@ -16,26 +16,6 @@ _operation_complete() {
   term::enable_input
 }
 
-_configure_ssh() {
-  command -v ssh &> /dev/null || return 2 # ssh absent
-  # Create the rule anyway
-  # systemctl -q is-enabled sshd || return 2   # sshd not enabled
-
-  local port
-  port=$(grep -Po '^Port\s+\K\d+' /etc/ssh/sshd_config)
-  port=${port:-22}
-
-  # Check if a rule for this port/subnet already exists
-  if sudo ufw status verbose 2> /dev/null | grep -qP "${port}/tcp.*192\.168\.1\.0/24|192\.168\.1\.0/24.*${port}/tcp"; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} SSH rule: already in place, skipping"
-    return 1 # unchanged
-  fi
-
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Allowing SSH on port ${CYAN}${port}/tcp${RESET} from ${GREEN}LAN${RESET}"
-  sudo ufw allow from 192.168.1.0/24 to any port "$port" proto tcp &> /dev/null
-  return 0 # applied
-}
-
 _configure_localsend() {
   command -v localsend &> /dev/null || return 2 # localsend absent
 
@@ -160,18 +140,9 @@ summary_rules=()
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting default firewall policies"
 sudo ufw default deny incoming &> /dev/null
 sudo ufw default allow outgoing &> /dev/null
-summary_rules+=("Default policy: ${RED}deny incoming${RESET}, ${GREEN}allow outgoing${RESET}")
-
-# ── SSH ───────────────────────────────────────────────────────
-_configure_ssh
-case $? in
-  0)
-    port=$(grep -Po '^Port\s+\K\d+' /etc/ssh/sshd_config)
-    port=${port:-22}
-    summary_rules+=("SSH: allowed from ${CYAN}192.168.1.0/24${RESET} on port ${CYAN}${port}/tcp${RESET}")
-    ;;
-  1) summary_rules+=("SSH: ${CYAN}unchanged${RESET}") ;;
-esac
+sudo ufw allow from 192.168.1.0/24 &> /dev/null
+summary_rules+=("Default policy (WAN): ${RED}deny incoming${RESET}, ${GREEN}allow outgoing${RESET}")
+summary_rules+=("Default policy (LAN): allow anything from LAN network")
 
 # ── LocalSend ─────────────────────────────────────────────────
 _configure_localsend
