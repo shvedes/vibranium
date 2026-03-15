@@ -18,7 +18,7 @@ RESET=$'\e[0m'
 
 # PKG / Font Install / Removal scripts
 VIBRANIUM_SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
-export VIBRANIUM_SUDO_PROMPT
+export SUDO_PROMPT=$VIBRANIUM_SUDO_PROMPT
 
 # helpers::ui::menu — Dynamic rofi dmenu wrapper with automatic window sizing
 #
@@ -786,6 +786,10 @@ term::spinner() {
     done
   done
 
+  # Capture exit code
+  wait "$pid"
+  local exit_code=$?
+
   # Clear the spinner once finished
   printf "%b" "$clear_line"
 
@@ -795,6 +799,9 @@ term::spinner() {
   else
     printf "%s\n" "$msg"
   fi
+
+  # propagate the exit code
+  return $exit_code
 }
 
 term::show_header() {
