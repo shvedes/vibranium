@@ -36,8 +36,8 @@ if [[ "$POWER_PROFILE" == "performance" ]]; then
     msg="You're running off AC"
   fi
 
-  notify-send -r $RANDOM -t 10000 "Power Management" "${msg}.\
-    Performance profile set explicitly"
+  notify-send -r $RANDOM -t 10000 "Power Management" \
+    "${msg}. Performance profile set explicitly"
 elif [[ "$POWER_PROFILE" == "power-saver" ]]; then
   notify-send -r $RANDOM -t 10000 "Power Management" \
     "You're running off battery. Power-saver profile set explicitly"

@@ -57,6 +57,14 @@ _toggle_loopback() {
   fi
 }
 
+(
+  if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
+    sleep 5
+    rm "$VIBRANIUM_STATE/secure-boot-setup.complete"
+    notify-send -r 1 -t 10000 "Secure Boot" "Secure Boot setup complete!"
+  fi
+) &
+
 mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
 
 source vb-core-lib

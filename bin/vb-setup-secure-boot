@@ -177,6 +177,7 @@ if [[ -n "$QUIRK_URLS" ]]; then
 fi
 
 kill $sudo_pid
+touch "$VIBRANIUM_STATE/secure-boot-setup.complete"
 
 echo -e "${GREEN}[VIBRANIUM]${RESET} Secure Boot setup complete"
 if term::ask_yes_no Y "Restart is required. Reboot now?"; then
