@@ -129,8 +129,8 @@ for script in "$SCRIPT_DIR/config/hardware"/*.sh; do
   bash "$script"
 done
 
-echo -e "${YELLOW}[INFO]${RESET} Basic installation complete"
-echo -e "${YELLOW}[INFO]${RESET} Executing post-install hooks..."
+# echo -e "${YELLOW}[INFO]${RESET} Basic installation complete"
+# echo -e "${YELLOW}[INFO]${RESET} Executing post-install hooks..."
 for script in "$SCRIPT_DIR/post-install"/*.sh; do
   bash "$script"
 done

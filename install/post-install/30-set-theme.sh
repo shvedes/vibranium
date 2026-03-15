@@ -2,12 +2,13 @@
 
 _log_info "Applying default theme"
 
-THEME_PATH="$HOME/.local/share/vibranium/themes/nightfox-nightfox"
+THEME_PATH="$VIBRANIUM/themes/nightfox-nightfox"
 
 cp -r "$VIBRANIUM/config/.gtkrc-2.0" "$HOME"
 
 # Symlink the default theme.
-ln -sf "$THEME_PATH" "$VIBRANIUM/theme/current"
+mkdir -p "$HOME/.config/vibranium/theme"
+ln -sf "$THEME_PATH" "$HOME/.config/vibranium/theme/current"
 
 # Symlink the btop theme as well
 mkdir -p "$HOME/.config/btop/themes"
