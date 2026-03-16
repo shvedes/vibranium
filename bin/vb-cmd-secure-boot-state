@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
 
-sb_status="$(bootctl status 2> /dev/null | awk '/Secure Boot/ {print $3}')"
-
 if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
   echo "pending reboot"
   exit 0
 fi
 
+sb_status="$(bootctl status 2> /dev/null | awk '/Secure Boot/ {print $3 $4}')"
+
 if [[ "$sb_status" == "disabled" ]]; then
   echo "disabled"
   exit 1
-elif [[ "$sb_status" =~ setup ]]; then
+elif [[ "$sb_status" == "disabled(setup)" ]]; then
   echo "setup"
   exit 2
-elif [[ "$sb_status" == "enabled" ]]; then
+elif [[ "$sb_status" == "enabled(user)" ]]; then
   echo "enabled"
   exit 0
 fi
