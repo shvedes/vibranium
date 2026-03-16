@@ -24,6 +24,13 @@ _operation_complete() {
 trap '_operation_canceled; exit 1' INT TERM HUP
 term::disable_input
 
+if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
+  term::show_header --color red
+  echo -e "${RED}[VIBRANIUM]${RESET} Setup has been done. Pending reboot."
+  _operation_canceled
+  exit 1
+fi
+
 if [[ ! -f /sys/firmware/efi/fw_platform_size ]]; then
   term::show_header --color red
   echo -e "${RED}[VIBRANIUM]${RESET} Not in ${CYAN}UEFI${RESET} mode"
@@ -97,7 +104,10 @@ term::show_header
 
 if term::ask_yes_no Y "You're about to setup Secure Boot. Continue?"; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} To work with efivars, Vibranium needs sudo"
-  sudo -v
+  # Keep sudo credentials window open, just in case.
+  # The subshell's pid is later killed.
+  (while true; do sudo -v; sleep 5; done) &
+  sudo_pid=$!
 else
   _operation_canceled
   exit 1
@@ -140,29 +150,20 @@ if [[ -z "$ESP_MOUNT" ]] || [[ ! -d "$ESP_MOUNT" ]]; then
   exit 1
 fi
 
-(
-  while true; do
-    sudo -v
-    sleep 5
-  done
-) &
-
-sudo_pid=$!
-
 if ! command -v sbctl > /dev/null; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} ${CYAN}sbctl${RESET} not found"
   vb-pkg-install --embedded -- sbctl
 fi
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Creating Secure Boot keys"
-if ! sudo sbctl --quiet create-keys; then
+sudo sbctl --quiet create-keys &
+if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Creating Secure Boot keys" "- ${GREEN}Done${RESET}"; then
   echo -e "${RED}[VIBRANIUM]${RESET} Failed to create keys"
   _operation_canceled
   exit 1
 fi
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Enrolling keys into firmware"
-if ! sudo sbctl --quiet enroll-keys --microsoft --firmware-builtin; then
+sudo sbctl --quiet enroll-keys --microsoft --firmware-builtin &
+if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Enrolling keys into firmware" "- ${GREEN}Done${RESET}"; then
   echo -e "${RED}[VIBRANIUM]${RESET} Key enrollment failed"
   _operation_canceled
   exit 1
@@ -187,7 +188,7 @@ for file in "${EFI_FILES[@]}"; do
 done
 
 sudo mkinitcpio -P &>/dev/null &
-if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Regenerating mkinitcpio" " - ${GREEN}Done${RESET}"; then
+if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Regenerating mkinitcpio" "- ${GREEN}Done${RESET}"; then
   echo -e "${RED}[VIBRANIUM]${RESET} Failed to regenerate initramfs"
   echo -e "${RED}[VIBRANIUM]${RESET} ${YELLOW}Warning${RESET}: your system may be unbootable without a valid initramfs."
   echo -e "${RED}[VIBRANIUM]${RESET} Before rebooting, open another terminal and run: ${RED}sudo ${GREEN}mkinitcpio ${YELLOW}-P${RESET}"

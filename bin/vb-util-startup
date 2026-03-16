@@ -62,10 +62,15 @@ _toggle_loopback() {
     rm "$VIBRANIUM_STATE/secure-boot-setup.complete"
     sleep 5
 
-    sb_state="$(sbctl status | awk '/Secure Boot/ {print $NF}')"
-    if [[ "$sb_state" == "Enabled" ]]; then
+    sb_state="$(vb-cmd-secure-boot-state)"
+
+    if [[ "$sb_state" == "enabled" ]]; then
       notify-send -r 1 -t 10000 "Secure Boot Setup Wizard" "Secure Boot setup complete!"
-    else
+    elif [[ "$sb_state" == "setup" ]]; then
+      msg="Secure Boot is still in Setup mode!"
+      msg+="Is your firmware poorly implemented?"
+      notify-send -r 1 -t 60000 -u critical "Secure Boot Setup Wizard" "$msg"
+    elif [[ "$sb_state" == "disabled" ]]; then
       msg="Secure Boot setup did not complete properly!\n"
       msg+="See 'sbctl status' for detailed info"
       notify-send -r 1 -t 60000 -u critical "Secure Boot Setup Wizard" "$msg"
