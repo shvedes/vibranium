@@ -35,7 +35,8 @@ while true; do
          getoption misc:middle_click_paste; \
          getoption render:direct_scanout; \
          getoption misc:disable_autoreload;
-         getoption general:layout" |
+         getoption general:layout; \
+         getoption cursor:zoom_detached_camera" |
       jq -s -r '.[] |
         if .option == "misc:vrr" then
             if .int == 0 then "false"
@@ -44,6 +45,8 @@ while true; do
             end
         elif .option == "general:layout" then
             .str
+        elif .option == "cursor:zoom_detached_camera" then
+            if .int == 1 then false else true end
         else
             if .int == 1 then "true" else "false" end
         end'
@@ -55,13 +58,15 @@ while true; do
   current_direct_scanout="${LINES[3]}"
   current_autoreload="${LINES[4]}"
   current_layout="${LINES[5]^}"
+  current_zoom="${LINES[6]}"
 
   OPTIONS=(
-    "Variable Refresh Rate : $current_vrr"
-    "Variable Frame Rate : $current_vfr"
-    "Disable Auto Reload : $current_autoreload"
-    "Middle Click Paste : $current_middle_click"
-    "Direct Scanout : $current_direct_scanout"
+    "Variable refresh rate : $current_vrr"
+    "Zoom follows cursor : $current_zoom"
+    "Variable frame rate : $current_vfr"
+    "Disable auto reload : $current_autoreload"
+    "Middle click paste : $current_middle_click"
+    "Direct scanout : $current_direct_scanout"
     "Layout : $current_layout"
   )
 
@@ -80,31 +85,37 @@ while true; do
     "Layout"*)
       _layout_submenu
       ;;
-    "Disable Auto Reload"*)
+    "Zoom follows cursor"*)
+      case "$current_zoom" in
+        "true") vb-cmd-edit-wm-config "cursor:zoom_detached_camera:true" "$CONFIG" ;;
+        "false") vb-cmd-edit-wm-config "cursor:zoom_detached_camera:false" "$CONFIG" ;;
+      esac
+      ;;
+    "Disable auto reload"*)
       case "$current_autoreload" in
         "true") vb-cmd-edit-wm-config "misc:disable_autoreload:false" "$CONFIG" ;;
         "false") vb-cmd-edit-wm-config "misc:disable_autoreload:true" "$CONFIG" ;;
       esac
       ;;
-    "Middle Click Paste"*)
+    "Middle click paste"*)
       case "$current_middle_click" in
         "true") vb-cmd-edit-wm-config "misc:middle_click_paste:false" "$CONFIG" ;;
         "false") vb-cmd-edit-wm-config "misc:middle_click_paste:true" "$CONFIG" ;;
       esac
       ;;
-    "Variable Frame Rate"*)
+    "Variable frame rate"*)
       case "$current_vfr" in
         "true") vb-cmd-edit-wm-config "misc:vfr:false" "$CONFIG" ;;
         "false") vb-cmd-edit-wm-config "misc:vfr:true" "$CONFIG" ;;
       esac
       ;;
-    "Direct Scanout"*)
+    "Direct scanout"*)
       case "$current_direct_scanout" in
         "true") vb-cmd-edit-wm-config "render:direct_scanout:false" "$CONFIG" ;;
         "false") vb-cmd-edit-wm-config "render:direct_scanout:true" "$CONFIG" ;;
       esac
       ;;
-    "Variable Refresh Rate"*)
+    "Variable refresh rate"*)
       while true; do
         vrr_opts=("Enable" "Disable" "Fullscreen only" "<b>Help</b>")
         helpers::ui::menu vrr_chosen "VRR" "ESC to go back" -- "${vrr_opts[@]}"
