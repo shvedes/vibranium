@@ -29,8 +29,9 @@ _set_audio_feedback() {
   while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
-    helpers::check VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
+    helpers::check \
+      VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK \
+      VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
 
     options=("Audio feedback : $VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK")
 
@@ -39,7 +40,7 @@ _set_audio_feedback() {
       # Split for the sake of the line width
       variant="${VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT%?} "
       variant+="${VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT: -1}"
-      options+=("Variant : $variant")
+      options+=("Variant : ${variant^}")
     fi
 
     mapfile -t options < <(helpers::configure::build_menu "${options[@]}")
@@ -69,7 +70,7 @@ _set_audio_feedback() {
 
 _set_audio_feedback_variant() {
   while true; do
-    local variant_options=("variant 1" "variant 2" "variant 3")
+    local variant_options=("Variant 1" "Variant 2" "Variant 3")
     local current_option opt
 
     opt="VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
@@ -87,7 +88,9 @@ _set_audio_feedback_variant() {
     fi
 
     helpers::configure::verify_option "$opt"
-    sed -i "/^${opt}/s/=.*/=\"${chosen// /}\"/" \
+
+    chosen="${chosen// /}"
+    sed -i "/^${opt}/s/=.*/=\"${chosen,}\"/" \
       "$VIBRANIUM_USER_SETTINGS"
     break
   done

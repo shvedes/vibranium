@@ -148,7 +148,7 @@ VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK=true
 VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK=false
 
 # @type string
-# @values variant1 variant2
+# @values variant1 variant2 variant3
 # @desc Which sound to play (option above).
 VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT="variant1"
 
