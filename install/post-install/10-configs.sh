@@ -2,6 +2,8 @@
 
 _log_info "Copying configs"
 
+mkdir -p "$HOME/.local/state/vibranium"
+
 # Everything that is pre-configured.
 cp -r "$VIBRANIUM/config/"* "$HOME/.config/"
 

@@ -31,8 +31,7 @@ _set_ddc_brightness() {
   )"
 
   cached_brightness="$(
-    sed -n "s/^${current_monitor}:\([0-9]\+\)$/\1/p" \
-      "$VIBRANIUM_STATE/brightness"
+    sed -n "s/^${current_monitor}:\([0-9]\+\)$/\1/p" "$VIBRANIUM_STATE/brightness"
   )"
 
   [[ -z "$current_brightness" ]] && return
@@ -48,10 +47,12 @@ _set_ddc_brightness() {
 } &
 
 _toggle_loopback() {
+  # Wait for pipewire to start
   while ! pidof -q pipewire; do
     sleep 0.1
   done
 
+  helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK
   if [[ $VIBRANIUM_VOLUME_SOURCE_LOOPBACK == true ]]; then
     vb-cmd-toggle-loopback
   fi
@@ -78,17 +79,12 @@ _toggle_loopback() {
   fi
 ) &
 
-mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_CACHE
+mkdir -p \
+  $VIBRANIUM_RUNTIME\
+  $VIBRANIUM_STATE \
+  $VIBRANIUM_CACHE
 
 source vb-core-lib
-
-CURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme" 2> /dev/null)"
-CURSOR_THEME="${CURSOR_THEME:-Adwaita}"
-
-CURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size" 2> /dev/null)"
-CURSOR_SIZE="${CURSOR_SIZE:-24}"
-
-vb-theme-cursor-set "$CURSOR_THEME" --size "$CURSOR_SIZE" &
 
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
   vb-util-first-run
@@ -97,18 +93,17 @@ fi
 
 _toggle_loopback &
 
-wallpaper_file="$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)"
-[[ -f "$wallpaper_file" ]] || vb-cmd-get-wallpaper > "$wallpaper_file"
+if [[ ! -f "$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)" ]]; then
+  vb-cmd-get-wallpaper > "$wallpaper_file"
+fi
 
-hyprpaper_unit="$(systemctl --user is-enabled hyprpaper)"
-if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
-  case "$hyprpaper_unit" in
-    disabled) systemctl --user enable --now hyprpaper ;;
-  esac
-else
-  case "$hyprpaper_unit" in
-    enabled) systemctl --user disable --now hyprpaper ;;
-  esac
+if [[ "$CHASSIS_TYPE" != vm ]]; then
+  helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
+  if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
+      if ! systemctl -q --user is-active hyprpaper; then
+        systemctl -q --user enable --now hyprpaper
+      fi
+  fi
 fi
 
 # If state file doesn't exist - create one and disable
@@ -116,14 +111,16 @@ fi
 # running in background because screen flashing effect
 # depends on it. It is not the best solution though, and
 # because of the while loop we must keep this check at the end
-if [[ ! -f "$VIBRANIUM_STATE/nightshift" ]]; then
-  echo "suspended" > "$VIBRANIUM_STATE/nightshift"
-  hyprctl -q hyprsunset identity
-elif [[ "$(< "$VIBRANIUM_STATE/nightshift")" = "suspended" ]]; then
-  while ! pidof -q hyprsunset; do
-    sleep 0.05
-  done
-  hyprctl -q hyprsunset identity
+if [[ "$CHASSIS_TYPE" != vm ]]; then
+  if [[ ! -f "$VIBRANIUM_STATE/nightshift" ]]; then
+    echo "suspended" > "$VIBRANIUM_STATE/nightshift"
+    hyprctl -q hyprsunset identity
+  elif [[ "$(< "$VIBRANIUM_STATE/nightshift")" == "suspended" ]]; then
+    while ! pidof -q hyprsunset; do
+      sleep 0.05
+    done
+    hyprctl -q hyprsunset identity
+  fi
 fi
 
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START
@@ -131,13 +128,14 @@ if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START = true ]]; then
   setsid -f vb-core-launcher
 fi
 
+# In case if power profile was changed outside of vibranium.
 vb-core-power "$(powerprofilesctl get)" &
 
 shopt -s nullglob
 
 HOOKS=("$XDG_CONFIG_HOME"/vibranium/startup/*.sh)
 
-if ((${#HOOKS[@]} >= 1)); then
+if ((${#HOOKS[@]} > 0)); then
   for hook in "${HOOKS[@]}"; do
     bash "$hook"
   done

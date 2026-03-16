@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-mkdir -p "$HOME/.local/state/vibranium"
-
 # Initial state for the hyprsunset
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   printf "suspended" > "$HOME/.local/state/vibranium/nightshift"

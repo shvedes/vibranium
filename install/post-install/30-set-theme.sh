@@ -51,7 +51,6 @@ sed -i "s/user/$USER/" "$HOME"/.config/qt*ct/qt*ct.conf
 
 # GNOME appearance
 gsettings set org.gnome.desktop.interface gtk-theme "Nightfox"
-gsettings set org.gnome.desktop.interface cursor-theme "macOS"
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
@@ -66,3 +65,6 @@ done
 ln -sf "$HOME/.local/share/vibranium/default/hypr/animations/default.conf" \
   "$HOME/.config/hypr/hyprland.conf.d/animations.conf"
 
+# Cursor theme
+echo "Adwaita" > "$HOME/.local/state/vibranium/cursor-theme"
+echo "24" > "$HOME/.local/state/vibranium/cursor-size"

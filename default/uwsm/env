@@ -50,6 +50,14 @@ path_add "$VIBRANIUM_PATH"
 export XCURSOR_PATH="$XDG_DATA_HOME/icons:/usr/share/icons"
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
+if [[ "$VIBRANIUM_STATE/cursor-theme" ]]; then
+  export XCURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme")"
+fi
+
+if [[ "$VIBRANIUM_STATE/cursor-size" ]]; then
+  export XCURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size")"
+fi
+
 # Use Wayland when possible. Fallback to XWayland otherwise
 export GDK_BACKEND="wayland,x11"
 export CLUTTER_BACKEND="wayland"
