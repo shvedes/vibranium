@@ -7,12 +7,14 @@ INDEX=0
 while true; do
   source "$VIBRANIUM_USER_SETTINGS"
 
-  helpers::check VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL
-  helpers::check VIBRANIUM_BRIGHTNESS_STEP
+  helpers::check \
+    VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL \
+    VIBRANIUM_BRIGHTNESS_STEP
 
   OPTIONS=(
     "Use DDC protocol : $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
     "Brightnes step : $VIBRANIUM_BRIGHTNESS_STEP"
+    "Notificaation : $VIBRANIUM_BRIGHTNESS_NOTIFY"
   )
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
@@ -36,6 +38,9 @@ while true; do
     "Brightnes step"*)
       helpers::configure::set_digit "Brightness step" "Brightness" \
         "int" 2 20 "VIBRANIUM_BRIGHTNESS_STEP"
+      ;;
+    "Notificaation"*)
+      helpers::configure::toggle_bool "VIBRANIUM_BRIGHTNESS_NOTIFY"
       ;;
   esac
 done

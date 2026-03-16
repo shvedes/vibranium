@@ -219,6 +219,10 @@ VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL=true
 # @type int
 VIBRANIUM_BRIGHTNESS_STEP=5
 
+# @type bool
+# @desc Whether to show brightness change notifications.
+VIBRANIUM_BRIGHTNESS_NOTIFY=true
+
 #             COLOR PICKER OPTIONS             #
 # ============================================ #
 #                                              #

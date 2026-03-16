@@ -21,24 +21,21 @@ source vb-core-lib
 
 usage() {
   cat << EOF
-Usage: ${0##*/} [--up|--down|--value N]
+Usage: ${0##*/} [--up|--down]
 
 Adjust screen brightness.
 
 Options:
     --up           Increase brightness by a step
     --down         Decrease brightness by a step
-    --value N      Set brightness to absolute value (0-100)
     -h, --help     Show this help and exit
 EOF
 }
 
-if [[ -z "$1" || ! $1 =~ ^--(up|down|value)$ ]]; then
+if [[ "$1" =~ ^(-h|--help)$ ]]; then
   usage
-  exit 1
-fi
-
-if [[ "$1" == "--value" && ! "$2" =~ ^[0-9]+$ ]]; then
+  exit 0
+elif [[ -z "$1" || ! $1 =~ ^--(up|down|value)$ ]]; then
   usage
   exit 1
 fi
@@ -256,7 +253,9 @@ use_swayosd="$VIBRANIUM_GLOBAL_USE_OSD"
   fi
 }
 
-helpers::check VIBRANIUM_BRIGHTNESS_STEP
+helpers::check \
+  VIBRANIUM_BRIGHTNESS_STEP \
+  VIBRANIUM_BRIGHTNESS_NOTIFY
 step=$VIBRANIUM_BRIGHTNESS_STEP
 
 case "$method" in
@@ -296,25 +295,6 @@ case "$method" in
         new=$((current - step))
         ((new < 0)) && new=0
         ;;
-      "--value")
-        if [[ $2 =~ ^[0-9]+$ ]]; then
-          if ((current == 0 && $2 == 0)); then
-            exit 0
-          elif ((current == 100 && $2 == 100)); then
-            exit 0
-          elif ((current == $2)); then
-            log::warn "Brightness level is already on ${current}%. Aborting"
-            exit 0
-          fi
-
-          if (($2 >= 0 && $2 <= 100)); then
-            new=$2
-          else
-            log::error "Out of boundary!"
-            exit 1
-          fi
-        fi
-        ;;
     esac
 
     log::info "New brightness level: ${YELLOW}$new${RESET}"
@@ -322,6 +302,10 @@ case "$method" in
 
     log::info "Updating caches"
     update_brightness_cache "$new" &
+
+    if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == false ]]; then
+      exit 0
+    fi
 
     if [[ $use_swayosd == true ]]; then
       if [[ ! $2 =~ ^[0-9]+$ ]]; then
@@ -360,46 +344,68 @@ case "$method" in
       exit 1
     fi
 
-    # Read current and max brightness from the kernel
-    current_raw=$(< /sys/class/backlight/*/brightness)
-    max_raw=$(< /sys/class/backlight/*/max_brightness)
-    current=$((current_raw * 100 / max_raw))
+    # When swayosd is active it owns the backlight device — skip raw sysfs
+    # calculations entirely and let it apply the change + show the OSD itself.
+    # Raw calculations are only needed for the plain notify-send path, or when
+    # notifications are disabled.
+    if [[ $use_swayosd == true && "$VIBRANIUM_BRIGHTNESS_NOTIFY" != "false" ]]; then
+      # Translate action into swayosd's (±)number / absolute syntax:
+      #   --up   → +<step>   e.g. +5
+      #   --down → -<step>   e.g. -5
+      case "$1" in
+        "--up")    swayosd_arg="+${step}" ;;
+        "--down")  swayosd_arg="-${step}" ;;
+      esac
 
-    case "$1" in
-      "--up")
-        # Step is in percent, convert to raw delta
-        delta=$((step * max_raw / 100))
-        new_raw=$((current_raw + delta))
-        ;;
-      "--down")
-        delta=$((step * max_raw / 100))
-        new_raw=$((current_raw - delta))
-        ;;
-      "--value")
-        if ((current == $2)); then
-          log::warn "Brightness level is already on ${current}%. Aborting"
-          exit 0
-        elif (($2 >= 0 && $2 <= 100)); then
-          new_raw=$(($2 * max_raw / 100))
-        fi
-        ;;
-    esac
-
-    # Clamp raw value
-    ((new_raw > max_raw)) && new_raw=$max_raw
-    ((new_raw < 0)) && new_raw=0
-
-    # Convert back to percent for OSD
-    new=$((new_raw * 100 / max_raw))
-
-    # Apply new brightness
-    log::info "New brightness level: ${YELLOW}$new${RESET}"
-    echo "$new_raw" > /sys/class/backlight/*/brightness
-
-    if [[ $use_swayosd == true ]]; then
-      log::info "Showing OSD overlay"
-      swayosd-client --brightness="$new"
+      log::info "Delegating brightness change to swayosd (--brightness ${swayosd_arg})"
+      swayosd-client --brightness="$swayosd_arg"
     else
+      # Read current and max brightness from the kernel
+      current_raw=$(< /sys/class/backlight/*/brightness)
+      max_raw=$(< /sys/class/backlight/*/max_brightness)
+      current=$((current_raw * 100 / max_raw))
+
+      case "$1" in
+        "--up")
+          # Round up to next step boundary in percent-space.
+          # Integer division truncates, so (current/step + 1)*step always gives
+          # the next clean multiple of step above current.
+          # e.g. current=4, step=5 → (4/5 + 1)*5 = (0+1)*5 = 5%
+          # e.g. current=5, step=5 → (5/5 + 1)*5 = (1+1)*5 = 10%
+          new_pct=$(( (current / step + 1) * step ))
+          # Ceiling division (+ 99) ensures raw value lands inside the target
+          # percent band when converted back, avoiding double-truncation drift.
+          # e.g. 5% of 255 → (5*255+99)/100 = 13 raw → 13*100/255 = 5% ✓
+          #                     without ceil → 12 raw → 12*100/255 = 4% ✗
+          new_raw=$(( (new_pct * max_raw + 99) / 100 ))
+          ;;
+        "--down")
+          # Round down to previous step boundary in percent-space.
+          # Subtracting 1 before dividing ensures we step down even when already
+          # sitting exactly on a boundary.
+          # e.g. current=10, step=5 → (10-1)/5*5 = 1*5 = 5%  (not stuck at 10%)
+          # e.g. current=9,  step=5 → (9-1)/5*5  = 1*5 = 5%
+          new_pct=$(( (current - 1) / step * step ))
+          # Same ceiling conversion as --up to prevent truncation drift.
+          new_raw=$(( (new_pct * max_raw + 99) / 100 ))
+          ;;
+      esac
+
+      # Clamp raw value
+      ((new_raw > max_raw)) && new_raw=$max_raw
+      ((new_raw < 0)) && new_raw=0
+
+      # Convert back to percent for OSD
+      new=$((new_raw * 100 / max_raw))
+
+      # Apply new brightness
+      log::info "New brightness level: ${YELLOW}$new${RESET}"
+      echo "$new_raw" > /sys/class/backlight/*/brightness
+
+      if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == "false" ]]; then
+        exit 0
+      fi
+
       notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"
     fi
     ;;
