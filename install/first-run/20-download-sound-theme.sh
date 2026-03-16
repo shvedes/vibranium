@@ -7,5 +7,18 @@ DIR="$XDG_DATA_HOME/sounds/Vibranium/stereo"
 LINK="https://github.com/ubuntu/yaru/raw/refs/heads/master/sounds/src/stereo/audio-volume-change.oga"
 FILE="$DIR/audio-volume-change.oga"
 
-mkdir -p "$DIR"
-wget -q -4 "$LINK" -O "$FILE"
+_download() {
+    until ping -q -c1 github.com &>/dev/null; do
+        sleep 5
+    done
+    mkdir -p "$DIR"
+    curl -fsSL -4 "$LINK" -o "$FILE"
+}
+
+if ping -q -c1 github.com &>/dev/null; then
+    mkdir -p "$DIR"
+    curl -fsSL -4 "$LINK" -o "$FILE"
+else
+    ( _download ) &
+    disown
+fi
