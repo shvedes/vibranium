@@ -93,6 +93,8 @@ if (( SETUP_MODE_RAW == 0 )); then
   exit 1
 fi
 
+term::show_header
+
 if term::ask_yes_no Y "You're about to setup Secure Boot. Continue?"; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} To work with efivars, Vibranium needs sudo"
   sudo -v
