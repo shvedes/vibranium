@@ -59,9 +59,17 @@ _toggle_loopback() {
 
 (
   if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
-    sleep 5
     rm "$VIBRANIUM_STATE/secure-boot-setup.complete"
-    notify-send -r 1 -t 10000 "Secure Boot" "Secure Boot setup complete!"
+    sleep 5
+
+    sb_state="$(sbctl status | awk '/Secure Boot/ {print $NF}')"
+    if [[ "$sb_state" == "Enabled" ]]; then
+      notify-send -r 1 -t 10000 "Secure Boot Setup Wizard" "Secure Boot setup complete!"
+    else
+      msg="Secure Boot setup did not complete properly!\n"
+      msg+="See 'sbctl status' for detailed info"
+      notify-send -r 1 -t 60000 -u critical "Secure Boot Setup Wizard" "$msg"
+    fi
   fi
 ) &
 

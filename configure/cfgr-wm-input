@@ -296,6 +296,7 @@ layouts_menu() {
                 set_layout_shortcut
                 ;;
         esac
+        hyprctl -q reload config-only
     done
 }
 

@@ -22,6 +22,7 @@ _operation_complete() {
 }
 
 trap '_operation_canceled; exit 1' INT TERM HUP
+term::disable_input
 
 if [[ ! -f /sys/firmware/efi/fw_platform_size ]]; then
   term::show_header --color red
@@ -30,15 +31,13 @@ if [[ ! -f /sys/firmware/efi/fw_platform_size ]]; then
   exit 1
 fi
 
-term::disable_input
-
 # Get the current boot entry via bootctl.
 # If it has a .efi extension, systemd-boot is using a UKI.
 # If it's a .conf file, it's a standard Boot Loader Specification (BLS) entry.
 # This single check tells us both:
 #   1) that systemd-boot is active,
 #   2) which boot type is in use (UKI or BLS).
-CURRENT_ENTRY=$(bootctl status | awk -F': ' '/Current Entry/ {print $2}')
+CURRENT_ENTRY=$(bootctl status 2> /dev/null | awk -F': ' '/Current Entry/ {print $2}')
 
 if [[ ! "$CURRENT_ENTRY" == *.efi ]]; then
   term::show_header --color red
@@ -50,30 +49,73 @@ if [[ ! "$CURRENT_ENTRY" == *.efi ]]; then
   exit 1
 fi
 
+# Safely glob efivars — nullglob prevents literal pattern on no-match
+shopt -s nullglob
+
 SECUREBOOT_EFIVAR=(/sys/firmware/efi/efivars/SecureBoot-*)
 SETUP_MODE_EFIVAR=(/sys/firmware/efi/efivars/SetupMode-*)
 
-if [[ ! -f "${SECUREBOOT_EFIVAR[0]}" || ! -f "${SETUP_MODE_EFIVAR[0]}" ]]; then
+shopt -u nullglob
+
+if [[ ${#SECUREBOOT_EFIVAR[@]} -eq 0 || ${#SETUP_MODE_EFIVAR[@]} -eq 0 ]]; then
   term::show_header --color red
-  echo -e "${RED}[VIBRANIUM]${RESET} Could not read Secure Boot EFI variables"
+  echo -e "${RED}[VIBRANIUM]${RESET} Could not locate Secure Boot EFI variables"
+  echo -e "${RED}[VIBRANIUM]${RESET} Is the system booted in UEFI mode with efivars mounted?"
   _operation_canceled
   exit 1
 fi
 
-SECUREBOOT_RAW=$(od -An -t u1 -j4 -N1 "${SECUREBOOT_EFIVAR[0]}")
-SETUP_MODE_RAW=$(od -An -t u1 -j4 -N1 "${SETUP_MODE_EFIVAR[0]}")
+if [[ ${#SECUREBOOT_EFIVAR[@]} -gt 1 || ${#SETUP_MODE_EFIVAR[@]} -gt 1 ]]; then
+  term::show_header --color red
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Warning: multiple EFI variable files found for the same name"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} SecureBoot matches: ${SECUREBOOT_EFIVAR[*]}"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} SetupMode matches:  ${SETUP_MODE_EFIVAR[*]}"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Using first match — inspect your efivars if this looks wrong"
+fi
+
+# Read first data byte (skip 4-byte attribute header), strip whitespace
+SECUREBOOT_RAW=$(od -An -t u1 -j4 -N1 "${SECUREBOOT_EFIVAR[0]}" | tr -d ' ')
+SETUP_MODE_RAW=$(od -An -t u1 -j4 -N1 "${SETUP_MODE_EFIVAR[0]}" | tr -d ' ')
 
 if (( SECUREBOOT_RAW == 1 )); then
   term::show_header --color green
-  echo -e "${GREEN}[VIBRANIUM]${RESET} ${CYAN}Secure Boot${RESET} is already active"
+  echo -e "${GREEN}[VIBRANIUM]${RESET} ${CYAN}Secure Boot${RESET} is already active."
+  echo -e "${GREEN}[Vibranium]${RESET} See ${GREEN}sbctl ${YELLOW}--help${RESET} for more info."
   _operation_complete
   exit 0
 fi
 
 if (( SETUP_MODE_RAW == 0 )); then
   term::show_header --color red
-  echo -e "${RED}[VIBRANIUM]${RESET} Secure Boot cannot be enabled: firmware locked (Setup mode off)"
-  echo -e "${RED}[VIBRANIUM]${RESET} Enable it in BIOS first"
+  echo -e "${RED}[VIBRANIUM]${RESET} Secure Boot cannot be enabled: firmware is locked (Setup Mode is off)"
+  echo -e "${RED}[VIBRANIUM]${RESET} Enter BIOS and enable Setup Mode first"
+  _operation_canceled
+  exit 1
+fi
+
+if term::ask_yes_no Y "You're about to setup Secure Boot. Continue?"; then
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} To work with efivars, Vibranium needs sudo"
+  sudo -v
+else
+  _operation_canceled
+  exit 1
+fi
+
+# Check NVRAM is actually writable before doing anything destructive
+_efi_nvram_writable() {
+  findmnt -n -o OPTIONS /sys/firmware/efi/efivars 2>/dev/null | grep -q '\brw\b' || return 1
+
+  # Canary write — catches firmware that reports rw but silently drops writes
+  local canary="/sys/firmware/efi/efivars/VibraniumProbe-00000000-0000-0000-0000-000000000000"
+  printf '\x07\x00\x00\x00\x00' | sudo tee "$canary" &>/dev/null || return 1
+  sudo chattr -i "$canary" 2>/dev/null
+  sudo rm -f "$canary" 2>/dev/null
+  return 0
+}
+
+if ! _efi_nvram_writable; then
+  echo -e "${RED}[VIBRANIUM]${RESET} EFI NVRAM is not writable — key enrollment will fail"
+  echo -e "${RED}[VIBRANIUM]${RESET} Try: ${RED}sudo ${GREEN}mount ${YELLOW}-o ${BLUE}remount,rw ${PURPLE}/sys/firmware/efi/efivars${RESET}"
   _operation_canceled
   exit 1
 fi
@@ -91,15 +133,7 @@ if [[ -z "$ESP_MOUNT" ]]; then
 fi
 
 if [[ -z "$ESP_MOUNT" ]] || [[ ! -d "$ESP_MOUNT" ]]; then
-  term::show_header --color red
   echo -e "${RED}[VIBRANIUM]${RESET} Could not locate a valid ESP mount point"
-  _operation_canceled
-  exit 1
-fi
-
-term::show_header
-
-if ! term::ask_yes_no Y "You're about to setup Secure Boot. Continue?"; then
   _operation_canceled
   exit 1
 fi
@@ -137,7 +171,7 @@ EFI_FILES=()
 # Find all ESP files to sign
 while IFS= read -r f; do
     EFI_FILES+=("$f")
-done < <(find "$ESP_MOUNT" -type f \( -iname '*.efi' \) )
+done < <(sudo find "$ESP_MOUNT" -type f \( -iname '*.efi' \) )
 
 for file in "${EFI_FILES[@]}"; do
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Signing ${CYAN}$file${RESET}"
