@@ -205,12 +205,13 @@ _set_animations_preset() {
   anim_opts=("$folder"/*.conf)
   anim_opts=("${anim_opts[@]##*/}")   # strip leading path
   anim_opts=("${anim_opts[@]%.conf}") # strip extension
+  anim_opts=("${anim_opts[@]^}")
 
   while true; do
     helpers::ui::menu anim_chosen "Animations" "ESC to go back" -- "${anim_opts[@]}"
     [[ -z "$anim_chosen" ]] && break
 
-    ln -sf "$folder/$anim_chosen.conf" "$target"
+    ln -sf "$folder/${anim_chosen,}.conf" "$target"
 
     if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
       hyprctl -q reload config-only
@@ -490,7 +491,7 @@ _animations_submenu() {
     opts=("Enabled : $enabled")
 
     if [[ "$enabled" == true ]]; then
-      opts+=("Preset : $anim_preset")
+      opts+=("Preset : ${anim_preset^}")
     fi
 
     mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
