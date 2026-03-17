@@ -8,37 +8,36 @@ _touchpad_options() {
     local index=0
 
     while true; do
+        hyprctl -q reload config-only
+
         mapfile -t lines < <(
             hyprctl --batch -j \
          "getoption input:touchpad:scroll_factor; \
 				 getoption input:touchpad:tap-to-click; \
 				 getoption input:touchpad:natural_scroll; \
-				 getoption input:touchpad:disable_while_typing" |
-                jq -r ' .option as $o |
-			if ($o | test("scroll_factor")) then
-				((.float * 100 | round) | tostring | (if length < 3 then ("0" * (3 - length)) + . else . end) | .[0:-2] + "." + .[-2:])
-			  elif ($o | test("accel_profile")) then
-				.str
-			  else
-				if .int == 1 then "true" else "false" end
-			  end
-			'
-        )
+				 getoption input:touchpad:disable_while_typing" | jq -r ' .option as $o |
+        if ($o | test("scroll_factor")) then
+          ((.float * 100 | round) | tostring | (if length < 3 then ("0" * (3 - length)) + . else . end) | .[0:-2] + "." + .[-2:])
+        elif ($o | test("accel_profile")) then
+          .str
+        else
+          if .int == 1 then "true" else "false" end
+			  end')
 
         local current_scroll_factor="${lines[0]}"
         local current_tap_to_click="${lines[1]}"
         local current_natural_scroll="${lines[2]}"
         local current_disable_while_typing="${lines[3]}"
 
-        local touchpad_chosen
         local touchpad_options=(
-            "Disable while typing : ${current_disable_while_typing}"
-            "Natural scrolling    : ${current_natural_scroll}"
-            "Scrolling speed      : ${current_scroll_factor}"
-            "Tap to click         : ${current_tap_to_click}"
+            "Disable while typing : $current_disable_while_typing"
+            "Natural scrolling : $current_natural_scroll"
+            "Scrolling speed : $current_scroll_factor"
+            "Tap to click : $current_tap_to_click"
         )
 
-        helpers::ui::menu touchpad_options "Touchpad" "ESC to go back" -selected-row "$index" -- "${touchpad_options[@]}"
+        mapfile -t touchpad_options < <(helpers::configure::build_menu "${touchpad_options[@]}")
+        helpers::ui::menu touchpad_chosen "Touchpad" "ESC to go back" -selected-row "$index" -- "${touchpad_options[@]}"
         [[ -z $touchpad_chosen ]] && break
 
         for i in "${!touchpad_options[@]}"; do
