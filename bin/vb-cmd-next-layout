@@ -1,0 +1,47 @@
+#!/bin/bash
+
+_usage() {
+    cat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Switch keyboard layout for the main Hyprland keyboard.
+Mainly used by the waybar module.
+
+Don't bind this script with keyboard shortcuts;
+use Hyprland's native config.
+
+Options:
+  --next            switch to next layout (default)
+  --prev            switch to previous layout
+  -h, --help        display this help and exit
+EOF
+}
+
+action="next"
+
+case "${1:-}" in
+    --next|"")
+        action="next"
+        ;;
+    --prev)
+        action="prev"
+        ;;
+    -h|--help)
+        _usage
+        exit 0
+        ;;
+    *)
+        echo "${0##*/}: invalid option: $1" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
+        exit 1
+        ;;
+esac
+
+device="$(hyprctl -j devices | jq -r '.keyboards[] | select(.main == true) | .name')"
+
+if [[ -z "$device" ]]; then
+    echo "${0##*/}: no main keyboard found" >&2
+    exit 1
+fi
+
+hyprctl -q switchxkblayout "$device" "$action"

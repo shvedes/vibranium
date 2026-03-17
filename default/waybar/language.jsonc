@@ -1,5 +1,7 @@
 {
 	"hyprland/language": {
+    "on-click-right": "vb-cmd-next-layout --prev",
+    "on-click": "vb-cmd-next-layout --next",
 		"format": "{}",
 		"format-en": "🇺🇸",
 		"format-ru": "🇷🇺",
