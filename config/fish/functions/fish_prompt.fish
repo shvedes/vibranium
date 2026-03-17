@@ -49,7 +49,7 @@ function fish_prompt
     set -l dir_str ""
 
     # Helper: truncate a list of path parts to at most 2, prefixed with ../
-    function __trunc_parts --no-scope-shadowing
+    function __trunc_parts
         set -l parts $argv
         set -l n (count $parts)
         if test $n -gt 2

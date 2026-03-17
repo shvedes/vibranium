@@ -1,4 +1,5 @@
-function img2jpg-medium
+# @vibranium
+function img2jpg-compressed --description "Convert images to JPG (high compression level)"
     if not command -q magick
         echo "imagemagick is not installed!"
         return 1

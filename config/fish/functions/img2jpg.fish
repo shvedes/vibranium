@@ -1,4 +1,5 @@
-function img2jpg
+# @vibranium
+function img2jpg --description "Convert images to JPG"
     if not command -q magick
         echo "imagemagick is not installed!"
         return 1

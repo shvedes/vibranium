@@ -1,4 +1,5 @@
-function cpuwatch
+# @vibranium
+function cpuwatch --description "CPU usage monitoring"
   set -l interval 1
   set -l entries  10
 

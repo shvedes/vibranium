@@ -1,4 +1,5 @@
-function extract
+# @vibranium
+function extract --description "Extract archives easily"
   if test (count $argv) -eq 0
     echo "Error: provide a file to extract" >&2
     return 1

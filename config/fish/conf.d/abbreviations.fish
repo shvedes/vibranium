@@ -4,6 +4,12 @@ if command -q fastfetch
   abbr ff fastfetch
 end
 
+if not command -q nmtui
+  abbr restart-network "sudo systemctl restart iwd systemd-{network,resolve}d"
+end
+
+abbr restart-pipewire "systemctl --user restart pipewire pipewire-pulse wireplumber"
+
 # Systemd abbrs. Think of it like this:
 # <s>ystem<c>tl --<u>ser <s>tatus
 abbr --position command se   "sudoedit"

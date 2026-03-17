@@ -1,12 +1,13 @@
 # Source: Omarchy
-function transcode-video-4K
+# @vibranium
+function downscale-1080p --description "Simple video downscaler (1080p)"
     if not command -q ffmpeg
         echo "ffmpeg is not installed!"
         return 1
     end
 
     if not set -q argv[1]
-        echo "usage: transcode-video-4K <video>"
+        echo "usage: transcode-video-1080p <video>"
         return 1
     end
 
@@ -15,5 +16,5 @@ function transcode-video-4K
         return 1
     end
 
-    ffmpeg -i $argv[1] -c:v libx265 -preset slow -crf 24 -c:a aac -b:a 192k (string replace -r '\.[^.]+$' '' $argv[1])-optimized.mp4
+    ffmpeg -i $argv[1] -vf scale=1920:1080 -c:v libx264 -preset fast -crf 23 -c:a copy (string replace -r '\.[^.]+$' '' $argv[1])-1080p.mp4
 end

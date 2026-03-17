@@ -11,8 +11,3 @@
 # when split into smaller files inside ~/.config/fish/conf.d/
 #
 # This file only affects interactive shells, so it’s safe to experiment.
-
-# Feel free to remove it.
-if status is-interactive
-    echo "Welcome. Please read me: ~/.config/fish/config.fish"
-end

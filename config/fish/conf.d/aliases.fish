@@ -5,11 +5,9 @@ if command -q eza
   alias tree="eza --tree"
 end
 
-if not command -q nmtui
-  abbr restart-network "sudo systemctl restart iwd systemd-{network,resolve}d"
-end
-
-abbr restart-pipewire "systemctl --user restart pipewire pipewire-pulse wireplumber"
-
 alias imv="imv-dir"
 alias ip="ip --color"
+
+if test -f $VIBRANIUM_STATE/update.available
+  alias update-vibranium="vb-core-term --floating -- vb-update"
+end

@@ -1,4 +1,5 @@
-function take
+# @vibranium
+function ccd --description "Create a directory & cd into it"
   if test (count $argv) -eq 0
     echo "Error: you must provide a directory name" >&2
     return 1

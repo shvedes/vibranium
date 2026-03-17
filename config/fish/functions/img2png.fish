@@ -1,4 +1,5 @@
-function img2png
+# @vibranium
+function img2png --description "Convert images to PNG"
     if not command -q magick
         echo "imagemagick is not installed!"
         return 1
