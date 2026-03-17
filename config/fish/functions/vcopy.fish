@@ -1,5 +1,5 @@
 # @vibranium
-function vcopy --description "Copy strings and files"
+function vcopy --description "Copy text or files"
     if test (count $argv) -eq 0
         echo "Error: provide text or file(s)" >&2
         return 1

@@ -1,5 +1,5 @@
 # @vibranium
-function mkvenv --description "Make and enter python venvs with a single command"
+function mkvenv --description "Create and activate Python virtualenv"
   if test (count $argv) -eq 0
     echo "you must provide a name" >&2
     return 1

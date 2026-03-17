@@ -1,5 +1,5 @@
 # @vibranium
-function memwatch --description "RAM usage monitoring"
+function memwatch --description "Monitor memory usage"
   set -l interval 1
   set -l entries  10
 
