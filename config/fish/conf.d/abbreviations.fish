@@ -1,0 +1,62 @@
+if command -q fastfetch
+  abbr neofetch fastfetch
+  abbr nf fastfetch
+  abbr ff fastfetch
+end
+
+# Systemd abbrs. Think of it like this:
+# <s>ystem<c>tl --<u>ser <s>tatus
+abbr --position command se   "sudoedit"
+abbr --position command sc   "systemctl"
+abbr --position command scs  "systemctl status"
+abbr --position command scu  "systemctl --user"
+abbr --position command scus "systemctl --user status"
+
+abbr \:q exit
+
+# Most common typos
+###################
+
+# ls
+abbr l ls
+abbr sl ls
+abbr lss ls
+
+# cd
+abbr dc cd
+abbr cdd cd
+abbr cd.. "cd .."
+abbr .. "cd .."
+abbr ... "cd ../.."
+abbr .... "cd ../../.."
+
+# git
+abbr gti git
+abbr gi git
+abbr gt git
+abbr gtiu git
+abbr gut git
+
+# sudo
+abbr sudp sudo
+abbr suod sudo
+abbr sduo sudo
+
+# pacman
+abbr pacamn pacman
+abbr apcman pacman
+
+# systemctl
+abbr sytemctl systemctl
+abbr systemclt systemctl
+abbr systmctl systemctl
+
+# misc
+abbr clera clear
+abbr clea clear
+abbr exti exit
+abbr exti exit
+abbr mkidr mkdir
+
+abbr grpe grep
+abbr gerp grep
