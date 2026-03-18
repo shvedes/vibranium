@@ -1,3 +1,7 @@
+contrib/vb-cmd-edit-wm-config/Cargo.lock
+contrib/vb-cmd-edit-wm-config/target
+bin/vb-cmd-edit-wm-config
+
 extras/icon_theme/Vibranium/icon-theme.cache
 vibranium.wiki
 install.bak
