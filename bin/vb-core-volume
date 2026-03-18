@@ -255,20 +255,12 @@ feedback() {
     fi
 
     if [[ "$variant" == "variant3" ]]; then
-      paplay "${dir}/bell.oga" &
+      setsid -f paplay "${dir}/bell.oga" &
     else
-      paplay "${dir}/audio-volume-change.oga" &
+      setsid -f paplay "${dir}/audio-volume-change.oga" &
     fi
   fi
 }
-
-# --- Lockfile ---
-
-# Prevent concurrent invocations (e.g. rapid key repeats or external triggers)
-# from racing against each other. flock acquires an exclusive lock on the file
-# descriptor; any second instance will exit immediately (-n) rather than queue.
-exec 9> "$VIBRANIUM_RUNTIME/${0##*/}.lock"
-flock -n 9 || exit 0
 
 # --- Argument parsing ---
 

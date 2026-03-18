@@ -2,13 +2,15 @@
 
 source vb-lib-core
 
-SYSTEMD_TARGETS=("cliphist" "hypridle")
+SYSTEMD_TARGETS=("cliphist")
 
 if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
   SYSTEMD_TARGETS+=("swayosd")
 fi
 
 if [[ "$CHASSIS_TYPE" != vm ]]; then
+  SYSTEMD_TARGETS+=("hypridle")
+
   if [[ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" == true ]]; then
     SYSTEMD_TARGETS+=("hyprpaper")
   fi

@@ -43,6 +43,7 @@ declare -A mime_apps=(
   [audio/opus]=mpv.desktop
 
   # Archives
+  [application/x-compressed-tar]=engrampa.desktop
   [application/x-7z-compressed]=engrampa.desktop
   [application/x-7z-compressed-tar]=engrampa.desktop
   [application/x-ace]=engrampa.desktop

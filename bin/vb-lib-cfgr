@@ -1,0 +1,587 @@
+#!/usr/bin/env bash
+
+# Before this library existed, every cfgr-* script manually wrote the same
+# loop structure: source settings, validate vars, build an OPTIONS array,
+# call rofi, then match the returned string in a case statement to decide
+# what to do. That structure was copy-pasted across more than 20 scripts.
+#
+# This library replaces that loop. A script using it describes *what* its
+# menu contains, and cfgr::run handles the rest.
+#
+# A complete cfgr-* script using this library looks like this:
+#
+#   source vb-lib-core
+#   source vb-lib-cfgr
+#
+#   _my_action() {
+#     cfgr::toggle_bool "MY_VAR"
+#     systemctl --user restart my-service
+#   }
+#
+#   _build() {
+#     cfgr::item::bool   "ANOTHER_VAR" "Toggle label"
+#     cfgr::item::action "_my_action"  "Action label"
+#   }
+#
+#   cfgr::run "My Menu" _build  ANOTHER_VAR
+#
+# That is the entire script. No while loop, no INDEX variable, no case.
+#
+# How it works internally:
+#   Two parallel arrays (_CFGR_ITEMS and _CFGR_DISPATCH) hold the current
+#   menu state. Each call to cfgr::item::* appends one entry to both arrays.
+#   When the user selects a menu row, cfgr::run looks up the same position
+#   in _CFGR_DISPATCH to know what to do. Because position is used for
+#   dispatch instead of string matching, label text is purely cosmetic and
+#   typos in labels can never break menu behaviour (I had so much trouble with that ><).
+
+# Ensures that a given option exists in the user settings file.
+# If it's missing, appends the default value from the defaults file.
+# Private — called only by toggle_bool, set_digit, and set_string.
+_cfgr::verify_option() {
+  local var="$1"
+  if [[ -z $var ]]; then
+    return 2
+  fi
+
+  local settings_file="$VIBRANIUM_USER_SETTINGS"
+  local defaults_file="$VIBRANIUM_PATH/vb-core-defaults"
+
+  while IFS= read -r line; do
+    if [[ "${line%%=*}" == "$var" ]]; then
+      return 0
+    fi
+  done < "$settings_file"
+
+  while IFS= read -r line; do
+    if [[ "${line%%=*}" == "$var" ]]; then
+      printf '%s\n' "$line" >> "$settings_file"
+      return 0
+    fi
+  done < "$defaults_file"
+
+  return 1
+}
+
+
+# Flips a boolean setting in the user settings file.
+# Flag '-v' prints the new value to stdout.
+cfgr::toggle_bool() {
+  local verbose
+  local setting_name
+  local current_value
+
+  if [ "$1" = "-v" ]; then
+    verbose=true
+    setting_name="$2"
+  else
+    verbose=false
+    setting_name="$1"
+  fi
+
+  _cfgr::verify_option "$setting_name"
+  eval "current_value=\$$setting_name"
+
+  case "$current_value" in
+    "true")
+      sed -i "/^${setting_name}=/s/=.*/=false/" "$VIBRANIUM_USER_SETTINGS"
+      [ "$verbose" = "true" ] && echo "false"
+      ;;
+    "false")
+      sed -i "/^${setting_name}=/s/=.*/=true/" "$VIBRANIUM_USER_SETTINGS"
+      [ "$verbose" = "true" ] && echo "true"
+      ;;
+  esac
+}
+
+
+# Aligns menu option labels to the same width for pretty column output.
+# Expects items in "label : value" format, ignores HTML tags when measuring
+# label length, pads shorter labels with spaces, and normalizes boolean
+# values (true/false -> yes/no). Non-matching lines are passed through unchanged.
+cfgr::build_menu() {
+  local options=("$@")
+  local max_len=0
+
+  for option in "${options[@]}"; do
+    if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
+      local clean_label="${BASH_REMATCH[1]}"
+
+      while [[ "$clean_label" =~ \<[^\>]*\> ]]; do
+        clean_label="${clean_label//${BASH_REMATCH[0]}/}"
+      done
+
+      (( ${#clean_label} > max_len )) && max_len=${#clean_label}
+    fi
+  done
+
+  local aligned_options=()
+  for option in "${options[@]}"; do
+    if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
+      local label="${BASH_REMATCH[1]}"
+      local value="${BASH_REMATCH[2]}"
+
+      local clean_label="$label"
+      while [[ "$clean_label" =~ \<[^\>]*\> ]]; do
+        clean_label="${clean_label//${BASH_REMATCH[0]}/}"
+      done
+
+      local spaces
+      printf -v spaces '%*s' $(( max_len - ${#clean_label} )) ''
+
+      if [[ "${value,,}" == "true" ]]; then
+        value="yes"
+      elif [[ "${value,,}" == "false" ]]; then
+        value="no"
+      fi
+
+      aligned_options+=("$label$spaces : $value")
+    else
+      aligned_options+=("$option")
+    fi
+  done
+
+  for aligned in "${aligned_options[@]}"; do
+    echo "$aligned"
+  done
+}
+
+
+# Prompts the user for a numeric value via menu, validates type and range,
+# and persists the result to the user settings file under the given option name.
+# Supports integers and floats, trims whitespace, normalizes float formatting,
+# and retries on invalid input with an error notification.
+cfgr::set_digit() {
+  local prompt_base="$1"
+  local rofi_title="$2"
+  local type="$3"
+  local min_val="$4"
+  local max_val="$5"
+  local opt_name="${6:-}"
+  local settings_file="$VIBRANIUM_USER_SETTINGS"
+
+  local range_text="${min_val}-${max_val}"
+  local prompt="${prompt_base} (${type})"
+
+  local awk_script="$VIBRANIUM/awk/helpers-set-digit.awk"
+
+  if [[ "$type" != "int" && "$type" != "float" ]]; then
+    return 1
+  fi
+
+  while true; do
+    local input
+    helpers::ui::menu input "$rofi_title" "$range_text" -- "$prompt"
+
+    [[ -z "$input" ]] && return 1
+    [[ "$input" == "$prompt" ]] && continue
+
+    input="${input#"${input%%[![:space:]]*}"}"
+    input="${input%"${input##*[![:space:]]}"}"
+
+    local result
+    result=$(awk -v val="$input" -v lo="$min_val" -v hi="$max_val" -v type="$type" -f "$awk_script")
+
+    if [[ $? -ne 0 ]]; then
+      notify-send -r 6 -u critical -t 1500 "Vibranium" \
+        "A ${type} between ${min_val} and ${max_val}!" &
+      continue
+    fi
+
+    input="$result"
+
+    if [[ -n "$opt_name" ]]; then
+      _cfgr::verify_option "$opt_name" || return 1
+      sed -i "/^${opt_name}/s/=.*/=${input}/" "$settings_file"
+    fi
+
+    printf "%s" "$input"
+    return 0
+  done
+}
+
+
+# Presents a menu of string options to the user, validates the selection,
+# and saves the chosen value to the user settings file under the given
+# variable name.
+cfgr::set_string() {
+  local var_name="$1"
+  local title="$2"
+  shift 2
+  local raw_options=("$@")
+
+  local labels=()
+  local values=()
+
+  # Split Pretty:Value
+  for opt in "${raw_options[@]}"; do
+    if [[ "$opt" == *:* ]]; then
+      labels+=("${opt%%:*}")
+      values+=("${opt#*:}")
+    else
+      labels+=("$opt")
+      values+=("$opt")
+    fi
+  done
+
+  while true; do
+    helpers::ui::menu chosen_label "$title" "ESC to go back" -- "${labels[@]}"
+    [[ -z "$chosen_label" ]] && break
+
+    # Find index of selected label
+    for i in "${!labels[@]}"; do
+      if [[ "${labels[$i]}" == "$chosen_label" ]]; then
+        local chosen_value="${values[$i]}"
+        _cfgr::verify_option "$var_name"
+        sed -i "/^${var_name}=/s|=.*|=\"${chosen_value// /_}\"|" "$VIBRANIUM_USER_SETTINGS"
+        return
+      fi
+    done
+  done
+}
+
+
+# _CFGR_ITEMS holds the display strings sent to rofi.
+# _CFGR_DISPATCH holds a descriptor for what to do when that row is selected.
+#
+# They are always populated together by _build, so index N
+# in _CFGR_ITEMS always corresponds to index N in _CFGR_DISPATCH.
+declare -a _CFGR_ITEMS=()
+declare -a _CFGR_DISPATCH=()
+
+
+# cfgr::item::bool  VAR  LABEL  HOOK
+#
+# Registers a menu row for a boolean setting.
+#
+#   VAR   - the name of the variable as a string, not its value.
+#           e.g.  "VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK"
+#           The current value is read via bash indirect expansion ${!var}.
+#
+#   LABEL - the left-hand text shown in the menu.
+#           e.g.  "Visual feedback"
+#
+#   HOOK  - optional. The name of an executable or a local
+#           function that will be executed after bool flip.
+#
+# The row appears as:
+#   Visual feedback : yes
+# or
+#   Visual feedback : no
+# (cfgr::build_menu maps true->yes and false->no)
+#
+# When selected: cfgr::toggle_bool is called with VAR.
+# The settings file is updated, the menu reopens with the new value.
+#
+# Use cfgr::item::action instead if toggling this setting also needs to
+# run a command (restart a service, call an external tool, etc.).
+#
+# Example:
+#   cfgr::item::bool "VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION" "Notification"
+cfgr::item::bool() {
+  local var="$1"
+  local label="$2"
+  local hook="${3:-}"
+
+  _CFGR_ITEMS+=("$label : ${!var}")
+
+  if [[ -n "$hook" ]]; then
+    _CFGR_DISPATCH+=("bool:$var:$hook")
+  else
+    _CFGR_DISPATCH+=("bool:$var")
+  fi
+}
+
+
+# cfgr::item::digit  VAR  LABEL  PROMPT  ROFI_TITLE  TYPE  MIN  MAX
+#
+# Registers a menu row for a numeric setting.
+#
+#   VAR        - variable name (same rules as cfgr::item::bool)
+#   LABEL      - left-hand text for the row in the parent menu
+#   PROMPT     - placeholder hint shown inside the rofi input box
+#                e.g.  "Volume adjustment step"
+#   ROFI_TITLE - prompt label shown to the left of the rofi input field
+#                e.g.  "Volume step"
+#   TYPE       - "int" or "float"
+#   MIN / MAX  - inclusive allowed range
+#
+# The row appears as:
+#   Volume step : 5
+#
+# When selected: a second rofi prompt opens for input. The entered value
+# is validated and, if valid, written to the settings file under VAR.
+# Invalid input shows a notification and the prompt reopens.
+#
+# Example:
+#   cfgr::item::digit "VIBRANIUM_VOLUME_ADJUSTMENT_STEP" "Volume step" \
+#     "Volume adjustment step" "Volume step" "int" 1 25
+cfgr::item::digit() {
+  local var="$1"
+  local label="$2"
+  local prompt="$3"
+  local rofi_title="$4"
+  local type="$5"
+  local min="$6"
+  local max="$7"
+
+  _CFGR_ITEMS+=("$label : ${!var}")
+
+  # Dispatch string format for digit:
+  #   digit:VAR:PROMPT:ROFI_TITLE:TYPE:MIN:MAX
+  # All fields are colon-separated so the dispatcher can split them with
+  # a single  IFS=: read -r var prompt rofi_title dtype min max  call.
+  _CFGR_DISPATCH+=("digit:${var}:${prompt}:${rofi_title}:${type}:${min}:${max}")
+}
+
+
+# cfgr::item::string  VAR  LABEL  ROFI_TITLE  OPT [OPT ...]
+#
+# Registers a menu row for a setting chosen from a fixed list of values.
+#
+#   VAR        - variable name
+#   LABEL      - left-hand text for the row in the parent menu
+#   ROFI_TITLE - prompt label in the picker menu
+#   OPT ...    - options in "Display Label:stored_value" format.
+#                If an option has no colon, the label is used as the value.
+#
+# The row appears as:
+#   Search engine : google
+#
+# When selected: a picker menu opens showing the display labels.
+# The stored_value matching the chosen label is written to the settings file.
+#
+# Example:
+#   cfgr::item::string "VIBRANIUM_GLOBAL_SEARCH_ENGINE" "Search engine" \
+#     "Search Engine" \
+#     "Google:google" "DuckDuckGo:duckduckgo" "Brave:brave"
+cfgr::item::string() {
+  local var="$1"
+  local label="$2"
+  local rofi_title="$3"
+  shift 3
+
+  _CFGR_ITEMS+=("$label : ${!var}")
+
+  # The options list needs to survive being stored as a single string and
+  # then split back into an array in the dispatcher.
+  # We join them with the ASCII unit-separator (hex 1F) as a delimiter.
+  # This character is safe because it never appears in option strings.
+  local opts_str
+  printf -v opts_str '%s\x1F' "$@"
+
+  # Dispatch string format for string:
+  #   string:VAR:ROFI_TITLE:OPT\x1FOPT\x1F...
+  _CFGR_DISPATCH+=("string:${var}:${rofi_title}:${opts_str%$'\x1F'}")
+}
+
+
+# cfgr::item::action  FUNC  LABEL
+#
+# Registers a menu row that runs a function when selected.
+# The label is displayed in bold (pango markup: <b>label</b>).
+#
+#   FUNC  - name of a bash function defined in the same script
+#   LABEL - text shown in the menu row
+#
+# This is the most flexible declarator. Use it for:
+#
+#   Toggles with side effects:
+#     _toggle_loopback() {
+#       cfgr::toggle_bool "VIBRANIUM_VOLUME_SOURCE_LOOPBACK"
+#       vb-cmd-toggle-loopback
+#     }
+#     cfgr::item::action "_toggle_loopback" "Hear my voice"
+#
+#   Submenus (the function opens its own menu via cfgr::run or a raw loop):
+#     _blur_build() { cfgr::item::bool "..." "..."; ... }
+#     _blur_submenu() { cfgr::run "Blur" _blur_build  BLUR_VAR; }
+#     cfgr::item::action "_blur_submenu" "Blur"
+#
+#   Complex input flows that write to external config files:
+#     _set_opacity() {
+#       while true; do
+#         helpers::ui::menu input "Opacity" "0.0 - 1.0" -- "Enter value"
+#         [[ -z "$input" ]] && break
+#         [[ "$input" =~ ... ]] || { notify-send ...; continue; }
+#         sed -i "s/opacity = .*/opacity = $input/" "$ALACRITTY_CONF"
+#         break
+#       done
+#     }
+#     cfgr::item::action "_set_opacity" "Terminal opacity"
+#
+#   Actions that close the entire menu chain:
+#     _open_editor() {
+#       vb-core-term -- "$EDITOR" "$CONFIG"
+#       helpers::ui::close_menus
+#     }
+#     cfgr::item::action "_open_editor" "Edit config"
+cfgr::item::action() {
+  local func="$1"
+  local label="$2"
+
+  _CFGR_ITEMS+=("<b>$label</b>")
+
+  # Dispatch string format for action:
+  #   action:FUNCNAME
+  _CFGR_DISPATCH+=("action:$func")
+}
+
+
+# cfgr::item::raw  DISPLAY_STRING  DISPATCH_STRING
+#
+# Registers an item with full manual control over both the display text
+# and the dispatch descriptor. This is an escape hatch for cases that
+# don't fit the typed declarators above.
+#
+# DISPLAY_STRING - the exact string passed to rofi (any text, any markup)
+#
+# DISPATCH_STRING - must be a valid descriptor in one of these formats:
+#   action:FUNCNAME
+#   bool:VARNAME
+#   digit:VAR:PROMPT:TITLE:TYPE:MIN:MAX
+#   string:VAR:TITLE:OPT\x1FOPT\x1F...
+#   display:      (empty payload means read-only row, no action on select)
+#
+# The main use case is display+action items where the displayed value comes
+# from somewhere other than a settings variable:
+#
+#   cfgr::item::raw \
+#     "Terminal opacity : $(_get_term_opacity)" \
+#     "action:_term_opacity_menu"
+#
+#   cfgr::item::raw \
+#     "Loopback volume : $(vb-cmd-toggle-loopback --get-volume)%" \
+#     "action:_set_loopback_volume"
+#
+# Because _build is called on every cfgr::run iteration, the getter
+# function runs every time the menu opens, so the displayed value is
+# always current.
+cfgr::item::raw() {
+  _CFGR_ITEMS+=("$1")
+  _CFGR_DISPATCH+=("$2")
+}
+
+
+# cfgr::dispatch  DESCRIPTOR
+#
+# Reads one dispatch descriptor and performs the corresponding action.
+# Called internally by cfgr::run after a menu selection.
+cfgr::dispatch() {
+  local descriptor="$1"
+
+  # Split on the first colon only.
+  # ${var%%:*} removes everything from the first colon onward (type).
+  # ${var#*:}  removes everything up to and including the first colon (payload).
+  local type="${descriptor%%:*}"
+  local payload="${descriptor#*:}"
+
+  case "$type" in
+
+    bool)
+      local var="${payload%%:*}"
+      local hook="${payload#*:}"
+      [[ "$hook" == "$var" ]] && hook=""   # no colon -> no hook
+
+      cfgr::toggle_bool "$var"
+      [[ -n "$hook" ]] && "$hook"
+      ;;
+    digit)
+      # payload: VAR:PROMPT:ROFI_TITLE:TYPE:MIN:MAX
+      local var prompt rofi_title dtype min max
+      IFS=: read -r var prompt rofi_title dtype min max <<< "$payload"
+      cfgr::set_digit "$prompt" "$rofi_title" "$dtype" "$min" "$max" "$var"
+      ;;
+
+    string)
+      # payload: VAR:ROFI_TITLE:OPT\x1FOPT\x1F...
+      local var rofi_title opts_raw
+
+      var="${payload%%:*}"
+      payload="${payload#*:}"
+
+      rofi_title="${payload%%:*}"
+      opts_raw="${payload#*:}"
+
+      local -a opts
+      IFS=$'\x1F' read -r -a opts <<< "$opts_raw"
+
+      cfgr::set_string "$var" "$rofi_title" "${opts[@]}"
+      ;;
+
+    action)
+      eval "$payload"
+      ;;
+
+    display)
+      :
+      ;;
+
+  esac
+}
+
+
+# cfgr::run  TITLE  BUILD_FUNC  [SETTINGS_VAR ...]
+#
+# The menu loop. This is what every cfgr-* script calls instead of
+# writing its own while loop.
+#
+#   TITLE        - prompt label shown in rofi (e.g. "Audio")
+#
+#   BUILD_FUNC   - name of a function (typically _build) that the script
+#                  defines. cfgr::run calls this function on every loop
+#                  iteration to populate _CFGR_ITEMS and _CFGR_DISPATCH.
+#                  Because it runs fresh each time, conditional items and
+#                  getter calls always reflect the current state.
+#
+#   SETTINGS_VAR - zero or more variable names passed to helpers::check.
+#                  These are the settings variables this menu reads.
+#
+# What cfgr::run does on each iteration:
+#   1.  source VIBRANIUM_USER_SETTINGS
+#   2.  helpers::check on declared SETTINGS_VAR names
+#   3.  Reset _CFGR_ITEMS and _CFGR_DISPATCH  (empty the parallel arrays)
+#   4.  BUILD_FUNC   (populate the arrays via cfgr::item::* calls)
+#   5.  cfgr::build_menu  (align the " : value" columns)
+#   6.  helpers::ui::menu  (open rofi, wait for selection)
+#   7.  If empty selection (Escape): break
+#   8.  Find selected item's position in options array
+#   9.  cfgr::dispatch  (act on the descriptor at that position)
+#  10.  loop back to 1
+cfgr::run() {
+  local title="$1"
+  local build_func="$2"
+  shift 2
+  local -a settings=("$@")
+
+  local index=0
+
+  while true; do
+
+    source "$VIBRANIUM_USER_SETTINGS"
+
+    if (( ${#settings[@]} > 0 )); then
+      helpers::check "${settings[@]}"
+    fi
+
+    _CFGR_ITEMS=()
+    _CFGR_DISPATCH=()
+    "$build_func"
+
+    local -a options
+    mapfile -t options < <(cfgr::build_menu "${_CFGR_ITEMS[@]}")
+
+    local chosen=""
+    helpers::ui::menu chosen "$title" "ESC to go back" \
+      -selected-row "$index" -- "${options[@]}"
+
+    [[ -z "$chosen" ]] && break
+
+    # Remember last selected entry
+    for index in "${!options[@]}"; do
+      [[ "${options[$index]}" == "$chosen" ]] && break
+    done
+
+    cfgr::dispatch "${_CFGR_DISPATCH[$index]}"
+  done
+}
