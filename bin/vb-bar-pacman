@@ -2,8 +2,11 @@
 
 source vb-core-lib
 
-helpers::check VIBRANIUM_BAR_PACMAN_MODULE_ENABLE
-helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
+helpers::check \
+  VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES \
+  VIBRANIUM_BAR_PACMAN_MODULE_ENABLE \
+  VIBRANIUM_BAR_SHOW_ANIMATION \
+  VIBRANIUM_BAR_SHOW_SEPARATOR
 
 # Module disabled - exit
 if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == false ]]; then
@@ -69,7 +72,6 @@ make_tooltip() {
 
 MARKER="$VIBRANIUM_RUNTIME/bar.updates.pid.${WAYBAR_PID}"
 
-helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
 if [[ "$VIBRANIUM_BAR_SHOW_ANIMATION" == false ]]; then
   show_spinner=false
 else
@@ -104,7 +106,7 @@ fi
 
 PKG_LIST="$VIBRANIUM_CACHE/bar.updates.list"
 
-( 
+(
   checkupdates --nocolor 2> /dev/null
   yay -Qua --color=never 2> /dev/null
 ) > "$PKG_LIST" &
@@ -118,7 +120,27 @@ fi
 
 TOTAL_COUNT="$(wc -l < "$PKG_LIST")"
 
-helpers::check VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES
+# To avoid spamming on every re-exec, we persist the last-shown unix timestamp to a state
+# file and only fire the notification again once 3 real days have passed since the last one.
+NOTIF_STATE_FILE="$VIBRANIUM_CACHE/${0##*/}.timestamp"
+NOTIF_INTERVAL=$((3 * 24 * 60 * 60)) # 3 days in seconds
+
+if (( TOTAL_COUNT > 150 )); then
+  now=$(date +%s)
+  last=0
+
+  if [[ -f "$NOTIF_STATE_FILE" ]]; then
+    last=$(< "$NOTIF_STATE_FILE")
+  fi
+
+  if (( now - last >= NOTIF_INTERVAL )); then
+    msg="You have $TOTAL_COUNT outdated packages.\n"
+    msg+="Remember, on Arch, it is recommended to update your system regularly"
+    notify-send -r 3 "More Than $TOTAL_COUNT Updates Available" "$msg"
+    echo "$now" > "$NOTIF_STATE_FILE"
+  fi
+fi
+
 if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES" == false ]]; then
   if ((TOTAL_COUNT == 0)); then
     printf '{"text": ""}'
