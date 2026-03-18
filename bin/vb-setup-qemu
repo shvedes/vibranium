@@ -42,7 +42,7 @@ _enable_systemd_units() {
   mapfile -t sockets < <(pacman -Ql libvirt | awk '/\/systemd\/.*\.(socket)$/ && $2 !~ /@/ {print $2}')
 
   for socket in "${sockets[@]}"; do
-    sudo systemctl -q enable --now "${socket##*/}" &
+    sudo systemctl -q enable --now "${socket##*/}" &> /dev/null &
   done
 
   # sudo systemctl -q enable --now dnsmasq.service &
@@ -69,7 +69,6 @@ _configure_ufw() {
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring firewall for libvirt"
   echo -e "\n\n$desired" | sudo tee -a "$conf" > /dev/null
-  return 0 # applied
 }
 
 # Overengineered protection layer
@@ -159,6 +158,14 @@ fi
 
 summary_rules=()
 
+# ── UFW firewall rules ────────────────────────────────────────
+_configure_ufw
+case $? in
+  0) summary_rules+=("UFW: ${GREEN}libvirt iptables backend configured${RESET}") ;;
+  1) summary_rules+=("UFW: ${CYAN}unchanged${RESET}") ;;
+  2) summary_rules+=("UFW: ${YELLOW}not present${RESET}, skipped") ;;
+esac
+
 # ── User group ────────────────────────────────────────────────
 if _add_user_to_group; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} A system restart is recommended for the group change to take effect"
@@ -176,14 +183,6 @@ summary_rules+=("Systemd units: ${GREEN}enabled and started${RESET}")
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up virtual network"
 _configure_virsh_network
 summary_rules+=("Virtual network: ${GREEN}default network autostart configured${RESET}")
-
-# ── UFW firewall rules ────────────────────────────────────────
-_configure_ufw
-case $? in
-  0) summary_rules+=("UFW: ${GREEN}libvirt iptables backend configured${RESET}") ;;
-  1) summary_rules+=("UFW: ${CYAN}unchanged${RESET}") ;;
-  2) summary_rules+=("UFW: ${YELLOW}not present${RESET}, skipped") ;;
-esac
 
 echo ""
 echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"
