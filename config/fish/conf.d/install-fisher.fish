@@ -1,3 +1,7 @@
+if not status is-interactive
+  return
+end
+
 set -l first_run_marker $XDG_CONFIG_HOME/fish/first-run
 
 if not functions -q fisher
