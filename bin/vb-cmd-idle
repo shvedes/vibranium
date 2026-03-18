@@ -3,7 +3,7 @@
 # Handle music playback on session lock/unlock.
 # Intended to be called by hypridle.
 
-source vb-core-lib
+source vb-lib-core
 
 RESTORE_FLAG="$VIBRANIUM_RUNTIME/restore-player"
 

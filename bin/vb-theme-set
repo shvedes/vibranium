@@ -2,7 +2,7 @@
 
 # shellcheck disable=SC2206
 
-source vb-core-lib
+source vb-lib-core
 
 # Assign a theme name to the GTK theme folder name
 declare -A FAMILIES=(

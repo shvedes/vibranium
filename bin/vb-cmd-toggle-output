@@ -57,7 +57,7 @@ while [[ $# -gt 0 ]]; do
   shift
 done
 
-source vb-core-lib
+source vb-lib-core
 
 helpers::check VIBRANIUM_GLOBAL_USE_OSD
 

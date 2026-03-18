@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 INDEX=0
 
 while true; do
   source "$VIBRANIUM_USER_SETTINGS"
 
-  helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
-  helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN
-  helpers::check VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART
-  helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
+  helpers::check \
+    VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK \
+    VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN \
+    VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART \
+    VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
 
   OPTIONS=("Show Now Playing notification : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING")
 
@@ -26,14 +27,7 @@ while true; do
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Now Playing" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [[ -z "$CHOSEN" ]] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "Show Now Playing notification"*)
@@ -52,6 +46,6 @@ while true; do
       vb-cmd-show-help now-playing
       INDEX=0
       ;;
+    "") break ;;
   esac
-
 done

@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+
+_HYPR_D="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d"
+
+HYPR_CONF_INPUT="$_HYPR_D/input.conf"
+HYPR_CONF_ADVANCED="$_HYPR_D/advanced.conf"
+HYPR_CONF_LAF="$_HYPR_D/look-and-feel.conf"
+HYPR_CONF_SMARTGAPS="$_HYPR_D/smart-gaps.conf"
+HYPR_CONF_ANIMATIONS="$_HYPR_D/animations.conf"
+HYPRLOCK_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock.conf"
+
+# Single-option read helpers
+
+hypr::bool()     { hyprctl -j getoption "$1" | jq -r 'if .int == 1 then "true" else "false" end'; }
+hypr::bool_inv() { hyprctl -j getoption "$1" | jq -r 'if .int == 0 then "true" else "false" end'; }
+hypr::int()      { hyprctl -j getoption "$1" | jq -r '.int'; }
+hypr::float()    { hyprctl -j getoption "$1" | jq -r '.float'; }
+hypr::str()      { hyprctl -j getoption "$1" | jq -r '.str'; }
+
+# Batch fetch -> associative array
+#
+# hypr::fetch "option:path|type" [...]
+#
+# Populates the global HYPR associative array. One hyprctl call per option.
+# No jq batching — avoids nan/invalid-JSON issues in hyprctl --batch -j output.
+#
+# Types: bool, bool_inv, int, float, float1 (1dp), float2 (2dp), str
+#
+# Usage:
+#   SPEC=("input:sensitivity|float2" "input:natural_scroll|bool" "input:kb_layout|str")
+#   hypr::fetch "${SPEC[@]}"
+#   echo "${HYPR[input:sensitivity]}"    # -> 0.00
+#   echo "${HYPR[input:natural_scroll]}" # -> false
+
+declare -A HYPR=()
+
+hypr::fetch() {
+  local spec opt type raw
+  for spec in "$@"; do
+    opt="${spec%|*}"
+    type="${spec#*|}"
+    case "$type" in
+      bool)                                   HYPR["$opt"]="$(hypr::bool     "$opt")" ;;
+      bool_inv)                               HYPR["$opt"]="$(hypr::bool_inv "$opt")" ;;
+      int)                                    HYPR["$opt"]="$(hypr::int      "$opt")" ;;
+      str)                                    HYPR["$opt"]="$(hypr::str      "$opt")" ;;
+      float)                                  HYPR["$opt"]="$(hypr::float    "$opt")" ;;
+      float1)    raw="$(hypr::float "$opt")"; HYPR["$opt"]=$(LC_NUMERIC=C printf "%.1f" "$raw") ;;
+      float2)    raw="$(hypr::float "$opt")"; HYPR["$opt"]=$(LC_NUMERIC=C printf "%.2f" "$raw") ;;
+      float_int) raw="$(hypr::float "$opt")"; HYPR["$opt"]=$(LC_NUMERIC=C printf "%.0f" "$raw") ;;
+    esac
+  done
+}
+
+# hypr::get <option>  — read from the last hypr::fetch result
+hypr::get() { printf "${HYPR[$1]}"; }
+
+# hypr::set <option> <value> <config_file>
+hypr::set() { vb-cmd-edit-wm-config "${1}:${2}" "$3"; }
+
+# hypr::toggle <option> <config_file>
+hypr::toggle() {
+  if [[ "$(hypr::bool "$1")" == "true" ]]; then
+    hypr::set "$1" false "$2"
+  else
+    hypr::set "$1" true "$2"
+  fi
+}
+
+# hypr::toggle_inv <option> <config_file>
+# For options where int==1 means logical false (e.g. ignore_window, zoom_detached_camera)
+hypr::toggle_inv() {
+  if [[ "$(hypr::bool_inv "$1")" == "true" ]]; then
+    hypr::set "$1" false "$2"
+  else
+    hypr::set "$1" true "$2"
+  fi
+}
+
+hypr::reload() { hyprctl -q reload config-only; }

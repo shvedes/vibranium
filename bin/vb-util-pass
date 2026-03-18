@@ -6,13 +6,13 @@
 # and async git sync with an internet-wait retry loop.
 #
 # Depends on: pass, gpg, git, ping, wl-copy, rofi, notify-send
-# Depends on vb-core-lib for: helpers::ui::menu, P_YELLOW
+# Depends on vb-lib-core for: helpers::ui::menu, P_YELLOW
 
 # =========================================================================
 # BOOTSTRAP
 # =========================================================================
 
-source vb-core-lib
+source vb-lib-core
 
 # Guard: verify `pass` is installed before doing anything else.
 # If missing, offer a one-click install via a notification action button.

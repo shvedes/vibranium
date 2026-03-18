@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 INDEX=0
 
@@ -17,14 +17,7 @@ while true; do
   )
 
   helpers::ui::menu CHOSEN "Player" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [[ -z "$CHOSEN" ]] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     *"Previous"*)
@@ -38,5 +31,6 @@ while true; do
     *"Help"*)
       vb-cmd-show-help player-fade
       ;;
+    "") break ;;
   esac
 done

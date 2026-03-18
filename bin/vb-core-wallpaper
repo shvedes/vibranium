@@ -5,7 +5,7 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 1
 fi
 
-source vb-core-lib
+source vb-lib-core
 
 CURRENT_THEME="$(vb-theme-get)"
 WALLS="$XDG_CONFIG_HOME/vibranium/theme/current/backgrounds"

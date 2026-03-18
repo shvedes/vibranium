@@ -1,26 +1,52 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
+source vb-lib-hypr
+
+BLUR_SPEC=(
+  "decoration:blur:enabled|bool"
+  "decoration:blur:size|int"
+  "decoration:blur:passes|int"
+  "decoration:blur:contrast|float"
+  "decoration:blur:brightness|float"
+  "decoration:blur:vibrancy|float"
+  "decoration:blur:noise|float"
+)
+
+SHADOW_SPEC=(
+  "decoration:shadow:enabled|bool"
+  "decoration:shadow:render_power|int"
+  "decoration:shadow:range|int"
+  "decoration:shadow:sharp|bool"
+  "decoration:shadow:ignore_window|bool_inv"
+)
+
+DECORATION_SPEC=(
+  "general:border_size|int"
+  "decoration:rounding|int"
+  "decoration:rounding_power|float2"
+  "decoration:active_opacity|float2"
+  "decoration:inactive_opacity|float2"
+  "decoration:fullscreen_opacity|float2"
+  "decoration:dim_inactive|bool"
+  "decoration:dim_strength|float2"
+  "decoration:dim_modal|bool"
+  "decoration:dim_special|float2"
+  "decoration:border_part_of_window|bool"
+)
 
 _edit_roundness() {
   local input
-  local dunstrc
-  local config_rasi
-  local swayosd_css
-
   input=$(helpers::configure::set_digit --verify "Border roundness" "Border roundness" "int" 0 16)
-  [[ -z "$input" ]] && return
-  vb-cmd-edit-wm-config "decoration:rounding:$input" "$HYPR_CONFIG"
+  if [[ -z "$input" ]]; then
+    return
+  fi
 
-  dunstrc="$XDG_CONFIG_HOME/dunst/dunstrc"
-  sed -i "/corner_radius/s/=.*/= $input/" "$dunstrc"
+  hypr::set "decoration:rounding" "$input" "$HYPR_CONF_LAF"
+  sed -i "/corner_radius/s/=.*/= $input/"        "$XDG_CONFIG_HOME/dunst/dunstrc"
+  sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/rofi/config.rasi"
+  sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/swayosd/style.css"
   vb-cmd-refresh-dunst &
-
-  config_rasi="$XDG_CONFIG_HOME/rofi/config.rasi"
-  sed -i "/border-radius/s/: .*/: ${input}px;/" "$config_rasi"
-
-  swayosd_css="$XDG_CONFIG_HOME/swayosd/style.css"
-  sed -i "/border-radius/s/: .*/: ${input}px;/" "$swayosd_css"
 
   helpers::check VIBRANIUM_GLOBAL_USE_OSD
   if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
@@ -29,444 +55,228 @@ _edit_roundness() {
 }
 
 _set_animations_preset() {
-  local folder target anim_opts anim_chosen
-
-  folder="$VIBRANIUM/default/hypr/animations"
-  target="$HOME/.config/hypr/hyprland.conf.d/animations.conf"
-
-  anim_opts=("$folder"/*.conf)
-  anim_opts=("${anim_opts[@]##*/}")   # strip leading path
-  anim_opts=("${anim_opts[@]%.conf}") # strip extension
+  local folder="$VIBRANIUM/default/hypr/animations" chosen
+  local anim_opts=("$folder"/*.conf)
+  anim_opts=("${anim_opts[@]##*/}")
+  anim_opts=("${anim_opts[@]%.conf}")
   anim_opts=("${anim_opts[@]^}")
 
   while true; do
-    helpers::ui::menu anim_chosen "Animations" "ESC to go back" -- "${anim_opts[@]}"
-    [[ -z "$anim_chosen" ]] && break
-
-    ln -sf "$folder/${anim_chosen,}.conf" "$target"
-
-    hyprctl -q reload config-only
+    helpers::ui::menu chosen "Animations" "ESC to go back" -- "${anim_opts[@]}"
+    if [[ -z "$chosen" ]]; then
+      break
+    fi
+    ln -sf "$folder/${chosen,}.conf" "$HYPR_CONF_ANIMATIONS"
+    hypr::reload
     break
   done
 }
 
-_edit_bool() {
-  case "$(hyprctl -j getoption "$1" | jq -r '.int')" in
-    1) vb-cmd-edit-wm-config "${1}:false" "$HYPR_CONFIG" ;;
-    0) vb-cmd-edit-wm-config "${1}:true" "$HYPR_CONFIG" ;;
-  esac
-  hyprctl -q reload config-only
-}
-
 _blur_submenu() {
-  local parameters index opts input
-  local labels
+  local index labels chosen input
 
   while true; do
-    mapfile -t parameters < <(
-      hyprctl -j --batch \
-        "getoption decoration:blur:enabled;
-             getoption decoration:blur:size;
-             getoption decoration:blur:passes;
-             getoption decoration:blur:contrast;
-             getoption decoration:blur:brightness;
-             getoption decoration:blur:vibrancy;
-             getoption decoration:blur:noise
-             " | jq -sr '.[] | .option as $o |
-                if ($o | test("enabled")) then
-                    (if .int == 1 then "true" else "false" end)
-                elif ($o | test("passes|size")) then
-                    .int
-                else
-                    .float
-                end
-            '
+    hypr::fetch "${BLUR_SPEC[@]}"
+
+    labels=("Enabled : ${HYPR[decoration:blur:enabled]}")
+    [[ "${HYPR[decoration:blur:enabled]}" == true ]] && labels+=(
+      "Size : ${HYPR[decoration:blur:size]}"
+      "Noise : ${HYPR[decoration:blur:noise]}"
+      "Passes : ${HYPR[decoration:blur:passes]}"
+      "Vibrancy : ${HYPR[decoration:blur:vibrancy]}"
+      "Contrast : ${HYPR[decoration:blur:contrast]}"
+      "Brightness : ${HYPR[decoration:blur:brightness]}"
     )
-
-    read -r enabled size passes contrast brightness vibrancy noise <<<"${parameters[*]}"
-
-    # Temporary removed
-    # helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
-    # local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
-    # local power_profile="$(vb-cmd-get-power)"
-
-    labels=("Enabled : $enabled")
-
-    if [[ "$enabled" == true ]]; then
-      labels+=(
-        "Size : $size"
-        "Noise : $noise"
-        "Passes : $passes"
-        "Vibrancy : $vibrancy"
-        "Contrast : $contrast"
-        "Brightness : $brightness"
-      )
-    fi
 
     mapfile -t labels < <(helpers::configure::build_menu "${labels[@]}")
     helpers::ui::menu chosen "Blur" "ESC to go back" -selected-row "$index" -- "${labels[@]}"
-    [[ -z $chosen ]] && break
-
-    for i in "${!labels[@]}"; do
-      [[ "${labels[$i]}" == "$chosen" ]] && {
-        index="$i"
-        break
-      }
-    done
+    helpers::configure::track_index labels "$chosen" index
 
     case "$chosen" in
       "Enabled"*)
-        _edit_bool "decoration:blur:enabled"
-
-        case "$enabled" in
-          "true")
-            sed -i '/blur_size/s/ =.*/ = 1/' "$HYPRLOCK_CONFIG"
-            sed -i '/blur_passes/s/ =.*/ = 1/' "$HYPRLOCK_CONFIG"
-            ;;
-          "false")
-            sed -i '/blur_size/s/ =.*/ = 5/' "$HYPRLOCK_CONFIG"
-            sed -i '/blur_passes/s/ =.*/ = 3/' "$HYPRLOCK_CONFIG"
-            ;;
-        esac
-
+        hypr::toggle "decoration:blur:enabled" "$HYPR_CONF_LAF"
+        if [[ "${HYPR[decoration:blur:enabled]}" == true ]]; then
+          sed -i '/blur_size/s/ =.*/ = 1/;/blur_passes/s/ =.*/ = 1/' "$HYPRLOCK_CONFIG"
+        else
+          sed -i '/blur_size/s/ =.*/ = 5/;/blur_passes/s/ =.*/ = 3/' "$HYPRLOCK_CONFIG"
+        fi
         ;;
-      "Noise"*)
-        input=$(helpers::configure::set_digit --verify "Blur noise" "Blur noise" "float" 0.0 1.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:noise:$input" "$HYPR_CONFIG"
-        ;;
-      "Vibrancy"*)
-        input=$(helpers::configure::set_digit --verify "Blur vibrancy" "Blur vibrancy" "float" 0.0 1.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:vibrancy:$input" "$HYPR_CONFIG"
-        ;;
-      "Brightness"*)
-        input=$(helpers::configure::set_digit --verify "Blur brightness" "Blur brightness" "float" 0.0 2.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:brightness:$input" "$HYPR_CONFIG"
-        ;;
-      "Contrast"*)
-        input=$(helpers::configure::set_digit --verify "Blur contrast" "Blur contrast" "float" 0.0 2.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:contrast:$input" "$HYPR_CONFIG"
-        ;;
-      "Size"*)
-        input=$(helpers::configure::set_digit --verify "Blur size" "Blur size" "int" 1 512)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:size:$input" "$HYPR_CONFIG"
-        ;;
-      "Passes"*)
-        input=$(helpers::configure::set_digit --verify "Blur passes" "Blur passes" "int" 1 20)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:passes:$input" "$HYPR_CONFIG"
-        ;;
+      "Noise"*)      input=$(helpers::configure::set_digit --verify "Blur noise"      "Blur noise"      float 0.0 1.0) && hypr::set "decoration:blur:noise"      "$input" "$HYPR_CONF_LAF" ;;
+      "Vibrancy"*)   input=$(helpers::configure::set_digit --verify "Blur vibrancy"   "Blur vibrancy"   float 0.0 1.0) && hypr::set "decoration:blur:vibrancy"   "$input" "$HYPR_CONF_LAF" ;;
+      "Brightness"*) input=$(helpers::configure::set_digit --verify "Blur brightness" "Blur brightness" float 0.0 2.0) && hypr::set "decoration:blur:brightness" "$input" "$HYPR_CONF_LAF" ;;
+      "Contrast"*)   input=$(helpers::configure::set_digit --verify "Blur contrast"   "Blur contrast"   float 0.0 2.0) && hypr::set "decoration:blur:contrast"   "$input" "$HYPR_CONF_LAF" ;;
+      "Size"*)       input=$(helpers::configure::set_digit --verify "Blur size"       "Blur size"       int   1   512) && hypr::set "decoration:blur:size"       "$input" "$HYPR_CONF_LAF" ;;
+      "Passes"*)     input=$(helpers::configure::set_digit --verify "Blur passes"     "Blur passes"     int   1    20) && hypr::set "decoration:blur:passes"     "$input" "$HYPR_CONF_LAF" ;;
+      "") break ;;
     esac
-
-    hyprctl -q reload config-only
+    hypr::reload
   done
 }
 
 _shadow_submenu() {
-  local parameters index opts input
-  local labels
+  local index labels chosen input
 
   while true; do
-    mapfile -t parameters < <(
-      hyprctl -j --batch \
-        "getoption decoration:shadow:enabled;
-             getoption decoration:shadow:render_power;
-             getoption decoration:shadow:range;
-             getoption decoration:shadow:sharp;
-             getoption decoration:shadow:ignore_window
-             " | jq -sr '.[] | .option as $o |
-                if ($o | test("enabled|sharp")) then
-                    (if .int == 1 then "true" else "false" end)
-                elif ($o | test("ignore_window")) then
-                    (if .int == 1 then "false" else "true" end)
-                else
-                    .int
-                end
-            '
+    hypr::fetch "${SHADOW_SPEC[@]}"
+
+    labels=("Enabled : ${HYPR[decoration:shadow:enabled]}")
+    [[ "${HYPR[decoration:shadow:enabled]}" == true ]] && labels+=(
+      "Power : ${HYPR[decoration:shadow:render_power]}"
+      "Range : ${HYPR[decoration:shadow:range]}px"
+      "Sharp : ${HYPR[decoration:shadow:sharp]}"
+      "Behind the window : ${HYPR[decoration:shadow:ignore_window]}"
     )
-
-    read -r enabled render_power range sharp ignore_window <<<"${parameters[*]}"
-
-    # Temporary removed
-    # helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
-    # local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
-    # local power_profile="$(vb-cmd-get-power)"
-
-    labels=("Enabled : $enabled")
-
-    if [[ "$enabled" == true ]]; then
-      labels+=(
-        "Power : $render_power"
-        "Range : ${range}px"
-        "Sharp : $sharp"
-        "Behind the window : $ignore_window"
-      )
-    fi
 
     mapfile -t labels < <(helpers::configure::build_menu "${labels[@]}")
     helpers::ui::menu chosen "Shadows" "ESC to go back" -selected-row "$index" -- "${labels[@]}"
-    [[ -z $chosen ]] && break
-
-    for i in "${!labels[@]}"; do
-      [[ "${labels[$i]}" == "$chosen" ]] && {
-        index="$i"
-        break
-      }
-    done
+    helpers::configure::track_index labels "$chosen" index
 
     case "$chosen" in
-      "Enabled"*) _edit_bool "decoration:shadow:enabled" ;;
-      "Sharp"*) _edit_bool "decoration:shadow:sharp" ;;
-      "Behind"*) _edit_bool "decoration:shadow:ignore_window" ;;
-      "Power"*)
-        input=$(helpers::configure::set_digit --verify "Render power" "Render power" "int" 1 4)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:shadow:render_power:$input" "$HYPR_CONFIG"
-        ;;
+      "") break ;;
+      "Enabled"*) hypr::toggle     "decoration:shadow:enabled"       "$HYPR_CONF_LAF" ;;
+      "Sharp"*)   hypr::toggle     "decoration:shadow:sharp"         "$HYPR_CONF_LAF" ;;
+      "Behind"*)  hypr::toggle_inv "decoration:shadow:ignore_window" "$HYPR_CONF_LAF" ;;
+      "Power"*)   input=$(helpers::configure::set_digit --verify "Render power" "Render power" int 1 4)   && hypr::set "decoration:shadow:render_power" "$input" "$HYPR_CONF_LAF" ;;
       "Range"*)
-        if [[ "$sharp" == true ]]; then
-          input=$(helpers::configure::set_digit --verify "Shadow range" "Shadow range" "int" 1 128)
-        else
-          input=$(helpers::configure::set_digit --verify "Shadow range" "Shadow range" "int" 4 128)
-        fi
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:shadow:range:$input" "$HYPR_CONFIG"
+        local min=4; [[ "${HYPR[decoration:shadow:sharp]}" == true ]] && min=1
+        input=$(helpers::configure::set_digit --verify "Shadow range" "Shadow range" int "$min" 128)
+        [[ -n "$input" ]] && hypr::set "decoration:shadow:range" "$input" "$HYPR_CONF_LAF"
         ;;
     esac
 
-    hyprctl -q reload config-only
+    hypr::reload
   done
 }
 
 _decoration_submenu() {
-  local parameters index opts input
-  local labels
+  local index labels chosen input
 
   while true; do
-    mapfile -t parameters < <(
-      hyprctl -j --batch \
-        "getoption general:border_size;
-             getoption decoration:rounding;
-             getoption decoration:rounding_power;
-             getoption decoration:active_opacity;
-             getoption decoration:inactive_opacity;
-             getoption decoration:fullscreen_opacity;
-             getoption decoration:dim_inactive;
-             getoption decoration:dim_strength;
-             getoption decoration:dim_modal;
-             getoption decoration:dim_special;
-             getoption decoration:border_part_of_window
-             " | jq -sr '.[] | .option as $o |
-                if ($o | test("dim_(inactive|modal)|border_part_of_window"; "i")) then
-                    (if .int == 1 then "true" else "false" end)
-                elif ($o | test(".*_(opacity|power|strength|special)")) then
-                    (.float * 100 | round / 100)
-                else
-                    .int
-                end
-            '
-    )
-
-    read -r bordersize rounding round_power a_opacity i_opacity f_opacity \
-      dim_inactive dim_strength dim_modal dim_special border_part <<<"${parameters[*]}"
+    hypr::fetch "${DECORATION_SPEC[@]}"
 
     labels=(
-      "Border size : $bordersize"
-      "Border roundness : $rounding"
-      "Rounding power : $round_power"
-      "Active window opacity : $a_opacity"
-      "Inactive window opacity : $i_opacity"
-      "Fullscreen window opacity : $f_opacity"
-      "Dim inactive window : $dim_inactive"
+      "Border size : ${HYPR[general:border_size]}"
+      "Border roundness : ${HYPR[decoration:rounding]}"
+      "Rounding power : ${HYPR[decoration:rounding_power]}"
+      "Active window opacity : ${HYPR[decoration:active_opacity]}"
+      "Inactive window opacity : ${HYPR[decoration:inactive_opacity]}"
+      "Fullscreen window opacity : ${HYPR[decoration:fullscreen_opacity]}"
+      "Dim inactive window : ${HYPR[decoration:dim_inactive]}"
     )
 
-    [[ "$dim_inactive" == true ]] ||
-      [[ "$dim_specialdim_modal" == true ]] && {
-      labels+=(
-        "Dim strength : $dim_strength"
-      )
-    }
+    if [[ "${HYPR[decoration:dim_inactive]}" == true ]]; then
+      if [[ "${HYPR[decoration:dim_modal]}" == true ]]; then
+        labels+=("Dim strength : ${HYPR[decoration:dim_strength]}")
+      fi
+    fi
 
     labels+=(
-      "Dim modal windows : $dim_modal"
-      "Dim special workspace : $dim_special"
-      "Border part of window : $border_part"
+      "Dim modal windows : ${HYPR[decoration:dim_modal]}"
+      "Dim special workspace : ${HYPR[decoration:dim_special]}"
+      "Border part of window : ${HYPR[decoration:border_part_of_window]}"
     )
 
     mapfile -t labels < <(helpers::configure::build_menu "${labels[@]}")
     helpers::ui::menu chosen "Decoration" "ESC to go back" -selected-row "$index" -- "${labels[@]}"
-    [[ -z $chosen ]] && break
-
-    for i in "${!labels[@]}"; do
-      [[ "${labels[$i]}" == "$chosen" ]] && {
-        index="$i"
-        break
-      }
-    done
+    helpers::configure::track_index labels "$chosen" index
 
     case "$chosen" in
-      "Border size"*)
-        input=$(helpers::configure::set_digit --verify "Border size" "Border size" "int" 0 24)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "general:border_size:$input" "$HYPR_CONFIG"
-        ;;
-      "Border roundness"*) _edit_roundness ;;
-      "Rounding power"*)
-        input=$(helpers::configure::set_digit --verify "Rounding power" "Rounding power" "float" 1.0 10.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:rounding_power:$input" "$HYPR_CONFIG"
-        ;;
-      "Active window opacity"*)
-        input=$(helpers::configure::set_digit --verify "Active opacity" "Active opacity" "float" 0.0 1.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:active_opacity:$input" "$HYPR_CONFIG"
-        ;;
-      "Inactive window opacity"*)
-        input=$(helpers::configure::set_digit --verify "Inactive opacity" "Inactive opacity" "float" 0.0 1.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:inactive_opacity:$input" "$HYPR_CONFIG"
-        ;;
-      "Fullscreen window opacity"*)
-        input=$(helpers::configure::set_digit --verify "Fullscreen opacity" "Fullscreen opacity" "float" 0.0 1.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:fullscreen_opacity:$input" "$HYPR_CONFIG"
-        ;;
-      "Dim inactive window"*) _edit_bool "decoration:dim_inactive" ;;
-      "Dim modal windows"*) _edit_bool "decoration:dim_modal" ;;
-      "Dim special workspace"*)
-        input=$(helpers::configure::set_digit --verify "Dim special" "Dim special" "float" 0.0 1.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:dim_special:$input" "$HYPR_CONFIG"
-        ;;
-      "Dim strength"*)
-        input=$(helpers::configure::set_digit --verify "Dim strength" "Dim strength" "float" 0.0 1.0)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:dim_strength:$input" "$HYPR_CONFIG"
-        ;;
-      "Border part of window"*) _edit_bool "decoration:border_part_of_window" ;;
+      "") break ;;
+      "Border size"*)               input=$(helpers::configure::set_digit --verify "Border size"         "Border size"         int   0   24) && hypr::set "general:border_size"             "$input" "$HYPR_CONF_LAF" ;;
+      "Border roundness"*)          _edit_roundness ;;
+      "Rounding power"*)            input=$(helpers::configure::set_digit --verify "Rounding power"      "Rounding power"      float 1.0 10.0) && hypr::set "decoration:rounding_power"     "$input" "$HYPR_CONF_LAF" ;;
+      "Active window opacity"*)     input=$(helpers::configure::set_digit --verify "Active opacity"      "Active opacity"      float 0.0  1.0) && hypr::set "decoration:active_opacity"     "$input" "$HYPR_CONF_LAF" ;;
+      "Inactive window opacity"*)   input=$(helpers::configure::set_digit --verify "Inactive opacity"    "Inactive opacity"    float 0.0  1.0) && hypr::set "decoration:inactive_opacity"   "$input" "$HYPR_CONF_LAF" ;;
+      "Fullscreen window opacity"*) input=$(helpers::configure::set_digit --verify "Fullscreen opacity"  "Fullscreen opacity"  float 0.0  1.0) && hypr::set "decoration:fullscreen_opacity" "$input" "$HYPR_CONF_LAF" ;;
+      "Dim inactive window"*)       hypr::toggle "decoration:dim_inactive"          "$HYPR_CONF_LAF" ;;
+      "Dim modal windows"*)         hypr::toggle "decoration:dim_modal"             "$HYPR_CONF_LAF" ;;
+      "Dim special workspace"*)     input=$(helpers::configure::set_digit --verify "Dim special"         "Dim special"         float 0.0  1.0) && hypr::set "decoration:dim_special"        "$input" "$HYPR_CONF_LAF" ;;
+      "Dim strength"*)              input=$(helpers::configure::set_digit --verify "Dim strength"        "Dim strength"        float 0.0  1.0) && hypr::set "decoration:dim_strength"       "$input" "$HYPR_CONF_LAF" ;;
+      "Border part of window"*)     hypr::toggle "decoration:border_part_of_window" "$HYPR_CONF_LAF" ;;
     esac
-
-    hyprctl -q reload config-only
+    hypr::reload
   done
 }
 
 _animations_submenu() {
-  local opts chosen
-  local enabled anim_file anim_preset
-
-  anim_file="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/animations.conf"
+  local opts chosen enabled anim_preset
 
   while true; do
-    enabled="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
+    hypr::reload
+    # animations:enabled is a single option — fine to read directly
+    enabled=$(hypr::int "animations:enabled")
+    [[ "$enabled" == 1 ]] && enabled=true || enabled=false
 
-    anim_preset="$(readlink "$anim_file")"
-    anim_preset="${anim_preset##*/}"   # strip path
-    anim_preset="${anim_preset%.conf}" # strip extension
-
-    [[ "$enabled" == "1" ]] && enabled="true" || enabled="false"
+    anim_preset=$(readlink "$HYPR_CONF_ANIMATIONS")
+    anim_preset="${anim_preset##*/}"; anim_preset="${anim_preset%.conf}"
 
     opts=("Enabled : $enabled")
-
-    if [[ "$enabled" == true ]]; then
-      opts+=("Preset : ${anim_preset^}")
-    fi
+    [[ "$enabled" == true ]] && opts+=("Preset : ${anim_preset^}")
 
     mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
-
     helpers::ui::menu chosen "Animations" "ESC to go back" -- "${opts[@]}"
-    [[ -z $chosen ]] && break
 
     case "$chosen" in
       "Enabled"*) vb-cmd-toggle-animations --quiet ;;
-      "Preset"*) _set_animations_preset ;;
+      "Preset"*)  _set_animations_preset ;;
+      "") break ;;
     esac
   done
 }
 
+GAPS_SPEC=(
+  "general:gaps_in|int"
+  "general:gaps_out|int"
+)
+
 _gaps_submenu() {
-  local index parameters opts chosen smartgaps_enabled input
+  local index opts chosen input smartgaps_enabled
 
   while true; do
-    [[ -f "$SMART_GAPS_CONFIG" ]] && {
-      smartgaps_enabled="true"
-    } || {
-      smartgaps_enabled="false"
-    }
+    [[ -f "$HYPR_CONF_SMARTGAPS" ]] && smartgaps_enabled=true || smartgaps_enabled=false
 
-    mapfile -t parameters < <(
-      hyprctl -j --batch \
-        "getoption general:gaps_in;
-                 getoption general:gaps_out
-                " | jq -r '.custom | split(" ")[0]'
+    # gaps return their value via .custom, not .int — read directly
+    mapfile -t _v < <(
+      hyprctl --batch -j "getoption general:gaps_in; getoption general:gaps_out" |
+      jq -r '.custom | split(" ")[0]'
     )
-
-    read -r gaps_in gaps_out <<<"${parameters[*]}"
+    local gaps_in="${_v[0]}" gaps_out="${_v[1]}"
 
     opts=(
       "Inner gaps : $gaps_in"
       "Outer gaps : $gaps_out"
     )
-
-    ((gaps_in != 0 && gaps_out != 0)) && {
-      opts+=("Smart gaps : $smartgaps_enabled")
-    }
+    (( gaps_in != 0 && gaps_out != 0 )) && opts+=("Smart gaps : $smartgaps_enabled")
 
     mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
     helpers::ui::menu chosen "Gaps" "ESC to go back" -selected-row "$index" -- "${opts[@]}"
-    [[ -z $chosen ]] && break
-
-    for i in "${!opts[@]}"; do
-      [[ "${opts[$i]}" == "$chosen" ]] && {
-        index="$i"
-        break
-      }
-    done
+    helpers::configure::track_index opts "$chosen" index
 
     case "$chosen" in
-      "Inner gaps"*)
-        input=$(helpers::configure::set_digit --verify "Inner gaps" "Inner gaps" "int" 0 50)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "general:gaps_in:$input" "$HYPR_CONFIG"
-        ;;
-      "Outer gaps"*)
-        input=$(helpers::configure::set_digit --verify "Outer gaps" "Outer gaps" "int" 0 50)
-        [[ -n "$input" ]] && vb-cmd-edit-wm-config "general:gaps_out:$input" "$HYPR_CONFIG"
-        ;;
+      "Inner gaps"*) input=$(helpers::configure::set_digit --verify "Inner gaps" "Inner gaps" int 0 50) && hypr::set "general:gaps_in"  "$input" "$HYPR_CONF_LAF" ;;
+      "Outer gaps"*) input=$(helpers::configure::set_digit --verify "Outer gaps" "Outer gaps" int 0 50) && hypr::set "general:gaps_out" "$input" "$HYPR_CONF_LAF" ;;
       "Smart gaps"*) vb-cmd-toggle-smart-gaps ;;
+      "") break ;;
     esac
-
-    hyprctl -q reload config-only
+    hypr::reload
   done
 }
 
 INDEX=0
-SMART_GAPS_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/smart-gaps.conf"
-HYPR_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/look-and-feel.conf"
-HYPRLOCK_CONFIG="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 
 while true; do
-  OPTIONS=(
-    "<b>Blur</b>"
-    "<b>Gaps</b>"
-    "<b>Shadows</b>"
-    "<b>Decoration</b>"
-    "<b>Animations</b>"
-  )
+  OPTIONS=("<b>Blur</b>" "<b>Gaps</b>" "<b>Shadows</b>" "<b>Decoration</b>" "<b>Animations</b>")
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Look & Feel" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [[ -z $CHOSEN ]] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
-    *"Blur"*)
-      _blur_submenu
-      ;;
-    *"Shadows"*)
-      _shadow_submenu
-      ;;
-    *"Decoration"*)
-      _decoration_submenu
-      ;;
-    *"Animations"*)
-      _animations_submenu
-      ;;
-    *"Gaps"*)
-      _gaps_submenu
-      ;;
+    *"Blur"*)       _blur_submenu ;;
+    *"Shadows"*)    _shadow_submenu ;;
+    *"Decoration"*) _decoration_submenu ;;
+    *"Animations"*) _animations_submenu ;;
+    *"Gaps"*)       _gaps_submenu ;;
+    "") break ;;
   esac
 done

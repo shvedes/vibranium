@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 _flash_screen_submenu() {
   local opts chosen var
@@ -8,7 +8,6 @@ _flash_screen_submenu() {
   while true; do
     opts=("Flash screen : $VIBRANIUM_RECORDING_FLASH_SCREEN" "<b>Help</b>")
     helpers::ui::menu chosen "Flash screen" "ESC to go back" -- "${opts[@]}"
-    [ -z "$chosen" ] && break
 
     case "$chosen" in
       "Flash"*)
@@ -19,6 +18,7 @@ _flash_screen_submenu() {
         vb-cmd-show-help recording-flash-screen
         continue
         ;;
+      "") break ;;
     esac
   done
 }
@@ -46,8 +46,6 @@ _set_recording_mode() {
   while true; do
     opts=("Constant Frame Rate" "Variable Frame Rate" "<b>Help</b>")
     helpers::ui::menu chosen "Mode" "ESC to go back" -- "${opts[@]}"
-    [[ -z "$chosen" ]] && break
-
     var="VIBRANIUM_RECORDING_FRAMERATE_MODE"
 
     case "$chosen" in
@@ -65,6 +63,7 @@ _set_recording_mode() {
         vb-cmd-show-help recording-record-type
         continue
         ;;
+      "") break ;;
     esac
   done
 }
@@ -74,7 +73,6 @@ _set_container_type() {
 
   opts=("mp4" "mkv" "webm")
   helpers::ui::menu _chosen "Container type" "ESC to go back" -- "${opts[@]}"
-  [ -z "$_chosen" ] && continue
 
   var1="VIBRANIUM_RECORDING_CONTAINER_TYPE"
   var2="VIBRANIUM_RECORDING_VIDEO_CODEC"
@@ -94,6 +92,7 @@ _set_container_type() {
       fi
       sed -i "/^${var1}/s/=.*/=\"${_chosen}\"/" "$VIBRANIUM_USER_SETTINGS"
       ;;
+    "") continue ;;
   esac
 }
 
@@ -122,13 +121,13 @@ _advanced_menu() {
 
     mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
     helpers::ui::menu chosen "Advanced" "ESC to go back" -- "${opts[@]}"
-    [ -z "$chosen" ] && break
 
     case "$chosen" in
       "Container type"*) _set_container_type ;;
       "Recording mode"*) _set_recording_mode ;;
-      "Codec"*) _set_codec ;;
       "Flash screen"*) _flash_screen_submenu ;;
+      "Codec"*) _set_codec ;;
+      "") break ;;
     esac
   done
 }
@@ -147,16 +146,16 @@ fi
 while true; do
   source "$VIBRANIUM_USER_SETTINGS"
 
-  helpers::check VIBRANIUM_RECORDING_QUALITY
-  helpers::check VIBRANIUM_RECORDING_CONTAINER_TYPE
-  helpers::check VIBRANIUM_RECORDING_FRAMERATE_MODE
-  helpers::check VIBRANIUM_RECORDING_VIDEO_CODEC
-
-  helpers::check VIBRANIUM_RECORDING_FPS
-  helpers::check VIBRANIUM_RECORDING_USE_RNNOISE
-  helpers::check VIBRANIUM_RECORDING_CAPTURE_SINK
-  helpers::check VIBRANIUM_RECORDING_FLASH_SCREEN
-  helpers::check VIBRANIUM_RECORDING_CAPTURE_SOURCE
+  helpers::check \
+    VIBRANIUM_RECORDING_QUALITY \
+    VIBRANIUM_RECORDING_CONTAINER_TYPE \
+    VIBRANIUM_RECORDING_FRAMERATE_MODE \
+    VIBRANIUM_RECORDING_VIDEO_CODEC \
+    VIBRANIUM_RECORDING_FPS \
+    VIBRANIUM_RECORDING_USE_RNNOISE \
+    VIBRANIUM_RECORDING_CAPTURE_SINK \
+    VIBRANIUM_RECORDING_FLASH_SCREEN \
+    VIBRANIUM_RECORDING_CAPTURE_SOURCE
 
   if [[ "$VIBRANIUM_RECORDING_QUALITY" == "very_high" ]]; then
     QUALITY="Very High"
@@ -186,14 +185,7 @@ while true; do
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Recording" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "FPS"*)
@@ -217,5 +209,6 @@ while true; do
     *"Advanced"*)
       _advanced_menu
       ;;
+    "") break ;;
   esac
 done

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 export PATH="$PATH:$VIBRANIUM/configure"
 
 _get_term_opacity() {
@@ -18,8 +18,8 @@ _term_opacity_menu() {
   while true; do
     prompt="Background opacity level (float)"
     helpers::ui::menu input "Terminal opacity" "0.0 - 1.0" -- "$prompt"
-    [[ -z "$input" ]] && break
     [[ "$prompt" == "$input" ]] && continue
+    [[ -z "$input" ]] && break
 
     if [[ "$input" =~ ^0(\.[0-9]+)?$ || "$input" == "1" || "$input" == "1.0" ]]; then
       [[ "$input" == 1 ]] && input="1.0"
@@ -49,9 +49,9 @@ _set_rofi_theme() {
   while true; do
     options=("Text" "Modern")
     helpers::ui::menu chosen "Theme" "ESC to go back" -- "${options[@]}"
-    [[ -z $chosen ]] && break
 
     case "${chosen,}" in
+      "") break ;;
       "text") sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-text.rasi|' "$config" ;;
       "modern") sed -i 's|\(@import "~/.local/share/vibranium/default/rofi/themes/\)[^"]*|\1theme-modern.rasi|' "$config" ;;
     esac
@@ -398,14 +398,7 @@ while true; do
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Misc" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [[ -z "$CHOSEN" ]] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "Default terminal"*)
@@ -453,6 +446,9 @@ while true; do
       vb-core-term --floating --title 'vb-env' -- "$EDITOR" "$XDG_CONFIG_HOME/vibranium/environment"
       helpers::ui::close_menus
       exit 0
+      ;;
+    "")
+      break
       ;;
   esac
 done

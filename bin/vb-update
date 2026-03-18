@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-source vb-core-lib
+source vb-lib-core
 
 # Always restore cursor on exit, regardless of how we exit
 trap 'term::enable_input' EXIT

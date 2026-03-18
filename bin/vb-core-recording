@@ -10,7 +10,7 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 1
 fi
 
-source vb-core-lib
+source vb-lib-core
 
 LOG_FILE="$VIBRANIUM_CACHE/${0##*/}.log"
 

@@ -2,7 +2,7 @@
 
 # Source: omarchy
 
-source vb-core-lib
+source vb-lib-core
 
 STATE_DIR="$VIBRANIUM_STATE/migrations"
 mkdir -p "$STATE_DIR/skipped"

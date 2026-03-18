@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 INDEX=0
 
@@ -89,14 +89,7 @@ while true; do
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Screenshots" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "Auto annotate"*)
@@ -122,8 +115,8 @@ while true; do
 
       if [[ $STATUS == "false" ]]; then
         _delete_existing_screenshots
-        unset STATUS
       fi
       ;;
+    "") break ;;
   esac
 done

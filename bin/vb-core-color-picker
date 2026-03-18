@@ -48,7 +48,7 @@ case "$1" in
     ;;
 esac
 
-source vb-core-lib
+source vb-lib-core
 
 if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
   if term::is_headless; then

@@ -4,7 +4,7 @@ STEP="5"
 ACTION=""
 LOCKFILE="$VIBRANIUM_RUNTIME/${0##*/}.lock"
 
-source vb-core-lib
+source vb-lib-core
 
 usage() {
   cat << USAGE

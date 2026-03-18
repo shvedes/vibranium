@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$VIBRANIUM/bin/vb-core-lib"
+source vb-lib-core
 
 options=("Seconds" "Minutes" "Hours")
 state="$VIBRANIUM_RUNTIME/vb-timer.remaining"

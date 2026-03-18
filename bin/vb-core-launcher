@@ -13,7 +13,7 @@
 #	- Common websites
 #	- Power menu
 
-source vb-core-lib
+source vb-lib-core
 
 if pidof -q rofi; then
   killall rofi

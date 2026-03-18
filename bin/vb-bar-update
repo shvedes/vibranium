@@ -2,7 +2,7 @@
 
 set -euo pipefail
 
-source vb-core-lib
+source vb-lib-core
 
 state="$VIBRANIUM_STATE/update.available"
 

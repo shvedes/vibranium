@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 LOOP_NAME="mic_loop"
 

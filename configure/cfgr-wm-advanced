@@ -1,8 +1,19 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
+source vb-lib-hypr
 
-CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.conf"
+CONFIG="$HYPR_CONF_ADVANCED"
+
+ADVANCED_SPEC=(
+  "misc:vrr|int"
+  "misc:vfr|bool"
+  "misc:middle_click_paste|bool"
+  "render:direct_scanout|bool"
+  "misc:disable_autoreload|bool"
+  "general:layout|str"
+  "cursor:zoom_detached_camera|bool"
+)
 
 _layout_submenu() {
   local opts chosen
@@ -11,15 +22,10 @@ _layout_submenu() {
   while true; do
     mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
     helpers::ui::menu chosen "Layout" "ESC to go back" -- "${opts[@]}"
-    [[ -z "$chosen" ]] && break
-
-    case "$chosen" in
-      "Dwindle") vb-cmd-edit-wm-config "general:layout:dwindle" "$CONFIG" ;;
-      "Master") vb-cmd-edit-wm-config "general:layout:master" "$CONFIG" ;;
-      "Scrolling") vb-cmd-edit-wm-config "general:layout:scrolling" "$CONFIG" ;;
-      "Monocle") vb-cmd-edit-wm-config "general:layout:monocle" "$CONFIG" ;;
-      *) continue ;;
-    esac
+    if [[ -z "$chosen" ]]; then
+      break
+    fi
+    hypr::set "general:layout" "${chosen,,}" "$CONFIG"
     break
   done
 }
@@ -27,111 +33,56 @@ _layout_submenu() {
 INDEX=0
 
 while true; do
-  hyprctl -q reload config-only
+  hypr::reload
+  hypr::fetch "${ADVANCED_SPEC[@]}"
 
-  mapfile -t LINES < <(
-    hyprctl --batch -j \
-      "getoption misc:vrr; \
-         getoption misc:vfr; \
-         getoption misc:middle_click_paste; \
-         getoption render:direct_scanout; \
-         getoption misc:disable_autoreload;
-         getoption general:layout; \
-         getoption cursor:zoom_detached_camera" |
-      jq -s -r '.[] |
-        if .option == "misc:vrr" then
-            if .int == 0 then "false"
-            elif .int == 1 then "true"
-            else "fullscreen"
-            end
-        elif .option == "general:layout" then
-            .str
-        elif .option == "cursor:zoom_detached_camera" then
-            if .int == 1 then false else true end
-        else
-            if .int == 1 then "true" else "false" end
-        end'
-  )
-
-  current_vrr="${LINES[0]}"
-  current_vfr="${LINES[1]}"
-  current_middle_click="${LINES[2]}"
-  current_direct_scanout="${LINES[3]}"
-  current_autoreload="${LINES[4]}"
-  current_layout="${LINES[5]^}"
-  current_zoom="${LINES[6]}"
+  # VRR has 3 states, map int -> display string
+  vrr_display=
+  case "${HYPR[misc:vrr]}" in
+    0) vrr_display=false ;;
+    1) vrr_display=true ;;
+    *) vrr_display=fullscreen ;;
+  esac
 
   OPTIONS=(
-    "Variable refresh rate : $current_vrr"
-    "Zoom follows cursor : $current_zoom"
-    "Variable frame rate : $current_vfr"
-    "Disable auto reload : $current_autoreload"
-    "Middle click paste : $current_middle_click"
-    "Direct scanout : $current_direct_scanout"
-    "Layout : $current_layout"
+    "Variable refresh rate : $vrr_display"
+    "Zoom detached camera : ${HYPR[cursor:zoom_detached_camera]}"
+    "Variable frame rate : ${HYPR[misc:vfr]}"
+    "Disable auto reload : ${HYPR[misc:disable_autoreload]}"
+    "Middle click paste : ${HYPR[misc:middle_click_paste]}"
+    "Direct scanout : ${HYPR[render:direct_scanout]}"
+    "Layout : ${HYPR[general:layout]^}"
   )
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Advanced" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [[ -z "$CHOSEN" ]] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  if [[ -z "$CHOSEN" ]]; then
+    break
+  fi
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
-    "Layout"*)
-      _layout_submenu
-      ;;
-    "Zoom follows cursor"*)
-      case "$current_zoom" in
-        "true") vb-cmd-edit-wm-config "cursor:zoom_detached_camera:true" "$CONFIG" ;;
-        "false") vb-cmd-edit-wm-config "cursor:zoom_detached_camera:false" "$CONFIG" ;;
-      esac
-      ;;
-    "Disable auto reload"*)
-      case "$current_autoreload" in
-        "true") vb-cmd-edit-wm-config "misc:disable_autoreload:false" "$CONFIG" ;;
-        "false") vb-cmd-edit-wm-config "misc:disable_autoreload:true" "$CONFIG" ;;
-      esac
-      ;;
-    "Middle click paste"*)
-      case "$current_middle_click" in
-        "true") vb-cmd-edit-wm-config "misc:middle_click_paste:false" "$CONFIG" ;;
-        "false") vb-cmd-edit-wm-config "misc:middle_click_paste:true" "$CONFIG" ;;
-      esac
-      ;;
-    "Variable frame rate"*)
-      case "$current_vfr" in
-        "true") vb-cmd-edit-wm-config "misc:vfr:false" "$CONFIG" ;;
-        "false") vb-cmd-edit-wm-config "misc:vfr:true" "$CONFIG" ;;
-      esac
-      ;;
-    "Direct scanout"*)
-      case "$current_direct_scanout" in
-        "true") vb-cmd-edit-wm-config "render:direct_scanout:false" "$CONFIG" ;;
-        "false") vb-cmd-edit-wm-config "render:direct_scanout:true" "$CONFIG" ;;
-      esac
-      ;;
+    "Layout"*)              _layout_submenu ;;
+    "Zoom detached camera"*) hypr::toggle "cursor:zoom_detached_camera" "$CONFIG" ;;
+    "Disable auto reload"*)  hypr::toggle "misc:disable_autoreload"     "$CONFIG" ;;
+    "Middle click paste"*)   hypr::toggle "misc:middle_click_paste"     "$CONFIG" ;;
+    "Variable frame rate"*)  hypr::toggle "misc:vfr"                    "$CONFIG" ;;
+    "Direct scanout"*)       hypr::toggle "render:direct_scanout"       "$CONFIG" ;;
     "Variable refresh rate"*)
       while true; do
-        vrr_opts=("Enable" "Disable" "Fullscreen only" "<b>Help</b>")
-        helpers::ui::menu vrr_chosen "VRR" "ESC to go back" -- "${vrr_opts[@]}"
-        [[ -z "$vrr_chosen" ]] && break
+        helpers::ui::menu vrr_chosen "VRR" "ESC to go back" -- \
+          "Enable" "Disable" "Fullscreen only" "<b>Help</b>"
+
+        if [[ -z "$vrr_chosen" ]]; then
+          break
+        fi
 
         case "$vrr_chosen" in
-          "Enable") vb-cmd-edit-wm-config "misc:vrr:1" "$CONFIG" ;;
-          "Disable") vb-cmd-edit-wm-config "misc:vrr:0" "$CONFIG" ;;
-          "Fullscreen only") vb-cmd-edit-wm-config "misc:vrr:2" "$CONFIG" ;;
-          *"Help"*)
-            vb-cmd-show-help hyprland-vrr
-            continue
-            ;;
+          "Enable")          hypr::set "misc:vrr" 1 "$CONFIG"; break ;;
+          "Disable")         hypr::set "misc:vrr" 0 "$CONFIG"; break ;;
+          "Fullscreen only") hypr::set "misc:vrr" 2 "$CONFIG"; break ;;
+          *"Help"*)          vb-cmd-show-help hyprland-vrr ;;
         esac
-        break
       done
       ;;
   esac

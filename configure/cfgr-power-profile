@@ -1,14 +1,15 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 INDEX=0
 
 while true; do
   source "$VIBRANIUM_USER_SETTINGS"
 
-  helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
-  helpers::check VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
+  helpers::check \
+    VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE \
+    VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
 
   OPTIONS=(
     "Respect power profile : $VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
@@ -17,14 +18,7 @@ while true; do
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Power profiles" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [[ -z "$CHOSEN" ]] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "Respect"*)
@@ -33,6 +27,6 @@ while true; do
     "Visual"*)
       helpers::configure::toggle_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
       ;;
+    "") break ;;
   esac
-
 done

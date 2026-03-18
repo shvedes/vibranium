@@ -12,7 +12,7 @@ EOF
 }
 
 _show() {
-  source vb-core-lib
+  source vb-lib-core
 
   local chosen
   helpers::ui::menu chosen "Clipboard" "search..." -display-columns 2 -- "${ENTRIES[@]}"

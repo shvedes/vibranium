@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 _toggle_volume_boost() {
   local var
@@ -46,13 +46,7 @@ _set_audio_feedback() {
     mapfile -t options < <(helpers::configure::build_menu "${options[@]}")
 
     helpers::ui::menu chosen "Audio feedback" "ESC to go back" -selected-row "$index" -- "${options[@]}"
-
-    for i in "${!options[@]}"; do
-      if [ "${options[$i]}" = "$chosen" ]; then
-        index="$i"
-        break
-      fi
-    done
+    helpers::configure::track_index options "$chosen" index
 
     case "$chosen" in
       *"Audio"*)
@@ -78,9 +72,8 @@ _set_audio_feedback_variant() {
 
     local chosen
     helpers::ui::menu chosen "Audio variant" "ESC to go back" -- "${variant_options[@]}"
-    [[ -z "$chosen" ]] && break
 
-    # Skip if choice matches current variant
+    [[ -z "$chosen" ]] && break
     [[ "$chosen" == "$current_option" ]] && break
 
     if [[ ! "${variant_options[*]}" =~ $chosen ]]; then
@@ -126,14 +119,7 @@ while true; do
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Audio" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "Hear my voice volume"*)
@@ -164,6 +150,9 @@ while true; do
     "Volume step"*)
       helpers::configure::set_digit "Volume adjustment step" "Volume step" \
         "int" 1 25 "VIBRANIUM_VOLUME_ADJUSTMENT_STEP"
+      ;;
+    "")
+      break
       ;;
   esac
 done

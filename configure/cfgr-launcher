@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 INDEX=0
 
 while true; do
   source "$VIBRANIUM_USER_SETTINGS"
 
-  helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI
-  helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS
-  helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
-  helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS
-  helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START
-  helpers::check VIBRANIUM_GLOBAL_SEARCH_ENGINE google
+  helpers::check \
+    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
+    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
+    VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
+    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
+    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START \
+    VIBRANIUM_GLOBAL_SEARCH_ENGINE google
 
   OPTIONS=(
     "Search engine : $VIBRANIUM_GLOBAL_SEARCH_ENGINE"
@@ -25,14 +26,7 @@ while true; do
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "App Launcher" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "Search engine"*)
@@ -56,6 +50,9 @@ while true; do
       ;;
     "Auto select"*)
       helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
+      ;;
+    "")
+      break
       ;;
   esac
 done

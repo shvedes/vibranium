@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 INDEX=0
 
@@ -18,14 +18,7 @@ while true; do
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Color picker" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "Show HEX preview"*)
@@ -33,6 +26,9 @@ while true; do
       ;;
     "Preview in notification"*)
       helpers::configure::toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
+      ;;
+    "")
+      break
       ;;
   esac
 done

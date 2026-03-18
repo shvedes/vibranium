@@ -23,7 +23,7 @@ export PATH="$PATH:$VIBRANIUM/bin"
 
 # ========================================== #
 
-source vb-core-lib &> /dev/null
+source vb-lib-core &> /dev/null
 
 export -f term::discard_buffer
 export -f term::disable_input

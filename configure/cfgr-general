@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 _confirm_kill_submenu() {
   local options confirm_to_kill_chosen
   while true; do
     options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "<b>Help</b>")
     helpers::ui::menu confirm_to_kill_chosen "Kill Confirm" "ESC to go back" -- "${options[@]}"
-    [[ -z "$confirm_to_kill_chosen" ]] && break
 
     case "$confirm_to_kill_chosen" in
       "Confirm"*)
@@ -16,6 +15,9 @@ _confirm_kill_submenu() {
         ;;
       *"Help"*)
         vb-cmd-show-help confirm-kill
+        ;;
+      "")
+        break
         ;;
     esac
   done
@@ -27,12 +29,12 @@ _update_channel_submenu() {
 
   while true; do
     helpers::ui::menu chosen "Update Channel" "ESC to go back" -- "${options[@]}"
-    [[ -z "$chosen" ]] && break
 
     case "$chosen" in
       "Upstream") vb-dev-switch-channel upstream ;;
       "Release") vb-dev-switch-channel release ;;
       "Dev") vb-dev-switch-channel dev ;;
+      "") break ;;
       *) continue ;;
     esac
     break
@@ -70,14 +72,7 @@ while true; do
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "General" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [[ "${OPTIONS[$i]}" == "$CHOSEN" ]]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "Update channel"*)
@@ -106,6 +101,9 @@ while true; do
       curl -s https://0x0.st/PL_C.jpg --output /tmp/fgsfds!.jpg
       imv /tmp/fgsfds!.jpg
       helpers::ui::close_menus
+      ;;
+    "")
+      break
       ;;
   esac
 done

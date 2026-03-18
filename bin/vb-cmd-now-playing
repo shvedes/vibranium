@@ -45,7 +45,7 @@ while true; do
   esac
 done
 
-source vb-core-lib
+source vb-lib-core
 
 album_art="/tmp/${0##*/}.art"
 state_file="$VIBRANIUM_RUNTIME/now_playing.cache"

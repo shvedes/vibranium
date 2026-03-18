@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 helpers::check \
   VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES \

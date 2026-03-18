@@ -9,7 +9,7 @@ for f in /run/systemd/inhibit/*; do
 done
 
 if [[ -n "$shown" ]]; then
-  source vb-core-lib
+  source vb-lib-core
 
   helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
   type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"

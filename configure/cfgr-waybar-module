@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
 _updates_weather_specific() {
   local options chosen index animate_loading \
@@ -11,8 +11,9 @@ _updates_weather_specific() {
   while true; do
     source "$VIBRANIUM_USER_SETTINGS"
 
-    helpers::check VIBRANIUM_BAR_SHOW_ANIMATION
-    helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
+    helpers::check \
+      VIBRANIUM_BAR_SHOW_ANIMATION \
+      VIBRANIUM_BAR_SHOW_SEPARATOR
 
     animate_loading="$VIBRANIUM_BAR_SHOW_ANIMATION"
     show_separators="$VIBRANIUM_BAR_SHOW_SEPARATOR"
@@ -21,17 +22,12 @@ _updates_weather_specific() {
       "Animate first run : $animate_loading"
       "Show separators   : $show_separators"
     )
-    helpers::ui::menu chosen "Extras" "ESC to go back" -selected-row "$index" -- "${options[@]}"
-    [[ -z "$chosen" ]] && return
 
-    for i in "${!options[@]}"; do
-      if [ "${options[$i]}" = "$chosen" ]; then
-        index="$i"
-        break
-      fi
-    done
+    helpers::ui::menu chosen "Extras" "ESC to go back" -selected-row "$index" -- "${options[@]}"
+    helpers::configure::track_index options "$chosen" index
 
     case "$chosen" in
+      "") break ;;
       "Animate first run"*)
         helpers::configure::toggle_bool "VIBRANIUM_BAR_SHOW_ANIMATION"
         ;;
@@ -101,9 +97,9 @@ _updates_submenu() {
       "Display zero updates : $show_on_zero"
     )
     helpers::ui::menu chosen "Updates" "ESC to go back" -- "${opts[@]}"
-    [ -z "$chosen" ] && break
 
     case "$chosen" in
+      "") break ;;
       "Display"*)
         helpers::configure::toggle_bool "VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES"
         vb-cmd-refresh-bar-module pacman &
@@ -117,8 +113,9 @@ INDEX=0
 while true; do
   OPTIONS=("Updates" "Weather")
 
-  helpers::check VIBRANIUM_BAR_PACMAN_MODULE_ENABLE
-  helpers::check VIBRANIUM_BAR_WEATHER_MODULE_ENABLE
+  helpers::check \
+    VIBRANIUM_BAR_PACMAN_MODULE_ENABLE \
+    VIBRANIUM_BAR_WEATHER_MODULE_ENABLE
 
   updates_enabled="$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
   weather_enabled="$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
@@ -128,14 +125,7 @@ while true; do
   fi
 
   helpers::ui::menu CHOSEN "Module settings" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && exit 0
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     "<b>Updates and Weather"*)
@@ -148,5 +138,6 @@ while true; do
     "Updates")
       _updates_submenu
       ;;
+    "") break ;;
   esac
 done

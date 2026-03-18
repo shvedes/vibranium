@@ -96,7 +96,7 @@ done
 
 _ensure_deps
 
-source vb-core-lib
+source vb-lib-core
 
 USER_ARGS=()
 PROFILES=("power-saver" "balanced" "performance")

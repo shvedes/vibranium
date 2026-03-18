@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 export PATH="$PATH:$VIBRANIUM/configure"
 
 INDEX=0
@@ -30,16 +30,10 @@ while true; do
   )
 
   helpers::ui::menu CHOSEN "Settings" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
+    "") break ;;
     "Waybar") cfgr-waybar-menu ;;
     "Set font") vb-font-set ;;
     "Idle") cfgr-idle ;;

@@ -4,7 +4,7 @@
 # If an inhibitor is already running, kills it; otherwise starts a new one.
 # Refreshes the Vibranium Waybar inhibitor module after action.
 
-source vb-core-lib
+source vb-lib-core
 
 usage() {
   cat << EOF

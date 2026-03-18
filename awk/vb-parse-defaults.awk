@@ -8,7 +8,7 @@
 # Each managed variable in that file is preceded by an annotation block made of
 # comment lines starting with # @<tag>. This script reads those annotations,
 # validates them for consistency, then emits bash array assignments so the caller
-# (helpers::check, from the vb-core-lib) can consume
+# (helpers::check, from the vb-lib-core) can consume
 # type/default/constraint metadata at runtime.
 #
 # --- Output streams ---

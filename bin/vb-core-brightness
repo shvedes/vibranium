@@ -17,7 +17,7 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 1
 fi
 
-source vb-core-lib
+source vb-lib-core
 
 usage() {
   cat << EOF

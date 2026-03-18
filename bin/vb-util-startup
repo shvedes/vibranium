@@ -84,7 +84,7 @@ mkdir -p \
   $VIBRANIUM_STATE \
   $VIBRANIUM_CACHE
 
-source vb-core-lib
+source vb-lib-core
 
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
   vb-util-first-run

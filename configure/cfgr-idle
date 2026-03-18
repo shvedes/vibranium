@@ -1,72 +1,41 @@
 #!/usr/bin/env bash
 
-source vb-core-lib
+source vb-lib-core
 
-INDEX=0
+_set_timeouts() {
+  local title="$1"
+  local timer_index="$2"
+  local min_minutes="$3"
+  local max_minutes="$4"
+
+  local input
+  input=$(helpers::configure::set_digit --verify \
+    "$title timeout" "$title" "int" "$min_minutes" "$max_minutes") || return
+
+  _update_timeout "$timer_index" $((input * 60))
+  systemctl --user restart hypridle &
+}
+
+_get_timeouts() {
+  local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
+  awk -f "$VIBRANIUM/awk/cfgr-idle-get-timeouts.awk" "$config"
+}
 
 _update_timeout() {
-  local index="$1" # 1 = lock, 2 = sleep
+  local index="$1"
   local seconds="$2"
   local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
 
   local timeouts
-  timeouts=($(_get_timeouts))
-
+  mapfile -t timeouts < <(_get_timeouts)
   timeouts[$((index - 1))]="$seconds"
 
-  awk -v lock="${timeouts[0]}" -v sleep="${timeouts[1]}" '
-        /^\s*listener\s*{/{f=1; print; next}
-        /^\s*}/{f=0; print; next}
-        f && /^\s*timeout\s*=/ {
-            if (c==0) {print "    timeout = " lock; c++}
-            else {print "    timeout = " sleep}
-            next
-        }
-        {print}
-    ' "$config" >"$config.tmp" && mv "$config.tmp" "$config"
+  awk -v lock="${timeouts[0]}" -v sleep="${timeouts[1]}" \
+    -f "$VIBRANIUM/awk/cfgr-idle-update-timeouts.awk" "$config" > "$config.tmp" \
+    && mv "$config.tmp" "$config"
 }
 
-_set_timeouts() {
-  local title="$1"       # "Lock" / "Sleep"
-  local prompt="$2"      # prompt text
-  local timer_index="$3" # 1 = lock, 2 = sleep
-  local min_value="$4"   # empty or lock_timeout
-
-  while true; do
-    helpers::ui::menu input "$title timeout" "in minutes" -- "$prompt"
-    [ -z "$input" ] && break
-    [ "$input" = "$prompt" ] && continue
-
-    [[ ! "$input" =~ ^[0-9]+$ ]] && {
-      notify-send -r 6 -u critical -t 1500 "Vibranium" "Only integers allowed!"
-      continue
-    }
-
-    if [[ -n "$min_value" ]] && ((input <= min_value)); then
-      notify-send -r 6 -u critical -t 3000 "Vibranium" \
-        "$title timeout must be greater than $min_value!"
-      continue
-    fi
-
-    _update_timeout "$timer_index" $((input * 60))
-    systemctl --user restart hypridle &
-    break
-  done
-}
-
-_get_timeouts() {
-  local config
-  config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
-
-  awk '
-        /^\s*listener\s*{/{f=1; next}
-        /^\s*}/{f=0; next}
-        f && /^\s*timeout\s*=/ {
-            match($0, /timeout\s*=\s*([0-9]+)/, a)
-            print a[1]
-        }
-    ' "$config"
-}
+INDEX=0
 
 while true; do
   source "$VIBRANIUM_USER_SETTINGS"
@@ -76,29 +45,19 @@ while true; do
   LOCK_TIMEOUT="${TIMEOUTS[0]}"
   SLEEP_TIMEOUT="${TIMEOUTS[1]}"
 
-  LOCK_TIMEOUT=$((LOCK_TIMEOUT / 60))
-  SLEEP_TIMEOUT=$((SLEEP_TIMEOUT / 60))
-
   helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
   INHIBIT_TYPE="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
 
   OPTIONS=(
-    "Lock  after : $LOCK_TIMEOUT min"
-    "Sleep after : $SLEEP_TIMEOUT min"
+    "Lock  after : $((LOCK_TIMEOUT / 60)) min"
+    "Sleep after : $((SLEEP_TIMEOUT / 60)) min"
     "Inhibit type : $INHIBIT_TYPE"
     "<b>Help</b>"
   )
 
   mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
   helpers::ui::menu CHOSEN "Idle" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
 
   case "$CHOSEN" in
     *"Inhibit"*)
@@ -114,8 +73,9 @@ while true; do
         fi
       ) &
       ;;
-    "Lock"*) _set_timeouts "Lock" "Lock timeout (int)" 1 ;;
-    "Sleep"*) _set_timeouts "Sleep" "Sleep timeout (int)" 2 "$LOCK_TIMEOUT" ;;
+    "Lock"*)  _set_timeouts "Lock"  1 1 $((SLEEP_TIMEOUT / 60 - 1)) ;;
+    "Sleep"*) _set_timeouts "Sleep" 2 $((LOCK_TIMEOUT / 60 + 1)) 3600 ;; # 1 hour
     *"Help"*) vb-cmd-show-help idle ;;
+    "") break ;;
   esac
 done

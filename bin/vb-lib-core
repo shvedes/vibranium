@@ -1101,3 +1101,13 @@ helpers::configure::set_string() {
     done
   done
 }
+
+helpers::configure::track_index() {
+  local -n _tbl=$1
+  local _val=$2
+  local -n _pos=$3
+  local i
+  for i in "${!_tbl[@]}"; do
+    [[ "${_tbl[$i]}" == "$_val" ]] && { _pos=$i; return; }
+  done
+}
