@@ -68,7 +68,7 @@ _manage_user_wallpapers() {
   files=("$wallpaper_dir"/*)
   shopt -u nullglob
 
-  if (( ${#files[@]} == 0 )); then
+  if ((${#files[@]} == 0)); then
     notify-send -r 1 "Vibranium" "No user wallpapers found for current theme"
     return
   fi
@@ -204,7 +204,7 @@ _pick_cursor_size() {
   line=${line#* } # remove first (theme name) word and following space
 
   # Split remaining sizes into array
-  read -r -a sizes <<< "$line"
+  read -r -a sizes <<<"$line"
 
   while true; do
     helpers::ui::menu chosen_size "Cursor size" "ESC to go back" -- "${sizes[@]}"
@@ -258,7 +258,7 @@ _pick_cursor_theme() {
     fi
 
     folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
-    echo "$folder" > "$VIBRANIUM_STATE/cursor-theme"
+    echo "$folder" >"$VIBRANIUM_STATE/cursor-theme"
 
     vb-theme-cursor-set
     break
@@ -280,7 +280,7 @@ _get_cursor_theme() {
       printf "%s" "$value"
       return
     fi
-  done <<< "$(vb-theme-cursor-list)"
+  done <<<"$(vb-theme-cursor-list)"
 
   # Fallback: if the list above is empty (e.g. not found)
   printf "Adwaita"
@@ -297,11 +297,11 @@ _get_default_browser() {
 
       browser="${value%%;*}"
       break
-    done < "$XDG_CONFIG_HOME/mimeapps.list"
+    done <"$XDG_CONFIG_HOME/mimeapps.list"
   fi
 
   if [[ -z "$browser" ]]; then
-    browser=$(xdg-mime query default x-scheme-handler/http 2> /dev/null)
+    browser=$(xdg-mime query default x-scheme-handler/http 2>/dev/null)
   fi
 
   if [[ -z "$browser" ]]; then
@@ -372,10 +372,10 @@ while true; do
   source "$VIBRANIUM_USER_SETTINGS"
 
   # CURSOR_THEME="$(_get_cursor_theme)"
-  CURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme")"
+  CURSOR_THEME="$(<"$VIBRANIUM_STATE/cursor-theme")"
   CURSOR_THEME="${CURSOR_THEME:-Default}"
 
-  CURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size")"
+  CURSOR_SIZE="$(<"$VIBRANIUM_STATE/cursor-size")"
   CURSOR_SIZE="${CURSOR_SIZE:-unknown}"
 
   helpers::check \

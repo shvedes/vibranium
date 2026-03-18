@@ -5,14 +5,14 @@ source vb-core-lib
 INDEX=0
 
 _touchpad_options() {
-    local index=0
+  local index=0
 
-    while true; do
-        hyprctl -q reload config-only
+  while true; do
+    hyprctl -q reload config-only
 
-        mapfile -t lines < <(
-            hyprctl --batch -j \
-         "getoption input:touchpad:scroll_factor; \
+    mapfile -t lines < <(
+      hyprctl --batch -j \
+        "getoption input:touchpad:scroll_factor; \
 				 getoption input:touchpad:tap-to-click; \
 				 getoption input:touchpad:natural_scroll; \
 				 getoption input:touchpad:disable_while_typing" | jq -r ' .option as $o |
@@ -22,207 +22,210 @@ _touchpad_options() {
           .str
         else
           if .int == 1 then "true" else "false" end
-			  end')
+			  end'
+    )
 
-        local current_scroll_factor="${lines[0]}"
-        local current_tap_to_click="${lines[1]}"
-        local current_natural_scroll="${lines[2]}"
-        local current_disable_while_typing="${lines[3]}"
+    local current_scroll_factor="${lines[0]}"
+    local current_tap_to_click="${lines[1]}"
+    local current_natural_scroll="${lines[2]}"
+    local current_disable_while_typing="${lines[3]}"
 
-        local touchpad_options=(
-            "Disable while typing : $current_disable_while_typing"
-            "Natural scrolling : $current_natural_scroll"
-            "Scrolling speed : $current_scroll_factor"
-            "Tap to click : $current_tap_to_click"
-        )
+    local touchpad_options=(
+      "Disable while typing : $current_disable_while_typing"
+      "Natural scrolling : $current_natural_scroll"
+      "Scrolling speed : $current_scroll_factor"
+      "Tap to click : $current_tap_to_click"
+    )
 
-        mapfile -t touchpad_options < <(helpers::configure::build_menu "${touchpad_options[@]}")
-        helpers::ui::menu touchpad_chosen "Touchpad" "ESC to go back" -selected-row "$index" -- "${touchpad_options[@]}"
-        [[ -z $touchpad_chosen ]] && break
+    mapfile -t touchpad_options < <(helpers::configure::build_menu "${touchpad_options[@]}")
+    helpers::ui::menu touchpad_chosen "Touchpad" "ESC to go back" -selected-row "$index" -- "${touchpad_options[@]}"
+    [[ -z $touchpad_chosen ]] && break
 
-        for i in "${!touchpad_options[@]}"; do
-            if [ "${touchpad_options[$i]}" = "$touchpad_chosen" ]; then
-                index="$i"
-                break
-            fi
-        done
-
-        case "$touchpad_chosen" in
-            "Disable while typing"*)
-                case "$current_disable_while_typing" in
-                    true)
-                        vb-cmd-edit-wm-config input:touchpad:disable_while_typing:false \
-                            "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                        ;;
-                    false)
-                        vb-cmd-edit-wm-config input:touchpad:disable_while_typing:true \
-                            "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                        ;;
-                esac
-                ;;
-            "Natural scrolling"*)
-                case "$current_natural_scroll" in
-                    true)
-                        vb-cmd-edit-wm-config input:touchpad:natural_scroll:false \
-                            "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                        ;;
-                    false)
-                        vb-cmd-edit-wm-config input:touchpad:natural_scroll:true \
-                            "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                        ;;
-                esac
-                ;;
-            "Tap to click"*)
-                case "$current_tap_to_click" in
-                    true)
-                        vb-cmd-edit-wm-config input:touchpad:tap-to-click:false \
-                            "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                        ;;
-                    false)
-                        vb-cmd-edit-wm-config input:touchpad:tap-to-click:true \
-                            "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                        ;;
-                esac
-                ;;
-            "Scrolling speed"*)
-                while true; do
-                    prompt="Scrolling speed (int / float)"
-                    helpers::ui::menu input "Scrolling speed" "0.0 - 1.0" -- "$prompt"
-                    [[ -z $input ]] && break
-                    if [[ "$prompt" == "$input" ]]; then
-                        continue
-                    fi
-
-                    if [[ ! $input =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
-                        notify-send -r 1 -t 2000 "Vibranium" "A number between 0 and 1"
-                        continue
-                    fi
-
-                    vb-cmd-edit-wm-config "input:touchpad:scroll_factor:$input" \
-                        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                    break
-                done
-                ;;
-        esac
+    for i in "${!touchpad_options[@]}"; do
+      if [ "${touchpad_options[$i]}" = "$touchpad_chosen" ]; then
+        index="$i"
+        break
+      fi
     done
+
+    case "$touchpad_chosen" in
+    "Disable while typing"*)
+      case "$current_disable_while_typing" in
+      true)
+        vb-cmd-edit-wm-config input:touchpad:disable_while_typing:false \
+          "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+        ;;
+      false)
+        vb-cmd-edit-wm-config input:touchpad:disable_while_typing:true \
+          "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+        ;;
+      esac
+      ;;
+    "Natural scrolling"*)
+      case "$current_natural_scroll" in
+      true)
+        vb-cmd-edit-wm-config input:touchpad:natural_scroll:false \
+          "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+        ;;
+      false)
+        vb-cmd-edit-wm-config input:touchpad:natural_scroll:true \
+          "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+        ;;
+      esac
+      ;;
+    "Tap to click"*)
+      case "$current_tap_to_click" in
+      true)
+        vb-cmd-edit-wm-config input:touchpad:tap-to-click:false \
+          "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+        ;;
+      false)
+        vb-cmd-edit-wm-config input:touchpad:tap-to-click:true \
+          "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+        ;;
+      esac
+      ;;
+    "Scrolling speed"*)
+      while true; do
+        prompt="Scrolling speed (int / float)"
+        helpers::ui::menu input "Scrolling speed" "0.0 - 1.0" -- "$prompt"
+        [[ -z $input ]] && break
+        if [[ "$prompt" == "$input" ]]; then
+          continue
+        fi
+
+        if [[ ! $input =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
+          notify-send -r 1 -t 2000 "Vibranium" "A number between 0 and 1"
+          continue
+        fi
+
+        vb-cmd-edit-wm-config "input:touchpad:scroll_factor:$input" \
+          "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+        break
+      done
+      ;;
+    esac
+  done
 }
 
 get_layouts() {
-    local path="/usr/share/X11/xkb/symbols"
-    local name
-    local layouts=()
+  local path="/usr/share/X11/xkb/symbols"
+  local name
+  local layouts=()
 
-    for file in "$path"/*; do
-        name="${file##*/}"
-        if [[ ${#name} -eq 2 && $name =~ ^[a-z][a-z]$ ]]; then
-            layouts+=("$name")
-        fi
-    done
+  for file in "$path"/*; do
+    name="${file##*/}"
+    if [[ ${#name} -eq 2 && $name =~ ^[a-z][a-z]$ ]]; then
+      layouts+=("$name")
+    fi
+  done
 
-    printf '%s\n' "${layouts[@]}"
+  printf '%s\n' "${layouts[@]}"
 }
 
-
-# yep, theese functions just have been copied
-# straight from the other script. For now
 check_module() {
-    local config
-    local module="$1"
-    config="$XDG_CONFIG_HOME/waybar/config.jsonc"
-    if grep -Eq "^\s*//.*\"$module\"" "$config"; then
-        return 0 # commented out - module disabled
-    else
-        return 1
-    fi
+  local config
+  local module="$1"
+  config="$XDG_CONFIG_HOME/waybar/config.jsonc"
+  if grep -Eq "^\s*//.*\"$module\"" "$config"; then
+    return 0 # commented out - module disabled
+  else
+    return 1
+  fi
 }
 
 toggle_module() {
-    local module="$1"
-    local config
+  local module="$1"
+  local config
 
-    config="$XDG_CONFIG_HOME/waybar/config.jsonc"
-    if check_module "$module"; then
-        sed -i "s|^\(\s*\)//\s*\(.*\"$module\".*\)|\1\2|" "$config"
-    else
-        sed -i "s|^\(\s*\)\(\".*$module\".*\)|\1// \2|" "$config"
-    fi
-    systemctl --user restart waybar
+  config="$XDG_CONFIG_HOME/waybar/config.jsonc"
+
+  if check_module "$module"; then
+    sed -i "s|^\(\s*\)//\s*\(.*\"$module\".*\)|\1\2|" "$config"
+  else
+    sed -i "s|^\(\s*\)\(\".*$module\".*\)|\1// \2|" "$config"
+  fi
+
+  systemctl --user restart waybar &
 }
 
 add_layout() {
-    local layouts
-    local chosen
-    local active_layouts
-    local final_layouts
+  local layouts
+  local chosen
+  local active_layouts
+  local final_layouts
 
-    mapfile -t layouts < <(get_layouts)
+  mapfile -t layouts < <(get_layouts)
 
-    while true; do
-        helpers::ui::menu chosen "Layouts" "ESC to go back" -- "${layouts[@]}"
+  while true; do
+    helpers::ui::menu chosen "Layouts" "ESC to go back" -- "${layouts[@]}"
 
-        [[ -z $chosen ]] && break
-        if [[ ! " ${layouts[*]} " =~ $chosen ]]; then
-            notify-send -r 3 -t 3000 -u critical "Vibranium" "Invalid layout"
-            continue
-        fi
-
-        active_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str')"
-        final_layouts="${active_layouts},${chosen}"
-        vb-cmd-edit-wm-config "input:kb_layout:$final_layouts" \
-            "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-        notify-send -r 1 "Vibranium" "Added new keyboard layout: <b>${chosen^^}</b>"
-        break
-    done
-
-    local number_layouts
-    number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str | split(",") | length')"
-
-    # Enable layout waybar module automatically if
-    # more then 1 layout
-    if (( number_layouts > 1 )); then
-        if check_module 'hyprland/language'; then
-            toggle_module 'hyprland/language'
-        fi
+    [[ -z $chosen ]] && break
+    if [[ ! " ${layouts[*]} " =~ $chosen ]]; then
+      notify-send -r 3 -t 3000 -u critical "Vibranium" "Invalid layout"
+      continue
     fi
+
+    active_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str')"
+    final_layouts="${active_layouts},${chosen}"
+    vb-cmd-edit-wm-config "input:kb_layout:$final_layouts" \
+      "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+    notify-send -r 1 "Vibranium" "Added new keyboard layout: <b>${chosen^^}</b>"
+    break
+  done
+
+  local number_layouts
+  number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str | split(",") | length')"
+
+  # Enable layout waybar module automatically if
+  # got more then 1 layout
+  if ((number_layouts > 1)); then
+    if check_module 'hyprland/language'; then
+      toggle_module 'hyprland/language'
+    fi
+  fi
 }
 
 remove_layout() {
-    local layouts
-    local chosen
-    local final_layouts
+  local layouts
+  local chosen
+  local final_layouts
 
-    while true; do
-        IFS=',' read -r -a layouts < <(hyprctl -j getoption input:kb_layout | jq -r '.str')
+  while true; do
+    IFS=',' read -r -a layouts < <(hyprctl -j getoption input:kb_layout | jq -r '.str')
 
-        helpers::ui::menu chosen "Remove layouts" "ESC to go back" -- "${layouts[@]}"
+    helpers::ui::menu chosen "Remove layouts" "ESC to go back" -- "${layouts[@]^^}"
 
-        [[ -z $chosen ]] && break
-        if [[ ! " ${layouts[*]} " =~ $chosen ]]; then
-            notify-send -r 3 -t 3000 -u critical "Vibranium" "Invalid layout"
-            continue
-        fi
+    [[ -z $chosen ]] && break
+    if [[ ! " ${layouts[*]} " =~ $chosen ]]; then
+      notify-send -r 3 -t 3000 -u critical "Vibranium" "Invalid layout"
+      continue
+    fi
 
-        final_layouts=()
-        for layout in "${layouts[@]}"; do
-            if [[ "$layout" != "$chosen" ]]; then
-                final_layouts+=("$layout")
-            fi
-        done
-
-        final_layouts_str=$(IFS=,; echo "${final_layouts[*]}")
-        vb-cmd-edit-wm-config "input:kb_layout:$final_layouts_str" \
-            "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-        notify-send -r 1 "Vibranium" "Removed existing keyboard layout: <b>${chosen^^}</b>"
-        break
+    final_layouts=()
+    for layout in "${layouts[@]}"; do
+      if [[ "$layout" != "$chosen" ]]; then
+        final_layouts+=("$layout")
+      fi
     done
 
-    local number_layouts
-    number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str | split(",") | length')"
-    if (( number_layouts == 1 )); then
-        if ! check_module 'hyprland/language'; then
-            toggle_module 'hyprland/language'
-        fi
+    final_layouts_str=$(
+      IFS=,
+      echo "${final_layouts[*]}"
+    )
+    vb-cmd-edit-wm-config "input:kb_layout:$final_layouts_str" \
+      "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+    notify-send -r 1 "Vibranium" "Removed existing keyboard layout: <b>${chosen^^}</b>"
+    break
+  done
+
+  local number_layouts
+  number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str | split(",") | length')"
+  if ((number_layouts == 1)); then
+    if ! check_module 'hyprland/language'; then
+      toggle_module 'hyprland/language'
     fi
+  fi
 }
 
 declare -A KB_GROUPS=(
@@ -238,73 +241,73 @@ declare -A KB_GROUPS=(
 
 declare -A XKB_OPTS
 for key in "${!KB_GROUPS[@]}"; do
-    suffix="${key#grp:}"  # Remove 'grp:' prefix
-    XKB_OPTS["${KB_GROUPS[$key]}"]="$suffix"
+  suffix="${key#grp:}" # Remove 'grp:' prefix
+  XKB_OPTS["${KB_GROUPS[$key]}"]="$suffix"
 done
 
 set_layout_shortcut() {
-    local placeholder chosen selected_key option
+  local placeholder chosen selected_key option
 
-    helpers::ui::menu chosen "Switch shortcut" "ESC to go back" -- "${KB_GROUPS[@]}"
-    [[ -z "$chosen" ]] && return
+  helpers::ui::menu chosen "Switch shortcut" "ESC to go back" -- "${KB_GROUPS[@]}"
+  [[ -z "$chosen" ]] && return
 
-    for key in "${!KB_GROUPS[@]}"; do
-        [[ "${KB_GROUPS[$key]}" == "$chosen" ]] && selected_key="$key" && break
-    done
+  for key in "${!KB_GROUPS[@]}"; do
+    [[ "${KB_GROUPS[$key]}" == "$chosen" ]] && selected_key="$key" && break
+  done
 
-    [[ -z "$selected_key" ]] && return
+  [[ -z "$selected_key" ]] && return
 
-    placeholder="__COLON__"
-    option="grp${placeholder}${XKB_OPTS[$chosen]}"
+  placeholder="__COLON__"
+  option="grp${placeholder}${XKB_OPTS[$chosen]}"
 
-    vb-cmd-edit-wm-config "input:kb_options:${option}" \
-        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-    sed -i "s/${placeholder}/:/" \
-        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-    sleep 0.03
+  vb-cmd-edit-wm-config "input:kb_options:${option}" \
+    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+  sed -i "s/${placeholder}/:/" \
+    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+  sleep 0.03
 }
 
 layouts_menu() {
-    local layouts_opts=()
-    local current_shortcut
-    local readable_shortcut
-    local number_layouts
-    local layouts_chosen
+  local layouts_opts=()
+  local current_shortcut
+  local readable_shortcut
+  local number_layouts
+  local layouts_chosen
 
-    while true; do
-        layouts_opts=("Add new" "Remove existing")
+  while true; do
+    layouts_opts=("Add new" "Remove existing")
 
-        current_shortcut="$(hyprctl -j getoption input:kb_options | jq -r .str)"
-        readable_shortcut="${KB_GROUPS[$current_shortcut]:-Unknown}"
-        number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str | split(",") | length')"
-        if (( number_layouts > 1 )); then
-            layouts_opts+=("Change layout with : $readable_shortcut")
-        fi
+    current_shortcut="$(hyprctl -j getoption input:kb_options | jq -r .str)"
+    readable_shortcut="${KB_GROUPS[$current_shortcut]:-Unknown}"
+    number_layouts="$(hyprctl -j getoption input:kb_layout | jq -r '.str | split(",") | length')"
+    if ((number_layouts > 1)); then
+      layouts_opts+=("Change layout with : $readable_shortcut")
+    fi
 
-        helpers::ui::menu layouts_chosen "Keyboard layouts" "ESC to go back" -- "${layouts_opts[@]}"
-        [[ -z "$layouts_chosen" ]] && break
+    helpers::ui::menu layouts_chosen "Keyboard layouts" "ESC to go back" -- "${layouts_opts[@]}"
+    [[ -z "$layouts_chosen" ]] && break
 
-        case "$layouts_chosen" in
-            "Add new")
-                add_layout
-                ;;
-            "Remove existing")
-                remove_layout
-                ;;
-            "Change"*)
-                set_layout_shortcut
-                ;;
-        esac
-        hyprctl -q reload config-only
-    done
+    case "$layouts_chosen" in
+    "Add new")
+      add_layout
+      ;;
+    "Remove existing")
+      remove_layout
+      ;;
+    "Change"*)
+      set_layout_shortcut
+      ;;
+    esac
+    hyprctl -q reload config-only
+  done
 }
 
 while true; do
-    hyprctl -q reload config-only
+  hyprctl -q reload config-only
 
-    mapfile -t lines < <(
-        hyprctl --batch -j \
-       "getoption input:sensitivity;   \
+  mapfile -t lines < <(
+    hyprctl --batch -j \
+      "getoption input:sensitivity;   \
 			 getoption input:accel_profile;  \
 			 getoption input:repeat_rate;    \
 			 getoption input:repeat_delay;   \
@@ -313,7 +316,7 @@ while true; do
 			 getoption cursor:inactive_timeout; \
 			 getoption cursor:hide_on_key_press; \
 			 getoption input:kb_layout" |
-            jq -r ' .option as $o |
+      jq -r ' .option as $o |
 		if ($o | test("scroll_factor")) then
 			(.float * 10 | round / 10)
 		  elif ($o | test("sensitivity|inactive_timeout")) then
@@ -326,185 +329,134 @@ while true; do
 			if .int == 1 then "true" else "false" end
 		  end
 		'
-    )
+  )
 
-    devices="$(hyprctl devices)"
-    current_sensitivity="${lines[0]}"
-    current_accel_profile="$([[ "${lines[1]}" == "adaptive" ]] && echo true || echo false)"
-    current_repeat_rate="${lines[2]}"
-    current_repeat_delay="${lines[3]}"
-    current_scroll_factor="${lines[4]}"
-    current_natural_scroll="${lines[5]}"
-    current_cursor_hide="${lines[6]}"
-    current_hide_key_press="${lines[7]}"
-    current_layouts="${lines[8]}"
+  current_sensitivity="${lines[0]}"
 
-    if [[ "$current_cursor_hide" == 0 ]]; then
-        current_cursor_hide="never"
-    else
-        current_cursor_hide+="s"
+  if [[ "${lines[1]}" == "adaptive" ]]; then
+    current_accel_profile="true"
+  else
+    current_accel_profile="false"
+  fi
+
+  current_repeat_rate="${lines[2]}"
+  current_repeat_delay="${lines[3]}"
+  current_scroll_factor="${lines[4]}"
+  current_natural_scroll="${lines[5]}"
+  current_cursor_hide="${lines[6]}"
+  current_hide_key_press="${lines[7]}"
+  current_layouts="${lines[8]}"
+
+  if [[ "$current_cursor_hide" == 0 ]]; then
+    current_cursor_hide="never"
+  else
+    current_cursor_hide+="s"
+  fi
+
+  OPTIONS=(
+    "Keyboard repeat delay : ${current_repeat_delay}ms"
+    "Keyboard repeat rate : ${current_repeat_rate}"
+    "Mouse acceleration : ${current_accel_profile}"
+    "Hide cursor after : ${current_cursor_hide}"
+    "Hide on key press : ${current_hide_key_press}"
+    "Natural scrolling : ${current_natural_scroll}"
+    "Mouse sensitivity : ${current_sensitivity}"
+    "Keyboard layouts : ${current_layouts}"
+    "Scrolling speed : ${current_scroll_factor}"
+  )
+
+  if [[ "$(hyprctl devices)" =~ [Tt]ouchpad ]]; then
+    OPTIONS+=("<b>Touchpad options</b>")
+  fi
+
+  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
+  helpers::ui::menu CHOSEN "Input" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
+  [ -z "$CHOSEN" ] && break
+
+  for i in "${!OPTIONS[@]}"; do
+    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
+      INDEX="$i"
+      break
     fi
+  done
 
-    OPTIONS=(
-        "Keyboard repeat delay : ${current_repeat_delay}ms"
-        "Keyboard repeat rate  : ${current_repeat_rate}"
-        "Mouse acceleration    : ${current_accel_profile}"
-        "Hide cursor after     : ${current_cursor_hide}"
-        "Hide on key press     : ${current_hide_key_press}"
-        "Natural scrolling     : ${current_natural_scroll}"
-        "Mouse sensitivity     : ${current_sensitivity}"
-        "Keyboard layouts      : ${current_layouts}"
-        "Scrolling speed       : ${current_scroll_factor}"
-    )
-
-    if [[ "$devices" =~ [Tt]ouchpad ]]; then
-        OPTIONS+=("<b>Touchpad options</b>")
-    fi
-
-    helpers::ui::menu CHOSEN "Input" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-    [ -z "$CHOSEN" ] && break
-
-    for i in "${!OPTIONS[@]}"; do
-        if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-            INDEX="$i"
-            break
-        fi
-    done
-
-    case "$CHOSEN" in
-        "Keyboard layouts"*)
-            layouts_menu
-            ;;
-        "Hide on key press"*)
-            case "$current_hide_key_press" in
-                true)
-                    vb-cmd-edit-wm-config "cursor:hide_on_key_press:false" \
-                        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                    ;;
-                false)
-                    vb-cmd-edit-wm-config "cursor:hide_on_key_press:true" \
-                        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                    ;;
-            esac
-            ;;
-        "Hide cursor after"*)
-            while true; do
-                prompt="Hide cursor after (int, in seconds)"
-                helpers::ui::menu input "Inactivity timeout" "0 to disable" -- "$prompt"
-                [[ -z "$input" ]] && break
-                [[ "$prompt" == "$input" ]] && continue
-
-                if [[ ! "$input" =~ ^[0-9]+$ ]]; then
-                    notify-send -r 1 "Vibranium" "Only integers allowed"
-                    continue
-                fi
-
-                vb-cmd-edit-wm-config "cursor:inactive_timeout:$input" \
-                    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                break
-            done
-            ;;
-        "Natural scrolling"*)
-            case "$current_natural_scroll" in
-                true)
-                    vb-cmd-edit-wm-config "input:natural_scroll:false" \
-                        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                    ;;
-                false)
-                    vb-cmd-edit-wm-config "input:natural_scroll:true" \
-                        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                    ;;
-
-            esac
-            ;;
-        "Scrolling speed"*)
-            while true; do
-                prompt="Scrolling speed (int / float, (multiplier))"
-                helpers::ui::menu input "Scrolling speed" "ESC to go back" -- "$prompt"
-                [[ -z $input ]] && break
-                [[ "$prompt" == "$input" ]] && continue
-
-                if [[ ! "$input" =~ ^[0-9]+(\.[0-9]+)?$ ]]; then
-                    notify-send -r 1 -t 2000 "Vibranium" "Only integers or floats allowed"
-                    continue
-                fi
-
-                vb-cmd-edit-wm-config "input:scroll_factor:$input" \
-                    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                break
-            done
-            ;;
-        "Keyboard repeat delay"*)
-            while true; do
-                prompt="Repeat delay (int, in ms)"
-                helpers::ui::menu input "Repeat delay" "200ms - 1000ms" -- "$prompt"
-                [[ -z $input ]] && break
-                [[ "$prompt" == "$input" ]] && continue
-
-                if [[ ! "$input" =~ ^[0-9]+$ ]]; then
-                    notify-send -r 1 -t 2000 "Vibranium" "Only integers allowed"
-                    continue
-                elif ((input < 200 || input > 1000)); then
-                    continue
-                fi
-
-                vb-cmd-edit-wm-config "input:repeat_delay:$input" \
-                    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                break
-            done
-            ;;
-        "Keyboard repeat rate"*)
-            while true; do
-                prompt="Repeat rate (int, in ms)"
-                helpers::ui::menu input "Repeat rate" "10ms - 50ms" -- "$prompt"
-                [[ -z $input ]] && break
-                [[ "$prompt" == "$input" ]] && continue
-
-                if [[ ! "$input" =~ ^[0-9]+$ ]]; then
-                    notify-send -r 1 -t 2000 "Vibranium" "Only integers allowed"
-                    continue
-                elif ((input < 10 || input > 50)); then
-                    continue
-                fi
-
-                vb-cmd-edit-wm-config "input:repeat_rate:$input" \
-                    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                break
-            done
-            ;;
-        "Mouse acceleration"*)
-            case "${current_accel_profile}" in
-                true)
-                    vb-cmd-edit-wm-config "input:accel_profile:flat" \
-                        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                    ;;
-                false)
-                    vb-cmd-edit-wm-config "input:accel_profile:adaptive" \
-                        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                    ;;
-            esac
-            ;;
-        "Mouse sensitivity"*)
-            while true; do
-                prompt="Sensitivity (int / float)"
-                helpers::ui::menu input "Sensitivity" "-1 to 1" -- "$prompt"
-                [[ -z $input ]] && break
-
-                if [[ "$input" == "$prompt" ]]; then
-                    continue
-                fi
-
-                if [[ "$input" =~ ^-?(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
-                    vb-cmd-edit-wm-config "input:sensitivity:$input" \
-                        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
-                    break
-                else
-                    notify-send -r 1 -t 2000 "Vibranium" "A number between -1 and 1"
-                fi
-            done
-            ;;
-        *"Touchpad options"*)
-            _touchpad_options
-            ;;
+  case "$CHOSEN" in
+  "Keyboard layouts"*)
+    layouts_menu
+    ;;
+  "Hide on key press"*)
+    case "$current_hide_key_press" in
+    true)
+      vb-cmd-edit-wm-config "cursor:hide_on_key_press:false" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+      ;;
+    false)
+      vb-cmd-edit-wm-config "cursor:hide_on_key_press:true" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+      ;;
     esac
+    ;;
+  "Hide cursor after"*)
+    local value
+    value=$(helpers::configure::set_digit --verify \
+      "Hide cursor after" "Seconds (0 - never)" int 0 86400) &&
+      vb-cmd-edit-wm-config "cursor:inactive_timeout:$value" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+    ;;
+  "Natural scrolling"*)
+    case "$current_natural_scroll" in
+    true)
+      vb-cmd-edit-wm-config "input:natural_scroll:false" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+      ;;
+    false)
+      vb-cmd-edit-wm-config "input:natural_scroll:true" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+      ;;
+    esac
+    ;;
+  "Scrolling speed"*)
+    local value
+    value=$(helpers::configure::set_digit --verify \
+      "Scrolling speed" "Scrolling speed" float 0.0 3.0) &&
+      vb-cmd-edit-wm-config "input:scroll_factor:$value" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+    ;;
+  "Keyboard repeat delay"*)
+    local value
+    value=$(helpers::configure::set_digit --verify \
+      "Repeat delay" "Repeat delay" int 200 1000) &&
+      vb-cmd-edit-wm-config "input:repeat_delay:$value" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+    ;;
+  "Keyboard repeat rate"*)
+    local value
+    value=$(helpers::configure::set_digit --verify \
+      "Repeat rate" "Repeat rate" int 10 50) &&
+      vb-cmd-edit-wm-config "input:repeat_rate:$value" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+    ;;
+  "Mouse acceleration"*)
+    case "${current_accel_profile}" in
+    true)
+      vb-cmd-edit-wm-config "input:accel_profile:flat" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+      ;;
+    false)
+      vb-cmd-edit-wm-config "input:accel_profile:adaptive" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+      ;;
+    esac
+    ;;
+  "Mouse sensitivity"*)
+    local value
+    value=$(helpers::configure::set_digit --verify \
+      "Sensitivity" "Mouse Sensitivity" float -1 1) &&
+      vb-cmd-edit-wm-config "input:sensitivity:$value" \
+        "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
+    ;;
+  *"Touchpad options"*)
+    _touchpad_options
+    ;;
+  esac
 done

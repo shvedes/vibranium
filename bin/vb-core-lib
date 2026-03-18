@@ -881,46 +881,27 @@ hypr::flash::screen() {
 # If it's missing, appends the default value from the defaults file.
 helpers::configure::verify_option() {
   local var="$1"
-  [[ -z $var ]] && return 2
+  if [[ -z $var ]]; then
+    return 2
+  fi
 
   local settings_file="$VIBRANIUM_USER_SETTINGS"
   local defaults_file="$VIBRANIUM_PATH/vb-core-defaults"
 
-  local def_line
-  def_line="$(awk -F= -v v="$var" '$1==v{print; exit}' "$defaults_file")" || return 1
-  [[ -z $def_line ]] && return 1
+  while IFS= read -r line; do
+    if [[ "${line%%=*}" == "$var" ]]; then
+      return 0
+    fi
+  done < "$settings_file"
 
-  awk -v var="$var" -v newline="$def_line" '
-        BEGIN { inserted=0 }
+  while IFS= read -r line; do
+    if [[ "${line%%=*}" == "$var" ]]; then
+      printf '%s\n' "$line" >> "$settings_file"
+      return 0
+    fi
+  done < "$defaults_file"
 
-        # Preserve header/comments exactly as-is until first VIBRANIUM_ var
-        !vars_started && !/^VIBRANIUM_/ { header[++h]=$0; next }
-
-        {
-            vars_started=1
-
-            # Collect only VIBRANIUM_* assignments
-            if ($0 ~ /^VIBRANIUM_[A-Za-z_]+=/) {
-                split($0,a,"=")
-                key=a[1]
-                vars[key]=$0
-                next
-            }
-        }
-
-        END {
-            # Overwrite or add the required variable
-            split(newline,a,"=")
-            vars[a[1]]=newline
-
-            # Print header first
-            for (i=1;i<=h;i++) print header[i]
-
-            # Sort keys (I am a bit a perfectionist)
-            n=asorti(vars, idx)
-            for (i=1;i<=n;i++) print vars[idx[i]]
-        }
-    ' "$settings_file" > "$settings_file.tmp" && mv "$settings_file.tmp" "$settings_file"
+  return 1
 }
 
 # Flips a boolean value of a passed variable.
@@ -957,23 +938,19 @@ helpers::configure::toggle_bool() {
 # Expects items in "label : value" format, ignores HTML tags when measuring
 # label length, pads shorter labels with spaces, and normalizes boolean
 # values (true/false -> yes/no). Non-matching lines are passed through unchanged.
+#
+# Usage: mapfile -r some_var < <(helpers::configure::build_menu ${options[@]})
 helpers::configure::build_menu() {
   local options=("$@")
   local max_len=0
-  local has_colon_options=()
 
   for option in "${options[@]}"; do
     if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
-      local label="${BASH_REMATCH[1]}"
-
-      local clean_label
-      clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
-
-      local len=${#clean_label}
-      if ((len > max_len)); then
-        max_len=$len
-      fi
-      has_colon_options+=("$option")
+      local clean_label="${BASH_REMATCH[1]}"
+      while [[ "$clean_label" =~ \<[^\>]*\> ]]; do
+        clean_label="${clean_label//${BASH_REMATCH[0]}/}"
+      done
+      (( ${#clean_label} > max_len )) && max_len=${#clean_label}
     fi
   done
 
@@ -983,23 +960,20 @@ helpers::configure::build_menu() {
       local label="${BASH_REMATCH[1]}"
       local value="${BASH_REMATCH[2]}"
 
-      local clean_label
-      clean_label=$(echo "$label" | sed 's/<[^>]*>//g')
-
-      local len=${#clean_label}
-      local padding=$((max_len - len))
-      local padded_label="$label"
-
-      for ((j = 0; j < padding; j++)); do
-        padded_label+=" "
+      local clean_label="$label"
+      while [[ "$clean_label" =~ \<[^\>]*\> ]]; do
+        clean_label="${clean_label//${BASH_REMATCH[0]}/}"
       done
+
+      local spaces
+      printf -v spaces '%*s' $(( max_len - ${#clean_label} )) ''
 
       if [[ "${value,,}" == "true" ]]; then
         value="yes"
       elif [[ "${value,,}" == "false" ]]; then
         value="no"
       fi
-      aligned_options+=("$padded_label : $value")
+      aligned_options+=("$label$spaces : $value")
     else
       aligned_options+=("$option")
     fi
@@ -1018,7 +992,6 @@ helpers::configure::build_menu() {
 helpers::configure::set_digit() {
   local check_only=false
 
-  # parse flags
   while [[ "$1" == -* ]]; do
     case "$1" in
       --verify) check_only=true ;;
@@ -1029,7 +1002,7 @@ helpers::configure::set_digit() {
 
   local prompt_base="$1"
   local rofi_title="$2"
-  local type="$3" # "int" or "float"
+  local type="$3"
   local min_val="$4"
   local max_val="$5"
   local opt_name="${6:-}"
@@ -1038,57 +1011,33 @@ helpers::configure::set_digit() {
   local range_text="${min_val}-${max_val}"
   local prompt="${prompt_base} (${type})"
 
+  local awk_script="$VIBRANIUM/awk/helpers-set-digit.awk"
+
+  if [[ "$type" != "int" && "$type" != "float" ]]; then
+    return 1
+  fi
+
   while true; do
     local input
     helpers::ui::menu input "$rofi_title" "$range_text" -- "$prompt"
 
     [[ -z "$input" ]] && return 1
-    [[ "$input" = "$prompt" ]] && continue
+    [[ "$input" == "$prompt" ]] && continue
 
     input="${input#"${input%%[![:space:]]*}"}"
     input="${input%"${input##*[![:space:]]}"}"
 
-    local valid=true
+    local result
+    result=$(awk -v val="$input" -v lo="$min_val" -v hi="$max_val" -v type="$type" -f "$awk_script")
 
-    if [[ "$type" == "int" ]]; then
-      if ! [[ "$input" =~ ^[0-9]+$ ]]; then
-        valid=false
-      else
-        local inrange
-        inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
-          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
-        [[ "$inrange" != 1 ]] && valid=false
-      fi
-
-    elif [[ "$type" == "float" ]]; then
-      if ! [[ "$input" =~ ^[0-9]*\.?[0-9]+$ ]]; then
-        valid=false
-      else
-        local inrange
-        inrange=$(awk -v v="$input" -v lo="$min_val" -v hi="$max_val" \
-          'BEGIN { v+=0; lo+=0; hi+=0; print (v >= lo && v <= hi) }')
-        [[ "$inrange" != 1 ]] && valid=false
-
-        if [[ "$valid" == true ]]; then
-          input=$(awk -v v="$input" '
-                        BEGIN {
-                            v+=0
-                            if (v == int(v)) printf "%d.0", int(v)
-                            else printf "%g", v
-                        }')
-        fi
-      fi
-    else
-      return 1
-    fi
-
-    if [[ "$valid" == false ]]; then
+    if [[ $? -ne 0 ]]; then
       notify-send -r 6 -u critical -t 1500 "Vibranium" \
-        "A ${type} between ${min_val} and ${max_val}!"
+        "A ${type} between ${min_val} and ${max_val}!" &
       continue
     fi
 
-    # check-only mode: just return the validated value
+    input="$result"
+
     if [[ "$check_only" == true ]]; then
       printf "%s" "$input"
       return 0
@@ -1097,7 +1046,12 @@ helpers::configure::set_digit() {
     if [[ -n "$opt_name" ]]; then
       helpers::configure::verify_option "$opt_name" || return 1
 
-      if grep -qE "^${opt_name}=" "$settings_file" 2> /dev/null; then
+      local exists=false
+      while IFS= read -r line; do
+        [[ "${line%%=*}" == "$opt_name" ]] && { exists=true; break; }
+      done < "$settings_file"
+
+      if [[ "$exists" == true ]]; then
         sed -i "/^${opt_name}/s/=.*/=${input}/" "$settings_file"
       else
         printf "%s=%s\n" "$opt_name" "$input" >> "$settings_file"

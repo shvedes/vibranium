@@ -2,183 +2,15 @@
 
 source vb-core-lib
 
-_edit_int() {
-  local print=0
-
-  while [[ "$1" == -* ]]; do
-    case "$1" in
-      -p | --print)
-        print=1
-        shift
-        ;;
-      --)
-        shift
-        break
-        ;;
-      *)
-        break
-        ;;
-    esac
-  done
-
-  local name="$1"
-  local key="$2"
-  local min="$3"
-  local max="$4"
-  local input prompt hint
-
-  [[ -n $min && ! $min =~ ^[0-9]+$ ]] && min=""
-  [[ -n $max && ! $max =~ ^[0-9]+$ ]] && max=""
-
-  if [[ -n $min && -n $max && $min -gt $max ]]; then
-    local _tmp=$min
-    min=$max
-    max=$_tmp
-  fi
-
-  prompt="$name (int)"
-
-  if [[ -n $min && -n $max ]]; then
-    hint="$min-$max"
-  elif [[ -n $min ]]; then
-    hint="≥ $min"
-  elif [[ -n $max ]]; then
-    hint="≤ $max"
-  else
-    hint="ESC to go back"
-  fi
-
-  while true; do
-    helpers::ui::menu input "$name" "$hint" -- "$prompt"
-
-    [[ -z $input ]] && break
-    [[ "$input" == "$prompt" ]] && continue
-
-    if [[ ! "$input" =~ ^[0-9]+$ ]]; then
-      notify-send -r 6 -u critical -t 2000 "Vibranium" "Only integers allowed"
-      continue
-    fi
-
-    [[ -n $min && $input -lt $min ]] && {
-      notify-send -r 6 -u critical -t 2000 "Vibranium" "Minimum value: $min"
-      continue
-    }
-
-    [[ -n $max && $input -gt $max ]] && {
-      notify-send -r 6 -u critical -t 2000 "Vibranium" "Maximum value: $max"
-      continue
-    }
-
-    vb-cmd-edit-wm-config "$key:$input" "$HYPR_CONFIG"
-    ((print)) && printf '%s\n' "$input"
-    break
-  done
-}
-
-_edit_float() {
-  local name="$1" # prompt title
-  local key="$2"  # hyprland config key
-  local min="$3"  # min
-  local max="$4"  # max
-  local input prompt regex
-
-  regex='^[0-9]*\.?[0-9]+$'
-
-  float_le() {
-    local a="$1" b="$2" a_int a_frac b_int b_frac
-
-    if [[ ! $a =~ \. ]]; then
-      a_int="${a##0}"
-      [ -z "$a_int" ] && a_int=0
-      a_frac=0
-    else
-      if [[ $a =~ ^\.[0-9]+$ ]]; then
-        a_int=0
-        a_frac="${a#\.}"
-      else
-        a_int="${a%%.*}"
-        a_int="${a_int##0}"
-        [ -z "$a_int" ] && a_int=0
-        a_frac="${a#*.}"
-      fi
-    fi
-
-    if [[ ! $b =~ \. ]]; then
-      b_int="${b##0}"
-      [ -z "$b_int" ] && b_int=0
-      b_frac=0
-    else
-      if [[ $b =~ ^\.[0-9]+$ ]]; then
-        b_int=0
-        b_frac="${b#\.}"
-      else
-        b_int="${b%%.*}"
-        b_int="${b_int##0}"
-        [ -z "$b_int" ] && b_int=0
-        b_frac="${b#*.}"
-      fi
-    fi
-
-    a_frac="${a_frac%%0*}"
-    [ -z "$a_frac" ] && a_frac=0
-    b_frac="${b_frac%%0*}"
-
-    [ -z "$b_frac" ] && b_frac=0
-
-    if [ "$a_int" -lt "$b_int" ]; then
-      return 0
-    elif [ "$a_int" -gt "$b_int" ]; then
-      return 1
-    fi
-
-    local len_a="${#a_frac}"
-    local len_b="${#b_frac}"
-    local max_len
-
-    max_len=$((len_a > len_b ? len_a : len_b))
-
-    if [ "$len_a" -lt "$max_len" ]; then
-      a_frac="$(printf "%s%0*$((max_len - len_a))d" "$a_frac" 0)"
-    fi
-
-    if [ "$len_b" -lt "$max_len" ]; then
-      b_frac="$(printf "%s%0*$((max_len - len_b))d" "$b_frac" 0)"
-    fi
-    [ "$a_frac" -le "$b_frac" ]
-  }
-
-  while true; do
-    prompt="$name (float)"
-    helpers::ui::menu input "$name" "$min - $max" -- "$prompt"
-    [[ -z $input ]] && break
-    [[ "$input" == "$prompt" ]] && continue
-
-    if [[ $input =~ ^[0-9]+$ ]]; then
-      input="${input}.0"
-    fi
-
-    if [[ ! $input =~ $regex ]]; then
-      notify-send -r 6 -u critical -t 2000 "Vibranium" "Enter a valid float number"
-      continue
-    fi
-
-    if ! float_le "$min" "$input" || ! float_le "$input" "$max"; then
-      notify-send -r 6 -u critical -t 2000 "Vibranium" "Value must be between <b>$min</b> and <b>$max</b>"
-      continue
-    fi
-
-    vb-cmd-edit-wm-config "$key:$input" "$HYPR_CONFIG"
-    break
-  done
-}
-
 _edit_roundness() {
   local input
   local dunstrc
   local config_rasi
   local swayosd_css
 
-  input=$(_edit_int -p "Border roundness" "decoration:rounding" 0 16)
+  input=$(helpers::configure::set_digit --verify "Border roundness" "Border roundness" "int" 0 16)
+  [[ -z "$input" ]] && return
+  vb-cmd-edit-wm-config "decoration:rounding:$input" "$HYPR_CONFIG"
 
   dunstrc="$XDG_CONFIG_HOME/dunst/dunstrc"
   sed -i "/corner_radius/s/=.*/= $input/" "$dunstrc"
@@ -213,9 +45,7 @@ _set_animations_preset() {
 
     ln -sf "$folder/${anim_chosen,}.conf" "$target"
 
-    if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
-      hyprctl -q reload config-only
-    fi
+    hyprctl -q reload config-only
     break
   done
 }
@@ -225,14 +55,11 @@ _edit_bool() {
     1) vb-cmd-edit-wm-config "${1}:false" "$HYPR_CONFIG" ;;
     0) vb-cmd-edit-wm-config "${1}:true" "$HYPR_CONFIG" ;;
   esac
-
-  if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
-    hyprctl -q reload config-only
-  fi
+  hyprctl -q reload config-only
 }
 
 _blur_submenu() {
-  local parameters index opts
+  local parameters index opts input
   local labels
 
   while true; do
@@ -256,11 +83,12 @@ _blur_submenu() {
             '
     )
 
-    read -r enabled size passes contrast brightness vibrancy noise <<< "${parameters[*]}"
+    read -r enabled size passes contrast brightness vibrancy noise <<<"${parameters[*]}"
 
-    helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
-    local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
-    local power_profile="$(vb-cmd-get-power)"
+    # Temporary removed
+    # helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
+    # local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
+    # local power_profile="$(vb-cmd-get-power)"
 
     labels=("Enabled : $enabled")
 
@@ -302,22 +130,38 @@ _blur_submenu() {
         esac
 
         ;;
-      "Noise"*) _edit_float "Blur noise" "decoration:blur:noise" 0.0 1.0 ;;
-      "Vibrancy"*) _edit_float "Blur vibrancy" "decoration:blur:vibrancy" 0.0 1.0 ;;
-      "Brightness"*) _edit_float "Blur brightness" "decoration:blur:brightness" 0.0 2.0 ;;
-      "Contrast"*) _edit_float "Blur contrast" "decoration:blur:contrast" 0.0 2.0 ;;
-      "Size"*) _edit_int "Blur size" "decoration:blur:size" ;;
-      "Passes"*) _edit_int "Blur passes" "decoration:blur:passes" ;;
+      "Noise"*)
+        input=$(helpers::configure::set_digit --verify "Blur noise" "Blur noise" "float" 0.0 1.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:noise:$input" "$HYPR_CONFIG"
+        ;;
+      "Vibrancy"*)
+        input=$(helpers::configure::set_digit --verify "Blur vibrancy" "Blur vibrancy" "float" 0.0 1.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:vibrancy:$input" "$HYPR_CONFIG"
+        ;;
+      "Brightness"*)
+        input=$(helpers::configure::set_digit --verify "Blur brightness" "Blur brightness" "float" 0.0 2.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:brightness:$input" "$HYPR_CONFIG"
+        ;;
+      "Contrast"*)
+        input=$(helpers::configure::set_digit --verify "Blur contrast" "Blur contrast" "float" 0.0 2.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:contrast:$input" "$HYPR_CONFIG"
+        ;;
+      "Size"*)
+        input=$(helpers::configure::set_digit --verify "Blur size" "Blur size" "int" 1 512)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:size:$input" "$HYPR_CONFIG"
+        ;;
+      "Passes"*)
+        input=$(helpers::configure::set_digit --verify "Blur passes" "Blur passes" "int" 1 20)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:blur:passes:$input" "$HYPR_CONFIG"
+        ;;
     esac
 
-    if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
-      hyprctl -q reload config-only
-    fi
+    hyprctl -q reload config-only
   done
 }
 
 _shadow_submenu() {
-  local parameters index opts
+  local parameters index opts input
   local labels
 
   while true; do
@@ -339,11 +183,12 @@ _shadow_submenu() {
             '
     )
 
-    read -r enabled render_power range sharp ignore_window <<< "${parameters[*]}"
+    read -r enabled render_power range sharp ignore_window <<<"${parameters[*]}"
 
-    helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
-    local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
-    local power_profile="$(vb-cmd-get-power)"
+    # Temporary removed
+    # helpers::check VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
+    # local respect_power_profile="$VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
+    # local power_profile="$(vb-cmd-get-power)"
 
     labels=("Enabled : $enabled")
 
@@ -371,24 +216,26 @@ _shadow_submenu() {
       "Enabled"*) _edit_bool "decoration:shadow:enabled" ;;
       "Sharp"*) _edit_bool "decoration:shadow:sharp" ;;
       "Behind"*) _edit_bool "decoration:shadow:ignore_window" ;;
-      "Power"*) _edit_int "Render power" "decoration:shadow:render_power" 1 4 ;;
+      "Power"*)
+        input=$(helpers::configure::set_digit --verify "Render power" "Render power" "int" 1 4)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:shadow:render_power:$input" "$HYPR_CONFIG"
+        ;;
       "Range"*)
         if [[ "$sharp" == true ]]; then
-          _edit_int "Shadow range" "decoration:shadow:range" 1 128
+          input=$(helpers::configure::set_digit --verify "Shadow range" "Shadow range" "int" 1 128)
         else
-          _edit_int "Shadow range" "decoration:shadow:range" 8 128
+          input=$(helpers::configure::set_digit --verify "Shadow range" "Shadow range" "int" 4 128)
         fi
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:shadow:range:$input" "$HYPR_CONFIG"
         ;;
     esac
 
-    if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
-      hyprctl -q reload config-only
-    fi
+    hyprctl -q reload config-only
   done
 }
 
 _decoration_submenu() {
-  local parameters index opts
+  local parameters index opts input
   local labels
 
   while true; do
@@ -417,7 +264,7 @@ _decoration_submenu() {
     )
 
     read -r bordersize rounding round_power a_opacity i_opacity f_opacity \
-      dim_inactive dim_strength dim_modal dim_special border_part <<< "${parameters[*]}"
+      dim_inactive dim_strength dim_modal dim_special border_part <<<"${parameters[*]}"
 
     labels=(
       "Border size : $bordersize"
@@ -454,22 +301,41 @@ _decoration_submenu() {
     done
 
     case "$chosen" in
-      "Border size"*) _edit_int "Border size" "general:border_size" 0 24 ;;
+      "Border size"*)
+        input=$(helpers::configure::set_digit --verify "Border size" "Border size" "int" 0 24)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "general:border_size:$input" "$HYPR_CONFIG"
+        ;;
       "Border roundness"*) _edit_roundness ;;
-      "Rounding power"*) _edit_float "Rounding power" "decoration:rounding_power" 1.0 10.0 ;;
-      "Active window opacity"*) _edit_float "Active opacity" "decoration:active_opacity" 0.0 1.0 ;;
-      "Inactive window opacity"*) _edit_float "Inactive opacity" "decoration:inactive_opacity" 0.0 1.0 ;;
-      "Fullscreen window opacity"*) _edit_float "Fullscreen opacity" "decoration:fullscreen_opacity" 0.0 1.0 ;;
+      "Rounding power"*)
+        input=$(helpers::configure::set_digit --verify "Rounding power" "Rounding power" "float" 1.0 10.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:rounding_power:$input" "$HYPR_CONFIG"
+        ;;
+      "Active window opacity"*)
+        input=$(helpers::configure::set_digit --verify "Active opacity" "Active opacity" "float" 0.0 1.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:active_opacity:$input" "$HYPR_CONFIG"
+        ;;
+      "Inactive window opacity"*)
+        input=$(helpers::configure::set_digit --verify "Inactive opacity" "Inactive opacity" "float" 0.0 1.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:inactive_opacity:$input" "$HYPR_CONFIG"
+        ;;
+      "Fullscreen window opacity"*)
+        input=$(helpers::configure::set_digit --verify "Fullscreen opacity" "Fullscreen opacity" "float" 0.0 1.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:fullscreen_opacity:$input" "$HYPR_CONFIG"
+        ;;
       "Dim inactive window"*) _edit_bool "decoration:dim_inactive" ;;
       "Dim modal windows"*) _edit_bool "decoration:dim_modal" ;;
-      "Dim special workspace"*) _edit_float "Dim special" "decoration:dim_special" 0.0 1.0 ;;
-      "Dim strength"*) _edit_float "Dim strength" "decoration:dim_strength" 0.0 1.0 ;;
+      "Dim special workspace"*)
+        input=$(helpers::configure::set_digit --verify "Dim special" "Dim special" "float" 0.0 1.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:dim_special:$input" "$HYPR_CONFIG"
+        ;;
+      "Dim strength"*)
+        input=$(helpers::configure::set_digit --verify "Dim strength" "Dim strength" "float" 0.0 1.0)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "decoration:dim_strength:$input" "$HYPR_CONFIG"
+        ;;
       "Border part of window"*) _edit_bool "decoration:border_part_of_window" ;;
     esac
 
-    if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
-      hyprctl -q reload config-only
-    fi
+    hyprctl -q reload config-only
   done
 }
 
@@ -507,7 +373,7 @@ _animations_submenu() {
 }
 
 _gaps_submenu() {
-  local index parameters opts chosen smartgaps_enabled
+  local index parameters opts chosen smartgaps_enabled input
 
   while true; do
     [[ -f "$SMART_GAPS_CONFIG" ]] && {
@@ -523,7 +389,7 @@ _gaps_submenu() {
                 " | jq -r '.custom | split(" ")[0]'
     )
 
-    read -r gaps_in gaps_out <<< "${parameters[*]}"
+    read -r gaps_in gaps_out <<<"${parameters[*]}"
 
     opts=(
       "Inner gaps : $gaps_in"
@@ -546,14 +412,18 @@ _gaps_submenu() {
     done
 
     case "$chosen" in
-      "Inner gaps"*) _edit_int "Inner gaps" "general:gaps_in" 0 50 ;;
-      "Outer gaps"*) _edit_int "Outer gaps" "general:gaps_out" 0 50 ;;
+      "Inner gaps"*)
+        input=$(helpers::configure::set_digit --verify "Inner gaps" "Inner gaps" "int" 0 50)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "general:gaps_in:$input" "$HYPR_CONFIG"
+        ;;
+      "Outer gaps"*)
+        input=$(helpers::configure::set_digit --verify "Outer gaps" "Outer gaps" "int" 0 50)
+        [[ -n "$input" ]] && vb-cmd-edit-wm-config "general:gaps_out:$input" "$HYPR_CONFIG"
+        ;;
       "Smart gaps"*) vb-cmd-toggle-smart-gaps ;;
     esac
 
-    if [[ "$AUTORELOAD_DISABLED" == 1 ]]; then
-      hyprctl -q reload config-only
-    fi
+    hyprctl -q reload config-only
   done
 }
 
@@ -561,28 +431,8 @@ INDEX=0
 SMART_GAPS_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/smart-gaps.conf"
 HYPR_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d/look-and-feel.conf"
 HYPRLOCK_CONFIG="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
-AUTORELOAD_DISABLED="$(hyprctl -j getoption 'misc:disable_autoreload' | jq -r '.int')"
 
 while true; do
-  mapfile -t PARAMETERS < <(
-    hyprctl -j --batch \
-      "getoption decoration:blur:enabled;
-             getoption decoration:shadow:enabled
-            " | jq -r '
-                  .option as $o |
-                  if   ($o | test("rounding|border_size")) then
-                    .int
-                  elif ($o | test(".*_opacity|dim_strength|dim_special")) then
-                      (.float * 10 | round / 10)
-                  elif ($o | test("gaps_in|gaps_out")) then
-                    (.custom | split(" ")[0])
-                  else
-                    if .int == 1 then "true" else "false" end
-                  end
-            '
-  )
-
-  read -r blur shadow <<< "${PARAMETERS[*]}"
   OPTIONS=(
     "<b>Blur</b>"
     "<b>Gaps</b>"

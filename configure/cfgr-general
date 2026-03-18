@@ -46,7 +46,7 @@ while true; do
 
   OPTIONS=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL")
 
-  UPDATE_CHANNEL="$(< "$VIBRANIUM_STATE/update.channel")"
+  UPDATE_CHANNEL="$(<"$VIBRANIUM_STATE/update.channel")"
 
   # Self-check: do not show anything
   # if on unknown branch.

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 source vb-core-lib
+
 CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.conf"
 
 _layout_submenu() {

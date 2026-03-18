@@ -23,7 +23,7 @@ _update_timeout() {
             next
         }
         {print}
-    ' "$config" > "$config.tmp" && mv "$config.tmp" "$config"
+    ' "$config" >"$config.tmp" && mv "$config.tmp" "$config"
 }
 
 _set_timeouts() {
