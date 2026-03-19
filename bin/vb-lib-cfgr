@@ -621,9 +621,10 @@ cfgr::dispatch() {
       local rofi_title="${fields[2]}"
       local hook="${fields[3]:-}"
       local opts_str="${fields[4]}"
+
       # re-split opts on \x1F
       IFS=$'\x1F' read -ra opts <<< "$opts_str"
-      cfgr::pick_string "$var" "$rofi_title" "${opts[@]}"
+      cfgr::set_string "$var" "$rofi_title" "${opts[@]}"
       [[ -n "$hook" ]] && eval "$hook"
       ;;
 
