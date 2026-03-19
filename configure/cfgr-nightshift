@@ -9,7 +9,12 @@ _toggle_nightshift() {
 }
 
 _set_temp() {
-  local input="$(cfgr::set_digit "Temperature" int 1000 20000)" || return
+  local input
+  input="$(cfgr::set_digit \
+    --title "Temperature" \
+    --type  int \
+    --min   1000 \
+    --max   20000)" || return
   vb-cmd-nightshift --set "$input"
 }
 

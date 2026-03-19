@@ -21,21 +21,31 @@ _toggle_waybar() {
 
 _set_spacing() {
   local input
-  input="$(cfgr::set_digit "Icon Spacing" int -6 16 --hint "Spacing (in pixels)")" || return
+  input="$(cfgr::set_digit \
+    --title "Icon Spacing" \
+    --hint  "Spacing (in pixels)" \
+    --type  int \
+    --min   -6 \
+    --max   16)" || return
   sed -i -E "s/(\"spacing\"\s*:\s*)-?[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
   systemctl -q --user restart waybar &
 }
 
 _set_height() {
   local input
-  input="$(cfgr::set_digit "$POSITION bar height" int 30 100 --hint "Height (in pixels)")" || return
+  input="$(cfgr::set_digit \
+    --title "$POSITION bar height" \
+    --hint  "Height (in pixels)" \
+    --type  int \
+    --min   30 \
+    --max   100)" || return
   sed -i -E "s/(\"height\"\s*:\s*)[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
   systemctl -q --user restart waybar &
 }
 
 _set_position() {
   case "$POSITION" in
-    top) vb-cmd-waybar-position --bottom ;;
+    top)    vb-cmd-waybar-position --bottom ;;
     bottom) vb-cmd-waybar-position --top ;;
   esac
 }
@@ -60,11 +70,17 @@ _build() {
   cfgr::item::raw "Enabled : $ENABLED" "action:_toggle_waybar"
 
   if [[ "$ENABLED" == true ]]; then
-    cfge::item::raw "Position : $POSITION" "action:_set_position"
+    cfgr::item::raw "Position : $POSITION" "action:_set_position"
     cfgr::item::raw "Spacing : $icon_spacing" "action:_set_spacing"
     cfgr::item::raw "Height : $height" "action:_set_height"
-    cfgr::item::action "waybar-toggle-modules" "Toggle modules"
-    cfgr::item::action "cfgr-waybar-module" "Module settings"
+
+    cfgr::item::action \
+      --func  "waybar-toggle-modules" \
+      --label "Toggle modules"
+
+    cfgr::item::action \
+      --func  "cfgr-waybar-module" \
+      --label "Module settings"
   fi
 }
 

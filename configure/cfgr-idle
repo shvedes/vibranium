@@ -29,7 +29,12 @@ _set_timeouts() {
   local max_minutes="$4"
 
   local input
-  input="$(cfgr::set_digit "$title timeout" int $min_minutes $max_minutes --hint "$title after N minutes")" || return
+  input="$(cfgr::set_digit \
+    --title "$title timeout" \
+    --hint  "$title after N minutes" \
+    --type  int \
+    --min   "$min_minutes" \
+    --max   "$max_minutes")" || return
 
   _update_timeout "$timer_index" $((input * 60))
   systemctl --user restart hypridle &
@@ -44,13 +49,21 @@ _build() {
   lock_timeout="${TIMEOUTS[0]}"
   sleep_timeout="${TIMEOUTS[1]}"
 
-  # Convert to minutes
+  # Convert seconds to minutes for display and range clamping.
   lock_timeout="$((lock_timeout / 60))"
   sleep_timeout="$((sleep_timeout / 60))"
 
-  cfgr::item::action "_set_timeouts Lock 1 1 $sleep_timeout" "Lock after : ${lock_timeout}m"
-  cfgr::item::action "_set_timeouts Sleep 2 $lock_timeout 3600" "Sleep after : ${sleep_timeout}m"
-  cfgr::item::action "vb-cmd-show-help idle" "Help"
+  cfgr::item::action \
+    --func  "_set_timeouts Lock 1 1 $sleep_timeout" \
+    --label "Lock after : ${lock_timeout}m"
+
+  cfgr::item::action \
+    --func  "_set_timeouts Sleep 2 $lock_timeout 3600" \
+    --label "Sleep after : ${sleep_timeout}m"
+
+  cfgr::item::action \
+    --func  "vb-cmd-show-help idle" \
+    --label "Help"
 }
 
 cfgr::run "Idle" "_build"

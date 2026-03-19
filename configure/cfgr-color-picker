@@ -4,8 +4,13 @@ source vb-lib-core
 source vb-lib-cfgr
 
 _build() {
-  cfgr::item::bool VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW "Show HEX preview"
-  cfgr::item::bool VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR "Prevew in notification"
+  cfgr::item::bool \
+    --var   VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW \
+    --label "Show HEX preview"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR \
+    --label "Prevew in notification"
 }
 
 cfgr::run "Color Picker" "_build" \

@@ -2,8 +2,7 @@
 
 source vb-lib-core
 source vb-lib-hypr
-
-INDEX=0
+source vb-lib-cfgr
 
 # Fetch specs
 # Declared once. Each entry is "option:path|type".
@@ -28,131 +27,6 @@ TOUCHPAD_SPEC=(
   "input:touchpad:disable_while_typing|bool"
 )
 
-_touchpad_options() {
-  local index=0 opts chosen input
-
-  while true; do
-    hypr::reload
-    hypr::fetch "${TOUCHPAD_SPEC[@]}"
-
-    opts=(
-      "Disable while typing : ${HYPR[input:touchpad:disable_while_typing]}"
-      "Natural scrolling : ${HYPR[input:touchpad:natural_scroll]}"
-      "Scrolling speed : ${HYPR[input:touchpad:scroll_factor]}"
-      "Tap to click : ${HYPR[input:touchpad:tap-to-click]}"
-    )
-
-    mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
-    helpers::ui::menu chosen "Touchpad" "ESC to go back" -selected-row "$index" -- "${opts[@]}"
-
-    if [[ -z "$chosen" ]]; then
-      break
-    fi
-
-    helpers::configure::track_index opts "$chosen" index
-
-    case "$chosen" in
-      "Disable while typing"*) hypr::toggle "input:touchpad:disable_while_typing" "$HYPR_CONF_INPUT" ;;
-      "Natural scrolling"*)    hypr::toggle "input:touchpad:natural_scroll"       "$HYPR_CONF_INPUT" ;;
-      "Tap to click"*)         hypr::toggle "input:touchpad:tap-to-click"         "$HYPR_CONF_INPUT" ;;
-      "Scrolling speed"*)
-        while true; do
-          local prompt="Scrolling speed (int / float)"
-          helpers::ui::menu input "Scrolling speed" "0.0 - 1.0" -- "$prompt"
-
-          if [[ -z "$input" || "$input" == "$prompt" ]]; then
-            break
-          fi
-
-          if [[ ! $input =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
-            notify-send -r 1 -t 2000 "Vibranium" "A number between 0 and 1"
-            continue
-          fi
-          hypr::set "input:touchpad:scroll_factor" "$input" "$HYPR_CONF_INPUT"
-          break
-        done
-        ;;
-    esac
-  done
-}
-
-get_layouts() {
-  for file in /usr/share/X11/xkb/symbols/??; do
-    if [[ "${file##*/}" =~ ^[a-z]{2}$ ]]; then
-      echo "${file##*/}"
-    fi
-  done
-}
-
-check_module() {
-  grep -Eq "^\s*//.*\"$1\"" "$XDG_CONFIG_HOME/waybar/config.jsonc"
-}
-
-toggle_module() {
-  local config="$XDG_CONFIG_HOME/waybar/config.jsonc"
-  if check_module "$1"; then
-    sed -i "s|^\(\s*\)//\s*\(.*\"$1\".*\)|\1\2|" "$config"
-  else
-    sed -i "s|^\(\s*\)\(\".*$1\".*\)|\1// \2|" "$config"
-  fi
-  systemctl --user restart waybar &
-}
-
-add_layout() {
-  local layouts chosen active_layouts
-  mapfile -t layouts < <(get_layouts)
-
-  while true; do
-    helpers::ui::menu chosen "Layouts" "ESC to go back" -- "${layouts[@]}"
-    if [[ -z "$chosen" ]]; then
-      break
-    fi
-
-    [[ ! " ${layouts[*]} " =~ $chosen ]] && {
-      notify-send -r 3 -t 3000 -u critical "Vibranium" "Invalid layout"
-      continue
-    }
-    active_layouts=$(hypr::str "input:kb_layout")
-    hypr::set "input:kb_layout" "${active_layouts},${chosen}" "$HYPR_CONF_INPUT"
-    notify-send -r 1 "Vibranium" "Added new keyboard layout: <b>${chosen^^}</b>"
-    break
-  done
-
-  local n; n=$(hypr::str "input:kb_layout" | awk -F, '{print NF}')
-  (( n > 1 )) && check_module 'hyprland/language' && toggle_module 'hyprland/language'
-}
-
-remove_layout() {
-  local layouts chosen final_layouts=()
-
-  while true; do
-    IFS=',' read -r -a layouts < <(hypr::str "input:kb_layout")
-    helpers::ui::menu chosen "Remove layouts" "ESC to go back" -- "${layouts[@]}"
-
-    if [[ -z "$chosen" ]]; then
-      break
-    fi
-
-    [[ ! " ${layouts[*]} " =~ $chosen ]] && {
-      notify-send -r 3 -t 3000 -u critical "Vibranium" "Invalid layout"
-      continue
-    }
-
-    for layout in "${layouts[@]}"; do
-      if [[ "$layout" != "$chosen" ]]; then
-        final_layouts+=("$layout")
-      fi
-    done
-
-    hypr::set "input:kb_layout" "$(IFS=,; echo "${final_layouts[*]}")" "$HYPR_CONF_INPUT"
-    notify-send -r 1 "Vibranium" "Removed existing keyboard layout: <b>${chosen^^}</b>"
-    break
-  done
-
-  local n; n=$(hypr::str "input:kb_layout" | awk -F, '{print NF}')
-  (( n == 1 )) && ! check_module 'hyprland/language' && toggle_module 'hyprland/language'
-}
-
 declare -A KB_GROUPS=(
   [grp:caps_toggle]="Caps Lock"
   [grp:ctrl_alt_toggle]="Ctrl + Alt"
@@ -164,120 +38,179 @@ declare -A KB_GROUPS=(
   [grp:rctrl_rshift_toggle]="Right Ctrl + Right Shift"
 )
 
-set_layout_shortcut() {
-  local chosen selected_key
-  helpers::ui::menu chosen "Switch shortcut" "ESC to go back" -- "${KB_GROUPS[@]}"
+_get_layouts() {
+  for file in /usr/share/X11/xkb/symbols/??; do
+    if [[ "${file##*/}" =~ ^[a-z]{2}$ ]]; then
+      echo "${file##*/}"
+    fi
+  done
+}
 
-  if [[ -z "$chosen" ]]; then
-    return
-  fi
+_set_layout_shortcut() {
+  local shortcuts chosen
+  chosen="$(cfgr::set_string --title "Choose Shortcut" --option "${KB_GROUPS[@]}")" || return
 
   for key in "${!KB_GROUPS[@]}"; do
     if [[ "${KB_GROUPS[$key]}" == "$chosen" ]]; then
-      selected_key="$key"
+      local selected_key="$key"
       break
     fi
   done
-
-  if [[ -z "$selected_key" ]]; then
-    return
-  fi
 
   local placeholder="__COLON__"
   hypr::set "input:kb_options" "grp${placeholder}${selected_key#grp:}" "$HYPR_CONF_INPUT"
   sed -i "s/${placeholder}/:/" "$HYPR_CONF_INPUT"
 }
 
-layouts_menu() {
-  local opts chosen n shortcut
+_remove_layout() {
+  local layouts chosen
 
-  while true; do
-    opts=("Add new" "Remove existing")
-    n=$(hypr::str "input:kb_layout" | awk -F, '{print NF}')
-    shortcut="${KB_GROUPS[$(hypr::str "input:kb_options")]:-Unknown}"
-    (( n > 1 )) && opts+=("Change layout with : $shortcut")
+  IFS=',' read -r -a layouts < <(hypr::str "input:kb_layout")
+  chosen="$(cfgr::set_string --title "Remove Layout" --option "${layouts[@]}")" || return
 
-    helpers::ui::menu chosen "Keyboard layouts" "ESC to go back" -- "${opts[@]}"
-    if [[ -z "$chosen" ]]; then
-      break
+  for layout in "${layouts[@]}"; do
+    if [[ "$layout" != "$chosen" ]]; then
+      final_layouts+=("$layout")
     fi
-
-    case "$chosen" in
-      "Add new")  add_layout ;;
-      "Remove"*)  remove_layout ;;
-      "Change"*)  set_layout_shortcut ;;
-    esac
-    hypr::reload
   done
+
+  hypr::set "input:kb_layout" "$(IFS=,; echo "${final_layouts[*]}")" "$HYPR_CONF_INPUT"
+  notify-send -r 1 "Vibranium" "Removed keyboard layout: <b>$chosen</b>"
 }
 
-while true; do
+_add_layout() {
+  local layouts input chosen
+  mapfile -t layouts < <(_get_layouts)
+
+  chosen="$(cfgr::set_string --title "Layouts" --option "${layouts[@]}")" || return
+
+  local active_layouts=$(hypr::str "input:kb_layout")
+  hypr::set "input:kb_layout" "${active_layouts},${chosen}" "$HYPR_CONF_INPUT"
+  notify-send -r 1 "Vibranium" "Added new keyboard layout: <b>${chosen^^}</b>"
+}
+
+_touchpad_menu() {
+  _b() {
+    hypr::reload
+    hypr::fetch "${TOUCHPAD_SPEC[@]}"
+
+    cfgr::item::action \
+      --label "Disable while typing : ${HYPR[input:touchpad:disable_while_typing]}" \
+      --func "_toggle 'input:touchpad:disable_while_typing'"
+
+    cfgr::item::action \
+      --label "Natural scrolling : ${HYPR[input:touchpad:natural_scroll]}" \
+      --func "_toggle 'input:touchpad:natural_scroll'"
+
+    cfgr::item:::action \
+      --label "Scrolling factor : ${HYPR[input:touchpad:scroll_factor]}" \
+      --func "_set_int 'Scrolling Factor' 'Factor (float)' float 0.1 30"
+
+    cfgr::item::action \
+      --label "Tap to click : ${HYPR[input:touchpad:tap-to-click]}" \
+      --func "_toggle 'input:touchpad:tap-to-click'"
+  }
+  cfgr::run "Touchpad" "_b"
+}
+
+_layouts_menu() {
+  _b() {
+    hypr::reload
+
+    local str="$(hypr::str "input:kb_options")"
+    local shortcut="${KB_GROUPS[$str]:-Unknown}"
+
+    cfgr::item::action --label "Add new"                         --func "_add_layout"
+    cfgr::item::action --label "Remove existing"                 --func "_remove_layout"
+    cfgr::item::action --label "Switch layout with  : $shortcut" --func "_set_layout_shortcut"
+  }
+
+  cfgr::run "Keyboard Layouts" "_b"
+}
+
+_set_int() {
+  local prompt="$1"
+  local hint="$2"
+  local _type="$3"
+  local min="$4"
+  local max="$5"
+  local path="$6"
+
+  local input
+  input="$(cfgr::set_digit \
+    --title "$prompt" \
+    --hint "$hint" \
+    --type "$_type" \
+    --min "$min" \
+    --max "$max"
+  )" || return
+
+  hypr::set "$path" "$input" "$HYPR_CONF_INPUT"
+}
+
+_toggle() {
+  local path="$1"
+  hypr::toggle "$path" "$HYPR_CONF_INPUT"
+}
+
+_toggle_accel() {
+  if [[ "$ACCEL" == true ]]; then
+    hypr::set "input:accel_profile" flat "$HYPR_CONF_INPUT"
+  else
+    hypr::set "input:accel_profile" adaptive "$HYPR_CONF_INPUT"
+  fi
+}
+
+_build() {
   hypr::reload
   hypr::fetch "${INPUT_SPEC[@]}"
 
   # Two options need a derived display value; everything else is used directly
-  accel="${HYPR[input:accel_profile]}"
-  [[ "$accel" == "adaptive" ]] && accel=true || accel=false
+  ACCEL="${HYPR[input:accel_profile]}"
+  [[ "$ACCEL" == "adaptive" ]] && ACCEL=true || ACCEL=false
 
-  cursor_hide="${HYPR[cursor:inactive_timeout]}"
+  local cursor_hide="${HYPR[cursor:inactive_timeout]}"
   [[ "$cursor_hide" == "0" ]] && cursor_hide="never" || cursor_hide+="s"
 
-  OPTIONS=(
-    "Keyboard repeat delay : ${HYPR[input:repeat_delay]}ms"
-    "Keyboard repeat rate : ${HYPR[input:repeat_rate]}"
-    "Mouse acceleration : $accel"
-    "Hide cursor after : $cursor_hide"
-    "Hide on key press : ${HYPR[cursor:hide_on_key_press]}"
-    "Natural scrolling : ${HYPR[input:natural_scroll]}"
-    "Mouse sensitivity : ${HYPR[input:sensitivity]}"
-    "Keyboard layouts : ${HYPR[input:kb_layout]}"
-    "Scrolling speed : ${HYPR[input:scroll_factor]}"
-  )
-  [[ "$(hyprctl devices)" =~ [Tt]ouchpad ]] && OPTIONS+=("<b>Touchpad options</b>")
-
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Input" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-
-  if [[ -z "$CHOSEN" ]]; then
-    break
+  if [[ "$(hyprctl devices)" =~ [Tt]ouchpad ]]; then
+    true
   fi
 
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
+  cfgr::item::action \
+    --label "Keyboard repeat delay : ${HYPR[input:repeat_delay]}ms" \
+    --func "_set_int 'Repeat Delay' 'Delay (ms)' int 200 1000 'input:repeat_delay'"
 
-  case "$CHOSEN" in
-    "Keyboard layouts"*)  layouts_menu ;;
-    "Hide on key press"*) hypr::toggle "cursor:hide_on_key_press" "$HYPR_CONF_INPUT" ;;
-    "Natural scrolling"*) hypr::toggle "input:natural_scroll"     "$HYPR_CONF_INPUT" ;;
-    "Mouse acceleration"*)
-      [[ "$accel" == true ]] \
-        && hypr::set "input:accel_profile" flat     "$HYPR_CONF_INPUT" \
-        || hypr::set "input:accel_profile" adaptive "$HYPR_CONF_INPUT"
-      ;;
-    "Hide cursor after"*)
-      value=$(helpers::configure::set_digit --verify \
-        "Hide cursor after" "Seconds (0 = never)" int 0 86400) &&
-        hypr::set "cursor:inactive_timeout" "$value" "$HYPR_CONF_INPUT"
-      ;;
-    "Scrolling speed"*)
-      value=$(helpers::configure::set_digit --verify \
-        "Scrolling speed" "Scrolling speed" float 0.0 3.0) &&
-        hypr::set "input:scroll_factor" "$value" "$HYPR_CONF_INPUT"
-      ;;
-    "Keyboard repeat delay"*)
-      value=$(helpers::configure::set_digit --verify \
-        "Repeat delay" "Repeat delay" int 200 1000) &&
-        hypr::set "input:repeat_delay" "$value" "$HYPR_CONF_INPUT"
-      ;;
-    "Keyboard repeat rate"*)
-      value=$(helpers::configure::set_digit --verify \
-        "Repeat rate" "Repeat rate" int 10 50) &&
-        hypr::set "input:repeat_rate" "$value" "$HYPR_CONF_INPUT"
-      ;;
-    "Mouse sensitivity"*)
-      value=$(helpers::configure::set_digit --verify \
-        "Sensitivity" "Mouse Sensitivity" float -1 1) &&
-        hypr::set "input:sensitivity" "$value" "$HYPR_CONF_INPUT"
-      ;;
-    *"Touchpad"*) _touchpad_options ;;
-  esac
-done
+  cfgr::item::action \
+    --label "Keyboard repeat rate : ${HYPR[input:repeat_rate]}" \
+    --func "_set_int 'Repeat rate' 'Rate (int)' int 10 50 'input:repeat_rate'"
+
+  cfgr::item::action \
+    --label "Mouse acceleration : $ACCEL" \
+    --func "_toggle_accel"
+
+  cfgr::item::action \
+    --label "Hide cursor after : $cursor_hide" \
+    --func "_set_int 'Hide After' 'Seconds (zero - never)' int 0 86400 'cursor:inactive_timeout'"
+
+  cfgr::item::action \
+    --label "Natural scrolling : ${HYPR[input:natural_scroll]}" \
+    --func "_toggle 'input:natural_scroll'"
+
+  cfgr::item::action \
+    --label "Mouse sensitivity : ${HYPR[input:sensitivity]}" \
+    --func "_set_int 'Sensitivity' 'Sensitivity (float)' float -1.0 1.0 'input:sensitivity'"
+
+  cfgr::item::action \
+    --label "Hide on key press : ${HYPR[cursor:hide_on_key_press]}" \
+    --func "_toggle 'cursor:hide_on_key_press'"
+
+  cfgr::item::action \
+    --label "Scrolling factor : ${HYPR[input:scroll_factor]}" \
+    --func "_set_int 'Scrolling Factor' 'Factor (float)' float 0.1 10.0 'input:scroll_factor'"
+
+  cfgr::item::action \
+    --label "Keyboard layouts : ${HYPR[input:kb_layout]}" \
+    --func "_layouts_menu"
+}
+
+cfgr::run "Input" "_build"

@@ -4,9 +4,22 @@ source vb-lib-core
 source vb-lib-cfgr
 
 _build() {
-  cfgr::item::bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL "Use DDC protocol"
-  cfgr::item::bool VIBRANIUM_BRIGHTNESS_NOTIFY "Show notificaation"
-  cfgr::item::digit VIBRANIUM_BRIGHTNESS_STEP "Brightnes step" "Step" "Brightness" int 1 25
+  cfgr::item::bool \
+    --var VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL \
+    --label "Use DDC protocol"
+
+  cfgr::item::bool \
+    --var VIBRANIUM_BRIGHTNESS_NOTIFY \
+    --label "Show notificaation"
+
+  cfgr::item::digit \
+    --var VIBRANIUM_BRIGHTNESS_STEP \
+    --prompt "Brightnes step" \
+    --label "Brightnes step" \
+    --title "Brightness" \
+    --type int \
+    --min 1 \
+    --max 25
 }
 
 cfgr::run "Brightness" "_build" \

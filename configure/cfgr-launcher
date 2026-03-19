@@ -4,14 +4,31 @@ source vb-lib-core
 source vb-lib-cfgr
 
 _build() {
-  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START "Launch on startup"
-  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI "Show AI webapps"
-  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS "Show webapps"
-  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS "Show icons"
-  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT "Auto select"
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START \
+    --label "Launch on startup"
 
-  cfgr::item::string VIBRANIUM_GLOBAL_SEARCH_ENGINE "Search engine" "Search Engine" \
-    "Google:google" "DuckDuckGo:duckduckgo" "Bing:bing" "Brave:brave"
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
+    --label "Show AI webapps"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
+    --label "Show webapps"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
+    --label "Show icons"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
+    --label "Auto select"
+
+  cfgr::item::string \
+    --var    VIBRANIUM_GLOBAL_SEARCH_ENGINE \
+    --label  "Search engine" \
+    --title  "Search Engine" \
+    --option "Google:google" "DuckDuckGo:duckduckgo" "Bing:bing" "Brave:brave"
 }
 
 cfgr::run "App Laucher" "_build"

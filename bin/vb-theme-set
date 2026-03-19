@@ -458,7 +458,7 @@ if [[ -f "$XDG_CONFIG_HOME/nvim/lua/config/colorscheme.lua" && $USER == shved ]]
 fi
 
 if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
-  systemctl --user restart swayosd
+  systemctl -q --user restart swayosd
 fi
 
 hyprctl -q dispatch sendshortcut CTRL, R, class:heroic

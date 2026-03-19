@@ -4,19 +4,40 @@ source vb-lib-core
 source vb-lib-cfgr
 
 _build() {
-  cfgr::item::string VIBRANIUM_SCREENSHOT_FILE_TYPE "Filetype" "Filetype" "PNG:png" "JPEG:jpeg" "PPM:ppm"
+  cfgr::item::string \
+    --var    VIBRANIUM_SCREENSHOT_FILE_TYPE \
+    --label  "Filetype" \
+    --title  "Filetype" \
+    --option "PNG:png" "JPEG:jpeg" "PPM:ppm"
 
   if [[ "$VIBRANIUM_SCREENSHOT_FILE_TYPE" == "jpeg" ]]; then
-    cfgr::item::digit VIBRANIUM_SCREENSHOT_JPEG_QUALITY "JPEG quality" "Quality (int)" "JPEG Quality" int 1 100
+    cfgr::item::digit \
+      --var    VIBRANIUM_SCREENSHOT_JPEG_QUALITY \
+      --label  "JPEG quality" \
+      --title  "JPEG Quality" \
+      --prompt "Quality (int)" \
+      --type   int \
+      --min    1 \
+      --max    100
   fi
 
   if [[ "$(hyprctl getoption animations:enabled)" =~ 1 ]]; then
-    cfgr::item::bool VIBRANIUM_SCREENSHOT_FLASH_SCREEN "Flash screen"
-    cfgr::item::bool VIBRANIUM_SCREENSHOT_FLASH_BORDER "Flash border"
+    cfgr::item::bool \
+      --var   VIBRANIUM_SCREENSHOT_FLASH_SCREEN \
+      --label "Flash screen"
+
+    cfgr::item::bool \
+      --var   VIBRANIUM_SCREENSHOT_FLASH_BORDER \
+      --label "Flash border"
   fi
 
-  cfgr::item::bool VIBRANIUM_SCREENSHOT_SAVE_TO_DISK "Save to disk"
-  cfgr::item::bool VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION "Show notification"
+  cfgr::item::bool \
+    --var   VIBRANIUM_SCREENSHOT_SAVE_TO_DISK \
+    --label "Save to disk"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION \
+    --label "Show notification"
 }
 
 cfgr::run "Screenshots" "_build" \

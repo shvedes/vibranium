@@ -12,7 +12,12 @@ _get_term_opacity() {
 
 _set_term_opacity() {
   local input config
-  input="$(cfgr::set_digit "Opacity" float 0.0 1.0 --hint "Opacity value (float)")" || return
+  input="$(cfgr::set_digit \
+    --title "Opacity" \
+    --hint  "Opacity value (float)" \
+    --type  float \
+    --min   0.0 \
+    --max   1.0)" || return
   config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
 
   sed -i -E '/^\[window\]/,/^\[/{s/^([[:space:]]*opacity[[:space:]]*=[[:space:]]*)"?[0-9.]+("?)/\1'"$input"'\2/}' "$config"
@@ -27,8 +32,9 @@ _get_rofi_theme() {
 
 _set_rofi_theme() {
   local input config
-
-  input="$(cfgr::set_string "Menu Theme" "Modern:modern" "Text:text")" || return
+  input="$(cfgr::set_string \
+    --title  "Menu Theme" \
+    --option "Modern:modern" "Text:text")" || return
   config="$XDG_CONFIG_HOME/rofi/config.rasi"
 
   sed -i "s|\(@import \"~/.local/share/vibranium/default/rofi/themes/\)[^\"]*|\1theme-${input}.rasi|" "$config"
@@ -55,12 +61,19 @@ _toggle_wallpaper() {
 
 _get_notification_timeout() {
   local config="$XDG_CONFIG_HOME/dunst/dunstrc"
-  sed -n 's/.*timeout[[:space:]]*=[[:space:]]*\([0-9]\+\).*/\1/p' "$config"
+  local output="$(sed -n 's/.*timeout[[:space:]]*=[[:space:]]*\([0-9]\+\).*/\1/p' "$config")"
+  printf "%ss" "$output"
 }
 
 _set_notification_timeout() {
   local config="$XDG_CONFIG_HOME/dunst/dunstrc"
-  local input="$(cfgr::set_digit "Timeout" int 3 30 --hint "Timeout (in seconds)")" || return
+  local input
+  input="$(cfgr::set_digit \
+    --title "Timeout" \
+    --hint  "Timeout (in seconds)" \
+    --type  int \
+    --min   3 \
+    --max   30)" || return
   sed -i -E "s/(timeout[[:space:]]*=[[:space:]]*)[0-9]+/\1${input}/" "$config"
   vb-cmd-refresh-dunst &
 }
@@ -91,7 +104,7 @@ _get_default_browser() {
   fi
 
   if [[ -z "$browser" ]]; then
-    # Only use xdg-mimem query as fallback
+    # Only use xdg-mime query as fallback
     browser=$(xdg-mime query default x-scheme-handler/http 2>/dev/null) && \
       # And instantly cache it for the loop above
       xdg-mime default "$browser" x-scheme-handler/https x-scheme-handler/http &
@@ -103,28 +116,28 @@ _get_default_browser() {
   fi
 
   case "$browser" in
-    opera.desktop) printf "Opera" ;;
-    firefox.desktop) printf "Firefox" ;;
-    chromium.desktop) printf "Chromium" ;;
-    vivaldi.desktop) printf "Vivaldi" ;;
-    google-chrome.desktop) printf "Google Chrome" ;;
-    microsoft-edge.desktop) printf "Microsoft Edge" ;;
-    brave-browser.desktop) printf "Brave" ;;
-    org.qutebrowser.qutebrowser.desktop) printf "Qutebrowser" ;;
+    opera.desktop)                          printf "Opera" ;;
+    firefox.desktop)                        printf "Firefox" ;;
+    chromium.desktop)                       printf "Chromium" ;;
+    vivaldi.desktop)                        printf "Vivaldi" ;;
+    google-chrome.desktop)                  printf "Google Chrome" ;;
+    microsoft-edge.desktop)                 printf "Microsoft Edge" ;;
+    brave-browser.desktop)                  printf "Brave" ;;
+    org.qutebrowser.qutebrowser.desktop)    printf "Qutebrowser" ;;
   esac
 }
 
 _set_default_browser() {
   declare -A browsers_map=()
 
-  [[ $(command -v firefox) ]] && browsers_map["Firefox"]="firefox.desktop"
-  [[ $(command -v chromium) ]] && browsers_map["Chromium"]="chromium.desktop"
+  [[ $(command -v firefox) ]]             && browsers_map["Firefox"]="firefox.desktop"
+  [[ $(command -v chromium) ]]            && browsers_map["Chromium"]="chromium.desktop"
   [[ $(command -v google-chrome-stable) ]] && browsers_map["Google Chrome"]="google-chrome.desktop"
-  [[ $(command -v brave-browser) ]] && browsers_map["Brave"]="brave-browser.desktop"
-  [[ $(command -v vivaldi) ]] && browsers_map["Vivaldi"]="vivaldi.desktop"
-  [[ $(command -v opera) ]] && browsers_map["Opera"]="opera.desktop"
-  [[ $(command -v microsoft-edge) ]] && browsers_map["Microsoft Edge"]="microsoft-edge.desktop"
-  [[ $(command -v qutebrowser) ]] && browsers_map["QuteBrowser"]="org.qutebrowser.qutebrowser.desktop"
+  [[ $(command -v brave-browser) ]]       && browsers_map["Brave"]="brave-browser.desktop"
+  [[ $(command -v vivaldi) ]]             && browsers_map["Vivaldi"]="vivaldi.desktop"
+  [[ $(command -v opera) ]]               && browsers_map["Opera"]="opera.desktop"
+  [[ $(command -v microsoft-edge) ]]      && browsers_map["Microsoft Edge"]="microsoft-edge.desktop"
+  [[ $(command -v qutebrowser) ]]         && browsers_map["QuteBrowser"]="org.qutebrowser.qutebrowser.desktop"
 
   local options=("${!browsers_map[@]}")
 
@@ -136,7 +149,10 @@ _set_default_browser() {
     return
   fi
 
-  local chosen="$(cfgr::set_string "Default Browser" "${!browsers_map[@]}")"
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title  "Default Browser" \
+    --option "${!browsers_map[@]}")"
   xdg-mime default "${browsers_map[$chosen]}" x-scheme-handler/https x-scheme-handler/http
 }
 
@@ -231,7 +247,7 @@ _manage_user_wallpapers() {
 
     _action "$chosen"
 
-    # reset index if chosen file was deleted
+    # Reset index if chosen file was deleted
     if [[ ! -f "$wallpaper_dir/$chosen" ]]; then
       index=0
     fi
@@ -252,7 +268,9 @@ _set_cursor_size() {
   # Split remaining sizes into array
   read -r -a sizes <<< "$line"
 
-  chosen_size="$(cfgr::set_string "Cursor Size" "${sizes[@]}")" || return
+  chosen_size="$(cfgr::set_string \
+    --title  "Cursor Size" \
+    --option "${sizes[@]}")" || return
 
   printf "%s" "$chosen_size" > "$state"
   vb-theme-cursor-set --size "$chosen_size" &
@@ -284,7 +302,9 @@ _set_cursor_theme() {
     return
   fi
 
-  chosen="$(cfgr::set_string "Cursor Theme" "${options[@]}")" || return
+  chosen="$(cfgr::set_string \
+    --title  "Cursor Theme" \
+    --option "${options[@]}")" || return
   folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
 
   printf "%s" "$folder" > "$state"
@@ -296,7 +316,7 @@ _get_cursor_theme() {
   local settings
   settings="$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
 
-  # gsettings returns "Defalut" most of the time, so just use gtk settings file instead.
+  # gsettings returns "Default" most of the time, so just use gtk settings file instead.
   # current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
   current="$(sed -n 's/^gtk-cursor-theme-name=//p' "$settings")"
 
@@ -318,27 +338,43 @@ _build() {
   CURSOR_SIZE="$(<"$VIBRANIUM_STATE/cursor-size")"
   CURSOR_SIZE="${CURSOR_SIZE:-Default}"
 
-  cfgr::item::raw "Notification timeout : $(_get_notification_timeout)s" "action:_set_notification_timeout"
+  cfgr::item::raw "Notification timeout : $(_get_notification_timeout)" "action:_set_notification_timeout"
 
-  if [[ "$VIBRANIUM_GLOBAL_TERMINAL" == "alacritty" ]]; then
-    cfgr::item::string VIBRANIUM_GLOBAL_TERMINAL "Default terminal" "Default Terminal" \
-      "Alacritty:alacritty" "Foot:foot" --hook "_term_hook"
-  fi
+  cfgr::item::string \
+    --var    VIBRANIUM_GLOBAL_TERMINAL \
+    --label  "Default terminal" \
+    --title  "Default Terminal" \
+    --hook   "_term_hook" \
+    --option "Alacritty:alacritty" "Foot:foot"
 
   cfgr::item::raw "Default browser : $(_get_default_browser)" "action:_set_default_browser"
 
   if [[ "$CHASSIS_TYPE" != vm ]]; then
-    cfgr::item::bool VIBRANIUM_GLOBAL_SHOW_WALLPAPER "Show wallpaper" "_toggle_wallpaper"
+    cfgr::item::bool \
+      --var   VIBRANIUM_GLOBAL_SHOW_WALLPAPER \
+      --label "Show wallpaper" \
+      --hook  "_toggle_wallpaper"
   fi
 
-  cfgr::item::raw "Term opacity : $(_get_term_opacity)" "action:_set_term_opacity"
-  cfgr::item::raw "Cursor theme : $CURSOR_THEME" "action:_set_cursor_theme"
-  cfgr::item::raw "Cursor size : $CURSOR_SIZE" "action:_set_cursor_size"
-  cfgr::item::raw "Menus theme : $(_get_rofi_theme)" "action:_set_rofi_theme"
+  if [[ "$VIBRANIUM_GLOBAL_TERMINAL" == alacritty ]]; then
+    cfgr::item::raw "Term opacity : $(_get_term_opacity)"   "action:_set_term_opacity"
+  fi
 
-  cfgr::item::action "_manage_user_wallpapers" "User wallpapers"
-  cfgr::item::action "cfgr-now-playing" "Now playing"
-  cfgr::item::action "_edit_env" "Edit env"
+  cfgr::item::raw "Cursor theme : $CURSOR_THEME"          "action:_set_cursor_theme"
+  cfgr::item::raw "Cursor size : $CURSOR_SIZE"            "action:_set_cursor_size"
+  cfgr::item::raw "Menus theme : $(_get_rofi_theme)"      "action:_set_rofi_theme"
+
+  cfgr::item::action \
+    --func  "_manage_user_wallpapers" \
+    --label "User wallpapers"
+
+  cfgr::item::action \
+    --func  "cfgr-now-playing" \
+    --label "Now playing"
+
+  cfgr::item::action \
+    --func  "_edit_env" \
+    --label "Edit env"
 }
 
 cfgr::run "Misc" "_build" \

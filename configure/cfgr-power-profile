@@ -4,8 +4,13 @@ source vb-lib-core
 source vb-lib-cfgr
 
 _build() {
-  cfgr::item::bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE "Respect power profiles"
-  cfgr::item::bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK "Notify on change"
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE \
+    --label "Respect power profiles"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK \
+    --label "Notify on change"
 }
 
 cfgr::run "Power Profiles" "_build" \

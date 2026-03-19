@@ -61,14 +61,37 @@ _build() {
   fi
 
   cfgr::item::raw "Keyboard layout : $KEYBOARD_LAYOUT_ENABLED" "action:_toggle_module 'hyprland/language'"
-  cfgr::item::bool VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE "Power profile" "vb-cmd-refresh-bar-module power-profile"
-  cfgr::item::bool VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE "Color picker" "vb-cmd-refresh-bar-module color-picker"
-  cfgr::item::bool VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE "Night light" "vb-cmd-refresh-bar-module nightshift"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE \
+    --label "Power profile" \
+    --hook  "vb-cmd-refresh-bar-module power-profile"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE \
+    --label "Color picker" \
+    --hook  "vb-cmd-refresh-bar-module color-picker"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE \
+    --label "Night light" \
+    --hook  "vb-cmd-refresh-bar-module nightshift"
+
   cfgr::item::raw "Microphone : $MICROPHONE_ENABLED" "action:_toggle_module 'pulseaudio#microphone'"
-  cfgr::item::raw "Bluetooth : $BLUETOOTH_ENABLED" "action:_toggle_module 'bluetooth'"
-  cfgr::item::bool VIBRANIUM_BAR_WEATHER_MODULE_ENABLE "Weather" "vb-cmd-refresh-bar-module weather"
+  cfgr::item::raw "Bluetooth : $BLUETOOTH_ENABLED"   "action:_toggle_module 'bluetooth'"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_BAR_WEATHER_MODULE_ENABLE \
+    --label "Weather" \
+    --hook  "vb-cmd-refresh-bar-module weather"
+
   cfgr::item::raw "Network : $NETWORK_ENABLED" "action:_toggle_module 'network'"
-  cfgr::item::bool VIBRANIUM_BAR_PACMAN_MODULE_ENABLE "Updates" "vb-cmd-refresh-bar-module pacman"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_BAR_PACMAN_MODULE_ENABLE \
+    --label "Updates" \
+    --hook  "vb-cmd-refresh-bar-module pacman"
+
   cfgr::item::raw "Volume : $VOLUME_ENABLED" "action:_toggle_module pulseaudio#volume"
 }
 

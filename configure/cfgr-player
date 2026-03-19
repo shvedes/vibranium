@@ -4,12 +4,23 @@ source vb-lib-core
 source vb-lib-cfgr
 
 _build() {
-  cfgr::item::string VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH "Fade in / out on Next / Previous" \
-    "Fade duration" "Very Slow:very_slow" "Slow:slow" "Normal:normal" "Fast:fast" "Very Fast:very_fast" "OFF:off"
-  cfgr::item::string VIBRANIUM_PLAYER_FADE_DURATION "Fade in / out on Play / Pause" \
-    "Fade duration" "Very Slow:very_slow" "Slow:slow" "Normal:normal" "Fast:fast" "Very Fast:very_fast" "OFF:off"
+  cfgr::item::string \
+    --var    VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH \
+    --label  "Fade in / out on Next / Previous" \
+    --title  "Fade duration" \
+    --option "Very Slow:very_slow" "Slow:slow" "Normal:normal" \
+             "Fast:fast" "Very Fast:very_fast" "OFF:off"
 
-  cfgr::item::action "vb-cmd-show-help player-fade" "Help"
+  cfgr::item::string \
+    --var    VIBRANIUM_PLAYER_FADE_DURATION \
+    --label  "Fade in / out on Play / Pause" \
+    --title  "Fade duration" \
+    --option "Very Slow:very_slow" "Slow:slow" "Normal:normal" \
+             "Fast:fast" "Very Fast:very_fast" "OFF:off"
+
+  cfgr::item::action \
+    --func  "vb-cmd-show-help player-fade" \
+    --label "Help"
 }
 
 cfgr::run "Media Controls" "_build" \

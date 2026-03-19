@@ -2,8 +2,7 @@
 
 source vb-lib-core
 source vb-lib-hypr
-
-CONFIG="$HYPR_CONF_ADVANCED"
+source vb-lib-cfgr
 
 ADVANCED_SPEC=(
   "misc:vrr|int"
@@ -15,75 +14,72 @@ ADVANCED_SPEC=(
   "cursor:zoom_detached_camera|bool"
 )
 
-_layout_submenu() {
-  local opts chosen
-  opts=("Dwindle" "Master" "Scrolling" "Monocle")
+_set_vrr() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "VRR" \
+    --option "Enable:1" \
+             "Disable:0" \
+             "Fullscreen only:2"
+  )"
 
-  while true; do
-    mapfile -t opts < <(helpers::configure::build_menu "${opts[@]}")
-    helpers::ui::menu chosen "Layout" "ESC to go back" -- "${opts[@]}"
-    if [[ -z "$chosen" ]]; then
-      break
-    fi
-    hypr::set "general:layout" "${chosen,,}" "$CONFIG"
-    break
-  done
+  hypr::set "misc:vrr" "$chosen" "$HYPR_CONF_ADVANCED"
 }
 
-INDEX=0
+_set_layout() {
+  chosen="$(cfgr::set_string \
+    --title "Windows Layout" \
+    --option "Dwindle:dwindle" \
+             "Master:master" \
+             "Scrolling:scrolling"
+  )"
+  hypr::set "general:layout" "$chosen" "$HYPR_CONF_ADVANCED"
+}
 
-while true; do
+_toggle() {
+  local path="$1"
+  hypr::toggle "$path" "$HYPR_CONF_ADVANCED"
+}
+
+_build() {
   hypr::reload
   hypr::fetch "${ADVANCED_SPEC[@]}"
 
   # VRR has 3 states, map int -> display string
-  vrr_display=
+  local vrr_display=
   case "${HYPR[misc:vrr]}" in
-    0) vrr_display=false ;;
-    1) vrr_display=true ;;
-    *) vrr_display=fullscreen ;;
+    1) vrr_display=enabled ;;
+    0) vrr_display=disabled ;;
+    *) vrr_display="Fullscreen only" ;;
   esac
 
-  OPTIONS=(
-    "Variable refresh rate : $vrr_display"
-    "Zoom detached camera : ${HYPR[cursor:zoom_detached_camera]}"
-    "Variable frame rate : ${HYPR[misc:vfr]}"
-    "Disable auto reload : ${HYPR[misc:disable_autoreload]}"
-    "Middle click paste : ${HYPR[misc:middle_click_paste]}"
-    "Direct scanout : ${HYPR[render:direct_scanout]}"
-    "Layout : ${HYPR[general:layout]^}"
-  )
+  cfgr::item::action \
+    --label "Variable refresh rate : ${vrr_display}" \
+    --func "_set_vrr"
 
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Advanced" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  if [[ -z "$CHOSEN" ]]; then
-    break
-  fi
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
+  cfgr::item::action \
+    --label "Zoom detached camera : ${HYPR[cursor:zoom_detached_camera]}" \
+    --func "_toggle 'cursor:zoom_detached_camera'"
 
-  case "$CHOSEN" in
-    "Layout"*)              _layout_submenu ;;
-    "Zoom detached camera"*) hypr::toggle "cursor:zoom_detached_camera" "$CONFIG" ;;
-    "Disable auto reload"*)  hypr::toggle "misc:disable_autoreload"     "$CONFIG" ;;
-    "Middle click paste"*)   hypr::toggle "misc:middle_click_paste"     "$CONFIG" ;;
-    "Variable frame rate"*)  hypr::toggle "misc:vfr"                    "$CONFIG" ;;
-    "Direct scanout"*)       hypr::toggle "render:direct_scanout"       "$CONFIG" ;;
-    "Variable refresh rate"*)
-      while true; do
-        helpers::ui::menu vrr_chosen "VRR" "ESC to go back" -- \
-          "Enable" "Disable" "Fullscreen only" "<b>Help</b>"
+  cfgr::item::action \
+    --label "Variable frame rate : ${HYPR[misc:vfr]}" \
+    --func "_toggle 'misc:vfr'"
 
-        if [[ -z "$vrr_chosen" ]]; then
-          break
-        fi
+  cfgr::item::action \
+    --label "Disable auto reload : ${HYPR[misc:disable_autoreload]}" \
+    --func "_toggle 'misc:disable_autoreload'"
 
-        case "$vrr_chosen" in
-          "Enable")          hypr::set "misc:vrr" 1 "$CONFIG"; break ;;
-          "Disable")         hypr::set "misc:vrr" 0 "$CONFIG"; break ;;
-          "Fullscreen only") hypr::set "misc:vrr" 2 "$CONFIG"; break ;;
-          *"Help"*)          vb-cmd-show-help hyprland-vrr ;;
-        esac
-      done
-      ;;
-  esac
-done
+  cfgr::item::action \
+    --label "Middle click paste : ${HYPR[misc:middle_click_paste]}" \
+    --func "_toggle 'misc:middle_click_paste'"
+
+  cfgr::item::action \
+    --label "Direct scanout : ${HYPR[render:direct_scanout]}" \
+    --func "_toggle 'render:direct_scanout'"
+
+  cfgr::item::action \
+    --label "Layout : ${HYPR[general:layout]^}" \
+    --func "_set_layout"
+}
+
+cfgr::run "Advanced" "_build"

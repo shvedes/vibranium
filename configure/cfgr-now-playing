@@ -4,14 +4,23 @@ source vb-lib-core
 source vb-lib-cfgr
 
 _build() {
-  cfgr::item::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING "Show now playing notification"
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING \
+    --label "Show now playing notification"
 
   if [[ "$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING" == true ]]; then
-    cfgr::item::bool VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART "Show album art"
+    cfgr::item::bool \
+      --var   VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART \
+      --label "Show album art"
   fi
 
-  cfgr::item::bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK "Pause on session lock"
-  cfgr::item::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN "Show on lockscreen"
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK \
+    --label "Pause on session lock"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN \
+    --label "Show on lockscreen"
 }
 
 cfgr::run "Now Playing" "_build" \

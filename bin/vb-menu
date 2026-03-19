@@ -51,13 +51,15 @@ while true; do
             vb-cmd-keybindings
             exit 0
             ;;
+          "") break ;;
           *) continue ;;
         esac
 
         if command -v chromium > /dev/null; then
           vb-cmd-launch-cmd chromium --app="$help_link"
-          helpers::ui::close_menus
         fi
+
+        helpers::ui::close_menus
       done
       ;;
     "Packages")

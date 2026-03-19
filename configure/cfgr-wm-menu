@@ -1,51 +1,35 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
+
 export PATH="$PATH:$VIBRANIUM/configure"
 
-INDEX=0
+_edit_cfgs_menu() {
+  _open() {
+    vb-core-term -- $EDITOR "$1"
+    helpers::ui::close_menus
+  }
 
-while true; do
-  OPTIONS=("<b>Input</b>" "<b>Appearance</b>" "<b>Edit configs</b>" "<b>Advanced</b>")
-  helpers::ui::menu CHOSEN "Hyprland" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [[ -z $CHOSEN ]] && break
+  _b() {
+    local monitors="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf"
+    local rules="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf"
+    local binds="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf"
+    local input="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
 
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
+    cfgr::item::action --label "Window Rules" --func "_open $rules"
+    cfgr::item::action --label "Keybindings"  --func "_open $binds"
+    cfgr::item::action --label "Monitors"     --func "_open $monitors"
+    cfgr::item::action --label "Input"        --func "_open $input"
+  }
+  cfgr::run "Edit Configs" "_b"
+}
 
-  case "$CHOSEN" in
-    *"Appearance"*)
-      cfgr-wm-appearance
-      ;;
-    *"Advanced"*)
-      cfgr-wm-advanced
-      ;;
-    *"Input"*)
-      cfgr-wm-input
-      ;;
-    *"Edit configs"*)
-      while true; do
-        edit_configs_opts=(
-          "<b><i>Input</i></b>"
-          "<b><i>Window rules</i></b>"
-          "<b><i>Keybindings</i></b>"
-          "<b><i>Monitors</i></b>"
-        )
-        helpers::ui::menu edit_configs_chosen "Edit" "ESC to go back" -- "${edit_configs_opts[@]}"
-        [[ -z $edit_configs_chosen ]] && break
+_build() {
+  cfgr::item::action --label "Input" --func "cfgr-wm-input"
+  cfgr::item::action --label "Advanced" --func "cfgr-wm-advanced"
+  cfgr::item::action --label "Appearance" --func "cfgr-wm-appearance"
+  cfgr::item::action --label "Edit Configs" --func "_edit_cfgs_menu"
+}
 
-        case "$edit_configs_chosen" in
-          *"Window rules"*) vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.conf" ;;
-          *"Keybindings"*) vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.conf" ;;
-          *"Monitors"*) vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.conf" ;;
-          *"Input"*) vb-core-term -- "$EDITOR" "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf" ;;
-        esac
-        helpers::ui::close_menus
-      done
-      ;;
-  esac
-done
+cfgr::run "Hyprland" "_build"

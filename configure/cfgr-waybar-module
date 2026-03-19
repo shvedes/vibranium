@@ -53,8 +53,14 @@ _updates_weather_menu() {
   }
 
   _u_w_build() {
-    cfgr::item::bool VIBRANIUM_BAR_SHOW_ANIMATION "Animate first launch"
-    cfgr::item::bool VIBRANIUM_BAR_SHOW_SEPARATOR "Show separators" "_update"
+    cfgr::item::bool \
+      --var   VIBRANIUM_BAR_SHOW_ANIMATION \
+      --label "Animate first launch"
+
+    cfgr::item::bool \
+      --var   VIBRANIUM_BAR_SHOW_SEPARATOR \
+      --label "Show separators" \
+      --hook  "_update"
   }
 
   cfgr::run "Updates & Weather" "_u_w_build" \
@@ -64,15 +70,23 @@ _updates_weather_menu() {
 
 _updates_menu() {
   _u_build() {
-    cfgr::item::bool VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES \
-      "Display when up to date" "vb-cmd-refresh-bar-module pacman &"
+    cfgr::item::bool \
+      --var   VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES \
+      --label "Display when up to date" \
+      --hook  "vb-cmd-refresh-bar-module pacman &"
   }
+
   cfgr::run "Updates" "_u_build" VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES
 }
 
 _build() {
-  cfgr::item::action "_updates_weather_menu" "Updates / Weather specific"
-  cfgr::item::action "_updates_menu" "Updates"
+  cfgr::item::action \
+    --func  "_updates_weather_menu" \
+    --label "Updates / Weather specific"
+
+  cfgr::item::action \
+    --func  "_updates_menu" \
+    --label "Updates"
 }
 
 cfgr::run "Modules" "_build"
