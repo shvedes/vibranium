@@ -147,73 +147,165 @@ cfgr::build_menu() {
 }
 
 
-# Prompts the user for a numeric value via menu, validates type and range,
-# and persists the result to the user settings file under the given option name.
-# Supports integers and floats, trims whitespace, normalizes float formatting,
-# and retries on invalid input with an error notification.
+# cfgr::set_digit  TITLE  TYPE  [MIN  MAX]  [--hint HINT]  [--var OPT_NAME]
+#
+# Opens a rofi prompt for entering a numeric value, validates it, and
+# either prints it to stdout or writes it to the settings file.
+#
+#   TITLE    - prompt label shown in the rofi title bar
+#
+#   TYPE     - "int" or "float". Controls validation and normalisation
+#              of the entered value. Any other value causes return 1.
+#
+#   MIN  MAX - optional range bounds (both, or both omitted).
+#              When omitted, any value of the correct type is accepted.
+#
+#   --hint HINT    - text shown as the dummy rofi entry (the visible hint
+#                    line the user sees inside the menu). When omitted,
+#                    the constructed prompt string is reused, matching the
+#                    previous behaviour.
+#
+#   --var OPT_NAME - the settings variable to update (e.g. "VIBRANIUM_VOLUME_ADJUSTMENT_STEP").
+#                   When omitted, the function acts as a plain picker:
+#                   prints the validated value to stdout and returns 0.
+#
+# Exit codes:
+#   0  - a valid number was entered
+#   1  - menu was dismissed (Escape), or TYPE was invalid
+#   -  - invalid/out-of-range input: notification fires, menu redraws
+#
+# Typical usage:
+#   value=$(cfgr::set_digit "Set opacity" float 0.0 1.0 --hint "Opacity (0.0 – 1.0)")
+#   cfgr::set_digit "Brightness" int 0 100 --hint "e.g. 75" --var VIBRANIUM_VOLUME_ADJUSTMENT_STEP
 cfgr::set_digit() {
-  local prompt_base="$1"
-  local rofi_title="$2"
-  local type="$3"
-  local min_val="$4"
-  local max_val="$5"
-  local opt_name="${6:-}"
-  local settings_file="$VIBRANIUM_USER_SETTINGS"
+  local title="$1"
+  local type="$2"
+  shift 2
 
-  local range_text="${min_val}-${max_val}"
-  local prompt="${prompt_base} (${type})"
+  local min_val=""
+  local max_val=""
+  local opt_name=""
+  local hint=""
 
-  local awk_script="$VIBRANIUM/awk/helpers-set-digit.awk"
+  while (( $# > 0 )); do
+    case "$1" in
+      --var)
+        opt_name="$2"
+        shift 2
+        ;;
+      --hint)
+        hint="$2"
+        shift 2
+        ;;
+      *)
+        if [[ -z "$min_val" ]]; then
+          min_val="$1"
+        else
+          max_val="$1"
+        fi
+        shift
+        ;;
+    esac
+  done
+
+  local awk_script="$VIBRANIUM/awk/verify-digit.awk"
 
   if [[ "$type" != "int" && "$type" != "float" ]]; then
     return 1
   fi
 
+  local range_text=""
+  [[ -n "$min_val" && -n "$max_val" ]] && range_text="${min_val}-${max_val}"
+
+  local prompt="${title} (${type})"
+  # Fall back to the prompt string when no explicit hint was given
+  local entry_hint="${hint:-$prompt}"
+
   while true; do
     local input
-    helpers::ui::menu input "$rofi_title" "$range_text" -- "$prompt"
+    helpers::ui::menu input "$title" "${range_text:-any ${type}}" -- "$entry_hint ($type)"
 
     [[ -z "$input" ]] && return 1
-    [[ "$input" == "$prompt" ]] && continue
+    [[ "$input" == "$entry_hint" ]] && continue
 
     input="${input#"${input%%[![:space:]]*}"}"
     input="${input%"${input##*[![:space:]]}"}"
 
     local result
-    result=$(awk -v val="$input" -v lo="$min_val" -v hi="$max_val" -v type="$type" -f "$awk_script")
+    result=$(awk \
+      -v val="$input" \
+      -v lo="$min_val" \
+      -v hi="$max_val" \
+      -v type="$type" \
+      -f "$awk_script"
+    )
 
     if [[ $? -ne 0 ]]; then
+      local range_hint=""
+      [[ -n "$min_val" && -n "$max_val" ]] && range_hint=" between ${min_val} and ${max_val}"
       notify-send -r 6 -u critical -t 1500 "Vibranium" \
-        "A ${type} between ${min_val} and ${max_val}!" &
+        "Expected ${type}${range_hint}!" &
       continue
     fi
 
-    input="$result"
-
     if [[ -n "$opt_name" ]]; then
       _cfgr::verify_option "$opt_name" || return 1
-      sed -i "/^${opt_name}/s/=.*/=${input}/" "$settings_file"
+      sed -i "/^${opt_name}/s/=.*/=${result}/" "$VIBRANIUM_USER_SETTINGS"
+    else
+      printf "%s" "$result"
     fi
-
-    printf "%s" "$input"
     return 0
   done
 }
 
 
-# Presents a menu of string options to the user, validates the selection,
-# and saves the chosen value to the user settings file under the given
-# variable name.
+# cfgr::set_string  TITLE  [OPTION ...]  [--var VAR_NAME]
+#
+# Opens a rofi menu for selecting a string value. Behaviour depends on
+# whether --var is provided:
+#
+#   Without --var  - one-shot picker. Prints the selected value to stdout
+#                   and returns 0, or returns 1 on dismissal. Caller
+#                   captures it with $(...).
+#
+#   With --var     - writes the selected value in-place to VIBRANIUM_USER_SETTINGS.
+#
+#   TITLE          - prompt label shown in rofi (e.g. "Select sink")
+#
+#   OPTION        - one or more options presented to the user.
+#                    Two formats are accepted:
+#                      "Pretty Label:stored_value"  - label shown in rofi, value written/printed
+#                      "plain"                      - same string used for both
+#
+#   --var VAR_NAME - the settings variable to update (e.g. "VIBRANIUM_GLOBAL_TERMINAL").
+#                   When omitted, the function acts as a plain picker.
+#
+# Typical usage:
+#   value=$(cfgr::set_string "Choose theme" "Dark:dark" "Light:light")
+#   cfgr::set_string "Select sink" "Headphones:hdmi" "Speakers:analog" --var AUDIO_SINK
 cfgr::set_string() {
-  local var_name="$1"
-  local title="$2"
-  shift 2
-  local raw_options=("$@")
+  local title="$1"
+  shift
+
+  local var_name=""
+  local raw_options=()
+
+  while (( $# > 0 )); do
+    case "$1" in
+      --var)
+        var_name="$2"
+        shift 2
+        ;;
+      *)
+        raw_options+=("$1")
+        shift
+        ;;
+    esac
+  done
 
   local labels=()
   local values=()
 
-  # Split Pretty:Value
   for opt in "${raw_options[@]}"; do
     if [[ "$opt" == *:* ]]; then
       labels+=("${opt%%:*}")
@@ -224,17 +316,21 @@ cfgr::set_string() {
     fi
   done
 
+  local chosen_label
   while true; do
     helpers::ui::menu chosen_label "$title" "ESC to go back" -- "${labels[@]}"
-    [[ -z "$chosen_label" ]] && break
+    [[ -z "$chosen_label" ]] && return 1
 
-    # Find index of selected label
     for i in "${!labels[@]}"; do
       if [[ "${labels[$i]}" == "$chosen_label" ]]; then
         local chosen_value="${values[$i]}"
-        _cfgr::verify_option "$var_name"
-        sed -i "/^${var_name}=/s|=.*|=\"${chosen_value// /_}\"|" "$VIBRANIUM_USER_SETTINGS"
-        return
+        if [[ -n "$var_name" ]]; then
+          _cfgr::verify_option "$var_name"
+          sed -i "/^${var_name}=/s|=.*|=\"${chosen_value// /_}\"|" "$VIBRANIUM_USER_SETTINGS"
+        else
+          printf '%s' "$chosen_value"
+        fi
+        return 0
       fi
     done
   done
@@ -490,7 +586,7 @@ cfgr::dispatch() {
       # payload: VAR:PROMPT:ROFI_TITLE:TYPE:MIN:MAX
       local var prompt rofi_title dtype min max
       IFS=: read -r var prompt rofi_title dtype min max <<< "$payload"
-      cfgr::set_digit "$prompt" "$rofi_title" "$dtype" "$min" "$max" "$var"
+      cfgr::set_digit "$rofi_title" "$dtype" "$min" "$max" --hint "$prompt" --var "$var"
       ;;
 
     string)
@@ -506,7 +602,7 @@ cfgr::dispatch() {
       local -a opts
       IFS=$'\x1F' read -r -a opts <<< "$opts_raw"
 
-      cfgr::set_string "$var" "$rofi_title" "${opts[@]}"
+      cfgr::set_string "$rofi_title" "${opts[@]}" --var "$var"
       ;;
 
     action)
