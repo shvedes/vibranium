@@ -102,9 +102,9 @@ _touchpad_menu() {
       --label "Natural scrolling : ${HYPR[input:touchpad:natural_scroll]}" \
       --func "_toggle 'input:touchpad:natural_scroll'"
 
-    cfgr::item:::action \
+    cfgr::item::action \
       --label "Scrolling factor : ${HYPR[input:touchpad:scroll_factor]}" \
-      --func "_set_int 'Scrolling Factor' 'Factor (float)' float 0.1 30"
+      --func "_set_int 'Scrolling Factor' 'Factor (float)' float 0.1 30 'input:touchpad:scroll_factor'"
 
     cfgr::item::action \
       --label "Tap to click : ${HYPR[input:touchpad:tap-to-click]}" \

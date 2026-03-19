@@ -24,7 +24,7 @@ _toggle_module() {
   fi
 
   _load_cfg
-  systemctl --user restart waybar
+  systemctl -q --user restart waybar
 }
 
 _build() {
