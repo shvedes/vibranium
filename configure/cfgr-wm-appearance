@@ -188,6 +188,26 @@ _decoration_menu() {
   cfgr::run "Decoration" "_b"
 }
 
+_anim_submenu() {
+  _b() {
+    hypr::reload
+
+    local chosen animations active_preset enabled
+    [[ "$(hypr::int "animations:enabled")" == 1 ]] && enabled=true || enabled=false
+
+
+    cfgr::item::action --label "Enabled : $enabled" --func "_toggle 'animations:enabled'"
+
+    if [[ "$enabled" == true ]]; then
+      active_preset="$(readlink "$HYPR_CONF_ANIMATIONS")"
+      active_preset="${active_preset##*/}"; active_preset="${active_preset%.conf}"
+
+      cfgr::item::action --label "Preset : ${active_preset^}" --func "_set_anim_preset"
+    fi
+  }
+  cfgr::run "Animations" "_b"
+}
+
 # ================================================================================ #
 
 _edit_roundness() {
@@ -207,6 +227,20 @@ _edit_roundness() {
   if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
     systemctl --user restart swayosd &
   fi
+}
+
+_set_anim_preset() {
+  local folder="$VIBRANIUM/default/hypr/animations" chosen
+  local presets=("$folder"/*.conf)
+
+  presets=("${presets[@]##*/}")
+  presets=("${presets[@]%.conf}")
+  presets=("${presets[@]^}")
+
+  local chosen
+  chosen="$(cfgr::set_string --title "Preset" --option "${presets[@]}")" || return
+
+  ln -sf "$folder/${chosen,}.conf" "$HYPR_CONF_ANIMATIONS"
 }
 
 # ================================================================================ #
@@ -249,7 +283,7 @@ _build() {
   cfgr::item::action --label "Blur" --func "_blur_menu"
   cfgr::item::action --label "Shadows" --func "_shadow_menu"
   cfgr::item::action --label "Decoration" --func "_decoration_menu"
-  # cfgr::item::action --label "Blur" --func
+  cfgr::item::action --label "Animations" --func "_anim_submenu"
 }
 
 cfgr::run "Appearance" "_build"
