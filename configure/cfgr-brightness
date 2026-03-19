@@ -1,42 +1,15 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-INDEX=0
+_build() {
+  cfgr::item::bool VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL "Use DDC protocol"
+  cfgr::item::bool VIBRANIUM_BRIGHTNESS_NOTIFY "Show notificaation"
+  cfgr::item::digit VIBRANIUM_BRIGHTNESS_STEP "Brightnes step" "Step" "Brightness" int 1 25
+}
 
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
-
-  helpers::check \
-    VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL \
-    VIBRANIUM_BRIGHTNESS_STEP
-
-  OPTIONS=(
-    "Use DDC protocol : $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
-    "Brightnes step : $VIBRANIUM_BRIGHTNESS_STEP"
-    "Notificaation : $VIBRANIUM_BRIGHTNESS_NOTIFY"
-  )
-
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Brightness" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    "Use DDC"*)
-      helpers::configure::toggle_bool "VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
-      ;;
-    *"OSD"*)
-      helpers::configure::toggle_bool "VIBRANIUM_BRIGHTNESS_USE_OSD"
-      ;;
-    "Brightnes step"*)
-      helpers::configure::set_digit "Brightness step" "Brightness" \
-        "int" 2 20 "VIBRANIUM_BRIGHTNESS_STEP"
-      ;;
-    "Notificaation"*)
-      helpers::configure::toggle_bool "VIBRANIUM_BRIGHTNESS_NOTIFY"
-      ;;
-    "")
-      break
-      ;;
-  esac
-done
+cfgr::run "Brightness" "_build" \
+  VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL \
+  VIBRANIUM_BRIGHTNESS_NOTIFY \
+  VIBRANIUM_BRIGHTNESS_STEP

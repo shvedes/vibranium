@@ -1,101 +1,71 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-INDEX=0
 WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"
+export PATH="$PATH:$VIBRANIUM/configure"
 
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
+_toggle_waybar() {
+  case "$ENABLED" in
+    "true")
+      systemctl --user disable --now waybar &
+      ENABLED=false
+      ;;
+    "false")
+      systemctl --user enable --now waybar &
+      ENABLED=true
+      ;;
+  esac
+}
 
-  if systemctl -q --user is-active waybar; then
-    ENABLED=true
-  else
-    ENABLED=false
+_set_spacing() {
+  local input
+  input="$(cfgr::set_digit "Icon Spacing" int -6 16 --hint "Spacing (in pixels)")" || return
+  sed -i -E "s/(\"spacing\"\s*:\s*)-?[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
+  systemctl -q --user restart waybar &
+}
+
+_set_height() {
+  local input
+  input="$(cfgr::set_digit "$POSITION bar height" int 30 100 --hint "Height (in pixels)")" || return
+  sed -i -E "s/(\"height\"\s*:\s*)[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
+  systemctl -q --user restart waybar &
+}
+
+_set_position() {
+  case "$POSITION" in
+    top) vb-cmd-waybar-position --bottom ;;
+    bottom) vb-cmd-waybar-position --top ;;
+  esac
+}
+
+_build() {
+  if [[ ! -n $ENABLED ]]; then
+    if systemctl -q --user is-active waybar; then
+      ENABLED=true
+    else
+      ENABLED=false
+    fi
   fi
 
-  eval "$(
-    sed -n \
-      -e 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/POSITION=\1/p' \
-      -e 's/.*"height"[[:space:]]*:[[:space:]]*\([^,]*\).*/HEIGHT=\1/p' \
-      -e 's/.*"spacing"[[:space:]]*:[[:space:]]*\([^,]*\).*/ICON_SPACING=\1/p' \
-      "$WAYBAR_CONFIG"
-  )"
+  local height icon_spacing
 
-  OPTIONS=("Enabled : $ENABLED")
+  eval "$(sed -n \
+      -e 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/POSITION=\1/p' \
+      -e 's/.*"height"[[:space:]]*:[[:space:]]*\([^,]*\).*/height=\1/p' \
+      -e 's/.*"spacing"[[:space:]]*:[[:space:]]*\([^,]*\).*/icon_spacing=\1/p' \
+      "$WAYBAR_CONFIG")"
+
+  cfgr::item::raw "Enabled : $ENABLED" "action:_toggle_waybar"
 
   if [[ "$ENABLED" == true ]]; then
-    OPTIONS+=(
-      "Position : $POSITION"
-      "Spacing : ${ICON_SPACING:-?}"
-      "Height : ${HEIGHT:-?}"
-      "<b>Module list</b>"
-      "<b>Module settings</b>"
-    )
+    cfge::item::raw "Position : $POSITION" "action:_set_position"
+    cfgr::item::raw "Spacing : $icon_spacing" "action:_set_spacing"
+    cfgr::item::raw "Height : $height" "action:_set_height"
+    cfgr::item::action "waybar-toggle-modules" "Toggle modules"
+    cfgr::item::action "cfgr-waybar-module" "Module settings"
   fi
+}
 
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Waybar" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    "") break ;;
-    "Enabled"*)
-      case "$ENABLED" in
-        "true") systemctl --user disable --now waybar ;;
-        "false") systemctl --user enable --now waybar ;;
-      esac
-      ;;
-    "Spacing"*)
-      while true; do
-        prompt="Icon spacing (int)"
-        helpers::ui::menu input "Icon spacing" "-6 - 16" -- "$prompt"
-        [[ -z "$input" ]] && break
-
-        [[ ! "$input" =~ ^-?[0-9]+$ ]] && {
-          notify-send -r 1 -t 2000 "Vibranium" "An integer between -6 and 16"
-          continue
-        }
-
-        if ((input > 16 || input < -6)); then
-          notify-send -r 1 -t 2000 "Vibranium" "An integer between -6 and 16"
-          continue
-        fi
-
-        sed -i -E "s/(\"spacing\"\s*:\s*)-?[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
-        systemctl --user restart waybar
-        break
-      done
-      ;;
-    "Height"*)
-      while true; do
-        prompt="Waybar height (int)"
-        helpers::ui::menu input "Bar height" "30-100" -- "$prompt"
-        [[ -z "$input" ]] && break
-
-        [[ ! "$input" =~ ^[0-9]+$ ]] && {
-          notify-send -r 1 -t 2000 "Vibranium" "An integer between 30-65"
-          continue
-        }
-
-        # 30 is minimum allowed height due to specific modules
-        if ((input > 100 || input < 30)); then
-          notify-send -r 1 -t 2000 "Vibranium" "An integer between 30-50"
-          continue
-        fi
-
-        sed -i -E "s/(\"height\"\s*:\s*)[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
-        systemctl --user restart waybar &
-        break
-      done
-      ;;
-    "Position"*)
-      case "$POSITION" in
-        top) vb-cmd-waybar-position --bottom ;;
-        bottom) vb-cmd-waybar-position --top ;;
-      esac
-      ;;
-    *"Module list"*) waybar-toggle-modules ;;
-    *"Module settings"*) cfgr-waybar-module ;;
-  esac
-done
+cfgr::run "Waybar" "_build"

@@ -1,34 +1,13 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-INDEX=0
+_build() {
+  cfgr::item::bool VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW "Show HEX preview"
+  cfgr::item::bool VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR "Prevew in notification"
+}
 
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
-
-  helpers::check \
-    VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW \
-    VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR
-
-  OPTIONS=(
-    "Show HEX preview : $VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
-    "Preview in notification : $VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
-  )
-
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Color picker" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    "Show HEX preview"*)
-      helpers::configure::toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
-      ;;
-    "Preview in notification"*)
-      helpers::configure::toggle_bool "VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
-      ;;
-    "")
-      break
-      ;;
-  esac
-done
+cfgr::run "Color Picker" "_build" \
+  VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR \
+  VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW

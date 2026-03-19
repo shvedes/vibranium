@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-enabled="$(vb-cmd-get-option VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE)"
+enabled="$(vb-cmd-get-option VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE)"
 if [[ $enabled == false ]]; then
   printf '{"text": ""}'
   exit 0

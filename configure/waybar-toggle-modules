@@ -1,16 +1,18 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
 WAYBAR_CFG="$XDG_CONFIG_HOME/waybar/config.jsonc"
+_CFG_CONTENT=""
+
+_load_cfg() {
+  _CFG_CONTENT=$(<"$WAYBAR_CFG")
+}
 
 _check_module() {
   local module="$1"
-  if grep -Eq "^\s*//.*\"$module\"" "$WAYBAR_CFG"; then
-    return 0 # commented out - module disabled
-  else
-    return 1
-  fi
+  [[ $'\n'"$_CFG_CONTENT" =~ $'\n'[[:space:]]*//[^$'\n']*\"$module\" ]]
 }
 
 _toggle_module() {
@@ -20,28 +22,13 @@ _toggle_module() {
   else
     sed -i "s|^\(\s*\)\(\".*$module\".*\)|\1// \2|" "$WAYBAR_CFG"
   fi
+
+  _load_cfg
   systemctl --user restart waybar
 }
 
-_power_profile_notify() {
-  if [ "$(vb-cmd-get-option VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE)" = "true" ] && [ "$(vb-cmd-get-power)" = "balanced" ]; then
-    msg="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_PURPLE}'><b>Don't be confused! The module you just enabled is active, actually</b></span>\n\n"
-    msg+="It isn’t shown in the bar because you’re on the '<span foreground='${P_YELLOW}'><b>balanced</b></span>' power\nprofile, which is the default one and doesn’t need to be displayed.\n"
-    msg+="\n<span foreground='${P_GREEN}'><b>•</b></span> <span foreground='${P_YELLOW}'><b>Try switching your power profile to see it in action</b></span>"
-    notify-send -r 1 -t 18000 "Vibranium" "$msg"
-  fi
-}
-
-INDEX=0
-
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
-
-  helpers::check VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE
-  helpers::check VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE
-  helpers::check VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE
-  helpers::check VIBRANIUM_BAR_WEATHER_MODULE_ENABLE
-  helpers::check VIBRANIUM_BAR_PACMAN_MODULE_ENABLE
+_build() {
+  _load_cfg
 
   if _check_module 'hyprland/language'; then
     KEYBOARD_LAYOUT_ENABLED="false"
@@ -73,77 +60,21 @@ while true; do
     BLUETOOTH_ENABLED="true"
   fi
 
-  OPTIONS=(
-    "Keyboard layout : $KEYBOARD_LAYOUT_ENABLED"
-    "Power profile : $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
-    "Color picker : $VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE"
-    "Night light : $VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE"
-    "Microphone : $MICROPHONE_ENABLED"
-    "Bluetooth : $BLUETOOTH_ENABLED"
-    "Weather : $VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
-    "Network : $NETWORK_ENABLED"
-    "Updates : $VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
-    "Volume : $VOLUME_ENABLED"
-  )
+  cfgr::item::raw "Keyboard layout : $KEYBOARD_LAYOUT_ENABLED" "action:_toggle_module 'hyprland/language'"
+  cfgr::item::bool VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE "Power profile" "vb-cmd-refresh-bar-module power-profile"
+  cfgr::item::bool VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE "Color picker" "vb-cmd-refresh-bar-module color-picker"
+  cfgr::item::bool VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE "Night light" "vb-cmd-refresh-bar-module nightshift"
+  cfgr::item::raw "Microphone : $MICROPHONE_ENABLED" "action:_toggle_module 'pulseaudio#microphone'"
+  cfgr::item::raw "Bluetooth : $BLUETOOTH_ENABLED" "action:_toggle_module 'bluetooth'"
+  cfgr::item::bool VIBRANIUM_BAR_WEATHER_MODULE_ENABLE "Weather" "vb-cmd-refresh-bar-module weather"
+  cfgr::item::raw "Network : $NETWORK_ENABLED" "action:_toggle_module 'network'"
+  cfgr::item::bool VIBRANIUM_BAR_PACMAN_MODULE_ENABLE "Updates" "vb-cmd-refresh-bar-module pacman"
+  cfgr::item::raw "Volume : $VOLUME_ENABLED" "action:_toggle_module pulseaudio#volume"
+}
 
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Toggle modules" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" = "$CHOSEN" ]; then
-      INDEX="$i"
-      break
-    fi
-  done
-
-  case "$CHOSEN" in
-    "Bluetooth"*)
-      _toggle_module 'bluetooth'
-      ;;
-    "Network"*)
-      _toggle_module 'network'
-      ;;
-    "Microphone"*)
-      _toggle_module 'pulseaudio#microphone'
-      ;;
-    "Volume"*)
-      _toggle_module 'pulseaudio#volume'
-      ;;
-    "Keyboard layout"*)
-      _toggle_module 'hyprland/language'
-      ;;
-    "Night light"*)
-      helpers::configure::toggle_bool "VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE"
-      vb-cmd-refresh-bar-module nightshift
-      ;;
-    "Color picker"*)
-      helpers::configure::toggle_bool "VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE"
-      vb-cmd-refresh-bar-module color-picker
-      ;;
-    "Power profile"*)
-      helpers::configure::toggle_bool "VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
-      vb-cmd-refresh-bar-module power-profile
-      ;;
-    "Updates"*)
-      helpers::configure::toggle_bool "VIBRANIUM_BAR_PACMAN_MODULE_ENABLE"
-
-      # Remove any existing PID marker to allow the loading animation
-      # to restart. This is necessary when modules are toggled while
-      # reusing the same Waybar PID.
-      rm -f "$VIBRANIUM_RUNTIME"/bar_updates.*
-
-      vb-cmd-refresh-bar-module pacman
-      ;;
-    "Weather"*)
-      helpers::configure::toggle_bool "VIBRANIUM_BAR_WEATHER_MODULE_ENABLE"
-
-      # Remove any existing PID marker to allow the loading animation
-      # to restart. This is necessary when modules are toggled while
-      # reusing the same Waybar PID.
-      rm -f "$VIBRANIUM_RUNTIME"/bar_weather.*
-
-      vb-cmd-refresh-bar-module weather
-      ;;
-  esac
-done
+cfgr::run "Waybar Modules" "_build" \
+  VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE \
+  VIBRANIUM_BAR_WEATHER_MODULE_ENABLE \
+  VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE \
+  VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE \
+  VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE

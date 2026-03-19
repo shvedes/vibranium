@@ -250,7 +250,7 @@ VIBRANIUM_COLOR_PICKER_NOTIFY=true
 
 # @type bool
 # @desc Whether to show the Night Light module.
-VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE=true
+VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE=true
 
 # @type bool
 # @desc Whether to enable the color picker module.
@@ -295,7 +295,7 @@ VIBRANIUM_BAR_SHOW_SEPARATOR=true
 #                                              #
 
 # @type int
-# @desc FPS to record video at.
+# @desc FPS to record video with.
 VIBRANIUM_RECORDING_FPS=30
 
 # @type string

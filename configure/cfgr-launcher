@@ -1,58 +1,17 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-INDEX=0
+_build() {
+  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START "Launch on startup"
+  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI "Show AI webapps"
+  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS "Show webapps"
+  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS "Show icons"
+  cfgr::item::bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT "Auto select"
 
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
+  cfgr::item::string VIBRANIUM_GLOBAL_SEARCH_ENGINE "Search engine" "Search Engine" \
+    "Google:google" "DuckDuckGo:duckduckgo" "Bing:bing" "Brave:brave"
+}
 
-  helpers::check \
-    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
-    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
-    VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
-    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
-    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START \
-    VIBRANIUM_GLOBAL_SEARCH_ENGINE google
-
-  OPTIONS=(
-    "Search engine : $VIBRANIUM_GLOBAL_SEARCH_ENGINE"
-    "Show web apps : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
-    "Show AI web apps : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
-    "Show app icons : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
-    "Open on startup : $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START"
-    "Auto select : $VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
-  )
-
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "App Launcher" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    "Search engine"*)
-      helpers::configure::set_string VIBRANIUM_GLOBAL_SEARCH_ENGINE "Search Engine" \
-        "Google:google" \
-        "DuckDuckGo:duckduckgo" \
-        "Brave Search:brave" \
-        "Microsoft Bing:bing"
-      ;;
-    "Show web apps"*)
-      helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS
-      ;;
-    "Show AI"*)
-      helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI
-      ;;
-    "Show app icons"*)
-      helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS
-      ;;
-    "Open on startup"*)
-      helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START
-      ;;
-    "Auto select"*)
-      helpers::configure::toggle_bool VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
-      ;;
-    "")
-      break
-      ;;
-  esac
-done
+cfgr::run "App Laucher" "_build"

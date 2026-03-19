@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 
-_HYPR_D="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprland.conf.d"
+_HYPR_D="$XDG_CONFIG_HOME/hypr/hyprland.conf.d"
 
 HYPR_CONF_INPUT="$_HYPR_D/input.conf"
 HYPR_CONF_ADVANCED="$_HYPR_D/advanced.conf"
 HYPR_CONF_LAF="$_HYPR_D/look-and-feel.conf"
 HYPR_CONF_SMARTGAPS="$_HYPR_D/smart-gaps.conf"
 HYPR_CONF_ANIMATIONS="$_HYPR_D/animations.conf"
-HYPRLOCK_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/hypr/hyprlock.conf"
+HYPRLOCK_CONFIG="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 
 # Single-option read helpers
 

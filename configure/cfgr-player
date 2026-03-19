@@ -1,36 +1,17 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-INDEX=0
+_build() {
+  cfgr::item::string VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH "Fade in / out on Next / Previous" \
+    "Fade duration" "Very Slow:very_slow" "Slow:slow" "Normal:normal" "Fast:fast" "Very Fast:very_fast" "OFF:off"
+  cfgr::item::string VIBRANIUM_PLAYER_FADE_DURATION "Fade in / out on Play / Pause" \
+    "Fade duration" "Very Slow:very_slow" "Slow:slow" "Normal:normal" "Fast:fast" "Very Fast:very_fast" "OFF:off"
 
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
+  cfgr::item::action "vb-cmd-show-help player-fade" "Help"
+}
 
-  helpers::check VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH
-  helpers::check VIBRANIUM_PLAYER_FADE_DURATION
-
-  OPTIONS=(
-    "Fade in / out on Next / Previous : ${VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH//_/ }"
-    "Fade in / out on Play / Pause    : ${VIBRANIUM_PLAYER_FADE_DURATION//_/ }"
-    "<b>Help</b>"
-  )
-
-  helpers::ui::menu CHOSEN "Player" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    *"Previous"*)
-      helpers::configure::set_string "VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH" \
-        "Next / Prev" "very slow" "slow" "normal" "fast" "very fast" "off"
-      ;;
-    *"Play"*)
-      helpers::configure::set_string "VIBRANIUM_PLAYER_FADE_DURATION" \
-        "Play / Pause" "very slow" "slow" "normal" "fast" "very fast" "off"
-      ;;
-    *"Help"*)
-      vb-cmd-show-help player-fade
-      ;;
-    "") break ;;
-  esac
-done
+cfgr::run "Media Controls" "_build" \
+  VIBRANIUM_PLAYER_FADE_DURATION \
+  VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH

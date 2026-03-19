@@ -1,45 +1,36 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-INDEX=0
+_toggle_nightshift() {
+  vb-cmd-nightshift --toggle
+  vb-cmd-refresh-bar-module nightshift
+}
 
-STATE_FILE="$XDG_STATE_HOME/vibranium/nightshift"
-CONFIG_FILE="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
+_set_temp() {
+  local input="$(cfgr::set_digit "Temperature" int 1000 20000)" || return
+  vb-cmd-nightshift --set "$input"
+}
 
-if [ ! -f "$STATE_FILE" ]; then
-  if hyprctl hyprsunset &>/dev/null; then
-    echo "active" >"$STATE_FILE"
-  else
-    echo "suspended" >"$STATE_FILE"
+_build() {
+  local state_file="$VIBRANIUM_STATE/nightshift"
+  local hyprsunset_conf="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
+  local temp="$(sed -n 's/.*temperature[[:space:]]*=[[:space:]]*\(.*\)/\1/p' "$hyprsunset_conf")"
+
+  if [[ ! -f "$state_file" ]]; then
+    if hyprctl hyprsunset &>/dev/null; then
+      printf "active" > "$state_file"
+    else
+      printf "suspended" > "$state_file"
+    fi
   fi
-fi
 
-while true; do
-  is_active="$(<"$STATE_FILE")"
-  temperature_current="$(sed -n 's/.*temperature[[:space:]]*=[[:space:]]*\(.*\)/\1/p' "$CONFIG_FILE")"
+  cfgr::item::raw "State : $(< "$state_file")" "action:_toggle_nightshift"
 
-  OPTIONS=("State : $is_active")
-
-  if [[ "$is_active" == active ]]; then
-    OPTIONS+=("Temperature : ${temperature_current}K")
+  if [[ "$(< "$state_file")" == "active" ]]; then
+    cfgr::item::raw "Temperature : ${temp}K" "action:_set_temp"
   fi
+}
 
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Night Light" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    "State"*)
-      vb-cmd-nightshift --toggle
-      vb-cmd-refresh-bar-module nightshift
-      ;;
-    "Temperature"*)
-      new_value="$(helpers::configure::set_digit --verify "Night Light Temperature (K)" "Temperature" "int" 1000 20000)"
-      if [[ -n "$new_value" ]]; then
-        vb-cmd-nightshift --set "$new_value"
-      fi
-      ;;
-    "") break ;;
-  esac
-done
+cfgr::run "Night Light" "_build"

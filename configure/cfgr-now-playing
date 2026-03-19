@@ -1,51 +1,21 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-INDEX=0
+_build() {
+  cfgr::item::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING "Show now playing notification"
 
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
-
-  helpers::check \
-    VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK \
-    VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN \
-    VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART \
-    VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
-
-  OPTIONS=("Show Now Playing notification : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING")
-
-  if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
-    OPTIONS+=("Show album art : $VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART")
+  if [[ "$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING" == true ]]; then
+    cfgr::item::bool VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART "Show album art"
   fi
 
-  OPTIONS+=(
-    "Show Now Playing on lockscreen : $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
-    "Pause music when locking screen : $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
-    "<b>Help</b>"
-  )
+  cfgr::item::bool VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK "Pause on session lock"
+  cfgr::item::bool VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN "Show on lockscreen"
+}
 
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Now Playing" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    "Show Now Playing notification"*)
-      helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
-      ;;
-    "Show album art"*)
-      helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART"
-      ;;
-    "Show Now Playing on lockscreen"*)
-      helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
-      ;;
-    "Pause music when locking"*)
-      helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
-      ;;
-    *"Help"*)
-      vb-cmd-show-help now-playing
-      INDEX=0
-      ;;
-    "") break ;;
-  esac
-done
+cfgr::run "Now Playing" "_build" \
+  VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING \
+  VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART \
+  VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK \
+  VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN

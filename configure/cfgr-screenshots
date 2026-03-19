@@ -1,122 +1,28 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-INDEX=0
+_build() {
+  cfgr::item::string VIBRANIUM_SCREENSHOT_FILE_TYPE "Filetype" "Filetype" "PNG:png" "JPEG:jpeg" "PPM:ppm"
 
-_delete_existing_screenshots() {
-  local prompt input confirm
-  local dir="$XDG_PICTURES_DIR/Screenshots"
-  local files=()
+  if [[ "$VIBRANIUM_SCREENSHOT_FILE_TYPE" == "jpeg" ]]; then
+    cfgr::item::digit VIBRANIUM_SCREENSHOT_JPEG_QUALITY "JPEG quality" "Quality (int)" "JPEG Quality" int 1 100
+  fi
 
-  shopt -s nullglob
+  if [[ "$(hyprctl getoption animations:enabled)" =~ 1 ]]; then
+    cfgr::item::bool VIBRANIUM_SCREENSHOT_FLASH_SCREEN "Flash screen"
+    cfgr::item::bool VIBRANIUM_SCREENSHOT_FLASH_BORDER "Flash border"
+  fi
 
-  files=("$dir"/*)
-
-  shopt -u nullglob
-
-  ((${#files[@]} == 0)) && return 0
-
-  prompt="Would you like to delete existing screenshots?"
-
-  while true; do
-    helpers::ui::menu input "$prompt" "" -- "Yes" "No"
-
-    case "$input" in
-      Yes)
-        prompt="This will permanently remove all screenshots"
-        helpers::ui::menu confirm "$prompt" "" -- "DELETE" "Cancel"
-
-        [[ "$confirm" != "DELETE" ]] && break
-
-        rm -f -- "${files[@]}"
-        notify-send -r 1 -t 5000 "Vibranium" "Screenshots have been deleted"
-        break
-        ;;
-      No | "")
-        break
-        ;;
-    esac
-  done
+  cfgr::item::bool VIBRANIUM_SCREENSHOT_SAVE_TO_DISK "Save to disk"
+  cfgr::item::bool VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION "Show notification"
 }
 
-ANIMATIONS_ENABLED="$(hyprctl -j getoption animations:enabled | jq '.int')"
-
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
-
-  helpers::check \
-    VIBRANIUM_SCREENSHOT_FILE_TYPE \
-    VIBRANIUM_SCREENSHOT_SAVE_TO_DISK \
-    VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE \
-    VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION
-
-  ANNOTATE="$VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE"
-  FILETYPE="${VIBRANIUM_SCREENSHOT_FILE_TYPE^^}"
-  SHOW_NOTIFICATION="$VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION"
-  SAVE_ON_DISK="$VIBRANIUM_SCREENSHOT_SAVE_TO_DISK"
-
-  OPTIONS=("File  format : $FILETYPE")
-
-  if [[ "$FILETYPE" =~ JPEG ]]; then
-    helpers::check VIBRANIUM_SCREENSHOT_JPEG_QUALITY
-    JPEG_QUALITY="$VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
-    OPTIONS+=("JPEG quality : $JPEG_QUALITY")
-  fi
-
-  OPTIONS+=(
-    "Save to disk : $SAVE_ON_DISK"
-    "Notification : $SHOW_NOTIFICATION"
-  )
-
-  if [[ "$ANIMATIONS_ENABLED" = "1" ]]; then
-    helpers::check \
-      VIBRANIUM_SCREENSHOT_FLASH_SCREEN \
-      VIBRANIUM_SCREENSHOT_FLASH_BORDER
-
-    FLASH_BORDER="$VIBRANIUM_SCREENSHOT_FLASH_BORDER"
-    FLASH_SCREEN="$VIBRANIUM_SCREENSHOT_FLASH_SCREEN"
-
-    OPTIONS+=(
-      "Flash screen : $FLASH_SCREEN"
-      "Flash border : $FLASH_BORDER"
-    )
-  fi
-
-  # OPTIONS+=(
-  #     "Auto annotate : $ANNOTATE"
-  # )
-
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Screenshots" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    "Auto annotate"*)
-      helpers::configure::toggle_bool "VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE"
-      ;;
-    "JPEG quality"*)
-      helpers::configure::set_digit "JPG Quality" "Quality" "int" 1 100 "VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
-      ;;
-    "File  format"*)
-      helpers::configure::set_string "VIBRANIUM_SCREENSHOT_FILE_TYPE" "Filetype" "png" "jpeg" "ppm"
-      ;;
-    "Flash screen"*)
-      helpers::configure::toggle_bool "VIBRANIUM_SCREENSHOT_FLASH_SCREEN"
-      ;;
-    "Flash border"*)
-      helpers::configure::toggle_bool "VIBRANIUM_SCREENSHOT_FLASH_BORDER"
-      ;;
-    "Notification"*)
-      helpers::configure::toggle_bool "VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION"
-      ;;
-    "Save to disk"*)
-      STATUS="$(helpers::configure::toggle_bool -v "VIBRANIUM_SCREENSHOT_SAVE_TO_DISK")"
-
-      if [[ $STATUS == "false" ]]; then
-        _delete_existing_screenshots
-      fi
-      ;;
-    "") break ;;
-  esac
-done
+cfgr::run "Screenshots" "_build" \
+  VIBRANIUM_SCREENSHOT_FILE_TYPE \
+  VIBRANIUM_SCREENSHOT_JPEG_QUALITY \
+  VIBRANIUM_SCREENSHOT_FLASH_BORDER \
+  VIBRANIUM_SCREENSHOT_FLASH_SCREEN \
+  VIBRANIUM_SCREENSHOT_SAVE_TO_DISK \
+  VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION

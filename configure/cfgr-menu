@@ -1,50 +1,27 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
+
 export PATH="$PATH:$VIBRANIUM/configure"
 
-INDEX=0
-
-while true; do
-  OPTIONS=(
-    "Idle"
-    "Audio"
-    "Waybar"
-    "General"
-    "Set font"
-    "Hyprland"
-    "Recording"
-  )
+_build() {
+  cfgr::item::action "cfgr-idle" "Idle"
+  cfgr::item::action "cfgr-audio" "Audio"
+  cfgr::item::action "cfgr-waybar-menu" "Waybar"
+  cfgr::item::action "cfgr-general" "General"
+  cfgr::item::action "vb-font-set" "Set Font"
+  cfgr::item::action "cfgr-wm-menu" "Hyprland"
+  cfgr::item::action "cfgr-recording" "Recording"
 
   if [[ "$CHASSIS_TYPE" != vm ]]; then
-    OPTIONS+=(
-      "Brightness"
-      "Night Light"
-    )
+    cfgr::item::action "cfgr-brightness" "Brightness"
+    cfgr::item::action "cfgr-nightshift" "Night Light"
   fi
 
-  OPTIONS+=(
-    "Screenshots"
-    "Color Picker"
-    "Miscellaneous"
-  )
+  cfgr::item::action "cfgr-screenshots" "Screenshots"
+  cfgr::item::action "cfgr-color-picker" "Color Picker"
+  cfgr::item::action "cfgr-misc" "Miscellaneous"
+}
 
-  helpers::ui::menu CHOSEN "Settings" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    "") break ;;
-    "Waybar") cfgr-waybar-menu ;;
-    "Set font") vb-font-set ;;
-    "Idle") cfgr-idle ;;
-    "Audio") cfgr-audio ;;
-    "Screenshots") cfgr-screenshots ;;
-    "Brightness") cfgr-brightness ;;
-    "Recording") cfgr-recording ;;
-    "Night Light") cfgr-nightshift ;;
-    "Color Picker") cfgr-color-picker ;;
-    "General") cfgr-general ;;
-    "Hyprland") cfgr-wm-menu ;;
-    "Miscellaneous") cfgr-misc ;;
-  esac
-done
+cfgr::run "Settings" "_build"

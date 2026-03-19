@@ -1,32 +1,13 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-INDEX=0
+_build() {
+  cfgr::item::bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE "Respect power profiles"
+  cfgr::item::bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK "Notify on change"
+}
 
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
-
-  helpers::check \
-    VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE \
-    VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
-
-  OPTIONS=(
-    "Respect power profile : $VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE"
-    "Visual feedback : $VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK"
-  )
-
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Power profiles" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    "Respect"*)
-      helpers::configure::toggle_bool VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE
-      ;;
-    "Visual"*)
-      helpers::configure::toggle_bool VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
-      ;;
-    "") break ;;
-  esac
-done
+cfgr::run "Power Profiles" "_build" \
+  VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE \
+  VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK

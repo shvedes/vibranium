@@ -223,7 +223,7 @@ cfgr::set_digit() {
 
   while true; do
     local input
-    helpers::ui::menu input "$title" "${range_text:-any ${type}}" -- "$entry_hint ($type)"
+    helpers::ui::menu input "$title" "${range_text:-any ${type}}" -- "$entry_hint"
 
     [[ -z "$input" ]] && return 1
     [[ "$input" == "$entry_hint" ]] && continue
@@ -382,7 +382,7 @@ cfgr::item::bool() {
   _CFGR_ITEMS+=("$label : ${!var}")
 
   if [[ -n "$hook" ]]; then
-    _CFGR_DISPATCH+=("bool:$var:$hook")
+    _CFGR_DISPATCH+=("bool:$var:action:$hook")
   else
     _CFGR_DISPATCH+=("bool:$var")
   fi
@@ -431,13 +431,16 @@ cfgr::item::digit() {
 }
 
 
-# cfgr::item::string  VAR  LABEL  ROFI_TITLE  OPT [OPT ...]
+# cfgr::item::string  VAR  LABEL  ROFI_TITLE  [--hook HOOK]  OPT [OPT ...]
 #
 # Registers a menu row for a setting chosen from a fixed list of values.
 #
 #   VAR        - variable name
 #   LABEL      - left-hand text for the row in the parent menu
 #   ROFI_TITLE - prompt label in the picker menu
+#   --hook HOOK - optional. The name of an executable or a local function
+#                 that will be executed after the value is written.
+#                 Placed anywhere after ROFI_TITLE, before or among options.
 #   OPT ...    - options in "Display Label:stored_value" format.
 #                If an option has no colon, the label is used as the value.
 #
@@ -446,16 +449,37 @@ cfgr::item::digit() {
 #
 # When selected: a picker menu opens showing the display labels.
 # The stored_value matching the chosen label is written to the settings file.
+# If a HOOK was given, it is called after the write.
 #
 # Example:
 #   cfgr::item::string "VIBRANIUM_GLOBAL_SEARCH_ENGINE" "Search engine" \
 #     "Search Engine" \
 #     "Google:google" "DuckDuckGo:duckduckgo" "Brave:brave"
+#
+#   cfgr::item::string "VIBRANIUM_GLOBAL_TERMINAL" "Terminal" \
+#     "Select terminal" --hook _apply_terminal \
+#     "Alacritty:alacritty" "Kitty:kitty" "Foot:foot"
 cfgr::item::string() {
   local var="$1"
   local label="$2"
   local rofi_title="$3"
   shift 3
+
+  local hook=""
+  local raw_opts=()
+
+  while (( $# > 0 )); do
+    case "$1" in
+      --hook)
+        hook="$2"
+        shift 2
+        ;;
+      *)
+        raw_opts+=("$1")
+        shift
+        ;;
+    esac
+  done
 
   _CFGR_ITEMS+=("$label : ${!var}")
 
@@ -464,11 +488,13 @@ cfgr::item::string() {
   # We join them with the ASCII unit-separator (hex 1F) as a delimiter.
   # This character is safe because it never appears in option strings.
   local opts_str
-  printf -v opts_str '%s\x1F' "$@"
+  printf -v opts_str '%s\x1F' "${raw_opts[@]}"
 
   # Dispatch string format for string:
-  #   string:VAR:ROFI_TITLE:OPT\x1FOPT\x1F...
-  _CFGR_DISPATCH+=("string:${var}:${rofi_title}:${opts_str%$'\x1F'}")
+  #   string:VAR:ROFI_TITLE:HOOK:OPT\x1FOPT\x1F...
+  # HOOK is an empty field when omitted, so the colon count stays constant
+  # and the dispatcher can always split the same way.
+  _CFGR_DISPATCH+=("string:${var}:${rofi_title}:${hook}:${opts_str%$'\x1F'}")
 }
 
 
@@ -516,7 +542,11 @@ cfgr::item::action() {
   local func="$1"
   local label="$2"
 
-  _CFGR_ITEMS+=("<b>$label</b>")
+  if [[ "$label" =~ .+\ :\ .+ ]]; then
+    _CFGR_ITEMS+=("$label")
+  else
+    _CFGR_ITEMS+=("<b>$label</b>")
+  fi
 
   # Dispatch string format for action:
   #   action:FUNCNAME
@@ -569,46 +599,37 @@ cfgr::dispatch() {
   # Split on the first colon only.
   # ${var%%:*} removes everything from the first colon onward (type).
   # ${var#*:}  removes everything up to and including the first colon (payload).
-  local type="${descriptor%%:*}"
+  # local type="${descriptor%%:*}"
   local payload="${descriptor#*:}"
 
+  IFS=: read -ra fields <<< "$descriptor"
+
+  local type="${fields[0]}"
+
   case "$type" in
-
     bool)
-      local var="${payload%%:*}"
-      local hook="${payload#*:}"
-      [[ "$hook" == "$var" ]] && hook=""   # no colon -> no hook
-
+      # fields: bool : VAR [: action : HOOK]
+      local var="${fields[1]}"
+      local hook="${fields[3]:-}"   # empty when no hook registered
       cfgr::toggle_bool "$var"
-      [[ -n "$hook" ]] && "$hook"
-      ;;
-    digit)
-      # payload: VAR:PROMPT:ROFI_TITLE:TYPE:MIN:MAX
-      local var prompt rofi_title dtype min max
-      IFS=: read -r var prompt rofi_title dtype min max <<< "$payload"
-      cfgr::set_digit "$rofi_title" "$dtype" "$min" "$max" --hint "$prompt" --var "$var"
+      [[ -n "$hook" ]] && eval "$hook"
       ;;
 
     string)
-      # payload: VAR:ROFI_TITLE:OPT\x1FOPT\x1F...
-      local var rofi_title opts_raw
-
-      var="${payload%%:*}"
-      payload="${payload#*:}"
-
-      rofi_title="${payload%%:*}"
-      opts_raw="${payload#*:}"
-
-      local -a opts
-      IFS=$'\x1F' read -r -a opts <<< "$opts_raw"
-
-      cfgr::set_string "$rofi_title" "${opts[@]}" --var "$var"
+      # fields: string : VAR : ROFI_TITLE : HOOK : opts_str
+      local var="${fields[1]}"
+      local rofi_title="${fields[2]}"
+      local hook="${fields[3]:-}"
+      local opts_str="${fields[4]}"
+      # re-split opts on \x1F
+      IFS=$'\x1F' read -ra opts <<< "$opts_str"
+      cfgr::pick_string "$var" "$rofi_title" "${opts[@]}"
+      [[ -n "$hook" ]] && eval "$hook"
       ;;
 
     action)
-      eval "$payload"
+      eval "${fields[1]}"
       ;;
-
     display)
       :
       ;;

@@ -1,20 +1,9 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-_set_timeouts() {
-  local title="$1"
-  local timer_index="$2"
-  local min_minutes="$3"
-  local max_minutes="$4"
-
-  local input
-  input=$(helpers::configure::set_digit --verify \
-    "$title timeout" "$title" "int" "$min_minutes" "$max_minutes") || return
-
-  _update_timeout "$timer_index" $((input * 60))
-  systemctl --user restart hypridle &
-}
+# ================================================================================ #
 
 _get_timeouts() {
   local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
@@ -26,56 +15,42 @@ _update_timeout() {
   local seconds="$2"
   local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
 
-  local timeouts
-  mapfile -t timeouts < <(_get_timeouts)
-  timeouts[$((index - 1))]="$seconds"
+  TIMEOUTS[$((index - 1))]="$seconds"
 
-  awk -v lock="${timeouts[0]}" -v sleep="${timeouts[1]}" \
-    -f "$VIBRANIUM/awk/cfgr-idle-update-timeouts.awk" "$config" > "$config.tmp" \
-    && mv "$config.tmp" "$config"
+  awk -v lock="${TIMEOUTS[0]}" -v sleep="${TIMEOUTS[1]}" \
+    -f "$VIBRANIUM/awk/cfgr-idle-update-timeouts.awk" "$config" > \
+    "$config.tmp" && mv "$config.tmp" "$config"
 }
 
-INDEX=0
+_set_timeouts() {
+  local title="$1"
+  local timer_index="$2"
+  local min_minutes="$3"
+  local max_minutes="$4"
 
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
+  local input
+  input="$(cfgr::set_digit "$title timeout" int $min_minutes $max_minutes --hint "$title after N minutes")" || return
 
+  _update_timeout "$timer_index" $((input * 60))
+  systemctl --user restart hypridle &
+}
+
+# ================================================================================ #
+
+_build() {
   mapfile -t TIMEOUTS < <(_get_timeouts)
+  local lock_timeout sleep_timeout
 
-  LOCK_TIMEOUT="${TIMEOUTS[0]}"
-  SLEEP_TIMEOUT="${TIMEOUTS[1]}"
+  lock_timeout="${TIMEOUTS[0]}"
+  sleep_timeout="${TIMEOUTS[1]}"
 
-  helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
-  INHIBIT_TYPE="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+  # Convert to minutes
+  lock_timeout="$((lock_timeout / 60))"
+  sleep_timeout="$((sleep_timeout / 60))"
 
-  OPTIONS=(
-    "Lock  after : $((LOCK_TIMEOUT / 60)) min"
-    "Sleep after : $((SLEEP_TIMEOUT / 60)) min"
-    "Inhibit type : $INHIBIT_TYPE"
-    "<b>Help</b>"
-  )
+  cfgr::item::action "_set_timeouts Lock 1 1 $sleep_timeout" "Lock after : ${lock_timeout}m"
+  cfgr::item::action "_set_timeouts Sleep 2 $lock_timeout 3600" "Sleep after : ${sleep_timeout}m"
+  cfgr::item::action "vb-cmd-show-help idle" "Help"
+}
 
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "Idle" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
-
-  case "$CHOSEN" in
-    *"Inhibit"*)
-      helpers::configure::set_string VIBRANIUM_GLOBAL_INHIBIT_TYPE "Sleep type" idle sleep
-      (
-        pid="$(systemd-inhibit --no-pager | awk '/Vibranium/ {print $4}')"
-
-        if [[ ! -z "$pid" ]]; then
-          # Disable active
-          vb-cmd-toggle-inhibit
-          # Start new with the new value
-          vb-cmd-toggle-inhibit
-        fi
-      ) &
-      ;;
-    "Lock"*)  _set_timeouts "Lock"  1 1 $((SLEEP_TIMEOUT / 60 - 1)) ;;
-    "Sleep"*) _set_timeouts "Sleep" 2 $((LOCK_TIMEOUT / 60 + 1)) 3600 ;; # 1 hour
-    *"Help"*) vb-cmd-show-help idle ;;
-    "") break ;;
-  esac
-done
+cfgr::run "Idle" "_build"

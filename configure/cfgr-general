@@ -1,109 +1,51 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-_confirm_kill_submenu() {
-  local options confirm_to_kill_chosen
-  while true; do
-    options=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL" "<b>Help</b>")
-    helpers::ui::menu confirm_to_kill_chosen "Kill Confirm" "ESC to go back" -- "${options[@]}"
+# ================================================================================ #
 
-    case "$confirm_to_kill_chosen" in
-      "Confirm"*)
-        helpers::configure::toggle_bool "VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
-        break
-        ;;
-      *"Help"*)
-        vb-cmd-show-help confirm-kill
-        ;;
-      "")
-        break
-        ;;
-    esac
-  done
+_set_update_channel() {
+  local chosen="$(cfgr::set_string "Update Channel" "Release:release" "Upstream:upstream" "Dev:dev")"
+  vb-dev-switch-channel "$chosen"
 }
 
-_update_channel_submenu() {
-  local options chosen
-  options=("Release" "Upstream" "Dev")
+_get_update_channel() {
+  local state channel
+  state="$VIBRANIUM_STATE/update.channel"
 
-  while true; do
-    helpers::ui::menu chosen "Update Channel" "ESC to go back" -- "${options[@]}"
-
-    case "$chosen" in
-      "Upstream") vb-dev-switch-channel upstream ;;
-      "Release") vb-dev-switch-channel release ;;
-      "Dev") vb-dev-switch-channel dev ;;
-      "") break ;;
-      *) continue ;;
-    esac
-    break
-  done
-}
-
-INDEX=0
-
-while true; do
-  source "$VIBRANIUM_USER_SETTINGS"
-
-  OPTIONS=("Confirm to kill : $VIBRANIUM_GLOBAL_CONFIRM_TO_KILL")
-
-  UPDATE_CHANNEL="$(<"$VIBRANIUM_STATE/update.channel")"
-
-  # Self-check: do not show anything
-  # if on unknown branch.
-  if [[ -z "$UPDATE_CHANNEL" ]]; then
-    branch="$(git -C "$VIBRANIUM" branch --show-current)"
-    if [[ "$branch" =~ ^(master|dev|v*)$ ]]; then
-      UPDATE_CHANNEL="$branch"
-      OPTIONS+=("Update channel : ${UPDATE_CHANNEL^}")
-    fi
+  if [[ -f "$state" ]]; then
+    channel="$(< "$state")"
+    printf "%s" "$channel"
   else
-    OPTIONS+=("Update channel : ${UPDATE_CHANNEL^}")
+    local branch="$(git -C "$VIBRANIUM" branch --show-current)"
+    # Show in menu and update state file
+    printf "%s" "$branch" | tee "$state"
   fi
+}
 
-  OPTIONS+=(
-    "OSD enabled : $VIBRANIUM_GLOBAL_USE_OSD"
-    "<b>App launcher</b>"
-    "<b>Player options</b>"
-    "<b>fgsfds!</b>"
-    # "<b>Power profiles</b>"
-  )
+_confirm_kill_menu() {
+  _build_ckm() {
+    cfgr::item::bool VIBRANIUM_GLOBAL_CONFIRM_TO_KILL "Confirm kill"
+    cfgr::item::action "vb-cmd-show-help confirm-kill" "Help"
+  }
 
-  mapfile -t OPTIONS < <(helpers::configure::build_menu "${OPTIONS[@]}")
-  helpers::ui::menu CHOSEN "General" "ESC to go back" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  helpers::configure::track_index OPTIONS "$CHOSEN" INDEX
+  cfgr::run "Confirm Window Kill" "_build_ckm" VIBRANIUM_GLOBAL_CONFIRM_TO_KILL
+}
 
-  case "$CHOSEN" in
-    "Update channel"*)
-      _update_channel_submenu
-      ;;
-    *"App launcher"*)
-      cfgr-launcher
-      ;;
-    *"Player options"*)
-      cfgr-player
-      ;;
-    *"Power profiles"*)
-      cfgr-power-profile
-      ;;
-    "OSD enabled"*)
-      if [[ "$(helpers::configure::toggle_bool -v "VIBRANIUM_GLOBAL_USE_OSD")" == "false" ]]; then
-        systemctl --user disable --now swayosd &
-      else
-        systemctl --user enable --now swayosd &
-      fi
-      ;;
-    "Confirm"*)
-      _confirm_kill_submenu
-      ;;
-    *"fgsfds!"*)
-      curl -s https://0x0.st/PL_C.jpg --output /tmp/fgsfds!.jpg
-      imv /tmp/fgsfds!.jpg
-      helpers::ui::close_menus
-      ;;
-    "")
-      break
-      ;;
-  esac
-done
+# ================================================================================ #
+
+_build() {
+  local ck="$VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
+
+  cfgr::item::bool VIBRANIUM_GLOBAL_USE_OSD "OSD enabled"
+  cfgr::item::raw "Confirm kill : $ck" "action:_confirm_kill_menu"
+  cfgr::item::raw "Update channel : $(_get_update_channel)" "action:_set_update_channel"
+
+  cfgr::item::action "cfgr-launcher" "App launcher"
+  cfgr::item::action "cfgr-player" "Mediacontrols"
+}
+
+cfgr::run "General" "_build" \
+  VIBRANIUM_GLOBAL_CONFIRM_TO_KILL \
+  VIBRANIUM_GLOBAL_USE_OSD
