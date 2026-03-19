@@ -47,7 +47,7 @@ _edit_env() {
 }
 
 _toggle_wallpaper() {
-  case "$(cfgr::toggle_bool -v "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
+  case "$(vb-cmd-get-option "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
     false)
       sed -i 's/path/# path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
       systemctl -q --user disable --now hyprpaper &

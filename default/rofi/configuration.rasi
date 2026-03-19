@@ -10,7 +10,7 @@ configuration {
 	sort                      : true;
 	fixed-num-lines           : false;
 
-    display-calc        : "Calculator";
+  display-calc        : "Calculator";
 	display-window      : "Windows";
 	display-run         : "Command";
 	display-combi       : "Search";
@@ -26,12 +26,12 @@ configuration {
 	scroll-method       : 1;
 	sorting-method      : "fzf";
 
-    hover-select    : true;
-    me-select-entry : "";
-    me-accept-entry: [ MousePrimary ];
+  hover-select    : true;
+  me-select-entry : "";
+  me-accept-entry: [ MousePrimary ];
 
-    calc {
-        hint-result: "";
-        hint-welcome: "";
-    }
+  calc {
+      hint-result: "";
+      hint-welcome: "";
+  }
 }
