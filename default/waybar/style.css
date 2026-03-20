@@ -3,22 +3,26 @@
 @define-color urgent     #f77069;
 
 * {
+  /* Ignore installed GTK theme */
+  all: initial;
+
 	background: @background;
 	color:      @foreground;
-}
 
-window#waybar {
 	font-family: 'Symbols Nerd Font Mono', 'Cascadia Code';
-	font-size: 12px;
+	font-size:  12px;
 }
 
 tooltip label {
 	font-size: 12px;
 }
 
+#workspaces {
+  margin-left: 4px;
+}
+
 #workspaces button {
-    color: @foreground;
-    min-width: 12px;
+  min-width: 24px;
 }
 
 #workspaces button.empty {
@@ -30,17 +34,20 @@ tooltip label {
 }
 
 #workspaces button.urgent {
-	opacity: 1;
-	animation: urgent-workspace 1s infinite
+	animation: urgent-workspace 1s infinite;
 }
 
 .modules-right {
-	color: @foreground;
-	margin-right: 8px
+  margin-right: 6px;
 }
 
-.module {
-	margin: 0px 6px
+.modules-right .module {
+  font-size: 11.5px;
+	margin: 0px 7px;
+}
+
+#clock {
+  margin: 0px 14px;
 }
 
 #tray {
@@ -66,7 +73,7 @@ tooltip label {
 #custom-separator,
 #custom-dynamic-separator {
 	color: @foreground;
-    opacity: 0.4
+  opacity: 0.5
 }
 
 #network.disconnected {
@@ -74,17 +81,17 @@ tooltip label {
 }
 
 #custom-timer.expired {
-    animation: timer-flash 1.05s infinite;
+  animation: timer-flash 1.05s infinite;
 }
 
 @keyframes timer-flash {
-    0% {
-        color: @foreground;
-    }
-    50% {
-        color: @urgent;
-    }
-    100% {
-        color: @foreground;
-    }
+  0% {
+    color: @foreground;
+  }
+  50% {
+    color: @urgent;
+  }
+  100% {
+    color: @foreground;
+  }
 }

@@ -385,8 +385,8 @@ helpers::bar::spinner() {
 
   local sep_pos="right" left_pad=0 right_pad=1
   case "${BASH_SOURCE[1]##*/}" in
-    vb-bar-pacman) sep_pos="left" left_pad=0 right_pad=1 ;;
-    vb-bar-weather) sep_pos="right" left_pad=0 right_pad=1 ;;
+    vb-bar-pacman) sep_pos="left" left_pad=0 right_pad=2 ;;
+    vb-bar-weather) sep_pos="right" left_pad=0 right_pad=2 ;;
   esac
 
   local sep=""

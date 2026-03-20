@@ -9,7 +9,7 @@ _build() {
   if [[ -f "$VIBRANIUM_RUNTIME/vb-timer.remaining" ]]; then
     cfgr::item::action --label "Stop timer" --func "pkill -f vb-util-timer; _die"
   else
-    cfgr::item::action --label "Start timer" --func "vb-util-timer"
+    cfgr::item::action --label "Start timer" --func "vb-util-timer; _die"
   fi
 
   cfgr::item::action --label "Toggle inhibitor" --func "vb-cmd-toggle-inhibit; _die"

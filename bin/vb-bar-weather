@@ -142,7 +142,7 @@ text="$(jq -r '.text' <<< "$WEATHER_JSON")"
 tooltip="$(jq -r '.tooltip' <<< "$WEATHER_JSON")"
 
 if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
-  text+="<span foreground='DimGray'> |</span>"
+  text+=" <span foreground='DimGray'>|</span>"
 fi
 
 rm -f "$temp_data"

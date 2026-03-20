@@ -152,7 +152,7 @@ if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
   text="<span foreground='DimGray'>|</span> "
 fi
 
-icon="<span rise='1pt' foreground='CornflowerBlue'>󰏔</span>"
+icon="<span foreground='CornflowerBlue'>📦</span>"
 text+="$icon $TOTAL_COUNT"
 tooltip="$(make_tooltip "$PKG_LIST")"
 
