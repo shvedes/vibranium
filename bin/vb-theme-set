@@ -4,7 +4,6 @@
 
 source vb-lib-core
 
-# Assign a theme name to the GTK theme folder name
 declare -A FAMILIES=(
    [Gruvbox]="Hard Medium Soft Light"
    [Everforest]="Hard Medium Soft"
@@ -21,53 +20,53 @@ declare -A STANDALONE_THEMES=(
 )
 
 # Map theme to GTK theme name if special
-declare -A GTK_MAP=(
-   [Osaka-Jade]="Nightfox-Terafox"
-   [Osaka-Osaka]="Osaka-Dark"
-   [Osaka-Solarized]="Osaka-Solarized"
-   [Osaka-Light]="Osaka-Light"
-   [Nightfox-Nightfox]="Nightfox"
-   [Evergarden]="Everforest-Hard"
-)
+# declare -A GTK_MAP=(
+#    [Osaka-Jade]="Nightfox-Terafox"
+#    [Osaka-Osaka]="Osaka-Dark"
+#    [Osaka-Solarized]="Osaka-Solarized"
+#    [Osaka-Light]="Osaka-Light"
+#    [Nightfox-Nightfox]="Nightfox"
+#    [Evergarden]="Everforest-Hard"
+# )
 
-declare -A PAPIRUS_COLORS=(
-   [Gruvbox-Hard]=yaru
-   [Gruvbox-Medium]=yaru
-   [Gruvbox-Soft]=yaru
-   [Gruvbox-Light]=palebrown
-
-   [Everforest-Hard]=green
-   [Everforest-Medium]=green
-   [Everforest-Soft]=green
-
-   [Catppuccin-Mocha]=indigo
-   [Catppuccin-Macchiato]=indigo
-   [Catppuccin-Frappe]=nordic
-   [Catppuccin-Latte]=blue
-
-   [Nightfox-Nightfox]=bluegrey
-   [Nightfox-Carbonfox]=black
-   [Nightfox-Nordfox]=nordic
-   [Nightfox-Terafox]=teal
-
-   [Rosepine]=violet
-   [Rosepine-Moon]=violet
-   [Rosepine-Dawn]=indigo
-
-   [Tokyonight-Night]=blue
-   [Tokyonight-Moon]=blue
-
-   [Osaka-Osaka]=teal
-   [Osaka-Jade]=teal
-   [Osaka-Solarized]=darkcyan
-   [Osaka-Light]=green
-
-   [Kanagawa-Wave]=yaru
-   [Kanagawa-Dragon]=yaru
-   [Kanagawa-Lotus]=palebrown
-
-   [Evergarden]=bluegrey
-)
+# declare -A PAPIRUS_COLORS=(
+#    [Gruvbox-Hard]=yaru
+#    [Gruvbox-Medium]=yaru
+#    [Gruvbox-Soft]=yaru
+#    [Gruvbox-Light]=palebrown
+#
+#    [Everforest-Hard]=green
+#    [Everforest-Medium]=green
+#    [Everforest-Soft]=green
+#
+#    [Catppuccin-Mocha]=indigo
+#    [Catppuccin-Macchiato]=indigo
+#    [Catppuccin-Frappe]=nordic
+#    [Catppuccin-Latte]=blue
+#
+#    [Nightfox-Nightfox]=bluegrey
+#    [Nightfox-Carbonfox]=black
+#    [Nightfox-Nordfox]=nordic
+#    [Nightfox-Terafox]=teal
+#
+#    [Rosepine]=violet
+#    [Rosepine-Moon]=violet
+#    [Rosepine-Dawn]=indigo
+#
+#    [Tokyonight-Night]=blue
+#    [Tokyonight-Moon]=blue
+#
+#    [Osaka-Osaka]=teal
+#    [Osaka-Jade]=teal
+#    [Osaka-Solarized]=darkcyan
+#    [Osaka-Light]=green
+#
+#    [Kanagawa-Wave]=yaru
+#    [Kanagawa-Dragon]=yaru
+#    [Kanagawa-Lotus]=palebrown
+#
+#    [Evergarden]=bluegrey
+# )
 
 LINK_TARGET="$XDG_CONFIG_HOME/vibranium/theme/current"
 
@@ -254,31 +253,42 @@ apply_theme() {
   rm -f "$LINK_TARGET"
   ln -sf "$theme_path" "$LINK_TARGET"
 
-  local gtk_theme="${GTK_MAP[$chosen]:-$chosen}"
+  # local gtk_theme="${GTK_MAP[$chosen]:-$chosen}"
 
-  sed -i -e "/gtk-theme-name/s/=.*/=$gtk_theme/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
-  sed -i -e "/gtk-theme-name/s/=.*/=\"$gtk_theme\"/" "$HOME/.gtkrc-2.0"
+  # sed -i -e "/gtk-theme-name/s/=.*/=$gtk_theme/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
+  # sed -i -e "/gtk-theme-name/s/=.*/=\"$gtk_theme\"/" "$HOME/.gtkrc-2.0"
 
   # Update GTK 4 symlinks — process substitution keeps a single bash process
-  while read -r link; do
-    ln -sf "$HOME/.themes/$gtk_theme/gtk-4.0/$link" \
-      "$XDG_CONFIG_HOME/gtk-4.0/${link}"
-  done < <(find "$XDG_CONFIG_HOME/gtk-4.0" -type l -printf "%f\n")
+  # while read -r link; do
+  #   ln -sf "$HOME/.themes/$gtk_theme/gtk-4.0/$link" \
+  #     "$XDG_CONFIG_HOME/gtk-4.0/${link}"
+  # done < <(find "$XDG_CONFIG_HOME/gtk-4.0" -type l -printf "%f\n")
 
-  gsettings set org.gnome.desktop.interface cursor-theme "$VIBRANIUM_CURSOR_THEME"
-  gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
+  # gsettings set org.gnome.desktop.interface cursor-theme "$VIBRANIUM_CURSOR_THEME"
+  # gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
 
   local icon_theme="Papirus-Dark"
 
   if [[ $folder_name =~ (light|latte|dawn)$ ]]; then
+    gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3'
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-light'
+
+    sed -i "/custom_palette/s/=.*/=false/" "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
+    sed -i "/custom_palette/s/=.*/=false/" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
+
     icon_theme="Papirus-Light"
   else
+    gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark'
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
+
+    sed -i "/custom_palette/s/=.*/=true/" "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
+    sed -i "/custom_palette/s/=.*/=true/" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
   fi
 
+  touch "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
+
   gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
-  papirus-folders --update-caches --theme "$icon_theme" --color "${color:-blue}" &> /dev/null &
+  # papirus-folders --update-caches --theme "$icon_theme" --color "${color:-blue}" &> /dev/null &
   apply_chromium_colors "$chosen" &
 }
 

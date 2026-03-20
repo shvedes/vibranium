@@ -11,7 +11,7 @@ if [[ -f /tmp/vibranium-remove-vencord ]]; then
   sudo rm /etc/pacman.d/hooks/80-discord.hook
 fi
 
-yay -Rnsc yay-debug --noconfirm &> /dev/null || true
+yay -Rnsc yay-debug papirus-folders --noconfirm &> /dev/null || true
 yay -Scc --noconfirm &> /dev/null
 yay -Ycc --noconfirm &> /dev/null
 

@@ -41,26 +41,26 @@ EOF
 ############################################################
 
 # QT colors
-mkdir -p "$HOME"/.config/qt{5,6}ct/colors
+# mkdir -p "$HOME"/.config/qt{5,6}ct/colors
 # Keep line width relatively short
-ln -sf "$HOME/.config/vibranium/theme/current/qt5ct.conf" \
-  "$HOME"/.config/qt5ct/colors/vibranium.conf
-ln -sf "$HOME/.config/vibranium/theme/current/qt6ct.conf" \
-  "$HOME"/.config/qt6ct/colors/vibranium.conf
-sed -i "s/user/$USER/" "$HOME"/.config/qt*ct/qt*ct.conf
+# ln -sf "$HOME/.config/vibranium/theme/current/qt5ct.conf" \
+#   "$HOME"/.config/qt5ct/colors/vibranium.conf
+# ln -sf "$HOME/.config/vibranium/theme/current/qt6ct.conf" \
+#   "$HOME"/.config/qt6ct/colors/vibranium.conf
+# sed -i "s/user/$USER/" "$HOME"/.config/qt*ct/qt*ct.conf
 
 # GNOME appearance
-gsettings set org.gnome.desktop.interface gtk-theme "Nightfox"
+gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
-bash $HOME/.local/bin/papirus-folders --theme "Papirus-Dark" --color nordic &> /dev/null
+papirus-folders --theme "Papirus-Dark" --color black --once --update-caches &> /dev/null
 
 # GTK symlinks
-mkdir -p "$HOME"/.config/gtk-{3,4}.0
-for f in assets gtk-dark.css gtk.css; do
-  ln -sf "$HOME/.local/share/themes/Nightfox/gtk-4.0/$f" "$HOME"/.config/gtk-4.0/
-done
+# mkdir -p "$HOME"/.config/gtk-{3,4}.0
+# for f in assets gtk-dark.css gtk.css; do
+#   ln -sf "$HOME/.local/share/themes/Nightfox/gtk-4.0/$f" "$HOME"/.config/gtk-4.0/
+# done
 
 ln -sf "$HOME/.local/share/vibranium/default/hypr/animations/default.conf" \
   "$HOME/.config/hypr/hyprland.conf.d/animations.conf"

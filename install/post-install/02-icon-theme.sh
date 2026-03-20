@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# no-op
+exit 0
+
 ICONS_DIR="$HOME/.local/share/icons"
 BIN_DIR="$HOME/.local/bin"
 CACHE_DIR="$HOME/.cache"

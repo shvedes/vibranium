@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# no-op
+exit 0
+
 spinner_frames=(
   '[=   ]'
   '[ =  ]'
