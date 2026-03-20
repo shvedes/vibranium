@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 
+ICONS_DIR="$HOME/.local/share/icons"
+
+cp -r "$VIBRANIUM/extras/icon_theme/Vibranium" "$ICONS_DIR"
+ln -sf "$ICONS_DIR" "$HOME/.icons"
+
 # no-op
 exit 0
 
-ICONS_DIR="$HOME/.local/share/icons"
 BIN_DIR="$HOME/.local/bin"
 CACHE_DIR="$HOME/.cache"
 
