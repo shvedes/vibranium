@@ -9,9 +9,9 @@
 #
 # Please note that internet search may often be unavailable when VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT is set to true.
 # This script can also open three additional menus with custom categories to open:
-#	- AI
-#	- Common websites
+#	- AI PWAs
 #	- Power menu
+#	- Common websites PWAs
 
 source vb-lib-core
 
@@ -30,7 +30,6 @@ show_icons="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
 search_engine="$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
 
 search_engine() {
-
   case "$search_engine" in
     "google") echo "https://www.google.com/search?q=" ;;
     "duckduckgo") echo "https://duckduckgo.com/?q=" ;;
@@ -103,6 +102,12 @@ set_rofi_flags() {
       ;;
   esac
 
+  if [[ "$auto_select" == true ]]; then
+    if [[ "$mode" =~ ^--(default|ai|web)$ ]]; then
+      _out+=(-auto-select true)
+    fi
+  fi
+
   case "$mode" in
     --power) _out+=(-drun-categories Power -display-drun "Power") ;;
     --web) _out+=(-drun-categories WebApp -display-drun "Web Apps") ;;
@@ -110,19 +115,15 @@ set_rofi_flags() {
   esac
 }
 
-if [[ "$auto_select" == true ]]; then
-  echo "info: auto select enabled"
-  opt_args+=(-auto-select true)
-fi
-
 case "$1" in
   --web | --ai | --power)
     set_rofi_flags "$1" opt_args
     LAUNCHER_MODE="${1/--/}"
     ;;
   *)
-    helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS
-    helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI
+    helpers::check \
+      VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
+      VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI
 
     WEB_APPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
     AI="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
