@@ -30,8 +30,8 @@ _build_help() {
 }
 
 _build() {
-  cfgr::item::action --label "Settings" --func "cfgr-main-menu"
-  cfgr::item::action --label "Packagse" --func "vb-menu-pkg"
+  cfgr::item::action --label "Settings" --func "cfgr-menu"
+  cfgr::item::action --label "Packages" --func "vb-menu-pkg"
   cfgr::item::action --label "Tweaks" --func "vb-menu-tweaks"
 
   if [[ "$CHASSIS_TYPE" != vm ]]; then
