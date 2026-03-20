@@ -34,10 +34,10 @@ _set_spacing() {
 _set_height() {
   local input
   input="$(cfgr::set_digit \
-    --title "$POSITION bar height" \
+    --title "${POSITION^} bar height" \
     --hint  "Height (in pixels)" \
     --type  int \
-    --min   30 \
+    --min   26 \
     --max   100)" || return
   sed -i -E "s/(\"height\"\s*:\s*)[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
   systemctl -q --user restart waybar &
@@ -59,20 +59,18 @@ _build() {
     fi
   fi
 
-  local height icon_spacing
-
   eval "$(sed -n \
       -e 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/POSITION=\1/p' \
-      -e 's/.*"height"[[:space:]]*:[[:space:]]*\([^,]*\).*/height=\1/p' \
-      -e 's/.*"spacing"[[:space:]]*:[[:space:]]*\([^,]*\).*/icon_spacing=\1/p' \
+      -e 's/.*"height"[[:space:]]*:[[:space:]]*\([^,]*\).*/HEIGHT=\1/p' \
+      -e 's/.*"spacing"[[:space:]]*:[[:space:]]*\([^,]*\).*/SPACING=\1/p' \
       "$WAYBAR_CONFIG")"
 
   cfgr::item::raw "Enabled : $ENABLED" "action:_toggle_waybar"
 
   if [[ "$ENABLED" == true ]]; then
-    cfgr::item::raw "Position : $POSITION" "action:_set_position"
-    cfgr::item::raw "Spacing : $icon_spacing" "action:_set_spacing"
-    cfgr::item::raw "Height : $height" "action:_set_height"
+    [[ -n "$POSITION" ]] && cfgr::item::raw "Position : $POSITION" "action:_set_position"
+    [[ -n "$SPACING" ]] && cfgr::item::raw "Spacing : $SPACING" "action:_set_spacing"
+    [[ -n "$HEIGHT" ]] && cfgr::item::raw "Height : $HEIGHT" "action:_set_height"
 
     cfgr::item::action \
       --func  "waybar-toggle-modules" \

@@ -46,6 +46,21 @@ source vb-lib-cfgr
 #   done
 # }
 
+WAYBAR_CFG="$XDG_CONFIG_HOME/waybar/config.jsonc"
+_CFG_CONTENT=""
+
+_load_cfg() {
+  _CFG_CONTENT=$(<"$WAYBAR_CFG")
+}
+
+# Returns true if the module string appears anywhere in the config,
+# whether active or commented out. Used to skip menu entries for
+# modules that are simply not part of this installation's config.
+_module_in_cfg() {
+  local module="$1"
+  [[ "$_CFG_CONTENT" == *"\"$module\""* ]]
+}
+
 _updates_weather_menu() {
   _update() {
     vb-cmd-refresh-bar-module pacman &
@@ -80,13 +95,28 @@ _updates_menu() {
 }
 
 _build() {
-  cfgr::item::action \
-    --func  "_updates_weather_menu" \
-    --label "Updates / Weather specific"
+  # Show the combined submenu only when at least one of the two modules
+  # it covers is actually declared in the config.
+  if _module_in_cfg 'custom/weather' || _module_in_cfg 'custom/pacman'; then
+    cfgr::item::action \
+      --func  "_updates_weather_menu" \
+      --label "Updates / Weather specific"
+  fi
 
-  cfgr::item::action \
+  _module_in_cfg 'custom/pacman' && cfgr::item::action \
     --func  "_updates_menu" \
     --label "Updates"
 }
+
+# Load config once up front so both the guard and _build share the same content
+# without a second read.
+_load_cfg
+
+# Bail out before handing off to cfgr::run — if neither module is present,
+# ::run would call _build and produce an empty menu with no useful entries.
+if ! _module_in_cfg 'custom/weather' && ! _module_in_cfg 'custom/pacman'; then
+  notify-send -r 1 -u normal "Vibranium" "No configurable modules are present in your Waybar config."
+  exit 0
+fi
 
 cfgr::run "Modules" "_build"

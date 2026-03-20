@@ -1,14 +1,21 @@
 [
 	{
-		// DO NOT EDIT THIS MANUALLY
+    // These three entries are being read by settings scripts.
+    // It's not recommended to remove them. You can modify them
+    // manually, but prefer Vibranium Menu > Settings > Waybar.
+    //
+    // When removed, corresponding options in Vibranium Settings
+    // will not be shown at all.
 		"position": "top",
-        "spacing": 0,
+    "spacing": 0,
 		"height": 30,
 
-		"layer": "bottom",
-		"fixed-center": true,
-		"reload_style_on_change": true,
-
+    // These are custom Waybar modules tuned to Vibranium looks.
+    // Do not edit files inside of $XDG_DATA_HOME/vibranium/default/waybar!
+    // Instead, if you want to make changes to specific module, copy
+    // one from desired file and put them after the modules array below.
+    // Modules that declared here take priority over modules in the
+    // default folder.
 		"include": [
 			"$XDG_DATA_HOME/vibranium/default/waybar/battery.jsonc",
 			"$XDG_DATA_HOME/vibranium/default/waybar/bluetooth.jsonc",
@@ -38,18 +45,20 @@
 			"$XDG_DATA_HOME/vibranium/default/waybar/vibranium-update.jsonc"
 		],
 
-		// All custom modules provided here can and should be enabled or disabled directly
-		// in Vibranium settings.
+    // Here you declare what modules Waybar will enable and show.
+    // Module order does matter. Don't edit this array manually
+    // unless you really need to. If you want enable or disable
+    // specific modules, use Vibranium Settings.
 		"modules-left": ["hyprland/workspaces"],
 		"modules-center": ["custom/weather","clock","custom/pacman"],
 		"modules-right": [
 			"custom/vibranium-update",
-            "custom/timer",
+      "custom/timer",
 			"custom/confirm-kill",
 			"custom/worker",
 			"custom/reading-mode",
 			"custom/inhibitor",
-            "custom/password-manager",
+      "custom/password-manager",
 			"custom/dynamic-separator",
 			// "hyprland/language",
 			"custom/recording-indicator",
