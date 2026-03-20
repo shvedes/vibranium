@@ -2,6 +2,8 @@
 
 ICONS_DIR="$HOME/.local/share/icons"
 
+mkdir -p "$ICONS_DIR"
+
 cp -r "$VIBRANIUM/extras/icon_theme/Vibranium" "$ICONS_DIR"
 ln -sf "$ICONS_DIR" "$HOME/.icons"
 
