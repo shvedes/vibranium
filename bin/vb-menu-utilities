@@ -12,11 +12,11 @@ _build() {
     cfgr::item::action --label "Start timer" --func "vb-util-timer"
   fi
 
-  cfgr::item::action --label "Toggle inhibitor" "vb-cmd-toggle-inhibit; _die"
-  cfgr::item::action --label "Reload Vibranium" "vb-cmd-reload; _die"
-  cfgr::item::action --label "Close all windows" "vb-cmd-close-windows; _die"
+  cfgr::item::action --label "Toggle inhibitor" --func "vb-cmd-toggle-inhibit; _die"
+  cfgr::item::action --label "Reload Vibranium" --func "vb-cmd-reload; _die"
+  cfgr::item::action --label "Close all windows" --func "vb-cmd-close-windows; _die"
 
-  if [[ -f "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
+  if [[ -e "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
     mpd_status="$(mpc status 2> /dev/null)"
   fi
 
@@ -25,7 +25,7 @@ _build() {
     cfgr::item::action --label "Copy current track" --func "vb-cmd-copy-track --notify; _die"
   fi
 
-  cfgr::item::action --label "Toggle reading mode" "vb-cmd-toggle-reading-mode; _die"
+  cfgr::item::action --label "Toggle reading mode" --func "vb-cmd-toggle-reading-mode; _die"
 }
 
 cfgr::run "Utilities" "_build"

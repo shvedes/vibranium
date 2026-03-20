@@ -3,16 +3,13 @@
 source vb-lib-core
 source vb-lib-cfgr
 
-_launch() {
-  vb-core-term --floating -- "$1"
-  helpers::ui::close_menus
-}
+_die() { helpers::ui::close_menus; }
 
 _build() {
-  cfgr::item::action --label "Secure Boot" --func "_launch vb-setup-sboot"
-  cfgr::item::action --label "Firewall" --func "_launch vb-setup-ufw"
-  cfgr::item::action --label "Docker" --func "_launch vb-setup-docker"
-  cfgr::item::action --label "QEMU" --func "_launch vb-setup-qemu"
+  cfgr::item::action --label "Secure Boot" --func "vb-core-term --floating -- vb-setup-sboot; _die "
+  cfgr::item::action --label "Firewall" --func "vb-core-term --floating -- vb-setup-ufw; _die "
+  cfgr::item::action --label "Docker" --func "vb-core-term --floating -- vb-setup-docker; _die "
+  cfgr::item::action --label "QEMU" --func "vb-core-term --floating -- vb-setup-qemu; _die "
 }
 
 cfgr::run "Setup" "_build"

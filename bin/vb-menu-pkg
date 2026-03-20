@@ -3,23 +3,20 @@
 source vb-lib-core
 source vb-lib-cfgr
 
-_launch() {
-  vb-core-term --floating -- "$1"
-  helpers::ui::close_menus
-}
+_die() { helpers::ui::close_menus; }
 
 _build_install() {
   _b() {
-    cfgr::item::action --label "Package" --func "_launch vb-pkg-install"
-    cfgr::item::action --label "Font" --func "_launch vb-pkg-font-install"
+    cfgr::item::action --label "Package" --func "vb-core-term --floating -- vb-pkg-install; _die"
+    cfgr::item::action --label "Font" --func "vb-core-term --floating -- vb-pkg-font-install; _die"
   }
   cfgr::run "Install" "_b"
 }
 
 _build_remove() {
   _b() {
-    cfgr::item::action --label "Package" --func "_launch vb-pkg-remove"
-    cfgr::item::action --label "Font" --func "_launch vb-pkg-font-remove"
+    cfgr::item::action --label "Package" --func "vb-core-term --floating -- vb-pkg-remove; _die"
+    cfgr::item::action --label "Font" --func "vb-core-term --floating -- vb-pkg-font-remove; _die"
   }
   cfgr::run "Uninstall" "_b"
 }
@@ -27,8 +24,8 @@ _build_remove() {
 _build() {
   cfgr::item::action --label "Install" --func "_build_install"
   cfgr::item::action --label "Uninstall" --func "_build_remove"
-  cfgr::item::action --label "System update" --func "_launch vb-pkg-update"
-  cfgr::item::action --label "Vibranium update" --func "_launch vb-update"
+  cfgr::item::action --label "System update" --func "vb-core-term --floating -- vb-pkg-update; _die"
+  cfgr::item::action --label "Vibranium update" --func "vb-core-term --floating -- vb-update; _die"
 }
 
 cfgr::run "Packages" "_build"
