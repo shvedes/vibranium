@@ -49,16 +49,17 @@ if ! command -v wttrbar > /dev/null; then
 fi
 
 _set_city() {
-  local opt city cfg
+  local opt city
 
   opt="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
-  cfg="$XDG_CONFIG_HOME/vibranium/settings"
+  city="$(curl -s --max-time 5 http://ip-api.com/json | jq -r '.city')" || return
 
-  city="$(curl -s --max-time 5 http://ip-api.com/json | jq -r '.city')"
-
-  # Verify and populate user settings file.
-  helpers::configure::verify_option "$opt"
-  sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$cfg"
+  # Verify and populate user settings file
+  if ! grep -qE "$opt" "$VIBRANIUM_USER_SETTINGS"; then
+    echo "${opt}=${city}" >> "$VIBRANIUM_USER_SETTINGS"
+  else
+    sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$VIBRANIUM_USER_SETTINGS"
+  fi
 
   notify-send -r 3 -t 7000 "Vibranium - Weather Monitoring" "Monitoring weather in $city"
 }

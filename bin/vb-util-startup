@@ -63,7 +63,7 @@ _toggle_loopback() {
     rm "$VIBRANIUM_STATE/secure-boot-setup.complete"
     sleep 5
 
-    sb_state="$(vb-cmd-secure-boot-state)"
+    sb_state="$(vb-cmd-sboot-status)"
 
     if [[ "$sb_state" == "enabled" ]]; then
       notify-send -r 1 -t 10000 "Secure Boot Setup Wizard" "Secure Boot setup complete!"

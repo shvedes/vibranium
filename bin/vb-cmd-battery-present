@@ -6,10 +6,13 @@
 # Used by the battery monitor and other battery-related checks.
 
 for bat in /sys/class/power_supply/BAT*; do
-  [[ -r $bat/present ]] &&
-    [[ $(cat $bat/present) == "1" ]] &&
-    [[ $(cat $bat/type) == "Battery" ]] &&
-    exit 0
+  if [[ -r $bat/present ]]; then
+    if [[ $(< $bat/present) == "1" ]]; then
+      if [[ $(< $bat/type) == "Battery" ]]; then
+        exit 0
+      fi
+    fi
+  fi
 done
 
 exit 1

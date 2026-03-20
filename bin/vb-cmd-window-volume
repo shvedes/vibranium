@@ -18,11 +18,6 @@ Options:
   -t, --toggle         Window volume toggle
   -s, --step PERCENT   Volume step size in percent (default: $STEP)
   -h, --help           Show this help message and exit
-
-Actions:
-  up      Raise volume by STEP%
-  down    Lower volume by STEP%
-  toggle  Toggle mute on all matching audio nodes
 USAGE
 }
 

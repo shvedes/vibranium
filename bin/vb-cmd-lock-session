@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Set keyboard layout to default (first layout)
+# Set keyboard layout to default (usually US)
 hyprctl -q switchxkblayout all 0
 
 pidof hyprlock || hyprlock

@@ -202,9 +202,11 @@ VIBRANIUM_SCREENSHOT_FLASH_BORDER=true
 # @desc indicate that screenshot was taken.
 VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION=true
 
+# @ignore
 # @type bool
 # @desc Whether to automatically open annotation
 # @desc tool (satty) after taking a screenshot.
+# @desc no-op
 VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE=false
 
 #             BRIGHTNESS OPTIONS               #
