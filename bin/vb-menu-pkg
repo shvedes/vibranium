@@ -1,63 +1,34 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-ACTIONS=(
-  "Install"
-  "Uninstall"
-  "System update"
-  "Vibranium update"
-)
+_launch() {
+  vb-core-term --floating -- "$1"
+  helpers::ui::close_menus
+}
 
-while true; do
-  helpers::ui::menu CHOSEN "Packages" "ESC to go back" -- "${ACTIONS[@]}"
-  [[ -z $CHOSEN ]] && break
+_build_install() {
+  _b() {
+    cfgr::item::action --label "Package" --func "_launch vb-pkg-install"
+    cfgr::item::action --label "Font" --func "_launch vb-pkg-font-install"
+  }
+  cfgr::run "Install" "_b"
+}
 
-  case "$CHOSEN" in
-    "Install")
-      while true; do
-        helpers::ui::menu install_chosen "Install" "ESC to go back" -- "Package" "Font"
-        [[ -z "$install_chosen" ]] && break
+_build_remove() {
+  _b() {
+    cfgr::item::action --label "Package" --func "_launch vb-pkg-remove"
+    cfgr::item::action --label "Font" --func "_launch vb-pkg-font-remove"
+  }
+  cfgr::run "Uninstall" "_b"
+}
 
-        case "$install_chosen" in
-          "Package") vb-core-term --floating -- vb-pkg-install ;;
-          "Font") vb-core-term --floating -- vb-pkg-font-install ;;
-          *) continue ;;
-        esac
+_build() {
+  cfgr::item::action --label "Install" --func "_build_install"
+  cfgr::item::action --label "Uninstall" --func "_build_remove"
+  cfgr::item::action --label "System update" --func "_launch vb-pkg-update"
+  cfgr::item::action --label "Vibranium update" --func "_launch vb-update"
+}
 
-        helpers::ui::close_menus
-      done
-      ;;
-    "Uninstall")
-      while true; do
-        helpers::ui::menu uninstall_chosen "Install" "ESC to go back" -- "Package" "Font"
-        [[ -z "$uninstall_chosen" ]] && break
-
-        case "$uninstall_chosen" in
-          "Package")
-            vb-core-term --floating -- vb-pkg-remove
-            ;;
-          "Font")
-            vb-core-term --floating -- vb-pkg-font-remove
-            ;;
-          *)
-            continue
-            ;;
-        esac
-
-        helpers::ui::close_menus
-      done
-      ;;
-    "System update")
-      vb-core-term --floating -- vb-pkg-update
-      helpers::ui::close_menus
-      ;;
-    "Vibranium update")
-      vb-core-term --floating -- vb-update
-      helpers::ui::close_menus
-      ;;
-    *)
-      continue
-      ;;
-  esac
-done
+cfgr::run "Packages" "_build"

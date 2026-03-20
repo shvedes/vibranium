@@ -2,13 +2,10 @@
 
 source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
 
+# Checking file existance is faster
+# than calling pacman -Q.
 if [[ ! -f /usr/lib/rofi/emoji.so ]]; then
-  msg="The emoji menu requires "
-  msg+="<span foreground='${P_YELLOW}'><b>rofi-emoji</b></span>, "
-  msg+="which is not installed.\n\n"
-
-  notify-send -r 4 -t 5000 "Vibranium" "$msg"
-  vb-pkg-install rofi-emoji
+  vb-core-term --floating -- vb-pkg-install --no-verify -- rofi-emoji
   exit 0
 fi
 

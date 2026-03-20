@@ -1,68 +1,31 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-ACTIONS=()
+_die() { helpers::ui::close_menus; }
 
-if [[ -f "$VIBRANIUM_RUNTIME/vb-timer.remaining" ]]; then
-  ACTIONS+=("Stop timer")
-else
-  ACTIONS+=("Set timer")
-fi
+_build() {
+  if [[ -f "$VIBRANIUM_RUNTIME/vb-timer.remaining" ]]; then
+    cfgr::item::action --label "Stop timer" --func "pkill -f vb-util-timer; _die"
+  else
+    cfgr::item::action --label "Start timer" --func "vb-util-timer"
+  fi
 
-ACTIONS+=(
-  "Toggle read mode"
-  "Toggle inhibitor"
-  "Reload Vibranium"
-  "Close all windows"
-)
+  cfgr::item::action --label "Toggle inhibitor" "vb-cmd-toggle-inhibit; _die"
+  cfgr::item::action --label "Reload Vibranium" "vb-cmd-reload; _die"
+  cfgr::item::action --label "Close all windows" "vb-cmd-close-windows; _die"
 
-if systemctl -q --user is-active mpd; then
-  mpd_status="$(mpc status 2> /dev/null)"
-fi
+  if [[ -f "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
+    mpd_status="$(mpc status 2> /dev/null)"
+  fi
 
-spotify_status="$(playerctl -p spotify status)"
-if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
-  ACTIONS+=("Copy current track")
-fi
+  spotify_status="$(playerctl -p spotify status)"
+  if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
+    cfgr::item::action --label "Copy current track" --func "vb-cmd-copy-track --notify; _die"
+  fi
 
-while true; do
-  helpers::ui::menu CHOSEN "Utilities" "search..." -- "${ACTIONS[@]}"
+  cfgr::item::action --label "Toggle reading mode" "vb-cmd-toggle-reading-mode; _die"
+}
 
-  case "$CHOSEN" in
-    "Close all windows")
-      vb-cmd-close-windows
-      exit 0
-      ;;
-    "Toggle read mode")
-      vb-cmd-toggle-reading-mode
-      exit 0
-      ;;
-    "Copy current track")
-      vb-cmd-copy-track --notify
-      exit 0
-      ;;
-    *"Stop timer"*)
-      pkill -f vb-util-timer
-      exit 0
-      ;;
-    "Set timer")
-      setsid vb-util-timer
-      exit 0
-      ;;
-    "Reload Vibranium")
-      vb-cmd-reload
-      exit 0
-      ;;
-    "Toggle inhibitor")
-      vb-cmd-toggle-inhibit
-      exit 0
-      ;;
-    "")
-      exit 1
-      ;;
-    *)
-      continue
-      ;;
-  esac
-done
+cfgr::run "Utilities" "_build"

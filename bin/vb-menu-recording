@@ -26,4 +26,4 @@ if [[ -z $CHOSEN ]] || [[ ! $CHOSEN =~ ^(Screen|Region)$ ]]; then
   exit 1
 fi
 
-exec setsid vb-core-recording "--${CHOSEN,,}"
+setsid -f vb-core-recording "--${CHOSEN,,}"

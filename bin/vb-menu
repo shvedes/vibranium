@@ -1,91 +1,44 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
+source vb-lib-cfgr
 
-OPTIONS=(
-  "Settings"
-  "Packages"
-  "Tweaks"
-)
+export PATH="$PATH:$VIBRANIUM/configure"
 
-if [[ "$CHASSIS_TYPE" != vm ]]; then
-  OPTIONS+=("Setup")
-fi
-
-OPTIONS+=("Help")
-
-if [[ -f "$VIBRANIUM_STATE/update.available" ]]; then
-  OPTIONS+=("<b>Update Vibranium</b>")
-fi
-
-INDEX=0
-
-while true; do
-  helpers::ui::menu CHOSEN "Vibranium" "ESC to exit" -selected-row "$INDEX" -- "${OPTIONS[@]}"
-  [ -z "$CHOSEN" ] && break
-
-  for i in "${!OPTIONS[@]}"; do
-    if [ "${OPTIONS[$i]}" == "$CHOSEN" ]; then
-      INDEX="$i"
-      break
+_build_help() {
+  _launch() {
+    if ! command -v "$1" > /dev/null; then
+      if command -v chromium > /dev/null; then
+        vb-cmd-launch-cmd chromium --app="$1"
+      else
+        vb-cmd-launch-cmd xdg-open "$1"
+      fi
+    else
+      eval "$1"
     fi
-  done
 
-  case "$CHOSEN" in
-    "Setup")
-      bash vb-menu-setup
-      ;;
-    "Settings")
-      bash "$VIBRANIUM/configure/cfgr-menu"
-      ;;
-    "Help")
-      help_opts=("Hyprland" "Vibranium" "Arch Linux" "<i>Keybindings</i>")
-      while true; do
-        helpers::ui::menu help_chosen "Help" "ESC to go back" -- "${help_opts[@]}"
+    helpers::ui::close_menus
+  }
 
-        case "$help_chosen" in
-          "Hyprland") help_link="https://wiki.hypr.land" ;;
-          "Vibranium") help_link="https://github.com/shvedes/vibranium/wiki" ;;
-          "Arch Linux") help_link="https://wiki.archlinux.org" ;;
-          *"Keybindings"*)
-            vb-cmd-keybindings
-            exit 0
-            ;;
-          "") break ;;
-          *) continue ;;
-        esac
+  _b() {
+    cfgr::item::action --label "Hyprland" --func "_launch 'https://wiki.hypr.land'"
+    cfgr::item::action --label "Vibranium" --func "_launch 'https://github.com/shvedes/vibranium/wiki'"
+    cfgr::item::action --label "Arch Linux" --func "_launch 'https://wiki.archlinux.org'"
+    cfgr::item::action --label "Keybindings" --func "_launch vb-cmd-keybindings"
+  }
+  cfgr::run "Help" "_b"
+}
 
-        if command -v chromium > /dev/null; then
-          vb-cmd-launch-cmd chromium --app="$help_link"
-        fi
+_build() {
+  cfgr::item::action --label "Settings" --func "cfgr-main-menu"
+  cfgr::item::action --label "Packagse" --func "vb-menu-pkg"
+  cfgr::item::action --label "Tweaks" --func "vb-menu-tweaks"
 
-        helpers::ui::close_menus
-      done
-      ;;
-    "Packages")
-      bash vb-menu-pkg
-      ;;
-    "Tweaks")
-      while true; do
-        helpers::ui::menu tweaks_chosen "Tweaks" "ESC to go back" -- "System" "Apps"
-        [[ -z $tweaks_chosen ]] && break
+  if [[ "$CHASSIS_TYPE" != vm ]]; then
+    cfgr::item::action --label "Setup" --func "vb-menu-setup"
+  fi
 
-        case "$tweaks_chosen" in
-          "Apps")
-            bash vb-menu-tweaks
-            ;;
-          "System")
-            bash vb-menu-tweaks-system
-            ;;
-        esac
-      done
-      ;;
-    *"Update Vibranium"*)
-      vb-core-term --floating -- vb-update
-      exit 0
-      ;;
-    *)
-      continue
-      ;;
-  esac
-done
+  cfgr::item::action --label "Help" --func "_build_help"
+}
+
+cfgr::run "Vibranium" "_build"
