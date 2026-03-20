@@ -267,17 +267,18 @@ apply_theme() {
   # gsettings set org.gnome.desktop.interface cursor-theme "$VIBRANIUM_CURSOR_THEME"
   # gsettings set org.gnome.desktop.interface gtk-theme "$gtk_theme"
 
-  local icon_theme="Papirus-Dark"
 
   if [[ $folder_name =~ (light|latte|dawn)$ ]]; then
+    local icon_theme="Papirus-Light"
+
     gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3'
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-light'
 
     sed -i "/custom_palette/s/=.*/=false/" "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
     sed -i "/custom_palette/s/=.*/=false/" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
-
-    icon_theme="Papirus-Light"
   else
+    local icon_theme="Papirus-Dark"
+
     gsettings set org.gnome.desktop.interface gtk-theme 'adw-gtk3-dark'
     gsettings set org.gnome.desktop.interface color-scheme 'prefer-dark'
 
@@ -288,7 +289,6 @@ apply_theme() {
   touch "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
 
   gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
-  # papirus-folders --update-caches --theme "$icon_theme" --color "${color:-blue}" &> /dev/null &
   apply_chromium_colors "$chosen" &
 }
 

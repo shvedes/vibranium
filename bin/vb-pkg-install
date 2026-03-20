@@ -241,13 +241,14 @@ _filter_packages() {
       # Since ${PACKAGES[@]} is a single package, we can refer it as a regular variable.
       echo -e "${GREEN}[VIBRANIUM]${RESET} ${YELLOW}$PACKAGES${RESET} is already installed"
 
-      # Only single package branch
-      if term::ask_yes_no Y "Install it anyway?"; then
-        NO_ASK=true
-        SKIP_OVERVIEW=true
-        FORCE_INSTALL=true
-        FILTERED=(neovim)
-        return
+      if [[ "$NO_ASK" == false ]]; then
+        # Only single package branch
+        if term::ask_yes_no Y "Install it anyway?"; then
+          SKIP_OVERVIEW=true
+          FORCE_INSTALL=true
+          FILTERED=(neovim)
+          return
+        fi
       fi
     else
       echo -e "${GREEN}[VIBRANIUM]${RESET} Selected packages are already installed"
