@@ -3,13 +3,26 @@
 source vb-lib-core
 source vb-lib-cfgr
 
+_has_line() {
+  local pattern="$1" file="$2" line
+  [[ -f "$file" ]] || return 1
+
+  while IFS= read -r line; do
+    if [[ "$line" == *"$pattern"* ]]; then
+      return 0
+    fi
+  done < "$file"
+
+  return 1
+}
+
 _build_apps() {
   local spicetify_file="$XDG_CONFIG_HOME/spicetify/config-xpui.ini"
   local chromium_file="$XDG_CONFIG_HOME/chromium-flags.conf"
 
   _b() {
     if command -v chromium > /dev/null; then
-      if ! grep -q "oauth2-client-id" "$chromium_file"; then
+      if _has_line "oauth2-client-id" "$chromium_file"; then
         cfgr::item::action \
           --label "Enable Chromium sync" \
           --func "vb-tweak-chromium enable; helpers::ui::close_menus"
@@ -21,7 +34,7 @@ _build_apps() {
     fi
 
     if command -v spicetify > /dev/null; then
-      if ! grep -q adblock "$spicetify_file"; then
+      if _has_line "adblock" "$spicetify_file"; then
         cfgr::item::action \
           --label "Install Spotify adblock" \
           --func "vb-tweak-spotify install; helpers::ui::close_menus"
