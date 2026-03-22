@@ -138,13 +138,11 @@ messagedialog {
 /* Target the main message label inside the dialog */
 messagedialog label {
     color: @dialog_fg_color;
-    font-size: 12pt;
-    font-weight: bold;
 }
 
 /* Target the secondary, more detailed text (if any) */
 messagedialog .secondary-text {
-    font-size: 10pt;
+    font-size: 9pt;
     font-style: italic;
 }
 
