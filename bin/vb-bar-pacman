@@ -32,7 +32,7 @@ if ((WAYBAR_PID == 0)); then
   fi
 fi
 
-if ! command -v checkupdates > /dev/null; then
+if ! command -v checkupdates >/dev/null; then
   # If executed from a terminal
   if ! term::is_headless; then
     log::error "Missing required dependencies: pacman-contrib"
@@ -51,7 +51,7 @@ if ! command -v checkupdates > /dev/null; then
 fi
 
 _wait_for_connection() {
-  while ! ping -c 1 1.1.1.1 &> /dev/null; do
+  while ! ping -c 1 1.1.1.1 &>/dev/null; do
     sleep 1
   done
 }
@@ -91,7 +91,7 @@ else
     rm -f "${MARKER%.*}".*
 
     # Create new one
-    : > "$MARKER"
+    : >"$MARKER"
   fi
 fi
 
@@ -107,9 +107,9 @@ fi
 PKG_LIST="$VIBRANIUM_CACHE/bar.updates.list"
 
 (
-  checkupdates --nocolor 2> /dev/null
-  yay -Qua --color=never 2> /dev/null
-) > "$PKG_LIST" &
+  checkupdates --nocolor 2>/dev/null
+  yay -Qua --color=never 2>/dev/null
+) >"$PKG_LIST" &
 get_updates_pid=$!
 
 if [[ "$show_spinner" == true ]]; then
@@ -118,26 +118,25 @@ else
   wait $get_updates_pid
 fi
 
-TOTAL_COUNT="$(wc -l < "$PKG_LIST")"
+TOTAL_COUNT="$(wc -l <"$PKG_LIST")"
 
 # To avoid spamming on every re-exec, we persist the last-shown unix timestamp to a state
 # file and only fire the notification again once 3 real days have passed since the last one.
 NOTIF_STATE_FILE="$VIBRANIUM_CACHE/${0##*/}.timestamp"
 NOTIF_INTERVAL=$((3 * 24 * 60 * 60)) # 3 days in seconds
 
-if (( TOTAL_COUNT > 150 )); then
+if ((TOTAL_COUNT > 125)); then
   now=$(date +%s)
   last=0
 
   if [[ -f "$NOTIF_STATE_FILE" ]]; then
-    last=$(< "$NOTIF_STATE_FILE")
+    last=$(<"$NOTIF_STATE_FILE")
   fi
 
-  if (( now - last >= NOTIF_INTERVAL )); then
-    msg="You have $TOTAL_COUNT outdated packages.\n"
-    msg+="Remember, on Arch, it is recommended to update your system regularly"
-    notify-send -r 3 "More Than $TOTAL_COUNT Updates Available" "$msg"
-    echo "$now" > "$NOTIF_STATE_FILE"
+  if ((now - last >= NOTIF_INTERVAL)); then
+    msg+="Remember that on Arch, it is recommended to update your system regularly"
+    notify-send -r 3 -t $((120 * 1000)) "More Than $TOTAL_COUNT Are Avaiting Updates" "$msg"
+    echo "$now" >"$NOTIF_STATE_FILE"
   fi
 fi
 
