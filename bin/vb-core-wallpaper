@@ -7,11 +7,14 @@ fi
 
 source vb-lib-core
 
+CUSTOM=false
 CURRENT_THEME="$(vb-theme-get)"
 WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
 USER_WALLPAPERS="$XDG_CONFIG_HOME/vibranium/themes/$CURRENT_THEME/backgrounds"
 
-if [[ "$WALLPAPER_PATH" != "$WALLS/"* && "$WALLPAPER_PATH" != "$USER_WALLPAPERS/"* ]]; then
+# In case if user set new wallpaper via thunar context menu
+if [[ $CUSTOM == true && ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
+
   mkdir -p "$USER_WALLPAPERS"
 
   if [[ ! -f "$USER_WALLPAPERS/${WALLPAPER_PATH##*/}" ]]; then
@@ -118,6 +121,7 @@ case "$1" in
   WALLPAPER_PATH="$(toggle_wallpaper "$1")"
   ;;
 *.png | *.jpg | *.jpeg | *.webp)
+  CUSTOM=true
   WALLPAPER_PATH="$(realpath "$1")"
 
   if [[ ! -f "$WALLPAPER_PATH" ]]; then
