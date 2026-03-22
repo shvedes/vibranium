@@ -8,20 +8,30 @@ fi
 source vb-lib-core
 
 CURRENT_THEME="$(vb-theme-get)"
-WALLS="$XDG_CONFIG_HOME/vibranium/theme/current/backgrounds"
-USER_WALLPAPERS="$XDG_CONFIG_HOME/vibranium/theme/wallpapers/$CURRENT_THEME"
+WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
+USER_WALLPAPERS="$XDG_CONFIG_HOME/vibranium/themes/$CURRENT_THEME/backgrounds"
+
+if [[ "$WALLPAPER_PATH" != "$WALLS/"* && "$WALLPAPER_PATH" != "$USER_WALLPAPERS/"* ]]; then
+  mkdir -p "$USER_WALLPAPERS"
+
+  if [[ ! -f "$USER_WALLPAPERS/${WALLPAPER_PATH##*/}" ]]; then
+    cp "$WALLPAPER_PATH" "$USER_WALLPAPERS/"
+    WALLPAPER_PATH="$USER_WALLPAPERS/${WALLPAPER_PATH##*/}"
+  fi
+fi
 
 toggle_wallpaper() {
   local mode="$1"
-  local current files user_files
+  local current files
   local idx next prev found
 
-  mapfile -t files < <(find "$WALLS" -maxdepth 1 -type f,l | sort)
-  mapfile -t user_files < <(find "$USER_WALLPAPERS" -maxdepth 1 -type f,l | sort)
+  mapfile -t files < <(
+    find "$WALLS" "$USER_WALLPAPERS" -maxdepth 1 \( -type f -o -type l \) 2>/dev/null |
+      while IFS= read -r f; do
+        [[ -f "$f" ]] && printf '%s\n' "$f"
+      done
+  )
 
-  files+=("${user_files[@]}")
-
-  # If it is empty (somehow) - exit
   [ ${#files[@]} -eq 0 ] && return 1
 
   current="$(vb-cmd-get-wallpaper)"
@@ -40,45 +50,43 @@ toggle_wallpaper() {
   fi
 
   case "$mode" in
-    --next)
-      if ((found)); then
-        next=$(((idx + 1) % ${#files[@]}))
-        printf "%s\n" "${files[$next]}"
-      else
-        printf "%s\n" "${files[0]}"
-      fi
-      ;;
-    --prev)
-      if ((found)); then
-        prev=$(((idx - 1 + ${#files[@]}) % ${#files[@]}))
-        printf "%s\n" "${files[$prev]}"
-      else
-        printf "%s\n" "${files[${#files[@]} - 1]}"
-      fi
-      ;;
-    *)
-      return 2
-      ;;
+  --next)
+    if ((found)); then
+      next=$(((idx + 1) % ${#files[@]}))
+      printf "%s\n" "${files[$next]}"
+    else
+      printf "%s\n" "${files[0]}"
+    fi
+    ;;
+  --prev)
+    if ((found)); then
+      prev=$(((idx - 1 + ${#files[@]}) % ${#files[@]}))
+      printf "%s\n" "${files[$prev]}"
+    else
+      printf "%s\n" "${files[${#files[@]}-1]}"
+    fi
+    ;;
+  *)
+    return 2
+    ;;
   esac
 }
 
 update_configs() {
-  local hyprlock_conf hyprpaper_conf state_file
+  local hyprpaper_conf state_file
   local wallpaper="$1"
 
-  hyprlock_conf="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
   hyprpaper_conf="$XDG_CONFIG_HOME/hypr/hyprpaper.conf"
   state_file="$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME"
 
-  printf "splash = false\n" > "$hyprpaper_conf"
-  printf "wallpaper:monitor = \nwallpaper:path = %s" "$wallpaper" >> "$hyprpaper_conf"
+  printf "splash = false\n" >"$hyprpaper_conf"
+  printf "wallpaper:monitor = \nwallpaper:path = %s" "$wallpaper" >>"$hyprpaper_conf"
 
-  printf "%s" "$wallpaper" > "$state_file"
-  sed -i "s|^\([[:space:]]*path = \).*|\1$wallpaper|" "$hyprlock_conf"
+  printf "%s" "$wallpaper" >"$state_file"
 }
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTION] <image>
 
 Options:
@@ -102,28 +110,29 @@ else
 fi
 
 case "$1" in
-  "")
-    usage
-    exit 0
-    ;;
-  --next | --prev)
-    WALLPAPER_PATH="$(toggle_wallpaper "$1")"
-    ;;
-  *.png | *.jpg | *.jpeg | *.webp)
-    WALLPAPER_PATH="$(realpath "$1")"
+"")
+  usage
+  exit 0
+  ;;
+--next | --prev)
+  WALLPAPER_PATH="$(toggle_wallpaper "$1")"
+  ;;
+*.png | *.jpg | *.jpeg | *.webp)
+  WALLPAPER_PATH="$(realpath "$1")"
 
-    if [[ ! -f "$WALLPAPER_PATH" ]]; then
-      log::error "$WALLPAPER_PATH doesn't exist!"
-      exit 1
-    fi
-    ;;
-  *)
-    usage
+  if [[ ! -f "$WALLPAPER_PATH" ]]; then
+    log::error "$WALLPAPER_PATH doesn't exist!"
     exit 1
-    ;;
+  fi
+  ;;
+*)
+  usage
+  exit 1
+  ;;
 esac
 
 hyprctl -q hyprpaper wallpaper ", $WALLPAPER_PATH"
+ln -sf "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/background"
 
 # In case if user set new wallpaper via thunar context menu
 # (e,g. user's own picture, downloaded from the internet) we

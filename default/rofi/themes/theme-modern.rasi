@@ -1,4 +1,4 @@
-@import "../vibranium/theme/current/rofi.rasi"
+@import "../vibranium/current/theme/rofi.rasi"
 @import "~/.local/share/vibranium/default/rofi/configuration.rasi"
 
 * {

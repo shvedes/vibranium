@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+# shellcheck disable=SC2034
+
+source vb-lib-core
+
+THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
+THEME_NAME_FILE="$XDG_CONFIG_HOME/vibranium/current/theme.name"
+FALLBACK_THEME="nightfox-nightfox"
+
+# Collect removable user themes: dirs inside USER_THEMES_PATH that have no
+# official counterpart. Overrides (same name as an official theme) are excluded
+# because removing them would expose the unmodified official theme, not uninstall
+# anything meaningful from the user's perspective.
+mapfile -t community_themes < <(
+  find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' |
+    sort |
+    while read -r folder; do
+      [[ ! -d "$VIBRANIUM/themes/$folder" ]] && echo "$folder"
+    done
+)
+
+if ((${#community_themes[@]} == 0)); then
+  notify-send -r 3 -t 2000 "Vibranium" "No Omarchy themes installed"
+  exit 0
+fi
+
+_capitalize() {
+  local IFS=- parts=() result=()
+  read -ra parts <<<"$1"
+  local part
+  for part in "${parts[@]}"; do
+    result+=("${part^}")
+  done
+  printf '%s' "${result[*]}"
+}
+
+# Build capitalized display names; map display -> folder for reverse lookup
+menu_items=()
+declare -A display_to_folder=()
+for folder in "${community_themes[@]}"; do
+  display="$(_capitalize "$folder")"
+  menu_items+=("$display")
+  display_to_folder["$display"]="$folder"
+done
+
+chosen_display=""
+helpers::ui::menu chosen_display "Uninstall theme" "" -selected-row 0 -- "${menu_items[@]}"
+
+if [[ -z "$chosen_display" ]]; then
+  exit 0
+fi
+
+chosen_name="${display_to_folder[$chosen_display]}"
+chosen_path="$THEMES_DIR/$chosen_name"
+
+if [[ ! -d "$chosen_path" ]]; then
+  notify-send -r 3 -t 5000 "Vibranium" "Theme folder not found: $chosen_path"
+  exit 1
+fi
+
+rm -rf "$chosen_path"
+
+# If the removed theme was active, fall back to the default
+current_theme=""
+if [[ -f "$THEME_NAME_FILE" ]]; then
+  current_theme="$(<"$THEME_NAME_FILE")"
+fi
+
+if [[ "$current_theme" == "$chosen_name" ]]; then
+  vb-theme-set "$FALLBACK_THEME"
+fi
+
+notify-send -r 3 "$chosen_name has been removed"

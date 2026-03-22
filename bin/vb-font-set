@@ -78,7 +78,7 @@ notify() {
 
 if [[ "$selected_font" == "$(vb-font-get)" ]]; then
   log::warn "'$selected_font' is already the default font"
-  notify "<span foreground='${P_ACCENT}'><b>${selected_font}</b></span> is already the default font!"
+  notify "<span foreground='$ACCENT}'><b>${selected_font}</b></span> is already the default font!"
   exit 1
 fi
 
@@ -120,4 +120,4 @@ if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
   systemctl --user restart swayosd &
 fi
 
-notify "Default font set to <span foreground='${P_ACCENT}'><b>${selected_font}</b></span>"
+notify "Default font set to <span foreground='$ACCENT}'><b>${selected_font}</b></span>"

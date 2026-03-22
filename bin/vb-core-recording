@@ -62,8 +62,9 @@ set_rec_area() {
       printf '%s' "$target"
       ;;
     region)
-      local slurp_flags=(-b ${P_GRAY}33 -c $P_ACCENT -f '%wx%h+%x+%y')
-      local selected_region="$(slurp ${slurp_flags[@]} 2> /dev/null)"
+      local slurp_flags=(-b "${P_GRAY}33" -c "$P_ACCENT" -f '%wx%h+%x+%y')
+      local selected_region
+      selected_region="$(slurp "${slurp_flags[@]}" 2> /dev/null)"
 
       printf "%s" "$selected_region"
       return 0

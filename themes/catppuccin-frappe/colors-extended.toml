@@ -1,0 +1,62 @@
+black_dim = "#232634"
+black = "#292c3c"
+black_bright = "#303446"
+
+red_dim = "#e67172"
+red = "#e78284"
+red_bright = "#e79396"
+
+pink_dim = "#f2a5da"
+pink = "#f4b8e4"
+pink_bright = "#f8ccee"
+
+green_dim = "#8ec673"
+green = "#a6d189"
+green_bright = "#bddca1"
+
+yellow_dim = "#d9bb74"
+yellow = "#e5c890"
+yellow_bright = "#f0d7ad"
+
+orange_dim = "#e9905d"
+orange = "#ef9f76"
+orange_bright = "#f4af8f"
+
+blue_dim = "#7a9ef0"
+blue = "#8caaee"
+blue_bright = "#9eb7ed"
+
+purple_dim = "#c68ee2"
+purple = "#ca9ee6"
+purple_bright = "#d0aeea"
+
+cyan_dim = "#58bfb5"
+cyan = "#81c8be"
+cyan_bright = "#a4d2c9"
+
+white_dim = "#b4c1f5"
+white = "#c6d0f5"
+white_bright = "#d9e0f6"
+
+gray_dim = "#394060"
+gray = "#414559"
+gray_bright = "#484a52"
+
+accent_dim = "#c68ee2"
+accent = "#ca9ee6"
+accent_bright = "#d0aeea"
+
+background_h = "#292c3c"
+background_0 = "#303446"
+background_1 = "#414559"
+background_2 = "#51576d"
+background_3 = "#626880"
+background_4 = "#737994"
+background_5 = "#838ba7"
+
+foreground_h = "#d6ddf8"
+foreground_0 = "#c6d0f5"
+foreground_1 = "#b5bfe2"
+foreground_2 = "#a5adce"
+foreground_3 = "#949cbb"
+foreground_4 = "#838ba7"

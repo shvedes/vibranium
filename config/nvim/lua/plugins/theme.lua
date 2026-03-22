@@ -1,0 +1,1 @@
+/home/shved/.config/vibranium/current/theme/neovim.lua

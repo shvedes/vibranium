@@ -57,8 +57,8 @@ if [[ ${#DEPS[@]} -eq 0 ]]; then
   exit 1
 fi
 
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 
-msg="Missing required dependencies: <span foreground='${P_YELLOW}'><b>${DEPS[*]}</b></span>"
+msg="Missing required dependencies: <span foreground='$YELLOW}'><b>${DEPS[*]}</b></span>"
 notify-send -r 4 "$NAME" "$msg"
 exit 1

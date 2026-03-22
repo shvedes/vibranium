@@ -117,24 +117,22 @@ if [[ "$DEVTYPE" == "disk" ]]; then
   fi
 fi
 
-source "/home/user_placeholder/.config/vibranium/theme/current/vibranium-lib-theme" 2> /dev/null || true
-
 case "$1" in
   add)
     what="Connected"
     if [[ -n "$target_dev" && "$include_devpath" -eq 1 ]]; then
-      msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> connected as <span foreground='${P_YELLOW}'><b>${target_dev}</b></span>"
+      msg="<b>${ID_MODEL}</b> connected as <b>${target_dev}</b>"
     else
-        msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> connected"
+        msg="<b>${ID_MODEL}</b> connected"
     fi
   ;;
   remove)
     what="Disconnected"
     # For remove: if DEVNAME was EFI -> we already ignored earlier. Use same logic to show dev if desired.
     if [[ -n "$target_dev" && "$include_devpath" -eq 1 ]]; then
-        msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> <span foreground='${P_RED}'><b>disconnected</b></span>"
+        msg="<b>${ID_MODEL}</b> <b>disconnected</b>"
     else
-        msg="<span foreground='${P_ACCENT}'><b>${ID_MODEL}</b></span> <span foreground='${P_RED}'><b>disconnected</b></span>"
+        msg="<b>${ID_MODEL}</b> <b>disconnected</b>"
     fi
   ;;
 esac

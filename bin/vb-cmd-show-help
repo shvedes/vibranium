@@ -1,27 +1,27 @@
 #!/usr/bin/env bash
 
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 
 case "$1" in
   "idle")
     TIME=15000
-    MSG="\n<span foreground='${P_ACCENT}'><b>•</b></span> "
+    MSG="\n<span foreground='${ACCENT}'><b>•</b></span> "
     MSG+="<b>Time of inactivity until screen lock</b>\n"
-    MSG+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+    MSG+="<span foreground='${ACCENT}'><b>•</b></span> "
     MSG+="<b>Time of inactivity before the system sleeps</b>\n\n"
     MSG+="<b>Inhibit types:</b>\n"
-    MSG+="<span foreground='${P_ACCENT}'><b>sleep</b></span> — "
+    MSG+="<span foreground='${ACCENT}'><b>sleep</b></span> — "
     MSG+="The session may lock normally, but the PC is prevented from going to sleep\n"
-    MSG+="<span foreground='${P_ACCENT}'><b>idle</b></span> — "
+    MSG+="<span foreground='${ACCENT}'><b>idle</b></span> — "
     MSG+="The system thinks you are active, so automatic locking does not trigger"
     ;;
   "confirm-kill")
     TIME=20000
-    MSG="\n<span foreground='${P_ACCENT}'><b>•</b></span> "
+    MSG="\n<span foreground='${ACCENT}'><b>•</b></span> "
     MSG+="<b>Whether to confirm action when triggering the kill window shortcut</b>\n"
-    MSG+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+    MSG+="<span foreground='${ACCENT}'><b>•</b></span> "
     MSG+="<b>Setting it to true helps prevent accidental force window kills</b>\n\n"
-    MSG+="When the <span foreground='${P_RED}'><b>force window kill</b></span> shortcut is triggered, this\n"
+    MSG+="When the <span foreground='${RED}'><b>force window kill</b></span> shortcut is triggered, this\n"
     MSG+="option asks you to press it again to confirm the action"
     ;;
   "player-fade")
@@ -32,63 +32,63 @@ case "$1" in
     ;;
   "now-playing")
     TIME=15000
-    MSG="\n<span foreground='${P_ACCENT}'><b>•</b></span> <b>"
+    MSG="\n<span foreground='${ACCENT}'><b>•</b></span> <b>"
     MSG+="Whether to show 'Now Playing' notification after screen unlock</b>\n\n"
-    MSG+="Note that when '<span foreground='${P_YELLOW}'><b>Include album art</b></span>' is "
-    MSG+="'<span foreground='${P_GREEN}'><b>true</b></span>' and a web-based player is used, it\n"
+    MSG+="Note that when '<span foreground='${YELLOW}'><b>Include album art</b></span>' is "
+    MSG+="'<span foreground='${GREEN}'><b>true</b></span>' and a web-based player is used, it\n"
     MSG+="takes some time to download an album art from the internet in order to display"
     MSG+="\n\n"
-    MSG+="<span foreground='${P_ACCENT}'><b>•</b></span> <b>Whether to pause "
+    MSG+="<span foreground='${ACCENT}'><b>•</b></span> <b>Whether to pause "
     MSG+="the active music when locking session</b>\n\n"
-    MSG+="When <span foreground='${P_GREEN}'><b>enabled</b></span>, "
+    MSG+="When <span foreground='${GREEN}'><b>enabled</b></span>, "
     MSG+="music will fade out when the screen is\nlocked and fade back in when it is unlocked."
     ;;
   "recording-flash-screen")
     TIME=10000
-    MSG="\nWhether to <span foreground='${P_YELLOW}'><b>flash</b></span> the whole screen when recording "
-    MSG+="<span foreground='${P_GREEN}'><b>starts</b></span> or <span foreground='${P_RED}'><b>stops</b></span>.\n"
+    MSG="\nWhether to <span foreground='${YELLOW}'><b>flash</b></span> the whole screen when recording "
+    MSG+="<span foreground='${GREEN}'><b>starts</b></span> or <span foreground='${RED}'><b>stops</b></span>.\n"
     MSG+="Purely aesthetic feature. The flashing effect isn't shown in the video itself"
     ;;
   "recording-codec-warning")
     TIME=10000
     TITLE="Warning"
     MSG="\nEnsure the selected codec is supported by your GPU.\n"
-    MSG+="If not, the <span foreground='${P_YELLOW}'><b>CPU</b></span> "
+    MSG+="If not, the <span foreground='${YELLOW}'><b>CPU</b></span> "
     MSG+="will be used as a fallback, which is less efficient"
     ;;
   "recording-record-type")
     TIME=30000
-    MSG="\n<span foreground='${P_YELLOW}'><b>Constant Frame Rate (CFR)</b></span>: "
+    MSG="\n<span foreground='${YELLOW}'><b>Constant Frame Rate (CFR)</b></span>: "
     MSG+="Each frame is stored at a fixed interval\n"
-    MSG+="• <span foreground='${P_GREEN}'><b>Pros</b></span>: best for editing, audio sync, and compatibility\n"
-    MSG+="• <span foreground='${P_RED}'><b>Cons</b></span>: if hardware struggles, frames may drop\n\n"
+    MSG+="• <span foreground='${GREEN}'><b>Pros</b></span>: best for editing, audio sync, and compatibility\n"
+    MSG+="• <span foreground='${RED}'><b>Cons</b></span>: if hardware struggles, frames may drop\n\n"
 
-    MSG+="<span foreground='${P_YELLOW}'><b>Variable Frame Rate (VFR)</b></span>: "
+    MSG+="<span foreground='${YELLOW}'><b>Variable Frame Rate (VFR)</b></span>: "
     MSG+="Intervals between frames can vary\n"
-    MSG+="• <span foreground='${P_GREEN}'><b>Pros</b></span>: smoother recording under load, fewer frame drops\n"
-    MSG+="• <span foreground='${P_RED}'><b>Cons</b></span>: some editors and players handle it poorly, sync can drift\n\n"
+    MSG+="• <span foreground='${GREEN}'><b>Pros</b></span>: smoother recording under load, fewer frame drops\n"
+    MSG+="• <span foreground='${RED}'><b>Cons</b></span>: some editors and players handle it poorly, sync can drift\n\n"
 
-    MSG+="Use <span foreground='${P_ACCENT}'><b>CFR</b></span> if you plan to edit the video. "
-    MSG+="Use <span foreground='${P_ACCENT}'><b>VFR</b></span> for lighter, adaptive recording"
+    MSG+="Use <span foreground='${ACCENT}'><b>CFR</b></span> if you plan to edit the video. "
+    MSG+="Use <span foreground='${ACCENT}'><b>VFR</b></span> for lighter, adaptive recording"
     ;;
   "recording-vp8-warn")
     TIME=10000
     TITLE="Warning"
-    MSG="\nYou selected the <span foreground='${P_YELLOW}'><b>WEBM</b></span> format. "
-    MSG+="\nThe <span foreground='${P_YELLOW}'>VP8</span> codec is used in this format, so it is set by default explicitly.\n\n"
-    MSG+="<span foreground='${P_RED}'>Make sure your GPU supports </span>"
-    MSG+="<span foreground='${P_YELLOW}'><b>VP8</b></span> <span foreground='${P_RED}'>encoding. If not, recording will fail.\n"
+    MSG="\nYou selected the <span foreground='${YELLOW}'><b>WEBM</b></span> format. "
+    MSG+="\nThe <span foreground='${YELLOW}'>VP8</span> codec is used in this format, so it is set by default explicitly.\n\n"
+    MSG+="<span foreground='${RED}'>Make sure your GPU supports </span>"
+    MSG+="<span foreground='${YELLOW}'><b>VP8</b></span> <span foreground='${RED}'>encoding. If not, recording will fail.\n"
     MSG+="In that case, choose a supported codec or leave the option on auto.</span>"
     ;;
   "hyprland-vrr")
     TIME=20000
-    MSG="\n<span foreground='${P_ACCENT}'><b>•</b></span> "
+    MSG="\n<span foreground='${ACCENT}'><b>•</b></span> "
     MSG+="<b>Adjusts the monitor's refresh rate to match the GPU output</b>\n\n"
-    MSG+="This <span foreground='${P_GREEN}'><b>prevents</b></span> "
-    MSG+="<span foreground='${P_ACCENT}'><b>tearing</b></span> and "
-    MSG+="<span foreground='${P_ACCENT}'><b>stuttering</b></span>, but can sometimes cause \n"
-    MSG+="visible <span foreground='${P_ACCENT}'><b>flickering</b></span> and may "
-    MSG+="<span foreground='${P_YELLOW}'><b>slightly increase eye fatigue</b></span> in some cases"
+    MSG+="This <span foreground='${GREEN}'><b>prevents</b></span> "
+    MSG+="<span foreground='${ACCENT}'><b>tearing</b></span> and "
+    MSG+="<span foreground='${ACCENT}'><b>stuttering</b></span>, but can sometimes cause \n"
+    MSG+="visible <span foreground='${ACCENT}'><b>flickering</b></span> and may "
+    MSG+="<span foreground='${YELLOW}'><b>slightly increase eye fatigue</b></span> in some cases"
     ;;
 esac
 

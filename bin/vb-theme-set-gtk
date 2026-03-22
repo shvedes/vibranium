@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+# GTK live-reload mechanism
+#
+# GTK caches CSS per theme name within a running session. Switching to the
+# same name again does nothing -- it serves from cache. Fix: keep two theme
+# slots (vibranium-a, vibranium-b) and alternate on every run. The new name
+# was never seen this session so GTK is forced to read from disk fresh.
+#
+# GTK3: live reload works via the alternating slot mechanism.
+# GTK4: libadwaita ignores named theme slots and has no live reload mechanism
+#       on bare Hyprland. Colors are written to ~/.config/gtk-4.0/gtk.css and
+#       will apply on next app restart.
+
+GTK_THEME="$XDG_CONFIG_HOME/vibranium/current/theme/gtk.css"
+
+# GTK3 -- alternating slots for live reload
+for slot in vibranium-a vibranium-b; do
+  gtk3_dir="$HOME/.local/share/themes/$slot/gtk-3.0"
+  mkdir -p "$gtk3_dir"
+  {
+    echo '@import url("/usr/share/themes/adw-gtk3/gtk-3.0/gtk.css");'
+    cat "$GTK_THEME"
+  } >"$gtk3_dir/gtk.css"
+done
+
+# GTK4 -- write user override, applies on next app restart
+mkdir -p "$XDG_CONFIG_HOME/gtk-4.0"
+cat "$GTK_THEME" >"$XDG_CONFIG_HOME/gtk-4.0/gtk.css"
+
+# Alternate between slots to bust GTK3 cache
+current=$(gsettings get org.gnome.desktop.interface gtk-theme | tr -d "'")
+next=$([ "$current" = "vibranium-a" ] && echo "vibranium-b" || echo "vibranium-a")
+gsettings set org.gnome.desktop.interface gtk-theme "$next"

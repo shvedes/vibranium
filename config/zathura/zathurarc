@@ -1,4 +1,4 @@
-include ../vibranium/theme/current/zathura
+include ../vibranium/current/theme/zathura
 
 set font "Cascadia Code 9"
 

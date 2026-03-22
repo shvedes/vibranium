@@ -1,0 +1,9 @@
+{
+	"custom/timer": {
+		"exec": "vb-bar-timer",
+		"return-type": "json",
+        "on-click": "pkill --signal TERM -f vb-util-timer",
+		"format": "{}",
+		"signal": 15
+	}
+}

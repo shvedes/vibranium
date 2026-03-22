@@ -1127,8 +1127,8 @@ while true; do
   # Append git sync options only when both conditions hold.
   if is_git_repo && has_git_remote; then
     OPTIONS+=(
-      "<span foreground='${P_YELLOW}'>[GIT]</span> Push to remote"
-      "<span foreground='${P_YELLOW}'>[GIT]</span> Pull from remote"
+      "<span foreground='$YELLOW}'>[GIT]</span> Push to remote"
+      "<span foreground='$YELLOW}'>[GIT]</span> Pull from remote"
     )
   fi
 

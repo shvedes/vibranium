@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+VB_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/theme"
+OBSIDIAN_CFG="$XDG_CONFIG_HOME/obsidian/obsidian.json"
+
+if [[ ! -f $VB_THEME_DIR/obsidian.css ]]; then
+  exit 0
+fi
+
+mapfile -t VAULTS < <(jq -r '.vaults | values[].path' "$OBSIDIAN_CFG")
+
+for vault in "${VAULTS[@]}"; do
+  [[ -d $vault/.obsidian ]] || continue
+
+  THEME_DIR="$vault/.obsidian/themes/Vibranium"
+  mkdir -p "$THEME_DIR"
+
+  [[ -f $THEME_DIR/manifest.json ]] || cat >"$THEME_DIR/manifest.json" <<'EOF'
+{
+  "name": "Vibranium",
+  "version": "1.0.0",
+  "minAppVersion": "0.16.0",
+  "description": "Automatically syncs with your current Vibranium system theme colors",
+  "author": "Vibranium",
+  "authorUrl": "https://github.com/shvedes/vibranium"
+}
+EOF
+
+  cp "$VB_THEME_DIR/obsidian.css" "$THEME_DIR/theme.css"
+done
+

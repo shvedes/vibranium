@@ -51,15 +51,15 @@ ensure_user_group() {
     log::error "To add yourself to the ${YELLOW}video${RESET} group, run:"
     log::error "'${RED}sudo ${CYAN}usermod ${YELLOW}-aG ${GREEN}video ${PURPLE}$USER${RESET}' and reboot your PC"
     if term::is_headless; then
-      msg="To add yourself to the <span foreground='${P_YELLOW}'>video</span> group, run:\n\n"
-      msg+="<b><span foreground='${P_RED}'>sudo</span> <span foreground='${P_ACCENT}'>usermod</span> "
-      msg+="<span foreground='${P_YELLOW}'>-aG</span> <span foreground='${P_GREEN}'>video</span> "
-      msg+="<span foreground='${P_PURPLE}'>$USER</span></b>\n\n"
+      msg="To add yourself to the <span foreground='$YELLOW}'>video</span> group, run:\n\n"
+      msg+="<b><span foreground='$RED}'>sudo</span> <span foreground='$ACCENT}'>usermod</span> "
+      msg+="<span foreground='$YELLOW}'>-aG</span> <span foreground='$GREEN}'>video</span> "
+      msg+="<span foreground='$PURPLE}'>$USER</span></b>\n\n"
       msg+="and reboot your laptop"
       notify-send -r 100 -t 30000 -u critical "Vibranium - Brightness" "$msg"
 
-      msg="The <span foreground='${P_YELLOW}'><b>raw</b></span> "
-      msg+="method (laptop screen) requires you to be in the <span foreground='${P_YELLOW}'><b>video</b></span> user group!"
+      msg="The <span foreground='$YELLOW}'><b>raw</b></span> "
+      msg+="method (laptop screen) requires you to be in the <span foreground='$YELLOW}'><b>video</b></span> user group!"
       notify-send -r 200 -t 10000 -u critical "Vibranium - Brightness" "$msg"
     fi
     return 1

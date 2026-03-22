@@ -9,7 +9,7 @@ theme[hi_fg]="#e57e80"
 theme[selected_bg]="#3d484d"
 theme[selected_fg]="#dabc7f"
 
-theme[inactive_fg]="#272e33"  
+theme[inactive_fg]="#3d484d"
 
 theme[graph_text]="#7a8478"
 

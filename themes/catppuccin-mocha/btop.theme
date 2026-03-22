@@ -6,7 +6,7 @@ theme[hi_fg]="#f38ba8"
 theme[selected_bg]="#45475a"
 theme[selected_fg]="#f9e2af"
 
-theme[inactive_fg]="#585b70"  
+theme[inactive_fg]="#585b70"
 
 theme[graph_text]="#6c7086"
 

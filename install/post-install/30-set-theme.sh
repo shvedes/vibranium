@@ -2,69 +2,53 @@
 
 _log_info "Applying default theme"
 
-THEME_PATH="$VIBRANIUM/themes/nightfox-nightfox"
-
-cp -r "$VIBRANIUM/config/.gtkrc-2.0" "$HOME"
+DEFAULT_THEME="$VIBRANIUM/themes/nightfox-nightfox"
+THEME_PATH="$HOME/.config/vibranium/current/theme"
 
 # Symlink the default theme.
-mkdir -p "$HOME/.config/vibranium/theme"
-ln -sf "$THEME_PATH" "$HOME/.config/vibranium/theme/current"
+mkdir -p "$THEME_PATH"
+cp -r "$DEFAULT_THEME"/* "$THEME_PATH"
+ln -s "$THEME_PATH/backgrounds/01-nightfox-bg.jpg" \
+  "$HOME/.config/vibranium/current/background"
+echo "nightfox-nightfox" >"$HOME/.config/vibranium/current/theme.name"
 
 # Symlink the btop theme as well
 mkdir -p "$HOME/.config/btop/themes"
-ln -sf "$HOME/.config/vibranium/theme/current/btop.theme" \
-  "$HOME/.config/btop/themes/current.theme"
+ln -sf "$HOME/.config/vibranium/current/theme/btop.theme" \
+  "$HOME/.config/btop/themes/vibranium.theme"
 
-# Heroic. It is not installed by default, but it will
-# automatically apply the active theme on first launch
-############################################################
-
-mkdir -p "$HOME"/.config/heroic/{store,themes}
-
-ln -sf "$HOME/.config/vibranium/theme/current/heroic.css" \
-  "$HOME/.config/heroic/themes/vibranium.css"
-
-cat > "$HOME/.config/heroic/config.json" << EOF
-{
-    "defaultSettings": {
-        "customThemesPath": "$HOME/.config/heroic/themes"
-    }
-}
-EOF
-
-cat > "$HOME/.config/heroic/store/config.json" << EOF
-{
-    "theme": "vibranium.css"
-}
-EOF
-
-############################################################
-
-# QT colors
-# mkdir -p "$HOME"/.config/qt{5,6}ct/colors
-# Keep line width relatively short
-# ln -sf "$HOME/.config/vibranium/theme/current/qt5ct.conf" \
-#   "$HOME"/.config/qt5ct/colors/vibranium.conf
-# ln -sf "$HOME/.config/vibranium/theme/current/qt6ct.conf" \
-#   "$HOME"/.config/qt6ct/colors/vibranium.conf
-# sed -i "s/user/$USER/" "$HOME"/.config/qt*ct/qt*ct.conf
-
-# GNOME appearance
-gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3-dark"
+# GNOME / GTK
+gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3"
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
-papirus-folders --theme "Papirus-Dark" --color black --once --update-caches &> /dev/null
-
-# GTK symlinks
-# mkdir -p "$HOME"/.config/gtk-{3,4}.0
-# for f in assets gtk-dark.css gtk.css; do
-#   ln -sf "$HOME/.local/share/themes/Nightfox/gtk-4.0/$f" "$HOME"/.config/gtk-4.0/
-# done
-
-ln -sf "$HOME/.local/share/vibranium/default/hypr/animations/default.conf" \
+# Default animations preset
+ln -sf "$VIBRANIUM/default/hypr/animations/default.conf" \
   "$HOME/.config/hypr/hyprland.conf.d/animations.conf"
 
+# Browser colors
+CHROME_FOLDER="/etc/chromium/policies/managed"
+CHROME_COLORS="$CHROME_FOLDER/color.json"
+BROWSER_COLORS_FILES=("$CHROME_COLORS")
+
+sudo mkdir -p "$CHROME_FOLDER"
+sudo chown -R "$USER:$USER" "$CHROME_FOLDER"
+
+# In case if user chose brave is browser of choise.
+if command -v brave >/dev/null; then
+  BRAVE_FOLDER="/etc/brave/policies/managed"
+  BRAVE_COLORS="$BRAVE_FOLDER/color.json"
+
+  sudo mkdir -p "$BRAVE_FOLDER"
+  sudo chown -R "$USER:$USER" "$BRAVE_FOLDER"
+
+  BROWSER_COLORS_FILES+=("$BRAVE_COLORS")
+fi
+
+for file in "${BROWSER_COLORS_FILES[@]}"; do
+  printf '{ "BrowserThemeColor": "#192330" }\n' >"$file"
+done
+
 # Cursor theme
-echo "Adwaita" > "$HOME/.local/state/vibranium/cursor-theme"
-echo "24" > "$HOME/.local/state/vibranium/cursor-size"
+echo "Adwaita" >"$HOME/.local/state/vibranium/cursor-theme"
+echo "24" >"$HOME/.local/state/vibranium/cursor-size"

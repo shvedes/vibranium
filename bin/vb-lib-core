@@ -5,7 +5,7 @@
 # Load defaults first
 source "$VIBRANIUM_PATH/vb-core-defaults"
 source "$XDG_CONFIG_HOME/vibranium/settings"
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 
 RED=$'\e[0;31m'
 YELLOW=$'\e[0;33m'

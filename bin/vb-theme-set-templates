@@ -1,0 +1,131 @@
+#!/usr/bin/env bash
+
+# vibranium theme applier
+#
+# COLORS FILE
+#   Reads colors from one of two TOML files in $NEXT_THEME_DIR:
+#     colors.toml           -- base palette, base16 keys (color0-color15,
+#                             foreground, background, cursor, ...)
+#     colors-extended.toml  -- named semantic keys (accent, selection, ...)
+#
+#   Both files are loaded when available and their keys are merged.
+#   The two files use disjoint key namespaces by convention, so collisions
+#   do not occur in practice.
+#
+# TEMPLATES
+#   Templates live in (user dir takes priority over built-in):
+#     $XDG_CONFIG_HOME/vibranium/themed/   -- user templates
+#     $VIBRANIUM/default/themed/           -- built-in templates
+#
+#   Two template types share the same directory:
+#     foo.tpl               -- plain template, works with both color sets
+#     foo.extended.tpl      -- extended template, skipped when only basic
+#                             colors are available
+#
+#   When both foo.tpl and foo.extended.tpl exist, the extended variant wins
+#   (processed first; the plain one is skipped via the output file guard).
+#   Output filename for both is foo (both suffixes are stripped).
+#
+# TEMPLATE SYNTAX
+#   {{ key }}            value as-is (e.g. #1e1e2e or Monospace)
+#   {{ key_strip }}      value with leading # removed (e.g. 1e1e2e)
+#   {{ key_upper }}      value uppercased (e.g. #1E1E2E or MONOSPACE)
+#   {{ key_lower }}      value lowercased (e.g. #1e1e2e or monospace)
+#
+#   Hex color keys only (values starting with #):
+#   {{ key_0x }}         0x-prefixed hex; alpha byte passed through if present
+#                          background = "#1e1e2e"    ->  0x1e1e2e
+#                          shadow     = "#1e1e2ecc"  ->  0x1e1e2ecc
+#   {{ key_r }}          red channel as decimal (e.g. 30)
+#   {{ key_g }}          green channel as decimal (e.g. 30)
+#   {{ key_b }}          blue channel as decimal (e.g. 46)
+#   {{ key_rgb }}        decimal channels (e.g. 30,30,46)
+#   {{ key_rgb_float }}  normalized float channels, 3 decimal places; alpha ignored
+#                          accent = "#cba6f7"    ->  0.796,0.651,0.969
+#                          crust  = "#181825dd"  ->  0.094,0.094,0.145
+#
+#   Alpha channels: use 8-char hex (rrggbbaa CSS order) in the TOML value to
+#   include alpha. {{ key }}, {{ key_strip }}, and {{ key_0x }} pass it through
+#   as-is. All channel variants (_r, _g, _b, _rgb, _rgb_float) decode only the
+#   first 6 digits and ignore alpha.
+#
+# WARNINGS
+#   - Both colors.toml and colors-extended.toml are loaded when available.
+#     Their key namespaces are disjoint by convention (base16 vs. named
+#     semantic keys), so plain templates referencing base16 keys work
+#     correctly regardless of whether extended colors are present.
+#   - _rgb_float precision is 3 decimal places; some apps may need more.
+#   - Inline TOML comments are stripped by discarding everything after the
+#     closing quote -- values containing a literal quote character will break.
+#   - Templates are not validated; unknown {{ key }} placeholders are left
+#     as-is in the output silently.
+
+TEMPLATES_DIR="$VIBRANIUM/default/themed"
+USER_TEMPLATES_DIR="$XDG_CONFIG_HOME/vibranium/themed"
+NEXT_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/next-theme"
+COLORS_FILE="$NEXT_THEME_DIR/colors.toml"
+COLORS_EXTENDED_FILE="$NEXT_THEME_DIR/colors-extended.toml"
+
+# Collect color sources: always start with the base file, then layer
+# extended on top when available (extended keys override base on collision)
+color_sources=()
+[[ -f $COLORS_FILE ]] && color_sources+=("$COLORS_FILE")
+[[ -f $COLORS_EXTENDED_FILE ]] && color_sources+=("$COLORS_EXTENDED_FILE")
+
+if [[ ${#color_sources[@]} -gt 0 ]]; then
+  sed_script=$(mktemp)
+
+  while IFS='=' read -r key value; do
+    key="${key//[\"\' ]/}"                # strip quotes and spaces from key
+    [[ $key && $key != \#* ]] || continue # skip empty lines and comments
+    value="${value#*[\"\']}"
+    value="${value%%[\"\']*}" # extract value between quotes (ignores inline comments)
+
+    printf 's|{{ %s }}|%s|g\n' "$key" "$value"
+    printf 's|{{ %s_strip }}|%s|g\n' "$key" "${value#\#}"
+    printf 's|{{ %s_upper }}|%s|g\n' "$key" "${value^^}"
+    printf 's|{{ %s_lower }}|%s|g\n' "$key" "${value,,}"
+
+    if [[ $value =~ ^# ]]; then
+      hex="${value#\#}"
+
+      # Inline hex -> decimal channel conversion; avoids subshell per color
+      r=$((16#${hex:0:2}))
+      g=$((16#${hex:2:2}))
+      b=$((16#${hex:4:2}))
+
+      printf 's|{{ %s_0x }}|0x%s|g\n' "$key" "$hex"
+      printf 's|{{ %s_rgb }}|%d,%d,%d|g\n' "$key" "$r" "$g" "$b"
+      printf 's|{{ %s_r }}|%d|g\n' "$key" "$r"
+      printf 's|{{ %s_g }}|%d|g\n' "$key" "$g"
+      printf 's|{{ %s_b }}|%d|g\n' "$key" "$b"
+      printf 's|{{ %s_rgb_float }}|%s|g\n' "$key" \
+        "$(awk "BEGIN{printf \"%.3f,%.3f,%.3f\", $r/255, $g/255, $b/255}")"
+    fi
+  done <"${color_sources[@]}" >"$sed_script"
+
+  shopt -s nullglob
+
+  # Process user templates first, then built-in templates (user overrides built-in).
+  # Within each dir, .extended.tpl files are processed before plain .tpl files so
+  # extended variants win over their plain counterparts via the ! -f guard below.
+  for tpl_dir in "$USER_TEMPLATES_DIR" "$TEMPLATES_DIR"; do
+    for tpl in "$tpl_dir"/*.extended.tpl "$tpl_dir"/*.tpl; do
+      filename="${tpl##*/}"            # strip directory path
+      filename="${filename%.tpl}"      # strip .tpl extension
+      filename="${filename%.extended}" # strip .extended suffix if present
+
+      # Skip .extended.tpl templates when extended colors are unavailable
+      [[ $tpl == *.extended.tpl && ! -f $COLORS_EXTENDED_FILE ]] && continue
+
+      output_path="$NEXT_THEME_DIR/$filename"
+
+      # Don't overwrite configs already written by a higher-priority source
+      if [[ ! -f $output_path ]]; then
+        sed -f "$sed_script" "$tpl" >"$output_path"
+      fi
+    done
+  done
+
+  rm "$sed_script"
+fi

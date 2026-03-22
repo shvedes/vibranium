@@ -65,7 +65,7 @@ set_output_file() {
 
 select_region() {
   local region
-  region="$(slurp -d -w 1 -b "$P_GRAY"33 -c "$P_ACCENT" 2> /dev/null)"
+  region="$(slurp -d -w 1 -b "${P_GRAY}33" -c "${P_ACCENT}" 2> /dev/null)"
 
   if [[ -z $region ]]; then
     return 1

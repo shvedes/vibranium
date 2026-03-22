@@ -1,12 +1,31 @@
 [general]
-import = [
-	"../../.local/share/vibranium/default/alacritty.toml",
-	"../vibranium/theme/current/alacritty.toml"
+live_config_reload = true
+import = ["../vibranium/current/theme/alacritty.toml"]
+
+[font]
+size = 10
+
+[colors]
+draw_bold_text_with_bright_colors = true
+
+[selection]
+# Automatically copy selected
+# text to the clipboard
+save_to_clipboard = true
+
+[window]
+opacity = 0.95
+dynamic_padding = true
+dynamic_title	= true
+startup_mode	= "Windowed"
+padding = { x = 10, y = 10 }
+
+[keyboard]
+bindings = [
+  # Open new window with CTRL + SHIFT + N
+	{ key = "N", mods = "Control|Shift", action = "CreateNewWindow" }
 ]
 
 [font.normal]
 family = "Cascadia Code"
 style  = "Regular"
-
-[window]
-opacity = 0.95

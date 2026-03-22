@@ -101,16 +101,16 @@ if [[ -z "$title" ]]; then
   fi
   pango_output="$filename"
   plain_output="$filename"
-  notify_body="<span foreground='${P_ORANGE}'> $filename</span>"
+  notify_body="<span foreground='$ORANGE}'> $filename</span>"
 else
   if [[ -z "$artist" ]]; then
     pango_output="$title"
     plain_output="$title"
-    notify_body="<span foreground='${P_ORANGE}'> $title</span>"
+    notify_body="<span foreground='$ORANGE}'> $title</span>"
   else
-    pango_output="$title <span foreground='${P_YELLOW}'>by</span> $artist"
+    pango_output="$title <span foreground='$YELLOW}'>by</span> $artist"
     plain_output="$title by $artist"
-    notify_body="<span foreground='${P_ORANGE}'> $title</span>\n<span foreground='${P_YELLOW}'> $artist</span>"
+    notify_body="<span foreground='$ORANGE}'> $title</span>\n<span foreground='$YELLOW}'> $artist</span>"
   fi
 fi
 

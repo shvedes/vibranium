@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
-enabled="$(vb-cmd-get-option VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE)"
-if [[ $enabled == false ]]; then
+source vb-lib-core
+
+helpers::check VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE
+if [[ "$VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE" == false ]]; then
   printf '{"text": ""}'
   exit 0
 fi
@@ -12,7 +14,7 @@ if [[ $state == "active" ]]; then
   config="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
   current="$(grep -oP '(?<=temperature = ).*' "$config")"
   tooltip="Night Light temperature: ${current}K"
-  printf '{"text": "%s", "tooltip": "%s"}' "\\udb80\\udf35" "$tooltip"
+  printf '{"text": "%s", "tooltip": "%s"}' "\udb86\ude4c" "$tooltip"
 else
-  printf '{"text": "%s", "tooltip": "Night Light is suspended"}' "\\udb80\\udf35"
+  printf '{"text": "%s", "tooltip": "Night Light suspended", "class": "suspended"}' "\udb86\ude4c"
 fi

@@ -33,18 +33,18 @@ function fish_prompt
     set -l last_status $status
 
     # Colors
-    set -l bold_cyan  (set_color --bold cyan)
+    set -l bold_cyan (set_color --bold cyan)
     set -l bold_green (set_color --bold green)
-    set -l bold_red   (set_color --bold red)
+    set -l bold_red (set_color --bold red)
 
-    set -l ital_cyan  (set_color --italics cyan)
+    set -l ital_cyan (set_color --italics cyan)
 
-    set -l cyan       (set_color cyan)
-    set -l green      (set_color green)
-    set -l red        (set_color red)
-    set -l gray       (set_color brblack)
-    set -l yellow     (set_color yellow)
-    set -l reset      (set_color normal)
+    set -l cyan (set_color cyan)
+    set -l green (set_color green)
+    set -l red (set_color red)
+    set -l gray (set_color brblack)
+    set -l yellow (set_color yellow)
+    set -l reset (set_color normal)
 
     set -l dir_str ""
 
@@ -97,7 +97,7 @@ function fish_prompt
             set branch (git rev-parse --short HEAD 2>/dev/null)
         end
         if test -n "$branch"
-            set branch_str $gray"at $ital_cyan$branch$reset "
+            set branch_str $yellow"at $ital_cyan$branch$reset "
         end
     end
 
@@ -108,7 +108,7 @@ function fish_prompt
 
         # Ahead / behind upstream
         set -l behind_count 0
-        set -l ahead_count  0
+        set -l ahead_count 0
         set -l ab (git rev-list --count --left-right "@{upstream}...HEAD" 2>/dev/null)
         if test -n "$ab"
             echo $ab | read --delimiter \t behind_count ahead_count
@@ -123,16 +123,16 @@ function fish_prompt
 
         # Porcelain file statuses
         set -l conflicted 0
-        set -l untracked  0
-        set -l modified   0
-        set -l staged     0
-        set -l renamed    0
-        set -l deleted    0
+        set -l untracked 0
+        set -l modified 0
+        set -l staged 0
+        set -l renamed 0
+        set -l deleted 0
 
         while read -l line
             set -l xy (string sub -l 2 -- $line)
-            set -l x  (string sub -l 1 -- $xy)
-            set -l y  (string sub -s 2 -l 1 -- $xy)
+            set -l x (string sub -l 1 -- $xy)
+            set -l y (string sub -s 2 -l 1 -- $xy)
 
             if test "$xy" = "??"
                 set untracked 1
@@ -145,16 +145,21 @@ function fish_prompt
             end
 
             switch $x
-                case R;      set renamed 1
-                case D;      set deleted 1
-                case A C M;  set staged 1
+                case R
+                    set renamed 1
+                case D
+                    set deleted 1
+                case A C M
+                    set staged 1
             end
 
             switch $y
-                case D;    set deleted 1
-                case M C;  set modified 1
+                case D
+                    set deleted 1
+                case M C
+                    set modified 1
             end
-        end < (git status --porcelain=v1 2>/dev/null | psub)
+        end <(git status --porcelain=v1 2>/dev/null | psub)
 
         # Stash
         set -l stashed 0
@@ -163,13 +168,27 @@ function fish_prompt
         end
 
         # Assemble symbols
-        if test $conflicted -eq 1;  set gs_flags "$gs_flags"$red\[!\]$reset\ ; end
-        if test $untracked  -eq 1;  set gs_flags "$gs_flags"$cyan\[U\]$reset\ ; end
-        if test $modified   -eq 1;  set gs_flags "$gs_flags"$green\[M\]$reset\ ; end
-        if test $stashed    -eq 1;  set gs_flags "$gs_flags"$gray\[S\]$reset\ ; end
-        if test $staged     -eq 1;  set gs_flags "$gs_flags"$yellow\[+\]$reset\ ; end
-        if test $renamed    -eq 1;  set gs_flags "$gs_flags"$cyan\[R\]$reset\ ; end
-        if test $deleted    -eq 1;  set gs_flags "$gs_flags"$red\[D\]$reset\ ; end
+        if test $conflicted -eq 1
+            set gs_flags "$gs_flags"$red\[!\]$reset\ 
+        end
+        if test $untracked -eq 1
+            set gs_flags "$gs_flags"$cyan\[U\]$reset\ 
+        end
+        if test $modified -eq 1
+            set gs_flags "$gs_flags"$green\[M\]$reset\ 
+        end
+        if test $stashed -eq 1
+            set gs_flags "$gs_flags"$gray\[S\]$reset\ 
+        end
+        if test $staged -eq 1
+            set gs_flags "$gs_flags"$yellow\[+\]$reset\ 
+        end
+        if test $renamed -eq 1
+            set gs_flags "$gs_flags"$cyan\[R\]$reset\ 
+        end
+        if test $deleted -eq 1
+            set gs_flags "$gs_flags"$red\[D\]$reset\ 
+        end
 
         set status_str "$cyan$gs_flags$reset"
     end

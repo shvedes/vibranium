@@ -4,6 +4,31 @@ font = "Cascadia Code 9"
 
 timeout = 3
 corner_radius = 0
+
+layer = top
+follow = mouse
+icon_theme = Papirus
+notification_limit = 3
+
+frame_width = 2
+gap_size = 10
+width = (200, 600)
+height = (0, 400)
+offset = (15, 15)
+
+indicate_hidden = false
+sort = update
+show_indicators = false
+mouse_left_click = do_action
+mouse_right_click = close_current
+
+progress_bar = true
+progress_bar_height = 10
+progress_bar_frame_width = 0
 progress_bar_corner_radius = 0
+progress_bar_horizontal_alignment = left
+
+[fullscreen]
+fullscreen = delay
 
 # vim:ft=cfg

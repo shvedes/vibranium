@@ -1,5 +1,113 @@
+/*
+ * These colors are used as fallback values
+ * when a custom Omarchy theme does not provide
+ * a Waybar style.css.
+ */
+@define-color foreground white;
+@define-color background black;
+@define-color urgent red;
 
-@import url("../../.local/share/vibranium/default/waybar/style.css");
+/* These colors and the entire Waybar appearance
+ * may be overridden by the imported theme.
+ */
+@import "../vibranium/current/theme/waybar.css";
+
+* {
+  /* Ignore installed GTK theme */
+  all: initial;
+
+	background: @background;
+	color:      @foreground;
+
+	font-family: 'Symbols Nerd Font Mono', 'Cascadia Code';
+	font-size:  12px;
+}
+
+tooltip label {
+	font-size: 12px;
+}
+
+#workspaces {
+  margin-left: 4px;
+}
+
+#workspaces button {
+  min-width: 24px;
+}
+
+@keyframes urgent-workspace {
+	0% { color: @urgent }
+}
+
+#workspaces button.urgent {
+	animation: urgent-workspace 1s infinite;
+}
+
+.modules-right {
+  margin-right: 6px;
+}
+
+.modules-right .module {
+  font-size: 11.5px;
+	margin: 0px 7px;
+}
+
+#workspaces button.empty,
+#custom-color-picker.empty,
+#custom-nightshift.suspended,
+#pulseaudio.microphone.source-muted,
+#pulseaudio.volume.muted {
+  opacity: 0.5;
+}
+
+#clock {
+  margin: 0px 14px;
+}
+
+#tray {
+	margin-right: 8px;
+}
+
+@keyframes flashing-animation {
+  0%   { color: @foreground }
+  25%  { color: @foreground }
+  50%  { color: @urgent }
+  75%  { color: @urgent }
+}
+
+#custom-confirm-kill {
+	color: @foreground;
+	animation: flashing-animation 1s infinite
+}
+
+#custom-recording-indicator {
+	color: @urgent;
+}
+
+#custom-separator,
+#custom-dynamic-separator {
+  opacity: 0.4
+}
+
+#network.disconnected {
+	color: @urgent
+}
+
+#custom-timer.expired {
+  animation: timer-flash 1.05s infinite;
+}
+
+@keyframes timer-flash {
+  0% {
+    color: @foreground;
+  }
+  50% {
+    color: @urgent;
+  }
+  100% {
+    color: @foreground;
+  }
+}
 
 window#waybar {
     font-family: 'Symbols Nerd Font Mono', 'Cascadia Code';

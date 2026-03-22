@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 
 # Checking file existance is faster
 # than calling pacman -Q.

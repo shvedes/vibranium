@@ -26,11 +26,14 @@ contrast_color() {
   fi
 }
 
+# Default to "empty" class when there is no history
+class="empty"
 tooltip="Click to pick a color"
 
 if [[ -s $history_file ]]; then
+  class=""
   tooltip="\tClick to pick a color"
-  tooltip+="\n     Right click to <span foreground='red3'><b>clear history</b></span>"
+  tooltip+="\n     Right click to <b>clear history</b>"
   tooltip+="\n<span foreground='gray'>---------------------------------------</span>"
   tooltip+="\\n\\t    <span size='9000'>Recent colors</span>"
 
@@ -40,4 +43,4 @@ if [[ -s $history_file ]]; then
   done < "$history_file"
 fi
 
-printf '{"text": "%s", "tooltip": "%s"}' "\uf1fb" "$tooltip"
+printf '{"text": "%s", "tooltip": "%s", "class": "%s"}' "\udb80\udf01" "$tooltip" "$class"

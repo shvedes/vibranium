@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+
+source vb-lib-core
+
+_operation_canceled() {
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+
+  term::enable_input
+}
+
+term::show_header
+
+# https://github.com/basecamp/omarchy/releases/tag/v3.3.0
+echo -e "${BLUE}[VIBRANIUM]${RESET} Vibranium only supports themes compatible with Omarchy v3.3.0+"
+
+if [[ -z "$1" ]]; then
+  read -rp "${YELLOW}[VIBRANIUM]${RESET} Git repo URL: " REPO_URL
+else
+  REPO_URL="$1"
+fi
+
+if [[ -z "$REPO_URL" ]]; then
+  echo "${RED}[VIBRANIUM]${RESET} No URL provided!"
+  _operation_canceled
+  exit 1
+fi
+
+# Validate: must be an https URL
+if [[ ! "$REPO_URL" =~ ^https:// ]]; then
+  echo "${RED}[VIBRANIUM}${RESET} You must provide URL!"
+  _operation_canceled
+  exit 1
+fi
+
+# Extract owner/repo from GitHub URL for the API, stripping scheme, host, and .git suffix
+REPO_PATH="${REPO_URL#https://github.com/}"
+REPO_PATH="${REPO_PATH%.git}"
+REPO_PATH="${REPO_PATH%/}" # guard against a trailing slash
+
+THEME_NAME="${REPO_URL%.git}"
+THEME_NAME="${THEME_NAME##*/}"
+THEME_NAME="${THEME_NAME#omarchy-}"
+THEME_NAME="${THEME_NAME%-theme}"
+
+THEMES_DIR="$HOME/.config/vibranium/themes"
+THEME_PATH="$THEMES_DIR/$THEME_NAME"
+
+# Fetch the repo root listing once - checks both candidate files in a single request
+# so we don't risk hitting the GitHub API rate limit with two separate calls
+if ! CONTENTS=$(curl -sf "https://api.github.com/repos/$REPO_PATH/contents/"); then
+  echo "${RED}[VIBRANIUM]${RESET} Could not reach repo or repo does not exist"
+  _operation_canceled
+  exit 1
+fi
+
+# Match strictly against the JSON name field - guards against partial matches
+# (e.g. a file called "my-colors.toml" must not pass)
+if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] &&
+  [[ "$CONTENTS" != *'"name": "colors-extended.toml"'* ]]; then
+  echo "${RED}[VIBRANIUM]${RESET} This theme is not compatible with Omarchy v3.3.0+"
+  _operation_canceled
+  exit 1
+fi
+
+# Remove stale copy of this theme if one already exists
+if [[ -d "$THEME_PATH" ]]; then
+  rm -rf "$THEME_PATH"
+fi
+
+if ! git clone "$REPO_URL" "$THEME_PATH"; then
+  echo "${RED}[VIBRANIUM]${RESET} Failed to clone theme repo"
+  exit 1
+fi
+
+vb-theme-set "$THEME_NAME"

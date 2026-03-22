@@ -1,6 +1,39 @@
-@import url("../vibranium/theme/current/swayosd.css");
-@import url("../../.local/share/vibranium/default/swayosd.css");
+@import url("../vibranium/current/theme/swayosd.css");
 
-window#osd, progressbar {
+window#osd {
+  padding: 0px 6px;
+  border: 2px solid @border;
+  border-radius: 0px;
+  background: @background;
+}
+
+image, label {
+	color: @text;
+}
+
+progressbar:disabled, image:disabled {
+	opacity: 0.5;
+}
+
+progressbar {
+	min-height: 16px;
 	border-radius: 0px;
+}
+
+trough {
+	min-height: inherit;
+	border-radius: inherit;
+	border: none;
+	background: @border;
+}
+
+progress {
+	min-height: inherit;
+	border-radius: 0px;
+	border: none;
+	background: @accent;
+}
+
+#container {
+	margin:6px;
 }

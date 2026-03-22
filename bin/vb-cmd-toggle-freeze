@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 source vb-lib-core
-source "$XDG_CONFIG_HOME/vibranium/theme/current/vibranium-lib-theme"
+source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 
 usage() {
   cat << EOF
@@ -41,4 +41,4 @@ else
   msg="restored"
 fi
 
-notify-send -r 3 "Vibranium" "<span foreground='${P_YELLOW}'>${NAME}</span> $msg"
+notify-send -r 3 "Vibranium" "<span foreground='$YELLOW}'>${NAME}</span> $msg"
