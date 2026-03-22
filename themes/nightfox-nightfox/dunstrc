@@ -2,13 +2,13 @@
 format      = "<span foreground='#719cd6' size='10000'><b>%s</b></span>\n%b"
 background  = "#192330"
 foreground  = "#cdcecf"
-frame_color = "#738091"
+frame_color = "#719cd6"
 highlight   = "#719cd6"
 
 [urgency_low]
 background  = "#192330"
 foreground  = "#cdcecf"
-frame_color = "#738091"
+frame_color = "#719cd6"
 highlight   = "#719cd6"
 
 [urgency_critical]
