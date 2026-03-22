@@ -52,3 +52,5 @@ done
 # Cursor theme
 echo "Adwaita" >"$HOME/.local/state/vibranium/cursor-theme"
 echo "24" >"$HOME/.local/state/vibranium/cursor-size"
+
+ln -s ~/.config/vibranium/current/theme/neovim.lua ~/.config/nvim/lua/plugins/theme.lua
