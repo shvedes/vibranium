@@ -1,23 +1,23 @@
-@define-color background {{ background_0 }};
-@define-color foreground {{ foreground_0 }};
+@define-color background {{ background }};
+@define-color foreground {{ foreground }};
 
 @define-color accent {{ accent }};
-@define-color black {{ background_0 }};
-@define-color red {{ red }};
-@define-color green {{ green }};
-@define-color yellow {{ yellow }};
-@define-color blue {{ blue }};
-@define-color magenta {{ purple }};
-@define-color cyan {{ cyan }};
-@define-color white {{ white }};
-@define-color bright_black {{ black_bright }};
-@define-color bright_red {{ red_bright }};
-@define-color bright_green {{ green_bright }};
-@define-color bright_yellow {{ yellow_bright }};
-@define-color bright_blue {{ blue_bright }};
-@define-color bright_magenta {{ purple_bright }};
-@define-color bright_cyan {{ cyan_bright }};
-@define-color bright_white {{ white_bright }};
+@define-color black {{ color0 }};
+@define-color red {{ color1 }};
+@define-color green {{ color2 }};
+@define-color yellow {{ color3 }};
+@define-color blue {{ color4 }};
+@define-color magenta {{ color5 }};
+@define-color cyan {{ color6 }};
+@define-color white {{ color7 }};
+@define-color bright_black {{ color8 }};
+@define-color bright_red {{ color9 }};
+@define-color bright_green {{ color10 }};
+@define-color bright_yellow {{ color11 }};
+@define-color bright_blue {{ color12 }};
+@define-color bright_magenta {{ color13 }};
+@define-color bright_cyan {{ color14 }};
+@define-color bright_white {{ color15 }};
 
 /* Adwaita Color Overrides */
 @define-color accent_bg_color @accent;
@@ -35,10 +35,10 @@
 @define-color sidebar_shade_color @black;
 
 /* Secondary sidebar (libadwaita) */
-@define-color secondary_sidebar_bg_color {{ background_h }};
+@define-color secondary_sidebar_bg_color @background;
 @define-color secondary_sidebar_fg_color @foreground;
-@define-color secondary_sidebar_backdrop_color {{ background_h }};
-@define-color secondary_sidebar_shade_color {{ background_h }};
+@define-color secondary_sidebar_backdrop_color @background;
+@define-color secondary_sidebar_shade_color @background;
 
 /* Headerbar */
 @define-color headerbar_bg_color @background;
@@ -58,18 +58,18 @@
 @define-color dialog_fg_color @foreground;
 
 /* OSD (on-screen display, e.g. volume overlay) */
-@define-color osd_bg_color {{ background_1 }};
+@define-color osd_bg_color @background;
 @define-color osd_fg_color @foreground;
 
 /* Thumbnails and banners */
-@define-color thumbnail_bg_color {{ background_2 }};
+@define-color thumbnail_bg_color background;
 @define-color thumbnail_fg_color @foreground;
-@define-color banner_bg_color {{ background_2 }};
+@define-color banner_bg_color background;
 @define-color banner_fg_color @foreground;
 
 /* Scrollbar and shade */
-@define-color shade_color {{ background_1 }};
-@define-color scrollbar_outline_color {{ background_1 }};
+@define-color shade_color background;
+@define-color scrollbar_outline_color background;
 
 /* Semantic states */
 @define-color destructive_bg_color @red;
@@ -110,7 +110,7 @@
 /* GTK3 legacy extras */
 @define-color selected_bg_color @accent;
 @define-color selected_fg_color @background;
-@define-color tooltip_bg_color {{ background_1 }};
+@define-color tooltip_bg_color background;
 @define-color tooltip_fg_color @foreground;
 @define-color link_color @blue;
 @define-color visited_link_color @magenta;
@@ -124,8 +124,8 @@
 @define-color wm_bg_color @background;
 @define-color wm_fg_color @foreground;
 @define-color wm_border_color alpha(@foreground, 0.1);
-@define-color wm_button_hover_color {{ background_1 }};
-@define-color wm_button_active_color {{ background_2 }};
+@define-color wm_button_hover_color alpha(@background, 0.8);
+@define-color wm_button_active_color alpha(@background, 0.8);
 @define-color wm_close_hover_color @red;
 @define-color wm_close_active_color @bright_red;
 
@@ -138,7 +138,7 @@ messagedialog {
 /* Target the main message label inside the dialog */
 messagedialog label {
     color: @dialog_fg_color;
-    font-size: 12pt;
+    font-size: 14pt;
     font-weight: bold;
 }
 
@@ -157,7 +157,7 @@ messagedialog button {
 }
 
 messagedialog button:hover {
-    background-color: {{ accent }};
+    background-color: rgba({{ accent_rgb }},0.8);
 }
 
 banner revealer widget {
@@ -194,7 +194,7 @@ filechooser .dialog-action-box:backdrop {
 }
 
 filechooser #pathbarbox {
-    border-bottom: 1px solid {{ background_3 }};
+    border-bottom: 1px solid @bright_black;
 }
 
 filechooserbutton:drop(active) {
