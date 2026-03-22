@@ -196,7 +196,6 @@ _manage_user_wallpapers() {
       case "$chosen" in
       "Open")
         imv "$wallpaper_dir/$target"
-        helpers::ui::close_menus
         ;;
       "Delete")
         rm -f "$wallpaper_dir/$target"
@@ -226,7 +225,7 @@ _manage_user_wallpapers() {
 
   for f in "$wallpaper_dir"/*; do
     if [[ -f "$f" ]]; then
-      files+=(${f##*/})
+      files+=("${f##*/}")
     fi
   done
 
