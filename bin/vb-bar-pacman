@@ -135,7 +135,7 @@ if ((TOTAL_COUNT > 125)); then
 
   if ((now - last >= NOTIF_INTERVAL)); then
     msg+="Remember that on Arch, it is recommended to update your system regularly"
-    notify-send -r 3 -t $((120 * 1000)) "More Than $TOTAL_COUNT Are Avaiting Updates" "$msg"
+    notify-send -r 3 -t $((120 * 1000)) "More Than $TOTAL_COUNT Are Awaiting Updates" "$msg"
     echo "$now" >"$NOTIF_STATE_FILE"
   fi
 fi
