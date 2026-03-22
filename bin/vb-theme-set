@@ -60,7 +60,8 @@ _discover_in_dir() {
   local theme_dir folder family variant light chosen key val
 
   for theme_dir in "$dir"/*/; do
-    # Pure-bash basename: strip trailing slash then everything up to last slash
+    [[ -d "$theme_dir" ]] || continue
+
     folder="${theme_dir%/}"
     folder="${folder##*/}"
 
