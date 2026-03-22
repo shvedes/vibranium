@@ -16,7 +16,7 @@ source vb-lib-core
 
 # Guard: verify `pass` is installed before doing anything else.
 # If missing, offer a one-click install via a notification action button.
-if ! command -v pass > /dev/null; then
+if ! command -v pass >/dev/null; then
   notify-send -r 1 -t 5000 \
     "Password Manager" \
     "The password manager package is not installed!"
@@ -89,7 +89,7 @@ is_git_repo() {
 # True when the local git repo has a remote named 'origin' configured.
 # git exits 0 when the remote exists, non-zero otherwise.
 has_git_remote() {
-  git -C "$PASSWORD_STORE_DIR" remote get-url origin > /dev/null 2>&1
+  git -C "$PASSWORD_STORE_DIR" remote get-url origin >/dev/null 2>&1
 }
 
 # True when the store contains at least one encrypted entry (.gpg file),
@@ -101,7 +101,7 @@ has_password_entries() {
     find "$PASSWORD_STORE_DIR" \
       -type f -name "*.gpg" \
       ! -path "$PASSWORD_STORE_DIR/.git/*" \
-      2> /dev/null
+      2>/dev/null
   )
   ((${#_hpe_tmp[@]} > 0))
 }
@@ -254,7 +254,7 @@ ensure_gpg_unlocked() {
   # Exit code is propagated directly to the caller:
   #   0        = decryption succeeded; key is now cached in the agent
   #   non-zero = user closed pinentry, wrong key, or agent error
-  gpg -q --no-tty -d "$gpg_file" > /dev/null 2>&1
+  gpg -q --no-tty -d "$gpg_file" >/dev/null 2>&1
   return $?
 }
 
@@ -271,7 +271,7 @@ ensure_gpg_unlocked() {
 # current HEAD — works correctly regardless of branch naming.
 # Uses git directly (not `pass git`) for predictable, unmodified exit codes.
 git_push_with_upstream_check() {
-  if ! git -C "$PASSWORD_STORE_DIR" rev-parse --verify "@{u}" > /dev/null 2>&1; then
+  if ! git -C "$PASSWORD_STORE_DIR" rev-parse --verify "@{u}" >/dev/null 2>&1; then
     # No upstream configured yet: set it on this first push.
     git -C "$PASSWORD_STORE_DIR" push -u origin
   else
@@ -288,7 +288,7 @@ git_push_with_upstream_check() {
 #   -c 1     : one probe packet per attempt
 #   -W 1     : wait at most 1 second per attempt before retrying
 wait_for_internet() {
-  while ! ping -c 1 -W 1 1.1.1.1 > /dev/null 2>&1; do
+  while ! ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; do
     sleep 1
   done
 }
@@ -306,14 +306,14 @@ wait_for_internet() {
 # This function is also exported via `export -f` so the child bash process
 # spawned by the Edit action can call it after `pass edit` finishes.
 async_git_push() {
-  printf '%s' "Password Manager: waiting for internet connection..." > "$ACTION"
+  printf '%s' "Password Manager: waiting for internet connection..." >"$ACTION"
   vb-cmd-refresh-bar-module password-manager
 
   # Block here. Parent shell and rofi UI remain fully responsive because
   # this entire function runs in a detached background process.
   wait_for_internet
 
-  printf '%s' "Password Manager: pushing local changes to remote..." > "$ACTION"
+  printf '%s' "Password Manager: pushing local changes to remote..." >"$ACTION"
   vb-cmd-refresh-bar-module password-manager
 
   # Capture combined stdout + stderr so we can include git's actual error
@@ -351,7 +351,7 @@ push_after_edit_if_needed() {
   is_git_repo && has_git_remote || return 0
 
   # No upstream tracking ref yet (first push ever) — push unconditionally.
-  if ! git -C "$PASSWORD_STORE_DIR" rev-parse --verify "@{u}" > /dev/null 2>&1; then
+  if ! git -C "$PASSWORD_STORE_DIR" rev-parse --verify "@{u}" >/dev/null 2>&1; then
     async_git_push &
     return 0
   fi
@@ -360,7 +360,7 @@ push_after_edit_if_needed() {
   #   exit 0 → identical trees (nothing committed since last sync) → skip
   #   exit 1 → trees differ (new commit exists locally) → push
   # Avoids any external counter or subshell just to detect a new commit.
-  if ! git -C "$PASSWORD_STORE_DIR" diff --quiet HEAD "@{u}" 2> /dev/null; then
+  if ! git -C "$PASSWORD_STORE_DIR" diff --quiet HEAD "@{u}" 2>/dev/null; then
     async_git_push &
   fi
 }
@@ -418,7 +418,7 @@ pick_location() {
       find "$full_dir" \
         -mindepth 1 -maxdepth 1 \
         -type d ! -name ".git" \
-        -printf "%f\n" 2> /dev/null |
+        -printf "%f\n" 2>/dev/null |
         sort -V
     )
 
@@ -536,7 +536,7 @@ pick_password_path() {
       find "$full_dir" \
         -mindepth 1 -maxdepth 1 \
         -type d ! -name ".git" \
-        -printf "%f\n" 2> /dev/null |
+        -printf "%f\n" 2>/dev/null |
         sort -V
     )
     # Strip .gpg extension: pass addresses entries by logical name, not filename.
@@ -544,7 +544,7 @@ pick_password_path() {
       find "$full_dir" \
         -maxdepth 1 \
         -type f -name "*.gpg" \
-        -printf "%f\n" 2> /dev/null |
+        -printf "%f\n" 2>/dev/null |
         sed 's/\.gpg$//' |
         sort -V
     )
@@ -695,231 +695,231 @@ action() {
 
   case "$action_chosen" in
 
-    "Copy")
-      # `pass show` outputs the password on line 1, then optional metadata
-      # (username, URL, notes) on subsequent lines. We want ONLY line 1.
-      # Process substitution < <(...) feeds pass output into `read` without
-      # forking a subshell for the read side. `read` consumes exactly one
-      # line and discards the rest, so only the password reaches first_line.
-      local first_line=""
-      { IFS= read -r first_line; } < <(pass show "$password" 2> /dev/null)
+  "Copy")
+    # `pass show` outputs the password on line 1, then optional metadata
+    # (username, URL, notes) on subsequent lines. We want ONLY line 1.
+    # Process substitution < <(...) feeds pass output into `read` without
+    # forking a subshell for the read side. `read` consumes exactly one
+    # line and discards the rest, so only the password reaches first_line.
+    local first_line=""
+    { IFS= read -r first_line; } < <(pass show "$password" 2>/dev/null)
 
-      if [[ -n "$first_line" ]]; then
-        # printf '%s' avoids appending a trailing newline to clipboard
-        # content (echo would add one, which some sites reject as invalid).
-        printf '%s' "$first_line" | wl-copy
-        notify-send -r 3 "Password Manager" "Password copied to clipboard"
-        return 0
-      else
-        notify-send -r 4 -t 3000 -u critical \
-          "Password Manager" "Failed to decrypt: $password"
-        return 1
-      fi
-      ;;
-
-    "Edit")
-      # Pre-warm the GPG agent BEFORE forking the terminal.
-      # See ensure_gpg_unlocked's docstring for the full rationale.
-      # If the key is already cached, this returns 0 instantly.
-      # If not, pinentry appears HERE — synchronously, in the foreground —
-      # BEFORE the terminal window opens.
-      if ! ensure_gpg_unlocked "$password"; then
-        # User cancelled pinentry or gpg failed. Do NOT open the terminal.
-        # Returning 1 keeps us in the action menu — not a full exit.
-        notify-send -r 4 -t 3000 -u critical \
-          "Password Manager" "Failed to unlock keyring. Edit cancelled."
-        return 1
-      fi
-
-      # Export the password path as an environment variable so the child
-      # bash process can access it without quoting concerns.
-      # Single quotes in the bash -c body prevent expansion in THIS shell;
-      # the child shell expands $_VB_EDIT_PASSWORD from its own environment.
-      export _VB_EDIT_PASSWORD="$password"
-
-      # Fork a floating terminal that:
-      #   1. Runs `pass edit`: decrypt → $EDITOR → re-encrypt → git commit
-      #   2. After the editor closes, calls push_after_edit_if_needed, which
-      #      checks whether a commit was actually made and only then pushes.
-      # vb-core-term forks and returns immediately to the parent shell, so
-      # the push logic MUST run inside the terminal's bash -c process —
-      # not in the parent (where it would run before editing even starts).
-      # All needed functions are available via export -f (done at script top).
-      vb-core-term --floating --title password-manager -- \
-        bash -c "pass edit "$_VB_EDIT_PASSWORD"; push_after_edit_if_needed"
-
+    if [[ -n "$first_line" ]]; then
+      # printf '%s' avoids appending a trailing newline to clipboard
+      # content (echo would add one, which some sites reject as invalid).
+      printf '%s' "$first_line" | wl-copy
+      notify-send -r 3 "Password Manager" "Password copied to clipboard"
       return 0
-      ;;
+    else
+      notify-send -r 4 -t 3000 -u critical \
+        "Password Manager" "Failed to decrypt: $password"
+      return 1
+    fi
+    ;;
 
-    "Move")
-      local target_location
-      # pick_location writes the chosen path into target_location via nameref.
-      if ! pick_location target_location "" "move"; then
-        return 1
-      fi
+  "Edit")
+    # Pre-warm the GPG agent BEFORE forking the terminal.
+    # See ensure_gpg_unlocked's docstring for the full rationale.
+    # If the key is already cached, this returns 0 instantly.
+    # If not, pinentry appears HERE — synchronously, in the foreground —
+    # BEFORE the terminal window opens.
+    if ! ensure_gpg_unlocked "$password"; then
+      # User cancelled pinentry or gpg failed. Do NOT open the terminal.
+      # Returning 1 keeps us in the action menu — not a full exit.
+      notify-send -r 4 -t 3000 -u critical \
+        "Password Manager" "Failed to unlock keyring. Edit cancelled."
+      return 1
+    fi
 
-      local filename="${password##*/}"
-      if [[ -z "$target_location" ]]; then
-        new_path="$filename"
-      else
-        new_path="$target_location/$filename"
-      fi
+    # Export the password path as an environment variable so the child
+    # bash process can access it without quoting concerns.
+    # Single quotes in the bash -c body prevent expansion in THIS shell;
+    # the child shell expands $_VB_EDIT_PASSWORD from its own environment.
+    export _VB_EDIT_PASSWORD="$password"
 
-      if [[ "$new_path" == "$password" ]]; then
-        notify-send -r 3 -t 2500 "Password Manager" "Same location, nothing to move"
-        return 1
-      fi
+    # Fork a floating terminal that:
+    #   1. Runs `pass edit`: decrypt → $EDITOR → re-encrypt → git commit
+    #   2. After the editor closes, calls push_after_edit_if_needed, which
+    #      checks whether a commit was actually made and only then pushes.
+    # vb-core-term forks and returns immediately to the parent shell, so
+    # the push logic MUST run inside the terminal's bash -c process —
+    # not in the parent (where it would run before editing even starts).
+    # All needed functions are available via export -f (done at script top).
+    vb-core-term --floating --title password-manager -- \
+      bash -c "pass edit "$_VB_EDIT_PASSWORD"; push_after_edit_if_needed"
 
-      # Paths passed as plain variables — no shell escaping needed.
-      # Shell escaping is for eval/interpreter contexts, not direct arg passing.
-      if pass mv "$password" "$new_path" > /dev/null; then
-        notify-send -r 3 -t 2500 -u low "Password Manager" "Password moved"
-        is_git_repo && has_git_remote && async_git_push &
-        return 2
-      else
-        return 1
-      fi
-      ;;
+    return 0
+    ;;
 
-    "Rename")
-      local new_name
-      # prompt_valid_name handles the inner loop + validation.
-      if ! prompt_valid_name new_name "New name for $password" "Enter new name"; then
-        return 1
-      fi
+  "Move")
+    local target_location
+    # pick_location writes the chosen path into target_location via nameref.
+    if ! pick_location target_location "" "move"; then
+      return 1
+    fi
 
-      # Rename = move within the same parent directory.
-      if [[ -z "$parent" ]]; then
-        new_path="$new_name"
-      else
-        new_path="$parent/$new_name"
-      fi
+    local filename="${password##*/}"
+    if [[ -z "$target_location" ]]; then
+      new_path="$filename"
+    else
+      new_path="$target_location/$filename"
+    fi
 
-      if pass mv "$password" "$new_path" > /dev/null; then
-        notify-send -r 3 -t 2500 -u low "Password Manager" "Password renamed"
-        is_git_repo && has_git_remote && async_git_push &
-        return 2
-      else
-        return 1
-      fi
-      ;;
+    if [[ "$new_path" == "$password" ]]; then
+      notify-send -r 3 -t 2500 "Password Manager" "Same location, nothing to move"
+      return 1
+    fi
 
-    "Delete")
-      helpers::ui::menu confirm \
-        "Delete ${password}?" \
-        "" \
-        -- "Yes" "No"
+    # Paths passed as plain variables — no shell escaping needed.
+    # Shell escaping is for eval/interpreter contexts, not direct arg passing.
+    if pass mv "$password" "$new_path" >/dev/null; then
+      notify-send -r 3 -t 2500 -u low "Password Manager" "Password moved"
+      is_git_repo && has_git_remote && async_git_push &
+      return 2
+    else
+      return 1
+    fi
+    ;;
 
-      # Any selection other than explicit "Yes" is treated as cancel.
-      [[ "$confirm" != "Yes" ]] && return 1
+  "Rename")
+    local new_name
+    # prompt_valid_name handles the inner loop + validation.
+    if ! prompt_valid_name new_name "New name for $password" "Enter new name"; then
+      return 1
+    fi
 
-      # --force: skip pass's own "are you sure?" prompt (we confirmed above).
-      if pass rm --force "$password" > /dev/null; then
-        notify-send -r 3 -t 2500 -u low "Password Manager" "Password deleted"
+    # Rename = move within the same parent directory.
+    if [[ -z "$parent" ]]; then
+      new_path="$new_name"
+    else
+      new_path="$parent/$new_name"
+    fi
 
-        # ── EMPTY FOLDER CLEANUP ─────────────────────────────────────
-        # After removing the entry, walk up the directory tree offering to
-        # delete parent folders that are now empty.
-        #
-        # Important: `pass rm --force` prunes empty directories automatically
-        # at its own discretion. A parent folder may already be gone on disk
-        # by the time we reach this loop — we must not ask the user to delete
-        # something that doesn't exist anymore. We detect that case separately
-        # from the case where the folder exists but is empty, and handle them
-        # differently: auto-pruned folders are cleaned up silently; only
-        # folders that still exist on disk and happen to be empty get the
-        # "Do you want to delete it?" prompt.
-        #
-        # Walk rules:
-        #   - Never delete (or ask about) the store root itself
-        #   - If a folder was already removed by pass: clean up cursor state,
-        #     reset the parent's cursor to 0, then climb silently
-        #   - If a folder exists and is empty: ask the user
-        #     - Yes → delete, reset parent cursor to 0, climb to check parent
-        #     - No  → stop climbing entirely (don't ask about grandparents)
-        #   - If a folder still has content: stop climbing
-        local check_dir="$parent"
+    if pass mv "$password" "$new_path" >/dev/null; then
+      notify-send -r 3 -t 2500 -u low "Password Manager" "Password renamed"
+      is_git_repo && has_git_remote && async_git_push &
+      return 2
+    else
+      return 1
+    fi
+    ;;
 
-        while [[ -n "$check_dir" ]]; do
-          local full_check="$PASSWORD_STORE_DIR/$check_dir"
+  "Delete")
+    helpers::ui::menu confirm \
+      "Delete ${password}?" \
+      "" \
+      -- "Yes" "No"
 
-          if [[ ! -d "$full_check" ]]; then
-            # The directory no longer exists on disk — pass rm already
-            # pruned it automatically. We did not ask; we cannot prevent
-            # it. Clean up the stale cursor entries for this path so
-            # a future folder with the same name doesn't inherit a
-            # garbage position, then climb silently to the parent.
+    # Any selection other than explicit "Yes" is treated as cancel.
+    [[ "$confirm" != "Yes" ]] && return 1
+
+    # --force: skip pass's own "are you sure?" prompt (we confirmed above).
+    if pass rm --force "$password" >/dev/null; then
+      notify-send -r 3 -t 2500 -u low "Password Manager" "Password deleted"
+
+      # ── EMPTY FOLDER CLEANUP ─────────────────────────────────────
+      # After removing the entry, walk up the directory tree offering to
+      # delete parent folders that are now empty.
+      #
+      # Important: `pass rm --force` prunes empty directories automatically
+      # at its own discretion. A parent folder may already be gone on disk
+      # by the time we reach this loop — we must not ask the user to delete
+      # something that doesn't exist anymore. We detect that case separately
+      # from the case where the folder exists but is empty, and handle them
+      # differently: auto-pruned folders are cleaned up silently; only
+      # folders that still exist on disk and happen to be empty get the
+      # "Do you want to delete it?" prompt.
+      #
+      # Walk rules:
+      #   - Never delete (or ask about) the store root itself
+      #   - If a folder was already removed by pass: clean up cursor state,
+      #     reset the parent's cursor to 0, then climb silently
+      #   - If a folder exists and is empty: ask the user
+      #     - Yes → delete, reset parent cursor to 0, climb to check parent
+      #     - No  → stop climbing entirely (don't ask about grandparents)
+      #   - If a folder still has content: stop climbing
+      local check_dir="$parent"
+
+      while [[ -n "$check_dir" ]]; do
+        local full_check="$PASSWORD_STORE_DIR/$check_dir"
+
+        if [[ ! -d "$full_check" ]]; then
+          # The directory no longer exists on disk — pass rm already
+          # pruned it automatically. We did not ask; we cannot prevent
+          # it. Clean up the stale cursor entries for this path so
+          # a future folder with the same name doesn't inherit a
+          # garbage position, then climb silently to the parent.
+          unset "last_selected_row[password_path:$check_dir]"
+          unset "last_selected_row[location:$check_dir:generate]"
+          unset "last_selected_row[location:$check_dir:move]"
+
+          # Derive the parent path and reset its cursor to 0, since
+          # one of its items (this folder) no longer exists in the
+          # listing and the saved index would be stale.
+          if [[ "$check_dir" == */* ]]; then
+            check_dir="${check_dir%/*}"
             unset "last_selected_row[password_path:$check_dir]"
-            unset "last_selected_row[location:$check_dir:generate]"
-            unset "last_selected_row[location:$check_dir:move]"
-
-            # Derive the parent path and reset its cursor to 0, since
-            # one of its items (this folder) no longer exists in the
-            # listing and the saved index would be stale.
-            if [[ "$check_dir" == */* ]]; then
-              check_dir="${check_dir%/*}"
-              unset "last_selected_row[password_path:$check_dir]"
-            else
-              # This folder's parent is the store root — stop here.
-              break
-            fi
-            continue
-          fi
-
-          # The directory exists. Check whether it has any remaining content.
-          # -maxdepth 1 limits the scan to the immediate level; we don't
-          # need to recurse — any direct child means the folder is non-empty.
-          local _dir_contents=()
-          mapfile -t _dir_contents < <(
-            find "$full_check" -mindepth 1 -maxdepth 1 2> /dev/null
-          )
-
-          if [[ ${#_dir_contents[@]} -gt 0 ]]; then
-            # Directory still has content — stop climbing.
-            break
-          fi
-
-          # The directory exists and is empty. Present a targeted prompt.
-          # The basename (not full path) keeps the question readable.
-          local del_confirm folder_name="${check_dir##*/}"
-          helpers::ui::menu del_confirm \
-            "Folder '${folder_name}' is now empty. Delete it?" \
-            "" \
-            -- "Yes" "No"
-
-          if [[ "$del_confirm" == "Yes" ]]; then
-            rm -rf "$full_check"
-
-            # Clear stale cursor entries for the removed directory.
-            unset "last_selected_row[password_path:$check_dir]"
-            unset "last_selected_row[location:$check_dir:generate]"
-            unset "last_selected_row[location:$check_dir:move]"
-
-            # Derive the parent and reset its cursor to 0.
-            # The deleted folder was one of its listed items; the saved
-            # index now points at whatever happens to be at that position
-            # in the next render — reset to 0 to avoid a stale jump.
-            if [[ "$check_dir" == */* ]]; then
-              check_dir="${check_dir%/*}"
-              unset "last_selected_row[password_path:$check_dir]"
-            else
-              # Parent is the store root — never delete it; stop here.
-              break
-            fi
           else
-            # User declined — stop climbing. Per spec: saying "No" at any
-            # level ends the chain; grandparents are not asked.
+            # This folder's parent is the store root — stop here.
             break
           fi
-        done
-        # ── END EMPTY FOLDER CLEANUP ─────────────────────────────────
+          continue
+        fi
 
-        is_git_repo && has_git_remote && async_git_push &
-        return 3 # Signal caller: this entry no longer exists.
-      else
-        return 1
-      fi
-      ;;
+        # The directory exists. Check whether it has any remaining content.
+        # -maxdepth 1 limits the scan to the immediate level; we don't
+        # need to recurse — any direct child means the folder is non-empty.
+        local _dir_contents=()
+        mapfile -t _dir_contents < <(
+          find "$full_check" -mindepth 1 -maxdepth 1 2>/dev/null
+        )
+
+        if [[ ${#_dir_contents[@]} -gt 0 ]]; then
+          # Directory still has content — stop climbing.
+          break
+        fi
+
+        # The directory exists and is empty. Present a targeted prompt.
+        # The basename (not full path) keeps the question readable.
+        local del_confirm folder_name="${check_dir##*/}"
+        helpers::ui::menu del_confirm \
+          "Folder '${folder_name}' is now empty. Delete it?" \
+          "" \
+          -- "Yes" "No"
+
+        if [[ "$del_confirm" == "Yes" ]]; then
+          rm -rf "$full_check"
+
+          # Clear stale cursor entries for the removed directory.
+          unset "last_selected_row[password_path:$check_dir]"
+          unset "last_selected_row[location:$check_dir:generate]"
+          unset "last_selected_row[location:$check_dir:move]"
+
+          # Derive the parent and reset its cursor to 0.
+          # The deleted folder was one of its listed items; the saved
+          # index now points at whatever happens to be at that position
+          # in the next render — reset to 0 to avoid a stale jump.
+          if [[ "$check_dir" == */* ]]; then
+            check_dir="${check_dir%/*}"
+            unset "last_selected_row[password_path:$check_dir]"
+          else
+            # Parent is the store root — never delete it; stop here.
+            break
+          fi
+        else
+          # User declined — stop climbing. Per spec: saying "No" at any
+          # level ends the chain; grandparents are not asked.
+          break
+        fi
+      done
+      # ── END EMPTY FOLDER CLEANUP ─────────────────────────────────
+
+      is_git_repo && has_git_remote && async_git_push &
+      return 3 # Signal caller: this entry no longer exists.
+    else
+      return 1
+    fi
+    ;;
   esac
 
   return 1
@@ -948,7 +948,7 @@ pick_secret_key() {
   # (fingerprint); field 10 of that fpr line is the 40-char fingerprint.
   # awk's getline advances one line within the same processing step.
   mapfile -t key_list < <(
-    gpg --list-secret-keys --with-colons 2> /dev/null |
+    gpg --list-secret-keys --with-colons 2>/dev/null |
       awk -F: '$1=="sec" { getline; if ($1=="fpr") print $10 }'
   )
 
@@ -979,7 +979,7 @@ initialize_password_store() {
   # `wc -l`, no subshell, and no risk of the original bug where a multi-line
   # string was compared with -gt as if it were an integer.
   mapfile -t key_fingerprints < <(
-    gpg --list-secret-keys --with-colons 2> /dev/null |
+    gpg --list-secret-keys --with-colons 2>/dev/null |
       awk -F: '$1=="sec" { getline; if ($1=="fpr") print $10 }'
   )
   key_count="${#key_fingerprints[@]}"
@@ -1002,7 +1002,7 @@ initialize_password_store() {
 
   mkdir -p "$PASSWORD_STORE_DIR"
 
-  if pass init "$key" > /dev/null 2>&1; then
+  if pass init "$key" >/dev/null 2>&1; then
     notify-send -r 3 -t 2000 -u low "Password Manager" \
       "Password store initialized successfully"
     return 0
@@ -1031,7 +1031,7 @@ search_passwords() {
       find "$PASSWORD_STORE_DIR" \
         -type f -name "*.gpg" \
         ! -path "$PASSWORD_STORE_DIR/.git/*" \
-        -printf "%P\n" 2> /dev/null |
+        -printf "%P\n" 2>/dev/null |
         sed 's/\.gpg$//' |
         sort -V
     )
@@ -1103,9 +1103,9 @@ while true; do
     done
 
     case "$OPTION_CHOSEN" in
-      "Initialize a password store")
-        initialize_password_store || continue
-        ;;
+    "Initialize a password store")
+      initialize_password_store || continue
+      ;;
     esac
     continue
   fi
@@ -1127,8 +1127,8 @@ while true; do
   # Append git sync options only when both conditions hold.
   if is_git_repo && has_git_remote; then
     OPTIONS+=(
-      "<span foreground='$YELLOW}'>[GIT]</span> Push to remote"
-      "<span foreground='$YELLOW}'>[GIT]</span> Pull from remote"
+      "<span foreground='${P_YELLOW}'>[GIT]</span> Push to remote"
+      "<span foreground='${P_YELLOW}'>[GIT]</span> Pull from remote"
     )
   fi
 
@@ -1151,126 +1151,126 @@ while true; do
 
   case "$OPTION_CHOSEN" in
 
-    "Open Passwords")
-      pick_password_path "" && exit 0
-      ;;
+  "Open Passwords")
+    pick_password_path "" && exit 0
+    ;;
 
-    "Search passwords")
-      search_passwords && exit 0
-      ;;
+  "Search passwords")
+    search_passwords && exit 0
+    ;;
 
-    "Create password")
-      # Step 1: choose destination folder.
-      # pick_location writes the path into 'location' via nameref — no subshell.
-      if ! pick_location location "" "generate"; then
+  "Create password")
+    # Step 1: choose destination folder.
+    # pick_location writes the path into 'location' via nameref — no subshell.
+    if ! pick_location location "" "generate"; then
+      continue
+    fi
+
+    # Step 2: choose the entry name (the .gpg filename without extension).
+    # prompt_valid_name handles the full inner loop with validation:
+    #   - hint selected → re-ask (do not cancel on hint Enter)
+    #   - invalid chars → notify + re-ask
+    #   - ESC → cancel, return to main menu via `continue`
+    # `name` is intentionally not declared with `local` here: `local` is
+    # only valid inside functions, and this block runs in the global scope
+    # of the main while loop.
+    name=""
+    if ! prompt_valid_name name "Password name" "Enter password name"; then
+      continue
+    fi
+
+    if [[ -z "$location" ]]; then
+      pass_path="$name"
+    else
+      pass_path="$location/$name"
+    fi
+
+    # Before generating, check whether an entry with this path already
+    # exists in the store. `pass generate` without --force would open an
+    # interactive terminal prompt asking to overwrite — invisible to the
+    # user and impossible to interact with from a rofi-driven script.
+    # We intercept this case with a rofi confirmation prompt instead.
+    # The .gpg extension is how pass stores entries on disk; its presence
+    # means the logical pass-path is already taken.
+    if [[ -f "$PASSWORD_STORE_DIR/${pass_path}.gpg" ]]; then
+      overwrite_confirm=""
+      helpers::ui::menu overwrite_confirm \
+        "'${pass_path}' already exists. Overwrite?" \
+        "" \
+        -- "Overwrite" "Cancel"
+
+      if [[ "$overwrite_confirm" != "Overwrite" ]]; then
         continue
       fi
-
-      # Step 2: choose the entry name (the .gpg filename without extension).
-      # prompt_valid_name handles the full inner loop with validation:
-      #   - hint selected → re-ask (do not cancel on hint Enter)
-      #   - invalid chars → notify + re-ask
-      #   - ESC → cancel, return to main menu via `continue`
-      # `name` is intentionally not declared with `local` here: `local` is
-      # only valid inside functions, and this block runs in the global scope
-      # of the main while loop.
-      name=""
-      if ! prompt_valid_name name "Password name" "Enter password name"; then
-        continue
-      fi
-
-      if [[ -z "$location" ]]; then
-        pass_path="$name"
-      else
-        pass_path="$location/$name"
-      fi
-
-      # Before generating, check whether an entry with this path already
-      # exists in the store. `pass generate` without --force would open an
-      # interactive terminal prompt asking to overwrite — invisible to the
-      # user and impossible to interact with from a rofi-driven script.
-      # We intercept this case with a rofi confirmation prompt instead.
-      # The .gpg extension is how pass stores entries on disk; its presence
-      # means the logical pass-path is already taken.
-      if [[ -f "$PASSWORD_STORE_DIR/${pass_path}.gpg" ]]; then
-        overwrite_confirm=""
-        helpers::ui::menu overwrite_confirm \
-          "'${pass_path}' already exists. Overwrite?" \
-          "" \
-          -- "Overwrite" "Cancel"
-
-        if [[ "$overwrite_confirm" != "Overwrite" ]]; then
-          continue
-        fi
-        # User confirmed overwrite: pass generate --force skips its own
-        # interactive prompt and replaces the entry unconditionally.
-        if pass generate --force -c "$pass_path" > /dev/null; then
-          notify-send -r 3 "Password Manager" \
-            "Password regenerated and copied to clipboard"
-          is_git_repo && has_git_remote && async_git_push &
-          exit 0
-        fi
-      else
-        # `pass generate -c`: generates a random password AND copies it to
-        # the clipboard immediately. No separate wl-copy step needed.
-        if pass generate -c "$pass_path" > /dev/null; then
-          notify-send -r 3 "Password Manager" \
-            "Password generated and copied to clipboard"
-          is_git_repo && has_git_remote && async_git_push &
-          exit 0
-        fi
-      fi
-      ;;
-
-    *"Push to remote")
-      # Explicit user-requested push, runs synchronously (foreground)
-      printf '%s' "Password Manager: pushing to remote..." > "$ACTION"
-      vb-cmd-refresh-bar-module password-manager
-
-      output="$(git_push_with_upstream_check 2>&1)"
-      ret=$?
-
-      # Clean up BEFORE exiting so the bar always returns to idle state,
-      # regardless of whether the push succeeded or failed.
-      rm -f "$ACTION"
-      vb-cmd-refresh-bar-module password-manager
-
-      if [[ $ret -ne 0 ]]; then
-        notify-send -r 4 -t 5000 -u critical \
-          "Password Manager" "Push failed: $output"
-        exit 1
-      elif [[ "$output" == *"up to date"* || "$output" == *"up-to-date"* ]]; then
-        # Git's "up to date" phrasing varies across versions; match loosely.
-        notify-send -r 3 -t 2500 -u low "Password Manager" "Already up to date"
-        exit 0
-      else
-        notify-send -r 3 -t 2500 -u low "Password Manager" "Pushed successfully"
+      # User confirmed overwrite: pass generate --force skips its own
+      # interactive prompt and replaces the entry unconditionally.
+      if pass generate --force -c "$pass_path" >/dev/null; then
+        notify-send -r 3 "Password Manager" \
+          "Password regenerated and copied to clipboard"
+        is_git_repo && has_git_remote && async_git_push &
         exit 0
       fi
-      ;;
-
-    *"Pull from remote")
-      printf '%s' "Password Manager: pulling from remote..." > "$ACTION"
-      vb-cmd-refresh-bar-module password-manager
-
-      output="$(pass git pull 2>&1)"
-      ret=$?
-
-      rm -f "$ACTION"
-      vb-cmd-refresh-bar-module password-manager
-
-      if [[ $ret -ne 0 ]]; then
-        notify-send -r 4 -t 5000 -u critical \
-          "Password Manager" "Pull failed: $output"
-        exit 1
-      elif [[ "$output" == *"Already up to date"* ]]; then
-        notify-send -r 3 -t 2500 -u low "Password Manager" "Already up to date"
-        exit 0
-      else
-        notify-send -r 3 -t 2500 -u low "Password Manager" "Pulled successfully"
+    else
+      # `pass generate -c`: generates a random password AND copies it to
+      # the clipboard immediately. No separate wl-copy step needed.
+      if pass generate -c "$pass_path" >/dev/null; then
+        notify-send -r 3 "Password Manager" \
+          "Password generated and copied to clipboard"
+        is_git_repo && has_git_remote && async_git_push &
         exit 0
       fi
-      ;;
+    fi
+    ;;
+
+  *"Push to remote")
+    # Explicit user-requested push, runs synchronously (foreground)
+    printf '%s' "Password Manager: pushing to remote..." >"$ACTION"
+    vb-cmd-refresh-bar-module password-manager
+
+    output="$(git_push_with_upstream_check 2>&1)"
+    ret=$?
+
+    # Clean up BEFORE exiting so the bar always returns to idle state,
+    # regardless of whether the push succeeded or failed.
+    rm -f "$ACTION"
+    vb-cmd-refresh-bar-module password-manager
+
+    if [[ $ret -ne 0 ]]; then
+      notify-send -r 4 -t 5000 -u critical \
+        "Password Manager" "Push failed: $output"
+      exit 1
+    elif [[ "$output" == *"up to date"* || "$output" == *"up-to-date"* ]]; then
+      # Git's "up to date" phrasing varies across versions; match loosely.
+      notify-send -r 3 -t 2500 -u low "Password Manager" "Already up to date"
+      exit 0
+    else
+      notify-send -r 3 -t 2500 -u low "Password Manager" "Pushed successfully"
+      exit 0
+    fi
+    ;;
+
+  *"Pull from remote")
+    printf '%s' "Password Manager: pulling from remote..." >"$ACTION"
+    vb-cmd-refresh-bar-module password-manager
+
+    output="$(pass git pull 2>&1)"
+    ret=$?
+
+    rm -f "$ACTION"
+    vb-cmd-refresh-bar-module password-manager
+
+    if [[ $ret -ne 0 ]]; then
+      notify-send -r 4 -t 5000 -u critical \
+        "Password Manager" "Pull failed: $output"
+      exit 1
+    elif [[ "$output" == *"Already up to date"* ]]; then
+      notify-send -r 3 -t 2500 -u low "Password Manager" "Already up to date"
+      exit 0
+    else
+      notify-send -r 3 -t 2500 -u low "Password Manager" "Pulled successfully"
+      exit 0
+    fi
+    ;;
 
   esac
 done
