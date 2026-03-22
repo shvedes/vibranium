@@ -45,13 +45,21 @@ for folder in "${BACKUP_FOLDERS[@]}"; do
   cp -r "$VIBRANIUM/config/$folder" "$XDG_CONFIG_HOME"
 done
 
+# Restore user overrides
+mkdir -p "$XDG_CONFIG_HOME"/vibranium/{current,themes,themed,startup,shutdown}
+cp "$XDG_CONFIG_HOME/vibrnaium.$TIMESTAMP"/{settings,environment} "$XDG_CONFIG_HOME/vibranium"/
+
+cp "$XDG_CONFIG_HOME/hypr.$TIMESTAMP"/{hyprpaper,hyprsunset,hypridle,xdph}.conf $XDG_CONFIG_HOME/hypr
+cp "$XDG_CONFIG_HOME/hypr.$TIMESTAMP/hyprland.conf.d"/* $XDG_CONFIG_HOME/hypr/hyprland.conf.d/
+systemctl -q --user restart hyprsunset hypridle hyprpaper
+
 rm -rf "$XDG_DATA_HOME/nvim"
 rm -f "$HOME/.local/bin/imv-cheatsheet"
 cp "$VIBRANIUM/extras/local/bin/imv-cheatsheet" "$HOME/.local/bin"
 
-mkdir -p "$XDG_CONFIG_HOME"/vibranium/{current,themes,themed,startup,shutdown}
 vb-theme-set "$CURRENT_THEME"
 
 if [[ $nvim_found == true ]]; then
   echo "Your nvim configuration was moved to $XDG_CONFIG_HOME/nvim.$TIMESTAMP"
 fi
+ln -sf $XDG_CONFIG_HOME/vibranium/current/theme/neovim.lua $XDG_CONFIG_HOME/nvim/lua/plugins/theme.lua
