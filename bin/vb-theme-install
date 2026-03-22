@@ -9,6 +9,8 @@ _operation_canceled() {
   term::enable_input
 }
 
+trap 'printf "\n"; _operation_canceled; exit 1' INT HUP
+
 term::show_header
 
 # https://github.com/basecamp/omarchy/releases/tag/v3.3.0
@@ -68,8 +70,10 @@ if [[ -d "$THEME_PATH" ]]; then
   rm -rf "$THEME_PATH"
 fi
 
-if ! git clone "$REPO_URL" "$THEME_PATH"; then
+git clone --quiet "$REPO_URL" "$THEME_PATH" &
+if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading theme" "- ${GREEN}Done${RESET}"; then
   echo "${RED}[VIBRANIUM]${RESET} Failed to clone theme repo"
+  _operation_canceled
   exit 1
 fi
 
