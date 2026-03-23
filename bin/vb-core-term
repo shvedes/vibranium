@@ -264,7 +264,8 @@ build_foot_args() {
 if ((${#cmd_args[@]} == 1)); then
   # Allow multiple neovim instances.
   # Usually when launched via app launcher.
-  if [[ ! "$title" == "nvim" ]]; then
+  ignore_focus_regex=$'^(nvim|vb-pkg-install)$'
+  if [[ ! "$title" =~ $ignore_focus_regex ]]; then
     if focus_if_running "$title"; then
       echo "Focusing existing window"
       exit 0
