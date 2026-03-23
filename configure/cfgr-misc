@@ -201,6 +201,12 @@ _manage_user_wallpapers() {
         rm -f "$wallpaper_dir/$target"
         notify-send -r 2 "Vibranium" "$target has been deleted"
 
+        # Also remove overlayed file
+        local current_mirror="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
+        if [[ -f "$current_mirror/$target" ]]; then
+          rm -f "$current_mirror/$target"
+        fi
+
         local current="$(vb-cmd-get-wallpaper)"
         current="${current##*/}"
 
@@ -212,9 +218,29 @@ _manage_user_wallpapers() {
         files=()
         for f in "$wallpaper_dir"/*; do
           if [[ -f "$f" ]]; then
-            files+=(${f##*/})
+            files+=("${f##*/}")
           fi
         done
+
+        # If backgrounds/ is now empty, decide how much to clean up.
+        if ((${#files[@]} == 0)); then
+          local theme_dir="${wallpaper_dir%/*}" # strip /backgrounds to get theme root
+          local theme_contents=()
+
+          for entry in "$theme_dir"/*; do
+            [[ -e "$entry" ]] && theme_contents+=("$entry")
+          done
+
+          # Only the empty backgrounds/ dir remains - remove the whole theme folder
+          if [[ ${#theme_contents[@]} -eq 1 && "${theme_contents[0]}" == "$wallpaper_dir" ]]; then
+            rm -r "$theme_dir"
+            return
+          fi
+
+          # Theme folder has other content - only drop the empty backgrounds/ dir
+          rmdir "$wallpaper_dir"
+          return
+        fi
         ;;
       esac
       break
