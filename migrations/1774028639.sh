@@ -23,11 +23,11 @@ CURRENT_THEME="${CURRENT_THEME:-nightfox-nightfox}"
 BACKUP_FOLDERS=(
   "vibranium"
   "alacritty"
-  "hyprland"
   "swayosd"
   "waybar"
   "dunst"
   "nvim"
+  "hypr"
   "imv"
 )
 
@@ -63,3 +63,8 @@ if [[ $nvim_found == true ]]; then
   echo "Your nvim configuration was moved to $XDG_CONFIG_HOME/nvim.$TIMESTAMP"
 fi
 ln -sf $XDG_CONFIG_HOME/vibranium/current/theme/neovim.lua $XDG_CONFIG_HOME/nvim/lua/plugins/theme.lua
+
+(
+  sleep 3
+  systemctm -q --user restart alacritty
+) &
