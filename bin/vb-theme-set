@@ -343,7 +343,7 @@ get_wallpaper() {
     fi
   fi
 
-  find "$CURRENT_THEME_PATH/backgrounds/" -type f,l | head -n1
+  find "$CURRENT_THEME_PATH/backgrounds/" -type f | head -n1
 }
 
 show_help() {
@@ -498,7 +498,7 @@ fi
 apply_theme "$CHOSEN" "$FOLDER_NAME"
 
 touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-vb-core-wallpaper "$(get_wallpaper "$CHOSEN")"
+vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")"
 
 vb-cmd-reload --quiet
 vb-theme-set-browser
