@@ -9,7 +9,7 @@ helpers::check VIBRANIUM_GLOBAL_TERMINAL
 readonly ALLOWED_TERMINALS=(alacritty foot)
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTIONS] [--] [COMMAND [ARGS...]]
 
 Open the default terminal. If COMMAND is provided, it will be
@@ -37,52 +37,52 @@ TERMINAL_FLAG=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    --terminal)
-      if [[ -z "${2-}" ]]; then
-        echo "--terminal requires an argument" >&2
-        exit 1
-      fi
-      TERMINAL_FLAG="$2"
-      shift 2
-      ;;
-    --floating)
-      FLOATING=true
-      shift
-      ;;
-    --directory)
-      if [[ -z "${2-}" ]]; then
-        echo "--directory requires an argument" >&2
-        exit 1
-      fi
-      WORKDIR="$2"
-      shift 2
-      ;;
-    --hold)
-      HOLD=true
-      shift
-      ;;
-    --title)
-      if [[ -z "${2-}" ]]; then
-        echo "--title requires an argument" >&2
-        exit 1
-      fi
-      TITLE="$2"
-      shift 2
-      ;;
-    # Everything after -- is treated as the command, even if it looks like a flag
-    --)
-      shift
-      break
-      ;;
-    *)
-      echo "Unknown option: $1" >&2
-      echo "Use '--' to separate options from a command, e.g.: ${0##*/} --floating -- btop" >&2
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --terminal)
+    if [[ -z "${2-}" ]]; then
+      echo "--terminal requires an argument" >&2
       exit 1
-      ;;
+    fi
+    TERMINAL_FLAG="$2"
+    shift 2
+    ;;
+  --floating)
+    FLOATING=true
+    shift
+    ;;
+  --directory)
+    if [[ -z "${2-}" ]]; then
+      echo "--directory requires an argument" >&2
+      exit 1
+    fi
+    WORKDIR="$2"
+    shift 2
+    ;;
+  --hold)
+    HOLD=true
+    shift
+    ;;
+  --title)
+    if [[ -z "${2-}" ]]; then
+      echo "--title requires an argument" >&2
+      exit 1
+    fi
+    TITLE="$2"
+    shift 2
+    ;;
+  # Everything after -- is treated as the command, even if it looks like a flag
+  --)
+    shift
+    break
+    ;;
+  *)
+    echo "Unknown option: $1" >&2
+    echo "Use '--' to separate options from a command, e.g.: ${0##*/} --floating -- btop" >&2
+    exit 1
+    ;;
   esac
 done
 
@@ -102,7 +102,7 @@ is_allowed_terminal() {
 detect_terminal() {
   local t
   for t in "${ALLOWED_TERMINALS[@]}"; do
-    if command -v "$t" > /dev/null 2>&1; then
+    if command -v "$t" >/dev/null 2>&1; then
       echo "$t"
       return
     fi
@@ -185,7 +185,7 @@ cmd_args=()
 if [[ $# -ge 1 ]]; then
   cmd="$1"
 
-  if ! command -v "$cmd" > /dev/null; then
+  if ! command -v "$cmd" >/dev/null; then
     echo "$cmd: command not found" >&2
     exit 1
   fi
@@ -207,8 +207,8 @@ fi
 build_alacritty_args() {
   local wclass="$1"
 
-  if ! systemctl -q --user is-active alacritty 2> /dev/null; then
-    systemctl -q --user enable --now alacritty 2> /dev/null || true
+  if ! systemctl -q --user is-active alacritty 2>/dev/null; then
+    systemctl -q --user enable --now alacritty 2>/dev/null || true
   fi
 
   term_args=(
@@ -236,8 +236,8 @@ build_alacritty_args() {
 build_foot_args() {
   local wclass="$1"
 
-  if ! systemctl -q --user is-active foot-server.socket 2> /dev/null; then
-    systemctl -q --user enable --now foot-server.socket 2> /dev/null || true
+  if ! systemctl -q --user is-active foot-server.socket 2>/dev/null; then
+    systemctl -q --user enable --now foot-server.socket 2>/dev/null || true
   fi
 
   term_args=(footclient
@@ -261,10 +261,14 @@ build_foot_args() {
 # If a window for this TUI command is already open, focus it and stop —
 # only when no extra arguments are passed (e.g. bare "btop", not "nvim file.txt").
 # Commands with arguments (like opening a specific file) should always spawn a new window.
-if [[ ${#cmd_args[@]} -eq 1 ]]; then
-  if focus_if_running "$title"; then
-    echo "Focusing existing window"
-    exit 0
+if ((${#cmd_args[@]} == 1)); then
+  # Allow multiple neovim instances.
+  # Usually when launched via app launcher.
+  if [[ ! "$title" == "nvim" ]]; then
+    if focus_if_running "$title"; then
+      echo "Focusing existing window"
+      exit 0
+    fi
   fi
 fi
 
@@ -276,8 +280,8 @@ if [[ "$FLOATING" == "true" ]]; then
   term_args=()
 
   case "$TERMINAL" in
-    alacritty) build_alacritty_args "$float_class" ;;
-    foot) build_foot_args "$float_class" ;;
+  alacritty) build_alacritty_args "$float_class" ;;
+  foot) build_foot_args "$float_class" ;;
   esac
 
   cmdline="$(printf '%q ' "${term_args[@]}")"
@@ -292,8 +296,8 @@ fi
 term_args=()
 
 case "$TERMINAL" in
-  alacritty) build_alacritty_args "$class" ;;
-  foot) build_foot_args "$class" ;;
+alacritty) build_alacritty_args "$class" ;;
+foot) build_foot_args "$class" ;;
 esac
 
 exec "${term_args[@]}"
