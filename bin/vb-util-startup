@@ -20,7 +20,7 @@ _set_ddc_brightness() {
   [[ "$feature_enabled" == false ]] && return
 
   current_brightness="$(
-    ddcutil getvcp 10 2> /dev/null |
+    ddcutil getvcp 10 2>/dev/null |
       sed -n 's/.*current value = *\([0-9]\+\).*/\1/p'
   )"
   [[ -z "$current_brightness" ]] && return
@@ -42,7 +42,7 @@ _set_ddc_brightness() {
 
 {
   _set_ddc_brightness || {
-    log::error "unable to restore brightness level for the external monitor(s)" >> "$LOGFILE" 2>&1
+    log::error "unable to restore brightness level for the external monitor(s)" >>"$LOGFILE" 2>&1
   }
 } &
 
@@ -80,8 +80,7 @@ _toggle_loopback() {
 ) &
 
 mkdir -p \
-  $VIBRANIUM_RUNTIME\
-  $VIBRANIUM_STATE \
+  $VIBRANIUM_RUNTIME $VIBRANIUM_STATE \
   $VIBRANIUM_CACHE
 
 source vb-lib-core
@@ -94,15 +93,15 @@ fi
 _toggle_loopback &
 
 if [[ ! -f "$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)" ]]; then
-  vb-cmd-get-wallpaper > "$wallpaper_file"
+  vb-cmd-get-wallpaper >"$wallpaper_file"
 fi
 
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
   if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
-      if ! systemctl -q --user is-active hyprpaper; then
-        systemctl -q --user enable --now hyprpaper
-      fi
+    if ! systemctl -q --user is-active awww; then
+      systemctl -q --user enable --now awww
+    fi
   fi
 fi
 
@@ -113,9 +112,9 @@ fi
 # because of the while loop we must keep this check at the end
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   if [[ ! -f "$VIBRANIUM_STATE/nightshift" ]]; then
-    echo "suspended" > "$VIBRANIUM_STATE/nightshift"
+    echo "suspended" >"$VIBRANIUM_STATE/nightshift"
     hyprctl -q hyprsunset identity
-  elif [[ "$(< "$VIBRANIUM_STATE/nightshift")" == "suspended" ]]; then
+  elif [[ "$(<"$VIBRANIUM_STATE/nightshift")" == "suspended" ]]; then
     while ! pidof -q hyprsunset; do
       sleep 0.05
     done

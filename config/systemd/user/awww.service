@@ -1,0 +1,15 @@
+[Unit]
+Description=Vibranium's wallpaper daemon
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/awww-daemon
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
+
+# vim:ft=systemd

@@ -12,7 +12,7 @@ if [[ "$CHASSIS_TYPE" != vm ]]; then
   SYSTEMD_TARGETS+=("hypridle")
 
   if [[ "$VIBRANIUM_GLOBAL_SHOW_WALLPAPER" == true ]]; then
-    SYSTEMD_TARGETS+=("hyprpaper")
+    SYSTEMD_TARGETS+=("awww")
   fi
 fi
 

@@ -1,12 +1,15 @@
 #!/usr/bin/env bash
 
-hyprpaper_conf="$XDG_CONFIG_HOME/hypr/hyprpaper.conf"
+if ! systemctl -q --user is-active awww; then
+  echo "awww isn't active!" >&2
+  exit 1
+fi
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTION]
 
-Print current hyprpaper wallpaper path.
+Print current wallpaper path.
 
 Options:
   -b, --basename  Print only the file name
@@ -14,33 +17,21 @@ Options:
 EOF
 }
 
-get_wallpaper() {
-  sed -n 's/^wallpaper:path = //p' "$hyprpaper_conf"
-}
+current="$(awww query | awk '{print substr($0, index($0, $9))}')"
 
 case "$1" in
-  -b | --basename)
-    if ! systemctl -q --user is-active hyprpaper; then
-      echo "error: wallpaper deamon is not active!" >&2
-      exit 1
-    fi
-
-    get_wallpaper | xargs -r basename
-    ;;
-  -h | --help)
-    usage
-    ;;
-  "")
-    if ! systemctl -q --user is-active hyprpaper; then
-      echo "error: wallpaper deamon is not active!" >&2
-      exit 1
-    fi
-
-    get_wallpaper
-    ;;
-  *)
-    echo "${0##*/}: invalid option '$1'" >&2
-    echo "Try '${0##*/} --help' for more information." >&2
-    exit 1
-    ;;
+-b | --basename)
+  basename "$current"
+  ;;
+-h | --help)
+  usage
+  ;;
+"")
+  printf "%s" "$current"
+  ;;
+*)
+  echo "${0##*/}: invalid option '$1'" >&2
+  echo "Try '${0##*/} --help' for more information." >&2
+  exit 1
+  ;;
 esac

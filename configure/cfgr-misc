@@ -50,11 +50,11 @@ _toggle_wallpaper() {
   case "$(vb-cmd-get-option "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
   false)
     sed -i 's/path/# path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
-    systemctl -q --user disable --now hyprpaper &
+    systemctl -q --user disable --now awww &
     ;;
   true)
     sed -i 's/# path/path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
-    systemctl -q --user enable --now hyprpaper &
+    systemctl -q --user enable --now awww &
     ;;
   esac
 }

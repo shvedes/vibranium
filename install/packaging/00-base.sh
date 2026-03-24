@@ -8,8 +8,8 @@ packages+=(${fonts[@]})
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   packages+=(
     gpu-screen-recorder bluez bluez-utils
-    bluetui hyprsunset hyprpaper ddcutil
-    wireless-regdb hyprlock hypridle
+    bluetui hyprsunset ddcutil wireless-regdb
+    hyprlock hypridle awww
   )
 else
   _log_info "Running in a VM: excluding hardware-specific packages"
@@ -18,5 +18,5 @@ fi
 rm -f /tmp/vibranium.packages
 
 for pkg in "${packages[@]}"; do
-  printf "%s\n" "$pkg" >> /tmp/vibranium.packages
+  printf "%s\n" "$pkg" >>/tmp/vibranium.packages
 done
