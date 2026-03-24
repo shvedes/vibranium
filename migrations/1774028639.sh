@@ -16,10 +16,6 @@ if command -v brave >/dev/null; then
   sudo chown -R "$USER:$USER" "$BRAVE_FOLDER"
 fi
 
-CURRENT_THEME="$(readlink "$XDG_CONFIG_HOME/vibranium/theme")"
-CURRENT_THEME="$(basename "$CURRENT_THEME" 2>/dev/null || true)"
-CURRENT_THEME="${CURRENT_THEME:-nightfox-nightfox}"
-
 BACKUP_FOLDERS=(
   "vibranium"
   "alacritty"
@@ -57,7 +53,7 @@ rm -rf "$XDG_DATA_HOME/nvim"
 rm -f "$HOME/.local/bin/imv-cheatsheet"
 cp "$VIBRANIUM/extras/local/bin/imv-cheatsheet" "$HOME/.local/bin"
 
-vb-theme-set "$CURRENT_THEME"
+vb-theme-set nightfox-nightfox
 
 if [[ $nvim_found == true ]]; then
   echo "Your nvim configuration was moved to $XDG_CONFIG_HOME/nvim.$TIMESTAMP"
@@ -66,5 +62,5 @@ ln -sf $XDG_CONFIG_HOME/vibranium/current/theme/neovim.lua $XDG_CONFIG_HOME/nvim
 
 (
   sleep 3
-  systemctm -q --user restart alacritty
+  systemctl -q --user restart alacritty
 ) &

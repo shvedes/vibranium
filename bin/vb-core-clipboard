@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 _usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTION]
 
 Options:
@@ -19,9 +19,9 @@ _show() {
 
   if [[ ! -z "$chosen" ]]; then
     if [[ "$chosen" =~ ^file:// ]]; then
-      printf "%s" "$chosen" | cliphist decode | wl-copy -t text/uri-list
+      printf "%s" "$chosen" | cliphist decode | wl-copy -n --type text/uri-list
     else
-      printf "%s" "$chosen" | cliphist decode | wl-copy
+      printf "%s" "$chosen" | cliphist decode | wl-copy -n
     fi
   fi
 }
@@ -50,30 +50,30 @@ _ensure_deps() {
 }
 
 case "$1" in
-  "--show")
-    _ensure_deps
-    _ensure_service
+"--show")
+  _ensure_deps
+  _ensure_service
 
-    ENTRIES=()
-    mapfile -t ENTRIES < <(cliphist list)
+  ENTRIES=()
+  mapfile -t ENTRIES < <(cliphist list)
 
-    if ((${#ENTRIES[@]} == 0)); then
-      notify-send -t 1000 -r 3 "Clipboard Manager" "<i>Clipboard is empty!</i>"
-      exit 1
-    fi
-
-    _show
-    ;;
-  "--clear")
-    _ensure_service
-    _clear
-    ;;
-  "-h" | "--help" | "")
-    _usage
-    exit 0
-    ;;
-  *)
-    _usage
+  if ((${#ENTRIES[@]} == 0)); then
+    notify-send -t 1000 -r 3 "Clipboard Manager" "<i>Clipboard is empty!</i>"
     exit 1
-    ;;
+  fi
+
+  _show
+  ;;
+"--clear")
+  _ensure_service
+  _clear
+  ;;
+"-h" | "--help" | "")
+  _usage
+  exit 0
+  ;;
+*)
+  _usage
+  exit 1
+  ;;
 esac
