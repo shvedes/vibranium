@@ -1,3 +1,7 @@
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  exit 0
+fi
+
 sudo pacman -Rnsc --noconfirm hyprpaper
 vb-pkg-install --embedded -- awww-git
 
