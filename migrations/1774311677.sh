@@ -3,9 +3,18 @@
 mkdir -p ~/.config/qt{5,6}ct/colors
 
 for v in 5 6; do
-  ln -sf ~/.config/vibranium/current/theme/qtct.conf ~/.config/qt${v}ct/colors/Vibranium.conf
-  sed -i '/custom_palette/s/=.*/true/' ~/.config/qt${v}ct/qt${v}ct.conf
+  cfg="$HOME/.config/qt${v}ct/qt${v}ct.conf"
+  theme="$HOME/.config/vibranium/current/theme/qtct.conf"
 
-  sed -i "s|^custom_palette=.*|custom_palette=/home/$USER/.config/vibranium/current/theme/qtct.conf|" \
-    ~/.config/qt${v}ct/qt${v}ct.conf
+  if grep -q '^custom_palette=' "$cfg"; then
+    sed -i 's/^custom_palette=.*/custom_palette=true/' "$cfg"
+  else
+    sed -i "/^\[Appearance\]/a custom_palette=true" "$cfg"
+  fi
+
+  if grep -q '^color_scheme_path=' "$cfg"; then
+    sed -i "s|^color_scheme_path=.*|color_scheme_path=$theme|" "$cfg"
+  else
+    sed -i "/^\[Appearance\]/a color_scheme_path=$theme" "$cfg"
+  fi
 done
