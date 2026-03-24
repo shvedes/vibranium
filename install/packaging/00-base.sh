@@ -9,7 +9,7 @@ if [[ "$CHASSIS_TYPE" != vm ]]; then
   packages+=(
     gpu-screen-recorder bluez bluez-utils
     bluetui hyprsunset ddcutil wireless-regdb
-    hyprlock hypridle awww
+    hyprlock hypridle awww-git
   )
 else
   _log_info "Running in a VM: excluding hardware-specific packages"
