@@ -16,7 +16,7 @@ user_services=(
 
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   system_services+=("bluetooth")
-  user_services+=("hyprpaper" "hyprsunset" "hypridle")
+  user_services+=("awww" "hyprsunset" "hypridle")
 fi
 
 user_timers=(
@@ -48,7 +48,7 @@ done
 
 override_services=(
   "waybar"
-  "hyprpaper"
+  "awww"
   "hypridle"
   "hyprsunset"
   "swyaosd"
@@ -59,7 +59,7 @@ override_services=(
 
 for unit in "${override_services[@]}"; do
   mkdir -p "$HOME/.config/systemd/user/${unit}.service.d"
-  cat > "$HOME/.config/systemd/user/${unit}.service.d/override.conf" << 'EOF'
+  cat >"$HOME/.config/systemd/user/${unit}.service.d/override.conf" <<'EOF'
 [Unit]
 StartLimitIntervalSec=1
 ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland
