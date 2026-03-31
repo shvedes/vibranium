@@ -1,0 +1,17 @@
+# ADB
+SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:ff4201:*", ACTION=="add", \
+    RUN+="/usr/bin/systemd-run --no-block --collect \
+        -E DEVPATH=$env{DEVPATH} \
+        -E ID_MODEL=$env{ID_MODEL} \
+        -E ID_VENDOR=$env{ID_VENDOR} \
+        -E ID_SERIAL_SHORT=$env{ID_SERIAL_SHORT} \
+        /usr/local/bin/vb-android-notify"
+
+# MTP
+SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:060101:*", ACTION=="add", \
+    RUN+="/usr/bin/systemd-run --no-block --collect \
+        -E DEVPATH=$env{DEVPATH} \
+        -E ID_MODEL=$env{ID_MODEL} \
+        -E ID_VENDOR=$env{ID_VENDOR} \
+        -E ID_SERIAL_SHORT=$env{ID_SERIAL_SHORT} \
+        /usr/local/bin/vb-android-notify"
