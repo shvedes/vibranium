@@ -2,7 +2,8 @@
 
 _log_info "Applying default theme"
 
-vb-theme-set nightfox-nightfox &>/dev/null
+THEME_DIR="$HOME/.config/vibranium/current/theme"
+mkdir -p "$THEME_DIR"
 
 # Symlink the btop theme
 mkdir -p "$HOME/.config/btop/themes"
