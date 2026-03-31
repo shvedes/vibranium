@@ -11,6 +11,7 @@ CUSTOM=false
 CURRENT_THEME="$(vb-theme-get)"
 WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
 USER_WALLPAPERS="$XDG_CONFIG_HOME/vibranium/themes/$CURRENT_THEME/backgrounds"
+STATE_FILE="$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME"
 
 # In case if user set new wallpaper via thunar context menu
 if [[ $CUSTOM == true && ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
@@ -133,6 +134,9 @@ fi
 
 awww img -t fade --transition-duration 0.5 --transition-step 255 --transition-fps 144 --transition-bezier 0.0,0.0,1.0,1.0 "$WALLPAPER_PATH"
 ln -sf "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/background"
+
+# Update state file
+printf "%s" "$WALLPAPER_PATH" >"$STATE_FILE"
 
 # In case if user set new wallpaper via thunar context menu
 # (e,g. user's own picture, downloaded from the internet) we

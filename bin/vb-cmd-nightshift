@@ -5,7 +5,7 @@ STATE_FILE="$VIBRANIUM_STATE/nightshift"
 STEP=100
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTIONS]
 
 Options:
@@ -28,7 +28,7 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
 fi
 
 lockfile="$VIBRANIUM_RUNTIME/${0##*/}.lock"
-exec 10> "$lockfile" || {
+exec 10>"$lockfile" || {
   echo "error: another instance of ${0##*/} already running!"
   exit 1
 }
@@ -40,50 +40,50 @@ if [[ $# -eq 0 ]]; then
   exit 0
 fi
 
-CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2> /dev/null | head -n1 || echo 5500)
+CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2>/dev/null | head -n1 || echo 5500)
 
 action=""
 ARG_TEMP=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    --toggle)
-      action="toggle"
-      shift
-      ;;
-    --inc | --increase | +)
-      action="inc"
-      shift
-      ;;
-    --dec | --decrease | -)
-      action="dec"
-      shift
-      ;;
-    --set)
-      action="set"
-      shift
-      ARG_TEMP="$1"
-      shift
-      ;;
-    --step)
-      shift
-      STEP="$1"
-      shift
-      ;;
-    [0-9]*)
-      action="set"
-      ARG_TEMP="$1"
-      shift
-      ;;
-    *)
-      printf '%s\n' "${0##*/}: invalid option: $1" >&2
-      printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
-      exit 1
-      ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --toggle)
+    action="toggle"
+    shift
+    ;;
+  --inc | --increase | +)
+    action="inc"
+    shift
+    ;;
+  --dec | --decrease | -)
+    action="dec"
+    shift
+    ;;
+  --set)
+    action="set"
+    shift
+    ARG_TEMP="$1"
+    shift
+    ;;
+  --step)
+    shift
+    STEP="$1"
+    shift
+    ;;
+  [0-9]*)
+    action="set"
+    ARG_TEMP="$1"
+    shift
+    ;;
+  *)
+    printf '%s\n' "${0##*/}: invalid option: $1" >&2
+    printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
+    exit 1
+    ;;
   esac
 done
 
@@ -92,22 +92,22 @@ if [[ ! -f "$STATE_FILE" ]]; then
   exit 1
 fi
 
-state="$(< "$STATE_FILE")"
+state="$(<"$STATE_FILE")"
 
 if [[ "$action" == "toggle" ]]; then
   case "$state" in
-    suspended)
-      hyprctl -q hyprsunset temperature "$CURRENT_TEMP" &
-      printf '%s\n' "active" > "$STATE_FILE"
-      ;;
-    active)
-      hyprctl -q hyprsunset identity &
-      printf '%s\n' "suspended" > "$STATE_FILE"
-      ;;
-    *)
-      printf '%s\n' "Unknown state in $STATE_FILE: '$state'" >&2
-      exit 1
-      ;;
+  suspended)
+    hyprctl -q hyprsunset temperature "$CURRENT_TEMP" &
+    printf "active" >"$STATE_FILE"
+    ;;
+  active)
+    hyprctl -q hyprsunset identity &
+    printf "suspended" >"$STATE_FILE"
+    ;;
+  *)
+    printf '%s\n' "Unknown state in $STATE_FILE: '$state'" >&2
+    exit 1
+    ;;
   esac
 
   vb-cmd-refresh-bar-module nightshift &
@@ -121,8 +121,8 @@ if [[ "$action" == "inc" || "$action" == "dec" ]]; then
   fi
 
   case "$action" in
-    inc) TEMP=$((CURRENT_TEMP + STEP)) ;;
-    dec) TEMP=$((CURRENT_TEMP - STEP)) ;;
+  inc) TEMP=$((CURRENT_TEMP + STEP)) ;;
+  dec) TEMP=$((CURRENT_TEMP - STEP)) ;;
   esac
 fi
 
@@ -144,8 +144,8 @@ if ((TEMP < 1000 || TEMP > 20000)); then
   exit 1
 fi
 
-printf '# Auto-generated! All changes will be overwritten!\n' > "$CONF"
-printf '\n\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" >> "$CONF"
+printf '# Auto-generated! All changes will be overwritten!\n' >"$CONF"
+printf '\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" >>"$CONF"
 hyprctl -q hyprsunset temperature "$TEMP" &
 
 vb-cmd-refresh-bar-module nightshift &

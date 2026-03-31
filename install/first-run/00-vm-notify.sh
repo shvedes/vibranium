@@ -2,11 +2,15 @@
 
 # $CHASSIS_TYPE is available externaly.
 
+if [[ ! "$CHASSIS_TYPE" == vm ]]; then
+  exit 0
+fi
+
 P_YELLOW='#e0af68'
 P_ACCENT='#7aa2f7'
 P_RED='#f7768e'
 
-if [[ "$CHASSIS_TYPE" == vm ]]; then
+(
   sleep 10
   msg="\n<span foreground='${P_YELLOW}'><b><i>You need to be aware of certain things</i></b></span>:\n\n"
   msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
@@ -26,29 +30,27 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   msg+="<span foreground='${P_YELLOW}'><b>VMware</b></span> are not supported.\n\n"
 
   notify-send -r $RANDOM -t 1800000 "Vibranium Is Running In a Virtual Machine" "$msg"
+) &
 
-  # Wrap in a subshell so
-  # next scripts will run
-  (
-    # Give the user time to
-    # read the first message
-    sleep 15
+(
+  # Give the user time to
+  # read the first message
+  sleep 25
 
-    msg="\nNote that special options were applied to your installation:\n\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Desktop background isn't available</b></span>\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Animations are disabled by default</b></span>\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Night Light isn't available</b></span>\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Printing service was removed from the installation</b></span>\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Bluetooth support is disabled</b></span>\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Media Player app won't work at all</b></span>\n"
-    msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-    msg+="<span foreground='${P_RED}'><b>Lockscreen isn't available</b></span>\n"
-    notify-send -r $RANDOM -t 1800000 "Vibranium Is Running In a Virtual Machine (2)" "$msg"
-  ) &
-fi
+  msg="\nNote that special options were applied to your installation:\n\n"
+  msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+  msg+="<span foreground='${P_RED}'><b>Desktop background isn't available</b></span>\n"
+  msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+  msg+="<span foreground='${P_RED}'><b>Animations are disabled by default</b></span>\n"
+  msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+  msg+="<span foreground='${P_RED}'><b>Night Light isn't available</b></span>\n"
+  msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+  msg+="<span foreground='${P_RED}'><b>Printing service was removed from the installation</b></span>\n"
+  msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+  msg+="<span foreground='${P_RED}'><b>Bluetooth support is disabled</b></span>\n"
+  msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+  msg+="<span foreground='${P_RED}'><b>Media Player app won't work at all</b></span>\n"
+  msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+  msg+="<span foreground='${P_RED}'><b>Lockscreen isn't available</b></span>\n"
+  notify-send -r $RANDOM -t 1800000 "Vibranium Is Running In a Virtual Machine (2)" "$msg"
+) &

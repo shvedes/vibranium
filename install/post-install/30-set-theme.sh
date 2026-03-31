@@ -2,23 +2,14 @@
 
 _log_info "Applying default theme"
 
-DEFAULT_THEME="$VIBRANIUM/themes/nightfox-nightfox"
-THEME_PATH="$HOME/.config/vibranium/current/theme"
+vb-theme-set nightfox-nightfox &>/dev/null
 
-# Symlink the default theme.
-mkdir -p "$THEME_PATH"
-cp -r "$DEFAULT_THEME"/* "$THEME_PATH"
-ln -s "$THEME_PATH/backgrounds/01-nightfox-bg.jpg" \
-  "$HOME/.config/vibranium/current/background"
-echo "nightfox-nightfox" >"$HOME/.config/vibranium/current/theme.name"
-
-# Symlink the btop theme as well
+# Symlink the btop theme
 mkdir -p "$HOME/.config/btop/themes"
 ln -sf "$HOME/.config/vibranium/current/theme/btop.theme" \
   "$HOME/.config/btop/themes/vibranium.theme"
 
 # GNOME / GTK
-gsettings set org.gnome.desktop.interface gtk-theme "adw-gtk3"
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
