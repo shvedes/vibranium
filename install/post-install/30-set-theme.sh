@@ -14,6 +14,10 @@ ln -sf "$HOME/.config/vibranium/current/theme/btop.theme" \
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 
+# QTCT
+sed -i "s/user/$USER/" "$HOME/.config/qt5ct/qt5ct.conf"
+sed -i "s/user/$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
+
 # Default animations preset
 ln -sf "$VIBRANIUM/default/hypr/animations/default.conf" \
   "$HOME/.config/hypr/hyprland.conf.d/animations.conf"
