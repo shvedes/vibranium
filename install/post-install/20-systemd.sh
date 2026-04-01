@@ -16,7 +16,7 @@ user_services=(
 
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   system_services+=("bluetooth")
-  user_services+=("awww" "hyprsunset" "hypridle")
+  user_services+=("awww" "hyprsunset")
 fi
 
 user_timers=(
@@ -25,35 +25,47 @@ user_timers=(
 
 masked_services=(
   "systemd-networkd-wait-online.service"
+  "systemd-userdbd.socket"
 )
+
+masked_user_services=("at-spi-dbus-bus")
 
 for service in "${masked_services[@]}"; do
   if systemctl -q is-enabled "$service"; then
     sudo systemctl -q disable "$service"
     sudo systemctl -q mask "$service"
+    UpdateSummary "Masked system service: ${service}"
   fi
 done
 
 for service in "${system_services[@]}"; do
   sudo systemctl -q enable "$service"
+  UpdateSummary "Enabled system service: ${service}.service"
 done
 
 for service in "${user_services[@]}"; do
   systemctl -q --user enable "$service"
+  UpdateSummary "Enabled user service: ${service}.service"
 done
 
 for timer in "${user_timers[@]}"; do
   systemctl -q --user enable "${timer}.timer"
+  UpdateSummary "Enabled user timer: ${timer}.timer"
+done
+
+for service in "${masked_user_services[@]}"; do
+  systemctl -q --user mask "$service"
+  UpdateSummary "Masked user service: ${service}.service"
 done
 
 override_services=(
-  "waybar"
   "awww"
+  "waybar"
+  "swayosd"
   "hypridle"
-  "hyprsunset"
-  "swyaosd"
-  "alacritty"
   "cliphist"
+  "alacritty"
+  "hyprsunset"
   "gnome-polkit"
 )
 
@@ -64,17 +76,5 @@ for unit in "${override_services[@]}"; do
 StartLimitIntervalSec=1
 ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland
 EOF
+  UpdateSummary "Created override for ${unit}.service"
 done
-
-masked_u_services=("at-spi-dbus-bus")
-
-for unit in "${masked_u_services[@]}"; do
-  systemctl -q --user mask "$unit"
-done
-
-UpdateSummary "Systemd: masked at-spi-dbus-bus user service (not needed in a wm environment)"
-UpdateSummary "Systemd: masked systemd-networkd-wait-online to prevent boot delays"
-UpdateSummary "Systemd: enabled system services (display manager, power profiles)"
-UpdateSummary "Systemd: enabled user services (Waybar, idle daemon, clipboard, etc.)"
-UpdateSummary "Systemd: enabled vibranium-update timer for automatic update notifications"
-UpdateSummary "Systemd: created service overrides with Hyprland environment condition"

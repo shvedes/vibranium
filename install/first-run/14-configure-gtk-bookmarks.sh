@@ -8,7 +8,7 @@ file="$XDG_CONFIG_HOME/user-dirs.dirs"
 if [[ ! "$file" ]]; then
   msg="$file does not exists! No default folder & bookmarks were created.\n"
 
-  if command -v xdg-user-dir > /dev/null; then
+  if command -v xdg-user-dir >/dev/null; then
     msg=+"To fix, run 'systemctl --user enable --now xdg-user-dirs'"
   else
     msg+="To fix, install xdg-user-dirs and run\n"
@@ -28,7 +28,8 @@ _parse_user_dirs() {
     value=${value/\$HOME/$HOME}
 
     echo "file://$value"
-  done < "$file"
+  done <"$file"
 }
 
-_parse_user_dirs > "$XDG_CONFIG_HOME/gtk-3.0/bookmarks"
+mkdir -p "$XDG_CONFIG_HOME/gtk-3.0"
+_parse_user_dirs >"$XDG_CONFIG_HOME/gtk-3.0/bookmarks"

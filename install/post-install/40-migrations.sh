@@ -8,7 +8,5 @@ _log_info "Setting up migrations"
 mkdir -p "$STATE_DIR"
 
 for file in "$MIGRATIONS_DIR"/*.sh; do
-  : > "$STATE_DIR/"${file##*/}""
+  : >"$STATE_DIR/"${file##*/}""
 done
-
-UpdateSummary "Migrations: created state tracking files for all available migration scripts"
