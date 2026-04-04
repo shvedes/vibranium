@@ -313,11 +313,13 @@ apply_theme() {
 
   if $is_light; then
     local icon_theme="Papirus-Light"
+    local color_scheme="prefer-light"
 
     sed -i "/custom_palette/s/=.*/=false/" "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
     sed -i "/custom_palette/s/=.*/=false/" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
   else
     local icon_theme="Papirus-Dark"
+    local color_scheme="prefer-dark"
 
     sed -i "/custom_palette/s/=.*/=true/" "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
     sed -i "/custom_palette/s/=.*/=true/" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
@@ -327,6 +329,7 @@ apply_theme() {
   touch "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
 
   gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
+  gsettings set org.gnome.desktop.interface color-scheme "$color_scheme"
 }
 
 get_wallpaper() {
