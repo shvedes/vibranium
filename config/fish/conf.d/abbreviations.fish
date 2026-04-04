@@ -1,21 +1,21 @@
 if command -q fastfetch
-  abbr neofetch fastfetch
-  abbr nf fastfetch
-  abbr ff fastfetch
+    abbr neofetch fastfetch
+    abbr nf fastfetch
+    abbr ff fastfetch
 end
 
 if not command -q nmtui
-  abbr restart-network "sudo systemctl restart iwd systemd-{network,resolve}d"
+    abbr restart-network "sudo systemctl restart iwd systemd-{network,resolve}d"
 end
 
 abbr restart-pipewire "systemctl --user restart pipewire pipewire-pulse wireplumber"
 
 # Systemd abbrs. Think of it like this:
 # <s>ystem<c>tl --<u>ser <s>tatus
-abbr --position command se   "sudoedit"
-abbr --position command sc   "systemctl"
-abbr --position command scs  "systemctl status"
-abbr --position command scu  "systemctl --user"
+abbr --position command se sudoedit
+abbr --position command sc systemctl
+abbr --position command scs "systemctl status"
+abbr --position command scu "systemctl --user"
 abbr --position command scus "systemctl --user status"
 
 abbr \:q exit
@@ -51,11 +51,6 @@ abbr sduo sudo
 # pacman
 abbr pacamn pacman
 abbr apcman pacman
-
-# systemctl
-abbr sytemctl systemctl
-abbr systemclt systemctl
-abbr systmctl systemctl
 
 # misc
 abbr clera clear
