@@ -7,10 +7,7 @@
 # slots (vibranium-a, vibranium-b) and alternate on every run. The new name
 # was never seen this session so GTK is forced to read from disk fresh.
 #
-# GTK3: live reload works via the alternating slot mechanism.
-# GTK4: libadwaita ignores named theme slots and has no live reload mechanism
-#       on bare Hyprland. Colors are written to ~/.config/gtk-4.0/gtk.css and
-#       will apply on next app restart.
+# Live reload works via the alternating slot mechanism.
 
 GTK_THEME="$XDG_CONFIG_HOME/vibranium/current/theme/gtk.css"
 
@@ -29,6 +26,14 @@ mkdir -p "$XDG_CONFIG_HOME/gtk-4.0"
 cat "$GTK_THEME" >"$XDG_CONFIG_HOME/gtk-4.0/gtk.css"
 
 # Alternate between slots to bust GTK3 cache
-current=$(gsettings get org.gnome.desktop.interface gtk-theme | tr -d "'")
-next=$([ "$current" = "vibranium-a" ] && echo "vibranium-b" || echo "vibranium-a")
+current=$(gsettings get org.gnome.desktop.interface gtk-theme)
+current=${current#\'}
+current=${current%\'}
+
+if [[ $current == vibranium-a ]]; then
+  next="vibranium-b"
+else
+  next="vibranium-a"
+fi
+
 gsettings set org.gnome.desktop.interface gtk-theme "$next"

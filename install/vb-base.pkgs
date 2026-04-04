@@ -1,11 +1,11 @@
 # vim:ft=cfg
 
-# Hyprland
+###### Hyprland
 hyprland
 hyprpicker
 xdg-desktop-portal-hyprland
 
-# Essentials
+###### Essentials
 sound-theme-freedesktop
 xdg-desktop-portal-gtk
 alacritty-sixel-git
@@ -22,25 +22,31 @@ foot
 fish
 imv
 
-# Zathura
+##### Zathura
 zathura
+zathura-ps
+zathura-cb
+zathura-djvu
 zathura-pdf-mupdf
 
-# CLIs
+##### CLIs
+
+# PKGBUILD of wttrbar-bin was manually
+# reviewed. The AUR package is clean.
+wttrbar-bin
 xorg-xrdb
 fastfetch
 mediainfo
-wttrbar
 neovim
 man-db
 wtype
+btop
 ncdu
 wget
-btop
 fzf
 jq
 
-# Thunar
+##### Thunar
 thunar
 thunar-archive-plugin
 thunar-volman
@@ -50,12 +56,12 @@ ffmpegthumbnailer
 tumbler
 gvfs
 
-# Rofi
+##### Rofi
 rofi
 rofi-calc
 rofi-emoji
 
-# Other
+##### Other
 polkit-gnome
 swayosd
 waybar
@@ -64,7 +70,7 @@ qt5ct
 qt6ct
 mpv
 
-# System
+##### System
 power-profiles-daemon
 realtime-privileges
 python-gobject
@@ -72,9 +78,10 @@ zram-generator
 pacman-contrib
 xdg-user-dirs
 uwsm
+# Display Manager
 ly
 
-# Sound
+##### Sound Server
 pipewire
 pipewire-pulse
 pipewire-jack

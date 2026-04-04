@@ -3,8 +3,6 @@
 # Dunst does not support importing config files, but it can read multiple config files from stdin or using dunstctl.
 # This allows us to logically separate default settings, colors, and user overrides (Vibranium settings)
 
-systemctl --user restart dunst
 dunstctl reload \
-  "$VIBRANIUM/default/dunstrc" \
   "$XDG_CONFIG_HOME/dunst/dunstrc" \
   "$XDG_CONFIG_HOME/vibranium/current/theme/dunstrc"

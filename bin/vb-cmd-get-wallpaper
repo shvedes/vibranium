@@ -21,7 +21,7 @@ current="$(awww query | awk '{print substr($0, index($0, $9))}')"
 
 case "$1" in
 -b | --basename)
-  basename "$current"
+  printf "${current##*/}"
   ;;
 -h | --help)
   usage

@@ -9,6 +9,7 @@ fi
 # This is just an adoptation.
 
 # Disable multicast dns in resolved. Avahi will provide this for better network printer discovery
+# See note: https://wiki.archlinux.org/title/Avahi#Installation
 sudo mkdir -p /etc/systemd/resolved.conf.d
 echo -e "[Resolve]\nMulticastDNS=no" | sudo tee /etc/systemd/resolved.conf.d/10-disable-multicast.conf >/dev/null
 
@@ -20,5 +21,5 @@ if ! grep -q '^CreateRemotePrinters Yes' /etc/cups/cups-browsed.conf; then
   echo 'CreateRemotePrinters Yes' | sudo tee -a /etc/cups/cups-browsed.conf >/dev/null
 fi
 
-sudo systemctl -q enable cups cups-browsed avahi-daemon
+sudo systemctl -q enable cups.socket cups-browsed avahi-daemon
 UpdateSummary "User choice: enabled CUPS printing service with network printer discovery"

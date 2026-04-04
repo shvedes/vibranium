@@ -162,7 +162,9 @@ _sort_by_length_desc() {
   mapfile -t _arr < <(
     for key in "${_arr[@]}"; do
       printf '%d %s\n' "${#key}" "$key"
-    done | sort -rn | cut -d' ' -f2-
+    done | sort -rn | while read -r _ key; do
+      printf '%s\n' "$key"
+    done
   )
 }
 
@@ -499,12 +501,14 @@ fi
 apply_theme "$CHOSEN" "$FOLDER_NAME"
 
 touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")"
+vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")" &
+
+killall -s USR2 btop &>/dev/null
 
 vb-cmd-reload --quiet
-vb-theme-set-browser
-vb-theme-set-obsidian
-vb-theme-set-gtk
-vb-theme-set-svg
 
-pkill -SIGUSR2 btop 2>/dev/null
+vb-theme-set-browser &
+vb-theme-set-gtk &
+
+vb-theme-set-obsidian &
+vb-theme-set-svg &

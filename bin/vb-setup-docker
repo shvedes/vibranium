@@ -30,7 +30,7 @@ _add_user_to_group() {
 _configure_daemon() {
   local desired
   desired=$(
-    cat << 'EOF'
+    cat <<'EOF'
 {
     "log-driver": "json-file",
     "log-opts": { "max-size": "10m", "max-file": "5" },
@@ -41,14 +41,14 @@ EOF
   )
 
   if [ -f /etc/docker/daemon.json ] &&
-    diff -q <(echo "$desired") /etc/docker/daemon.json &> /dev/null; then
+    diff -q <(echo "$desired") /etc/docker/daemon.json &>/dev/null; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} Docker daemon config: already up to date, skipping"
     return 1 # unchanged
   fi
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring Docker daemon (log rotation + DNS)"
   sudo mkdir -p /etc/docker
-  echo "$desired" | sudo tee /etc/docker/daemon.json > /dev/null
+  echo "$desired" | sudo tee /etc/docker/daemon.json >/dev/null
   return 0 # written
 }
 
@@ -57,14 +57,14 @@ _configure_resolved() {
   local desired=$'[Resolve]\nDNSStubListenerExtra=172.17.0.1'
 
   if [ -f "$conf" ] &&
-    diff -q <(echo "$desired") "$conf" &> /dev/null; then
+    diff -q <(echo "$desired") "$conf" &>/dev/null; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} systemd-resolved config: already up to date, skipping"
     return 1 # unchanged
   fi
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Exposing systemd-resolved to the Docker network"
   sudo mkdir -p /etc/systemd/resolved.conf.d
-  echo -e "$desired" | sudo tee "$conf" > /dev/null
+  echo -e "$desired" | sudo tee "$conf" >/dev/null
   sudo systemctl restart systemd-resolved
   return 0 # written
 }
@@ -74,23 +74,23 @@ _configure_no_block_boot() {
   local desired=$'[Unit]\nDefaultDependencies=no'
 
   if [ -f "$conf" ] &&
-    diff -q <(echo "$desired") "$conf" &> /dev/null; then
+    diff -q <(echo "$desired") "$conf" &>/dev/null; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} Boot-block prevention drop-in: already up to date, skipping"
     return 1 # unchanged
   fi
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Preventing Docker from blocking boot (${BLUE}network-online.target${RESET})"
   sudo mkdir -p /etc/systemd/system/docker.service.d
-  echo -e "$desired" | sudo tee "$conf" > /dev/null
+  echo -e "$desired" | sudo tee "$conf" >/dev/null
   return 0 # written
 }
 
 _configure_ufw() {
   # Skip entirely if ufw is not installed or not active
-  if ! command -v ufw &> /dev/null; then
+  if ! command -v ufw &>/dev/null; then
     return 2 # ufw absent
   fi
-  if ! sudo ufw status 2> /dev/null | grep -q "^Status: active"; then
+  if ! sudo ufw status 2>/dev/null | grep -q "^Status: active"; then
     return 2 # ufw inactive
   fi
 
@@ -98,12 +98,12 @@ _configure_ufw() {
   local ufw_docker_present=false
 
   # DNS rule: look for our comment tag in the ruleset
-  if sudo ufw status verbose 2> /dev/null | grep -q 'allow-docker-dns'; then
+  if sudo ufw status verbose 2>/dev/null | grep -q 'allow-docker-dns'; then
     dns_rule_present=true
   fi
 
   # ufw-docker: it appends a clearly-marked block to /etc/ufw/after.rules
-  if grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2> /dev/null; then
+  if grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2>/dev/null; then
     ufw_docker_present=true
   fi
 
@@ -116,12 +116,12 @@ _configure_ufw() {
 
   if ! $dns_rule_present; then
     sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 \
-      comment 'allow-docker-dns' &> /dev/null
+      comment 'allow-docker-dns' &>/dev/null
   fi
 
   if ! $ufw_docker_present; then
     local ufw_docker_url="https://raw.githubusercontent.com/chaifeng/ufw-docker/refs/heads/master/ufw-docker"
-    curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &> /dev/null
+    curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &>/dev/null
   fi
 
   return 0 # applied
@@ -132,8 +132,8 @@ _configure_ufw() {
 term::show_header
 term::disable_input
 
-if systemctl -q is-enabled docker.socket 2> /dev/null ||
-  systemctl -q is-enabled docker.service 2> /dev/null; then
+if systemctl -q is-enabled docker.socket 2>/dev/null ||
+  systemctl -q is-enabled docker.service 2>/dev/null; then
   echo -e "${GREEN}[VIBRANIUM]${RESET} Docker is already set up and working"
   _operation_complete
   exit 0
@@ -189,9 +189,9 @@ fi
 # ── UFW firewall rules ────────────────────────────────────────
 _configure_ufw
 case $? in
-  0) summary_rules+=("UFW: ${GREEN}Docker rules applied${RESET} (DNS stub + ufw-docker)") ;;
-  1) summary_rules+=("UFW: ${CYAN}unchanged${RESET}") ;;
-  2) summary_rules+=("UFW: ${YELLOW}not active${RESET}, skipped") ;;
+0) summary_rules+=("UFW: ${GREEN}Docker rules applied${RESET} (DNS stub + ufw-docker)") ;;
+1) summary_rules+=("UFW: ${CYAN}unchanged${RESET}") ;;
+2) summary_rules+=("UFW: ${YELLOW}not active${RESET}, skipped") ;;
 esac
 
 # ── Docker group ──────────────────────────────────────────────

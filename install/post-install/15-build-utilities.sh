@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
-InstallPackages rust
+_log_info "Building Vibranium utilities"
 
-_log_info "Compiling additional utilities"
+sudo pacman -S --noconfirm rust &>/dev/null
+
 cd "$VIBRANIUM/contrib/vb-cmd-edit-wm-config"
 bash build.sh
 
