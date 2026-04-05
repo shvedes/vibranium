@@ -34,40 +34,29 @@ FZF_ARGS=(
 _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
   read -n1 -r -s -p $'. Press any key to exit' dummy
-  printf '\e[?25h' # show cursor
 }
 
 _get_fonts() {
   local pkg
   for pkg in $(pacman -Qq); do
     case "$pkg" in
-      ttf* | otf* | *-nerd | *-nerd-mono)
-        printf '%s\n' "$pkg"
-        ;;
+    ttf* | otf* | *-nerd | *-nerd-mono)
+      printf '%s\n' "$pkg"
+      ;;
     esac
   done
 }
 
 trap 'printf "\n"; _operation_canceled; exit 1' SIGINT
 
-printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
-printf '\e[?25l' # Hide cursor
+term::show_header
 
 mapfile -t LIST < <(_get_fonts)
 mapfile -t CHOSEN < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
-
-# fzf restores cursor visibility,
-# so we re-hide it again.
-printf '\e[?25l'
 
 if [[ ${#CHOSEN[@]} -eq 0 ]]; then
   _operation_canceled
   exit 1
 fi
 
-if term::ask_yes_no Y "Proced with removal?"; then
-  vb-pkg-uninstall --no-logo "${CHOSEN[@]}"
-else
-  _operation_canceled
-  exit 1
-fi
+vb-pkg-remove --no-logo -- "${CHOSEN[@]}"

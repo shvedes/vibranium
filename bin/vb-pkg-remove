@@ -3,7 +3,7 @@
 source vb-lib-core
 
 _usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTIONS]... [--] [PACKAGE]...
 
 Uninstall packages in Vibranium
@@ -64,7 +64,7 @@ _handle_systemd() {
         seen_user[$unit]=1
         unit_pkg_user[$unit]="$pkg"
 
-        if systemctl -q --user is-enabled "$unit" 2> /dev/null; then
+        if systemctl -q --user is-enabled "$unit" 2>/dev/null; then
           user_enabled_units+=("$unit")
         fi
       else
@@ -76,11 +76,11 @@ _handle_systemd() {
         unit_pkg_system[$unit]="$pkg"
 
         # is-enabled does not require sudo even for system units
-        if systemctl -q is-enabled "$unit" 2> /dev/null; then
+        if systemctl -q is-enabled "$unit" 2>/dev/null; then
           system_enabled_units+=("$unit")
         fi
       fi
-    done < <(pacman -Ql "$pkg" 2> /dev/null | awk -f "${VIBRANIUM}/awk/vb-pkg-parse-systemd.awk")
+    done < <(pacman -Ql "$pkg" 2>/dev/null | awk -f "${VIBRANIUM}/awk/vb-pkg-parse-systemd.awk")
   done
 }
 
@@ -96,11 +96,11 @@ _ask_yes_no_all() {
     answer="${answer:-$default}"
 
     case "$answer" in
-      [Yy][Ee][Ss] | [Yy]) return 0 ;;
-      [Nn][Oo] | [Nn]) return 1 ;;
-      [Aa][Ll][Ll]) return 2 ;;
-      # Re-draw the question line.
-      *) printf "\r\e[K" ;;
+    [Yy][Ee][Ss] | [Yy]) return 0 ;;
+    [Nn][Oo] | [Nn]) return 1 ;;
+    [Aa][Ll][Ll]) return 2 ;;
+    # Re-draw the question line.
+    *) printf "\r\e[K" ;;
     esac
   done
 
@@ -134,30 +134,30 @@ _disable_scope_units() {
       local response=$?
 
       case $response in
-        0) # Yes
+      0) # Yes
+        if [[ "$scope" == "user" ]]; then
+          systemctl -q --user disable "$unit" &
+        else
+          sudo systemctl -q disable "$unit" &
+        fi
+        _pids+=($!)
+        remaining=("${remaining[@]:1}")
+        ;;
+      2) # All
+        echo -e "${BLUE}[VIBRANIUM]${RESET} Disabling all units for '${GREEN}${pkg}${RESET}'..."
+        for u in "${remaining[@]}"; do
           if [[ "$scope" == "user" ]]; then
-            systemctl -q --user disable "$unit" &
+            systemctl -q --user disable "$u" &
           else
-            sudo systemctl -q disable "$unit" &
+            sudo systemctl -q disable "$u" &
           fi
           _pids+=($!)
-          remaining=("${remaining[@]:1}")
-          ;;
-        2) # All
-          echo -e "${BLUE}[VIBRANIUM]${RESET} Disabling all units for '${GREEN}${pkg}${RESET}'..."
-          for u in "${remaining[@]}"; do
-            if [[ "$scope" == "user" ]]; then
-              systemctl -q --user disable "$u" &
-            else
-              sudo systemctl -q disable "$u" &
-            fi
-            _pids+=($!)
-          done
-          remaining=()
-          ;;
-        *) # No
-          remaining=("${remaining[@]:1}")
-          ;;
+        done
+        remaining=()
+        ;;
+      *) # No
+        remaining=("${remaining[@]:1}")
+        ;;
       esac
     done
   done
@@ -209,18 +209,18 @@ _operation_canceled() {
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --positive)
-        color="$GREEN"
-        shift
-        ;;
-      --exit)
-        exit_after=true
-        shift
-        ;;
-      --newline)
-        printf '\n'
-        shift
-        ;;
+    --positive)
+      color="$GREEN"
+      shift
+      ;;
+    --exit)
+      exit_after=true
+      shift
+      ;;
+    --newline)
+      printf '\n'
+      shift
+      ;;
     esac
   done
 
@@ -263,7 +263,7 @@ _ensure_installed() {
   local -a missing=()
 
   for pkg in "${PACKAGES[@]}"; do
-    if ! pacman -Qq "$pkg" &> /dev/null; then
+    if ! pacman -Qq "$pkg" &>/dev/null; then
       missing+=("$pkg")
     fi
   done
@@ -303,7 +303,7 @@ _show_overview() {
   #   - header (if shown)
   #   - 1 title line ("You're about to uninstall...")
   #   - N package lines
-  local overhead=$((SHOW_LOGO == true ? HEADER_LINES : 0))
+  local overhead=$((NO_LOGO == false ? HEADER_LINES : 0))
   local total=$((overhead + 1 + ${#packages[@]}))
 
   if ((total > $(tput lines))); then
@@ -339,13 +339,13 @@ _choose_packages() {
 
 _remove_orphans() {
   echo -e "${GREEN}[VIBRANIUM]${RESET} Removing orphan packages..."
-  yay -Ycc --noconfirm &> /dev/null
+  yay -Ycc --noconfirm &>/dev/null
 }
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
 export SUDO_PROMPT
 
-SHOW_LOGO=true
+NO_LOGO=false
 NO_DUMMY=false
 NO_SYSTEMD=false
 CONSERVATIVE=false
@@ -386,43 +386,43 @@ trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --help | -h)
+  --help | -h)
+    _usage
+    exit
+    ;;
+  --no-logo)
+    NO_LOGO=true
+    shift
+    ;;
+  --no-dummy)
+    NO_DUMMY=true
+    shift
+    ;;
+  --no-verify)
+    NO_VERIFY=true
+    shift
+    ;;
+  --no-systemd)
+    NO_SYSTEMD=true
+    shift
+    ;;
+  --conservative)
+    CONSERVATIVE=true
+    shift
+    ;;
+  --)
+    shift
+    if [[ $# -eq 0 ]]; then
       _usage
-      exit
-      ;;
-    --no-logo)
-      NO_LOGO=true
-      shift
-      ;;
-    --no-dummy)
-      NO_DUMMY=true
-      shift
-      ;;
-    --no-verify)
-      NO_VERIFY=true
-      shift
-      ;;
-    --no-systemd)
-      NO_SYSTEMD=true
-      shift
-      ;;
-    --conservative)
-      CONSERVATIVE=true
-      shift
-      ;;
-    --)
-      shift
-      if [[ $# -eq 0 ]]; then
-        _usage
-        exit 1
-      fi
-      break
-      ;;
-    --*)
-      echo "Unknown option: $1" >&2
       exit 1
-      ;;
-    *) break ;;
+    fi
+    break
+    ;;
+  --*)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
+  *) break ;;
   esac
 done
 
@@ -436,7 +436,7 @@ if (($# > 0)); then
   # which is why a huge yellow logo will be visible for a fraction of a second before fzf launches. That's why we do it this way.
   #
   # This also applies to the same constructions below.
-  if [[ $SHOW_LOGO == true ]]; then
+  if [[ $NO_LOGO == false ]]; then
     term::show_header
   fi
 
@@ -447,7 +447,7 @@ if (($# > 0)); then
 
   _show_overview
 else
-  if ! command -v fzf > /dev/null; then
+  if ! command -v fzf >/dev/null; then
     log::error "fzf is not installed!"
     exit 1
   fi
@@ -455,7 +455,7 @@ else
   _get_installed_packages
 
   if ! _choose_packages; then
-    if [[ $SHOW_LOGO == true ]]; then
+    if [[ $NO_LOGO == false ]]; then
       term::show_header
     fi
 
@@ -463,7 +463,7 @@ else
     exit 0
   fi
 
-  if [[ $SHOW_LOGO == true ]]; then
+  if [[ $NO_LOGO == false ]]; then
     term::show_header
   fi
 
