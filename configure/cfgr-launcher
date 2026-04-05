@@ -5,29 +5,29 @@ source vb-lib-cfgr
 
 _build() {
   cfgr::item::bool \
-    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START \
+    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START \
     --label "Launch on startup"
 
   cfgr::item::bool \
-    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
-    --label "Show AI webapps"
+    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
+    --label "Show AI PWAs"
 
   cfgr::item::bool \
-    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
-    --label "Show webapps"
+    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
+    --label "Show PWAs"
 
   cfgr::item::bool \
-    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
+    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
     --label "Show icons"
 
   cfgr::item::bool \
-    --var   VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
+    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
     --label "Auto select"
 
   cfgr::item::string \
-    --var    VIBRANIUM_GLOBAL_SEARCH_ENGINE \
-    --label  "Search engine" \
-    --title  "Search Engine" \
+    --var VIBRANIUM_GLOBAL_SEARCH_ENGINE \
+    --label "Search engine" \
+    --title "Search Engine" \
     --option "Google:google" "DuckDuckGo:duckduckgo" "Bing:bing" "Brave:brave"
 }
 

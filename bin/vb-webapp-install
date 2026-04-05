@@ -4,6 +4,118 @@ source vb-lib-core
 
 ICON_DIR="$HOME/.local/share/applications/icons"
 
+# ---------------------------------------------------------------------------
+# Flags populated by argument parsing below. All default to empty; interactive
+# mode fills them via prompts, non-interactive mode via --flags.
+# ---------------------------------------------------------------------------
+APP_URL=""
+APP_NAME=""
+ICON_REF=""
+CUSTOM_EXEC=""
+MIME_TYPES=""
+EXTRA_KEYWORDS=""
+CATEGORY=""
+INTERACTIVE_MODE=false
+
+_usage() {
+  cat <<EOF
+Usage: ${0##*/} [OPTION]...
+
+Install a Progressive Web App shortcut as a .desktop launcher entry.
+
+Options:
+  --url URL           Web app URL to install
+  --name NAME         App display name (default: fetched from page <title>)
+  --icon REF          Icon URL or filename inside the icons directory
+  --exec CMD          Custom Exec= value (default: vb-webapp-launch URL)
+  --mime-types TYPES  MimeType= value for the .desktop file
+  --keywords KW       Extra keywords, semicolon-separated (appended to auto-generated ones)
+  --category CAT      Categories= value for the .desktop file (e.g. Network;WebBrowser)
+  -h, --help          Show this help and exit
+
+If --url is not provided, the script runs in interactive mode and prompts
+for all required fields. In non-interactive mode (--url given), a missing
+--name is resolved automatically by fetching the page <title>.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    _usage
+    exit 0
+    ;;
+  --url)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    APP_URL="$2"
+    shift 2
+    ;;
+  --name)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    APP_NAME="$2"
+    shift 2
+    ;;
+  --icon)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    ICON_REF="$2"
+    shift 2
+    ;;
+  --exec)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    CUSTOM_EXEC="$2"
+    shift 2
+    ;;
+  --mime-types)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    MIME_TYPES="$2"
+    shift 2
+    ;;
+  --keywords)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    EXTRA_KEYWORDS="$2"
+    shift 2
+    ;;
+  --category)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    CATEGORY="$2"
+    shift 2
+    ;;
+  --)
+    shift
+    break
+    ;;
+  --* | -*)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
+  *)
+    echo "Unexpected argument: '$1'. Use flags to pass values." >&2
+    exit 1
+    ;;
+  esac
+done
+
 _operation_complete() {
   term::disable_input
 
@@ -14,6 +126,10 @@ _operation_complete() {
 }
 
 _operation_canceled() {
+  # The blocking read is only appropriate in interactive mode. In non-interactive
+  # mode all output is already suppressed, so there is nothing to wait on.
+  [[ $INTERACTIVE_MODE == true ]] || return
+
   term::disable_input
 
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
@@ -79,7 +195,7 @@ _auto_keywords_from_url() {
   # Extract ONLY the very last segment after the final '/'
   local last_segment="${path##*/}"
 
-  # If the URL ends with '/', last_segment will be empty → fall back to previous segment
+  # If the URL ends with '/', last_segment will be empty -> fall back to previous segment
   if [[ -z "$last_segment" ]]; then
     # Remove trailing / and take the new last segment
     path="${path%/}"
@@ -214,11 +330,13 @@ _normalize_url() {
 # Main logic
 # ---------------------------------------------------------------------------
 
-trap "printf '\n';_operation_canceled; exit 1" INT
+if [[ -z $APP_URL ]]; then
+  # Interactive mode: --url was not supplied, prompt for everything.
 
-term::show_header
+  INTERACTIVE_MODE=true
+  trap "printf '\n';_operation_canceled; exit 1" INT
+  term::show_header
 
-if (($# < 1)); then
   # Ask for the URL first so we can pull a suggested name from it.
   while true; do
     term::enable_input
@@ -248,7 +366,7 @@ if (($# < 1)); then
   # Verify reachability before doing anything else.
   _check_url_reachable "$APP_URL" &
   if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking URL"; then
-    echo "${RED}[VIBRANIUM]${RESET} Could not reach ${BLUE}${APP_URL}${RESET}"
+    echo "${RED}[VIBRANIUM]${RESET} Could not reach ${BLUE}http(s)://${APP_URL#*://}${RESET}"
     echo "${RED}[VIBRANIUM]${RESET} Check the URL or your connection."
     _operation_canceled
     exit 1
@@ -266,6 +384,7 @@ if (($# < 1)); then
       APP_NAME="${APP_NAME:-$PAGE_TITLE}"
     fi
   else
+    term::enable_input
     # No title found; require explicit input.
     while true; do
       read -rp "${YELLOW}[VIBRANIUM]${RESET} Web App name: " APP_NAME
@@ -309,9 +428,15 @@ if (($# < 1)); then
   fi
   KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
 
+  # Prompt for an optional .desktop Categories= value.
+  # Standard categories: https://specifications.freedesktop.org/menu-spec/latest/category-registry.html
+  term::enable_input
+  read -rp "${BLUE}[VIBRANIUM]${RESET} Category (e.g. Network;WebBrowser, or Enter to skip): ${BLUE}" CATEGORY
+  term::disable_input
+
   # Try to fetch the favicon from Google's service; fall back to manual input.
   mkdir -p "$ICON_DIR"
-  echo "${YELLOW}[VIBRANIUM]${RESET} Fetching icon..."
+  echo "${YELLOW}[VIBRANIUM]${RESET} Getting PWA icon..."
   FAVICON_URL="https://www.google.com/s2/favicons?domain=${APP_URL}&sz=128"
   if curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2>/dev/null && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
     ICON_REF="$APP_NAME.png"
@@ -326,20 +451,9 @@ if (($# < 1)); then
 
   CUSTOM_EXEC=""
   MIME_TYPES=""
-  INTERACTIVE_MODE=true
 else
-  #TODO: GNU Coreutils-like flags instead of positional options.
-
-  # Non-interactive mode.
-  # Arguments: URL [ICON_REF [NAME [CUSTOM_EXEC [MIME_TYPES [KEYWORDS]]]]]
-  APP_URL="$1"
-  ICON_REF="${2:-}"
-  APP_NAME="${3:-}"
-  CUSTOM_EXEC="${4:-}"
-  MIME_TYPES="${5:-}"
-
-  # $6 = optional extra keywords (semicolon-separated Desktop Entry format).
-  EXTRA_KEYWORDS="${6:-}"
+  # Non-interactive mode: --url was supplied. Suppress all output.
+  exec >/dev/null 2>&1
 
   APP_URL="$(_normalize_url "$APP_URL")"
 
@@ -351,13 +465,13 @@ else
   fi
 
   if ! _check_url_reachable "$APP_URL"; then
-    echo "${RED}[VIBRANIUM]${RESET} Could not reach ${BLUE}$APP_URL${RESET}"
+    echo "${RED}[VIBRANIUM]${RESET} Could not reach ${BLUE}http(s)://${APP_URL#*://}${RESET}"
     echo "${RED}[VIBRANIUM]${RESET} Please check the URL or your connection"
     _operation_canceled
     exit 1
   fi
 
-  # If no name was supplied, attempt to pull it from the page title.
+  # If no name was supplied via --name, attempt to pull it from the page title.
   if [[ -z $APP_NAME ]]; then
     APP_NAME="$(_fetch_page_title "$APP_URL")" || true
   fi
@@ -372,11 +486,10 @@ else
   AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
   KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
 
-  INTERACTIVE_MODE=false
 fi
 
 if [[ -z $APP_NAME || -z $APP_URL ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} Could not determine app name. Pass it explicitly as \$3."
+  echo "${RED}[VIBRANIUM]${RESET} Could not determine app name. Pass it via --name."
   _operation_canceled
   exit 1
 fi
@@ -401,7 +514,12 @@ if [[ $ICON_REF =~ ^https?:// ]]; then
   fi
 else
   # Treat as a filename relative to ICON_DIR (non-interactive shorthand).
-  ICON_PATH="$ICON_DIR/$ICON_REF"
+  if [[ -f "$ICON_DIR/$ICON_REF" ]]; then
+    ICON_PATH="$ICON_DIR/$ICON_REF"
+  else
+    # Assume that icon lives in XDG-respected icon pack
+    ICON_PATH="$ICON_REF"
+  fi
 fi
 
 EXEC_COMMAND="${CUSTOM_EXEC:-vb-webapp-launch $APP_URL}"
@@ -422,6 +540,10 @@ EOF
 
 if [[ -n $MIME_TYPES ]]; then
   echo "MimeType=$MIME_TYPES" >>"$DESKTOP_FILE"
+fi
+
+if [[ -n $CATEGORY ]]; then
+  echo "Categories=WebApp;$CATEGORY" >>"$DESKTOP_FILE"
 fi
 
 if [[ $INTERACTIVE_MODE == "true" ]]; then
