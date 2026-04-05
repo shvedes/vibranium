@@ -68,7 +68,14 @@ export ELECTRON_OZONE_PLATFORM_HINT="auto"
 # https://github.com/basecamp/omarchy/issues/2564#issuecomment-3450877034
 export SDL_VIDEODRIVER="wayland"
 
-export CHASSIS_TYPE="$(hostnamectl chassis)"
+readonly CHASSIS_STATE="$VIBRANIUM_STATE/chassis-type"
+
+if [[ -f "$CHASSIS_STATE" ]]; then
+  export CHASSIS_TYPE="$(<"$CHASSIS_STATE")"
+else
+  export CHASSIS_TYPE="$(hostnamectl chassis)"
+  printf "%s" "$CHASSIS_TYPE" > "$CHASSIS_STATE"
+fi
 
 # Load standard user directories from ~/.config/user-dirs.dirs
 # This can be useful when these directories are exported globally
