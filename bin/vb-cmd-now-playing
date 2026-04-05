@@ -13,7 +13,7 @@
 progname=${0##*/}
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: $progname [OPTION]
 
 Display information about the currently playing track.
@@ -32,16 +32,16 @@ eval set -- "$TEMP"
 hyprlock=false
 while true; do
   case "$1" in
-    --hyprlock)
-      hyprlock=true
-      shift
-      ;;
-    --help) usage ;;
-    --)
-      shift
-      break
-      ;;
-    *) break ;;
+  --hyprlock)
+    hyprlock=true
+    shift
+    ;;
+  --help) usage ;;
+  --)
+    shift
+    break
+    ;;
+  *) break ;;
   esac
 done
 
@@ -50,33 +50,33 @@ source vb-lib-core
 album_art="/tmp/${0##*/}.art"
 state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
 
-pc_status="$(playerctl status 2> /dev/null || true)"
+pc_status="$(playerctl status 2>/dev/null || true)"
 
 if systemctl -q --user is-active mpd; then
-  mpd_status="$(mpc status 2> /dev/null)"
+  mpd_status="$(mpc status 2>/dev/null)"
 fi
 
 if [[ "$pc_status" == "Playing" ]]; then
   player="playerctl"
-  echo "$player" > "$state_file"
+  echo "$player" >"$state_file"
   IFS='^' read -r title artist <<< \
-    "$(playerctl metadata --format '{{title}}^{{artist}}' 2> /dev/null)"
+    "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
 elif [[ "$mpd_status" == *"[playing]"* ]]; then
   player="mpd"
-  echo "$player" > "$state_file"
+  echo "$player" >"$state_file"
   IFS='^' read -r title artist <<< \
-    "$(mpc current -f '%title%^%artist%' 2> /dev/null)"
+    "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
 elif [[ -f "$state_file" ]]; then
-  player="$(< "$state_file")"
+  player="$(<"$state_file")"
   case "$player" in
-    playerctl)
-      IFS='^' read -r title artist <<< \
-        "$(playerctl metadata --format '{{title}}^{{artist}}' 2> /dev/null)"
-      ;;
-    mpd)
-      IFS='^' read -r title artist <<< \
-        "$(mpc current -f '%title%^%artist%' 2> /dev/null)"
-      ;;
+  playerctl)
+    IFS='^' read -r title artist <<< \
+      "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
+    ;;
+  mpd)
+    IFS='^' read -r title artist <<< \
+      "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
+    ;;
   esac
 else
   echo "No active players" >&2
@@ -86,7 +86,7 @@ fi
 # If $artist & (or) $title does not exist
 if [[ -z "$title" ]]; then
   if [[ "$player" == "playerctl" ]]; then
-    url="$(playerctl metadata --format '{{xesam:url}}' 2> /dev/null)"
+    url="$(playerctl metadata --format '{{xesam:url}}' 2>/dev/null)"
     if [[ "$url" =~ ^file:// ]]; then
       filename="${url#file://}"
       filename="${filename##*/}"
@@ -94,23 +94,23 @@ if [[ -z "$title" ]]; then
       filename="${url##*/}" # Fallback for non-file URLs, e.g., spotify:track:id
     fi
   else
-    filename="$(mpc current -f "%file%" 2> /dev/null)"
+    filename="$(mpc current -f "%file%" 2>/dev/null)"
   fi
   if [[ -z "$filename" ]]; then
     filename="Unknown track"
   fi
   pango_output="$filename"
   plain_output="$filename"
-  notify_body="<span foreground='$ORANGE}'> $filename</span>"
+  notify_body="<span foreground='${P_ORANGE}'> $filename</span>"
 else
   if [[ -z "$artist" ]]; then
     pango_output="$title"
     plain_output="$title"
-    notify_body="<span foreground='$ORANGE}'> $title</span>"
+    notify_body="<span foreground='${P_ORANGE}'> $title</span>"
   else
-    pango_output="$title <span foreground='$YELLOW}'>by</span> $artist"
+    pango_output="$title <span foreground='${P_YELLOW}'>by</span> $artist"
     plain_output="$title by $artist"
-    notify_body="<span foreground='$ORANGE}'> $title</span>\n<span foreground='$YELLOW}'> $artist</span>"
+    notify_body="<span foreground='${P_ORANGE}'> $title</span>\n<span foreground='${P_YELLOW}'> $artist</span>"
   fi
 fi
 
@@ -135,17 +135,17 @@ show_album_art="$VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART"
 
 if [[ "$show_album_art" = true ]]; then
   case "$player" in
-    "playerctl")
-      album_art_url="$(playerctl metadata mpris:artUrl)"
-      if [[ "$album_art_url" =~ ^https?:// ]]; then
-        curl -s "$album_art_url" -o "$album_art"
-      else
-        album_art="$album_art_url"
-      fi
-      ;;
-    "mpd")
-      mpc readpicture "$(mpc --format "%file%" current)" > "$album_art"
-      ;;
+  "playerctl")
+    album_art_url="$(playerctl metadata mpris:artUrl)"
+    if [[ "$album_art_url" =~ ^https?:// ]]; then
+      curl -s "$album_art_url" -o "$album_art"
+    else
+      album_art="$album_art_url"
+    fi
+    ;;
+  "mpd")
+    mpc readpicture "$(mpc --format "%file%" current)" >"$album_art"
+    ;;
   esac
 fi
 
