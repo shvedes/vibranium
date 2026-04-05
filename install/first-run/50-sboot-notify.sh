@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  exit 0
+fi
+
 if [[ $(vb-cmd-sboot-status) != setup ]]; then
   exit 0
 fi
