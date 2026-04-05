@@ -6,7 +6,7 @@ theme[hi_fg]="#c94f6d"
 theme[selected_bg]="#29394f"
 theme[selected_fg]="#dbc074"
 
-theme[inactive_fg]="#535c67"  
+theme[inactive_fg]="#535c67"
 
 theme[graph_text]="#98a1ae"
 
@@ -33,9 +33,9 @@ theme[cached_start]="#81b29a"
 theme[cached_mid]="#f4a261"
 theme[cached_end]="#c94f6d"
 
-theme[available_start]="#81b29a"
+theme[available_start]="#c94f6d"
 theme[available_mid]="#f4a261"
-theme[available_end]="#c94f6d"
+theme[available_end]="#81b29a"
 
 theme[used_start]="#81b29a"
 theme[used_mid]="#f4a261"
