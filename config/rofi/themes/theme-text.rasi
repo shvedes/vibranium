@@ -1,5 +1,4 @@
 @import "../vibranium/current/theme/rofi.rasi"
-@import "~/.local/share/vibranium/default/rofi/configuration.rasi"
 
 * {
 	background-color: transparent;

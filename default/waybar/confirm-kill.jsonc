@@ -1,8 +1,0 @@
-{
-	"custom/confirm-kill": {
-		"exec": "vb-bar-confirm-kill",
-		"return-type": "json",
-		"format": "{text}",
-		"signal": 13
-	}
-}

@@ -37,7 +37,7 @@ _set_rofi_theme() {
     --option "Modern:modern" "Text:text")" || return
   config="$XDG_CONFIG_HOME/rofi/config.rasi"
 
-  sed -i "s|\(@import \"~/.local/share/vibranium/default/rofi/themes/\)[^\"]*|\1theme-${input}.rasi|" "$config"
+  sed -i "s|\(@import \"./themes/\)[^\"]*|\1theme-${input}.rasi|" "$config"
 }
 
 _edit_env() {
