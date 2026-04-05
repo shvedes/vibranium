@@ -256,7 +256,7 @@ VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE=true
 
 # @type bool
 # @desc Whether to enable the color picker module.
-VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE=false
+VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE=true
 
 # @type bool
 # @desc Whether to enable the power profile module.
