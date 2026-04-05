@@ -15,7 +15,7 @@ source vb-lib-core
 LOG_FILE="$VIBRANIUM_CACHE/${0##*/}.log"
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTION]
 
 Options:
@@ -58,28 +58,30 @@ set_rec_area() {
   local target="${1/--/}"
 
   case "$target" in
-    portal)
-      printf '%s' "$target"
-      ;;
-    region)
-      local slurp_flags=(-b "${P_GRAY}33" -c "$P_ACCENT" -f '%wx%h+%x+%y')
-      local selected_region
-      selected_region="$(slurp "${slurp_flags[@]}" 2> /dev/null)"
+  portal)
+    printf '%s' "$target"
+    ;;
+  region)
+    local slurp_flags=(-b "${P_GRAY}33" -c "$P_ACCENT" -f '%wx%h+%x+%y')
+    local selected_region
+    selected_region="$(slurp "${slurp_flags[@]}" 2>/dev/null)"
 
-      printf "%s" "$selected_region"
-      return 0
-      ;;
-    screen)
-      local monitor
-      monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
-      printf '%s' "$monitor"
-      ;;
+    printf "%s" "$selected_region"
+    return 0
+    ;;
+  screen)
+    local monitor
+    monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
+    printf '%s' "$monitor"
+    ;;
   esac
 }
 
 init_recording() {
+  local opt_flags=()
+
   if [[ ! -z ${1:-} ]]; then
-    local opt_flags=(-encoder cpu)
+    opt_flags=(-encoder cpu)
   fi
 
   if [[ -z "$AREA" ]]; then
@@ -114,6 +116,11 @@ init_recording() {
     opt_flags+=(-a 'default_output')
   fi
 
+  # Capture the output path before launch so we can watch for its creation.
+  # This also avoids calling output_file() twice (skewed timestamps).
+  local out_file
+  out_file="$(output_file)"
+
   gpu-screen-recorder \
     ${opt_flags[@]} \
     -q "$QUALITY" \
@@ -122,16 +129,28 @@ init_recording() {
     -fm "$FRM" \
     -c "$EXT" \
     -f "$FPS" \
-    -o "$(output_file)" &> "$LOG_FILE" &
+    -o "$out_file" &>"$LOG_FILE" &
 
   local pid=$!
-  sleep 0.2
 
-  # process's alive; recording started
-  if kill -0 $pid 2> /dev/null; then
+  if [[ "$AREA" == "portal" ]]; then
+    # gsr blocks here waiting for the user to pick a capture source.
+    # Poll for a short startup window: if the process dies within it,
+    # the picker was dismissed or gsr hit an early error. If it survives,
+    # the picker was accepted and recording is underway.
+    local deadline=$((SECONDS + 3))
+    while ((SECONDS < deadline)); do
+      if ! kill -0 "$pid" 2>/dev/null; then
+        return 1
+      fi
+      sleep 0.2
+    done
     return 0
-  else #  recording failed
-    return 1
+  else
+    # Region/screen start recording immediately. A brief wait is enough
+    # to catch any startup failure before declaring success.
+    sleep 0.2
+    kill -0 "$pid" 2>/dev/null
   fi
 }
 
@@ -161,36 +180,50 @@ both_failed_notification() {
 }
 
 start_rec() {
-  helpers::check VIBRANIUM_RECORDING_FPS
-  helpers::check VIBRANIUM_RECORDING_QUALITY
-  helpers::check VIBRANIUM_RECORDING_VIDEO_CODEC
-  helpers::check VIBRANIUM_RECORDING_USE_RNNOISE
-  helpers::check VIBRANIUM_RECORDING_CAPTURE_SINK
-  helpers::check VIBRANIUM_RECORDING_CAPTURE_SOURCE
-  helpers::check VIBRANIUM_RECORDING_CONTAINER_TYPE
-  helpers::check VIBRANIUM_RECORDING_FRAMERATE_MODE
+  helpers::check \
+    VIBRANIUM_RECORDING_FPS \
+    VIBRANIUM_RECORDING_QUALITY \
+    VIBRANIUM_RECORDING_VIDEO_CODEC \
+    VIBRANIUM_RECORDING_USE_RNNOISE \
+    VIBRANIUM_RECORDING_CAPTURE_SINK \
+    VIBRANIUM_RECORDING_CAPTURE_SOURCE \
+    VIBRANIUM_RECORDING_CONTAINER_TYPE \
+    VIBRANIUM_RECORDING_FRAMERATE_MODE
 
-  if ! init_recording; then
-    log::warn "failed to start recording. Using fallback mode"
-    VIBRANIUM_RECORDING_VIDEO_CODEC="h264"
-    VIBRANIUM_RECORDING_CONTAINER_TYPE="mp4"
+  local rec_status
+  init_recording
+  rec_status=$?
 
-    mv "$LOG_FILE" "${LOG_FILE}.latest_fallback"
-
-    if ! init_recording --fallback; then
-      mv "$LOG_FILE" "${LOG_FILE}.latest_failed"
-      log::error "failed to start recording in fallback mode"
-      both_failed_notification
-      exit 1
-    fi
-
-    touch "$VIBRANIUM_CACHE/fallback_mode"
-    visualize
-    log::info "recording started in fallback mode"
-  else
+  if ((rec_status == 0)); then
     visualize
     log::info "recording started"
+    return 0
   fi
+
+  # In portal mode a non-zero exit without an output file always means
+  # the picker was dismissed -- no encoder was ever selected so fallback
+  # makes no sense, and a second picker would just confuse the user.
+  if [[ "$AREA" == "portal" ]]; then
+    log::info "recording cancelled by user"
+    return 0
+  fi
+
+  log::warn "failed to start recording. Using fallback mode"
+  VIBRANIUM_RECORDING_VIDEO_CODEC="h264"
+  VIBRANIUM_RECORDING_CONTAINER_TYPE="mp4"
+
+  mv "$LOG_FILE" "${LOG_FILE}.latest_fallback"
+
+  if ! init_recording --fallback; then
+    mv "$LOG_FILE" "${LOG_FILE}.latest_failed"
+    log::error "failed to start recording in fallback mode"
+    both_failed_notification
+    exit 1
+  fi
+
+  touch "$VIBRANIUM_CACHE/fallback_mode"
+  visualize
+  log::info "recording started in fallback mode"
 }
 
 if pid="$(pidof gpu-screen-recorder)"; then
@@ -223,17 +256,16 @@ if ! missing="$(vb-cmd-is-present gpu-screen-recorder jq)"; then
 fi
 
 case "$1" in
-  --region | --screen | --portal)
-    AREA="$(set_rec_area "$1")"
-    start_rec
-    ;;
-  -h | --help | "")
-    usage
-    exit 0
-    ;;
-  *)
-    usage
-    exit 1
-    ;;
+--region | --screen | --portal)
+  AREA="$(set_rec_area "$1")"
+  start_rec
+  ;;
+-h | --help | "")
+  usage
+  exit 0
+  ;;
+*)
+  usage
+  exit 1
+  ;;
 esac
-

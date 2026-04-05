@@ -20,10 +20,10 @@ if pidof -q gpu-screen-recorder; then
   exit 0
 fi
 
-read -r CHOSEN < <(rofi -dmenu -sync -p "Record" <<< $'Screen\nRegion')
+read -r CHOSEN < <(rofi -dmenu -sync -p "Record" <<<$'Screen\nRegion\nPortal')
 
-if [[ -z $CHOSEN ]] || [[ ! $CHOSEN =~ ^(Screen|Region)$ ]]; then
+if [[ -z $CHOSEN ]] || [[ ! $CHOSEN =~ ^(Screen|Region|Portal)$ ]]; then
   exit 1
 fi
 
-setsid -f vb-core-recording "--${CHOSEN,,}"
+setsid -f vb-core-recording "--${CHOSEN,}"
