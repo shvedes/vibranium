@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+source vb-lib-core
+
+ICON_DIR="$HOME/.local/share/applications/icons"
+DESKTOP_DIR="$HOME/.local/share/applications/"
+
+FZF_ARGS=(
+  --multi
+  --prompt '❯ '
+  --marker '❯ '
+  --pointer '◆ '
+  --separator '-'
+  --scrollbar '|'
+  --info 'right'
+  --ghost 'search...'
+  --color 'pointer:blue'
+)
+
+_operation_canceled() {
+  term::disable_input
+
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+
+  term::enable_input
+}
+
+_operation_complete() {
+  term::disable_input
+
+  printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  read -n1 -r -p $'Uninstallation complete. Press any key to exit ' dummy
+
+  term::enable_input
+}
+
+if (($# == 0)); then
+  WEB_APPS=()
+  while IFS= read -r -d '' file; do
+    if grep -q '^Exec=.*\(vb-webapp-launch\).*' "$file"; then
+      name="${file##*/}"      # strip path
+      name="${name%.desktop}" # strip suffix
+      WEB_APPS+=("$name")
+    fi
+  done < <(find "$DESKTOP_DIR" -name '*.desktop' -print0)
+
+  if ((${#WEB_APPS[@]})); then
+    IFS=$'\n' SORTED_WEB_APPS=($(sort <<<"${WEB_APPS[*]}"))
+    unset IFS
+
+    APP_NAMES=()
+    while IFS= read -r line; do
+      [[ -n $line ]] && APP_NAMES+=("$line")
+    done < <(printf '%s\n' "${SORTED_WEB_APPS[@]}" | fzf ${FZF_ARGS[@]})
+  else
+    term::show_header --color red
+    echo "${RED}[VIBRANIUM]${RESET} No custom Web Apps found"
+    _operation_canceled
+    exit 1
+  fi
+else
+  APP_NAMES=("$@")
+fi
+
+if ((${#APP_NAMES[@]} == 0)); then
+  exit 0
+fi
+
+term::show_header
+
+for APP_NAME in "${APP_NAMES[@]}"; do
+  rm -f "$DESKTOP_DIR/$APP_NAME.desktop"
+  rm -f "$ICON_DIR/$APP_NAME.png"
+  echo "${GREEN}[VIBRANIUM]${RESET} Removed ${BLUE}${APP_NAME}${RESET}"
+done
+
+_operation_complete

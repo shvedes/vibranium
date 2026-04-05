@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+_get_default_browser() {
+  local browser
+
+  # Read from mimeapps.list first. It is
+  # faster than launching xdg-mime.
+  if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
+    while IFS='=' read -r key value; do
+      if [[ "$key" != "x-scheme-handler/http" ]]; then
+        continue
+      fi
+
+      browser="${value%%;*}"
+      break
+    done <"$XDG_CONFIG_HOME/mimeapps.list"
+  fi
+
+  if [[ -z "$browser" ]]; then
+    # Only use xdg-mime query as fallback
+    xdg-mime query default x-scheme-handler/http 2>/dev/null
+  fi
+}
+
+browser=$(_get_default_browser)
+
+# Copy-pasted from Omarchy.
+
+case $browser in
+google-chrome* | brave-browser* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
+*) browser="chromium.desktop" ;;
+esac
+
+exec setsid -f $(sed -n 's/^Exec=\([^ ]*\).*/\1/p' {~/.local,~/.nix-profile,/usr}/share/applications/$browser 2>/dev/null) --app="$1" "${@:2}"

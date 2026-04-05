@@ -7,8 +7,8 @@ export PATH="$PATH:$VIBRANIUM/configure"
 
 _build_help() {
   _launch() {
-    if ! command -v "$1" > /dev/null; then
-      if command -v chromium > /dev/null; then
+    if ! command -v "$1" >/dev/null; then
+      if command -v chromium >/dev/null; then
         vb-cmd-launch-cmd chromium --app="$1"
       else
         vb-cmd-launch-cmd xdg-open "$1"

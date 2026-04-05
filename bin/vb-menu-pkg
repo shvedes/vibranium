@@ -8,8 +8,9 @@ _die() { helpers::ui::close_menus; }
 _build_install() {
   _b() {
     cfgr::item::action --label "Package" --func "vb-core-term --floating -- vb-pkg-install; _die"
-    cfgr::item::action --label "Font" --func "vb-core-term --floating -- vb-pkg-font-install; _die"
+    cfgr::item::action --label "Web App" --func "vb-core-term --floating -- vb-webapp-install; _die"
     cfgr::item::action --label "Theme" --func "vb-core-term --floating -- vb-theme-install; _die"
+    cfgr::item::action --label "Font" --func "vb-core-term --floating -- vb-pkg-font-install; _die"
   }
   cfgr::run "Install" "_b"
 }
@@ -17,6 +18,7 @@ _build_install() {
 _build_remove() {
   _b() {
     cfgr::item::action --label "Package" --func "vb-core-term --floating -- vb-pkg-remove; _die"
+    cfgr::item::action --label "Web App" --func "vb-core-term --floating -- vb-webapp-remove; _die"
     cfgr::item::action --label "Font" --func "vb-core-term --floating -- vb-pkg-font-remove; _die"
     cfgr::item::action --label "Theme" --func "vb-theme-remove; _die"
   }
