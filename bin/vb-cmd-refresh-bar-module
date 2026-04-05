@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} MODULE_NAME
 
 Send a refresh signal to the Waybar module MODULE_NAME.
@@ -12,10 +12,10 @@ EOF
 }
 
 case "${1:-}" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
+-h | --help)
+  usage
+  exit 0
+  ;;
 esac
 
 [[ -z "${1:-}" ]] && {
@@ -25,7 +25,7 @@ esac
 
 declare -A signals
 
-for file in "$VIBRANIUM"/default/waybar/*; do
+for file in "$XDG_CONFIG_HOME"/waybar/modules/*; do
   while IFS= read -r line; do
     [[ $line == *'"signal"'* ]] || continue
 
@@ -34,7 +34,7 @@ for file in "$VIBRANIUM"/default/waybar/*; do
     sig="${line//[^0-9]/}" # keep kill signals only
 
     signals["$name"]="$sig"
-  done < "$file"
+  done <"$file"
 done
 
 module_name="$1"
