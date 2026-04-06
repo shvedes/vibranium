@@ -4,8 +4,10 @@
 
 # Load defaults first
 source "$VIBRANIUM_PATH/vb-core-defaults"
-source "$XDG_CONFIG_HOME/vibranium/settings"
-source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
+
+# Ignore error outputs while installing Vibranium (these files don't exist yet)
+source "$XDG_CONFIG_HOME/vibranium/settings" 2>/dev/null
+source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme" 2>/dev/null
 
 RED=$'\e[0;31m'
 YELLOW=$'\e[0;33m'
@@ -71,14 +73,14 @@ helpers::ui::menu() {
   # The values were empirically derived for the configured rofi font/theme so that
   # the window is never too narrow to display the longest entry without clipping.
   local -A map=(
-     [80]=816 [78]=799 [76]=782 [74]=765 [72]=748 [70]=731
-     [68]=714 [66]=697 [64]=680 [62]=663 [60]=646
-     [58]=629 [56]=612 [54]=595 [52]=578 [50]=561
-     [48]=544 [46]=527 [44]=510 [42]=493 [40]=476
-     [38]=459 [36]=442 [34]=425 [32]=408 [30]=391
-     [28]=374 [26]=357 [24]=340 [22]=323 [20]=306
-     [18]=289 [16]=272 [14]=255 [12]=238 [10]=221
-     [8]=208 [6]=200 [0]=196
+    [80]=816 [78]=799 [76]=782 [74]=765 [72]=748 [70]=731
+    [68]=714 [66]=697 [64]=680 [62]=663 [60]=646
+    [58]=629 [56]=612 [54]=595 [52]=578 [50]=561
+    [48]=544 [46]=527 [44]=510 [42]=493 [40]=476
+    [38]=459 [36]=442 [34]=425 [32]=408 [30]=391
+    [28]=374 [26]=357 [24]=340 [22]=323 [20]=306
+    [18]=289 [16]=272 [14]=255 [12]=238 [10]=221
+    [8]=208 [6]=200 [0]=196
   )
 
   # Guard against multiple concurrent rofi instances.
@@ -92,7 +94,7 @@ helpers::ui::menu() {
     return 1
   fi
 
-  : > "$lock_file"
+  : >"$lock_file"
 
   trap "rm -f "$lock_file"" EXIT INT HUP
 
@@ -159,7 +161,7 @@ helpers::ui::menu() {
     if ((${#line} > maxlen_input)); then
       maxlen_input=${#line}
     fi
-  done <<< "$input_plain"
+  done <<<"$input_plain"
 
   # The window must also be wide enough to show the prompt label + placeholder hint,
   # so we take the maximum of the two lengths. If entries are short but the prompt
@@ -184,7 +186,7 @@ helpers::ui::menu() {
   local lines=0
   while IFS= read -r _; do
     ((lines++))
-  done <<< "$input_plain"
+  done <<<"$input_plain"
 
   # We don't need it anymore.
   unset input_plain
@@ -225,7 +227,7 @@ helpers::ui::menu() {
     -theme-str 'entry {placeholder: "'"${placeholder}"'";}' \
     -theme-str 'window {width: '"${width}px"';}' \
     -matching-negate-char '' "${rofi_opts[@]}" \
-    "${user_rofi_args[@]}" <<< "$rofi_input" 2> /dev/null)
+    "${user_rofi_args[@]}" <<<"$rofi_input" 2>/dev/null)
 
   # Write the result into the caller's named variable without a subshell.
   # printf -v <name> is bash's built-in way to assign to a variable by name;
@@ -301,7 +303,7 @@ helpers::ui::register_menu() {
     # whether the process exists and we have permission to signal it.
     # If it returns 0 (success), the process is alive; we keep it in the clean list.
     # If it returns non-zero, the process is dead; we silently drop it.
-    if kill -0 "$pid" 2> /dev/null; then
+    if kill -0 "$pid" 2>/dev/null; then
       # ${clean:+$clean } expands to "$clean " only when $clean is non-empty,
       # giving us space-separated PIDs without a leading space.
       clean="${clean:+$clean }$pid"
@@ -368,11 +370,11 @@ helpers::ui::close_menus() {
     # Probe the PID before attempting to kill it — it may have already exited
     # naturally (e.g. user closed rofi manually) between registration and now.
     # If it's gone, skip it rather than letting kill emit a spurious error.
-    kill -0 "$pid" 2> /dev/null || continue
+    kill -0 "$pid" 2>/dev/null || continue
 
     # Now kill the menu script itself. This is safe to do last because the
     # child (rofi) is already gone, and the script is just sitting in wait/read.
-    kill "$pid" 2> /dev/null
+    kill "$pid" 2>/dev/null
   done
 }
 
@@ -385,8 +387,8 @@ helpers::bar::spinner() {
 
   local sep_pos="right" left_pad=0 right_pad=1
   case "${BASH_SOURCE[1]##*/}" in
-    vb-bar-pacman) sep_pos="left" left_pad=0 right_pad=2 ;;
-    vb-bar-weather) sep_pos="right" left_pad=0 right_pad=2 ;;
+  vb-bar-pacman) sep_pos="left" left_pad=0 right_pad=2 ;;
+  vb-bar-weather) sep_pos="right" left_pad=0 right_pad=2 ;;
   esac
 
   local sep=""
@@ -415,12 +417,12 @@ helpers::bar::spinner() {
 
   if (($# > 0)); then
     # Main loop: PID-waiting mode
-    while kill -0 "$@" 2> /dev/null; do
+    while kill -0 "$@" 2>/dev/null; do
       for ch in "${spinstr[@]}"; do
         print_frame "$ch"
         sleep "$delay"
 
-        if ! kill -0 "$@" 2> /dev/null; then
+        if ! kill -0 "$@" 2>/dev/null; then
           return
         fi
       done
@@ -535,55 +537,55 @@ helpers::check() {
     is_valid=1
 
     case $type in
-      bool)
-        # Lowercase via ,, operator so "True"/"TRUE"/"true" all pass
-        normalized=${val,,}
+    bool)
+      # Lowercase via ,, operator so "True"/"TRUE"/"true" all pass
+      normalized=${val,,}
 
-        # Booleans must be exactly "true" or "false" — nothing else
-        [[ $normalized != true && $normalized != false ]] && is_valid=0
-        ;;
-      int)
-        # Normalize comma-as-decimal-separator (e.g. European locale "3,14" → "3.14")
-        normalized=${val//,/.}
+      # Booleans must be exactly "true" or "false" — nothing else
+      [[ $normalized != true && $normalized != false ]] && is_valid=0
+      ;;
+    int)
+      # Normalize comma-as-decimal-separator (e.g. European locale "3,14" → "3.14")
+      normalized=${val//,/.}
 
-        # _RE_INT is a precompiled variable reference — bash reuses its compiled form
-        # across calls, unlike an inline string literal which is recompiled each time.
-        if [[ ! $normalized =~ $_RE_INT ]]; then
-          is_valid=0
-        else
-          sign=${BASH_REMATCH[1]}
-          int_part=${BASH_REMATCH[2]} # leading zeros already stripped by 0* group
-          frac_part=${BASH_REMATCH[3]} # empty or ".digits"
+      # _RE_INT is a precompiled variable reference — bash reuses its compiled form
+      # across calls, unlike an inline string literal which is recompiled each time.
+      if [[ ! $normalized =~ $_RE_INT ]]; then
+        is_valid=0
+      else
+        sign=${BASH_REMATCH[1]}
+        int_part=${BASH_REMATCH[2]}  # leading zeros already stripped by 0* group
+        frac_part=${BASH_REMATCH[3]} # empty or ".digits"
 
-          # Rebuild a clean normalized form: sign + stripped-zero int + optional fraction
-          normalized="${sign}${int_part}${frac_part}"
+        # Rebuild a clean normalized form: sign + stripped-zero int + optional fraction
+        normalized="${sign}${int_part}${frac_part}"
 
-          # Only do range check if a min was defined for this variable
-          min=${OPTION_MINS[$var_name]-} # -} gives empty string if key absent
-          if [[ -n $min ]]; then
-            max=${OPTION_MAXS[$var_name]}
+        # Only do range check if a min was defined for this variable
+        min=${OPTION_MINS[$var_name]-} # -} gives empty string if key absent
+        if [[ -n $min ]]; then
+          max=${OPTION_MAXS[$var_name]}
 
-            # 10# prefix forces base-10 interpretation so "08" and "09" don't
-            # trigger bash's "invalid octal" arithmetic error.
-            # The sign is prepended *outside* the 10# to handle negatives correctly.
-            signed_int=$((${sign}10#$int_part))
-            ((signed_int < 10#$min || signed_int > 10#$max)) && is_valid=0
-          fi
+          # 10# prefix forces base-10 interpretation so "08" and "09" don't
+          # trigger bash's "invalid octal" arithmetic error.
+          # The sign is prepended *outside* the 10# to handle negatives correctly.
+          signed_int=$((${sign}10#$int_part))
+          ((signed_int < 10#$min || signed_int > 10#$max)) && is_valid=0
         fi
-        ;;
-      string)
-        # OPTION_ALLOWEDS stores values as |val1|val2|valN| (pipe-delimited with
-        # sentinel pipes at both ends, set by vb-defaults.awk).
-        # A single glob test replaces the former read-ra + for loop entirely:
-        # O(1) regardless of how many allowed values there are.
-        allowed_str=${OPTION_ALLOWEDS[$var_name]-}
+      fi
+      ;;
+    string)
+      # OPTION_ALLOWEDS stores values as |val1|val2|valN| (pipe-delimited with
+      # sentinel pipes at both ends, set by vb-defaults.awk).
+      # A single glob test replaces the former read-ra + for loop entirely:
+      # O(1) regardless of how many allowed values there are.
+      allowed_str=${OPTION_ALLOWEDS[$var_name]-}
 
-        if [[ -n $allowed_str ]]; then
-          [[ $allowed_str == *"|${val}|"* ]] || is_valid=0
-        fi
+      if [[ -n $allowed_str ]]; then
+        [[ $allowed_str == *"|${val}|"* ]] || is_valid=0
+      fi
 
-        # If no allowed list exists, any non-empty string is considered valid
-        ;;
+      # If no allowed list exists, any non-empty string is considered valid
+      ;;
     esac
     # (( is_valid )) exits 0 when is_valid=1 (valid), 1 when is_valid=0 (invalid)
     if ((is_valid)); then
@@ -659,12 +661,12 @@ term::ask_yes_no() {
 
   # Set hint based on default
   case "$default" in
-    Y) hint="(Y/n)" ;;
-    N) hint="(y/N)" ;;
-    *)
-      hint="(Y/n)"
-      default="Y"
-      ;;
+  Y) hint="(Y/n)" ;;
+  N) hint="(y/N)" ;;
+  *)
+    hint="(Y/n)"
+    default="Y"
+    ;;
   esac
 
   term::enable_input
@@ -686,18 +688,18 @@ term::ask_yes_no() {
     fi
 
     case "$input" in
-      [Yy][Ee][Ss] | [Yy])
-        term::disable_input
-        return 0
-        ;;
-      [Nn][Oo] | [Nn])
-        term::disable_input
-        return 1
-        ;;
-      *)
-        # Clear line and retry
-        printf "\r\e[K"
-        ;;
+    [Yy][Ee][Ss] | [Yy])
+      term::disable_input
+      return 0
+      ;;
+    [Nn][Oo] | [Nn])
+      term::disable_input
+      return 1
+      ;;
+    *)
+      # Clear line and retry
+      printf "\r\e[K"
+      ;;
     esac
   done
 }
@@ -731,7 +733,7 @@ term::spinner() {
   local clear_line="\r\033[K"
 
   # While the process exists, animate the term::spinner
-  while kill -0 "$pid" 2> /dev/null; do
+  while kill -0 "$pid" 2>/dev/null; do
     for i in "${spinstr[@]}"; do
       printf "\r${msg} %s" "${i} "
       sleep $delay
@@ -761,17 +763,17 @@ term::show_header() {
 
   if [[ "${1-}" == "--color" ]]; then
     case "${2-}" in
-      purple) color="$PURPLE" ;;
-      green) color="$GREEN" ;;
-      blue) color="$BLUE" ;;
-      cyan) color="$CYAN" ;;
-      red) color="$RED" ;;
-      *) color="$YELLOW" ;;
+    purple) color="$PURPLE" ;;
+    green) color="$GREEN" ;;
+    blue) color="$BLUE" ;;
+    cyan) color="$CYAN" ;;
+    red) color="$RED" ;;
+    *) color="$YELLOW" ;;
     esac
   fi
 
   printf "\n%s%s%s\n\n" "${color:-$YELLOW}" \
-    "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+    "$(<"$VIBRANIUM/logo.txt")" "$RESET"
 }
 
 term::is_headless() {
