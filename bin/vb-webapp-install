@@ -392,8 +392,7 @@ if [[ -z $APP_URL ]]; then
   _url_overwrite_confirmed=false
   if _dup_file="$(_find_webapp_by_url "$APP_URL")"; then
     _dup_file="${_dup_file##*/}"
-    echo "${YELLOW}[VIBRANIUM]${RESET} This PWA is already installed (${BLUE}${_dup_file/PWA - /}${RESET})"
-    if term::ask_yes_no Y "Overwrite?"; then
+    if term::ask_yes_no Y "This PWA is already installed. Overwrite it?"; then
       _url_overwrite_confirmed=true
     else
       _operation_canceled
@@ -403,18 +402,27 @@ if [[ -z $APP_URL ]]; then
 
   # Verify reachability before doing anything else.
   _check_url_reachable "$APP_URL" &
-  if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking URL"; then
+  if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Verifying URL"; then
     echo "${RED}[VIBRANIUM]${RESET} Could not reach ${BLUE}http(s)://${APP_URL#*://}${RESET}"
     echo "${RED}[VIBRANIUM]${RESET} Check the URL or your connection."
     _operation_canceled
     exit 1
   fi
 
-  # Fetch the page title to use as a default app name.
-  PAGE_TITLE="$(_fetch_page_title "$APP_URL")"
+  tmpfile=$(mktemp)
+  _fetch_page_title "$APP_URL" >"$tmpfile" &
+
+  if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching page title"; then
+    PAGE_TITLE=$(<"$tmpfile")
+  else
+    echo "${RED}[VIBRANIUM]${RESET} Failed to fetch page title"
+    PAGE_TITLE=""
+  fi
+
+  rm -f "$tmpfile"
 
   # Check if the page title contains illegal characters.
-  # If so - reset the title. This will trigger manual input.
+  # If so - fix them.
   case "$PAGE_TITLE" in
   *$'\n'* | *$'\r'* | *$'\t'* | */* | " "* | *" ")
     PAGE_TITLE=$(_strip_title "$PAGE_TITLE")
@@ -426,7 +434,7 @@ if [[ -z $APP_URL ]]; then
   if [[ -n $PAGE_TITLE ]]; then
     echo "${YELLOW}[VIBRANIUM]${RESET} Auto-generated name: ${BLUE}${PAGE_TITLE}${RESET}"
     # Show the suggested name; accept on Enter, or type to override.
-    read -rp "${BLUE}[VIBRANIUM]${RESET} PWA name (Enter to keep default): $BLUE" APP_NAME
+    read -rp "${BLUE}[VIBRANIUM]${RESET} PWA name (Enter to keep the name above): $BLUE" APP_NAME
     APP_NAME="PWA - ${APP_NAME:-$PAGE_TITLE}"
   else
     # No title found; require explicit input.
@@ -489,19 +497,17 @@ if [[ -z $APP_URL ]]; then
   # Try to fetch the favicon from Google's service; fall back to manual input.
   FAVICON_URL="https://www.google.com/s2/favicons?domain=${APP_URL}&sz=128"
 
-  curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2>/dev/null &
+  if term::ask_yes_no Y "Would you like to keep the web page's original icon?"; then
+    curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2>/dev/null &
 
-  if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading favicon of the URL" && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
-    ICON_REF="$APP_NAME.png"
-
-    if ! term::ask_yes_no Y "Would you like to keep web page's favicon?"; then
-      rm "$ICON_DIR/$ICON_REF"
+    if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading favicon of the URL" && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
+      ICON_REF="$APP_NAME.png"
+    else
+      echo "${RED}[VIBRANIUM]${RESET} Could not fetch favicon automatically. Enter a PNG icon URL manually"
+      echo "${RED}[VIBRANIUM]${RESET} See ${BLUE}https://dashboardicons.com${RESET} for a large library"
       ICON_REF="$(_ask_for_icon)"
     fi
   else
-    echo "${RED}[VIBRANIUM]${RESET} Could not fetch favicon automatically. Enter a PNG icon URL manually"
-    echo "${RED}[VIBRANIUM]${RESET} See ${BLUE}https://dashboardicons.com${RESET} for a large library"
-
     ICON_REF="$(_ask_for_icon)"
   fi
 

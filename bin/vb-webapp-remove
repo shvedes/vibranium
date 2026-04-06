@@ -9,7 +9,7 @@ FZF_ARGS=(
   --multi
   --prompt '❯ '
   --marker '❯ '
-  --pointer '◆ '
+  --pointer '◆'
   --separator '-'
   --scrollbar '|'
   --info 'right'
@@ -44,47 +44,36 @@ Options:
 EOF
 }
 
-_error() {
-  printf '%s[VIBRANIUM]%s %s\n' "$RED" "$RESET" "$1" >&2
-  printf 'Try %s --help for more information\n' "${0##*/}" >&2
-  exit 1
-}
-
 _remove_pwa() {
   local name="$1"
-  local desktop_path="${2:-$DESKTOP_DIR/PWA - $name.desktop}"
-  local interactive="${3:-false}"
+  local desktop_path="$2"
   local removed=false
 
-  if [[ -f "$desktop_path" ]]; then
+  [[ -f "$desktop_path" ]] && {
     rm -f -- "$desktop_path"
     removed=true
-  fi
-
-  if [[ -f "$ICON_DIR/PWA - $name.png" ]]; then
+  }
+  [[ -f "$ICON_DIR/PWA - $name.png" ]] && {
     rm -f -- "$ICON_DIR/PWA - $name.png"
     removed=true
-  fi
+  }
 
   if [[ "$removed" == true ]]; then
-    if [[ "$interactive" == true ]]; then
-      printf '%s[VIBRANIUM]%s Removed %s%s%s\n' "$GREEN" "$RESET" "$BLUE" "$name" "$RESET"
-    else
-      printf 'Removed %s%s%s\n' "$BLUE" "$name" "$RESET"
-    fi
+    [[ $INTERACTIVE == true ]] &&
+      echo "${GREEN}[VIBRANIUM]${RESET} Removed ${BLUE}${name}${RESET}" ||
+      echo "Removed ${BLUE}${name}${RESET}"
   else
-    printf 'No such PWA: %s%s%s\n' "$BLUE" "$name" "$RESET" >&2
+    echo "No such PWA: ${BLUE}${name}${RESET}" >&2
   fi
 }
 
-resolve_desktop_path() {
-  local arg="$1"
-
-  if [[ "$arg" == */* ]]; then
-    printf '%s\n' "$arg"
-  else
-    printf '%s/%s\n' "$DESKTOP_DIR" "$arg"
-  fi
+_desktop_name() {
+  local file="$1"
+  local name
+  name=$(grep '^Name=' "$file" | head -1)
+  name="${name#Name=}"
+  name="${name#PWA - }"
+  echo "$name"
 }
 
 APP_NAMES=()
@@ -101,118 +90,114 @@ while [[ $# -gt 0 ]]; do
   --file)
     INTERACTIVE=false
     shift
-    [[ $# -gt 0 ]] || _error "Error: --file requires at least one .desktop file argument"
-
+    if [[ $# -eq 0 ]]; then
+      echo "${RED}[VIBRANIUM]${RESET} Error: --file requires at least one .desktop file argument" >&2
+      echo "Try ${0##*/} --help for more information" >&2
+      exit 1
+    fi
     while [[ $# -gt 0 && "$1" != -* ]]; do
-      [[ "$1" == *.desktop ]] || _error "Error: not a .desktop file: $1"
+      if [[ "$1" != *.desktop ]]; then
+        echo "${RED}[VIBRANIUM]${RESET} Error: not a .desktop file: $1" >&2
+        echo "Try ${0##*/} --help for more information" >&2
+        exit 1
+      fi
       DESKTOP_FILES+=("$1")
       shift
     done
     ;;
 
-  --file=*)
-    INTERACTIVE=false
-    file="${1#--file=}"
-    [[ -n "$file" ]] || _error "Error: --file requires at least one .desktop file argument"
-    [[ "$file" == *.desktop ]] || _error "Error: not a .desktop file: $file"
-    DESKTOP_FILES+=("$file")
-    shift
-    ;;
-
   -*)
-    printf 'Unknown option: %s\n' "$1" >&2
-    printf '%s --help for more information\n' "${0##*/}" >&2
+    echo "Unknown option: $1" >&2
+    echo "${0##*/} --help for more information" >&2
     exit 1
     ;;
 
   *)
-    INTERACTIVE=false
-    APP_NAMES+=("$1")
-    shift
+    echo "Unknown option: $1" >&2
+    echo "${0##*/} --help for more information" >&2
+    exit 1
     ;;
   esac
 done
 
 if [[ ${#APP_NAMES[@]} -gt 0 && ${#DESKTOP_FILES[@]} -gt 0 ]]; then
-  _error "Error: use either positional PWA names or --file, not both"
+  echo "${RED}[VIBRANIUM]${RESET} Error: use either positional PWA names or --file, not both" >&2
+  echo "Try ${0##*/} --help for more information" >&2
+  exit 1
 fi
+
+# --- Resolve targets: parallel arrays of (name, desktop_path) ---
+
+TARGET_NAMES=()
+TARGET_PATHS=()
 
 if [[ $INTERACTIVE == true ]]; then
   term::show_header
 
-  WEB_APPS=()
+  declare -A PWA_MAP
   while IFS= read -r -d '' file; do
-    if grep -q '^Exec=.*\(vb-webapp-launch\).*' "$file"; then
-      name="${file##*/}"
-      name="${name%.desktop}"
-      name="${name#PWA - }"
-      WEB_APPS+=("$name")
+    if grep -q '^Exec=.*vb-webapp-launch.*' "$file"; then
+      PWA_MAP["$(_desktop_name "$file")"]="$file"
     fi
   done < <(find "$DESKTOP_DIR" -name 'PWA - *.desktop' -print0)
 
-  if ((${#WEB_APPS[@]} == 0)); then
+  if ((${#PWA_MAP[@]} == 0)); then
     term::show_header --color red
-    printf '%s[VIBRANIUM]%s No PWAs found\n' "$RED" "$RESET"
+    echo "${RED}[VIBRANIUM]${RESET} No PWAs found"
     _operation_canceled
     exit 1
   fi
 
-  mapfile -t APP_NAMES < <(printf '%s\n' "${WEB_APPS[@]}" | fzf "${FZF_ARGS[@]}")
+  mapfile -t SELECTED < <(printf '%s\n' "${!PWA_MAP[@]}" | sort | fzf "${FZF_ARGS[@]}")
 
-  if ((${#APP_NAMES[@]} == 0)); then
+  if ((${#SELECTED[@]} == 0)); then
     _operation_canceled
     exit 1
   fi
 
-  if ((${#APP_NAMES[@]} == 1)); then
-    prefix=""
-  else
-    prefix="s"
-  fi
+  count=${#SELECTED[@]}
+  ((count == 1)) && suffix="" || suffix="s"
 
-  if ! term::ask_yes_no Y "You're about to remove ${#APP_NAMES[@]} PWA${prefix}. Continue?"; then
+  if ! term::ask_yes_no Y "You're about to remove $count PWA${suffix}. Continue?"; then
     _operation_canceled
     exit 1
   fi
+
+  for name in "${SELECTED[@]}"; do
+    TARGET_NAMES+=("$name")
+    TARGET_PATHS+=("${PWA_MAP[$name]}")
+  done
+
 else
-  if ((${#APP_NAMES[@]} > 0)); then
-    for name in "${APP_NAMES[@]}"; do
-      if [[ "$name" == *.desktop || "$name" == */* ]]; then
-        _error "Error: file paths must be specified with --file. Positional arguments are PWA names only."
-      fi
-    done
-  fi
+  for name in "${APP_NAMES[@]}"; do
+    TARGET_NAMES+=("$name")
+    TARGET_PATHS+=("$DESKTOP_DIR/PWA - $name.desktop")
+  done
+
+  for file_arg in "${DESKTOP_FILES[@]}"; do
+    [[ "$file_arg" == */* ]] && desktop_path="$file_arg" || desktop_path="$DESKTOP_DIR/$file_arg"
+
+    if [[ ! -f "$desktop_path" ]]; then
+      echo "No such file: $file_arg" >&2
+      continue
+    fi
+
+    filename="${desktop_path##*/}"
+
+    if [[ "$filename" != PWA\ -\ *.desktop ]]; then
+      echo "Warning: not a PWA file: $filename" >&2
+      continue
+    fi
+
+    TARGET_NAMES+=("$(_desktop_name "$desktop_path")")
+    TARGET_PATHS+=("$desktop_path")
+  done
 fi
 
-for APP_NAME in "${APP_NAMES[@]}"; do
-  if [[ $INTERACTIVE == true ]]; then
-    _remove_pwa "$APP_NAME" "" true
-  else
-    _remove_pwa "$APP_NAME" "" false
-  fi
+# --- Remove all targets ---
+
+for i in "${!TARGET_NAMES[@]}"; do
+  _remove_pwa "${TARGET_NAMES[$i]}" "${TARGET_PATHS[$i]}"
 done
 
-for DESKTOP_FILE_ARG in "${DESKTOP_FILES[@]}"; do
-  desktop_path="$(resolve_desktop_path "$DESKTOP_FILE_ARG")"
-
-  if [[ ! -f "$desktop_path" ]]; then
-    printf 'No such file: %s\n' "$DESKTOP_FILE_ARG" >&2
-    continue
-  fi
-
-  filename="${desktop_path##*/}"
-
-  if [[ "$filename" == PWA\ -\ *.desktop ]]; then
-    echo "Warninmg: not a PWA file: $filename"
-    continue
-  fi
-
-  name="${filename%.desktop}"
-  name="${name#PWA - }"
-
-  _remove_pwa "$name" "$desktop_path" false
-done
-
-if [[ $INTERACTIVE == true ]]; then
-  _operation_complete
-fi
+[[ $INTERACTIVE == true ]] && _operation_complete
