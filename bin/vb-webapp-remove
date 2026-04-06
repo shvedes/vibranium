@@ -3,7 +3,7 @@
 source vb-lib-core
 
 ICON_DIR="$HOME/.local/share/applications/icons"
-DESKTOP_DIR="$HOME/.local/share/applications/"
+DESKTOP_DIR="$HOME/.local/share/applications"
 
 FZF_ARGS=(
   --multi
@@ -19,60 +19,200 @@ FZF_ARGS=(
 
 _operation_canceled() {
   term::disable_input
-
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
-  read -n1 -r -s -p $'. Press any key to exit' dummy
-
+  read -r -n1 -s -p $'. Press any key to exit' _dummy
   term::enable_input
 }
 
 _operation_complete() {
   term::disable_input
-
   printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
-  read -n1 -r -p $'Uninstallation complete. Press any key to exit ' dummy
-
+  read -r -n1 -p $'Removal complete. Press any key to exit ' _dummy
   term::enable_input
 }
 
-if (($# == 0)); then
+_usage() {
+  cat <<'EOF'
+Usage: vb-webapp-remove [OPTION]... [NAME]...
+
+Remove Progressive Web App shortcuts as .desktop launcher entries.
+If no NAMEs or --file options are provided, the script runs in interactive mode.
+
+Options:
+  --file FILE...      .desktop file(s) to remove (basename or full path)
+  -h, --help          Show this help and exit
+EOF
+}
+
+_error() {
+  printf '%s[VIBRANIUM]%s %s\n' "$RED" "$RESET" "$1" >&2
+  printf 'Try %s --help for more information\n' "${0##*/}" >&2
+  exit 1
+}
+
+_remove_pwa() {
+  local name="$1"
+  local desktop_path="${2:-$DESKTOP_DIR/PWA - $name.desktop}"
+  local interactive="${3:-false}"
+  local removed=false
+
+  if [[ -f "$desktop_path" ]]; then
+    rm -f -- "$desktop_path"
+    removed=true
+  fi
+
+  if [[ -f "$ICON_DIR/PWA - $name.png" ]]; then
+    rm -f -- "$ICON_DIR/PWA - $name.png"
+    removed=true
+  fi
+
+  if [[ "$removed" == true ]]; then
+    if [[ "$interactive" == true ]]; then
+      printf '%s[VIBRANIUM]%s Removed %s%s%s\n' "$GREEN" "$RESET" "$BLUE" "$name" "$RESET"
+    else
+      printf 'Removed %s%s%s\n' "$BLUE" "$name" "$RESET"
+    fi
+  else
+    printf 'No such PWA: %s%s%s\n' "$BLUE" "$name" "$RESET" >&2
+  fi
+}
+
+resolve_desktop_path() {
+  local arg="$1"
+
+  if [[ "$arg" == */* ]]; then
+    printf '%s\n' "$arg"
+  else
+    printf '%s/%s\n' "$DESKTOP_DIR" "$arg"
+  fi
+}
+
+APP_NAMES=()
+DESKTOP_FILES=()
+INTERACTIVE=true
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    _usage
+    exit 0
+    ;;
+
+  --file)
+    INTERACTIVE=false
+    shift
+    [[ $# -gt 0 ]] || _error "Error: --file requires at least one .desktop file argument"
+
+    while [[ $# -gt 0 && "$1" != -* ]]; do
+      [[ "$1" == *.desktop ]] || _error "Error: not a .desktop file: $1"
+      DESKTOP_FILES+=("$1")
+      shift
+    done
+    ;;
+
+  --file=*)
+    INTERACTIVE=false
+    file="${1#--file=}"
+    [[ -n "$file" ]] || _error "Error: --file requires at least one .desktop file argument"
+    [[ "$file" == *.desktop ]] || _error "Error: not a .desktop file: $file"
+    DESKTOP_FILES+=("$file")
+    shift
+    ;;
+
+  -*)
+    printf 'Unknown option: %s\n' "$1" >&2
+    printf '%s --help for more information\n' "${0##*/}" >&2
+    exit 1
+    ;;
+
+  *)
+    INTERACTIVE=false
+    APP_NAMES+=("$1")
+    shift
+    ;;
+  esac
+done
+
+if [[ ${#APP_NAMES[@]} -gt 0 && ${#DESKTOP_FILES[@]} -gt 0 ]]; then
+  _error "Error: use either positional PWA names or --file, not both"
+fi
+
+if [[ $INTERACTIVE == true ]]; then
+  term::show_header
+
   WEB_APPS=()
   while IFS= read -r -d '' file; do
     if grep -q '^Exec=.*\(vb-webapp-launch\).*' "$file"; then
-      name="${file##*/}"      # strip path
-      name="${name%.desktop}" # strip suffix
+      name="${file##*/}"
+      name="${name%.desktop}"
+      name="${name#PWA - }"
       WEB_APPS+=("$name")
     fi
-  done < <(find "$DESKTOP_DIR" -name '*.desktop' -print0)
+  done < <(find "$DESKTOP_DIR" -name 'PWA - *.desktop' -print0)
 
-  if ((${#WEB_APPS[@]})); then
-    IFS=$'\n' SORTED_WEB_APPS=($(sort <<<"${WEB_APPS[*]}"))
-    unset IFS
-
-    APP_NAMES=()
-    while IFS= read -r line; do
-      [[ -n $line ]] && APP_NAMES+=("$line")
-    done < <(printf '%s\n' "${SORTED_WEB_APPS[@]}" | fzf ${FZF_ARGS[@]})
-  else
+  if ((${#WEB_APPS[@]} == 0)); then
     term::show_header --color red
-    echo "${RED}[VIBRANIUM]${RESET} No custom Web Apps found"
+    printf '%s[VIBRANIUM]%s No PWAs found\n' "$RED" "$RESET"
+    _operation_canceled
+    exit 1
+  fi
+
+  mapfile -t APP_NAMES < <(printf '%s\n' "${WEB_APPS[@]}" | fzf "${FZF_ARGS[@]}")
+
+  if ((${#APP_NAMES[@]} == 0)); then
+    _operation_canceled
+    exit 1
+  fi
+
+  if ((${#APP_NAMES[@]} == 1)); then
+    prefix=""
+  else
+    prefix="s"
+  fi
+
+  if ! term::ask_yes_no Y "You're about to remove ${#APP_NAMES[@]} PWA${prefix}. Continue?"; then
     _operation_canceled
     exit 1
   fi
 else
-  APP_NAMES=("$@")
+  if ((${#APP_NAMES[@]} > 0)); then
+    for name in "${APP_NAMES[@]}"; do
+      if [[ "$name" == *.desktop || "$name" == */* ]]; then
+        _error "Error: file paths must be specified with --file. Positional arguments are PWA names only."
+      fi
+    done
+  fi
 fi
-
-if ((${#APP_NAMES[@]} == 0)); then
-  exit 0
-fi
-
-term::show_header
 
 for APP_NAME in "${APP_NAMES[@]}"; do
-  rm -f "$DESKTOP_DIR/$APP_NAME.desktop"
-  rm -f "$ICON_DIR/$APP_NAME.png"
-  echo "${GREEN}[VIBRANIUM]${RESET} Removed ${BLUE}${APP_NAME}${RESET}"
+  if [[ $INTERACTIVE == true ]]; then
+    _remove_pwa "$APP_NAME" "" true
+  else
+    _remove_pwa "$APP_NAME" "" false
+  fi
 done
 
-_operation_complete
+for DESKTOP_FILE_ARG in "${DESKTOP_FILES[@]}"; do
+  desktop_path="$(resolve_desktop_path "$DESKTOP_FILE_ARG")"
+
+  if [[ ! -f "$desktop_path" ]]; then
+    printf 'No such file: %s\n' "$DESKTOP_FILE_ARG" >&2
+    continue
+  fi
+
+  filename="${desktop_path##*/}"
+
+  if [[ "$filename" == PWA\ -\ *.desktop ]]; then
+    echo "Warninmg: not a PWA file: $filename"
+    continue
+  fi
+
+  name="${filename%.desktop}"
+  name="${name#PWA - }"
+
+  _remove_pwa "$name" "$desktop_path" false
+done
+
+if [[ $INTERACTIVE == true ]]; then
+  _operation_complete
+fi

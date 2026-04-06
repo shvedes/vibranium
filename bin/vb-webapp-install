@@ -8,6 +8,7 @@ ICON_DIR="$HOME/.local/share/applications/icons"
 # Flags populated by argument parsing below. All default to empty; interactive
 # mode fills them via prompts, non-interactive mode via --flags.
 # ---------------------------------------------------------------------------
+
 APP_URL=""
 APP_NAME=""
 ICON_REF=""
@@ -286,7 +287,7 @@ _find_webapp_by_url() {
   local dir="$HOME/.local/share/applications"
   local f line
 
-  for f in "$dir"/*.desktop; do
+  for f in "$dir/PWA - "*.desktop; do
     [[ -f "$f" ]] || continue
 
     while IFS= read -r line || [[ -n $line ]]; do
@@ -294,7 +295,6 @@ _find_webapp_by_url() {
         echo "$f"
         return 0
       fi
-      # Stop after first non-[Desktop Entry] section
       [[ $line == '['*']' ]] && [[ $line != '[Desktop Entry]' ]] && break
     done <"$f"
   done
@@ -326,6 +326,43 @@ _normalize_url() {
   printf 'https://%s' "$url"
 }
 
+_ask_for_icon() {
+  local ref
+
+  read -rp "${BLUE}[VIBRANIUM]${RESET} Icon URL / path / name (or Enter for default): ${BLUE}" ref
+  [[ -z $ref ]] && ref="webbrowser-app"
+  printf "%s" "$ref"
+}
+
+_strip_title() {
+  local s="$1"
+
+  # Remove newlines and tabs (most annoying cases)
+  s=${s//$'\n'/ }
+  s=${s//$'\r'/ }
+  s=${s//$'\t'/ }
+
+  # Replace slash (only truly illegal char)
+  s=${s//\//-}
+
+  # Collapse double spaces (cheap pass)
+  while [[ $s == *"  "* ]]; do
+    s=${s//"  "/" "}
+  done
+
+  # Trim leading/trailing spaces
+  s="${s#"${s%%[![:space:]]*}"}"
+  s="${s%"${s##*[![:space:]]}"}"
+
+  # Prevent hidden files
+  [[ $s == .* ]] && s="${s#.}"
+
+  # Fallback
+  [[ -z $s ]] && s="App"
+
+  printf '%s\n' "$s"
+}
+
 # ---------------------------------------------------------------------------
 # Main logic
 # ---------------------------------------------------------------------------
@@ -340,7 +377,7 @@ if [[ -z $APP_URL ]]; then
   # Ask for the URL first so we can pull a suggested name from it.
   while true; do
     term::enable_input
-    read -rp "${YELLOW}[VIBRANIUM]${RESET} Web App URL: ${BLUE}" APP_URL
+    read -rp "${YELLOW}[VIBRANIUM]${RESET} PWA URL: ${BLUE}" APP_URL
     term::disable_input
     if [[ -n $APP_URL ]]; then
       break
@@ -354,7 +391,8 @@ if [[ -z $APP_URL ]]; then
   # check below does not prompt again for the same collision.
   _url_overwrite_confirmed=false
   if _dup_file="$(_find_webapp_by_url "$APP_URL")"; then
-    echo "${YELLOW}[VIBRANIUM]${RESET} This Web App is already installed (${BLUE}${_dup_file##*/}${RESET})"
+    _dup_file="${_dup_file##*/}"
+    echo "${YELLOW}[VIBRANIUM]${RESET} This PWA is already installed (${BLUE}${_dup_file/PWA - /}${RESET})"
     if term::ask_yes_no Y "Overwrite?"; then
       _url_overwrite_confirmed=true
     else
@@ -375,21 +413,31 @@ if [[ -z $APP_URL ]]; then
   # Fetch the page title to use as a default app name.
   PAGE_TITLE="$(_fetch_page_title "$APP_URL")"
 
+  # Check if the page title contains illegal characters.
+  # If so - reset the title. This will trigger manual input.
+  case "$PAGE_TITLE" in
+  *$'\n'* | *$'\r'* | *$'\t'* | */* | " "* | *" ")
+    PAGE_TITLE=$(_strip_title "$PAGE_TITLE")
+    ;;
+  esac
+
+  term::enable_input
+
   if [[ -n $PAGE_TITLE ]]; then
     echo "${YELLOW}[VIBRANIUM]${RESET} Auto-generated name: ${BLUE}${PAGE_TITLE}${RESET}"
-    if ! term::ask_yes_no Y "Would you like to keep it?"; then
-      # Show the suggested name; accept on Enter, or type to override.
-      term::enable_input
-      read -rp "${BLUE}[VIBRANIUM]${RESET} Web App name (override): $BLUE" APP_NAME
-      APP_NAME="${APP_NAME:-$PAGE_TITLE}"
-    fi
+    # Show the suggested name; accept on Enter, or type to override.
+    read -rp "${BLUE}[VIBRANIUM]${RESET} PWA name (Enter to keep default): $BLUE" APP_NAME
+    APP_NAME="PWA - ${APP_NAME:-$PAGE_TITLE}"
   else
-    term::enable_input
     # No title found; require explicit input.
     while true; do
-      read -rp "${YELLOW}[VIBRANIUM]${RESET} Web App name: " APP_NAME
+      read -rp "${YELLOW}[VIBRANIUM]${RESET} PWA name: " APP_NAME
 
-      [[ -n $APP_NAME ]] && break
+      # Got name - exit loop
+      if [[ -n $APP_NAME ]]; then
+        break
+      fi
+
       echo "${RED}[VIBRANIUM]${RESET} Name cannot be empty"
     done
   fi
@@ -400,7 +448,7 @@ if [[ -z $APP_URL ]]; then
   # an overwrite (which would target the same .desktop file in the normal case).
   if [[ $_url_overwrite_confirmed == "false" &&
     -f "$HOME/.local/share/applications/$APP_NAME.desktop" ]]; then
-    echo "${YELLOW}[VIBRANIUM]${RESET} A web app named ${BLUE}${APP_NAME}${RESET} is already installed."
+    echo "${YELLOW}[VIBRANIUM]${RESET} A PWA named ${BLUE}${APP_NAME/PWA - /}${RESET} is already installed."
     if ! _prompt_overwrite; then
       _operation_canceled
       exit 1
@@ -409,9 +457,11 @@ if [[ -z $APP_URL ]]; then
 
   # Auto-generate keywords from the URL and let the user add more.
   AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
+
+  echo "${BLUE}[VIBRANIUM]${RESET} Hint: keywords are special words that can be used as a search query in the app launcher"
   echo "${YELLOW}[VIBRANIUM]${RESET} Auto-detected keywords: ${BLUE}${AUTO_KEYWORDS//;/ }${RESET}"
 
-  if ! term::ask_yes_no Y "Would you like to keep them?"; then
+  if ! term::ask_yes_no Y "Would you like to keep auto-generated keywords?"; then
     AUTO_KEYWORDS=""
   fi
 
@@ -434,19 +484,25 @@ if [[ -z $APP_URL ]]; then
   read -rp "${BLUE}[VIBRANIUM]${RESET} Category (e.g. Network;WebBrowser, or Enter to skip): ${BLUE}" CATEGORY
   term::disable_input
 
-  # Try to fetch the favicon from Google's service; fall back to manual input.
   mkdir -p "$ICON_DIR"
-  echo "${YELLOW}[VIBRANIUM]${RESET} Getting PWA icon..."
+
+  # Try to fetch the favicon from Google's service; fall back to manual input.
   FAVICON_URL="https://www.google.com/s2/favicons?domain=${APP_URL}&sz=128"
-  if curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2>/dev/null && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
+
+  curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2>/dev/null &
+
+  if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading favicon of the URL" && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
     ICON_REF="$APP_NAME.png"
+
+    if ! term::ask_yes_no Y "Would you like to keep web page's favicon?"; then
+      rm "$ICON_DIR/$ICON_REF"
+      ICON_REF="$(_ask_for_icon)"
+    fi
   else
     echo "${RED}[VIBRANIUM]${RESET} Could not fetch favicon automatically. Enter a PNG icon URL manually"
     echo "${RED}[VIBRANIUM]${RESET} See ${BLUE}https://dashboardicons.com${RESET} for a large library"
-    term::enable_input
-    read -rp "${BLUE}[VIBRANIUM]${RESET} Icon URL (or Enter for default): ${BLUE}" ICON_REF
-    term::disable_input
-    printf "%s" "$RESET"
+
+    ICON_REF="$(_ask_for_icon)"
   fi
 
   CUSTOM_EXEC=""
@@ -459,14 +515,14 @@ else
 
   # Abort early on URL collision before touching the network.
   if _dup_file="$(_find_webapp_by_url "$APP_URL")"; then
-    echo "${RED}[VIBRANIUM]${RESET} A web app for ${BLUE}$APP_URL${RESET} is already installed (${BLUE}${_dup_file##*/}${RESET})"
+    echo "${RED}[VIBRANIUM]${RESET} A PWA for this URL is already installed (${BLUE}${_dup_file##*/}${RESET})"
     _operation_canceled
     exit 1
   fi
 
   if ! _check_url_reachable "$APP_URL"; then
-    echo "${RED}[VIBRANIUM]${RESET} Could not reach ${BLUE}http(s)://${APP_URL#*://}${RESET}"
-    echo "${RED}[VIBRANIUM]${RESET} Please check the URL or your connection"
+    echo "${RED}[VIBRANIUM]${RESET} Could not reach given URL"
+    echo "${RED}[VIBRANIUM]${RESET} Please verify that URL exists or check your connection"
     _operation_canceled
     exit 1
   fi
@@ -478,7 +534,7 @@ else
 
   # Abort on name collision once APP_NAME is known.
   if [[ -f "$HOME/.local/share/applications/$APP_NAME.desktop" ]]; then
-    echo "${RED}[VIBRANIUM]${RESET} A web app named ${BLUE}$APP_NAME${RESET} is already installed"
+    echo "${RED}[VIBRANIUM]${RESET} A PWA named ${BLUE}$APP_NAME${RESET} is already installed"
     _operation_canceled
     exit 1
   fi
@@ -496,11 +552,6 @@ fi
 
 mkdir -p "$ICON_DIR"
 
-# If no icon reference was supplied, fall back to the Google favicon service.
-if [[ -z $ICON_REF ]]; then
-  ICON_REF="https://www.google.com/s2/favicons?domain=${APP_URL}&sz=128"
-fi
-
 # Resolve ICON_REF to a local path, downloading if it is a URL.
 if [[ $ICON_REF =~ ^https?:// ]]; then
   # Preserve the file extension from the URL if recognisable, else default png.
@@ -508,9 +559,11 @@ if [[ $ICON_REF =~ ^https?:// ]]; then
   [[ $local_ext =~ ^(png|jpg|jpeg|ico)$ ]] || local_ext="png"
 
   ICON_PATH="$ICON_DIR/$APP_NAME.$local_ext"
+
   if ! curl -fsSL -o "$ICON_PATH" "$ICON_REF" 2>/dev/null || [[ ! -s $ICON_PATH ]]; then
     # Use a generic system icon as fallback rather than aborting the install.
-    ICON_PATH="emblem-question"
+    echo "${RED}[VIBRANIUM]${RESET} Could not fetch givenURL. Using fallback icon"
+    ICON_PATH="webbrowser-app"
   fi
 else
   # Treat as a filename relative to ICON_DIR (non-interactive shorthand).
@@ -528,26 +581,26 @@ DESKTOP_FILE="$HOME/.local/share/applications/$APP_NAME.desktop"
 cat >"$DESKTOP_FILE" <<EOF
 [Desktop Entry]
 Version=1.0
-Name=$APP_NAME
+Name=${APP_NAME/PWA - /}
 Comment=$APP_NAME
 Exec=$EXEC_COMMAND
 Terminal=false
 Type=Application
 Icon=$ICON_PATH
 StartupNotify=true
-Keywords=$KEYWORDS
+Categories=PWA;${CATEGORY}
 EOF
 
 if [[ -n $MIME_TYPES ]]; then
   echo "MimeType=$MIME_TYPES" >>"$DESKTOP_FILE"
 fi
 
-if [[ -n $CATEGORY ]]; then
-  echo "Categories=WebApp;$CATEGORY" >>"$DESKTOP_FILE"
+if [[ -n $KEYWORDS ]]; then
+  echo "Keywords=$KEYWORDS" >>"$DESKTOP_FILE"
 fi
 
 if [[ $INTERACTIVE_MODE == "true" ]]; then
-  echo "${GREEN}[VIBRANIUM]${RESET} ${BLUE}${APP_NAME}${RESET} has been installed"
+  echo "${GREEN}[VIBRANIUM]${RESET} ${BLUE}${APP_NAME/PWA - /}${RESET} has been installed"
   echo "${GREEN}[VIBRANIUM]${RESET} You can find it in the app launcher"
   _operation_complete
 fi
