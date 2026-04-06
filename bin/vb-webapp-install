@@ -505,10 +505,15 @@ if [[ -z $APP_URL ]]; then
     else
       echo "${RED}[VIBRANIUM]${RESET} Could not fetch favicon automatically. Enter a PNG icon URL manually"
       echo "${RED}[VIBRANIUM]${RESET} See ${BLUE}https://dashboardicons.com${RESET} for a large library"
+
+      term::enable_input
       ICON_REF="$(_ask_for_icon)"
+      term::disable_input
     fi
   else
+    term::enable_input
     ICON_REF="$(_ask_for_icon)"
+    term::disable_input
   fi
 
   CUSTOM_EXEC=""
@@ -562,7 +567,7 @@ mkdir -p "$ICON_DIR"
 if [[ $ICON_REF =~ ^https?:// ]]; then
   # Preserve the file extension from the URL if recognisable, else default png.
   local_ext="${ICON_REF##*.}"
-  [[ $local_ext =~ ^(png|jpg|jpeg|ico)$ ]] || local_ext="png"
+  [[ $local_ext =~ ^(png|jpg|jpeg|ico|svg)$ ]] || local_ext="png"
 
   ICON_PATH="$ICON_DIR/$APP_NAME.$local_ext"
 
