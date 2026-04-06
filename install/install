@@ -8,7 +8,7 @@ fi
 # ========================================================================================== #
 
 EXPECTED_PATH="$HOME/.local/share/vibranium/install"
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
 
 if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   echo "ERROR: This script must be run from $EXPECTED_PATH" >&2
@@ -19,17 +19,22 @@ fi
 
 export CHASSIS_TYPE="$(hostnamectl chassis)"
 export VIBRANIUM="$HOME/.local/share/vibranium"
-export PATH="$PATH:$VIBRANIUM/bin"
+export VIBRANIUM_PATH="$VIBRANIUM/bin"
+export PATH="$PATH:$VIBRANIUM_PATH"
 
 # ========================================== #
 
-source vb-lib-core &> /dev/null
+source vb-lib-core &>/dev/null
 
 export -f term::discard_buffer
 export -f term::disable_input
 export -f term::enable_input
 export -f term::show_header
 export -f term::ask_yes_no
+
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_CACHE_HOME="$HOME/.cache"
 
 export PURPLE GREEN CYAN
 export RED YELLOW BLUE
@@ -47,7 +52,7 @@ done
 
 touch /tmp/vb-install-ongoing
 
-exec < /dev/tty
+exec </dev/tty
 
 # Clear TTY and move prompt
 # to the bottom
@@ -103,7 +108,7 @@ fi
   done
 ) &
 
-if ! pacman -Qq "yay" &> /dev/null; then
+if ! pacman -Qq "yay" &>/dev/null; then
   _log_info "Installing AUR helper"
 
   if ! InstallYay; then
@@ -120,7 +125,7 @@ done
 
 echo -e "${YELLOW}[INFO]${RESET} Initializing package installation"
 for script in "$SCRIPT_DIR/packaging"/*.sh; do
-  yay --noconfirm -Sy &> /dev/null
+  yay --noconfirm -Sy &>/dev/null
   bash "$script"
 done
 

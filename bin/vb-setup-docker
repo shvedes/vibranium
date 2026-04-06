@@ -41,14 +41,20 @@ EOF
   )
 
   if [ -f /etc/docker/daemon.json ] &&
-    diff -q <(echo "$desired") /etc/docker/daemon.json &>/dev/null; then
+    printf '%s' "$desired" | diff -q - /etc/docker/daemon.json &>/dev/null; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} Docker daemon config: already up to date, skipping"
     return 1 # unchanged
   fi
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring Docker daemon (log rotation + DNS)"
   sudo mkdir -p /etc/docker
-  echo "$desired" | sudo tee /etc/docker/daemon.json >/dev/null
+
+  if [[ -f /etc/docker/daemon.json ]]; then
+    echo "${GREEN}[VIBRANIUM]${RESET} Backing up existing ${BLUE}deamon.json${RESET}"
+    sudo mv /etc/docker/daemon.json /etc/docker/daemon.json.bak
+  fi
+
+  printf "%s" "$desired" | sudo tee /etc/docker/daemon.json >/dev/null
   return 0 # written
 }
 
@@ -57,14 +63,20 @@ _configure_resolved() {
   local desired=$'[Resolve]\nDNSStubListenerExtra=172.17.0.1'
 
   if [ -f "$conf" ] &&
-    diff -q <(echo "$desired") "$conf" &>/dev/null; then
+    printf '%s' "$desired" | diff -q - "$conf" &>/dev/null; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} systemd-resolved config: already up to date, skipping"
     return 1 # unchanged
   fi
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Exposing systemd-resolved to the Docker network"
   sudo mkdir -p /etc/systemd/resolved.conf.d
-  echo -e "$desired" | sudo tee "$conf" >/dev/null
+
+  if [[ -f "$conf" ]]; then
+    echo "${GREEN}[VIBRANIUM]${RESET} Backing up existing ${BLUE}20-docker-dns.conf${RESET}"
+    sudo mv "$conf" "$conf.bak"
+  fi
+
+  printf "%s" "$desired" | sudo tee "$conf" >/dev/null
   sudo systemctl restart systemd-resolved
   return 0 # written
 }
@@ -74,14 +86,20 @@ _configure_no_block_boot() {
   local desired=$'[Unit]\nDefaultDependencies=no'
 
   if [ -f "$conf" ] &&
-    diff -q <(echo "$desired") "$conf" &>/dev/null; then
+    printf '%s' "$desired" | diff -q - "$conf" &>/dev/null; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} Boot-block prevention drop-in: already up to date, skipping"
     return 1 # unchanged
   fi
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Preventing Docker from blocking boot (${BLUE}network-online.target${RESET})"
   sudo mkdir -p /etc/systemd/system/docker.service.d
-  echo -e "$desired" | sudo tee "$conf" >/dev/null
+
+  if [[ -f "$conf" ]]; then
+    echo "${GREEN}[VIBRANIUM]${RESET} Backing up existing ${BLUE}no-block-boot.conf${RESET}"
+    sudo mv "$conf" "$conf.bak"
+  fi
+
+  printf '%s' "$desired" | sudo tee "$conf" >/dev/null
   return 0 # written
 }
 

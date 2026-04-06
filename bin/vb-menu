@@ -5,6 +5,8 @@ source vb-lib-cfgr
 
 export PATH="$PATH:$VIBRANIUM/configure"
 
+_die() { helpers::ui::close_menus; }
+
 _build_help() {
   _launch() {
     if ! command -v "$1" >/dev/null; then
@@ -29,9 +31,30 @@ _build_help() {
   cfgr::run "Help" "_b"
 }
 
+_build_install() {
+  _b() {
+    cfgr::item::action --label "Package" --func "vb-core-term --floating -- vb-pkg-install; _die"
+    cfgr::item::action --label "Web App" --func "vb-core-term --floating -- vb-webapp-install; _die"
+    cfgr::item::action --label "Theme" --func "vb-core-term --floating -- vb-theme-install; _die"
+    cfgr::item::action --label "Font" --func "vb-core-term --floating -- vb-pkg-font-install; _die"
+  }
+  cfgr::run "Install" "_b"
+}
+
+_build_remove() {
+  _b() {
+    cfgr::item::action --label "Package" --func "vb-core-term --floating -- vb-pkg-remove; _die"
+    cfgr::item::action --label "Web App" --func "vb-core-term --floating -- vb-webapp-remove; _die"
+    cfgr::item::action --label "Theme" --func "vb-core-term --floating -- vb-theme-remove; _die"
+    cfgr::item::action --label "Font" --func "vb-core-term --floating -- vb-pkg-font-remove; _die"
+  }
+  cfgr::run "Remove" "_b"
+}
+
 _build() {
   cfgr::item::action --label "Settings" --func "cfgr-menu"
-  cfgr::item::action --label "Packages" --func "vb-menu-pkg"
+  cfgr::item::action --label "Install" --func "_build_install"
+  cfgr::item::action --label "Remove" --func "_build_remove"
   cfgr::item::action --label "Tweaks" --func "vb-menu-tweaks"
 
   if [[ "$CHASSIS_TYPE" != vm ]]; then
