@@ -239,6 +239,9 @@ if pid="$(pidof gpu-screen-recorder)"; then
     notify-send -r 3 "Screen Recorder" "Recording saved"
   fi
 
+  # Wait for the pid
+  sleep 0.1
+
   vb-cmd-refresh-bar-module recording-indicator
   copy
   exit 0
