@@ -2,11 +2,7 @@
 
 packages=()
 
-if ! term::ask_yes_no Y "Any additional packages you want to install?"; then
-  exit 0
-fi
-
-printf "%s[>>>>]%s Enter packages (including AUR): %s" "$CYAN" "$RESET" "$YELLOW"
+printf "%s[>>>>]%s Additional packages (space-separated, keep empty to skip): %s" "$CYAN" "$RESET" "$YELLOW"
 trap 'printf "%s" "$RESET"' INT
 
 # Handle input

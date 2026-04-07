@@ -20,8 +20,10 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
 
   # The reason behind this is that when screen locks in a VM (tested only in QEMU),
   # CPU usage spikes almost to 100% and stays there until the unlock.
-  printf "# Screen lock isn't available inside of a VM.\n" >>"$hypr_binds"
+  printf "\n# Screen lock isn't available inside of a VM.\n" >>"$hypr_binds"
   printf "unbind = CTRL ALT, L" >>"$hypr_binds"
+  printf "\n# Screen lock isn't available inside of a VM." >>"$hypr_binds"
+  printf "unbind = CTRL ALT, R" >>"$hypr_binds"
 
   UpdateSummary "VM environment: disabled Hyprland animations"
   UpdateSummary "VM environment: removed Bluetooth application and Waybar module"

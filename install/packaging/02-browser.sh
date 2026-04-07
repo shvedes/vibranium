@@ -26,10 +26,10 @@ browser_pkgs=(
 printf "%s[QSTN]%s What is your browser of choice?\n" "$CYAN" "$RESET"
 
 for i in "${!browsers[@]}"; do
-  printf "%s[QSTN]%s %s%d)%s %s\n" "$CYAN" "$RESET" "$YELLOW" "$((i + 1))" "$RESET" "${browsers[$i]}"
+  printf "%s[????]%s %s%d)%s %s\n" "$CYAN" "$RESET" "$YELLOW" "$((i + 1))" "$RESET" "${browsers[$i]}"
 done
 
-echo -e "${CYAN}[QSTN]${RESET} Hint: ${CYAN}Chromium${RESET} is already included"
+echo -e "${CYAN}[QSTN]${RESET} Note: ${CYAN}Chromium${RESET} is already included"
 
 while true; do
   printf "%s[>>>>]%s Enter number (1-%d): %s" "$CYAN" "$RESET" "${#browsers[@]}" "$YELLOW"
@@ -67,5 +67,5 @@ while true; do
 done
 
 for pkg in "${packages[@]}"; do
-  printf "%s\n" "$pkg" >> /tmp/vibranium.packages
+  printf "%s\n" "$pkg" >>/tmp/vibranium.packages
 done
