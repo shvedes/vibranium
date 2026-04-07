@@ -4,17 +4,12 @@ source vb-lib-core
 
 show() {
   printf '{"text": "|"}'
-  exit
+  exit 0
 }
 
-for f in /run/systemd/inhibit/*; do
-  [[ -f $f ]] || continue
-  while IFS= read -r line; do
-    case $line in
-      *=Vibranium) show ;;
-    esac
-  done < "$f"
-done
+if systemctl -q --user is-active vibranium-inhibit@{sleep,idle}; then
+  show
+fi
 
 paths=(
   "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
@@ -25,7 +20,9 @@ paths=(
 )
 
 for p in "${paths[@]}"; do
-  [[ -e "$p" ]] && show
+  if [[ -e "$p" ]]; then
+    show
+  fi
 done
 
 printf '{"text": ""}'

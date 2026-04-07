@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 
 # Toggle a persistent systemd-inhibit to prevent idle suspend.
-# If an inhibitor is already running, kills it; otherwise starts a new one.
+# If an inhibitor is already running, stops it; otherwise starts a new one.
 # Refreshes the Vibranium Waybar inhibitor module after action.
 
 source vb-lib-core
 
-usage() {
-  cat << EOF
+_usage() {
+  cat <<EOF
 Usage: ${0##*/} [OPTION]
 
-Toggle systemd idle inhibitor for Vibranium.
+Toggle systemd idle inhibitor.
 
 Options:
   -h, --help   Show this help and exit
@@ -18,25 +18,25 @@ EOF
 }
 
 case "${1:-}" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
+-h | --help)
+  _usage
+  exit 0
+  ;;
+-*)
+  echo "Error: uknown option: $1" >&2
+  echo "Try ${0##*/} --help" >&2
+  exit 1
+  ;;
 esac
 
-pid="$(systemd-inhibit --no-pager | awk '/Vibranium/ {print $4}')"
+helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
+TYPE="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+UNIT="vibranium-inhibit@$TYPE"
 
-if [[ -n "$pid" ]]; then
-  kill "$pid"
+if systemctl -q --user is-active $UNIT; then
+  systemctl -q --user stop $UNIT
 else
-  helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
-  type="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
-
-  setsid -f systemd-inhibit \
-    --what="$type" \
-    --who="Vibranium" \
-    --why="Manual sleep inhibition" \
-    sleep infinity &
+  systemctl -q --user start $UNIT
 fi
 
-vb-cmd-refresh-bar-module inhibitor &
+vb-cmd-refresh-bar-module inhibitor

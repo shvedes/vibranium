@@ -31,14 +31,18 @@ _set_timeouts() {
   local input
   input="$(cfgr::set_digit \
     --title "$title timeout" \
-    --hint  "$title after N minutes" \
-    --type  int \
-    --min   "$min_minutes" \
-    --max   "$max_minutes")" || return
+    --hint "$title after N minutes" \
+    --type int \
+    --min "$min_minutes" \
+    --max "$max_minutes")" || return
 
   _update_timeout "$timer_index" $((input * 60))
   systemctl --user restart hypridle &
 }
+
+# _set_imhibit_type (){
+#
+# }
 
 # ================================================================================ #
 
@@ -53,16 +57,24 @@ _build() {
   lock_timeout="$((lock_timeout / 60))"
   sleep_timeout="$((sleep_timeout / 60))"
 
+  helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
+  local inh_type="${VIBRANIUM_GLOBAL_INHIBIT_TYPE^}"
+  local inh_var="VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+
   cfgr::item::action \
-    --func  "_set_timeouts Lock 1 1 $sleep_timeout" \
+    --func "_set_timeouts Lock 1 1 $sleep_timeout" \
     --label "Lock after : ${lock_timeout}m"
 
   cfgr::item::action \
-    --func  "_set_timeouts Sleep 2 $lock_timeout 3600" \
+    --func "_set_timeouts Sleep 2 $lock_timeout 3600" \
     --label "Sleep after : ${sleep_timeout}m"
 
   cfgr::item::action \
-    --func  "vb-cmd-show-help idle" \
+    --func "cfgr::set_string --title Type --option 'Idle:idle' 'Sleep:sleep' --var $inh_var " \
+    --label "Inhibit type : $inh_type"
+
+  cfgr::item::action \
+    --func "vb-cmd-show-help idle" \
     --label "Help"
 }
 
