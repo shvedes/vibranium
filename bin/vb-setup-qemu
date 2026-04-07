@@ -70,7 +70,7 @@ _ensure_virt_manager() {
     if term::ask_yes_no Y "Install it now?"; then
       if vb-pkg-install --embedded -- virt-manager; then
         if term::ask_yes_no Y "Launch it now?"; then
-          exec setsid -f virt-manager &>/dev/null
+          app2unit virt-manager &>/dev/null
         fi
       else
         echo -e "${RED}[VIBRANIUM]${RESET} Failed to install ${YELLOW}virt-manager${RESET}"
@@ -191,7 +191,7 @@ echo ""
 echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/QEMU${RESET} for further, advanced configuration"
 
 if term::ask_yes_no Y "Launch VM Manager now?"; then
-  exec setsid -f virt-manager &>/dev/null
+  exec app2unit virt-manager &>/dev/null
 else
   _operation_complete
 fi

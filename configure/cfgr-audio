@@ -86,7 +86,6 @@
 source vb-lib-core
 source vb-lib-cfgr
 
-
 # ─── Private helper functions ─────────────────────────────────────────────────
 #
 # These are small, single-purpose functions called either:
@@ -138,7 +137,6 @@ _on_boost_toggled() {
   fi
 }
 
-
 # _set_audio_feedback_variant — action for the "Variant" row in the feedback sub-menu
 #
 # Registered via --func in cfgr::item::action. Called when the user selects
@@ -164,21 +162,19 @@ _on_boost_toggled() {
 # see the conditional in _audio_feedback_build below.
 _set_audio_feedback_variant() {
   cfgr::set_string \
-    --title  "Feedback Variant" \
+    --title "Feedback Variant" \
     --option "Variant 1:variant1" "Variant 2:variant2" "Variant 3:variant3" \
-    --var    VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
+    --var VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
 }
-
 
 # _open_wiremix — action for the "Open volume mixer" row
 #
-# Spawns wiremix in a floating terminal window via vb-core-term, then
+# Spawns wiremix in a floating terminal window via xdg-terminal-exec, then
 # immediately closes the entire cfgr menu stack with helpers::ui::close_menus.
 _open_wiremix() {
-  vb-core-term --floating -- wiremix
+  xdg-terminal-exec --app-id=org.vb.term.float --title=wiremix -- wiremix
   helpers::ui::close_menus
 }
-
 
 # _set_loopback_volume — action for the dynamic "Hear my voice volume" row
 #
@@ -212,14 +208,13 @@ _open_wiremix() {
 _set_loopback_volume() {
   cfgr::set_digit \
     --title "Hear my voice volume" \
-    --hint  "Volume" \
-    --type  int \
-    --min   10 \
-    --max   100 \
-    --var   VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME
+    --hint "Volume" \
+    --type int \
+    --min 10 \
+    --max 100 \
+    --var VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME
   vb-cmd-toggle-loopback
 }
-
 
 # ─── Menu builder functions ───────────────────────────────────────────────────
 #
@@ -266,7 +261,7 @@ _set_loopback_volume() {
 #   wrap it in <b></b>, so it renders like a regular value row.
 _audio_feedback_build() {
   cfgr::item::bool \
-    --var   VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK \
+    --var VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK \
     --label "Audio feedback"
 
   if [[ "${VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK}" == true ]]; then
@@ -275,11 +270,10 @@ _audio_feedback_build() {
     display_variant="${display_variant//_/ }"
 
     cfgr::item::action \
-      --func  "_set_audio_feedback_variant" \
+      --func "_set_audio_feedback_variant" \
       --label "Variant : ${display_variant}"
   fi
 }
-
 
 # _audio_feedback_submenu — opens the "Audio feedback" sub-menu
 #
@@ -301,7 +295,6 @@ _audio_feedback_submenu() {
     VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT \
     VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
 }
-
 
 # _build — populates the top-level Audio menu
 #
@@ -357,18 +350,18 @@ _audio_feedback_submenu() {
 #     Launches wiremix and closes all cfgr menus via _open_wiremix.
 _build() {
   cfgr::item::bool \
-    --var   VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
+    --var VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
     --label "Boost up to 150%" \
-    --hook  "_on_boost_toggled"
+    --hook "_on_boost_toggled"
 
   cfgr::item::bool \
-    --var   VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK \
+    --var VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK \
     --label "Visual feedback"
 
   cfgr::item::bool \
-    --var   VIBRANIUM_VOLUME_SOURCE_LOOPBACK \
+    --var VIBRANIUM_VOLUME_SOURCE_LOOPBACK \
     --label "Hear my voice" \
-    --hook  "vb-cmd-toggle-loopback"
+    --hook "vb-cmd-toggle-loopback"
 
   if [[ "$VIBRANIUM_VOLUME_SOURCE_LOOPBACK" == true ]]; then
     local loopback_vol
@@ -376,28 +369,27 @@ _build() {
     loopback_vol="${loopback_vol:-?}"
 
     cfgr::item::action \
-      --func  "_set_loopback_volume" \
+      --func "_set_loopback_volume" \
       --label "Hear my voice volume : ${loopback_vol}%"
   fi
 
   cfgr::item::digit \
-    --var    VIBRANIUM_VOLUME_ADJUSTMENT_STEP \
-    --label  "Volume step" \
-    --title  "Volume step" \
+    --var VIBRANIUM_VOLUME_ADJUSTMENT_STEP \
+    --label "Volume step" \
+    --title "Volume step" \
     --prompt "Enter step size" \
-    --type   int \
-    --min    1 \
-    --max    25
+    --type int \
+    --min 1 \
+    --max 25
 
   cfgr::item::action \
-    --func  "_audio_feedback_submenu" \
+    --func "_audio_feedback_submenu" \
     --label "Audio feedback"
 
   cfgr::item::action \
-    --func  "_open_wiremix" \
+    --func "_open_wiremix" \
     --label "Open volume mixer"
 }
-
 
 # ─── Entry point ──────────────────────────────────────────────────────────────
 #

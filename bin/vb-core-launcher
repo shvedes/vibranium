@@ -31,10 +31,10 @@ search_engine="$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
 
 search_engine() {
   case "$search_engine" in
-    "google") echo "https://www.google.com/search?q=" ;;
-    "duckduckgo") echo "https://duckduckgo.com/?q=" ;;
-    "bing") echo "https://bing.com/search?q=" ;;
-    "brave") echo "https://search.brave.com/search?q=" ;;
+  "google") echo "https://www.google.com/search?q=" ;;
+  "duckduckgo") echo "https://duckduckgo.com/?q=" ;;
+  "bing") echo "https://bing.com/search?q=" ;;
+  "brave") echo "https://search.brave.com/search?q=" ;;
   esac
 }
 
@@ -42,45 +42,45 @@ process_input() {
   local input="$*"
 
   case "$input" in
-    "file://"*)
-      # Open in default app (media viewer, text editor, whatever)
-      log::info "Input is a local file. Opening in default app"
-      input="${input#file://}"
-      exec setsid -f xdg-open "$input" &> /dev/null &
-      ;;
-    "https://"*)
-      # Open in default browser
-      log::info "Input is a link. Opening in default browser"
-      exec setsid -f xdg-open "$input" &> /dev/null &
-      ;;
-    "DBus launch")
-      # org.telegram.desktop.desktop for example
-      # Let DBus do its thing
-      log::info "Input is a DBus service"
-      exit 0
-      ;;
-    *)
-      local cmd="${input%% *}"
-      local args="${input#"$cmd"}"
+  "file://"*)
+    # Open in default app (media viewer, text editor, whatever)
+    log::info "Input is a local file. Opening in default app"
+    input="${input#file://}"
+    app2unit-open "$input" &>/dev/null &
+    ;;
+  "https://"*)
+    # Open in default browser
+    log::info "Input is a link. Opening in default browser"
+    app2unit-open "$input" &>/dev/null &
+    ;;
+  "DBus launch")
+    # org.telegram.desktop.desktop for example
+    # Let DBus do its thing
+    log::info "Input is a DBus service"
+    exit 0
+    ;;
+  *)
+    local cmd="${input%% *}"
+    local args="${input#"$cmd"}"
 
-      if [[ -x "$cmd" ]] || command -v "$cmd" > /dev/null 2>&1; then
-        log::info "Input ${YELLOW}is${RESET} an executable. Executing with args"
-        exec setsid -f "$cmd" $args
-      elif [[ -e "$input" ]]; then
-        log::info "Input ${YELLOW}is${RESET} a file. Opening using ${YELLOW}xdg-open${RESET}"
-        exec setsid -f xdg-open "$input" &> /dev/null &
-      else
-        if [[ "$LAUNCHER_MODE" == "default" ]]; then
-          [[ "$auto_select" = true ]] && {
-            log::info "Auto select enabled. Ignoring web search"
-            exit 1
-          }
-          log::info "Input ${YELLOW}is${RESET} a web search query"
-          log::info "Searching ${YELLOW}$input${RESET} on ${BLUE}${search_engine^}${RESET}"
-          exec setsid -f xdg-open "$(search_engine)${input}" &> /dev/null &
-        fi
+    if [[ -x "$cmd" ]] || command -v "$cmd" >/dev/null 2>&1; then
+      log::info "Input ${YELLOW}is${RESET} an executable. Executing with args"
+      app2unit "$cmd" $args
+    elif [[ -e "$input" ]]; then
+      log::info "Input ${YELLOW}is${RESET} a file. Opening using ${YELLOW}xdg-open${RESET}"
+      app2unit-open "$input" &>/dev/null &
+    else
+      if [[ "$LAUNCHER_MODE" == "default" ]]; then
+        [[ "$auto_select" = true ]] && {
+          log::info "Auto select enabled. Ignoring web search"
+          exit 1
+        }
+        log::info "Input ${YELLOW}is${RESET} a web search query"
+        log::info "Searching ${YELLOW}$input${RESET} on ${BLUE}${search_engine^}${RESET}"
+        app2unit-open "$(search_engine)${input}" &>/dev/null &
       fi
-      ;;
+    fi
+    ;;
   esac
 }
 
@@ -91,15 +91,15 @@ set_rofi_flags() {
   _out=()
 
   case "$mode" in
-    --web | --ai | --power)
-      _out+=(
-        -disable-history
-        -icon-theme Vibranium
-        -no-fixed-num-lines true
-        -theme-str 'configuration {show-icons: true;}'
-        -theme-str 'element-icon {enabled: true;}'
-      )
-      ;;
+  --web | --ai | --power)
+    _out+=(
+      -disable-history
+      -icon-theme Vibranium
+      -no-fixed-num-lines true
+      -theme-str 'configuration {show-icons: true;}'
+      -theme-str 'element-icon {enabled: true;}'
+    )
+    ;;
   esac
 
   if [[ "$auto_select" == true ]]; then
@@ -109,44 +109,44 @@ set_rofi_flags() {
   fi
 
   case "$mode" in
-    --power) _out+=(-drun-categories Power -display-drun "Power") ;;
-    --web) _out+=(-drun-categories WebApp -display-drun "Web Apps") ;;
-    --ai) _out+=(-drun-categories AI -display-drun "AIs") ;;
+  --power) _out+=(-drun-categories Power -display-drun "Power") ;;
+  --web) _out+=(-drun-categories WebApp -display-drun "Web Apps") ;;
+  --ai) _out+=(-drun-categories AI -display-drun "AIs") ;;
   esac
 }
 
 case "$1" in
-  --web | --ai | --power)
-    set_rofi_flags "$1" opt_args
-    LAUNCHER_MODE="${1/--/}"
-    ;;
-  *)
-    helpers::check \
-      VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
-      VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI
+--web | --ai | --power)
+  set_rofi_flags "$1" opt_args
+  LAUNCHER_MODE="${1/--/}"
+  ;;
+*)
+  helpers::check \
+    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
+    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI
 
-    WEB_APPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
-    AI="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
+  WEB_APPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
+  AI="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
 
-    EXCLUDE="Power"
+  EXCLUDE="Power"
 
-    [[ $WEB_APPS != true ]] && EXCLUDE+=",WebApp"
-    [[ $AI != true ]] && EXCLUDE+=",AI"
+  [[ $WEB_APPS != true ]] && EXCLUDE+=",WebApp"
+  [[ $AI != true ]] && EXCLUDE+=",AI"
 
-    opt_args+=(-drun-exclude-categories "$EXCLUDE")
+  opt_args+=(-drun-exclude-categories "$EXCLUDE")
 
-    [[ $WEB_APPS == true || $AI == true ]] && {
-      opt_args+=(-icon-theme Vibranium)
-    }
-    LAUNCHER_MODE="default"
-    ;;
+  [[ $WEB_APPS == true || $AI == true ]] && {
+    opt_args+=(-icon-theme Vibranium)
+  }
+  LAUNCHER_MODE="default"
+  ;;
 esac
 
 if [[ "$show_icons" = true ]]; then
   opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
 fi
 
-read -r input < <(rofi -show drun -run-command "echo {cmd} {args}" "${opt_args[@]}" 2> /dev/null)
+read -r input < <(rofi -show drun -run-command "echo {cmd} {args}" "${opt_args[@]}" 2>/dev/null)
 
 if [[ ! -z "$input" ]]; then
   process_input "${input[@]}"

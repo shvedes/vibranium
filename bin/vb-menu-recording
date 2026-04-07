@@ -16,6 +16,7 @@ if pidof -q rofi; then
 fi
 
 if pidof -q gpu-screen-recorder; then
+  # Trigger killswitch
   vb-core-recording
   exit 0
 fi
@@ -26,4 +27,4 @@ if [[ -z $CHOSEN ]] || [[ ! $CHOSEN =~ ^(Screen|Region|Portal)$ ]]; then
   exit 1
 fi
 
-setsid -f vb-core-recording "--${CHOSEN,}"
+app2unit vb-core-recording "--${CHOSEN,}"

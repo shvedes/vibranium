@@ -2,7 +2,7 @@
 Type=Application
 Name=Wifi Manager
 TryExec=impala
-Exec=vb-core-term -- impala
+Exec=xdg-terminal-exec -- impala
 Icon=network-wireless-signal-excellent-symbolic
 Keywords=wifi;network;dns;vpn;wireless;connection;online;offline;
 OnlyShowIn=Hyprland;

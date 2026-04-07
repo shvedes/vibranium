@@ -2,7 +2,7 @@
 
 TIMESTAMP="$(git -C "$VIBRANIUM" log -1 --format=%cd --date=unix)"
 FILE="$VIBRANIUM/migrations/${TIMESTAMP}.sh"
-$EDITOR "$FILE"
+${EDITOR:-nvim} "$FILE"
 
 # And skip it instantly after creation.
 MIGRATION_FILE="$VIBRANIUM_STATE/migrations/${TIMESTAMP}.sh"

@@ -7,7 +7,7 @@
 		"on-click": "vb-core-volume --quiet --microphone-toggle",
 		"on-scroll-up": "vb-core-volume --microphone-up",
 		"on-scroll-down": "vb-core-volume --microphone-down",
-		"on-click-right": "vb-core-term --floating -- wiremix --tab input",
+		"on-click-right": "xdg-terminal-exec --app-id=org.vb.term.float --title=wiremix -- wiremix --tab input",
 
 		"scroll-step": 1,
 		"tooltip": false

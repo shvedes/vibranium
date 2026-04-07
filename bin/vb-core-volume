@@ -3,7 +3,7 @@
 source vb-lib-core
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTION]...
 
 Control system volume and microphone.
@@ -42,7 +42,7 @@ show_volume_notification() {
   fi
 
   vol_info=$(wpctl get-volume "$device")
-  read -r _ vol muted <<< "$vol_info"
+  read -r _ vol muted <<<"$vol_info"
 
   if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
     max_vol=1.5
@@ -78,21 +78,21 @@ adjust_volume() {
   fi
 
   case "$device_type" in
-    vol)
-      device="@DEFAULT_AUDIO_SINK@"
-      osd_arg="--output-volume"
-      notification_type="Volume"
-      ;;
-    mic)
-      device="@DEFAULT_AUDIO_SOURCE@"
-      osd_arg="--input-volume"
-      notification_type="Microphone"
-      ;;
+  vol)
+    device="@DEFAULT_AUDIO_SINK@"
+    osd_arg="--output-volume"
+    notification_type="Volume"
+    ;;
+  mic)
+    device="@DEFAULT_AUDIO_SOURCE@"
+    osd_arg="--input-volume"
+    notification_type="Microphone"
+    ;;
   esac
 
   # Parse volume and mute state from a single wpctl call
   local vol_info mute_state
-  read -r _ current_volume mute_state <<< "$(wpctl get-volume "$device")"
+  read -r _ current_volume mute_state <<<"$(wpctl get-volume "$device")"
 
   # Unmute before adjusting so the volume change isn't silently swallowed
   if [[ "$mute_state" == "[MUTED]" ]]; then
@@ -171,7 +171,7 @@ set_volume() {
     return
   fi
 
-  read -r _ _ mute_state <<< "$(wpctl get-volume "$device")"
+  read -r _ _ mute_state <<<"$(wpctl get-volume "$device")"
   if [[ "$mute_state" == "[MUTED]" ]]; then
     wpctl set-mute "$device" 0
   fi
@@ -207,16 +207,16 @@ toggle_mute() {
   local device osd_arg type
 
   case "$device_type" in
-    vol)
-      device="@DEFAULT_AUDIO_SINK@"
-      osd_arg="--output-volume"
-      type="Volume"
-      ;;
-    mic)
-      device="@DEFAULT_AUDIO_SOURCE@"
-      osd_arg="--input-volume"
-      type="Microphone"
-      ;;
+  vol)
+    device="@DEFAULT_AUDIO_SINK@"
+    osd_arg="--output-volume"
+    type="Volume"
+    ;;
+  mic)
+    device="@DEFAULT_AUDIO_SOURCE@"
+    osd_arg="--input-volume"
+    type="Microphone"
+    ;;
   esac
 
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
@@ -241,12 +241,12 @@ feedback() {
     variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
 
     case "$variant" in
-      "variant1" | "variant3")
-        dir="/usr/share/sounds/freedesktop/stereo"
-        ;;
-      "variant2")
-        dir="$XDG_DATA_HOME/sounds/Vibranium/stereo"
-        ;;
+    "variant1" | "variant3")
+      dir="/usr/share/sounds/freedesktop/stereo"
+      ;;
+    "variant2")
+      dir="$XDG_DATA_HOME/sounds/Vibranium/stereo"
+      ;;
     esac
 
     if [[ ! -d "$dir" ]]; then
@@ -255,9 +255,9 @@ feedback() {
     fi
 
     if [[ "$variant" == "variant3" ]]; then
-      setsid -f paplay "${dir}/bell.oga" &
+      paplay "${dir}/bell.oga" &
     else
-      setsid -f paplay "${dir}/audio-volume-change.oga" &
+      paplay "${dir}/audio-volume-change.oga" &
     fi
   fi
 }
@@ -275,55 +275,55 @@ quiet=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    -q | --quiet)
-      quiet=true
-      ;;
-    --volume-up)
-      action="vol-up"
-      ;;
-    --volume-down)
-      action="vol-down"
-      ;;
-    --volume-toggle)
-      action="vol-toggle"
-      ;;
-    --microphone-up)
-      action="mic-up"
-      ;;
-    --microphone-down)
-      action="mic-down"
-      ;;
-    --microphone-toggle)
-      action="mic-toggle"
-      ;;
-    --volume)
-      if [[ -z "$2" || "$2" == --* ]]; then
-        echo "${0##*/}: option '--volume' requires an argument" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
-        exit 1
-      fi
-      action="vol-set"
-      volume_value="$2"
-      shift
-      ;;
-    --)
-      shift
-      break
-      ;;
-    -*)
-      echo "${0##*/}: unrecognized option '$1'" >&2
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -q | --quiet)
+    quiet=true
+    ;;
+  --volume-up)
+    action="vol-up"
+    ;;
+  --volume-down)
+    action="vol-down"
+    ;;
+  --volume-toggle)
+    action="vol-toggle"
+    ;;
+  --microphone-up)
+    action="mic-up"
+    ;;
+  --microphone-down)
+    action="mic-down"
+    ;;
+  --microphone-toggle)
+    action="mic-toggle"
+    ;;
+  --volume)
+    if [[ -z "$2" || "$2" == --* ]]; then
+      echo "${0##*/}: option '--volume' requires an argument" >&2
       echo "Try '${0##*/} --help' for more information." >&2
       exit 1
-      ;;
-    *)
-      echo "${0##*/}: unexpected argument '$1'" >&2
-      echo "Try '${0##*/} --help' for more information." >&2
-      exit 1
-      ;;
+    fi
+    action="vol-set"
+    volume_value="$2"
+    shift
+    ;;
+  --)
+    shift
+    break
+    ;;
+  -*)
+    echo "${0##*/}: unrecognized option '$1'" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
+  *)
+    echo "${0##*/}: unexpected argument '$1'" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
   esac
   shift
 done
@@ -341,28 +341,28 @@ helpers::check \
   VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
 
 case "$action" in
-  vol-up)
-    adjust_volume "+" "vol"
-    feedback
-    ;;
-  vol-down)
-    adjust_volume "-" "vol"
-    feedback
-    ;;
-  vol-set)
-    set_volume "$volume_value"
-    feedback
-    ;;
-  vol-toggle)
-    toggle_mute "vol"
-    ;;
-  mic-up)
-    adjust_volume "+" "mic"
-    ;;
-  mic-down)
-    adjust_volume "-" "mic"
-    ;;
-  mic-toggle)
-    toggle_mute "mic"
-    ;;
+vol-up)
+  adjust_volume "+" "vol"
+  feedback
+  ;;
+vol-down)
+  adjust_volume "-" "vol"
+  feedback
+  ;;
+vol-set)
+  set_volume "$volume_value"
+  feedback
+  ;;
+vol-toggle)
+  toggle_mute "vol"
+  ;;
+mic-up)
+  adjust_volume "+" "mic"
+  ;;
+mic-down)
+  adjust_volume "-" "mic"
+  ;;
+mic-toggle)
+  toggle_mute "mic"
+  ;;
 esac

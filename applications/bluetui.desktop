@@ -2,7 +2,7 @@
 Type=Application
 Name=Bluetooth Manager
 TryExec=bluetui
-Exec=vb-core-term -- bluetui
+Exec=xdg-terminal-exec -- bluetui
 Icon=bluetooth-active-symbolic
 Keywords=bluetooth;connection;
 OnlyShowIn=Hyprland;

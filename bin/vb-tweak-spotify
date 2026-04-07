@@ -8,12 +8,12 @@ ACTION="$1"
 progress() {
   local msg="$1"
   case "$msg" in
-    clear)
-      rm -f "$VIBRNAIUM_RUNTIME/worker.active"
-      ;;
-    *)
-      echo "$msg" > "$VIBRNAIUM_RUNTIME/worker.active"
-      ;;
+  clear)
+    rm -f "$VIBRNAIUM_RUNTIME/worker.active"
+    ;;
+  *)
+    echo "$msg" >"$VIBRNAIUM_RUNTIME/worker.active"
+    ;;
   esac
   vb-cmd-refresh-bar-module worker
 }
@@ -25,7 +25,7 @@ fail() {
   msg+="\n<b><i>Click here to see logs</i></b>"
 
   if [[ "$(notify-send -A true -r 4 -t 10000 -u critical 'Vibranium' "$msg")" == 0 ]]; then
-    vb-core-term -- "$EDITOR" "$LOGFILE"
+    xdg-terminal-exec -- "${EDITOR:-nvim}" "$LOGFILE"
   fi
   progress clear
   exit 1
@@ -37,11 +37,11 @@ install_adblock() {
 
   if [ ! -f "$FILE" ]; then
     curl -fsSL "https://raw.githubusercontent.com/rxri/spicetify-extensions/refs/heads/main/adblock/adblock.js" \
-      -o "$FILE" &> "$LOGFILE" || fail
+      -o "$FILE" &>"$LOGFILE" || fail
   fi
 
   spicetify -q config extensions adblock.js
-  spicetify -n apply &> "$LOGFILE" || fail
+  spicetify -n apply &>"$LOGFILE" || fail
 
   progress clear
   if pkill -0 spotify; then
@@ -71,10 +71,10 @@ remove_adblock() {
 }
 
 case "$ACTION" in
-  install) install_adblock ;;
-  remove) remove_adblock ;;
-  *)
-    echo "Usage: $0 {install|remove}" >&2
-    exit 1
-    ;;
+install) install_adblock ;;
+remove) remove_adblock ;;
+*)
+  echo "Usage: $0 {install|remove}" >&2
+  exit 1
+  ;;
 esac

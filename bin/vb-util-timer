@@ -13,13 +13,13 @@ cleanup() {
 
   kill $(pgrep -f -- '--who=Timer')
   kill -s KILL "$paplay_pid" &
-  > /dev/null
+  >/dev/null
   exit 0
 }
 
 trap cleanup EXIT INT TERM
 
-if pgrep -f -- '--why=Timer' > /dev/null; then
+if pgrep -f -- '--why=Timer' >/dev/null; then
   cleanup
 fi
 
@@ -36,15 +36,15 @@ while true; do
     [[ "$sub_chosen" =~ ^[0-9]+$ ]] || continue
 
     case "$chosen" in
-      Seconds)
-        sleep_time="$sub_chosen"
-        ;;
-      Minutes)
-        sleep_time=$((sub_chosen * 60))
-        ;;
-      Hours)
-        sleep_time=$((sub_chosen * 3600))
-        ;;
+    Seconds)
+      sleep_time="$sub_chosen"
+      ;;
+    Minutes)
+      sleep_time=$((sub_chosen * 60))
+      ;;
+    Hours)
+      sleep_time=$((sub_chosen * 3600))
+      ;;
     esac
     break 2
   done
@@ -52,18 +52,18 @@ done
 
 [[ -z "$sleep_time" ]] && exit 0
 
-setsid -f systemd-inhibit --what=idle --why="Timer is active" --who="Timer" sleep $sleep_time
+setsid -f systemd-inhibit --what=idle --why="Sleep is inhibited because of the active timer" --who="Timer" sleep $sleep_time
 
 time_remaining=$sleep_time
 while ((time_remaining > 0)); do
-  echo "$time_remaining" > "$state"
+  echo "$time_remaining" >"$state"
   vb-cmd-refresh-bar-module timer
   ((time_remaining--))
   sleep 1 &
   wait $!
 done
 
-echo "timed out" > "$state"
+echo "timed out" >"$state"
 vb-cmd-refresh-bar-module timer
 
 while true; do

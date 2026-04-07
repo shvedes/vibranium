@@ -199,7 +199,7 @@ prompt_valid_name() {
 # ensure_gpg_unlocked  <password_path>
 #
 # Problem this solves:
-#   vb-core-term forks itself and does NOT block the calling shell. If the GPG
+#   xdg-terminal-exec forks itself and does NOT block the calling shell. If the GPG
 #   agent has not yet cached the key passphrase, gpg's pinentry dialog would
 #   appear AFTER the terminal window opens — visually behind it — making the
 #   editor look frozen while waiting for a prompt the user can't see.
@@ -741,11 +741,11 @@ action() {
     #   1. Runs `pass edit`: decrypt → $EDITOR → re-encrypt → git commit
     #   2. After the editor closes, calls push_after_edit_if_needed, which
     #      checks whether a commit was actually made and only then pushes.
-    # vb-core-term forks and returns immediately to the parent shell, so
+    # xdg-terminal-exec forks and returns immediately to the parent shell, so
     # the push logic MUST run inside the terminal's bash -c process —
     # not in the parent (where it would run before editing even starts).
     # All needed functions are available via export -f (done at script top).
-    vb-core-term --floating --title password-manager -- \
+    xdg-terminal-exec --app-id=org.vb.term.float --title="pass" -- \
       bash -c "pass edit "$_VB_EDIT_PASSWORD"; push_after_edit_if_needed"
 
     return 0

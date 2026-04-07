@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
-TryExec=foot
-Exec=footclient
+TryExec=alacritty
+Exec=alacritty msg create-window
 Icon=konsole
 
 Terminal=false
@@ -13,6 +13,6 @@ StartupNotify=true
 StartupWMClass=org.vb.term
 
 X-TerminalArgExec=-e
-X-TerminalArgAppId=--app-id=
+X-TerminalArgAppId=--class=
 X-TerminalArgTitle=--title=
 X-TerminalArgDir=--working-directory=

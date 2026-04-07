@@ -5,7 +5,7 @@ source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 # Checking file existance is faster
 # than calling pacman -Q.
 if [[ ! -f /usr/lib/rofi/emoji.so ]]; then
-  vb-core-term --floating -- vb-pkg-install --no-verify -- rofi-emoji
+  vb-pkg-install --no-verify -- rofi-emoji
   exit 0
 fi
 

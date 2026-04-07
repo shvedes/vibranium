@@ -7,7 +7,7 @@ export PATH="$PATH:$VIBRANIUM/configure"
 
 _edit_cfgs_menu() {
   _open() {
-    vb-core-term -- $EDITOR "$1"
+    xdg-terminal-exec -- ${EDITOR:-nvim} "$1"
     helpers::ui::close_menus
   }
 
@@ -18,9 +18,9 @@ _edit_cfgs_menu() {
     local input="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.conf"
 
     cfgr::item::action --label "Window Rules" --func "_open $rules"
-    cfgr::item::action --label "Keybindings"  --func "_open $binds"
-    cfgr::item::action --label "Monitors"     --func "_open $monitors"
-    cfgr::item::action --label "Input"        --func "_open $input"
+    cfgr::item::action --label "Keybindings" --func "_open $binds"
+    cfgr::item::action --label "Monitors" --func "_open $monitors"
+    cfgr::item::action --label "Input" --func "_open $input"
   }
   cfgr::run "Edit Configs" "_b"
 }

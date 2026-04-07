@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 _usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTION]...
 
 Perform system update using yay, check for important updates, and prompt for reboot if necessary.
@@ -62,7 +62,7 @@ _check_important() {
 
 # e.g. clicked on the updates waybar module
 if [[ ! -t 1 ]]; then
-  exec setsid vb-core-term --floating -- "$0"
+  xdg-terminal-exec -- "$0"
   exit
 fi
 
@@ -79,34 +79,34 @@ trap 'printf "\n"; kill -- -$$ 2>/dev/null; _operation_canceled; exit 1' SIGHUP 
 
 while (($# > 0)); do
   case "$1" in
-    --no-logo)
-      NO_LOGO=true
-      shift
-      ;;
-    --no-dummy)
-      NO_DUMMY=true
-      shift
-      ;;
-    --help)
-      _usage
-      exit 0
-      ;;
-    --)
-      shift
-      break
-      ;;
-    --*)
-      echo "Unknown option: $1" >&2
-      exit 1
-      ;;
-    *)
-      break
-      ;;
+  --no-logo)
+    NO_LOGO=true
+    shift
+    ;;
+  --no-dummy)
+    NO_DUMMY=true
+    shift
+    ;;
+  --help)
+    _usage
+    exit 0
+    ;;
+  --)
+    shift
+    break
+    ;;
+  --*)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
+  *)
+    break
+    ;;
   esac
 done
 
 if [[ $NO_LOGO == false ]]; then
-  printf "\n%s%s%s\n\n" "$YELLOW" "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+  printf "\n%s%s%s\n\n" "$YELLOW" "$(<"$VIBRANIUM/logo.txt")" "$RESET"
 fi
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
@@ -121,7 +121,7 @@ fi
 # Hide cursor
 printf '\e[?25l'
 
-yay -Sy &> /dev/null &
+yay -Sy &>/dev/null &
 pid=$!
 
 term::spinner $pid "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"

@@ -10,11 +10,13 @@ sound-theme-freedesktop
 xdg-desktop-portal-gtk
 alacritty-sixel-git
 papirus-icon-theme
+xdg-terminal-exec
 papirus-folders
 adw-gtk-theme
 imagemagick
 chromium
 cliphist
+app2unit
 zenity
 slurp
 satty

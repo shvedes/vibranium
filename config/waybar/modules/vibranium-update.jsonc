@@ -4,7 +4,7 @@
 		"hide-empty-text": true,
 
 		"exec": "vb-bar-update",
-		"on-click": "vb-core-term --floating -- vb-update",
+		"on-click": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-update -- vb-update",
 
 		"signal": 12,
 		"return-type": "json"

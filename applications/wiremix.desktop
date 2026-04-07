@@ -2,7 +2,7 @@
 Type=Application
 Name=Volume Mixer
 TryExec=wiremix
-Exec=vb-core-term -- wiremix
+Exec=xdg-terminal-exec -- wiremix
 Icon=org.pulseaudio.pavucontrol
 Keywords=audio;sound;headset;speakers;bluetooth;pipewire;pulseaudio;mixer;wiremix;pavucontrol;
 OnlyShowIn=Hyprland;

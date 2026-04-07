@@ -11,9 +11,9 @@ _build_help() {
   _launch() {
     if ! command -v "$1" >/dev/null; then
       if command -v chromium >/dev/null; then
-        vb-cmd-launch-cmd chromium --app="$1"
+        vb-webapp-launch "$1"
       else
-        vb-cmd-launch-cmd xdg-open "$1"
+        app2unit-open "$1"
       fi
     else
       eval "$1"
@@ -33,20 +33,20 @@ _build_help() {
 
 _build_install() {
   _b() {
-    cfgr::item::action --label "Package" --func "vb-core-term --floating -- vb-pkg-install; _die"
-    cfgr::item::action --label "Theme" --func "vb-core-term --floating -- vb-theme-install; _die"
-    cfgr::item::action --label "Font" --func "vb-core-term --floating -- vb-pkg-font-install; _die"
-    cfgr::item::action --label "PWA" --func "vb-core-term --floating -- vb-webapp-install; _die"
+    cfgr::item::action --label "Package" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-install -- vb-pkg-install; _die"
+    cfgr::item::action --label "Theme" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-install -- vb-theme-install; _die"
+    cfgr::item::action --label "Font" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-font-install -- vb-pkg-font-install; _die"
+    cfgr::item::action --label "PWA" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-install -- vb-webapp-install; _die"
   }
   cfgr::run "Install" "_b"
 }
 
 _build_remove() {
   _b() {
-    cfgr::item::action --label "Package" --func "vb-core-term --floating -- vb-pkg-remove; _die"
-    cfgr::item::action --label "Theme" --func "vb-core-term --floating -- vb-theme-remove; _die"
-    cfgr::item::action --label "Font" --func "vb-core-term --floating -- vb-pkg-font-remove; _die"
-    cfgr::item::action --label "PWA" --func "vb-core-term --floating -- vb-webapp-remove; _die"
+    cfgr::item::action --label "Package" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-remove -- vb-pkg-remove; _die"
+    cfgr::item::action --label "Theme" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-remove -- vb-theme-remove; _die"
+    cfgr::item::action --label "Font" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-font-remove -- vb-pkg-font-remove; _die"
+    cfgr::item::action --label "PWA" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-remove -- vb-webapp-remove; _die"
   }
   cfgr::run "Remove" "_b"
 }

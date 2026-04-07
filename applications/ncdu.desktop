@@ -2,7 +2,7 @@
 Type=Application
 Name=Disk Usage Analizer
 TryExec=ncdu
-Exec=vb-core-term -- ncdu --enable-delete --exclude-kernfs --group-directories-first /
+Exec=xdg-terminal-exec -- ncdu --enable-delete --exclude-kernfs --group-directories-first /
 Icon=filelight
 Keywords=disk;dh;du;usage;ncdu
 OnlyShowIn=Hyprland;

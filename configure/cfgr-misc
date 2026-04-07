@@ -42,7 +42,7 @@ _set_rofi_theme() {
 
 _edit_env() {
   local env_file="$XDG_CONFIG_HOME/vibranium/environment"
-  vb-core-term --floating --title 'vb-env' -- nvim "$env_file"
+  xdg-terminal-exec --app-id=org.vb.term.float --title="vb-env" -- ${EDITOR:-nvim} "$env_file"
   helpers::ui::close_menus
 }
 
@@ -79,12 +79,20 @@ _set_notification_timeout() {
 }
 
 _term_hook() {
-  out="$(vb-cmd-get-option VIBRANIUM_GLOBAL_TERMINAL)"
-  if [[ "$out" == foot ]]; then
+  case "$(vb-cmd-get-option VIBRANIUM_GLOBAL_TERMINAL)" in
+  "foot")
+    desktop_id="footclient.desktop"
     systemctl -q --user disable alacritty.service &
-  else
+    systemctl -q --user enable --now foot-server.socket &
+    ;;
+  "alacritty")
+    desktop_id="Alacritty.desktop"
     systemctl -q --user disable foot-server.socket &
-  fi
+    systemctl -q --user enable --now alacritty.service &
+    ;;
+  esac
+
+  printf "%s\n" "$desktop_id" >$XDG_CONFIG_HOME/xdg-terminals.list
 }
 
 _get_default_browser() {

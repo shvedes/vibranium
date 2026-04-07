@@ -706,7 +706,7 @@ cfgr::item::string() {
 #
 #   Actions that close the entire menu chain:
 #     _open_editor() {
-#       vb-core-term -- "$EDITOR" "$CONFIG"
+#       xdg-terminal-exec -- "$EDITOR" "$CONFIG"
 #       helpers::ui::close_menus
 #     }
 #     cfgr::item::action --func "_open_editor" --label "Edit config"
