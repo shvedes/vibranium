@@ -33,6 +33,11 @@ _build_help() {
 
 _build_install() {
   _b() {
+    local vb_update_state="$VIBRANIUM_STATE/update.available"
+    if [[ -f $vb_update_state ]]; then
+      cfgr::item::action --label "Vibranium Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title='Vibranium Update' -- vb-update; _die"
+    fi
+
     cfgr::item::action --label "Package" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-install -- vb-pkg-install; _die"
     cfgr::item::action --label "Theme" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-install -- vb-theme-install; _die"
     cfgr::item::action --label "Font" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-font-install -- vb-pkg-font-install; _die"
