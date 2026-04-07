@@ -57,7 +57,6 @@ _build() {
   lock_timeout="$((lock_timeout / 60))"
   sleep_timeout="$((sleep_timeout / 60))"
 
-  helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
   local inh_type="${VIBRANIUM_GLOBAL_INHIBIT_TYPE^}"
   local inh_var="VIBRANIUM_GLOBAL_INHIBIT_TYPE"
 
@@ -78,4 +77,4 @@ _build() {
     --label "Help"
 }
 
-cfgr::run "Idle" "_build"
+cfgr::run "Idle" "_build" VIBRANIUM_GLOBAL_INHIBIT_TYPE

@@ -381,12 +381,16 @@ _build() {
 
   cfgr::item::raw "Notification timeout : $(_get_notification_timeout)" "action:_set_notification_timeout"
 
-  cfgr::item::string \
-    --var VIBRANIUM_GLOBAL_TERMINAL \
-    --label "Default terminal" \
-    --title "Default Terminal" \
-    --hook "_term_hook" \
-    --option "Alacritty:alacritty" "Foot:foot"
+  # Allow default terminal selection only when both are installed.
+  if command -v alacritty >/dev/null && command -v foot >/dev/null; then
+    cfgr::item::string \
+      --var VIBRANIUM_GLOBAL_TERMINAL \
+      --label "Default terminal" \
+      --title "Default Terminal" \
+      --hook "_term_hook" \
+      --option "Alacritty:alacritty" "Foot:foot"
+
+  fi
 
   cfgr::item::raw "Default browser : $(_get_default_browser)" "action:_set_default_browser"
 
@@ -405,17 +409,9 @@ _build() {
   cfgr::item::raw "Cursor size : $CURSOR_SIZE" "action:_set_cursor_size"
   cfgr::item::raw "Menus theme : $(_get_rofi_theme)" "action:_set_rofi_theme"
 
-  cfgr::item::action \
-    --func "_manage_user_wallpapers" \
-    --label "User wallpapers"
-
-  cfgr::item::action \
-    --func "cfgr-now-playing" \
-    --label "Now playing"
-
-  cfgr::item::action \
-    --func "_edit_env" \
-    --label "Edit env"
+  cfgr::item::action --func "_manage_user_wallpapers" --label "User wallpapers"
+  cfgr::item::action --func "cfgr-now-playing" --label "Now playing"
+  cfgr::item::action --func "_edit_env" --label "Edit env"
 }
 
 cfgr::run "Misc" "_build" \
