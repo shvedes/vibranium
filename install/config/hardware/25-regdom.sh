@@ -31,11 +31,11 @@ if [[ ! -n ${WIRELESS_REGDOM} ]]; then
     # Check if we have a two letter country code
     if [[ $COUNTRY =~ ^[A-Z]{2}$ ]]; then
       # Append it to the wireless-regdom conf file that is used at boot
-      echo "WIRELESS_REGDOM=\"$COUNTRY\"" | sudo tee -a /etc/conf.d/wireless-regdom > /dev/null
+      echo "WIRELESS_REGDOM=\"$COUNTRY\"" | sudo tee -a /etc/conf.d/wireless-regdom >/dev/null
       UpdateSummary "WiFi / regulatory domain: configured from timezone data ($COUNTRY)"
     else
       _log_warn "No configured timezone found. Regulatory domain remains unchanged"
-      sudo pacman -Rnsc --noconfirm wireless-regdb &> /dev/null
+      sudo pacman -Rnsc --noconfirm wireless-regdb &>/dev/null
     fi
   fi
 fi

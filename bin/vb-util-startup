@@ -96,12 +96,10 @@ if [[ ! -f "$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)" ]]; then
   vb-cmd-get-wallpaper >"$wallpaper_file"
 fi
 
-if [[ "$CHASSIS_TYPE" != vm ]]; then
-  helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
-  if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
-    if ! systemctl -q --user is-active awww; then
-      systemctl -q --user enable --now awww
-    fi
+helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
+if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
+  if ! systemctl -q --user is-active awww; then
+    systemctl -q --user enable --now awww
   fi
 fi
 

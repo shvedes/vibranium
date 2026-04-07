@@ -2,6 +2,8 @@
 
 ###### Hyprland
 hyprland
+hyprlock
+hypridle
 hyprpicker
 xdg-desktop-portal-hyprland
 
@@ -9,11 +11,13 @@ xdg-desktop-portal-hyprland
 sound-theme-freedesktop
 xdg-desktop-portal-gtk
 alacritty-sixel-git
+gpu-screen-recorder
 papirus-icon-theme
 xdg-terminal-exec
 papirus-folders
 adw-gtk-theme
 imagemagick
+awww-git
 chromium
 cliphist
 app2unit

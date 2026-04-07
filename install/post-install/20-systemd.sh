@@ -8,6 +8,7 @@ system_services=(
 )
 
 user_services=(
+  "awww"
   "waybar"
   "cliphist"
   "alacritty"
@@ -16,7 +17,7 @@ user_services=(
 
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   system_services+=("bluetooth")
-  user_services+=("awww" "hyprsunset")
+  user_services+=("hyprsunset")
 fi
 
 user_timers=(

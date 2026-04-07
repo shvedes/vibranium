@@ -7,12 +7,9 @@ packages+=(${fonts[@]})
 
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   packages+=(
-    gpu-screen-recorder bluez bluez-utils
-    bluetui hyprsunset ddcutil wireless-regdb
-    hyprlock hypridle awww-git
+    bluez bluez-utils bluetui
+    hyprsunset ddcutil wireless-regdb
   )
-else
-  _log_info "Running in a VM: excluding hardware-specific packages"
 fi
 
 rm -f /tmp/vibranium.packages
