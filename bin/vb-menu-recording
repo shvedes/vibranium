@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 
+if [[ $CHASSIS_TYPE == vm ]]; then
+  notify-send "Screen Recorder" "screen recording isn't available in a VM!"
+  echo "Error: screen recording isn't available in a VM!" >&2
+  exit 1
+fi
+
 if pidof -q rofi; then
   killall rofi
   exit 0

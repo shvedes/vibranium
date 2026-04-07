@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+if [[ $CHASSIS_TYPE == vm ]]; then
+  echo "Error: screen recording isn't available in a VM!" >&2
+  exit 1
+fi
+
 source vb-lib-core
 
 LOG_FILE="$VIBRANIUM_CACHE/${0##*/}.log"
@@ -70,7 +75,7 @@ set_rec_area() {
 init_recording() {
   local opt_flags=()
 
-  if [[ ! -z ${1:-} ]] || [[ $CHASSIS_TYPE == vm ]]; then
+  if [[ ! -z ${1:-} ]]; then
     opt_flags=(-encoder cpu)
   fi
 
