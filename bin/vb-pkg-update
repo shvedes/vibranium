@@ -43,9 +43,26 @@ _check_updates() {
 }
 
 _perform_update() {
-  if ! yes | yay --noconfirm --sudoloop; then
-    return 1
+  local need_inhibit=1
+
+  systemctl -q --user is-active vibranium-inhibit@idle && need_inhibit=
+  systemctl -q --user is-active vibranium-inhibit@sleep && need_inhibit=
+
+  if [[ -n $need_inhibit ]]; then
+    systemctl -q --user start vibranium-inhibit@sleep
+    vb-cmd-refresh-bar-module inhibitor
   fi
+
+  cleanup() {
+    if [[ -n $need_inhibit ]]; then
+      systemctl -q --user stop vibranium-inhibit@sleep
+      vb-cmd-refresh-bar-module inhibitor
+    fi
+  }
+
+  trap cleanup RETURN
+
+  yes | yay --noconfirm --sudoloop
 }
 
 _check_important() {
@@ -118,8 +135,7 @@ if (($? != 0)); then
   exit 1
 fi
 
-# Hide cursor
-printf '\e[?25l'
+term::disable_input
 
 yay -Sy &>/dev/null &
 pid=$!
