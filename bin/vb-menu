@@ -54,7 +54,7 @@ _build_remove() {
 _build_update() {
   _b() {
     cfgr::item::action --label "System Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-update -- vb-pkg-update; _die"
-    cfgr::item::action --label "Vibranium Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vibranium-update -- vb-update; _die"
+    cfgr::item::action --label "Vibranium Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-update -- vb-update; _die"
   }
   cfgr::run "Update" "_b"
 }
