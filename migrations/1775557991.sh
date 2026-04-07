@@ -11,3 +11,5 @@ mv ~/.config/Thunar/uca.xml ~/.config/Thunar/uca.xml.$TIMESTAMP
 cp $VIBRANIUM/config/Thunar/uca.xml ~/.config/Thunar/
 
 cp $VIBRANIUM/config/xdg-terminals.list ~/.config/
+
+cp $VIBRANIUM/applications/hidden/{Alacritty,footclient}.desktop ~/.local/share/applications/
