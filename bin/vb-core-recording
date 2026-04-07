@@ -70,7 +70,7 @@ set_rec_area() {
 init_recording() {
   local opt_flags=()
 
-  if [[ ! -z ${1:-} ]]; then
+  if [[ ! -z ${1:-} ]] || [[ $CHASSIS_TYPE == vm ]]; then
     opt_flags=(-encoder cpu)
   fi
 
