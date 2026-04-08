@@ -59,7 +59,7 @@ _update() {
   stashed=false
 
   if [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
-    channel="$(< "$VIBRANIUM_STATE/update.channel")"
+    channel="$(<"$VIBRANIUM_STATE/update.channel")"
   else
     channel="$(git -C "$VIBRANIUM" branch --show-current)"
   fi
@@ -78,7 +78,7 @@ _update() {
     # so the comparison against HEAD (always a commit hash) is valid
     latest_commit=$(git -C "$VIBRANIUM" rev-parse "${latest_tag}^{}")
     current_commit=$(git -C "$VIBRANIUM" rev-parse HEAD)
-    current_tag=$(git -C "$VIBRANIUM" describe --tags --exact-match 2> /dev/null ||
+    current_tag=$(git -C "$VIBRANIUM" describe --tags --exact-match 2>/dev/null ||
       git -C "$VIBRANIUM" rev-parse --short HEAD)
 
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Local:  $current_tag ($current_commit)"
@@ -146,12 +146,10 @@ _update() {
 term::show_header
 term::disable_input
 
-rm -f "$VIBRANIUM_STATE/update.available" || true
-vb-cmd-refresh-bar-module vibranium-update
-
 if term::ask_yes_no Y "Proceed with update?"; then
   _update
-  exit 0
+  rm -f "$VIBRANIUM_STATE/update.available" || true
+  vb-cmd-refresh-bar-module vibranium-update
 else
   echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
   _pause
