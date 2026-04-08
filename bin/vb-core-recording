@@ -158,7 +158,9 @@ fallback_notification() {
   msg+="Please make sure your GPU supports selected codec.\n"
   msg+="Click here to see the logs"
 
-  if notify-send -A true -r 4 -u critical -t 25000 "Screen Recording" "$msg"; then
+  local action="$(notify-send --action=true -r 4 -u critical -t 25000 "Screen Recording" "$msg")"
+
+  if [[ $action == "0" ]]; then
     xdg-terminal-exec -- "${EDITOR:-nvim}" "${LOG_FILE}.latest_fallback"
   fi
 }
@@ -169,7 +171,9 @@ both_failed_notification() {
   msg="Failed to start screen recording in both normal and fallback modes.\n"
   msg+="Click here to see the lock."
 
-  if notify-send -A true -r 4 -u critical -t 25000 "Screen Recording" "$msg"; then
+  local action="$(notify-send --action=true -r 4 -u critical -t 25000 "Screen Recording" "$msg")"
+
+  if [[ $action == "0" ]]; then
     xdg-terminal-exec -- "${EDITOR:-nvim}" "${LOG_FILE}.latest_failed"
   fi
 }

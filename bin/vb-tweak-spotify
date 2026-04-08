@@ -24,7 +24,9 @@ fail() {
   msg="Adblock installation failed"
   msg+="\n<b><i>Click here to see logs</i></b>"
 
-  if [[ "$(notify-send -A true -r 4 -t 10000 -u critical 'Vibranium' "$msg")" == 0 ]]; then
+  local action="$(notify-send --action=true -r 4 -t 10000 -u critical 'Vibranium' "$msg")"
+
+  if [[ $action == "0" ]]; then
     xdg-terminal-exec -- "${EDITOR:-nvim}" "$LOGFILE"
   fi
   progress clear
