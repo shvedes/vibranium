@@ -4,8 +4,8 @@ FILE="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.conf"
 SELF="${0##*/}"
 
 shcat() {
-  while IFS= read -r xte__line; do
-    printf '%s\n' "$xte__line"
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
   done
 }
 
@@ -35,11 +35,11 @@ workspace = w[tv1]s[false], gapsout:0, gapsin:0
 workspace = f[1]s[false], gapsout:0, gapsin:0
 
 windowrule = border_size 0, match:float 0, match:workspace w[tv1]s[false]
+windowrule = no_shadow 1, match:float 0, match:workspace w[1]s[false]
 windowrule = rounding 0, match:float 0, match:workspace w[tv1]s[false]
 windowrule = border_size 0, match:float 0, match:workspace f[1]s[false]
 windowrule = rounding 0, match:float 0, match:workspace f[1]s[false]
-windowrule = no_shadow false, match:float 0, match:workspace f[1]s[false]
 EOF
 fi
 
-hyprctl -q reload config-only &
+hyprctl -q reload config-only
