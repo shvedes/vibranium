@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 
 FILE="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.conf"
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r xte__line; do
+    printf '%s\n' "$xte__line"
+  done
+}
 
 usage() {
-  cat << EOF
-Usage: ${0##*/} [--help]
+  shcat <<EOF
+Usage: $SELF [--help]
 
 Toggle Hyprland smart gaps configuration.
 
@@ -14,31 +21,16 @@ EOF
 }
 
 case "${1:-}" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
+-h | --help)
+  usage
+  exit 0
+  ;;
 esac
-
-mapfile -t gaps < <(
-  hyprctl -j --batch \
-    'getoption general:gaps_in;
-         getoption general:gaps_out' |
-    jq -r '.custom | split(" ")[0]'
-)
-
-gaps_in=${gaps[0]}
-gaps_out=${gaps[1]}
-
-if ((gaps_in == 0 && gaps_out == 0)); then
-  notify-send -r 3 "Vibranium" "You don't have any gaps at all!"
-  exit 1
-fi
 
 if [[ -f "$FILE" ]]; then
   rm "$FILE"
 else
-  cat > "$FILE" << EOF
+  shcat >"$FILE" <<EOF
 workspace = w[tv1]s[false], gapsout:0, gapsin:0
 workspace = f[1]s[false], gapsout:0, gapsin:0
 
@@ -46,6 +38,7 @@ windowrule = border_size 0, match:float 0, match:workspace w[tv1]s[false]
 windowrule = rounding 0, match:float 0, match:workspace w[tv1]s[false]
 windowrule = border_size 0, match:float 0, match:workspace f[1]s[false]
 windowrule = rounding 0, match:float 0, match:workspace f[1]s[false]
+windowrule = no_shadow false, match:float 0, match:workspace f[1]s[false]
 EOF
 fi
 
