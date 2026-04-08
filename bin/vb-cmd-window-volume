@@ -2,15 +2,26 @@
 
 STEP="5"
 ACTION=""
-LOCKFILE="$VIBRANIUM_RUNTIME/${0##*/}.lock"
+SELF="${0##*/}"
 
 source vb-lib-core
 
+# Shoutout to https://github.com/Vladimir-csp
+# for this neat solution.
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 usage() {
-  cat << USAGE
-Usage: ${0##*/} [OPTIONS]
+  shcat <<-EOF
+Usage: $SELF [OPTIONS]
 
 Adjust the volume of the currently focused Hyprland window.
+
+Please note that processes that use ALSA as their output
+may not be picked up by this script (e.g. Telegram).
 
 Options:
   -u, --up             Window volume up
@@ -18,115 +29,189 @@ Options:
   -t, --toggle         Window volume toggle
   -s, --step PERCENT   Volume step size in percent (default: $STEP)
   -h, --help           Show this help message and exit
-USAGE
+EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -s | --step)
-      STEP="$2"
-      shift 2
-      ;;
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    -u | -d | -t)
-      ACTION="${1/-/}"
-      shift
-      ;;
-    --up | --down | --toggle)
-      ACTION="${1/--/}"
-      shift
-      ;;
-    *)
-      echo "${0##*/}: unknown option '$1'" >&2
-      usage >&2
-      exit 1
-      ;;
+  -s | --step)
+    STEP="$2"
+    shift 2
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -u | -d | -t)
+    ACTION="${1/-/}"
+    shift
+    ;;
+  --up | --down | --toggle)
+    ACTION="${1/--/}"
+    shift
+    ;;
+  *)
+    echo "$SELF: unknown option '$1'" >&2
+    usage >&2
+    exit 1
+    ;;
   esac
 done
 
 if [[ -z "$ACTION" ]]; then
-  echo "${0##*/}: action required (--up|--down|--toggle)" >&2
+  echo "$SELF: action required (--up|--down|--toggle)" >&2
   usage >&2
   exit 1
 fi
 
-# killswitch — only one instance may run at a time;
-# scroll events can fire faster than pw-dump finishes
-exec 9> "$LOCKFILE"
-flock -n 9 || exit 0
+# parse both pid and title out of one hyprctl call and one jq invocation,
+# rather than forking jq twice on the same JSON string
+read -r ACTIVE_PID WINDOW_TITLE < <(
+  hyprctl -j activewindow | jq -r '[.pid, .title] | @tsv'
+)
 
-ACTIVE_WINDOW=$(hyprctl -j activewindow)
-ACTIVE_PID=$(jq '.pid' <<< "$ACTIVE_WINDOW")
-WINDOW_TITLE=$(jq -r '.title' <<< "$ACTIVE_WINDOW")
-
-# guard: hyprctl returns {} on an empty workspace, jq yields null for .pid
+# guard: hyprctl returns {} on an empty workspace; jq yields "null" for .pid
 if [[ -z "$ACTIVE_PID" || "$ACTIVE_PID" == "null" ]]; then
-  log::error "no active window found"
   exit 1
 fi
 
 # collect the focused pid and all its descendants into a flat list
 # so that apps which emit audio from a child process are also matched
 collect_pids() {
-  # TODO: recurse through the process tree rooted at $1
-  # hint: `pgrep -P <pid>` gives direct children; recurse until pgrep returns nothing
-  echo "$1"
+  local root="$1"
+
+  # read the entire process table once into awk, build a parent->children map,
+  # then do a BFS from root -- no subprocess per node, no recursion overhead
+  ps -e -o pid=,ppid= | awk -v root="$root" '
+    { children[$2] = children[$2] " " $1 }
+    END {
+      queue[1] = root
+      depth = 1
+      while (depth > 0) {
+        new_depth = 0
+        for (i = 1; i <= depth; i++) {
+          p = queue[i]
+          print p
+          if (p in children) {
+            n = split(children[p], kids)
+            for (j = 1; j <= n; j++)
+              next_queue[++new_depth] = kids[j]
+          }
+        }
+        depth = new_depth
+        for (i = 1; i <= depth; i++) queue[i] = next_queue[i]
+        delete next_queue
+      }
+    }
+  '
 }
+
 mapfile -t ALL_PIDS < <(collect_pids "$ACTIVE_PID")
 
-# build a jq-compatible JSON array of all pids to match against pw-dump
-# PID_ARRAY=$(printf '%s\n' "${ALL_PIDS[@]}" | jq -R -s 'split("\n")[:-1] | map(tonumber)')
-PID_ARRAY=$(jq -n '$ARGS.positional | map(tonumber)' --args "${ALL_PIDS[@]}")
+# Previously this used pw-dump, which serializes the ENTIRE PipeWire object
+# graph (nodes, ports, links, devices, modules, clients -- typically hundreds
+# to thousands of objects) before jq can filter it.
+#
+# pactl list sink-inputs only enumerates active audio streams (typically
+# under 10 entries), so it is orders of magnitude cheaper to parse.
+#
+# Each output line is: SINK_INPUT_ID VOLUME_PCT MUTED
+# where MUTED is "yes" or "no".
+mapfile -t SINK_DATA < <(
+  pactl list sink-inputs | awk -v pids="${ALL_PIDS[*]}" '
+    BEGIN {
+      n = split(pids, a)
+      for (i = 1; i <= n; i++) pid_set[a[i]] = 1
+    }
 
-# find all PipeWire output audio nodes whose application pid is anywhere in the collected pid set
-mapfile -t NODES < <(pw-dump | jq -r --argjson pids "$PID_ARRAY" '
-  .[] |
-  select(.type == "PipeWire:Interface:Node") |
-  select(.info.props."media.class" == "Stream/Output/Audio") |
-  select((.info.props."application.process.id" | tonumber?) as $p | $pids | index($p) != null) |
-  .id
-')
+    /^Sink Input #/ {
+      # flush the previous record if it matched a target pid
+      if (id != "" && matched) print id, vol, muted
+      id   = $3;  sub(/#/, "", id)
+      vol  = 100
+      muted = "no"
+      matched = 0
+    }
 
-if [[ ${#NODES[@]} -eq 0 ]]; then
+    /^[[:space:]]+Mute:/ { muted = $2 }
+
+    /^[[:space:]]+Volume:/ {
+      # the Volume line looks like:
+      #   front-left: 65536 / 100% / 0.00 dB,   front-right: ...
+      # walk fields to find the first "NNN%" token and strip the percent sign
+      for (i = 1; i <= NF; i++) {
+        if ($i ~ /^[0-9]+%[,]?$/) {
+          vol = $i + 0
+          break
+        }
+      }
+    }
+
+    /application\.process\.id/ {
+      gsub(/"/, "", $NF)
+      if ($NF in pid_set) matched = 1
+    }
+
+    END { if (id != "" && matched) print id, vol, muted }
+  '
+)
+
+if [[ ${#SINK_DATA[@]} -eq 0 ]]; then
   exit 0
 fi
 
-# apply the action to every matching node (e.g. multiple browser tabs share one pid)
-for NODE_ID in "${NODES[@]}"; do
-  case "$ACTION" in
-    up)
-      if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
-        wpctl set-volume "$NODE_ID" "${STEP}%+" --limit 1.5
-      else
-        wpctl set-volume "$NODE_ID" "${STEP}%+" --limit 1.0
-      fi
-      ;;
-    down) wpctl set-volume "$NODE_ID" "${STEP}%-" ;;
-    toggle) wpctl set-mute "$NODE_ID" toggle ;;
-  esac
-done
-
 helpers::check VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
+APPLY_BOOST="$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED"
 
-# read back current state from the first matched node after adjustment
-read -r _ node_vol node_muted <<< "$(wpctl get-volume "${NODES[0]}")"
-
-# max_vol drives the progress bar scale; wired to the above-100% boost flag so the
-# bar stays proportional when VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED is enabled
-if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
-  max_vol=1.5
+# max_vol_pct drives both the step clamping and the progress bar scale
+if [[ "$APPLY_BOOST" == true ]]; then
+  max_vol_pct=150
 else
-  max_vol=1.0
+  max_vol_pct=100
 fi
 
-# bar_value scales it into 0-100 relative to max_vol so the bar stays proportional
-bar_value=$(awk -v v="$node_vol" -v max="$max_vol" 'BEGIN {printf "%d", (v/max)*100}')
-icons_folder="$XDG_DATA_HOME/icons/Papirus/24x24/symbolic/status"
+# track the first matched stream's resulting state for the notification;
+# computed here rather than re-queried via wpctl get-volume after the fact
+first_new_vol=""
+first_new_muted=""
 
-if [[ "$node_muted" == "[MUTED]" ]]; then
+for SINK_ENTRY in "${SINK_DATA[@]}"; do
+  read -r sink_id sink_vol sink_muted <<<"$SINK_ENTRY"
+
+  case "$ACTION" in
+  up)
+    new_vol=$((sink_vol + STEP))
+    ((new_vol > max_vol_pct)) && new_vol=$max_vol_pct
+    pactl set-sink-input-volume "$sink_id" "${new_vol}%"
+    new_muted="$sink_muted"
+    ;;
+  down)
+    new_vol=$((sink_vol - STEP))
+    ((new_vol < 0)) && new_vol=0
+    pactl set-sink-input-volume "$sink_id" "${new_vol}%"
+    new_muted="$sink_muted"
+    ;;
+  toggle)
+    pactl set-sink-input-mute "$sink_id" toggle
+    new_vol="$sink_vol"
+    # invert mute locally -- no re-query needed
+    [[ "$sink_muted" == "yes" ]] && new_muted="no" || new_muted="yes"
+    ;;
+  esac
+
+  # only the first stream drives the notification
+  if [[ -z "$first_new_vol" ]]; then
+    first_new_vol="$new_vol"
+    first_new_muted="$new_muted"
+  fi
+done
+
+# scale current volume into 0-100 relative to max_vol_pct so the bar
+# stays proportional when the above-100% boost is enabled
+bar_value=$((first_new_vol * 100 / max_vol_pct))
+icons_folder="/usr/share/icons/Papirus/24x24/symbolic/status"
+
+if [[ "$first_new_muted" == "yes" ]]; then
   notify-send -r 2 -i "$icons_folder/audio-volume-muted-symbolic.svg" -t 1000 "$WINDOW_TITLE Muted"
 else
   notify-send -r 2 -i "$icons_folder/audio-volume-high-symbolic.svg" -t 1000 "$WINDOW_TITLE" -h "int:value:$bar_value"
