@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: ${0##*/} [OPTION]
 
 Set power profiles in Vibranium.
@@ -27,18 +27,18 @@ notify() {
   local label=""
 
   case "$profile" in
-    "performance")
-      icon="power-profile-performance-symbolic"
-      label="Performance"
-      ;;
-    "balanced")
-      icon="power-profile-balanced-symbolic"
-      label="Balanced"
-      ;;
-    "power-saver")
-      icon="power-profile-power-saver-symbolic"
-      label="Powersave"
-      ;;
+  "performance")
+    icon="power-profile-performance-symbolic"
+    label="Performance"
+    ;;
+  "balanced")
+    icon="power-profile-balanced-symbolic"
+    label="Balanced"
+    ;;
+  "power-saver")
+    icon="power-profile-power-saver-symbolic"
+    label="Powersave"
+    ;;
   esac
 
   helpers::check VIBRANIUM_GLOBAL_USE_OSD
@@ -50,10 +50,10 @@ notify() {
   fi
 }
 
-update_cache() { echo "$1" > "$VIBRANIUM_STATE/power-profile"; }
+update_cache() { echo "$1" >"$VIBRANIUM_STATE/power-profile"; }
 
 _ensure_deps() {
-  if ! command -v powerprofilesctl > /dev/null; then
+  if ! command -v powerprofilesctl >/dev/null; then
     echo "[ERROR] Missing required dependencies: power-profiles-daemon"
     vb-cmd-dep-notify --name "Power Management" --deps "power-profiles-daemon"
     exit 1
@@ -65,32 +65,32 @@ QUIET="false"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -q | --quiet)
-      QUIET=true
-      shift
-      ;;
-    --next | --prev)
-      ACTION="${1/--/}"
-      shift
-      ;;
-    power-saver | balanced | performance)
-      TARGET_PROFILE="$1"
-      shift
-      ;;
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    --*)
-      echo "Unknown option: $@." >&2
-      echo "Use flag --help to see available options." >&2
-      exit 1
-      ;;
-    *)
-      echo "Unknown profile: $1." >&2
-      echo "Use flag --help to see available options." >&2
-      exit 1
-      ;;
+  -q | --quiet)
+    QUIET=true
+    shift
+    ;;
+  --next | --prev)
+    ACTION="${1/--/}"
+    shift
+    ;;
+  power-saver | balanced | performance)
+    TARGET_PROFILE="$1"
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --*)
+    echo "Unknown option: $@." >&2
+    echo "Use flag --help to see available options." >&2
+    exit 1
+    ;;
+  *)
+    echo "Unknown profile: $1." >&2
+    echo "Use flag --help to see available options." >&2
+    exit 1
+    ;;
   esac
 done
 
@@ -113,12 +113,12 @@ if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
   done
 
   case "$ACTION" in
-    "next")
-      next_index=$(((current_index + 1) % ${#PROFILES[@]}))
-      ;;
-    "prev")
-      next_index=$(((current_index - 1 + ${#PROFILES[@]}) % ${#PROFILES[@]}))
-      ;;
+  "next")
+    next_index=$(((current_index + 1) % ${#PROFILES[@]}))
+    ;;
+  "prev")
+    next_index=$(((current_index - 1 + ${#PROFILES[@]}) % ${#PROFILES[@]}))
+    ;;
   esac
 
   TARGET_PROFILE="${PROFILES[$next_index]}"
@@ -133,3 +133,17 @@ notify "$TARGET_PROFILE"
 
 powerprofilesctl set "$TARGET_PROFILE" &
 vb-cmd-refresh-bar-module power-profile &
+
+# Explicitly send notification when
+# waybar module is disabled or the waybar is disabled itself.
+module_enabled() {
+  helpers::check VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE
+  case "$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE" in
+  true) return 0 ;;
+  false) return 1 ;;
+  esac
+}
+
+if ! systemctl -q --user is-active waybar || ! module_enabled; then
+  notify-send -r 3 -t 2000 "Power Management" "Power profile set to $TARGET_PROFILE"
+fi
