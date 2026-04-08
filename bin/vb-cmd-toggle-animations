@@ -46,8 +46,14 @@ if ! vb-cmd-edit-wm-config --get animations:enabled "$CONF" >/dev/null; then
 fi
 
 case "$(vb-cmd-edit-wm-config --get animations:enabled "$CONF")" in
-true) vb-cmd-edit-wm-config 'animations:enabled:false' "$CONF" ;;
-false) vb-cmd-edit-wm-config 'animations:enabled:true' "$CONF" ;;
+true)
+  vb-cmd-edit-wm-config 'animations:enabled:false' "$CONF"
+  vb-cmd-edit-wm-config 'animations:enabled:false' "$HYPRLOCK_CONF"
+  ;;
+false)
+  vb-cmd-edit-wm-config 'animations:enabled:true' "$CONF"
+  vb-cmd-edit-wm-config 'animations:enabled:true' "$HYPRLOCK_CONF"
+  ;;
 esac
 
 hyprctl -q reload config-only &
