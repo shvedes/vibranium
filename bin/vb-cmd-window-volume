@@ -169,7 +169,7 @@ for SINK_ENTRY in "${SINK_DATA[@]}"; do
   case "$ACTION" in
   up)
     new_vol=$((sink_vol + STEP))
-    ((new_vol > 100)) && new_vol=$max_vol_pct
+    ((new_vol > 100)) && new_vol=100
     pactl set-sink-input-volume "$sink_id" "${new_vol}%"
     new_muted="$sink_muted"
     ;;
