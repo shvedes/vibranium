@@ -3,10 +3,11 @@
 TIMESTAMP=$(date +%s)
 
 mv ~/.config/waybar ~/.config/waybar.$TIMESTAMP
+cp -r $VIBRANIUM/config/waybar ~/.config
 
 clean_rust=false
 
-if ! command cargo >/dev/null; then
+if ! command -v cargo >/dev/null; then
   clean_rust=true
   vb-pkg-install --embedded -- rust
 fi
