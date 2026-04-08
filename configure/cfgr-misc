@@ -168,7 +168,7 @@ _manage_user_wallpapers() {
   local wallpaper_dir files
   local current_wallpaper
 
-  local current_theme="$(vb-theme-get)"
+  local current_theme="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
   wallpaper_dir="$XDG_CONFIG_HOME/vibranium/themes/$current_theme/backgrounds"
 
   if [[ ! -d "$wallpaper_dir" ]]; then
@@ -215,7 +215,7 @@ _manage_user_wallpapers() {
           rm -f "$current_mirror/$target"
         fi
 
-        local current="$(vb-cmd-get-wallpaper)"
+        local current="$(vb-core-wallpaper --get)"
         current="${current##*/}"
 
         if [[ "$current" == "$target" ]]; then

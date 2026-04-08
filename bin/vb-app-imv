@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 if [[ -z "$1" ]]; then
   if ! command -v zenity >/dev/null; then

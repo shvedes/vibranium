@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 # Usage: <package_name>:<binary_associated_with>
 # We use this syntax because the name of the package may differ from the name of

@@ -1,10 +1,16 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
-source vb-lib-core
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat <<EOF
-Usage: ${0##*/} [OPTION]...
+  shcat <<EOF
+Usage: $SELF [OPTION]...
 
 Control system volume and microphone.
 
@@ -148,7 +154,7 @@ set_volume() {
   fi
 
   if ! [[ "$int_val" =~ ^[0-9]+$ ]] || ((int_val < 0 || int_val > max_volume)); then
-    echo "${0##*/}: invalid volume value '${1}' (expected integer 0-${max_volume})" >&2
+    echo "Error: invalid volume value '${1}' (expected integer 0-${max_volume})" >&2
     exit 1
   fi
 
@@ -302,8 +308,8 @@ while [[ $# -gt 0 ]]; do
     ;;
   --volume)
     if [[ -z "$2" || "$2" == --* ]]; then
-      echo "${0##*/}: option '--volume' requires an argument" >&2
-      echo "Try '${0##*/} --help' for more information." >&2
+      echo "Error: option '--volume' requires an argument" >&2
+      echo "Try '$SELF --help' for more information." >&2
       exit 1
     fi
     action="vol-set"
@@ -315,13 +321,13 @@ while [[ $# -gt 0 ]]; do
     break
     ;;
   -*)
-    echo "${0##*/}: unrecognized option '$1'" >&2
-    echo "Try '${0##*/} --help' for more information." >&2
+    echo "Error: unrecognized option '$1'" >&2
+    echo "Try '$SELF --help' for more information." >&2
     exit 1
     ;;
   *)
-    echo "${0##*/}: unexpected argument '$1'" >&2
-    echo "Try '${0##*/} --help' for more information." >&2
+    echo "Error: unexpected argument '$1'" >&2
+    echo "Try '$SELF --help' for more information." >&2
     exit 1
     ;;
   esac
@@ -329,10 +335,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$action" ]]; then
-  echo "${0##*/}: no action specified" >&2
-  echo "Try '${0##*/} --help' for more information." >&2
+  echo "Error: no action specified" >&2
+  echo "Try '$SELF --help' for more information." >&2
   exit 1
 fi
+
+source vb-lib-core
 
 helpers::check \
   VIBRANIUM_GLOBAL_USE_OSD \

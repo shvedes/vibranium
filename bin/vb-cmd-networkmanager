@@ -1,10 +1,18 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat <<EOF
-Usage: ${0##*/} [OPTION]
+  shcat <<EOF
+Usage: $SELF [OPTION]
 
-Launch UI / TUI for the active network manager.
+Launch GUI / TUI for the active network manager.
 
 Options:
   -h, --help  Display this help and exit
@@ -18,8 +26,8 @@ case "$1" in
   ;;
 "") ;;
 *)
-  echo "${0##*/}: invalid option '$1'" >&2
-  echo "Try '${0##*/} --help' for more information." >&2
+  echo "Error: invalid option '$1'" >&2
+  echo "Try '$SELF --help' for more information." >&2
   exit 1
   ;;
 esac
@@ -27,24 +35,29 @@ esac
 # Detect primary network interface utility
 if command -v nmtui >/dev/null 2>&1; then
   xdg-terminal-exec --app-id=org.vb.term.float --title=nmtui -- nmtui
+  exit 0
 elif command -v iwctl >/dev/null 2>&1; then
   if command -v impala >/dev/null 2>&1; then
     xdg-terminal-exec --app-id=org.vb.term.float --title=impala -- impala
+    exit 0
   elif command -v iwmenu >/dev/null 2>&1; then
     app2unit iwmenu
+    exit 0
   elif command -v iwgtk >/dev/null 2>&1; then
     app2unit iwgtk
+    exit 0
   else
     xdg-terminal-exec --app-id=org.vb.term.float --title=iwctl -- iwctl
+    exit 0
   fi
-else
-  if systemctl -q is-active systemd-networkd; then
-    msg="'<i>systemd-networkd</i>' doesn't provide a TUI frontend. Use CLI instead.\n"
-    msg+="See '<i>networkctl --help</i>' for more info"
-  else
-    msg="Network manager provider not found"
-  fi
-
-  notify-send -r 1 -t 10000 "Vibranium - Networking" "$msg"
-  exit 1
 fi
+
+if systemctl -q is-active systemd-networkd; then
+  msg="'<i>systemd-networkd</i>' doesn't provide a TUI frontend. Use CLI instead.\n"
+  msg+="See '<i>networkctl --help</i>' for more info"
+else
+  msg="Network manager provider not found"
+fi
+
+notify-send -r 1 -t 10000 "Vibranium - Networking" "$msg"
+exit 1

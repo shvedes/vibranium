@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 if systemctl -q --user is-active vibranium-inhibit@sleep; then
   printf '{"text": "\uf023", "tooltip": "System sleep blocked"}'

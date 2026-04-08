@@ -1,12 +1,20 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
+SELF="${0##*/}"
 CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
 STATE_FILE="$VIBRANIUM_STATE/nightshift"
+LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 STEP=100
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 usage() {
-  cat <<EOF
-Usage: ${0##*/} [OPTIONS]
+  shcat <<EOF
+Usage: $SELF [OPTIONS]
 
 Options:
   --toggle             Toggle night light
@@ -27,9 +35,8 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 1
 fi
 
-lockfile="$VIBRANIUM_RUNTIME/${0##*/}.lock"
-exec 10>"$lockfile" || {
-  echo "error: another instance of ${0##*/} already running!"
+exec 10>"$LOCKFILE" || {
+  echo "Error: another instance of $SELF already running!"
   exit 1
 }
 
@@ -40,7 +47,17 @@ if [[ $# -eq 0 ]]; then
   exit 0
 fi
 
-CURRENT_TEMP=$(grep -Po '(?<=temperature = )\d+' "$CONF" 2>/dev/null | head -n1 || echo 5500)
+while IFS= read -r line; do
+  case $line in
+  *"temperature = "*)
+    tmp=${line#*temperature = }
+    CURRENT_TEMP=${tmp%%[^0-9]*}
+
+    unset tmp
+    break
+    ;;
+  esac
+done <"$CONF"
 
 action=""
 ARG_TEMP=""
@@ -80,15 +97,15 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   *)
-    printf '%s\n' "${0##*/}: invalid option: $1" >&2
-    printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
+    echo "Error: invalid option: $1" >&2
+    echo "Try '$SELF --help' for more information" >&2
     exit 1
     ;;
   esac
 done
 
 if [[ ! -f "$STATE_FILE" ]]; then
-  printf '%s\n' "Night light state file not found: $STATE_FILE" >&2
+  echo "Night Light state file not found: $STATE_FILE" >&2
   exit 1
 fi
 
@@ -105,7 +122,7 @@ if [[ "$action" == "toggle" ]]; then
     printf "suspended" >"$STATE_FILE"
     ;;
   *)
-    printf '%s\n' "Unknown state in $STATE_FILE: '$state'" >&2
+    echo "Unknown state in $STATE_FILE: '$state'" >&2
     exit 1
     ;;
   esac
@@ -116,7 +133,7 @@ fi
 
 if [[ "$action" == "inc" || "$action" == "dec" ]]; then
   if [[ "$state" == "suspended" ]]; then
-    printf '%s\n' "Night light is suspended" >&2
+    echo "Night Light is suspended" >&2
     exit 1
   fi
 
@@ -128,19 +145,19 @@ fi
 
 if [[ "$action" == "set" ]]; then
   if ! [[ "$ARG_TEMP" =~ ^[0-9]+$ ]]; then
-    printf '%s\n' "Invalid temperature: $ARG_TEMP" >&2
+    echo "Invalid temperature: $ARG_TEMP" >&2
     exit 1
   fi
   TEMP="$ARG_TEMP"
 fi
 
 if [[ -z "${TEMP:-}" ]]; then
-  printf '%s\n' "No operation performed." >&2
+  echo "No operation performed" >&2
   exit 0
 fi
 
 if ((TEMP < 1000 || TEMP > 20000)); then
-  printf '%s\n' "Temperature must be between 1000K and 20000K" >&2
+  echo "Temperature must be between 1000K and 20000K" >&2
   exit 1
 fi
 

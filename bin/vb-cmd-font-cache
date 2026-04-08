@@ -1,7 +1,13 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 _usage() {
-  cat << EOF
+  shcat <<EOF
 Usage: ${0##*/} [OPTION]...
 
 Update font cache and notify Vibranium worker module.
@@ -14,18 +20,18 @@ EOF
 }
 
 case "$1" in
-  "") true ;;
-  -h | --help)
-    _usage
-    exit 0
-    ;;
-  *)
-    _usage
-    exit 1
-    ;;
+"") true ;;
+-h | --help)
+  _usage
+  exit 0
+  ;;
+*)
+  _usage
+  exit 1
+  ;;
 esac
 
-printf "Updating font cache. This might take some time" > "$VIBRANIUM_RUNTIME/worker.active"
+printf "Updating font cache. This might take some time" >"$VIBRANIUM_RUNTIME/worker.active"
 vb-cmd-refresh-bar-module worker
 
 fc-cache -f

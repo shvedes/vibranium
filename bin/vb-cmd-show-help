@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 

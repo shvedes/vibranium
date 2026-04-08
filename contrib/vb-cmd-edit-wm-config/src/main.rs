@@ -3,7 +3,14 @@ use std::process;
 
 // ─── CLI parsing ─────────────────────────────────────────────────────────────
 
+enum Mode {
+    Write,
+    // Read mode: path points to an option, value is printed to stdout.
+    Read,
+}
+
 struct Args {
+    mode: Mode,
     path: String,
     file: String,
 }
@@ -11,15 +18,28 @@ struct Args {
 fn parse_args() -> Args {
     let raw: Vec<String> = std::env::args().collect();
 
-    if raw.len() < 3 {
-        eprintln!("Usage: vb-cmd-edit-wm-config <path:value> <file>");
-        process::exit(1);
+    // --get <path> <file>
+    if raw.len() == 4 && raw[1] == "--get" {
+        return Args {
+            mode: Mode::Read,
+            path: raw[2].clone(),
+            file: raw[3].clone(),
+        };
     }
 
-    Args {
-        path: raw[1].clone(),
-        file: raw[2].clone(),
+    // <path:value> <file>
+    if raw.len() >= 3 {
+        return Args {
+            mode: Mode::Write,
+            path: raw[1].clone(),
+            file: raw[2].clone(),
+        };
     }
+
+    eprintln!("Usage:");
+    eprintln!("  vb-cmd-edit-wm-config <path:value> <file>");
+    eprintln!("  vb-cmd-edit-wm-config --get <path> <file>");
+    process::exit(1);
 }
 
 // ─── Path parsing ─────────────────────────────────────────────────────────────
@@ -216,6 +236,61 @@ fn option_key(stripped: &str) -> Option<String> {
     None
 }
 
+/// Extract value from `key = value` line (the part after the first `=`).
+fn option_value(stripped: &str) -> Option<String> {
+    stripped
+        .find('=')
+        .map(|eq| stripped[eq + 1..].trim().to_string())
+}
+
+// ─── Read ─────────────────────────────────────────────────────────────────────
+
+// Navigate sections identified by `path[..n-1]`, then find the option named
+// `path[n-1]` and print its value.  Exit 1 silently on any miss.
+fn read_value(lines: &[String], path: &[String], occurrence: i32) {
+    if path.is_empty() {
+        process::exit(1);
+    }
+
+    let (section_path, option_tail) = path.split_at(path.len() - 1);
+    let option_name = &option_tail[0];
+
+    // Top-level option: no enclosing section.
+    if section_path.is_empty() {
+        for line in lines {
+            let stripped = line.trim_start();
+            if stripped.is_empty() || stripped.starts_with('#') {
+                continue;
+            }
+            if let Some(key) = option_key(stripped) {
+                if key == *option_name {
+                    // Print the raw value string (no surrounding quotes added).
+                    let val = option_value(stripped).unwrap_or_default();
+                    println!("{}", val);
+                    return;
+                }
+            }
+        }
+        // Option not found at top level.
+        process::exit(1);
+    }
+
+    // Nested option: locate the innermost section first.
+    let sec_bounds = match find_section_bounds(lines, section_path, 0, occurrence) {
+        Some(b) => b,
+        None => process::exit(1),
+    };
+    let (sec_start, sec_end, _) = sec_bounds;
+
+    let opt_line = match find_option_in_section(lines, sec_start, sec_end, option_name) {
+        Some(l) => l,
+        None => process::exit(1),
+    };
+
+    let stripped = lines[opt_line].trim_start();
+    let val = option_value(stripped).unwrap_or_default();
+    println!("{}", val);
+}
 
 // ─── Write ────────────────────────────────────────────────────────────────────
 
@@ -348,16 +423,30 @@ fn main() {
 
     let lines: Vec<String> = match fs::read_to_string(&args.file) {
         Ok(content) => content.lines().map(|l| format!("{}\n", l)).collect(),
+        // File not found is a miss, not an error worth printing.
         Err(_) => Vec::new(),
     };
 
-    let (path_and_value, occurrence) = parse_path(&args.path);
+    match args.mode {
+        Mode::Read => {
+            // In read mode the path IS the full option path (no trailing value segment).
+            // occurrence suffix (@N) is still supported.
+            let (path, occurrence) = parse_path(&args.path);
+            if path.len() < 1 {
+                process::exit(1);
+            }
+            read_value(&lines, &path, occurrence);
+        }
 
-    if path_and_value.len() < 2 {
-        process::exit(1);
+        Mode::Write => {
+            let (path_and_value, occurrence) = parse_path(&args.path);
+            if path_and_value.len() < 2 {
+                process::exit(1);
+            }
+            let path = &path_and_value[..path_and_value.len() - 1];
+            let value = &path_and_value[path_and_value.len() - 1];
+            let mut lines = lines;
+            write_value(&mut lines, path, value, &args.file, occurrence);
+        }
     }
-    let path = &path_and_value[..path_and_value.len() - 1];
-    let value = &path_and_value[path_and_value.len() - 1];
-    let mut lines = lines;
-    write_value(&mut lines, path, value, &args.file, occurrence);
 }

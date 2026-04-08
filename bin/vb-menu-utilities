@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 source vb-lib-core
 source vb-lib-cfgr

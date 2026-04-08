@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 LOGFILE="$XDG_CACHE_HOME/vibranium/spotify_adblock_installer.log"
 EXT_DIR="$XDG_CONFIG_HOME/spicetify/Extensions"

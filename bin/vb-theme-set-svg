@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 # Vibranium comes with its own custom icon set, mainly for entries in custom menus such as AI, Power, etc.
 # Since it is svg, we can change the colors of the icons, so we do.

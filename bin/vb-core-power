@@ -1,27 +1,28 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat <<EOF
-Usage: ${0##*/} [OPTION]
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]...[PROFILE]
 
 Set power profiles in Vibranium.
 
 Options:
   --next       Next power profile
   --prev       Previous power profile
+  --get        Get current power profile
   -q, --quiet  Do not output in console
 
-  [profile]    Set specified profile. Can be power-saver,balanced,performance
+  [PROFILE]    Set specified profile. Can be power-saver,balanced,performance
 EOF
 }
 
 notify() {
-
-  helpers::check VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
-  if [[ $VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK == false ]]; then
-    return 0
-  fi
-
   local profile="$1"
   local icon=""
   local label=""
@@ -41,20 +42,46 @@ notify() {
     ;;
   esac
 
-  helpers::check VIBRANIUM_GLOBAL_USE_OSD
+  source vb-lib-core
 
-  if [[ $VIBRANIUM_GLOBAL_USE_OSD == "true" ]]; then
-    swayosd-client --custom-message "$label" --custom-icon "$icon"
-  else
-    notify-send -r 3 -t 1500 "Power Management" "Power profile set to <b>${label,,}</b>"
+  helpers::check \
+    VIBRANIUM_GLOBAL_USE_OSD \
+    VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE
+
+  # Explicitly send notification when
+  # waybar module is disabled or the waybar is disabled itself.
+  local module_enabled="$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
+
+  if ! systemctl -q --user is-active waybar || [[ ! $module_enabled == "true" ]]; then
+    if [[ $VIBRANIUM_GLOBAL_USE_OSD == "true" ]]; then
+      swayosd-client --custom-message "$label" --custom-icon "$icon"
+    else
+      notify-send -r 3 -t 1500 "Power Management" "Power profile set to <b>${label,,}</b>"
+    fi
   fi
+
+}
+
+get_power_profile() {
+  local state_file="$VIBRANIUM_STATE/power-profile"
+
+  if [[ -f "$state_file" ]]; then
+    local state="$(<"$state_file")"
+    printf "%s" "$state"
+    return
+  fi
+
+  # Update state file if it doesn't exists
+  local curr_profile="$(powerprofilesctl get)"
+  printf "%s" "$curr_profile" >"$state_file"
+  printf "%s" "$curr_profile"
 }
 
 update_cache() { echo "$1" >"$VIBRANIUM_STATE/power-profile"; }
 
 _ensure_deps() {
   if ! command -v powerprofilesctl >/dev/null; then
-    echo "[ERROR] Missing required dependencies: power-profiles-daemon"
+    echo "Error: missing required dependencies: power-profiles-daemon"
     vb-cmd-dep-notify --name "Power Management" --deps "power-profiles-daemon"
     exit 1
   fi
@@ -81,6 +108,10 @@ while [[ $# -gt 0 ]]; do
     usage
     exit 0
     ;;
+  --get)
+    get_power_profile
+    exit 0
+    ;;
   --*)
     echo "Unknown option: $@." >&2
     echo "Use flag --help to see available options." >&2
@@ -96,11 +127,9 @@ done
 
 _ensure_deps
 
-source vb-lib-core
-
 USER_ARGS=()
 PROFILES=("power-saver" "balanced" "performance")
-CURRENT="$(vb-cmd-get-power)"
+CURRENT="$(get_power_profile)"
 
 if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
   current_index=0
@@ -128,22 +157,8 @@ if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
   fi
 fi
 
-update_cache "$TARGET_PROFILE"
-notify "$TARGET_PROFILE"
-
 powerprofilesctl set "$TARGET_PROFILE" &
 vb-cmd-refresh-bar-module power-profile &
 
-# Explicitly send notification when
-# waybar module is disabled or the waybar is disabled itself.
-module_enabled() {
-  helpers::check VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE
-  case "$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE" in
-  true) return 0 ;;
-  false) return 1 ;;
-  esac
-}
-
-if ! systemctl -q --user is-active waybar || ! module_enabled; then
-  notify-send -r 3 -t 2000 "Power Management" "Power profile set to $TARGET_PROFILE"
-fi
+update_cache "$TARGET_PROFILE"
+notify "$TARGET_PROFILE"

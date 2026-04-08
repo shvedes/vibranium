@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 state="$VIBRANIUM_RUNTIME/worker.active"
 

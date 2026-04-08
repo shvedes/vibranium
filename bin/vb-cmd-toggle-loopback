@@ -1,31 +1,48 @@
-#!/usr/bin/env bash
-
-source vb-lib-core
+#!/usr/bin/bash
 
 LOOP_NAME="mic_loop"
+ACTION="apply"
+SELF="${0##*/}"
 
-helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME
-helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
-VOL="${VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME}%"
-
-print_help() {
-  cat << EOF
-Usage: ${0##*/} [OPTIONS]
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTIONS]
 
 Enable default microphone loopback (aka hear my voice)
 
+Note: you will not be able to toggle it from the shell.
+Use Vibranium Menu > Settings > Audio instead.
+
 Options:
-      --help Show this help and exit
+    -h, --help         Show this help and exit
+    --get-volume       Print current loopback volume and exit
 EOF
 }
 
 get_default_source() {
-  pactl info | awk -F': ' '/Default Source/ {print $2}'
+  local line
+  while IFS= read -r line; do
+    if [[ "$line" == "Default Source: "* ]]; then
+      printf '%s\n' "${line#Default Source: }"
+      return
+    fi
+  done < <(pactl info)
 }
 
 get_default_sink() {
-  pactl info | awk -F': ' '/Default Sink/ {print $2}'
+  local line
+  while IFS= read -r line; do
+    if [[ "$line" == "Default Sink: "* ]]; then
+      printf '%s\n' "${line#Default Sink: }"
+      return
+    fi
+  done < <(pactl info)
 }
 
 find_module_ids() {
@@ -38,7 +55,8 @@ get_loopback_volume() {
   fi
 
   local module_id sink_input vol
-  module_id=$(find_module_ids | head -n1)
+  # Read only the first module id; process substitution avoids a pipe and head.
+  read -r module_id < <(find_module_ids)
 
   if [[ -z "$module_id" ]]; then
     echo "no loopback"
@@ -67,87 +85,90 @@ find_sink_input_id() {
     '
 }
 
-ACTION="apply"
-if ! OPTS=$(getopt -o h -l help,get-volume -- "$@"); then
-  exit 2
-fi
-
-eval set -- "$OPTS"
-
-while true; do
+# Parse arguments before sourcing the lib so that -h/--help is free of side
+# effects. The lib is sourced further below, only when an action needs it.
+while [[ $# -gt 0 ]]; do
   case "$1" in
-    --help)
-      ACTION="help"
-      shift
-      ;;
-    --get-volume)
-      get_loopback_volume
-      exit 0
-      ;;
-    *)
-      break
-      ;;
-  esac
-done
-
-case "$ACTION" in
-  help)
-    print_help
+  -h | --help)
+    usage
     exit 0
     ;;
-  apply)
-    # If the setting is not enabled, unload any existing loopback modules
-    if [[ "$VIBRANIUM_VOLUME_SOURCE_LOOPBACK" != "true" ]]; then
-      MODULE_IDS=$(find_module_ids || true)
-      if [[ -n "${MODULE_IDS}" ]]; then
-        # Unload every matching module id
-        while IFS= read -r mid; do
-          [[ -z "$mid" ]] && continue
-          pactl unload-module "$mid" > /dev/null 2>&1 || true
-        done <<< "$MODULE_IDS"
-      fi
-      exit 0
-    fi
-
-    # If enabled: update volume for existing modules if present
-    MODULE_IDS=$(find_module_ids || true)
-    if [[ -n "${MODULE_IDS}" ]]; then
-      while IFS= read -r mid; do
-        [[ -z "$mid" ]] && continue
-        SINK_INPUT_ID=$(find_sink_input_id "$mid")
-        if [[ -n "$SINK_INPUT_ID" ]]; then
-          pactl set-sink-input-volume "$SINK_INPUT_ID" "$VOL" > /dev/null 2>&1 || true
-        fi
-      done <<< "$MODULE_IDS"
-      exit 0
-    else
-      # Create loopback
-      SOURCE=$(get_default_source)
-      SINK=$(get_default_sink)
-      if [[ -z "${SOURCE:-}" || -z "${SINK:-}" ]]; then
-        exit 1
-      fi
-
-      NEW_MODULE_ID=$(pactl load-module module-loopback \
-        source="$SOURCE" \
-        sink="$SINK" \
-        latency_msec=10 \
-        adjust_latency=true \
-        loopback_name="$LOOP_NAME" 2> /dev/null || true)
-
-      # Wait for sink-input to appear and set volume
-      for i in {1..10}; do
-        SINK_INPUT_ID=$(find_sink_input_id "$NEW_MODULE_ID")
-        if [[ -n "$SINK_INPUT_ID" ]]; then
-          pactl set-sink-input-volume "$SINK_INPUT_ID" "$VOL" > /dev/null 2>&1 || true
-          break
-        fi
-        sleep 0.1
-      done
-      exit 0
-    fi
+  --get-volume)
+    ACTION="get-volume"
     ;;
   *)
+    printf '%s: unknown option: %s\n' "$SELF" "$1" >&2
     exit 2
     ;;
+  esac
+  shift
+done
+
+# Source only now that we know we need runtime config values.
+source vb-lib-core
+
+helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME
+helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK
+
+VOL="${VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME}%"
+
+case "$ACTION" in
+get-volume)
+  get_loopback_volume
+  ;;
+apply)
+  # If the setting is not enabled, unload any existing loopback modules.
+  if [[ "$VIBRANIUM_VOLUME_SOURCE_LOOPBACK" != "true" ]]; then
+    MODULE_IDS=$(find_module_ids || true)
+    if [[ -n "${MODULE_IDS}" ]]; then
+      # Unload every matching module id.
+      while IFS= read -r mid; do
+        [[ -z "$mid" ]] && continue
+        pactl unload-module "$mid" >/dev/null 2>&1 || true
+      done <<<"$MODULE_IDS"
+    fi
+    exit 0
+  fi
+
+  # If enabled: update volume for existing modules if present.
+  MODULE_IDS=$(find_module_ids || true)
+  if [[ -n "${MODULE_IDS}" ]]; then
+    while IFS= read -r mid; do
+      [[ -z "$mid" ]] && continue
+      SINK_INPUT_ID=$(find_sink_input_id "$mid")
+      if [[ -n "$SINK_INPUT_ID" ]]; then
+        pactl set-sink-input-volume "$SINK_INPUT_ID" "$VOL" >/dev/null 2>&1 || true
+      fi
+    done <<<"$MODULE_IDS"
+    exit 0
+  else
+    # Create loopback.
+    SOURCE=$(get_default_source)
+    SINK=$(get_default_sink)
+    if [[ -z "${SOURCE:-}" || -z "${SINK:-}" ]]; then
+      exit 1
+    fi
+
+    NEW_MODULE_ID=$(pactl load-module module-loopback \
+      source="$SOURCE" \
+      sink="$SINK" \
+      latency_msec=10 \
+      adjust_latency=true \
+      loopback_name="$LOOP_NAME" 2>/dev/null || true)
+
+    # Wait for the sink-input to appear, then set initial volume.
+    for i in {1..10}; do
+      SINK_INPUT_ID=$(find_sink_input_id "$NEW_MODULE_ID")
+      if [[ -n "$SINK_INPUT_ID" ]]; then
+        pactl set-sink-input-volume "$SINK_INPUT_ID" "$VOL" >/dev/null 2>&1 || true
+        break
+      fi
+      sleep 0.1
+    done
+    exit 0
+  fi
+  ;;
+*)
+  exit 2
+  ;;
 esac

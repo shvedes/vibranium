@@ -1,11 +1,57 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]...
+
+Print current Secure Boot status.
+
+Options:
+  -h, --help     Display this help and exit
+
+Exit status:
+  0  secure boot is enabled
+  1  secure boot is disabled
+  2  secure boot is in setup mode
+  3  pending reboot
+EOF
+}
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+"")
+  :
+  ;;
+*)
+  echo "Error: unknown option: $1" >&2
+  echo "Try '${0##*/} --help' for more information" >&2
+  exit 1
+  ;;
+esac
 
 if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
   echo "pending reboot"
-  exit 0
+  exit 3
 fi
 
-sb_status="$(bootctl status 2> /dev/null | awk '/Secure Boot/ {print $3 $4}')"
+while IFS= read -r line; do
+  if [[ $line == *"Secure Boot"* ]]; then
+    continue
+  fi
+
+  read -r -a fields <<<"$line"
+  sb_status="${fields[2]}${fields[3]}"
+  break
+done < <(bootctl status 2>/dev/null)
 
 if [[ "$sb_status" == "disabled" ]]; then
   echo "disabled"

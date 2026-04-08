@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 gtk_font="$(gsettings get org.gnome.desktop.interface font-name)"
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 exec 9> "$VIBRANIUM_RUNTIME/${0##*/}.lock"
 

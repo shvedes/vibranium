@@ -1,10 +1,13 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
-source vb-lib-core
-source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat <<EOF
+  shcat <<EOF
 Usage: ${0##*/} [--help]
 
 Suspend or resume the currently active window in Hyprland.
@@ -21,6 +24,9 @@ case "${1:-}" in
   exit 0
   ;;
 esac
+
+source vb-lib-core
+source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 
 # Get active window PID and class
 read -r PID NAME <<<"$(hyprctl -j activewindow | jq -r '[.pid,.title]|@tsv')"
@@ -41,4 +47,4 @@ else
   msg="restored"
 fi
 
-notify-send -r 3 "Vibranium" "<span foreground='${P_YELLOW}'>${NAME}</span> $msg"
+notify-send -r 3 "PID Freezer" "<span foreground='${P_YELLOW}'>${NAME}</span> $msg"

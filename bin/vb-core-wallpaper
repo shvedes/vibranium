@@ -1,44 +1,82 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
-source vb-lib-core
-
-CUSTOM=false
-CURRENT_THEME="$(vb-theme-get)"
+THEME="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
 WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
-USER_WALLPAPERS="$XDG_CONFIG_HOME/vibranium/themes/$CURRENT_THEME/backgrounds"
-STATE_FILE="$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME"
+UWALLS="$XDG_CONFIG_HOME/vibranium/themes/$THEME/backgrounds"
+STATE_FILE="$VIBRANIUM_STATE/wallpaper/$THEME"
 
-# In case if user set new wallpaper via thunar context menu
-if [[ $CUSTOM == true && ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
-  mkdir -p "$USER_WALLPAPERS"
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION] <image>
 
-  if [[ ! -f "$USER_WALLPAPERS/${WALLPAPER_PATH##*/}" ]]; then
-    cp "$WALLPAPER_PATH" "$USER_WALLPAPERS/"
-    WALLPAPER_PATH="$USER_WALLPAPERS/${WALLPAPER_PATH##*/}"
+Set wallappers in Vibranium.
+
+Supported formats: jpeg, jpegxl, png, gif, pnm, tga, tiff, webp, bmp, svg.
+
+Options:
+  --next          Set the next wallpaper
+  --prev          Set the previous wallpaper
+  --get           Get the current wallpaper
+  <image>         Path to an image file (.png, .jpg, .jpeg, .webp) to set as wallpaper
+
+If no OPTION is provided, the script expects an image file as an argument.
+EOF
+}
+
+get_wallpaper() {
+  local current
+  while IFS= read -r line; do
+    current="${line#*image: }"
+    echo "$current"
+  done < <(awww query)
+}
+
+copy_uwall() {
+  # In case if user set new wallpaper via thunar context menu
+  # (e,g. user's own picture, downloaded from the internet) we
+  # should copy this file to the folder that contains user wallpapers
+  # only. Why copy? In case if original file gets deleted
+  if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
+    mkdir -p "$UWALLS"
+    cp "$WALLPAPER_PATH" "$UWALLS/"
+    WALLPAPER_PATH="$UWALLS/${WALLPAPER_PATH##*/}"
   fi
-fi
+}
 
-toggle_wallpaper() {
+cycle_wallpaper() {
   local mode="$1"
   local current files
   local idx next prev found
   local candidate
 
+  # Read all wallpaper files (regular files or potential symlinks)
   mapfile -t files < <(
     find "$WALLS" -maxdepth 1 \( -type f -o -type l \) 2>/dev/null |
       while IFS= read -r f; do
-        [[ -f "$f" ]] && printf '%s\n' "$f"
+        if [[ -f "$f" ]]; then
+          printf '%s\n' "$f"
+        fi
       done
   )
 
-  [ ${#files[@]} -eq 0 ] && return 1
+  # Exit if no wallpapers found
+  if ((${#files[@]} == 0)); then
+    return 1
+  fi
 
-  current="$(vb-cmd-get-wallpaper)"
+  # Get current wallpaper
+  current="$(get_wallpaper)"
 
   found=0
   idx=0
 
+  # Find index of current wallpaper in the files array
   if [ -n "$current" ]; then
     for i in "${!files[@]}"; do
       if [ "${files[$i]}" = "$current" ]; then
@@ -52,101 +90,99 @@ toggle_wallpaper() {
   case "$mode" in
   --next)
     if ((found)); then
+      # Wrap around using modulo
       next=$(((idx + 1) % ${#files[@]}))
       candidate="${files[$next]}"
     else
+      # Default to first wallpaper if current not found
       candidate="${files[0]}"
     fi
     ;;
   --prev)
     if ((found)); then
+      # Wrap around safely
       prev=$(((idx - 1 + ${#files[@]}) % ${#files[@]}))
       candidate="${files[$prev]}"
     else
+      # Default to last wallpaper
       candidate="${files[${#files[@]}-1]}"
     fi
     ;;
   esac
 
-  # If candidate is current wallpaper - do nothing.
-  # This means that there's only one wallpaper found for a theme.
-  if [ "$candidate" = "$current" ]; then
+  # Do nothing if candidate is the same as current wallpaper
+  # This handles the case of a single wallpaper in the directory
+  if [[ "$candidate" == "$current" ]]; then
     return 0
   fi
 
   printf "%s" "$candidate"
 }
 
-usage() {
-  cat <<EOF
-Usage: ${0##*/} [OPTION] <image>
-
-Options:
-  --next          Set the next wallpaper
-  --prev          Set the previous wallpaper
-  <image>         Path to an image file (.png, .jpg, .jpeg, .webp) to set as wallpaper
-
-If no OPTION is provided, the script expects an image file as an argument.
-EOF
+service_status() {
+  systemctl -q --user is-active awww
 }
 
-helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
-if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
-  if ! systemctl -q --user is-active awww; then
-    systemctl -q --user enable --now awww
+feature_enabled() {
+  source vb-lib-core
+
+  helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
+  if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
+    if ! service_status; then
+      systemctl -q --user enable --now awww
+    fi
+  else
+    return 1
   fi
-else
-  log::error "Go to Vibranium Menu > Settings > Misc > Show wallpaper"
-  exit 1
-fi
+}
 
 case "$1" in
-"")
+"" | -h | --help)
   usage
   exit 0
   ;;
---next | --prev)
-  WALLPAPER_PATH="$(toggle_wallpaper "$1")"
+-g | --get)
+  get_wallpaper
+  exit 0
   ;;
-*.png | *.jpg | *.jpeg | *.webp)
-  CUSTOM=true
+--next | --prev)
+  if ! feature_enabled; then
+    echo "Error: this feature is disabled." >&2
+    echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
+    exit 1
+  fi
+
+  WALLPAPER_PATH="$(cycle_wallpaper "$1")"
+  ;;
+*.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.gif | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
+  if ! feature_enabled; then
+    echo "Error: this feature is disabled." >&2
+    echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
+    exit 1
+  fi
+
   WALLPAPER_PATH="$(realpath "$1")"
 
   if [[ ! -f "$WALLPAPER_PATH" ]]; then
-    log::error "$WALLPAPER_PATH doesn't exist!"
+    log::error "${YELLOW}${WALLPAPER_PATH}${RESET} doesn't exist!"
     exit 1
   fi
+
+  if [[ $1 == *.gif && ! -f "$UWALLS/${1##*/}" ]]; then
+    notify-send -r 3 -t 6000 "Vibranium - Wallpapers" "GIF images might take a while to load. Please wait."
+  fi
+
+  copy_uwall
   ;;
-*)
-  usage
+-*)
+  echo "Error: unknown flag option: ${1}." >&2
+  echo "Try ${0##*/} --help for more information." >&2
   exit 1
   ;;
 esac
 
-if [[ -z "$WALLPAPER_PATH" ]]; then
-  exit 0
-fi
-
-awww img -t fade --transition-duration 0.5 --transition-step 255 --transition-fps 144 --transition-bezier 0.0,0.0,1.0,1.0 "$WALLPAPER_PATH"
+awww img -t fade --transition-duration 0.5 --transition-step 255 "$WALLPAPER_PATH" &
 ln -sf "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/background"
 
-# Update state file
+# Update the state file
 printf "%s" "$WALLPAPER_PATH" >"$STATE_FILE"
-
-# In case if user set new wallpaper via thunar context menu
-# (e,g. user's own picture, downloaded from the internet) we
-# should copy this file to the folder that contains user wallpapers
-# only. Why copy? In case if original file gets deleted
-if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
-
-  mkdir -p "$USER_WALLPAPERS"
-
-  if [[ ! -f "$USER_WALLPAPERS/${WALLPAPER_PATH##*/}" ]]; then
-    cp "$WALLPAPER_PATH" "$USER_WALLPAPERS/"
-    # Also copy to the active theme folder so
-    # we don't have to toggle theme to make it available
-    # when using --next flag (CTRL ALT + W)
-    cp "$WALLPAPER_PATH" "$WALLS"
-    WALLPAPER_PATH="$USER_WALLPAPERS/${WALLPAPER_PATH##*/}"
-  fi
-fi

@@ -1,9 +1,15 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 HISTORY="$VIBRANIUM_CACHE/color-picker.history"
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 usage() {
-  cat << EOF
+  shcat <<EOF
 Usage: ${0##*/} [OPTION]
 
 Simple color picker for Vibranium.
@@ -14,38 +20,34 @@ Options:
 EOF
 }
 
-clear_history() {
-  : > "$HISTORY"
-  vb-cmd-refresh-bar-module color-picker &
-}
-
 check_deps() {
-  if ! command -v hyprpicker > /dev/null; then
-    echo "[ERROR] missing required dependencies: hyprpicker" >&2
+  if ! command -v hyprpicker >/dev/null; then
+    echo "Error: missing required dependencies: hyprpicker" >&2
     vb-cmd-dep-notify --name "Color Picker" --deps "hyprpicker"
     return 1
   fi
 }
 
 case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -c | --clear)
-    check_deps || exit 1
-    clear_history
-    exit 0
-    ;;
-  "")
-    check_deps || exit 1
-    :
-    ;;
-  *)
-    echo -e "Unknown option: $@\n" >&2
-    usage
-    exit 1
-    ;;
+-h | --help)
+  usage
+  exit 0
+  ;;
+-c | --clear)
+  : >"$HISTORY"
+  vb-cmd-refresh-bar-module \
+    color-picker &
+  exit 0
+  ;;
+"")
+  check_deps || exit 1
+  :
+  ;;
+*)
+  echo -e "Unknown option: $@\n" >&2
+  usage
+  exit 1
+  ;;
 esac
 
 source vb-lib-core
@@ -85,19 +87,19 @@ selected_color=$(hyprpicker -a -b -l -r -f hex "${opt_args[@]}" | grep -v '^\[ER
 
 # Read the cache file and update it if the selected color is not
 # a duplicate of one already existing in the cache file.
-if ! grep -Fxq "$selected_color" "$HISTORY" 2> /dev/null; then
+if ! grep -Fxq "$selected_color" "$HISTORY" 2>/dev/null; then
   # Wipe file if reached limit
-  if [[ "$(wc -l < "$HISTORY" 2> /dev/null)" -ge $hist_size ]]; then
-    echo "$selected_color" > "$HISTORY"
+  if [[ "$(wc -l <"$HISTORY" 2>/dev/null)" -ge $hist_size ]]; then
+    echo "$selected_color" >"$HISTORY"
   else
-    echo "$selected_color" >> "$HISTORY"
+    echo "$selected_color" >>"$HISTORY"
   fi
 fi
 
 # Generate a 1:1px image of the selected color to display in the notification
 if [[ $show_selected == true ]]; then
   preview_img="/tmp/latest_color.png"
-  if command -v magick > /dev/null; then
+  if command -v magick >/dev/null; then
     magick -size 1x1 xc:"${selected_color}" "$preview_img"
   else
     log::warn "ImageMagick is not installed!"

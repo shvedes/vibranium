@@ -1,14 +1,20 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 # Toggle a persistent systemd-inhibit to prevent idle suspend.
 # If an inhibitor is already running, stops it; otherwise starts a new one.
 # Refreshes the Vibranium Waybar inhibitor module after action.
 
-source vb-lib-core
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 _usage() {
-  cat <<EOF
-Usage: ${0##*/} [OPTION]
+  shcat <<EOF
+Usage: $SELF [OPTION]
 
 Toggle systemd idle inhibitor.
 
@@ -23,20 +29,19 @@ case "${1:-}" in
   exit 0
   ;;
 -*)
-  echo "Error: uknown option: $1" >&2
-  echo "Try ${0##*/} --help" >&2
+  echo "Error: unknown option: $1" >&2
+  echo "Try '$SELF --help' for more information" >&2
   exit 1
   ;;
 esac
 
-helpers::check VIBRANIUM_GLOBAL_INHIBIT_TYPE
-TYPE="$VIBRANIUM_GLOBAL_INHIBIT_TYPE"
+TYPE="$(vb-cmd-get-option VIBRANIUM_GLOBAL_INHIBIT_TYPE)"
 UNIT="vibranium-inhibit@$TYPE"
 
 if systemctl -q --user is-active $UNIT; then
-  systemctl -q --user stop $UNIT
+  systemctl -q --user stop $UNIT &
 else
-  systemctl -q --user start $UNIT
+  systemctl -q --user start $UNIT &
 fi
 
-vb-cmd-refresh-bar-module inhibitor
+vb-cmd-refresh-bar-module inhibitor &

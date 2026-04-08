@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 if ! command -v syncthing >/dev/null; then
   if [[ ! -t 1 ]]; then

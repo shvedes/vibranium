@@ -1,10 +1,16 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
-source vb-lib-core
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat << EOF
-Usage: ${0##*/} OPTION_NAME
+  shcat <<EOF
+Usage: $SELF OPTION_NAME
 
 Print the value of the specified Vibranium option.
 
@@ -14,20 +20,21 @@ EOF
 }
 
 case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  "")
-    echo "${0##*/}: missing OPTION_NAME" >&2
-    echo "Try '${0##*/} --help' for more information." >&2
-    exit 1
-    ;;
+-h | --help)
+  usage
+  exit 0
+  ;;
+"")
+  echo "Error: missing OPTION_NAME" >&2
+  echo "Try '$SELF --help' for more information." >&2
+  exit 1
+  ;;
 esac
 
-helpers::check "$1" &> /dev/null
+source vb-lib-core
+
+helpers::check "$1"
 
 if [[ -n "${!1+x}" ]]; then
   printf '%s\n' "${!1}"
-  exit 0
 fi

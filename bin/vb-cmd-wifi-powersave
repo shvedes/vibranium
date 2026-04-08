@@ -1,9 +1,23 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat <<EOF
-Usage: ${0##*/} [--on|--off|--get]
+  shcat <<EOF
+Usage: $SELF [--on|--off|--get]
+
 Toggle Wi-Fi power saving on all wireless interfaces.
+
+Note: this script is being used by a udev rule, which is
+      is installed on a portable devices by default.
+      This script is not intended to be launched by a
+      regular user, but you can. Requires sudo privileges.
 
 Options:
   --on      enable power saving
@@ -14,25 +28,26 @@ EOF
 }
 
 case "${1:-}" in
-  --on|--off)
-    # strip leading '--'
-    value="${1#--}"
-    ;;
-  --get)
-    value="get"
-    ;;
-  --help)
-    usage
-    exit 0
-    ;;
-  "")
-    usage >&2
-    exit 1
-    ;;
-  *)
-    echo "unrecognized option '$1' -- try --on, --off, or --get" >&2
-    exit 1
-    ;;
+--on | --off)
+  # strip leading '--'
+  value="${1#--}"
+  ;;
+--get)
+  value="get"
+  ;;
+--help)
+  usage
+  exit 0
+  ;;
+"")
+  usage >&2
+  exit 1
+  ;;
+*)
+  echo "Error: unknown option: $1" >&2
+  echo "Try '$SELF --help' for more information" >&2
+  exit 1
+  ;;
 esac
 
 found=0
@@ -45,7 +60,7 @@ while IFS= read -r iface; do
     }
     printf "  %-12s %s\n" "$iface:" "$state"
   else
-    if (( EUID != 0 )); then
+    if ((EUID != 0)); then
       # Launched by user, not by the udev rule
       if sudo iw dev "$iface" set power_save "$value" 2>/dev/null; then
         found=$((found + 1))
@@ -59,8 +74,7 @@ while IFS= read -r iface; do
   found=$((found + 1))
 done < <(iw dev | awk '/^\s+Interface / { print $2 }')
 
-if (( found == 0 )); then
+if ((found == 0)); then
   echo "no wireless interfaces found" >&2
   exit 1
 fi
-

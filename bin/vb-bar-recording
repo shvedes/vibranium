@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 if pidof -q gpu-screen-recorder; then
   printf '{"text": "%s", "tooltip": "%s"}' \

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 CHROME_FOLDER="/etc/chromium/policies/managed"
 CHROME_COLORS="$CHROME_FOLDER/color.json"

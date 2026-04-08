@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 # shellcheck disable=SC2086
 # Overcomplicated launcher based on rofi, which can:
@@ -44,19 +44,16 @@ process_input() {
   case "$input" in
   "file://"*)
     # Open in default app (media viewer, text editor, whatever)
-    log::info "Input is a local file. Opening in default app"
     input="${input#file://}"
     app2unit-open "$input" &>/dev/null &
     ;;
   "https://"*)
     # Open in default browser
-    log::info "Input is a link. Opening in default browser"
     app2unit-open "$input" &>/dev/null &
     ;;
   "DBus launch")
     # org.telegram.desktop.desktop for example
     # Let DBus do its thing
-    log::info "Input is a DBus service"
     exit 0
     ;;
   *)
@@ -64,19 +61,14 @@ process_input() {
     local args="${input#"$cmd"}"
 
     if [[ -x "$cmd" ]] || command -v "$cmd" >/dev/null 2>&1; then
-      log::info "Input ${YELLOW}is${RESET} an executable. Executing with args"
       app2unit "$cmd" $args
     elif [[ -e "$input" ]]; then
-      log::info "Input ${YELLOW}is${RESET} a file. Opening using ${YELLOW}xdg-open${RESET}"
       app2unit-open "$input" &>/dev/null &
     else
       if [[ "$LAUNCHER_MODE" == "default" ]]; then
         [[ "$auto_select" = true ]] && {
-          log::info "Auto select enabled. Ignoring web search"
           exit 1
         }
-        log::info "Input ${YELLOW}is${RESET} a web search query"
-        log::info "Searching ${YELLOW}$input${RESET} on ${BLUE}${search_engine^}${RESET}"
         app2unit-open "$(search_engine)${input}" &>/dev/null &
       fi
     fi

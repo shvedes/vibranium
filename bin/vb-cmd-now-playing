@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 # This script displays the currently playing track from either a Playerctl-compatible
 # media player or MPD (Music Player Daemon). It can:
@@ -10,44 +10,51 @@
 # using Pango markup for notifications or lockscreen display, and cleans up temporary
 # album art files afterward.
 
-progname=${0##*/}
+SELF=${0##*/}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat <<EOF
-Usage: $progname [OPTION]
+  shcat <<EOF
+Usage: $SELF [OPTION]
 
 Display information about the currently playing track.
 
 Options:
   --hyprlock    Format the output for the Hyprland lock screen
-  --help        Display this help and exit
+  -h, --help    Display this help and exit
 EOF
-  exit 0
 }
 
-TEMP=$(getopt -o '' --long hyprlock,help -- "$@")
-if [ $? != 0 ]; then usage; fi
-eval set -- "$TEMP"
-
 hyprlock=false
-while true; do
+
+while (($#)); do
   case "$1" in
   --hyprlock)
     hyprlock=true
-    shift
     ;;
-  --help) usage ;;
-  --)
-    shift
+  -h | --help)
+    usage
+    exit
+    ;;
+  -*)
+    echo "Error: unknown option: $1" >&2
+    exit 1
+    ;;
+  *)
     break
     ;;
-  *) break ;;
   esac
+  shift
 done
 
 source vb-lib-core
 
-album_art="/tmp/${0##*/}.art"
+album_art="/tmp/$SELF.album-art"
 state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
 
 pc_status="$(playerctl status 2>/dev/null || true)"
@@ -59,23 +66,20 @@ fi
 if [[ "$pc_status" == "Playing" ]]; then
   player="playerctl"
   echo "$player" >"$state_file"
-  IFS='^' read -r title artist <<< \
-    "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
-elif [[ "$mpd_status" == *"[playing]"* ]]; then
+  IFS='^' read -r title artist <<<"$(playerctl metadata --format '{{title}}^{{artist}}')"
+elif [[ -n "$mpd_status" && "$mpd_status" == *"[playing]"* ]]; then
   player="mpd"
   echo "$player" >"$state_file"
-  IFS='^' read -r title artist <<< \
-    "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
+  IFS='^' read -r title artist <<<"$(mpc current -f '%title%^%artist%')"
 elif [[ -f "$state_file" ]]; then
   player="$(<"$state_file")"
   case "$player" in
   playerctl)
     IFS='^' read -r title artist <<< \
-      "$(playerctl metadata --format '{{title}}^{{artist}}' 2>/dev/null)"
+      "$(playerctl metadata --format '{{title}}^{{artist}}')"
     ;;
   mpd)
-    IFS='^' read -r title artist <<< \
-      "$(mpc current -f '%title%^%artist%' 2>/dev/null)"
+    IFS='^' read -r title artist <<<"$(mpc current -f '%title%^%artist%')"
     ;;
   esac
 else
@@ -86,15 +90,16 @@ fi
 # If $artist & (or) $title does not exist
 if [[ -z "$title" ]]; then
   if [[ "$player" == "playerctl" ]]; then
-    url="$(playerctl metadata --format '{{xesam:url}}' 2>/dev/null)"
+    url="$(playerctl metadata --format '{{xesam:url}}')"
     if [[ "$url" =~ ^file:// ]]; then
       filename="${url#file://}"
       filename="${filename##*/}"
     else
-      filename="${url##*/}" # Fallback for non-file URLs, e.g., spotify:track:id
+      # Fallback for non-file URLs, e.g., spotify:track:id
+      filename="${url##*/}"
     fi
   else
-    filename="$(mpc current -f "%file%" 2>/dev/null)"
+    filename="$(mpc current -f '%file%')"
   fi
   if [[ -z "$filename" ]]; then
     filename="Unknown track"
@@ -121,8 +126,8 @@ if [[ "$hyprlock" == true ]]; then
 
   if [[ "$show_on_lockscreen" == true ]]; then
     printf "<span size='20000' foreground='%s' rise='-3.5pt'><b>󰝚</b></span> %s" "$P_ACCENT" "$pango_output"
+    exit 0
   fi
-  exit 0
 else
   echo "$plain_output"
 fi

@@ -1,16 +1,21 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 if [[ $CHASSIS_TYPE == vm ]]; then
   echo "Error: screen recording isn't available in a VM!" >&2
   exit 1
 fi
 
-source vb-lib-core
+SELF="${0##*/}"
+LOG_FILE="$VIBRANIUM_CACHE/$SELF.log"
 
-LOG_FILE="$VIBRANIUM_CACHE/${0##*/}.log"
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat <<EOF
+  shcat <<EOF
 Usage: ${0##*/} [OPTION]
 
 Options:
@@ -27,8 +32,7 @@ get_output_dir() {
 }
 
 output_file() {
-  printf "%s/recording-%s.%s" \
-    "$(get_output_dir)" \
+  printf "%s/recording-%s.%s" "$(get_output_dir)" \
     "$(date +"%Y-%m-%d_%H-%M-%S")" "$EXT"
 }
 
@@ -225,46 +229,64 @@ start_rec() {
   log::info "recording started in fallback mode"
 }
 
-if pid="$(pidof gpu-screen-recorder)"; then
-  log::info "recording saved"
-  visualize
-  kill $pid
+ensure_deps() {
+  local missing=()
 
-  if [ -f "$VIBRANIUM_CACHE/fallback_mode" ]; then
-    fallback_notification
-    rm "$VIBRANIUM_CACHE/fallback_mode"
-  else
-    # Do not show "Recording saved" when ran in fallback
-    notify-send -r 3 "Screen Recorder" "Recording saved"
+  for pkg in gpu-screen-recorder jq; do
+    if ! command -v $pkg >/dev/null; then
+      missing+=($pkg)
+    fi
+  done
+
+  if ((${#missing[@]} == 0)); then
+    return
   fi
 
-  # Wait for the pid
-  sleep 0.1
-
-  vb-cmd-refresh-bar-module recording-indicator
-  copy
-  exit 0
-fi
-
-if ! missing="$(vb-cmd-is-present gpu-screen-recorder jq)"; then
-  log::error "missing required dependencies: $missing"
-
-  if term::is_headless; then
-    vb-cmd-dep-notify \
-      --name "Screen Recording" \
-      --deps "$missing"
-  fi
+  vb-cmd-dep-notify \
+    --name "Screen Recording" \
+    --deps "${missing[*]}"
   exit 1
-fi
+}
+
+stop_rec() {
+  source vb-lib-core
+
+  if pid="$(pidof gpu-screen-recorder)"; then
+    visualize
+    kill $pid
+
+    if [ -f "$VIBRANIUM_CACHE/fallback_mode" ]; then
+      fallback_notification
+      rm "$VIBRANIUM_CACHE/fallback_mode"
+    else
+      # Do not show "Recording saved" when ran in fallback
+      notify-send -r 3 "Screen Recorder" "Recording saved"
+    fi
+
+    # Wait for the pid
+    sleep 0.1
+
+    vb-cmd-refresh-bar-module recording-indicator
+    copy
+    exit 0
+  else
+    echo "No active GSR instance found" >&2
+    exit 1
+  fi
+}
 
 case "$1" in
 --region | --screen | --portal)
   AREA="$(set_rec_area "$1")"
+  source vb-lib-core
   start_rec
   ;;
--h | --help | "")
+-h | --help)
   usage
   exit 0
+  ;;
+"")
+  stop_rec
   ;;
 *)
   usage

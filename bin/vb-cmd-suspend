@@ -1,18 +1,52 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
-killall rofi
+SELF="${0##*/}"
 
-loginctl lock-session
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
-animations_enabled="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
-if [[ $animations_enabled == 1 ]]; then
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTION]...
+
+Lock the session and suspend the system.
+Handle Hyprland animation transitions.
+
+Options:
+  -h, --help     display this help and exit
+EOF
+}
+
+case "${1-}" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+"")
+  :
+  ;;
+*)
+  echo "Error: unknown option: $1" >&2
+  echo "Try '$SELF --help' for more information." >&2
+  exit 1
+  ;;
+esac
+
+vb-cmd-lock-session
+
+ANIMATIONS_ENABLED="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
+
+if ((ANIMATIONS_ENABLED == 1)); then
   hyprctl -q hyprsunset gamma 0
   sleep 1
 fi
 
 systemctl suspend
 
-if [[ $animations_enabled == 1 ]]; then
+if ((ANIMATIONS_ENABLED == 1)); then
   sleep 1
   hyprctl -q hyprsunset gamma 100
 fi

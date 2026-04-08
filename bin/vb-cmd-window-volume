@@ -1,10 +1,8 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 STEP="5"
 ACTION=""
 SELF="${0##*/}"
-
-source vb-lib-core
 
 # Shoutout to https://github.com/Vladimir-csp
 # for this neat solution.
@@ -43,11 +41,11 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   -u | -d | -t)
-    ACTION="${1/-/}"
+    ACTION="${1#-}"
     shift
     ;;
   --up | --down | --toggle)
-    ACTION="${1/--/}"
+    ACTION="${1#--}"
     shift
     ;;
   *)
@@ -160,16 +158,6 @@ if [[ ${#SINK_DATA[@]} -eq 0 ]]; then
   exit 0
 fi
 
-helpers::check VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
-APPLY_BOOST="$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED"
-
-# max_vol_pct drives both the step clamping and the progress bar scale
-if [[ "$APPLY_BOOST" == true ]]; then
-  max_vol_pct=150
-else
-  max_vol_pct=100
-fi
-
 # track the first matched stream's resulting state for the notification;
 # computed here rather than re-queried via wpctl get-volume after the fact
 first_new_vol=""
@@ -181,7 +169,7 @@ for SINK_ENTRY in "${SINK_DATA[@]}"; do
   case "$ACTION" in
   up)
     new_vol=$((sink_vol + STEP))
-    ((new_vol > max_vol_pct)) && new_vol=$max_vol_pct
+    ((new_vol > 100)) && new_vol=$max_vol_pct
     pactl set-sink-input-volume "$sink_id" "${new_vol}%"
     new_muted="$sink_muted"
     ;;
@@ -208,8 +196,8 @@ done
 
 # scale current volume into 0-100 relative to max_vol_pct so the bar
 # stays proportional when the above-100% boost is enabled
-bar_value=$((first_new_vol * 100 / max_vol_pct))
-icons_folder="/usr/share/icons/Papirus/24x24/symbolic/status"
+bar_value=$((first_new_vol * 100 / 100))
+icons_folder="/usr/share/icons/Papirus/16x16/symbolic/status"
 
 if [[ "$first_new_muted" == "yes" ]]; then
   notify-send -r 2 -i "$icons_folder/audio-volume-muted-symbolic.svg" -t 1000 "$WINDOW_TITLE Muted"

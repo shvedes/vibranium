@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 SELF="${0##*/}"
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"

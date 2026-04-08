@@ -1,7 +1,13 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat << EOF
+  shcat <<EOF
 Usage: ${0##*/} [OPTION]...
 
 Toggle reading mode in Hyprland by toggling a screen shader.
@@ -26,14 +32,14 @@ if [[ "$1" =~ ^(-h|--help)$ ]]; then
   exit 0
 fi
 
-shader="$VIBRANIUM/default/hypr/shaders/grayscale.glsl"
-config="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+SHADER="$VIBRANIUM/default/hypr/shaders/grayscale.glsl"
+CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
 
 if _grayscale_enabled; then
   rm -f "$config"
 else
-  echo "decoration:screen_shader = $shader" > "$config"
+  echo "decoration:screen_shader = $SHADER" >"$CONFIG"
 fi
 
 hyprctl -q reload config-only &
-vb-cmd-refresh-bar-module reading-mode
+vb-cmd-refresh-bar-module reading-mode &

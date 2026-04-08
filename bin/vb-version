@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 TAG=$(git -C "$VIBRANIUM" describe --tags --abbrev=0 2> /dev/null)
 HEAD=$(git -C "$VIBRANIUM" rev-parse --short HEAD)

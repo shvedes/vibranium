@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 STATE_THEME="$VIBRANIUM_STATE/cursor-theme"
 STATE_SIZE="$VIBRANIUM_STATE/cursor-size"

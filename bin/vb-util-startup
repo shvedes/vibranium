@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 LOGFILE="$VIBRANIUM_CACHE/${0##*/}.errors"
 
@@ -92,8 +92,9 @@ fi
 
 _toggle_loopback &
 
-if [[ ! -f "$VIBRANIUM_STATE/wallpaper/$(vb-theme-get)" ]]; then
-  vb-cmd-get-wallpaper >"$wallpaper_file"
+CURRENT_THEME="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+if [[ ! -f "$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME" ]]; then
+  vb-core-wallpaper --get >"$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME"
 fi
 
 helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER

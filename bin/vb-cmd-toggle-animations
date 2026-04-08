@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 # Toggle Hyprland animations on/off.
 # Ensures the config block exists, reads the current state, flips it, reloads config,
@@ -7,52 +7,47 @@
 CONF="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.conf"
 HYPRLOCK_CONF="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 
-usage() {
-  cat << EOF
-Usage: ${0##*/} [--quiet] [--help]
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
-Toggle Hyprland animations on/off.
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [--help]
+
+Toggle Hyprland animations on/off
 
 Options:
-  --quiet     Do not print 'enabled' or 'disabled'.
   -h, --help  Show this help and exit
 EOF
 }
 
-QUIET=false
-
-# CLI parsing
-for arg in "$@"; do
-  case "$arg" in
-    --quiet) QUIET=true ;;
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    *) ;;
-  esac
-done
-
-# Ensure animations block exists
-if ! grep -qE '^[[:space:]]*animations[[:space:]]*{' "$CONF" 2> /dev/null; then
-  VALUE=$(hyprctl -j getoption animations:enabled | jq -r '.set')
-  printf "\n\nanimations {\n\tenabled = %s\n}" "$VALUE" >> "$CONF"
-fi
-
-# Read current state from config
-ANIMATIONS_ENABLED="$(sed -n '/animations[[:space:]]*{/,/}/{s/.*enabled[[:space:]]*=[[:space:]]*\([^;]*\).*/\1/p}' "$CONF")"
-
-# Toggle
-case "$ANIMATIONS_ENABLED" in
-  true)
-    sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1false/}' "$CONF" "$HYPRLOCK_CONF"
-    [[ "$QUIET" = false ]] && echo "disabled"
-    ;;
-  false)
-    sed -i '/animations[[:space:]]*{/,/}/{s/\(enabled[[:space:]]*=[[:space:]]*\).*/\1true/}' "$CONF" "$HYPRLOCK_CONF"
-    [[ "$QUIET" = false ]] && echo "enabled"
-    ;;
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+"")
+  :
+  ;;
+*)
+  echo "Error: unknown option: $1" >&2
+  echo "Try '${0##*/} --help' for more information" >&2
+  exit 1
+  ;;
 esac
 
-# Reload config asynchronously
+# Ensure animations block exists
+if ! vb-cmd-edit-wm-config --get animations:enabled "$CONF" >/dev/null; then
+  VALUE=$(hyprctl -j getoption animations:enabled | jq -r '.set')
+  vb-cmd-edit-wm-config animations:enabled:$VALUE "$CONF"
+fi
+
+case "$(vb-cmd-edit-wm-config --get animations:enabled "$CONF")" in
+true) vb-cmd-edit-wm-config 'animations:enabled:false' "$CONF" ;;
+false) vb-cmd-edit-wm-config 'animations:enabled:true' "$CONF" ;;
+esac
+
 hyprctl -q reload config-only &

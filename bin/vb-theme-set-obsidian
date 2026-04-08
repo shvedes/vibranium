@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 VB_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/theme"
 OBSIDIAN_CFG="$XDG_CONFIG_HOME/obsidian/obsidian.json"

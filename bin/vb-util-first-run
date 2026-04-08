@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 WORKER="$VIBRANIUM_RUNTIME/worker.active"
 FIRSTBOOT_HOOKS="$VIBRANIUM/install/first-run"

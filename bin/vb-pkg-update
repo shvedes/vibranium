@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 _usage() {
   cat <<EOF
@@ -123,7 +123,7 @@ while (($# > 0)); do
 done
 
 if [[ $NO_LOGO == false ]]; then
-  printf "\n%s%s%s\n\n" "$YELLOW" "$(<"$VIBRANIUM/logo.txt")" "$RESET"
+  term::show_header
 fi
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"

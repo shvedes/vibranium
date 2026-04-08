@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 source vb-lib-core
 
@@ -9,11 +9,11 @@ if ! [[ $VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE == true ]]; then
   exit 0
 fi
 
-current="$(vb-cmd-get-power)"
+current="$(vb-core-power --get)"
 case "$current" in
-  "power-saver") icon='\uf06c' ;;
-  "balanced") icon='' ;;
-  "performance") icon='\uf0e7' ;;
+"power-saver") icon='\uf06c' ;;
+"balanced") icon='' ;;
+"performance") icon='\uf0e7' ;;
 esac
 
 printf '{"text": "%s", "tooltip": "%s"}' "$icon" "Power profile: $current"

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
   echo "Not available in a VM" >&2

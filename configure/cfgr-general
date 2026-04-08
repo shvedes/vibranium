@@ -8,16 +8,16 @@ source vb-lib-cfgr
 _toggle_osd_service() {
   # Since we're working with outdated value, flip the logic
   if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-    systemctl -q --user disable --now swayosd
+    systemctl -q --user disable --now swayosd &
   else
-    systemctl -q --user enable --now swayosd
+    systemctl -q --user enable --now swayosd &
   fi
 }
 
 _set_update_channel() {
   local chosen
   chosen="$(cfgr::set_string \
-    --title  "Update Channel" \
+    --title "Update Channel" \
     --option "Release:release" "Upstream:upstream" "Dev:dev")"
   vb-dev-switch-channel "$chosen"
 }
@@ -27,7 +27,7 @@ _get_update_channel() {
   state="$VIBRANIUM_STATE/update.channel"
 
   if [[ -f "$state" ]]; then
-    channel="$(< "$state")"
+    channel="$(<"$state")"
     printf "%s" "$channel"
   else
     local branch="$(git -C "$VIBRANIUM" branch --show-current)"
@@ -38,11 +38,11 @@ _get_update_channel() {
 _confirm_kill_menu() {
   _build_ckm() {
     cfgr::item::bool \
-      --var   VIBRANIUM_GLOBAL_CONFIRM_TO_KILL \
+      --var VIBRANIUM_GLOBAL_CONFIRM_TO_KILL \
       --label "Confirm kill"
 
     cfgr::item::action \
-      --func  "vb-cmd-show-help confirm-kill" \
+      --func "vb-cmd-show-help confirm-kill" \
       --label "Help"
   }
 
@@ -55,19 +55,19 @@ _build() {
   local ck="$VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
 
   cfgr::item::bool \
-    --var   VIBRANIUM_GLOBAL_USE_OSD \
+    --var VIBRANIUM_GLOBAL_USE_OSD \
     --label "OSD enabled" \
     --hook "_toggle_osd_service"
 
-  cfgr::item::raw "Confirm kill : $ck"         "action:_confirm_kill_menu"
+  cfgr::item::raw "Confirm kill : $ck" "action:_confirm_kill_menu"
   cfgr::item::raw "Update channel : $(_get_update_channel)" "action:_set_update_channel"
 
   cfgr::item::action \
-    --func  "cfgr-launcher" \
+    --func "cfgr-launcher" \
     --label "App launcher"
 
   cfgr::item::action \
-    --func  "cfgr-player" \
+    --func "cfgr-player" \
     --label "Mediacontrols"
 }
 

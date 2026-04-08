@@ -1,10 +1,17 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
+SELF="${0##*/}"
 CLIENTS=(ncmpcpp rmpc cmus vimpc)
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 usage() {
-  cat <<EOF
-Usage: ${0##*/} [OPTION]
+  shcat <<EOF
+Usage: $SELF [OPTION]
 
 Detect an installed MPD client.
 If a window exists, focus it. Otherwise launch it.
@@ -21,15 +28,16 @@ case "$1" in
   ;;
 "") ;;
 *)
-  echo "${0##*/}: invalid option '$1'" >&2
-  echo "Try '${0##*/} --help' for more information." >&2
+  echo "Error: invalid option '$1'" >&2
+  echo "Try '$SELF --help' for more information." >&2
   exit 1
   ;;
 esac
 
-command -v mpd >/dev/null 2>&1 || exit 1
-
-CLIENT=""
+if ! command -v mpd >/dev/null; then
+  echo "Error: MPD is not installed" >&2
+  exit 1
+fi
 
 for c in "${CLIENTS[@]}"; do
   if command -v "$c" >/dev/null 2>&1; then
@@ -38,7 +46,9 @@ for c in "${CLIENTS[@]}"; do
   fi
 done
 
-if [[ -z $CLIENT ]]; then
+if [[ ! -n $CLIENT ]]; then
+  echo "Could not find installed MPD client" >&2
+  notify-send -r 4 -t 3000 "Vibranium" "Could not find installed MPD client!"
   exit 1
 fi
 
