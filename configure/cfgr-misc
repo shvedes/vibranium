@@ -389,6 +389,8 @@ _build() {
 
   cfgr::item::raw "Notification timeout : $(_get_notification_timeout)" "action:_set_notification_timeout"
 
+  cfgr::item::bool --var VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK --label "Pause music on lock"
+
   # Allow default terminal selection only when both are installed.
   if command -v alacritty >/dev/null && command -v foot >/dev/null; then
     cfgr::item::string \
@@ -423,5 +425,6 @@ _build() {
 }
 
 cfgr::run "Misc" "_build" \
+  VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK \
   VIBRANIUM_GLOBAL_SHOW_WALLPAPER \
   VIBRANIUM_GLOBAL_TERMINAL

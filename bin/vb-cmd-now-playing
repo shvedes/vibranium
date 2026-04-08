@@ -3,9 +3,8 @@
 # This script displays the currently playing track from either a Playerctl-compatible
 # media player or MPD (Music Player Daemon). It can:
 # 1. Output the track title and artist to the terminal.
-# 2. Format the output for the Hyprland lock screen if run with --hyprlock.
-# 3. Optionally download and show the album art if enabled in Vibranium settings.
-# 4. Send a desktop notification with the track information and album art.
+# 2. Optionally download and show the album art if enabled in Vibranium settings.
+# 3. Send a desktop notification with the track information and album art.
 # The script checks which player is currently active, retrieves metadata, formats it
 # using Pango markup for notifications or lockscreen display, and cleans up temporary
 # album art files afterward.
@@ -25,18 +24,12 @@ Usage: $SELF [OPTION]
 Display information about the currently playing track.
 
 Options:
-  --hyprlock    Format the output for the Hyprland lock screen
   -h, --help    Display this help and exit
 EOF
 }
 
-hyprlock=false
-
 while (($#)); do
   case "$1" in
-  --hyprlock)
-    hyprlock=true
-    ;;
   -h | --help)
     usage
     exit
@@ -119,18 +112,7 @@ else
   fi
 fi
 
-# Build pango formatted message for the lock screen.
-if [[ "$hyprlock" == true ]]; then
-  helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN
-  show_on_lockscreen="$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN"
-
-  if [[ "$show_on_lockscreen" == true ]]; then
-    printf "<span size='20000' foreground='%s' rise='-3.5pt'><b>󰝚</b></span> %s" "$P_ACCENT" "$pango_output"
-    exit 0
-  fi
-else
-  echo "$plain_output"
-fi
+echo "$plain_output"
 
 # Reminder:
 # When this option is set to true and a web-based player is used (e.g., Spotify),

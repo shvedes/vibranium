@@ -82,11 +82,6 @@ VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK=true
 VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING=false
 
 # @type bool
-# @desc Whether to show currently playing
-# @desc (or paused) track on the lockscreen.
-VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING_LOCKSCREEN=true
-
-# @type bool
 # @desc Whether to include album art into notification.
 # @note In case of web-based player (e.g. Spotify) the art will be downloaded from
 # @note the web, which will take some time (it is highly depends on your network speed).
