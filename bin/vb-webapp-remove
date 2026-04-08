@@ -132,8 +132,6 @@ TARGET_NAMES=()
 TARGET_PATHS=()
 
 if [[ $INTERACTIVE == true ]]; then
-  term::show_header
-
   declare -A PWA_MAP
   while IFS= read -r -d '' file; do
     if grep -q '^Exec=.*vb-webapp-launch.*' "$file"; then
@@ -147,6 +145,8 @@ if [[ $INTERACTIVE == true ]]; then
     _operation_canceled
     exit 1
   fi
+
+  term::show_header
 
   mapfile -t SELECTED < <(printf '%s\n' "${!PWA_MAP[@]}" | sort | fzf "${FZF_ARGS[@]}")
 
