@@ -1,45 +1,28 @@
 #!/usr/bin/env bash
 
-lockfile="$VIBRANIUM_RUNTIME/${0##*/}.lock"
+SELF="${0##*/}"
+LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 
-exec 9> "$lockfile" || {
-  echo "error: anoter instance of ${0##*/} is already running!" >&2
+exec 9>"$LOCKFILE" || {
+  echo "Error: anoter instance of $SELF is already running!" >&2
   exit 1
 }
 
 flock -n 9 || exit 0
 
-source vb-lib-core
+VOLUME_FILE="$VIBRANIUM_RUNTIME/$SELF.volume"
+PLAYER_CACHE_FILE="$VIBRANIUM_RUNTIME/$SELF.player"
+SLEEP_TIME=0.005
 
-helpers::check VIBRANIUM_PLAYER_FADE_DURATION
-helpers::check VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH
-
-VOLUME_FILE="$VIBRANIUM_RUNTIME/${0##*/}.volume"
-PLAYER_CACHE_FILE="$VIBRANIUM_RUNTIME/${0##*/}.player"
-SLEEP_TIME=0.005 # Adjust this for overall speed; smaller = faster loops, but may strain CPU
-
-# Map fade durations to number of steps (higher steps = slower fade, longer duration)
-case "$VIBRANIUM_PLAYER_FADE_DURATION" in
-  "very_slow") NUM_STEPS=200 ;;
-  "slow") NUM_STEPS=100 ;;
-  "normal") NUM_STEPS=50 ;;
-  "fast") NUM_STEPS=30 ;;
-  "very_fast") NUM_STEPS=10 ;;
-  "off") NUM_STEPS="off" ;;
-esac
-
-case "$VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH" in
-  "very_slow") NUM_STEPS_SWITCH=200 ;;
-  "slow") NUM_STEPS_SWITCH=100 ;;
-  "normal") NUM_STEPS_SWITCH=50 ;;
-  "fast") NUM_STEPS_SWITCH=30 ;;
-  "very_fast") NUM_STEPS_SWITCH=10 ;;
-  "off") NUM_STEPS_SWITCH="off" ;;
-esac
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat << EOF
-Usage: ${0##*/}  [OPTION]
+  shcat <<EOF
+Usage: $SELF  [OPTION]
 
 Media control script with smooth volume fade effects for playerctl and MPD.
 
@@ -53,126 +36,199 @@ Options:
 EOF
 }
 
-# Function to check if a player is active and get its status
+set_opts() {
+  source vb-lib-core
+
+  helpers::check \
+    VIBRANIUM_PLAYER_FADE_DURATION \
+    VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH
+
+  # Map fade durations to number of steps (higher steps = slower fade, longer duration)
+  case "$VIBRANIUM_PLAYER_FADE_DURATION" in
+  "very_slow") NUM_STEPS=200 ;;
+  "slow") NUM_STEPS=100 ;;
+  "normal") NUM_STEPS=50 ;;
+  "fast") NUM_STEPS=30 ;;
+  "very_fast") NUM_STEPS=10 ;;
+  "off") NUM_STEPS="off" ;;
+  esac
+
+  case "$VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH" in
+  "very_slow") NUM_STEPS_SWITCH=200 ;;
+  "slow") NUM_STEPS_SWITCH=100 ;;
+  "normal") NUM_STEPS_SWITCH=50 ;;
+  "fast") NUM_STEPS_SWITCH=30 ;;
+  "very_fast") NUM_STEPS_SWITCH=10 ;;
+  "off") NUM_STEPS_SWITCH="off" ;;
+  esac
+}
+
 get_player_status() {
   local player="$1"
-  if [ "$player" = "playerctl" ]; then
-    local stat
-    stat=$(playerctl status 2> /dev/null)
-    if [ "$stat" = "Playing" ] || [ "$stat" = "Paused" ]; then
+
+  case "$player" in
+  playerctl)
+    local stat=$(playerctl status 2>/dev/null)
+
+    case "$stat" in
+    Playing | Paused)
       echo "$stat"
       return 0
-    fi
-  elif [ "$player" = "mpd" ]; then
-    # Do not trigger socket activation
-    # in case if MPD is inactive
-    if ! systemctl -q --user is-active mpd; then
-      return
-    fi
+      ;;
+    esac
+    ;;
+
+  mpd)
+    # Do not trigger socket activation in case if MPD is inactive
+    systemctl -q --user is-active mpd || return
 
     local stat
-    stat=$(mpc status 2> /dev/null | grep -oP '\[\K(playing|paused)')
+    while read -r l; do
+      case $l in
+      *"[playing]"*)
+        stat="playing"
+        break
+        ;;
+      *"[paused]"*)
+        stat="paused"
+        break
+        ;;
+      esac
+    done < <(mpc status 2>/dev/null)
 
-    if [ -n "$stat" ]; then
-      echo "${stat^}" # Capitalize first letter
+    case "$stat" in
+    "")
+      :
+      ;;
+    *)
+      # Capitalize first letter
+      echo "${stat^}"
       return 0
-    fi
-  fi
+      ;;
+    esac
+    ;;
+  esac
+
   return 1
 }
 
-# Detect active player with priority to Playing
-PLAYER=""
-STATUS=""
+# Player detection (only executed when an actual media action is requested)
+detect_active_player() {
+  PLAYER=""
+  STATUS=""
 
-# First, check for Playing players
-if ! command -v mpc > /dev/null; then
-  PLAYER="playerctl"
-else
-  for p in playerctl mpd; do
-    stat=$(get_player_status "$p")
-    if [ $? -eq 0 ] && [ "$stat" = "Playing" ]; then
-      PLAYER="$p"
-      STATUS="$stat"
-      echo "$PLAYER" > "$PLAYER_CACHE_FILE" # Update cache since it's Playing
-      break
-    fi
-  done
-fi
-
-# If no Playing, check cache for Paused
-if [ -z "$PLAYER" ] && [ -f "$PLAYER_CACHE_FILE" ]; then
-  CACHED_PLAYER=$(< "$PLAYER_CACHE_FILE")
-  stat=$(get_player_status "$CACHED_PLAYER")
-  if [ $? -eq 0 ] && [ "$stat" = "Paused" ]; then
-    PLAYER="$CACHED_PLAYER"
-    STATUS="$stat"
+  # First, check for Playing players
+  if ! command -v mpc >/dev/null; then
+    PLAYER="playerctl"
+  else
+    for p in playerctl mpd; do
+      stat=$(get_player_status "$p")
+      if [ $? -eq 0 ] && [ "$stat" = "Playing" ]; then
+        PLAYER="$p"
+        STATUS="$stat"
+        # Update cache since it's Playing
+        echo "$PLAYER" >"$PLAYER_CACHE_FILE"
+        break
+      fi
+    done
   fi
-fi
 
-# If still no player, check for Paused players
-if [ -z "$PLAYER" ]; then
-  for p in playerctl mpd; do
-    stat=$(get_player_status "$p")
+  # If no Playing, check cache for Paused
+  if [ -z "$PLAYER" ] && [ -f "$PLAYER_CACHE_FILE" ]; then
+    CACHED_PLAYER=$(<"$PLAYER_CACHE_FILE")
+    stat=$(get_player_status "$CACHED_PLAYER")
     if [ $? -eq 0 ] && [ "$stat" = "Paused" ]; then
-      PLAYER="$p"
+      PLAYER="$CACHED_PLAYER"
       STATUS="$stat"
-      break
     fi
-  done
-fi
+  fi
 
-# Fallback
-if [ -z "$PLAYER" ]; then
-  PLAYER="playerctl"
-  STATUS=$(get_player_status "playerctl") || STATUS="Stopped"
-fi
+  # If still no player, check for Paused players
+  if [ -z "$PLAYER" ]; then
+    for p in playerctl mpd; do
+      stat=$(get_player_status "$p")
+      if [ $? -eq 0 ] && [ "$stat" = "Paused" ]; then
+        PLAYER="$p"
+        STATUS="$stat"
+        break
+      fi
+    done
+  fi
+
+  # Fallback
+  if [ -z "$PLAYER" ]; then
+    PLAYER="playerctl"
+    STATUS=$(get_player_status "playerctl")
+    if (($! != 0)); then
+      STATUS="Stopped"
+    fi
+  fi
+}
 
 # Player abstraction functions
 # Volumes are handled as floats 0-1 for consistency
 
 get_volume() {
   if [ "$PLAYER" = "playerctl" ]; then
-    playerctl volume 2> /dev/null
+    playerctl volume 2>/dev/null
+
   elif [ "$PLAYER" = "mpd" ]; then
-    mpc volume 2> /dev/null | sed 's/[^0-9]//g' | awk '{print $1 / 100}'
+    # Read output like: "volume: 25%" -> extract "25%"
+    read -r _ vol _ < <(mpc volume 2>/dev/null) || {
+      return
+    }
+
+    # Strip trailing "%" -> "25"
+    vol=${vol%\%}
+
+    # "$((vol))e-2" -> "25e-2" (scientific notation)
+    # printf then converts it to a proper float → "0.25"
+    # Bash itself can't do floating point, but printf can format it
+    printf '%0.2f\n' "$((vol))e-2"
   fi
 }
 
 set_volume() {
   local vol="$1"
-  if [ "$PLAYER" = "playerctl" ]; then
-    playerctl volume "$vol" 2> /dev/null
-  elif [ "$PLAYER" = "mpd" ]; then
+
+  case "$PLAYER" in
+  playerctl)
+    playerctl volume "$vol" 2>/dev/null
+    ;;
+
+  mpd)
     local int_vol
-    int_vol=$(awk "BEGIN {printf \"%.0f\", $vol * 100}")
+
+    # The same trick here
+    printf -v int_vol '%.0f' "${vol}e2"
     mpc -q volume "$int_vol"
-  fi
+    ;;
+  esac
 }
 
 play() {
   if [ "$PLAYER" = "playerctl" ]; then
-    playerctl play 2> /dev/null
+    playerctl play 2>/dev/null
   elif [ "$PLAYER" = "mpd" ]; then
     mpc -q play
   fi
   # Update cache
-  echo "$PLAYER" > "$PLAYER_CACHE_FILE"
+  echo "$PLAYER" >"$PLAYER_CACHE_FILE"
 }
 
 pause() {
   if [ "$PLAYER" = "playerctl" ]; then
-    playerctl pause 2> /dev/null
+    playerctl pause 2>/dev/null
   elif [ "$PLAYER" = "mpd" ]; then
     mpc -q pause
   fi
   # Update cache
-  echo "$PLAYER" > "$PLAYER_CACHE_FILE"
+  echo "$PLAYER" >"$PLAYER_CACHE_FILE"
 }
 
 next_track() {
   if [ "$PLAYER" = "playerctl" ]; then
-    playerctl next 2> /dev/null
+    playerctl next 2>/dev/null
   elif [ "$PLAYER" = "mpd" ]; then
     mpc -q next
   fi
@@ -180,13 +236,12 @@ next_track() {
 
 previous_track() {
   if [ "$PLAYER" = "playerctl" ]; then
-    playerctl previous 2> /dev/null
+    playerctl previous 2>/dev/null
   elif [ "$PLAYER" = "mpd" ]; then
     mpc -q prev
   fi
 }
 
-# Fade out to 0
 fade_out() {
   local num_steps="$1"
   if [ "$num_steps" = "off" ]; then
@@ -195,143 +250,171 @@ fade_out() {
 
   local current
   current=$(get_volume)
-  if awk "BEGIN {exit !($current <= 0)}"; then
+  # Force exactly 2 decimal places (pure bash + builtin printf)
+  current=$(printf '%.2f' "$current")
+
+  # Convert "0.75" -> integer 75 (hundredths)
+  local current_int
+  current_int=$((10#${current//./}))
+
+  if ((current_int <= 0)); then
     return # Already at 0
   fi
 
-  local step
-  step=$(awk "BEGIN {print $current / $num_steps}")
-
   for ((i = 1; i <= num_steps; i++)); do
+    local new_vol_int
+    # Pure integer math: current * (num_steps - i) / num_steps
+    # This is smoother and avoids floating-point rounding drift
+    new_vol_int=$((current_int * (num_steps - i) / num_steps))
+
     local new_vol
-    new_vol=$(awk "BEGIN {print $current - $i * $step}")
+    # Convert back to 0.xx float using the exact same printf trick we used in get_volume
+    new_vol=$(printf '%0.2f' "$((new_vol_int))e-2")
+
     set_volume "$new_vol"
     sleep "$SLEEP_TIME"
   done
   set_volume 0
 }
 
-# Fade in to target
 fade_in() {
   local num_steps="$1"
   local target="$2"
+
   if [ "$num_steps" = "off" ]; then
     set_volume "$target"
     return
   fi
-  if awk "BEGIN {exit !($target <= 0)}"; then
-    return # Target is 0
+
+  # Normalize target to exactly 2 decimals
+  target=$(printf '%.2f' "$target")
+
+  # Convert to integer hundredths
+  local target_int
+  target_int=$((10#${target//./}))
+
+  if ((target_int <= 0)); then
+    # Target is 0
+    return
   fi
-  local step
-  step=$(awk "BEGIN {print $target / $num_steps}")
+
   for ((i = 1; i <= num_steps; i++)); do
+    local new_vol_int
+    new_vol_int=$((target_int * i / num_steps))
+
     local new_vol
-    new_vol=$(awk "BEGIN {print $i * $step}")
+    new_vol=$(printf '%0.2f' "$((new_vol_int))e-2")
+
     set_volume "$new_vol"
     sleep "$SLEEP_TIME"
   done
+
   set_volume "$target"
 }
 
-CURRENT_VOLUME=$(get_volume)
-
 case "$1" in
-  "--toggle")
-    if [ "$STATUS" = "Playing" ]; then
-      if [ "$NUM_STEPS" != "off" ]; then
-        echo "$CURRENT_VOLUME" > "$VOLUME_FILE"
-        fade_out "$NUM_STEPS"
+"--toggle")
+  set_opts
+  detect_active_player
+  CURRENT_VOLUME=$(get_volume)
+  if [ "$STATUS" = "Playing" ]; then
+    if [ "$NUM_STEPS" != "off" ]; then
+      echo "$CURRENT_VOLUME" >"$VOLUME_FILE"
+      fade_out "$NUM_STEPS"
+    fi
+    pause
+    if [ "$NUM_STEPS" != "off" ]; then
+      set_volume "$CURRENT_VOLUME"
+    fi
+  else
+    if [ -f "$VOLUME_FILE" ]; then
+      TARGET_VOLUME=$(<"$VOLUME_FILE")
+      if [ "$NUM_STEPS" = "off" ]; then
+        play
+        rm "$VOLUME_FILE"
+        exit 0
       fi
-      pause
-      if [ "$NUM_STEPS" != "off" ]; then
-        set_volume "$CURRENT_VOLUME"
-      fi
+      set_volume 0
+      play
+      fade_in "$NUM_STEPS" "$TARGET_VOLUME"
+      rm "$VOLUME_FILE"
     else
-      if [ -f "$VOLUME_FILE" ]; then
-        TARGET_VOLUME=$(< "$VOLUME_FILE")
-        if [ "$NUM_STEPS" = "off" ]; then
-          play
-          rm "$VOLUME_FILE"
-          exit 0
-        fi
+      play
+    fi
+  fi
+  ;;
+"--play")
+  set_opts
+  detect_active_player
+  if [ "$STATUS" != "Playing" ]; then
+    if [ -f "$VOLUME_FILE" ]; then
+      TARGET_VOLUME=$(<"$VOLUME_FILE")
+      if [ "$NUM_STEPS" = "off" ]; then
+        play
+        rm "$VOLUME_FILE"
+      else
         set_volume 0
         play
         fade_in "$NUM_STEPS" "$TARGET_VOLUME"
         rm "$VOLUME_FILE"
-      else
-        play
       fi
-    fi
-    ;;
-  "--play")
-    if [ "$STATUS" != "Playing" ]; then
-      if [ -f "$VOLUME_FILE" ]; then
-        TARGET_VOLUME=$(< "$VOLUME_FILE")
-        if [ "$NUM_STEPS" = "off" ]; then
-          play
-          rm "$VOLUME_FILE"
-        else
-          set_volume 0
-          play
-          fade_in "$NUM_STEPS" "$TARGET_VOLUME"
-          rm "$VOLUME_FILE"
-        fi
-      else
-        play
-      fi
-    fi
-    ;;
-  "--pause")
-    if [ "$STATUS" = "Playing" ]; then
-      if [ "$NUM_STEPS" != "off" ]; then
-        echo "$CURRENT_VOLUME" > "$VOLUME_FILE"
-        fade_out "$NUM_STEPS"
-      fi
-      pause
-      if [ "$NUM_STEPS" != "off" ]; then
-        set_volume "$CURRENT_VOLUME"
-      fi
-    fi
-    ;;
-  "--next" | "--previous")
-    if [ "$NUM_STEPS_SWITCH" = "off" ]; then
-      if [ "$1" = "--next" ]; then
-        next_track
-      else
-        previous_track
-      fi
-      exit 0
-    fi
-
-    if [ "$STATUS" = "Paused" ]; then
-      fade_out "$NUM_STEPS"
+    else
       play
+    fi
+  fi
+  ;;
+"--pause")
+  set_opts
+  detect_active_player
+  CURRENT_VOLUME=$(get_volume)
+  if [ "$STATUS" = "Playing" ]; then
+    if [ "$NUM_STEPS" != "off" ]; then
+      echo "$CURRENT_VOLUME" >"$VOLUME_FILE"
       fade_out "$NUM_STEPS"
     fi
-
-    original_volume="$CURRENT_VOLUME"
-    fade_out "$NUM_STEPS_SWITCH"
+    pause
+    if [ "$NUM_STEPS" != "off" ]; then
+      set_volume "$CURRENT_VOLUME"
+    fi
+  fi
+  ;;
+"--next" | "--previous")
+  set_opts
+  detect_active_player
+  CURRENT_VOLUME=$(get_volume)
+  if [ "$NUM_STEPS_SWITCH" = "off" ]; then
     if [ "$1" = "--next" ]; then
       next_track
     else
       previous_track
     fi
-    fade_in "$NUM_STEPS_SWITCH" "$original_volume"
-    ;;
-  "-h" | "--help")
-    usage
     exit 0
-    ;;
-  "")
-    echo -e "Expected OPTION, got nothing\n"
-    usage
-    exit 1
-    ;;
-  *)
-    echo -e "Uknown argument: $@\n"
-    usage
-    exit 1
-    ;;
+  fi
+
+  if [ "$STATUS" = "Paused" ]; then
+    fade_out "$NUM_STEPS"
+    play
+    fade_out "$NUM_STEPS"
+  fi
+
+  original_volume="$CURRENT_VOLUME"
+  fade_out "$NUM_STEPS_SWITCH"
+  if [ "$1" = "--next" ]; then
+    next_track
+  else
+    previous_track
+  fi
+  fade_in "$NUM_STEPS_SWITCH" "$original_volume"
+  ;;
+"-h" | "--help" | "")
+  usage
+  exit 0
+  ;;
+*)
+  echo -e "Uknown argument: $@\n"
+  usage
+  exit 1
+  ;;
 esac
 
 rm -f "$lockfile"
