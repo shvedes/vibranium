@@ -18,3 +18,5 @@ bash build.sh
 if [[ $clean_rust == true ]]; then
   sudo pacman -Rnsc --noconfirm rust &>/dev/null
 fi
+
+cp $VIBRANIUM/config/systemd/user/hyprlock.service ~/.config/systemd/user/
