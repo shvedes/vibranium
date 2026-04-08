@@ -329,18 +329,14 @@ case "$method" in
   fi
   ;;
 "raw")
-  if ! ensure_user_group; then
-    exit 1
-  fi
-
   # When swayosd is active it owns the backlight device — skip raw sysfs
   # calculations entirely and let it apply the change + show the OSD itself.
   # Raw calculations are only needed for the plain notify-send path, or when
   # notifications are disabled.
   if [[ $use_swayosd == true && "$VIBRANIUM_BRIGHTNESS_NOTIFY" != "false" ]]; then
     # Translate action into swayosd's (±)number / absolute syntax:
-    #   --up   → +<step>   e.g. +5
-    #   --down → -<step>   e.g. -5
+    #   --up   -> +<step>   e.g. +5
+    #   --down -> -<step>   e.g. -5
     case "$1" in
     "--up") swayosd_arg="+${step}" ;;
     "--down") swayosd_arg="-${step}" ;;
