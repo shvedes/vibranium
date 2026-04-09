@@ -40,10 +40,6 @@ _set_timeouts() {
   systemctl --user restart hypridle &
 }
 
-# _set_imhibit_type (){
-#
-# }
-
 # ================================================================================ #
 
 _build() {

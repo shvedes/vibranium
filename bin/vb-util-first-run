@@ -3,8 +3,14 @@
 WORKER="$VIBRANIUM_RUNTIME/worker.active"
 FIRSTBOOT_HOOKS="$VIBRANIUM/install/first-run"
 
+# Double check
+if [[ ! -f "$VIBRANIUM_STATE/first-run" ]]; then
+  echo "First run marker doesn't exists!" >&2
+  exit 1
+fi
+
 # Set Waybar icon
-echo "Finishing installation..." > "$WORKER"
+echo "Finishing installation..." >"$WORKER"
 vb-cmd-refresh-bar-module worker
 
 # Generate XDG directories

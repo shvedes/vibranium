@@ -25,15 +25,25 @@ fi
 
 while true; do
   helpers::ui::menu chosen "Set timer for" "ESC to go back" -- "${options[@]}"
-  [[ -z "$chosen" ]] && exit 1
-  [[ " ${options[*]} " == *" $chosen "* ]] || continue
+  if [[ -z "$chosen" ]]; then
+    exit 1
+  fi
+
+  if [[ ! " ${options[*]} " == *" $chosen "* ]]; then
+    continue
+  fi
 
   while true; do
     prompt="Int, in ${chosen,}"
     helpers::ui::menu sub_chosen "Set timer" "ESC to go back" -- "$prompt"
 
-    [[ -z "$sub_chosen" ]] && break
-    [[ "$sub_chosen" =~ ^[0-9]+$ ]] || continue
+    if [[ -z "$sub_chosen" ]]; then
+      break
+    fi
+
+    if [[ ! "$sub_chosen" =~ ^[0-9]+$ ]]; then
+      continue
+    fi
 
     case "$chosen" in
     Seconds)
@@ -50,7 +60,9 @@ while true; do
   done
 done
 
-[[ -z "$sleep_time" ]] && exit 0
+if [[ -z "$sleep_time" ]]; then
+  exit 0
+fi
 
 setsid -f systemd-inhibit --what=idle --why="Sleep is inhibited because of the active timer" --who="Timer" sleep $sleep_time
 

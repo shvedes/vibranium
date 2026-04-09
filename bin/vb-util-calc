@@ -1,9 +1,45 @@
 #!/usr/bin/bash
 
-exec 9> "$VIBRANIUM_RUNTIME/${0##*/}.lock"
+SELF="${0##*/}"
+LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTIONS]
+
+Open / close rofi-based calculator.
+
+Options:
+  -h, --help Show this help and exit
+EOF
+}
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+-* | --*)
+  echo "Error: unknown option: '$1'" >&2
+  echo "Try '$SELF --help' for more information" >&2
+  exit 1
+  ;;
+*)
+  echo "Ignoring input '$@'"
+  ;;
+esac
+
+exec 9>"$LOCKFILE"
+
+# Killswitch
 if ! flock -n 9; then
-  pkill -f "rofi.*-show calc" 2> /dev/null
+  pkill -f "rofi.*-show calc" 2>/dev/null
   exit 0
 fi
 
@@ -14,12 +50,12 @@ if [[ ! -f /usr/lib/rofi/libcalc.so ]]; then
 fi
 
 theme_str="$(
-  cat << EOF
+  shcat <<EOF
 window {
-    width: 500;
+    width: 30%;
 }
 entry {
-    placeholder: " expression";
+    placeholder: ' expression';
 }
 listview, num-rows, textbox-num-sep, num-filtered-rows {
     enabled: false;

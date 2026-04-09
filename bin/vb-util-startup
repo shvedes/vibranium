@@ -1,140 +1,34 @@
 #!/usr/bin/bash
 
-LOGFILE="$VIBRANIUM_CACHE/${0##*/}.errors"
-
-# A small piece of logic that runs when the session starts.
-# Nothing much is happening here right now, but in the future,
-# I think it will be possible to implement something like self-check for the entire setup.
-
-# This function handles cases where the monitor brightness might have been changed
-# manually, dual-boot (e.g. Monitorian), or through any external means outside the script.
-# It checks the current brightness via DDC, compares it with the cached value,
-# and updates it if there's a discrepancy.
-_set_ddc_brightness() {
-  local feature_enabled
-  local current_brightness current_monitor cached_brightness
-
-  helpers::check VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL
-  feature_enabled="$VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL"
-
-  [[ "$feature_enabled" == false ]] && return
-
-  current_brightness="$(
-    ddcutil getvcp 10 2>/dev/null |
-      sed -n 's/.*current value = *\([0-9]\+\).*/\1/p'
-  )"
-  [[ -z "$current_brightness" ]] && return
-
-  current_monitor="$(
-    hyprctl -j monitors |
-      jq -r '.[] | select(.focused == true) | .name'
-  )"
-
-  cached_brightness="$(
-    sed -n "s/^${current_monitor}:\([0-9]\+\)$/\1/p" "$VIBRANIUM_STATE/brightness"
-  )"
-
-  [[ -z "$current_brightness" ]] && return
-  if [[ -n "$cached_brightness" && "$cached_brightness" != "$current_brightness" ]]; then
-    vb-core-brightness "$current_brightness"
-  fi
-}
-
-{
-  _set_ddc_brightness || {
-    log::error "unable to restore brightness level for the external monitor(s)" >>"$LOGFILE" 2>&1
-  }
-} &
-
-_toggle_loopback() {
-  # Wait for pipewire to start
-  while ! pidof -q pipewire; do
-    sleep 0.1
-  done
-
-  helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK
-  if [[ $VIBRANIUM_VOLUME_SOURCE_LOOPBACK == true ]]; then
-    vb-cmd-toggle-loopback
-  fi
-}
-
-(
-  if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
-    rm "$VIBRANIUM_STATE/secure-boot-setup.complete"
-    sleep 5
-
-    sb_state="$(vb-cmd-sboot-status)"
-
-    if [[ "$sb_state" == "enabled" ]]; then
-      notify-send -r 1 -t 10000 "Secure Boot Setup Wizard" "Secure Boot setup complete!"
-    elif [[ "$sb_state" == "setup" ]]; then
-      msg="Secure Boot is still in Setup mode!"
-      msg+="Is your firmware poorly implemented?"
-      notify-send -r 1 -t 60000 -u critical "Secure Boot Setup Wizard" "$msg"
-    elif [[ "$sb_state" == "disabled" ]]; then
-      msg="Secure Boot setup did not complete properly!\n"
-      msg+="See 'sbctl status' for detailed info"
-      notify-send -r 1 -t 60000 -u critical "Secure Boot Setup Wizard" "$msg"
-    fi
-  fi
-) &
-
-mkdir -p \
-  $VIBRANIUM_RUNTIME $VIBRANIUM_STATE \
-  $VIBRANIUM_CACHE
-
-source vb-lib-core
-
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
   vb-util-first-run
   exit 0
 fi
 
-_toggle_loopback &
+source vb-lib-core
+export -f helpers::check
 
-CURRENT_THEME="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
-if [[ ! -f "$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME" ]]; then
-  vb-core-wallpaper --get >"$VIBRANIUM_STATE/wallpaper/$CURRENT_THEME"
-fi
+# Point child bash processes at the lib so they auto-source it.
+export BASH_ENV="$VIBRANIUM/bin/vb-lib-core"
 
-helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
-if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
-  if ! systemctl -q --user is-active awww; then
-    systemctl -q --user enable --now awww
-  fi
-fi
+mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_STATE $VIBRANIUM_CACHE
 
-# If state file doesn't exist - create one and disable
-# night light (by default). We still need hyprsunset
-# running in background because screen flashing effect
-# depends on it. It is not the best solution though, and
-# because of the while loop we must keep this check at the end
-if [[ "$CHASSIS_TYPE" != vm ]]; then
-  if [[ ! -f "$VIBRANIUM_STATE/nightshift" ]]; then
-    echo "suspended" >"$VIBRANIUM_STATE/nightshift"
-    hyprctl -q hyprsunset identity
-  elif [[ "$(<"$VIBRANIUM_STATE/nightshift")" == "suspended" ]]; then
-    while ! pidof -q hyprsunset; do
-      sleep 0.05
-    done
-    hyprctl -q hyprsunset identity
-  fi
-fi
-
-helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START
-if [[ $VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START = true ]]; then
-  setsid -f vb-core-launcher
-fi
-
-# In case if power profile was changed outside of vibranium.
-vb-core-power "$(powerprofilesctl get)" &
-
-shopt -s nullglob
-
-HOOKS=("$XDG_CONFIG_HOME"/vibranium/startup/*.sh)
+# Run the default startup scripts first
+HOOKS=("$VIBRANIUM"/default/hooks/startup/*.sh)
 
 if ((${#HOOKS[@]} > 0)); then
   for hook in "${HOOKS[@]}"; do
-    bash "$hook"
+    bash "$hook" &
+  done
+fi
+
+shopt -s nullglob
+
+# Then user scripts
+UHOOKS=("$XDG_CONFIG_HOME"/vibranium/startup/*.sh)
+
+if ((${#UHOOKS[@]} > 0)); then
+  for hook in "${UHOOKS[@]}"; do
+    bash "$hook" &
   done
 fi

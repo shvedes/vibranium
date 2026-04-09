@@ -8,7 +8,7 @@ shcat() {
 
 usage() {
   shcat <<EOF
-Usage: ${0##*/} [OPTION]...[PROFILE]
+Usage: ${0##*/} [OPTION | PROFILE]
 
 Set power profiles in Vibranium.
 
@@ -16,7 +16,7 @@ Options:
   --next       Next power profile
   --prev       Previous power profile
   --get        Get current power profile
-  -q, --quiet  Do not output in console
+  -q, --quiet  Be quiet (cli and notification)
 
   [PROFILE]    Set specified profile. Can be power-saver,balanced,performance
 EOF
@@ -26,6 +26,10 @@ notify() {
   local profile="$1"
   local icon=""
   local label=""
+
+  if [[ $QUIET == true ]]; then
+    return
+  fi
 
   case "$profile" in
   "performance")

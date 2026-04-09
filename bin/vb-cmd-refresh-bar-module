@@ -27,7 +27,6 @@ esac
 waybar_pid=$(systemctl --user show waybar -p MainPID --value)
 
 if (($waybar_pid == 0)); then
-  echo "Error: Waybar PID not found" >&2
   exit 1
 fi
 
