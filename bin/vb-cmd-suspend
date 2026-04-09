@@ -44,9 +44,15 @@ if ((ANIMATIONS_ENABLED == 1)); then
   sleep 1
 fi
 
+# Disable sleep ihibitor (sleep block) first since it
+# will require sudo in order to suspend.
+if systemctl -q --user is-active vibranium-inhibit@sleep.service; then
+  vb-cmd-toggle-inhibit
+fi
+
 systemctl suspend
 
 if ((ANIMATIONS_ENABLED == 1)); then
-  sleep 1
+  sleep 2
   hyprctl -q hyprsunset gamma 100
 fi
