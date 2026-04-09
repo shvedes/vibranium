@@ -45,7 +45,7 @@ _build() {
 
   cfgr::item::bool \
     --var VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE \
-    --label "Automatically annotate"
+    --label "Annotate automatically"
 }
 
 cfgr::run "Screenshots" "_build" \

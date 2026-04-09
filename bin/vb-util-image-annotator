@@ -130,4 +130,4 @@ if cmp -s "$original_snapshot" "$image"; then
 fi
 
 notify-send -r 3 "Image Annotator" "File saved to ${image%/*}"
-wl-copy -t "$mime_type" <"$image"
+printf 'file://%s' "$image" | wl-copy -t text/uri-list
