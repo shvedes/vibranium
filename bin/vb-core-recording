@@ -37,7 +37,7 @@ output_file() {
 }
 
 visualize() {
-  vb-cmd-refresh-bar-module recording-indicator
+  vb-cmd-refresh-bar-module recording
 
   helpers::check VIBRANIUM_RECORDING_FLASH_SCREEN
   if [[ $VIBRANIUM_RECORDING_FLASH_SCREEN == true ]]; then
@@ -266,7 +266,7 @@ stop_rec() {
     # Wait for the pid
     sleep 0.1
 
-    vb-cmd-refresh-bar-module recording-indicator
+    vb-cmd-refresh-bar-module recording
     copy
     exit 0
   else
