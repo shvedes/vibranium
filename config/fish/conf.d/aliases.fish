@@ -5,6 +5,10 @@ if command -q eza
     alias tree="eza --tree"
 end
 
+if command -q trash
+    alias rm="trash -v"
+end
+
 alias imv="imv-dir"
 alias ip="ip --color"
 
