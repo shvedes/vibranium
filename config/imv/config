@@ -45,7 +45,7 @@ f = fullscreen
 <Shift+plus> = zoom 5%
 <minus> = zoom -5%
 
-e = exec app2unit vb-util-image-annotator "$imv_current_file" &
+e = exec vb-util-image-annotator --imv "$imv_current_file" &
 c = exec imv-copy ''"$imv_current_file"'' &
 w = exec vb-core-wallpaper "$imv_current_file" &
 <Ctrl+h> = exec imv-cheatsheet

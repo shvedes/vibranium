@@ -21,6 +21,13 @@ The annotated file is saved back over the source file.
 EOF
 }
 
+# If launched from imv - close that window
+# before editing.
+if [[ "$1" == "--imv" ]]; then
+  killall imv-wayland
+  shift
+fi
+
 # Reject excess positional args before touching options.
 if [[ $# -gt 1 ]]; then
   echo "Error: too many arguments. Expected at most one FILE." >&2
