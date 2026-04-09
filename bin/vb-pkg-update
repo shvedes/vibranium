@@ -1,7 +1,13 @@
 #!/usr/bin/bash
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 _usage() {
-  cat <<EOF
+  shcat <<EOF
 Usage: ${0##*/} [OPTION]...
 
 Perform system update using yay, check for important updates, and prompt for reboot if necessary.
@@ -79,7 +85,7 @@ _check_important() {
 
 # e.g. clicked on the updates waybar module
 if [[ ! -t 1 ]]; then
-  xdg-terminal-exec -- "$0"
+  xdg-terminal-exec --title=${0##*/} --app-id=org.vb.term.float -- "$0"
   exit
 fi
 

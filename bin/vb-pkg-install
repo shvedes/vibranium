@@ -2,8 +2,14 @@
 
 source vb-lib-core
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 _usage() {
-  cat <<EOF
+  shcat <<EOF
 Usage: ${0##*/} [OPTION]... [PACKAGE]...
 
 Install packages in Vibranium
