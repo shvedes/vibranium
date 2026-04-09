@@ -26,8 +26,22 @@ EOF
 }
 
 player_is_playing() {
-  [[ "$(playerctl status 2>/dev/null)" == "Playing" ]] ||
-    [[ "$(mpc status 2>/dev/null | awk 'NR==2 {print $1}')" == "[playing]" ]]
+  if [[ "$(playerctl status 2>/dev/null)" == "Playing" ]]; then
+    return 0
+  else
+    # Don't trigger mpd systemd service if for no reason.
+    if systemctl -q --user is-active mpd.service; then
+      while read -r l; do
+        case $l in
+        *"[playing]"*)
+          return 0
+          ;;
+        esac
+      done < <(mpc status 2>/dev/null)
+    fi
+  fi
+
+  return 1
 }
 
 case "$1" in
@@ -38,12 +52,18 @@ case "$1" in
 
 --before)
   source vb-lib-core
-  helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
 
-  [[ $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == false ]] && exit 0
+  helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
+  pause_music="$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+
+  # Don't pause any music with active inhibitor.
+  if systemctl -q --user is-active vibranium-inhibit@sleep; then
+    exit 0
+  elif [[ $pause_music == false ]]; then
+    exit 0
+  fi
 
   if player_is_playing; then
-    mkdir -p "$(dirname "$RESTORE_FLAG")"
     vb-core-mediacontrol --toggle &
     : >"$RESTORE_FLAG"
   fi
