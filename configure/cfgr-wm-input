@@ -4,6 +4,8 @@ source vb-lib-core
 source vb-lib-hypr
 source vb-lib-cfgr
 
+WAYBAR_CFG="$XDG_CONFIG_HOME/waybar/config.jsonc"
+
 # Fetch specs
 # Declared once. Each entry is "option:path|type".
 # Types: bool, bool_inv, int, float, float1, float2, str  (see hypr-lib)
@@ -64,6 +66,7 @@ _set_layout_shortcut() {
 
 _remove_layout() {
   local layouts chosen
+  local -a final_layouts=()
 
   IFS=',' read -r -a layouts < <(hypr::str "input:kb_layout")
   chosen="$(cfgr::set_string --title "Remove Layout" --option "${layouts[@]}")" || return
@@ -76,17 +79,66 @@ _remove_layout() {
 
   hypr::set "input:kb_layout" "$(IFS=,; echo "${final_layouts[*]}")" "$HYPR_CONF_INPUT"
   notify-send -r 1 "Vibranium" "Removed keyboard layout: <b>$chosen</b>"
+
+  # If only one layout remains, the bar language indicator is now useless.
+  # Check whether the module is present in the config AND currently uncommented;
+  # if so, comment it out and reload the bar.
+  if (( ${#final_layouts[@]} == 1 )); then
+    local cfg_content
+    cfg_content=$(<"$WAYBAR_CFG")
+
+    # The module must exist in the file at all (guards against manual removal).
+    if [[ "$cfg_content" == *'"hyprland/language"'* ]]; then
+      # A line is commented out when it matches: optional whitespace, //, anything,
+      # then the module string. If this pattern does NOT match, the module is active.
+      if ! [[ $'\n'"$cfg_content" =~ $'\n'[[:space:]]*//[^$'\n']*'"hyprland/language"' ]]; then
+        sed -i 's|^\(\s*\)\(.*"hyprland/language".*\)|\1// \2|' "$WAYBAR_CFG"
+        systemctl -q --user restart waybar &
+      fi
+    fi
+  fi
 }
 
 _add_layout() {
-  local layouts input chosen
+  local layouts chosen
   mapfile -t layouts < <(_get_layouts)
 
   chosen="$(cfgr::set_string --title "Layouts" --option "${layouts[@]}")" || return
 
-  local active_layouts=$(hypr::str "input:kb_layout")
+  local active_layouts
+  active_layouts="$(hypr::str "input:kb_layout")"
+
+  # Guard against duplicate layout
+  local -a current_layouts
+  IFS=',' read -r -a current_layouts <<< "$active_layouts"
+  for layout in "${current_layouts[@]}"; do
+    if [[ "$layout" == "$chosen" ]]; then
+      notify-send -r 1 "Vibranium" "Layout <b>${chosen^^}</b> is already active"
+      return
+    fi
+  done
+
   hypr::set "input:kb_layout" "${active_layouts},${chosen}" "$HYPR_CONF_INPUT"
   notify-send -r 1 "Vibranium" "Added new keyboard layout: <b>${chosen^^}</b>"
+
+  # Count the layouts we now have by splitting the combined string on commas.
+  local -a all_layouts
+  IFS=',' read -r -a all_layouts <<< "${active_layouts},${chosen}"
+
+  # If there are now multiple layouts and the bar module is still commented out,
+  # uncomment it and reload the bar so the language indicator becomes visible.
+  if (( ${#all_layouts[@]} > 1 )); then
+    local cfg_content
+    cfg_content=$(<"$WAYBAR_CFG")
+
+    # Pattern mirrors _check_module from waybar-toggle-modules: a line is
+    # considered commented out when it starts with optional whitespace, then //,
+    # then contains the module string somewhere on the same line.
+    if [[ $'\n'"$cfg_content" =~ $'\n'[[:space:]]*//[^$'\n']*'"hyprland/language"' ]]; then
+      sed -i 's|^\(\s*\)//\s*\(.*"hyprland/language".*\)|\1\2|' "$WAYBAR_CFG"
+      systemctl -q --user restart waybar &
+    fi
+  fi
 }
 
 _touchpad_menu() {
