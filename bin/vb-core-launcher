@@ -45,11 +45,20 @@ process_input() {
   "file://"*)
     # Open in default app (media viewer, text editor, whatever)
     input="${input#file://}"
-    app2unit-open "$input" &>/dev/null &
+    app2unit-open -s app-graphical.slice "$input" &>/dev/null &
     ;;
+    # Okay so, at the moment of invocation
+    # we don't know if there's an active browser process
+    # where the link will be opened. If thre's none, that's
+    # fine - app2unit-open will create a systemd unit out of
+    # chromium, firefox or whatever. When there's a window,
+    # we're creating a transient unit for nothing. So should keep
+    # keep app2unit here at all? Also should we use app-graphical.slice
+    # for links? Questionable at the moment. I'll keep it for now,
+    # since it doesn't brake anything.
   "https://"*)
     # Open in default browser
-    app2unit-open "$input" &>/dev/null &
+    app2unit-open -s app-graphical.slice "$input" &>/dev/null &
     ;;
   "DBus launch")
     # org.telegram.desktop.desktop for example
@@ -61,15 +70,15 @@ process_input() {
     local args="${input#"$cmd"}"
 
     if [[ -x "$cmd" ]] || command -v "$cmd" >/dev/null 2>&1; then
-      app2unit "$cmd" $args
+      app2unit -s app-graphical.slice "$cmd" $args &
     elif [[ -e "$input" ]]; then
-      app2unit-open "$input" &>/dev/null &
+      app2unit-open -s app-graphical.slice "$input" &>/dev/null &
     else
       if [[ "$LAUNCHER_MODE" == "default" ]]; then
         [[ "$auto_select" = true ]] && {
           exit 1
         }
-        app2unit-open "$(search_engine)${input}" &>/dev/null &
+        app2unit-open -s app-graphical.slice "$(search_engine)${input}" &>/dev/null &
       fi
     fi
     ;;
