@@ -18,6 +18,7 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
 fi
 
 SELF="${0##*/}"
+QUIET=false
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 
 shcat() {
@@ -28,23 +29,58 @@ shcat() {
 
 usage() {
   shcat <<EOF
-Usage: $SELF [--up|--down]
+Usage: $SELF [--up|--down|--set <0-100>]
 
 Adjust screen brightness.
 
 Options:
-    --up           Increase brightness
-    --down         Decrease brightness
-    -h, --help     Show this help and exit
+    --up              Increase brightness
+    --down            Decrease brightness
+    --set             Set brightness to <0-100>%
+    -q, --quiet       Do not display notification or OSD
+    -h, --help        Show this help and exit
 EOF
 }
 
-if [[ "$1" =~ ^(-h|--help)$ || -z "$1" ]]; then
+ACTION=""
+SET_VALUE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --up | --down)
+    ACTION="$1"
+    shift
+    ;;
+  --set)
+    # --set requires a following integer in the range 0-100
+    if [[ ! "$2" =~ ^[0-9]+$ ]] || (($2 < 0 || $2 > 100)); then
+      echo "Error: --set requires an integer between 0 and 100" >&2
+      usage
+      exit 1
+    fi
+    ACTION="$1"
+    SET_VALUE="$2"
+    shift 2
+    ;;
+  -q | --quiet)
+    QUIET=true
+    shift
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
+  esac
+done
+
+# No action flag was provided — print usage and exit cleanly
+if [[ -z "$ACTION" ]]; then
   usage
   exit 0
-elif [[ ! $1 =~ ^--(up|down|value)$ ]]; then
-  usage
-  exit 1
 fi
 
 exec 9>"$LOCKFILE" || {
@@ -231,7 +267,10 @@ else
   fi
 fi
 
-helpers::check VIBRANIUM_GLOBAL_USE_OSD
+helpers::check \
+  VIBRANIUM_BRIGHTNESS_STEP \
+  VIBRANIUM_BRIGHTNESS_NOTIFY \
+  VIBRANIUM_GLOBAL_USE_OSD
 
 use_swayosd="$VIBRANIUM_GLOBAL_USE_OSD"
 
@@ -242,9 +281,6 @@ use_swayosd="$VIBRANIUM_GLOBAL_USE_OSD"
   fi
 }
 
-helpers::check \
-  VIBRANIUM_BRIGHTNESS_STEP \
-  VIBRANIUM_BRIGHTNESS_NOTIFY
 step=$VIBRANIUM_BRIGHTNESS_STEP
 
 case "$method" in
@@ -273,7 +309,7 @@ case "$method" in
   fi
 
   # The remaining code at the bottom is generally self-explanatory
-  case "$1" in
+  case "$ACTION" in
   "--up")
     ((current == 100)) && exit 0
     new=$((current + step))
@@ -283,6 +319,10 @@ case "$method" in
     ((current == 0)) && exit 0
     new=$((current - step))
     ((new < 0)) && new=0
+    ;;
+  "--set")
+    # SET_VALUE is already validated as 0-100 above
+    new=$SET_VALUE
     ;;
   esac
 
@@ -296,11 +336,9 @@ case "$method" in
     exit 0
   fi
 
-  if [[ $use_swayosd == true ]]; then
-    if [[ ! $2 =~ ^[0-9]+$ ]]; then
-      log::info "Showing OSD overlay"
-      osd "$new" &
-    fi
+  if [[ $use_swayosd == true && $QUIET == false ]]; then
+    log::info "Showing OSD overlay"
+    osd "$new" &
   else
     # Do not display the monitor name if it is only one.
     if [[ ! $(hyprctl -j monitors | jq 'length') == "1" ]]; then
@@ -323,7 +361,7 @@ case "$method" in
       exit
     fi
 
-    if [[ ! $2 =~ ^[0-9]+$ ]]; then
+    if [[ $QUIET == false ]]; then
       notify-send -r 2 -t 1000 "Brightness $source${new}%" -h int:value:"$new"
     fi
   fi
@@ -333,24 +371,28 @@ case "$method" in
   # calculations entirely and let it apply the change + show the OSD itself.
   # Raw calculations are only needed for the plain notify-send path, or when
   # notifications are disabled.
-  if [[ $use_swayosd == true && "$VIBRANIUM_BRIGHTNESS_NOTIFY" != "false" ]]; then
+  if [[ $use_swayosd == true && "$VIBRANIUM_BRIGHTNESS_NOTIFY" != "false" && "$QUIET" == false ]]; then
     # Translate action into swayosd's (±)number / absolute syntax:
     #   --up   -> +<step>   e.g. +5
     #   --down -> -<step>   e.g. -5
-    case "$1" in
+    #   --set  -> <value>   e.g. 60  (swayosd treats bare integers as absolute)
+    case "$ACTION" in
     "--up") swayosd_arg="+${step}" ;;
     "--down") swayosd_arg="-${step}" ;;
+    "--set") swayosd_arg="$SET_VALUE" ;;
     esac
 
-    log::info "Delegating brightness change to swayosd (--brightness ${swayosd_arg})"
-    swayosd-client --brightness="$swayosd_arg"
+    if [[ $QUIET == false ]]; then
+      log::info "Delegating brightness change to swayosd (--brightness ${swayosd_arg})"
+      swayosd-client --brightness="$swayosd_arg"
+    fi
   else
     # Read current and max brightness from the kernel
     current_raw=$(</sys/class/backlight/*/brightness)
     max_raw=$(</sys/class/backlight/*/max_brightness)
     current=$((current_raw * 100 / max_raw))
 
-    case "$1" in
+    case "$ACTION" in
     "--up")
       # Round up to next step boundary in percent-space.
       # Integer division truncates, so (current/step + 1)*step always gives
@@ -374,6 +416,12 @@ case "$method" in
       # Same ceiling conversion as --up to prevent truncation drift.
       new_raw=$(((new_pct * max_raw + 99) / 100))
       ;;
+    "--set")
+      # Convert the requested percentage directly to a raw sysfs value.
+      # Ceiling division avoids truncation drift, same as the step branches.
+      new_pct=$SET_VALUE
+      new_raw=$(((new_pct * max_raw + 99) / 100))
+      ;;
     esac
 
     # Clamp raw value
@@ -391,7 +439,9 @@ case "$method" in
       exit 0
     fi
 
-    notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"
+    if [[ $QUIET == false ]]; then
+      notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"
+    fi
   fi
   ;;
 esac
