@@ -38,7 +38,7 @@ ACTION="$VIBRANIUM_RUNTIME/password-manager.action"
 # definition time.
 export ACTION
 
-# Associative array: maps a named menu context key → the last selected row index.
+# Associative array: maps a named menu context key -> the last selected row index.
 # This lets every rofi menu re-open with the cursor on the item the user last
 # interacted with, giving seamless back-navigation through folder trees.
 # Key format: "<context>:<path>" or "<context>:<path>:<mode>".
@@ -123,10 +123,10 @@ has_password_entries() {
 #   - No slashes, backslashes, or any other shell metacharacters
 #
 # Behavior:
-#   - ESC (empty rofi result) → cancel → return 1
-#   - Enter on hint text without typing → re-show prompt (do NOT cancel)
-#   - Enter on invalid text → notify + re-show prompt
-#   - Enter on valid text → write to nameref, return 0
+#   - ESC (empty rofi result) -> cancel -> return 1
+#   - Enter on hint text without typing -> re-show prompt (do NOT cancel)
+#   - Enter on invalid text -> notify + re-show prompt
+#   - Enter on valid text -> write to nameref, return 0
 #
 # Returns:
 #   0  — valid name written into nameref_var
@@ -225,7 +225,7 @@ prompt_valid_name() {
 #   opens and `pass edit` calls gpg, which finds no cached key, tries to
 #   prompt, fails silently, and hands `pass edit` an empty temp file to edit.
 #   Omitting `--batch` lets gpg properly route the passphrase request through
-#   the agent → pinentry, while `--no-tty` still prevents any TTY-based
+#   the agent -> pinentry, while `--no-tty` still prevents any TTY-based
 #   prompting (all interaction goes through the graphical pinentry window).
 #
 # Arguments:
@@ -247,7 +247,7 @@ ensure_gpg_unlocked() {
   # Attempt decryption of the exact file that `pass edit` will use.
   #   -q       : quiet; suppress gpg's informational stderr output
   #   --no-tty : do not use the controlling terminal for passphrase input;
-  #              all interaction is routed through the gpg-agent → pinentry
+  #              all interaction is routed through the gpg-agent -> pinentry
   #   > /dev/null : discard the decrypted plaintext; we want only the
   #                 side-effect of caching the key in the agent
   #
@@ -342,9 +342,9 @@ async_git_push() {
 # without saving, no commit was made and pushing would be a no-op or fail.
 #
 # Strategy: compare local HEAD tree to the upstream tracking ref.
-#   Same trees  → nothing committed → skip push
-#   Trees differ → pass edit committed a change → fire async push
-#   No upstream  → first-ever push → fire async push unconditionally
+#   Same trees  -> nothing committed -> skip push
+#   Trees differ -> pass edit committed a change -> fire async push
+#   No upstream  -> first-ever push -> fire async push unconditionally
 #
 # Exported via `export -f` so the child bash -c process for Edit can call it.
 push_after_edit_if_needed() {
@@ -357,8 +357,8 @@ push_after_edit_if_needed() {
   fi
 
   # git diff --quiet HEAD "@{u}":
-  #   exit 0 → identical trees (nothing committed since last sync) → skip
-  #   exit 1 → trees differ (new commit exists locally) → push
+  #   exit 0 -> identical trees (nothing committed since last sync) -> skip
+  #   exit 1 -> trees differ (new commit exists locally) -> push
   # Avoids any external counter or subshell just to detect a new commit.
   if ! git -C "$PASSWORD_STORE_DIR" diff --quiet HEAD "@{u}" 2>/dev/null; then
     async_git_push &
@@ -466,9 +466,9 @@ pick_location() {
       done
 
       # prompt_valid_name handles the full inner loop:
-      #   - hint selected → re-ask (don't cancel out of location picker)
-      #   - ESC → cancel folder creation, but stay in location picker
-      #   - valid name → proceed to existence check below
+      #   - hint selected -> re-ask (don't cancel out of location picker)
+      #   - ESC -> cancel folder creation, but stay in location picker
+      #   - valid name -> proceed to existence check below
       if prompt_valid_name new_folder "New folder name" "Enter folder name"; then
         if [[ -d "$full_dir/$new_folder" ]]; then
           # The folder already exists on disk. Rather than erroring out
@@ -614,10 +614,10 @@ pick_password_path() {
 
       # Action sub-loop for the selected entry.
       # action() return codes:
-      #   0 → operation complete (copy/edit) — bubble up and exit
-      #   1 → error or cancel — re-show action menu
-      #   2 → go back to file listing (same directory)
-      #   3 → entry deleted — rebuild directory view from surviving parent
+      #   0 -> operation complete (copy/edit) — bubble up and exit
+      #   1 -> error or cancel — re-show action menu
+      #   2 -> go back to file listing (same directory)
+      #   3 -> entry deleted — rebuild directory view from surviving parent
       while true; do
         action "$password_full"
         local action_ret=$?
@@ -738,7 +738,7 @@ action() {
     export _VB_EDIT_PASSWORD="$password"
 
     # Fork a floating terminal that:
-    #   1. Runs `pass edit`: decrypt → $EDITOR → re-encrypt → git commit
+    #   1. Runs `pass edit`: decrypt -> $EDITOR -> re-encrypt -> git commit
     #   2. After the editor closes, calls push_after_edit_if_needed, which
     #      checks whether a commit was actually made and only then pushes.
     # xdg-terminal-exec forks and returns immediately to the parent shell, so
@@ -835,8 +835,8 @@ action() {
       #   - If a folder was already removed by pass: clean up cursor state,
       #     reset the parent's cursor to 0, then climb silently
       #   - If a folder exists and is empty: ask the user
-      #     - Yes → delete, reset parent cursor to 0, climb to check parent
-      #     - No  → stop climbing entirely (don't ask about grandparents)
+      #     - Yes -> delete, reset parent cursor to 0, climb to check parent
+      #     - No  -> stop climbing entirely (don't ask about grandparents)
       #   - If a folder still has content: stop climbing
       local check_dir="$parent"
 
@@ -1168,9 +1168,9 @@ while true; do
 
     # Step 2: choose the entry name (the .gpg filename without extension).
     # prompt_valid_name handles the full inner loop with validation:
-    #   - hint selected → re-ask (do not cancel on hint Enter)
-    #   - invalid chars → notify + re-ask
-    #   - ESC → cancel, return to main menu via `continue`
+    #   - hint selected -> re-ask (do not cancel on hint Enter)
+    #   - invalid chars -> notify + re-ask
+    #   - ESC -> cancel, return to main menu via `continue`
     # `name` is intentionally not declared with `local` here: `local` is
     # only valid inside functions, and this block runs in the global scope
     # of the main while loop.

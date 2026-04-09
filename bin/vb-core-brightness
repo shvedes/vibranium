@@ -355,21 +355,21 @@ case "$method" in
       # Round up to next step boundary in percent-space.
       # Integer division truncates, so (current/step + 1)*step always gives
       # the next clean multiple of step above current.
-      # e.g. current=4, step=5 → (4/5 + 1)*5 = (0+1)*5 = 5%
-      # e.g. current=5, step=5 → (5/5 + 1)*5 = (1+1)*5 = 10%
+      # e.g. current=4, step=5 -> (4/5 + 1)*5 = (0+1)*5 = 5%
+      # e.g. current=5, step=5 -> (5/5 + 1)*5 = (1+1)*5 = 10%
       new_pct=$(((current / step + 1) * step))
       # Ceiling division (+ 99) ensures raw value lands inside the target
       # percent band when converted back, avoiding double-truncation drift.
-      # e.g. 5% of 255 → (5*255+99)/100 = 13 raw → 13*100/255 = 5% ✓
-      #                     without ceil → 12 raw → 12*100/255 = 4% ✗
+      # e.g. 5% of 255 -> (5*255+99)/100 = 13 raw -> 13*100/255 = 5% ✓
+      #                     without ceil -> 12 raw -> 12*100/255 = 4% ✗
       new_raw=$(((new_pct * max_raw + 99) / 100))
       ;;
     "--down")
       # Round down to previous step boundary in percent-space.
       # Subtracting 1 before dividing ensures we step down even when already
       # sitting exactly on a boundary.
-      # e.g. current=10, step=5 → (10-1)/5*5 = 1*5 = 5%  (not stuck at 10%)
-      # e.g. current=9,  step=5 → (9-1)/5*5  = 1*5 = 5%
+      # e.g. current=10, step=5 -> (10-1)/5*5 = 1*5 = 5%  (not stuck at 10%)
+      # e.g. current=9,  step=5 -> (9-1)/5*5  = 1*5 = 5%
       new_pct=$(((current - 1) / step * step))
       # Same ceiling conversion as --up to prevent truncation drift.
       new_raw=$(((new_pct * max_raw + 99) / 100))

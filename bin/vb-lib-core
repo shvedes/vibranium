@@ -68,7 +68,7 @@ helpers::ui::menu() {
   local var_name="$1"
   shift
 
-  # Lookup table: character-count thresholds → pixel widths for the rofi window.
+  # Lookup table: character-count thresholds -> pixel widths for the rofi window.
   # Each key is the minimum text length that maps to the paired pixel value.
   # The values were empirically derived for the configured rofi font/theme so that
   # the window is never too narrow to display the longest entry without clipping.
@@ -123,10 +123,10 @@ helpers::ui::menu() {
 
   # Build the newline-delimited list of menu entries.
   # Two modes:
-  #   1. '--' sentinel found → entries come from remaining positional arguments.
+  #   1. '--' sentinel found -> entries come from remaining positional arguments.
   #      We prepend '\n' before each item *except the first* to avoid a trailing
   #      newline, which rofi would render as a blank phantom entry at the bottom.
-  #   2. No '--' → entries are read wholesale from stdin via `read -r -d ''`.
+  #   2. No '--' -> entries are read wholesale from stdin via `read -r -d ''`.
   #      The -d '' trick sets the delimiter to NUL, so read slurps everything
   #      until EOF rather than stopping at the first newline. `|| true` suppresses
   #      the non-zero exit code that read returns when it hits EOF without a NUL.
@@ -545,7 +545,7 @@ helpers::check() {
       [[ $normalized != true && $normalized != false ]] && is_valid=0
       ;;
     int)
-      # Normalize comma-as-decimal-separator (e.g. European locale "3,14" → "3.14")
+      # Normalize comma-as-decimal-separator (e.g. European locale "3,14" -> "3.14")
       normalized=${val//,/.}
 
       # _RE_INT is a precompiled variable reference — bash reuses its compiled form

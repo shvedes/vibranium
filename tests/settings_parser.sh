@@ -134,18 +134,18 @@ log_case "valid: exact default value"     "$B1" "false"    "false"
 log_case "valid: opposite bool"           "$B1" "true"     "true"
 log_case "valid: uppercase TRUE"          "$B1" "TRUE"     "true"
 log_case "valid: mixed case False"        "$B1" "False"    "false"
-log_case "invalid: empty → fallback"      "$B1" ""         "$D1"
+log_case "invalid: empty -> fallback"      "$B1" ""         "$D1"
 log_case "invalid: 'yes'"                 "$B1" "yes"      "$D1"
 log_case "invalid: '1'"                   "$B1" "1"        "$D1"
 log_case "invalid: '0'"                   "$B1" "0"        "$D1"
 log_case "invalid: garbage string"        "$B1" "notabool" "$D1"
-log_case "invalid: unset → fallback"      "$B1" __UNSET__  "$D1"
+log_case "invalid: unset -> fallback"      "$B1" __UNSET__  "$D1"
 
 section "bool — $B2"
 log_case "valid: default"                 "$B2" "true"     "true"
 log_case "valid: opposite"                "$B2" "false"    "false"
-log_case "invalid: empty → fallback"      "$B2" ""         "$D2"
-log_case "invalid: unset → fallback"      "$B2" __UNSET__  "$D2"
+log_case "invalid: empty -> fallback"      "$B2" ""         "$D2"
+log_case "invalid: unset -> fallback"      "$B2" __UNSET__  "$D2"
 
 # =============================================================================
 # 3. Int — plain (no range)
@@ -161,11 +161,11 @@ log_case "valid: leading zeros stripped"  "$IP" "007"      "7"
 log_case "valid: large number"            "$IP" "99999"    "99999"
 log_case "valid: negative"                "$IP" "-3"       "-3"
 log_case "valid: comma as decimal sep"    "$IP" "5,0"      "5.0"
-log_case "invalid: empty → fallback"      "$IP" ""         "$DP"
+log_case "invalid: empty -> fallback"      "$IP" ""         "$DP"
 log_case "invalid: float string"          "$IP" "3.14.1"   "$DP"
 log_case "invalid: letters"               "$IP" "abc"      "$DP"
 log_case "invalid: mixed alphanum"        "$IP" "5px"      "$DP"
-log_case "invalid: unset → fallback"      "$IP" __UNSET__  "$DP"
+log_case "invalid: unset -> fallback"      "$IP" __UNSET__  "$DP"
 
 # =============================================================================
 # 4. Int — range-constrained
@@ -182,11 +182,11 @@ log_case "valid: min boundary"            "$IR" "$RMIN"            "$RMIN"
 log_case "valid: max boundary"            "$IR" "$RMAX"            "$RMAX"
 log_case "valid: midpoint"                "$IR" "50"               "50"
 log_case "valid: leading zeros stripped"  "$IR" "080"              "80"
-log_case "invalid: below min → fallback"  "$IR" "$(( RMIN - 1 ))"  "$DR"
-log_case "invalid: above max → fallback"  "$IR" "$(( RMAX + 1 ))"  "$DR"
-log_case "invalid: empty → fallback"      "$IR" ""                 "$DR"
+log_case "invalid: below min -> fallback"  "$IR" "$(( RMIN - 1 ))"  "$DR"
+log_case "invalid: above max -> fallback"  "$IR" "$(( RMAX + 1 ))"  "$DR"
+log_case "invalid: empty -> fallback"      "$IR" ""                 "$DR"
 log_case "invalid: letters"               "$IR" "abc"              "$DR"
-log_case "invalid: unset → fallback"      "$IR" __UNSET__          "$DR"
+log_case "invalid: unset -> fallback"      "$IR" __UNSET__          "$DR"
 
 # =============================================================================
 # 5. String — enum-constrained
@@ -204,11 +204,11 @@ section "string enum — $SE  [$( _allowed_list "$SE" )]"
 for _v in "${_se_allowed[@]}"; do
     log_case "valid: enum value '$_v'"    "$SE" "$_v"               "$_v"
 done
-log_case "invalid: empty → fallback"      "$SE" ""                  "$DSE"
+log_case "invalid: empty -> fallback"      "$SE" ""                  "$DSE"
 log_case "invalid: not in enum"           "$SE" "notanoption"       "$DSE"
 log_case "invalid: correct uppercased"    "$SE" "${_se_allowed[0]^^}" "$DSE"
 log_case "invalid: value with spaces"     "$SE" "${_se_allowed[0]} " "$DSE"
-log_case "invalid: unset → fallback"      "$SE" __UNSET__           "$DSE"
+log_case "invalid: unset -> fallback"      "$SE" __UNSET__           "$DSE"
 
 # =============================================================================
 # 6. String — second enum var
@@ -227,8 +227,8 @@ done
 log_case "invalid: unlisted value"        "$SE2" "gif"              "$DSE2"
 log_case "invalid: uppercase"             "$SE2" "PNG"              "$DSE2"
 log_case "invalid: partial match"         "$SE2" "jp"               "$DSE2"
-log_case "invalid: empty → fallback"      "$SE2" ""                 "$DSE2"
-log_case "invalid: unset → fallback"      "$SE2" __UNSET__          "$DSE2"
+log_case "invalid: empty -> fallback"      "$SE2" ""                 "$DSE2"
+log_case "invalid: unset -> fallback"      "$SE2" __UNSET__          "$DSE2"
 
 # =============================================================================
 # 7. Unknown variable — should warn and return 1, variable untouched

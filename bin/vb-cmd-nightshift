@@ -162,7 +162,7 @@ if ((TEMP < 1000 || TEMP > 20000)); then
 fi
 
 printf '# Auto-generated! All changes will be overwritten!\n' >"$CONF"
-printf '\nmax-gamma = 150\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" >>"$CONF"
+printf '\nmax-gamma = 150\n\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" >>"$CONF"
 hyprctl -q hyprsunset temperature "$TEMP" &
 
 vb-cmd-refresh-bar-module nightshift &

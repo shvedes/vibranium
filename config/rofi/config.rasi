@@ -1,3 +1,4 @@
+/* Full documentation: man rofi | man 5 rofi-theme */
 
 @import "./themes/theme-modern.rasi"
 

@@ -115,7 +115,7 @@ function warn(msg) {
     if (block_start == 0) block_start = NR
 
     t = tolower($3)
-    # Normalise "integer" → "int" so the rest of the script only needs to
+    # Normalise "integer" -> "int" so the rest of the script only needs to
     # check against the three canonical type strings.
     if (t == "integer") t = "int"
 
@@ -267,7 +267,7 @@ function warn(msg) {
     # Strip one layer of matching surrounding quotes so the stored value is bare.
     # Only acts when both the first and last characters are the same quote type.
     # Mismatched or unquoted values are left intact.
-    # Examples: "foo" → foo,  'bar' → bar,  unquoted → unchanged.
+    # Examples: "foo" -> foo,  'bar' -> bar,  unquoted -> unchanged.
     if (length(val) >= 2) {
         f = substr(val, 1, 1)
         l = substr(val, length(val), 1)

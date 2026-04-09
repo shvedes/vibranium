@@ -182,7 +182,7 @@ get_volume() {
     vol=${vol%\%}
 
     # "$((vol))e-2" -> "25e-2" (scientific notation)
-    # printf then converts it to a proper float → "0.25"
+    # printf then converts it to a proper float -> "0.25"
     # Bash itself can't do floating point, but printf can format it
     printf '%0.2f\n' "$((vol))e-2"
   fi

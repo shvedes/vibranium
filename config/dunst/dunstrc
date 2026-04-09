@@ -1,15 +1,37 @@
+# The default Dunst configuration for Vibranium.
+# Full documentation: man 5 dunstc
+
 [global]
+# Where to display on the screen.
 origin = top-right
 font = "Cascadia Code 9"
 
+# For how long to wait for a
+# notification to close.
 timeout = 3
+
+# Self-explanatory
 corner_radius = 0
 
+# Wayland thing. Available options: top, bottom, overlay
+# bottom - display notifications behind windows
+# top -  display notifications over windows
+# overlay - display notifications over everything
 layer = top
-follow = mouse
-icon_theme = Papirus
-notification_limit = 3
 
+# Defines where the notifications should be placed
+# in a multi-monitor setup. 'mouse' means that
+# a notification will be displayed on the monitor
+# the mouse cursor is currently on.
+follow = mouse
+
+# Self-explanatory
+icon_theme = Papirus
+
+# The number of notifications that can appear at one time.
+notification_limit = 7
+
+# Self-explanatory
 frame_width = 2
 gap_size = 10
 width = (200, 600)
@@ -17,11 +39,24 @@ height = (0, 400)
 offset = (15, 15)
 
 indicate_hidden = false
+
+# Sort by: newest first (on top)
 sort = update
-show_indicators = false
+
+# Show a visual indicator that a notification
+# contains a custom action that can be activated
+# by a mouse click.
+show_indicators = true
+
+# Decide what to do on click when a notification has
+# an action.
+# Available options: none, do_action, close_current, close_all, context, context_all
 mouse_left_click = do_action
 mouse_right_click = close_current
+mouse_click_middle = none
 
+# Progress bar appearance.
+# The one that you see when changing the volume or brightness.
 progress_bar = true
 progress_bar_height = 10
 progress_bar_frame_width = 0
@@ -29,6 +64,8 @@ progress_bar_corner_radius = 0
 progress_bar_horizontal_alignment = left
 
 [fullscreen]
+# Delay all incoming notifications when in fullscreen window.
+# Show them after exiting the fullscreen window.
 fullscreen = delay
 
 # vim:ft=cfg
