@@ -12,7 +12,7 @@ if command -v brave >/dev/null; then
   BROWSER_FILES+=("$BRAVE_COLORS")
 fi
 
-INPUT="$(< "$XDG_CONFIG_HOME/vibranium/current/theme/chromium.theme")"
+INPUT="$(<"$XDG_CONFIG_HOME/vibranium/current/theme/chromium.theme")"
 INPUT="${INPUT// /}"
 
 # HEX
@@ -25,9 +25,9 @@ else
 fi
 
 for file in "${BROWSER_FILES[@]}"; do
-  printf '{ "BrowserThemeColor": "%s" }\n' "$THEME_COLOR" > "$file"
+  printf '{ "BrowserThemeColor": "%s" }\n' "$THEME_COLOR" >"$file"
 done
 
 # Refresh policies
-chromium --refresh-platform-policy --no-startup-window >/dev/null
-command -v brave >/dev/null && brave --refresh-platform-policy --no-startup-window >/dev/null
+chromium --refresh-platform-policy --no-startup-window &>/dev/null
+command -v brave >/dev/null && brave --refresh-platform-policy --no-startup-window &>/dev/null
