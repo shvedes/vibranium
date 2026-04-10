@@ -124,7 +124,6 @@
 #
 #   cfgr::run "My Menu" "_build"  MY_BOOL_VAR MY_STRING_VAR MY_INT_VAR
 
-
 # _cfgr::verify_option  VAR
 #
 # Ensures that a given option exists in the user settings file.
@@ -143,18 +142,17 @@ _cfgr::verify_option() {
     if [[ "${line%%=*}" == "$var" ]]; then
       return 0
     fi
-  done < "$settings_file"
+  done <"$settings_file"
 
   while IFS= read -r line; do
     if [[ "${line%%=*}" == "$var" ]]; then
-      printf '%s\n' "$line" >> "$settings_file"
+      printf '%s\n' "$line" >>"$settings_file"
       return 0
     fi
-  done < "$defaults_file"
+  done <"$defaults_file"
 
   return 1
 }
-
 
 # cfgr::toggle_bool  [-p | --print]  VAR
 #
@@ -177,17 +175,16 @@ cfgr::toggle_bool() {
   eval "value=\$$var"
 
   case "$value" in
-    "true")
-      sed -i "/^${var}=/s/=.*/=false/" "$VIBRANIUM_USER_SETTINGS"
-      [ "$verbose" = "true" ] && echo "false"
-      ;;
-    "false")
-      sed -i "/^${var}=/s/=.*/=true/" "$VIBRANIUM_USER_SETTINGS"
-      [ "$verbose" = "true" ] && echo "true"
-      ;;
+  "true")
+    sed -i "/^${var}=/s/=.*/=false/" "$VIBRANIUM_USER_SETTINGS"
+    [ "$verbose" = "true" ] && echo "false"
+    ;;
+  "false")
+    sed -i "/^${var}=/s/=.*/=true/" "$VIBRANIUM_USER_SETTINGS"
+    [ "$verbose" = "true" ] && echo "true"
+    ;;
   esac
 }
-
 
 # cfgr::build_menu  ITEM [ITEM ...]
 #
@@ -196,13 +193,13 @@ cfgr::toggle_bool() {
 # label length, pads shorter labels with spaces, and normalises boolean
 # values (true/false -> yes/no). Non-matching lines are passed through unchanged.
 cfgr::build_menu() {
-  local options=("$@")  # all arguments; each element is one "label : value" string
-  local max_len=0        # longest plain-text label length found across all options
+  local options=("$@") # all arguments; each element is one "label : value" string
+  local max_len=0      # longest plain-text label length found across all options
 
   # Pass 1: find the longest plain-text label length.
   for option in "${options[@]}"; do
     if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
-      local clean_label="${BASH_REMATCH[1]}"  # everything before " : "
+      local clean_label="${BASH_REMATCH[1]}" # everything before " : "
 
       # Strip HTML-like tags before measuring visible width.
       # Tags inflate character count without adding visible columns.
@@ -211,7 +208,7 @@ cfgr::build_menu() {
         clean_label="${clean_label//${BASH_REMATCH[0]}/}"
       done
 
-      (( ${#clean_label} > max_len )) && max_len=${#clean_label}
+      ((${#clean_label} > max_len)) && max_len=${#clean_label}
     fi
   done
 
@@ -219,8 +216,8 @@ cfgr::build_menu() {
   local aligned_options=()
   for option in "${options[@]}"; do
     if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
-      local label="${BASH_REMATCH[1]}"   # raw label, may still contain HTML tags
-      local value="${BASH_REMATCH[2]}"   # everything after " : "
+      local label="${BASH_REMATCH[1]}" # raw label, may still contain HTML tags
+      local value="${BASH_REMATCH[2]}" # everything after " : "
 
       # Strip tags from a throwaway copy to measure this label's visible width.
       local clean_label="$label"
@@ -231,7 +228,7 @@ cfgr::build_menu() {
       # printf '%*s' N '' prints exactly N spaces without output; -v captures
       # the result into a variable instead of printing to stdout.
       local spaces
-      printf -v spaces '%*s' $(( max_len - ${#clean_label} )) ''
+      printf -v spaces '%*s' $((max_len - ${#clean_label})) ''
 
       # Normalise boolean strings to friendlier display values.
       # ${value,,} lowercases the value, making the check case-insensitive.
@@ -254,7 +251,6 @@ cfgr::build_menu() {
     echo "$aligned"
   done
 }
-
 
 # cfgr::set_digit  --title TITLE  --type TYPE  [--min MIN]  [--max MAX]
 #                  [--hint HINT]  [--var OPT_NAME]
@@ -298,16 +294,34 @@ cfgr::set_digit() {
 
   # Parse all flags in a position-independent loop so callers can supply
   # arguments in any order without breaking anything.
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-      --title) title="$2";    shift 2 ;;
-      --type)  type="$2";     shift 2 ;;
-      --min)   min_val="$2";  shift 2 ;;
-      --max)   max_val="$2";  shift 2 ;;
-      --var)   opt_name="$2"; shift 2 ;;
-      --hint)  hint="$2";     shift 2 ;;
-      # Ignore unrecognised tokens so future flags don't break existing call sites.
-      *) shift ;;
+    --title)
+      title="$2"
+      shift 2
+      ;;
+    --type)
+      type="$2"
+      shift 2
+      ;;
+    --min)
+      min_val="$2"
+      shift 2
+      ;;
+    --max)
+      max_val="$2"
+      shift 2
+      ;;
+    --var)
+      opt_name="$2"
+      shift 2
+      ;;
+    --hint)
+      hint="$2"
+      shift 2
+      ;;
+    # Ignore unrecognised tokens so future flags don't break existing call sites.
+    *) shift ;;
     esac
   done
 
@@ -339,12 +353,13 @@ cfgr::set_digit() {
     input="${input%"${input##*[![:space:]]}"}"
 
     local result
-    result=$(awk \
-      -v val="$input" \
-      -v lo="$min_val" \
-      -v hi="$max_val" \
-      -v type="$type" \
-      -f "$awk_script"
+    result=$(
+      awk \
+        -v val="$input" \
+        -v lo="$min_val" \
+        -v hi="$max_val" \
+        -v type="$type" \
+        -f "$awk_script"
     )
 
     if [[ $? -ne 0 ]]; then
@@ -365,7 +380,6 @@ cfgr::set_digit() {
     return 0
   done
 }
-
 
 # cfgr::set_string  --title TITLE  --option OPT [OPT ...]  [--var VAR_NAME]
 #
@@ -394,20 +408,26 @@ cfgr::set_string() {
   local var_name=""
   local raw_options=()
 
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-      --title) title="$2"; shift 2 ;;
-      --option)
-        # Consume all following arguments as option entries until the next
-        # flag (anything starting with --) or end of arguments is reached.
+    --title)
+      title="$2"
+      shift 2
+      ;;
+    --option)
+      # Consume all following arguments as option entries until the next
+      # flag (anything starting with --) or end of arguments is reached.
+      shift
+      while (($# > 0)) && [[ "$1" != --* ]]; do
+        raw_options+=("$1")
         shift
-        while (( $# > 0 )) && [[ "$1" != --* ]]; do
-          raw_options+=("$1")
-          shift
-        done
-        ;;
-      --var) var_name="$2"; shift 2 ;;
-      *) shift ;;
+      done
+      ;;
+    --var)
+      var_name="$2"
+      shift 2
+      ;;
+    *) shift ;;
     esac
   done
 
@@ -419,10 +439,10 @@ cfgr::set_string() {
 
   for opt in "${raw_options[@]}"; do
     if [[ "$opt" == *:* ]]; then
-      labels+=("${opt%%:*}")   # everything before the first colon
-      values+=("${opt#*:}")    # everything after the first colon
+      labels+=("${opt%%:*}") # everything before the first colon
+      values+=("${opt#*:}")  # everything after the first colon
     else
-      labels+=("$opt")         # plain format: label and value are the same
+      labels+=("$opt") # plain format: label and value are the same
       values+=("$opt")
     fi
   done
@@ -452,7 +472,6 @@ cfgr::set_string() {
   done
 }
 
-
 # _CFGR_ITEMS holds the display strings sent to rofi.
 # _CFGR_DISPATCH holds a descriptor for what to do when that row is selected.
 #
@@ -460,7 +479,7 @@ cfgr::set_string() {
 # conditional items and dynamic getter calls always reflect current state.
 declare -a _CFGR_ITEMS=()
 declare -a _CFGR_DISPATCH=()
-
+declare -a _CFGR_ICONS=()
 
 # cfgr::item::bool  --var VAR  --label LABEL  [--hook HOOK]
 #
@@ -491,16 +510,31 @@ cfgr::item::bool() {
   local var=""
   local label=""
   local hook=""
+  local icon=""
 
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-      --var)   var="$2";   shift 2 ;;
-      --label) label="$2"; shift 2 ;;
-      --hook)  hook="$2";  shift 2 ;;
-      *) shift ;;
+    --var)
+      var="$2"
+      shift 2
+      ;;
+    --label)
+      label="$2"
+      shift 2
+      ;;
+    --hook)
+      hook="$2"
+      shift 2
+      ;;
+    --icon)
+      icon="$2"
+      shift 2
+      ;;
+    *) shift ;;
     esac
   done
 
+  _CFGR_ICONS+=("$icon")
   _CFGR_ITEMS+=("$label : ${!var}")
 
   # The hook field is only added to the descriptor when a hook was provided.
@@ -512,7 +546,6 @@ cfgr::item::bool() {
     _CFGR_DISPATCH+=("bool:${var}")
   fi
 }
-
 
 # cfgr::item::digit  --var VAR  --label LABEL  --title TITLE  --type TYPE
 #                    [--prompt PROMPT]  [--min MIN]  [--max MAX]
@@ -554,23 +587,50 @@ cfgr::item::digit() {
   local type=""
   local min=""
   local max=""
+  local icon=""
 
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-      --var)    var="$2";        shift 2 ;;
-      --label)  label="$2";      shift 2 ;;
-      --prompt) prompt="$2";     shift 2 ;;
-      --title)  rofi_title="$2"; shift 2 ;;
-      --type)   type="$2";       shift 2 ;;
-      --min)    min="$2";        shift 2 ;;
-      --max)    max="$2";        shift 2 ;;
-      *) shift ;;
+    --var)
+      var="$2"
+      shift 2
+      ;;
+    --label)
+      label="$2"
+      shift 2
+      ;;
+    --prompt)
+      prompt="$2"
+      shift 2
+      ;;
+    --title)
+      rofi_title="$2"
+      shift 2
+      ;;
+    --type)
+      type="$2"
+      shift 2
+      ;;
+    --min)
+      min="$2"
+      shift 2
+      ;;
+    --max)
+      max="$2"
+      shift 2
+      ;;
+    --icon)
+      icon="$2"
+      shift 2
+      ;;
+    *) shift ;;
     esac
   done
 
   # Fall back to the rofi title when no separate prompt was given.
   local hint="${prompt:-$rofi_title}"
 
+  _CFGR_ICONS+=("$icon")
   _CFGR_ITEMS+=("$label : ${!var}")
 
   # Descriptor format: digit:VAR:HINT:ROFI_TITLE:TYPE:MIN:MAX
@@ -578,7 +638,6 @@ cfgr::item::digit() {
   # plain IFS=: split in the dispatcher is safe for this type.
   _CFGR_DISPATCH+=("digit:${var}:${hint}:${rofi_title}:${type}:${min}:${max}")
 }
-
 
 # cfgr::item::string  --var VAR  --label LABEL  --title TITLE
 #                     [--hook HOOK]
@@ -628,36 +687,54 @@ cfgr::item::string() {
   local rofi_title=""
   local hook=""
   local raw_opts=()
+  local icon=""
 
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-      --var)   var="$2";        shift 2 ;;
-      --label) label="$2";      shift 2 ;;
-      --title) rofi_title="$2"; shift 2 ;;
-      --hook)  hook="$2";       shift 2 ;;
-      --option)
-        # Consume all following non-flag arguments as option entries.
+    --var)
+      var="$2"
+      shift 2
+      ;;
+    --label)
+      label="$2"
+      shift 2
+      ;;
+    --title)
+      rofi_title="$2"
+      shift 2
+      ;;
+    --hook)
+      hook="$2"
+      shift 2
+      ;;
+    --icon)
+      icon="$2"
+      shift 2
+      ;;
+    --option)
+      # Consume all following non-flag arguments as option entries.
+      shift
+      while (($# > 0)) && [[ "$1" != --* ]]; do
+        raw_opts+=("$1")
         shift
-        while (( $# > 0 )) && [[ "$1" != --* ]]; do
-          raw_opts+=("$1")
-          shift
-        done
-        ;;
-      *) shift ;;
+      done
+      ;;
+    *) shift ;;
     esac
   done
 
   # Reverse lookup: find the pretty label for the current raw value so the
   # parent menu row shows "H264" instead of "h264".
   local current_val="${!var}"
-  local display_val="$current_val"  # fall back to raw if no match is found
+  local display_val="$current_val" # fall back to raw if no match is found
   for opt in "${raw_opts[@]}"; do
     if [[ "$opt" == *:* ]] && [[ "${opt#*:}" == "$current_val" ]]; then
-      display_val="${opt%%:*}"  # the part before the first colon is the label
+      display_val="${opt%%:*}" # the part before the first colon is the label
       break
     fi
   done
 
+  _CFGR_ICONS+=("$icon")
   _CFGR_ITEMS+=("$label : $display_val")
 
   # Join options with the ASCII unit-separator (0x1F) as a delimiter.
@@ -673,7 +750,6 @@ cfgr::item::string() {
   # and the dispatcher can always peel exactly three fixed fields from the left.
   _CFGR_DISPATCH+=("string:${var}:${rofi_title}:${hook}:${opts_str%$'\x1F'}")
 }
-
 
 # cfgr::item::action  --func FUNC  --label LABEL
 #
@@ -713,12 +789,23 @@ cfgr::item::string() {
 cfgr::item::action() {
   local func=""
   local label=""
+  local icon=""
 
-  while (( $# > 0 )); do
+  while (($# > 0)); do
     case "$1" in
-      --func)  func="$2";  shift 2 ;;
-      --label) label="$2"; shift 2 ;;
-      *) shift ;;
+    --func)
+      func="$2"
+      shift 2
+      ;;
+    --label)
+      label="$2"
+      shift 2
+      ;;
+    --icon)
+      icon="$2"
+      shift 2
+      ;;
+    *) shift ;;
     esac
   done
 
@@ -733,8 +820,8 @@ cfgr::item::action() {
 
   # Descriptor format: action:FUNCNAME
   _CFGR_DISPATCH+=("action:${func}")
+  _CFGR_ICONS+=("$icon")
 }
-
 
 # cfgr::item::raw  DISPLAY_STRING  DISPATCH_STRING
 #
@@ -769,8 +856,8 @@ cfgr::item::action() {
 cfgr::item::raw() {
   _CFGR_ITEMS+=("$1")
   _CFGR_DISPATCH+=("$2")
+  _CFGR_ICONS+=("$icon")
 }
-
 
 # cfgr::dispatch  DESCRIPTOR
 #
@@ -791,89 +878,91 @@ cfgr::dispatch() {
 
   case "$type" in
 
-    bool)
-      # Descriptor format: bool:VAR  or  bool:VAR:action:HOOK
-      # IFS=: split is safe here because VAR names and hook names never
-      # contain colons.
-      local -a fields
-      IFS=: read -ra fields <<< "$descriptor"
+  bool)
+    # Descriptor format: bool:VAR  or  bool:VAR:action:HOOK
+    # IFS=: split is safe here because VAR names and hook names never
+    # contain colons.
+    local -a fields
+    IFS=: read -ra fields <<<"$descriptor"
 
-      local var="${fields[1]}"
-      local hook="${fields[3]:-}"  # fields[2] is the literal "action" sentinel; [3] is the name
+    local var="${fields[1]}"
+    local hook="${fields[3]:-}" # fields[2] is the literal "action" sentinel; [3] is the name
 
-      cfgr::toggle_bool "$var"
+    cfgr::toggle_bool "$var"
 
-      if [[ -n "$hook" ]]; then
-        eval "$hook"
-      fi
-      ;;
+    if [[ -n "$hook" ]]; then
+      eval "$hook"
+    fi
+    ;;
 
-    digit)
-      # Descriptor format: digit:VAR:HINT:ROFI_TITLE:TYPE:MIN:MAX
-      # IFS=: split is safe here because all fields are short identifiers or
-      # numbers; none of them contain colons.
-      local -a fields
-      IFS=: read -ra fields <<< "$descriptor"
+  digit)
+    # Descriptor format: digit:VAR:HINT:ROFI_TITLE:TYPE:MIN:MAX
+    # IFS=: split is safe here because all fields are short identifiers or
+    # numbers; none of them contain colons.
+    local -a fields
+    IFS=: read -ra fields <<<"$descriptor"
 
-      local var="${fields[1]}"
-      local hint="${fields[2]}"
-      local rofi_title="${fields[3]}"
-      local dtype="${fields[4]}"
-      local min="${fields[5]}"
-      local max="${fields[6]}"
+    local var="${fields[1]}"
+    local hint="${fields[2]}"
+    local rofi_title="${fields[3]}"
+    local dtype="${fields[4]}"
+    local min="${fields[5]}"
+    local max="${fields[6]}"
 
-      # Pass --min/--max only when both bounds were recorded; omitting them
-      # tells set_digit to accept any value of the correct type.
-      if [[ -n "$min" && -n "$max" ]]; then
-        cfgr::set_digit --var "$var" --title "$rofi_title" --hint "$hint" \
-          --type "$dtype" --min "$min" --max "$max"
-      else
-        cfgr::set_digit --var "$var" --title "$rofi_title" --hint "$hint" \
-          --type "$dtype"
-      fi
-      ;;
+    # Pass --min/--max only when both bounds were recorded; omitting them
+    # tells set_digit to accept any value of the correct type.
+    if [[ -n "$min" && -n "$max" ]]; then
+      cfgr::set_digit --var "$var" --title "$rofi_title" --hint "$hint" \
+        --type "$dtype" --min "$min" --max "$max"
+    else
+      cfgr::set_digit --var "$var" --title "$rofi_title" --hint "$hint" \
+        --type "$dtype"
+    fi
+    ;;
 
-    string)
-      # Descriptor format: string:VAR:ROFI_TITLE:HOOK:opts_str
-      #
-      # opts_str uses 0x1F (unit-separator) as its inner delimiter because
-      # individual options are in "Pretty Label:stored_value" format and
-      # already contain colons. An IFS=: split of the full descriptor would
-      # destroy them, so we peel the three fixed leading fields one at a time
-      # using parameter expansion instead.
-      local rest="$payload"
+  string)
+    # Descriptor format: string:VAR:ROFI_TITLE:HOOK:opts_str
+    #
+    # opts_str uses 0x1F (unit-separator) as its inner delimiter because
+    # individual options are in "Pretty Label:stored_value" format and
+    # already contain colons. An IFS=: split of the full descriptor would
+    # destroy them, so we peel the three fixed leading fields one at a time
+    # using parameter expansion instead.
+    local rest="$payload"
 
-      local var="${rest%%:*}";        rest="${rest#*:}"  # field 1: VAR name
-      local rofi_title="${rest%%:*}"; rest="${rest#*:}"  # field 2: rofi title
-      local hook="${rest%%:*}";       rest="${rest#*:}"  # field 3: hook (may be empty)
-      # Everything remaining is the opts_str; it may contain colons freely.
-      local opts_str="$rest"
+    local var="${rest%%:*}"
+    rest="${rest#*:}" # field 1: VAR name
+    local rofi_title="${rest%%:*}"
+    rest="${rest#*:}" # field 2: rofi title
+    local hook="${rest%%:*}"
+    rest="${rest#*:}" # field 3: hook (may be empty)
+    # Everything remaining is the opts_str; it may contain colons freely.
+    local opts_str="$rest"
 
-      # Re-split the options blob on 0x1F to recover the original array.
-      local -a opts
-      IFS=$'\x1F' read -ra opts <<< "$opts_str"
+    # Re-split the options blob on 0x1F to recover the original array.
+    local -a opts
+    IFS=$'\x1F' read -ra opts <<<"$opts_str"
 
-      cfgr::set_string --title "$rofi_title" --var "$var" --option "${opts[@]}"
+    cfgr::set_string --title "$rofi_title" --var "$var" --option "${opts[@]}"
 
-      if [[ -n "$hook" ]]; then
-        eval "$hook"
-      fi
-      ;;
+    if [[ -n "$hook" ]]; then
+      eval "$hook"
+    fi
+    ;;
 
-    action)
-      # Descriptor format: action:FUNCNAME
-      # eval runs the function name stored in the descriptor.
-      eval "${payload}"
-      ;;
+  action)
+    # Descriptor format: action:FUNCNAME
+    # eval runs the function name stored in the descriptor.
+    eval "${payload}"
+    ;;
 
-    display)
-      # Read-only label row; selecting it intentionally does nothing.
-      :
-      ;;
+  display)
+    # Read-only label row; selecting it intentionally does nothing.
+    :
+    ;;
 
   esac
 }
-
 
 # cfgr::run  TITLE  BUILD_FUNC  [SETTINGS_VAR ...]
 #
@@ -914,20 +1003,24 @@ cfgr::run() {
 
     source "$VIBRANIUM_USER_SETTINGS"
 
-    if (( ${#settings[@]} > 0 )); then
+    if ((${#settings[@]} > 0)); then
       helpers::check "${settings[@]}"
     fi
 
     _CFGR_ITEMS=()
     _CFGR_DISPATCH=()
+    _CFGR_ICONS=()
+
     "$build_func"
 
     local -a options
     mapfile -t options < <(cfgr::build_menu "${_CFGR_ITEMS[@]}")
 
-    local chosen=""
-    helpers::ui::menu chosen "$title" "ESC to go back" \
-      -selected-row "$index" -- "${options[@]}"
+    # TODO:pass -show-icons only for top-level entries like the root
+    # of Vibranium menu or the root of Settings submenu; hide icons
+    # for the actual settings entries.
+
+    helpers::ui::menu chosen "$title" "ESC to go back" -selected-row "$index" -- "${options[@]}"
 
     [[ -z "$chosen" ]] && break
 
