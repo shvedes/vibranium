@@ -2,8 +2,6 @@
 
 # shellcheck disable=SC2206
 
-source vb-lib-core
-
 # Populated by _discover_themes at startup.
 # FAMILIES maps family display name -> space-separated variant display names.
 # STANDALONE_THEMES maps display name -> display name (value == key).
@@ -26,6 +24,7 @@ CURRENT_THEME_PATH="$XDG_CONFIG_HOME/vibranium/current/theme"
 NEXT_THEME_PATH="$XDG_CONFIG_HOME/vibranium/current/next-theme"
 THEME_NAME_FILE="$XDG_CONFIG_HOME/vibranium/current/theme.name"
 USER_THEMES_PATH="$XDG_CONFIG_HOME/vibranium/themes"
+SELF="${0##*/}"
 
 # "tokyonight-night" -> "Tokyonight-Night"
 capitalize() {
@@ -60,7 +59,9 @@ _discover_in_dir() {
   local theme_dir folder family variant light chosen key val
 
   for theme_dir in "$dir"/*/; do
-    [[ -d "$theme_dir" ]] || continue
+    if [[ ! -d "$theme_dir" ]]; then
+      continue
+    fi
 
     folder="${theme_dir%/}"
     folder="${folder##*/}"
@@ -72,11 +73,9 @@ _discover_in_dir() {
     if [[ -f "$theme_dir/theme.info" ]]; then
       # Read all recognised fields; silently ignore blank/unknown lines
       while IFS='=' read -r key val; do
-        case "$key" in
-        FAMILY) family="$val" ;;
-        VARIANT) variant="$val" ;;
-        LIGHT) light="$val" ;;
-        esac
+        [[ $key == FAMILY ]] && family=$val
+        [[ $key == VARIANT ]] && variant=$val
+        [[ $key == LIGHT ]] && light=$val
       done <"$theme_dir/theme.info"
     else
       # Fallback: derive family/variant from folder name; do NOT write theme.info
@@ -90,10 +89,11 @@ _discover_in_dir() {
         variant="${suffix^}"
       fi
 
-      # Omarchy-compatible light flag: read from theme.light if present
+      # Omarchy-compatible light flag
       if [[ -f "$theme_dir/theme.light" ]]; then
-        light="$(<"$theme_dir/theme.light")"
-        light="${light,,}" # normalise to lowercase
+        light="true"
+      else
+        light="false"
       fi
     fi
 
@@ -140,9 +140,9 @@ _discover_themes() {
 
 get_current_target_basename() {
   if [[ -f "$THEME_NAME_FILE" ]]; then
-    cat "$THEME_NAME_FILE"
+    printf "%s" "$(<$THEME_NAME_FILE)"
   else
-    echo ""
+    printf ""
   fi
 }
 
@@ -157,15 +157,18 @@ is_current_theme() {
 
 # Sort keys descending by length
 _sort_by_length_desc() {
-  local -n _arr="$1"
-  local key
-  mapfile -t _arr < <(
-    for key in "${_arr[@]}"; do
-      printf '%d %s\n' "${#key}" "$key"
-    done | sort -rn | while read -r _ key; do
-      printf '%s\n' "$key"
+  local -n arr="$1"
+  local i j tmp
+
+  for ((i = 0; i < ${#arr[@]}; i++)); do
+    for ((j = i + 1; j < ${#arr[@]}; j++)); do
+      if ((${#arr[j]} > ${#arr[i]})); then
+        tmp=${arr[i]}
+        arr[i]=${arr[j]}
+        arr[j]=$tmp
+      fi
     done
-  )
+  done
 }
 
 _build_family_keys() {
@@ -179,17 +182,19 @@ _build_family_keys() {
 }
 
 _find_index() {
-  # Echo the 0-based index of $2 in array named $1, or 0 if not found
+  # Printf the 0-based index of $2 in array named $1, or 0 if not found
   local -n _arr="$1"
   local needle="$2"
   local i
+
   for i in "${!_arr[@]}"; do
     [[ "${_arr[$i]}" == "$needle" ]] && {
-      echo "$i"
+      printf "$i"
       return
     }
   done
-  echo 0
+
+  printf "0"
 }
 
 pick_family() {
@@ -209,7 +214,7 @@ pick_family() {
     local k
     for k in "${keys[@]}"; do
       [[ "$k" == "$family_chosen" ]] && {
-        echo "$family_chosen"
+        printf "%s" "$family_chosen"
         return 0
       }
     done
@@ -234,7 +239,7 @@ pick_variant() {
 
     for v in "${items[@]}"; do
       [[ "$v" == "$display" ]] && {
-        echo "$display"
+        printf "%s" "$display"
         return 0
       }
     done
@@ -249,6 +254,7 @@ apply_theme() {
   # official themes (with or without a user overlay) copy from VIBRANIUM/themes.
   local source_label="${THEME_SOURCE[$folder_name]:-official}"
   local src_path
+
   if [[ "$source_label" == "user" ]]; then
     src_path="$USER_THEMES_PATH/$folder_name"
   else
@@ -274,8 +280,18 @@ apply_theme() {
 
   # Base layer: official theme (or the user-only theme when there is no official counterpart).
   # Exclude backgrounds/ from the synchronous pass — it's the only thing that's ever slow.
-  find "$src_path" -maxdepth 1 -mindepth 1 ! -name "backgrounds" -exec cp -r {} "$NEXT_THEME_PATH/" \;
+  files=()
+  while IFS= read -r -d '' file; do
+    files+=("$file")
+  done < <(find "$src_path" -maxdepth 1 -mindepth 1 ! -name "backgrounds" -print0)
 
+  if ((${#files[@]} > 0)); then
+    cp -a -- "${files[@]}" "$NEXT_THEME_PATH/"
+  fi
+
+  # Create hard links for all the wallpapers.
+  # This makes the copy process instant.
+  # It avoids waiting for all the big images to copy.
   if [[ -d "$src_path/backgrounds" ]]; then
     mkdir -p "$NEXT_THEME_PATH/backgrounds"
     cp -rl "$src_path/backgrounds/." "$NEXT_THEME_PATH/backgrounds/"
@@ -285,14 +301,21 @@ apply_theme() {
   # Files present in USER_THEMES_PATH/$folder_name overwrite their official
   # counterparts; files absent from the overlay are inherited from the base.
   if [[ "$source_label" == "official" && -d "$USER_THEMES_PATH/$folder_name" ]]; then
-    find "$USER_THEMES_PATH/$folder_name" -maxdepth 1 -mindepth 1 \
-      ! -name "backgrounds" -exec cp -r {} "$NEXT_THEME_PATH/" \;
+    files=()
+    while IFS= read -r -d '' file; do
+      files+=("$file")
+    done < <(find "$USER_THEMES_PATH" -maxdepth 1 -mindepth 1 ! -name "backgrounds" -print0)
+
+    if ((${#files[@]} > 0)); then
+      cp -a -- "${files[@]}" "$NEXT_THEME_PATH/"
+    fi
 
     if [[ -d "$USER_THEMES_PATH/$folder_name/backgrounds" ]]; then
       cp -rl "$USER_THEMES_PATH/$folder_name/backgrounds/." "$NEXT_THEME_PATH/backgrounds/"
     fi
   fi
 
+  # Create missing config files from templates
   vb-theme-set-templates
 
   # Atomic swap: replace current with the fully-built staging directory
@@ -300,11 +323,12 @@ apply_theme() {
   mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"
 
   # Record the active theme name for is_current_theme and external tooling
-  echo "$folder_name" >"$THEME_NAME_FILE"
+  printf "%s" "$folder_name" >"$THEME_NAME_FILE"
 
   # Determine light/dark from discovery metadata; fall back to folder-name
   # regex for themes that carry no light flag in either theme.info or theme.light
   local is_light=false
+
   if [[ -n "${THEME_LIGHT[$folder_name]+_}" ]]; then
     [[ "${THEME_LIGHT[$folder_name]}" == "true" ]] && is_light=true
   elif [[ $folder_name =~ (light|latte|dawn)$ ]]; then
@@ -314,19 +338,17 @@ apply_theme() {
   if $is_light; then
     local icon_theme="Papirus-Light"
     local color_scheme="prefer-light"
-
-    sed -i "/custom_palette/s/=.*/=false/" "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
-    sed -i "/custom_palette/s/=.*/=false/" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
+    palette=false
   else
     local icon_theme="Papirus-Dark"
     local color_scheme="prefer-dark"
-
-    sed -i "/custom_palette/s/=.*/=true/" "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"
-    sed -i "/custom_palette/s/=.*/=true/" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
+    palette=true
   fi
 
-  # QT{5,6}CT won't detect this change automatically, so trigger
-  touch "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf" "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf"
+  for v in 5 6; do
+    sed -i "/custom_palette/s/=.*/=$palette/" \
+      "$XDG_CONFIG_HOME/qt${v}ct/qt${v}ct.conf"
+  done
 
   gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
   gsettings set org.gnome.desktop.interface color-scheme "$color_scheme"
@@ -342,19 +364,32 @@ get_wallpaper() {
     if [[ -f "$state_file" ]]; then
       local saved_wallpaper
       saved_wallpaper="$(<"$state_file")"
+
       if [[ -f "$saved_wallpaper" ]]; then
-        echo "$saved_wallpaper"
+        printf "%s" "$saved_wallpaper"
         return 0
       fi
     fi
   fi
 
-  find "$CURRENT_THEME_PATH/backgrounds/" -type f | head -n1
+  shopt -s nullglob
+  local files=("$CURRENT_THEME_PATH/backgrounds/"*)
+  shopt -u nullglob
+
+  if [[ ${#files[@]} -gt 0 ]]; then
+    printf "%s" "${files[0]}"
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
 }
 
 show_help() {
-  cat <<EOF
-Usage: ${0##*/} [OPTION]... [THEME]
+  shcat <<EOF
+Usage: $SELF [OPTION]... [THEME]
 
 Apply a Vibranium theme. With no THEME argument an interactive picker is
 launched. With a THEME argument the theme is applied non-interactively.
@@ -373,10 +408,10 @@ Arguments:
                     word, e.g.: evergarden
 
 Examples:
-  ${0##*/}                        Launch interactive picker
-  ${0##*/} gruvbox-hard           Apply by folder name directly
-  ${0##*/} Catppuccin-Mocha       Apply by capitalized name
-  ${0##*/} "Tokyonight Night"     Apply with a space-separated name
+  $SELF                        Launch interactive picker
+  $SELF gruvbox-hard           Apply by folder name directly
+  $SELF Catppuccin-Mocha       Apply by capitalized name
+  $SELF "Tokyonight Night"     Apply with a space-separated name
 EOF
 }
 
@@ -394,7 +429,21 @@ list_themes() {
     names+=("${FOLDER_MAP[$family]}")
   done
 
-  printf '%s\n' "${names[@]}" | sort
+  # insertion sort (lexicographical)
+  local i j key
+  for ((i = 1; i < ${#names[@]}; i++)); do
+    key=${names[i]}
+    j=$((i - 1))
+
+    while ((j >= 0)) && [[ ${names[j]} > $key ]]; do
+      names[j+1]=${names[j]}
+      ((j--))
+    done
+
+    names[j+1]=$key
+  done
+
+  printf '%s\n' "${names[@]}"
 }
 
 # Discover themes before any command handling
@@ -410,6 +459,8 @@ case "${1-}" in
   exit 0
   ;;
 esac
+
+source vb-lib-core
 
 if [[ -n "$1" ]]; then
   # Normalise spaces to hyphens ("Tokyonight Night" -> "Tokyonight-Night")
@@ -430,7 +481,7 @@ if [[ -n "$1" ]]; then
     VARIANT="${INPUT_THEME#*-}"
 
     if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
-      log::error "Family '$FAMILY' not found. Run '${0##*/} --list' to see available themes."
+      log::error "Family '$FAMILY' not found. Run '$SELF --list' to see available themes."
       exit 1
     fi
 
@@ -444,7 +495,7 @@ if [[ -n "$1" ]]; then
     done
 
     if ! $VARIANT_FOUND; then
-      log::error "Variant '$VARIANT' not found in family '$FAMILY'. Run '${0##*/} --list' to see available themes."
+      log::error "Variant '$VARIANT' not found in family '$FAMILY'. Run '$SELF --list' to see available themes."
       exit 1
     fi
 
@@ -480,7 +531,11 @@ else
     _vvariants=(${FAMILIES[$FAMILY]})
     _sort_by_length_desc _vvariants
     _vitems=()
-    for _vv in "${_vvariants[@]}"; do _vitems+=("${_vv//-/ }"); done
+
+    for _vv in "${_vvariants[@]}"; do
+      _vitems+=("${_vv//-/ }")
+    done
+
     _last_variant_row[$FAMILY]="$(_find_index _vitems "$VARIANT_DISPLAY")"
 
     VARIANT="${VARIANT_DISPLAY// /-}"
@@ -502,16 +557,16 @@ if [[ ! -d "$VIBRANIUM/themes/$FOLDER_NAME" && ! -d "$USER_THEMES_PATH/$FOLDER_N
 fi
 
 apply_theme "$CHOSEN" "$FOLDER_NAME"
-
-touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")" &
-
-killall -s USR2 btop &>/dev/null
-
+vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")"
 vb-cmd-reload --quiet
 
-vb-theme-set-browser &
-vb-theme-set-gtk &
+# These things can be easily be set in the backgrounds
+(
+  touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+  killall --quiet -s USR2 btop
 
-vb-theme-set-obsidian &
-vb-theme-set-svg &
+  vb-theme-set-gtk
+  vb-theme-set-svg
+  vb-theme-set-browser
+  vb-theme-set-obsidian
+) &
