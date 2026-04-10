@@ -230,6 +230,8 @@ _operation_canceled() {
     esac
   done
 
+  term::disable_input
+
   printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
@@ -253,6 +255,8 @@ _uninstallation_complete() {
   if [[ "$CONSERVATIVE" == true ]]; then
     return
   fi
+
+  term::disable_input
 
   printf "%s[VIBRANIUM]%s Uninstallation complete" "$GREEN" "$RESET"
 
@@ -346,6 +350,12 @@ _choose_packages() {
 _remove_orphans() {
   echo -e "${GREEN}[VIBRANIUM]${RESET} Removing orphan packages..."
   yay -Ycc --noconfirm &>/dev/null
+}
+
+_update_bar_module() {
+  # Edge case: explicitly update the Waybar module
+  # in case if we deleted a package that was in update queue.
+  vb-cmd-refresh-bar-module pacman
 }
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
@@ -494,6 +504,7 @@ if term::ask_yes_no Y "Proceed with uninstallation?"; then
     fi
 
     _remove_orphans
+    _update_bar_module
     _uninstallation_complete
   else
     _operation_canceled
