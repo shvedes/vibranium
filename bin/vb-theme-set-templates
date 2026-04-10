@@ -67,27 +67,34 @@ color_sources=()
 [[ -f $COLORS_EXTENDED_FILE ]] && color_sources+=("$COLORS_EXTENDED_FILE")
 
 if [[ ${#color_sources[@]} -gt 0 ]]; then
-  sed_script="$VIBRANIUM_RUNTIME/${0##*/}.sed"
+  # Build the substitution table and write it directly to a file for awk.
+  #
+  # SOH (\x01) is the field separator between placeholder and value.
+  # Neither placeholder syntax ({{ name }}) nor any color/font value can
+  # contain that byte, so no escaping is needed.
+  subs_file="$VIBRANIUM_RUNTIME/${0##*/}.subs"
 
   for src in "${color_sources[@]}"; do
     while IFS='=' read -r key value; do
-      # strip quotes and spaces from key
+      # Strip quotes and spaces from the key side
       key="${key//[\"\' ]/}"
 
-      # skip empty lines and comments
-      if [[ ! $key && $key != \#* ]]; then
+      # Skip blank lines (key is empty) and comment lines (key starts with #).
+      # The original used && here, which only skipped blank lines; || is the
+      # correct guard that also covers comment-only lines.
+      if [[ ! $key || $key == \#* ]]; then
         continue
       fi
 
+      # Extract the value between the first pair of quotes,
+      # discarding everything after the closing quote (inline comments)
       value="${value#*[\"\']}"
-      # extract value between quotes
-      # (ignores inline comments)
       value="${value%%[\"\']*}"
 
-      printf 's|{{ %s }}|%s|g\n' "$key" "$value"
-      printf 's|{{ %s_strip }}|%s|g\n' "$key" "${value#\#}"
-      printf 's|{{ %s_upper }}|%s|g\n' "$key" "${value^^}"
-      printf 's|{{ %s_lower }}|%s|g\n' "$key" "${value,,}"
+      printf '{{ %s }}\x01%s\n' "$key" "$value"
+      printf '{{ %s_strip }}\x01%s\n' "$key" "${value#\#}"
+      printf '{{ %s_upper }}\x01%s\n' "$key" "${value^^}"
+      printf '{{ %s_lower }}\x01%s\n' "$key" "${value,,}"
 
       if [[ $value =~ ^# ]]; then
         hex="${value#\#}"
@@ -97,20 +104,27 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
         g=$((16#${hex:2:2}))
         b=$((16#${hex:4:2}))
 
-        printf 's|{{ %s_0x }}|0x%s|g\n' "$key" "$hex"
-        printf 's|{{ %s_rgb }}|%d,%d,%d|g\n' "$key" "$r" "$g" "$b"
-        printf 's|{{ %s_r }}|%d|g\n' "$key" "$r"
-        printf 's|{{ %s_g }}|%d|g\n' "$key" "$g"
-        printf 's|{{ %s_b }}|%d|g\n' "$key" "$b"
+        printf '{{ %s_0x }}\x010x%s\n' "$key" "$hex"
+        printf '{{ %s_rgb }}\x01%d,%d,%d\n' "$key" "$r" "$g" "$b"
+        printf '{{ %s_r }}\x01%d\n' "$key" "$r"
+        printf '{{ %s_g }}\x01%d\n' "$key" "$g"
+        printf '{{ %s_b }}\x01%d\n' "$key" "$b"
       fi
     done <"$src"
-  done >"$sed_script"
+  done >"$subs_file"
 
   shopt -s nullglob
 
-  # Process user templates first, then built-in templates (user overrides built-in).
-  # Within each dir, .extended.tpl files are processed before plain .tpl files so
-  # extended variants win over their plain counterparts via the ! -f guard below.
+  # Collect templates that need processing and write a tpl->output map for awk.
+  #
+  # Priority: user templates before built-in, extended before plain within
+  # each dir.  Because all rendering is batched into one awk call, nothing is
+  # written to disk during this loop, so "! -f output_path" alone would not
+  # deduplicate within the run.  seen_outputs covers that case.
+  outmap_file="$VIBRANIUM_RUNTIME/${0##*/}.outmap"
+  declare -A seen_outputs
+  tpl_files=()
+
   for tpl_dir in "$USER_TEMPLATES_DIR" "$TEMPLATES_DIR"; do
     for tpl in "$tpl_dir"/*.extended.tpl "$tpl_dir"/*.tpl; do
       filename="${tpl##*/}"            # strip directory path
@@ -122,12 +136,25 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
 
       output_path="$NEXT_THEME_DIR/$filename"
 
-      # Don't overwrite configs already written by a higher-priority source
-      if [[ ! -f $output_path ]]; then
-        sed -f "$sed_script" "$tpl" >"$output_path"
+      # Skip if already written by a previous run, or already claimed by a
+      # higher-priority template earlier in this loop
+      if [[ ! -f $output_path && -z ${seen_outputs[$output_path]+x} ]]; then
+        printf '%s\x01%s\n' "$tpl" "$output_path" >>"$outmap_file"
+        tpl_files+=("$tpl")
+        seen_outputs["$output_path"]=1
       fi
     done
   done
 
-  rm "$sed_script"
+  if [[ ${#tpl_files[@]} -gt 0 ]]; then
+    awk -f "$VIBRANIUM/awk/vb-theme-set-templates.awk" \
+      "$subs_file" "$outmap_file" "${tpl_files[@]}"
+    rm "$outmap_file"
+  else
+    # No templates to process;
+    # remove the (empty) outmap file if it was created
+    rm -f "$outmap_file"
+  fi
+
+  rm "$subs_file"
 fi
