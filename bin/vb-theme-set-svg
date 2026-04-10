@@ -7,6 +7,4 @@ source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 
 ICONS_DIR="$XDG_DATA_HOME/icons/Vibranium/scalable/apps"
 
-for file in "$ICONS_DIR"/*; do
-  sed -i "/style=/s/fill: #.*\"/fill: ${P_TEXT}\"/g" "$file"
-done
+sed -iE "/style=/s/fill: #.*\"/fill: ${P_TEXT}\"/g" "$ICONS_DIR"/*.svg
