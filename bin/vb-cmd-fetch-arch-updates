@@ -1,0 +1,45 @@
+#!/usr/bin/bash
+
+CACHE_FILE="$VIBRANIUM_CACHE/pkg-updates.list"
+TIMESTAMP_FILE="$VIBRANIUM_CACHE/pkg-updates.timestamp"
+INTERVAL=$((3 * 24 * 60 * 60))
+THRESHOLD=125
+
+missing=()
+
+command -v checkupdates >/dev/null 2>&1 || missing+=("checkupdates")
+command -v yay >/dev/null 2>&1 || missing+=("yay")
+
+if ((${#missing[@]} > 0)); then
+  notify-send -r 3 -t 120000 \
+    "Could Not Fetch System Updates" \
+    "Missing required dependencies: ${missing[*]}"
+  exit 1
+fi
+
+while ! ping -c 1 1.1.1.1 &>/dev/null; do
+  sleep 1
+done
+
+checkupdates --nocolor 2>/dev/null >"$CACHE_FILE"
+yay -Qua --color=never 2>/dev/null >>"$CACHE_FILE"
+
+mapfile -t LINES <"$CACHE_FILE"
+TOTAL_COUNT=${#LINES[@]}
+
+if ((TOTAL_COUNT >= THRESHOLD)); then
+  TIMESTAMP_NOW=$(date +%s)
+  TIMESTAMP_LAST=0
+
+  if [[ -f "$TIMESTAMP_FILE" ]]; then
+    TIMESTAMP_LAST=$(<"$TIMESTAMP_FILE")
+  fi
+
+  if ((TIMESTAMP_NOW - TIMESTAMP_LAST >= INTERVAL)); then
+    notify-send -r 3 -t 120000 \
+      "$TOTAL_COUNT Packages Are Awaiting Updates" \
+      "On Arch it is recommended to update your system regularly"
+
+    printf "%s" "$TIMESTAMP_NOW" >"$TIMESTAMP_FILE"
+  fi
+fi

@@ -14,52 +14,13 @@ if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == false ]]; then
   exit 0
 fi
 
-# Waybar is launched via systemd, so ideally we get its PID
-# via a systemctl call (this is also slightly faster than calling pidof).
-WAYBAR_PID="$(systemctl --user show waybar -p MainPID --value)"
-
-if ((WAYBAR_PID == 0)); then
-  # Not launched via systemd or inactive.
-  # Try to get with pidof instead.
-  WAYBAR_PID="$(pidof waybar)"
-
-  # If empty - the process doesn't exist.
-  if [[ -z "$WAYBAR_PID" ]]; then
-    if ! term::is_headless; then
-      log::error "Waybar isn't active!"
-      exit 1
-    fi
-  fi
+if ! term::is_headless && [[ "$1" != "--force" ]]; then
+  log::warn "Don't run this script manually!"
+  log::warn "To bypass, run with --force flag"
+  exit 1
 fi
-
-if ! command -v checkupdates >/dev/null; then
-  # If executed from a terminal
-  if ! term::is_headless; then
-    log::error "Missing required dependencies: pacman-contrib"
-    log::error "To install, run 'sudo pacman -S pacman-contrib'"
-    exit 1
-  fi
-
-  text="<span foreground='red2'>\uf071</span>"
-  tooltip="Missing required dependencies: pacman-contrib"
-
-  printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
-
-  # Exit with code 0.
-  # Otherwise Waybar won't display json string
-  exit 0
-fi
-
-_wait_for_connection() {
-  while ! ping -c 1 1.1.1.1 &>/dev/null; do
-    sleep 1
-  done
-}
 
 make_tooltip() {
-  local any=false
-
-  # If not then there's no updates available.
   if [[ ! -s "$PKG_LIST" ]]; then
     printf "You're up to date!"
     return
@@ -70,7 +31,14 @@ make_tooltip() {
   awk -f "$VIBRANIUM/awk/vb-bar-pacman.awk" "$PKG_LIST"
 }
 
-MARKER="$VIBRANIUM_RUNTIME/bar.updates.pid.${WAYBAR_PID}"
+WAYBAR_PID=$(pidof waybar)
+
+if [[ -z $WAYBAR_PID ]]; then
+  log::error "Waybar PID not found!"
+  exit 1
+fi
+
+MARKER="$VIBRANIUM_RUNTIME/waybar.$WAYBAR_PID"
 
 if [[ "$VIBRANIUM_BAR_SHOW_ANIMATION" == false ]]; then
   show_spinner=false
@@ -95,50 +63,29 @@ else
   fi
 fi
 
-_wait_for_connection &
-connection_pid=$!
+PKG_LIST="$VIBRANIUM_CACHE/pkg-updates.list"
+
+systemctl -q --user start fetch-arch-updates.service &
 
 if [[ "$show_spinner" == true ]]; then
-  helpers::bar::spinner "Waiting for the internet connection..." $connection_pid
+  helpers::bar::spinner "Getting updates..." $!
 else
-  wait $connection_pid
+  wait $!
 fi
 
-PKG_LIST="$VIBRANIUM_CACHE/bar.updates.list"
+exit_status="$(systemctl --user show fetch-arch-updates.service -p ExecMainStatus --value)"
 
-(
-  checkupdates --nocolor 2>/dev/null
-  yay -Qua --color=never 2>/dev/null
-) >"$PKG_LIST" &
-get_updates_pid=$!
+if ((exit_status != 0)); then
+  text="<span foreground='red2'>\uf071</span>"
+  tooltip="Update service failed. For more information, try:\n"
+  tooltip+="systemctl --user status fetch-arch-updates.service"
 
-if [[ "$show_spinner" == true ]]; then
-  helpers::bar::spinner "Getting updates..." $get_updates_pid
-else
-  wait $get_updates_pid
+  printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
+  exit 0
 fi
 
-TOTAL_COUNT="$(wc -l <"$PKG_LIST")"
-
-# To avoid spamming on every re-exec, we persist the last-shown unix timestamp to a state
-# file and only fire the notification again once 3 real days have passed since the last one.
-NOTIF_STATE_FILE="$VIBRANIUM_CACHE/${0##*/}.timestamp"
-NOTIF_INTERVAL=$((3 * 24 * 60 * 60)) # 3 days in seconds
-
-if ((TOTAL_COUNT > 125)); then
-  now=$(date +%s)
-  last=0
-
-  if [[ -f "$NOTIF_STATE_FILE" ]]; then
-    last=$(<"$NOTIF_STATE_FILE")
-  fi
-
-  if ((now - last >= NOTIF_INTERVAL)); then
-    msg+="Remember that on Arch, it is recommended to update your system regularly"
-    notify-send -r 3 -t $((120 * 1000)) "More Than $TOTAL_COUNT Are Awaiting Updates" "$msg"
-    echo "$now" >"$NOTIF_STATE_FILE"
-  fi
-fi
+mapfile -t COUNT <"$PKG_LIST"
+TOTAL_COUNT=${#COUNT[@]}
 
 if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES" == false ]]; then
   if ((TOTAL_COUNT == 0)); then
@@ -151,10 +98,7 @@ if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
   text="<span foreground='DimGray'>|</span> "
 fi
 
-icon="<span foreground='CornflowerBlue'>📦</span>"
-text+="$icon $TOTAL_COUNT"
+text+="<span foreground='CornflowerBlue'>📦</span> $TOTAL_COUNT"
 tooltip="$(make_tooltip "$PKG_LIST")"
-
-rm -f "$PKG_LIST"
 
 jq -nc --unbuffered --arg text "$text" --arg tooltip "$tooltip" '{text: $text, tooltip: $tooltip}'

@@ -22,6 +22,7 @@ fi
 
 user_timers=(
   "vibranium-update"
+  "fetch-arch-updates"
 )
 
 masked_services=(

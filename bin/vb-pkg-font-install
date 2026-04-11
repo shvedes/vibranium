@@ -65,7 +65,7 @@ LIST="$(<"$VIBRANIUM_CACHE/${0##*/}.list")"
 mapfile -t chosen < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
 
 term::enable_input
-rm -f "$TMP"
+rm -f "$VIBRANIUM_CACHE/${0##*/}.list"
 
 if [[ ${#chosen[@]} -eq 0 ]]; then
   _operation_canceled

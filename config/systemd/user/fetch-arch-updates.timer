@@ -1,0 +1,11 @@
+[Unit]
+Description=Fetch Arch Linux package updates every 15 minutes
+
+[Timer]
+OnCalendar=*:0/15
+OnBootSec=0
+Persistent=true
+Unit=fetch-arch-updates.service
+
+[Install]
+WantedBy=default.target
