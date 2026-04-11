@@ -1,8 +1,9 @@
 #!/usr/bin/bash
 
-source vb-lib-core
+# shellcheck disable=SC2034
 
-ICON_DIR="$HOME/.local/share/applications/icons"
+ICON_DIR="$XDG_DATA_HOME/applications/icons"
+SELF="${0##*/}"
 
 # ---------------------------------------------------------------------------
 # Flags populated by argument parsing below. All default to empty; interactive
@@ -18,9 +19,15 @@ EXTRA_KEYWORDS=""
 CATEGORY=""
 INTERACTIVE_MODE=false
 
+_shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 _usage() {
-  cat <<EOF
-Usage: ${0##*/} [OPTION]...
+  _shcat <<EOF
+Usage: $SELF [OPTION]...
 
 Install a Progressive Web App shortcut as a .desktop launcher entry.
 
@@ -119,23 +126,16 @@ done
 
 _operation_complete() {
   term::disable_input
-
   printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
   read -n1 -r -p $'Installation complete. Press any key to exit ' dummy
-
   term::enable_input
 }
 
 _operation_canceled() {
-  # The blocking read is only appropriate in interactive mode. In non-interactive
-  # mode all output is already suppressed, so there is nothing to wait on.
   [[ $INTERACTIVE_MODE == true ]] || return
-
   term::disable_input
-
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
   read -n1 -r -s -p $'. Press any key to exit' dummy
-
   term::enable_input
 }
 
@@ -151,11 +151,11 @@ _operation_canceled() {
 _auto_keywords_from_url() {
   local url="$1"
 
-  local host="${url#*://}" # remove protocol
-  host="${host%%/*}"       # remove path
-  host="${host%%\?*}"      # remove query
-  host="${host%%#*}"       # remove fragment
-  host="${host#www.}"      # strip www.
+  local host="${url#*://}"
+  host="${host%%/*}"
+  host="${host%%\?*}"
+  host="${host%%#*}"
+  host="${host#www.}"
 
   IFS='.' read -ra parts <<<"$host"
 
@@ -163,29 +163,22 @@ _auto_keywords_from_url() {
   local count="${#parts[@]}"
 
   if ((count < 2)); then
-    # Single component
     local cap="${parts[0]^}"
     keywords="${cap};"
   else
-    # All parts except the last (TLD)
     for ((i = 0; i < count - 1; i++)); do
-      # Skip parts that are too short (e.g. "co" in .co.uk)
       ((${#parts[$i]} > 2)) || continue
       local cap="${parts[$i]^}"
       keywords+="${cap};"
     done
   fi
 
-  # Extract the path portion, but only when a '/' actually follows the host.
-  # Without this guard, a domain-only URL like "https://example.com" leaves
-  # path="example.com" after the protocol strip, causing the TLD to be split
-  # out as a keyword in the segment loop below.
   local _after_proto="${url#*://}"
   local path=""
   if [[ "$_after_proto" == */* ]]; then
-    path="${_after_proto#*/}" # remove host
-    path="${path%%\?*}"       # remove query string
-    path="${path%%#*}"        # remove fragment
+    path="${_after_proto#*/}"
+    path="${path%%\?*}"
+    path="${path%%#*}"
   fi
 
   if [[ -z "$path" || "$path" == "/" ]]; then
@@ -193,25 +186,19 @@ _auto_keywords_from_url() {
     return
   fi
 
-  # Extract ONLY the very last segment after the final '/'
   local last_segment="${path##*/}"
 
-  # If the URL ends with '/', last_segment will be empty -> fall back to previous segment
   if [[ -z "$last_segment" ]]; then
-    # Remove trailing / and take the new last segment
     path="${path%/}"
     last_segment="${path##*/}"
   fi
 
-  # Basic URL decoding for common cases
   last_segment="${last_segment//%20/ }"
   last_segment="${last_segment//%2D/-}"
   last_segment="${last_segment//%5F/_}"
 
-  # Split on -, _, ., / and spaces
   IFS=' -_./' read -ra words <<<"$last_segment"
 
-  # Common stop words (lowercase)
   local -A stop_words=(
     [the]=1 [a]=1 [an]=1 [and]=1 [or]=1 [of]=1 [in]=1 [on]=1 [for]=1
     [with]=1 [to]=1 [from]=1 [by]=1 [at]=1 [as]=1 [is]=1 [are]=1
@@ -221,11 +208,8 @@ _auto_keywords_from_url() {
 
   for word in "${words[@]}"; do
     [[ -z "$word" || ${#word} -le 2 ]] && continue
-
     local lower="${word,,}"
     [[ ${stop_words[$lower]} ]] && continue
-
-    # Capitalize first letter
     local capitalized="${word^}"
     keywords+="${capitalized};"
   done
@@ -237,8 +221,6 @@ _auto_keywords_from_url() {
 # Fetch the HTML of a URL and extract the content of the <title> tag.
 # Prints the title (stripped of leading/trailing whitespace) on stdout.
 # Returns 0 on any HTTP response, 1 if curl could not connect at all.
-# The -f flag is intentionally omitted so that error pages (4xx/5xx) still
-# return a body; we only want to detect network-level failures here.
 # ---------------------------------------------------------------------------
 _fetch_page_title() {
   local url="$1"
@@ -256,7 +238,6 @@ _fetch_page_title() {
 
 # ---------------------------------------------------------------------------
 # Check that a URL is reachable by sending an HTTP HEAD request.
-# Uses a 10-second timeout and follows up to 3 redirects.
 # Returns 0 if the server responds with any HTTP status, 1 otherwise.
 # ---------------------------------------------------------------------------
 _check_url_reachable() {
@@ -278,13 +259,12 @@ _check_url_reachable() {
 }
 
 # ---------------------------------------------------------------------------
-# Scan all installed .desktop files for one whose Exec= line was written by
-# this tool for the given URL. Prints the matching file path and returns 0
-# if found, returns 1 otherwise.
+# Scan all installed PWA .desktop files for one whose Exec= line matches
+# the given URL. Prints the matching file path and returns 0 if found.
 # ---------------------------------------------------------------------------
 _find_webapp_by_url() {
   local url="$1"
-  local dir="$HOME/.local/share/applications"
+  local dir="$XDG_DATA_HOME/applications"
   local f line
 
   for f in "$dir/PWA - "*.desktop; do
@@ -328,7 +308,6 @@ _normalize_url() {
 
 _ask_for_icon() {
   local ref
-
   read -rp "${BLUE}[VIBRANIUM]${RESET} Icon URL / path / name (or Enter for default): ${BLUE}" ref
   [[ -z $ref ]] && ref="vb-pwa"
   printf "%s" "$ref"
@@ -364,21 +343,86 @@ _strip_title() {
 }
 
 # ---------------------------------------------------------------------------
+# Resolve ICON_REF to a local path, downloading if it is a URL.
+# Falls back to the generic "vb-pwa" system icon on any failure.
+# ---------------------------------------------------------------------------
+_resolve_icon() {
+  local ref="$1"
+  local name="$2"
+
+  if [[ -z $ref ]]; then
+    echo "vb-pwa"
+    return
+  fi
+
+  if [[ $ref =~ ^https?:// ]]; then
+    local ext="${ref##*.}"
+    [[ $ext =~ ^(png|jpg|jpeg|ico|svg)$ ]] || ext="png"
+    local path="$ICON_DIR/$name.$ext"
+    if curl -fsSL -o "$path" "$ref" 2>/dev/null && [[ -s $path ]]; then
+      echo "$path"
+    else
+      echo "vb-pwa"
+    fi
+    return
+  fi
+
+  if [[ -f "$ICON_DIR/$ref" ]]; then
+    echo "$ICON_DIR/$ref"
+  else
+    echo "$ref"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Write the .desktop file for the given PWA.
+# ---------------------------------------------------------------------------
+_write_desktop() {
+  local name="$1" exec_cmd="$2" icon="$3" keywords="$4" mime="$5" category="$6"
+  local file="$XDG_DATA_HOME/applications/$name.desktop"
+
+  cat >"$file" <<EOF
+[Desktop Entry]
+Version=1.0
+Name=${name#PWA - }
+Comment=$name
+Exec=$exec_cmd
+Terminal=false
+Type=Application
+Icon=$icon
+StartupNotify=true
+Categories=PWA;${category}
+EOF
+
+  if [[ -n $mime ]]; then
+    printf 'MimeType=%s\n' "$mime" >>"$file"
+  fi
+
+  if [[ -n $keywords ]]; then
+    printf 'Keywords=%s\n' "$keywords" >>"$file"
+  fi
+}
+
+# ---------------------------------------------------------------------------
 # Main logic
 # ---------------------------------------------------------------------------
 
-if [[ -z $APP_URL ]]; then
-  # Interactive mode: --url was not supplied, prompt for everything.
+source vb-lib-core
 
+if [[ ! -f "$ICON_DIR" ]]; then
+  mkdir -p "$ICON_DIR"
+fi
+
+if [[ -z $APP_URL ]]; then
   INTERACTIVE_MODE=true
-  trap "printf '\n';_operation_canceled; exit 1" INT
+  trap "printf '\n'; _operation_canceled; exit 1" INT
   term::show_header
 
-  # Ask for the URL first so we can pull a suggested name from it.
   while true; do
     term::enable_input
     read -rp "${YELLOW}[VIBRANIUM]${RESET} PWA URL: ${BLUE}" APP_URL
     term::disable_input
+
     if [[ -n $APP_URL ]]; then
       break
     fi
@@ -386,12 +430,8 @@ if [[ -z $APP_URL ]]; then
 
   APP_URL="$(_normalize_url "$APP_URL")"
 
-  # Check for an existing installation with this URL before spending time on
-  # reachability or title fetching. Set a flag on confirmation so the name
-  # check below does not prompt again for the same collision.
   _url_overwrite_confirmed=false
   if _dup_file="$(_find_webapp_by_url "$APP_URL")"; then
-    _dup_file="${_dup_file##*/}"
     if term::ask_yes_no Y "This PWA is already installed. Overwrite it?"; then
       _url_overwrite_confirmed=true
     else
@@ -400,7 +440,6 @@ if [[ -z $APP_URL ]]; then
     fi
   fi
 
-  # Verify reachability before doing anything else.
   _check_url_reachable "$APP_URL" &
   if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Verifying URL"; then
     echo "${RED}[VIBRANIUM]${RESET} Could not reach ${BLUE}http(s)://${APP_URL#*://}${RESET}"
@@ -409,103 +448,70 @@ if [[ -z $APP_URL ]]; then
     exit 1
   fi
 
-  tmpfile=$(mktemp)
-  _fetch_page_title "$APP_URL" >"$tmpfile" &
-
+  _fetch_page_title "$APP_URL" >"$VIBRANIUM_RUNTIME/$SELF.tmp" &
   if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching page title"; then
-    PAGE_TITLE=$(<"$tmpfile")
+    PAGE_TITLE=$(<"$VIBRANIUM_RUNTIME/$SELF.tmp")
   else
-    echo "${RED}[VIBRANIUM]${RESET} Failed to fetch page title"
     PAGE_TITLE=""
   fi
 
-  rm -f "$tmpfile"
+  rm -f "$VIBRANIUM_RUNTIME/$SELF.tmp" &
 
-  # Check if the page title contains illegal characters.
-  # If so - fix them.
-  case "$PAGE_TITLE" in
-  *$'\n'* | *$'\r'* | *$'\t'* | */* | " "* | *" ")
-    PAGE_TITLE=$(_strip_title "$PAGE_TITLE")
-    ;;
-  esac
+  PAGE_TITLE="$(_strip_title "$PAGE_TITLE")"
 
   term::enable_input
-
-  if [[ -n $PAGE_TITLE ]]; then
+  if [[ -n $PAGE_TITLE && $PAGE_TITLE != "App" ]]; then
     echo "${YELLOW}[VIBRANIUM]${RESET} Auto-generated name: ${BLUE}${PAGE_TITLE}${RESET}"
-    # Show the suggested name; accept on Enter, or type to override.
     read -rp "${BLUE}[VIBRANIUM]${RESET} PWA name (Enter to keep the name above): $BLUE" APP_NAME
     APP_NAME="PWA - ${APP_NAME:-$PAGE_TITLE}"
   else
-    # No title found; require explicit input.
     while true; do
       read -rp "${YELLOW}[VIBRANIUM]${RESET} PWA name: " APP_NAME
-
-      # Got name - exit loop
       if [[ -n $APP_NAME ]]; then
         break
       fi
-
       echo "${RED}[VIBRANIUM]${RESET} Name cannot be empty"
     done
+    APP_NAME="PWA - $APP_NAME"
   fi
-
   term::disable_input
 
-  # Check for a name collision only if the URL check did not already confirm
-  # an overwrite (which would target the same .desktop file in the normal case).
-  if [[ $_url_overwrite_confirmed == "false" &&
-    -f "$HOME/.local/share/applications/$APP_NAME.desktop" ]]; then
-    echo "${YELLOW}[VIBRANIUM]${RESET} A PWA named ${BLUE}${APP_NAME/PWA - /}${RESET} is already installed."
+  if [[ $_url_overwrite_confirmed == false && -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]]; then
+    echo "${YELLOW}[VIBRANIUM]${RESET} A PWA named ${BLUE}${APP_NAME#PWA - }${RESET} is already installed."
     if ! _prompt_overwrite; then
       _operation_canceled
       exit 1
     fi
   fi
 
-  # Auto-generate keywords from the URL and let the user add more.
   AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
 
-  echo "${BLUE}[VIBRANIUM]${RESET} Hint: keywords are special words that can be used as a search query in the app launcher"
-  echo "${YELLOW}[VIBRANIUM]${RESET} Auto-detected keywords: ${BLUE}${AUTO_KEYWORDS//;/ }${RESET}"
-
-  if ! term::ask_yes_no Y "Would you like to keep auto-generated keywords?"; then
-    AUTO_KEYWORDS=""
+  if [[ -n "$AUTO_KEYWORDS" ]]; then
+    echo "${BLUE}[VIBRANIUM]${RESET} Hint: keywords are special words that can be used as a search query in the app launcher"
+    echo "${YELLOW}[VIBRANIUM]${RESET} Auto-detected keywords: ${BLUE}${AUTO_KEYWORDS//;/ }${RESET}"
+    term::ask_yes_no Y "Would you like to keep auto-generated keywords?" || AUTO_KEYWORDS=""
   fi
 
   term::enable_input
   read -rp "${BLUE}[VIBRANIUM]${RESET} Additional keywords (space-separated, or Enter to skip): $BLUE" EXTRA_KW_RAW
   term::disable_input
 
-  # Convert the user's space-separated extras into semicolon-separated form.
   EXTRA_KEYWORDS=""
-  if [[ -n $EXTRA_KW_RAW ]]; then
-    for kw in $EXTRA_KW_RAW; do
-      EXTRA_KEYWORDS+="${kw};"
-    done
-  fi
+  for kw in $EXTRA_KW_RAW; do EXTRA_KEYWORDS+="${kw};"; done
   KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
 
-  # Prompt for an optional .desktop Categories= value.
-  # Standard categories: https://specifications.freedesktop.org/menu-spec/latest/category-registry.html
   term::enable_input
   read -rp "${BLUE}[VIBRANIUM]${RESET} Category (e.g. Network;WebBrowser, or Enter to skip): ${BLUE}" CATEGORY
   term::disable_input
 
-  mkdir -p "$ICON_DIR"
-
-  # Try to fetch the favicon from Google's service; fall back to manual input.
   FAVICON_URL="https://www.google.com/s2/favicons?domain=${APP_URL}&sz=128"
-
   if term::ask_yes_no Y "Would you like to keep the web page's original icon?"; then
     curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2>/dev/null &
-
     if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading favicon of the URL" && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
       ICON_REF="$APP_NAME.png"
     else
       echo "${RED}[VIBRANIUM]${RESET} Could not fetch favicon automatically. Enter a PNG icon URL manually"
       echo "${RED}[VIBRANIUM]${RESET} See ${BLUE}https://dashboardicons.com${RESET} for a large library"
-
       term::enable_input
       ICON_REF="$(_ask_for_icon)"
       term::disable_input
@@ -516,102 +522,37 @@ if [[ -z $APP_URL ]]; then
     term::disable_input
   fi
 
-  CUSTOM_EXEC=""
-  MIME_TYPES=""
-else
-  # Non-interactive mode: --url was supplied. Suppress all output.
-  exec >/dev/null 2>&1
+  ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
+  EXEC_COMMAND="vb-webapp-launch $APP_URL"
 
+else
   APP_URL="$(_normalize_url "$APP_URL")"
 
-  # Abort early on URL collision before touching the network.
-  if _dup_file="$(_find_webapp_by_url "$APP_URL")"; then
-    echo "${RED}[VIBRANIUM]${RESET} A PWA for this URL is already installed (${BLUE}${_dup_file##*/}${RESET})"
-    _operation_canceled
-    exit 1
-  fi
+  _find_webapp_by_url "$APP_URL" && exit 1
+  _check_url_reachable "$APP_URL" || exit 1
 
-  if ! _check_url_reachable "$APP_URL"; then
-    echo "${RED}[VIBRANIUM]${RESET} Could not reach given URL"
-    echo "${RED}[VIBRANIUM]${RESET} Please verify that URL exists or check your connection"
-    _operation_canceled
-    exit 1
-  fi
-
-  # If no name was supplied via --name, attempt to pull it from the page title.
   if [[ -z $APP_NAME ]]; then
     APP_NAME="$(_fetch_page_title "$APP_URL")" || true
   fi
 
-  # Abort on name collision once APP_NAME is known.
-  if [[ -f "$HOME/.local/share/applications/$APP_NAME.desktop" ]]; then
-    echo "${RED}[VIBRANIUM]${RESET} A PWA named ${BLUE}$APP_NAME${RESET} is already installed"
-    _operation_canceled
-    exit 1
-  fi
+  APP_NAME="$(_strip_title "$APP_NAME")"
+  [[ -z $APP_NAME || $APP_NAME == "App" ]] && exit 1
+
+  [[ $APP_NAME != "PWA - "* ]] && APP_NAME="PWA - $APP_NAME"
+
+  [[ -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]] && exit 1
 
   AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
   KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
+  ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
+  EXEC_COMMAND="${CUSTOM_EXEC:-vb-webapp-launch $APP_URL}"
 
 fi
 
-if [[ -z $APP_NAME || -z $APP_URL ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} Could not determine app name. Pass it via --name."
-  _operation_canceled
-  exit 1
-fi
+_write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$KEYWORDS" "$MIME_TYPES" "$CATEGORY"
 
-mkdir -p "$ICON_DIR"
-
-# Resolve ICON_REF to a local path, downloading if it is a URL.
-if [[ $ICON_REF =~ ^https?:// ]]; then
-  # Preserve the file extension from the URL if recognisable, else default png.
-  local_ext="${ICON_REF##*.}"
-  [[ $local_ext =~ ^(png|jpg|jpeg|ico|svg)$ ]] || local_ext="png"
-
-  ICON_PATH="$ICON_DIR/$APP_NAME.$local_ext"
-
-  if ! curl -fsSL -o "$ICON_PATH" "$ICON_REF" 2>/dev/null || [[ ! -s $ICON_PATH ]]; then
-    # Use a generic system icon as fallback rather than aborting the install.
-    echo "${RED}[VIBRANIUM]${RESET} Could not fetch givenURL. Using fallback icon"
-    ICON_PATH="vb-pwa"
-  fi
-else
-  # Treat as a filename relative to ICON_DIR (non-interactive shorthand).
-  if [[ -f "$ICON_DIR/$ICON_REF" ]]; then
-    ICON_PATH="$ICON_DIR/$ICON_REF"
-  else
-    # Assume that icon lives in XDG-respected icon pack
-    ICON_PATH="$ICON_REF"
-  fi
-fi
-
-EXEC_COMMAND="${CUSTOM_EXEC:-vb-webapp-launch $APP_URL}"
-DESKTOP_FILE="$HOME/.local/share/applications/$APP_NAME.desktop"
-
-cat >"$DESKTOP_FILE" <<EOF
-[Desktop Entry]
-Version=1.0
-Name=${APP_NAME/PWA - /}
-Comment=$APP_NAME
-Exec=$EXEC_COMMAND
-Terminal=false
-Type=Application
-Icon=$ICON_PATH
-StartupNotify=true
-Categories=PWA;${CATEGORY}
-EOF
-
-if [[ -n $MIME_TYPES ]]; then
-  echo "MimeType=$MIME_TYPES" >>"$DESKTOP_FILE"
-fi
-
-if [[ -n $KEYWORDS ]]; then
-  echo "Keywords=$KEYWORDS" >>"$DESKTOP_FILE"
-fi
-
-if [[ $INTERACTIVE_MODE == "true" ]]; then
-  echo "${GREEN}[VIBRANIUM]${RESET} ${BLUE}${APP_NAME/PWA - /}${RESET} has been installed"
+if [[ $INTERACTIVE_MODE == true ]]; then
+  echo "${GREEN}[VIBRANIUM]${RESET} ${BLUE}${APP_NAME#PWA - }${RESET} has been installed"
   echo "${GREEN}[VIBRANIUM]${RESET} You can find it in the app launcher"
   _operation_complete
 fi
