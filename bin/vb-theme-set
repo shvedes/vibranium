@@ -11,6 +11,9 @@ declare -A FAMILIES=()
 declare -A STANDALONE_THEMES=()
 declare -A FOLDER_MAP=()
 
+ACTIVE_FAMILY=""
+ACTIVE_VARIANT=""
+
 # Maps folder name -> "true"/"false". Populated by _discover_in_dir.
 # If a folder has no light metadata at all, the key is absent and apply_theme
 # falls back to the folder-name regex as a last resort.
@@ -34,7 +37,7 @@ capitalize() {
   for part in "${parts[@]}"; do
     result+=("${part^}")
   done
-  printf "${result[*]}"
+  printf "%s" "${result[*]}"
 }
 
 # Process one themes directory and register every theme found into the
@@ -140,17 +143,16 @@ _discover_themes() {
 
 get_current_target_basename() {
   if [[ -f "$THEME_NAME_FILE" ]]; then
-    printf "%s" "$(<$THEME_NAME_FILE)"
+    printf "%s" "$(<"$THEME_NAME_FILE")"
   else
     printf ""
   fi
 }
 
 is_current_theme() {
-  local theme="$1"
-  local curr_basename
-  curr_basename="$(get_current_target_basename)"
-
+  local theme="$1" curr_basename
+  [[ -f "$THEME_NAME_FILE" ]] || return 1
+  curr_basename="$(<"$THEME_NAME_FILE")"
   [[ -z "$curr_basename" ]] && return 1
   [[ "${curr_basename,,}" == "${theme,,}" ]]
 }
@@ -181,6 +183,40 @@ _build_family_keys() {
   _sort_by_length_desc _keys
 }
 
+# Resolves the current on-disk theme name back to its discovery keys and
+# writes them into the globals ACTIVE_FAMILY and ACTIVE_VARIANT.
+# Called once before the interactive picker is shown.
+# ACTIVE_FAMILY — the family key (e.g. "Tokyonight") or standalone key (e.g. "Evergarden").
+# ACTIVE_VARIANT — the variant key (e.g. "Night"); empty for standalone themes.
+_resolve_active_theme() {
+  ACTIVE_FAMILY=""
+  ACTIVE_VARIANT=""
+
+  [[ -f "$THEME_NAME_FILE" ]] || return
+  local curr_folder
+  curr_folder="$(<"$THEME_NAME_FILE")"
+  [[ -z "$curr_folder" ]] && return
+
+  local family variant
+  for family in "${!FAMILIES[@]}"; do
+    for variant in ${FAMILIES[$family]}; do
+      if [[ "${FOLDER_MAP[${family}-${variant}]}" == "$curr_folder" ]]; then
+        ACTIVE_FAMILY="$family"
+        ACTIVE_VARIANT="$variant"
+        return
+      fi
+    done
+  done
+
+  for family in "${!STANDALONE_THEMES[@]}"; do
+    if [[ "${FOLDER_MAP[$family]}" == "$curr_folder" ]]; then
+      ACTIVE_FAMILY="$family"
+      ACTIVE_VARIANT=""
+      return
+    fi
+  done
+}
+
 _find_index() {
   # Printf the 0-based index of $2 in array named $1, or 0 if not found
   local -n _arr="$1"
@@ -189,7 +225,7 @@ _find_index() {
 
   for i in "${!_arr[@]}"; do
     [[ "${_arr[$i]}" == "$needle" ]] && {
-      printf "$i"
+      printf "%s" "$i"
       return
     }
   done
@@ -202,16 +238,32 @@ pick_family() {
   local keys=()
   _build_family_keys keys
 
+  # Make active theme indicator using pango markup.
+  local display_keys=() k
+  for k in "${keys[@]}"; do
+    if [[ -n "$ACTIVE_FAMILY" && "$k" == "$ACTIVE_FAMILY" ]]; then
+      display_keys+=("<b><i>$k</i></b>")
+    else
+      display_keys+=("$k")
+    fi
+  done
+
   local family_chosen
   while true; do
     helpers::ui::menu \
       family_chosen "Theme" "" \
       -selected-row "$selected_row" \
       -theme-str 'window{width: 300px;}' \
-      -- "${keys[@]}"
-    [[ -z "$family_chosen" ]] && exit 0
+      -- "${display_keys[@]}"
 
-    local k
+    if [[ -z "$family_chosen" ]]; then
+      exit 0
+    fi
+
+    # Strip markup before resolving so downstream logic is unaffected
+    family_chosen="${family_chosen#<b><i>}"
+    family_chosen="${family_chosen%</i></b>}"
+
     for k in "${keys[@]}"; do
       [[ "$k" == "$family_chosen" ]] && {
         printf "%s" "$family_chosen"
@@ -232,10 +284,27 @@ pick_variant() {
     items+=("${v//-/ }")
   done
 
+  # Make active theme indicator using pango markup.
+  local display_items=() item
+  for item in "${items[@]}"; do
+    if [[ -n "$ACTIVE_VARIANT" && "$family" == "$ACTIVE_FAMILY" &&
+      "${item// /-}" == "$ACTIVE_VARIANT" ]]; then
+      display_items+=("<b><i>$item</i></b>")
+    else
+      display_items+=("$item")
+    fi
+  done
+
   local display
   while true; do
-    helpers::ui::menu display "$family" "flavor" -selected-row "$selected_row" -- "${items[@]}"
-    [[ -z "$display" ]] && return 1
+    helpers::ui::menu display "$family" "flavor" -selected-row "$selected_row" -- "${display_items[@]}"
+    if [[ -z "$display" ]]; then
+      return 1
+    fi
+
+    # Strip markup before resolving so downstream logic is unaffected
+    display="${display#<b><i>}"
+    display="${display%</i></b>}"
 
     for v in "${items[@]}"; do
       [[ "$v" == "$display" ]] && {
@@ -304,7 +373,7 @@ apply_theme() {
     files=()
     while IFS= read -r -d '' file; do
       files+=("$file")
-    done < <(find "$USER_THEMES_PATH" -maxdepth 1 -mindepth 1 ! -name "backgrounds" -print0)
+    done < <(find "$USER_THEMES_PATH/$folder_name" -maxdepth 1 -mindepth 1 ! -name "backgrounds" -print0)
 
     if ((${#files[@]} > 0)); then
       cp -a -- "${files[@]}" "$NEXT_THEME_PATH/"
@@ -503,6 +572,8 @@ if [[ -n "$1" ]]; then
     FOLDER_NAME="${FOLDER_MAP[$CHOSEN]}"
   fi
 else
+  _resolve_active_theme
+
   declare -A _last_variant_row=()
   _family_row=0
 
