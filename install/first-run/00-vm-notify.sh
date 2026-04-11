@@ -25,20 +25,16 @@ P_RED='#f7768e'
   msg+="<span foreground='${P_YELLOW}'><b>Virtualbox</b></span> & "
   msg+="<span foreground='${P_YELLOW}'><b>VMware</b></span> are not supported.\n\n"
 
-  notify-send -r $RANDOM -t 1800000 "Vibranium Is Running In a Virtual Machine" "$msg"
-) &
-
-(
-  # Give the user time to
-  # read the first message
-  sleep 25
-
-  msg="\nNote that special options were applied to your installation:\n\n"
+  msg+="Note that special options were applied to your installation:\n\n"
   msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
   msg+="<span foreground='${P_RED}'><b>Night Light isn't available</b></span>\n"
   msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-  msg+="<span foreground='${P_RED}'><b>Bluetooth support is disabled</b></span>\n"
+  msg+="<span foreground='${P_RED}'><b>Screen recording isn't available</b></span>\n"
   msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
-  msg+="<span foreground='${P_RED}'><b>Media Player app won't work at all</b></span>\n"
-  notify-send -r $RANDOM -t 1800000 "Vibranium Is Running In a Virtual Machine (2)" "$msg"
+  msg+="<span foreground='${P_RED}'><b>Bluetooth support is disabled (obviously)</b></span>\n"
+
+  msg+="<span foreground='${P_ACCENT}'><b>•</b></span> "
+  msg+="<span foreground='${P_RED}'><b>Animations are disabled by default</b></span>\n"
+
+  notify-send -r $RANDOM -t 1800000 "Vibranium Is Running In a Virtual Machine" "$msg"
 ) &
