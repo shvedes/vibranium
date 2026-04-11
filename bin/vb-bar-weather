@@ -30,7 +30,7 @@ if ((WAYBAR_PID == 0)); then
   fi
 fi
 
-if ! command -v wttrbar > /dev/null; then
+if ! command -v wttrbar >/dev/null; then
   # If executed from a terminal
   if ! term::is_headless; then
     log::error "Missing required dependencies: wttrbar"
@@ -56,7 +56,7 @@ _set_city() {
 
   # Verify and populate user settings file
   if ! grep -qE "$opt" "$VIBRANIUM_USER_SETTINGS"; then
-    echo "${opt}=${city}" >> "$VIBRANIUM_USER_SETTINGS"
+    echo "${opt}=${city}" >>"$VIBRANIUM_USER_SETTINGS"
   else
     sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$VIBRANIUM_USER_SETTINGS"
   fi
@@ -65,7 +65,7 @@ _set_city() {
 }
 
 _wait_for_connection() {
-  while ! ping -c 1 1.1.1.1 &> /dev/null; do
+  while ! ping -c 1 1.1.1.1 &>/dev/null; do
     sleep 1
   done
 }
@@ -84,7 +84,7 @@ else
     rm -f "${marker%.*}".*
 
     # Create new one
-    : > "$marker"
+    : >"$marker"
   fi
 fi
 
@@ -108,12 +108,12 @@ if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" == "not_set" ]]; then
   fi
 
   # Read the settings file with the updated city for monitoring
-  source $VIBRANIUM_USER_SETTINGS
+  source "$VIBRANIUM_USER_SETTINGS"
 fi
 
 TEMP_DATA="$VIBRANIUM_RUNTIME/bar.weather.json"
 
-wttrbar --location "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" > "$TEMP_DATA" 2> /dev/null &
+wttrbar --location "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" >"$TEMP_DATA" 2>/dev/null &
 pid=$!
 
 if [[ "$show_spinner" == "true" ]]; then
@@ -123,7 +123,7 @@ else
   wait $pid
 fi
 
-WEATHER_JSON="$(< "$TEMP_DATA")"
+WEATHER_JSON="$(<"$TEMP_DATA")"
 
 if [[ -z "$WEATHER_JSON" ]]; then
   icon="<span foreground='red2'>\uf071</span>"
@@ -138,14 +138,14 @@ if [[ -z "$WEATHER_JSON" ]]; then
 fi
 
 # Build json output
-text="$(jq -r '.text' <<< "$WEATHER_JSON")"
-tooltip="$(jq -r '.tooltip' <<< "$WEATHER_JSON")"
+text="$(jq -r '.text' <<<"$WEATHER_JSON")"
+tooltip="$(jq -r '.tooltip' <<<"$WEATHER_JSON")"
 
 if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
   text+=" <span foreground='DimGray'>|</span>"
 fi
 
-rm -f "$temp_data"
+rm -f "$TEMP_DATA" /tmp/wttrbar*
 
 jq -nc \
   --arg text "$text" \
