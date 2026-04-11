@@ -331,12 +331,12 @@ apply_theme() {
   fi
 
   if [[ ! -d "$src_path" ]]; then
-    log::error "Theme folder $src_path does not exist."
+    echo "Error: theme folder $src_path does not exist." >&2
     exit 1
   fi
 
   if is_current_theme "$folder_name"; then
-    log::error "Already on $chosen"
+    echo "Error: already on $chosen." >&2
     notify-send -r 4 -t 1500 "Theme Selector" "Already on $chosen"
     exit 1
   fi
@@ -529,8 +529,6 @@ case "${1-}" in
   ;;
 esac
 
-source vb-lib-core
-
 if [[ -n "$1" ]]; then
   # Normalise spaces to hyphens ("Tokyonight Night" -> "Tokyonight-Night")
   INPUT_THEME="${1// /-}"
@@ -550,7 +548,7 @@ if [[ -n "$1" ]]; then
     VARIANT="${INPUT_THEME#*-}"
 
     if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
-      log::error "Family '$FAMILY' not found. Run '$SELF --list' to see available themes."
+      echo "Error: family '$FAMILY' not found. Run '$SELF --list' to see available themes." >&2
       exit 1
     fi
 
@@ -564,7 +562,7 @@ if [[ -n "$1" ]]; then
     done
 
     if ! $VARIANT_FOUND; then
-      log::error "Variant '$VARIANT' not found in family '$FAMILY'. Run '$SELF --list' to see available themes."
+      echo "Error: variant '$VARIANT' not found in family '$FAMILY'. Run '$SELF --list' to see available themes." >&2
       exit 1
     fi
 
@@ -572,6 +570,7 @@ if [[ -n "$1" ]]; then
     FOLDER_NAME="${FOLDER_MAP[$CHOSEN]}"
   fi
 else
+  source vb-lib-core
   _resolve_active_theme
 
   declare -A _last_variant_row=()
@@ -617,13 +616,13 @@ else
 fi
 
 if [[ -z "$FOLDER_NAME" ]]; then
-  log::error "Theme '$CHOSEN' could not be resolved to a folder."
+  echo "Error: theme '$CHOSEN' could not be resolved to a folder." >&2
   exit 1
 fi
 
 # Verify the resolved folder actually exists in at least one source location
 if [[ ! -d "$VIBRANIUM/themes/$FOLDER_NAME" && ! -d "$USER_THEMES_PATH/$FOLDER_NAME" ]]; then
-  log::error "Theme '$CHOSEN' could not be resolved to a folder."
+  echo "Error: theme '$CHOSEN' could not be resolved to a folder." >&2
   exit 1
 fi
 
