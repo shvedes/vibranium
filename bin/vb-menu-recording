@@ -6,21 +6,19 @@ if [[ $CHASSIS_TYPE == vm ]]; then
   exit 1
 fi
 
-if pidof -q rofi; then
-  killall rofi
-  exit 0
-fi
-
-if pidof -q gpu-screen-recorder; then
+if [[ -f "$VIBRANIUM_RUNTIME/recording-ongoing" ]]; then
   # Trigger killswitch
   vb-core-recording
   exit 0
 fi
 
-read -r CHOSEN < <(rofi -dmenu -sync -p "Record" <<<$'Screen\nRegion\nPortal')
+source vb-lib-core
+source vb-lib-cfgr
 
-if [[ -z $CHOSEN ]] || [[ ! $CHOSEN =~ ^(Screen|Region|Portal)$ ]]; then
-  exit 1
-fi
+_build() {
+  cfgr::item::action --label "Screen" --func "vb-core-recording --screen; exit" --icon vb-monitor
+  cfgr::item::action --label "Region" --func "vb-core-recording --region; exit" --icon vb-region
+  cfgr::item::action --label "Portal" --func "vb-core-recording --portal; exit" --icon vb-wm
+}
 
-app2unit vb-core-recording "--${CHOSEN,}"
+cfgr::run "Record" "_build"
