@@ -630,13 +630,10 @@ apply_theme "$CHOSEN" "$FOLDER_NAME"
 vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")"
 vb-cmd-reload --quiet
 
-# These things can be easily be set in the backgrounds
-(
-  touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-  killall --quiet -s USR2 btop
+touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+killall --quiet -s USR2 btop
 
-  vb-theme-set-gtk
-  vb-theme-set-svg
-  vb-theme-set-browser
-  vb-theme-set-obsidian
-) &
+vb-theme-set-gtk
+vb-theme-set-svg
+vb-theme-set-browser
+vb-theme-set-obsidian

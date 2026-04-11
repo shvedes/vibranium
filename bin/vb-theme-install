@@ -13,9 +13,6 @@ trap 'printf "\n"; _operation_canceled; exit 1' INT HUP
 
 term::show_header
 
-# https://github.com/basecamp/omarchy/releases/tag/v3.3.0
-echo -e "${BLUE}[VIBRANIUM]${RESET} Vibranium only supports themes compatible with Omarchy v3.3.0+"
-
 if [[ -z "$1" ]]; then
   read -rp "${YELLOW}[VIBRANIUM]${RESET} Git repo URL: " REPO_URL
 else
@@ -26,10 +23,8 @@ if [[ -z "$REPO_URL" ]]; then
   echo "${RED}[VIBRANIUM]${RESET} No URL provided!"
   _operation_canceled
   exit 1
-fi
-
-# Validate: must be an https URL
-if [[ ! "$REPO_URL" =~ ^https:// ]]; then
+# Validate: must be an http(s) URL
+elif [[ ! "$REPO_URL" =~ ^https?:// ]]; then
   echo "${RED}[VIBRANIUM}${RESET} You must provide URL!"
   _operation_canceled
   exit 1
@@ -44,13 +39,17 @@ THEME_NAME="${REPO_URL%.git}"
 THEME_NAME="${THEME_NAME##*/}"
 THEME_NAME="${THEME_NAME#omarchy-}"
 THEME_NAME="${THEME_NAME%-theme}"
+THEME_NAME_COLOR="${BLUE}${THEME_NAME^}${RESET}"
 
 THEMES_DIR="$HOME/.config/vibranium/themes"
 THEME_PATH="$THEMES_DIR/$THEME_NAME"
 
 # Fetch the repo root listing once - checks both candidate files in a single request
 # so we don't risk hitting the GitHub API rate limit with two separate calls
-if ! CONTENTS=$(curl -sf "https://api.github.com/repos/$REPO_PATH/contents/"); then
+CONTENTS_FILE="/tmp/${0##*/}.tmp"
+curl -sf "https://api.github.com/repos/$REPO_PATH/contents/" --output "$CONTENTS_FILE" &
+
+if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking theme compatibility"; then
   echo "${RED}[VIBRANIUM]${RESET} Could not reach repo or repo does not exist"
   _operation_canceled
   exit 1
@@ -58,20 +57,32 @@ fi
 
 # Match strictly against the JSON name field - guards against partial matches
 # (e.g. a file called "my-colors.toml" must not pass)
-if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] &&
-  [[ "$CONTENTS" != *'"name": "colors-extended.toml"'* ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} This theme is not compatible with Omarchy v3.3.0+"
+CONTENTS="$(<"$CONTENTS_FILE")"
+if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] && [[ "$CONTENTS" != *'"name": "colors-extended.toml"'* ]]; then
+  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${GREEN}Omarchy${RESET} versions prior to ${BLUE}v3.3.0${BLUE}"
+
+  # https://github.com/basecamp/omarchy/releases/tag/v3.3.0
+  echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${BLUE}"
+
+  rm -f "$CONTENTS_FILE"
   _operation_canceled
   exit 1
 fi
 
+rm -f "$CONTENTS_FILE"
+
 # Remove stale copy of this theme if one already exists
 if [[ -d "$THEME_PATH" ]]; then
+  if ! term::ask_yes_no Y "$THEME_NAME_COLOR already exists. Do you want to reinstall it?"; then
+    _operation_canceled
+    exit 1
+  fi
+
   rm -rf "$THEME_PATH"
 fi
 
 git clone --quiet "$REPO_URL" "$THEME_PATH" &
-if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading theme" "- ${GREEN}Done${RESET}"; then
+if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading $THEME_NAME_COLOR" "- ${GREEN}Done${RESET}"; then
   echo "${RED}[VIBRANIUM]${RESET} Failed to clone theme repo"
   _operation_canceled
   exit 1
