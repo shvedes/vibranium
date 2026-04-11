@@ -1,7 +1,7 @@
 [Desktop Entry]
 Type=Application
 Name=File Manager
-Icon=org.xfce.thunar
+Icon=thunar
 TryExec=thunar
 Exec=thunar %U
 MimeType=inode/directory;

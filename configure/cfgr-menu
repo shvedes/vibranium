@@ -6,22 +6,22 @@ source vb-lib-cfgr
 export PATH="$PATH:$VIBRANIUM/configure"
 
 _build() {
-  cfgr::item::action --func "cfgr-idle"        --label "Idle"
-  cfgr::item::action --func "cfgr-audio"       --label "Audio"
-  cfgr::item::action --func "cfgr-waybar-menu" --label "Waybar"
-  cfgr::item::action --func "cfgr-general"     --label "General"
-  cfgr::item::action --func "vb-font-set"      --label "Set Font"
-  cfgr::item::action --func "cfgr-wm-menu"     --label "Hyprland"
-  cfgr::item::action --func "cfgr-recording"   --label "Recording"
+  cfgr::item::action --func "cfgr-idle" --label "Idle" --icon vb-idle
+  cfgr::item::action --func "cfgr-audio" --label "Audio" --icon vb-volume
+  cfgr::item::action --func "cfgr-waybar-menu" --label "Waybar" --icon vb-settings
+  cfgr::item::action --func "cfgr-general" --label "General" --icon vb-settings
+  cfgr::item::action --func "vb-font-set" --label "Set Font" --icon vb-font
+  cfgr::item::action --func "cfgr-wm-menu" --label "Hyprland" --icon vb-wm
+  cfgr::item::action --func "cfgr-recording" --label "Recording" --icon vb-video
 
   if [[ "$CHASSIS_TYPE" != vm ]]; then
-    cfgr::item::action --func "cfgr-brightness" --label "Brightness"
-    cfgr::item::action --func "cfgr-nightshift"  --label "Night Light"
+    cfgr::item::action --func "cfgr-brightness" --label "Brightness" --icon vb-brightness
+    cfgr::item::action --func "cfgr-nightshift" --label "Night Light" --icon vb-night-light
   fi
 
-  cfgr::item::action --func "cfgr-screenshots"  --label "Screenshots"
-  cfgr::item::action --func "cfgr-color-picker" --label "Color Picker"
-  cfgr::item::action --func "cfgr-misc"         --label "Miscellaneous"
+  cfgr::item::action --func "cfgr-screenshots" --label "Screenshots" --icon vb-screenshot
+  cfgr::item::action --func "cfgr-color-picker" --label "Color Picker" --icon vb-theme
+  cfgr::item::action --func "cfgr-misc" --label "Miscellaneous" --icon vb-tools
 }
 
 cfgr::run "Settings" "_build"

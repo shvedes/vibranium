@@ -23,23 +23,6 @@ _set_term_opacity() {
   sed -i -E '/^\[window\]/,/^\[/{s/^([[:space:]]*opacity[[:space:]]*=[[:space:]]*)"?[0-9.]+("?)/\1'"$input"'\2/}' "$config"
 }
 
-_get_rofi_theme() {
-  local config="$XDG_CONFIG_HOME/rofi/config.rasi"
-  local theme="$(awk -f "$VIBRANIUM/awk/get-rofi-theme.awk" "$config")" || return
-  theme="${theme:-couldn\'t get theme}"
-  printf "%s" "$theme"
-}
-
-_set_rofi_theme() {
-  local input config
-  input="$(cfgr::set_string \
-    --title "Menu Theme" \
-    --option "Modern:modern" "Text:text")" || return
-  config="$XDG_CONFIG_HOME/rofi/config.rasi"
-
-  sed -i "s|\(@import \"./themes/\)[^\"]*|\1theme-${input}.rasi|" "$config"
-}
-
 _edit_env() {
   local env_file="$XDG_CONFIG_HOME/vibranium/environment"
   xdg-terminal-exec --app-id=org.vb.term.float --title="vb-env" -- ${EDITOR:-nvim} "$env_file"
@@ -417,7 +400,6 @@ _build() {
 
   cfgr::item::raw "Cursor theme : $CURSOR_THEME" "action:_set_cursor_theme"
   cfgr::item::raw "Cursor size : $CURSOR_SIZE" "action:_set_cursor_size"
-  cfgr::item::raw "Menus theme : $(_get_rofi_theme)" "action:_set_rofi_theme"
 
   cfgr::item::action --func "_manage_user_wallpapers" --label "User wallpapers"
   cfgr::item::action --func "cfgr-now-playing" --label "Now playing"

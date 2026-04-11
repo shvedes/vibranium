@@ -73,7 +73,7 @@
 #       +-- "bool:..."     -> cfgr::toggle_bool + optional hook
 #       +-- "digit:..."    -> cfgr::set_digit (opens input prompt)
 #       +-- "string:..."   -> cfgr::set_string (opens picker)
-#       +-- "action:FUNC"  -> eval FUNC
+#       +-- "action:FUNC"  -> FUNC
 #       +-- "display:"     -> no-op (read-only label row)
 #       |
 #       v
@@ -159,29 +159,27 @@ _cfgr::verify_option() {
 # Flips a boolean setting in the user settings file.
 # The optional -p / --print flag prints the new value to stdout.
 cfgr::toggle_bool() {
-  local verbose
-  local value
+  local verbose=false
   local var
 
   if [[ "$1" =~ ^-(p|-print)$ ]]; then
     verbose=true
     var="$2"
   else
-    verbose=false
     var="$1"
   fi
 
   _cfgr::verify_option "$var"
-  eval "value=\$$var"
+  local value="${!var}"
 
   case "$value" in
   "true")
     sed -i "/^${var}=/s/=.*/=false/" "$VIBRANIUM_USER_SETTINGS"
-    [ "$verbose" = "true" ] && echo "false"
+    $verbose && printf 'false\n'
     ;;
   "false")
     sed -i "/^${var}=/s/=.*/=true/" "$VIBRANIUM_USER_SETTINGS"
-    [ "$verbose" = "true" ] && echo "true"
+    $verbose && printf 'true\n'
     ;;
   esac
 }
@@ -196,15 +194,21 @@ cfgr::build_menu() {
   local options=("$@") # all arguments; each element is one "label : value" string
   local max_len=0      # longest plain-text label length found across all options
 
+  # Stored in a variable so bash doesn't re-parse the pattern on each iteration,
+  # and to avoid backslash-escaping spaces inside [[ =~ ]] directly.
+  local re_col='^(.*) : (.*)$'
+  local re_tag='<[^>]*>'
+
   # Pass 1: find the longest plain-text label length.
   for option in "${options[@]}"; do
-    if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
-      local clean_label="${BASH_REMATCH[1]}" # everything before " : "
+    if [[ "$option" =~ $re_col ]]; then
+      # everything before " : "
+      local clean_label="${BASH_REMATCH[1]}"
 
       # Strip HTML-like tags before measuring visible width.
       # Tags inflate character count without adding visible columns.
       # The loop repeats because =~ finds only one match at a time.
-      while [[ "$clean_label" =~ \<[^\>]*\> ]]; do
+      while [[ "$clean_label" =~ $re_tag ]]; do
         clean_label="${clean_label//${BASH_REMATCH[0]}/}"
       done
 
@@ -215,13 +219,15 @@ cfgr::build_menu() {
   # Pass 2: rebuild each option with padding so all value columns line up.
   local aligned_options=()
   for option in "${options[@]}"; do
-    if [[ "$option" =~ ^(.*)\ :\ (.*)$ ]]; then
-      local label="${BASH_REMATCH[1]}" # raw label, may still contain HTML tags
-      local value="${BASH_REMATCH[2]}" # everything after " : "
+    if [[ "$option" =~ $re_col ]]; then
+      # raw label, may still contain HTML tags
+      local label="${BASH_REMATCH[1]}"
+      # everything after " : "
+      local value="${BASH_REMATCH[2]}"
 
       # Strip tags from a throwaway copy to measure this label's visible width.
       local clean_label="$label"
-      while [[ "$clean_label" =~ \<[^\>]*\> ]]; do
+      while [[ "$clean_label" =~ $re_tag ]]; do
         clean_label="${clean_label//${BASH_REMATCH[0]}/}"
       done
 
@@ -248,7 +254,7 @@ cfgr::build_menu() {
   done
 
   for aligned in "${aligned_options[@]}"; do
-    echo "$aligned"
+    printf '%s\n' "$aligned"
   done
 }
 
@@ -335,8 +341,7 @@ cfgr::set_digit() {
   local range_text=""
   [[ -n "$min_val" && -n "$max_val" ]] && range_text="${min_val}-${max_val}"
 
-  local prompt="${title} (${type})"
-  local entry_hint="${hint:-$prompt}"
+  local entry_hint="${hint:-${title} (${type})}"
 
   while true; do
     local input
@@ -474,14 +479,15 @@ cfgr::set_string() {
 
 # _CFGR_ITEMS holds the display strings sent to rofi.
 # _CFGR_DISPATCH holds a descriptor for what to do when that row is selected.
+# _CFGR_ICONS holds an optional icon path/name per row (empty string = no icon).
 #
-# Both arrays are reset and repopulated on every cfgr::run iteration, so
+# All three arrays are reset and repopulated on every cfgr::run iteration, so
 # conditional items and dynamic getter calls always reflect current state.
 declare -a _CFGR_ITEMS=()
 declare -a _CFGR_DISPATCH=()
 declare -a _CFGR_ICONS=()
 
-# cfgr::item::bool  --var VAR  --label LABEL  [--hook HOOK]
+# cfgr::item::bool  --var VAR  --label LABEL  [--icon ICON]  [--hook HOOK]
 #
 # Registers a menu row for a boolean setting.
 #
@@ -489,6 +495,8 @@ declare -a _CFGR_ICONS=()
 #                   The current value is read via indirect expansion ${!var}.
 #
 #   --label LABEL  - the left-hand text shown in the menu row.
+#
+#   --icon ICON    - optional icon path or name shown by rofi next to the row.
 #
 #   --hook HOOK    - optional. Name of a function or executable to call
 #                   after the bool is flipped.
@@ -548,7 +556,7 @@ cfgr::item::bool() {
 }
 
 # cfgr::item::digit  --var VAR  --label LABEL  --title TITLE  --type TYPE
-#                    [--prompt PROMPT]  [--min MIN]  [--max MAX]
+#                    [--prompt PROMPT]  [--min MIN]  [--max MAX]  [--icon ICON]
 #
 # Registers a menu row for a numeric setting.
 #
@@ -568,6 +576,8 @@ cfgr::item::bool() {
 #
 #   --min MIN      - lower bound of the accepted range (inclusive)
 #   --max MAX      - upper bound of the accepted range (inclusive)
+#
+#   --icon ICON    - optional icon path or name shown by rofi next to the row.
 #
 # The row appears as:
 #   FPS : 30
@@ -640,7 +650,7 @@ cfgr::item::digit() {
 }
 
 # cfgr::item::string  --var VAR  --label LABEL  --title TITLE
-#                     [--hook HOOK]
+#                     [--hook HOOK]  [--icon ICON]
 #                     --option OPT [OPT ...]
 #
 # Registers a menu row for a setting chosen from a fixed list of values.
@@ -653,6 +663,8 @@ cfgr::item::digit() {
 #
 #   --hook HOOK    - optional. Name of a function or executable to call
 #                   after the selected value is written.
+#
+#   --icon ICON    - optional icon path or name shown by rofi next to the row.
 #
 #   --option OPT [OPT ...]
 #                  - options in "Pretty Label:stored_value" format.
@@ -751,7 +763,7 @@ cfgr::item::string() {
   _CFGR_DISPATCH+=("string:${var}:${rofi_title}:${hook}:${opts_str%$'\x1F'}")
 }
 
-# cfgr::item::action  --func FUNC  --label LABEL
+# cfgr::item::action  --func FUNC  --label LABEL  [--icon ICON]
 #
 # Registers a menu row that runs a function when selected.
 # The label is displayed in bold (pango markup: <b>label</b>).
@@ -759,6 +771,8 @@ cfgr::item::string() {
 #   --func FUNC    - name of a bash function defined in the same script
 #
 #   --label LABEL  - text shown in the menu row
+#
+#   --icon ICON    - optional icon path or name shown by rofi next to the row.
 #
 # This is the most flexible declarator. Use it for:
 #
@@ -818,12 +832,11 @@ cfgr::item::action() {
     _CFGR_ITEMS+=("<b>$label</b>")
   fi
 
-  # Descriptor format: action:FUNCNAME
   _CFGR_DISPATCH+=("action:${func}")
   _CFGR_ICONS+=("$icon")
 }
 
-# cfgr::item::raw  DISPLAY_STRING  DISPATCH_STRING
+# cfgr::item::raw  DISPLAY_STRING  DISPATCH_STRING  [ICON]
 #
 # Registers an item with full manual control over both the display text
 # and the dispatch descriptor. This is an escape hatch for cases that
@@ -838,6 +851,8 @@ cfgr::item::action() {
 #   digit:VAR:PROMPT:ROFI_TITLE:TYPE:MIN:MAX
 #   string:VAR:ROFI_TITLE:HOOK:opt\x1Fopt\x1F...
 #   display:      (empty payload = read-only row, no action on select)
+#
+# ICON            - optional icon path or name (empty string or omitted = no icon)
 #
 # The main use case is display+action items where the displayed value comes
 # from somewhere other than a settings variable:
@@ -856,7 +871,7 @@ cfgr::item::action() {
 cfgr::item::raw() {
   _CFGR_ITEMS+=("$1")
   _CFGR_DISPATCH+=("$2")
-  _CFGR_ICONS+=("$icon")
+  _CFGR_ICONS+=("${3-}")
 }
 
 # cfgr::dispatch  DESCRIPTOR
@@ -964,6 +979,15 @@ cfgr::dispatch() {
   esac
 }
 
+# _cfgr::has_icons
+# Returns 0 (success) if any element of _CFGR_ICONS is non-empty, 1 otherwise.
+_cfgr::has_icons() {
+  for icon in "${_CFGR_ICONS[@]}"; do
+    [[ -n "$icon" ]] && return 0
+  done
+  return 1
+}
+
 # cfgr::run  TITLE  BUILD_FUNC  [SETTINGS_VAR ...]
 #
 # The menu loop. This is what every cfgr-* script calls instead of
@@ -983,7 +1007,7 @@ cfgr::dispatch() {
 # What cfgr::run does on each iteration:
 #   1.  source VIBRANIUM_USER_SETTINGS
 #   2.  helpers::check on declared SETTINGS_VAR names
-#   3.  Reset _CFGR_ITEMS and _CFGR_DISPATCH  (empty the parallel arrays)
+#   3.  Reset _CFGR_ITEMS, _CFGR_DISPATCH, _CFGR_ICONS  (empty the parallel arrays)
 #   4.  BUILD_FUNC   (populate the arrays via cfgr::item::* calls)
 #   5.  cfgr::build_menu  (align the " : value" columns)
 #   6.  helpers::ui::menu  (open rofi, wait for selection)
@@ -1000,7 +1024,6 @@ cfgr::run() {
   local index=0
 
   while true; do
-
     source "$VIBRANIUM_USER_SETTINGS"
 
     if ((${#settings[@]} > 0)); then
@@ -1016,18 +1039,42 @@ cfgr::run() {
     local -a options
     mapfile -t options < <(cfgr::build_menu "${_CFGR_ITEMS[@]}")
 
-    # TODO:pass -show-icons only for top-level entries like the root
-    # of Vibranium menu or the root of Settings submenu; hide icons
-    # for the actual settings entries.
+    local chosen
+    if _cfgr::has_icons; then
+      # Icon case: write a NUL-annotated menu file for rofi, and a separate
+      # plain-text fd so helpers::ui::menu can measure widths without icon noise.
+      local plain_text_fd
+      exec {plain_text_fd}< <(printf '%s\n' "${options[@]}")
 
-    helpers::ui::menu chosen "$title" "ESC to go back" -selected-row "$index" -- "${options[@]}"
+      local tmp_menu="$VIBRANIUM_RUNTIME/cfgr_menu_$$"
+      {
+        for i in "${!options[@]}"; do
+          printf '%s' "${options[$i]}"
+          if [[ -n "${_CFGR_ICONS[$i]}" ]]; then
+            printf '\0icon\x1f%s' "${_CFGR_ICONS[$i]}"
+          fi
+          printf '\n'
+        done
+      } >"$tmp_menu"
+
+      helpers::ui::menu chosen "$title" "ESC to go back" \
+        -selected-row "$index" -plain-fd "$plain_text_fd" \
+        -input-file "$tmp_menu" -show-icons
+
+      exec {plain_text_fd}<&-
+      rm -f "$tmp_menu"
+    else
+      # No icons: pass items inline
+      helpers::ui::menu chosen "$title" "ESC to go back" \
+        -selected-row "$index" -- "${options[@]}"
+    fi
 
     [[ -z "$chosen" ]] && break
 
-    # Remember the last selected row index so rofi reopens with the cursor
-    # on the same entry after a value is changed.
-    for index in "${!options[@]}"; do
-      [[ "${options[$index]}" == "$chosen" ]] && break
+    for idx in "${!options[@]}"; do
+      if [[ "${options[$idx]}" == "$chosen" ]]; then
+        index=$idx && break
+      fi
     done
 
     cfgr::dispatch "${_CFGR_DISPATCH[$index]}"

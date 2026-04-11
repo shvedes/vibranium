@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 ICONS_DIR="$HOME/.local/share/icons"
-VB_ICONS="$VIBRANIUM/extras/icon_theme/Vibranium"
+VB_ICONS="$VIBRANIUM/extras/icons/Vibranium"
 
 mkdir -p "$ICONS_DIR"
 

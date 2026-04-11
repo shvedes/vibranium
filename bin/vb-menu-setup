@@ -6,10 +6,10 @@ source vb-lib-cfgr
 _die() { helpers::ui::close_menus; }
 
 _build() {
-  cfgr::item::action --label "Secure Boot" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-sboot; _die "
-  cfgr::item::action --label "Firewall" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-ufw -- vb-setup-ufw; _die "
-  cfgr::item::action --label "Docker" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-docker -- vb-setup-docker; _die "
-  cfgr::item::action --label "QEMU" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-qemu -- vb-setup-qemu; _die "
+  cfgr::item::action --label "Secure Boot" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-sboot; _die " --icon vb-secure-boot
+  cfgr::item::action --label "Firewall" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-ufw -- vb-setup-ufw; _die " --icon vb-lock
+  cfgr::item::action --label "Docker" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-docker -- vb-setup-docker; _die " --icon vb-docker
+  cfgr::item::action --label "QEMU" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-qemu -- vb-setup-qemu; _die " --icon vb-vm
 }
 
 cfgr::run "Setup" "_build"

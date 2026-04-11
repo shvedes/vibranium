@@ -2,7 +2,7 @@
 Type=Application
 Version=1.0
 Name=Suspend
-Icon=suspend
+Icon=vb-night-light
 Keywords=Sleep;Standby
 # VM specific: we don't installl ddcutil in a virtual machine,
 # so this is relatively safe way to hide the suspend option

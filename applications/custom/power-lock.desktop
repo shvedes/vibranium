@@ -2,7 +2,7 @@
 Type=Application
 Version=1.0
 Name=Lock session
-Icon=lock
+Icon=vb-lock
 Keywords=Session;Lock;Screensaver
 # VM specific: we don't installl ddcutil in a virtual machine,
 # so this is relatively safe way to hide the suspend option

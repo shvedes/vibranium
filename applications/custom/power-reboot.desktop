@@ -2,7 +2,7 @@
 Type=Application
 Version=1.0
 Name=Reboot
-Icon=reboot
+Icon=vb-reboot
 Keywords=Reboot;Restart;
 Exec=systemctl reboot
 Terminal=false

@@ -330,7 +330,7 @@ _ask_for_icon() {
   local ref
 
   read -rp "${BLUE}[VIBRANIUM]${RESET} Icon URL / path / name (or Enter for default): ${BLUE}" ref
-  [[ -z $ref ]] && ref="webbrowser-app"
+  [[ -z $ref ]] && ref="vb-pwa"
   printf "%s" "$ref"
 }
 
@@ -574,7 +574,7 @@ if [[ $ICON_REF =~ ^https?:// ]]; then
   if ! curl -fsSL -o "$ICON_PATH" "$ICON_REF" 2>/dev/null || [[ ! -s $ICON_PATH ]]; then
     # Use a generic system icon as fallback rather than aborting the install.
     echo "${RED}[VIBRANIUM]${RESET} Could not fetch givenURL. Using fallback icon"
-    ICON_PATH="webbrowser-app"
+    ICON_PATH="vb-pwa"
   fi
 else
   # Treat as a filename relative to ICON_DIR (non-interactive shorthand).

@@ -2,7 +2,7 @@
 Type=Application
 Version=1.0
 Name=Shutdown
-Icon=power
+Icon=vb-power
 Keywords=Poweroff;Shut;Stop;
 Exec=systemctl poweroff
 Terminal=false

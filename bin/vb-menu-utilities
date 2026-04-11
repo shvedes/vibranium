@@ -7,25 +7,25 @@ _die() { helpers::ui::close_menus; }
 
 _build() {
   if [[ -f "$VIBRANIUM_RUNTIME/vb-timer.remaining" ]]; then
-    cfgr::item::action --label "Stop timer" --func "pkill -f vb-util-timer; _die"
+    cfgr::item::action --label "Stop timer" --func "pkill -f vb-util-timer; _die" --icon vb-timer
   else
-    cfgr::item::action --label "Start timer" --func "vb-util-timer; _die"
+    cfgr::item::action --label "Start timer" --func "vb-util-timer; _die" --icon vb-timer
   fi
 
-  cfgr::item::action --label "Toggle inhibitor" --func "vb-cmd-toggle-inhibit; _die"
-  cfgr::item::action --label "Reload Vibranium" --func "vb-cmd-reload; _die"
-  cfgr::item::action --label "Close all windows" --func "vb-cmd-close-windows; _die"
+  cfgr::item::action --label "Toggle inhibitor" --func "vb-cmd-toggle-inhibit; _die" --icon vb-inhibitor
+  cfgr::item::action --label "Reload Vibranium" --func "vb-cmd-reload; _die" --icon vb-update
+  cfgr::item::action --label "Close all windows" --func "vb-cmd-close-windows; _die" --icon vb-xmark
 
   if [[ -e "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
-    mpd_status="$(mpc status 2> /dev/null)"
+    mpd_status="$(mpc status 2>/dev/null)"
   fi
 
   spotify_status="$(playerctl -p spotify status)"
   if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
-    cfgr::item::action --label "Copy current track" --func "vb-cmd-copy-track --notify; _die"
+    cfgr::item::action --label "Copy current track" --func "vb-cmd-copy-track --notify; _die" --icon vb-music
   fi
 
-  cfgr::item::action --label "Toggle reading mode" --func "vb-cmd-toggle-reading-mode; _die"
+  cfgr::item::action --label "Toggle reading mode" --func "vb-cmd-toggle-reading-mode; _die" --icon vb-book
 }
 
 cfgr::run "Utilities" "_build"

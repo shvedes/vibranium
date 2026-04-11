@@ -2,5 +2,5 @@
 Type=Application
 Name=Calculator
 Exec=vb-util-calc
-Icon=gnome-calculator
+Icon=calculator
 OnlyShowIn=Hyprland;

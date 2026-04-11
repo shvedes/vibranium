@@ -35,33 +35,18 @@ export SUDO_PROMPT=$VIBRANIUM_SUDO_PROMPT
 #   <result_var>   — Name of the variable in the caller's scope that will receive
 #                    the selected string.
 #   <prompt>       — The label shown before the input field in rofi (e.g. "Open:").
-#   [placeholder]  — Optional placeholder text inside the input field. Detected by checking
-#                    whether the next arg does NOT start with '-'. Gets a leading space
-#                    prepended so it doesn't butt up against the cursor.
+#   [placeholder]  — Optional placeholder text inside the input field. Gets a leading
+#                    space prepended so it doesn't butt up against the cursor.
 #   [rofi_args]    — Any extra rofi flags (e.g. -kb-custom-1 "Alt+x"). Collected until
 #                    '--' is encountered or arguments run out.
+#                    Special flag: -plain-fd FD  (used internally by cfgr::run)
 #   [-- entry ...]  — Inline menu entries passed as individual arguments after '--'.
 #                    If '--' is absent, entries are read from stdin instead (pipe-friendly).
 #
 # RETURN VALUE:
 #   0 if the user selected something, 1 if rofi was killed (already running) or
 #   the user dismissed the menu with Escape / no selection.
-#
-# EXAMPLES:
-#   # Pipe input, no placeholder:
-#   helpers::ui::menu result "Open" -- -- Firefox Chromium Terminal
-#   echo "$result"
-#
-#   # Stdin input with placeholder and extra rofi flag:
-#   printf '%s\n' one two three | helpers::ui::menu result "Pick" "an item" -lines 5
-#
-# NOTES:
-#   - Pango markup (<b>, <i>, etc.) is supported in entries by default; stripped only
-#     for length calculations so the window width reflects visible text, not tags.
-#   - Clipboard-sourced calls (detected via BASH_SOURCE[1]) disable Pango parsing
-#     because clipboard content is raw text and angle-bracket chars would break markup.
 helpers::ui::menu() {
-  # See function declaration below.
   helpers::ui::register_menu
 
   # Capture the caller's variable name first.
@@ -96,7 +81,7 @@ helpers::ui::menu() {
 
   : >"$lock_file"
 
-  trap "rm -f "$lock_file"" EXIT INT HUP
+  trap "rm -f \"$lock_file\"" EXIT INT HUP
 
   # The prompt is the label rofi renders to the left of the text input field.
   local prompt="$1"
@@ -112,84 +97,70 @@ helpers::ui::menu() {
     shift
   fi
 
-  # Collect any caller-supplied rofi flags into an array, stopping at '--' or end of args.
-  # Stored as an array (not a string) so flags with spaces or special chars survive
-  # word-splitting when we later expand "${user_rofi_args[@]}".
   local user_rofi_args=()
+  local plain_fd=""
+  local input_file=""
+
   while [[ $# -gt 0 && "$1" != "--" ]]; do
-    user_rofi_args+=("$1")
-    shift
+    case "$1" in
+    -plain-fd)
+      plain_fd="$2"
+      shift 2
+      ;;
+    -input-file)
+      input_file="$2"
+      shift 2
+      ;;
+    *)
+      user_rofi_args+=("$1")
+      shift
+      ;;
+    esac
   done
 
-  # Build the newline-delimited list of menu entries.
-  # Two modes:
-  #   1. '--' sentinel found -> entries come from remaining positional arguments.
-  #      We prepend '\n' before each item *except the first* to avoid a trailing
-  #      newline, which rofi would render as a blank phantom entry at the bottom.
-  #   2. No '--' -> entries are read wholesale from stdin via `read -r -d ''`.
-  #      The -d '' trick sets the delimiter to NUL, so read slurps everything
-  #      until EOF rather than stopping at the first newline. `|| true` suppresses
-  #      the non-zero exit code that read returns when it hits EOF without a NUL.
-  local rofi_input=""
+  # Build input_plain (for width/line measurement) and rofi_input
+  #
+  # inline=true  -> entries came as '--' args; rofi_input is pre-built, use <<<
+  # plain_fd set -> caller provided a separate fd with clean (icon-stripped) text
+  # else         -> read everything from stdin into rofi_input
+  local inline=false rofi_input="" input_plain=""
+
   if [[ "$1" == "--" ]]; then
     shift
-    local first=true
+    inline=true
     for arg in "$@"; do
-      if $first; then
-        rofi_input="$arg" # First entry: set directly, no leading newline.
-        first=false
-      else
-        rofi_input+=$'\n'"$arg" # Subsequent entries: prepend newline as separator.
-      fi                        # This way the string never ends with a bare newline.
+      rofi_input+="${rofi_input:+$'\n'}$arg"
     done
+    input_plain="${rofi_input//<*>/}"
+  elif [[ -n "$plain_fd" ]]; then
+    input_plain="$(<&"$plain_fd")"
+    input_plain="${input_plain//<*>/}"
   else
     IFS= read -r -d '' rofi_input || true
-    # IFS= prevents leading/trailing whitespace from being stripped by read.
-    # -r disables backslash interpretation so entries with '\' are preserved literally.
+    input_plain="${rofi_input//<*>/}"
   fi
-
-  # Strip all Pango XML tags from a copy of the input before measuring text lengths.
-  # The pattern <*> matches any tag (greedy glob, not regex), removing e.g. <b>, </b>,
-  # <span weight="bold">, etc. This gives us the visible character count rather than
-  # the raw byte count including invisible markup, which is what determines visual width.
-  local input_plain="${rofi_input//<*>/}"
 
   # Walk every line of the stripped input to find the longest visible entry.
   # The counter is incremented only when the current line's length exceeds the running maximum.
-  local maxlen_input=0 line
+  local maxlen_input=0 lines=0 line
   while IFS= read -r line; do
-    if ((${#line} > maxlen_input)); then
-      maxlen_input=${#line}
-    fi
+    ((${#line} > maxlen_input)) && maxlen_input=${#line}
+    ((lines++))
   done <<<"$input_plain"
 
-  # The window must also be wide enough to show the prompt label + placeholder hint,
-  # so we take the maximum of the two lengths. If entries are short but the prompt
-  # is long, the window should still be sized for the prompt.
+  # We don't need it anymore.
+  unset input_plain
+
   local promptlen=$((${#prompt} + ${#placeholder}))
   local maxlen=$((maxlen_input > promptlen ? maxlen_input : promptlen))
 
-  # Walk the map keys in descending order to find the first threshold ≤ maxlen.
-  # The keys are listed explicitly (not via iteration) to guarantee descending order,
-  # since associative arrays in bash have no defined iteration order.
-  # Once we find a key where maxlen >= key, that key's pixel value becomes our width.
-  local width=$((maxlen))
+  local width=$maxlen
   for k in 80 78 76 74 72 70 68 66 64 62 60 58 56 54 52 50 48 46 44 42 40 38 36 34 32 30 28 26 24 22 20 18 16 14 12 10 8 6 0; do
     if ((width >= k)); then
       width=${map[$k]}
       break
     fi
   done
-
-  # Count the total number of lines in the (plain) input so we can conditionally
-  # enable rofi's -auto-select.
-  local lines=0
-  while IFS= read -r _; do
-    ((lines++))
-  done <<<"$input_plain"
-
-  # We don't need it anymore.
-  unset input_plain
 
   # Build the dynamic portion of the rofi option list.
   local rofi_opts=()
@@ -201,10 +172,8 @@ helpers::ui::menu() {
   #   c) This isn't a clipboard menu, where auto-selection would be jarring.
   helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
   if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT" == true ]]; then
-    if ((lines > 1)); then
-      if [[ ! "${BASH_SOURCE[1]}" =~ vb-core-clipboard ]]; then
-        rofi_opts+=(-auto-select)
-      fi
+    if ((lines > 1)) && [[ ! "${BASH_SOURCE[1]}" =~ vb-core-clipboard ]]; then
+      rofi_opts+=(-auto-select)
     fi
   fi
 
@@ -214,37 +183,35 @@ helpers::ui::menu() {
   # BASH_SOURCE[1] is the path of the script that called this function (index 0 is
   # this file itself), so matching "vb-core-clipboard" in it is a reliable caller-identity check.
   if [[ ! "${BASH_SOURCE[1]}" =~ vb-core-clipboard ]]; then
-    rofi_opts+=(-markup -markup-rows)
+    rofi_opts+=(-markup-rows)
   fi
 
-  # Run rofi and capture its output via a temp file rather than command substitution.
-  # Command substitution $(...) spawns a subshell, which is what we're avoiding here.
-  # The PID ($$) is embedded in the filename to prevent collisions if multiple
-  # instances of this function somehow run concurrently (e.g. from different terminals).
+  # Build the common argument list once;
+  # only the input source differs per branch.
+  local common_args=(
+    rofi -i -dmenu -p "$prompt" -sync
+    -theme-str 'entry {placeholder: "'"${placeholder}"'";}'
+    -theme-str "window {width: ${width}px;}"
+    -matching-negate-char ''
+    "${rofi_opts[@]}"
+    "${user_rofi_args[@]}"
+  )
+
   local selected=""
+  if [[ -n "$input_file" ]]; then
+    selected=$("${common_args[@]}" <"$input_file" 2>/dev/null)
+  elif $inline || [[ -z "$plain_fd" ]]; then
+    # Covers: inline '--' args, and legacy stdin (already read into rofi_input).
+    selected=$("${common_args[@]}" <<<"$rofi_input" 2>/dev/null)
+  else
+    # plain_fd set but no input_file: icon-annotated entries arrive on stdin.
+    selected=$("${common_args[@]}" <&0 2>/dev/null)
+  fi
 
-  read -r selected < <(rofi -i -dmenu -p "$prompt" -sync \
-    -theme-str 'entry {placeholder: "'"${placeholder}"'";}' \
-    -theme-str 'window {width: '"${width}px"';}' \
-    -matching-negate-char '' "${rofi_opts[@]}" \
-    "${user_rofi_args[@]}" <<<"$rofi_input" 2>/dev/null)
-
-  # Write the result into the caller's named variable without a subshell.
-  # printf -v <name> is bash's built-in way to assign to a variable by name;
-  # it's equivalent to eval "$var_name='$selected'" but safe against injection
-  # because the variable name and value are handled as separate printf arguments.
   printf -v "$var_name" '%s' "$selected"
-
   rm -f "$lock_file"
 
-  # Exit status doubles as a boolean: 0 (success) means something was selected,
-  # 1 (failure) means the user hit Escape or the input was empty. Callers can
-  # branch on this with a plain `if helpers::ui::menu result "Pick" -- a b c; then`.
-  [[ -n "$selected" ]] && {
-    return 0
-  } || {
-    return 1
-  }
+  [[ -n "$selected" ]] && return 0 || return 1
 }
 
 # helpers::ui::register_menu - Sanitize and export PID ancestry for menu chains
@@ -492,7 +459,7 @@ helpers::check() {
 
   # Iterate $@ directly — no need to copy into a local array first.
   for var_name in "$@"; do
-    # Cpecial var; it has no predetermined values. Just skip.
+    # Special var; it has no predetermined values. Just skip.
     if [[ "$var_name" == "VIBRANIUM_BAR_WEATHER_MODULE_CITY" ]]; then
       continue
     fi
@@ -648,7 +615,7 @@ term::enable_input() {
   unset term_original_settings
   # Clear input buffer first
   term::discard_buffer
-  # Show curosr
+  # Show cursor
   printf '\e[?25h'
 }
 

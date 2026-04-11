@@ -13,6 +13,7 @@ ln -sf "$HOME/.config/vibranium/current/theme/btop.theme" \
 # GNOME / GTK
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
+gsettings set org.gnome.desktop.interface icon-theme 'Vibranium'
 
 # QTCT
 sed -i "s/user/$USER/" "$HOME/.config/qt5ct/qt5ct.conf"

@@ -2,7 +2,7 @@
 Type=Application
 Version=1.0
 Name=Log out
-Icon=logout
+Icon=vb-logout
 Keywords=Session;Logout;Screensaver
 Exec=vb-core-stop-session
 Terminal=false

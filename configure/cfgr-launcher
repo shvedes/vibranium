@@ -3,10 +3,37 @@
 source vb-lib-core
 source vb-lib-cfgr
 
+_get_rofi_theme() {
+  local config="$XDG_CONFIG_HOME/rofi/config.rasi"
+  local theme="$(awk -f "$VIBRANIUM/awk/get-rofi-theme.awk" "$config")" || return
+  theme="${theme:-couldn\'t get theme}"
+  printf "%s" "$theme"
+}
+
+_set_rofi_theme() {
+  local input config
+  input="$(cfgr::set_string \
+    --title "Menu Theme" \
+    --option "Modern:modern" "Text:text")" || return
+  config="$XDG_CONFIG_HOME/rofi/config.rasi"
+
+  sed -i "s|\(@import \"./themes/\)[^\"]*|\1theme-${input}.rasi|" "$config"
+}
+
 _build() {
   cfgr::item::bool \
     --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START \
     --label "Launch on startup"
+
+  cfgr::item::string \
+    --var VIBRANIUM_GLOBAL_SEARCH_ENGINE \
+    --label "Search engine" \
+    --title "Search Engine" \
+    --option "Google:google" "DuckDuckGo:duckduckgo" "Bing:bing" "Brave:brave"
+
+  cfgr::item::bool \
+    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
+    --label "Auto select"
 
   cfgr::item::bool \
     --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
@@ -20,15 +47,7 @@ _build() {
     --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
     --label "Show icons"
 
-  cfgr::item::bool \
-    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
-    --label "Auto select"
-
-  cfgr::item::string \
-    --var VIBRANIUM_GLOBAL_SEARCH_ENGINE \
-    --label "Search engine" \
-    --title "Search Engine" \
-    --option "Google:google" "DuckDuckGo:duckduckgo" "Bing:bing" "Brave:brave"
+  cfgr::item::raw "Theme : $(_get_rofi_theme)" "action:_set_rofi_theme"
 }
 
 cfgr::run "App Laucher" "_build"

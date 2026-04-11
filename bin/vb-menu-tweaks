@@ -24,10 +24,12 @@ _build_apps() {
     if command -v chromium >/dev/null; then
       if _has_line "oauth2-client-id" "$chromium_file"; then
         cfgr::item::action \
+          --icon vb-tools \
           --label "Disable Chromium sync" \
           --func "vb-tweak-chromium disable; helpers::ui::close_menus"
       else
         cfgr::item::action \
+          --icon vb-tools \
           --label "Enable Chromium sync" \
           --func "vb-tweak-chromium enable; helpers::ui::close_menus"
       fi
@@ -36,10 +38,12 @@ _build_apps() {
     if command -v spicetify >/dev/null; then
       if _has_line "adblock" "$spicetify_file"; then
         cfgr::item::action \
+          --icon vb-tools \
           --label "Remove Spotify adblock" \
           --func "vb-tweak-spotify remove; helpers::ui::close_menus"
       else
         cfgr::item::action \
+          --icon vb-tools \
           --label "Install Spotify adblock" \
           --func "vb-tweak-spotify install; helpers::ui::close_menus"
       fi
@@ -57,6 +61,7 @@ _build_system() {
     fi
 
     cfgr::item::action \
+      --icon vb-tools \
       --label "$action systemd coredump" \
       --func "vb-tweak-coredump; helpers::ui::close_menus"
   }
@@ -64,8 +69,8 @@ _build_system() {
 }
 
 _build() {
-  cfgr::item::action --label "App tweaks" --func "_build_apps"
-  cfgr::item::action --label "System tweaks" --func "_build_system"
+  cfgr::item::action --label "App tweaks" --func "_build_apps" --icon vb-tools
+  cfgr::item::action --label "System tweaks" --func "_build_system" --icon vb-tools
 }
 
 cfgr::run "Tweaks" "_build"

@@ -2,7 +2,7 @@
 Type=Application
 Version=1.0
 Name=UEFI Setup
-Icon=uefi
+Icon=vb-chip
 Keywords=UEFI;Bios;Setup;Firmware;Asus;MSI;Gigabyte;Dell;Framework
 Exec=systemctl reboot --firmware-setup
 Terminal=false
