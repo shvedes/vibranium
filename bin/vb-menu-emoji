@@ -14,6 +14,10 @@ if pidof -q rofi; then
   exit 0
 fi
 
+# We use copy mode beacuse when wtype is invoked the language
+# Waybar module disappaers until next layout switch. It's a known
+# bug which is not yet closed: https://github.com/Alexays/Waybar/issues/1536
 rofi -modi emoji -show emoji -p "Emoji" \
   -theme-str "window{width: 400px;}" \
-  -emoji-format "{emoji} {name}"
+  -emoji-format "{emoji} {name}" \
+  -emoji-mode copy
