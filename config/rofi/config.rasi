@@ -26,7 +26,7 @@ configuration {
 	display-drun        : "Search";
 	display-ssh         : "SSH";
 
-	icon-theme          : "Papirus";
+	icon-theme          : "Vibranium";
 	drun-display-format : "{name}";
 	matching            : "prefix";
 	drun-match-fields   : "name,keywords,categories";
