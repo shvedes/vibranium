@@ -1,19 +1,22 @@
 #!/usr/bin/env bash
 
-CURRENT_BRANCH="$(git -C "$VIBRANIUM" branch --show-current)"
 STATE_FILE="$HOME/.local/state/vibranium/update.channel"
 
-if [[ "$CURRENT_BRANCH" =~ ^v[09]\.[09]\.[09]$ ]]; then
-  printf "%s" "release" > "$STATE_FILE"
+branch=$(git -C "$VIBRANIUM" symbolic-ref -q --short HEAD)
 
-elif [[ "$CURRENT_BRANCH" == "dev" ]]; then
-  printf "%s" "dev" > "$STATE_FILE"
+if [[ -n "$branch" ]]; then
+  case "$branch" in
+  master)
+    state="upstream"
+    ;;
+  *)
+    state="$branch"
+    ;;
+  esac
 else
-  if [[ "$CURRENT_BRANCH" == "master" ]]; then
-    printf "%s" "upstream" > "$STATE_FILE"
-  else
-    printf "%s" "$CURRENT_BRANCH" > "$STATE_FILE"
-  fi
+  state="release"
 fi
+
+printf "%s" "$state" >"$STATE_FILE"
 
 UpdateSummary "Configuration: set Vibranium update channel to $CURRENT_BRANCH"
