@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_STATE $VIBRANIUM_CACHE
+
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
   vb-util-first-run
   exit 0
@@ -10,8 +12,6 @@ export -f helpers::check
 
 # Point child bash processes at the lib so they auto-source it.
 export BASH_ENV="$VIBRANIUM/bin/vb-lib-core"
-
-mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_STATE $VIBRANIUM_CACHE
 
 # Run the default startup scripts first
 HOOKS=("$VIBRANIUM"/default/hooks/startup/*.sh)
