@@ -198,8 +198,9 @@ start_rec() {
   rec_status=$?
 
   if ((rec_status == 0)); then
-    visualize
     log::info "recording started"
+    : >"$VIBRANIUM_RUNTIME/recording-ongoing"
+    visualize
     return 0
   fi
 
@@ -262,6 +263,8 @@ stop_rec() {
       # Do not show "Recording saved" when ran in fallback
       notify-send -r 3 "Screen Recorder" "Recording saved"
     fi
+
+    rm -f "$VIBRANIUM_RUNTIME/recording-ongoing"
 
     # Wait for the pid
     sleep 0.1
