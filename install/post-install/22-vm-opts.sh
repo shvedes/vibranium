@@ -18,11 +18,7 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   sed -i '/\"bluetooth\"/s/\"/\/\/ /' "$waybar_cfg"
   sed -i '/\"custom\/nightshift\"/s/\"/\/\/ /' "$waybar_cfg"
 
-  # The reason behind this is that when screen locks in a VM (tested only in QEMU),
-  # CPU usage spikes almost to 100% and stays there until the unlock.
-  printf "\n# Screen lock isn't available inside of a VM.\n" >>"$hypr_binds"
-  printf "unbind = CTRL ALT, L" >>"$hypr_binds"
-  printf "\n# Screen lock isn't available inside of a VM." >>"$hypr_binds"
+  printf "\n# Screen recording isn't available inside of a VM." >>"$hypr_binds"
   printf "unbind = CTRL ALT, R" >>"$hypr_binds"
 
   UpdateSummary "VM environment: disabled Hyprland animations"
