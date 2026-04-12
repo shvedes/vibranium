@@ -280,8 +280,8 @@ stop_rec() {
 
 case "$1" in
 --region | --screen | --portal)
-  AREA="$(set_rec_area "$1")"
   source vb-lib-core
+  AREA="$(set_rec_area "$1")"
   start_rec
   ;;
 -h | --help)
