@@ -98,7 +98,7 @@ if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
   text="<span foreground='DimGray'>|</span> "
 fi
 
-text+="<span foreground='CornflowerBlue'>📦</span> $TOTAL_COUNT"
+text+="📦 $TOTAL_COUNT"
 tooltip="$(make_tooltip "$PKG_LIST")"
 
 jq -nc --unbuffered --arg text "$text" --arg tooltip "$tooltip" '{text: $text, tooltip: $tooltip}'

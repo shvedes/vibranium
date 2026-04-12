@@ -1,138 +1,87 @@
 .theme-dark, .theme-light {
-  /* Color definitions */
-  --color-red: {{ red }};
+
   --color-red-rgb: {{ red_rgb }};
+  --color-red: {{ red }};
 
-  --color-green: {{ green }};
-  --color-green-rgb: {{ green_rgb }};
-
-  --color-yellow: {{ yellow }};
-  --color-yellow-rgb: {{ yellow_rgb }};
-
-  --color-blue: {{ blue }};
-  --color-blue-rgb: {{ blue_rgb }};
-
-  --color-purple: {{ purple }};
-  --color-purple-rgb: {{ purple_rgb }};
-
-  --color-pink: {{ pink }};
-  --color-pink-rgb: {{ pink_rgb }};
-
-  --color-cyan: {{ cyan }};
-  --color-cyan-rgb: {{ cyan_rgb }};
-
-  --color-orange: {{ orange }};
   --color-orange-rgb: {{ orange_rgb }};
+  --color-orange: {{ orange }};
 
-  /* Gradually build all base colors */
-  --color-base-00: rgba({{ background_h_rgb }},0.5);
-  --color-base-05: rgba({{ background_h_rgb }},1.0);
-  --color-base-10: rgba({{ background_0_rgb }},0.5);
-  --color-base-20: rgba({{ background_0_rgb }},1.0);
-  --color-base-25: rgba({{ background_1_rgb }},0.5);
-  --color-base-30: rgba({{ background_1_rgb }},1.0);
-  --color-base-35: rgba({{ background_2_rgb }},0.5);
-  --color-base-40: rgba({{ background_2_rgb }},1.0);
-  --color-base-50: rgba({{ background_3_rgb }},0.5);
-  --color-base-60: rgba({{ background_3_rgb }},1.0);
-  --color-base-70: rgba({{ background_4_rgb }},1.0);
-  --color-base-100: rgba({{ background5_rgb }},1.0);
+  --color-yellow-rgb: {{ yellow_rgb }};
+  --color-yellow: {{ yellow }};
 
-  /* Core colors */
-  --background-primary: {{ background_0 }};
-  --background-primary-alt: {{ background_h }};
-  --background-secondary: rgba({{ background_1_rgb }},0.3);
-  --background-secondary-alt: {{ background_1 }};
+  --color-green-rgb: {{ green_rgb }};
+  --color-green: {{ green }};
+
+  --color-cyan-rgb: {{ cyan_rgb }};
+  --color-cyan: {{ cyan }};
+
+  --color-blue-rgb: {{ blue_rgb }};
+  --color-blue: {{ blue }};
+
+  --color-purple-rgb: {{ purple_rgb }};
+  --color-purple: {{ purple }};
+
+  --color-pink-rgb: {{ pink_rgb }};
+  --color-pink: {{ pink }};
+
+  --accent-h: {{ accent_h }};
+  --accent-s: {{ accent_s }}%;
+  --accent-l: {{ accent_l }}%;
+
   --text-normal: {{ foreground_0 }};
 
-  /* Selection colors */
-  --text-selection: rgba({{ foreground_0_rgb }},0.15);
+  --link-external-color: {{ blue }};
+  --link-external-color-hover: {{ purple }};
 
-  /* Border color */
-  --background-modifier-border: var(--color-base-40);
+  /* --h1-color: inherit; */
+  /* --h2-color: inherit; */
+  /* --h3-color: inherit; */
+  /* --h4-color: inherit; */
+  /* --h5-color: inherit; */
+  /* --h6-color: inherit; */
 
-  /* Semantic heading colors */
-  --text-title-h1: var(--color-green);
-  --text-title-h2: var(--color-cyan);
-  --text-title-h3: var(--color-blue);
-  --text-title-h4: var(--color-yellow);
-  --text-title-h5: var(--color-orange);
-  --text-title-h6: var(--color-purple);
+  /*
+   *
+   * Gradually build all base colors
+   *
+   */
 
-  /* Links and accents */
-  --text-link: var(--color-blue);
-  --text-accent: {{ accent }};
-  --text-accent-hover: var(--color-purple);
-  --interactive-accent: {{ accent }};
-  --interactive-accent-hover: rgba({{ accent_rgb }},0.8);
+  /* Main document background, settings background */
+  --color-base-00:  {{ background_0 }};
 
-  /* Muted text */
-  --text-muted: color-mix(in srgb, {{ foreground_0 }} 70%, transparent);
-  --text-faint: color-mix(in srgb, {{ foreground_0 }} 55%, transparent);
+  --color-base-05:  {{ background_0 }};
 
-  /* Code */
-  --code-normal: {{ foreground_2 }};
+  /* Code block color, options' island background */
+  --color-base-10:  {{ background_1 }};
 
-  /* Errors and success */
-  --text-error: {{ red }};
-  --text-error-hover: {{ red }};
-  --text-success: {{ green }};
+  /* Background of  left & right section, context menu, canvas's drag icons background */
+  --color-base-20:  rgba(calc({{ background_1_r }} * 0.8), calc({{ background_1_g }} * 0.8), calc({{ background_1_b }} * 0.8));
 
-  /* Tags */
-  --tag-color: {{ yellow }};
-  --tag-background: rgba({{ background_3_rgb }},0.5);
+  /* Input field background */
+  --color-base-25:  rgba(calc({{ background_0_r }} * 0.8), calc({{ background_0_g }} * 0.8), calc({{ background_0_b }} * 0.8));
 
-  /* Graph */
-  --graph-line: {{ gray }};
-  --graph-node: {{ accent }};
-  --graph-node-focused: var(--color-blue);
-  --graph-node-tag: var(--color-green);
-  --graph-node-attachment: var(--color-yellow);
-}
+  /* Top bar background, section border, canva's grid color
+   * non accent-colored button background */
+  --color-base-30:  {{ background_2 }};
 
-/* Headers */
-.cm-header-1, .markdown-rendered h1 { color: var(--text-title-h1); }
-.cm-header-2, .markdown-rendered h2 { color: var(--text-title-h2); }
-.cm-header-3, .markdown-rendered h3 { color: var(--text-title-h3); }
-.cm-header-4, .markdown-rendered h4 { color: var(--text-title-h4); }
-.cm-header-5, .markdown-rendered h5 { color: var(--text-title-h5); }
-.cm-header-6, .markdown-rendered h6 { color: var(--text-title-h6); }
+   /* Background of inactive toggles, borders of some UI elements,
+   * hover background on *some* buttons */
+  --color-base-35:  {{ background_3 }};
 
-/* Code blocks */
-.markdown-rendered code {
-  color: {{ foreground_2 }};
-}
+  /* Mostly UI borders */
+  --color-base-40:  {{ background_3 }};
 
-/* Syntax highlighting */
-.cm-s-obsidian span.cm-keyword { color: var(--color-red); }
-.cm-s-obsidian span.cm-string { color: var(--color-yellow); }
-.cm-s-obsidian span.cm-number { color: var(--color-cyan); }
-.cm-s-obsidian span.cm-comment { color: {{ gray }}; }
-.cm-s-obsidian span.cm-operator { color: var(--color-purple); }
-.cm-s-obsidian span.cm-def { color: var(--color-blue); }
+  /* Some UI elements color */
+  --color-base-50:  {{ background_5 }};
 
-/* Links */
-.markdown-rendered a {
-  color: var(--text-link);
-}
+  --color-base-60: {{ foreground_2 }};
 
-/* Blockquotes */
-.markdown-rendered blockquote {
-  border-left-color: {{ accent }};
-}
+  /* Text color in non-document places */
+  --color-base-70: {{ foreground_1 }};
 
-/* Active elements */
-.workspace-leaf.mod-active .workspace-leaf-header-title {
-  color: var(--interactive-accent);
-}
-
-.nav-file-title.is-active {
-  color: var(--interactive-accent);
-}
-
-/* Search results */
-.search-result-file-title {
-  color: var(--interactive-accent);
+  /* Couldn't find it, but according to the default Obsidian theme,
+   * this is equal to text color, as well as base-70 and base-60  */
+  --color-base-100: {{ foreground_0 }};
 }
 
 /* vim: set ft=css: */
