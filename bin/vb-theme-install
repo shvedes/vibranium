@@ -14,21 +14,27 @@ trap 'printf "\n"; _operation_canceled; exit 1' INT HUP
 
 term::show_header
 
-if [[ -z "$1" ]]; then
-  read -rp "${YELLOW}[VIBRANIUM]${RESET} Git repo URL: " REPO_URL
-else
+# If a URL was passed as an argument, use it directly and skip the prompt loop.
+# Otherwise, keep asking until the user provides a valid http(s) URL (or hits Ctrl+C).
+if [[ -n "$1" ]]; then
   REPO_URL="$1"
-fi
+else
+  while true; do
+    read -rp "${YELLOW}[VIBRANIUM]${RESET} Git repo URL: " REPO_URL
 
-if [[ -z "$REPO_URL" ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} No URL provided!"
-  _operation_canceled
-  exit 1
-# Validate: must be an http(s) URL
-elif [[ ! "$REPO_URL" =~ ^https?:// ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} You must provide a URL!"
-  _operation_canceled
-  exit 1
+    if [[ -z "$REPO_URL" ]]; then
+      echo "${RED}[VIBRANIUM]${RESET} No URL provided. Try again."
+      continue
+    fi
+
+    if [[ ! "$REPO_URL" =~ ^https?:// ]]; then
+      echo "${RED}[VIBRANIUM]${RESET} You must provide an http(s) URL. Try again."
+      continue
+    fi
+
+    # Input passed both checks - we have a usable URL
+    break
+  done
 fi
 
 # Extract owner/repo from GitHub URL for the API, stripping scheme, host, and .git suffix
@@ -50,7 +56,7 @@ THEME_PATH="$THEMES_DIR/$THEME_NAME"
 # so we refuse early rather than letting that happen.
 OFFICIAL_THEME_PATH="$VIBRANIUM/themes/$THEME_NAME"
 if [[ -d "$OFFICIAL_THEME_PATH" ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR is an official Vibranium theme and cannot be overwritten by a community install"
+  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR is an official Vibranium theme and cannot be overwritten by a community install."
   _operation_canceled
   exit 1
 fi
