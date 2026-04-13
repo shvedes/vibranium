@@ -2,20 +2,20 @@
 
 _HYPR_D="$XDG_CONFIG_HOME/hypr/hyprland.conf.d"
 
-HYPR_CONF_INPUT="$_HYPR_D/input.conf"
-HYPR_CONF_ADVANCED="$_HYPR_D/advanced.conf"
-HYPR_CONF_LAF="$_HYPR_D/look-and-feel.conf"
-HYPR_CONF_SMARTGAPS="$_HYPR_D/smart-gaps.conf"
-HYPR_CONF_ANIMATIONS="$_HYPR_D/animations.conf"
-HYPRLOCK_CONFIG="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+export HYPR_CONF_INPUT="$_HYPR_D/input.conf"
+export HYPR_CONF_ADVANCED="$_HYPR_D/advanced.conf"
+export HYPR_CONF_LAF="$_HYPR_D/look-and-feel.conf"
+export HYPR_CONF_SMARTGAPS="$_HYPR_D/smart-gaps.conf"
+export HYPR_CONF_ANIMATIONS="$_HYPR_D/animations.conf"
+export HYPRLOCK_CONFIG="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
 
 # Single-option read helpers
 
-hypr::bool()     { hyprctl -j getoption "$1" | jq -r 'if .int == 1 then "true" else "false" end'; }
+hypr::bool() { hyprctl -j getoption "$1" | jq -r 'if .int == 1 then "true" else "false" end'; }
 hypr::bool_inv() { hyprctl -j getoption "$1" | jq -r 'if .int == 0 then "true" else "false" end'; }
-hypr::int()      { hyprctl -j getoption "$1" | jq -r '.int'; }
-hypr::float()    { hyprctl -j getoption "$1" | jq -r '.float'; }
-hypr::str()      { hyprctl -j getoption "$1" | jq -r '.str'; }
+hypr::int() { hyprctl -j getoption "$1" | jq -r '.int'; }
+hypr::float() { hyprctl -j getoption "$1" | jq -r '.float'; }
+hypr::str() { hyprctl -j getoption "$1" | jq -r '.str'; }
 
 # Batch fetch -> associative array
 #
@@ -58,11 +58,11 @@ hypr::fetch() {
   local jq_prog="" expr
   for i in "${!opts[@]}"; do
     case "${types[$i]}" in
-      bool)                  expr=".[$i].int | if . == 1 then \"true\" else \"false\" end" ;;
-      bool_inv)              expr=".[$i].int | if . == 0 then \"true\" else \"false\" end" ;;
-      int)                   expr=".[$i].int | tostring" ;;
-      str)                   expr=".[$i].str" ;;
-      float|float1|float2|float_int) expr=".[$i].float | tostring" ;;
+    bool) expr=".[$i].int | if . == 1 then \"true\" else \"false\" end" ;;
+    bool_inv) expr=".[$i].int | if . == 0 then \"true\" else \"false\" end" ;;
+    int) expr=".[$i].int | tostring" ;;
+    str) expr=".[$i].str" ;;
+    float | float1 | float2 | float_int) expr=".[$i].float | tostring" ;;
     esac
     jq_prog+="${jq_prog:+,}($expr)"
   done
@@ -72,21 +72,21 @@ hypr::fetch() {
   # into an array natively, so .[i] indexing is reliable without regex splitting.
   local raw vals
   raw=$(hyprctl -j --batch "$query")
-  mapfile -t vals < <(jq -rs "[$jq_prog] | .[]" <<< "${raw//nan/0}")
+  mapfile -t vals < <(jq -rs "[$jq_prog] | .[]" <<<"${raw//nan/0}")
 
   for i in "${!opts[@]}"; do
     local opt="${opts[$i]}" val="${vals[$i]}"
     case "${types[$i]}" in
-      float1)    HYPR["$opt"]=$(LC_NUMERIC=C printf "%.1f" "$val") ;;
-      float2)    HYPR["$opt"]=$(LC_NUMERIC=C printf "%.2f" "$val") ;;
-      float_int) HYPR["$opt"]=$(LC_NUMERIC=C printf "%.0f" "$val") ;;
-      *)         HYPR["$opt"]="$val" ;;
+    float1) HYPR["$opt"]=$(LC_NUMERIC=C printf "%.1f" "$val") ;;
+    float2) HYPR["$opt"]=$(LC_NUMERIC=C printf "%.2f" "$val") ;;
+    float_int) HYPR["$opt"]=$(LC_NUMERIC=C printf "%.0f" "$val") ;;
+    *) HYPR["$opt"]="$val" ;;
     esac
   done
 }
 
 # hypr::get <option>  — read from the last hypr::fetch result
-hypr::get() { printf "${HYPR[$1]}"; }
+hypr::get() { printf "%s" "${HYPR[$1]}"; }
 
 # hypr::set <option> <value> <config_file>
 hypr::set() { vb-cmd-edit-wm-config "${1}:${2}" "$3"; }

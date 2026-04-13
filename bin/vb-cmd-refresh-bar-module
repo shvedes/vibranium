@@ -26,7 +26,7 @@ esac
 
 waybar_pid=$(systemctl --user show waybar -p MainPID --value)
 
-if (($waybar_pid == 0)); then
+if ((waybar_pid == 0)); then
   exit 1
 fi
 

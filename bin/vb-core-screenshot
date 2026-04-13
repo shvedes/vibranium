@@ -21,105 +21,105 @@ EOF
 }
 
 copy() {
-  printf "file://%s" "$1" | wl-copy --type text/uri-list
+  printf 'file://%s' "$1" | wl-copy --type text/uri-list
 }
 
 notify() {
-  local target message is_on_disk
-
   if [[ $VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION == false ]]; then
     return 0
   fi
 
-  is_on_disk="$VIBRANIUM_SCREENSHOT_SAVE_TO_DISK"
-
   case "$1" in
-  "region") target="Selected region" ;;
-  "window") target="Active window" ;;
-  "screen") target="Active screen" ;;
+  region) local target='Selected region' ;;
+  window) local target='Active window' ;;
+  screen) local target='Active screen' ;;
   esac
 
-  if [[ "$is_on_disk" == true ]]; then
-    message="saved to disk"
+  if [[ $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK == true ]]; then
+    local message='saved to disk'
   else
-    message="captured"
+    local message='captured'
   fi
 
-  notify-send -r 3 -t 1500 "Screenshot" "$target $message"
-}
-
-set_output_dir() {
-  mkdir -p "${XDG_PICTURES_DIR:-$HOME}/Screenshots"
-  printf "%s" "${XDG_PICTURES_DIR:-$HOME}/Screenshots"
+  notify-send -r 3 -t 1500 'Screenshot' "$target $message"
 }
 
 set_output_file() {
+  local -n _path=$1
+
   if [[ $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK == false ]]; then
-    printf "$VIBRANIUM_RUNTIME/screenshot.%s" "$FILETYPE"
+    _path="$VIBRANIUM_RUNTIME/screenshot.$FILETYPE"
     return
   fi
 
-  local date
-  date="$(date +"%Y-%m-%d_%H-%M-%S")"
+  local dir timestamp
+  dir="${XDG_PICTURES_DIR:-$HOME}/Screenshots"
+  printf -v timestamp '%(%Y-%m-%d_%H-%M-%S)T' -1
 
-  printf "%s/screenshot-%s.%s" "$(set_output_dir)" "$date" "$FILETYPE"
+  if [[ ! -d "$dir" ]]; then
+    mkdir -p "$dir"
+  fi
+
+  _path="$dir/screenshot-$timestamp.$FILETYPE"
 }
 
 select_region() {
-  local region
-  region="$(slurp -d -w 1 -b "${P_GRAY}33" -c "${P_ACCENT}" 2>/dev/null)"
+  local -n _region=$1
+  local result result_rc
 
-  if [[ -z $region ]]; then
+  result="$(slurp -d -w 1 -b "${P_GRAY}33" -c "${P_ACCENT}" 2>/dev/null)"
+  result_rc=$?
+
+  if ((result_rc != 0)) || [[ -z $result ]]; then
     return 1
   fi
 
-  printf "%s" "$region"
+  _region="$result"
 }
 
 get_window_geometry() {
-  local geometry
-  geometry="$(hyprctl -j activewindow | jq -r '"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"')"
+  local -n _geometry=$1
+  local result expression
 
-  if [[ $geometry == *null* ]]; then
+  expression='"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"'
+  result="$(hyprctl -j activewindow | jq -r "$expression")"
+
+  if [[ $result == *null* ]]; then
     return 1
   fi
 
-  printf "%s" "$geometry"
+  _geometry="$result"
 }
 
 capture() {
   local target="$1"
-  local geometry region
   local output_file
 
-  output_file="$(set_output_file)"
+  set_output_file output_file
 
   case "$target" in
   region)
-
-    if ! region="$(select_region)"; then
+    local region
+    if ! select_region region; then
       exit 1
     fi
 
-    # shellcheck disable=SC2068
-    grim ${GRIM_OPTS[@]} -g "$region" "$output_file"
+    grim "${GRIM_OPTS[@]}" -g "$region" "$output_file"
     ;;
   window)
-
-    if ! geometry="$(get_window_geometry)"; then
+    local geometry
+    if ! get_window_geometry geometry; then
       exit 1
     fi
 
-    # shellcheck disable=SC2068
-    grim ${GRIM_OPTS[@]} -g "$geometry" "$output_file"
+    grim "${GRIM_OPTS[@]}" -g "$geometry" "$output_file"
 
     if [[ $FLASH_BORDER == true ]]; then
       hypr::flash::border
     fi
     ;;
   screen)
-    # shellcheck disable=SC2068
-    grim ${GRIM_OPTS[@]} "$output_file"
+    grim "${GRIM_OPTS[@]}" "$output_file"
 
     if [[ $FLASH_SCREEN == true ]]; then
       hypr::flash::screen
@@ -127,7 +127,7 @@ capture() {
     ;;
   esac
 
-  if [[ ! -f "$output_file" ]]; then
+  if [[ ! -f $output_file ]]; then
     exit 1
   fi
 
@@ -137,7 +137,6 @@ capture() {
   if [[ $ANNOTATE == true ]]; then
     exec setsid -f app2unit vb-util-image-annotator "$output_file"
   fi
-
 }
 
 init() {
@@ -167,23 +166,22 @@ init() {
 
   GRIM_OPTS+=(-t "$FILETYPE")
 
-  if [[ $FILETYPE =~ jp(e)?g ]]; then
+  if [[ $FILETYPE =~ ^jp(e)?g$ ]]; then
     GRIM_OPTS+=(-q "$VIBRANIUM_SCREENSHOT_JPEG_QUALITY")
   fi
 }
 
 check_deps() {
-  local missing=()
-  local deps=(grim slurp jq)
+  local dep missing=()
 
-  for d in "${deps[@]}"; do
-    if ! command -v "$d" >/dev/null; then
-      missing+=("$d")
+  for dep in grim slurp jq; do
+    if ! command -v "$dep" >/dev/null; then
+      missing+=("$dep")
     fi
   done
 
   if ((${#missing[@]} > 0)); then
-    vb-cmd-dep-notify --name "Screenshot Utility" --deps "${missing[*]}"
+    vb-cmd-dep-notify --name 'Screenshot Utility' --deps "${missing[*]}"
     return 1
   fi
 }
@@ -199,16 +197,15 @@ case "$1" in
     exit 1
   fi
 
-  init
-  capture "${1/--/}"
+  init && capture "${1#--}"
   ;;
--h | --help | "")
+-h | --help | '')
   usage
   exit 0
   ;;
 *)
-  echo "Unknown option: $1." >&2
-  echo "Use flag --help to see available options." >&2
+  echo "Unknown option: $*" >&2
+  echo "Try '${0##*/} --help' for more information" >&2
   exit 1
   ;;
 esac

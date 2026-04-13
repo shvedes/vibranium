@@ -15,9 +15,9 @@ shcat() {
 
 usage() {
   shcat <<EOF
-Usage: ${0##*/} [--help]
+Usage: ${0##*/} [OPTION]
 
-Toggle Hyprland animations on/off
+Toggle Hyprland and Hyprlock animations on/off
 
 Options:
   -h, --help  Show this help and exit
@@ -33,7 +33,7 @@ case "$1" in
   :
   ;;
 *)
-  echo "Error: unknown option: $1" >&2
+  echo "Error: unknown option -- $*" >&2
   echo "Try '${0##*/} --help' for more information" >&2
   exit 1
   ;;
@@ -42,7 +42,7 @@ esac
 # Ensure animations block exists
 if ! vb-cmd-edit-wm-config --get animations:enabled "$CONF" >/dev/null; then
   VALUE=$(hyprctl -j getoption animations:enabled | jq -r '.set')
-  vb-cmd-edit-wm-config animations:enabled:$VALUE "$CONF"
+  vb-cmd-edit-wm-config "animations:enabled:$VALUE" "$CONF"
 fi
 
 case "$(vb-cmd-edit-wm-config --get animations:enabled "$CONF")" in

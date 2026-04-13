@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-mkdir -p $VIBRANIUM_RUNTIME $VIBRANIUM_STATE $VIBRANIUM_CACHE
+mkdir -p "$VIBRANIUM_RUNTIME" "$VIBRANIUM_STATE" "$VIBRANIUM_CACHE"
 
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
   vb-util-first-run

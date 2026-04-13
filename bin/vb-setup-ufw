@@ -9,6 +9,7 @@ source vb-lib-core
 
 _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
 
   term::enable_input
@@ -16,33 +17,34 @@ _operation_canceled() {
 
 _operation_complete() {
   printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+  # shellcheck disable=SC2034
   read -n1 -r -p $'. Press any key to exit ' dummy
 
   term::enable_input
 }
 
 _configure_localsend() {
-  command -v localsend &> /dev/null || return 2 # localsend absent
+  command -v localsend &>/dev/null || return 2 # localsend absent
 
-  if sudo ufw status verbose 2> /dev/null | grep -q '53317'; then
+  if sudo ufw status verbose 2>/dev/null | grep -q '53317'; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} LocalSend rules: already in place, skipping"
     return 1 # unchanged
   fi
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Allowing LocalSend (port ${CYAN}53317${RESET})"
-  sudo ufw allow 53317/udp &> /dev/null
-  sudo ufw allow 53317/tcp &> /dev/null
+  sudo ufw allow 53317/udp &>/dev/null
+  sudo ufw allow 53317/tcp &>/dev/null
   return 0 # applied
 }
 
 _configure_docker() {
-  command -v docker &> /dev/null || return 2 # docker absent
+  command -v docker &>/dev/null || return 2 # docker absent
 
   local dns_rule_present=false
   local ufw_docker_present=false
 
-  sudo ufw status verbose 2> /dev/null | grep -q 'allow-docker-dns' && dns_rule_present=true
-  grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2> /dev/null && ufw_docker_present=true
+  sudo ufw status verbose 2>/dev/null | grep -q 'allow-docker-dns' && dns_rule_present=true
+  grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2>/dev/null && ufw_docker_present=true
 
   if $dns_rule_present && $ufw_docker_present; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} Docker UFW rules: already in place, skipping"
@@ -53,26 +55,26 @@ _configure_docker() {
 
   if ! $dns_rule_present; then
     sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 \
-      comment 'allow-docker-dns' &> /dev/null
+      comment 'allow-docker-dns' &>/dev/null
   fi
 
   if ! $ufw_docker_present; then
     local ufw_docker_url="https://raw.githubusercontent.com/chaifeng/ufw-docker/refs/heads/master/ufw-docker"
-    curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &> /dev/null
+    curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &>/dev/null
   fi
 
   return 0 # applied
 }
 
 _configure_libvirt() {
-  command -v virsh &> /dev/null || return 2 # libvirt absent
+  command -v virsh &>/dev/null || return 2 # libvirt absent
 
   local changed=false
 
-  if ! grep -q '^firewall_backend' /etc/libvirt/network.conf 2> /dev/null; then
+  if ! grep -q '^firewall_backend' /etc/libvirt/network.conf 2>/dev/null; then
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting libvirt firewall backend to iptables"
     printf '\n\n# Vibranium overrides below\nfirewall_backend = "iptables"\n' |
-      sudo tee -a /etc/libvirt/network.conf > /dev/null
+      sudo tee -a /etc/libvirt/network.conf >/dev/null
     changed=true
   else
     echo -e "${GREEN}[VIBRANIUM]${RESET} Libvirt firewall config: already up to date, skipping"
@@ -90,17 +92,17 @@ _configure_libvirt() {
 }
 
 _configure_syncthing() {
-  command -v syncthing > /dev/null || return 2 # syncthing absent
+  command -v syncthing >/dev/null || return 2 # syncthing absent
 
-  sudo ufw allow syncthing &> /dev/null
-  sudo ufw allow syncthing-gui &> /dev/null
+  sudo ufw allow syncthing &>/dev/null
+  sudo ufw allow syncthing-gui &>/dev/null
 }
 
 # ─────────────────────────────────────────────────────────────
 
 term::disable_input
 
-if command -v ufw &> /dev/null; then
+if command -v ufw &>/dev/null; then
   if systemctl -q is-enabled ufw; then
     term::show_header --color green
     echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall is already set up and running"
@@ -143,45 +145,45 @@ summary_rules=()
 
 # ── Default policies ──────────────────────────────────────────
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting default firewall policies"
-sudo ufw default deny incoming &> /dev/null
-sudo ufw default allow outgoing &> /dev/null
-sudo ufw allow from 192.168.1.0/24 &> /dev/null
+sudo ufw default deny incoming &>/dev/null
+sudo ufw default allow outgoing &>/dev/null
+sudo ufw allow from 192.168.1.0/24 &>/dev/null
 summary_rules+=("Default policy (WAN): ${RED}deny incoming${RESET}, ${GREEN}allow outgoing${RESET}")
 summary_rules+=("Default policy (LAN): allow anything from LAN network")
 
 # ── LocalSend ─────────────────────────────────────────────────
 _configure_localsend
 case $? in
-  0) summary_rules+=("LocalSend: allowed ${CYAN}53317/tcp${RESET} and ${CYAN}53317/udp${RESET}") ;;
-  1) summary_rules+=("LocalSend: ${CYAN}unchanged${RESET}") ;;
+0) summary_rules+=("LocalSend: allowed ${CYAN}53317/tcp${RESET} and ${CYAN}53317/udp${RESET}") ;;
+1) summary_rules+=("LocalSend: ${CYAN}unchanged${RESET}") ;;
 esac
 
 # ── Docker ────────────────────────────────────────────────────
 _configure_docker
 case $? in
-  0) summary_rules+=("Docker: DNS stub rule added, ufw-docker hook installed") ;;
-  1) summary_rules+=("Docker: ${CYAN}unchanged${RESET}") ;;
+0) summary_rules+=("Docker: DNS stub rule added, ufw-docker hook installed") ;;
+1) summary_rules+=("Docker: ${CYAN}unchanged${RESET}") ;;
 esac
 
 # ── Libvirt ───────────────────────────────────────────────────
 _configure_libvirt
 case $? in
-  0) summary_rules+=("Libvirt: iptables backend set") ;;
-  1) summary_rules+=("Libvirt: ${CYAN}unchanged${RESET}") ;;
+0) summary_rules+=("Libvirt: iptables backend set") ;;
+1) summary_rules+=("Libvirt: ${CYAN}unchanged${RESET}") ;;
 esac
 
 # ── Syncthing ───────────────────────────────────────────────────
 _configure_syncthing
 case $? in
-  0) summary_rules+=("Syncthing: firewall profile set") ;;
-  1) summary_rules+=("Syncthing: ${CYAN}unchanged${RESET}") ;;
+0) summary_rules+=("Syncthing: firewall profile set") ;;
+1) summary_rules+=("Syncthing: ${CYAN}unchanged${RESET}") ;;
 esac
 
 # ── Enable ────────────────────────────────────────────────────
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling UFW"
 sudo systemctl -q enable ufw
-sudo ufw --force enable &> /dev/null
-sudo ufw reload &> /dev/null
+sudo ufw --force enable &>/dev/null
+sudo ufw reload &>/dev/null
 summary_rules+=("UFW service: ${GREEN}enabled${RESET} and ${GREEN}active${RESET}")
 
 echo -e "${BLUE}[VIBRANIUM]${RESET} System restart is recommended."

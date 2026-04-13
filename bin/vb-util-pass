@@ -746,7 +746,7 @@ action() {
     # not in the parent (where it would run before editing even starts).
     # All needed functions are available via export -f (done at script top).
     xdg-terminal-exec --app-id=org.vb.term.float --title="pass" -- \
-      bash -c "pass edit "$_VB_EDIT_PASSWORD"; push_after_edit_if_needed"
+      bash -c "pass edit \"$_VB_EDIT_PASSWORD\"; push_after_edit_if_needed"
 
     return 0
     ;;

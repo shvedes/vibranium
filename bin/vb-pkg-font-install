@@ -33,6 +33,7 @@ FZF_ARGS=(
 
 _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
   printf '\e[?25h' # show cursor
 }
@@ -42,8 +43,8 @@ _get_fonts() {
 
   while IFS= read -r pkg; do
     case "$pkg" in
-    ttf* | ttf*-nerd | ttf*-nerd-mono | \
-      otf* | otf*-nerd | otf*-nerd-mono)
+    ttf*-nerd-mono | ttf*-nerd | ttf* | \
+      otf*-nerd-mono | otf*-nerd | otf*)
       printf '%s\n' "$pkg"
       ;;
     esac

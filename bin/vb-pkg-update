@@ -24,6 +24,7 @@ _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
 
   if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
+    # shellcheck disable=SC2034
     read -n1 -r -s -p $'. Press any key to exit' dummy
   fi
 
@@ -34,6 +35,7 @@ _update_complete() {
   printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$@"
 
   if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
+    # shellcheck disable=SC2034
     read -n1 -r -p $'. Press any key to exit' dummy
   fi
 
@@ -85,7 +87,7 @@ _check_important() {
 
 # e.g. clicked on the updates waybar module
 if [[ ! -t 1 ]]; then
-  xdg-terminal-exec --title=${0##*/} --app-id=org.vb.term.float -- "$0"
+  xdg-terminal-exec --title="${0##*/}" --app-id=org.vb.term.float -- "$0"
   exit
 fi
 
@@ -133,11 +135,8 @@ if [[ $NO_LOGO == false ]]; then
 fi
 
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
-sudo -v &
-_sudo_pid=$!
-wait $_sudo_pid
-if (($? != 0)); then
-  echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
+if ! sudo -v; then
+  _operation_canceled
   exit 1
 fi
 

@@ -36,12 +36,12 @@ case "${1:-}" in
 esac
 
 TYPE="$(vb-cmd-get-option VIBRANIUM_GLOBAL_INHIBIT_TYPE)"
-UNIT="vibranium-inhibit@$TYPE"
+UNIT="vibranium-inhibit@${TYPE}.service"
 
-if systemctl -q --user is-active $UNIT; then
-  systemctl -q --user stop $UNIT &
+if systemctl -q --user is-active "$UNIT"; then
+  systemctl -q --user stop "$UNIT" &
 else
-  systemctl -q --user start $UNIT &
+  systemctl -q --user start "$UNIT" &
 fi
 
 vb-cmd-refresh-bar-module inhibitor &

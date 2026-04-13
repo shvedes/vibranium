@@ -17,11 +17,48 @@ Options:
 EOF
 }
 
-_show() {
+_check_deps() {
+  local missing=()
+  local deps=(cliphist rofi)
+
+  for d in "${deps[@]}"; do
+    if ! command -v "$d" >/dev/null; then
+      missing+=("$d")
+    fi
+  done
+
+  if ((${#missing[@]} > 0)); then
+    vb-cmd-dep-notify \
+      --name "Clipboard Manager" \
+      --deps "${missing[*]}"
+    return 1
+  fi
+}
+
+case "$1" in
+"--show")
+  if ! _check_deps; then
+    exit 1
+  fi
+
+  if ! systemctl -q --user is-active cliphist.service; then
+    systemctl -q --user enable --now cliphist.service
+  fi
+
   source vb-lib-core
 
-  local chosen
-  helpers::ui::menu chosen "Clipboard" "search..." -display-columns 2 -- "${ENTRIES[@]}"
+  ENTRIES=()
+  mapfile -t ENTRIES < <(cliphist list)
+
+  if ((${#ENTRIES[@]} == 0)); then
+    notify-send -t 1000 -r 3 \
+      "Clipboard Manager" \
+      "<i>Clipboard is empty!</i>"
+    exit 1
+  fi
+
+  helpers::ui::menu chosen "Clipboard" "search..." \
+    -display-columns 2 -- "${ENTRIES[@]}"
 
   if [[ ! -z "$chosen" ]]; then
     if [[ "$chosen" =~ ^file:// ]]; then
@@ -30,56 +67,28 @@ _show() {
       printf "%s" "$chosen" | cliphist decode | wl-copy -n
     fi
   fi
-}
-
-_clear() {
-  # if it's open
-  # at the moment
-  # of invocation
-  killall -q rofi
-
-  cliphist wipe
-  wl-copy --clear
-}
-
-_ensure_service() {
-  if ! systemctl -q --user is-active cliphist; then
-    systemctl -q --user enable --now cliphist
-  fi
-}
-
-_ensure_deps() {
-  if ! missing="$(vb-cmd-is-present rofi cliphist)"; then
-    [[ -t 1 ]] && vb-cmd-dep-notify --name "Clipboard Manager" --deps "$missing"
-    exit 1
-  fi
-}
-
-case "$1" in
-"--show")
-  _ensure_deps
-  _ensure_service
-
-  ENTRIES=()
-  mapfile -t ENTRIES < <(cliphist list)
-
-  if ((${#ENTRIES[@]} == 0)); then
-    notify-send -t 1000 -r 3 "Clipboard Manager" "<i>Clipboard is empty!</i>"
-    exit 1
-  fi
-
-  _show
   ;;
 "--clear")
-  _ensure_service
-  _clear
+  if ! _check_deps; then
+    exit 1
+  fi
+
+  if ! systemctl -q --user is-active cliphist.service; then
+    systemctl -q --user enable --now cliphist.service
+    exit 0
+  fi
+
+  killall -q rofi
+  wl-copy --clear
+  cliphist wipe
   ;;
 "-h" | "--help" | "")
   _usage
   exit 0
   ;;
-*)
-  _usage
+-*)
+  echo "Error: unknown option: $*" >&2
+  echi "Try '${0#**/} --help' for more information" >&2
   exit 1
   ;;
 esac

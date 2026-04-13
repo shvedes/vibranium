@@ -1,7 +1,5 @@
 #!/usr/bin/bash
 
-# shellcheck disable=SC2034
-
 source vb-lib-core
 
 THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
@@ -16,7 +14,9 @@ mapfile -t community_themes < <(
   find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' |
     sort |
     while read -r folder; do
-      [[ ! -d "$VIBRANIUM/themes/$folder" ]] && echo "$folder"
+      if [[ ! -d "$VIBRANIUM/themes/$folder" ]]; then
+        echo "$folder"
+      fi
     done
 )
 
@@ -26,12 +26,18 @@ if ((${#community_themes[@]} == 0)); then
 fi
 
 _capitalize() {
-  local IFS=- parts=() result=()
-  read -ra parts <<<"$1"
+  parts=() result=()
+
+  local IFS=-            # Split words by '-'
+  read -ra parts <<<"$1" # Read input string into array 'parts' using IFS='-'
+
   local part
   for part in "${parts[@]}"; do
+    # Capitalize first character of each part
     result+=("${part^}")
   done
+
+  # Join parts back with '-' (due to IFS) and print
   printf '%s' "${result[*]}"
 }
 
@@ -61,7 +67,33 @@ fi
 
 rm -rf "$chosen_path"
 
-# If the removed theme was active, fall back to the default
+# Update the state file;
+# don't store data of now deleted themes.
+state_file="$VIBRANIUM_STATE/wallpaper.state"
+
+if [[ -f "$state_file" ]]; then
+  lines=() # Array to store all lines from the file
+
+  # Read the file line by line into the array
+  # The '|| [[ -n "$line" ]]' ensures the last line is processed
+  # even if it doesn't end with a newline
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    lines+=("$line")
+  done <"$state_file"
+
+  {
+    # Iterate over the collected lines
+    for line in "${lines[@]}"; do
+      # Skip the line that matches the selected key (chosen_name=...)
+      [[ "$line" == "${chosen_name}="* ]] && continue
+
+      # Print all other lines as-is
+      printf '%s\n' "$line"
+    done
+  } >"$state_file" # Overwrite the original file with filtered content
+fi
+
+# If the removed theme was the active one, fall back to the default
 current_theme=""
 if [[ -f "$THEME_NAME_FILE" ]]; then
   current_theme="$(<"$THEME_NAME_FILE")"

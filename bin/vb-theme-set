@@ -424,23 +424,38 @@ apply_theme() {
 }
 
 get_wallpaper() {
-  local state_dir="$VIBRANIUM_STATE/wallpaper"
-  local state_file="$state_dir/${1,,}"
+  local state_file="$VIBRANIUM_STATE/wallpaper.state"
+  local theme="${1,,}"
+  local line key val
 
-  if [[ ! -d $state_dir ]]; then
-    mkdir -p "$state_dir"
-  else
-    if [[ -f "$state_file" ]]; then
-      local saved_wallpaper
-      saved_wallpaper="$(<"$state_file")"
+  # Parse the consolidated state file line by line.
+  # Each entry has the form: theme_name="full_path"
+  if [[ -f "$state_file" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      # Extract the key: everything before the first =
+      key="${line%%=*}"
 
-      if [[ -f "$saved_wallpaper" ]]; then
-        printf "%s" "$saved_wallpaper"
-        return 0
+      if [[ "$key" == "$theme" ]]; then
+        # Extract the value: drop the key and =, then strip the quotes
+        val="${line#*=}"
+        val="${val#\"}"
+        val="${val%\"}"
+
+        # Only use the saved path if the file still actually exists.
+        # A missing file means the wallpaper was deleted; fall through
+        # to the directory scan below.
+        if [[ -f "$val" ]]; then
+          printf "%s" "$val"
+          return 0
+        fi
+
+        # Found the entry but the target is gone — stop searching.
+        break
       fi
-    fi
+    done <"$state_file"
   fi
 
+  # No valid saved path found: return the first wallpaper in the theme dir.
   shopt -s nullglob
   local files=("$CURRENT_THEME_PATH/backgrounds/"*)
   shopt -u nullglob

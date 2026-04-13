@@ -9,6 +9,7 @@ source vb-lib-core
 
 _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
 
   term::enable_input
@@ -16,6 +17,7 @@ _operation_canceled() {
 
 _operation_complete() {
   printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  # shellcheck disable=SC2034
   read -n1 -r -p $'Setup complete. Press any key to exit ' dummy
 
   term::enable_input
@@ -44,7 +46,7 @@ fi
 # This single check tells us both:
 #   1) that systemd-boot is active,
 #   2) which boot type is in use (UKI or BLS).
-CURRENT_ENTRY=$(bootctl status 2> /dev/null | awk -F': ' '/Current Entry/ {print $2}')
+CURRENT_ENTRY=$(bootctl status 2>/dev/null | awk -F': ' '/Current Entry/ {print $2}')
 
 if [[ ! "$CURRENT_ENTRY" == *.efi ]]; then
   term::show_header --color red
@@ -84,7 +86,7 @@ fi
 SECUREBOOT_RAW=$(od -An -t u1 -j4 -N1 "${SECUREBOOT_EFIVAR[0]}" | tr -d ' ')
 SETUP_MODE_RAW=$(od -An -t u1 -j4 -N1 "${SETUP_MODE_EFIVAR[0]}" | tr -d ' ')
 
-if (( SECUREBOOT_RAW == 1 )); then
+if ((SECUREBOOT_RAW == 1)); then
   term::show_header --color green
   echo -e "${GREEN}[VIBRANIUM]${RESET} ${CYAN}Secure Boot${RESET} is already active."
   echo -e "${GREEN}[Vibranium]${RESET} See ${GREEN}sbctl ${YELLOW}--help${RESET} for more info."
@@ -92,7 +94,7 @@ if (( SECUREBOOT_RAW == 1 )); then
   exit 0
 fi
 
-if (( SETUP_MODE_RAW == 0 )); then
+if ((SETUP_MODE_RAW == 0)); then
   term::show_header --color red
   echo -e "${RED}[VIBRANIUM]${RESET} Secure Boot cannot be enabled: firmware is locked (Setup Mode is off)"
   echo -e "${RED}[VIBRANIUM]${RESET} Enter BIOS and enable Setup Mode first"
@@ -106,7 +108,10 @@ if term::ask_yes_no Y "You're about to setup Secure Boot. Continue?"; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} To work with efivars, Vibranium needs sudo"
   # Keep sudo credentials window open, just in case.
   # The subshell's pid is later killed.
-  (while true; do sudo -v; sleep 5; done) &
+  (while true; do
+    sudo -v
+    sleep 5
+  done) &
   sudo_pid=$!
 else
   _operation_canceled
@@ -150,7 +155,7 @@ if [[ -z "$ESP_MOUNT" ]] || [[ ! -d "$ESP_MOUNT" ]]; then
   exit 1
 fi
 
-if ! command -v sbctl > /dev/null; then
+if ! command -v sbctl >/dev/null; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} ${CYAN}sbctl${RESET} not found"
   vb-pkg-install --embedded -- sbctl
 fi
@@ -173,8 +178,8 @@ EFI_FILES=()
 
 # Find all ESP files to sign
 while IFS= read -r f; do
-    EFI_FILES+=("$f")
-done < <(sudo find "$ESP_MOUNT" -type f \( -iname '*.efi' \) )
+  EFI_FILES+=("$f")
+done < <(sudo find "$ESP_MOUNT" -type f \( -iname '*.efi' \))
 
 for file in "${EFI_FILES[@]}"; do
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Signing ${CYAN}$file${RESET}"
@@ -210,7 +215,7 @@ if [[ -n "$QUIRK_URLS" ]]; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Your firmware has known quirks that may affect security:"
   while IFS= read -r url; do
     echo -e "             ${CYAN}$url${RESET}"
-  done <<< "$QUIRK_URLS"
+  done <<<"$QUIRK_URLS"
 fi
 
 kill $sudo_pid
@@ -231,4 +236,3 @@ if term::ask_yes_no Y "Restart is required. Reboot now?"; then
 else
   _operation_complete
 fi
-

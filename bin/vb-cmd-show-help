@@ -87,4 +87,4 @@ case "$1" in
   ;;
 esac
 
-notify-send -r 33 -t $TIME "${P_TITLE:-Help}" "$MSG"
+notify-send -r 33 -t "$TIME" "${TITLE:-Help}" "$MSG"

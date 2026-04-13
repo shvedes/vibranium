@@ -4,8 +4,8 @@
 
 for bat in /sys/class/power_supply/BAT*; do
   if [[ -r $bat/present ]]; then
-    if [[ $(<$bat/present) == "1" ]]; then
-      if [[ $(<$bat/type) == "Battery" ]]; then
+    if [[ $(<"$bat"/present) == "1" ]]; then
+      if [[ $(<"$bat"/type) == "Battery" ]]; then
         exit 0
       fi
     fi

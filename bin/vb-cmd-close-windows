@@ -26,7 +26,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   *)
     echo "Error: unknown option: ${1}." >&2
-    echo "Try ${0##*/} for more information." >&2
+    echo "Try '${0##*/} --help' for more information." >&2
     exit 1
     ;;
   esac

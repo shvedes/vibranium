@@ -1,154 +1,200 @@
 #!/usr/bin/bash
 
 # shellcheck disable=SC2086
-# Overcomplicated launcher based on rofi, which can:
-#	- Launch applications
-#	- Open local files in default applications
-#	- Open links
-#	- Search the internet
+# overcomplicated launcher based on rofi, which can:
+#	- launch applications
+#	- open local files in default applications
+#	- open links
+#	- search the internet
 #
-# Please note that internet search may often be unavailable when VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT is set to true.
-# This script can also open three additional menus with custom categories to open:
-#	- AI PWAs
-#	- Power menu
-#	- Common websites PWAs
+# please note that internet search may often be unavailable when vibranium_global_app_launcher_auto_select is set to true.
+# this script can also open three additional menus with custom categories to open:
+#	- ai pwas
+#	- power menu
+#	- common websites pwas
 
-source vb-lib-core
+OPT_ARGS=""
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+A rofi-based application launcher that can launch apps, open local files,
+follow links, perform internet searches, and display custom category menus.
+
+Options:
+      --ai        Show only ai pwa entries (drun category: AI)
+      --web       Show only pre-installed web app PWA entries (drun category: Webapp)
+      --pwa       Show user-installed web app PWA entries (drun category: PWA)
+      --power     Show only power-management entries (drun category: Power)
+  -h, --help      Display this help and exit
+
+Input Handling (default mode):
+  file://<path>   Open the file in its default application via app2unit-open
+  https://<url>   Open the url in the default browser via app2unit-open
+  <path>          Open a local path that exists on disk
+  <query>         Search in a preffered search engine
+  <command>       Execute the command
+EOF
+}
+
+_open_file() {
+  local file="${1#file://}"
+  # open in default app (media viewer, text editor, whatever)
+  app2unit-open -s app-graphical.slice "$file" &>/dev/null &
+}
+
+_open_link() {
+  local link="$1"
+  # Okay so, at the moment of invocation
+  # we don't know if there's an active browser process
+  # where the link will be opened. if thre's none, that's
+  # fine - app2unit-open will create a systemd unit out of
+  # Chromium, Firefox or whatever. when there's a window,
+  # we're creating a transient unit for nothing. So should keep
+  # keep app2unit here at all? also should we use app-graphical.slice
+  # for links? Questionable at the moment. I'll keep it for now,
+  # since it doesn't brake anything.
+  app2unit-open -s app-graphical.slice "$link" &>/dev/null &
+}
+
+_get_search_engine() {
+  case "$SEARCH_ENGINE" in
+  "duckduckgo") printf "https://duckduckgo.com/?q=" ;;
+  "google") printf "https://www.google.com/search?q=" ;;
+  "brave") printf "https://search.brave.com/search?q=" ;;
+  "bing") printf "https://bing.com/search?q=" ;;
+  esac
+}
+
+_search_the_internet() {
+  local engine
+
+  local input="$*"
+  engine="$(_get_search_engine)"
+
+  app2unit-open -S both -s app-graphical.slice "${engine}${input}" &>/dev/null &
+}
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+esac
 
 if pidof -q rofi; then
   killall rofi
   exit 0
 fi
 
+source vb-lib-core
+
 helpers::check \
+  VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
   VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
+  VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
   VIBRANIUM_GLOBAL_SEARCH_ENGINE
 
-auto_select="$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
-show_icons="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
-search_engine="$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
+AUTO_SELECT="$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
+SHOW_ICONS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
+SEARCH_ENGINE="$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
 
-search_engine() {
-  case "$search_engine" in
-  "google") echo "https://www.google.com/search?q=" ;;
-  "duckduckgo") echo "https://duckduckgo.com/?q=" ;;
-  "bing") echo "https://bing.com/search?q=" ;;
-  "brave") echo "https://search.brave.com/search?q=" ;;
-  esac
-}
+case "$1" in
+--web | --ai | --power | --pwa)
+  OPT_ARGS+=(
+    -disable-history
+    -icon-theme vibranium
+    -no-fixed-num-lines true
+    -theme-str 'configuration {show-icons: true;}'
+    -theme-str 'element-icon {enabled: true;}'
+  )
 
-process_input() {
-  local input="$*"
-
-  case "$input" in
-  "file://"*)
-    # Open in default app (media viewer, text editor, whatever)
-    input="${input#file://}"
-    app2unit-open -s app-graphical.slice "$input" &>/dev/null &
-    ;;
-    # Okay so, at the moment of invocation
-    # we don't know if there's an active browser process
-    # where the link will be opened. If thre's none, that's
-    # fine - app2unit-open will create a systemd unit out of
-    # chromium, firefox or whatever. When there's a window,
-    # we're creating a transient unit for nothing. So should keep
-    # keep app2unit here at all? Also should we use app-graphical.slice
-    # for links? Questionable at the moment. I'll keep it for now,
-    # since it doesn't brake anything.
-  "https://"*)
-    # Open in default browser
-    app2unit-open -s app-graphical.slice "$input" &>/dev/null &
-    ;;
-  "DBus launch")
-    # org.telegram.desktop.desktop for example
-    # Let DBus do its thing
-    exit 0
-    ;;
-  *)
-    local cmd="${input%% *}"
-    local args="${input#"$cmd"}"
-
-    if [[ -x "$cmd" ]] || command -v "$cmd" >/dev/null 2>&1; then
-      app2unit -s app-graphical.slice "$cmd" $args &
-    elif [[ -e "$input" ]]; then
-      app2unit-open -s app-graphical.slice "$input" &>/dev/null &
-    else
-      if [[ "$LAUNCHER_MODE" == "default" ]]; then
-        [[ "$auto_select" = true ]] && {
-          exit 1
-        }
-        app2unit-open -s app-graphical.slice "$(search_engine)${input}" &>/dev/null &
-      fi
-    fi
-    ;;
-  esac
-}
-
-set_rofi_flags() {
-  local mode="$1"
-  local -n _out="$2"
-
-  _out=()
-
-  case "$mode" in
-  --web | --ai | --power)
-    _out+=(
-      -disable-history
-      -icon-theme Vibranium
-      -no-fixed-num-lines true
-      -theme-str 'configuration {show-icons: true;}'
-      -theme-str 'element-icon {enabled: true;}'
-    )
-    ;;
-  esac
-
-  if [[ "$auto_select" == true ]]; then
-    if [[ "$mode" =~ ^--(default|ai|web)$ ]]; then
+  if [[ "$AUTO_SELECT" == true ]]; then
+    # Don't enable auto-select for Power menu
+    if [[ "$LAUNCHER_MODE" =~ ^--(default|ai|web|pwa)$ ]]; then
       _out+=(-auto-select true)
     fi
   fi
 
-  case "$mode" in
-  --power) _out+=(-drun-categories Power -display-drun "Power") ;;
-  --web) _out+=(-drun-categories WebApp -display-drun "Web Apps") ;;
-  --ai) _out+=(-drun-categories AI -display-drun "AIs") ;;
+  case "$1" in
+  --power) OPT_ARGS+=(-drun-categories Power -display-drun "Power") ;;
+  --web) OPT_ARGS+=(-drun-categories Webapp -display-drun "Web Apps") ;;
+  --pwa) OPT_ARGS+=(-drun-categories PWA -display-drun "PWA") ;;
+  --ai) OPT_ARGS+=(-drun-categories AI -display-drun "AIs") ;;
   esac
-}
 
-case "$1" in
---web | --ai | --power)
-  set_rofi_flags "$1" opt_args
   LAUNCHER_MODE="${1/--/}"
   ;;
 *)
-  helpers::check \
-    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
-    VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI
-
-  WEB_APPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
-  AI="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
+  SHOW_WEBAPPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
+  SHOW_AI_WEBAPPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
 
   EXCLUDE="Power"
 
-  [[ $WEB_APPS != true ]] && EXCLUDE+=",WebApp"
-  [[ $AI != true ]] && EXCLUDE+=",AI"
+  if [[ "$SHOW_WEBAPPS" != true ]]; then
+    EXCLUDE+=",Webapp"
+  fi
 
-  opt_args+=(-drun-exclude-categories "$EXCLUDE")
+  if [[ "$SHOW_AI_WEBAPPS" != true ]]; then
+    EXCLUDE+=",AI"
+  fi
 
-  [[ $WEB_APPS == true || $AI == true ]] && {
-    opt_args+=(-icon-theme Vibranium)
-  }
+  OPT_ARGS+=(-drun-exclude-categories "$EXCLUDE")
+
+  if [[ "$SHOW_WEBAPPS" == true || "$SHOW_AI_WEBAPPS" == true ]]; then
+    OPT_ARGS+=(-icon-theme Vibranium)
+  fi
+
   LAUNCHER_MODE="default"
   ;;
 esac
 
-if [[ "$show_icons" = true ]]; then
-  opt_args+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
+if [[ "$SHOW_ICONS" = true ]]; then
+  OPT_ARGS+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
 fi
 
-read -r input < <(rofi -show drun -run-command "echo {cmd} {args}" "${opt_args[@]}" 2>/dev/null)
+read -r INPUT < <(rofi -show drun -run-command "echo {cmd} {args}" "${OPT_ARGS[@]}" 2>/dev/null)
 
-if [[ ! -z "$input" ]]; then
-  process_input "${input[@]}"
-fi
+case "$INPUT" in
+"file://"*)
+  _open_file "$INPUT"
+  ;;
+"https://"*)
+  _open_link "$INPUT"
+  ;;
+"DBus launch" | "")
+  exit 0
+  ;;
+*)
+  # Determine whether the input
+  # is a command or a search query.
+  CMD="${INPUT%% *}"
+  ARGS="${INPUT#"$CMD"}"
+
+  # File exists and it IS an executable
+  if [[ -x "$CMD" ]] || command -v "$CMD" >/dev/null; then
+    app2unit -s app-graphical.slice "$CMD" $ARGS &
+  # File exists
+  elif [[ -e "$INPUT" ]]; then
+    app2unit-open -s app-graphical.slice "$INPUT" &>/dev/null &
+  # It's a web query
+  else
+    # Web search is only available in the default mode
+    if [[ "$LAUNCHER_MODE" == "default" ]]; then
+      # Disable web serch when auto-select is on
+      if [[ "$AUTO_SELECT" = true ]]; then
+        exit 1
+      fi
+      _search_the_internet "$INPUT"
+    fi
+  fi
+  ;;
+esac

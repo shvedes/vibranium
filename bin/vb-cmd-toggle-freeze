@@ -8,7 +8,7 @@ shcat() {
 
 usage() {
   shcat <<EOF
-Usage: ${0##*/} [--help]
+Usage: ${0##*/} [OPTION]
 
 Suspend or resume the currently active window in Hyprland.
 Sends a desktop notification with the window name and new state.
@@ -37,7 +37,7 @@ if [[ -z $PID ]]; then
 fi
 
 # Read process state
-read _ _ state _ </proc/$PID/stat
+read -r _ _ state _ <"/proc/$PID/stat"
 
 if [[ $state != T ]]; then
   kill -STOP "$PID"

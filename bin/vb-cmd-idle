@@ -14,7 +14,7 @@ shcat() {
 
 usage() {
   shcat <<EOF
-Usage: $SELF OPTION
+Usage: $SELF [OPTION]
 
 Handle media playback on session lock/unlock events.
 
@@ -91,7 +91,7 @@ case "$1" in
   ;;
 
 *)
-  echo "Error: invalid option '$1'" >&2
+  echo "Error: invalid option -- $*" >&2
   echo "Try '$SELF --help' for more information." >&2
   exit 1
   ;;

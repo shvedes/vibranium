@@ -68,7 +68,8 @@ get_player_status() {
 
   case "$player" in
   playerctl)
-    local stat=$(playerctl status 2>/dev/null)
+    local stat
+    stat=$(playerctl status 2>/dev/null)
 
     case "$stat" in
     Playing | Paused)
@@ -80,7 +81,9 @@ get_player_status() {
 
   mpd)
     # Do not trigger socket activation in case if MPD is inactive
-    systemctl -q --user is-active mpd || return
+    if ! systemctl -q --user is-active mpd; then
+      return
+    fi
 
     local stat
     while read -r l; do
@@ -122,8 +125,8 @@ detect_active_player() {
     PLAYER="playerctl"
   else
     for p in playerctl mpd; do
-      stat=$(get_player_status "$p")
-      if [ $? -eq 0 ] && [ "$stat" = "Playing" ]; then
+
+      if stat=$(get_player_status "$p") && [[ "$stat" == "Playing" ]]; then
         PLAYER="$p"
         STATUS="$stat"
         # Update cache since it's Playing
@@ -136,8 +139,8 @@ detect_active_player() {
   # If no Playing, check cache for Paused
   if [ -z "$PLAYER" ] && [ -f "$PLAYER_CACHE_FILE" ]; then
     CACHED_PLAYER=$(<"$PLAYER_CACHE_FILE")
-    stat=$(get_player_status "$CACHED_PLAYER")
-    if [ $? -eq 0 ] && [ "$stat" = "Paused" ]; then
+
+    if stat=$(get_player_status "$CACHED_PLAYER") && [[ "$stat" == "Paused" ]]; then
       PLAYER="$CACHED_PLAYER"
       STATUS="$stat"
     fi
@@ -146,8 +149,8 @@ detect_active_player() {
   # If still no player, check for Paused players
   if [ -z "$PLAYER" ]; then
     for p in playerctl mpd; do
-      stat=$(get_player_status "$p")
-      if [ $? -eq 0 ] && [ "$stat" = "Paused" ]; then
+
+      if stat=$(get_player_status "$p") && [[ "$stat" == "Paused" ]]; then
         PLAYER="$p"
         STATUS="$stat"
         break
@@ -158,8 +161,7 @@ detect_active_player() {
   # Fallback
   if [ -z "$PLAYER" ]; then
     PLAYER="playerctl"
-    STATUS=$(get_player_status "playerctl")
-    if (($! != 0)); then
+    if ! STATUS=$(get_player_status "playerctl"); then
       STATUS="Stopped"
     fi
   fi
@@ -411,10 +413,10 @@ case "$1" in
   exit 0
   ;;
 *)
-  echo -e "Uknown argument: $@\n"
-  usage
+  echo "Uknown argument: $*" >&2
+  echo "Try '$SELF --help' for more information" >&2
   exit 1
   ;;
 esac
 
-rm -f "$lockfile"
+rm -f "$LOCKFILE"

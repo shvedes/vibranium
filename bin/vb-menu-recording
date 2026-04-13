@@ -8,7 +8,7 @@ fi
 
 if [[ -f "$VIBRANIUM_RUNTIME/recording-ongoing" ]]; then
   # Trigger killswitch
-  vb-core-recording
+  vb-core-recording --stop
   exit 0
 fi
 

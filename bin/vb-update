@@ -8,6 +8,7 @@ source vb-lib-core
 trap 'term::enable_input' EXIT
 
 _pause() {
+  # shellcheck disable=SC2034
   read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to exit' dummy
 }
 

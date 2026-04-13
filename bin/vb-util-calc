@@ -25,13 +25,13 @@ case "$1" in
   usage
   exit 0
   ;;
--* | --*)
+--* | -*)
   echo "Error: unknown option: '$1'" >&2
   echo "Try '$SELF --help' for more information" >&2
   exit 1
   ;;
 *)
-  echo "Ignoring input '$@'"
+  echo "Ignoring input '$*'"
   ;;
 esac
 

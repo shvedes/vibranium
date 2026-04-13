@@ -3,7 +3,7 @@
 source vb-lib-core
 
 usage() {
-  cat << EOF
+  cat <<EOF
 Usage: vb-font-set [OPTION] [FONT]
 
 Set the system-wide default font across GTK, Alacritty, Waybar, Rofi, Dunst,
@@ -22,15 +22,15 @@ EOF
 }
 
 case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -*)
-    log::error "Unknown option: $1"
-    usage >&2
-    exit 1
-    ;;
+-h | --help)
+  usage
+  exit 0
+  ;;
+-*)
+  log::error "Unknown option: $1"
+  usage >&2
+  exit 1
+  ;;
 esac
 
 mapfile -t fonts < <(
@@ -51,7 +51,7 @@ mapfile -t fonts < <(
 from_arg=0
 
 if [[ -n "$1" ]]; then
-  if [[ " ${fonts[*]} " =~ " $1 " ]]; then
+  if [[ " ${fonts[*]} " =~ $1 ]]; then
     selected_font="$1"
     from_arg=1
   else

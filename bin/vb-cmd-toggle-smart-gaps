@@ -11,7 +11,7 @@ shcat() {
 
 usage() {
   shcat <<EOF
-Usage: $SELF [--help]
+Usage: $SELF [OPTION]
 
 Toggle Hyprland smart gaps configuration.
 
@@ -28,7 +28,7 @@ case "${1:-}" in
 esac
 
 if [[ -f "$FILE" ]]; then
-  rm "$FILE"
+  rm -f "$FILE"
 else
   shcat >"$FILE" <<EOF
 workspace = w[tv1]s[false], gapsout:0, gapsin:0

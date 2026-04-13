@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+# shellcheck disable=SC2329
+
 source vb-lib-core
 source vb-lib-cfgr
 

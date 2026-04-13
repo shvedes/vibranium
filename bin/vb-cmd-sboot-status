@@ -8,7 +8,7 @@ shcat() {
 
 usage() {
   shcat <<EOF
-Usage: ${0##*/} [OPTION]...
+Usage: ${0##*/} [OPTION]
 
 Print current Secure Boot status.
 

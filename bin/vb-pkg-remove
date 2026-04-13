@@ -54,12 +54,12 @@ _handle_systemd() {
 
   local -A seen_user=()
   local -A seen_system=()
-  local pkg unit_type scope unit_path unit
+  local pkg scope unit_path unit
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Getting systemd service information..."
 
   for pkg in "${PACKAGES[@]}"; do
-    while read -r unit_type scope unit_path; do
+    while read -r scope unit_path; do
       unit="${unit_path##*/}"
 
       if [[ "$scope" == "user" ]]; then
@@ -86,7 +86,7 @@ _handle_systemd() {
           system_enabled_units+=("$unit")
         fi
       fi
-    done < <(pacman -Ql "$pkg" 2>/dev/null | awk -f "${VIBRANIUM}/awk/vb-pkg-parse-systemd.awk")
+    done < <(pacman -Ql "$pkg" 2>/dev/null | awk -f "$VIBRANIUM/awk/vb-pkg-parse-systemd.awk")
   done
 }
 
@@ -131,7 +131,7 @@ _disable_scope_units() {
   term::enable_input
 
   for pkg in "${!_pkg_map[@]}"; do
-    remaining=(${_pkg_map[$pkg]})
+    remaining=("${_pkg_map[$pkg]}")
 
     while ((${#remaining[@]} > 0)); do
       unit="${remaining[0]}"
@@ -261,6 +261,7 @@ _uninstallation_complete() {
   printf "%s[VIBRANIUM]%s Uninstallation complete" "$GREEN" "$RESET"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
+    # shellcheck disable=SC2034
     read -n1 -r -s -p $'. Press any key to exit' dummy
   fi
 
@@ -308,21 +309,6 @@ _show_overview() {
   for pkg in "${packages[@]}"; do
     echo -e "\t   - ${YELLOW}${pkg}${RESET}"
   done
-
-  # Lines printed above this overview in the normal flow:
-  #   - header (if shown)
-  #   - 1 title line ("You're about to uninstall...")
-  #   - N package lines
-  local overhead=$((NO_LOGO == false ? HEADER_LINES : 0))
-  local total=$((overhead + 1 + ${#packages[@]}))
-
-  if ((total > $(tput lines))); then
-    if [[ "$TERM" == "alacritty" ]]; then
-      local msg="Use ${BLUE}Ctrl${RESET}+${BLUE}Shift${RESET}+${BLUE}Space${RESET} to enter ${GREEN}Vim${RESET} mode. "
-      msg+="Use ${YELLOW}k${RESET}/${YELLOW}j${RESET} to scroll ${YELLOW}up${RESET}/${YELLOW}down${RESET}"
-      echo -e "${YELLOW}[VIBRANIUM]${RESET} Your list is long — scroll up to review it. $msg"
-    fi
-  fi
 }
 
 _uninstall_packages() {
@@ -366,8 +352,6 @@ NO_DUMMY=false
 NO_SYSTEMD=false
 CONSERVATIVE=false
 PACKAGES=()
-
-HEADER_LINES=11 # Height of term::show_header output in lines
 
 FZF_ARGS=(
   --multi
@@ -415,7 +399,8 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   --no-verify)
-    NO_VERIFY=true
+    # No-op
+    # NO_VERIFY=true
     shift
     ;;
   --no-systemd)
@@ -472,10 +457,10 @@ else
 
   if ! _choose_packages; then
     if [[ $NO_LOGO == false ]]; then
-      term::show_header
+      term::show_header --color green
     fi
 
-    _operation_canceled
+    _operation_canceled --positive
     exit 0
   fi
 

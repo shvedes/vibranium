@@ -21,7 +21,8 @@ if [[ "$INPUT" =~ ^#?[0-9a-fA-F]{6}$ ]]; then
   THEME_COLOR="#$hex"
 else
   # RGB
-  THEME_COLOR=$(printf '#%02x%02x%02x' ${INPUT//,/ })
+  # shellcheck disable=SC2183
+  THEME_COLOR=$(printf '#%02x%02x%02x' "${INPUT//,/ }")
 fi
 
 for file in "${BROWSER_FILES[@]}"; do

@@ -12,8 +12,7 @@ cleanup() {
   vb-cmd-refresh-bar-module timer
 
   kill $(pgrep -f -- '--who=Timer')
-  kill -s KILL "$paplay_pid" &
-  >/dev/null
+  kill -s KILL "$paplay_pid" &>/dev/null
   exit 0
 }
 
@@ -64,7 +63,7 @@ if [[ -z "$sleep_time" ]]; then
   exit 0
 fi
 
-setsid -f systemd-inhibit --what=idle --why="Sleep is inhibited because of the active timer" --who="Timer" sleep $sleep_time
+setsid -f systemd-inhibit --what=idle --why="Sleep is inhibited because of the active timer" --who="Timer" sleep "$sleep_time"
 
 time_remaining=$sleep_time
 while ((time_remaining > 0)); do

@@ -13,15 +13,16 @@ _usage() {
 Usage: $SELF [OPTION]
 
 Switch keyboard layout for the main Hyprland keyboard.
-Mainly used by the waybar module.
+Mainly used by the Waybar module.
 
-Don't bind this script with keyboard shortcuts;
-use Hyprland's native config.
+Notes:
+  Don't bind this script with keyboard shortcuts;
+  use Hyprland's native config.
 
 Options:
-  --next            switch to next layout (default)
-  --prev            switch to previous layout
-  -h, --help        display this help and exit
+  --next            Switch to next layout (default)
+  --prev            Switch to previous layout
+  -h, --help        Display this help and exit
 EOF
 }
 

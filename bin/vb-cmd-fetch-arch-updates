@@ -5,6 +5,37 @@ TIMESTAMP_FILE="$VIBRANIUM_CACHE/pkg-updates.timestamp"
 INTERVAL=$((3 * 24 * 60 * 60))
 THRESHOLD=125
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Fetch new updates from Arch Linux repositories and the AUR.
+
+Options:
+  -h, --help  Show this help and exit
+
+Notes:
+  This is an auxiliary script for fetch-arch-updates.service.
+  This script is also launched by the "Updates" bar module
+  if it is enabled.
+EOF
+}
+
+if [[ "$1" =~ ^-(h|-help)$ ]]; then
+  usage
+  exit 0
+elif [[ "$1" != "" ]]; then
+  echo "Error: unknown option -- $*" >&2
+  echo "Try '${0##*/} --help' for more information" >&2
+  exit 1
+fi
+
 missing=()
 
 command -v checkupdates >/dev/null 2>&1 || missing+=("checkupdates")
@@ -28,7 +59,8 @@ mapfile -t LINES <"$CACHE_FILE"
 TOTAL_COUNT=${#LINES[@]}
 
 if ((TOTAL_COUNT >= THRESHOLD)); then
-  TIMESTAMP_NOW=$(date +%s)
+  printf -v TIMESTAMP_NOW '%(%Y-%m-%d_%H-%M-%S)T' -1
+  # TIMESTAMP_NOW=$(date +%s)
   TIMESTAMP_LAST=0
 
   if [[ -f "$TIMESTAMP_FILE" ]]; then

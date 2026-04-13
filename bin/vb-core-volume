@@ -12,26 +12,61 @@ usage() {
   shcat <<EOF
 Usage: $SELF [OPTION]...
 
-Control system volume and microphone.
+Control system and microphone volume.
 
 Options:
-      --volume-up          raise volume by one step
-      --volume-down        lower volume by one step
-      --volume-toggle      toggle mute on the default audio sink
-      --microphone-up      raise microphone volume by one step
-      --microphone-down    lower microphone volume by one step
-      --microphone-toggle  toggle mute on the default audio source
-      --volume INT         set volume to INT percent
-      -q,--quiet           suppress desktop notifications (notify-send only)
-      -h,--help            display this help and exit
+      --volume-up          Raise volume by one step
+      --volume-down        Lower volume by one step
+      --volume-toggle      Toggle mute on the default audio sink
+      --microphone-up      Raise microphone volume by one step
+      --microphone-down    Lower microphone volume by one step
+      --microphone-toggle  Toggle mute on the default audio source
+      --volume INT         Set volume to INT percent
+      -q,--quiet           Suppress desktop notifications (notify-send only)
+      -h,--help            Display this help and exit
 
 EOF
+}
+
+# To display the progress bar, libnotify only accepts values from 0 to 100. If the user has enabled above 100%,
+# we need to convert the volume values to a 100% scale in order to display the progress bar correctly.
+_to_int100() {
+  # nameref: _result becomes a reference to the caller's variable name passed as $1
+  local -n _result="$1"
+
+  local val="$2"
+  local int_part frac_part
+
+  # integer part: strip everything after last dot
+  int_part="${val%.*}"
+
+  if [[ "$val" == *"."* ]]; then
+    # fractional part: everything after first dot
+    frac_part="${val#*.}"
+
+    # pad with zeros to guarantee at least 2 digits
+    frac_part="${frac_part}00"
+    # take only first 2 digits (truncate, no rounding)
+    frac_part="${frac_part:0:2}"
+  else
+    frac_part="00" # no decimal part → treat as ".00"
+  fi
+
+  # Build integer scaled by 100:
+  # - int_part * 100 -> shift integer part
+  # - 10#$frac_part  -> force base-10 (avoids octal issues like "08")
+  _result=$((int_part * 100 + 10#$frac_part))
 }
 
 show_volume_notification() {
   local device="$1"
   local type="$2"
-  local vol_info muted vol display_vol bar_value max_vol
+  # $3 display_vol  – pre-computed integer %; omit to query wpctl (toggle case)
+  # $4 bar_value    – pre-computed 0-100 bar value
+  # $5 muted        – "true" if muted, anything else / absent means unmuted
+  local display_vol="$3"
+  local bar_value="$4"
+  local muted="$5"
 
   # Suppress the notification when the active window is fullscreen.
   # Dunst queues notifications during fullscreen and shows them only
@@ -40,32 +75,44 @@ show_volume_notification() {
   # We don't apply this rule to OSD notifications because
   # it defeats the purpose of OSDs
 
-  local fullscreen_state
-  fullscreen_state="$(hyprctl -j activewindow | jq -r '.fullscreen')"
+  # local fullscreen_state
+  # fullscreen_state="$(hyprctl -j activewindow | jq -r '.fullscreen')"
+  #
+  # if ((fullscreen_state == 2)); then
+  #   return
+  # fi
 
-  if ((fullscreen_state == 2)); then
-    return
+  # Only query wpctl when the caller couldn't supply pre-computed values
+  # (i.e. toggle_mute, where the new state is genuinely unknown).
+  if [[ -z "$display_vol" ]]; then
+    local vol_info vol muted_flag max_vol vol100 max100
+    vol_info=$(wpctl get-volume "$device")
+    read -r _ vol muted_flag <<<"$vol_info"
+
+    if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
+      max_vol=1.5
+    else
+      max_vol=1.0
+    fi
+
+    _to_int100 vol100 "$vol"
+    _to_int100 max100 "$max_vol"
+
+    display_vol=$vol100
+    bar_value=$((vol100 * 100 / max100))
+
+    if [[ "$muted_flag" == "[MUTED]" ]]; then
+      muted="true"
+    fi
   fi
 
-  vol_info=$(wpctl get-volume "$device")
-  read -r _ vol muted <<<"$vol_info"
-
-  if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
-    max_vol=1.5
-  else
-    max_vol=1.0
-  fi
-
-  # To display the progress bar, libnotify only accepts values from 0 to 100. If the user has enabled above 100%,
-  # we need to convert the volume values to a 100% scale in order to display the progress bar correctly.
-  display_vol=$(awk -v v="$vol" 'BEGIN {printf "%d", v*100}')
-  bar_value=$(awk -v v="$vol" -v max="$max_vol" 'BEGIN {printf "%d", (v/max)*100}')
-
-  if [[ "$muted" == "[MUTED]" ]]; then
-    notify-send -r 3 -t 1000 "$type Muted"
+  # Fire-and-forget: avoid blocking on the D-Bus round-trip.
+  # -r (replace) is a hint to the daemon and works fine asynchronously.
+  if [[ "$muted" == "true" ]]; then
+    notify-send -r 3 -t 1000 "$type Muted" &
   else
     if [[ "$type" != "Microphone" ]]; then
-      notify-send -r 3 -t 1000 "$type ${display_vol}%" -h "int:value:$bar_value"
+      notify-send -r 3 -t 1000 "$type ${display_vol}%" -h "int:value:$bar_value" &
     fi
   fi
 }
@@ -96,21 +143,39 @@ adjust_volume() {
     ;;
   esac
 
-  # Parse volume and mute state from a single wpctl call
   local vol_info mute_state
   read -r _ current_volume mute_state <<<"$(wpctl get-volume "$device")"
 
-  # Unmute before adjusting so the volume change isn't silently swallowed
   if [[ "$mute_state" == "[MUTED]" ]]; then
     wpctl set-mute "$device" 0
   fi
 
+  local cv100 max100 new100
+
+  _to_int100 cv100 "$current_volume"
+  _to_int100 max100 "$max_volume"
+
   # Stop if already at limits
-  if [[ "$direction" == "+" ]] && awk "BEGIN {exit !($current_volume >= $max_volume)}"; then
+  if [[ "$direction" == "+" ]] && ((cv100 >= max100)); then
     exit 0
-  elif [[ "$direction" == "-" ]] && awk "BEGIN {exit !($current_volume <= 0.00)}"; then
+  elif [[ "$direction" == "-" ]] && ((cv100 <= 0)); then
     exit 0
   fi
+
+  # new100 is intentionally outer-scoped so callers below can read it.
+  _calc_new_volume() {
+    if [[ "$direction" == "+" ]]; then
+      new100=$((cv100 + VIBRANIUM_VOLUME_ADJUSTMENT_STEP))
+      ((new100 > max100)) && new100=$max100
+    else
+      new100=$((cv100 - VIBRANIUM_VOLUME_ADJUSTMENT_STEP))
+      ((new100 < 0)) && new100=0
+    fi
+    # Convert back from integer*100 -> string with 2 decimal places
+    # - new100 / 100 -> integer part
+    # - new100 % 100 -> fractional part (always 2 digits)
+    printf -v new_volume "%d.%02d" $((new100 / 100)) $((new100 % 100))
+  }
 
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
     if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
@@ -120,30 +185,23 @@ adjust_volume() {
         swayosd-client "$osd_arg" "${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}"
       fi
     else
-      if [[ "$direction" == "+" ]]; then
-        new_volume=$(awk -v cv="$current_volume" -v step="$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" -v max="$max_volume" \
-          'BEGIN {new = cv + step/100; if (new > max) new = max; printf "%.2f", new}')
-      else
-        new_volume=$(awk -v cv="$current_volume" -v step="$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" \
-          'BEGIN {new = cv - step/100; if (new < 0.0) new = 0.0; printf "%.2f", new}')
-      fi
+      _calc_new_volume
       wpctl set-volume "$device" "$new_volume"
-      [[ "$quiet" != true ]] && show_volume_notification "$device" "$notification_type"
+      if [[ "$quiet" == false ]]; then
+        # Pass pre-computed values: skip the redundant wpctl get-volume inside
+        # show_volume_notification. Volume is always unmuted at this point.
+        local bar=$((new100 * 100 / max100))
+        show_volume_notification "$device" "$notification_type" "$new100" "$bar"
+      fi
     fi
   else
-    if [[ "$direction" == "+" ]]; then
-      new_volume=$(awk -v cv="$current_volume" -v step="$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" -v max="$max_volume" \
-        'BEGIN {new = cv + step/100; if (new > max) new = max; printf "%.2f", new}')
-    else
-      new_volume=$(awk -v cv="$current_volume" -v step="$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" \
-        'BEGIN {new = cv - step/100; if (new < 0.0) new = 0.0; printf "%.2f", new}')
-    fi
+    _calc_new_volume
     wpctl set-volume "$device" "$new_volume"
   fi
 }
 
 set_volume() {
-  local int_val="${1%%%}" # Strip optional trailing '%'
+  local int_val="${1%%%}"
   local device="@DEFAULT_AUDIO_SINK@"
   local max_volume
 
@@ -158,8 +216,8 @@ set_volume() {
     exit 1
   fi
 
-  local float_val mute_state
-  float_val=$(awk -v v="$int_val" 'BEGIN {printf "%.2f", v/100}')
+  local float_val
+  printf -v float_val "%d.%02d" $((int_val / 100)) $((int_val % 100))
 
   if ((int_val == 0)); then
     wpctl set-volume "$device" 0
@@ -171,11 +229,13 @@ set_volume() {
           --custom-icon="audio-volume-muted-symbolic" \
           --custom-progress="0.0001"
       else
-        show_volume_notification "$device" "Volume"
+        show_volume_notification "$device" "Volume" "0" "0" "true"
       fi
     fi
     return
   fi
+
+  local mute_state
 
   read -r _ _ mute_state <<<"$(wpctl get-volume "$device")"
   if [[ "$mute_state" == "[MUTED]" ]]; then
@@ -186,12 +246,10 @@ set_volume() {
 
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true && "$quiet" != true ]]; then
     if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-      # swayosd-client has no absolute-set command, so we approximate with
-      # --custom-progress (0.0-1.0 scale), a matching freedesktop icon, and
-      # a label showing the real percentage.
+      local scaled=$((int_val * 10000 / max_volume))
       local osd_progress osd_icon
-      osd_progress=$(awk -v v="$int_val" -v max="$max_volume" \
-        'BEGIN {printf "%.4f", v/max}')
+      printf -v osd_progress "%d.%04d" $((scaled / 10000)) $((scaled % 10000))
+
       if ((int_val <= 33)); then
         osd_icon="audio-volume-low-symbolic"
       elif ((int_val <= 66)); then
@@ -199,11 +257,14 @@ set_volume() {
       else
         osd_icon="audio-volume-high-symbolic"
       fi
+
       swayosd-client \
         --custom-icon="$osd_icon" \
         --custom-progress="$osd_progress"
     else
-      show_volume_notification "$device" "Volume"
+      # int_val is already the display percentage; bar scales it to 0-100 of max_volume.
+      local bar=$((int_val * 100 / max_volume))
+      show_volume_notification "$device" "Volume" "$int_val" "$bar"
     fi
   fi
 }
@@ -230,7 +291,9 @@ toggle_mute() {
       swayosd-client "$osd_arg" mute-toggle
     else
       wpctl set-mute "$device" toggle
-      [[ "$quiet" != true ]] && show_volume_notification "$device" "$type"
+      if [[ "$quiet" == false ]]; then
+        show_volume_notification "$device" "$type"
+      fi
     fi
   else
     wpctl set-mute "$device" toggle
@@ -241,9 +304,7 @@ toggle_mute() {
 feedback() {
   local variant dir
 
-  helpers::check VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
   if [[ "$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK" == true ]]; then
-    helpers::check VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
     variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
 
     case "$variant" in
@@ -256,19 +317,17 @@ feedback() {
     esac
 
     if [[ ! -d "$dir" ]]; then
-      log::error "$dir does not exist! Using the default one!"
+      echo "Error (${FUNCNAME[0]}): $dir does not exist! Using the default one!" >&2
       dir="/usr/share/sounds/freedesktop/stereo"
     fi
 
     if [[ "$variant" == "variant3" ]]; then
-      paplay "${dir}/bell.oga" &
+      pw-play --latency 10ms "${dir}/bell.oga" &
     else
-      paplay "${dir}/audio-volume-change.oga" &
+      pw-play --latency 10ms "${dir}/audio-volume-change.oga" &
     fi
   fi
 }
-
-# --- Argument parsing ---
 
 if [[ $# -eq 0 ]]; then
   usage
@@ -345,8 +404,10 @@ source vb-lib-core
 helpers::check \
   VIBRANIUM_GLOBAL_USE_OSD \
   VIBRANIUM_VOLUME_ADJUSTMENT_STEP \
+  VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK \
   VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK \
-  VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
+  VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
+  VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
 
 case "$action" in
 vol-up)

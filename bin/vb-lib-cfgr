@@ -367,6 +367,7 @@ cfgr::set_digit() {
         -f "$awk_script"
     )
 
+    # shellcheck disable=SC2181
     if [[ $? -ne 0 ]]; then
       local range_hint=""
       if [[ -n "$min_val" && -n "$max_val" ]]; then

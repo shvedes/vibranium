@@ -18,7 +18,8 @@ EOF
 }
 
 _grayscale_enabled() {
-  local opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
+  local opt
+  opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
 
   if [[ "$opt" == "[[EMPTY]]" || "$opt" =~ ^()$ ]]; then
     return 1
@@ -36,7 +37,7 @@ SHADER="$VIBRANIUM/default/hypr/shaders/grayscale.glsl"
 CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
 
 if _grayscale_enabled; then
-  rm -f "$config"
+  rm -f "$CONFIG"
 else
   echo "decoration:screen_shader = $SHADER" >"$CONFIG"
 fi

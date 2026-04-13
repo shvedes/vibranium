@@ -28,7 +28,7 @@ case "$1" in
   ;;
 "") ;;
 *)
-  echo "Error: invalid option '$1'" >&2
+  echo "Error: unknown option -- $*" >&2
   echo "Try '$SELF --help' for more information." >&2
   exit 1
   ;;

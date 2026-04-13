@@ -223,6 +223,7 @@ _installation_complete() {
   printf "%s[VIBRANIUM]%s Installation complete" "$GREEN" "$RESET"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
+    # shellcheck disable=SC2034
     read -n1 -r -s -p $'. Press any key to exit' dummy
   fi
 
@@ -232,7 +233,7 @@ _installation_complete() {
 # Filters out already-installed packages from PACKAGES and populates FILTERED.
 _filter_packages() {
   if [[ "$FORCE_INSTALL" == true ]]; then
-    FILTERED=(${PACKAGES[@]})
+    FILTERED=("${PACKAGES[@]}")
     return
   fi
 
@@ -299,21 +300,6 @@ _show_overview() {
   for pkg in "${packages[@]}"; do
     echo -e "\t   - ${YELLOW}${pkg}${RESET}"
   done
-
-  # Lines printed above this overview in the normal flow:
-  #   - header (if shown)
-  #   - 1 title line ("You're about to install...")
-  #   - N package lines
-  local overhead=$((SHOW_LOGO == true ? HEADER_LINES : 0))
-  local total=$((overhead + 1 + ${#packages[@]}))
-
-  if ((total > $(tput lines))); then
-    if [[ "$TERM" == "alacritty" ]]; then
-      local msg="Use ${BLUE}Ctrl${RESET}+${BLUE}Shift${RESET}+${BLUE}Space${RESET} to enter ${GREEN}Vim${RESET} mode. "
-      msg+="Use ${YELLOW}k${RESET}/${YELLOW}j${RESET} to scroll ${YELLOW}up${RESET}/${YELLOW}down${RESET}"
-      echo -e "${YELLOW}[VIBRANIUM]${RESET} Your list is long — scroll up to review it. $msg"
-    fi
-  fi
 }
 
 _install_packages() {
@@ -439,8 +425,6 @@ SKIP_OVERVIEW=false
 EMBEDDED=false
 PACKAGES=()
 FILTERED=()
-
-HEADER_LINES=10 # Height of the logo/header block in lines
 
 YAY_FLAGS=(
   "--answerclean" "Y"

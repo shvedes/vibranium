@@ -35,77 +35,98 @@ case "$1" in
   ;;
 -c | --clear)
   : >"$HISTORY"
-  vb-cmd-refresh-bar-module \
-    color-picker &
+  vb-cmd-refresh-bar-module color-picker
   exit 0
   ;;
 "")
-  check_deps || exit 1
-  :
+  if ! check_deps; then
+    exit 1
+  fi
   ;;
 *)
-  echo -e "Unknown option: $@\n" >&2
-  usage
+  echo "Error: unknown option: $*" >&2
+  echo "Try '${0##*/} --help' for more information" >&2
   exit 1
   ;;
 esac
 
-source vb-lib-core
-
 if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
-  if term::is_headless; then
-    msg="<b>Color Picker</b> isn't available while <b>Reading Mode</b> is active!"
-    notify-send -r 2 -t 3000 "Color Picker" "$msg"
-  fi
-  log::error "Reading Mode is active. Aborting"
+  echo "Not available while reading mode is active"
+  notify-send -r 2 -t 3000 "Color Picker" \
+    "<b>Color Picker</b> isn't available while <b>Reading Mode</b> is active!"
   exit 1
 fi
 
 if pid=$(pidof hyprpicker); then
-  kill $pid
+  kill "$pid"
   exit 1
 fi
 
-helpers::check VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR
-helpers::check VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW
-helpers::check VIBRANIUM_COLOR_PICKER_HISTORY_SIZE
+source vb-lib-core
 
-show_selected="$VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
-hex_preview="$VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
-hist_size="$VIBRANIUM_COLOR_PICKER_HISTORY_SIZE"
+helpers::check \
+  VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR \
+  VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW \
+  VIBRANIUM_COLOR_PICKER_HISTORY_SIZE
 
-opt_args=()
-if [[ "$hex_preview" == false ]]; then
-  opt_args+=(-d)
+SHOW_SELECTED="$VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
+HEX_PREVIEW="$VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
+HIST_SIZE="$VIBRANIUM_COLOR_PICKER_HISTORY_SIZE"
+
+OPT_ARGS=()
+if [[ "$HEX_PREVIEW" == false ]]; then
+  OPT_ARGS+=(-d)
 fi
 
-selected_color=$(hyprpicker -a -b -l -r -f hex "${opt_args[@]}" | grep -v '^\[ERR\]')
-[[ -z "$selected_color" ]] && {
-  echo "selection canceled"
-  exit 1
-}
+while IFS= read -r line; do
+  if [[ $line == "[ERR]"* ]]; then
+    continue
+  fi
+
+  SELECTED_COLOR=$line
+done < <(hyprpicker -a -b -l -r -f hex "${OPT_ARGS[@]}")
+
+if [[ -z "$SELECTED_COLOR" ]]; then
+  exit 0
+fi
 
 # Read the cache file and update it if the selected color is not
 # a duplicate of one already existing in the cache file.
-if ! grep -Fxq "$selected_color" "$HISTORY" 2>/dev/null; then
+FOUND=false
+COUNT=0
+
+# Read file line by line (if it exists)
+if [[ -f "$HISTORY" ]]; then
+  while IFS= read -r line; do
+    ((COUNT++))
+
+    # Check for exact match
+    if [[ "$line" == "$SELECTED_COLOR" ]]; then
+      FOUND=true
+    fi
+  done <"$HISTORY"
+fi
+
+# Only update if not found
+if [[ "$FOUND" == false ]]; then
   # Wipe file if reached limit
-  if [[ "$(wc -l <"$HISTORY" 2>/dev/null)" -ge $hist_size ]]; then
-    echo "$selected_color" >"$HISTORY"
+  if ((COUNT >= HIST_SIZE)); then
+    printf '%s\n' "$SELECTED_COLOR" >"$HISTORY"
   else
-    echo "$selected_color" >>"$HISTORY"
+    printf '%s\n' "$SELECTED_COLOR" >>"$HISTORY"
   fi
 fi
 
 # Generate a 1:1px image of the selected color to display in the notification
-if [[ $show_selected == true ]]; then
-  preview_img="/tmp/latest_color.png"
+if [[ $SHOW_SELECTED == true ]]; then
+  PREVIEW_IMG="$VIBRANIUM_RUNTIME/color-picker.png"
   if command -v magick >/dev/null; then
-    magick -size 1x1 xc:"${selected_color}" "$preview_img"
+    magick -size 1x1 xc:"${SELECTED_COLOR}" "$PREVIEW_IMG"
   else
     log::warn "ImageMagick is not installed!"
   fi
 fi
 
-notify-send -r 3 -t 1500 -i "$preview_img" "Color Picker" "Color copied to clipboard"
+notify-send -r 3 -t 1500 -i "$PREVIEW_IMG" "Color Picker" "Color copied to clipboard"
 vb-cmd-refresh-bar-module color-picker
-rm -f "$preview_img"
+rm -f "$PREVIEW_IMG"

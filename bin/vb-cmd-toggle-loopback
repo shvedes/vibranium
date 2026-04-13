@@ -107,8 +107,9 @@ done
 # Source only now that we know we need runtime config values.
 source vb-lib-core
 
-helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME
-helpers::check VIBRANIUM_VOLUME_SOURCE_LOOPBACK
+helpers::check \
+  VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME \
+  VIBRANIUM_VOLUME_SOURCE_LOOPBACK
 
 VOL="${VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME}%"
 

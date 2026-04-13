@@ -23,17 +23,15 @@ EOF
 }
 
 notify() {
-  local icon="$1" summary="$2" body="$3"
+  local summary="$1" body="$2" monitor icon
+
+  icon="/usr/share/icons/Papirus/24x24/panel/volume-level-high.svg"
 
   if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
-    local monitor="$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')"
+    monitor="$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')"
     swayosd-client --monitor "$monitor" --custom-message "$body" ${icon:+--custom-icon "$icon"}
   else
-    if [[ -n $icon ]]; then
-      local icon_path
-      icon_path="$(find "/usr/share/icons/Papirus" -name "${icon}.svg" -print -quit 2>/dev/null)"
-    fi
-    notify-send -r 2 -t 2000 ${icon_path:+-i "$icon_path"} "$summary" "$body"
+    notify-send -r 2 -t 2000 -i "$icon" "$summary" "$body"
   fi
 }
 
@@ -48,13 +46,18 @@ while [[ $# -gt 0 ]]; do
     break
     ;;
   *)
-    echo "Error: unknown option: $1" >&2
+    echo "Error: unknown option -- $*" >&2
     echo "Try '$SELF --help' for more information" >&2
     exit 1
     ;;
   esac
   shift
 done
+
+if ! command -v jq >/dev/null; then
+  vb-cmd-dep-notify --name "Output Switcher" --deps "jq"
+  exit 1
+fi
 
 source vb-lib-core
 
@@ -66,7 +69,7 @@ sinks=$(pactl -f json list sinks | jq '[.[] | select((.ports | length == 0) or (
 sinks_count=$(jq '. | length' <<<"$sinks")
 
 if [[ $sinks_count -eq 0 ]]; then
-  notify "" "Vibranium" "No audio devices found"
+  notify "Vibranium" "No audio devices found"
   exit 1
 fi
 
@@ -111,4 +114,4 @@ if [[ $next_sink_name != "$current_sink_name" ]]; then
   pactl set-default-sink "$next_sink_name"
 fi
 
-notify "volume-level-high" "Output Device" "$next_sink_description"
+notify "Output Device" "$next_sink_description"

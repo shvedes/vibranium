@@ -83,13 +83,6 @@ fi
 
 filetype="${image##*.}"
 
-case "$filetype" in
-jpg | jpeg) mime_type="image/jpeg" ;;
-png) mime_type="image/png" ;;
-webp) mime_type="image/webp" ;;
-ppm) mime_type="image/x-portable-pixmap" ;;
-esac
-
 # satty only accepts .png files (extension check, not magic bytes).
 # For other types, copy to a temp .png in /tmp so the working file is invisible
 # to any file manager that may have the source directory open.

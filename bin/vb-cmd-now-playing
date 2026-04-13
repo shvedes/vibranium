@@ -1,14 +1,5 @@
 #!/usr/bin/bash
 
-# This script displays the currently playing track from either a Playerctl-compatible
-# media player or MPD (Music Player Daemon). It can:
-# 1. Output the track title and artist to the terminal.
-# 2. Optionally download and show the album art if enabled in Vibranium settings.
-# 3. Send a desktop notification with the track information and album art.
-# The script checks which player is currently active, retrieves metadata, formats it
-# using Pango markup for notifications or lockscreen display, and cleans up temporary
-# album art files afterward.
-
 SELF=${0##*/}
 
 shcat() {
@@ -97,16 +88,13 @@ if [[ -z "$title" ]]; then
   if [[ -z "$filename" ]]; then
     filename="Unknown track"
   fi
-  pango_output="$filename"
   plain_output="$filename"
   notify_body="<span foreground='${P_ORANGE}'> $filename</span>"
 else
   if [[ -z "$artist" ]]; then
-    pango_output="$title"
     plain_output="$title"
     notify_body="<span foreground='${P_ORANGE}'> $title</span>"
   else
-    pango_output="$title <span foreground='${P_YELLOW}'>by</span> $artist"
     plain_output="$title by $artist"
     notify_body="<span foreground='${P_ORANGE}'> $title</span>\n<span foreground='${P_YELLOW}'> $artist</span>"
   fi
@@ -131,7 +119,8 @@ if [[ "$show_album_art" = true ]]; then
     fi
     ;;
   "mpd")
-    mpc readpicture "$(mpc --format "%file%" current)" >"$album_art"
+    mpd_file="$(mpc --format "%file%" current)"
+    mpc readpicture "$mpd_file" >"$album_art"
     ;;
   esac
 fi

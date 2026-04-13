@@ -70,68 +70,72 @@ get_power_profile() {
   local state_file="$VIBRANIUM_STATE/power-profile"
 
   if [[ -f "$state_file" ]]; then
-    local state="$(<"$state_file")"
+    local state
+    state="$(<"$state_file")"
     printf "%s" "$state"
     return
   fi
 
   # Update state file if it doesn't exists
-  local curr_profile="$(powerprofilesctl get)"
+  local curr_profile
+  curr_profile="$(powerprofilesctl get)"
   printf "%s" "$curr_profile" >"$state_file"
   printf "%s" "$curr_profile"
 }
 
-update_cache() { echo "$1" >"$VIBRANIUM_STATE/power-profile"; }
+set_power_profile() {
+  local target="$1"
+  local state="$VIBRANIUM_STATE/power-profile"
 
-_ensure_deps() {
-  if ! command -v powerprofilesctl >/dev/null; then
-    echo "Error: missing required dependencies: power-profiles-daemon"
-    vb-cmd-dep-notify --name "Power Management" --deps "power-profiles-daemon"
-    exit 1
-  fi
+  powerprofilesctl set "$target" &
+
+  # Update cache
+  echo "$target" >"$state"
 }
 
 ACTION="next"
 QUIET="false"
+SELF="${0##*/}"
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-  -q | --quiet)
-    QUIET=true
-    shift
-    ;;
-  --next | --prev)
-    ACTION="${1/--/}"
-    shift
-    ;;
-  power-saver | balanced | performance)
-    TARGET_PROFILE="$1"
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --get)
-    get_power_profile
-    exit 0
-    ;;
-  --*)
-    echo "Unknown option: $@." >&2
-    echo "Use flag --help to see available options." >&2
-    exit 1
-    ;;
-  *)
-    echo "Unknown profile: $1." >&2
-    echo "Use flag --help to see available options." >&2
-    exit 1
-    ;;
-  esac
-done
+case "$1" in
+-q | --quiet)
+  QUIET=true
+  ;;
+--next | --prev)
+  ACTION="${1/--/}"
+  ;;
+power-saver | balanced | performance)
+  TARGET_PROFILE="$1"
+  ;;
+-h | --help)
+  usage
+  exit 0
+  ;;
+--get)
+  get_power_profile
+  exit 0
+  ;;
+"")
+  ACTION="next"
+  ;;
+-*)
+  echo "Unknown option: $*" >&2
+  echo "Try '$SELF --help' for more information" >&2
+  exit 1
+  ;;
+*)
+  echo "Unknown profile: $1" >&2
+  echo "Try '$SELF --help' for more information" >&2
+  exit 1
+  ;;
+esac
 
-_ensure_deps
+if ! command -v powerprofilesctl >/dev/null; then
+  echo "Error: missing required dependencies: power-profiles-daemon"
+  vb-cmd-dep-notify --name "Power Management" --deps "power-profiles-daemon"
+  exit 1
+fi
 
-USER_ARGS=()
 PROFILES=("power-saver" "balanced" "performance")
 CURRENT="$(get_power_profile)"
 
@@ -161,8 +165,7 @@ if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
   fi
 fi
 
-powerprofilesctl set "$TARGET_PROFILE" &
+set_power_profile "$TARGET_PROFILE"
 vb-cmd-refresh-bar-module power-profile &
 
-update_cache "$TARGET_PROFILE"
 notify "$TARGET_PROFILE"
