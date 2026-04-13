@@ -1,98 +1,87 @@
 .theme-dark, .theme-light {
-  /* Core colors */
-  --background-primary: {{ background }};
-  --background-primary-alt: {{ background }};
-  --background-secondary: {{ background }};
-  --background-secondary-alt: {{ background }};
-  --text-normal: {{ foreground }};
 
-  /* Selection colors */
-  --text-selection: {{ selection_background }};
+  --color-red-rgb: {{ color1_rgb }};
+  --color-red: {{ color1 }};
 
-  /* Border color */
-  --background-modifier-border: {{ color8 }};
+  --color-orange-rgb: {{ color3_rgb }};
+  --color-orange: {{ color3 }};
 
-  /* Semantic heading colors */
-  --text-title-h1: {{ color1 }};
-  --text-title-h2: {{ color2 }};
-  --text-title-h3: {{ color3 }};
-  --text-title-h4: {{ color4 }};
-  --text-title-h5: {{ color5 }};
-  --text-title-h6: {{ color5 }};
+  --color-yellow-rgb: {{ color11_rgb }};
+  --color-yellow: {{ color11 }};
 
-  /* Links and accents */
-  --text-link: {{ color4 }};
-  --text-accent: {{ accent }};
-  --text-accent-hover: {{ accent }};
-  --interactive-accent: {{ accent }};
-  --interactive-accent-hover: {{ accent }};
+  --color-green-rgb: {{ color2_rgb }};
+  --color-green: {{ color2 }};
 
-  /* Muted text */
-  --text-muted: color-mix(in srgb, {{ foreground }} 70%, transparent);
-  --text-faint: color-mix(in srgb, {{ foreground }} 55%, transparent);
+  --color-cyan-rgb: {{ color6_rgb }};
+  --color-cyan: {{ color6 }};
 
-  /* Code */
-  --code-normal: {{ color6 }};
+  --color-blue-rgb: {{ color4_rgb }};
+  --color-blue: {{ color4 }};
 
-  /* Errors and success */
-  --text-error: {{ color1 }};
-  --text-error-hover: {{ color1 }};
-  --text-success: {{ color2 }};
+  --color-purple-rgb: {{ color5_rgb }};
+  --color-purple: {{ color5 }};
 
-  /* Tags */
-  --tag-color: {{ color6 }};
-  --tag-background: {{ color8 }};
+  --color-pink-rgb: {{ color13_rgb }};
+  --color-pink: {{ color13 }};
 
-  /* Graph */
-  --graph-line: {{ color8 }};
-  --graph-node: {{ accent }};
-  --graph-node-focused: {{ color4 }};
-  --graph-node-tag: {{ color6 }};
-  --graph-node-attachment: {{ color2 }};
+  --accent-h: {{ color4_h }};
+  --accent-s: {{ color4_s }}%;
+  --accent-l: {{ color4_l }}%;
+
+  --text-normal: {{ color7 }};
+
+  --link-external-color: {{ color4 }};
+  --link-external-color-hover: {{ color5 }};
+
+  /* --h1-color: inherit; */
+  /* --h2-color: inherit; */
+  /* --h3-color: inherit; */
+  /* --h4-color: inherit; */
+  /* --h5-color: inherit; */
+  /* --h6-color: inherit; */
+
+  /*
+   *
+   * Gradually build all base colors
+   *
+   */
+
+  /* Main document background, settings background */
+  --color-base-00:  {{ color0 }};
+
+  --color-base-05:  {{ color0 }};
+
+  /* Code block color, options' island background */
+  --color-base-10:  {{ color0 }};
+
+  /* Background of left & right section, context menu, canvas's drag icons background */
+  --color-base-20:  rgba({{ color0_rgb }}, 0.8);
+
+  /* Input field background */
+  --color-base-25:  rgba({{ color0_rgb }}, 0.8);
+
+  /* Top bar background, section border, canvas's grid color
+   * non accent-colored button background */
+  --color-base-30:  {{ color8 }};
+
+   /* Background of inactive toggles, borders of some UI elements,
+   * hover background on *some* buttons */
+  --color-base-35:  {{ color8 }};
+
+  /* Mostly UI borders */
+  --color-base-40:  {{ color8 }};
+
+  /* Some UI elements color */
+  --color-base-50:  {{ color12 }};
+
+  --color-base-60: {{ color6 }};
+
+  /* Text color in non-document places */
+  --color-base-70: {{ color7 }};
+
+  /* Couldn't find it, but according to the default Obsidian theme,
+   * this is equal to text color, as well as base-70 and base-60  */
+  --color-base-100: {{ color7 }};
 }
 
-/* Headers */
-.cm-header-1, .markdown-rendered h1 { color: var(--text-title-h1); }
-.cm-header-2, .markdown-rendered h2 { color: var(--text-title-h2); }
-.cm-header-3, .markdown-rendered h3 { color: var(--text-title-h3); }
-.cm-header-4, .markdown-rendered h4 { color: var(--text-title-h4); }
-.cm-header-5, .markdown-rendered h5 { color: var(--text-title-h5); }
-.cm-header-6, .markdown-rendered h6 { color: var(--text-title-h6); }
-
-/* Code blocks */
-.markdown-rendered code {
-  color: {{ color6 }};
-}
-
-/* Syntax highlighting */
-.cm-s-obsidian span.cm-keyword { color: {{ color1 }}; }
-.cm-s-obsidian span.cm-string { color: {{ color2 }}; }
-.cm-s-obsidian span.cm-number { color: {{ color3 }}; }
-.cm-s-obsidian span.cm-comment { color: {{ color8 }}; }
-.cm-s-obsidian span.cm-operator { color: {{ color4 }}; }
-.cm-s-obsidian span.cm-def { color: {{ color4 }}; }
-
-/* Links */
-.markdown-rendered a {
-  color: var(--text-link);
-}
-
-/* Blockquotes */
-.markdown-rendered blockquote {
-  border-left-color: {{ accent }};
-}
-
-/* Active elements */
-.workspace-leaf.mod-active .workspace-leaf-header-title {
-  color: var(--interactive-accent);
-}
-
-.nav-file-title.is-active {
-  color: var(--interactive-accent);
-}
-
-/* Search results */
-.search-result-file-title {
-  color: var(--interactive-accent);
-}
-
+/* vim: set ft=css: */

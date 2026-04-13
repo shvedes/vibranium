@@ -12,16 +12,16 @@ theme[selected_fg]="{{ accent }}"
 
 theme[inactive_fg]="{{ gray }}"
 
-theme[graph_text]="{{ foreground_0 }}"
+theme[graph_text]="{{ gray_bright }}"
 
 theme[meter_bg]="{{ gray }}"
 
 theme[proc_misc]="{{ foreground_0 }}"
 
-theme[cpu_box]="{{ purple }}"
-theme[mem_box]="{{ green }}"
-theme[net_box]="{{ red }}"
-theme[proc_box]="{{ accent }}"
+theme[cpu_box]="{{ background_4 }}"
+theme[mem_box]="{{ background_4 }}"
+theme[net_box]="{{ background_4 }}"
+theme[proc_box]="{{ background_4 }}"
 
 theme[div_line]="{{ gray_dim }}"
 
