@@ -1,0 +1,65 @@
+# Port of the Aamis theme for Omarchy:
+# https://github.com/vyrx-dev/omarchy-aamis-theme
+
+black_dim = "#333333"
+black = "#404040"
+black_bright = "#4d4d4d"
+
+red_dim = "#ad1f33"
+red = "#e25d6c"
+red_bright = "#de5468"
+
+pink_dim = "#b84770"
+pink = "#c46e8f"
+pink_bright = "#d491aa"
+
+green_dim = "#709966"
+green = "#8bad85"
+green_bright = "#acc2a3"
+
+yellow_dim = "#bf885a"
+yellow = "#cea37f"
+yellow_bright = "#dcbca3"
+
+orange_dim = "#c4763b"
+orange = "#cf9463"
+orange_bright = "#dcb089"
+
+blue_dim = "#619cd1"
+blue = "#89b5dc"
+blue_bright = "#b0cfe8"
+
+purple_dim = "#a75880"
+purple = "#b9799e"
+purple_bright = "#cb9ab5"
+
+cyan_dim = "#669985"
+cyan = "#85ad99"
+cyan_bright = "#a3c2b9"
+
+white_dim = "#c4b29f"
+white = "#e1cdb7"
+white_bright = "#eadccc"
+
+gray_dim = "#655858"
+gray = "#706a6a"
+gray_bright = "#876e6e"
+
+accent_dim = "#a46d42"
+accent = "#bf885a"
+accent_bright = "#cba380"
+
+background_h = "#0f0f0f"
+background_0 = "#141414"
+background_1 = "#1f1f1f"
+background_2 = "#292929"
+background_3 = "#333333"
+background_4 = "#404040"
+background_5 = "#4d4d4d"
+
+foreground_h = "#eadccc"
+foreground_0 = "#d8cbbc"
+foreground_1 = "#c5b9ac"
+foreground_2 = "#b4a99c"
+foreground_3 = "#a2988d"
+foreground_4 = "#968d83"
