@@ -18,10 +18,10 @@ theme[meter_bg]="{{ gray }}"
 
 theme[proc_misc]="{{ foreground_0 }}"
 
-theme[cpu_box]="{{ background_4 }}"
-theme[mem_box]="{{ background_4 }}"
-theme[net_box]="{{ background_4 }}"
-theme[proc_box]="{{ background_4 }}"
+theme[cpu_box]="{{ gray_bright }}"
+theme[mem_box]="{{ gray_bright }}"
+theme[net_box]="{{ gray_bright }}"
+theme[proc_box]="{{ gray_bright }}"
 
 theme[div_line]="{{ gray_dim }}"
 
