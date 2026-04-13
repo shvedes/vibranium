@@ -26,7 +26,7 @@ if [[ -z "$REPO_URL" ]]; then
   exit 1
 # Validate: must be an http(s) URL
 elif [[ ! "$REPO_URL" =~ ^https?:// ]]; then
-  echo "${RED}[VIBRANIUM}${RESET} You must provide URL!"
+  echo "${RED}[VIBRANIUM]${RESET} You must provide a URL!"
   _operation_canceled
   exit 1
 fi
@@ -45,6 +45,16 @@ THEME_NAME_COLOR="${BLUE}${THEME_NAME^}${RESET}"
 THEMES_DIR="$HOME/.config/vibranium/themes"
 THEME_PATH="$THEMES_DIR/$THEME_NAME"
 
+# Official themes ship inside the Vibranium repo itself. A community theme whose
+# derived name collides with an official one would silently shadow it after install,
+# so we refuse early rather than letting that happen.
+OFFICIAL_THEME_PATH="$VIBRANIUM/themes/$THEME_NAME"
+if [[ -d "$OFFICIAL_THEME_PATH" ]]; then
+  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR is an official Vibranium theme and cannot be overwritten by a community install"
+  _operation_canceled
+  exit 1
+fi
+
 # Fetch the repo root listing once - checks both candidate files in a single request
 # so we don't risk hitting the GitHub API rate limit with two separate calls
 CONTENTS_FILE="/tmp/${0##*/}.tmp"
@@ -60,10 +70,10 @@ fi
 # (e.g. a file called "my-colors.toml" must not pass)
 CONTENTS="$(<"$CONTENTS_FILE")"
 if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] && [[ "$CONTENTS" != *'"name": "colors-extended.toml"'* ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${GREEN}Omarchy${RESET} versions prior to ${BLUE}v3.3.0${BLUE}"
+  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${GREEN}Omarchy${RESET} versions prior to ${BLUE}v3.3.0${RESET}"
 
   # https://github.com/basecamp/omarchy/releases/tag/v3.3.0
-  echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${BLUE}"
+  echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${RESET}"
 
   rm -f "$CONTENTS_FILE"
   _operation_canceled
