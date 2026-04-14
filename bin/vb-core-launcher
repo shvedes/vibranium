@@ -178,6 +178,7 @@ case "$INPUT" in
   # is a command or a search query.
   CMD="${INPUT%% *}"
   ARGS="${INPUT#"$CMD"}"
+  ARGS="${ARGS# }"
 
   # File exists and it IS an executable
   if [[ -x "$CMD" ]] || command -v "$CMD" >/dev/null; then
