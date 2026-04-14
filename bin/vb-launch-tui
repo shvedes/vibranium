@@ -87,12 +87,21 @@ WINDOW_PATTERN="$APP_NAME"
 
 WINDOW_ADDRESS="$(
   jq -r --arg p "$WINDOW_PATTERN" '
+    def by_class:
+      .class != null and (.class | startswith("org.vb.term"));
+
+    def class_match:
+      .class | test("^org\\.vb\\.term");
+
     first(
-      .[]
-      | select(
-          (.class | test("\\b" + $p + "\\b"; "i")) or
-          (.title | test("\\b" + $p + "\\b"; "i"))
-        )
+      (
+        .[] | select(class_match)
+      )
+      |
+      select(
+        (.class | test("\\b" + $p + "\\b"; "i")) or
+        (.title | test("\\b" + $p + "\\b"; "i"))
+      )
       | .address
     )
   ' < <(hyprctl -j clients)
