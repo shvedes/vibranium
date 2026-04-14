@@ -4,7 +4,7 @@ _log_info "Installing PWAs..."
 
 vb-webapp-install --category AI --url 'chatgpt.com' --name ChatGPT --icon chatgpt
 vb-webapp-install --category AI --url 'grok.com' --name Grok --icon grok
-vb-webapp-install --category AI --url 'perplexity.ai' --name Perplexity
+vb-webapp-install --category AI --url 'perplexity.ai' --name Perplexity --icon perplexity
 vb-webapp-install --category AI --url 'gemini.google.com' --name Gemini --icon google-gemini
 vb-webapp-install --category AI --url 'claude.ai/chats' --name Claude --icon claude
 vb-webapp-install --category AI --url 'chat.deepseek.com' --name DeepSeek --icon deepseek

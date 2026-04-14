@@ -139,7 +139,7 @@ TARGET_PATHS=()
 if [[ $INTERACTIVE == true ]]; then
   declare -A PWA_MAP
   while IFS= read -r -d '' file; do
-    grep -q '^Exec=.*vb-webapp-launch.*' "$file" &&
+    grep -q '^Exec=.*vb-launch-webapp.*' "$file" &&
       PWA_MAP["$(_desktop_name "$file")"]="$file"
   done < <(find "$DESKTOP_DIR" -name 'PWA - *.desktop' -print0)
 
