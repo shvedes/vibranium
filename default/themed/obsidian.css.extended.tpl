@@ -84,4 +84,14 @@
   --color-base-100: {{ foreground_0 }};
 }
 
+/* Add barely visible border for settings sections */
+/* It's a small change, but it makes a big difference visually */
+.setting-group .setting-items {
+  border: 1px solid {{ background_3 }};
+}
+
+.setting-group .setting-item {
+  border-top: 1px solid {{ background_2 }};
+}
+
 /* vim: set ft=css: */
