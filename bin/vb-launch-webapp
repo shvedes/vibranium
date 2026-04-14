@@ -1,5 +1,45 @@
 #!/usr/bin/bash
 
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [URL]
+
+Open Progressive Web Apps (PWA)s in Vibranium.
+If a window eixsts - focuses it.
+
+Arguments:
+  URL         Target URL to open or focus
+
+Options:
+  -h, --help  Show this help message and exit
+
+Examples:
+  $SELF https://example.com
+  $SELF http://archlinux.org
+EOF
+}
+
+case "${1:-}" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+esac
+
+if [[ $# -lt 1 ]]; then
+  echo "Error: missing URL" >&2
+  echo "Try '$SELF --help' for more information" >&2
+  exit 1
+fi
+
 get_default_browser() {
   local -n _out="$1"
   local browser=""
