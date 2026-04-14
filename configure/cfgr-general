@@ -30,7 +30,8 @@ _get_update_channel() {
     channel="$(<"$state")"
     printf "%s" "${channel^}"
   else
-    local branch="$(git -C "$VIBRANIUM" branch --show-current)"
+    local branch
+    branch="$(git -C "$VIBRANIUM" branch --show-current)"
     printf "%s" "$branch" | tee "$state"
   fi
 }

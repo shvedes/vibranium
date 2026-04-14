@@ -69,29 +69,12 @@ _updates_weather_menu() {
 
   _u_w_build() {
     cfgr::item::bool \
-      --var   VIBRANIUM_BAR_SHOW_ANIMATION \
+      --var VIBRANIUM_BAR_SHOW_ANIMATION \
       --label "Animate first launch"
-
-    cfgr::item::bool \
-      --var   VIBRANIUM_BAR_SHOW_SEPARATOR \
-      --label "Show separators" \
-      --hook  "_update"
   }
 
   cfgr::run "Updates & Weather" "_u_w_build" \
-    VIBRANIUM_BAR_SHOW_ANIMATION \
-    VIBRANIUM_BAR_SHOW_SEPARATOR
-}
-
-_updates_menu() {
-  _u_build() {
-    cfgr::item::bool \
-      --var   VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES \
-      --label "Display when up to date" \
-      --hook  "vb-cmd-refresh-bar-module pacman &"
-  }
-
-  cfgr::run "Updates" "_u_build" VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES
+    VIBRANIUM_BAR_SHOW_ANIMATION
 }
 
 _build() {
@@ -99,13 +82,9 @@ _build() {
   # it covers is actually declared in the config.
   if _module_in_cfg 'custom/weather' || _module_in_cfg 'custom/pacman'; then
     cfgr::item::action \
-      --func  "_updates_weather_menu" \
-      --label "Updates / Weather specific"
+      --func "_updates_weather_menu" \
+      --label "Updates / Weather"
   fi
-
-  _module_in_cfg 'custom/pacman' && cfgr::item::action \
-    --func  "_updates_menu" \
-    --label "Updates"
 }
 
 # Load config once up front so both the guard and _build share the same content

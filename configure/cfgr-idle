@@ -15,7 +15,7 @@ _update_timeout() {
   local seconds="$2"
   local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
 
-  TIMEOUTS[$((index - 1))]="$seconds"
+  TIMEOUTS[index-1]="$seconds"
 
   awk -v lock="${TIMEOUTS[0]}" -v sleep="${TIMEOUTS[1]}" \
     -f "$VIBRANIUM/awk/cfgr-idle-update-timeouts.awk" "$config" > \

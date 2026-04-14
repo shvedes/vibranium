@@ -192,7 +192,7 @@ _anim_submenu() {
   _b() {
     hypr::reload
 
-    local chosen animations active_preset enabled
+    local chosen active_preset enabled
     [[ "$(hypr::int "animations:enabled")" == 1 ]] && enabled=true || enabled=false
 
 

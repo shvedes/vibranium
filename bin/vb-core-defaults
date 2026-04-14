@@ -264,11 +264,6 @@ VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE=true
 VIBRANIUM_BAR_PACMAN_MODULE_ENABLE=false
 
 # @type bool
-# @desc Whether to show the updates module
-# @desc even if there is no updates available.
-VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES=true
-
-# @type bool
 # @desc Whether to enable weather the module.
 VIBRANIUM_BAR_WEATHER_MODULE_ENABLE=false
 
@@ -283,11 +278,6 @@ VIBRANIUM_BAR_WEATHER_MODULE_CITY="not_set"
 # @desc Whether to display loading animation at first run.
 # @desc Applicable to updates and weather only.
 VIBRANIUM_BAR_SHOW_ANIMATION=true
-
-# @type bool
-# @desc Whether to show separator
-# @desc for updates and weather modules.
-VIBRANIUM_BAR_SHOW_SEPARATOR=true
 
 #         SCREEN RECORDING OPTIONS             #
 # ============================================ #

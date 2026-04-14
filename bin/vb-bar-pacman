@@ -3,10 +3,8 @@
 source vb-lib-core
 
 helpers::check \
-  VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES \
   VIBRANIUM_BAR_PACMAN_MODULE_ENABLE \
-  VIBRANIUM_BAR_SHOW_ANIMATION \
-  VIBRANIUM_BAR_SHOW_SEPARATOR
+  VIBRANIUM_BAR_SHOW_ANIMATION
 
 # Module disabled - exit
 if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == false ]]; then
@@ -87,17 +85,12 @@ fi
 mapfile -t COUNT <"$PKG_LIST"
 TOTAL_COUNT=${#COUNT[@]}
 
-if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_SHOW_ZERO_UPDATES" == false ]]; then
-  if ((TOTAL_COUNT == 0)); then
-    printf '{"text": ""}'
-    exit 0
-  fi
+if ((TOTAL_COUNT == 0)); then
+  printf '{"text": ""}'
+  exit 0
 fi
 
-if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
-  text="<span foreground='DimGray'>|</span> "
-fi
-
+text="<span foreground='DimGray'>|</span> "
 text+="📦 $TOTAL_COUNT"
 tooltip="$(make_tooltip "$PKG_LIST")"
 

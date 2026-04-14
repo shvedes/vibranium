@@ -4,8 +4,7 @@ source vb-lib-core
 
 helpers::check \
   VIBRANIUM_BAR_WEATHER_MODULE_ENABLE \
-  VIBRANIUM_BAR_SHOW_ANIMATION \
-  VIBRANIUM_BAR_SHOW_SEPARATOR
+  VIBRANIUM_BAR_SHOW_ANIMATION
 
 if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE" == false ]]; then
   printf '{"text": ""}'
@@ -127,10 +126,7 @@ WEATHER_JSON="$(<"$TEMP_DATA")"
 
 if [[ -z "$WEATHER_JSON" ]]; then
   icon="<span foreground='red2'>\uf071</span>"
-
-  if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
-    icon+="  <span foreground='DimGray'>|</span>"
-  fi
+  icon+="  <span foreground='DimGray'>|</span>"
 
   tooltip="wttrbar exited with an error"
   printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
@@ -139,11 +135,8 @@ fi
 
 # Build json output
 text="$(jq -r '.text' <<<"$WEATHER_JSON")"
+text+=" <span foreground='DimGray'>|</span>"
 tooltip="$(jq -r '.tooltip' <<<"$WEATHER_JSON")"
-
-if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
-  text+=" <span foreground='DimGray'>|</span>"
-fi
 
 rm -f "$TEMP_DATA" /tmp/wttrbar*
 

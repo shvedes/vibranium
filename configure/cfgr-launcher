@@ -5,9 +5,25 @@ source vb-lib-cfgr
 
 _get_rofi_theme() {
   local config="$XDG_CONFIG_HOME/rofi/config.rasi"
-  local theme="$(awk -f "$VIBRANIUM/awk/get-rofi-theme.awk" "$config")" || return
-  theme="${theme:-couldn\'t get theme}"
-  printf "%s" "$theme"
+  local line theme
+
+  while IFS= read -r line; do
+    if [[ ! $line == *@import* ]]; then
+      continue
+    fi
+
+    if [[ $line =~ @import[[:space:]]+\"[^\"]*/(theme[-a-z]*)\.rasi\" ]]; then
+      theme="${BASH_REMATCH[1]}"
+
+      theme="${theme#theme-}"
+      theme="${theme^}"
+
+      printf "%s" "$theme"
+      return 0
+    fi
+  done <"$config"
+
+  printf "%s" "couldn't get theme"
 }
 
 _set_rofi_theme() {

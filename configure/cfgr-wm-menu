@@ -7,7 +7,7 @@ export PATH="$PATH:$VIBRANIUM/configure"
 
 _edit_cfgs_menu() {
   _open() {
-    xdg-terminal-exec -- ${EDITOR:-nvim} "$1"
+    xdg-terminal-exec -- "${EDITOR:-nvim}" "$1"
     helpers::ui::close_menus
   }
 

@@ -25,7 +25,7 @@ _set_term_opacity() {
 
 _edit_env() {
   local env_file="$XDG_CONFIG_HOME/vibranium/environment"
-  xdg-terminal-exec --app-id=org.vb.term.float --title="vb-env" -- ${EDITOR:-nvim} "$env_file"
+  xdg-terminal-exec --app-id=org.vb.term.float --title="vb-env" -- "${EDITOR:-nvim}" "$env_file"
   helpers::ui::close_menus
 }
 
@@ -44,8 +44,19 @@ _toggle_wallpaper() {
 
 _get_notification_timeout() {
   local config="$XDG_CONFIG_HOME/dunst/dunstrc"
-  local output="$(sed -n 's/.*timeout[[:space:]]*=[[:space:]]*\([0-9]\+\).*/\1/p' "$config")"
-  printf "%ss" "$output"
+  local line value
+
+  while IFS='=' read -r key value; do
+    key="${key//[[:space:]]/}"
+
+    [[ $key == timeout ]] || continue
+
+    value="${value//[[:space:]]/}"
+    printf "%s" "$value"
+    return 0
+  done <"$config"
+
+  return 1
 }
 
 _set_notification_timeout() {
@@ -75,7 +86,7 @@ _term_hook() {
     ;;
   esac
 
-  printf "%s\n" "$desktop_id" >$XDG_CONFIG_HOME/xdg-terminals.list
+  printf "%s\n" "$desktop_id" >"$XDG_CONFIG_HOME/xdg-terminals.list"
 }
 
 _get_default_browser() {
@@ -96,9 +107,9 @@ _get_default_browser() {
 
   if [[ -z "$browser" ]]; then
     # Only use xdg-mime query as fallback
+    # And instantly cache it for the loop above
     browser=$(xdg-mime query default x-scheme-handler/http 2>/dev/null) &&
-      # And instantly cache it for the loop above
-      xdg-mime default "$browser" x-scheme-handler/https x-scheme-handler/http &
+      xdg-mime default "$browser" x-scheme-handler/https x-scheme-handler/http
   fi
 
   if [[ -z "$browser" ]]; then
@@ -149,9 +160,9 @@ _set_default_browser() {
 
 _manage_user_wallpapers() {
   local wallpaper_dir files
-  local current_wallpaper
 
-  local current_theme="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+  local current_theme
+  current_theme="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
   wallpaper_dir="$XDG_CONFIG_HOME/vibranium/themes/$current_theme/backgrounds"
 
   if [[ ! -d "$wallpaper_dir" ]]; then
@@ -180,7 +191,7 @@ _manage_user_wallpapers() {
       helpers::ui::menu chosen "$target" "ESC to go back" -- "${options[@]}"
       [[ -z "$chosen" ]] && return
 
-      if ! [[ " ${options[*]} " =~ " $chosen " ]]; then
+      if ! [[ " ${options[*]} " =~ $chosen ]]; then
         continue
       fi
 
@@ -198,7 +209,8 @@ _manage_user_wallpapers() {
           rm -f "$current_mirror/$target"
         fi
 
-        local current="$(vb-core-wallpaper --get)"
+        local current
+        current="$(vb-core-wallpaper --get)"
         current="${current##*/}"
 
         if [[ "$current" == "$target" ]]; then
@@ -274,7 +286,7 @@ _manage_user_wallpapers() {
       fi
     done
 
-    if ! [[ " ${files[*]} " =~ " $chosen " ]]; then
+    if ! [[ " ${files[*]} " =~ $chosen ]]; then
       continue
     fi
 
@@ -314,7 +326,6 @@ _set_cursor_theme() {
 
   local state="$VIBRANIUM_STATE/cursor-theme"
 
-  declare -A CURSOR_FOLDER_TO_NAME=()
   declare -A CURSOR_NAME_TO_FOLDER=()
 
   while IFS= read -r line; do
@@ -323,7 +334,6 @@ _set_cursor_theme() {
     folder=${line%%|*}
     pretty=${line#*|}
 
-    CURSOR_FOLDER_TO_NAME["$folder"]="$pretty"
     CURSOR_NAME_TO_FOLDER["$pretty"]="$folder"
 
     options+=("$pretty")
@@ -370,7 +380,7 @@ _build() {
   CURSOR_SIZE="$(<"$VIBRANIUM_STATE/cursor-size")"
   CURSOR_SIZE="${CURSOR_SIZE:-Default}"
 
-  cfgr::item::raw "Notification timeout : $(_get_notification_timeout)" "action:_set_notification_timeout"
+  cfgr::item::raw "Notification timeout : $(_get_notification_timeout)s" "action:_set_notification_timeout"
 
   cfgr::item::bool --var VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK --label "Pause music on lock"
 

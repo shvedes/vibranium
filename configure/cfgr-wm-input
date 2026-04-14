@@ -49,7 +49,7 @@ _get_layouts() {
 }
 
 _set_layout_shortcut() {
-  local shortcuts chosen
+  local chosen
   chosen="$(cfgr::set_string --title "Choose Shortcut" --option "${KB_GROUPS[@]}")" || return
 
   for key in "${!KB_GROUPS[@]}"; do
@@ -169,7 +169,8 @@ _layouts_menu() {
   _b() {
     hypr::reload
 
-    local str="$(hypr::str "input:kb_options")"
+    local str
+    str="$(hypr::str "input:kb_options")"
     local shortcut="${KB_GROUPS[$str]:-Unknown}"
 
     cfgr::item::action --label "Add new"                         --func "_add_layout"
