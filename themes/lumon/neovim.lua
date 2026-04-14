@@ -11,7 +11,7 @@ return {
         bg = "#1f3347",
         dark_bg = "#141f29",
         darker_bg = "#141f29",
-        lighter_bg = "#1f3347",
+        lighter_bg = "#335270",
 
         fg = "#d6e2ee",
         dark_fg = "#a0bbd9",
