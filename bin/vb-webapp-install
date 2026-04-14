@@ -35,7 +35,7 @@ Options:
   --url URL           Web app URL to install
   --name NAME         App display name (default: fetched from page <title>)
   --icon REF          Icon URL or filename inside the icons directory
-  --exec CMD          Custom Exec= value (default: vb-webapp-launch URL)
+  --exec CMD          Custom Exec= value (default: vb-launch-webapp URL)
   --mime-types TYPES  MimeType= value for the .desktop file
   --keywords KW       Extra keywords, semicolon-separated (appended to auto-generated ones)
   --category CAT      Categories= value for the .desktop file (e.g. Network;WebBrowser)
@@ -271,7 +271,7 @@ _find_webapp_by_url() {
     [[ -f "$f" ]] || continue
 
     while IFS= read -r line || [[ -n $line ]]; do
-      if [[ $line == "Exec=vb-webapp-launch $url" ]]; then
+      if [[ $line == "Exec=vb-launch-webapp $url" ]]; then
         echo "$f"
         return 0
       fi
@@ -523,7 +523,7 @@ if [[ -z $APP_URL ]]; then
   fi
 
   ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
-  EXEC_COMMAND="vb-webapp-launch $APP_URL"
+  EXEC_COMMAND="vb-launch-webapp $APP_URL"
 
 else
   APP_URL="$(_normalize_url "$APP_URL")"
@@ -545,8 +545,7 @@ else
   AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
   KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
   ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
-  EXEC_COMMAND="${CUSTOM_EXEC:-vb-webapp-launch $APP_URL}"
-
+  EXEC_COMMAND="${CUSTOM_EXEC:-vb-launch-webapp $APP_URL}"
 fi
 
 _write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$KEYWORDS" "$MIME_TYPES" "$CATEGORY"

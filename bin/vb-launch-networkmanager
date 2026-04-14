@@ -34,20 +34,20 @@ esac
 
 # Detect primary network interface utility
 if command -v nmtui >/dev/null 2>&1; then
-  xdg-terminal-exec --app-id=org.vb.term.float --title=nmtui -- nmtui
+  vb-launch-tui --app-id=org.vb.term.float -- nmtui
   exit 0
 elif command -v iwctl >/dev/null 2>&1; then
   if command -v impala >/dev/null 2>&1; then
-    xdg-terminal-exec --app-id=org.vb.term.float --title=impala -- impala
+    vb-launch-tui --app-id=org.vb.term.float -- impala
     exit 0
   elif command -v iwmenu >/dev/null 2>&1; then
-    app2unit iwmenu
+    vb-launch-cmd -- iwmenu
     exit 0
   elif command -v iwgtk >/dev/null 2>&1; then
-    app2unit iwgtk
+    vb-launch-cmd -- iwgtk
     exit 0
   else
-    xdg-terminal-exec --app-id=org.vb.term.float --title=iwctl -- iwctl
+    vb-launch-tui --app-id=org.vb.term.float -- iwctl
     exit 0
   fi
 fi

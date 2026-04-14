@@ -3,8 +3,8 @@
 		"on-click": "vb-core-volume --volume-toggle",
 		"on-scroll-up": "vb-core-volume --volume-up",
 		"on-scroll-down": "vb-core-volume --volume-down",
-		"on-click-right": "xdg-terminal-exec --app-id=org.vb.term.float --title=wiremix -- wiremix --tab output",
-        "on-click-middle": "vb-cmd-toggle-output",
+		"on-click-right": "vb-launch-tui --app-id=org.vb.term.float --title=wiremix -- wiremix --tab output",
+    "on-click-middle": "vb-cmd-toggle-output",
 
 		"format": "{icon}",
 		"format-muted": "\udb81\udf5f",

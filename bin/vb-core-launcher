@@ -181,7 +181,11 @@ case "$INPUT" in
 
   # File exists and it IS an executable
   if [[ -x "$CMD" ]] || command -v "$CMD" >/dev/null; then
-    app2unit -s app-graphical.slice "$CMD" $ARGS &
+    if [[ "$CMD" =~ vb-* ]]; then
+      eval "$CMD" "$ARGS"
+    else
+      vb-launch-cmd -- "$CMD" "$ARGS" &
+    fi
   # File exists
   elif [[ -e "$INPUT" ]]; then
     app2unit-open -s app-graphical.slice "$INPUT" &>/dev/null &

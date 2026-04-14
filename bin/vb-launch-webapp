@@ -1,0 +1,88 @@
+#!/usr/bin/bash
+
+get_default_browser() {
+  local -n _out="$1"
+  local browser=""
+
+  # Fast path: mimeapps.list
+  if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
+    while IFS='=' read -r key value; do
+      if [[ ! $key == "x-scheme-handler/http" ]]; then
+        continue
+      fi
+      browser="${value%%;*}"
+      break
+    done <"$XDG_CONFIG_HOME/mimeapps.list"
+  fi
+
+  # Fallback
+  if [[ -z $browser ]]; then
+    browser="$(xdg-mime query default x-scheme-handler/http 2>/dev/null)"
+  fi
+
+  _out="$browser"
+}
+
+get_default_browser browser
+
+case $browser in
+google-chrome* | brave-browser* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
+*) browser="chromium.desktop" ;;
+esac
+
+execs=()
+
+for dir in ~/.local/share/applications ~/.nix-profile/share/applications /usr/share/applications; do
+  if [[ ! -d $dir ]]; then
+    continue
+  fi
+
+  for f in "$dir"/$browser; do
+    if [[ ! -f $f ]]; then
+      continue
+    fi
+
+    while IFS= read -r line; do
+      if [[ ! $line == Exec=* ]]; then
+        continue
+      fi
+      line=${line#Exec=}
+      execs+=("${line%% *}")
+    done <"$f"
+  done
+done
+
+# Fallback if nothing found
+if ! ((${#execs[@]})); then
+  execs=("chromium")
+fi
+
+URL="$1"
+COMMAND=("${execs[0]}")
+
+CLIENTS_JSON="$(hyprctl clients -j)"
+
+WINDOW_ADDRESS="$(
+  jq -r --arg url "$URL" '
+    def host:
+      $url
+      | sub("^https?://"; "")
+      | split("/")[0]
+      | ascii_downcase;
+
+    first(
+      .[]
+      | select(
+          (.class | ascii_downcase | contains(host))
+        )
+      | .address
+    )
+  ' <<<"$CLIENTS_JSON"
+)"
+
+if [[ -n $WINDOW_ADDRESS && $WINDOW_ADDRESS != "null" ]]; then
+  [[ -t 1 ]] && echo "Focusing existing window"
+  hyprctl -q dispatch focuswindow "address:$WINDOW_ADDRESS"
+else
+  exec setsid -f app2unit -- "${COMMAND[0]}" --app="$URL"
+fi

@@ -2,7 +2,7 @@
 Type=Application
 Name=System Monitor
 TryExec=btop
-Exec=xdg-terminal-exec -- btop
+Exec=vb-launch-tui -- btop
 Icon=utilities-system-monitor
 Keywords=btop;disk;network;cpu;gpu;process;monitor;resource;manager;
 OnlyShowIn=Hyprland;

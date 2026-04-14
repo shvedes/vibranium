@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTIONS] -- COMMAND [ARGS...]
+
+Focus existing window matching COMMAND, or launch it in a terminal.
+
+Options:
+  --title      Override window title
+  --app-id     Override application ID
+  -h, --help   Show this help and exit
+EOF
+}
+
+APP_ID=""
+TITLE=""
+
+(($#)) || {
+  usage >&2
+  exit 1
+}
+
+while (($#)); do
+  case "$1" in
+  --app-id=*)
+    APP_ID="${1#*=}"
+    shift
+    ;;
+  --app-id)
+    [[ -n "$2" ]] || {
+      echo "Error: missing value for --app-id" >&2
+      exit 1
+    }
+    APP_ID="$2"
+    shift 2
+    ;;
+  --title=*)
+    TITLE="${1#*=}"
+    shift
+    ;;
+  --title)
+    [[ -n "$2" ]] || {
+      echo "Error: missing value for --title" >&2
+      exit 1
+    }
+    TITLE="$2"
+    shift 2
+    ;;
+  --)
+    shift
+    break
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option -- $*" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if ! (($#)); then
+  echo "Error: missing COMMAND after --" >&2
+  exit 1
+fi
+
+COMMAND=("$@")
+
+# Derive defaults
+APP_NAME="${COMMAND[0]##*/}"
+: "${APP_ID:=org.vb.term.$APP_NAME}"
+: "${TITLE:=$APP_NAME}"
+
+WINDOW_PATTERN="$APP_NAME"
+
+WINDOW_ADDRESS="$(
+  jq -r --arg p "$WINDOW_PATTERN" '
+    first(
+      .[]
+      | select(
+          (.class | test("\\b" + $p + "\\b"; "i")) or
+          (.title | test("\\b" + $p + "\\b"; "i"))
+        )
+      | .address
+    )
+  ' < <(hyprctl -j clients)
+)"
+
+if [[ -n "$WINDOW_ADDRESS" ]]; then
+  [[ -t 0 ]] && echo "Focusing existing window"
+  hyprctl -q dispatch focuswindow "address:$WINDOW_ADDRESS"
+else
+  exec setsid -f xdg-terminal-exec \
+    --app-id="$APP_ID" \
+    --title="$TITLE" \
+    -- "${COMMAND[@]}"
+fi
