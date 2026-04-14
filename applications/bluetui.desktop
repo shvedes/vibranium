@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Bluetooth Manager
-TryExec=bluetui
-Exec=vb-launch-tui -- bluetui
-Icon=bluetooth-active-symbolic
-Keywords=bluetooth;connection;
-OnlyShowIn=Hyprland;

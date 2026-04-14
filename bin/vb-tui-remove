@@ -1,0 +1,204 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+DESKTOP_DIR="$XDG_DATA_HOME/applications"
+ICON_DIR="$DESKTOP_DIR/icons"
+
+FZF_ARGS=(
+  --multi
+  --ignore-case
+  --highlight-line
+
+  --delimiter $'\t'
+  --with-nth 1
+
+  --info 'hidden'
+  --border 'bold'
+
+  --border-label ' alt-p: toggle preview, ctrl-j/k: next/prev item, tab: multi-select'
+  --border-label-pos 'bottom'
+
+  --list-label 'TUI App List'
+  --list-border 'bold'
+
+  --input-label 'Filter TUI Apps'
+  --input-border 'bold'
+
+  --preview 'cat {2}'
+  --preview-border 'bold'
+  --preview-window 'right:50%:wrap'
+  --preview-label 'Desktop File'
+
+  --bind 'alt-p:toggle-preview'
+
+  --color 'pointer:white,marker:green'
+)
+
+_operation_canceled() {
+  term::disable_input
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  read -r -n1 -s -p $'. Press any key to exit' _dummy
+  term::enable_input
+}
+
+_operation_complete() {
+  term::disable_input
+  printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  read -r -n1 -p $'Removal complete. Press any key to exit ' _dummy
+  term::enable_input
+}
+
+_shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+_usage() {
+  _shcat <<'EOF'
+Usage: vb-tuiapp-remove [OPTION]...
+
+Remove TUI application shortcuts as .desktop launcher entries.
+If no options are provided, the script runs in interactive mode.
+
+Options:
+  --file FILE...      .desktop file(s) to remove (basename or full path)
+  -h, --help          Show this help and exit
+EOF
+}
+
+_desktop_name() {
+  local name
+  name=$(grep '^Name=' "$1" | head -1)
+  name="${name#Name=}"
+  echo "${name#TUI - }"
+}
+
+_remove_tuiapp() {
+  local name="$1" desktop_path="$2" removed=false
+
+  [[ -f "$desktop_path" ]] && {
+    rm -f -- "$desktop_path"
+    removed=true
+  }
+
+  for ext in png jpg jpeg ico svg; do
+    [[ -f "$ICON_DIR/TUI - $name.$ext" ]] && {
+      rm -f -- "$ICON_DIR/TUI - $name.$ext"
+      removed=true
+    }
+  done
+
+  if [[ "$removed" == true ]]; then
+    echo "${GREEN}[VIBRANIUM]${RESET} Removed ${BLUE}${name}${RESET}"
+  else
+    echo "No such TUI app: ${BLUE}${name}${RESET}" >&2
+  fi
+}
+
+DESKTOP_FILES=()
+INTERACTIVE=true
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    _usage
+    exit 0
+    ;;
+
+  --file)
+    INTERACTIVE=false
+    shift
+    if [[ $# -eq 0 ]]; then
+      echo "${RED}[VIBRANIUM]${RESET} Error: --file requires at least one .desktop file argument" >&2
+      echo "Try ${0##*/} --help for more information" >&2
+      exit 1
+    fi
+    while [[ $# -gt 0 && "$1" != -* ]]; do
+      if [[ "$1" != *.desktop ]]; then
+        echo "${RED}[VIBRANIUM]${RESET} Error: not a .desktop file: $1" >&2
+        echo "Try ${0##*/} --help for more information" >&2
+        exit 1
+      fi
+      DESKTOP_FILES+=("$1")
+      shift
+    done
+    ;;
+
+  *)
+    echo "Unknown option: $1" >&2
+    echo "${0##*/} --help for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+# --- Resolve targets ---
+
+TARGET_NAMES=()
+TARGET_PATHS=()
+
+if [[ $INTERACTIVE == true ]]; then
+  declare -A TUI_MAP
+  while IFS= read -r -d '' file; do
+    grep -q '^Exec=.*vb-launch-tui.*' "$file" &&
+      TUI_MAP["$(_desktop_name "$file")"]="$file"
+  done < <(find "$DESKTOP_DIR" -name 'TUI - *.desktop' -print0)
+
+  if ((${#TUI_MAP[@]} == 0)); then
+    term::show_header --color red
+    echo "${RED}[VIBRANIUM]${RESET} No TUI apps found"
+    _operation_canceled
+    exit 1
+  fi
+
+  mapfile -t SELECTED < <(
+    for name in "${!TUI_MAP[@]}"; do
+      printf '%s\t%s\n' "$name" "${TUI_MAP[$name]}"
+    done | sort | fzf "${FZF_ARGS[@]}"
+  )
+
+  term::show_header
+
+  if ((${#SELECTED[@]} == 0)); then
+    _operation_canceled
+    exit 1
+  fi
+
+  ((${#SELECTED[@]} == 1)) && suffix="" || suffix="s"
+  if ! term::ask_yes_no Y "You're about to remove ${#SELECTED[@]} TUI app${suffix}. Continue?"; then
+    _operation_canceled
+    exit 1
+  fi
+
+  for entry in "${SELECTED[@]}"; do
+    TARGET_NAMES+=("${entry%%$'\t'*}")
+    TARGET_PATHS+=("${entry##*$'\t'}")
+  done
+
+else
+  for file_arg in "${DESKTOP_FILES[@]}"; do
+    [[ "$file_arg" == */* ]] && desktop_path="$file_arg" || desktop_path="$DESKTOP_DIR/$file_arg"
+
+    if [[ ! -f "$desktop_path" ]]; then
+      echo "No such file: $file_arg" >&2
+      continue
+    fi
+
+    filename="${desktop_path##*/}"
+    if [[ "$filename" != TUI\ -\ *.desktop ]]; then
+      echo "Warning: not a TUI app file: $filename" >&2
+      continue
+    fi
+
+    TARGET_NAMES+=("$(_desktop_name "$desktop_path")")
+    TARGET_PATHS+=("$desktop_path")
+  done
+fi
+
+for i in "${!TARGET_NAMES[@]}"; do
+  _remove_tuiapp "${TARGET_NAMES[$i]}" "${TARGET_PATHS[$i]}"
+done
+
+[[ $INTERACTIVE == true ]] && _operation_complete

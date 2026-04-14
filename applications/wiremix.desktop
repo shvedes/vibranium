@@ -1,8 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Volume Mixer
-TryExec=wiremix
-Exec=vb-launch-tui -- wiremix
-Icon=org.pulseaudio.pavucontrol
-Keywords=audio;sound;headset;speakers;bluetooth;pipewire;pulseaudio;mixer;wiremix;pavucontrol;
-OnlyShowIn=Hyprland;
