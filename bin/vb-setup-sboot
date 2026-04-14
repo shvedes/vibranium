@@ -11,16 +11,12 @@ _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
-
-  term::enable_input
 }
 
 _operation_complete() {
   printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
   # shellcheck disable=SC2034
   read -n1 -r -p $'Setup complete. Press any key to exit ' dummy
-
-  term::enable_input
 }
 
 trap '_operation_canceled; exit 1' INT TERM HUP

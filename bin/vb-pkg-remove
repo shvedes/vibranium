@@ -230,17 +230,11 @@ _operation_canceled() {
     esac
   done
 
-  term::disable_input
-
   printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
     read -n1 -r -s -p $'. Press any key to exit' dummy
   fi
-
-  # Always re-enable input regardless of exit path
-  # (fixes trap leaving terminal broken).
-  term::enable_input
 
   if [[ $exit_after == true ]]; then
     if [[ "$color" == "$GREEN" ]]; then
@@ -256,16 +250,12 @@ _uninstallation_complete() {
     return
   fi
 
-  term::disable_input
-
   printf "%s[VIBRANIUM]%s Uninstallation complete" "$GREEN" "$RESET"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
     # shellcheck disable=SC2034
     read -n1 -r -s -p $'. Press any key to exit' dummy
   fi
-
-  term::enable_input
 }
 
 # Verifies that all CLI-provided packages are actually installed.

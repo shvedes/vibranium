@@ -27,8 +27,6 @@ _operation_canceled() {
     # shellcheck disable=SC2034
     read -n1 -r -s -p $'. Press any key to exit' dummy
   fi
-
-  printf '\e[?25h' # Show cursor
 }
 
 _update_complete() {
@@ -100,7 +98,7 @@ NO_LOGO=false
 NO_DUMMY=false
 PKG_LIST=()
 
-trap 'printf "\n"; kill -- -$$ 2>/dev/null; _operation_canceled; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
+trap 'term::disable_input; _operation_canceled; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
 
 while (($# > 0)); do
   case "$1" in

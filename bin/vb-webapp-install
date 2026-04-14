@@ -128,7 +128,6 @@ _operation_complete() {
   term::disable_input
   printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
   read -n1 -r -p $'Installation complete. Press any key to exit ' dummy
-  term::enable_input
 }
 
 _operation_canceled() {
@@ -136,7 +135,6 @@ _operation_canceled() {
   term::disable_input
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
   read -n1 -r -s -p $'. Press any key to exit' dummy
-  term::enable_input
 }
 
 # ---------------------------------------------------------------------------

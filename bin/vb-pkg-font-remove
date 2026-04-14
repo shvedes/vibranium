@@ -32,11 +32,9 @@ FZF_ARGS=(
 )
 
 _operation_canceled() {
-  term::disable_input
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
-  term::enable_input
 }
 
 _get_fonts() {
