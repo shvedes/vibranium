@@ -97,38 +97,44 @@ ACTION="next"
 QUIET="false"
 SELF="${0##*/}"
 
-case "$1" in
--q | --quiet)
-  QUIET=true
-  ;;
---next | --prev)
-  ACTION="${1/--/}"
-  ;;
-power-saver | balanced | performance)
-  TARGET_PROFILE="$1"
-  ;;
--h | --help)
-  usage
-  exit 0
-  ;;
---get)
-  get_power_profile
-  exit 0
-  ;;
-"")
-  ACTION="next"
-  ;;
--*)
-  echo "Unknown option: $*" >&2
-  echo "Try '$SELF --help' for more information" >&2
-  exit 1
-  ;;
-*)
-  echo "Unknown profile: $1" >&2
-  echo "Try '$SELF --help' for more information" >&2
-  exit 1
-  ;;
-esac
+while (($# > 0)); do
+  case "$1" in
+  -q | --quiet)
+    QUIET=true
+    shift
+    ;;
+  --next | --prev)
+    ACTION="${1/--/}"
+    shift
+    ;;
+  power-saver | balanced | performance)
+    TARGET_PROFILE="$1"
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --get)
+    get_power_profile
+    exit 0
+    ;;
+  "")
+    ACTION="next"
+    shift
+    ;;
+  -*)
+    echo "Unknown option: $*" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  *)
+    echo "Unknown profile: $1" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
 
 if ! command -v powerprofilesctl >/dev/null; then
   echo "Error: missing required dependencies: power-profiles-daemon"
