@@ -1,8 +1,0 @@
-[Desktop Entry]
-Name=Archive Manger
-Comment=Create and modify an archive
-TryExec=engrampa
-Exec=engrampa %U
-Type=Application
-Icon=engrampa
-OnlyShowIn=Hyprland;
