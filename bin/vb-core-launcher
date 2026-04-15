@@ -185,7 +185,7 @@ case "$INPUT" in
     if [[ "$CMD" =~ vb-* ]]; then
       eval "$CMD" "$ARGS"
     else
-      vb-launch-cmd -- "$CMD" "$ARGS" &
+      vb-launch-cmd -- $CMD $ARGS &
     fi
   # File exists
   elif [[ -e "$INPUT" ]]; then
