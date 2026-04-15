@@ -13,9 +13,9 @@ Usage: ${0##*/} [OPTION]
 A basic screenshot utility for Vibranium.
 
 Options:
-  --region    Capture region
-  --window    Capture window
-  --screen    Capture screen
+  --screen    Capture active screen
+  --window    Capture active window
+  --region    Capture selected region
   -h, --help  Display this help and exit
 EOF
 }
@@ -92,6 +92,7 @@ get_window_geometry() {
 }
 
 capture() {
+  local monitor
   local target="$1"
   local output_file
 
@@ -119,7 +120,8 @@ capture() {
     fi
     ;;
   screen)
-    grim "${GRIM_OPTS[@]}" "$output_file"
+    monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused) | .name')"
+    grim "${GRIM_OPTS[@]}" -o "$monitor" "$output_file"
 
     if [[ $FLASH_SCREEN == true ]]; then
       hypr::flash::screen
