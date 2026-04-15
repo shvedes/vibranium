@@ -60,12 +60,12 @@ thunar-volman
 ffmpegthumbnailer
 xarchiver
 tumbler
-p7zip
 lrzip
 unarj
 unrar
 unzip
 gvfs
+7zip
 zip
 
 ##### Rofi
