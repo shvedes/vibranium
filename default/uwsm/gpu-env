@@ -1,11 +1,7 @@
 #!/usr/bin/bash
 
-# Guard: refuse to run as a subprocess (sourcing sets BASH_SOURCE[0] != $0)
-if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
-  printf '%s\n' \
-    "detect_va_driver.sh must be sourced, not executed:" \
-    "  source ${BASH_SOURCE[0]}" >&2
-  exit 1
+if [[ "$CHASSIS_TYPE" == "vm" ]]; then
+  exit 0
 fi
 
 _va_exports=$(
