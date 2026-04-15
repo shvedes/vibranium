@@ -45,12 +45,10 @@ fi
 
 while IFS= read -r line; do
   if [[ $line == *"Secure Boot"* ]]; then
-    continue
+    read -r -a fields <<<"$line"
+    sb_status="${fields[2]}${fields[3]}"
+    break
   fi
-
-  read -r -a fields <<<"$line"
-  sb_status="${fields[2]}${fields[3]}"
-  break
 done < <(bootctl status 2>/dev/null)
 
 if [[ "$sb_status" == "disabled" ]]; then
