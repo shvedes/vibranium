@@ -9,11 +9,11 @@
             "weeks-pos"     : "right",
             "on-scroll"     : 1,
                 "format": {
-                  "months":   "<b>{}</b>",
-                  "days":     "<b>{}</b>",
-                  "weeks":    "<b>W{}</b>",
-                  "weekdays": "<b>{}</b>",
-                  "today":    "<b><u>{}</u></b>"
+                    "months":     "<span color='white'><b>{}</b></span>",
+                    "days":       "<span color='gray'><b>{}</b></span>",
+                    "weeks":      "<span color='cyan'><b>W{}</b></span>",
+                    "weekdays":   "<span color='yellow'><b>{}</b></span>",
+                    "today":      "<span color='green3'><b><u>{}</u></b></span>"
                 }
         },
         "actions":  {
