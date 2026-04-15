@@ -83,6 +83,9 @@ python-gobject
 zram-generator
 pacman-contrib
 xdg-user-dirs
+cups-browsed
+avahi
+cups
 uwsm
 # Display Manager
 ly
