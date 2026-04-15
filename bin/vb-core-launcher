@@ -111,7 +111,7 @@ case "$1" in
 --web | --ai | --power | --pwa)
   OPT_ARGS+=(
     -disable-history
-    -icon-theme vibranium
+    -icon-theme Vibranium
     -no-fixed-num-lines true
     -theme-str 'configuration {show-icons: true;}'
     -theme-str 'element-icon {enabled: true;}'
