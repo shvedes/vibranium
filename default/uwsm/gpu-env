@@ -1,9 +1,5 @@
 #!/usr/bin/bash
 
-if [[ "$CHASSIS_TYPE" == "vm" ]]; then
-  exit 0
-fi
-
 _va_exports=$(
   # Run the heavy lifting in a subshell so local functions and variables do not
   # pollute the caller's environment. We export back only the two variables.

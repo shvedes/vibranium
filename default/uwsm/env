@@ -50,12 +50,14 @@ path_add "$VIBRANIUM_PATH"
 export XCURSOR_PATH="$XDG_DATA_HOME/icons:/usr/share/icons"
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
-if [[ "$VIBRANIUM_STATE/cursor-theme" ]]; then
-  export XCURSOR_THEME="$(< "$VIBRANIUM_STATE/cursor-theme")"
+if [[ -f "$VIBRANIUM_STATE/cursor-theme" ]]; then
+  XCURSOR_THEME="$(<"$VIBRANIUM_STATE/cursor-theme")"
+  export XCURSOR_THEME
 fi
 
-if [[ "$VIBRANIUM_STATE/cursor-size" ]]; then
-  export XCURSOR_SIZE="$(< "$VIBRANIUM_STATE/cursor-size")"
+if [[ -f "$VIBRANIUM_STATE/cursor-size" ]]; then
+  XCURSOR_SIZE="$(<"$VIBRANIUM_STATE/cursor-size")"
+  export XCURSOR_SIZE
 fi
 
 # Use Wayland when possible. Fallback to XWayland otherwise
@@ -71,10 +73,12 @@ export SDL_VIDEODRIVER="wayland"
 readonly CHASSIS_STATE="$VIBRANIUM_STATE/chassis-type"
 
 if [[ -f "$CHASSIS_STATE" ]]; then
-  export CHASSIS_TYPE="$(<"$CHASSIS_STATE")"
+  CHASSIS_TYPE="$(<"$CHASSIS_STATE")"
+  export CHASSIS_TYPE
 else
-  export CHASSIS_TYPE="$(hostnamectl chassis)"
-  printf "%s" "$CHASSIS_TYPE" > "$CHASSIS_STATE"
+  CHASSIS_TYPE="$(hostnamectl chassis)"
+  export CHASSIS_TYPE
+  printf "%s" "$CHASSIS_TYPE" >"$CHASSIS_STATE"
 fi
 
 # Load standard user directories from ~/.config/user-dirs.dirs
@@ -82,19 +86,21 @@ fi
 # or needed in shells outside a desktop session (e.g., scripts).
 
 if [[ -f "$XDG_CONFIG_HOME/user-dirs.dirs" ]]; then
-    while IFS='=' read -r var val; do
-        [[ -z "$var" || "$var" == \#* ]] && continue
+  while IFS='=' read -r var val; do
+    [[ -z "$var" || "$var" == \#* ]] && continue
 
-        val="${val//\"/}"
-        val="${val//\$HOME/$HOME}"
+    val="${val//\"/}"
+    val="${val//\$HOME/$HOME}"
 
-        export "$var"="$val"
-    done < "$XDG_CONFIG_HOME/user-dirs.dirs"
+    export "$var"="$val"
+  done <"$XDG_CONFIG_HOME/user-dirs.dirs"
 fi
 
 # Properly detect and export
 # LIBVA_DRIVER_NAME & VDPAU_DRIVER
-source "$VIBRANIUM/default/uwsm/gpu-env"
+if [[ ! "$CHASSIS_STATE" == "vm" ]]; then
+  source "$VIBRANIUM/default/uwsm/gpu-env"
+fi
 
 # Export user-defined environment
 source "$XDG_CONFIG_HOME/vibranium/environment"
