@@ -139,12 +139,13 @@ case "$1" in
 
   EXCLUDE="Power"
 
-  if [[ "$SHOW_WEBAPPS" != true ]]; then
+  if [[ "$SHOW_WEBAPPS" == false && "$SHOW_AI_WEBAPPS" == false ]]; then
+    EXCLUDE+=",PWA"
+  elif [[ "$SHOW_WEBAPPS" != true ]]; then
     EXCLUDE+=",Webapp"
-  fi
-
-  if [[ "$SHOW_AI_WEBAPPS" != true ]]; then
+  elif [[ "$SHOW_AI_WEBAPPS" != true ]]; then
     EXCLUDE+=",AI"
+
   fi
 
   OPT_ARGS+=(-drun-exclude-categories "$EXCLUDE")
