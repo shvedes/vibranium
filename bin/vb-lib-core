@@ -674,15 +674,16 @@ term::ask_yes_no() {
 # A term::spinner utility function.
 # Displays an animated term::spinner in the terminal while a given process (PID) is running.
 #
-# Usage: long_running_command & term::spinner $! "Doing stuff..." "Done"
+# Usage: long_running_command & term::spinner $! "Doing stuff..." "Done" "Failed"
 #
 # Parameters:
 # $1 - PID of the process to wait for.
 # $2 - Message to display alongside the term::spinner.
-# $3 - (Optional) Final message to display when the process completes.
+# $3 - (Optional) Final message to display when the process completes successfully (exit code 0).
+# $4 - (Optional) Final message to display when the process fails (non-zero exit code).
 #
 # The term::spinner uses Unicode braille characters for a smooth animation.
-# It clears itself once the process finishes, and optionally prints a success message.
+# It clears itself once the process finishes, and optionally prints a success or error message.
 term::spinner() {
   # The PID of the process to watch
   local pid=$1
@@ -690,14 +691,20 @@ term::spinner() {
   # The message to show while spinning
   local msg="$2"
 
-  # Delay between term::spinner frames (seconds)
-  local delay=0.1
-  local spinstr
+  # Final message on success (exit code 0)
+  local success_msg="$3"
 
-  spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  # Final message on failure (non-zero exit code)
+  local error_msg="$4"
+
+  local delay=0.07
+  # spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
+  local spinstr=('/' '-' '\' '|')
 
   # ANSI sequence to clear the current line
   local clear_line="\r\033[K"
+
+  term::disable_input
 
   # While the process exists, animate the term::spinner
   while kill -0 "$pid" 2>/dev/null; do
@@ -714,11 +721,21 @@ term::spinner() {
   # Clear the spinner once finished
   printf "%b" "$clear_line"
 
-  # Print the final message if provided
-  if [ -n "$3" ]; then
-    printf "%s %s\n" "$msg" "$3"
+  # Print the final message depending on exit status
+  if [ $exit_code -eq 0 ]; then
+    # Success case
+    if [ -n "$success_msg" ]; then
+      printf "%s %s\n" "$msg" "$success_msg"
+    else
+      printf "%s\n" "$msg"
+    fi
   else
-    printf "%s\n" "$msg"
+    # Failure case
+    if [ -n "$error_msg" ]; then
+      printf "%s %s\n" "$msg" "$error_msg"
+    else
+      printf "%s\n" "$msg"
+    fi
   fi
 
   # propagate the exit code
