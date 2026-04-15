@@ -56,11 +56,17 @@ jq
 thunar
 thunar-archive-plugin
 thunar-volman
-engrampa
 
 ffmpegthumbnailer
+xarchiver
 tumbler
+p7zip
+lrzip
+unarj
+unrar
+unzip
 gvfs
+zip
 
 ##### Rofi
 rofi
