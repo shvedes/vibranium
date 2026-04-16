@@ -37,3 +37,8 @@ else
 fi
 
 gsettings set org.gnome.desktop.interface gtk-theme "$next"
+
+# Some windows like polkit prompts, Pinentry prompts and such
+# don't inherit the value from gsettings. Because of that, we
+# edit these files manually. Not a big deal.
+sed -i "/gtk-theme-name/s/=.*/=${next}/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
