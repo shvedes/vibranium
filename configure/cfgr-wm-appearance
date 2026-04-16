@@ -51,7 +51,7 @@ _gaps_menu() {
     local gaps_in="${_v[0]}" gaps_out="${_v[1]}"
 
     local smartgaps_enabled
-    [[ -f "$HYPR_CONF_SMARTGAPS" ]] && smartgaps_enabled=active || smartgaps_enabled=disabled
+    [[ -f "$HYPR_CONF_SMARTGAPS" ]] && smartgaps_enabled=enabled || smartgaps_enabled=disabled
 
     cfgr::item::action \
       --label "Gaps in : $gaps_in" \
