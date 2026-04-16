@@ -322,9 +322,9 @@ feedback() {
     fi
 
     if [[ "$variant" == "variant3" ]]; then
-      pw-play --latency 10ms "${dir}/bell.oga" &
+      paplay "${dir}/bell.oga" &
     else
-      pw-play --latency 10ms "${dir}/audio-volume-change.oga" &
+      paplay "${dir}/audio-volume-change.oga" &
     fi
   fi
 }
