@@ -92,9 +92,6 @@ zram-generator
 pacman-contrib
 xdg-user-dirs
 smartmontools
-cups-browsed
-avahi
-cups
 uwsm
 duf
 # Display Manager

@@ -2,6 +2,24 @@
 
 # Copy-pasted from Omarchy.
 
+packages=(
+  cups
+  cups-pdf
+  cups-browsed
+  cups-filters
+
+  # https://wiki.archlinux.org/title/CUPS#Printer_drivers
+  gutenprint
+  foomatic-db
+  foomatic-db-ppds
+  foomatic-db-engine
+  foomatic-db-nonfree
+  foomatic-db-nonfree-ppds
+  foomatic-db-gutenprint-ppds
+)
+
+InstallPackages "${packages[@]}"
+
 # Disable multicast dns in resolved.
 # Avahi will provide this for better network printer discovery
 sudo mkdir -p /etc/systemd/resolved.conf.d
