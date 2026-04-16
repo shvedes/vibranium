@@ -36,15 +36,18 @@ zathura-cb
 zathura-djvu
 zathura-pdf-mupdf
 
-##### CLIs
+##### CLIs & TUIs
 
 # PKGBUILD of wttrbar-bin was manually
 # reviewed. The AUR package is clean.
 wttrbar-bin
+# Needed for cusror themes
 xorg-xrdb
 fastfetch
+# Used by imv's helper script
 mediainfo
 neovim
+# Must have
 man-db
 btop
 ncdu
@@ -56,7 +59,6 @@ jq
 thunar
 thunar-archive-plugin
 thunar-volman
-
 ffmpegthumbnailer
 xarchiver
 tumbler
@@ -89,10 +91,12 @@ python-gobject
 zram-generator
 pacman-contrib
 xdg-user-dirs
+smartmontools
 cups-browsed
 avahi
 cups
 uwsm
+duf
 # Display Manager
 ly
 

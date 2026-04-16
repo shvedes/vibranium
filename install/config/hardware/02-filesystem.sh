@@ -9,12 +9,19 @@ if [[ "$ROOT_FS" == "btrfs" ]]; then
   _log_info "These can be useful for maintenance and troubleshooting tasks."
 
   PACKAGES+=(btrfs-progs compsize)
-  UpdateSummary "System / Storage: installed BTRFS tools (btrfs-progs, compsize) - user choice"
+  UpdateSummary "System / Disks: installed BTRFS tools (btrfs-progs, compsize) - user choice"
 fi
 
-if [[ "$(lsblk -f)" =~ ntfs ]]; then
+total_diskks="$(lsblk -f)"
+
+if [[ "$total_diskks" =~ ntfs ]]; then
   PACKAGES+=(ntfs-3g)
-  UpdateSummary "System / Storage: installed NTFS-3G driver for NTFS partition access - user choice"
+  UpdateSummary "System / Disks: installed NTFS-3G driver for NTFS partition access - user choice"
+fi
+
+if [[ "$total_diskks" =~ nvme ]]; then
+  PACKAGES+=(nvme-cli)
+  UpdateSummary "System / Disks: installed nvme-cli disk utility (NVME disk detected)"
 fi
 
 if ((${#PACKAGES[@]} > 0)); then
