@@ -1,0 +1,161 @@
+#!/usr/bin/bash
+
+# Print files passed by a Thunar custom action via the system default CUPS printer.
+# Native CUPS formats are sent directly. Office documents are converted to PDF via
+# LibreOffice and SVGs via Inkscape, if those tools are available. Unknown formats
+# are passed through and let CUPS decide.
+
+set -uo pipefail
+
+# Per-process temporary working directory.
+WORK_DIR="/tmp/vb-print-$$"
+
+cleanup() {
+  if [[ -d "$WORK_DIR" ]]; then
+    rm -rf "$WORK_DIR"
+  fi
+}
+
+trap cleanup EXIT
+
+if (($# == 0)); then
+  notify-send -r 3 -t 5000 "Nothing To Print" "No files were passed"
+  exit 0
+fi
+
+have_libreoffice=false
+have_inkscape=false
+
+command -v libreoffice &>/dev/null && have_libreoffice=true
+command -v inkscape &>/dev/null && have_inkscape=true
+
+# Refuse to print if CUPS is down.
+if ! systemctl -q is-active cups.service; then
+  notify-send -r 4 -u critical -t 20000 "Print System Service Is Not Running" \
+    "Enable with 'systemctl enable --now cups.service'"
+  exit 1
+fi
+
+# Default printer check
+# lpstat -d outputs either:
+#   "system default destination: <name>"   (printer configured)
+#   "no system default destination"        (nothing set)
+# Command substitution strips the trailing newline, so the result is one clean line.
+lpstat_out=$(lpstat -d 2>/dev/null) # Read the default printer description from CUPS.
+default_printer=""
+
+if [[ "$lpstat_out" == *"system default destination:"* ]]; then
+  default_printer="${lpstat_out#*system default destination: }" # Extract printer name.
+fi
+
+if [[ -z "$default_printer" ]]; then
+  notify-send -r 4 -u critical -t 10000 "No Default Printer Found" \
+    "No system default printer is configured.\nTo add a printer, use <b>Print Settings</b> in app menu"
+  exit 1
+fi
+
+mkdir -p "$WORK_DIR"
+
+succeeded=0    # Number of files printed successfully.
+failed=0       # Number of files that failed.
+failed_body="" # Notification body with failed file names.
+
+# Converts the file if necessary, then spools it to the default printer.
+# Returns 0 on success, 1 on conversion or spool failure.
+print_file() {
+  local file="$1"
+
+  local base="${file##*/}" # Strip directory path.
+  local ext="${base##*.}"  # Extract file extension.
+  ext="${ext,,}"           # Normalize extension to lowercase.
+
+  # Path that will be sent to lp.
+  local to_print
+
+  # Defaults to direct printing.
+  to_print="$file"
+
+  case "$ext" in
+  # Reliable via CUPS (through cups-filters).
+  pdf | ps)
+    ;;
+
+  # Usually fine via filters (images, text).
+  jpg | jpeg | png | gif | bmp | tiff | tif | \
+    txt | text | log | md | rst | csv | tsv | \
+    html | htm | xhtml | \
+    eps)
+    ;;
+
+  # Better to convert via LibreOffice for consistency.
+  odt | ott | sxw | \
+    doc | docx | dot | dotx | rtf | \
+    ods | ots | sxc | \
+    xls | xlsx | xlsm | xlt | xltx | \
+    odp | otp | sxi | \
+    ppt | pptx | pptm | pot | potx | \
+    odg | otg)
+    if $have_libreoffice; then
+      # Set the converted PDF output path.
+      out="$WORK_DIR/${base%.*}.pdf"
+
+      # Convert.
+      libreoffice --headless --convert-to pdf \
+        --outdir "$WORK_DIR" "$file" &>/dev/null || return 1
+
+      # Print the converted PDF instead of the source file.
+      to_print="$out"
+    fi
+    ;;
+
+  # SVG needs explicit conversion.
+  svg)
+    if $have_inkscape; then
+      # Set the converted PDF output path.
+      out="$WORK_DIR/${base%.*}.pdf"
+
+      # Convert.
+      inkscape --export-type=pdf \
+        --export-filename="$out" "$file" \
+        &>/dev/null || return 1
+
+      # Print the converted PDF instead of the source file.
+      to_print="$out"
+    fi
+    ;;
+
+  # Everything else: let CUPS try
+  *)
+    ;;
+  esac
+
+  # Send the file to the default printer.
+  lp -d "$default_printer" "$to_print" &>/dev/null
+}
+
+# Queue handling
+for file in "$@"; do
+  # Skip anything that is not a regular file.
+  if [[ ! -f "$file" ]]; then
+    ((failed++)) || true
+    failed_body+=$'\n'"  ${file##*/} (not a file)"
+    continue
+  fi
+
+  # Print one file at a time.
+  if print_file "$file"; then
+    ((succeeded++)) || true
+  else
+    ((failed++)) || true
+    failed_body+=$'\n'"  ${file##*/}"
+  fi
+done
+
+# Summary notification
+if ((failed == 0)); then
+  notify-send -r 3 -t 5000 "$succeeded File(s) Queued" "Sent to: $default_printer"
+elif ((succeeded == 0)); then
+  notify-send -r 4 -u critical -t 10000 "All $failed File(s) Failed" "$failed_body"
+else
+  notify-send -r 3 -t 5000 "$succeeded File(s) Queued, $failed File(s) Failed" "Failed:$failed_body"
+fi

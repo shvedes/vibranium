@@ -23,4 +23,16 @@
 	<patterns>*</patterns>
 	<image-files/>
 </action>
+<action>
+	<icon>printer</icon>
+	<name>Print</name>
+	<submenu></submenu>
+	<unique-id>1776364775958435-1</unique-id>
+	<command>vb-cmd-print %F</command>
+	<description>Print selected files</description>
+	<range>*</range>
+	<patterns>*.pdf;*.ps;*.eps;*.xps;*.txt;*.text;*.log;*.md;*.rst;*.csv;*.tsv;*.html;*.htm;*.xhtml;*.odt;*.ott;*.sxw;*.doc;*.docx;*.dot;*.dotx;*.rtf;*.ods;*.ots;*.sxc;*.xls;*.xlsx;*.xlsm;*.xlt;*.xltx;*.odp;*.otp;*.sxi;*.ppt;*.pptx;*.pptm;*.pot;*.potx;*.odg;*.otg</patterns>
+	<image-files/>
+	<other-files/>
+</action>
 </actions>

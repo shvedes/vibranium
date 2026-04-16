@@ -8,6 +8,7 @@ packages=(
   cups-pdf
   cups-browsed
   cups-filters
+  system-config-printer
 
   # https://wiki.archlinux.org/title/CUPS#Printer_drivers
   gutenprint
