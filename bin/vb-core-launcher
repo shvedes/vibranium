@@ -126,7 +126,7 @@ case "$1" in
 
   case "$1" in
   --power) OPT_ARGS+=(-drun-categories Power -display-drun "Power") ;;
-  --web) OPT_ARGS+=(-drun-categories Webapp -display-drun "Web Apps") ;;
+  --web) OPT_ARGS+=(-drun-categories WebApp -display-drun "Web Apps") ;;
   --pwa) OPT_ARGS+=(-drun-categories PWA -display-drun "PWA") ;;
   --ai) OPT_ARGS+=(-drun-categories AI -display-drun "AIs") ;;
   esac
@@ -142,10 +142,9 @@ case "$1" in
   if [[ "$SHOW_WEBAPPS" == false && "$SHOW_AI_WEBAPPS" == false ]]; then
     EXCLUDE+=",PWA"
   elif [[ "$SHOW_WEBAPPS" != true ]]; then
-    EXCLUDE+=",Webapp"
+    EXCLUDE+=",WebApp"
   elif [[ "$SHOW_AI_WEBAPPS" != true ]]; then
     EXCLUDE+=",AI"
-
   fi
 
   OPT_ARGS+=(-drun-exclude-categories "$EXCLUDE")
