@@ -253,7 +253,7 @@ _filter_packages() {
           NO_ASK=true
           SKIP_OVERVIEW=true
           FORCE_INSTALL=true
-          FILTERED=(neovim)
+          FILTERED=()
           return
         fi
       fi

@@ -607,10 +607,10 @@ term::disable_input() {
 # and reverts to original stty settings for full reset.
 # The flush loop lives here to clear the buffer after disable period.
 term::enable_input() {
-  # Restore echoing first to allow normal display if needed post-flush.
-  stty echo
   # Restore original settings from global variable for complete reset.
   stty "$term_original_settings"
+  # Restore echoing to allow normal display if needed post-flush.
+  stty echo
   # Unset the global variable to clean up.
   unset term_original_settings
   # Clear input buffer first
