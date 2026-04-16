@@ -151,7 +151,6 @@ messagedialog button {
     background-color: @black;
     color: @foreground;
     border: 1px solid @bright_black;
-    padding: 10px;
 }
 
 messagedialog button:hover {
@@ -160,7 +159,6 @@ messagedialog button:hover {
 
 banner revealer widget {
     background: @bright_black;
-    padding: 5px;
     color: @foreground;
 }
 

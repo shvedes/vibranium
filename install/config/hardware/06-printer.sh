@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  exit 0
+fi
+
 # Copy-pasted from Omarchy.
 
 packages=(

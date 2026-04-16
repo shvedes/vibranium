@@ -1,5 +1,33 @@
 #!/usr/bin/bash
 
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  [[ -t 1 ]] && echo "Not available in a VM!" >&2
+  notify-send -r 4 -t 3000 -u critical "Print Manager" \
+    "This feature is not available in a VM!"
+  exit 1
+fi
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+if [[ "${1-}" =~ ^-(-help|h)$ ]] || [[ -z "$1" ]]; then
+  shcat <<EOF
+Usage: ${0##*/} [FILE]...
+
+Print files passed by a Thunar custom action via the system default CUPS printer.
+Native CUPS formats are sent directly. Office documents are converted to PDF via
+LibreOffice and SVGs via Inkscape, if those tools are available. Unknown formats
+are passed through and let CUPS decide.
+
+Options:
+  -h, --help     Display this help and exit
+EOF
+  exit 0
+fi
+
 # Print files passed by a Thunar custom action via the system default CUPS printer.
 # Native CUPS formats are sent directly. Office documents are converted to PDF via
 # LibreOffice and SVGs via Inkscape, if those tools are available. Unknown formats
@@ -17,11 +45,6 @@ cleanup() {
 }
 
 trap cleanup EXIT
-
-if (($# == 0)); then
-  notify-send -r 3 -t 5000 "Nothing To Print" "No files were passed"
-  exit 0
-fi
 
 have_libreoffice=false
 have_inkscape=false
@@ -50,7 +73,7 @@ fi
 
 if [[ -z "$default_printer" ]]; then
   notify-send -r 4 -u critical -t 10000 "No Default Printer Found" \
-    "No system default printer is configured.\nTo add a printer, use <b>Print Settings</b> in app menu"
+    "No system default printer is configured.\nTo add a printer, use <b>Print Settings</b> in app launcher"
   exit 1
 fi
 
