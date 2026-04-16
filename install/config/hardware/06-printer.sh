@@ -4,6 +4,7 @@
 
 packages=(
   cups
+  nss-mdns
   cups-pdf
   cups-browsed
   cups-filters
