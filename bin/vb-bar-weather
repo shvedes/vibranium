@@ -37,7 +37,8 @@ if ! command -v wttrbar >/dev/null; then
     exit 1
   fi
 
-  text="<span foreground='red2'>\uf071</span>"
+  text="<span foreground='${P_RED}'>\uf071</span>"
+  text+="  <span foreground='DimGray'>|</span>"
   tooltip="Missing required dependencies: wttrbar"
 
   printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
@@ -125,8 +126,8 @@ fi
 WEATHER_JSON="$(<"$TEMP_DATA")"
 
 if [[ -z "$WEATHER_JSON" ]]; then
-  icon="<span foreground='red2'>\uf071</span>"
-  icon+="  <span foreground='DimGray'>|</span>"
+  icon="<span foreground='${P_RED}'>\uf071</span>"
+  icon+="  <span foreground='${P_GRAY}'>|</span>"
 
   tooltip="wttrbar exited with an error"
   printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
@@ -135,7 +136,7 @@ fi
 
 # Build json output
 text="$(jq -r '.text' <<<"$WEATHER_JSON")"
-text+=" <span foreground='DimGray'>|</span>"
+text+=" <span foreground='${P_GRAY}'>|</span>"
 tooltip="$(jq -r '.tooltip' <<<"$WEATHER_JSON")"
 
 rm -f "$TEMP_DATA" /tmp/wttrbar*

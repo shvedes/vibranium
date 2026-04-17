@@ -358,16 +358,11 @@ helpers::bar::spinner() {
   vb-bar-weather) sep_pos="right" left_pad=0 right_pad=2 ;;
   esac
 
-  local sep=""
-
-  helpers::check VIBRANIUM_BAR_SHOW_SEPARATOR
-  if [[ "$VIBRANIUM_BAR_SHOW_SEPARATOR" == true ]]; then
-    sep="<span foreground='DimGray'>|</span>"
-  fi
+  local sep="<span foreground='${P_GRAY}'>|</span>"
 
   print_frame() {
     local ch="$1"
-    local inner="<span rise='-2pt' foreground='gray'>$ch</span>"
+    local inner="<span rise='-2pt' foreground='${P_TEXT}'>$ch</span>"
 
     if [[ "$sep" ]]; then
       if [[ "$sep_pos" == "left" ]]; then

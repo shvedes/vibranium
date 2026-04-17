@@ -74,7 +74,8 @@ fi
 exit_status="$(systemctl --user show fetch-arch-updates.service -p ExecMainStatus --value)"
 
 if ((exit_status != 0)); then
-  text="<span foreground='red2'>\uf071</span>"
+  text="<span foreground='${P_GRAY}'>|</span>   "
+  text+="<span foreground='${P_RED}'>\uf071</span>"
   tooltip="Update service failed. For more information, try:\n"
   tooltip+="systemctl --user status fetch-arch-updates.service"
 
@@ -90,7 +91,7 @@ if ((TOTAL_COUNT == 0)); then
   exit 0
 fi
 
-text="<span foreground='DimGray'>|</span> "
+text="<span foreground='${P_GRAY}'>|</span> "
 text+="📦 $TOTAL_COUNT"
 tooltip="$(make_tooltip "$PKG_LIST")"
 
