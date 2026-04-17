@@ -19,6 +19,57 @@ Options:
 EOF
 }
 
+focus_or_launch() {
+  local -a cmd=("$@")
+
+  local match_key="${cmd[0]##*/}"
+  match_key="${match_key,,}"
+
+  local window_address
+  window_address="$(
+    jq -r --arg key "$match_key" '
+      . as $clients |
+
+      # Phase 1: exact match against .class and .initialClass.
+      (
+        try first(
+          $clients[]
+          | (.class        // "" | ascii_downcase) as $c
+          | (.initialClass // "" | ascii_downcase) as $ic
+          | select($c == $key or $ic == $key)
+          | .address
+        )
+      )
+
+      //
+
+      # Phase 2: partial match — either the class is a substring of the
+      # key or the key is a substring of the class. The empty-string
+      # guard prevents "" from matching everything via contains().
+      # Example: key="google-chrome-stable", class="google-chrome" ->
+      # "google-chrome-stable" contains "google-chrome" -> match.
+      (
+        try first(
+          $clients[]
+          | (.class        // "" | ascii_downcase) as $c
+          | (.initialClass // "" | ascii_downcase) as $ic
+          | select(
+              ($c  != "" and (($c  | contains($key)) or ($key | contains($c))))  or
+              ($ic != "" and (($ic | contains($key)) or ($key | contains($ic))))
+            )
+          | .address
+        )
+      )
+    ' 2>/dev/null < <(hyprctl -j clients)
+  )"
+
+  if [[ -n "$window_address" ]]; then
+    hyprctl -q dispatch focuswindow "address:$window_address"
+  else
+    exec setsid -f app2unit -- "${cmd[@]}"
+  fi
+}
+
 if ! (($#)); then
   usage >&2
   exit 1
@@ -49,25 +100,5 @@ done
 
 COMMAND=("$@")
 
-APP_NAME="${COMMAND[0]##*/}"
-WINDOW_PATTERN="$APP_NAME"
-
-WINDOW_ADDRESS="$(
-  jq -r --arg p "$WINDOW_PATTERN" '
-    first(
-      .[]
-      | select(
-          (.class | test("\\b" + $p + "\\b"; "i")) or
-          (.title | test("\\b" + $p + "\\b"; "i"))
-        )
-      | .address
-    )
-  ' < <(hyprctl -j clients)
-)"
-
-if [[ -n "$WINDOW_ADDRESS" ]]; then
-  [[ -t 0 ]] && echo "Focusing existing window"
-  hyprctl -q dispatch focuswindow "address:$WINDOW_ADDRESS"
-else
-  exec setsid -f app2unit -- "${COMMAND[@]}"
-fi
+# shellcheck disable=SC2068
+focus_or_launch ${COMMAND[@]}

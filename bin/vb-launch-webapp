@@ -13,7 +13,7 @@ usage() {
 Usage: $SELF [URL]
 
 Open Progressive Web Apps (PWA)s in Vibranium.
-If a window eixsts - focuses it.
+If a window exists - focuses it.
 
 Arguments:
   URL         Target URL to open or focus
@@ -40,6 +40,8 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 
+URL="$1"
+
 get_default_browser() {
   local -n _out="$1"
   local browser=""
@@ -61,6 +63,44 @@ get_default_browser() {
   fi
 
   _out="$browser"
+}
+
+focus_or_launch() {
+  local -a cmd=("$@")
+
+  # Extract the hostname from the URL global for window matching.
+  # Strip the scheme (e.g. "https://"), then strip any path, port,
+  # query string, or fragment that follows the host.
+  local host="${URL#*://}"
+  host="${host%%[/?#:]*}"
+  host="${host,,}"
+
+  # Chrome PWA windows have class "chrome-{encoded_url}-Default", with
+  # the hostname appearing immediately after the "chrome-" prefix.
+  # startswith("chrome-{host}") is precise: it targets only PWA windows
+  # for this exact site and can't collide with other Chrome PWA windows
+  # whose hostnames begin differently.
+  local window_address
+  window_address="$(
+    hyprctl -j clients | jq -r --arg host "$host" '
+      try first(
+        .[]
+        | (.class        // "" | ascii_downcase) as $c
+        | (.initialClass // "" | ascii_downcase) as $ic
+        | select(
+            ($c  | startswith("chrome-\($host)")) or
+            ($ic | startswith("chrome-\($host)"))
+          )
+        | .address
+      )
+    ' 2>/dev/null
+  )"
+
+  if [[ -n "$window_address" ]]; then
+    hyprctl -q dispatch focuswindow "address:$window_address"
+  else
+    exec setsid -f app2unit -- "${cmd[@]}"
+  fi
 }
 
 get_default_browser browser
@@ -97,32 +137,5 @@ if ! ((${#execs[@]})); then
   execs=("chromium")
 fi
 
-URL="$1"
-COMMAND=("${execs[0]}")
-
-CLIENTS_JSON="$(hyprctl clients -j)"
-
-WINDOW_ADDRESS="$(
-  jq -r --arg url "$URL" '
-    def host:
-      $url
-      | sub("^https?://"; "")
-      | split("/")[0]
-      | ascii_downcase;
-
-    first(
-      .[]
-      | select(
-          (.class | ascii_downcase | contains(host))
-        )
-      | .address
-    )
-  ' <<<"$CLIENTS_JSON"
-)"
-
-if [[ -n $WINDOW_ADDRESS && $WINDOW_ADDRESS != "null" ]]; then
-  [[ -t 1 ]] && echo "Focusing existing window"
-  hyprctl -q dispatch focuswindow "address:$WINDOW_ADDRESS"
-else
-  exec setsid -f app2unit -- "${COMMAND[0]}" --app="$URL"
-fi
+# shellcheck disable=SC2086
+focus_or_launch ${execs[0]} --app="$URL"
