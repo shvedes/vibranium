@@ -9,6 +9,7 @@ set selection-clipboard "clipboard"
 set recolor "false"
 
 map o file_chooser
+map p print
 
 map [normal] l follow
 map [index] l feedkeys <Return>
