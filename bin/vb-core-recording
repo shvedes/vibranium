@@ -100,7 +100,7 @@ set_recording_area() {
 # Sets the global RECORDING_PID on success.
 init_recording() {
   local opt_flags=()
-  local fps ext frm codec quality capture_sink capture_source
+  local fps frm codec quality capture_sink capture_source
 
   if [[ -n ${1:-} ]]; then
     opt_flags=(-encoder cpu)
@@ -111,7 +111,7 @@ init_recording() {
   fi
 
   fps="$VIBRANIUM_RECORDING_FPS"
-  ext="$VIBRANIUM_RECORDING_CONTAINER_TYPE"
+  EXT="$VIBRANIUM_RECORDING_CONTAINER_TYPE"
   frm="$VIBRANIUM_RECORDING_FRAMERATE_MODE"
   codec="$VIBRANIUM_RECORDING_VIDEO_CODEC"
   quality="$VIBRANIUM_RECORDING_QUALITY"
@@ -138,7 +138,7 @@ init_recording() {
     -w "$AREA" \
     -k "$codec" \
     -fm "$frm" \
-    -c "$ext" \
+    -c "$EXT" \
     -f "$fps" \
     -o "$out_file" &>"$LOG_FILE" &
 
