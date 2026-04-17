@@ -109,6 +109,11 @@ VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT=false
 VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START=false
 
 # @type bool
+# @desc Always try to focus existing windows instead of opening
+# @desc a new instance of the same application.
+VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS=true
+
+# @type bool
 # @desc Whether to respect the 'power-saver' profile.
 # @note If true, things like blur / shadows / heavy background
 # @note processes will be suspended til the power profile change.

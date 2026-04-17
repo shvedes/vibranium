@@ -52,18 +52,29 @@ _build() {
     --label "Auto select"
 
   cfgr::item::bool \
-    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
-    --label "Show AI PWAs"
+    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS \
+    --label "Focus first"
+
+  cfgr::item::bool \
+    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
+    --label "Show icons"
 
   cfgr::item::bool \
     --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
     --label "Show PWAs"
 
   cfgr::item::bool \
-    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
-    --label "Show icons"
+    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
+    --label "Show AIs"
 
   cfgr::item::raw "Theme : $(_get_rofi_theme)" "action:_set_rofi_theme"
 }
 
-cfgr::run "App Laucher" "_build"
+cfgr::run "App Laucher" "_build" \
+  VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ON_START \
+  VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
+  VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
+  VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
+  VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS \
+  VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
+  VIBRANIUM_GLOBAL_SEARCH_ENGINE

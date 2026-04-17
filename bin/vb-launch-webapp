@@ -27,21 +27,6 @@ Examples:
 EOF
 }
 
-case "${1:-}" in
--h | --help)
-  usage
-  exit 0
-  ;;
-esac
-
-if [[ $# -lt 1 ]]; then
-  echo "Error: missing URL" >&2
-  echo "Try '$SELF --help' for more information" >&2
-  exit 1
-fi
-
-URL="$1"
-
 get_default_browser() {
   local -n _out="$1"
   local browser=""
@@ -103,6 +88,23 @@ focus_or_launch() {
   fi
 }
 
+case "${1:-}" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+esac
+
+if [[ $# -lt 1 ]]; then
+  echo "Error: missing URL" >&2
+  echo "Try '$SELF --help' for more information" >&2
+  exit 1
+fi
+
+source vb-lib-core
+
+URL="$1"
+
 get_default_browser browser
 
 case $browser in
@@ -137,5 +139,12 @@ if ! ((${#execs[@]})); then
   execs=("chromium")
 fi
 
-# shellcheck disable=SC2086
-focus_or_launch ${execs[0]} --app="$URL"
+helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
+
+if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
+  # shellcheck disable=SC2068
+  focus_or_launch ${execs[0]} --app="$URL"
+else
+  # shellcheck disable=SC2068
+  exec setsid -f app2unit -- ${execs[0]} --app="$URL"
+fi

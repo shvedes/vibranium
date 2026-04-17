@@ -75,6 +75,8 @@ if ! (($#)); then
   exit 1
 fi
 
+source vb-lib-core
+
 while (($#)); do
   case "$1" in
   --)
@@ -100,5 +102,12 @@ done
 
 COMMAND=("$@")
 
-# shellcheck disable=SC2068
-focus_or_launch ${COMMAND[@]}
+helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
+
+if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
+  # shellcheck disable=SC2068
+  focus_or_launch ${COMMAND[@]}
+else
+  # shellcheck disable=SC2068
+  exec setsid -f app2unit -- ${COMMAND[@]}
+fi

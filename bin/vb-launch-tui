@@ -130,6 +130,8 @@ if ! (($#)); then
   exit 1
 fi
 
+source vb-lib-core
+
 COMMAND=("$@")
 
 # Derive defaults
@@ -137,4 +139,15 @@ APP_NAME="${COMMAND[0]##*/}"
 : "${APP_ID:=org.vb.term.$APP_NAME}"
 : "${TITLE:=$APP_NAME}"
 
-focus_or_launch "${COMMAND[@]}"
+helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
+
+if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
+  # shellcheck disable=SC2068
+  focus_or_launch "${COMMAND[@]}"
+else
+  # shellcheck disable=SC2068
+  exec setsid -f xdg-terminal-exec \
+    --app-id="$APP_ID" \
+    --title="$TITLE" \
+    -- "${COMMAND[@]}"
+fi
