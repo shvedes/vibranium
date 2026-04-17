@@ -39,11 +39,6 @@ _ask_for_sudo() {
   sudo -n true 2>/dev/null && return
 
   term::enable_input
-
-  if [[ "$EMBEDDED" == false ]]; then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
-  fi
-
   sudo -v
   term::disable_input
 }

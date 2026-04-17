@@ -152,7 +152,6 @@ if [[ -z "$ESP_MOUNT" ]] || [[ ! -d "$ESP_MOUNT" ]]; then
 fi
 
 if ! command -v sbctl >/dev/null; then
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${CYAN}sbctl${RESET} not found"
   vb-pkg-install --embedded -- sbctl
 fi
 
