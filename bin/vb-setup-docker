@@ -4,6 +4,8 @@ source vb-lib-core
 
 export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
 
+PACKAGES=(docker docker-compose)
+
 _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
   # shellcheck disable=SC2034
@@ -162,7 +164,17 @@ if ! term::ask_yes_no Y "Proceed with setup?"; then
   exit 1
 fi
 
-if ! vb-pkg-install --embedded -- docker docker-compose; then
+if term::ask_yes_no Y "Would you like to install LazyDocker as well?"; then
+  vb-tui-install \
+    --exec "lazydocker" \
+    --name "Lazy Docker" \
+    --icon "docker-desktop" \
+    --category "System" \
+    --keywords "VM;Container;Apps"
+  PACKAGES+=(lazydocker)
+fi
+
+if ! vb-pkg-install --embedded -- "${PACKAGES[@]}"; then
   _operation_canceled
   exit 1
 fi
