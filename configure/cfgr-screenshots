@@ -21,15 +21,13 @@ _build() {
       --max 100
   fi
 
-  if [[ "$(hyprctl getoption animations:enabled)" =~ 1 ]]; then
-    cfgr::item::bool \
-      --var VIBRANIUM_SCREENSHOT_FLASH_SCREEN \
-      --label "Flash screen"
+  cfgr::item::bool \
+    --var VIBRANIUM_SCREENSHOT_FLASH_SCREEN \
+    --label "Flash screen"
 
-    cfgr::item::bool \
-      --var VIBRANIUM_SCREENSHOT_FLASH_BORDER \
-      --label "Flash border"
-  fi
+  cfgr::item::bool \
+    --var VIBRANIUM_SCREENSHOT_FLASH_BORDER \
+    --label "Flash border"
 
   cfgr::item::bool \
     --var VIBRANIUM_SCREENSHOT_SAVE_TO_DISK \
