@@ -68,7 +68,7 @@ focus_or_launch() {
   if [[ -n "$window_address" ]]; then
     hyprctl -q dispatch focuswindow "address:$window_address"
   else
-    exec setsid -f xdg-terminal-exec \
+    source xdg-terminal-exec \
       --app-id="$APP_ID" \
       --title="$TITLE" \
       -- "${cmd[@]}"
@@ -130,7 +130,9 @@ if ! (($#)); then
   exit 1
 fi
 
-source vb-lib-core
+if ! declare -F helpers::check >/dev/null; then
+  source vb-lib-core
+fi
 
 COMMAND=("$@")
 

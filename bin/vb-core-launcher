@@ -47,7 +47,7 @@ EOF
 _open_file() {
   local file="${1#file://}"
   # open in default app (media viewer, text editor, whatever)
-  app2unit-open -s app-graphical.slice "$file" &>/dev/null &
+  source app2unit -s app-graphical.slice -- xdg-open "$file" &>/dev/null
 }
 
 _open_link() {
@@ -64,22 +64,18 @@ _open_link() {
   app2unit-open -s app-graphical.slice "$link" &>/dev/null &
 }
 
-_get_search_engine() {
-  case "$SEARCH_ENGINE" in
-  "duckduckgo") printf "https://duckduckgo.com/?q=" ;;
-  "google") printf "https://www.google.com/search?q=" ;;
-  "brave") printf "https://search.brave.com/search?q=" ;;
-  "bing") printf "https://bing.com/search?q=" ;;
-  esac
-}
-
 _search_the_internet() {
+  local input="$*"
   local engine
 
-  local input="$*"
-  engine="$(_get_search_engine)"
+  case "$SEARCH_ENGINE" in
+  "duckduckgo") local engine="https://duckduckgo.com/?q=" ;;
+  "google") local engine="https://www.google.com/search?q=" ;;
+  "brave") local engine="https://search.brave.com/search?q=" ;;
+  "bing") local engine="https://bing.com/search?q=" ;;
+  esac
 
-  app2unit-open -S both -s app-graphical.slice "${engine}${input}" &>/dev/null &
+  source app2unit -S both -s app-graphical.slice -- xdg-open "${engine}${input}" &>/dev/null
 }
 
 case "$1" in
@@ -183,13 +179,15 @@ case "$INPUT" in
   # File exists and it IS an executable
   if [[ -x "$CMD" ]] || command -v "$CMD" >/dev/null; then
     if [[ "$CMD" =~ vb-* ]]; then
-      eval "$CMD" "$ARGS"
+      # Source so the child gets all the
+      # functions and settings cache.
+      eval source "$CMD" "$ARGS"
     else
-      vb-launch-cmd -- $CMD $ARGS &
+      source vb-launch-cmd -- $CMD $ARGS
     fi
   # File exists
   elif [[ -e "$INPUT" ]]; then
-    app2unit-open -s app-graphical.slice "$INPUT" &>/dev/null &
+    source app2unit -s app-graphical.slice -- xdg-open "$INPUT" &>/dev/null
   # It's a web query
   else
     # Web search is only available in the default mode
