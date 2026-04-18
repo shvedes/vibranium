@@ -169,10 +169,10 @@ _set_audio_feedback_variant() {
 
 # _open_wiremix — action for the "Open volume mixer" row
 #
-# Spawns wiremix in a floating terminal window via xdg-terminal-exec, then
+# Spawns wiremix in a floating terminal window via vb-launch-tui, then
 # immediately closes the entire cfgr menu stack with helpers::ui::close_menus.
 _open_wiremix() {
-  xdg-terminal-exec --app-id=org.vb.term.float --title=wiremix -- wiremix
+  vb-launch-tui --title="wiremix" --app-id="org.vb.term.float" -- wiremix
   helpers::ui::close_menus
 }
 
