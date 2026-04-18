@@ -200,7 +200,7 @@ _resolve_active_theme() {
   local family variant
   for family in "${!FAMILIES[@]}"; do
     for variant in ${FAMILIES[$family]}; do
-      if [[ "${FOLDER_MAP[${family}-${variant}]}" == "$curr_folder" ]]; then
+      if [[ "${FOLDER_MAP[${family} - ${variant}]}" == "$curr_folder" ]]; then
         ACTIVE_FAMILY="$family"
         ACTIVE_VARIANT="$variant"
         return
@@ -505,7 +505,7 @@ list_themes() {
 
   for family in "${!FAMILIES[@]}"; do
     for variant in ${FAMILIES[$family]}; do
-      names+=("${FOLDER_MAP[${family}-${variant}]}")
+      names+=("${FOLDER_MAP[${family} - ${variant}]}")
     done
   done
 
@@ -520,11 +520,11 @@ list_themes() {
     j=$((i - 1))
 
     while ((j >= 0)) && [[ ${names[j]} > $key ]]; do
-      names[j+1]=${names[j]}
+      names[j + 1]=${names[j]}
       ((j--))
     done
 
-    names[j+1]=$key
+    names[j + 1]=$key
   done
 
   printf '%s\n' "${names[@]}"
@@ -648,7 +648,7 @@ vb-cmd-reload --quiet
 touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
 killall --quiet -s USR2 btop
 
-vb-theme-set-gtk
-vb-theme-set-svg
-vb-theme-set-browser
-vb-theme-set-obsidian
+vb-theme-set-gtk &
+vb-theme-set-svg &
+vb-theme-set-browser &
+vb-theme-set-obsidian &
