@@ -2,8 +2,8 @@
 
 CACHE_FILE="$VIBRANIUM_CACHE/pkg-updates.list"
 TIMESTAMP_FILE="$VIBRANIUM_CACHE/pkg-updates.timestamp"
-INTERVAL=$((3 * 24 * 60 * 60))
-THRESHOLD=125
+INTERVAL=$((3 * 24 * 60 * 60)) # 3 real days
+THRESHOLD=125                  # packages
 
 shcat() {
   while IFS= read -r line; do
@@ -59,8 +59,7 @@ mapfile -t LINES <"$CACHE_FILE"
 TOTAL_COUNT=${#LINES[@]}
 
 if ((TOTAL_COUNT >= THRESHOLD)); then
-  printf -v TIMESTAMP_NOW '%(%Y-%m-%d_%H-%M-%S)T' -1
-  # TIMESTAMP_NOW=$(date +%s)
+  TIMESTAMP_NOW=$EPOCHSECONDS
   TIMESTAMP_LAST=0
 
   if [[ -f "$TIMESTAMP_FILE" ]]; then
