@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-source vb-lib-core
-source vb-lib-cfgr
 
 WAYBAR_CFG="$XDG_CONFIG_HOME/waybar/config.jsonc"
 _CFG_CONTENT=""

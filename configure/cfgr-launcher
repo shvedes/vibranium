@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-source vb-lib-core
-source vb-lib-cfgr
 
 _get_rofi_theme() {
   local config="$XDG_CONFIG_HOME/rofi/config.rasi"

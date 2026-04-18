@@ -75,11 +75,7 @@ if ! (($#)); then
   exit 1
 fi
 
-# Source the library only when not launched
-# from an another script.
-if ! declare -F helpers::check >/dev/null; then
-  source vb-lib-core
-fi
+source vb-lib-core
 
 while (($#)); do
   case "$1" in

@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-lib-core
-source vb-lib-cfgr
-
-export PATH="$PATH:$VIBRANIUM/configure"
+source vb-lib-hypr
 
 _edit_cfgs_menu() {
   _open() {

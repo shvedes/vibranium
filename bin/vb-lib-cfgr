@@ -124,6 +124,13 @@
 #
 #   cfgr::run "My Menu" "_build"  MY_BOOL_VAR MY_STRING_VAR MY_INT_VAR
 
+# Source guard: mirrors the one in vb-lib-core.
+if [[ -n "${_VB_LIB_CFGR_LOADED:-}" ]]; then
+  return 0
+fi
+
+declare -gr _VB_LIB_CFGR_LOADED=1
+
 # _cfgr::verify_option  VAR
 #
 # Ensures that a given option exists in the user settings file.
@@ -212,7 +219,9 @@ cfgr::build_menu() {
         clean_label="${clean_label//${BASH_REMATCH[0]}/}"
       done
 
-      ((${#clean_label} > max_len)) && max_len=${#clean_label}
+      if ((${#clean_label} > max_len)); then
+        max_len=${#clean_label}
+      fi
     fi
   done
 
@@ -331,7 +340,7 @@ cfgr::set_digit() {
     esac
   done
 
-  local awk_script="$VIBRANIUM/awk/verify-digit.awk"
+  local awk_script="$VIBRANIUM/awk/cfgr-verify-digit.awk"
 
   # Reject unknown types before opening the menu.
   if [[ "$type" != "int" && "$type" != "float" ]]; then
@@ -967,11 +976,82 @@ cfgr::dispatch() {
     ;;
 
   action)
-    # Descriptor format: action:FUNCNAME
-    # eval runs the function name stored in the descriptor.
-    eval "${payload}"
-    ;;
+    # Descriptor format: action:FUNCNAME_OR_SCRIPT
+    #
+    # Two paths depending on whether the payload names a defined shell
+    # function or an executable script in PATH.
+    #
+    # Function path (most common):
+    #   The function is already defined in this process (it was declared by
+    #   the current script or a previously sourced library). Call it directly.
+    #   This is the original behaviour and requires no changes at call sites.
+    #
+    # Script path (the new in-process path):
+    #   The payload is not a defined function but IS a script resolvable in
+    #   PATH (e.g. "cfgr-recording"). Instead of exec-ing it as a new bash
+    #   process, we source it inside the current one. Sourcing means:
+    #     1. "source vb-lib-core" and "source vb-lib-cfgr" at the top of
+    #        the child script are no-ops (source guards fire, return 0).
+    #     2. The child script defines its _build function.
+    #     3. The child script calls cfgr::run "Title" "_build" VARS, which
+    #        blocks in its own while loop until the user presses ESC.
+    #     4. cfgr::run returns, source returns, we are back here.
+    #
+    # _build collision:
+    #   Every cfgr-* script uses "_build" as its build function name.
+    #   Sourcing a child script overwrites the parent's _build. We save the
+    #   parent's definition text before sourcing and restore it after, so
+    #   the parent's cfgr::run loop can continue correctly on its next
+    #   iteration without any change to any cfgr-* script.
 
+    local _func_or_script="$payload"
+
+    if declare -f "$_func_or_script" >/dev/null 2>&1; then
+      # Fast path: already a defined function, call it directly.
+      "$_func_or_script"
+      return
+    fi
+
+    # Compound command path: payload contains whitespace or shell control
+    # characters, so it cannot be a bare script name. These are shell
+    # command strings meant to be interpreted as-is (source: vb-menu), e.g.:
+    #   "xdg-terminal-exec --app-id=... -- cmd; _die"
+    #   "_launch 'https://wiki.hypr.land'"
+    # Pass them straight to eval and skip the source machinery entirely.
+    if [[ "$_func_or_script" =~ [[:space:]\;\|\&\(\)\`] ]]; then
+      eval "$_func_or_script"
+      return
+    fi
+
+    # Slow path: not a function — look it up in PATH.
+    local _script_path
+    _script_path="$(command -v "$_func_or_script" 2>/dev/null)" || {
+      local msg="cfgr::dispatch: '${_func_or_script}' is neither a function nor a PATH script"
+      notify-send -r 4 -t 5000 -u critical "Vibranium: ${0##*/}" "$msg"
+      [[ -t 2 ]] && log::error "${0##*/}: $msg"
+      return 1
+    }
+
+    # Save the parent's _build definition so it survives the child redefining it.
+    # "declare -f name" prints the full function definition as valid bash source.
+    # We capture it into a local string and eval it back after the child exits.
+    local _parent_build_def=""
+    if declare -f _build >/dev/null 2>&1; then
+      _parent_build_def="$(declare -f _build)"
+    fi
+
+    # Source the script in-process. The child's cfgr::run call will block
+    # here until the user dismisses the submenu with ESC, at which point
+    # cfgr::run returns, source returns, and execution continues below.
+    source "$_script_path"
+
+    # Restore the parent's _build so the parent cfgr::run loop can call it
+    # correctly on the next iteration. Without this the parent would call
+    # the child's _build, see wrong items, and potentially spin forever.
+    if [[ -n "$_parent_build_def" ]]; then
+      eval "$_parent_build_def"
+    fi
+    ;;
   display)
     # Read-only label row; selecting it intentionally does nothing.
     :
@@ -1042,35 +1122,30 @@ cfgr::run() {
 
     local chosen
     if _cfgr::has_icons; then
-      # Icon case: write a NUL-annotated menu file for rofi, and a separate
-      # plain-text fd so helpers::ui::menu can measure widths without icon noise.
       local plain_text_fd
       exec {plain_text_fd}< <(printf '%s\n' "${options[@]}")
 
-      local tmp_menu="$VIBRANIUM_RUNTIME/cfgr_menu_$$"
-      {
-        for i in "${!options[@]}"; do
-          printf '%s' "${options[$i]}"
-          if [[ -n "${_CFGR_ICONS[$i]}" ]]; then
-            printf '\0icon\x1f%s' "${_CFGR_ICONS[$i]}"
-          fi
-          printf '\n'
-        done
-      } >"$tmp_menu"
-
       helpers::ui::menu chosen "$title" "ESC to go back" \
         -selected-row "$index" -plain-fd "$plain_text_fd" \
-        -input-file "$tmp_menu" -show-icons
+        -input-file <(
+          for i in "${!options[@]}"; do
+            printf '%s' "${options[$i]}"
+            if [[ -n "${_CFGR_ICONS[$i]}" ]]; then
+              printf '\0icon\x1f%s' "${_CFGR_ICONS[$i]}"
+            fi
+            printf '\n'
+          done
+        ) -show-icons
 
       exec {plain_text_fd}<&-
-      rm -f "$tmp_menu"
     else
-      # No icons: pass items inline
       helpers::ui::menu chosen "$title" "ESC to go back" \
         -selected-row "$index" -- "${options[@]}"
     fi
 
-    [[ -z "$chosen" ]] && break
+    if [[ -z "$chosen" ]]; then
+      break
+    fi
 
     for idx in "${!options[@]}"; do
       if [[ "${options[$idx]}" == "$chosen" ]]; then

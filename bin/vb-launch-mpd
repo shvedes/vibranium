@@ -87,7 +87,7 @@ else
 fi
 
 if [[ -z "$CLIENT" ]]; then
-  [[ -t 0 ]] && echo "Could not find installed MPD client" >&2
+  [[ -t 2 ]] && echo "Could not find installed MPD client" >&2
   notify-send -r 4 -t 3000 "Vibranium" "Could not find installed MPD client!"
   exit 1
 fi

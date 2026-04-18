@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-lib-core
 source vb-lib-hypr
-source vb-lib-cfgr
 
 ADVANCED_SPEC=(
   "misc:vrr|int"

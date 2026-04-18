@@ -2,9 +2,6 @@
 
 # shellcheck disable=SC2329
 
-source vb-lib-core
-source vb-lib-cfgr
-
 _has_line() {
   local pattern="$1" file="$2" line
   [[ -f "$file" ]] || return 1

@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-source vb-lib-core
-source vb-lib-cfgr
 
 # _update_module_setting() {
 #   local var="$1"

@@ -130,9 +130,7 @@ if ! (($#)); then
   exit 1
 fi
 
-if ! declare -F helpers::check >/dev/null; then
-  source vb-lib-core
-fi
+source vb-lib-core
 
 COMMAND=("$@")
 
@@ -142,7 +140,6 @@ APP_NAME="${COMMAND[0]##*/}"
 : "${TITLE:=$APP_NAME}"
 
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
-
 if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
   # shellcheck disable=SC2068
   focus_or_launch "${COMMAND[@]}"

@@ -1,8 +1,5 @@
 #!/usr/bin/bash
 
-source vb-lib-core
-source vb-lib-cfgr
-
 _die() { helpers::ui::close_menus; }
 
 _build() {

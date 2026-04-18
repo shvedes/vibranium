@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-lib-core
-source vb-lib-cfgr
 
-export PATH="$PATH:$VIBRANIUM/configure"
 
 _get_term_opacity() {
   local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"

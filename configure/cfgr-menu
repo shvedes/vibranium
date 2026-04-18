@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-lib-core
-source vb-lib-cfgr
 
-export PATH="$PATH:$VIBRANIUM/configure"
 
 _build() {
   cfgr::item::action --func "cfgr-idle" --label "Idle" --icon vb-idle

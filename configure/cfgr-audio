@@ -83,8 +83,6 @@
 #   does a reverse lookup through the option list on every build so the parent
 #   row always displays a human-readable value.
 
-source vb-lib-core
-source vb-lib-cfgr
 
 # ─── Private helper functions ─────────────────────────────────────────────────
 #

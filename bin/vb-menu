@@ -5,8 +5,6 @@
 source vb-lib-core
 source vb-lib-cfgr
 
-export PATH="$PATH:$VIBRANIUM/configure"
-
 _die() { helpers::ui::close_menus; }
 
 _build_help() {

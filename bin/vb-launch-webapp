@@ -140,7 +140,6 @@ if ! ((${#execs[@]})); then
 fi
 
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
-
 if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
   # shellcheck disable=SC2068
   focus_or_launch ${execs[0]} --app="$URL"

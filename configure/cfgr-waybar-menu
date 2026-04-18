@@ -1,10 +1,7 @@
 #!/usr/bin/env bash
 
-source vb-lib-core
-source vb-lib-cfgr
 
 WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"
-export PATH="$PATH:$VIBRANIUM/configure"
 
 _toggle_waybar() {
   case "$ENABLED" in

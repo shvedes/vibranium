@@ -1,7 +1,5 @@
 #!/usr/bin/bash
 
-source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
-
 # Checking file existance is faster
 # than calling pacman -Q.
 if [[ ! -f /usr/lib/rofi/emoji.so ]]; then
