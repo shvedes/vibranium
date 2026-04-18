@@ -59,7 +59,7 @@ _gaps_menu() {
       --label "Gaps out : $gaps_out" \
       --func "_set_int 'Gaps out' 'Gaps out (int)' int 0 50 'general:gaps_out'"
 
-    cfgr::item::action --label "Smart gaps : $smartgaps_enabled" --func "vb-cmd-toggle-smart-gaps"
+    cfgr::item::action --label "Smart gaps : $smartgaps_enabled" --func "vb-toggle-smartgaps"
   }
   cfgr::run "Gaps" "_b"
 }

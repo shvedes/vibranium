@@ -4,7 +4,7 @@
 		"hide-empty-text": true,
 
 		"exec": "vb-bar-inhibitor",
-		"on-click": "vb-cmd-toggle-inhibit",
+		"on-click": "vb-toggle-inhibitor",
 
 		"signal": 3,
 		"return-type": "json"

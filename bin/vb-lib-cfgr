@@ -796,7 +796,7 @@ cfgr::item::string() {
 #   Toggles with side effects:
 #     _toggle_loopback() {
 #       cfgr::toggle_bool "VIBRANIUM_VOLUME_SOURCE_LOOPBACK"
-#       vb-cmd-toggle-loopback
+#       vb-toggle-loopback
 #     }
 #     cfgr::item::action --func "_toggle_loopback" --label "Hear my voice"
 #
@@ -872,7 +872,7 @@ cfgr::item::action() {
 #     "action:_term_opacity_menu"
 #
 #   cfgr::item::raw \
-#     "Loopback volume : $(vb-cmd-toggle-loopback --get-volume)%" \
+#     "Loopback volume : $(vb-toggle-loopback --get-volume)%" \
 #     "action:_set_loopback_volume"
 #
 # Because _build is called on every cfgr::run iteration, the getter

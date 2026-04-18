@@ -47,7 +47,7 @@ fi
 # Disable sleep ihibitor (sleep block) first since it
 # will require sudo in order to suspend.
 if systemctl -q --user is-active vibranium-inhibit@sleep.service; then
-  vb-cmd-toggle-inhibit
+  vb-toggle-inhibitor
 fi
 
 systemctl suspend

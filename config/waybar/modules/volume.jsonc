@@ -4,7 +4,7 @@
 		"on-scroll-up": "vb-core-volume --volume-up",
 		"on-scroll-down": "vb-core-volume --volume-down",
 		"on-click-right": "vb-launch-tui --app-id=org.vb.term.float --title=wiremix -- wiremix --tab output",
-    "on-click-middle": "vb-cmd-toggle-output",
+    "on-click-middle": "vb-toggle-output",
 
 		"format": "{icon}",
 		"format-muted": "\udb81\udf5f",

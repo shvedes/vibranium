@@ -83,7 +83,6 @@
 #   does a reverse lookup through the option list on every build so the parent
 #   row always displays a human-readable value.
 
-
 # ─── Private helper functions ─────────────────────────────────────────────────
 #
 # These are small, single-purpose functions called either:
@@ -201,7 +200,7 @@ _open_wiremix() {
 #     When --var is omitted, cfgr::set_digit acts as a plain picker and
 #     prints the validated value to stdout instead.
 #
-# After the value is saved, vb-cmd-toggle-loopback is called to apply the
+# After the value is saved, vb-toggle-loopback is called to apply the
 # new level to the live PipeWire loopback node.
 _set_loopback_volume() {
   cfgr::set_digit \
@@ -211,7 +210,7 @@ _set_loopback_volume() {
     --min 10 \
     --max 100 \
     --var VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME
-  vb-cmd-toggle-loopback
+  vb-toggle-loopback
 }
 
 # ─── Menu builder functions ───────────────────────────────────────────────────
@@ -308,7 +307,7 @@ _audio_feedback_submenu() {
 #     volume change, so no service restart or immediate side-effect is needed.
 #
 #   "Hear my voice"
-#     --hook "vb-cmd-toggle-loopback": the hook here is an external command,
+#     --hook "vb-toggle-loopback": the hook here is an external command,
 #     not a local function — that is fine, cfgr::dispatch simply evals it.
 #     The command enables or disables the PipeWire loopback node that routes
 #     microphone audio back to the speakers.
@@ -320,7 +319,7 @@ _audio_feedback_submenu() {
 #     volume is fetched live and embedded in the --label so the user can see
 #     it without opening the input prompt.
 #
-#     vb-cmd-toggle-loopback --get-volume may return nothing if the loopback
+#     vb-toggle-loopback --get-volume may return nothing if the loopback
 #     node has not been created yet (e.g. right after the setting is turned on).
 #     ${loopback_vol:-?} substitutes "?" in that case so the label always
 #     renders as something meaningful rather than "Hear my voice volume : %".
@@ -359,11 +358,11 @@ _build() {
   cfgr::item::bool \
     --var VIBRANIUM_VOLUME_SOURCE_LOOPBACK \
     --label "Hear my voice" \
-    --hook "vb-cmd-toggle-loopback"
+    --hook "vb-toggle-loopback"
 
   if [[ "$VIBRANIUM_VOLUME_SOURCE_LOOPBACK" == true ]]; then
     local loopback_vol
-    loopback_vol=$(vb-cmd-toggle-loopback --get-volume 2>/dev/null)
+    loopback_vol=$(vb-toggle-loopback --get-volume 2>/dev/null)
     loopback_vol="${loopback_vol:-?}"
 
     cfgr::item::action \

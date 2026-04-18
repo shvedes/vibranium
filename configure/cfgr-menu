@@ -1,17 +1,15 @@
 #!/usr/bin/env bash
 
-
-
 _build() {
   cfgr::item::action --func "cfgr-idle" --label "Idle" --icon vb-idle
   cfgr::item::action --func "cfgr-audio" --label "Audio" --icon vb-volume
   cfgr::item::action --func "cfgr-waybar-menu" --label "Waybar" --icon vb-settings
   cfgr::item::action --func "cfgr-general" --label "General" --icon vb-settings
-  cfgr::item::action --func "vb-font-set" --label "Set Font" --icon vb-font
+  cfgr::item::action --func "eval vb-font-set" --label "Set Font" --icon vb-font
   cfgr::item::action --func "cfgr-wm-menu" --label "Hyprland" --icon vb-wm
-  cfgr::item::action --func "cfgr-recording" --label "Recording" --icon vb-video
 
   if [[ "$CHASSIS_TYPE" != vm ]]; then
+    cfgr::item::action --func "cfgr-recording" --label "Recording" --icon vb-video
     cfgr::item::action --func "cfgr-brightness" --label "Brightness" --icon vb-brightness
     cfgr::item::action --func "cfgr-nightshift" --label "Night Light" --icon vb-night-light
   fi
