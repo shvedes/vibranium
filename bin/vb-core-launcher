@@ -138,7 +138,7 @@ case "$1" in
   if [[ "$SHOW_WEBAPPS" == false && "$SHOW_AI_WEBAPPS" == false ]]; then
     EXCLUDE+=",PWA"
   elif [[ "$SHOW_WEBAPPS" != true ]]; then
-    EXCLUDE+=",WebApp"
+    EXCLUDE+=",WebApp,PWA"
   elif [[ "$SHOW_AI_WEBAPPS" != true ]]; then
     EXCLUDE+=",AI"
   fi
