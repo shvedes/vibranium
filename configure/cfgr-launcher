@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-
 _get_rofi_theme() {
   local config="$XDG_CONFIG_HOME/rofi/config.rasi"
   local line theme
@@ -61,9 +60,11 @@ _build() {
     --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
     --label "Show PWAs"
 
-  cfgr::item::bool \
-    --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
-    --label "Show AIs"
+  if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS" == true ]]; then
+    cfgr::item::bool \
+      --var VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
+      --label "Show AIs"
+  fi
 
   cfgr::item::raw "Theme : $(_get_rofi_theme)" "action:_set_rofi_theme"
 }
