@@ -1,26 +1,33 @@
 #!/usr/bin/env bash
 
-
 _build() {
-  cfgr::item::string \
-    --var    VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH \
-    --label  "Fade in / out on Next / Previous" \
-    --title  "Fade duration" \
-    --option "Very Slow:very_slow" "Slow:slow" "Normal:normal" \
-             "Fast:fast" "Very Fast:very_fast" "OFF:off"
+  cfgr::item::bool \
+    --var VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING \
+    --label "Show now playing notification"
+
+  if [[ "$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING" == true ]]; then
+    cfgr::item::bool \
+      --var VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART \
+      --label "Also show album art"
+  fi
 
   cfgr::item::string \
-    --var    VIBRANIUM_PLAYER_FADE_DURATION \
-    --label  "Fade in / out on Play / Pause" \
-    --title  "Fade duration" \
+    --var VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH \
+    --label "Fade in / out on Next / Previous" \
+    --title "Fade duration" \
     --option "Very Slow:very_slow" "Slow:slow" "Normal:normal" \
-             "Fast:fast" "Very Fast:very_fast" "OFF:off"
+    "Fast:fast" "Very Fast:very_fast" "OFF:off"
 
-  cfgr::item::action \
-    --func  "vb-cmd-show-help player-fade" \
-    --label "Help"
+  cfgr::item::string \
+    --var VIBRANIUM_PLAYER_FADE_DURATION \
+    --label "Fade in / out on Play / Pause" \
+    --title "Fade duration" \
+    --option "Very Slow:very_slow" "Slow:slow" "Normal:normal" \
+    "Fast:fast" "Very Fast:very_fast" "OFF:off"
 }
 
 cfgr::run "Media Controls" "_build" \
-  VIBRANIUM_PLAYER_FADE_DURATION \
-  VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH
+  VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART \
+  VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH \
+  VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING \
+  VIBRANIUM_PLAYER_FADE_DURATION

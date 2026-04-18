@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-
-
 _get_term_opacity() {
   local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
   sed -nE '/^\[window\]/,/^\[/{s/^[[:space:]]*opacity[[:space:]]*=[[:space:]]*"?([0-9.]+)"?/\1/p}' "$config"
@@ -409,11 +407,9 @@ _build() {
   cfgr::item::raw "Cursor size : ${CURSOR_SIZE}px" "action:_set_cursor_size"
 
   cfgr::item::action --func "_manage_user_wallpapers" --label "User wallpapers"
-  cfgr::item::action --func "cfgr-now-playing" --label "Now playing"
   cfgr::item::action --func "_edit_env" --label "Edit env"
 }
 
 cfgr::run "Misc" "_build" \
-  VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK \
   VIBRANIUM_GLOBAL_SHOW_WALLPAPER \
   VIBRANIUM_GLOBAL_TERMINAL

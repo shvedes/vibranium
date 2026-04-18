@@ -17,7 +17,7 @@ _edit_cfgs_menu() {
     cfgr::item::action --label "Window Rules" --func "_open $rules" --icon vb-code
     cfgr::item::action --label "Keybindings" --func "_open $binds" --icon vb-keyboard
     cfgr::item::action --label "Monitors" --func "_open $monitors" --icon vb-monitor
-    cfgr::item::action --label "Input" --func "_open $input" --icon vb-keyboard
+    cfgr::item::action --label "Input" --func "_open $input" --icon vb-mouse
   }
   cfgr::run "Edit Configs" "_b"
 }

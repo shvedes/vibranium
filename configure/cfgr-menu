@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
 _build() {
   cfgr::item::action --func "cfgr-idle" --label "Idle" --icon vb-idle
@@ -15,7 +15,9 @@ _build() {
   fi
 
   cfgr::item::action --func "cfgr-screenshots" --label "Screenshots" --icon vb-screenshot
+  cfgr::item::action --func "cfgr-launcher" --label "App Launcher" --icon vb-launcher
   cfgr::item::action --func "cfgr-color-picker" --label "Color Picker" --icon vb-theme
+  cfgr::item::action --func "cfgr-player" --label "Media Control" --icon vb-music
   cfgr::item::action --func "cfgr-misc" --label "Miscellaneous" --icon vb-tools
 }
 
