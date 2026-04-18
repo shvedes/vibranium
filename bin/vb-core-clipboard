@@ -61,7 +61,7 @@ case "$1" in
     -display-columns 2 -- "${ENTRIES[@]}"
 
   if [[ ! -z "$chosen" ]]; then
-    if [[ "$chosen" =~ ^file:// ]]; then
+    if [[ "$chosen" =~ file:// ]]; then
       printf "%s" "$chosen" | cliphist decode | wl-copy -n --type text/uri-list
     else
       printf "%s" "$chosen" | cliphist decode | wl-copy -n
