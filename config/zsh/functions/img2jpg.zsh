@@ -1,13 +1,19 @@
 # @vibranium
-# @description Convert images to JPG (high compression level)
-function img2jpg-compressed() {
+# @description Convert images to JPG
+function img2jpg() {
   if ! command -v magick >/dev/null 2>&1; then
     echo "imagemagick is not installed!" >&2
     return 1
   fi
 
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "Usage: ${funcstack[1]} <image> [magick options]"
+    echo "Converts image to JPG format (quality 95, stripped metadata by default)"
+    return 0
+  fi
+
   if [[ -z "${1:-}" ]]; then
-    echo "usage: img2jpg_compressed <image> [magick options]" >&2
+    echo "usage: ${funcstack[1]} <image> [magick options]" >&2
     return 1
   fi
 
@@ -27,10 +33,10 @@ function img2jpg-compressed() {
     return 1
   fi
 
-  local out="${img%.*}-compressed.jpg"
+  local base="${img%.*}"
+  local out="${base}-converted.jpg"
 
   if magick "$img" "${rest[@]}" \
-    -resize '1800x>' \
     -quality 95 \
     -strip \
     "$out"; then

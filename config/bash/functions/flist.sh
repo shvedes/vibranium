@@ -1,5 +1,5 @@
 function flist() {
-  local dir="${XDG_CONFIG_HOME:-$HOME/.config}/bash/functions"
+  local dir="$BASH_CONFIG_DIR/functions"
   local -a funcs=()
   local prev_line=""
 

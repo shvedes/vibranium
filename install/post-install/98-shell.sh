@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-if term::ask_yes_no Y "Would you like to use fish shell?"; then
-  InstallPackages fish
-  sudo usermod --shell /usr/bin/fish $USER
-  rm -rf "$HOME"/.config/{bash,starship.toml} "$HOME"/.bashrc
+shell="$(</tmp/shell)"
+
+if [[ "$shell" == "bash" ]]; then
+  exit 0
 else
-  InstallPackages starship
-  sudo pacman -Rnsc --noconfirm fish &>/dev/null
-  rm -rf "$HOME"/.config/fish
+  _log_info "Setting up shell"
 fi
+
+sudo usermod --shell /usr/bin/$shell $USER

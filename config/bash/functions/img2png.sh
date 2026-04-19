@@ -6,8 +6,14 @@ function img2png() {
     return 1
   fi
 
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "Usage: ${FUNCNAME[0]} <image> [magick options]"
+    echo "Converts image to optimized PNG (lossless compression, stripped metadata)"
+    return 0
+  fi
+
   if [[ -z "${1:-}" ]]; then
-    echo "usage: img2png <image> [magick options]" >&2
+    echo "usage: ${FUNCNAME[0]} <image> [magick options]" >&2
     return 1
   fi
 
@@ -27,7 +33,6 @@ function img2png() {
     return 1
   fi
 
-  # remove extension
   local out="${img%.*}-optimized.png"
 
   if magick "$img" "${rest[@]}" -strip \

@@ -1,0 +1,5 @@
+alias gti="git"
+alias gi="git"
+alias gt="git"
+alias gtiu="git"
+alias gut="git"

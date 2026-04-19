@@ -6,8 +6,14 @@ function img2jpg() {
     return 1
   fi
 
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "Usage: ${FUNCNAME[0]} <image> [magick options]"
+    echo "Converts image to JPG format (quality 95, stripped metadata by default)"
+    return 0
+  fi
+
   if [[ -z "${1:-}" ]]; then
-    echo "usage: img2jpg <image> [magick options]" >&2
+    echo "usage: ${FUNCNAME[0]} <image> [magick options]" >&2
     return 1
   fi
 

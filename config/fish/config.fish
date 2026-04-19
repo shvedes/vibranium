@@ -8,6 +8,8 @@
 # - tweak prompt, colors, and behavior
 #
 # Tip: keep things organized. Large configs are easier to maintain
-# when split into smaller files inside ~/.config/fish/conf.d/
+# when split into smaller files inside ~/.config/fish/conf.d/ and
+# ~/.config/fish/functions/
 #
-# This file only affects interactive shells, so it’s safe to experiment.
+# This file only affects interactive shells, so it’s safe to experiment when
+# fish is your login shell.

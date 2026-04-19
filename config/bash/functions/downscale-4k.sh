@@ -6,8 +6,15 @@ function downscale-4k() {
     return 1
   fi
 
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "Usage: ${FUNCNAME[0]} <file>"
+    echo "Converts video to H.265 (HEVC) with reduced size"
+    echo "Output: <input-name>-optimized.mp4"
+    return 0
+  fi
+
   if [[ -z "${1:-}" ]]; then
-    echo "Usage: ${FUNCNAME[0]} <file>" >&2
+    echo "Usage: downscale-4k <file>" >&2
     return 1
   fi
 
@@ -28,4 +35,6 @@ function downscale-4k() {
     -c:a aac \
     -b:a 192k \
     "$output"
+
+  echo "Done: $output"
 }

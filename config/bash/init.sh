@@ -3,16 +3,24 @@ if [[ $- != *i* ]]; then
   return
 fi
 
+# Don't throw error
+# when globs don't expand.
+shopt -s nullglob
+
 YELLOW=$'\e[0;33m'
-RESET=$'\e[0m'
 GREEN=$'\e[0;32m'
+RED=$'\e[0;31m'
+RESET=$'\e[0m'
 
-source "${XDG_CONFIG_HOME:-$HOME/.config}"/bash/install_plugins.sh
+BASH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/bash"
 
-for f in "${XDG_CONFIG_HOME:-$HOME/.config}"/bash/{plugins,functions,aliases,abbreviations}/*.sh; do
+# Source pre-prompt logic first
+source "$BASH_CONFIG_DIR/conf.d/plugins.sh"
+
+for f in "$BASH_CONFIG_DIR"/{plugins,functions,aliases}/*.sh; do
   source "$f"
 done
 
-source "${XDG_CONFIG_HOME:-$HOME/.config}"/bash/greeting.sh
-source "${XDG_CONFIG_HOME:-$HOME/.config}"/bash/prompt.sh
-source "${XDG_CONFIG_HOME:-$HOME/.config}"/bash/binds.sh
+source "$BASH_CONFIG_DIR/greeting.sh"
+source "$BASH_CONFIG_DIR/prompt.sh"
+source "$BASH_CONFIG_DIR/binds.sh"

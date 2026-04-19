@@ -9,9 +9,12 @@ if command -q trash
     alias rm="trash -v"
 end
 
-alias imv="imv-dir"
+if command -q imv
+    alias imv="imv-dir"
+end
+
 alias ip="ip --color"
 
-if test -f $VIBRANIUM_STATE/update.available
+if set -q VIBRANIUM_STATE; and test -f "$VIBRANIUM_STATE/update.available"
     alias update-vibranium="xdg-terminal-exec --app-id=org.vb.term.float --title=vb-update -- vb-update"
 end

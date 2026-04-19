@@ -25,7 +25,6 @@ format              = "[$path]($style) "
 # ---------------------------------------------------------------------------
 # Git branch
 # ---------------------------------------------------------------------------
-# Fish: $yellow"at " + $ital_cyan$branch
 # symbol = "" suppresses the default  character.
 
 [git_branch]
@@ -36,11 +35,8 @@ symbol = ""
 # Git status
 # ---------------------------------------------------------------------------
 # Order mirrors the fish prompt assembly order:
-#   ahead/behind → conflicted → untracked → modified → stashed → staged
-#   → renamed → deleted
-#
-# Fish only sets binary flags (0 or 1) for local statuses, so single-symbol
-# display without a count is used for those. Ahead/behind retain their counts.
+#   ahead/behind -> conflicted -> untracked -> modified -> stashed -> staged
+#   -> renamed -> deleted
 
 [git_status]
 format = "$ahead_behind$conflicted$untracked$modified$stashed$staged$renamed$deleted"
@@ -67,10 +63,6 @@ deleted    = '[\[D\] ](red)'
 # ---------------------------------------------------------------------------
 # Prompt character
 # ---------------------------------------------------------------------------
-# Fish: bold_green/bold_red ❯ followed by a space.
-# Starship's character module format is "$symbol " by default, so the space
-# must NOT be inside the symbol string itself — that would produce two spaces.
-
 [character]
 success_symbol = "[❯](bold green)"
 error_symbol   = "[❯](bold red)"

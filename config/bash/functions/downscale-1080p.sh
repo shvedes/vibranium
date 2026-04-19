@@ -6,6 +6,13 @@ function downscale-1080p() {
     return 1
   fi
 
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "Usage: ${FUNCNAME[0]} <file>"
+    echo "Downscales video to 1080p (1920x1080) using H.264"
+    echo "Output: <input-name>-1080p.mp4"
+    return 0
+  fi
+
   if [[ -z "${1:-}" ]]; then
     echo "Usage: ${FUNCNAME[0]} <file>" >&2
     return 1
@@ -28,4 +35,6 @@ function downscale-1080p() {
     -crf 23 \
     -c:a copy \
     "$output"
+
+  echo "Done: $output"
 }

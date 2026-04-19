@@ -2,8 +2,15 @@
 # @description Extract archives
 function extract() {
   if [[ $# -eq 0 ]]; then
+    echo "Usage: ${FUNCNAME[0]} <archive> [archive...]" >&2
     echo "${FUNCNAME[0]}: expected FILE, got nothing" >&2
     return 1
+  fi
+
+  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
+    echo "Usage: ${FUNCNAME[0]} <archive> [archive...]"
+    echo "Supports: .tar, .tar.*, .zip, .7z"
+    return 0
   fi
 
   local archive

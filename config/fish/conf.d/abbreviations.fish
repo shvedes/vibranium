@@ -18,6 +18,7 @@ abbr --position command scs "systemctl status"
 abbr --position command scu "systemctl --user"
 abbr --position command scus "systemctl --user status"
 
+# Vim time :D
 abbr \:q exit
 
 # Most common typos
