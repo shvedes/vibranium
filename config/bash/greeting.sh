@@ -1,4 +1,4 @@
-if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/bash/.greeting.disabled" ]]; then
+if [[ -f "${XDG_CONFIG_HOME:-$HOME/.config}/bash/greeting-disabled" ]]; then
   return 0
 fi
 
