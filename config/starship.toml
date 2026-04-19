@@ -1,32 +1,24 @@
+# https://starship.rs/guide/
+
 add_newline = false
 
-# Only render these modules, in this order. Everything else is suppressed.
-format = "$directory$git_branch$git_status$character"
+format = "$sudo$python$hostname$directory$git_branch$git_status$cmd_duration$jobs$character"
 
 # ---------------------------------------------------------------------------
 # Directory
 # ---------------------------------------------------------------------------
-# truncation_length = 3 means: repo_name + up to 2 subdirectory components,
-# which mirrors __trunc_parts truncating the relative path to 2 parts.
-# Outside a repo the same 3-component limit applies to the absolute path.
-
 [directory]
 truncation_length   = 3
 truncation_symbol   = "../"
 truncate_to_repo    = true
 repo_root_style     = "bold cyan"
 style               = "cyan"
-# Shown when inside a git repo. $repo_root = repo dir name, $path = relative
-# subpath. The trailing space is the separator before the branch segment.
 repo_root_format    = "[$repo_root]($repo_root_style)[$path]($style) "
-# Shown when NOT inside a git repo.
 format              = "[$path]($style) "
 
 # ---------------------------------------------------------------------------
 # Git branch
 # ---------------------------------------------------------------------------
-# symbol = "" suppresses the default  character.
-
 [git_branch]
 format = "[at ](yellow)[$branch](italic cyan) "
 symbol = ""
@@ -34,24 +26,13 @@ symbol = ""
 # ---------------------------------------------------------------------------
 # Git status
 # ---------------------------------------------------------------------------
-# Order mirrors the fish prompt assembly order:
-#   ahead/behind -> conflicted -> untracked -> modified -> stashed -> staged
-#   -> renamed -> deleted
-
 [git_status]
 format = "$ahead_behind$conflicted$untracked$modified$stashed$staged$renamed$deleted"
 
-# Ahead / behind upstream
-ahead    = "[\u2191 ${count} ](bold green)"
-behind   = "[\u2193 ${count} ](bold red)"
-diverged = "[\u2191 ${ahead_count} ](bold green)[\u2193 ${behind_count} ](bold red)"
+ahead    = "[ ${count} ](bold green)"
+behind   = "[ ${count} ](bold red)"
+diverged = "[ ${ahead_count} ](bold green)[ ${behind_count} ](bold red)"
 
-# Local status symbols.
-# Inside a starship format text group [...], literal bracket characters must
-# be written as \[ and \]. TOML basic strings (double-quoted) don't allow \[
-# as an escape sequence, so single-quoted TOML literal strings are used here
-# — backslashes in literal strings are never processed by TOML and are passed
-# through verbatim to starship, which does understand \[ and \].
 conflicted = '[\[!\] ](red)'
 untracked  = '[\[U\] ](bright-black)'
 modified   = '[\[M\] ](green)'
@@ -59,6 +40,43 @@ stashed    = '[\[S\] ](bright-black)'
 staged     = '[\[+\] ](yellow)'
 renamed    = '[\[R\] ](cyan)'
 deleted    = '[\[D\] ](red)'
+
+# ---------------------------------------------------------------------------
+# Python — venv name only, hidden when no venv active
+# ---------------------------------------------------------------------------
+[python]
+format         = '[(\($virtualenv\) )](italic yellow)'
+detect_files   = ['.python-version', 'requirements.txt', 'pyproject.toml',
+                  'Pipfile', 'setup.py', 'setup.cfg', 'tox.ini']
+detect_folders = ['.venv', 'venv', '__pypackages__']
+
+# ---------------------------------------------------------------------------
+# Hostname — SSH sessions only
+# ---------------------------------------------------------------------------
+[hostname]
+ssh_only = true
+format   = "[$hostname](bold yellow) in "
+
+# ---------------------------------------------------------------------------
+# Sudo — shown when cached credentials are active
+# ---------------------------------------------------------------------------
+[sudo]
+format   = '[\[!!\] ](bold red)'
+disabled = false
+
+# ---------------------------------------------------------------------------
+# Command duration — show for commands ≥ 1 s
+# ---------------------------------------------------------------------------
+[cmd_duration]
+min_time = 1_000
+format   = "[|](bright-black) [(${duration})](yellow) "
+
+# ---------------------------------------------------------------------------
+# Jobs — background job count, shown only when jobs exist
+# ---------------------------------------------------------------------------
+[jobs]
+format    = '[\[${number}j\] ](bright-black)'
+threshold = 1
 
 # ---------------------------------------------------------------------------
 # Prompt character
