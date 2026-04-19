@@ -44,4 +44,4 @@ else
   systemctl -q --user start "$UNIT" &
 fi
 
-vb-cmd-refresh-bar-module inhibitor &
+vb-refresh-waybar-module inhibitor &

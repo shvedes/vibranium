@@ -11,7 +11,7 @@ fi
 
 # Set Waybar icon
 echo "Finishing installation..." >"$WORKER"
-vb-cmd-refresh-bar-module worker
+vb-refresh-waybar-module worker
 
 # Generate XDG directories
 xdg-user-dirs-update --force
@@ -22,7 +22,7 @@ done
 
 # Remove Waybar icon
 rm -f "$VIBRANIUM_RUNTIME/worker.active"
-vb-cmd-refresh-bar-module worker
+vb-refresh-waybar-module worker
 
 # Remove first run marker
 rm -f "$VIBRANIUM_STATE/first-run"

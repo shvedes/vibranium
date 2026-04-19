@@ -43,4 +43,4 @@ else
 fi
 
 hyprctl -q reload config-only &
-vb-cmd-refresh-bar-module reading-mode &
+vb-refresh-waybar-module reading-mode &

@@ -28,24 +28,24 @@ if [ -f "$STATE_FILE" ]; then
   # In this case, we terminate the process to avoid accidentally killing it
   if [ "$PREV_PID" -ne "$PID" ] 2>/dev/null; then
     rm -f "$STATE_FILE"
-    vb-cmd-refresh-bar-module confirm-kill
+    vb-refresh-waybar-module confirm-kill
     exit 1
   fi
   # second press -> confirmed
   rm -f "$STATE_FILE"
-  vb-cmd-refresh-bar-module confirm-kill
+  vb-refresh-waybar-module confirm-kill
 else
   # If the state file does not exist, it means that this is the first time the script has been run (before confirmation).
   # We record the PID of the active window for subsequent confirmation and wait three seconds.
   # If during this time the script does not run a second time with the existing PID file (confirmation),
   # we process this case as a cancellation of the action by deleting the state file
   echo "$PID" >"$STATE_FILE"
-  vb-cmd-refresh-bar-module confirm-kill
+  vb-refresh-waybar-module confirm-kill
 
   sleep 3
   if [ -f "$STATE_FILE" ]; then
     rm -f "$STATE_FILE"
-    vb-cmd-refresh-bar-module confirm-kill
+    vb-refresh-waybar-module confirm-kill
     exit 1
   fi
   exit 0

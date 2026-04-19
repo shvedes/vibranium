@@ -307,14 +307,14 @@ wait_for_internet() {
 # spawned by the Edit action can call it after `pass edit` finishes.
 async_git_push() {
   printf '%s' "Password Manager: waiting for internet connection..." >"$ACTION"
-  vb-cmd-refresh-bar-module password-manager
+  vb-refresh-waybar-module password-manager
 
   # Block here. Parent shell and rofi UI remain fully responsive because
   # this entire function runs in a detached background process.
   wait_for_internet
 
   printf '%s' "Password Manager: pushing local changes to remote..." >"$ACTION"
-  vb-cmd-refresh-bar-module password-manager
+  vb-refresh-waybar-module password-manager
 
   # Capture combined stdout + stderr so we can include git's actual error
   # message in the failure notification. Command substitution is necessary
@@ -331,7 +331,7 @@ async_git_push() {
   # Always clean up regardless of outcome — prevents the bar from getting
   # permanently stuck in "pushing…" state on git errors.
   rm -f "$ACTION"
-  vb-cmd-refresh-bar-module password-manager
+  vb-refresh-waybar-module password-manager
 }
 
 # push_after_edit_if_needed
@@ -1225,7 +1225,7 @@ while true; do
   *"Push to remote")
     # Explicit user-requested push, runs synchronously (foreground)
     printf '%s' "Password Manager: pushing to remote..." >"$ACTION"
-    vb-cmd-refresh-bar-module password-manager
+    vb-refresh-waybar-module password-manager
 
     output="$(git_push_with_upstream_check 2>&1)"
     ret=$?
@@ -1233,7 +1233,7 @@ while true; do
     # Clean up BEFORE exiting so the bar always returns to idle state,
     # regardless of whether the push succeeded or failed.
     rm -f "$ACTION"
-    vb-cmd-refresh-bar-module password-manager
+    vb-refresh-waybar-module password-manager
 
     if [[ $ret -ne 0 ]]; then
       notify-send -r 4 -t 5000 -u critical \
@@ -1251,13 +1251,13 @@ while true; do
 
   *"Pull from remote")
     printf '%s' "Password Manager: pulling from remote..." >"$ACTION"
-    vb-cmd-refresh-bar-module password-manager
+    vb-refresh-waybar-module password-manager
 
     output="$(pass git pull 2>&1)"
     ret=$?
 
     rm -f "$ACTION"
-    vb-cmd-refresh-bar-module password-manager
+    vb-refresh-waybar-module password-manager
 
     if [[ $ret -ne 0 ]]; then
       notify-send -r 4 -t 5000 -u critical \

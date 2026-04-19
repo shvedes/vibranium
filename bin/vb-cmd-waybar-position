@@ -62,4 +62,4 @@ else
 fi
 
 systemctl -q --user restart waybar &
-vb-cmd-refresh-dunst &
+vb-refresh-dunst &

@@ -219,7 +219,7 @@ _edit_roundness() {
   sed -i "/corner_radius/s/=.*/= $input/"        "$XDG_CONFIG_HOME/dunst/dunstrc"
   sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/rofi/config.rasi"
   sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/swayosd/style.css"
-  vb-cmd-refresh-dunst &
+  vb-refresh-dunst &
 
   helpers::check VIBRANIUM_GLOBAL_USE_OSD
   if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then

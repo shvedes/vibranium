@@ -15,7 +15,7 @@ progress() {
     echo "$msg" >"$VIBRNAIUM_RUNTIME/worker.active"
     ;;
   esac
-  vb-cmd-refresh-bar-module worker
+  vb-refresh-waybar-module worker
 }
 
 fail() {

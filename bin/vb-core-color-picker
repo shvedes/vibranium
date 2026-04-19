@@ -35,7 +35,7 @@ case "$1" in
   ;;
 -c | --clear)
   : >"$HISTORY"
-  vb-cmd-refresh-bar-module color-picker
+  vb-refresh-waybar-module color-picker
   exit 0
   ;;
 "")
@@ -128,5 +128,5 @@ if [[ $SHOW_SELECTED == true ]]; then
 fi
 
 notify-send -r 3 -t 1500 -i "$PREVIEW_IMG" "Color Picker" "Color copied to clipboard"
-vb-cmd-refresh-bar-module color-picker
+vb-refresh-waybar-module color-picker
 rm -f "$PREVIEW_IMG"

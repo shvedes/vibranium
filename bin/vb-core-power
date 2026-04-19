@@ -172,6 +172,6 @@ if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
 fi
 
 set_power_profile "$TARGET_PROFILE"
-vb-cmd-refresh-bar-module power-profile &
+vb-refresh-waybar-module power-profile &
 
 notify "$TARGET_PROFILE"

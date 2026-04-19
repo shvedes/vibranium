@@ -9,7 +9,7 @@ paplay_pid=""
 
 cleanup() {
   rm -f "$state"
-  vb-cmd-refresh-bar-module timer
+  vb-refresh-waybar-module timer
 
   kill $(pgrep -f -- '--who=Timer')
   kill -s KILL "$paplay_pid" &>/dev/null
@@ -68,14 +68,14 @@ setsid -f systemd-inhibit --what=idle --why="Sleep is inhibited because of the a
 time_remaining=$sleep_time
 while ((time_remaining > 0)); do
   echo "$time_remaining" >"$state"
-  vb-cmd-refresh-bar-module timer
+  vb-refresh-waybar-module timer
   ((time_remaining--))
   sleep 1 &
   wait $!
 done
 
 echo "timed out" >"$state"
-vb-cmd-refresh-bar-module timer
+vb-refresh-waybar-module timer
 
 while true; do
   paplay --volume 32500 "$ring" &

@@ -3,7 +3,7 @@
 
 _toggle_nightshift() {
   vb-cmd-nightshift --toggle
-  vb-cmd-refresh-bar-module nightshift
+  vb-refresh-waybar-module nightshift
 }
 
 _set_temp() {

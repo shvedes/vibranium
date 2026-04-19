@@ -13,7 +13,7 @@ if systemctl -q --user is-active waybar; then
 fi
 
 systemctl --user restart "${SYSTEMD_TARGETS[@]}" &
-vb-cmd-refresh-dunst
+vb-refresh-dunst
 
 hyprctl -q reload config-only &
 

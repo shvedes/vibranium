@@ -39,7 +39,7 @@
 #         "The value has been changed. Don't forget to enable the module."
 #     fi
 #
-#     vb-cmd-refresh-bar-module "$module_name" &
+#     vb-refresh-waybar-module "$module_name" &
 #     break
 #   done
 # }
@@ -61,8 +61,8 @@ _module_in_cfg() {
 
 _updates_weather_menu() {
   _update() {
-    vb-cmd-refresh-bar-module pacman &
-    vb-cmd-refresh-bar-module weather &
+    vb-refresh-waybar-module pacman &
+    vb-refresh-waybar-module weather &
   }
 
   _u_w_build() {

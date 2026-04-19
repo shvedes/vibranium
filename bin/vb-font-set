@@ -109,7 +109,7 @@ sed -i -E "/^font[[:space:]]*=/ s/(=\s*\")[^\"]* ([0-9]+\")/\1${selected_font} \
 sed -i -E "s/(font:\s*\")[^\"]* ([0-9]+)\"/\1${selected_font} \2\"/" \
   "$XDG_CONFIG_HOME/rofi/config.rasi"
 
-vb-cmd-refresh-dunst
+vb-refresh-dunst
 
 if ! systemctl -q --user is-active waybar; then
   systemctl -q --user restart waybar &

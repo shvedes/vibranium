@@ -48,7 +48,7 @@ output_file() {
 }
 
 visualize() {
-  vb-cmd-refresh-bar-module recording
+  vb-refresh-waybar-module recording
 
   if [[ $VIBRANIUM_RECORDING_FLASH_SCREEN == true ]]; then
     hypr::flash::screen
@@ -262,7 +262,7 @@ stop_rec() {
   # Wait for the pid
   sleep 0.1
 
-  vb-cmd-refresh-bar-module recording && copy
+  vb-refresh-waybar-module recording && copy
 }
 
 get_ongoing_pid() {

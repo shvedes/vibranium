@@ -56,13 +56,13 @@ _perform_update() {
 
   if [[ -n $need_inhibit ]]; then
     systemctl -q --user start vibranium-inhibit@sleep
-    vb-cmd-refresh-bar-module inhibitor
+    vb-refresh-waybar-module inhibitor
   fi
 
   cleanup() {
     if [[ -n $need_inhibit ]]; then
       systemctl -q --user stop vibranium-inhibit@sleep
-      vb-cmd-refresh-bar-module inhibitor
+      vb-refresh-waybar-module inhibitor
     fi
   }
 
@@ -160,7 +160,7 @@ if ! _perform_update; then
   exit 1
 fi
 
-vb-cmd-refresh-bar-module pacman &
+vb-refresh-waybar-module pacman &
 
 if _check_important; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"

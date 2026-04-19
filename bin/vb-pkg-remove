@@ -328,7 +328,7 @@ _remove_orphans() {
 _update_bar_module() {
   # Edge case: explicitly update the Waybar module
   # in case if we deleted a package that was in update queue.
-  vb-cmd-refresh-bar-module pacman
+  vb-refresh-waybar-module pacman
 }
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"

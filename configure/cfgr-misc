@@ -64,7 +64,7 @@ _set_notification_timeout() {
     --min 3 \
     --max 30)" || return
   sed -i -E "s/(timeout[[:space:]]*=[[:space:]]*)[0-9]+/\1${input}/" "$config"
-  vb-cmd-refresh-dunst &
+  vb-refresh-dunst &
 }
 
 _term_hook() {
