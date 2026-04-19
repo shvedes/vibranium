@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+source vb-lib-core
+source $VIBRANIUM/install/helpers/00-logging.sh
+
 packages=()
 
 shells=(
@@ -20,7 +23,7 @@ for i in "${!shells[@]}"; do
 done
 
 while true; do
-  printf "%s[>>>>]%s Enter number (1-%d): %s" "$CYAN" "$RESET" "${#shells[@]}" "$YELLOW"
+  printf "%s[>>>>]%s Enter number (1-%d) [default: 1]: %s" "$CYAN" "$RESET" "${#shells[@]}" "$YELLOW"
   trap 'printf "%s" "$RESET"' INT
 
   term::enable_input
@@ -29,6 +32,8 @@ while true; do
 
   printf "%s" "$RESET"
   trap - INT
+
+  shell_idx="${shell_idx:-1}" # Default to 1 (Bash) if empty
 
   if [[ "$shell_idx" =~ ^[0-9]+$ ]] && ((shell_idx >= 1 && shell_idx <= ${#shells[@]})); then
     selected_shell="${shells[$((shell_idx - 1))]}"
