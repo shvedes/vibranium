@@ -13,14 +13,14 @@ bindkey '^[f' forward-word           # Alt+F
 bindkey '^P' up-line-or-history      # Ctrl+P
 bindkey '^N' down-line-or-history    # Ctrl+N
 
-bindkey '^R' history-incremental-search-backward   # Ctrl+R
-bindkey '^S' history-incremental-search-forward    # Ctrl+S (forward search)
-
 # Editing
 bindkey '^U' backward-kill-line      # Ctrl+U
 bindkey '^K' kill-line               # Ctrl+K
 bindkey '^W' backward-kill-word      # Ctrl+W
 bindkey '^[^?' backward-kill-word    # Alt+Backspace
+
+bindkey '^R' history-incremental-search-backward   # Ctrl+R
+bindkey '^S' history-incremental-search-forward    # Ctrl+S (forward search)
 
 # Clear screen
 bindkey '^L' clear-screen

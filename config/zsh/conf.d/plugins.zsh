@@ -51,6 +51,7 @@ source "${ZINIT_HOME}/zinit.zsh"
 zinit_ensure zsh-users/zsh-autosuggestions
 zinit_ensure zdharma-continuum/fast-syntax-highlighting
 zinit_ensure zsh-users/zsh-completions
+zinit_ensure hlissner/zsh-autopair
 
 if $add_padding; then
   echo
