@@ -1,0 +1,76 @@
+add_newline = false
+
+# Only render these modules, in this order. Everything else is suppressed.
+format = "$directory$git_branch$git_status$character"
+
+# ---------------------------------------------------------------------------
+# Directory
+# ---------------------------------------------------------------------------
+# truncation_length = 3 means: repo_name + up to 2 subdirectory components,
+# which mirrors __trunc_parts truncating the relative path to 2 parts.
+# Outside a repo the same 3-component limit applies to the absolute path.
+
+[directory]
+truncation_length   = 3
+truncation_symbol   = "../"
+truncate_to_repo    = true
+repo_root_style     = "bold cyan"
+style               = "cyan"
+# Shown when inside a git repo. $repo_root = repo dir name, $path = relative
+# subpath. The trailing space is the separator before the branch segment.
+repo_root_format    = "[$repo_root]($repo_root_style)[$path]($style) "
+# Shown when NOT inside a git repo.
+format              = "[$path]($style) "
+
+# ---------------------------------------------------------------------------
+# Git branch
+# ---------------------------------------------------------------------------
+# Fish: $yellow"at " + $ital_cyan$branch
+# symbol = "" suppresses the default  character.
+
+[git_branch]
+format = "[at ](yellow)[$branch](italic cyan) "
+symbol = ""
+
+# ---------------------------------------------------------------------------
+# Git status
+# ---------------------------------------------------------------------------
+# Order mirrors the fish prompt assembly order:
+#   ahead/behind → conflicted → untracked → modified → stashed → staged
+#   → renamed → deleted
+#
+# Fish only sets binary flags (0 or 1) for local statuses, so single-symbol
+# display without a count is used for those. Ahead/behind retain their counts.
+
+[git_status]
+format = "$ahead_behind$conflicted$untracked$modified$stashed$staged$renamed$deleted"
+
+# Ahead / behind upstream
+ahead    = "[\u2191 ${count} ](bold green)"
+behind   = "[\u2193 ${count} ](bold red)"
+diverged = "[\u2191 ${ahead_count} ](bold green)[\u2193 ${behind_count} ](bold red)"
+
+# Local status symbols.
+# Inside a starship format text group [...], literal bracket characters must
+# be written as \[ and \]. TOML basic strings (double-quoted) don't allow \[
+# as an escape sequence, so single-quoted TOML literal strings are used here
+# — backslashes in literal strings are never processed by TOML and are passed
+# through verbatim to starship, which does understand \[ and \].
+conflicted = '[\[!\] ](red)'
+untracked  = '[\[U\] ](bright-black)'
+modified   = '[\[M\] ](green)'
+stashed    = '[\[S\] ](bright-black)'
+staged     = '[\[+\] ](yellow)'
+renamed    = '[\[R\] ](cyan)'
+deleted    = '[\[D\] ](red)'
+
+# ---------------------------------------------------------------------------
+# Prompt character
+# ---------------------------------------------------------------------------
+# Fish: bold_green/bold_red ❯ followed by a space.
+# Starship's character module format is "$symbol " by default, so the space
+# must NOT be inside the symbol string itself — that would produce two spaces.
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol   = "[❯](bold red)"

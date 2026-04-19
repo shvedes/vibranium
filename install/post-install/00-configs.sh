@@ -6,6 +6,7 @@ mkdir -p "$HOME/.local/state/vibranium"
 
 # Everything that is pre-configured.
 cp -r "$VIBRANIUM/config/"* "$HOME/.config/"
+cp "$VIBRANIUM/config/.bashrc" "$HOME"
 
 # Some additional scripts.
 # I might move imv auxiliary scripts
