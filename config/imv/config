@@ -27,6 +27,9 @@ q = quit
 l = next 1
 j = prev 1
 
+<Right> = next 1
+<Left> = prev 1
+
 <Shift+L> = pan +20 0
 <Shift+J> = pan -20 0
 <Shift+I> = pan 0 -20
