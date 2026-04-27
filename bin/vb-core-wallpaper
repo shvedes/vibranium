@@ -84,7 +84,7 @@ cycle_wallpaper() {
   local idx next prev found
   local candidate
 
-  mapfile -t files < <(find "$WALLS" -maxdepth 1 -xtype f 2>/dev/null)
+  mapfile -t files < <(find "$WALLS" -maxdepth 1 -xtype f 2>/dev/null | sort)
 
   # Exit if no wallpapers found
   if ((${#files[@]} == 0)); then
@@ -126,7 +126,7 @@ cycle_wallpaper() {
       candidate="${files[$prev]}"
     else
       # Default to last wallpaper
-      candidate="${files[${#files[@]}-1]}"
+      candidate="${files[${#files[@]} - 1]}"
     fi
     ;;
   esac
