@@ -12,7 +12,7 @@
 		"height": 30,
 
     // This is used by vb-cmd-reload
-    "on-sigusr2": "reload",
+    "on-sigusr1": "reload",
 
     // This is used by vb-toggle-waybar
     "on-sigusr2": "toggle",
