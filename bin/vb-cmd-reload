@@ -9,7 +9,9 @@ if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
 fi
 
 if systemctl -q --user is-active waybar; then
-  SYSTEMD_TARGETS+=("waybar")
+  # SIGUSR1 is explicitly set to the reload action in the waybar config.
+  # Remove / reassign that line - this code won't work.
+  pkill --signal USR1 waybar
 fi
 
 systemctl --user restart "${SYSTEMD_TARGETS[@]}" &
