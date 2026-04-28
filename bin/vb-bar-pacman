@@ -62,25 +62,42 @@ else
 fi
 
 PKG_LIST="$VIBRANIUM_CACHE/pkg-updates.list"
+FETCH_TIMESTAMP_FILE="$VIBRANIUM_CACHE/pkg-updates.fetched"
+CACHE_TTL=$((10 * 60)) # 10 minutes — adjust to taste
 
-systemctl -q --user start fetch-arch-updates.service &
+cache_is_fresh() {
+  if ! [[ -f "$PKG_LIST" && -f "$FETCH_TIMESTAMP_FILE" ]]; then
+    return 1
+  fi
 
-if [[ "$show_spinner" == true ]]; then
-  helpers::bar::spinner "Getting updates..." $!
-else
-  wait $!
-fi
+  local last_fetch
+  last_fetch=$(<"$FETCH_TIMESTAMP_FILE")
 
-exit_status="$(systemctl --user show fetch-arch-updates.service -p ExecMainStatus --value)"
+  ((EPOCHSECONDS - last_fetch < CACHE_TTL))
+}
 
-if ((exit_status != 0)); then
-  text="<span foreground='${P_GRAY}'>|</span>   "
-  text+="<span foreground='${P_RED}'>\uf071</span>"
-  tooltip="Update service failed. For more information, try:\n"
-  tooltip+="systemctl --user status fetch-arch-updates.service"
+if ! cache_is_fresh; then
+  systemctl -q --user start fetch-arch-updates.service &
 
-  printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
-  exit 0
+  if [[ "$show_spinner" == true ]]; then
+    helpers::bar::spinner "Getting updates..." $!
+  else
+    wait $!
+  fi
+
+  exit_status="$(systemctl --user show fetch-arch-updates.service -p ExecMainStatus --value)"
+
+  if ((exit_status != 0)); then
+    text="<span foreground='${P_GRAY}'>|</span>   "
+    text+="<span foreground='${P_RED}'>\uf071</span>"
+    tooltip="Update service failed. For more information, try:\n"
+    tooltip+="systemctl --user status fetch-arch-updates.service"
+
+    printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
+    exit 0
+  fi
+
+  printf "%s" "$EPOCHSECONDS" >"$FETCH_TIMESTAMP_FILE"
 fi
 
 mapfile -t COUNT <"$PKG_LIST"
