@@ -11,12 +11,6 @@
 		"spacing": 0,
 		"height": 30,
 
-    // This is used by vb-cmd-reload
-    "on-sigusr1": "reload",
-
-    // This is used by vb-toggle-waybar
-    "on-sigusr2": "toggle",
-
 		// These are Waybar modules that come with Vibranium.
 		// Feel free to edit these files.
 		// It is not recommended to edit this array manually;

@@ -146,7 +146,9 @@ pid=$!
 term::spinner $pid "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"
 
 if ! _check_updates; then
+  rm -f "$VIBRANIUM_CACHE"/pkg-updates.*
   _update_complete "You are up to date"
+  vb-refresh-waybar-module pacman &
   exit 0
 fi
 
@@ -160,6 +162,7 @@ if ! _perform_update; then
   exit 1
 fi
 
+rm -f "$VIBRANIUM_CACHE"/pkg-updates.*
 vb-refresh-waybar-module pacman &
 
 if _check_important; then

@@ -2,6 +2,4 @@
 
 # This script hides the waybar using a custom kill signal (does not kill the process)
 
-# SIGUSR2 is explicitly set to the reload action in the waybar config.
-# Remove / reassign that line - this code won't work.
-pkill -SIGUSR2 waybar
+pkill -SIGUSR1 waybar
