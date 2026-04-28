@@ -116,7 +116,7 @@ case "$1" in
   if [[ "$AUTO_SELECT" == true ]]; then
     # Don't enable auto-select for Power menu
     if [[ "$LAUNCHER_MODE" =~ ^--(default|ai|web|pwa)$ ]]; then
-      _out+=(-auto-select true)
+      OPT_ARGS+=(-auto-select true)
     fi
   fi
 
@@ -147,6 +147,10 @@ case "$1" in
 
   if [[ "$SHOW_WEBAPPS" == true || "$SHOW_AI_WEBAPPS" == true ]]; then
     OPT_ARGS+=(-icon-theme Vibranium)
+  fi
+
+  if [[ "$AUTO_SELECT" == true ]]; then
+    OPT_ARGS+=(-auto-select true)
   fi
 
   LAUNCHER_MODE="default"
