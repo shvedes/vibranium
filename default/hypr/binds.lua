@@ -1,4 +1,5 @@
 local mainMod = "SUPER"
+local chassis_type = os.getenv("CHASSIS_TYPE")
 
 local directions = {
   { key = "J", dir = "left" },
@@ -178,40 +179,52 @@ hl.bind("XF86Explorer", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { descriptio
 hl.bind("XF86HomePage", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "File manager" }) -- GUI file manager
 hl.bind(mainMod .. " + E", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "File manager" }) -- GUI file manager
 
--- Vibranium menus
+-- ############### --
+-- Vibranium menus --
+-- ############### --
+
+-- The Main Menu
 hl.bind("CTRL + ALT + V", hl.dsp.exec_raw("vb-menu"), { description = "Vibranium menu" })
 hl.bind("XF86Tools", hl.dsp.exec_raw("vb-menu"), { description = "Vibranium menu" })
+
+-- Utilities Menu
 hl.bind("CTRL + ALT + U", hl.dsp.exec_raw("vb-menu-utilities"), { description = "Utilities menu" })
+
+-- Password Manager
 hl.bind("CTRL + ALT + P", hl.dsp.exec_raw("vb-util-pass"), { description = "Password Manager" })
 
+-- Screen Recording
+if chassis_type ~= "vm" then
+  hl.bind("CTRL + ALT + R", hl.dsp.exec_raw("vb-menu-recording"), { description = "Record screen" })
+end
+
 -- Brightness control
-hl.bind(
-  mainMod .. " + SHIFT + F11",
-  hl.dsp.exec_raw("vb-core-brightness --up"),
-  { description = "Brightness up", locked = true, repeating = true }
-)
-hl.bind(
-  mainMod .. " + SHIFT + F10",
-  hl.dsp.exec_raw("vb-core-brightness --down"),
-  { description = "Brightness down", locked = true, repeating = true }
-)
-hl.bind(
-  "XF86MonBrightnessUp",
-  hl.dsp.exec_raw("vb-core-brightness --up"),
-  { description = "Brightness up", locked = true, repeating = true }
-)
-hl.bind(
-  "XF86MonBrightnessDown",
-  hl.dsp.exec_raw("vb-core-brightness --down"),
-  { description = "Brightness down", locked = true, repeating = true }
-)
+if chassis_type ~= "vm" then
+  hl.bind(
+    mainMod .. " + SHIFT + F11",
+    hl.dsp.exec_raw("vb-core-brightness --up"),
+    { description = "Brightness up", locked = true, repeating = true }
+  )
+  hl.bind(
+    mainMod .. " + SHIFT + F10",
+    hl.dsp.exec_raw("vb-core-brightness --down"),
+    { description = "Brightness down", locked = true, repeating = true }
+  )
+  hl.bind(
+    "XF86MonBrightnessUp",
+    hl.dsp.exec_raw("vb-core-brightness --up"),
+    { description = "Brightness up", locked = true, repeating = true }
+  )
+  hl.bind(
+    "XF86MonBrightnessDown",
+    hl.dsp.exec_raw("vb-core-brightness --down"),
+    { description = "Brightness down", locked = true, repeating = true }
+  )
+end
 
 -- Clipboard management
 hl.bind(mainMod .. " + V", hl.dsp.exec_raw("vb-core-clipboard --show"), { description = "Show clipboard" })
 hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_raw("vb-core-clipboard --clear"), { description = "Clear clipboard" })
-
--- Screen Recording
-hl.bind("CTRL + ALT + R", hl.dsp.exec_raw("vb-menu-recording"), { description = "Record screen" })
 
 -- Screenshots
 hl.bind(
@@ -270,7 +283,10 @@ hl.bind(
 hl.bind(mainMod .. " + B", hl.dsp.exec_raw("vb-core-power --next"), { description = "Next power profile" })
 
 -- System monitoring
-hl.bind(mainMod .. " + Grave", hl.dsp.exec_raw("vb-launch-tui -- nvtop"), { description = "Open nvtop" })
+if chassis_type ~= "vm" then
+  hl.bind(mainMod .. " + Grave", hl.dsp.exec_raw("vb-launch-tui -- nvtop"), { description = "Open nvtop" })
+end
+
 hl.bind(mainMod .. " + ESCAPE", hl.dsp.exec_raw("vb-launch-tui -- btop"), { description = "Open btop" }) -- < KDE Plasma-like
 hl.bind("CTRL + SHIFT + ESCAPE", hl.dsp.exec_raw("vb-launch-tui -- btop"), { description = "Open btop" }) -- < MS Windows-like
 
