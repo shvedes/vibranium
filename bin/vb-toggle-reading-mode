@@ -34,12 +34,18 @@ if [[ "$1" =~ ^(-h|--help)$ ]]; then
 fi
 
 SHADER="$VIBRANIUM/default/hypr/shaders/grayscale.glsl"
-CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua"
 
 if _grayscale_enabled; then
   rm -f "$CONFIG"
 else
-  echo "decoration:screen_shader = $SHADER" >"$CONFIG"
+  cat <<EOF >"$CONFIG"
+hl.config({
+  decoration = {
+    screen_shader = "$SHADER"
+  }
+})
+EOF
 fi
 
 hyprctl -q reload config-only &

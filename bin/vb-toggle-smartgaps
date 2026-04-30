@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-FILE="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.conf"
+FILE="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.lua"
 SELF="${0##*/}"
 
 shcat() {
@@ -31,14 +31,27 @@ if [[ -f "$FILE" ]]; then
   rm -f "$FILE"
 else
   shcat >"$FILE" <<EOF
-workspace = w[tv1]s[false], gapsout:0, gapsin:0
-workspace = f[1]s[false], gapsout:0, gapsin:0
+hl.workspace_rule({
+  workspace = "w[tv1]s[false]",
+  gaps_out = 0,
+  gaps_in = 0,
+})
 
-windowrule = border_size 0, match:float 0, match:workspace w[tv1]s[false]
-windowrule = no_shadow 1, match:float 0, match:workspace w[1]s[false]
-windowrule = rounding 0, match:float 0, match:workspace w[tv1]s[false]
-windowrule = border_size 0, match:float 0, match:workspace f[1]s[false]
-windowrule = rounding 0, match:float 0, match:workspace f[1]s[false]
+hl.workspace_rule({
+  workspace = "f[1]s[false]",
+  gaps_out = 0,
+  gaps_in = 0,
+})
+
+hl.window_rule({
+  match = {
+    float = false,
+    workspace = "w[tv1]s[false]",
+  },
+  rounding = 0,
+  border_size = 0,
+  no_shadow = true,
+})
 EOF
 fi
 

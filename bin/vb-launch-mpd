@@ -107,7 +107,7 @@ WINDOW_ADDRESS="$(
 )"
 
 if [[ -n "$WINDOW_ADDRESS" ]]; then
-  hyprctl dispatch focuswindow "address:$WINDOW_ADDRESS"
+  hyprctl -q dispatch "hl.dsp.focus({window = 'address:${WINDOW_ADDRESS}'})"
 else
   xdg-terminal-exec --app-id=mpd --title="$CLIENT" -- "$CLIENT"
 fi

@@ -667,16 +667,15 @@ hypr::is_fullscreen() {
 }
 
 hypr::flash::border() {
-  [[ "$(hyprctl -j getoption animations:enabled | jq -r '.int')" == 0 ]] && return 0
+  # [[ "$(hyprctl -j getoption 'animations.enabled' | jq -r '.int')" == 0 ]] && return 0
 
-  hyprctl -q "keyword general:col.active_border rgb(${P_TEXT###})"
+  setsid -f hyprctl -q eval "hl.config({general = {col = {active_border = 'rgb(${P_TEXT###})'}}})"
   sleep 0.2
   hyprctl -q reload config-only
 }
 
 hypr::flash::screen() {
-  local anim_status="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
-  [[ $anim_status == 0 ]] && return 0
+  [[ "$(hyprctl -j getoption 'animations.enabled' | jq -r '.int')" == 0 ]] && return 0
 
   hyprctl -q hyprsunset gamma 150
   hyprctl -q hyprsunset gamma 100

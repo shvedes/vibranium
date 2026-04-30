@@ -96,12 +96,12 @@ apply_zoom100() {
   fi
 
   # One IPC request for both runtime changes.
-  if ! hyprctl --batch "keyword cursor:zoom_factor $new_float ; keyword cursor:no_warps $no_warps" >/dev/null 2>&1; then
-    printf 'Failed to set zoom factor to %s\n' "$new_float" >&2
-    return 1
-  fi
-
-  printf '%s\n' "$new_float"
+  # if ! hyprctl --batch "keyword cursor.zoom_factor $new_float ; keyword cursor.no_warps $no_warps" >/dev/null 2>&1; then
+  #   printf 'Failed to set zoom factor to %s\n' "$new_float" >&2
+  #   return 1
+  # fi
+  hyprctl eval "hl.config({cursor = {zoom_factor = ${new_float}}})"
+  # printf '%s\n' "$new_float"
 }
 
 while (($#)); do

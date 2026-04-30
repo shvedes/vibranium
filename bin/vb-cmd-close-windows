@@ -35,5 +35,5 @@ done
 mapfile -t window_addresses < <(hyprctl clients -j | jq -r ".[].address")
 
 for addr in "${window_addresses[@]}"; do
-  hyprctl dispatch closewindow "address:$addr"
+  hyprctl -q dispatch "hl.dsp.window.close({window = 'address:${window_addresses}'})"
 done

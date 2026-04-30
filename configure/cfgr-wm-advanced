@@ -3,13 +3,13 @@
 source vb-lib-hypr
 
 ADVANCED_SPEC=(
-  "misc:vrr|int"
-  "misc:vfr|bool"
-  "misc:middle_click_paste|bool"
-  "render:direct_scanout|bool"
-  "misc:disable_autoreload|bool"
-  "general:layout|str"
-  "cursor:zoom_detached_camera|bool"
+  "misc.vrr|int"
+  "debug.vfr|bool"
+  "misc.middle_click_paste|bool"
+  "render.direct_scanout|bool"
+  "misc.disable_autoreload|bool"
+  "general.layout|str"
+  "cursor.zoom_detached_camera|bool"
 )
 
 _set_vrr() {
@@ -56,27 +56,27 @@ _build() {
     --func "_set_vrr"
 
   cfgr::item::action \
-    --label "Zoom detached camera : ${HYPR[cursor:zoom_detached_camera]}" \
+    --label "Zoom detached camera : ${HYPR[cursor.zoom_detached_camera]}" \
     --func "_toggle 'cursor:zoom_detached_camera'"
 
   cfgr::item::action \
-    --label "Variable frame rate : ${HYPR[misc:vfr]}" \
-    --func "_toggle 'misc:vfr'"
+    --label "Variable frame rate : ${HYPR[misc.vfr]}" \
+    --func "_toggle 'debug:vfr'"
 
   cfgr::item::action \
-    --label "Disable auto reload : ${HYPR[misc:disable_autoreload]}" \
+    --label "Disable auto reload : ${HYPR[misc.disable_autoreload]}" \
     --func "_toggle 'misc:disable_autoreload'"
 
   cfgr::item::action \
-    --label "Middle click paste : ${HYPR[misc:middle_click_paste]}" \
+    --label "Middle click paste : ${HYPR[misc.middle_click_paste]}" \
     --func "_toggle 'misc:middle_click_paste'"
 
   cfgr::item::action \
-    --label "Direct scanout : ${HYPR[render:direct_scanout]}" \
+    --label "Direct scanout : ${HYPR[render.direct_scanout]}" \
     --func "_toggle 'render:direct_scanout'"
 
   cfgr::item::action \
-    --label "Layout : ${HYPR[general:layout]^}" \
+    --label "Layout : ${HYPR[general.layout]^}" \
     --func "_set_layout"
 }
 

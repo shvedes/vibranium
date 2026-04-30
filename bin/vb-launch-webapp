@@ -82,7 +82,7 @@ focus_or_launch() {
   )"
 
   if [[ -n "$window_address" ]]; then
-    hyprctl -q dispatch focuswindow "address:$window_address"
+    hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
   else
     exec setsid -f app2unit -- "${cmd[@]}"
   fi

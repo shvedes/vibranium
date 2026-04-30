@@ -2,12 +2,11 @@
 
 _HYPR_D="$XDG_CONFIG_HOME/hypr/hyprland.conf.d"
 
-export HYPR_CONF_INPUT="$_HYPR_D/input.conf"
-export HYPR_CONF_ADVANCED="$_HYPR_D/advanced.conf"
-export HYPR_CONF_LAF="$_HYPR_D/look-and-feel.conf"
-export HYPR_CONF_SMARTGAPS="$_HYPR_D/smart-gaps.conf"
-export HYPR_CONF_ANIMATIONS="$_HYPR_D/animations.conf"
-export HYPRLOCK_CONFIG="$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+export HYPR_CONF_INPUT="$_HYPR_D/input.lua"
+export HYPR_CONF_ADVANCED="$_HYPR_D/advanced.lua"
+export HYPR_CONF_LAF="$_HYPR_D/look-and-feel.lua"
+export HYPR_CONF_SMARTGAPS="$_HYPR_D/smart-gaps.lua"
+export HYPR_CONF_ANIMATIONS="$_HYPR_D/animations.lua"
 
 # Single-option read helpers
 
