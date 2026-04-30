@@ -11,7 +11,7 @@ if ! command -v cargo >/dev/null; then
   sudo pacman -S --noconfirm rust &>/dev/null
 fi
 
-git clone -q https://github.com/shvedes/hyprland-config-editor /tmp/hce && cd /tmp/hce
+git clone -q https://github.com/shvedes/hyprland-config-editor --branch lua /tmp/hce && cd /tmp/hce
 
 make install BINARY=vb-cmd-edit-wm-config PREFIX=~/.local/share/vibranium &>/dev/null
 

@@ -132,8 +132,8 @@ hl.bind(mainMod .. " + period", hl.dsp.exec_raw("vb-menu-emoji"), { description 
 hl.bind("XF86Calculator", hl.dsp.exec_raw("vb-util-calc"), { description = "Toggle Calculator" })
 
 -- Zoom
-hl.bind(mainMod .. " + SHIFT + mouse_up", hl.dsp.exec_raw("vb-core-zoom --increase"), { description = "Zoom in" })
-hl.bind(mainMod .. " + SHIFT + mouse_down", hl.dsp.exec_raw("vb-core-zoom --decrease"), { description = "Zoom out" })
+hl.bind(mainMod .. " + SHIFT + mouse_down", hl.dsp.exec_raw("vb-core-zoom --increase"), { description = "Zoom in" })
+hl.bind(mainMod .. " + SHIFT + mouse_up", hl.dsp.exec_raw("vb-core-zoom --decrease"), { description = "Zoom out" })
 
 -- Adjust window's volume
 hl.bind(mainMod .. " + mouse_up", hl.dsp.exec_raw("vb-cmd-window-volume --down"), { description = "Window volume up" })
