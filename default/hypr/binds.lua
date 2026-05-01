@@ -103,12 +103,8 @@ for i = 1, 10 do
   )
 end
 
-hl.bind("CTRL + " .. mainMod .. " + Right", hl.dsp.focus({ workspace = "next" }), { description = "Next workspace" })
-hl.bind(
-  "CTRL + " .. mainMod .. " + Left",
-  hl.dsp.focus({ workspace = "previous" }),
-  { description = "Previous workspace" }
-)
+hl.bind("CTRL + " .. mainMod .. " + Right", hl.dsp.focus({ workspace = "m+1" }), { description = "Next workspace" })
+hl.bind("CTRL + " .. mainMod .. " + Left", hl.dsp.focus({ workspace = "m-1" }), { description = "Previous workspace" })
 
 -- Special worksapce
 hl.bind(mainMod .. " + Minus", hl.dsp.workspace.toggle_special("scratchpad"), { description = "Toggle scratchpad" })
