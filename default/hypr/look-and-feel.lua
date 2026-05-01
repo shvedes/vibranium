@@ -43,15 +43,9 @@ hl.config({
     },
   },
 
-  -- animations = function()
-  --   return {
-  --     enabled = os.getenv("CHASSIS_TYPE") ~= "vm",
-  --   }
-  -- end,
-
-  -- animations = {
-  --   enabled = true,
-  -- },
+  animations = {
+    enabled = os.getenv("CHASSIS_TYPE") ~= "vm",
+  },
 
   misc = {
     animate_manual_resizes = true,
