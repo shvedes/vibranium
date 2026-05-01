@@ -388,8 +388,21 @@ _cleanup() {
   yay -Ycc --noconfirm &>/dev/null
 
   if [[ "$KEEP_CACHE" == false ]]; then
-    echo -e "${BLUE}[VIBRANIUM]${RESET} Removing package cache"
-    yay -Scc --noconfirm &>/dev/null
+    local do_clean=false
+
+    if [[ -f "$VIBRANIUM_CACHE/${0##*/}.remove_cache" ]]; then
+      do_clean=true
+    elif term::ask_yes_no Y "Remove package cache?"; then
+      do_clean=true
+      if term::ask_yes_no Y "Remember this option?"; then
+        : >"$VIBRANIUM_CACHE/${0##*/}.remove_cache"
+      fi
+    fi
+
+    if [[ "$do_clean" == true ]]; then
+      yay -Scc --noconfirm &>/dev/null &
+      term::spinner $! "${BLUE}[VIBRANIUM]${RESET} Removing package cache" "" ""
+    fi
   fi
 }
 
