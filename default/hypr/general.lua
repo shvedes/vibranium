@@ -35,7 +35,7 @@ hl.config({
 
   ecosystem = {
     no_update_news = true,
-    enforce_permissions = true,
+    enforce_permissions = false,
   },
 
   render = {
