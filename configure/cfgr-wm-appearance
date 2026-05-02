@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+source vb-lib-core
+source vb-lib-cfgr
 source vb-lib-hypr
 
 BLUR_SPEC=(
@@ -17,20 +19,19 @@ SHADOW_SPEC=(
   "decoration.shadow.render_power|int"
   "decoration.shadow.range|int"
   "decoration.shadow.sharp|bool"
-  "decoration.shadow.ignore_window|bool_inv"
 )
 
 DECORATION_SPEC=(
   "general.border_size|int"
   "decoration.rounding|int"
-  "decoration.rounding_power|float2"
-  "decoration.active_opacity|float2"
-  "decoration.inactive_opacity|float2"
-  "decoration.fullscreen_opacity|float2"
+  "decoration.rounding_power|float"
+  "decoration.active_opacity|float"
+  "decoration.inactive_opacity|float"
+  "decoration.fullscreen_opacity|float"
   "decoration.dim_inactive|bool"
-  "decoration.dim_strength|float2"
+  "decoration.dim_strength|float"
   "decoration.dim_modal|bool"
-  "decoration.dim_special|float2"
+  "decoration.dim_special|float"
   "decoration.border_part_of_window|bool"
 )
 
@@ -49,7 +50,11 @@ _gaps_menu() {
     local gaps_in="${_v[0]}" gaps_out="${_v[1]}"
 
     local smartgaps_enabled
-    [[ -f "$HYPR_CONF_SMARTGAPS" ]] && smartgaps_enabled=enabled || smartgaps_enabled=disabled
+    if [[ -f "$HYPR_CONF_SMARTGAPS" ]]; then
+      smartgaps_enabled=enabled
+    else
+      smartgaps_enabled=disabled
+    fi
 
     cfgr::item::action \
       --label "Gaps in : $gaps_in" \
@@ -109,7 +114,7 @@ _shadow_menu() {
 
     cfgr::item::action \
       --label "Enabled : ${HYPR[decoration.shadow.enabled]}" \
-      --func "_toggle 'decoration.shadow.enabled'"
+      --func "_toggle 'decoration:shadow:enabled'"
 
     if [[ ${HYPR[decoration.shadow.enabled]} == true ]]; then
       cfgr::item::action \
@@ -123,10 +128,6 @@ _shadow_menu() {
       cfgr::item::action \
         --label "Sharp : ${HYPR[decoration.shadow.sharp]}" \
         --func "_toggle 'decoration:shadow:sharp'"
-
-      cfgr::item::action \
-        --label "Behind window : ${HYPR[decoration.shadow.ignore_window]}" \
-        --func "_toggle 'decoration:shadow:ignore_window'"
     fi
   }
   cfgr::run "Blur" "_b"
@@ -177,7 +178,7 @@ _decoration_menu() {
 
     cfgr::item::action \
       --label "Dim special workspace : ${HYPR[decoration.dim_special]}" \
-      --func "_toggle 'decoration:dim_special'"
+      --func "_set_int 'Dim Strength' 'Special workspace' float 0.0 1.0 'decoration:dim_special'"
 
     cfgr::item::action \
       --label "Border part of window : ${HYPR[decoration.border_part_of_window]}" \
@@ -191,14 +192,14 @@ _anim_submenu() {
     hypr::reload
 
     local chosen active_preset enabled
-    [[ "$(hypr::int "animations.enabled")" == 1 ]] && enabled=true || enabled=false
 
+    enabled="$(hypr::bool "animations.enabled")"
 
     cfgr::item::action --label "Enabled : $enabled" --func "_toggle 'animations:enabled'"
 
     if [[ "$enabled" == true ]]; then
       active_preset="$(readlink "$HYPR_CONF_ANIMATIONS")"
-      active_preset="${active_preset##*/}"; active_preset="${active_preset%.conf}"
+      active_preset="${active_preset##*/}"; active_preset="${active_preset%.lua}"
 
       cfgr::item::action --label "Preset : ${active_preset^}" --func "_set_anim_preset"
     fi
@@ -216,9 +217,13 @@ _edit_roundness() {
   )" || return
 
   hypr::set "decoration:rounding" "$input" "$HYPR_CONF_LAF"
-  sed -i "/corner_radius/s/=.*/= $input/"        "$XDG_CONFIG_HOME/dunst/dunstrc"
-  sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/rofi/config.rasi"
-  sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/swayosd/style.css"
+
+  # Ignore error outputs in case if the user changed these configs
+
+  sed -i "/corner_radius/s/=.*/= $input/"        "$XDG_CONFIG_HOME/dunst/dunstrc" 2>/dev/null
+  sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/rofi/config.rasi" 2>/dev/null
+  sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/swayosd/style.css" 2>/dev/null
+
   vb-refresh-dunst &
 
   helpers::check VIBRANIUM_GLOBAL_USE_OSD

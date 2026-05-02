@@ -5,10 +5,10 @@ source vb-lib-hypr
 ADVANCED_SPEC=(
   "misc.vrr|int"
   "debug.vfr|bool"
-  "misc.middle_click_paste|bool"
-  "render.direct_scanout|bool"
-  "misc.disable_autoreload|bool"
   "general.layout|str"
+  "render.direct_scanout|int"
+  "misc.middle_click_paste|bool"
+  "misc.disable_autoreload|bool"
   "cursor.zoom_detached_camera|bool"
 )
 
@@ -16,12 +16,24 @@ _set_vrr() {
   local chosen
   chosen="$(cfgr::set_string \
     --title "VRR" \
-    --option "Enable:1" \
-             "Disable:0" \
+    --option "Enabled:1" \
+             "Disabled:0" \
              "Fullscreen only:2"
   )"
 
   hypr::set "misc:vrr" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set_ds() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Direct Scanout" \
+    --option "Enabled:1" \
+             "Disabled:0" \
+             "Auto:2"
+  )"
+
+  hypr::set "render:direct_scanout" "$chosen" "$HYPR_CONF_ADVANCED"
 }
 
 _set_layout() {
@@ -29,6 +41,7 @@ _set_layout() {
     --title "Windows Layout" \
     --option "Dwindle:dwindle" \
              "Master:master" \
+             "Monocle:monocle" \
              "Scrolling:scrolling"
   )"
   hypr::set "general:layout" "$chosen" "$HYPR_CONF_ADVANCED"
@@ -43,12 +56,19 @@ _build() {
   hypr::reload
   hypr::fetch "${ADVANCED_SPEC[@]}"
 
-  # VRR has 3 states, map int -> display string
-  local vrr_display=
-  case "${HYPR[misc:vrr]}" in
-    1) vrr_display=enabled ;;
-    0) vrr_display=disabled ;;
-    *) vrr_display="Fullscreen only" ;;
+  # VRR / Direct Scanout has 3 states, map int -> display string
+  local vrr_display= ds_display=
+
+  case "${HYPR[misc.vrr]}" in
+    1) vrr_display="enabled" ;;
+    0) vrr_display="disabled" ;;
+    2) vrr_display="fullscreen only" ;;
+  esac
+
+  case "${HYPR[render.direct_scanout]}" in
+    1) ds_display="enabled" ;;
+    0) ds_display="disabled" ;;
+    2) ds_display="auto" ;;
   esac
 
   cfgr::item::action \
@@ -60,7 +80,7 @@ _build() {
     --func "_toggle 'cursor:zoom_detached_camera'"
 
   cfgr::item::action \
-    --label "Variable frame rate : ${HYPR[misc.vfr]}" \
+    --label "Variable frame rate : ${HYPR[debug.vfr]}" \
     --func "_toggle 'debug:vfr'"
 
   cfgr::item::action \
@@ -72,11 +92,11 @@ _build() {
     --func "_toggle 'misc:middle_click_paste'"
 
   cfgr::item::action \
-    --label "Direct scanout : ${HYPR[render.direct_scanout]}" \
-    --func "_toggle 'render:direct_scanout'"
+    --label "Direct scanout : ${ds_display}" \
+    --func "_set_ds"
 
   cfgr::item::action \
-    --label "Layout : ${HYPR[general.layout]^}" \
+    --label "Windows layout : ${HYPR[general.layout]}" \
     --func "_set_layout"
 }
 

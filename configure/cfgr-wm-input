@@ -4,24 +4,20 @@ source vb-lib-hypr
 
 WAYBAR_CFG="$XDG_CONFIG_HOME/waybar/config.jsonc"
 
-# Fetch specs
-# Declared once. Each entry is "option:path|type".
-# Types: bool, bool_inv, int, float, float1, float2, str  (see hypr-lib)
-
 INPUT_SPEC=(
-  "input.sensitivity|float2"
+  "input.sensitivity|float"
   "input.accel_profile|str"
   "input.repeat_rate|int"
   "input.repeat_delay|int"
-  "input.scroll_factor|float1"
+  "input.scroll_factor|float"
   "input.natural_scroll|bool"
-  "cursor.inactive_timeout|float_int"
+  "cursor.inactive_timeout|float"
   "cursor.hide_on_key_press|bool"
   "input.kb_layout|str"
 )
 
 TOUCHPAD_SPEC=(
-  "input.touchpad.scroll_factor|float2"
+  "input.touchpad.scroll_factor|float"
   "input.touchpad.tap-to-click|bool"
   "input.touchpad.natural_scroll|bool"
   "input.touchpad.disable_while_typing|bool"
@@ -218,21 +214,29 @@ _build() {
 
   # Two options need a derived display value; everything else is used directly
   ACCEL="${HYPR[input.accel_profile]}"
-  [[ "$ACCEL" == "adaptive" ]] && ACCEL=true || ACCEL=false
+  if [[ "$ACCEL" == "adaptive" ]]; then
+    ACCEL=true
+  else
+    ACCEL=false
+  fi
 
   local cursor_hide="${HYPR[cursor.inactive_timeout]}"
-  [[ "$cursor_hide" == "0" ]] && cursor_hide="never" || cursor_hide+="s"
+  if [[ "$cursor_hide" == 0* ]]; then
+    cursor_hide="never"
+  else
+    cursor_hide+="s"
+  fi
 
   if [[ "$(hyprctl devices)" =~ [Tt]ouchpad ]]; then
     true
   fi
 
   cfgr::item::action \
-    --label "Keyboard repeat delay : ${HYPR[input:repeat_delay]}ms" \
+    --label "Keyboard repeat delay : ${HYPR[input.repeat_delay]}ms" \
     --func "_set_int 'Repeat Delay' 'Delay (ms)' int 200 1000 'input:repeat_delay'"
 
   cfgr::item::action \
-    --label "Keyboard repeat rate : ${HYPR[input:repeat_rate]}" \
+    --label "Keyboard repeat rate : ${HYPR[input.repeat_rate]}" \
     --func "_set_int 'Repeat rate' 'Rate (int)' int 10 50 'input:repeat_rate'"
 
   cfgr::item::action \
@@ -244,23 +248,23 @@ _build() {
     --func "_set_int 'Hide After' 'Seconds (zero - never)' int 0 86400 'cursor:inactive_timeout'"
 
   cfgr::item::action \
-    --label "Natural scrolling : ${HYPR[input:natural_scroll]}" \
+    --label "Natural scrolling : ${HYPR[input.natural_scroll]}" \
     --func "_toggle 'input:natural_scroll'"
 
   cfgr::item::action \
-    --label "Mouse sensitivity : ${HYPR[input:sensitivity]}" \
+    --label "Mouse sensitivity : ${HYPR[input.sensitivity]}" \
     --func "_set_int 'Sensitivity' 'Sensitivity (float)' float -1.0 1.0 'input:sensitivity'"
 
   cfgr::item::action \
-    --label "Hide on key press : ${HYPR[cursor:hide_on_key_press]}" \
+    --label "Hide on key press : ${HYPR[cursor.hide_on_key_press]}" \
     --func "_toggle 'cursor:hide_on_key_press'"
 
   cfgr::item::action \
-    --label "Scrolling factor : ${HYPR[input:scroll_factor]}" \
+    --label "Scrolling factor : ${HYPR[input.scroll_factor]}" \
     --func "_set_int 'Scrolling Factor' 'Factor (float)' float 0.1 10.0 'input:scroll_factor'"
 
   cfgr::item::action \
-    --label "Keyboard layouts : ${HYPR[input:kb_layout]}" \
+    --label "Keyboard layouts : ${HYPR[input.kb_layout]}" \
     --func "_layouts_menu"
 }
 
