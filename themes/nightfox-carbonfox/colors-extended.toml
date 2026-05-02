@@ -42,9 +42,9 @@ gray_dim = "#2a2a2a"
 gray = "#525253"
 gray_bright = "#7e7e7e"
 
-accent_dim = "#3d3d3d"
-accent = "#484848"
-accent_bright = "#696969"
+accent_dim = "#667bbe"
+accent = "#78a9ff"
+accent_bright = "#a2c0ff"
 
 background_h = "#141414"
 background_0 = "#161616"
