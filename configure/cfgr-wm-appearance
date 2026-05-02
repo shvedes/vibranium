@@ -40,10 +40,10 @@ _gaps_menu() {
   _b() {
     hypr::reload
 
-    # gaps return their value via .custom, not .int — read directly
+    # gaps return their value via .css, not .int — read directly
     mapfile -t _v < <(
       hyprctl --batch -j "getoption general.gaps_in; getoption general.gaps_out" |
-      jq -r '.custom | split(" ")[0]'
+      jq -r '.css | split(" ")[0]'
     )
 
     local gaps_in="${_v[0]}" gaps_out="${_v[1]}"

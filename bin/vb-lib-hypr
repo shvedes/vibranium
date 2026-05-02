@@ -66,8 +66,8 @@ hypr::fetch() {
     jq_prog+="${jq_prog:+,}($expr)"
   done
 
-  # Bash substitution patches bare `nan` tokens before jq sees them —
-  # no external process needed. jq -rs slurps the concatenated JSON objects
+  # Bash substitution patches bare `nan` tokens before jq sees them.
+  # jq -rs slurps the concatenated JSON objects
   # into an array natively, so .[i] indexing is reliable without regex splitting.
   local raw vals
   raw=$(hyprctl -j --batch "$query")
