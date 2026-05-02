@@ -13,7 +13,7 @@ _build() {
   fi
 
   cfgr::item::action --label "Toggle inhibitor" --func "vb-toggle-inhibitor; _die" --icon vb-inhibitor
-  cfgr::item::action --label "Reload Vibranium" --func "vb-cmd-reload; _die" --icon vb-update
+  cfgr::item::action --label "Reload Vibranium" --func "vb-cmd-reload --quiet; _die" --icon vb-update
   cfgr::item::action --label "Close all windows" --func "vb-cmd-close-windows; _die" --icon vb-xmark
 
   if [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
