@@ -16,7 +16,6 @@ papirus-icon-theme
 xdg-terminal-exec
 adw-gtk-theme
 imagemagick
-awww-git
 chromium
 cliphist
 app2unit
@@ -24,6 +23,7 @@ starship
 zenity
 slurp
 satty
+awww
 grim
 foot
 imv
