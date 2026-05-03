@@ -57,7 +57,7 @@
 #       |
 #       +-- cfgr::item::action
 #       |     _CFGR_ITEMS[N]     = "<b>Advanced</b>"
-#       |     _CFGR_DISPATCH[N]  = "action:_func_name"
+#       |     _CFGR_DISPATCH[N]  = "action:_func_name"  (or "action:_func_name\x1EHOOK")
 #       |
 #       v
 #   cfgr::build_menu()               aligns " : value" columns for clean output
@@ -103,6 +103,8 @@
 #           (HOOK is an empty field when omitted; colon count stays constant)
 #
 #   action  action:FUNCNAME
+#           action:FUNCNAME\x1EHOOK
+#           (0x1E separates FUNCNAME from HOOK; colons are legal in both fields)
 #
 #   display display:
 #
@@ -773,7 +775,7 @@ cfgr::item::string() {
   _CFGR_DISPATCH+=("string:${var}:${rofi_title}:${hook}:${opts_str%$'\x1F'}")
 }
 
-# cfgr::item::action  --func FUNC  --label LABEL  [--icon ICON]
+# cfgr::item::action  --func FUNC  --label LABEL  [--icon ICON]  [--hook HOOK]
 #
 # Registers a menu row that runs a function when selected.
 # The label is displayed in bold (pango markup: <b>label</b>).
@@ -783,6 +785,19 @@ cfgr::item::string() {
 #   --label LABEL  - text shown in the menu row
 #
 #   --icon ICON    - optional icon path or name shown by rofi next to the row.
+#
+#   --hook HOOK    - optional. Shell command or function name to run after the
+#                   action returns. Launched in a detached subshell (& disown)
+#                   so it does not block the menu from redrawing.
+#                   Useful for side effects that are slow relative to the menu
+#                   loop: reloading a bar segment, signalling a service, etc.
+#                   The hook fires after the action fully completes -- including
+#                   after the user dismisses any submenu the action may open.
+#
+# Encoding note: HOOK is stored in the descriptor using ASCII record-separator
+# (0x1E) as the delimiter between FUNC and HOOK, because both fields may
+# legitimately contain colons (URLs, compound commands). 0x1E never appears
+# in realistic shell strings so the split is unambiguous.
 #
 # This is the most flexible declarator. Use it for:
 #
@@ -814,6 +829,7 @@ cfgr::item::action() {
   local func=""
   local label=""
   local icon=""
+  local hook=""
 
   while (($# > 0)); do
     case "$1" in
@@ -823,6 +839,10 @@ cfgr::item::action() {
       ;;
     --label)
       label="$2"
+      shift 2
+      ;;
+    --hook)
+      hook="$2"
       shift 2
       ;;
     --icon)
@@ -842,7 +862,16 @@ cfgr::item::action() {
     _CFGR_ITEMS+=("<b>$label</b>")
   fi
 
-  _CFGR_DISPATCH+=("action:${func}")
+  # Append the hook using ASCII record-separator (0x1E) as the delimiter.
+  # Colons are NOT used here because both FUNC and HOOK may contain them
+  # (URLs in compound commands, e.g. _launch 'https://...').
+  # The plain action:FUNC form is preserved when no hook is given so
+  # existing call sites require no changes.
+  if [[ -n "$hook" ]]; then
+    _CFGR_DISPATCH+=("action:${func}"$'\x1E'"${hook}")
+  else
+    _CFGR_DISPATCH+=("action:${func}")
+  fi
   _CFGR_ICONS+=("$icon")
 }
 
@@ -856,6 +885,7 @@ cfgr::item::action() {
 #
 # DISPATCH_STRING - must be a valid descriptor in one of these formats:
 #   action:FUNCNAME
+#   action:FUNCNAME\x1EHOOK          (0x1E = ASCII record-separator)
 #   bool:VARNAME
 #   bool:VARNAME:action:HOOK
 #   digit:VAR:PROMPT:ROFI_TITLE:TYPE:MIN:MAX
@@ -976,39 +1006,38 @@ cfgr::dispatch() {
     ;;
 
   action)
-    # Descriptor format: action:FUNCNAME_OR_SCRIPT
+    # Descriptor format: action:FUNCNAME  or  action:FUNCNAME\x1EHOOK
     #
-    # Two paths depending on whether the payload names a defined shell
-    # function or an executable script in PATH.
+    # The 0x1E (ASCII record-separator) is used instead of a colon because
+    # both FUNCNAME and HOOK may contain colons (URLs in compound commands).
+    # Peeling on 0x1E is safe; it never appears in real shell strings.
     #
-    # Function path (most common):
-    #   The function is already defined in this process (it was declared by
-    #   the current script or a previously sourced library). Call it directly.
-    #   This is the original behaviour and requires no changes at call sites.
+    # Three dispatch paths depending on what FUNCNAME looks like:
+    #   1. Defined bash function  -> call directly.
+    #   2. Compound command (has whitespace / shell metacharacters) -> eval.
+    #   3. Bare name not defined as a function -> look it up in PATH, source it.
     #
-    # Script path (the new in-process path):
-    #   The payload is not a defined function but IS a script resolvable in
-    #   PATH (e.g. "cfgr-recording"). Instead of exec-ing it as a new bash
-    #   process, we source it inside the current one. Sourcing means:
-    #     1. "source vb-lib-core" and "source vb-lib-cfgr" at the top of
-    #        the child script are no-ops (source guards fire, return 0).
-    #     2. The child script defines its _build function.
-    #     3. The child script calls cfgr::run "Title" "_build" VARS, which
-    #        blocks in its own while loop until the user presses ESC.
-    #     4. cfgr::run returns, source returns, we are back here.
-    #
-    # _build collision:
-    #   Every cfgr-* script uses "_build" as its build function name.
-    #   Sourcing a child script overwrites the parent's _build. We save the
-    #   parent's definition text before sourcing and restore it after, so
-    #   the parent's cfgr::run loop can continue correctly on its next
-    #   iteration without any change to any cfgr-* script.
+    # After the action completes on any path, if a hook was supplied it is
+    # launched in a detached subshell (& disown) so the menu can redraw
+    # immediately without waiting for the hook to finish.
 
-    local _func_or_script="$payload"
+    # Split payload on the first 0x1E to separate the func/command from the hook.
+    # When no 0x1E is present, _hook stays empty and _func_or_script is the full payload.
+    local _func_or_script="${payload%%$'\x1E'*}"
+    local _hook=""
+    if [[ "$payload" == *$'\x1E'* ]]; then
+      _hook="${payload#*$'\x1E'}"
+    fi
 
     if declare -f "$_func_or_script" >/dev/null 2>&1; then
       # Fast path: already a defined function, call it directly.
       "$_func_or_script"
+
+      # Fire hook detached after the function returns.
+      if [[ -n "$_hook" ]]; then
+        (eval "$_hook") &
+        disown $!
+      fi
       return
     fi
 
@@ -1020,10 +1049,16 @@ cfgr::dispatch() {
     # Pass them straight to eval and skip the source machinery entirely.
     if [[ "$_func_or_script" =~ [[:space:]\;\|\&\(\)\`] ]]; then
       eval "$_func_or_script"
+
+      # Fire hook detached after the eval returns.
+      if [[ -n "$_hook" ]]; then
+        (eval "$_hook") &
+        disown $!
+      fi
       return
     fi
 
-    # Slow path: not a function — look it up in PATH.
+    # Slow path: not a function -- look it up in PATH.
     local _script_path
     _script_path="$(command -v "$_func_or_script" 2>/dev/null)" || {
       local msg="cfgr::dispatch: '${_func_or_script}' is neither a function nor a PATH script"
@@ -1050,6 +1085,12 @@ cfgr::dispatch() {
     # the child's _build, see wrong items, and potentially spin forever.
     if [[ -n "$_parent_build_def" ]]; then
       eval "$_parent_build_def"
+    fi
+
+    # Fire hook detached after the sourced script's menu is dismissed.
+    if [[ -n "$_hook" ]]; then
+      (eval "$_hook") &
+      disown $!
     fi
     ;;
   display)

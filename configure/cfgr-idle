@@ -62,7 +62,8 @@ _build() {
     --label "Sleep after : ${sleep_timeout}m"
 
   cfgr::item::action \
-    --func "cfgr::set_string --title Type --option 'Idle:idle' 'Sleep:sleep' --var $inh_var && vb-toggle-inhibitor --retoggle" \
+    --func "cfgr::set_string --title Type --option 'Idle:idle' 'Sleep:sleep' --var $inh_var" \
+    --hook "vb-toggle-inhibitor --retoggle" \
     --label "Inhibit type : $inh_type"
 
   cfgr::item::action \
