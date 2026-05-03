@@ -14,10 +14,8 @@ alacritty-sixel-git
 gpu-screen-recorder
 papirus-icon-theme
 xdg-terminal-exec
-papirus-folders
 adw-gtk-theme
 imagemagick
-awww-git
 chromium
 cliphist
 app2unit
@@ -25,6 +23,7 @@ starship
 zenity
 slurp
 satty
+awww
 grim
 foot
 imv

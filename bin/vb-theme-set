@@ -200,7 +200,7 @@ _resolve_active_theme() {
   local family variant
   for family in "${!FAMILIES[@]}"; do
     for variant in ${FAMILIES[$family]}; do
-      if [[ "${FOLDER_MAP[${family} - ${variant}]}" == "$curr_folder" ]]; then
+      if [[ "${FOLDER_MAP[${family}-${variant}]}" == "$curr_folder" ]]; then
         ACTIVE_FAMILY="$family"
         ACTIVE_VARIANT="$variant"
         return
@@ -505,7 +505,7 @@ list_themes() {
 
   for family in "${!FAMILIES[@]}"; do
     for variant in ${FAMILIES[$family]}; do
-      names+=("${FOLDER_MAP[${family} - ${variant}]}")
+      names+=("${FOLDER_MAP[${family}-${variant}]}")
     done
   done
 

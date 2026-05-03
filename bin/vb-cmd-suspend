@@ -59,7 +59,7 @@ if ! sc_out="$(systemctl suspend 2>&1)"; then
   msg+="Command: <b>systemctl suspend</b>\n\n"
   msg+="Error output:\n<b>$sc_out</b>"
 
-  notify-send -u critical -t 10000 \
+  notify-send -u critical -t 30000 \
     "Vibranium" "$msg"
 fi
 

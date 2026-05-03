@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-
 # ================================================================================ #
 
 _get_timeouts() {
@@ -13,7 +12,7 @@ _update_timeout() {
   local seconds="$2"
   local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
 
-  TIMEOUTS[index-1]="$seconds"
+  TIMEOUTS[index - 1]="$seconds"
 
   awk -v lock="${TIMEOUTS[0]}" -v sleep="${TIMEOUTS[1]}" \
     -f "$VIBRANIUM/awk/cfgr-idle-update-timeouts.awk" "$config" > \
@@ -63,7 +62,8 @@ _build() {
     --label "Sleep after : ${sleep_timeout}m"
 
   cfgr::item::action \
-    --func "cfgr::set_string --title Type --option 'Idle:idle' 'Sleep:sleep' --var $inh_var " \
+    --func "cfgr::set_string --title Type --option 'Idle:idle' 'Sleep:sleep' --var $inh_var" \
+    --hook "vb-toggle-inhibitor --retoggle" \
     --label "Inhibit type : $inh_type"
 
   cfgr::item::action \
