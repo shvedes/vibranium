@@ -8,14 +8,15 @@ hl.config({
   decoration = {
     dim_inactive = true,
     rounding = 0,
+
+    blur = {
+      enabled = false,
+      size = 5,
+    },
+
+    shadow = {
+      enabled = true,
+    },
   },
 
-  blur = {
-    enabled = false,
-    size = 5,
-  },
-
-  shadow = {
-    enabled = true,
-  },
 })
