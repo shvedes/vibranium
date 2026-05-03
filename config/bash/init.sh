@@ -14,10 +14,7 @@ RESET=$'\e[0m'
 
 BASH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/bash"
 
-# Source pre-prompt logic first
-source "$BASH_CONFIG_DIR/conf.d/plugins.sh"
-
-for f in "$BASH_CONFIG_DIR"/{plugins,functions,aliases}/*.sh; do
+for f in "$BASH_CONFIG_DIR"/{functions,aliases}/*.sh; do
   source "$f"
 done
 
