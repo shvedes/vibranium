@@ -54,7 +54,7 @@ _set_layout_shortcut() {
   done
 
   local placeholder="__COLON__"
-  hypr::set "input.kb_options" "grp${placeholder}${selected_key#grp:}" "$HYPR_CONF_INPUT"
+  hypr::set "input:kb_options" "grp${placeholder}${selected_key#grp:}" "$HYPR_CONF_INPUT"
   sed -i "s/${placeholder}/:/" "$HYPR_CONF_INPUT"
 }
 
@@ -71,7 +71,7 @@ _remove_layout() {
     fi
   done
 
-  hypr::set "input.kb_layout" "$(IFS=,; echo "${final_layouts[*]}")" "$HYPR_CONF_INPUT"
+  hypr::set "input:kb_layout" "$(IFS=,; echo "${final_layouts[*]}")" "$HYPR_CONF_INPUT"
   notify-send -r 1 "Vibranium" "Removed keyboard layout: <b>$chosen</b>"
 
   # If only one layout remains, the bar language indicator is now useless.
@@ -112,7 +112,7 @@ _add_layout() {
     fi
   done
 
-  hypr::set "input.kb_layout" "${active_layouts},${chosen}" "$HYPR_CONF_INPUT"
+  hypr::set "input:kb_layout" "${active_layouts},${chosen}" "$HYPR_CONF_INPUT"
   notify-send -r 1 "Vibranium" "Added new keyboard layout: <b>${chosen^^}</b>"
 
   # Count the layouts we now have by splitting the combined string on commas.
@@ -165,7 +165,7 @@ _layouts_menu() {
 
     local str
     str="$(hypr::str "input.kb_options")"
-    local shortcut="${KB_GROUPS[$str]:-Unknown}"
+    local shortcut="${KB_GROUPS[$str]:-<i>Unset</i>}"
 
     cfgr::item::action --label "Add new"                         --func "_add_layout"
     cfgr::item::action --label "Remove existing"                 --func "_remove_layout"
@@ -202,9 +202,9 @@ _toggle() {
 
 _toggle_accel() {
   if [[ "$ACCEL" == true ]]; then
-    hypr::set "input.accel_profile" flat "$HYPR_CONF_INPUT"
+    hypr::set "input:accel_profile" flat "$HYPR_CONF_INPUT"
   else
-    hypr::set "input.accel_profile" adaptive "$HYPR_CONF_INPUT"
+    hypr::set "input:accel_profile" adaptive "$HYPR_CONF_INPUT"
   fi
 }
 
@@ -221,6 +221,7 @@ _build() {
   fi
 
   local cursor_hide="${HYPR[cursor.inactive_timeout]}"
+
   if [[ "$cursor_hide" == 0* ]]; then
     cursor_hide="never"
   else
@@ -244,7 +245,7 @@ _build() {
     --func "_toggle_accel"
 
   cfgr::item::action \
-    --label "Hide cursor after : $cursor_hide" \
+    --label "Hide cursor after : ${cursor_hide/.0/}" \
     --func "_set_int 'Hide After' 'Seconds (zero - never)' int 0 86400 'cursor:inactive_timeout'"
 
   cfgr::item::action \
