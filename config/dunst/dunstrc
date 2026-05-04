@@ -46,7 +46,7 @@ sort = update
 # Show a visual indicator that a notification
 # contains a custom action that can be activated
 # by a mouse click.
-# show_indicators = true
+show_indicators = false
 
 # Decide what to do on click when a notification has
 # an action.
