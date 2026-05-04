@@ -154,7 +154,7 @@ hl.window_rule({
   name = "Thunar: File Operation",
   match = {
     class = "[Tt]hunar",
-    title = '^(Rename "(.*?)"|Create New Folder|File Operation Progress)$',
+    title = '^(Rename "(.*?)"|Create New Folder|File Operation Progress|New\\s.*)$',
   },
   float = true,
   center = true,
@@ -169,7 +169,8 @@ hl.window_rule({
 
     -- All package management scripts
     -- And pretty much every TUI that can be launched by clicking on a Waybar module.
-    title = "(vb-(tui|font|webapp|update|pkg|setup|env|theme-install).*|bluetui|vb-update|wiremix|nmtui|impala|iwctl|pass)",
+    title =
+    "(vb-(tui|font|webapp|update|pkg|setup|env|theme-install).*|bluetui|vb-update|wiremix|nmtui|impala|iwctl|pass)",
     float = true,
   },
 
