@@ -213,7 +213,7 @@ _edit_roundness() {
   local input
   input="$(cfgr::set_digit --title \
     "Border Roundness" --hint "Roundness (int)" \
-    --type int --min 0 --max 16
+    --type int --min 0 --max 32
   )" || return
 
   hypr::set "decoration:rounding" "$input" "$HYPR_CONF_LAF"
@@ -223,6 +223,13 @@ _edit_roundness() {
   sed -i "/corner_radius/s/=.*/= $input/"        "$XDG_CONFIG_HOME/dunst/dunstrc" 2>/dev/null
   sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/rofi/config.rasi" 2>/dev/null
   sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/swayosd/style.css" 2>/dev/null
+
+  if ! grep -Pqzo '\*\s*\{[^}]*border-radius\s*:' "$XDG_CONFIG_HOME/gtk-3.0/gtk.css"; then
+    printf '* {\n\tborder-radius: %s;\n}\n' "$input" >> "$XDG_CONFIG_HOME/gtk-3.0/gtk.css"
+  else
+    sed -i '/\*\s*{/,/}/ s/border-radius\s*:\s*[^;]*/border-radius: '"$input"'/' \
+      "$XDG_CONFIG_HOME/gtk-3.0/gtk.css"
+  fi
 
   vb-refresh-dunst &
 
