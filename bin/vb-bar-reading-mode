@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua"
 
 if [[ -f "$CONFIG" ]]; then
   icon="\udb82\udfc2"

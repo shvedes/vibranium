@@ -25,7 +25,7 @@ _build() {
     cfgr::item::action --label "Copy current track" --func "vb-cmd-copy-track --notify; _die" --icon vb-music
   fi
 
-  if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
+  if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua" ]]; then
     cfgr::item::action --label "Disable reading mode" --func "vb-toggle-reading-mode; _die" --icon vb-book
   else
     cfgr::item::action --label "Enable reading mode" --func "vb-toggle-reading-mode; _die" --icon vb-book

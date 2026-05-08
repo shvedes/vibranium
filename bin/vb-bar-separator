@@ -12,7 +12,7 @@ if systemctl -q --user is-active vibranium-inhibit@{sleep,idle}; then
 fi
 
 paths=(
-  "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf"
+  "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua"
   "$VIBRANIUM_RUNTIME/password-manager.action"
   "$VIBRANIUM_RUNTIME/vb-timer.remaining"
   "$VIBRANIUM_STATE/update.available"
