@@ -123,12 +123,19 @@ hl.bind(mainMod .. " + Q", hl.dsp.window.close(), { description = "Close active 
 -- state is cleaned up on config reload so stale timers never carry over.
 --
 -- State between first and second press: { pid, timer }. Nil otherwise.
+
 local kill_confirm = nil
+local in_submap = false
+
+hl.on("keybinds.submap", function(name)
+  in_submap = name ~= ""
+end)
 
 hl.on("config.reloaded", function()
-  -- Always exit any active submap on reload so the user is never stuck in
-  -- a mode after config changes are applied.
-  hl.dispatch(hl.dsp.submap("reset"))
+  if in_submap then
+    hl.dispatch(hl.dsp.submap("reset"))
+    in_submap = false
+  end
 
   if kill_confirm ~= nil then
     kill_confirm.timer:set_enabled(false)
