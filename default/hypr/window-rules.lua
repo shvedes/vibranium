@@ -29,7 +29,7 @@ hl.window_rule({
 
 hl.window_rule({
   match = {
-    class = "(?i)(frefox|zen|librewolf)",
+    class = "(?i)(firefox|zen|librewolf)",
   },
   tag = "+firefoxBasedBrowser",
 })

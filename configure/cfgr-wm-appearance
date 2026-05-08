@@ -41,13 +41,21 @@ _gaps_menu() {
   _b() {
     hypr::reload
 
-    # gaps return their value via .css, not .int — read directly
-    mapfile -t _v < <(
-      hyprctl --batch -j "getoption general.gaps_in; getoption general.gaps_out" |
-      jq -r '.css | split(" ")[0]'
-    )
+    local lnf="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua"
+    local gaps_in gaps_out
 
-    local gaps_in="${_v[0]}" gaps_out="${_v[1]}"
+    if ! gaps_in="$(vb-cmd-edit-wm-config --get 'general:gaps_in' "$lnf")"; then
+      # gaps return their value via .css, not .int — read directly
+      mapfile -t _v < <(
+        hyprctl --batch -j "getoption general.gaps_in; getoption general.gaps_out" |
+        jq -r '.css | split(" ")[0]'
+      )
+
+      gaps_in="${_v[0]}"
+      gaps_out="${_v[1]}"
+    else
+      gaps_out="$(vb-cmd-edit-wm-config --get 'general:gaps_out' "$lnf")"
+    fi
 
     local smartgaps_enabled
     if [[ -f "$HYPR_CONF_SMARTGAPS" ]]; then

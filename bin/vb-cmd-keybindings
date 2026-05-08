@@ -144,7 +144,7 @@ case "$1" in
       -theme-str 'entry { placeholder: " search shortucts"; }' \
       -theme-str 'listview { lines: 20; columns: 1; }' \
       -theme "$XDG_CONFIG_HOME/rofi/config.rasi" \
-      -theme-str 'window { width:500; }' \
+      -theme-str 'window { width:600; }' \
       -p "Keybindings" -no-auto-select
     ;;
 esac

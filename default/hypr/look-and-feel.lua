@@ -43,6 +43,18 @@ hl.config({
     },
   },
 
+  group = {
+    groupbar = {
+      height = 16,
+      font_size = 12,
+      indicator_gap = 0,
+      indicator_height = 8,
+      render_titles = false,
+      font_weight_active = "bold",
+      font_weight_inactive = "light"
+    }
+  },
+
   animations = {
     enabled = os.getenv("CHASSIS_TYPE") ~= "vm",
   },

@@ -53,6 +53,10 @@ hl.config({
     allow_tearing = true,
   },
 
+  group = {
+    insert_after_current = false
+  },
+
   scrolling = {
     follow_min_visible = 0.3,
     column_width = 0.65,
