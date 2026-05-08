@@ -359,24 +359,6 @@ end
 
 -- Workspace management
 
-
--- Switch to or move the active window to workspaces 1–10.
--- Key 0 maps to workspace 10 via the i % 10 index.
-for i = 1, 10 do
-  local key = i % 10
-
-  hl.bind(
-    mainMod .. " + " .. key,
-    hl.dsp.focus({ workspace = i }),
-    { description = "Workspace " .. i }
-  )
-  hl.bind(
-    mainMod .. " + SHIFT + " .. key,
-    hl.dsp.window.move({ workspace = i, follow = false }),
-    { description = "Move to workspace " .. i }
-  )
-end
-
 hl.bind(
   "CTRL + " .. mainMod .. " + Right",
   hl.dsp.focus({ workspace = "m+1" }),
@@ -388,19 +370,54 @@ hl.bind(
   { description = "Previous workspace" }
 )
 
--- Special (scratchpad) workspace.
+-- Move between workspaces, including scratchpad.
+-- Credit: https://www.reddit.com/user/pbo-sab/.
+-- https://www.reddit.com/r/hyprland/comments/1t74dt6/comment/okm9qk2
+local function move_and_toggle_sws(key)
+  local sws = hl.get_active_special_workspace()
+  local cw = hl.get_active_window()
+
+  if cw then
+    if sws then
+      -- Move from special to normal and close the sws.
+      hl.dispatch(hl.dsp.window.move({ workspace = key, follow = false }))
+      hl.dispatch(hl.dsp.workspace.toggle_special("scratchpad"))
+    else
+      -- Move normally.
+      hl.dispatch(hl.dsp.window.move({ workspace = key, follow = false }))
+    end
+  end
+end
+
+for i = 1, 10 do
+  local key = i % 10
+  local label = tostring(key == 0 and 10 or key)
+
+  hl.bind(mainMod .. " + " .. key,
+    hl.dsp.focus({ workspace = i }),
+    { description = "Workspace " .. label }
+  )
+
+  hl.bind(mainMod .. " + SHIFT + " .. key, function()
+    move_and_toggle_sws(i)
+  end, {
+    description = "Move to workspace " .. label
+  })
+end
+
 hl.bind(
   mainMod .. " + Minus",
   hl.dsp.workspace.toggle_special("scratchpad"),
-  { description = "Toggle scratchpad" }
+  { description = "Toggle special workspace" }
 )
 hl.bind(
   mainMod .. " + SHIFT + Minus",
-  hl.dsp.window.move({ workspace = "special:scratchpad" }),
-  { description = "Move to scratchpad" }
+  hl.dsp.window.move({ workspace = "special:scratchpad", follow = false }),
+  { description = "Move to special workspace" }
 )
 
--- Cycle back to the previously focused workspace on the same monitor.
+-- Cycle back to the previously focused
+-- workspace on the same monitor.
 hl.bind(
   mainMod .. " + TAB",
   hl.dsp.focus({ workspace = "previous_per_monitor" }),
