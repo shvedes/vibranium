@@ -228,10 +228,6 @@ _build() {
     cursor_hide+="s"
   fi
 
-  if [[ "$(hyprctl devices)" =~ [Tt]ouchpad ]]; then
-    true
-  fi
-
   cfgr::item::action \
     --label "Keyboard repeat delay : ${HYPR[input.repeat_delay]}ms" \
     --func "_set_int 'Repeat Delay' 'Delay (ms)' int 200 1000 'input:repeat_delay'"
@@ -267,6 +263,12 @@ _build() {
   cfgr::item::action \
     --label "Keyboard layouts : ${HYPR[input.kb_layout]}" \
     --func "_layouts_menu"
+
+  if [[ "$(hyprctl devices)" =~ [Tt]ouchpad ]]; then
+    cfgr::item::action \
+    --label "Touchpad options" \
+    --func "_touchpad_menu"
+  fi
 }
 
 cfgr::run "Input" "_build"

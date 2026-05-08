@@ -18,6 +18,6 @@ if ((${#HOOKS[@]} >= 0)); then
   done
 fi
 
-if ! out="$(uwsm stop)"; then
-  notify-send -r 4 "Failed to Log Out!" "UWSM shows this error: \n\n${out}"
+if ! out="$(uwsm stop 2>&1)"; then
+  notify-send -r 4 -t 15000 "Failed to Log Out!" "UWSM shows this error: \n\n${out}"
 fi

@@ -5,7 +5,7 @@ fi
 echo "Edit config in: ${YELLOW}~/.bash${RESET}"
 echo "Hide this message: ${GREEN}toggle-startup-message${RESET}"
 echo "List additional shell functions: ${GREEN}flist${RESET}"
-echo "Zsh documentation: ${GREEN}man ${YELLOW}bash${RESET}"
+echo "Bash documentation: ${GREEN}man ${YELLOW}bash${RESET}"
 
 if ! [[ -c /dev/tty && $TERM == linux ]]; then
   if [[ -n "$VIBRANIUM_STATE" && -f "$VIBRANIUM_STATE/update.available" ]]; then
