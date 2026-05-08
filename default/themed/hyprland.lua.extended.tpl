@@ -25,7 +25,7 @@ hl.config({
           "rgba({{ orange_strip }}b3)",
           "rgba({{ red_strip }}b3)",
         },
-        angle = 90
+        angle = 45
       },
       border_locked_inactive = "rgba({{ background_3_strip }}b3)",
     },
