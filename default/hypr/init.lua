@@ -32,6 +32,7 @@ source_file(VIBRANIUM .. "/window-rules.lua")
 source_file(VIBRANIUM .. "/permissions.lua")
 source_file(VIBRANIUM .. "/binds.lua")
 source_file(VIBRANIUM .. "/input.lua")
+source_file(VIBRANIUM .. "/events.lua")
 
 -- ############################## --
 -- Auto-load extra Lua configs    --
