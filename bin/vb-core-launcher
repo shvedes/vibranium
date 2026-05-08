@@ -182,20 +182,11 @@ case "$INPUT" in
 
   # File exists and it IS an executable
   if [[ -x "$CMD" ]] || command -v "$CMD" >/dev/null; then
-    # if [[ "$CMD" =~ vb-* ]]; then
-    # Okay this is a bit silly
-    # if [[ "$CMD" == vb-cmd-suspend ]]; then
-    #   # Remove all positional args so
-    #   # vb-cmd-suspend doesn't gets mad
-    #   set --
-    #   source vb-cmd-suspend
-    #   exit 0
-    # fi
-    #
-    # # Source so the child gets all the
-    # # functions and settings cache.
-    # eval source "$CMD" "$ARGS"
-    # else
+    if [[ "$CMD" == "date" ]]; then
+      notify-send "$(eval $CMD)"
+      exit 0
+    fi
+
     source vb-launch-cmd -- $CMD $ARGS
     # fi
   # File exists
