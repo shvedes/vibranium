@@ -324,7 +324,7 @@ hl.bind("ALT + J", function()
   local win = hl.get_active_window()
   if win == nil or win.group == nil then return end
   hl.dispatch(hl.dsp.group.prev())
-end, { description = "Group: previous tab" })
+end, { description = "Group: previoue tab" })
 
 hl.bind("ALT + SHIFT + Grave", function()
   local win = hl.get_active_window()
@@ -352,6 +352,8 @@ for i = 1, 10 do
   hl.bind("ALT + " .. (i % 10), function()
     local win = hl.get_active_window()
     if win == nil or win.group == nil then return end
+    -- Index out of range, do nothing.
+    if i > win.group.size then return end
     hl.dispatch(hl.dsp.group.active({ index = i }))
   end, { description = "Group: jump to tab " .. i, non_consuming = true })
 end
