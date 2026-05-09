@@ -41,7 +41,7 @@ mkdir -p "$HOME/.local/share/vibranium"
 # Ask user which branch to clone
 echo "Which version would you like to install?"
 echo "  [1] release  - latest stable release (default)"
-echo "  [2] dev      - development branch"
+# echo "  [2] dev      - development branch"
 echo "  [3] upstream - master branch"
 while true; do
     echo -n "Enter your choice [1/2/3] or press Enter for default: " > /dev/tty
