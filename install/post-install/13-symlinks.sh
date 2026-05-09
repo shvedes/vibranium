@@ -6,6 +6,7 @@ declare -A LINKS=(
   # It's probably not the best practice...
   ["$VIBRANIUM/default/uwsm/env"]="$HOME/.config/uwsm/env"
   ["$HOME/.config/vibranium/current/theme/yazi.toml"]="$HOME/.config/yazi/theme.toml"
+  ["$HOME/.config/vibranium/current/theme/hyprtoolkit.conf"]="$HOME/.config/hypr/hyprtoolkit.conf"
 )
 
 # Create required folders first
