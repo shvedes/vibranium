@@ -1,7 +1,6 @@
 hl.window_rule({
   match = {
-    class = "^()$",
-    title = "^Minecraft\\*\\s\\d\\.\\d?$",
+    class = "^Minecraft\\*\\s\\d\\.\\d\\d?"
   },
   tag = "+gameWindow",
 })
