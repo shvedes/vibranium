@@ -74,6 +74,7 @@ hl.window_rule({
 hl.window_rule({
   match = { tag = "gameWindow" },
   tag = "+focusOnActivate",
+  opaque = true
 })
 
 hl.window_rule({
