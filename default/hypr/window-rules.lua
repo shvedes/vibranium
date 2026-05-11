@@ -14,7 +14,7 @@ hl.window_rule({
 
 hl.window_rule({
   match = {
-    class = "[\\w.]*?(steam|heroic|lutris|prismlauncher|.*\\.RetroArch|dolphin-emu)",
+    class = "[\\w.]*?(.*\\.PrismLauncher|steam|heroic|lutris|prismlauncher|.*\\.RetroArch|dolphin-emu)",
   },
   tag = "+gameLauncher",
 })
