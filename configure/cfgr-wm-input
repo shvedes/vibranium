@@ -18,7 +18,7 @@ INPUT_SPEC=(
 
 TOUCHPAD_SPEC=(
   "input.touchpad.scroll_factor|float"
-  "input.touchpad.tap-to-click|bool"
+  "input.touchpad.tap_to_click|bool"
   "input.touchpad.natural_scroll|bool"
   "input.touchpad.disable_while_typing|bool"
 )
@@ -142,19 +142,19 @@ _touchpad_menu() {
 
     cfgr::item::action \
       --label "Disable while typing : ${HYPR[input.touchpad.disable_while_typing]}" \
-      --func "_toggle 'input.touchpad.disable_while_typing'"
+      --func "_toggle 'input:touchpad:disable_while_typing'"
 
     cfgr::item::action \
       --label "Natural scrolling : ${HYPR[input.touchpad.natural_scroll]}" \
-      --func "_toggle 'input.touchpad.natural_scroll'"
+      --func "_toggle 'input:touchpad:natural_scroll'"
 
     cfgr::item::action \
       --label "Scrolling factor : ${HYPR[input.touchpad.scroll_factor]}" \
       --func "_set_int 'Scrolling Factor' 'Factor (float)' float 0.1 30 'input.touchpad.scroll_factor'"
 
     cfgr::item::action \
-      --label "Tap to click : ${HYPR[input.touchpad.tap-to-click]}" \
-      --func "_toggle 'input.touchpad.tap-to-click'"
+      --label "Tap to click : ${HYPR[input.touchpad.tap_to_click]}" \
+      --func "_toggle 'input:touchpad:tap_to_click'"
   }
   cfgr::run "Touchpad" "_b"
 }
