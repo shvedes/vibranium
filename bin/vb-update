@@ -87,6 +87,8 @@ _update() {
 
     if [[ "$current_commit" == "$latest_commit" ]]; then
       echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date"
+      rm -f "$VIBRANIUM_STATE/update.available" || true
+      vb-refresh-waybar-module vb-update
       _pause
       exit 0
     fi
@@ -124,6 +126,8 @@ _update() {
         ahead=$(git -C "$VIBRANIUM" rev-list origin/master..HEAD --count)
         echo -e "${GREEN}[VIBRANIUM]${RESET} You are $ahead commit(s) ahead of remote, nothing to pull"
       fi
+      rm -f "$VIBRANIUM_STATE/update.available" || true
+      vb-refresh-waybar-module vb-update
       _pause
       exit 0
     fi
