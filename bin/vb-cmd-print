@@ -35,6 +35,8 @@ fi
 
 set -uo pipefail
 
+export LANG="en_US.UTF-8"
+
 # Per-process temporary working directory.
 WORK_DIR="/tmp/vb-print-$$"
 
