@@ -120,6 +120,16 @@ hl.window_rule({
   dim_around = true,
 })
 
+hl.window_rule({
+  match = {
+    class = "gcr-prompter|xdg-desktop-portal-gtk|[Tt]hunar",
+    title = "^()$"
+  },
+  border_color = ATTENTION,
+  stay_focused = true,
+  dim_around = true,
+})
+
 -- Special rules for Vibranium utilities, running in a floating terminal window
 hl.window_rule({
   name = "Floating Terminal (dimmed)",

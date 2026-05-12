@@ -29,18 +29,3 @@ hl.window_rule({
   border_color = ATTENTION,
   dim_around = true,
 })
-
-hl.window_rule({
-  match = {
-    class = "[Tt]hunar",
-    title = "^()$",
-  },
-  border_color = ATTENTION,
-  dim_around = true,
-})
-
-hl.window_rule({
-  match = { class = "xdg-desktop-portal-gtk", title = "^()$" },
-  border_color = ATTENTION,
-  dim_around = true,
-})
