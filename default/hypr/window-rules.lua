@@ -147,6 +147,12 @@ hl.window_rule({
   dim_around = true,
 })
 
+hl.window_rule({
+  match = { class = "xdg-desktop-portal-gtk", title = "^()$" },
+  border_color = ATTENTION,
+  dim_around = true,
+})
+
 -- Thunar special rules.
 -- Keeps small contextual windows always visible and focused.
 -- To revert, just tile the window.
