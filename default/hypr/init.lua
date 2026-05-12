@@ -9,26 +9,43 @@ local VIBRANIUM = home .. "/.local/share/vibranium/default/hypr"
 local CONFIG = home .. "/.config/vibranium"
 local HYPR = home .. "/.config/hypr"
 
+local function exists_file(path)
+  local f = io.open(path, "r")
+  if f then
+    f:close()
+    return true
+  end
+  return false
+end
+
+local function exists_dir(path)
+  local f = io.open(path .. "/.", "r")
+  if f then
+    f:close()
+    return true
+  end
+  return false
+end
+
 local function source(path)
   -- If path contains a glob/wildcard, expand it
   if path:find("[*?%[%]]") then
-    local p = io.popen('find "$(dirname \'' ..
-      path .. '\')" -maxdepth 1 -type f,l -name "' .. path:match("[^/]+$") .. '" 2>/dev/null | sort')
+    local dir = path:match("^(.*)/[^/]+$") or "."
+    local pattern = path:match("([^/]+)$")
+
+    local p = io.popen('find "' .. dir .. '" -maxdepth 1 -type f 2>/dev/null')
     if p then
       for file in p:lines() do
-        local fn = loadfile(file)
-        if fn then fn() end
+        if pattern == "*" or file:match(pattern:gsub("%.", "%%."):gsub("%*", ".*"):gsub("%?", ".")) then
+          local fn = loadfile(file)
+          if fn then fn() end
+        end
       end
       p:close()
     end
   else
-    -- Check if it's a directory
-    local attr = io.popen('[ -d "' .. path .. '" ] && echo dir || [ -f "' .. path .. '" ] && echo file || echo missing')
-    local kind = attr and attr:read("*l") or "missing"
-    if attr then attr:close() end
-
-    if kind == "dir" then
-      local p = io.popen('find "' .. path .. '" -maxdepth 1 -type f,l -name "*.lua" 2>/dev/null | sort')
+    if exists_dir(path) then
+      local p = io.popen('find "' .. path .. '" -maxdepth 1 -type f -name "*.lua" 2>/dev/null')
       if p then
         for file in p:lines() do
           local fn = loadfile(file)
@@ -36,11 +53,10 @@ local function source(path)
         end
         p:close()
       end
-    elseif kind == "file" then
+    elseif exists_file(path) then
       local fn = loadfile(path)
       if fn then fn() end
     end
-    -- silently skip if missing (matches original behaviour)
   end
 end
 
