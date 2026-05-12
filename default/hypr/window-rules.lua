@@ -122,9 +122,16 @@ hl.window_rule({
 
 hl.window_rule({
   match = {
-    class = "gcr-prompter|xdg-desktop-portal-gtk|[Tt]hunar",
+    class = "xdg-desktop-portal-gtk|[Tt]hunar",
     title = "^()$"
   },
+  border_color = ATTENTION,
+  stay_focused = true,
+  dim_around = true,
+})
+
+hl.window_rule({
+  match = { class = "gcr-prompter" },
   border_color = ATTENTION,
   stay_focused = true,
   dim_around = true,
