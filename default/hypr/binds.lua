@@ -189,22 +189,10 @@ end, { description = "Force kill active window" })
 
 -- Window state
 
+local function center_floating_win(win)
+  local floating = win.floating
 
--- Toggle fullscreen for the active window.
-hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), { description = "Toggle fullscreen" })
-
--- Toggle floating for the active window.
--- When a tiled window is switched to floating it often retains its full tiled
--- dimensions and extends off-screen. To avoid needing a manual resize and
--- reposition, the window is automatically resized to 70% of the monitor and centered.
-hl.bind(mainMod .. " + SHIFT + F", function()
-  local win = hl.get_active_window()
-  if win == nil then return end
-
-  local was_floating = win.floating
-  hl.dispatch(hl.dsp.window.float())
-
-  if not was_floating then
+  if floating then
     local mon = hl.get_active_monitor()
     if mon == nil then return end
 
@@ -214,30 +202,73 @@ hl.bind(mainMod .. " + SHIFT + F", function()
     hl.dispatch(hl.dsp.window.resize({ x = w, y = h }))
     hl.dispatch(hl.dsp.window.center())
   end
+end
+
+
+-- Toggle fullscreen for the active window.
+-- hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), { description = "Toggle fullscreen" })
+hl.bind(mainMod .. " + F", function()
+  local win = hl.get_active_window()
+  if win == nil then return end
+
+  hl.dispatch(hl.dsp.window.fullscreen({ mode = "fullscreen" }))
+  center_floating_win(win)
+end, { description = "Toggle fullscreen" })
+
+-- Toggle floating for the active window.
+-- When a tiled window is switched to floating it often retains its full tiled
+-- dimensions and extends off-screen. To avoid needing a manual resize and
+-- reposition, the window is automatically resized to 70% of the monitor and centered.
+hl.bind(mainMod .. " + SHIFT + F", function()
+  local win = hl.get_active_window()
+  if win == nil then return end
+
+  hl.dispatch(hl.dsp.window.float())
+  center_floating_win(win)
 end, { description = "Toggle floating" })
 
 -- Pin the active window so it follows across all workspaces.
 -- If the window is tiled, it is first floated and shrunk to 50% of the
 -- monitor to avoid it spanning the full screen while pinned.
+-- Remembers whether a window was tiled before we pinned it.
+-- Keyed by win.address, so it survives across multiple windows.
+local pin_memory = {}
+
 hl.bind(mainMod .. " + SHIFT + P", function()
   local win = hl.get_active_window()
   if win == nil then return end
 
-  local was_pinned = win.pinned
-  local was_float  = win.floating
+  if win.pinned then
+    -- Unpinning
+    local prev = pin_memory[win.address]
+    pin_memory[win.address] = nil
 
-  if not was_pinned and not was_float then
-    local mon = hl.get_active_monitor()
-    if mon == nil then return end
+    hl.dispatch(hl.dsp.window.pin())
 
-    local w = math.floor(mon.width * 0.5)
-    local h = math.floor(mon.height * 0.5)
+    -- Only restore to tiled if we're the ones who floated it.
+    if prev and prev.was_tiled then
+      hl.dispatch(hl.dsp.window.float({ action = "unset" }))
+    end
+  else
+    -- Pinning
+    pin_memory[win.address] = { was_tiled = not win.floating }
 
-    hl.dispatch(hl.dsp.window.float())
-    hl.dispatch(hl.dsp.window.resize({ x = w, y = h }))
+    if not win.floating then
+      local mon = hl.get_active_monitor()
+      if mon == nil then return end
+
+      -- mon.width/height are physical pixels; divide by scale for logical coords.
+      local lw = math.floor(mon.width / mon.scale)
+      local lh = math.floor(mon.height / mon.scale)
+      local w  = math.floor(lw * 0.5)
+      local h  = math.floor(lh * 0.5)
+
+      hl.dispatch(hl.dsp.window.float())
+      hl.dispatch(hl.dsp.window.resize({ x = w, y = h }))
+    end
+
+    hl.dispatch(hl.dsp.window.pin())
   end
-
-  hl.dispatch(hl.dsp.window.pin())
 end, { description = "Pin active window" })
 
 -- Toggle the dwindle split direction for the active container.
