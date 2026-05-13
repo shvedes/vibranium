@@ -8,7 +8,7 @@ This article explains how Vibranium fits together conceptually.
 
 At its core, Vibranium is a Bash library plus a collection of scripts that share that library. These scripts are:
 
-- **Keybinding targets** — bound directly in [`binds.conf`](https://github.com/shvedes/vibranium/blob/master/default/hypr/binds.conf) and called by Hyprland when you press a sequence of keys
+- **Keybinding targets** — bound directly in [`binds.lua`](https://github.com/shvedes/vibranium/blob/master/default/hypr/binds.lua) and called by Hyprland when you press a sequence of keys
 - **Custom [Waybar](https://github.com/alexays/waybar) modules** — run on a timer or signal and emit JSON status text
 - **[Rofi](https://github.com/davatorium/rofi) menus** — configuration panels built with the `cfgr` framework
 - **Core or auxiliary utilities** — install packages, apply themes, manage PWAs, get configs values, toggle configs values and so on

@@ -8,7 +8,7 @@ To configure most aspects of Hyprland’s appearance, go to:
 
 Here you can adjust *gaps* (including smart gaps), *shadows*, *blur*, *animations*, and general visual behavior such as window dimming.
 
-For more advanced configuration, you can edit existing `.conf` files in:
+For more advanced configuration, you can edit existing `.lua` files in:
 
 ```bash
 ~/.config/hypr/hyprland.conf.d/
