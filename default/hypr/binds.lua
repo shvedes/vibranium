@@ -345,7 +345,7 @@ hl.bind("ALT + L", function()
   hl.dispatch(hl.dsp.group.next())
 end, { description = "Group: next tab" })
 
-hl.bind("ALT + Grave", function()
+hl.bind("ALT + TAB", function()
   local win = hl.get_active_window()
   if win == nil or win.group == nil then return end
   hl.dispatch(hl.dsp.group.next())
