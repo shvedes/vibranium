@@ -1,7 +1,7 @@
 
 # How to Customize Keybindings
 
-Vibranium's keybindings are defined in `~/.local/share/vibranium/default/hypr/binds.conf` and loaded by Hyprland at startup. Because that file lives inside the Vibranium installation directory, you should not edit it directly - your changes will be overwritten on the next update.
+Vibranium's keybindings are defined in `~/.local/share/vibranium/default/hypr/binds.lua` and loaded by Hyprland at startup. Because that file lives inside the Vibranium installation directory, you should not edit it directly - your changes will be overwritten on the next update.
 
 Instead, use the user override mechanism described below.
 
@@ -9,26 +9,26 @@ Instead, use the user override mechanism described below.
 
 ## The override file
 
-Hyprland's configuration is assembled from several sourced files. The entry point is `~/.config/hypr/hyprland.conf`, which sources the Vibranium defaults last. Any file you source *after* the defaults overrides them.
+Hyprland's configuration is assembled from several sourced files. The entry point is `~/.config/hypr/hyprland.lua`, which sources the Vibranium defaults last. Any file you source *after* the defaults overrides them.
 
-All your overrides live in `~/.config/hypr/hyprland.conf.d/*.conf`. Out of the box, you will find several files there, including `binds.conf`, `monitors.conf`, `window-rules.conf`, `input.conf`, and others.
+All your overrides live in `~/.config/hypr/hyprland.conf.d/*.lua`. Out of the box, you will find several files there, including `binds.lua`, `monitors.lua`, `window-rules.lua`, `input.lua`, and others.
 
 By default, these files don’t change anything, so on startup Hyprland simply reads them and does nothing. However, they contain basic syntax overviews, live examples, and optional Vibranium settings that you can enable.
 
-Any other file with the `*.conf` extension will be sourced automatically as soon as it is created or updated.
+Any other file with the `*.lua extension will be sourced automatically as soon as it is created or updated.
 
 ---
 
 ## Adding a new keybinding
 
-In `binds.conf`, use the standard Hyprland `bind` syntax:
+In `binds.lua`, use the standard Hyprland `bind` syntax:
 
 ```
 # Open a calculator with Super + C
-bind = SUPER, C, exec, vb-util-calc
+hl.bind("SUPER + C", hl.dsp.exec_raw("vb-util-calc"))
 
 # Open btop with Super + Shift + B
-bind = SUPER SHIFT, B, exec, vb-core-term --floating -- btop
+hl.bind("SUPER + SHIFT + B", hl.dsp.exec_raw("vb-core-term --floating -- btop"))
 ```
 
 ### Unbinding
@@ -40,13 +40,13 @@ If your keybinding overrides one of Vibranium’s defaults, a single key press w
 # Let’s say you want to remap the app launcher from SUPER + A to SUPER + SPACE.
 
 # 1. Unbind the existing keybinding:
-unbind = SUPER, A
+hl.unbind("SUPER + A")
 
 # 2a. Rebind it to a new key:
-bindd = SUPER, SPACE, Open app launcher, exec, vb-core-launcher
+hl.bind("SUPER + SPACE", hl.dsp.exec_raw("vb-core-launcher"))
 
 # 2b. Or rebind the SAME key to a different action:
-bind = SUPER, A, exec, my-cool-app
+hl.bind("SUPER + A", hl.dsp.exec_raw("my-cool-app"))
 
 # Hyprland reads config files from top to bottom, which is important
 # for understanding how bindings are applied.
@@ -72,14 +72,14 @@ Mouse bindings use `bindm`:
 
 ```
 # Move floating windows with Super + left mouse button
-bindm = SUPER, mouse:272, movewindow
+hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true })
 
 # Resize floating windows with Super + right mouse button
-bindm = SUPER, mouse:273, resizewindow
+hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true })
 ```
 
 ---
 
 ## Further reading
 
-- [Hyprland bind documentation](https://wiki.hypr.land/Configuring/Binds/) — full Hyprland bind syntax
+- [Hyprland documentation](https://wiki.hypr.land/Configuring/Basics/Binds/) — full Hyprland bind syntax
