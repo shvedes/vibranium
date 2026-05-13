@@ -4,6 +4,15 @@ source vb-lib-core
 source vb-lib-cfgr
 source vb-lib-hypr
 
+GLOW_SPEC=(
+  "decoration.glow.enabeld|bool"
+  "decoration.glow.range|int"
+  "decoration.glow.render_power|int"
+  # Soon
+  # "decoration.glow.color|color"
+  # "decoration.glow.color_inactive|color"
+)
+
 BLUR_SPEC=(
   "decoration.blur.enabled|bool"
   "decoration.blur.size|int"
@@ -147,11 +156,11 @@ _decoration_menu() {
     hypr::fetch "${DECORATION_SPEC[@]}"
 
     cfgr::item::action \
-      --label "Border size : ${HYPR[general.border_size]}" \
+      --label "Border size : ${HYPR[general.border_size]}px" \
       --func "_set_int 'Border Size' 'Border size (int)' int 0 50 'general:border_size'"
 
     cfgr::item::action \
-      --label "Border roundness : ${HYPR[decoration.rounding]}" \
+      --label "Border roundness : ${HYPR[decoration.rounding]}px" \
       --func "_edit_roundness"
 
     cfgr::item::action \
@@ -213,6 +222,25 @@ _anim_submenu() {
     fi
   }
   cfgr::run "Animations" "_b"
+}
+
+_glow_submenu(){
+  _b(){
+    hypr::reload
+
+    cfgr::item::action \
+      --label "Enabled : ${HYPR[decoration.glow.enabled]}" \
+      --func "_toggle" "decoration:glow:enabled"
+
+    cfgr::item::action \
+      --label "Range : ${HYPR[decoration.glow.range]}px" \
+      --func "_set_int 'Glow Range' 'Glow Range (int)' int 1 50 'decoration:glow:range'"
+
+    cfgr::item::action \
+      --label "Render Power : ${HYPR[decoration.glow.render_power]}px" \
+      --func "_set_int 'Render Power' 'Render Power (int)' int 1 50 'decoration:glow:render_power'"
+  }
+  cfgr::run "Glow" "_b"
 }
 
 # ================================================================================ #
@@ -299,6 +327,7 @@ _toggle() {
 _build() {
   cfgr::item::action --label "Gaps" --func "_gaps_menu"
   cfgr::item::action --label "Blur" --func "_blur_menu"
+  cfgr::item::action --label "Glow" --func "_glow_submenu"
   cfgr::item::action --label "Shadows" --func "_shadow_menu"
   cfgr::item::action --label "Decoration" --func "_decoration_menu"
   cfgr::item::action --label "Animations" --func "_anim_submenu"
