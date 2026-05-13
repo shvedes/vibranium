@@ -1,6 +1,7 @@
 #!/usr/bin/bash
 
 SELF=${0##*/}
+QUIET=false
 
 shcat() {
   while IFS= read -r line; do
@@ -16,6 +17,7 @@ Display information about the currently playing track.
 
 Options:
   -h, --help    Display this help and exit
+  -q, --quiet   Do not display notification
 EOF
 }
 
@@ -25,6 +27,9 @@ while (($#)); do
     usage
     exit
     ;;
+  -q | --quiet)
+      QUIET=true
+      ;;
   -*)
     echo "Error: unknown option: $1" >&2
     exit 1
@@ -127,7 +132,9 @@ fi
 
 # Even if the file inside $album_art does not exist, notify-send will still send a notification,
 # although without the cover art, so we do not check for the existence of the file.
-notify-send -r 3 -t 5000 -i "$album_art" "Now Playing" "$notify_body"
+if ! $QUIET; then
+  notify-send -r 3 -t 5000 -i "$album_art" "Now Playing" "$notify_body"
+fi
 
 # Even though the image may be small, we don't need junk in RAM.
 rm -f "$album_art"
