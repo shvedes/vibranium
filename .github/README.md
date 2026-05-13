@@ -11,7 +11,7 @@ configure almost every aspect of your typical desktop usage: appearance of the W
 curl -fsSL https://raw.githubusercontent.com/shvedes/vibranium/master/install.sh | bash
 ```
 
-See [wiki page](https://github.com/shvedes/vibranium/wiki#installation).
+See [wiki page](../wiki/Home.md).
 
 Note: wiki hasn't been updated in months and my have irrelevant info.
 
