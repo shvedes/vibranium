@@ -457,10 +457,35 @@ if [[ -z $APP_URL ]]; then
 
   PAGE_TITLE="$(_strip_title "$PAGE_TITLE")"
 
+  # Cloudflare and similar bot-protection pages serve a challenge document
+  # whose <title> is a fixed string like "Just a moment..." instead of the
+  # real page title. Detect these and fall back to manual entry so the user
+  # does not end up with a PWA named after the challenge interstitial.
+  # The shopt is set locally so it does not affect the rest of the script.
+  #
+  # Matched patterns (case-insensitive):
+  #   "Just a moment..."   - Cloudflare JS challenge
+  #   "Please Wait..."     - Cloudflare managed challenge
+  #   "Attention Required" - Cloudflare WAF block page
+  #   "Access Denied"      - generic WAF / CDN block
+  #   "...Cloudflare"      - any title containing the Cloudflare brand name
+  _title_is_challenge=false
+  if shopt -s nocasematch 2>/dev/null; then
+    [[ $PAGE_TITLE =~ ^(Just a moment|Please Wait|Attention Required|Access Denied)|Cloudflare ]] \
+      && _title_is_challenge=true
+    shopt -u nocasematch
+  fi
+
+  if [[ $_title_is_challenge == true ]]; then
+    echo "${RED}[VIBRANIUM]${RESET} Page title could not be fetched (human verification detected)"
+    echo "${RED}[VIBRANIUM]${RESET} Enter the PWA name manually below"
+    PAGE_TITLE=""
+  fi
+
   term::enable_input
   if [[ -n $PAGE_TITLE && $PAGE_TITLE != "App" ]]; then
     echo "${YELLOW}[VIBRANIUM]${RESET} Auto-generated name: ${BLUE}${PAGE_TITLE}${RESET}"
-    read -rp "${BLUE}[VIBRANIUM]${RESET} PWA name (Enter to keep the name above): $BLUE" APP_NAME
+    read -rp "${BLUE}[VIBRANIUM]${RESET} PWA name (Enter to keep the name above): " APP_NAME
     APP_NAME="PWA - ${APP_NAME:-$PAGE_TITLE}"
   else
     while true; do
