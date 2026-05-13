@@ -5,7 +5,7 @@ source vb-lib-cfgr
 source vb-lib-hypr
 
 GLOW_SPEC=(
-  "decoration.glow.enabeld|bool"
+  "decoration.glow.enabled|bool"
   "decoration.glow.range|int"
   "decoration.glow.render_power|int"
   # Soon
@@ -227,18 +227,25 @@ _anim_submenu() {
 _glow_submenu(){
   _b(){
     hypr::reload
+    hypr::fetch "${GLOW_SPEC[@]}"
+
+    local enabled
+    enabled="$(hypr::bool "decoration.glow.enabled")"
 
     cfgr::item::action \
-      --label "Enabled : ${HYPR[decoration.glow.enabled]}" \
-      --func "_toggle" "decoration:glow:enabled"
+      --label "Enabled : $enabled" \
+      --func "_toggle 'decoration:glow:enabled'"
 
-    cfgr::item::action \
-      --label "Range : ${HYPR[decoration.glow.range]}px" \
-      --func "_set_int 'Glow Range' 'Glow Range (int)' int 1 50 'decoration:glow:range'"
+    if [[ "$enabled" == true ]]; then
+      cfgr::item::action \
+        --label "Range : ${HYPR[decoration.glow.range]}px" \
+        --func "_set_int 'Glow Range' 'Glow Range (int)' int 1 100 'decoration:glow:range'"
 
-    cfgr::item::action \
-      --label "Render Power : ${HYPR[decoration.glow.render_power]}px" \
-      --func "_set_int 'Render Power' 'Render Power (int)' int 1 50 'decoration:glow:render_power'"
+      cfgr::item::action \
+        --label "Render Power : ${HYPR[decoration.glow.render_power]}" \
+        --func "_set_int 'Render Power' 'Render Power (int)' int 1 4 'decoration:glow:render_power'"
+    fi
+
   }
   cfgr::run "Glow" "_b"
 }
