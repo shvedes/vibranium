@@ -17,8 +17,7 @@ source vb-lib-core
 # Guard: verify `pass` is installed before doing anything else.
 # If missing, offer a one-click install via a notification action button.
 if ! command -v pass >/dev/null; then
-  notify-send -r 1 -t 5000 \
-    "Password Manager" \
+  notify-send -r 1 -t 5000 "Password Manager" \
     "The password manager package is not installed!"
   vb-pkg-install --no-verify -- pass
   exit 0
@@ -180,9 +179,9 @@ prompt_valid_name() {
     # Allowlist check: only safe characters for a filesystem entry name.
     # Slashes (path separators), backslashes, and shell metacharacters are
     # all excluded by this pattern. Spaces are intentionally allowed.
-    if [[ "$input" =~ [^a-zA-Z0-9._\ -] ]]; then
+    if [[ "$input" =~ [^a-zA-Z0-9._\ -]@ ]]; then
       notify-send -r 3 -t 2000 "Password Manager" \
-        "Invalid characters. Allowed: letters, numbers, space, . - _"
+        "Invalid characters. Allowed: letters, numbers, space, . - _ @"
       continue
     fi
 
@@ -306,15 +305,9 @@ wait_for_internet() {
 # This function is also exported via `export -f` so the child bash process
 # spawned by the Edit action can call it after `pass edit` finishes.
 async_git_push() {
-  printf '%s' "Password Manager: waiting for internet connection..." >"$ACTION"
-  vb-refresh-waybar-module password-manager
-
-  # Block here. Parent shell and rofi UI remain fully responsive because
+  pri # Block here. Parent shell and rofi UI remain fully responsive because
   # this entire function runs in a detached background process.
   wait_for_internet
-
-  printf '%s' "Password Manager: pushing local changes to remote..." >"$ACTION"
-  vb-refresh-waybar-module password-manager
 
   # Capture combined stdout + stderr so we can include git's actual error
   # message in the failure notification. Command substitution is necessary
@@ -327,11 +320,6 @@ async_git_push() {
     notify-send -r 4 -t 5000 -u critical \
       "Password Manager" "Error pushing to remote: $output"
   fi
-
-  # Always clean up regardless of outcome — prevents the bar from getting
-  # permanently stuck in "pushing…" state on git errors.
-  rm -f "$ACTION"
-  vb-refresh-waybar-module password-manager
 }
 
 # push_after_edit_if_needed
@@ -402,7 +390,7 @@ pick_location() {
   if [[ "$mode" == "move" ]]; then
     local action_text="[M] Move file here"
   else
-    local action_text="[P] Generate password here"
+    local action_text="[P] Create password here"
   fi
 
   while true; do
@@ -707,7 +695,7 @@ action() {
     if [[ -n "$first_line" ]]; then
       # printf '%s' avoids appending a trailing newline to clipboard
       # content (echo would add one, which some sites reject as invalid).
-      printf '%s' "$first_line" | wl-copy
+      printf '%s' "$first_line" | wl-copy --sensitive --type text/plain
       notify-send -r 3 "Password Manager" "Password copied to clipboard"
       return 0
     else
@@ -1185,55 +1173,156 @@ while true; do
       pass_path="$location/$name"
     fi
 
-    # Before generating, check whether an entry with this path already
-    # exists in the store. `pass generate` without --force would open an
-    # interactive terminal prompt asking to overwrite — invisible to the
-    # user and impossible to interact with from a rofi-driven script.
-    # We intercept this case with a rofi confirmation prompt instead.
+    # Step 3: ask how to create the password. Two methods are offered:
+    #   "Enter password"   -- user types (or pastes) an existing password
+    #   "Generate password" -- `pass` produces a cryptographically random one
+    create_method=""
+    helpers::ui::menu create_method \
+      "Password for $pass_path" "" -- "Enter password" "Generate password"
+
+    # ESC pressed
+    if [[ -z "$create_method" ]]; then
+      continue
+    fi
+
+    # Step 4: overwrite guard — shared across both methods.
+    #
+    # Neither `pass insert` nor `pass generate` can be safely prompted
+    # in the background, so we intercept the overwrite case ourselves with
+    # a rofi confirmation menu and pass --force when the user confirms.
     # The .gpg extension is how pass stores entries on disk; its presence
     # means the logical pass-path is already taken.
+    create_force=0
     if [[ -f "$PASSWORD_STORE_DIR/${pass_path}.gpg" ]]; then
       overwrite_confirm=""
       helpers::ui::menu overwrite_confirm \
-        "'${pass_path}' already exists. Overwrite?" \
-        "" \
+        "'${pass_path}' already exists. Overwrite?" "" \
         -- "Overwrite" "Cancel"
 
-      if [[ "$overwrite_confirm" != "Overwrite" ]]; then
+      [[ "$overwrite_confirm" != "Overwrite" ]] && continue
+
+      # Flag for both branches below: they must pass --force to their
+      # respective pass sub-commands to skip pass's own interactive prompt.
+      create_force=1
+    fi
+
+    # Step 5: dispatch to the chosen method.
+    case "$create_method" in
+
+    "Enter password")
+      # Open a floating nvim window so the user can type (or paste) the
+      # password in a real editor rather than a rofi input field.
+      # This mirrors the Edit action's terminal-fork pattern, but we need
+      # to READ the result back into this process, so we must block until
+      # the editor closes. A FIFO is the clean synchronisation primitive:
+      # the parent blocks on `read < fifo`; the terminal's bash -c writes
+      # one byte to the FIFO immediately after nvim exits, unblocking the
+      # parent. No polling or sub-second sleep loops needed.
+
+      # Isolated temp dir (0700 by default from mktemp) holds both the
+      # plaintext password file and the FIFO. Keeping them together makes
+      # atomic cleanup easy: a single `rm -rf` removes both.
+      enter_tmpdir=$(mktemp -d)
+
+      # The file nvim will open. Created empty so nvim does not show a
+      # "new file" notice — the user should see a clean, blank buffer.
+      export _VB_ENTER_FILE="$enter_tmpdir/password"
+      : >"$_VB_ENTER_FILE"
+
+      # The FIFO that the terminal's bash -c writes to after nvim exits.
+      # mkfifo creates it in a blocked state; the first `read` on it will
+      # block until a writer opens and writes at least one byte.
+      export _VB_ENTER_FIFO="$enter_tmpdir/done"
+      mkfifo "$_VB_ENTER_FIFO"
+
+      # Fork the floating terminal. xdg-terminal-exec returns immediately
+      # (it does not block for the child process to finish), so the parent
+      # reaches the `read` below before the user has even typed anything.
+      # The bash -c chain:
+      #   1. nvim opens the temp file — user types the password, then :wq
+      #   2. printf writes one byte to the FIFO — unblocks the parent read
+      # Single-quoting $_VB_ENTER_FILE / $_VB_ENTER_FIFO inside the bash -c
+      # body is intentional: expansion happens in the CHILD shell from its
+      # own exported environment, not in this shell.
+      xdg-terminal-exec --app-id=org.vb.term.float --title="pass" -- \
+        bash -c "nvim '$_VB_ENTER_FILE'; printf x > '$_VB_ENTER_FIFO'"
+
+      # Block here until the terminal signals done.
+      # -t 600: 5 min safety timeout for the case where the terminal
+      # window is force-closed (which kills the bash -c without it ever
+      # writing to the FIFO, leaving the read blocked indefinitely otherwise).
+      if ! read -r -t 600 _enter_signal <"$_VB_ENTER_FIFO"; then
+        # Timeout or read error — terminal was likely force-closed.
+        rm -rf "$enter_tmpdir"
+        unset _VB_ENTER_FILE _VB_ENTER_FIFO
         continue
       fi
-      # User confirmed overwrite: pass generate --force skips its own
-      # interactive prompt and replaces the entry unconditionally.
-      if pass generate --force -c "$pass_path" >/dev/null; then
-        notify-send -r 3 "Password Manager" \
-          "Password regenerated and copied to clipboard"
+
+      # Read the first non-empty line from the file as the password.
+      # `pass show` treats line 1 as the password; we follow the same
+      # convention so the stored entry is immediately usable with Copy.
+      # Blank lines are skipped: nvim always writes a trailing newline,
+      # and a user might accidentally leave an empty first line.
+      entered_pw=""
+      while IFS= read -r _enter_line; do
+        if [[ -n "$_enter_line" ]]; then
+          entered_pw="$_enter_line"
+          break
+        fi
+      done <"$_VB_ENTER_FILE"
+
+      rm -rf "$enter_tmpdir"
+      unset _VB_ENTER_FILE _VB_ENTER_FIFO
+
+      # Empty file (or all-blank lines) means the user saved nothing —
+      # treat as cancellation rather than storing a blank password.
+      if [[ -z "$entered_pw" ]]; then
+        continue
+      fi
+
+      # `pass insert --echo` reads a single plaintext line from stdin,
+      # encrypts it, and commits the result — no terminal interaction.
+      # `--force` skips pass's own overwrite prompt; we already confirmed.
+      # `printf '%s\n'` guarantees exactly one trailing newline (the record
+      # terminator pass expects) without echo's -e interpretation risk.
+      if ((create_force)); then
+        printf '%s\n' "$entered_pw" |
+          pass insert --echo --force "$pass_path" >/dev/null
+      else
+        printf '%s\n' "$entered_pw" |
+          pass insert --echo "$pass_path" >/dev/null
+      fi
+
+      if [[ $? -eq 0 ]]; then
+        printf '%s' "$entered_pw" | wl-copy --sensitive --type text/plain
+        notify-send -r 3 "Password Manager" "Password saved and copied to clipboard"
         is_git_repo && has_git_remote && async_git_push &
         exit 0
       fi
-    else
-      # `pass generate -c`: generates a random password AND copies it to
-      # the clipboard immediately. No separate wl-copy step needed.
-      if pass generate -c "$pass_path" >/dev/null; then
-        notify-send -r 3 "Password Manager" \
-          "Password generated and copied to clipboard"
-        is_git_repo && has_git_remote && async_git_push &
-        exit 0
+      ;;
+
+    "Generate password")
+      if ((create_force)); then
+        if pass generate --force -c "$pass_path" >/dev/null; then
+          notify-send -r 3 "Password Manager" "Password regenerated and copied to clipboard"
+          is_git_repo && has_git_remote && async_git_push &
+          exit 0
+        fi
+      else
+        if pass generate -c "$pass_path" >/dev/null; then
+          notify-send -r 3 "Password Manager" "Password generated and copied to clipboard"
+          is_git_repo && has_git_remote && async_git_push &
+          exit 0
+        fi
       fi
-    fi
+      ;;
+
+    esac
     ;;
 
   *"Push to remote")
-    # Explicit user-requested push, runs synchronously (foreground)
-    printf '%s' "Password Manager: pushing to remote..." >"$ACTION"
-    vb-refresh-waybar-module password-manager
-
     output="$(git_push_with_upstream_check 2>&1)"
     ret=$?
-
-    # Clean up BEFORE exiting so the bar always returns to idle state,
-    # regardless of whether the push succeeded or failed.
-    rm -f "$ACTION"
-    vb-refresh-waybar-module password-manager
 
     if [[ $ret -ne 0 ]]; then
       notify-send -r 4 -t 5000 -u critical \
@@ -1250,14 +1339,8 @@ while true; do
     ;;
 
   *"Pull from remote")
-    printf '%s' "Password Manager: pulling from remote..." >"$ACTION"
-    vb-refresh-waybar-module password-manager
-
     output="$(pass git pull 2>&1)"
     ret=$?
-
-    rm -f "$ACTION"
-    vb-refresh-waybar-module password-manager
 
     if [[ $ret -ne 0 ]]; then
       notify-send -r 4 -t 5000 -u critical \
