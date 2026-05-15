@@ -33,6 +33,7 @@
 	<range>*</range>
 	<patterns>*.pdf;*.ps;*.eps;*.xps;*.txt;*.text;*.log;*.md;*.rst;*.csv;*.tsv;*.html;*.htm;*.xhtml;*.odt;*.ott;*.sxw;*.doc;*.docx;*.dot;*.dotx;*.rtf;*.ods;*.ots;*.sxc;*.xls;*.xlsx;*.xlsm;*.xlt;*.xltx;*.odp;*.otp;*.sxi;*.ppt;*.pptx;*.pptm;*.pot;*.potx;*.odg;*.otg</patterns>
 	<image-files/>
+  <text-files/>
 	<other-files/>
 </action>
 </actions>
