@@ -185,6 +185,9 @@ case "$INPUT" in
     if [[ "$CMD" == "date" ]]; then
       notify-send "$(eval $CMD)"
       exit 0
+    elif [[ "$CMD" == vb-core* ]]; then
+      eval "$INPUT"
+      exit 0
     fi
 
     source vb-launch-cmd -- $CMD $ARGS
