@@ -28,39 +28,133 @@ focus_or_launch() {
   local window_address
   window_address="$(
     jq -r --arg key "$match_key" '
+
+      # Returns true when "short" is a separator-bounded prefix of "long":
+      # "long" must start with "short", and the character in "long"
+      # immediately after the shared prefix must be a word-boundary
+      # separator (-, ., _), or both strings are equal length.
+      # Example: sep_prefix("google-chrome"; "google-chrome-stable") -> true
+      #          sep_prefix("obs";           "obsidian")             -> false
+      def sep_prefix(short; long):
+        (long | startswith(short)) and
+        (
+          (long | length) == (short | length) or
+          (long[(short | length) : (short | length) + 1] | test("[-._]"))
+        );
+
+      # Returns true when "cls" uses dot-separated reverse-domain-name
+      # notation and at least one of its components matches $key via one
+      # of three sub-rules:
+      #
+      #   1. Component starts with $key.
+      #      Example: key="obs" matches component "obsproject".
+      #
+      #   2. $key is a sep_prefix match on the component: $key starts with
+      #      the component AND the character following the component in $key
+      #      is a word-boundary separator.
+      #      Example: key="gnome-terminal" matches component "gnome" (next
+      #      char is "-").  Plain startswith is intentionally NOT used here
+      #      because short TLD-style components like "org", "com", "io",
+      #      "gnome", or "kde" would then false-match any key that merely
+      #      starts with those letters.
+      #
+      #   3. Normalized equality: after stripping all hyphens and underscores
+      #      from both sides, the strings are identical.
+      #      Example: key="kde-connect" matches component "kdeconnect".
+      #
+      # Classes without dots (e.g. "obsidian", "firefox") bypass this
+      # function entirely: the contains(".") guard excludes them.
+      # Empty components produced by split on classes with leading,
+      # trailing, or consecutive dots are filtered out before matching
+      # to prevent startswith("") from vacuously returning true.
+      def rdns_match(cls):
+        (cls | contains(".")) and
+        (
+          cls | split(".") | map(select(length > 0)) |
+          any(
+            . as $comp |
+            ($comp | startswith($key)) or
+            sep_prefix($comp; $key) or
+            (($comp | gsub("[-_]"; "")) == ($key | gsub("[-_]"; "")))
+          )
+        );
+
+      # Each phase collects all matching client objects into an array,
+      # then sorts by focusHistoryID descending so that when multiple
+      # windows satisfy the same phase, the most-recently-focused one is
+      # returned rather than whichever happens to be first in Hyprland`s
+      # internal client list.
+      #
+      # .[0].address on an empty array evaluates to null ([] | .[0] ->
+      # null, null | .address -> null), which causes the // operator to
+      # fall through to the next phase.  The final // empty converts a
+      # null result from all three phases to no output at all, so that
+      # the shell variable receiving this substitution is empty and the
+      # caller launches a new window instead of attempting to focus
+      # address:null.
+      #
+      # select(.address != null) guards against client objects where the
+      # address field is absent or null, which would otherwise survive
+      # the phase and produce a null string passed to hyprctl dispatch.
+
       . as $clients |
 
-      # Phase 1: exact match against .class and .initialClass.
+      # Phase 1: exact case-folded match against .class and .initialClass.
       (
-        try first(
+        [
           $clients[]
           | (.class        // "" | ascii_downcase) as $c
           | (.initialClass // "" | ascii_downcase) as $ic
           | select($c == $key or $ic == $key)
-          | .address
-        )
+          | select(.address != null)
+        ]
+        | sort_by(-.focusHistoryID? // 0)
+        | .[0].address
       )
 
       //
 
-      # Phase 2: partial match — either the class is a substring of the
-      # key or the key is a substring of the class. The empty-string
-      # guard prevents "" from matching everything via contains().
-      # Example: key="google-chrome-stable", class="google-chrome" ->
-      # "google-chrome-stable" contains "google-chrome" -> match.
+      # Phase 2: separator-aware prefix match.
+      # One name must be a hyphen/dot/underscore-delimited prefix of the
+      # other.  Example: key="google-chrome-stable", class="google-chrome"
+      # -> "google-chrome-stable" starts with "google-chrome" + "-" -> match.
       (
-        try first(
+        [
           $clients[]
           | (.class        // "" | ascii_downcase) as $c
           | (.initialClass // "" | ascii_downcase) as $ic
           | select(
-              ($c  != "" and (($c  | contains($key)) or ($key | contains($c))))  or
-              ($ic != "" and (($ic | contains($key)) or ($key | contains($ic))))
+              ($c  != "" and (sep_prefix($c;  $key) or sep_prefix($key; $c))) or
+              ($ic != "" and (sep_prefix($ic; $key) or sep_prefix($key; $ic)))
             )
-          | .address
-        )
+          | select(.address != null)
+        ]
+        | sort_by(-.focusHistoryID? // 0)
+        | .[0].address
       )
-    ' 2>/dev/null < <(hyprctl -j clients)
+
+      //
+
+      # Phase 3: reverse-domain-name class matching.
+      # Handles apps whose window class uses dot-separated notation such as
+      # com.obsproject.Studio or org.prismlauncher.PrismLauncher, where
+      # neither exact nor sep_prefix matching against the full class string
+      # would succeed.
+      (
+        [
+          $clients[]
+          | (.class        // "" | ascii_downcase) as $c
+          | (.initialClass // "" | ascii_downcase) as $ic
+          | select(rdns_match($c) or rdns_match($ic))
+          | select(.address != null)
+        ]
+        | sort_by(-.focusHistoryID? // 0)
+        | .[0].address
+      )
+
+      // empty
+
+    ' < <(hyprctl -j clients)
   )"
 
   if [[ -n "$window_address" ]]; then
@@ -101,12 +195,18 @@ done
 }
 
 COMMAND=("$@")
+SKIP_REGEX='[Th]unar|nvim'
 
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
 
 if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
-  # shellcheck disable=SC2068
-  focus_or_launch ${COMMAND[@]}
+  # You probably want multiple file managers open simultaneously
+  if [[ "${COMMAND[0]}" =~ $SKIP_REGEX ]]; then
+    # shellcheck disable=SC2068
+    exec setsid -f app2unit -- ${COMMAND[@]}
+  else
+    focus_or_launch ${COMMAND[@]}
+  fi
 else
   # shellcheck disable=SC2068
   exec setsid -f app2unit -- ${COMMAND[@]}
