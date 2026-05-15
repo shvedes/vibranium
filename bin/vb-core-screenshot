@@ -16,6 +16,7 @@ Options:
   --screen    Capture active screen
   --window    Capture active window
   --region    Capture selected region
+  --annotate  Annotate taken screenshot
   -h, --help  Display this help and exit
 EOF
 }
@@ -188,26 +189,52 @@ check_deps() {
   fi
 }
 
-case "$1" in
---region | --window | --screen)
-  if slurp_pid="$(pidof slurp)"; then
-    kill "$slurp_pid"
-    exit 1
-  fi
+MODE=''
+# Tracks whether --annotate was passed on the command line.
+# When true, annotation is forced regardless of VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE.
+EXPLICIT_ANNOTATE=false
 
-  if ! check_deps; then
+for arg in "$@"; do
+  case "$arg" in
+  --region | --window | --screen)
+    MODE="${arg#--}"
+    ;;
+  --annotate)
+    EXPLICIT_ANNOTATE=true
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Unknown option: $arg" >&2
+    echo "Try '${0##*/} --help' for more information" >&2
     exit 1
-  fi
+    ;;
+  esac
+done
 
-  init && capture "${1#--}"
-  ;;
--h | --help | '')
+# No capture mode given — nothing to do.
+if [[ -z $MODE ]]; then
   usage
   exit 0
-  ;;
-*)
-  echo "Unknown option: $*" >&2
-  echo "Try '${0##*/} --help' for more information" >&2
+fi
+
+if slurp_pid="$(pidof slurp)"; then
+  kill "$slurp_pid"
   exit 1
-  ;;
-esac
+fi
+
+if ! check_deps; then
+  exit 1
+fi
+
+init
+
+# --annotate was passed explicitly: force annotation, ignoring the
+# VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE builtin setting.
+if [[ $EXPLICIT_ANNOTATE == true ]]; then
+  ANNOTATE=true
+fi
+
+capture "$MODE"

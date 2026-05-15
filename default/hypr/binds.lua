@@ -520,7 +520,7 @@ hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_raw("vb-core-screenshot --region"
 hl.bind(mainMod .. " + SHIFT + Z", hl.dsp.exec_raw("vb-core-screenshot --screen"),
   { description = "Screenshot (screen)" })
 
-hl.bind("Print", hl.dsp.exec_raw("vb-core-screenshot --screen"), { description = "Screenshot (screen)" })
+hl.bind("Print", hl.dsp.exec_raw("vb-core-screenshot --screen --annotate"), { description = "Screenshot (screen)" })
 
 hl.bind(mainMod .. " + SHIFT + A", function()
   if hl.get_active_window() == nil then return end
