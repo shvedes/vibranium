@@ -18,6 +18,13 @@ if ((${#HOOKS[@]} >= 0)); then
   done
 fi
 
+# Stop all active sleep inhibitors
+if systemctl -q --user is-active vibranium-inhibit@sleep; then
+  systemctl -q --user stop vibranium-inhibit@sleep
+elif systemctl -q --user is-active vibranium-inhibit@idle; then
+  systemctl -q --user stop vibranium-inhibit@idle
+fi
+
 if ! out="$(uwsm stop 2>&1)"; then
   notify-send -r 4 -t 15000 "Failed to Log Out!" "UWSM shows this error: \n\n${out}"
 fi
