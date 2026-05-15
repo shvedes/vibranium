@@ -1,5 +1,10 @@
 hl.window_rule({
   match = {
+    -- When using system instalation of glfw,
+    -- Minecraft window doens't always set its class,
+    -- so we make it totally optional for cases
+    -- when the window was launched using Xwayland
+    -- for example, which will set its class.
     class = "(^Minecraft\\*\\s\\d\\.\\d\\d?)?",
     title = "^Minecraft\\*\\s\\d\\.\\d\\d?"
   },
@@ -105,20 +110,6 @@ hl.window_rule({
   float = true,
   center = true,
   size = "monitor_w*0.7 monitor_h*0.7",
-})
-
--- Thunar special rules.
--- Keeps small contextual windows always visible and focused.
--- To revert, just tile the window.
-hl.window_rule({
-  name = "Thunar: File Operation",
-  match = {
-    class = "[Tt]hunar",
-    title = '^(Rename "(.*?)"|Create New Folder|File Operation Progress|New\\s.*)$',
-  },
-  float = true,
-  center = true,
-  dim_around = true,
 })
 
 hl.window_rule({
