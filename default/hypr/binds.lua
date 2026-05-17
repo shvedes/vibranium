@@ -273,10 +273,22 @@ end, { description = "Pin active window" })
 
 -- Toggle the dwindle split direction for the active container.
 hl.bind(mainMod .. " + S", function()
-  if hl.get_config("general.layout") ~= "dwindle" then return end
-  if hl.get_active_window() == nil then return end
+  -- if hl.get_config("general.layout") ~= "dwindle" then return end
+  local ws = hl.get_active_workspace()
+  if ws == nil then return end
+
+  -- Dwindle-only dispatcher
+  if ws.tiled_layout ~= "dwindle" then
+    return
+  end
+
+  -- I love complications hehe
+  if hl.get_active_window() == nil then
+    return
+  end
+
   hl.dispatch(hl.dsp.layout("togglesplit"))
-end, { description = "Toggle split direction" })
+end, { description = "Toggle split direction (dwindle)", auto_consuming = true })
 
 -- Toggle pseudo-tiled for the active window. No-op on floating windows to
 -- avoid confusion, since pseudo-tile has no meaningful effect on floats.
