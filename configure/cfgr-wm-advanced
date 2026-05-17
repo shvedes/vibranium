@@ -6,6 +6,7 @@ ADVANCED_SPEC=(
   "misc.vrr|int"
   "debug.vfr|bool"
   "general.layout|str"
+  "scrolling.direction|str"
   "render.direct_scanout|int"
   "misc.middle_click_paste|bool"
   "misc.disable_autoreload|bool"
@@ -37,6 +38,7 @@ _set_ds() {
 }
 
 _set_layout() {
+  local chosen
   chosen="$(cfgr::set_string \
     --title "Windows Layout" \
     --option "Dwindle:dwindle" \
@@ -45,6 +47,19 @@ _set_layout() {
              "Scrolling:scrolling"
   )"
   hypr::set "general:layout" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set_scrolling_dir (){
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Layout direction"\
+    --option "Left:left" \
+             "Right:right"\
+             "Up:up" \
+             "Down:down"
+  )"
+
+  hypr::set "scrolling:direction" "$chosen" "$HYPR_CONF_ADVANCED"
 }
 
 _toggle() {
@@ -98,6 +113,14 @@ _build() {
   cfgr::item::action \
     --label "Windows layout : ${HYPR[general.layout]}" \
     --func "_set_layout"
+
+  if [[ "${HYPR[general.layout]}" == scrolling ]]; then
+    local direction="${HYPR[scrolling.direction]}"
+
+    cfgr::item::action \
+      --label "Scrolling direction : $direction" \
+      --func "_set_scrolling_dir"
+  fi
 }
 
 cfgr::run "Advanced" "_build"

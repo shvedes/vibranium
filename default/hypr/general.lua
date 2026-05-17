@@ -58,7 +58,6 @@ hl.config({
   },
 
   scrolling = {
-    follow_min_visible = 0.3,
-    column_width = 0.65,
+    column_width = 0.5,
   },
 })
