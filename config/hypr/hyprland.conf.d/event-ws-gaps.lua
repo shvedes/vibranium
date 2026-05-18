@@ -1,6 +1,8 @@
 -- Remove / comment the line below to enable this feature.
 -- Don't forget to relaod configuration.
-do return end
+do
+  return
+end
 
 -- Not applicable in Scrolling & Monocle layouts
 local layout = hl.get_config("general.layout")
@@ -11,7 +13,7 @@ end
 
 -- Original configured gap values from the user's config.
 -- These act as the "100%" baseline before scaling.
-local baseline_in  = 0
+local baseline_in = 0
 local baseline_out = 0
 
 -- Gap scaling presets based on window count.
@@ -21,7 +23,7 @@ local baseline_out = 0
 --   3 windows -> 0.40x
 --   4 windows -> 0.25x
 --   5+        -> 0.00x
-local SCALE        = { 1.0, 0.65, 0.40, 0.25, 0.00 }
+local SCALE = { 1.0, 0.65, 0.40, 0.25, 0.00 }
 
 -- Read a gap value from config.
 --
@@ -48,7 +50,7 @@ end
 -- Capture the current configured gap values so scaling
 -- always happens relative to the latest config state.
 local function capture_baseline()
-  baseline_in  = read_gap("general.gaps_in")
+  baseline_in = read_gap("general.gaps_in")
   baseline_out = read_gap("general.gaps_out")
 end
 
@@ -85,11 +87,11 @@ local function update_gaps(ws, exclude_address)
   -- be used to deduplicate. Instead we key on w.group.current.address,
   -- which is the same string for every member of a given group at
   -- any point in time.
-  local count       = 0
+  local count = 0
   local seen_groups = {}
 
   for _, w in ipairs(hl.get_workspace_windows(ws)) do
-    if w.address ~= exclude_address then
+    if w.address ~= exclude_address and w.floating == false then
       if w.group == nil then
         -- Not in any group: always count.
         count = count + 1
@@ -111,19 +113,19 @@ local function update_gaps(ws, exclude_address)
 
   -- Clamp scale index so any amount above the
   -- table size uses the last scale preset.
-  local scale   = SCALE[math.min(count, #SCALE)]
+  local scale = SCALE[math.min(count, #SCALE)]
 
   -- Scale gaps while preserving a minimum size of 1.
   -- +0.5 before floor() gives rounded integer results.
-  local new_in  = math.max(1, math.floor(baseline_in * scale + 0.5))
+  local new_in = math.max(1, math.floor(baseline_in * scale + 0.5))
   local new_out = math.max(1, math.floor(baseline_out * scale + 0.5))
 
   -- Apply the newly calculated gap values globally.
   hl.config({
     general = {
-      gaps_in  = new_in,
-      gaps_out = new_out
-    }
+      gaps_in = new_in,
+      gaps_out = new_out,
+    },
   })
 end
 
