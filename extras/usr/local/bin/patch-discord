@@ -7,9 +7,9 @@ wget -q $URL -O "$CLI"
 chmod +x "$CLI"
 
 if [[ -d /opt/discord ]]; then
-  $CLI -install -install-openasar -location /opt/discord &> /dev/null
+  $CLI -install -install-openasar -location /opt/discord &>/dev/null
 else
-  systemd-run -M user_placeholder@.host --user $CLI rinstall -install-openasar -location /home/user_placeholder/.config/discord &> /dev/null
-fr
+  systemd-run -M user_placeholder@.host --user $CLI rinstall -install-openasar -location /home/user_placeholder/.config/discord &>/dev/null
+fi
 
 rm -f "$CLI"
