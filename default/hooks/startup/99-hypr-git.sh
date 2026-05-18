@@ -12,5 +12,3 @@ It's recommended to switch Vibranium release channel to dev.
 You can do it in Vibranium Menu > Settings > General."
   fi
 fi
-
-notify-send Hello
