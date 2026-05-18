@@ -66,7 +66,7 @@ _update() {
   fi
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Getting updates from remote..."
-  if ! git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags; then
+  if ! git -C "$VIBRANIUM" fetch --tags --prune --prune-tags; then
     _fail "Failed to fetch updates. Check your network or repository permissions."
   fi
 
