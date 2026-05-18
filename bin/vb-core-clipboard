@@ -1,0 +1,94 @@
+#!/usr/bin/bash
+
+_shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+_usage() {
+  _shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Options:
+  --show      Show clipboard history
+  --clear     Clear clipboard history
+  -h, --help  Show this help and exit
+EOF
+}
+
+_check_deps() {
+  local missing=()
+  local deps=(cliphist rofi)
+
+  for d in "${deps[@]}"; do
+    if ! command -v "$d" >/dev/null; then
+      missing+=("$d")
+    fi
+  done
+
+  if ((${#missing[@]} > 0)); then
+    vb-cmd-dep-notify \
+      --name "Clipboard Manager" \
+      --deps "${missing[*]}"
+    return 1
+  fi
+}
+
+case "$1" in
+"--show")
+  if ! _check_deps; then
+    exit 1
+  fi
+
+  if ! systemctl -q --user is-active cliphist.service; then
+    systemctl -q --user enable --now cliphist.service
+  fi
+
+  source vb-lib-core
+
+  ENTRIES=()
+  mapfile -t ENTRIES < <(cliphist list)
+
+  if ((${#ENTRIES[@]} == 0)); then
+    notify-send -t 1000 -r 3 \
+      "Clipboard Manager" \
+      "<i>Clipboard is empty!</i>"
+    exit 1
+  fi
+
+  helpers::ui::menu chosen "Clipboard" "search..." \
+    -display-columns 2 -- "${ENTRIES[@]}"
+
+  if [[ ! -z "$chosen" ]]; then
+    if [[ "$chosen" =~ file:// ]]; then
+      printf "%s" "$chosen" | cliphist decode | wl-copy -n --type text/uri-list
+    else
+      printf "%s" "$chosen" | cliphist decode | wl-copy -n
+    fi
+  fi
+  ;;
+"--clear")
+  if ! _check_deps; then
+    exit 1
+  fi
+
+  if ! systemctl -q --user is-active cliphist.service; then
+    systemctl -q --user enable --now cliphist.service
+    exit 0
+  fi
+
+  killall -q rofi
+  wl-copy --clear
+  cliphist wipe
+  ;;
+"-h" | "--help" | "")
+  _usage
+  exit 0
+  ;;
+-*)
+  echo "Error: unknown option: $*" >&2
+  echi "Try '${0#**/} --help' for more information" >&2
+  exit 1
+  ;;
+esac

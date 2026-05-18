@@ -1,0 +1,8 @@
+#!/usr/bin/bash
+
+# Set keyboard layout to default (usually US)
+hyprctl -q switchxkblayout all 0
+
+if ! systemctl -q --user is-active hyprlock.service; then
+  systemctl -q --user start hyprlock.service
+fi

@@ -1,0 +1,13 @@
+{
+	"custom/color-picker": {
+		"format":"{text}",
+		"hide-empty-text": true,
+		"return-type":"json",
+		"interval": "once",
+		"signal": 8,
+
+		"exec": "vb-bar-color-picker",
+		"on-click": "vb-core-color-picker",
+		"on-click-right": "vb-core-color-picker --clear"
+	}
+}

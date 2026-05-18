@@ -1,0 +1,94 @@
+{
+	"$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+	"display": {
+		"separator": " "
+	},
+	"logo": {
+		"source": "BLAG"
+	},
+	"modules": [
+		"title",
+		"separator",
+		"break",
+		{
+			"type": "os",
+			"key": "\uf111",
+			"format": "{2}",
+			"keyColor": "yellow"
+		},
+		{
+			"type": "command",
+			"key": "\uf111",
+			"text": "uname -r | { IFS=- read ver _; echo $ver; }",
+			"format": "Linux {}",
+			"keyColor": "yellow"
+		},
+		{
+			"type": "command",
+			"text": "git -C $VIBRANIUM describe --tags --abbrev=0 2>/dev/null",
+			"key": "\uf111",
+			"format": "Vibranium {}",
+			"keyColor": "yellow"
+		},
+		{
+			"type": "command",
+			"text": "birth_install=$(stat -c %W /); current=$(date +%s); days_difference=$(( (current - birth_install) / 86400 )); echo $days_difference",
+			"key": "\uf111",
+			"format": "OS age {} days",
+			"keyColor": "yellow"
+		},
+		{
+			"type": "command",
+			"text": "birth_install=$(stat -c %W $VIBRANIUM); current=$(date +%s); days_difference=$(( (current - birth_install) / 86400 )); echo $days_difference",
+			"key": "\uf111",
+			"format": "Vibranium age {} days",
+			"keyColor": "yellow"
+		},
+		{
+			"type": "packages",
+			"key": "\uf111",
+			"format": "{1} packages",
+			"keyColor": "yellow"
+		},
+		"break",
+		{
+			"type": "cpu",
+			"key": "\uf111",
+			"format": "{1}",
+			"keyColor": "green"
+		},
+		{
+			"type": "gpu",
+			"key": "\uf111",
+			"format": "{2}",
+			"keyColor": "green"
+		},
+		"break",
+		{
+			"type": "disk",
+			"folders": "/",
+			"key": "\uf111",
+			"format": "Disk {1} / {2}",
+			"keyColor": "blue"
+		},
+		{
+			"type": "memory",
+			"key": "\uf111",
+			"format": "RAM {1} / {2}",
+			"keyColor": "blue"
+		},
+		{
+			"type": "swap",
+			"key": "\uf111",
+			"format": "Swap {1} / {2}",
+			"keyColor": "blue"
+		},
+		"break",
+		{
+			"type": "uptime",
+			"key": "\uf111",
+			"keyColor": "red"
+		},
+		"break"
+	]
+}

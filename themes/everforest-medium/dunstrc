@@ -1,0 +1,23 @@
+
+[global]
+format      = "<span foreground='#a7c080' size='10000'><b>%s</b></span>\n%b"
+background  = "#2d353b"
+foreground  = "#d3c6aa"
+frame_color = "#9da9a0"
+highlight   = "#9da9a0"
+
+[urgency_low]
+background  = "#2d353b"
+foreground  = "#d3c6aa"
+frame_color = "#9da9a0"
+highlight   = "#9da9a0"
+
+[urgency_critical]
+background  = "#2d353b"
+foreground  = "#d3c6aa"
+frame_color = "#e67e80"
+highlight   = "#9da9a0"
+# Disable timeout for urgent notifications
+timeout     = 0
+
+# vim:ft=cfg

@@ -1,0 +1,654 @@
+#!/usr/bin/bash
+
+# shellcheck disable=SC2206
+
+# Populated by _discover_themes at startup.
+# FAMILIES maps family display name -> space-separated variant display names.
+# STANDALONE_THEMES maps display name -> display name (value == key).
+# FOLDER_MAP maps the "CHOSEN" key (Family-Variant or standalone Name)
+# to the actual directory name under the themes source.
+declare -A FAMILIES=()
+declare -A STANDALONE_THEMES=()
+declare -A FOLDER_MAP=()
+
+ACTIVE_FAMILY=""
+ACTIVE_VARIANT=""
+
+# Maps folder name -> "true"/"false". Populated by _discover_in_dir.
+# If a folder has no light metadata at all, the key is absent and apply_theme
+# falls back to the folder-name regex as a last resort.
+declare -A THEME_LIGHT=()
+#
+# Maps folder name -> "official" | "user". Drives which source path is used
+# as the base copy in apply_theme; user-only themes skip the official copy step.
+declare -A THEME_SOURCE=()
+
+CURRENT_THEME_PATH="$XDG_CONFIG_HOME/vibranium/current/theme"
+NEXT_THEME_PATH="$XDG_CONFIG_HOME/vibranium/current/next-theme"
+THEME_NAME_FILE="$XDG_CONFIG_HOME/vibranium/current/theme.name"
+USER_THEMES_PATH="$XDG_CONFIG_HOME/vibranium/themes"
+SELF="${0##*/}"
+
+# "tokyonight-night" -> "Tokyonight-Night"
+capitalize() {
+  local IFS=- parts result=()
+  read -ra parts <<<"$1"
+  local part
+  for part in "${parts[@]}"; do
+    result+=("${part^}")
+  done
+  printf "%s" "${result[*]}"
+}
+
+# Process one themes directory and register every theme found into the
+# global FAMILIES / STANDALONE_THEMES / FOLDER_MAP / THEME_LIGHT / THEME_SOURCE maps.
+#
+# source_label ("official" or "user") is recorded per folder so apply_theme
+# knows which base path to copy from. User entries win on collision, allowing
+# a user-local copy of an official theme to fully replace it.
+#
+# For each subdirectory the light/dark flag is resolved in priority order:
+#   1. LIGHT= field in theme.info  (native format)
+#   2. theme.light file            (Omarchy-compatible fallback)
+#   3. Absent — apply_theme falls back to a folder-name regex at runtime
+#
+# Family/variant metadata priority:
+#   1. theme.info (FAMILY= / VARIANT= fields)
+#   2. Derived from folder name — no file written for unrecognised folders
+#      (safe for bare git repos dropped into the directory)
+_discover_in_dir() {
+  local dir="$1"
+  local source_label="${2:-official}"
+  local theme_dir folder family variant light chosen key val
+
+  for theme_dir in "$dir"/*/; do
+    if [[ ! -d "$theme_dir" ]]; then
+      continue
+    fi
+
+    folder="${theme_dir%/}"
+    folder="${folder##*/}"
+
+    family=""
+    variant=""
+    light=""
+
+    if [[ -f "$theme_dir/theme.info" ]]; then
+      # Read all recognised fields; silently ignore blank/unknown lines
+      while IFS='=' read -r key val; do
+        [[ $key == FAMILY ]] && family=$val
+        [[ $key == VARIANT ]] && variant=$val
+        [[ $key == LIGHT ]] && light=$val
+      done <"$theme_dir/theme.info"
+    else
+      # Fallback: derive family/variant from folder name; do NOT write theme.info
+      if [[ "$folder" != *-* ]]; then
+        family=""
+        variant="${folder^}"
+      else
+        local prefix="${folder%%-*}"
+        local suffix="${folder#*-}"
+        family="${prefix^}"
+        variant="${suffix^}"
+      fi
+
+      # Omarchy-compatible light flag
+      if [[ -f "$theme_dir/theme.light" ]]; then
+        light="true"
+      else
+        light="false"
+      fi
+    fi
+
+    [[ -n "$light" ]] && THEME_LIGHT["$folder"]="$light"
+
+    # A user folder whose name matches an existing official theme is a plain
+    # override: leave THEME_SOURCE as "official" so apply_theme performs the
+    # base+overlay copy, and skip re-registering to prevent a duplicate menu entry.
+    # A user folder with no official counterpart — regardless of whether it has
+    # a .git directory — is a new user-authored theme and must be registered.
+    if [[ "$source_label" == "user" && -d "$VIBRANIUM/themes/$folder" ]]; then
+      continue
+    fi
+
+    # User entries overwrite official ones so a user-local copy takes full precedence
+    THEME_SOURCE["$folder"]="$source_label"
+
+    if [[ -z "$family" ]]; then
+      STANDALONE_THEMES["$variant"]="$variant"
+      FOLDER_MAP["$variant"]="$folder"
+    else
+      if [[ -z "${FAMILIES[$family]+_}" ]]; then
+        FAMILIES["$family"]="$variant"
+      else
+        FAMILIES["$family"]+=" $variant"
+      fi
+      chosen="${family}-${variant}"
+      FOLDER_MAP["$chosen"]="$folder"
+    fi
+  done
+}
+
+_discover_themes() {
+  _discover_in_dir "$VIBRANIUM/themes" "official"
+
+  # User themes in $USER_THEMES_PATH are layered on top of official ones.
+  # A folder present in both acts as a full user-override of the official theme
+  # (source_label "user" wins the collision). A folder present only here is a
+  # user-local theme with no official counterpart.
+  if [[ -d "$USER_THEMES_PATH" ]]; then
+    _discover_in_dir "$USER_THEMES_PATH" "user"
+  fi
+}
+
+get_current_target_basename() {
+  if [[ -f "$THEME_NAME_FILE" ]]; then
+    printf "%s" "$(<"$THEME_NAME_FILE")"
+  else
+    printf ""
+  fi
+}
+
+is_current_theme() {
+  local theme="$1" curr_basename
+  [[ -f "$THEME_NAME_FILE" ]] || return 1
+  curr_basename="$(<"$THEME_NAME_FILE")"
+  [[ -z "$curr_basename" ]] && return 1
+  [[ "${curr_basename,,}" == "${theme,,}" ]]
+}
+
+# Sort keys descending by length
+_sort_by_length_desc() {
+  local -n arr="$1"
+  local i j tmp
+
+  for ((i = 0; i < ${#arr[@]}; i++)); do
+    for ((j = i + 1; j < ${#arr[@]}; j++)); do
+      if ((${#arr[j]} > ${#arr[i]})); then
+        tmp=${arr[i]}
+        arr[i]=${arr[j]}
+        arr[j]=$tmp
+      fi
+    done
+  done
+}
+
+_build_family_keys() {
+  # Populate the nameref array with sorted family+standalone keys
+  local -n _keys="$1"
+  _keys=(
+    "${!FAMILIES[@]}"
+    "${!STANDALONE_THEMES[@]}"
+  )
+  _sort_by_length_desc _keys
+}
+
+# Resolves the current on-disk theme name back to its discovery keys and
+# writes them into the globals ACTIVE_FAMILY and ACTIVE_VARIANT.
+# Called once before the interactive picker is shown.
+# ACTIVE_FAMILY — the family key (e.g. "Tokyonight") or standalone key (e.g. "Evergarden").
+# ACTIVE_VARIANT — the variant key (e.g. "Night"); empty for standalone themes.
+_resolve_active_theme() {
+  ACTIVE_FAMILY=""
+  ACTIVE_VARIANT=""
+
+  [[ -f "$THEME_NAME_FILE" ]] || return
+  local curr_folder
+  curr_folder="$(<"$THEME_NAME_FILE")"
+  [[ -z "$curr_folder" ]] && return
+
+  local family variant
+  for family in "${!FAMILIES[@]}"; do
+    for variant in ${FAMILIES[$family]}; do
+      if [[ "${FOLDER_MAP[${family}-${variant}]}" == "$curr_folder" ]]; then
+        ACTIVE_FAMILY="$family"
+        ACTIVE_VARIANT="$variant"
+        return
+      fi
+    done
+  done
+
+  for family in "${!STANDALONE_THEMES[@]}"; do
+    if [[ "${FOLDER_MAP[$family]}" == "$curr_folder" ]]; then
+      ACTIVE_FAMILY="$family"
+      ACTIVE_VARIANT=""
+      return
+    fi
+  done
+}
+
+_find_index() {
+  # Printf the 0-based index of $2 in array named $1, or 0 if not found
+  local -n _arr="$1"
+  local needle="$2"
+  local i
+
+  for i in "${!_arr[@]}"; do
+    [[ "${_arr[$i]}" == "$needle" ]] && {
+      printf "%s" "$i"
+      return
+    }
+  done
+
+  printf "0"
+}
+
+pick_family() {
+  local selected_row="${1:-0}"
+  local keys=()
+  _build_family_keys keys
+
+  # Make active theme indicator using pango markup.
+  local display_keys=() k
+  for k in "${keys[@]}"; do
+    if [[ -n "$ACTIVE_FAMILY" && "$k" == "$ACTIVE_FAMILY" ]]; then
+      display_keys+=("<b><i>$k</i></b>")
+    else
+      display_keys+=("$k")
+    fi
+  done
+
+  local family_chosen
+  while true; do
+    helpers::ui::menu \
+      family_chosen "Theme" "" \
+      -selected-row "$selected_row" \
+      -theme-str 'window{width: 300px;}' \
+      -- "${display_keys[@]}"
+
+    if [[ -z "$family_chosen" ]]; then
+      exit 0
+    fi
+
+    # Strip markup before resolving so downstream logic is unaffected
+    family_chosen="${family_chosen#<b><i>}"
+    family_chosen="${family_chosen%</i></b>}"
+
+    for k in "${keys[@]}"; do
+      [[ "$k" == "$family_chosen" ]] && {
+        printf "%s" "$family_chosen"
+        return 0
+      }
+    done
+  done
+}
+
+pick_variant() {
+  local family="$1"
+  local selected_row="${2:-0}"
+  local variants=(${FAMILIES[$family]})
+  _sort_by_length_desc variants
+
+  local items=() v
+  for v in "${variants[@]}"; do
+    items+=("${v//-/ }")
+  done
+
+  # Make active theme indicator using pango markup.
+  local display_items=() item
+  for item in "${items[@]}"; do
+    if [[ -n "$ACTIVE_VARIANT" && "$family" == "$ACTIVE_FAMILY" &&
+      "${item// /-}" == "$ACTIVE_VARIANT" ]]; then
+      display_items+=("<b><i>$item</i></b>")
+    else
+      display_items+=("$item")
+    fi
+  done
+
+  local display
+  while true; do
+    helpers::ui::menu display "$family" "flavor" -selected-row "$selected_row" -- "${display_items[@]}"
+    if [[ -z "$display" ]]; then
+      return 1
+    fi
+
+    # Strip markup before resolving so downstream logic is unaffected
+    display="${display#<b><i>}"
+    display="${display%</i></b>}"
+
+    for v in "${items[@]}"; do
+      [[ "$v" == "$display" ]] && {
+        printf "%s" "$display"
+        return 0
+      }
+    done
+  done
+}
+
+apply_theme() {
+  local chosen="$1"
+  local folder_name="$2"
+
+  # Resolve the base source path: user-only themes copy from USER_THEMES_PATH;
+  # official themes (with or without a user overlay) copy from VIBRANIUM/themes.
+  local source_label="${THEME_SOURCE[$folder_name]:-official}"
+  local src_path
+
+  if [[ "$source_label" == "user" ]]; then
+    src_path="$USER_THEMES_PATH/$folder_name"
+  else
+    src_path="$VIBRANIUM/themes/$folder_name"
+  fi
+
+  if [[ ! -d "$src_path" ]]; then
+    echo "Error: theme folder $src_path does not exist." >&2
+    exit 1
+  fi
+
+  if is_current_theme "$folder_name"; then
+    echo "Error: already on $chosen." >&2
+    notify-send -r 4 -t 1500 "Theme Selector" "Already on $chosen"
+    exit 1
+  fi
+
+  # Stage into next-theme first so the swap into current is atomic.
+  # This means a crash or signal mid-copy can't leave current/theme half-written.
+  rm -rf "$NEXT_THEME_PATH"
+  mkdir -p "$NEXT_THEME_PATH"
+  mkdir -p "$CURRENT_THEME_PATH"
+
+  # Base layer: official theme (or the user-only theme when there is no official counterpart).
+  # Exclude backgrounds/ from the synchronous pass — it's the only thing that's ever slow.
+  files=()
+  while IFS= read -r -d '' file; do
+    files+=("$file")
+  done < <(find "$src_path" -maxdepth 1 -mindepth 1 ! -name "backgrounds" -print0)
+
+  if ((${#files[@]} > 0)); then
+    cp -a -- "${files[@]}" "$NEXT_THEME_PATH/"
+  fi
+
+  # Create hard links for all the wallpapers.
+  # This makes the copy process instant.
+  # It avoids waiting for all the big images to copy.
+  if [[ -d "$src_path/backgrounds" ]]; then
+    mkdir -p "$NEXT_THEME_PATH/backgrounds"
+    cp -rl "$src_path/backgrounds/." "$NEXT_THEME_PATH/backgrounds/"
+  fi
+
+  # Overlay layer: user customisations on top of an official base.
+  # Files present in USER_THEMES_PATH/$folder_name overwrite their official
+  # counterparts; files absent from the overlay are inherited from the base.
+  if [[ "$source_label" == "official" && -d "$USER_THEMES_PATH/$folder_name" ]]; then
+    files=()
+    while IFS= read -r -d '' file; do
+      files+=("$file")
+    done < <(find "$USER_THEMES_PATH/$folder_name" -maxdepth 1 -mindepth 1 ! -name "backgrounds" -print0)
+
+    if ((${#files[@]} > 0)); then
+      cp -a -- "${files[@]}" "$NEXT_THEME_PATH/"
+    fi
+
+    if [[ -d "$USER_THEMES_PATH/$folder_name/backgrounds" ]]; then
+      cp -rl "$USER_THEMES_PATH/$folder_name/backgrounds/." "$NEXT_THEME_PATH/backgrounds/"
+    fi
+  fi
+
+  # Create missing config files from templates
+  vb-theme-set-templates
+
+  # Atomic swap: replace current with the fully-built staging directory
+  rm -rf "$CURRENT_THEME_PATH"
+  mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"
+
+  # Record the active theme name for is_current_theme and external tooling
+  printf "%s" "$folder_name" >"$THEME_NAME_FILE"
+
+  # Determine light/dark from discovery metadata; fall back to folder-name
+  # regex for themes that carry no light flag in either theme.info or theme.light
+  local is_light=false
+
+  if [[ -n "${THEME_LIGHT[$folder_name]+_}" ]]; then
+    [[ "${THEME_LIGHT[$folder_name]}" == "true" ]] && is_light=true
+  elif [[ $folder_name =~ (light|latte|dawn)$ ]]; then
+    is_light=true
+  fi
+
+  if $is_light; then
+    local icon_theme="Papirus-Light"
+    local color_scheme="prefer-light"
+    palette=false
+  else
+    local icon_theme="Papirus-Dark"
+    local color_scheme="prefer-dark"
+    palette=true
+  fi
+
+  for v in 5 6; do
+    sed -i "/custom_palette/s/=.*/=$palette/" \
+      "$XDG_CONFIG_HOME/qt${v}ct/qt${v}ct.conf"
+  done
+
+  gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
+  gsettings set org.gnome.desktop.interface color-scheme "$color_scheme"
+}
+
+get_wallpaper() {
+  local state_file="$VIBRANIUM_STATE/wallpaper.state"
+  local theme="${1,,}"
+  local line key val
+
+  # Parse the consolidated state file line by line.
+  # Each entry has the form: theme_name="full_path"
+  if [[ -f "$state_file" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      # Extract the key: everything before the first =
+      key="${line%%=*}"
+
+      if [[ "$key" == "$theme" ]]; then
+        # Extract the value: drop the key and =, then strip the quotes
+        val="${line#*=}"
+        val="${val#\"}"
+        val="${val%\"}"
+
+        # Only use the saved path if the file still actually exists.
+        # A missing file means the wallpaper was deleted; fall through
+        # to the directory scan below.
+        if [[ -f "$val" ]]; then
+          printf "%s" "$val"
+          return 0
+        fi
+
+        # Found the entry but the target is gone — stop searching.
+        break
+      fi
+    done <"$state_file"
+  fi
+
+  # No valid saved path found: return the first wallpaper in the theme dir.
+  shopt -s nullglob
+  local files=("$CURRENT_THEME_PATH/backgrounds/"*)
+  shopt -u nullglob
+
+  if [[ ${#files[@]} -gt 0 ]]; then
+    printf "%s" "${files[0]}"
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+show_help() {
+  shcat <<EOF
+Usage: $SELF [OPTION]... [THEME]
+
+Apply a Vibranium theme. With no THEME argument an interactive picker is
+launched. With a THEME argument the theme is applied non-interactively.
+
+Options:
+  -h, --help        Show this help text and exit
+  -l, --list        List all available theme names and exit
+
+Arguments:
+  THEME             Theme to apply. Accepted formats (case-insensitive):
+                    gruvbox-hard      folder name
+                    Gruvbox-Hard      capitalized folder name
+                    "Gruvbox Hard"    space-separated family + variant
+
+                    Standalone themes (no variant) are passed as a single
+                    word, e.g.: evergarden
+
+Examples:
+  $SELF                        Launch interactive picker
+  $SELF gruvbox-hard           Apply by folder name directly
+  $SELF Catppuccin-Mocha       Apply by capitalized name
+  $SELF "Tokyonight Night"     Apply with a space-separated name
+EOF
+}
+
+list_themes() {
+  local family variant
+  local -a names=()
+
+  for family in "${!FAMILIES[@]}"; do
+    for variant in ${FAMILIES[$family]}; do
+      names+=("${FOLDER_MAP[${family}-${variant}]}")
+    done
+  done
+
+  for family in "${!STANDALONE_THEMES[@]}"; do
+    names+=("${FOLDER_MAP[$family]}")
+  done
+
+  # insertion sort (lexicographical)
+  local i j key
+  for ((i = 1; i < ${#names[@]}; i++)); do
+    key=${names[i]}
+    j=$((i - 1))
+
+    while ((j >= 0)) && [[ ${names[j]} > $key ]]; do
+      names[j + 1]=${names[j]}
+      ((j--))
+    done
+
+    names[j + 1]=$key
+  done
+
+  printf '%s\n' "${names[@]}"
+}
+
+# Discover themes before any command handling
+_discover_themes
+
+case "${1-}" in
+-h | --help)
+  show_help
+  exit 0
+  ;;
+-l | --list)
+  list_themes
+  exit 0
+  ;;
+esac
+
+if [[ -n "$1" ]]; then
+  # Normalise spaces to hyphens ("Tokyonight Night" -> "Tokyonight-Night")
+  INPUT_THEME="${1// /-}"
+
+  # Fast path: $1 is already a valid theme folder name (case-insensitive).
+  # Check official themes dir first, then user themes dir, before attempting
+  # any family/variant parsing so callers can pass folder names directly.
+  if [[ -d "$VIBRANIUM/themes/${INPUT_THEME,,}" ]]; then
+    FOLDER_NAME="${INPUT_THEME,,}"
+    CHOSEN="$(capitalize "$FOLDER_NAME")"
+  elif [[ -d "$USER_THEMES_PATH/${INPUT_THEME,,}" ]]; then
+    FOLDER_NAME="${INPUT_THEME,,}"
+    CHOSEN="$(capitalize "$FOLDER_NAME")"
+  else
+    # Structured path: Family[-Variant] parsing against discovered data
+    FAMILY="${INPUT_THEME%%-*}"
+    VARIANT="${INPUT_THEME#*-}"
+
+    if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
+      echo "Error: family '$FAMILY' not found. Run '$SELF --list' to see available themes." >&2
+      exit 1
+    fi
+
+    VARIANT_FOUND=false
+    for v in ${FAMILIES[$FAMILY]}; do
+      if [[ "${v,,}" == "${VARIANT,,}" ]]; then
+        VARIANT_FOUND=true
+        VARIANT="$v" # use the canonical casing from discovery
+        break
+      fi
+    done
+
+    if ! $VARIANT_FOUND; then
+      echo "Error: variant '$VARIANT' not found in family '$FAMILY'. Run '$SELF --list' to see available themes." >&2
+      exit 1
+    fi
+
+    CHOSEN="${FAMILY}-${VARIANT}"
+    FOLDER_NAME="${FOLDER_MAP[$CHOSEN]}"
+  fi
+else
+  source vb-lib-core
+  _resolve_active_theme
+
+  declare -A _last_variant_row=()
+  _family_row=0
+
+  while true; do
+    FAMILY="$(pick_family "$_family_row")" || exit 1
+    [ -z "$FAMILY" ] && exit 1
+
+    # Remember which row this family sits on for when we return
+    _fkeys=()
+    _build_family_keys _fkeys
+    _family_row="$(_find_index _fkeys "$FAMILY")"
+
+    if [[ -n "${STANDALONE_THEMES[$FAMILY]+_}" ]]; then
+      CHOSEN="${STANDALONE_THEMES[$FAMILY]}"
+      FOLDER_NAME="${FOLDER_MAP[$CHOSEN]}"
+      break
+    fi
+
+    VARIANT_DISPLAY="$(pick_variant "$FAMILY" "${_last_variant_row[$FAMILY]:-0}")"
+    if [[ -z "$VARIANT_DISPLAY" ]]; then
+      # Escape pressed - go back to family menu with cursor restored
+      continue
+    fi
+
+    # Remember which variant row was chosen for this family
+    _vvariants=(${FAMILIES[$FAMILY]})
+    _sort_by_length_desc _vvariants
+    _vitems=()
+
+    for _vv in "${_vvariants[@]}"; do
+      _vitems+=("${_vv//-/ }")
+    done
+
+    _last_variant_row[$FAMILY]="$(_find_index _vitems "$VARIANT_DISPLAY")"
+
+    VARIANT="${VARIANT_DISPLAY// /-}"
+    CHOSEN="${FAMILY}-${VARIANT}"
+    FOLDER_NAME="${FOLDER_MAP[$CHOSEN]}"
+    break
+  done
+fi
+
+if [[ -z "$FOLDER_NAME" ]]; then
+  echo "Error: theme '$CHOSEN' could not be resolved to a folder." >&2
+  exit 1
+fi
+
+# Verify the resolved folder actually exists in at least one source location
+if [[ ! -d "$VIBRANIUM/themes/$FOLDER_NAME" && ! -d "$USER_THEMES_PATH/$FOLDER_NAME" ]]; then
+  echo "Error: theme '$CHOSEN' could not be resolved to a folder." >&2
+  exit 1
+fi
+
+apply_theme "$CHOSEN" "$FOLDER_NAME"
+vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")"
+vb-cmd-reload --quiet
+
+touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+killall --quiet -s USR2 btop
+
+vb-theme-set-gtk &
+vb-theme-set-svg &
+vb-theme-set-browser &
+vb-theme-set-obsidian &

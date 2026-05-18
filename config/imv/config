@@ -1,0 +1,56 @@
+[options]
+# Start over the first file when reaching the end.
+loop_input = true
+
+# Overlay info that you see in the bottom left.
+# Don't recommend removing it, unless you really need to.
+overlay = true
+overlay_font = Cascadia Code:9
+overlay_text = $(bash imv-overlay ''"$imv_current_file"'')
+
+overlay_background_color = 000000
+overlay_background_alpha = cc
+overlay_position_bottom = true
+
+# Set current window title based on current image open.
+# In default Vibranium setup it doesn't make sense, but
+# if you decide to add a waybar module that displays window's
+# title then it might be handy.
+title_text = $imv_current_file
+
+# Unload all default imv keybindings.
+suppress_default_binds = true
+
+[binds]
+q = quit
+
+l = next 1
+j = prev 1
+
+<Right> = next 1
+<Left> = prev 1
+
+<Shift+L> = pan +20 0
+<Shift+J> = pan -20 0
+<Shift+I> = pan 0 -20
+<Shift+K> = pan 0 +20
+
+0 = reset
+<Shift+R> = reset
+
+r = rotate by 90
+p = toggle_playing
+
+o = overlay
+f = fullscreen
+
+<period> = next_frame
+<Shift+plus> = zoom 5%
+<minus> = zoom -5%
+
+e = exec vb-util-image-annotator --imv "$imv_current_file" &
+c = exec imv-copy ''"$imv_current_file"'' &
+w = exec vb-core-wallpaper "$imv_current_file" &
+<Ctrl+h> = exec imv-cheatsheet
+
+# vim:ft=dosini

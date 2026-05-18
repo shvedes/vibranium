@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=btop++
+TryExec=btop
+Exec=btop
+NoDisplay=true

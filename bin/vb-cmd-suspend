@@ -1,0 +1,70 @@
+#!/usr/bin/bash
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTION]...
+
+Lock the session and suspend the system.
+Handle Hyprland animation transitions.
+
+Options:
+  -h, --help     display this help and exit
+EOF
+}
+
+case "${1-}" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+"")
+  :
+  ;;
+*)
+  echo "Error: unknown option -- $1" >&2
+  echo "Try '$SELF --help' for more information." >&2
+  exit 1
+  ;;
+esac
+
+# Lock session first
+vb-cmd-lock-session
+
+# Get current animations state.
+# This needed for smooth fade in/out of the screen using
+# gamma adjustments via hyprsunset.
+ANIMATIONS_ENABLED="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
+if ((ANIMATIONS_ENABLED == 1)); then
+  hyprctl -q hyprsunset gamma 0
+  sleep 1
+fi
+
+# Disable sleep ihibitor (sleep block) first since it
+# will require sudo in order to suspend.
+if systemctl -q --user is-active vibranium-inhibit@sleep.service; then
+  vb-toggle-inhibitor
+fi
+
+# If suspend fails, show a clear error instead of failing silently.
+if ! sc_out="$(systemctl suspend 2>&1)"; then
+  msg="Failed to suspend the system.\n\n"
+  msg+="Command: <b>systemctl suspend</b>\n\n"
+  msg+="Error output:\n<b>$sc_out</b>"
+
+  notify-send -u critical -t 30000 \
+    "Vibranium" "$msg"
+fi
+
+# This happens post-sleep
+if ((ANIMATIONS_ENABLED == 1)); then
+  sleep 2
+  hyprctl -q hyprsunset gamma 100
+fi

@@ -1,0 +1,140 @@
+#!/usr/bin/bash
+
+SELF=${0##*/}
+QUIET=false
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTION]
+
+Display information about the currently playing track.
+
+Options:
+  -h, --help    Display this help and exit
+  -q, --quiet   Do not display notification
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+  -h | --help)
+    usage
+    exit
+    ;;
+  -q | --quiet)
+      QUIET=true
+      ;;
+  -*)
+    echo "Error: unknown option: $1" >&2
+    exit 1
+    ;;
+  *)
+    break
+    ;;
+  esac
+  shift
+done
+
+source vb-lib-core
+
+album_art="/tmp/$SELF.album-art"
+state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
+
+pc_status="$(playerctl status 2>/dev/null || true)"
+
+if systemctl -q --user is-active mpd; then
+  mpd_status="$(mpc status 2>/dev/null)"
+fi
+
+if [[ "$pc_status" == "Playing" ]]; then
+  player="playerctl"
+  echo "$player" >"$state_file"
+  IFS='^' read -r title artist <<<"$(playerctl metadata --format '{{title}}^{{artist}}')"
+elif [[ -n "$mpd_status" && "$mpd_status" == *"[playing]"* ]]; then
+  player="mpd"
+  echo "$player" >"$state_file"
+  IFS='^' read -r title artist <<<"$(mpc current -f '%title%^%artist%')"
+elif [[ -f "$state_file" ]]; then
+  player="$(<"$state_file")"
+  case "$player" in
+  playerctl)
+    IFS='^' read -r title artist <<< \
+      "$(playerctl metadata --format '{{title}}^{{artist}}')"
+    ;;
+  mpd)
+    IFS='^' read -r title artist <<<"$(mpc current -f '%title%^%artist%')"
+    ;;
+  esac
+else
+  echo "No active players" >&2
+  exit 1
+fi
+
+# If $artist & (or) $title does not exist
+if [[ -z "$title" ]]; then
+  if [[ "$player" == "playerctl" ]]; then
+    url="$(playerctl metadata --format '{{xesam:url}}')"
+    if [[ "$url" =~ ^file:// ]]; then
+      filename="${url#file://}"
+      filename="${filename##*/}"
+    else
+      # Fallback for non-file URLs, e.g., spotify:track:id
+      filename="${url##*/}"
+    fi
+  else
+    filename="$(mpc current -f '%file%')"
+  fi
+  if [[ -z "$filename" ]]; then
+    filename="Unknown track"
+  fi
+  plain_output="$filename"
+  notify_body="<span foreground='${P_ORANGE}'> $filename</span>"
+else
+  if [[ -z "$artist" ]]; then
+    plain_output="$title"
+    notify_body="<span foreground='${P_ORANGE}'> $title</span>"
+  else
+    plain_output="$title by $artist"
+    notify_body="<span foreground='${P_ORANGE}'> $title</span>\n<span foreground='${P_YELLOW}'> $artist</span>"
+  fi
+fi
+
+echo "$plain_output"
+
+# Reminder:
+# When this option is set to true and a web-based player is used (e.g., Spotify),
+# displaying the album cover may take some time because it needs to be downloaded from the internet.
+helpers::check VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART
+show_album_art="$VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART"
+
+if [[ "$show_album_art" = true ]]; then
+  case "$player" in
+  "playerctl")
+    album_art_url="$(playerctl metadata mpris:artUrl)"
+    if [[ "$album_art_url" =~ ^https?:// ]]; then
+      curl -s "$album_art_url" -o "$album_art"
+    else
+      album_art="$album_art_url"
+    fi
+    ;;
+  "mpd")
+    mpd_file="$(mpc --format "%file%" current)"
+    mpc readpicture "$mpd_file" >"$album_art"
+    ;;
+  esac
+fi
+
+# Even if the file inside $album_art does not exist, notify-send will still send a notification,
+# although without the cover art, so we do not check for the existence of the file.
+if ! $QUIET; then
+  notify-send -r 3 -t 5000 -i "$album_art" "Now Playing" "$notify_body"
+fi
+
+# Even though the image may be small, we don't need junk in RAM.
+rm -f "$album_art"

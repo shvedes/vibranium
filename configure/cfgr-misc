@@ -1,0 +1,415 @@
+#!/usr/bin/env bash
+
+_get_term_opacity() {
+  local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+  sed -nE '/^\[window\]/,/^\[/{s/^[[:space:]]*opacity[[:space:]]*=[[:space:]]*"?([0-9.]+)"?/\1/p}' "$config"
+}
+
+_set_term_opacity() {
+  local input config
+  input="$(cfgr::set_digit \
+    --title "Opacity" \
+    --hint "Opacity value (float)" \
+    --type float \
+    --min 0.0 \
+    --max 1.0)" || return
+  config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+
+  sed -i -E '/^\[window\]/,/^\[/{s/^([[:space:]]*opacity[[:space:]]*=[[:space:]]*)"?[0-9.]+("?)/\1'"$input"'\2/}' "$config"
+}
+
+_edit_env() {
+  local env_file="$XDG_CONFIG_HOME/vibranium/environment"
+  xdg-terminal-exec --app-id=org.vb.term.float --title="vb-env" -- "${EDITOR:-nvim}" "$env_file"
+  helpers::ui::close_menus
+}
+
+_toggle_wallpaper() {
+  case "$(vb-cmd-get-option "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
+  false)
+    sed -i 's/path/# path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+    systemctl -q --user disable --now awww &
+    ;;
+  true)
+    sed -i 's/# path/path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+    systemctl -q --user enable --now awww &
+    ;;
+  esac
+}
+
+_get_notification_timeout() {
+  local config="$XDG_CONFIG_HOME/dunst/dunstrc"
+  local line value
+
+  while IFS='=' read -r key value; do
+    key="${key//[[:space:]]/}"
+
+    [[ $key == timeout ]] || continue
+
+    value="${value//[[:space:]]/}"
+    printf "%s" "$value"
+    return 0
+  done <"$config"
+
+  return 1
+}
+
+_set_notification_timeout() {
+  local config="$XDG_CONFIG_HOME/dunst/dunstrc"
+  local input
+  input="$(cfgr::set_digit \
+    --title "Timeout" \
+    --hint "Timeout (in seconds)" \
+    --type int \
+    --min 3 \
+    --max 30)" || return
+  sed -i -E "s/(timeout[[:space:]]*=[[:space:]]*)[0-9]+/\1${input}/" "$config"
+  vb-refresh-dunst &
+}
+
+_term_hook() {
+  case "$(vb-cmd-get-option VIBRANIUM_GLOBAL_TERMINAL)" in
+  "foot")
+    desktop_id="footclient.desktop"
+    systemctl -q --user disable alacritty.service &
+    systemctl -q --user enable --now foot-server.socket &
+    ;;
+  "alacritty")
+    desktop_id="Alacritty.desktop"
+    systemctl -q --user disable foot-server.socket &
+    systemctl -q --user enable --now alacritty.service &
+    ;;
+  esac
+
+  printf "%s\n" "$desktop_id" >"$XDG_CONFIG_HOME/xdg-terminals.list"
+}
+
+_get_default_browser() {
+  local browser
+
+  # Read from mimeapps.list first. It is
+  # faster than launching xdg-mime.
+  if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
+    while IFS='=' read -r key value; do
+      if [[ "$key" != "x-scheme-handler/http" ]]; then
+        continue
+      fi
+
+      browser="${value%%;*}"
+      break
+    done <"$XDG_CONFIG_HOME/mimeapps.list"
+  fi
+
+  if [[ -z "$browser" ]]; then
+    # Only use xdg-mime query as fallback
+    # And instantly cache it for the loop above
+    browser=$(xdg-mime query default x-scheme-handler/http 2>/dev/null) &&
+      xdg-mime default "$browser" x-scheme-handler/https x-scheme-handler/http
+  fi
+
+  if [[ -z "$browser" ]]; then
+    printf "(no browsers found)"
+    return
+  fi
+
+  case "$browser" in
+  opera.desktop) printf "Opera" ;;
+  firefox.desktop) printf "Firefox" ;;
+  chromium.desktop) printf "Chromium" ;;
+  vivaldi.desktop) printf "Vivaldi" ;;
+  google-chrome.desktop) printf "Google Chrome" ;;
+  microsoft-edge.desktop) printf "Microsoft Edge" ;;
+  brave-browser.desktop) printf "Brave" ;;
+  org.qutebrowser.qutebrowser.desktop) printf "Qutebrowser" ;;
+  esac
+}
+
+_set_default_browser() {
+  declare -A browsers_map=()
+
+  [[ $(command -v firefox) ]] && browsers_map["Firefox"]="firefox.desktop"
+  [[ $(command -v chromium) ]] && browsers_map["Chromium"]="chromium.desktop"
+  [[ $(command -v google-chrome-stable) ]] && browsers_map["Google Chrome"]="google-chrome.desktop"
+  [[ $(command -v brave-browser) ]] && browsers_map["Brave"]="brave-browser.desktop"
+  [[ $(command -v vivaldi) ]] && browsers_map["Vivaldi"]="vivaldi.desktop"
+  [[ $(command -v opera) ]] && browsers_map["Opera"]="opera.desktop"
+  [[ $(command -v microsoft-edge) ]] && browsers_map["Microsoft Edge"]="microsoft-edge.desktop"
+  [[ $(command -v qutebrowser) ]] && browsers_map["QuteBrowser"]="org.qutebrowser.qutebrowser.desktop"
+
+  local options=("${!browsers_map[@]}")
+
+  if ((${#options[@]} == 1)); then
+    notify-send -r 2 "Vibranium" "Only ${options[0]} detected. Nothing to choose from!"
+    return
+  elif ((${#options[@]} == 0)); then
+    notify-send -r 2 "Vibranium" "No installed browsers found!"
+    return
+  fi
+
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Default Browser" \
+    --option "${!browsers_map[@]}")"
+  xdg-mime default "${browsers_map[$chosen]}" x-scheme-handler/https x-scheme-handler/http
+}
+
+_manage_user_wallpapers() {
+  local wallpaper_dir files
+
+  local current_theme
+  current_theme="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+  wallpaper_dir="$XDG_CONFIG_HOME/vibranium/themes/$current_theme/backgrounds"
+
+  if [[ ! -d "$wallpaper_dir" ]]; then
+    notify-send -r 1 "Vibranium" "No user wallpapers found for current theme"
+    return
+  fi
+
+  shopt -s nullglob
+  files=("$wallpaper_dir"/*)
+  shopt -u nullglob
+
+  if ((${#files[@]} == 0)); then
+    notify-send -r 1 "Vibranium" "No user wallpapers found for current theme"
+    return
+  fi
+
+  local folder files chosen
+
+  _action() {
+    local target options chosen
+
+    target="$1"
+    options=("Open" "Delete")
+
+    while true; do
+      helpers::ui::menu chosen "$target" "ESC to go back" -- "${options[@]}"
+      [[ -z "$chosen" ]] && return
+
+      if ! [[ " ${options[*]} " =~ $chosen ]]; then
+        continue
+      fi
+
+      case "$chosen" in
+      "Open")
+        imv "$wallpaper_dir/$target"
+        ;;
+      "Delete")
+        rm -f "$wallpaper_dir/$target"
+        notify-send -r 2 "Vibranium" "$target has been deleted"
+
+        # Also remove overlayed file
+        local current_mirror="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
+        if [[ -f "$current_mirror/$target" ]]; then
+          rm -f "$current_mirror/$target"
+        fi
+
+        local current
+        current="$(vb-core-wallpaper --get)"
+        current="${current##*/}"
+
+        if [[ "$current" == "$target" ]]; then
+          vb-core-wallpaper --next
+        fi
+
+        # Refresh files list after delete
+        files=()
+        for f in "$wallpaper_dir"/*; do
+          if [[ -f "$f" ]]; then
+            files+=("${f##*/}")
+          fi
+        done
+
+        # If backgrounds/ is now empty, decide how much to clean up.
+        if ((${#files[@]} == 0)); then
+          local theme_dir="${wallpaper_dir%/*}" # strip /backgrounds to get theme root
+          local theme_contents=()
+
+          for entry in "$theme_dir"/*; do
+            [[ -e "$entry" ]] && theme_contents+=("$entry")
+          done
+
+          # Only the empty backgrounds/ dir remains - remove the whole theme folder
+          if [[ ${#theme_contents[@]} -eq 1 && "${theme_contents[0]}" == "$wallpaper_dir" ]]; then
+            rm -r "$theme_dir"
+            return
+          fi
+
+          # Theme folder has other content - only drop the empty backgrounds/ dir
+          rmdir "$wallpaper_dir"
+          return
+        fi
+        ;;
+      esac
+      break
+    done
+  }
+
+  files=()
+
+  for f in "$wallpaper_dir"/*; do
+    if [[ -f "$f" ]]; then
+      files+=("${f##*/}")
+    fi
+  done
+
+  local index=0
+  local open_folder_opt="Open containing folder"
+
+  while true; do
+    if [[ ${#files[@]} -eq 0 ]]; then
+      rmdir "$wallpaper_dir"
+      return
+    fi
+
+    # Prepend the folder shortcut above all file entries
+    local menu_items=("$open_folder_opt" "${files[@]}")
+
+    helpers::ui::menu chosen "Your wallpapers" "ESC to go back" -selected-row "$index" -- "${menu_items[@]}"
+    [[ -z "$chosen" ]] && return
+
+    if [[ "$chosen" == "$open_folder_opt" ]]; then
+      xdg-open "$wallpaper_dir"
+      index=0 # Keep the shortcut selected on return
+      continue
+    fi
+
+    for i in "${!files[@]}"; do
+      if [[ "${files[$i]}" == "$chosen" ]]; then
+        index="$((i + 1))" # +1 because menu_items[0] is the folder shortcut
+        break
+      fi
+    done
+
+    if ! [[ " ${files[*]} " =~ $chosen ]]; then
+      continue
+    fi
+
+    _action "$chosen"
+
+    if [[ ! -f "$wallpaper_dir/$chosen" ]]; then
+      index=0
+    fi
+  done
+}
+
+_set_cursor_size() {
+  local -a sizes=()
+  local chosen_size
+  local line
+
+  local state="$VIBRANIUM_STATE/cursor-size"
+
+  read -r line < <(vb-theme-cursor-list --size "${CURSOR_THEME:-Adwaita}")
+  [[ -z "$line" ]] && return
+  line=${line#* } # remove first (theme name) word and following space
+
+  # Split remaining sizes into array
+  read -r -a sizes <<<"$line"
+
+  chosen_size="$(cfgr::set_string \
+    --title "Cursor Size" \
+    --option "${sizes[@]}")" || return
+
+  printf "%s" "$chosen_size" >"$state"
+  vb-theme-cursor-set --size "$chosen_size" &
+}
+
+_set_cursor_theme() {
+  local options=()
+  local chosen folder
+
+  local state="$VIBRANIUM_STATE/cursor-theme"
+
+  declare -A CURSOR_NAME_TO_FOLDER=()
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+
+    folder=${line%%|*}
+    pretty=${line#*|}
+
+    CURSOR_NAME_TO_FOLDER["$pretty"]="$folder"
+
+    options+=("$pretty")
+  done < <(vb-theme-cursor-list)
+
+  if ((${#options[@]} <= 1)); then
+    notify-send -r 3 "Vibranium" "No curosr themes found"
+    return
+  fi
+
+  chosen="$(cfgr::set_string \
+    --title "Cursor Theme" \
+    --option "${options[@]}")" || return
+  folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
+
+  printf "%s" "$folder" >"$state"
+  vb-theme-cursor-set &
+}
+
+_get_cursor_theme() {
+  local current
+  local settings
+  settings="$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+
+  # gsettings returns "Default" most of the time, so just use gtk settings file instead.
+  # current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
+  current="$(sed -n 's/^gtk-cursor-theme-name=//p' "$settings")"
+
+  while IFS='|' read -r key value; do
+    if [[ "$key" == "$current" ]]; then
+      printf "%s" "$value"
+      return
+    fi
+  done <<<"$(vb-theme-cursor-list)"
+
+  # Fallback: if the list above is empty (e.g. not found)
+  printf "Adwaita"
+}
+
+_build() {
+  CURSOR_THEME="$(<"$VIBRANIUM_STATE/cursor-theme")"
+  CURSOR_THEME="${CURSOR_THEME:-$(_get_cursor_theme)}"
+
+  CURSOR_SIZE="$(<"$VIBRANIUM_STATE/cursor-size")"
+  CURSOR_SIZE="${CURSOR_SIZE:-Default}"
+
+  cfgr::item::raw "Notification timeout : $(_get_notification_timeout)s" "action:_set_notification_timeout"
+
+  cfgr::item::bool --var VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK --label "Pause music on lock"
+
+  # Allow default terminal selection only when both are installed.
+  if command -v alacritty >/dev/null && command -v foot >/dev/null; then
+    cfgr::item::string \
+      --var VIBRANIUM_GLOBAL_TERMINAL \
+      --label "Default terminal" \
+      --title "Default Terminal" \
+      --hook "_term_hook" \
+      --option "Alacritty:alacritty" "Foot:foot"
+
+  fi
+
+  cfgr::item::raw "Default browser : $(_get_default_browser)" "action:_set_default_browser"
+
+  if [[ "$CHASSIS_TYPE" != vm ]]; then
+    cfgr::item::bool \
+      --var VIBRANIUM_GLOBAL_SHOW_WALLPAPER \
+      --label "Show wallpaper" \
+      --hook "_toggle_wallpaper"
+  fi
+
+  if [[ "$VIBRANIUM_GLOBAL_TERMINAL" == alacritty ]]; then
+    cfgr::item::raw "Term opacity : $(_get_term_opacity)" "action:_set_term_opacity"
+  fi
+
+  cfgr::item::raw "Cursor theme : $CURSOR_THEME" "action:_set_cursor_theme"
+  cfgr::item::raw "Cursor size : ${CURSOR_SIZE}px" "action:_set_cursor_size"
+
+  cfgr::item::action --func "_manage_user_wallpapers" --label "User wallpapers"
+  cfgr::item::action --func "_edit_env" --label "Edit env"
+}
+
+cfgr::run "Misc" "_build" \
+  VIBRANIUM_GLOBAL_SHOW_WALLPAPER \
+  VIBRANIUM_GLOBAL_TERMINAL

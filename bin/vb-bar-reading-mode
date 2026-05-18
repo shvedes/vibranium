@@ -1,0 +1,13 @@
+#!/usr/bin/bash
+
+CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua"
+
+if [[ -f "$CONFIG" ]]; then
+  icon="\udb82\udfc2"
+  tooltip="\tReading mode is active\n\n"
+  tooltip+="   Note that grayscale effect will be\n"
+  tooltip+="visible on screenshots and screen records"
+  printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
+else
+  printf '{"text": ""}'
+fi

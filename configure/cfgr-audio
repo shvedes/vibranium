@@ -1,0 +1,430 @@
+#!/usr/bin/env bash
+
+# cfgr-audio — Audio settings menu
+#
+# This script is the canonical live example of how vb-lib-cfgr is used.
+# Read it top to bottom — the structure is identical in every cfgr-* script.
+#
+# vb-lib-core   provides helpers::*, notify-send wrappers, and all
+#               VIBRANIUM_* environment variables.
+# vb-lib-cfgr   provides the menu framework: cfgr::item::*, cfgr::run,
+#               cfgr::toggle_bool, cfgr::set_digit, cfgr::set_string, etc.
+#
+# After both libraries are sourced, a cfgr-* script only needs to do two things:
+#   1.  Define private helper functions for any side-effects or sub-menus.
+#   2.  Define a _build function that registers every menu row via cfgr::item::*.
+#
+# cfgr::run at the bottom takes care of the loop, rofi calls, and dispatch.
+# There is no while loop, no INDEX variable, and no case statement here.
+#
+#
+# HOW THE ITEM FUNCTIONS WORK
+# ---------------------------
+#
+# Every cfgr::item::* call appends one entry to two parallel arrays inside
+# vb-lib-cfgr:
+#
+#   _CFGR_ITEMS[N]    — the display string sent to rofi for row N
+#   _CFGR_DISPATCH[N] — a descriptor string encoding what to do when row N
+#                       is selected
+#
+# cfgr::run calls the _build function fresh on every loop iteration, so:
+#   - Conditional rows (if blocks) are re-evaluated on every redraw.
+#   - Values shown in labels are always current — no stale snapshots.
+#
+# After the user picks a row, cfgr::run looks up _CFGR_DISPATCH at the same
+# index and passes it to cfgr::dispatch, which reads the type tag and acts:
+#
+#   bool:VAR[:action:HOOK]          -> cfgr::toggle_bool VAR, then HOOK if set
+#   digit:VAR:HINT:TITLE:TYPE:MIN:MAX -> cfgr::set_digit (opens numeric input)
+#   string:VAR:TITLE:HOOK:opts      -> cfgr::set_string (opens picker)
+#   action:FUNCNAME                 -> eval FUNCNAME
+#   display:                        -> no-op (read-only row)
+#
+#
+# THE FLAG-BASED API
+# ------------------
+#
+# All cfgr::item::* functions accept named flags in any order:
+#
+#   cfgr::item::bool
+#     --var   VAR     the settings variable name (not its value)
+#     --label LABEL   text shown on the left of the menu row
+#     --hook  HOOK    optional function/command called after the bool is flipped
+#
+#   cfgr::item::digit
+#     --var    VAR    the settings variable name
+#     --label  LABEL  text shown on the left of the menu row
+#     --title  TITLE  rofi window title / input field label
+#     --prompt HINT   placeholder text inside the rofi input box (defaults to TITLE)
+#     --type   TYPE   "int" or "float"
+#     --min    MIN    lower bound (inclusive)
+#     --max    MAX    upper bound (inclusive)
+#
+#   cfgr::item::string
+#     --var    VAR    the settings variable name
+#     --label  LABEL  text shown on the left of the menu row
+#     --title  TITLE  rofi window title for the picker menu
+#     --hook   HOOK   optional function/command called after the value is written
+#     --option OPT [OPT ...]
+#                     options in "Pretty Label:stored_value" format; all non-flag
+#                     arguments following --option are consumed as options until
+#                     the next flag or end of arguments
+#
+#   cfgr::item::action
+#     --func  FUNC    name of the function to call when this row is selected
+#     --label LABEL   text shown in the menu row (auto-wrapped in <b></b> unless
+#                     the label already contains " : ", in which case it's shown as-is)
+#
+# The "Pretty Label:stored_value" option format:
+#   When a string item's options include "H264:h264", rofi shows "H264" to the
+#   user but writes "h264" to the settings file. The parent menu row also shows
+#   the pretty label ("H264") rather than the raw value — cfgr::item::string
+#   does a reverse lookup through the option list on every build so the parent
+#   row always displays a human-readable value.
+
+# ─── Private helper functions ─────────────────────────────────────────────────
+#
+# These are small, single-purpose functions called either:
+#   a) as --hook HOOK to cfgr::item::bool  — run automatically after the bool
+#      is toggled, letting you react to the new value, or
+#   b) as --func FUNC to cfgr::item::action — run when the user explicitly
+#      selects that row in the menu.
+#
+# None of these are called directly by cfgr::run. They are referenced by name
+# only in the _build functions below, and invoked via cfgr::dispatch at runtime.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# _on_boost_toggled — hook for VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED
+#
+# Registered via --hook in cfgr::item::bool. Runs immediately after
+# cfgr::toggle_bool flips the boost setting.
+#
+# Its job: enforce a safety constraint. If boost was just turned OFF and the
+# current volume is above 100%, clamp it back to 100% so the user isn't left
+# with distorted audio silently.
+#
+# Why re-source settings here?
+#   cfgr::toggle_bool writes to the settings file on disk, but in-memory
+#   variables are not automatically updated. Re-sourcing ensures we read the
+#   value that was just written (false, since boost was turned off).
+#
+# Volume format from wpctl:
+#   "Volume: 1.23" — a float where 1.00 = 100%, 1.50 = 150%.
+#   The first regex captures the numeric part after "Volume: ".
+#   The second regex matches the boost range (1.10–1.50) plus a defensive
+#   upper bound for anything >= 2.00 that should never occur in practice.
+_on_boost_toggled() {
+  source "$VIBRANIUM_USER_SETTINGS"
+
+  if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == false ]]; then
+    local current_vol
+    current_vol=$(wpctl get-volume "@DEFAULT_AUDIO_SINK@")
+
+    if [[ $current_vol =~ ([0-9]+\.[0-9]+) ]]; then
+      current_vol="${BASH_REMATCH[1]}"
+
+      # 1.10-1.50 covers the boost range (110%-150%).
+      # The [2-9] arm catches anything >= 200% as a defensive upper bound.
+      if [[ $current_vol =~ ^(1\.[1-4][0-9]|1\.50|[2-9]) ]]; then
+        notify-send -r 2 -t 5000 "Vibranium" "Volume level has been set back to 100%"
+        vb-core-volume --volume 100 &
+      fi
+    fi
+  fi
+}
+
+# _set_audio_feedback_variant — action for the "Variant" row in the feedback sub-menu
+#
+# Registered via --func in cfgr::item::action. Called when the user selects
+# the "Variant" row in the audio feedback sub-menu.
+#
+# Uses cfgr::set_string to open a rofi picker showing three labeled options.
+# The flag breakdown:
+#
+#   --title "Feedback Variant"
+#     The rofi window title shown while the picker is open.
+#
+#   --option "Variant 1:variant1" "Variant 2:variant2" "Variant 3:variant3"
+#     All options in a single --option block. Each entry follows the
+#     "Pretty Label:stored_value" format: the label is shown in rofi, the
+#     stored_value is what gets written to the settings file.
+#
+#   --var VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
+#     The settings variable to update with the chosen stored_value.
+#     When --var is omitted, cfgr::set_string acts as a plain picker and
+#     prints the selected value to stdout instead of writing to the file.
+#
+# This function is only registered when audio feedback is currently enabled —
+# see the conditional in _audio_feedback_build below.
+_set_audio_feedback_variant() {
+  cfgr::set_string \
+    --title "Feedback Variant" \
+    --option "Variant 1:variant1" "Variant 2:variant2" "Variant 3:variant3" \
+    --var VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
+}
+
+# _open_wiremix — action for the "Open volume mixer" row
+#
+# Spawns wiremix in a floating terminal window via vb-launch-tui, then
+# immediately closes the entire cfgr menu stack with helpers::ui::close_menus.
+_open_wiremix() {
+  vb-launch-tui --title="wiremix" --app-id="org.vb.term.float" -- wiremix
+  helpers::ui::close_menus
+}
+
+# _set_loopback_volume — action for the dynamic "Hear my voice volume" row
+#
+# Only registered when VIBRANIUM_VOLUME_SOURCE_LOOPBACK is true (see the
+# conditional block in _build below). Prompts for a new loopback volume and
+# applies it immediately.
+#
+# Uses cfgr::set_digit to open a rofi numeric input prompt. The flag breakdown:
+#
+#   --title "Hear my voice volume"
+#     The rofi window title / label shown to the left of the input field.
+#
+#   --hint "Volume"
+#     Placeholder text shown inside the input box before the user types.
+#     When omitted, the --title value is reused as the hint.
+#
+#   --type int
+#     Only whole-number percentages make sense for a volume level.
+#
+#   --min 10  --max 100
+#     The accepted range. Values outside this range trigger a notification
+#     and the prompt redraws — the caller never handles that logic manually.
+#
+#   --var VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME
+#     The settings variable to write the validated result into.
+#     When --var is omitted, cfgr::set_digit acts as a plain picker and
+#     prints the validated value to stdout instead.
+#
+# After the value is saved, vb-toggle-loopback is called to apply the
+# new level to the live PipeWire loopback node.
+_set_loopback_volume() {
+  cfgr::set_digit \
+    --title "Hear my voice volume" \
+    --hint "Volume" \
+    --type int \
+    --min 10 \
+    --max 100 \
+    --var VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME
+  vb-toggle-loopback
+}
+
+# ─── Menu builder functions ───────────────────────────────────────────────────
+#
+# A _build function is a plain bash function that calls cfgr::item::* once
+# per menu row. cfgr::run resets both parallel arrays and re-calls the _build
+# function on every loop iteration so conditional rows and embedded getter
+# calls always reflect the current state.
+#
+# This script has two: one for the nested "Audio feedback" sub-menu, and one
+# for the main Audio menu.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# _audio_feedback_build — populates the "Audio feedback" sub-menu
+#
+# Row 1: Bool toggle for enabling/disabling audio feedback.
+#
+#   --var VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
+#     The current value is read via bash indirect expansion (${!var}).
+#     cfgr::build_menu normalises the true/false to yes/no at display time.
+#
+#   --label "Audio feedback"
+#     Text shown on the left of the row in the menu.
+#
+#   No --hook here: the feedback system reads the setting live on each
+#   volume event, so no immediate side-effect is needed after the toggle.
+#
+# Row 2 (conditional): Only shown when audio feedback is currently enabled.
+#
+#   Showing a variant picker when feedback is off would be misleading — the
+#   setting is stored but the feedback system won't use it, so any change
+#   there would appear to have no effect.
+#
+#   The display variant is formatted before the label is built:
+#     ${display_variant^}    capitalises the first character
+#     ${display_variant//_/ } replaces underscores with spaces
+#   so "variant2" becomes "Variant 2" for display.
+#
+#   This row is registered with --func rather than as a bool. Selecting it
+#   calls _set_audio_feedback_variant, which opens a picker for the three
+#   variants. The label intentionally embeds the current value so the user
+#   can see what is selected without opening the picker.
+#
+#   Note: when a --label already contains " : ", cfgr::item::action does not
+#   wrap it in <b></b>, so it renders like a regular value row.
+_audio_feedback_build() {
+  cfgr::item::bool \
+    --var VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK \
+    --label "Audio feedback"
+
+  if [[ "${VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK}" == true ]]; then
+    local display_variant="${VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT}"
+    display_variant="${display_variant^}"
+    display_variant="${display_variant//_/ }"
+
+    cfgr::item::action \
+      --func "_set_audio_feedback_variant" \
+      --label "Variant : ${display_variant}"
+  fi
+}
+
+# _audio_feedback_submenu — opens the "Audio feedback" sub-menu
+#
+# Referenced via --func in cfgr::item::action inside _build.
+# When the user selects the "Audio feedback" row in the main menu,
+# cfgr::dispatch calls this function, which starts a new cfgr::run loop.
+#
+# cfgr::run is fully re-entrant: calling it from inside an action creates a
+# nested menu that behaves exactly like the top-level one. Pressing Escape in
+# the sub-menu breaks its inner loop and returns to the parent menu's loop,
+# which then redraws itself with fresh state.
+#
+# The variable names after _audio_feedback_build are passed to helpers::check
+# on every iteration. Always list every variable whose value is shown in a
+# label or read by a conditional inside any _build this cfgr::run uses.
+# See the entry-point comment below for a detailed explanation of why.
+_audio_feedback_submenu() {
+  cfgr::run "Audio feedback" _audio_feedback_build \
+    VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT \
+    VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK
+}
+
+# _build — populates the top-level Audio menu
+#
+# ── Bool rows ──────────────────────────────────────────────────────────────
+#
+#   "Boost up to 150%"
+#     --hook "_on_boost_toggled": after the bool is flipped, the hook runs
+#     to clamp the live volume back to 100% if boost was just disabled and
+#     the level is already above that threshold.
+#
+#   "Visual feedback"
+#     No --hook: the visual feedback system reads the setting live on each
+#     volume change, so no service restart or immediate side-effect is needed.
+#
+#   "Hear my voice"
+#     --hook "vb-toggle-loopback": the hook here is an external command,
+#     not a local function — that is fine, cfgr::dispatch simply evals it.
+#     The command enables or disables the PipeWire loopback node that routes
+#     microphone audio back to the speakers.
+#
+# ── Conditional action row ─────────────────────────────────────────────────
+#
+#   "Hear my voice volume"
+#     Only registered when loopback is currently active. The current loopback
+#     volume is fetched live and embedded in the --label so the user can see
+#     it without opening the input prompt.
+#
+#     vb-toggle-loopback --get-volume may return nothing if the loopback
+#     node has not been created yet (e.g. right after the setting is turned on).
+#     ${loopback_vol:-?} substitutes "?" in that case so the label always
+#     renders as something meaningful rather than "Hear my voice volume : %".
+#
+#     Stderr is suppressed (2>/dev/null) for the same reason: the command may
+#     emit an error before the node exists, which would corrupt the menu output.
+#
+# ── Digit row ──────────────────────────────────────────────────────────────
+#
+#   "Volume step"
+#     When selected, a rofi numeric input prompt opens. The entered value is
+#     validated against --type and the --min/--max range before being written
+#     to the settings file. Invalid input triggers a notification and the
+#     prompt retries automatically — _build never needs to handle that logic.
+#
+#     --prompt sets the placeholder hint shown inside the rofi input box.
+#     When omitted, the --title value is reused as the hint.
+#
+# ── Action rows ────────────────────────────────────────────────────────────
+#
+#   "Audio feedback"
+#     Opens the nested feedback sub-menu via _audio_feedback_submenu.
+#
+#   "Open volume mixer"
+#     Launches wiremix and closes all cfgr menus via _open_wiremix.
+_build() {
+  cfgr::item::bool \
+    --var VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
+    --label "Boost up to 150%" \
+    --hook "_on_boost_toggled"
+
+  cfgr::item::bool \
+    --var VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK \
+    --label "Visual feedback"
+
+  cfgr::item::bool \
+    --var VIBRANIUM_VOLUME_SOURCE_LOOPBACK \
+    --label "Hear my voice" \
+    --hook "vb-toggle-loopback"
+
+  if [[ "$VIBRANIUM_VOLUME_SOURCE_LOOPBACK" == true ]]; then
+    local loopback_vol
+    loopback_vol=$(vb-toggle-loopback --get-volume 2>/dev/null)
+    loopback_vol="${loopback_vol:-?}"
+
+    cfgr::item::action \
+      --func "_set_loopback_volume" \
+      --label "Hear my voice volume : ${loopback_vol}%"
+  fi
+
+  cfgr::item::digit \
+    --var VIBRANIUM_VOLUME_ADJUSTMENT_STEP \
+    --label "Volume step" \
+    --title "Volume step" \
+    --prompt "Enter step size" \
+    --type int \
+    --min 1 \
+    --max 25
+
+  cfgr::item::action \
+    --func "_audio_feedback_submenu" \
+    --label "Audio feedback"
+
+  cfgr::item::action \
+    --func "_open_wiremix" \
+    --label "Open volume mixer"
+}
+
+# ─── Entry point ──────────────────────────────────────────────────────────────
+#
+# cfgr::run is the only thing executed at the top level. It starts the loop.
+#
+# Argument 1 — "Audio"
+#   The rofi window title shown while this menu is open.
+#
+# Argument 2 — "_build"
+#   The build function. cfgr::run calls it on every loop iteration to rebuild
+#   _CFGR_ITEMS and _CFGR_DISPATCH from scratch. Because it runs fresh every
+#   time, conditional rows and embedded getter calls always reflect current state.
+#
+# Arguments 3+ — settings variables this menu reads
+#   On each iteration, cfgr::run sources the settings file and then passes
+#   these names to helpers::check. helpers::check ensures each one exists and
+#   holds a valid value, resetting it to the default from vb-core-defaults
+#   if not.
+#
+#   Why does this matter?
+#     Suppose a user manually edits the settings file and writes
+#     VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED=alksjdlaksd instead of true/false.
+#     If that variable is NOT listed here, cfgr::run sources the garbage value
+#     and renders "Boost up to 150% : alksjdlaksd" in the menu. toggle_bool
+#     would still recover (it calls the same check function internally), but
+#     the menu will have already drawn the garbage string before that happens.
+#     Listing the variable here means helpers::check corrects the bad value
+#     before the menu is drawn at all, so the display is always consistent.
+#
+#   Rule of thumb: list every variable whose value appears in a label or is
+#   read by a conditional inside any _build function this cfgr::run uses —
+#   including those in sub-menu builders, because helpers::check at the
+#   top level is the first opportunity to catch bad values before they propagate.
+# ─────────────────────────────────────────────────────────────────────────────
+cfgr::run "Audio" "_build" \
+  VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME \
+  VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
+  VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK \
+  VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK \
+  VIBRANIUM_VOLUME_SOURCE_LOOPBACK \
+  VIBRANIUM_VOLUME_ADJUSTMENT_STEP

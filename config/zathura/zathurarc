@@ -1,0 +1,15 @@
+include ../vibranium/current/theme/zathurarc
+
+set font "Cascadia Code 9"
+
+# Automatically copy selected text to clipboard
+set selection-clipboard "clipboard"
+
+# Keep original PDF colors by default
+set recolor "false"
+
+map o file_chooser
+map p print
+
+map [normal] l follow
+map [index] l feedkeys <Return>

@@ -1,0 +1,465 @@
+#!/usr/bin/bash
+
+# Overcomplicated script that manages brightness control using raw sysfs values
+# as well as the DDC protocol for external monitors. The script uses state files to cache
+# active values for both methods to speed up subsequent script executions.
+# This is ESPECIALLY useful for the DDC method, because ddcutil is known to be quite slow.
+# Thanks to the state file, changing brightness with DDC takes milliseconds instead of 500-700-1000ms.
+#
+# The script can accept parameters such as up | down for relative brightness adjustment with dynamic steps using Vibranium settings,
+# as well as absolute values such as 20, 50, 100, etc.
+#
+# TODO: allow setting brightness below 0% by adjusting gamma level below 100% via hyprsunset.
+
+if [[ "$CHASSIS_TYPE" == "vm" ]]; then
+  notify-send -r 4 "Vibranium - Brightness" -u critical -t 5000 \
+    "Brightness control is not available inside of a Virtual Machine"
+  exit 1
+fi
+
+SELF="${0##*/}"
+QUIET=false
+LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTIONS]
+
+Adjust screen brightness.
+
+Options:
+    --up              Increase brightness
+    --down            Decrease brightness
+    --set             Set brightness to <0-100>%
+    -q, --quiet       Do not display notification or OSD
+    -h, --help        Show this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --up | --down)
+    ACTION="$1"
+    shift
+    ;;
+  --set)
+    # --set requires a following integer in the range 0-100
+    if [[ ! "$2" =~ ^[0-9]+$ ]] || (($2 < 0 || $2 > 100)); then
+      echo "Error: --set requires an integer between 0 and 100" >&2
+      exit 1
+    fi
+    ACTION="$1"
+    SET_VALUE="$2"
+    shift 2
+    ;;
+  -q | --quiet)
+    QUIET=true
+    shift
+    ;;
+  *)
+    echo "Error: unknown option: $*" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+# No action flag was provided — print usage and exit cleanly
+if [[ -z "$ACTION" ]]; then
+  usage
+  exit 0
+fi
+
+exec 9>"$LOCKFILE" || {
+  echo "Error: another instance of $SELF is already running!" >&2
+  exit 1
+}
+flock -n 9 || exit 0
+
+source vb-lib-core
+
+helpers::check \
+  VIBRANIUM_GLOBAL_USE_OSD \
+  VIBRANIUM_BRIGHTNESS_STEP \
+  VIBRANIUM_BRIGHTNESS_NOTIFY \
+  VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL
+
+get_i2c_bus() {
+  local state_file new_info
+  declare -A bus_map
+
+  # Detect monitors and extract MONITOR:BUS pairs,
+  # skipping internal laptop panels
+  new_info="$(ddcutil detect 2>/dev/null | awk '
+        /I2C bus:/ {
+            bus=$NF
+            sub("/dev/i2c-", "", bus)
+        }
+        /DRM_connector:/ {
+            skip=0
+            name=$2
+            if (name ~ /^card[0-9]+-eDP/) skip=1
+            sub(/^card[0-9]+-/, "", name)
+        }
+        /This is a laptop/ { skip=1 }
+        /VCP version/ && !skip { print name ":" bus }
+    ')"
+
+  state_file="$VIBRANIUM_STATE/i2c-bus"
+
+  # Load existing cache if present
+  if [[ -f "$state_file" ]]; then
+    while IFS=: read -r name bus; do
+      if [[ -n "$name" && -n "$bus" ]]; then
+        bus_map["$name"]="$bus"
+      fi
+    done <"$state_file"
+  fi
+
+  # Merge newly detected data (overrides cached entries)
+  while IFS=: read -r name bus; do
+    if [[ -n "$name" && -n "$bus" ]]; then
+      bus_map["$name"]="$bus"
+    fi
+  done <<<"$new_info"
+
+  {
+    # Write merged cache back to disk
+    for name in "${!bus_map[@]}"; do
+      printf '%s:%s\n' "$name" "${bus_map[$name]}"
+    done
+  } >"$state_file"
+}
+
+ensure_i2c_cache() {
+  local target name bus
+  target="$VIBRANIUM_STATE/i2c-bus"
+
+  if [[ ! -f "$target" ]]; then
+    return 1
+  fi
+
+  while IFS=: read -r name bus; do
+    if [[ "$name" == "$ACTIVE_MONITOR" ]]; then
+      return 0
+    fi
+  done <"$target"
+
+  return 1
+}
+
+set_i2c_bus() {
+  local final_bus
+
+  if ! ensure_i2c_cache; then
+    echo "I2C bus cache for the active monitor not found. Getting one"
+    get_i2c_bus
+  fi
+
+  while IFS=: read -r name bus; do
+    [[ $name == "$ACTIVE_MONITOR" ]] || continue
+    final_bus="$bus"
+    break
+  done <"$VIBRANIUM_STATE/i2c-bus"
+
+  echo "$final_bus"
+}
+
+get_brightness_cache() {
+  local state_file
+  declare -A old_info
+
+  state_file="$VIBRANIUM_STATE/brightness"
+
+  if [[ -f "$state_file" ]]; then
+    while IFS=: read -r name value; do
+      if [[ -n "$name" && -n "$value" ]]; then
+        old_info["$name"]="$value"
+      fi
+    done <"$state_file"
+  fi
+
+  # If no entry for the active monitor, return empty to trigger a fresh fetch
+  echo "${old_info["$ACTIVE_MONITOR"]}"
+}
+
+update_brightness_cache() {
+  local new_value="$1"
+  local state_file tmp
+  declare -A info
+
+  state_file="$VIBRANIUM_STATE/brightness"
+  tmp="$(mktemp)"
+
+  # If the state file exists, read its contents
+  if [[ -f "$state_file" ]]; then
+    # Read lines in the format "Monitor:Brightness"
+    while IFS=: read -r name value; do
+      if [[ -n "$name" && -n "$value" ]]; then
+        info["$name"]="$value"
+      fi
+    done <"$state_file"
+  fi
+
+  # Update the brightness for the active monitor
+  info["$ACTIVE_MONITOR"]="$new_value"
+
+  # Write all "Monitor:Brightness" pairs
+  for name in "${!info[@]}"; do
+    printf '%s:%s\n' "$name" "${info[$name]}"
+  done >"$tmp"
+
+  mv -f "$tmp" "$state_file"
+}
+
+osd() {
+  local value="$1"
+  local icon progress
+
+  # Set specific icons depending on the current brightness level (icons are taken from the active icon pack)
+  if ((value <= 30)); then
+    icon="brightness-low-symbolic"
+  elif ((value <= 70)); then
+    icon="brightness-symbolic"
+  else
+    icon="brightness-high-symbolic"
+  fi
+
+  # Integer-only approximation:
+  # We scale everything by 100 to avoid floating point.
+  # Target formula: 0.02 + value * 0.0098
+  # Multiply by 100 → 2 + value * 0.98
+  # Then approximate 0.98 as 98/100 (integer division will truncate).
+  local p
+  p=$((2 + value * 98 / 100))
+
+  # p is now in range:
+  # value=0   -> p=2   (represents 0.02)
+  # value=100 -> p=100 (represents 1.00)
+
+  # Handle the upper bound explicitly:
+  # Without this, p=100 would be formatted as "0.100" instead of "1.00"
+  if ((p == 100)); then
+    printf -v progress "1.00"
+  else
+    # Format as fixed-point:
+    # "0.%02d" -> always 2 digits after decimal (e.g. 2 -> 0.02, 37 -> 0.37)
+    printf -v progress "0.%02d" "$p"
+  fi
+
+  # I can't imagine a situation where this service would be turned off,
+  # but let it be here just in case
+  if ! systemctl -q --user is-active swayosd; then
+    echo "Activating swayosd.service"
+    systemctl --user enable --now swayosd.service
+  fi
+
+  swayosd-client --custom-icon="$icon" --custom-progress="$progress"
+}
+
+HYPRLAND_DATA="$(hyprctl -j --batch 'monitors; activewindow' 2>/dev/null)"
+
+IFS=$'\t' read -r ACTIVE_MONITOR MONITOR_COUNT FULLSCREEN_STATE < <(
+  jq -rs '[
+    (.[0][] | select(.focused) | .name),
+    (.[0] | length | tostring),
+    (.[1].fullscreen | tostring)
+  ] | @tsv' <<<"$HYPRLAND_DATA"
+)
+
+if [[ -z "$ACTIVE_MONITOR" ]]; then
+  notify-send -r 1 -t 3000 -u critical "Vibranium - Brightness" "Cannot get the active monitor!"
+  exit 1
+fi
+
+if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
+  # If the driver for adjusting the brightness of the built-in screen is not found and DDC control is disabled globally
+  if [[ $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL == false ]]; then
+    echo "This feature is disabled in Vibranium settings"
+    exit 1
+  else
+    if ! command -v ddcutil >/dev/null; then
+      vb-cmd-dep-notify --name "Brightness Control" --deps ddcutil
+      exit 1
+    fi
+
+    method="ddc"
+    I2C_BUS="$(set_i2c_bus)"
+
+    # TODO: As far as I know, optimal values for --sleep-multiplier can vary from a monitor to a monitor,
+    # and while it works well on one monitor, it may not work at all on another.
+    # In this case, we need to create a mini-algorithm that will calculate and record valid values for the monitor and use them.
+    ddcutil_flags=(--sleep-multiplier 0.13 --noverify --skip-ddc-checks --maxtries 1,1,1)
+  fi
+else
+  if [[ -n "$ACTIVE_MONITOR" && ! "$ACTIVE_MONITOR" =~ ^eDP* ]]; then
+    method="ddc"
+    I2C_BUS="$(set_i2c_bus)"
+  else
+    method="raw"
+  fi
+fi
+
+if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+  if ! command -v swayosd-client >/dev/null; then
+    vb-cmd-dep-notify --name "Brightness Control" --deps swayosd
+    exit 1
+  fi
+fi
+
+step=$VIBRANIUM_BRIGHTNESS_STEP
+
+case "$method" in
+"ddc")
+  current="$(get_brightness_cache)"
+  if [[ ! $current =~ ^[0-9]+$ ]]; then
+    # As mentioned above, --sleep-multiplier can sometimes fail at very low values,
+    # so we give the command three attempts to get the data from the monitor using the DDC protocol.
+    for ((i = 0; i < 5; i++)); do
+      current=$(ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" getvcp 10 2>/dev/null | awk '/current/ {print int($9)}')
+      if [[ $current =~ ^[0-9]+$ ]] && ((current >= 0 && current <= 100)); then
+        break
+      fi
+    done
+    echo "Warn: cache not found!"
+    update_brightness_cache "$current" &
+  fi
+
+  # The remaining code at the bottom is generally self-explanatory
+  case "$ACTION" in
+  "--up")
+    ((current == 100)) && exit 0
+    new=$((current + step))
+    ((new > 100)) && new=100
+    ;;
+  "--down")
+    ((current == 0)) && exit 0
+    new=$((current - step))
+    ((new < 0)) && new=0
+    ;;
+  "--set")
+    # SET_VALUE is already validated as 0-100 above
+    new=$SET_VALUE
+    ;;
+  esac
+
+  ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &>/dev/null &
+  update_brightness_cache "$new" &
+
+  if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == false ]]; then
+    exit 0
+  fi
+
+  if [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $QUIET == false ]]; then
+    osd "$new" &
+  else
+    # Do not display the monitor name if it is only one.
+    if ((MONITOR_COUNT > 1)); then
+      source="($ACTIVE_MONITOR) "
+    fi
+
+    # Suppress the notification when the active window is fullscreen.
+    # Dunst queues notifications during fullscreen and shows them only
+    # after exiting fullscreen, which makes them stale and irrelevant.
+    #
+    # We don't apply this rule to OSD notifications because
+    # it defeats the purpose of OSDs
+
+    if ((FULLSCREEN_STATE == 2)); then
+      exit
+    fi
+
+    if [[ "$QUIET" == false ]]; then
+      notify-send -r 2 -t 1000 "Brightness $source${new}%" -h int:value:"$new"
+    fi
+  fi
+  ;;
+"raw")
+  # When swayosd is active it owns the backlight device — skip raw sysfs
+  # calculations entirely and let it apply the change + show the OSD itself.
+  # Raw calculations are only needed for the plain notify-send path, or when
+  # notifications are disabled.
+  if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true && "$VIBRANIUM_BRIGHTNESS_NOTIFY" != "false" && "$QUIET" == false ]]; then
+    # Translate action into swayosd's (±)number / absolute syntax:
+    #   --up   -> +<step>   e.g. +5
+    #   --down -> -<step>   e.g. -5
+    #   --set  -> <value>   e.g. 60  (swayosd treats bare integers as absolute)
+    case "$ACTION" in
+    "--up") swayosd_arg="+${step}" ;;
+    "--down") swayosd_arg="-${step}" ;;
+    "--set") swayosd_arg="$SET_VALUE" ;;
+    esac
+
+    if [[ "$QUIET" == false ]]; then
+      swayosd-client --brightness="$swayosd_arg"
+    fi
+  else
+    # Read current and max brightness from the kernel
+    current_raw=$(</sys/class/backlight/*/brightness)
+    max_raw=$(</sys/class/backlight/*/max_brightness)
+    current=$((current_raw * 100 / max_raw))
+
+    case "$ACTION" in
+    "--up")
+      # Round up to next step boundary in percent-space.
+      # Integer division truncates, so (current/step + 1)*step always gives
+      # the next clean multiple of step above current.
+      # e.g. current=4, step=5 -> (4/5 + 1)*5 = (0+1)*5 = 5%
+      # e.g. current=5, step=5 -> (5/5 + 1)*5 = (1+1)*5 = 10%
+      new_pct=$(((current / step + 1) * step))
+
+      # Ceiling division (+ 99) ensures raw value lands inside the target
+      # percent band when converted back, avoiding double-truncation drift.
+      # e.g. 5% of 255 -> (5*255+99)/100 = 13 raw -> 13*100/255 = 5% ✓
+      #                     without ceil -> 12 raw -> 12*100/255 = 4% ✗
+      new_raw=$(((new_pct * max_raw + 99) / 100))
+      ;;
+    "--down")
+      # Round down to previous step boundary in percent-space.
+      # Subtracting 1 before dividing ensures we step down even when already
+      # sitting exactly on a boundary.
+      # e.g. current=10, step=5 -> (10-1)/5*5 = 1*5 = 5%  (not stuck at 10%)
+      # e.g. current=9,  step=5 -> (9-1)/5*5  = 1*5 = 5%
+      new_pct=$(((current - 1) / step * step))
+
+      # Same ceiling conversion as --up to prevent truncation drift.
+      new_raw=$(((new_pct * max_raw + 99) / 100))
+      ;;
+    "--set")
+      # Convert the requested percentage directly to a raw sysfs value.
+      # Ceiling division avoids truncation drift, same as the step branches.
+      new_pct=$SET_VALUE
+      new_raw=$(((new_pct * max_raw + 99) / 100))
+      ;;
+    esac
+
+    # Clamp raw value
+    ((new_raw > max_raw)) && new_raw=$max_raw
+    ((new_raw < 0)) && new_raw=0
+
+    # Convert back to percent for OSD
+    new=$((new_raw * 100 / max_raw))
+
+    # Apply new brightness
+    echo "$new_raw" >/sys/class/backlight/*/brightness
+
+    if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == "false" ]]; then
+      exit 0
+    fi
+
+    if [[ "$QUIET" == false ]]; then
+      notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"
+    fi
+  fi
+  ;;
+esac

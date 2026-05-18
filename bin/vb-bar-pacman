@@ -1,0 +1,93 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+helpers::check \
+  VIBRANIUM_BAR_PACMAN_MODULE_ENABLE \
+  VIBRANIUM_BAR_SHOW_ANIMATION
+
+# Module disabled - exit
+if [[ "$VIBRANIUM_BAR_PACMAN_MODULE_ENABLE" == false ]]; then
+  printf '{"text":""}'
+  exit 0
+fi
+
+if ! term::is_headless && [[ "$1" != "--force" ]]; then
+  log::warn "Don't run this script manually!"
+  log::warn "To bypass, run with --force flag"
+  exit 1
+fi
+
+make_tooltip() {
+  if [[ ! -s "$PKG_LIST" ]]; then
+    printf "You're up to date!"
+    return
+  fi
+
+  # Parse updates list.
+  # See the vb-bar-pacman.awk for explanation.
+  awk -f "$VIBRANIUM/awk/vb-bar-pacman.awk" "$PKG_LIST"
+}
+
+WAYBAR_PID=$(pidof waybar)
+
+if [[ -z $WAYBAR_PID ]]; then
+  log::error "Waybar PID not found!"
+  exit 1
+fi
+
+MARKER="$VIBRANIUM_RUNTIME/waybar.$WAYBAR_PID"
+
+if [[ "$VIBRANIUM_BAR_SHOW_ANIMATION" == false ]]; then
+  show_spinner=false
+else
+  # If started before with
+  # the same waybar pid
+  if [[ -f "$MARKER" ]]; then
+    # Triggered by 'restart-interval'
+    # option - dont' animate.
+    show_spinner=false
+  else
+    # Marker doesn't exist -
+    # most likely first run
+    show_spinner=true
+
+    # Remove old markers
+    # if exist
+    rm -f "${MARKER%.*}".*
+
+    # Create new one
+    : >"$MARKER"
+  fi
+fi
+
+PKG_LIST="$VIBRANIUM_CACHE/pkg-updates.list"
+
+systemctl -q --user start fetch-arch-updates.service &
+
+if [[ "$show_spinner" == true ]]; then
+  helpers::bar::spinner "Getting updates..." $!
+else
+  wait $!
+fi
+
+exit_status="$(systemctl --user show fetch-arch-updates.service -p ExecMainStatus --value)"
+
+if ((exit_status != 0)); then
+  text="<span foreground='${P_GRAY}'>|</span>   "
+  text+="<span foreground='${P_RED}'>\uf071</span>"
+  tooltip="Update service failed. For more information, try:\n"
+  tooltip+="systemctl --user status fetch-arch-updates.service"
+
+  printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
+  exit 0
+fi
+
+mapfile -t COUNT <"$PKG_LIST"
+TOTAL_COUNT=${#COUNT[@]}
+
+text="<span foreground='${P_GRAY}'>|</span> "
+text+="📦 $TOTAL_COUNT"
+tooltip="$(make_tooltip "$PKG_LIST")"
+
+jq -nc --unbuffered --arg text "$text" --arg tooltip "$tooltip" '{text: $text, tooltip: $tooltip}'

@@ -1,0 +1,65 @@
+#!/usr/bin/bash
+
+WAYBAR_CONF="$XDG_CONFIG_HOME/waybar/config.jsonc"
+DUNST_CONF="$XDG_CONFIG_HOME/dunst/dunstrc"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [--top|--bottom] [--help]
+
+Move Waybar and Dunst notifications to the top or bottom of the screen.
+
+Options:
+  --top       Move modules to the top
+  --bottom    Move modules to the bottom
+  -h, --help  Show this help and exit
+EOF
+}
+
+TARGET=""
+
+for arg in "$@"; do
+  case "$arg" in
+  --top) TARGET="top" ;;
+  --bottom) TARGET="bottom" ;;
+  -h | --help | "")
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Unknown option: $arg" >&2
+    usage
+    exit 1
+    ;;
+  esac
+done
+
+CURRENT_POSITION="$(awk -F'"' '/"position"[[:space:]]*:/ {print $4}' "$WAYBAR_CONF")"
+
+if [[ "$CURRENT_POSITION" == "$TARGET" ]]; then
+  exit 0
+fi
+
+sed -i "/position/s/${CURRENT_POSITION}/${TARGET}/" "$WAYBAR_CONF"
+
+case "$TARGET" in
+top) ORIGIN="top-right" ;;
+bottom) ORIGIN="bottom-right" ;;
+esac
+
+if [[ ! -f "$DUNST_CONF" ]]; then
+  printf "[global]\norigin = %s\n" "$ORIGIN" >"$DUNST_CONF"
+elif ! grep -q origin "$DUNST_CONF"; then
+  printf "\norigin = %s\n" "$ORIGIN" >>"$DUNST_CONF"
+else
+  sed -i "/origin/s/${CURRENT_POSITION}/${TARGET}/" "$DUNST_CONF"
+fi
+
+systemctl -q --user restart waybar &
+vb-refresh-dunst &

@@ -1,0 +1,39 @@
+#!/usr/bin/bash
+
+TAG=$(git -C "$VIBRANIUM" describe --tags --abbrev=0 2> /dev/null)
+HEAD=$(git -C "$VIBRANIUM" rev-parse --short HEAD)
+TAG_COMMIT=$(git -C "$VIBRANIUM" rev-parse --short "$(git -C "$VIBRANIUM" rev-list -n 1 "$TAG")")
+DATE=$(git -C "$VIBRANIUM" show -s --format=%cd --date=short HEAD)
+BRANCH=$(git -C "$VIBRANIUM" branch --show-current)
+
+if [ "$HEAD" = "$TAG_COMMIT" ]; then
+  echo "Vibranium ${TAG} release (${DATE})"
+else
+  COMMITS_AHEAD=$(git -C "$VIBRANIUM" rev-list --count "$TAG"..HEAD)
+
+  echo "Vibranium dev ${TAG}+"
+  echo "Branch: ${BRANCH} @ ${HEAD} (${DATE})"
+  echo "${COMMITS_AHEAD} commits ahead of ${TAG}"
+
+  # Determine the reference to measure "behind" against.
+  # dev branch compares to master; master compares to its remote tracking branch.
+  case "$BRANCH" in
+    master | main)
+      UPSTREAM=$(git -C "$VIBRANIUM" rev-parse --abbrev-ref '@{upstream}' 2> /dev/null)
+      ;;
+    *)
+      UPSTREAM="origin/master"
+      ;;
+  esac
+
+  if [ -n "$UPSTREAM" ] && git -C "$VIBRANIUM" rev-parse --verify "$UPSTREAM" &> /dev/null; then
+    COMMITS_BEHIND=$(git -C "$VIBRANIUM" rev-list --count HEAD.."$UPSTREAM")
+    if [ "$COMMITS_BEHIND" -gt 0 ]; then
+      echo "${COMMITS_BEHIND} commits behind ${UPSTREAM}"
+    fi
+  fi
+fi
+
+if [ -f "$VIBRANIUM_STATE/update.available" ]; then
+  echo "New version available: $(< "$VIBRANIUM_STATE/update.available")"
+fi

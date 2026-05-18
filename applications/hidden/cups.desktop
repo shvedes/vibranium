@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=CUPS
+TryExec=lp
+Exec=xdg-open http://localhost:631/
+NoDisplay=true

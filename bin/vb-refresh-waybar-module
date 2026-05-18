@@ -1,0 +1,57 @@
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} MODULE_NAME
+
+Send a refresh signal to the Waybar module MODULE_NAME.
+
+Options:
+  -h, --help   Show this help and exit
+EOF
+}
+
+case "$1" in
+-h | --help | "")
+  usage
+  exit 0
+  ;;
+esac
+
+waybar_pid=$(systemctl --user show waybar -p MainPID --value)
+
+if ((waybar_pid == 0)); then
+  exit 1
+fi
+
+declare -A signals
+
+for file in "$XDG_CONFIG_HOME"/waybar/modules/custom-*.jsonc; do
+  while IFS= read -r line; do
+    [[ $line == *'"signal"'* ]] || continue
+
+    name="${file##*/}"     # remove path
+    name="${name%.jsonc}"  # remove file extension
+    name="${name#custom-}" # remove prefix
+    sig="${line//[^0-9]/}" # keep kill signals only
+
+    signals["$name"]="$sig"
+  done <"$file"
+done
+
+module_name="${1/custom-/}"
+module_signal="${signals[$module_name]}"
+
+if [ -n "$module_signal" ]; then
+  kill -RTMIN+"$module_signal" "$waybar_pid"
+  kill -RTMIN+"${signals[dynamic-separator]}" "$waybar_pid"
+else
+  echo "Unknown module: $module_name" >&2
+  exit 1
+fi

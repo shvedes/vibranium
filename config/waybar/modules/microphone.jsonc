@@ -1,0 +1,15 @@
+{
+	"pulseaudio#microphone": {
+		"format-source-muted": "\ued03",
+		"format-source": "\ued03" ,
+		"format": "{format_source}",
+
+		"on-click": "vb-core-volume --quiet --microphone-toggle",
+		"on-scroll-up": "vb-core-volume --microphone-up",
+		"on-scroll-down": "vb-core-volume --microphone-down",
+		"on-click-right": "vb-launch-tui --app-id=org.vb.term.float --title=wiremix -- wiremix --tab input",
+
+		"scroll-step": 1,
+		"tooltip": false
+	}
+}

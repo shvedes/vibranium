@@ -1,0 +1,21 @@
+#!/usr/bin/bash
+
+# Checking file existance is faster
+# than calling pacman -Q.
+if [[ ! -f /usr/lib/rofi/emoji.so ]]; then
+  vb-pkg-install --no-verify -- rofi-emoji
+  exit 0
+fi
+
+if pidof -q rofi; then
+  killall rofi
+  exit 0
+fi
+
+# We use copy mode beacuse when wtype is invoked the language
+# Waybar module disappaers until next layout switch. It's a known
+# bug which is not yet closed: https://github.com/Alexays/Waybar/issues/1536
+rofi -modi emoji -show emoji -p "Emoji" \
+  -theme-str "window{width: 400px;}" \
+  -emoji-format "{emoji} {name}" \
+  -emoji-mode copy

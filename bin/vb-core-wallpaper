@@ -1,0 +1,222 @@
+#!/usr/bin/bash
+
+THEME="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
+UWALLS="$XDG_CONFIG_HOME/vibranium/themes/$THEME/backgrounds"
+WALLPAPER_STATE="$VIBRANIUM_STATE/wallpaper.state"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION] <image>
+
+Set wallpapers in Vibranium.
+
+Supported formats: jpeg, jpegxl, png, gif, pnm, tga, tiff, webp, bmp, svg.
+
+Options:
+  --next          Set the next wallpaper
+  --prev          Set the previous wallpaper
+  --get           Get the current wallpaper
+  <image>         Path to an image file (.png, .jpg, .jpeg, .webp) to set as wallpaper
+
+If no OPTION is provided, the script expects an image file as an argument.
+EOF
+}
+
+write_wallpaper_state() {
+  local theme="$1"
+  local path="$2"
+  local found=0
+  local -a lines=()
+  local line
+
+  # Read all existing entries into memory first.
+  # This is necessary because we will truncate the file on write,
+  # so we cannot read and write it at the same time.
+  if [[ -f "$WALLPAPER_STATE" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      lines+=("$line")
+    done <"$WALLPAPER_STATE"
+  fi
+
+  # Write all entries back, replacing the one for this theme in place.
+  # The > redirect truncates the file before the first printf runs,
+  # which is safe because all lines are already loaded into the array.
+  {
+    for line in "${lines[@]}"; do
+      if [[ "$line" == "${theme}="* ]]; then
+        printf '%s="%s"\n' "$theme" "$path"
+        found=1
+      else
+        printf '%s\n' "$line"
+      fi
+    done
+
+    # Theme not yet in the file — append as a new entry.
+    if [[ $found -eq 0 ]]; then
+      printf '%s="%s"\n' "$theme" "$path"
+    fi
+  } >"$WALLPAPER_STATE"
+}
+
+get_wallpaper() {
+  local link="$XDG_CONFIG_HOME/vibranium/current/background"
+  local -n _source="$1"
+
+  _source="$(readlink -s "$link")"
+
+  if [[ -z "$_source" ]]; then
+    while IFS= read -r line; do
+      _source="${line#*image: }"
+    done < <(awww query)
+  fi
+}
+
+cycle_wallpaper() {
+  local mode="$1"
+  local current files
+  local idx next prev found
+  local candidate
+
+  mapfile -t files < <(find "$WALLS" -maxdepth 1 -xtype f 2>/dev/null | sort)
+
+  # Exit if no wallpapers found
+  if ((${#files[@]} == 0)); then
+    return 1
+  fi
+
+  # Get current wallpaper first
+  get_wallpaper current
+
+  found=0
+  idx=0
+
+  # Find index of current wallpaper in the files array
+  if [ -n "$current" ]; then
+    for i in "${!files[@]}"; do
+      if [ "${files[$i]}" = "$current" ]; then
+        idx=$i
+        found=1
+        break
+      fi
+    done
+  fi
+
+  case "$mode" in
+  --next)
+    if ((found)); then
+      # Wrap around using modulo
+      next=$(((idx + 1) % ${#files[@]}))
+      candidate="${files[$next]}"
+    else
+      # Default to first wallpaper if current not found
+      candidate="${files[0]}"
+    fi
+    ;;
+  --prev)
+    if ((found)); then
+      # Wrap around safely
+      prev=$(((idx - 1 + ${#files[@]}) % ${#files[@]}))
+      candidate="${files[$prev]}"
+    else
+      # Default to last wallpaper
+      candidate="${files[${#files[@]} - 1]}"
+    fi
+    ;;
+  esac
+
+  # Do nothing if candidate is the same as current wallpaper
+  # This handles the case of a single wallpaper in the directory
+  if [[ "$candidate" == "$current" ]]; then
+    return 0
+  fi
+
+  printf "%s" "$candidate"
+}
+
+feature_enabled() {
+  source vb-lib-core
+
+  helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
+  if [[ $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
+    if ! systemctl -q --user is-active awww.service; then
+      systemctl -q --user enable --now awww.service
+    fi
+  else
+    return 1
+  fi
+}
+
+case "$1" in
+"" | -h | --help)
+  usage
+  exit 0
+  ;;
+-g | --get)
+  get_wallpaper CURRENT
+  # shellcheck disable=SC2153
+  echo "$CURRENT"
+  exit 0
+  ;;
+--next | --prev)
+  if ! feature_enabled; then
+    echo "Error: this feature is disabled." >&2
+    echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
+    exit 1
+  fi
+
+  WALLPAPER_PATH="$(cycle_wallpaper "$1")"
+
+  # cycle_wallpaper prints nothing when there is only one
+  # wallpaper and it is already active — nothing to do
+  if [[ -z "$WALLPAPER_PATH" ]]; then
+    exit 0
+  fi
+  ;;
+*.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.gif | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
+  if ! feature_enabled; then
+    echo "Error: this feature is disabled." >&2
+    echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
+    exit 1
+  fi
+
+  WALLPAPER_PATH="$(realpath "$1")"
+
+  if [[ ! -f "$WALLPAPER_PATH" ]]; then
+    echo "Error: '$WALLPAPER_PATH' doesn't exist!" >&2
+    exit 1
+  fi
+
+  if [[ $1 == *.gif && ! -f "$UWALLS/${1##*/}" ]]; then
+    notify-send -r 3 -t 6000 "Vibranium - Wallpapers" \
+      "GIF images might take a while to load. Please wait."
+  fi
+
+  # In case if user set new wallpaper via thunar context menu
+  # (e,g. user's own picture, downloaded from the internet) we
+  # should copy this file to the folder that contains user wallpapers
+  # only. Why copy? In case if original file gets deleted
+  if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
+    mkdir -p "$UWALLS"
+    cp "$WALLPAPER_PATH" "$UWALLS/"
+    WALLPAPER_PATH="$UWALLS/${WALLPAPER_PATH##*/}"
+  fi
+  ;;
+-*)
+  echo "Error: unknown option: $*" >&2
+  echo "Try ${0##*/} --help for more information." >&2
+  exit 1
+  ;;
+esac
+
+awww img -t fade --transition-duration 0.5 --transition-step 255 "$WALLPAPER_PATH" &
+ln -sf "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/background"
+
+# Update the state file
+write_wallpaper_state "$THEME" "$WALLPAPER_PATH"

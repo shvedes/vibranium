@@ -1,0 +1,195 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
+
+_allow_paravirtualization=false
+
+for _arg in "$@"; do
+  if [[ "$_arg" == "--allow-paravirtualization" ]]; then
+    _allow_paravirtualization=true
+  fi
+done
+
+_operation_canceled() {
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  # shellcheck disable=SC2034
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+}
+
+_operation_complete() {
+  printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+  # shellcheck disable=SC2034
+  read -n1 -r -p $'. Press any key to exit ' dummy
+}
+
+_add_user_to_group() {
+  if groups | grep -qw libvirt; then
+    return 1 # already a member
+  fi
+
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Adding ${CYAN}${USER}${RESET} to the '${CYAN}libvirt${RESET}' group"
+  sudo usermod -aG libvirt "$USER"
+  return 0 # was added
+}
+
+_enable_systemd_units() {
+  sudo systemctl --quiet enable --now libvirtd.socket
+}
+
+_configure_virsh_network() {
+  # Redirect to /dev/null in case it's already active
+  sudo virsh -q net-autostart default 2>/dev/null || true
+  sudo virsh -q net-start default 2>/dev/null || true
+}
+
+_configure_ufw() {
+  if ! command -v ufw &>/dev/null; then
+    return 2 # ufw absent
+  fi
+
+  local conf=/etc/libvirt/network.conf
+  local desired=$'# Vibranium overrides below\nfirewall_backend = "iptables"'
+
+  if grep -q '^firewall_backend' "$conf" 2>/dev/null; then
+    echo -e "${GREEN}[VIBRANIUM]${RESET} UFW libvirt config: already up to date, skipping"
+    return 1 # unchanged
+  fi
+
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring firewall for libvirt"
+  echo -e "\n\n$desired" | sudo tee -a "$conf" >/dev/null
+}
+
+# Overengineered protection layer
+_ensure_virt_manager() {
+  if ! command -v virt-manager >/dev/null; then
+    echo -e "${RED}[VIBRANIUM]${RESET} However, you're missing the ${YELLOW}VM Manager${RESET} app"
+    if term::ask_yes_no Y "Install it now?"; then
+      if vb-pkg-install --embedded -- virt-manager; then
+        if term::ask_yes_no Y "Launch it now?"; then
+          app2unit virt-manager &>/dev/null
+        fi
+      else
+        echo -e "${RED}[VIBRANIUM]${RESET} Failed to install ${YELLOW}virt-manager${RESET}"
+      fi
+    else
+      echo -e "${YELLOW}[VIBRANIUM]${RESET} Remember that you need the ${YELLOW}virt-manager${RESET} package to manage virtual machines"
+    fi
+  else
+    echo -e "${BLUE}[VIBRANIUM]${RESET} You can start using it by launching ${YELLOW}Virtual Machine Manager${RESET} in App Launcher"
+  fi
+}
+
+# ─────────────────────────────────────────────────────────────
+
+term::disable_input
+
+if [[ "$CHASSIS_TYPE" == vm ]] && [[ "$_allow_paravirtualization" == false ]]; then
+  term::show_header --color red
+  echo -e "${RED}[VIBRANIUM]${RESET} Running in a VM!"
+  echo -e "${RED}[VIBRANIUM]${RESET} Paravirtualization is not recommended"
+  echo -e "${RED}[VIBRANIUM]${RESET} Use ${CYAN}${0##*/} --allow-paravirtualization${RESET} to bypass this check"
+  _operation_canceled
+  exit 1
+fi
+
+if command -v virsh >/dev/null; then
+  if systemctl -q is-enabled libvirtd.socket ||
+    systemctl -q is-enabled libvirtd.service; then
+
+    # Show green logo as indication of success
+    term::show_header --color green
+
+    echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU is already set up and running"
+    _ensure_virt_manager
+  else
+    term::show_header
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} The QEMU was set up before, but looks like required service is down"
+
+    term::enable_input
+    if term::ask_yes_no Y "Would you like to fix it now?"; then
+      if ! sudo systemctl -q enable --now libvirtd.socket; then
+        log::error "Failed to enable systemd unit"
+        term::disable_input
+        _operation_canceled
+        exit 1
+      fi
+
+      echo -e "${GREEN}[VIBRANIUM]${RESET} Enabled and started ${YELLOW}libvirtd.socket${RESET}"
+
+      term::disable_input
+      _ensure_virt_manager
+    else
+      echo -e "${YELLOW}[VIBRANIUM]${RESET} You've set up QEMU before. Don't forget to enable ${YELLOW}libvirtd.socket${RESET} manually"
+    fi
+  fi
+
+  echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/QEMU${RESET} for further, advanced configuration"
+  _operation_complete
+  exit 0
+fi
+
+# And the default yellow otherwise
+term::show_header
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup QEMU VM (${BLUE}libvirt${RESET})"
+
+if ! term::ask_yes_no Y "Proceed with setup?"; then
+  _operation_canceled
+  exit 1
+fi
+
+if term::ask_yes_no N "Would you like to include non-X86 emulation?"; then
+  qemu_variant="qemu-full"
+else
+  qemu_variant="qemu-desktop"
+fi
+
+if ! vb-pkg-install --embedded -- $qemu_variant libvirt dnsmasq virt-manager; then
+  _operation_canceled
+  exit 1
+fi
+
+summary_rules=()
+
+# ── UFW firewall rules ────────────────────────────────────────
+_configure_ufw
+case $? in
+0) summary_rules+=("UFW: ${GREEN}libvirt iptables backend configured${RESET}") ;;
+1) summary_rules+=("UFW: ${CYAN}unchanged${RESET}") ;;
+2) summary_rules+=("UFW: ${YELLOW}not present${RESET}, skipped") ;;
+esac
+
+# ── User group ────────────────────────────────────────────────
+if _add_user_to_group; then
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} A system restart is recommended for the group change to take effect"
+  summary_rules+=("User ${CYAN}${USER}${RESET}: ${GREEN}added${RESET} to the ${CYAN}libvirt${RESET} group (restart recommended)")
+else
+  summary_rules+=("User ${CYAN}${USER}${RESET}: already in the ${CYAN}libvirt${RESET} group")
+fi
+
+# ── Systemd units ─────────────────────────────────────────────
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling systemd units"
+_enable_systemd_units
+summary_rules+=("Systemd units: ${GREEN}enabled and started${RESET}")
+
+# ── Virtual network ───────────────────────────────────────────
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up virtual network"
+_configure_virsh_network
+summary_rules+=("Virtual network: ${GREEN}default network autostart configured${RESET}")
+
+echo ""
+echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"
+for rule in "${summary_rules[@]}"; do
+  echo -e "${BLUE}[VIBRANIUM]${RESET}  • $rule"
+done
+echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
+echo ""
+echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/QEMU${RESET} for further, advanced configuration"
+
+if term::ask_yes_no Y "Launch VM Manager now?"; then
+  exec app2unit virt-manager &>/dev/null
+else
+  _operation_complete
+fi

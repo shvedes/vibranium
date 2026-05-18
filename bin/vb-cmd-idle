@@ -1,0 +1,98 @@
+#!/usr/bin/bash
+
+# Handle music playback on session lock/unlock.
+# Intended to be called by hypridle.
+
+SELF="${0##*/}"
+RESTORE_FLAG="$VIBRANIUM_RUNTIME/restore-player"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTION]
+
+Handle media playback on session lock/unlock events.
+
+Options:
+  --before     Handle session lock
+  --after      Handle session unlock
+  -h, --help   Display this help and exit
+EOF
+}
+
+player_is_playing() {
+  if [[ "$(playerctl status 2>/dev/null)" == "Playing" ]]; then
+    return 0
+  else
+    # Don't trigger mpd systemd service if for no reason.
+    if systemctl -q --user is-active mpd.service; then
+      while read -r l; do
+        case $l in
+        *"[playing]"*)
+          return 0
+          ;;
+        esac
+      done < <(mpc status 2>/dev/null)
+    fi
+  fi
+
+  return 1
+}
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+
+--before)
+  source vb-lib-core
+
+  helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
+  pause_music="$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+
+  # Don't pause any music with active inhibitor.
+  if systemctl -q --user is-active vibranium-inhibit@sleep; then
+    exit 0
+  elif [[ $pause_music == false ]]; then
+    exit 0
+  fi
+
+  if player_is_playing; then
+    vb-core-mediacontrol --toggle &
+    : >"$RESTORE_FLAG"
+  fi
+  ;;
+
+--after)
+  source vb-lib-core
+  if [[ -f "$RESTORE_FLAG" ]]; then
+    rm -f "$RESTORE_FLAG"
+    if ! player_is_playing; then
+      vb-core-mediacontrol --toggle &
+    fi
+
+    helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
+    if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
+      vb-cmd-now-playing
+    fi
+  fi
+  ;;
+
+"")
+  echo "Error: missing option" >&2
+  echo "Try '$SELF --help' for more information." >&2
+  exit 1
+  ;;
+
+*)
+  echo "Error: invalid option -- $*" >&2
+  echo "Try '$SELF --help' for more information." >&2
+  exit 1
+  ;;
+esac

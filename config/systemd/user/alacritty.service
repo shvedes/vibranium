@@ -1,0 +1,15 @@
+[Unit]
+Description=Alacritty Daemon
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/alacritty --daemon
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
+
+# vim:ft=systemd

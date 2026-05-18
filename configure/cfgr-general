@@ -1,0 +1,49 @@
+#!/usr/bin/env bash
+
+# ================================================================================ #
+
+_toggle_osd_service() {
+  # Since we're working with outdated value, flip the logic
+  if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+    systemctl -q --user disable --now swayosd &
+  else
+    systemctl -q --user enable --now swayosd &
+  fi
+}
+
+_set_update_channel() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Update Channel" \
+    --option "Release:release" "Upstream:upstream" "Dev:dev")"
+  vb-dev-switch-channel "$chosen"
+}
+
+_get_update_channel() {
+  local state channel
+  state="$VIBRANIUM_STATE/update.channel"
+
+  if [[ -f "$state" ]]; then
+    channel="$(<"$state")"
+    printf "%s" "${channel^}"
+  else
+    local branch
+    branch="$(git -C "$VIBRANIUM" branch --show-current)"
+    printf "%s" "$branch" | tee "$state"
+  fi
+}
+
+# ================================================================================ #
+
+_build() {
+  cfgr::item::bool \
+    --var VIBRANIUM_GLOBAL_USE_OSD \
+    --label "OSD enabled" \
+    --hook "_toggle_osd_service"
+
+  cfgr::item::raw "Update channel : $(_get_update_channel)" "action:_set_update_channel"
+}
+
+cfgr::run "General" "_build" \
+  VIBRANIUM_GLOBAL_CONFIRM_TO_KILL \
+  VIBRANIUM_GLOBAL_USE_OSD

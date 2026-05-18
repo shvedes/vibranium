@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Chromium
+TryExec=/usr/bin/chromium
+Exec=/usr/bin/chromium %U
+Categories=Browsers;Network
+Icon=chromium
+Keywords=chrome;google;browser;internet;surf

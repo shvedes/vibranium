@@ -1,0 +1,228 @@
+#!/usr/bin/bash
+
+# COLORS FILE
+#   Reads colors from one of two TOML files in $NEXT_THEME_DIR:
+#     colors.toml           -- base palette, base16 keys (color0-color15,
+#                             foreground, background, cursor, ...)
+#     colors-extended.toml  -- named semantic keys (accent, selection, ...)
+#
+#   Both files are loaded when available and their keys are merged.
+#   The two files use disjoint key namespaces by convention, so collisions
+#   do not occur in practice.
+#
+# TEMPLATES
+#   Templates live in (user dir takes priority over built-in):
+#     $XDG_CONFIG_HOME/vibranium/themed/   -- user templates
+#     $VIBRANIUM/default/themed/           -- built-in templates
+#
+#   Two template types share the same directory:
+#     foo.tpl               -- plain template, works with both color sets
+#     foo.extended.tpl      -- extended template, skipped when only basic
+#                             colors are available
+#
+#   When both foo.tpl and foo.extended.tpl exist, the extended variant wins
+#   (processed first; the plain one is skipped via the output file guard).
+#   Output filename for both is foo (both suffixes are stripped).
+#
+# TEMPLATE SYNTAX
+#   {{ key }}            value as-is (e.g. #1e1e2e)
+#   {{ key_strip }}      value with leading # removed (e.g. 1e1e2e)
+#   {{ key_upper }}      value uppercased (e.g. #1E1E2E)
+#   {{ key_lower }}      value lowercased (e.g. #1e1e2e)
+#
+#   Hex color keys only (values starting with #):
+#   {{ key_0x }}         0x-prefixed hex; alpha byte passed through if present
+#                          background = "#1e1e2e"    ->  0x1e1e2e
+#                          shadow     = "#1e1e2ecc"  ->  0x1e1e2ecc
+#   {{ key_r }}          red channel as decimal (e.g. 30)
+#   {{ key_g }}          green channel as decimal (e.g. 30)
+#   {{ key_b }}          blue channel as decimal (e.g. 46)
+#   {{ key_rgb }}        decimal channels (e.g. 30,30,46)
+#   {{ key_h }}          hue as integer degrees 0-359 (e.g. 240)
+#   {{ key_s }}          saturation as integer percentage 0-100 (e.g. 21)
+#   {{ key_l }}          lightness as integer percentage 0-100 (e.g. 15)
+#   {{ key_hsl }}        H,S%,L% shorthand (e.g. 240,21%,15%)
+#
+#   Alpha channels: use 8-char hex (rrggbbaa CSS order) in the TOML value to
+#   include alpha. {{ key }}, {{ key_strip }}, and {{ key_0x }} pass it through
+#   as-is. All channel variants (_r, _g, _b, _rgb, _h, _s, _l, _hsl) decode
+#   only the first 6 digits and ignore alpha.
+#
+# WARNINGS
+#   - Both colors.toml and colors-extended.toml are loaded when available.
+#     Their key namespaces are disjoint by convention (base16 vs. named
+#     semantic keys), so plain templates referencing base16 keys work
+#     correctly regardless of whether extended colors are present.
+#   - Inline TOML comments are stripped by discarding everything after the
+#     closing quote -- values containing a literal quote character will break.
+#   - Templates are not validated; unknown {{ key }} placeholders are left
+#     as-is in the output silently.
+
+TEMPLATES_DIR="$VIBRANIUM/default/themed"
+USER_TEMPLATES_DIR="$XDG_CONFIG_HOME/vibranium/themed"
+NEXT_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/next-theme"
+COLORS_FILE="$NEXT_THEME_DIR/colors.toml"
+COLORS_EXTENDED_FILE="$NEXT_THEME_DIR/colors-extended.toml"
+
+# Collect color sources: always start with the base file, then layer
+# extended on top when available (extended keys override base on collision)
+color_sources=()
+
+[[ -f $COLORS_FILE ]] && color_sources+=("$COLORS_FILE")
+[[ -f $COLORS_EXTENDED_FILE ]] && color_sources+=("$COLORS_EXTENDED_FILE")
+
+if [[ ${#color_sources[@]} -gt 0 ]]; then
+  # Build the substitution table and write it directly to a file for awk.
+  #
+  # SOH (\x01) is the field separator between placeholder and value.
+  # Neither placeholder syntax ({{ name }}) nor any color/font value can
+  # contain that byte, so no escaping is needed.
+  subs_file="$VIBRANIUM_RUNTIME/${0##*/}.subs"
+
+  for src in "${color_sources[@]}"; do
+    while IFS='=' read -r key value; do
+      # Strip quotes and spaces from the key side
+      key="${key//[\"\' ]/}"
+
+      # Skip blank lines (key is empty) and comment lines (key starts with #).
+      # The original used && here, which only skipped blank lines; || is the
+      # correct guard that also covers comment-only lines.
+      if [[ ! $key || $key == \#* ]]; then
+        continue
+      fi
+
+      # Extract the value between the first pair of quotes,
+      # discarding everything after the closing quote (inline comments)
+      value="${value#*[\"\']}"
+      value="${value%%[\"\']*}"
+
+      printf '{{ %s }}\x01%s\n' "$key" "$value"
+      printf '{{ %s_strip }}\x01%s\n' "$key" "${value#\#}"
+      printf '{{ %s_upper }}\x01%s\n' "$key" "${value^^}"
+      printf '{{ %s_lower }}\x01%s\n' "$key" "${value,,}"
+
+      if [[ $value =~ ^# ]]; then
+        hex="${value#\#}"
+
+        # Inline hex -> decimal channel conversion
+        r=$((16#${hex:0:2}))
+        g=$((16#${hex:2:2}))
+        b=$((16#${hex:4:2}))
+
+        printf '{{ %s_0x }}\x010x%s\n' "$key" "$hex"
+        printf '{{ %s_rgb }}\x01%d,%d,%d\n' "$key" "$r" "$g" "$b"
+        printf '{{ %s_r }}\x01%d\n' "$key" "$r"
+        printf '{{ %s_g }}\x01%d\n' "$key" "$g"
+        printf '{{ %s_b }}\x01%d\n' "$key" "$b"
+
+        R=$(((r * 1000 + 127) / 255))
+        G=$(((g * 1000 + 127) / 255))
+        B=$(((b * 1000 + 127) / 255))
+
+        # Determine cmax, cmin, and which channel is dominant (for hue)
+        if ((R >= G && R >= B)); then
+          cmax=$R hue_ch=r
+        elif ((G >= B)); then
+          cmax=$G hue_ch=g
+        else
+          cmax=$B hue_ch=b
+        fi
+        if ((R <= G && R <= B)); then
+          cmin=$R
+        elif ((G <= B)); then
+          cmin=$G
+        else
+          cmin=$B
+        fi
+        delta=$((cmax - cmin))
+
+        # Lightness 0-100 (rounded via +500 before /1000)
+        hsl_l=$((((cmax + cmin) * 50 + 500) / 1000))
+
+        # Saturation 0-100 (rounded); delta==0 means achromatic
+        if ((delta == 0)); then
+          hsl_s=0
+        else
+          abs2l=$((cmax + cmin - 1000))
+          ((abs2l < 0)) && abs2l=$((-abs2l))
+          denom=$((1000 - abs2l)) # 1000 × (1 − |2L−1|)
+          hsl_s=$(((delta * 100 + denom / 2) / denom))
+        fi
+
+        # Hue 0-359 (integer degrees).
+        # The ×1000 scale cancels exactly in each branch's division.
+        if ((delta == 0)); then
+          hsl_h=0
+        elif [[ $hue_ch == r ]]; then
+          num=$(((G - B) * 60))
+          if ((num >= 0)); then
+            hsl_h=$(((num + delta / 2) / delta))
+          else
+            hsl_h=$(((num - delta / 2) / delta))
+          fi
+          ((hsl_h < 0)) && hsl_h=$((hsl_h + 360))
+        elif [[ $hue_ch == g ]]; then
+          num=$(((B - R) * 60))
+          if ((num >= 0)); then
+            hsl_h=$(((num + delta / 2) / delta + 120))
+          else
+            hsl_h=$(((num - delta / 2) / delta + 120))
+          fi
+        else
+          num=$(((R - G) * 60))
+          if ((num >= 0)); then
+            hsl_h=$(((num + delta / 2) / delta + 240))
+          else
+            hsl_h=$(((num - delta / 2) / delta + 240))
+          fi
+        fi
+
+        printf '{{ %s_h }}\x01%d\n' "$key" "$hsl_h"
+        printf '{{ %s_s }}\x01%d\n' "$key" "$hsl_s"
+        printf '{{ %s_l }}\x01%d\n' "$key" "$hsl_l"
+        printf '{{ %s_hsl }}\x01%d,%d%%,%d%%\n' "$key" "$hsl_h" "$hsl_s" "$hsl_l"
+      fi
+    done <"$src"
+  done >"$subs_file"
+
+  shopt -s nullglob
+
+  # Collect templates that need processing and write a tpl->output map for awk.
+  #
+  # Priority: user templates before built-in, extended before plain within
+  # each dir.  Because all rendering is batched into one awk call, nothing is
+  # written to disk during this loop, so "! -f output_path" alone would not
+  # deduplicate within the run.  seen_outputs covers that case.
+  outmap_file="$VIBRANIUM_RUNTIME/${0##*/}.outmap"
+  declare -A seen_outputs
+  tpl_files=()
+
+  for tpl_dir in "$USER_TEMPLATES_DIR" "$TEMPLATES_DIR"; do
+    for tpl in "$tpl_dir"/*.extended.tpl "$tpl_dir"/*.tpl; do
+      filename="${tpl##*/}"            # strip directory path
+      filename="${filename%.tpl}"      # strip .tpl extension
+      filename="${filename%.extended}" # strip .extended suffix if present
+
+      # Skip .extended.tpl templates when extended colors are unavailable
+      [[ $tpl == *.extended.tpl && ! -f $COLORS_EXTENDED_FILE ]] && continue
+
+      output_path="$NEXT_THEME_DIR/$filename"
+
+      # Skip if already written by a previous run, or already claimed by a
+      # higher-priority template earlier in this loop
+      if [[ ! -f $output_path && -z ${seen_outputs[$output_path]+x} ]]; then
+        printf '%s\x01%s\n' "$tpl" "$output_path" >>"$outmap_file"
+        tpl_files+=("$tpl")
+        seen_outputs["$output_path"]=1
+      fi
+    done
+  done
+
+  if ((${#tpl_files[@]} > 0)); then
+    awk -f "$VIBRANIUM/awk/vb-theme-set-templates.awk" \
+      "$subs_file" "$outmap_file" "${tpl_files[@]}"
+  fi
+
+  rm -f "$outmap_file"
+  rm -f "$subs_file"
+fi

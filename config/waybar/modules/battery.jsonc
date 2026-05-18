@@ -1,0 +1,28 @@
+{
+	"battery": {
+	"interval": 5,
+	"format": "{icon}",
+	"format-discharging": "{icon}",
+	"format-charging": "\udb81\udea5",
+	"format-plugged": "\udb81\udea5",
+	"format-full": "\udb81\udea5",
+	"states": { "warning": 20, "critical": 5 },
+	"tooltip-format-discharging": "Discharging ({power:>1.0f}W): {capacity}%\n{timeTo}\nHealth: {health}%",
+	"tooltip-format-charging": "Charging ({power:>1.0f}W): {capacity}%\n{timeTo}\nhealth: {health}%",
+	"format-icons": {
+		"default": [
+			"\udb80\udc8e",
+			"\udb80\udc7a",
+			"\udb80\udc7b",
+			"\udb80\udc7c",
+			"\udb80\udc7d",
+			"\udb80\udc7e",
+			"\udb80\udc7f",
+			"\udb80\udc80",
+			"\udb80\udc81",
+			"\udb80\udc82",
+			"\udb80\udc79"
+			]
+		}
+	}
+}

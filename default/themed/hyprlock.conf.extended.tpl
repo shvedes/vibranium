@@ -1,0 +1,5 @@
+$color = rgb({{ background_0_strip }})
+$inner_color = rgb({{ background_1_strip }})
+$outer_color = rgb({{ background_5_strip }})
+$font_color = rgb({{ foreground_0_strip }})
+$check_color = rgb({{ yellow_strip }})

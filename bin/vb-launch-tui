@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTIONS] -- COMMAND [ARGS...]
+
+Focus existing window matching COMMAND, or launch it in a terminal.
+
+Options:
+  --title      Override window title
+  --app-id     Override application ID
+  -h, --help   Show this help and exit
+EOF
+}
+
+focus_or_launch() {
+  local -a cmd=("$@")
+
+  local match_key="${cmd[0]##*/}"
+  match_key="${match_key,,}"
+
+  local window_address
+  window_address="$(
+    jq -r --arg key "$match_key" '
+      . as $clients |
+
+      # Phase 1: exact match against .class and .initialClass.
+      (
+        try first(
+          $clients[]
+          | (.class        // "" | ascii_downcase) as $c
+          | (.initialClass // "" | ascii_downcase) as $ic
+          | select($c == $key or $ic == $key)
+          | .address
+        )
+      )
+
+      //
+
+      # Phase 2: partial match — either the class is a substring of the
+      # key or the key is a substring of the class. The empty-string
+      # guard prevents "" from matching everything via contains().
+      # Example: key="google-chrome-stable", class="google-chrome" ->
+      # "google-chrome-stable" contains "google-chrome" -> match.
+      (
+        try first(
+          $clients[]
+          | (.class        // "" | ascii_downcase) as $c
+          | (.initialClass // "" | ascii_downcase) as $ic
+          | select(
+              ($c  != "" and (($c  | contains($key)) or ($key | contains($c))))  or
+              ($ic != "" and (($ic | contains($key)) or ($key | contains($ic))))
+            )
+          | .address
+        )
+      )
+    ' 2>/dev/null < <(hyprctl -j clients)
+  )"
+
+  if [[ -n "$window_address" ]]; then
+    hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
+  else
+    source xdg-terminal-exec \
+      --app-id="$APP_ID" \
+      --title="$TITLE" \
+      -- "${cmd[@]}"
+  fi
+}
+
+APP_ID=""
+TITLE=""
+
+(($#)) || {
+  usage >&2
+  exit 1
+}
+
+while (($#)); do
+  case "$1" in
+  --app-id=*)
+    APP_ID="${1#*=}"
+    shift
+    ;;
+  --app-id)
+    [[ -n "$2" ]] || {
+      echo "Error: missing value for --app-id" >&2
+      exit 1
+    }
+    APP_ID="$2"
+    shift 2
+    ;;
+  --title=*)
+    TITLE="${1#*=}"
+    shift
+    ;;
+  --title)
+    [[ -n "$2" ]] || {
+      echo "Error: missing value for --title" >&2
+      exit 1
+    }
+    TITLE="$2"
+    shift 2
+    ;;
+  --)
+    shift
+    break
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option -- $*" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if ! (($#)); then
+  echo "Error: missing COMMAND after --" >&2
+  exit 1
+fi
+
+source vb-lib-core
+
+COMMAND=("$@")
+
+# Derive defaults
+APP_NAME="${COMMAND[0]##*/}"
+: "${APP_ID:=org.vb.term.$APP_NAME}"
+: "${TITLE:=$APP_NAME}"
+
+helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
+if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
+  # shellcheck disable=SC2068
+  focus_or_launch "${COMMAND[@]}"
+else
+  # shellcheck disable=SC2068
+  exec setsid -f xdg-terminal-exec \
+    --app-id="$APP_ID" \
+    --title="$TITLE" \
+    -- "${COMMAND[@]}"
+fi

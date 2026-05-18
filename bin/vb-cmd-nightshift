@@ -1,0 +1,168 @@
+#!/usr/bin/bash
+
+SELF="${0##*/}"
+CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
+STATE_FILE="$VIBRANIUM_STATE/nightshift"
+LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
+STEP=100
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTIONS]
+
+Options:
+  --toggle             Toggle night light
+  --inc, --increase    Increase temperature by STEP (or +)
+  --dec, --decrease    Decrease temperature by STEP (or -)
+  --set TEMPERATURE    Set absolute temperature (in Kelvin)
+  --step N             Use step N (default $STEP)
+  -h, --help           Show this help and exit
+
+Notes:
+  Temperature must be between 1000 and 20000.
+  The script expects a state file at: $STATE_FILE
+EOF
+}
+
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  echo "not available in a VM" >&2
+  exit 1
+fi
+
+exec 10>"$LOCKFILE" || {
+  echo "Error: another instance of $SELF already running!"
+  exit 1
+}
+
+flock -n 10 || exit 0
+
+if [[ $# -eq 0 ]]; then
+  usage
+  exit 0
+fi
+
+while IFS= read -r line; do
+  case $line in
+  *"temperature = "*)
+    tmp=${line#*temperature = }
+    CURRENT_TEMP=${tmp%%[^0-9]*}
+
+    unset tmp
+    break
+    ;;
+  esac
+done <"$CONF"
+
+action=""
+ARG_TEMP=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --toggle)
+    action="toggle"
+    shift
+    ;;
+  --inc | --increase | +)
+    action="inc"
+    shift
+    ;;
+  --dec | --decrease | -)
+    action="dec"
+    shift
+    ;;
+  --set)
+    action="set"
+    shift
+    ARG_TEMP="$1"
+    shift
+    ;;
+  --step)
+    shift
+    STEP="$1"
+    shift
+    ;;
+  [0-9]*)
+    action="set"
+    ARG_TEMP="$1"
+    shift
+    ;;
+  *)
+    echo "Error: invalid option: $1" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if [[ ! -f "$STATE_FILE" ]]; then
+  echo "Night Light state file not found: $STATE_FILE" >&2
+  exit 1
+fi
+
+state="$(<"$STATE_FILE")"
+
+if [[ "$action" == "toggle" ]]; then
+  case "$state" in
+  suspended)
+    hyprctl -q hyprsunset temperature "$CURRENT_TEMP" &
+    printf "active" >"$STATE_FILE"
+    ;;
+  active)
+    hyprctl -q hyprsunset identity &
+    printf "suspended" >"$STATE_FILE"
+    ;;
+  *)
+    echo "Unknown state in $STATE_FILE: '$state'" >&2
+    exit 1
+    ;;
+  esac
+
+  vb-refresh-waybar-module nightshift &
+  exit 0
+fi
+
+if [[ "$action" == "inc" || "$action" == "dec" ]]; then
+  if [[ "$state" == "suspended" ]]; then
+    echo "Night Light is suspended" >&2
+    exit 1
+  fi
+
+  case "$action" in
+  inc) TEMP=$((CURRENT_TEMP + STEP)) ;;
+  dec) TEMP=$((CURRENT_TEMP - STEP)) ;;
+  esac
+fi
+
+if [[ "$action" == "set" ]]; then
+  if ! [[ "$ARG_TEMP" =~ ^[0-9]+$ ]]; then
+    echo "Invalid temperature: $ARG_TEMP" >&2
+    exit 1
+  fi
+  TEMP="$ARG_TEMP"
+fi
+
+if [[ -z "${TEMP:-}" ]]; then
+  echo "No operation performed" >&2
+  exit 0
+fi
+
+if ((TEMP < 1000 || TEMP > 20000)); then
+  echo "Temperature must be between 1000K and 20000K" >&2
+  exit 1
+fi
+
+printf '# Auto-generated! All changes will be overwritten!\n' >"$CONF"
+printf '\nmax-gamma = 150\n\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" >>"$CONF"
+hyprctl -q hyprsunset temperature "$TEMP" &
+
+vb-refresh-waybar-module nightshift &

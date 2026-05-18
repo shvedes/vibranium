@@ -1,0 +1,24 @@
+#!/usr/bin/bash
+
+if [[ $CHASSIS_TYPE == vm ]]; then
+  notify-send "Screen Recorder" "screen recording isn't available in a VM!"
+  echo "Error: screen recording isn't available in a VM!" >&2
+  exit 1
+fi
+
+if [[ -f "$VIBRANIUM_RUNTIME/recording-ongoing" ]]; then
+  # Trigger killswitch
+  vb-core-recording --stop
+  exit 0
+fi
+
+source vb-lib-core
+source vb-lib-cfgr
+
+_build() {
+  cfgr::item::action --label "Screen" --func "vb-core-recording --screen; exit" --icon vb-monitor
+  cfgr::item::action --label "Region" --func "vb-core-recording --region; exit" --icon vb-region
+  cfgr::item::action --label "Portal" --func "vb-core-recording --portal; exit" --icon vb-wm
+}
+
+cfgr::run "Record" "_build"

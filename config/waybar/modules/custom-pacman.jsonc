@@ -1,0 +1,13 @@
+{
+	"custom/pacman": {
+		"format": "{text}",
+		"hide-empty-text":  true,
+
+        "exec-on-event": true,
+		"exec": "vb-bar-pacman",
+		"on-click": "vb-pkg-update",
+		"restart-interval": 900, // 15 min
+		"return-type": "json",
+		"signal": 5
+	}
+}

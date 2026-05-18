@@ -1,0 +1,78 @@
+#!/usr/bin/bash
+
+# shellcheck disable=SC2329
+
+source vb-lib-core
+source vb-lib-cfgr
+
+_die() { helpers::ui::close_menus; }
+
+_build_help() {
+  _launch() {
+    if ! command -v "$1" >/dev/null; then
+      if command -v chromium >/dev/null; then
+        vb-launch-webapp "$1"
+      else
+        app2unit-open "$1"
+      fi
+    else
+      eval "$1"
+    fi
+
+    helpers::ui::close_menus
+  }
+
+  _b() {
+    cfgr::item::action --label "Hyprland" --func "_launch 'https://wiki.hypr.land'" --icon vb-wm
+    cfgr::item::action --label "Vibranium" --func "_launch 'https://github.com/shvedes/vibranium/wiki'" --icon vb-github
+    cfgr::item::action --label "Arch Linux" --func "_launch 'https://wiki.archlinux.org'" --icon vb-arch-linux
+    cfgr::item::action --label "Keybindings" --func "_launch vb-cmd-keybindings" --icon vb-keyboard
+  }
+  cfgr::run "Help" "_b"
+}
+
+_build_install() {
+  _b() {
+    cfgr::item::action --label "Package" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-install -- vb-pkg-install; _die" --icon vb-package
+    cfgr::item::action --label "Theme" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-install -- vb-theme-install; _die" --icon vb-theme
+    cfgr::item::action --label "Font" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-font-install -- vb-pkg-font-install; _die" --icon vb-font
+    cfgr::item::action --label "TUI" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-install -- vb-tui-install; _die" --icon vb-console
+    cfgr::item::action --label "PWA" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-install -- vb-webapp-install; _die" --icon vb-pwa
+  }
+  cfgr::run "Install" "_b"
+}
+
+_build_remove() {
+  _b() {
+    cfgr::item::action --label "Package" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-remove -- vb-pkg-remove; _die" --icon vb-package
+    cfgr::item::action --label "Theme" --func "vb-theme-remove; _die" --icon vb-theme
+    cfgr::item::action --label "Font" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-font-remove -- vb-pkg-font-remove; _die" --icon vb-font
+    cfgr::item::action --label "TUI" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-remove -- vb-tui-remove; _die" --icon vb-console
+    cfgr::item::action --label "PWA" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-remove -- vb-webapp-remove; _die" --icon vb-pwa
+  }
+  cfgr::run "Remove" "_b"
+}
+
+_build_update() {
+  _b() {
+    cfgr::item::action --label "System Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-update -- vb-pkg-update; _die" --icon vb-arch-linux
+    cfgr::item::action --label "Vibranium Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-update -- vb-update; _die" --icon vb-github
+  }
+  cfgr::run "Update" "_b"
+}
+
+_build() {
+  cfgr::item::action --label "Settings" --func "cfgr-menu" --icon vb-settings
+  cfgr::item::action --label "Install" --func "_build_install" --icon vb-install
+  cfgr::item::action --label "Remove" --func "_build_remove" --icon vb-trash
+  cfgr::item::action --label "Update" --func "_build_update" --icon vb-update
+  cfgr::item::action --label "Tweaks" --func "vb-menu-tweaks" --icon vb-tools
+
+  if [[ "$CHASSIS_TYPE" != vm ]]; then
+    cfgr::item::action --label "Setup" --func "vb-menu-setup" --icon vb-tools
+  fi
+
+  cfgr::item::action --label "Help" --func "_build_help" --icon vb-help
+}
+
+cfgr::run "Vibranium" "_build"

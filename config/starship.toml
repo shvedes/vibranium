@@ -1,0 +1,86 @@
+# https://starship.rs/guide/
+
+add_newline = false
+
+format = "$sudo$python$hostname$directory$git_branch$git_status$cmd_duration$jobs$character"
+
+# ---------------------------------------------------------------------------
+# Directory
+# ---------------------------------------------------------------------------
+[directory]
+truncation_length   = 3
+truncation_symbol   = "../"
+truncate_to_repo    = true
+repo_root_style     = "bold cyan"
+style               = "cyan"
+repo_root_format    = "[$repo_root]($repo_root_style)[$path]($style) "
+format              = "[$path]($style) "
+
+# ---------------------------------------------------------------------------
+# Git branch
+# ---------------------------------------------------------------------------
+[git_branch]
+format = "[at ](yellow)[$branch](italic cyan) "
+symbol = ""
+
+# ---------------------------------------------------------------------------
+# Git status
+# ---------------------------------------------------------------------------
+[git_status]
+format = "$ahead_behind$conflicted$untracked$modified$stashed$staged$renamed$deleted"
+
+ahead    = "[ ${count} ](bold green)"
+behind   = "[ ${count} ](bold red)"
+diverged = "[ ${ahead_count} ](bold green)[ ${behind_count} ](bold red)"
+
+conflicted = '[\[!\] ](red)'
+untracked  = '[\[U\] ](bright-black)'
+modified   = '[\[M\] ](green)'
+stashed    = '[\[S\] ](bright-black)'
+staged     = '[\[+\] ](yellow)'
+renamed    = '[\[R\] ](cyan)'
+deleted    = '[\[D\] ](red)'
+
+# ---------------------------------------------------------------------------
+# Python — venv name only, hidden when no venv active
+# ---------------------------------------------------------------------------
+[python]
+format         = '[(\($virtualenv\) )](italic yellow)'
+detect_files   = ['.python-version', 'requirements.txt', 'pyproject.toml',
+                  'Pipfile', 'setup.py', 'setup.cfg', 'tox.ini']
+detect_folders = ['.venv', 'venv', '__pypackages__']
+
+# ---------------------------------------------------------------------------
+# Hostname — SSH sessions only
+# ---------------------------------------------------------------------------
+[hostname]
+ssh_only = true
+format   = "[$hostname](bold yellow) in "
+
+# ---------------------------------------------------------------------------
+# Sudo — shown when cached credentials are active
+# ---------------------------------------------------------------------------
+[sudo]
+format   = '[\[!!\] ](bold red)'
+disabled = false
+
+# ---------------------------------------------------------------------------
+# Command duration — show for commands ≥ 1 s
+# ---------------------------------------------------------------------------
+[cmd_duration]
+min_time = 1_000
+format   = "[|](bright-black) [(${duration})](yellow) "
+
+# ---------------------------------------------------------------------------
+# Jobs — background job count, shown only when jobs exist
+# ---------------------------------------------------------------------------
+[jobs]
+format    = '[\[${number}j\] ](bright-black)'
+threshold = 1
+
+# ---------------------------------------------------------------------------
+# Prompt character
+# ---------------------------------------------------------------------------
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol   = "[❯](bold red)"

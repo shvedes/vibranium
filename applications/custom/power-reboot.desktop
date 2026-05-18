@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Reboot
+Icon=vb-reboot
+Keywords=Reboot;Restart;
+Exec=systemctl reboot
+Terminal=false
+Categories=Power;
+OnlyShowIn=Hyprland;

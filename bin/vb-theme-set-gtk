@@ -1,0 +1,44 @@
+#!/usr/bin/bash
+
+# GTK live-reload mechanism
+#
+# GTK caches CSS per theme name within a running session. Switching to the
+# same name again does nothing -- it serves from cache. Fix: keep two theme
+# slots (vibranium-a, vibranium-b) and alternate on every run. The new name
+# was never seen this session so GTK is forced to read from disk fresh.
+#
+# Live reload works via the alternating slot mechanism.
+
+GTK_THEME="$XDG_CONFIG_HOME/vibranium/current/theme/gtk.css"
+
+# GTK3 -- alternating slots for live reload
+for slot in vibranium-a vibranium-b; do
+  gtk3_dir="$HOME/.local/share/themes/$slot/gtk-3.0"
+  mkdir -p "$gtk3_dir"
+  {
+    echo '@import url("/usr/share/themes/adw-gtk3/gtk-3.0/gtk.css");'
+    cat "$GTK_THEME"
+  } >"$gtk3_dir/gtk.css"
+done
+
+# GTK4 -- write user override, applies on next app restart
+mkdir -p "$XDG_CONFIG_HOME/gtk-4.0"
+cat "$GTK_THEME" >"$XDG_CONFIG_HOME/gtk-4.0/gtk.css"
+
+# Alternate between slots to bust GTK3 cache
+current=$(gsettings get org.gnome.desktop.interface gtk-theme)
+current=${current#\'}
+current=${current%\'}
+
+if [[ $current == vibranium-a ]]; then
+  next="vibranium-b"
+else
+  next="vibranium-a"
+fi
+
+gsettings set org.gnome.desktop.interface gtk-theme "$next"
+
+# Some windows like polkit prompts, Pinentry prompts and such
+# don't inherit the value from gsettings. Because of that, we
+# edit these files manually. Not a big deal.
+sed -i "/gtk-theme-name/s/=.*/=${next}/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini

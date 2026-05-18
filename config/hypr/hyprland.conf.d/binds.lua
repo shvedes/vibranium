@@ -1,0 +1,174 @@
+-- Full binds documentation:
+-- https://wiki.hypr.land/Configuring/Basics/Binds
+
+-- ###########################################################################
+-- BASIC SYNTAX
+-- ###########################################################################
+--
+-- hl.bind(keys, dispatcher|function, { options? })
+--
+-- Example:
+-- hl.bind("Print", hl.dsp.exec_raw("flameshot"), { description = "Open Flameshot" })
+--
+-- This binds the Print Screen key to launch Flameshot.
+--
+-- You can also use modifiers:
+-- hl.bind("SUPER + SHIFT + G", hl.dsp.exec_raw("app2unit steam"))
+--
+-- This launches Steam when you press SUPER + SHIFT + G.
+--
+-- Notes:
+-- - SUPER usually means the Windows key.
+-- - Key order does not matter, but spacing should be consistent for readability.
+--
+-- ###########################################################################
+-- UNBINDING KEYS
+-- ###########################################################################
+--
+-- hl.unbind("SUPER + SHIFT + G")
+--
+-- This removes a keybind.
+--
+-- If multiple binds use the same keys, all of them will trigger unless unbound.
+--
+-- You can also unbind dynamically:
+--
+-- hyprctl eval 'hl.unbind("SUPER + SHIFT + G")'
+--
+-- Note:
+-- The bind will reappear after config reload unless removed from config.
+--
+-- ###########################################################################
+-- MOUSE BINDS
+-- ###########################################################################
+--
+-- Mouse buttons and scroll can also be bound.
+--
+-- Example (scroll up):
+-- hl.bind("SUPER + mouse_up", hl.dsp.exec_raw("notify-send 'Hello there!'"))
+--
+-- Example (left click with modifiers):
+-- hl.bind("SUPER + SHIFT + mouse:272", hl.dsp.exec_raw("vb-cmd-reload"))
+--
+-- This reloads Vibranium config when pressing SUPER + SHIFT + left click.
+--
+-- Note:
+-- mouse_up and mouse_down are intentionally inverted in behavior.
+--
+-- ###########################################################################
+-- BIND OPTIONS
+-- ###########################################################################
+--
+-- locked           (bool)   - Works even when input is locked (for example lockscreen)
+-- release          (bool)   - Triggers on key release instead of press
+-- click            (bool)   - Triggers on click release if cursor stays within drag threshold
+-- drag             (bool)   - Triggers on release if cursor moves outside drag threshold
+-- long_press       (bool)   - Triggers after holding a key for a longer time
+-- repeating        (bool)   - Repeats action while key is held
+-- non_consuming    (bool)   - Passes key event to active window as well
+-- auto_consuming   (bool)   - Passes event only if dispatcher fails
+-- mouse            (bool)   - Marks bind as a mouse input
+-- transparent      (bool)   - Cannot be overridden by other binds
+-- ignore_mods      (bool)   - Ignores modifier keys
+-- separate         (bool)   - Treats modifier combinations independently
+-- description      (string) - Human-readable description of the bind
+-- bypass           (bool)   - Ignores application input inhibition requests
+-- submap_universal (bool)   - Active in all submaps
+-- devices          (table)  - Restrict bind to specific input devices
+--
+-- More details:
+-- https://wiki.hypr.land/Configuring/Basics/Binds/#keysym-combos
+--
+-- ###########################################################################
+-- DISPATCHERS
+-- ###########################################################################
+--
+-- The "dispatcher" is NOT limited to hl.dsp.* functions.
+--
+-- It can be ANY Lua function.
+--
+-- This means:
+-- - You can call system commands
+-- - You can run custom Lua logic
+-- - You can modify config state dynamically
+-- - You can wrap multiple actions into one bind
+--
+-- In short: this is just Lua.
+-- You can do basically anything you want here.
+--
+-- Examples:
+--
+-- 1. Standard dispatcher (most common):
+--
+-- hl.bind("SUPER + RETURN", hl.dsp.exec_raw("alacritty"))
+--
+--
+-- 2. Custom Lua function:
+--
+-- hl.bind("SUPER + H", function()
+--   -- You won't technically see anything,
+--   -- since it ran by Hyprland internaly.
+--   print("Hello from Lua bind!")
+-- end)
+--
+--
+-- 3. Multiple actions in one bind:
+--
+-- hl.bind("SUPER + J", function()
+--   hl.dsp.exec_raw("notify-send 'First action'")()
+--   hl.dsp.exec_raw("alacritty")()
+-- end)
+--
+--
+-- 4. Conditional logic:
+--
+-- hl.bind("SUPER + K", function()
+--   local hour = os.date("*t").hour
+--
+--   if hour < 12 then
+--     hl.dsp.exec_raw("notify-send 'Good morning'")()
+--   else
+--     hl.dsp.exec_raw("notify-send 'Good day'")()
+--   end
+-- end)
+--
+--
+-- 5. Using it like a real programming language:
+--
+-- hl.bind("SUPER + L", function()
+--   local file = io.open(os.getenv("HOME") .. "/log.txt", "a")
+--   if file then
+--     file:write("Bind triggered at " .. os.date() .. "\n")
+--     file:close()
+--   end
+-- end)
+--
+-- ###########################################################################
+-- WEB SHORTCUTS (OPTIONAL)
+-- ###########################################################################
+--
+-- Vibranium includes optional shortcuts for web services such as AI chat,
+-- Gmail, and so on.
+--
+-- These are disabled by default to avoid excessive global hotkeys.
+-- They also may conflict with ALT-based shortcuts in some applications.
+--
+-- NOTE:
+-- Requires a Chromium-based browser.
+--
+-- Example (disabled by default):
+--
+-- hl.bind("ALT + W", hl.dsp.exec_raw("vb-core-launcher --web"), { description = "PWA Launcher" })
+-- hl.bind("ALT + A", hl.dsp.exec_raw("vb-core-launcher --ai"), { description = "AI Launcher" })
+--
+-- ###########################################################################
+-- EXTRA UTILITIES (OPTIONAL)
+-- ###########################################################################
+--
+-- Example:
+--
+-- hl.bind("SUPER + SHIFT + W", hl.dsp.exec_raw("vb-toggle-waybar"), { description = "Toggle status bar" })
+--
+-- This toggles the visibility of the status bar.
+--
+-- ###########################################################################

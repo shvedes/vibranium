@@ -1,0 +1,56 @@
+#!/bin/bash
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+_usage() {
+  shcat <<EOF
+Usage: $SELF [OPTION]
+
+Switch keyboard layout for the main Hyprland keyboard.
+Mainly used by the Waybar module.
+
+Notes:
+  Don't bind this script with keyboard shortcuts;
+  use Hyprland's native config.
+
+Options:
+  --next            Switch to next layout (default)
+  --prev            Switch to previous layout
+  -h, --help        Display this help and exit
+EOF
+}
+
+case "${1:-}" in
+--next | "")
+  action="next"
+  ;;
+--prev)
+  action="prev"
+  ;;
+-h | --help)
+  _usage
+  exit 0
+  ;;
+*)
+  echo "Error: invalid option: $1" >&2
+  echo "Try '$SELF --help' for more information." >&2
+  exit 1
+  ;;
+esac
+
+device="$(hyprctl -j devices | jq -r '.keyboards[] | select(.main == true) | .name')"
+
+if [[ -z "$device" ]]; then
+  echo "Error: no main keyboard found" >&2
+  notify-send -r 4 -t 3000 -u critical "Vibranium" \
+    "Could not detect your default keyboard layout"
+  exit 1
+fi
+
+hyprctl -q switchxkblayout "$device" "$action"

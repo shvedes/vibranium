@@ -1,0 +1,21 @@
+{
+	"network": {
+		"interval": 1,
+		"format-wifi": "{icon}",
+		"format-ethernet": "\uef09",
+		"format-disconnected": "\udb82\udd2d",
+
+		"format-icons": [
+			"\udb82\udd2f",
+			"\udb82\udd1f",
+			"\udb82\udd22",
+			"\udb82\udd25",
+			"\udb82\udd28"
+		],
+
+		"on-click": "vb-launch-networkmanager",
+		"tooltip-format": "Connected to {essid}\nSignal strenght: {signalStrength}%\nWLAN IP: {ipaddr}\nIn: {bandwidthDownBytes:<} Out: {bandwidthUpBytes:>}",
+		"tooltip-format-ethernet": "LAN IP: {ipaddr}\nIn: {bandwidthDownBytes:<} Out: {bandwidthUpBytes:=}",
+		"tooltip-format-disconnected": "Click here to connect to a network"
+	}
+}

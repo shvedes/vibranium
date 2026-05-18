@@ -1,0 +1,11 @@
+#!/usr/bin/bash
+
+TIMESTAMP="$(git -C "$VIBRANIUM" log -1 --format=%cd --date=unix)"
+FILE="$VIBRANIUM/migrations/${TIMESTAMP}.sh"
+${EDITOR:-nvim} "$FILE"
+
+# And skip it instantly after creation.
+MIGRATION_FILE="$VIBRANIUM_STATE/migrations/${TIMESTAMP}.sh"
+if [[ -f "$FILE" ]]; then
+  : >"$MIGRATION_FILE"
+fi

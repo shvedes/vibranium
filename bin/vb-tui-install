@@ -1,0 +1,403 @@
+#!/usr/bin/bash
+
+# shellcheck disable=SC2034
+
+ICON_DIR="$XDG_DATA_HOME/applications/icons"
+SELF="${0##*/}"
+
+# ---------------------------------------------------------------------------
+# Flags populated by argument parsing below. All default to empty; interactive
+# mode fills them via prompts, non-interactive mode via --flags.
+# ---------------------------------------------------------------------------
+
+TUI_EXEC=""
+TUI_EXEC_RAW=""
+APP_NAME=""
+ICON_REF=""
+CUSTOM_EXEC=""
+EXTRA_KEYWORDS=""
+CATEGORY=""
+EXEC_ARGS=""
+FLOAT=false
+INTERACTIVE_MODE=false
+
+_shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+_usage() {
+  _shcat <<EOF
+Usage: $SELF [OPTION]...
+
+Install a TUI application shortcut as a .desktop launcher entry.
+
+Options:
+  --exec CMD          TUI command to launch
+  --args ARGS         Positional arguments passed to the TUI command
+  --name NAME         App display name
+  --icon REF          Icon URL or filename inside the icons directory
+  --custom-exec CMD   Override the full Exec= value
+  --keywords KW       Extra keywords, semicolon-separated
+  --category CAT      Extra Categories= value
+  --float             Launch in a floating window
+  -h, --help          Show this help and exit
+
+If --exec is not provided, the script runs in interactive mode and prompts
+for all required fields.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    _usage
+    exit 0
+    ;;
+  --exec)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    TUI_EXEC="$2"
+    TUI_EXEC_RAW="$2"
+    shift 2
+    ;;
+  --args)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    EXEC_ARGS="$2"
+    shift 2
+    ;;
+  --name)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    APP_NAME="$2"
+    shift 2
+    ;;
+  --icon)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    ICON_REF="$2"
+    shift 2
+    ;;
+  --custom-exec)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    CUSTOM_EXEC="$2"
+    shift 2
+    ;;
+  --keywords)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    EXTRA_KEYWORDS="$2"
+    shift 2
+    ;;
+  --category)
+    [[ $# -ge 2 ]] || {
+      echo "Missing value for $1" >&2
+      exit 1
+    }
+    CATEGORY="$2"
+    shift 2
+    ;;
+  --float)
+    FLOAT=true
+    shift
+    ;;
+  --)
+    shift
+    break
+    ;;
+  --* | -*)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
+  *)
+    echo "Unexpected argument: '$1'. Use flags to pass values." >&2
+    exit 1
+    ;;
+  esac
+done
+
+_operation_complete() {
+  term::disable_input
+  printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  read -n1 -r -p $'Installation complete. Press any key to exit ' dummy
+}
+
+_operation_canceled() {
+  [[ $INTERACTIVE_MODE == true ]] || return
+  term::disable_input
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+}
+
+# ---------------------------------------------------------------------------
+# Derive a default app name from the exec command:
+# takes the basename, strips any path, and capitalizes the first letter.
+# Example: /usr/bin/lazygit -> Lazygit
+# ---------------------------------------------------------------------------
+_name_from_exec() {
+  local exec_cmd="$1"
+  local base="${exec_cmd##*/}"
+  base="${base%% *}"
+  printf '%s' "${base^}"
+}
+
+# ---------------------------------------------------------------------------
+# Check that a command exists in $PATH.
+# Returns 0 if found, 1 otherwise.
+# ---------------------------------------------------------------------------
+_check_exec_exists() {
+  command -v "$1" &>/dev/null
+}
+
+# ---------------------------------------------------------------------------
+# Scan all .desktop files in the TUI applications directory for one whose
+# TryExec= line matches the given executable name.
+# TryExec= holds only the bare command (no positional args), making it more
+# reliable than Exec= for identity checks. It also appears near the top of
+# the file, so the loop exits early on a match or on the next section header.
+# Prints the matching file path and returns 0 if found; returns 1 otherwise.
+# ---------------------------------------------------------------------------
+_find_tuiapp_by_tryexec() {
+  # Strip any leading path so "/usr/bin/lazygit" matches "lazygit" in TryExec.
+  local exec_cmd="${1##*/}"
+  local dir="$XDG_DATA_HOME/applications"
+  local file line value
+
+  for file in "$dir"/TUI*.desktop; do
+    [[ -f $file ]] || continue
+    while IFS= read -r line; do
+      case "$line" in
+      TryExec=*)
+        value="${line#TryExec=}"
+        # Normalise the stored value as well, in case it contains a full path.
+        [[ "${value##*/}" == "$exec_cmd" ]] && {
+          echo "$file"
+          return 0
+        }
+        # TryExec appears at most once per [Desktop Entry]; stop reading.
+        break
+        ;;
+      # Any section header other than the opening [Desktop Entry] means we
+      # have left the main block; TryExec cannot appear below this point.
+      "["*)
+        [[ "$line" == "[Desktop Entry]" ]] || break
+        ;;
+      esac
+    done <"$file"
+  done
+
+  return 1
+}
+
+_ask_for_icon() {
+  local ref
+  read -rp "${BLUE}[VIBRANIUM]${RESET} Icon URL / path / name (or Enter for default): ${BLUE}" ref
+  [[ -z $ref ]] && ref="vb-console"
+  printf "%s" "$ref"
+}
+
+# ---------------------------------------------------------------------------
+# Resolve ICON_REF to a local path, downloading if it is a URL.
+# Falls back to the generic "vb-console" system icon on any failure.
+# ---------------------------------------------------------------------------
+_resolve_icon() {
+  local ref="$1"
+  local name="$2"
+
+  if [[ -z $ref ]]; then
+    echo "vb-console"
+    return
+  fi
+
+  if [[ $ref =~ ^https?:// ]]; then
+    local ext="${ref##*.}"
+    [[ $ext =~ ^(png|jpg|jpeg|ico|svg)$ ]] || ext="png"
+    local path="$ICON_DIR/$name.$ext"
+    if curl -fsSL -o "$path" "$ref" 2>/dev/null && [[ -s $path ]]; then
+      echo "$path"
+    else
+      echo "vb-console"
+    fi
+    return
+  fi
+
+  if [[ -f "$ICON_DIR/$ref" ]]; then
+    echo "$ICON_DIR/$ref"
+  else
+    echo "$ref"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Build the Exec= command for vb-launch-tui.
+# ---------------------------------------------------------------------------
+_build_exec_command() {
+  local exec_cmd="$1"
+  local float="$2"
+
+  if [[ $float == true ]]; then
+    printf 'vb-launch-tui --app-id=org.vb.term.float -- %s' "$exec_cmd"
+  else
+    printf 'vb-launch-tui -- %s' "$exec_cmd"
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Write the .desktop file for the given TUI app.
+# ---------------------------------------------------------------------------
+_write_desktop() {
+  local name="$1" exec_cmd="$2" icon="$3" keywords="$4" category="$5"
+  local file="$XDG_DATA_HOME/applications/$name.desktop"
+
+  cat >"$file" <<EOF
+[Desktop Entry]
+Version=1.0
+Name=${name#TUI - }
+Comment=$name
+TryExec=$TUI_EXEC_RAW
+Exec=$exec_cmd
+Terminal=false
+Type=Application
+Icon=$icon
+StartupNotify=true
+Categories=TUI;${category}
+Keywords=tui;console;terminal;$TUI_EXEC_RAW;${keywords}
+EOF
+}
+
+# ---------------------------------------------------------------------------
+# Main logic
+# ---------------------------------------------------------------------------
+
+source vb-lib-core
+
+if [[ ! -f "$ICON_DIR" ]]; then
+  mkdir -p "$ICON_DIR"
+fi
+
+if [[ -z $TUI_EXEC ]]; then
+  INTERACTIVE_MODE=true
+  trap "printf '\n'; _operation_canceled; exit 1" INT
+  term::show_header
+
+  # -- Exec command ----------------------------------------------------------
+  while true; do
+    term::enable_input
+    read -rp "${YELLOW}[VIBRANIUM]${RESET} TUI command (e.g. lazygit, btop): ${BLUE}" TUI_EXEC
+    term::disable_input
+    if [[ -n $TUI_EXEC ]]; then
+      break
+    fi
+    echo "${RED}[VIBRANIUM]${RESET} Command cannot be empty"
+  done
+
+  if ! _check_exec_exists "${TUI_EXEC%% *}"; then
+    echo "${YELLOW}[VIBRANIUM]${RESET} Warning: ${BLUE}${TUI_EXEC%% *}${RESET} was not found in \$PATH."
+    if ! term::ask_yes_no N "Continue anyway?"; then
+      _operation_canceled
+      exit 1
+    fi
+  fi
+
+  # Check by exec identity, not by name, to catch the same binary registered
+  # under a different display name.
+  if _find_tuiapp_by_tryexec "$TUI_EXEC" &>/dev/null; then
+    echo "${YELLOW}[VIBRANIUM]${RESET} A TUI app for ${BLUE}${TUI_EXEC##*/}${RESET} is already installed."
+    if ! term::ask_yes_no Y "Overwrite it?"; then
+      _operation_canceled
+      exit 1
+    fi
+  fi
+
+  # -- Positional arguments --------------------------------------------------
+  term::enable_input
+  read -rp "${BLUE}[VIBRANIUM]${RESET} Arguments (e.g. --option1 value --option2, or Enter to skip): ${BLUE}" EXEC_ARGS
+  term::disable_input
+
+  # -- App name --------------------------------------------------------------
+  _suggested_name="$(_name_from_exec "$TUI_EXEC")"
+  echo "${YELLOW}[VIBRANIUM]${RESET} Suggested name: ${BLUE}${_suggested_name}${RESET}"
+  term::enable_input
+  read -rp "${BLUE}[VIBRANIUM]${RESET} App name (Enter to keep the name above): ${BLUE}" APP_NAME
+  term::disable_input
+  APP_NAME="TUI - ${APP_NAME:-$_suggested_name}"
+
+  # -- Float window ----------------------------------------------------------
+  if term::ask_yes_no N "Launch in a floating window?"; then
+    FLOAT=true
+  fi
+
+  # -- Keywords --------------------------------------------------------------
+  echo "${BLUE}[VIBRANIUM]${RESET} Hint: keywords help the app launcher find this entry by search terms"
+  term::enable_input
+  read -rp "${BLUE}[VIBRANIUM]${RESET} Keywords (space-separated, or Enter to skip): ${BLUE}" EXTRA_KW_RAW
+  term::disable_input
+
+  EXTRA_KEYWORDS=""
+  for kw in $EXTRA_KW_RAW; do EXTRA_KEYWORDS+="${kw};"; done
+
+  # -- Category --------------------------------------------------------------
+  term::enable_input
+  read -rp "${BLUE}[VIBRANIUM]${RESET} Extra categories (e.g. System;Monitor, or Enter to skip): ${BLUE}" CATEGORY
+  term::disable_input
+
+  # -- Icon ------------------------------------------------------------------
+  term::enable_input
+  ICON_REF="$(_ask_for_icon)"
+  term::disable_input
+
+  TUI_EXEC_RAW="$TUI_EXEC"
+
+  if [[ -n $EXEC_ARGS ]]; then
+    TUI_EXEC="$TUI_EXEC $EXEC_ARGS"
+  fi
+
+  ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
+  EXEC_COMMAND="$(_build_exec_command "$TUI_EXEC" "$FLOAT")"
+
+else
+  if [[ -z $APP_NAME ]]; then
+    APP_NAME="$(_name_from_exec "$TUI_EXEC")"
+  fi
+
+  if [[ $APP_NAME != "TUI - "* ]]; then
+    APP_NAME="TUI - $APP_NAME"
+  fi
+
+  # Same identity check as in interactive mode: match by TryExec, not by file name.
+  if _find_tuiapp_by_tryexec "$TUI_EXEC_RAW" &>/dev/null; then
+    exit 1
+  fi
+
+  TUI_EXEC_RAW="$TUI_EXEC"
+
+  if [[ -n $EXEC_ARGS ]]; then
+    TUI_EXEC="$TUI_EXEC $EXEC_ARGS"
+  fi
+
+  ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
+  EXEC_COMMAND="${CUSTOM_EXEC:-$(_build_exec_command "$TUI_EXEC" "$FLOAT")}"
+fi
+
+_write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$EXTRA_KEYWORDS" "$CATEGORY"
+
+if [[ $INTERACTIVE_MODE == true ]]; then
+  echo "${GREEN}[VIBRANIUM]${RESET} ${BLUE}${APP_NAME#TUI - }${RESET} has been installed"
+  echo "${GREEN}[VIBRANIUM]${RESET} You can find it in the app launcher"
+  _operation_complete
+fi

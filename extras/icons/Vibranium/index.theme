@@ -1,0 +1,15 @@
+[Icon Theme]
+Name=Vibranium
+Comment=Custom SVGs for Vibranium
+Inherits=Papirus
+Directories=scalable/actions,scalable/apps
+
+[scalable/actions]
+Size=48
+Context=Actions
+Type=Scalable
+
+[scalable/apps]
+Size=48
+Context=Apps
+Type=Scalable

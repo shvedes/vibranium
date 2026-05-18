@@ -1,0 +1,106 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
+THEME_NAME_FILE="$XDG_CONFIG_HOME/vibranium/current/theme.name"
+FALLBACK_THEME="nightfox-nightfox"
+
+# Collect removable user themes: dirs inside USER_THEMES_PATH that have no
+# official counterpart. Overrides (same name as an official theme) are excluded
+# because removing them would expose the unmodified official theme, not uninstall
+# anything meaningful from the user's perspective.
+mapfile -t community_themes < <(
+  find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' |
+    sort |
+    while read -r folder; do
+      if [[ ! -d "$VIBRANIUM/themes/$folder" ]]; then
+        echo "$folder"
+      fi
+    done
+)
+
+if ((${#community_themes[@]} == 0)); then
+  notify-send -r 3 -t 2000 "Vibranium" "No Omarchy themes installed"
+  exit 0
+fi
+
+_capitalize() {
+  parts=() result=()
+
+  local IFS=-            # Split words by '-'
+  read -ra parts <<<"$1" # Read input string into array 'parts' using IFS='-'
+
+  local part
+  for part in "${parts[@]}"; do
+    # Capitalize first character of each part
+    result+=("${part^}")
+  done
+
+  # Join parts back with '-' (due to IFS) and print
+  printf '%s' "${result[*]}"
+}
+
+# Build capitalized display names; map display -> folder for reverse lookup
+menu_items=()
+declare -A display_to_folder=()
+for folder in "${community_themes[@]}"; do
+  display="$(_capitalize "$folder")"
+  menu_items+=("$display")
+  display_to_folder["$display"]="$folder"
+done
+
+chosen_display=""
+helpers::ui::menu chosen_display "Uninstall theme" "" -selected-row 0 -- "${menu_items[@]}"
+
+if [[ -z "$chosen_display" ]]; then
+  exit 0
+fi
+
+chosen_name="${display_to_folder[$chosen_display]}"
+chosen_path="$THEMES_DIR/$chosen_name"
+
+if [[ ! -d "$chosen_path" ]]; then
+  notify-send -r 3 -t 5000 "Vibranium" "Theme folder not found: $chosen_path"
+  exit 1
+fi
+
+rm -rf "$chosen_path"
+
+# Update the state file;
+# don't store data of now deleted themes.
+state_file="$VIBRANIUM_STATE/wallpaper.state"
+
+if [[ -f "$state_file" ]]; then
+  lines=() # Array to store all lines from the file
+
+  # Read the file line by line into the array
+  # The '|| [[ -n "$line" ]]' ensures the last line is processed
+  # even if it doesn't end with a newline
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    lines+=("$line")
+  done <"$state_file"
+
+  {
+    # Iterate over the collected lines
+    for line in "${lines[@]}"; do
+      # Skip the line that matches the selected key (chosen_name=...)
+      [[ "$line" == "${chosen_name}="* ]] && continue
+
+      # Print all other lines as-is
+      printf '%s\n' "$line"
+    done
+  } >"$state_file" # Overwrite the original file with filtered content
+fi
+
+# If the removed theme was the active one, fall back to the default
+current_theme=""
+if [[ -f "$THEME_NAME_FILE" ]]; then
+  current_theme="$(<"$THEME_NAME_FILE")"
+fi
+
+if [[ "$current_theme" == "$chosen_name" ]]; then
+  vb-theme-set "$FALLBACK_THEME"
+fi
+
+notify-send -r 3 "Vibranium" "${chosen_name^} has been removed"

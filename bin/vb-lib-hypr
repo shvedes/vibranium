@@ -1,0 +1,96 @@
+#!/usr/bin/bash
+
+_HYPR_D="$XDG_CONFIG_HOME/hypr/hyprland.conf.d"
+
+export HYPR_CONF_INPUT="$_HYPR_D/input.lua"
+export HYPR_CONF_ADVANCED="$_HYPR_D/advanced.lua"
+export HYPR_CONF_LAF="$_HYPR_D/look-and-feel.lua"
+export HYPR_CONF_SMARTGAPS="$_HYPR_D/smart-gaps.lua"
+export HYPR_CONF_ANIMATIONS="$_HYPR_D/animations.lua"
+
+# Single-option read helpers
+
+hypr::bool() { hyprctl -j getoption "$1" | jq -r '.bool'; }
+hypr::int() { hyprctl -j getoption "$1" | jq -r '.int'; }
+hypr::float() { hyprctl -j getoption "$1" | jq -r '.float'; }
+hypr::str() { hyprctl -j getoption "$1" | jq -r '.str'; }
+
+# Batch fetch -> associative array
+#
+# hypr::fetch "option:path|type" [...]
+#
+# Populates the global HYPR associative array via a single hyprctl --batch
+# call and a single jq -rs pass over the concatenated JSON output.
+# hyprctl --batch -j can emit bare `nan` for unset floats — patched with sed
+# before jq sees it
+#
+# Usage:
+#   SPEC=("input:sensitivity|float2" "input:natural_scroll|bool" "input:kb_layout|str")
+#   hypr::fetch "${SPEC[@]}"
+#   echo "${HYPR[input:sensitivity]}"    # -> 0.00
+#   echo "${HYPR[input:natural_scroll]}" # -> false
+
+declare -A HYPR=()
+
+hypr::fetch() {
+  [[ $# -eq 0 ]] && return
+
+  local spec i
+  local -a opts types
+
+  for spec in "$@"; do
+    opts+=("${spec%|*}")
+    types+=("${spec#*|}")
+  done
+
+  # Single semicolon-delimited batch query
+  local query=""
+  for opt in "${opts[@]}"; do
+    query+="${query:+;}getoption $opt"
+  done
+
+  # Build one jq program that emits values in spec order, one per line.
+  # float* types emit the raw float here; printf formatting happens below.
+  local jq_prog="" expr
+  for i in "${!opts[@]}"; do
+    case "${types[$i]}" in
+    bool) expr=".[$i].bool" ;;
+    int) expr=".[$i].int | tostring" ;;
+    str) expr=".[$i].str" ;;
+    float) expr=".[$i].float | tostring" ;;
+    esac
+    jq_prog+="${jq_prog:+,}($expr)"
+  done
+
+  # Bash substitution patches bare `nan` tokens before jq sees them.
+  # jq -rs slurps the concatenated JSON objects
+  # into an array natively, so .[i] indexing is reliable without regex splitting.
+  local raw vals
+  raw=$(hyprctl -j --batch "$query")
+  mapfile -t vals < <(jq -rs "[$jq_prog] | .[]" <<<"${raw//nan/0}")
+
+  for i in "${!opts[@]}"; do
+    local opt="${opts[$i]}" val="${vals[$i]}"
+    case "${types[$i]}" in
+    float) HYPR["$opt"]=$(LC_NUMERIC=C printf "%.1f" "$val") ;;
+    *) HYPR["$opt"]="$val" ;;
+    esac
+  done
+}
+
+# hypr::get <option>  — read from the last hypr::fetch result
+hypr::get() { printf "%s" "${HYPR[$1]}"; }
+
+# hypr::set <option> <value> <config_file>
+hypr::set() { vb-cmd-edit-wm-config "${1}:${2}" "$3"; }
+
+# hypr::toggle <option> <config_file>
+hypr::toggle() {
+  if [[ "$(hypr::bool "$1")" == "true" ]]; then
+    hypr::set "$1" false "$2"
+  else
+    hypr::set "$1" true "$2"
+  fi
+}
+
+hypr::reload() { hyprctl -q reload config-only; }

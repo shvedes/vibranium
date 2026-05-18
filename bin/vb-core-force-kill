@@ -1,0 +1,54 @@
+#!/usr/bin/bash
+
+# vb-core-force-kill
+# This script forcibly closes the active window if it is frozen, for example,
+# using a secure confirmation mechanism involving a repeat call (shortcut) via a state file.
+# If the initial call was made on window A and the confirmation on window B, no action will be taken.
+
+PID=$(hyprctl -j activewindow | jq -r '.pid')
+STATE_FILE="$VIBRANIUM_RUNTIME/confirm-kill"
+
+# There are no windows on current workspace
+if [[ "$PID" == "null" ]]; then
+  exit 1
+fi
+
+# First, check whether the confirmation function is enabled globally.
+# If not, forcefully close the window immediately (no confirmation)
+if [[ "$(vb-cmd-get-option VIBRANIUM_GLOBAL_CONFIRM_TO_KILL)" == false ]]; then
+  hyprctl -q dispatch "hl.dsp.window.kill({window = 'pid:${PID}'})"
+  exit 0
+fi
+
+# If the state file exists, we confirm the forced closure of the window
+if [ -f "$STATE_FILE" ]; then
+  PREV_PID=$(<"$STATE_FILE")
+  # We must compare the recorded PID and the PID of the active window.
+  # If they do not match, it means that the user has launched confirmation in another window.
+  # In this case, we terminate the process to avoid accidentally killing it
+  if [ "$PREV_PID" -ne "$PID" ] 2>/dev/null; then
+    rm -f "$STATE_FILE"
+    vb-refresh-waybar-module confirm-kill
+    exit 1
+  fi
+  # second press -> confirmed
+  rm -f "$STATE_FILE"
+  vb-refresh-waybar-module confirm-kill
+else
+  # If the state file does not exist, it means that this is the first time the script has been run (before confirmation).
+  # We record the PID of the active window for subsequent confirmation and wait three seconds.
+  # If during this time the script does not run a second time with the existing PID file (confirmation),
+  # we process this case as a cancellation of the action by deleting the state file
+  echo "$PID" >"$STATE_FILE"
+  vb-refresh-waybar-module confirm-kill
+
+  sleep 3
+  if [ -f "$STATE_FILE" ]; then
+    rm -f "$STATE_FILE"
+    vb-refresh-waybar-module confirm-kill
+    exit 1
+  fi
+  exit 0
+fi
+
+hyprctl -q dispatch "hl.dsp.window.kill()"

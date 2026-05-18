@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+<action>
+	<icon>utilities-terminal</icon>
+	<name>Open Terminal Here</name>
+	<submenu></submenu>
+	<unique-id>1761167642911348-1</unique-id>
+	<command>xdg-terminal-exec --dir=%f</command>
+	<description>Open terminal in selected directory</description>
+	<range></range>
+	<patterns>*</patterns>
+	<startup-notify/>
+	<directories/>
+</action>
+<action>
+	<icon>image-x-tiff</icon>
+	<name>Set as wallpaper</name>
+	<submenu></submenu>
+	<unique-id>1761243531064717-1</unique-id>
+	<command>vb-core-wallpaper %f</command>
+	<description>Set selected image as desktop background</description>
+	<range>*</range>
+	<patterns>*</patterns>
+	<image-files/>
+</action>
+<action>
+	<icon>printer</icon>
+	<name>Print</name>
+	<submenu></submenu>
+	<unique-id>1776364775958435-1</unique-id>
+	<command>vb-cmd-print %F</command>
+	<description>Print selected files</description>
+	<range>*</range>
+	<patterns>*.pdf;*.ps;*.eps;*.xps;*.txt;*.text;*.log;*.md;*.rst;*.csv;*.tsv;*.html;*.htm;*.xhtml;*.odt;*.ott;*.sxw;*.doc;*.docx;*.dot;*.dotx;*.rtf;*.ods;*.ots;*.sxc;*.xls;*.xlsx;*.xlsm;*.xlt;*.xltx;*.odp;*.otp;*.sxi;*.ppt;*.pptx;*.pptm;*.pot;*.potx;*.odg;*.otg</patterns>
+	<image-files/>
+  <text-files/>
+	<other-files/>
+</action>
+</actions>

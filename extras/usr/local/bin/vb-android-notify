@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+
+# Find the active graphical session user
+get_session_user() {
+  loginctl list-sessions --no-legend |
+    while read -r sid uid user _rest; do
+      state=$(loginctl show-session "$sid" -p State --value 2>/dev/null)
+      type=$(loginctl show-session "$sid" -p Type --value 2>/dev/null)
+      if [[ "$state" == "active" && "$type" == "wayland" ]]; then
+        echo "$user"
+        return
+      fi
+    done
+}
+
+TARGET_USER=$(get_session_user)
+TARGET_UID=$(id -u "$TARGET_USER")
+DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/${TARGET_UID}/bus"
+
+DEVICE_NAME="${ID_MODEL:-Unknown Android}"
+VENDOR="${ID_VENDOR:-Unknown Vendor}"
+
+sudo -u "$TARGET_USER" \
+  DBUS_SESSION_BUS_ADDRESS="$DBUS_SESSION_BUS_ADDRESS" \
+  /usr/bin/notify-send \
+  --urgency=normal \
+  --icon=phone \
+  --app-name="USB Device" \
+  "Android connected" \
+  "${VENDOR} ${DEVICE_NAME}"

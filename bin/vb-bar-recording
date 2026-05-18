@@ -1,0 +1,8 @@
+#!/usr/bin/bash
+
+if [[ -f "$VIBRANIUM_RUNTIME/recording-ongoing" ]]; then
+  printf '{"text": "%s", "tooltip": "%s"}' \
+    "\uf28d" "Screen recording is active"
+else
+  printf '{"text": ""}'
+fi

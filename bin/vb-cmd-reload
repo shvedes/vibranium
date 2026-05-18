@@ -1,0 +1,22 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+SYSTEMD_TARGETS=("cliphist")
+
+if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+  SYSTEMD_TARGETS+=("swayosd")
+fi
+
+if systemctl -q --user is-active waybar; then
+  SYSTEMD_TARGETS+=("waybar")
+fi
+
+systemctl --user restart "${SYSTEMD_TARGETS[@]}" &
+vb-refresh-dunst
+
+hyprctl -q reload config-only &
+
+if [[ ! "$1" =~ ^(-q|--quiet)$ ]]; then
+  notify-send -r 2 -t 1500 "Vibranium" "Configuration reloaded"
+fi

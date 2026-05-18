@@ -1,0 +1,132 @@
+#!/usr/bin/bash
+
+HISTORY="$VIBRANIUM_CACHE/color-picker.history"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Simple color picker for Vibranium.
+
+Options:
+  -c, --clear  Clear history of recent colors
+  -h, --help   Show this help exit exit
+EOF
+}
+
+check_deps() {
+  if ! command -v hyprpicker >/dev/null; then
+    echo "Error: missing required dependencies: hyprpicker" >&2
+    vb-cmd-dep-notify --name "Color Picker" --deps "hyprpicker"
+    return 1
+  fi
+}
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+-c | --clear)
+  : >"$HISTORY"
+  vb-refresh-waybar-module color-picker
+  exit 0
+  ;;
+"")
+  if ! check_deps; then
+    exit 1
+  fi
+  ;;
+*)
+  echo "Error: unknown option: $*" >&2
+  echo "Try '${0##*/} --help' for more information" >&2
+  exit 1
+  ;;
+esac
+
+if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
+  echo "Not available while reading mode is active"
+  notify-send -r 2 -t 3000 "Color Picker" \
+    "<b>Color Picker</b> isn't available while <b>Reading Mode</b> is active!"
+  exit 1
+fi
+
+if pid=$(pidof hyprpicker); then
+  kill "$pid"
+  exit 1
+fi
+
+source vb-lib-core
+
+helpers::check \
+  VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR \
+  VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW \
+  VIBRANIUM_COLOR_PICKER_HISTORY_SIZE
+
+SHOW_SELECTED="$VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
+HEX_PREVIEW="$VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
+HIST_SIZE="$VIBRANIUM_COLOR_PICKER_HISTORY_SIZE"
+
+OPT_ARGS=()
+if [[ "$HEX_PREVIEW" == false ]]; then
+  OPT_ARGS+=(-d)
+fi
+
+while IFS= read -r line; do
+  if [[ $line == "[ERR]"* ]]; then
+    continue
+  fi
+
+  SELECTED_COLOR=$line
+done < <(hyprpicker -a -b -l -r -f hex "${OPT_ARGS[@]}")
+
+if [[ -z "$SELECTED_COLOR" ]]; then
+  exit 0
+fi
+
+# Read the cache file and update it if the selected color is not
+# a duplicate of one already existing in the cache file.
+FOUND=false
+COUNT=0
+
+# Read file line by line (if it exists)
+if [[ -f "$HISTORY" ]]; then
+  while IFS= read -r line; do
+    ((COUNT++))
+
+    # Check for exact match
+    if [[ "$line" == "$SELECTED_COLOR" ]]; then
+      FOUND=true
+    fi
+  done <"$HISTORY"
+fi
+
+# Only update if not found
+if [[ "$FOUND" == false ]]; then
+  # Wipe file if reached limit
+  if ((COUNT >= HIST_SIZE)); then
+    printf '%s\n' "$SELECTED_COLOR" >"$HISTORY"
+  else
+    printf '%s\n' "$SELECTED_COLOR" >>"$HISTORY"
+  fi
+fi
+
+# Generate a 1:1px image of the selected color to display in the notification
+if [[ $SHOW_SELECTED == true ]]; then
+  PREVIEW_IMG="$VIBRANIUM_RUNTIME/color-picker.png"
+  if command -v magick >/dev/null; then
+    magick -size 1x1 xc:"${SELECTED_COLOR}" "$PREVIEW_IMG"
+  else
+    log::warn "ImageMagick is not installed!"
+  fi
+fi
+
+notify-send -r 3 -t 1500 -i "$PREVIEW_IMG" "Color Picker" "Color copied to clipboard"
+vb-refresh-waybar-module color-picker
+rm -f "$PREVIEW_IMG"

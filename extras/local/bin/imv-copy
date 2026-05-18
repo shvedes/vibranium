@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# This file is symlinked to $VIBRANIUM
+# DO NOT EDIT
+
+cat "$1" | wl-copy
+notify-send -r 1 "Vibranium" "Selected image copied to clipboard"

@@ -1,0 +1,65 @@
+# Port of the Demon theme for Omarchy
+# https://github.com/HANCORE-linux/omarchy-demon-theme
+
+black_dim = "#3d3d3d"
+black = "#424242"
+black_bright = "#575757"
+
+red_dim = "#722b1d"
+red = "#9a3c29"
+red_bright = "#c44931"
+
+pink_dim = "#742a4a"
+pink = "#963a58"
+pink_bright = "#b94b73"
+
+green_dim = "#455337"
+green = "#627648"
+green_bright = "#7e945b"
+
+yellow_dim = "#99660a"
+yellow = "#cb8b0b"
+yellow_bright = "#f5b114"
+
+orange_dim = "#993300"
+orange = "#cc4400"
+orange_bright = "#ff4e00"
+
+blue_dim = "#304783"
+blue = "#405ca5"
+blue_bright = "#5a75bf"
+
+purple_dim = "#4f316d"
+purple = "#6e3f93"
+purple_bright = "#8252b2"
+
+cyan_dim = "#a84e1a"
+cyan = "#d4571f"
+cyan_bright = "#e57643"
+
+white_dim = "#c3ae92"
+white = "#e7e0d4"
+white_bright = "#e8e0d4"
+
+gray_dim = "#4d4d4d"
+gray = "#575757"
+gray_bright = "#666666"
+
+accent_dim = "#c98508"
+accent = "#e5990a"
+accent_bright = "#eeab47"
+
+background_h = "#141414"
+background_0 = "#1f1f1f"
+background_1 = "#262626"
+background_2 = "#2e2e2e"
+background_3 = "#3d3d3d"
+background_4 = "#424242"
+background_5 = "#575757"
+
+foreground_h = "#e7e0d4"
+foreground_0 = "#ded4c4"
+foreground_1 = "#cabeac"
+foreground_2 = "#b6aa94"
+foreground_3 = "#a2967d"
+foreground_4 = "#8e8266"

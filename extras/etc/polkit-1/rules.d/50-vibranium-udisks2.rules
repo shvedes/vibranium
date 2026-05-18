@@ -1,0 +1,8 @@
+// vim:ft=javascript
+// Mount internal drivers without sudo prompt.
+// Source: https://forum.manjaro.org/t/stable-update-2024-01-13-kernels-systemd-qt5-mesa-dbus-firefox-thunderbird/155007/123
+polkit.addRule(function(action, subject) {
+    if (action.id.indexOf("org.freedesktop.udisks2.") == 0 && subject.isInGroup("wheel")) {
+        return polkit.Result.YES;
+    }
+});

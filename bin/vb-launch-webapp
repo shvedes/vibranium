@@ -1,0 +1,149 @@
+#!/usr/bin/bash
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [URL]
+
+Open Progressive Web Apps (PWA)s in Vibranium.
+If a window exists - focuses it.
+
+Arguments:
+  URL         Target URL to open or focus
+
+Options:
+  -h, --help  Show this help message and exit
+
+Examples:
+  $SELF https://example.com
+  $SELF http://archlinux.org
+EOF
+}
+
+get_default_browser() {
+  local -n _out="$1"
+  local browser=""
+
+  # Fast path: mimeapps.list
+  if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
+    while IFS='=' read -r key value; do
+      if [[ ! $key == "x-scheme-handler/http" ]]; then
+        continue
+      fi
+      browser="${value%%;*}"
+      break
+    done <"$XDG_CONFIG_HOME/mimeapps.list"
+  fi
+
+  # Fallback
+  if [[ -z $browser ]]; then
+    browser="$(xdg-mime query default x-scheme-handler/http 2>/dev/null)"
+  fi
+
+  _out="$browser"
+}
+
+focus_or_launch() {
+  local -a cmd=("$@")
+
+  # Extract the hostname from the URL global for window matching.
+  # Strip the scheme (e.g. "https://"), then strip any path, port,
+  # query string, or fragment that follows the host.
+  local host="${URL#*://}"
+  host="${host%%[/?#:]*}"
+  host="${host,,}"
+
+  # Chrome PWA windows have class "chrome-{encoded_url}-Default", with
+  # the hostname appearing immediately after the "chrome-" prefix.
+  # startswith("chrome-{host}") is precise: it targets only PWA windows
+  # for this exact site and can't collide with other Chrome PWA windows
+  # whose hostnames begin differently.
+  local window_address
+  window_address="$(
+    hyprctl -j clients | jq -r --arg host "$host" '
+      try first(
+        .[]
+        | (.class        // "" | ascii_downcase) as $c
+        | (.initialClass // "" | ascii_downcase) as $ic
+        | select(
+            ($c  | startswith("chrome-\($host)")) or
+            ($ic | startswith("chrome-\($host)"))
+          )
+        | .address
+      )
+    ' 2>/dev/null
+  )"
+
+  if [[ -n "$window_address" ]]; then
+    hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
+  else
+    exec setsid -f app2unit -- "${cmd[@]}"
+  fi
+}
+
+case "${1:-}" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+esac
+
+if [[ $# -lt 1 ]]; then
+  echo "Error: missing URL" >&2
+  echo "Try '$SELF --help' for more information" >&2
+  exit 1
+fi
+
+source vb-lib-core
+
+URL="$1"
+
+get_default_browser browser
+
+case $browser in
+google-chrome* | brave-browser* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
+*) browser="chromium.desktop" ;;
+esac
+
+execs=()
+
+for dir in ~/.local/share/applications ~/.nix-profile/share/applications /usr/share/applications; do
+  if [[ ! -d $dir ]]; then
+    continue
+  fi
+
+  for f in "$dir"/$browser; do
+    if [[ ! -f $f ]]; then
+      continue
+    fi
+
+    while IFS= read -r line; do
+      if [[ ! $line == Exec=* ]]; then
+        continue
+      fi
+      line=${line#Exec=}
+      execs+=("${line%% *}")
+    done <"$f"
+  done
+done
+
+# Fallback if nothing found
+if ! ((${#execs[@]})); then
+  execs=("chromium")
+fi
+
+helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
+if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
+  # shellcheck disable=SC2068
+  focus_or_launch ${execs[0]} --app="$URL"
+else
+  # shellcheck disable=SC2068
+  exec setsid -f app2unit -- ${execs[0]} --app="$URL"
+fi

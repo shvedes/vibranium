@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+# In case if Hyprlock crashed, you can switch to another tty and
+# log in then call this script (available in $PATH)
+# in order to unlock "crashed session"
+pkill --signal USR1 hyprlock || true
+
+# Switch back to tty1 (default for graphical session in Vibranium)
+chvt 1
+
+# Kill parent shell to end current (recovery) tty session
+kill -TERM "$PPID"

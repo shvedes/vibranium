@@ -1,0 +1,39 @@
+
+# Place your environment variables here.
+# The text below is just an example. Feel free to delete or change it
+# All changes are applied only after re-login!
+
+export SUDO_PROMPT=$'\033[1;31m[sudo]\033[0m Password for '"$USER"': '
+
+# Set your default editor
+# This could be nvim, nano, emacs, kate or whatever you want
+export EDITOR="nvim"
+export SYSTEMD_EDITOR="$EDITOR"
+export MANPAGER="$EDITOR +Man!"
+
+#########################################################################################
+
+# You can also reassign the default folders for userspace package managers.
+# Golang, for example, likes to create its home folder directly right in $HOME,
+# which can sometimes be annoying. You can reassign this directory to anywhere you want.
+export GOPATH="$XDG_DATA_HOME/go"
+export CARGO_HOME="$XDG_DATA_HOME/cargo"
+
+# And then you can add the these folders to the $PATH in this way
+path_add $GOPATH/bin
+
+# This exact form is required.
+# path_add is a special command available only in environment files.
+# It appends entries to $PATH without duplicating existing ones,
+# which is necessary given how the environment is built.
+
+#########################################################################################
+
+# If you actively use mangohud, you can specify its entire configuration in a single variable,
+# instead of a special file in the root folder of each game:
+export MANGOHUD_CONFIG="fps_only,alpha=0.3,background_alpha=0,text_color=ffffff,font_size=18"
+
+# If you are a pass user (https://www.passwordstore.org/), you can specify a specific folder that pass will use to look for passwords. For example:
+export PASSWORD_STORE_DIR="$XDG_DATA_HOME/password-store"
+
+# vim:ft=bash

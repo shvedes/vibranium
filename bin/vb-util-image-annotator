@@ -1,0 +1,133 @@
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION] [FILE]
+
+Launch a photo editor for the given image file using satty.
+If no FILE is provided, prompt for selection using zenity if available.
+
+Options:
+  -h, --help  display this help and exit
+
+FILE must be an image file with extension: .png, .jpg, .jpeg, .ppm, or .webp.
+The annotated file is saved back over the source file.
+EOF
+}
+
+# If launched from imv - close that window
+# before editing.
+if [[ "$1" == "--imv" ]]; then
+  killall imv-wayland
+  shift
+fi
+
+# Reject excess positional args before touching options.
+if [[ $# -gt 1 ]]; then
+  echo "Error: too many arguments. Expected at most one FILE." >&2
+  echo "Try '${0##*/} --help' for more information." >&2
+  exit 1
+fi
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+-?*)
+  echo "Error: unknown option '$1'." >&2
+  echo "Try '${0##*/} --help' for more information." >&2
+  exit 1
+  ;;
+esac
+
+if ! command -v satty >/dev/null; then
+  echo "Error: satty not found!" >&2
+  vb-cmd-dep-notify --name "Image Editor" --deps "satty"
+  exit 1
+fi
+
+# Resolve the image path: use the argument if given, otherwise prompt with zenity.
+if [[ $# -eq 1 ]]; then
+  image="$1"
+else
+  if ! command -v zenity >/dev/null; then
+    [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Editor" --deps zenity
+    echo "Error: no image file provided and zenity not available." >&2
+    exit 1
+  fi
+
+  image="$(zenity --title="Select File" --file-selection \
+    --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2>/dev/null)"
+
+  if [[ -z "$image" ]]; then
+    exit 0 # User canceled selection; exit quietly.
+  fi
+fi
+
+if [[ ! -f "$image" ]]; then
+  echo "Error: '$image' is not a valid file." >&2
+  exit 1
+fi
+
+if [[ ! "$image" =~ \.(png|jpg|jpeg|ppm|webp)$ ]]; then
+  echo "Error: '$image' does not have a supported image extension." >&2
+  exit 1
+fi
+
+filetype="${image##*.}"
+
+# satty only accepts .png files (extension check, not magic bytes).
+# For other types, copy to a temp .png in /tmp so the working file is invisible
+# to any file manager that may have the source directory open.
+if [[ "$filetype" != "png" ]]; then
+  satty_input="$(mktemp --suffix=.png)"
+  cp "$image" "$satty_input"
+else
+  satty_input="$image"
+fi
+
+# Snapshot after the rename so the comparison is .png vs .png on both sides.
+# satty always writes to --output-filename on close, even without changes,
+# so byte-level comparison is the only reliable way to know if anything changed.
+original_snapshot="$(mktemp)"
+cp "$satty_input" "$original_snapshot"
+
+# Clean up temp files on any exit, including unexpected signals.
+# For .png inputs satty_input == image, so we only remove it when it's a real temp.
+if [[ "$filetype" != "png" ]]; then
+  trap 'rm -f "$satty_input" "$original_snapshot"' EXIT
+else
+  trap 'rm -f "$original_snapshot"' EXIT
+fi
+
+satty_flags=(
+  --copy-command "$(printf 'file://%s' "$image" | wl-copy -t text/uri-list)"
+  --output-filename "$satty_input"
+  --font-family "$(vb-font-get)"
+  --focus-toggles-toolbars
+  --disable-notifications
+  --initial-tool "brush"
+  --filename "$satty_input"
+)
+
+satty "${satty_flags[@]}" &>/dev/null
+
+# Copy the edited file back if we were working on a /tmp copy.
+if [[ "$filetype" != "png" ]]; then
+  cp "$satty_input" "$image"
+fi
+
+# Files are identical; the user closed satty without making any edits.
+if cmp -s "$original_snapshot" "$image"; then
+  exit 0
+fi
+
+notify-send -r 3 "Image Annotator" "File saved to ${image%/*}"
+printf 'file://%s' "$image" | wl-copy -t text/uri-list

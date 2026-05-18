@@ -1,0 +1,110 @@
+# This file linked to $VIBRANIUM. DO NOT EDIT!!!
+
+# If you want to edit / add / remove environment variables,
+# consider using "$XDG_CONFIG_HOME/vibranium/environment",
+# which will take priority over this file.
+
+# shellcheck source=/dev/null
+
+# We have two environment files:
+# 1) a mandatory (this one) that is always sourced
+# 2) an optional user env file that may also modify PATH
+#
+# Because both files can add the same directories,
+# PATH updates must be idempotent.
+#
+# A naive `PATH="$DIR:$PATH"` would prepend the directory twice
+# when both env files are loaded.
+#
+# `path_add` checks whether the directory is already present
+# and only prepends it if it is missing, preventing duplication
+# and keeping PATH stable regardless of load order.
+# https://wiki.archlinux.org/title/Environment_variables#Using_shell_initialization_files
+
+path_add() {
+  for d in "$@"; do
+    [[ -d "$d" && ! "$PATH" =~ (^|:)$d(:|$) ]] && PATH="$PATH:$d"
+  done
+}
+
+# https://specifications.freedesktop.org/basedir-spec/latest
+export XDG_DATA_DIRS="/usr/local/share:/usr/share"
+export XDG_STATE_HOME="$HOME/.local/state"
+export XDG_DATA_HOME="$HOME/.local/share"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_CACHE_HOME="$HOME/.cache"
+export XDG_CONFIG_DIRS="/etc/xdg"
+
+export VIBRANIUM_USER_SETTINGS="$XDG_CONFIG_HOME/vibranium/settings"
+export VIBRANIUM_RUNTIME="$XDG_RUNTIME_DIR/vibranium"
+export VIBRANIUM_PATH="$XDG_DATA_HOME/vibranium/bin"
+export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
+export VIBRANIUM_CACHE="$XDG_CACHE_HOME/vibranium"
+export VIBRANIUM="$XDG_DATA_HOME/vibranium"
+
+path_add "$HOME/.local/bin"
+path_add "$VIBRANIUM_PATH"
+
+# Theming
+# https://wiki.archlinux.org/title/Cursor_themes#Environment_variable
+export XCURSOR_PATH="$XDG_DATA_HOME/icons:/usr/share/icons"
+export QT_QPA_PLATFORMTHEME="qt6ct"
+
+if [[ -f "$VIBRANIUM_STATE/cursor-theme" ]]; then
+  XCURSOR_THEME="$(<"$VIBRANIUM_STATE/cursor-theme")"
+  export XCURSOR_THEME
+fi
+
+if [[ -f "$VIBRANIUM_STATE/cursor-size" ]]; then
+  XCURSOR_SIZE="$(<"$VIBRANIUM_STATE/cursor-size")"
+  export XCURSOR_SIZE
+fi
+
+# Use Wayland when possible. Fallback to XWayland otherwise
+export GDK_BACKEND="wayland,x11"
+export CLUTTER_BACKEND="wayland"
+export QT_QPA_PLATFORM="wayland;xcb"
+export ELECTRON_OZONE_PLATFORM_HINT="auto"
+
+# Keep in mind
+# https://github.com/basecamp/omarchy/issues/2564#issuecomment-3450877034
+export SDL_VIDEODRIVER="wayland"
+
+readonly CHASSIS_STATE="$VIBRANIUM_STATE/chassis-type"
+
+if [[ -f "$CHASSIS_STATE" ]]; then
+  CHASSIS_TYPE="$(<"$CHASSIS_STATE")"
+  export CHASSIS_TYPE
+else
+  CHASSIS_TYPE="$(hostnamectl chassis)"
+  export CHASSIS_TYPE
+  printf "%s" "$CHASSIS_TYPE" >"$CHASSIS_STATE"
+fi
+
+# Load standard user directories from ~/.config/user-dirs.dirs
+# This can be useful when these directories are exported globally
+# or needed in shells outside a desktop session (e.g., scripts).
+
+if [[ -f "$XDG_CONFIG_HOME/user-dirs.dirs" ]]; then
+  while IFS='=' read -r var val; do
+    [[ -z "$var" || "$var" == \#* ]] && continue
+
+    val="${val//\"/}"
+    val="${val//\$HOME/$HOME}"
+
+    export "$var"="$val"
+  done <"$XDG_CONFIG_HOME/user-dirs.dirs"
+fi
+
+# Properly detect and export
+# LIBVA_DRIVER_NAME & VDPAU_DRIVER
+if [[ ! "$CHASSIS_STATE" == "vm" ]]; then
+  source "$VIBRANIUM/default/uwsm/gpu-env"
+fi
+
+# Export user-defined environment
+source "$XDG_CONFIG_HOME/vibranium/environment"
+
+export PATH
+
+# vim:ft=bash

@@ -1,0 +1,9 @@
+{
+	"custom/dynamic-separator": {
+		"exec": "vb-bar-separator",
+		"return-type": "json",
+		"tooltip": false,
+		"format": "{}",
+		"signal": 10
+	}
+}

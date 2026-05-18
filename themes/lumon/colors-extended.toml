@@ -1,0 +1,64 @@
+# Port of the official Lumon Omarchy theme
+
+black_dim = "#304d69"
+black = "#3d668f"
+black_bright = "#7099c2"
+
+red_dim = "#d54e5f"
+red = "#e07787"
+red_bright = "#f2cace"
+
+pink_dim = "#9a70b3"
+pink = "#b08fc7"
+pink_bright = "#c9b2d7"
+
+green_dim = "#67bc67"
+green = "#88cd8b"
+green_bright = "#aedbae"
+
+yellow_dim = "#e5b03e"
+yellow = "#e9be6c"
+yellow_bright = "#efd19a"
+
+orange_dim = "#e58d3e"
+orange = "#e9a56d"
+orange_bright = "#efc19a"
+
+blue_dim = "#5f89c4"
+blue = "#82a8d4"
+blue_bright = "#a7c1e2"
+
+purple_dim = "#6a61c2"
+purple = "#8e88ce"
+purple_bright = "#b2abdd"
+
+cyan_dim = "#67bca2"
+cyan = "#89cdbb"
+cyan_bright = "#aedbce"
+
+white_dim = "#c5d0db"
+white = "#d6e2ee"
+white_bright = "#d9e4ef"
+
+gray_dim = "#1f3347"
+gray = "#304d69"
+gray_bright = "#3d668f"
+
+accent_dim = "#5f89c4"
+accent = "#82a8d4"
+accent_bright = "#a7c1e2"
+
+background_h = "#141f29"
+background_0 = "#1b2d40"
+background_1 = "#253d56"
+background_2 = "#2b4764"
+background_3 = "#335270"
+background_4 = "#395c7e"
+background_5 = "#3d668f"
+
+foreground_h = "#d9e4ef"
+foreground_0 = "#d6e2ee"
+foreground_1 = "#c5d5e7"
+foreground_2 = "#b3c8e0"
+foreground_3 = "#a0bbd9"
+foreground_4 = "#8fadd1"

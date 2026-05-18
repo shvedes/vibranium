@@ -1,0 +1,78 @@
+#!/usr/bin/bash
+
+# Toggle a persistent systemd-inhibit to prevent idle suspend.
+# If an inhibitor is already running, stops it; otherwise starts a new one.
+# Refreshes the Vibranium Waybar inhibitor module after action.
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+_usage() {
+  shcat <<EOF
+Usage: $SELF [OPTION]
+
+Toggle systemd idle inhibitor.
+
+Options:
+  -h, --help      Show this help and exit
+  -r, --retoggle  If an inhibitor is active, stop it and restart it under
+                  the current type. Used after a type change in cfgr-idle.
+                  No-op if no inhibitor is running. (hacky workaround)
+EOF
+}
+
+opt_retoggle=0
+
+case "${1:-}" in
+-h | --help)
+  _usage
+  exit 0
+  ;;
+-r | --retoggle)
+  opt_retoggle=1
+  ;;
+-*)
+  echo "Error: unknown option: $1" >&2
+  echo "Try '$SELF --help' for more information" >&2
+  exit 1
+  ;;
+esac
+
+REFRESH_BAR=false
+TYPE="$(vb-cmd-get-option VIBRANIUM_GLOBAL_INHIBIT_TYPE)"
+UNIT="vibranium-inhibit@${TYPE}.service"
+
+_active_unit=""
+for _type in idle sleep; do
+  _candidate="vibranium-inhibit@${_type}.service"
+  if systemctl -q --user is-active "$_candidate"; then
+    _active_unit="$_candidate"
+    break
+  fi
+done
+
+if ((opt_retoggle)); then
+  # Called after a type change. If something is running, swap it out.
+  # If nothing is running, the inhibitor was off: leave it off.
+  if [[ -n "$_active_unit" && "$_active_unit" != "$UNIT" ]]; then
+    systemctl -q --user stop "$_active_unit"
+    systemctl -q --user start "$UNIT" &
+    REFRESH_BAR=true
+  fi
+elif [[ -n "$_active_unit" ]]; then
+  # Any active inhibitor means the inhibitor is ON: toggle it off.
+  systemctl -q --user stop "$_active_unit" &
+  REFRESH_BAR=true
+else
+  systemctl -q --user start "$UNIT" &
+  REFRESH_BAR=true
+fi
+
+if $REFRESH_BAR; then
+  vb-refresh-waybar-module inhibitor &
+fi

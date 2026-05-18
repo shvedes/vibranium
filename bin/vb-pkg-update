@@ -1,0 +1,187 @@
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+_usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]...
+
+Perform system update using yay, check for important updates, and prompt for reboot if necessary.
+
+Options:
+  --no-logo         Do not display the logo at startup
+  --no-dummy        Do not wait for a key press after completion or cancellation
+
+Refreshes repositories, lists outdated packages, performs the update, and checks if a reboot is recommended based on updated packages.
+EOF
+}
+
+_operation_canceled() {
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+
+  if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
+    # shellcheck disable=SC2034
+    read -n1 -r -s -p $'. Press any key to exit' dummy
+  fi
+}
+
+_update_complete() {
+  printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$@"
+
+  if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
+    # shellcheck disable=SC2034
+    read -n1 -r -p $'. Press any key to exit' dummy
+  fi
+
+  printf '\e[?25h' # Show cursor
+}
+
+_check_updates() {
+  mapfile -t PKG_LIST < <(yay -Qqu)
+
+  if ((${#PKG_LIST[@]} == 0)); then
+    return 1
+  fi
+}
+
+_perform_update() {
+  local need_inhibit=1
+
+  systemctl -q --user is-active vibranium-inhibit@idle && need_inhibit=
+  systemctl -q --user is-active vibranium-inhibit@sleep && need_inhibit=
+
+  if [[ -n $need_inhibit ]]; then
+    systemctl -q --user start vibranium-inhibit@sleep
+    vb-refresh-waybar-module inhibitor
+  fi
+
+  cleanup() {
+    if [[ -n $need_inhibit ]]; then
+      systemctl -q --user stop vibranium-inhibit@sleep
+      vb-refresh-waybar-module inhibitor
+    fi
+  }
+
+  trap cleanup RETURN
+
+  yes | yay --noconfirm --sudoloop
+}
+
+_check_important() {
+  local important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
+
+  for pkg in "${PKG_LIST[@]}"; do
+    if [[ $pkg =~ $important_regex ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+# e.g. clicked on the updates waybar module
+if [[ ! -t 1 ]]; then
+  xdg-terminal-exec --title="${0##*/}" --app-id=org.vb.term.float -- "$0"
+  exit
+fi
+
+source vb-lib-core
+
+SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
+export SUDO_PROMPT
+
+NO_LOGO=false
+NO_DUMMY=false
+PKG_LIST=()
+
+trap 'term::disable_input; _operation_canceled; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
+
+while (($# > 0)); do
+  case "$1" in
+  --no-logo)
+    NO_LOGO=true
+    shift
+    ;;
+  --no-dummy)
+    NO_DUMMY=true
+    shift
+    ;;
+  --help)
+    _usage
+    exit 0
+    ;;
+  --)
+    shift
+    break
+    ;;
+  --*)
+    echo "Unknown option: $1" >&2
+    exit 1
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+if [[ $NO_LOGO == false ]]; then
+  term::show_header
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
+if ! sudo -v; then
+  _operation_canceled
+  exit 1
+fi
+
+term::disable_input
+
+yay -Sy &>/dev/null &
+pid=$!
+
+term::spinner $pid "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"
+
+if ! _check_updates; then
+  rm -f "$VIBRANIUM_CACHE"/pkg-updates.*
+  _update_complete "You are up to date"
+  vb-refresh-waybar-module pacman &
+  exit 0
+fi
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} package(s) are awaiting updates"
+echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting system update..."
+
+if ! _perform_update; then
+  echo -e "${RED}[VIBRANIUM]${RESET} Something went wrong"
+
+  _operation_canceled
+  exit 1
+fi
+
+rm -f "$VIBRANIUM_CACHE"/pkg-updates.*
+vb-refresh-waybar-module pacman &
+
+if _check_important; then
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
+
+  if term::ask_yes_no Y "Restart now?"; then
+
+    for i in {5..1}; do
+      for dots in "" "." ".." "..."; do
+        printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$YELLOW" "$RESET" "$i" "$dots"
+        sleep 0.25
+      done
+    done
+
+    systemctl reboot
+    exit 0
+  else
+    _update_complete "System update complete. Restart required"
+  fi
+else
+  _update_complete "System update complete"
+fi

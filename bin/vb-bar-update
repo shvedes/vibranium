@@ -1,0 +1,42 @@
+#!/usr/bin/bash
+
+set -euo pipefail
+
+source vb-lib-core
+
+state="$VIBRANIUM_STATE/update.available"
+
+if [[ ! -f "$state" ]]; then
+  printf '{"text": ""}'
+  exit 0
+fi
+
+# Wait for network before displaying update info, bail after 30 attempts
+attempts=0
+while ! ping -c 1 -W 2 8.8.8.8 &> /dev/null; do
+  attempts=$((attempts + 1))
+  if ((attempts >= 30)); then
+    printf '{"text": ""}'
+    exit 0
+  fi
+  sleep 1
+done
+
+channel="release"
+
+if [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
+  channel="$(< "$VIBRANIUM_STATE/update.channel")"
+fi
+
+content="$(< "$state")"
+icon="<span foreground='green3'>\uf071</span>"
+tooltip="<span foreground='CornflowerBlue'><b>Vibranium</b></span> update available!\n"
+
+if [[ "$channel" == "release" ]]; then
+  tooltip+="<span foreground='CornflowerBlue'><b>New version</b></span>: <b>${content}</b>\n"
+else
+  tooltip+="<span foreground='CornflowerBlue'><b>Commits behind</b></span>: <b>${content}</b>\n"
+fi
+
+tooltip+="<span foreground='yellow'><b>Click here to update</b></span>"
+printf '{"text": "%s", "tooltip": "%s" }' "$icon" "$tooltip"

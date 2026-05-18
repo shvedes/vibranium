@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+
+_build() {
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE \
+    --label "Respect power profiles"
+
+  cfgr::item::bool \
+    --var   VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK \
+    --label "Notify on change"
+}
+
+cfgr::run "Power Profiles" "_build" \
+  VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE \
+  VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK

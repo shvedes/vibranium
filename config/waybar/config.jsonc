@@ -1,0 +1,81 @@
+[
+	{
+		// These three lines are read by Vibranium settings.
+		// It is not recommended to edit or remove them manually.
+		// If you want to modify any of them, use:
+		// Vibranium Menu > Settings > Waybar.
+		//
+		// If you remove them, Vibranium settings will not detect them
+		// and no options will be shown to adjust them.
+		"position": "top",
+		"spacing": 0,
+		"height": 30,
+
+		// These are Waybar modules that come with Vibranium.
+		// Feel free to edit these files.
+		// It is not recommended to edit this array manually;
+		// instead use:
+		// Vibranium Menu > Settings > Waybar > Toggle modules.
+		//
+		// Some modules are special and are made specifically for Vibranium.
+		// If you remove them, Vibranium settings will not detect them
+		// and they will be hidden from the settings menu.
+		"include": [
+			"$XDG_CONFIG_HOME/waybar/modules/battery.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/bluetooth.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/clock.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-confirm-kill.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-color-picker.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-dynamic-separator.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-nightshift.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-inhibitor.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/language.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-logout.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/microphone.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/network.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-pacman.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-power-profile.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-reading-mode.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-recording.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-separator.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-timer.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/tray.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/group-tray.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/volume.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-weather.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-worker.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/workspaces.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-pass.jsonc",
+			"$XDG_CONFIG_HOME/waybar/modules/custom-vb-update.jsonc"
+		],
+
+		// All custom modules listed here can and should be enabled or disabled
+		// directly from Vibranium settings.
+		"modules-left": ["hyprland/workspaces"],
+		"modules-center": ["custom/weather", "clock", "custom/pacman"],
+		"modules-right": [
+			"custom/vibranium-update",
+			"custom/timer",
+			"custom/confirm-kill",
+			"custom/worker",
+			"custom/reading-mode",
+			"custom/inhibitor",
+			"custom/password-manager",
+			"custom/dynamic-separator",
+			// "hyprland/language",
+			"custom/recording-indicator",
+			"custom/power-profile",
+			"custom/color-picker",
+			"custom/nightshift",
+			"pulseaudio#microphone",
+			"pulseaudio#volume",
+			"bluetooth",
+			"network",
+			"battery",
+			"custom/separator",
+			"group/traygroup"
+		]
+	}
+]
+
+// vim:ft=jsonc

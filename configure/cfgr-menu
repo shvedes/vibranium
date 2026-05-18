@@ -1,0 +1,24 @@
+#!/usr/bin/bash
+
+_build() {
+  cfgr::item::action --func "cfgr-idle" --label "Idle" --icon vb-idle
+  cfgr::item::action --func "cfgr-audio" --label "Audio" --icon vb-volume
+  cfgr::item::action --func "cfgr-waybar-menu" --label "Waybar" --icon vb-settings
+  cfgr::item::action --func "cfgr-general" --label "General" --icon vb-settings
+  cfgr::item::action --func "eval vb-font-set" --label "Set Font" --icon vb-font
+  cfgr::item::action --func "cfgr-wm-menu" --label "Hyprland" --icon vb-wm
+
+  if [[ "$CHASSIS_TYPE" != vm ]]; then
+    cfgr::item::action --func "cfgr-recording" --label "Recording" --icon vb-video
+    cfgr::item::action --func "cfgr-brightness" --label "Brightness" --icon vb-brightness
+    cfgr::item::action --func "cfgr-nightshift" --label "Night Light" --icon vb-night-light
+  fi
+
+  cfgr::item::action --func "cfgr-screenshots" --label "Screenshots" --icon vb-screenshot
+  cfgr::item::action --func "cfgr-launcher" --label "App Launcher" --icon vb-launcher
+  cfgr::item::action --func "cfgr-color-picker" --label "Color Picker" --icon vb-theme
+  cfgr::item::action --func "cfgr-player" --label "Media Control" --icon vb-music
+  cfgr::item::action --func "cfgr-misc" --label "Miscellaneous" --icon vb-tools
+}
+
+cfgr::run "Settings" "_build"

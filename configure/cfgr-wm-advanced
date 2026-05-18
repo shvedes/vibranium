@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+
+source vb-lib-hypr
+
+ADVANCED_SPEC=(
+  "misc.vrr|int"
+  "debug.vfr|bool"
+  "general.layout|str"
+  "scrolling.direction|str"
+  "render.direct_scanout|int"
+  "misc.middle_click_paste|bool"
+  "misc.disable_autoreload|bool"
+  "cursor.zoom_detached_camera|bool"
+)
+
+_set_vrr() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "VRR" \
+    --option "Enabled:1" \
+             "Disabled:0" \
+             "Fullscreen only:2"
+  )"
+
+  hypr::set "misc:vrr" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set_ds() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Direct Scanout" \
+    --option "Enabled:1" \
+             "Disabled:0" \
+             "Auto:2"
+  )"
+
+  hypr::set "render:direct_scanout" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set_layout() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Windows Layout" \
+    --option "Dwindle:dwindle" \
+             "Master:master" \
+             "Monocle:monocle" \
+             "Scrolling:scrolling"
+  )"
+  hypr::set "general:layout" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set_scrolling_dir (){
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Layout direction"\
+    --option "Left:left" \
+             "Right:right"\
+             "Up:up" \
+             "Down:down"
+  )"
+
+  hypr::set "scrolling:direction" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_toggle() {
+  local path="$1"
+  hypr::toggle "$path" "$HYPR_CONF_ADVANCED"
+}
+
+_build() {
+  hypr::reload
+  hypr::fetch "${ADVANCED_SPEC[@]}"
+
+  # VRR / Direct Scanout has 3 states, map int -> display string
+  local vrr_display= ds_display=
+
+  case "${HYPR[misc.vrr]}" in
+    1) vrr_display="enabled" ;;
+    0) vrr_display="disabled" ;;
+    2) vrr_display="fullscreen only" ;;
+  esac
+
+  case "${HYPR[render.direct_scanout]}" in
+    1) ds_display="enabled" ;;
+    0) ds_display="disabled" ;;
+    2) ds_display="auto" ;;
+  esac
+
+  cfgr::item::action \
+    --label "Variable refresh rate : ${vrr_display}" \
+    --func "_set_vrr"
+
+  cfgr::item::action \
+    --label "Zoom detached camera : ${HYPR[cursor.zoom_detached_camera]}" \
+    --func "_toggle 'cursor:zoom_detached_camera'"
+
+  cfgr::item::action \
+    --label "Variable frame rate : ${HYPR[debug.vfr]}" \
+    --func "_toggle 'debug:vfr'"
+
+  cfgr::item::action \
+    --label "Disable auto reload : ${HYPR[misc.disable_autoreload]}" \
+    --func "_toggle 'misc:disable_autoreload'"
+
+  cfgr::item::action \
+    --label "Middle click paste : ${HYPR[misc.middle_click_paste]}" \
+    --func "_toggle 'misc:middle_click_paste'"
+
+  cfgr::item::action \
+    --label "Direct scanout : ${ds_display}" \
+    --func "_set_ds"
+
+  cfgr::item::action \
+    --label "Windows layout : ${HYPR[general.layout]}" \
+    --func "_set_layout"
+
+  if [[ "${HYPR[general.layout]}" == scrolling ]]; then
+    local direction="${HYPR[scrolling.direction]}"
+
+    cfgr::item::action \
+      --label "Scrolling direction : $direction" \
+      --func "_set_scrolling_dir"
+  fi
+}
+
+cfgr::run "Advanced" "_build"

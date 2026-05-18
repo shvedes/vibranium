@@ -1,0 +1,16 @@
+[Unit]
+Description=Fetch Arch Linux updates and store in cache
+PartOf=graphical-session.target
+After=graphical-session.target
+Requisite=graphical-session.target
+ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/share/vibranium/bin/vb-cmd-fetch-arch-updates
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
+
+# vim:ft=systemd

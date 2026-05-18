@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+
+
+_toggle_nightshift() {
+  vb-cmd-nightshift --toggle
+  vb-refresh-waybar-module nightshift
+}
+
+_set_temp() {
+  local input
+  input="$(cfgr::set_digit \
+    --title "Temperature" \
+    --type int \
+    --min 1000 \
+    --max 20000)" || return
+  vb-cmd-nightshift --set "$input"
+}
+
+_build() {
+  local state_file="$VIBRANIUM_STATE/nightshift"
+  local hyprsunset_conf="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
+
+  local temp
+  temp="$(sed -n 's/.*temperature[[:space:]]*=[[:space:]]*\(.*\)/\1/p' "$hyprsunset_conf")"
+
+  if [[ ! -f "$state_file" ]]; then
+    if hyprctl hyprsunset &>/dev/null; then
+      printf "active" >"$state_file"
+    else
+      printf "suspended" >"$state_file"
+    fi
+  fi
+
+  cfgr::item::raw "State : $(<"$state_file")" "action:_toggle_nightshift"
+
+  if [[ "$(<"$state_file")" == "active" ]]; then
+    cfgr::item::raw "Temperature : ${temp}K" "action:_set_temp"
+  fi
+}
+
+cfgr::run "Night Light" "_build"

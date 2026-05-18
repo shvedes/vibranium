@@ -1,0 +1,100 @@
+@import "../vibranium/current/theme/rofi.rasi"
+
+* {
+    background-color: transparent;
+}
+
+window {
+    width:            350px;
+    padding:          20;
+    border:           2;
+    border-color:     @border;
+    background-color: @background;
+}
+
+element {
+    padding: 8px;
+    spacing: 0px 8px;
+    cursor:  pointer;
+}
+
+element normal.normal {
+    background-color: transparent;
+    text-color:       @foreground-muted;
+}
+
+element normal.active {
+    background-color: @border;
+}
+
+element selected.normal {
+    background-color: @selected;
+    text-color:       @foreground;
+}
+
+element alternate.normal {
+    background-color: transparent;
+    text-color:       @foreground-muted;
+}
+
+element-text {
+    background-color: transparent;
+    text-color:       inherit;
+    cursor:           inherit;
+}
+
+element-icon {
+    background-color: transparent;
+}
+
+listview {
+    padding:      16px 0 0 0;
+    border:       2px solid 0px 0px;
+    border-color: @highlight;
+    margin:       12px 0 0 0;
+	lines:        9;
+}
+
+scrollbar {
+    padding:      1px 0px 0px 4px;
+    handle-width: 2px;
+    handle-color: @highlight;
+}
+
+message {
+    border: 0.15em;
+    margin: 18px 2px 0px 2px;
+    padding: 8px 8px 8px 8px;
+    border-color: @border;
+}
+
+entry {
+    text-color:        @foreground-muted;
+    placeholder-color: @foreground-muted;
+    cursor:            text;
+    placeholder:       "";
+}
+
+case-indicator {
+    enabled: false;
+}
+
+num-filtered-rows {
+    expand:     false;
+    text-color: @foreground-muted;
+}
+
+num-rows {
+    expand:     false;
+    text-color: @border;
+}
+
+textbox-num-sep {
+    expand:     false;
+    str:        "/";
+    text-color: @border;
+}
+
+prompt {
+    text-color: @foreground;
+}

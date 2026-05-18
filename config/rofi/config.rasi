@@ -1,0 +1,47 @@
+/* Full documentation: man rofi | man 5 rofi-theme */
+
+@import "./themes/theme-modern.rasi"
+
+window, mainbox {
+	font: "Cascadia Code 10";
+	border-radius: 0px;
+}
+
+configuration {
+	modes : [ drun ];
+
+	drun-reload-desktop-cache : true;
+	drun-use-desktop-cache    : true;
+	transient-window          : true;
+	steal-focus               : true;
+	markup                    : true;
+	sort                      : true;
+	fixed-num-lines           : false;
+
+  display-calc        : "Calculator";
+	display-window      : "Windows";
+	display-run         : "Command";
+	display-combi       : "Search";
+	display-emoji       : "Emoji";
+	display-drun        : "Search";
+	display-ssh         : "SSH";
+
+	icon-theme          : "Vibranium";
+	drun-display-format : "{name}";
+	matching            : "prefix";
+	drun-match-fields   : "name,keywords,categories";
+	monitor             : "-1";
+	scroll-method       : 1;
+	sorting-method      : "fzf";
+
+  hover-select    : true;
+  me-select-entry : "";
+  me-accept-entry: [ MousePrimary ];
+
+  drun { fallback-icon: "gtk-dialog-question"; }
+
+  calc {
+      hint-result: "";
+      hint-welcome: "";
+  }
+}

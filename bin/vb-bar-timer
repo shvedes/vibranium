@@ -1,0 +1,46 @@
+#!/usr/bin/bash
+
+state_file="$VIBRANIUM_RUNTIME/vb-timer.remaining"
+
+if [[ -f "$state_file" ]]; then
+  remaining="$(< "$state_file")"
+else
+  printf '{"text": ""}'
+  exit 1
+fi
+
+icon="\uf2f2"
+text="$icon"
+tooltip="Timer is active"
+class="active"
+
+if [[ $remaining =~ ^[0-9]+$ ]]; then
+  rem=$remaining
+  formatted=""
+
+  years=$((rem / 31557600))
+  rem=$((rem % 31557600))
+
+  days=$((rem / 86400))
+  rem=$((rem % 86400))
+
+  hours=$((rem / 3600))
+  rem=$((rem % 3600))
+
+  minutes=$((rem / 60))
+  seconds=$((rem % 60))
+
+  [[ $years -gt 0 ]] && formatted+="${years}y "
+  [[ $days -gt 0 ]] && formatted+="${days}d "
+  [[ $hours -gt 0 ]] && formatted+="${hours}h "
+  [[ $minutes -gt 0 ]] && formatted+="${minutes}m "
+
+  formatted+="${seconds}s"
+  text+="  <span foreground='gray'>$formatted</span>"
+else
+  text+=" !"
+  tooltip="<b>Time is out!</b>"
+  class="expired"
+fi
+
+printf '{"text": "%s", "tooltip": "%s", "class": "%s"}' "$text" "$tooltip" "$class"

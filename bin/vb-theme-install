@@ -1,0 +1,117 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+_operation_canceled() {
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  # shellcheck disable=SC2034
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+
+  term::enable_input
+}
+
+trap 'printf "\n"; _operation_canceled; exit 1' INT HUP
+
+term::show_header
+
+# If a URL was passed as an argument, use it directly and skip the prompt loop.
+# Otherwise, keep asking until the user provides a valid http(s) URL (or hits Ctrl+C).
+if [[ -n "$1" ]]; then
+  REPO_URL="$1"
+else
+  while true; do
+    read -rp "${YELLOW}[VIBRANIUM]${RESET} Git repo URL: " REPO_URL
+
+    if [[ -z "$REPO_URL" ]]; then
+      echo "${RED}[VIBRANIUM]${RESET} No URL provided. Try again."
+      continue
+    fi
+
+    if [[ ! "$REPO_URL" =~ ^https?:// ]]; then
+      echo "${RED}[VIBRANIUM]${RESET} You must provide an http(s) URL. Try again."
+      continue
+    fi
+
+    # Input passed both checks - we have a usable URL
+    break
+  done
+fi
+
+# Extract owner/repo from GitHub URL for the API, stripping scheme, host, and .git suffix
+REPO_PATH="${REPO_URL#https://github.com/}"
+REPO_PATH="${REPO_PATH%.git}"
+REPO_PATH="${REPO_PATH%/}" # guard against a trailing slash
+
+THEME_NAME="${REPO_URL%.git}"
+THEME_NAME="${THEME_NAME##*/}"
+THEME_NAME="${THEME_NAME#omarchy-}"
+THEME_NAME="${THEME_NAME%-theme}"
+THEME_NAME_COLOR="${BLUE}${THEME_NAME^}${RESET}"
+
+THEMES_DIR="$HOME/.config/vibranium/themes"
+THEME_PATH="$THEMES_DIR/$THEME_NAME"
+
+# Official themes ship inside the Vibranium repo itself. A community theme whose
+# derived name collides with an official one would silently shadow it after install,
+# so we refuse early rather than letting that happen.
+OFFICIAL_THEME_PATH="$VIBRANIUM/themes/$THEME_NAME"
+if [[ -d "$OFFICIAL_THEME_PATH" ]]; then
+  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR is an official Vibranium theme and cannot be overwritten by a community install."
+  _operation_canceled
+  exit 1
+fi
+
+# Fetch the repo root listing once - checks both candidate files in a single request
+# so we don't risk hitting the GitHub API rate limit with two separate calls
+CONTENTS_FILE="/tmp/${0##*/}.tmp"
+curl -sf "https://api.github.com/repos/$REPO_PATH/contents/" --output "$CONTENTS_FILE" &
+
+if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking theme compatibility"; then
+  echo "${RED}[VIBRANIUM]${RESET} Could not reach repo or repo does not exist"
+  _operation_canceled
+  exit 1
+fi
+
+# Match strictly against the JSON name field - guards against partial matches
+# (e.g. a file called "my-colors.toml" must not pass)
+CONTENTS="$(<"$CONTENTS_FILE")"
+if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] && [[ "$CONTENTS" != *'"name": "colors-extended.toml"'* ]]; then
+  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${GREEN}Omarchy${RESET} versions prior to ${BLUE}v3.3.0${RESET}"
+
+  # https://github.com/basecamp/omarchy/releases/tag/v3.3.0
+  echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${RESET}"
+
+  rm -f "$CONTENTS_FILE"
+  _operation_canceled
+  exit 1
+fi
+
+if [[ "$CONTENTS" != *'"name:" "hyprland.lua"'* ]]; then
+  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${CYAN}Hyprland${RESET} versions prior to ${BLUE}v0.55.0${RESET}"
+  echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${RESET} and ${CYAN}Hyprland${RESET} ${BLUE}v0.55.0+${RESET}"
+
+  rm -f "$CONTENTS_FILE"
+  _operation_canceled
+  exit 1
+fi
+
+rm -f "$CONTENTS_FILE"
+
+# Remove stale copy of this theme if one already exists
+if [[ -d "$THEME_PATH" ]]; then
+  if ! term::ask_yes_no Y "$THEME_NAME_COLOR already exists. Do you want to reinstall it?"; then
+    _operation_canceled
+    exit 1
+  fi
+
+  rm -rf "$THEME_PATH"
+fi
+
+git clone --quiet "$REPO_URL" "$THEME_PATH" &
+if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading $THEME_NAME_COLOR" "- ${GREEN}Done${RESET}"; then
+  echo "${RED}[VIBRANIUM]${RESET} Failed to clone theme repo"
+  _operation_canceled
+  exit 1
+fi
+
+vb-theme-set "$THEME_NAME"

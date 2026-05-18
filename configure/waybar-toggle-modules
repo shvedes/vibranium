@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+
+
+WAYBAR_CFG="$XDG_CONFIG_HOME/waybar/config.jsonc"
+_CFG_CONTENT=""
+
+# Instead of using grep multiple times, potentially slowing
+# down the whole script, we're loading the entire config
+# file into memory. The config is less than 100 lines,
+# the the cost is practically zero, compared to
+# multiple grep's fork().
+_load_cfg() {
+  _CFG_CONTENT=$(<"$WAYBAR_CFG")
+}
+
+# Returns true if the module string appears anywhere in the config,
+# whether active or commented out. Used to skip menu entries for
+# modules that are simply not part of this config (anymore).
+# E.g., removed manually by user.
+_module_in_cfg() {
+  local module="$1"
+  [[ "$_CFG_CONTENT" == *"\"$module\""* ]]
+}
+
+# Returns true if the module is currently commented out (i.e. disabled).
+_check_module() {
+  local module="$1"
+  [[ $'\n'"$_CFG_CONTENT" =~ $'\n'[[:space:]]*//[^$'\n']*\"$module\" ]]
+}
+
+_toggle_module() {
+  local module="$1"
+  if _check_module "$module"; then
+    sed -i "s|^\(\s*\)//\s*\(.*\"$module\".*\)|\1\2|" "$WAYBAR_CFG"
+  else
+    sed -i "s|^\(\s*\)\(\".*$module\".*\)|\1// \2|" "$WAYBAR_CFG"
+  fi
+
+  _load_cfg
+  systemctl -q --user restart waybar &
+}
+
+_build() {
+  _load_cfg
+
+  if _module_in_cfg 'hyprland/language'; then
+    if _check_module 'hyprland/language'; then
+      KEYBOARD_LAYOUT_ENABLED="false"
+    else
+      KEYBOARD_LAYOUT_ENABLED="true"
+    fi
+  fi
+
+  if _module_in_cfg 'network'; then
+    if _check_module 'network'; then
+      NETWORK_ENABLED="false"
+    else
+      NETWORK_ENABLED="true"
+    fi
+  fi
+
+  if _module_in_cfg 'pulseaudio#microphone'; then
+    if _check_module 'pulseaudio#microphone'; then
+      MICROPHONE_ENABLED="false"
+    else
+      MICROPHONE_ENABLED="true"
+    fi
+  fi
+
+  if _module_in_cfg 'pulseaudio#volume'; then
+    if _check_module 'pulseaudio#volume'; then
+      VOLUME_ENABLED="false"
+    else
+      VOLUME_ENABLED="true"
+    fi
+  fi
+
+  if _module_in_cfg 'bluetooth'; then
+    if _check_module 'bluetooth'; then
+      BLUETOOTH_ENABLED="false"
+    else
+      BLUETOOTH_ENABLED="true"
+    fi
+  fi
+
+  # Each cfgr::item::raw is guarded by _module_in_cfg so that menu entries
+  # are only emitted when the module is actually declared in the config.
+  _module_in_cfg 'hyprland/language' &&
+    cfgr::item::raw "Keyboard layout : $KEYBOARD_LAYOUT_ENABLED" "action:_toggle_module 'hyprland/language'"
+
+  _module_in_cfg 'custom/power-profile' && cfgr::item::bool \
+    --var VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE \
+    --label "Power profile" \
+    --hook "vb-refresh-waybar-module power-profile"
+
+  _module_in_cfg 'custom/color-picker' && cfgr::item::bool \
+    --var VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE \
+    --label "Color picker" \
+    --hook "vb-refresh-waybar-module color-picker"
+
+  _module_in_cfg 'custom/nightshift' && cfgr::item::bool \
+    --var VIBRANIUM_BAR_NIGHT_LIGHT_MODULE_ENABLE \
+    --label "Night light" \
+    --hook "vb-refresh-waybar-module nightshift"
+
+  _module_in_cfg 'pulseaudio#microphone' &&
+    cfgr::item::raw "Microphone : $MICROPHONE_ENABLED" "action:_toggle_module 'pulseaudio#microphone'"
+
+  _module_in_cfg 'bluetooth' &&
+    cfgr::item::raw "Bluetooth : $BLUETOOTH_ENABLED" "action:_toggle_module 'bluetooth'"
+
+  _module_in_cfg 'custom/weather' && cfgr::item::bool \
+    --var VIBRANIUM_BAR_WEATHER_MODULE_ENABLE \
+    --label "Weather" \
+    --hook "vb-refresh-waybar-module weather"
+
+  _module_in_cfg 'network' &&
+    cfgr::item::raw "Network : $NETWORK_ENABLED" "action:_toggle_module 'network'"
+
+  _module_in_cfg 'custom/pacman' && cfgr::item::bool \
+    --var VIBRANIUM_BAR_PACMAN_MODULE_ENABLE \
+    --label "Updates" \
+    --hook "vb-refresh-waybar-module pacman"
+
+  _module_in_cfg 'pulseaudio#volume' &&
+    cfgr::item::raw "Volume : $VOLUME_ENABLED" "action:_toggle_module pulseaudio#volume"
+}
+
+cfgr::run "Waybar Modules" "_build" \
+  VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE \
+  VIBRANIUM_BAR_WEATHER_MODULE_ENABLE \
+  VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE \
+  VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE \
+  VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE

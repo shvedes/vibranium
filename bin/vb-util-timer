@@ -1,0 +1,84 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+options=("Seconds" "Minutes" "Hours")
+state="$VIBRANIUM_RUNTIME/vb-timer.remaining"
+ring="/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
+paplay_pid=""
+
+cleanup() {
+  rm -f "$state"
+  vb-refresh-waybar-module timer
+
+  kill $(pgrep -f -- '--who=Timer')
+  kill -s KILL "$paplay_pid" &>/dev/null
+  exit 0
+}
+
+trap cleanup EXIT INT TERM
+
+if pgrep -f -- '--why=Timer' >/dev/null; then
+  cleanup
+fi
+
+while true; do
+  helpers::ui::menu chosen "Set timer for" "ESC to go back" -- "${options[@]}"
+  if [[ -z "$chosen" ]]; then
+    exit 1
+  fi
+
+  if [[ ! " ${options[*]} " == *" $chosen "* ]]; then
+    continue
+  fi
+
+  while true; do
+    prompt="Int, in ${chosen,}"
+    helpers::ui::menu sub_chosen "Set timer" "ESC to go back" -- "$prompt"
+
+    if [[ -z "$sub_chosen" ]]; then
+      break
+    fi
+
+    if [[ ! "$sub_chosen" =~ ^[0-9]+$ ]]; then
+      continue
+    fi
+
+    case "$chosen" in
+    Seconds)
+      sleep_time="$sub_chosen"
+      ;;
+    Minutes)
+      sleep_time=$((sub_chosen * 60))
+      ;;
+    Hours)
+      sleep_time=$((sub_chosen * 3600))
+      ;;
+    esac
+    break 2
+  done
+done
+
+if [[ -z "$sleep_time" ]]; then
+  exit 0
+fi
+
+setsid -f systemd-inhibit --what=idle --why="Sleep is inhibited because of the active timer" --who="Timer" sleep "$sleep_time"
+
+time_remaining=$sleep_time
+while ((time_remaining > 0)); do
+  echo "$time_remaining" >"$state"
+  vb-refresh-waybar-module timer
+  ((time_remaining--))
+  sleep 1 &
+  wait $!
+done
+
+echo "timed out" >"$state"
+vb-refresh-waybar-module timer
+
+while true; do
+  paplay --volume 32500 "$ring" &
+  paplay_pid=$!
+  wait "$paplay_pid"
+done

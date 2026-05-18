@@ -1,0 +1,12 @@
+{
+	"custom/inhibitor": {
+		"format": "{text}",
+		"hide-empty-text": true,
+
+		"exec": "vb-bar-inhibitor",
+		"on-click": "vb-toggle-inhibitor",
+
+		"signal": 3,
+		"return-type": "json"
+	}
+}

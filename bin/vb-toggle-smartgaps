@@ -1,0 +1,50 @@
+#!/usr/bin/bash
+
+FILE="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.lua"
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTION]
+
+Toggle Hyprland smart gaps configuration.
+
+Options:
+  -h, --help   Show this help and exit
+EOF
+}
+
+case "${1:-}" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+esac
+
+if [[ -f "$FILE" ]]; then
+  rm -f "$FILE"
+else
+  shcat >"$FILE" <<EOF
+hl.workspace_rule({
+  workspace = "w[tv1]s[false]",
+  gaps_out = 0,
+  gaps_in = 0,
+})
+
+hl.window_rule({
+  match = {
+    float = false,
+    workspace = "w[tv1]s[false]",
+  },
+  decorate = false
+})
+EOF
+fi
+
+hyprctl -q reload config-only

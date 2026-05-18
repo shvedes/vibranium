@@ -1,0 +1,307 @@
+#!/usr/bin/env bash
+
+source vb-lib-core
+source vb-lib-cfgr
+source vb-lib-hypr
+
+BLUR_SPEC=(
+  "decoration.blur.enabled|bool"
+  "decoration.blur.size|int"
+  "decoration.blur.passes|int"
+  "decoration.blur.contrast|float"
+  "decoration.blur.brightness|float"
+  "decoration.blur.vibrancy|float"
+  "decoration.blur.noise|float"
+)
+
+SHADOW_SPEC=(
+  "decoration.shadow.enabled|bool"
+  "decoration.shadow.render_power|int"
+  "decoration.shadow.range|int"
+  "decoration.shadow.sharp|bool"
+)
+
+DECORATION_SPEC=(
+  "general.border_size|int"
+  "decoration.rounding|int"
+  "decoration.rounding_power|float"
+  "decoration.active_opacity|float"
+  "decoration.inactive_opacity|float"
+  "decoration.fullscreen_opacity|float"
+  "decoration.dim_inactive|bool"
+  "decoration.dim_strength|float"
+  "decoration.dim_modal|bool"
+  "decoration.dim_special|float"
+  "decoration.border_part_of_window|bool"
+)
+
+# ================================================================================ #
+
+_gaps_menu() {
+  _b() {
+    hypr::reload
+
+    local lnf="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua"
+    local gaps_in gaps_out
+
+    if ! gaps_in="$(vb-cmd-edit-wm-config --get 'general:gaps_in' "$lnf")"; then
+      # gaps return their value via .css, not .int — read directly
+      mapfile -t _v < <(
+        hyprctl --batch -j "getoption general.gaps_in; getoption general.gaps_out" |
+        jq -r '.css | split(" ")[0]'
+      )
+
+      gaps_in="${_v[0]}"
+      gaps_out="${_v[1]}"
+    else
+      gaps_out="$(vb-cmd-edit-wm-config --get 'general:gaps_out' "$lnf")"
+    fi
+
+    local smartgaps_enabled
+    if [[ -f "$HYPR_CONF_SMARTGAPS" ]]; then
+      smartgaps_enabled=enabled
+    else
+      smartgaps_enabled=disabled
+    fi
+
+    cfgr::item::action \
+      --label "Gaps in : $gaps_in" \
+      --func "_set_int 'Gaps in' 'Gaps in (int)' int 0 50 'general:gaps_in'"
+
+    cfgr::item::action \
+      --label "Gaps out : $gaps_out" \
+      --func "_set_int 'Gaps out' 'Gaps out (int)' int 0 50 'general:gaps_out'"
+
+    cfgr::item::action --label "Smart gaps : $smartgaps_enabled" --func "vb-toggle-smartgaps"
+  }
+  cfgr::run "Gaps" "_b"
+}
+
+_blur_menu() {
+  _b() {
+    hypr::reload
+    hypr::fetch "${BLUR_SPEC[@]}"
+
+    cfgr::item::action \
+      --label "Enabled : ${HYPR[decoration.blur.enabled]}" \
+      --func "_toggle 'decoration:blur:enabled'"
+
+    if [[ ${HYPR[decoration.blur.enabled]} == true ]]; then
+      cfgr::item::action \
+        --label "Size : ${HYPR[decoration.blur.size]}" \
+        --func "_set_int 'Blur Size' 'Size in pixels (int)' int 1 512 'decoration:blur:size'"
+
+      cfgr::item::action \
+        --label "Noise : ${HYPR[decoration.blur.noise]}" \
+        --func "_set_int 'Blur Noise' 'Noise (float)' float 0.0 1.0 'decoration:blur:noise'"
+
+      cfgr::item::action \
+        --label "Passes : ${HYPR[decoration.blur.passes]}" \
+        --func "_set_int 'Blur Passes' 'Passes (int)' int 1 50 'decoration:blur:passes'"
+
+      cfgr::item::action \
+        --label "Vibrancy : ${HYPR[decoration.blur.vibrancy]}" \
+        --func "_set_int 'Blur Vibrancy' 'Vibrancy (float)' float 0.0 1.0 'decoration:blur:vibrancy'"
+
+      cfgr::item::action \
+        --label "Contrast : ${HYPR[decoration.blur.contrast]}" \
+        --func "_set_int 'Blur Contrast' 'Contrast (float)' float 0.0 2.0 'decoration:blur:contrast'"
+
+      cfgr::item::action \
+        --label "Brightness : ${HYPR[decoration.blur.brightness]}" \
+        --func "_set_int 'Blur Brightness' 'Brightness (float)' float 0.0 2.0 'decoration:blur:brightness'"
+    fi
+  }
+  cfgr::run "Blur" "_b"
+}
+
+_shadow_menu() {
+  _b() {
+    hypr::reload
+    hypr::fetch "${SHADOW_SPEC[@]}"
+
+    cfgr::item::action \
+      --label "Enabled : ${HYPR[decoration.shadow.enabled]}" \
+      --func "_toggle 'decoration:shadow:enabled'"
+
+    if [[ ${HYPR[decoration.shadow.enabled]} == true ]]; then
+      cfgr::item::action \
+        --label "Power : ${HYPR[decoration.shadow.render_power]}" \
+        --func "_set_int 'Shadow Power' 'Shadow power (int)' int 1 4 'decoration:shadow:render_power'"
+
+      cfgr::item::action \
+        --label "Range : ${HYPR[decoration.shadow.range]}" \
+        --func "_set_int 'Shadow Range' 'Shadow range (int)' int 1 128 'decoration:shadow:range'"
+
+      cfgr::item::action \
+        --label "Sharp : ${HYPR[decoration.shadow.sharp]}" \
+        --func "_toggle 'decoration:shadow:sharp'"
+    fi
+  }
+  cfgr::run "Blur" "_b"
+}
+
+_decoration_menu() {
+  _b() {
+    hypr::reload
+    hypr::fetch "${DECORATION_SPEC[@]}"
+
+    cfgr::item::action \
+      --label "Border size : ${HYPR[general.border_size]}" \
+      --func "_set_int 'Border Size' 'Border size (int)' int 0 50 'general:border_size'"
+
+    cfgr::item::action \
+      --label "Border roundness : ${HYPR[decoration.rounding]}" \
+      --func "_edit_roundness"
+
+    cfgr::item::action \
+      --label "Rounding power : ${HYPR[decoration.rounding_power]}" \
+      --func "_set_int 'Rounding Power' 'Rounding power (float)' float 0.0 10.0 'decoration:rounding_power'"
+
+    cfgr::item::action \
+      --label "Active opacity : ${HYPR[decoration.active_opacity]}" \
+      --func "_set_int 'Active Opacity' 'Active opacity (float)' float 0.0 1.0 'decoration:active_opacity'"
+
+    cfgr::item::action \
+      --label "Inactive opacity : ${HYPR[decoration.active_opacity]}" \
+      --func "_set_int 'Inactive Opacity' 'Inactive opacity (float)' float 0.0 1.0 'decoration:inactive_opacity'"
+
+    cfgr::item::action \
+      --label "Fullscreen opacity : ${HYPR[decoration.fullscreen_opacity]}" \
+      --func "_set_int 'Fullscreen Opacity' 'Fullscreen opacity (float)' float 0.0 1.0 'decoration:fullscreen_opacity'"
+
+    cfgr::item::action \
+      --label "Dim inactive window : ${HYPR[decoration.dim_inactive]}" \
+      --func "_toggle 'decoration:dim_inactive'"
+
+    if [[ ${HYPR[decoration.dim_inactive]} == true ]]; then
+      cfgr::item::action \
+        --label "Dim strength : ${HYPR[decoration.dim_strength]}" \
+        --func "_set_int 'Dim strength' 'Inactive dim (float)' float 0.0 1.0 'decoration:dim_strength'"
+    fi
+
+    cfgr::item::action \
+      --label "Dim modal windows : ${HYPR[decoration.dim_modal]}" \
+      --func "_toggle 'decoration:dim_modal'"
+
+    cfgr::item::action \
+      --label "Dim special workspace : ${HYPR[decoration.dim_special]}" \
+      --func "_set_int 'Dim Strength' 'Special workspace' float 0.0 1.0 'decoration:dim_special'"
+
+    cfgr::item::action \
+      --label "Border part of window : ${HYPR[decoration.border_part_of_window]}" \
+      --func "_toggle 'decoration:border_part_of_window'"
+  }
+  cfgr::run "Decoration" "_b"
+}
+
+_anim_submenu() {
+  _b() {
+    hypr::reload
+
+    local chosen active_preset enabled
+
+    enabled="$(hypr::bool "animations.enabled")"
+
+    cfgr::item::action --label "Enabled : $enabled" --func "_toggle 'animations:enabled'"
+
+    if [[ "$enabled" == true ]]; then
+      active_preset="$(readlink "$HYPR_CONF_ANIMATIONS")"
+      active_preset="${active_preset##*/}"; active_preset="${active_preset%.lua}"
+
+      cfgr::item::action --label "Preset : ${active_preset^}" --func "_set_anim_preset"
+    fi
+  }
+  cfgr::run "Animations" "_b"
+}
+
+# ================================================================================ #
+
+_edit_roundness() {
+  local input
+  input="$(cfgr::set_digit --title \
+    "Border Roundness" --hint "Roundness (int)" \
+    --type int --min 0 --max 32
+  )" || return
+
+  hypr::set "decoration:rounding" "$input" "$HYPR_CONF_LAF"
+
+  # Ignore error outputs in case if the user changed these configs
+
+  sed -i "/corner_radius/s/=.*/= $input/"        "$XDG_CONFIG_HOME/dunst/dunstrc" 2>/dev/null
+  sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/rofi/config.rasi" 2>/dev/null
+  sed -i "/border-radius/s/: .*/: ${input}px;/"  "$XDG_CONFIG_HOME/swayosd/style.css" 2>/dev/null
+
+  if ! grep -Pqzo '\*\s*\{[^}]*border-radius\s*:' "$XDG_CONFIG_HOME/gtk-3.0/gtk.css"; then
+    printf '* {\n\tborder-radius: %s;\n}\n' "$input" >> "$XDG_CONFIG_HOME/gtk-3.0/gtk.css"
+  else
+    sed -i '/\*\s*{/,/}/ s/border-radius\s*:\s*[^;]*/border-radius: '"$input"'/' \
+      "$XDG_CONFIG_HOME/gtk-3.0/gtk.css"
+  fi
+
+  vb-refresh-dunst &
+
+  helpers::check VIBRANIUM_GLOBAL_USE_OSD
+  if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+    systemctl --user restart swayosd &
+  fi
+}
+
+_set_anim_preset() {
+  local folder="$VIBRANIUM/default/hypr/animations" chosen
+  local presets=("$folder"/*.lua)
+
+  presets=("${presets[@]##*/}")
+  presets=("${presets[@]%.lua}")
+  presets=("${presets[@]^}")
+
+  local chosen
+  chosen="$(cfgr::set_string --title "Preset" --option "${presets[@]}")" || return
+
+  ln -sf "$folder/${chosen,}.lua" "$HYPR_CONF_ANIMATIONS"
+}
+
+# ================================================================================ #
+
+_set_int() {
+  local prompt="$1"
+  local hint="$2"
+  local _type="$3"
+  local min="$4"
+  local max="$5"
+  local path="$6"
+
+  local input
+  input="$(cfgr::set_digit \
+    --title "$prompt" \
+    --hint "$hint" \
+    --type "$_type" \
+    --min "$min" \
+    --max "$max"
+  )" || return
+
+  hypr::set "$path" "$input" "$HYPR_CONF_LAF"
+}
+
+_set() {
+  local path="$1"
+  local value="$2"
+  hypr::set "$path" "$value" "$HYPR_CONF_LAF"
+}
+
+_toggle() {
+  local path="$1"
+  hypr::toggle "$path" "$HYPR_CONF_LAF"
+}
+
+# ================================================================================ #
+
+_build() {
+  cfgr::item::action --label "Gaps" --func "_gaps_menu"
+  cfgr::item::action --label "Blur" --func "_blur_menu"
+  cfgr::item::action --label "Shadows" --func "_shadow_menu"
+  cfgr::item::action --label "Decoration" --func "_decoration_menu"
+  cfgr::item::action --label "Animations" --func "_anim_submenu"
+}
+
+cfgr::run "Appearance" "_build"

@@ -1,0 +1,177 @@
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION | PROFILE]
+
+Set power profiles in Vibranium.
+
+Options:
+  --next       Next power profile
+  --prev       Previous power profile
+  --get        Get current power profile
+  -q, --quiet  Be quiet (cli and notification)
+
+  [PROFILE]    Set specified profile. Can be power-saver,balanced,performance
+EOF
+}
+
+notify() {
+  local profile="$1"
+  local icon=""
+  local label=""
+
+  if [[ $QUIET == true ]]; then
+    return
+  fi
+
+  case "$profile" in
+  "performance")
+    icon="power-profile-performance-symbolic"
+    label="Performance"
+    ;;
+  "balanced")
+    icon="power-profile-balanced-symbolic"
+    label="Balanced"
+    ;;
+  "power-saver")
+    icon="power-profile-power-saver-symbolic"
+    label="Powersave"
+    ;;
+  esac
+
+  source vb-lib-core
+
+  helpers::check \
+    VIBRANIUM_GLOBAL_USE_OSD \
+    VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE
+
+  # Explicitly send notification when
+  # waybar module is disabled or the waybar is disabled itself.
+  local module_enabled="$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
+
+  if ! systemctl -q --user is-active waybar || [[ ! $module_enabled == "true" ]]; then
+    if [[ $VIBRANIUM_GLOBAL_USE_OSD == "true" ]]; then
+      swayosd-client --custom-message "$label" --custom-icon "$icon"
+    else
+      notify-send -r 3 -t 1500 "Power Management" "Power profile set to <b>${label,,}</b>"
+    fi
+  fi
+
+}
+
+get_power_profile() {
+  local state_file="$VIBRANIUM_STATE/power-profile"
+
+  if [[ -f "$state_file" ]]; then
+    local state
+    state="$(<"$state_file")"
+    printf "%s" "$state"
+    return
+  fi
+
+  # Update state file if it doesn't exists
+  local curr_profile
+  curr_profile="$(powerprofilesctl get)"
+  printf "%s" "$curr_profile" >"$state_file"
+  printf "%s" "$curr_profile"
+}
+
+set_power_profile() {
+  local target="$1"
+  local state="$VIBRANIUM_STATE/power-profile"
+
+  powerprofilesctl set "$target" &
+
+  # Update cache
+  echo "$target" >"$state"
+}
+
+ACTION="next"
+QUIET="false"
+SELF="${0##*/}"
+
+while (($# > 0)); do
+  case "$1" in
+  -q | --quiet)
+    QUIET=true
+    shift
+    ;;
+  --next | --prev)
+    ACTION="${1/--/}"
+    shift
+    ;;
+  power-saver | balanced | performance)
+    TARGET_PROFILE="$1"
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --get)
+    get_power_profile
+    exit 0
+    ;;
+  "")
+    ACTION="next"
+    shift
+    ;;
+  -*)
+    echo "Unknown option: $*" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  *)
+    echo "Unknown profile: $1" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if ! command -v powerprofilesctl >/dev/null; then
+  echo "Error: missing required dependencies: power-profiles-daemon"
+  vb-cmd-dep-notify --name "Power Management" --deps "power-profiles-daemon"
+  exit 1
+fi
+
+PROFILES=("power-saver" "balanced" "performance")
+CURRENT="$(get_power_profile)"
+
+if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
+  current_index=0
+
+  for i in "${!PROFILES[@]}"; do
+    if [[ "${PROFILES[$i]}" == "$CURRENT" ]]; then
+      current_index=$i
+      break
+    fi
+  done
+
+  case "$ACTION" in
+  "next")
+    next_index=$(((current_index + 1) % ${#PROFILES[@]}))
+    ;;
+  "prev")
+    next_index=$(((current_index - 1 + ${#PROFILES[@]}) % ${#PROFILES[@]}))
+    ;;
+  esac
+
+  TARGET_PROFILE="${PROFILES[$next_index]}"
+
+  if [[ $QUIET == false ]]; then
+    echo "$TARGET_PROFILE"
+  fi
+fi
+
+set_power_profile "$TARGET_PROFILE"
+vb-refresh-waybar-module power-profile &
+
+notify "$TARGET_PROFILE"

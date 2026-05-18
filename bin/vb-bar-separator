@@ -1,0 +1,28 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+show() {
+  printf '{"text": "|"}'
+  exit 0
+}
+
+if systemctl -q --user is-active vibranium-inhibit@{sleep,idle}; then
+  show
+fi
+
+paths=(
+  "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua"
+  "$VIBRANIUM_RUNTIME/password-manager.action"
+  "$VIBRANIUM_RUNTIME/vb-timer.remaining"
+  "$VIBRANIUM_STATE/update.available"
+  "$VIBRANIUM_RUNTIME/confirm-kill"
+)
+
+for p in "${paths[@]}"; do
+  if [[ -e "$p" ]]; then
+    show
+  fi
+done
+
+printf '{"text": ""}'

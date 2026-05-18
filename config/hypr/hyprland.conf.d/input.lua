@@ -1,0 +1,101 @@
+-- Full documentation:
+-- https://wiki.hypr.land/Configuring/Basics/Variables/#input
+
+-- ###########################################################################
+-- BASIC SYNTAX
+-- ###########################################################################
+--
+-- hl.config({
+--   input = {
+--     kb_layout = "us,fr,es",
+--     kb_options = "grp:win_space_toggle,caps:escape",
+--     follow_mouse = 0,
+--     sensitivity = 0,
+--     accel_profile = "flat",
+--   },
+-- })
+--
+-- ###########################################################################
+-- KEYBOARD LAYOUT
+-- ###########################################################################
+--
+-- To see available layouts:
+-- - run: localectl list-x11-keymap-layouts
+-- - or check: /usr/share/X11/xkb/rules/evdev.lst
+--
+-- Example:
+--
+-- kb_layout = "us,fr,es"
+--
+-- Switch layout with:
+--
+-- kb_options = "grp:win_space_toggle,caps:escape"
+--
+-- ###########################################################################
+-- MOUSE FOCUS BEHAVIOR
+-- ###########################################################################
+--
+-- follow_mouse controls how focus follows the cursor:
+--
+-- 0 - Cursor does not affect focus
+-- 1 - Focus always follows cursor
+-- 2 - Cursor and keyboard focus are loosely linked
+--     Clicking updates keyboard focus
+-- 3 - Cursor and keyboard focus are fully independent
+--     Clicking does NOT change keyboard focus
+--
+-- ###########################################################################
+-- SENSITIVITY
+-- ###########################################################################
+--
+-- sensitivity = 0
+--
+-- Range:
+-- -1  -> lowest
+--  0  -> default
+--  1  -> highest
+--
+-- ###########################################################################
+-- ACCELERATION PROFILE
+-- ###########################################################################
+--
+-- accel_profile = "flat"
+--
+-- Available modes:
+-- - "flat"     -> no acceleration
+-- - "adaptive" -> dynamic acceleration
+-- - "custom"   -> fully manual curve
+--
+-- Example custom profile:
+--
+-- accel_profile = "custom 200 0.0 0.5"
+--
+-- Where:
+-- - 200   = step
+-- - 0.0   = first point
+-- - 0.5   = second point
+--
+-- ###########################################################################
+-- PER-DEVICE CONFIGURATION
+-- ###########################################################################
+--
+-- Full docs:
+-- https://wiki.hypr.land/Configuring/Advanced-and-Cool/Devices
+--
+-- hl.device({
+--   name = "my-cool-mouse",
+--   sensitivity = -0.5,
+-- })
+--
+-- To get device names:
+--   hyprctl devices
+--
+-- ###########################################################################
+--
+-- hl.config({
+--   input = {
+--     sensitivity = (os.getenv("hostname") == "laptop") and -0.3 or 0,
+--   },
+-- })
+--
+-- ###########################################################################

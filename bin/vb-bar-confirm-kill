@@ -1,0 +1,7 @@
+#!/usr/bin/bash
+
+if [[ -f "$VIBRANIUM_RUNTIME/confirm-kill" ]]; then
+  printf '{"text": "%s", "tooltip": "%s"}' "\uee15" "Confirm force kill"
+else
+  printf '{"text": ""}'
+fi

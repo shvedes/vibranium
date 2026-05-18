@@ -1,0 +1,74 @@
+#!/usr/bin/bash
+
+SELF="${0##*/}"
+LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTIONS]
+
+Open / close rofi-based calculator.
+
+Options:
+  -h, --help Show this help and exit
+EOF
+}
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+--* | -*)
+  echo "Error: unknown option: '$1'" >&2
+  echo "Try '$SELF --help' for more information" >&2
+  exit 1
+  ;;
+*)
+  echo "Ignoring input '$*'"
+  ;;
+esac
+
+exec 9>"$LOCKFILE"
+
+# Killswitch
+if ! flock -n 9; then
+  pkill -f "rofi.*-show calc" 2>/dev/null
+  exit 0
+fi
+
+if [[ ! -f /usr/lib/rofi/libcalc.so ]]; then
+  echo "error: missing required dependencies: rofi-calc"
+  [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Calculator" --deps "rofi-calc"
+  exit 1
+fi
+
+theme_str="$(
+  shcat <<EOF
+window {
+    width: 30%;
+}
+entry {
+    placeholder: ' expression';
+}
+listview, num-rows, textbox-num-sep, num-filtered-rows {
+    enabled: false;
+}
+EOF
+)"
+
+rofi \
+  -no-sort \
+  -lines 0 \
+  -show calc \
+  -modi calc \
+  -no-history \
+  -no-show-match \
+  -theme-str "$theme_str" \
+  -calc-command "echo -n '{result}' | wl-copy"

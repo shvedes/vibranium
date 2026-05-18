@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+
+WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"
+
+_toggle_waybar() {
+  case "$ENABLED" in
+    "true")
+      systemctl --user disable --now waybar &
+      ENABLED=false
+      ;;
+    "false")
+      systemctl --user enable --now waybar &
+      ENABLED=true
+      ;;
+  esac
+}
+
+_set_spacing() {
+  local input
+  input="$(cfgr::set_digit \
+    --title "Icon Spacing" \
+    --hint  "Spacing (in pixels)" \
+    --type  int \
+    --min   -6 \
+    --max   16)" || return
+  sed -i -E "s/(\"spacing\"\s*:\s*)-?[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
+  systemctl -q --user restart waybar &
+}
+
+_set_height() {
+  local input
+  input="$(cfgr::set_digit \
+    --title "${POSITION^} bar height" \
+    --hint  "Height (in pixels)" \
+    --type  int \
+    --min   26 \
+    --max   100)" || return
+  sed -i -E "s/(\"height\"\s*:\s*)[0-9]+/\1${input}/" "$WAYBAR_CONFIG"
+  systemctl -q --user restart waybar &
+}
+
+_set_position() {
+  case "$POSITION" in
+    top)    vb-cmd-waybar-position --bottom ;;
+    bottom) vb-cmd-waybar-position --top ;;
+  esac
+}
+
+_build() {
+  if [[ ! -n $ENABLED ]]; then
+    if systemctl -q --user is-active waybar; then
+      ENABLED=true
+    else
+      ENABLED=false
+    fi
+  fi
+
+  eval "$(sed -n \
+      -e 's/.*"position"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/POSITION=\1/p' \
+      -e 's/.*"height"[[:space:]]*:[[:space:]]*\([^,]*\).*/HEIGHT=\1/p' \
+      -e 's/.*"spacing"[[:space:]]*:[[:space:]]*\([^,]*\).*/SPACING=\1/p' \
+      "$WAYBAR_CONFIG")"
+
+  cfgr::item::raw "Enabled : $ENABLED" "action:_toggle_waybar"
+
+  if [[ "$ENABLED" == true ]]; then
+    [[ -n "$POSITION" ]] && cfgr::item::raw "Position : $POSITION" "action:_set_position"
+    [[ -n "$SPACING" ]] && cfgr::item::raw "Spacing : $SPACING" "action:_set_spacing"
+    [[ -n "$HEIGHT" ]] && cfgr::item::raw "Height : $HEIGHT" "action:_set_height"
+
+    cfgr::item::action \
+      --func  "waybar-toggle-modules" \
+      --label "Toggle modules"
+
+    cfgr::item::action \
+      --func  "cfgr-waybar-module" \
+      --label "Module settings"
+  fi
+}
+
+cfgr::run "Waybar" "_build"

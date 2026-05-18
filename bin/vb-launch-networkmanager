@@ -1,0 +1,63 @@
+#!/usr/bin/bash
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTION]
+
+Launch GUI / TUI for the active network manager.
+
+Options:
+  -h, --help  Display this help and exit
+EOF
+}
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+"") ;;
+*)
+  echo "Error: invalid option '$1'" >&2
+  echo "Try '$SELF --help' for more information." >&2
+  exit 1
+  ;;
+esac
+
+# Detect primary network interface utility
+if command -v nmtui >/dev/null 2>&1; then
+  vb-launch-tui --app-id=org.vb.term.float -- nmtui
+  exit 0
+elif command -v iwctl >/dev/null 2>&1; then
+  if command -v impala >/dev/null 2>&1; then
+    vb-launch-tui --app-id=org.vb.term.float -- impala
+    exit 0
+  elif command -v iwmenu >/dev/null 2>&1; then
+    vb-launch-cmd -- iwmenu
+    exit 0
+  elif command -v iwgtk >/dev/null 2>&1; then
+    vb-launch-cmd -- iwgtk
+    exit 0
+  else
+    vb-launch-tui --app-id=org.vb.term.float -- iwctl
+    exit 0
+  fi
+fi
+
+if systemctl -q is-active systemd-networkd; then
+  msg="'<i>systemd-networkd</i>' doesn't provide a TUI frontend. Use CLI instead.\n"
+  msg+="See '<i>networkctl --help</i>' for more info"
+else
+  msg="Network manager provider not found"
+fi
+
+notify-send -r 1 -t 10000 "Vibranium - Networking" "$msg"
+exit 1

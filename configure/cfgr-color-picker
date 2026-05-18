@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+
+_build() {
+  cfgr::item::bool \
+    --var VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW \
+    --label "Show HEX preview"
+
+  command -v magick >/dev/null && cfgr::item::bool \
+    --var VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR \
+    --label "Prevew in notification"
+}
+
+cfgr::run "Color Picker" "_build" \
+  VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR \
+  VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW

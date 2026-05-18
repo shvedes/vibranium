@@ -1,0 +1,113 @@
+#!/usr/bin/bash
+
+SELF="${0##*/}"
+CLIENTS=(ncmpcpp rmpc cmus vimpc)
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTIONS]
+
+Detect an installed MPD client.
+If a window exists, focus it. Otherwise launch it.
+
+Arguments:
+  CLIENT      Optional: force specific client (ncmpcpp, rmpc, cmus, vimpc)
+
+Options:
+  --client    Explicitly set client
+  -h, --help  Display this help and exit
+EOF
+}
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+"") ;;
+*)
+  # if not option, treat as possible client override
+  if [[ "$1" != -* ]]; then
+    REQUESTED_CLIENT="$1"
+    shift
+  fi
+  ;;
+esac
+
+if ! command -v mpd >/dev/null; then
+  echo "Error: MPD is not installed" >&2
+  exit 1
+fi
+
+CLIENT=""
+REQUESTED_CLIENT=""
+
+case "$1" in
+-h | --help)
+  usage
+  exit 0
+  ;;
+--client=*)
+  REQUESTED_CLIENT="${1#*=}"
+  shift
+  ;;
+--client*)
+  shift
+  REQUESTED_CLIENT="$1"
+  ;;
+"") ;;
+*)
+  echo "Error: unknown option -- $*" >&2
+  echo "Try '$SELF --help' for more information." >&2
+  exit 1
+  ;;
+esac
+
+# If user requested specific client, validate it
+if [[ -n "$REQUESTED_CLIENT" ]]; then
+  if command -v "$REQUESTED_CLIENT" >/dev/null 2>&1; then
+    CLIENT="$REQUESTED_CLIENT"
+  else
+    echo "Error: '$REQUESTED_CLIENT' is not installed" >&2
+    exit 1
+  fi
+else
+  for c in "${CLIENTS[@]}"; do
+    if command -v "$c" >/dev/null 2>&1; then
+      CLIENT="$c"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$CLIENT" ]]; then
+  [[ -t 2 ]] && echo "Could not find installed MPD client" >&2
+  notify-send -r 4 -t 3000 "Vibranium" "Could not find installed MPD client!"
+  exit 1
+fi
+
+WINDOW_ADDRESS="$(
+  jq -r --arg p "$CLIENT" '
+    first(
+      .[]
+      | select(
+          (.class | test("\\b" + $p + "\\b"; "i"))
+          or
+          (.title | test("\\b" + $p + "\\b"; "i"))
+        )
+      | .address
+    )
+  ' < <(hyprctl clients -j)
+)"
+
+if [[ -n "$WINDOW_ADDRESS" ]]; then
+  hyprctl -q dispatch "hl.dsp.focus({window = 'address:${WINDOW_ADDRESS}'})"
+else
+  xdg-terminal-exec --app-id=mpd --title="$CLIENT" -- "$CLIENT"
+fi

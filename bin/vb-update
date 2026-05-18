@@ -1,0 +1,168 @@
+#!/usr/bin/bash
+
+set -euo pipefail
+
+source vb-lib-core
+
+# Always restore cursor on exit, regardless of how we exit
+trap 'term::enable_input' EXIT
+
+_pause() {
+  # shellcheck disable=SC2034
+  read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to exit' dummy
+}
+
+_fail() {
+  echo -e "${RED}[VIBRANIUM]${RESET} $1" >&2
+  _pause
+  exit 1
+}
+
+_check_and_stash() {
+  if ! git -C "$VIBRANIUM" diff --quiet HEAD ||
+    ! git -C "$VIBRANIUM" diff --cached --quiet ||
+    [[ -n "$(git -C "$VIBRANIUM" ls-files --others --exclude-standard)" ]]; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Stashing local changes..."
+
+    if ! git -C "$VIBRANIUM" stash push --include-untracked -m "autostash before update" -q; then
+      _fail "Failed to stash local changes."
+    fi
+
+    stashed=true
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Local changes stashed"
+  else
+    echo -e "${GREEN}[VIBRANIUM]${RESET} No local changes to stash"
+  fi
+}
+
+_apply_stash() {
+  if [[ "$stashed" == true ]]; then
+    if ! git -C "$VIBRANIUM" stash apply -q; then
+      _fail "Stash apply failed due to conflicts. Please resolve manually."
+    fi
+
+    git -C "$VIBRANIUM" stash drop -q
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Stash applied"
+  fi
+}
+
+_restore_stash_and_fail() {
+  local msg="$1"
+  if [[ "$stashed" == true ]]; then
+    git -C "$VIBRANIUM" stash pop -q || true
+  fi
+  _fail "$msg"
+}
+
+_update() {
+  local channel
+  # stashed must not be local so _check_and_stash and _apply_stash can share it
+  stashed=false
+
+  if [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
+    channel="$(<"$VIBRANIUM_STATE/update.channel")"
+  else
+    channel="$(git -C "$VIBRANIUM" branch --show-current)"
+  fi
+
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Getting updates from remote..."
+  if ! git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags; then
+    _fail "Failed to fetch updates. Check your network or repository permissions."
+  fi
+
+  if [[ "$channel" == "release" ]]; then
+    local latest_tag current_tag latest_commit current_commit
+
+    latest_tag=$(git -C "$VIBRANIUM" tag --sort=-creatordate | head -n 1)
+
+    # Use ^{} to dereference annotated tags to their underlying commit,
+    # so the comparison against HEAD (always a commit hash) is valid
+    latest_commit=$(git -C "$VIBRANIUM" rev-parse "${latest_tag}^{}")
+    current_commit=$(git -C "$VIBRANIUM" rev-parse HEAD)
+    current_tag=$(git -C "$VIBRANIUM" describe --tags --exact-match 2>/dev/null ||
+      git -C "$VIBRANIUM" rev-parse --short HEAD)
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Local:  $current_tag ($current_commit)"
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Remote: $latest_tag ($latest_commit)"
+
+    if [[ "$current_commit" == "$latest_commit" ]]; then
+      echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date"
+      rm -f "$VIBRANIUM_STATE/update.available" || true
+      vb-refresh-waybar-module vb-update
+      _pause
+      exit 0
+    fi
+
+    _check_and_stash
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Updating to ${latest_tag}..."
+    if ! git -C "$VIBRANIUM" checkout -q "$latest_tag"; then
+      _restore_stash_and_fail "Failed to checkout $latest_tag."
+    fi
+
+    _apply_stash
+
+    vb-update-migrate
+
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $latest_tag"
+
+  else
+    local remote_commit current_commit remote_short current_short behind
+
+    remote_commit=$(git -C "$VIBRANIUM" rev-parse origin/master)
+    remote_short=$(git -C "$VIBRANIUM" rev-parse --short origin/master)
+    current_commit=$(git -C "$VIBRANIUM" rev-parse HEAD)
+    current_short=$(git -C "$VIBRANIUM" rev-parse --short HEAD)
+    behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/master --count)
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Local:  $current_short ($current_commit)"
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Remote: $remote_short ($remote_commit)"
+
+    if [[ "$behind" -eq 0 ]]; then
+      if [[ "$current_commit" == "$remote_commit" ]]; then
+        echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date"
+      else
+        local ahead
+        ahead=$(git -C "$VIBRANIUM" rev-list origin/master..HEAD --count)
+        echo -e "${GREEN}[VIBRANIUM]${RESET} You are $ahead commit(s) ahead of remote, nothing to pull"
+      fi
+      rm -f "$VIBRANIUM_STATE/update.available" || true
+      vb-refresh-waybar-module vb-update
+      _pause
+      exit 0
+    fi
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} $behind new commit(s) available"
+
+    _check_and_stash
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Updating to latest upstream..."
+
+    # We already fetched, so merge rather than pull to avoid a second fetch
+    if ! git -C "$VIBRANIUM" merge --ff-only origin/master -q; then
+      _restore_stash_and_fail "Failed to merge upstream changes."
+    fi
+
+    _apply_stash
+
+    vb-update-migrate
+
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $remote_short"
+  fi
+
+  vb-cmd-reload --quiet
+  _pause
+}
+
+term::show_header
+term::disable_input
+
+if term::ask_yes_no Y "Proceed with update?"; then
+  _update
+  rm -f "$VIBRANIUM_STATE/update.available" || true
+  vb-refresh-waybar-module vb-update
+else
+  echo -e "${RED}[VIBRANIUM]${RESET} Operation aborted"
+  _pause
+  exit 1
+fi

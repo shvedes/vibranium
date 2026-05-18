@@ -1,0 +1,243 @@
+-- Full documentation:
+-- https://wiki.hypr.land/Configuring/Basics/Window-Rules/
+
+-- ###########################################################################
+-- BASIC IDEA
+-- ###########################################################################
+--
+-- Window rules define how specific windows should behave
+-- based on their properties (class, title, tags, etc).
+--
+-- Common use cases:
+-- - Force apps to float
+-- - Send apps to specific workspaces
+-- - Resize / move windows automatically
+-- - Disable blur / animations for certain apps
+--
+-- ###########################################################################
+-- BASIC SYNTAX
+-- ###########################################################################
+--
+-- hl.window_rule({
+--   match = {
+--     class = "my-app",
+--   },
+--   float = true,
+-- })
+--
+-- Optional name (useful for debugging / organization):
+--
+-- hl.window_rule({
+--   name = "float-my-app",
+--   match = { class = "my-app" },
+--   float = true,
+-- })
+--
+-- ###########################################################################
+-- HOW IT WORKS
+-- ###########################################################################
+--
+-- A rule has 2 parts:
+--
+-- 1. match (conditions)
+-- 2. effects (what to apply)
+--
+-- All match fields must pass.
+-- If they do, effects are applied.
+--
+-- Rules are evaluated from top to bottom.
+-- Multiple rules can affect the same window.
+--
+-- ###########################################################################
+-- MATCH (CONDITIONS)
+-- ###########################################################################
+--
+-- Example:
+--
+-- match = {
+--   class = "firefox",
+--   title = ".*YouTube.*",
+-- }
+--
+-- Notes:
+-- - Most fields support regex
+-- - Common fields: class, title, initialClass, initialTitle, tag
+--
+-- ###########################################################################
+-- EFFECTS
+-- ###########################################################################
+--
+-- Examples:
+--
+-- float = true
+-- workspace = "3"
+-- size = "800 600"
+-- move = "100 100"
+-- center = true
+--
+-- You can combine multiple effects in one rule.
+--
+-- ###########################################################################
+-- STATIC VS DYNAMIC RULES
+-- ###########################################################################
+--
+-- Static:
+-- - Applied once on window creation
+-- - Example: workspace, float, move, size
+--
+-- Dynamic:
+-- - Re-evaluated when window state changes
+-- - Example: opacity, blur rules, focus-related behavior
+--
+-- ###########################################################################
+-- EXPRESSIONS (MOVE / SIZE)
+-- ###########################################################################
+--
+-- You can use expressions:
+--
+-- move = "(monitor_w*0.5) (monitor_h*0.5)"
+-- size = "(monitor_w*0.5) (monitor_h*0.5)"
+--
+-- Available variables include:
+-- monitor_w, monitor_h, window_w, window_h, cursor_x, cursor_y
+--
+-- ###########################################################################
+-- EXAMPLES
+-- ###########################################################################
+--
+-- Float and center pavucontrol:
+--
+-- hl.window_rule({
+--   match = { class = "pavucontrol" },
+--   float = true,
+--   size = "800 500",
+--   center = true,
+-- })
+--
+--
+-- Open Firefox on workspace 2:
+--
+-- hl.window_rule({
+--   match = { class = "firefox" },
+--   workspace = "2",
+-- })
+--
+--
+-- Disable blur for mpv:
+--
+-- hl.window_rule({
+--   match = { class = "mpv" },
+--   no_blur = true,
+-- })
+--
+--
+-- Match multiple conditions:
+--
+-- hl.window_rule({
+--   match = {
+--     class = "firefox",
+--     title = ".*Picture-in-Picture.*",
+--   },
+--   float = true,
+--   pin = true,
+-- })
+--
+-- ###########################################################################
+-- LAYER RULES (SPECIAL CASE)
+-- ###########################################################################
+--
+-- Some UI elements (launchers, overlays, etc) are "layers", not normal windows.
+--
+-- Use hl.layer_rule for them:
+--
+-- hl.layer_rule({
+--   match = { namespace = "rofi" },
+--   no_anim = true,
+-- })
+--
+-- Full docs:
+-- https://wiki.hypr.land/Configuring/Window-Rules/#layer-rules
+--
+-- ###########################################################################
+-- VIBRANIUM TAGS (PREDEFINED GROUPS)
+-- ###########################################################################
+--
+-- Vibranium provides predefined tags to group windows.
+--
+-- Examples:
+--   gameWindow     - most (Proton) games
+--   officeWindow   - LibreOffice, Obsidian, PDF viewers
+--   gameLauncher   - Steam, Heroic, Lutris, PrismLauncher
+--   browserWindow  - most popular browsers
+--
+-- These tags DO NOT apply rules by themselves.
+-- They only help you target groups of apps.
+--
+-- Example usage:
+--
+-- hl.window_rule({
+--   match = { tag = "officeWindow" },
+--   workspace = "2",
+-- })
+--
+-- hl.window_rule({
+--   match = { tag = "browserWindow" },
+--   workspace = "3",
+-- })
+--
+-- hl.window_rule({
+--   match = { tag = "gameLauncher" },
+--   workspace = "9",
+-- })
+--
+-- hl.window_rule({
+--   match = { tag = "gameWindow" },
+--   workspace = "10",
+-- })
+--
+-- ###########################################################################
+-- SPECIAL INTERACTIVE WINDOWS
+-- ###########################################################################
+--
+-- Vibranium applies special handling for windows that require user attention:
+--
+-- Examples:
+-- - Confirmation dialogs
+-- - "Save file" prompts
+-- - Password / polkit dialogs
+-- - File deletion dialogs
+--
+-- Behavior:
+-- - Open as floating
+-- - Red border
+-- - Background dimmed
+--
+-- Similar to UAC dialogs on Windows.
+--
+-- ###########################################################################
+-- AUTO-FOCUS BEHAVIOR
+-- ###########################################################################
+--
+-- Some apps automatically regain focus when needed.
+--
+-- Includes:
+-- - Windows with the browserWindow tag
+-- - Apps like Discord, Spotify, etc (URI-based workflows)
+--
+-- Reason:
+-- Some workflows depend on focus returning to the original app.
+--
+-- Example:
+-- - Login via browser
+-- - Original app regains focus after completion
+--
+-- ###########################################################################
+-- IMPORTANT NOTES
+-- ###########################################################################
+--
+-- - Rules are evaluated from top to bottom
+-- - All match conditions must pass
+-- - Static rules run once, dynamic rules update over time
+-- - Multiple rules can stack
+--
+-- ###########################################################################

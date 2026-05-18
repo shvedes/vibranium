@@ -1,0 +1,147 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+helpers::check \
+  VIBRANIUM_BAR_WEATHER_MODULE_ENABLE \
+  VIBRANIUM_BAR_SHOW_ANIMATION
+
+if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_ENABLE" == false ]]; then
+  printf '{"text": ""}'
+  exit 0
+fi
+
+# Waybar is launched via systemd, so ideally we get its PID
+# via a systemctl call (this is also slightly faster than calling pidof).
+WAYBAR_PID="$(systemctl --user show waybar -p MainPID --value)"
+
+if ((WAYBAR_PID == 0)); then
+  # Not launched via systemd or inactive.
+  # Try to get with pidof instead.
+  WAYBAR_PID="$(pidof waybar)"
+
+  # If empty - the process doesn't exist.
+  if [[ -z "$WAYBAR_PID" ]]; then
+    if ! term::is_headless; then
+      log::error "Waybar isn't active!"
+      exit 1
+    fi
+  fi
+fi
+
+if ! command -v wttrbar >/dev/null; then
+  # If executed from a terminal
+  if ! term::is_headless; then
+    log::error "Missing required dependencies: wttrbar"
+    log::error "To install, run 'yay -S wttrbar'"
+    exit 1
+  fi
+
+  text="<span foreground='${P_RED}'>\uf071</span>"
+  text+="  <span foreground='DimGray'>|</span>"
+  tooltip="Missing required dependencies: wttrbar"
+
+  printf '{"text": "%s", "tooltip": "%s"}' "$text" "$tooltip"
+
+  # Exit with code 0.
+  # Otherwise Waybar won't display json string
+  exit 0
+fi
+
+_set_city() {
+  local opt city
+
+  opt="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
+  city="$(curl -s --max-time 5 http://ip-api.com/json | jq -r '.city')" || return
+
+  # Verify and populate user settings file
+  if ! grep -qE "$opt" "$VIBRANIUM_USER_SETTINGS"; then
+    echo "${opt}=${city}" >>"$VIBRANIUM_USER_SETTINGS"
+  else
+    sed -i "s|^${opt}=.*|${opt}=\"${city}\"|" "$VIBRANIUM_USER_SETTINGS"
+  fi
+
+  notify-send -r 3 -t 7000 "Vibranium - Weather Monitoring" "Monitoring weather in $city"
+}
+
+_wait_for_connection() {
+  while ! ping -c 1 1.1.1.1 &>/dev/null; do
+    sleep 1
+  done
+}
+
+marker="${VIBRANIUM_RUNTIME}/bar.weather.pid.${WAYBAR_PID}"
+
+if [[ "$VIBRANIUM_BAR_SHOW_ANIMATION" == false ]]; then
+  show_spinner=false
+else
+  if [[ -f "$marker" ]]; then
+    show_spinner=false
+  else
+    show_spinner=true
+
+    # Remove old markers
+    rm -f "${marker%.*}".*
+
+    # Create new one
+    : >"$marker"
+  fi
+fi
+
+_wait_for_connection &
+connection_pid=$!
+
+if [[ "$show_spinner" == true ]]; then
+  helpers::bar::spinner "Waiting for the internet connection..." $connection_pid
+else
+  wait $connection_pid
+fi
+
+if [[ "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" == "not_set" ]]; then
+  _set_city &
+  set_city_pid=$!
+
+  if [[ "$show_spinner" == "true" ]]; then
+    helpers::bar::spinner "Getting your location..." $set_city_pid
+  else
+    wait $set_city_pid
+  fi
+
+  # Read the settings file with the updated city for monitoring
+  source "$VIBRANIUM_USER_SETTINGS"
+fi
+
+TEMP_DATA="$VIBRANIUM_RUNTIME/bar.weather.json"
+
+wttrbar --location "$VIBRANIUM_BAR_WEATHER_MODULE_CITY" >"$TEMP_DATA" 2>/dev/null &
+pid=$!
+
+if [[ "$show_spinner" == "true" ]]; then
+  helpers::bar::spinner "Fetching weather..." $pid
+else
+  # Wait for pid (if no animation used)
+  wait $pid
+fi
+
+WEATHER_JSON="$(<"$TEMP_DATA")"
+
+if [[ -z "$WEATHER_JSON" ]]; then
+  icon="<span foreground='${P_RED}'>\uf071</span>"
+  icon+="  <span foreground='${P_GRAY}'>|</span>"
+
+  tooltip="wttrbar exited with an error"
+  printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
+  exit 0
+fi
+
+# Build json output
+text="$(jq -r '.text' <<<"$WEATHER_JSON")"
+text+=" <span foreground='${P_GRAY}'>|</span>"
+tooltip="$(jq -r '.tooltip' <<<"$WEATHER_JSON")"
+
+rm -f "$TEMP_DATA" /tmp/wttrbar*
+
+jq -nc \
+  --arg text "$text" \
+  --arg tooltip "$tooltip" \
+  '{text: $text, tooltip: $tooltip}'

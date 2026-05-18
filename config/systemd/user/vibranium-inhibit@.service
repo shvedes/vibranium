@@ -1,0 +1,7 @@
+[Unit]
+Description=Vibranium Inhibit (%i)
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/systemd-inhibit --what=%i --who=Vibranium --why="Manual inhibition (%i)" /usr/bin/sleep infinity
+Restart=always

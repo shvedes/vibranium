@@ -1,0 +1,2 @@
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd*", SUBSYSTEMS=="usb", RUN+="/usr/local/bin/vb-usb-notify add"
+ACTION=="remove", SUBSYSTEM=="block", KERNEL=="sd*", SUBSYSTEMS=="usb", RUN+="/usr/local/bin/vb-usb-notify remove"

@@ -1,0 +1,75 @@
+#!/usr/bin/bash
+
+# shellcheck disable=SC2329
+
+_has_line() {
+  local pattern="$1" file="$2" line
+  [[ -f "$file" ]] || return 1
+
+  while IFS= read -r line; do
+    if [[ "$line" == *"$pattern"* ]]; then
+      return 0
+    fi
+  done <"$file"
+
+  return 1
+}
+
+_build_apps() {
+  local spicetify_file="$XDG_CONFIG_HOME/spicetify/config-xpui.ini"
+  local chromium_file="$XDG_CONFIG_HOME/chromium-flags.conf"
+
+  _b() {
+    if command -v chromium >/dev/null; then
+      if _has_line "oauth2-client-id" "$chromium_file"; then
+        cfgr::item::action \
+          --icon vb-tools \
+          --label "Disable Chromium sync" \
+          --func "vb-tweak-chromium disable; helpers::ui::close_menus"
+      else
+        cfgr::item::action \
+          --icon vb-tools \
+          --label "Enable Chromium sync" \
+          --func "vb-tweak-chromium enable; helpers::ui::close_menus"
+      fi
+    fi
+
+    if command -v spicetify >/dev/null; then
+      if _has_line "adblock" "$spicetify_file"; then
+        cfgr::item::action \
+          --icon vb-tools \
+          --label "Remove Spotify adblock" \
+          --func "vb-tweak-spotify remove; helpers::ui::close_menus"
+      else
+        cfgr::item::action \
+          --icon vb-tools \
+          --label "Install Spotify adblock" \
+          --func "vb-tweak-spotify install; helpers::ui::close_menus"
+      fi
+    fi
+  }
+  cfgr::run "App Tweaks" "_b"
+}
+
+_build_system() {
+  _b() {
+    if [[ "$(sysctl -n kernel.core_pattern)" == "|/bin/false" ]]; then
+      local action="Enable"
+    else
+      local action="Disable"
+    fi
+
+    cfgr::item::action \
+      --icon vb-tools \
+      --label "$action systemd coredump" \
+      --func "vb-tweak-coredump; helpers::ui::close_menus"
+  }
+  cfgr::run "System Tweaks" "_b"
+}
+
+_build() {
+  cfgr::item::action --label "App tweaks" --func "_build_apps" --icon vb-tools
+  cfgr::item::action --label "System tweaks" --func "_build_system" --icon vb-tools
+}
+
+cfgr::run "Tweaks" "_build"

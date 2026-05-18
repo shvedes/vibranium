@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+
+source vb-lib-hypr
+
+_edit_cfgs_menu() {
+  _open() {
+    xdg-terminal-exec -- "${EDITOR:-nvim}" "$1"
+    helpers::ui::close_menus
+  }
+
+  _b() {
+    local monitors="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua"
+    local rules="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.lua"
+    local binds="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.lua"
+    local input="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua"
+
+    cfgr::item::action --label "Window Rules" --func "_open $rules" --icon vb-code
+    cfgr::item::action --label "Keybindings" --func "_open $binds" --icon vb-keyboard
+    cfgr::item::action --label "Monitors" --func "_open $monitors" --icon vb-monitor
+    cfgr::item::action --label "Input" --func "_open $input" --icon vb-mouse
+  }
+  cfgr::run "Edit Configs" "_b"
+}
+
+_build() {
+  cfgr::item::action --label "Input" --func "cfgr-wm-input" --icon vb-keyboard
+  cfgr::item::action --label "Advanced" --func "cfgr-wm-advanced" --icon vb-caution
+  cfgr::item::action --label "Appearance" --func "cfgr-wm-appearance" --icon vb-theme
+  cfgr::item::action --label "Edit Configs" --func "_edit_cfgs_menu" --icon vb-edit
+}
+
+cfgr::run "Hyprland" "_build"

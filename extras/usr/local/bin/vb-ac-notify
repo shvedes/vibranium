@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+ONLINE_FILE="/sys/class/power_supply/ACAD/online"
+STATE_FILE="/run/vb-ac.state"
+
+CURRENT=0
+PREV=""
+
+if [[ -f "$ONLINE_FILE" ]]; then
+    CURRENT="$(< "$ONLINE_FILE")"
+fi
+
+if [[ -f "$STATE_FILE" ]]; then
+    PREV="$(< "$STATE_FILE")"
+fi
+
+if [[ "$CURRENT" == "$PREV" ]]; then
+    exit 0
+fi
+
+echo "$CURRENT" > "$STATE_FILE"
+
+if [[ "$CURRENT" == "1" ]]; then
+    systemd-run -M user_placeholder@.host --user notify-send -r 5 "Power Management" "Power source: AC"
+else
+    systemd-run -M user_placeholder@.host --user notify-send -r 5 "Power Management" "Power source: battery"
+fi

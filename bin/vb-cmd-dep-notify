@@ -1,0 +1,64 @@
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTIONS]
+
+Checks that required dependencies are installed and shows a notification if something is missing.
+
+Options:
+  --name TITLE           Set the notification title (required)
+  --deps DEP1 [DEP2...]  List required dependencies (at least one, required)
+  -h, --help             Show this help message and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  --name)
+    [[ $# -ge 2 ]] || usage
+    NAME=$2
+    shift 2
+    ;;
+  --deps)
+    shift
+    if [[ $# -eq 0 || $1 == --* ]]; then
+      echo "Error: expected at least one dependency after --deps" >&2
+      exit 1
+    fi
+    while [[ $# -gt 0 && $1 != --* ]]; do
+      DEPS+=("$1")
+      shift
+    done
+    ;;
+  -h | --help | "")
+    usage
+    ;;
+  *)
+    echo "Error: unknown argument: $1" >&2
+    usage
+    exit 1
+    ;;
+  esac
+done
+
+if [[ -z $NAME ]]; then
+  echo "Error: expected --name, got nothing" >&2
+  exit 1
+fi
+
+if [[ ${#DEPS[@]} -eq 0 ]]; then
+  echo "Error: expected --deps, got nothing" >&2
+  exit 1
+fi
+
+source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
+
+msg="Missing required dependencies: <span foreground='${P_YELLOW}'><b>${DEPS[*]}</b></span>"
+notify-send -r 4 "$NAME" "$msg"

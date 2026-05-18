@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Shutdown
+Icon=vb-power
+Keywords=Poweroff;Shut;Stop;
+Exec=systemctl poweroff
+Terminal=false
+Categories=Power;
+OnlyShowIn=Hyprland;

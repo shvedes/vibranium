@@ -1,0 +1,183 @@
+#!/usr/bin/env bash
+
+SELF="${0##*/}"
+STEP_DEFAULT="0.20"
+ACTION=""
+STEP="$STEP_DEFAULT"
+
+STATE_FILE="$VIBRANIUM_RUNTIME/$SELF"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTION]
+
+Zoom in and out your entire screen.
+
+Options:
+  -i, --increase         Increase zoom by step
+  -d, --decrease         Decrease zoom by step (floor 1.00)
+  -r, --reset            Reset zoom to 1.00
+  -s, --step <value>     Set step (default: ${STEP_DEFAULT})
+  -h, --help             Display this help and exit
+
+Short forms: you may also pass a single argument "+" or "-" for increase/decrease.
+EOF
+}
+
+_to_int100() {
+  local -n _result="$1"
+  local val="$2"
+  local int_part frac_part
+
+  int_part="${val%.*}"
+  if [[ "$val" == *.* ]]; then
+    frac_part="${val#*.}"
+    frac_part="${frac_part}00"
+    frac_part="${frac_part:0:2}"
+  else
+    frac_part="00"
+  fi
+
+  _result=$((int_part * 100 + 10#$frac_part))
+}
+
+_from_int100() {
+  local -n _result="$1"
+  local val100="$2"
+  printf -v _result "%d.%02d" $((val100 / 100)) $((val100 % 100))
+}
+
+read_state100() {
+  local -n ref=$1
+  local v=100
+
+  if [[ -r "$STATE_FILE" ]]; then
+    IFS= read -r v <"$STATE_FILE" || v=100
+
+    # keep default if value is not numeric
+    if [[ ! "$v" =~ ^[0-9]+$ ]]; then
+      v=100
+    fi
+  fi
+
+  # shellcheck disable=SC2034
+  ref="$v"
+}
+
+write_state100() {
+  local new100="$1"
+
+  if ((new100 == 100)); then
+    if [[ -f "$STATE_FILE" ]]; then
+      rm -f "$STATE_FILE"
+      return 0
+    fi
+  fi
+
+  printf '%s\n' "$new100" >"$STATE_FILE"
+}
+
+apply_zoom100() {
+  local new100="$1"
+  local new_float no_warps
+
+  _from_int100 new_float "$new100"
+
+  if ((new100 != 100)); then
+    no_warps="true"
+  else
+    no_warps="false"
+  fi
+
+  # if ! hyprctl --batch "keyword cursor.zoom_factor $new_float ; keyword cursor.no_warps $no_warps" >/dev/null 2>&1; then
+  #   printf 'Failed to set zoom factor to %s\n' "$new_float" >&2
+  #   return 1
+  # fi
+  hyprctl -q eval "hl.config({cursor = {zoom_factor = ${new_float}}})"
+}
+
+while (($#)); do
+  case "$1" in
+  -i | --increase)
+    ACTION="increase"
+    shift
+    ;;
+  -d | --decrease)
+    ACTION="decrease"
+    shift
+    ;;
+  -r | --reset)
+    ACTION="reset"
+    shift
+    ;;
+  -s | --step)
+    [[ -n "$2" ]] || {
+      echo "Error: --step requires a value" >&2
+      exit 1
+    }
+    STEP="$2"
+    shift 2
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  "+")
+    ACTION="increase"
+    shift
+    ;;
+  "-")
+    ACTION="decrease"
+    shift
+    ;;
+  *)
+    echo "Error: unknown option -- $1" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if [[ -z "$ACTION" ]]; then
+  usage >&2
+  exit 1
+fi
+
+_to_int100 step100 "$STEP"
+
+# shellcheck disable=SC2154
+if ((step100 <= 0)); then
+  printf "Invalid step value: %s (must be > 0)\n" "$STEP" >&2
+  exit 2
+fi
+
+read_state100 current100
+
+case "$ACTION" in
+increase)
+  # shellcheck disable=SC2154
+  new100=$((current100 + step100))
+  ;;
+decrease)
+  # shellcheck disable=SC2154
+  new100=$((current100 - step100))
+  ((new100 < 100)) && new100=100
+  ;;
+reset)
+  new100=100
+  ;;
+*)
+  usage >&2
+  exit 1
+  ;;
+esac
+
+if apply_zoom100 "$new100"; then
+  write_state100 "$new100"
+fi
