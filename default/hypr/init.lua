@@ -64,6 +64,8 @@ end
 --          Core config           --
 -- ############################## --
 
+source(VIBRANIUM .. "/lib/*.lua")
+
 source(VIBRANIUM .. "/autostart.lua")
 source(VIBRANIUM .. "/general.lua")
 source(VIBRANIUM .. "/look-and-feel.lua")
@@ -85,7 +87,7 @@ source(VIBRANIUM .. "/events.lua")
 -- ############################## --
 
 do
-  local p = io.popen('find "' .. HYPR .. '/hyprland.conf.d" -maxdepth 1 -type f,l -name "*.lua" 2>/dev/null')
+  local p = io.popen('find "' .. HYPR .. '/hyprland.conf.d" -type f,l -name "*.lua" 2>/dev/null')
   if p then
     for file in p:lines() do
       source(file)

@@ -669,9 +669,7 @@ hypr::flash::border() {
     return
   fi
 
-  hyprctl -q eval "hl.config({ general = { col = { active_border = \"rgb(${P_TEXT###})\" }}})"
-  sleep 0.2
-  hyprctl -q reload config-only
+  hyprctl -q eval "Vb.FlashBorder('0xff${P_TEXT###}')"
 }
 
 hypr::flash::screen() {
