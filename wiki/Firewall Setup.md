@@ -1,4 +1,4 @@
-Vibranium does not come with a preconfigured firewall, but it provides a simple way to set one up. To begin, go to *Vibranium Menu* -> *Setup* -> *Firewall*.
+Vibranium does not come with a preconfigured firewall, but it provides a simple way to set one up. To begin, go to *Vibranium Menu* (`CTRL ALT V`) -> *Setup* -> *Firewall*.
 
 The setup process is fully automated and takes only a few seconds. The script installs [UFW](https://en.wikipedia.org/wiki/Uncomplicated_Firewall) as the firewall backend and configures it based on your system.
 

@@ -11,7 +11,7 @@ shcat() {
 _help() {
   shcat <<EOF
 Usage: $SELF [OPTION]... -- COMMAND [ARG]...
-Launch COMMAND under gamescope, auto-detecting the focused Hyprland monitor.
+Launch COMMAND under gamescope
 
 Options:
       --ld-workaround            Try to use LD_PRELOAD workaround
@@ -158,15 +158,15 @@ has_extra_flag() {
 parse_gamescope_options() {
   local opts_str="$1"
   local -a tokens
-  read -ra tokens <<< "$opts_str"
+  read -ra tokens <<<"$opts_str"
 
   local token
   for token in "${tokens[@]}"; do
     # Only validate tokens that look like flags; bare values (numbers, strings
     # following a flag) are passed through as-is.
     if [[ "$token" == -* ]]; then
-      is_known_gamescope_flag "$token" \
-        || die "unknown gamescope option: '$token'"
+      is_known_gamescope_flag "$token" ||
+        die "unknown gamescope option: '$token'"
     fi
     EXTRA_GAMESCOPE_OPTS+=("$token")
   done
@@ -178,38 +178,38 @@ EXTRA_GAMESCOPE_OPTS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    -h|--help)
-      _help
-      exit 0
-      ;;
-    --mangohud)
-      USE_MANGOHUD=true
-      shift
-      ;;
-    --ld-workaround)
-      OVERRIDE_LDPRELOAD=true
-      shift
-      ;;
-    --gamescope-options=*)
-      parse_gamescope_options "${1#*=}"
-      shift
-      ;;
-    --gamescope-options)
-      [[ -n "${2-}" ]] || die "'--gamescope-options' requires an argument"
-      parse_gamescope_options "$2"
-      shift 2
-      ;;
-    --)
-      shift
-      break
-      ;;
-    -*)
-      die "unrecognized option: '$1'"
-      ;;
-    *)
-      # No '--' separator used — treat the rest as the game command.
-      break
-      ;;
+  -h | --help)
+    _help
+    exit 0
+    ;;
+  --mangohud)
+    USE_MANGOHUD=true
+    shift
+    ;;
+  --ld-workaround)
+    OVERRIDE_LDPRELOAD=true
+    shift
+    ;;
+  --gamescope-options=*)
+    parse_gamescope_options "${1#*=}"
+    shift
+    ;;
+  --gamescope-options)
+    [[ -n "${2-}" ]] || die "'--gamescope-options' requires an argument"
+    parse_gamescope_options "$2"
+    shift 2
+    ;;
+  --)
+    shift
+    break
+    ;;
+  -*)
+    die "unrecognized option: '$1'"
+    ;;
+  *)
+    # No '--' separator used — treat the rest as the game command.
+    break
+    ;;
   esac
 done
 
@@ -247,10 +247,10 @@ if ! [[ -n "$SDL_VIDEODRIVER" ]]; then
 fi
 
 MONITOR_DATA="$(hyprctl -j monitors | jq -r '.[] | select(.focused)')"
-MONITOR_NAME="$(jq -r '.name' <<< "$MONITOR_DATA")"
-MONITOR_REFRESH_RATE="$(jq -r '.refreshRate | floor' <<< "$MONITOR_DATA")"
-MONITOR_H="$(jq -r '.height' <<< "$MONITOR_DATA")"
-MONITOR_W="$(jq -r '.width' <<< "$MONITOR_DATA")"
+MONITOR_NAME="$(jq -r '.name' <<<"$MONITOR_DATA")"
+MONITOR_REFRESH_RATE="$(jq -r '.refreshRate | floor' <<<"$MONITOR_DATA")"
+MONITOR_H="$(jq -r '.height' <<<"$MONITOR_DATA")"
+MONITOR_W="$(jq -r '.width' <<<"$MONITOR_DATA")"
 
 # Build exec command line
 
@@ -259,7 +259,7 @@ EXEC_CMDLINE=()
 # Power profile
 mapfile -t POWERPROFILES < <(powerprofilesctl list | awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }')
 
-if (( ${#POWERPROFILES[@]} > 0 )); then
+if ((${#POWERPROFILES[@]} > 0)); then
   if [[ "${POWERPROFILES[*]}" =~ performance ]]; then
     EXEC_CMDLINE=(
       powerprofilesctl launch
@@ -278,13 +278,13 @@ fi
 # already supplied via --gamescope-options so their value takes effect.
 GAMESCOPE_DEFAULTS=()
 has_extra_flag -r || has_extra_flag --nested-refresh || GAMESCOPE_DEFAULTS+=(--nested-refresh "$MONITOR_REFRESH_RATE")
-has_extra_flag -W || has_extra_flag --output-width   || GAMESCOPE_DEFAULTS+=(-W "$MONITOR_W")
-has_extra_flag -H || has_extra_flag --output-height  || GAMESCOPE_DEFAULTS+=(-H "$MONITOR_H")
-has_extra_flag -w || has_extra_flag --nested-width   || GAMESCOPE_DEFAULTS+=(-w "$MONITOR_W")
-has_extra_flag -h || has_extra_flag --nested-height  || GAMESCOPE_DEFAULTS+=(-h "$MONITOR_H")
-has_extra_flag -h || has_extra_flag --adaptive-sync  || GAMESCOPE_DEFAULTS+=(--adaptive-sync)
-has_extra_flag -h || has_extra_flag --fullscreen     || GAMESCOPE_DEFAULTS+=(--fullscreen)
-has_extra_flag -S || has_extra_flag --scaler         || GAMESCOPE_DEFAULTS+=(-S auto)
+has_extra_flag -W || has_extra_flag --output-width || GAMESCOPE_DEFAULTS+=(-W "$MONITOR_W")
+has_extra_flag -H || has_extra_flag --output-height || GAMESCOPE_DEFAULTS+=(-H "$MONITOR_H")
+has_extra_flag -w || has_extra_flag --nested-width || GAMESCOPE_DEFAULTS+=(-w "$MONITOR_W")
+has_extra_flag -h || has_extra_flag --nested-height || GAMESCOPE_DEFAULTS+=(-h "$MONITOR_H")
+has_extra_flag -h || has_extra_flag --adaptive-sync || GAMESCOPE_DEFAULTS+=(--adaptive-sync)
+has_extra_flag -h || has_extra_flag --fullscreen || GAMESCOPE_DEFAULTS+=(--fullscreen)
+has_extra_flag -S || has_extra_flag --scaler || GAMESCOPE_DEFAULTS+=(-S auto)
 
 GAME_CMDLINE=()
 if $OVERRIDE_LDPRELOAD; then

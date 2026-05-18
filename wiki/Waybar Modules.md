@@ -4,7 +4,7 @@ This includes state-based modules that show or hide themselves based on specific
 
 Vibranium also features interactive modules that you can actively use. Examples include the [color picker](https://github.com/shvedes/vibranium/blob/master/config/waybar/modules/custom-color-picker.jsonc) and [updates](https://github.com/shvedes/vibranium/blob/master/config/waybar/modules/custom-pacman.jsonc).
 
-If you want to customize anything, you can do so in `~/.config/waybar`. To toggle modules on and off, go to *Vibranium Menu* → *Settings* → *Waybar* → *Toggle Modules*:
+If you want to customize anything, you can do so in `~/.config/waybar`. To toggle modules on and off, go to *Vibranium Menu* (`CTRL ALT V`) -> *Settings* -> *Waybar* -> *Toggle Modules*:
 
 ![showcase](./media/waybar_modules.gif)
 

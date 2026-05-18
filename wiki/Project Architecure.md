@@ -4,7 +4,7 @@ Vibranium is not a traditional dotfiles repository, nor a desktop environment, n
 
 This article explains how Vibranium fits together conceptually.
 
-## What vibranium really is
+## What Vibranium really is
 
 At its core, Vibranium is a Bash library plus a collection of scripts that share that library. These scripts are:
 

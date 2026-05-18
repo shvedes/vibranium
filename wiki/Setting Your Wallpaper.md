@@ -10,4 +10,4 @@ vb-core-wallpaper /path/to/your/beautiful_wallpaper.png
 
 Vibranium stores wallpapers **per theme**, meaning that if you want to use the same wallpaper with a different theme, you’ll need to set it again.
 
-You can manage your wallpapers via: *Vibranium Menu* → *Settings* → *Misc* → *User wallpapers*. From there, you can open the folder, view, or delete wallpapers.
+You can manage your wallpapers via: *Vibranium Menu* (`CTRL ALT V`) -> *Settings* -> *Misc* -> *User wallpapers*. From there, you can open the folder, view, or delete wallpapers.

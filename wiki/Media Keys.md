@@ -4,4 +4,4 @@ When pausing the currently playing track, the audio doesn’t stop abruptly. Ins
 
 You can also enable a "Now Playing" notification, which appears when you unlock a previously locked session. Optionally, it can display album art.
 
-All related settings are available in *Vibranium Menu* -> *Settings* -> *Media Control*.
+All related settings are available in *Vibranium Menu* (`CTRL ALT V`) -> *Settings* -> *Media Control*.

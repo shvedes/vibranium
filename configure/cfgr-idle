@@ -65,10 +65,6 @@ _build() {
     --func "cfgr::set_string --title Type --option 'Idle:idle' 'Sleep:sleep' --var $inh_var" \
     --hook "vb-toggle-inhibitor --retoggle" \
     --label "Inhibit type : $inh_type"
-
-  cfgr::item::action \
-    --func "vb-cmd-show-help idle" \
-    --label "Help"
 }
 
 cfgr::run "Idle" "_build" VIBRANIUM_GLOBAL_INHIBIT_TYPE

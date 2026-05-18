@@ -33,31 +33,14 @@ _get_update_channel() {
   fi
 }
 
-_confirm_kill_menu() {
-  _build_ckm() {
-    cfgr::item::bool \
-      --var VIBRANIUM_GLOBAL_CONFIRM_TO_KILL \
-      --label "Confirm kill"
-
-    cfgr::item::action \
-      --func "vb-cmd-show-help confirm-kill" \
-      --label "Help"
-  }
-
-  cfgr::run "Confirm Window Kill" "_build_ckm" VIBRANIUM_GLOBAL_CONFIRM_TO_KILL
-}
-
 # ================================================================================ #
 
 _build() {
-  local ck="$VIBRANIUM_GLOBAL_CONFIRM_TO_KILL"
-
   cfgr::item::bool \
     --var VIBRANIUM_GLOBAL_USE_OSD \
     --label "OSD enabled" \
     --hook "_toggle_osd_service"
 
-  cfgr::item::raw "Confirm kill : $ck" "action:_confirm_kill_menu"
   cfgr::item::raw "Update channel : $(_get_update_channel)" "action:_set_update_channel"
 }
 

@@ -45,7 +45,7 @@ Where you can find community themes:
 
 ### Installing an Omarchy theme
 
-To install an Omarchy theme, go to *Vibranium Menu* → *Install* → *Theme*.  
+To install an Omarchy theme, go to *Vibranium Menu* (`CTRL ALT V`) -> *Install* -> *Theme*.  
 A terminal window with several prompts will appear.
 
 Before installation, the installer verifies that the theme is supported and will fail if it is not.
@@ -55,7 +55,7 @@ Once installed, the theme is applied immediately and becomes available in the th
 ### Removing an Omarchy theme
 
 To remove a theme, follow the reverse process.  
-Open *Vibranium Menu* → *Remove* -> *Theme*. A rofi window will appear with a list of all installed community themes.
+Open *Vibranium Menu* (`CTRL ALT V`) -> *Remove* -> *Theme*. A rofi window will appear with a list of all installed community themes.
 
 Select the theme you want and press *Enter*.  
 If the theme is currently active, it will be replaced with the default one.

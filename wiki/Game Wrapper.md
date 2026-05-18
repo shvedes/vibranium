@@ -1,6 +1,6 @@
 Vibranium includes a handy CLI game wrapper that launches games inside the `gamescope` micro-compositor when `gamescope` is available on the system. Gamescope can potentially eliminate various Wine and XWayland-related issues, while also improving performance in some cases.
 
-First, make sure you have `gamescope` and optionally `mangohud` installed (*Vibranium Menu* > *Install* > *Package*), then launch your game with:
+First, make sure you have `gamescope` and optionally `mangohud` installed (*Vibranium Menu* (`CTRL ALT V`) > *Install* > *Package*), then launch your game with:
 
 ```bash
 vb-core-gamemode -- my-cool-game

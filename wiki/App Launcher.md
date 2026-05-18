@@ -1,6 +1,6 @@
 The app launcher (`SUPER A`) is essentially a rofi wrapper, extended with additional features that you can customize in Vibranium Settings.
 
-To configure it, go to *Vibranium Menu* -> *Settings* -> *App Launcher*.
+To configure it, go to *Vibranium Menu* (`CTRL ALT V`) -> *Settings* -> *App Launcher*.
 
 ## Web Search
 

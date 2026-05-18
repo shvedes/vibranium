@@ -16,7 +16,7 @@ The installer also supports a full CLI mode. To see all available options, run:
 vb-webapp-install --help
 ````
 
-Vibranium comes with several PWAs by default: common websites such as Reddit, GitHub, YouTube, or X, as well as AI tools like ChatGPT, Grok, Perplexity, and more. All of them are installed but disabled by default, giving you full control. You can toggle them in *Vibranium Menu* -> *Settings* -> *App Launcher*. For example, you can disable only AI-related PWAs if you want.
+Vibranium comes with several PWAs by default: common websites such as Reddit, GitHub, YouTube, or X, as well as AI tools like ChatGPT, Grok, Perplexity, and more. All of them are installed but disabled by default, giving you full control. You can toggle them in *Vibranium Menu* (`CTRL ALT V`) -> *Settings* -> *App Launcher*. For example, you can disable only AI-related PWAs if you want.
 
 ## Text User Interface (TUI) Applications
 

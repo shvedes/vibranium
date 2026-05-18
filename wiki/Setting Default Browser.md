@@ -1,6 +1,6 @@
 ## Vibranium Way
 
-`Vibranium Menu -> Settings -> Misc -> Default Browser`
+*Vibranium Menu* (`CTRL ALT V`) -> *Settings* -> *Misc* -> *Default Browser*
 
 Vibranium tries to cover as many browsers as possible. If you don’t see your preferred browser in the list, feel free to open an issue.
 
