@@ -72,7 +72,6 @@ source(VIBRANIUM .. "/look-and-feel.lua")
 
 source(CONFIG .. "/current/theme/hyprland.lua")
 
-source(VIBRANIUM .. "/layer-rules.lua")
 source(VIBRANIUM .. "/window-rules.lua")
 source(VIBRANIUM .. "/window-rules/*.lua")
 
