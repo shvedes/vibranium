@@ -172,3 +172,27 @@
 -- This toggles the visibility of the status bar.
 --
 -- ###########################################################################
+
+hl.bind("SUPER + SHIFT + D", function()
+  local LAYOUTS = { "dwindle", "master", "scrolling", "monocle" }
+
+  local LAYOUT_INDEX = {}
+  for i, name in ipairs(LAYOUTS) do
+    LAYOUT_INDEX[name] = i
+  end
+
+  local current, err = hl.get_config("general.layout")
+
+  if err then
+    return
+  end
+
+  local current_index = LAYOUT_INDEX[current] or 0
+  local next_index = (current_index % #LAYOUTS) + 1
+  local next_layout = LAYOUTS[next_index]
+
+  hl.config({ ["general.layout"] = next_layout })
+  -- You can make it optional.
+  -- You can also use hl.notification().
+  -- hl.dispatch(hl.dsp.exec_raw("notify-send -t 2000 -r 100 'Hyprland' 'Current layout: " .. next_layout .. "'"))
+end, { description = "Cycle window layout" })
