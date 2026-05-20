@@ -14,7 +14,7 @@ if [[ -d "$THEMES_DIR" ]]; then
   mv "$THEMES_DIR" "$THEMES_BAK"
 fi
 
-git clone "https://github.com/shvedes/vibrnaium-wallpapers" "$THEMES_DIR"
+git clone "https://github.com/shvedes/vibranium-wallpapers" "$THEMES_DIR"
 rm -rf "$THEMES_DIR/.git" "$THEMES_DIR/.github"
 
 if [[ -d "$THEMES_BAK" ]]; then
