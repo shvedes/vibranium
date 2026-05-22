@@ -5,8 +5,6 @@ Vibranium's keybindings are defined in `~/.local/share/vibranium/default/hypr/bi
 
 Instead, use the user override mechanism described below.
 
----
-
 ## The override file
 
 Hyprland's configuration is assembled from several sourced files. The entry point is `~/.config/hypr/hyprland.lua`, which sources the Vibranium defaults last. Any file you source *after* the defaults overrides them.
@@ -16,8 +14,6 @@ All your overrides live in `~/.config/hypr/hyprland.conf.d/*.lua`. Out of the bo
 By default, these files don’t change anything, so on startup Hyprland simply reads them and does nothing. However, they contain basic syntax overviews, live examples, and optional Vibranium settings that you can enable.
 
 Any other file with the `*.lua extension will be sourced automatically as soon as it is created or updated.
-
----
 
 ## Adding a new keybinding
 
@@ -54,8 +50,6 @@ hl.bind("SUPER + A", hl.dsp.exec_raw("my-cool-app"))
 
 As soon as you save the file, Hyprland will pick up the changes and reload automatically. If you have `disable_autoreload` enabled, you can reload Hyprland manually using the Utilities Menu (`CTRL + ALT + U`).
 
----
-
 ## View all current keybindings
 
 There are two ways to do this.
@@ -63,8 +57,6 @@ There are two ways to do this.
 First, open the *Vibranium Menu* (`CTRL + ALT + V`), go to *Help*, and select *Keybindings*. This will show all the keybindings Hyprland is currently aware of.
 
 The second option is via the terminal. Run `vb-cmd-keybindings --list` to print all keybindings directly to the output. For easier navigation, you can pipe it into `less`: `vb-cmd-keybindings --list | less`.
-
----
 
 ## Mouse bindings
 
@@ -77,8 +69,6 @@ hl.bind("SUPER + mouse:272", hl.dsp.window.drag(), { mouse = true })
 # Resize floating windows with Super + right mouse button
 hl.bind("SUPER + mouse:273", hl.dsp.window.resize(), { mouse = true })
 ```
-
----
 
 ## Further reading
 

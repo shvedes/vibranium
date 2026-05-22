@@ -3,8 +3,6 @@
 
 The `cfgr` system is the mechanism behind every settings menu in Vibranium's **Vibranium menu -> Settings** hierarchy. This article explains why it was built and how it works.
 
----
-
 ## The problem it solves
 
 Before [`vb-lib-cfgr`](https://github.com/shvedes/vibranium/blob/master/bin/vb-lib-cfgr) existed, every settings script (`cfgr-audio`, `cfgr-brightness`, `cfgr-screenshots`, etc.) contained the same boilerplate:

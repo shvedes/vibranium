@@ -12,8 +12,6 @@ A theme can include many wallpapers, and image files are significantly larger th
 
 Vibranium approaches this differently by using symbolic links (`cp --link`) specifically for the `backgrounds/` directory, while still copying other files normally so they can be overridden by user configs.
 
----
-
 ## How does it work
 
 When you select a theme (`CTRL + ALT + T`), `vb-theme-set` performs the following steps:
@@ -27,8 +25,6 @@ When you select a theme (`CTRL + ALT + T`), `vb-theme-set` performs the followin
 
 For more details, see the source code of [`vb-theme-set`](https://github.com/shvedes/vibranium/blob/master/bin/vb-theme-set).
 
----
-
 ## Omarchy theme support
 
 > [!WARNING]
@@ -41,8 +37,6 @@ In `v3.3.0`, Omarchy introduced template-based theme generation using Base16 col
 As mentioned earlier, Vibranium is built from scratch and differs from Omarchy in several areas, including application choices. For example, Omarchy uses [Walker](https://github.com/abenz1267/walker) as its launcher, while Vibranium uses rofi.
 
 Because of this, Omarchy themes typically do not include configs for tools used by Vibranium (such as `rofi.rasi`). By providing a `colors.toml`, a theme gives Vibranium enough information to generate the missing configs automatically. This applies not only to rofi, but to any component where the two systems differ.
-
----
 
 ## Generating themes from templates
 
@@ -60,10 +54,10 @@ Vibranium supports both Omarchy templates and its own extended format. These can
 
 For a full list of templates, see the [`themed`](https://github.com/shvedes/vibranium/tree/master/default/themed) directory.
 
+If you don't like the default implementation of a template and want to override it, or just want to add your own template for an application, you can place them in `~/.config/vibranium/themed`.
+
 > [!NOTE]
 > Note that only HEX colors are supported by `colors-extended.toml`.
-
----
 
 ## The template generator
 
@@ -81,8 +75,6 @@ The idea originates from Omarchy, but the implementation has been significantly 
 
 For implementation details, see [`vb-theme-set-templates`](https://github.com/shvedes/vibranium/blob/master/bin/vb-theme-set-templates).
 
----
-## Theme types
 
 Instead of placing all themes in a single flat menu, Vibranium organizes them into families.
 
@@ -92,8 +84,6 @@ Themes without variants, such as *Ristretto* or *Evergarden*, are treated as sta
 
 This approach keeps the menu clean, avoids clutter, and scales well as more themes are added.
 
-
----
 # Further reading
 
 - [Omarchy's template generator](https://github.com/basecamp/omarchy/blob/dev/bin/omarchy-theme-set-templates)

@@ -17,6 +17,7 @@ This page is a starting point. To learn more about Vibranium, you'll find an ove
 - [Media Keys](Media%20Keys.md)
 - [Screenshots](Screenshots.md)
 - [Color Picker](Color%20Picker.md)
+- [General Advice](General%20Advice.md)
 - [Optional Setups](Additional%20Setups.md)
 - [Screen Recording](Screen%20Recording.md)
 - [Preconfigured Shell](Preconfigured%20shell.md)
