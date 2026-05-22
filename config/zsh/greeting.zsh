@@ -15,3 +15,9 @@ if ! [[ -c /dev/tty && $TERM == linux ]]; then
 fi
 
 echo
+
+if [[ -f $VIBRANIUM_STATE/errors_found ]]; then
+  echo "Vibrainum errors found!"
+  echo "Type ${GREEN}vibranium-healthcheck${RESET} to repair"
+  echo
+fi

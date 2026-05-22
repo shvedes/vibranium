@@ -18,3 +18,5 @@ alias grpe="grep"
 alias gerp="grep"
 
 alias cleart="clear"
+
+alias vibranium-healhcheck="vb-cmd-healthcheck"

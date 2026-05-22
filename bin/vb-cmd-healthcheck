@@ -1,0 +1,10 @@
+#!/usr/bin/bash
+
+if ! command -v vb-cmd-edit-wm-config >/dev/null; then
+  echo "Repairing vb-cmd-edit-wm-config"
+  echo "This might take some time"
+  bash "$VIBRANIUM/install/post-install/15-build-utilities.sh" 2>/dev/null
+  echo "Repaired vb-cmd-edit-wm-config"
+fi
+
+rm -f $VIBRANIUM_STATE/errors_found

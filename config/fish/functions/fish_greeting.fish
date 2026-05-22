@@ -18,3 +18,9 @@ function fish_greeting
         echo
     end
 end
+
+if test -f $VIBRANIUM_STATE/errors_found
+  echo "Vibrainum errors found!"
+  echo "Type "(set_color green)"vibranium-healthcheck"(set_color normal)" to repair"
+  echo
+end

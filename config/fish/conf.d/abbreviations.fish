@@ -54,6 +54,7 @@ abbr pacamn pacman
 abbr apcman pacman
 
 # misc
+abbr cleart clear
 abbr clera clear
 abbr clea clear
 abbr exti exit
