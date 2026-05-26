@@ -18,7 +18,7 @@ hl.window_rule({
   name = "Thunar: File Operation",
   match = {
     class = "[Tt]hunar",
-    title = '^(Renombrar\\s(.*?)|Crear una carpeta nueva|Progreso de las operaciones de archivo|Nuev(a|o)\\s.*)$',
+    title = "^(Renombrar\\s(.*?)|Crear una carpeta nueva|Progreso de las operaciones de archivo|Nuev(a|o)\\s.*)$"
   },
   float = true,
   center = true,
