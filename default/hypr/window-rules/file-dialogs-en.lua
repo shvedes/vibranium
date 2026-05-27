@@ -29,7 +29,7 @@ hl.window_rule({
   name = "Thunar: File Operation",
   match = {
     class = "[Tt]hunar",
-    title = "(Rename(\\s.*)?|Create New Folder|File Operation Progress|New\\s.*)"
+    title = "(Rename\\s.*|Create New Folder|File Operation Progress|New\\s.*)"
   },
   float = true,
   center = true,
