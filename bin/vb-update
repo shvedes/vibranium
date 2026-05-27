@@ -54,6 +54,18 @@ _restore_stash_and_fail() {
   _fail "$msg"
 }
 
+vb_wallpapers_pull() {
+    local repo_dir="$XDG_CONFIG_HOME/vibranium/themes"
+
+    # Fetch without touching the working tree
+    git -C "$repo_dir" fetch origin || return 1
+
+    # Hard-reset to the remote state, discarding any local modifications
+    # to tracked files (deleted, edited, replaced). Untracked user files
+    # (newly added wallpapers not in the repo) are preserved.
+    git -C "$repo_dir" reset --hard "origin/master"
+}
+
 _update() {
   local channel
   # stashed must not be local so _check_and_stash and _apply_stash can share it
@@ -158,6 +170,7 @@ term::show_header
 term::disable_input
 
 if term::ask_yes_no Y "Proceed with update?"; then
+  vb_wallpapers_pull
   _update
   rm -f "$VIBRANIUM_STATE/update.available" || true
   vb-refresh-waybar-module vb-update
