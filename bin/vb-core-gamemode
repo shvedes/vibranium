@@ -16,6 +16,7 @@ Launch COMMAND under gamescope
 Options:
       --ld-workaround            Try to use LD_PRELOAD workaround
       --gamescope-options=OPTS   Pass extra flags to gamescope
+      --no-power-profile         Don't change power profile
       --mangohud                 Wrap the game with mangohud
       -h, --help                 Display this help and exit
 
@@ -173,6 +174,7 @@ parse_gamescope_options() {
 }
 
 OVERRIDE_LDPRELOAD=false
+NO_POWER_PROFILE=false
 USE_MANGOHUD=false
 EXTRA_GAMESCOPE_OPTS=()
 
@@ -199,6 +201,10 @@ while [[ $# -gt 0 ]]; do
     parse_gamescope_options "$2"
     shift 2
     ;;
+  --no-power-profile)
+      NO_POWER_PROFILE=true
+      shift
+      ;;
   --)
     shift
     break
@@ -257,15 +263,18 @@ MONITOR_W="$(jq -r '.width' <<<"$MONITOR_DATA")"
 EXEC_CMDLINE=()
 
 # Power profile
-mapfile -t POWERPROFILES < <(powerprofilesctl list | awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }')
+if [[ $NO_POWER_PROFILE == false ]]; then
+  # I should move this logic to the vb-core-power so we don't cycle ghost (not available on a machine) profiles
+  mapfile -t POWERPROFILES < <(powerprofilesctl list | awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }')
 
-if ((${#POWERPROFILES[@]} > 0)); then
-  if [[ "${POWERPROFILES[*]}" =~ performance ]]; then
-    EXEC_CMDLINE=(
-      powerprofilesctl launch
-      --profile performance
-      --
-    )
+  if ((${#POWERPROFILES[@]} > 0)); then
+    if [[ "${POWERPROFILES[*]}" =~ performance ]]; then
+      EXEC_CMDLINE=(
+        powerprofilesctl launch
+        --profile performance
+        --
+      )
+    fi
   fi
 fi
 
