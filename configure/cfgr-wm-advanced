@@ -6,11 +6,51 @@ ADVANCED_SPEC=(
   "misc.vrr|int"
   "debug.vfr|bool"
   "general.layout|str"
-  "scrolling.direction|str"
   "render.direct_scanout|int"
   "misc.middle_click_paste|bool"
   "misc.disable_autoreload|bool"
   "cursor.zoom_detached_camera|bool"
+)
+
+MASTER_SPEC=(
+  "master.slave_count_for_center_master|int"
+  "master.special_scale_factor|float"
+  "master.center_master_fallback|str"
+  # Not yet available in the stable release
+  # "master.focus_master_on_close|bool"
+  "master.always_keep_position|bool"
+  "master.allow_small_split|bool"
+  "master.smart_resizing|bool"
+  "master.drop_at_cursor|bool"
+  "master.new_on_active|str"
+  "master.orientation|str"
+  "master.new_on_top|bool"
+  "master.new_status|str"
+  "master.mfact|float"
+)
+
+DWINDLE_SPEC=(
+  "dwindle.permanent_direction_override|bool"
+  "dwindle.split_width_multiplier|float"
+  "dwindle.special_scale_factor|float"
+  "dwindle.use_active_for_splits|bool"
+  "dwindle.default_split_ratio|float"
+  "dwindle.precise_mouse_move|bool"
+  "dwindle.preserve_split|bool"
+  "dwindle.smart_resizing|bool"
+  "dwindle.smart_split|bool"
+  "dwindle.force_split|int"
+  "dwindle.split_bias|int"
+)
+
+SCROLLING_SPEC=(
+  "scrolling.follow_min_visible|float"
+  "scrolling.focus_fit_method|int"
+  "scrolling.column_width|float"
+  "scrolling.follow_focus|bool"
+  "scrolling.wrap_swapcol|bool"
+  "scrolling.wrap_focus|bool"
+  "scrolling.direction|str"
 )
 
 _set_vrr() {
@@ -35,6 +75,101 @@ _set_ds() {
   )"
 
   hypr::set "render:direct_scanout" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::scrolling::focus_fit() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Focus fit method" \
+    --option "Center:0" "Fit:1"
+  )"
+
+  hypr::set "scrolling:focus_fit_method" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::scrolling::column_width (){
+  local chosen
+  chosen="$(cfgr::set_digit \
+    --hint "Default column width" \
+    --title "Column Width" \
+    --type "float" \
+    --min "0.1" \
+    --max "1.0"
+  )"
+
+  hypr::set "scrolling:column_width" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::scrolling::follow_min_visible(){
+  local chosen
+  chosen="$(cfgr::set_digit \
+    --hint "Window fraction" \
+    --title "Follow Minimim Visible" \
+    --type "float" \
+    --min "0.0" \
+    --max "1.0"
+  )"
+
+  hypr::set "scrolling:follow_min_visible" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::dwindle::special_scale_factor (){
+  local chosen
+  chosen="$(cfgr::set_digit \
+    --hint "Special Workspace Scale" \
+    --title "Scale factor" \
+    --type "float" \
+    --min "0.0" \
+    --max "1.0"
+  )"
+
+  hypr::set "dwindle:special_scale_factor" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::dwindle::split_method (){
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Split Method" \
+    --option "Follow mouse:0" "Left:1" "Right:2"
+  )"
+
+  hypr::set "dwindle:force_split" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::dwindle::split_bias (){
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Split Bias" \
+    --option "Directional:0" "Current window:1"
+  )"
+
+  hypr::set "dwindle:split_bias" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::dwindle::split_width_multiplier (){
+  local chosen
+  chosen="$(cfgr::set_digit \
+    --hint "Width Multiplier" \
+    --title "Window width multiplier" \
+    --type "float" \
+    --min "0.0" \
+    --max "10.0"
+  )"
+
+  hypr::set "dwindle:split_width_multiplier" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::dwindle::default_split_ratio (){
+  local chosen
+  chosen="$(cfgr::set_digit \
+    --hint "Split Ratio" \
+    --title "Window split ratio" \
+    --type "float" \
+    --min "0.1" \
+    --max "1.9"
+  )"
+
+  hypr::set "dwindle:default_split_ratio" "$chosen" "$HYPR_CONF_ADVANCED"
 }
 
 _set_layout() {
@@ -65,6 +200,275 @@ _set_scrolling_dir (){
 _toggle() {
   local path="$1"
   hypr::toggle "$path" "$HYPR_CONF_ADVANCED"
+}
+
+_menu::scrolling () {
+  _b(){
+    hypr::reload
+    hypr::fetch "${SCROLLING_SPEC[@]}"
+
+    case "${HYPR[scrolling.focus_fit_method]}" in
+      0) fit_method="center" ;;
+      1) fit_method="fit" ;;
+    esac
+
+    cfgr::item::action \
+      --label "Direction : ${HYPR[scrolling.direction]}" \
+      --func "_set_scrolling_dir"
+
+    cfgr::item::action \
+      --label "Follow focus : ${HYPR[scrolling.follow_focus]}" \
+      --func "hypr::toggle 'scrolling:follow_focus' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Fit method : $fit_method" \
+      --func "_set::scrolling::focus_fit"
+
+    cfgr::item::action \
+      --label "Column width : ${HYPR[scrolling.column_width]}" \
+      --func "_set::scrolling::column_width"
+
+    cfgr::item::action \
+      --label "Follow minimim visible : ${HYPR[scrolling.follow_min_visible]}" \
+      --func "_set::scrolling::follow_min_visible"
+
+    cfgr::item::action \
+      --label "Wrap swapcol : ${HYPR[scrolling.wrap_swapcol]}" \
+      --func "hypr::toggle 'scrolling:wrap_swapcol' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Wrap focus : ${HYPR[scrolling.wrap_focus]}" \
+      --func "hypr::toggle 'scrolling:wrap_focus' "$HYPR_CONF_ADVANCED""
+    }
+
+  cfgr::run "Scrolling Layout" "_b"
+}
+
+_menu::dwindle() {
+  _b (){
+    hypr::reload
+    hypr::fetch "${DWINDLE_SPEC[@]}"
+
+    local split_method= split_bias=
+
+    case "${HYPR[dwindle.force_split]}" in
+      0) split_method="follow mouse" ;;
+      1) split_method="left" ;;
+      2) split_method="right" ;;
+    esac
+
+    case "${HYPR[dwindle.split_bias]}" in
+      0) split_bias="directional" ;;
+      1) split_bias="current window" ;;
+    esac
+
+    cfgr::item::action \
+      --label "Split method : $split_method" \
+      --func "_set::dwindle::split_method"
+
+    cfgr::item::action \
+      --label "Preserve split : ${HYPR[dwindle.preserve_split]}" \
+      --func "hypr::toggle 'dwindle:preserve_split' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Smart split : ${HYPR[dwindle.smart_split]}" \
+      --func "hypr::toggle 'dwindle:smart_split' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Smart resizing : ${HYPR[dwindle.smart_resizing]}" \
+      --func "hypr::toggle 'dwindle:smart_resizing' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Direction override : ${HYPR[dwindle.permanent_direction_override]}" \
+      --func "hypr::toggle 'dwindle:permanent_direction_override' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Special workspace scale : ${HYPR[dwindle.special_scale_factor]}" \
+      --func "_set::dwindle::special_scale_factor"
+
+    cfgr::item::action \
+      --label "Width multiplier : ${HYPR[dwindle.split_width_multiplier]}" \
+      --func "_set::dwindle::split_width_multiplier"
+
+    cfgr::item::action \
+      --label "Use active for splits : ${HYPR[dwindle.use_active_for_splits]}" \
+      --func "hypr::toggle 'dwindle:use_active_for_splits' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Width multiplier : ${HYPR[dwindle.split_width_multiplier]}" \
+      --func "_set::dwindle::split_width_multiplier"
+
+    cfgr::item::action \
+      --label "Split ratio : ${HYPR[dwindle.default_split_ratio]}" \
+      --func "_set::dwindle::default_split_ratio"
+
+    cfgr::item::action \
+      --label "Split bias : $split_bias" \
+      --func "_set::dwindle::split_bias"
+
+    cfgr::item::action \
+      --label "Precise mouse move : ${HYPR[dwindle.precise_mouse_move]}" \
+      --func "hypr::toggle 'dwindle:precise_mouse_move' "$HYPR_CONF_ADVANCED""
+  }
+
+  cfgr::run "Dwindle Layout" "_b"
+}
+
+_set::master::new_status() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "New window status" \
+    --option "Master:master" \
+             "Slave:slave" \
+             "Inherit from focused:inherit"
+  )"
+
+  hypr::set "master:new_status" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::master::new_on_active() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "New window placement (relative to focused)" \
+    --option "Before:before" \
+             "After:after" \
+             "None (default boundary):none"
+  )"
+
+  hypr::set "master:new_on_active" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::master::orientation() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Master area orientation" \
+    --option "Left:left" \
+             "Right:right" \
+             "Top:top" \
+             "Bottom:bottom" \
+             "Center:center"
+  )"
+
+  hypr::set "master:orientation" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::master::center_master_fallback() {
+  local chosen
+  # When using center orientation, this is the fallback split side
+  # used when the layout cannot center (e.g. odd slave counts).
+  chosen="$(cfgr::set_string \
+    --title "Center master fallback orientation" \
+    --option "Left:left" \
+             "Right:right" \
+             "Top:top" \
+             "Bottom:bottom"
+  )"
+
+  hypr::set "master:center_master_fallback" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::master::special_scale_factor() {
+  local chosen
+  chosen="$(cfgr::set_digit \
+    --hint "Special workspace scale" \
+    --title "Scale factor" \
+    --type "float" \
+    --min "0.0" \
+    --max "1.0"
+  )"
+
+  hypr::set "master:special_scale_factor" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::master::mfact() {
+  local chosen
+  # mfact is the fraction of screen width/height given to the master area.
+  # 0.55 is the default; 0.70 means master gets 70% of the axis.
+  chosen="$(cfgr::set_digit \
+    --hint "Master area fraction" \
+    --title "Master size factor" \
+    --type "float" \
+    --min "0.0" \
+    --max "1.0"
+  )"
+
+  hypr::set "master:mfact" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::master::slave_count_for_center_master() {
+  local chosen
+  # Number of slaves required before center-master mode activates.
+  # 0 means always center when orientation = center.
+  chosen="$(cfgr::set_digit \
+    --hint "Slave count threshold" \
+    --title "Slave count for center master" \
+    --type "int" \
+    --min "0" \
+    --max "20"
+  )"
+
+  hypr::set "master:slave_count_for_center_master" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_menu::master() {
+  _b() {
+    hypr::reload
+    hypr::fetch "${MASTER_SPEC[@]}"
+
+    cfgr::item::action \
+      --label "Orientation : ${HYPR[master.orientation]}" \
+      --func "_set::master::orientation"
+
+    cfgr::item::action \
+      --label "New window status : ${HYPR[master.new_status]}" \
+      --func "_set::master::new_status"
+
+    cfgr::item::action \
+      --label "New on active : ${HYPR[master.new_on_active]}" \
+      --func "_set::master::new_on_active"
+
+    cfgr::item::action \
+      --label "New on top : ${HYPR[master.new_on_top]}" \
+      --func "hypr::toggle 'master:new_on_top' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Master size factor : ${HYPR[master.mfact]}" \
+      --func "_set::master::mfact"
+
+    cfgr::item::action \
+      --label "Center master fallback : ${HYPR[master.center_master_fallback]}" \
+      --func "_set::master::center_master_fallback"
+
+    cfgr::item::action \
+      --label "Slave count for center master : ${HYPR[master.slave_count_for_center_master]}" \
+      --func "_set::master::slave_count_for_center_master"
+
+    cfgr::item::action \
+      --label "Special workspace scale : ${HYPR[master.special_scale_factor]}" \
+      --func "_set::master::special_scale_factor"
+
+     cfgr::item::action \
+       --label "Allow small split : ${HYPR[master.allow_small_split]}" \
+       --func "hypr::toggle 'master:allow_small_split' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Smart resizing : ${HYPR[master.smart_resizing]}" \
+      --func "hypr::toggle 'master:smart_resizing' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Drop at cursor : ${HYPR[master.drop_at_cursor]}" \
+      --func "hypr::toggle 'master:drop_at_cursor' "$HYPR_CONF_ADVANCED""
+
+    cfgr::item::action \
+      --label "Always keep position : ${HYPR[master.always_keep_position]}" \
+      --func "hypr::toggle 'master:always_keep_position' "$HYPR_CONF_ADVANCED""
+
+    # cfgr::item::action \
+    #   --label "Focus master on close : ${HYPR[master.focus_master_on_close]}" \
+    #   --func "hypr::toggle 'master:focus_master_on_close' "$HYPR_CONF_ADVANCED""
+  }
+
+  cfgr::run "Master Layout" "_b"
 }
 
 _build() {
@@ -114,13 +518,17 @@ _build() {
     --label "Windows layout : ${HYPR[general.layout]}" \
     --func "_set_layout"
 
-  if [[ "${HYPR[general.layout]}" == scrolling ]]; then
-    local direction="${HYPR[scrolling.direction]}"
+  cfgr::item::action \
+    --label "Scrolling options" \
+    --func "_menu::scrolling"
 
-    cfgr::item::action \
-      --label "Scrolling direction : $direction" \
-      --func "_set_scrolling_dir"
-  fi
+  cfgr::item::action \
+    --label "Dwindle options" \
+    --func "_menu::dwindle"
+
+  cfgr::item::action \
+    --label "Master options" \
+    --func "_menu::master"
 }
 
 cfgr::run "Advanced" "_build"
