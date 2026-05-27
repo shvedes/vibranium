@@ -37,6 +37,11 @@ _check_deps() {
 
 case "$1" in
 "--show")
+  if pidof -q rofi; then
+    killall rofi
+    exit 0
+  fi
+
   if ! _check_deps; then
     exit 1
   fi
