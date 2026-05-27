@@ -9,7 +9,29 @@ ADVANCED_SPEC=(
   "render.direct_scanout|int"
   "misc.middle_click_paste|bool"
   "misc.disable_autoreload|bool"
+)
+
+CURSOR_SPEC=(
+  "cursor.enable_hyprcursor|bool"
+  "cursor.sync_gsettings_theme|bool"
+  "cursor.no_hardware_cursors|int"
+  "cursor.use_cpu_buffer|int"
+  "cursor.no_warps|bool"
+  "cursor.persistent_warps|bool"
+  "cursor.warp_back_after_non_mouse_input|bool"
+  "cursor.warp_on_change_workspace|int"
+  "cursor.warp_on_toggle_special|int"
+  "cursor.hide_on_key_press|bool"
+  "cursor.hide_on_touch|bool"
+  "cursor.hide_on_tablet|bool"
+  "cursor.inactive_timeout|float"
+  "cursor.hotspot_padding|int"
+  "cursor.min_refresh_rate|int"
+  "cursor.invisible|bool"
+  "cursor.no_break_fs_vrr|int"
+  "cursor.zoom_rigid|bool"
   "cursor.zoom_detached_camera|bool"
+  "cursor.zoom_disable_aa|bool"
 )
 
 MASTER_SPEC=(
@@ -197,9 +219,224 @@ _set_scrolling_dir (){
   hypr::set "scrolling:direction" "$chosen" "$HYPR_CONF_ADVANCED"
 }
 
-_toggle() {
-  local path="$1"
-  hypr::toggle "$path" "$HYPR_CONF_ADVANCED"
+_set::cursor::no_hardware_cursors() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Hardware cursors" \
+    --option "Auto:0" \
+             "Always software:1" \
+             "Force software:2"
+  )"
+
+  hypr::set "cursor:no_hardware_cursors" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::cursor::use_cpu_buffer() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "CPU cursor buffer" \
+    --option "Auto:0" \
+             "Always:1" \
+             "Force:2"
+  )"
+
+  hypr::set "cursor:use_cpu_buffer" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::cursor::warp_on_change_workspace() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Warp on workspace change" \
+    --option "Disabled:0" \
+             "Enabled:1" \
+             "Force center:2"
+  )"
+
+  hypr::set "cursor:warp_on_change_workspace" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::cursor::warp_on_toggle_special() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "Warp on special workspace toggle" \
+    --option "Disabled:0" \
+             "Enabled:1" \
+             "Force center:2"
+  )"
+
+  hypr::set "cursor:warp_on_toggle_special" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::cursor::no_break_fs_vrr() {
+  local chosen
+  chosen="$(cfgr::set_string \
+    --title "No break fullscreen VRR" \
+    --option "Disabled:0" \
+             "Enabled:1" \
+             "Force:2"
+  )"
+
+  hypr::set "cursor:no_break_fs_vrr" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::cursor::inactive_timeout() {
+  local chosen
+  chosen="$(cfgr::set_digit \
+    --hint "Seconds before hiding" \
+    --title "Inactive timeout" \
+    --type "float" \
+    --min "0.0" \
+    --max "60.0"
+  )"
+
+  hypr::set "cursor:inactive_timeout" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::cursor::hotspot_padding() {
+  local chosen
+  chosen="$(cfgr::set_digit \
+    --hint "Padding around hotspot (px)" \
+    --title "Hotspot padding" \
+    --type "int" \
+    --min "0" \
+    --max "32"
+  )"
+
+  hypr::set "cursor:hotspot_padding" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_set::cursor::min_refresh_rate() {
+  local chosen
+  chosen="$(cfgr::set_digit \
+    --hint "Minimum cursor refresh rate (Hz)" \
+    --title "Min refresh rate" \
+    --type "int" \
+    --min "60" \
+    --max "360"
+  )"
+
+  hypr::set "cursor:min_refresh_rate" "$chosen" "$HYPR_CONF_ADVANCED"
+}
+
+_menu::cursor() {
+  _b() {
+    hypr::reload
+    hypr::fetch "${CURSOR_SPEC[@]}"
+
+    local hw_cursor_display= cpu_buf_display= warp_ws_display= warp_sp_display= no_break_vrr_display=
+
+    case "${HYPR[cursor.no_hardware_cursors]}" in
+      0) hw_cursor_display="auto" ;;
+      1) hw_cursor_display="always software" ;;
+      2) hw_cursor_display="force software" ;;
+    esac
+
+    case "${HYPR[cursor.use_cpu_buffer]}" in
+      0) cpu_buf_display="auto" ;;
+      1) cpu_buf_display="always" ;;
+      2) cpu_buf_display="force" ;;
+    esac
+
+    case "${HYPR[cursor.warp_on_change_workspace]}" in
+      0) warp_ws_display="disabled" ;;
+      1) warp_ws_display="enabled" ;;
+      2) warp_ws_display="force center" ;;
+    esac
+
+    case "${HYPR[cursor.warp_on_toggle_special]}" in
+      0) warp_sp_display="disabled" ;;
+      1) warp_sp_display="enabled" ;;
+      2) warp_sp_display="force center" ;;
+    esac
+
+    case "${HYPR[cursor.no_break_fs_vrr]}" in
+      0) no_break_vrr_display="disabled" ;;
+      1) no_break_vrr_display="enabled" ;;
+      2) no_break_vrr_display="force" ;;
+    esac
+
+    cfgr::item::action \
+      --label "Enable hyprcursor : ${HYPR[cursor.enable_hyprcursor]}" \
+      --func "hypr::toggle 'cursor:enable_hyprcursor' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Sync gsettings theme : ${HYPR[cursor.sync_gsettings_theme]}" \
+      --func "hypr::toggle 'cursor:sync_gsettings_theme' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Hardware cursors : $hw_cursor_display" \
+      --func "_set::cursor::no_hardware_cursors"
+
+    cfgr::item::action \
+      --label "CPU buffer : $cpu_buf_display" \
+      --func "_set::cursor::use_cpu_buffer"
+
+    cfgr::item::action \
+      --label "Invisible : ${HYPR[cursor.invisible]}" \
+      --func "hypr::toggle 'cursor:invisible' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Inactive timeout : ${HYPR[cursor.inactive_timeout]}s" \
+      --func "_set::cursor::inactive_timeout"
+
+    cfgr::item::action \
+      --label "Hotspot padding : ${HYPR[cursor.hotspot_padding]}px" \
+      --func "_set::cursor::hotspot_padding"
+
+    cfgr::item::action \
+      --label "Min refresh rate : ${HYPR[cursor.min_refresh_rate]}Hz" \
+      --func "_set::cursor::min_refresh_rate"
+
+    cfgr::item::action \
+      --label "Hide on key press : ${HYPR[cursor.hide_on_key_press]}" \
+      --func "hypr::toggle 'cursor:hide_on_key_press' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Hide on touch : ${HYPR[cursor.hide_on_touch]}" \
+      --func "hypr::toggle 'cursor:hide_on_touch' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Hide on tablet : ${HYPR[cursor.hide_on_tablet]}" \
+      --func "hypr::toggle 'cursor:hide_on_tablet' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "No warps : ${HYPR[cursor.no_warps]}" \
+      --func "hypr::toggle 'cursor:no_warps' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Persistent warps : ${HYPR[cursor.persistent_warps]}" \
+      --func "hypr::toggle 'cursor:persistent_warps' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Warp back after non-mouse input : ${HYPR[cursor.warp_back_after_non_mouse_input]}" \
+      --func "hypr::toggle 'cursor:warp_back_after_non_mouse_input' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Warp on workspace change : $warp_ws_display" \
+      --func "_set::cursor::warp_on_change_workspace"
+
+    cfgr::item::action \
+      --label "Warp on special toggle : $warp_sp_display" \
+      --func "_set::cursor::warp_on_toggle_special"
+
+    cfgr::item::action \
+      --label "No break fullscreen VRR : $no_break_vrr_display" \
+      --func "_set::cursor::no_break_fs_vrr"
+
+    cfgr::item::action \
+      --label "Zoom rigid : ${HYPR[cursor.zoom_rigid]}" \
+      --func "hypr::toggle 'cursor:zoom_rigid' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Zoom detached camera : ${HYPR[cursor.zoom_detached_camera]}" \
+      --func "hypr::toggle 'cursor:zoom_detached_camera' \"$HYPR_CONF_ADVANCED\""
+
+    cfgr::item::action \
+      --label "Zoom disable anti-aliasing : ${HYPR[cursor.zoom_disable_aa]}" \
+      --func "hypr::toggle 'cursor:zoom_disable_aa' \"$HYPR_CONF_ADVANCED\""
+  }
+
+  cfgr::run "Cursor" "_b"
 }
 
 _menu::scrolling () {
@@ -495,20 +732,16 @@ _build() {
     --func "_set_vrr"
 
   cfgr::item::action \
-    --label "Zoom detached camera : ${HYPR[cursor.zoom_detached_camera]}" \
-    --func "_toggle 'cursor:zoom_detached_camera'"
-
-  cfgr::item::action \
     --label "Variable frame rate : ${HYPR[debug.vfr]}" \
-    --func "_toggle 'debug:vfr'"
+    --func "hypr::toggle 'debug:vfr' "$HYPR_CONF_ADVANCED""
 
   cfgr::item::action \
     --label "Disable auto reload : ${HYPR[misc.disable_autoreload]}" \
-    --func "_toggle 'misc:disable_autoreload'"
+    --func "hypr::toggle 'misc:disable_autoreload' "$HYPR_CONF_ADVANCED""
 
   cfgr::item::action \
     --label "Middle click paste : ${HYPR[misc.middle_click_paste]}" \
-    --func "_toggle 'misc:middle_click_paste'"
+    --func "hypr::toggle 'misc:middle_click_paste' "$HYPR_CONF_ADVANCED""
 
   cfgr::item::action \
     --label "Direct scanout : ${ds_display}" \
@@ -517,6 +750,10 @@ _build() {
   cfgr::item::action \
     --label "Windows layout : ${HYPR[general.layout]}" \
     --func "_set_layout"
+
+  cfgr::item::action \
+    --label "Cursor options" \
+    --func "_menu::cursor"
 
   cfgr::item::action \
     --label "Scrolling options" \
