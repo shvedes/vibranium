@@ -1,7 +1,5 @@
 #!/usr/bin/bash
 
-# Copy currently playing MPD or Spotify track URI to clipboard
-
 SELF="${0##*/}"
 
 shcat() {
@@ -15,7 +13,7 @@ usage() {
 Usage: $SELF [OPTION]
 
 Copy URI of the currently playing track to the clipboard.
-Supports MPD and Spotify.
+Supports MPD and Playerctl.
 
 Options:
   -n, --notify  Show desktop notification
@@ -47,10 +45,10 @@ mpd_music_dir() {
 mpd_is_playing() {
   while read -r line; do
     case "$line" in
-    *"[playing]"*)
+    *"[playing]"*|*"[paused]"*)
       return 0
       ;;
-    *"[paused]"*)
+    *)
       return 1
       ;;
     esac
@@ -84,7 +82,7 @@ if command -v mpc >/dev/null && [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] && mpd_is_p
   if [[ -n "$track" && -n "$music_dir" ]]; then
     file="file://$music_dir/$track"
   fi
-elif playerctl -p spotify status &>/dev/null; then
+elif playerctl status &>/dev/null; then
   file="$(playerctl metadata --format '{{xesam:url}}' 2>/dev/null)"
 fi
 
