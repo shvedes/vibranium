@@ -14,9 +14,7 @@ case "$VGA_STR" in
     NVIDIA_SETUP_NEEDED=true
     PACKAGES+=(
       "nvtop"
-      "egl-wayland"
       "nvidia-dkms"
-      "nvidia-utils"
       "linux-headers"
       "nvidia-settings"
       "lib32-nvidia-utils"
