@@ -25,7 +25,7 @@ fi
 shopt -s nullglob
 
 # Then user scripts
-UHOOKS=("$XDG_CONFIG_HOME"/vibranium/startup/*.sh)
+UHOOKS=("$XDG_CONFIG_HOME"/vibranium/hooks/startup/*.sh)
 
 if ((${#UHOOKS[@]} > 0)); then
   for hook in "${UHOOKS[@]}"; do

@@ -10,7 +10,7 @@ for app in "${APPS[@]}"; do
   killall -s KILL "$app"
 done
 
-HOOKS=("$XDG_CONFIG_HOME"/vibranium/shutdown/*.sh)
+HOOKS=("$XDG_CONFIG_HOME"/vibranium/hooks/shutdown/*.sh)
 
 if ((${#HOOKS[@]} >= 0)); then
   for hook in "${HOOKS[@]}"; do
