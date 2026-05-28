@@ -26,6 +26,7 @@
 tooltip, tooltip label {
 	font-size: 12px;
   background: black;
+  color: white;
 }
 
 #workspaces {
