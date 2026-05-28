@@ -191,7 +191,6 @@ case "$INPUT" in
     fi
 
     source vb-launch-cmd -- $CMD $ARGS
-    # fi
   # File exists
   elif [[ -e "$INPUT" ]]; then
     source app2unit -s app-graphical.slice -- xdg-open "$INPUT" &>/dev/null
