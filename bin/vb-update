@@ -55,15 +55,19 @@ _restore_stash_and_fail() {
 }
 
 vb_wallpapers_pull() {
-    local repo_dir="$XDG_CONFIG_HOME/vibranium/themes"
+  local repo_dir="$XDG_CONFIG_HOME/vibranium/themes"
 
-    # Fetch without touching the working tree
-    git -C "$repo_dir" fetch origin || return 1
+  if ! [[ -d $repo_dir/.git ]]; then
+    return
+  fi
 
-    # Hard-reset to the remote state, discarding any local modifications
-    # to tracked files (deleted, edited, replaced). Untracked user files
-    # (newly added wallpapers not in the repo) are preserved.
-    git -C "$repo_dir" reset --hard "origin/master"
+  # Fetch without touching the working tree
+  git -C "$repo_dir" fetch origin || return 1
+
+  # Hard-reset to the remote state, discarding any local modifications
+  # to tracked files (deleted, edited, replaced). Untracked user files
+  # (newly added wallpapers not in the repo) are preserved.
+  git -C "$repo_dir" reset --hard "origin/master"
 }
 
 _update() {
