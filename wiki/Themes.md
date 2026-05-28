@@ -60,6 +60,14 @@ Open *Vibranium Menu* (`CTRL ALT V`) -> *Remove* -> *Theme*. A rofi window will 
 Select the theme you want and press *Enter*.  
 If the theme is currently active, it will be replaced with the default one.
 
+## Theme hooks
+
+If you want to extend your theme capabilities, you can create custom bash scripts, that is to say, "hooks", that will execute every time you change the active theme. You may have as many hooks as you want.
+
+Go to `~/.config/vibranium/hooks/themes` and check out `example.sh` which will guide you through.
+
+Also don't forget that you have an option to modify and/or create your own templates in `~/.config/vibranium/themed`. Read [Themes Architecture](Themes%20Architecture.md) for more information.
+
 ---
 
 Related pages:

@@ -27,6 +27,8 @@ CURRENT_THEME_PATH="$XDG_CONFIG_HOME/vibranium/current/theme"
 NEXT_THEME_PATH="$XDG_CONFIG_HOME/vibranium/current/next-theme"
 THEME_NAME_FILE="$XDG_CONFIG_HOME/vibranium/current/theme.name"
 USER_THEMES_PATH="$XDG_CONFIG_HOME/vibranium/themes"
+HOOK_DIR="$XDG_CONFIG_HOME/vibranium/hooks/theme"
+
 SELF="${0##*/}"
 
 # "tokyonight-night" -> "Tokyonight-Night"
@@ -313,6 +315,24 @@ pick_variant() {
       }
     done
   done
+}
+
+apply_hooks(){
+  # Apply custom user hooks
+  if [[ -d "$HOOK_DIR" ]]; then
+    shopt -s nullglob
+    HOOK_FILES=($HOOK_DIR/*.sh)
+    shopt -u nullglob
+
+    if ((${#HOOK_FILES[@]} == 0)); then
+      # No user hooks found - do nothing
+      exit 0
+    fi
+
+    for hook in "${HOOK_FILES[@]}"; do
+      bash "$hook"
+    done
+  fi
 }
 
 apply_theme() {
@@ -648,6 +668,7 @@ vb-cmd-reload --quiet
 touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
 killall --quiet -s USR2 btop
 
+apply_hooks &
 vb-theme-set-gtk &
 vb-theme-set-svg &
 vb-theme-set-browser &
