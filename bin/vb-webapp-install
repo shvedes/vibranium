@@ -390,6 +390,7 @@ Type=Application
 Icon=$icon
 StartupNotify=true
 Categories=PWA;${category}
+OnlyShowIn=Hyprland;
 EOF
 
   if [[ -n $mime ]]; then
