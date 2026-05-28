@@ -30,6 +30,7 @@ RESET=$'\e[0m'
 printf -v VIBRANIUM_SUDO_PROMPT '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER"
 export SUDO_PROMPT=$VIBRANIUM_SUDO_PROMPT
 export PATH="$PATH:$VIBRANIUM/configure"
+export LANG="en_US.UTF-8"
 
 # helpers::ui::menu — Dynamic rofi dmenu wrapper with automatic window sizing
 #
