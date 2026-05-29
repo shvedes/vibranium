@@ -132,4 +132,4 @@ if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading $THEME_NAME_COLO
   exit 1
 fi
 
-vb-theme-set "$THEME_NAME"
+exec setsid -f vb-theme-set "$THEME_NAME"
