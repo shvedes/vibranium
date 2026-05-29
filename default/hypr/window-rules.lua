@@ -138,7 +138,7 @@ hl.window_rule({
     -- All package management scripts
     -- And pretty much every TUI that can be launched by clicking on a Waybar module.
     title =
-    "(vb-(tui|font|webapp|update|pkg|setup|env|theme-install).*|bluetui|vb-update|wiremix|nmtui|impala|iwctl|pass)",
+    "(vb-(tui|font|webapp|update|pkg|setup|env|theme-install|util-yt-dlp).*|bluetui|vb-update|wiremix|nmtui|impala|iwctl|pass)",
     float = true,
   },
 

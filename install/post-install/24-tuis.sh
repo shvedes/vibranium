@@ -33,3 +33,9 @@ vb-tui-install \
   --icon 'filelight' \
   --category 'System' \
   --args '--enable-delete --exclude-kernfs --group-directories-first /'
+
+vb-tui-install \
+  --exec vb-util-yt-dlp \
+  --name 'Video Downloader' \
+  --category 'Utilities' \
+  --float

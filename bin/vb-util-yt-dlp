@@ -1,0 +1,164 @@
+#!/usr/bin/bash
+
+source vb-lib-core
+
+URL="${1:-}"
+OUTPUT_DIR="$XDG_DOWNLOAD_DIR"
+
+# All browsers yt-dlp supports, in priority order.
+# Each will be tried in turn; cookieless is the final fallback.
+COOKIE_BROWSERS=(chrome chromium firefox brave vivaldi edge opera)
+
+# Show the header only in interactive mode.
+if [[ -z "$1" ]]; then
+  term::show_header
+fi
+
+trap 'printf "\n";_operation_canceled; exit 1' INT
+
+_operation_canceled() {
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+}
+
+_operation_complete() {
+  printf "%s[VIBRANIUM]%s Operation complete" "$GREEN" "$RESET"
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+}
+
+# Try downloading with cookies from each installed browser in turn,
+# falling back to a cookieless attempt as a last resort.
+# On first success the winning browser's cookies are written to the cache
+# file; subsequent runs load that file directly and skip the browser
+# scan entirely. If the cached cookies ever stop working the cache is
+# wiped and the full scan runs again, writing a fresh winner.
+_try_download() {
+  local url="$1"
+  local cookie_cache="$VIBRANIUM_CACHE/${0##*/}"
+
+  local base_args=(
+    -f "bestvideo+bestaudio/best"
+    --remux-video mp4
+    --quiet --progress
+    --extractor-args "youtube:player_client=tv"
+    --throttled-rate 100K
+    -P "$OUTPUT_DIR"
+    --print-to-file "after_move:filepath" "$DOWNLOAD_PATH_FILE"
+  )
+
+  # Fast path — cached cookies from a previous successful run.
+  if [[ -f "$cookie_cache" ]]; then
+    echo "${YELLOW}[VIBRANIUM]${RESET} Downloading..."
+    if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url"; then
+      return 0
+    fi
+    echo "${YELLOW}[VIBRANIUM]${RESET} Cached cookies stale — re-scanning browsers"
+    rm -f "$cookie_cache"
+  fi
+
+  # Slow path — try every browser; write cookies on first success so
+  # the next invocation takes the fast path.
+  for browser in "${COOKIE_BROWSERS[@]}"; do
+    echo "${YELLOW}[VIBRANIUM]${RESET} Trying ${BLUE}${browser}${RESET} cookies"
+    # --cookies writes the merged jar to disk when the download succeeds.
+    if yt-dlp "${base_args[@]}" --cookies-from-browser "$browser" \
+               --cookies "$cookie_cache" "$url" 2>/dev/null; then
+      return 0
+    fi
+    # Discard any partial cookie file the failed attempt may have written.
+    rm -f "$cookie_cache"
+  done
+
+  # All browsers exhausted — attempt without cookies (this will also
+  # surface the real error if the URL itself is the problem).
+  echo "${YELLOW}[VIBRANIUM]${RESET} No browser cookies worked. Downloading without cookies"
+  yt-dlp "${base_args[@]}" "$url"
+}
+
+# Returns 0 (true) when the terminal window is NOT on the currently focused
+# workspace, meaning the user has switched away and a notification is useful.
+# Returns 1 when the window is on the active workspace (user can see the
+# terminal output directly).
+#
+# The window is identified by its fixed class and title, which Vibranium
+# sets via window rules when launching this script. This is more reliable
+# than PID (shared across all Alacritty windows) or address (requires
+# capturing activewindow at startup before the user can switch away).
+_window_is_offscreen() {
+  local active_ws our_ws
+
+  active_ws="$(hyprctl -j activeworkspace | jq -r '.id')"
+
+  our_ws="$(hyprctl -j clients | jq -r \
+    '.[] | select(.title == "vb-util-yt-dlp") | .workspace.id')"
+
+  # If the window is not found in the client list (e.g. it was closed),
+  # treat it as onscreen to avoid spurious notifications.
+  [[ -z "$our_ws" ]] && return 1
+
+  # Return 0 when the workspace IDs differ (window is offscreen).
+  [[ "$our_ws" != "$active_ws" ]]
+}
+
+if ! command -v yt-dlp >/dev/null; then
+  if ! term::ask_yes_no Y "${BLUE}yt-dlp${RESET} not found. Install it now?"; then
+    _operation_canceled
+    exit 1
+  fi
+
+  vb-pkg-install --embedded -- yt-dlp
+  term::enable_input
+fi
+
+while true; do
+  if [[ -z "$URL" ]]; then
+    read -rp "${YELLOW}[VIBRANIUM]${RESET} Enter video URL: " URL
+  fi
+
+  if [[ $URL =~ ^https?:// ]]; then
+    break
+  fi
+
+  echo "${RED}[VIBRANIUM]${RESET} Not a valid URL!"
+  URL=""
+done
+
+# Tmpfile receives the final file path from yt-dlp via --print-to-file.
+# Reset the trap so the tmpfile is removed on Ctrl-C as well.
+DOWNLOAD_PATH_FILE="$(mktemp)"
+trap 'rm -f "$DOWNLOAD_PATH_FILE"; printf "\n"; _operation_canceled; exit 1' INT
+
+if ! _try_download "$URL"; then
+  rm -f "$DOWNLOAD_PATH_FILE"
+  if _window_is_offscreen; then
+    notify-send -r 3 -t 10000 -u critical "Video Downloader" \
+      "Failed to download:\n<span foreground='${P_RED}'>$URL</span>!"
+    exit 1
+  fi
+
+  echo "${RED}[VIBRANIUM]${RESET} Something went wrong!"
+  _operation_canceled
+  exit 1
+fi
+
+# Read and strip the trailing newline that --print-to-file appends.
+DOWNLOADED_FILE="$(< "$DOWNLOAD_PATH_FILE")"
+DOWNLOADED_FILE="${DOWNLOADED_FILE%$'\n'}"
+rm -f "$DOWNLOAD_PATH_FILE"
+
+# Copy the file URI to the clipboard so it can be pasted directly into
+# file managers, media players, or anything that accepts drag-and-drop.
+if [[ -n "$DOWNLOADED_FILE" && -f "$DOWNLOADED_FILE" ]]; then
+  printf 'file://%s' "$DOWNLOADED_FILE" | wl-copy --type text/uri-list
+  echo "${GREEN}[VIBRANIUM]${RESET} Copied to clipboard: ${BLUE}file://${DOWNLOADED_FILE}${RESET}"
+fi
+
+echo "${GREEN}[VIBRANIUM]${RESET} Video has been saved to ${BLUE}$OUTPUT_DIR${RESET}"
+
+if _window_is_offscreen; then
+  notify-send -r 3 -t 5000 "Video Downloader" \
+    "Video has been successfully saved to <b><span foreground='${P_BLUE}'>$OUTPUT_DIR</span></b>"
+  exit 0
+fi
+
+_operation_complete

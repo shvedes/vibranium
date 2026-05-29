@@ -27,6 +27,7 @@ This page is a starting point. To learn more about Vibranium, you'll find an ove
 - [Idle Timeouts](Idle%20Timeouts.md)
 - [Window Groups](Window%20Groups.md)
 - [Waybar Modules](Waybar%20Modules.md)
+- [Video Downloader](Video%20Downloader.md)
 - [Keyboard Shortcuts](Keyboard%20Shortcuts.md)
 - [Project Philosophy](Project%20Philosophy.md)
 - [Themes Architecture](Themes%20Architecture.md)
