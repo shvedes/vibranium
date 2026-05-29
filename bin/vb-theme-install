@@ -49,9 +49,17 @@ THEME_NAME="${THEME_NAME##*/}"
 THEME_NAME="${THEME_NAME#omarchy}"
 THEME_NAME="${THEME_NAME#vibranium}"
 THEME_NAME="${THEME_NAME#-theme-}"
-THEME_NAME_COLOR="${BLUE}${THEME_NAME^}${RESET}"
 
-THEMES_DIR="$HOME/.config/vibranium/themes"
+THEME_DISPLAY_NAME=""
+
+for _word in ${THEME_NAME//-/ }; do
+  THEME_DISPLAY_NAME+="${_word^} "
+done
+
+THEME_DISPLAY_NAME="${THEME_DISPLAY_NAME% }"
+THEME_NAME_COLOR="${BLUE}${THEME_DISPLAY_NAME}${RESET}"
+
+THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
 THEME_PATH="$THEMES_DIR/$THEME_NAME"
 
 # Official themes ship inside the Vibranium repo itself. A community theme whose
