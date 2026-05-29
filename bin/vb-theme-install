@@ -39,7 +39,6 @@ fi
 
 # Extract owner/repo from GitHub URL for the API, stripping scheme, host, and .git suffix
 REPO_PATH="${REPO_URL#https://github.com/}"
-REPO_PATH="${REPO_URL#https://gitlab.com/}" # <- Just in case
 REPO_PATH="${REPO_PATH%.git}"
 REPO_PATH="${REPO_PATH%/}" # guard against a trailing slash
 
