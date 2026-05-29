@@ -36,12 +36,19 @@ _get_update_channel() {
 # ================================================================================ #
 
 _build() {
-  cfgr::item::bool \
-    --var VIBRANIUM_GLOBAL_USE_OSD \
-    --label "OSD enabled" \
-    --hook "_toggle_osd_service"
+  local update_channel
+  update_channel="$(_get_update_channel)"
 
-  cfgr::item::raw "Update channel : $(_get_update_channel)" "action:_set_update_channel"
+  # Don't show this option at all when
+  # SwayOSD isn't installed
+  if command -v swayosd-client >/dev/null; then
+    cfgr::item::bool \
+      --var VIBRANIUM_GLOBAL_USE_OSD \
+      --label "OSD enabled" \
+      --hook "_toggle_osd_service"
+  fi
+
+  cfgr::item::raw "Update channel : $update_channel" "action:_set_update_channel"
 }
 
 cfgr::run "General" "_build" \
