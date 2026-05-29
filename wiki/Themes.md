@@ -7,7 +7,7 @@ The currently active theme is highlighted in bold italic text.
 Most themes are forks of Neovim themes, but not all of them.
 There are also ports of official and community Omarchy themes, adapted for Vibranium.
 
-At the time of writing, there are 34 pre-installed themes available.
+At the time of writing, there are 26 pre-installed themes available, and many more available via *Vibranium Menu* -> *Install* -> *Theme*. Use [this](https://github.com/search?q=vibranium-theme-&type=repositories) link to get all additional, officially supported Vibranium themes.
 
 ## Types
 
