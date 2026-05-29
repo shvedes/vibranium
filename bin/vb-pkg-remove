@@ -468,13 +468,10 @@ if term::ask_yes_no Y "Proceed with uninstallation?"; then
   # pacman -Ql still knows about the packages.
   if [[ $NO_SYSTEMD == false ]]; then
     _handle_systemd
+    _disable_systemd_units
   fi
 
   if _uninstall_packages; then
-    if [[ $NO_SYSTEMD == false ]]; then
-      _disable_systemd_units
-    fi
-
     _remove_orphans
     _update_bar_module
     _uninstallation_complete
