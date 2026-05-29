@@ -4,7 +4,7 @@ hl.config({
   general = {
     col = {
       active_border = "rgba({{ accent_strip }}b3)",
-      inactive_border = "rgb({{ background_3_strip }})",
+      inactive_border = "rgb({{ background_2_strip }})",
     },
   },
 
