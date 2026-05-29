@@ -131,7 +131,7 @@ _disable_scope_units() {
     remaining=("${_pkg_map[$pkg]}")
 
     while ((${#remaining[@]} > 0)); do
-      unit="${remaining[0]}"
+      unit="${remaining[0]/ /}" # Strip trailing spaces
 
       _ask_yes_no_all Y "${BLUE}[VIBRANIUM]${RESET} Disable unit '${BLUE}${unit}${RESET}' from package '${GREEN}${pkg}${RESET}' ($scope scope)?"
       local response=$?
