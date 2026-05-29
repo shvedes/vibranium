@@ -37,7 +37,7 @@ _capitalize() {
     result+=("${part^}")
   done
 
-  # Join parts back with '-' (due to IFS) and print
+  local IFS=' '
   printf '%s' "${result[*]}"
 }
 
