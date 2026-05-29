@@ -52,7 +52,7 @@ Before installation, the installer verifies that the theme is supported and will
 
 Once installed, the theme is applied immediately and becomes available in the theme picker (`CTRL ALT + T`).
 
-### Removing an Omarchy theme
+### Removing a community theme
 
 To remove a theme, follow the reverse process.  
 Open *Vibranium Menu* (`CTRL ALT V`) -> *Remove* -> *Theme*. A rofi window will appear with a list of all installed community themes.
