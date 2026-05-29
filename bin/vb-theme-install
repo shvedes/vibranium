@@ -39,11 +39,14 @@ fi
 
 # Extract owner/repo from GitHub URL for the API, stripping scheme, host, and .git suffix
 REPO_PATH="${REPO_URL#https://github.com/}"
+REPO_PATH="${REPO_URL#https://gitlab.com/}" # <- Just in case
 REPO_PATH="${REPO_PATH%.git}"
 REPO_PATH="${REPO_PATH%/}" # guard against a trailing slash
 
 THEME_NAME="${REPO_URL%.git}"
 THEME_NAME="${THEME_NAME##*/}"
+# Strip down omarchy-theme prefix so we can
+# extract the theme name.
 THEME_NAME="${THEME_NAME#omarchy-}"
 THEME_NAME="${THEME_NAME%-theme}"
 THEME_NAME_COLOR="${BLUE}${THEME_NAME^}${RESET}"
@@ -86,14 +89,21 @@ if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] && [[ "$CONTENTS" != *'"name":
   exit 1
 fi
 
-if [[ "$CONTENTS" != *'"name:" "hyprland.lua"'* ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${CYAN}Hyprland${RESET} versions prior to ${BLUE}v0.55.0${RESET}"
-  echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${RESET} and ${CYAN}Hyprland${RESET} ${BLUE}v0.55.0+${RESET}"
+echo "${GREEN}[VIBRANIUM]${RESET} $THEME_NAME_COLOR is compatible with Vibranium"
 
-  rm -f "$CONTENTS_FILE"
-  _operation_canceled
-  exit 1
-fi
+# Update: we can actually rely on the template generator, so
+# the existence of hyprland.lua is no longer mandatory.
+# I should've realized that much sooner lol.
+# Omarchy themes still look bad though.
+
+# if [[ "$CONTENTS" != *'"name:" "hyprland.lua"'* ]]; then
+#   echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${CYAN}Hyprland${RESET} versions prior to ${BLUE}v0.55.0${RESET}"
+#   echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${RESET} and ${CYAN}Hyprland${RESET} ${BLUE}v0.55.0+${RESET}"
+#
+#   rm -f "$CONTENTS_FILE"
+#   _operation_canceled
+#   exit 1
+# fi
 
 rm -f "$CONTENTS_FILE"
 
