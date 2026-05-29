@@ -48,6 +48,7 @@ THEME_NAME="${THEME_NAME##*/}"
 # Strip down omarchy-theme prefix so we can
 # extract the theme name.
 THEME_NAME="${THEME_NAME#omarchy-}"
+THEME_NAME="${THEME_NAME#vibranium-}"
 THEME_NAME="${THEME_NAME%-theme}"
 THEME_NAME_COLOR="${BLUE}${THEME_NAME^}${RESET}"
 
