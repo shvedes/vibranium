@@ -189,7 +189,7 @@ echo ""
 echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/QEMU${RESET} for further, advanced configuration"
 
 if term::ask_yes_no Y "Launch VM Manager now?"; then
-  exec app2unit virt-manager &>/dev/null
+  exec setsid -f app2unit virt-manager &>/dev/null
 else
   _operation_complete
 fi
