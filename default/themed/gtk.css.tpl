@@ -208,6 +208,36 @@ toast button.circular.flat.image-button:hover {
     background-color: @red;
 }
 
+/* Context Menus */
+
+/* Menu background */
+menu, popover.menu contents {
+    background-color: @background;
+}
+
+/* Menu item */
+menu menuitem, popover.menu modelbutton {
+    color: @foreground;
+}
+
+/* Selected / Hovered */
+menu menuitem:hover,
+menu menuitem:selected,
+popover.menu modelbutton:hover {
+    background-color: alpha(@accent, 0.8);
+    color: @background;
+}
+
+/* Disabled items */
+menu menuitem:disabled,
+popover.menu modelbutton:disabled {
+    color: alpha(@foreground, 0.3);
+}
+
+menu separator {
+    background-color: alpha(@foreground, 0.1);
+}
+
 * {
     border-radius: 0;
 }
