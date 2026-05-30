@@ -15,6 +15,10 @@ gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 gsettings set org.gnome.desktop.interface icon-theme 'Vibranium'
 
+mkdir -p ~/.config/gtk-3.0
+printf '* {\n\tborder-radius: 0;\n}\n\n@import "colors.css";' \
+  > ~/.config/gtk-3.0/gtk.css
+
 # QTCT
 sed -i "s/user/$USER/" "$HOME/.config/qt5ct/qt5ct.conf"
 sed -i "s/user/$USER/" "$HOME/.config/qt6ct/qt6ct.conf"
