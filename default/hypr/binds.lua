@@ -25,6 +25,15 @@ local resize         = {
   { key = "K", x = 0,   y = 40 },  -- down
 }
 
+-- Same deltas as resize, but bound to arrow keys so the resize submap
+-- is reachable without the IJKL cluster (e.g. on a laptop or numpad layout).
+local resize_arrows  = {
+  { key = "Left",  x = -40, y = 0 },   -- left
+  { key = "Right", x = 40,  y = 0 },   -- right
+  { key = "Up",    x = 0,   y = -40 }, -- up
+  { key = "Down",  x = 0,   y = 40 },  -- down
+}
+
 -- Merge directions and arrows into one sequence for binds that cover both.
 local all_directions = {}
 table.move(directions, 1, #directions, 1, all_directions)
@@ -80,11 +89,29 @@ end
 -- Q (quit) / Escape / Return / Backspace to exit the resize mode.
 
 hl.define_submap("resize", function()
+  -- IJKL bindings.
   for _, r in ipairs(resize) do
     local dir = ""
     for _, d in ipairs(directions) do
       if d.key == r.key then
         dir = d.dir; break
+      end
+    end
+
+    hl.bind(
+      r.key,
+      hl.dsp.window.resize({ x = r.x, y = r.y, relative = true }),
+      { repeating = true, description = "Resize " .. dir }
+    )
+  end
+
+  -- Arrow key bindings: same deltas as the IJKL cluster above.
+  -- Direction label is resolved from the arrows table to reuse the mapping.
+  for _, r in ipairs(resize_arrows) do
+    local dir = ""
+    for _, a in ipairs(arrows) do
+      if a.key == r.key then
+        dir = a.dir; break
       end
     end
 
