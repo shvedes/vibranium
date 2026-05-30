@@ -41,8 +41,7 @@ mkdir -p "$HOME/.local/share/vibranium"
 # Ask user which branch to clone
 echo "Which version would you like to install?"
 echo "  [1] release  - latest stable release (default)"
-# echo "  [2] dev      - development branch"
-echo "  [3] upstream - master branch"
+echo "  [2] upstream - latest git commit"
 while true; do
     echo -n "Enter your choice [1/2/3] or press Enter for default: " > /dev/tty
     read branch_choice < /dev/tty
@@ -55,18 +54,13 @@ while true; do
             git clone --branch "$latest_ver" "$REPO_URL" "$INSTALL_DIR"
             break
             ;;
-        2|"dev")
-            echo "Cloning vibranium repository (dev branch)..."
-            git clone --branch dev "$REPO_URL" "$INSTALL_DIR"
-            break
-            ;;
-        3|"upstream")
+        2|"upstream")
             echo "Cloning vibranium repository (master branch)..."
             git clone --branch master "$REPO_URL" "$INSTALL_DIR"
             break
             ;;
         *)
-            echo "Invalid choice: '$branch_choice'. Please enter 1, 2, or 3."
+            echo "Invalid choice: '$branch_choice'. Please enter 1 or 2"
             ;;
     esac
 done
@@ -80,4 +74,3 @@ sleep 2
 
 # Run the installer
 exec bash "$INSTALL_DIR/install/install"
-
