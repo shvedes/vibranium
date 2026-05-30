@@ -4,6 +4,7 @@ SELF="${0##*/}"
 STEP_DEFAULT="0.20"
 ACTION=""
 STEP="$STEP_DEFAULT"
+ZOOM_VALUE=""
 
 STATE_FILE="$VIBRANIUM_RUNTIME/$SELF"
 
@@ -22,6 +23,7 @@ Zoom in and out your entire screen.
 Options:
   -i, --increase         Increase zoom by step
   -d, --decrease         Decrease zoom by step (floor 1.00)
+  -v, --zoom-value <n>   Set zoom value directly
   -r, --reset            Reset zoom to 1.00
   -s, --step <value>     Set step (default: ${STEP_DEFAULT})
   -h, --help             Display this help and exit
@@ -60,13 +62,11 @@ read_state100() {
   if [[ -r "$STATE_FILE" ]]; then
     IFS= read -r v <"$STATE_FILE" || v=100
 
-    # keep default if value is not numeric
     if [[ ! "$v" =~ ^[0-9]+$ ]]; then
       v=100
     fi
   fi
 
-  # shellcheck disable=SC2034
   ref="$v"
 }
 
@@ -99,6 +99,7 @@ apply_zoom100() {
   #   printf 'Failed to set zoom factor to %s\n' "$new_float" >&2
   #   return 1
   # fi
+
   hyprctl -q eval "hl.config({cursor = {zoom_factor = ${new_float}}})"
 }
 
@@ -112,6 +113,16 @@ while (($#)); do
     ACTION="decrease"
     shift
     ;;
+  -v | --zoom-value)
+    [[ -n "$2" ]] || {
+      echo "Error: --zoom-value requires a value" >&2
+      exit 1
+    }
+
+    ACTION="set"
+    ZOOM_VALUE="$2"
+    shift 2
+    ;;
   -r | --reset)
     ACTION="reset"
     shift
@@ -121,6 +132,7 @@ while (($#)); do
       echo "Error: --step requires a value" >&2
       exit 1
     }
+
     STEP="$2"
     shift 2
     ;;
@@ -151,23 +163,32 @@ fi
 
 _to_int100 step100 "$STEP"
 
-# shellcheck disable=SC2154
 if ((step100 <= 0)); then
   printf "Invalid step value: %s (must be > 0)\n" "$STEP" >&2
   exit 2
+fi
+
+if [[ "$ACTION" == "set" ]]; then
+  _to_int100 zoom100 "$ZOOM_VALUE"
+
+  if ((zoom100 < 100)); then
+    printf "Invalid zoom value: %s (must be >= 1.00)\n" "$ZOOM_VALUE" >&2
+    exit 2
+  fi
 fi
 
 read_state100 current100
 
 case "$ACTION" in
 increase)
-  # shellcheck disable=SC2154
   new100=$((current100 + step100))
   ;;
 decrease)
-  # shellcheck disable=SC2154
   new100=$((current100 - step100))
   ((new100 < 100)) && new100=100
+  ;;
+set)
+  new100="$zoom100"
   ;;
 reset)
   new100=100

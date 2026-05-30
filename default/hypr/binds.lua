@@ -653,6 +653,7 @@ hl.bind(mainMod .. " + B", hl.dsp.exec_raw("vb-core-power --next"), { descriptio
 
 
 hl.bind("XF86Calculator", hl.dsp.exec_raw("vb-util-calc"), { description = "Toggle calculator" })
+hl.bind(mainMod .. " + mouse:274", hl.dsp.exec_raw("vb-core-zoom --reset"), { description = "Reset zoom level" })
 
 
 -- System monitoring
