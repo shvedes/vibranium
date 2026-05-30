@@ -44,11 +44,23 @@ REPO_PATH="${REPO_PATH%/}" # guard against a trailing slash
 
 THEME_NAME="${REPO_URL%.git}"
 THEME_NAME="${THEME_NAME##*/}"
-# Strip down omarchy-theme prefix so we can
-# extract the theme name.
+
+# Strip the vendor prefix (omarchy or vibranium). This leaves a leading dash
+# when the repo name is "omarchy-foo-theme" or "vibranium-foo-theme", because
+# the prefix pattern ends right before the first separator.
 THEME_NAME="${THEME_NAME#omarchy}"
 THEME_NAME="${THEME_NAME#vibranium}"
-THEME_NAME="${THEME_NAME#-theme-}"
+
+# Remove the leading dash that is left after stripping the vendor prefix above.
+# Without this, a repo named "omarchy-miasma-theme" produces "-miasma-theme",
+# which becomes a folder with a leading dash and a leading space in menus.
+THEME_NAME="${THEME_NAME#-}"
+
+# Strip the word "theme" however it appears in what remains.
+# "omarchy-theme-miasma"  -> after prefix strip: "theme-miasma" -> strip "theme-" -> "miasma"
+# "omarchy-miasma-theme"  -> after prefix strip: "miasma-theme"  -> strip "-theme" -> "miasma"
+THEME_NAME="${THEME_NAME#theme-}"
+THEME_NAME="${THEME_NAME%-theme}"
 
 THEME_DISPLAY_NAME=""
 
@@ -78,31 +90,6 @@ CONTENTS_FILE="/tmp/${0##*/}.tmp"
 curl -sf "https://api.github.com/repos/$REPO_PATH/contents/" --output "$CONTENTS_FILE" &
 
 if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking theme compatibility"; then
-  echo "${RED}[VIBRANIUM]${RESET} Could not reach repo or repo does not exist"
-  _operation_canceled
-  exit 1
-fi
-
-# Match strictly against the JSON name field - guards against partial matches
-# (e.g. a file called "my-colors.toml" must not pass)
-CONTENTS="$(<"$CONTENTS_FILE")"
-if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] && [[ "$CONTENTS" != *'"name": "colors-extended.toml"'* ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${GREEN}Omarchy${RESET} versions prior to ${BLUE}v3.3.0${RESET}"
-
-  # https://github.com/basecamp/omarchy/releases/tag/v3.3.0
-  echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${RESET}"
-
-  rm -f "$CONTENTS_FILE"
-  _operation_canceled
-  exit 1
-fi
-
-echo "${GREEN}[VIBRANIUM]${RESET} $THEME_NAME_COLOR is compatible with Vibranium"
-
-# Update: we can actually rely on the template generator, so
-# the existence of hyprland.lua is no longer mandatory.
-# I should've realized that much sooner lol.
-# Omarchy themes still look bad though.
 
 # if [[ "$CONTENTS" != *'"name:" "hyprland.lua"'* ]]; then
 #   echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${CYAN}Hyprland${RESET} versions prior to ${BLUE}v0.55.0${RESET}"
