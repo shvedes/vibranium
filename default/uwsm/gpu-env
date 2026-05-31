@@ -39,10 +39,10 @@ _va_exports=$(
 
       local vendor=""
       case "$drv" in
-      nvidia) vendor="nvidia" ;;
-      i915 | xe) vendor="intel" ;; # xe = new Intel DG/Meteor driver
-      amdgpu | radeon) vendor="amd" ;;
-      *) continue ;;
+        nvidia) vendor="nvidia" ;;
+        i915 | xe) vendor="intel" ;; # xe = new Intel DG/Meteor driver
+        amdgpu | radeon) vendor="amd" ;;
+        *) continue ;;
       esac
 
       present_vendors["$vendor"]=1
@@ -91,46 +91,46 @@ _va_exports=$(
 
     case "$vendor" in
     nvidia)
-      if _driver_so_exists nvidia; then
+      # if _driver_so_exists nvidia; then
         _out_driver="nvidia"
         _out_vdpau="nvidia"
-      fi
+      # fi
       ;;
     intel)
       # iHD (modern, gen8+) preferred over legacy i965.
-      if _driver_so_exists iHD; then
+      # if _driver_so_exists iHD; then
         _out_driver="iHD"
         _out_vdpau="va_gl"
-      elif _driver_so_exists i965; then
+      # elif _driver_so_exists i965; then
         _out_driver="i965"
         _out_vdpau="va_gl"
-      fi
+      # fi
       ;;
     amd)
-      if _driver_so_exists radeonsi; then
+      # if _driver_so_exists radeonsi; then
         _out_driver="radeonsi"
         _out_vdpau="radeonsi"
-      fi
+      # fi
       ;;
     esac
 
     # Vendor-agnostic fallback: scan in priority order.
-    if [[ -z "$_out_driver" ]]; then
-      local candidates=(nvidia iHD i965 radeonsi)
-      local d
-      for d in "${candidates[@]}"; do
-        if _driver_so_exists "$d"; then
-          _out_driver="$d"
-          case "$d" in
-          nvidia) _out_vdpau="nvidia" ;;
-          iHD | i965) _out_vdpau="va_gl" ;;
-          radeonsi) _out_vdpau="radeonsi" ;;
-          *) _out_vdpau="" ;;
-          esac
-          break
-        fi
-      done
-    fi
+    # if [[ -z "$_out_driver" ]]; then
+    #   local candidates=(nvidia iHD i965 radeonsi)
+    #   local d
+    #   for d in "${candidates[@]}"; do
+    #     if _driver_so_exists "$d"; then
+    #       _out_driver="$d"
+    #       case "$d" in
+    #         nvidia) _out_vdpau="nvidia" ;;
+    #         iHD | i965) _out_vdpau="va_gl" ;;
+    #         radeonsi) _out_vdpau="radeonsi" ;;
+    #         *) _out_vdpau="" ;;
+    #       esac
+    #       break
+    #     fi
+    #   done
+    # fi
   }
 
   _main() {
