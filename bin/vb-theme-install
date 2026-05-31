@@ -25,7 +25,9 @@ _owner_repo_to_url() {
   echo "https://github.com/$1.git"
 }
 
-term::show_header
+if [[ -z "$1" ]]; then
+  term::show_header
+fi
 
 # If an argument was passed, use it directly and skip the prompt loop.
 # If it is owner/repo shorthand, verify the repo exists on GitHub first,
