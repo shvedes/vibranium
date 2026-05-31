@@ -12,28 +12,69 @@ _operation_canceled() {
 
 trap 'printf "\n"; _operation_canceled; exit 1' INT HUP
 
+# Return true if the input looks like a GitHub owner/repo shorthand.
+# Accepts alphanumeric characters, hyphens, underscores, and dots on
+# both sides of exactly one slash, with no scheme prefix.
+_is_owner_repo_format() {
+  [[ "$1" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]
+}
+
+# Expand an owner/repo shorthand into a full GitHub HTTPS clone URL.
+# .git is appended so git-clone gets a canonical remote URL.
+_owner_repo_to_url() {
+  echo "https://github.com/$1.git"
+}
+
 term::show_header
 
-# If a URL was passed as an argument, use it directly and skip the prompt loop.
-# Otherwise, keep asking until the user provides a valid http(s) URL (or hits Ctrl+C).
+# If an argument was passed, use it directly and skip the prompt loop.
+# If it is owner/repo shorthand, verify the repo exists on GitHub first,
+# then expand it to a full URL. A bare https URL is used as-is.
+# Otherwise, keep asking until the user gives valid input (or hits Ctrl+C).
 if [[ -n "$1" ]]; then
-  REPO_URL="$1"
+  if _is_owner_repo_format "$1"; then
+    # Run the existence check in the background so term::spinner can show progress
+    curl -sf -o /dev/null "https://api.github.com/repos/$1" &
+    if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking repo $1"; then
+      echo "${RED}[VIBRANIUM]${RESET} GitHub repo $1 does not exist or could not be reached"
+      _operation_canceled
+      exit 1
+    fi
+    REPO_URL="$(_owner_repo_to_url "$1")"
+  elif [[ "$1" =~ ^https?:// ]]; then
+    REPO_URL="$1"
+  else
+    echo "${RED}[VIBRANIUM]${RESET} Argument must be an http(s) URL or owner/repo shorthand"
+    _operation_canceled
+    exit 1
+  fi
 else
   while true; do
-    read -rp "${YELLOW}[VIBRANIUM]${RESET} Git repo URL: " REPO_URL
+    read -rp "${YELLOW}[VIBRANIUM]${RESET} Git repo: " REPO_URL
 
     if [[ -z "$REPO_URL" ]]; then
-      echo "${RED}[VIBRANIUM]${RESET} No URL provided. Try again."
+      echo "${RED}[VIBRANIUM]${RESET} No input provided. Try again."
       continue
     fi
 
-    if [[ ! "$REPO_URL" =~ ^https?:// ]]; then
-      echo "${RED}[VIBRANIUM]${RESET} You must provide an http(s) URL. Try again."
-      continue
+    # A full https URL needs no further validation at this stage
+    if [[ "$REPO_URL" =~ ^https?:// ]]; then
+      break
     fi
 
-    # Input passed both checks - we have a usable URL
-    break
+    # owner/repo shorthand: check that the repo actually exists before proceeding
+    if _is_owner_repo_format "$REPO_URL"; then
+      curl -sf -o /dev/null "https://api.github.com/repos/$REPO_URL" &
+      if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking repo $REPO_URL"; then
+        echo "${RED}[VIBRANIUM]${RESET} GitHub repo $REPO_URL does not exist. Try again."
+        continue
+      fi
+
+      REPO_URL="$(_owner_repo_to_url "$REPO_URL")"
+      break
+    fi
+
+    echo "${RED}[VIBRANIUM]${RESET} Provide an http(s) URL or owner/repo shorthand (e.g. user/repo)"
   done
 fi
 
@@ -110,20 +151,6 @@ if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] && [[ "$CONTENTS" != *'"name":
 fi
 
 echo "${GREEN}[VIBRANIUM]${RESET} $THEME_NAME_COLOR is compatible with Vibranium"
-
-# Update: we can actually rely on the template generator, so
-# the existence of hyprland.lua is no longer mandatory.
-# I should've realized that much sooner lol.
-# Omarchy themes still look bad though.
-
-# if [[ "$CONTENTS" != *'"name:" "hyprland.lua"'* ]]; then
-#   echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${CYAN}Hyprland${RESET} versions prior to ${BLUE}v0.55.0${RESET}"
-#   echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${RESET} and ${CYAN}Hyprland${RESET} ${BLUE}v0.55.0+${RESET}"
-#
-#   rm -f "$CONTENTS_FILE"
-#   _operation_canceled
-#   exit 1
-# fi
 
 rm -f "$CONTENTS_FILE"
 

@@ -223,6 +223,5 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
       "$subs_file" "$outmap_file" "${tpl_files[@]}"
   fi
 
-  rm -f "$outmap_file"
-  rm -f "$subs_file"
+  rm -f "$outmap_file" "$subs_file"
 fi
