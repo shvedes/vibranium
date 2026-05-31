@@ -2,6 +2,8 @@
 
 source vb-lib-core
 
+set -- "${1%/}"
+
 _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
   # shellcheck disable=SC2034
@@ -53,6 +55,7 @@ if [[ -n "$1" ]]; then
 else
   while true; do
     read -rp "${YELLOW}[VIBRANIUM]${RESET} Git repo: " REPO_URL
+    REPO_URL="${REPO_URL%/}"
 
     if [[ -z "$REPO_URL" ]]; then
       echo "${RED}[VIBRANIUM]${RESET} No input provided. Try again."
