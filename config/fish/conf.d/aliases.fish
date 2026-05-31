@@ -18,3 +18,5 @@ alias ip="ip --color"
 if set -q VIBRANIUM_STATE; and test -f "$VIBRANIUM_STATE/update.available"
     alias update-vibranium="xdg-terminal-exec --app-id=org.vb.term.float --title=vb-update -- vb-update"
 end
+
+alias omarchy-theme-install="vb-theme-install"

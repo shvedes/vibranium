@@ -20,3 +20,4 @@ alias gerp="grep"
 alias cleart="clear"
 
 alias vibranium-healhcheck="vb-cmd-healthcheck"
+alias omarchy-theme-install="vb-theme-install"
