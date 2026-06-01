@@ -4,6 +4,7 @@ source vb-lib-core
 
 DESKTOP_DIR="$XDG_DATA_HOME/applications"
 ICON_DIR="$DESKTOP_DIR/icons"
+WEBAPP_DATA_DIR="$XDG_DATA_HOME/webapps"
 
 FZF_ARGS=(
   --multi
@@ -68,24 +69,74 @@ Options:
 EOF
 }
 
+_has_webapp_exec() {
+  local line
+  while IFS= read -r line; do
+    [[ "$line" == Exec=*vb-launch-webapp* ]] && return 0
+  done < "$1"
+  return 1
+}
+
 _desktop_name() {
-  local name
-  name=$(grep '^Name=' "$1" | head -1)
-  name="${name#Name=}"
-  echo "${name#PWA - }"
+  local line
+  while IFS= read -r line; do
+    if [[ "$line" == Name=* ]]; then
+      line="${line#Name=}"
+      echo "${line#PWA - }"
+      return
+    fi
+  done < "$1"
+}
+
+# ---------------------------------------------------------------------------
+# Derive the browser data directory name from a URL.
+# Must stay in sync with the identically named function in vb-launch-webapp;
+# both must produce the same string for the same URL or removal will miss the
+# data directory the launcher created.
+# ---------------------------------------------------------------------------
+_profile_dir_from_url() {
+  local url="$1"
+  local host="${url#*://}"
+  host="${host%%[/?#:]*}"
+  host="${host,,}"
+  host="${host//\./-}"
+  printf '%s' "$host"
 }
 
 _remove_pwa() {
-  local name="$1" desktop_path="$2" removed=false
+  local name="$1" desktop_path="$2"
+  local removed=false exec_line=""
 
-  [[ -f "$desktop_path" ]] && {
+  # Read the Exec= line before removing the file; the URL embedded in it is
+  # needed to derive the browser data directory path when --own-profile was used.
+  if [[ -f "$desktop_path" ]]; then
+    local line
+    while IFS= read -r line; do
+      if [[ "$line" == Exec=* ]]; then
+        exec_line="${line#Exec=}"
+        break
+      fi
+    done < "$desktop_path"
     rm -f -- "$desktop_path"
     removed=true
-  }
+  fi
+
   [[ -f "$ICON_DIR/PWA - $name.png" ]] && {
     rm -f -- "$ICON_DIR/PWA - $name.png"
     removed=true
   }
+
+  # If the PWA was installed with --own-profile, remove its isolated browser
+  # data directory. The URL is always the last whitespace-separated token on
+  # the Exec= line regardless of other flags between the command and the URL.
+  if [[ "$exec_line" == *--own-profile* ]]; then
+    local url="${exec_line##* }"
+    local data_dir="$WEBAPP_DATA_DIR/$(_profile_dir_from_url "$url")"
+    if [[ -d "$data_dir" ]]; then
+      rm -rf -- "$data_dir"
+      echo "${GREEN}[VIBRANIUM]${RESET} Removed browser data for ${BLUE}${name}${RESET}"
+    fi
+  fi
 
   if [[ "$removed" == true ]]; then
     echo "${GREEN}[VIBRANIUM]${RESET} Removed ${BLUE}${name}${RESET}"
@@ -138,10 +189,13 @@ TARGET_PATHS=()
 
 if [[ $INTERACTIVE == true ]]; then
   declare -A PWA_MAP
-  while IFS= read -r -d '' file; do
-    grep -q '^Exec=.*vb-launch-webapp.*' "$file" &&
-      PWA_MAP["$(_desktop_name "$file")"]="$file"
-  done < <(find "$DESKTOP_DIR" -name 'PWA - *.desktop' -print0)
+
+  shopt -s nullglob
+  for file in "$DESKTOP_DIR"/'PWA - '*.desktop; do
+    _has_webapp_exec "$file" \
+    && PWA_MAP["$(_desktop_name "$file")"]="$file"
+  done
+  shopt -u nullglob
 
   if ((${#PWA_MAP[@]} == 0)); then
     term::show_header --color red

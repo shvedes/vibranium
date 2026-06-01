@@ -10,20 +10,24 @@ shcat() {
 
 usage() {
   shcat <<EOF
-Usage: $SELF [URL]
+Usage: $SELF [OPTION]... URL
 
-Open Progressive Web Apps (PWA)s in Vibranium.
-If a window exists - focuses it.
+Open a Progressive Web App (PWA) in Vibranium.
+If a window for the URL already exists, focus it instead.
 
 Arguments:
-  URL         Target URL to open or focus
+  URL              Target URL to open or focus
 
 Options:
-  -h, --help  Show this help message and exit
+  --own-profile    Launch in a separate browser data directory derived from the URL
+                   hostname. The directory is stored under $XDG_DATA_HOME/webapps/
+                   and is completely invisible to the main browser instance (no shared
+                   profile picker, no shared session, cookies, or extensions).
+  -h, --help       Show this help message and exit
 
 Examples:
   $SELF https://example.com
-  $SELF http://archlinux.org
+  $SELF --own-profile https://mail.example.com
 EOF
 }
 
@@ -50,6 +54,24 @@ get_default_browser() {
   _out="$browser"
 }
 
+# ---------------------------------------------------------------------------
+# Derive a unique directory name from a URL for use as a Chromium user-data-dir.
+# Strips the scheme and everything after the hostname (path, port, query,
+# fragment), lowercases it, and replaces dots with hyphens.
+# The result is used as the last component of $XDG_DATA_HOME/webapps/<name>,
+# not as a profile subdirectory inside an existing data dir; therefore it is
+# invisible to the main browser instance.
+# Example: https://app.example.com/path -> app-example-com
+# ---------------------------------------------------------------------------
+_profile_dir_from_url() {
+  local url="$1"
+  local host="${url#*://}"
+  host="${host%%[/?#:]*}"
+  host="${host,,}"
+  host="${host//\./-}"
+  printf '%s' "$host"
+}
+
 focus_or_launch() {
   local -a cmd=("$@")
 
@@ -60,11 +82,15 @@ focus_or_launch() {
   host="${host%%[/?#:]*}"
   host="${host,,}"
 
-  # Chrome PWA windows have class "chrome-{encoded_url}-Default", with
+  # Chrome PWA windows have class "chrome-{encoded_url}-{profile}", with
   # the hostname appearing immediately after the "chrome-" prefix.
   # startswith("chrome-{host}") is precise: it targets only PWA windows
   # for this exact site and can't collide with other Chrome PWA windows
   # whose hostnames begin differently.
+  # When --own-profile is active, --user-data-dir gives the PWA its own
+  # data root with a default profile named "Default" inside it, so the
+  # window class is still "chrome-{host}-Default" -- the same prefix
+  # match covers both the shared-profile and own-profile cases.
   local window_address
   window_address="$(
     hyprctl -j clients | jq -r --arg host "$host" '
@@ -88,12 +114,37 @@ focus_or_launch() {
   fi
 }
 
-case "${1:-}" in
--h | --help)
-  usage
-  exit 0
-  ;;
-esac
+# ---------------------------------------------------------------------------
+# Argument parsing
+# ---------------------------------------------------------------------------
+
+OWN_PROFILE=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --own-profile)
+    OWN_PROFILE=true
+    shift
+    ;;
+  --)
+    shift
+    break
+    ;;
+  --* | -*)
+    echo "Error: unknown option: $1" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  *)
+    # First non-flag argument is the URL; stop parsing options.
+    break
+    ;;
+  esac
+done
 
 if [[ $# -lt 1 ]]; then
   echo "Error: missing URL" >&2
@@ -139,11 +190,22 @@ if ! ((${#execs[@]})); then
   execs=("chromium")
 fi
 
+# Each own-profile PWA gets a completely separate Chromium user data
+# directory stored here. Using --user-data-dir instead of
+# --profile-directory is the key distinction: a profile subdirectory
+# inside the shared data dir is registered in the browser's Local State
+# and appears in the profile picker; a separate data dir is entirely
+# unknown to the main browser instance.
+WEBAPP_DATA_DIR="$XDG_DATA_HOME/webapps"
+
+browser_cmd=("${execs[0]}" --app="$URL")
+if [[ $OWN_PROFILE == true ]]; then
+  browser_cmd+=(--user-data-dir="$WEBAPP_DATA_DIR/$(_profile_dir_from_url "$URL")")
+fi
+
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
 if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
-  # shellcheck disable=SC2068
-  focus_or_launch ${execs[0]} --app="$URL"
+  focus_or_launch "${browser_cmd[@]}"
 else
-  # shellcheck disable=SC2068
-  exec setsid -f app2unit -- ${execs[0]} --app="$URL"
+  exec setsid -f app2unit -- "${browser_cmd[@]}"
 fi

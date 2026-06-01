@@ -17,6 +17,7 @@ CUSTOM_EXEC=""
 MIME_TYPES=""
 EXTRA_KEYWORDS=""
 CATEGORY=""
+OWN_PROFILE=false
 INTERACTIVE_MODE=false
 
 _shcat() {
@@ -39,11 +40,16 @@ Options:
   --mime-types TYPES  MimeType= value for the .desktop file
   --keywords KW       Extra keywords, semicolon-separated (appended to auto-generated ones)
   --category CAT      Categories= value for the .desktop file (e.g. Network;WebBrowser)
+  --own-profile       Launch the PWA in its own isolated browser profile
   -h, --help          Show this help and exit
 
 If --url is not provided, the script runs in interactive mode and prompts
 for all required fields. In non-interactive mode (--url given), a missing
 --name is resolved automatically by fetching the page <title>.
+
+When --own-profile is set, the launcher receives a --profile-directory flag
+derived from the URL hostname, giving the PWA its own cookies and session.
+Note: --own-profile is ignored when --exec is also provided.
 EOF
 }
 
@@ -108,6 +114,10 @@ while [[ $# -gt 0 ]]; do
     }
     CATEGORY="$2"
     shift 2
+    ;;
+  --own-profile)
+    OWN_PROFILE=true
+    shift
     ;;
   --)
     shift
@@ -235,13 +245,12 @@ _fetch_page_title() {
 
   html="$(curl -sL --max-time 10 --max-redirs 3 -A "$ua" "$url" 2>/dev/null)" || return 1
 
-  printf '%s\n' "$html" |
-    sed -n '/<title/I{
-      :a
-      /<\/title>/!{N; ba}
-      s/.*<title[^>]*>[[:space:]]*\([^<]*\)[[:space:]]*<\/title>.*/\1/ip
-      q
-    }'
+  sed -n '/<title/I{
+    :a
+    /<\/title>/!{N; ba}
+    s/.*<title[^>]*>[[:space:]]*\([^<]*\)[[:space:]]*<\/title>.*/\1/ip
+    q
+  }' <<< "$html"
 }
 
 # ---------------------------------------------------------------------------
@@ -269,6 +278,8 @@ _check_url_reachable() {
 # ---------------------------------------------------------------------------
 # Scan all installed PWA .desktop files for one whose Exec= line matches
 # the given URL. Prints the matching file path and returns 0 if found.
+# Recognises both the plain and --own-profile Exec= variants so that
+# duplicate detection works regardless of how the PWA was originally installed.
 # ---------------------------------------------------------------------------
 _find_webapp_by_url() {
   local url="$1"
@@ -279,7 +290,7 @@ _find_webapp_by_url() {
     [[ -f "$f" ]] || continue
 
     while IFS= read -r line || [[ -n $line ]]; do
-      if [[ $line == "Exec=vb-launch-webapp $url" ]]; then
+      if [[ $line == "Exec=vb-launch-webapp $url" || $line == "Exec=vb-launch-webapp --own-profile $url" ]]; then
         echo "$f"
         return 0
       fi
@@ -523,6 +534,14 @@ if [[ -z $APP_URL ]]; then
     fi
   fi
 
+  # Ask whether to isolate this PWA in its own browser profile. Defaulting to N
+  # because most PWAs share the default profile without issue; isolation is only
+  # needed when separate login sessions or cookies are required (e.g. two
+  # accounts on the same service).
+  if term::ask_yes_no N "Launch this PWA in its own isolated browser profile?"; then
+    OWN_PROFILE=true
+  fi
+
   AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
 
   if [[ -n "$AUTO_KEYWORDS" ]]; then
@@ -562,7 +581,12 @@ if [[ -z $APP_URL ]]; then
   fi
 
   ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
-  EXEC_COMMAND="vb-launch-webapp $APP_URL"
+
+  if [[ $OWN_PROFILE == true ]]; then
+    EXEC_COMMAND="vb-launch-webapp --own-profile $APP_URL"
+  else
+    EXEC_COMMAND="vb-launch-webapp $APP_URL"
+  fi
 
 else
   APP_URL="$(_normalize_url "$APP_URL")"
@@ -584,7 +608,15 @@ else
   AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
   KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
   ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
-  EXEC_COMMAND="${CUSTOM_EXEC:-vb-launch-webapp $APP_URL}"
+
+  # --exec overrides everything; --own-profile only applies to the default launcher
+  if [[ -n $CUSTOM_EXEC ]]; then
+    EXEC_COMMAND="$CUSTOM_EXEC"
+  elif [[ $OWN_PROFILE == true ]]; then
+    EXEC_COMMAND="vb-launch-webapp --own-profile $APP_URL"
+  else
+    EXEC_COMMAND="vb-launch-webapp $APP_URL"
+  fi
 fi
 
 _write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$KEYWORDS" "$MIME_TYPES" "$CATEGORY"
