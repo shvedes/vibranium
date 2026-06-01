@@ -31,7 +31,12 @@ set_theme() {
   fi
 }
 
-set_theme "code" "$XDG_CONFIG_HOME/Code/User/settings.json"
+if [[ -f /usr/share/applications/code-oss.desktop ]]; then
+  set_theme "code" "$XDG_CONFIG_HOME/Code - OSS/User/settings.json"
+elif [[ -d /usr/share/applications/code.desktop  ]]; then
+  set_theme "code" "$XDG_CONFIG_HOME/Code/User/settings.json"
+fi
+
 set_theme "code-insiders" "$XDG_CONFIG_HOME/Code - Insiders/User/settings.json"
 set_theme "codium" "$XDG_CONFIG_HOME/VSCodium/User/settings.json"
 set_theme "vscodium-insiders" "$XDG_CONFIG_HOME/VSCodium - Insiders/User/settings.json"
