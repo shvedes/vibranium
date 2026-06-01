@@ -22,35 +22,67 @@ Notes:
 Options:
   --next            Switch to next layout (default)
   --prev            Switch to previous layout
+  --notify          Notify after switch
   -h, --help        Display this help and exit
 EOF
 }
 
-case "${1:-}" in
---next | "")
-  action="next"
-  ;;
---prev)
-  action="prev"
-  ;;
--h | --help)
-  _usage
-  exit 0
-  ;;
-*)
-  echo "Error: invalid option: $1" >&2
-  echo "Try '$SELF --help' for more information." >&2
-  exit 1
-  ;;
-esac
+NOTIFY=false
+action="next"
 
-device="$(hyprctl -j devices | jq -r '.keyboards[] | select(.main == true) | .name')"
+while [[ $# -gt 0 ]]; do
+  case "${1:-}" in
+  --next)
+    action="next"
+    shift
+    ;;
+  --prev)
+    action="prev"
+    shift
+    ;;
+  --notify)
+    NOTIFY=true
+    shift
+    ;;
+  -h | --help)
+    _usage
+    exit 0
+    ;;
+  *)
+    echo "Error: invalid option: $1" >&2
+    echo "Try '$SELF --help' for more information." >&2
+    exit 1
+    ;;
+  esac
+done
+
+device="$(
+  hyprctl -j devices |
+    jq -r '.keyboards[] | select(.main == true) | .name'
+)"
 
 if [[ -z "$device" ]]; then
   echo "Error: no main keyboard found" >&2
-  notify-send -r 4 -t 3000 -u critical "Vibranium" \
-    "Could not detect your default keyboard layout"
+
+  if command -v notify-send >/dev/null 2>&1; then
+    notify-send -r 4 -t 3000 -u critical \
+      "Vibranium" \
+      "Could not detect your default keyboard"
+  fi
+
   exit 1
 fi
 
-hyprctl -q switchxkblayout "$device" "$action"
+if ! hyprctl -q switchxkblayout "$device" "$action"; then
+  echo "Error: failed to switch keyboard layout" >&2
+  exit 1
+fi
+
+if $NOTIFY; then
+  layout="$(
+    hyprctl -j devices |
+      jq -r '.keyboards[] | select(.main == true) | .active_keymap'
+  )"
+
+  notify-send -r 4 -t 3000 "Keyboard Layout: $layout"
+fi
