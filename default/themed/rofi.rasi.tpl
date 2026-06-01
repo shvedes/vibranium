@@ -1,11 +1,11 @@
 * {
   background:       {{ background }};
-  background-hard:  {{ background }};
+  background-hard:  {{ background|lightness=-0.3 }};
 
-  foreground:       {{ foreground }};
-  foreground-muted: {{ color8 }};
+  foreground:       rgb({{ foreground_rgb }});
+  foreground-muted: rgb({{ background_rgb|lightness=+0.30 }});
 
-  border:    {{ color8 }};
-  selected:  {{ color8 }};
+  border:    {{ background|lightness=+0.15 }};
+  selected:  {{ background|lightness=+0.07 }};
   highlight: {{ accent }};
 }

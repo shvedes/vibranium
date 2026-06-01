@@ -1,0 +1,42 @@
+# This is the advanced settings file, intended to be edited manually.
+# If you're changing values here, you likely know what you're doing.
+# All changes are applied instantly. If you're unfamiliar with these
+# options, refer to the wiki for guidance.
+
+
+# Extra files to always regenerate from templates, even when the active theme
+# ships its own version of the file.  Normally a theme-provided file blocks
+# template output; entries here override that and let the template win instead.
+#
+# Two entry formats are supported:
+#
+#   "file.ext"              -- global: template always wins, for every theme
+#   "theme-name/file.ext"   -- scoped: template wins only for that one theme;
+#                              all other themes keep their own file untouched
+#
+# Use this when you maintain your own template for a file or want to fully
+# manage a file through Vibranium's template system.
+#
+# List the output filename without the .tpl suffix, matching exactly what
+# appears under ~/.config/vibranium/themed/ or $VIBRANIUM/default/themed/.
+# Example: ("alacritty.toml" "foot.ini" "my-cool-theme/waybar.css")
+vb_force_template_files=(
+  # Instead of letting every theme install
+  # its own extension and clutter the
+  # extensions list, we generate a single
+  # extension whenever the theme changes.
+  #
+  # No clutter. No dependencies. Just clean.
+  "vscode.json"
+
+  # Always use the generated Obsidian theme to avoid
+  # theme-specific quirks, custom shadows, and other
+  # styling inconsistencies. The Vibranium template
+  # mirrors Obsidian's original theme structure.
+  "obsidian.css"
+
+  # Always prefer builtin GTK theme.
+  "gtk.css"
+)
+
+# vim:ft=bash

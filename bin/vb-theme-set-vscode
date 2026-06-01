@@ -1,0 +1,38 @@
+#!/usr/bin/bash
+
+THEME="$XDG_CONFIG_HOME/vibranium/current/theme/vscode.json"
+
+_jsonc() { sed 's|[[:space:]]*//.*||' "$1"; }
+
+set_theme() {
+  local editor_cmd="$1"
+  local settings_path="$2"
+
+  command -v "$editor_cmd" >/dev/null || return 0
+
+  if [[ -f $THEME ]]; then
+    theme_name=$(_jsonc "$THEME" | jq -r '.name')
+    extension=$(_jsonc "$THEME" | jq -r '.extension // empty')
+
+    if [[ -n $extension ]] && ! "$editor_cmd" --list-extensions 2>/dev/null | grep -Fxq "$extension"; then
+      "$editor_cmd" --install-extension "$extension" >/dev/null 2>&1
+    fi
+
+    mkdir -p "$(dirname "$settings_path")"
+    [[ -f $settings_path ]] || printf '{\n}\n' >"$settings_path"
+
+    if grep -q '^\s*{\s*}\s*$' "$settings_path"; then
+      sed -i --follow-symlinks 's/{\s*}/{"workbench.colorTheme": ""}/' "$settings_path"
+    fi
+
+    sed -i --follow-symlinks -E "s/(\"workbench.colorTheme\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")/\1$theme_name\2/" "$settings_path"
+  elif [[ -f $settings_path ]]; then
+    sed -i --follow-symlinks -E 's/\"workbench\.colorTheme\"[[:space:]]*:[^,}]*,?//' "$settings_path"
+  fi
+}
+
+set_theme "code" "$XDG_CONFIG_HOME/Code/User/settings.json"
+set_theme "code-insiders" "$XDG_CONFIG_HOME/Code - Insiders/User/settings.json"
+set_theme "codium" "$XDG_CONFIG_HOME/VSCodium/User/settings.json"
+set_theme "vscodium-insiders" "$XDG_CONFIG_HOME/VSCodium - Insiders/User/settings.json"
+set_theme "cursor" "$XDG_CONFIG_HOME/Cursor/User/settings.json"

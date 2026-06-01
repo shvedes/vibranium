@@ -1,0 +1,165 @@
+[mgr]
+marker_copied = { fg = "{{ color2 }}", bg = "{{ color2 }}" }
+marker_cut = { fg = "{{ color1 }}", bg = "{{ color1 }}" }
+marker_marked = { fg = "{{ color5 }}", bg = "{{ color5 }}" }
+marker_selected = { fg = "{{ color3 }}", bg = "{{ color3 }}" }
+
+cwd = { fg = "{{ color3|lightness=+0.20 }}" }
+
+find_keyword = { fg = "{{ color4|lightness=+0.20 }}", bg = "{{ color1 }}", underline = true }
+find_position = { }
+
+count_copied = { fg = "{{ color0 }}", bg = "{{ color2|lightness=+0.20 }}" }
+count_cut = { fg = "{{ color0 }}", bg = "{{ color1|lightness=+0.20}}" }
+count_selected = { fg = "{{ color0 }}", bg = "{{ color3|lightness=+0.20 }}" }
+
+border_symbol = "│"
+border_style = { fg = "{{ background|lightness=+0.25 }}" }
+
+[indicator]
+parent = { reversed = true }
+current = { reversed = true }
+preview = { reversed = true }
+padding = { open = " ", close = " " }
+
+[tabs]
+active = { fg = "{{ color0 }}", bg = "{{ color4 }}" }
+inactive = { fg = "{{ color0 }}", bg = "{{ color0 }}" }
+
+sep_inner = { open = "", close = "" }
+sep_outer = { open = "", close = "" }
+
+
+[mode]
+normal_main = { fg = "{{ color0 }}", bg = "{{ color4 }}" }
+normal_alt = { fg = "{{ foreground }}", bg = "{{ background|lightness=+0.30 }}" }
+select_main = { fg = "{{ color0 }}", bg = "{{ color5 }}" }
+select_alt = { fg = "{{ foreground }}", bg = "{{ background|lightness=+0.30 }}" }
+unset_main = { fg = "{{ color0 }}", bg = "{{ color3 }}" }
+unset_alt = { fg = "{{ foreground }}", bg = "{{ background|lightness=+0.30 }}" }
+
+
+[status]
+sep_left = { open = "", close = "" }
+sep_right = { open = "", close = "" }
+overall = { fg = "{{ foreground }}", bg = "{{ color0 }}" }
+
+progress_label = { fg = "{{ color4 }}", bold = true }
+progress_normal = { fg = "{{ color0 }}", bg = "{{ color0 }}" }
+progress_error = { fg = "{{ color0 }}", bg = "{{ color0 }}" }
+
+perm_type = { fg = "{{ color4 }}" }
+perm_read = { fg = "{{ color3 }}" }
+perm_write = { fg = "{{ color1 }}" }
+perm_exec = { fg = "{{ color2 }}" }
+perm_sep = { fg = "{{ background|lightness=+0.40 }}" }
+
+
+[pick]
+border = { fg = "{{ background|lightness=+0.40 }}" }
+active = { fg = "{{ color1 }}", bold = true }
+inactive = {}
+
+[input]
+border = { fg = "{{ color4 }}" }
+title = {}
+value = {}
+selected = { reversed = true }
+
+[completion]
+border = { fg = "{{ color4 }}" }
+active = { reversed = true }
+inactive = {}
+
+[tasks]
+border = { fg = "{{ color4 }}" }
+title = {}
+hovered = { fg = "{{ color5 }}" }
+
+[which]
+cols = 2
+separator = " - "
+separator_style = { fg = "{{ background|lightness=+0.20 }}" }
+mask = { bg = "{{ background|lightness=+0.05 }}" }
+rest = { fg = "{{ color1 }}" }
+cand = { fg = "{{ color4 }}" }
+desc = { fg = "{{ background|lightness=+0.50 }}" }
+
+[help]
+on = { fg = "{{ color2|lightness=+0.20 }}" }
+run = { fg = "{{ color5|lightness=+0.20 }}" }
+desc = {}
+hovered = { reversed = true, bold = true }
+footer = { fg = "{{ foreground }}", bg = "{{ color0 }}" }
+
+[notify]
+title_info = { fg = "{{ color2 }}" }
+title_warn = { fg = "{{ color3 }}" }
+title_error = { fg = "{{ color3 }}" }
+
+[icon]
+globs = []
+dirs  = []
+files = []
+
+conds = [
+  { if = "dir", text = "[D]" },
+  { if = "link", text = "[L]", fg = "{{ color2 }}" },
+
+  { if = "socket", text = "[S]" },
+  { if = "fifo", text = "[P]" },
+  { if = "block", text = "[B]", fg = "{{ color3 }}" },
+  { if = "char", text = "[C]", fg = "{{ color6 }}" },
+
+  { if = "!(dir | link | socket | fifo | block | char)", text = "[F]", fg = "{{ background|lightness=+0.60 }}" },
+]
+
+exts = [
+  # Archives
+  { name = "zip", text = "[A]", fg = "{{ color6 }}" },
+  { name = "tar", text = "[A]", fg = "{{ color6 }}" },
+  { name = "rar", text = "[A]", fg = "{{ color6 }}" },
+  { name = "7z", text = "[A]", fg = "{{ color6 }}" },
+  { name = "gz", text = "[A]", fg = "{{ color6 }}" },
+
+  # Images
+  { name = "png", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
+  { name = "ppm", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
+  { name = "svg", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
+  { name = "jpg", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
+  { name = "jxl", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
+  { name = "jpeg", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
+  { name = "heic", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
+
+  # Videos
+  { name = "mp4", text = "[V]", fg = "{{ color5|lightness=+0.20 }}" },
+  { name = "mkv", text = "[V]", fg = "{{ color5|lightness=+0.20 }}" },
+  { name = "webm", text = "[V]", fg = "{{ color5|lightness=+0.20 }}" },
+]
+
+[filetype]
+rules = [
+    # images
+    { mime = "image/*", fg = "{{ color3 }}" },
+
+    # media
+    { mime = "{audio,video}/*", fg = "{{ color4 }}" },
+
+    # archives
+    { mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "{{ color5 }}" },
+
+    # documents
+    { mime = "application/{pdf,doc,rtf,vnd.*}", fg = "{{ color5 }}" },
+
+    # broken links
+    { url = "*", is = "orphan", fg = "{{ color1 }}" },
+
+    # executables
+    { url = "*", is = "exec", fg = "{{ color2 }}" },
+
+    # fallback
+    { url = "*", fg = "{{ color3 }}" },
+    { url = "*/", fg = "{{ color4 }}" },
+]
+
+# vim:ft=toml

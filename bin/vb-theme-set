@@ -42,6 +42,19 @@ capitalize() {
   printf "%s" "${result[*]}"
 }
 
+# "morning-lavender" -> "Morning Lavender"  (hyphens become spaces, each word capitalised)
+# Used for community themes that have no theme.info and would otherwise be
+# mis-parsed as a family/variant pair by the hyphen heuristic.
+capitalize_words() {
+  local IFS=- parts=() part
+  read -ra parts <<<"$1"
+  local out=""
+  for part in "${parts[@]}"; do
+    out+="${part^} "
+  done
+  printf "%s" "${out% }"
+}
+
 # Process one themes directory and register every theme found into the
 # global FAMILIES / STANDALONE_THEMES / FOLDER_MAP / THEME_LIGHT / THEME_SOURCE maps.
 #
@@ -56,8 +69,10 @@ capitalize() {
 #
 # Family/variant metadata priority:
 #   1. theme.info (FAMILY= / VARIANT= fields)
-#   2. Derived from folder name — no file written for unrecognised folders
-#      (safe for bare git repos dropped into the directory)
+#   2. Official themes only: derived from folder name by splitting on the first
+#      hyphen ("tokyonight-night" -> family "Tokyonight", variant "Night").
+#      User/community themes with no theme.info are always standalone; hyphens
+#      are treated as word separators in the display name, not family delimiters.
 _discover_in_dir() {
   local dir="$1"
   local source_label="${2:-official}"
@@ -83,8 +98,17 @@ _discover_in_dir() {
         [[ $key == LIGHT ]] && light=$val
       done <"$theme_dir/theme.info"
     else
-      # Fallback: derive family/variant from folder name; do NOT write theme.info
-      if [[ "$folder" != *-* ]]; then
+      # Fallback: derive display name from folder name; do NOT write theme.info.
+      # For official themes, a hyphen splits family from variant (e.g.
+      # "tokyonight-night" -> family "Tokyonight", variant "Night").
+      # For user/community themes, hyphens are just word separators in a name;
+      # there is no reliable way to know that "morning-lavender" is meant as a
+      # family/variant pair rather than a two-word standalone name, so every
+      # user theme without an explicit theme.info is always standalone.
+      if [[ "$source_label" == "user" ]]; then
+        family=""
+        variant="$(capitalize_words "$folder")"
+      elif [[ "$folder" != *-* ]]; then
         family=""
         variant="${folder^}"
       else
@@ -404,15 +428,15 @@ apply_theme() {
     fi
   fi
 
+  # Record the active theme name for is_current_theme and external tooling
+  printf "%s" "$folder_name" >"$THEME_NAME_FILE"
+
   # Create missing config files from templates
   vb-theme-set-templates
 
   # Atomic swap: replace current with the fully-built staging directory
   rm -rf "$CURRENT_THEME_PATH"
   mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"
-
-  # Record the active theme name for is_current_theme and external tooling
-  printf "%s" "$folder_name" >"$THEME_NAME_FILE"
 
   # Determine light/dark from discovery metadata; fall back to folder-name
   # regex for themes that carry no light flag in either theme.info or theme.light
@@ -673,3 +697,4 @@ vb-theme-set-gtk &
 vb-theme-set-svg &
 vb-theme-set-browser &
 vb-theme-set-obsidian &
+vb-theme-set-vscode &

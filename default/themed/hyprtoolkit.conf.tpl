@@ -1,0 +1,6 @@
+background = rgb({{ background_strip }})
+base = rgb({{ background_strip|lightness=+0.10 }})
+alternative_base = rgb({{ background_strip|lightness=+0.20 }})
+bright_text = rgb({{ foreground_strip|lightness=+0.10 }})
+accent = rgb({{ accent_strip }})
+accent_secondary = rgb({{ accent_strip|lightness=-0.10 }})

@@ -1,4 +1,4 @@
 @define-color background {{ background }};
-@define-color border {{ color0 }};
+@define-color border {{ background|lightness=+0.15 }};
 @define-color accent {{ accent }};
 @define-color text {{ foreground }};

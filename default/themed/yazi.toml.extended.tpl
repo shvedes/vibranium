@@ -6,7 +6,7 @@ marker_selected = { fg = "{{ yellow }}", bg = "{{ yellow }}" }
 
 cwd = { fg = "{{ yellow_bright }}" }
 
-find_keyword = { fg = "{{ blue_bright }}", bg = "{{ black }}", underline = true }
+find_keyword = { fg = "{{ blue_bright }}", underline = true }
 find_position = { }
 
 count_copied = { fg = "{{ black }}", bg = "{{ green_bright }}" }
@@ -80,10 +80,10 @@ hovered = { fg = "{{ purple }}" }
 cols = 2
 separator = " - "
 separator_style = { fg = "{{ background_5 }}" }
-mask = { bg = "{{ black }}" }
+mask = { bg = "{{ background_1 }}" }
 rest = { fg = "{{ red }}" }
 cand = { fg = "{{ blue }}" }
-desc = { fg = "{{ gray }}" }
+desc = { fg = "{{ foreground_2 }}" }
 
 [help]
 on = { fg = "{{ green_bright }}" }

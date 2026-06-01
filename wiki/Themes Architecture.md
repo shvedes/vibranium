@@ -27,8 +27,6 @@ For more details, see the source code of [`vb-theme-set`](https://github.com/shv
 
 ## Omarchy theme support
 
-> [!WARNING]
-> Starting from Hyprland v0.55.0, Vibranium now supports only lua-compatible themes. While the old *hyprlang* is still there, Vibranium has already fully migrated to lua, making it impossible to use `.conf` files in lua runtime.
 
 Vibranium supports Omarchy themes, but not all of them.
 
@@ -73,8 +71,127 @@ The idea originates from Omarchy, but the implementation has been significantly 
 - `{{ key_b }}` -> `#1e1e2e` -> `46`
 - `{{ key_rgb }}` -> `#1e1e2e` -> `30,30,46`
 
+In addition to the above, templates support inline color calculations via a pipe syntax. See the section below for full details.
+
 For implementation details, see [`vb-theme-set-templates`](https://github.com/shvedes/vibranium/blob/master/bin/vb-theme-set-templates).
 
+## Inline color calculations
+
+Vibranium templates support inline color calculations directly within placeholder keys. This is primarily useful when only `colors.toml` is available, since that file provides only the 16 base colors without tints, shades, or semantic variants. Rather than leaving the output looking flat, templates can derive the missing colors on the fly from the base palette.
+
+The syntax extends any existing key with one or more pipe-separated operations:
+
+```
+{{ key_<format>|operation=value|operation=value }}
+```
+
+The base key before the first `|` must be a valid key as it appears in the substitution table — format suffix included. Plain `{{ key }}` keys (raw hex) also work. Operations are applied left to right, and the result is emitted in the same format as the base key.
+
+### Available operations by format
+
+**HEX** — keys like `{{ background_0 }}`, `{{ color4_strip }}`, `{{ color4_upper }}`, `{{ color4_0x }}`
+
+| Operation | Value | Description |
+|---|---|---|
+| `alpha` | `0.0` – `1.0` | Appends a two-digit hex alpha byte to the color |
+| `lightness` | `0.0` – `1.0` or signed | Sets or shifts HSL lightness; see below |
+
+**RGB** — keys ending in `_rgb`, e.g. `{{ background_0_rgb }}`
+
+| Operation | Value | Description |
+|---|---|---|
+| `alpha` | `0.0` – `1.0` | Appends alpha as a literal float fourth channel |
+| `red` | `+N` / `-N` | Offsets the red channel by N (0–255), clamped |
+| `green` | `+N` / `-N` | Offsets the green channel by N (0–255), clamped |
+| `blue` | `+N` / `-N` | Offsets the blue channel by N (0–255), clamped |
+| `lightness` | `0.0` – `1.0` or signed | Sets or shifts HSL lightness; see below |
+
+**HSL** — keys ending in `_hsl`, e.g. `{{ background_0_hsl }}`
+
+| Operation | Value | Description |
+|---|---|---|
+| `lighten` | `N` | Increases lightness by N percentage points, clamped to 100 |
+| `darken` | `N` | Decreases lightness by N percentage points, clamped to 0 |
+| `saturate` | `N` | Increases saturation by N percentage points, clamped to 100 |
+| `desaturate` | `N` | Decreases saturation by N percentage points, clamped to 0 |
+| `hue` | `+N` / `-N` | Rotates the hue by N degrees; wraps around 360 |
+
+### The `lightness` operation
+
+The `lightness` operation works on both HEX and RGB keys and operates in two modes depending on whether the value carries a sign:
+
+- **Absolute** (`lightness=0.75`): sets the HSL lightness to exactly that ratio, where `0.0` is black and `1.0` is white. Useful for generating a specific tint regardless of the source color.
+- **Relative** (`lightness=+0.15`, `lightness=-0.10`): shifts the current lightness by that amount. Useful when you want any color to appear slightly lighter or darker without knowing its exact L value ahead of time.
+
+In both cases the color is round-tripped through HSL, so hue and saturation are preserved.
+
+The HSL format uses different operation names for the same concept (`lighten`/`darken`) and accepts integer percentage points rather than a float ratio, since the stored value is already `h,s,l`.
+
+### Number format
+
+Values are parsed by AWK's standard numeric coercion. Both `0.20` and `.20` are accepted, so `lightness=+.15` is equivalent to `lightness=+0.15`. Integers work the same way: `alpha=1` is treated as `1.0`.
+
+### Order of operations
+
+Operations are applied strictly left to right. The order only matters when two operations affect the same channel or the same color space. For example:
+
+```
+{{ color4_rgb|lightness=0.8|blue=-30 }}
+```
+
+This sets lightness to 80% first (rebuilding RGB from HSL), then subtracts 30 from the resulting blue channel. Reversing the order would subtract 30 from the original blue first and then discard it during the HSL rebuild — producing a different result. As a rule: apply channel offsets (`red`, `green`, `blue`) after `lightness` if you want them to survive.
+
+### Practical examples
+
+Generating a semi-transparent overlay background in a CSS-like config:
+
+```
+background-color: {{ background_0_rgb|alpha=0.85 }};
+```
+
+Lightening an arbitrary accent color for a hover state:
+
+```
+hover-color: {{ color4|lightness=+0.15 }};
+```
+
+A tint variant for a border, always at a fixed light level regardless of theme:
+
+```
+border: 2px solid #{{ color4_strip|lightness=0.75 }};
+```
+
+A 0x-prefixed color for a compositor rule, brightened:
+
+```
+col.active_border = {{ color4_0x|lightness=+0.12 }}ff
+```
+
+An RGBA string for a notification background with a blue tint:
+
+```
+background = {{ background_0_rgb|blue=+18|alpha=0.92 }};
+```
+
+Rotating the hue of a base color for a complementary accent:
+
+```
+accent-alt: hsl({{ color4_hsl|hue=+180 }});
+```
+
+### Cautions
+
+**Achromatic colors are hue-neutral.** Pure greys (saturation = 0) have no meaningful hue. Lightness operations on grey work correctly, but `hue` rotation and `saturate` on an HSL key have no visual effect because both H and S are zero for those colors.
+
+**Hex variants preserve their format.** If you use `{{ color4_strip|lightness=+0.15 }}`, the output is bare hex without a `#` — the same format the plain `{{ color4_strip }}` key would have produced. The same applies to `_upper` (uppercased result) and `_0x` (result prefixed with `0x`). Combine with care if the target config expects a specific prefix.
+
+**Unknown keys are left verbatim.** If the base key does not exist in the substitution table — for example because `colors.toml` does not define it — the entire `{{ ... }}` token is left unchanged in the output rather than replaced with an empty string. This makes errors visible rather than silently producing broken configs.
+
+**`alpha` on a HEX key appends a byte, not a channel.** The result is an 8-character `#rrggbbaa` string. If the target config does not understand 8-character hex (e.g. some older GTK config formats), this will break it.
+
+**Operations outside their format are silently ignored.** Writing `{{ background_0_hsl|alpha=0.5 }}` does nothing, because `alpha` is not defined for HSL keys. The color is still substituted — just without the operation applied.
+
+---
 
 Instead of placing all themes in a single flat menu, Vibranium organizes them into families.
 

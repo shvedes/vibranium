@@ -10,14 +10,15 @@
 @define-color magenta {{ color5 }};
 @define-color cyan {{ color6 }};
 @define-color white {{ color7 }};
-@define-color bright_black {{ color8 }};
-@define-color bright_red {{ color9 }};
-@define-color bright_green {{ color10 }};
-@define-color bright_yellow {{ color11 }};
-@define-color bright_blue {{ color12 }};
-@define-color bright_magenta {{ color13 }};
-@define-color bright_cyan {{ color14 }};
-@define-color bright_white {{ color15 }};
+
+@define-color bright_black {{ background|lightness=+0.07 }};
+@define-color bright_red {{ color1|lightness=+0.15 }};
+@define-color bright_green {{ color2|lightness=+0.15 }};
+@define-color bright_yellow {{ color3|lightness=+0.15 }};
+@define-color bright_blue {{ color4|lightness=+0.15 }};
+@define-color bright_magenta {{ color5|lightness=+0.15 }};
+@define-color bright_cyan {{ color6|lightness=+0.15 }};
+@define-color bright_white {{ color7|lightness=+0.15 }};
 
 /* Adwaita Color Overrides */
 @define-color accent_bg_color @accent;
@@ -212,7 +213,7 @@ toast button.circular.flat.image-button:hover {
 
 /* Menu background */
 menu, popover.menu contents {
-    background-color: @background;
+    background-color: {{ background|lightness=+0.05 }};
 }
 
 /* Menu item */

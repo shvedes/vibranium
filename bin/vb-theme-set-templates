@@ -41,12 +41,61 @@
 #   {{ key_h }}          hue as integer degrees 0-359 (e.g. 240)
 #   {{ key_s }}          saturation as integer percentage 0-100 (e.g. 21)
 #   {{ key_l }}          lightness as integer percentage 0-100 (e.g. 15)
-#   {{ key_hsl }}        H,S%,L% shorthand (e.g. 240,21%,15%)
+#   {{ key_hsl }}        H,S,L shorthand (e.g. 240,21,15)
 #
 #   Alpha channels: use 8-char hex (rrggbbaa CSS order) in the TOML value to
 #   include alpha. {{ key }}, {{ key_strip }}, and {{ key_0x }} pass it through
 #   as-is. All channel variants (_r, _g, _b, _rgb, _h, _s, _l, _hsl) decode
 #   only the first 6 digits and ignore alpha.
+#
+# INLINE COLOR CALCULATIONS
+#   Any key can be extended with one or more pipe-separated operations that are
+#   evaluated at substitution time and replaced with a final computed value.
+#   The base key before the first | must be a key that exists in the subs table
+#   (format suffix included). Operations are applied left to right.
+#
+#   Syntax: {{ base_key|op=val|op=val }}
+#
+#   HEX keys ({{ key }}, {{ key_strip }}, {{ key_upper }}, {{ key_0x }}):
+#     alpha=<0.0-1.0>       appends a two-digit hex alpha byte
+#                             {{ color4|alpha=0.5 }}    ->  #1e1e2eff -> #1e1e2e80
+#     lightness=<value>     round-trips through HSL to set or shift L;
+#                           output is re-encoded in the same variant format
+#                           (strip stays strip, upper stays upper, etc.)
+#
+#   RGB keys ({{ key_rgb }}):
+#     alpha=<0.0-1.0>       appends alpha as a literal float fourth channel
+#                             {{ color4_rgb|alpha=0.6 }}   ->  30,30,46,0.6
+#     red=<+/-N>            offsets the red channel by N, clamped to 0-255
+#     green=<+/-N>          offsets the green channel by N, clamped to 0-255
+#     blue=<+/-N>           offsets the blue channel by N, clamped to 0-255
+#     lightness=<value>     round-trips through HSL to set or shift L,
+#                           then rebuilds RGB; hue and saturation are preserved
+#
+#   HSL keys ({{ key_hsl }}):
+#     lighten=<N>           increases L by N percentage points, clamped to 100
+#     darken=<N>            decreases L by N percentage points, clamped to 0
+#     saturate=<N>          increases S by N percentage points, clamped to 100
+#     desaturate=<N>        decreases S by N percentage points, clamped to 0
+#     hue=<+/-N>            rotates H by N degrees, wraps around 360
+#
+#   The lightness operation (HEX and RGB only):
+#     Absolute: lightness=0.75   sets L to exactly 75% (0.0 = black, 1.0 = white)
+#     Relative: lightness=+0.15  shifts current L up by 15 percentage points
+#               lightness=-0.10  shifts current L down by 10 percentage points
+#     The presence of a leading + or - determines the mode.
+#
+#   Number format:
+#     Both 0.20 and .20 are accepted. Integer values like alpha=1 are treated
+#     as 1.0. The sign is part of the value string, not a separate token.
+#
+#   Order of operations:
+#     Applied strictly left to right. Order matters when two operations affect
+#     the same channel. In particular, channel offsets (red/green/blue) applied
+#     before lightness will be overwritten during the HSL rebuild -- apply them
+#     after lightness if both are needed.
+#       {{ color4_rgb|lightness=0.8|blue=-30 }}   correct: offset survives
+#       {{ color4_rgb|blue=-30|lightness=0.8 }}   wrong: offset is discarded
 #
 # WARNINGS
 #   - Both colors.toml and colors-extended.toml are loaded when available.
@@ -55,14 +104,48 @@
 #     correctly regardless of whether extended colors are present.
 #   - Inline TOML comments are stripped by discarding everything after the
 #     closing quote -- values containing a literal quote character will break.
-#   - Templates are not validated; unknown {{ key }} placeholders are left
-#     as-is in the output silently.
+#   - Unknown {{ key }} placeholders with no pipe operator are left as-is in
+#     the output. Pipe expressions whose base key is not found in the subs
+#     table are also left verbatim, making resolution failures visible rather
+#     than silently producing empty or broken values.
+#   - Operations that are not defined for a given format (e.g. alpha on an
+#     HSL key) are silently ignored; the color is still substituted.
+#   - The alpha operation on HEX keys produces an 8-character #rrggbbaa
+#     string. Configs that do not accept 8-character hex will break.
+#   - Hue rotation and saturation on achromatic colors (pure greys, S=0)
+#     have no visible effect since both H and S are zero for those colors.
 
 TEMPLATES_DIR="$VIBRANIUM/default/themed"
 USER_TEMPLATES_DIR="$XDG_CONFIG_HOME/vibranium/themed"
 NEXT_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/next-theme"
 COLORS_FILE="$NEXT_THEME_DIR/colors.toml"
 COLORS_EXTENDED_FILE="$NEXT_THEME_DIR/colors-extended.toml"
+
+# Written by vb-theme-set immediately before this script runs; used to match
+# theme-scoped entries in vb_force_template_files ("theme-name/file.ext").
+NEXT_THEME_NAME=$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")
+
+# Built-in files that are always regenerated from templates even when the
+# theme already provides them.  Normally an existing file prevents template
+# output; entries in this array bypass that check so the template wins.
+# User-defined entries are merged in below from settings.advanced.
+force_template_files=()
+
+# Source settings.advanced to pick up vb_force_template_files.
+# This script can run without a pre-loaded settings environment, so we source
+# explicitly here.  Re-sourcing a settings-only file is harmless; all it does
+# is reassign the same variables to the same values.
+_settings_adv="$XDG_CONFIG_HOME/vibranium/settings.advanced"
+[[ -f $_settings_adv ]] && source "$_settings_adv"
+unset _settings_adv
+
+# Merge user-defined entries from settings.advanced into the built-in list.
+# The ${array[@]+"..."} expansion guard silently handles the case where
+# vb_force_template_files is unset or empty (i.e. settings.advanced is absent
+# or the user left the array empty).
+force_template_files+=(
+  "${vb_force_template_files[@]+"${vb_force_template_files[@]}"}"
+)
 
 # Collect color sources: always start with the base file, then layer
 # extended on top when available (extended keys override base on collision)
@@ -187,6 +270,15 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
 
   shopt -s nullglob
 
+  # Build a fast-lookup set from force_template_files for O(1) membership tests.
+  # Two key shapes are supported:
+  #   "file.ext"              -- global: template always wins for any theme
+  #   "theme-name/file.ext"   -- scoped: template wins only for that theme
+  declare -A _force_set
+  for _f in "${force_template_files[@]}"; do
+    _force_set["$_f"]=1
+  done
+
   # Collect templates that need processing and write a tpl->output map for awk.
   #
   # Priority: user templates before built-in, extended before plain within
@@ -208,9 +300,15 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
 
       output_path="$NEXT_THEME_DIR/$filename"
 
-      # Skip if already written by a previous run, or already claimed by a
-      # higher-priority template earlier in this loop
-      if [[ ! -f $output_path && -z ${seen_outputs[$output_path]+x} ]]; then
+      # Skip if already claimed by a higher-priority template in this run.
+      # Also skip if the file exists on disk, UNLESS it matches a force entry:
+      # a plain "file.ext" entry forces it globally; a "theme/file.ext" entry
+      # forces it only when NEXT_THEME_NAME matches the theme prefix.
+      if [[ -z ${seen_outputs[$output_path]+x} ]] && \
+         { [[ ! -f $output_path ]] || \
+           [[ -n ${_force_set[$filename]+x} ]] || \
+           { [[ -n $NEXT_THEME_NAME ]] && \
+             [[ -n ${_force_set[$NEXT_THEME_NAME/$filename]+x} ]]; }; }; then
         printf '%s\x01%s\n' "$tpl" "$output_path" >>"$outmap_file"
         tpl_files+=("$tpl")
         seen_outputs["$output_path"]=1

@@ -33,19 +33,6 @@
   --link-external-color: {{ blue }};
   --link-external-color-hover: {{ purple }};
 
-  /* --h1-color: inherit; */
-  /* --h2-color: inherit; */
-  /* --h3-color: inherit; */
-  /* --h4-color: inherit; */
-  /* --h5-color: inherit; */
-  /* --h6-color: inherit; */
-
-  /*
-   *
-   * Gradually build all base colors
-   *
-   */
-
   /* Main document background, settings background */
   --color-base-00:  {{ background_0 }};
 

@@ -1,0 +1,26 @@
+{
+  "name": "vibranium",
+  "displayName": "Vibranium",
+  "description": "Sync with Vibranium theme",
+  "version": "0.0.1",
+  "publisher": "vibranium",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Themes"
+  ],
+  "main": "./extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "themes": [
+      {
+        "label": "Vibranium",
+        "uiTheme": "vs-dark",
+        "path": "./themes/vibranium.json"
+      }
+    ]
+  }
+}

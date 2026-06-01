@@ -1,0 +1,20 @@
+#!/usr/bin/bash
+
+readonly _THEME_SRC="$VIBRANIUM/extras/vscode/vibranium.theme"
+readonly _THEME_JSON="$HOME/.config/vibranium/current/theme/vscode.json"
+
+for editor_dir in \
+  "$HOME/.vscode" \
+  "$HOME/.vscode-insiders" \
+  "$HOME/.vscode-oss" \
+  "$HOME/.vscode-oss-insiders" \
+  "$HOME/.cursor"
+do
+  mkdir -p "$editor_dir/extensions"
+
+  cp -r "$_THEME_SRC" "$editor_dir/extensions/"
+
+  ln -sf \
+    "$_THEME_JSON" \
+    "$editor_dir/extensions/vibranium.theme/themes/vibranium.json"
+done
