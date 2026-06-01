@@ -30,7 +30,7 @@ player_is_playing() {
     return 0
   else
     # Don't trigger mpd systemd service if for no reason.
-    if systemctl -q --user is-active mpd.service; then
+    if [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
       while read -r l; do
         case $l in
         *"[playing]"*)
