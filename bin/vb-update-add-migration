@@ -2,10 +2,42 @@
 
 TIMESTAMP="$(git -C "$VIBRANIUM" log -1 --format=%cd --date=unix)"
 FILE="$VIBRANIUM/migrations/${TIMESTAMP}.sh"
-${EDITOR:-nvim} "$FILE"
 
-# And skip it instantly after creation.
-MIGRATION_FILE="$VIBRANIUM_STATE/migrations/${TIMESTAMP}.sh"
-if [[ -f "$FILE" ]]; then
-  : >"$MIGRATION_FILE"
+# Write the template into RAM; the destination file is never touched unless
+# the user actually edits the content.
+tmp="/dev/shm/vb-migration-$TIMESTAMP.sh"
+trap 'rm -f "$tmp"' EXIT
+
+cat >"$tmp" <<'EOF'
+#!/usr/bin/bash
+
+GREEN=$'\e[0;32m'
+RESET=$'\e[0m'
+SELF="${0##*/}"
+SELF="${SELF/.sh/}"
+
+
+
+# Remove if needed.
+echo "${GREEN}[MIGRATION|$SELF]${RESET} Message"
+EOF
+
+template_hash="$(sha256sum "$tmp" | cut -d' ' -f1)"
+
+if [[ -z "${EDITOR:-}" || ${EDITOR##*/} == nvim ]]; then
+  nvim +8 +'startinsert' "$tmp"
+else
+  "${EDITOR:-nvim}" "$tmp"
+fi
+
+# If the editor deleted the buffer file, treat it as an abort.
+if ! [[ -f "$tmp" ]]; then
+  exit 0
+fi
+
+current_hash="$(sha256sum "$tmp" | cut -d' ' -f1)"
+
+if [[ "$current_hash" != "$template_hash" ]]; then
+  mv "$tmp" "$FILE"
+  : >"$VIBRANIUM_STATE/migrations/${TIMESTAMP}.sh"
 fi
