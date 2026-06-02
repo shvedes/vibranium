@@ -30,6 +30,7 @@ USER_THEMES_PATH="$XDG_CONFIG_HOME/vibranium/themes"
 HOOK_DIR="$XDG_CONFIG_HOME/vibranium/hooks/theme"
 
 SELF="${0##*/}"
+FORCE=false
 
 # "tokyonight-night" -> "Tokyonight-Night"
 capitalize() {
@@ -379,7 +380,7 @@ apply_theme() {
     exit 1
   fi
 
-  if is_current_theme "$folder_name"; then
+  if is_current_theme "$folder_name" && ! $FORCE; then
     echo "Error: already on $chosen." >&2
     notify-send -r 4 -t 1500 "Theme Selector" "Already on $chosen"
     exit 1
@@ -515,7 +516,7 @@ shcat() {
   done
 }
 
-show_help() {
+_usage() {
   shcat <<EOF
 Usage: $SELF [OPTION]... [THEME]
 
@@ -525,6 +526,7 @@ launched. With a THEME argument the theme is applied non-interactively.
 Options:
   -h, --help        Show this help text and exit
   -l, --list        List all available theme names and exit
+  -f, --force       Forcefully set the active theme if selected
 
 Arguments:
   THEME             Theme to apply. Accepted formats (case-insensitive):
@@ -578,8 +580,12 @@ list_themes() {
 _discover_themes
 
 case "${1-}" in
+-f | --force)
+    FORCE=true
+    shift
+    ;;
 -h | --help)
-  show_help
+  _usgae
   exit 0
   ;;
 -l | --list)
