@@ -108,11 +108,17 @@ show_volume_notification() {
 
   # Fire-and-forget: avoid blocking on the D-Bus round-trip.
   # -r (replace) is a hint to the daemon and works fine asynchronously.
-  if [[ "$muted" == "true" ]]; then
-    notify-send -r 3 -t 1000 "$type Muted" &
-  else
-    notify-send -r 3 -t 1000 "$type ${display_vol}%" -h "int:value:$bar_value" &
+  local is_fullscreen
+  is_fullscreen="$(hyprctl -j activewindow | jq -r .fullscreen)"
+
+  if (( is_fullscreen == 0 )); then
+    if [[ "$muted" == "true" ]]; then
+      notify-send -r 3 -t 1000 "$type Muted" &
+    else
+      notify-send -r 3 -t 1000 "$type ${display_vol}%" -h "int:value:$bar_value" &
+    fi
   fi
+
 }
 
 adjust_volume() {
