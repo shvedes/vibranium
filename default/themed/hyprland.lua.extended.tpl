@@ -1,4 +1,5 @@
 ATTENTION = "rgb({{ red_strip }})"
+RESIZE = "rgb({{ accent_bright_strip }})"
 
 hl.config({
   general = {

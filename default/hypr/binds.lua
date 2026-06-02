@@ -105,6 +105,11 @@ hl.define_submap("resize", function()
     )
   end
 
+  local function exit_resize_mode()
+    Vb.FlashBorder(RESIZE)
+    hl.dispatch(hl.dsp.submap("reset"))
+  end
+
   -- Arrow key bindings: same deltas as the IJKL cluster above.
   -- Direction label is resolved from the arrows table to reuse the mapping.
   for _, r in ipairs(resize_arrows) do
@@ -122,16 +127,17 @@ hl.define_submap("resize", function()
     )
   end
 
-  hl.bind("Q", hl.dsp.submap("reset"), { description = "Exit resize mode" })
-  hl.bind("Escape", hl.dsp.submap("reset"), { description = "Exit resize mode" })
-  hl.bind("Return", hl.dsp.submap("reset"), { description = "Exit resize mode" })
-  hl.bind("BackSpace", hl.dsp.submap("reset"), { description = "Exit resize mode" })
+  hl.bind("Q", exit_resize_mode, { description = "Exit resize mode" })
+  hl.bind("Escape", exit_resize_mode, { description = "Exit resize mode" })
+  hl.bind("Return", exit_resize_mode, { description = "Exit resize mode" })
+  hl.bind("BackSpace", exit_resize_mode, { description = "Exit resize mode" })
 end)
 
 hl.bind(
   mainMod .. " + R",
   function()
     if hl.get_active_window() == nil then return end
+    Vb.FlashBorder(RESIZE)
     hl.dispatch(hl.dsp.submap("resize"))
   end,
   { description = "Enter resize mode" }
