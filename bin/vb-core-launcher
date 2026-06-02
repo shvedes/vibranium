@@ -64,6 +64,25 @@ _open_link() {
   app2unit-open -s app-graphical.slice "$link" &>/dev/null &
 }
 
+_handle_keyword() {
+  local input="$1"
+  local entry keyword action
+
+  for entry in "${vb_launcher_keywords[@]+"${vb_launcher_keywords[@]}"}"; do
+    keyword="${entry%%:*}"
+    action="${entry#*:}"
+
+    if [[ "$input" == "$keyword" ]]; then
+      if ! eval "$action"; then
+        printf "Keyword '$keyword' returned non zero exit code!\n" >&2
+        exit 1
+      fi
+      return 0
+    fi
+  done
+  return 1
+}
+
 _search_the_internet() {
   local input="$*"
   local engine
@@ -91,6 +110,12 @@ if pidof -q rofi; then
 fi
 
 source vb-lib-core
+
+if [[ -f "${VIBRANIUM_USER_SETTINGS}.functions" ]]; then
+  source "${VIBRANIUM_USER_SETTINGS}.functions"
+fi
+
+source "${VIBRANIUM_USER_SETTINGS}.advanced"
 
 helpers::check \
   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
@@ -174,6 +199,11 @@ case "$INPUT" in
   exit 0
   ;;
 *)
+  # Keywords take precedence.
+  if _handle_keyword "$INPUT"; then
+    exit 0
+  fi
+
   # Determine whether the input
   # is a command or a search query.
   CMD="${INPUT%% *}"
@@ -182,10 +212,7 @@ case "$INPUT" in
 
   # File exists and it IS an executable
   if [[ -x "$CMD" ]] || command -v "$CMD" >/dev/null; then
-    if [[ "$CMD" == "date" ]]; then
-      notify-send "$(eval $CMD)"
-      exit 0
-    elif [[ "$CMD" == vb-core* ]]; then
+    if [[ "$CMD" == vb-core* ]]; then
       eval "$INPUT"
       exit 0
     fi

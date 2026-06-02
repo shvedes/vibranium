@@ -1,0 +1,28 @@
+# vim:ft=bash
+#
+# User-defined functions for use in settings.advanced.
+# This file is sourced before settings.advanced, so any function
+# defined here can be used directly as a keyword action.
+#
+# Example:
+#
+#   _show_kernel_version() {
+#     notify-send "Kernel" "$(uname -r)"
+#   }
+#
+# Then in settings.advanced:
+#   vb_launcher_keywords=(
+#     "kernel:_show_kernel_version"
+#   )
+
+_vb_kw_date() {
+  notify-send "$(date)"
+}
+
+_check_updates() {
+  local updates
+  updates=$(checkupdates | wc -l)
+
+  notify-send "System Updates" \
+    "There are $updates updates available"
+}

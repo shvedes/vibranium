@@ -1,3 +1,5 @@
+# vim:ft=bash
+#
 # This is the advanced settings file, intended to be edited manually.
 # If you're changing values here, you likely know what you're doing.
 # All changes are applied instantly. If you're unfamiliar with these
@@ -39,4 +41,20 @@ vb_force_template_files=(
   "gtk.css"
 )
 
-# vim:ft=bash
+# Launcher keywords: special words recognised in the rofi search bar.
+# Each entry has the form "keyword:action", where action is eval'd as a
+# shell command. Both inline expressions and function names work:
+#
+#   "hello:notify-send Hello"
+#   "date:notify-send \"$(date)\""   # escape $ to expand at trigger time, not at source time
+#   "kernel:_show_kernel_version"    # function defined in settings.functions
+#
+# Functions can be defined here (before the array) or in the
+# ~/.config/vibranium/settings.functions (preferred way).
+# The latter is being sourced by exec scripts that use it.
+
+vb_launcher_keywords=(
+  "date:_vb_kw_date"
+  "updates:_check_updates"
+  "stopify:app2unit -- spotify"
+  )
