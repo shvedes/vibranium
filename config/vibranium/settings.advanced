@@ -56,5 +56,5 @@ vb_force_template_files=(
 vb_launcher_keywords=(
   "date:_vb_kw_date"
   "updates:_check_updates"
-  "stopify:app2unit -- spotify"
+  "stopify:vb-launch-cmd -- spotify"
   )
