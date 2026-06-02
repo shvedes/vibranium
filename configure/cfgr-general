@@ -33,6 +33,24 @@ _get_update_channel() {
   fi
 }
 
+_get_vb_updates (){
+  local file="$XDG_CONFIG_HOME/systemd/user/default.target.wants/vibranium-update.timer"
+
+  if [[ -L "$file" ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+_toggle_vb_updates (){
+  if _get_vb_updates; then
+    systemctl -q --user disable --now vibranium-update.timer
+  else
+    systemctl -q --user enable --now vibranium-update.timer
+  fi
+}
+
 # ================================================================================ #
 
 _build() {
@@ -48,7 +66,14 @@ _build() {
       --hook "_toggle_osd_service"
   fi
 
+  if _get_vb_updates; then
+    local vb_updates_enabled="true"
+  else
+    local vb_updates_enabled="false"
+  fi
+
   cfgr::item::raw "Update channel : $update_channel" "action:_set_update_channel"
+  cfgr::item::raw "Updates auto check : $vb_updates_enabled" "action:_toggle_vb_updates"
 }
 
 cfgr::run "General" "_build" \
