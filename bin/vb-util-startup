@@ -13,6 +13,21 @@ export -f helpers::check
 # Point child bash processes at the lib so they auto-source it.
 export BASH_ENV="$VIBRANIUM/bin/vb-lib-core"
 
+shopt -s nullglob
+
+# XDG autostart entries
+for desktop in "$XDG_CONFIG_HOME"/autostart/*.desktop; do
+  if [[ ! -f "$desktop" ]]; then
+    continue
+  fi
+
+  exec_cmd="$(awk -F= '/^Exec=/{print substr($0,6); exit}' "$desktop")"
+
+  if [[ -n "$exec_cmd" ]]; then
+    setsid -f app2unit -- $exec_cmd
+  fi
+done
+
 # Run the default startup scripts first
 HOOKS=("$VIBRANIUM"/default/hooks/startup/*.sh)
 
@@ -21,8 +36,6 @@ if ((${#HOOKS[@]} > 0)); then
     bash "$hook" &
   done
 fi
-
-shopt -s nullglob
 
 # Then user scripts
 UHOOKS=("$XDG_CONFIG_HOME"/vibranium/hooks/startup/*.sh)
