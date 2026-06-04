@@ -205,6 +205,9 @@ case "$1" in
   if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
     mkdir -p "$UWALLS"
     cp "$WALLPAPER_PATH" "$UWALLS/"
+    # Also copy to the currently active theme (in case if the user
+    # cycles the wallpapers over and over again without changing the theme)
+    cp "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds/"
     WALLPAPER_PATH="$UWALLS/${WALLPAPER_PATH##*/}"
   fi
   ;;
