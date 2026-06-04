@@ -625,6 +625,8 @@ hl.bind(mainMod .. " + SHIFT + mouse_down", hl.dsp.exec_raw("vb-core-zoom --incr
   { description = "Zoom in" })
 hl.bind(mainMod .. " + SHIFT + mouse_up", hl.dsp.exec_raw("vb-core-zoom --decrease"),
   { description = "Zoom out" })
+hl.bind(mainMod .. " + SHIFT + mouse:274", hl.dsp.exec_raw("vb-core-zoom --reset"),
+  { description = "Reset zoom level" })
 
 
 -- Mouse drag and resize
@@ -659,7 +661,6 @@ hl.bind(mainMod .. " + B", hl.dsp.exec_raw("vb-core-power --next"), { descriptio
 
 
 hl.bind("XF86Calculator", hl.dsp.exec_raw("vb-util-calc"), { description = "Toggle calculator" })
-hl.bind(mainMod .. " + mouse:274", hl.dsp.exec_raw("vb-core-zoom --reset"), { description = "Reset zoom level" })
 
 
 -- System monitoring
