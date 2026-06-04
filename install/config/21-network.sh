@@ -177,7 +177,7 @@ sudo mkdir -p /etc/systemd/network
 
 _log_info "Getting *.network reference files"
 for file in 20-wwan.network 20-ethernet.network 20-wlan.network; do
-  curl -fsSo "/tmp/${file}" "${base_url}/${file}"
+  curl -4 -fsSo "/tmp/${file}" "${base_url}/${file}"
   _log_info "Got ${file}"
   sudo mv -f "/tmp/${file}" "/etc/systemd/network/${file}"
 done
