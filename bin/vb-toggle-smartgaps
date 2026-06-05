@@ -32,7 +32,7 @@ if [[ -f "$FILE" ]]; then
 else
   shcat >"$FILE" <<EOF
 hl.workspace_rule({
-  workspace = "w[tv1]s[false]",
+  workspace = "w[tv1] w[g0] s[false]", -- 1 tiled, no groups, not special
   gaps_out = 0,
   gaps_in = 0,
 })
@@ -40,7 +40,7 @@ hl.workspace_rule({
 hl.window_rule({
   match = {
     float = false,
-    workspace = "w[tv1]s[false]",
+    workspace = "w[tv1] w[g0] s[false]",
   },
   decorate = false
 })
