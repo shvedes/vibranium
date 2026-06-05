@@ -388,25 +388,25 @@ hl.bind("ALT + L", function()
   local win = hl.get_active_window()
   if win == nil or win.group == nil then return end
   hl.dispatch(hl.dsp.group.next())
-end, { description = "Group: next tab" })
+end, { description = "Group: next tab", non_consuming = false })
 
 hl.bind("ALT + TAB", function()
   local win = hl.get_active_window()
   if win == nil or win.group == nil then return end
   hl.dispatch(hl.dsp.group.next())
-end, { description = "Group: next tab" })
+end, { description = "Group: next tab", non_consuming = false })
 
 hl.bind("ALT + J", function()
   local win = hl.get_active_window()
   if win == nil or win.group == nil then return end
   hl.dispatch(hl.dsp.group.prev())
-end, { description = "Group: previoue tab" })
+end, { description = "Group: previoue tab", non_consuming = false })
 
 hl.bind("ALT + SHIFT + Grave", function()
   local win = hl.get_active_window()
   if win == nil or win.group == nil then return end
   hl.dispatch(hl.dsp.group.prev())
-end, { description = "Group: previous tab" })
+end, { description = "Group: previous tab", non_consuming = false })
 
 -- Reorder tabs within the group. Shifting a tab changes its position in the
 -- group bar without changing which window is focused.
@@ -415,13 +415,13 @@ hl.bind(mainMod .. " + CTRL + SHIFT + J", function()
   local win = hl.get_active_window()
   if win == nil or win.group == nil then return end
   hl.dispatch(hl.dsp.group.move_window({ back = true }))
-end, { description = "Group: move tab backward" })
+end, { description = "Group: move tab backward", non_consuming = false })
 
 hl.bind(mainMod .. " + CTRL + SHIFT + L", function()
   local win = hl.get_active_window()
   if win == nil or win.group == nil then return end
   hl.dispatch(hl.dsp.group.move_window())
-end, { description = "Group: move tab forward" })
+end, { description = "Group: move tab forward", non_consuming = false })
 
 -- Jump to a specific group tab by index.
 for i = 1, 10 do
@@ -431,7 +431,7 @@ for i = 1, 10 do
     -- Index out of range, do nothing.
     if i > win.group.size then return end
     hl.dispatch(hl.dsp.group.active({ index = i }))
-  end, { description = "Group: jump to tab " .. i, non_consuming = true })
+  end, { description = "Group: jump to tab " .. i, non_consuming = false })
 end
 
 

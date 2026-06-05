@@ -1,5 +1,3 @@
-hl.animation({ leaf = "global", enabled = true })
-
 -- Beziers
 hl.curve("easeSoft", { type = "bezier", points = { { 0.18, 0.62 }, { 0.32, 1.00 } } })
 hl.curve("easeFade", { type = "bezier", points = { { 0.28, 0.00 }, { 0.22, 1.00 } } })
