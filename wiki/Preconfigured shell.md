@@ -1,4 +1,4 @@
-During installation, you’ll be asked which shell you use.  
+During installation, you’ll be asked which shell you use.
 Vibranium provides three popular options: `bash`, `zsh`, and `fish`, all with largely similar configurations.
 
 Keep in mind that shells are not identical. A feature that works in `bash` or `zsh` may not work in `fish`, for example. That said, all three configurations aim for feature parity as much as possible.
@@ -13,7 +13,7 @@ To simplify maintenance across all three shells, Vibranium uses [Starship](https
 
 The Git module uses minimal glyphs (Nerd Fonts), keeping most of the status output as plain text with color formatting.
 
-![](starship_git_module.jpeg)
+![](./media/starship_git_module.jpeg)
 
 | Indicator    | Symbol    |
 | ------------ | --------- |
@@ -38,7 +38,7 @@ By default, the hostname is not shown, since you already know your machine. Howe
 
 ### Python Venv
 
-> [!NOTE]  
+> [!NOTE]
 > You can create and activate Python virtual environments using the `mkvenv` command.
 
 A simple indicator appears when a Python virtual environment is active.
