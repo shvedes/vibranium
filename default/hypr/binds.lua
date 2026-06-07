@@ -426,7 +426,7 @@ for i = 1, 10 do
       return
     end
 
-    if win.group.size == 1 or win.tags == "browserWindow" then
+    if win.group.size == 1 then
       hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "down" }))
       hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "up" }))
       return
