@@ -356,12 +356,7 @@ hl.bind(mainMod .. " + SHIFT + G", function()
 end, { description = "Eject window from group" })
 
 -- Merge the active window into an existing group in the given direction.
--- Uses the directions table (IJKL) rather than all_directions — arrow key
--- fallbacks are not bound here because merge is a deliberate action that
--- should not be triggered by casual arrow use.
--- No group guard: the active window does not need to already be in a group
--- in order to be pushed into one.
-for _, d in ipairs(directions) do
+for _, d in ipairs(all_directions) do
   hl.bind(
     mainMod .. " + CTRL + " .. d.key,
     function()
@@ -374,62 +369,72 @@ for _, d in ipairs(directions) do
 end
 
 -- Lock or unlock the active group so it stops accepting new members.
-hl.bind(mainMod .. " + CTRL + G", function()
-  local win = hl.get_active_window()
-  if win == nil or win.group == nil then return end
-  hl.dispatch(hl.dsp.group.lock_active())
-end, { description = "Lock / unlock active group" })
+hl.bind(mainMod .. " + CTRL + G", hl.dsp.group.lock_active(), {
+  description = "Lock / unlock active group",
+})
 
 -- Navigate group tabs. J = previous, L = next. The horizontal pair mirrors
 -- the natural left/right reading order of tabs in the group bar.
 -- I and K are intentionally unbound: tab order is linear, not spatial.
 
-hl.bind("ALT + L", function()
-  local win = hl.get_active_window()
-  if win == nil or win.group == nil then return end
-  hl.dispatch(hl.dsp.group.next())
-end, { description = "Group: next tab", non_consuming = false })
+hl.bind("ALT + L", hl.dsp.group.next(), {
+  description = "Group: next tab",
+  non_consuming = false,
+})
 
-hl.bind("ALT + TAB", function()
-  local win = hl.get_active_window()
-  if win == nil or win.group == nil then return end
-  hl.dispatch(hl.dsp.group.next())
-end, { description = "Group: next tab", non_consuming = false })
+hl.bind("ALT + TAB", hl.dsp.group.next(), {
+  description = "Group: next tab",
+  non_consuming = false,
+})
 
-hl.bind("ALT + J", function()
-  local win = hl.get_active_window()
-  if win == nil or win.group == nil then return end
-  hl.dispatch(hl.dsp.group.prev())
-end, { description = "Group: previoue tab", non_consuming = false })
+hl.bind("ALT + J", hl.dsp.group.prev(), {
+  description = "Group: previous tab",
+  non_consuming = false,
+})
 
-hl.bind("ALT + SHIFT + Grave", function()
-  local win = hl.get_active_window()
-  if win == nil or win.group == nil then return end
-  hl.dispatch(hl.dsp.group.prev())
-end, { description = "Group: previous tab", non_consuming = false })
+hl.bind("ALT + SHIFT + Grave", hl.dsp.group.prev(), {
+  description = "Group: previous tab",
+  non_consuming = false,
+})
 
--- Reorder tabs within the group. Shifting a tab changes its position in the
--- group bar without changing which window is focused.
--- I and K are intentionally unbound for the same reason as tab navigation.
-hl.bind(mainMod .. " + CTRL + SHIFT + J", function()
-  local win = hl.get_active_window()
-  if win == nil or win.group == nil then return end
-  hl.dispatch(hl.dsp.group.move_window({ back = true }))
-end, { description = "Group: move tab backward", non_consuming = false })
+hl.bind(mainMod .. " + CTRL + SHIFT + J", hl.dsp.group.move_window({ back = true }), {
+  description = "Group: move tab backward",
+  non_consuming = false,
+})
 
-hl.bind(mainMod .. " + CTRL + SHIFT + L", function()
-  local win = hl.get_active_window()
-  if win == nil or win.group == nil then return end
-  hl.dispatch(hl.dsp.group.move_window())
-end, { description = "Group: move tab forward", non_consuming = false })
+hl.bind(mainMod .. " + CTRL + SHIFT + L", hl.dsp.group.move_window(), {
+  description = "Group: move tab forward",
+  non_consuming = false,
+})
 
 -- Jump to a specific group tab by index.
 for i = 1, 10 do
   hl.bind("ALT + " .. (i % 10), function()
     local win = hl.get_active_window()
-    if win == nil or win.group == nil then return end
-    -- Index out of range, do nothing.
+
+    if win == nil then
+      return
+    end
+
+    -- If currnt window is not in a group - pass the shortcut directly.
+    -- ALT + N is usually consumed by browsers, so it have to be useful.
+    -- hl.dsp.send_shortcut() leaves a bug where the keys are being repeatedly
+    -- pressed after the key release.
+    if win.group == nil then
+      hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "down" }))
+      hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "up" }))
+      return
+    end
+
+    if win.group.size == 1 or win.tags == "browserWindow" then
+      hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "down" }))
+      hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "up" }))
+      return
+    end
+
+    -- Index out of range for the current group; do nothing.
     if i > win.group.size then return end
+
     hl.dispatch(hl.dsp.group.active({ index = i }))
   end, { description = "Group: jump to tab " .. i, non_consuming = false })
 end
@@ -438,12 +443,12 @@ end
 -- Workspace management
 
 hl.bind(
-  "CTRL + " .. mainMod .. " + Right",
+  mainMod .. "+ ALT + Right",
   hl.dsp.focus({ workspace = "m+1" }),
   { description = "Next workspace" }
 )
 hl.bind(
-  "CTRL + " .. mainMod .. " + Left",
+  mainMod .. "+ ALT + Left",
   hl.dsp.focus({ workspace = "m-1" }),
   { description = "Previous workspace" }
 )
