@@ -18,7 +18,7 @@ Options:
   --get        Get current power profile
   -q, --quiet  Be quiet (cli and notification)
 
-  [PROFILE]    Set specified profile. Can be power-saver,balanced,performance
+  [PROFILE]    Set a specific profile (see: powerprofilesctl list)
 EOF
 }
 
@@ -44,6 +44,10 @@ notify() {
     icon="power-profile-power-saver-symbolic"
     label="Powersave"
     ;;
+  *)
+    icon="battery-symbolic"
+    label="$profile"
+    ;;
   esac
 
   source vb-lib-core
@@ -67,30 +71,65 @@ notify() {
 }
 
 get_power_profile() {
-  local state_file="$VIBRANIUM_STATE/power-profile"
-
-  if [[ -f "$state_file" ]]; then
-    local state
-    state="$(<"$state_file")"
-    printf "%s" "$state"
+  local state="$VIBRANIUM_STATE/power-profile"
+  if [[ -f "$state" ]]; then
+    IFS=: read -r _ profile <"$state"
+    printf '%s' "$profile"
     return
   fi
 
-  # Update state file if it doesn't exists
-  local curr_profile
-  curr_profile="$(powerprofilesctl get)"
-  printf "%s" "$curr_profile" >"$state_file"
-  printf "%s" "$curr_profile"
+  powerprofilesctl get
 }
 
 set_power_profile() {
   local target="$1"
-  local state="$VIBRANIUM_STATE/power-profile"
-
   powerprofilesctl set "$target" &
+  _write_state "$target"
+}
 
-  # Update cache
-  echo "$target" >"$state"
+_write_state() {
+  local current="$1"
+  {
+    printf 'current:%s\n\n' "$current"
+    printf '%s\n' "${PROFILES[@]}"
+  } >"$VIBRANIUM_STATE/power-profile"
+}
+
+_load_state() {
+  local state="$VIBRANIUM_STATE/power-profile"
+  local _detected
+
+  if [[ -f "$state" ]]; then
+    mapfile -t _lines <"$state"
+    CURRENT="${_lines[0]#current:}"
+    PROFILES=("${_lines[@]:2}")
+
+    if [[ ${#PROFILES[@]} -gt 0 ]]; then
+      return
+    fi
+  fi
+
+  # Cold start or repair: regenerate profiles from powerprofilesctl
+  mapfile -t _detected < <(
+    powerprofilesctl list \
+      | awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }'
+  )
+
+  PROFILES=()
+
+  for profile in balanced performance power-saver; do
+    for detected in "${_detected[@]}"; do
+      if [[ "$detected" == "$profile" ]]; then
+        PROFILES+=("$profile")
+      fi
+    done
+  done
+
+  if [[ -z "$CURRENT" ]]; then
+    CURRENT="$(powerprofilesctl get)"
+  fi
+
+  _write_state "$CURRENT"
 }
 
 ACTION="next"
@@ -105,10 +144,6 @@ while (($# > 0)); do
     ;;
   --next | --prev)
     ACTION="${1/--/}"
-    shift
-    ;;
-  power-saver | balanced | performance)
-    TARGET_PROFILE="$1"
     shift
     ;;
   -h | --help)
@@ -129,9 +164,8 @@ while (($# > 0)); do
     exit 1
     ;;
   *)
-    echo "Unknown profile: $1" >&2
-    echo "Try '$SELF --help' for more information" >&2
-    exit 1
+    TARGET_PROFILE="$1"
+    shift
     ;;
   esac
 done
@@ -142,8 +176,18 @@ if ! command -v powerprofilesctl >/dev/null; then
   exit 1
 fi
 
-PROFILES=("power-saver" "balanced" "performance")
-CURRENT="$(get_power_profile)"
+_load_state
+
+if [[ ${#PROFILES[@]} -eq 0 ]]; then
+  echo "Error: could not determine available power profiles" >&2
+  exit 1
+fi
+
+if [[ -n "$TARGET_PROFILE" ]] && [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
+  echo "Unknown profile: $TARGET_PROFILE" >&2
+  echo "Available: ${PROFILES[*]}" >&2
+  exit 1
+fi
 
 if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
   current_index=0
