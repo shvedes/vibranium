@@ -206,16 +206,19 @@ _anim_submenu() {
     cfgr::item::action --label "Enabled : $enabled" --func "_toggle 'animations:enabled'"
 
     if [[ "$enabled" == true ]]; then
-      local active_preset; active_preset="$(readlink "$HYPR_CONF_ANIMATIONS")"
+      local active_preset
+      if [[ -L "$HYPR_CONF_ANIMATIONS" ]]; then
+        active_preset="$(readlink "$HYPR_CONF_ANIMATIONS")"
 
-      # Check if the active preset is one of the defaults.
-      if [[ $active_preset =~ vibranium ]]; then
-        active_preset="${active_preset##*/}"  # Strip path
-        active_preset="${active_preset%.lua}" # Strip extension
-        active_preset="${active_preset^}"     # Make the first letter uppercase
-      else
-        # Semi-transparent, italic.
+        if [[ $active_preset =~ (vibranium|\.config/hypr/animations) ]]; then
+          active_preset="${active_preset##*/}"  # Strip path
+          active_preset="${active_preset%.lua}" # Strip extension
+          active_preset="${active_preset^}"     # Make the first letter uppercase
+        fi
+      elif [[ -f "$HYPR_CONF_ANIMATIONS" ]]; then
         active_preset="<span alpha='70%'><i>[user defined]</i></span>"
+      elif [[ ! -f "$HYPR_CONF_ANIMATIONS" || ! -L "$HYPR_CONF_ANIMATIONS" ]]; then
+        active_preset="<span alpha='70%'><i>[hyprland's default]</i></span>"
       fi
 
       # If not, then most likely the file is deleted (default hyprland animations),
@@ -259,24 +262,76 @@ _edit_roundness() {
   fi
 }
 
-# TODO: scan not only the $folder, but also a (new) folder with
-# user's presets. I guess ~/.config/hypr/hyprland.conf.d/animations/ is the way to go.
 _set_anim_preset() {
-  local folder="$VIBRANIUM/default/hypr/animations" chosen
-  local presets=("$folder"/*.lua)
+  local folder_defaults="$VIBRANIUM/default/hypr/animations"
+  # source() in "$VIBRANIUM/default/hypr/init.lua" recursively sources all
+  # .lua files found in the hypr.cond.d. Keeping that folder in there will cause animations override.
+  local folder_custom="$XDG_CONFIG_HOME/hypr/animations"
+  local chosen f
 
-  presets=("${presets[@]##*/}")   # Strip path
-  presets=("${presets[@]%.lua}")  # Strip extension
-  presets=("${presets[@]^}")      # Make the first letter uppercase
+  # Collect default preset names
+  local -a defaults=()
+  for f in "$folder_defaults"/*.lua; do
+    if [[ ! -f "$f" ]]; then
+      continue
+    fi
 
-  local chosen
-  chosen="$(cfgr::set_string --title "Preset" --option "${presets[@]}")" || return
+    f="${f##*/}"; defaults+=("${f%.lua}")
+  done
+
+  # Collect custom preset names, filtering out any that collide with defaults.
+  # Default presets always take priority — shadowed customs are excluded and the user is notified.
+  local -a customs=() shadowed=()
+  if [[ -d "$folder_custom" ]]; then
+    local name def is_shadowed
+    for f in "$folder_custom"/*.lua; do
+      if [[ ! -f "$f" ]]; then
+        continue
+      fi
+
+      f="${f##*/}"; name="${f%.lua}"
+      is_shadowed=0
+      for def in "${defaults[@]}"; do
+        if [[ "$name" == "$def" ]]; then
+          { is_shadowed=1; break; }
+        fi
+      done
+      (( is_shadowed )) && shadowed+=("$name") || customs+=("$name")
+    done
+  fi
+
+  # Notify about shadowed custom presets, if any
+  if (( ${#shadowed[@]} )); then
+    local shadow_msg="The following custom presets share names with built-in ones and will be ignored:\n"
+    for name in "${shadowed[@]}"; do
+      shadow_msg+="  • <span foreground='${P_YELLOW}'><b>${name^}</b></span>\n"
+    done
+    notify-send -r 4 -t 10000 "Animation Preset Conflict" "$shadow_msg"
+  fi
+
+  # Build display list: defaults first, then non-colliding customs.
+  local -a presets=("${defaults[@]}" "${customs[@]}")
+  # First letter capitalized
+  local -a display=("${presets[@]^}")
+
+  chosen="$(cfgr::set_string --title "Preset" --option "${display[@]}")" || return
+
+  # Map display name back to filename stem and determine source folder.
+  # Defaults always take priority, so check there first.
+  local chosen_lower="${chosen,}"
+  local source_folder
+
+  if [[ -f "$folder_defaults/${chosen_lower}.lua" ]]; then
+    source_folder="$folder_defaults"
+  else
+    source_folder="$folder_custom"
+  fi
 
   # First, check whether the target file is a symlink (one of the defaults)
   # or a standalone file. If the latter, then backup it first so the user doesn't lose their custom curve.
   #
   # Pay attention to the -f test, not the -L.
-  if [[ -f "$HYPR_CONF_ANIMATIONS" ]]; then
+  if [[ ! -L "$HYPR_CONF_ANIMATIONS" ]]; then
     # Just in case. Sometimes it's better to be paranoid.
     # Instead of overwriting backup file, create another one with
     # UNIX epoch time prepended to it. $EPOCHSECONDS is a bash's builtin special variable.
@@ -296,7 +351,7 @@ _set_anim_preset() {
     notify-send -r 3 -t 12000 "Your Animations Preset Has Been Saved" "$msg"
   fi
 
-  ln -sf "$folder/${chosen,}.lua" "$HYPR_CONF_ANIMATIONS"
+  ln -sf "$source_folder/${chosen_lower}.lua" "$HYPR_CONF_ANIMATIONS"
 }
 
 # ================================================================================ #
