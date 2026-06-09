@@ -147,3 +147,8 @@ hl.window_rule({
   dim_around = true,
   stay_focused = true,
 })
+
+hl.layer_rule({
+  match = { namespace = "selection" },
+  no_anim = true
+})
