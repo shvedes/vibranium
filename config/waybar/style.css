@@ -95,6 +95,14 @@ tooltip, tooltip label {
 	color: @urgent
 }
 
+#bluetooth, #bluetooth.disabled, #bluetooth.off {
+  opacity: 0.5
+}
+
+#bluetooth.connected {
+  opacity: 1
+}
+
 #custom-timer.expired {
   animation: timer-flash 1.05s infinite;
 }
