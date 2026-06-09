@@ -2,11 +2,6 @@
 
 # ================================================================================ #
 
-_get_timeouts() {
-  local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
-  awk -f "$VIBRANIUM/awk/cfgr-idle-get-timeouts.awk" "$config"
-}
-
 _update_timeout() {
   local index="$1"
   local seconds="$2"
@@ -40,26 +35,38 @@ _set_timeouts() {
 # ================================================================================ #
 
 _build() {
-  mapfile -t TIMEOUTS < <(_get_timeouts)
-  local lock_timeout sleep_timeout
+  local config_valid="true"
+  local config="$XDG_CONFIG_HOME/hypr/hypridle.conf"
 
-  lock_timeout="${TIMEOUTS[0]}"
-  sleep_timeout="${TIMEOUTS[1]}"
+  mapfile -t TIMEOUTS < <(awk -f "$VIBRANIUM/awk/cfgr-idle-get-timeouts.awk" "$config")
 
-  # Convert seconds to minutes for display and range clamping.
-  lock_timeout="$((lock_timeout / 60))"
-  sleep_timeout="$((sleep_timeout / 60))"
+  if [[ -z "${TIMEOUTS[@]}" ]]; then
+    config_valid="false"
+    notify-send -r 3 -t 10000 "Unable To Parse Config File" \
+      "<span foreground='${P_ACCENT}'><b>hypridle.conf</b></span> is formatted incorrectly. Timeout options are unavailable."
+  fi
+
+  if [[ "$config_valid" == "true" ]]; then
+    local lock_timeout sleep_timeout
+
+    lock_timeout="${TIMEOUTS[0]}"
+    sleep_timeout="${TIMEOUTS[1]}"
+
+    # Convert seconds to minutes for display and range clamping.
+    lock_timeout="$((lock_timeout / 60))"
+    sleep_timeout="$((sleep_timeout / 60))"
+
+    cfgr::item::action \
+      --func "_set_timeouts Lock 1 1 $sleep_timeout" \
+      --label "Lock after : ${lock_timeout}m"
+
+    cfgr::item::action \
+      --func "_set_timeouts Sleep 2 $lock_timeout 3600" \
+      --label "Sleep after : ${sleep_timeout}m"
+  fi
 
   local inh_type="${VIBRANIUM_GLOBAL_INHIBIT_TYPE^}"
   local inh_var="VIBRANIUM_GLOBAL_INHIBIT_TYPE"
-
-  cfgr::item::action \
-    --func "_set_timeouts Lock 1 1 $sleep_timeout" \
-    --label "Lock after : ${lock_timeout}m"
-
-  cfgr::item::action \
-    --func "_set_timeouts Sleep 2 $lock_timeout 3600" \
-    --label "Sleep after : ${sleep_timeout}m"
 
   cfgr::item::action \
     --func "cfgr::set_string --title Type --option 'Idle:idle' 'Sleep:sleep' --var $inh_var" \

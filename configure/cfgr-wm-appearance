@@ -291,11 +291,14 @@ _set_anim_preset() {
 
       f="${f##*/}"; name="${f%.lua}"
       is_shadowed=0
+
       for def in "${defaults[@]}"; do
         if [[ "$name" == "$def" ]]; then
-          { is_shadowed=1; break; }
+          is_shadowed=1
+          break
         fi
       done
+
       (( is_shadowed )) && shadowed+=("$name") || customs+=("$name")
     done
   fi
