@@ -206,10 +206,22 @@ _anim_submenu() {
     cfgr::item::action --label "Enabled : $enabled" --func "_toggle 'animations:enabled'"
 
     if [[ "$enabled" == true ]]; then
-      active_preset="$(readlink "$HYPR_CONF_ANIMATIONS")"
-      active_preset="${active_preset##*/}"; active_preset="${active_preset%.lua}"
+      local active_preset; active_preset="$(readlink "$HYPR_CONF_ANIMATIONS")"
 
-      cfgr::item::action --label "Preset : ${active_preset^}" --func "_set_anim_preset"
+      # Check if the active preset is one of the defaults.
+      if [[ $active_preset =~ vibranium ]]; then
+        active_preset="${active_preset##*/}"  # Strip path
+        active_preset="${active_preset%.lua}" # Strip extension
+        active_preset="${active_preset^}"     # Make the first letter uppercase
+      else
+        # Semi-transparent, italic.
+        active_preset="<span alpha='70%'><i>[user defined]</i></span>"
+      fi
+
+      # If not, then most likely the file is deleted (default hyprland animations),
+      # it is not symlinked or the user wrote its own animations curve. Therefore
+      # we don't know what's the curve, so show [user defined] value.
+      cfgr::item::action --label "Preset : $active_preset" --func "_set_anim_preset"
     fi
   }
   cfgr::run "Animations" "_b"
@@ -247,16 +259,42 @@ _edit_roundness() {
   fi
 }
 
+# TODO: scan not only the $folder, but also a (new) folder with
+# user's presets. I guess ~/.config/hypr/hyprland.conf.d/animations/ is the way to go.
 _set_anim_preset() {
   local folder="$VIBRANIUM/default/hypr/animations" chosen
   local presets=("$folder"/*.lua)
 
-  presets=("${presets[@]##*/}")
-  presets=("${presets[@]%.lua}")
-  presets=("${presets[@]^}")
+  presets=("${presets[@]##*/}")   # Strip path
+  presets=("${presets[@]%.lua}")  # Strip extension
+  presets=("${presets[@]^}")      # Make the first letter uppercase
 
   local chosen
   chosen="$(cfgr::set_string --title "Preset" --option "${presets[@]}")" || return
+
+  # First, check whether the target file is a symlink (one of the defaults)
+  # or a standalone file. If the latter, then backup it first so the user doesn't lose their custom curve.
+  #
+  # Pay attention to the -f test, not the -L.
+  if [[ -f "$HYPR_CONF_ANIMATIONS" ]]; then
+    # Just in case. Sometimes it's better to be paranoid.
+    # Instead of overwriting backup file, create another one with
+    # UNIX epoch time prepended to it. $EPOCHSECONDS is a bash's builtin special variable.
+    if [[ -f "${HYPR_CONF_ANIMATIONS}.bak" ]]; then
+      mv "$HYPR_CONF_ANIMATIONS" "${HYPR_CONF_ANIMATIONS}.bak.$EPOCHSECONDS"
+      local backed_up="${HYPR_CONF_ANIMATIONS}.bak.$EPOCHSECONDS"
+    else
+      mv "$HYPR_CONF_ANIMATIONS" "${HYPR_CONF_ANIMATIONS}.bak"
+      local backed_up="${HYPR_CONF_ANIMATIONS}.bak"
+    fi
+
+    local msg="Your custom preset "
+    msg+="<span foreground='${P_ACCENT}'><b>${HYPR_CONF_ANIMATIONS##*/}</b></span> "
+    msg+="has been backed up as:\n"
+    msg+="<span foreground='${P_GREEN}'><b>$backed_up</b></span>"
+
+    notify-send -r 3 -t 12000 "Your Animations Preset Has Been Saved" "$msg"
+  fi
 
   ln -sf "$folder/${chosen,}.lua" "$HYPR_CONF_ANIMATIONS"
 }
