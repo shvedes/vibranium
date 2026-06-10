@@ -9,6 +9,7 @@ ADVANCED_SPEC=(
   "render.direct_scanout|int"
   "misc.middle_click_paste|bool"
   "misc.disable_autoreload|bool"
+  "misc.enable_anr_dialog|bool"
 )
 
 CURSOR_SPEC=(
@@ -742,6 +743,10 @@ _build() {
   cfgr::item::action \
     --label "Middle click paste : ${HYPR[misc.middle_click_paste]}" \
     --func "hypr::toggle 'misc:middle_click_paste' "$HYPR_CONF_ADVANCED""
+
+  cfgr::item::action \
+    --label "Enable ANR dialog : ${HYPR[misc.enable_anr_dialog]}" \
+    --func "hypr::toggle 'misc:enable_anr_dialog' "$HYPR_CONF_ADVANCED""
 
   cfgr::item::action \
     --label "Direct scanout : ${ds_display}" \
