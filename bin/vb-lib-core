@@ -666,11 +666,7 @@ hypr::is_fullscreen() {
 }
 
 hypr::flash::border() {
-  if [[ "$(hyprctl -j getoption 'animations.enabled' | jq -r '.bool')" == false ]]; then
-    return
-  fi
-
-  hyprctl -q eval "Vb.FlashBorder('0xff${P_TEXT###}')"
+  hyprctl -q eval "Hypr.Helpers.FlashBorder('0xff${P_TEXT###}')"
 }
 
 hypr::flash::screen() {

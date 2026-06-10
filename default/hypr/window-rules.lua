@@ -1,3 +1,9 @@
+if not Vibranium.Colors.red.normal then
+  BorderAttention = "rgb(ff0000)"
+else
+  BorderAttention = Vibranium.Colors.red.normal
+end
+
 hl.window_rule({
   match = {
     -- When using system instalation of glfw,
@@ -80,7 +86,6 @@ hl.window_rule({
 hl.window_rule({
   match = { tag = "gameWindow" },
   tag = "+focusOnActivate",
-  opaque = true
 })
 
 hl.window_rule({
@@ -117,14 +122,14 @@ hl.window_rule({
     class = "xdg-desktop-portal-gtk|[Tt]hunar",
     title = "^()$"
   },
-  border_color = ATTENTION,
+  border_color = BorderAttention,
   stay_focused = true,
   dim_around = true,
 })
 
 hl.window_rule({
   match = { class = "gcr-prompter" },
-  border_color = ATTENTION,
+  border_color = BorderAttention,
   stay_focused = true,
   dim_around = true,
 })
@@ -151,4 +156,74 @@ hl.window_rule({
 hl.layer_rule({
   match = { namespace = "selection" },
   no_anim = true
+})
+
+-- ============================================================================================================================= --
+
+hl.window_rule({
+  match = {
+    title =
+        "(?i)^("
+        .. "Save\\s+as|"
+        .. "(Open|Choose|All|Select|Save)\\s(?:\\w+\\s)?(?:Image|Folder.*|(?:All\\s)?Files?)|"
+        .. "(Image|Video)\\sfile|"
+        .. "Local\\sfile|"
+        .. "File\\supload|"
+        .. "New\\sarchive"
+        .. ")$",
+  },
+
+  float = true,
+  size = "monitor_w*0.7 monitor_h*0.7",
+  dim_around = true,
+  center = true
+})
+
+-- Thunar special rules.
+-- Keeps small contextual windows always visible and focused.
+-- To revert, just tile the window.
+hl.window_rule({
+  name = "Thunar: File Operation",
+  match = {
+    class = "[Tt]hunar",
+    title = "(Rename\\s.*|Create (New Folder|Document from template.*)|File Operation Progress|New\\s.*)"
+  },
+  float = true,
+  center = true,
+  dim_around = true,
+})
+
+-- ============================================================================================================================= --
+
+-- Matches window titles that likely indicate attention-demanding dialogs
+-- (e.g. confirmations, warnings, permissions, save prompts, errors).
+-- Used to apply visual emphasis so these windows are harder to miss.
+--
+-- Try to exit GIMP with an unsaved file to see the effect.
+
+local warn_actions = "(open shell script|authenticate|confirm|(empty\\s)?trash|delete)"
+local warn_states = "(warning|attention|alert|error)"
+local warn_misc = "(permission|quit|requ(ired|est))"
+local warn_save = "save[\\s\\w]*\\?"
+
+local warn_actions_classes = "(Pinentry-gtk)"
+local warn_titles = string.format("(?i)(%s|%s|%s|%s)([\\s\\w]*)?\\??", warn_actions, warn_states, warn_misc, warn_save)
+local warn_classes = string.format("(?i)(%s)([\\s\\w]*)?\\??", warn_titles)
+
+hl.window_rule({
+  match = { title = warn_titles },
+  border_color = BorderAttention,
+  dim_around = true,
+})
+
+hl.window_rule({
+  match = { class = warn_classes },
+  border_color = BorderAttention,
+  dim_around = true,
+})
+
+hl.window_rule({
+  match = { class = warn_actions_classes },
+  border_color = BorderAttention,
+  dim_around = true,
 })

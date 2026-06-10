@@ -3,18 +3,16 @@
 source vb-lib-core
 source vb-lib-cfgr
 
-_die() { helpers::ui::close_menus; }
-
 _build() {
   if [[ -f "$VIBRANIUM_RUNTIME/vb-timer.remaining" ]]; then
-    cfgr::item::action --label "Stop timer" --func "pkill -f vb-util-timer; _die" --icon vb-timer
+    cfgr::item::action --label "Stop timer" --func "pkill -f vb-util-timer; exit" --icon vb-timer
   else
-    cfgr::item::action --label "Start timer" --func "vb-util-timer; _die" --icon vb-timer
+    cfgr::item::action --label "Start timer" --func "vb-util-timer; exit" --icon vb-timer
   fi
 
-  cfgr::item::action --label "Toggle inhibitor" --func "vb-toggle-inhibitor; _die" --icon vb-inhibitor
-  cfgr::item::action --label "Reload Vibranium" --func "vb-cmd-reload --quiet; _die" --icon vb-update
-  cfgr::item::action --label "Close all windows" --func "hyprctl -q eval 'CloseWindows()'; _die" --icon vb-xmark
+  cfgr::item::action --label "Toggle inhibitor" --func "vb-toggle-inhibitor; exit" --icon vb-inhibitor
+  cfgr::item::action --label "Reload Vibranium" --func "vb-cmd-reload --quiet; exit" --icon vb-update
+  cfgr::item::action --label "Close all windows" --func "hyprctl -q eval 'Hypr.Helpers.CloseWindows()'; exit" --icon vb-xmark
 
   if [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
     mpd_status="$(mpc status 2>/dev/null)"
@@ -22,13 +20,13 @@ _build() {
 
   spotify_status="$(playerctl -p spotify status)"
   if [[ "$mpd_status" == *"[playing]"* || "$spotify_status" == "Playing" ]]; then
-    cfgr::item::action --label "Copy current track" --func "vb-cmd-copy-track --notify; _die" --icon vb-music
+    cfgr::item::action --label "Copy current track" --func "vb-cmd-copy-track --notify; exit" --icon vb-music
   fi
 
   if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua" ]]; then
-    cfgr::item::action --label "Disable reading mode" --func "vb-toggle-reading-mode; _die" --icon vb-book
+    cfgr::item::action --label "Disable reading mode" --func "vb-toggle-reading-mode; exit" --icon vb-book
   else
-    cfgr::item::action --label "Enable reading mode" --func "vb-toggle-reading-mode; _die" --icon vb-book
+    cfgr::item::action --label "Enable reading mode" --func "vb-toggle-reading-mode; exit" --icon vb-book
   fi
 }
 

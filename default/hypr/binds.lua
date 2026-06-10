@@ -39,29 +39,6 @@ local all_directions = {}
 table.move(directions, 1, #directions, 1, all_directions)
 table.move(arrows, 1, #arrows, #all_directions + 1, all_directions)
 
--- Shared replace ID for window management notifications. Using a fixed ID
--- collapses repeated presses into a single notification bubble.
-local WIN_NOTIF = 33
-
-
--- Helpers
-
-
--- Returns true if the file at path exists and is readable.
-local function file_exists(path)
-  local f = io.open(path, "r")
-  if f then f:close() end
-  return f ~= nil
-end
-
--- Escapes a string for safe interpolation inside single-quoted sh arguments.
--- POSIX sh provides no escape sequence inside single quotes; the standard
--- workaround is to close the quote, emit a quoted literal, then reopen:
--- ' becomes '\''
-local function shell_quote(s)
-  return (s:gsub("'", "'\\''"))
-end
-
 
 -- Window management
 
@@ -106,7 +83,7 @@ hl.define_submap("resize", function()
   end
 
   local function exit_resize_mode()
-    Vb.FlashBorder(RESIZE)
+    Hypr.Helpers.FlashBorder(Vibranium.Colors.accent.bright)
     hl.dispatch(hl.dsp.submap("reset"))
   end
 
@@ -131,13 +108,15 @@ hl.define_submap("resize", function()
   hl.bind("Escape", exit_resize_mode, { description = "Exit resize mode" })
   hl.bind("Return", exit_resize_mode, { description = "Exit resize mode" })
   hl.bind("BackSpace", exit_resize_mode, { description = "Exit resize mode" })
+  hl.bind(mainMod .. " + R", exit_resize_mode, { description = "Exit resize mode" })
 end)
 
 hl.bind(
   mainMod .. " + R",
   function()
     if hl.get_active_window() == nil then return end
-    Vb.FlashBorder(RESIZE)
+
+    Hypr.Helpers.FlashBorder(Vibranium.Colors.accent.bright)
     hl.dispatch(hl.dsp.submap("resize"))
   end,
   { description = "Enter resize mode" }
@@ -150,102 +129,18 @@ hl.bind(
 -- Close the active window.
 hl.bind(mainMod .. " + Q", hl.dsp.window.close(), { description = "Close active window" })
 
--- Force-kill the active window. Requires a second press within 1.5 seconds on
--- the same window to confirm. Switching windows between presses cancels the
--- operation to prevent accidentally killing the wrong process. The pending
--- state is cleaned up on config reload so stale timers never carry over.
---
--- State between first and second press: { pid, timer }. Nil otherwise.
-
-local kill_confirm = nil
-local in_submap = false
-
-hl.on("keybinds.submap", function(name)
-  in_submap = name ~= ""
-end)
-
-hl.on("config.reloaded", function()
-  if in_submap then
-    hl.dispatch(hl.dsp.submap("reset"))
-    in_submap = false
-  end
-
-  if kill_confirm ~= nil then
-    kill_confirm.timer:set_enabled(false)
-    kill_confirm = nil
-  end
-end)
-
-hl.bind(mainMod .. " + SHIFT + Q", function()
-  local win = hl.get_active_window()
-
-  if win == nil then return end
-
-  local pid   = win.pid
-  local title = win.initial_title
-
-  if kill_confirm ~= nil then
-    if kill_confirm.pid ~= pid then
-      -- Active window changed since arming; abort to avoid killing the wrong window.
-      kill_confirm.timer:set_enabled(false)
-      kill_confirm = nil
-      hl.dispatch(hl.dsp.exec_raw(
-        "notify-send -r " .. WIN_NOTIF .. " -u critical -t 3000 'Window Killer' 'Aborted: active window changed'"
-      ))
-      return
-    end
-
-    -- Second press on the same window: confirmed, kill it.
-    kill_confirm.timer:set_enabled(false)
-    kill_confirm = nil
-
-    hl.dispatch(hl.dsp.exec_raw(
-      "notify-send -r " .. WIN_NOTIF .. " 'Window Killer'"
-      .. " '<i><b>" .. shell_quote(title) .. "</b></i> was killed'"
-    ))
-    hl.dispatch(hl.dsp.window.kill())
-    return
-  end
-
-  -- First press: arm the confirmation state and start the 3-second timeout.
-  hl.dispatch(hl.dsp.exec_raw(
-    "notify-send -r " .. WIN_NOTIF .. " -t 2000 'Window Killer' 'Confirm within 3 seconds'"
-  ))
-
-  local timer = hl.timer(function()
-    kill_confirm = nil
-  end, { timeout = 1500, type = "oneshot" })
-
-  kill_confirm = { pid = pid, timer = timer }
-end, { description = "Force kill active window" })
-
+-- Kill the active window.
+hl.bind(mainMod .. " + SHIFT + Q", Hypr.Helpers.ForceKillWindow, { description = "Force kill active window" })
 
 -- Window state
 
-local function center_floating_win(win)
-  local floating = win.floating
-
-  if floating then
-    local mon = hl.get_active_monitor()
-    if mon == nil then return end
-
-    local w = math.floor(mon.width * 0.7)
-    local h = math.floor(mon.height * 0.7)
-
-    hl.dispatch(hl.dsp.window.resize({ x = w, y = h }))
-    hl.dispatch(hl.dsp.window.center())
-  end
-end
-
-
 -- Toggle fullscreen for the active window.
--- hl.bind(mainMod .. " + F", hl.dsp.window.fullscreen({ mode = "fullscreen" }), { description = "Toggle fullscreen" })
 hl.bind(mainMod .. " + F", function()
   local win = hl.get_active_window()
   if win == nil then return end
 
   hl.dispatch(hl.dsp.window.fullscreen({ mode = "fullscreen" }))
-  center_floating_win(win)
+  Hypr.Helpers.CenterFloatingWindow(win)
 end, { description = "Toggle fullscreen" })
 
 -- Toggle floating for the active window.
@@ -257,7 +152,7 @@ hl.bind(mainMod .. " + SHIFT + F", function()
   if win == nil then return end
 
   hl.dispatch(hl.dsp.window.float())
-  center_floating_win(win)
+  Hypr.Helpers.CenterFloatingWindow(win)
 end, { description = "Toggle floating" })
 
 -- Pin the active window so it follows across all workspaces.
@@ -456,21 +351,6 @@ hl.bind(
 -- Move between workspaces, including scratchpad.
 -- Credit: https://www.reddit.com/user/pbo-sab/.
 -- https://www.reddit.com/r/hyprland/comments/1t74dt6/comment/okm9qk2
-local function move_and_toggle_sws(key)
-  local sws = hl.get_active_special_workspace()
-  local cw = hl.get_active_window()
-
-  if cw then
-    if sws then
-      -- Move from special to normal and close the sws.
-      hl.dispatch(hl.dsp.window.move({ workspace = key, follow = false }))
-      hl.dispatch(hl.dsp.workspace.toggle_special("scratchpad"))
-    else
-      -- Move normally.
-      hl.dispatch(hl.dsp.window.move({ workspace = key, follow = false }))
-    end
-  end
-end
 
 for i = 1, 10 do
   local key = i % 10
@@ -482,7 +362,7 @@ for i = 1, 10 do
   )
 
   hl.bind(mainMod .. " + SHIFT + " .. key, function()
-    move_and_toggle_sws(i)
+    Hypr.Helpers.MoveAndToggleScratchpad(i)
   end, {
     description = "Move to workspace " .. label
   })
@@ -545,8 +425,7 @@ hl.bind(mainMod .. " + E", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { descrip
 
 -- Freeze the active window's process (SIGSTOP/SIGCONT).
 hl.bind("CTRL + ALT + F", function()
-  if hl.get_active_window() == nil then return end
-  hl.dispatch(hl.dsp.exec_raw("vb-toggle-freeze"))
+  Hypr.Helpers.WindowToggleFreeze()
 end, { description = "Freeze window" })
 
 
@@ -680,33 +559,19 @@ hl.bind("XF86Calculator", hl.dsp.exec_raw("vb-util-calc"), { description = "Togg
 -- System monitoring
 
 
--- Launches a TUI binary inside a terminal, notifying if the binary is absent.
-local function launch_tui(binary, command)
-  if not file_exists(binary) then
-    local name = binary:match("[^/]+$")
-    hl.dispatch(hl.dsp.exec_raw(
-      "notify-send -r " .. WIN_NOTIF .. " -u critical -t 5000"
-      .. " 'Cannot launch system monitor'"
-      .. " 'Missing dependency: <b>" .. name .. "</b>'"
-    ))
-    return
-  end
-  hl.dispatch(hl.dsp.exec_raw(command))
-end
-
 -- SUPER + ESCAPE and CTRL + SHIFT + ESCAPE are both inherited exceptions:
 -- the former echoes macOS/GNOME activity-monitor conventions, the latter
 -- echoes Windows Task Manager. Both are kept for cross-OS muscle memory.
 hl.bind(mainMod .. " + ESCAPE", function()
-  launch_tui("/usr/bin/btop", "vb-launch-tui -- btop")
+  Hypr.Helpers.LaunchTUI("/usr/bin/btop", "vb-launch-tui -- btop")
 end, { description = "System monitor (btop)" })
 
 hl.bind("CTRL + SHIFT + ESCAPE", function()
-  launch_tui("/usr/bin/btop", "vb-launch-tui -- btop")
+  Hypr.Helpers.LaunchTUI("/usr/bin/btop", "vb-launch-tui -- btop")
 end, { description = "System monitor (btop)" })
 
 if chassis_type ~= "vm" then
   hl.bind(mainMod .. " + Grave", function()
-    launch_tui("/usr/bin/nvtop", "vb-launch-tui -- nvtop")
+    Hypr.Helpers.LaunchTUI("/usr/bin/nvtop", "vb-launch-tui -- nvtop")
   end, { description = "GPU monitor (nvtop)" })
 end

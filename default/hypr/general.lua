@@ -11,20 +11,10 @@ hl.config({
     disable_xdg_env_checks = true,
     disable_watchdog_warning = true,
     disable_splash_rendering = true,
-    disable_hyprland_guiutils_check = true,
-
-    col = {
-      splash = "rgb(333333)",
-    },
-
-    background_color = "rgb(333333)",
     allow_session_lock_restore = true,
-
-    enable_anr_dialog = true,
-    -- Is it removed in 0.55?
-    -- new_window_takes_over_fullscreen = 2,
+    disable_hyprland_guiutils_check = true,
     font_family = "Cascadia Code",
-
+    enable_anr_dialog = true,
     vrr = 2,
   },
 
