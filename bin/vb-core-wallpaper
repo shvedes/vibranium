@@ -17,7 +17,7 @@ Usage: ${0##*/} [OPTION] <image>
 
 Set wallpapers in Vibranium.
 
-Supported formats: jpeg, jpegxl, png, gif, pnm, tga, tiff, webp, bmp, svg.
+Supported formats: jpeg, jpegxl, png, pnm, tga, tiff, webp, bmp, svg.
 
 Options:
   --next          Set the next wallpaper
@@ -153,7 +153,23 @@ feature_enabled() {
   fi
 }
 
-case "$1" in
+# Normalize file extension to lowercase so that .JPG, .PNG, etc. are
+# treated identically to their lowercase counterparts by the case below.
+# A separate variable is used instead of rewriting $1 to preserve the
+# original path for file operations (realpath, cp, etc.) further down.
+_dispatch="$1"
+if [[ "$_dispatch" != -* ]]; then
+  _fname="${_dispatch##*/}"
+  if [[ "$_fname" == *"."* ]]; then
+    _ext="${_fname##*.}"
+    _ext_lower="${_ext,,}"
+    if [[ "$_ext" != "$_ext_lower" ]]; then
+      _dispatch="${_dispatch%"$_fname"}${_fname%"$_ext"}${_ext_lower}"
+    fi
+  fi
+fi
+
+case "$_dispatch" in
 "" | -h | --help)
   usage
   exit 0
@@ -179,7 +195,7 @@ case "$1" in
     exit 0
   fi
   ;;
-*.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.gif | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
+*.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
   if ! feature_enabled; then
     echo "Error: this feature is disabled." >&2
     echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
@@ -191,11 +207,6 @@ case "$1" in
   if [[ ! -f "$WALLPAPER_PATH" ]]; then
     echo "Error: '$WALLPAPER_PATH' doesn't exist!" >&2
     exit 1
-  fi
-
-  if [[ $1 == *.gif && ! -f "$UWALLS/${1##*/}" ]]; then
-    notify-send -r 3 -t 6000 "Vibranium - Wallpapers" \
-      "GIF images might take a while to load. Please wait."
   fi
 
   # In case if user set new wallpaper via thunar context menu
