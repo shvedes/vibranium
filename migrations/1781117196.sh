@@ -9,6 +9,7 @@ SELF="${0##*/}"
 SELF="${SELF/.sh/}"
 
 file="$XDG_CONFIG_HOME/vibranium/settings.advanced"
+theme="$(<$XDG_CONFIG_HOME/vibranium/current/theme.name)"
 
 awk '
 /^[[:space:]]*vb_force_template_files=\([[:space:]]*$/ {
@@ -22,7 +23,9 @@ awk '
   next
 }
 { print }
-' "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+' "$file" >"$file.tmp" && mv "$file.tmp" "$file"
+
+vb-theme-set --force "$theme"
 
 echo "${RED}[MIGRATION|$SELF]${RESET} If you've installed a community theme for Omarchy,"
 echo "${RED}[MIGRATION|$SELF]${RESET} keep in mind that, from now on, Hyprland's appearance"
