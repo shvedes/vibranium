@@ -139,9 +139,9 @@ _disable_scope_units() {
       case $response in
       0) # Yes
         if [[ "$scope" == "user" ]]; then
-          systemctl -q --user disable "$unit" &
+          systemctl -q --user disable --now "$unit" &
         else
-          sudo systemctl -q disable "$unit" &
+          sudo systemctl -q disable --now "$unit" &
         fi
         _pids+=($!)
         remaining=("${remaining[@]:1}")
@@ -150,9 +150,9 @@ _disable_scope_units() {
         echo -e "${BLUE}[VIBRANIUM]${RESET} Disabling all units for '${GREEN}${pkg}${RESET}'..."
         for u in "${remaining[@]}"; do
           if [[ "$scope" == "user" ]]; then
-            systemctl -q --user disable "$u" &
+            systemctl -q --user disable ---now "$u" &
           else
-            sudo systemctl -q disable "$u" &
+            sudo systemctl -q disable --now "$u" &
           fi
           _pids+=($!)
         done
