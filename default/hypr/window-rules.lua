@@ -179,6 +179,18 @@ hl.window_rule({
   center = true
 })
 
+hl.window_rule({
+  match = {
+    class = "^xdg-desktop-portal-gtk$",
+    title = "^Warning: this site can see edits you make$",
+  },
+
+  float = true,
+  size = "monitor_w*0.7 monitor_h*0.7",
+  dim_around = true,
+  center = true
+})
+
 -- Thunar special rules.
 -- Keeps small contextual windows always visible and focused.
 -- To revert, just tile the window.
