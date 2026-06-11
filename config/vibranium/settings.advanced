@@ -10,18 +10,22 @@
 # ships its own version of the file.  Normally a theme-provided file blocks
 # template output; entries here override that and let the template win instead.
 #
-# Two entry formats are supported:
+# Three entry formats are supported:
 #
-#   "file.ext"              -- global: template always wins, for every theme
-#   "theme-name/file.ext"   -- scoped: template wins only for that one theme;
-#                              all other themes keep their own file untouched
+#   "file.ext"               -- global: template always wins, for every theme
+#   "theme-name/file.ext"    -- scoped: template wins only for that one theme;
+#                               all other themes keep their own file untouched
+#   "!theme-name/file.ext"   -- inverse: template wins for every theme EXCEPT
+#                               that one; useful when a single theme ships a
+#                               file you want to preserve while managing all
+#                               others through the template system
 #
 # Use this when you maintain your own template for a file or want to fully
 # manage a file through Vibranium's template system.
 #
 # List the output filename without the .tpl suffix, matching exactly what
 # appears under ~/.config/vibranium/themed/ or $VIBRANIUM/default/themed/.
-# Example: ("alacritty.toml" "foot.ini" "my-cool-theme/waybar.css")
+# Example: ("alacritty.toml" "foot.ini" "my-cool-theme/waybar.css" "!nightfox-nordfox/dunstrc")
 vb_force_template_files=(
   # Instead of letting every theme install
   # its own extension and clutter the
