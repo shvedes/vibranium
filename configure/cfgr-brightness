@@ -1,11 +1,6 @@
 #!/usr/bin/env bash
 
-
 _build() {
-  cfgr::item::bool \
-    --var VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL \
-    --label "Use DDC protocol"
-
   cfgr::item::bool \
     --var VIBRANIUM_BRIGHTNESS_NOTIFY \
     --label "Show notificaation"
@@ -21,6 +16,5 @@ _build() {
 }
 
 cfgr::run "Brightness" "_build" \
-  VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL \
   VIBRANIUM_BRIGHTNESS_NOTIFY \
   VIBRANIUM_BRIGHTNESS_STEP

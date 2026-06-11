@@ -2,6 +2,11 @@
 
 helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
 if [[ ! $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then
+  if systemctl q --user is-active awww; then
+    # Option disabled, but the service was active.
+    systemctl -q --user disable --now awww
+  fi
+
   exit 0
 fi
 

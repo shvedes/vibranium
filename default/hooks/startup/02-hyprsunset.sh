@@ -7,7 +7,7 @@
 # because of the while loop we must keep this check at the end
 if [[ "$CHASSIS_TYPE" != vm ]]; then
   if [[ ! -f "$VIBRANIUM_STATE/nightshift" ]]; then
-    echo "suspended" >"$VIBRANIUM_STATE/nightshift"
+    peintf 'suspended' >"$VIBRANIUM_STATE/nightshift"
     hyprctl -q hyprsunset identity
   elif [[ "$(<"$VIBRANIUM_STATE/nightshift")" == "suspended" ]]; then
     while ! pidof -q hyprsunset; do

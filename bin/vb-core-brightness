@@ -91,8 +91,7 @@ source vb-lib-core
 helpers::check \
   VIBRANIUM_GLOBAL_USE_OSD \
   VIBRANIUM_BRIGHTNESS_STEP \
-  VIBRANIUM_BRIGHTNESS_NOTIFY \
-  VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL
+  VIBRANIUM_BRIGHTNESS_NOTIFY
 
 get_i2c_bus() {
   local state_file new_info
@@ -283,24 +282,18 @@ if [[ -z "$ACTIVE_MONITOR" ]]; then
 fi
 
 if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
-  # If the driver for adjusting the brightness of the built-in screen is not found and DDC control is disabled globally
-  if [[ $VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL == false ]]; then
-    echo "This feature is disabled in Vibranium settings"
+  if ! command -v ddcutil >/dev/null; then
+    vb-cmd-dep-notify --name "Brightness Control" --deps ddcutil
     exit 1
-  else
-    if ! command -v ddcutil >/dev/null; then
-      vb-cmd-dep-notify --name "Brightness Control" --deps ddcutil
-      exit 1
-    fi
-
-    method="ddc"
-    I2C_BUS="$(set_i2c_bus)"
-
-    # TODO: As far as I know, optimal values for --sleep-multiplier can vary from a monitor to a monitor,
-    # and while it works well on one monitor, it may not work at all on another.
-    # In this case, we need to create a mini-algorithm that will calculate and record valid values for the monitor and use them.
-    ddcutil_flags=(--sleep-multiplier 0.13 --noverify --skip-ddc-checks --maxtries 1,1,1)
   fi
+
+  method="ddc"
+  I2C_BUS="$(set_i2c_bus)"
+
+  # TODO: As far as I know, optimal values for --sleep-multiplier can vary from a monitor to a monitor,
+  # and while it works well on one monitor, it may not work at all on another.
+  # In this case, we need to create a mini-algorithm that will calculate and record valid values for the monitor and use them.
+  ddcutil_flags=(--sleep-multiplier 0.13 --noverify --skip-ddc-checks --maxtries 1,1,1)
 else
   if [[ -n "$ACTIVE_MONITOR" && ! "$ACTIVE_MONITOR" =~ ^eDP* ]]; then
     method="ddc"

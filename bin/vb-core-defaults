@@ -215,11 +215,6 @@ VIBRANIUM_SCREENSHOT_CAPTURE_CURSOR=false
 # ============================================ #
 #                                              #
 
-# @type bool
-# @desc Whether to use DDC (Display Data Channel) protocol
-# @desc to control brightness of external monitors.
-VIBRANIUM_BRIGHTNESS_USE_DDC_CONTROL=true
-
 # @type int
 VIBRANIUM_BRIGHTNESS_STEP=5
 
