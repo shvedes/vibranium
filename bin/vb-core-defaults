@@ -97,10 +97,6 @@ VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS=true
 VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS=false
 
 # @type bool
-# @desc Whether to show pre-installed AI web apps in app launcher.
-VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI=false
-
-# @type bool
 # @desc man rofi(1): When one entry is left, automatically select it.
 VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT=false
 
