@@ -28,7 +28,9 @@
   --accent-s: {{ accent_s }}%;
   --accent-l: {{ accent_l }}%;
 
-  --text-normal: {{ foreground }};
+  --text-normal: rgb({{ foreground_rgb }});
+  --text-faint: rgba({{ foreground_rgb }},0.5);
+  --text-selection: rgba({{ background_rgb|lightness=+0.50 }},0.20);
 
   --link-external-color: var(--color-blue);
   --link-external-color-hover: var(--color-purple);
@@ -40,38 +42,40 @@
   --h5-color: inherit;
   --h6-color: inherit;
 
+  --code-comment: rgb({{ background_rgb|lightness=+0.25 }});
+
   /* Main document background, settings background */
   --color-base-00:  rgb({{ background_rgb }});
 
-  --color-base-05:  rgb({{ background_rgb|lightness=+0.02 }});
+  --color-base-05:  rgb({{ background_rgb|lightness=+0.03 }});
 
   /* Code block color, options' island background */
-  --color-base-10:  rgb({{ background_rgb|lightness=+0.04 }});
+  --color-base-10:  rgb({{ background_rgb|lightness=+0.06 }});
 
   /* Background of left & right section, context menu, canvas's drag icons background */
   --color-base-20:  rgb({{ background_rgb|lightness=+0.06 }});
 
   /* Input field background */
-  --color-base-25:  rgb({{ background_rgb|lightness=-0.02 }});
+  --color-base-25:  rgb({{ background_rgb|lightness=+0.09 }});
 
   /* Top bar background, section border, canva's grid color
    * non accent-colored button background */
-  --color-base-30:  rgb({{ background_rgb|lightness=+0.10 }});
+  --color-base-30:  rgb({{ background_rgb|lightness=+0.13 }});
 
-   /* Background of inactive toggles, borders of some UI elements,
-   * hover background on *some* buttons */
-  --color-base-35:  rgb({{ background_rgb|lightness=+0.12 }});
+  /* Background of inactive toggles, borders of some UI elements,
+  * hover background on *some* buttons */
+  --color-base-35:  rgb({{ background_rgb|lightness=+0.20 }});
 
   /* Mostly UI borders */
-  --color-base-40:  rgb({{ background_rgb|lightness=+0.14 }});;
+  --color-base-40:  rgb({{ background_rgb|lightness=+0.25 }});;
 
   /* Some UI elements color */
-  --color-base-50:  rgb({{ background_rgb|lightness=+0.16 }});
+  --color-base-50:  rgb({{ background_rgb|lightness=+0.35 }});
 
-  --color-base-60: rgb({{ foreground_rgb|lightness=-0.15 }});
+  --color-base-60: rgb({{ background_rgb|lightness=+0.45 }});
 
   /* Text color in non-document places */
-  --color-base-70: rgb({{ foreground_rgb|lightness=-0.10 }});
+  --color-base-70: rgb({{ background_rgb|lightness=+0.55 }});
 
   /* Couldn't find it, but according to the default Obsidian theme,
    * this is equal to text color, as well as base-70 and base-60  */
