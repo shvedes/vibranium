@@ -2,22 +2,30 @@
 
 source vb-lib-core
 
+HOOK_FILE="$XDG_CONFIG_HOME/vibranium/hooks/font-change.sh"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 usage() {
-  cat <<EOF
-Usage: vb-font-set [OPTION] [FONT]
+  shcat <<EOF
+Usage: ${0##*/} [OPTION] [FONT]
 
 Set the system-wide default font across GTK, Alacritty, Waybar, Rofi, Dunst,
 and Qt applications.
 
-When FONT is supplied and found in the available font list, it is applied
-directly without opening the interactive picker.
+FONT must be given as "Family Style" (e.g. "JetBrains Mono Bold Italic").
+When omitted, an interactive picker opens.
 
 Options:
   -h, --help     Show this help message and exit
 
 Examples:
-  vb-font-set                    Open interactive font picker
-  vb-font-set "Noto Sans"        Apply "Noto Sans" directly
+  ${0##*/}
+  ${0##*/} "JetBrains Mono Regular"
 EOF
 }
 
@@ -27,19 +35,35 @@ case "$1" in
   exit 0
   ;;
 -*)
-  log::error "Unknown option: $1"
+  echo "Error: Unknown option - $@" >&2
   usage >&2
   exit 1
   ;;
 esac
 
-mapfile -t fonts < <(
-  fc-list :spacing=100 family |
-    gawk '{
-        split($0, a, ",")
-        f = a[1]
-        if (f !~ /emoji|signwriting|symbols/i)
-            seen[f]
+# Collect monospace fonts with family and style stored as separate fields
+# joined by |.  The pipe delimiter survives the menu round-trip without any
+# brittle suffix-splitting heuristic: after the user picks a "Family Style"
+# display string we look it up in _font_map to recover both pieces cleanly.
+#
+# fc-list may return comma-separated lists for family and style (one font file
+# can carry multiple family names); only the first element of each is kept.
+mapfile -t _font_raw < <(
+  fc-list -f '%{family}|%{style}\n' :spacing=100 |
+    gawk -F'|' '
+    {
+        n = split($1, fams, ",")
+        fam = fams[1]
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", fam)
+
+        m = split($2, stys, ",")
+        sty = stys[1]
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", sty)
+
+        if (fam ~ /emoji|signwriting|symbols/i) next
+
+        key = fam "|" sty
+        seen[key] = 1
     }
     END {
         n = asorti(seen, sorted)
@@ -48,27 +72,49 @@ mapfile -t fonts < <(
     }'
 )
 
+# Build a display list ("Family Style") and an associative map from that
+# display string back to the raw "Family|Style" entry.
+declare -A _font_map
+declare -a _font_display
+
+for _e in "${_font_raw[@]}"; do
+  _fam="${_e%%|*}"
+  _sty="${_e##*|}"
+  _disp="${_fam} ${_sty}"
+  _font_display+=("$_disp")
+  _font_map["$_disp"]="${_e}"
+done
+
 from_arg=0
+selected_display=""
 
 if [[ -n "$1" ]]; then
-  if [[ " ${fonts[*]} " =~ $1 ]]; then
-    selected_font="$1"
+  if [[ -v "_font_map[$1]" ]]; then
+    selected_display="$1"
     from_arg=1
   else
-    log::warn "Font '$1' not found in available fonts — falling back to picker"
-    helpers::ui::menu selected_font "Search fonts" "ESC to go back" -- "${fonts[@]}"
+    echo "Warn: font '$1' not found in available fonts -- falling back to picker"
+    helpers::ui::menu selected_display "Search fonts" "ESC to go back" -- "${_font_display[@]}"
   fi
 else
-  helpers::ui::menu selected_font "Search fonts" "ESC to go back" -- "${fonts[@]}"
+  helpers::ui::menu selected_display "Search fonts" "ESC to go back" -- "${_font_display[@]}"
 fi
 
-if [[ -z "$selected_font" ]]; then
-  log::error "No font selected — operation cancelled"
+[[ -z "$selected_display" ]] && {
+  echo "Error: no font selected -- operation cancelled" >&2
   exit 1
-fi
+}
 
-# Emit a desktop notification only when running headlessly (i.e. not from a
-# terminal) and the font was not supplied as a CLI argument.
+_raw="${_font_map[$selected_display]}"
+font_family="${_raw%%|*}"   # e.g. "JetBrains Mono"
+font_style="${_raw##*|}"    # e.g. "Bold Italic"
+
+# selected_font is the "Family Style" display name kept for the vb-font-get
+# comparison and desktop notifications.
+selected_font="$selected_display"
+
+# Emit a desktop notification only when running headlessly and the font was
+# not supplied as a CLI argument.
 notify() {
   local message="$1"
   if ((from_arg == 0)) && term::is_headless; then
@@ -77,47 +123,191 @@ notify() {
 }
 
 if [[ "$selected_font" == "$(vb-font-get)" ]]; then
-  log::warn "'$selected_font' is already the default font"
-  notify "<span foreground='$ACCENT}'><b>${selected_font}</b></span> is already the default font!"
+  echo "Warn: '$selected_font' is already the default font"
+  notify "<span foreground='${ACCENT}'><b>${selected_font}</b></span> is already the default font!"
   exit 1
 fi
 
-# GTK
-sed -i -E "s/^(gtk-font-name\s*=\s*).*/\1${selected_font}/" \
-  "$XDG_CONFIG_HOME/gtk-3.0/settings.ini" \
-  "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
-gsettings set org.gnome.desktop.interface font-name "${selected_font}"
+# sed_or_append <file> <grep-ERE> <sed-ERE-expr> <fallback-line>
+#
+# Apply <sed-ERE-expr> to <file>.  If <grep-ERE> does not match any line the
+# key is considered absent and <fallback-line> is appended instead.
+# A missing file is created containing only <fallback-line>.
+sed_or_append() {
+  local file="$1" grep_pat="$2" sed_expr="$3" fallback="$4"
+  if [[ ! -f "$file" ]]; then
+    echo "Warn: Config not found, creating: $file"
+    mkdir -p "$(dirname "$file")"
+    printf '%s\n' "$fallback" > "$file"
+    return
+  fi
+  if grep -qE "$grep_pat" "$file"; then
+    sed -i -E "$sed_expr" "$file"
+  else
+    printf '%s\n' "$fallback" >> "$file"
+  fi
+}
 
-# Alacritty
-sed -i -E "s/(family\s*=\s*\").*(\")/\1${selected_font}\2/" \
-  "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+# _toml_set_key <file> <section> <key> <value>
+#
+# Set <key> = "<value>" inside [<section>] in a TOML file.
+#
+# Three cases:
+#   section absent            -> append section + key at end of file
+#   section present, key absent -> insert key on the line after the header
+#   section present, key present -> replace the quoted value in-place
+#
+# File is rewritten via a tmp -> mv swap so a crash leaves the original intact.
+_toml_set_key() {
+  local file="$1" section="$2" key="$3" value="$4"
+  local header="[$section]"
 
-# Waybar
-sed -i -E "/window#waybar\s*\{/,/\}/ {
-    s/^(\s*font-family:\s*)'Symbols Nerd Font Mono',\s*'.*';/\1'Symbols Nerd Font Mono', '${selected_font}';/
-}" "$XDG_CONFIG_HOME/waybar/style.css"
+  if [[ ! -f "$file" ]]; then
+    echo "Warn: Alacritty config not found, creating: $file"
+    mkdir -p "$(dirname "$file")"
+    printf '[%s]\n%s = "%s"\n' "$section" "$key" "$value" > "$file"
+    return
+  fi
 
-# Qt
-sed -i -E "/^(fixed|general)=/ s@^([^,\"]*=\")[^\",]*@\1${selected_font}@" \
-  "$XDG_CONFIG_HOME"/qt{5,6}ct/qt*ct.conf
+  if ! grep -qxF "$header" "$file"; then
+    # Section does not exist at all -- append it.
+    printf '\n[%s]\n%s = "%s"\n' "$section" "$key" "$value" >> "$file"
+    return
+  fi
 
-# Dunst
-sed -i -E "/^font[[:space:]]*=/ s/(=\s*\")[^\"]* ([0-9]+\")/\1${selected_font} \2/" \
-  "$XDG_CONFIG_HOME/dunst/dunstrc"
+  # Check whether the key already appears inside this section.
+  local found
+  found=$(awk -v hdr="$header" -v k="$key" '
+    $0 == hdr                                          { in_sec = 1; next }
+    /^\[/                                              { in_sec = 0 }
+    in_sec && $0 ~ "^[[:space:]]*" k "[[:space:]]*="  { print 1; exit }
+  ' "$file")
 
-# Rofi
-sed -i -E "s/(font:\s*\")[^\"]* ([0-9]+)\"/\1${selected_font} \2\"/" \
-  "$XDG_CONFIG_HOME/rofi/config.rasi"
+  local tmp="${file}.vb-tmp"
+
+  if [[ "$found" == "1" ]]; then
+    # Replace the quoted value of the existing key.
+    awk -v hdr="$header" -v k="$key" -v v="$value" '
+      $0 == hdr                                          { in_sec = 1; print; next }
+      /^\[/                                              { in_sec = 0 }
+      in_sec && $0 ~ "^[[:space:]]*" k "[[:space:]]*="  { sub(/"[^"]*"/, "\"" v "\"") }
+      { print }
+    ' "$file" > "$tmp" && mv "$tmp" "$file"
+  else
+    # Insert the key on the line immediately after the section header.
+    awk -v hdr="$header" -v k="$key" -v v="$value" '
+      { print }
+      $0 == hdr { print k " = \"" v "\"" }
+    ' "$file" > "$tmp" && mv "$tmp" "$file"
+  fi
+}
+
+_pango_name() {
+  if [[ "$font_style" == "Regular" ]] || [[ "$font_style" == "Roman" ]]; then
+    printf '%s' "$font_family"
+  else
+    printf '%s %s' "$font_family" "$font_style"
+  fi
+}
+
+_gtk_apply() {
+  local file="$1"
+  local cur_size
+  cur_size=$(grep -oP 'gtk-font-name[[:space:]]*=.*\s+\K[0-9]+(\.[0-9]+)?' "$file" 2>/dev/null)
+  cur_size="${cur_size:-12}"
+  local name
+  name="$(_pango_name) ${cur_size}"
+  sed_or_append "$file" \
+    '^gtk-font-name[[:space:]]*=' \
+    "s|^(gtk-font-name[[:space:]]*=[[:space:]]*).*|\1${name}|" \
+    "gtk-font-name=${name}"
+}
+
+_gtk_apply "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+_gtk_apply "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
+
+# Mirror the GTK 3 value via gsettings so running apps pick it up without a
+# restart.  Size is re-read from the file we just updated.
+_gtk3_size=$(
+  grep -oP 'gtk-font-name[[:space:]]*=.*\s+\K[0-9]+(\.[0-9]+)?' \
+    "$XDG_CONFIG_HOME/gtk-3.0/settings.ini" 2>/dev/null || printf '12'
+)
+
+gsettings set org.gnome.desktop.interface font-name "$(_pango_name) ${_gtk3_size:-10}"
+
+# TOML splits family and style into separate string keys within [font.*]
+# sections -- there is no "Family Style" combined string like other apps use.
+#
+# Only [font.normal] gets the style the user picked.  The bold, italic, and
+# bold_italic sections keep their own style values (Bold, Italic, Bold Italic)
+# and only have their family updated.  Sections that do not already exist in
+# the file are left alone to avoid breaking Alacritty's automatic bold/italic
+# synthesis for fonts that ship without separate bold/italic files.
+_alacritty="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+_toml_set_key "$_alacritty" "font.normal" "family" "$font_family"
+_toml_set_key "$_alacritty" "font.normal" "style"  "$font_style"
+for _sec in font.bold font.italic font.bold_italic; do
+  grep -qxF "[$_sec]" "$_alacritty" 2>/dev/null || continue
+  _toml_set_key "$_alacritty" "$_sec" "family" "$font_family"
+done
+
+sed_or_append "$XDG_CONFIG_HOME/waybar/style.css" \
+  "font-family:.*Symbols Nerd Font Mono" \
+  "/^\*[[:space:]]*\{/,/^\}/ {
+    s|(font-family:[[:space:]]*)'Symbols Nerd Font Mono',[[:space:]]*'[^']*';|\1'Symbols Nerd Font Mono', '${font_family}';|
+  }" \
+  "  font-family: 'Symbols Nerd Font Mono', '${font_family}';"
+
+for _qt in "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf" \
+           "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"; do
+  [[ -f "$_qt" ]] || continue
+  sed_or_append "$_qt" \
+    '^(fixed|general)=' \
+    "/^(fixed|general)=/ s|^([^,\"]*=\")[^\",]*|\1${font_family}|" \
+    "general=\"${font_family},12,-1,5,50,0,0,0,0,0\""
+done
+
+_dunst_apply() {
+  local file="$1"
+  local cur_size
+  cur_size=$(grep -oP '^font[[:space:]]*=.*\s+\K[0-9]+' "$file" 2>/dev/null)
+  cur_size="${cur_size:-12}"
+  local name
+  name="$(_pango_name)"
+  sed_or_append "$file" \
+    '^font[[:space:]]*=' \
+    "s|^(font[[:space:]]*=[[:space:]]*).*|\1${name} ${cur_size}|" \
+    "font = ${name} ${cur_size}"
+}
+_dunst_apply "$XDG_CONFIG_HOME/dunst/dunstrc"
+
+_rofi_apply() {
+  local file="$1"
+  local cur_size
+  cur_size=$(grep -oP 'font:[[:space:]]*"[^"]*\s\K[0-9]+(?=")' "$file" 2>/dev/null | head -1)
+  cur_size="${cur_size:-12}"
+  sed_or_append "$file" \
+    'font:[[:space:]]*"' \
+    "s|(font:[[:space:]]*\")[^\"]*\"|\1${font_family} ${cur_size}\"|" \
+    "    font: \"${font_family} ${cur_size}\";"
+}
+_rofi_apply "$XDG_CONFIG_HOME/rofi/config.rasi"
 
 vb-refresh-dunst
 
-if ! systemctl -q --user is-active waybar; then
-  systemctl -q --user restart waybar &
+if systemctl -q --user is-active waybar; then
+  systemctl -q --user restart waybar
 fi
 
 helpers::check VIBRANIUM_GLOBAL_USE_OSD
 if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-  systemctl --user restart swayosd &
+  systemctl --user restart swayosd
 fi
 
-notify "Default font set to <span foreground='$ACCENT}'><b>${selected_font}</b></span>"
+# Apply user-defined custom logic.
+# The $FONT is visible to the hook.
+if [[ -f "$HOOK_FILE" ]]; then
+  FONT="$selected_font" bash "$HOOK_FILE"
+fi
+
+notify "Default font set to <span foreground='${P_YELLOW}'><b>${selected_font}</b></span>"
