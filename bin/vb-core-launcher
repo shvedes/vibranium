@@ -212,14 +212,7 @@ case "$INPUT" in
 
   # File exists and it IS an executable
   if [[ -x "$CMD" ]] || command -v "$CMD" >/dev/null; then
-    if [[ "$CMD" =~ vb-(core|util|cmd)-* ]]; then
-      [[ -t 2 ]] && echo "Do not launch vibranium scripts from the app launcher!" >&2 || {
-        notify-send -u critical -t 5000 -r 4 "Do Not Launch Vibranium Scripts From The App Launcher!" \
-            "They're not inteded to be used in this way!"
-        }
-      exit 1
-    # vb-launch-* scripts have their own focus_or_launch logic, so just eval them.
-    elif [[ "$CMD" =~ vb-(launch|app)* ]]; then
+    if [[ "$CMD" == vb-core* ]]; then
       eval "$INPUT"
       exit 0
     fi
