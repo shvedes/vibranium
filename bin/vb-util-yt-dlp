@@ -35,6 +35,7 @@ _operation_complete() {
 _try_download() {
   local url="$1"
   local cookie_cache="$VIBRANIUM_CACHE/${0##*/}"
+  local _stderr_tmp
 
   local base_args=(
     -f "bestvideo+bestaudio/best"
@@ -49,11 +50,23 @@ _try_download() {
   # Fast path — cached cookies from a previous successful run.
   if [[ -f "$cookie_cache" ]]; then
     echo "${YELLOW}[VIBRANIUM]${RESET} Downloading..."
-    if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url"; then
+    _stderr_tmp="/tmp/${0#**/}.tmp"
+    if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url" 2>"$_stderr_tmp"; then
+      # Download succeeded. If YouTube flagged our cookies as rotated, wipe the
+      # cache now so the next run picks up a fresh jar — and swallow the warning
+      # (the current download is already done, nothing to act on).
+      if sed -n '/no longer valid/q; $q1' "$_stderr_tmp"; then
+        echo "${YELLOW}[VIBRANIUM]${RESET} YouTube cookies rotated — cache cleared for next run"
+        rm -f "$cookie_cache"
+      fi
+      rm -f "$_stderr_tmp"
       return 0
     fi
+    # Download failed. Discard stderr — DRM/format errors here are just symptoms
+    # of stale cached cookies; the browser re-scan below will sort it out, and
+    # any genuine URL problem will surface again during the cookieless fallback.
+    rm -f "$_stderr_tmp" "$cookie_cache"
     echo "${YELLOW}[VIBRANIUM]${RESET} Cached cookies stale — re-scanning browsers"
-    rm -f "$cookie_cache"
   fi
 
   # Slow path — try every browser; write cookies on first success so
