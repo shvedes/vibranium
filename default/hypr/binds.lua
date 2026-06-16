@@ -272,18 +272,22 @@ hl.bind(mainMod .. " + CTRL + G", hl.dsp.group.lock_active(), {
 -- the natural left/right reading order of tabs in the group bar.
 -- I and K are intentionally unbound: tab order is linear, not spatial.
 
+-- Set non_consuming for these two, so some windows like
+-- vb-pkg-install can detect alt-j/k shortcuts. Not a good solution at the moment;
+-- I'll change it later.
+
 hl.bind("ALT + L", hl.dsp.group.next(), {
   description = "Group: next tab",
-  non_consuming = false,
-})
-
-hl.bind("ALT + TAB", hl.dsp.group.next(), {
-  description = "Group: next tab",
-  non_consuming = false,
+  non_consuming = true,
 })
 
 hl.bind("ALT + J", hl.dsp.group.prev(), {
   description = "Group: previous tab",
+  non_consuming = true,
+})
+
+hl.bind("ALT + TAB", hl.dsp.group.next(), {
+  description = "Group: next tab",
   non_consuming = false,
 })
 

@@ -452,7 +452,7 @@ FZF_ARGS=(
   --info 'hidden'
   --border 'bold'
 
-  --border-label ' alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select '
+  --border-label ' alt-p: toggle description, alt-j/k: scroll description, alt-b/B: toggle PKGBUILD, ctrl-j/k: next/prev item, tab: multi-select '
   --border-label-pos 'bottom'
 
   --list-label 'Package list'
@@ -466,6 +466,8 @@ FZF_ARGS=(
   --preview-window 'right:75%:wrap'
   --preview-label 'Package Information'
 
+  --bind 'alt-b:change-preview:yay -Gpa {1} | tail -n +5'
+  --bind 'alt-B:change-preview:yay -Siia {1}'
   --bind 'alt-p:toggle-preview'
   --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
   --bind 'alt-k:preview-up,alt-j:preview-down'
