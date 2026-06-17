@@ -119,7 +119,7 @@ hl.window_rule({
 
 hl.window_rule({
   match = {
-    class = "xdg-desktop-portal-gtk|[Tt]hunar",
+    class = "xdg-desktop-portal-gtk|[Tt]hunar|virt-manager",
     title = "^()$"
   },
   border_color = BorderAttention,
