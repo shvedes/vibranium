@@ -269,9 +269,7 @@ _manage_user_wallpapers() {
     [[ -z "$chosen" ]] && return
 
     if [[ "$chosen" == "$open_folder_opt" ]]; then
-      xdg-open "$wallpaper_dir"
-      index=0 # Keep the shortcut selected on return
-      continue
+      xdg-open "$wallpaper_dir"; exit
     fi
 
     for i in "${!files[@]}"; do
