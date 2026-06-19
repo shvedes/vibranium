@@ -27,16 +27,6 @@ fi
 # GLOBALS
 # =========================================================================
 
-# Path to the action-status file polled by the waybar password-manager module.
-# Writing a message here causes the bar icon to show contextual status text.
-# Removing the file returns the icon to idle state.
-ACTION="$VIBRANIUM_RUNTIME/password-manager.action"
-
-# Must be exported so async background jobs (which run in child bash processes
-# via export -f + bash -c) can update the bar without knowing the path at
-# definition time.
-export ACTION
-
 # Associative array: maps a named menu context key -> the last selected row index.
 # This lets every rofi menu re-open with the cursor on the item the user last
 # interacted with, giving seamless back-navigation through folder trees.
@@ -178,8 +168,12 @@ prompt_valid_name() {
 
     # Allowlist check: only safe characters for a filesystem entry name.
     # Slashes (path separators), backslashes, and shell metacharacters are
-    # all excluded by this pattern. Spaces are intentionally allowed.
-    if [[ "$input" =~ [^a-zA-Z0-9._\ -]@ ]]; then
+    # all excluded by this pattern. Spaces and @ are intentionally allowed.
+    # Pattern is stored in a variable so bash does not word-split on the
+    # space inside the bracket expression (unquoted RHS of =~ is tokenized
+    # before being handed to the regex engine).
+    local _pvn_re='[^a-zA-Z0-9._ @-]'
+    if [[ "$input" =~ $_pvn_re ]]; then
       notify-send -r 3 -t 2000 "Password Manager" \
         "Invalid characters. Allowed: letters, numbers, space, . - _ @"
       continue
@@ -295,17 +289,11 @@ wait_for_internet() {
 # async_git_push
 #
 # Intended to be launched as a background job: `async_git_push &`
-# Sequence:
-#   1. Update waybar icon: "waiting for internet".
-#   2. Block until network is reachable (infinite 1 s retry — no timeout).
-#   3. Update waybar icon: "pushing".
-#   4. Push. On failure, surface git's error message via notification.
-#   5. Always clean up the action file to return the icon to idle.
 #
 # This function is also exported via `export -f` so the child bash process
 # spawned by the Edit action can call it after `pass edit` finishes.
 async_git_push() {
-  pri # Block here. Parent shell and rofi UI remain fully responsive because
+  # Block here. Parent shell and rofi UI remain fully responsive because
   # this entire function runs in a detached background process.
   wait_for_internet
 
@@ -388,10 +376,11 @@ pick_location() {
   local full_dir dirs items chosen type name new_folder row_key i
 
   if [[ "$mode" == "move" ]]; then
-    local action_text="[M] Move file here"
+    local action_text="<span foreground='${P_ORANGE}'>[M]</span> Move file here"
   else
-    local action_text="[P] Create password here"
+    local action_text="<span foreground='${P_GREEN}'>[P]</span> Create password here"
   fi
+  local create_folder_text="<span foreground='${P_YELLOW}'>[C]</span> Create new folder"
 
   while true; do
     # Unique key per directory level + mode so each context remembers its
@@ -412,9 +401,9 @@ pick_location() {
 
     # Build item list: confirm-action first, then create-folder,
     # then subdirectories prefixed "[D]" for type detection below.
-    items=("$action_text" "[C] Create new folder")
+    items=("$action_text" "$create_folder_text")
     for d in "${dirs[@]}"; do
-      items+=("[D] $d")
+      items+=("<span foreground='${P_BLUE}'>[D]</span> $d")
     done
 
     local selected_row="${last_selected_row[$row_key]:-0}"
@@ -445,7 +434,7 @@ pick_location() {
       _pl_out="$current_path"
       return 0
 
-    elif [[ "$chosen" == "[C] Create new folder" ]]; then
+    elif [[ "$chosen" == "$create_folder_text" ]]; then
       for i in "${!items[@]}"; do
         [[ "${items[$i]}" == "$chosen" ]] && {
           last_selected_row[$row_key]="$i"
@@ -478,9 +467,13 @@ pick_location() {
       continue
 
     else
-      # Directory entry: formatted as "[D] dirname".
-      type="${chosen:1:1}"            # Character at index 1, between '[' and ']'
-      name="${chosen#\["${type}"\] }" # Strip "[D] " prefix to get bare name
+      # Directory entry: formatted as "<span foreground='COLOR'>[D]</span> dirname".
+      # Strip the opening tag (up to first '>') to expose "[D]</span> dirname",
+      # then take the char at index 1 as the type letter and strip everything
+      # up to and including "</span> " for the bare name.
+      local _raw="${chosen#*>}"
+      type="${_raw:1:1}"
+      name="${chosen#*</span> }"
 
       if [[ "$type" == "D" ]]; then
         for i in "${!items[@]}"; do
@@ -539,8 +532,8 @@ pick_password_path() {
 
     # Directories first, then files. Prefixes "[D]"/"[F]" for type detection.
     items=()
-    for d in "${dirs[@]}"; do items+=("[D] $d"); done
-    for f in "${files[@]}"; do items+=("[F] $f"); done
+    for d in "${dirs[@]}"; do items+=("<span foreground='${P_BLUE}'>[D]</span> $d"); done
+    for f in "${files[@]}"; do items+=("<span foreground='${P_YELLOW}'>[F]</span> $f"); done
 
     # Empty directory: `pass rm` can auto-remove empty dirs after deletion.
     # Auto-navigate up rather than showing an empty rofi menu.
@@ -581,8 +574,9 @@ pick_password_path() {
       }
     done
 
-    type="${chosen:1:1}"
-    name="${chosen#\["${type}"\] }"
+    local _raw="${chosen#*>}"
+    type="${_raw:1:1}"
+    name="${chosen#*</span> }"
 
     if [[ "$type" == "D" ]]; then
       if [[ -z "$current_path" ]]; then
@@ -1230,33 +1224,54 @@ while true; do
       : >"$_VB_ENTER_FILE"
 
       # The FIFO that the terminal's bash -c writes to after nvim exits.
-      # mkfifo creates it in a blocked state; the first `read` on it will
-      # block until a writer opens and writes at least one byte.
       export _VB_ENTER_FIFO="$enter_tmpdir/done"
       mkfifo "$_VB_ENTER_FIFO"
 
-      # Fork the floating terminal. xdg-terminal-exec returns immediately
-      # (it does not block for the child process to finish), so the parent
-      # reaches the `read` below before the user has even typed anything.
-      # The bash -c chain:
+      # Open the FIFO for both reading and writing (O_RDWR) NOW, before the
+      # terminal is launched. This fixes two failure modes:
+      #
+      # (a) Deadlock when xdg-terminal-exec is synchronous (blocks until the
+      #     terminal process exits): the child's `printf x > fifo` opens the
+      #     write end with O_WRONLY, which blocks waiting for a reader — but
+      #     the parent is still stuck inside xdg-terminal-exec and has not yet
+      #     reached the `read` below. Neither side can proceed.
+      #     With the fd already open O_RDWR here, the child's O_WRONLY open
+      #     finds an existing reader immediately, so printf succeeds and the
+      #     terminal exits. xdg-terminal-exec then returns, and the parent
+      #     reads the buffered byte from fd.
+      #
+      # (b) select() returns "readable" immediately on FIFOs with no writer:
+      #     POSIX allows select() to report a FIFO as readable (with 0 bytes /
+      #     EOF) when no write end is open. Opening O_RDWR keeps the write end
+      #     open in the parent, so select() blocks correctly until real data
+      #     arrives from the child.
+      exec {_vb_fd}<>"$_VB_ENTER_FIFO"
+
+      # Fork the floating terminal. The bash -c chain:
       #   1. nvim opens the temp file — user types the password, then :wq
       #   2. printf writes one byte to the FIFO — unblocks the parent read
-      # Single-quoting $_VB_ENTER_FILE / $_VB_ENTER_FIFO inside the bash -c
-      # body is intentional: expansion happens in the CHILD shell from its
-      # own exported environment, not in this shell.
+      # $_VB_ENTER_FILE and $_VB_ENTER_FIFO are expanded by this shell
+      # (double-quoted context); single quotes in the child protect the paths
+      # from word-splitting inside bash -c.
       xdg-terminal-exec --app-id=org.vb.term.float --title="pass" -- \
         bash -c "nvim '$_VB_ENTER_FILE'; printf x > '$_VB_ENTER_FIFO'"
 
       # Block here until the terminal signals done.
+      # -n 1: return after exactly one byte. Without this, read waits for a
+      #   newline terminator that `printf x` never writes. Because the parent
+      #   also holds the write end open (via the O_RDWR fd), EOF never arrives
+      #   either — so a plain `read` would hang indefinitely even after the
+      #   child has written the signal byte.
       # -t 600: 5 min safety timeout for the case where the terminal
-      # window is force-closed (which kills the bash -c without it ever
-      # writing to the FIFO, leaving the read blocked indefinitely otherwise).
-      if ! read -r -t 600 _enter_signal <"$_VB_ENTER_FIFO"; then
+      #   window is force-closed (killing bash -c before it writes to the FIFO).
+      if ! read -r -n 1 -t 600 _enter_signal <&"$_vb_fd"; then
         # Timeout or read error — terminal was likely force-closed.
+        exec {_vb_fd}>&-
         rm -rf "$enter_tmpdir"
         unset _VB_ENTER_FILE _VB_ENTER_FIFO
         continue
       fi
+      exec {_vb_fd}>&-
 
       # Read the first non-empty line from the file as the password.
       # `pass show` treats line 1 as the password; we follow the same
