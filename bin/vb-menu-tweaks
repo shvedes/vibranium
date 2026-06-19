@@ -33,20 +33,6 @@ _build_apps() {
           --func "vb-tweak-chromium enable; helpers::ui::close_menus"
       fi
     fi
-
-    if command -v spicetify >/dev/null; then
-      if _has_line "adblock" "$spicetify_file"; then
-        cfgr::item::action \
-          --icon vb-tools \
-          --label "Remove Spotify adblock" \
-          --func "vb-tweak-spotify remove; helpers::ui::close_menus"
-      else
-        cfgr::item::action \
-          --icon vb-tools \
-          --label "Install Spotify adblock" \
-          --func "vb-tweak-spotify install; helpers::ui::close_menus"
-      fi
-    fi
   }
   cfgr::run "App Tweaks" "_b"
 }

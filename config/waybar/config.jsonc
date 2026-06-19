@@ -43,7 +43,6 @@
 			"$XDG_CONFIG_HOME/waybar/modules/group-tray.jsonc",
 			"$XDG_CONFIG_HOME/waybar/modules/volume.jsonc",
 			"$XDG_CONFIG_HOME/waybar/modules/custom-weather.jsonc",
-			"$XDG_CONFIG_HOME/waybar/modules/custom-worker.jsonc",
 			"$XDG_CONFIG_HOME/waybar/modules/workspaces.jsonc",
 			"$XDG_CONFIG_HOME/waybar/modules/custom-pass.jsonc",
 			"$XDG_CONFIG_HOME/waybar/modules/custom-vb-update.jsonc"
@@ -57,7 +56,6 @@
 			"custom/vibranium-update",
 			"custom/timer",
 			"custom/confirm-kill",
-			"custom/worker",
 			"custom/reading-mode",
 			"custom/inhibitor",
 			"custom/password-manager",

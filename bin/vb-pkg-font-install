@@ -74,5 +74,5 @@ if [[ ${#chosen[@]} -eq 0 ]]; then
 fi
 
 if vb-pkg-install --no-logo --no-verify -- "${chosen[@]}"; then
-  exec setsid -f vb-cmd-font-cache
+  exec setsid -f fc-cache -f
 fi

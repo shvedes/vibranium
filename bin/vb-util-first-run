@@ -1,6 +1,5 @@
 #!/usr/bin/bash
 
-WORKER="$VIBRANIUM_RUNTIME/worker.active"
 FIRSTBOOT_HOOKS="$VIBRANIUM/install/first-run"
 
 # Double check
@@ -9,20 +8,12 @@ if [[ ! -f "$VIBRANIUM_STATE/first-run" ]]; then
   exit 1
 fi
 
-# Set Waybar icon
-echo "Finishing installation..." >"$WORKER"
-vb-refresh-waybar-module worker
-
 # Generate XDG directories
 xdg-user-dirs-update --force
 
 for hook in "${FIRSTBOOT_HOOKS}"/*.sh; do
   bash "$hook"
 done
-
-# Remove Waybar icon
-rm -f "$VIBRANIUM_RUNTIME/worker.active"
-vb-refresh-waybar-module worker
 
 # Remove first run marker
 rm -f "$VIBRANIUM_STATE/first-run"

@@ -10,7 +10,7 @@ _usage() {
   shcat <<EOF
 Usage: ${0##*/} [OPTION]...
 
-Update font cache and notify Vibranium worker module.
+Update font cache.
 
 Options:
   -h, --help      display this help and exit
@@ -31,10 +31,4 @@ case "$1" in
   ;;
 esac
 
-printf "Updating font cache. This might take some time" >"$VIBRANIUM_RUNTIME/worker.active"
-vb-refresh-waybar-module worker
-
 fc-cache -f
-
-rm "$VIBRANIUM_RUNTIME/worker.active"
-vb-refresh-waybar-module worker
