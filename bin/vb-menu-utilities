@@ -10,7 +10,7 @@ _build() {
     cfgr::item::action --label "Start timer" --func "vb-util-timer; exit" --icon vb-timer
   fi
 
-  cfgr::item::action --label "Toggle inhibitor" --func "vb-toggle-inhibitor; exit" --icon vb-inhibitor
+  cfgr::item::action --label "Toggle caffeine" --func "vb-toggle-inhibitor; exit" --icon vb-inhibitor
   cfgr::item::action --label "Reload Vibranium" --func "vb-cmd-reload --quiet; exit" --icon vb-update
   cfgr::item::action --label "Close all windows" --func "hyprctl -q eval 'Hypr.Helpers.CloseWindows()'; exit" --icon vb-xmark
 

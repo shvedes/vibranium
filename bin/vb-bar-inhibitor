@@ -1,9 +1,9 @@
 #!/usr/bin/bash
 
 if systemctl -q --user is-active vibranium-inhibit@sleep; then
-  printf '{"text": "\uf023", "tooltip": "System sleep blocked"}'
+  printf '{"text": "\uef59", "tooltip": "System sleep blocked"}'
 elif systemctl -q --user is-active vibranium-inhibit@idle; then
-  printf '{"text": "\uf023", "tooltip": "Screen lock blocked"}'
+  printf '{"text": "\uef59", "tooltip": "Screen lock blocked"}'
 else
   printf '{"text": ""}'
   exit 0
