@@ -585,7 +585,7 @@ case "${1-}" in
     shift
     ;;
 -h | --help)
-  _usgae
+  _usage
   exit 0
   ;;
 -l | --list)
