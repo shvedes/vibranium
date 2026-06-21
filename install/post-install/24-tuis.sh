@@ -17,6 +17,7 @@ vb-tui-install \
 
 vb-tui-install \
   --exec bluetui \
+  --keywords 'Bt' \
   --name 'Bluetooth Manager' \
   --icon 'bluetooth-active-symbolic' \
   --category 'System'
