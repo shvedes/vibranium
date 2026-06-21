@@ -1,6 +1,6 @@
-black_dim = "#0b0d0f"
-black = "#232a2e"
-black_bright = "#323d43"
+black_dim = "#3a4147"
+black = "#343c42"
+black_bright = "#2f373d"
 
 red_dim = "#514045"
 red = "#e57e80"
