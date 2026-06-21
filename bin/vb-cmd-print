@@ -35,8 +35,6 @@ fi
 
 set -uo pipefail
 
-export LANG="en_US.UTF-8"
-
 # Per-process temporary working directory.
 WORK_DIR="/tmp/vb-print-$$"
 
@@ -66,7 +64,9 @@ fi
 #   "system default destination: <name>"   (printer configured)
 #   "no system default destination"        (nothing set)
 # Command substitution strips the trailing newline, so the result is one clean line.
-lpstat_out=$(lpstat -d 2>/dev/null) # Read the default printer description from CUPS.
+#
+# Read the default printer description from CUPS.
+lpstat_out=$(env LANG="en_US.UTF-8" lpstat -d 2>/dev/null)
 default_printer=""
 
 if [[ "$lpstat_out" == *"system default destination:"* ]]; then
