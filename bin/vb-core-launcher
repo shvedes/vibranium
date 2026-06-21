@@ -215,6 +215,10 @@ case "$INPUT" in
     if [[ "$CMD" == vb* ]]; then
       eval "$INPUT"
       exit 0
+    # Let Steam handle its URIs.
+    elif [[ "$ARGS" =~ ^steam:// ]]; then
+      eval "$INPUT"
+      exit 0
     fi
 
     source vb-launch-cmd -- $CMD $ARGS
