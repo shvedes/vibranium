@@ -45,6 +45,20 @@ _capitalize() {
 menu_items=()
 declare -A display_to_folder=()
 for folder in "${community_themes[@]}"; do
+  # Cover a case where a theme was git clone'd
+  # manually. This way the theme folder name will
+  # remain the same as the repo name. So remove it from
+  # display name.
+  folder="${folder/vibranium-theme-/}"
+  folder="${folder/-vibranium-theme/}"
+  folder="${folder/theme-vibranium-/}"
+  folder="${folder/-theme-vibranium/}"
+
+  folder="${folder/omarchy-theme-/}"
+  folder="${folder/-omarchy-theme/}"
+  folder="${folder/theme-omarchy-/}"
+  folder="${folder/-theme-omarchy/}"
+
   display="$(_capitalize "$folder")"
   menu_items+=("$display")
   display_to_folder["$display"]="$folder"
