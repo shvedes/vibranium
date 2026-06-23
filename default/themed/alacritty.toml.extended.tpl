@@ -37,7 +37,7 @@ background = "{{ background_3 }}"
 foreground = "{{ foreground_h }}"
 
 [colors.normal]
-black   = "{{ black }}"
+black   = "{{ background_4 }}"
 red     = "{{ red }}"
 green   = "{{ green }}"
 yellow  = "{{ yellow }}"
@@ -47,7 +47,7 @@ cyan    = "{{ cyan }}"
 white   = "{{ white }}"
 
 [colors.bright]
-black   = "{{ black_bright }}"
+black   = "{{ background_5 }}"
 red     = "{{ red_bright }}"
 green   = "{{ green_bright }}"
 yellow  = "{{ yellow_bright }}"
