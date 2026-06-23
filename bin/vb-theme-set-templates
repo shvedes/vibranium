@@ -270,39 +270,14 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
 
   shopt -s nullglob
 
-  # Build fast-lookup structures from force_template_files.
-  # Three entry shapes are supported:
-  #   "file.ext"               global: template always wins for any theme
-  #   "theme-name/file.ext"    scoped: template wins only for that theme
-  #   "!theme-name/file.ext"   inverse: template wins for every theme EXCEPT
-  #                            that one; the leading ! is the sigil
-  declare -A _force_set     # global and positive-scoped entries  →  key=1
-  declare -A _force_except  # inverse-scoped entries → key="file.ext", value=" t1 t2 ..."
+  # Build a fast-lookup set from force_template_files for O(1) membership tests.
+  # Two key shapes are supported:
+  #   "file.ext"              -- global: template always wins for any theme
+  #   "theme-name/file.ext"   -- scoped: template wins only for that theme
+  declare -A _force_set
   for _f in "${force_template_files[@]}"; do
-    if [[ $_f == '!'* ]]; then
-      _rest="${_f#!}"
-      _force_except[${_rest#*/}]+=" ${_rest%%/*}"
-    else
-      _force_set["$_f"]=1
-    fi
+    _force_set["$_f"]=1
   done
-  unset _f _rest
-
-  # Returns 0 when the given filename should be force-generated for the current theme.
-  _is_forced() {
-    local fname="$1"
-    # Global: "file.ext" forces regardless of theme
-    [[ -n ${_force_set[$fname]+x} ]] && return 0
-    # Positive-scoped: "theme/file.ext" forces only for NEXT_THEME_NAME
-    [[ -n $NEXT_THEME_NAME && -n ${_force_set[$NEXT_THEME_NAME/$fname]+x} ]] && return 0
-    # Inverse-scoped: "!theme/file.ext" forces for all themes except the listed one(s);
-    # guard on NEXT_THEME_NAME so an unknown theme never silently matches
-    if [[ -n ${_force_except[$fname]+x} && -n $NEXT_THEME_NAME ]]; then
-      local excluded=" ${_force_except[$fname]} "
-      [[ $excluded != *" $NEXT_THEME_NAME "* ]] && return 0
-    fi
-    return 1
-  }
 
   # Collect templates that need processing and write a tpl->output map for awk.
   #
@@ -326,9 +301,14 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
       output_path="$NEXT_THEME_DIR/$filename"
 
       # Skip if already claimed by a higher-priority template in this run.
-      # Also skip if the file already exists on disk, UNLESS _is_forced matches.
+      # Also skip if the file exists on disk, UNLESS it matches a force entry:
+      # a plain "file.ext" entry forces it globally; a "theme/file.ext" entry
+      # forces it only when NEXT_THEME_NAME matches the theme prefix.
       if [[ -z ${seen_outputs[$output_path]+x} ]] && \
-         { [[ ! -f $output_path ]] || _is_forced "$filename"; }; then
+         { [[ ! -f $output_path ]] || \
+           [[ -n ${_force_set[$filename]+x} ]] || \
+           { [[ -n $NEXT_THEME_NAME ]] && \
+             [[ -n ${_force_set[$NEXT_THEME_NAME/$filename]+x} ]]; }; }; then
         printf '%s\x01%s\n' "$tpl" "$output_path" >>"$outmap_file"
         tpl_files+=("$tpl")
         seen_outputs["$output_path"]=1

@@ -143,9 +143,17 @@ function hsl_to_rgb(h, s, l,    sn, ln, C, Hp, X, m, r1, g1, b1, hmod2, abshm1, 
 #          saturate=<N>        -- increase S by N percentage points
 #          desaturate=<N>      -- decrease S by N percentage points
 #          hue=<+/-N>          -- rotate H by N degrees
+#   hwb  : hue=<+/-N>          -- rotate H by N degrees
+#          whiten=<N>          -- increase W by N percentage points
+#          blacken=<N>         -- increase B by N percentage points
+#   cmyk : cyan=<+/-N>         -- offset C by N percentage points
+#          magenta=<+/-N>      -- offset M by N percentage points
+#          yellow=<+/-N>       -- offset Y by N percentage points
+#          key=<+/-N>          -- offset K by N percentage points
 #
-# Assumes bash emits RGB as "r,g,b" and HSL as "h,s,l" (comma-separated,
-# no spaces, no units; h in 0-360, s and l in 0-100).
+# Assumes bash emits RGB as "r,g,b", HSL as "h,s,l", HWB as "h,w,b", and
+# CMYK as "c,m,y,k" (comma-separated; HSL/HWB/CMYK channels carry a literal
+# "%" suffix that AWK's numeric-string coercion (+0) ignores).
 #
 function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt, color_val, n_ops, ops, i, op, eq_pos, op_name, op_val_str, op_val, alpha_str, has_alpha, parts, hex_variant, hex_modified, norm_val, rebuilt) {
   pipe_pos = index(expr, "|")
@@ -164,9 +172,11 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
   color_val = subs[base_key]
 
   # Detect color format from the suffix of the key string.
-  if      (index(base_key, "_rgb }}") > 0) fmt = "rgb"
-  else if (index(base_key, "_hsl }}") > 0) fmt = "hsl"
-  else                                      fmt = "hex"
+  if      (index(base_key, "_rgb }}") > 0)  fmt = "rgb"
+  else if (index(base_key, "_hsl }}") > 0)  fmt = "hsl"
+  else if (index(base_key, "_hwb }}") > 0)  fmt = "hwb"
+  else if (index(base_key, "_cmyk }}") > 0) fmt = "cmyk"
+  else                                       fmt = "hex"
 
   # For hex format, also detect which variant bash emitted so we can parse
   # the value correctly (each variant has a different prefix) and emit the
@@ -193,6 +203,18 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
     _h = parts[1] + 0
     _s = parts[2] + 0
     _l = parts[3] + 0
+  } else if (fmt == "hwb") {
+    # "%" suffixes on parts[2]/parts[3] are dropped by AWK's +0 coercion.
+    split(color_val, parts, ",")
+    _h  = parts[1] + 0
+    _w  = parts[2] + 0
+    _bk = parts[3] + 0
+  } else if (fmt == "cmyk") {
+    split(color_val, parts, ",")
+    _c = parts[1] + 0
+    _m = parts[2] + 0
+    _y = parts[3] + 0
+    _k = parts[4] + 0
   } else {
     # Normalize the stored value to #rrggbb before handing it to parse_hex,
     # which always expects a leading '#'.  Each variant needs different handling:
@@ -289,6 +311,21 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
         _h = ((_h + op_val) % 360.0 + 360.0) % 360.0
       }
 
+    } else if (fmt == "hwb") {
+
+      if      (op_name == "whiten")  _w  = clamp(_w + op_val, 0, 100)
+      else if (op_name == "blacken") _bk = clamp(_bk + op_val, 0, 100)
+      else if (op_name == "hue") {
+        _h = ((_h + op_val) % 360.0 + 360.0) % 360.0
+      }
+
+    } else if (fmt == "cmyk") {
+
+      if      (op_name == "cyan")    _c = clamp(_c + op_val, 0, 100)
+      else if (op_name == "magenta") _m = clamp(_m + op_val, 0, 100)
+      else if (op_name == "yellow")  _y = clamp(_y + op_val, 0, 100)
+      else if (op_name == "key")     _k = clamp(_k + op_val, 0, 100)
+
     }
   }
 
@@ -315,6 +352,14 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
   if (fmt == "hsl") {
     # Round to integers to match the format bash emits.
     return int(_h + 0.5) "," int(_s + 0.5) "," int(_l + 0.5)
+  }
+
+  if (fmt == "hwb") {
+    return int(_h + 0.5) "," int(_w + 0.5) "%," int(_bk + 0.5) "%"
+  }
+
+  if (fmt == "cmyk") {
+    return int(_c + 0.5) "%," int(_m + 0.5) "%," int(_y + 0.5) "%," int(_k + 0.5) "%"
   }
 
   return ""
