@@ -15,5 +15,8 @@ cp -r "$VIBRANIUM/config/rofi/themes" "$XDG_CONFIG_HOME/rofi/themes"
 sed -i "s|\(@import \"./themes/\)[^\"]*|\1vibranium.rasi|" \
   "$XDG_CONFIG_HOME/rofi/config.rasi"
 
+theme="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+vb-theme-set --force "$theme"
+
 echo "${GREEN}[MIGRATION|$SELF]${RESET} Existing rofi's themes/ folder has been backed up"
 echo "${GREEN}[MIGRATION|$SELF]${RESET} Migrate manually if needed"
