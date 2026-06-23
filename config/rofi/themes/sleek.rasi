@@ -1,0 +1,148 @@
+@import "../vibranium/current/theme/rofi.rasi"
+
+* {
+  foreground-muted: @background-5;
+  foreground:       @foreground-0;
+  background:       @background-0;
+  border:           @background-4;
+}
+
+window {
+  fullscreen:       false;
+  location:         center;
+  anchor:           center;
+  width:            20%;
+
+  border:           1px solid;
+  border-color:     @border;
+  border-radius:    6px;
+  background-color: @background-h;
+  cursor:           default;
+}
+
+mainbox {
+  enabled:          true;
+  spacing:          10px;
+  margin:           0px;
+  padding:          10px;
+
+  border:           none;
+  background-color: @background-h;
+
+  children:         [ "inputbar", "listview", "message" ];
+}
+
+inputbar {
+  enabled:          true;
+  padding:          8px;
+  margin:           0px 0px 8px 0px;
+
+  border:           1px;
+  border-radius:    6px;
+  border-color:     @border;
+
+  background-color: @black;
+  text-color:       @foreground;
+
+  children:         [ "prompt", "textbox-prompt-sep", "entry" ];
+}
+
+prompt {
+  background-color: inherit;
+  text-color:       inherit;
+}
+
+listview {
+  lines:            10;
+  padding:          16px;
+  scrollbar:        false;
+  layout:           vertical;
+
+  border:           1px solid;
+  border-color:     @border;
+  border-radius:    6px;
+
+  background-color: @background;
+  text-color:       @foreground;
+  cursor:           default;
+}
+
+element {
+  enabled:          true;
+  spacing:          10px;
+  padding:          10px;
+
+  border-color:     @accent-bright;
+
+  background-color: transparent;
+  text-color:       @foreground;
+
+  orientation:      horizontal;
+  cursor:           pointer;
+}
+
+element normal.normal {
+  background-color: transparent;
+  text-color:       @foreground-muted;
+}
+
+element alternate.normal {
+  background-color: transparent;
+  text-color:       @foreground-muted;
+}
+
+element selected.normal {
+  border:           1px solid;
+  border-radius:    6px;
+  border-color:     @border;
+
+  background-color: @background-1;
+  text-color:       @foreground;
+}
+
+element-icon {
+  background-color: transparent;
+  text-color:       inherit;
+
+  size:             16px;
+  cursor:           inherit;
+}
+
+element-text {
+  background-color: transparent;
+  text-color:       inherit;
+
+  highlight:        @accent-bright;
+
+  cursor:           inherit;
+
+  vertical-align:   0.5;
+  horizontal-align: 0.0;
+}
+
+textbox {
+  background-color: transparent;
+  text-color:       @foreground;
+
+  vertical-align:   0.5;
+  horizontal-align: 0.0;
+
+  highlight:        none;
+}
+
+textbox-prompt-sep {
+  str:        ":";
+  expand:     false;
+  text-color: @foreground;
+  padding:    0px 6px 0px 0px;
+}
+
+message {
+  padding:          12px;
+
+  border:           1px solid;
+  border-color:     @border;
+  border-radius:    6px;
+
+  background-color: @background-1;
+}

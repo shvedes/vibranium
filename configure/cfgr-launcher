@@ -9,10 +9,11 @@ _get_rofi_theme() {
       continue
     fi
 
-    if [[ $line =~ @import[[:space:]]+\"[^\"]*/(theme[-a-z]*)\.rasi\" ]]; then
+    if [[ $line =~ @import[[:space:]]+\"[^\"]*/([^/\"]+)\.rasi\" ]]; then
       theme="${BASH_REMATCH[1]}"
 
       theme="${theme#theme-}"
+      theme="${theme//-/ }"
       theme="${theme^}"
 
       printf "%s" "$theme"
@@ -24,13 +25,32 @@ _get_rofi_theme() {
 }
 
 _set_rofi_theme() {
-  local input config
-  input="$(cfgr::set_string \
-    --title "Menu Theme" \
-    --option "Modern:modern" "Text:text")" || return
-  config="$XDG_CONFIG_HOME/rofi/config.rasi"
+  local config input themes dir
 
-  sed -i "s|\(@import \"./themes/\)[^\"]*|\1theme-${input}.rasi|" "$config"
+  config="$XDG_CONFIG_HOME/rofi/config.rasi"
+  dir="$XDG_CONFIG_HOME/rofi/themes"
+
+  themes=()
+
+  for file in "$dir"/*.rasi; do
+    [[ -e "$file" ]] || continue
+
+    local name value
+
+    value="${file##*/}"
+    value="${value/.rasi/}"
+    value="${value#theme-}"
+
+    name="${value//-/ }"
+    name="${name^}"
+
+    themes+=("$name:$value")
+  done
+
+  input="$(cfgr::set_string --title "Menu Theme" \
+    --option "${themes[@]}")" || return
+
+  sed -i "s|\(@import \"./themes/\)[^\"]*|\1${input}.rasi|" "$config"
 }
 
 _build() {

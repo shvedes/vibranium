@@ -1,0 +1,22 @@
+@import "../vibranium/current/theme/rofi.rasi"
+@import "./vibranium.rasi"
+
+window {
+  width:    20%;
+  height:   100%;
+  border:   none;
+  location: east;
+}
+
+scrollbar {
+  handle-width: 0px;
+  padding:      0px;
+}
+
+listview {
+  margin: 0px;
+}
+
+element selected.normal {
+  background-color: transparent;
+}
