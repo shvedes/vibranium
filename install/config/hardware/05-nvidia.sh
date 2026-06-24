@@ -11,13 +11,13 @@ helpers::log::info "Configuring NVIDIA drivers (this may take a moment)"
 
 helpers::log::info "Updating mkinitcpio.conf"
 # Remove any old nvidia modules to prevent duplicates
-vb::sed "$MKINITCPIO_CONF" -E 's/ nvidia_drm//g; s/ nvidia_uvm//g; s/ nvidia_modeset//g; s/ nvidia//g;'
+helpers::sed "$MKINITCPIO_CONF" -E 's/ nvidia_drm//g; s/ nvidia_uvm//g; s/ nvidia_modeset//g; s/ nvidia//g;'
 
 # Add the new modules at the start of the MODULES array
-vb::sed "$MKINITCPIO_CONF" -E "s/^(MODULES=\\()/\\1${NVIDIA_MODULES} /"
+helpers::sed "$MKINITCPIO_CONF" -E "s/^(MODULES=\\()/\\1${NVIDIA_MODULES} /"
 
 # Clean up potential double spaces
-vb::sed "$MKINITCPIO_CONF" -E 's/  +/ /g'
+helpers::sed "$MKINITCPIO_CONF" -E 's/  +/ /g'
 
 helpers::log::info "Generating mkinitcpio image"
 if ! sudo mkinitcpio -P &> /dev/null; then

@@ -1,25 +1,25 @@
 #!/usr/bin/env bash
 
 _VB_BACKUP_HOME_STORE="$HOME/.local/state/vibranium/backup/home"
-_VB_BACKUP_SYSTEM_STORE="/var/lib/vibranium/backup/system"
+_VB_BACKUP_SYSTEM_STORE="$HOME/.local/state/vibranium/backup/home"
 
 # Decide whether a path needs sudo to touch.
-vb::_needs_sudo() {
+helpers::_needs_sudo() {
   local path="$1"
   [[ "$path" != "$HOME" && "$path" != "$HOME"/* ]]
 }
 
 # Print the sudo command to use for a path, or nothing for plain $HOME paths.
-# Usage: local as_root; as_root=$(vb::_sudo_for "$path"); $as_root cp ...
-vb::_sudo_for() {
-  if vb::_needs_sudo "$1"; then
+# Usage: local as_root; as_root=$(helpers::_sudo_for "$path"); $as_root cp ...
+helpers::_sudo_for() {
+  if helpers::_needs_sudo "$1"; then
     printf 'sudo'
   fi
 }
 
 # Map an original absolute path to its backup path and manifest file.
 # Sets the globals _VB_BK_PATH and _VB_BK_MANIFEST.
-vb::_resolve_backup_path() {
+helpers::_resolve_backup_path() {
   local original="$1"
   local store rel
 
@@ -37,7 +37,7 @@ vb::_resolve_backup_path() {
 
 # Back up a single path (file, directory, or symlink) if it currently
 # exists and has not been backed up before.
-vb::backup_path() {
+helpers::backup_path() {
   local original="$1"
   local as_root kind
 
@@ -46,7 +46,7 @@ vb::backup_path() {
     return 0
   fi
 
-  vb::_resolve_backup_path "$original"
+  helpers::_resolve_backup_path "$original"
 
   # Already captured on an earlier run; never overwrite a real backup
   # with a possibly already-modified copy.
@@ -54,7 +54,7 @@ vb::backup_path() {
     return 0
   fi
 
-  as_root=$(vb::_sudo_for "$_VB_BK_PATH")
+  as_root=$(helpers::_sudo_for "$_VB_BK_PATH")
   $as_root mkdir -p "$(dirname "$_VB_BK_PATH")"
 
   # cp -a preserves permissions, ownership, timestamps, and symlinks.
@@ -73,20 +73,19 @@ vb::backup_path() {
 
   $as_root mkdir -p "$(dirname "$_VB_BK_MANIFEST")"
   printf '%(%Y-%m-%d %H:%M:%S)T\t%s\t%s\t%s\n' -1 \
-    "$original" "$_VB_BK_PATH" "$kind" |
-    $as_root tee -a "$_VB_BK_MANIFEST" >/dev/null
+    "$original" "$_VB_BK_PATH" "$kind" | $as_root tee -a "$_VB_BK_MANIFEST" >/dev/null
 
   return 0
 }
 
 # Write stdin (typically a heredoc) to a file, backing up whatever was there before.
-vb::write_file() {
+helpers::write_file() {
   local dest="$1"
   local as_root
 
-  vb::backup_path "$dest"
+  helpers::backup_path "$dest"
 
-  as_root=$(vb::_sudo_for "$dest")
+  as_root=$(helpers::_sudo_for "$dest")
   $as_root mkdir -p "$(dirname "$dest")"
   $as_root tee "$dest" >/dev/null
 }
@@ -98,16 +97,16 @@ vb::write_file() {
 # If src is a directory, its contents are merged into dest (dest is
 # created if missing); pre-existing files in dest that have no
 # counterpart in src are left untouched.
-vb::copy() {
+helpers::copy() {
   local src="$1" dest="$2"
   local as_root target rel entry
 
-  as_root=$(vb::_sudo_for "$dest")
+  as_root=$(helpers::_sudo_for "$dest")
 
   if [[ -d "$src" && ! -L "$src" ]]; then
     while IFS= read -r -d '' entry; do
       rel="${entry#"$src"/}"
-      vb::backup_path "$dest/$rel"
+      helpers::backup_path "$dest/$rel"
     done < <(find "$src" \( -type f -o -type l \) -print0)
 
     $as_root mkdir -p "$dest"
@@ -116,7 +115,7 @@ vb::copy() {
     target="$dest"
     [[ -d "$dest" ]] && target="$dest/$(basename "$src")"
 
-    vb::backup_path "$target"
+    helpers::backup_path "$target"
     $as_root mkdir -p "$(dirname "$target")"
     $as_root cp -a "$src" "$target"
   fi
@@ -124,7 +123,7 @@ vb::copy() {
 
 # Create or update a symlink, backing up whatever real file or different
 # symlink previously occupied that path.
-vb::symlink() {
+helpers::symlink() {
   local target="$1" linkpath="$2"
   local as_root
 
@@ -132,43 +131,43 @@ vb::symlink() {
     return 0
   fi
 
-  vb::backup_path "$linkpath"
+  helpers::backup_path "$linkpath"
 
-  as_root=$(vb::_sudo_for "$linkpath")
+  as_root=$(helpers::_sudo_for "$linkpath")
   $as_root mkdir -p "$(dirname "$linkpath")"
   $as_root ln -sf "$target" "$linkpath"
 }
 
 # In-place sed, backing up the file first.
-# Usage: vb::sed "$file" -Ei 's/foo/bar/'
-vb::sed() {
+# Usage: helpers::sed "$file" -Ei 's/foo/bar/'
+helpers::sed() {
   local file="$1"
   shift
   local as_root
-  as_root=$(vb::_sudo_for "$file")
+  as_root=$(helpers::_sudo_for "$file")
 
-  vb::backup_path "$file"
+  helpers::backup_path "$file"
   $as_root sed -i "$@" "$file"
 }
 
 # Append a line to a file only if a marker string is not already present,
 # backing up the file first.
-vb::append_once() {
+helpers::append_once() {
   local file="$1" marker="$2" text="$3"
   local as_root
-  as_root=$(vb::_sudo_for "$file")
+  as_root=$(helpers::_sudo_for "$file")
 
   if [[ -f "$file" ]] && $as_root grep -qF "$marker" "$file" 2>/dev/null; then
     return 0
   fi
 
-  vb::backup_path "$file"
+  helpers::backup_path "$file"
   $as_root mkdir -p "$(dirname "$file")"
   printf '%s\n' "$text" | $as_root tee -a "$file" >/dev/null
 }
 
 # Remove a file, directory, or symlink, backing it up first.
-vb::remove() {
+helpers::remove() {
   local path="$1"
   local as_root
 
@@ -176,14 +175,14 @@ vb::remove() {
     return 0
   fi
 
-  as_root=$(vb::_sudo_for "$path")
+  as_root=$(helpers::_sudo_for "$path")
 
-  vb::backup_path "$path"
+  helpers::backup_path "$path"
   $as_root rm -rf "$path"
 }
 
 # Print every backup captured so far, across both stores, oldest first.
-vb::backup_list() {
+helpers::backup_list() {
   local manifest store
   for store in "$_VB_BACKUP_HOME_STORE" "$_VB_BACKUP_SYSTEM_STORE"; do
     manifest="$(dirname "$store")/manifest.log"
@@ -194,19 +193,18 @@ vb::backup_list() {
 
 # Restore a single path from its backup, overwriting whatever is
 # currently there. Returns 1 if no backup exists for that path.
-vb::backup_restore() {
+helpers::backup_restore() {
   local original="$1"
   local as_root
 
-  vb::_resolve_backup_path "$original"
+  helpers::_resolve_backup_path "$original"
 
   if [[ ! -e "$_VB_BK_PATH" && ! -L "$_VB_BK_PATH" ]]; then
     helpers::log::error "No backup found for ${original}"
     return 1
   fi
 
-  as_root=$(vb::_sudo_for "$original")
-
+  as_root=$(helpers::_sudo_for "$original")
   $as_root mkdir -p "$(dirname "$original")"
 
   # Clear whatever currently sits at the path first. Without this, cp

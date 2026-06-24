@@ -1,8 +1,8 @@
 #!/usr/bin/bash
 
-# Written by _prompt_error_action; read immediately after it returns.
+# Written by helpers::prompt_err_action; read immediately after it returns.
 # Valid values: "retry", "skip", "abort".
-# Must never be read from a subshell -- callers must invoke _prompt_error_action
+# Must never be read from a subshell -- callers must invoke helpers::prompt_err_action
 # as a plain function call, not via $(...), so the assignment is visible here.
 _LAST_ERROR_ACTION=""
 
@@ -30,8 +30,7 @@ helpers::prompt_err_action() {
     term::enable_input
     while true; do
         printf '%s[FAIL]%s [R]etry  [S]kip  [A]bort: %s' "$RED" "$RESET" "$YELLOW"
-        read -r choice
-        printf '%s' "$RESET"
+        read -r choice; printf '%s' "$RESET"
 
         case "${choice,,}" in
             r|retry)
@@ -62,11 +61,10 @@ helpers::run_step() {
     local phase="$1"
     local script="$2"
     local script_name exit_code
-    script_name=$(basename "$script")
+    script_name="${script##*/}"
 
-    printf '\n[%(%H:%M:%S)T] START phase=%s script=%s\n' \
-        -1 "$phase" "$script_name" \
-        >> "$_LOG_FILE" 2>/dev/null
+    printf '\n[%(%H:%M:%S)T] START phase="%s" script="%s"\n' -1 \
+     "$phase" "$script_name" >> "$_LOG_FILE" 2>/dev/null
 
     while true; do
         # Capture output to the log while keeping it visible on the terminal.
@@ -83,29 +81,26 @@ helpers::run_step() {
         # A child that failed mid-prompt may have left echo enabled.
         term::disable_input
 
-        printf '[%(%H:%M:%S)T] END   phase=%s script=%s exit=%d\n' -1 \
-            "$phase" "$script_name" "$exit_code" >> "$_LOG_FILE" 2>/dev/null
+        printf '[%(%H:%M:%S)T] END   phase="%s" script="%s" exit=%d\n' -1 \
+          "$phase" "$script_name" "$exit_code" >> "$_LOG_FILE" 2>/dev/null
 
         ((exit_code == 0)) && return 0
 
-        _prompt_error_action "$phase" "$script_name" "$exit_code"
+        helpers::prompt_err_action "$phase" "$script_name" "$exit_code"
 
         case "$_LAST_ERROR_ACTION" in
             retry)
                 helpers::log::info "Retrying ${script_name}..."
-                printf '[%(%H:%M:%S)T] RETRY %s\n' -1 "$script_name" \
-                    >> "$_LOG_FILE" 2>/dev/null
+                printf '[%(%H:%M:%S)T] RETRY %s\n' -1 "$script_name" >> "$_LOG_FILE" 2>/dev/null
                 ;;
             skip)
                 helpers::log::warn "Skipped: ${script_name}"
-                printf '[%(%H:%M:%S)T] SKIP  %s\n' -1 "$script_name" \
-                    >> "$_LOG_FILE" 2>/dev/null
+                printf '[%(%H:%M:%S)T] SKIP  %s\n' -1 "$script_name" >> "$_LOG_FILE" 2>/dev/null
                 return 0
                 ;;
             abort)
-                printf '[%(%H:%M:%S)T] ABORT at %s\n' -1 "$script_name" \
-                    >> "$_LOG_FILE" 2>/dev/null
-                _abort_install
+                printf '[%(%H:%M:%S)T] ABORT at %s\n' -1 "$script_name" >> "$_LOG_FILE" 2>/dev/null
+                helpers::abort_install
                 ;;
         esac
     done
@@ -127,6 +122,6 @@ helpers::run_phase() {
 
     for script in "$phase_dir"/*.sh; do
         [[ -f "$script" ]] || continue
-        run_step "$phase_name" "$script"
+        helpers::run_step "$phase_name" "$script"
     done
 }

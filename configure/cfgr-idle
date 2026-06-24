@@ -42,8 +42,10 @@ _build() {
 
   if [[ -z "${TIMEOUTS[@]}" ]]; then
     config_valid="false"
-    notify-send -r 3 -t 10000 "Unable To Parse Config File" \
-      "<span foreground='${P_ACCENT}'><b>hypridle.conf</b></span> is formatted incorrectly. Timeout options are unavailable."
+    if [[ -f "$config" ]]; then
+      notify-send -r 3 -t 10000 "Unable To Parse Config File" \
+        "<span foreground='${P_ACCENT}'><b>hypridle.conf</b></span> is formatted incorrectly. Timeout options are unavailable."
+    fi
   fi
 
   if [[ "$config_valid" == "true" ]]; then

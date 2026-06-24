@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-if vb::is_vm; then
+if helpers::is_vm; then
   exit 0
 fi
 
@@ -119,7 +119,7 @@ migrate_nm_wifi_to_iwd() {
   # Permissions must be 600; iwd refuses to load world-readable profiles.
   local iwd_profile="/var/lib/iwd/${ssid}.psk"
 
-  printf '[Security]\n%s\n' "$iwd_key_line" | vb::write_file "$iwd_profile"
+  printf '[Security]\n%s\n' "$iwd_key_line" | helpers::write_file "$iwd_profile"
   sudo chmod 600 "$iwd_profile"
 
   helpers::log::info "Wrote iwd profile for '${ssid}' -> ${iwd_profile}"
@@ -143,7 +143,7 @@ use_network_manager() {
     # NetworkManager manages /etc/resolv.conf itself once active; drop the
     # stub-resolv.conf symlink systemd-resolved left behind so it does not
     # linger and confuse the next thing that reads it.
-    vb::remove /etc/resolv.conf
+    helpers::remove /etc/resolv.conf
   fi
 
   sudo systemctl -q enable --now NetworkManager
@@ -170,9 +170,9 @@ use_networkd_and_iwd() {
   helpers::log::info "Setting up systemd-networkd and iwd"
   helpers::install_pkg iw iwd
 
-  if vb::has_wifi_adapter; then
+  if helpers::has_wifi_adapter; then
     helpers::install_pkg impala
-    touch /tmp/vibranium-impala-installed
+    : >/tmp/vibranium-impala-installed
   else
     helpers::log::info "No wireless adapter detected, skipping impala (iwd's TUI frontend)"
   fi
@@ -188,7 +188,7 @@ use_networkd_and_iwd() {
     helpers::log::info "Removing NetworkManager"
     sudo pacman -Rnsc --noconfirm networkmanager &>/dev/null
     sudo systemctl -q disable NetworkManager
-    touch /tmp/vibranium-nm.removed
+    : >/tmp/vibranium-nm.removed
   fi
 
   helpers::log::info "Configuring network settings"
@@ -197,9 +197,9 @@ use_networkd_and_iwd() {
   helpers::log::info "Getting *.network reference files"
   for file in 20-wwan.network 20-ethernet.network 20-wlan.network; do
     curl -4 -fsSo "/tmp/${file}" "${base_url}/${file}"
-    vb::copy "/tmp/${file}" "/etc/systemd/network/${file}"
-    rm -f "/tmp/${file}"
+    helpers::copy "/tmp/${file}" "/etc/systemd/network/${file}"
     helpers::log::info "Got ${file}"
+    rm -f "/tmp/${file}"
   done
 
   helpers::log::info "Setting up systemd units"
@@ -214,11 +214,11 @@ use_networkd_and_iwd() {
   done
 
   helpers::log::info "Symlinking /etc/resolv.conf"
-  vb::symlink /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+  helpers::symlink /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
   sudo systemctl -q restart systemd-resolved
 }
 
-if term::ask_yes_no N "Use systemd-networkd and iwd instead of NetworkManager?"; then
+if term::ask_yes_no N "Would you like to use ${CYAN}systemd-networkd${RESET} instead of ${CYAN}NetworkManager${RESET}?"; then
   helpers::log::info "Setting up networking"
   use_networkd_and_iwd
 else

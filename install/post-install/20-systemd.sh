@@ -68,7 +68,7 @@ override_services=(
 
 for unit in "${override_services[@]}"; do
   mkdir -p "$HOME/.config/systemd/user/${unit}.service.d"
-  vb::write_file "$HOME/.config/systemd/user/${unit}.service.d/override.conf" <<EOF
+  helpers::write_file "$HOME/.config/systemd/user/${unit}.service.d/override.conf" <<EOF
 [Unit]
 StartLimitIntervalSec=1
 ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland

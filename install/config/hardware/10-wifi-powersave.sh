@@ -7,13 +7,13 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
 fi
 
 if vb-cmd-battery-present; then
-  vb::write_file /etc/udev/rules.d/99-wifi-powersave.rules << EOF2
+  helpers::write_file /etc/udev/rules.d/99-wifi-powersave.rules << EOF2
 # Laptop specific: toggle Wifi powersave based on charging state
 SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="0", RUN+="$HOME/.local/share/vibranium/bin/vb-cmd-wifi-powersave --on"
 SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="1", RUN+="$HOME/.local/share/vibranium/bin/vb-cmd-wifi-powersave --off"
 EOF2
 else
-  vb::write_file /etc/udev/rules.d/99-wifi-powersave.rules << EOF2
+  helpers::write_file /etc/udev/rules.d/99-wifi-powersave.rules << EOF2
 # Desktop specific: disable Wifi's powersave mode on every boot
 ACTION=="add", SUBSYSTEM=="net", KERNEL=="wl*", RUN+="$HOME/.local/share/vibranium/bin/vb-cmd-wifi-powersave --off"
 EOF2

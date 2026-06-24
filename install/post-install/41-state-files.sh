@@ -6,7 +6,7 @@ if [[ "$CHASSIS_TYPE" != vm ]]; then
 fi
 
 if [[ -f /tmp/vibranium-nm.removed ]]; then
-  touch ~/.local/state/vibranium/network-notify
+  : >"$HOME/.local/state/vibranium/network-notify"
 fi
 
 # First run marker

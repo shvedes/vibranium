@@ -1,0 +1,7 @@
+# should only be used when lstopo is built with Cairo/X11 support
+# so that no terminal is required
+[Desktop Entry]
+Name=Hardware Locality lstopo
+Type=Application
+NoDisplay=true
+Exec=lstopo

@@ -12,9 +12,9 @@ for editor_dir in \
 do
   mkdir -p "$editor_dir/extensions"
 
-  vb::copy "$_THEME_SRC" "$editor_dir/extensions/$(basename "$_THEME_SRC")"
+  helpers::copy "$_THEME_SRC" "$editor_dir/extensions/$(basename "$_THEME_SRC")"
 
-  vb::symlink \
+  helpers::symlink \
     "$_THEME_JSON" \
     "$editor_dir/extensions/vibranium.theme/themes/vibranium.json"
 done

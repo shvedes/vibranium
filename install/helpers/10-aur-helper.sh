@@ -8,7 +8,7 @@ helpers::install_yay() {
   sudo pacman -Suy --noconfirm &> /dev/null
 
   if ! pacman -Qq base-devel &> /dev/null; then
-    helpers::log::info "Installing ${YELLOW}base-deve${RESET}..."
+    helpers::log::info "Installing ${YELLOW}base-devel${RESET}..."
     sudo pacman --noconfirm -S base-devel &> /dev/null
   fi
 
@@ -16,7 +16,7 @@ helpers::install_yay() {
     rm -rf $tmp_dir
   fi
 
-  helpers::log::info "Cloning ${BLUE}${url}${RESET}"
+  helpers::log::info "Cloning ${CYAN}${url}${RESET}"
   git clone -q "$url" $tmp_dir && cd $tmp_dir
 
   helpers::log::info "Building and installing AUR helper"
@@ -24,6 +24,7 @@ helpers::install_yay() {
 
   makepkg -sirc --noconfirm &> /dev/null
   local rc=$?
+
   if ((rc != 0)); then
     helpers::log::error "${GREEN}makepkg ${YELLOW}-sirc${RESET} returned code $rc"
     cd $HOME
@@ -31,7 +32,7 @@ helpers::install_yay() {
     return 1
   fi
 
-  helpers::log::info "AUR helper has been installe"
+  helpers::log::info "AUR helper has been installed"
   sleep 1
   cd $HOME
   rm -rf $tmp_dir

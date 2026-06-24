@@ -4,22 +4,22 @@ LOGIND_CONF="/etc/systemd/logind.conf"
 
 # Don't let systemd handle hardware power button.
 # Long press still shuts down the machine; it's being handled by firmware.
-vb::sed "$LOGIND_CONF" -E '/^#?HandlePowerKey=/s/^#//;/HandlePowerKey/s/=.*/=ignore/'
+helpers::sed "$LOGIND_CONF" -E '/^#?HandlePowerKey=/s/^#//;/HandlePowerKey/s/=.*/=ignore/'
 
 sudo mkdir -p /etc/tmpfiles.d
 
-vb::write_file /etc/tmpfiles.d/coredump.conf << EOF2
+helpers::write_file /etc/tmpfiles.d/coredump.conf << EOF2
 # Clear all coredumps that were created more than 3 days ago
 d /var/lib/systemd/coredump 0755 root root 3d
 EOF2
 
-vb::write_file /etc/tmpfiles.d/thp.conf << EOF2
+helpers::write_file /etc/tmpfiles.d/thp.conf << EOF2
 # Improve performance for applications that use tcmalloc
 # https://github.com/google/tcmalloc/blob/master/docs/tuning.md#system-level-optimizations
 w! /sys/kernel/mm/transparent_hugepage/defrag - - - - defer+madvise
 EOF2
 
-vb::write_file /etc/tmpfiles.d/thp-shrinker.conf << EOF2
+helpers::write_file /etc/tmpfiles.d/thp-shrinker.conf << EOF2
 # THP Shrinker has been added in the 6.12 kernel. The default value is 511.
 # THP=always vastly overprovisions THPs in sparsely accessed memory areas,
 # resulting in excessive memory pressure and premature OOM killing. 409

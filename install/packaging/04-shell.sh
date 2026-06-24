@@ -19,7 +19,8 @@ for i in "${!shells[@]}"; do
 done
 
 while true; do
-  printf "%s[>>>>]%s Enter number (1-%d) [default: 1]: %s" "$CYAN" "$RESET" "${#shells[@]}" "$YELLOW"
+  printf "%s[>>>>]%s Enter number (1-%d) [default is %s]: %s" \
+    "$CYAN" "$RESET" "${#shells[@]}" "${SHELL##*/}" "$YELLOW"
   trap 'printf "%s" "$RESET"' INT
 
   term::enable_input
@@ -29,7 +30,17 @@ while true; do
   printf "%s" "$RESET"
   trap - INT
 
-  shell_idx="${shell_idx:-1}" # Default to 1 (Bash) if empty
+  default_shell_idx=1
+  active_shell="${SHELL##*/}"
+
+  for i in "${!shell_pkgs[@]}"; do
+    if [[ "${shell_pkgs[$i]}" == "$active_shell" ]]; then
+      default_shell_idx=$((i + 1))
+      break
+    fi
+  done
+
+  shell_idx="${shell_idx:-$default_shell_idx}"
 
   if [[ "$shell_idx" =~ ^[0-9]+$ ]] && ((shell_idx >= 1 && shell_idx <= ${#shells[@]})); then
     selected_shell="${shells[$((shell_idx - 1))]}"

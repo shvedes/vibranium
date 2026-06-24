@@ -15,7 +15,7 @@ if [[ $MACBOOK_MODEL =~ MacBook(8,1|9,1|10,1)|MacBookPro13,[123]|MacBookPro14,[1
   if [[ -f $NVME_DEVICE ]]; then
     helpers::log::info "Applying suspend fix"
 
-    cat <<EOF | vb::write_file /etc/systemd/system/apple-nvme-suspend-fix.service
+    cat <<EOF | helpers::write_file /etc/systemd/system/apple-nvme-suspend-fix.service
 [Unit]
 Description=NVMe Suspend Fix for MacBook
 

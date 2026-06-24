@@ -14,5 +14,5 @@ mkdir -p "$HOME"/.config/uwsm
 mkdir -p "$HOME/.config/yazi"
 
 for src in "${!LINKS[@]}"; do
-  vb::symlink "$src" "${LINKS[$src]}"
+  helpers::symlink "$src" "${LINKS[$src]}"
 done

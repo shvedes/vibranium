@@ -7,7 +7,7 @@ mkdir -p "$THEME_DIR"
 
 # Symlink the btop theme
 mkdir -p "$HOME/.config/btop/themes"
-vb::symlink "$HOME/.config/vibranium/current/theme/btop.theme" \
+helpers::symlink "$HOME/.config/vibranium/current/theme/btop.theme" \
   "$HOME/.config/btop/themes/vibranium.theme"
 
 # GNOME / GTK
@@ -17,14 +17,14 @@ gsettings set org.gnome.desktop.interface icon-theme 'Vibranium'
 
 mkdir -p ~/.config/gtk-3.0
 printf '* {\n\tborder-radius: 0;\n}\n\n@import "colors.css";' |
-  vb::write_file ~/.config/gtk-3.0/gtk.css
+  helpers::write_file ~/.config/gtk-3.0/gtk.css
 
 # QTCT
-vb::sed "$HOME/.config/qt5ct/qt5ct.conf" "s/user/$USER/"
-vb::sed "$HOME/.config/qt6ct/qt6ct.conf" "s/user/$USER/"
+helpers::sed "$HOME/.config/qt5ct/qt5ct.conf" "s/user/$USER/"
+helpers::sed "$HOME/.config/qt6ct/qt6ct.conf" "s/user/$USER/"
 
 # Default animations preset
-vb::symlink "$VIBRANIUM/default/hypr/animations/default.lua" \
+helpers::symlink "$VIBRANIUM/default/hypr/animations/default.lua" \
   "$HOME/.config/hypr/hyprland.conf.d/animations.lua"
 
 # Browser colors
@@ -47,11 +47,11 @@ if command -v brave >/dev/null; then
 fi
 
 for file in "${BROWSER_COLORS_FILES[@]}"; do
-  printf '{ "BrowserThemeColor": "#192330" }\n' | vb::write_file "$file"
+  printf '{ "BrowserThemeColor": "#192330" }\n' | helpers::write_file "$file"
 done
 
 # Cursor theme
 echo "Adwaita" >"$HOME/.local/state/vibranium/cursor-theme"
 echo "24" >"$HOME/.local/state/vibranium/cursor-size"
 
-vb::symlink ~/.config/vibranium/current/theme/neovim.lua ~/.config/nvim/lua/plugins/theme.lua
+helpers::symlink ~/.config/vibranium/current/theme/neovim.lua ~/.config/nvim/lua/plugins/theme.lua

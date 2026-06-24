@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 
+if [[ "$CHASSIS_TYPE" == "vm" ]]; then
+  exit 0
+fi
+
 SB_STATE="$(vb-cmd-sboot-status)"
 
 if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then

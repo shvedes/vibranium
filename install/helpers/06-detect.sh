@@ -14,7 +14,9 @@ helpers::is_vm() {
 helpers::has_wifi_adapter() {
   local iface
   for iface in /sys/class/net/*/; do
-    [[ -d "${iface}wireless" || -d "${iface}phy80211" ]] && return 0
+    if [[ -d "${iface}wireless" || -d "${iface}phy80211" ]]; then
+      return 0
+    fi
   done
   return 1
 }

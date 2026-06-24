@@ -31,7 +31,7 @@ if [[ ! -n ${WIRELESS_REGDOM} ]]; then
     # Check if we have a two letter country code
     if [[ $COUNTRY =~ ^[A-Z]{2}$ ]]; then
       # Append it to the wireless-regdom conf file that is used at boot
-      vb::append_once /etc/conf.d/wireless-regdom "WIRELESS_REGDOM=" "WIRELESS_REGDOM=\"$COUNTRY\""
+      helpers::append_once /etc/conf.d/wireless-regdom "WIRELESS_REGDOM=" "WIRELESS_REGDOM=\"$COUNTRY\""
     else
       helpers::log::warn "No configured timezone found"
       helpers::log::warn "Regulatory domain remains unchanged"

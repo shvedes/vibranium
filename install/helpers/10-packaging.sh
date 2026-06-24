@@ -7,6 +7,7 @@ helpers::install_pkg() {
   else
     local verify=false
   fi
+
   local packages=("$@")
   local total=${#packages[@]}
   local current=0
@@ -20,18 +21,19 @@ helpers::install_pkg() {
     '[   =]'
   )
 
-  local frame_file tag_file
-  frame_file=$(mktemp)
-  tag_file=$(mktemp)
+  local frame_file="/tmp/${0##*/}.frame"
+  local tag_file="/tmp/${0##*/}.tag"
+
   echo 0 > "$frame_file"
 
   # Reads aur_tag from tag_file each frame so label updates without restart
   _spinner() {
     local i
-    i=$(cat "$2")
+    i=$(<"$2")
+
     while true; do
       local tag
-      tag=$(cat "$4")
+      tag=$(<"$4")
       printf "\r\033[K%s Installing %s%s [%d/%d]" \
         "${GRAY}${spinner_frames[$i]}${RESET}" \
         "${CYAN}${1}${RESET}" "$tag" "$3" "$5"

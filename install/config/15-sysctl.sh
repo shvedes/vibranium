@@ -20,7 +20,7 @@ case "$CHASSIS_TYPE" in
     ;;
 esac
 
-vb::write_file /etc/sysctl.d/vibranium-sysctl.conf << EOF2
+helpers::write_file /etc/sysctl.d/vibranium-sysctl.conf << EOF2
 # Enable the sysctl setting kernel.unprivileged_userns_clone to allow normal users to run unprivileged containers.
 kernel.unprivileged_userns_clone = 1
 
@@ -48,7 +48,7 @@ net.ipv4.tcp_mtu_probing = 1
 fs.file-max = 2097152
 EOF2
 
-vb::write_file /etc/sysctl.d/vibranium-vm.conf << EOF2
+helpers::write_file /etc/sysctl.d/vibranium-vm.conf << EOF2
 # The sysctl swappiness parameter determines the kernel's preference for
 # pushing anonymous pages or page cache to disk in memory-starved situations.
 # A low value causes the kernel to prefer freeing up open files (page cache).
