@@ -24,6 +24,20 @@ export PATH="$PATH:$VIBRANIUM_PATH"
 
 # ========================================== #
 
+# Set log file before sourcing helpers so exported functions can reference it.
+export _LOG_FILE="$HOME/vibranium-install.log"
+
+{
+  printf '=== Vibranium Installation Log ===\n'
+  printf 'Date    : %s\n' "$(date)"
+  printf 'User    : %s\n' "$USER"
+  printf 'Host    : %s\n' "$(hostname)"
+  printf 'Chassis : %s\n' "$CHASSIS_TYPE"
+  printf '==================================\n\n'
+} > "$_LOG_FILE"
+
+# ========================================== #
+
 source vb-lib-core &>/dev/null
 
 export -f term::discard_buffer
@@ -48,59 +62,124 @@ for helper in "$SCRIPT_DIR/helpers"/*.sh; do
   source "$helper"
 done
 
+# And their functions
+export -f helpers::log::info
+export -f helpers::log::warn
+export -f helpers::log::error
+export -f helpers::log::phase
+export -f helpers::log::success
+
+export -f helpers::_needs_sudo
+export -f helpers::_sudo_for
+export -f helpers::_resolve_backup_path
+export -f helpers::backup_path
+export -f helpers::write_file
+export -f helpers::copy
+export -f helpers::symlink
+export -f helpers::sed
+export -f helpers::append_once
+export -f helpers::remove
+export -f helpers::backup_list
+export -f helpers::backup_restore
+
+export -f helpers::is_vm
+export -f helpers::has_wifi_adapter
+
+export -f helpers::install_yay
+export -f helpers::install_pkg
+
+export -f helpers::abort_install
+export -f helpers::prompt_err_action
+export -f helpers::run_step
+export -f helpers::run_phase
+
+# ========================================== #
+
+# Installation lifecycle state. The EXIT trap reads this to decide what to print.
+# Values: "" (in progress), "aborted" (user-initiated abort), "true" (complete).
+_INSTALL_COMPLETE=""
+export _INSTALL_COMPLETE
+
+# Set to true by the INT/TERM traps so the EXIT message is more specific.
+_INTERRUPT=false
+
+# PID of the sudo keepalive loop; killed on any exit. Initialized empty so
+# the kill in the EXIT trap is a harmless no-op before the loop starts.
+SUDO_KEEPALIVE_PID=""
+
+_cleanup_on_exit() {
+  kill "$SUDO_KEEPALIVE_PID" 2>/dev/null
+  wait "$SUDO_KEEPALIVE_PID" 2>/dev/null
+  rm -f /tmp/vb-install-ongoing
+  term::enable_input
+
+  case "$_INSTALL_COMPLETE" in
+    true) ;;
+    aborted)
+      printf '[%(%H:%M:%S)T] aborted\n' -1 >> "$_LOG_FILE" 2>/dev/null
+      helpers::log::error "Installation aborted"
+      helpers::log::error "Log: ${_LOG_FILE}"
+      ;;
+    *)
+      if [[ "$_INTERRUPT" == true ]]; then
+        printf '[%(%H:%M:%S)T] interrupted\n' -1 >> "$_LOG_FILE" 2>/dev/null
+        helpers::log::error "Installation interrupted"
+      else
+        printf '[%(%H:%M:%S)T] unexpected exit\n' -1 >> "$_LOG_FILE" 2>/dev/null
+        helpers::log::error "Installation terminated unexpectedly"
+      fi
+      helpers::log::error "Log: ${_LOG_FILE}"
+      ;;
+  esac
+}
+
+trap '_cleanup_on_exit' EXIT
+trap '_INTERRUPT=true; exit 130' INT
+trap '_INTERRUPT=true; exit 143' TERM
+
 # ========================================== #
 
 touch /tmp/vb-install-ongoing
 
 exec </dev/tty
 
-# Clear TTY and move prompt
-# to the bottom
+# Clear TTY and move prompt to the bottom
 clear
 tput cup 9999 0
 
 term::disable_input
 term::show_header
 
-_log_info "Welcome to ${CYAN}Vibranium${RESET}, an ${GREEN}Omarchy${RESET}-like ${CYAN}Arch Linux${RESET} configuration."
-_log_info "It is designed to be simple, extremely fast, and highly customizable."
-_log_info ""
-_log_info "This installer will directly modify system files, install packages,"
-_log_info "change configuration across the system, and tune everything"
-_log_info "specifically for your hardware."
-_log_info ""
-_log_info "In addition to performing automatic tasks, the installer will also ask you"
-_log_info "a number of yes/no questions to tailor your installation to your needs."
-_log_info ""
-_log_info "${YELLOW}WARNING${RESET}: This installer creates ${RED}NO${RESET} backups."
-_log_info "Existing configuration files may be overwritten without notice."
-_log_info ""
-_log_info "Vibranium is ${RED}NOT${RESET} intended to be installed on an existing system."
-_log_info "Running it on a system that already contains data, custom configs,"
-_log_info "or another setup may break your environment or cause data loss."
-_log_info ""
-_log_info "Only proceed if this is a fresh Arch Linux installation created"
-_log_info "manually or with archinstall."
-_log_info ""
-_log_info "If you are unsure, ${RED}STOP${RESET} now and create a clean installation first."
+helpers::log::info "Welcome to ${CYAN}Vibranium${RESET}, an ${GREEN}Omarchy${RESET}-like ${CYAN}Arch Linux${RESET} configuration."
+helpers::log::info "It is designed to be simple, extremely fast, and highly customizable."
+helpers::log::info ""
+helpers::log::info "This installer will directly modify system files, install packages,"
+helpers::log::info "change configuration across the system, and tune everything"
+helpers::log::info "specifically for your hardware."
+helpers::log::info ""
+helpers::log::info "In addition to performing automatic tasks, the installer will also ask you"
+helpers::log::info "a number of yes/no questions to tailor your installation to your needs."
+helpers::log::info ""
+helpers::log::info "Before changing or replacing a file that already exists, the installer"
+helpers::log::info "backs it up first. System files are kept under"
+helpers::log::info "${CYAN}/var/lib/vibranium/backup${RESET}, and files under your home directory are kept"
+helpers::log::info "under ${CYAN}~/.local/state/vibranium/backup${RESET}."
+helpers::log::info ""
 
-if term::ask_yes_no Y "Proceed with Installation?"; then
-  if ! term::ask_yes_no Y "Proceed with Installation? (double check)"; then
-    _log_error "Installation aborted"
-    exit 1
-  fi
-else
-  _log_error "Installation aborted"
+if ! term::ask_yes_no Y "Proceed with Installation?"; then
+  _INSTALL_COMPLETE=aborted
   exit 1
 fi
 
 # ========================================== #
 
 if ! sudo -v; then
-  _log_error "Installation aborted"
+  _INSTALL_COMPLETE=aborted
   exit 1
 fi
 
+# Keep sudo credentials alive
+# for the duration of the installation.
 (
   while true; do
     sudo -v
@@ -108,48 +187,43 @@ fi
   done
 ) &
 
-if ! pacman -Qq "yay" &>/dev/null; then
-  _log_info "Installing AUR helper"
+SUDO_KEEPALIVE_PID=$!
+
+if ! command -v yay &>/dev/null; then
+  helpers::log::info "Installing AUR helper"
 
   if ! InstallYay; then
-    _log_error "Failed to install AUR helper"
-    _log_error "Aborting installation"
+    helpers::log::error "Failed to install AUR helper"
+    helpers::log::error "Aborting installation"
     exit 1
   fi
 fi
 
-echo -e "${YELLOW}[INFO]${RESET} Setting up system and configs"
-for script in "$SCRIPT_DIR/config"/*.sh; do
-  bash "$script"
-done
+# ========================================== #
 
-echo -e "${YELLOW}[INFO]${RESET} Initializing package installation"
-for script in "$SCRIPT_DIR/packaging"/*.sh; do
-  yay --noconfirm -Sy &>/dev/null
-  bash "$script"
-done
+helpers::run_phase "System configuration"  "$SCRIPT_DIR/config"
+helpers::run_phase "Package installation"  "$SCRIPT_DIR/packaging"
+helpers::run_phase "Hardware setup"        "$SCRIPT_DIR/config/hardware"
+helpers::run_phase "Post-install"          "$SCRIPT_DIR/post-install"
 
-echo -e "${YELLOW}[INFO]${RESET} Setting up hardware"
-for script in "$SCRIPT_DIR/config/hardware"/*.sh; do
-  bash "$script"
-done
+# ========================================== #
 
-# echo -e "${YELLOW}[INFO]${RESET} Basic installation complete"
-# echo -e "${YELLOW}[INFO]${RESET} Executing post-install hooks..."
-for script in "$SCRIPT_DIR/post-install"/*.sh; do
-  bash "$script"
-done
+_INSTALL_COMPLETE=true
 
-# Clear TTY and move prompt
-# to the bottom
+# Clear TTY and move prompt to the bottom
 clear
 tput cup 9999 0
 
 term::show_header --color green
 
-_log_success "Installation complete. System restart required"
-_log_success "You have to pick Hyprland (uwsm-managed) in the login manager"
-_log_success "Otherwise Vibranium will NOT WORK"
+helpers::log::success "Installation complete. System restart required"
+helpers::log::success "You have to pick 'Hyprland (uwsm-managed)' in the login manager"
+helpers::log::success "Otherwise Vibranium will NOT WORK"
+helpers::log::success ""
+
+while ! term::ask_yes_no N "Did you read the message above?"; do
+  helpers::log::success "Read it"
+done
 
 if term::ask_yes_no Y "Reboot now?"; then
   rm -f /tmp/vb-install-ongoing
@@ -164,6 +238,3 @@ if term::ask_yes_no Y "Reboot now?"; then
 
   systemctl reboot
 fi
-
-rm -f /tmp/vb-install-ongoing
-term::enable_input

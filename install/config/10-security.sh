@@ -9,17 +9,13 @@ if [[ ! -d /etc/sudoers.d ]]; then
 fi
 
 # sudo: show asterisk symbols when entering a password
-sudo grep -qxF '## VIBRANIUM: Enable interactive prompt' "$SUDOERS_CONF" 2> /dev/null ||
-  echo -e '\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback' | sudo tee -a "$SUDOERS_CONF" > /dev/null
+vb::append_once "$SUDOERS_CONF" \
+  '## VIBRANIUM: Enable interactive prompt' \
+  $'\n## VIBRANIUM: Enable interactive prompt\nDefaults env_reset,pwfeedback'
 
 # Increase failed sudo attempts to five
-grep -qxF 'nodelay' "$FAILLOCK_CONF" ||
-  echo -e 'deny = 5\nnodelay' | sudo tee -a "$FAILLOCK_CONF" > /dev/null
+vb::append_once "$FAILLOCK_CONF" 'nodelay' $'deny = 5\nnodelay'
 
 # Completely remove delay between sudo attempts after entering wrong password
 sudo grep -q '^auth.*pam_unix\.so.*try_first_pass nullok nodelay' "$SYSTEM_AUTH_CONF" ||
-  sudo sed -Ei '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\bnullok\b/& nodelay/' "$SYSTEM_AUTH_CONF"
-
-UpdateSummary "Security / sudo: interactive prompt enabled"
-UpdateSummary "Security / faillock: failed attempts increased to 5"
-UpdateSummary "Security / faillock: sudo delay on wrong password removed"
+  vb::sed "$SYSTEM_AUTH_CONF" -E '/^auth.*pam_unix\.so.*try_first_pass nullok/ s/\bnullok\b/& nodelay/'

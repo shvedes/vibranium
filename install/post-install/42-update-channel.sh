@@ -19,4 +19,3 @@ fi
 
 printf "%s" "$state" >"$STATE_FILE"
 
-UpdateSummary "Configuration: set Vibranium update channel to $CURRENT_BRANCH"

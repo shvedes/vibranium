@@ -17,5 +17,3 @@ yay -Ycc --noconfirm &>/dev/null
 
 mkdir -p "$HOME"/.config/vibranium/{startup,shutdown}
 
-UpdateSummary "Package manager: removed yay-debug package"
-UpdateSummary "Package manager: cleaned yay build files and cache"

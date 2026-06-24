@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
 
 readonly _THEME_SRC="$VIBRANIUM/extras/vscode/vibranium.theme"
 readonly _THEME_JSON="$HOME/.config/vibranium/current/theme/vscode.json"
@@ -12,9 +12,9 @@ for editor_dir in \
 do
   mkdir -p "$editor_dir/extensions"
 
-  cp -r "$_THEME_SRC" "$editor_dir/extensions/"
+  vb::copy "$_THEME_SRC" "$editor_dir/extensions/$(basename "$_THEME_SRC")"
 
-  ln -sf \
+  vb::symlink \
     "$_THEME_JSON" \
     "$editor_dir/extensions/vibranium.theme/themes/vibranium.json"
 done

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-_log_info "Installing TUIs"
+helpers::log::info "Installing TUIs"
 
 vb-tui-install \
   --exec btop \
@@ -9,11 +9,13 @@ vb-tui-install \
   --category 'System' \
   --keywords 'Resource;Network;Disk;GPU;Process'
 
-vb-tui-install \
-  --exec impala \
-  --name 'Wifi Manager' \
-  --icon 'network-wireless-signal-excellent-symbolic' \
-  --category 'System;Network'
+if [[ -f /tmp/vibranium-impala-installed ]]; then
+  vb-tui-install \
+    --exec impala \
+    --name 'Wifi Manager' \
+    --icon 'network-wireless-signal-excellent-symbolic' \
+    --category 'System;Network'
+fi
 
 vb-tui-install \
   --exec bluetui \
@@ -30,7 +32,7 @@ vb-tui-install \
 
 vb-tui-install \
   --exec ncdu \
-  --name 'Disk Usage Analizer' \
+  --name 'Disk Usage Analyzer' \
   --icon 'filelight' \
   --category 'System' \
   --args '--enable-delete --exclude-kernfs --group-directories-first /'

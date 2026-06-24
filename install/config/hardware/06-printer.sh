@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 
-if [[ "$CHASSIS_TYPE" == vm ]]; then
+# Printing support (CUPS) and network printer/scanner discovery (Avahi).
+# Source: Omarchy, adapted for Vibranium.
+
+if vb::is_vm; then
+  exit 0
+elif ! term::ask_yes_no N "Install and configure printing support (CUPS, Avahi)?"; then
   exit 0
 fi
-
-# Copy-pasted from Omarchy.
 
 packages=(
   cups
@@ -24,19 +27,20 @@ packages=(
   foomatic-db-gutenprint-ppds
 )
 
-InstallPackages "${packages[@]}"
+helpers::install_pkg "${packages[@]}"
 
-# Disable multicast dns in resolved.
-# Avahi will provide this for better network printer discovery
-sudo mkdir -p /etc/systemd/resolved.conf.d
-echo -e "[Resolve]\nMulticastDNS=no" | sudo tee /etc/systemd/resolved.conf.d/10-disable-multicast.conf >/dev/null
+# Disable multicast DNS in resolved.
+# Avahi will provide this instead, for better network printer discovery.
+# https://wiki.archlinux.org/title/Avahi#Installation
+vb::write_file /etc/systemd/resolved.conf.d/10-disable-multicast.conf << EOF2
+[Resolve]
+MulticastDNS=no
+EOF2
 
 # Enable mDNS resolution for .local domains
-sudo sed -i 's/^hosts:.*/hosts: mymachines mdns_minimal [NOTFOUND=return] resolve files myhostname dns/' /etc/nsswitch.conf
+vb::sed /etc/nsswitch.conf 's/^hosts:.*/hosts: mymachines mdns_minimal [NOTFOUND=return] resolve files myhostname dns/'
 
 # Enable automatically adding remote printers
-if ! grep -q '^CreateRemotePrinters Yes' /etc/cups/cups-browsed.conf; then
-  echo 'CreateRemotePrinters Yes' | sudo tee -a /etc/cups/cups-browsed.conf >/dev/null
-fi
+vb::append_once /etc/cups/cups-browsed.conf 'CreateRemotePrinters Yes' 'CreateRemotePrinters Yes'
 
-sudo systemctl --quiet enable cups.service cups-browsed.service avahi-daemon.service
+sudo systemctl -q enable cups.service cups-browsed.service avahi-daemon.service

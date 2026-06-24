@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 
-source vb-lib-core
-source $VIBRANIUM/install/helpers/00-logging.sh
-
 packages=()
-
 shells=(
   "Bash"
   "Zsh"

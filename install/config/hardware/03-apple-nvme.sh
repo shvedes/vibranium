@@ -8,14 +8,14 @@
 MACBOOK_MODEL=$(cat /sys/class/dmi/id/product_name 2>/dev/null || true)
 
 if [[ $MACBOOK_MODEL =~ MacBook(8,1|9,1|10,1)|MacBookPro13,[123]|MacBookPro14,[123] ]]; then
-  _log_info "Detected MacBook model: $MACBOOK_MODEL"
+  helpers::log::info "Detected MacBook model: $MACBOOK_MODEL"
 
   NVME_DEVICE="/sys/bus/pci/devices/0000:01:00.0/d3cold_allowed"
 
   if [[ -f $NVME_DEVICE ]]; then
-    _log_info "Applying suspend fix"
+    helpers::log::info "Applying suspend fix"
 
-    cat <<EOF | sudo tee /etc/systemd/system/apple-nvme-suspend-fix.service >/dev/null
+    cat <<EOF | vb::write_file /etc/systemd/system/apple-nvme-suspend-fix.service
 [Unit]
 Description=NVMe Suspend Fix for MacBook
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-_log_info "Building Vibranium utilities"
-_log_info "This might take a minute"
+helpers::log::info "Building Vibranium utilities"
+helpers::log::info "This might take a minute"
 
 base_cwd="$(pwd)"
 delete_rust=false

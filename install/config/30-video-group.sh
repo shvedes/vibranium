@@ -7,5 +7,4 @@
 # It allows to manipulate '/sys/class/backlight' without sudo.
 if [ ! -z "$(find /sys/class/backlight -mindepth 1 -maxdepth 1 2> /dev/null)" ]; then
   sudo usermod -aG video "$USER"
-  UpdateSummary "System / groups: added user $USER to 'video' group for direct sysfs backlight access"
 fi

@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
 
-_log_info "Copying configs"
+helpers::log::info "Copying configs"
 
 mkdir -p "$HOME/.local/state/vibranium"
 
 # Everything that is pre-configured.
-cp -r "$VIBRANIUM/config/"* "$HOME/.config/"
-cp "$VIBRANIUM"/config/.* "$HOME"
+for entry in "$VIBRANIUM"/config/*; do
+  [[ -e "$entry" ]] || continue
+  vb::copy "$entry" "$HOME/.config/$(basename "$entry")"
+done
+
+for entry in "$VIBRANIUM"/config/.*; do
+  base="$(basename "$entry")"
+  [[ "$base" == "." || "$base" == ".." ]] && continue
+  vb::copy "$entry" "$HOME/$base"
+done
 
 # Some additional scripts.
 # I might move imv auxiliary scripts
 # from here eventually. Ideally,
 # $VIBRANIUM_PATH is the right place for them.
 mkdir -p "$HOME"/.local/bin
-cp -r "$VIBRANIUM/extras/local/bin/"* "$HOME/.local/bin"
+for entry in "$VIBRANIUM"/extras/local/bin/*; do
+  [[ -e "$entry" ]] || continue
+  vb::copy "$entry" "$HOME/.local/bin/$(basename "$entry")"
+done
 
 # Custom / Hidden app menu entries
 mkdir -p "$HOME"/.local/share/applications
@@ -22,8 +33,18 @@ mkdir -p "$HOME"/.local/share/applications
 # not a good solution. If the user wants to edit one of them or simply
 # *unhide* an entry, it will create git conflicts, which **will**
 # lead to further confusion and Vibranium update errors.
-cp -r "$VIBRANIUM"/applications/*.desktop "$HOME/.local/share/applications"
+for entry in "$VIBRANIUM"/applications/*.desktop; do
+  [[ -e "$entry" ]] || continue
+  vb::copy "$entry" "$HOME/.local/share/applications/$(basename "$entry")"
+done
 
 # Don't use brace expansion here for the sake of readability.
-cp -r "$VIBRANIUM"/applications/custom/*.desktop "$HOME/.local/share/applications"
-cp -r "$VIBRANIUM"/applications/hidden/*.desktop "$HOME/.local/share/applications"
+for entry in "$VIBRANIUM"/applications/custom/*.desktop; do
+  [[ -e "$entry" ]] || continue
+  vb::copy "$entry" "$HOME/.local/share/applications/$(basename "$entry")"
+done
+
+for entry in "$VIBRANIUM"/applications/hidden/*.desktop; do
+  [[ -e "$entry" ]] || continue
+  vb::copy "$entry" "$HOME/.local/share/applications/$(basename "$entry")"
+done

@@ -1,24 +1,15 @@
 #!/usr/bin/env bash
 
-if [[ "$CHASSIS_TYPE" == vm ]]; then
+if vb::is_vm; then
   exit 0
 fi
 
+# Clear flags from a previous run. Both are set conditionally further down,
+# and re-running the installer with a different choice should not leave a
+# stale flag from an earlier run lying around for a later phase to trip on.
+rm -f /tmp/vibranium-impala-installed /tmp/vibranium-nm.removed
+
 shopt -s nullglob
-
-units=(
-  iwd
-  systemd-resolved
-  systemd-networkd
-  systemd-timesyncd
-)
-m_units=(
-  systemd-networkd-wait-online
-)
-
-# Use archiso's default network settings as reference.
-# There's no clear reason for this decision. I just like being dumb.
-base_url="https://gitlab.archlinux.org/archlinux/archiso/-/raw/master/configs/releng/airootfs/etc/systemd/network"
 
 # Attempt to carry over the active WiFi credentials from NetworkManager to iwd
 # before NM is removed. Without this, the system loses network access after the
@@ -61,17 +52,17 @@ migrate_nm_wifi_to_iwd() {
   done < <(iw dev 2>/dev/null | awk '/Interface/{print $2}')
 
   if [[ -z "$wifi_dev" ]]; then
-    _log_warn "No associated WiFi interface found; skipping migration"
+    helpers::log::warn "No connected WiFi interface found, skipping credential migration"
     return 0
   fi
 
-  _log_info "Active WiFi: interface=${wifi_dev} ssid=${ssid}"
+  helpers::log::info "Active WiFi: interface=${wifi_dev} ssid=${ssid}"
 
   # Reject SSIDs that cannot be used as-is in a Linux filename. iwd supports
   # an =<hex> filename encoding for such SSIDs but implementing that encoder
   # here is out of scope; warn and skip rather than writing a broken profile.
   if [[ "$ssid" == */* ]] || [[ "$ssid" == *$'\0'* ]]; then
-    _log_warn "SSID '${ssid}' contains characters invalid in a filename; skipping migration"
+    helpers::log::warn "SSID '${ssid}' contains characters that are not valid in a filename, skipping migration"
     return 0
   fi
 
@@ -88,11 +79,11 @@ migrate_nm_wifi_to_iwd() {
   )
 
   if [[ -z "$nm_conn_file" ]]; then
-    _log_warn "No NM connection profile found for SSID '${ssid}'; skipping migration"
+    helpers::log::warn "No NetworkManager profile found for SSID '${ssid}', skipping migration"
     return 0
   fi
 
-  _log_info "Found NM profile: ${nm_conn_file}"
+  helpers::log::info "Found NetworkManager profile: ${nm_conn_file}"
 
   # Extract the psk= value. The value may itself contain '=' (e.g. a base64
   # passphrase), so strip only the leading "psk=" prefix via sub() rather than
@@ -107,14 +98,14 @@ migrate_nm_wifi_to_iwd() {
   )
 
   if [[ -z "$psk" ]]; then
-    _log_warn "No PSK field in NM profile for '${ssid}' (open network?); skipping migration"
+    helpers::log::warn "No PSK field in the NetworkManager profile for '${ssid}' (open network?), skipping migration"
     return 0
   fi
 
   # NM can store the credential in two forms:
   #   - A 64-character lowercase hex string: the raw 256-bit pre-shared key,
   #     derived by PBKDF2 from the passphrase. iwd calls this PreSharedKey=.
-  #   - Anything else: the human-readable WPA passphrase (8–63 ASCII chars or
+  #   - Anything else: the human-readable WPA passphrase (8-63 ASCII chars or
   #     a valid UTF-8 sequence). iwd calls this Passphrase=.
   local iwd_key_line
   if [[ "$psk" =~ ^[0-9a-fA-F]{64}$ ]]; then
@@ -126,81 +117,110 @@ migrate_nm_wifi_to_iwd() {
   # Write the iwd network profile.
   # Format: plain INI file at /var/lib/iwd/<SSID>.psk
   # Permissions must be 600; iwd refuses to load world-readable profiles.
-  sudo mkdir -p /var/lib/iwd
-
   local iwd_profile="/var/lib/iwd/${ssid}.psk"
 
-  # Warn rather than silently clobber a profile that was written by a previous
-  # run or by the user manually.
-  if sudo test -f "$iwd_profile"; then
-    _log_warn "iwd profile already exists at '${iwd_profile}'; overwriting"
-  fi
-
-  printf '[Security]\n%s\n' "$iwd_key_line" | sudo tee "$iwd_profile" >/dev/null
+  printf '[Security]\n%s\n' "$iwd_key_line" | vb::write_file "$iwd_profile"
   sudo chmod 600 "$iwd_profile"
 
-  _log_info "Wrote iwd profile for '${ssid}' -> ${iwd_profile}"
-  UpdateSummary "System / network: migrated WiFi credentials for '${ssid}' from NetworkManager to iwd"
+  helpers::log::info "Wrote iwd profile for '${ssid}' -> ${iwd_profile}"
 }
 
-_log_info "Setting up networking"
+# Switch the active network stack to NetworkManager. Also handles the
+# re-run case where an earlier Vibranium install had already switched the
+# machine to systemd-networkd + iwd, so this is safe to use as the
+# steady-state choice even on a non-fresh system.
+use_network_manager() {
+  helpers::log::info "Setting up NetworkManager"
 
-InstallPackages iw iwd impala
-UpdateSummary "System / network: installed iwd as wireless backend. Use 'impala' as user TUI frontend"
-
-if pacman -Qq networkmanager &>/dev/null; then
-  _log_info "Detected NetworkManager; migrating active WiFi credentials"
-
-  # Run migration before NM is stopped so nmcli and the connection files are
-  # still accessible. The function is safe to call even if there is nothing to
-  # migrate; it exits early with a warning in every failure path.
-  migrate_nm_wifi_to_iwd
-
-  _log_info "Removing NetworkManager"
-  sudo pacman -Rnsc --noconfirm networkmanager &>/dev/null
-  sudo systemctl -q disable NetworkManager
-  touch /tmp/vibranium-nm.removed
-  UpdateSummary "System / network: replaced NetworkManager with systemd-networkd and iwd"
-fi
-
-_log_info "Configuring network settings"
-if [[ -d /etc/systemd/network ]]; then
-  files=(/etc/systemd/network/*)
-
-  if ((${#files[@]} > 0)); then
-    sudo mv /etc/systemd/network \
-      /etc/systemd/network.bak
+  if ! pacman -Qq networkmanager &>/dev/null; then
+    helpers::install_pkg networkmanager
   fi
+
+  if systemctl is-enabled --quiet iwd 2>/dev/null || systemctl is-enabled --quiet systemd-networkd 2>/dev/null; then
+    helpers::log::info "Reverting a previous systemd-networkd / iwd setup"
+    sudo systemctl -q disable --now iwd systemd-networkd systemd-resolved 2>/dev/null
+    sudo systemctl -q unmask systemd-networkd-wait-online 2>/dev/null
+    # NetworkManager manages /etc/resolv.conf itself once active; drop the
+    # stub-resolv.conf symlink systemd-resolved left behind so it does not
+    # linger and confuse the next thing that reads it.
+    vb::remove /etc/resolv.conf
+  fi
+
+  sudo systemctl -q enable --now NetworkManager
+}
+
+# Switch the active network stack to systemd-networkd + iwd, migrating
+# active NetworkManager WiFi credentials first so the machine does not
+# lose network access after the daemon switch.
+use_networkd_and_iwd() {
+  local units=(
+    iwd
+    systemd-resolved
+    systemd-networkd
+    systemd-timesyncd
+  )
+  local masked_units=(
+    systemd-networkd-wait-online
+  )
+
+  # Use archiso's default network settings as reference.
+  # There's no clear reason for this decision. I just like being dumb.
+  local base_url="https://gitlab.archlinux.org/archlinux/archiso/-/raw/master/configs/releng/airootfs/etc/systemd/network"
+
+  helpers::log::info "Setting up systemd-networkd and iwd"
+  helpers::install_pkg iw iwd
+
+  if vb::has_wifi_adapter; then
+    helpers::install_pkg impala
+    touch /tmp/vibranium-impala-installed
+  else
+    helpers::log::info "No wireless adapter detected, skipping impala (iwd's TUI frontend)"
+  fi
+
+  if pacman -Qq networkmanager &>/dev/null; then
+    helpers::log::info "Detected NetworkManager, migrating active WiFi credentials"
+
+    # Run migration before NM is stopped so nmcli and the connection files are
+    # still accessible. The function is safe to call even if there is nothing
+    # to migrate; it exits early with a warning in every failure path.
+    migrate_nm_wifi_to_iwd
+
+    helpers::log::info "Removing NetworkManager"
+    sudo pacman -Rnsc --noconfirm networkmanager &>/dev/null
+    sudo systemctl -q disable NetworkManager
+    touch /tmp/vibranium-nm.removed
+  fi
+
+  helpers::log::info "Configuring network settings"
+  sudo mkdir -p /etc/systemd/network
+
+  helpers::log::info "Getting *.network reference files"
+  for file in 20-wwan.network 20-ethernet.network 20-wlan.network; do
+    curl -4 -fsSo "/tmp/${file}" "${base_url}/${file}"
+    vb::copy "/tmp/${file}" "/etc/systemd/network/${file}"
+    rm -f "/tmp/${file}"
+    helpers::log::info "Got ${file}"
+  done
+
+  helpers::log::info "Setting up systemd units"
+
+  for unit in "${units[@]}"; do
+    sudo systemctl -q enable "$unit"
+  done
+
+  for unit in "${masked_units[@]}"; do
+    sudo systemctl -q disable "$unit"
+    sudo systemctl -q mask "$unit"
+  done
+
+  helpers::log::info "Symlinking /etc/resolv.conf"
+  vb::symlink /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
+  sudo systemctl -q restart systemd-resolved
+}
+
+if term::ask_yes_no N "Use systemd-networkd and iwd instead of NetworkManager?"; then
+  helpers::log::info "Setting up networking"
+  use_networkd_and_iwd
+else
+  use_network_manager
 fi
-
-sudo mkdir -p /etc/systemd/network
-
-_log_info "Getting *.network reference files"
-for file in 20-wwan.network 20-ethernet.network 20-wlan.network; do
-  curl -4 -fsSo "/tmp/${file}" "${base_url}/${file}"
-  _log_info "Got ${file}"
-  sudo mv -f "/tmp/${file}" "/etc/systemd/network/${file}"
-done
-
-_log_info "Setting up systemd units"
-
-for unit in "${units[@]}"; do
-  sudo systemctl -q enable "$unit"
-done
-
-for unit in "${m_units[@]}"; do
-  sudo systemctl -q disable "$unit"
-  sudo systemctl -q mask "$unit"
-done
-
-if [[ -f /etc/resolv.conf ]]; then
-  sudo rm -f /etc/resolv.conf
-fi
-
-_log_info "Symlinking /etc/resolv.conf"
-sudo ln -sf /run/systemd/resolve/stub-resolv.conf /etc/resolv.conf
-sudo systemctl -q restart systemd-resolved
-
-UpdateSummary "System / network: configured systemd-networkd with Arch ISO reference profiles"
-UpdateSummary "System / network: enabled systemd-resolved as system DNS resolver"
-UpdateSummary "System / network: masked systemd-networkd-wait-online to prevent boot delays"

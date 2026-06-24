@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-_log_info "Creating symlinks"
+helpers::log::info "Creating symlinks"
 
 declare -A LINKS=(
   # It's probably not the best practice...
@@ -14,7 +14,5 @@ mkdir -p "$HOME"/.config/uwsm
 mkdir -p "$HOME/.config/yazi"
 
 for src in "${!LINKS[@]}"; do
-  ln -sf "$src" "${LINKS[$src]}" >/dev/null
+  vb::symlink "$src" "${LINKS[$src]}"
 done
-
-UpdateSummary "Configuration: symlinks for configuration files"

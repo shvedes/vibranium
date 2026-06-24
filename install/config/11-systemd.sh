@@ -3,30 +3,28 @@
 LOGIND_CONF="/etc/systemd/logind.conf"
 
 # Don't let systemd handle hardware power button.
-sudo sed -Ei '/^#?HandlePowerKey=/s/^#//;/HandlePowerKey/s/=.*/=ignore/' "$LOGIND_CONF"
+# Long press still shuts down the machine; it's being handled by firmware.
+vb::sed "$LOGIND_CONF" -E '/^#?HandlePowerKey=/s/^#//;/HandlePowerKey/s/=.*/=ignore/'
 
 sudo mkdir -p /etc/tmpfiles.d
-sudo tee /etc/tmpfiles.d/coredump.conf > /dev/null << EOF
+
+vb::write_file /etc/tmpfiles.d/coredump.conf << EOF2
 # Clear all coredumps that were created more than 3 days ago
 d /var/lib/systemd/coredump 0755 root root 3d
-EOF
+EOF2
 
-sudo tee /etc/tmpfiles.d/thp.conf > /dev/null << EOF
+vb::write_file /etc/tmpfiles.d/thp.conf << EOF2
 # Improve performance for applications that use tcmalloc
 # https://github.com/google/tcmalloc/blob/master/docs/tuning.md#system-level-optimizations
 w! /sys/kernel/mm/transparent_hugepage/defrag - - - - defer+madvise
-EOF
+EOF2
 
-sudo tee /etc/tmpfiles.d/thp-shrinker.conf > /dev/null << EOF
-# THP Shrinker  has  been  added  in  the  6.12 Kernel.  Default   Value   is  511
-# THP=always          policy          vastly          overprovisions          THPs
-# in sparsely  accessed  memory  areas, resulting in excessive memory pressure and
-# premature OOM killing. 409 means  that any THP that has more than 409 out of 512
-# (80%)  zero  filled  pages  will  be  split. This reduces the memory usage, when
-# THP=always  used and the memory usage goes down to around the same usage as when
-# madvise   is  used,  while  still  providing  an  equal  performance improvement
+vb::write_file /etc/tmpfiles.d/thp-shrinker.conf << EOF2
+# THP Shrinker has been added in the 6.12 kernel. The default value is 511.
+# THP=always vastly overprovisions THPs in sparsely accessed memory areas,
+# resulting in excessive memory pressure and premature OOM killing. 409
+# means that any THP with more than 409 out of 512 (80%) zero-filled pages
+# will be split. This reduces memory usage close to what madvise gives,
+# while still keeping most of the performance benefit of THP=always.
 w! /sys/kernel/mm/transparent_hugepage/khugepaged/max_ptes_none - - - - 409
-EOF
-
-UpdateSummary "System / tmpfiles.d: coredump cleanup policy for >3 days applied"
-UpdateSummary "System / tmpfiles.d: THP Shrinker configuration applied (source: CachyOS)"
+EOF2

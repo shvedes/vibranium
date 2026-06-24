@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 
-InstallYay() {
+helpers::install_yay() {
   local tmp_dir="/tmp/yay"
   local url="https://aur.archlinux.org/yay.git"
 
-  _log_info "Refreshing repos"
+  helpers::log::info "Refreshing Arch Linux repositories"
   sudo pacman -Suy --noconfirm &> /dev/null
 
   if ! pacman -Qq base-devel &> /dev/null; then
-    _log_info "Installing \e[0;36mbase-devel\e[0m..."
+    helpers::log::info "Installing ${YELLOW}base-deve${RESET}..."
     sudo pacman --noconfirm -S base-devel &> /dev/null
   fi
 
@@ -16,23 +16,23 @@ InstallYay() {
     rm -rf $tmp_dir
   fi
 
-  _log_info "Clonning $url"
+  helpers::log::info "Cloning ${BLUE}${url}${RESET}"
   git clone -q "$url" $tmp_dir && cd $tmp_dir
 
-  _log_info "Building and installing yay"
-  _log_info "You might be sudo prompted multiple times"
+  helpers::log::info "Building and installing AUR helper"
+  helpers::log::info "You will be sudo prompted multiple times"
 
-  if ! makepkg -sirc --noconfirm &> /dev/null; then
-    _log_error "makepkg -sirc returned  code $?"
+  makepkg -sirc --noconfirm &> /dev/null
+  local rc=$?
+  if ((rc != 0)); then
+    helpers::log::error "${GREEN}makepkg ${YELLOW}-sirc${RESET} returned code $rc"
     cd $HOME
     rm -rf $tmp_dir
     return 1
   fi
 
-  _log_info "Yay installed"
+  helpers::log::info "AUR helper has been installe"
   sleep 1
   cd $HOME
   rm -rf $tmp_dir
 }
-
-export -f InstallYay

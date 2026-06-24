@@ -7,28 +7,23 @@ fi
 MKINITCPIO_CONF="/etc/mkinitcpio.conf"
 NVIDIA_MODULES="nvidia nvidia_modeset nvidia_uvm nvidia_drm"
 
-_log_info "Configuring NVIDIA drivers (this may take a moment)"
+helpers::log::info "Configuring NVIDIA drivers (this may take a moment)"
 
-sudo cp /etc/mkinitcpio.conf /etc/mkinitcpio.conf.bak
-
-_log_info "Updating mkinitcpio.conf"
+helpers::log::info "Updating mkinitcpio.conf"
 # Remove any old nvidia modules to prevent duplicates
-sudo sed -i -E 's/ nvidia_drm//g; s/ nvidia_uvm//g; s/ nvidia_modeset//g; s/ nvidia//g;' "$MKINITCPIO_CONF"
+vb::sed "$MKINITCPIO_CONF" -E 's/ nvidia_drm//g; s/ nvidia_uvm//g; s/ nvidia_modeset//g; s/ nvidia//g;'
 
 # Add the new modules at the start of the MODULES array
-sudo sed -i -E "s/^(MODULES=\\()/\\1${NVIDIA_MODULES} /" "$MKINITCPIO_CONF"
+vb::sed "$MKINITCPIO_CONF" -E "s/^(MODULES=\\()/\\1${NVIDIA_MODULES} /"
 
 # Clean up potential double spaces
-sudo sed -i -E 's/  +/ /g' "$MKINITCPIO_CONF"
+vb::sed "$MKINITCPIO_CONF" -E 's/  +/ /g'
 
-_log_info "Generating mkinitcpio image"
+helpers::log::info "Generating mkinitcpio image"
 if ! sudo mkinitcpio -P &> /dev/null; then
-  _log_error "mkinitcpio -P failed"
+  helpers::log::error "mkinitcpio -P failed"
   rm -f /tmp/nvidia-setup-needed
   exit 1
 fi
 
 rm -f /tmp/nvidia-setup-needed
-
-UpdateSummary "GPU / NVIDIA: added nvidia modules to mkinitcpio.conf (nvidia, nvidia_modeset, nvidia_uvm, nvidia_drm)"
-UpdateSummary "GPU / NVIDIA: backed up original mkinitcpio.conf to /etc/mkinitcpio.conf.bak"

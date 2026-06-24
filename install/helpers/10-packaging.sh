@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-InstallPackages() {
+helpers::install_pkg() {
   if [[ "$1" == "--verify" ]]; then
     local verify=true
     shift
@@ -93,5 +93,3 @@ InstallPackages() {
       "$CYAN" "$RESET" "$GREEN" "$installed" "$RESET"
   fi
 }
-
-export -f InstallPackages

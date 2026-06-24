@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+
+source "$VIBRANIUM/install/helpers/05-backup.sh"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+_usage() {
+  shcat <<EOF
+Usage: ${0##*/} COMMAND [OPTION]...
+
+Manage Vibranium backups.
+
+Commands:
+  list              List available backups
+  restore PATH      Restore backup from PATH
+
+Options:
+  -h, --help        Display this help and exit
+
+EOF
+}
+
+case "${1:-}" in
+  list)
+    vb::backup_list
+    ;;
+  restore)
+    if [[ -z "${2:-}" ]]; then
+      echo "${0##*/}: missing path to restore" >&2
+      echo "Try '${0##*/} --help' for more information." >&2
+      exit 1
+    fi
+    vb::backup_restore "$2"
+    ;;
+  -h|--help)
+    _usage
+    ;;
+  *)
+    echo "${0##*/}: invalid command '${1:-}'" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
+esac

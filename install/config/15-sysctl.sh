@@ -20,7 +20,7 @@ case "$CHASSIS_TYPE" in
     ;;
 esac
 
-sudo tee /etc/sysctl.d/vibranium-sysctl.conf > /dev/null << EOF
+vb::write_file /etc/sysctl.d/vibranium-sysctl.conf << EOF2
 # Enable the sysctl setting kernel.unprivileged_userns_clone to allow normal users to run unprivileged containers.
 kernel.unprivileged_userns_clone = 1
 
@@ -46,9 +46,9 @@ net.ipv4.tcp_mtu_probing = 1
 
 # Set size of file handles and inode cache
 fs.file-max = 2097152
-EOF
+EOF2
 
-sudo tee /etc/sysctl.d/vibranium-vm.conf > /dev/null << EOF
+vb::write_file /etc/sysctl.d/vibranium-vm.conf << EOF2
 # The sysctl swappiness parameter determines the kernel's preference for
 # pushing anonymous pages or page cache to disk in memory-starved situations.
 # A low value causes the kernel to prefer freeing up open files (page cache).
@@ -68,7 +68,7 @@ vm.vfs_cache_pressure = 50
 # physical addresses, but consecutive blocks on swap space. That means the
 # pages were swapped out together. Default is 3. Increase this value to 1
 # or 2 if you are using physical swap (1 for SSD, 2 for HDD).
-# Vibranium uses zram by defualt, so 0.
+# Vibranium uses zram by default, so 0.
 vm.page-cluster = 0
 
 # Contains, in bytes, the amount of memory at which a process generating
@@ -83,13 +83,4 @@ vm.dirty_background_bytes = $DIRTY_BACKGROUND_BYTES
 # disk. This tunable expresses the interval between those wakeups in
 # hundredths of a second. Default is 500.
 # vm.dirty_writeback_centisecs = $DIRTY_WRITEBACK_CENTISECS
-EOF
-
-UpdateSummary "System / sysctl: virtual memory management tuned for machine type ($MACHINE_TYPE)"
-UpdateSummary "System / sysctl: kernel messages hidden and printk output suppressed"
-UpdateSummary "System / sysctl: kernel pointer restrictions and kexec disabled"
-UpdateSummary "System / sysctl: netdev receive queue increased to 4096"
-UpdateSummary "System / sysctl: file handle and inode cache increased to 2097152"
-UpdateSummary "System / sysctl: swappiness set to 100, vfs cache pressure to 50, page-cluster to 0"
-UpdateSummary "System / sysctl: dirty page limits configured based on machine type"
-UpdateSummary "System / sysctl: enabled TCP MTU probing to mitigate PMTU black holes"
+EOF2
