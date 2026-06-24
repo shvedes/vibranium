@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+
+PERCENT=20
+URGENCY="normal"
+FORCE=0
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<-EOF
+	Usage: ${0##*/} [OPTION]...
+
+	Send a desktop notification to the active non-root user when battery
+	capacity reaches a given threshold. Meant to be invoked by udev on
+	power_supply uevents, one invocation per threshold.
+
+	  -p, --percent=PERCENT   battery threshold (default: 20)
+	  -u, --urgency=LEVEL     low, normal, critical
+	  -f, --force             ignore state file
+	  -h, --help              show help
+	EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -p | --percent)
+    PERCENT="$2"
+    shift 2
+    ;;
+
+  --percent=*)
+    PERCENT="${1#*=}"
+    shift
+    ;;
+
+  -p?*)
+    PERCENT="${1#-p}"
+    shift
+    ;;
+
+  -u | --urgency)
+    URGENCY="$2"
+    shift 2
+    ;;
+
+  --urgency=*)
+    URGENCY="${1#*=}"
+    shift
+    ;;
+
+  -u?*)
+    URGENCY="${1#-u}"
+    shift
+    ;;
+
+  -f | --force)
+    FORCE=1
+    shift
+    ;;
+
+  -h | --help)
+    usage
+    exit 0
+    ;;
+
+  *)
+    printf '%s: unknown option: %s\n' "${0##*/}" "$1" >&2
+    exit 1
+    ;;
+  esac
+done
+
+case "$URGENCY" in
+low | normal | critical)
+  ;;
+*)
+  printf '%s: urgency must be low, normal, or critical\n' "${0##*/}" >&2
+  exit 1
+  ;;
+esac
+
+if [[ "$PERCENT" =~ ^[0-9]+$ ]]; then
+  :
+else
+  printf '%s: percent must be integer\n' "${0##*/}" >&2
+  exit 1
+fi
+
+if [[ "$EUID" -ne 0 ]]; then
+  printf '%s: must run as root\n' "${0##*/}" >&2
+  exit 1
+fi
+
+BATTERY_PATHS=()
+
+for CANDIDATE in /sys/class/power_supply/*; do
+  if [[ -f "$CANDIDATE/type" ]] && [[ "$(<"$CANDIDATE/type")" == "Battery" ]]; then
+    BATTERY_PATHS+=("$CANDIDATE")
+  fi
+done
+
+if [[ ${#BATTERY_PATHS[@]} -eq 0 ]]; then
+  printf '%s: no battery found\n' "${0##*/}" >&2
+  exit 1
+fi
+
+TOTAL_NOW=0
+TOTAL_FULL=0
+
+for BAT in "${BATTERY_PATHS[@]}"; do
+  if [[ -f "$BAT/energy_now" ]] && [[ -f "$BAT/energy_full" ]]; then
+    ((TOTAL_NOW += $(<"$BAT/energy_now")))
+    ((TOTAL_FULL += $(<"$BAT/energy_full")))
+  elif [[ -f "$BAT/charge_now" ]] && [[ -f "$BAT/charge_full" ]]; then
+    ((TOTAL_NOW += $(<"$BAT/charge_now")))
+    ((TOTAL_FULL += $(<"$BAT/charge_full")))
+  else
+    ((TOTAL_NOW += $(<"$BAT/capacity")))
+    ((TOTAL_FULL += 100))
+  fi
+done
+
+CAPACITY=$((TOTAL_NOW * 100 / TOTAL_FULL))
+
+COMPOSITOR_PID="$(pidof Hyprland)"
+
+if [[ -z "$COMPOSITOR_PID" ]]; then
+  printf '%s: Hyprland not running\n' "${0##*/}" >&2
+  exit 1
+fi
+
+mapfile -d '' ENV_ENTRIES <"/proc/$COMPOSITOR_PID/environ"
+
+TARGET_HOME=""
+VIBRANIUM_RUNTIME=""
+
+for ENTRY in "${ENV_ENTRIES[@]}"; do
+  case "$ENTRY" in
+  HOME=*) TARGET_HOME="${ENTRY#HOME=}" ;;
+  VIBRANIUM_RUNTIME=*) VIBRANIUM_RUNTIME="${ENTRY#VIBRANIUM_RUNTIME=}" ;;
+  esac
+
+  if [[ -n "$TARGET_HOME" ]]; then
+    if [[ -n "$VIBRANIUM_RUNTIME" ]]; then
+      break
+    fi
+  fi
+done
+
+TARGET_USER="${TARGET_HOME##*/}"
+
+if [[ -z "$TARGET_USER" ]]; then
+  printf '%s: no user session found\n' "${0##*/}" >&2
+  exit 1
+fi
+
+if [[ "$TARGET_USER" == "root" ]]; then
+  printf '%s: refusing root session\n' "${0##*/}" >&2
+  exit 1
+fi
+
+if [[ -z "$VIBRANIUM_RUNTIME" ]]; then
+  printf '%s: missing runtime env\n' "${0##*/}" >&2
+  exit 1
+fi
+
+STATE_FILE="${VIBRANIUM_RUNTIME}/battery-notify-${PERCENT}.state"
+
+if ((CAPACITY > PERCENT)); then
+  if [[ -e "$STATE_FILE" ]]; then
+    rm -f "$STATE_FILE"
+  fi
+  exit 0
+fi
+
+if [[ -e "$STATE_FILE" ]]; then
+  if ((FORCE == 1)); then
+    :
+  else
+    exit 0
+  fi
+fi
+
+if [[ "$URGENCY" == "critical" ]]; then
+  TIME=30000
+else
+  TIME=15000
+fi
+
+sudo -u "$TARGET_USER" env "${ENV_ENTRIES[@]}" \
+  notify-send -u "$URGENCY" -t "$TIME" -r 4455 \
+  "You're Low On Battery" "The Battery at ${CAPACITY}%"
+
+: >"$STATE_FILE"
