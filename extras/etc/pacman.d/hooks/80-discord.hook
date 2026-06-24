@@ -1,5 +1,5 @@
 [Trigger]
-Operation = Install 
+Operation = Install
 Operation = Upgrade
 Target = discord
 Type = Package
@@ -7,5 +7,4 @@ Type = Package
 [Action]
 Description = Updating Vencord
 When = PostTransaction
-Depends = wget
 Exec = /usr/local/bin/patch-discord

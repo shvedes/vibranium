@@ -1,3 +1,72 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
-systemd-run -M user_placeholder@.host --user spicetify backup apply &> /dev/null
+if [[ "$EUID" -eq 0 ]]; then
+  # Set by sudo even with env_reset.
+  TARGET_USER="$SUDO_USER"
+
+  # Fallback: ask logind for the user on the active session.
+  if [[ -z "$TARGET_USER" ]]; then
+    for session in $(loginctl list-sessions --no-legend | awk '{print $1}'); do
+      state=$(loginctl show-session "$session" -p State --value)
+      if [[ "$state" == "active" ]]; then
+        TARGET_USER=$(loginctl show-session "$session" -p Name --value)
+        break
+      fi
+    done
+  fi
+
+  # Fallback (2)
+  if [[ -z "$TARGET_USER" ]]; then
+    TARGET_USER=$(awk -F: '$3 >= 1000 && $3 < 60000 { print $1; exit }' /etc/passwd)
+  fi
+
+  if [[ -z "$TARGET_USER" ]]; then
+    echo "==> ERROR: could not determine target user for Spicetify patch" >&2
+    exit 1
+  fi
+
+  exec su - "$TARGET_USER" -c "$0"
+fi
+
+# From here on we are running as the target user, not root.
+
+if ! command -v spicetify >/dev/null; then
+  echo "==> ERROR: spicetify is not installed or not on PATH" >&2
+  echo "==> Install it with: yay -S spicetify-cli" >&2
+  exit 1
+fi
+
+echo "==> Checking if Spotify was previously patched"
+if ! find /opt/spotify/ -type f -exec grep -q -m1 spicetify {} + >/dev/null; then
+  echo "==> Spotify wasn't patched; skipping re-patch"
+  exit 0
+fi
+
+if ! spicetify --no-restart --quiet restore &>/dev/null; then
+  echo "==> Backing up Spotify state"
+  spicetify --no-restart --quiet backup
+
+  if (($?)); then
+    echo "==> ERROR: Couldn't backup Spotify state"
+    echo "==> Patch Spotify manually"
+    exit 1
+  fi
+fi
+
+echo "==> Restoring Spicetify state"
+spicetify --no-restart --quiet restore
+
+if (($?)); then
+  echo "==> ERROR: Couldn't restore Spicetify state"
+  echo "==> Patch Spotify manually"
+  exit 1
+fi
+
+echo "==> Patching Spotify"
+spicetify --no-restart --quiet apply
+
+if (($?)); then
+  echo "==> ERROR: Spicetify failed to patch Spotify"
+  echo "==> Make sure you have updated Spotify first"
+  exit 1
+fi

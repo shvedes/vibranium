@@ -1,15 +1,56 @@
-#!/usr/bin/env bash
+#!/usr/bin/bash
 
+if [[ "$EUID" -eq 0 ]]; then
+  # Set by sudo even with env_reset.
+  TARGET_USER="$SUDO_USER"
+
+  # Fallback: ask logind for the user on the active session.
+  if [[ -z "$TARGET_USER" ]]; then
+    for session in $(loginctl list-sessions --no-legend | awk '{print $1}'); do
+      state=$(loginctl show-session "$session" -p State --value)
+      if [[ "$state" == "active" ]]; then
+        TARGET_USER=$(loginctl show-session "$session" -p Name --value)
+        break
+      fi
+    done
+  fi
+
+  # Fallback (2)
+  if [[ -z "$TARGET_USER" ]]; then
+    TARGET_USER=$(awk -F: '$3 >= 1000 && $3 < 60000 { print $1; exit }' /etc/passwd)
+  fi
+
+  if [[ -z "$TARGET_USER" ]]; then
+    echo "==> ERROR: could not determine target user for Vencord patch" >&2
+    exit 1
+  fi
+
+  exec su - "$TARGET_USER" -c "$0"
+fi
+
+# From here on we are running as the target user, not root.
+
+PATCH_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/discord"
 URL='https://github.com/Vendicated/VencordInstaller/releases/latest/download/VencordInstallerCli-Linux'
 CLI="/tmp/vencord-installer"
 
-wget -q $URL -O "$CLI"
-chmod +x "$CLI"
-
-if [[ -d /opt/discord ]]; then
-  $CLI -install -install-openasar -location /opt/discord &>/dev/null
-else
-  systemd-run -M user_placeholder@.host --user $CLI rinstall -install-openasar -location /home/user_placeholder/.config/discord &>/dev/null
+echo "==> Downloading Vencord CLI installer"
+if command -v wget >/dev/null; then
+  wget -q "$URL" -O "$CLI"
+elif command -v curl >/dev/null; then
+  curl -fsSL "$URL" -o "$CLI"
 fi
 
-rm -f "$CLI"
+if (($?)); then
+  echo "==> ERROR: Couldn't download Vencord CLI installer"
+fi
+
+echo "==> Patching Discord"
+
+chmod +x "$CLI" && $CLI -install -install-openasar -location "$PATCH_PATH"
+
+if (($?)); then
+  echo "==> ERROR: Vencord CLI installer failed to patch Discord path"
+fi
+
+command rm -rf "$CLI"
