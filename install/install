@@ -210,18 +210,12 @@ helpers::run_phase "Post-install"          "$SCRIPT_DIR/post-install"
 
 _INSTALL_COMPLETE=true
 
-# Clear TTY and move prompt to the bottom
-clear
-tput cup 9999 0
-
-term::show_header --color green
-
 helpers::log::success "Installation complete. System restart required"
 helpers::log::success "You have to pick 'Hyprland (uwsm-managed)' in the login manager"
 helpers::log::success "Otherwise Vibranium will NOT WORK"
 
 while ! term::ask_yes_no N "Did you read the message above?"; do
-  helpers::log::success "Read it"
+  :
 done
 
 if term::ask_yes_no Y "Reboot now?"; then
