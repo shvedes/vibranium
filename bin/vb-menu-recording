@@ -18,7 +18,12 @@ source vb-lib-cfgr
 _build() {
   cfgr::item::action --label "Screen" --func "vb-core-recording --screen; exit" --icon vb-monitor
   cfgr::item::action --label "Region" --func "vb-core-recording --region; exit" --icon vb-region
-  cfgr::item::action --label "Portal" --func "vb-core-recording --portal; exit" --icon vb-wm
+
+  # THe current implementation is kinda bad and broken. I need to find a way to properly check in time if the
+  # recording has actually started, updating the icon in the bar in perfect sync with the actual recording.
+  # Note: --portal is still available via CLI flags, although it doesn't work.
+  #
+  # cfgr::item::action --label "Portal" --func "vb-core-recording --portal; exit" --icon vb-wm
 }
 
 cfgr::run "Record" "_build"
