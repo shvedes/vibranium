@@ -2,7 +2,7 @@
 
 packages=()
 
-printf "%s[>>>>]%s Additional packages (space-separated, keep empty to skip): %s" "$CYAN" "$RESET" "$YELLOW"
+printf "%s[>>>>]%s Additional packages (space-separated, empty to skip): %s" "$CYAN" "$RESET" "$YELLOW"
 trap 'printf "%s" "$RESET"' INT
 
 # Handle input

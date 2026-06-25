@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 _VB_BACKUP_HOME_STORE="$HOME/.local/state/vibranium/backup/home"
-_VB_BACKUP_SYSTEM_STORE="$HOME/.local/state/vibranium/backup/home"
+_VB_BACKUP_SYSTEM_STORE="$HOME/.local/state/vibranium/backup/system"
 
 # Decide whether a path needs sudo to touch.
 helpers::_needs_sudo() {
