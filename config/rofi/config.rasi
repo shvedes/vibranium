@@ -1,7 +1,5 @@
 /* Full documentation: man rofi | man 5 rofi-theme */
 
-@import "./themes/vibranium.rasi"
-
 window, mainbox {
 	font: "Cascadia Code 10";
 	border-radius: 0px;
@@ -45,3 +43,5 @@ configuration {
       hint-welcome: "";
   }
 }
+
+@import "./themes/vibranium.rasi"
