@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+helpers::log::info "Configuring system"
+
 for entry in "$VIBRANIUM"/extras/etc/*; do
   [[ -e "$entry" ]] || continue
   helpers::copy "$entry" "/etc/${entry##*/}"

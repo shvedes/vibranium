@@ -4,6 +4,8 @@ SUDOERS_CONF="/etc/sudoers.d/vibranium"
 FAILLOCK_CONF="/etc/security/faillock.conf"
 SYSTEM_AUTH_CONF="/etc/pam.d/system-auth"
 
+helpers::log::info "Configuring sudo & pam"
+
 if [[ ! -d /etc/sudoers.d ]]; then
   sudo mkdir /etc/sudoers.d
 fi

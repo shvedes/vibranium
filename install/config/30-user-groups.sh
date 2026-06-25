@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+helpers::log::info "Setting up user groups"
+
 # Specify the default groups to add the user to.
 #
 # I am aware that the "wheel" group can replace all of these,

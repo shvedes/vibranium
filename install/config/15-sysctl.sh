@@ -18,6 +18,8 @@ case "$CHASSIS_TYPE" in
     ;;
 esac
 
+helpers::log::info "Configuring kernel (device type: $CHASSIS_TYPE)"
+
 helpers::write_file /etc/sysctl.d/vibranium-sysctl.conf << EOF2
 # Enable the sysctl setting kernel.unprivileged_userns_clone to allow normal users to run unprivileged containers.
 kernel.unprivileged_userns_clone = 1

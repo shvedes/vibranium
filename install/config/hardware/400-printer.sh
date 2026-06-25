@@ -12,6 +12,8 @@ if ! term::ask_yes_no N "$prompt"; then
   exit 0
 fi
 
+helpers::log::info "Setting up CUPS, Avahi & mDNS"
+
 packages=(
   cups
   nss-mdns

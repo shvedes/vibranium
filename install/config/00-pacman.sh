@@ -3,6 +3,8 @@
 PACMAN_CONF="/etc/pacman.conf"
 MAKEPKG_CONF="/etc/makepkg.conf"
 
+helpers::log::info "Configuring package manager"
+
 # Enable multilib repository
 grep -qE '^\[multilib\]' "$PACMAN_CONF" ||
   helpers::sed "$PACMAN_CONF" -E '/\[multilib\]/,/^$/s/^#//'
