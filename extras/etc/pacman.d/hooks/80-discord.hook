@@ -1,4 +1,5 @@
 [Trigger]
+Operation = Install
 Operation = Upgrade
 Target = discord
 Type = Package
@@ -6,4 +7,4 @@ Type = Package
 [Action]
 Description = Updating Vencord
 When = PostTransaction
-Exec = /usr/local/bin/patch-discord
+Exec = /usr/local/bin/su-bridge vb-patch-discord

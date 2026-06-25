@@ -1,7 +1,0 @@
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ACTION=="change", ATTR{online}=="0", RUN+="/home/user_placeholder/.local/share/vibranium/bin/vb-udev-battery-notify -p 25 -u normal"
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ACTION=="change", ATTR{online}=="0", RUN+="/home/user_placeholder/.local/share/vibranium/bin/vb-udev-battery-notify -p 15 -u critical"
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ACTION=="change", ATTR{online}=="0", RUN+="/home/user_placeholder/.local/share/vibranium/bin/vb-udev-battery-notify -p 5  -u critical"
-
-SUBSYSTEM=="power_supply", ATTR{type}=="Battery", RUN+="/home/user_placeholder/.local/share/vibranium/bin/vb-udev-battery-notify -p 25 -u normal"
-SUBSYSTEM=="power_supply", ATTR{type}=="Battery", RUN+="/home/user_placeholder/.local/share/vibranium/bin/vb-udev-battery-notify -p 15 -u critical"
-SUBSYSTEM=="power_supply", ATTR{type}=="Battery", RUN+="/home/user_placeholder/.local/share/vibranium/bin/vb-udev-battery-notify -p 5  -u critical"

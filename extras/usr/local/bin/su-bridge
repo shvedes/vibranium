@@ -1,0 +1,109 @@
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+    shcat <<EOF
+Usage: ${0##*/} [COMMAND] [ARGS]...
+
+DESCRIPTION:
+  Bridge (su) execution of a command into an active user's Hyprland session.
+  This script is designed to run as root to permit commands to access
+  the graphical session of the currently logged-in user, which is
+  otherwise inaccessible due to environment isolation.
+
+OPTIONS:
+  -h, --help    Display this help and exit
+
+EXAMPLES:
+  ${0##*/} notify-send "Task Complete"
+  ${0##*/} my-custom-script --verbose
+EOF
+}
+
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        -h|--help) usage 0 ;;
+        --) shift; break ;;
+        -*) echo "==> ERROR: ${0##*/}: invalid option '$1'" >&2; usage 1 ;;
+        *) break ;;
+    esac
+done
+
+if [[ "$#" -eq 0 ]]; then
+    usage
+    exit 1
+fi
+
+# Only trigger the bridge logic if run as root
+if [[ "$EUID" -eq 0 ]]; then
+  TARGET_USER="$SUDO_USER"
+
+  # Fallback 1: loginctl
+  if [[ -z "$TARGET_USER" ]]; then
+    while read -r session; do
+      if [[ "$(loginctl show-session "$session" -p State --value)" == "active" ]]; then
+        TARGET_USER=$(loginctl show-session "$session" -p Name --value)
+        break
+      fi
+    done < <(loginctl list-sessions --no-legend | awk '{print $1}')
+  fi
+
+  # Fallback 2: /etc/passwd (1000-60000 UID range)
+  if [[ -z "$TARGET_USER" ]]; then
+    TARGET_USER=$(awk -F: '$3 >= 1000 && $3 < 60000 { print $1; exit }' /etc/passwd)
+  fi
+
+  if [[ -z "$TARGET_USER" ]]; then
+    echo "==> ERROR: ${0##*/}: could not determine target user" >&2
+    exit 1
+  fi
+
+  # Find Hyprland PID
+  WM_PID=""
+  for pid in $(pidof Hyprland); do
+    if [[ "$(stat -c '%U' "/proc/$pid")" == "$TARGET_USER" ]]; then
+      WM_PID="$pid"
+      break
+    fi
+  done
+
+  if [[ -z "$WM_PID" ]]; then
+    echo "==> ERROR: Could not find running Hyprland instance for $TARGET_USER" >&2
+    exit 1
+  fi
+
+  # Parse the active Wayland session environment
+  declare -A SESSION_ENV
+  while IFS='=' read -r -d '' key value; do
+    case "$key" in
+      HOME|PATH|VIBRANIUM_PATH|XDG_*)
+        SESSION_ENV["$key"]="$value"
+        ;;
+    esac
+  done < "/proc/$WM_PID/environ"
+
+  # Ensure the custom path is injected into $PATH
+  TARGET_PATH="${SESSION_ENV[PATH]}"
+  if [[ -n "${SESSION_ENV[VIBRANIUM_PATH]}" && "$TARGET_PATH" != *"${SESSION_ENV[VIBRANIUM_PATH]}"* ]]; then
+    TARGET_PATH="${SESSION_ENV[VIBRANIUM_PATH]}:$TARGET_PATH"
+  fi
+
+  # Reconstruct the environment arguments
+  ENV_ARGS=("HOME=${SESSION_ENV[HOME]}" "PATH=$TARGET_PATH")
+  for key in "${!SESSION_ENV[@]}"; do
+    if [[ "$key" == XDG_* || "$key" == "VIBRANIUM_PATH" ]]; then
+      ENV_ARGS+=("$key=${SESSION_ENV[$key]}")
+    fi
+  done
+
+  # Bridge Execution
+  exec runuser -u "$TARGET_USER" -- env "${ENV_ARGS[@]}" "$@"
+fi
+
+# Fallback: if run directly as non-root, just execute the command
+exec "$@"

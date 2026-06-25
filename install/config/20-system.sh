@@ -27,55 +27,6 @@ helpers::write_file /etc/modprobe.d/vb-v4l-dkms.conf << EOF2
 options v4l2loopback exclusive_caps=1 card_label="Virtual Camera Loopback"
 EOF2
 
-helpers::write_file /etc/systemd/zram-generator.conf << EOF2
-# vim:ft=systemd
-# man zram-generator.conf:
-# This file was created by Vibranium install scripts.
-# #################################################### #
-#
-# A piecewise-linear size 1:1 for the first 4G, then 1:2 above, up to a max of 32G:
-#      zram device size
-#          ^
-#      32G>|                                                oooooooooooooo
-#          |                                            o
-#      30G>|                                        o
-#          |
-#         /=/
-#          |
-#       8G>│                           o
-#          │                       o
-#          │                   o
-#          │               o
-#          │           o
-#       4G>│       o
-#          │     o
-#          │   o
-#       1G>│ o
-#          0───────────────────────────────────||──────────────────────> total usable RAM
-#            ^     ^       ^               ^        ^       ^       ^
-#            1G    4G      8G             12G      56G     60G     64G
-
-[zram0]
-zram-size = min(min(ram, 4096) + max(ram - 4096, 0) / 2, 32 * 1024)
-compression-algorithm = lzo-rle zstd(level=3) (type=idle)
-EOF2
-
-helpers::write_file /etc/systemd/system.conf.d/50-fast-shutdown.conf <<EOF2
-# vim:ft=systemd
-# This file was created by Vibranium install scripts.
-# #################################################### #
-[Manager]
-DefaultTimeoutStopSec=5s
-EOF2
-
-helpers::write_file /etc/systemd/system/user@.service.d/50-fast-shutdown.conf <<EOF2
-# vim:ft=systemd
-# This file was created by Vibranium install scripts.
-# #################################################### #
-[Service]
-TimeoutStopSec=5s
-EOF2
-
 helpers::write_file /etc/polkit-1/rules.d/50-vb-udisks2.rules << EOF2
 // vim:ft=javascript
 // This file was created by Vibranium install scripts.
