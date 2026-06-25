@@ -37,3 +37,7 @@ fi
 
 sudo cp "$VIBRANIUM/extras/usr/local/bin/su-bridge" /usr/local/bin/
 sudo cp "$VIBRANIUM"/extras/etc/pacman.d/hooks/*.hook /etc/pacman.d/hooks/
+
+sudo rm -f /usr/local/bin/patch-discord
+sudo rm -f /usr/local/bin/patch-spotify
+sudo rm -f /usr/local/bin/vb-ac-notify
