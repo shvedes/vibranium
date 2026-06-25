@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-helpers::log::info "Installing PWAs..."
+helpers::log::info "Installing WebApps"
 
 vb-webapp-install \
   --category AI \

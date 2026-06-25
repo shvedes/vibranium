@@ -5,7 +5,7 @@ VB_ICONS="$VIBRANIUM/extras/icons/Vibranium"
 
 mkdir -p "$ICONS_DIR"
 
-helpers::copy "$VB_ICONS" "$ICONS_DIR/$(basename "$VB_ICONS")"
+helpers::copy "$VB_ICONS" "$ICONS_DIR/${VB_ICONS##*/}"
 
 # Compatibility workaround
 helpers::symlink "$ICONS_DIR" "$HOME/.icons"

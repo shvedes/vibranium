@@ -20,14 +20,14 @@ done
 # I might move imv auxiliary scripts
 # from here eventually. Ideally,
 # $VIBRANIUM_PATH is the right place for them.
-mkdir -p "$HOME"/.local/bin
+mkdir -p "$HOME/.local/bin"
 for entry in "$VIBRANIUM"/extras/local/bin/*; do
   [[ -e "$entry" ]] || continue
   helpers::copy "$entry" "$HOME/.local/bin/$(basename "$entry")"
 done
 
 # Custom / Hidden app menu entries
-mkdir -p "$HOME"/.local/share/applications
+mkdir -p "$HOME/.local/share/applications"
 
 # Previously I used to symlink all of them, but practically speaking it is
 # not a good solution. If the user wants to edit one of them or simply
