@@ -1,0 +1,49 @@
+#!/bin/bash
+
+# Credits: Omarchy
+
+shopt -s nocasematch
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION] STRING
+
+Search DMI product information for a substring match (case-insensitive)
+
+Options:
+  -h, --help     display this help and exit
+
+Exit status:
+  0  match found
+  1  no match found
+  2  invalid or missing argument
+EOF
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+esac
+
+needle=${1:-}
+
+if [[ -z $needle ]]; then
+  exit 2
+fi
+
+# Read DMI strings
+product_name=""
+product_family=""
+
+[[ -r /sys/class/dmi/id/product_name ]] && product_name=$(< /sys/class/dmi/id/product_name)
+[[ -r /sys/class/dmi/id/product_family ]] && product_family=$(< /sys/class/dmi/id/product_family)
+
+[[ $product_name == *"$needle"* ]] || [[ $product_family == *"$needle"* ]]

@@ -1,0 +1,123 @@
+#!/usr/bin/env bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTIONS] <VENDOR>
+
+Check for GPU presence and capabilities.
+
+Arguments:
+  <VENDOR>       Target GPU vendor to check: AMD, Intel, or Nvidia (case-insensitive)
+
+Options:
+  -h, --help     Show this help and exit
+  -v, --verbose  Print detected GPU line(s) to stdout
+  -g, --gsr      Check for GSP/GSR-capable NVIDIA GPU
+
+Exit status:
+  0  Target GPU / capability found
+  1  Target GPU / capability not found, or invalid option usage
+EOF
+}
+
+VERBOSE=0
+GSR_MODE=0
+TARGET_VENDOR=""
+
+while (($# > 0)); do
+  case "$1" in
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    -v|--verbose)
+      VERBOSE=1
+      shift
+      ;;
+    -g|--gsr)
+      GSR_MODE=1
+      shift
+      ;;
+    -*|--*)
+      usage
+      exit 1
+      ;;
+    *)
+      if [[ -n "$TARGET_VENDOR" ]]; then
+        usage
+        exit 1
+      fi
+      TARGET_VENDOR="${1,,}"
+      shift
+      ;;
+  esac
+done
+
+if [[ -z "$TARGET_VENDOR" ]]; then
+  usage
+  exit 1
+fi
+
+case "$TARGET_VENDOR" in
+  amd)    EXPECTED_ID="0x1002" ;;
+  intel)  EXPECTED_ID="0x8086" ;;
+  nvidia) EXPECTED_ID="0x10de" ;;
+  *)      usage; exit 1 ;;
+esac
+
+# Invalid --gsr invocation for non-NVIDIA vendors
+if (( GSR_MODE )) && [[ "$TARGET_VENDOR" != "nvidia" ]]; then
+  if (( VERBOSE )); then
+    printf "Error: The --gsr flag is designed for NVIDIA checks only and will not work with %s.\n" "${TARGET_VENDOR^^}" >&2
+  fi
+  exit 1
+fi
+
+gpu_found=0
+matches=()
+
+if (( VERBOSE || GSR_MODE )); then
+  # Fallback path: use lspci if text matching or stdout printing is requested
+  hex_id="${EXPECTED_ID#0x}"
+  mapfile -t matches < <(lspci -nn | grep -E "\[${hex_id}:" || true)
+
+  if (( ${#matches[@]} > 0 )); then
+    if (( GSR_MODE )); then
+      for line in "${matches[@]}"; do
+        if [[ $line =~ (GTX\ 16[0-9]{2}|RTX\ (PRO\ [0-9]{4}|[2-5][0-9]{3})|Quadro\ RTX|RTX\ A[0-9]{4}|A[1-9][0-9]{2}|H[1-9][0-9]{2}|T4|L[0-9]+) ]]; then
+          gpu_found=1
+          break
+        fi
+      done
+    else
+      gpu_found=1
+    fi
+  fi
+else
+  for vendor_file in /sys/bus/pci/devices/*/vendor; do
+    [[ -f "$vendor_file" ]] || continue
+    read -r vendor < "$vendor_file"
+    if [[ "$vendor" == "$EXPECTED_ID" ]]; then
+      read -r class < "${vendor_file%vendor}class"
+      if [[ "$class" == 0x03* ]]; then
+        gpu_found=1
+        break
+      fi
+    fi
+  done
+fi
+
+if (( gpu_found )); then
+  if (( VERBOSE && ${#matches[@]} > 0 )); then
+    printf '%s\n' "${matches[@]}"
+  fi
+  exit 0
+else
+  exit 1
+fi

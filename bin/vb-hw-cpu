@@ -1,0 +1,377 @@
+#!/usr/bin/env bash
+
+CPU_VENDOR=
+CPU_FAMILY=
+CPU_MODEL_ID=
+CPU_MODEL_NAME=
+CPU_STEPPING=
+CPU_MHZ=
+CPU_CACHE=
+CPU_CORES=
+CPU_TOTAL_THREADS=0
+CPU_MICROCODE=
+CPU_FLAGS=
+CPU_BUGS=
+
+# Explicit control flags
+USE_QUOTE=0
+IS_ALL=0
+
+# Arrays to accumulate keys and values separately for clean alignment
+OUTPUT_LABELS=()
+OUTPUT_VALUES=()
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]...
+
+Print CPU information and exit.
+With no option, prints the CPU vendor and name (equivalent to -vn)
+Options can be combined (e.g., -vnlq) or spaced (e.g., -v -l -q)
+
+Options:
+  -h, --help                  Show this help and exit
+  -q, --quote                 Format raw output for shell scripts/IFS parsing (removes labels/units)
+  -v, --vendor                Print CPU vendor
+  -c, --code                  Print CPU raw code (Model ID)
+  -l, --microarchitecture     Print CPU microarchitecture
+  -n, --name                  Print CPU name
+  -g, --stepping              Print CPU stepping
+  -u, --microcode             Print CPU microcode version
+  -m, --mhz                   Print CPU frequency in MHz
+  -s, --cache                 Print CPU cache size
+  -p, --cores                 Print CPU core count per socket
+  -t, --threads               Print total system CPU threads count
+  -b, --bugs                  Print known CPU vulnerabilities/bugs
+  -f, --flags                 Print CPU flags / features
+  -a, --all                   Print all CPU info in a clean, aligned, per-line layout
+
+Intended use for -q / --quote:
+  Strips decorative text, units, and brackets to output raw values for downstream
+  automation or scripting. Its output structure depends on how it is paired:
+
+  1. Multi-flag strings (e.g., -vnmq):
+     Joins raw values on a single line delimited by a single quote ('). This protects
+     spaces in CPU names and allows clean parsing into local variables using IFS
+
+     Example:
+       \$ ./${0##*/} -vnmq
+       Intel'Core i7-10700K'3800.000
+
+     Usage in scripts:
+       IFS="'" read -r vendor model speed <<< "\$ (${0##*/} -vnmq)"
+
+  2. Paired with 'all' (e.g., -aq or -a -q):
+     Bypasses column alignment/labels entirely, outputting only raw values with
+     each value cleanly isolated on its own individual line
+
+     Example:
+       \$ ${0##*/} -aq
+       Intel
+       165
+       Comet Lake
+EOF
+}
+
+# Parse /proc/cpuinfo once and cache results
+_init_cpuinfo() {
+  [[ -n $CPU_MODEL_NAME ]] && return 0
+
+  if [[ -d /sys/devices/system/cpu ]]; then
+    local cpu_dirs=( /sys/devices/system/cpu/cpu[0-9]* )
+    CPU_TOTAL_THREADS=${#cpu_dirs[@]}
+  else
+    CPU_TOTAL_THREADS=1
+  fi
+
+  local key value found_processor=0
+
+  while IFS=: read -r key value; do
+    local clean_key="${key%%$'\t'*}"
+    clean_key="${clean_key%"${clean_key##*[![:space:]]}"}"
+
+    # Break early the moment we hit the start of the second core's data block
+    if [[ "$clean_key" == "processor" ]]; then
+      ((found_processor++))
+      if [[ $found_processor -gt 1 ]]; then
+        break
+      fi
+    fi
+
+    value="${value# }"
+
+    case "$clean_key" in
+      "vendor_id")   [[ -z $CPU_VENDOR ]]     && CPU_VENDOR="$value"     ;;
+      "cpu family")  [[ -z $CPU_FAMILY ]]     && CPU_FAMILY="$value"     ;;
+      "model")       [[ -z $CPU_MODEL_ID ]]   && CPU_MODEL_ID="$value"   ;;
+      "model name")  [[ -z $CPU_MODEL_NAME ]] && CPU_MODEL_NAME="$value" ;;
+      "stepping")    [[ -z $CPU_STEPPING ]]   && CPU_STEPPING="$value"   ;;
+      "cpu MHz")     [[ -z $CPU_MHZ ]]        && CPU_MHZ="$value"        ;;
+      "cache size")  [[ -z $CPU_CACHE ]]      && CPU_CACHE="$value"      ;;
+      "cpu cores")   [[ -z $CPU_CORES ]]      && CPU_CORES="$value"      ;;
+      "microcode")   [[ -z $CPU_MICROCODE ]]  && CPU_MICROCODE="$value"  ;;
+      "flags"|"Features") [[ -z $CPU_FLAGS ]] && CPU_FLAGS="$value"      ;;
+      "bugs")        [[ -z $CPU_BUGS ]]       && CPU_BUGS="$value"       ;;
+    esac
+  done < /proc/cpuinfo
+
+  [[ -n $CPU_MODEL_NAME ]]
+}
+
+_add_part() {
+  OUTPUT_LABELS+=("$1")
+  OUTPUT_VALUES+=("$2")
+}
+
+add_cpu_vendor() {
+  _init_cpuinfo || return 1
+  local val
+  case "$CPU_VENDOR" in
+    AuthenticAMD) val="AMD"   ;;
+    GenuineIntel) val="Intel" ;;
+    *)            val="${CPU_VENDOR:-unknown}" ;;
+  esac
+  _add_part "Vendor:" "$val"
+}
+
+add_cpu_code() {
+  _init_cpuinfo || return 1
+  _add_part "Code:" "${CPU_MODEL_ID:-unknown}"
+}
+
+add_cpu_microarchitecture() {
+  _init_cpuinfo || return 1
+  local uarch
+
+  case "$CPU_VENDOR" in
+    GenuineIntel)
+      case "$CPU_FAMILY" in
+        6)
+          case "$CPU_MODEL_ID" in
+            42|45)       uarch='Sandy Bridge' ;;
+            58|62)       uarch='Ivy Bridge'   ;;
+            60|63|69|70) uarch='Haswell'      ;;
+            61|79|86)    uarch='Broadwell'    ;;
+            78|85|94)    uarch='Skylake'      ;;
+            142|158)     uarch='Coffee Lake'  ;;
+            204)         uarch='Panther Lake' ;;
+            165|166)     uarch='Comet Lake'   ;;
+            126)         uarch='Ice Lake'     ;;
+            140|141)     uarch='Tiger Lake'   ;;
+            167)         uarch='Rocket Lake'  ;;
+            151|154)     uarch='Alder Lake'   ;;
+            183|191)     uarch='Raptor Lake'  ;;
+            170|172)     uarch='Meteor Lake'  ;;
+            189)         uarch='Lunar Lake'   ;;
+            197)         uarch='Arrow Lake'   ;;
+          esac ;;
+      esac ;;
+    AuthenticAMD)
+      case "$CPU_FAMILY" in
+        23)
+          case "$CPU_MODEL_ID" in
+            1)                 uarch='Zen'   ;;
+            8|24)              uarch='Zen+'  ;;
+            49|96|104|113|144) uarch='Zen 2' ;;
+          esac ;;
+        25)
+          case "$CPU_MODEL_ID" in
+            1|8|33)         uarch='Zen 3'  ;;
+            68|80)          uarch='Zen 3+' ;;
+            97|116|117|120) uarch='Zen 4'  ;;
+            161)            uarch='Zen 4c' ;;
+          esac ;;
+        26)
+          case "$CPU_MODEL_ID" in
+            32|36|64) uarch='Zen 5'  ;;
+            68)       uarch='Zen 5c' ;;
+          esac ;;
+      esac ;;
+  esac
+  _add_part "Architecture:" "${uarch:-unknown}"
+}
+
+add_cpu_name() {
+  _init_cpuinfo || return 1
+  local name="$CPU_MODEL_NAME"
+
+  case "$CPU_VENDOR" in
+    AuthenticAMD)
+      name="${name#AMD }"
+      name="${name% [0-9]*-Core Processor}"
+      name="${name% with Radeon*}"
+      ;;
+    GenuineIntel)
+      [[ $name == *'Gen '* ]] && name="${name#*Gen }"
+      name="${name#Intel(R) }"
+      name="${name#Intel }"
+      name="${name//(R)/}"
+      name="${name//(TM)/}"
+      name="${name/ CPU/}"
+      name="${name% @ *}"
+
+      while [[ $name == *'  '* ]]; do name="${name//  / }"; done
+      name="${name# }"; name="${name% }"
+      ;;
+    *)
+      name="${name//(R)/}"
+      name="${name//(TM)/}"
+      ;;
+  esac
+  _add_part "Model:" "${name:-unknown}"
+}
+
+add_cpu_stepping() {
+  _init_cpuinfo || return 1
+  _add_part "Stepping:" "${CPU_STEPPING:-unknown}"
+}
+
+add_cpu_microcode() {
+  _init_cpuinfo || return 1
+  _add_part "Microcode:" "${CPU_MICROCODE:-unknown}"
+}
+
+add_cpu_mhz() {
+  _init_cpuinfo || return 1
+  if (( USE_QUOTE )); then
+    _add_part "Speed:" "${CPU_MHZ:-unknown}"
+  else
+    _add_part "Speed:" "${CPU_MHZ:-unknown} MHz"
+  fi
+}
+
+add_cpu_cache() {
+  _init_cpuinfo || return 1
+  _add_part "Cache:" "${CPU_CACHE:-unknown}"
+}
+
+add_cpu_cores() {
+  _init_cpuinfo || return 1
+  _add_part "Cores:" "${CPU_CORES:-unknown}"
+}
+
+add_cpu_threads() {
+  _init_cpuinfo || return 1
+  _add_part "Threads:" "${CPU_TOTAL_THREADS:-unknown}"
+}
+
+add_cpu_bugs() {
+  _init_cpuinfo || return 1
+  if (( USE_QUOTE )); then
+    _add_part "Bugs:" "${CPU_BUGS:-none}"
+  else
+    _add_part "Bugs:" "[ ${CPU_BUGS:-none} ]"
+  fi
+}
+
+add_cpu_flags() {
+  _init_cpuinfo || return 1
+  if (( USE_QUOTE )); then
+    _add_part "Flags:" "${CPU_FLAGS:-none}"
+  else
+    _add_part "Flags:" "[ ${CPU_FLAGS:-none} ]"
+  fi
+}
+
+# Print everything in exact /proc/cpuinfo sequential top-to-bottom layout
+add_all() {
+  add_cpu_vendor
+  add_cpu_code
+  add_cpu_microarchitecture
+  add_cpu_name
+  add_cpu_stepping
+  add_cpu_microcode
+  add_cpu_mhz
+  add_cpu_cache
+  add_cpu_cores
+  add_cpu_threads
+  add_cpu_bugs
+  add_cpu_flags
+}
+
+# Default handling (runs if no flags provided)
+if [[ $# -eq 0 ]]; then
+  add_cpu_vendor
+  add_cpu_name
+fi
+
+# Store arguments to process sequentially after flag configuration
+ARGS_QUEUE=()
+
+while [[ $# -gt 0 ]]; do
+  arg="$1"
+  shift
+
+  if [[ "$arg" == --* ]]; then
+    case "$arg" in
+      --help)                 usage; exit 0 ;;
+      --quote)                USE_QUOTE=1 ;;
+      *)                      ARGS_QUEUE+=("$arg") ;;
+    esac
+  elif [[ "$arg" == -* && ${#arg} -gt 1 ]]; then
+    for (( i=1; i<${#arg}; i++ )); do
+      opt="${arg:$i:1}"
+      case "$opt" in
+        h) usage; exit 0 ;;
+        q) USE_QUOTE=1 ;;
+        *) ARGS_QUEUE+=("-$opt") ;;
+      esac
+    done
+  else
+   usage
+    exit 2
+  fi
+done
+
+# Evaluate standard flags now that formatting style (USE_QUOTE) is completely resolved
+for arg in "${ARGS_QUEUE[@]}"; do
+  case "$arg" in
+    --vendor|-v)            add_cpu_vendor ;;
+    --code|-c)              add_cpu_code ;;
+    --microarchitecture|-l) add_cpu_microarchitecture ;;
+    --name|-n)              add_cpu_name ;;
+    --stepping|-g)          add_cpu_stepping ;;
+    --microcode|-u)         add_cpu_microcode ;;
+    --mhz|-m)               add_cpu_mhz ;;
+    --cache|-s)             add_cpu_cache ;;
+    --cores|-p)             add_cpu_cores ;;
+    --threads|-t)           add_cpu_threads ;;
+    --bugs|-b)              add_cpu_bugs ;;
+    --flags|-f)             add_cpu_flags ;;
+    --all|-a)               IS_ALL=1; add_all ;;
+    *)                      usage; exit 2 ;;
+  esac
+done
+
+# Print final result strings based on configuration styles
+if [[ ${#OUTPUT_VALUES[@]} -gt 0 ]]; then
+  if (( IS_ALL )); then
+    # --all layout style (always line-separated)
+    for (( i=0; i<${#OUTPUT_VALUES[@]}; i++ )); do
+      if (( USE_QUOTE )); then
+        printf '%s\n' "${OUTPUT_VALUES[i]}"
+      else
+        # Aligns columns
+        printf '%-18s %s\n' "${OUTPUT_LABELS[i]}" "${OUTPUT_VALUES[i]}"
+      fi
+    done
+  elif (( USE_QUOTE )); then
+    # Standard multi-flag parsed string for scripts/IFS hooks
+    IFS="'"
+    printf '%s\n' "${OUTPUT_VALUES[*]}"
+  else
+    # Standard multi-flag combo layout for clean CLI display (e.g. -vn)
+    out_array=()
+    for (( i=0; i<${#OUTPUT_VALUES[@]}; i++ )); do
+      out_array+=("${OUTPUT_LABELS[i]} ${OUTPUT_VALUES[i]}")
+    done
+    IFS=" "
+    printf '%s\n' "${out_array[*]}"
+  fi
+fi

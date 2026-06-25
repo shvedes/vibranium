@@ -1,0 +1,48 @@
+#!/usr/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Check whether a battery is present and active in /sys/class/power_supply.
+
+Exit status:
+  0    Battery found and marked as present
+  1    No active battery detected
+
+Options:
+  -h, --help    Show this help and exit
+
+EOF
+}
+
+case "${1:-}" in
+  -h|--help)
+    usage
+    exit 0
+    ;;
+  "")
+    ;;
+  *)
+    print_help
+    exit 2
+    ;;
+esac
+
+for bat in /sys/class/power_supply/BAT*; do
+  if [[ -r $bat/present ]]; then
+    if [[ $(<"$bat"/present) == "1" ]]; then
+      if [[ $(<"$bat"/type) == "Battery" ]]; then
+        exit 0
+      fi
+    fi
+  fi
+done
+
+exit 1
