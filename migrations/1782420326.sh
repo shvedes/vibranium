@@ -36,4 +36,4 @@ EOF2
 fi
 
 sudo cp "$VIBRANIUM/extras/usr/local/bin/su-bridge" /usr/local/bin/
-sudo cp "$VIBRANIUM"/extras/etc/pacman.d/hooks/*.hooks /etc/pacman.d/hooks/
+sudo cp "$VIBRANIUM"/extras/etc/pacman.d/hooks/*.hook /etc/pacman.d/hooks/
