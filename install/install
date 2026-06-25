@@ -162,8 +162,7 @@ helpers::log::info "In addition to performing automatic tasks, the installer wil
 helpers::log::info "a number of yes/no questions to tailor your installation to your needs."
 helpers::log::info ""
 helpers::log::info "Before changing or replacing a file that already exists, the installer"
-helpers::log::info "backs it up first. Your backup files are kept under"
-helpers::log::info "${CYAN}~/.local/state/vibranium/backup${RESET}."
+helpers::log::info "backs it up first. Your backup files are kept under ${CYAN}~/.local/state/vibranium/backup${RESET}."
 helpers::log::info ""
 
 if ! term::ask_yes_no Y "Proceed with Installation?"; then
