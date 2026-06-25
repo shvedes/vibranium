@@ -31,9 +31,8 @@ fi
 # From here on we are running as the target user, not root.
 
 if ! command -v spicetify >/dev/null; then
-  echo "==> ERROR: spicetify is not installed or not on PATH" >&2
-  echo "==> Install it with: yay -S spicetify-cli" >&2
-  exit 1
+  echo "==> Spicetify is not installed; skipping re-patch" >&2
+  exit 0
 fi
 
 echo "==> Checking if Spotify was previously patched"

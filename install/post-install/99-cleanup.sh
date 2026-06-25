@@ -1,19 +1,15 @@
 #!/usr/bin/env bash
 
-if [[ -f /tmp/vibranium-remove-spicetify ]]; then
-  sudo rm /usr/local/bin/patch-spotify
-  sudo rm /etc/pacman.d/hooks/70-spotify.hook
-  sudo rm /etc/pacman.d/hooks/80-spotify.hook
-fi
-
-if [[ -f /tmp/vibranium-remove-vencord ]]; then
-  sudo rm /usr/local/bin/patch-discord
-  sudo rm /etc/pacman.d/hooks/80-discord.hook
+# We have nothing to connect / listen to in a vm.
+if [[ "$CHASSIS_TYPE" == "vm" ]]; then
+  command suod rm -rf /usr/local/bin/vb-android-notify
+  command suod rm -rf /usr/local/bin/vb-battery-alert
+  command suod rm -rf /usr/local/bin/vb-usb-notify
+  command sudo rm -rf /etc/udev/rules.d/*
 fi
 
 yay -Rnsc yay-debug --noconfirm &>/dev/null || true
-yay -Scc --noconfirm &>/dev/null
-yay -Ycc --noconfirm &>/dev/null
+yay -Scc --noconfirm &>/dev/null || true
+yay -Ycc --noconfirm &>/dev/null || true
 
-mkdir -p "$HOME"/.config/vibranium/{startup,shutdown}
-
+mkdir -p "$HOME"/.config/vibranium/{hooks,themed,themes}

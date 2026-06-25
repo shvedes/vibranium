@@ -2,7 +2,7 @@
 
 # Credits: Omarchy
 
-if [[ "$(</sys/class/dmi/id/sys_vendor 2>/dev/nukk)" == "Microsoft Corporation" ]]; then
+if [[ "$(</sys/class/dmi/id/sys_vendor 2>/dev/null)" == "Microsoft Corporation" ]]; then
   if ! vb-hw-match "Surface"; then
     exit 1
   fi

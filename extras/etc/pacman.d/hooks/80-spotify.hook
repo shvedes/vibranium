@@ -7,5 +7,4 @@ Type = Package
 [Action]
 Description = Updating spicetify config
 When = PostTransaction
-Depends = spicetify-cli
 Exec = /usr/local/bin/patch-spotify
