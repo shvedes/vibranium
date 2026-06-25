@@ -31,7 +31,7 @@ export _LOG_FILE="$HOME/vibranium-install.log"
   printf '=== Vibranium Installation Log ===\n'
   printf 'Date    : %s\n' "$(date)"
   printf 'User    : %s\n' "$USER"
-  printf 'Host    : %s\n' "$(hostname)"
+  printf 'Host    : %s\n' "$(hostnamectl hostname)"
   printf 'Chassis : %s\n' "$CHASSIS_TYPE"
   printf '==================================\n\n'
 } > "$_LOG_FILE"

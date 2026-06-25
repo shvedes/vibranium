@@ -9,9 +9,11 @@ fi
 
 gpu_arch="$(<"$arch_state_file")"
 
+
+echo -e "\n\n# The lines below were added by the automatic driver configuration\n#\n" >> "$env_file"
+
 if [[ "$gpu_arch" == "turing_plus" ]]; then
   {
-    echo ""
     echo "# NVIDIA (Turing+ with GSP firmware)"
     echo "NVD_BACKEND=direct"
     echo "LIBVA_DRIVER_NAME=nvidia"
@@ -19,7 +21,6 @@ if [[ "$gpu_arch" == "turing_plus" ]]; then
   } >> "$env_file"
 elif [[ "$gpu_arch" == "maxwell_pascal_volta" ]]; then
   {
-    echo ""
     echo "# NVIDIA (Maxwell/Pascal/Volta without GSP firmware)"
     echo "NVD_BACKEND=egl"
     echo "__GLX_VENDOR_LIBRARY_NAME=nvidia"
