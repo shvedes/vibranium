@@ -43,7 +43,7 @@ echo "Which version would you like to install?"
 echo "  [1] release  - latest stable release (default)"
 echo "  [2] upstream - latest git commit"
 while true; do
-    echo -n "Enter your choice [1/2/3] or press Enter for default: " > /dev/tty
+    echo -n "Enter your choice [1/2] or press Enter for default: " > /dev/tty
     read branch_choice < /dev/tty
 
     case "${branch_choice:-1}" in
