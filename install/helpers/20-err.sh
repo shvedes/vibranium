@@ -70,7 +70,17 @@ helpers::run_step() {
         # Capture output to the log while keeping it visible on the terminal.
         # PIPESTATUS[0] is the exit code of bash itself, not of tee.
         if [[ -n "${_LOG_FILE:-}" ]]; then
-            bash "$script" 2>&1 | tee -a "$_LOG_FILE"
+        # Strip all ANSI escape characters before writing to the log file.
+        # Keep the log  readable.
+            bash "$script" 2>&1 | tee >(
+                local esc=$'\x1b'
+                shopt -s extglob
+                while IFS= read -r line || [[ -n "$line" ]]; do
+                    line="${line//${esc}\[*([0-9;])[A-Za-z]/}"
+                    line="${line//$'\r'/}"
+                    printf '%s\n' "$line"
+                done >> "$_LOG_FILE"
+            )
             exit_code="${PIPESTATUS[0]}"
         else
             bash "$script"
