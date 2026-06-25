@@ -27,13 +27,13 @@ helpers::install_yay() {
 
   if ((rc != 0)); then
     helpers::log::error "${GREEN}makepkg ${YELLOW}-sirc${RESET} returned code $rc"
-    cd $HOME
+    cd "$HOME"
     rm -rf $tmp_dir
     return 1
   fi
 
   helpers::log::info "AUR helper has been installed"
   sleep 1
-  cd $HOME
+  cd "$HOME"
   rm -rf $tmp_dir
 }

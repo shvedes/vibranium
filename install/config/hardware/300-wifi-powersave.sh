@@ -6,7 +6,7 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 0
 fi
 
-if vb-cmd-battery-present; then
+if vb-hw-battery; then
   helpers::write_file /etc/udev/rules.d/99-wifi-powersave.rules << EOF2
 # Laptop specific: toggle Wifi powersave based on charging state
 SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="0", RUN+="$HOME/.local/share/vibranium/bin/vb-cmd-wifi-powersave --on"

@@ -21,7 +21,7 @@ helpers::_sudo_for() {
 # Sets the globals _VB_BK_PATH and _VB_BK_MANIFEST.
 helpers::_resolve_backup_path() {
   local original="$1"
-  local store rel
+  local store rel manifest_dir
 
   if [[ "$original" == "$HOME" || "$original" == "$HOME"/* ]]; then
     store="$_VB_BACKUP_HOME_STORE"
@@ -32,7 +32,11 @@ helpers::_resolve_backup_path() {
   fi
 
   _VB_BK_PATH="$store/$rel"
-  _VB_BK_MANIFEST="$(dirname "$store")/manifest.log"
+
+  manifest_dir="${store%/*}"
+  [[ "$manifest_dir" == "$store" ]] && manifest_dir="."
+
+  _VB_BK_MANIFEST="$manifest_dir/manifest.log"
 }
 
 # Back up a single path (file, directory, or symlink) if it currently
@@ -40,6 +44,7 @@ helpers::_resolve_backup_path() {
 helpers::backup_path() {
   local original="$1"
   local as_root kind
+  local bk_dir manifest_dir
 
   # Nothing on disk, nothing to preserve.
   if [[ ! -e "$original" && ! -L "$original" ]]; then
@@ -49,13 +54,16 @@ helpers::backup_path() {
   helpers::_resolve_backup_path "$original"
 
   # Already captured on an earlier run; never overwrite a real backup
-  # with a possibly already-modified copy.
   if [[ -e "$_VB_BK_PATH" || -L "$_VB_BK_PATH" ]]; then
     return 0
   fi
 
   as_root=$(helpers::_sudo_for "$_VB_BK_PATH")
-  $as_root mkdir -p "$(dirname "$_VB_BK_PATH")"
+
+  bk_dir="${_VB_BK_PATH%/*}"
+  [[ "$bk_dir" == "$_VB_BK_PATH" ]] && bk_dir="."
+
+  $as_root mkdir -p "$bk_dir"
 
   # cp -a preserves permissions, ownership, timestamps, and symlinks.
   if ! $as_root cp -a "$original" "$_VB_BK_PATH" 2>/dev/null; then
@@ -64,14 +72,20 @@ helpers::backup_path() {
   fi
 
   if [[ -L "$original" ]]; then
-    kind=symlink
+    kind="symlink"
   elif [[ -d "$original" ]]; then
-    kind=dir
+    kind="dir"
   else
-    kind=file
+    kind="file"
   fi
 
-  $as_root mkdir -p "$(dirname "$_VB_BK_MANIFEST")"
+  manifest_dir="${_VB_BK_MANIFEST%/*}"
+  if [[ "$manifest_dir" == "$_VB_BK_MANIFEST" ]]; then
+    manifest_dir="."
+  fi
+
+  $as_root mkdir -p "$manifest_dir"
+
   printf '%(%Y-%m-%d %H:%M:%S)T\t%s\t%s\t%s\n' -1 \
     "$original" "$_VB_BK_PATH" "$kind" | $as_root tee -a "$_VB_BK_MANIFEST" >/dev/null
 
@@ -82,11 +96,20 @@ helpers::backup_path() {
 helpers::write_file() {
   local dest="$1"
   local as_root
+  local dir
 
   helpers::backup_path "$dest"
 
+  dir="${dest%/*}"
+
+  if [[ "$dir" == "$dest" ]]; then
+    dir="."
+  elif [[ -z "$dir" ]]; then
+    dir="/"
+  fi
+
   as_root=$(helpers::_sudo_for "$dest")
-  $as_root mkdir -p "$(dirname "$dest")"
+  $as_root mkdir -p "$dir"
   $as_root tee "$dest" >/dev/null
 }
 
@@ -100,6 +123,7 @@ helpers::write_file() {
 helpers::copy() {
   local src="$1" dest="$2"
   local as_root target rel entry
+  local target_dir
 
   as_root=$(helpers::_sudo_for "$dest")
 
@@ -116,7 +140,13 @@ helpers::copy() {
     [[ -d "$dest" ]] && target="$dest/$(basename "$src")"
 
     helpers::backup_path "$target"
-    $as_root mkdir -p "$(dirname "$target")"
+
+    target_dir="${target%/*}"
+    if [[ "$target_dir" == "$target" ]]; then
+      target_dir="."
+    fi
+
+    $as_root mkdir -p "$target_dir"
     $as_root cp -a "$src" "$target"
   fi
 }
@@ -126,6 +156,7 @@ helpers::copy() {
 helpers::symlink() {
   local target="$1" linkpath="$2"
   local as_root
+  local dir
 
   if [[ -L "$linkpath" && "$(readlink "$linkpath")" == "$target" ]]; then
     return 0
@@ -134,7 +165,13 @@ helpers::symlink() {
   helpers::backup_path "$linkpath"
 
   as_root=$(helpers::_sudo_for "$linkpath")
-  $as_root mkdir -p "$(dirname "$linkpath")"
+
+  dir="${linkpath%/*}"
+  if [[ "$dir" == "$linkpath" ]]; then
+    dir="."
+  fi
+
+  $as_root mkdir -p "$dir"
   $as_root ln -sf "$target" "$linkpath"
 }
 
@@ -155,6 +192,8 @@ helpers::sed() {
 helpers::append_once() {
   local file="$1" marker="$2" text="$3"
   local as_root
+  local dir
+
   as_root=$(helpers::_sudo_for "$file")
 
   if [[ -f "$file" ]] && $as_root grep -qF "$marker" "$file" 2>/dev/null; then
@@ -162,7 +201,13 @@ helpers::append_once() {
   fi
 
   helpers::backup_path "$file"
-  $as_root mkdir -p "$(dirname "$file")"
+
+  dir="${file%/*}"
+  if [[ "$dir" == "$file" ]]; then
+    dir="."
+  fi
+
+  $as_root mkdir -p "$dir"
   printf '%s\n' "$text" | $as_root tee -a "$file" >/dev/null
 }
 
@@ -183,9 +228,15 @@ helpers::remove() {
 
 # Print every backup captured so far, across both stores, oldest first.
 helpers::backup_list() {
-  local manifest store
+  local manifest store manifest_dir
+
   for store in "$_VB_BACKUP_HOME_STORE" "$_VB_BACKUP_SYSTEM_STORE"; do
-    manifest="$(dirname "$store")/manifest.log"
+    manifest_dir="${store%/*}"
+    if [[ "$manifest_dir" == "$store" ]]; then
+      manifest_dir="."
+    fi
+
+    manifest="$manifest_dir/manifest.log"
     [[ -f "$manifest" ]] || continue
     cat "$manifest"
   done
@@ -196,6 +247,7 @@ helpers::backup_list() {
 helpers::backup_restore() {
   local original="$1"
   local as_root
+  local dir
 
   helpers::_resolve_backup_path "$original"
 
@@ -205,7 +257,13 @@ helpers::backup_restore() {
   fi
 
   as_root=$(helpers::_sudo_for "$original")
-  $as_root mkdir -p "$(dirname "$original")"
+
+  dir="${original%/*}"
+  if [[ "$dir" == "$original" ]]; then
+    dir="."
+  fi
+
+  $as_root mkdir -p "$dir"
 
   # Clear whatever currently sits at the path first. Without this, cp
   # refuses to write through an existing symlink, and a directory vs.
@@ -213,5 +271,6 @@ helpers::backup_restore() {
   # also fail.
   $as_root rm -rf "$original"
   $as_root cp -a "$_VB_BK_PATH" "$original"
+
   helpers::log::succsess "Restored ${original} from backup"
 }

@@ -91,7 +91,6 @@ python-gobject
 zram-generator
 pacman-contrib
 xdg-user-dirs
-smartmontools
 uwsm
 # Display Manager
 ly

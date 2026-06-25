@@ -2,14 +2,12 @@
 
 case "$CHASSIS_TYPE" in
   laptop | convertible | tablet)
-    MACHINE_TYPE="Laptop / Tablet / Convertible"
     DIRTY_BYTES="134217728"
     DIRTY_BACKGROUND_BYTES="33554432"
     DIRTY_WRITEBACK_CENTISECS="1000"
     ;;
 
   desktop)
-    MACHINE_TYPE="Desktop"
     DIRTY_BYTES="268435456"
     DIRTY_BACKGROUND_BYTES="67108864"
     DIRTY_WRITEBACK_CENTISECS="1500"

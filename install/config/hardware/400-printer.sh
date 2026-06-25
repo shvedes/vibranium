@@ -5,7 +5,10 @@
 
 if helpers::is_vm; then
   exit 0
-elif ! term::ask_yes_no N "Install and configure printing support (CUPS, Avahi)?"; then
+fi
+
+prompt="Install and configure printing support (CUPS, Avahi)?"
+if ! term::ask_yes_no N "$prompt"; then
   exit 0
 fi
 

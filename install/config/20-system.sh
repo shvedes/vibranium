@@ -6,12 +6,16 @@ for entry in "$VIBRANIUM"/extras/etc/*; do
 done
 
 helpers::write_file /etc/modules-load.d/vb-ntsync.conf << EOF2
+# This file was created by Vibranium install scripts.
+# ################################################## #
 # Load ntsync driver for better gaming compatibility with Wine.
 # More info: https://www.phoronix.com/news/Linux-6.14-NTSYNC-Driver-Ready
 ntsync
 EOF2
 
 helpers::write_file /etc/modprobe.d/vb-blacklist.conf << EOF2
+# # This file was created by Vibranium install scripts.
+# #################################################### #
 # Disable hardware watchdog
 blacklist sp5100_tco
 blacklist iTCO_wdt
@@ -24,6 +28,8 @@ EOF2
 helpers::write_file /etc/systemd/zram-generator.conf << EOF2
 # vim:ft=systemd
 # man zram-generator.conf:
+# This file was created by Vibranium install scripts.
+# #################################################### #
 #
 # A piecewise-linear size 1:1 for the first 4G, then 1:2 above, up to a max of 32G:
 #      zram device size
@@ -52,10 +58,27 @@ zram-size = min(min(ram, 4096) + max(ram - 4096, 0) / 2, 32 * 1024)
 compression-algorithm = lzo-rle zstd(level=3) (type=idle)
 EOF2
 
-sudo mkdir -p /etc/polkit-1/rules.d
+helpers::write_file /etc/systemd/system.conf.d/50-fast-shutdown.conf <<EOF2
+# vim:ft=systemd
+# This file was created by Vibranium install scripts.
+# #################################################### #
+[Manager]
+DefaultTimeoutStopSec=5s
+EOF2
+
+helpers::write_file /etc/systemd/system/user@.service.d/50-fast-shutdown.conf <<EOF2
+# vim:ft=systemd
+# This file was created by Vibranium install scripts.
+# #################################################### #
+[Service]
+TimeoutStopSec=5s
+EOF2
 
 helpers::write_file /etc/polkit-1/rules.d/50-vb-udisks2.rules << EOF2
 // vim:ft=javascript
+// This file was created by Vibranium install scripts.
+// ///////////////////////////////////////////////////
+//
 // Mount internal drivers without sudo prompt.
 // Source: https://forum.manjaro.org/t/stable-update-2024-01-13-kernels-systemd-qt5-mesa-dbus-firefox-thunderbird/155007/123
 

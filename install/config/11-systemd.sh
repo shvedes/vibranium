@@ -6,8 +6,6 @@ LOGIND_CONF="/etc/systemd/logind.conf"
 # Long press still shuts down the machine; it's being handled by firmware.
 helpers::sed "$LOGIND_CONF" -E '/^#?HandlePowerKey=/s/^#//;/HandlePowerKey/s/=.*/=ignore/'
 
-sudo mkdir -p /etc/tmpfiles.d
-
 helpers::write_file /etc/tmpfiles.d/coredump.conf << EOF2
 # Clear all coredumps that were created more than 3 days ago
 d /var/lib/systemd/coredump 0755 root root 3d
