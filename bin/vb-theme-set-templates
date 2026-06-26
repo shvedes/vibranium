@@ -42,11 +42,13 @@
 #   {{ key_s }}          saturation as integer percentage 0-100 (e.g. 21)
 #   {{ key_l }}          lightness as integer percentage 0-100 (e.g. 15)
 #   {{ key_hsl }}        H,S,L shorthand (e.g. 240,21,15)
+#   {{ key_w }}          HWB whiteness as integer percentage 0-100 (e.g. 12)
+#   {{ key_hwb }}        H,W,Bk shorthand (e.g. 240,12%,85%)
 #
 #   Alpha channels: use 8-char hex (rrggbbaa CSS order) in the TOML value to
 #   include alpha. {{ key }}, {{ key_strip }}, and {{ key_0x }} pass it through
-#   as-is. All channel variants (_r, _g, _b, _rgb, _h, _s, _l, _hsl) decode
-#   only the first 6 digits and ignore alpha.
+#   as-is. All channel variants (_r, _g, _b, _rgb, _h, _s, _l, _hsl, _w, _hwb)
+#   decode only the first 6 digits and ignore alpha.
 #
 # INLINE COLOR CALCULATIONS
 #   Any key can be extended with one or more pipe-separated operations that are
@@ -78,6 +80,19 @@
 #     saturate=<N>          increases S by N percentage points, clamped to 100
 #     desaturate=<N>        decreases S by N percentage points, clamped to 0
 #     hue=<+/-N>            rotates H by N degrees, wraps around 360
+#
+#   Single-channel scalar keys ({{ key_r }}, {{ key_g }}, {{ key_b }},
+#   {{ key_h }}, {{ key_s }}, {{ key_l }}, {{ key_w }}):
+#     lightness=<value>     shifts or sets the channel's own value directly;
+#                           the op name is reused from the HEX/RGB lightness
+#                           operation for syntax consistency, it is not
+#                           limited to lightness-related channels
+#                             {{ color1_r|lightness=-0.05 }}   shifts R down
+#                             {{ color1_h|lightness=-0.05 }}   shifts H down
+#                             {{ color1_w|lightness=0.3 }}     sets W to 30%
+#     Absolute and relative modes work the same as the HEX/RGB lightness
+#     operation below. R/G/B normalize against 0-255; H/S/L/W normalize
+#     against 0-100, except H wraps modulo 360 instead of clamping.
 #
 #   The lightness operation (HEX and RGB only):
 #     Absolute: lightness=0.75   sets L to exactly 75% (0.0 = black, 1.0 = white)
@@ -264,6 +279,15 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
         printf '{{ %s_s }}\x01%d\n' "$key" "$hsl_s"
         printf '{{ %s_l }}\x01%d\n' "$key" "$hsl_l"
         printf '{{ %s_hsl }}\x01%d,%d%%,%d%%\n' "$key" "$hsl_h" "$hsl_s" "$hsl_l"
+
+        # HWB shares hue with HSL. Whiteness is the minimum channel
+        # (cmin), blackness is the complement of the maximum channel
+        # (1000 - cmax), both rounded from the 0-1000 scale to 0-100.
+        hwb_w=$(((cmin * 100 + 500) / 1000))
+        hwb_bk=$((((1000 - cmax) * 100 + 500) / 1000))
+
+        printf '{{ %s_w }}\x01%d\n' "$key" "$hwb_w"
+        printf '{{ %s_hwb }}\x01%d,%d%%,%d%%\n' "$key" "$hsl_h" "$hwb_w" "$hwb_bk"
       fi
     done <"$src"
   done >"$subs_file"
@@ -304,11 +328,11 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
       # Also skip if the file exists on disk, UNLESS it matches a force entry:
       # a plain "file.ext" entry forces it globally; a "theme/file.ext" entry
       # forces it only when NEXT_THEME_NAME matches the theme prefix.
-      if [[ -z ${seen_outputs[$output_path]+x} ]] && \
-         { [[ ! -f $output_path ]] || \
-           [[ -n ${_force_set[$filename]+x} ]] || \
-           { [[ -n $NEXT_THEME_NAME ]] && \
-             [[ -n ${_force_set[$NEXT_THEME_NAME/$filename]+x} ]]; }; }; then
+      if [[ -z ${seen_outputs[$output_path]+x} ]] &&
+        { [[ ! -f $output_path ]] ||
+          [[ -n ${_force_set[$filename]+x} ]] ||
+          { [[ -n $NEXT_THEME_NAME ]] &&
+            [[ -n ${_force_set[$NEXT_THEME_NAME / $filename]+x} ]]; }; }; then
         printf '%s\x01%s\n' "$tpl" "$output_path" >>"$outmap_file"
         tpl_files+=("$tpl")
         seen_outputs["$output_path"]=1

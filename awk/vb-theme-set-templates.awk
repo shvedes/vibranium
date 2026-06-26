@@ -150,12 +150,23 @@ function hsl_to_rgb(h, s, l,    sn, ln, C, Hp, X, m, r1, g1, b1, hmod2, abshm1, 
 #          magenta=<+/-N>      -- offset M by N percentage points
 #          yellow=<+/-N>       -- offset Y by N percentage points
 #          key=<+/-N>          -- offset K by N percentage points
+#   scalar (_r, _g, _b, _h, _s, _l, _w): lightness=<0.0-1.0>
+#          relative: leading +/- shifts the current value by N (normalized
+#          to the channel's native range, e.g. +0.05 on _r shifts red by
+#          0.05*255). absolute: no sign sets the value directly (normalized
+#          to the channel's native range). _h wraps modulo 360 instead of
+#          clamping; all other channels clamp to their native range. The
+#          op name "lightness" is reused across all scalar channels for
+#          syntax consistency with the hex/rgb lightness operation; it
+#          means "shift this value" regardless of which channel it is.
 #
 # Assumes bash emits RGB as "r,g,b", HSL as "h,s,l", HWB as "h,w,b", and
 # CMYK as "c,m,y,k" (comma-separated; HSL/HWB/CMYK channels carry a literal
-# "%" suffix that AWK's numeric-string coercion (+0) ignores).
+# "%" suffix that AWK's numeric-string coercion (+0) ignores). Single-channel
+# scalar keys (_r, _g, _b, _h, _s, _l, _w) are a bare decimal number with
+# no separators.
 #
-function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt, color_val, n_ops, ops, i, op, eq_pos, op_name, op_val_str, op_val, alpha_str, has_alpha, parts, hex_variant, hex_modified, norm_val, rebuilt) {
+function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt, color_val, n_ops, ops, i, op, eq_pos, op_name, op_val_str, op_val, alpha_str, has_alpha, parts, hex_variant, hex_modified, norm_val, rebuilt, scalar_ch, scalar_val, scalar_lo, scalar_hi) {
   pipe_pos = index(expr, "|")
   if (pipe_pos == 0) return ""
 
@@ -172,10 +183,20 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
   color_val = subs[base_key]
 
   # Detect color format from the suffix of the key string.
+  # Single-channel scalar keys (_r, _g, _b, _h, _s, _l, _w) are checked
+  # before the bare hex fallback since they have no multi-channel suffix
+  # of their own to match against.
   if      (index(base_key, "_rgb }}") > 0)  fmt = "rgb"
   else if (index(base_key, "_hsl }}") > 0)  fmt = "hsl"
   else if (index(base_key, "_hwb }}") > 0)  fmt = "hwb"
   else if (index(base_key, "_cmyk }}") > 0) fmt = "cmyk"
+  else if (index(base_key, "_r }}") > 0)    { fmt = "scalar"; scalar_ch = "r" }
+  else if (index(base_key, "_g }}") > 0)    { fmt = "scalar"; scalar_ch = "g" }
+  else if (index(base_key, "_b }}") > 0)    { fmt = "scalar"; scalar_ch = "b" }
+  else if (index(base_key, "_h }}") > 0)    { fmt = "scalar"; scalar_ch = "h" }
+  else if (index(base_key, "_s }}") > 0)    { fmt = "scalar"; scalar_ch = "s" }
+  else if (index(base_key, "_l }}") > 0)    { fmt = "scalar"; scalar_ch = "l" }
+  else if (index(base_key, "_w }}") > 0)    { fmt = "scalar"; scalar_ch = "w" }
   else                                       fmt = "hex"
 
   # For hex format, also detect which variant bash emitted so we can parse
@@ -215,6 +236,9 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
     _m = parts[2] + 0
     _y = parts[3] + 0
     _k = parts[4] + 0
+  } else if (fmt == "scalar") {
+    # Single decimal number, no comma-separated parts to split.
+    scalar_val = color_val + 0
   } else {
     # Normalize the stored value to #rrggbb before handing it to parse_hex,
     # which always expects a leading '#'.  Each variant needs different handling:
@@ -326,6 +350,35 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
       else if (op_name == "yellow")  _y = clamp(_y + op_val, 0, 100)
       else if (op_name == "key")     _k = clamp(_k + op_val, 0, 100)
 
+    } else if (fmt == "scalar") {
+
+      if (op_name == "lightness") {
+        # R/G/B channels are 0-255, all other channels (H/S/L/W) are 0-100
+        # for normalized purposes; hue additionally wraps mod 360 instead
+        # of clamping.
+        if (scalar_ch == "r" || scalar_ch == "g" || scalar_ch == "b") {
+          scalar_lo = 0; scalar_hi = 255
+        } else {
+          scalar_lo = 0; scalar_hi = 100
+        }
+
+        # A leading '+' or '-' means relative: op_val is a normalized
+        # 0.0-1.0 offset scaled to the channel's native range and added
+        # to the current value. No sign means absolute: op_val is a
+        # normalized 0.0-1.0 target scaled to the channel's native range.
+        if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-") {
+          if (scalar_ch == "h")
+            scalar_val = ((scalar_val + op_val * 360.0) % 360.0 + 360.0) % 360.0
+          else
+            scalar_val = clamp(scalar_val + op_val * (scalar_hi - scalar_lo), scalar_lo, scalar_hi)
+        } else {
+          if (scalar_ch == "h")
+            scalar_val = ((op_val * 360.0) % 360.0 + 360.0) % 360.0
+          else
+            scalar_val = clamp(op_val * (scalar_hi - scalar_lo), scalar_lo, scalar_hi)
+        }
+      }
+
     }
   }
 
@@ -360,6 +413,10 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
 
   if (fmt == "cmyk") {
     return int(_c + 0.5) "%," int(_m + 0.5) "%," int(_y + 0.5) "%," int(_k + 0.5) "%"
+  }
+
+  if (fmt == "scalar") {
+    return int(scalar_val + 0.5)
   }
 
   return ""
