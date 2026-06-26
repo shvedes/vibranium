@@ -244,11 +244,18 @@ _edit_roundness() {
   local dunstrc="$XDG_CONFIG_HOME/dunst/dunstrc"
   local lines=() found=0
   local i
+
   if [[ -f "$dunstrc" ]]; then
     mapfile -t lines < "$dunstrc"
+
     for i in "${!lines[@]}"; do
       if [[ ${lines[i]} =~ ^corner_radius ]]; then
         lines[i]="corner_radius = $input"
+        found=1
+      fi
+
+      if [[ ${lines[i]} =~ ^progress_bar_corner_radius ]]; then
+        lines[i]="progress_bar_corner_radius = $input"
         found=1
       fi
     done
