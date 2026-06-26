@@ -559,6 +559,17 @@ hl.bind(mainMod .. " + B", hl.dsp.exec_raw("vb-core-power --next"), { descriptio
 
 hl.bind("XF86Calculator", hl.dsp.exec_raw("vb-util-calc"), { description = "Toggle calculator" })
 
+hl.bind("SUPER + CTRL + equal", function()
+  Hypr.Helpers.ScaleStep(1)
+end, { description = "Increase active display scale" })
+
+hl.bind("SUPER + CTRL + minus", function()
+  Hypr.Helpers.ScaleStep(-1)
+end, { description = "Decrease active display scale" })
+
+hl.bind("SUPER + CTRL + 0", function()
+  hl.dispatch(hl.dsp.exec_raw("hyprctl -q reload"))
+end, { description = "Decrease active display scale" })
 
 -- System monitoring
 

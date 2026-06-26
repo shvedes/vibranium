@@ -194,3 +194,84 @@ function Hypr.Helpers.WindowToggleFreeze()
     verb
   )))
 end
+
+-- Hyprland (via the Wayland fractional-scale protocol) quantizes monitor
+-- scale to multiples of 1/120, on top of requiring the scale to divide
+-- both monitor dimensions into whole logical pixels. A scale of k/120
+-- satisfies both requirements exactly when k divides
+--
+-- 120 * gcd(width, height), so valid k values are the divisors of that
+-- number, this is checked with plain integer division, no float epsilon
+-- needed.
+local SCALE_DENOMINATOR = 120
+
+-- Lowest scale allowed. Prevents stepping down into impractically tiny
+-- logical resolutions, and as a side effect keeps scale from ever
+-- reaching zero or negative.
+local SCALE_MIN = 0.5
+
+-- Highest scale allowed, prevents stepping up into impractically huge
+-- logical resolutions
+local SCALE_MAX = 3.0
+
+-- Greatest common divisor of two integers
+local function Gcd(a, b)
+  while b ~= 0 do
+    a, b = b, a % b
+  end
+  return a
+end
+
+-- Steps the active monitor's scale to the next value that is both a
+-- multiple of 1/120 and divides the monitor resolution into whole
+-- logical pixels. direction must be 1 to increase scale or -1 to
+-- decrease it.
+function Hypr.Helpers.ScaleStep(direction)
+  local monitor = hl.get_active_monitor()
+  if monitor == nil then
+    return
+  end
+
+  local width = math.floor(monitor.width + 0.5)
+  local height = math.floor(monitor.height + 0.5)
+
+  -- The number every valid k must divide
+  local valid_multiple = SCALE_DENOMINATOR * Gcd(width, height)
+
+  local k_min = math.ceil(SCALE_MIN * SCALE_DENOMINATOR)
+  local k_max = math.floor(SCALE_MAX * SCALE_DENOMINATOR)
+
+  -- Snap the current scale onto the nearest 1/120 multiple first, so
+  -- this still behaves correctly even if the scale was set to something
+  -- off grid by another tool
+  local k = math.floor((monitor.scale * SCALE_DENOMINATOR) + 0.5)
+
+  local new_scale = nil
+
+  while true do
+    k = k + direction
+
+    if k < k_min or k > k_max then
+      break
+    end
+
+    if valid_multiple % k == 0 then
+      new_scale = k / SCALE_DENOMINATOR
+      break
+    end
+  end
+
+  if new_scale == nil then
+    return
+  end
+
+  hl.monitor({
+    output = monitor.name,
+    scale = string.format("%.10f", new_scale),
+  })
+
+  hl.notification.create({
+    text = string.format("Display scale: %.4g", new_scale),
+    timeout = 1.5,
+  })
+end
