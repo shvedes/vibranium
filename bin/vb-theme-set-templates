@@ -18,7 +18,7 @@
 #   Two template types share the same directory:
 #     foo.tpl               -- plain template, works with both color sets
 #     foo.extended.tpl      -- extended template, skipped when only basic
-#                             colors are available
+#                              colors are available
 #
 #   When both foo.tpl and foo.extended.tpl exist, the extended variant wins
 #   (processed first; the plain one is skipped via the output file guard).
@@ -125,8 +125,8 @@
 #     than silently producing empty or broken values.
 #   - Operations that are not defined for a given format (e.g. alpha on an
 #     HSL key) are silently ignored; the color is still substituted.
-#   - The alpha operation on HEX keys produces an 8-character #rrggbbaa
-#     string. Configs that do not accept 8-character hex will break.
+#   - The alpha operation on HEX keys produces an 8-character #rrggbbaa string.
+#     Configs that do not accept 8-character hex will break.
 #   - Hue rotation and saturation on achromatic colors (pure greys, S=0)
 #     have no visible effect since both H and S are zero for those colors.
 
@@ -141,14 +141,16 @@ COLORS_EXTENDED_FILE="$NEXT_THEME_DIR/colors-extended.toml"
 NEXT_THEME_NAME=$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")
 
 # Built-in files that are always regenerated from templates even when the
-# theme already provides them.  Normally an existing file prevents template
+# theme already provides them.
+# Normally an existing file prevents template
 # output; entries in this array bypass that check so the template wins.
 # User-defined entries are merged in below from settings.advanced.
 force_template_files=()
 
 # Source settings.advanced to pick up vb_force_template_files.
 # This script can run without a pre-loaded settings environment, so we source
-# explicitly here.  Re-sourcing a settings-only file is harmless; all it does
+# explicitly here.
+# Re-sourcing a settings-only file is harmless; all it does
 # is reassign the same variables to the same values.
 _settings_adv="$XDG_CONFIG_HOME/vibranium/settings.advanced"
 [[ -f $_settings_adv ]] && source "$_settings_adv"
@@ -165,7 +167,6 @@ force_template_files+=(
 # Collect color sources: always start with the base file, then layer
 # extended on top when available (extended keys override base on collision)
 color_sources=()
-
 [[ -f $COLORS_FILE ]] && color_sources+=("$COLORS_FILE")
 [[ -f $COLORS_EXTENDED_FILE ]] && color_sources+=("$COLORS_EXTENDED_FILE")
 
@@ -175,6 +176,8 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
   # SOH (\x01) is the field separator between placeholder and value.
   # Neither placeholder syntax ({{ name }}) nor any color/font value can
   # contain that byte, so no escaping is needed.
+  #
+  # Pass 1: Build the raw substitution table (No math, just base keys)
   subs_file="$VIBRANIUM_RUNTIME/${0##*/}.subs"
 
   for src in "${color_sources[@]}"; do
@@ -194,101 +197,8 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
       value="${value#*[\"\']}"
       value="${value%%[\"\']*}"
 
-      printf '{{ %s }}\x01%s\n' "$key" "$value"
-      printf '{{ %s_strip }}\x01%s\n' "$key" "${value#\#}"
-      printf '{{ %s_upper }}\x01%s\n' "$key" "${value^^}"
-      printf '{{ %s_lower }}\x01%s\n' "$key" "${value,,}"
-
-      if [[ $value =~ ^# ]]; then
-        hex="${value#\#}"
-
-        # Inline hex -> decimal channel conversion
-        r=$((16#${hex:0:2}))
-        g=$((16#${hex:2:2}))
-        b=$((16#${hex:4:2}))
-
-        printf '{{ %s_0x }}\x010x%s\n' "$key" "$hex"
-        printf '{{ %s_rgb }}\x01%d,%d,%d\n' "$key" "$r" "$g" "$b"
-        printf '{{ %s_r }}\x01%d\n' "$key" "$r"
-        printf '{{ %s_g }}\x01%d\n' "$key" "$g"
-        printf '{{ %s_b }}\x01%d\n' "$key" "$b"
-
-        R=$(((r * 1000 + 127) / 255))
-        G=$(((g * 1000 + 127) / 255))
-        B=$(((b * 1000 + 127) / 255))
-
-        # Determine cmax, cmin, and which channel is dominant (for hue)
-        if ((R >= G && R >= B)); then
-          cmax=$R hue_ch=r
-        elif ((G >= B)); then
-          cmax=$G hue_ch=g
-        else
-          cmax=$B hue_ch=b
-        fi
-        if ((R <= G && R <= B)); then
-          cmin=$R
-        elif ((G <= B)); then
-          cmin=$G
-        else
-          cmin=$B
-        fi
-        delta=$((cmax - cmin))
-
-        # Lightness 0-100 (rounded via +500 before /1000)
-        hsl_l=$((((cmax + cmin) * 50 + 500) / 1000))
-
-        # Saturation 0-100 (rounded); delta==0 means achromatic
-        if ((delta == 0)); then
-          hsl_s=0
-        else
-          abs2l=$((cmax + cmin - 1000))
-          ((abs2l < 0)) && abs2l=$((-abs2l))
-          denom=$((1000 - abs2l)) # 1000 × (1 − |2L−1|)
-          hsl_s=$(((delta * 100 + denom / 2) / denom))
-        fi
-
-        # Hue 0-359 (integer degrees).
-        # The ×1000 scale cancels exactly in each branch's division.
-        if ((delta == 0)); then
-          hsl_h=0
-        elif [[ $hue_ch == r ]]; then
-          num=$(((G - B) * 60))
-          if ((num >= 0)); then
-            hsl_h=$(((num + delta / 2) / delta))
-          else
-            hsl_h=$(((num - delta / 2) / delta))
-          fi
-          ((hsl_h < 0)) && hsl_h=$((hsl_h + 360))
-        elif [[ $hue_ch == g ]]; then
-          num=$(((B - R) * 60))
-          if ((num >= 0)); then
-            hsl_h=$(((num + delta / 2) / delta + 120))
-          else
-            hsl_h=$(((num - delta / 2) / delta + 120))
-          fi
-        else
-          num=$(((R - G) * 60))
-          if ((num >= 0)); then
-            hsl_h=$(((num + delta / 2) / delta + 240))
-          else
-            hsl_h=$(((num - delta / 2) / delta + 240))
-          fi
-        fi
-
-        printf '{{ %s_h }}\x01%d\n' "$key" "$hsl_h"
-        printf '{{ %s_s }}\x01%d\n' "$key" "$hsl_s"
-        printf '{{ %s_l }}\x01%d\n' "$key" "$hsl_l"
-        printf '{{ %s_hsl }}\x01%d,%d%%,%d%%\n' "$key" "$hsl_h" "$hsl_s" "$hsl_l"
-
-        # HWB shares hue with HSL. Whiteness is the minimum channel
-        # (cmin), blackness is the complement of the maximum channel
-        # (1000 - cmax), both rounded from the 0-1000 scale to 0-100.
-        hwb_w=$(((cmin * 100 + 500) / 1000))
-        hwb_bk=$((((1000 - cmax) * 100 + 500) / 1000))
-
-        printf '{{ %s_w }}\x01%d\n' "$key" "$hwb_w"
-        printf '{{ %s_hwb }}\x01%d,%d%%,%d%%\n' "$key" "$hsl_h" "$hwb_w" "$hwb_bk"
-      fi
+      # Output format: key\x01value
+      printf '%s\x01%s\n' "$key" "$value"
     done <"$src"
   done >"$subs_file"
 
@@ -306,13 +216,16 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
   # Collect templates that need processing and write a tpl->output map for awk.
   #
   # Priority: user templates before built-in, extended before plain within
-  # each dir.  Because all rendering is batched into one awk call, nothing is
+  # each dir.
+  # Because all rendering is batched into one awk call, nothing is
   # written to disk during this loop, so "! -f output_path" alone would not
-  # deduplicate within the run.  seen_outputs covers that case.
+  # deduplicate within the run.
+  # seen_outputs covers that case.
   outmap_file="$VIBRANIUM_RUNTIME/${0##*/}.outmap"
   declare -A seen_outputs
   tpl_files=()
 
+  # Pass 2: Collect templates
   for tpl_dir in "$USER_TEMPLATES_DIR" "$TEMPLATES_DIR"; do
     for tpl in "$tpl_dir"/*.extended.tpl "$tpl_dir"/*.tpl; do
       filename="${tpl##*/}"            # strip directory path
@@ -326,8 +239,8 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
 
       # Skip if already claimed by a higher-priority template in this run.
       # Also skip if the file exists on disk, UNLESS it matches a force entry:
-      # a plain "file.ext" entry forces it globally; a "theme/file.ext" entry
-      # forces it only when NEXT_THEME_NAME matches the theme prefix.
+      # a plain "file.ext" entry forces it globally;
+      # a "theme/file.ext" entry forces it only when NEXT_THEME_NAME matches the theme prefix.
       if [[ -z ${seen_outputs[$output_path]+x} ]] &&
         { [[ ! -f $output_path ]] ||
           [[ -n ${_force_set[$filename]+x} ]] ||
@@ -340,6 +253,7 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
     done
   done
 
+  # Pass 3: Evaluate everything through AWK
   if ((${#tpl_files[@]} > 0)); then
     awk -f "$VIBRANIUM/awk/vb-theme-set-templates.awk" \
       "$subs_file" "$outmap_file" "${tpl_files[@]}"

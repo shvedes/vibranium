@@ -1,15 +1,111 @@
 #!/usr/bin/awk
 
-# Literal string replacement: replace every occurrence of 'from' in 'str'
-# with 'to', treating all characters as plain literals (no regex).
-function lit_replace(str, from, to,    result, pos) {
-  result = ""
-  while ((pos = index(str, from)) > 0) {
-    result = result substr(str, 1, pos - 1) to
-    str    = substr(str, pos + length(from))
-  }
-  return result str
-}
+# ==============================================================================
+# VIBRANIUM TEMPLATE REPLAY ENGINE (AWK IMPLEMENTATION)
+# ==============================================================================
+# Reads a pre-processed substitution table and an output file mapping, then
+# tokenizes and evaluates theme template files in a single fast execution pass.
+#
+# TEMPLATE SYNTAX
+#   {{ key }}            value as-is (e.g. #1e1e2e)
+#   {{ key_strip }}      value with leading # removed (e.g. 1e1e2e)
+#   {{ key_upper }}      value uppercased (e.g. #1E1E2E)
+#   {{ key_lower }}      value lowercased (e.g. #1e1e2e)
+#
+#   Hex color keys only (values starting with #):
+#   {{ key_0x }}         0x-prefixed hex; alpha byte passed through if present
+#                          background = "#1e1e2e"    ->  0x1e1e2e
+#                          shadow     = "#1e1e2ecc"  ->  0x1e1e2ecc
+#   {{ key_r }}          red channel as decimal (e.g. 30)
+#   {{ key_g }}          green channel as decimal (e.g. 30)
+#   {{ key_b }}          blue channel as decimal (e.g. 46)
+#   {{ key_rgb }}        decimal channels (e.g. 30,30,46)
+#   {{ key_h }}          hue as integer degrees 0-359 (e.g. 240)
+#   {{ key_s }}          saturation as integer percentage 0-100 (e.g. 21)
+#   {{ key_l }}          lightness as integer percentage 0-100 (e.g. 15)
+#   {{ key_hsl }}        H,S,L shorthand (e.g. 240,21,15)
+#   {{ key_w }}          HWB whiteness as integer percentage 0-100 (e.g. 12)
+#   {{ key_hwb }}        H,W,Bk shorthand (e.g. 240,12%,85%)
+#
+#   Alpha channels: use 8-char hex (rrggbbaa CSS order) in the TOML value to
+#   include alpha. {{ key }}, {{ key_strip }}, and {{ key_0x }} pass it through
+#   as-is. All channel variants (_r, _g, _b, _rgb, _h, _s, _l, _hsl, _w, _hwb)
+#   decode only the first 6 digits and ignore alpha.
+#
+# INLINE COLOR CALCULATIONS
+#   Any key can be extended with one or more pipe-separated operations that are
+#   evaluated at substitution time and replaced with a final computed value.
+#   The base key before the first | must be a key that exists in the subs table
+#   (format suffix included). Operations are applied left to right.
+#
+#   Syntax: {{ base_key|op=val|op=val }}
+#
+#   HEX keys ({{ key }}, {{ key_strip }}, {{ key_upper }}, {{ key_0x }}):
+#     alpha=<0.0-1.0>       appends a two-digit hex alpha byte
+#                             {{ color4|alpha=0.5 }}    ->  #1e1e2eff -> #1e1e2e80
+#     lightness=<value>     round-trips through HSL to set or shift L;
+#                           output is re-encoded in the same variant format
+#                           (strip stays strip, upper stays upper, etc.)
+#
+#   RGB keys ({{ key_rgb }}):
+#     alpha=<0.0-1.0>       appends alpha as a literal float fourth channel
+#                             {{ color4_rgb|alpha=0.6 }}   ->  30,30,46,0.6
+#     red=<+/-N>            offsets the red channel by N, clamped to 0-255
+#     green=<+/-N>          offsets the green channel by N, clamped to 0-255
+#     blue=<+/-N>           offsets the blue channel by N, clamped to 0-255
+#     lightness=<value>     round-trips through HSL to set or shift L,
+#                           then rebuilds RGB; hue and saturation are preserved
+#
+#   HSL keys ({{ key_hsl }}):
+#     lighten=<N>           increases L by N percentage points, clamped to 100
+#     darken=<N>            decreases L by N percentage points, clamped to 0
+#     saturate=<N>          increases S by N percentage points, clamped to 100
+#     desaturate=<N>        decreases S by N percentage points, clamped to 0
+#     hue=<+/-N>            rotates H by N degrees, wraps around 360
+#
+#   Single-channel scalar keys ({{ key_r }}, {{ key_g }}, {{ key_b }},
+#   {{ key_h }}, {{ key_s }}, {{ key_l }}, {{ key_w }}):
+#     lightness=<value>     shifts or sets the channel's own value directly;
+#                           the op name is reused from the HEX/RGB lightness
+#                           operation for syntax consistency, it is not
+#                           limited to lightness-related channels
+#                             {{ color1_r|lightness=-0.05 }}   shifts R down
+#                             {{ color1_h|lightness=-0.05 }}   shifts H down
+#                             {{ color1_w|lightness=0.3 }}     sets W to 30%
+#     Absolute and relative modes work the same as the HEX/RGB lightness
+#     operation below. R/G/B normalize against 0-255; H/S/L/W normalize
+#     against 0-100, except H wraps modulo 360 instead of clamping.
+#
+#   The lightness operation (HEX and RGB only):
+#     Absolute: lightness=0.75   sets L to exactly 75% (0.0 = black, 1.0 = white)
+#     Relative: lightness=+0.15  shifts current L up by 15 percentage points
+#               lightness=-0.10  shifts current L down by 10 percentage points
+#     The presence of a leading + or - determines the mode.
+#
+#   Number format:
+#     Both 0.20 and .20 are accepted. Integer values like alpha=1 are treated
+#     as 1.0. The sign is part of the value string, not a separate token.
+#
+#   Order of operations:
+#     Applied strictly left to right. Order matters when two operations affect
+#     the same channel. In particular, channel offsets (red/green/blue) applied
+#     before lightness will be overwritten during the HSL rebuild -- apply them
+#     after lightness if both are needed.
+#       {{ color4_rgb|lightness=0.8|blue=-30 }}   correct: offset survives
+#       {{ color4_rgb|blue=-30|lightness=0.8 }}   wrong: offset is discarded
+#
+# WARNINGS
+#   - Unknown {{ key }} placeholders with no pipe operator are left as-is in
+#     the output. Pipe expressions whose base key is not found in the subs
+#     table are also left verbatim, making resolution failures visible rather
+#     than silently producing empty or broken values.
+#   - Operations that are not defined for a given format (e.g. alpha on an
+#     HSL key) are silently ignored; the color is still substituted.
+#   - The alpha operation on HEX keys produces an 8-character #rrggbbaa string.
+#     Configs that do not accept 8-character hex will break.
+#   - Hue rotation and saturation on achromatic colors (pure greys, S=0)
+#     have no visible effect since both H and S are zero for those colors.
+# ==============================================================================
 
 # Clamp value v to the closed interval [lo, hi].
 function clamp(v, lo, hi) {
@@ -20,12 +116,7 @@ function clamp(v, lo, hi) {
 function hex_char_val(c,    lc) {
   lc = tolower(c)
   if (lc >= "0" && lc <= "9") return lc + 0
-  if (lc == "a") return 10
-  if (lc == "b") return 11
-  if (lc == "c") return 12
-  if (lc == "d") return 13
-  if (lc == "e") return 14
-  if (lc == "f") return 15
+  if (lc >= "a" && lc <= "f") return 10 + index("abcdef", lc) - 1
   return 0
 }
 
@@ -38,7 +129,7 @@ function int_to_hex2(n,    iv, digits) {
 
 # Parse a "#rrggbb" string into globals _r, _g, _b (integers 0-255).
 function parse_hex(hex) {
-  hex = substr(hex, 2)  # drop the leading '#'
+  hex = substr(hex, 2) # drop the leading '#'
   _r = hex_char_val(substr(hex, 1, 1)) * 16 + hex_char_val(substr(hex, 2, 1))
   _g = hex_char_val(substr(hex, 3, 1)) * 16 + hex_char_val(substr(hex, 4, 1))
   _b = hex_char_val(substr(hex, 5, 1)) * 16 + hex_char_val(substr(hex, 6, 1))
@@ -46,7 +137,7 @@ function parse_hex(hex) {
 
 # Convert integer RGB (0-255 each) to HSL.
 # Assumes: r, g, b are the only arguments; all other names are locals.
-# Sets globals: _h (0-360), _s (0-100), _l (0-100).
+# Sets globals: _h (0-360), _s (0-100), _l (0-100), and provisions HWB parameters.
 function rgb_to_hsl(r, g, b,    rn, gn, bn, cmax, cmin, delta, lv, abs2l1, max_ch) {
   rn = r / 255.0
   gn = g / 255.0
@@ -55,12 +146,16 @@ function rgb_to_hsl(r, g, b,    rn, gn, bn, cmax, cmin, delta, lv, abs2l1, max_c
   # Track which channel is dominant so hue can be computed without
   # floating-point equality comparisons on derived values.
   if (rn >= gn && rn >= bn) { cmax = rn; max_ch = "r" }
-  else if (gn >= bn)         { cmax = gn; max_ch = "g" }
-  else                       { cmax = bn; max_ch = "b" }
+  else if (gn >= bn)        { cmax = gn; max_ch = "g" }
+  else                      { cmax = bn; max_ch = "b" }
 
-  cmin  = (rn <= gn && rn <= bn) ? rn : (gn <= bn ? gn : bn)
+  cmin = (rn <= gn && rn <= bn) ? rn : (gn <= bn ? gn : bn)
   delta = cmax - cmin
-  lv    = (cmax + cmin) / 2.0
+  lv = (cmax + cmin) / 2.0
+
+  # Setup HWB parameters globally
+  _w = cmin * 100.0
+  _bk = (1.0 - cmax) * 100.0
 
   # Achromatic colors (greys) have no meaningful hue or saturation.
   if (delta < 0.000001) {
@@ -94,8 +189,8 @@ function hsl_to_rgb(h, s, l,    sn, ln, C, Hp, X, m, r1, g1, b1, hmod2, abshm1, 
   if (abs2l1 < 0) abs2l1 = -abs2l1
   C = (1.0 - abs2l1) * sn
 
-  Hp     = h / 60.0
-  hmod2  = Hp % 2.0
+  Hp = h / 60.0
+  hmod2 = Hp % 2.0
   abshm1 = hmod2 - 1.0
   if (abshm1 < 0) abshm1 = -abshm1
   X = C * (1.0 - abshm1)
@@ -108,264 +203,159 @@ function hsl_to_rgb(h, s, l,    sn, ln, C, Hp, X, m, r1, g1, b1, hmod2, abshm1, 
   else if (Hp < 5) { r1=X; g1=0; b1=C }
   else             { r1=C; g1=0; b1=X }
 
-  m  = ln - C / 2.0
-  _r = int((r1 + m) * 255.0 + 0.5)
-  _g = int((g1 + m) * 255.0 + 0.5)
-  _b = int((b1 + m) * 255.0 + 0.5)
-
-  _r = clamp(_r, 0, 255)
-  _g = clamp(_g, 0, 255)
-  _b = clamp(_b, 0, 255)
+  m = ln - C / 2.0
+  _r = clamp(int((r1 + m) * 255.0 + 0.5), 0, 255)
+  _g = clamp(int((g1 + m) * 255.0 + 0.5), 0, 255)
+  _b = clamp(int((b1 + m) * 255.0 + 0.5), 0, 255)
 }
 
-# Evaluate one pipe expression and return the final color string.
-#
-# 'expr' is the stripped content between {{ and }}, already confirmed to
-# contain at least one '|', e.g. "background_0_hsl|lighten=+15" or
-# "red_rgb|alpha=0.8|blue=-26".
-#
-# The base key (the part before the first '|') is looked up in the subs
-# table exactly as bash would have emitted it. The format (hex/rgb/hsl) is
-# inferred from the key suffix.
-#
-# Returns the computed string, or "" if the base key is unknown or the
-# format cannot be parsed.
-#
-# Supported operations per format:
-#   hex  : alpha=<0.0-1.0>     -- appends two-digit hex alpha byte
-#   rgb  : alpha=<0.0-1.0>     -- appends literal float as fourth channel
-#          red=<+/-N>          -- offset red channel, clamped to 0-255
-#          green=<+/-N>        -- offset green channel, clamped to 0-255
-#          blue=<+/-N>         -- offset blue channel, clamped to 0-255
-#          lightness=<0.0-1.0> -- set HSL L absolutely, rebuild RGB
-#   hsl  : lighten=<N>         -- increase L by N percentage points
-#          darken=<N>          -- decrease L by N percentage points
-#          saturate=<N>        -- increase S by N percentage points
-#          desaturate=<N>      -- decrease S by N percentage points
-#          hue=<+/-N>          -- rotate H by N degrees
-#   hwb  : hue=<+/-N>          -- rotate H by N degrees
-#          whiten=<N>          -- increase W by N percentage points
-#          blacken=<N>         -- increase B by N percentage points
-#   cmyk : cyan=<+/-N>         -- offset C by N percentage points
-#          magenta=<+/-N>      -- offset M by N percentage points
-#          yellow=<+/-N>       -- offset Y by N percentage points
-#          key=<+/-N>          -- offset K by N percentage points
-#   scalar (_r, _g, _b, _h, _s, _l, _w): lightness=<0.0-1.0>
-#          relative: leading +/- shifts the current value by N (normalized
-#          to the channel's native range, e.g. +0.05 on _r shifts red by
-#          0.05*255). absolute: no sign sets the value directly (normalized
-#          to the channel's native range). _h wraps modulo 360 instead of
-#          clamping; all other channels clamp to their native range. The
-#          op name "lightness" is reused across all scalar channels for
-#          syntax consistency with the hex/rgb lightness operation; it
-#          means "shift this value" regardless of which channel it is.
-#
-# Assumes bash emits RGB as "r,g,b", HSL as "h,s,l", HWB as "h,w,b", and
-# CMYK as "c,m,y,k" (comma-separated; HSL/HWB/CMYK channels carry a literal
-# "%" suffix that AWK's numeric-string coercion (+0) ignores). Single-channel
-# scalar keys (_r, _g, _b, _h, _s, _l, _w) are a bare decimal number with
-# no separators.
-#
-function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt, color_val, n_ops, ops, i, op, eq_pos, op_name, op_val_str, op_val, alpha_str, has_alpha, parts, hex_variant, hex_modified, norm_val, rebuilt, scalar_ch, scalar_val, scalar_lo, scalar_hi) {
-  pipe_pos = index(expr, "|")
-  if (pipe_pos == 0) return ""
+# Computes and resolves a token inner expression explicitly requested by the scanner.
+# e.g., "color1_hsl | lighten=10" or a plain key token like "background".
+# Supports format detection, hex variations, single-channel scalars, and full pipeline processing.
+function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fmt, hex_variant, scalar_ch, raw_val, has_alpha, alpha_str, n_ops, ops, i, op, eq_pos, op_name, op_val_str, op_val, hex_modified, rebuilt, scalar_val, scalar_lo, scalar_hi) {
+  pipe_pos = index(inner_expr, "|")
+  if (pipe_pos > 0) {
+    base_part = substr(inner_expr, 1, pipe_pos - 1)
+    ops_str   = substr(inner_expr, pipe_pos + 1)
+  } else {
+    base_part = inner_expr
+    ops_str   = ""
+  }
 
-  base_part = substr(expr, 1, pipe_pos - 1)
-  ops_str   = substr(expr, pipe_pos + 1)
-
-  # Trim trailing whitespace from the base key part so "key | op" also works.
+  # Trim leading/trailing whitespace from the base key part so "key | op" works smoothly.
+  sub(/^[[:space:]]+/, "", base_part)
   sub(/[[:space:]]+$/, "", base_part)
 
-  # Reconstruct the full substitution key with the standard {{ }} delimiters.
-  base_key = "{{ " base_part " }}"
+  # Lazy format evaluation structure
+  fmt = "hex"
+  hex_variant = "plain"
+  scalar_ch = ""
+  base_key = base_part
 
+  # Detect the expected color format from the key suffix.
+  # Single-channel scalar keys are evaluated before bare hex fallback mappings.
+  if (base_key in subs) {
+    # Exact base dictionary match verified
+  } else if (sub(/_strip$/, "", base_key)) { hex_variant = "strip" }
+  else if (sub(/_upper$/, "", base_key))   { hex_variant = "upper" }
+  else if (sub(/_lower$/, "", base_key))   { hex_variant = "lower" }
+  else if (sub(/_0x$/, "", base_key))      { hex_variant = "0x" }
+  else if (sub(/_rgb$/, "", base_key))     { fmt = "rgb" }
+  else if (sub(/_hsl$/, "", base_key))     { fmt = "hsl" }
+  else if (sub(/_hwb$/, "", base_key))     { fmt = "hwb" }
+  else if (sub(/_r$/, "", base_key))       { fmt = "scalar"; scalar_ch = "r" }
+  else if (sub(/_g$/, "", base_key))       { fmt = "scalar"; scalar_ch = "g" }
+  else if (sub(/_b$/, "", base_key))       { fmt = "scalar"; scalar_ch = "b" }
+  else if (sub(/_h$/, "", base_key))       { fmt = "scalar"; scalar_ch = "h" }
+  else if (sub(/_s$/, "", base_key))       { fmt = "scalar"; scalar_ch = "s" }
+  else if (sub(/_l$/, "", base_key))       { fmt = "scalar"; scalar_ch = "l" }
+  else if (sub(/_w$/, "", base_key))       { fmt = "scalar"; scalar_ch = "w" }
+  else return ""
+
+  # If the resolved base component is absent from our substitutions database, drop execution.
   if (!(base_key in subs)) return ""
-  color_val = subs[base_key]
+  raw_val = subs[base_key]
 
-  # Detect color format from the suffix of the key string.
-  # Single-channel scalar keys (_r, _g, _b, _h, _s, _l, _w) are checked
-  # before the bare hex fallback since they have no multi-channel suffix
-  # of their own to match against.
-  if      (index(base_key, "_rgb }}") > 0)  fmt = "rgb"
-  else if (index(base_key, "_hsl }}") > 0)  fmt = "hsl"
-  else if (index(base_key, "_hwb }}") > 0)  fmt = "hwb"
-  else if (index(base_key, "_cmyk }}") > 0) fmt = "cmyk"
-  else if (index(base_key, "_r }}") > 0)    { fmt = "scalar"; scalar_ch = "r" }
-  else if (index(base_key, "_g }}") > 0)    { fmt = "scalar"; scalar_ch = "g" }
-  else if (index(base_key, "_b }}") > 0)    { fmt = "scalar"; scalar_ch = "b" }
-  else if (index(base_key, "_h }}") > 0)    { fmt = "scalar"; scalar_ch = "h" }
-  else if (index(base_key, "_s }}") > 0)    { fmt = "scalar"; scalar_ch = "s" }
-  else if (index(base_key, "_l }}") > 0)    { fmt = "scalar"; scalar_ch = "l" }
-  else if (index(base_key, "_w }}") > 0)    { fmt = "scalar"; scalar_ch = "w" }
-  else                                       fmt = "hex"
-
-  # For hex format, also detect which variant bash emitted so we can parse
-  # the value correctly (each variant has a different prefix) and emit the
-  # result in the matching format.
-  #   plain / lower  ->  #rrggbb   (parse_hex handles both; tolower inside)
-  #   upper          ->  #RRGGBB   (same, tolower inside parse_hex)
-  #   strip          ->   rrggbb   (no '#'; parse_hex would drop first digit)
-  #   0x             ->  0xrrggbb  (parse_hex would drop '0', leaving xrrggbb)
-  if (fmt == "hex") {
-    if      (index(base_key, "_strip }}") > 0) hex_variant = "strip"
-    else if (index(base_key, "_upper }}") > 0) hex_variant = "upper"
-    else if (index(base_key, "_0x }}")   > 0) hex_variant = "0x"
-    else                                        hex_variant = "plain"
+  # Guard check for non-hex values (e.g. font string options or raw literals)
+  if (raw_val !~ /^#/) {
+    if (ops_str != "" || fmt != "hex") return ""
+    if (hex_variant == "upper") return toupper(raw_val)
+    if (hex_variant == "lower") return tolower(raw_val)
+    if (hex_variant == "strip") { sub(/^#/, "", raw_val); return raw_val }
+    return raw_val
   }
 
-  # Parse the stored color value into working globals.
-  if (fmt == "rgb") {
-    split(color_val, parts, ",")
-    _r = int(parts[1] + 0)
-    _g = int(parts[2] + 0)
-    _b = int(parts[3] + 0)
-  } else if (fmt == "hsl") {
-    split(color_val, parts, ",")
-    _h = parts[1] + 0
-    _s = parts[2] + 0
-    _l = parts[3] + 0
-  } else if (fmt == "hwb") {
-    # "%" suffixes on parts[2]/parts[3] are dropped by AWK's +0 coercion.
-    split(color_val, parts, ",")
-    _h  = parts[1] + 0
-    _w  = parts[2] + 0
-    _bk = parts[3] + 0
-  } else if (fmt == "cmyk") {
-    split(color_val, parts, ",")
-    _c = parts[1] + 0
-    _m = parts[2] + 0
-    _y = parts[3] + 0
-    _k = parts[4] + 0
-  } else if (fmt == "scalar") {
-    # Single decimal number, no comma-separated parts to split.
-    scalar_val = color_val + 0
-  } else {
-    # Normalize the stored value to #rrggbb before handing it to parse_hex,
-    # which always expects a leading '#'.  Each variant needs different handling:
-    #   strip -> bare hex digits, prepend '#'
-    #   0x    -> "0x" prefix, replace with '#'
-    #   plain/upper/lower -> already start with '#', pass through
-    if      (hex_variant == "strip") norm_val = "#" color_val
-    else if (hex_variant == "0x")    norm_val = "#" substr(color_val, 3)
-    else                             norm_val = color_val
-
-    if (length(norm_val) < 7 || substr(norm_val, 1, 1) != "#") return ""
-    parse_hex(norm_val)
+  # Populate standard working globals
+  parse_hex(raw_val)
+  if (fmt != "hex" || ops_str != "") {
+    rgb_to_hsl(_r, _g, _b)
   }
 
+  # Synchronize specific current scalar dimension targeting
+  if (fmt == "scalar") {
+    if (scalar_ch == "r")      scalar_val = _r
+    else if (scalar_ch == "g") scalar_val = _g
+    else if (scalar_ch == "b") scalar_val = _b
+    else if (scalar_ch == "h") scalar_val = _h
+    else if (scalar_ch == "s") scalar_val = _s
+    else if (scalar_ch == "l") scalar_val = _l
+    else if (scalar_ch == "w") scalar_val = _w
+  }
+
+  has_alpha = 0
   alpha_str = ""
-  has_alpha  = 0
+  hex_modified = 0
 
-  n_ops = split(ops_str, ops, "|")
+  # Evaluate pipeline operational modifications sequentially from left to right
+  if (ops_str != "") {
+    n_ops = split(ops_str, ops, "|")
+    for (i = 1; i <= n_ops; i++) {
+      op = ops[i]
+      sub(/^[[:space:]]+/, "", op)
+      sub(/[[:space:]]+$/, "", op)
+      eq_pos = index(op, "=")
+      if (eq_pos == 0) continue
 
-  for (i = 1; i <= n_ops; i++) {
-    op = ops[i]
-    sub(/^[[:space:]]+/, "", op)
-    sub(/[[:space:]]+$/, "", op)
+      op_name = substr(op, 1, eq_pos - 1)
+      op_val_str = substr(op, eq_pos + 1)
 
-    eq_pos = index(op, "=")
-    if (eq_pos == 0) continue
+      # Coerce string tokens cleanly into arithmetic context representations
+      op_val = op_val_str + 0
 
-    op_name    = substr(op, 1, eq_pos - 1)
-    op_val_str = substr(op, eq_pos + 1)
-
-    # AWK converts "+15" and "-26" correctly via arithmetic context.
-    op_val = op_val_str + 0
-
-    if (fmt == "hex") {
-
-      if (op_name == "alpha") {
-        # Convert the 0.0-1.0 float to a two-digit hex byte and
-        # store it for appending to the #rrggbb value.
-        alpha_str = int_to_hex2(int(clamp(op_val, 0.0, 1.0) * 255.0 + 0.5))
-        has_alpha = 1
-      } else if (op_name == "lightness") {
-        # Round-trip through HSL exactly like the RGB path.
-        # A leading sign means relative adjustment (offset from current L);
-        # no sign means absolute target in the 0.0-1.0 range.
-        rgb_to_hsl(_r, _g, _b)
-        if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-")
-          _l = clamp(_l + op_val * 100.0, 0, 100)
-        else
-          _l = clamp(op_val * 100.0, 0, 100)
-        hsl_to_rgb(_h, _s, _l)
-        # Signal that _r/_g/_b now differ from color_val and must be
-        # re-encoded rather than returning the original hex string.
-        hex_modified = 1
-      }
-
-    } else if (fmt == "rgb") {
-
-      if (op_name == "alpha") {
-        # Preserve the original string literal so "0.60" stays "0.60",
-        # which is important for consumers that treat the field as text.
-        alpha_str = op_val_str
-        has_alpha = 1
-      } else if (op_name == "red") {
-        _r = int(clamp(_r + op_val, 0, 255))
-      } else if (op_name == "green") {
-        _g = int(clamp(_g + op_val, 0, 255))
-      } else if (op_name == "blue") {
-        _b = int(clamp(_b + op_val, 0, 255))
-      } else if (op_name == "lightness") {
-        # Always round-trip through HSL so the current L is available
-        # regardless of whether the adjustment is relative or absolute.
-        rgb_to_hsl(_r, _g, _b)
-
-        # A leading '+' or '-' in the raw string means relative adjustment:
-        # op_val is treated as a signed offset in 0.0-1.0 units added to
-        # the current lightness. Without a sign prefix, it is an absolute
-        # target (0.0 = black, 0.5 = mid, 1.0 = white).
-        if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-")
-          _l = clamp(_l + op_val * 100.0, 0, 100)
-        else
-          _l = clamp(op_val * 100.0, 0, 100)
-
-        hsl_to_rgb(_h, _s, _l)
-      }
-
-    } else if (fmt == "hsl") {
-
-      if      (op_name == "lighten")    _l = clamp(_l + op_val, 0, 100)
-      else if (op_name == "darken")     _l = clamp(_l - op_val, 0, 100)
-      else if (op_name == "saturate")   _s = clamp(_s + op_val, 0, 100)
-      else if (op_name == "desaturate") _s = clamp(_s - op_val, 0, 100)
-      else if (op_name == "hue") {
-        # Double modulo to handle negative rotations cleanly.
-        _h = ((_h + op_val) % 360.0 + 360.0) % 360.0
-      }
-
-    } else if (fmt == "hwb") {
-
-      if      (op_name == "whiten")  _w  = clamp(_w + op_val, 0, 100)
-      else if (op_name == "blacken") _bk = clamp(_bk + op_val, 0, 100)
-      else if (op_name == "hue") {
-        _h = ((_h + op_val) % 360.0 + 360.0) % 360.0
-      }
-
-    } else if (fmt == "cmyk") {
-
-      if      (op_name == "cyan")    _c = clamp(_c + op_val, 0, 100)
-      else if (op_name == "magenta") _m = clamp(_m + op_val, 0, 100)
-      else if (op_name == "yellow")  _y = clamp(_y + op_val, 0, 100)
-      else if (op_name == "key")     _k = clamp(_k + op_val, 0, 100)
-
-    } else if (fmt == "scalar") {
-
-      if (op_name == "lightness") {
-        # R/G/B channels are 0-255, all other channels (H/S/L/W) are 0-100
-        # for normalized purposes; hue additionally wraps mod 360 instead
-        # of clamping.
+      if (fmt == "hex") {
+        if (op_name == "alpha") {
+          # Transmute relative 0.0-1.0 floating point alpha metrics to hex pairs
+          alpha_str = int_to_hex2(int(clamp(op_val, 0.0, 1.0) * 255.0 + 0.5))
+          has_alpha = 1
+        } else if (op_name == "lightness") {
+          # Check for relative offset operation modifications (+/-) vs absolute target values
+          if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-")
+            _l = clamp(_l + op_val * 100.0, 0, 100)
+          else
+            _l = clamp(op_val * 100.0, 0, 100)
+          hsl_to_rgb(_h, _s, _l)
+          hex_modified = 1
+        }
+      } else if (fmt == "rgb") {
+        if (op_name == "alpha") {
+          # Maintain precise matching literal float format strings for text processors
+          alpha_str = op_val_str
+          has_alpha = 1
+        } else if (op_name == "red") {
+          _r = int(clamp(_r + op_val, 0, 255))
+          rgb_to_hsl(_r, _g, _b)
+        } else if (op_name == "green") {
+          _g = int(clamp(_g + op_val, 0, 255))
+          rgb_to_hsl(_r, _g, _b)
+        } else if (op_name == "blue") {
+          _b = int(clamp(_b + op_val, 0, 255))
+          rgb_to_hsl(_r, _g, _b)
+        } else if (op_name == "lightness") {
+          if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-")
+            _l = clamp(_l + op_val * 100.0, 0, 100)
+          else
+            _l = clamp(op_val * 100.0, 0, 100)
+          hsl_to_rgb(_h, _s, _l)
+        }
+      } else if (fmt == "hsl") {
+        if      (op_name == "lighten")    _l = clamp(_l + op_val, 0, 100)
+        else if (op_name == "darken")     _l = clamp(_l - op_val, 0, 100)
+        else if (op_name == "saturate")   _s = clamp(_s + op_val, 0, 100)
+        else if (op_name == "desaturate") _s = clamp(_s - op_val, 0, 100)
+        else if (op_name == "hue")        _h = ((_h + op_val) % 360.0 + 360.0) % 360.0
+      } else if (fmt == "hwb") {
+        if      (op_name == "whiten")  _w = clamp(_w + op_val, 0, 100)
+        else if (op_name == "blacken") _bk = clamp(_bk + op_val, 0, 100)
+        else if (op_name == "hue")     _h = ((_h + op_val) % 360.0 + 360.0) % 360.0
+      } else if (fmt == "scalar" && op_name == "lightness") {
+        # Standard native scaling boundaries lookup selection logic setup
         if (scalar_ch == "r" || scalar_ch == "g" || scalar_ch == "b") {
           scalar_lo = 0; scalar_hi = 255
         } else {
           scalar_lo = 0; scalar_hi = 100
         }
 
-        # A leading '+' or '-' means relative: op_val is a normalized
-        # 0.0-1.0 offset scaled to the channel's native range and added
-        # to the current value. No sign means absolute: op_val is a
-        # normalized 0.0-1.0 target scaled to the channel's native range.
+        # Scalar channel computations. Hue rotates/wraps, all other options clamp.
         if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-") {
           if (scalar_ch == "h")
             scalar_val = ((scalar_val + op_val * 360.0) % 360.0 + 360.0) % 360.0
@@ -378,23 +368,24 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
             scalar_val = clamp(op_val * (scalar_hi - scalar_lo), scalar_lo, scalar_hi)
         }
       }
-
     }
   }
 
-  # Emit the result in the same format as the base key.
+  # Build out and emit formatting representations matching request specifications
   if (fmt == "hex") {
     if (hex_modified) {
-      # Re-encode the modified channels and apply the same prefix/casing
-      # that the original variant used, so the output stays a drop-in
-      # replacement for what the plain (no-pipe) key would have produced.
-      rebuilt = int_to_hex2(_r) int_to_hex2(_g) int_to_hex2(_b) (has_alpha ? alpha_str : "")
-      if      (hex_variant == "strip") return rebuilt
-      else if (hex_variant == "upper") return "#" toupper(rebuilt)
-      else if (hex_variant == "0x")    return "0x" rebuilt
-      else                             return "#" rebuilt
+      rebuilt = int_to_hex2(_r) int_to_hex2(_g) int_to_hex2(_b)
+    } else {
+      rebuilt = substr(raw_val, 2)
+      if (has_alpha && length(rebuilt) == 8) rebuilt = substr(rebuilt, 1, 6)
     }
-    return color_val (has_alpha ? alpha_str : "")
+    if (has_alpha) rebuilt = rebuilt alpha_str
+
+    if (hex_variant == "strip") return rebuilt
+    if (hex_variant == "upper") return "#" toupper(rebuilt)
+    if (hex_variant == "lower") return "#" tolower(rebuilt)
+    if (hex_variant == "0x")    return "0x" rebuilt
+    return "#" rebuilt
   }
 
   if (fmt == "rgb") {
@@ -402,34 +393,16 @@ function resolve_pipe_expr(expr,    pipe_pos, base_part, base_key, ops_str, fmt,
     return _r "," _g "," _b
   }
 
-  if (fmt == "hsl") {
-    # Round to integers to match the format bash emits.
-    return int(_h + 0.5) "," int(_s + 0.5) "," int(_l + 0.5)
-  }
-
-  if (fmt == "hwb") {
-    return int(_h + 0.5) "," int(_w + 0.5) "%," int(_bk + 0.5) "%"
-  }
-
-  if (fmt == "cmyk") {
-    return int(_c + 0.5) "%," int(_m + 0.5) "%," int(_y + 0.5) "%," int(_k + 0.5) "%"
-  }
-
-  if (fmt == "scalar") {
-    return int(scalar_val + 0.5)
-  }
+  if (fmt == "hsl")    return int(_h + 0.5) "," int(_s + 0.5) "," int(_l + 0.5)
+  if (fmt == "hwb")    return int(_h + 0.5) "," int(_w + 0.5) "%," int(_bk + 0.5) "%"
+  if (fmt == "scalar") return int(scalar_val + 0.5)
 
   return ""
 }
 
-# Scan 'line' for any {{ ... | ... }} tokens that survived the literal
-# substitution pass (meaning they are computed expressions, not plain keys)
-# and resolve them one by one, left to right.
-#
-# Tokens without '|' that are still unresolved are left verbatim so that
-# unknown keys remain visible rather than silently disappearing.
-#
-function resolve_pipe_exprs(line,    result, rest, open_pos, close_pos, full_tok, inner, resolved) {
+# The single-pass tokenization loop scanning lines left to right
+# Unresolved keys stay unmodified inside the templates so that visibility constraints remain clear.
+function process_line(line,    result, rest, open_pos, close_pos, full_tok, inner, resolved) {
   result = ""
   rest   = line
 
@@ -443,21 +416,15 @@ function resolve_pipe_exprs(line,    result, rest, open_pos, close_pos, full_tok
     close_pos = index(rest, "}}")
     if (close_pos == 0) { result = result rest; break }
 
-    # Capture the full token including its delimiters.
     full_tok = substr(rest, 1, close_pos + 1)
-
-    # Isolate the inner content: skip the leading "{{" (2 chars), read up
-    # to but not including "}}"; the length is therefore close_pos - 3.
     inner = substr(rest, 3, close_pos - 3)
-    sub(/^[[:space:]]+/, "", inner)
-    sub(/[[:space:]]+$/, "", inner)
 
-    if (index(inner, "|") > 0) {
-      resolved = resolve_pipe_expr(inner)
-      # On failure, preserve the original token so the error stays visible.
-      result = result (resolved != "" ? resolved : full_tok)
+    resolved = resolve_token(inner)
+
+    # If successfully evaluated append value; otherwise preserve the original token as-is
+    if (resolved != "") {
+      result = result resolved
     } else {
-      # No pipe operator: not a computed expression, leave it untouched.
       result = result full_tok
     }
 
@@ -467,25 +434,23 @@ function resolve_pipe_exprs(line,    result, rest, open_pos, close_pos, full_tok
   return result
 }
 
+# ARGV[1]: Substitution variables map database entries file
 FILENAME == ARGV[1] {
   sep = index($0, "\x01")
   subs[substr($0, 1, sep - 1)] = substr($0, sep + 1)
   next
 }
 
+# ARGV[2]: Output file execution routing directories mapping file
 FILENAME == ARGV[2] {
   sep = index($0, "\x01")
   outmap[substr($0, 1, sep - 1)] = substr($0, sep + 1)
   next
 }
 
+# Route current stream context onto target file pointers
 FNR == 1 { outfile = outmap[FILENAME] }
 
 {
-  line = $0
-  # Pass 1: fast literal substitution from the pre-built subs table.
-  for (k in subs) line = lit_replace(line, k, subs[k])
-  # Pass 2: evaluate any remaining computed pipe expressions.
-  line = resolve_pipe_exprs(line)
-  print line > outfile
+  print process_line($0) > outfile
 }
