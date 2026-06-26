@@ -1,8 +1,22 @@
 #!/usr/bin/env bash
 
-PERCENT=20
-URGENCY="normal"
+PERCENT=""
+URGENCY=""
 FORCE=0
+
+SCRIPT_NAME="${0##*/}"
+
+# Thresholds and their urgency are built into the script, so it has
+# everything it needs in a single standalone invocation with no args.
+# Order matters: when several thresholds are crossed in one run, the
+# last one processed is the one left visible (see -r below).
+KNOWN_THRESHOLDS=(25 15 5)
+
+declare -A THRESHOLD_URGENCY=(
+  [25]="normal"
+  [15]="critical"
+  [5]="critical"
+)
 
 shcat() {
   while IFS= read -r line; do
@@ -12,16 +26,18 @@ shcat() {
 
 usage() {
   shcat <<-EOF
-	Usage: ${0##*/} [OPTION]...
+	Usage: ${SCRIPT_NAME} [OPTION]...
 
-	Send a desktop notification to the active non-root user when battery
-	capacity reaches a given threshold. Meant to be invoked by udev on
-	power_supply uevents, one invocation per threshold.
+	Send a desktop notification when battery capacity reaches a low threshold.
+	Meant to be invoked by udev on power_supply uevents.
 
-	  -p, --percent=PERCENT   battery threshold (default: 20)
-	  -u, --urgency=LEVEL     low, normal, critical
-	  -f, --force             ignore state file
-	  -h, --help              show help
+	With no options, every built-in threshold (${KNOWN_THRESHOLDS[*]}) is
+	checked in one run, each with its own built-in urgency.
+
+	  -p, --percent=PERCENT   Check only this threshold instead of all built-in ones
+	  -u, --urgency=LEVEL     Low, normal, critical; overrides the built-in urgency
+	  -f, --force             Ignore existing notified state
+	  -h, --help              Show this help and exit
 	EOF
 }
 
@@ -68,30 +84,25 @@ while [[ $# -gt 0 ]]; do
     ;;
 
   *)
-    printf '%s: unknown option: %s\n' "${0##*/}" "$1" >&2
+    printf '%s: unknown option: %s\n' "$SCRIPT_NAME" "$1" >&2
     exit 1
     ;;
   esac
 done
 
-case "$URGENCY" in
-low | normal | critical)
-  ;;
-*)
-  printf '%s: urgency must be low, normal, or critical\n' "${0##*/}" >&2
-  exit 1
-  ;;
-esac
-
-if [[ "$PERCENT" =~ ^[0-9]+$ ]]; then
-  :
-else
-  printf '%s: percent must be integer\n' "${0##*/}" >&2
-  exit 1
+if [[ -n "$URGENCY" ]]; then
+  case "$URGENCY" in
+  low | normal | critical)
+    ;;
+  *)
+    printf '%s: urgency must be low, normal, or critical\n' "$SCRIPT_NAME" >&2
+    exit 1
+    ;;
+  esac
 fi
 
-if [[ "$EUID" -ne 0 ]]; then
-  printf '%s: must run as root\n' "${0##*/}" >&2
+if [[ -n "$PERCENT" ]] && ! [[ "$PERCENT" =~ ^[0-9]+$ ]]; then
+  printf '%s: percent must be integer\n' "$SCRIPT_NAME" >&2
   exit 1
 fi
 
@@ -104,7 +115,7 @@ for CANDIDATE in /sys/class/power_supply/*; do
 done
 
 if [[ ${#BATTERY_PATHS[@]} -eq 0 ]]; then
-  printf '%s: no battery found\n' "${0##*/}" >&2
+  printf '%s: no battery found\n' "$SCRIPT_NAME" >&2
   exit 1
 fi
 
@@ -124,75 +135,158 @@ for BAT in "${BATTERY_PATHS[@]}"; do
   fi
 done
 
-CAPACITY=$((TOTAL_NOW * 100 / TOTAL_FULL))
-
-COMPOSITOR_PID="$(pidof Hyprland)"
-
-if [[ -z "$COMPOSITOR_PID" ]]; then
-  printf '%s: Hyprland not running\n' "${0##*/}" >&2
-  exit 1
+if [[ -z "$VIBRANIUM_RUNTIME" ]]; then
+  VIBRANIUM_RUNTIME="${XDG_RUNTIME_DIR:-/run/user/$EUID}/vibranium"
 fi
 
-mapfile -d '' ENV_ENTRIES <"/proc/$COMPOSITOR_PID/environ"
+if ! [[ -d "$VIBRANIUM_RUNTIME" ]]; then
+  mkdir -p "$VIBRANIUM_RUNTIME"
+fi
 
-TARGET_HOME=""
-VIBRANIUM_RUNTIME=""
+# Single state file for this script, one notified threshold per line.
+STATE_FILE="$VIBRANIUM_RUNTIME/${SCRIPT_NAME}.state"
+NOTIFIED=()
 
-for ENTRY in "${ENV_ENTRIES[@]}"; do
-  case "$ENTRY" in
-  HOME=*) TARGET_HOME="${ENTRY#HOME=}" ;;
-  VIBRANIUM_RUNTIME=*) VIBRANIUM_RUNTIME="${ENTRY#VIBRANIUM_RUNTIME=}" ;;
-  esac
+if [[ -f "$STATE_FILE" ]]; then
+  while IFS= read -r LINE; do
+    [[ -n "$LINE" ]] || continue
+    NOTIFIED+=("$LINE")
+  done <"$STATE_FILE"
+fi
 
-  if [[ -n "$TARGET_HOME" ]]; then
-    if [[ -n "$VIBRANIUM_RUNTIME" ]]; then
+# Drop entries for thresholds no longer in KNOWN_THRESHOLDS.
+FILTERED=()
+
+for ENTRY in "${NOTIFIED[@]}"; do
+  for KNOWN in "${KNOWN_THRESHOLDS[@]}"; do
+    if [[ "$ENTRY" == "$KNOWN" ]]; then
+      FILTERED+=("$ENTRY")
       break
     fi
-  fi
+  done
 done
 
-TARGET_USER="${TARGET_HOME##*/}"
+NOTIFIED=("${FILTERED[@]}")
 
-if [[ -z "$TARGET_USER" ]]; then
-  printf '%s: no user session found\n' "${0##*/}" >&2
-  exit 1
-fi
+is_notified() {
+  local CANDIDATE="$1"
+  local ENTRY
 
-if [[ "$TARGET_USER" == "root" ]]; then
-  printf '%s: refusing root session\n' "${0##*/}" >&2
-  exit 1
-fi
+  for ENTRY in "${NOTIFIED[@]}"; do
+    if [[ "$ENTRY" == "$CANDIDATE" ]]; then
+      return 0
+    fi
+  done
 
-if [[ -z "$VIBRANIUM_RUNTIME" ]]; then
-  printf '%s: missing runtime env\n' "${0##*/}" >&2
-  exit 1
-fi
+  return 1
+}
 
-STATE_FILE="${VIBRANIUM_RUNTIME}/battery-notify-${PERCENT}.state"
+remove_notified() {
+  local CANDIDATE="$1"
+  local ENTRY
+  local RESULT=()
 
-if ((CAPACITY > PERCENT)); then
-  if [[ -e "$STATE_FILE" ]]; then
-    rm -f "$STATE_FILE"
+  for ENTRY in "${NOTIFIED[@]}"; do
+    if [[ "$ENTRY" != "$CANDIDATE" ]]; then
+      RESULT+=("$ENTRY")
+    fi
+  done
+
+  NOTIFIED=("${RESULT[@]}")
+}
+
+add_notified() {
+  local CANDIDATE="$1"
+
+  if ! is_notified "$CANDIDATE"; then
+    NOTIFIED+=("$CANDIDATE")
   fi
+}
+
+write_state() {
+  if [[ ${#NOTIFIED[@]} -eq 0 ]]; then
+    rm -f "$STATE_FILE"
+  else
+    printf '%s\n' "${NOTIFIED[@]}" >"$STATE_FILE"
+  fi
+}
+
+# Reset, or notify for, a single threshold against the current capacity.
+process_threshold() {
+  local THRESH="$1"
+  local THIS_URGENCY="$2"
+  local TIME
+
+  if ((CAPACITY > THRESH)); then
+    remove_notified "$THRESH"
+    return
+  fi
+
+  if is_notified "$THRESH" && ((FORCE != 1)); then
+    return
+  fi
+
+  if [[ "$THIS_URGENCY" == "critical" ]]; then
+    TIME=0
+  else
+    TIME=15000
+  fi
+
+  add_notified "$THRESH"
+
+  if [[ "$THIS_URGENCY" == "critical" ]]; then
+    if ((CAPACITY <= 5)); then
+      local message="The battery at less than 5%!"
+    else
+      local message="The battery is at ${CAPACITY}%"
+    fi
+  fi
+
+  notify-send -u "$THIS_URGENCY" -t "$TIME" -r 4455 \
+    "You Are Low On Battery" "$message"
+}
+
+CAPACITY=$((TOTAL_NOW * 100 / TOTAL_FULL))
+
+# Clear all notified thresholds while the system is charging.
+# This allows notifications to trigger again after unplugging.
+if [[ -f /sys/class/power_supply/AC/online ]] &&
+  [[ "$(</sys/class/power_supply/AC/online)" == 1 ]]; then
+  NOTIFIED=()
+  write_state
   exit 0
 fi
 
-if [[ -e "$STATE_FILE" ]]; then
-  if ((FORCE == 1)); then
-    :
-  else
-    exit 0
+# Fallback charging detection for systems where AC is unavailable.
+CHARGING=0
+
+for BAT in "${BATTERY_PATHS[@]}"; do
+  if [[ -f "$BAT/status" ]] && [[ "$(<"$BAT/status")" == "Charging" ]]; then
+    CHARGING=1
+    break
   fi
+done
+
+if ((CHARGING == 1)); then
+  NOTIFIED=()
+  write_state
+  exit 0
 fi
 
-if [[ "$URGENCY" == "critical" ]]; then
-  TIME=30000
+if [[ -n "$PERCENT" ]]; then
+  THRESHOLDS_TO_CHECK=("$PERCENT")
 else
-  TIME=15000
+  THRESHOLDS_TO_CHECK=("${KNOWN_THRESHOLDS[@]}")
 fi
 
-sudo -u "$TARGET_USER" env "${ENV_ENTRIES[@]}" \
-  notify-send -u "$URGENCY" -t "$TIME" -r 4455 \
-  "You're Low On Battery" "The Battery at ${CAPACITY}%"
+for THRESH in "${THRESHOLDS_TO_CHECK[@]}"; do
+  if [[ -n "$URGENCY" ]]; then
+    THIS_URGENCY="$URGENCY"
+  else
+    THIS_URGENCY="${THRESHOLD_URGENCY[$THRESH]:-normal}"
+  fi
 
-: >"$STATE_FILE"
+  process_threshold "$THRESH" "$THIS_URGENCY"
+done
+
+write_state
