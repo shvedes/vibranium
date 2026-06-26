@@ -99,6 +99,10 @@ tooltip, tooltip label {
   opacity: 0.5
 }
 
+#battery.warning, #battery.critical {
+  color: @urgent;
+}
+
 #bluetooth.connected {
   opacity: 1
 }
