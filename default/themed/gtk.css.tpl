@@ -2,7 +2,7 @@
 @define-color foreground {{ foreground }};
 
 @define-color accent {{ accent }};
-@define-color black {{ color0 }};
+@define-color black {{ background|lightness=+0.02 }};
 @define-color red {{ color1 }};
 @define-color green {{ color2 }};
 @define-color yellow {{ color3 }};

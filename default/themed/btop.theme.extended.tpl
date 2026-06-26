@@ -1,28 +1,20 @@
 theme[main_bg]="{{ background_0 }}"
-
 theme[main_fg]="{{ foreground_0 }}"
-
 theme[title]="{{ foreground_0 }}"
-
 theme[hi_fg]="{{ accent }}"
 
-theme[selected_bg]="{{ background_2 }}"
-
+theme[selected_bg]="{{ background_1 }}"
 theme[selected_fg]="{{ accent }}"
-
 theme[inactive_fg]="{{ gray }}"
 
 theme[graph_text]="{{ gray_bright }}"
-
-theme[meter_bg]="{{ gray }}"
-
+theme[meter_bg]="{{ gray_dim }}"
 theme[proc_misc]="{{ foreground_0 }}"
 
-theme[cpu_box]="{{ gray_bright }}"
-theme[mem_box]="{{ gray_bright }}"
-theme[net_box]="{{ gray_bright }}"
-theme[proc_box]="{{ gray_bright }}"
-
+theme[cpu_box]="{{ gray_dim }}"
+theme[mem_box]="{{ gray_dim }}"
+theme[net_box]="{{ gray_dim }}"
+theme[proc_box]="{{ gray_dim }}"
 theme[div_line]="{{ gray_dim }}"
 
 theme[temp_start]="{{ green }}"
@@ -60,4 +52,3 @@ theme[upload_end]="{{ blue }}"
 theme[process_start]="{{ cyan }}"
 theme[process_mid]="{{ blue }}"
 theme[process_end]="{{ purple }}"
-

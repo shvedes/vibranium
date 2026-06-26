@@ -29,45 +29,20 @@
   --accent-l: {{ accent_l }}%;
 
   --text-normal: {{ foreground_0 }};
-
   --link-external-color: {{ blue }};
   --link-external-color-hover: {{ purple }};
 
-  /* Main document background, settings background */
   --color-base-00:  {{ background_0 }};
-
   --color-base-05:  {{ background_0 }};
-
-  /* Code block color, options' island background */
   --color-base-10:  {{ background_1 }};
-
-  /* Background of  left & right section, context menu, canvas's drag icons background */
-  --color-base-20:  rgba(calc({{ background_1_r }} * 0.8), calc({{ background_1_g }} * 0.8), calc({{ background_1_b }} * 0.8));
-
-  /* Input field background */
-  --color-base-25:  rgba(calc({{ background_0_r }} * 0.8), calc({{ background_0_g }} * 0.8), calc({{ background_0_b }} * 0.8));
-
-  /* Top bar background, section border, canva's grid color
-   * non accent-colored button background */
+  --color-base-20:  {{ background_1 }};
+  --color-base-25:  {{ background_2 }};
   --color-base-30:  {{ background_2 }};
-
-   /* Background of inactive toggles, borders of some UI elements,
-   * hover background on *some* buttons */
   --color-base-35:  {{ background_3 }};
-
-  /* Mostly UI borders */
   --color-base-40:  {{ background_3 }};
-
-  /* Some UI elements color */
   --color-base-50:  {{ background_5 }};
-
-  --color-base-60: {{ foreground_2 }};
-
-  /* Text color in non-document places */
-  --color-base-70: {{ foreground_1 }};
-
-  /* Couldn't find it, but according to the default Obsidian theme,
-   * this is equal to text color, as well as base-70 and base-60  */
+  --color-base-60:  {{ foreground_2 }};
+  --color-base-70:  {{ foreground_1 }};
   --color-base-100: {{ foreground_0 }};
 }
 
@@ -78,7 +53,7 @@
 }
 
 .setting-group .setting-item {
-  border-top: 1px solid {{ background_2 }};
+  border-top: 1px solid {{ background_3 }};
 }
 
 /* vim: set ft=css: */

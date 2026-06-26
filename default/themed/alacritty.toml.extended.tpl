@@ -1,7 +1,7 @@
 [colors.primary]
 background = "{{ background_0 }}"
 foreground = "{{ foreground_0 }}"
-dim_foreground = "{{ background_h }}"
+dim_foreground = "{{ foreground_4 }}"
 bright_foreground = "{{ foreground_h }}"
 
 [colors.cursor]
@@ -57,7 +57,7 @@ cyan    = "{{ cyan_bright }}"
 white   = "{{ white_bright }}"
 
 [colors.dim]
-black   = "{{ black_dim }}"
+black   = "{{ background_3 }}"
 red     = "{{ red_dim }}"
 green   = "{{ green_dim }}"
 yellow  = "{{ yellow_dim }}"

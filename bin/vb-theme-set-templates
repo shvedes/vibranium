@@ -1,134 +1,186 @@
 #!/usr/bin/bash
 
-# COLORS FILE
-#   Reads colors from one of two TOML files in $NEXT_THEME_DIR:
-#     colors.toml           -- base palette, base16 keys (color0-color15,
-#                             foreground, background, cursor, ...)
-#     colors-extended.toml  -- named semantic keys (accent, selection, ...)
+# VIBRANIUM THEME TEMPLATES
 #
-#   Both files are loaded when available and their keys are merged.
-#   The two files use disjoint key namespaces by convention, so collisions
-#   do not occur in practice.
+# If you ended up reading this file because you went looking for how your
+# theme actually gets applied to your config files, you are in the right
+# place. This script is the one that takes the colors from your current
+# theme and writes them into every app's config file. The actual color
+# math (lightening a color, rotating a hue, and so on) lives in a separate
+# awk script that this file calls at the very end; you do not need to know
+# awk to use any of what is described below.
 #
-# TEMPLATES
-#   Templates live in (user dir takes priority over built-in):
-#     $XDG_CONFIG_HOME/vibranium/themed/   -- user templates
-#     $VIBRANIUM/default/themed/           -- built-in templates
+# WHERE YOUR COLORS COME FROM
 #
-#   Two template types share the same directory:
-#     foo.tpl               -- plain template, works with both color sets
-#     foo.extended.tpl      -- extended template, skipped when only basic
-#                              colors are available
+#   Every theme directory can contain up to two files:
 #
-#   When both foo.tpl and foo.extended.tpl exist, the extended variant wins
-#   (processed first; the plain one is skipped via the output file guard).
-#   Output filename for both is foo (both suffixes are stripped).
+#     colors.toml
+#       The base palette. Sixteen numbered colors (color0 through color15,
+#       following the standard base16 color order) plus a handful of named
+#       ones: foreground, background, cursor, accent, selection_foreground,
+#       selection_background. This is the file format most community
+#       themes ship with, since it matches what Omarchy uses.
 #
-# TEMPLATE SYNTAX
-#   {{ key }}            value as-is (e.g. #1e1e2e)
-#   {{ key_strip }}      value with leading # removed (e.g. 1e1e2e)
-#   {{ key_upper }}      value uppercased (e.g. #1E1E2E)
-#   {{ key_lower }}      value lowercased (e.g. #1e1e2e)
+#     colors-extended.toml
+#       A Vibranium-specific file with a much larger palette: a dim, base,
+#       and bright shade of each named color (black, red, pink, green,
+#       yellow, orange, blue, purple, cyan, white, gray, accent), plus a
+#       seven-step background ramp (background_h, background_0 through
+#       background_5) and a six-step foreground ramp (foreground_h,
+#       foreground_0 through foreground_4). Having this many colors
+#       already defined means a template rarely needs to compute a shade
+#       on the fly, it can usually just reference the right step directly.
 #
-#   Hex color keys only (values starting with #):
-#   {{ key_0x }}         0x-prefixed hex; alpha byte passed through if present
-#                          background = "#1e1e2e"    ->  0x1e1e2e
-#                          shadow     = "#1e1e2ecc"  ->  0x1e1e2ecc
-#   {{ key_r }}          red channel as decimal (e.g. 30)
-#   {{ key_g }}          green channel as decimal (e.g. 30)
-#   {{ key_b }}          blue channel as decimal (e.g. 46)
-#   {{ key_rgb }}        decimal channels (e.g. 30,30,46)
-#   {{ key_h }}          hue as integer degrees 0-359 (e.g. 240)
-#   {{ key_s }}          saturation as integer percentage 0-100 (e.g. 21)
-#   {{ key_l }}          lightness as integer percentage 0-100 (e.g. 15)
-#   {{ key_hsl }}        H,S,L shorthand (e.g. 240,21,15)
-#   {{ key_w }}          HWB whiteness as integer percentage 0-100 (e.g. 12)
-#   {{ key_hwb }}        H,W,Bk shorthand (e.g. 240,12%,85%)
+#   Both files are read when present and their colors are combined into one
+#   pool that templates can pull from. A theme does not have to ship both;
+#   plenty of themes only provide colors.toml, in which case any template
+#   that needs the extended palette is simply skipped (more on that
+#   below).
 #
-#   Alpha channels: use 8-char hex (rrggbbaa CSS order) in the TOML value to
-#   include alpha. {{ key }}, {{ key_strip }}, and {{ key_0x }} pass it through
-#   as-is. All channel variants (_r, _g, _b, _rgb, _h, _s, _l, _hsl, _w, _hwb)
-#   decode only the first 6 digits and ignore alpha.
+#   If a community theme does not follow the base16 color order for
+#   color0-color15, anything generated from those keys may end up looking
+#   a little off. That is a property of the theme file, not something this
+#   script can detect or correct.
 #
-# INLINE COLOR CALCULATIONS
-#   Any key can be extended with one or more pipe-separated operations that are
-#   evaluated at substitution time and replaced with a final computed value.
-#   The base key before the first | must be a key that exists in the subs table
-#   (format suffix included). Operations are applied left to right.
+# WHERE TEMPLATES LIVE
 #
-#   Syntax: {{ base_key|op=val|op=val }}
+#   A template is just a normal config file for some app, with placeholders
+#   dropped in where a color should go. Templates are picked up from two
+#   places, checked in this order:
 #
-#   HEX keys ({{ key }}, {{ key_strip }}, {{ key_upper }}, {{ key_0x }}):
-#     alpha=<0.0-1.0>       appends a two-digit hex alpha byte
-#                             {{ color4|alpha=0.5 }}    ->  #1e1e2eff -> #1e1e2e80
-#     lightness=<value>     round-trips through HSL to set or shift L;
-#                           output is re-encoded in the same variant format
-#                           (strip stays strip, upper stays upper, etc.)
+#     $XDG_CONFIG_HOME/vibranium/themed/   (your own templates)
+#     $VIBRANIUM/default/themed/           (the ones Vibranium ships with)
 #
-#   RGB keys ({{ key_rgb }}):
-#     alpha=<0.0-1.0>       appends alpha as a literal float fourth channel
-#                             {{ color4_rgb|alpha=0.6 }}   ->  30,30,46,0.6
-#     red=<+/-N>            offsets the red channel by N, clamped to 0-255
-#     green=<+/-N>          offsets the green channel by N, clamped to 0-255
-#     blue=<+/-N>           offsets the blue channel by N, clamped to 0-255
-#     lightness=<value>     round-trips through HSL to set or shift L,
-#                           then rebuilds RGB; hue and saturation are preserved
+#   If you drop a template into your own themed/ folder with the same name
+#   as a built-in one, yours is used instead. This is the normal way to
+#   customize how a particular app gets themed without editing anything
+#   under $VIBRANIUM itself.
 #
-#   HSL keys ({{ key_hsl }}):
-#     lighten=<N>           increases L by N percentage points, clamped to 100
-#     darken=<N>            decreases L by N percentage points, clamped to 0
-#     saturate=<N>          increases S by N percentage points, clamped to 100
-#     desaturate=<N>        decreases S by N percentage points, clamped to 0
-#     hue=<+/-N>            rotates H by N degrees, wraps around 360
+#   A template can also come in two flavors for the same target file:
 #
-#   Single-channel scalar keys ({{ key_r }}, {{ key_g }}, {{ key_b }},
-#   {{ key_h }}, {{ key_s }}, {{ key_l }}, {{ key_w }}):
-#     lightness=<value>     shifts or sets the channel's own value directly;
-#                           the op name is reused from the HEX/RGB lightness
-#                           operation for syntax consistency, it is not
-#                           limited to lightness-related channels
-#                             {{ color1_r|lightness=-0.05 }}   shifts R down
-#                             {{ color1_h|lightness=-0.05 }}   shifts H down
-#                             {{ color1_w|lightness=0.3 }}     sets W to 30%
-#     Absolute and relative modes work the same as the HEX/RGB lightness
-#     operation below. R/G/B normalize against 0-255; H/S/L/W normalize
-#     against 0-100, except H wraps modulo 360 instead of clamping.
+#     foo.tpl              works with just the base palette
+#     foo.extended.tpl      wants the extended palette, and is skipped
+#                           entirely when colors-extended.toml is missing
 #
-#   The lightness operation (HEX and RGB only):
-#     Absolute: lightness=0.75   sets L to exactly 75% (0.0 = black, 1.0 = white)
-#     Relative: lightness=+0.15  shifts current L up by 15 percentage points
-#               lightness=-0.10  shifts current L down by 10 percentage points
-#     The presence of a leading + or - determines the mode.
+#   Both produce a file simply named foo. If a theme provides the extended
+#   palette and both flavors exist, the extended one wins.
 #
-#   Number format:
-#     Both 0.20 and .20 are accepted. Integer values like alpha=1 are treated
-#     as 1.0. The sign is part of the value string, not a separate token.
+# WRITING A PLACEHOLDER
 #
-#   Order of operations:
-#     Applied strictly left to right. Order matters when two operations affect
-#     the same channel. In particular, channel offsets (red/green/blue) applied
-#     before lightness will be overwritten during the HSL rebuild -- apply them
-#     after lightness if both are needed.
-#       {{ color4_rgb|lightness=0.8|blue=-30 }}   correct: offset survives
-#       {{ color4_rgb|blue=-30|lightness=0.8 }}   wrong: offset is discarded
+#   Inside a template, a placeholder looks like {{ something }}, two curly
+#   braces on each side with the key in between. The plain form just drops
+#   the color value in as it is written in the TOML file:
 #
-# WARNINGS
-#   - Both colors.toml and colors-extended.toml are loaded when available.
-#     Their key namespaces are disjoint by convention (base16 vs. named
-#     semantic keys), so plain templates referencing base16 keys work
-#     correctly regardless of whether extended colors are present.
-#   - Inline TOML comments are stripped by discarding everything after the
-#     closing quote -- values containing a literal quote character will break.
-#   - Unknown {{ key }} placeholders with no pipe operator are left as-is in
-#     the output. Pipe expressions whose base key is not found in the subs
-#     table are also left verbatim, making resolution failures visible rather
-#     than silently producing empty or broken values.
-#   - Operations that are not defined for a given format (e.g. alpha on an
-#     HSL key) are silently ignored; the color is still substituted.
-#   - The alpha operation on HEX keys produces an 8-character #rrggbbaa string.
-#     Configs that do not accept 8-character hex will break.
-#   - Hue rotation and saturation on achromatic colors (pure greys, S=0)
-#     have no visible effect since both H and S are zero for those colors.
+#     {{ background }}            ->  #1e1e2e
+#
+#   A few suffixes change how the same color is written out:
+#
+#     {{ background_strip }}      ->  1e1e2e        (no leading #)
+#     {{ background_upper }}      ->  #1E1E2E        (uppercased)
+#     {{ background_lower }}      ->  #1e1e2e        (lowercased)
+#     {{ background_0x }}         ->  0x1e1e2e       (0x instead of #)
+#
+#   If your color includes an alpha byte (an 8-character hex value like
+#   #1e1e2ecc, the last two digits being transparency), the four forms
+#   above all carry it through untouched.
+#
+#   For apps that want a color split into channels instead of one hex
+#   string, these suffixes are available on any color key:
+#
+#     {{ color4_r }}   {{ color4_g }}   {{ color4_b }}     red/green/blue, 0-255 each
+#     {{ color4_rgb }}                                     all three, comma separated
+#     {{ color4_h }}   {{ color4_s }}   {{ color4_l }}     hue 0-359, saturation/lightness 0-100
+#     {{ color4_hsl }}                                     all three, comma separated
+#     {{ color4_w }}                                       HWB whiteness, 0-100
+#     {{ color4_hwb }}                                     hue, whiteness, blackness, comma separated
+#
+#   Any non-color values in your TOML files (a font name, for example) only
+#   support the plain, _upper, _lower, and _strip forms, since there is no
+#   color to extract a channel from.
+#
+# RECOLORING ON THE FLY
+#
+#   Sometimes a template needs a shade that nobody defined anywhere. Rather
+#   than asking the theme author to add it, you can compute it right inside
+#   the placeholder by adding one or more "|operation=value" pieces after
+#   the key:
+#
+#     {{ color4|lightness=0.8 }}
+#
+#   This takes color4, reinterprets it through lightness, and gives back a
+#   normal hex value, lighter than the original. You can chain several
+#   operations, each one separated by another |, and they are applied in
+#   the order you write them:
+#
+#     {{ color4|lightness=0.8|alpha=0.5 }}
+#
+#   Which operations make sense depends on the shape of the placeholder:
+#
+#     On a plain or hex-variant key ({{ key }}, _strip, _upper, _lower, _0x):
+#       alpha=0.0 to 1.0        makes the color partly transparent
+#       lightness=N             see "setting versus shifting" below
+#
+#     On an _rgb key:
+#       alpha=0.0 to 1.0        adds a transparency value as a fourth number
+#       red=N, green=N, blue=N  nudges one channel up or down, clamped 0-255
+#       lightness=N             same lightness behavior as above, then
+#                                rebuilt back into red/green/blue
+#
+#     On an _hsl key:
+#       lighten=N, darken=N     moves lightness up or down by N points
+#       saturate=N, desaturate=N   moves saturation up or down by N points
+#       hue=N                   rotates the hue by N degrees, wrapping
+#                                around at 360
+#
+#     On an _hwb key:
+#       whiten=N, blacken=N     moves whiteness or blackness by N points
+#       hue=N                   same hue rotation as above
+#
+#     On a single-channel key (_r, _g, _b, _h, _s, _l, _w):
+#       lightness=N             nudges or sets that one channel directly,
+#                                see "setting versus shifting" below
+#
+#   Setting versus shifting: write lightness=0.75 (no sign) to set the
+#   value to exactly that amount, or lightness=+0.15 / lightness=-0.10
+#   (with a sign) to shift it up or down from whatever it already is. The
+#   same plain-number-versus-signed-number rule is what the single-channel
+#   lightness operation above follows too, even on channels that are not
+#   lightness, like hue or whiteness.
+#
+#   Numbers can be written as 0.20 or .20, both work the same way.
+#
+#   One thing worth knowing before you chain operations: red=/green=/blue=
+#   and lightness= both end up changing the color's red/green/blue values,
+#   but lightness gets there by rebuilding the color from scratch through
+#   hue, saturation, and lightness. If you apply a channel nudge first and
+#   then lightness, the nudge gets overwritten:
+#
+#     {{ color4_rgb|lightness=0.8|blue=-30 }}   the nudge survives
+#     {{ color4_rgb|blue=-30|lightness=0.8 }}   the nudge is lost
+#
+#   Put lightness first if you need to combine the two.
+#
+# IF SOMETHING LOOKS WRONG
+#
+#   - A placeholder that does not match anything (a typo in the key name,
+#     or an operation that refers to a color nobody defined) is left
+#     exactly as written in the generated file, rather than being replaced
+#     with something blank. If you ever see a literal {{ ... }} in a
+#     config file Vibranium generated, that is the engine telling you it
+#     could not find what you asked for.
+#   - Hue rotation and saturation changes do nothing visible on a pure
+#     grey, since a grey has no hue or saturation to begin with.
+#   - Adding alpha to a hex color produces an 8-character value
+#     (#rrggbbaa). Some apps only accept 6-character hex and will not
+#     accept that, so use alpha sparingly on keys destined for those.
+#   - By default, if a file already exists in your active theme folder
+#     (because the theme author shipped it directly, not as a template),
+#     Vibranium leaves it alone instead of overwriting it with the
+#     template output. If you want a particular file to always be
+#     regenerated from its template regardless, add it to
+#     vb_force_template_files in your settings.advanced, either as a
+#     plain filename to force it for every theme, or as
+#     "theme-name/filename" to force it only for that one theme.
 
 TEMPLATES_DIR="$VIBRANIUM/default/themed"
 USER_TEMPLATES_DIR="$XDG_CONFIG_HOME/vibranium/themed"
@@ -136,111 +188,103 @@ NEXT_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/next-theme"
 COLORS_FILE="$NEXT_THEME_DIR/colors.toml"
 COLORS_EXTENDED_FILE="$NEXT_THEME_DIR/colors-extended.toml"
 
-# Written by vb-theme-set immediately before this script runs; used to match
-# theme-scoped entries in vb_force_template_files ("theme-name/file.ext").
+# vb-theme-set writes the plain theme name here right before this script
+# runs, so we can match "theme-name/file.ext" scoped entries below.
 NEXT_THEME_NAME=$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")
 
-# Built-in files that are always regenerated from templates even when the
-# theme already provides them.
-# Normally an existing file prevents template
-# output; entries in this array bypass that check so the template wins.
-# User-defined entries are merged in below from settings.advanced.
+# Filenames in this list always get regenerated from their template, even
+# when a file of that name already exists in the theme folder. Built-in
+# entries go here; anything the user added in ~/.config/vibranium/settings.advanced
+# is merged in further down.
 force_template_files=()
 
-# Source settings.advanced to pick up vb_force_template_files.
-# This script can run without a pre-loaded settings environment, so we source
-# explicitly here.
-# Re-sourcing a settings-only file is harmless; all it does
-# is reassign the same variables to the same values.
+# This script can be invoked on its own, without the rest of the settings
+# environment already loaded, so settings.advanced is sourced explicitly
+# here to pick up vb_force_template_files.
 _settings_adv="$XDG_CONFIG_HOME/vibranium/settings.advanced"
 [[ -f $_settings_adv ]] && source "$_settings_adv"
 unset _settings_adv
 
-# Merge user-defined entries from settings.advanced into the built-in list.
-# The ${array[@]+"..."} expansion guard silently handles the case where
-# vb_force_template_files is unset or empty (i.e. settings.advanced is absent
-# or the user left the array empty).
+# The ${array[@]+"..."} form below expands to nothing, rather than raising
+# an unbound-variable error, when vb_force_template_files was never set or
+# was left empty.
 force_template_files+=(
   "${vb_force_template_files[@]+"${vb_force_template_files[@]}"}"
 )
 
-# Collect color sources: always start with the base file, then layer
-# extended on top when available (extended keys override base on collision)
+# Gather whichever color files this theme actually provides. Order matters
+# here: extended is appended after the base file, so when the same key
+# somehow exists in both, the extended value is the one that survives.
 color_sources=()
 [[ -f $COLORS_FILE ]] && color_sources+=("$COLORS_FILE")
 [[ -f $COLORS_EXTENDED_FILE ]] && color_sources+=("$COLORS_EXTENDED_FILE")
 
 if [[ ${#color_sources[@]} -gt 0 ]]; then
-  # Build the substitution table and write it directly to a file for awk.
-  #
-  # SOH (\x01) is the field separator between placeholder and value.
-  # Neither placeholder syntax ({{ name }}) nor any color/font value can
-  # contain that byte, so no escaping is needed.
-  #
-  # Pass 1: Build the raw substitution table (No math, just base keys)
+  # Flatten every available color file into one "key<SOH>value" table for
+  # awk to read. SOH (\x01) is used as the separator because it cannot
+  # appear in either a placeholder name or a TOML value, so no escaping of
+  # the values themselves is ever needed.
   subs_file="$VIBRANIUM_RUNTIME/${0##*/}.subs"
 
   for src in "${color_sources[@]}"; do
     while IFS='=' read -r key value; do
-      # Strip quotes and spaces from the key side
+      # Strip quotes and spaces from the key side of "key = "value"".
       key="${key//[\"\' ]/}"
 
-      # Skip blank lines (key is empty) and comment lines (key starts with #).
-      # The original used && here, which only skipped blank lines; || is the
-      # correct guard that also covers comment-only lines.
+      # Blank lines and comment lines both produce an empty key here, so
+      # one check filters both out.
       if [[ ! $key || $key == \#* ]]; then
         continue
       fi
 
-      # Extract the value between the first pair of quotes,
-      # discarding everything after the closing quote (inline comments)
+      # Pull out whatever sits between the first pair of quotes on the
+      # value side; this also quietly drops a trailing inline comment,
+      # since anything after the closing quote is discarded.
       value="${value#*[\"\']}"
       value="${value%%[\"\']*}"
 
-      # Output format: key\x01value
       printf '%s\x01%s\n' "$key" "$value"
     done <"$src"
   done >"$subs_file"
 
   shopt -s nullglob
 
-  # Build a fast-lookup set from force_template_files for O(1) membership tests.
-  # Two key shapes are supported:
-  #   "file.ext"              -- global: template always wins for any theme
-  #   "theme-name/file.ext"   -- scoped: template wins only for that theme
+  # Turn force_template_files into a set for quick membership checks
+  # further down, rather than scanning the array on every template.
   declare -A _force_set
   for _f in "${force_template_files[@]}"; do
     _force_set["$_f"]=1
   done
 
-  # Collect templates that need processing and write a tpl->output map for awk.
-  #
-  # Priority: user templates before built-in, extended before plain within
-  # each dir.
-  # Because all rendering is batched into one awk call, nothing is
-  # written to disk during this loop, so "! -f output_path" alone would not
-  # deduplicate within the run.
-  # seen_outputs covers that case.
+  # outmap_file tells awk which output path each template renders to.
+  # tpl_files is the actual list of templates that made the cut and will
+  # be handed to awk for rendering.
   outmap_file="$VIBRANIUM_RUNTIME/${0##*/}.outmap"
   declare -A seen_outputs
   tpl_files=()
 
-  # Pass 2: Collect templates
+  # Walk user templates before built-in ones, and within each directory,
+  # extended templates before plain ones, so higher-priority versions
+  # claim their output filename first and lower-priority duplicates are
+  # skipped by the seen_outputs check below.
   for tpl_dir in "$USER_TEMPLATES_DIR" "$TEMPLATES_DIR"; do
     for tpl in "$tpl_dir"/*.extended.tpl "$tpl_dir"/*.tpl; do
-      filename="${tpl##*/}"            # strip directory path
-      filename="${filename%.tpl}"      # strip .tpl extension
-      filename="${filename%.extended}" # strip .extended suffix if present
+      filename="${tpl##*/}"            # drop the directory part
+      filename="${filename%.tpl}"      # drop the .tpl extension
+      filename="${filename%.extended}" # drop .extended if present
 
-      # Skip .extended.tpl templates when extended colors are unavailable
+      # An .extended.tpl with no extended palette available has nothing
+      # to render with, so it is skipped rather than producing a file
+      # full of empty placeholders.
       [[ $tpl == *.extended.tpl && ! -f $COLORS_EXTENDED_FILE ]] && continue
 
       output_path="$NEXT_THEME_DIR/$filename"
 
-      # Skip if already claimed by a higher-priority template in this run.
-      # Also skip if the file exists on disk, UNLESS it matches a force entry:
-      # a plain "file.ext" entry forces it globally;
-      # a "theme/file.ext" entry forces it only when NEXT_THEME_NAME matches the theme prefix.
+      # Render this template only if nothing higher-priority already
+      # claimed the same output path this run, and either the output
+      # does not already exist on disk, or it is explicitly listed in
+      # force_template_files (globally by filename, or scoped to the
+      # current theme as "theme-name/filename").
       if [[ -z ${seen_outputs[$output_path]+x} ]] &&
         { [[ ! -f $output_path ]] ||
           [[ -n ${_force_set[$filename]+x} ]] ||
@@ -253,7 +297,8 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
     done
   done
 
-  # Pass 3: Evaluate everything through AWK
+  # Hand everything off to the awk engine in one call: the color table,
+  # the output map, then every template that needs rendering.
   if ((${#tpl_files[@]} > 0)); then
     awk -f "$VIBRANIUM/awk/vb-theme-set-templates.awk" \
       "$subs_file" "$outmap_file" "${tpl_files[@]}"

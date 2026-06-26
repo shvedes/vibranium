@@ -34,6 +34,10 @@ cyan_dim = "#1d6f86"
 cyan = "#2897b6"
 cyan_bright = "#2eaed1"
 
+gray_dim = "#bdb9b0"
+gray = "#c9c5ba"
+gray_bright = "#d6d0c4"
+
 white_dim = "#59544a"
 white = "#726c5f"
 white_bright = "#8b8474"

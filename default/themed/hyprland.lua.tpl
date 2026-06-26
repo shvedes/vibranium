@@ -4,8 +4,8 @@ RESIZE = "rgb({{ accent_strip|lightness=+0.20 }})"
 hl.config({
   general = {
     col = {
-      active_border = "rgb({{ accent_strip|lightness=+0.05 }})",
-      inactive_border = "rgb({{ background_strip|lightness=+0.10 }})",
+      active_border = "rgba({{ accent_strip|lightness=+0.05|alpha=0.70 }})",
+      inactive_border = "rgba({{ background_strip|lightness=+0.10|alpha=0.70 }})",
     },
   },
 
@@ -18,17 +18,17 @@ hl.config({
 
   group = {
     col = {
-      border_active = "rgba({{ accent_strip }}b3)",
+      border_active = "rgba({{ accent_strip|alpha=0.70 }})",
       border_inactive = "rgb({{ background_strip|lightness=+0.10 }})",
       border_locked_active = {
         colors = {
-          "rgba({{ color3_strip }}b3)",
-          "rgba({{ color11_strip }}b3)",
-          "rgba({{ color1_strip }}b3)",
+          "rgba({{ color3_strip|alpha=0.70 }})",
+          "rgba({{ color11_strip|alpha=0.70 }})",
+          "rgba({{ color1_strip|alpha=0.70 }})",
         },
         angle = 45
       },
-      border_locked_inactive = "rgba({{ background_strip|lightness=+0.20 }}b3)",
+      border_locked_inactive = "rgba({{ background_strip|lightness=+0.20|alpha=0.70 }})",
     },
 
     groupbar = {

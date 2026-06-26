@@ -27,7 +27,7 @@ text = "{{ selection_foreground }}"
 background = "{{ selection_background }}"
 
 [colors.normal]
-black = "{{ color0|lightness=+0.10 }}"
+black = "{{ background|lightness=+0.10 }}"
 red = "{{ color1 }}"
 green = "{{ color2 }}"
 yellow = "{{ color3 }}"
@@ -37,7 +37,7 @@ cyan = "{{ color6 }}"
 white = "{{ color7 }}"
 
 [colors.bright]
-black = "{{ color0|lightness=+0.20 }}"
+black = "{{ background|lightness=+0.20 }}"
 red = "{{ color1|lightness=+0.05 }}"
 green = "{{ color2|lightness=+0.05 }}"
 yellow = "{{ color3|lightness=+0.05 }}"
