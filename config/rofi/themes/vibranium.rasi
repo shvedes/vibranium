@@ -10,6 +10,8 @@
 
   scrollbar:        @border;
   border:           @background-3;
+
+  background-color: transparent;
 }
 
 window {
