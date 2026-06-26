@@ -1,0 +1,94 @@
+#!/bin/sh
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]...
+
+Search and read installed manual pages using fzf.
+
+Options:
+  -h, --help     display this help and exit
+EOF
+}
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -*)
+    printf "%s: invalid option -- '%s'\n" "${0##*/}" "$1" >&2
+    printf "Try '%s --help' for more information.\n" "${0##*/}" >&2
+    exit 1
+    ;;
+  *)
+    printf "%s: unexpected argument -- '%s'\n" "${0##*/}" "$1" >&2
+    printf "Try '%s --help' for more information.\n" "${0##*/}" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if ! command -v fzf >/dev/null; then
+  printf "%s: error: fzf is not installed!" >&2
+  exit 1
+fi
+
+if [ -z "$EDITOR" ]; then
+  for ed in nvim vim neovide vi less; do
+    if command -v "$ed" >/dev/null 2>&1; then
+      EDITOR="$ed"
+      break
+    fi
+  done
+fi
+
+export EDITOR
+
+if [ -z "$MANPAGER" ]; then
+  case "$EDITOR" in
+  *nvim | *vim)
+    export MANPAGER="$EDITOR +Man!"
+    ;;
+  *nano)
+    export MANPAGER="$EDITOR -v"
+    ;;
+  *)
+    export MANPAGER="$EDITOR"
+    ;;
+  esac
+fi
+
+while true; do
+  selected=$(
+    man -k . 2>/dev/null |
+      sed 's/ - .*//; s/\([^ ]\)(/\1 (/' |
+      fzf --layout=reverse \
+        --border=sharp \
+        --border-label ' alt-p: toggle preview | alt-j/j: scroll preview ' \
+        --border-label-pos 'bottom' \
+        --input-label 'search man pages' \
+        --preview-window="right:60%:border-sharp" \
+        --bind 'alt-p:toggle-preview' \
+        --bind 'alt-k:preview-up,alt-j:preview-down' \
+        --preview 'MANPAGER=cat man {1} 2>/dev/null' \
+        --prompt="> "
+  )
+
+  [ -z "$selected" ] && exit 0
+
+  page="${selected%%(*}"
+  page="${page% }"
+
+  tmp="${selected#*(}"
+  section="${tmp%%)*}"
+
+  man "$section" "$page"
+done

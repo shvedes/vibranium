@@ -42,3 +42,9 @@ vb-tui-install \
   --name 'Video Downloader' \
   --category 'Utilities' \
   --float
+
+vb-tui-install \
+  --exec vb-cmd-manpager \
+  --name 'Man Page Viewer' \
+  --category 'Utilities;System' \
+  --float
