@@ -7,15 +7,23 @@ if [[ ! -f $VB_THEME_DIR/obsidian.css ]]; then
   exit 0
 fi
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 mapfile -t VAULTS < <(jq -r '.vaults | values[].path' "$OBSIDIAN_CFG")
 
 for vault in "${VAULTS[@]}"; do
   [[ -d $vault/.obsidian ]] || continue
 
   THEME_DIR="$vault/.obsidian/themes/Vibranium"
-  mkdir -p "$THEME_DIR"
+  if ! [[ -f "$THEME_DIR" ]]; then
+    mkdir -p "$THEME_DIR"
+  fi
 
-  [[ -f $THEME_DIR/manifest.json ]] || cat >"$THEME_DIR/manifest.json" <<'EOF'
+  [[ -f $THEME_DIR/manifest.json ]] || shcat >"$THEME_DIR/manifest.json" <<'EOF'
 {
   "name": "Vibranium",
   "version": "1.0.0",
@@ -28,4 +36,3 @@ EOF
 
   cp "$VB_THEME_DIR/obsidian.css" "$THEME_DIR/theme.css"
 done
-

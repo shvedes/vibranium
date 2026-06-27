@@ -11,19 +11,28 @@
 
 GTK_THEME="$XDG_CONFIG_HOME/vibranium/current/theme/gtk.css"
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 # GTK3 -- alternating slots for live reload
 for slot in vibranium-a vibranium-b; do
   gtk3_dir="$HOME/.local/share/themes/$slot/gtk-3.0"
   mkdir -p "$gtk3_dir"
-  {
-    echo '@import url("/usr/share/themes/adw-gtk3/gtk-3.0/gtk.css");'
-    cat "$GTK_THEME"
-  } >"$gtk3_dir/gtk.css"
+  shcat >"$gtk3_dir/gtk.css" <<-EOF
+@import url("/usr/share/themes/adw-gtk3/gtk-3.0/gtk.css");
+
+$(<"$GTK_THEME")
+EOF
 done
 
 # GTK4 -- write user override, applies on next app restart
 mkdir -p "$XDG_CONFIG_HOME/gtk-4.0"
-cat "$GTK_THEME" >"$XDG_CONFIG_HOME/gtk-4.0/gtk.css"
+shcat >"$XDG_CONFIG_HOME/gtk-4.0/gtk.css" <<-EOF
+"$(<"$GTK_THEME")"
+EOF
 
 # Alternate between slots to bust GTK3 cache
 current=$(gsettings get org.gnome.desktop.interface gtk-theme)

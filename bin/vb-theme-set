@@ -2,6 +2,8 @@
 
 # shellcheck disable=SC2206
 
+shopt -s extglob dotglob nullglob
+
 # Populated by _discover_themes at startup.
 # FAMILIES maps family display name -> space-separated variant display names.
 # STANDALONE_THEMES maps display name -> display name (value == key).
@@ -342,24 +344,6 @@ pick_variant() {
   done
 }
 
-apply_hooks(){
-  # Apply custom user hooks
-  if [[ -d "$HOOK_DIR" ]]; then
-    shopt -s nullglob
-    HOOK_FILES=($HOOK_DIR/*.sh)
-    shopt -u nullglob
-
-    if ((${#HOOK_FILES[@]} == 0)); then
-      # No user hooks found - do nothing
-      exit 0
-    fi
-
-    for hook in "${HOOK_FILES[@]}"; do
-      bash "$hook"
-    done
-  fi
-}
-
 apply_theme() {
   local chosen="$1"
   local folder_name="$2"
@@ -389,15 +373,11 @@ apply_theme() {
   # Stage into next-theme first so the swap into current is atomic.
   # This means a crash or signal mid-copy can't leave current/theme half-written.
   rm -rf "$NEXT_THEME_PATH"
-  mkdir -p "$NEXT_THEME_PATH"
-  mkdir -p "$CURRENT_THEME_PATH"
+  mkdir -p "$NEXT_THEME_PATH" "$NEXT_THEME_PATH/backgrounds" "$CURRENT_THEME_PATH"
 
   # Base layer: official theme (or the user-only theme when there is no official counterpart).
   # Exclude backgrounds/ from the synchronous pass — it's the only thing that's ever slow.
-  files=()
-  while IFS= read -r -d '' file; do
-    files+=("$file")
-  done < <(find "$src_path" -maxdepth 1 -mindepth 1 ! -name "backgrounds" -print0)
+  local files=("$src_path"/!(backgrounds))
 
   if ((${#files[@]} > 0)); then
     cp -a -- "${files[@]}" "$NEXT_THEME_PATH/"
@@ -407,7 +387,6 @@ apply_theme() {
   # This makes the copy process instant.
   # It avoids waiting for all the big images to copy.
   if [[ -d "$src_path/backgrounds" ]]; then
-    mkdir -p "$NEXT_THEME_PATH/backgrounds"
     cp -rl "$src_path/backgrounds/." "$NEXT_THEME_PATH/backgrounds/"
   fi
 
@@ -415,10 +394,7 @@ apply_theme() {
   # Files present in USER_THEMES_PATH/$folder_name overwrite their official
   # counterparts; files absent from the overlay are inherited from the base.
   if [[ "$source_label" == "official" && -d "$USER_THEMES_PATH/$folder_name" ]]; then
-    files=()
-    while IFS= read -r -d '' file; do
-      files+=("$file")
-    done < <(find "$USER_THEMES_PATH/$folder_name" -maxdepth 1 -mindepth 1 ! -name "backgrounds" -print0)
+    files=("$USER_THEMES_PATH/$folder_name"/!(backgrounds))
 
     if ((${#files[@]} > 0)); then
       cp -a -- "${files[@]}" "$NEXT_THEME_PATH/"
@@ -445,6 +421,7 @@ apply_theme() {
 
   if [[ -n "${THEME_LIGHT[$folder_name]+_}" ]]; then
     [[ "${THEME_LIGHT[$folder_name]}" == "true" ]] && is_light=true
+  # This covers only official themes though
   elif [[ $folder_name =~ (light|latte|dawn)$ ]]; then
     is_light=true
   fi
@@ -452,20 +429,20 @@ apply_theme() {
   if $is_light; then
     local icon_theme="Papirus-Light"
     local color_scheme="prefer-light"
-    palette=false
+    custom_palette=false
   else
     local icon_theme="Papirus-Dark"
     local color_scheme="prefer-dark"
-    palette=true
+    custom_palette=true
   fi
 
   for v in 5 6; do
-    sed -i "/custom_palette/s/=.*/=$palette/" \
+    sed -i "/custom_palette/s/=.*/=$custom_palette/" \
       "$XDG_CONFIG_HOME/qt${v}ct/qt${v}ct.conf"
   done
 
-  gsettings set org.gnome.desktop.interface icon-theme "$icon_theme"
-  gsettings set org.gnome.desktop.interface color-scheme "$color_scheme"
+  gsettings set org.gnome.desktop.interface icon-theme "$icon_theme" &
+  gsettings set org.gnome.desktop.interface color-scheme "$color_scheme" &
 }
 
 get_wallpaper() {
@@ -501,9 +478,7 @@ get_wallpaper() {
   fi
 
   # No valid saved path found: return the first wallpaper in the theme dir.
-  shopt -s nullglob
   local files=("$CURRENT_THEME_PATH/backgrounds/"*)
-  shopt -u nullglob
 
   if [[ ${#files[@]} -gt 0 ]]; then
     printf "%s" "${files[0]}"
@@ -576,23 +551,23 @@ list_themes() {
   printf '%s\n' "${names[@]}"
 }
 
-# Discover themes before any command handling
-_discover_themes
-
 case "${1-}" in
 -f | --force)
-    FORCE=true
-    shift
-    ;;
+  FORCE=true
+  shift
+  ;;
 -h | --help)
   _usage
   exit 0
   ;;
 -l | --list)
+  _discover_themes
   list_themes
   exit 0
   ;;
 esac
+
+_discover_themes
 
 if [[ -n "$1" ]]; then
   # Normalise spaces to hyphens ("Tokyonight Night" -> "Tokyonight-Night")
@@ -692,15 +667,28 @@ if [[ ! -d "$VIBRANIUM/themes/$FOLDER_NAME" && ! -d "$USER_THEMES_PATH/$FOLDER_N
 fi
 
 apply_theme "$CHOSEN" "$FOLDER_NAME"
-vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")"
-vb-cmd-reload --quiet
-
+source vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")" &
 touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
+source vb-cmd-reload --quiet &
 killall --quiet -s USR2 btop
 
-apply_hooks &
-vb-theme-set-gtk &
-vb-theme-set-svg &
-vb-theme-set-browser &
-vb-theme-set-obsidian &
-vb-theme-set-vscode &
+# Theme setters
+for f in "$VIBRANIUM"/bin/vb-theme-set-*; do
+  # Not quite a setter, plus we called it earlier
+  [[ "${f##*/}" =~ templates$ ]] && continue
+  source "$f" &
+done
+
+# Apply custom user hooks
+if [[ -d "$HOOK_DIR" ]]; then
+  HOOK_FILES=($HOOK_DIR/*.sh)
+
+  if ((${#HOOK_FILES[@]} == 0)); then
+    # No user hooks found - do nothing
+    exit 0
+  fi
+
+  for hook in "${HOOK_FILES[@]}"; do
+    source "$hook" &
+  done
+fi

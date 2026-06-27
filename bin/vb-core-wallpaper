@@ -182,9 +182,9 @@ case "$_dispatch" in
   ;;
 --next | --prev)
   if ! feature_enabled; then
-    echo "Error: this feature is disabled." >&2
-    echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
-    exit 1
+    # echo "Error: this feature is disabled." >&2
+    # echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
+    exit 0
   fi
 
   WALLPAPER_PATH="$(cycle_wallpaper "$1")"
@@ -197,9 +197,9 @@ case "$_dispatch" in
   ;;
 *.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
   if ! feature_enabled; then
-    echo "Error: this feature is disabled." >&2
-    echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
-    exit 1
+    # echo "Error: this feature is disabled." >&2
+    # echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
+    exit 0
   fi
 
   WALLPAPER_PATH="$(realpath "$1")"
