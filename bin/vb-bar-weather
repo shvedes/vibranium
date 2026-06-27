@@ -127,7 +127,7 @@ WEATHER_JSON="$(<"$TEMP_DATA")"
 
 if [[ -z "$WEATHER_JSON" ]]; then
   icon="<span foreground='${P_RED}'>\uf071</span>"
-  icon+="  <span foreground='${P_GRAY}'>|</span>"
+  icon+="  <span foreground='${P_FOREGROUND_0}66'>|</span>"
 
   tooltip="wttrbar exited with an error"
   printf '{"text": "%s", "tooltip": "%s"}' "$icon" "$tooltip"
@@ -136,7 +136,7 @@ fi
 
 # Build json output
 text="$(jq -r '.text' <<<"$WEATHER_JSON")"
-text+=" <span foreground='${P_GRAY}'>|</span>"
+text+=" <span foreground='${P_FOREGROUND_0}66'>|</span>"
 tooltip="$(jq -r '.tooltip' <<<"$WEATHER_JSON")"
 
 rm -f "$TEMP_DATA" /tmp/wttrbar*

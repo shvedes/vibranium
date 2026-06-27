@@ -38,9 +38,9 @@ white_dim = "#d5c4a1"
 white = "#ebdbb2"
 white_bright = "#fbf1c7"
 
-gray_dim = "#7c6f64"
-gray = "#928374"
-gray_bright = "#a89984"
+gray_dim = "#4c4745"
+gray = "#57514e"
+gray_bright = "#625c58"
 
 accent_dim = "#79740e"
 accent = "#98971a"

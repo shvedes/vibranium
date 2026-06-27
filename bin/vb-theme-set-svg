@@ -8,9 +8,9 @@ source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 ICONS_DIR="$XDG_DATA_HOME/icons/Vibranium/scalable"
 
 sed -i -E '
-  s/(^|[[:space:];"])fill[[:space:]]*:[[:space:]]*[^;" ]+/\1fill:'"$P_TEXT"'/g;
-  s/fill="[^"]*"/fill="'"$P_TEXT"'"/g;
+  s/(^|[[:space:];"])fill[[:space:]]*:[[:space:]]*[^;" ]+/\1fill:'"$P_FOREGROUND_0"'/g;
+  s/fill="[^"]*"/fill="'"$P_FOREGROUND_0"'"/g;
 
-  s/(^|[[:space:];"])stroke[[:space:]]*:[[:space:]]*[^;" ]+/\1stroke:'"$P_TEXT"'/g;
-  s/stroke="[^"]*"/stroke="'"$P_TEXT"'"/g
+  s/(^|[[:space:];"])stroke[[:space:]]*:[[:space:]]*[^;" ]+/\1stroke:'"$P_FOREGROUND_0"'/g;
+  s/stroke="[^"]*"/stroke="'"$P_FOREGROUND_0"'"/g
 ' "$ICONS_DIR"/{apps,actions}/*.svg

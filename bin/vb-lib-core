@@ -234,11 +234,11 @@ helpers::bar::spinner() {
   vb-bar-weather) sep_pos="right" left_pad=0 right_pad=2 ;;
   esac
 
-  local sep="<span foreground='${P_GRAY}'>|</span>"
+  local sep="<span foreground='${P_FOREGROUND_0}66'>|</span>"
 
   print_frame() {
     local ch="$1"
-    local inner="<span rise='-2pt' foreground='${P_TEXT}'>$ch</span>"
+    local inner="<span rise='-2pt' foreground='${P_FOREGROUND_0}'>$ch</span>"
 
     if [[ "$sep" ]]; then
       if [[ "$sep_pos" == "left" ]]; then
@@ -665,7 +665,7 @@ hypr::is_fullscreen() {
 }
 
 hypr::flash::border() {
-  hyprctl -q eval "Hypr.Helpers.FlashBorder('0xff${P_TEXT###}')"
+  hyprctl -q eval "Hypr.Helpers.FlashBorder('0xff${P_FOREGROUND_0###}')"
 }
 
 hypr::flash::screen() {
