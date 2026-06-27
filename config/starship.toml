@@ -82,5 +82,5 @@ threshold = 1
 # Prompt character
 # ---------------------------------------------------------------------------
 [character]
-success_symbol = "[❯](bold green)"
-error_symbol   = "[❯](bold red)"
+success_symbol = "\n[❯](bold green)"
+error_symbol   = "\n[❯](bold red)"
