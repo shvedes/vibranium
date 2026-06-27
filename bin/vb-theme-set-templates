@@ -263,39 +263,52 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
   declare -A seen_outputs
   tpl_files=()
 
-  # Walk user templates before built-in ones, and within each directory,
-  # extended templates before plain ones, so higher-priority versions
-  # claim their output filename first and lower-priority duplicates are
-  # skipped by the seen_outputs check below.
-  for tpl_dir in "$USER_TEMPLATES_DIR" "$TEMPLATES_DIR"; do
-    for tpl in "$tpl_dir"/*.extended.tpl "$tpl_dir"/*.tpl; do
-      filename="${tpl##*/}"            # drop the directory part
-      filename="${filename%.tpl}"      # drop the .tpl extension
-      filename="${filename%.extended}" # drop .extended if present
+  # A block redirect keeps a single file descriptor open for all printf
+  # writes rather than reopening the file on each iteration with >>. The
+  # loop visits user templates before built-in ones, and extended before
+  # plain within each directory, so higher-priority versions claim their
+  # output filename first and lower-priority duplicates are dropped by the
+  # seen_outputs check below.
+  {
+    for tpl_dir in "$USER_TEMPLATES_DIR" "$TEMPLATES_DIR"; do
+      for tpl in "$tpl_dir"/*.extended.tpl "$tpl_dir"/*.tpl; do
+        filename="${tpl##*/}"            # drop the directory part
+        filename="${filename%.tpl}"      # drop the .tpl extension
+        filename="${filename%.extended}" # drop .extended if present
 
-      # An .extended.tpl with no extended palette available has nothing
-      # to render with, so it is skipped rather than producing a file
-      # full of empty placeholders.
-      [[ $tpl == *.extended.tpl && ! -f $COLORS_EXTENDED_FILE ]] && continue
+        # An .extended.tpl with no extended palette available has nothing
+        # to render with, so it is skipped rather than producing a file
+        # full of empty placeholders.
+        [[ $tpl == *.extended.tpl && ! -f $COLORS_EXTENDED_FILE ]] && continue
 
-      output_path="$NEXT_THEME_DIR/$filename"
+        output_path="$NEXT_THEME_DIR/$filename"
 
-      # Render this template only if nothing higher-priority already
-      # claimed the same output path this run, and either the output
-      # does not already exist on disk, or it is explicitly listed in
-      # force_template_files (globally by filename, or scoped to the
-      # current theme as "theme-name/filename").
-      if [[ -z ${seen_outputs[$output_path]+x} ]] &&
-        { [[ ! -f $output_path ]] ||
-          [[ -n ${_force_set[$filename]+x} ]] ||
-          { [[ -n $NEXT_THEME_NAME ]] &&
-            [[ -n ${_force_set[$NEXT_THEME_NAME / $filename]+x} ]]; }; }; then
-        printf '%s\x01%s\n' "$tpl" "$output_path" >>"$outmap_file"
-        tpl_files+=("$tpl")
-        seen_outputs["$output_path"]=1
-      fi
+        # Render this template only if nothing higher-priority already
+        # claimed the same output path this run, and either the output
+        # does not already exist on disk, or it is explicitly listed in
+        # force_template_files (globally by filename, or scoped to the
+        # current theme as "theme-name/filename").
+        if [[ -z ${seen_outputs[$output_path]+x} ]]; then
+          should_write=false
+
+          if [[ ! -f $output_path ]]; then
+            should_write=true
+          elif [[ -n ${_force_set[$filename]+x} ]]; then
+            should_write=true
+          elif [[ -n $NEXT_THEME_NAME ]] &&
+            [[ -n ${_force_set[$NEXT_THEME_NAME / $filename]+x} ]]; then
+            should_write=true
+          fi
+
+          if $should_write; then
+            printf '%s\x01%s\n' "$tpl" "$output_path"
+            tpl_files+=("$tpl")
+            seen_outputs["$output_path"]=1
+          fi
+        fi
+      done
     done
-  done
+  } >"$outmap_file"
 
   # Hand everything off to the awk engine in one call: the color table,
   # the output map, then every template that needs rendering.

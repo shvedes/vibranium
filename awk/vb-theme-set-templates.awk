@@ -28,6 +28,23 @@
 #     {{ typo_key }} sitting in a generated config file is something a
 #     person will actually notice; a silently blank value is not.
 
+# Two lookup tables that pay for themselves many times over during template
+# rendering. _hv[] maps any hex digit character (both cases) directly to
+# its integer value, so hex_char_val no longer needs a tolower() call and
+# an index() scan for every nibble it reads. _hex2[] maps every integer
+# 0-255 directly to its two-character lowercase hex string, so int_to_hex2
+# can return in one step rather than two substr() calls.
+BEGIN {
+  _hv["0"]=0; _hv["1"]=1; _hv["2"]=2; _hv["3"]=3; _hv["4"]=4
+  _hv["5"]=5; _hv["6"]=6; _hv["7"]=7; _hv["8"]=8; _hv["9"]=9
+  _hv["a"]=10; _hv["b"]=11; _hv["c"]=12; _hv["d"]=13; _hv["e"]=14; _hv["f"]=15
+  _hv["A"]=10; _hv["B"]=11; _hv["C"]=12; _hv["D"]=13; _hv["E"]=14; _hv["F"]=15
+
+  _d = "0123456789abcdef"
+  for (_i = 0; _i <= 255; _i++)
+    _hex2[_i] = substr(_d, int(_i / 16) + 1, 1) substr(_d, (_i % 16) + 1, 1)
+}
+
 # Restrict v to the closed range [lo, hi]. Nearly every operation below ends
 # with a clamp, since channel math has a way of drifting just outside its
 # valid range from rounding alone.
@@ -35,23 +52,13 @@ function clamp(v, lo, hi) {
   return v < lo ? lo : (v > hi ? hi : v)
 }
 
-# Value of a single hex digit, case-insensitively. The building block for
-# pulling a "#rrggbb" string apart one nibble at a time.
-function hex_char_val(c,    lc) {
-  lc = tolower(c)
-  if (lc >= "0" && lc <= "9") return lc + 0
-  if (lc >= "a" && lc <= "f") return 10 + index("abcdef", lc) - 1
-  return 0
-}
+# Value of a single hex digit, case-insensitively. Just a table lookup
+# into _hv[]; the heavy lifting moved to BEGIN.
+function hex_char_val(c) { return _hv[c] }
 
-# The reverse of hex_char_val: an integer channel value (0-255) back into a
-# two-character lowercase hex pair. Used whenever a computed channel needs
-# to be written back out as hex.
-function int_to_hex2(n,    iv, digits) {
-  digits = "0123456789abcdef"
-  iv = int(clamp(n, 0, 255))
-  return substr(digits, int(iv / 16) + 1, 1) substr(digits, (iv % 16) + 1, 1)
-}
+# The reverse: an integer 0-255 back into a two-character lowercase hex
+# pair. Just a table lookup into _hex2[]; the heavy lifting moved to BEGIN.
+function int_to_hex2(n) { return _hex2[int(clamp(n, 0, 255))] }
 
 # Splits a "#rrggbb" string into the _r, _g, _b globals. Assumes the value
 # has already been confirmed to start with # and to be well-formed; callers
@@ -141,20 +148,83 @@ function hsl_to_rgb(h, s, l,    sn, ln, C, Hp, X, m, r1, g1, b1, hmod2, abshm1, 
   _b = clamp(int((b1 + m) * 255.0 + 0.5), 0, 255)
 }
 
+# Called once before the first template line is processed, after both
+# subs[] and outmap[] are fully loaded. It walks every entry in subs[] and
+# pre-computes all the format variants a template might ask for, storing the
+# results in resolved[]. The payoff is in resolve_token(): a no-pipeline
+# placeholder becomes a single array lookup here rather than a parse_hex()
+# call, an rgb_to_hsl() call, and a chain of suffix comparisons per token.
+#
+# Non-hex values (font names and the like) get the four string-only
+# variants; hex colors get the full set of channel and format
+# representations. The second loop re-stamps every literal subs[] key
+# directly into resolved[], so if a key name happens to collide with a
+# derived variant name the explicit value always wins.
+function _precompute(    key, val, stripped, ph, ps, pl, pw, pbk) {
+  for (key in subs) {
+    val = subs[key]
+
+    if (val !~ /^#/) {
+      resolved[key]          = val
+      resolved[key "_strip"] = val
+      resolved[key "_upper"] = toupper(val)
+      resolved[key "_lower"] = tolower(val)
+      continue
+    }
+
+    stripped = substr(val, 2)
+    resolved[key]          = val
+    resolved[key "_strip"] = stripped
+    resolved[key "_upper"] = "#" toupper(stripped)
+    resolved[key "_lower"] = "#" tolower(stripped)
+    resolved[key "_0x"]    = "0x" stripped
+
+    parse_hex(val)
+    resolved[key "_r"]   = _r
+    resolved[key "_g"]   = _g
+    resolved[key "_b"]   = _b
+    resolved[key "_rgb"] = _r "," _g "," _b
+
+    rgb_to_hsl(_r, _g, _b)
+    ph = int(_h + 0.5); ps = int(_s + 0.5); pl = int(_l + 0.5)
+    pw = int(_w + 0.5); pbk = int(_bk + 0.5)
+    resolved[key "_h"]   = ph
+    resolved[key "_s"]   = ps
+    resolved[key "_l"]   = pl
+    resolved[key "_hsl"] = ph "," ps "," pl
+    resolved[key "_w"]   = pw
+    resolved[key "_hwb"] = ph "," pw "%," pbk "%"
+  }
+
+  # A literal subs[] key always takes precedence over any derived variant
+  # that lands on the same name, so stamp them all in after the loop above.
+  for (key in subs) { resolved[key] = subs[key] }
+}
+
 # Takes whatever sat between {{ and }} (for example "color4|lightness=0.8")
 # and turns it into the final string a template should see. This is the
 # one function that knows about every output format and every pipe
 # operation, so it is long, but each branch below stands on its own.
-function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fmt, hex_variant, scalar_ch, raw_val, has_alpha, alpha_str, n_ops, ops, i, op, eq_pos, op_name, op_val_str, op_val, hex_modified, rebuilt, scalar_val, scalar_lo, scalar_hi) {
-  # Split off the pipe chain, if there is one, from the base key.
+function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fmt, hex_variant, scalar_ch, raw_val, has_alpha, alpha_str, n_ops, ops, i, op, eq_pos, op_name, op_val_str, op_val, hex_modified, rebuilt, scalar_val, scalar_lo, scalar_hi, _hsl_done) {
+  # Fast path: the token has no pipe operator, so it is a plain key
+  # reference with an optional format suffix. Everything the template
+  # might ask for in this case was pre-computed by _precompute() into
+  # resolved[], so a single lookup is enough. An unrecognized key simply
+  # will not be in the table, and the empty-string return tells
+  # process_line() to leave the original token in place.
   pipe_pos = index(inner_expr, "|")
-  if (pipe_pos > 0) {
-    base_part = substr(inner_expr, 1, pipe_pos - 1)
-    ops_str   = substr(inner_expr, pipe_pos + 1)
-  } else {
+  if (pipe_pos == 0) {
     base_part = inner_expr
-    ops_str   = ""
+    sub(/^[[:space:]]+/, "", base_part)
+    sub(/[[:space:]]+$/, "", base_part)
+    if (base_part in resolved) return resolved[base_part]
+    return ""
   }
+
+  # Pipeline present: split off the ops and proceed through the full
+  # resolution path below.
+  base_part = substr(inner_expr, 1, pipe_pos - 1)
+  ops_str   = substr(inner_expr, pipe_pos + 1)
 
   # Templates are free to write "{{ key | op=val }}" with extra spaces
   # around the key for readability, so trim before doing anything else.
@@ -206,25 +276,33 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
     return raw_val
   }
 
-  # From here on we know we are dealing with an actual color, so populate
-  # the RGB globals, and HSL too unless the request is a plain unmodified
-  # hex value that does not need it.
+  # From here on we are dealing with an actual color. Parse the hex into
+  # _r, _g, _b, then compute HSL only if the format genuinely needs it
+  # upfront. hex and rgb defer the call until a lightness operation
+  # actually arrives, since alpha and channel nudges do not touch HSL.
   parse_hex(raw_val)
-  if (fmt != "hex" || ops_str != "") {
+  _hsl_done = 0
+
+  if (fmt == "hsl" || fmt == "hwb") {
     rgb_to_hsl(_r, _g, _b)
+    _hsl_done = 1
   }
 
-  # A scalar request (_r, _h, _w, and so on) wants exactly one channel out
-  # of everything we just computed. Pull it into scalar_val now so the
-  # lightness operation below has a single value to work against.
+  # A scalar request wants exactly one channel. r/g/b come straight from
+  # parse_hex; h/s/l/w need HSL first, which we compute here if we have
+  # not already done so above.
   if (fmt == "scalar") {
     if (scalar_ch == "r")      scalar_val = _r
     else if (scalar_ch == "g") scalar_val = _g
     else if (scalar_ch == "b") scalar_val = _b
-    else if (scalar_ch == "h") scalar_val = _h
-    else if (scalar_ch == "s") scalar_val = _s
-    else if (scalar_ch == "l") scalar_val = _l
-    else if (scalar_ch == "w") scalar_val = _w
+    else {
+      rgb_to_hsl(_r, _g, _b)
+      _hsl_done = 1
+      if      (scalar_ch == "h") scalar_val = _h
+      else if (scalar_ch == "s") scalar_val = _s
+      else if (scalar_ch == "l") scalar_val = _l
+      else if (scalar_ch == "w") scalar_val = _w
+    }
   }
 
   has_alpha = 0
@@ -259,6 +337,9 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
           alpha_str = int_to_hex2(int(clamp(op_val, 0.0, 1.0) * 255.0 + 0.5))
           has_alpha = 1
         } else if (op_name == "lightness") {
+          # Compute HSL now if we deferred it; this is the first operation
+          # on this token that actually needs _h and _s.
+          if (!_hsl_done) { rgb_to_hsl(_r, _g, _b); _hsl_done = 1 }
           # A leading sign means "shift the current lightness by this
           # much"; no sign means "set lightness to exactly this value".
           if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-")
@@ -277,16 +358,19 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
           has_alpha = 1
         } else if (op_name == "red") {
           _r = int(clamp(_r + op_val, 0, 255))
-          rgb_to_hsl(_r, _g, _b)
+          # Nudging a channel makes any cached HSL stale; mark it so a
+          # subsequent lightness op recomputes before reading _h and _s.
+          _hsl_done = 0
         } else if (op_name == "green") {
           _g = int(clamp(_g + op_val, 0, 255))
-          rgb_to_hsl(_r, _g, _b)
+          _hsl_done = 0
         } else if (op_name == "blue") {
           _b = int(clamp(_b + op_val, 0, 255))
-          rgb_to_hsl(_r, _g, _b)
+          _hsl_done = 0
         } else if (op_name == "lightness") {
           # Same absolute-vs-relative rule as the hex branch above, just
           # rebuilt into RGB instead of a hex string at the end.
+          if (!_hsl_done) { rgb_to_hsl(_r, _g, _b); _hsl_done = 1 }
           if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-")
             _l = clamp(_l + op_val * 100.0, 0, 100)
           else
@@ -429,8 +513,12 @@ FILENAME == ARGV[2] {
 
 # The first line of each remaining input file tells us which output path
 # it was assigned in the map above; every subsequent line of that file
-# writes to the same place.
-FNR == 1 { outfile = outmap[FILENAME] }
+# writes to the same place. _precompute() runs on the first template seen,
+# after subs[] and outmap[] are both fully loaded.
+FNR == 1 {
+  if (!_precomputed) { _precompute(); _precomputed = 1 }
+  outfile = outmap[FILENAME]
+}
 
 {
   print process_line($0) > outfile
