@@ -1,5 +1,5 @@
 hl.on("hyprland.start", function()
-  hl.exec_cmd("vb-theme-cursor-set --quiet")
+  hl.exec_cmd("vb-cursor-set --quiet")
   hl.exec_cmd("vb-refresh-dunst")
   hl.exec_cmd("vb-util-startup")
 

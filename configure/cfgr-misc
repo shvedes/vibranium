@@ -291,14 +291,34 @@ _manage_user_wallpapers() {
   done
 }
 
+# _update_cursor_state [theme] [size]
+#   Merges the given fields into the unified cursor state file,
+#   preserving whichever field is passed as an empty string.
+_update_cursor_state() {
+  local new_theme="$1" new_size="$2"
+  local state="$VIBRANIUM_STATE/cursor-theme"
+  local theme size
+
+  if [[ -f "$state" ]]; then
+    # shellcheck source=/dev/null
+    source "$state"
+  fi
+
+  [[ -n "$new_theme" ]] && theme="$new_theme"
+  [[ -n "$new_size" ]] && size="$new_size"
+
+  {
+    printf 'theme="%s"\n' "$theme"
+    printf 'size=%s\n' "$size"
+  } > "$state"
+}
+
 _set_cursor_size() {
   local -a sizes=()
   local chosen_size
   local line
 
-  local state="$VIBRANIUM_STATE/cursor-size"
-
-  read -r line < <(vb-theme-cursor-list --size "${CURSOR_THEME:-Adwaita}")
+  read -r line < <(vb-cursor-list --size "${CURSOR_THEME:-Adwaita}")
   [[ -z "$line" ]] && return
   line=${line#* } # remove first (theme name) word and following space
 
@@ -309,15 +329,13 @@ _set_cursor_size() {
     --title "Cursor Size" \
     --option "${sizes[@]}")" || return
 
-  printf "%s" "$chosen_size" >"$state"
-  vb-theme-cursor-set --size "$chosen_size" &
+  _update_cursor_state "" "$chosen_size"
+  vb-cursor-set --size "$chosen_size" &
 }
 
 _set_cursor_theme() {
   local options=()
   local chosen folder
-
-  local state="$VIBRANIUM_STATE/cursor-theme"
 
   declare -A CURSOR_NAME_TO_FOLDER=()
 
@@ -330,7 +348,7 @@ _set_cursor_theme() {
     CURSOR_NAME_TO_FOLDER["$pretty"]="$folder"
 
     options+=("$pretty")
-  done < <(vb-theme-cursor-list)
+  done < <(vb-cursor-list)
 
   if ((${#options[@]} <= 1)); then
     notify-send -r 3 "Vibranium" "No curosr themes found"
@@ -342,8 +360,8 @@ _set_cursor_theme() {
     --option "${options[@]}")" || return
   folder="${CURSOR_NAME_TO_FOLDER[$chosen]}"
 
-  printf "%s" "$folder" >"$state"
-  vb-theme-cursor-set &
+  _update_cursor_state "$folder" ""
+  vb-cursor-set &
 }
 
 _get_cursor_theme() {
@@ -355,26 +373,30 @@ _get_cursor_theme() {
   # current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
   current="$(sed -n 's/^gtk-cursor-theme-name=//p' "$settings")"
 
-  while IFS='|' read -r key value; do
+  while IFS= read -r value; do
     if [[ "$key" == "$current" ]]; then
+      notify-send "$value"
       printf "%s" "$value"
       return
     fi
-  done <<<"$(vb-theme-cursor-list)"
+  done <<<"$(vb-cursor-list)"
 
-  # Fallback: if the list above is empty (e.g. not found)
-  printf "Adwaita"
+  # Fallback
+  printf '<i>[unknown]</i>'
 }
 
 _build() {
-  CURSOR_THEME="$(<"$VIBRANIUM_STATE/cursor-theme")"
-  CURSOR_THEME="${CURSOR_THEME:-$(_get_cursor_theme)}"
+  local cursor_theme="$VIBRANIUM_STATE/cursor-theme"
 
-  CURSOR_SIZE="$(<"$VIBRANIUM_STATE/cursor-size")"
-  CURSOR_SIZE="${CURSOR_SIZE:-Default}"
+  if [[ -f "$cursor_theme" ]]; then
+    # shellcheck source=/dev/null
+    source "$cursor_theme"
+  fi
+
+  CURSOR_THEME="${theme:-$(_get_cursor_theme)}"
+  CURSOR_SIZE="${size:-Default}"
 
   cfgr::item::raw "Notification timeout : $(_get_notification_timeout)s" "action:_set_notification_timeout"
-
   cfgr::item::bool --var VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK --label "Pause music on lock"
 
   # Allow default terminal selection only when both are installed.
@@ -402,7 +424,7 @@ _build() {
   fi
 
   cfgr::item::raw "Cursor theme : $CURSOR_THEME" "action:_set_cursor_theme"
-  cfgr::item::raw "Cursor size : ${CURSOR_SIZE}px" "action:_set_cursor_size"
+  cfgr::item::raw "Cursor size : $CURSOR_SIZE" "action:_set_cursor_size"
 
   cfgr::item::action --func "_manage_user_wallpapers" --label "User wallpapers"
   cfgr::item::action --func "_edit_env" --label "Edit env"

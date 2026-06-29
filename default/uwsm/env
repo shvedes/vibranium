@@ -51,13 +51,10 @@ export XCURSOR_PATH="$XDG_DATA_HOME/icons:/usr/share/icons"
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
 if [[ -f "$VIBRANIUM_STATE/cursor-theme" ]]; then
-  XCURSOR_THEME="$(<"$VIBRANIUM_STATE/cursor-theme")"
-  export XCURSOR_THEME
-fi
+  source "$VIBRANIUM_STATE/cursor-theme"
 
-if [[ -f "$VIBRANIUM_STATE/cursor-size" ]]; then
-  XCURSOR_SIZE="$(<"$VIBRANIUM_STATE/cursor-size")"
-  export XCURSOR_SIZE
+  [[ -n "$theme" ]] && export XCURSOR_THEME="$theme"
+  [[ -n "$size" ]]  && export XCURSOR_SIZE="$size"
 fi
 
 # Use Wayland when possible. Fallback to XWayland otherwise
