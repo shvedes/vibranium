@@ -12,7 +12,13 @@ if [[ -z "$CURRENT_BRIGHTNESS" ]]; then
 fi
 
 CURRENT_MONITOR="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
-CACHED_BRIGHTNESS="$(sed -n "s/^${CURRENT_MONITOR}:\([0-9]\+\)$/\1/p" "$VIBRANIUM_STATE/brightness")"
+
+while IFS=: read -r _ monitor level; do
+  if [[ $monitor == "$CURRENT_MONITOR" ]]; then
+    CACHED_BRIGHTNESS=$level
+    break
+  fi
+done < "$VIBRANIUM_STATE/monitors"
 
 if [[ -z "$CACHED_BRIGHTNESS" ]]; then
   exit

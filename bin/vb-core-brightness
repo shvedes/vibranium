@@ -1,8 +1,9 @@
 #!/usr/bin/bash
 
 # Overcomplicated script that manages brightness control using raw sysfs values
-# as well as the DDC protocol for external monitors. The script uses state files to cache
-# active values for both methods to speed up subsequent script executions.
+# as well as the DDC protocol for external monitors. The script uses a single state file
+# (lines in the "i2c:output:level" format) to cache active values for both methods
+# to speed up subsequent script executions.
 # This is ESPECIALLY useful for the DDC method, because ddcutil is known to be quite slow.
 # Thanks to the state file, changing brightness with DDC takes milliseconds instead of 500-700-1000ms.
 #
@@ -93,9 +94,52 @@ helpers::check \
   VIBRANIUM_BRIGHTNESS_STEP \
   VIBRANIUM_BRIGHTNESS_NOTIFY
 
+# One line per monitor in the format:
+#   i2c:output:level
+# where any field may be empty when not yet known (e.g. the level before the
+# first DDC read). The "output" (monitor name) is the key. Both the i2c bus
+# discovery and the brightness cache read/write through these helpers so that
+# updating one field never clobbers the other.
+STATE_FILE="$VIBRANIUM_STATE/monitors"
+
+# Load the unified state into the bus_map / level_map associative arrays.
+# Caller must declare them. Returns nothing useful; just populates the maps.
+load_state() {
+  local i2c output level
+  [[ -f "$STATE_FILE" ]] || return 0
+
+  while IFS=: read -r i2c output level; do
+    [[ -n "$output" ]] || continue
+    bus_map["$output"]="$i2c"
+    level_map["$output"]="$level"
+  done <"$STATE_FILE"
+}
+
+# Write the bus_map / level_map associative arrays back to the unified state
+# file. The file is tiny, so we build the whole content in a single string and
+# write it with one redirection. Caller must have the maps declared and populated.
+save_state() {
+  local output content=""
+
+  # Every known output lives in level_map after a load_state (even bus-only
+  # entries get an empty level), so iterating it covers all keys. Outputs that
+  # somehow exist only in bus_map are picked up by the second pass.
+  for output in "${!bus_map[@]}"; do
+    content+="${bus_map[$output]}:$output:${level_map[$output]}"$'\n'
+  done
+  for output in "${!level_map[@]}"; do
+    [[ -n "${bus_map[$output]+x}" ]] && continue
+    content+=":$output:${level_map[$output]}"$'\n'
+  done
+
+  printf '%s' "$content" >"$STATE_FILE"
+}
+
+# Detect monitors via DDC and merge their i2c buses into the unified state,
+# preserving any cached brightness levels.
 get_i2c_bus() {
-  local state_file new_info
-  declare -A bus_map
+  declare -A bus_map level_map
+  local new_info output bus
 
   # Detect monitors and extract MONITOR:BUS pairs,
   # skipping internal laptop panels
@@ -114,111 +158,56 @@ get_i2c_bus() {
         /VCP version/ && !skip { print name ":" bus }
     ')"
 
-  state_file="$VIBRANIUM_STATE/i2c-bus"
+  # Load existing cache so levels (and other buses) survive the rewrite
+  load_state
 
-  # Load existing cache if present
-  if [[ -f "$state_file" ]]; then
-    while IFS=: read -r name bus; do
-      if [[ -n "$name" && -n "$bus" ]]; then
-        bus_map["$name"]="$bus"
-      fi
-    done <"$state_file"
-  fi
-
-  # Merge newly detected data (overrides cached entries)
-  while IFS=: read -r name bus; do
-    if [[ -n "$name" && -n "$bus" ]]; then
-      bus_map["$name"]="$bus"
+  # Merge newly detected buses (overrides cached bus entries only)
+  while IFS=: read -r output bus; do
+    if [[ -n "$output" && -n "$bus" ]]; then
+      bus_map["$output"]="$bus"
     fi
   done <<<"$new_info"
 
-  {
-    # Write merged cache back to disk
-    for name in "${!bus_map[@]}"; do
-      printf '%s:%s\n' "$name" "${bus_map[$name]}"
-    done
-  } >"$state_file"
+  save_state
 }
 
 ensure_i2c_cache() {
-  local target name bus
-  target="$VIBRANIUM_STATE/i2c-bus"
+  declare -A bus_map level_map
+  load_state
 
-  if [[ ! -f "$target" ]]; then
-    return 1
-  fi
-
-  while IFS=: read -r name bus; do
-    if [[ "$name" == "$ACTIVE_MONITOR" ]]; then
-      return 0
-    fi
-  done <"$target"
-
-  return 1
+  [[ -n "${bus_map[$ACTIVE_MONITOR]:-}" ]]
 }
 
 set_i2c_bus() {
-  local final_bus
+  declare -A bus_map level_map
 
   if ! ensure_i2c_cache; then
     echo "I2C bus cache for the active monitor not found. Getting one"
     get_i2c_bus
   fi
 
-  while IFS=: read -r name bus; do
-    [[ $name == "$ACTIVE_MONITOR" ]] || continue
-    final_bus="$bus"
-    break
-  done <"$VIBRANIUM_STATE/i2c-bus"
-
-  echo "$final_bus"
+  load_state
+  echo "${bus_map[$ACTIVE_MONITOR]}"
 }
 
 get_brightness_cache() {
-  local state_file
-  declare -A old_info
-
-  state_file="$VIBRANIUM_STATE/brightness"
-
-  if [[ -f "$state_file" ]]; then
-    while IFS=: read -r name value; do
-      if [[ -n "$name" && -n "$value" ]]; then
-        old_info["$name"]="$value"
-      fi
-    done <"$state_file"
-  fi
+  declare -A bus_map level_map
+  load_state
 
   # If no entry for the active monitor, return empty to trigger a fresh fetch
-  echo "${old_info["$ACTIVE_MONITOR"]}"
+  echo "${level_map[$ACTIVE_MONITOR]:-}"
 }
 
 update_brightness_cache() {
   local new_value="$1"
-  local state_file tmp
-  declare -A info
+  declare -A bus_map level_map
 
-  state_file="$VIBRANIUM_STATE/brightness"
-  tmp="$(mktemp)"
+  load_state
 
-  # If the state file exists, read its contents
-  if [[ -f "$state_file" ]]; then
-    # Read lines in the format "Monitor:Brightness"
-    while IFS=: read -r name value; do
-      if [[ -n "$name" && -n "$value" ]]; then
-        info["$name"]="$value"
-      fi
-    done <"$state_file"
-  fi
+  # Update the brightness for the active monitor, leaving its i2c bus intact
+  level_map["$ACTIVE_MONITOR"]="$new_value"
 
-  # Update the brightness for the active monitor
-  info["$ACTIVE_MONITOR"]="$new_value"
-
-  # Write all "Monitor:Brightness" pairs
-  for name in "${!info[@]}"; do
-    printf '%s:%s\n' "$name" "${info[$name]}"
-  done >"$tmp"
-
-  mv -f "$tmp" "$state_file"
+  save_state
 }
 
 osd() {
@@ -325,7 +314,8 @@ case "$method" in
       fi
     done
     echo "Warn: cache not found!"
-    update_brightness_cache "$current" &
+    # No need to persist "$current" here: the final value ("$new") is written
+    # below, and doing both would race two background writers on the same file.
   fi
 
   # The remaining code at the bottom is generally self-explanatory
