@@ -11,7 +11,7 @@ FALLBACK_THEME="nightfox-nightfox"
 # because removing them would expose the unmodified official theme, not uninstall
 # anything meaningful from the user's perspective.
 mapfile -t community_themes < <(
-  find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' |
+  find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d,l -printf '%f\n' |
     sort |
     while read -r folder; do
       if [[ ! -d "$VIBRANIUM/themes/$folder" ]]; then
@@ -44,24 +44,26 @@ _capitalize() {
 # Build capitalized display names; map display -> folder for reverse lookup
 menu_items=()
 declare -A display_to_folder=()
+declare -A display_to_clean=()
+
 for folder in "${community_themes[@]}"; do
-  # Cover a case where a theme was git clone'd
-  # manually. This way the theme folder name will
-  # remain the same as the repo name. So remove it from
-  # display name.
-  folder="${folder/vibranium-theme-/}"
-  folder="${folder/-vibranium-theme/}"
-  folder="${folder/theme-vibranium-/}"
-  folder="${folder/-theme-vibranium/}"
+  clean_name="$folder"
 
-  folder="${folder/omarchy-theme-/}"
-  folder="${folder/-omarchy-theme/}"
-  folder="${folder/theme-omarchy-/}"
-  folder="${folder/-theme-omarchy/}"
+  clean_name="${clean_name/vibranium-theme-/}"
+  clean_name="${clean_name/-vibranium-theme/}"
+  clean_name="${clean_name/theme-vibranium-/}"
+  clean_name="${clean_name/-theme-vibranium/}"
 
-  display="$(_capitalize "$folder")"
+  clean_name="${clean_name/omarchy-theme-/}"
+  clean_name="${clean_name/-omarchy-theme/}"
+  clean_name="${clean_name/theme-omarchy-/}"
+  clean_name="${clean_name/-theme-omarchy/}"
+
+  display="$(_capitalize "$clean_name")"
   menu_items+=("$display")
+
   display_to_folder["$display"]="$folder"
+  display_to_clean["$display"]="$clean_name"
 done
 
 chosen_display=""
@@ -72,11 +74,20 @@ if [[ -z "$chosen_display" ]]; then
 fi
 
 chosen_name="${display_to_folder[$chosen_display]}"
+chosen_clean="${display_to_clean[$chosen_display]}"
 chosen_path="$THEMES_DIR/$chosen_name"
 
 if [[ ! -d "$chosen_path" ]]; then
   notify-send -r 3 -t 5000 "Vibranium" "Theme folder not found: $chosen_path"
   exit 1
+fi
+
+# Read the active theme name before deletion; if current/ is a symlink to the
+# active theme directory, rm -rf below would dangle it and make the file
+# unreadable, leaving current_theme empty and skipping the fallback switch.
+current_theme=""
+if [[ -f "$THEME_NAME_FILE" ]]; then
+  current_theme="$(<"$THEME_NAME_FILE")"
 fi
 
 rm -rf "$chosen_path"
@@ -108,13 +119,8 @@ if [[ -f "$state_file" ]]; then
 fi
 
 # If the removed theme was the active one, fall back to the default
-current_theme=""
-if [[ -f "$THEME_NAME_FILE" ]]; then
-  current_theme="$(<"$THEME_NAME_FILE")"
-fi
-
-if [[ "$current_theme" == "$chosen_name" ]]; then
+if [[ "$current_theme" == "$chosen_clean" ]]; then
   vb-theme-set "$FALLBACK_THEME"
 fi
 
-notify-send -r 3 "Vibranium" "${chosen_name^} has been removed"
+notify-send -r 3 "Vibranium" "$chosen_display has been removed"
