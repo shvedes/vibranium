@@ -14,7 +14,7 @@ Usage: $SELF [OPTION]... -- COMMAND [ARG]...
 Launch COMMAND under gamescope
 
 Options:
-      --ld-workaround            Try to use LD_PRELOAD workaround
+      --ld-workaround            Try to use LD_PRELOAD workaround (Steam overlay)
       --gamescope-options=OPTS   Pass extra flags to gamescope
       --no-power-profile         Don't change power profile
       --mangohud                 Wrap the game with mangohud
@@ -264,8 +264,7 @@ EXEC_CMDLINE=()
 
 # Power profile
 if [[ $NO_POWER_PROFILE == false ]]; then
-  # I should move this logic to the vb-core-power so we don't cycle ghost (not available on a machine) profiles
-  mapfile -t POWERPROFILES < <(powerprofilesctl list | awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }')
+  mapfile -t POWERPROFILES < <(vb-core-power --list)
 
   if ((${#POWERPROFILES[@]} > 0)); then
     if [[ "${POWERPROFILES[*]}" =~ performance ]]; then
@@ -274,6 +273,8 @@ if [[ $NO_POWER_PROFILE == false ]]; then
         --profile performance
         --
       )
+    else
+      echo "$SELF: warning: no 'performance' power profile available, skipping"
     fi
   fi
 fi
