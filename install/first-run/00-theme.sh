@@ -1,3 +1,3 @@
 #!/bin/bash
 
-vb-theme-set nightfox-nightfox
+vb-theme-set Nightfox
