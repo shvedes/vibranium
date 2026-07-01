@@ -1,36 +1,53 @@
 #!/usr/bin/bash
 
-TAG=$(git -C "$VIBRANIUM" describe --tags --abbrev=0 2> /dev/null)
-HEAD=$(git -C "$VIBRANIUM" rev-parse --short HEAD)
-TAG_COMMIT=$(git -C "$VIBRANIUM" rev-parse --short "$(git -C "$VIBRANIUM" rev-list -n 1 "$TAG")")
-DATE=$(git -C "$VIBRANIUM" show -s --format=%cd --date=short HEAD)
-BRANCH=$(git -C "$VIBRANIUM" branch --show-current)
+DESCRIBE=$(git -C "$VIBRANIUM" describe --tags --long --abbrev=7 2>/dev/null)
+INFO=$(git -C "$VIBRANIUM" show -s --format="%cd|%h|%D" --date=short HEAD 2>/dev/null)
 
-if [ "$HEAD" = "$TAG_COMMIT" ]; then
-  echo "Vibranium ${TAG} release (${DATE})"
-else
-  COMMITS_AHEAD=$(git -C "$VIBRANIUM" rev-list --count "$TAG"..HEAD)
+DATE="${INFO%%|*}"
+REST="${INFO#*|}"
+SHORT_HASH="${REST%%|*}"
+REFS="${REST#*|}"
 
-  echo "Vibranium dev ${TAG}+"
-  echo "Branch: ${BRANCH} @ ${HEAD} (${DATE})"
-  echo "${COMMITS_AHEAD} commits ahead of ${TAG}"
+case "$REFS" in
+  *"HEAD -> "*)
+    BRANCH="${REFS#*HEAD -> }"
+    BRANCH="${BRANCH%%,*}"
+    ;;
+esac
 
-  # Determine the reference to measure "behind" against.
-  # dev branch compares to master; master compares to its remote tracking branch.
-  case "$BRANCH" in
-    master | main)
-      UPSTREAM=$(git -C "$VIBRANIUM" rev-parse --abbrev-ref '@{upstream}' 2> /dev/null)
-      ;;
-    *)
-      UPSTREAM="origin/master"
-      ;;
-  esac
+if [ -n "$DESCRIBE" ]; then
+  DESCRIBE_NO_HASH="${DESCRIBE%-*}"
+  COMMITS_AHEAD="${DESCRIBE_NO_HASH##*-}"
+  TAG="${DESCRIBE_NO_HASH%-*}"
 
-  if [ -n "$UPSTREAM" ] && git -C "$VIBRANIUM" rev-parse --verify "$UPSTREAM" &> /dev/null; then
-    COMMITS_BEHIND=$(git -C "$VIBRANIUM" rev-list --count HEAD.."$UPSTREAM")
-    if [ "$COMMITS_BEHIND" -gt 0 ]; then
-      echo "${COMMITS_BEHIND} commits behind ${UPSTREAM}"
+  if [ "$COMMITS_AHEAD" -eq 0 ]; then
+    echo "Vibranium ${TAG} release (${DATE})"
+  else
+    echo "Vibranium dev ${TAG}+"
+    echo "Branch: ${BRANCH} @ ${SHORT_HASH} (${DATE})"
+    echo "${COMMITS_AHEAD} commits ahead of ${TAG}"
+
+    case "$BRANCH" in
+      master | main)
+        UPSTREAM=$(git -C "$VIBRANIUM" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)
+        ;;
+      *)
+        UPSTREAM="origin/master"
+        ;;
+    esac
+
+    if [ -n "$UPSTREAM" ] && git -C "$VIBRANIUM" rev-parse --verify "$UPSTREAM" &>/dev/null; then
+      COMMITS_BEHIND=$(git -C "$VIBRANIUM" rev-list --count HEAD.."$UPSTREAM")
+      if [ "$COMMITS_BEHIND" -gt 0 ]; then
+        echo "${COMMITS_BEHIND} commits behind ${UPSTREAM}"
+      fi
     fi
+  fi
+else
+  if [ -n "$BRANCH" ]; then
+    echo "Branch: ${BRANCH} @ ${SHORT_HASH} (${DATE})"
+  else
+    echo "Vibranium ${SHORT_HASH} (${DATE})"
   fi
 fi
 

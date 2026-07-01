@@ -4,9 +4,6 @@ set -euo pipefail
 
 source vb-lib-core
 
-# Always restore cursor on exit, regardless of how we exit
-trap 'term::enable_input' EXIT
-
 _pause() {
   # shellcheck disable=SC2034
   read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to exit' dummy
@@ -38,7 +35,7 @@ _check_and_stash() {
 _apply_stash() {
   if [[ "$stashed" == true ]]; then
     if ! git -C "$VIBRANIUM" stash apply -q; then
-      _fail "Stash apply failed due to conflicts. Please resolve manually."
+      _fail "Stash apply failed due to conflicts. Your changes are preserved in the stash (check 'git stash list'). Resolve conflicts in the working tree, then run 'git stash drop'."
     fi
 
     git -C "$VIBRANIUM" stash drop -q
@@ -49,9 +46,98 @@ _apply_stash() {
 _restore_stash_and_fail() {
   local msg="$1"
   if [[ "$stashed" == true ]]; then
-    git -C "$VIBRANIUM" stash pop -q || true
+    if ! git -C "$VIBRANIUM" stash pop -q; then
+      echo -e "${YELLOW}[VIBRANIUM]${RESET} WARNING: Could not restore stashed changes automatically." >&2
+      echo -e "${YELLOW}[VIBRANIUM]${RESET} Check 'git stash list' and restore manually." >&2
+    fi
   fi
   _fail "$msg"
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat >&2 <<EOF
+Usage: ${0##*/} [OPTION]... [CHANNEL]
+
+Update Vibranium to the latest version.
+
+Options:
+      --nuke            discard all local changes and reset to remote state
+      --help            display this help and exit
+EOF
+}
+
+_nuke() {
+  local channel target
+
+  if [[ -n "$channel_arg" ]]; then
+    channel="$channel_arg"
+  elif [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
+    channel="$(<"$VIBRANIUM_STATE/update.channel")"
+  else
+    channel="$(git -C "$VIBRANIUM" branch --show-current)"
+  fi
+
+  if [[ -z "$channel" ]]; then
+    _fail "Not on a branch. Specify a channel or switch to a branch before nuking."
+  fi
+
+  echo -e "${RED}[VIBRANIUM]${RESET} WARNING: This will DISCARD ALL local changes, stashes, and untracked files."
+  if ! term::ask_yes_no N "Are you sure?"; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Nuke aborted"
+    _pause
+    exit 0
+  fi
+  if ! term::ask_yes_no N "Really? This cannot be undone."; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} Nuke aborted"
+    _pause
+    exit 0
+  fi
+
+  git -C "$VIBRANIUM" fetch --all --prune --prune-tags &>/dev/null &
+  if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching latest from remote..." "${GREEN}✔${RESET}" "${RED}✘${RESET}"; then
+    _fail "Failed to fetch updates."
+  fi
+
+  if [[ "$channel" == "release" ]]; then
+    local latest_tag
+    latest_tag=$(git -C "$VIBRANIUM" tag --sort=-creatordate | head -n 1)
+    if [[ -z "$latest_tag" ]]; then
+      _fail "No release tags found."
+    fi
+    target=$(git -C "$VIBRANIUM" rev-parse "${latest_tag}^{}")
+  else
+    local remote_ref
+    case "$channel" in
+      upstream) remote_ref="origin/master" ;;
+      dev)      remote_ref="origin/dev" ;;
+      *)        remote_ref="origin/$channel" ;;
+    esac
+    if ! git -C "$VIBRANIUM" rev-parse --verify "$remote_ref" &>/dev/null; then
+      _fail "Remote branch '$remote_ref' not found. Verify your channel name or check available remotes with 'git branch -r'."
+    fi
+    target="$remote_ref"
+  fi
+
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Resetting to $target..."
+  if ! git -C "$VIBRANIUM" reset --hard "$target"; then
+    _fail "Failed to reset to $target."
+  fi
+
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Cleaning untracked files..."
+  git -C "$VIBRANIUM" clean -fdx
+
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Clearing all stashes..."
+  git -C "$VIBRANIUM" stash clear
+
+  rm -f "$VIBRANIUM_STATE/update.available" || true
+  vb-refresh-waybar-module vb-update
+  echo -e "${GREEN}[VIBRANIUM]${RESET} Repository reset to clean state"
 }
 
 _update() {
@@ -59,14 +145,20 @@ _update() {
   # stashed must not be local so _check_and_stash and _apply_stash can share it
   stashed=false
 
-  if [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
+  if [[ -n "$channel_arg" ]]; then
+    channel="$channel_arg"
+  elif [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
     channel="$(<"$VIBRANIUM_STATE/update.channel")"
   else
     channel="$(git -C "$VIBRANIUM" branch --show-current)"
   fi
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Getting updates from remote..."
-  if ! git -C "$VIBRANIUM" fetch --tags --prune --prune-tags; then
+  if [[ -z "$channel" ]]; then
+    _fail "Not on a branch. Please switch to a branch before updating."
+  fi
+
+  git -C "$VIBRANIUM" fetch --tags --prune --prune-tags &>/dev/null &
+  if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting updates from remote" "" ""; then
     _fail "Failed to fetch updates. Check your network or repository permissions."
   fi
 
@@ -96,24 +188,37 @@ _update() {
     _check_and_stash
 
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Updating to ${latest_tag}..."
-    if ! git -C "$VIBRANIUM" checkout -q "$latest_tag"; then
-      _restore_stash_and_fail "Failed to checkout $latest_tag."
+    if ! git -C "$VIBRANIUM" merge --ff-only "$latest_tag" -q; then
+      _restore_stash_and_fail "Failed to fast-forward to $latest_tag."
     fi
 
     _apply_stash
 
-    vb-update-migrate
+    if ! vb-update-migrate; then
+      _fail "Update to $latest_tag succeeded but migration failed. Please check manually."
+    fi
 
     echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $latest_tag"
 
   else
+    local remote_ref
+    case "$channel" in
+      upstream) remote_ref="origin/master" ;;
+      dev)      remote_ref="origin/dev" ;;
+      *)        remote_ref="origin/$channel" ;;
+    esac
+
+    if ! git -C "$VIBRANIUM" rev-parse --verify "$remote_ref" &>/dev/null; then
+      _fail "Remote branch '$remote_ref' not found. Verify your channel name or check available remotes with 'git branch -r'."
+    fi
+
     local remote_commit current_commit remote_short current_short behind
 
-    remote_commit=$(git -C "$VIBRANIUM" rev-parse origin/master)
-    remote_short=$(git -C "$VIBRANIUM" rev-parse --short origin/master)
+    remote_commit=$(git -C "$VIBRANIUM" rev-parse "$remote_ref")
+    remote_short=$(git -C "$VIBRANIUM" rev-parse --short "$remote_ref")
     current_commit=$(git -C "$VIBRANIUM" rev-parse HEAD)
     current_short=$(git -C "$VIBRANIUM" rev-parse --short HEAD)
-    behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/master --count)
+    behind=$(git -C "$VIBRANIUM" rev-list HEAD.."$remote_ref" --count)
 
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Local:  $current_short ($current_commit)"
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Remote: $remote_short ($remote_commit)"
@@ -123,7 +228,7 @@ _update() {
         echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date"
       else
         local ahead
-        ahead=$(git -C "$VIBRANIUM" rev-list origin/master..HEAD --count)
+        ahead=$(git -C "$VIBRANIUM" rev-list "$remote_ref"..HEAD --count)
         echo -e "${GREEN}[VIBRANIUM]${RESET} You are $ahead commit(s) ahead of remote, nothing to pull"
       fi
       rm -f "$VIBRANIUM_STATE/update.available" || true
@@ -139,23 +244,62 @@ _update() {
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Updating to latest upstream..."
 
     # We already fetched, so merge rather than pull to avoid a second fetch
-    if ! git -C "$VIBRANIUM" merge --ff-only origin/master -q; then
+    if ! git -C "$VIBRANIUM" merge --ff-only "$remote_ref" -q; then
       _restore_stash_and_fail "Failed to merge upstream changes."
     fi
 
     _apply_stash
 
-    vb-update-migrate
+    if ! vb-update-migrate; then
+      _fail "Update succeeded but migration failed. Please check manually."
+    fi
 
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $remote_short"
+    echo -e "${GREEN}[VIBRANIUM]${RESET} Vibranium updated to $remote_short ($channel)"
   fi
 
   vb-cmd-reload --quiet
   _pause
 }
 
+nuke=false
+channel_arg=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --nuke)
+      nuke=true
+      shift
+      ;;
+    -h| --help)
+      usage
+      exit 0
+      ;;
+    --*)
+      echo "${0##*/}: unknown option '$1'" >&2
+      echo "Try '${0##*/} --help' for more information." >&2
+      exit 1
+      ;;
+    *)
+      if [[ -z "$channel_arg" ]]; then
+        channel_arg="$1"
+      else
+        echo "${0##*/}: unexpected argument '$1'" >&2
+        echo "Try '${0##*/} --help' for more information." >&2
+        exit 1
+      fi
+      shift
+      ;;
+  esac
+done
+
 term::show_header
 term::disable_input
+
+if [[ "$nuke" == true ]]; then
+  _nuke
+  _pause
+  exit 0
+fi
 
 if term::ask_yes_no Y "Proceed with update?"; then
   _update
