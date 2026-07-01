@@ -2,6 +2,15 @@
 
 SELF="${0##*/}"
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -15,6 +24,7 @@ Usage: $SELF -- COMMAND [ARGS...]
 Focus existing window matching COMMAND, or launch it via app2unit.
 
 Options:
+  -v, --verbose  Enable verbose output
   -h, --help     Show this help and exit
 EOF
 }
@@ -24,6 +34,7 @@ focus_or_launch() {
 
   local match_key="${cmd[0]##*/}"
   match_key="${match_key,,}"
+  log Info "Focus or launch: key=$match_key cmd=${cmd[*]}"
 
   local window_address
   window_address="$(
@@ -158,8 +169,10 @@ focus_or_launch() {
   )"
 
   if [[ -n "$window_address" ]]; then
+    log Info "Focusing existing window: address=$window_address"
     hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
   else
+    log Info "No matching window found, launching: ${cmd[*]}"
     exec setsid -f app2unit -- "${cmd[@]}"
   fi
 }
@@ -176,6 +189,10 @@ while (($#)); do
   --)
     shift
     break
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
     ;;
   -h | --help)
     usage
@@ -202,12 +219,14 @@ helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
 if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
   # You probably want multiple file managers open simultaneously
   if [[ "${COMMAND[0]}" =~ $SKIP_REGEX ]]; then
+    log Info "Command ${COMMAND[0]} matches skip regex, launching directly"
     # shellcheck disable=SC2068
     exec setsid -f app2unit -- ${COMMAND[@]}
   else
     focus_or_launch ${COMMAND[@]}
   fi
 else
+  log Info "Always-focus disabled, launching directly"
   # shellcheck disable=SC2068
   exec setsid -f app2unit -- ${COMMAND[@]}
 fi

@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 
@@ -32,6 +41,7 @@ Options:
   --pause        Pause playback
   --next         Switch to next track
   --previous     Switch to previous track
+  -v, --verbose  Enable verbose output
   -h, --help     Display this help and exit
 EOF
 }
@@ -183,9 +193,10 @@ get_volume() {
     # Strip trailing "%" -> "25"
     vol=${vol%\%}
 
-    # "$((vol))e-2" -> "25e-2" (scientific notation)
-    # printf then converts it to a proper float -> "0.25"
-    # Bash itself can't do floating point, but printf can format it
+    # Bash cannot do floating-point arithmetic, but printf(1) can format
+    # scientific notation.  "25e-2" is parsed by printf as 0.25.
+    # "$((vol))" evaluates the variable as an integer, producing
+    # "25e-2" which is then formatted by %0.2f as "0.25".
     printf '%0.2f\n' "$((vol))e-2"
   fi
 }
@@ -201,7 +212,8 @@ set_volume() {
   mpd)
     local int_vol
 
-    # The same trick here
+    # Reverse of get_volume: multiply by 100 via scientific notation
+    # (e.g. "0.75e2" → 75), then round to nearest integer with %.0f.
     printf -v int_vol '%.0f' "${vol}e2"
     mpc -q volume "$int_vol"
     ;;
@@ -244,6 +256,9 @@ previous_track() {
   fi
 }
 
+# Smoothly fade volume from current to 0 over num_steps iterations.
+# Uses pure integer arithmetic on hundredths-of-volume to avoid
+# floating-point rounding drift across the fade curve.
 fade_out() {
   local num_steps="$1"
   if [ "$num_steps" = "off" ]; then
@@ -252,25 +267,25 @@ fade_out() {
 
   local current
   current=$(get_volume)
-  # Force exactly 2 decimal places (pure bash + builtin printf)
   current=$(printf '%.2f' "$current")
 
-  # Convert "0.75" -> integer 75 (hundredths)
+  # Convert "0.75" -> integer 75 (hundredths). 10# ensures base-10
+  # parsing even if the stripped string begins with "0".
   local current_int
   current_int=$((10#${current//./}))
 
   if ((current_int <= 0)); then
-    return # Already at 0
+    return
   fi
 
   for ((i = 1; i <= num_steps; i++)); do
     local new_vol_int
-    # Pure integer math: current * (num_steps - i) / num_steps
-    # This is smoother and avoids floating-point rounding drift
+    # Linear fade: vol = current * (steps - i) / steps
+    # Integer division truncates naturally, which is fine here every
+    # intermediate step is slightly quieter than the ideal curve.
     new_vol_int=$((current_int * (num_steps - i) / num_steps))
 
     local new_vol
-    # Convert back to 0.xx float using the exact same printf trick we used in get_volume
     new_vol=$(printf '%0.2f' "$((new_vol_int))e-2")
 
     set_volume "$new_vol"
@@ -279,6 +294,8 @@ fade_out() {
   set_volume 0
 }
 
+# Smoothly fade volume from 0 to target over num_steps iterations.
+# Same integer-based approach as fade_out.
 fade_in() {
   local num_steps="$1"
   local target="$2"
@@ -288,20 +305,18 @@ fade_in() {
     return
   fi
 
-  # Normalize target to exactly 2 decimals
   target=$(printf '%.2f' "$target")
 
-  # Convert to integer hundredths
   local target_int
   target_int=$((10#${target//./}))
 
   if ((target_int <= 0)); then
-    # Target is 0
     return
   fi
 
   for ((i = 1; i <= num_steps; i++)); do
     local new_vol_int
+    # Linear ramp: vol = target * i / steps
     new_vol_int=$((target_int * i / num_steps))
 
     local new_vol
@@ -314,8 +329,38 @@ fade_in() {
   set_volume "$target"
 }
 
-case "$1" in
+ACTION=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --toggle | --play | --pause | --next | --previous)
+    ACTION="$1"
+    shift
+    ;;
+  *)
+    echo "Unknown argument: $*" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+# The toggle/pause action saves the current volume to a file before
+# fading out, then restores it when resuming. This preserves the
+# user's volume level across a play/pause cycle even when fade is
+# enabled. Without this, a fade-out would set volume to 0 and the
+# next fade-in would have nothing to ramp from.
+case "$ACTION" in
 "--toggle")
+  log Info "Toggling play/pause"
   set_opts
   detect_active_player
   CURRENT_VOLUME=$(get_volume)
@@ -346,6 +391,7 @@ case "$1" in
   fi
   ;;
 "--play")
+  log Info "Playing"
   set_opts
   detect_active_player
   if [ "$STATUS" != "Playing" ]; then
@@ -366,6 +412,7 @@ case "$1" in
   fi
   ;;
 "--pause")
+  log Info "Pausing"
   set_opts
   detect_active_player
   CURRENT_VOLUME=$(get_volume)
@@ -381,11 +428,12 @@ case "$1" in
   fi
   ;;
 "--next" | "--previous")
+  log Info "Track: ${ACTION#--}"
   set_opts
   detect_active_player
   CURRENT_VOLUME=$(get_volume)
   if [ "$NUM_STEPS_SWITCH" = "off" ]; then
-    if [ "$1" = "--next" ]; then
+    if [ "$ACTION" = "--next" ]; then
       next_track
     else
       previous_track
@@ -401,21 +449,16 @@ case "$1" in
 
   original_volume="$CURRENT_VOLUME"
   fade_out "$NUM_STEPS_SWITCH"
-  if [ "$1" = "--next" ]; then
+  if [ "$ACTION" = "--next" ]; then
     next_track
   else
     previous_track
   fi
   fade_in "$NUM_STEPS_SWITCH" "$original_volume"
   ;;
-"-h" | "--help" | "")
+"")
   usage
   exit 0
-  ;;
-*)
-  echo "Uknown argument: $*" >&2
-  echo "Try '$SELF --help' for more information" >&2
-  exit 1
   ;;
 esac
 

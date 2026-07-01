@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 FILE="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.lua"
 SELF="${0##*/}"
 
@@ -16,17 +25,22 @@ Usage: $SELF [OPTION]
 Toggle Hyprland smart gaps configuration.
 
 Options:
-  -h, --help   Show this help and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
 EOF
 }
 
 case "${1:-}" in
+-v | --verbose)
+  VERBOSE=true
+  ;;
 -h | --help)
   usage
   exit 0
   ;;
 esac
 
+log Info "Toggling smart gaps"
 if [[ -f "$FILE" ]]; then
   rm -f "$FILE"
 else

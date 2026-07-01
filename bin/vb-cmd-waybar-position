@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 WAYBAR_CONF="$XDG_CONFIG_HOME/waybar/config.jsonc"
 DUNST_CONF="$XDG_CONFIG_HOME/dunst/dunstrc"
 
@@ -18,28 +27,50 @@ Move Waybar and Dunst notifications to the top or bottom of the screen.
 Options:
   --top       Move modules to the top
   --bottom    Move modules to the bottom
+  -v, --verbose Enable verbose output
   -h, --help  Show this help and exit
 EOF
 }
 
 TARGET=""
 
-for arg in "$@"; do
-  case "$arg" in
-  --top) TARGET="top" ;;
-  --bottom) TARGET="bottom" ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  --top)
+    TARGET="top"
+    shift
+    ;;
+  --bottom)
+    TARGET="bottom"
+    shift
+    ;;
   -h | --help | "")
     usage
     exit 0
     ;;
   *)
-    echo "Unknown option: $arg" >&2
+    echo "Unknown option: $1" >&2
     usage
     exit 1
     ;;
   esac
 done
 
+if [[ -z "$TARGET" ]]; then
+  echo "Error: missing target (--top or --bottom)" >&2
+  usage
+  exit 1
+fi
+
+log Info "Moving Waybar to $TARGET"
+
+# Extract the current "position" value from Waybar's JSON config.
+# awk splits by double quotes so $4 is the value field (e.g. "top" or "bottom").
+# Format: "position": "top"   → $1="", $2="position", $3=": ", $4="top"
 CURRENT_POSITION="$(awk -F'"' '/"position"[[:space:]]*:/ {print $4}' "$WAYBAR_CONF")"
 
 if [[ "$CURRENT_POSITION" == "$TARGET" ]]; then
@@ -53,6 +84,10 @@ top) ORIGIN="top-right" ;;
 bottom) ORIGIN="bottom-right" ;;
 esac
 
+# Update Dunst's notification origin to match the new Waybar position.
+# If the dunstrc does not exist yet, create it with just the origin setting.
+# If it exists but has no origin line, append one.
+# Otherwise replace the existing origin value inline.
 if [[ ! -f "$DUNST_CONF" ]]; then
   printf "[global]\norigin = %s\n" "$ORIGIN" >"$DUNST_CONF"
 elif ! grep -q origin "$DUNST_CONF"; then

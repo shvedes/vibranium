@@ -1,5 +1,14 @@
 #!/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 
 shcat() {
@@ -14,7 +23,8 @@ Usage: $SELF [OPTION]...
 Cycle to the next available PipeWire audio output.
 
 Options:
-  -h, --help       display this help text and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
 
 Exit status:
   0   output switched successfully (or only one output present)
@@ -37,6 +47,10 @@ notify() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -h | --help)
     usage
     exit 0
@@ -77,6 +91,8 @@ if [[ $sinks_count -eq 1 ]]; then
   notify-send -r 2 "Vibranium" "Only one audio output available — nothing to switch to"
   exit 0
 fi
+
+log Info "Cycling audio output"
 
 # Determine next sink
 current_sink_name=$(pactl get-default-sink)

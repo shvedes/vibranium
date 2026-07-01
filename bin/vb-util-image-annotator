@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -14,7 +23,8 @@ Launch a photo editor for the given image file using satty.
 If no FILE is provided, prompt for selection using zenity if available.
 
 Options:
-  -h, --help  display this help and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
 
 FILE must be an image file with extension: .png, .jpg, .jpeg, .ppm, or .webp.
 The annotated file is saved back over the source file.
@@ -24,6 +34,7 @@ EOF
 # If launched from imv - close that window
 # before editing.
 if [[ "$1" == "--imv" ]]; then
+  log Info "Closing imv before annotation"
   killall imv-wayland
   shift
 fi
@@ -36,6 +47,10 @@ if [[ $# -gt 1 ]]; then
 fi
 
 case "$1" in
+-v | --verbose)
+  VERBOSE=true
+  shift
+  ;;
 -h | --help)
   usage
   exit 0
@@ -47,8 +62,10 @@ case "$1" in
   ;;
 esac
 
+log Info "Starting image annotator"
+
 if ! command -v satty >/dev/null; then
-  echo "Error: satty not found!" >&2
+  log Error "satty not found"
   vb-cmd-dep-notify --name "Image Editor" --deps "satty"
   exit 1
 fi

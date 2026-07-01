@@ -18,6 +18,7 @@ Options:
       --gamescope-options=OPTS   Pass extra flags to gamescope
       --no-power-profile         Don't change power profile
       --mangohud                 Wrap the game with mangohud
+      -v, --verbose              Be verbose
       -h, --help                 Display this help and exit
 
 Notes:
@@ -135,12 +136,22 @@ die() {
   exit 1
 }
 
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 is_known_gamescope_flag() {
   local flag="$1"
   local f
+
   for f in "${GAMESCOPE_FLAGS[@]}"; do
     [[ "$flag" == "$f" ]] && return 0
   done
+
+  log Warn "unknown gamescope option: $flag"
   return 1
 }
 
@@ -161,21 +172,28 @@ parse_gamescope_options() {
   local -a tokens
   read -ra tokens <<<"$opts_str"
 
-  local token
+  local token prev_was_flag=false
   for token in "${tokens[@]}"; do
-    # Only validate tokens that look like flags; bare values (numbers, strings
-    # following a flag) are passed through as-is.
     if [[ "$token" == -* ]]; then
-      is_known_gamescope_flag "$token" ||
-        die "unknown gamescope option: '$token'"
+      if is_known_gamescope_flag "$token"; then
+        EXTRA_GAMESCOPE_OPTS+=("$token")
+        prev_was_flag=true
+      else
+        prev_was_flag=false
+      fi
+    else
+      if $prev_was_flag; then
+        EXTRA_GAMESCOPE_OPTS+=("$token")
+        prev_was_flag=false
+      fi
     fi
-    EXTRA_GAMESCOPE_OPTS+=("$token")
   done
 }
 
 OVERRIDE_LDPRELOAD=false
 NO_POWER_PROFILE=false
 USE_MANGOHUD=false
+VERBOSE=false
 EXTRA_GAMESCOPE_OPTS=()
 
 while [[ $# -gt 0 ]]; do
@@ -202,9 +220,13 @@ while [[ $# -gt 0 ]]; do
     shift 2
     ;;
   --no-power-profile)
-      NO_POWER_PROFILE=true
-      shift
-      ;;
+    NO_POWER_PROFILE=true
+    shift
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   --)
     shift
     break
@@ -222,13 +244,18 @@ done
 [[ $# -gt 0 ]] || die "no command given"
 
 # Mangohud availability check (done early so we can warn before any exec)
-if $USE_MANGOHUD && ! command -v mangohud >/dev/null; then
-  echo "$SELF: warning: --mangohud requested but 'mangohud' not found in PATH; ignoring" >&2
-  USE_MANGOHUD=false
+if $USE_MANGOHUD; then
+  if ! command -v mangohud >/dev/null; then
+    USE_MANGOHUD=false
+    log Warn "--mangohud requested but 'mangohud' not found in PATH; ignoring"
+  else
+    log Info "Found mangohud"
+  fi
 fi
 
 # Gamescope not available — fall back gracefully
 if ! command -v gamescope >/dev/null; then
+  log Warn "gamescope is not installed"
   notify-send -r 1 -t 5000 "Vibranium" \
     "<b>gamescope</b> not found! Launching the game as is."
 
@@ -248,6 +275,9 @@ SAVED_LD_PRELOAD="${LD_PRELOAD-}"
 unset LD_PRELOAD
 export LD_PRELOAD=""
 
+# Default to Wayland SDL backend unless the user has explicitly set one.
+# This is needed because some games default to X11 under gamescope even
+# though the native Wayland path is available and performs better.
 if ! [[ -n "$SDL_VIDEODRIVER" ]]; then
   export SDL_VIDEODRIVER="wayland"
 fi
@@ -258,11 +288,15 @@ MONITOR_REFRESH_RATE="$(jq -r '.refreshRate | floor' <<<"$MONITOR_DATA")"
 MONITOR_H="$(jq -r '.height' <<<"$MONITOR_DATA")"
 MONITOR_W="$(jq -r '.width' <<<"$MONITOR_DATA")"
 
+log Info "Monitor: $MONITOR_NAME (${MONITOR_W}x${MONITOR_H}@$MONITOR_REFRESH_RATE)"
+
 # Build exec command line
 
 EXEC_CMDLINE=()
 
 # Power profile
+
+log Info "Getting available power profiles"
 if [[ $NO_POWER_PROFILE == false ]]; then
   mapfile -t POWERPROFILES < <(vb-core-power --list)
 
@@ -274,18 +308,21 @@ if [[ $NO_POWER_PROFILE == false ]]; then
         --
       )
     else
-      echo "$SELF: warning: no 'performance' power profile available, skipping"
+      log Warn "'performance' power profile not available, skipping"
     fi
   fi
 fi
 
-# Mangohud — use separate binary instead of gamescope's --mangoapp (broken)
+# mangohud is added as a separate wrapper instead of using gamescope's
+# built-in --mangoapp flag, which has known stability issues and lacks
+# some mangohud overlay features.
 if $USE_MANGOHUD; then
   EXEC_CMDLINE+=(mangohud)
 fi
 
 # Build resolution/refresh/scaler defaults, skipping any flag the user
 # already supplied via --gamescope-options so their value takes effect.
+# Each line checks the short and long flag name before appending the default.
 GAMESCOPE_DEFAULTS=()
 has_extra_flag -r || has_extra_flag --nested-refresh || GAMESCOPE_DEFAULTS+=(--nested-refresh "$MONITOR_REFRESH_RATE")
 has_extra_flag -W || has_extra_flag --output-width || GAMESCOPE_DEFAULTS+=(-W "$MONITOR_W")
@@ -301,6 +338,16 @@ if $OVERRIDE_LDPRELOAD; then
   GAME_CMDLINE=(env LD_PRELOAD="$SAVED_LD_PRELOAD")
 fi
 
+log Info "Gamescope log available in $VIBRANIUM_CACHE/gamescope_latest.log"
+log Info "Full cmdline: ${EXEC_CMDLINE[*]}"
+log Info "Launching ${GAME_CMDLINE[*]}"
+
+# Assemble and exec the final gamescope command:
+#   1. powerprofilesctl launch --profile performance (optional)
+#   2. mangohud (optional)
+#   3. gamescope with user extras → built-in defaults → hardcoded flags
+#   4. -- as separator, followed by the game command
+#   5. stdout+stderr redirected to a log file for debugging.
 exec "${EXEC_CMDLINE[@]}" gamescope \
   "${EXTRA_GAMESCOPE_OPTS[@]}" \
   "${GAMESCOPE_DEFAULTS[@]}" \
@@ -308,4 +355,5 @@ exec "${EXEC_CMDLINE[@]}" gamescope \
   --immediate-flips \
   --backend wayland \
   --expose-wayland \
-  --rt -- "${GAME_CMDLINE[@]}" "$@"
+  --rt -- "${GAME_CMDLINE[@]}" "$@" \
+    &> "$VIBRANIUM_CACHE/gamescope_latest.log"

@@ -1,5 +1,14 @@
 #!/usr/bin/env bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 STEP_DEFAULT="0.20"
 ACTION=""
@@ -26,12 +35,16 @@ Options:
   -v, --zoom-value <n>   Set zoom value directly
   -r, --reset            Reset zoom to 1.00
   -s, --step <value>     Set step (default: ${STEP_DEFAULT})
+      --verbose          Enable verbose output
   -h, --help             Display this help and exit
 
 Short forms: you may also pass a single argument "+" or "-" for increase/decrease.
 EOF
 }
 
+# Convert a decimal string (e.g. "1.50", "0.20") to a fixed-point
+# integer scaled by x100 for integer arithmetic in Bash.
+# E.g. "1.50" -> 150, "0.20" -> 20.
 _to_int100() {
   local -n _result="$1"
   local val="$2"
@@ -49,12 +62,17 @@ _to_int100() {
   _result=$((int_part * 100 + 10#$frac_part))
 }
 
+# Reverse of _to_int100: convert a x100 integer back to a decimal string
+# with two fractional digits (e.g. 150 -> "1.50").
 _from_int100() {
   local -n _result="$1"
   local val100="$2"
   printf -v _result "%d.%02d" $((val100 / 100)) $((val100 % 100))
 }
 
+# Read the zoom state file (x100 integer, defaults to 100 = 1.00).
+# The file may contain arbitrary content from an interrupted write; guard
+# against non-numeric values by falling back to 100.
 read_state100() {
   local -n ref=$1
   local v=100
@@ -70,6 +88,9 @@ read_state100() {
   ref="$v"
 }
 
+# Persist the zoom level as a x100 integer. When zoom is reset to 1.00
+# (the default) remove the state file so read_state100 returns the
+# default without any I/O.
 write_state100() {
   local new100="$1"
 
@@ -83,22 +104,16 @@ write_state100() {
   printf '%s\n' "$new100" >"$STATE_FILE"
 }
 
+# Apply the zoom factor to Hyprland using its Lua-style config eval API.
+# Hyprland's cursor.zoom_factor controls the display magnification.
+# cursor.no_warps is intentionally not set here: the old --batch path
+# (commented out below) used both, but the current hl.config approach
+# only sets zoom_factor; no_warps remains at the user's global default.
 apply_zoom100() {
   local new100="$1"
   local new_float no_warps
 
   _from_int100 new_float "$new100"
-
-  if ((new100 != 100)); then
-    no_warps="true"
-  else
-    no_warps="false"
-  fi
-
-  # if ! hyprctl --batch "keyword cursor.zoom_factor $new_float ; keyword cursor.no_warps $no_warps" >/dev/null 2>&1; then
-  #   printf 'Failed to set zoom factor to %s\n' "$new_float" >&2
-  #   return 1
-  # fi
 
   hyprctl -q eval "hl.config({cursor = {zoom_factor = ${new_float}}})"
 }
@@ -136,6 +151,10 @@ while (($#)); do
     STEP="$2"
     shift 2
     ;;
+  --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -h | --help)
     usage
     exit 0
@@ -160,6 +179,8 @@ if [[ -z "$ACTION" ]]; then
   usage >&2
   exit 1
 fi
+
+log Info "Action: $ACTION, step: $STEP"
 
 _to_int100 step100 "$STEP"
 
@@ -198,6 +219,8 @@ reset)
   exit 1
   ;;
 esac
+
+log Info "Zoom: $(printf '%d.%02d' $((current100 / 100)) $((current100 % 100))) -> $(printf '%d.%02d' $((new100 / 100)) $((new100 % 100)))"
 
 if apply_zoom100 "$new100"; then
   write_state100 "$new100"

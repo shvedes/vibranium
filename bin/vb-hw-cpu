@@ -79,10 +79,15 @@ Intended use for -q / --quote:
 EOF
 }
 
-# Parse /proc/cpuinfo once and cache results
+# Parse /proc/cpuinfo once and cache results into global variables.
+# Each core repeats the same key-value block, so we read only the first
+# block then break. The [[ -n $CPU_MODEL_NAME ]] guard at the top ensures
+# subsequent calls (from add_cpu_* functions) skip re-parsing.
 _init_cpuinfo() {
   [[ -n $CPU_MODEL_NAME ]] && return 0
 
+  # Count logical processors from sysfs directory entries. This is
+  # faster than parsing /proc/cpuinfo a second time for thread count.
   if [[ -d /sys/devices/system/cpu ]]; then
     local cpu_dirs=( /sys/devices/system/cpu/cpu[0-9]* )
     CPU_TOTAL_THREADS=${#cpu_dirs[@]}
@@ -93,6 +98,8 @@ _init_cpuinfo() {
   local key value found_processor=0
 
   while IFS=: read -r key value; do
+    # /proc/cpuinfo keys on some kernels have a trailing tab before the
+    # colon; strip it and trim trailing whitespace for consistent matching.
     local clean_key="${key%%$'\t'*}"
     clean_key="${clean_key%"${clean_key##*[![:space:]]}"}"
 
@@ -124,6 +131,10 @@ _init_cpuinfo() {
   [[ -n $CPU_MODEL_NAME ]]
 }
 
+# Accumulate a (label, value) pair for later formatted output. Labels
+# and values are stored in parallel arrays to support three rendering
+# modes: aligned columns (--all), raw single-line (multiple flags), and
+# line-separated raw (--all --quote).
 _add_part() {
   OUTPUT_LABELS+=("$1")
   OUTPUT_VALUES+=("$2")
@@ -132,6 +143,7 @@ _add_part() {
 add_cpu_vendor() {
   _init_cpuinfo || return 1
   local val
+  # Normalise /proc/cpuinfo vendor strings to short human-readable names.
   case "$CPU_VENDOR" in
     AuthenticAMD) val="AMD"   ;;
     GenuineIntel) val="Intel" ;;
@@ -145,6 +157,9 @@ add_cpu_code() {
   _add_part "Code:" "${CPU_MODEL_ID:-unknown}"
 }
 
+# Decode (family, model) pairs into marketing microarchitecture names
+# by looking up known CPUID values. This mapping is updated as new
+# generations are released.
 add_cpu_microarchitecture() {
   _init_cpuinfo || return 1
   local uarch
@@ -197,6 +212,9 @@ add_cpu_microarchitecture() {
   _add_part "Architecture:" "${uarch:-unknown}"
 }
 
+# Strip vendor-specific branding decorations from the raw model name so
+# the output is concise: "Core i7-10700K" instead of
+# "Intel(R) Core(TM) i7-10700K CPU @ 3.80GHz".
 add_cpu_name() {
   _init_cpuinfo || return 1
   local name="$CPU_MODEL_NAME"
@@ -216,6 +234,8 @@ add_cpu_name() {
       name="${name/ CPU/}"
       name="${name% @ *}"
 
+      # Collapse multiple spaces (some /proc/cpuinfo versions double-space
+      # between words) and trim leading/trailing whitespace.
       while [[ $name == *'  '* ]]; do name="${name//  / }"; done
       name="${name# }"; name="${name% }"
       ;;
@@ -295,13 +315,16 @@ add_all() {
   add_cpu_flags
 }
 
-# Default handling (runs if no flags provided)
+# Default: when no flags are given, show vendor + model as a quick summary.
 if [[ $# -eq 0 ]]; then
   add_cpu_vendor
   add_cpu_name
 fi
 
-# Store arguments to process sequentially after flag configuration
+# Two-pass argument processing:
+#   1. Parse flags to set USE_QUOTE (controls quoting mode for the whole run).
+#   2. Evaluate action flags (--vendor, -c, etc.) into ARGS_QUEUE so that
+#      formatting state is resolved before any add_* function runs.
 ARGS_QUEUE=()
 
 while [[ $# -gt 0 ]]; do
@@ -315,6 +338,9 @@ while [[ $# -gt 0 ]]; do
       *)                      ARGS_QUEUE+=("$arg") ;;
     esac
   elif [[ "$arg" == -* && ${#arg} -gt 1 ]]; then
+    # Support bundled short flags (e.g. -vn, -vlq) by decomposing the
+    # string into individual characters. Settings flags like 'q' set
+    # USE_QUOTE immediately; action flags are queued as "-$opt".
     for (( i=1; i<${#arg}; i++ )); do
       opt="${arg:$i:1}"
       case "$opt" in
@@ -329,7 +355,7 @@ while [[ $# -gt 0 ]]; do
   fi
 done
 
-# Evaluate standard flags now that formatting style (USE_QUOTE) is completely resolved
+# Second pass: invoke the add_* functions queued in ARGS_QUEUE.
 for arg in "${ARGS_QUEUE[@]}"; do
   case "$arg" in
     --vendor|-v)            add_cpu_vendor ;;
@@ -349,24 +375,25 @@ for arg in "${ARGS_QUEUE[@]}"; do
   esac
 done
 
-# Print final result strings based on configuration styles
+# Three rendering modes:
+#   1. --all (IS_ALL): always line-separated (with optional labels).
+#   2. --quote (USE_QUOTE) without --all: single line, "'"-delimited for IFS.
+#   3. Default multi-flag: space-separated label+value pairs.
 if [[ ${#OUTPUT_VALUES[@]} -gt 0 ]]; then
   if (( IS_ALL )); then
-    # --all layout style (always line-separated)
     for (( i=0; i<${#OUTPUT_VALUES[@]}; i++ )); do
       if (( USE_QUOTE )); then
         printf '%s\n' "${OUTPUT_VALUES[i]}"
       else
-        # Aligns columns
         printf '%-18s %s\n' "${OUTPUT_LABELS[i]}" "${OUTPUT_VALUES[i]}"
       fi
     done
   elif (( USE_QUOTE )); then
-    # Standard multi-flag parsed string for scripts/IFS hooks
+    # Single line with "'" as delimiter for easy shell parsing:
+    #   IFS="'" read -r vendor model speed <<< "$(vb-hw-cpu -vnmq)"
     IFS="'"
     printf '%s\n' "${OUTPUT_VALUES[*]}"
   else
-    # Standard multi-flag combo layout for clean CLI display (e.g. -vn)
     out_array=()
     for (( i=0; i<${#OUTPUT_VALUES[@]}; i++ )); do
       out_array+=("${OUTPUT_LABELS[i]} ${OUTPUT_VALUES[i]}")

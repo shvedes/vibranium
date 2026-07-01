@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 
 shcat() {
@@ -15,26 +24,43 @@ Usage: $SELF OPTION_NAME
 Print the value of the specified Vibranium option.
 
 Options:
-  -h, --help  Display this help and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
 EOF
 }
 
-case "$1" in
--h | --help)
-  usage
-  exit 0
-  ;;
-"")
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+if [[ $# -eq 0 ]]; then
   echo "Error: missing OPTION_NAME" >&2
   echo "Try '$SELF --help' for more information." >&2
   exit 1
-  ;;
-esac
+fi
+
+log Info "Getting option: $1"
 
 source vb-lib-core
 
 helpers::check "$1"
 
+# "${!1}" is Bash indirect variable expansion: it resolves to the value
+# of the variable whose name is stored in $1 (e.g. if $1="SOME_VAR",
+# "${!1}" expands to $SOME_VAR). The +x test checks whether the variable
+# exists without triggering "unbound variable" errors under set -u.
 if [[ -n "${!1+x}" ]]; then
   printf '%s\n' "${!1}"
 fi

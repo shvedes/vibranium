@@ -1,5 +1,54 @@
 #!/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Show a logout confirmation dialog.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option: $1" >&2
+    usage
+    exit 1
+    ;;
+  esac
+done
+
+# rofi -sync makes the call block until the user makes a selection
+# (otherwise -dmenu returns immediately with an empty result).
+# -hover-select and -me-accept-entry MousePrimary allow click-to-select
+# without requiring Enter, matching common logout dialog behaviour.
 rofi_opts=(
   -sync
   -dmenu

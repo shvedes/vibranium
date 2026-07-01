@@ -2,6 +2,15 @@
 
 SELF="${0##*/}"
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -17,6 +26,7 @@ Focus existing window matching COMMAND, or launch it in a terminal.
 Options:
   --title      Override window title
   --app-id     Override application ID
+  -v, --verbose Enable verbose output
   -h, --help   Show this help and exit
 EOF
 }
@@ -26,6 +36,7 @@ focus_or_launch() {
 
   local match_key="${cmd[0]##*/}"
   match_key="${match_key,,}"
+  log Info "Focus or launch TUI: key=$match_key app_id=$APP_ID title=$TITLE cmd=${cmd[*]}"
 
   local window_address
   window_address="$(
@@ -66,8 +77,10 @@ focus_or_launch() {
   )"
 
   if [[ -n "$window_address" ]]; then
+    log Info "Focusing existing terminal window: address=$window_address"
     hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
   else
+    log Info "No matching terminal window, launching: ${cmd[*]}"
     source xdg-terminal-exec \
       --app-id="$APP_ID" \
       --title="$TITLE" \
@@ -109,6 +122,10 @@ while (($#)); do
     TITLE="$2"
     shift 2
     ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   --)
     shift
     break
@@ -144,6 +161,7 @@ if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
   # shellcheck disable=SC2068
   focus_or_launch "${COMMAND[@]}"
 else
+  log Info "Always-focus disabled, launching directly"
   # shellcheck disable=SC2068
   exec setsid -f xdg-terminal-exec \
     --app-id="$APP_ID" \

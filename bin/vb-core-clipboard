@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 _shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -13,6 +22,7 @@ Usage: ${0##*/} [OPTION]
 Options:
   --show      Show clipboard history
   --clear     Clear clipboard history
+  -v, --verbose Enable verbose output
   -h, --help  Show this help and exit
 EOF
 }
@@ -35,8 +45,40 @@ _check_deps() {
   fi
 }
 
-case "$1" in
-"--show")
+MODE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  --show)
+    MODE="show"
+    shift
+    ;;
+  --clear)
+    MODE="clear"
+    shift
+    ;;
+  -h | --help)
+    _usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option: $*" >&2
+    echo "Try '${0##*/} --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+case "$MODE" in
+show)
+  log Info "Showing clipboard history"
+
+  # If rofi is already running from a previous --show, kill it to toggle
+  # the picker closed. This matches the common rofi-as-a-popup pattern.
   if pidof -q rofi; then
     killall rofi
     exit 0
@@ -66,6 +108,9 @@ case "$1" in
     -display-columns 2 -- "${ENTRIES[@]}"
 
   if [[ ! -z "$chosen" ]]; then
+    # cliphist list entries with file:// URIs must be decoded and copied
+    # as text/uri-list so Wayland compositors handle them as file transfers
+    # rather than plain text. Non-URI entries are copied as plain text.
     if [[ "$chosen" =~ file:// ]]; then
       printf "%s" "$chosen" | cliphist decode | wl-copy -n --type text/uri-list
     else
@@ -73,7 +118,9 @@ case "$1" in
     fi
   fi
   ;;
-"--clear")
+clear)
+  log Info "Clearing clipboard history"
+
   if ! _check_deps; then
     exit 1
   fi
@@ -87,13 +134,8 @@ case "$1" in
   wl-copy --clear
   cliphist wipe
   ;;
-"-h" | "--help" | "")
+*)
   _usage
   exit 0
-  ;;
--*)
-  echo "Error: unknown option: $*" >&2
-  echi "Try '${0#**/} --help' for more information" >&2
-  exit 1
   ;;
 esac

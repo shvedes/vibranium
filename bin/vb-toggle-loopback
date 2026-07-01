@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 LOOP_NAME="mic_loop"
 ACTION="apply"
 SELF="${0##*/}"
@@ -22,6 +31,7 @@ Use Vibranium Menu > Settings > Audio instead.
 Options:
     -h, --help         Show this help and exit
     --get-volume       Print current loopback volume and exit
+    -v, --verbose      Enable verbose output
 EOF
 }
 
@@ -59,13 +69,13 @@ get_loopback_volume() {
   read -r module_id < <(find_module_ids)
 
   if [[ -z "$module_id" ]]; then
-    echo "no loopback"
+    log Info "no loopback"
     exit 1
   fi
 
   sink_input=$(find_sink_input_id "$module_id")
   if [[ -z "$sink_input" ]]; then
-    echo "no sink input"
+    log Info "no sink input"
     exit 1
   fi
 
@@ -89,19 +99,23 @@ find_sink_input_id() {
 # effects. The lib is sourced further below, only when an action needs it.
 while [[ $# -gt 0 ]]; do
   case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -h | --help)
     usage
     exit 0
     ;;
   --get-volume)
     ACTION="get-volume"
+    shift
     ;;
   *)
     printf '%s: unknown option: %s\n' "$SELF" "$1" >&2
     exit 2
     ;;
   esac
-  shift
 done
 
 # Source only now that we know we need runtime config values.
@@ -112,6 +126,8 @@ helpers::check \
   VIBRANIUM_VOLUME_SOURCE_LOOPBACK
 
 VOL="${VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME}%"
+
+log Info "Action: $ACTION"
 
 case "$ACTION" in
 get-volume)

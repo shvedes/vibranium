@@ -2,6 +2,15 @@
 
 # shellcheck disable=SC2206
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shopt -s extglob dotglob nullglob
 
 # Populated by _discover_themes at startup.
@@ -499,6 +508,7 @@ Apply a Vibranium theme. With no THEME argument an interactive picker is
 launched. With a THEME argument the theme is applied non-interactively.
 
 Options:
+  -v, --verbose     Enable verbose output
   -h, --help        Show this help text and exit
   -l, --list        List all available theme names and exit
   -f, --force       Forcefully set the active theme if selected
@@ -551,7 +561,13 @@ list_themes() {
   printf '%s\n' "${names[@]}"
 }
 
+log Info "Starting theme selector"
+
 case "${1-}" in
+-v | --verbose)
+  VERBOSE=true
+  shift
+  ;;
 -f | --force)
   FORCE=true
   shift

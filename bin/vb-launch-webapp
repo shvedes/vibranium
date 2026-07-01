@@ -2,6 +2,15 @@
 
 SELF="${0##*/}"
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -23,6 +32,7 @@ Options:
                    hostname. The directory is stored under $XDG_DATA_HOME/webapps/
                    and is completely invisible to the main browser instance (no shared
                    profile picker, no shared session, cookies, or extensions).
+  -v, --verbose    Enable verbose output
   -h, --help       Show this help message and exit
 
 Examples:
@@ -34,6 +44,8 @@ EOF
 get_default_browser() {
   local -n _out="$1"
   local browser=""
+
+  log Info "Detecting default browser"
 
   # Fast path: mimeapps.list
   if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
@@ -75,6 +87,8 @@ _profile_dir_from_url() {
 focus_or_launch() {
   local -a cmd=("$@")
 
+  log Info "Focus or launch webapp: URL=$URL host=$host own_profile=$OWN_PROFILE"
+
   # Extract the hostname from the URL global for window matching.
   # Strip the scheme (e.g. "https://"), then strip any path, port,
   # query string, or fragment that follows the host.
@@ -108,8 +122,10 @@ focus_or_launch() {
   )"
 
   if [[ -n "$window_address" ]]; then
+    log Info "Focusing existing PWA window: address=$window_address"
     hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
   else
+    log Info "No matching PWA window, launching: ${cmd[*]}"
     exec setsid -f app2unit -- "${cmd[@]}"
   fi
 }
@@ -122,6 +138,10 @@ OWN_PROFILE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -h | --help)
     usage
     exit 0
@@ -200,12 +220,17 @@ WEBAPP_DATA_DIR="$XDG_DATA_HOME/webapps"
 
 browser_cmd=("${execs[0]}" --app="$URL")
 if [[ $OWN_PROFILE == true ]]; then
-  browser_cmd+=(--user-data-dir="$WEBAPP_DATA_DIR/$(_profile_dir_from_url "$URL")")
+  local profile_dir
+  profile_dir="$(_profile_dir_from_url "$URL")"
+  log Info "Own profile enabled, data dir: $WEBAPP_DATA_DIR/$profile_dir"
+  browser_cmd+=(--user-data-dir="$WEBAPP_DATA_DIR/$profile_dir")
 fi
 
+log Info "Browser command: ${browser_cmd[*]}"
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
 if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
   focus_or_launch "${browser_cmd[@]}"
 else
+  log Info "Always-focus disabled, launching directly"
   exec setsid -f app2unit -- "${browser_cmd[@]}"
 fi

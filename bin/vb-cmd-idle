@@ -3,6 +3,15 @@
 # Handle music playback on session lock/unlock.
 # Intended to be called by hypridle.
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 RESTORE_FLAG="$VIBRANIUM_RUNTIME/restore-player"
 
@@ -21,15 +30,18 @@ Handle media playback on session lock/unlock events.
 Options:
   --before     Handle session lock
   --after      Handle session unlock
-  -h, --help   Display this help and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
 EOF
 }
 
+# Check whether any media player is actively playing. playerctl is
+# checked first (fast MPRIS D-Bus query). For MPD, use the fifo check
+# to avoid triggering socket activation when the daemon is stopped.
 player_is_playing() {
   if [[ "$(playerctl status 2>/dev/null)" == "Playing" ]]; then
     return 0
   else
-    # Don't trigger mpd systemd service if for no reason.
     if [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
       while read -r l; do
         case $l in
@@ -44,36 +56,62 @@ player_is_playing() {
   return 1
 }
 
-case "$1" in
--h | --help)
-  usage
-  exit 0
-  ;;
+MODE=""
 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --before | --after)
+    MODE="$1"
+    shift
+    ;;
+  *)
+    echo "Error: invalid option -- $*" >&2
+    echo "Try '$SELF --help' for more information." >&2
+    exit 1
+    ;;
+  esac
+done
+
+case "$MODE" in
 --before)
+  log Info "Lock handler"
   source vb-lib-core
 
   helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
   pause_music="$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
 
-  # Don't pause any music with active inhibitor.
+  # Skip music pause when the sleep inhibitor is active (user is watching
+  # a video or listening to music and explicitly prevented auto-lock).
   if systemctl -q --user is-active vibranium-inhibit@sleep; then
+    log Info "Sleep inhibitor active, skipping pause"
     exit 0
   elif [[ $pause_music == false ]]; then
     exit 0
   fi
 
   if player_is_playing; then
+    log Info "Pausing music"
     vb-core-mediacontrol --toggle &
+    # Create the restore flag so the --after handler can resume playback.
     : >"$RESTORE_FLAG"
   fi
   ;;
 
 --after)
+  log Info "Unlock handler"
   source vb-lib-core
   if [[ -f "$RESTORE_FLAG" ]]; then
     rm -f "$RESTORE_FLAG"
     if ! player_is_playing; then
+      log Info "Restoring music"
       vb-core-mediacontrol --toggle &
     fi
 
@@ -84,14 +122,8 @@ case "$1" in
   fi
   ;;
 
-"")
-  echo "Error: missing option" >&2
-  echo "Try '$SELF --help' for more information." >&2
-  exit 1
-  ;;
-
 *)
-  echo "Error: invalid option -- $*" >&2
+  echo "Error: missing option" >&2
   echo "Try '$SELF --help' for more information." >&2
   exit 1
   ;;

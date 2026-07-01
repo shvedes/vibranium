@@ -1,10 +1,62 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Run health checks on Vibranium installation.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option: $1" >&2
+    usage
+    exit 1
+    ;;
+  esac
+done
+
+log Info "Running health checks"
+
+# vb-cmd-edit-wm-config is a compiled binary (not a shell script). If it's
+# missing, the build step in 15-build-utilities.sh must be re-run to compile
+# it from its rust source.
 if ! command -v vb-cmd-edit-wm-config >/dev/null; then
-  echo "Repairing vb-cmd-edit-wm-config"
-  echo "This might take some time"
+  log Info "Repairing vb-cmd-edit-wm-config"
+  log Info "This might take some time"
   bash "$VIBRANIUM/install/post-install/15-build-utilities.sh" 2>/dev/null
-  echo "Repaired vb-cmd-edit-wm-config"
+  log Info "Repaired vb-cmd-edit-wm-config"
 fi
 
+# Clear the error marker so subsequent health checks don't assume the
+# installation is still broken.
 rm -f $VIBRANIUM_STATE/errors_found

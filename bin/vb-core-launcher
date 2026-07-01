@@ -2,16 +2,25 @@
 
 # shellcheck disable=SC2086
 # overcomplicated launcher based on rofi, which can:
-#	- launch applications
-#	- open local files in default applications
-#	- open links
-#	- search the internet
+# - launch applications
+# - open local files in default applications
+# - open links
+# - search the internet
 #
 # please note that internet search may often be unavailable when vibranium_global_app_launcher_auto_select is set to true.
 # this script can also open three additional menus with custom categories to open:
-#	- ai pwas
-#	- power menu
-#	- common websites pwas
+# - ai pwas
+# - power menu
+# - common websites pwas
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
 
 OPT_ARGS=""
 
@@ -33,6 +42,7 @@ Options:
       --web       Show only pre-installed web app PWA entries (drun category: Webapp)
       --pwa       Show user-installed web app PWA entries (drun category: PWA)
       --power     Show only power-management entries (drun category: Power)
+  -v, --verbose   Enable verbose output
   -h, --help      Display this help and exit
 
 Input Handling (default mode):
@@ -46,24 +56,26 @@ EOF
 
 _open_file() {
   local file="${1#file://}"
-  # open in default app (media viewer, text editor, whatever)
+  log Info "Opening file: $file"
+  # source app2unit creates a transient systemd scope so the launched
+  # xdg-open process is tracked and cleaned up with the session.
   source app2unit -s app-graphical.slice -- xdg-open "$file" &>/dev/null
 }
 
 _open_link() {
   local link="$1"
-  # Okay so, at the moment of invocation
-  # we don't know if there's an active browser process
-  # where the link will be opened. if thre's none, that's
-  # fine - app2unit-open will create a systemd unit out of
-  # Chromium, Firefox or whatever. when there's a window,
-  # we're creating a transient unit for nothing. So should keep
-  # keep app2unit here at all? also should we use app-graphical.slice
-  # for links? Questionable at the moment. I'll keep it for now,
-  # since it doesn't brake anything.
+  log Info "Opening link: $link"
+  # app2unit-open wraps the browser call in a transient systemd scope
+  # so it inherits the graphical session's cgroup. If a browser window
+  # already exists, the scope is created for nothing, but the overhead
+  # is negligible and it prevents orphaned browser processes on logout.
   app2unit-open -s app-graphical.slice "$link" &>/dev/null &
 }
 
+# Keywords are defined in the user's advanced settings file as
+# "keyword:command" pairs. The keyword is everything before the first
+# colon; the action is everything after (eval'd). This lets users define
+# shortcuts like "htop:foot htop" in their Vibranium config.
 _handle_keyword() {
   local input="$1"
   local entry keyword action
@@ -73,6 +85,7 @@ _handle_keyword() {
     action="${entry#*:}"
 
     if [[ "$input" == "$keyword" ]]; then
+      log Info "Keyword matched: $keyword → $action"
       if ! eval "$action"; then
         printf "Keyword '$keyword' returned non zero exit code!\n" >&2
         exit 1
@@ -94,17 +107,35 @@ _search_the_internet() {
   "bing") local engine="https://bing.com/search?q=" ;;
   esac
 
+  log Info "Searching: $input via $SEARCH_ENGINE"
   source app2unit -S both -s app-graphical.slice -- xdg-open "${engine}${input}" &>/dev/null
 }
 
-case "$1" in
--h | --help)
-  usage
-  exit 0
-  ;;
-esac
+MODE=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --web | --ai | --power | --pwa)
+    MODE="$1"
+    shift
+    break
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 if pidof -q rofi; then
+  log Info "Killing existing rofi instance"
   killall rofi
   exit 0
 fi
@@ -121,15 +152,15 @@ helpers::check \
   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS \
   VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT \
   VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS \
-  VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI \
   VIBRANIUM_GLOBAL_SEARCH_ENGINE
 
 AUTO_SELECT="$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
 SHOW_ICONS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
 SEARCH_ENGINE="$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
 
-case "$1" in
+case "$MODE" in
 --web | --ai | --power | --pwa)
+  log Info "Launcher mode: ${MODE#--}"
   OPT_ARGS+=(
     -disable-history
     -icon-theme Vibranium
@@ -139,20 +170,21 @@ case "$1" in
   )
 
   if [[ "$AUTO_SELECT" == true ]]; then
-    # Don't enable auto-select for Power menu
+    # Don't enable auto-select for Power menu: accidentally confirming a
+    # power action (logout, reboot) on single-result display is dangerous.
     if [[ "$LAUNCHER_MODE" =~ ^--(default|ai|web|pwa)$ ]]; then
       OPT_ARGS+=(-auto-select true)
     fi
   fi
 
-  case "$1" in
+  case "$MODE" in
   --power) OPT_ARGS+=(-drun-categories Power -display-drun "Power") ;;
   --web) OPT_ARGS+=(-drun-categories WebApp -display-drun "Web Apps") ;;
   --pwa) OPT_ARGS+=(-drun-categories PWA -display-drun "PWA") ;;
   --ai) OPT_ARGS+=(-drun-categories AI -display-drun "AIs") ;;
   esac
 
-  LAUNCHER_MODE="${1/--/}"
+  LAUNCHER_MODE="${MODE/--/}"
   ;;
 *)
   SHOW_WEBAPPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
@@ -168,6 +200,7 @@ case "$1" in
     EXCLUDE+=",AI"
   fi
 
+  log Info "Default mode: excluding categories: $EXCLUDE"
   OPT_ARGS+=(-drun-exclude-categories "$EXCLUDE")
 
   if [[ "$SHOW_WEBAPPS" == true || "$SHOW_AI_WEBAPPS" == true ]]; then
@@ -186,7 +219,12 @@ if [[ "$SHOW_ICONS" = true ]]; then
   OPT_ARGS+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
 fi
 
+# rofi -show drun normally executes the selected entry directly. By
+# overriding run-command with "echo {cmd} {args}", we capture what would
+# be executed and handle the dispatch ourselves below.
 read -r INPUT < <(rofi -show drun -run-command "echo {cmd} {args}" "${OPT_ARGS[@]}" 2>/dev/null)
+
+log Info "Rofi input: $INPUT"
 
 case "$INPUT" in
 "file://"*)
@@ -196,44 +234,52 @@ case "$INPUT" in
   _open_link "$INPUT"
   ;;
 "DBus launch" | "")
+  log Info "No selection or DBus launch, exiting"
   exit 0
   ;;
 *)
-  # Keywords take precedence.
+  # Keywords take precedence over all other input types.
   if _handle_keyword "$INPUT"; then
     exit 0
   fi
 
-  # Determine whether the input
-  # is a command or a search query.
+  # Split the rofi output into command and arguments.
   CMD="${INPUT%% *}"
   ARGS="${INPUT#"$CMD"}"
   ARGS="${ARGS# }"
 
-  # File exists and it IS an executable
   if [[ -x "$CMD" ]] || command -v "$CMD" >/dev/null; then
+    log Info "Executing command: $CMD"
+    # Vibranium-internal commands are eval'd directly so they inherit the
+    # caller's environment without spawning a new shell.
     if [[ "$CMD" == vb* ]]; then
+      log Info "Internal Vibranium command, eval: $INPUT"
       eval "$INPUT"
       exit 0
-    # Let Steam handle its URIs.
     elif [[ "$ARGS" =~ ^steam:// ]]; then
+      # Steam URIs (steam://rungameid/...) must be handled by Steam itself;
+      # xdg-open does not route them correctly in all configurations.
+      log Info "Steam URI detected, eval: $INPUT"
       eval "$INPUT"
       exit 0
     fi
 
     source vb-launch-cmd -- $CMD $ARGS
-  # File exists
   elif [[ -e "$INPUT" ]]; then
+    log Info "Opening local file: $INPUT"
     source app2unit -s app-graphical.slice -- xdg-open "$INPUT" &>/dev/null
-  # It's a web query
   else
-    # Web search is only available in the default mode
+    # Web search is only available in the default mode.
+    # When auto-select is on, the first search result is selected instantly
+    # and there is no way to type a query, so web search is disabled.
     if [[ "$LAUNCHER_MODE" == "default" ]]; then
-      # Disable web serch when auto-select is on
       if [[ "$AUTO_SELECT" = true ]]; then
+        log Info "Web search skipped (auto-select active)"
         exit 1
       fi
       _search_the_internet "$INPUT"
+    else
+      log Info "Web search unavailable in ${LAUNCHER_MODE} mode"
     fi
   fi
   ;;

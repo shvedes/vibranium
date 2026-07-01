@@ -1,7 +1,64 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Reload Vibranium configuration and restart relevant services.
+
+Options:
+  -q, --quiet    Do not show notification
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
+QUIET=false
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -q | --quiet)
+    QUIET=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option: $1" >&2
+    usage
+    exit 1
+    ;;
+  esac
+done
+
 source vb-lib-core
 
+log Info "Reloading configuration"
+
+# Build the list of user services to restart. cliphist is always restarted
+# to pick up any changes. swayosd and waybar are conditionally included
+# based on configuration and current running state respectively.
 SYSTEMD_TARGETS=("cliphist")
 
 if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
@@ -15,8 +72,9 @@ fi
 systemctl --user restart "${SYSTEMD_TARGETS[@]}" &
 vb-refresh-dunst
 
+# Reload Hyprland configuration without restarting the compositor.
 hyprctl -q reload config-only &
 
-if [[ ! "$1" =~ ^(-q|--quiet)$ ]]; then
+if ! $QUIET; then
   notify-send -r 2 -t 1500 "Vibranium" "Configuration reloaded"
 fi

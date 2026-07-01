@@ -4,6 +4,15 @@
 # If an inhibitor is already running, stops it; otherwise starts a new one.
 # Refreshes the Vibranium Waybar inhibitor module after action.
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 
 shcat() {
@@ -19,6 +28,7 @@ Usage: $SELF [OPTION]
 Toggle systemd idle inhibitor.
 
 Options:
+  -v, --verbose   Enable verbose output
   -h, --help      Show this help and exit
   -r, --retoggle  If an inhibitor is active, stop it and restart it under
                   the current type. Used after a type change in cfgr-idle.
@@ -28,20 +38,30 @@ EOF
 
 opt_retoggle=0
 
-case "${1:-}" in
--h | --help)
-  _usage
-  exit 0
-  ;;
--r | --retoggle)
-  opt_retoggle=1
-  ;;
--*)
-  echo "Error: unknown option: $1" >&2
-  echo "Try '$SELF --help' for more information" >&2
-  exit 1
-  ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    _usage
+    exit 0
+    ;;
+  -r | --retoggle)
+    opt_retoggle=1
+    shift
+    ;;
+  -*)
+    echo "Error: unknown option: $1" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 REFRESH_BAR=false
 TYPE="$(vb-cmd-get-option VIBRANIUM_GLOBAL_INHIBIT_TYPE)"
@@ -57,18 +77,19 @@ for _type in idle sleep; do
 done
 
 if ((opt_retoggle)); then
-  # Called after a type change. If something is running, swap it out.
-  # If nothing is running, the inhibitor was off: leave it off.
+  log Info "Retoggle requested"
   if [[ -n "$_active_unit" && "$_active_unit" != "$UNIT" ]]; then
+    log Info "Switching inhibitor from $_active_unit to $UNIT"
     systemctl -q --user stop "$_active_unit"
     systemctl -q --user start "$UNIT" &
     REFRESH_BAR=true
   fi
 elif [[ -n "$_active_unit" ]]; then
-  # Any active inhibitor means the inhibitor is ON: toggle it off.
+  log Info "Stopping inhibitor: $_active_unit"
   systemctl -q --user stop "$_active_unit" &
   REFRESH_BAR=true
 else
+  log Info "Starting inhibitor: $UNIT"
   systemctl -q --user start "$UNIT" &
   REFRESH_BAR=true
 fi

@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -13,22 +22,32 @@ Usage: ${0##*/} [OPTION]...
 Update font cache.
 
 Options:
-  -h, --help      display this help and exit
+  -v, --verbose   Enable verbose output
+  -h, --help      Display this help and exit
 
 This command forces a rebuild of the fontconfig cache using fc-cache -f.
 EOF
 }
 
-case "$1" in
-"") true ;;
--h | --help)
-  _usage
-  exit 0
-  ;;
-*)
-  _usage
-  exit 1
-  ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    _usage
+    exit 0
+    ;;
+  *)
+    _usage
+    exit 1
+    ;;
+  esac
+done
 
+log Info "Rebuilding font cache"
+# Force a full rebuild: -f ignores timestamps and re-scans every font
+# directory. Without -f, fc-cache only updates directories whose mtime
+# has changed since the last run.
 fc-cache -f

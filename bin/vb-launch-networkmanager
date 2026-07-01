@@ -2,6 +2,15 @@
 
 SELF="${0##*/}"
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -15,11 +24,15 @@ Usage: $SELF [OPTION]
 Launch GUI / TUI for the active network manager.
 
 Options:
-  -h, --help  Display this help and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
 EOF
 }
 
 case "$1" in
+-v | --verbose)
+  VERBOSE=true
+  ;;
 -h | --help)
   usage
   exit 0
@@ -34,28 +47,35 @@ esac
 
 # Detect primary network interface utility
 if command -v nmtui >/dev/null 2>&1; then
+  log Info "Detected nmtui (NetworkManager), launching"
   vb-launch-tui --app-id=org.vb.term.float -- nmtui
   exit 0
 elif command -v iwctl >/dev/null 2>&1; then
   if command -v impala >/dev/null 2>&1; then
+    log Info "Detected impala (iwd frontend), launching"
     vb-launch-tui --app-id=org.vb.term.float -- impala
     exit 0
   elif command -v iwmenu >/dev/null 2>&1; then
+    log Info "Detected iwmenu, launching"
     vb-launch-cmd -- iwmenu
     exit 0
   elif command -v iwgtk >/dev/null 2>&1; then
+    log Info "Detected iwgtk, launching"
     vb-launch-cmd -- iwgtk
     exit 0
   else
+    log Info "No GUI frontend found, launching iwctl TUI"
     vb-launch-tui --app-id=org.vb.term.float -- iwctl
     exit 0
   fi
 fi
 
 if systemctl -q is-active systemd-networkd; then
+  log Info "systemd-networkd is active but has no TUI frontend"
   msg="'<i>systemd-networkd</i>' doesn't provide a TUI frontend. Use CLI instead.\n"
   msg+="See '<i>networkctl --help</i>' for more info"
 else
+  log Warn "No network manager detected"
   msg="Network manager provider not found"
 fi
 

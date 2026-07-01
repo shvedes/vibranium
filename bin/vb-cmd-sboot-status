@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -13,6 +22,7 @@ Usage: ${0##*/} [OPTION]
 Print current Secure Boot status.
 
 Options:
+  -v, --verbose  Enable verbose output
   -h, --help     Display this help and exit
 
 Exit status:
@@ -23,26 +33,37 @@ Exit status:
 EOF
 }
 
-case "$1" in
--h | --help)
-  usage
-  exit 0
-  ;;
-"")
-  :
-  ;;
-*)
-  echo "Error: unknown option: $1" >&2
-  echo "Try '${0##*/} --help' for more information" >&2
-  exit 1
-  ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option: $1" >&2
+    echo "Try '${0##*/} --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+log Info "Querying Secure Boot status"
 
 if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
   echo "pending reboot"
   exit 3
 fi
 
+# Parse bootctl status output to determine Secure Boot state.
+# Sample output lines:
+#   Secure Boot: disabled
+#   Secure Boot: disabled (setup)
+#   Secure Boot: enabled (user)
+# Fields 3 and 4 are concatenated to form the status tag.
 while IFS= read -r line; do
   if [[ $line == *"Secure Boot"* ]]; then
     read -r -a fields <<<"$line"

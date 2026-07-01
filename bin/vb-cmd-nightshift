@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
 STATE_FILE="$VIBRANIUM_STATE/nightshift"
@@ -22,6 +31,7 @@ Options:
   --dec, --decrease    Decrease temperature by STEP (or -)
   --set TEMPERATURE    Set absolute temperature (in Kelvin)
   --step N             Use step N (default $STEP)
+  -v, --verbose        Enable verbose output
   -h, --help           Show this help and exit
 
 Notes:
@@ -30,11 +40,16 @@ Notes:
 EOF
 }
 
+# Night shift (blue-light filter) is not available inside VMs because
+# hyprsunset may not function correctly on virtualised GPUs.
 if [[ "$CHASSIS_TYPE" == vm ]]; then
+  log Info "Not available in a VM"
   echo "not available in a VM" >&2
   exit 1
 fi
 
+# Lock on fd 10 to prevent concurrent adjustments from racing on the
+# config file write and the hyprsunset IPC call.
 exec 10>"$LOCKFILE" || {
   echo "Error: another instance of $SELF already running!"
   exit 1
@@ -64,6 +79,10 @@ ARG_TEMP=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -h | --help)
     usage
     exit 0
@@ -111,6 +130,9 @@ fi
 
 state="$(<"$STATE_FILE")"
 
+# Toggle between active and suspended state. hyprsunset is called in
+# the background since the IPC involves a D-Bus round-trip. The state
+# file is updated synchronously before the module refresh.
 if [[ "$action" == "toggle" ]]; then
   case "$state" in
   suspended)
@@ -161,6 +183,9 @@ if ((TEMP < 1000 || TEMP > 20000)); then
   exit 1
 fi
 
+# Write the hyprsunset config file with the new temperature.
+# The file is marked auto-generated so users know manual edits will be
+# overwritten. max-gamma = 150 limits the colour transformation range.
 printf '# Auto-generated! All changes will be overwritten!\n' >"$CONF"
 printf '\nmax-gamma = 150\n\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" >>"$CONF"
 hyprctl -q hyprsunset temperature "$TEMP" &

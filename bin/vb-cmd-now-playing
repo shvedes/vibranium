@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF=${0##*/}
 QUIET=false
 
@@ -17,6 +26,7 @@ Display information about the currently playing track.
 
 Options:
   -h, --help    Display this help and exit
+  -v, --verbose Enable verbose output
   -q, --quiet   Do not display notification
 EOF
 }
@@ -27,10 +37,15 @@ while (($#)); do
     usage
     exit
     ;;
-  -q | --quiet)
-      QUIET=true
-      ;;
-  -*)
+   -v | --verbose)
+       VERBOSE=true
+       shift
+       ;;
+   -q | --quiet)
+       QUIET=true
+       shift
+       ;;
+   -*)
     echo "Error: unknown option: $1" >&2
     exit 1
     ;;
@@ -52,6 +67,10 @@ if systemctl -q --user is-active mpd; then
   mpd_status="$(mpc status 2>/dev/null)"
 fi
 
+# Detect the active player: prefer a currently Playing player, then
+# fall back to the cached player from a previous invocation (which
+# may be in Paused state). The cache file prevents thrashing between
+# playerctl and MPD when both are installed but only one is active.
 if [[ "$pc_status" == "Playing" ]]; then
   player="playerctl"
   echo "$player" >"$state_file"
@@ -118,8 +137,10 @@ if [[ "$show_album_art" = true ]]; then
   "playerctl")
     album_art_url="$(playerctl metadata mpris:artUrl)"
     if [[ "$album_art_url" =~ ^https?:// ]]; then
+      # Online players (e.g. Spotify) expose a remote URL — download it.
       curl -s "$album_art_url" -o "$album_art"
     else
+      # Local players (e.g. mpv, VLC) expose a file:// path — use directly.
       album_art="$album_art_url"
     fi
     ;;

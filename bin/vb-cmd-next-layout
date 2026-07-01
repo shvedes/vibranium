@@ -1,5 +1,14 @@
 #!/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 
 shcat() {
@@ -23,6 +32,7 @@ Options:
   --next            Switch to next layout (default)
   --prev            Switch to previous layout
   --notify          Notify after switch
+  -v, --verbose     Enable verbose output
   -h, --help        Display this help and exit
 EOF
 }
@@ -44,6 +54,10 @@ while [[ $# -gt 0 ]]; do
     NOTIFY=true
     shift
     ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -h | --help)
     _usage
     exit 0
@@ -56,12 +70,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+log Info "Action: $action"
+
 device="$(
   hyprctl -j devices |
     jq -r '.keyboards[] | select(.main == true) | .name'
 )"
 
 if [[ -z "$device" ]]; then
+  log Error "no main keyboard found"
   echo "Error: no main keyboard found" >&2
 
   if command -v notify-send >/dev/null 2>&1; then
@@ -73,11 +90,15 @@ if [[ -z "$device" ]]; then
   exit 1
 fi
 
+log Info "Switching layout on $device to $action"
 if ! hyprctl -q switchxkblayout "$device" "$action"; then
   echo "Error: failed to switch keyboard layout" >&2
   exit 1
 fi
 
+# Query the active keymap after switching for the notification. A second
+# hyprctl call is needed here because switchxkblayout does not return the
+# new layout and the cached value may be stale.
 if $NOTIFY; then
   layout="$(
     hyprctl -j devices |

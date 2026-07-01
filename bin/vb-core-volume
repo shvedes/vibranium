@@ -1,7 +1,22 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+# Log to stderr at the given level, but only when VERBOSE is on AND
+# stdin is a terminal (-t 0).  The isatty guard prevents
+# non-interactive callers (e.g. spawned by sway bindings, dunst scripts)
+# from producing stderr noise even when VERBOSE is set globally.
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 
+# Portable stdin-to-stdout copy that avoids subshell overhead.
+# Used where heredocs or <<< would create an extra process.
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -23,13 +38,17 @@ Options:
       --microphone-toggle  Toggle mute on the default audio source
       --volume INT         Set volume to INT percent
       -q,--quiet           Suppress desktop notifications (notify-send only)
+      -v,--verbose         Enable verbose output
       -h,--help            Display this help and exit
 
 EOF
 }
 
-# To display the progress bar, libnotify only accepts values from 0 to 100. If the user has enabled above 100%,
-# we need to convert the volume values to a 100% scale in order to display the progress bar correctly.
+# Convert a wpctl-style decimal volume string (e.g. "0.85", "1.50") to a
+# fixed-point integer scaled by x100 for integer arithmetic in Bash.
+# The x100 representation is also used for notify-send progress bars;
+# when ALLOW_ABOVE_HUNDRED is true the bar is re-scaled later as
+#   bar = vol100 * 100 / max100
 _to_int100() {
   # nameref: _result becomes a reference to the caller's variable name passed as $1
   local -n _result="$1"
@@ -68,19 +87,9 @@ show_volume_notification() {
   local bar_value="$4"
   local muted="$5"
 
-  # Suppress the notification when the active window is fullscreen.
-  # Dunst queues notifications during fullscreen and shows them only
-  # after exiting fullscreen, which makes them stale and irrelevant.
-  #
-  # We don't apply this rule to OSD notifications because
-  # it defeats the purpose of OSDs
-
-  # local fullscreen_state
-  # fullscreen_state="$(hyprctl -j activewindow | jq -r '.fullscreen')"
-  #
-  # if ((fullscreen_state == 2)); then
-  #   return
-  # fi
+  # Dunst queues notifications during fullscreen and delivers them all
+  # at once on exit.  Skip notify-send while a fullscreen window is
+  # focused to avoid stale volume bars.  OSDs are exempt from this rule.
 
   # Only query wpctl when the caller couldn't supply pre-computed values
   # (i.e. toggle_mute, where the new state is genuinely unknown).
@@ -108,6 +117,9 @@ show_volume_notification() {
 
   # Fire-and-forget: avoid blocking on the D-Bus round-trip.
   # -r (replace) is a hint to the daemon and works fine asynchronously.
+  # Query fresh fullscreen state right before notification.
+  # hyprctl is called here (not cached from earlier) because the
+  # active window may have changed between volume adjustment and now.
   local is_fullscreen
   is_fullscreen="$(hyprctl -j activewindow | jq -r .fullscreen)"
 
@@ -125,6 +137,7 @@ adjust_volume() {
   local direction="$1"
   local device_type="$2"
   local device osd_arg notification_type max_volume osd_max_flag current_volume new_volume
+  log Info "Adjusting $device_type $direction"
 
   if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
     max_volume=1.5
@@ -181,6 +194,9 @@ adjust_volume() {
     printf -v new_volume "%d.%02d" $((new100 / 100)) $((new100 % 100))
   }
 
+  # swayosd-client handles both the volume change and OSD atomically.
+  # When swayosd is unavailable or USE_OSD is false, fall back to
+  # manual wpctl set-volume + notify-send.
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
     if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
       if [[ -n "$osd_max_flag" ]]; then
@@ -208,6 +224,7 @@ set_volume() {
   local int_val="${1%%%}"
   local device="@DEFAULT_AUDIO_SINK@"
   local max_volume
+  log Info "Setting volume to ${int_val}%"
 
   if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
     max_volume=150
@@ -220,6 +237,8 @@ set_volume() {
     exit 1
   fi
 
+  # Convert integer percent to wpctl's decimal format (e.g. 85 -> "0.85").
+  # wpctl accepts 2-decimal-place strings representing a 0.0-1.5 range.
   local float_val
   printf -v float_val "%d.%02d" $((int_val / 100)) $((int_val % 100))
 
@@ -250,6 +269,8 @@ set_volume() {
 
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true && "$quiet" != true ]]; then
     if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+      # Scale absolute percent (0-150) to a 0-100 progress bar using
+      # x10000 fixed-point (4 decimal places) for swayosd's --custom-progress.
       local scaled=$((int_val * 10000 / max_volume))
       local osd_progress osd_icon
       printf -v osd_progress "%d.%04d" $((scaled / 10000)) $((scaled % 10000))
@@ -289,7 +310,11 @@ toggle_mute() {
     type="Microphone"
     ;;
   esac
+  log Info "Toggling mute for $device_type"
 
+  # Delegate to swayosd-client when OSD is active (handles both the
+  # mute toggle and the visual feedback atomically), otherwise invert
+  # mute through wpctl and send a notification manually.
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
     if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
       swayosd-client "$osd_arg" mute-toggle
@@ -311,6 +336,9 @@ feedback() {
   if [[ "$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK" == true ]]; then
     variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
 
+    # Variant 1/3: standard freedesktop.org sounds shipped by libcanberra.
+    # Variant 2:   custom Vibranium sound pack in XDG_DATA_HOME.
+    # Variant 3:   plays bell.oga instead of audio-volume-change.oga.
     case "$variant" in
     "variant1" | "variant3")
       dir="/usr/share/sounds/freedesktop/stereo"
@@ -347,6 +375,10 @@ while [[ $# -gt 0 ]]; do
   -h | --help)
     usage
     exit 0
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
     ;;
   -q | --quiet)
     quiet=true
@@ -413,6 +445,9 @@ helpers::check \
   VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
   VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
 
+# Mic operations intentionally do not call feedback(): the audio
+# feedback plays on the default (speaker) sink and would confuse the
+# user when they are adjusting their microphone level.
 case "$action" in
 vol-up)
   adjust_volume "+" "vol"

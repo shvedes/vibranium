@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 STEP="5"
 ACTION=""
 SELF="${0##*/}"
@@ -26,6 +35,7 @@ Options:
   -d, --down           Window volume down
   -t, --toggle         Window volume toggle
   -s, --step PERCENT   Volume step size in percent (default: $STEP)
+  -v, --verbose        Enable verbose output
   -h, --help           Show this help message and exit
 EOF
 }
@@ -35,6 +45,10 @@ while [[ $# -gt 0 ]]; do
   -s | --step)
     STEP="$2"
     shift 2
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
     ;;
   -h | --help)
     usage
@@ -62,24 +76,29 @@ if [[ -z "$ACTION" ]]; then
   exit 1
 fi
 
-# parse both pid and title out of one hyprctl call and one jq invocation,
-# rather than forking jq twice on the same JSON string
+# Extract the focused window's PID and title from a single hyprctl call
+# using jq's @tsv output, avoiding a second jq fork on the same JSON.
 read -r ACTIVE_PID WINDOW_TITLE < <(
   hyprctl -j activewindow | jq -r '[.pid, .title] | @tsv'
 )
 
-# guard: hyprctl returns {} on an empty workspace; jq yields "null" for .pid
+log Info "Action: $ACTION, window: $WINDOW_TITLE"
+
+# hyprctl returns {} on an empty workspace; jq outputs "null" for .pid
 if [[ -z "$ACTIVE_PID" || "$ACTIVE_PID" == "null" ]]; then
   exit 1
 fi
 
-# collect the focused pid and all its descendants into a flat list
-# so that apps which emit audio from a child process are also matched
+# Build a flat list of the focused window's PID and all its descendants.
+# This is necessary because many applications (Chromium, Electron apps,
+# Steam games) spawn separate audio-emitting child processes that PipeWire
+# associates with the child PID, not the window's PID.
+#
+# The algorithm reads the full process table once, builds a parent→children
+# adjacency map in awk, then does a BFS from the root PID.
 collect_pids() {
   local root="$1"
 
-  # read the entire process table once into awk, build a parent->children map,
-  # then do a BFS from root -- no subprocess per node, no recursion overhead
   ps -e -o pid=,ppid= | awk -v root="$root" '
     { children[$2] = children[$2] " " $1 }
     END {
@@ -106,15 +125,15 @@ collect_pids() {
 
 mapfile -t ALL_PIDS < <(collect_pids "$ACTIVE_PID")
 
-# Previously this used pw-dump, which serializes the ENTIRE PipeWire object
-# graph (nodes, ports, links, devices, modules, clients -- typically hundreds
-# to thousands of objects) before jq can filter it.
+# Parse PipeWire/PulseAudio sink-inputs via pactl to find audio streams
+# belonging to the focused window tree. pactl list sink-inputs is used
+# instead of pw-dump because it only enumerates active streams (typically
+# <10 entries vs. hundreds of PipeWire objects).
 #
-# pactl list sink-inputs only enumerates active audio streams (typically
-# under 10 entries), so it is orders of magnitude cheaper to parse.
-#
-# Each output line is: SINK_INPUT_ID VOLUME_PCT MUTED
-# where MUTED is "yes" or "no".
+# The awk script produces one line per matching stream:
+#   SINK_INPUT_ID VOLUME_PCT MUTED
+# where MUTED is "yes" or "no". It checks application.process.id against
+# the BFS-collected PID set.
 mapfile -t SINK_DATA < <(
   pactl list sink-inputs | awk -v pids="${ALL_PIDS[*]}" '
     BEGIN {
@@ -123,7 +142,6 @@ mapfile -t SINK_DATA < <(
     }
 
     /^Sink Input #/ {
-      # flush the previous record if it matched a target pid
       if (id != "" && matched) print id, vol, muted
       id   = $3;  sub(/#/, "", id)
       vol  = 100
@@ -134,9 +152,9 @@ mapfile -t SINK_DATA < <(
     /^[[:space:]]+Mute:/ { muted = $2 }
 
     /^[[:space:]]+Volume:/ {
-      # the Volume line looks like:
-      #   front-left: 65536 / 100% / 0.00 dB,   front-right: ...
-      # walk fields to find the first "NNN%" token and strip the percent sign
+      # Volume line format:
+      #   front-left: 65536 / 100% / 0.00 dB, front-right: ...
+      # Walk fields to find the first "NNN%" token.
       for (i = 1; i <= NF; i++) {
         if ($i ~ /^[0-9]+%[,]?$/) {
           vol = $i + 0

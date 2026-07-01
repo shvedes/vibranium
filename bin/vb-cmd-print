@@ -1,5 +1,32 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION] [FILE]...
+
+Print files via the system default CUPS printer.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
 if [[ "$CHASSIS_TYPE" == vm ]]; then
   [[ -t 1 ]] && echo "Not available in a VM!" >&2
   notify-send -r 4 -t 3000 -u critical "Print Manager" \
@@ -13,25 +40,25 @@ shcat() {
   done
 }
 
-if [[ "${1-}" =~ ^-(-help|h)$ ]] || [[ -z "$1" ]]; then
-  shcat <<EOF
-Usage: ${0##*/} [FILE]...
-
-Print files passed by a Thunar custom action via the system default CUPS printer.
-Native CUPS formats are sent directly. Office documents are converted to PDF via
-LibreOffice and SVGs via Inkscape, if those tools are available. Unknown formats
-are passed through and let CUPS decide.
-
-Options:
-  -h, --help     Display this help and exit
-EOF
-  exit 0
-fi
-
-# Print files passed by a Thunar custom action via the system default CUPS printer.
-# Native CUPS formats are sent directly. Office documents are converted to PDF via
-# LibreOffice and SVGs via Inkscape, if those tools are available. Unknown formats
-# are passed through and let CUPS decide.
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 set -uo pipefail
 
@@ -52,26 +79,21 @@ have_inkscape=false
 command -v libreoffice &>/dev/null && have_libreoffice=true
 command -v inkscape &>/dev/null && have_inkscape=true
 
-# Refuse to print if CUPS is down.
-if ! systemctl -q is-active cups.service; then
-  notify-send -r 4 -u critical -t 20000 "Print System Service Is Not Running" \
-    "Enable with 'systemctl enable --now cups.service'"
-  exit 1
-fi
+  if ! systemctl -q is-active cups.service; then
+    notify-send -r 4 -u critical -t 20000 "Print System Service Is Not Running" \
+      "Enable with 'systemctl enable --now cups.service'"
+    exit 1
+  fi
 
-# Default printer check
-# lpstat -d outputs either:
-#   "system default destination: <name>"   (printer configured)
-#   "no system default destination"        (nothing set)
-# Command substitution strips the trailing newline, so the result is one clean line.
-#
-# Read the default printer description from CUPS.
-lpstat_out=$(env LANG="en_US.UTF-8" lpstat -d 2>/dev/null)
-default_printer=""
+  # Determine the system default printer via lpstat -d.
+  # The LANG override ensures English output for the string match.
+  # Format: "system default destination: <printer_name>"
+  lpstat_out=$(env LANG="en_US.UTF-8" lpstat -d 2>/dev/null)
+  default_printer=""
 
-if [[ "$lpstat_out" == *"system default destination:"* ]]; then
-  default_printer="${lpstat_out#*system default destination: }" # Extract printer name.
-fi
+  if [[ "$lpstat_out" == *"system default destination:"* ]]; then
+    default_printer="${lpstat_out#*system default destination: }"
+  fi
 
 if [[ -z "$default_printer" ]]; then
   notify-send -r 4 -u critical -t 10000 "No Default Printer Found" \

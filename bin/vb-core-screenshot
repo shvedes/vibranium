@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -17,10 +26,14 @@ Options:
   --window    Capture active window
   --region    Capture selected region
   --annotate  Annotate taken screenshot
+  -v, --verbose Enable verbose output
   -h, --help  Display this help and exit
 EOF
 }
 
+# Copy the screenshot path to the clipboard as a text/uri-list so
+# pasting in a file manager or chat app treats it as a file reference
+# rather than a plain-text path.
 copy() {
   printf 'file://%s' "$1" | wl-copy --type text/uri-list
 }
@@ -48,6 +61,9 @@ notify() {
 set_output_file() {
   local -n _path=$1
 
+  # When saving to disk is disabled, the screenshot is written to the
+  # runtime directory (tmpfs) and exists only until reboot. Otherwise
+  # it goes to ~/Pictures/Screenshots/ with a timestamped filename.
   if [[ $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK == false ]]; then
     _path="$VIBRANIUM_RUNTIME/screenshot.$FILETYPE"
     return
@@ -64,6 +80,11 @@ set_output_file() {
   _path="$dir/screenshot-$timestamp.$FILETYPE"
 }
 
+# slurp interactive region selector.
+#   -d  draw borders
+#   -w 1  border width in px
+#   -b / -c  overlay color from Vibranium theme variables
+# Output format matches grim's -g geometry syntax: WxH+X+Y
 select_region() {
   local -n _region=$1
   local result result_rc
@@ -78,6 +99,10 @@ select_region() {
   _region="$result"
 }
 
+# Extract the focused window's geometry from Hyprland as a grim-compatible
+# geometry string: "X,Y WxH" (e.g. "100,50 1920x1080").
+# hyprctl -j activewindow returns the window's at[] and size[] arrays;
+# the jq expression formats them directly.
 get_window_geometry() {
   local -n _geometry=$1
   local result expression
@@ -98,6 +123,7 @@ capture() {
   local output_file
 
   set_output_file output_file
+  log Info "Capturing $target screenshot -> $output_file"
 
   case "$target" in
   region)
@@ -163,12 +189,14 @@ init() {
 
   GRIM_OPTS=()
 
+  # grim -c includes the cursor in the screenshot.
   if [[ $CURSOR == true ]]; then
     GRIM_OPTS+=(-c)
   fi
 
   GRIM_OPTS+=(-t "$FILETYPE")
 
+  # grim -q sets JPEG quality (0-100); only applicable for jpeg/jpg output.
   if [[ $FILETYPE =~ ^jp(e)?g$ ]]; then
     GRIM_OPTS+=(-q "$VIBRANIUM_SCREENSHOT_JPEG_QUALITY")
   fi
@@ -194,20 +222,26 @@ MODE=''
 # When true, annotation is forced regardless of VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE.
 EXPLICIT_ANNOTATE=false
 
-for arg in "$@"; do
-  case "$arg" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   --region | --window | --screen)
-    MODE="${arg#--}"
+    MODE="${1#--}"
+    shift
     ;;
   --annotate)
     EXPLICIT_ANNOTATE=true
+    shift
     ;;
   -h | --help)
     usage
     exit 0
     ;;
   *)
-    echo "Unknown option: $arg" >&2
+    echo "Unknown option: $1" >&2
     echo "Try '${0##*/} --help' for more information" >&2
     exit 1
     ;;

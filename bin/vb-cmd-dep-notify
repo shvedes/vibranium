@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -15,6 +24,7 @@ Checks that required dependencies are installed and shows a notification if some
 Options:
   --name TITLE           Set the notification title (required)
   --deps DEP1 [DEP2...]  List required dependencies (at least one, required)
+  -v, --verbose          Enable verbose output
   -h, --help             Show this help message and exit
 EOF
 }
@@ -32,10 +42,16 @@ while [[ $# -gt 0 ]]; do
       echo "Error: expected at least one dependency after --deps" >&2
       exit 1
     fi
+    # Collect all arguments following --deps until the next flag (--*)
+    # or end-of-args. This allows listing multiple deps in one invocation.
     while [[ $# -gt 0 && $1 != --* ]]; do
       DEPS+=("$1")
       shift
     done
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
     ;;
   -h | --help | "")
     usage
@@ -58,7 +74,11 @@ if [[ ${#DEPS[@]} -eq 0 ]]; then
   exit 1
 fi
 
+# Source the theme library for P_YELLOW and other colour variables used
+# in the notification markup.
 source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
 
 msg="Missing required dependencies: <span foreground='${P_YELLOW}'><b>${DEPS[*]}</b></span>"
+# Replace notification ID 4 so repeated dep-notify calls update the same
+# notification bubble instead of stacking new ones.
 notify-send -r 4 "$NAME" "$msg"

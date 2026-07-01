@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 THEME="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
 WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
 UWALLS="$XDG_CONFIG_HOME/vibranium/themes/$THEME/backgrounds"
@@ -23,6 +32,7 @@ Options:
   --next          Set the next wallpaper
   --prev          Set the previous wallpaper
   --get           Get the current wallpaper
+  -v, --verbose   Enable verbose output
   <image>         Path to an image file (.png, .jpg, .jpeg, .webp) to set as wallpaper
 
 If no OPTION is provided, the script expects an image file as an argument.
@@ -48,6 +58,8 @@ write_wallpaper_state() {
   # Write all entries back, replacing the one for this theme in place.
   # The > redirect truncates the file before the first printf runs,
   # which is safe because all lines are already loaded into the array.
+  # State file format: one theme="path" entry per line, e.g.
+  #   nord="nord/wallpaper-01.jpg"
   {
     for line in "${lines[@]}"; do
       if [[ "$line" == "${theme}="* ]]; then
@@ -65,6 +77,10 @@ write_wallpaper_state() {
   } >"$WALLPAPER_STATE"
 }
 
+# Resolve the current wallpaper path. The symlink at
+# vibranium/current/background is the primary source; if it is missing
+# (e.g. on first run before any wallpaper has been set), fall back to
+# querying awww for its active image.
 get_wallpaper() {
   local link="$XDG_CONFIG_HOME/vibranium/current/background"
   local -n _source="$1"
@@ -73,11 +89,15 @@ get_wallpaper() {
 
   if [[ -z "$_source" ]]; then
     while IFS= read -r line; do
+      # awww query output: "active: on\nimage: /path/to/img"
       _source="${line#*image: }"
     done < <(awww query)
   fi
 }
 
+# Cycle to the next or previous wallpaper in the active theme's
+# backgrounds directory. Returns the selected path (or nothing when
+# there is only one wallpaper and it is already active).
 cycle_wallpaper() {
   local mode="$1"
   local current files
@@ -86,18 +106,16 @@ cycle_wallpaper() {
 
   mapfile -t files < <(find "$WALLS" -maxdepth 1 -xtype f 2>/dev/null | sort)
 
-  # Exit if no wallpapers found
   if ((${#files[@]} == 0)); then
     return 1
   fi
 
-  # Get current wallpaper first
   get_wallpaper current
 
   found=0
   idx=0
 
-  # Find index of current wallpaper in the files array
+  # Locate the current wallpaper's position in the sorted file list.
   if [ -n "$current" ]; then
     for i in "${!files[@]}"; do
       if [ "${files[$i]}" = "$current" ]; then
@@ -111,28 +129,22 @@ cycle_wallpaper() {
   case "$mode" in
   --next)
     if ((found)); then
-      # Wrap around using modulo
       next=$(((idx + 1) % ${#files[@]}))
       candidate="${files[$next]}"
     else
-      # Default to first wallpaper if current not found
       candidate="${files[0]}"
     fi
     ;;
   --prev)
     if ((found)); then
-      # Wrap around safely
       prev=$(((idx - 1 + ${#files[@]}) % ${#files[@]}))
       candidate="${files[$prev]}"
     else
-      # Default to last wallpaper
       candidate="${files[${#files[@]} - 1]}"
     fi
     ;;
   esac
 
-  # Do nothing if candidate is the same as current wallpaper
-  # This handles the case of a single wallpaper in the directory
   if [[ "$candidate" == "$current" ]]; then
     return 0
   fi
@@ -153,6 +165,22 @@ feature_enabled() {
   fi
 }
 
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
 # Normalize file extension to lowercase so that .JPG, .PNG, etc. are
 # treated identically to their lowercase counterparts by the case below.
 # A separate variable is used instead of rewriting $1 to preserve the
@@ -164,6 +192,7 @@ if [[ "$_dispatch" != -* ]]; then
     _ext="${_fname##*.}"
     _ext_lower="${_ext,,}"
     if [[ "$_ext" != "$_ext_lower" ]]; then
+      # Reconstruct the path with the lowered extension in place.
       _dispatch="${_dispatch%"$_fname"}${_fname%"$_ext"}${_ext_lower}"
     fi
   fi
@@ -182,12 +211,11 @@ case "$_dispatch" in
   ;;
 --next | --prev)
   if ! feature_enabled; then
-    # echo "Error: this feature is disabled." >&2
-    # echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
+    # Wallpaper feature is disabled globally — exit silently.
     exit 0
   fi
 
-  WALLPAPER_PATH="$(cycle_wallpaper "$1")"
+  WALLPAPER_PATH="$(cycle_wallpaper "$_dispatch")"
 
   # cycle_wallpaper prints nothing when there is only one
   # wallpaper and it is already active — nothing to do
@@ -197,8 +225,7 @@ case "$_dispatch" in
   ;;
 *.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
   if ! feature_enabled; then
-    # echo "Error: this feature is disabled." >&2
-    # echo "To enable, go to Vibranium Menu > Settings > Misc > Show wallpaper." >&2
+    # Wallpaper feature is disabled globally — exit silently.
     exit 0
   fi
 
@@ -209,15 +236,13 @@ case "$_dispatch" in
     exit 1
   fi
 
-  # In case if user set new wallpaper via thunar context menu
-  # (e,g. user's own picture, downloaded from the internet) we
-  # should copy this file to the folder that contains user wallpapers
-  # only. Why copy? In case if original file gets deleted
+  # When the user sets a wallpaper from an external path (e.g. Thunar
+  # context menu, downloaded file), copy it into the theme's backgrounds
+  # directory so the file persists even if the original is deleted.
+  # Also copy into the current active theme so cycle_wallpaper can find it.
   if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
     mkdir -p "$UWALLS"
     cp "$WALLPAPER_PATH" "$UWALLS/"
-    # Also copy to the currently active theme (in case if the user
-    # cycles the wallpapers over and over again without changing the theme)
     cp "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds/"
     WALLPAPER_PATH="$UWALLS/${WALLPAPER_PATH##*/}"
   fi
@@ -229,6 +254,7 @@ case "$_dispatch" in
   ;;
 esac
 
+log Info "Setting wallpaper: $WALLPAPER_PATH"
 awww img -t fade --transition-duration 0.5 --transition-step 255 "$WALLPAPER_PATH" &
 ln -sf "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/background"
 

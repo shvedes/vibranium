@@ -13,11 +13,13 @@ Usage: ${0##*/} [OPTION | PROFILE]
 Set power profiles in Vibranium.
 
 Options:
-  --next       Next power profile
-  --prev       Previous power profile
-  --get        Get the active power profile
-  --list       List available power profiles
-  -q, --quiet  Be quiet (cli and notification)
+  --next           Next power profile
+  --prev           Previous power profile
+  --get            Get the active power profile
+  --list           List available power profiles
+  -f, --force      Force rebuild state file
+  -q, --quiet      Be quiet (cli and notification)
+  -v, --verbose    Enable verbose output
 
   [PROFILE]    Set a specific profile (see: powerprofilesctl list)
 EOF
@@ -57,8 +59,10 @@ notify() {
     VIBRANIUM_GLOBAL_USE_OSD \
     VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE
 
-  # Explicitly send notification when
-  # waybar module is disabled or the waybar is disabled itself.
+  # Skip notification when waybar is active AND the power-profile module
+  # is enabled, because the module itself reflects the current profile
+  # visually in the bar. Only notify directly when waybar is off (e.g.
+  # fullscreen game) or the module is disabled by the user.
   local module_enabled="$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
 
   if ! systemctl -q --user is-active waybar || [[ ! $module_enabled == "true" ]]; then
@@ -84,6 +88,7 @@ get_power_profile() {
 
 set_power_profile() {
   local target="$1"
+  log Info "Setting power profile to $target"
   powerprofilesctl set "$target" &
   _write_state "$target"
 }
@@ -100,7 +105,7 @@ _load_state() {
   local state="$VIBRANIUM_STATE/power-profile"
   local _detected
 
-  if [[ -f "$state" ]]; then
+  if [[ -f "$state" ]] && [[ $FORCE == false ]]; then
     mapfile -t _lines <"$state"
     CURRENT="${_lines[0]#current:}"
     PROFILES=("${_lines[@]:2}")
@@ -111,6 +116,7 @@ _load_state() {
   fi
 
   # Cold start or repair: regenerate profiles from powerprofilesctl
+  log Info "Loading available power profiles"
   mapfile -t _detected < <(
     powerprofilesctl list \
       | awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }'
@@ -133,8 +139,18 @@ _load_state() {
   _write_state "$CURRENT"
 }
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 ACTION="next"
 QUIET="false"
+FORCE=false
 SELF="${0##*/}"
 
 while (($# > 0)); do
@@ -145,6 +161,14 @@ while (($# > 0)); do
     ;;
   --next | --prev)
     ACTION="${1/--/}"
+    shift
+    ;;
+  -f | --force)
+    FORCE=true
+    shift
+    ;;
+  -v | --verbose)
+    VERBOSE=true
     shift
     ;;
   -h | --help)
@@ -190,6 +214,12 @@ if [[ ${#PROFILES[@]} -eq 0 ]]; then
   exit 1
 fi
 
+log Info "Current profile: $CURRENT"
+
+# Validate the target profile against the ordered list from _load_state.
+# The first guard rejects an explicit TARGET_PROFILE that is not available.
+# The second guard is reached when no TARGET_PROFILE was given and the
+# script must calculate the next/prev index.
 if [[ -n "$TARGET_PROFILE" ]] && [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
   echo "Unknown profile: $TARGET_PROFILE" >&2
   echo "Available: ${PROFILES[*]}" >&2
@@ -206,6 +236,9 @@ if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
     fi
   done
 
+  # Wrap-around modulo arithmetic for cycling through the profile list.
+  # The "+ ${#PROFILES[@]}" in the "prev" branch ensures the result
+  # stays non-negative before the modulo.
   case "$ACTION" in
   "next")
     next_index=$(((current_index + 1) % ${#PROFILES[@]}))

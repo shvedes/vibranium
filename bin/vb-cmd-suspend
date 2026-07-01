@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 
 shcat() {
@@ -16,44 +25,49 @@ Lock the session and suspend the system.
 Handle Hyprland animation transitions.
 
 Options:
-  -h, --help     display this help and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
 EOF
 }
 
-case "${1-}" in
--h | --help)
-  usage
-  exit 0
-  ;;
-"")
-  :
-  ;;
-*)
-  echo "Error: unknown option -- $1" >&2
-  echo "Try '$SELF --help' for more information." >&2
-  exit 1
-  ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option -- $1" >&2
+    echo "Try '$SELF --help' for more information." >&2
+    exit 1
+    ;;
+  esac
+done
+
+log Info "Locking session and suspending"
 
 # Lock session first
 vb-cmd-lock-session
 
-# Get current animations state.
-# This needed for smooth fade in/out of the screen using
-# gamma adjustments via hyprsunset.
+# Save the current animations state so we can restore it after wake.
+# Fading the screen gamma to 0 before suspend creates a smooth
+# fade-to-black effect when animations are enabled.
 ANIMATIONS_ENABLED="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
 if ((ANIMATIONS_ENABLED == 1)); then
   hyprctl -q hyprsunset gamma 0
   sleep 1
 fi
 
-# Disable sleep ihibitor (sleep block) first since it
-# will require sudo in order to suspend.
+# Disable the sleep inhibitor before suspending because systemctl
+# suspend requires a sleep-capable state and the inhibitor would block it.
 if systemctl -q --user is-active vibranium-inhibit@sleep.service; then
   vb-toggle-inhibitor
 fi
 
-# If suspend fails, show a clear error instead of failing silently.
 if ! sc_out="$(systemctl suspend 2>&1)"; then
   msg="Failed to suspend the system.\n\n"
   msg+="Command: <b>systemctl suspend</b>\n\n"
@@ -63,7 +77,8 @@ if ! sc_out="$(systemctl suspend 2>&1)"; then
     "Vibranium" "$msg"
 fi
 
-# This happens post-sleep
+# Post-wake: restore screen gamma after a short delay to let the
+# compositor and GPU re-initialise.
 if ((ANIMATIONS_ENABLED == 1)); then
   sleep 2
   hyprctl -q hyprsunset gamma 100

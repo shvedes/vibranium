@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 # Overcomplicated script that manages brightness control using raw sysfs values
 # as well as the DDC protocol for external monitors. The script uses a single state file
 # (lines in the "i2c:output:level" format) to cache active values for both methods
@@ -12,6 +21,10 @@
 #
 # TODO: allow setting brightness below 0% by adjusting gamma level below 100% via hyprsunset.
 
+# CHASSIS_TYPE is set early in the session based on
+# systemd-detect-virt --chassis; skip brightness control entirely
+# when running inside a VM because neither sysfs backlight nor DDC
+# passthrough are guaranteed to work.
 if [[ "$CHASSIS_TYPE" == "vm" ]]; then
   notify-send -r 4 "Vibranium - Brightness" -u critical -t 5000 \
     "Brightness control is not available inside of a Virtual Machine"
@@ -20,6 +33,7 @@ fi
 
 SELF="${0##*/}"
 QUIET=false
+FORCE=false
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 
 shcat() {
@@ -38,7 +52,9 @@ Options:
     --up              Increase brightness
     --down            Decrease brightness
     --set             Set brightness to <0-100>%
+    -f, --force       Bypass state file, work directly with ddcutil
     -q, --quiet       Do not display notification or OSD
+    -v, --verbose     Enable verbose output
     -h, --help        Show this help and exit
 EOF
 }
@@ -63,6 +79,14 @@ while [[ $# -gt 0 ]]; do
     SET_VALUE="$2"
     shift 2
     ;;
+  -f | --force)
+    FORCE=true
+    shift
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -q | --quiet)
     QUIET=true
     shift
@@ -81,6 +105,9 @@ if [[ -z "$ACTION" ]]; then
   exit 0
 fi
 
+# Open the lockfile on fd 9 and acquire a non-blocking exclusive lock.
+# flock -n returns nonzero when another instance holds the lock, so we
+# exit silently — the running instance will handle the request.
 exec 9>"$LOCKFILE" || {
   echo "Error: another instance of $SELF is already running!" >&2
   exit 1
@@ -104,10 +131,14 @@ STATE_FILE="$VIBRANIUM_STATE/monitors"
 
 # Load the unified state into the bus_map / level_map associative arrays.
 # Caller must declare them. Returns nothing useful; just populates the maps.
+# Load the unified state into the bus_map / level_map associative arrays.
+# Caller must declare them. Returns nothing useful; just populates the maps.
 load_state() {
   local i2c output level
   [[ -f "$STATE_FILE" ]] || return 0
 
+  # Parse each line of the state file ("i2c:output:level"), splitting on
+  # colons. Lines without an output name are considered corrupted and skipped.
   while IFS=: read -r i2c output level; do
     [[ -n "$output" ]] || continue
     bus_map["$output"]="$i2c"
@@ -141,8 +172,12 @@ get_i2c_bus() {
   declare -A bus_map level_map
   local new_info output bus
 
-  # Detect monitors and extract MONITOR:BUS pairs,
-  # skipping internal laptop panels
+  # Parse ddcutil detect output (expected format):
+  #   DRM_connector: card1-eDP-1   → skip (internal laptop panel)
+  #   DRM_connector: card1-DP-3    → name becomes "DP-3"
+  #   I2C bus: /dev/i2c-6          → bus becomes "6"
+  #   VCP version: ...             → emit "DP-3:6"
+  # The awk state machine tracks skip across multi-line connector blocks.
   new_info="$(ddcutil detect 2>/dev/null | awk '
         /I2C bus:/ {
             bus=$NF
@@ -181,8 +216,12 @@ ensure_i2c_cache() {
 set_i2c_bus() {
   declare -A bus_map level_map
 
-  if ! ensure_i2c_cache; then
-    echo "I2C bus cache for the active monitor not found. Getting one"
+  # With --force, skip the state file cache entirely and always run a
+  # fresh ddcutil detect. Otherwise use the cached bus if available.
+  if [[ $FORCE == true ]]; then
+    get_i2c_bus
+  elif ! ensure_i2c_cache; then
+    log Info "I2C bus cache for the active monitor not found, running detect"
     get_i2c_bus
   fi
 
@@ -191,6 +230,12 @@ set_i2c_bus() {
 }
 
 get_brightness_cache() {
+  # With --force, bypass the state file and return empty to force a fresh
+  # ddcutil read.
+  if [[ $FORCE == true ]]; then
+    return 0
+  fi
+
   declare -A bus_map level_map
   load_state
 
@@ -248,13 +293,16 @@ osd() {
   # I can't imagine a situation where this service would be turned off,
   # but let it be here just in case
   if ! systemctl -q --user is-active swayosd; then
-    echo "Activating swayosd.service"
+    log Info "Activating swayosd.service"
     systemctl --user enable --now swayosd.service
   fi
 
   swayosd-client --custom-icon="$icon" --custom-progress="$progress"
 }
 
+# Fetch monitors and active window in one hyprctl batch call, then extract
+# the focused monitor name, total monitor count, and fullscreen state via jq.
+# @tsv emits tab-separated values so the three fields can be read with IFS=$'\t'.
 HYPRLAND_DATA="$(hyprctl -j --batch 'monitors; activewindow' 2>/dev/null)"
 
 IFS=$'\t' read -r ACTIVE_MONITOR MONITOR_COUNT FULLSCREEN_STATE < <(
@@ -265,11 +313,19 @@ IFS=$'\t' read -r ACTIVE_MONITOR MONITOR_COUNT FULLSCREEN_STATE < <(
   ] | @tsv' <<<"$HYPRLAND_DATA"
 )
 
+log Info "Active monitor: $ACTIVE_MONITOR"
+
 if [[ -z "$ACTIVE_MONITOR" ]]; then
   notify-send -r 1 -t 3000 -u critical "Vibranium - Brightness" "Cannot get the active monitor!"
   exit 1
 fi
 
+# Decide between DDC (external monitors) and raw sysfs (internal laptop panel).
+# The heuristics:
+#   1. No /sys/class/backlight/ device → no built-in panel → must use DDC.
+#   2. /sys/class/backlight/ exists but the focused monitor name does not
+#      start with eDP → external monitor on a laptop with a closed lid → DDC.
+#   3. Otherwise → raw sysfs access to the built-in backlight.
 if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
   if ! command -v ddcutil >/dev/null; then
     vb-cmd-dep-notify --name "Brightness Control" --deps ddcutil
@@ -278,6 +334,7 @@ if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
 
   method="ddc"
   I2C_BUS="$(set_i2c_bus)"
+  log Info "Using DDC method, I2C bus: $I2C_BUS"
 
   # TODO: As far as I know, optimal values for --sleep-multiplier can vary from a monitor to a monitor,
   # and while it works well on one monitor, it may not work at all on another.
@@ -289,6 +346,7 @@ else
     I2C_BUS="$(set_i2c_bus)"
   else
     method="raw"
+    log Info "Using raw sysfs method"
   fi
 fi
 
@@ -300,20 +358,23 @@ if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
 fi
 
 step=$VIBRANIUM_BRIGHTNESS_STEP
+log Info "Action: $ACTION, method: $method, step: $step"
 
 case "$method" in
 "ddc")
   current="$(get_brightness_cache)"
   if [[ ! $current =~ ^[0-9]+$ ]]; then
-    # As mentioned above, --sleep-multiplier can sometimes fail at very low values,
-    # so we give the command three attempts to get the data from the monitor using the DDC protocol.
+    # --sleep-multiplier 0.13 is aggressive and some monitors need a few
+    # tries before they respond on the I2C bus. Retry up to 5 times to
+    # work around transient DDC NACKs; the loop exits early once a valid
+    # value (0-100) is obtained.
     for ((i = 0; i < 5; i++)); do
       current=$(ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" getvcp 10 2>/dev/null | awk '/current/ {print int($9)}')
       if [[ $current =~ ^[0-9]+$ ]] && ((current >= 0 && current <= 100)); then
         break
       fi
     done
-    echo "Warn: cache not found!"
+    [[ $FORCE == false ]] && log Warn "cache not found!"
     # No need to persist "$current" here: the final value ("$new") is written
     # below, and doing both would race two background writers on the same file.
   fi
@@ -336,6 +397,10 @@ case "$method" in
     ;;
   esac
 
+  log Info "Setting brightness to $new (current: $current)"
+  # Fire ddcutil in the background because the DDC write + monitor
+  # response can take 200-500ms; the cache update races alongside
+  # so we don't serialize the two async operations.
   ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &>/dev/null &
   update_brightness_cache "$new" &
 

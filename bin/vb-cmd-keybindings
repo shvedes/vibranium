@@ -1,18 +1,42 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Display Hyprland keybindings in an interactive search menu.
+
+Options:
+  -l, --list     List all keybindings to stdout
+  -i, --index    Lookup a keybinding by description
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
 # Source: Omarchy.
 # Adapted for Vibranium
 
-# A script to display Hyprland keybindings defined in your configuration
-# using rofi for an interactive search menu.
-
-# Fetch dynamic keybindings from Hyprland
-#
-# Also do some pre-processing:
-# - Remove standard Vibranium bin path prefix
-# - Remove uwsm prefix
-# - Map numeric modifier key mask to a textual rendition
-# - Output comma-separated values that the parser can understand
+# Fetch dynamic keybindings from Hyprland and pre-process them:
+# - Strip common command prefixes (uwsm app --)
+# - Map Hyprland's numeric modmask to human-readable modifier names
+#   (0=none, 1=SHIFT, 4=CTRL, 8=ALT, 64=SUPER, and common bitwise ORs)
+# - Output comma-separated fields: modmask,key@keycode,description,dispatcher,arg
 dynamic_bindings() {
   hyprctl -j binds |
     jq -r '.[] | {modmask, key, keycode, description, dispatcher, arg} | "\(.modmask),\(.key)@\(.keycode),\(.description),\(.dispatcher),\(.arg)"' |
@@ -128,23 +152,40 @@ by_index() {
 	'
 }
 
-case "$1" in
-  "--list" | "-l")
-    dynamic_bindings | sort -u | parse_bindings
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
     ;;
-  "--index" | "-i")
-    if [[ -z "$2" ]]; then
-      echo "--index requires an argument"
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --list | -l)
+    dynamic_bindings | sort -u | parse_bindings
+    exit 0
+    ;;
+  --index | -i)
+    shift
+    if [[ $# -eq 0 ]]; then
+      echo "Error: --index requires an argument" >&2
       exit 1
     fi
-    by_index "$2"
+    log Info "Looking up keybinding: $1"
+    by_index "$1"
+    exit 0
     ;;
   *)
-    dynamic_bindings | sort -u | parse_bindings | rofi -dmenu -sync \
-      -theme-str 'entry { placeholder: " search shortucts"; }' \
-      -theme-str 'listview { lines: 20; columns: 1; }' \
-      -theme "$XDG_CONFIG_HOME/rofi/config.rasi" \
-      -theme-str 'window { width:600; }' \
-      -p "Keybindings" -no-auto-select
+    break
     ;;
-esac
+  esac
+done
+
+log Info "Opening interactive keybinding browser"
+dynamic_bindings | sort -u | parse_bindings | rofi -dmenu -sync \
+  -theme-str 'entry { placeholder: " search shortucts"; }' \
+  -theme-str 'listview { lines: 20; columns: 1; }' \
+  -theme "$XDG_CONFIG_HOME/rofi/config.rasi" \
+  -theme-str 'window { width:600; }' \
+  -p "Keybindings" -no-auto-select

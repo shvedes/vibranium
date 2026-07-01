@@ -1,14 +1,72 @@
 #!/usr/bin/bash
 
-# Usage: <package_name>:<binary_associated_with>
-# We use this syntax because the name of the package may differ from the name of
-# the binary that the package provides. For example, if we want to check for the
-# presence of the swayosd package, the 'command -v swayosd' will fail because
-# swayosd provides binaries with a name different from the package name.
-#
-# Despite the above, this syntax is not mandatory. In this case, a binary name should
-# be the same as the package name
+VERBOSE=false
 
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION] <package:binary>...
+
+Check whether required packages are installed.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+
+Examples:
+  ${0##*/} swayosd:swayosd swayosd:swayosd-client
+  ${0##*/} neovim:nvim,vi
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+if [[ $# -eq 0 ]]; then
+  echo "Error: missing package arguments" >&2
+  usage
+  exit 1
+fi
+
+log Info "Checking $(($#)) package(s)"
+
+# Entry syntax: <package_name>:<binary_name[,binary_name,...]>
+# The colon separates the human-readable package name from the actual
+# binaries to check. Multiple binaries may be comma-separated (any one
+# suffices). When no colon is present, the entire entry is treated as
+# both the package name and the binary name.
+#
+# Example: swayosd:swayosd-client  → checks for swayosd-client binary
+#          neovim:nvim,vi          → checks for nvim OR vi binary
 missing=()
 
 for entry in "$@"; do

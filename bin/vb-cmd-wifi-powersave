@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 
 shcat() {
@@ -23,35 +32,58 @@ Options:
   --on      enable power saving
   --off     disable power saving
   --get     show current power saving state for each interface
+  -v, --verbose  Enable verbose output
   --help    display this help and exit
 EOF
 }
 
-case "${1:-}" in
---on | --off)
-  # strip leading '--'
-  value="${1#--}"
-  ;;
---get)
-  value="get"
-  ;;
---help)
-  usage
-  exit 0
-  ;;
-"")
+value=""
+ACTION=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  --on | --off)
+    ACTION="${1#--}"
+    shift
+    ;;
+  --get)
+    ACTION="get"
+    shift
+    ;;
+  --help)
+    usage
+    exit 0
+    ;;
+  "")
+    usage >&2
+    exit 1
+    ;;
+  *)
+    echo "Error: unknown option: $1" >&2
+    echo "Try '$SELF --help' for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+value="$ACTION"
+
+if [[ -z "$value" ]]; then
   usage >&2
   exit 1
-  ;;
-*)
-  echo "Error: unknown option: $1" >&2
-  echo "Try '$SELF --help' for more information" >&2
-  exit 1
-  ;;
-esac
+fi
+
+log Info "Wi-Fi powersave: $value"
 
 found=0
 
+# Enumerate wireless interfaces via iw (look for "Interface wlan0" etc.)
+# and either query or set power_save on each. When running as root (e.g.
+# from a udev rule), direct access is used; otherwise sudo is prepended.
 while IFS= read -r iface; do
   if [ "$value" = "get" ]; then
     state=$(iw dev "$iface" get power_save 2>/dev/null) || {
@@ -61,7 +93,6 @@ while IFS= read -r iface; do
     printf "  %-12s %s\n" "$iface:" "$state"
   else
     if ((EUID != 0)); then
-      # Launched by user, not by the udev rule
       if sudo iw dev "$iface" set power_save "$value" 2>/dev/null; then
         found=$((found + 1))
       fi

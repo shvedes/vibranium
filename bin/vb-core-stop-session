@@ -1,30 +1,73 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose) VERBOSE=true; shift ;;
+  -h | --help)
+    echo "Usage: ${0##*/} [OPTION]"
+    echo ""
+    echo "Terminate the current session forcefully."
+    echo ""
+    echo "Options:"
+    echo "  -v, --verbose  Enable verbose output"
+    echo "  -h, --help     Show this help and exit"
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option: $1" >&2
+    exit 1
+    ;;
+  esac
+done
+
 # When terminating a session correctly (systemd-way), some applications freeze completely,
 # and sometimes you have to wait for logind to time out to completely terminate the session.
 # I don't know why this happens, but it's annoying, so we take a rough approach with these applications.
 
+# Hard-kill known troublemakers before uwsm stop: Electron apps (Discord,
+# vesktop, Spotify) and Steam frequently hang during orderly shutdown
+# because they ignore SIGTERM or wait on child processes.  SIGKILL bypasses
+# their cleanup routines, which is safe because these apps persist state
+# incrementally and data loss on force-close is negligible.
 APPS=("Discord" "vesktop" "spotify" "steam" "steamwebhelper")
 
+log Info "Killing frozen applications: ${APPS[*]}"
 for app in "${APPS[@]}"; do
   killall -s KILL "$app"
 done
 
+# Source user-defined shutdown hooks from the hooks directory.
+# Each .sh file is sourced in a sub-shell (bash "$hook") so a single
+# failing hook does not abort the rest.
 HOOKS=("$XDG_CONFIG_HOME"/vibranium/hooks/shutdown/*.sh)
 
 if ((${#HOOKS[@]} >= 0)); then
+  log Info "Running shutdown hooks"
   for hook in "${HOOKS[@]}"; do
     bash "$hook"
   done
 fi
 
-# Stop all active sleep inhibitors
+# Release any active sleep inhibitors so the session can terminate
+# cleanly without logind holding a lock.
 if systemctl -q --user is-active vibranium-inhibit@sleep; then
   systemctl -q --user stop vibranium-inhibit@sleep
 elif systemctl -q --user is-active vibranium-inhibit@idle; then
   systemctl -q --user stop vibranium-inhibit@idle
 fi
 
+# uwsm stop initiates the Wayland session shutdown via UWSM. If it
+# fails, show the error in a persistent notification so the user knows
+# the session may not have terminated fully.
 if ! out="$(uwsm stop 2>&1)"; then
   notify-send -r 4 -t 15000 "Failed to Log Out!" "UWSM shows this error: \n\n${out}"
 fi

@@ -1,5 +1,43 @@
 #!/usr/bin/bash
 
-# This script hides the waybar using a custom kill signal (does not kill the process)
+VERBOSE=false
 
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+usage() {
+  cat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Toggle Waybar visibility using SIGUSR1.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Error: unknown option: $1" >&2
+    echo "Try '${0##*/} --help' for more information." >&2
+    exit 1
+    ;;
+  esac
+done
+
+log Info "Toggling Waybar visibility"
 pkill -SIGUSR1 waybar

@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 SELF="${0##*/}"
 
 shcat() {
@@ -17,10 +26,14 @@ Supports MPD and Playerctl.
 
 Options:
   -n, --notify  Show desktop notification
+  -v, --verbose Enable verbose output
   -h, --help    Display this help and exit
 EOF
 }
 
+# Parse MPD's music_directory from mpd.conf using a regex that matches
+# optional leading whitespace, the directive, and the quoted path.
+# Expands a leading ~ to $HOME since MPD allows tilde paths in config.
 mpd_music_dir() {
   local dir
 
@@ -56,24 +69,35 @@ mpd_is_playing() {
 
 notify=false
 
-case "$1" in
--n | --notify)
-  notify=true
-  ;;
--h | --help)
-  usage
-  exit 0
-  ;;
-"") ;;
-*)
-  echo "$SELF: invalid option '$1'" >&2
-  echo "Try '$SELF --help' for more information." >&2
-  exit 1
-  ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -n | --notify)
+    notify=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "$SELF: invalid option '$1'" >&2
+    echo "Try '$SELF --help' for more information." >&2
+    exit 1
+    ;;
+  esac
+done
+
+log Info "Copying current track"
 
 file=""
 
+# Prefer MPD when its control fifo exists (indicating the daemon is active
+# and reachable), falling back to playerctl for all other MPRIS players.
+# The fifo check avoids triggering socket activation on a stopped MPD.
 if command -v mpc >/dev/null && [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] && mpd_is_playing; then
   track="$(mpc current -f '%file%')"
   music_dir="$(mpd_music_dir)"

@@ -1,5 +1,22 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if [[ -t 0 ]]; then
+    if $VERBOSE; then
+      echo "[${0##*/}] $level: $*" >&2
+    fi
+  else
+    case "$level" in
+    Error) echo "==> ERROR: $*" ;;
+    Warn)  echo "==> WARN: $*"  ;;
+    *)     echo "==> $*"        ;;
+    esac
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -14,6 +31,7 @@ Patch Discord with Vencord.
 
 Options:
   -u, --uninstall  Uninstall Vencord and OpenASAR
+  -v, --verbose    Enable verbose output
   -h, --help       Show this help and exit
 EOF
 }
@@ -22,18 +40,21 @@ ACTION="install"
 
 for arg in "$@"; do
   case "$arg" in
-    -h|--help)
-      usage
-      exit 0
-      ;;
-    -u|--uninstall|-uninstall)
-      ACTION="uninstall"
-      ;;
-    *)
-      printf '%s: invalid option -- %s\n' "${0##*/}" "$arg" >&2
-      printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
-      exit 2
-      ;;
+  -v | --verbose)
+    VERBOSE=true
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -u | --uninstall | -uninstall)
+    ACTION="uninstall"
+    ;;
+  *)
+    printf '%s: invalid option -- %s\n' "${0##*/}" "$arg" >&2
+    printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
+    exit 2
+    ;;
   esac
 done
 
@@ -41,34 +62,34 @@ PATCH_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/discord"
 URL='https://github.com/Vendicated/VencordInstaller/releases/latest/download/VencordInstallerCli-Linux'
 CLI="/tmp/vencord-installer"
 
-echo "==> Downloading Vencord CLI installer"
+log Info "Downloading Vencord CLI installer"
 
 if command -v wget >/dev/null; then
   wget -q "$URL" -O "$CLI"
 elif command -v curl >/dev/null; then
   curl -fsSL "$URL" -o "$CLI"
 else
-  echo "==> ERROR: Neither wget nor curl is installed" >&2
+  log Error "Neither wget nor curl is installed"
   exit 1
 fi
 
 if (($?)); then
-  echo "==> ERROR: Couldn't download Vencord CLI installer" >&2
+  log Error "Couldn't download Vencord CLI installer"
   exit 1
 fi
 
 chmod +x "$CLI"
 
 if [ "$ACTION" = "uninstall" ]; then
-  echo "==> Uninstalling Vencord from Discord"
+  log Info "Uninstalling Vencord from Discord"
   "$CLI" -uninstall -uninstall-openasar -location "$PATCH_PATH"
 else
-  echo "==> Patching Discord"
+  log Info "Patching Discord"
   "$CLI" -install -install-openasar -location "$PATCH_PATH"
 fi
 
 if (($?)); then
-  echo "==> ERROR: Vencord CLI installer failed" >&2
+  log Error "Vencord CLI installer failed"
   exit 1
 fi
 

@@ -1,5 +1,14 @@
 #!/usr/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -13,7 +22,8 @@ Usage: ${0##*/} [OPTION]...
 Toggle reading mode in Hyprland by toggling a screen shader.
 
 Options:
-  -h,--help    Display this help and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
 EOF
 }
 
@@ -28,14 +38,26 @@ _grayscale_enabled() {
   fi
 }
 
-if [[ "$1" =~ ^(-h|--help)$ ]]; then
-  usage
-  exit 0
-fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 SHADER="$VIBRANIUM/default/hypr/shaders/grayscale.glsl"
 CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua"
 
+log Info "Toggling reading mode"
 if _grayscale_enabled; then
   rm -f "$CONFIG"
 else

@@ -13,12 +13,26 @@ Usage: ${0##*/} [OPTION]...
 Search and read installed manual pages using fzf.
 
 Options:
-  -h, --help     display this help and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
 EOF
+}
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
 }
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -h | --help)
     usage
     exit 0
@@ -37,11 +51,15 @@ while [ "$#" -gt 0 ]; do
 done
 
 if ! command -v fzf >/dev/null; then
+  log Error "fzf is not installed"
   printf "%s: error: fzf is not installed!" >&2
   exit 1
 fi
 
+# Auto-detect an editor if none is set. The preference order is nvim →
+# vim → neovide → vi → less, matching the most common terminal editors.
 if [ -z "$EDITOR" ]; then
+  log Info "EDITOR not set, detecting..."
   for ed in nvim vim neovide vi less; do
     if command -v "$ed" >/dev/null 2>&1; then
       EDITOR="$ed"
@@ -52,6 +70,10 @@ fi
 
 export EDITOR
 
+# Set MANPAGER based on the detected editor so that opening a man page
+# from fzf uses the appropriate viewer. vim/nvim users get the +Man!
+# plugin integration; nano gets -v (view mode); others use the editor
+# directly as the pager.
 if [ -z "$MANPAGER" ]; then
   case "$EDITOR" in
   *nvim | *vim)
@@ -66,6 +88,10 @@ if [ -z "$MANPAGER" ]; then
   esac
 fi
 
+# Loop: show fzf with a live preview of the selected man page.
+# man -k . lists every installed man page; sed strips the description
+# after " - " and inserts a space before the section parenthesis so
+# fzf's {1} extract matches the page name only.
 while true; do
   selected=$(
     man -k . 2>/dev/null |
@@ -84,6 +110,8 @@ while true; do
 
   [ -z "$selected" ] && exit 0
 
+  # Parse the selected entry: extract page name (before paren) and section.
+  # Format from man -k:  "page_name (section)"
   page="${selected%%(*}"
   page="${page% }"
 
