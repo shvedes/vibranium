@@ -4,7 +4,7 @@ source vb-lib-core
 
 THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
 THEME_NAME_FILE="$XDG_CONFIG_HOME/vibranium/current/theme.name"
-FALLBACK_THEME="nightfox-nightfox"
+FALLBACK_THEME="Nightfox"
 
 # Collect removable user themes: dirs inside USER_THEMES_PATH that have no
 # official counterpart. Overrides (same name as an official theme) are excluded
@@ -12,7 +12,6 @@ FALLBACK_THEME="nightfox-nightfox"
 # anything meaningful from the user's perspective.
 mapfile -t community_themes < <(
   find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d,l -printf '%f\n' |
-    sort |
     while read -r folder; do
       if [[ ! -d "$VIBRANIUM/themes/$folder" ]]; then
         echo "$folder"
