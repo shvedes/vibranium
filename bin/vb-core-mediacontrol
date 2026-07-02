@@ -124,9 +124,12 @@ get_player_status() {
 }
 
 # Three-pass probe: first try the cached STATE_PLAYER (only if Playing), then
-# scan all players for a Playing one, then for a Paused one. This ensures that
-# a player that the user started after the state file was written (e.g. Spotify
-# via playerctl while MPD is paused) is always picked up. Falls back to playerctl
+# scan all players for a Playing one, then for a Paused one (preferring the
+# cached STATE_PLAYER before falling back to the ordered list). This ensures
+# that a player the user started after the state file was written (e.g. Spotify
+# via playerctl while MPD is paused) is always picked up when it is Playing,
+# but when resuming from Paused the last-used player wins over a stale
+# playerctl process that happens to be paused too. Falls back to playerctl
 # when nothing is detected.
 detect_active_player() {
   PLAYER=""
@@ -154,9 +157,17 @@ detect_active_player() {
     fi
   done
 
+  if [[ -n "$STATE_PLAYER" ]]; then
+    if get_player_status "$STATE_PLAYER" STATUS && [[ "$STATUS" == "Paused" ]]; then
+      PLAYER="$STATE_PLAYER"
+      return 0
+    fi
+  fi
+
   for p in "${player_list[@]}"; do
     if get_player_status "$p" STATUS && [[ "$STATUS" == "Paused" ]]; then
       PLAYER="$p"
+      STATE_PLAYER="$p"
       return 0
     fi
   done
@@ -167,6 +178,7 @@ detect_active_player() {
 
 get_volume() {
   local -n result=$1
+  result="0.00"
 
   if [ "$PLAYER" = "playerctl" ]; then
     # playerctl volume emits a decimal in 0-1 range.
@@ -452,10 +464,17 @@ if _acquire_lock; then
       ;;
     esac
 
-    # Queue consumer: read pending action before persisting state so that
-    # a concurrent queuer write is captured before write_state overwrites
-    # the file. Clear the action field on disk by writing without it.
-    read_state
+    # Queue consumer: read only the action field from the state file so that
+    # a concurrent queuer write from a lock-contending instance is captured
+    # before write_state persists the current STATE_PLAYER/STATE_VOLUME.
+    # Calling read_state() here would overwrite those working values with
+    # stale data from the file, undoing updates from the action above.
+    STATE_ACTION=""
+    if [[ -f "$STATE_FILE" ]]; then
+      while IFS='=' read -r key value; do
+        [[ $key == action ]] && STATE_ACTION=$value && break
+      done < "$STATE_FILE"
+    fi
     if [[ -n "$STATE_ACTION" ]]; then
       ACTION="$STATE_ACTION"
     else
