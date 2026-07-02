@@ -156,6 +156,10 @@ case "$action" in
 get_power_profile() {
 ```
 
+# Git Commits
+
+All commits must follow **Conventional Commits** (`type(scope): description`). Types: `feat`, `fix`, `refactor`, `style`, `docs`, `chore`, `test`, `perf`, `ci`, `build`, `revert`. The commit body must be **plain text only** — no markdown, no bullet lists, no backticks. Wrap at 72 characters.
+
 # Command Naming
 
 You may use already existing Vibranium commands. Always try `--help` CLI flag first. All commands start with `vb-`.
