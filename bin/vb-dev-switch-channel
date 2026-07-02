@@ -1,9 +1,22 @@
-#!/usr/bin/bash
+#!/bin/bash
 
-set -euo pipefail
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
-  cat << EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]... CHANNEL
 Switch the Vibranium update channel to CHANNEL.
 
@@ -21,6 +34,10 @@ CHANNEL=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
     -h | --help)
       usage
       exit 0
@@ -37,9 +54,9 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       CHANNEL="$1"
+      shift
       ;;
   esac
-  shift
 done
 
 if [[ -z "$CHANNEL" ]]; then
@@ -59,6 +76,8 @@ esac
 
 GIT="git -C $VIBRANIUM"
 
+# Send a desktop notification when stdout is not a terminal (i.e. when
+# invoked from a launcher or hook rather than interactively).
 notify() {
   local urgency="${1:-normal}" message="$2"
 
@@ -75,6 +94,8 @@ die() {
 
 CURRENT="$($GIT branch --show-current)"
 
+# When on a release tag (branch name starts with "v"), skip the dirty
+# check because detached HEAD is expected and the checkout is read-only.
 if [[ ! "$CURRENT" =~ ^v ]]; then
   CHANGES="$($GIT status --porcelain | wc -l)"
 
@@ -88,6 +109,10 @@ if [[ ! "$CURRENT" =~ ^v ]]; then
   fi
 fi
 
+# Each channel writes its name to update.channel so that vb-update-fetch
+# knows which remote ref to track.  The reload and update service are
+# backgrounded: the reload may take hundreds of ms and the update fetch
+# can pend on network I/O.
 case "$CHANNEL" in
   release)
     LATEST="$($GIT tag --sort=-creatordate | head -n 1)"

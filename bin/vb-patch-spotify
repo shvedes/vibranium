@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 VERBOSE=false
 
@@ -53,6 +53,7 @@ while (($#)); do
   esac
 done
 
+# If Spicetify was never installed, there is nothing to restore or apply.
 if ! command -v spicetify >/dev/null; then
   log Warn "Spicetify is not installed, skipping"
   exit 0
@@ -60,12 +61,17 @@ fi
 
 log Info "Checking if Spotify was previously patched"
 
+# Prefer ripgrep for speed when searching through the Spotify binary
+# directory; fall back to grep if rg is unavailable.
 if command -v rg >/dev/null; then
   grep_cmd=(rg -q -m1 spicetify)
 else
   grep_cmd=(grep -q -m1 spicetify)
 fi
 
+# Check whether any file under /opt/spotify/ contains a spicetify
+# reference.  If none do, the patch has already been reverted or was
+# never applied, so skip the restore+apply cycle.
 if ! find /opt/spotify/ -type f -exec "${grep_cmd[@]}" {} + >/dev/null; then
   log Info "Spotify wasn't patched; skipping re-patch"
   exit 0

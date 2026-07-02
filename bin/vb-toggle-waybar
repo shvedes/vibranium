@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 VERBOSE=false
 
@@ -9,8 +9,14 @@ log() {
   fi
 }
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 usage() {
-  cat <<EOF
+  shcat <<EOF
 Usage: ${0##*/} [OPTION]
 
 Toggle Waybar visibility using SIGUSR1.
@@ -39,5 +45,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# SIGUSR1 is Waybar's built-in toggle signal.  No config reload is
+# needed; Waybar handles this signal internally.
 log Info "Toggling Waybar visibility"
 pkill -SIGUSR1 waybar

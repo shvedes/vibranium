@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 CPU_VENDOR=
 CPU_FAMILY=

@@ -1,7 +1,52 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Interactive font package installer using fzf.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 source vb-lib-core
 
+# fzf configuration for font selection with a preview pane showing
+# detailed package info from yay -Sii.
 FZF_ARGS=(
   --multi
   --ignore-case
@@ -38,6 +83,10 @@ _operation_canceled() {
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
+# Query both official repos and AUR for font packages.  The glob patterns
+# match TTF and OTF packages (including Nerd Font variants) while
+# excluding non-font packages that happen to contain "ttf" or "otf" in
+# their names.
 _get_fonts() {
   local pkg
 

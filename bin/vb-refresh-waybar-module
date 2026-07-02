@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 shcat() {
   while IFS= read -r line; do
@@ -17,12 +17,17 @@ Options:
 EOF
 }
 
-case "$1" in
--h | --help | "")
-  usage
-  exit 0
-  ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 waybar_pid=$(systemctl --user show waybar -p MainPID --value)
 

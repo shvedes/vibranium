@@ -1,4 +1,13 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
 
 shcat() {
   while IFS= read -r line; do
@@ -22,18 +31,21 @@ Options:
 EOF
 }
 
-case "${1:-}" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
   -h|--help)
     usage
     exit 0
     ;;
-  "")
+  -v|--verbose)
+    VERBOSE=true
+    shift
     ;;
   *)
-    print_help
-    exit 2
+    break
     ;;
-esac
+  esac
+done
 
 # Scan /sys/class/power_supply/BAT* entries. A battery is considered
 # "present" when three conditions hold: the directory exists, the

@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 TIMESTAMP="$(git -C "$VIBRANIUM" log -1 --format=%cd --date=unix)"
 FILE="$VIBRANIUM/migrations/${TIMESTAMP}.sh"

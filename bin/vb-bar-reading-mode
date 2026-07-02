@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua"
 

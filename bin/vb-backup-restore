@@ -1,6 +1,13 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-source "$VIBRANIUM/install/helpers/05-backup.sh"
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
 
 shcat() {
   while IFS= read -r line; do
@@ -8,7 +15,7 @@ shcat() {
   done
 }
 
-_usage() {
+usage() {
   shcat <<EOF
 Usage: ${0##*/} COMMAND [OPTION]...
 
@@ -24,9 +31,13 @@ Options:
 EOF
 }
 
-case "${1:-}" in
+source "$VIBRANIUM/install/helpers/05-backup.sh"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
   list)
     vb::backup_list
+    shift
     ;;
   restore)
     if [[ -z "${2:-}" ]]; then
@@ -35,13 +46,20 @@ case "${1:-}" in
       exit 1
     fi
     vb::backup_restore "$2"
+    shift 2
     ;;
   -h|--help)
-    _usage
+    usage
+    exit 0
+    ;;
+  -v|--verbose)
+    VERBOSE=true
+    shift
     ;;
   *)
-    echo "${0##*/}: invalid command '${1:-}'" >&2
+    echo "${0##*/}: invalid command '$1'" >&2
     echo "Try '${0##*/} --help' for more information." >&2
     exit 1
     ;;
-esac
+  esac
+done

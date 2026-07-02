@@ -1,12 +1,57 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]...
+
+Set a countdown timer with a rofi-based duration picker.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
+EOF
+}
 
 source vb-lib-core
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 options=("Seconds" "Minutes" "Hours")
 state="$VIBRANIUM_RUNTIME/vb-timer.remaining"
 ring="/usr/share/sounds/freedesktop/stereo/alarm-clock-elapsed.oga"
 paplay_pid=""
 
+# Clean up state file, refresh waybar, and kill the systemd-inhibit
+# idle blocker on exit so that the display is no longer held awake.
 cleanup() {
   rm -f "$state"
   vb-refresh-waybar-module timer
@@ -18,6 +63,8 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
+# If another timer instance is already counting down, kill it and start
+# fresh.  The --why=Timer argument is set by systemd-inhibit below.
 if pgrep -f -- '--why=Timer' >/dev/null; then
   cleanup
 fi
@@ -63,8 +110,16 @@ if [[ -z "$sleep_time" ]]; then
   exit 0
 fi
 
+# systemd-inhibit blocks idle suspension for the duration of the timer.
+# --what=idle is used instead of --what=sleep so the screen can still
+# turn off while the timer is running, but the system will not suspend.
+# setsid detaches the inhibit process from the terminal so it survives
+# the script's exit.
 setsid -f systemd-inhibit --what=idle --why="Sleep is inhibited because of the active timer" --who="Timer" sleep "$sleep_time"
 
+# Countdown loop: write remaining seconds to the state file every tick
+# and signal waybar to re-read it.  sleep 1 & wait avoids accumulating
+# sub-second drift across iterations.
 time_remaining=$sleep_time
 while ((time_remaining > 0)); do
   echo "$time_remaining" >"$state"
@@ -77,6 +132,8 @@ done
 echo "timed out" >"$state"
 vb-refresh-waybar-module timer
 
+# Play the alarm sound in a loop until the user kills this script
+# (cleanup traps INT/TERM and stops paplay via the saved PID).
 while true; do
   paplay --volume 32500 "$ring" &
   paplay_pid=$!

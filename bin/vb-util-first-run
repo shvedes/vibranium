@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 FIRSTBOOT_HOOKS="$VIBRANIUM/install/first-run"
 

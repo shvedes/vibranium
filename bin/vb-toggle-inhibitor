@@ -1,8 +1,4 @@
-#!/usr/bin/bash
-
-# Toggle a persistent systemd-inhibit to prevent idle suspend.
-# If an inhibitor is already running, stops it; otherwise starts a new one.
-# Refreshes the Vibranium Waybar inhibitor module after action.
+#!/bin/bash
 
 VERBOSE=false
 
@@ -67,6 +63,9 @@ REFRESH_BAR=false
 TYPE="$(vb-cmd-get-option VIBRANIUM_GLOBAL_INHIBIT_TYPE)"
 UNIT="vibranium-inhibit@${TYPE}.service"
 
+# Scan the two possible inhibitor unit types (idle and sleep) to find
+# which one (if any) is currently active.  Only one can be active at a
+# time since this script toggles between them.
 _active_unit=""
 for _type in idle sleep; do
   _candidate="vibranium-inhibit@${_type}.service"
@@ -76,6 +75,9 @@ for _type in idle sleep; do
   fi
 done
 
+# Retoggle: called after an inhibitor type change in cfgr-idle.  Stops
+# the old type and starts the new one.  No-op when the current active
+# unit already matches the configured type.
 if ((opt_retoggle)); then
   log Info "Retoggle requested"
   if [[ -n "$_active_unit" && "$_active_unit" != "$UNIT" ]]; then

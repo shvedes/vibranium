@@ -1,5 +1,50 @@
-#!/usr/bin/bash
+#!/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]...
+
+Print current Vibranium version and git status.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+# Parse git output where INFO has the format "%cd|%h|%D" (date, hash, refs).
+# Parameter expansion strips the pipe-delimited fields without forking.
 DESCRIBE=$(git -C "$VIBRANIUM" describe --tags --long --abbrev=7 2>/dev/null)
 INFO=$(git -C "$VIBRANIUM" show -s --format="%cd|%h|%D" --date=short HEAD 2>/dev/null)
 
@@ -8,6 +53,9 @@ REST="${INFO#*|}"
 SHORT_HASH="${REST%%|*}"
 REFS="${REST#*|}"
 
+# Extract the branch name from the %D refs field which contains
+# "tag: v1.0, HEAD -> main, origin/main".  We want the part after
+# "HEAD -> " and before the first comma.
 case "$REFS" in
   *"HEAD -> "*)
     BRANCH="${REFS#*HEAD -> }"
@@ -15,18 +63,22 @@ case "$REFS" in
     ;;
 esac
 
-if [ -n "$DESCRIBE" ]; then
+if [[ -n "$DESCRIBE" ]]; then
+  # git describe output: "v1.0-5-gabcdef1"
+  # Split on the last hyphen to get tag and commits-ahead count.
   DESCRIBE_NO_HASH="${DESCRIBE%-*}"
   COMMITS_AHEAD="${DESCRIBE_NO_HASH##*-}"
   TAG="${DESCRIBE_NO_HASH%-*}"
 
-  if [ "$COMMITS_AHEAD" -eq 0 ]; then
+  if ((COMMITS_AHEAD == 0)); then
     echo "Vibranium ${TAG} release (${DATE})"
   else
     echo "Vibranium dev ${TAG}+"
     echo "Branch: ${BRANCH} @ ${SHORT_HASH} (${DATE})"
     echo "${COMMITS_AHEAD} commits ahead of ${TAG}"
 
+    # Determine upstream for behind-count.  On master/main resolve the
+    # configured upstream; on other branches default to origin/master.
     case "$BRANCH" in
       master | main)
         UPSTREAM=$(git -C "$VIBRANIUM" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)
@@ -36,21 +88,23 @@ if [ -n "$DESCRIBE" ]; then
         ;;
     esac
 
-    if [ -n "$UPSTREAM" ] && git -C "$VIBRANIUM" rev-parse --verify "$UPSTREAM" &>/dev/null; then
+    if [[ -n "$UPSTREAM" ]] && git -C "$VIBRANIUM" rev-parse --verify "$UPSTREAM" &>/dev/null; then
       COMMITS_BEHIND=$(git -C "$VIBRANIUM" rev-list --count HEAD.."$UPSTREAM")
-      if [ "$COMMITS_BEHIND" -gt 0 ]; then
+      if ((COMMITS_BEHIND > 0)); then
         echo "${COMMITS_BEHIND} commits behind ${UPSTREAM}"
       fi
     fi
   fi
 else
-  if [ -n "$BRANCH" ]; then
+  if [[ -n "$BRANCH" ]]; then
     echo "Branch: ${BRANCH} @ ${SHORT_HASH} (${DATE})"
   else
     echo "Vibranium ${SHORT_HASH} (${DATE})"
   fi
 fi
 
-if [ -f "$VIBRANIUM_STATE/update.available" ]; then
+# If an update-fetch run found a newer version, its tag was written
+# to this state file by vb-update-fetch.
+if [[ -f "$VIBRANIUM_STATE/update.available" ]]; then
   echo "New version available: $(< "$VIBRANIUM_STATE/update.available")"
 fi

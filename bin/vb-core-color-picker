@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 HISTORY="$VIBRANIUM_CACHE/color-picker.history"
 VERBOSE=false

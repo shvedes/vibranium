@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 _die() { helpers::ui::close_menus; }
 

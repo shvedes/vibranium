@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 # Handle music playback on session lock/unlock.
 # Intended to be called by hypridle.

@@ -1,4 +1,47 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Interactive font package remover using fzf.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 source vb-lib-core
 
@@ -37,6 +80,8 @@ _operation_canceled() {
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
+# List installed font packages by matching their names against common
+# font package prefixes (ttf, otf) and Nerd Font suffixes.
 _get_fonts() {
   local pkg
   for pkg in $(pacman -Qq); do

@@ -1,6 +1,15 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 set -euo pipefail
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
 
 source vb-lib-core
 
@@ -15,6 +24,9 @@ _fail() {
   exit 1
 }
 
+# Check for any dirty state (unstaged, staged, or untracked files) and
+# stash them before the pull so the working tree is clean.  The stash
+# is re-applied after the update via _apply_stash / _restore_stash_and_fail.
 _check_and_stash() {
   if ! git -C "$VIBRANIUM" diff --quiet HEAD ||
     ! git -C "$VIBRANIUM" diff --cached --quiet ||
@@ -68,6 +80,7 @@ Update Vibranium to the latest version.
 
 Options:
       --nuke            discard all local changes and reset to remote state
+  -v, --verbose         enable verbose output
       --help            display this help and exit
 EOF
 }
@@ -266,11 +279,15 @@ channel_arg=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
     --nuke)
       nuke=true
       shift
       ;;
-    -h| --help)
+    -h | --help)
       usage
       exit 0
       ;;

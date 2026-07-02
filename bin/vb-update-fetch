@@ -1,8 +1,13 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 set -euo pipefail
 
-# Wait for network, bail out after 60 attempts
+# This script is triggered by a systemd timer and runs non-interactively.
+# It is intentionally silent (no log/usage functions) because all output
+# goes to the journal and the user is notified via Waybar or notify-send
+# only when an update is actually found.
+
+# Wait for network, bail out after 60 attempts (~1 minute)
 attempts=0
 while ! ping -c 1 -W 2 8.8.8.8 &>/dev/null; do
   attempts=$((attempts + 1))
@@ -35,6 +40,7 @@ if [[ "$channel" == "release" ]]; then
   if [[ "$remote_latest" != "$local_latest" ]]; then
     echo "$remote_latest" >"$VIBRANIUM_STATE/update.available"
     if systemctl -q --user is-active waybar; then
+      # RTMIN+12 = pacman module, RTMIN+10 = update module
       pkill -RTMIN+12 waybar || true
       pkill -RTMIN+10 waybar || true
     else
@@ -47,7 +53,7 @@ else
   # upstream/dev channel: count how many commits local is behind origin/<master/dev>
   branch="$(git -C "$VIBRANIUM" branch --show-current)"
 
-  # Uknown branch - do nothing
+  # Unknown branch - do nothing
   if [[ ! "$branch" =~ ^(master|dev)$ ]]; then
     exit 0
   fi
@@ -57,6 +63,7 @@ else
   if ((behind > 0)); then
     echo "$behind" >"$VIBRANIUM_STATE/update.available"
     if systemctl -q --user is-active waybar; then
+      # RTMIN+12 = pacman module, RTMIN+10 = update module
       pkill -RTMIN+12 waybar || true
       pkill -RTMIN+10 waybar || true
     else

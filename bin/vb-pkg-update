@@ -1,4 +1,13 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
 
 shcat() {
   while IFS= read -r line; do
@@ -6,7 +15,7 @@ shcat() {
   done
 }
 
-_usage() {
+usage() {
   shcat <<EOF
 Usage: ${0##*/} [OPTION]...
 
@@ -48,6 +57,10 @@ _check_updates() {
   fi
 }
 
+# Temporarily enable the sleep inhibitor during the update to prevent
+# the system from suspending while packages are being installed.  The
+# trap on RETURN restores the original inhibitor state when the function
+# completes (whether successful or not).
 _perform_update() {
   local need_inhibit=1
 
@@ -68,9 +81,14 @@ _perform_update() {
 
   trap cleanup RETURN
 
+  # yes and --noconfirm together handle both the download prompt and
+  # the package installation confirmation non-interactively.
+  # --sudoloop keeps the sudo timestamp fresh for long updates.
   yes | yay --noconfirm --sudoloop
 }
 
+# Return 0 when any updated package is a kernel, graphics driver,
+# display server, or networking component that requires a reboot.
 _check_important() {
   local important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
 
@@ -83,7 +101,9 @@ _check_important() {
   return 1
 }
 
-# e.g. clicked on the updates waybar module
+# When invoked from the Waybar pacman module (no TTY attached), open a
+# terminal window running this script so the user sees the interactive
+# update flow.
 if [[ ! -t 1 ]]; then
   xdg-terminal-exec --title="${0##*/}" --app-id=org.vb.term.float -- "$0"
   exit
@@ -111,7 +131,7 @@ while (($# > 0)); do
     shift
     ;;
   --help)
-    _usage
+    usage
     exit 0
     ;;
   --)
@@ -132,6 +152,8 @@ if [[ $NO_LOGO == false ]]; then
   term::show_header
 fi
 
+# Refresh the sudo timestamp before the long-running yay call so the
+# password prompt appears at the start rather than mid-update.
 echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
 if ! sudo -v; then
   _operation_canceled

@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 STATE_FILE="$VIBRANIUM_STATE/cursor-theme"
 

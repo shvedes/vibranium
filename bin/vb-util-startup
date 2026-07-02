@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 mkdir -p "$VIBRANIUM_RUNTIME" "$VIBRANIUM_STATE" "$VIBRANIUM_CACHE"
 

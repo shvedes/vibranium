@@ -1,21 +1,80 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Launch syncthing UI in Vibranium.
+
+Options:
+  -h, --help     Show this help and exit
+  -v, --verbose   Enable verbose output
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+log Info "Checking Syncthing availability"
 
 if ! command -v syncthing >/dev/null; then
+  log Error "Syncthing is not installed"
   if [[ ! -t 1 ]]; then
     notify-send -r 4 -u critical -t 5000 \
       "Vibranium" "Syncthing is not installed!"
   fi
 
-  echo "error: syncthing is not installed!" >&2
+  log Error "Syncthing is not installed!" >&2
   exit 1
 fi
 
+log Info "Checking systemd unit"
+
 if ! systemctl -q --user is-active syncthing; then
+  log Warn "Systemd unit isn't active"
+  log Info "Enabling and starting syncthing.service"
   systemctl -q --user enable --now syncthing
 fi
 
+# Prefer the Chromium webapp wrapper (which creates an app-style window)
+# over the built-in syncthing browser command which opens the default
+# system browser.
 if command -v chromium >/dev/null; then
+  log Info "Opening syncthing via chromium webapp"
   vb-launch-webapp "https://127.0.0.1:8384"
 else
+  log Info "Opening syncthing via browser"
   syncthing browser
 fi

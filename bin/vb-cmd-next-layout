@@ -98,7 +98,7 @@ fi
 
 # Query the active keymap after switching for the notification. A second
 # hyprctl call is needed here because switchxkblayout does not return the
-# new layout and the cached value may be stale.
+# new layout and the cached value from the first call would be stale.
 if $NOTIFY; then
   layout="$(
     hyprctl -j devices |

@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 # Checking file existance is faster
 # than calling pacman -Q.

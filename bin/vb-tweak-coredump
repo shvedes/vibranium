@@ -1,25 +1,69 @@
-#!/usr/bin/bash
+#!/bin/bash
 
-# TODO: polkit policy
+VERBOSE=false
 
-_is_enabled() {
-  local pattern
-  pattern="$(sysctl -n kernel.core_pattern)"
-  if [[ "$pattern" == "|/bin/false" ]]; then
-    return 0
-  else
-    return 1
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
   fi
 }
 
-if ! _is_enabled; then
-  if ! pkexec bash -c 'printf "kernel.core_pattern=|/bin/false\n" > /etc/sysctl.d/99-coredump.conf; sysctl --system'; then
-    exit 1
-  fi
-  notify-send -r 3 "Vibranium" "<b>systemd-coredump</b> disabled. No reboot required"
-else
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Toggle systemd-coredump on/off.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+# Check whether coredump is disabled by looking at kernel.core_pattern.
+# When set to "|/bin/false" the kernel pipes core dumps to /bin/false
+# (i.e. discards them) instead of passing them to systemd-coredump.
+_is_disabled() {
+  local pattern
+  pattern="$(sysctl -n kernel.core_pattern)"
+  [[ "$pattern" == "|/bin/false" ]]
+}
+
+# pkexec writes the sysctl config as root and applies it immediately
+# via sysctl --system, so the change takes effect without a reboot.
+if _is_disabled; then
+  log Info "Enabling coredumps"
   if ! pkexec bash -c 'rm -f /etc/sysctl.d/99-coredump.conf; sysctl --system'; then
     exit 1
   fi
   notify-send -r 3 "Vibranium" "<b>systemd-coredump</b> enabled. No reboot required"
+else
+  log Info "Disabling coredumps"
+  if ! pkexec bash -c 'printf "kernel.core_pattern=|/bin/false\n" > /etc/sysctl.d/99-coredump.conf; sysctl --system'; then
+    exit 1
+  fi
+  notify-send -r 3 "Vibranium" "<b>systemd-coredump</b> disabled. No reboot required"
 fi

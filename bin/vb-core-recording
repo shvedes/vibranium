@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 if [[ $CHASSIS_TYPE == vm ]]; then
   printf 'Error: screen recording is not available in a VM!\n' >&2

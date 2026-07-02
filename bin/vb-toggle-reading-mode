@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 VERBOSE=false
 
@@ -27,6 +27,10 @@ Options:
 EOF
 }
 
+# Check whether a screen shader is currently active by inspecting
+# Hyprland's decoration:screen_shader option.  hyprctl returns the
+# literal string "[[EMPTY]]" when no shader is set, and jq strips
+# surrounding quotes so the empty case is also matched by ^()$.
 _grayscale_enabled() {
   local opt
   opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
@@ -61,7 +65,7 @@ log Info "Toggling reading mode"
 if _grayscale_enabled; then
   rm -f "$CONFIG"
 else
-  cat <<EOF >"$CONFIG"
+  shcat <<EOF >"$CONFIG"
 hl.config({
   decoration = {
     screen_shader = "$SHADER"
@@ -70,5 +74,8 @@ hl.config({
 EOF
 fi
 
+# Reload and refresh are backgrounded because hyprctl may take tens of
+# ms over the socket and the waybar module refresh depends on the new
+# state being visible to vb-hw-gpu first.
 hyprctl -q reload config-only &
 vb-refresh-waybar-module reading-mode &

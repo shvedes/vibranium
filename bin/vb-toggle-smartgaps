@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 VERBOSE=false
 
@@ -30,20 +30,33 @@ Options:
 EOF
 }
 
-case "${1:-}" in
--v | --verbose)
-  VERBOSE=true
-  ;;
--h | --help)
-  usage
-  exit 0
-  ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 log Info "Toggling smart gaps"
+
+# The presence of smart-gaps.lua enables the rule; removing it reverts
+# to the default gaps defined in the main Hyprland config.
 if [[ -f "$FILE" ]]; then
   rm -f "$FILE"
 else
+  # Both workspace rule and window rule are needed: the workspace rule
+  # sets gaps_out/gaps_in to 0 on all non-float windows, and the window
+  # rule suppresses decorations (title bars, borders) which would waste
+  # space when gaps are removed.
   shcat >"$FILE" <<EOF
 hl.workspace_rule({
   workspace = "w[tv1] w[g0] s[false]", -- 1 tiled, no groups, not special

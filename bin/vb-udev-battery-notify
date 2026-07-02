@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 PERCENT=""
 URGENCY=""
@@ -9,7 +9,7 @@ SCRIPT_NAME="${0##*/}"
 # Thresholds and their urgency are built into the script, so it has
 # everything it needs in a single standalone invocation with no args.
 # Order matters: when several thresholds are crossed in one run, the
-# last one processed is the one left visible (see -r below).
+# last one processed is the one left visible via notify-send -r 4455.
 KNOWN_THRESHOLDS=(25 15 5)
 
 declare -A THRESHOLD_URGENCY=(
@@ -108,6 +108,8 @@ fi
 
 BATTERY_PATHS=()
 
+# $(<) strips the trailing newline present in all sysfs pseudo-files.
+# Without it the comparison "Battery\n" == "Battery" would always fail.
 for CANDIDATE in /sys/class/power_supply/*; do
   if [[ -f "$CANDIDATE/type" ]] && [[ "$(<"$CANDIDATE/type")" == "Battery" ]]; then
     BATTERY_PATHS+=("$CANDIDATE")
@@ -122,6 +124,11 @@ fi
 TOTAL_NOW=0
 TOTAL_FULL=0
 
+# Three-tier fallback for capacity aggregation across batteries:
+#   1. energy_now/energy_full  (µWh)  — preferred, most precise
+#   2. charge_now/charge_full  (µAh)  — fallback when energy is absent
+#   3. capacity                (0-100) — last resort; paired with +100 so
+#      CAPACITY = TOTAL_NOW * 100 / TOTAL_FULL yields the percentage directly.
 for BAT in "${BATTERY_PATHS[@]}"; do
   if [[ -f "$BAT/energy_now" ]] && [[ -f "$BAT/energy_full" ]]; then
     ((TOTAL_NOW += $(<"$BAT/energy_now")))
@@ -154,7 +161,8 @@ if [[ -f "$STATE_FILE" ]]; then
   done <"$STATE_FILE"
 fi
 
-# Drop entries for thresholds no longer in KNOWN_THRESHOLDS.
+# Prune stale thresholds from state so KNOWN_THRESHOLDS can be changed
+# between runs without stale entries preventing re-notification.
 FILTERED=()
 
 for ENTRY in "${NOTIFIED[@]}"; do
@@ -203,6 +211,8 @@ add_notified() {
   fi
 }
 
+# Purge the state file when the notified list is empty to leave no trace
+# on disk when all thresholds have re-armed.
 write_state() {
   if [[ ${#NOTIFIED[@]} -eq 0 ]]; then
     rm -f "$STATE_FILE"
@@ -211,7 +221,17 @@ write_state() {
   fi
 }
 
-# Reset, or notify for, a single threshold against the current capacity.
+# Process a single threshold against CAPACITY.
+#
+# When capacity has risen back above the threshold, remove the notified
+# marker (re-arm) without sending a notification, so the next dip to or
+# below this threshold re-triggers.  When capacity is at or below the
+# threshold and already notified, skip unless --force is used.
+#
+# The shared replace-ID 4455 ensures that when multiple thresholds are
+# processed in one run only the last notification survives on screen.
+# Combined with the iteration order in KNOWN_THRESHOLDS, this means a
+# lower (more urgent) threshold always wins over a higher one.
 process_threshold() {
   local THRESH="$1"
   local THIS_URGENCY="$2"
@@ -226,6 +246,8 @@ process_threshold() {
     return
   fi
 
+  # Critical notifications have no timeout so they persist until the
+  # user dismisses them.  Normal ones auto-close after 15 seconds.
   if [[ "$THIS_URGENCY" == "critical" ]]; then
     TIME=0
   else
@@ -234,6 +256,8 @@ process_threshold() {
 
   add_notified "$THRESH"
 
+  # message is intentionally left unset for non-critical urgencies,
+  # causing notify-send to show the notification with no body text.
   if [[ "$THIS_URGENCY" == "critical" ]]; then
     if ((CAPACITY <= 5)); then
       local message="The battery at less than 5%!"
@@ -246,6 +270,9 @@ process_threshold() {
     "You Are Low On Battery" "$message"
 }
 
+# Combined percentage across every detected battery.  Integer division is
+# safe here because TOTAL_FULL is non-zero (every discovered battery
+# contributed at least 100 from the capacity fallback).
 CAPACITY=$((TOTAL_NOW * 100 / TOTAL_FULL))
 
 # Clear all notified thresholds while the system is charging.
@@ -257,7 +284,9 @@ if [[ -f /sys/class/power_supply/AC/online ]] &&
   exit 0
 fi
 
-# Fallback charging detection for systems where AC is unavailable.
+# Fallback charging detection for systems where /sys/class/power_supply/AC
+# is absent (e.g. USB-C PD laptops that only expose a BAT status node).
+# Checks each battery's status file directly.
 CHARGING=0
 
 for BAT in "${BATTERY_PATHS[@]}"; do

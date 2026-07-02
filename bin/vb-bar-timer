@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 state_file="$VIBRANIUM_RUNTIME/vb-timer.remaining"
 

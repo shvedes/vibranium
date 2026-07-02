@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 if [[ -f "$VIBRANIUM_RUNTIME/recording-ongoing" ]]; then
   printf '{"text": "%s", "tooltip": "%s"}' \

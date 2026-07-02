@@ -1,4 +1,13 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
 
 SELF="${0##*/}"
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
@@ -16,39 +25,48 @@ Usage: ${0##*/} [OPTIONS]
 Open / close rofi-based calculator.
 
 Options:
-  -h, --help Show this help and exit
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
 EOF
 }
 
-case "$1" in
--h | --help)
-  usage
-  exit 0
-  ;;
---* | -*)
-  echo "Error: unknown option: '$1'" >&2
-  echo "Try '$SELF --help' for more information" >&2
-  exit 1
-  ;;
-*)
-  echo "Ignoring input '$*'"
-  ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 exec 9>"$LOCKFILE"
 
-# Killswitch
+# flock(1) with fd 9 implements a singleton toggle: the first invocation
+# acquires the lock and opens rofi-calc; a second invocation (while the
+# first still holds the lock) fails to acquire it and kills the existing
+# rofi calc session, effectively toggling it off.
 if ! flock -n 9; then
   pkill -f "rofi.*-show calc" 2>/dev/null
   exit 0
 fi
 
+# rofi-calc provides the calc mode as a shared library loaded by rofi.
+# If the library is absent show a dependency notification with guidance.
 if [[ ! -f /usr/lib/rofi/libcalc.so ]]; then
   echo "error: missing required dependencies: rofi-calc"
   [[ ! -t 1 ]] && vb-cmd-dep-notify --name "Calculator" --deps "rofi-calc"
   exit 1
 fi
 
+# Inline theme that reduces the calculator window to a single input
+# line (no listview, no history) with a placeholder hint.
 theme_str="$(
   shcat <<EOF
 window {
@@ -63,6 +81,8 @@ listview, num-rows, textbox-num-sep, num-filtered-rows {
 EOF
 )"
 
+# -calc-command pipes the result to wl-copy so the computed value is
+# immediately available on the clipboard without manual selection.
 rofi \
   -no-sort \
   -lines 0 \

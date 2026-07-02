@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 _HYPR_D="$XDG_CONFIG_HOME/hypr/hyprland.conf.d"
 

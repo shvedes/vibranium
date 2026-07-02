@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 # A rofi-based frontend for the `pass` password manager (passwordstore.org).
 # Handles: store initialization, GPG key selection, browsing, CRUD operations,

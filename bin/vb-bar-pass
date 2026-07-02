@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 STATE="$VIBRANIUM_RUNTIME/password-manager.action"
 

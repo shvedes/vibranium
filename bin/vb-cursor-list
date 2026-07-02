@@ -1,7 +1,22 @@
-#!/usr/bin/bash
+#!/bin/bash
 
-_usage() {
-  cat << EOF
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
 Usage: ${0##*/} [--pretty] [--size] [THEME]
 
 List available X11 cursor themes.
@@ -13,6 +28,7 @@ Without flags scans for cursor themes and prints folder names
 Options:
   --pretty   use human-readable name from .theme file instead of folder name
   --size     append available cursor pixel sizes
+  -v, --verbose   Enable verbose output
   -h, --help display this help and exit
 EOF
 }
@@ -24,14 +40,20 @@ THEME_ARG=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h | --help)
-      _usage
+      usage
       exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
       ;;
     --pretty)
       FLAG_PRETTY=true
+      shift
       ;;
     --size)
       FLAG_SIZE=true
+      shift
       ;;
     -*)
       echo "unknown option: $1" >&2
@@ -43,11 +65,14 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       THEME_ARG="$1"
+      shift
       ;;
   esac
-  shift
 done
 
+# Parse a freedesktop.org .theme file to extract the human-readable
+# Name from the [Icon Theme] section.  Falls back to the directory name
+# when no .theme file or Name entry exists.
 parse_cursor_theme() {
   local file="$1"
   local line name
@@ -76,6 +101,10 @@ parse_cursor_theme() {
   THEMES["$dir"]="${name:-$dir}"
 }
 
+# Parse the Xcursor binary format (.cursor files) to extract available
+# pixel sizes.  Each cursor file has a header with a table of contents
+# containing type+size entries; type 0xfffd0002 indicates a size entry.
+# Bash cannot parse binary structs, so this is delegated to Python 3.
 print_all_sizes() {
   python3 - "$@" << 'PYEOF'
 import sys, struct
@@ -106,6 +135,10 @@ for name, path in pairs:
 PYEOF
 }
 
+# Populate THEMES[name]=display_name and THEME_DIRS[name]=cursors_path
+# from a cursor theme directory.  Checks cursor.theme first (KDE/XCursor
+# convention), then index.theme (freedesktop icon theme), then falls back
+# to the directory name.
 register_theme() {
   local theme_path="$1"
   local dir_name="${theme_path##*/}"
@@ -121,6 +154,7 @@ register_theme() {
   fi
 }
 
+# Standard cursor theme search order: system-wide, then user-local.
 SEARCH_DIRS=(
   "/usr/share/icons"
   "${XDG_DATA_HOME:-$HOME/.local/share}/icons"

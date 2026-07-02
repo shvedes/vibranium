@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 shcat() {
   while IFS= read -r line; do

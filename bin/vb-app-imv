@@ -1,9 +1,57 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION] <image>
+
+Open an image with imv in Vibranium.
+
+Options:
+  -v, --verbose   Enable verbose output
+  <image>         Path to an image file to open
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  --help)
+    usage
+    exit 0
+    ;;
+  --)
+    shift
+    break
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 if [[ -z "$1" ]]; then
+  log Info "No file arg, opening picker"
   if ! command -v zenity >/dev/null; then
+    log Error "Zenity not found" >&2
     [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Viewer" --deps zenity
-    echo "error: zenity not found" >&2
     exit 1
   fi
 
@@ -11,10 +59,14 @@ if [[ -z "$1" ]]; then
 
   # no files were chosen
   if [[ ! -f "$file" ]]; then
+    log Info "No file selected"
     exit 1
   fi
+  log Info "Selected file: $file"
 else
   file="$1"
+  log Info "Using file: $file"
 fi
 
-exec imv-dir "$file"
+log Info "Opening using xdg-open"
+exec xdg-open "$file"

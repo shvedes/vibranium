@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 # =============================================================================
 # vb-lib-cfgr -- declarative configuration menu library

@@ -1,17 +1,43 @@
-#!/usr/bin/bash
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} enable|disable
+
+Enable or disable Google Sync in Chromium.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
+EOF
+}
 
 source vb-lib-core
 
 TARGET="$XDG_CONFIG_HOME/chromium-flags.conf"
 
-[[ -z "$1" || ! "$1" =~ ^(en|dis)able$ ]] && {
-  echo "Usage: ${0##*/} enable|disable"
-  exit 1
-}
-
-case "$1" in
+while [[ $# -gt 0 ]]; do
+  case "$1" in
   enable)
     if ! grep -q "oauth2" "$TARGET"; then
+      # These flags enable the hidden Google Sync UI in Chromium by
+      # providing OAuth client credentials that are normally only
+      # present in Google-branded builds (Chrome).
       echo "--oauth2-client-id=77185425430.apps.googleusercontent.com" >> "$TARGET"
       echo "--oauth2-client-secret=OTJgUOQcT7lO7GsGZq2G4IlT" >> "$TARGET"
 
@@ -23,15 +49,16 @@ case "$1" in
 
       notify-send -r 3 "Vibranium" "$msg"
     else
-      log::warn "You already have Google sync enabled!"
+      log Warn "You already have Google sync enabled!"
       exit 1
     fi
+    shift
     ;;
   disable)
     if grep -q "oauth2" "$TARGET"; then
       sed -i '/--oauth2/d' "$TARGET"
 
-      msg="Google sync has been disbaled"
+      msg="Google sync has been disabled"
 
       if pidof -q chromium; then
         msg+="\n\n<b>Please restart your browser</b>"
@@ -39,10 +66,24 @@ case "$1" in
 
       notify-send -r 3 "Vibranium" "$msg"
     else
-      log::warn "You already have Google sync disabled!"
+      log Warn "You already have Google sync disabled!"
       exit 1
     fi
+    shift
     ;;
-esac
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    echo "Usage: ${0##*/} enable|disable" >&2
+    exit 1
+    ;;
+  esac
+done
 
 helpers::ui::close_menus
