@@ -212,6 +212,19 @@ Each command has its own prefix after `vb-`. Prefix means purpose. Use `vb-<prev
 | `themes/` | 26 color themes across 8 families |
 | `wiki/` | Project documentation (may be outdated) |
 
+# Special Directories
+
+Vibranium exports four standard XDG-aligned directories (defined in `default/uwsm/env`). All are
+**writable, guaranteed to exist at runtime**, and should be used by scripts for their respective
+purposes instead of creating ad-hoc directories.
+
+| Variable | Path | Purpose |
+|----------|------|---------|
+| `VIBRANIUM` | `$XDG_DATA_HOME/vibranium` → `~/.local/share/vibranium` | Project root (git repository, scripts, configs, themes) |
+| `VIBRANIUM_CACHE` | `$XDG_CACHE_HOME/vibranium` → `~/.cache/vibranium` | Non-essential cached data (package lists, color histories, recording logs, cookie jars) |
+| `VIBRANIUM_RUNTIME` | `$XDG_RUNTIME_DIR/vibranium` → `/run/user/$UID/vibranium` | Ephemeral runtime files (lock files, FIFOs, temp output like screenshots, recording state) |
+| `VIBRANIUM_STATE` | `$XDG_STATE_HOME/vibranium` → `~/.local/state/vibranium` | Persistent state (power profiles, wallpapers, migration tracking, cursor theme, monitor config) |
+
 # Theme System
 
 ## Structure
