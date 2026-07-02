@@ -117,10 +117,14 @@ _load_state() {
 
   # Cold start or repair: regenerate profiles from powerprofilesctl
   log Info "Loading available power profiles"
-  mapfile -t _detected < <(
-    powerprofilesctl list \
-      | awk '/^\s*[* ]\s*[a-zA-Z0-9\-]+:$/ { gsub(/^[*[:space:]]+|:$/,""); print }'
-  )
+  _detected=()
+  while IFS= read -r line; do
+    # Match profile lines: optional leading whitespace/asterisk, then name, then colon.
+    # Extract the profile name into BASH_REMATCH[1] and discard the rest.
+    if [[ "$line" =~ ^[*[:space:]]+([a-zA-Z0-9-]+):$ ]]; then
+      _detected+=("${BASH_REMATCH[1]}")
+    fi
+  done < <(powerprofilesctl list)
 
   PROFILES=()
 
