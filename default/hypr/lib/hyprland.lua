@@ -270,8 +270,5 @@ function Hypr.Helpers.ScaleStep(direction)
     scale = string.format("%.10f", new_scale),
   })
 
-  hl.notification.create({
-    text = string.format("Display scale: %.4g", new_scale),
-    timeout = 1.5,
-  })
+  hl.exec_cmd("notify-send -r 777 'Vibranium' '" .. string.format("Display scale: %.4g", new_scale) .. "'")
 end
