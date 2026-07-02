@@ -161,7 +161,8 @@ adjust_volume() {
   esac
 
   local vol_info mute_state
-  read -r _ current_volume mute_state <<<"$(wpctl get-volume "$device")"
+  vol_info=$(wpctl get-volume "$device")
+  read -r _ current_volume mute_state <<<"$vol_info"
 
   if [[ "$mute_state" == "[MUTED]" ]]; then
     wpctl set-mute "$device" 0
@@ -258,9 +259,10 @@ set_volume() {
     return
   fi
 
-  local mute_state
+  local mute_state vol_info
 
-  read -r _ _ mute_state <<<"$(wpctl get-volume "$device")"
+  vol_info=$(wpctl get-volume "$device")
+  read -r _ _ mute_state <<<"$vol_info"
   if [[ "$mute_state" == "[MUTED]" ]]; then
     wpctl set-mute "$device" 0
   fi
