@@ -214,6 +214,7 @@ ensure_i2c_cache() {
 }
 
 set_i2c_bus() {
+  local -n _result="$1"
   declare -A bus_map level_map
 
   # With --force, skip the state file cache entirely and always run a
@@ -226,10 +227,12 @@ set_i2c_bus() {
   fi
 
   load_state
-  echo "${bus_map[$ACTIVE_MONITOR]}"
+  _result="${bus_map[$ACTIVE_MONITOR]}"
 }
 
 get_brightness_cache() {
+  local -n _result="$1"
+
   # With --force, bypass the state file and return empty to force a fresh
   # ddcutil read.
   if [[ $FORCE == true ]]; then
@@ -240,7 +243,7 @@ get_brightness_cache() {
   load_state
 
   # If no entry for the active monitor, return empty to trigger a fresh fetch
-  echo "${level_map[$ACTIVE_MONITOR]:-}"
+  _result="${level_map[$ACTIVE_MONITOR]:-}"
 }
 
 update_brightness_cache() {
@@ -333,7 +336,7 @@ if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
   fi
 
   method="ddc"
-  I2C_BUS="$(set_i2c_bus)"
+  set_i2c_bus I2C_BUS
   log Info "Using DDC method, I2C bus: $I2C_BUS"
 
   # TODO: As far as I know, optimal values for --sleep-multiplier can vary from a monitor to a monitor,
@@ -343,7 +346,7 @@ if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
 else
   if [[ -n "$ACTIVE_MONITOR" && ! "$ACTIVE_MONITOR" =~ ^eDP* ]]; then
     method="ddc"
-    I2C_BUS="$(set_i2c_bus)"
+    set_i2c_bus I2C_BUS
   else
     method="raw"
     log Info "Using raw sysfs method"
@@ -362,14 +365,20 @@ log Info "Action: $ACTION, method: $method, step: $step"
 
 case "$method" in
 "ddc")
-  current="$(get_brightness_cache)"
+  get_brightness_cache current
   if [[ ! $current =~ ^[0-9]+$ ]]; then
     # --sleep-multiplier 0.13 is aggressive and some monitors need a few
     # tries before they respond on the I2C bus. Retry up to 5 times to
     # work around transient DDC NACKs; the loop exits early once a valid
     # value (0-100) is obtained.
     for ((i = 0; i < 5; i++)); do
-      current=$(ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" getvcp 10 2>/dev/null | awk '/current/ {print int($9)}')
+      line_output=$(ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" getvcp 10 2>/dev/null)
+      # Match the current brightness value in ddcutil output format:
+      #   VCP code 0x10 (...): current value =   25, max value =   100
+      # The value follows "current value =" with variable whitespace.
+      if [[ "$line_output" =~ current\ value\ =\ +([0-9]+) ]]; then
+        current="${BASH_REMATCH[1]}"
+      fi
       if [[ $current =~ ^[0-9]+$ ]] && ((current >= 0 && current <= 100)); then
         break
       fi
