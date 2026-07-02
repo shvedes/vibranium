@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2001
 
 _HYPR_D="$XDG_CONFIG_HOME/hypr/hyprland.conf.d"
 
@@ -22,8 +21,8 @@ hypr::str() { hyprctl -j getoption "$1" | jq -r '.str'; }
 #
 # Populates the global HYPR associative array via a single hyprctl --batch
 # call and a single jq -rs pass over the concatenated JSON output.
-# hyprctl --batch -j can emit bare `nan` for unset floats — patched with sed
-# before jq sees it
+# hyprctl --batch -j can emit bare `nan` for unset floats — patched with
+# bash substitution before jq sees it
 #
 # Usage:
 #   SPEC=("input:sensitivity|float2" "input:natural_scroll|bool" "input:kb_layout|str")
@@ -72,11 +71,13 @@ hypr::fetch() {
   done
 
   # Bash substitution patches bare `nan` tokens before jq sees them.
-  # jq -rs slurps the concatenated JSON objects
-  # into an array natively, so .[i] indexing is reliable without regex splitting.
+  # hyprctl --batch -j emits bare `nan` for unset float options. No JSON key
+  # or quoted string value in hyprctl output contains the substring "nan",
+  # so global substitution is safe.
   local raw vals
   raw=$(hyprctl -j --batch "$query")
-  mapfile -t vals < <(jq -rs "[$jq_prog] | .[]" <<<"$(sed 's/\bnan\b/0/g' <<<"$raw")")
+  raw="${raw//nan/0}"
+  mapfile -t vals < <(jq -rs "[$jq_prog] | .[]" <<<"$raw")
 
   for i in "${!opts[@]}"; do
     local opt="${opts[$i]}" val="${vals[$i]}"
