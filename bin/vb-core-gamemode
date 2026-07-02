@@ -282,11 +282,11 @@ if ! [[ -n "$SDL_VIDEODRIVER" ]]; then
   export SDL_VIDEODRIVER="wayland"
 fi
 
-MONITOR_DATA="$(hyprctl -j monitors | jq -r '.[] | select(.focused)')"
-MONITOR_NAME="$(jq -r '.name' <<<"$MONITOR_DATA")"
-MONITOR_REFRESH_RATE="$(jq -r '.refreshRate | floor' <<<"$MONITOR_DATA")"
-MONITOR_H="$(jq -r '.height' <<<"$MONITOR_DATA")"
-MONITOR_W="$(jq -r '.width' <<<"$MONITOR_DATA")"
+read -r MONITOR_NAME MONITOR_REFRESH_RATE MONITOR_H MONITOR_W < <(
+  hyprctl -j monitors | jq -r '
+    .[] | select(.focused) | [.name, (.refreshRate | floor), .height, .width] | @tsv
+  '
+)
 
 log Info "Monitor: $MONITOR_NAME (${MONITOR_W}x${MONITOR_H}@$MONITOR_REFRESH_RATE)"
 
