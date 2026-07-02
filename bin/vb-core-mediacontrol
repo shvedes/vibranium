@@ -123,18 +123,18 @@ get_player_status() {
   return 1
 }
 
-# Two-pass probe: first try the cached STATE_PLAYER from the state file, falling
-# back to a full scan. Playing players are preferred over Paused ones so that
-# the active sink is always selected (STATE_PLAYER is updated only when a
-# Playing player is found). Defaults to playerctl when nothing is detected.
+# Three-pass probe: first try the cached STATE_PLAYER (only if Playing), then
+# scan all players for a Playing one, then for a Paused one. This ensures that
+# a player that the user started after the state file was written (e.g. Spotify
+# via playerctl while MPD is paused) is always picked up. Falls back to playerctl
+# when nothing is detected.
 detect_active_player() {
   PLAYER=""
   STATUS=""
 
   if [[ -n "$STATE_PLAYER" ]]; then
-    if get_player_status "$STATE_PLAYER" STATUS && [[ -n "$STATUS" ]]; then
+    if get_player_status "$STATE_PLAYER" STATUS && [[ "$STATUS" == "Playing" ]]; then
       PLAYER="$STATE_PLAYER"
-      [[ "$STATUS" == "Playing" ]] && STATE_PLAYER="$PLAYER"
       return 0
     fi
   fi
@@ -329,9 +329,12 @@ set_opts
 
 if [[ $NUM_STEPS == off && $NUM_STEPS_SWITCH == off ]]; then
   # Ramp-off fast path: the action is instantaneous (~7ms total), so no
-  # lock or queue is needed. Read STATE_PLAYER from the state file for
-  # the direct dispatch (defaults to playerctl when absent or empty).
+  # lock or queue is needed. detect_active_player uses the same three-pass
+  # probe as the slow path (Playing > Paused > default), so the cached
+  # STATE_PLAYER is always validated against what is actually running.
   read_state
+  detect_active_player
+  write_state
   case "$ACTION" in
   "--toggle")
     log Info "Toggling play/pause"
@@ -440,7 +443,6 @@ if _acquire_lock; then
       if [[ $STATUS == Paused ]]; then
         fade_out "$NUM_STEPS"
         play
-        fade_out "$NUM_STEPS"
       fi
 
       original_volume="$CURRENT_VOLUME"
@@ -463,7 +465,7 @@ if _acquire_lock; then
   done
   _release_lock
 else
-  (
+  {
     if [[ -f "$STATE_FILE" ]]; then
       while IFS='=' read -r key value; do
         [[ $key == action ]] && continue
@@ -471,5 +473,5 @@ else
       done < "$STATE_FILE"
     fi
     echo "action=$ACTION"
-  ) > "$STATE_FILE"
+  } > "$STATE_FILE"
 fi
