@@ -1,9 +1,11 @@
 ---
-name: vibranium
+name: vibranium-development
 description: Skill for developing Vibranium
 ---
 
-# Style
+# Code Style
+
+You mostly will write in bash, not just bash, but top class bash. That means:
 
 - Two spaces for indentation, no tabs
 - Use `[[ ]]` for string/file tests, `(( ))` for numeric tests
@@ -11,11 +13,16 @@ description: Skill for developing Vibranium
 - Quote paths with spaces instead of escaping with `\ `
 - Shebangs: `#!/bin/bash` (never `#!/usr/bin/env bash`)
 - Use pure bash as much as possible
-- Each script must have `usage()` with GNU-style `-h`/`--help` output, `VERBOSE=` with `-v`/`--verbose`, a `log()` function, and `shcat()` for help display (never `cat`)
 - Parse CLI args in a `while`/`case` loop, not `getopts`
-- Use ASCII dashes, not em dashes (`---` → `---`, never U+2014)
+- Use ASCII dashes (`-`), not em dashes, never U+2014
+
+Each script must have `-v` / `--verbose` CLI option, `usage()` function for `--help` option, and `shcat()` as replacement for
+`cat` in conjuction with heredoc and `log()`. `log()` must be used extensively with `--verbose` option and with
+forced error messages even if `--verbose` isn't provided. Here's an example of these functions:
 
 ```bash
+VERBOSE=false
+
 log() {
   local level="$1"; shift
   if $VERBOSE && [[ -t 0 ]]; then
@@ -29,12 +36,66 @@ shcat() {
   done
 }
 
-log Info "Did some random thing"
-log Warn "Missing thing A, skipping"
-log Error "Could not get A working" >&2
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTIONS]
+
+Adjust screen brightness.
+
+Options:
+    --up              Increase brightness
+    --down            Decrease brightness
+    --set             Set brightness to <0-100>%
+    -f, --force       Bypass state file, work directly with ddcutil
+    -q, --quiet       Do not display notification or OSD
+    -v, --verbose     Enable verbose output
+    -h, --help        Show this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --option1)
+    # Something
+    shift
+    ;;
+  --option2)
+    # Something
+    shift 2
+    ;;
+  -f | --force)
+    FORCE=true
+    shift
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -q | --quiet)
+    QUIET=true
+    shift
+    ;;
+  *)
+    log Error "Unknown option: $*" >&2
+    log Error "Try '${0##*/}' --help for more information" >&2
+    exit 1
+    ;;
+  esac
+done
+
+log Info "Did thing X"
+log Warn "Thing X not found, skipping"
+log Error "Thing X failed, exiting!" >&2
+
 ```
 
-# Comment Style
+See how this sample doesn't have any external command?
+
+## Comment style
 
 Add **timeless, technical** inline comments targeting **non-obvious code**. Do NOT add header blocks, section banners, or comments on self-explanatory code.
 
@@ -43,7 +104,7 @@ Add **timeless, technical** inline comments targeting **non-obvious code**. Do N
 - **Near-code**: Place comments immediately above the relevant line(s). No file-level headers, no section banners.
 - **Format**: Standard `# ` prefix. One space after `#`. Blank lines between unrelated comment blocks.
 
-## Skip
+### Skip
 
 - Trivial helpers: `shcat`, `log`, `usage`
 - Variable declarations: `VERBOSE=false`, `QUIET=false`, `SELF=...`
@@ -51,7 +112,7 @@ Add **timeless, technical** inline comments targeting **non-obvious code**. Do N
 - Standard dependency checks (`command -v ...`)
 - Lines already clear from context: `exit 0`, `source ...`, `helpers::check`
 
-## Target
+### Target
 
 - **Functions with non-obvious arguments, side effects, or return conventions** - describe parameters, return values, and side effects.
 - **Data format assumptions** - file layouts, pipe-separated fields, fixed-point scaling, etc.
@@ -62,7 +123,7 @@ Add **timeless, technical** inline comments targeting **non-obvious code**. Do N
 - **State synchronization** - file locking, cache reads vs writes, async vs sync operations.
 - **Silent error handling** - `|| exit 0` with flock, empty fallbacks, suppressed stderr.
 
-## Approved Examples
+### Examples
 
 ```bash
 # Convert a wpctl-style decimal volume string (e.g. "0.85", "1.50") to a
@@ -95,25 +156,10 @@ case "$action" in
 get_power_profile() {
 ```
 
-```bash
-# powerprofilesctl set involves a D-Bus round-trip to power-profiles-daemon
-# that can take hundreds of ms.  Fire-and-forget it so the state write and
-# subsequent notification return instantly.
-set_power_profile() {
-```
-
-```bash
-# State file format (3+ lines):
-#   line 1:   current:<active_profile>
-#   line 2:   (blank - separator)
-#   line 3+:  <profile_name>  (one per line, in canonical priority order)
-# This layout is consumed by _load_state and get_power_profile.
-_write_state() {
-```
-
 # Command Naming
 
-All commands start with `vb-`. Prefixes indicate purpose. Use `vb-<prefix>-*` to find prefix-specific scripts.
+You may use already existing Vibranium commands. Always try `--help` CLI flag first. All commands start with `vb-`.
+Each command has its own prefix after `vb-`. Prefix means purpose. Use `vb-<previx>-*` glob to see all prefix commands.
 
 | Prefix | Purpose |
 |--------|---------|
@@ -266,6 +312,7 @@ These idioms appear throughout `bin/`:
 ## String Manipulation
 
 `vb-version` parses git output with parameter expansion:
+
 ```bash
 DATE="${INFO%%|*}"           # Remove longest suffix after |
 REST="${INFO#*|}"            # Remove shortest prefix before |
@@ -288,6 +335,7 @@ read -r var < <(cmd)                                  # First line only
 ## Associative Arrays
 
 Theme discovery (`vb-theme-set`) builds `FAMILIES[family]="variants"` and `FOLDER_MAP[key]=dir`:
+
 ```bash
 declare -A FAMILIES=() FOLDER_MAP=()
 for dir in "$@"; do
@@ -298,6 +346,7 @@ done
 ```
 
 `cfgr-misc` uses them for browser selection:
+
 ```bash
 declare -A browsers_map=()
 [[ $(command -v firefox) ]] && browsers_map["Firefox"]="firefox.desktop"
@@ -307,6 +356,7 @@ declare -A browsers_map=()
 ## Namerefs
 
 `vb-lib-core` validates variables transparently:
+
 ```bash
 helpers::check() {
   for var_name in "$@"; do
@@ -323,6 +373,7 @@ helpers::check() {
 
 `vb-toggle-loopback` uses iteration with timeout:
 ```bash
+
 for i in {1..10}; do
   SINK_INPUT_ID=$(find_sink_input_id "$NEW_MODULE_ID")
   [[ -n "$SINK_INPUT_ID" ]] && { pactl set-sink-input-volume "$SINK_INPUT_ID" ...; break; }
@@ -333,6 +384,7 @@ done
 ## File-as-Toggle Pattern
 
 `vb-toggle-smartgaps` creates/removes a file to toggle state:
+
 ```bash
 if [[ -f "$FILE" ]]; then
   rm -f "$FILE"
@@ -341,12 +393,14 @@ else
 hl.workspace_rule({ workspace = "w[tv1] w[g0] s[false]", gaps_out = 0, gaps_in = 0 })
 EOF
 fi
+
 hyprctl -q reload config-only
 ```
 
 ## Regex Tests + Functional Returns
 
 `vb-toggle-reading-mode` uses boolean return and `[[ =~ ]]`:
+
 ```bash
 _grayscale_enabled() {
   local opt
@@ -358,8 +412,10 @@ _grayscale_enabled() {
 ## Lock File + Singleton
 
 `vb-util-calc` uses `flock` with `exec FD`:
+
 ```bash
 exec 9>"$LOCKFILE"
+
 if ! flock -n 9; then
   pkill -f "rofi.*-show calc" 2>/dev/null
   exit 0
@@ -387,7 +443,7 @@ done
 | Script | Purpose |
 |--------|---------|
 | `vb-parse-defaults.awk` | Parses `vb-core-defaults` annotation blocks, emits bash `eval`-able array assignments |
-| `vb-theme-set-templates.awk` | 525-line template engine: `{{ var }}` substitution, color math (RGB/HSL/HWB), lightness shifts, alpha compositing |
+| `vb-theme-set-templates.awk` | template engine: `{{ var }}` substitution, color math (RGB/HSL/HWB), lightness shifts, alpha compositing |
 | `vb-bar-pacman.awk` | Renders Waybar updates module: filters/sorts/truncates `pacman -Qu` output, Pango markup |
 | `cfgr-verify-digit.awk` | Validates user digit input against type (int/float) and range |
 | `cfgr-idle-get-timeouts.awk` | Extracts timeout values from `hypridle.conf` listener blocks |
@@ -396,7 +452,7 @@ done
 
 ## `vb-lib-hypr` — Hyprland IPC
 
-Shell-level Hyprland option access (`bin/vb-lib-hypr`, 96 lines):
+Shell-level Hyprland option access (`bin/vb-lib-hypr`):
 
 - `hypr::bool/int/float/str <option>` — read via `hyprctl -j getoption | jq`
 - `hypr::fetch <spec...>` — **batch N+1 avoidance**: single `hyprctl --batch -j` + `jq -rs` call. Spec format: `option:path|type`. Populates `$HYPR[]` associative array.
@@ -408,7 +464,7 @@ Config file constants: `HYPR_CONF_INPUT`, `HYPR_CONF_ADVANCED`, `HYPR_CONF_LAF`,
 
 ## Hyprland Lua Runtime
 
-`default/hypr/lib/hyprland.lua` (277 lines) provides `Hypr.Helpers.*` functions inside Hyprland's Lua runtime:
+`default/hypr/lib/hyprland.lua` provides `Hypr.Helpers.*` functions inside Hyprland's Lua runtime:
 - `CenterFloatingWindow(win)` — 70% monitor size, centered
 - `ForceKillWindow()` — two-press kill with 1.5s timer and red border tag
 - `WindowToggleFreeze()` — SIGSTOP/SIGCONT via `/proc/pid/stat` state check
@@ -419,7 +475,8 @@ Uses `WIN_NOTIF = 33` (shared notification replace-ID) and `KillConfirm = nil` g
 
 ## Migrations
 
-Timestamp-based versioning in `migrations/<unix_timestamp>.sh`. Each script is idempotent (author's responsibility). Runs only on upgrades, not fresh installs. Triggered by `install/post-install/40-migrations.sh`.
+Timestamp-based versioning in `migrations/<unix_timestamp>.sh`. Each script is idempotent (author's responsibility).
+Runs only on upgrades, not fresh installs. Triggered by `bin/vb-update`.
 
 ## Settings Annotation Format
 
@@ -452,12 +509,8 @@ Tags: `@type` (bool/int/string, required), `@range` (int only, `N..M`), `@values
 | `flock` | Singleton lock pattern (mediacontrol, brightness, nightshift, calculator) |
 | `slurp` + `grim` | Region selection + screenshot capture |
 | `pactl` / `wpctl` | Audio control |
-| `ffmpeg` | Recording encoding |
-
-## Desktop Files
-
-`applications/custom/` — power management + tool launchers (`.desktop`). `applications/hidden/` — entries suppressed via `NotShowIn=Vibranium`.
 
 ## Hooks
 
 `config/vibranium/hooks/startup/`, `shutdown/`, `theme/` — `.sh` files run in alphanumeric order. Single hooks like `font-change.sh` at root level get context variables (e.g. `$FONT`).
+

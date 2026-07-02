@@ -346,7 +346,7 @@ helpers::check() {
     # ${OPTION_DEFAULTS[$var_name]+x}: the +x trick tests key *existence* in the associative
     # array without caring about the value. Without +x, an empty string would look like unset.
     if [[ -z ${OPTION_DEFAULTS[$var_name]+x} ]]; then
-      log::warn "Variable $var_name not found in defaults"
+      printf "[${0##*/}] Warn: Variable %s not found in defaults\n" "$var_name"
       all_found=0
       unset -n ref # must release before continue — rebinding a live nameref is undefined
       continue
@@ -358,7 +358,7 @@ helpers::check() {
 
     # If the variable is completely empty/unset, skip validation and just apply the default
     if [[ -z $val ]]; then
-      log::warn "$var_name is unset. Using default ($default_value)"
+      printf "[${0##*/}] Warn: %s is unset. Using default (%s)\n" "$var_name" "$default_value"
 
       # Direct assignment through the nameref — no printf -v overhead.
       ref=$default_value
@@ -432,7 +432,7 @@ helpers::check() {
       # case, etc.
       ref=$normalized
     else
-      log::warn "Invalid value for $var_name. Using default ($default_value)"
+      printf "[${0##*/}] Warn: Invalid value for %s. Using default (%s)\n" "$var_name" "$default_value"
       ref=$default_value
     fi
 
