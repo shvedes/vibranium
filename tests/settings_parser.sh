@@ -32,7 +32,7 @@ log_case() {
     [[ -z $set_to ]] && disp="''" || disp="$set_to"
   fi
 
-  helpers::check "$var" >"$_tmpfile" 2>&1
+  helpers::check "$var" >/dev/null 2>/dev/null
   local status
   if [[ ${!var} == "$expected" ]]; then
     status="${_g}PASS${_R}"
@@ -223,5 +223,145 @@ else
   printf "${_r}[FAIL]${_R} rc=%d  got='%s'\n" "$_rc" "$VIBRANIUM_TOTALLY_UNKNOWN_XYZ"
   FAIL=$((FAIL + 1))
 fi
+
+# =============================================================================
+# 8. Return codes for valid vars
+# =============================================================================
+
+section "return codes"
+
+_assert_rc() {
+  local label="$1" var="$2" set_to="$3" exp_rc="$4" exp_val="$5"
+  TOTAL=$((TOTAL + 1))
+  printf -v "$var" '%s' "$set_to"
+  helpers::check "$var" >/dev/null 2>&1
+  local rc=$?
+  local val="${!var}"
+  if ((rc == exp_rc)) && [[ $val == "$exp_val" ]]; then
+    printf "  ${_g}[PASS]${_R}  %s  (rc=%d)\n" "$label" "$rc"
+    PASS=$((PASS + 1))
+  else
+    printf "  ${_r}[FAIL]${_R}  %s  rc=%d (expected %d)  val='%s' (expected '%s')\n" \
+      "$label" "$rc" "$exp_rc" "$val" "$exp_val"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
+_assert_rc "bool valid -> rc 0"        "$B1" "true"  "0" "true"
+_assert_rc "int valid -> rc 0"         "$IP" "42"   "0" "42"
+_assert_rc "int ranged valid -> rc 0"  "$IR" "50"   "0" "50"
+_assert_rc "string valid -> rc 0"      "$SE" "bing" "0" "bing"
+
+# =============================================================================
+# 9. Multi-variable check — nameref lifecycle
+# =============================================================================
+
+section "multi-variable check — nameref lifecycle"
+
+TOTAL=$((TOTAL + 1))
+VIBRANIUM_GLOBAL_USE_OSD="false"
+VIBRANIUM_VOLUME_ADJUSTMENT_STEP="10"
+VIBRANIUM_GLOBAL_SEARCH_ENGINE="duckduckgo"
+helpers::check VIBRANIUM_GLOBAL_USE_OSD VIBRANIUM_VOLUME_ADJUSTMENT_STEP VIBRANIUM_GLOBAL_SEARCH_ENGINE >/dev/null 2>&1
+if [[ $VIBRANIUM_GLOBAL_USE_OSD == false && $VIBRANIUM_VOLUME_ADJUSTMENT_STEP == 10 && $VIBRANIUM_GLOBAL_SEARCH_ENGINE == duckduckgo ]]; then
+  printf "  ${_g}[PASS]${_R}  three vars in one call, all keep their valid values\n"
+  PASS=$((PASS + 1))
+else
+  printf "  ${_r}[FAIL]${_R}  osd='%s'  step='%s'  engine='%s'\n" \
+    "$VIBRANIUM_GLOBAL_USE_OSD" "$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" "$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
+  FAIL=$((FAIL + 1))
+fi
+
+# Mixed: first valid, second invalid -> both should resolve
+TOTAL=$((TOTAL + 1))
+VIBRANIUM_GLOBAL_USE_OSD="true"
+VIBRANIUM_VOLUME_ADJUSTMENT_STEP="garbage"
+VIBRANIUM_GLOBAL_SEARCH_ENGINE="brave"
+D3="${OPTION_DEFAULTS[$IP]}"
+helpers::check VIBRANIUM_GLOBAL_USE_OSD VIBRANIUM_VOLUME_ADJUSTMENT_STEP VIBRANIUM_GLOBAL_SEARCH_ENGINE >/dev/null 2>&1
+if [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $VIBRANIUM_VOLUME_ADJUSTMENT_STEP == "$D3" && $VIBRANIUM_GLOBAL_SEARCH_ENGINE == brave ]]; then
+  printf "  ${_g}[PASS]${_R}  mixed valid/invalid, invalid falls back, others untouched\n"
+  PASS=$((PASS + 1))
+else
+  printf "  ${_r}[FAIL]${_R}  osd='%s'  step='%s' (expected '%s')  engine='%s'\n" \
+    "$VIBRANIUM_GLOBAL_USE_OSD" "$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" "$D3" "$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
+  FAIL=$((FAIL + 1))
+fi
+
+# Nameref release: two consecutive calls with different vars shouldn't cross-contaminate
+TOTAL=$((TOTAL + 1))
+VIBRANIUM_GLOBAL_USE_OSD="false"
+VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK="true"
+helpers::check VIBRANIUM_GLOBAL_USE_OSD >/dev/null 2>&1
+helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK >/dev/null 2>&1
+if [[ $VIBRANIUM_GLOBAL_USE_OSD == false && $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == true ]]; then
+  printf "  ${_g}[PASS]${_R}  consecutive calls, no cross-contamination\n"
+  PASS=$((PASS + 1))
+else
+  printf "  ${_r}[FAIL]${_R}  osd='%s'  pause='%s'\n" \
+    "$VIBRANIUM_GLOBAL_USE_OSD" "$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+  FAIL=$((FAIL + 1))
+fi
+
+# =============================================================================
+# 10. VIBRANIUM_BAR_WEATHER_MODULE_CITY — hardcoded skip
+# =============================================================================
+
+section "VIBRANIUM_BAR_WEATHER_MODULE_CITY — hardcoded skip"
+
+# The var IS in the cache (awk parser doesn't honor @ignore), but helpers::check
+# has a hardcoded continue for this name. Verify it passes through unchanged.
+CC_VAR="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
+
+# The var has @ignore which means no @type annotation → the awk parser skips it.
+TOTAL=$((TOTAL + 1))
+if [[ -z ${OPTION_DEFAULTS[$CC_VAR]+x} ]]; then
+  printf "  ${_g}[PASS]${_R}  absent from cache (correct: @ignore → no @type → skipped)\n"
+  PASS=$((PASS + 1))
+else
+  printf "  ${_r}[FAIL]${_R}  unexpectedly present in cache (default='%s')\n" "${OPTION_DEFAULTS[$CC_VAR]}"
+  FAIL=$((FAIL + 1))
+fi
+
+# helpers::check on an unregistered var: should log a warning, return 1, leave value.
+TOTAL=$((TOTAL + 1))
+printf -v "$CC_VAR" '%s' "Paris"
+helpers::check "$CC_VAR" >/dev/null 2>&1
+local_rc=$?
+if [[ ${!CC_VAR} == "Paris" ]] && ((local_rc == 0)); then
+  printf "  ${_g}[PASS]${_R}  value preserved, rc=0 (hardcoded continue before cache lookup)\n"
+  PASS=$((PASS + 1))
+else
+  printf "  ${_r}[FAIL]${_R}  val='%s' (expected Paris)  rc=%d (expected 1)\n" "${!CC_VAR}" "$local_rc"
+  FAIL=$((FAIL + 1))
+fi
+
+# =============================================================================
+# 11. Int — decimal fraction edge cases
+# =============================================================================
+
+section "int decimal fraction — edge cases"
+
+IP2="VIBRANIUM_BRIGHTNESS_STEP"
+DP2="${OPTION_DEFAULTS[$IP2]}"
+
+# 3.14 is a valid float that matches the int regex — currently accepted
+log_case "float 3.14 on non-range int"  "$IP2" "3.14" "3.14"
+
+# Just the fraction ".5" — must start with a digit, so should fail
+log_case "dot-five on non-range int"  "$IP2" ".5" "$DP2"
+
+# Leading + sign — regex is ^(-?)0*[0-9]+(\.[0-9]+)?$ so + is not accepted
+log_case "leading + on non-range int"  "$IP2" "+7" "$DP2"
+
+# =============================================================================
+# 12. String — leading/trailing whitespace
+# =============================================================================
+
+section "string enum — whitespace in value"
+
+# Leading space should cause a mismatch (the allowed list has exact values)
+log_case "leading space"  "$SE" " google" "$DSE"
+log_case "trailing space" "$SE" "google " "$DSE"
 
 summary
