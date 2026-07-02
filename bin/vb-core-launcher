@@ -102,10 +102,18 @@ _search_the_internet() {
   local engine
 
   case "$SEARCH_ENGINE" in
-  "duckduckgo") local engine="https://duckduckgo.com/?q=" ;;
-  "google") local engine="https://www.google.com/search?q=" ;;
-  "brave") local engine="https://search.brave.com/search?q=" ;;
-  "bing") local engine="https://bing.com/search?q=" ;;
+  "duckduckgo")
+    local engine="https://duckduckgo.com/?q="
+    ;;
+  "google")
+    local engine="https://www.google.com/search?q="
+    ;;
+  "brave")
+    local engine="https://search.brave.com/search?q="
+    ;;
+  "bing")
+    local engine="https://bing.com/search?q="
+    ;;
   esac
 
   log Info "Searching: $input via $SEARCH_ENGINE"
@@ -179,10 +187,18 @@ case "$MODE" in
   fi
 
   case "$MODE" in
-  --power) OPT_ARGS+=(-drun-categories Power -display-drun "Power") ;;
-  --web) OPT_ARGS+=(-drun-categories WebApp -display-drun "Web Apps") ;;
-  --pwa) OPT_ARGS+=(-drun-categories PWA -display-drun "PWA") ;;
-  --ai) OPT_ARGS+=(-drun-categories AI -display-drun "AIs") ;;
+  --power)
+    OPT_ARGS+=(-drun-categories Power -display-drun "Power")
+    ;;
+  --web)
+    OPT_ARGS+=(-drun-categories WebApp -display-drun "Web Apps")
+    ;;
+  --pwa)
+    OPT_ARGS+=(-drun-categories PWA -display-drun "PWA")
+    ;;
+  --ai)
+    OPT_ARGS+=(-drun-categories AI -display-drun "AIs")
+    ;;
   esac
 
   LAUNCHER_MODE="${MODE/--/}"

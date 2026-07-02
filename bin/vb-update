@@ -127,9 +127,15 @@ _nuke() {
   else
     local remote_ref
     case "$channel" in
-      upstream) remote_ref="origin/master" ;;
-      dev)      remote_ref="origin/dev" ;;
-      *)        remote_ref="origin/$channel" ;;
+      upstream)
+        remote_ref="origin/master"
+        ;;
+      dev)
+        remote_ref="origin/dev"
+        ;;
+      *)
+        remote_ref="origin/$channel"
+        ;;
     esac
     if ! git -C "$VIBRANIUM" rev-parse --verify "$remote_ref" &>/dev/null; then
       _fail "Remote branch '$remote_ref' not found. Verify your channel name or check available remotes with 'git branch -r'."
@@ -216,9 +222,15 @@ _update() {
   else
     local remote_ref
     case "$channel" in
-      upstream) remote_ref="origin/master" ;;
-      dev)      remote_ref="origin/dev" ;;
-      *)        remote_ref="origin/$channel" ;;
+      upstream)
+        remote_ref="origin/master"
+        ;;
+      dev)
+        remote_ref="origin/dev"
+        ;;
+      *)
+        remote_ref="origin/$channel"
+        ;;
     esac
 
     if ! git -C "$VIBRANIUM" rev-parse --verify "$remote_ref" &>/dev/null; then

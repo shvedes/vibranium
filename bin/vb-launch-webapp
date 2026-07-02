@@ -180,7 +180,9 @@ get_default_browser browser
 
 case $browser in
 google-chrome* | brave-browser* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
-*) browser="chromium.desktop" ;;
+*)
+  browser="chromium.desktop"
+  ;;
 esac
 
 execs=()

@@ -1,14 +1,5 @@
 #!/bin/bash
 
-VERBOSE=false
-
-log() {
-  local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
 # Overcomplicated script that manages brightness control using raw sysfs values
 # as well as the DDC protocol for external monitors. The script uses a single state file
 # (lines in the "i2c:output:level" format) to cache active values for both methods
@@ -34,6 +25,7 @@ fi
 SELF="${0##*/}"
 QUIET=false
 FORCE=false
+VERBOSE=false
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 
 shcat() {
@@ -41,6 +33,14 @@ shcat() {
     printf '%s\n' "$line"
   done
 }
+
+log() {
+  local level="$1"; shift
+  if $VERBOSE && [[ -t 0 ]]; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 
 usage() {
   shcat <<EOF
@@ -541,9 +541,15 @@ case "$method" in
     #   --down -> -<step>   e.g. -5
     #   --set  -> <value>   e.g. 60  (swayosd treats bare integers as absolute)
     case "$ACTION" in
-    "--up") swayosd_arg="+${step}" ;;
-    "--down") swayosd_arg="-${step}" ;;
-    "--set") swayosd_arg="$SET_VALUE" ;;
+    "--up")
+      swayosd_arg="+${step}"
+      ;;
+    "--down")
+      swayosd_arg="-${step}"
+      ;;
+    "--set")
+      swayosd_arg="$SET_VALUE"
+      ;;
     esac
 
     if [[ "$QUIET" == false ]]; then

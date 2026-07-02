@@ -160,8 +160,12 @@ if [[ "$action" == "inc" || "$action" == "dec" ]]; then
   fi
 
   case "$action" in
-  inc) TEMP=$((CURRENT_TEMP + STEP)) ;;
-  dec) TEMP=$((CURRENT_TEMP - STEP)) ;;
+  inc)
+    TEMP=$((CURRENT_TEMP + STEP))
+    ;;
+  dec)
+    TEMP=$((CURRENT_TEMP - STEP))
+    ;;
   esac
 fi
 

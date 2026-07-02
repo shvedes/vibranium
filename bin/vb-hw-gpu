@@ -67,10 +67,19 @@ fi
 # Map vendor names to PCI vendor IDs (from pci.ids).
 # These are the standard 16-bit identifiers assigned by the PCI SIG.
 case "$TARGET_VENDOR" in
-  amd)    EXPECTED_ID="0x1002" ;;
-  intel)  EXPECTED_ID="0x8086" ;;
-  nvidia) EXPECTED_ID="0x10de" ;;
-  *)      usage; exit 1 ;;
+  amd)
+    EXPECTED_ID="0x1002"
+    ;;
+  intel)
+    EXPECTED_ID="0x8086"
+    ;;
+  nvidia)
+    EXPECTED_ID="0x10de"
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
 esac
 
 # GSR (GSP/GSR) capability is an NVIDIA-specific feature related to

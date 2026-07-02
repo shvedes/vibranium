@@ -9,21 +9,37 @@ log() {
   fi
 }
 
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTIONS]
+
+Terminate the current session forcefully.
+
+Options:
+    -v, --verbose     Enable verbose output
+    -h, --help        Show this help and exit
+EOF
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose) VERBOSE=true; shift ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -h | --help)
-    echo "Usage: ${0##*/} [OPTION]"
-    echo ""
-    echo "Terminate the current session forcefully."
-    echo ""
-    echo "Options:"
-    echo "  -v, --verbose  Enable verbose output"
-    echo "  -h, --help     Show this help and exit"
+    usage
     exit 0
     ;;
   *)
-    echo "Error: unknown option: $1" >&2
+    log Error "Unknown option: $1" >&2
+    log Error "Try '${0##*/}' --help for more information" >&2
     exit 1
     ;;
   esac

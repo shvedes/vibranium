@@ -230,8 +230,16 @@ helpers::bar::spinner() {
 
   local sep_pos="right" left_pad=0 right_pad=1
   case "${BASH_SOURCE[1]##*/}" in
-  vb-bar-pacman) sep_pos="left" left_pad=0 right_pad=2 ;;
-  vb-bar-weather) sep_pos="right" left_pad=0 right_pad=2 ;;
+  vb-bar-pacman)
+    sep_pos="left"
+    left_pad=0
+    right_pad=2
+    ;;
+  vb-bar-weather)
+    sep_pos="right"
+    left_pad=0
+    right_pad=2
+    ;;
   esac
 
   local sep="<span foreground='${P_FOREGROUND_0}66'>|</span>"
@@ -499,8 +507,12 @@ term::ask_yes_no() {
 
   # Set hint based on default
   case "$default" in
-  Y) hint="(Y/n)" ;;
-  N) hint="(y/N)" ;;
+  Y)
+    hint="(Y/n)"
+    ;;
+  N)
+    hint="(y/N)"
+    ;;
   *)
     hint="(Y/n)"
     default="Y"
@@ -618,12 +630,24 @@ term::show_header() {
 
   if [[ "${1-}" == "--color" ]]; then
     case "${2-}" in
-    purple) color="$PURPLE" ;;
-    green) color="$GREEN" ;;
-    blue) color="$BLUE" ;;
-    cyan) color="$CYAN" ;;
-    red) color="$RED" ;;
-    *) color="$YELLOW" ;;
+    purple)
+      color="$PURPLE"
+      ;;
+    green)
+      color="$GREEN"
+      ;;
+    blue)
+      color="$BLUE"
+      ;;
+    cyan)
+      color="$CYAN"
+      ;;
+    red)
+      color="$RED"
+      ;;
+    *)
+      color="$YELLOW"
+      ;;
     esac
   fi
 

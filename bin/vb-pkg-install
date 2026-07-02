@@ -192,8 +192,12 @@ _operation_canceled() {
   local exit_after=false
 
   case "$1" in
-  --positive) color="$GREEN" ;;
-  --exit) exit_after=true ;;
+  --positive)
+    color="$GREEN"
+    ;;
+  --exit)
+    exit_after=true
+    ;;
   esac
 
   printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"

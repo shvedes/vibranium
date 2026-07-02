@@ -10,9 +10,15 @@ log() {
     fi
   else
     case "$level" in
-    Error) echo "==> ERROR: $*" ;;
-    Warn)  echo "==> WARN: $*"  ;;
-    *)     echo "==> $*"        ;;
+    Error)
+      echo "==> ERROR: $*"
+      ;;
+    Warn)
+      echo "==> WARN: $*"
+      ;;
+    *)
+      echo "==> $*"
+      ;;
     esac
   fi
 }

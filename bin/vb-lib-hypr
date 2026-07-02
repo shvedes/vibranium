@@ -54,10 +54,18 @@ hypr::fetch() {
   local jq_prog="" expr
   for i in "${!opts[@]}"; do
     case "${types[$i]}" in
-    bool) expr=".[$i].bool" ;;
-    int) expr=".[$i].int | tostring" ;;
-    str) expr=".[$i].str" ;;
-    float) expr=".[$i].float | tostring" ;;
+    bool)
+      expr=".[$i].bool"
+      ;;
+    int)
+      expr=".[$i].int | tostring"
+      ;;
+    str)
+      expr=".[$i].str"
+      ;;
+    float)
+      expr=".[$i].float | tostring"
+      ;;
     esac
     jq_prog+="${jq_prog:+,}($expr)"
   done
@@ -72,8 +80,12 @@ hypr::fetch() {
   for i in "${!opts[@]}"; do
     local opt="${opts[$i]}" val="${vals[$i]}"
     case "${types[$i]}" in
-    float) HYPR["$opt"]=$(LC_NUMERIC=C printf "%.1f" "$val") ;;
-    *) HYPR["$opt"]="$val" ;;
+    float)
+      HYPR["$opt"]=$(LC_NUMERIC=C printf "%.1f" "$val")
+      ;;
+    *)
+      HYPR["$opt"]="$val"
+      ;;
     esac
   done
 }

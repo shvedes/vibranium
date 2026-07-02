@@ -217,9 +217,15 @@ fi
 # ── UFW firewall rules ────────────────────────────────────────
 _configure_ufw
 case $? in
-0) summary_rules+=("UFW: ${GREEN}Docker rules applied${RESET} (DNS stub + ufw-docker)") ;;
-1) summary_rules+=("UFW: ${CYAN}unchanged${RESET}") ;;
-2) summary_rules+=("UFW: ${YELLOW}not active${RESET}, skipped") ;;
+0)
+  summary_rules+=("UFW: ${GREEN}Docker rules applied${RESET} (DNS stub + ufw-docker)")
+  ;;
+1)
+  summary_rules+=("UFW: ${CYAN}unchanged${RESET}")
+  ;;
+2)
+  summary_rules+=("UFW: ${YELLOW}not active${RESET}, skipped")
+  ;;
 esac
 
 # ── Docker group ──────────────────────────────────────────────

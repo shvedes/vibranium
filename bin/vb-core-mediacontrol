@@ -32,9 +32,15 @@ read_state() {
   [[ -f "$STATE_FILE" ]] || return 0
   while IFS='=' read -r key value; do
     case $key in
-      player) STATE_PLAYER=$value ;;
-      volume) STATE_VOLUME=$value ;;
-      action) STATE_ACTION=$value ;;
+      player)
+        STATE_PLAYER=$value
+        ;;
+      volume)
+        STATE_VOLUME=$value
+        ;;
+      action)
+        STATE_ACTION=$value
+        ;;
     esac
   done < "$STATE_FILE"
 }
@@ -74,21 +80,45 @@ set_opts() {
   # distinguish "no fade requested" from "fade with 0 steps" via a string
   # equality check, which also avoids division-by-zero in the step loop.
   case "$VIBRANIUM_PLAYER_FADE_DURATION" in
-    very_slow) NUM_STEPS=200 ;;
-    slow) NUM_STEPS=100 ;;
-    normal) NUM_STEPS=50 ;;
-    fast) NUM_STEPS=30 ;;
-    very_fast) NUM_STEPS=10 ;;
-    off) NUM_STEPS="off" ;;
+    very_slow)
+      NUM_STEPS=200
+      ;;
+    slow)
+      NUM_STEPS=100
+      ;;
+    normal)
+      NUM_STEPS=50
+      ;;
+    fast)
+      NUM_STEPS=30
+      ;;
+    very_fast)
+      NUM_STEPS=10
+      ;;
+    off)
+      NUM_STEPS="off"
+      ;;
   esac
 
   case "$VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH" in
-    very_slow) NUM_STEPS_SWITCH=200 ;;
-    slow) NUM_STEPS_SWITCH=100 ;;
-    normal) NUM_STEPS_SWITCH=50 ;;
-    fast) NUM_STEPS_SWITCH=30 ;;
-    very_fast) NUM_STEPS_SWITCH=10 ;;
-    off) NUM_STEPS_SWITCH="off" ;;
+    very_slow)
+      NUM_STEPS_SWITCH=200
+      ;;
+    slow)
+      NUM_STEPS_SWITCH=100
+      ;;
+    normal)
+      NUM_STEPS_SWITCH=50
+      ;;
+    fast)
+      NUM_STEPS_SWITCH=30
+      ;;
+    very_fast)
+      NUM_STEPS_SWITCH=10
+      ;;
+    off)
+      NUM_STEPS_SWITCH="off"
+      ;;
   esac
 }
 
@@ -103,7 +133,9 @@ get_player_status() {
   playerctl)
     read -r result < <(playerctl status 2>/dev/null)
     case "$result" in
-    Playing | Paused) return 0 ;;
+    Playing | Paused)
+      return 0
+      ;;
     esac
     ;;
   mpd)
@@ -114,8 +146,14 @@ get_player_status() {
     # mpc status emits lines like "[playing] #1/1 0:42/3:30 (20%)".
     while read -r l; do
       case $l in
-      *"[playing]"*) result="Playing"; return 0 ;;
-      *"[paused]"*)  result="Paused";  return 0 ;;
+      *"[playing]"*)
+        result="Playing"
+        return 0
+        ;;
+      *"[paused]"*)
+        result="Paused"
+        return 0
+        ;;
       esac
     done < <(mpc status 2>/dev/null)
     ;;

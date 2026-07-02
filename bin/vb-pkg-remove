@@ -99,11 +99,19 @@ _ask_yes_no_all() {
     answer="${answer:-$default}"
 
     case "$answer" in
-    [Yy][Ee][Ss] | [Yy]) return 0 ;;
-    [Nn][Oo] | [Nn]) return 1 ;;
-    [Aa][Ll][Ll]) return 2 ;;
+    [Yy][Ee][Ss] | [Yy])
+      return 0
+      ;;
+    [Nn][Oo] | [Nn])
+      return 1
+      ;;
+    [Aa][Ll][Ll])
+      return 2
+      ;;
     # Re-draw the question line.
-    *) printf "\r\e[K" ;;
+    *)
+      printf "\r\e[K"
+      ;;
     esac
   done
 
@@ -410,7 +418,9 @@ while [[ $# -gt 0 ]]; do
     echo "Unknown option: $1" >&2
     exit 1
     ;;
-  *) break ;;
+  *)
+    break
+    ;;
   esac
 done
 

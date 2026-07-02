@@ -1,26 +1,19 @@
 #!/bin/bash
 
+SELF="${0##*/}"
 VERBOSE=false
 
-# Log to stderr at the given level, but only when VERBOSE is on AND
-# stdin is a terminal (-t 0).  The isatty guard prevents
-# non-interactive callers (e.g. spawned by sway bindings, dunst scripts)
-# from producing stderr noise even when VERBOSE is set globally.
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
 log() {
   local level="$1"; shift
   if $VERBOSE && [[ -t 0 ]]; then
     echo "[${0##*/}] $level: $*" >&2
   fi
-}
-
-SELF="${0##*/}"
-
-# Portable stdin-to-stdout copy that avoids subshell overhead.
-# Used where heredocs or <<< would create an extra process.
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
 }
 
 usage() {

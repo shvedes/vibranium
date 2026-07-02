@@ -338,7 +338,9 @@ cfgr::set_digit() {
       shift 2
       ;;
     # Ignore unrecognised tokens so future flags don't break existing call sites.
-    *) shift ;;
+    *)
+      shift
+      ;;
     esac
   done
 
@@ -444,7 +446,9 @@ cfgr::set_string() {
       var_name="$2"
       shift 2
       ;;
-    *) shift ;;
+    *)
+      shift
+      ;;
     esac
   done
 
@@ -550,7 +554,9 @@ cfgr::item::bool() {
       icon="$2"
       shift 2
       ;;
-    *) shift ;;
+    *)
+      shift
+      ;;
     esac
   done
 
@@ -645,7 +651,9 @@ cfgr::item::digit() {
       icon="$2"
       shift 2
       ;;
-    *) shift ;;
+    *)
+      shift
+      ;;
     esac
   done
 
@@ -743,7 +751,9 @@ cfgr::item::string() {
         shift
       done
       ;;
-    *) shift ;;
+    *)
+      shift
+      ;;
     esac
   done
 
@@ -849,7 +859,9 @@ cfgr::item::action() {
       icon="$2"
       shift 2
       ;;
-    *) shift ;;
+    *)
+      shift
+      ;;
     esac
   done
 

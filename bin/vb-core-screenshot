@@ -44,9 +44,15 @@ notify() {
   fi
 
   case "$1" in
-  region) local target='Selected region' ;;
-  window) local target='Active window' ;;
-  screen) local target='Active screen' ;;
+  region)
+    local target='Selected region'
+    ;;
+  window)
+    local target='Active window'
+    ;;
+  screen)
+    local target='Active screen'
+    ;;
   esac
 
   if [[ $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK == true ]]; then

@@ -150,29 +150,45 @@ summary_rules+=("Default policy (LAN): allow anything from LAN network")
 # ── LocalSend ─────────────────────────────────────────────────
 _configure_localsend
 case $? in
-0) summary_rules+=("LocalSend: allowed ${CYAN}53317/tcp${RESET} and ${CYAN}53317/udp${RESET}") ;;
-1) summary_rules+=("LocalSend: ${CYAN}unchanged${RESET}") ;;
+0)
+  summary_rules+=("LocalSend: allowed ${CYAN}53317/tcp${RESET} and ${CYAN}53317/udp${RESET}")
+  ;;
+1)
+  summary_rules+=("LocalSend: ${CYAN}unchanged${RESET}")
+  ;;
 esac
 
 # ── Docker ────────────────────────────────────────────────────
 _configure_docker
 case $? in
-0) summary_rules+=("Docker: DNS stub rule added, ufw-docker hook installed") ;;
-1) summary_rules+=("Docker: ${CYAN}unchanged${RESET}") ;;
+0)
+  summary_rules+=("Docker: DNS stub rule added, ufw-docker hook installed")
+  ;;
+1)
+  summary_rules+=("Docker: ${CYAN}unchanged${RESET}")
+  ;;
 esac
 
 # ── Libvirt ───────────────────────────────────────────────────
 _configure_libvirt
 case $? in
-0) summary_rules+=("Libvirt: iptables backend set") ;;
-1) summary_rules+=("Libvirt: ${CYAN}unchanged${RESET}") ;;
+0)
+  summary_rules+=("Libvirt: iptables backend set")
+  ;;
+1)
+  summary_rules+=("Libvirt: ${CYAN}unchanged${RESET}")
+  ;;
 esac
 
 # ── Syncthing ───────────────────────────────────────────────────
 _configure_syncthing
 case $? in
-0) summary_rules+=("Syncthing: firewall profile set") ;;
-1) summary_rules+=("Syncthing: ${CYAN}unchanged${RESET}") ;;
+0)
+  summary_rules+=("Syncthing: firewall profile set")
+  ;;
+1)
+  summary_rules+=("Syncthing: ${CYAN}unchanged${RESET}")
+  ;;
 esac
 
 # ── Enable ────────────────────────────────────────────────────

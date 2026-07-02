@@ -80,8 +80,12 @@ fi
 sed -i "/position/s/${CURRENT_POSITION}/${TARGET}/" "$WAYBAR_CONF"
 
 case "$TARGET" in
-top) ORIGIN="top-right" ;;
-bottom) ORIGIN="bottom-right" ;;
+top)
+    ORIGIN="top-right"
+    ;;
+bottom)
+    ORIGIN="bottom-right"
+    ;;
 esac
 
 # Update Dunst's notification origin to match the new Waybar position.

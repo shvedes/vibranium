@@ -11,9 +11,15 @@ fi
 
 current="$(vb-core-power --get)"
 case "$current" in
-"power-saver") icon='\uf06c' ;;
-"balanced") icon='' ;;
-"performance") icon='\uf0e7' ;;
+"power-saver")
+    icon='\uf06c'
+    ;;
+"balanced")
+    icon=''
+    ;;
+"performance")
+    icon='\uf0e7'
+    ;;
 esac
 
 printf '{"text": "%s", "tooltip": "%s"}' "$icon" "Power profile: $current"

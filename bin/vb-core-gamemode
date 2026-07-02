@@ -8,7 +8,7 @@ shcat() {
   done
 }
 
-_help() {
+usage() {
   shcat <<EOF
 Usage: $SELF [OPTION]... -- COMMAND [ARG]...
 Launch COMMAND under gamescope
@@ -199,7 +199,7 @@ EXTRA_GAMESCOPE_OPTS=()
 while [[ $# -gt 0 ]]; do
   case "$1" in
   -h | --help)
-    _help
+    usage
     exit 0
     ;;
   --mangohud)

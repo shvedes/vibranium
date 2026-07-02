@@ -114,17 +114,39 @@ _init_cpuinfo() {
     value="${value# }"
 
     case "$clean_key" in
-      "vendor_id")   [[ -z $CPU_VENDOR ]]     && CPU_VENDOR="$value"     ;;
-      "cpu family")  [[ -z $CPU_FAMILY ]]     && CPU_FAMILY="$value"     ;;
-      "model")       [[ -z $CPU_MODEL_ID ]]   && CPU_MODEL_ID="$value"   ;;
-      "model name")  [[ -z $CPU_MODEL_NAME ]] && CPU_MODEL_NAME="$value" ;;
-      "stepping")    [[ -z $CPU_STEPPING ]]   && CPU_STEPPING="$value"   ;;
-      "cpu MHz")     [[ -z $CPU_MHZ ]]        && CPU_MHZ="$value"        ;;
-      "cache size")  [[ -z $CPU_CACHE ]]      && CPU_CACHE="$value"      ;;
-      "cpu cores")   [[ -z $CPU_CORES ]]      && CPU_CORES="$value"      ;;
-      "microcode")   [[ -z $CPU_MICROCODE ]]  && CPU_MICROCODE="$value"  ;;
-      "flags"|"Features") [[ -z $CPU_FLAGS ]] && CPU_FLAGS="$value"      ;;
-      "bugs")        [[ -z $CPU_BUGS ]]       && CPU_BUGS="$value"       ;;
+      "vendor_id")
+        [[ -z $CPU_VENDOR ]] && CPU_VENDOR="$value"
+        ;;
+      "cpu family")
+        [[ -z $CPU_FAMILY ]] && CPU_FAMILY="$value"
+        ;;
+      "model")
+        [[ -z $CPU_MODEL_ID ]] && CPU_MODEL_ID="$value"
+        ;;
+      "model name")
+        [[ -z $CPU_MODEL_NAME ]] && CPU_MODEL_NAME="$value"
+        ;;
+      "stepping")
+        [[ -z $CPU_STEPPING ]] && CPU_STEPPING="$value"
+        ;;
+      "cpu MHz")
+        [[ -z $CPU_MHZ ]] && CPU_MHZ="$value"
+        ;;
+      "cache size")
+        [[ -z $CPU_CACHE ]] && CPU_CACHE="$value"
+        ;;
+      "cpu cores")
+        [[ -z $CPU_CORES ]] && CPU_CORES="$value"
+        ;;
+      "microcode")
+        [[ -z $CPU_MICROCODE ]] && CPU_MICROCODE="$value"
+        ;;
+      "flags"|"Features")
+        [[ -z $CPU_FLAGS ]] && CPU_FLAGS="$value"
+        ;;
+      "bugs")
+        [[ -z $CPU_BUGS ]] && CPU_BUGS="$value"
+        ;;
     esac
   done < /proc/cpuinfo
 
@@ -145,9 +167,15 @@ add_cpu_vendor() {
   local val
   # Normalise /proc/cpuinfo vendor strings to short human-readable names.
   case "$CPU_VENDOR" in
-    AuthenticAMD) val="AMD"   ;;
-    GenuineIntel) val="Intel" ;;
-    *)            val="${CPU_VENDOR:-unknown}" ;;
+    AuthenticAMD)
+      val="AMD"
+      ;;
+    GenuineIntel)
+      val="Intel"
+      ;;
+    *)
+      val="${CPU_VENDOR:-unknown}"
+      ;;
   esac
   _add_part "Vendor:" "$val"
 }
@@ -169,43 +197,93 @@ add_cpu_microarchitecture() {
       case "$CPU_FAMILY" in
         6)
           case "$CPU_MODEL_ID" in
-            42|45)       uarch='Sandy Bridge' ;;
-            58|62)       uarch='Ivy Bridge'   ;;
-            60|63|69|70) uarch='Haswell'      ;;
-            61|79|86)    uarch='Broadwell'    ;;
-            78|85|94)    uarch='Skylake'      ;;
-            142|158)     uarch='Coffee Lake'  ;;
-            204)         uarch='Panther Lake' ;;
-            165|166)     uarch='Comet Lake'   ;;
-            126)         uarch='Ice Lake'     ;;
-            140|141)     uarch='Tiger Lake'   ;;
-            167)         uarch='Rocket Lake'  ;;
-            151|154)     uarch='Alder Lake'   ;;
-            183|191)     uarch='Raptor Lake'  ;;
-            170|172)     uarch='Meteor Lake'  ;;
-            189)         uarch='Lunar Lake'   ;;
-            197)         uarch='Arrow Lake'   ;;
+            42|45)
+              uarch='Sandy Bridge'
+              ;;
+            58|62)
+              uarch='Ivy Bridge'
+              ;;
+            60|63|69|70)
+              uarch='Haswell'
+              ;;
+            61|79|86)
+              uarch='Broadwell'
+              ;;
+            78|85|94)
+              uarch='Skylake'
+              ;;
+            142|158)
+              uarch='Coffee Lake'
+              ;;
+            204)
+              uarch='Panther Lake'
+              ;;
+            165|166)
+              uarch='Comet Lake'
+              ;;
+            126)
+              uarch='Ice Lake'
+              ;;
+            140|141)
+              uarch='Tiger Lake'
+              ;;
+            167)
+              uarch='Rocket Lake'
+              ;;
+            151|154)
+              uarch='Alder Lake'
+              ;;
+            183|191)
+              uarch='Raptor Lake'
+              ;;
+            170|172)
+              uarch='Meteor Lake'
+              ;;
+            189)
+              uarch='Lunar Lake'
+              ;;
+            197)
+              uarch='Arrow Lake'
+              ;;
           esac ;;
       esac ;;
     AuthenticAMD)
       case "$CPU_FAMILY" in
         23)
           case "$CPU_MODEL_ID" in
-            1)                 uarch='Zen'   ;;
-            8|24)              uarch='Zen+'  ;;
-            49|96|104|113|144) uarch='Zen 2' ;;
+            1)
+              uarch='Zen'
+              ;;
+            8|24)
+              uarch='Zen+'
+              ;;
+            49|96|104|113|144)
+              uarch='Zen 2'
+              ;;
           esac ;;
         25)
           case "$CPU_MODEL_ID" in
-            1|8|33)         uarch='Zen 3'  ;;
-            68|80)          uarch='Zen 3+' ;;
-            97|116|117|120) uarch='Zen 4'  ;;
-            161)            uarch='Zen 4c' ;;
+            1|8|33)
+              uarch='Zen 3'
+              ;;
+            68|80)
+              uarch='Zen 3+'
+              ;;
+            97|116|117|120)
+              uarch='Zen 4'
+              ;;
+            161)
+              uarch='Zen 4c'
+              ;;
           esac ;;
         26)
           case "$CPU_MODEL_ID" in
-            32|36|64) uarch='Zen 5'  ;;
-            68)       uarch='Zen 5c' ;;
+            32|36|64)
+              uarch='Zen 5'
+              ;;
+            68)
+              uarch='Zen 5c'
+              ;;
           esac ;;
       esac ;;
   esac
@@ -333,9 +411,16 @@ while [[ $# -gt 0 ]]; do
 
   if [[ "$arg" == --* ]]; then
     case "$arg" in
-      --help)                 usage; exit 0 ;;
-      --quote)                USE_QUOTE=1 ;;
-      *)                      ARGS_QUEUE+=("$arg") ;;
+      --help)
+        usage
+        exit 0
+        ;;
+      --quote)
+        USE_QUOTE=1
+        ;;
+      *)
+        ARGS_QUEUE+=("$arg")
+        ;;
     esac
   elif [[ "$arg" == -* && ${#arg} -gt 1 ]]; then
     # Support bundled short flags (e.g. -vn, -vlq) by decomposing the
@@ -344,9 +429,16 @@ while [[ $# -gt 0 ]]; do
     for (( i=1; i<${#arg}; i++ )); do
       opt="${arg:$i:1}"
       case "$opt" in
-        h) usage; exit 0 ;;
-        q) USE_QUOTE=1 ;;
-        *) ARGS_QUEUE+=("-$opt") ;;
+        h)
+          usage
+          exit 0
+          ;;
+        q)
+          USE_QUOTE=1
+          ;;
+        *)
+          ARGS_QUEUE+=("-$opt")
+          ;;
       esac
     done
   else
@@ -358,20 +450,50 @@ done
 # Second pass: invoke the add_* functions queued in ARGS_QUEUE.
 for arg in "${ARGS_QUEUE[@]}"; do
   case "$arg" in
-    --vendor|-v)            add_cpu_vendor ;;
-    --code|-c)              add_cpu_code ;;
-    --microarchitecture|-l) add_cpu_microarchitecture ;;
-    --name|-n)              add_cpu_name ;;
-    --stepping|-g)          add_cpu_stepping ;;
-    --microcode|-u)         add_cpu_microcode ;;
-    --mhz|-m)               add_cpu_mhz ;;
-    --cache|-s)             add_cpu_cache ;;
-    --cores|-p)             add_cpu_cores ;;
-    --threads|-t)           add_cpu_threads ;;
-    --bugs|-b)              add_cpu_bugs ;;
-    --flags|-f)             add_cpu_flags ;;
-    --all|-a)               IS_ALL=1; add_all ;;
-    *)                      usage; exit 2 ;;
+    --vendor|-v)
+      add_cpu_vendor
+      ;;
+    --code|-c)
+      add_cpu_code
+      ;;
+    --microarchitecture|-l)
+      add_cpu_microarchitecture
+      ;;
+    --name|-n)
+      add_cpu_name
+      ;;
+    --stepping|-g)
+      add_cpu_stepping
+      ;;
+    --microcode|-u)
+      add_cpu_microcode
+      ;;
+    --mhz|-m)
+      add_cpu_mhz
+      ;;
+    --cache|-s)
+      add_cpu_cache
+      ;;
+    --cores|-p)
+      add_cpu_cores
+      ;;
+    --threads|-t)
+      add_cpu_threads
+      ;;
+    --bugs|-b)
+      add_cpu_bugs
+      ;;
+    --flags|-f)
+      add_cpu_flags
+      ;;
+    --all|-a)
+      IS_ALL=1
+      add_all
+      ;;
+    *)
+      usage
+      exit 2
+      ;;
   esac
 done
 

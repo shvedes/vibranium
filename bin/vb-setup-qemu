@@ -156,9 +156,15 @@ summary_rules=()
 # ── UFW firewall rules ────────────────────────────────────────
 _configure_ufw
 case $? in
-0) summary_rules+=("UFW: ${GREEN}libvirt iptables backend configured${RESET}") ;;
-1) summary_rules+=("UFW: ${CYAN}unchanged${RESET}") ;;
-2) summary_rules+=("UFW: ${YELLOW}not present${RESET}, skipped") ;;
+0)
+  summary_rules+=("UFW: ${GREEN}libvirt iptables backend configured${RESET}")
+  ;;
+1)
+  summary_rules+=("UFW: ${CYAN}unchanged${RESET}")
+  ;;
+2)
+  summary_rules+=("UFW: ${YELLOW}not present${RESET}, skipped")
+  ;;
 esac
 
 # ── User group ────────────────────────────────────────────────
