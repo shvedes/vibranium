@@ -4,15 +4,13 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
 
-THEME="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
-WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
-UWALLS="$XDG_CONFIG_HOME/vibranium/themes/$THEME/backgrounds"
 WALLPAPER_STATE="$VIBRANIUM_STATE/wallpaper.state"
+WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
 
 shcat() {
   while IFS= read -r line; do
@@ -117,9 +115,9 @@ cycle_wallpaper() {
   idx=0
 
   # Locate the current wallpaper's position in the sorted file list.
-  if [ -n "$current" ]; then
+  if [[ -n "$current" ]]; then
     for i in "${!files[@]}"; do
-      if [ "${files[$i]}" = "$current" ]; then
+      if [[ "${files[$i]}" == "$current" ]]; then
         idx=$i
         found=1
         break
@@ -199,6 +197,9 @@ if [[ "$_dispatch" != -* ]]; then
   fi
 fi
 
+THEME="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+UWALLS="$XDG_CONFIG_HOME/vibranium/themes/$THEME/backgrounds"
+
 case "$_dispatch" in
 "" | -h | --help)
   usage
@@ -234,7 +235,7 @@ case "$_dispatch" in
   WALLPAPER_PATH="$(realpath "$1")"
 
   if [[ ! -f "$WALLPAPER_PATH" ]]; then
-    echo "Error: '$WALLPAPER_PATH' doesn't exist!" >&2
+    log Error "'$WALLPAPER_PATH' doesn't exist!"
     exit 1
   fi
 
@@ -250,8 +251,8 @@ case "$_dispatch" in
   fi
   ;;
 -*)
-  echo "Error: unknown option: $*" >&2
-  echo "Try ${0##*/} --help for more information." >&2
+  log Error "unknown option: $*"
+  log Error "Try ${0##*/} --help for more information."
   exit 1
   ;;
 esac

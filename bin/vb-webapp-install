@@ -5,6 +5,15 @@
 ICON_DIR="$XDG_DATA_HOME/applications/icons"
 SELF="${0##*/}"
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Flags populated by argument parsing below. All default to empty; interactive
 # mode fills them via prompts, non-interactive mode via --flags.
@@ -20,14 +29,14 @@ CATEGORY=""
 OWN_PROFILE=false
 INTERACTIVE_MODE=false
 
-_shcat() {
+shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
   done
 }
 
-_usage() {
-  _shcat <<EOF
+usage() {
+  shcat <<EOF
 Usage: $SELF [OPTION]...
 
 Install a Progressive Web App shortcut as a .desktop launcher entry.
@@ -56,12 +65,16 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
   -h | --help)
-    _usage
+    usage
     exit 0
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
     ;;
   --url)
     [[ $# -ge 2 ]] || {
-      echo "Missing value for $1" >&2
+      log Error "Missing value for --url"
       exit 1
     }
     APP_URL="$2"
@@ -69,7 +82,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --name)
     [[ $# -ge 2 ]] || {
-      echo "Missing value for $1" >&2
+      log Error "Missing value for --name"
       exit 1
     }
     APP_NAME="$2"
@@ -77,7 +90,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --icon)
     [[ $# -ge 2 ]] || {
-      echo "Missing value for $1" >&2
+      log Error "Missing value for --icon"
       exit 1
     }
     ICON_REF="$2"
@@ -85,7 +98,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --exec)
     [[ $# -ge 2 ]] || {
-      echo "Missing value for $1" >&2
+      log Error "Missing value for --exec"
       exit 1
     }
     CUSTOM_EXEC="$2"
@@ -93,7 +106,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --mime-types)
     [[ $# -ge 2 ]] || {
-      echo "Missing value for $1" >&2
+      log Error "Missing value for --mime-types"
       exit 1
     }
     MIME_TYPES="$2"
@@ -101,7 +114,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --keywords)
     [[ $# -ge 2 ]] || {
-      echo "Missing value for $1" >&2
+      log Error "Missing value for --keywords"
       exit 1
     }
     EXTRA_KEYWORDS="$2"
@@ -109,7 +122,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --category)
     [[ $# -ge 2 ]] || {
-      echo "Missing value for $1" >&2
+      log Error "Missing value for --category"
       exit 1
     }
     CATEGORY="$2"
@@ -124,11 +137,11 @@ while [[ $# -gt 0 ]]; do
     break
     ;;
   --* | -*)
-    echo "Unknown option: $1" >&2
+    log Error "Unknown option: $1"
     exit 1
     ;;
   *)
-    echo "Unexpected argument: '$1'. Use flags to pass values." >&2
+    log Error "Unexpected argument: $1. Use flags to pass values"
     exit 1
     ;;
   esac

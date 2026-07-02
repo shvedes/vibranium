@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -43,15 +43,14 @@ EOF
 # Night shift (blue-light filter) is not available inside VMs because
 # hyprsunset may not function correctly on virtualised GPUs.
 if [[ "$CHASSIS_TYPE" == vm ]]; then
-  log Info "Not available in a VM"
-  echo "not available in a VM" >&2
+  log Error "Not available in a VM"
   exit 1
 fi
 
 # Lock on fd 10 to prevent concurrent adjustments from racing on the
 # config file write and the hyprsunset IPC call.
 exec 10>"$LOCKFILE" || {
-  echo "Error: another instance of $SELF already running!"
+  log Error "another instance of $SELF already running!"
   exit 1
 }
 
@@ -61,18 +60,6 @@ if [[ $# -eq 0 ]]; then
   usage
   exit 0
 fi
-
-while IFS= read -r line; do
-  case $line in
-  *"temperature = "*)
-    tmp=${line#*temperature = }
-    CURRENT_TEMP=${tmp%%[^0-9]*}
-
-    unset tmp
-    break
-    ;;
-  esac
-done <"$CONF"
 
 action=""
 ARG_TEMP=""
@@ -116,19 +103,36 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   *)
-    echo "Error: invalid option: $1" >&2
-    echo "Try '$SELF --help' for more information" >&2
+    log Error "Invalid option: $1"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
 done
 
 if [[ ! -f "$STATE_FILE" ]]; then
-  echo "Night Light state file not found: $STATE_FILE" >&2
+  log Error "Night Light state file not found: $STATE_FILE"
   exit 1
 fi
 
 state="$(<"$STATE_FILE")"
+
+# Read the current temperature from the hyprsunset config. Needed for
+# toggle (re-applies the configured value), inc, and dec actions.
+# Only read when the action actually needs the current value.
+if [[ $action =~ ^(toggle|inc|dec)$ ]]; then
+  while IFS= read -r line; do
+    case $line in
+    *"temperature = "*)
+      tmp=${line#*temperature = }
+      CURRENT_TEMP=${tmp%%[^0-9]*}
+
+      unset tmp
+      break
+      ;;
+    esac
+  done <"$CONF"
+fi
 
 # Toggle between active and suspended state. hyprsunset is called in
 # the background since the IPC involves a D-Bus round-trip. The state
@@ -144,7 +148,7 @@ if [[ "$action" == "toggle" ]]; then
     printf "suspended" >"$STATE_FILE"
     ;;
   *)
-    echo "Unknown state in $STATE_FILE: '$state'" >&2
+    log Error "Unknown state in state file: $state"
     exit 1
     ;;
   esac
@@ -155,7 +159,7 @@ fi
 
 if [[ "$action" == "inc" || "$action" == "dec" ]]; then
   if [[ "$state" == "suspended" ]]; then
-    echo "Night Light is suspended" >&2
+    log Warn "Night Light is suspended"
     exit 1
   fi
 
@@ -171,19 +175,19 @@ fi
 
 if [[ "$action" == "set" ]]; then
   if ! [[ "$ARG_TEMP" =~ ^[0-9]+$ ]]; then
-    echo "Invalid temperature: $ARG_TEMP" >&2
+    log Error "Invalid temperature: $ARG_TEMP"
     exit 1
   fi
   TEMP="$ARG_TEMP"
 fi
 
 if [[ -z "${TEMP:-}" ]]; then
-  echo "No operation performed" >&2
+  log Error "No operation performed"
   exit 0
 fi
 
 if ((TEMP < 1000 || TEMP > 20000)); then
-  echo "Temperature must be between 1000K and 20000K" >&2
+  log Error "Temperature must be between 1000K and 20000K"
   exit 1
 fi
 

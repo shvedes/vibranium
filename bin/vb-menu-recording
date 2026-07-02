@@ -1,8 +1,27 @@
 #!/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  sed -n '2,10p' "$0"
+}
+
 if [[ $CHASSIS_TYPE == vm ]]; then
   notify-send "Screen Recorder" "screen recording isn't available in a VM!"
-  echo "Error: screen recording isn't available in a VM!" >&2
+  log Error "screen recording isn't available in a VM!"
   exit 1
 fi
 

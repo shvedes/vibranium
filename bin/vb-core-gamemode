@@ -130,15 +130,9 @@ GAMESCOPE_FLAGS=(
   --keep-alive
 )
 
-die() {
-  echo "$SELF: $*" >&2
-  echo "Try '$SELF --help' for more information." >&2
-  exit 1
-}
-
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -215,7 +209,11 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   --gamescope-options)
-    [[ -n "${2-}" ]] || die "'--gamescope-options' requires an argument"
+    if [[ -z "${2-}" ]]; then
+      log Error "'--gamescope-options' requires an argument"
+      log Error "Try '$SELF --help' for more information."
+      exit 1
+    fi
     parse_gamescope_options "$2"
     shift 2
     ;;
@@ -232,7 +230,9 @@ while [[ $# -gt 0 ]]; do
     break
     ;;
   -*)
-    die "unrecognized option: '$1'"
+    log Error "unrecognized option: '$1'"
+    log Error "Try '$SELF --help' for more information."
+    exit 1
     ;;
   *)
     # No '--' separator used — treat the rest as the game command.
@@ -241,7 +241,11 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-[[ $# -gt 0 ]] || die "no command given"
+if [[ $# -eq 0 ]]; then
+  log Error "no command given"
+  log Error "Try '$SELF --help' for more information."
+  exit 1
+fi
 
 # Mangohud availability check (done early so we can warn before any exec)
 if $USE_MANGOHUD; then

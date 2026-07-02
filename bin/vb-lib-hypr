@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2001
 
 _HYPR_D="$XDG_CONFIG_HOME/hypr/hyprland.conf.d"
 
@@ -75,7 +76,7 @@ hypr::fetch() {
   # into an array natively, so .[i] indexing is reliable without regex splitting.
   local raw vals
   raw=$(hyprctl -j --batch "$query")
-  mapfile -t vals < <(jq -rs "[$jq_prog] | .[]" <<<"${raw//nan/0}")
+  mapfile -t vals < <(jq -rs "[$jq_prog] | .[]" <<<"$(sed 's/\bnan\b/0/g' <<<"$raw")")
 
   for i in "${!opts[@]}"; do
     local opt="${opts[$i]}" val="${vals[$i]}"

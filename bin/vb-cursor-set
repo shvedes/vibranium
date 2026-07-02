@@ -1,5 +1,14 @@
 #!/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 STATE_FILE="$VIBRANIUM_STATE/cursor-theme"
 
 DEFAULT_THEME="Adwaita"
@@ -39,7 +48,7 @@ shcat() {
   done
 }
 
-_usage() {
+usage() {
   shcat << EOF
 Usage: ${0##*/} [OPTION]... [THEME]
 
@@ -56,20 +65,24 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
     -h | --help)
-      _usage
+      usage
       exit 0
       ;;
     -s | --size)
       if ! [[ -n "$2" && "$2" =~ ^[0-9]+$ ]]; then
-        echo "error: --size requires a numeric argument" >&2
+        log Error "--size requires a numeric argument"
         exit 1
       fi
       SELECTED_SIZE="$2"
       shift 2
       ;;
     -*)
-      echo "unknown option: $1" >&2
+      log Error "Unknown option: $1"
       exit 1
       ;;
     *)
@@ -110,7 +123,7 @@ for d in "${SEARCH_DIRS[@]}"; do
 done
 
 if ! ((theme_found)); then
-  echo "error: '$SELECTED_THEME' not found" >&2
+  log Error "Theme not found: $SELECTED_THEME"
   exit 1
 fi
 
@@ -122,7 +135,7 @@ if [[ -n "$available_sizes" ]] && ! grep -qw "$SELECTED_SIZE" <<< "$available_si
 
   if [[ -t 1 ]]; then
     msg="size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME'"$'\n'"Run: vb-cursor-list --size '$SELECTED_THEME'"
-    echo "error: $msg" >&2
+    log Error "$msg"
     exit 1
   fi
 

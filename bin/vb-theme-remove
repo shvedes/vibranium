@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -38,8 +38,8 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   *)
-    echo "Error: unknown option: $1" >&2
-    echo "Try '${0##*/} --help' for more information." >&2
+    log Error "unknown option: $1"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
@@ -88,7 +88,6 @@ _capitalize() {
 # Build capitalized display names; map display -> folder for reverse lookup
 menu_items=()
 declare -A display_to_folder=()
-declare -A display_to_clean=()
 
 for folder in "${community_themes[@]}"; do
   clean_name="$folder"
@@ -107,7 +106,6 @@ for folder in "${community_themes[@]}"; do
   menu_items+=("$display")
 
   display_to_folder["$display"]="$folder"
-  display_to_clean["$display"]="$clean_name"
 done
 
 chosen_display=""
@@ -118,7 +116,6 @@ if [[ -z "$chosen_display" ]]; then
 fi
 
 chosen_name="${display_to_folder[$chosen_display]}"
-chosen_clean="${display_to_clean[$chosen_display]}"
 chosen_path="$THEMES_DIR/$chosen_name"
 
 if [[ ! -d "$chosen_path" ]]; then
@@ -163,7 +160,7 @@ if [[ -f "$state_file" ]]; then
 fi
 
 # If the removed theme was the active one, fall back to the default
-if [[ "$current_theme" == "$chosen_clean" ]]; then
+if [[ "$current_theme" == "$chosen_name" ]]; then
   vb-theme-set "$FALLBACK_THEME"
 fi
 

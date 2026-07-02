@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -63,7 +63,7 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   *)
-    echo "$SELF: unknown option '$1'" >&2
+    log Error "Unknown option: $1"
     usage >&2
     exit 1
     ;;
@@ -71,7 +71,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$ACTION" ]]; then
-  echo "$SELF: action required (--up|--down|--toggle)" >&2
+  log Error "Action required (--up, --down, or --toggle)"
   usage >&2
   exit 1
 fi
@@ -214,7 +214,7 @@ done
 
 # scale current volume into 0-100 relative to max_vol_pct so the bar
 # stays proportional when the above-100% boost is enabled
-bar_value=$((first_new_vol * 100 / 100))
+bar_value=$first_new_vol
 icons_folder="/usr/share/icons/Papirus/16x16/symbolic/status"
 
 if [[ "$first_new_muted" == "yes" ]]; then

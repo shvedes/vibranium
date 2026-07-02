@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -15,7 +15,7 @@ shcat() {
   done
 }
 
-_usage() {
+usage() {
   shcat <<EOF
 Usage: ${0##*/} [OPTION]...
 
@@ -36,11 +36,11 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   -h | --help)
-    _usage
+    usage
     exit 0
     ;;
   *)
-    _usage
+    usage
     exit 1
     ;;
   esac

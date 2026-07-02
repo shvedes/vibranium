@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source vb-lib-core
+VERBOSE=false
 
 shcat() {
   while IFS= read -r line; do
@@ -8,7 +9,7 @@ shcat() {
   done
 }
 
-_usage() {
+usage() {
   shcat <<EOF
 Usage: ${0##*/} [OPTION]... [PACKAGE]...
 
@@ -33,6 +34,13 @@ If no PACKAGE is provided, refresh repositories and use fzf for interactive pack
 Packages are filtered to install only those not already present.
 Systemd units (services/sockets) from installed packages are detected and enabled with user prompts.
 EOF
+}
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
 }
 
 _ask_for_sudo() {
@@ -484,8 +492,12 @@ trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --help | -h)
-    _usage
-    exit
+    usage
+    exit 0
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
     ;;
   --embedded)
     EMBEDDED=true
@@ -530,17 +542,17 @@ while [[ $# -gt 0 ]]; do
   --)
     shift
     if [[ $# -eq 0 ]]; then
-      _usage
+      usage
       exit 1
     fi
     break
     ;;
   --* | -*)
-    echo "Unknown option: $1" >&2
+    log Error "Unknown option: $1"
     exit 1
     ;;
   *)
-    echo "Unexpected argument: '$1'. Use '--' to separate options from packages." >&2
+    log Error "Unexpected argument: $1. Use '--' to separate options from packages"
     exit 1
     ;;
   esac

@@ -2,12 +2,21 @@
 
 source vb-lib-core
 
+VERBOSE=false
+
 HOOK_FILE="$XDG_CONFIG_HOME/vibranium/hooks/font-change.sh"
 
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
   done
+}
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
 }
 
 usage() {
@@ -35,7 +44,7 @@ case "$1" in
   exit 0
   ;;
 -*)
-  echo "Error: Unknown option - $@" >&2
+  log Error "Unknown option - $*"
   usage >&2
   exit 1
   ;;
@@ -93,7 +102,7 @@ if [[ -n "$1" ]]; then
     selected_display="$1"
     from_arg=1
   else
-    echo "Warn: font '$1' not found in available fonts -- falling back to picker"
+    log Warn "font '$1' not found in available fonts -- falling back to picker"
     helpers::ui::menu selected_display "Search fonts" "ESC to go back" -- "${_font_display[@]}"
   fi
 else
@@ -101,7 +110,7 @@ else
 fi
 
 [[ -z "$selected_display" ]] && {
-  echo "Error: no font selected -- operation cancelled" >&2
+  log Error "no font selected -- operation cancelled"
   exit 1
 }
 
@@ -123,7 +132,7 @@ notify() {
 }
 
 if [[ "$selected_font" == "$(vb-font-get)" ]]; then
-  echo "Warn: '$selected_font' is already the default font"
+  log Warn "'$selected_font' is already the default font"
   notify "<span foreground='${ACCENT}'><b>${selected_font}</b></span> is already the default font!"
   exit 1
 fi
@@ -136,7 +145,7 @@ fi
 sed_or_append() {
   local file="$1" grep_pat="$2" sed_expr="$3" fallback="$4"
   if [[ ! -f "$file" ]]; then
-    echo "Warn: Config not found, creating: $file"
+    log Warn "Config not found, creating: $file"
     mkdir -p "$(dirname "$file")"
     printf '%s\n' "$fallback" > "$file"
     return
@@ -163,7 +172,7 @@ _toml_set_key() {
   local header="[$section]"
 
   if [[ ! -f "$file" ]]; then
-    echo "Warn: Alacritty config not found, creating: $file"
+    log Warn "Alacritty config not found, creating: $file"
     mkdir -p "$(dirname "$file")"
     printf '[%s]\n%s = "%s"\n' "$section" "$key" "$value" > "$file"
     return

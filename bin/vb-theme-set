@@ -6,7 +6,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -369,12 +369,12 @@ apply_theme() {
   fi
 
   if [[ ! -d "$src_path" ]]; then
-    echo "Error: theme folder $src_path does not exist." >&2
+    log Error "theme folder $src_path does not exist."
     exit 1
   fi
 
   if is_current_theme "$folder_name" && ! $FORCE; then
-    echo "Error: already on $chosen." >&2
+    log Error "already on $chosen."
     notify-send -r 4 -t 1500 "Theme Selector" "Already on $chosen"
     exit 1
   fi
@@ -500,7 +500,7 @@ shcat() {
   done
 }
 
-_usage() {
+usage() {
   shcat <<EOF
 Usage: $SELF [OPTION]... [THEME]
 
@@ -563,25 +563,30 @@ list_themes() {
 
 log Info "Starting theme selector"
 
-case "${1-}" in
--v | --verbose)
-  VERBOSE=true
-  shift
-  ;;
--f | --force)
-  FORCE=true
-  shift
-  ;;
--h | --help)
-  _usage
-  exit 0
-  ;;
--l | --list)
-  _discover_themes
-  list_themes
-  exit 0
-  ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -f | --force)
+    FORCE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -l | --list)
+    _discover_themes
+    list_themes
+    exit 0
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
 
 _discover_themes
 
@@ -604,7 +609,7 @@ if [[ -n "$1" ]]; then
     VARIANT="${INPUT_THEME#*-}"
 
     if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
-      echo "Error: family '$FAMILY' not found. Run '$SELF --list' to see available themes." >&2
+      log Error "family '$FAMILY' not found. Run '$SELF --list' to see available themes."
       exit 1
     fi
 
@@ -618,7 +623,7 @@ if [[ -n "$1" ]]; then
     done
 
     if ! $VARIANT_FOUND; then
-      echo "Error: variant '$VARIANT' not found in family '$FAMILY'. Run '$SELF --list' to see available themes." >&2
+      log Error "variant '$VARIANT' not found in family '$FAMILY'. Run '$SELF --list' to see available themes."
       exit 1
     fi
 
@@ -634,7 +639,7 @@ else
 
   while true; do
     FAMILY="$(pick_family "$_family_row")" || exit 1
-    [ -z "$FAMILY" ] && exit 1
+    [[ -z "$FAMILY" ]] && exit 1
 
     # Remember which row this family sits on for when we return
     _fkeys=()
@@ -672,13 +677,13 @@ else
 fi
 
 if [[ -z "$FOLDER_NAME" ]]; then
-  echo "Error: theme '$CHOSEN' could not be resolved to a folder." >&2
+  log Error "theme '$CHOSEN' could not be resolved to a folder."
   exit 1
 fi
 
 # Verify the resolved folder actually exists in at least one source location
 if [[ ! -d "$VIBRANIUM/themes/$FOLDER_NAME" && ! -d "$USER_THEMES_PATH/$FOLDER_NAME" ]]; then
-  echo "Error: theme '$CHOSEN' could not be resolved to a folder." >&2
+  log Error "theme '$CHOSEN' could not be resolved to a folder."
   exit 1
 fi
 

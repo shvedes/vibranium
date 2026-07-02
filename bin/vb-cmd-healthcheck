@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -38,7 +38,7 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   *)
-    echo "Error: unknown option: $1" >&2
+    log Error "unknown option: $1"
     usage
     exit 1
     ;;
@@ -59,4 +59,4 @@ fi
 
 # Clear the error marker so subsequent health checks don't assume the
 # installation is still broken.
-rm -f $VIBRANIUM_STATE/errors_found
+rm -f "$VIBRANIUM_STATE"/errors_found

@@ -6,7 +6,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -199,15 +199,15 @@ while (($#)); do
     exit 0
     ;;
   *)
-    echo "Error: unknown option -- $*" >&2
-    echo "Try '$SELF --help' for more information" >&2
+    log Error "unknown option -- $*"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
 done
 
 (($#)) || {
-  echo "Error: missing COMMAND after --" >&2
+  log Error "missing COMMAND after --"
   exit 1
 }
 
@@ -223,6 +223,7 @@ if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
     # shellcheck disable=SC2068
     exec setsid -f app2unit -- ${COMMAND[@]}
   else
+    # shellcheck disable=SC2068
     focus_or_launch ${COMMAND[@]}
   fi
 else

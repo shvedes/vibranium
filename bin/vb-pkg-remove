@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source vb-lib-core
+VERBOSE=false
 
 shcat() {
   while IFS= read -r line; do
@@ -8,7 +9,7 @@ shcat() {
   done
 }
 
-_usage() {
+usage() {
   shcat <<EOF
 Usage: ${0##*/} [OPTIONS]... [--] [PACKAGE]...
 
@@ -26,6 +27,13 @@ If no PACKAGE is provided, list explicitly installed packages and use fzf for in
 Packages are filtered to those installed. After removal, detects and disables any enabled systemd units
 (services/sockets) from the removed packages to clean up broken symlinks in systemd directories.
 EOF
+}
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
 }
 
 _ask_for_sudo() {
@@ -158,7 +166,7 @@ _disable_scope_units() {
         echo -e "${BLUE}[VIBRANIUM]${RESET} Disabling all units for '${GREEN}${pkg}${RESET}'..."
         for u in "${remaining[@]}"; do
           if [[ "$scope" == "user" ]]; then
-            systemctl -q --user disable ---now "$u" &
+            systemctl -q --user disable --now "$u" &
           else
             sudo systemctl -q disable --now "$u" &
           fi
@@ -382,8 +390,12 @@ trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --help | -h)
-    _usage
-    exit
+    usage
+    exit 0
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
     ;;
   --no-logo)
     NO_LOGO=true
@@ -409,13 +421,13 @@ while [[ $# -gt 0 ]]; do
   --)
     shift
     if [[ $# -eq 0 ]]; then
-      _usage
+      usage
       exit 1
     fi
     break
     ;;
   --*)
-    echo "Unknown option: $1" >&2
+    log Error "Unknown option: $1"
     exit 1
     ;;
   *)

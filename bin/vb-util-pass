@@ -12,7 +12,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -46,8 +46,8 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   *)
-    echo "Error: unknown option: $1" >&2
-    echo "Try '${0##*/} --help' for more information." >&2
+    log Error "Unknown option: $1"
+    log Error "Try '${0##*/} --help' for more information"
     exit 1
     ;;
   esac
@@ -62,6 +62,7 @@ source vb-lib-core
 # Guard: verify `pass` is installed before doing anything else.
 # If missing, offer a one-click install via a notification action button.
 if ! command -v pass >/dev/null; then
+  log Error "Password manager package is not installed"
   notify-send -r 1 -t 5000 "Password Manager" \
     "The password manager package is not installed!"
   vb-pkg-install --no-verify -- pass
@@ -199,6 +200,7 @@ prompt_valid_name() {
     # Reject names starting with a dot: prevents hidden files and guards
     # against "." or ".." as standalone names.
     if [[ "$input" == .* ]]; then
+      log Warn "Name cannot start with a dot"
       notify-send -r 3 -t 2000 "Password Manager" \
         "Name cannot start with a dot"
       continue
@@ -206,6 +208,7 @@ prompt_valid_name() {
 
     # Reject ".." anywhere in the name (e.g. "foo..bar" or the literal "..").
     if [[ "$input" =~ \.\. ]]; then
+      log Warn "Name cannot contain '..'"
       notify-send -r 3 -t 2000 "Password Manager" \
         "Name cannot contain '..'"
       continue
@@ -219,6 +222,7 @@ prompt_valid_name() {
     # before being handed to the regex engine).
     local _pvn_re='[^a-zA-Z0-9._ @-]'
     if [[ "$input" =~ $_pvn_re ]]; then
+      log Warn "Invalid characters in name"
       notify-send -r 3 -t 2000 "Password Manager" \
         "Invalid characters. Allowed: letters, numbers, space, . - _ @"
       continue
@@ -292,6 +296,7 @@ ensure_gpg_unlocked() {
   # Exit code is propagated directly to the caller:
   #   0        = decryption succeeded; key is now cached in the agent
   #   non-zero = user closed pinentry, wrong key, or agent error
+  log Info "Pre-warming GPG cache for: $password"
   gpg -q --no-tty -d "$gpg_file" >/dev/null 2>&1
   return $?
 }
@@ -350,6 +355,7 @@ async_git_push() {
   push_ret=$?
 
   if [[ $push_ret -ne 0 ]]; then
+    log Error "Push to remote failed: $output"
     notify-send -r 4 -t 5000 -u critical \
       "Password Manager" "Error pushing to remote: $output"
   fi
@@ -506,6 +512,7 @@ pick_location() {
           # Folder does not exist — create it and stay at the current level
           # so the user can see it in the listing and navigate in if desired.
           mkdir -p "$full_dir/$new_folder"
+          log Info "Created folder: $new_folder"
           notify-send -r 3 -t 2500 "Password Manager" "Folder created"
         fi
       fi
@@ -735,9 +742,11 @@ action() {
       # printf '%s' avoids appending a trailing newline to clipboard
       # content (echo would add one, which some sites reject as invalid).
       printf '%s' "$first_line" | wl-copy --sensitive --type text/plain
+      log Info "Password copied to clipboard: $password"
       notify-send -r 3 "Password Manager" "Password copied to clipboard"
       return 0
     else
+      log Error "Failed to decrypt: $password"
       notify-send -r 4 -t 3000 -u critical \
         "Password Manager" "Failed to decrypt: $password"
       return 1
@@ -753,6 +762,7 @@ action() {
     if ! ensure_gpg_unlocked "$password"; then
       # User cancelled pinentry or gpg failed. Do NOT open the terminal.
       # Returning 1 keeps us in the action menu — not a full exit.
+      log Error "Failed to unlock keyring for: $password"
       notify-send -r 4 -t 3000 -u critical \
         "Password Manager" "Failed to unlock keyring. Edit cancelled."
       return 1
@@ -793,6 +803,7 @@ action() {
     fi
 
     if [[ "$new_path" == "$password" ]]; then
+      log Warn "Same location for move, skipped: $password"
       notify-send -r 3 -t 2500 "Password Manager" "Same location, nothing to move"
       return 1
     fi
@@ -800,10 +811,12 @@ action() {
     # Paths passed as plain variables — no shell escaping needed.
     # Shell escaping is for eval/interpreter contexts, not direct arg passing.
     if pass mv "$password" "$new_path" >/dev/null; then
+      log Info "Moved password: $password -> $new_path"
       notify-send -r 3 -t 2500 -u low "Password Manager" "Password moved"
       is_git_repo && has_git_remote && async_git_push &
       return 2
     else
+      log Error "Move failed: $password -> $new_path"
       return 1
     fi
     ;;
@@ -823,10 +836,12 @@ action() {
     fi
 
     if pass mv "$password" "$new_path" >/dev/null; then
+      log Info "Renamed password: $password -> $new_path"
       notify-send -r 3 -t 2500 -u low "Password Manager" "Password renamed"
       is_git_repo && has_git_remote && async_git_push &
       return 2
     else
+      log Error "Rename failed: $password -> $new_path"
       return 1
     fi
     ;;
@@ -842,6 +857,7 @@ action() {
 
     # --force: skip pass's own "are you sure?" prompt (we confirmed above).
     if pass rm --force "$password" >/dev/null; then
+      log Info "Deleted password: $password"
       notify-send -r 3 -t 2500 -u low "Password Manager" "Password deleted"
 
       # ── EMPTY FOLDER CLEANUP ─────────────────────────────────────
@@ -915,6 +931,7 @@ action() {
           -- "Yes" "No"
 
         if [[ "$del_confirm" == "Yes" ]]; then
+          log Info "Removed empty folder: $check_dir"
           rm -rf "$full_check"
 
           # Clear stale cursor entries for the removed directory.
@@ -969,6 +986,7 @@ pick_secret_key() {
   local key_list=() chosen_key found=0 k
 
   notify-send -r 3 -t 3000 "Password Manager" "Please choose a secret key"
+  log Info "Prompting user for GPG key selection"
 
   # Parse gpg's machine-readable colon-delimited output.
   # For each "sec" (secret key primary record), the next line is "fpr"
@@ -1012,14 +1030,16 @@ initialize_password_store() {
   key_count="${#key_fingerprints[@]}"
 
   if [[ $key_count -eq 0 ]]; then
+    log Error "No GPG secret keys available"
     notify-send -r 4 -t 5000 -u critical "Password Manager" \
       "No GPG keys found. Please create one first with 'gpg --gen-key'"
     exit 1
   elif [[ $key_count -gt 1 ]]; then
     # Multiple keys: user must choose which one to use as the store key.
     # pick_secret_key writes the fingerprint into 'key' via nameref.
-    if ! pick_secret_key key; then
-      notify-send -r 4 -t 3000 -u critical "Password Manager" "Operation aborted"
+      if ! pick_secret_key key; then
+        log Warn "Key selection cancelled"
+        notify-send -r 4 -t 3000 -u critical "Password Manager" "Operation aborted"
       exit 1
     fi
   else
@@ -1030,10 +1050,12 @@ initialize_password_store() {
   mkdir -p "$PASSWORD_STORE_DIR"
 
   if pass init "$key" >/dev/null 2>&1; then
+    log Info "Password store initialized with key: $key"
     notify-send -r 3 -t 2000 -u low "Password Manager" \
       "Password store initialized successfully"
     return 0
   else
+    log Error "Password store initialization failed"
     notify-send -r 4 -t 5000 -u critical "Password Manager" \
       "Error initializing password store"
     return 1
@@ -1064,6 +1086,7 @@ search_passwords() {
     )
 
     if [[ ${#all_passwords[@]} -eq 0 ]]; then
+      log Info "No password entries in store"
       notify-send -r 3 -t 2000 "Password Manager" "No passwords in store"
       return 1
     fi
@@ -1353,8 +1376,10 @@ while true; do
           pass insert --echo "$pass_path" >/dev/null
       fi
 
+      # shellcheck disable=SC2181
       if [[ $? -eq 0 ]]; then
         printf '%s' "$entered_pw" | wl-copy --sensitive --type text/plain
+        log Info "Password saved: $pass_path"
         notify-send -r 3 "Password Manager" "Password saved and copied to clipboard"
         is_git_repo && has_git_remote && async_git_push &
         exit 0
@@ -1364,12 +1389,14 @@ while true; do
     "Generate password")
       if ((create_force)); then
         if pass generate --force -c "$pass_path" >/dev/null; then
+          log Info "Password regenerated: $pass_path"
           notify-send -r 3 "Password Manager" "Password regenerated and copied to clipboard"
           is_git_repo && has_git_remote && async_git_push &
           exit 0
         fi
       else
         if pass generate -c "$pass_path" >/dev/null; then
+          log Info "Password generated: $pass_path"
           notify-send -r 3 "Password Manager" "Password generated and copied to clipboard"
           is_git_repo && has_git_remote && async_git_push &
           exit 0
@@ -1385,14 +1412,17 @@ while true; do
     ret=$?
 
     if [[ $ret -ne 0 ]]; then
+      log Error "Push to remote failed: $output"
       notify-send -r 4 -t 5000 -u critical \
         "Password Manager" "Push failed: $output"
       exit 1
     elif [[ "$output" == *"up to date"* || "$output" == *"up-to-date"* ]]; then
       # Git's "up to date" phrasing varies across versions; match loosely.
+      log Info "Remote already up to date"
       notify-send -r 3 -t 2500 -u low "Password Manager" "Already up to date"
       exit 0
     else
+      log Info "Push to remote succeeded"
       notify-send -r 3 -t 2500 -u low "Password Manager" "Pushed successfully"
       exit 0
     fi
@@ -1403,13 +1433,16 @@ while true; do
     ret=$?
 
     if [[ $ret -ne 0 ]]; then
+      log Error "Pull from remote failed: $output"
       notify-send -r 4 -t 5000 -u critical \
         "Password Manager" "Pull failed: $output"
       exit 1
     elif [[ "$output" == *"Already up to date"* ]]; then
+      log Info "Remote already up to date"
       notify-send -r 3 -t 2500 -u low "Password Manager" "Already up to date"
       exit 0
     else
+      log Info "Pull from remote succeeded"
       notify-send -r 3 -t 2500 -u low "Password Manager" "Pulled successfully"
       exit 0
     fi

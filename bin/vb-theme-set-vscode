@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -64,6 +64,7 @@ set_theme() {
 
     # Install the required theme extension if it is not already present.
     if [[ -n $extension ]] && ! "$editor_cmd" --list-extensions 2>/dev/null | grep -Fxq "$extension"; then
+      log Info "Installing extension $extension for $editor_cmd"
       "$editor_cmd" --install-extension "$extension" >/dev/null 2>&1
     fi
 
@@ -77,17 +78,19 @@ set_theme() {
     fi
 
     # Replace the workbench.colorTheme value with the new theme name.
+    log Info "Applying theme $theme_name to $editor_cmd"
     sed -i --follow-symlinks -E "s/(\"workbench.colorTheme\"[[:space:]]*:[[:space:]]*\")[^\"]*(\")/\1$theme_name\2/" "$settings_path"
   elif [[ -f $settings_path ]]; then
     # No theme file exists: remove any workbench.colorTheme entry that
     # may have been left behind by a previous theme application.
+    log Info "Clearing theme from $editor_cmd settings"
     sed -i --follow-symlinks -E 's/\"workbench\.colorTheme\"[[:space:]]*:[^,}]*,?//' "$settings_path"
   fi
 }
 
 if [[ -f /usr/share/applications/code-oss.desktop ]]; then
   set_theme "code" "$XDG_CONFIG_HOME/Code - OSS/User/settings.json"
-elif [[ -d /usr/share/applications/code.desktop  ]]; then
+elif [[ -f /usr/share/applications/code.desktop ]]; then
   set_theme "code" "$XDG_CONFIG_HOME/Code/User/settings.json"
 fi
 

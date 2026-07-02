@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -48,8 +48,8 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   *)
-    echo "Error: unknown option: $*" >&2
-    echo "Try '${0##*/} --help' for more information" >&2
+    log Error "unknown option: $*"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
@@ -72,11 +72,24 @@ fi
 # Wait for network connectivity before querying repos.
 # 1.1.1.1 (Cloudflare DNS) is used because it is generally reachable
 # even when DNS resolution for other hosts would fail.
-while ! ping -c 1 1.1.1.1 &>/dev/null; do
+# Times out after 30 seconds to avoid hanging indefinitely.
+NETWORK_REACHABLE=false
+
+for _ in {1..30}; do
+  if ping -c 1 8.8.8.8 &>/dev/null; then
+    NETWORK_REACHABLE=true
+    break
+  fi
   sleep 1
 done
 
-checkupdates --nocolor 2>/dev/null >"$CACHE_FILE"
+if ! $NETWORK_REACHABLE; then
+  log Warn "Network not reachable after 30s, skipping update check"
+  exit 0
+fi
+
+: >"$CACHE_FILE"
+checkupdates --nocolor 2>/dev/null >>"$CACHE_FILE"
 yay -Qua --color=never 2>/dev/null >>"$CACHE_FILE"
 
 mapfile -t LINES <"$CACHE_FILE"
@@ -91,6 +104,9 @@ if ((TOTAL_COUNT >= THRESHOLD)); then
 
   if [[ -f "$TIMESTAMP_FILE" ]]; then
     TIMESTAMP_LAST=$(<"$TIMESTAMP_FILE")
+    # Validate that the stored value is a plausible Unix timestamp
+    # (within a reasonable range for the current system).
+    [[ $TIMESTAMP_LAST =~ ^[0-9]+$ ]] || TIMESTAMP_LAST=0
   fi
 
   if ((TIMESTAMP_NOW - TIMESTAMP_LAST >= INTERVAL)); then

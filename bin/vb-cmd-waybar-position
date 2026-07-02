@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -53,7 +53,7 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   *)
-    echo "Unknown option: $1" >&2
+    log Error "Unknown option: $1"
     usage
     exit 1
     ;;
@@ -61,7 +61,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$TARGET" ]]; then
-  echo "Error: missing target (--top or --bottom)" >&2
+  log Error "missing target (--top or --bottom)"
   usage
   exit 1
 fi

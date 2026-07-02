@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2015,SC2094
 
 VERBOSE=false
 SELF="${0##*/}"
@@ -12,7 +13,7 @@ STATE_ACTION=""
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -218,10 +219,10 @@ get_volume() {
   local -n result=$1
   result="0.00"
 
-  if [ "$PLAYER" = "playerctl" ]; then
+  if [[ "$PLAYER" == "playerctl" ]]; then
     # playerctl volume emits a decimal in 0-1 range.
     read -r result < <(playerctl volume 2>/dev/null)
-  elif [ "$PLAYER" = "mpd" ]; then
+  elif [[ "$PLAYER" == "mpd" ]]; then
     # mpc volume output: "vol: 75" — extract the middle field, strip the
     # trailing "%" if present, then convert 0-100 integer -> 0-1 float via
     # scientific notation (75 -> 0.75).
@@ -249,35 +250,35 @@ set_volume() {
 }
 
 play() {
-  if [ "$PLAYER" = "playerctl" ]; then
+  if [[ "$PLAYER" == "playerctl" ]]; then
     playerctl play 2>/dev/null
-  elif [ "$PLAYER" = "mpd" ]; then
+  elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q play
   fi
   STATE_PLAYER="$PLAYER"
 }
 
 pause() {
-  if [ "$PLAYER" = "playerctl" ]; then
+  if [[ "$PLAYER" == "playerctl" ]]; then
     playerctl pause 2>/dev/null
-  elif [ "$PLAYER" = "mpd" ]; then
+  elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q pause
   fi
   STATE_PLAYER="$PLAYER"
 }
 
 next_track() {
-  if [ "$PLAYER" = "playerctl" ]; then
+  if [[ "$PLAYER" == "playerctl" ]]; then
     playerctl next 2>/dev/null
-  elif [ "$PLAYER" = "mpd" ]; then
+  elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q next
   fi
 }
 
 previous_track() {
-  if [ "$PLAYER" = "playerctl" ]; then
+  if [[ "$PLAYER" == "playerctl" ]]; then
     playerctl previous 2>/dev/null
-  elif [ "$PLAYER" = "mpd" ]; then
+  elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q prev
   fi
 }
@@ -363,8 +364,8 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   *)
-    echo "Unknown argument: $*" >&2
-    echo "Try '$SELF --help' for more information" >&2
+    log Error "Unknown argument: $*"
+    log Error "Try '$SELF --help' for more information"
     exit 1
     ;;
   esac

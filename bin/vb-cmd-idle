@@ -7,7 +7,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -73,8 +73,8 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   *)
-    echo "Error: invalid option -- $*" >&2
-    echo "Try '$SELF --help' for more information." >&2
+    log Error "invalid option -- $*"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
@@ -123,8 +123,8 @@ case "$MODE" in
   ;;
 
 *)
-  echo "Error: missing option" >&2
-  echo "Try '$SELF --help' for more information." >&2
+  log Error "missing option"
+  log Error "Try --help for more information"
   exit 1
   ;;
 esac

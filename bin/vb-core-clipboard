@@ -4,19 +4,19 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
 
-_shcat() {
+shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
   done
 }
 
-_usage() {
-  _shcat <<EOF
+usage() {
+  shcat <<EOF
 Usage: ${0##*/} [OPTION]
 
 Options:
@@ -62,12 +62,12 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   -h | --help)
-    _usage
+    usage
     exit 0
     ;;
   *)
-    echo "Error: unknown option: $*" >&2
-    echo "Try '${0##*/} --help' for more information" >&2
+    log Error "unknown option: $*"
+    log Error "Try '${0##*/} --help' for more information"
     exit 1
     ;;
   esac
@@ -107,7 +107,7 @@ show)
   helpers::ui::menu chosen "Clipboard" "search..." \
     -display-columns 2 -- "${ENTRIES[@]}"
 
-  if [[ ! -z "$chosen" ]]; then
+  if [[ -n "$chosen" ]]; then
     # cliphist list entries with file:// URIs must be decoded and copied
     # as text/uri-list so Wayland compositors handle them as file transfers
     # rather than plain text. Non-URI entries are copied as plain text.
@@ -135,7 +135,7 @@ clear)
   cliphist wipe
   ;;
 *)
-  _usage
+  usage
   exit 0
   ;;
 esac

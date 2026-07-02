@@ -22,12 +22,12 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
 
-while [ "$#" -gt 0 ]; do
+while [[ $# -gt 0 ]]; do
   case "$1" in
   -v | --verbose)
     VERBOSE=true
@@ -38,13 +38,13 @@ while [ "$#" -gt 0 ]; do
     exit 0
     ;;
   -*)
-    printf "%s: invalid option -- '%s'\n" "${0##*/}" "$1" >&2
-    printf "Try '%s --help' for more information.\n" "${0##*/}" >&2
+    log Error "Invalid option: $1"
+    log Error "Try --help for more information"
     exit 1
     ;;
   *)
-    printf "%s: unexpected argument -- '%s'\n" "${0##*/}" "$1" >&2
-    printf "Try '%s --help' for more information.\n" "${0##*/}" >&2
+    log Error "Unexpected argument: $1"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
@@ -52,13 +52,12 @@ done
 
 if ! command -v fzf >/dev/null; then
   log Error "fzf is not installed"
-  printf "%s: error: fzf is not installed!" >&2
   exit 1
 fi
 
 # Auto-detect an editor if none is set. The preference order is nvim ->
 # vim -> neovide -> vi -> less, matching the most common terminal editors.
-if [ -z "$EDITOR" ]; then
+if [[ -z $EDITOR ]]; then
   log Info "EDITOR not set, detecting..."
   for ed in nvim vim neovide vi less; do
     if command -v "$ed" >/dev/null 2>&1; then
@@ -74,7 +73,7 @@ export EDITOR
 # from fzf uses the appropriate viewer. vim/nvim users get the +Man!
 # plugin integration; nano gets -v (view mode); others use the editor
 # directly as the pager.
-if [ -z "$MANPAGER" ]; then
+if [[ -z $MANPAGER ]]; then
   case "$EDITOR" in
   *nvim | *vim)
     export MANPAGER="$EDITOR +Man!"
@@ -108,7 +107,7 @@ while true; do
         --prompt="> "
   )
 
-  [ -z "$selected" ] && exit 0
+  [[ -z "$selected" ]] && exit 0
 
   # Parse the selected entry: extract page name (before paren) and section.
   # Format from man -k:  "page_name (section)"

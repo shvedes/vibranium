@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
     ACTION="get"
     shift
     ;;
-  --help)
+  -h | --help)
     usage
     exit 0
     ;;
@@ -63,8 +63,8 @@ while [[ $# -gt 0 ]]; do
     exit 1
     ;;
   *)
-    echo "Error: unknown option: $1" >&2
-    echo "Try '$SELF --help' for more information" >&2
+    log Error "unknown option: $1"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
@@ -85,27 +85,26 @@ found=0
 # and either query or set power_save on each. When running as root (e.g.
 # from a udev rule), direct access is used; otherwise sudo is prepended.
 while IFS= read -r iface; do
-  if [ "$value" = "get" ]; then
-    state=$(iw dev "$iface" get power_save 2>/dev/null) || {
-      printf "  %-12s (unable to query)\n" "$iface:" >&2
-      continue
-    }
-    printf "  %-12s %s\n" "$iface:" "$state"
+  if [[ $value == "get" ]]; then
+    if state=$(iw dev "$iface" get power_save 2>/dev/null); then
+      printf "  %-12s %s\n" "$iface:" "$state"
+      found=$((found + 1))
+    else
+      log Error "Unable to query power save on $iface"
+    fi
   else
     if ((EUID != 0)); then
-      if sudo iw dev "$iface" set power_save "$value" 2>/dev/null; then
-        found=$((found + 1))
-      fi
+      cmd=(sudo iw)
     else
-      if iw dev "$iface" set power_save "$value" 2>/dev/null; then
-        found=$((found + 1))
-      fi
+      cmd=(iw)
+    fi
+    if "${cmd[@]}" dev "$iface" set power_save "$value" 2>/dev/null; then
+      found=$((found + 1))
     fi
   fi
-  found=$((found + 1))
 done < <(iw dev | awk '/^\s+Interface / { print $2 }')
 
 if ((found == 0)); then
-  echo "no wireless interfaces found" >&2
+  log Error "No wireless interfaces found"
   exit 1
 fi

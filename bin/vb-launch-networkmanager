@@ -6,7 +6,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -39,8 +39,8 @@ case "$1" in
   ;;
 "") ;;
 *)
-  echo "Error: invalid option '$1'" >&2
-  echo "Try '$SELF --help' for more information." >&2
+  log Error "invalid option '$1'"
+  log Error "Try --help for more information"
   exit 1
   ;;
 esac

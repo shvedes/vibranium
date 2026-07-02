@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -43,14 +43,14 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     -*)
-      echo "${0##*/}: unrecognized option '$1'" >&2
-      echo "Try '${0##*/} --help' for more information." >&2
+      log Error "Unrecognized option: $1"
+      log Error "Try '${0##*/} --help' for more information."
       exit 1
       ;;
     *)
       if [[ -n "$CHANNEL" ]]; then
-        echo "${0##*/}: too many arguments" >&2
-        echo "Try '${0##*/} --help' for more information." >&2
+        log Error "Too many arguments"
+        log Error "Try '${0##*/} --help' for more information."
         exit 1
       fi
       CHANNEL="$1"
@@ -60,16 +60,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$CHANNEL" ]]; then
-  echo "${0##*/}: missing operand" >&2
-  echo "Try '${0##*/} --help' for more information." >&2
+  log Error "Missing operand"
+  log Error "Try '${0##*/} --help' for more information."
   exit 1
 fi
 
 case "$CHANNEL" in
   release | upstream | dev) ;;
   *)
-    echo "${0##*/}: invalid channel '$CHANNEL'" >&2
-    echo "Try '${0##*/} --help' for more information." >&2
+    log Error "Invalid channel: $CHANNEL"
+    log Error "Try '${0##*/} --help' for more information."
     exit 1
     ;;
 esac
@@ -87,7 +87,7 @@ notify() {
 }
 
 die() {
-  echo "${0##*/}: $*" >&2
+  log Error "$*"
   notify critical "$*"
   exit 1
 }
@@ -96,12 +96,12 @@ CURRENT="$($GIT branch --show-current)"
 
 # When on a release tag (branch name starts with "v"), skip the dirty
 # check because detached HEAD is expected and the checkout is read-only.
-if [[ ! "$CURRENT" =~ ^v ]]; then
+if [[ ! "$CURRENT" =~ ^v[0-9] ]]; then
   CHANGES="$($GIT status --porcelain | wc -l)"
 
   if ((CHANGES > 0)); then
     MSG="you have unsaved changes. Commit them first or stash them with: git stash"
-    echo "${0##*/}: $MSG" >&2
+    log Error "$MSG"
     if [[ ! -t 2 ]]; then
       notify-send -r 4 -u critical -t 7000 "Vibranium" "$MSG"
     fi
@@ -119,6 +119,7 @@ case "$CHANNEL" in
     $GIT switch --detach "$LATEST" || die "failed to switch to '$LATEST'"
 
     echo "release" > "$VIBRANIUM_STATE/update.channel"
+    log Info "Switched to release: $LATEST"
     echo "Switched to $LATEST."
     notify "" "Switched to $LATEST"
     ;;
@@ -126,6 +127,7 @@ case "$CHANNEL" in
     $GIT switch master || die "failed to switch to 'master'"
 
     echo "upstream" > "$VIBRANIUM_STATE/update.channel"
+    log Info "Switched to upstream"
     echo "Switched to upstream."
     notify "" "Switched to upstream"
     ;;
@@ -133,9 +135,9 @@ case "$CHANNEL" in
     $GIT switch dev || die "failed to switch to 'dev'"
 
     echo "dev" > "$VIBRANIUM_STATE/update.channel"
+    log Info "Switched to dev"
     echo "Switched to dev."
     notify "" "Switched to dev"
-    vb-cmd-reload --quiet
     ;;
 esac
 

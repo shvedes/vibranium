@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -17,7 +17,7 @@ shcat() {
   done
 }
 
-_usage() {
+usage() {
   shcat <<EOF
 Usage: $SELF [OPTION]
 
@@ -59,12 +59,12 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   -h | --help)
-    _usage
+    usage
     exit 0
     ;;
   *)
-    echo "Error: invalid option: $1" >&2
-    echo "Try '$SELF --help' for more information." >&2
+    log Error "invalid option: $1"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
@@ -72,14 +72,12 @@ done
 
 log Info "Action: $action"
 
-device="$(
-  hyprctl -j devices |
-    jq -r '.keyboards[] | select(.main == true) | .name'
-)"
+devices_json="$(hyprctl -j devices)"
+device="$(jq -r '.keyboards[] | select(.main == true) | .name' <<<"$devices_json")"
 
 if [[ -z "$device" ]]; then
   log Error "no main keyboard found"
-  echo "Error: no main keyboard found" >&2
+  log Error "no main keyboard found"
 
   if command -v notify-send >/dev/null 2>&1; then
     notify-send -r 4 -t 3000 -u critical \
@@ -92,18 +90,14 @@ fi
 
 log Info "Switching layout on $device to $action"
 if ! hyprctl -q switchxkblayout "$device" "$action"; then
-  echo "Error: failed to switch keyboard layout" >&2
+  log Error "failed to switch keyboard layout"
   exit 1
 fi
 
-# Query the active keymap after switching for the notification. A second
-# hyprctl call is needed here because switchxkblayout does not return the
-# new layout and the cached value from the first call would be stale.
+# Re-query devices after switching — the cached JSON from before the
+# switch still holds the old keymap and would produce a stale notification.
 if $NOTIFY; then
-  layout="$(
-    hyprctl -j devices |
-      jq -r '.keyboards[] | select(.main == true) | .active_keymap'
-  )"
+  layout="$(hyprctl -j devices | jq -r '.keyboards[] | select(.main == true) | .active_keymap')"
 
   notify-send -r 4 -t 3000 "Keyboard Layout: $layout"
 fi

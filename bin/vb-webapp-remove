@@ -1,5 +1,14 @@
 #!/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 source vb-lib-core
 
 DESKTOP_DIR="$XDG_DATA_HOME/applications"
@@ -50,14 +59,14 @@ _operation_complete() {
   term::enable_input
 }
 
-_shcat() {
+shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
   done
 }
 
-_usage() {
-  _shcat <<'EOF'
+usage() {
+  shcat <<'EOF'
 Usage: vb-webapp-remove [OPTION]...
 
 Remove Progressive Web App shortcuts as .desktop launcher entries.
@@ -131,7 +140,8 @@ _remove_pwa() {
   # the Exec= line regardless of other flags between the command and the URL.
   if [[ "$exec_line" == *--own-profile* ]]; then
     local url="${exec_line##* }"
-    local data_dir="$WEBAPP_DATA_DIR/$(_profile_dir_from_url "$url")"
+    local data_dir
+    data_dir="$WEBAPP_DATA_DIR/$(_profile_dir_from_url "$url")"
     if [[ -d "$data_dir" ]]; then
       rm -rf -- "$data_dir"
       echo "${GREEN}[VIBRANIUM]${RESET} Removed browser data for ${BLUE}${name}${RESET}"
@@ -141,7 +151,7 @@ _remove_pwa() {
   if [[ "$removed" == true ]]; then
     echo "${GREEN}[VIBRANIUM]${RESET} Removed ${BLUE}${name}${RESET}"
   else
-    echo "No such PWA: ${BLUE}${name}${RESET}" >&2
+    log Error "No such PWA: $name"
   fi
 }
 
@@ -151,7 +161,7 @@ INTERACTIVE=true
 while [[ $# -gt 0 ]]; do
   case "$1" in
   -h | --help)
-    _usage
+    usage
     exit 0
     ;;
 
@@ -159,14 +169,14 @@ while [[ $# -gt 0 ]]; do
     INTERACTIVE=false
     shift
     if [[ $# -eq 0 ]]; then
-      echo "${RED}[VIBRANIUM]${RESET} Error: --file requires at least one .desktop file argument" >&2
-      echo "Try ${0##*/} --help for more information" >&2
+      log Error "--file requires at least one .desktop file argument"
+      log Error "Try --help for more information"
       exit 1
     fi
     while [[ $# -gt 0 && "$1" != -* ]]; do
       if [[ "$1" != *.desktop ]]; then
-        echo "${RED}[VIBRANIUM]${RESET} Error: not a .desktop file: $1" >&2
-        echo "Try ${0##*/} --help for more information" >&2
+        log Error "Not a .desktop file: $1"
+        log Error "Try --help for more information"
         exit 1
       fi
       DESKTOP_FILES+=("$1")
@@ -175,8 +185,8 @@ while [[ $# -gt 0 ]]; do
     ;;
 
   *)
-    echo "Unknown option: $1" >&2
-    echo "${0##*/} --help for more information" >&2
+    log Error "Unknown option: $1"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
@@ -233,13 +243,13 @@ else
     [[ "$file_arg" == */* ]] && desktop_path="$file_arg" || desktop_path="$DESKTOP_DIR/$file_arg"
 
     if [[ ! -f "$desktop_path" ]]; then
-      echo "No such file: $file_arg" >&2
+      log Error "No such file: $file_arg"
       continue
     fi
 
     filename="${desktop_path##*/}"
     if [[ "$filename" != PWA\ -\ *.desktop ]]; then
-      echo "Warning: not a PWA file: $filename" >&2
+      log Warn "not a PWA file: $filename"
       continue
     fi
 

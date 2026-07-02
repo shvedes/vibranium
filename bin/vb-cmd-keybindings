@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -120,36 +120,14 @@ parse_bindings() {
 
 by_index() {
   local desc="$1"
-  hyprctl -j binds |
-    jq -r --arg d "$desc" '
-	  def modmap(x):
-		if x == 0 then ""
-		elif x == 1 then "SHIFT"
-		elif x == 4 then "CTRL"
-		elif x == 5 then "SHIFT CTRL"
-		elif x == 8 then "ALT"
-		elif x == 9 then "SHIFT ALT"
-		elif x == 12 then "CTRL ALT"
-		elif x == 13 then "SHIFT CTRL ALT"
-		elif x == 64 then "SUPER"
-		elif x == 65 then "SUPER SHIFT"
-		elif x == 68 then "SUPER CTRL"
-		elif x == 69 then "SUPER SHIFT CTRL"
-		elif x == 72 then "SUPER ALT"
-		elif x == 73 then "SUPER SHIFT ALT"
-		elif x == 76 then "SUPER CTRL ALT"
-		elif x == 77 then "SUPER SHIFT CTRL ALT"
-		else x|tostring end;
-
-	  [.[] | select(.description == $d)] as $matches |
-	  if ($matches | length) == 0 then
-		"No keybindings found for: " + $d
-	  else
-		($matches | to_entries[] | "\(.key + 1). " +
-		  ((modmap(.value.modmask) + " " + (.value.key // "")) | gsub("^ +| +$";""))
-		)
-	  end
-	'
+  dynamic_bindings | awk -F, -v d="$desc" '
+    $3 == d {
+      gsub(/@.*/, "", $2)
+      count++
+      printf "%d. %s %s\n", count, $1, $2
+    }
+    END { if (count == 0) print "No keybindings found for: " d }
+  '
 }
 
 while [[ $# -gt 0 ]]; do
@@ -169,7 +147,7 @@ while [[ $# -gt 0 ]]; do
   --index | -i)
     shift
     if [[ $# -eq 0 ]]; then
-      echo "Error: --index requires an argument" >&2
+      log Error "--index requires an argument"
       exit 1
     fi
     log Info "Looking up keybinding: $1"
@@ -183,6 +161,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 log Info "Opening interactive keybinding browser"
+
 dynamic_bindings | sort -u | parse_bindings | rofi -dmenu -sync \
   -theme-str 'entry { placeholder: " search shortucts"; }' \
   -theme-str 'listview { lines: 20; columns: 1; }' \

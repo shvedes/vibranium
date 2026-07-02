@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -32,14 +32,14 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
   --name)
-    [[ $# -ge 2 ]] || usage
+    if [[ $# -lt 2 ]]; then usage; exit 1; fi
     NAME=$2
     shift 2
     ;;
   --deps)
     shift
     if [[ $# -eq 0 || $1 == --* ]]; then
-      echo "Error: expected at least one dependency after --deps" >&2
+      log Error "expected at least one dependency after --deps"
       exit 1
     fi
     # Collect all arguments following --deps until the next flag (--*)
@@ -55,9 +55,10 @@ while [[ $# -gt 0 ]]; do
     ;;
   -h | --help | "")
     usage
+    exit 0
     ;;
   *)
-    echo "Error: unknown argument: $1" >&2
+    log Error "unknown argument: $1"
     usage
     exit 1
     ;;
@@ -65,12 +66,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z $NAME ]]; then
-  echo "Error: expected --name, got nothing" >&2
+  log Error "expected --name, got nothing"
   exit 1
 fi
 
 if [[ ${#DEPS[@]} -eq 0 ]]; then
-  echo "Error: expected --deps, got nothing" >&2
+  log Error "expected --deps, got nothing"
   exit 1
 fi
 

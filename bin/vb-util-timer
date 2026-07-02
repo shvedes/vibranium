@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -57,7 +57,7 @@ cleanup() {
   vb-refresh-waybar-module timer
 
   kill $(pgrep -f -- '--who=Timer')
-  kill -s KILL "$paplay_pid" &>/dev/null
+  [[ -n "$paplay_pid" ]] && kill -s KILL "$paplay_pid" &>/dev/null
   exit 0
 }
 
@@ -65,7 +65,7 @@ trap cleanup EXIT INT TERM
 
 # If another timer instance is already counting down, kill it and start
 # fresh.  The --why=Timer argument is set by systemd-inhibit below.
-if pgrep -f -- '--why=Timer' >/dev/null; then
+if pgrep -f -- '--who=Timer' >/dev/null; then
   cleanup
 fi
 
@@ -116,6 +116,7 @@ fi
 # setsid detaches the inhibit process from the terminal so it survives
 # the script's exit.
 setsid -f systemd-inhibit --what=idle --why="Sleep is inhibited because of the active timer" --who="Timer" sleep "$sleep_time"
+log Info "Timer started: ${sleep_time}s"
 
 # Countdown loop: write remaining seconds to the state file every tick
 # and signal waybar to re-read it.  sleep 1 & wait avoids accumulating
@@ -131,6 +132,7 @@ done
 
 echo "timed out" >"$state"
 vb-refresh-waybar-module timer
+log Info "Timer expired"
 
 # Play the alarm sound in a loop until the user kills this script
 # (cleanup traps INT/TERM and stops paplay via the saved PID).

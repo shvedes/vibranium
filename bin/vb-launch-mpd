@@ -7,7 +7,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -54,12 +54,11 @@ case "$1" in
 esac
 
 if ! command -v mpd >/dev/null; then
-  echo "Error: MPD is not installed" >&2
+  log Error "MPD is not installed"
   exit 1
 fi
 
 CLIENT=""
-REQUESTED_CLIENT=""
 
 case "$1" in
 -v | --verbose)
@@ -79,8 +78,8 @@ case "$1" in
   ;;
 "") ;;
 *)
-  echo "Error: unknown option -- $*" >&2
-  echo "Try '$SELF --help' for more information." >&2
+  log Error "Unknown option: $*"
+  log Error "Try --help for more information"
   exit 1
   ;;
 esac
@@ -91,7 +90,7 @@ if [[ -n "$REQUESTED_CLIENT" ]]; then
   if command -v "$REQUESTED_CLIENT" >/dev/null 2>&1; then
     CLIENT="$REQUESTED_CLIENT"
   else
-    echo "Error: '$REQUESTED_CLIENT' is not installed" >&2
+    log Error "'$REQUESTED_CLIENT' is not installed"
     exit 1
   fi
 else
@@ -106,7 +105,7 @@ fi
 
 if [[ -z "$CLIENT" ]]; then
   log Warn "No MPD client found"
-  [[ -t 2 ]] && echo "Could not find installed MPD client" >&2
+  [[ -t 2 ]] && log Error "Could not find installed MPD client"
   notify-send -r 4 -t 3000 "Vibranium" "Could not find installed MPD client!"
   exit 1
 fi

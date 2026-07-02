@@ -6,7 +6,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -104,7 +104,7 @@ while (($#)); do
     ;;
   --app-id)
     [[ -n "$2" ]] || {
-      echo "Error: missing value for --app-id" >&2
+      log Error "missing value for --app-id"
       exit 1
     }
     APP_ID="$2"
@@ -116,7 +116,7 @@ while (($#)); do
     ;;
   --title)
     [[ -n "$2" ]] || {
-      echo "Error: missing value for --title" >&2
+      log Error "missing value for --title"
       exit 1
     }
     TITLE="$2"
@@ -135,15 +135,15 @@ while (($#)); do
     exit 0
     ;;
   *)
-    echo "Error: unknown option -- $*" >&2
-    echo "Try '$SELF --help' for more information" >&2
+    log Error "unknown option -- $*"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
 done
 
 if ! (($#)); then
-  echo "Error: missing COMMAND after --" >&2
+  log Error "missing COMMAND after --"
   exit 1
 fi
 

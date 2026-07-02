@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# shellcheck disable=SC2086
+# shellcheck disable=SC2086,SC2154
 # overcomplicated launcher based on rofi, which can:
 # - launch applications
 # - open local files in default applications
@@ -18,7 +18,7 @@ VERBOSE=false
 log() {
   local level="$1"
   shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -88,7 +88,7 @@ _handle_keyword() {
     if [[ "$input" == "$keyword" ]]; then
       log Info "Keyword matched: $keyword -> $action"
       if ! eval "$action"; then
-        printf "Keyword '$keyword' returned non zero exit code!\n" >&2
+        log Error "Keyword '$keyword' returned non zero exit code!"
         exit 1
       fi
       return 0
@@ -178,10 +178,12 @@ case "$MODE" in
     -theme-str 'element-icon {enabled: true;}'
   )
 
+  LAUNCHER_MODE="${MODE/--/}"
+
   if [[ "$AUTO_SELECT" == true ]]; then
     # Don't enable auto-select for Power menu: accidentally confirming a
     # power action (logout, reboot) on single-result display is dangerous.
-    if [[ "$LAUNCHER_MODE" =~ ^--(default|ai|web|pwa)$ ]]; then
+    if [[ "$LAUNCHER_MODE" =~ ^(ai|web|pwa)$ ]]; then
       OPT_ARGS+=(-auto-select true)
     fi
   fi
@@ -200,8 +202,6 @@ case "$MODE" in
     OPT_ARGS+=(-drun-categories AI -display-drun "AIs")
     ;;
   esac
-
-  LAUNCHER_MODE="${MODE/--/}"
   ;;
 *)
   SHOW_WEBAPPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"

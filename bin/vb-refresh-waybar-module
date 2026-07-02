@@ -1,5 +1,14 @@
 #!/bin/bash
 
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -19,6 +28,10 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   -h | --help)
     usage
     exit 0
@@ -44,7 +57,7 @@ for file in "$XDG_CONFIG_HOME"/waybar/modules/custom-*.jsonc; do
     name="${file##*/}"     # remove path
     name="${name%.jsonc}"  # remove file extension
     name="${name#custom-}" # remove prefix
-    sig="${line//[^0-9]/}" # keep kill signals only
+    [[ $line =~ \"signal\":[[:space:]]*([0-9]+) ]] && sig="${BASH_REMATCH[1]}" || sig=""
 
     signals["$name"]="$sig"
   done <"$file"
@@ -53,10 +66,10 @@ done
 module_name="${1/custom-/}"
 module_signal="${signals[$module_name]}"
 
-if [ -n "$module_signal" ]; then
+if [[ -n "$module_signal" ]]; then
   kill -RTMIN+"$module_signal" "$waybar_pid"
   kill -RTMIN+"${signals[dynamic-separator]}" "$waybar_pid"
 else
-  echo "Unknown module: $module_name" >&2
+  log Error "Unknown module: $module_name"
   exit 1
 fi

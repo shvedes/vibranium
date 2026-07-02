@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -28,17 +28,11 @@ EOF
 }
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
-  [[ -t 1 ]] && echo "Not available in a VM!" >&2
+  log Error "Not available in a VM"
   notify-send -r 4 -t 3000 -u critical "Print Manager" \
     "This feature is not available in a VM!"
   exit 1
 fi
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -79,21 +73,21 @@ have_inkscape=false
 command -v libreoffice &>/dev/null && have_libreoffice=true
 command -v inkscape &>/dev/null && have_inkscape=true
 
-  if ! systemctl -q is-active cups.service; then
-    notify-send -r 4 -u critical -t 20000 "Print System Service Is Not Running" \
-      "Enable with 'systemctl enable --now cups.service'"
-    exit 1
-  fi
+if ! systemctl -q is-active cups.service; then
+  notify-send -r 4 -u critical -t 20000 "Print System Service Is Not Running" \
+    "Enable with 'systemctl enable --now cups.service'"
+  exit 1
+fi
 
-  # Determine the system default printer via lpstat -d.
-  # The LANG override ensures English output for the string match.
-  # Format: "system default destination: <printer_name>"
-  lpstat_out=$(env LANG="en_US.UTF-8" lpstat -d 2>/dev/null)
-  default_printer=""
+# Determine the system default printer via lpstat -d.
+# The LANG override ensures English output for the string match.
+# Format: "system default destination: <printer_name>"
+lpstat_out=$(env LANG="en_US.UTF-8" lpstat -d 2>/dev/null)
+default_printer=""
 
-  if [[ "$lpstat_out" == *"system default destination:"* ]]; then
-    default_printer="${lpstat_out#*system default destination: }"
-  fi
+if [[ "$lpstat_out" == *"system default destination:"* ]]; then
+  default_printer="${lpstat_out#*system default destination: }"
+fi
 
 if [[ -z "$default_printer" ]]; then
   notify-send -r 4 -u critical -t 10000 "No Default Printer Found" \
@@ -177,7 +171,10 @@ print_file() {
   esac
 
   # Send the file to the default printer.
-  lp -d "$default_printer" "$to_print" &>/dev/null
+  if ! lp -d "$default_printer" "$to_print" &>/dev/null; then
+    log Error "failed to print $to_print"
+    return 1
+  fi
 }
 
 # Queue handling

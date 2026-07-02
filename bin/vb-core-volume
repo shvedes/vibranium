@@ -11,7 +11,7 @@ shcat() {
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -227,7 +227,7 @@ set_volume() {
   fi
 
   if ! [[ "$int_val" =~ ^[0-9]+$ ]] || ((int_val < 0 || int_val > max_volume)); then
-    echo "Error: invalid volume value '${1}' (expected integer 0-${max_volume})" >&2
+    log Error "invalid volume value '${1}' (expected integer 0-${max_volume})"
     exit 1
   fi
 
@@ -344,7 +344,7 @@ feedback() {
     esac
 
     if [[ ! -d "$dir" ]]; then
-      echo "Error (${FUNCNAME[0]}): $dir does not exist! Using the default one!" >&2
+      log Error "${FUNCNAME[0]}: $dir does not exist! Using the default one!"
       dir="/usr/share/sounds/freedesktop/stereo"
     fi
 
@@ -398,8 +398,8 @@ while [[ $# -gt 0 ]]; do
     ;;
   --volume)
     if [[ -z "$2" || "$2" == --* ]]; then
-      echo "Error: option '--volume' requires an argument" >&2
-      echo "Try '$SELF --help' for more information." >&2
+      log Error "option '--volume' requires an argument"
+      log Error "Try '$SELF --help' for more information."
       exit 1
     fi
     action="vol-set"
@@ -411,13 +411,13 @@ while [[ $# -gt 0 ]]; do
     break
     ;;
   -*)
-    echo "Error: unrecognized option '$1'" >&2
-    echo "Try '$SELF --help' for more information." >&2
+    log Error "unrecognized option '$1'"
+    log Error "Try '$SELF --help' for more information."
     exit 1
     ;;
   *)
-    echo "Error: unexpected argument '$1'" >&2
-    echo "Try '$SELF --help' for more information." >&2
+    log Error "unexpected argument '$1'"
+    log Error "Try '$SELF --help' for more information."
     exit 1
     ;;
   esac
@@ -425,8 +425,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$action" ]]; then
-  echo "Error: no action specified" >&2
-  echo "Try '$SELF --help' for more information." >&2
+  log Error "no action specified"
+  log Error "Try '$SELF --help' for more information."
   exit 1
 fi
 

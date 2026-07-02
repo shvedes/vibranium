@@ -6,7 +6,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -155,8 +155,8 @@ while [[ $# -gt 0 ]]; do
     break
     ;;
   --* | -*)
-    echo "Error: unknown option: $1" >&2
-    echo "Try '$SELF --help' for more information" >&2
+    log Error "unknown option: $1"
+    log Error "Try --help for more information"
     exit 1
     ;;
   *)
@@ -167,8 +167,8 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $# -lt 1 ]]; then
-  echo "Error: missing URL" >&2
-  echo "Try '$SELF --help' for more information" >&2
+  log Error "missing URL"
+  log Error "Try --help for more information"
   exit 1
 fi
 
@@ -222,7 +222,6 @@ WEBAPP_DATA_DIR="$XDG_DATA_HOME/webapps"
 
 browser_cmd=("${execs[0]}" --app="$URL")
 if [[ $OWN_PROFILE == true ]]; then
-  local profile_dir
   profile_dir="$(_profile_dir_from_url "$URL")"
   log Info "Own profile enabled, data dir: $WEBAPP_DATA_DIR/$profile_dir"
   browser_cmd+=(--user-data-dir="$WEBAPP_DATA_DIR/$profile_dir")

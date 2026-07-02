@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -55,16 +55,28 @@ mpd_music_dir() {
   printf '%s\n' "$dir"
 }
 
-mpd_is_playing() {
-  while read -r line; do
-    case "$line" in
-      *"[playing]"*|*"[paused]"*)
-        return 0
-        ;;
-    esac
-  done < <(mpc status 2>/dev/null)
+# Decode %XX sequences back to their original bytes. Replaces % with \x
+# and lets printf '%b' interpret the resulting escape sequences.
+_url_decode() {
+  local str="$1"
+  printf '%b\n' "${str//%/\\x}"
+}
 
-  return 1
+# URL-encode a string for use in a URI path by converting each byte
+# outside the RFC 3986 unreserved set to %XX.
+_url_encode() {
+  local str="$1" c i
+  for ((i = 0; i < ${#str}; i++)); do
+    c="${str:i:1}"
+    case "$c" in
+      [a-zA-Z0-9./_~-]) printf '%s' "$c" ;;
+      *) printf '%%%02X' "'$c" ;;
+    esac
+  done
+}
+
+mpd_is_playing() {
+  [[ "$(mpc status %state% 2>/dev/null)" == "playing" ]]
 }
 
 notify=false
@@ -84,8 +96,8 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   *)
-    echo "$SELF: invalid option '$1'" >&2
-    echo "Try '$SELF --help' for more information." >&2
+    log Error "Invalid option: $1"
+    log Error "Try --help for more information"
     exit 1
     ;;
   esac
@@ -103,14 +115,15 @@ if command -v mpc >/dev/null && [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] && mpd_is_p
   music_dir="$(mpd_music_dir)"
 
   if [[ -n "$track" && -n "$music_dir" ]]; then
-    file="file://$music_dir/$track"
+    file="file://$(_url_encode "$music_dir/$track")"
   fi
+
 elif playerctl status &>/dev/null; then
   file="$(playerctl metadata --format '{{xesam:url}}' 2>/dev/null)"
 fi
 
 if [[ -z "$file" ]]; then
-  echo "Error: no track currently playing" >&2
+  log Error "no track currently playing"
   if [[ "$notify" == true ]]; then
     notify-send -u critical -t 3000 -r 4 "Vibranium" "No track currently playing"
   fi
@@ -123,7 +136,7 @@ if [[ "$notify" == true ]]; then
   if [[ "$file" =~ ^https?:// ]]; then
     msg="Link copied to clipboard"
   else
-    msg="<i><b>${file##*/}</b></i> copied to clipboard"
+    msg="<i><b>$(_url_decode "${file##*/}")</b></i> copied to clipboard"
   fi
   notify-send -r 3 "Vibranium" "$msg"
 fi

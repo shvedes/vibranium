@@ -31,7 +31,7 @@ done
 # GTK4 -- write user override, applies on next app restart
 mkdir -p "$XDG_CONFIG_HOME/gtk-4.0"
 shcat >"$XDG_CONFIG_HOME/gtk-4.0/gtk.css" <<-EOF
-"$(<"$GTK_THEME")"
+$(<"$GTK_THEME")
 EOF
 
 # Alternate between slots to bust GTK3 cache

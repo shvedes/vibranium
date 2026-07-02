@@ -36,11 +36,10 @@ shcat() {
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
-
 
 usage() {
   shcat <<EOF
@@ -72,7 +71,7 @@ while [[ $# -gt 0 ]]; do
   --set)
     # --set requires a following integer in the range 0-100
     if [[ ! "$2" =~ ^[0-9]+$ ]] || (($2 < 0 || $2 > 100)); then
-      echo "Error: --set requires an integer between 0 and 100" >&2
+      log Error "--set requires an integer between 0 and 100"
       exit 1
     fi
     ACTION="$1"
@@ -92,8 +91,8 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   *)
-    echo "Error: unknown option: $*" >&2
-    echo "Try '$SELF --help' for more information" >&2
+    log Error "unknown option: $*"
+    log Error "Try '$SELF --help' for more information"
     exit 1
     ;;
   esac
@@ -109,7 +108,7 @@ fi
 # flock -n returns nonzero when another instance holds the lock, so we
 # exit silently — the running instance will handle the request.
 exec 9>"$LOCKFILE" || {
-  echo "Error: another instance of $SELF is already running!" >&2
+  log Error "another instance of $SELF is already running!"
   exit 1
 }
 flock -n 9 || exit 0
@@ -129,8 +128,6 @@ helpers::check \
 # updating one field never clobbers the other.
 STATE_FILE="$VIBRANIUM_STATE/monitors"
 
-# Load the unified state into the bus_map / level_map associative arrays.
-# Caller must declare them. Returns nothing useful; just populates the maps.
 # Load the unified state into the bus_map / level_map associative arrays.
 # Caller must declare them. Returns nothing useful; just populates the maps.
 load_state() {
@@ -394,7 +391,7 @@ if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
   # In this case, we need to create a mini-algorithm that will calculate and record valid values for the monitor and use them.
   ddcutil_flags=(--sleep-multiplier 0.13 --noverify --skip-ddc-checks --maxtries 1,1,1)
 else
-  if [[ -n "$ACTIVE_MONITOR" && ! "$ACTIVE_MONITOR" =~ ^eDP* ]]; then
+  if [[ -n "$ACTIVE_MONITOR" && ! "$ACTIVE_MONITOR" =~ ^eDP ]]; then
     method="ddc"
     set_i2c_bus I2C_BUS
   else
@@ -446,14 +443,15 @@ case "$method" in
   case "$ACTION" in
   "--up")
     if ((GAMMA < 100)); then
-      # Gamma recovery: increase gamma toward 100 before raising hardware
-      # brightness.  Both ranges use the same step granularity.
       new_gamma=$((GAMMA + step))
       ((new_gamma > 100)) && new_gamma=100
       apply_gamma "$new_gamma"
       save_gamma "$new_gamma"
       GAMMA=$new_gamma
       log Info "Gamma raised to $GAMMA (brightness unchanged at $current)"
+      if ((GAMMA == 100)); then
+        new=$current
+      fi
     else
       ((current == 100)) && exit 0
       new=$((current + step))
@@ -462,7 +460,6 @@ case "$method" in
     ;;
   "--down")
     if ((current == 0 && GAMMA > GAMMA_MIN)); then
-      # Hardware at minimum; transition to gamma dimming below 100%.
       new_gamma=$((GAMMA - step))
       ((new_gamma < GAMMA_MIN)) && new_gamma=$GAMMA_MIN
       apply_gamma "$new_gamma"
@@ -501,7 +498,7 @@ case "$method" in
     # Gamma dimming active — swayosd OSD only covers 0-100, so use
     # notify-send with the effective "below zero" caption.
     if ((FULLSCREEN_STATE == 2)); then
-      exit
+      exit 0
     fi
     if [[ "$QUIET" == false ]]; then
       dim_bar=$(( (GAMMA - GAMMA_MIN) * 100 / (100 - GAMMA_MIN) ))
@@ -522,7 +519,7 @@ case "$method" in
       # We don't apply this rule to OSD notifications because
       # it defeats the purpose of OSDs
       if ((FULLSCREEN_STATE == 2)); then
-        exit
+        exit 0
       fi
 
       if [[ "$QUIET" == false ]]; then
@@ -564,15 +561,19 @@ case "$method" in
     case "$ACTION" in
     "--up")
       if ((GAMMA < 100)); then
-        # Gamma recovery: raise gamma toward 100 before touching hardware.
         new_gamma=$((GAMMA + step))
         ((new_gamma > 100)) && new_gamma=100
         apply_gamma "$new_gamma"
         save_gamma "$new_gamma"
         GAMMA=$new_gamma
         log Info "Gamma raised to $GAMMA (brightness unchanged at $current)"
+        if ((GAMMA == 100)); then
+          new_pct=$current
+          new_raw=$(((new_pct * max_raw + 99) / 100))
+        fi
       else
-        new_pct=$(((current / step + 1) * step))
+        new_pct=$((current + step))
+        ((new_pct > 100)) && new_pct=100
         new_raw=$(((new_pct * max_raw + 99) / 100))
       fi
       ;;
@@ -586,7 +587,8 @@ case "$method" in
         GAMMA=$new_gamma
         log Info "Gamma lowered to $GAMMA (brightness at minimum)"
       else
-        new_pct=$(((current - 1) / step * step))
+        new_pct=$((current - step))
+        ((new_pct < 0)) && new_pct=0
         new_raw=$(((new_pct * max_raw + 99) / 100))
       fi
       ;;

@@ -1,10 +1,11 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 
 VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -85,7 +86,7 @@ read_state100() {
     fi
   fi
 
-  ref="$v"
+  : "${ref:="$v"}"
 }
 
 # Persist the zoom level as a x100 integer. When zoom is reset to 1.00
@@ -111,7 +112,7 @@ write_state100() {
 # only sets zoom_factor; no_warps remains at the user's global default.
 apply_zoom100() {
   local new100="$1"
-  local new_float no_warps
+  local new_float
 
   _from_int100 new_float "$new100"
 
@@ -130,7 +131,7 @@ while (($#)); do
     ;;
   -v | --zoom-value)
     [[ -n "$2" ]] || {
-      echo "Error: --zoom-value requires a value" >&2
+      log Error "--zoom-value requires a value"
       exit 1
     }
 
@@ -144,7 +145,7 @@ while (($#)); do
     ;;
   -s | --step)
     [[ -n "$2" ]] || {
-      echo "Error: --step requires a value" >&2
+      log Error "--step requires a value"
       exit 1
     }
 
@@ -168,15 +169,15 @@ while (($#)); do
     shift
     ;;
   *)
-    echo "Error: unknown option -- $1" >&2
-    echo "Try '$SELF --help' for more information" >&2
+    log Error "unknown option -- $1"
+    log Error "Try '$SELF --help' for more information"
     exit 1
     ;;
   esac
 done
 
 if [[ -z "$ACTION" ]]; then
-  usage >&2
+  usage
   exit 1
 fi
 
@@ -185,7 +186,7 @@ log Info "Action: $ACTION, step: $STEP"
 _to_int100 step100 "$STEP"
 
 if ((step100 <= 0)); then
-  printf "Invalid step value: %s (must be > 0)\n" "$STEP" >&2
+  log Error "Invalid step value: $STEP (must be > 0)"
   exit 2
 fi
 
@@ -193,7 +194,7 @@ if [[ "$ACTION" == "set" ]]; then
   _to_int100 zoom100 "$ZOOM_VALUE"
 
   if ((zoom100 < 100)); then
-    printf "Invalid zoom value: %s (must be >= 1.00)\n" "$ZOOM_VALUE" >&2
+    log Error "Invalid zoom value: $ZOOM_VALUE (must be >= 1.00)"
     exit 2
   fi
 fi
@@ -215,9 +216,8 @@ reset)
   new100=100
   ;;
 *)
-  usage >&2
+  usage
   exit 1
-  ;;
 esac
 
 log Info "Zoom: $(printf '%d.%02d' $((current100 / 100)) $((current100 % 100))) -> $(printf '%d.%02d' $((new100 / 100)) $((new100 % 100)))"

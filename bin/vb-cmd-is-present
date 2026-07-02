@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -52,7 +52,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ $# -eq 0 ]]; then
-  echo "Error: missing package arguments" >&2
+  log Error "missing package arguments"
   usage
   exit 1
 fi

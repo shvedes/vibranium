@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -41,8 +41,8 @@ fi
 
 # Reject excess positional args before touching options.
 if [[ $# -gt 1 ]]; then
-  echo "Error: too many arguments. Expected at most one FILE." >&2
-  echo "Try '${0##*/} --help' for more information." >&2
+  log Error "too many arguments. Expected at most one FILE."
+  log Error "Try --help for more information"
   exit 1
 fi
 
@@ -56,8 +56,8 @@ case "$1" in
   exit 0
   ;;
 -?*)
-  echo "Error: unknown option '$1'." >&2
-  echo "Try '${0##*/} --help' for more information." >&2
+  log Error "unknown option '$1'."
+  log Error "Try --help for more information"
   exit 1
   ;;
 esac
@@ -76,7 +76,7 @@ if [[ $# -eq 1 ]]; then
 else
   if ! command -v zenity >/dev/null; then
     [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Editor" --deps zenity
-    echo "Error: no image file provided and zenity not available." >&2
+    log Error "no image file provided and zenity not available."
     exit 1
   fi
 
@@ -89,12 +89,12 @@ else
 fi
 
 if [[ ! -f "$image" ]]; then
-  echo "Error: '$image' is not a valid file." >&2
+  log Error "'$image' is not a valid file."
   exit 1
 fi
 
 if [[ ! "$image" =~ \.(png|jpg|jpeg|ppm|webp)$ ]]; then
-  echo "Error: '$image' does not have a supported image extension." >&2
+  log Error "'$image' does not have a supported image extension."
   exit 1
 fi
 

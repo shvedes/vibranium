@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -31,34 +31,33 @@ Options:
 EOF
 }
 
-while (($#)); do
+while [[ $# -gt 0 ]]; do
   case "$1" in
   -h | --help)
     usage
-    exit
+    exit 0
     ;;
-   -v | --verbose)
-       VERBOSE=true
-       shift
-       ;;
-   -q | --quiet)
-       QUIET=true
-       shift
-       ;;
-   -*)
-    echo "Error: unknown option: $1" >&2
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -q | --quiet)
+    QUIET=true
+    shift
+    ;;
+  -*)
+    log Error "unknown option: $1"
     exit 1
     ;;
   *)
     break
     ;;
   esac
-  shift
 done
 
 source vb-lib-core
 
-album_art="/tmp/$SELF.album-art"
+album_art="$VIBRANIUM_RUNTIME/$SELF.album-art"
 state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
 
 pc_status="$(playerctl status 2>/dev/null || true)"
@@ -91,7 +90,7 @@ elif [[ -f "$state_file" ]]; then
     ;;
   esac
 else
-  echo "No active players" >&2
+  log Error "No active players"
   exit 1
 fi
 
