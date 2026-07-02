@@ -99,7 +99,8 @@ get_wallpaper() {
 # backgrounds directory. Returns the selected path (or nothing when
 # there is only one wallpaper and it is already active).
 cycle_wallpaper() {
-  local mode="$1"
+  local -n _result="$1"
+  local mode="$2"
   local current files
   local idx next prev found
   local candidate
@@ -149,7 +150,7 @@ cycle_wallpaper() {
     return 0
   fi
 
-  printf "%s" "$candidate"
+  _result="$candidate"
 }
 
 feature_enabled() {
@@ -215,9 +216,10 @@ case "$_dispatch" in
     exit 0
   fi
 
-  WALLPAPER_PATH="$(cycle_wallpaper "$_dispatch")"
+  WALLPAPER_PATH=""
+  cycle_wallpaper WALLPAPER_PATH "$_dispatch"
 
-  # cycle_wallpaper prints nothing when there is only one
+  # cycle_wallpaper returns empty when there is only one
   # wallpaper and it is already active — nothing to do
   if [[ -z "$WALLPAPER_PATH" ]]; then
     exit 0
