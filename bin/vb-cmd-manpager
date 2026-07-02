@@ -56,8 +56,8 @@ if ! command -v fzf >/dev/null; then
   exit 1
 fi
 
-# Auto-detect an editor if none is set. The preference order is nvim →
-# vim → neovide → vi → less, matching the most common terminal editors.
+# Auto-detect an editor if none is set. The preference order is nvim ->
+# vim -> neovide -> vi -> less, matching the most common terminal editors.
 if [ -z "$EDITOR" ]; then
   log Info "EDITOR not set, detecting..."
   for ed in nvim vim neovide vi less; do

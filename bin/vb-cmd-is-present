@@ -65,8 +65,8 @@ log Info "Checking $(($#)) package(s)"
 # suffices). When no colon is present, the entire entry is treated as
 # both the package name and the binary name.
 #
-# Example: swayosd:swayosd-client  → checks for swayosd-client binary
-#          neovim:nvim,vi          → checks for nvim OR vi binary
+# Example: swayosd:swayosd-client  -> checks for swayosd-client binary
+#          neovim:nvim,vi          -> checks for nvim OR vi binary
 missing=()
 
 for entry in "$@"; do

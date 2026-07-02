@@ -669,10 +669,31 @@ hypr::flash::border() {
 }
 
 hypr::flash::screen() {
-  if [[ "$(hyprctl -j getoption 'animations.enabled' | jq -r '.bool')" == false ]]; then
-    return
+  [[ "$(hyprctl -j getoption 'animations.enabled' | jq -r '.bool')" == false ]] && return
+
+  local gamma_before=100
+  local target_gamma=
+  local state_file="$VIBRANIUM_STATE/monitors"
+
+  [[ -f "$state_file" ]] && while IFS=: read -r _ _ _ gamma_before; do
+    if [[ "$gamma_before" =~ ^[0-9]+$ ]]; then
+      if ((gamma_before >= 10 && gamma_before <= 100)); then
+        break
+      fi
+    fi
+    gamma_before=100
+  done <"$state_file"
+
+  if ! [[ "$gamma_before" =~ ^[0-9]+$ ]]; then
+    gamma_before=100
   fi
 
-  hyprctl -q hyprsunset gamma 150
-  hyprctl -q hyprsunset gamma 100
+  # hyprsunset caps at 150 — flash is gamma_before + 100, so anything
+  # above 50 would get truncated without this clamp.
+  target_gamma=$((gamma_before + 100))
+  ((target_gamma > 150)) && target_gamma=150
+
+  hyprctl -q hyprsunset gamma "$target_gamma"
+  sleep 0.15
+  hyprctl -q hyprsunset gamma "$gamma_before"
 }

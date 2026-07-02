@@ -68,7 +68,7 @@ _to_int100() {
     # take only first 2 digits (truncate, no rounding)
     frac_part="${frac_part:0:2}"
   else
-    frac_part="00" # no decimal part → treat as ".00"
+    frac_part="00" # no decimal part -> treat as ".00"
   fi
 
   # Build integer scaled by 100:

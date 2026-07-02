@@ -345,7 +345,7 @@ log Info "Launching ${GAME_CMDLINE[*]}"
 # Assemble and exec the final gamescope command:
 #   1. powerprofilesctl launch --profile performance (optional)
 #   2. mangohud (optional)
-#   3. gamescope with user extras → built-in defaults → hardcoded flags
+#   3. gamescope with user extras -> built-in defaults -> hardcoded flags
 #   4. -- as separator, followed by the game command
 #   5. stdout+stderr redirected to a log file for debugging.
 exec "${EXEC_CMDLINE[@]}" gamescope \

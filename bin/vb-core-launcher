@@ -86,7 +86,7 @@ _handle_keyword() {
     action="${entry#*:}"
 
     if [[ "$input" == "$keyword" ]]; then
-      log Info "Keyword matched: $keyword → $action"
+      log Info "Keyword matched: $keyword -> $action"
       if ! eval "$action"; then
         printf "Keyword '$keyword' returned non zero exit code!\n" >&2
         exit 1

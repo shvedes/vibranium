@@ -14,7 +14,8 @@ You mostly will write in bash, not just bash, but top class bash. That means:
 - Shebangs: `#!/bin/bash` (never `#!/usr/bin/env bash`)
 - Use pure bash as much as possible
 - Parse CLI args in a `while`/`case` loop, not `getopts`
-- Use ASCII dashes (`-`), not em dashes (U+2014). Use `->` not `→` (U+2192)
+- Use ASCII dashes (`-`), not em dashes (U+2014).
+- Use `->` not `→` (U+2192)
 
 Each script must have `-v` / `--verbose` CLI option, `usage()` function for `--help` option, and `shcat()` as replacement for
 `cat` in conjuction with heredoc and `log()`. `log()` must be used extensively with `--verbose` option and with

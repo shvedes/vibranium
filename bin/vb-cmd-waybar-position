@@ -70,7 +70,7 @@ log Info "Moving Waybar to $TARGET"
 
 # Extract the current "position" value from Waybar's JSON config.
 # awk splits by double quotes so $4 is the value field (e.g. "top" or "bottom").
-# Format: "position": "top"   → $1="", $2="position", $3=": ", $4="top"
+# Format: "position": "top"   -> $1="", $2="position", $3=": ", $4="top"
 CURRENT_POSITION="$(awk -F'"' '/"position"[[:space:]]*:/ {print $4}' "$WAYBAR_CONF")"
 
 if [[ "$CURRENT_POSITION" == "$TARGET" ]]; then

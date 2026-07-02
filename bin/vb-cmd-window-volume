@@ -94,7 +94,7 @@ fi
 # Steam games) spawn separate audio-emitting child processes that PipeWire
 # associates with the child PID, not the window's PID.
 #
-# The algorithm reads the full process table once, builds a parent→children
+# The algorithm reads the full process table once, builds a parent->children
 # adjacency map in awk, then does a BFS from the root PID.
 collect_pids() {
   local root="$1"

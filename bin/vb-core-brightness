@@ -18,8 +18,8 @@ log() {
 #
 # The script can accept parameters such as up | down for relative brightness adjustment with dynamic steps using Vibranium settings,
 # as well as absolute values such as 20, 50, 100, etc.
-#
-# TODO: allow setting brightness below 0% by adjusting gamma level below 100% via hyprsunset.
+# Gamma dimming (via hyprsunset) extends the effective range below 0% when
+# the hardware backlight is already at its minimum.
 
 # CHASSIS_TYPE is set early in the session based on
 # systemd-detect-virt --chassis; skip brightness control entirely
@@ -134,12 +134,14 @@ STATE_FILE="$VIBRANIUM_STATE/monitors"
 # Load the unified state into the bus_map / level_map associative arrays.
 # Caller must declare them. Returns nothing useful; just populates the maps.
 load_state() {
-  local i2c output level
+  local i2c output level gamma
   [[ -f "$STATE_FILE" ]] || return 0
 
-  # Parse each line of the state file ("i2c:output:level"), splitting on
+  # Parse each line of the state file ("i2c:output:level:gamma"), splitting on
   # colons. Lines without an output name are considered corrupted and skipped.
-  while IFS=: read -r i2c output level; do
+  # The optional 4th field (gamma) is read but not used here — it is queried
+  # separately by load_gamma().
+  while IFS=: read -r i2c output level gamma; do
     [[ -n "$output" ]] || continue
     bus_map["$output"]="$i2c"
     level_map["$output"]="$level"
@@ -150,20 +152,68 @@ load_state() {
 # file. The file is tiny, so we build the whole content in a single string and
 # write it with one redirection. Caller must have the maps declared and populated.
 save_state() {
-  local output content=""
+  local output content="" current_gamma=100
+
+  # Preserve the existing gamma from the state file (defaulting to 100 when
+  # the file is missing or all lines use the old 3-field format).
+  while IFS=: read -r _ _ _ current_gamma; do
+    [[ "$current_gamma" =~ ^[0-9]+$ ]] && ((current_gamma >= GAMMA_MIN && current_gamma <= 100)) && break
+    current_gamma=100
+  done <"$STATE_FILE" 2>/dev/null
 
   # Every known output lives in level_map after a load_state (even bus-only
   # entries get an empty level), so iterating it covers all keys. Outputs that
   # somehow exist only in bus_map are picked up by the second pass.
   for output in "${!bus_map[@]}"; do
-    content+="${bus_map[$output]}:$output:${level_map[$output]}"$'\n'
+    content+="${bus_map[$output]}:$output:${level_map[$output]}:$current_gamma"$'\n'
   done
+
   for output in "${!level_map[@]}"; do
     [[ -n "${bus_map[$output]+x}" ]] && continue
-    content+=":$output:${level_map[$output]}"$'\n'
+    content+=":$output:${level_map[$output]}:$current_gamma"$'\n'
   done
 
   printf '%s' "$content" >"$STATE_FILE"
+}
+
+# Gamma dimming. 10-100 where 100 = normal, stored as a 4th colon-separated
+# field on every monitor entry in the state file (i2c:output:level:gamma).
+# Writing all lines keeps gamma in sync across monitors since it is a global
+# GPU property applied via hyprsunset, not per-output.
+GAMMA_MIN=10
+
+# Read gamma from the first monitor line that has a 4th field.  Defaults to
+# 100 when the file is missing or all lines use the old 3-field format.
+load_gamma() {
+  local gamma=""
+  [[ -f "$STATE_FILE" ]] || { echo 100; return; }
+  while IFS=: read -r _ _ _ gamma; do
+    [[ "$gamma" =~ ^[0-9]+$ ]] && ((gamma >= GAMMA_MIN && gamma <= 100)) && { echo "$gamma"; return; }
+  done <"$STATE_FILE"
+  echo 100
+}
+
+# Rewrite every line of the monitors file with the new gamma value.  When
+# the file does not exist (e.g. raw sysfs path that never runs DDC), create
+# a sentinel entry so gamma persists across script invocations.  The sentinel
+# format (::level:gamma) is invisible to load_state() which skips blank
+# output fields, but load_gamma() reads the 4th field from any line.
+save_gamma() {
+  local new_gamma="$1" content="" i2c output level gamma
+
+  if [[ ! -f "$STATE_FILE" ]]; then
+    printf '::0:%d\n' "$new_gamma" >"$STATE_FILE"
+    return
+  fi
+
+  while IFS=: read -r i2c output level gamma; do
+    content+="$i2c:$output:$level:$new_gamma"$'\n'
+  done <"$STATE_FILE"
+  printf '%s' "$content" >"$STATE_FILE"
+}
+
+apply_gamma() {
+  hyprctl -q hyprsunset gamma "$1"
 }
 
 # Detect monitors via DDC and merge their i2c buses into the unified state,
@@ -173,10 +223,10 @@ get_i2c_bus() {
   local new_info output bus
 
   # Parse ddcutil detect output (expected format):
-  #   DRM_connector: card1-eDP-1   → skip (internal laptop panel)
-  #   DRM_connector: card1-DP-3    → name becomes "DP-3"
-  #   I2C bus: /dev/i2c-6          → bus becomes "6"
-  #   VCP version: ...             → emit "DP-3:6"
+  #   DRM_connector: card1-eDP-1   -> skip (internal laptop panel)
+  #   DRM_connector: card1-DP-3    -> name becomes "DP-3"
+  #   I2C bus: /dev/i2c-6          -> bus becomes "6"
+  #   VCP version: ...             -> emit "DP-3:6"
   # The awk state machine tracks skip across multi-line connector blocks.
   new_info="$(ddcutil detect 2>/dev/null | awk '
         /I2C bus:/ {
@@ -274,7 +324,7 @@ osd() {
   # Integer-only approximation:
   # We scale everything by 100 to avoid floating point.
   # Target formula: 0.02 + value * 0.0098
-  # Multiply by 100 → 2 + value * 0.98
+  # Multiply by 100 -> 2 + value * 0.98
   # Then approximate 0.98 as 98/100 (integer division will truncate).
   local p
   p=$((2 + value * 98 / 100))
@@ -325,10 +375,10 @@ fi
 
 # Decide between DDC (external monitors) and raw sysfs (internal laptop panel).
 # The heuristics:
-#   1. No /sys/class/backlight/ device → no built-in panel → must use DDC.
+#   1. No /sys/class/backlight/ device -> no built-in panel -> must use DDC.
 #   2. /sys/class/backlight/ exists but the focused monitor name does not
-#      start with eDP → external monitor on a laptop with a closed lid → DDC.
-#   3. Otherwise → raw sysfs access to the built-in backlight.
+#      start with eDP -> external monitor on a laptop with a closed lid -> DDC.
+#   3. Otherwise -> raw sysfs access to the built-in backlight.
 if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
   if ! command -v ddcutil >/dev/null; then
     vb-cmd-dep-notify --name "Brightness Control" --deps ddcutil
@@ -363,6 +413,11 @@ fi
 step=$VIBRANIUM_BRIGHTNESS_STEP
 log Info "Action: $ACTION, method: $method, step: $step"
 
+# Load current gamma state before entering method-specific dispatch.  The
+# same (action, step, current-brightness) tuple determines whether we adjust
+# hardware backlight or hyprsunset gamma.
+GAMMA=$(load_gamma)
+
 case "$method" in
 "ddc")
   get_brightness_cache current
@@ -388,65 +443,99 @@ case "$method" in
     # below, and doing both would race two background writers on the same file.
   fi
 
-  # The remaining code at the bottom is generally self-explanatory
   case "$ACTION" in
   "--up")
-    ((current == 100)) && exit 0
-    new=$((current + step))
-    ((new > 100)) && new=100
+    if ((GAMMA < 100)); then
+      # Gamma recovery: increase gamma toward 100 before raising hardware
+      # brightness.  Both ranges use the same step granularity.
+      new_gamma=$((GAMMA + step))
+      ((new_gamma > 100)) && new_gamma=100
+      apply_gamma "$new_gamma"
+      save_gamma "$new_gamma"
+      GAMMA=$new_gamma
+      log Info "Gamma raised to $GAMMA (brightness unchanged at $current)"
+    else
+      ((current == 100)) && exit 0
+      new=$((current + step))
+      ((new > 100)) && new=100
+    fi
     ;;
   "--down")
-    ((current == 0)) && exit 0
-    new=$((current - step))
-    ((new < 0)) && new=0
+    if ((current == 0 && GAMMA > GAMMA_MIN)); then
+      # Hardware at minimum; transition to gamma dimming below 100%.
+      new_gamma=$((GAMMA - step))
+      ((new_gamma < GAMMA_MIN)) && new_gamma=$GAMMA_MIN
+      apply_gamma "$new_gamma"
+      save_gamma "$new_gamma"
+      GAMMA=$new_gamma
+      log Info "Gamma lowered to $GAMMA (brightness at minimum)"
+    else
+      ((current == 0)) && exit 0
+      new=$((current - step))
+      ((new < 0)) && new=0
+    fi
     ;;
   "--set")
-    # SET_VALUE is already validated as 0-100 above
+    # Absolute set resets gamma to normal to keep the result predictable.
+    if ((GAMMA != 100)); then
+      apply_gamma 100
+      save_gamma 100
+      GAMMA=100
+      log Info "Gamma reset to 100"
+    fi
     new=$SET_VALUE
     ;;
   esac
 
-  log Info "Setting brightness to $new (current: $current)"
-  # Fire ddcutil in the background because the DDC write + monitor
-  # response can take 200-500ms; the cache update races alongside
-  # so we don't serialize the two async operations.
-  ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &>/dev/null &
-  update_brightness_cache "$new" &
+  if [[ -n "$new" ]]; then
+    log Info "Setting brightness to $new (current: $current)"
+    ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &>/dev/null &
+    update_brightness_cache "$new" &
+  fi
 
   if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == false ]]; then
     exit 0
   fi
 
-  if [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $QUIET == false ]]; then
-    osd "$new" &
-  else
-    # Do not display the monitor name if it is only one.
-    if ((MONITOR_COUNT > 1)); then
-      source="($ACTIVE_MONITOR) "
-    fi
-
-    # Suppress the notification when the active window is fullscreen.
-    # Dunst queues notifications during fullscreen and shows them only
-    # after exiting fullscreen, which makes them stale and irrelevant.
-    #
-    # We don't apply this rule to OSD notifications because
-    # it defeats the purpose of OSDs
-
+  if ((GAMMA < 100)); then
+    # Gamma dimming active — swayosd OSD only covers 0-100, so use
+    # notify-send with the effective "below zero" caption.
     if ((FULLSCREEN_STATE == 2)); then
       exit
     fi
-
     if [[ "$QUIET" == false ]]; then
-      notify-send -r 2 -t 1000 "Brightness $source${new}%" -h int:value:"$new"
+      dim_bar=$(( (GAMMA - GAMMA_MIN) * 100 / (100 - GAMMA_MIN) ))
+      notify-send -r 2 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
+    fi
+  elif [[ -n "$new" ]]; then
+    if [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $QUIET == false ]]; then
+      osd "$new" &
+    else
+      if ((MONITOR_COUNT > 1)); then
+        source="($ACTIVE_MONITOR) "
+      fi
+
+      # Suppress the notification when the active window is fullscreen.
+      # Dunst queues notifications during fullscreen and shows them only
+      # after exiting fullscreen, which makes them stale and irrelevant.
+      #
+      # We don't apply this rule to OSD notifications because
+      # it defeats the purpose of OSDs
+      if ((FULLSCREEN_STATE == 2)); then
+        exit
+      fi
+
+      if [[ "$QUIET" == false ]]; then
+        notify-send -r 2 -t 1000 "Brightness $source${new}%" -h int:value:"$new"
+      fi
     fi
   fi
   ;;
 "raw")
-  # When swayosd is active it owns the backlight device — skip raw sysfs
-  # calculations entirely and let it apply the change + show the OSD itself.
-  # Raw calculations are only needed for the plain notify-send path, or when
-  # notifications are disabled.
-  if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true && "$VIBRANIUM_BRIGHTNESS_NOTIFY" != "false" && "$QUIET" == false ]]; then
+  # swayosd delegation is only safe when gamma is at normal (100) because
+  # swayosd-client --brightness only understands 0-100 and would conflict
+  # with gamma-based dimming below that range.
+  if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true && "$VIBRANIUM_BRIGHTNESS_NOTIFY" != "false" && "$QUIET" == false && "$GAMMA" == "100" ]]; then
     # Translate action into swayosd's (±)number / absolute syntax:
     #   --up   -> +<step>   e.g. +5
     #   --down -> -<step>   e.g. -5
@@ -468,54 +557,68 @@ case "$method" in
 
     case "$ACTION" in
     "--up")
-      # Round up to next step boundary in percent-space.
-      # Integer division truncates, so (current/step + 1)*step always gives
-      # the next clean multiple of step above current.
-      # e.g. current=4, step=5 -> (4/5 + 1)*5 = (0+1)*5 = 5%
-      # e.g. current=5, step=5 -> (5/5 + 1)*5 = (1+1)*5 = 10%
-      new_pct=$(((current / step + 1) * step))
-
-      # Ceiling division (+ 99) ensures raw value lands inside the target
-      # percent band when converted back, avoiding double-truncation drift.
-      # e.g. 5% of 255 -> (5*255+99)/100 = 13 raw -> 13*100/255 = 5% ✓
-      #                     without ceil -> 12 raw -> 12*100/255 = 4% ✗
-      new_raw=$(((new_pct * max_raw + 99) / 100))
+      if ((GAMMA < 100)); then
+        # Gamma recovery: raise gamma toward 100 before touching hardware.
+        new_gamma=$((GAMMA + step))
+        ((new_gamma > 100)) && new_gamma=100
+        apply_gamma "$new_gamma"
+        save_gamma "$new_gamma"
+        GAMMA=$new_gamma
+        log Info "Gamma raised to $GAMMA (brightness unchanged at $current)"
+      else
+        new_pct=$(((current / step + 1) * step))
+        new_raw=$(((new_pct * max_raw + 99) / 100))
+      fi
       ;;
     "--down")
-      # Round down to previous step boundary in percent-space.
-      # Subtracting 1 before dividing ensures we step down even when already
-      # sitting exactly on a boundary.
-      # e.g. current=10, step=5 -> (10-1)/5*5 = 1*5 = 5%  (not stuck at 10%)
-      # e.g. current=9,  step=5 -> (9-1)/5*5  = 1*5 = 5%
-      new_pct=$(((current - 1) / step * step))
-
-      # Same ceiling conversion as --up to prevent truncation drift.
-      new_raw=$(((new_pct * max_raw + 99) / 100))
+      if ((current == 0 && GAMMA > GAMMA_MIN)); then
+        # Hardware at minimum; transition to gamma dimming.
+        new_gamma=$((GAMMA - step))
+        ((new_gamma < GAMMA_MIN)) && new_gamma=$GAMMA_MIN
+        apply_gamma "$new_gamma"
+        save_gamma "$new_gamma"
+        GAMMA=$new_gamma
+        log Info "Gamma lowered to $GAMMA (brightness at minimum)"
+      else
+        new_pct=$(((current - 1) / step * step))
+        new_raw=$(((new_pct * max_raw + 99) / 100))
+      fi
       ;;
     "--set")
-      # Convert the requested percentage directly to a raw sysfs value.
-      # Ceiling division avoids truncation drift, same as the step branches.
+      if ((GAMMA != 100)); then
+        apply_gamma 100
+        save_gamma 100
+        GAMMA=100
+        log Info "Gamma reset to 100"
+      fi
       new_pct=$SET_VALUE
       new_raw=$(((new_pct * max_raw + 99) / 100))
       ;;
     esac
 
-    # Clamp raw value
-    ((new_raw > max_raw)) && new_raw=$max_raw
-    ((new_raw < 0)) && new_raw=0
+    if [[ -n "${new_raw+x}" ]]; then
+      # Clamp raw value
+      ((new_raw > max_raw)) && new_raw=$max_raw
+      ((new_raw < 0)) && new_raw=0
 
-    # Convert back to percent for OSD
-    new=$((new_raw * 100 / max_raw))
+      new=$((new_raw * 100 / max_raw))
 
-    # Apply new brightness
-    echo "$new_raw" >/sys/class/backlight/*/brightness
+      echo "$new_raw" >/sys/class/backlight/*/brightness
+    fi
 
     if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == "false" ]]; then
       exit 0
     fi
 
-    if [[ "$QUIET" == false ]]; then
-      notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"
+    if ((GAMMA < 100)); then
+      if [[ "$QUIET" == false ]]; then
+        dim_bar=$(( (GAMMA - GAMMA_MIN) * 100 / (100 - GAMMA_MIN) ))
+        notify-send -r 1 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
+      fi
+    elif [[ -n "${new_raw+x}" ]]; then
+      if [[ "$QUIET" == false ]]; then
+        notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"
+      fi
     fi
   fi
   ;;
