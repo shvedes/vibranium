@@ -1,7 +1,6 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Printing support (CUPS) and network printer/scanner discovery (Avahi).
-# Source: Omarchy, adapted for Vibranium.
 
 if helpers::is_vm; then
   exit 0
@@ -42,10 +41,8 @@ helpers::write_file /etc/systemd/resolved.conf.d/10-disable-multicast.conf << EO
 MulticastDNS=no
 EOF2
 
-# Enable mDNS resolution for .local domains
 helpers::sed /etc/nsswitch.conf 's/^hosts:.*/hosts: mymachines mdns_minimal [NOTFOUND=return] resolve files myhostname dns/'
 
-# Enable automatically adding remote printers
 helpers::append_once /etc/cups/cups-browsed.conf 'CreateRemotePrinters Yes' 'CreateRemotePrinters Yes'
 
 sudo systemctl -q enable cups.service cups-browsed.service avahi-daemon.service

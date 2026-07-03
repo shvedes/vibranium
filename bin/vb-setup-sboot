@@ -48,13 +48,13 @@ if [[ ! "$CURRENT_ENTRY" == *.efi ]]; then
   term::show_header --color red
   echo -e "${RED}[VIBRANIUM]${RESET} Only ${CYAN}UKI${RESET} method is supported"
   echo -e "${RED}[VIBRANIUM]${RESET} A ${CYAN}Unified Kernel Image (UKI)${RESET} is a single ${CYAN}.efi${RESET} file bundling the kernel, initramfs,"
-  echo -e "${RED}[VIBRANIUM]${RESET} and boot parameters — required for Secure Boot signing to work end-to-end."
+  echo -e "${RED}[VIBRANIUM]${RESET} and boot parameters - required for Secure Boot signing to work end-to-end."
   echo -e "${RED}[VIBRANIUM]${RESET} See: ${CYAN}https://wiki.archlinux.org/title/Unified_kernel_image${RESET}"
   _operation_canceled
   exit 1
 fi
 
-# Safely glob efivars — nullglob prevents literal pattern on no-match
+# Safely glob efivars - nullglob prevents literal pattern on no-match
 shopt -s nullglob
 
 SECUREBOOT_EFIVAR=(/sys/firmware/efi/efivars/SecureBoot-*)
@@ -75,7 +75,7 @@ if [[ ${#SECUREBOOT_EFIVAR[@]} -gt 1 || ${#SETUP_MODE_EFIVAR[@]} -gt 1 ]]; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Warning: multiple EFI variable files found for the same name"
   echo -e "${YELLOW}[VIBRANIUM]${RESET} SecureBoot matches: ${SECUREBOOT_EFIVAR[*]}"
   echo -e "${YELLOW}[VIBRANIUM]${RESET} SetupMode matches:  ${SETUP_MODE_EFIVAR[*]}"
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Using first match — inspect your efivars if this looks wrong"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Using first match - inspect your efivars if this looks wrong"
 fi
 
 # Read first data byte (skip 4-byte attribute header), strip whitespace
@@ -118,7 +118,7 @@ fi
 _efi_nvram_writable() {
   findmnt -n -o OPTIONS /sys/firmware/efi/efivars 2>/dev/null | grep -q '\brw\b' || return 1
 
-  # Canary write — catches firmware that reports rw but silently drops writes
+  # Canary write - catches firmware that reports rw but silently drops writes
   local canary="/sys/firmware/efi/efivars/VibraniumProbe-00000000-0000-0000-0000-000000000000"
   printf '\x07\x00\x00\x00\x00' | sudo tee "$canary" &>/dev/null || return 1
   sudo chattr -i "$canary" 2>/dev/null
@@ -127,7 +127,7 @@ _efi_nvram_writable() {
 }
 
 if ! _efi_nvram_writable; then
-  echo -e "${RED}[VIBRANIUM]${RESET} EFI NVRAM is not writable — key enrollment will fail"
+  echo -e "${RED}[VIBRANIUM]${RESET} EFI NVRAM is not writable - key enrollment will fail"
   echo -e "${RED}[VIBRANIUM]${RESET} Try: ${RED}sudo ${GREEN}mount ${YELLOW}-o ${BLUE}remount,rw ${PURPLE}/sys/firmware/efi/efivars${RESET}"
   _operation_canceled
   exit 1

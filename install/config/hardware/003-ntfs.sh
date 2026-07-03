@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 while read -r fstype; do
   if [[ "$fstype" == "ntfs" || "$fstype" == "ntfs3" || "$fstype" == "fuseblk" ]]; then

@@ -104,7 +104,7 @@ summary() {
 # 1. Basic substitution and format variants
 # =============================================================================
 
-section "basic — plain key, format suffixes"
+section "basic - plain key, format suffixes"
 
 _clean
 
@@ -166,7 +166,7 @@ log_case "w scalar"              "31"            "$(_read_out fw)"
 # 2. Non-hex pass-through
 # =============================================================================
 
-section "non-hex — pass-through, upper, strip"
+section "non-hex - pass-through, upper, strip"
 
 _clean
 
@@ -189,10 +189,10 @@ log_case "non-hex upper"     '"FIRA CODE"'  "$(_read_out nhu)"
 log_case "non-hex strip"     '"Fira Code"'  "$(_read_out nhs)"
 
 # =============================================================================
-# 3. Pipe — alpha
+# 3. Pipe - alpha
 # =============================================================================
 
-section "pipe — alpha"
+section "pipe - alpha"
 
 _clean
 
@@ -212,10 +212,10 @@ log_case "hex alpha 0.5"       "#c94f6d80"        "$(_read_out alpha)"
 log_case "rgb alpha 0.5"       "201,79,109,0.5"   "$(_read_out alpha_rgb)"
 
 # =============================================================================
-# 4. Pipe — lightness (relative +/- and absolute)
+# 4. Pipe - lightness (relative +/- and absolute)
 # =============================================================================
 
-section "pipe — lightness"
+section "pipe - lightness"
 
 _clean
 
@@ -280,7 +280,7 @@ log_case "scalar l +0.10"         "60"             "$(_read_out slp)"
 # 5. Unknown / unresolvable tokens
 # =============================================================================
 
-section "unknown tokens — left untouched"
+section "unknown tokens - left untouched"
 
 _clean
 
@@ -333,10 +333,10 @@ log_case "multi-line line 1"          "first: #c94f6d"                  "$l1"
 log_case "multi-line line 2"          "second: #719cd6"                 "$l2"
 
 # =============================================================================
-# 7. Passthrough — no placeholders
+# 7. Passthrough - no placeholders
 # =============================================================================
 
-section "passthrough — no placeholders"
+section "passthrough - no placeholders"
 
 _clean
 
@@ -355,10 +355,10 @@ log_case "passthrough line 1"  "hello world"            "${pt_lines[0]}"
 log_case "passthrough line 2"  "no placeholders here"   "${pt_lines[1]}"
 
 # =============================================================================
-# 8. Edge cases — whitespace in tokens
+# 8. Edge cases - whitespace in tokens
 # =============================================================================
 
-section "edge cases — whitespace in tokens"
+section "edge cases - whitespace in tokens"
 
 _clean
 
@@ -405,7 +405,7 @@ log_case "tpl_b output"  "#719cd6"  "$(_read_out tb)"
 # 10. Empty subs table
 # =============================================================================
 
-section "empty subs table — tokens left untouched"
+section "empty subs table - tokens left untouched"
 
 _clean
 
@@ -424,7 +424,7 @@ log_case "no subs"  "{{ color4 }} nothing happens"  "$(_read_out es)"
 # 11. Multiple pipe operations in chain
 # =============================================================================
 
-section "pipe chain — multiple operations"
+section "pipe chain - multiple operations"
 
 _clean
 
@@ -447,7 +447,7 @@ log_case "rgb chain (channel nudges)"           "205,100,200" "$(_read_out chain
 # 12. Eight-digit hex (source color with alpha byte)
 # =============================================================================
 
-section "8-digit hex in subs — alpha in source"
+section "8-digit hex in subs - alpha in source"
 
 _clean
 
@@ -525,10 +525,10 @@ log_case "unclosed {{ with no }}"     "unclosed {{ forever" "$(_read_out b2)"
 log_case "unclosed valid key"         "{{ color4"           "$(_read_out b3)"
 
 # =============================================================================
-# 15. Boundary clamping — lightness extremes
+# 15. Boundary clamping - lightness extremes
 # =============================================================================
 
-section "boundary clamping — lightness extremes"
+section "boundary clamping - lightness extremes"
 
 _clean
 
@@ -575,7 +575,7 @@ _run \
 
 # color4_h = 345
 # +1.5: (345 + 1.5*360) % 360 = 165
-# -2.0: (345 - 2.0*360) % 360 → ((345-720) % 360 + 360) % 360 = (-375 % 360 + 360) % 360
+# -2.0: (345 - 2.0*360) % 360 -> ((345-720) % 360 + 360) % 360 = (-375 % 360 + 360) % 360
 #   In AWK: -375 % 360 = -375 - (-2 * 360) = -375 + 720 = 345
 # wait: int(-375/360) = int(-1.0417) = -1 (AWK truncates toward zero? No, AWK uses floor.)
 #   Actually, AWK's `%` operator: x % y = x - (int(x/y) * y)
@@ -602,7 +602,7 @@ log_case "hue -0.5 cycles"  "165"  "$(_read_out hw2)"
 # 17. HWB with hue pipe
 # =============================================================================
 
-section "HWB — hue pipe"
+section "HWB - hue pipe"
 
 _clean
 
@@ -626,7 +626,7 @@ log_case "hwb hue=180 + whiten"  "180,20%,0%" "$(_read_out hwc)"
 # 18. HSL combined ops
 # =============================================================================
 
-section "HSL — combined ops in chain"
+section "HSL - combined ops in chain"
 
 _clean
 
@@ -643,16 +643,16 @@ _run \
     hc2 '{{ red_hsl|darken=10|desaturate=30|hue=240 }}'
 
 # red_hsl = 0,100,50
-# lighten=10 → 0,100,60; hue=120 → 120,100,60
+# lighten=10 -> 0,100,60; hue=120 -> 120,100,60
 log_case "hsl lighten + hue"          "120,100,60"  "$(_read_out hc1)"
-# darken=10 → 0,100,40; desaturate=30 → 0,70,40; hue=240 → 240,70,40
+# darken=10 -> 0,100,40; desaturate=30 -> 0,70,40; hue=240 -> 240,70,40
 log_case "hsl darken+desaturate+hue"  "240,70,40"   "$(_read_out hc2)"
 
 # =============================================================================
-# 19. Precompute collision — explicit key overrides derived variant
+# 19. Precompute collision - explicit key overrides derived variant
 # =============================================================================
 
-section "precompute collision — explicit key beats derived"
+section "precompute collision - explicit key beats derived"
 
 _clean
 
@@ -676,7 +676,7 @@ log_case "derived hsl unaffected" "345,53,55"   "$(_read_out pc2)"
 # 20. Non-hex with _0x suffix
 # =============================================================================
 
-section "non-hex with _0x suffix — returns raw value"
+section "non-hex with _0x suffix - returns raw value"
 
 _clean
 
@@ -698,7 +698,7 @@ log_case "non-hex _0x unknown"  "{{ font_0x }}"  "$(_read_out nx0)"
 # 21. Trailing pipe (empty ops)
 # =============================================================================
 
-section "trailing pipe — empty ops string"
+section "trailing pipe - empty ops string"
 
 _clean
 
@@ -721,7 +721,7 @@ log_case "valid pipe then trailing"      "#e60000"  "$(_read_out tp2)"
 # 22. Hex lightness + alpha combined (hex_modified + has_alpha)
 # =============================================================================
 
-section "hex — lightness + alpha combined"
+section "hex - lightness + alpha combined"
 
 _clean
 
@@ -735,14 +735,14 @@ _run \
   --tpl \
     hla '{{ red|lightness=+0.10|alpha=0.5 }}'
 
-# lightness=+0.10 → l=60 → #ff3333; alpha=0.5 → 80 in hex → #ff333380
+# lightness=+0.10 -> l=60 -> #ff3333; alpha=0.5 -> 80 in hex -> #ff333380
 log_case "lightness + alpha"  "#ff333380"  "$(_read_out hla)"
 
 # =============================================================================
-# 23. Garbage hex in subs — invalid hex digits parse as zeros
+# 23. Garbage hex in subs - invalid hex digits parse as zeros
 # =============================================================================
 
-section "garbage data — invalid hex digits"
+section "garbage data - invalid hex digits"
 
 # The awk engine does NOT validate hex digits. Plain {{ key }} returns the
 # literal value from subs as-is. Format suffixes trigger parse_hex() which
@@ -769,15 +769,15 @@ _run \
     gh4 '{{ short_rgb }}'
 
 log_case "invalid hex passthrough"  "#GGGGGG"  "$(_read_out gh1)"
-log_case "invalid hex → rgb"        "0,0,0"    "$(_read_out gh2)"
+log_case "invalid hex -> rgb"        "0,0,0"    "$(_read_out gh2)"
 log_case "short hex passthrough"    "#12"      "$(_read_out gh3)"
-log_case "short hex → rgb (18,0,0)" "18,0,0"   "$(_read_out gh4)"
+log_case "short hex -> rgb (18,0,0)" "18,0,0"   "$(_read_out gh4)"
 
 # =============================================================================
 # 24. Garbage pipe operations
 # =============================================================================
 
-section "garbage data — pipe operations"
+section "garbage data - pipe operations"
 
 _clean
 
@@ -797,20 +797,20 @@ _run \
     gp3 '{{ red|alpha=2.0 }}' \
     gp4 '{{ red|blah=5 }}'
 
-# lightness=abc: op_val = "abc" + 0 = 0, substr("abc",1,1)="a" → absolute 0 → black
+# lightness=abc: op_val = "abc" + 0 = 0, substr("abc",1,1)="a" -> absolute 0 -> black
 log_case "lightness=abc (non-numeric)"  "#000000"  "$(_read_out gp1)"
-# alpha=-0.5: clamped to 0.0 → 00
+# alpha=-0.5: clamped to 0.0 -> 00
 log_case "alpha=-0.5 (clamped to 0)"   "#ff000000"  "$(_read_out gp2)"
-# alpha=2.0: clamped to 1.0 → ff
+# alpha=2.0: clamped to 1.0 -> ff
 log_case "alpha=2.0 (clamped to 1)"    "#ff0000ff"  "$(_read_out gp3)"
 # unknown op name silently skipped
 log_case "unknown op 'blah=5'"          "#ff0000"    "$(_read_out gp4)"
 
 # =============================================================================
-# 25. Malformed tokens — nested braces, unbalanced, wrong syntax
+# 25. Malformed tokens - nested braces, unbalanced, wrong syntax
 # =============================================================================
 
-section "garbage data — malformed tokens"
+section "garbage data - malformed tokens"
 
 _clean
 
@@ -832,11 +832,11 @@ _run \
     mt4 '{{color4=val}}' \
     mt5 '   '
 
-# {{ {{ }} }} — inner {{ }} is matched first; outer braces become literal
+# {{ {{ }} }} - inner {{ }} is matched first; outer braces become literal
 log_case "nested {{{{ }}}}"    "{{{{ }}}}"   "$(_read_out mt1)"
-# just closers — no placeholder
+# just closers - no placeholder
 log_case "unbalanced }}}}"     "}}}}"         "$(_read_out mt2)"
-# pipe at start — no key
+# pipe at start - no key
 log_case "pipe at start {{|"   "{{|color4}}"  "$(_read_out mt3)"
 # equals instead of pipe
 log_case "equals instead of |" "{{color4=val}}" "$(_read_out mt4)"
@@ -844,10 +844,10 @@ log_case "equals instead of |" "{{color4=val}}" "$(_read_out mt4)"
 log_case "whitespace only"     "   "          "$(_read_out mt5)"
 
 # =============================================================================
-# 26. Double pipe — empty segment in chain
+# 26. Double pipe - empty segment in chain
 # =============================================================================
 
-section "garbage data — double pipe"
+section "garbage data - double pipe"
 
 _clean
 
@@ -861,7 +861,7 @@ _run \
   --tpl \
     dp1 '{{ red||lightness=-0.05 }}'
 
-# |lightness=0.05| → split on | gives ["", "lightness=-0.05"]; empty first
+# |lightness=0.05| -> split on | gives ["", "lightness=-0.05"]; empty first
 # segment is skipped because it has no "=".
 log_case "double pipe with no op"  "#e60000"  "$(_read_out dp1)"
 

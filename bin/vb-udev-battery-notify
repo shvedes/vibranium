@@ -125,9 +125,9 @@ TOTAL_NOW=0
 TOTAL_FULL=0
 
 # Three-tier fallback for capacity aggregation across batteries:
-#   1. energy_now/energy_full  (µWh)  — preferred, most precise
-#   2. charge_now/charge_full  (µAh)  — fallback when energy is absent
-#   3. capacity                (0-100) — last resort; paired with +100 so
+#   1. energy_now/energy_full  (µWh)  - preferred, most precise
+#   2. charge_now/charge_full  (µAh)  - fallback when energy is absent
+#   3. capacity                (0-100) - last resort; paired with +100 so
 #      CAPACITY = TOTAL_NOW * 100 / TOTAL_FULL yields the percentage directly.
 for BAT in "${BATTERY_PATHS[@]}"; do
   if [[ -f "$BAT/energy_now" ]] && [[ -f "$BAT/energy_full" ]]; then

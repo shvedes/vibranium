@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 REFRESH_RATE="$(hyprctl -j monitors | jq -r 'max_by(.refreshRate) | (.refreshRate + 0.5 | floor)')"
 

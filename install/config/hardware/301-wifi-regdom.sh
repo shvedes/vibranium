@@ -1,21 +1,15 @@
-#!/usr/bin/env bash
-
-# Source: Omarchy
-# Slightly adapted for Vibranium.
+#!/bin/bash
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 0
 fi
 
-# First check that wireless-regdb is there
 if [[ -f "/etc/conf.d/wireless-regdom" ]]; then
   unset WIRELESS_REGDOM
   . /etc/conf.d/wireless-regdom
 fi
 
-# If the region is already set, we're done
 if [[ ! -n ${WIRELESS_REGDOM} ]]; then
-  # Get the current timezone
   if [[ -e "/etc/localtime" ]]; then
     TIMEZONE=$(readlink -f /etc/localtime)
     TIMEZONE=${TIMEZONE#/usr/share/zoneinfo/}
@@ -28,9 +22,7 @@ if [[ ! -n ${WIRELESS_REGDOM} ]]; then
       COUNTRY=$(awk -v tz="$TIMEZONE" '$3 == tz {print $1; exit}' /usr/share/zoneinfo/zone.tab)
     fi
 
-    # Check if we have a two letter country code
     if [[ $COUNTRY =~ ^[A-Z]{2}$ ]]; then
-      # Append it to the wireless-regdom conf file that is used at boot
       helpers::append_once /etc/conf.d/wireless-regdom "WIRELESS_REGDOM=" "WIRELESS_REGDOM=\"$COUNTRY\""
     else
       helpers::log::warn "No configured timezone found"

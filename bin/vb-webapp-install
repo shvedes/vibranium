@@ -232,7 +232,7 @@ _auto_keywords_from_url() {
   )
 
   for word in "${words[@]}"; do
-    [[ -z "$word" || ${#word} -le 2 ]] && continue
+    [[ -z "$word" ]] || (( ${#word} <= 2 )) && continue
     local lower="${word,,}"
     [[ ${stop_words[$lower]} ]] && continue
     local capitalized="${word^}"

@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 arch_state_file="/tmp/nvidia-arch"
 env_file="$HOME/.config/vibranium/environment"

@@ -1,5 +1,4 @@
-#!/usr/bin/bash
-
+#!/bin/bash
 # Here you can write your own custom scripts
 # that will automatically execute every time you
 # change the active theme. Since this is inside the

@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 helpers::install_yay() {
   local tmp_dir="/tmp/yay"
   local url="https://aur.archlinux.org/yay.git"

@@ -31,7 +31,7 @@ printf -v VIBRANIUM_SUDO_PROMPT '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RES
 export SUDO_PROMPT=$VIBRANIUM_SUDO_PROMPT
 export PATH="$PATH:$VIBRANIUM/configure"
 
-# helpers::ui::menu — Dynamic rofi dmenu wrapper with automatic window sizing
+# helpers::ui::menu - Dynamic rofi dmenu wrapper with automatic window sizing
 #
 # PURPOSE:
 #   Launches a rofi dmenu prompt whose window width auto-scales to fit the longest
@@ -41,15 +41,15 @@ export PATH="$PATH:$VIBRANIUM/configure"
 # USAGE:
 #   helpers::ui::menu <result_var> <prompt> [placeholder] [rofi_args...] -- [ entry1 entry2 ...]
 #
-#   <result_var>   — Name of the variable in the caller's scope that will receive
+#   <result_var>   - Name of the variable in the caller's scope that will receive
 #                    the selected string.
-#   <prompt>       — The label shown before the input field in rofi (e.g. "Open:").
-#   [placeholder]  — Optional placeholder text inside the input field. Gets a leading
+#   <prompt>       - The label shown before the input field in rofi (e.g. "Open:").
+#   [placeholder]  - Optional placeholder text inside the input field. Gets a leading
 #                    space prepended so it doesn't butt up against the cursor.
-#   [rofi_args]    — Any extra rofi flags (e.g. -kb-custom-1 "Alt+x"). Collected until
+#   [rofi_args]    - Any extra rofi flags (e.g. -kb-custom-1 "Alt+x"). Collected until
 #                    '--' is encountered or arguments run out.
 #                    Special flag: -plain-fd FD  (used internally by cfgr::run)
-#   [-- entry ...]  — Inline menu entries passed as individual arguments after '--'.
+#   [-- entry ...]  - Inline menu entries passed as individual arguments after '--'.
 #                    If '--' is absent, entries are read from stdin instead (pipe-friendly).
 #
 # RETURN VALUE:
@@ -274,7 +274,7 @@ helpers::bar::spinner() {
       done
     done
   else
-    # Single-pass mode (no PIDs) — exactly one full rotation
+    # Single-pass mode (no PIDs) - exactly one full rotation
     for ch in "${spinstr[@]}"; do
       print_frame "$ch"
       sleep "$delay"
@@ -319,7 +319,7 @@ declare -r _RE_INT='^(-?)0*([0-9]+)(\.[0-9]+)?$'
 # Returns: 0 on success (all validated or fallback), 1 if any not found in cache.
 helpers::check() {
   # Lazy-load: only run awk on the very first call.
-  # ${#OPTION_DEFAULTS[@]} gives the number of keys — 0 means the cache is cold.
+  # ${#OPTION_DEFAULTS[@]} gives the number of keys - 0 means the cache is cold.
   if ((${#OPTION_DEFAULTS[@]} == 0)); then
     local awk_script="$VIBRANIUM/awk/vb-parse-defaults.awk"
 
@@ -327,7 +327,7 @@ helpers::check() {
   fi
 
   # all_found uses 1/0 integers rather than "true"/"false" strings to avoid repeated
-  # string comparisons in the hot path — (( all_found )) at the end converts to exit code.
+  # string comparisons in the hot path - (( all_found )) at the end converts to exit code.
   local all_found=1
 
   # All scalars hoisted above the loop so bash doesn't re-execute the `local`
@@ -336,7 +336,7 @@ helpers::check() {
   local min max sign int_part frac_part signed_int
   local allowed_str
 
-  # Iterate $@ directly — no need to copy into a local array first.
+  # Iterate $@ directly - no need to copy into a local array first.
   for var_name in "$@"; do
     # Special var; it has no predetermined values. Just skip.
     if [[ "$var_name" == "VIBRANIUM_BAR_WEATHER_MODULE_CITY" ]]; then
@@ -356,7 +356,7 @@ helpers::check() {
     if [[ -z ${OPTION_DEFAULTS[$var_name]+x} ]]; then
       printf "[${0##*/}] Warn: Variable %s not found in defaults\n" "$var_name"
       all_found=0
-      unset -n ref # must release before continue — rebinding a live nameref is undefined
+      unset -n ref # must release before continue - rebinding a live nameref is undefined
       continue
     fi
 
@@ -368,7 +368,7 @@ helpers::check() {
     if [[ -z $val ]]; then
       printf "[${0##*/}] Warn: %s is unset. Using default (%s)\n" "$var_name" "$default_value"
 
-      # Direct assignment through the nameref — no printf -v overhead.
+      # Direct assignment through the nameref - no printf -v overhead.
       ref=$default_value
       unset -n ref
       continue
@@ -378,7 +378,7 @@ helpers::check() {
     # We don't mutate val itself so we can still reference the original in error messages.
     normalized=$val
 
-    # is_valid as integer — 1=valid, 0=invalid. Avoids string comparisons at the
+    # is_valid as integer - 1=valid, 0=invalid. Avoids string comparisons at the
     # bottom of the loop where we decide whether to apply the default or write back.
     is_valid=1
 
@@ -387,14 +387,14 @@ helpers::check() {
       # Lowercase via ,, operator so "True"/"TRUE"/"true" all pass
       normalized=${val,,}
 
-      # Booleans must be exactly "true" or "false" — nothing else
+      # Booleans must be exactly "true" or "false" - nothing else
       [[ $normalized != true && $normalized != false ]] && is_valid=0
       ;;
     int)
       # Normalize comma-as-decimal-separator (e.g. European locale "3,14" -> "3.14")
       normalized=${val//,/.}
 
-      # _RE_INT is a precompiled variable reference — bash reuses its compiled form
+      # _RE_INT is a precompiled variable reference - bash reuses its compiled form
       # across calls, unlike an inline string literal which is recompiled each time.
       if [[ ! $normalized =~ $_RE_INT ]]; then
         is_valid=0
@@ -435,7 +435,7 @@ helpers::check() {
     esac
     # (( is_valid )) exits 0 when is_valid=1 (valid), 1 when is_valid=0 (invalid)
     if ((is_valid)); then
-      # Write the normalized form back through the nameref — this is the important part
+      # Write the normalized form back through the nameref - this is the important part
       # for int/bool: the caller's variable ends up with leading zeros stripped, correct
       # case, etc.
       ref=$normalized
@@ -444,14 +444,14 @@ helpers::check() {
       ref=$default_value
     fi
 
-    # Release the nameref before the next iteration — without this, the next
+    # Release the nameref before the next iteration - without this, the next
     # `declare -n ref=...` would re-bind an already-live nameref, which in some
     # bash versions causes the old target to linger or the new bind to be skipped.
     unset -n ref
   done
 
   # (( all_found )) exits 0 when all_found=1 (every variable found), 1 when any was missing.
-  # Cleaner than return $(( 1 - all_found )) — no arithmetic expansion subshell, just a test.
+  # Cleaner than return $(( 1 - all_found )) - no arithmetic expansion subshell, just a test.
   ((all_found))
 }
 
@@ -712,7 +712,7 @@ hypr::flash::screen() {
     gamma_before=100
   fi
 
-  # hyprsunset caps at 150 — flash is gamma_before + 100, so anything
+  # hyprsunset caps at 150 - flash is gamma_before + 100, so anything
   # above 50 would get truncated without this clamp.
   target_gamma=$((gamma_before + 100))
   ((target_gamma > 150)) && target_gamma=150

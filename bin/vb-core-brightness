@@ -1,21 +1,5 @@
 #!/bin/bash
 
-# Overcomplicated script that manages brightness control using raw sysfs values
-# as well as the DDC protocol for external monitors. The script uses a single state file
-# (lines in the "output:i2c:level" format) to cache active values for both methods
-# to speed up subsequent script executions.
-# This is ESPECIALLY useful for the DDC method, because ddcutil is known to be quite slow.
-# Thanks to the state file, changing brightness with DDC takes milliseconds instead of 500-700-1000ms.
-#
-# The script can accept parameters such as up | down for relative brightness adjustment with dynamic steps using Vibranium settings,
-# as well as absolute values such as 20, 50, 100, etc.
-# Gamma dimming (via hyprsunset) extends the effective range below 0% when
-# the hardware backlight is already at its minimum.
-
-# CHASSIS_TYPE is set early in the session based on
-# systemd-detect-virt --chassis; skip brightness control entirely
-# when running inside a VM because neither sysfs backlight nor DDC
-# passthrough are guaranteed to work.
 if [[ "$CHASSIS_TYPE" == "vm" ]]; then
   notify-send -r 4 "Vibranium - Brightness" -u critical -t 5000 \
     "Brightness control is not available inside of a Virtual Machine"
@@ -128,7 +112,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# No action flag was provided — print usage and exit cleanly
+# No action flag was provided - print usage and exit cleanly
 if [[ -z "$ACTION" ]]; then
   usage
   exit 0
@@ -155,7 +139,7 @@ fi
 
 # Open the lockfile on fd 9 and acquire a non-blocking exclusive lock.
 # flock -n returns nonzero when another instance holds the lock, so we
-# exit silently — the running instance will handle the request.
+# exit silently - the running instance will handle the request.
 exec 9>"$LOCKFILE" || {
   log Error "another instance of $SELF is already running!" >&2
   exit 1
@@ -169,7 +153,7 @@ helpers::check \
   VIBRANIUM_BRIGHTNESS_STEP \
   VIBRANIUM_BRIGHTNESS_NOTIFY
 
-# Global state maps — populated once by load_state, read/written by all
+# Global state maps - populated once by load_state, read/written by all
 # helpers in-memory instead of re-reading the state file on every access.
 declare -A bus_map=() level_map=() mult_map=()
 GAMMA=100
@@ -229,7 +213,7 @@ load_state() {
 
 # Write the global bus_map / level_map / mult_map / GAMMA back to the state
 # file.  Because we keep everything in memory there is no need to re-read the
-# file first — the globals are the authoritative source.
+# file first - the globals are the authoritative source.
 # When no monitor entries exist (raw-only session) a sentinel line preserves
 # GAMMA so dimming state survives across invocations.
 save_state() {
@@ -277,7 +261,7 @@ load_gamma() {
 }
 
 # Update gamma in the global GAMMA and persist.  save_state writes every line
-# with the new gamma, so a missing file is handled automatically — the first
+# with the new gamma, so a missing file is handled automatically - the first
 # call to save_state creates it with the then-known monitors.
 save_gamma() {
   GAMMA="$1"
@@ -335,7 +319,7 @@ _probe_mult() {
 }
 
 # Load sleep-multiplier for the current monitor.  Uses the cached value from
-# the state file when available — skips the expensive ddcutil probe entirely.
+# the state file when available - skips the expensive ddcutil probe entirely.
 # When FORCE is set or no cached entry exists, probes and calibrates from
 # scratch, then persists the result for subsequent invocations.
 calibrate_sleep_mult() {
@@ -349,9 +333,9 @@ calibrate_sleep_mult() {
   fi
 
   if [[ $MULT_CACHED == false ]]; then
-    # No cached value (or FORCE) — probe to discover a working multiplier
+    # No cached value (or FORCE) - probe to discover a working multiplier
     if ! _probe_mult "$mult"; then
-      # Current multiplier fails — probe upward to find a working floor
+      # Current multiplier fails - probe upward to find a working floor
       try=$mult
       while ((try < MULT_HUNDREDTHS_MAX)); do
         try=$((try + 5))
@@ -387,7 +371,7 @@ calibrate_all() {
   local output bus saved_monitor bus_map_str
 
   if ! command -v ddcutil >/dev/null; then
-    log Error "ddcutil not found — cannot calibrate" >&2
+    log Error "ddcutil not found - cannot calibrate" >&2
     vb-cmd-dep-notify --name "Brightness Control" --deps ddcutil
     return 1
   fi
@@ -515,7 +499,7 @@ osd() {
   local value="$1" label="${2:-}"
   local icon progress
 
-  # Negative label (e.g. "-30%") means gamma dimming — always use low icon.
+  # Negative label (e.g. "-30%") means gamma dimming - always use low icon.
   if [[ "$label" == -* ]]; then
     icon="brightness-low-symbolic"
   elif ((value <= 30)); then
@@ -622,12 +606,12 @@ else
 fi
 
 # When gamma dimming is active (GAMMA < 100) the monitor is already at
-# physical minimum — skip sleep-multiplier calibration (and all subsequent
+# physical minimum - skip sleep-multiplier calibration (and all subsequent
 # ddcutil calls) until we come back above the floor.
 # GAMMA is already populated by load_state() at the top of main.
 
 if [[ "$method" == "ddc" ]]; then
-  if [[ $GAMMA -eq 100 || "$ACTION" == "--set" ]]; then
+  if (( GAMMA == 100 )) || [[ "$ACTION" == "--set" ]]; then
     calibrate_sleep_mult
     ddcutil_flags=(--sleep-multiplier "$SLEEP_MULT_FLOAT" --noverify --skip-ddc-checks --maxtries 1,1,1)
     log Info "Sleep multiplier: $SLEEP_MULT_FLOAT"
@@ -736,7 +720,7 @@ case "$method" in
   fi
 
   if ((GAMMA < 100)); then
-    # Gamma dimming active — show the negative percentage via OSD or notify.
+    # Gamma dimming active - show the negative percentage via OSD or notify.
     if ((FULLSCREEN_STATE == 2)); then
       exit 0
     fi

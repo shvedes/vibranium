@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 readonly _THEME_SRC="$VIBRANIUM/extras/vscode/vibranium.theme"
 readonly _THEME_JSON="$HOME/.config/vibranium/current/theme/vscode.json"

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Test suite for helpers::check
 
@@ -108,7 +108,7 @@ D1="${OPTION_DEFAULTS[$B1]}"
 B2="VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
 D2="${OPTION_DEFAULTS[$B2]}"
 
-section "bool — $B1"
+section "bool - $B1"
 log_case "exact default value" "$B1" "false" "false"
 log_case "opposite bool" "$B1" "true" "true"
 log_case "uppercase TRUE" "$B1" "TRUE" "true"
@@ -120,20 +120,20 @@ log_case "'0'" "$B1" "0" "$D1"
 log_case "garbage string" "$B1" "notabool" "$D1"
 log_case "unset -> fallback" "$B1" __UNSET__ "$D1"
 
-section "bool — $B2"
+section "bool - $B2"
 log_case "default" "$B2" "true" "true"
 log_case "opposite" "$B2" "false" "false"
 log_case "empty -> fallback" "$B2" "" "$D2"
 log_case "unset -> fallback" "$B2" __UNSET__ "$D2"
 
 # =============================================================================
-# 3. Int — plain (no range)
+# 3. Int - plain (no range)
 # =============================================================================
 
 IP="VIBRANIUM_VOLUME_ADJUSTMENT_STEP"
 DP="${OPTION_DEFAULTS[$IP]}"
 
-section "int plain — $IP"
+section "int plain - $IP"
 log_case "default" "$IP" "5" "5"
 log_case "zero" "$IP" "0" "0"
 log_case "leading zeros" "$IP" "007" "7"
@@ -147,7 +147,7 @@ log_case "mixed alphanum" "$IP" "5px" "$DP"
 log_case "unset -> fallback" "$IP" __UNSET__ "$DP"
 
 # =============================================================================
-# 4. Int — range-constrained
+# 4. Int - range-constrained
 # =============================================================================
 
 IR="VIBRANIUM_SCREENSHOT_JPEG_QUALITY"
@@ -155,7 +155,7 @@ DR="${OPTION_DEFAULTS[$IR]}"
 RMIN="${OPTION_MINS[$IR]}"
 RMAX="${OPTION_MAXS[$IR]}"
 
-section "int ranged — $IR [${RMIN}..${RMAX}]"
+section "int ranged - $IR [${RMIN}..${RMAX}]"
 log_case "default" "$IR" "$DR" "$DR"
 log_case "min boundary" "$IR" "$RMIN" "$RMIN"
 log_case "max boundary" "$IR" "$RMAX" "$RMAX"
@@ -168,7 +168,7 @@ log_case "letters" "$IR" "abc" "$DR"
 log_case "unset -> fallback" "$IR" __UNSET__ "$DR"
 
 # =============================================================================
-# 5. String — enum-constrained
+# 5. String - enum-constrained
 # =============================================================================
 
 SE="VIBRANIUM_GLOBAL_SEARCH_ENGINE"
@@ -177,7 +177,7 @@ _raw="${OPTION_ALLOWEDS[$SE]-}"
 _raw="${_raw//|/ }"
 read -ra _se_allowed <<<"$_raw"
 
-section "string enum — $SE  [$(_allowed_list "$SE")]"
+section "string enum - $SE  [$(_allowed_list "$SE")]"
 for _v in "${_se_allowed[@]}"; do
   log_case "enum '$_v'" "$SE" "$_v" "$_v"
 done
@@ -188,7 +188,7 @@ log_case "value with spaces" "$SE" "${_se_allowed[0]} " "$DSE"
 log_case "unset -> fallback" "$SE" __UNSET__ "$DSE"
 
 # =============================================================================
-# 6. String — second enum var
+# 6. String - second enum var
 # =============================================================================
 
 SE2="VIBRANIUM_SCREENSHOT_FILE_TYPE"
@@ -197,7 +197,7 @@ _raw="${OPTION_ALLOWEDS[$SE2]-}"
 _raw="${_raw//|/ }"
 read -ra _se2_allowed <<<"$_raw"
 
-section "string enum — $SE2  [$(_allowed_list "$SE2")]"
+section "string enum - $SE2  [$(_allowed_list "$SE2")]"
 for _v in "${_se2_allowed[@]}"; do
   log_case "enum '$_v'" "$SE2" "$_v" "$_v"
 done
@@ -253,10 +253,10 @@ _assert_rc "int ranged valid -> rc 0"  "$IR" "50"   "0" "50"
 _assert_rc "string valid -> rc 0"      "$SE" "bing" "0" "bing"
 
 # =============================================================================
-# 9. Multi-variable check — nameref lifecycle
+# 9. Multi-variable check - nameref lifecycle
 # =============================================================================
 
-section "multi-variable check — nameref lifecycle"
+section "multi-variable check - nameref lifecycle"
 
 TOTAL=$((TOTAL + 1))
 VIBRANIUM_GLOBAL_USE_OSD="false"
@@ -304,19 +304,19 @@ else
 fi
 
 # =============================================================================
-# 10. VIBRANIUM_BAR_WEATHER_MODULE_CITY — hardcoded skip
+# 10. VIBRANIUM_BAR_WEATHER_MODULE_CITY - hardcoded skip
 # =============================================================================
 
-section "VIBRANIUM_BAR_WEATHER_MODULE_CITY — hardcoded skip"
+section "VIBRANIUM_BAR_WEATHER_MODULE_CITY - hardcoded skip"
 
 # The var IS in the cache (awk parser doesn't honor @ignore), but helpers::check
 # has a hardcoded continue for this name. Verify it passes through unchanged.
 CC_VAR="VIBRANIUM_BAR_WEATHER_MODULE_CITY"
 
-# The var has @ignore which means no @type annotation → the awk parser skips it.
+# The var has @ignore which means no @type annotation -> the awk parser skips it.
 TOTAL=$((TOTAL + 1))
 if [[ -z ${OPTION_DEFAULTS[$CC_VAR]+x} ]]; then
-  printf "  ${_g}[PASS]${_R}  absent from cache (correct: @ignore → no @type → skipped)\n"
+  printf "  ${_g}[PASS]${_R}  absent from cache (correct: @ignore -> no @type -> skipped)\n"
   PASS=$((PASS + 1))
 else
   printf "  ${_r}[FAIL]${_R}  unexpectedly present in cache (default='%s')\n" "${OPTION_DEFAULTS[$CC_VAR]}"
@@ -337,28 +337,28 @@ else
 fi
 
 # =============================================================================
-# 11. Int — decimal fraction edge cases
+# 11. Int - decimal fraction edge cases
 # =============================================================================
 
-section "int decimal fraction — edge cases"
+section "int decimal fraction - edge cases"
 
 IP2="VIBRANIUM_BRIGHTNESS_STEP"
 DP2="${OPTION_DEFAULTS[$IP2]}"
 
-# 3.14 is a valid float that matches the int regex — currently accepted
+# 3.14 is a valid float that matches the int regex - currently accepted
 log_case "float 3.14 on non-range int"  "$IP2" "3.14" "3.14"
 
-# Just the fraction ".5" — must start with a digit, so should fail
+# Just the fraction ".5" - must start with a digit, so should fail
 log_case "dot-five on non-range int"  "$IP2" ".5" "$DP2"
 
-# Leading + sign — regex is ^(-?)0*[0-9]+(\.[0-9]+)?$ so + is not accepted
+# Leading + sign - regex is ^(-?)0*[0-9]+(\.[0-9]+)?$ so + is not accepted
 log_case "leading + on non-range int"  "$IP2" "+7" "$DP2"
 
 # =============================================================================
-# 12. String — leading/trailing whitespace
+# 12. String - leading/trailing whitespace
 # =============================================================================
 
-section "string enum — whitespace in value"
+section "string enum - whitespace in value"
 
 # Leading space should cause a mismatch (the allowed list has exact values)
 log_case "leading space"  "$SE" " google" "$DSE"

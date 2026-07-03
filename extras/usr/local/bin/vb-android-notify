@@ -1,6 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# Find the active graphical session user
 get_session_user() {
   loginctl list-sessions --no-legend |
     while read -r sid uid user _rest; do

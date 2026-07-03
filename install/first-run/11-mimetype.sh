@@ -1,20 +1,16 @@
 #!/bin/bash
 
 declare -A mime_apps=(
-  # Web
   [x-scheme-handler/http]=chromium.desktop
   [x-scheme-handler/https]=chromium.desktop
   [text/html]=chromium.desktop
 
-  # Documents / eBooks
   [application/pdf]=org.pwmt.zathura.desktop
   [application/epub+zip]=org.pwmt.zathura.desktop
   [application/postscript]=org.pwmt.zathura.desktop
 
-  # Directories
   [inode/directory]=thunar.desktop
 
-  # Images
   [image/jpeg]=imv-dir.desktop
   [image/png]=imv-dir.desktop
   [image/webp]=imv-dir.desktop
@@ -28,28 +24,24 @@ declare -A mime_apps=(
   [image/x-canon-cr2]=imv-dir.desktop
   [image/x-nikon-nef]=imv-dir.desktop
 
-  # Videos
   [video/mp4]=mpv.desktop
   [video/webm]=mpv.desktop
   [video/x-matroska]=mpv.desktop
   [video/avi]=mpv.desktop
   [video/mpeg]=mpv.desktop
 
-  # Audio
   [audio/mpeg]=mpv.desktop
   [audio/flac]=mpv.desktop
   [audio/wav]=mpv.desktop
   [audio/ogg]=mpv.desktop
   [audio/opus]=mpv.desktop
 
-  # Text / Code
   [text/plain]=nvim.desktop
   [text/markdown]=nvim.desktop
   [text/x-shellscript]=nvim.desktop
   [application/json]=nvim.desktop
   [application/x-yaml]=nvim.desktop
 
-  # Torrents / Magnet
   [application/x-bittorrent]=org.qbittorrent.qBittorrent.desktop
   [x-scheme-handler/magnet]=org.qbittorrent.qBittorrent.desktop
 )

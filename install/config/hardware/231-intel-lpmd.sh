@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 IFS="'" read -r CPU_VENDOR CPU_CODE < <(vb-hw-cpu -qvc)
 

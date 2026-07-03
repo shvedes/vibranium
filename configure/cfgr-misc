@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 _get_term_opacity() {
   local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
@@ -369,8 +369,6 @@ _get_cursor_theme() {
   local settings
   settings="$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
 
-  # gsettings returns "Default" most of the time, so just use gtk settings file instead.
-  # current="$(gsettings get org.gnome.desktop.interface cursor-theme | sed "s/'//g")"
   current="$(sed -n 's/^gtk-cursor-theme-name=//p' "$settings")"
 
   while IFS= read -r value; do
@@ -381,7 +379,6 @@ _get_cursor_theme() {
     fi
   done <<<"$(vb-cursor-list)"
 
-  # Fallback
   printf '<i>[unknown]</i>'
 }
 

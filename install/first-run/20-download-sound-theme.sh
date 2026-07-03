@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # To avoid depending on another package for a single file,
 # we can simply download that file directly from the source.

@@ -1,6 +1,5 @@
-#!/usr/bin/bash
+#!/bin/bash
 
-# Early exit if no NVIDIA GPU is found
 if ! vb-hw-gpu nvidia; then
   exit 0
 fi
@@ -35,7 +34,6 @@ fi
 
 helpers::install_pkg "$kernel_headers" "${packages[@]}"
 
-# Early KMS configuration
 helpers::write_file /etc/modprobe.d/nvidia.conf <<EOF
 options nvidia_drm modeset=1
 EOF

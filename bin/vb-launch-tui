@@ -56,7 +56,7 @@ focus_or_launch() {
 
       //
 
-      # Phase 2: partial match — either the class is a substring of the
+      # Phase 2: partial match - either the class is a substring of the
       # key or the key is a substring of the class. The empty-string
       # guard prevents "" from matching everything via contains().
       # Example: key="google-chrome-stable", class="google-chrome" ->

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 _get_rofi_theme() {
   local config="$XDG_CONFIG_HOME/rofi/config.rasi"

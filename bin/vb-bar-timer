@@ -30,10 +30,10 @@ if [[ $remaining =~ ^[0-9]+$ ]]; then
   minutes=$((rem / 60))
   seconds=$((rem % 60))
 
-  [[ $years -gt 0 ]] && formatted+="${years}y "
-  [[ $days -gt 0 ]] && formatted+="${days}d "
-  [[ $hours -gt 0 ]] && formatted+="${hours}h "
-  [[ $minutes -gt 0 ]] && formatted+="${minutes}m "
+  (( years > 0 )) && formatted+="${years}y "
+  (( days > 0 )) && formatted+="${days}d "
+  (( hours > 0 )) && formatted+="${hours}h "
+  (( minutes > 0 )) && formatted+="${minutes}m "
 
   formatted+="${seconds}s"
   text+="  <span foreground='gray'>$formatted</span>"

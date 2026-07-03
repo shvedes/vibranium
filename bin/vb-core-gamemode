@@ -235,7 +235,7 @@ while [[ $# -gt 0 ]]; do
     exit 1
     ;;
   *)
-    # No '--' separator used — treat the rest as the game command.
+    # No '--' separator used - treat the rest as the game command.
     break
     ;;
   esac
@@ -257,7 +257,7 @@ if $USE_MANGOHUD; then
   fi
 fi
 
-# Gamescope not available — fall back gracefully
+# Gamescope not available - fall back gracefully
 if ! command -v gamescope >/dev/null; then
   log Warn "gamescope is not installed"
   notify-send -r 1 -t 5000 "Vibranium" \

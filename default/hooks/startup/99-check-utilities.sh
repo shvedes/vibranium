@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 if ! command -v vb-cmd-edit-wm-config >/dev/null; then
   : > "$VIBRANIUM_STATE/errors_found"

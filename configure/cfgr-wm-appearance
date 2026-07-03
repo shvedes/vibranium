@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 source vb-lib-core
 source vb-lib-cfgr
@@ -35,8 +35,6 @@ DECORATION_SPEC=(
   "decoration.border_part_of_window|bool"
 )
 
-# ================================================================================ #
-
 _gaps_menu() {
   _b() {
     hypr::reload
@@ -45,7 +43,7 @@ _gaps_menu() {
     local gaps_in gaps_out
 
     if ! gaps_in="$(vb-cmd-edit-wm-config --get 'general:gaps_in' "$lnf")"; then
-      # gaps return their value via .css, not .int — read directly
+      # gaps return their value via .css, not .int - read directly
       mapfile -t _v < <(
         hyprctl --batch -j "getoption general.gaps_in; getoption general.gaps_out" |
         jq -r '.css | split(" ")[0]'
@@ -230,8 +228,6 @@ _anim_submenu() {
   cfgr::run "Animations" "_b"
 }
 
-# ================================================================================ #
-
 _edit_roundness() {
   local input
   input="$(cfgr::set_digit --title \
@@ -327,7 +323,7 @@ _set_anim_preset() {
   done
 
   # Collect custom preset names, filtering out any that collide with defaults.
-  # Default presets always take priority — shadowed customs are excluded and the user is notified.
+  # Default presets always take priority - shadowed customs are excluded and the user is notified.
   local -a customs=() shadowed=()
   if [[ -d "$folder_custom" ]]; then
     local name def is_shadowed
@@ -404,8 +400,6 @@ _set_anim_preset() {
   ln -sf "$source_folder/${chosen_lower}.lua" "$HYPR_CONF_ANIMATIONS"
 }
 
-# ================================================================================ #
-
 _set_int() {
   local prompt="$1"
   local hint="$2"
@@ -436,8 +430,6 @@ _toggle() {
   local path="$1"
   hypr::toggle "$path" "$HYPR_CONF_LAF"
 }
-
-# ================================================================================ #
 
 _build() {
   cfgr::item::action --label "Gaps" --func "_gaps_menu"

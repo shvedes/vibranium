@@ -6,40 +6,40 @@
 #
 # Each managed variable must be preceded by an annotation block using @-tags.
 # The block must have no blank lines between it and the assignment.
-# Blank lines between blocks are required — they act as hard resets for the parser.
+# Blank lines between blocks are required - they act as hard resets for the parser.
 #
-# # @type   — required. One of: bool  int  string
-# # @range  — int only, optional. Format: N..M  (e.g. 0..100). N must be strictly less than M.
-# # @values — string only, required. Space-separated list of allowed values, unquoted.
-# # @desc   — optional, repeatable. Free-form human description. Ignored by the parser.
-#             Use multiple @desc lines for longer descriptions — each line is ignored
+# # @type   - required. One of: bool  int  string
+# # @range  - int only, optional. Format: N..M  (e.g. 0..100). N must be strictly less than M.
+# # @values - string only, required. Space-separated list of allowed values, unquoted.
+# # @desc   - optional, repeatable. Free-form human description. Ignored by the parser.
+#             Use multiple @desc lines for longer descriptions - each line is ignored
 #             individually, so line count has no effect on parsing.
-# # @note   — optional, repeatable. Free-form human notes. Ignored by the parser.
-#             Use multiple @note lines for longer descriptions — each line is ignored
+# # @note   - optional, repeatable. Free-form human notes. Ignored by the parser.
+#             Use multiple @note lines for longer descriptions - each line is ignored
 #             individually, so line count has no effect on parsing.
 # # @ignore - ignores the variable.
 #
-# Booleans — unquoted value, no @range or @values:
+# Booleans - unquoted value, no @range or @values:
 #   # @type bool
 #   # @desc Whether to show OSD notifications.
 #   # @note Note: spawns a new process!
 #   VIBRANIUM_FOO=true
 #
-# Integers — unquoted value, @range is optional:
+# Integers - unquoted value, @range is optional:
 #   # @type int
 #   # @range 0..100
 #   # @desc JPEG quality for screenshots (higher = larger file).
 #   # @note Stay within the range!
 #   VIBRANIUM_FOO=80
 #
-# Strings — double-quoted value, @values required:
+# Strings - double-quoted value, @values required:
 #   # @type string
 #   # @values value1 value2 valueN
 #   # @desc Which search engine to use for the search shortcut.
 #   VIBRANIUM_FOO="value1"
 #
 # The default value is read directly from the assignment (VAR=value).
-# Do not add a separate comment for the default — it is not parsed.
+# Do not add a separate comment for the default - it is not parsed.
 #
 # Variables without a @type annotation are ignored by the validator entirely.
 #

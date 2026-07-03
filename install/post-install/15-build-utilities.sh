@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 helpers::log::info "Building Vibranium utilities"
 helpers::log::info "This might take a minute"

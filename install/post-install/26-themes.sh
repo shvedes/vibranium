@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 if ! term::ask_yes_no N "Would you like to install additional themes?"; then
   exit 0

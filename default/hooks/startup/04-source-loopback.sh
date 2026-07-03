@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Wait for pipewire to start
 while ! pidof -q pipewire; do

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # If state file doesn't exist - create one and disable
 # night light (by default). We still need hyprsunset

@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-# ================================================================================ #
+#!/bin/bash
 
 _update_timeout() {
   local index="$1"
@@ -31,8 +29,6 @@ _set_timeouts() {
   _update_timeout "$timer_index" $((input * 60))
   systemctl --user restart hypridle &
 }
-
-# ================================================================================ #
 
 _build() {
   local config_valid="true"

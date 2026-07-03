@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Automatically populate sidebar menu (bookmarks)
 # with the default XDG folders.

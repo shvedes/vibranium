@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 
 WAYBAR_CONFIG="$XDG_CONFIG_HOME/waybar/config.jsonc"

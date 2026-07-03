@@ -1,6 +1,4 @@
-#!/usr/bin/bash
-
-# Credits: Omarchy
+#!/bin/bash
 
 AMD_AUDIO_CARD=
 

@@ -26,7 +26,7 @@ shcat() {
 
 # The state file has two tiers: persistent fields (player, volume) written on
 # every action, and an ephemeral action queue field written by the lock-fallback
-# path. write_state omits action intentionally — the queue consumer reads the
+# path. write_state omits action intentionally - the queue consumer reads the
 # pending action before writing, preventing a concurrent queue write from being
 # silently overwritten.
 read_state() {
@@ -223,7 +223,7 @@ get_volume() {
     # playerctl volume emits a decimal in 0-1 range.
     read -r result < <(playerctl volume 2>/dev/null)
   elif [[ "$PLAYER" == "mpd" ]]; then
-    # mpc volume output: "vol: 75" — extract the middle field, strip the
+    # mpc volume output: "vol: 75" - extract the middle field, strip the
     # trailing "%" if present, then convert 0-100 integer -> 0-1 float via
     # scientific notation (75 -> 0.75).
     read -r _ vol _ < <(mpc volume 2>/dev/null) || return 1

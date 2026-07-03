@@ -1,5 +1,4 @@
-#!/usr/bin/bash
-
+#!/bin/bash
 _va_exports=$(
   # Run the heavy lifting in a subshell so local functions and variables do not
   # pollute the caller's environment. We export back only the two variables.
@@ -22,7 +21,7 @@ _va_exports=$(
   # vendor string of the first match in priority order: nvidia > intel > amd.
   #
   # Falls back to any detected vendor (connected or not) when no connected
-  # display is found — handles headless / offload scenarios.
+  # display is found - handles headless / offload scenarios.
   #
   # Outputs one of: nvidia  intel  amd  (empty string if nothing detected)
   _active_display_vendor() {
@@ -144,7 +143,7 @@ _va_exports=$(
   _main
 )
 
-# eval must run here — in the top-level scope of the sourced script — so that
+# eval must run here - in the top-level scope of the sourced script - so that
 # the exports land in UWSM's env shell (or any other caller).
 # A pipe ( subshell | while-eval ) would create a second subshell for the
 # eval, making the exports invisible to the caller. $() + eval avoids that.

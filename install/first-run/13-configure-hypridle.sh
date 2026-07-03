@@ -1,13 +1,10 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Dynamically adjust idle times based on the machine type
 case "$CHASSIS_TYPE" in
 laptop | tablet | convertible)
-  # 2 minutes
   LOCK_AFTER=120
-  # 5 minutes
   SLEEP_AFTER=300
-  # set type
   MACHINE_TYPE="Portable (laptop/tablet)"
   ;;
 
@@ -17,11 +14,8 @@ vm)
 
 # Desktop / Other
 *)
-  # 10 minutes
   LOCK_AFTER=600
-  # 15 minutes
   SLEEP_AFTER=900
-  # set type
   MACHINE_TYPE="Desktop/Any other"
   ;;
 esac

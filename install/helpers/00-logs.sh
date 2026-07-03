@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 helpers::log::info() {
   echo -e "\e[0;36m[INFO]\e[0m ${*}"
 }

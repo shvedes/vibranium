@@ -1,16 +1,14 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 helpers::log::info "Applying default theme"
 
 THEME_DIR="$HOME/.config/vibranium/current/theme"
 mkdir -p "$THEME_DIR"
 
-# Symlink the btop theme
 mkdir -p "$HOME/.config/btop/themes"
 helpers::symlink "$HOME/.config/vibranium/current/theme/btop.theme" \
   "$HOME/.config/btop/themes/vibranium.theme"
 
-# GNOME / GTK
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
 gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
 gsettings set org.gnome.desktop.interface icon-theme 'Vibranium'
@@ -19,15 +17,12 @@ mkdir -p ~/.config/gtk-3.0
 printf '* {\n\tborder-radius: 0;\n}\n\n@import "colors.css";' |
   helpers::write_file ~/.config/gtk-3.0/gtk.css
 
-# QTCT
 helpers::sed "$HOME/.config/qt5ct/qt5ct.conf" "s/user/$USER/"
 helpers::sed "$HOME/.config/qt6ct/qt6ct.conf" "s/user/$USER/"
 
-# Default animations preset
 helpers::symlink "$VIBRANIUM/default/hypr/animations/default.lua" \
   "$HOME/.config/hypr/hyprland.conf.d/animations.lua"
 
-# Browser colors
 CHROME_FOLDER="/etc/chromium/policies/managed"
 CHROME_COLORS="$CHROME_FOLDER/color.json"
 BROWSER_COLORS_FILES=("$CHROME_COLORS")
@@ -35,7 +30,6 @@ BROWSER_COLORS_FILES=("$CHROME_COLORS")
 sudo mkdir -p "$CHROME_FOLDER"
 sudo chown -R "$USER:$USER" "$CHROME_FOLDER"
 
-# In case if user chose brave is browser of choise.
 if command -v brave >/dev/null; then
   BRAVE_FOLDER="/etc/brave/policies/managed"
   BRAVE_COLORS="$BRAVE_FOLDER/color.json"
@@ -50,7 +44,6 @@ for file in "${BROWSER_COLORS_FILES[@]}"; do
   printf '{ "BrowserThemeColor": "#192330" }\n' | helpers::write_file "$file"
 done
 
-# Cursor theme
 echo "Adwaita" >"$HOME/.local/state/vibranium/cursor-theme"
 echo "24" >"$HOME/.local/state/vibranium/cursor-size"
 

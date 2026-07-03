@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Archive Manager
 cp /usr/share/applications/xarchiver.desktop ~/.local/share/applications

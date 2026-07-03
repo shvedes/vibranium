@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 # Early exit if no AMD GPU is found
 if ! vb-hw-gpu amd; then

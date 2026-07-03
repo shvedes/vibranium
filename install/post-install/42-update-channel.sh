@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 STATE_FILE="$HOME/.local/state/vibranium/update.channel"
 

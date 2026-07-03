@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 while read -r fstype; do
   if [[ "$fstype" == "btrfs" ]]; then

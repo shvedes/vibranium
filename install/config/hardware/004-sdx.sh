@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 while read -r major minor blocks name; do
   if [[ "$name" =~ (sda|hda) ]]; then

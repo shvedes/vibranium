@@ -73,9 +73,9 @@ _to_int100() {
 show_volume_notification() {
   local device="$1"
   local type="$2"
-  # $3 display_vol  – pre-computed integer %; omit to query wpctl (toggle case)
-  # $4 bar_value    – pre-computed 0-100 bar value
-  # $5 muted        – "true" if muted, anything else / absent means unmuted
+  # $3 display_vol  - pre-computed integer %; omit to query wpctl (toggle case)
+  # $4 bar_value    - pre-computed 0-100 bar value
+  # $5 muted        - "true" if muted, anything else / absent means unmuted
   local display_vol="$3"
   local bar_value="$4"
   local muted="$5"

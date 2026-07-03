@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Reference DPI that UI toolkits treat as "1x" (the CSS/Windows standard).
 # Scale = physical_dpi / REFERENCE_DPI, rounded to the nearest clean step.

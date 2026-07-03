@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # We have nothing to connect / listen to in a vm.
 if [[ "$CHASSIS_TYPE" == "vm" ]]; then

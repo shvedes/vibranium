@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 helpers::log::info "Configuring system"
 
@@ -42,7 +42,6 @@ polkit.addRule(function(action, subject) {
 });
 EOF2
 
-# Auxiliary scripts (executed by the udev)
 local_bin_files=()
 for entry in "$VIBRANIUM"/extras/usr/local/bin/*; do
   [[ -e "$entry" ]] || continue

@@ -254,7 +254,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# No capture mode given — nothing to do.
+# No capture mode given - nothing to do.
 if [[ -z $MODE ]]; then
   usage
   exit 0

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 if ! vb-hw-gpu intel; then
   exit 0
@@ -19,12 +19,10 @@ packages=(
 VGA_STR="$(lspci -nn | grep -i "8086:")"
 
 case "$VGA_STR" in
-  # Broadwell (2014) and newer
   *Broadwell* | *Skylake* | *"Kaby Lake"* | *"Coffee Lake"* | *"Comet Lake"* | *"Ice Lake"* | *"Tiger Lake"* | *"Alder Lake"* | *"Raptor Lake"* | *Arc*)
     packages+=("intel-media-driver")
     ;;
 
-  # GMA 4500 (2008) up to pre-Broadwell
   *Penryn* | *Nehalem* | *Westmere* | *"Sandy Bridge"* | *"Ivy Bridge"* | *Haswell*)
     packages+=("libva-intel-driver")
     ;;

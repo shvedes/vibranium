@@ -9,7 +9,7 @@ tmp="/dev/shm/vb-migration-$TIMESTAMP.sh"
 trap 'rm -f "$tmp"' EXIT
 
 cat >"$tmp" <<'EOF'
-#!/usr/bin/bash
+#!/bin/bash
 
 GREEN=$'\e[0;32m'
 RESET=$'\e[0m'

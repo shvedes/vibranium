@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 # Here you can write your custom logic, which will
 # execute every time you log out from your current session.

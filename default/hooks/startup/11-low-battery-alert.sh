@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 for CANDIDATE in /sys/class/power_supply/*; do
   [[ -f "$CANDIDATE/type" ]] || continue

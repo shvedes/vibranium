@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 source vb-lib-hypr
 
@@ -701,9 +701,7 @@ _menu::master() {
       --label "Always keep position : ${HYPR[master.always_keep_position]}" \
       --func "hypr::toggle 'master:always_keep_position' "$HYPR_CONF_ADVANCED""
 
-    # cfgr::item::action \
-    #   --label "Focus master on close : ${HYPR[master.focus_master_on_close]}" \
-    #   --func "hypr::toggle 'master:focus_master_on_close' "$HYPR_CONF_ADVANCED""
+    
   }
 
   cfgr::run "Master Layout" "_b"

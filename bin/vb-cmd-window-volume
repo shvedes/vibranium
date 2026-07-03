@@ -13,8 +13,6 @@ STEP="5"
 ACTION=""
 SELF="${0##*/}"
 
-# Shoutout to https://github.com/Vladimir-csp
-# for this neat solution.
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"

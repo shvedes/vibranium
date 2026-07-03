@@ -30,10 +30,10 @@ ini_upsert() {
   fi
 
   if grep -q "^${key}\s*=" "$file"; then
-    # key exists – update in-place
+    # key exists - update in-place
     sed -i "s|^${key}\s*=.*|${key}=${value}|" "$file"
   else
-    # key absent – append after the section header, or at end of file
+    # key absent - append after the section header, or at end of file
     if grep -q "^\[${section}\]" "$file"; then
       sed -i "/^\[${section}\]/a ${key}=${value}" "$file"
     else
@@ -131,7 +131,7 @@ fi
 available_sizes=$(vb-cursor-list --size "$SELECTED_THEME" 2> /dev/null | awk '{$1=""; print}')
 
 if [[ -n "$available_sizes" ]] && ! grep -qw "$SELECTED_SIZE" <<< "$available_sizes"; then
-  msg="Size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME' — falling back to ${DEFAULT_SIZE}px"
+  msg="Size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME' - falling back to ${DEFAULT_SIZE}px"
 
   if [[ -t 1 ]]; then
     msg="size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME'"$'\n'"Run: vb-cursor-list --size '$SELECTED_THEME'"
@@ -140,7 +140,7 @@ if [[ -n "$available_sizes" ]] && ! grep -qw "$SELECTED_SIZE" <<< "$available_si
   fi
 
   notify-send -r 4 -t 10000 "Vibranium - Cursor Themes" "$msg"
-  # Carried-over size doesn't fit the new theme — silently use the default.
+  # Carried-over size doesn't fit the new theme - silently use the default.
   SELECTED_SIZE="$DEFAULT_SIZE"
 fi
 

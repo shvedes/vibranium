@@ -136,10 +136,10 @@ if [[ "$show_album_art" = true ]]; then
   "playerctl")
     album_art_url="$(playerctl metadata mpris:artUrl)"
     if [[ "$album_art_url" =~ ^https?:// ]]; then
-      # Online players (e.g. Spotify) expose a remote URL — download it.
+      # Online players (e.g. Spotify) expose a remote URL - download it.
       curl -s "$album_art_url" -o "$album_art"
     else
-      # Local players (e.g. mpv, VLC) expose a file:// path — use directly.
+      # Local players (e.g. mpv, VLC) expose a file:// path - use directly.
       album_art="$album_art_url"
     fi
     ;;

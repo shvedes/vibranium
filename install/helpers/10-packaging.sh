@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 helpers::install_pkg() {
   if [[ "$1" == "--verify" ]]; then
     local verify=true
@@ -60,7 +59,7 @@ helpers::install_pkg() {
 
     ((current++))
 
-    # Clear tag and start spinner immediately — zero gap between packages
+    # Clear tag and start spinner immediately - zero gap between packages
     echo "" > "$tag_file"
     _spinner "$pkg" "$frame_file" "$current" "$tag_file" "$total" &
     spinner_pid=$!

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # Initial state for the hyprsunset
 if [[ "$CHASSIS_TYPE" != vm ]]; then

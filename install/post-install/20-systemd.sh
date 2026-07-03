@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 helpers::log::info "Setting up systemd units"
 

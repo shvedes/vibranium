@@ -1,16 +1,14 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 packages=()
 
 printf "%s[>>>>]%s Additional packages (space-separated, empty to skip): %s" "$CYAN" "$RESET" "$YELLOW"
 trap 'printf "%s" "$RESET"' INT
 
-# Handle input
 term::enable_input
 read -ra packages
 term::disable_input
 
-# Restore text color
 printf "%s" "$RESET"
 trap - INT
 

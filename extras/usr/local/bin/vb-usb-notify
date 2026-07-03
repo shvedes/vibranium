@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 # helper: check if partition looks like EFI (returns 0 if EFI)
 is_efi_partition() {

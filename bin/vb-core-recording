@@ -52,7 +52,7 @@ get_output_dir() {
   _dir="${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts"
 
   # Lazily create the output directory on first invocation rather than at
-  # script startup — avoids creating empty directories when --help is used.
+  # script startup - avoids creating empty directories when --help is used.
   if [[ ! -d "$_dir" ]]; then
     mkdir -p "$_dir"
   fi
@@ -75,7 +75,7 @@ visualize() {
   vb-refresh-waybar-module recording
 
   # Brief screen flash to provide immediate visual confirmation that
-  # recording started — useful for region/portal modes where there is no
+  # recording started - useful for region/portal modes where there is no
   # visible UI chrome otherwise.
   if [[ $VIBRANIUM_RECORDING_FLASH_SCREEN == true ]]; then
     hypr::flash::screen
@@ -278,7 +278,7 @@ start_recording() {
   fi
 
   # In portal mode a non-zero exit without an output file always means
-  # the picker was dismissed — no encoder was ever selected so fallback
+  # the picker was dismissed - no encoder was ever selected so fallback
   # makes no sense, and a second picker would just confuse the user.
   if [[ $AREA == portal ]]; then
     log Info "Recording cancelled by user"
@@ -366,7 +366,7 @@ MODE=""
 # Parse CLI flags. Options that consume a positional value (e.g. --region)
 # use `break` so subsequent arguments can be forwarded to child programs or
 # treated as operands. Flags that come AFTER the mode keyword are ignored
-# by this loop — currently there are none, but this structure supports that
+# by this loop - currently there are none, but this structure supports that
 # pattern without a refactor.
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -437,7 +437,7 @@ case "$MODE" in
   fi
   ;;
 "")
-  # No arguments at all — show usage and exit cleanly.
+  # No arguments at all - show usage and exit cleanly.
   usage
   exit 0
   ;;

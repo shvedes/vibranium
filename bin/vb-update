@@ -248,7 +248,7 @@ _update() {
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Local:  $current_short ($current_commit)"
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Remote: $remote_short ($remote_commit)"
 
-    if [[ "$behind" -eq 0 ]]; then
+    if (( behind == 0 )); then
       if [[ "$current_commit" == "$remote_commit" ]]; then
         echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date"
       else

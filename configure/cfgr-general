@@ -1,6 +1,4 @@
-#!/usr/bin/env bash
-
-# ================================================================================ #
+#!/bin/bash
 
 _toggle_osd_service() {
   # Since we're working with outdated value, flip the logic
@@ -50,8 +48,6 @@ _toggle_vb_updates (){
     systemctl -q --user enable --now vibranium-update.timer
   fi
 }
-
-# ================================================================================ #
 
 _build() {
   local update_channel

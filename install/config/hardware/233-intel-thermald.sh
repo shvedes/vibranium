@@ -1,7 +1,5 @@
-#!/usr/bin/bash
+#!/bin/bash
 
-# Source: Omarchy; adapted for Vibranium.
-#
 # Enable thermald for Intel laptops (Sandy Bridge and newer)
 # Thermald is useful for Intel Sandy Bridge (2nd gen Core, model 42/45) and newer CPUs.
 

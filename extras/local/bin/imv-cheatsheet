@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 source ~/.config/vibranium/current/theme/vb-lib-theme
 

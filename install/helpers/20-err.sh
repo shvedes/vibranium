@@ -1,5 +1,4 @@
-#!/usr/bin/bash
-
+#!/bin/bash
 # Written by helpers::prompt_err_action; read immediately after it returns.
 # Valid values: "retry", "skip", "abort".
 # Must never be read from a subshell -- callers must invoke helpers::prompt_err_action

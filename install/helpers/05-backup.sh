@@ -1,5 +1,4 @@
-#!/usr/bin/env bash
-
+#!/bin/bash
 _VB_BACKUP_HOME_STORE="$HOME/.local/state/vibranium/backup/home"
 _VB_BACKUP_SYSTEM_STORE="$HOME/.local/state/vibranium/backup/system"
 
@@ -65,7 +64,6 @@ helpers::backup_path() {
 
   $as_root mkdir -p "$bk_dir"
 
-  # cp -a preserves permissions, ownership, timestamps, and symlinks.
   if ! $as_root cp -a "$original" "$_VB_BK_PATH" 2>/dev/null; then
     helpers::log::warn "Could not back up ${original}, continuing without a backup for it"
     return 1

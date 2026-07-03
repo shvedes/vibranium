@@ -164,8 +164,8 @@ has_password_entries() {
 #   - Enter on valid text -> write to nameref, return 0
 #
 # Returns:
-#   0  — valid name written into nameref_var
-#   1  — user pressed ESC (cancelled)
+#   0  - valid name written into nameref_var
+#   1  - user pressed ESC (cancelled)
 prompt_valid_name() {
   local -n _pvn_out="$1"
   local title="$2"
@@ -182,17 +182,17 @@ prompt_valid_name() {
 
     if [[ "$input" == "$hint" ]]; then
       # User pressed Enter on the hint text without typing a real name.
-      # Re-show the prompt — do NOT treat this as a cancel (issue 4/6).
+      # Re-show the prompt - do NOT treat this as a cancel (issue 4/6).
       continue
     fi
 
     # Strip leading whitespace: remove the shortest span of non-whitespace
-    # from the end, which leaves only the leading whitespace — then remove that.
+    # from the end, which leaves only the leading whitespace - then remove that.
     input="${input#"${input%%[![:space:]]*}"}"
     # Strip trailing whitespace: same logic in reverse.
     input="${input%"${input##*[![:space:]]}"}"
 
-    # After stripping whitespace, nothing remains — re-ask.
+    # After stripping whitespace, nothing remains - re-ask.
     if [[ -z "$input" ]]; then
       continue
     fi
@@ -228,7 +228,7 @@ prompt_valid_name() {
       continue
     fi
 
-    # All checks passed — write through the nameref and return success.
+    # All checks passed - write through the nameref and return success.
     _pvn_out="$input"
     return 0
   done
@@ -243,7 +243,7 @@ prompt_valid_name() {
 # Problem this solves:
 #   xdg-terminal-exec forks itself and does NOT block the calling shell. If the GPG
 #   agent has not yet cached the key passphrase, gpg's pinentry dialog would
-#   appear AFTER the terminal window opens — visually behind it — making the
+#   appear AFTER the terminal window opens - visually behind it - making the
 #   editor look frozen while waiting for a prompt the user can't see.
 #
 # Solution:
@@ -252,7 +252,7 @@ prompt_valid_name() {
 #   foreground. Once the user authenticates, the gpg-agent caches the key for
 #   its configured TTL, so the subsequent `pass edit` inside the terminal
 #   decrypts without prompting again.
-#   If the key is already cached, gpg returns 0 instantly — zero overhead.
+#   If the key is already cached, gpg returns 0 instantly - zero overhead.
 #
 # Why decrypt the specific file (not an arbitrary one):
 #   Decrypting the exact file that `pass edit` will open confirms that this
@@ -263,7 +263,7 @@ prompt_valid_name() {
 # Why no --batch flag:
 #   `--batch` instructs gpg to never prompt interactively. On some agent
 #   configurations this causes gpg to silently skip the pinentry call and
-#   return 0 anyway — without actually caching the key. The terminal then
+#   return 0 anyway - without actually caching the key. The terminal then
 #   opens and `pass edit` calls gpg, which finds no cached key, tries to
 #   prompt, fails silently, and hands `pass edit` an empty temp file to edit.
 #   Omitting `--batch` lets gpg properly route the passphrase request through
@@ -275,8 +275,8 @@ prompt_valid_name() {
 #                      (e.g. "email/gmail", same value passed to pass edit)
 #
 # Returns:
-#   0        — key is cached or was just successfully unlocked
-#   non-zero — user cancelled pinentry or gpg failed; do NOT open terminal
+#   0        - key is cached or was just successfully unlocked
+#   non-zero - user cancelled pinentry or gpg failed; do NOT open terminal
 ensure_gpg_unlocked() {
   local password="$1"
   local gpg_file="$PASSWORD_STORE_DIR/${password}.gpg"
@@ -311,7 +311,7 @@ ensure_gpg_unlocked() {
 # On first push (no upstream tracking branch configured), passes -u to set
 # the upstream so all subsequent pushes can use the simpler plain form.
 # We intentionally do NOT specify a branch name so git resolves it from the
-# current HEAD — works correctly regardless of branch naming.
+# current HEAD - works correctly regardless of branch naming.
 # Uses git directly (not `pass git`) for predictable, unmodified exit codes.
 git_push_with_upstream_check() {
   if ! git -C "$PASSWORD_STORE_DIR" rev-parse --verify "@{u}" >/dev/null 2>&1; then
@@ -326,7 +326,7 @@ git_push_with_upstream_check() {
 # wait_for_internet
 #
 # Blocks until a network connection is confirmed by pinging Cloudflare's DNS.
-# Designed for use inside background jobs — burns negligible CPU.
+# Designed for use inside background jobs - burns negligible CPU.
 #   1.1.1.1  : globally reachable, reliable, responds to ICMP
 #   -c 1     : one probe packet per attempt
 #   -W 1     : wait at most 1 second per attempt before retrying
@@ -354,7 +354,7 @@ async_git_push() {
   output="$(git_push_with_upstream_check 2>&1)"
   push_ret=$?
 
-  if [[ $push_ret -ne 0 ]]; then
+  if (( push_ret != 0 )); then
     log Error "Push to remote failed: $output"
     notify-send -r 4 -t 5000 -u critical \
       "Password Manager" "Error pushing to remote: $output"
@@ -377,7 +377,7 @@ async_git_push() {
 push_after_edit_if_needed() {
   is_git_repo && has_git_remote || return 0
 
-  # No upstream tracking ref yet (first push ever) — push unconditionally.
+  # No upstream tracking ref yet (first push ever) - push unconditionally.
   if ! git -C "$PASSWORD_STORE_DIR" rev-parse --verify "@{u}" >/dev/null 2>&1; then
     async_git_push &
     return 0
@@ -410,11 +410,11 @@ export -f has_git_remote
 # pick_location  <nameref_var>  [current_path]  [mode]
 #
 # Interactive folder browser. Result (relative path) is written into
-# <nameref_var> via nameref — no subshell, no printf, no command substitution.
+# <nameref_var> via nameref - no subshell, no printf, no command substitution.
 #
 # Returns:
-#   0  — user confirmed a location (nameref_var is set to the chosen path)
-#   1  — user cancelled from the root level
+#   0  - user confirmed a location (nameref_var is set to the chosen path)
+#   1  - user cancelled from the root level
 #
 # Arguments:
 #   $1  nameref_var   caller's variable to receive the chosen path
@@ -502,14 +502,14 @@ pick_location() {
           # The folder already exists on disk. Rather than erroring out
           # or silently doing nothing, navigate into it: the user's intent
           # of "I want to go to this folder" is satisfied either way.
-          # We do not notify — teleporting is self-evident from context.
+          # We do not notify - teleporting is self-evident from context.
           if [[ -z "$current_path" ]]; then
             current_path="$new_folder"
           else
             current_path="$current_path/$new_folder"
           fi
         else
-          # Folder does not exist — create it and stay at the current level
+          # Folder does not exist - create it and stay at the current level
           # so the user can see it in the listing and navigate in if desired.
           mkdir -p "$full_dir/$new_folder"
           log Info "Created folder: $new_folder"
@@ -555,8 +555,8 @@ pick_location() {
 # select a password entry ([F] items), then hand off to action().
 #
 # Returns:
-#   0  — an action completed; caller should exit the script
-#   1  — user cancelled from the root level
+#   0  - an action completed; caller should exit the script
+#   1  - user cancelled from the root level
 pick_password_path() {
   local current_path="${1:-}"
   local full_dir dirs files items chosen type name row_key i
@@ -648,18 +648,18 @@ pick_password_path() {
 
       # Action sub-loop for the selected entry.
       # action() return codes:
-      #   0 -> operation complete (copy/edit) — bubble up and exit
-      #   1 -> error or cancel — re-show action menu
+      #   0 -> operation complete (copy/edit) - bubble up and exit
+      #   1 -> error or cancel - re-show action menu
       #   2 -> go back to file listing (same directory)
-      #   3 -> entry deleted — rebuild directory view from surviving parent
+      #   3 -> entry deleted - rebuild directory view from surviving parent
       while true; do
         action "$password_full"
         local action_ret=$?
-        if [[ $action_ret -eq 0 ]]; then
+        if (( action_ret == 0 )); then
           return 0
-        elif [[ $action_ret -eq 2 ]]; then
+        elif (( action_ret == 2 )); then
           break # Redisplay listing for current directory.
-        elif [[ $action_ret -eq 3 ]]; then
+        elif (( action_ret == 3 )); then
           # Entry deleted. `pass rm` may have also removed empty parent
           # directories. Walk upward until we find one that still exists.
           full_dir="$PASSWORD_STORE_DIR/$current_path"
@@ -673,7 +673,7 @@ pick_password_path() {
           done
           break # Rebuild listing for the surviving parent.
         fi
-        # action_ret eq 1: error or cancel — re-show action menu.
+        # action_ret eq 1: error or cancel - re-show action menu.
       done
     fi
   done
@@ -688,10 +688,10 @@ pick_password_path() {
 # Shows an action menu for the given password entry and dispatches the handler.
 #
 # Returns:
-#   0  — operation complete; propagate exit upward
-#   1  — stay in current context (error, cancel, sub-action abort)
-#   2  — go back to the file listing
-#   3  — entry was deleted; caller should rebuild the directory view
+#   0  - operation complete; propagate exit upward
+#   1  - stay in current context (error, cancel, sub-action abort)
+#   2  - go back to the file listing
+#   3  - entry was deleted; caller should rebuild the directory view
 action() {
   local password="$1"
   local actions=("Copy" "Edit" "Move" "Rename" "Delete")
@@ -757,11 +757,11 @@ action() {
     # Pre-warm the GPG agent BEFORE forking the terminal.
     # See ensure_gpg_unlocked's docstring for the full rationale.
     # If the key is already cached, this returns 0 instantly.
-    # If not, pinentry appears HERE — synchronously, in the foreground —
+    # If not, pinentry appears HERE - synchronously, in the foreground -
     # BEFORE the terminal window opens.
     if ! ensure_gpg_unlocked "$password"; then
       # User cancelled pinentry or gpg failed. Do NOT open the terminal.
-      # Returning 1 keeps us in the action menu — not a full exit.
+      # Returning 1 keeps us in the action menu - not a full exit.
       log Error "Failed to unlock keyring for: $password"
       notify-send -r 4 -t 3000 -u critical \
         "Password Manager" "Failed to unlock keyring. Edit cancelled."
@@ -779,7 +779,7 @@ action() {
     #   2. After the editor closes, calls push_after_edit_if_needed, which
     #      checks whether a commit was actually made and only then pushes.
     # xdg-terminal-exec forks and returns immediately to the parent shell, so
-    # the push logic MUST run inside the terminal's bash -c process —
+    # the push logic MUST run inside the terminal's bash -c process -
     # not in the parent (where it would run before editing even starts).
     # All needed functions are available via export -f (done at script top).
     xdg-terminal-exec --app-id=org.vb.term.float --title="pass" -- \
@@ -808,7 +808,7 @@ action() {
       return 1
     fi
 
-    # Paths passed as plain variables — no shell escaping needed.
+    # Paths passed as plain variables - no shell escaping needed.
     # Shell escaping is for eval/interpreter contexts, not direct arg passing.
     if pass mv "$password" "$new_path" >/dev/null; then
       log Info "Moved password: $password -> $new_path"
@@ -866,7 +866,7 @@ action() {
       #
       # Important: `pass rm --force` prunes empty directories automatically
       # at its own discretion. A parent folder may already be gone on disk
-      # by the time we reach this loop — we must not ask the user to delete
+      # by the time we reach this loop - we must not ask the user to delete
       # something that doesn't exist anymore. We detect that case separately
       # from the case where the folder exists but is empty, and handle them
       # differently: auto-pruned folders are cleaned up silently; only
@@ -887,7 +887,7 @@ action() {
         local full_check="$PASSWORD_STORE_DIR/$check_dir"
 
         if [[ ! -d "$full_check" ]]; then
-          # The directory no longer exists on disk — pass rm already
+          # The directory no longer exists on disk - pass rm already
           # pruned it automatically. We did not ask; we cannot prevent
           # it. Clean up the stale cursor entries for this path so
           # a future folder with the same name doesn't inherit a
@@ -903,7 +903,7 @@ action() {
             check_dir="${check_dir%/*}"
             unset "last_selected_row[password_path:$check_dir]"
           else
-            # This folder's parent is the store root — stop here.
+            # This folder's parent is the store root - stop here.
             break
           fi
           continue
@@ -911,14 +911,14 @@ action() {
 
         # The directory exists. Check whether it has any remaining content.
         # -maxdepth 1 limits the scan to the immediate level; we don't
-        # need to recurse — any direct child means the folder is non-empty.
+        # need to recurse - any direct child means the folder is non-empty.
         local _dir_contents=()
         mapfile -t _dir_contents < <(
           find "$full_check" -mindepth 1 -maxdepth 1 2>/dev/null
         )
 
         if [[ ${#_dir_contents[@]} -gt 0 ]]; then
-          # Directory still has content — stop climbing.
+          # Directory still has content - stop climbing.
           break
         fi
 
@@ -942,16 +942,16 @@ action() {
           # Derive the parent and reset its cursor to 0.
           # The deleted folder was one of its listed items; the saved
           # index now points at whatever happens to be at that position
-          # in the next render — reset to 0 to avoid a stale jump.
+          # in the next render - reset to 0 to avoid a stale jump.
           if [[ "$check_dir" == */* ]]; then
             check_dir="${check_dir%/*}"
             unset "last_selected_row[password_path:$check_dir]"
           else
-            # Parent is the store root — never delete it; stop here.
+            # Parent is the store root - never delete it; stop here.
             break
           fi
         else
-          # User declined — stop climbing. Per spec: saying "No" at any
+          # User declined - stop climbing. Per spec: saying "No" at any
           # level ends the chain; grandparents are not asked.
           break
         fi
@@ -976,11 +976,11 @@ action() {
 # pick_secret_key  <nameref_var>
 #
 # Presents a rofi menu listing all available GPG secret key fingerprints.
-# Writes the chosen fingerprint into <nameref_var> via nameref — no subshell.
+# Writes the chosen fingerprint into <nameref_var> via nameref - no subshell.
 #
 # Returns:
-#   0  — fingerprint written into nameref_var
-#   1  — user cancelled or selection not in list
+#   0  - fingerprint written into nameref_var
+#   1  - user cancelled or selection not in list
 pick_secret_key() {
   local -n _psk_out="$1"
   local key_list=() chosen_key found=0 k
@@ -1020,7 +1020,7 @@ initialize_password_store() {
   local key="" key_fingerprints=() key_count
 
   # Collect all secret key fingerprints into an array in one shot.
-  # Using an array lets us check the count with ${#...} — no external
+  # Using an array lets us check the count with ${#...} - no external
   # `wc -l`, no subshell, and no risk of the original bug where a multi-line
   # string was compared with -gt as if it were an integer.
   mapfile -t key_fingerprints < <(
@@ -1029,12 +1029,12 @@ initialize_password_store() {
   )
   key_count="${#key_fingerprints[@]}"
 
-  if [[ $key_count -eq 0 ]]; then
+  if (( key_count == 0 )); then
     log Error "No GPG secret keys available"
     notify-send -r 4 -t 5000 -u critical "Password Manager" \
       "No GPG keys found. Please create one first with 'gpg --gen-key'"
     exit 1
-  elif [[ $key_count -gt 1 ]]; then
+  elif (( key_count > 1 )); then
     # Multiple keys: user must choose which one to use as the store key.
     # pick_secret_key writes the fingerprint into 'key' via nameref.
       if ! pick_secret_key key; then
@@ -1043,7 +1043,7 @@ initialize_password_store() {
       exit 1
     fi
   else
-    # Exactly one key: no ambiguity — use it directly from the array.
+    # Exactly one key: no ambiguity - use it directly from the array.
     key="${key_fingerprints[0]}"
   fi
 
@@ -1113,15 +1113,15 @@ search_passwords() {
     while true; do
       action "$chosen_full"
       local action_ret=$?
-      if [[ $action_ret -eq 0 ]]; then
+      if (( action_ret == 0 )); then
         return 0
-      elif [[ $action_ret -eq 2 || $action_ret -eq 3 ]]; then
+      elif (( action_ret == 2 || action_ret == 3 )); then
         # Back to search (2), or entry deleted (3).
         # Break to outer loop which rebuilds the full flat list.
         # Deleted entries will simply be absent from the new list.
         break
       fi
-      # action_ret eq 1: cancel or error — re-show action menu.
+      # action_ret eq 1: cancel or error - re-show action menu.
     done
   done
 }
@@ -1162,7 +1162,7 @@ while true; do
 
   # ── INITIALIZED STORE ────────────────────────────────────────────────
 
-  # Show Open/Search only when entries exist — an empty store can't be
+  # Show Open/Search only when entries exist - an empty store can't be
   # browsed or searched meaningfully.
   if has_password_entries; then
     OPTIONS=(
@@ -1211,7 +1211,7 @@ while true; do
 
   "Create password")
     # Step 1: choose destination folder.
-    # pick_location writes the path into 'location' via nameref — no subshell.
+    # pick_location writes the path into 'location' via nameref - no subshell.
     if ! pick_location location "" "generate"; then
       continue
     fi
@@ -1247,7 +1247,7 @@ while true; do
       continue
     fi
 
-    # Step 4: overwrite guard — shared across both methods.
+    # Step 4: overwrite guard - shared across both methods.
     #
     # Neither `pass insert` nor `pass generate` can be safely prompted
     # in the background, so we intercept the overwrite case ourselves with
@@ -1287,7 +1287,7 @@ while true; do
       enter_tmpdir=$(mktemp -d)
 
       # The file nvim will open. Created empty so nvim does not show a
-      # "new file" notice — the user should see a clean, blank buffer.
+      # "new file" notice - the user should see a clean, blank buffer.
       export _VB_ENTER_FILE="$enter_tmpdir/password"
       : >"$_VB_ENTER_FILE"
 
@@ -1300,7 +1300,7 @@ while true; do
       #
       # (a) Deadlock when xdg-terminal-exec is synchronous (blocks until the
       #     terminal process exits): the child's `printf x > fifo` opens the
-      #     write end with O_WRONLY, which blocks waiting for a reader — but
+      #     write end with O_WRONLY, which blocks waiting for a reader - but
       #     the parent is still stuck inside xdg-terminal-exec and has not yet
       #     reached the `read` below. Neither side can proceed.
       #     With the fd already open O_RDWR here, the child's O_WRONLY open
@@ -1316,8 +1316,8 @@ while true; do
       exec {_vb_fd}<>"$_VB_ENTER_FIFO"
 
       # Fork the floating terminal. The bash -c chain:
-      #   1. nvim opens the temp file — user types the password, then :wq
-      #   2. printf writes one byte to the FIFO — unblocks the parent read
+      #   1. nvim opens the temp file - user types the password, then :wq
+      #   2. printf writes one byte to the FIFO - unblocks the parent read
       # $_VB_ENTER_FILE and $_VB_ENTER_FIFO are expanded by this shell
       # (double-quoted context); single quotes in the child protect the paths
       # from word-splitting inside bash -c.
@@ -1328,12 +1328,12 @@ while true; do
       # -n 1: return after exactly one byte. Without this, read waits for a
       #   newline terminator that `printf x` never writes. Because the parent
       #   also holds the write end open (via the O_RDWR fd), EOF never arrives
-      #   either — so a plain `read` would hang indefinitely even after the
+      #   either - so a plain `read` would hang indefinitely even after the
       #   child has written the signal byte.
       # -t 600: 5 min safety timeout for the case where the terminal
       #   window is force-closed (killing bash -c before it writes to the FIFO).
       if ! read -r -n 1 -t 600 _enter_signal <&"$_vb_fd"; then
-        # Timeout or read error — terminal was likely force-closed.
+        # Timeout or read error - terminal was likely force-closed.
         exec {_vb_fd}>&-
         rm -rf "$enter_tmpdir"
         unset _VB_ENTER_FILE _VB_ENTER_FIFO
@@ -1357,14 +1357,14 @@ while true; do
       rm -rf "$enter_tmpdir"
       unset _VB_ENTER_FILE _VB_ENTER_FIFO
 
-      # Empty file (or all-blank lines) means the user saved nothing —
+      # Empty file (or all-blank lines) means the user saved nothing -
       # treat as cancellation rather than storing a blank password.
       if [[ -z "$entered_pw" ]]; then
         continue
       fi
 
       # `pass insert --echo` reads a single plaintext line from stdin,
-      # encrypts it, and commits the result — no terminal interaction.
+      # encrypts it, and commits the result - no terminal interaction.
       # `--force` skips pass's own overwrite prompt; we already confirmed.
       # `printf '%s\n'` guarantees exactly one trailing newline (the record
       # terminator pass expects) without echo's -e interpretation risk.
@@ -1376,8 +1376,7 @@ while true; do
           pass insert --echo "$pass_path" >/dev/null
       fi
 
-      # shellcheck disable=SC2181
-      if [[ $? -eq 0 ]]; then
+      if (( $? == 0 )); then
         printf '%s' "$entered_pw" | wl-copy --sensitive --type text/plain
         log Info "Password saved: $pass_path"
         notify-send -r 3 "Password Manager" "Password saved and copied to clipboard"
@@ -1411,7 +1410,7 @@ while true; do
     output="$(git_push_with_upstream_check 2>&1)"
     ret=$?
 
-    if [[ $ret -ne 0 ]]; then
+    if (( ret != 0 )); then
       log Error "Push to remote failed: $output"
       notify-send -r 4 -t 5000 -u critical \
         "Password Manager" "Push failed: $output"
@@ -1432,7 +1431,7 @@ while true; do
     output="$(pass git pull 2>&1)"
     ret=$?
 
-    if [[ $ret -ne 0 ]]; then
+    if (( ret != 0 )); then
       log Error "Pull from remote failed: $output"
       notify-send -r 4 -t 5000 -u critical \
         "Password Manager" "Pull failed: $output"

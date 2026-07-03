@@ -1,10 +1,6 @@
-#!/usr/bin/bash
-
-# Credits: Omarchy
+#!/bin/bash
 
 # Assume we're using UKIs.
-# I have no Intel hardware ATM, so I can't
-# verify if this works.
 
 CMDLINE_FILE="/etc/kernel/cmdline"
 

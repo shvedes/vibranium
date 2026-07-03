@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 _build() {
   cfgr::item::action --func "cfgr-idle" --label "Idle" --icon vb-idle

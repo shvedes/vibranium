@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 helpers::check VIBRANIUM_GLOBAL_SHOW_WALLPAPER
 if [[ ! $VIBRANIUM_GLOBAL_SHOW_WALLPAPER == true ]]; then

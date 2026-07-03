@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 if [[ -f $VIBRANIUM_STATE/network-notify ]]; then
   notify-send -r $RANDOM -t 180000 "Network" "Click the Wifi icon to connect to the internet"

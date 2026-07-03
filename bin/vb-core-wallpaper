@@ -68,8 +68,8 @@ write_wallpaper_state() {
       fi
     done
 
-    # Theme not yet in the file — append as a new entry.
-    if [[ $found -eq 0 ]]; then
+    # Theme not yet in the file - append as a new entry.
+    if (( found == 0 )); then
       printf '%s="%s"\n' "$theme" "$path"
     fi
   } >"$WALLPAPER_STATE"
@@ -213,7 +213,7 @@ case "$_dispatch" in
   ;;
 --next | --prev)
   if ! feature_enabled; then
-    # Wallpaper feature is disabled globally — exit silently.
+    # Wallpaper feature is disabled globally - exit silently.
     exit 0
   fi
 
@@ -221,14 +221,14 @@ case "$_dispatch" in
   cycle_wallpaper WALLPAPER_PATH "$_dispatch"
 
   # cycle_wallpaper returns empty when there is only one
-  # wallpaper and it is already active — nothing to do
+  # wallpaper and it is already active - nothing to do
   if [[ -z "$WALLPAPER_PATH" ]]; then
     exit 0
   fi
   ;;
 *.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
   if ! feature_enabled; then
-    # Wallpaper feature is disabled globally — exit silently.
+    # Wallpaper feature is disabled globally - exit silently.
     exit 0
   fi
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 if [[ "$(id -u)" == 0 ]]; then
   echo "Do not run this script as root!" >&2

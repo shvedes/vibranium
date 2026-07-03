@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 groups=(wheel audio video storage network realtime)
 

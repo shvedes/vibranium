@@ -1,7 +1,4 @@
-#!/usr/bin/env bash
-
-# Copy-pasted from Omarchy.
-# For the sake of compatibility.
+#!/bin/bash
 
 # Detect MacBook models that need SPI keyboard modules
 product_name="$(< /sys/class/dmi/id/product_name)"

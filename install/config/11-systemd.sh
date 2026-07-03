@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 LOGIND_CONF="/etc/systemd/logind.conf"
 

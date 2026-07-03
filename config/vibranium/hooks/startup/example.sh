@@ -1,4 +1,4 @@
-#!/usr/bin/bash
+#!/bin/bash
 
 # Here you can write your custom logic, which will
 # execute every time you start a new session.

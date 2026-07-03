@@ -90,29 +90,29 @@ _try_download() {
     --print-to-file "after_move:filepath" "$DOWNLOAD_PATH_FILE"
   )
 
-  # Fast path — cached cookies from a previous successful run.
+  # Fast path - cached cookies from a previous successful run.
   if [[ -f "$cookie_cache" ]]; then
     echo "${YELLOW}[VIBRANIUM]${RESET} Downloading..."
     _stderr_tmp="/tmp/${0#**/}.tmp"
     if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url" 2>"$_stderr_tmp"; then
       # Download succeeded. If YouTube flagged our cookies as rotated, wipe the
-      # cache now so the next run picks up a fresh jar — and swallow the warning
+      # cache now so the next run picks up a fresh jar - and swallow the warning
       # (the current download is already done, nothing to act on).
       if sed -n '/no longer valid/q; $q1' "$_stderr_tmp"; then
-        echo "${YELLOW}[VIBRANIUM]${RESET} YouTube cookies rotated — cache cleared for next run"
+        echo "${YELLOW}[VIBRANIUM]${RESET} YouTube cookies rotated - cache cleared for next run"
         rm -f "$cookie_cache"
       fi
       rm -f "$_stderr_tmp"
       return 0
     fi
-    # Download failed. Discard stderr — DRM/format errors here are just symptoms
+    # Download failed. Discard stderr - DRM/format errors here are just symptoms
     # of stale cached cookies; the browser re-scan below will sort it out, and
     # any genuine URL problem will surface again during the cookieless fallback.
     rm -f "$_stderr_tmp" "$cookie_cache"
-    echo "${YELLOW}[VIBRANIUM]${RESET} Cached cookies stale — re-scanning browsers"
+    echo "${YELLOW}[VIBRANIUM]${RESET} Cached cookies stale - re-scanning browsers"
   fi
 
-  # Slow path — try every browser; write cookies on first success so
+  # Slow path - try every browser; write cookies on first success so
   # the next invocation takes the fast path.
   for browser in "${COOKIE_BROWSERS[@]}"; do
     echo "${YELLOW}[VIBRANIUM]${RESET} Trying ${BLUE}${browser}${RESET} cookies"
@@ -125,7 +125,7 @@ _try_download() {
     rm -f "$cookie_cache"
   done
 
-  # All browsers exhausted — attempt without cookies (this will also
+  # All browsers exhausted - attempt without cookies (this will also
   # surface the real error if the URL itself is the problem).
   echo "${YELLOW}[VIBRANIUM]${RESET} No browser cookies worked. Downloading without cookies"
   yt-dlp "${base_args[@]}" "$url"

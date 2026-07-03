@@ -1,7 +1,4 @@
-#!/usr/bin/env bash
-
-# Copy-pasted from Omarchy.
-# Not my work.
+#!/bin/bash
 
 # Fix NVMe suspend issues on MacBook models
 # This prevents NVMe drives from failing to wake from sleep properly
@@ -20,16 +17,16 @@ if [[ $MACBOOK_MODEL =~ MacBook(8,1|9,1|10,1)|MacBookPro13,[123]|MacBookPro14,[1
     helpers::log::info "Apple: applying suspend fix"
 
 
-    helpers::write_file /etc/systemd/system/apple-nvme-suspend-fix.service <<-EOF
-    [Unit]
-    Description=NVMe Suspend Fix for MacBook
+    helpers::write_file /etc/systemd/system/apple-nvme-suspend-fix.service <<EOF
+[Unit]
+Description=NVMe Suspend Fix for MacBook
 
-    [Service]
-    ExecStart=/bin/bash -c 'echo 0 > /sys/bus/pci/devices/0000\:01\:00.0/d3cold_allowed'
+[Service]
+ExecStart=/bin/bash -c 'echo 0 > /sys/bus/pci/devices/0000\:01\:00.0/d3cold_allowed'
 
-    [Install]
-    WantedBy=multi-user.target
-    EOF
+[Install]
+WantedBy=multi-user.target
+EOF
 
     sudo systemctl -q daemon-reload
     sudo systemctl -q enable apple-nvme-suspend-fix.service

@@ -94,7 +94,7 @@ if ! hyprctl -q switchxkblayout "$device" "$action"; then
   exit 1
 fi
 
-# Re-query devices after switching — the cached JSON from before the
+# Re-query devices after switching - the cached JSON from before the
 # switch still holds the old keymap and would produce a stale notification.
 if $NOTIFY; then
   layout="$(hyprctl -j devices | jq -r '.keyboards[] | select(.main == true) | .active_keymap')"

@@ -106,7 +106,7 @@ _init_cpuinfo() {
     # Break early the moment we hit the start of the second core's data block
     if [[ "$clean_key" == "processor" ]]; then
       ((found_processor++))
-      if [[ $found_processor -gt 1 ]]; then
+      if (( found_processor > 1 )); then
         break
       fi
     fi
@@ -422,7 +422,7 @@ while [[ $# -gt 0 ]]; do
         ARGS_QUEUE+=("$arg")
         ;;
     esac
-  elif [[ "$arg" == -* && ${#arg} -gt 1 ]]; then
+  elif [[ "$arg" == -* ]] && (( ${#arg} > 1 )); then
     # Support bundled short flags (e.g. -vn, -vlq) by decomposing the
     # string into individual characters. Settings flags like 'q' set
     # USE_QUOTE immediately; action flags are queued as "-$opt".

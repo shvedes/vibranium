@@ -21,7 +21,7 @@ hypr::str() { hyprctl -j getoption "$1" | jq -r '.str'; }
 #
 # Populates the global HYPR associative array via a single hyprctl --batch
 # call and a single jq -rs pass over the concatenated JSON output.
-# hyprctl --batch -j can emit bare `nan` for unset floats — patched with
+# hyprctl --batch -j can emit bare `nan` for unset floats - patched with
 # bash substitution before jq sees it
 #
 # Usage:
@@ -92,7 +92,7 @@ hypr::fetch() {
   done
 }
 
-# hypr::get <option>  — read from the last hypr::fetch result
+# hypr::get <option>  - read from the last hypr::fetch result
 hypr::get() { printf "%s" "${HYPR[$1]}"; }
 
 # hypr::set <option> <value> <config_file>

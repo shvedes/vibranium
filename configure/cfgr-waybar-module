@@ -1,48 +1,5 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-
-# _update_module_setting() {
-#   local var="$1"
-#   local type="$2"
-#   local rofi_title="$3"
-#   local rofi_subtitle="$4"
-#   local validation_regex="$5"
-#   local error_message="$6"
-#   local quote_value="$7"
-#   local module_name="$8"
-#   local enabled_var="$9"
-#
-#   local current_value="${!var}"
-#   rofi_subtitle="${rofi_subtitle//\{current\}/$current_value}"
-#
-#   while true; do
-#     helpers::ui::menu new_value "$rofi_title" "$rofi_subtitle" -- "Enter new value ($type)"
-#     [ -z "$new_value" ] && break
-#
-#     if [[ ! "$new_value" =~ $validation_regex ]]; then
-#       if [[ -n "$error_message" ]]; then
-#         notify-send -r 1 -u critical -t 2000 "Vibranium" "$error_message"
-#       fi
-#       continue
-#     fi
-#
-#     helpers::configure::verify_option "$var"
-#
-#     if [[ "$quote_value" == "yes" ]]; then
-#       sed -i "s|^${var}=.*|${var}=\"${new_value}\"|" "$VIBRANIUM_USER_SETTINGS"
-#     else
-#       sed -i "/^${var}/s/=.*/=${new_value}/" "$VIBRANIUM_USER_SETTINGS"
-#     fi
-#
-#     if [[ "${!enabled_var}" == false ]]; then
-#       notify-send -r 1 -t 5000 "Vibranium" \
-#         "The value has been changed. Don't forget to enable the module."
-#     fi
-#
-#     vb-refresh-waybar-module "$module_name" &
-#     break
-#   done
-# }
 
 WAYBAR_CFG="$XDG_CONFIG_HOME/waybar/config.jsonc"
 _CFG_CONTENT=""
@@ -89,7 +46,7 @@ _build() {
 # without a second read.
 _load_cfg
 
-# Bail out before handing off to cfgr::run — if neither module is present,
+# Bail out before handing off to cfgr::run - if neither module is present,
 # ::run would call _build and produce an empty menu with no useful entries.
 if ! _module_in_cfg 'custom/weather' && ! _module_in_cfg 'custom/pacman'; then
   notify-send -r 1 -u normal "Vibranium" "No configurable modules are present in your Waybar config."

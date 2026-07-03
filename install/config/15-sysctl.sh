@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 case "$CHASSIS_TYPE" in
   laptop | convertible | tablet)

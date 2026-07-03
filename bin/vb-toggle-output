@@ -82,13 +82,13 @@ sinks=$(pactl -f json list sinks | jq '[.[] | select((.ports | length == 0) or (
 
 sinks_count=$(jq '. | length' <<<"$sinks")
 
-if [[ $sinks_count -eq 0 ]]; then
+if (( sinks_count == 0 )); then
   notify "Vibranium" "No audio devices found"
   exit 1
 fi
 
-if [[ $sinks_count -eq 1 ]]; then
-  notify-send -r 2 "Vibranium" "Only one audio output available — nothing to switch to"
+if (( sinks_count == 1 )); then
+  notify-send -r 2 "Vibranium" "Only one audio output available - nothing to switch to"
   exit 0
 fi
 
