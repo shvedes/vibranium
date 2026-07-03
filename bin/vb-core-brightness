@@ -26,6 +26,8 @@ SELF="${0##*/}"
 QUIET=false
 FORCE=false
 VERBOSE=false
+MONITOR_ARG=""
+ORIGINAL_ARGS=("$@")
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 
 shcat() {
@@ -36,7 +38,9 @@ shcat() {
 
 log() {
   local level="$1"; shift
-  echo "[${0##*/}] $level: $*"
+  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
 }
 
 usage() {
@@ -50,6 +54,7 @@ Options:
     --down            Decrease brightness
     --set             Set brightness to <-90-100>%
     --calibrate       Re-calibrate DDC timeouts for external monitors
+    --monitor         Target one or more monitors (comma-separated: HDMI-A-1,eDP-1)
     -f, --force       Bypass state file, work directly with ddcutil
     -q, --quiet       Do not display notification or OSD
     -v, --verbose     Enable verbose output
@@ -95,6 +100,14 @@ while [[ $# -gt 0 ]]; do
     ACTION="$1"
     shift 2
     ;;
+  --monitor)
+    if [[ -z "${2:-}" ]]; then
+      log Error "--monitor requires a monitor name" >&2
+      exit 1
+    fi
+    MONITOR_ARG="$2"
+    shift 2
+    ;;
   -f | --force)
     FORCE=true
     shift
@@ -118,6 +131,25 @@ done
 # No action flag was provided — print usage and exit cleanly
 if [[ -z "$ACTION" ]]; then
   usage
+  exit 0
+fi
+
+# Dispatch comma-separated monitors to per-monitor invocations.
+# Each sub-call inherits all other flags but targets a single monitor.
+if [[ -n "$MONITOR_ARG" && "$MONITOR_ARG" == *,* ]]; then
+  IFS=, read -ra MONITORS <<< "$MONITOR_ARG"
+  BASE_ARGS=()
+  skip_next=false
+  for arg in "${ORIGINAL_ARGS[@]}"; do
+    if $skip_next; then skip_next=false; continue; fi
+    if [[ "$arg" == --monitor ]]; then skip_next=true; continue; fi
+    BASE_ARGS+=("$arg")
+  done
+  for mon in "${MONITORS[@]}"; do
+    mon="${mon//[[:space:]]/}"
+    [[ -z "$mon" ]] && continue
+    "$0" "${BASE_ARGS[@]}" --monitor "$mon"
+  done
   exit 0
 fi
 
@@ -365,7 +397,16 @@ calibrate_all() {
   # Fresh detection, bypassing the bus cache
   FORCE=true get_i2c_bus
 
-  bus_map_str="${!bus_map[*]}"
+  if [[ -n "$MONITOR_ARG" ]]; then
+    if [[ -z "${bus_map[$MONITOR_ARG]+x}" ]]; then
+      log Error "Monitor '$MONITOR_ARG' has no DDC support or was not detected" >&2
+      return 1
+    fi
+    bus_map_str="$MONITOR_ARG"
+  else
+    bus_map_str="${!bus_map[*]}"
+  fi
+
   if [[ -z "$bus_map_str" ]]; then
     log Warn "No DDC-capable monitors found"
     return 0
@@ -543,6 +584,10 @@ IFS=$'\t' read -r ACTIVE_MONITOR MONITOR_COUNT FULLSCREEN_STATE < <(
     (.[1].fullscreen | tostring)
   ] | @tsv' <<<"$HYPRLAND_DATA"
 )
+
+if [[ -n "$MONITOR_ARG" ]]; then
+  ACTIVE_MONITOR="$MONITOR_ARG"
+fi
 
 log Info "Active monitor: $ACTIVE_MONITOR"
 
