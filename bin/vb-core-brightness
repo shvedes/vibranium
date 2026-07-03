@@ -2,7 +2,7 @@
 
 # Overcomplicated script that manages brightness control using raw sysfs values
 # as well as the DDC protocol for external monitors. The script uses a single state file
-# (lines in the "i2c:output:level" format) to cache active values for both methods
+# (lines in the "output:i2c:level" format) to cache active values for both methods
 # to speed up subsequent script executions.
 # This is ESPECIALLY useful for the DDC method, because ddcutil is known to be quite slow.
 # Thanks to the state file, changing brightness with DDC takes milliseconds instead of 500-700-1000ms.
@@ -36,9 +36,7 @@ shcat() {
 
 log() {
   local level="$1"; shift
-  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
+  echo "[${0##*/}] $level: $*"
 }
 
 usage() {
@@ -50,7 +48,8 @@ Adjust screen brightness.
 Options:
     --up              Increase brightness
     --down            Decrease brightness
-    --set             Set brightness to <0-100>%
+    --set             Set brightness to <-90-100>%
+    --calibrate       Re-calibrate DDC timeouts for external monitors
     -f, --force       Bypass state file, work directly with ddcutil
     -q, --quiet       Do not display notification or OSD
     -v, --verbose     Enable verbose output
@@ -64,18 +63,36 @@ while [[ $# -gt 0 ]]; do
     usage
     exit 0
     ;;
+  --calibrate)
+    if [[ -n "$ACTION" ]]; then
+      log Error "--calibrate cannot be combined with other actions" >&2
+      exit 1
+    fi
+    ACTION="--calibrate"
+    shift
+    ;;
   --up | --down)
+    if [[ -n "$ACTION" ]]; then
+      log Error "mutually exclusive actions: $ACTION and $1" >&2
+      exit 1
+    fi
     ACTION="$1"
     shift
     ;;
   --set)
-    # --set requires a following integer in the range 0-100
-    if [[ ! "$2" =~ ^[0-9]+$ ]] || (($2 < 0 || $2 > 100)); then
-      log Error "--set requires an integer between 0 and 100"
+    if [[ -n "$ACTION" ]]; then
+      log Error "mutually exclusive actions: $ACTION and --set" >&2
+      exit 1
+    fi
+    # Strip optional trailing "%" before validation.
+    SET_VALUE="${2%\%}"
+    # --set requires an integer in the range -90..100.
+    # Negative values map to hardware minimum + gamma dimming.
+    if [[ ! "$SET_VALUE" =~ ^-?[0-9]+$ ]] || ((SET_VALUE < -90 || SET_VALUE > 100)); then
+      log Error "--set requires an integer between -90 and 100" >&2
       exit 1
     fi
     ACTION="$1"
-    SET_VALUE="$2"
     shift 2
     ;;
   -f | --force)
@@ -91,8 +108,8 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   *)
-    log Error "unknown option: $*"
-    log Error "Try '$SELF --help' for more information"
+    log Error "unknown option: $*" >&2
+    log Error "Try '$SELF --help' for more information" >&2
     exit 1
     ;;
   esac
@@ -108,7 +125,7 @@ fi
 # flock -n returns nonzero when another instance holds the lock, so we
 # exit silently — the running instance will handle the request.
 exec 9>"$LOCKFILE" || {
-  log Error "another instance of $SELF is already running!"
+  log Error "another instance of $SELF is already running!" >&2
   exit 1
 }
 flock -n 9 || exit 0
@@ -120,103 +137,274 @@ helpers::check \
   VIBRANIUM_BRIGHTNESS_STEP \
   VIBRANIUM_BRIGHTNESS_NOTIFY
 
+# Global state maps — populated once by load_state, read/written by all
+# helpers in-memory instead of re-reading the state file on every access.
+declare -A bus_map=() level_map=() mult_map=()
+GAMMA=100
+
 # One line per monitor in the format:
-#   i2c:output:level
+#   output:i2c:level:gamma:mult
 # where any field may be empty when not yet known (e.g. the level before the
 # first DDC read). The "output" (monitor name) is the key. Both the i2c bus
 # discovery and the brightness cache read/write through these helpers so that
-# updating one field never clobbers the other.
+# updating one field never clobbers the other. The first line is a comment
+# ("#output:i2c:level:gamma:mult") that also acts as a format version marker.
 STATE_FILE="$VIBRANIUM_STATE/monitors"
+STATE_HEADER="# output:i2c:level:gamma:mult"
 
-# Load the unified state into the bus_map / level_map associative arrays.
-# Caller must declare them. Returns nothing useful; just populates the maps.
+# Load the unified state into the global bus_map / level_map / mult_map / GAMMA.
+# The maps are declared globally once; this function resets and repopulates them.
+# Each call is a full file read, so callers minimise invocations.
 load_state() {
-  local i2c output level gamma
+  local _gamma_seen _first_line
   [[ -f "$STATE_FILE" ]] || return 0
 
-  # Parse each line of the state file ("i2c:output:level:gamma"), splitting on
-  # colons. Lines without an output name are considered corrupted and skipped.
-  # The optional 4th field (gamma) is read but not used here — it is queried
-  # separately by load_gamma().
-  while IFS=: read -r i2c output level gamma; do
-    [[ -n "$output" ]] || continue
-    bus_map["$output"]="$i2c"
-    level_map["$output"]="$level"
+  read -r _first_line <"$STATE_FILE"
+  if [[ "$_first_line" != "$STATE_HEADER" ]]; then
+    rm -f "$STATE_FILE"
+    return 0
+  fi
+
+  bus_map=()
+  level_map=()
+  mult_map=()
+  GAMMA=100
+
+  while IFS=: read -r output i2c level gamma mult; do
+    [[ "$output" == \#* ]] && continue
+
+    # Monitor data line (non-empty output) populates the maps.
+    if [[ -n "$output" ]]; then
+      bus_map["$output"]="$i2c"
+      level_map["$output"]="$level"
+
+      if [[ -n "$mult" && "$mult" =~ ^[0-9]+$ ]]; then
+        if ((mult >= MULT_HUNDREDTHS_MIN && mult <= MULT_HUNDREDTHS_MAX)); then
+          mult_map["$output"]=$mult
+        fi
+      fi
+    fi
+
+    # Sentinel lines (empty output) carry gamma-only state for raw method.
+    if [[ -z "${_gamma_seen+x}" && "$gamma" =~ ^[0-9]+$ ]]; then
+      if ((gamma >= GAMMA_MIN && gamma <= 100)); then
+        GAMMA=$gamma
+        _gamma_seen=true
+      fi
+    fi
   done <"$STATE_FILE"
 }
 
-# Write the bus_map / level_map associative arrays back to the unified state
-# file. The file is tiny, so we build the whole content in a single string and
-# write it with one redirection. Caller must have the maps declared and populated.
+# Write the global bus_map / level_map / mult_map / GAMMA back to the state
+# file.  Because we keep everything in memory there is no need to re-read the
+# file first — the globals are the authoritative source.
+# When no monitor entries exist (raw-only session) a sentinel line preserves
+# GAMMA so dimming state survives across invocations.
 save_state() {
-  local output content="" current_gamma=100
+  local content="$STATE_HEADER"$'\n'
 
-  # Preserve the existing gamma from the state file (defaulting to 100 when
-  # the file is missing or all lines use the old 3-field format).
-  while IFS=: read -r _ _ _ current_gamma; do
-    [[ "$current_gamma" =~ ^[0-9]+$ ]] && ((current_gamma >= GAMMA_MIN && current_gamma <= 100)) && break
-    current_gamma=100
-  done <"$STATE_FILE" 2>/dev/null
+  if ((${#bus_map[@]} == 0 && ${#level_map[@]} == 0)); then
+    content+=":::$GAMMA"$'\n'
+  else
+    for output in "${!bus_map[@]}"; do
+      _write_mon "$output" "${bus_map[$output]}" \
+        "${level_map[$output]}" "$GAMMA" "${mult_map[$output]}"
+    done
 
-  # Every known output lives in level_map after a load_state (even bus-only
-  # entries get an empty level), so iterating it covers all keys. Outputs that
-  # somehow exist only in bus_map are picked up by the second pass.
-  for output in "${!bus_map[@]}"; do
-    content+="${bus_map[$output]}:$output:${level_map[$output]}:$current_gamma"$'\n'
-  done
-
-  for output in "${!level_map[@]}"; do
-    [[ -n "${bus_map[$output]+x}" ]] && continue
-    content+=":$output:${level_map[$output]}:$current_gamma"$'\n'
-  done
+    for output in "${!level_map[@]}"; do
+      [[ -n "${bus_map[$output]+x}" ]] && continue
+      _write_mon "$output" "" "${level_map[$output]}" \
+        "$GAMMA" "${mult_map[$output]}"
+    done
+  fi
 
   printf '%s' "$content" >"$STATE_FILE"
 }
 
+# Append one monitor line to $content.  Omits trailing colon when last
+# field is empty so the file never accumulates ":<empty>" cruft.
+_write_mon() {
+  local out="$1" i2c="$2" lvl="$3" gam="$4" mlt="$5"
+  if [[ -n "$mlt" ]]; then
+    content+="$out:$i2c:$lvl:$gam:$mlt"$'\n'
+  else
+    content+="$out:$i2c:$lvl:$gam"$'\n'
+  fi
+}
+
 # Gamma dimming. 10-100 where 100 = normal, stored as a 4th colon-separated
-# field on every monitor entry in the state file (i2c:output:level:gamma).
+# field on every monitor entry in the state file (output:i2c:level:gamma).
 # Writing all lines keeps gamma in sync across monitors since it is a global
 # GPU property applied via hyprsunset, not per-output.
 GAMMA_MIN=10
 
-# Read gamma from the first monitor line that has a 4th field.  Defaults to
-# 100 when the file is missing or all lines use the old 3-field format.
+# Read gamma from the global GAMMA (set by load_state).
 load_gamma() {
-  local gamma=""
-  [[ -f "$STATE_FILE" ]] || { echo 100; return; }
-  while IFS=: read -r _ _ _ gamma; do
-    [[ "$gamma" =~ ^[0-9]+$ ]] && ((gamma >= GAMMA_MIN && gamma <= 100)) && { echo "$gamma"; return; }
-  done <"$STATE_FILE"
-  echo 100
+  local -n _out="$1"
+  _out=$GAMMA
 }
 
-# Rewrite every line of the monitors file with the new gamma value.  When
-# the file does not exist (e.g. raw sysfs path that never runs DDC), create
-# a sentinel entry so gamma persists across script invocations.  The sentinel
-# format (::level:gamma) is invisible to load_state() which skips blank
-# output fields, but load_gamma() reads the 4th field from any line.
+# Update gamma in the global GAMMA and persist.  save_state writes every line
+# with the new gamma, so a missing file is handled automatically — the first
+# call to save_state creates it with the then-known monitors.
 save_gamma() {
-  local new_gamma="$1" content="" i2c output level gamma
-
-  if [[ ! -f "$STATE_FILE" ]]; then
-    printf '::0:%d\n' "$new_gamma" >"$STATE_FILE"
-    return
-  fi
-
-  while IFS=: read -r i2c output level gamma; do
-    content+="$i2c:$output:$level:$new_gamma"$'\n'
-  done <"$STATE_FILE"
-  printf '%s' "$content" >"$STATE_FILE"
+  GAMMA="$1"
+  save_state
 }
 
 apply_gamma() {
   hyprctl -q hyprsunset gamma "$1"
 }
 
+# --- Sleep-multiplier calibration ---
+# Internal representation: integer hundredths (MULT_HUNDREDTHS = 30 means 0.30).
+# State file stores this as a 5th colon-separated field: output:i2c:level:gamma:mult_hundredths
+MULT_HUNDREDTHS_MIN=10
+MULT_HUNDREDTHS_MAX=50
+MULT_HUNDREDTHS_DEFAULT=13
+
+# Format hundredths as a float string for ddcutil --sleep-multiplier
+# e.g. 30 -> "0.30", 5 -> "0.05".
+_mult_float() {
+  local -n _out=$1
+  printf -v _out "0.%02d" "$2"
+}
+
+# Load multiplier hundredths for the active monitor from the global mult_map.
+# Defaults to MULT_HUNDREDTHS_DEFAULT when missing or pre-calibration entry.
+# Sets MULT_CACHED to true when a per-monitor entry was found.
+load_mult() {
+  local -n _out="$1"
+  local cached="${mult_map[$ACTIVE_MONITOR]:-}"
+  if [[ -n "$cached" ]]; then
+    _out=$cached
+    MULT_CACHED=true
+  else
+    _out=$MULT_HUNDREDTHS_DEFAULT
+    MULT_CACHED=false
+  fi
+}
+
+# Update sleep-multiplier for the active monitor in the global mult_map and
+# persist.  save_state writes every line, so the active monitor entry gets
+# the new value while others are preserved as-is.
+save_mult() {
+  mult_map[$ACTIVE_MONITOR]=$1
+  save_state
+}
+
+# Test whether a given multiplier (in hundredths) renders ddcutil responsive.
+# Runs a single getvcp 10 probe and checks for a valid brightness value.
+_probe_mult() {
+  local candidate="$1" output mf
+  _mult_float mf "$candidate"
+  output=$(ddcutil --bus "$I2C_BUS" --sleep-multiplier "$mf" --noverify --skip-ddc-checks --maxtries 1,1,1 getvcp 10 2>/dev/null)
+  [[ "$output" =~ current\ value\ =\ +([0-9]+) ]]
+}
+
+# Load sleep-multiplier for the current monitor.  Uses the cached value from
+# the state file when available — skips the expensive ddcutil probe entirely.
+# When FORCE is set or no cached entry exists, probes and calibrates from
+# scratch, then persists the result for subsequent invocations.
+calibrate_sleep_mult() {
+  local mult try
+
+  if [[ $FORCE == true ]]; then
+    mult=$MULT_HUNDREDTHS_DEFAULT
+    MULT_CACHED=false
+  else
+    load_mult mult
+  fi
+
+  if [[ $MULT_CACHED == false ]]; then
+    # No cached value (or FORCE) — probe to discover a working multiplier
+    if ! _probe_mult "$mult"; then
+      # Current multiplier fails — probe upward to find a working floor
+      try=$mult
+      while ((try < MULT_HUNDREDTHS_MAX)); do
+        try=$((try + 5))
+        if ((try > MULT_HUNDREDTHS_MAX)); then
+          try=$MULT_HUNDREDTHS_MAX
+        fi
+        if _probe_mult "$try"; then
+          mult=$try
+          break
+        fi
+      done
+
+      save_mult "$mult"
+    else
+      # First-time calibration: persist the working multiplier so subsequent
+      # invocations find a cached value and skip the expensive probe.
+      save_mult "$mult"
+    fi
+
+    if [[ $ACTION != "--calibrate" ]]; then
+      notify-send -r 5 -t 15000 "Brightness - Calibration" \
+        "DDC timeouts calibrated for <span foreground='${P_GREEN_BRIGHT}'><b>${ACTIVE_MONITOR}</b></span>"
+    fi
+  fi
+
+  _mult_float SLEEP_MULT_FLOAT "$mult"
+}
+
+# Re-calibrate sleep-multiplier for every DDC-capable monitor.  Runs a fresh
+# ddcutil detect, then iterates over all discovered external outputs, probing
+# and storing the optimal multiplier for each.
+calibrate_all() {
+  local output bus saved_monitor bus_map_str
+
+  if ! command -v ddcutil >/dev/null; then
+    log Error "ddcutil not found — cannot calibrate" >&2
+    vb-cmd-dep-notify --name "Brightness Control" --deps ddcutil
+    return 1
+  fi
+
+  log Info "Detecting DDC-capable monitors..."
+
+  # Fresh detection, bypassing the bus cache
+  FORCE=true get_i2c_bus
+
+  bus_map_str="${!bus_map[*]}"
+  if [[ -z "$bus_map_str" ]]; then
+    log Warn "No DDC-capable monitors found"
+    return 0
+  fi
+
+  log Info "Found monitors: $bus_map_str"
+  saved_monitor="$ACTIVE_MONITOR"
+
+  local count=0 summary=""
+  for output in $bus_map_str; do
+    bus="${bus_map[$output]}"
+
+    if [[ -z "$bus" ]]; then
+      log Warn "  Skipping $output (no I2C bus)"
+      continue
+    fi
+
+    count=$((count + 1))
+    log Info "[$count] Calibrating $output (I2C bus $bus)..."
+
+    ACTIVE_MONITOR="$output"
+    I2C_BUS="$bus"
+
+    FORCE=true calibrate_sleep_mult
+
+    log Info "  -> sleep-multiplier = $SLEEP_MULT_FLOAT"
+    summary="${summary}${summary:+\\n}- <span foreground='${P_GREEN_BRIGHT}'><b>${output}</b></span>"
+  done
+
+  ACTIVE_MONITOR="$saved_monitor"
+
+  log Info "Calibrated $count monitor(s)"
+  notify-send -r 3 -t 15000 "Brightness - Calibration" \
+    "Calibrated $count monitor(s):\\n$summary"
+}
+
 # Detect monitors via DDC and merge their i2c buses into the unified state,
 # preserving any cached brightness levels.
 get_i2c_bus() {
-  declare -A bus_map level_map
   local new_info output bus
 
   # Parse ddcutil detect output (expected format):
@@ -253,64 +441,43 @@ get_i2c_bus() {
   save_state
 }
 
-ensure_i2c_cache() {
-  declare -A bus_map level_map
-  load_state
-
-  [[ -n "${bus_map[$ACTIVE_MONITOR]:-}" ]]
-}
-
 set_i2c_bus() {
   local -n _result="$1"
-  declare -A bus_map level_map
 
-  # With --force, skip the state file cache entirely and always run a
-  # fresh ddcutil detect. Otherwise use the cached bus if available.
-  if [[ $FORCE == true ]]; then
-    get_i2c_bus
-  elif ! ensure_i2c_cache; then
-    log Info "I2C bus cache for the active monitor not found, running detect"
-    get_i2c_bus
+  if [[ $FORCE == false && -n "${bus_map[$ACTIVE_MONITOR]:-}" ]]; then
+    _result="${bus_map[$ACTIVE_MONITOR]}"
+    return
   fi
 
-  load_state
+  log Info "I2C bus cache for the active monitor not found, running detect"
+  get_i2c_bus
   _result="${bus_map[$ACTIVE_MONITOR]}"
 }
 
 get_brightness_cache() {
   local -n _result="$1"
 
-  # With --force, bypass the state file and return empty to force a fresh
-  # ddcutil read.
   if [[ $FORCE == true ]]; then
     return 0
   fi
 
-  declare -A bus_map level_map
-  load_state
-
-  # If no entry for the active monitor, return empty to trigger a fresh fetch
   _result="${level_map[$ACTIVE_MONITOR]:-}"
 }
 
 update_brightness_cache() {
   local new_value="$1"
-  declare -A bus_map level_map
-
-  load_state
-
-  # Update the brightness for the active monitor, leaving its i2c bus intact
   level_map["$ACTIVE_MONITOR"]="$new_value"
-
   save_state
 }
 
 osd() {
-  local value="$1"
+  local value="$1" label="${2:-}"
   local icon progress
 
-  # Set specific icons depending on the current brightness level (icons are taken from the active icon pack)
-  if ((value <= 30)); then
+  # Negative label (e.g. "-30%") means gamma dimming — always use low icon.
+  if [[ "$label" == -* ]]; then
+    icon="brightness-low-symbolic"
+  elif ((value <= 30)); then
     icon="brightness-low-symbolic"
   elif ((value <= 70)); then
     icon="brightness-symbolic"
@@ -347,8 +514,22 @@ osd() {
     systemctl --user enable --now swayosd.service
   fi
 
-  swayosd-client --custom-icon="$icon" --custom-progress="$progress"
+  if [[ -n "$label" ]]; then
+    swayosd-client --custom-icon="$icon" --custom-progress="$progress" --custom-progress-text="$label"
+  else
+    swayosd-client --custom-icon="$icon" --custom-progress="$progress"
+  fi
 }
+
+# Load cached monitor metadata once.  All subsequent helpers read from the
+# in-memory globals (bus_map, level_map, mult_map, GAMMA) and only hit the
+# state file again for writes.
+load_state
+
+if [[ $ACTION == "--calibrate" ]]; then
+  calibrate_all
+  exit 0
+fi
 
 # Fetch monitors and active window in one hyprctl batch call, then extract
 # the focused monitor name, total monitor count, and fullscreen state via jq.
@@ -385,11 +566,6 @@ if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
   method="ddc"
   set_i2c_bus I2C_BUS
   log Info "Using DDC method, I2C bus: $I2C_BUS"
-
-  # TODO: As far as I know, optimal values for --sleep-multiplier can vary from a monitor to a monitor,
-  # and while it works well on one monitor, it may not work at all on another.
-  # In this case, we need to create a mini-algorithm that will calculate and record valid values for the monitor and use them.
-  ddcutil_flags=(--sleep-multiplier 0.13 --noverify --skip-ddc-checks --maxtries 1,1,1)
 else
   if [[ -n "$ACTIVE_MONITOR" && ! "$ACTIVE_MONITOR" =~ ^eDP ]]; then
     method="ddc"
@@ -397,6 +573,21 @@ else
   else
     method="raw"
     log Info "Using raw sysfs method"
+  fi
+fi
+
+# When gamma dimming is active (GAMMA < 100) the monitor is already at
+# physical minimum — skip sleep-multiplier calibration (and all subsequent
+# ddcutil calls) until we come back above the floor.
+# GAMMA is already populated by load_state() at the top of main.
+
+if [[ "$method" == "ddc" ]]; then
+  if [[ $GAMMA -eq 100 || "$ACTION" == "--set" ]]; then
+    calibrate_sleep_mult
+    ddcutil_flags=(--sleep-multiplier "$SLEEP_MULT_FLOAT" --noverify --skip-ddc-checks --maxtries 1,1,1)
+    log Info "Sleep multiplier: $SLEEP_MULT_FLOAT"
+  else
+    ddcutil_flags=(--sleep-multiplier 0.13 --noverify --skip-ddc-checks --maxtries 1,1,1)
   fi
 fi
 
@@ -410,20 +601,14 @@ fi
 step=$VIBRANIUM_BRIGHTNESS_STEP
 log Info "Action: $ACTION, method: $method, step: $step"
 
-# Load current gamma state before entering method-specific dispatch.  The
-# same (action, step, current-brightness) tuple determines whether we adjust
-# hardware backlight or hyprsunset gamma.
-GAMMA=$(load_gamma)
-
 case "$method" in
 "ddc")
   get_brightness_cache current
   if [[ ! $current =~ ^[0-9]+$ ]]; then
-    # --sleep-multiplier 0.13 is aggressive and some monitors need a few
-    # tries before they respond on the I2C bus. Retry up to 5 times to
-    # work around transient DDC NACKs; the loop exits early once a valid
-    # value (0-100) is obtained.
-    for ((i = 0; i < 5; i++)); do
+    # Aggressive sleep-multiplier values need a few tries before the monitor
+    # responds on the I2C bus. Retry up to 10 times to work around transient
+    # DDC NACKs; the loop exits early once a valid value (0-100) is obtained.
+    for ((i = 0; i < 10; i++)); do
       line_output=$(ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" getvcp 10 2>/dev/null)
       # Match the current brightness value in ddcutil output format:
       #   VCP code 0x10 (...): current value =   25, max value =   100
@@ -431,8 +616,10 @@ case "$method" in
       if [[ "$line_output" =~ current\ value\ =\ +([0-9]+) ]]; then
         current="${BASH_REMATCH[1]}"
       fi
-      if [[ $current =~ ^[0-9]+$ ]] && ((current >= 0 && current <= 100)); then
-        break
+      if [[ $current =~ ^[0-9]+$ ]]; then
+          if ((current >= 0 && current <= 100)); then
+            break
+          fi
       fi
     done
     [[ $FORCE == false ]] && log Warn "cache not found!"
@@ -473,18 +660,27 @@ case "$method" in
     fi
     ;;
   "--set")
-    # Absolute set resets gamma to normal to keep the result predictable.
-    if ((GAMMA != 100)); then
-      apply_gamma 100
-      save_gamma 100
-      GAMMA=100
-      log Info "Gamma reset to 100"
+    if ((SET_VALUE >= 0)); then
+      if ((GAMMA != 100)); then
+        apply_gamma 100
+        save_gamma 100
+        GAMMA=100
+      fi
+      new=$SET_VALUE
+    else
+      new=0
+      new_gamma=$((100 + SET_VALUE))
+      ((new_gamma < GAMMA_MIN)) && new_gamma=$GAMMA_MIN
+      if ((GAMMA != new_gamma)); then
+        apply_gamma "$new_gamma"
+        save_gamma "$new_gamma"
+        GAMMA=$new_gamma
+      fi
     fi
-    new=$SET_VALUE
     ;;
   esac
 
-  if [[ -n "$new" ]]; then
+  if [[ -n "$new" && "$new" != "$current" ]]; then
     log Info "Setting brightness to $new (current: $current)"
     ddcutil --bus "$I2C_BUS" "${ddcutil_flags[@]}" setvcp 10 "$new" &>/dev/null &
     update_brightness_cache "$new" &
@@ -495,14 +691,17 @@ case "$method" in
   fi
 
   if ((GAMMA < 100)); then
-    # Gamma dimming active — swayosd OSD only covers 0-100, so use
-    # notify-send with the effective "below zero" caption.
+    # Gamma dimming active — show the negative percentage via OSD or notify.
     if ((FULLSCREEN_STATE == 2)); then
       exit 0
     fi
     if [[ "$QUIET" == false ]]; then
       dim_bar=$(( (GAMMA - GAMMA_MIN) * 100 / (100 - GAMMA_MIN) ))
-      notify-send -r 2 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
+      if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
+        osd "$dim_bar" "-$((100 - GAMMA))%" &
+      else
+        notify-send -r 2 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
+      fi
     fi
   elif [[ -n "$new" ]]; then
     if [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $QUIET == false ]]; then
@@ -562,11 +761,17 @@ case "$method" in
     "--up")
       if ((GAMMA < 100)); then
         new_gamma=$((GAMMA + step))
-        ((new_gamma > 100)) && new_gamma=100
+        if ((new_gamma > 100)); then
+          new_gamma=100
+        fi
+
         apply_gamma "$new_gamma"
         save_gamma "$new_gamma"
+
         GAMMA=$new_gamma
+
         log Info "Gamma raised to $GAMMA (brightness unchanged at $current)"
+
         if ((GAMMA == 100)); then
           new_pct=$current
           new_raw=$(((new_pct * max_raw + 99) / 100))
@@ -581,10 +786,14 @@ case "$method" in
       if ((current == 0 && GAMMA > GAMMA_MIN)); then
         # Hardware at minimum; transition to gamma dimming.
         new_gamma=$((GAMMA - step))
-        ((new_gamma < GAMMA_MIN)) && new_gamma=$GAMMA_MIN
+        if ((new_gamma < GAMMA_MIN)); then
+          new_gamma=$GAMMA_MIN
+        fi
         apply_gamma "$new_gamma"
         save_gamma "$new_gamma"
+
         GAMMA=$new_gamma
+
         log Info "Gamma lowered to $GAMMA (brightness at minimum)"
       else
         new_pct=$((current - step))
@@ -593,14 +802,29 @@ case "$method" in
       fi
       ;;
     "--set")
-      if ((GAMMA != 100)); then
-        apply_gamma 100
-        save_gamma 100
-        GAMMA=100
-        log Info "Gamma reset to 100"
+      if ((SET_VALUE >= 0)); then
+        if ((GAMMA != 100)); then
+          apply_gamma 100
+          save_gamma 100
+          GAMMA=100
+        fi
+
+        new_pct=$SET_VALUE
+        new_raw=$(((new_pct * max_raw + 99) / 100))
+      else
+        new_pct=0; new_raw=0
+        new_gamma=$((100 + SET_VALUE))
+
+        if ((new_gamma < GAMMA_MIN)); then
+          new_gamma=$GAMMA_MIN
+        fi
+
+        if ((GAMMA != new_gamma)); then
+          apply_gamma "$new_gamma"
+          save_gamma "$new_gamma"
+          GAMMA=$new_gamma
+        fi
       fi
-      new_pct=$SET_VALUE
-      new_raw=$(((new_pct * max_raw + 99) / 100))
       ;;
     esac
 
@@ -621,7 +845,11 @@ case "$method" in
     if ((GAMMA < 100)); then
       if [[ "$QUIET" == false ]]; then
         dim_bar=$(( (GAMMA - GAMMA_MIN) * 100 / (100 - GAMMA_MIN) ))
-        notify-send -r 1 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
+        if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
+          osd "$dim_bar" "-$((100 - GAMMA))%" &
+        else
+          notify-send -r 1 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
+        fi
       fi
     elif [[ -n "${new_raw+x}" ]]; then
       if [[ "$QUIET" == false ]]; then
