@@ -36,8 +36,8 @@
   --color-base-05:  {{ background_0 }};
   --color-base-10:  {{ background_1 }};
   --color-base-20:  {{ background_1 }};
-  --color-base-25:  {{ background_2 }};
-  --color-base-30:  {{ background_2 }};
+  --color-base-25:  {{ background_2|lightness=-0.05 }};
+  --color-base-30:  {{ background_2|lightness=-0.05 }};
   --color-base-35:  {{ background_3 }};
   --color-base-40:  {{ background_3 }};
   --color-base-50:  {{ background_5 }};

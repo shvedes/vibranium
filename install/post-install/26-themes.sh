@@ -14,6 +14,7 @@ THEMES=(
   biscuit
   dracula
   kanso
+  antix
   aamis
   demon
   lumon
