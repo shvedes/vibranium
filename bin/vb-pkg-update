@@ -24,8 +24,7 @@ Perform system update using yay, check for important updates, and prompt for reb
 Options:
   --no-logo         Do not display the logo at startup
   --no-dummy        Do not wait for a key press after completion or cancellation
-
-Refreshes repositories, lists outdated packages, performs the update, and checks if a reboot is recommended based on updated packages.
+  -h, --help        Display this help and exit
 EOF
 }
 
@@ -130,7 +129,7 @@ while (($# > 0)); do
     NO_DUMMY=true
     shift
     ;;
-  --help)
+  -h | --help)
     usage
     exit 0
     ;;

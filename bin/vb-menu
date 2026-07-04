@@ -5,8 +5,6 @@
 source vb-lib-core
 source vb-lib-cfgr
 
-_die() { helpers::ui::close_menus; }
-
 _build_help() {
   _launch() {
     if ! command -v "$1" >/dev/null; then
@@ -33,30 +31,30 @@ _build_help() {
 
 _build_install() {
   _b() {
-    cfgr::item::action --label "Package" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-install -- vb-pkg-install; _die" --icon vb-package
-    cfgr::item::action --label "Theme" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-install -- vb-theme-install; _die" --icon vb-theme
-    cfgr::item::action --label "Font" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-font-install -- vb-pkg-font-install; _die" --icon vb-font
-    cfgr::item::action --label "TUI" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-install -- vb-tui-install; _die" --icon vb-console
-    cfgr::item::action --label "PWA" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-install -- vb-webapp-install; _die" --icon vb-pwa
+    cfgr::item::action --label "Package" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-install -- vb-pkg-install; helpers::ui::close_menus" --icon vb-package
+    cfgr::item::action --label "Theme" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-install -- vb-theme-install; helpers::ui::close_menus" --icon vb-theme
+    cfgr::item::action --label "Font" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-font-install -- vb-pkg-font-install; helpers::ui::close_menus" --icon vb-font
+    cfgr::item::action --label "TUI" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-install -- vb-tui-install; helpers::ui::close_menus" --icon vb-console
+    cfgr::item::action --label "PWA" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-install -- vb-webapp-install; helpers::ui::close_menus" --icon vb-pwa
   }
   cfgr::run "Install" "_b"
 }
 
 _build_remove() {
   _b() {
-    cfgr::item::action --label "Package" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-remove -- vb-pkg-remove; _die" --icon vb-package
-    cfgr::item::action --label "Theme" --func "vb-theme-remove; _die" --icon vb-theme
-    cfgr::item::action --label "Font" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-font-remove -- vb-pkg-font-remove; _die" --icon vb-font
-    cfgr::item::action --label "TUI" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-remove -- vb-tui-remove; _die" --icon vb-console
-    cfgr::item::action --label "PWA" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-remove -- vb-webapp-remove; _die" --icon vb-pwa
+    cfgr::item::action --label "Package" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-remove -- vb-pkg-remove; helpers::ui::close_menus" --icon vb-package
+    cfgr::item::action --label "Theme" --func "vb-theme-remove; helpers::ui::close_menus" --icon vb-theme
+    cfgr::item::action --label "Font" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-font-remove -- vb-pkg-font-remove; helpers::ui::close_menus" --icon vb-font
+    cfgr::item::action --label "TUI" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-remove -- vb-tui-remove; helpers::ui::close_menus" --icon vb-console
+    cfgr::item::action --label "PWA" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-remove -- vb-webapp-remove; helpers::ui::close_menus" --icon vb-pwa
   }
   cfgr::run "Remove" "_b"
 }
 
 _build_update() {
   _b() {
-    cfgr::item::action --label "System Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-update -- vb-pkg-update; _die" --icon vb-arch-linux
-    cfgr::item::action --label "Vibranium Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-update -- vb-update; _die" --icon vb-github
+    cfgr::item::action --label "System Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-update -- vb-pkg-update; helpers::ui::close_menus" --icon vb-arch-linux
+    cfgr::item::action --label "Vibranium Update" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-update -- vb-update; helpers::ui::close_menus" --icon vb-github
   }
   cfgr::run "Update" "_b"
 }

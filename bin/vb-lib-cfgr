@@ -1055,7 +1055,7 @@ cfgr::dispatch() {
     # Compound command path: payload contains whitespace or shell control
     # characters, so it cannot be a bare script name. These are shell
     # command strings meant to be interpreted as-is (source: vb-menu), e.g.:
-    #   "xdg-terminal-exec --app-id=... -- cmd; _die"
+    #   "xdg-terminal-exec --app-id=... -- cmd; helpers::ui::close_menus"
     #   "_launch 'https://wiki.hypr.land'"
     # Pass them straight to eval and skip the source machinery entirely.
     if [[ "$_func_or_script" =~ [[:space:]\;\|\&\(\)\`] ]]; then
@@ -1168,6 +1168,11 @@ cfgr::run() {
     _CFGR_ICONS=()
 
     "$build_func"
+
+    local _menu_id="${BASH_SOURCE[1]##*/}"
+    local _umf="$XDG_CONFIG_HOME/vibranium/user-menu.d/${_menu_id}.sh"
+    [[ -f "$_umf" ]] && source "$_umf"
+    unset _menu_id _umf
 
     local -a options
     mapfile -t options < <(cfgr::build_menu "${_CFGR_ITEMS[@]}")

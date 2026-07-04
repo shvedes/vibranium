@@ -30,6 +30,7 @@ Options:
   --next          Set the next wallpaper
   --prev          Set the previous wallpaper
   --get           Get the current wallpaper
+  -h, --help      Display this help and exit
   -v, --verbose   Enable verbose output
   <image>         Path to an image file (.png, .jpg, .jpeg, .webp) to set as wallpaper
 

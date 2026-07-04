@@ -19,6 +19,7 @@ Options:
   --list           List available power profiles
   -f, --force      Force rebuild state file
   -q, --quiet      Be quiet (cli and notification)
+  -h, --help       Display this help and exit
   -v, --verbose    Enable verbose output
 
   [PROFILE]    Set a specific profile (see: powerprofilesctl list)

@@ -22,6 +22,7 @@ Usage: ${0##*/} [OPTION] <image>
 Open an image with imv in Vibranium.
 
 Options:
+  -h, --help      Display this help and exit
   -v, --verbose   Enable verbose output
   <image>         Path to an image file to open
 EOF
@@ -33,7 +34,7 @@ while [[ $# -gt 0 ]]; do
     VERBOSE=true
     shift
     ;;
-  --help)
+  -h | --help)
     usage
     exit 0
     ;;
