@@ -1,0 +1,163 @@
+#!/bin/bash
+
+VERBOSE=false
+SELF="${0##*/}"
+ARTIST=""
+GENRE=""
+ALBUM=""
+TRACK=""
+RANDOM_MODE=false
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF [OPTIONS]
+
+Add tracks to MPD queue and play a random one.
+
+Options:
+  -A, --artist ARTIST    Queue tracks by ARTIST
+  -a, --album ALBUM      Queue tracks with ALBUM tag
+  -t, --track TRACK      Queue tracks matching TRACK title
+  -g, --genre GENRE      Queue tracks with GENRE tag
+  -r, --random           Play one random track
+
+  -v, --verbose          Enable verbose output
+  -h, --help             Display this help and exit
+
+Notes:
+  --artist, --album, and --track can be combined together.
+  --genre and --random are standalone options.
+
+  Artist/Album/Track use case-insensitive substring search,
+  so --track "absolute in dou" matches "Absolute In Doubt".
+  --genre uses exact matching.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -A | --artist)
+    ARTIST="$2"
+    shift 2
+    ;;
+  -a | --album)
+    ALBUM="$2"
+    shift 2
+    ;;
+  -t | --track)
+    TRACK="$2"
+    shift 2
+    ;;
+  -g | --genre)
+    GENRE="$2"
+    shift 2
+    ;;
+  -r | --random)
+    RANDOM_MODE=true
+    shift
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -*)
+    log Error "Unknown option: $1" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if $RANDOM_MODE; then
+  if [[ -n "$ARTIST" || -n "$GENRE" || -n "$ALBUM" || -n "$TRACK" ]]; then
+    log Error "--random cannot combine with other filters" >&2
+    exit 1
+  fi
+elif [[ -n "$GENRE" ]]; then
+  if [[ -n "$ARTIST" || -n "$ALBUM" || -n "$TRACK" ]]; then
+    log Error "--genre cannot combine with --artist, --album, or --track" >&2
+    exit 1
+  fi
+elif [[ -z "$ARTIST" && -z "$ALBUM" && -z "$TRACK" ]]; then
+  log Error "No mode specified" >&2
+  usage >&2
+  exit 1
+fi
+
+if ! command -v mpc >/dev/null; then
+  log Error "MPD not installed" >&2
+  exit 1
+fi
+
+if ! mpc status >/dev/null 2>&1; then
+  log Error "MPD not running" >&2
+  exit 1
+fi
+
+if $RANDOM_MODE; then
+  mapfile -t all < <(mpc listall)
+  count=${#all[@]}
+
+  if ((!count)); then
+    log Error "Library empty" >&2
+    exit 1
+  fi
+
+  pick=$((RANDOM % count))
+  mpc -q clear
+  mpc add "${all[pick]}"
+  mpc -q play
+  exit 0
+fi
+
+filter_args=()
+[[ -n "$ARTIST" ]] && filter_args+=(artist "$ARTIST")
+[[ -n "$ALBUM" ]] && filter_args+=(album "$ALBUM")
+[[ -n "$TRACK" ]] && filter_args+=(title "$TRACK")
+
+if [[ -n "$GENRE" ]]; then
+  mapfile -t tracks < <(mpc find genre "$GENRE")
+else
+  mapfile -t tracks < <(mpc search "${filter_args[@]}")
+fi
+
+count=${#tracks[@]}
+
+if ((!count)); then
+  log Error "No tracks found${ARTIST:+ for: $ARTIST}${GENRE:+ for genre: $GENRE}${ALBUM:+ for album: $ALBUM}${TRACK:+ for track: $TRACK}" >&2
+  exit 1
+fi
+
+# When searching album without artist, multiple albums may share a name.
+# Use only the first matching album's tracks.
+if [[ -n "$ALBUM" && -z "$ARTIST" && -z "$GENRE" && -z "$TRACK" ]]; then
+  first_dir="${tracks[0]%/*}"
+  filtered=()
+
+  for t in "${tracks[@]}"; do
+    [[ "${t%/*}" == "$first_dir" ]] && filtered+=("$t")
+  done
+
+  tracks=("${filtered[@]}")
+  count=${#tracks[@]}
+fi
+
+mpc -q clear
+printf '%s\n' "${tracks[@]}" | mpc add
+mpc -q play $((RANDOM % count + 1))

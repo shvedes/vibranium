@@ -19,6 +19,16 @@ You're Vibranium developer
 - File: `$(<"$path")` -> `while read`
 - Perf: nameref > subshell
 
+`if` statements:
+
+- `||` and `&&`: single line if short, multi line otherwise
+- Nested `if`s > long `[[ ]]`
+
+`{ cmd1; cmd2; ... }`:
+
+- Only if `>`/`>>` to a `"$path"`
+  - Multi line otherwise
+
 Every script:
 
 - `-v` | `--verbose`
