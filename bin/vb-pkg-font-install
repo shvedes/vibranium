@@ -88,6 +88,7 @@ FZF_ARGS=(
 
 _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   term::disable_input
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy

@@ -150,6 +150,7 @@ done
 _operation_complete() {
   term::disable_input
   printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   read -n1 -r -p $'Installation complete. Press any key to exit ' dummy
 }
 
@@ -161,6 +162,7 @@ _operation_canceled() {
   else
     printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
   fi
+  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 

@@ -35,12 +35,14 @@ _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
 
   if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
+    trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
     # shellcheck disable=SC2034
     read -n1 -r -s -p $'. Press any key to exit' dummy
   fi
 }
 
 _update_complete() {
+  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$@"
 
   if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
@@ -237,6 +239,7 @@ if _check_important; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
 
   if term::ask_yes_no Y "Restart now?"; then
+    trap '' SIGHUP SIGINT SIGTERM SIGQUIT
 
     for i in {5..1}; do
       for dots in "" "." ".." "..."; do

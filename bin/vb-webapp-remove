@@ -48,6 +48,7 @@ FZF_ARGS=(
 _operation_canceled() {
   term::disable_input
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   read -r -n1 -s -p $'. Press any key to exit' _dummy
   term::enable_input
 }
@@ -55,6 +56,7 @@ _operation_canceled() {
 _operation_complete() {
   term::disable_input
   printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   read -r -n1 -p $'Removal complete. Press any key to exit ' _dummy
   term::enable_input
 }

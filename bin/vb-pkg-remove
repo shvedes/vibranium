@@ -250,6 +250,7 @@ _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
+    trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
     read -n1 -r -s -p $'. Press any key to exit' dummy
   fi
 
@@ -266,6 +267,8 @@ _uninstallation_complete() {
   if [[ "$CONSERVATIVE" == true ]]; then
     return
   fi
+
+  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
 
   printf "%s[VIBRANIUM]%s Uninstallation complete" "$GREEN" "$RESET"
 

@@ -8,12 +8,14 @@ PACKAGES=(docker docker-compose)
 
 _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
 _operation_complete() {
   printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -p $'. Press any key to exit ' dummy
 }
