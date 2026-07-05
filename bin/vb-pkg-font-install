@@ -1,11 +1,12 @@
 #!/bin/bash
 
 VERBOSE=false
+AUR_MODE=false
 
 log() {
   local level="$1"; shift
   if $VERBOSE && [[ -t 0 ]]; then
-    echo "[${0##*/}] $level: $*" >&2
+    echo "[${0##*/}] $level: $*"
   fi
 }
 
@@ -23,6 +24,7 @@ Interactive font package installer using fzf.
 
 Options:
   -v, --verbose  Enable verbose output
+  --aur          Install fonts from AUR instead of official repos
   -h, --help     Show this help and exit
 EOF
 }
@@ -31,6 +33,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
   -v | --verbose)
     VERBOSE=true
+    shift
+    ;;
+  --aur)
+    AUR_MODE=true
     shift
     ;;
   -h | --help)
@@ -45,8 +51,12 @@ done
 
 source vb-lib-core
 
-# fzf configuration for font selection with a preview pane showing
-# detailed package info from yay -Sii.
+if [[ "$AUR_MODE" == true ]]; then
+  PREVIEW_CMD='yay -Sii {1}'
+else
+  PREVIEW_CMD='pacman -Si {1}'
+fi
+
 FZF_ARGS=(
   --multi
   --ignore-case
@@ -64,7 +74,7 @@ FZF_ARGS=(
   --input-label 'Filter packages'
   --input-border 'bold'
 
-  --preview 'yay -Sii {1}'
+  --preview "$PREVIEW_CMD"
   --preview-border 'bold'
   --preview-window 'right:75%:wrap'
   --preview-label 'Package Information'
@@ -83,12 +93,15 @@ _operation_canceled() {
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
-# Query both official repos and AUR for font packages.  The glob patterns
-# match TTF and OTF packages (including Nerd Font variants) while
-# excluding non-font packages that happen to contain "ttf" or "otf" in
-# their names.
 _get_fonts() {
+  log Info "Fetching font packages"
   local pkg
+
+  if [[ "$AUR_MODE" == true ]]; then
+    local cmd=(yay -Slqa)
+  else
+    local cmd=(pacman -Slq)
+  fi
 
   while IFS= read -r pkg; do
     case "$pkg" in
@@ -97,13 +110,10 @@ _get_fonts() {
       printf '%s\n' "$pkg"
       ;;
     esac
-  done < <(
-    pacman -Slq
-    yay -Slqa
-  )
+  done < <("${cmd[@]}")
 }
 
-trap 'printf "\n"; _operation_canceled; exit 1' SIGINT
+trap 'trap "exit 1" SIGINT; printf "\n"; _operation_canceled; exit 1' SIGINT
 
 term::show_header
 term::disable_input
@@ -122,6 +132,7 @@ if [[ ${#chosen[@]} -eq 0 ]]; then
   exit 1
 fi
 
+log Info "${#chosen[@]} font(s) selected"
 if vb-pkg-install --no-logo --no-verify -- "${chosen[@]}"; then
   exec setsid -f fc-cache -f
 fi

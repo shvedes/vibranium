@@ -20,7 +20,8 @@ Options:
   --no-dummy        Do not wait for a key press after completion or cancellation
   --no-systemd      Skip systemd post-removal hook
   --conservative    Do not print any success / fail messages
-  -h,--help         Show this help and exit
+  -v, --verbose     Enable verbose output
+  -h, --help        Show this help and exit
   --                End of options. Everything after is PACKAGE
 
 If no PACKAGE is provided, list explicitly installed packages and use fzf for interactive selection.
@@ -37,6 +38,7 @@ log() {
 }
 
 _ask_for_sudo() {
+  log Info "Acquiring sudo for removal"
   term::enable_input
   sudo -v
   term::disable_input
@@ -51,6 +53,7 @@ _ask_for_sudo() {
 #   - unit_pkg_user:         Associative map of user unit name -> package.
 #   - unit_pkg_system:       Associative map of system unit name -> package.
 _handle_systemd() {
+  log Info "Checking systemd units for ${#PACKAGES[@]} packages"
   user_enabled_units=()
   system_enabled_units=()
 
@@ -135,6 +138,7 @@ _ask_yes_no_all() {
 #   $3 (nref)  - indexed array to append background PIDs into
 _disable_scope_units() {
   local scope="$1"
+  log Info "Disabling units (scope=$scope)"
   local -n _pkg_map="$2"
   local -n _pids="$3"
 
@@ -274,6 +278,7 @@ _uninstallation_complete() {
 # Verifies that all CLI-provided packages are actually installed.
 # Reports any that aren't. Returns 1 if any are missing.
 _ensure_installed() {
+  log Info "Verifying ${#PACKAGES[@]} package(s) are installed"
   local -a missing=()
 
   for pkg in "${PACKAGES[@]}"; do
@@ -297,6 +302,7 @@ _ensure_installed() {
 # (accounting for the header and the overview title line) and shows a
 # terminal-specific scrolling hint if it does.
 _show_overview() {
+  log Info "Showing overview for ${#PACKAGES[@]} package(s)"
   local packages=("${PACKAGES[@]}")
 
   if ((${#packages[@]} == 0)); then
@@ -315,17 +321,20 @@ _show_overview() {
 }
 
 _uninstall_packages() {
+  log Info "Uninstalling ${#PACKAGES[@]} package(s)"
   term::enable_input
   sudo pacman -Rns "${PACKAGES[@]}"
 }
 
 _get_installed_packages() {
+  log Info "Fetching installed packages"
   mapfile -t PACKAGES < <(pacman -Qqe)
 }
 
 # Allows the user to select packages using fzf with preview.
 # Populates PACKAGES with selected items. Returns 1 if none selected.
 _choose_packages() {
+  log Info "Opening fzf for package selection"
   local -a chosen
 
   term::enable_input
@@ -337,11 +346,13 @@ _choose_packages() {
 }
 
 _remove_orphans() {
+  log Info "Removing orphan packages"
   echo -e "${GREEN}[VIBRANIUM]${RESET} Removing orphan packages..."
   yay -Ycc --noconfirm &>/dev/null
 }
 
 _update_bar_module() {
+  log Info "Updating Waybar pacman module"
   # Edge case: explicitly update the Waybar module
   # in case if we deleted a package that was in update queue.
   vb-refresh-waybar-module pacman
@@ -385,7 +396,7 @@ FZF_ARGS=(
   --color 'pointer:white,marker:green'
 )
 
-trap 'printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
+trap 'trap "exit 1" SIGHUP SIGINT SIGTERM SIGQUIT; printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

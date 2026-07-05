@@ -5,7 +5,7 @@ VERBOSE=false
 log() {
   local level="$1"; shift
   if $VERBOSE && [[ -t 0 ]]; then
-    echo "[${0##*/}] $level: $*" >&2
+    echo "[${0##*/}] $level: $*"
   fi
 }
 
@@ -83,6 +83,7 @@ _operation_canceled() {
 # List installed font packages by matching their names against common
 # font package prefixes (ttf, otf) and Nerd Font suffixes.
 _get_fonts() {
+  log Info "Fetching installed font packages"
   local pkg
   for pkg in $(pacman -Qq); do
     case "$pkg" in
@@ -93,7 +94,7 @@ _get_fonts() {
   done
 }
 
-trap 'printf "\n"; _operation_canceled; exit 1' SIGINT
+trap 'trap "exit 1" SIGINT; printf "\n"; _operation_canceled; exit 1' SIGINT
 
 term::show_header
 
@@ -105,4 +106,5 @@ if [[ ${#CHOSEN[@]} -eq 0 ]]; then
   exit 1
 fi
 
+log Info "${#CHOSEN[@]} font(s) selected"
 vb-pkg-remove --no-logo -- "${CHOSEN[@]}"

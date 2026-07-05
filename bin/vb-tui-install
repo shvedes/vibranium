@@ -306,7 +306,7 @@ fi
 
 if [[ -z $TUI_EXEC ]]; then
   INTERACTIVE_MODE=true
-  trap "printf '\n'; _operation_canceled; exit 1" INT
+  trap "trap 'exit 1' INT; printf '\n'; _operation_canceled; exit 1" INT
   term::show_header
 
   # -- Exec command ----------------------------------------------------------

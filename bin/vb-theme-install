@@ -55,7 +55,7 @@ _operation_canceled() {
   term::enable_input
 }
 
-trap 'printf "\n"; _operation_canceled; exit 1' INT HUP
+trap 'trap "exit 1" INT HUP; printf "\n"; _operation_canceled; exit 1' INT HUP
 
 # Return true if the input looks like a GitHub owner/repo shorthand.
 # Accepts alphanumeric characters, hyphens, underscores, and dots on

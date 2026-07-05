@@ -57,7 +57,7 @@ if [[ -z "$1" ]]; then
   term::show_header
 fi
 
-trap 'printf "\n";_operation_canceled; exit 1' INT
+trap 'trap "exit 1" INT; printf "\n";_operation_canceled; exit 1' INT
 
 _operation_canceled() {
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
@@ -182,7 +182,7 @@ done
 # Tmpfile receives the final file path from yt-dlp via --print-to-file.
 # Reset the trap so the tmpfile is removed on Ctrl-C as well.
 DOWNLOAD_PATH_FILE="$(mktemp)"
-trap 'rm -f "$DOWNLOAD_PATH_FILE"; printf "\n"; _operation_canceled; exit 1' INT
+trap 'trap "exit 1" INT; rm -f "$DOWNLOAD_PATH_FILE"; printf "\n"; _operation_canceled; exit 1' INT
 
 if ! _try_download "$URL"; then
   rm -f "$DOWNLOAD_PATH_FILE"

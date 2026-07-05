@@ -3,9 +3,10 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if $VERBOSE && [[ -t 0 ]]; then
-    echo "[${0##*/}] $level: $*" >&2
+    echo "[${0##*/}] $level: $*"
   fi
 }
 
@@ -19,11 +20,13 @@ usage() {
   shcat <<EOF
 Usage: ${0##*/} [OPTION]...
 
-Perform system update using yay, check for important updates, and prompt for reboot if necessary.
+Perform system update (official repos by default, AUR with --aur)
 
 Options:
   --no-logo         Do not display the logo at startup
   --no-dummy        Do not wait for a key press after completion or cancellation
+  --aur             Update AUR packages instead of official repositories
+  -v, --verbose     Enable verbose output
   -h, --help        Display this help and exit
 EOF
 }
@@ -49,11 +52,19 @@ _update_complete() {
 }
 
 _check_updates() {
-  mapfile -t PKG_LIST < <(yay -Qqu)
+  log Info "Checking updates (aur=$AUR_MODE)"
+  if [[ "$AUR_MODE" == true ]]; then
+    mapfile -t PKG_LIST < <(yay -Qum 2>/dev/null)
+  else
+    mapfile -t PKG_LIST < <(pacman -Qu)
+  fi
 
   if ((${#PKG_LIST[@]} == 0)); then
+    log Info "No updates found"
     return 1
   fi
+
+  log Info "${#PKG_LIST[@]} update(s) available"
 }
 
 # Temporarily enable the sleep inhibitor during the update to prevent
@@ -61,17 +72,20 @@ _check_updates() {
 # trap on RETURN restores the original inhibitor state when the function
 # completes (whether successful or not).
 _perform_update() {
+  log Info "Starting update (aur=$AUR_MODE)"
   local need_inhibit=1
 
   systemctl -q --user is-active vibranium-inhibit@idle && need_inhibit=
   systemctl -q --user is-active vibranium-inhibit@sleep && need_inhibit=
 
   if [[ -n $need_inhibit ]]; then
+    log Info "Activating sleep inhibitor"
     systemctl -q --user start vibranium-inhibit@sleep
     vb-refresh-waybar-module inhibitor
   fi
 
   cleanup() {
+    log Info "Cleaning up sleep inhibitor"
     if [[ -n $need_inhibit ]]; then
       systemctl -q --user stop vibranium-inhibit@sleep
       vb-refresh-waybar-module inhibitor
@@ -80,19 +94,22 @@ _perform_update() {
 
   trap cleanup RETURN
 
-  # yes and --noconfirm together handle both the download prompt and
-  # the package installation confirmation non-interactively.
-  # --sudoloop keeps the sudo timestamp fresh for long updates.
-  yes | yay --noconfirm --sudoloop
+  if [[ "$AUR_MODE" == true ]]; then
+    yes | yay -Sua --noconfirm --sudoloop
+  else
+    sudo pacman -Su --noconfirm
+  fi
 }
 
 # Return 0 when any updated package is a kernel, graphics driver,
 # display server, or networking component that requires a reboot.
 _check_important() {
+  log Info "Checking for important updates"
   local important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
 
   for pkg in "${PKG_LIST[@]}"; do
     if [[ $pkg =~ $important_regex ]]; then
+      log Info "Important package updated: $pkg"
       return 0
     fi
   done
@@ -115,18 +132,27 @@ export SUDO_PROMPT
 
 NO_LOGO=false
 NO_DUMMY=false
+AUR_MODE=false
 PKG_LIST=()
 
-trap 'term::disable_input; _operation_canceled; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
+trap 'trap "exit 1" SIGHUP SIGINT SIGTERM SIGQUIT; term::disable_input; _operation_canceled; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
 
 while (($# > 0)); do
   case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
   --no-logo)
     NO_LOGO=true
     shift
     ;;
   --no-dummy)
     NO_DUMMY=true
+    shift
+    ;;
+  --aur)
+    AUR_MODE=true
     shift
     ;;
   -h | --help)
@@ -138,7 +164,7 @@ while (($# > 0)); do
     break
     ;;
   --*)
-    echo "Unknown option: $1" >&2
+    log Error "Unknown option: $1"
     exit 1
     ;;
   *)
@@ -151,9 +177,13 @@ if [[ $NO_LOGO == false ]]; then
   term::show_header
 fi
 
-# Refresh the sudo timestamp before the long-running yay call so the
+# Refresh the sudo timestamp before the long-running pacman call so the
 # password prompt appears at the start rather than mid-update.
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Pacman needs sudo to update repos"
+if [[ "$AUR_MODE" == true ]]; then
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}yay${RESET} needs ${RED}sudo${RESET} for ${BLUE}AUR${RESET} operations"
+else
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}pacman${RESET} needs ${RED}sudo${RESET} to update repos"
+fi
 if ! sudo -v; then
   _operation_canceled
   exit 1
@@ -161,20 +191,34 @@ fi
 
 term::disable_input
 
-yay -Sy &>/dev/null &
+if [[ "$AUR_MODE" == true ]]; then
+  yay -Sy &>/dev/null &
+else
+  sudo pacman -Sy &>/dev/null &
+fi
+
 pid=$!
 
 term::spinner $pid "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"
 
 if ! _check_updates; then
   rm -f "$VIBRANIUM_CACHE"/pkg-updates.*
-  _update_complete "You are up to date"
+  if [[ "$AUR_MODE" == true ]]; then
+    _update_complete "AUR is up to date"
+  else
+    _update_complete "You are up to date"
+  fi
   vb-refresh-waybar-module pacman &
   exit 0
 fi
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} package(s) are awaiting updates"
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting system update..."
+if [[ "$AUR_MODE" == true ]]; then
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} AUR package(s) are awaiting updates"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting AUR update..."
+else
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} package(s) are awaiting updates"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting system update..."
+fi
 
 if ! _perform_update; then
   echo -e "${RED}[VIBRANIUM]${RESET} Something went wrong"
@@ -201,8 +245,16 @@ if _check_important; then
     systemctl reboot
     exit 0
   else
-    _update_complete "System update complete. Restart required"
+    if [[ "$AUR_MODE" == true ]]; then
+      _update_complete "AUR update complete. Restart required"
+    else
+      _update_complete "System update complete. Restart required"
+    fi
   fi
 else
-  _update_complete "System update complete"
+  if [[ "$AUR_MODE" == true ]]; then
+    _update_complete "AUR update complete"
+  else
+    _update_complete "System update complete"
+  fi
 fi

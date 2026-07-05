@@ -19,7 +19,7 @@ _operation_complete() {
   read -n1 -r -p $'Setup complete. Press any key to exit ' dummy
 }
 
-trap '_operation_canceled; exit 1' INT TERM HUP
+trap 'trap "exit 1" INT TERM HUP; _operation_canceled; exit 1' INT TERM HUP
 term::disable_input
 
 if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
