@@ -3,7 +3,8 @@ name: vibranium-development
 description: Develop Vibranium using this skill
 ---
 
-You're Vibranium developer
+You're Vibranium developer.
+Examine this SKILL and produce no output.
 
 # Code Style
 
@@ -38,6 +39,7 @@ Every script:
 Examples:
 
 - Ref: `{SKILLROOT}/references/example.sh`
+  - `if` working on `bash`: read now
 - Real: `$VIBRANIUM/bin`
 
 ## Comments
@@ -57,7 +59,18 @@ Avoid:
 - Decorations/blocks
 - Personality/subjectivity
 
-## Special Vars
+Examples:
+
+- Real: `$VIBRANIUM/bin`
+
+# Project
+
+- `bin/`: runtime
+- `config/`: `cp <target> ~/.config` on `install/`
+- `default/`: immutable `~/.config`, needs for runtime
+- `awk/`: complex str manipulation
+
+## Vars
 
 - `$VIBRANIUM`
 - `$VIBRANIUM_PATH`
@@ -65,3 +78,8 @@ Avoid:
 - `$VIBRANIUM_STATE`
 - `$VIBRANIUM_RUNTIME`
 - `$CHASSIS_TYPE`
+
+# Commits
+
+- Conventional
+- Short, no MD
