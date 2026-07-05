@@ -67,7 +67,7 @@ _handle_systemd() {
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Getting systemd service information..."
 
   for pkg in "${PACKAGES[@]}"; do
-    while read -r scope unit_path; do
+    while read -r unit_type scope unit_path; do
       unit="${unit_path##*/}"
 
       if [[ "$scope" == "user" ]]; then

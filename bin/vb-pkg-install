@@ -131,6 +131,7 @@ _enable_systemd_units() {
   mapfile -t unique_pkgs < <(printf '%s\n' "${provides_systemd_service[@]}" | sort -u)
 
   local pkg unit_type scope unit_name
+  local -a pids=()
 
   for pkg in "${unique_pkgs[@]}"; do
     for i in "${!provides_systemd_service[@]}"; do
@@ -148,10 +149,16 @@ _enable_systemd_units() {
         else
           sudo systemctl -q --now enable "$unit_name" &
         fi
+        pids+=($!)
         break # Skip lower-priority units for this package
       fi
     done
   done
+
+  if ((${#pids[@]} > 0)); then
+    echo -e "${BLUE}[VIBRANIUM]${RESET} Waiting for systemd units to be enabled..."
+    wait "${pids[@]}"
+  fi
 }
 
 _refresh_repos() {

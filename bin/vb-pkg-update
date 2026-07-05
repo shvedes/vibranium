@@ -105,9 +105,10 @@ _perform_update() {
 # display server, or networking component that requires a reboot.
 _check_important() {
   log Info "Checking for important updates"
-  local important_regex='^(systemd|linux(-.*)?|networkmanager|iwd|mesa|nvidia)$'
+  local important_regex='^(systemd|linux(-headers|-lts|-zen|-hardened)?|networkmanager|iwd|mesa|nvidia)$'
 
-  for pkg in "${PKG_LIST[@]}"; do
+  for pkg_line in "${PKG_LIST[@]}"; do
+    local pkg="${pkg_line%% *}"
     if [[ $pkg =~ $important_regex ]]; then
       log Info "Important package updated: $pkg"
       return 0
@@ -179,10 +180,12 @@ fi
 
 # Refresh the sudo timestamp before the long-running pacman call so the
 # password prompt appears at the start rather than mid-update.
-if [[ "$AUR_MODE" == true ]]; then
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}yay${RESET} needs ${RED}sudo${RESET} for ${BLUE}AUR${RESET} operations"
-else
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}pacman${RESET} needs ${RED}sudo${RESET} to update repos"
+if ! sudo -n true 2>/dev/null; then
+  if [[ "$AUR_MODE" == true ]]; then
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}yay${RESET} needs ${RED}sudo${RESET} for ${BLUE}AUR${RESET} operations"
+  else
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}pacman${RESET} needs ${RED}sudo${RESET} to update repos"
+  fi
 fi
 if ! sudo -v; then
   _operation_canceled
