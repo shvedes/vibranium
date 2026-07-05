@@ -3,7 +3,6 @@
 source vb-lib-core
 
 VERBOSE=false
-
 HOOK_FILE="$XDG_CONFIG_HOME/vibranium/hooks/font-change.sh"
 
 shcat() {
@@ -58,9 +57,11 @@ esac
 # fc-list may return comma-separated lists for family and style (one font file
 # can carry multiple family names); only the first element of each is kept.
 mapfile -t _font_raw < <(
-  fc-list -f '%{family}|%{style}\n' :spacing=100 |
+  fc-list -f '%{family}|%{style}|%{spacing}\n' |
     gawk -F'|' '
     {
+        if ($3 != 100 && $3 != 90) next
+
         n = split($1, fams, ",")
         fam = fams[1]
         gsub(/^[[:space:]]+|[[:space:]]+$/, "", fam)
@@ -94,6 +95,10 @@ for _e in "${_font_raw[@]}"; do
   _font_map["$_disp"]="${_e}"
 done
 
+_import_entry="<span foreground='${P_YELLOW}'>[F]</span> "
+_import_entry+="<b>Install font from file</b>"
+_font_display=("$_import_entry" "${_font_display[@]}")
+
 from_arg=0
 selected_display=""
 
@@ -113,6 +118,36 @@ fi
   log Error "no font selected -- operation cancelled"
   exit 1
 }
+
+if [[ "$selected_display" == "$_import_entry" ]]; then
+  font_raw=$(zenity --file-selection --multiple \
+    --title="Select font files" --file-filter="*.ttf *.otf *.ttc" 2>/dev/null)
+
+  if [[ -z "$font_raw" ]]; then
+    exit 1
+  fi
+
+  IFS='|' read -ra font_paths <<< "$font_raw"
+
+  notify-send -r 1 -t 5000 "Vibranium" \
+    "Installing ${#font_paths[@]} font(s)"
+
+  if ! [[ -d "$XDG_DATA_HOME/fonts" ]]; then
+    mkdir -p "$XDG_DATA_HOME/fonts"
+  fi
+
+  for _fp in "${font_paths[@]}"; do
+    cp "$_fp" "$XDG_DATA_HOME/fonts/"
+  done
+
+  notify-send -r 1 -t 5000 "Vibranium" "Regenerating font cache..."
+  fc-cache --really-force /usr/share/fonts "$XDG_DATA_HOME/fonts"
+
+  notify-send -r 1 -t 3000 "Vibranium" \
+    "<span foreground='${P_GREEN}'><b>${#font_paths[@]}</b></span> font(s) imported"
+
+  exec "$0" "$@"
+fi
 
 _raw="${_font_map[$selected_display]}"
 font_family="${_raw%%|*}"   # e.g. "JetBrains Mono"
