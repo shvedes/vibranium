@@ -62,9 +62,17 @@ vb_force_template_files=(
 # Functions can be defined here (before the array) or in the
 # ~/.config/vibranium/settings.functions (preferred way).
 # The latter is being sourced by exec scripts that use it.
+#
+# Keywords also accept positional parameters: everything typed after
+# the keyword in the launcher search bar is appended as arguments to
+# the action command.
 
 vb_launcher_keywords=(
   "date:_vb_kw_date"
   "updates:_check_updates"
   "stopify:vb-launch-cmd -- spotify"
+
+  # Type "play <query>" in the launcher to search MPD library.
+  # The query is passed as --search argument to vb-cmd-play-mpd.
+  "play:vb-cmd-play-mpd --search"
   )
