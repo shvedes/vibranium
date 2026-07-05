@@ -7,6 +7,7 @@ GENRE=""
 ALBUM=""
 TRACK=""
 RANDOM_MODE=false
+SEARCH=""
 
 log() {
   local level="$1"; shift
@@ -33,17 +34,19 @@ Options:
   -t, --track TRACK      Queue tracks matching TRACK title
   -g, --genre GENRE      Queue tracks with GENRE tag
   -r, --random           Play one random track
+  -s, --search QUERY     Search artist/album/track, play best matches
 
   -v, --verbose          Enable verbose output
   -h, --help             Display this help and exit
 
 Notes:
   --artist, --album, and --track can be combined together.
-  --genre and --random are standalone options.
+  --genre, --random, and --search are standalone options.
 
   Artist/Album/Track use case-insensitive substring search,
   so --track "absolute in dou" matches "Absolute In Doubt".
   --genre uses exact matching.
+  --search searches across all three fields and deduplicates results.
 EOF
 }
 
@@ -69,6 +72,11 @@ while [[ $# -gt 0 ]]; do
     RANDOM_MODE=true
     shift
     ;;
+  -s | --search)
+    shift
+    SEARCH="$*"
+    set --
+    ;;
   -v | --verbose)
     VERBOSE=true
     shift
@@ -85,16 +93,21 @@ while [[ $# -gt 0 ]]; do
 done
 
 if $RANDOM_MODE; then
-  if [[ -n "$ARTIST" || -n "$GENRE" || -n "$ALBUM" || -n "$TRACK" ]]; then
+  if [[ -n "$ARTIST" || -n "$GENRE" || -n "$ALBUM" || -n "$TRACK" || -n "$SEARCH" ]]; then
     log Error "--random cannot combine with other filters" >&2
     exit 1
   fi
 elif [[ -n "$GENRE" ]]; then
-  if [[ -n "$ARTIST" || -n "$ALBUM" || -n "$TRACK" ]]; then
-    log Error "--genre cannot combine with --artist, --album, or --track" >&2
+  if [[ -n "$ARTIST" || -n "$ALBUM" || -n "$TRACK" || -n "$SEARCH" ]]; then
+    log Error "--genre cannot combine with other filters" >&2
     exit 1
   fi
-elif [[ -z "$ARTIST" && -z "$ALBUM" && -z "$TRACK" ]]; then
+elif [[ -n "$SEARCH" ]]; then
+  if [[ -n "$ARTIST" || -n "$ALBUM" || -n "$TRACK" || -n "$GENRE" ]]; then
+    log Error "--fuzzy cannot combine with other filters" >&2
+    exit 1
+  fi
+elif [[ -z "$ARTIST" && -z "$ALBUM" && -z "$TRACK" && -z "$SEARCH" ]]; then
   log Error "No mode specified" >&2
   usage >&2
   exit 1
@@ -123,6 +136,146 @@ if $RANDOM_MODE; then
   mpc -q clear
   mpc add "${all[pick]}"
   mpc -q play
+  exit 0
+fi
+
+if [[ -n "$SEARCH" ]]; then
+  # Runtime directory for intermediate files
+  tmp="$VIBRANIUM_RUNTIME/vb-cmd-play-mpd.$$"
+  mkdir -p -- "$tmp" || exit 1
+  trap 'rm -rf -- "$tmp"' EXIT
+  sc="$tmp/scores"
+
+  read -ra tokens <<< "$SEARCH"
+
+  # Full-query substring across artist, album, title.
+  # Tracks matching the full query get a high base score and are always included.
+  {
+    while IFS= read -r t; do printf '10\t%s\n' "$t"; done < <(mpc search artist "$SEARCH")
+    while IFS= read -r t; do printf '8\t%s\n' "$t";  done < <(mpc search album "$SEARCH")
+    while IFS= read -r t; do printf '7\t%s\n' "$t";  done < <(mpc search title "$SEARCH")
+  } >> "$sc"
+
+  # Per-token per-field files. Identical tokens deduplicated so
+  # "chk chk chk" produces a single token set.
+  declare -A tok_seen
+  n_tok=0
+  for tok in "${tokens[@]}"; do
+    [[ ${#tok} -lt 2 ]] && continue
+    [[ -n "${tok_seen["$tok"]}" ]] && continue
+    tok_seen["$tok"]=1
+
+    mpc search artist "$tok" 2>/dev/null > "$tmp/$n_tok.artist"
+    mpc search album  "$tok" 2>/dev/null > "$tmp/$n_tok.album"
+    mpc search title  "$tok" 2>/dev/null > "$tmp/$n_tok.title"
+
+    # Union of per-field matches for this token (associative array dedup)
+    declare -A _u
+    while IFS= read -r t; do _u["$t"]=1; done < "$tmp/$n_tok.artist"
+    while IFS= read -r t; do _u["$t"]=1; done < "$tmp/$n_tok.album"
+    while IFS= read -r t; do _u["$t"]=1; done < "$tmp/$n_tok.title"
+    for t in "${!_u[@]}"; do printf '%s\n' "$t"; done > "$tmp/$n_tok"
+    unset _u
+
+    ((n_tok++))
+  done
+
+  # Token intersection via in-memory associative arrays.
+  # Only tracks matching every token (>= 1 field per token) qualify.
+  if ((n_tok > 1)); then
+    declare -A int_set
+    while IFS= read -r t; do int_set["$t"]=1; done < "$tmp/0"
+
+    for ((i=1; i<n_tok; i++)); do
+      declare -A tok_set
+      while IFS= read -r t; do tok_set["$t"]=1; done < "$tmp/$i"
+
+      # Rebuild int_set in new array to avoid unset bugs with
+      # special characters in keys (e.g. apostrophes in titles).
+      declare -A next_set
+      for t in "${!int_set[@]}"; do
+        [[ -n "${tok_set["$t"]}" ]] && next_set["$t"]=1
+      done
+
+      int_set=()
+      for t in "${!next_set[@]}"; do int_set["$t"]=1; done
+      unset tok_set next_set
+    done
+    for t in "${!int_set[@]}"; do printf '%s\n' "$t"; done > "$tmp/intersect"
+    unset int_set
+  elif ((n_tok == 1)); then
+    while IFS= read -r t; do printf '%s\n' "$t"; done < "$tmp/0" > "$tmp/intersect"
+  else
+    : > "$tmp/intersect"
+  fi
+
+  # Per-token per-field scoring for intersection members.
+  # Weights: artist +3, album +2, title +1 per matching token.
+  if [[ -s "$tmp/intersect" ]]; then
+    declare -A in_int
+    while IFS= read -r t; do in_int["$t"]=1; done < "$tmp/intersect"
+
+    for ((i=0; i<n_tok; i++)); do
+      while IFS= read -r t; do
+        [[ -n "${in_int["$t"]}" ]] && printf '3\t%s\n' "$t"
+      done < "$tmp/$i.artist" >> "$sc"
+
+      while IFS= read -r t; do
+        [[ -n "${in_int["$t"]}" ]] && printf '2\t%s\n' "$t"
+      done < "$tmp/$i.album" >> "$sc"
+
+      while IFS= read -r t; do
+        [[ -n "${in_int["$t"]}" ]] && printf '1\t%s\n' "$t"
+      done < "$tmp/$i.title" >> "$sc"
+    done
+
+    # Bonus: all tokens match within the same field.
+    # Gives +5 (artist) / +4 (album) / +3 (title) to all intersection tracks.
+    if ((n_tok >= 2)); then
+      for field in artist album title; do
+        missing=false
+        for ((i=0; i<n_tok; i++)); do
+          [[ ! -s "$tmp/$i.$field" ]] && { missing=true; break; }
+        done
+        $missing && continue
+
+        case $field in
+          artist) bonus=5 ;;
+          album)  bonus=4 ;;
+          title)  bonus=3 ;;
+        esac
+
+        while IFS= read -r t; do
+          printf '%d\t%s\n' "$bonus" "$t"
+        done < "$tmp/intersect" >> "$sc"
+      done
+    fi
+  fi
+
+  if [[ ! -s "$sc" ]]; then
+    log Error "No matches for: $SEARCH" >&2
+    exit 1
+  fi
+
+  # Aggregate per-track scores from all scoring sources.
+  declare -A agg
+  while IFS=$'\t' read -r score t; do
+    ((agg["$t"] += score))
+  done < "$sc"
+
+  # Sort by score descending, highest first.
+  tracks=()
+  while IFS=$'\t' read -r _ t; do
+    tracks+=("$t")
+  done < <(
+    for t in "${!agg[@]}"; do
+      printf '%d\t%s\n' "${agg[$t]}" "$t"
+    done | sort -t$'\t' -k1,1rn
+  )
+
+  mpc -q clear
+  printf '%s\n' "${tracks[@]}" | mpc add
+  mpc -q play 1
   exit 0
 fi
 
