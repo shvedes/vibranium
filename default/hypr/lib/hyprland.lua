@@ -8,7 +8,9 @@ WIN_NOTIF = 33
 -- Returns true if the file at path exists and is readable.
 local function file_exists(path)
   local f = io.open(path, "r")
-  if f then f:close() end
+  if f then
+    f:close()
+  end
   return f ~= nil
 end
 
@@ -23,10 +25,14 @@ end
 -- Centers a floating window at 70 % of its monitor dimensions.
 -- No-op if the window is not floating.
 function Hypr.Helpers.CenterFloatingWindow(win)
-  if not win.floating then return end
+  if not win.floating then
+    return
+  end
 
   local mon = hl.get_active_monitor()
-  if mon == nil then return end
+  if mon == nil then
+    return
+  end
 
   local w = math.floor(mon.width * 0.7)
   local h = math.floor(mon.height * 0.7)
@@ -41,7 +47,7 @@ end
 -- https://www.reddit.com/r/hyprland/comments/1t74dt6/comment/okm9qk2
 function Hypr.Helpers.MoveAndToggleScratchpad(key)
   local sws = hl.get_active_special_workspace()
-  local cw  = hl.get_active_window()
+  local cw = hl.get_active_window()
 
   if cw then
     if sws then
@@ -78,11 +84,13 @@ end
 -- aborts (removing the red border) to prevent killing the wrong process.
 function Hypr.Helpers.ForceKillWindow()
   local win = hl.get_active_window()
-  if win == nil then return end
+  if win == nil then
+    return
+  end
 
-  local pid   = win.pid
+  local pid = win.pid
   local title = win.initial_title
-  local addr  = win.address
+  local addr = win.address
 
   if KillConfirm ~= nil then
     if KillConfirm.pid ~= pid then
@@ -91,10 +99,11 @@ function Hypr.Helpers.ForceKillWindow()
       remove_border_tag(KillConfirm.addr, "KillArmed")
       KillConfirm = nil
 
-      hl.dispatch(hl.dsp.exec_raw(
-        "notify-send -r " ..
-        WIN_NOTIF .. " -t 4000 'Kill Cancelled' 'The active window changed before confirmation'"
-      ))
+      hl.dispatch(
+        hl.dsp.exec_raw(
+          "notify-send -r " .. WIN_NOTIF .. " -t 4000 'Kill Cancelled' 'The active window changed before confirmation'"
+        )
+      )
       return
     end
 
@@ -103,10 +112,16 @@ function Hypr.Helpers.ForceKillWindow()
     KillConfirm.timer:set_enabled(false)
     KillConfirm = nil
 
-    hl.dispatch(hl.dsp.exec_raw(
-      "notify-send -r " .. WIN_NOTIF .. " 'Window Force-Killed'"
-      .. " '<b>" .. Hypr.Helpers.ShellQuote(title) .. "</b> was forcefully terminated'"
-    ))
+    hl.dispatch(
+      hl.dsp.exec_raw(
+        "notify-send -r "
+          .. WIN_NOTIF
+          .. " 'Window Force-Killed'"
+          .. " '<b>"
+          .. Hypr.Helpers.ShellQuote(title)
+          .. "</b> was forcefully terminated'"
+      )
+    )
     hl.dispatch(hl.dsp.window.kill())
     return
   end
@@ -128,14 +143,16 @@ end
 function Hypr.Helpers.CloseWindows()
   for _, win in ipairs(hl.get_windows()) do
     hl.dispatch(hl.dsp.window.close({
-      window = "address:" .. win.address
+      window = "address:" .. win.address,
     }))
   end
 end
 
 function Hypr.Helpers.FlashBorder(col)
   local win = hl.get_active_window()
-  if not win then return end
+  if not win then
+    return
+  end
 
   local addr = win.address
 
@@ -152,11 +169,17 @@ end
 function Hypr.Helpers.LaunchTUI(binary, command)
   if not file_exists(binary) then
     local name = binary:match("[^/]+$")
-    hl.dispatch(hl.dsp.exec_raw(
-      "notify-send -r " .. WIN_NOTIF .. " -u critical -t 5000"
-      .. " 'Cannot launch system monitor'"
-      .. " 'Missing dependency: <b>" .. name .. "</b>'"
-    ))
+    hl.dispatch(
+      hl.dsp.exec_raw(
+        "notify-send -r "
+          .. WIN_NOTIF
+          .. " -u critical -t 5000"
+          .. " 'Cannot launch system monitor'"
+          .. " 'Missing dependency: <b>"
+          .. name
+          .. "</b>'"
+      )
+    )
     return
   end
   hl.dispatch(hl.dsp.exec_raw(command))
@@ -164,7 +187,9 @@ end
 
 function Hypr.Helpers.WindowToggleFreeze()
   local win = hl.get_active_window()
-  if not win then return end
+  if not win then
+    return
+  end
 
   local target_pid = win.pid
 
@@ -180,19 +205,17 @@ function Hypr.Helpers.WindowToggleFreeze()
 
   local sig, verb
   if state == "T" then
-    sig  = "CONT"
+    sig = "CONT"
     verb = "restored"
   else
-    sig  = "STOP"
+    sig = "STOP"
     verb = "suspended"
   end
 
   hl.dispatch(hl.dsp.exec_cmd("kill -" .. sig .. " " .. target_pid))
-  hl.dispatch(hl.dsp.exec_cmd(string.format(
-    "notify-send -r 3 'PID Freezer' '<b>%s</b> %s'",
-    win.title:gsub("'", "'\\''"),
-    verb
-  )))
+  hl.dispatch(
+    hl.dsp.exec_cmd(string.format("notify-send -r 3 'PID Freezer' '<b>%s</b> %s'", win.title:gsub("'", "'\\''"), verb))
+  )
 end
 
 -- Hyprland (via the Wayland fractional-scale protocol) quantizes monitor
@@ -270,5 +293,5 @@ function Hypr.Helpers.ScaleStep(direction)
     scale = string.format("%.10f", new_scale),
   })
 
-  hl.exec_cmd("notify-send -r 777 'Vibranium' '" .. string.format("Display scale: %.4g", new_scale) .. "'")
+  hl.exec_cmd("notify-send -r 777 'Vibranium' '" .. string.format("Display scale: <b>%.4g", new_scale) .. "x</b>'")
 end
