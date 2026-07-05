@@ -75,11 +75,13 @@ _open_link() {
 
 # Keywords are defined in the user's advanced settings file as
 # "keyword:command" pairs. The keyword is everything before the first
-# colon; the action is everything after (eval'd). This lets users define
-# shortcuts like "htop:foot htop" in their Vibranium config.
+# colon; the action is everything after (eval'd). If input is
+# "keyword rest...", the rest is appended as arguments to the action.
+# This lets users define shortcuts like "play:vb-cmd-play-mpd --search"
+# and invoke "play metallica" to run "vb-cmd-play-mpd --search metallica".
 _handle_keyword() {
   local input="$1"
-  local entry keyword action
+  local entry keyword action extra
 
   for entry in "${vb_launcher_keywords[@]+"${vb_launcher_keywords[@]}"}"; do
     keyword="${entry%%:*}"
@@ -88,6 +90,16 @@ _handle_keyword() {
     if [[ "$input" == "$keyword" ]]; then
       log Info "Keyword matched: $keyword -> $action"
       if ! eval "$action"; then
+        log Error "Keyword '$keyword' returned non zero exit code!"
+        exit 1
+      fi
+      return 0
+    fi
+
+    if [[ "$input" == "$keyword "* ]]; then
+      extra="${input#$keyword }"
+      log Info "Keyword matched with args: $keyword -> $action $extra"
+      if ! eval "$action $extra"; then
         log Error "Keyword '$keyword' returned non zero exit code!"
         exit 1
       fi
