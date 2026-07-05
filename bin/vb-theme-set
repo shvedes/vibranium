@@ -280,7 +280,7 @@ pick_family() {
   local display_keys=() k
   for k in "${keys[@]}"; do
     if [[ -n "$ACTIVE_FAMILY" && "$k" == "$ACTIVE_FAMILY" ]]; then
-      display_keys+=("<b><i>$k</i></b>")
+      display_keys+=("<span foreground='$P_ACCENT'><b><i>$k</i></b></span>")
     else
       display_keys+=("$k")
     fi
@@ -298,7 +298,9 @@ pick_family() {
       exit 0
     fi
 
-    # Strip markup before resolving so downstream logic is unaffected
+    # Strip pango markup before resolving
+    family_chosen="${family_chosen##<span*><b><i>}"
+    family_chosen="${family_chosen%</i></b></span>}"
     family_chosen="${family_chosen#<b><i>}"
     family_chosen="${family_chosen%</i></b>}"
 
@@ -327,7 +329,7 @@ pick_variant() {
   for item in "${items[@]}"; do
     if [[ -n "$ACTIVE_VARIANT" && "$family" == "$ACTIVE_FAMILY" &&
       "${item// /-}" == "$ACTIVE_VARIANT" ]]; then
-      display_items+=("<b><i>$item</i></b>")
+      display_items+=("<span foreground='$P_ACCENT'><b><i>$item</i></b></span>")
     else
       display_items+=("$item")
     fi
@@ -340,7 +342,9 @@ pick_variant() {
       return 1
     fi
 
-    # Strip markup before resolving so downstream logic is unaffected
+    # Strip pango markup before resolving
+    display="${display##<span*><b><i>}"
+    display="${display%</i></b></span>}"
     display="${display#<b><i>}"
     display="${display%</i></b>}"
 

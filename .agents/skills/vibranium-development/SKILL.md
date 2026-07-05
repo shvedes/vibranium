@@ -78,6 +78,7 @@ Examples:
 - `$VIBRANIUM_STATE`
 - `$VIBRANIUM_RUNTIME`
 - `$CHASSIS_TYPE`
+- XDG Base Directory spec
 
 # Commits
 
