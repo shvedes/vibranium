@@ -39,9 +39,9 @@ EOF
 # - Output comma-separated fields: modmask,key@keycode,description,dispatcher,arg
 dynamic_bindings() {
   hyprctl -j binds |
-    jq -r '.[] | {modmask, key, keycode, description, dispatcher, arg} | "\(.modmask),\(.key)@\(.keycode),\(.description),\(.dispatcher),\(.arg)"' |
+    jq -r '.[] | {modmask, key, keycode, description, dispatcher, arg, submap} | "\(.modmask),\(.key)@\(.keycode),\(.description),\(.dispatcher),\(.arg),\(.submap // "-")"' |
     sed -r \
-      -e 's/null//' \
+      -e 's/null//g' \
       -e 's,uwsm app -- ,,' \
       -e 's/@0//' \
       -e 's/,@/,code:/' \
@@ -73,6 +73,9 @@ dynamic_bindings() {
 parse_bindings() {
   awk -F, '
 {
+    submap = $NF
+    if (submap == "-") submap = ""
+
     # Ignore specific cases
     if ($0 ~ /switch:on:Lid Switch/ || $0 ~ /XF86/) next;
 
@@ -94,8 +97,8 @@ parse_bindings() {
 
     if (action == "") {
         # Reconstruct the command from the remaining fields
-        for (i = 4; i <= NF; i++) {
-            action = action $i (i < NF ? "," : "");
+        for (i = 4; i < NF; i++) {
+            action = action $i (i < NF - 1 ? "," : "");
         }
 
         # Clean up trailing commas, remove leading "exec, ", and trim
@@ -113,7 +116,11 @@ parse_bindings() {
     }
 
     if (action != "") {
-        printf "%-25s : %s\n", key_combo, action;
+        if (submap != "") {
+            printf "[%s] %-25s : %s\n", submap, key_combo, action;
+        } else {
+            printf "%-25s : %s\n", key_combo, action;
+        }
     }
 }'
 }
@@ -124,7 +131,13 @@ by_index() {
     $3 == d {
       gsub(/@.*/, "", $2)
       count++
-      printf "%d. %s %s\n", count, $1, $2
+      submap = $NF
+      if (submap == "-") submap = ""
+      if (submap != "") {
+        printf "%d. [%s] %s %s\n", count, submap, $1, $2
+      } else {
+        printf "%d. %s %s\n", count, $1, $2
+      }
     }
     END { if (count == 0) print "No keybindings found for: " d }
   '
