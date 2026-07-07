@@ -5,8 +5,8 @@ SELF="${0##*/}"
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
-    echo "[${0##*/}] $level: $*"
+  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
   fi
 }
 
@@ -64,4 +64,4 @@ done
 
 log Info "Did thing A"
 log Warn "Thing A returned non-zero"
-log Error "Thing A failed!" >&2 # < Redirection
+log Error "Thing A failed!"

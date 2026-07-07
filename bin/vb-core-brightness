@@ -54,7 +54,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --calibrate)
     if [[ -n "$ACTION" ]]; then
-      log Error "--calibrate cannot be combined with other actions" >&2
+      log Error "--calibrate cannot be combined with other actions"
       exit 1
     fi
     ACTION="--calibrate"
@@ -62,7 +62,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --up | --down)
     if [[ -n "$ACTION" ]]; then
-      log Error "mutually exclusive actions: $ACTION and $1" >&2
+      log Error "mutually exclusive actions: $ACTION and $1"
       exit 1
     fi
     ACTION="$1"
@@ -70,7 +70,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --set)
     if [[ -n "$ACTION" ]]; then
-      log Error "mutually exclusive actions: $ACTION and --set" >&2
+      log Error "mutually exclusive actions: $ACTION and --set"
       exit 1
     fi
     # Strip optional trailing "%" before validation.
@@ -78,7 +78,7 @@ while [[ $# -gt 0 ]]; do
     # --set requires an integer in the range -90..100.
     # Negative values map to hardware minimum + gamma dimming.
     if [[ ! "$SET_VALUE" =~ ^-?[0-9]+$ ]] || ((SET_VALUE < -90 || SET_VALUE > 100)); then
-      log Error "--set requires an integer between -90 and 100" >&2
+      log Error "--set requires an integer between -90 and 100"
       exit 1
     fi
     ACTION="$1"
@@ -86,7 +86,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --monitor)
     if [[ -z "${2:-}" ]]; then
-      log Error "--monitor requires a monitor name" >&2
+      log Error "--monitor requires a monitor name"
       exit 1
     fi
     MONITOR_ARG="$2"
@@ -105,8 +105,8 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   *)
-    log Error "unknown option: $*" >&2
-    log Error "Try '$SELF --help' for more information" >&2
+    log Error "unknown option: $*"
+    log Error "Try '$SELF --help' for more information"
     exit 1
     ;;
   esac
@@ -141,7 +141,7 @@ fi
 # flock -n returns nonzero when another instance holds the lock, so we
 # exit silently - the running instance will handle the request.
 exec 9>"$LOCKFILE" || {
-  log Error "another instance of $SELF is already running!" >&2
+  log Error "another instance of $SELF is already running!"
   exit 1
 }
 flock -n 9 || exit 0
@@ -371,7 +371,7 @@ calibrate_all() {
   local output bus saved_monitor bus_map_str
 
   if ! command -v ddcutil >/dev/null; then
-    log Error "ddcutil not found - cannot calibrate" >&2
+    log Error "ddcutil not found - cannot calibrate"
     vb-cmd-dep-notify --name "Brightness Control" --deps ddcutil
     return 1
   fi
@@ -383,7 +383,7 @@ calibrate_all() {
 
   if [[ -n "$MONITOR_ARG" ]]; then
     if [[ -z "${bus_map[$MONITOR_ARG]+x}" ]]; then
-      log Error "Monitor '$MONITOR_ARG' has no DDC support or was not detected" >&2
+      log Error "Monitor '$MONITOR_ARG' has no DDC support or was not detected"
       return 1
     fi
     bus_map_str="$MONITOR_ARG"

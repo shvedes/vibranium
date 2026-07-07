@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -56,7 +56,7 @@ if ! command -v syncthing >/dev/null; then
       "Vibranium" "Syncthing is not installed!"
   fi
 
-  log Error "Syncthing is not installed!" >&2
+  log Error "Syncthing is not installed!"
   exit 1
 fi
 

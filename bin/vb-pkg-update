@@ -3,10 +3,9 @@
 VERBOSE=false
 
 log() {
-  local level="$1"
-  shift
-  if $VERBOSE && [[ -t 0 ]]; then
-    echo "[${0##*/}] $level: $*"
+  local level="$1"; shift
+  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[${0##*/}] $level: $*" >&2
   fi
 }
 

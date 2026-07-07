@@ -4,7 +4,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if $VERBOSE && [[ -t 0 ]]; then
+  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -51,7 +51,7 @@ done
 if [[ -z "$1" ]]; then
   log Info "No file arg, opening picker"
   if ! command -v zenity >/dev/null; then
-    log Error "Zenity not found" >&2
+    log Error "Zenity not found"
     [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Viewer" --deps zenity
     exit 1
   fi

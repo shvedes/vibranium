@@ -11,7 +11,7 @@ SEARCH=""
 
 log() {
   local level="$1"; shift
-  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -86,7 +86,7 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   -*)
-    log Error "Unknown option: $1" >&2
+    log Error "Unknown option: $1"
     exit 1
     ;;
   esac
@@ -94,32 +94,32 @@ done
 
 if $RANDOM_MODE; then
   if [[ -n "$ARTIST" || -n "$GENRE" || -n "$ALBUM" || -n "$TRACK" || -n "$SEARCH" ]]; then
-    log Error "--random cannot combine with other filters" >&2
+    log Error "--random cannot combine with other filters"
     exit 1
   fi
 elif [[ -n "$GENRE" ]]; then
   if [[ -n "$ARTIST" || -n "$ALBUM" || -n "$TRACK" || -n "$SEARCH" ]]; then
-    log Error "--genre cannot combine with other filters" >&2
+    log Error "--genre cannot combine with other filters"
     exit 1
   fi
 elif [[ -n "$SEARCH" ]]; then
   if [[ -n "$ARTIST" || -n "$ALBUM" || -n "$TRACK" || -n "$GENRE" ]]; then
-    log Error "--fuzzy cannot combine with other filters" >&2
+    log Error "--fuzzy cannot combine with other filters"
     exit 1
   fi
 elif [[ -z "$ARTIST" && -z "$ALBUM" && -z "$TRACK" && -z "$SEARCH" ]]; then
-  log Error "No mode specified" >&2
+  log Error "No mode specified"
   usage >&2
   exit 1
 fi
 
 if ! command -v mpc >/dev/null; then
-  log Error "MPD not installed" >&2
+  log Error "MPD not installed"
   exit 1
 fi
 
 if ! mpc status >/dev/null 2>&1; then
-  log Error "MPD not running" >&2
+  log Error "MPD not running"
   exit 1
 fi
 
@@ -128,7 +128,7 @@ if $RANDOM_MODE; then
   count=${#all[@]}
 
   if ((!count)); then
-    log Error "Library empty" >&2
+    log Error "Library empty"
     exit 1
   fi
 
@@ -253,7 +253,7 @@ if [[ -n "$SEARCH" ]]; then
   fi
 
   if [[ ! -s "$sc" ]]; then
-    log Error "No matches for: $SEARCH" >&2
+    log Error "No matches for: $SEARCH"
     exit 1
   fi
 
@@ -293,7 +293,7 @@ fi
 count=${#tracks[@]}
 
 if ((!count)); then
-  log Error "No tracks found${ARTIST:+ for: $ARTIST}${GENRE:+ for genre: $GENRE}${ALBUM:+ for album: $ALBUM}${TRACK:+ for track: $TRACK}" >&2
+  log Error "No tracks found${ARTIST:+ for: $ARTIST}${GENRE:+ for genre: $GENRE}${ALBUM:+ for album: $ALBUM}${TRACK:+ for track: $TRACK}"
   exit 1
 fi
 
