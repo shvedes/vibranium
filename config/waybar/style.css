@@ -103,6 +103,10 @@ tooltip, tooltip label {
   color: @urgent;
 }
 
+#battery.charging, #battery.plugged {
+  color: @green;
+}
+
 #bluetooth.connected {
   opacity: 1
 }
