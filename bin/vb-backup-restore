@@ -36,7 +36,7 @@ source "$VIBRANIUM/install/helpers/05-backup.sh"
 while [[ $# -gt 0 ]]; do
   case "$1" in
   list)
-    vb::backup_list
+    helpers::backup_list
     shift
     ;;
   restore)
@@ -45,7 +45,7 @@ while [[ $# -gt 0 ]]; do
       echo "Try '${0##*/} --help' for more information." >&2
       exit 1
     fi
-    vb::backup_restore "$2"
+    helpers::backup_restore "$2"
     shift 2
     ;;
   -h|--help)

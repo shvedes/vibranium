@@ -1,0 +1,86 @@
+#!/bin/bash
+
+VERBOSE=false
+SELF="${0##*/}"
+
+log() {
+  local level="$1"; shift
+  if [[ $level == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[$SELF] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF CONFIG_PATH
+
+Copy the named config from \$VIBRANIUM/config back to ~/.config,
+backing up the current file with a timestamp.
+
+Example:
+  $SELF hypr/hyprlock.conf
+  $SELF waybar/config.jsonc
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
+while (( $# > 0 )); do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+if [[ -z ${1:-} ]]; then
+  log Error "missing CONFIG_PATH"
+  log Error "Try '$SELF --help' for more information"
+  exit 1
+fi
+
+CONFIG_REL="$1"
+USER_FILE="$XDG_CONFIG_HOME/$CONFIG_REL"
+SRC_FILE="${VIBRANIUM}/config/$CONFIG_REL"
+printf -v BAK_FILE '%s.bak.%(%s)T' "$USER_FILE" -1
+
+if [[ ! -f $SRC_FILE ]]; then
+  log Error "Vibranium config not found: $SRC_FILE"
+  exit 1
+fi
+
+DIR=${USER_FILE%/*}
+if ! [[ -d $DIR ]]; then
+  mkdir -p "$DIR"
+fi
+
+if [[ -f $USER_FILE ]]; then
+  cp -f "$USER_FILE" "$BAK_FILE" 2>/dev/null || true
+  cp -f "$SRC_FILE" "$USER_FILE" 2>/dev/null
+
+  if cmp -s "$USER_FILE" "$BAK_FILE"; then
+    rm -f "$BAK_FILE"
+    log Info "$USER_FILE unchanged, no backup needed"
+  else
+    log Info "Replaced $USER_FILE, backup at $BAK_FILE"
+  fi
+else
+  cp -f "$SRC_FILE" "$USER_FILE" 2>/dev/null
+  log Info "Created $USER_FILE from Vibranium config"
+fi
