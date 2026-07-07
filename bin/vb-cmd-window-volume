@@ -121,22 +121,91 @@ collect_pids() {
   '
 }
 
-mapfile -t ALL_PIDS < <(collect_pids "$ACTIVE_PID")
+CACHE_DIR="${VIBRANIUM_RUNTIME:-/tmp}/vb-cmd-window-volume"
+for f in "$CACHE_DIR"/*; do
+  [ -f "$f" ] || continue
+  kill -0 "${f##*/}" 2>/dev/null || rm "$f"
+done
+CACHE_FILE="$CACHE_DIR/$ACTIVE_PID"
+
+ALL_PIDS=()
+if [[ -f "$CACHE_FILE" ]]; then
+  printf -v _now '%(%s)T' -1
+  if (( _now - $(stat -c %Y "$CACHE_FILE") < 2 )); then
+    mapfile -t ALL_PIDS <"$CACHE_FILE"
+  fi
+fi
+if [[ ${#ALL_PIDS[@]} -eq 0 ]]; then
+  mapfile -t ALL_PIDS < <(collect_pids "$ACTIVE_PID")
+  mkdir -p "$CACHE_DIR" 2>/dev/null
+  printf '%s\n' "${ALL_PIDS[@]}" >"$CACHE_FILE"
+fi
+
+# Collect binary names from all PIDs in the tree for fallback.
+# Many streams omit application.process.id but set
+# application.process.binary, node.name, or application.name.
+#
+# Three fallbacks for root binary: comm, cmdline basename, ps.
+ROOT_BIN=$(<"/proc/$ACTIVE_PID/comm" 2>/dev/null)
+if [[ -z "$ROOT_BIN" ]]; then
+  IFS= read -r -d '' ROOT_BIN <"/proc/$ACTIVE_PID/cmdline" 2>/dev/null
+  ROOT_BIN="${ROOT_BIN##*/}"
+fi
+if [[ -z "$ROOT_BIN" ]]; then
+  ROOT_BIN=$(ps -o comm= -p "$ACTIVE_PID" 2>/dev/null)
+fi
+
+declare -A _bins
+BINS_STR=
+for p in "${ALL_PIDS[@]}"; do
+  comm=$(<"/proc/$p/comm" 2>/dev/null) || continue
+  [[ -n "${_bins[$comm]+set}" ]] && continue
+  _bins[$comm]=1
+  BINS_STR="$BINS_STR $comm"
+done
+[[ -n "$ROOT_BIN" && -z "${_bins[$ROOT_BIN]+set}" ]] && BINS_STR="$BINS_STR $ROOT_BIN"
+BINS_STR="${BINS_STR:1}"
+
+# Extract first word of window title for media.name fallback.
+TITLE_TOKEN="${WINDOW_TITLE%% *}"
+TITLE_TOKEN="${TITLE_TOKEN,,}"
+
+log Info "Window PID tree: ${ALL_PIDS[*]}"
+log Info "Root binary: $ROOT_BIN binaries: $BINS_STR title_token: $TITLE_TOKEN"
 
 # Parse PipeWire/PulseAudio sink-inputs via pactl to find audio streams
 # belonging to the focused window tree. pactl list sink-inputs is used
 # instead of pw-dump because it only enumerates active streams (typically
 # <10 entries vs. hundreds of PipeWire objects).
 #
-# The awk script produces one line per matching stream:
+# Matching (any of):
+#   1. application.process.id    in PID tree
+#   2. application.process.binary in binary name set
+#   3. node.name / application.name / media.name in bin_set or matches root
+#   4. media.name                contains window title first word (case-insensitive)
+#
+# Output: one line per matching stream:
 #   SINK_INPUT_ID VOLUME_PCT MUTED
-# where MUTED is "yes" or "no". It checks application.process.id against
-# the BFS-collected PID set.
 mapfile -t SINK_DATA < <(
-  pactl list sink-inputs | awk -v pids="${ALL_PIDS[*]}" '
+  pactl list sink-inputs | awk \
+    -v pids="${ALL_PIDS[*]}" \
+    -v bins="$BINS_STR" \
+    -v root_bin="$ROOT_BIN" \
+    -v title_token="$TITLE_TOKEN" '
+    function in_bin_set(s) {
+      return (s in bin_set) || (s == root_lower)
+    }
+    function try_match(s) {
+      if (matched) return
+      if (in_bin_set(s)) { matched = 1; return }
+      if (title_token != "" && index(s, title_token) > 0) matched = 1
+    }
     BEGIN {
       n = split(pids, a)
       for (i = 1; i <= n; i++) pid_set[a[i]] = 1
+      m = split(bins, b)
+      for (i = 1; i <= m; i++) bin_set[b[i]] = 1
+      root_lower = tolower(root_bin)
     }
 
     /^Sink Input #/ {
@@ -150,9 +219,6 @@ mapfile -t SINK_DATA < <(
     /^[[:space:]]+Mute:/ { muted = $2 }
 
     /^[[:space:]]+Volume:/ {
-      # Volume line format:
-      #   front-left: 65536 / 100% / 0.00 dB, front-right: ...
-      # Walk fields to find the first "NNN%" token.
       for (i = 1; i <= NF; i++) {
         if ($i ~ /^[0-9]+%[,]?$/) {
           vol = $i + 0
@@ -166,9 +232,21 @@ mapfile -t SINK_DATA < <(
       if ($NF in pid_set) matched = 1
     }
 
+    /application\.process\.binary/ {
+      gsub(/"/, "", $NF)
+      if ($NF in bin_set) matched = 1
+    }
+
+    /(application|node|media)\.name/ {
+      gsub(/[";]/, "", $NF)
+      try_match(tolower($NF))
+    }
+
     END { if (id != "" && matched) print id, vol, muted }
   '
 )
+
+log Info "SINK_DATA: ${SINK_DATA[*]:-(none)}"
 
 if [[ ${#SINK_DATA[@]} -eq 0 ]]; then
   exit 0
@@ -212,7 +290,7 @@ done
 
 # scale current volume into 0-100 relative to max_vol_pct so the bar
 # stays proportional when the above-100% boost is enabled
-bar_value=$first_new_vol
+bar_value=${first_new_vol:-0}
 icons_folder="/usr/share/icons/Papirus/16x16/symbolic/status"
 
 if [[ "$first_new_muted" == "yes" ]]; then
