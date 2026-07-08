@@ -1,0 +1,86 @@
+#!/bin/bash
+
+VERBOSE=false
+SCRIPT_NAME="${0##*/}"
+
+log() {
+  local level="$1"; shift
+  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[$SCRIPT_NAME] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SCRIPT_NAME [OPTION]...
+
+Send desktop notification when Android device connects.
+Called by su-bridge from udev.
+
+  -m, --id-model=STRING   Device model string
+  -V, --id-vendor=STRING  Device vendor string
+  -v, --verbose           Verbose output
+  -h, --help              Show this help and exit
+EOF
+}
+
+ID_MODEL="Android device"
+ID_VENDOR="Unknown"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -m | --id-model)
+    ID_MODEL="$2"
+    shift 2
+    ;;
+  --id-model=*)
+    ID_MODEL="${1#*=}"
+    shift
+    ;;
+  -m?*)
+    ID_MODEL="${1#-m}"
+    shift
+    ;;
+  -V | --id-vendor)
+    ID_VENDOR="$2"
+    shift 2
+    ;;
+  --id-vendor=*)
+    ID_VENDOR="${1#*=}"
+    shift
+    ;;
+  -V?*)
+    ID_VENDOR="${1#-V}"
+    shift
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --)
+    shift
+    break
+    ;;
+  -*)
+    log Error "Unknown option: $1"
+    log Error "Try '$SCRIPT_NAME --help' for more information"
+    exit 1
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+log Info "Android connected: ${ID_VENDOR} ${ID_MODEL}"
+notify-send -r 11 "Android Connected" "${ID_VENDOR} ${ID_MODEL}"
