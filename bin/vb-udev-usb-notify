@@ -1,0 +1,118 @@
+#!/bin/bash
+
+VERBOSE=false
+SCRIPT_NAME="${0##*/}"
+
+log() {
+  local level="$1"; shift
+  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+    echo "[$SCRIPT_NAME] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SCRIPT_NAME [OPTION]... --add|--remove
+
+Send desktop notification on USB storage connect/disconnect.
+Called by su-bridge from udev.
+
+  -a, --add               Device connected
+  -r, --remove            Device disconnected
+  -d, --devname=DEVNAME   Device node (e.g. /dev/sda1)
+  -m, --id-model=STRING   Device model string
+  -v, --verbose           Verbose output
+  -h, --help              Show this help and exit
+EOF
+}
+
+ACTION=""
+DEVNAME=""
+ID_MODEL="USB device"
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+  -a | --add)
+    ACTION="add"
+    shift
+    ;;
+  -r | --remove)
+    ACTION="remove"
+    shift
+    ;;
+  -d | --devname)
+    DEVNAME="$2"
+    shift 2
+    ;;
+  --devname=*)
+    DEVNAME="${1#*=}"
+    shift
+    ;;
+  -d?*)
+    DEVNAME="${1#-d}"
+    shift
+    ;;
+  -m | --id-model)
+    ID_MODEL="$2"
+    shift 2
+    ;;
+  --id-model=*)
+    ID_MODEL="${1#*=}"
+    shift
+    ;;
+  -m?*)
+    ID_MODEL="${1#-m}"
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  --)
+    shift
+    break
+    ;;
+  -*)
+    log Error "Unknown option: $1"
+    log Error "Try '$SCRIPT_NAME --help' for more information"
+    exit 1
+    ;;
+  *)
+    break
+    ;;
+  esac
+done
+
+if [[ -z "$ACTION" ]]; then
+  log Error "missing action: use --add or --remove"
+  usage
+  exit 1
+fi
+
+source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
+
+if [[ "$ACTION" == "add" ]]; then
+  if [[ -n "$DEVNAME" ]]; then
+    msg="<span foreground='$P_ACCENT'><b>$ID_MODEL</b></span> connected as <b>$DEVNAME</b>"
+  else
+    msg="<span foreground='$P_ACCENT'><b>$ID_MODEL</b></span>"
+  fi
+  notify-send -r 10 "USB Connected" "$msg"
+else
+  if [[ -n "$DEVNAME" ]]; then
+    msg="<b>$DEVNAME</b>"
+  else
+    msg="Drive disconnected"
+  fi
+  notify-send -r 10 "USB Removed" "$msg"
+fi
