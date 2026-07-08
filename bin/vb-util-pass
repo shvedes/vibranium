@@ -68,6 +68,8 @@ source vb-lib-core
 # Guard: verify `pass` is installed before doing anything else.
 # If missing, offer a one-click install via a notification action button.
 if ! command -v pass >/dev/null; then
+  $SYNC && exit 0
+
   log Error "Password manager package is not installed"
   notify-send -r 1 -t 5000 "Password Manager" \
     "The password manager package is not installed!"
