@@ -216,22 +216,17 @@ case "$MODE" in
   ;;
 *)
   SHOW_WEBAPPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
-  SHOW_AI_WEBAPPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_AI"
 
   EXCLUDE="Power"
 
-  if [[ "$SHOW_WEBAPPS" == false && "$SHOW_AI_WEBAPPS" == false ]]; then
-    EXCLUDE+=",PWA"
-  elif [[ "$SHOW_WEBAPPS" != true ]]; then
-    EXCLUDE+=",WebApp,PWA"
-  elif [[ "$SHOW_AI_WEBAPPS" != true ]]; then
-    EXCLUDE+=",AI"
+  if [[ "$SHOW_WEBAPPS" != true ]]; then
+    EXCLUDE+=",WebApp,PWA,AI"
   fi
 
   log Info "Default mode: excluding categories: $EXCLUDE"
   OPT_ARGS+=(-drun-exclude-categories "$EXCLUDE")
 
-  if [[ "$SHOW_WEBAPPS" == true || "$SHOW_AI_WEBAPPS" == true ]]; then
+  if [[ "$SHOW_WEBAPPS" == true ]]; then
     OPT_ARGS+=(-icon-theme Vibranium)
   fi
 
