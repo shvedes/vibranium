@@ -53,3 +53,5 @@ done
 for file in "${local_bin_files[@]}"; do
   helpers::sed "$file" "s/user_placeholder/$USER/g"
 done
+
+helpers::sed "/etc/udev/rules.d/99-wifi-powersave.rules" "s/user_placeholder/$USER/g"
