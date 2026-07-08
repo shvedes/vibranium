@@ -9,6 +9,7 @@
 # Depends on vb-lib-core for: helpers::ui::menu, P_YELLOW
 
 VERBOSE=false
+SYNC=false
 
 log() {
   local level="$1"; shift
@@ -30,8 +31,9 @@ Usage: ${0##*/} [OPTION]
 Rofi-based frontend for the pass password manager.
 
 Options:
-  -v, --verbose  Enable verbose output
-  -h, --help     Display this help and exit
+  -v, --verbose     Enable verbose output
+  -s, --sync        Sync with git remote (pull & push), then exit
+  -h, --help        Display this help and exit
 EOF
 }
 
@@ -39,6 +41,10 @@ while [[ $# -gt 0 ]]; do
   case "$1" in
   -v | --verbose)
     VERBOSE=true
+    shift
+    ;;
+  -s | --sync)
+    SYNC=true
     shift
     ;;
   -h | --help)
@@ -402,6 +408,54 @@ export -f async_git_push
 export -f push_after_edit_if_needed
 export -f is_git_repo
 export -f has_git_remote
+
+# sync_with_git
+#
+# Entry point for `--sync` CLI flag. Pulls from and pushes to the password
+# store's git remote. Waits for network if unavailable and sends desktop
+# notifications for the wait and sync-complete states. Exits after sync.
+sync_with_git() {
+  local pull_output push_output
+  local did_sync=false
+  local pull_ret push_ret
+
+  is_git_repo && has_git_remote || exit 0
+
+  if ! ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
+    log Info "Network unavailable; entering wait loop"
+    notify-send -r 2 -t 0 "Password Manager" \
+      "Waiting for network to sync your passwords..."
+  fi
+
+  wait_for_internet
+  log Info "Network available, starting git sync"
+
+  log Info "Pulling from remote..."
+  pull_output="$(pass git pull --rebase 2>&1)"
+  pull_ret=$?
+
+  log Info "Pushing to remote..."
+  push_output="$(git_push_with_upstream_check 2>&1)"
+  push_ret=$?
+
+  if [[ "$pull_output" != *"Already up to date"* ]] && (( pull_ret == 0 )); then
+    did_sync=true
+  fi
+
+  if [[ "$push_output" != *"Everything up-to-date"* ]] && (( push_ret == 0 )); then
+    did_sync=true
+  fi
+
+  if $did_sync; then
+    log Info "Sync completed with changes"
+    notify-send -r 2 -t 2500 -u low "Password Manager" \
+      "Git repo has been synced"
+  fi
+
+  exit 0
+}
+
+$SYNC && sync_with_git
 
 # =========================================================================
 # PICK A LOCATION (folder picker for Create / Move)
