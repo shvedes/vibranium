@@ -83,7 +83,7 @@ hypr::fetch() {
     local opt="${opts[$i]}" val="${vals[$i]}"
     case "${types[$i]}" in
     float)
-      HYPR["$opt"]=$(LC_NUMERIC=C printf "%.1f" "$val")
+      HYPR["$opt"]=$(LC_NUMERIC=C printf "%.2f" "$val")
       ;;
     *)
       HYPR["$opt"]="$val"
