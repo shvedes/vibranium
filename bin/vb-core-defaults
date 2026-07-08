@@ -332,10 +332,5 @@ VIBRANIUM_RECORDING_FLASH_SCREEN=true
 
 # @type string
 # @values very_slow slow normal fast very_fast off
-# @desc How fast should the fade effect be when playing/pausing
+# @desc How fast should the fade effect be
 VIBRANIUM_PLAYER_FADE_DURATION="off"
-
-# @type string
-# @values very_slow slow normal fast very_fast off
-# @desc How fast should the fade effect be when switching to the next / prev track
-VIBRANIUM_PLAYER_FADE_DURATION_ON_SWITCH="off"
