@@ -1,2 +1,0 @@
-# Desktop specific: disable Wifi's powersave mode on every boot
-ACTION=="add", SUBSYSTEM=="net", KERNEL=="wl*", RUN+="/home/user_placeholder/.local/share/vibranium/bin/vb-cmd-wifi-powersave --off"
