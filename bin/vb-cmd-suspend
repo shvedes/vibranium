@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -22,7 +23,6 @@ usage() {
 Usage: $SELF [OPTION]...
 
 Lock the session and suspend the system.
-Handle Hyprland animation transitions.
 
 Options:
   -v, --verbose  Enable verbose output
@@ -53,6 +53,12 @@ log Info "Locking session and suspending"
 # Lock session first
 vb-cmd-lock-session
 
+# Disable the sleep inhibitor before suspending because systemctl
+# suspend requires a sleep-capable state and the inhibitor would block it.
+if systemctl -q --user is-active vibranium-inhibit@sleep; then
+  vb-toggle-inhibitor
+fi
+
 # Save the current animations state so we can restore it after wake.
 # Fading the screen gamma to 0 before suspend creates a smooth
 # fade-to-black effect when animations are enabled.
@@ -60,12 +66,6 @@ ANIMATIONS_ENABLED="$(hyprctl -j getoption animations:enabled | jq -r '.int')"
 if ((ANIMATIONS_ENABLED == 1)); then
   hyprctl -q hyprsunset gamma 0
   sleep 1
-fi
-
-# Disable the sleep inhibitor before suspending because systemctl
-# suspend requires a sleep-capable state and the inhibitor would block it.
-if systemctl -q --user is-active vibranium-inhibit@sleep; then
-  vb-toggle-inhibitor
 fi
 
 if ! sc_out="$(systemctl suspend 2>&1)"; then
