@@ -376,8 +376,15 @@ _menu::cursor() {
       --label "Invisible : ${HYPR[cursor.invisible]}" \
       --func "hypr::toggle 'cursor:invisible' \"$HYPR_CONF_ADVANCED\""
 
+    local timeout="${HYPR[cursor.inactive_timeout]}"
+    if [[ "${timeout%.*}" == 0 ]]; then
+      timeout="never"
+    else
+      timeout="${timeout%.*}s"
+    fi
+
     cfgr::item::action \
-      --label "Inactive timeout : ${HYPR[cursor.inactive_timeout]}s" \
+      --label "Hide after : $timeout" \
       --func "_set::cursor::inactive_timeout"
 
     cfgr::item::action \
@@ -701,7 +708,7 @@ _menu::master() {
       --label "Always keep position : ${HYPR[master.always_keep_position]}" \
       --func "hypr::toggle 'master:always_keep_position' "$HYPR_CONF_ADVANCED""
 
-    
+
   }
 
   cfgr::run "Master Layout" "_b"

@@ -154,7 +154,7 @@ _set_default_browser() {
 }
 
 _manage_user_wallpapers() {
-  local wallpaper_dir files
+  local wallpaper_dir files chosen
 
   local current_theme
   current_theme="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
@@ -174,7 +174,8 @@ _manage_user_wallpapers() {
     return
   fi
 
-  local folder files chosen
+  # Store basenames after the empty check — saves a second glob call
+  files=("${files[@]##*/}")
 
   _action() {
     local target options chosen
@@ -222,20 +223,18 @@ _manage_user_wallpapers() {
 
         # If backgrounds/ is now empty, decide how much to clean up.
         if ((${#files[@]} == 0)); then
-          local theme_dir="${wallpaper_dir%/*}" # strip /backgrounds to get theme root
+          local theme_dir="${wallpaper_dir%/*}"
           local theme_contents=()
 
           for entry in "$theme_dir"/*; do
             [[ -e "$entry" ]] && theme_contents+=("$entry")
           done
 
-          # Only the empty backgrounds/ dir remains - remove the whole theme folder
           if [[ ${#theme_contents[@]} -eq 1 && "${theme_contents[0]}" == "$wallpaper_dir" ]]; then
             rm -r "$theme_dir"
             return
           fi
 
-          # Theme folder has other content - only drop the empty backgrounds/ dir
           rmdir "$wallpaper_dir"
           return
         fi
@@ -244,14 +243,6 @@ _manage_user_wallpapers() {
       break
     done
   }
-
-  files=()
-
-  for f in "$wallpaper_dir"/*; do
-    if [[ -f "$f" ]]; then
-      files+=("${f##*/}")
-    fi
-  done
 
   local index=0
   local open_folder_opt="Open containing folder"
@@ -371,32 +362,38 @@ _get_cursor_theme() {
 
   current="$(sed -n 's/^gtk-cursor-theme-name=//p' "$settings")"
 
-  while IFS= read -r value; do
-    if [[ "$key" == "$current" ]]; then
-      notify-send "$value"
-      printf "%s" "$value"
+  local line pretty folder
+  while IFS='|' read -r folder pretty; do
+    if [[ "$folder" == "$current" ]]; then
+      printf '%s' "$pretty"
       return
     fi
-  done <<<"$(vb-cursor-list)"
+  done < <(vb-cursor-list)
 
   printf '<i>[unknown]</i>'
 }
 
 _build() {
-  local cursor_theme="$VIBRANIUM_STATE/cursor-theme"
+  local cursor_theme_file="$VIBRANIUM_STATE/cursor-theme"
 
-  if [[ -f "$cursor_theme" ]]; then
-    # shellcheck source=/dev/null
-    source "$cursor_theme"
+  if [[ -f "$cursor_theme_file" ]]; then
+    source "$cursor_theme_file"
   fi
 
   CURSOR_THEME="${theme:-$(_get_cursor_theme)}"
   CURSOR_SIZE="${size:-Default}"
 
-  cfgr::item::raw "Notification timeout : $(_get_notification_timeout)s" "action:_set_notification_timeout"
+  local notif_timeout default_browser term_opacity
+  notif_timeout=$(_get_notification_timeout)
+  default_browser=$(_get_default_browser)
+
+  if [[ "$VIBRANIUM_GLOBAL_TERMINAL" == alacritty ]]; then
+    term_opacity=$(_get_term_opacity)
+  fi
+
+  cfgr::item::raw "Notification timeout : ${notif_timeout}s" "action:_set_notification_timeout"
   cfgr::item::bool --var VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK --label "Pause music on lock"
 
-  # Allow default terminal selection only when both are installed.
   if command -v alacritty >/dev/null && command -v foot >/dev/null; then
     cfgr::item::string \
       --var VIBRANIUM_GLOBAL_TERMINAL \
@@ -404,10 +401,9 @@ _build() {
       --title "Default Terminal" \
       --hook "_term_hook" \
       --option "Alacritty:alacritty" "Foot:foot"
-
   fi
 
-  cfgr::item::raw "Default browser : $(_get_default_browser)" "action:_set_default_browser"
+  cfgr::item::raw "Default browser : $default_browser" "action:_set_default_browser"
 
   if [[ "$CHASSIS_TYPE" != vm ]]; then
     cfgr::item::bool \
@@ -417,7 +413,7 @@ _build() {
   fi
 
   if [[ "$VIBRANIUM_GLOBAL_TERMINAL" == alacritty ]]; then
-    cfgr::item::raw "Term opacity : $(_get_term_opacity)" "action:_set_term_opacity"
+    cfgr::item::raw "Term opacity : $term_opacity" "action:_set_term_opacity"
   fi
 
   cfgr::item::raw "Cursor theme : $CURSOR_THEME" "action:_set_cursor_theme"

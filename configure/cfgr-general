@@ -13,22 +13,17 @@ _set_update_channel() {
   local chosen
   chosen="$(cfgr::set_string \
     --title "Update Channel" \
-    --option "Release:release" "Upstream:upstream" "Dev:dev")"
+    --option "Release:release" "Upstream:upstream")"
   vb-dev-switch-channel "$chosen"
 }
 
 _get_update_channel() {
-  local state channel
-  state="$VIBRANIUM_STATE/update.channel"
-
-  if [[ -f "$state" ]]; then
-    channel="$(<"$state")"
-    printf "%s" "${channel^}"
-  else
-    local branch
-    branch="$(git -C "$VIBRANIUM" branch --show-current)"
-    printf "%s" "$branch" | tee "$state"
-  fi
+  local branch
+  branch="$(git -C "$VIBRANIUM" branch --show-current 2>/dev/null)"
+  case "$branch" in
+    master) echo "Upstream" ;;
+    *)      echo "Release" ;;
+  esac
 }
 
 _get_vb_updates (){

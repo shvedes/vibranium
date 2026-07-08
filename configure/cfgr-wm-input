@@ -11,8 +11,6 @@ INPUT_SPEC=(
   "input.repeat_delay|int"
   "input.scroll_factor|float"
   "input.natural_scroll|bool"
-  "cursor.inactive_timeout|float"
-  "cursor.hide_on_key_press|bool"
   "input.kb_layout|str"
 )
 
@@ -220,14 +218,6 @@ _build() {
     ACCEL=false
   fi
 
-  local cursor_hide="${HYPR[cursor.inactive_timeout]}"
-
-  if [[ "$cursor_hide" == 0* ]]; then
-    cursor_hide="never"
-  else
-    cursor_hide+="s"
-  fi
-
   cfgr::item::action \
     --label "Keyboard repeat delay : ${HYPR[input.repeat_delay]}ms" \
     --func "_set_int 'Repeat Delay' 'Delay (ms)' int 200 1000 'input:repeat_delay'"
@@ -241,20 +231,12 @@ _build() {
     --func "_toggle_accel"
 
   cfgr::item::action \
-    --label "Hide cursor after : ${cursor_hide/.0/}" \
-    --func "_set_int 'Hide After' 'Seconds (zero - never)' int 0 86400 'cursor:inactive_timeout'"
-
-  cfgr::item::action \
     --label "Natural scrolling : ${HYPR[input.natural_scroll]}" \
     --func "_toggle 'input:natural_scroll'"
 
   cfgr::item::action \
     --label "Mouse sensitivity : ${HYPR[input.sensitivity]}" \
     --func "_set_int 'Sensitivity' 'Sensitivity (float)' float -1.0 1.0 'input:sensitivity'"
-
-  cfgr::item::action \
-    --label "Hide on key press : ${HYPR[cursor.hide_on_key_press]}" \
-    --func "_toggle 'cursor:hide_on_key_press'"
 
   cfgr::item::action \
     --label "Scrolling factor : ${HYPR[input.scroll_factor]}" \

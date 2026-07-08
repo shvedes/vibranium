@@ -19,21 +19,24 @@ _set_temp() {
 _build() {
   local state_file="$VIBRANIUM_STATE/nightshift"
   local hyprsunset_conf="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
+  local temp state
 
-  local temp
   temp="$(sed -n 's/.*temperature[[:space:]]*=[[:space:]]*\(.*\)/\1/p' "$hyprsunset_conf")"
 
-  if [[ ! -f "$state_file" ]]; then
+  if [[ -f "$state_file" ]]; then
+    IFS= read -r state <"$state_file"
+  else
     if hyprctl hyprsunset &>/dev/null; then
-      printf "active" >"$state_file"
+      state="active"
     else
-      printf "suspended" >"$state_file"
+      state="suspended"
     fi
+    printf '%s\n' "$state" >"$state_file"
   fi
 
-  cfgr::item::raw "State : $(<"$state_file")" "action:_toggle_nightshift"
+  cfgr::item::raw "State : $state" "action:_toggle_nightshift"
 
-  if [[ "$(<"$state_file")" == "active" ]]; then
+  if [[ "$state" == "active" ]]; then
     cfgr::item::raw "Temperature : ${temp}K" "action:_set_temp"
   fi
 }
