@@ -117,19 +117,29 @@ helpers::ui::menu() {
   # else         -> read everything from stdin into rofi_input
   local inline=false rofi_input="" input_plain=""
 
+  # Globbing crosses newlines; [[ =~ ]] is the correct regex for this.
+  local _vb_strip_html
+  _vb_strip_html() {
+    local s="$1" re='<[^>]*>'
+    while [[ "$s" =~ $re ]]; do
+      s="${s//"${BASH_REMATCH[0]}"/}"
+    done
+    printf '%s\n' "$s"
+  }
+
   if [[ "$1" == "--" ]]; then
     shift
     inline=true
     for arg in "$@"; do
       rofi_input+="${rofi_input:+$'\n'}$arg"
     done
-    input_plain="${rofi_input//<*>/}"
+    input_plain=$(_vb_strip_html "$rofi_input")
   elif [[ -n "$plain_fd" ]]; then
-    input_plain="$(<&"$plain_fd")"
-    input_plain="${input_plain//<*>/}"
+    IFS= read -r -d '' input_plain <&"$plain_fd" || true
+    input_plain=$(_vb_strip_html "$input_plain")
   else
     IFS= read -r -d '' rofi_input || true
-    input_plain="${rofi_input//<*>/}"
+    input_plain=$(_vb_strip_html "$rofi_input")
   fi
 
   # Walk every line of the stripped input to find the longest visible entry.
