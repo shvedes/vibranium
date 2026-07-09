@@ -425,8 +425,6 @@ sync_with_git() {
 
   if ! ping -c 1 -W 1 1.1.1.1 >/dev/null 2>&1; then
     log Info "Network unavailable; entering wait loop"
-    notify-send -r 2 -t 0 "Password Manager" \
-      "Waiting for network to sync your passwords..."
   fi
 
   wait_for_internet
