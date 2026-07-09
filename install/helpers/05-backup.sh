@@ -5,7 +5,7 @@ export _VB_BACKUP_SYSTEM_STORE="$HOME/.local/state/vibranium/backup/system"
 # Decide whether a path needs sudo to touch.
 helpers::_needs_sudo() {
   local path="$1"
-  [[ "$path" != "$HOME" && "$path" != "$HOME"/* ]]
+  [[ ! -O "$path" && ! -w "$path" ]]
 }
 
 # Print the sudo command to use for a path, or nothing for plain $HOME paths.
@@ -249,6 +249,11 @@ helpers::backup_restore() {
 
   helpers::_resolve_backup_path "$original"
 
+  if [[ "$_VB_BK_PATH" == "/" ]]; then
+    helpers::log::error "Refusing to restore root filesystem"
+    return 1
+  fi
+
   if [[ ! -e "$_VB_BK_PATH" && ! -L "$_VB_BK_PATH" ]]; then
     helpers::log::error "No backup found for ${original}"
     return 1
@@ -270,5 +275,5 @@ helpers::backup_restore() {
   $as_root rm -rf "$original"
   $as_root cp -a "$_VB_BK_PATH" "$original"
 
-  helpers::log::succsess "Restored ${original} from backup"
+  helpers::log::success "Restored ${original} from backup"
 }

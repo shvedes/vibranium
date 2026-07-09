@@ -13,7 +13,7 @@ _build() {
 
   cfgr::item::string \
     --var VIBRANIUM_PLAYER_FADE_DURATION \
-    --label "Fade in / out on playback controls" \
+    --label "Fade in / out effect" \
     --title "Fade duration" \
     --option "Very Slow:very_slow" "Slow:slow" "Normal:normal" \
     "Fast:fast" "Very Fast:very_fast" "OFF:off"
