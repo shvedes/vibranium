@@ -47,4 +47,4 @@ vb-tui-install \
   --exec vb-cmd-manpager \
   --name 'Man Page Viewer' \
   --category 'Utilities;System' \
-  --float
+  --icon 'bookworm'
