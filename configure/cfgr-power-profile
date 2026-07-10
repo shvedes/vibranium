@@ -1,5 +1,15 @@
 #!/bin/bash
 
+_on_ac() {
+  local supply
+  for supply in /sys/class/power_supply/*; do
+    [[ "$(< "$supply/type")" == "Mains" ]] || continue
+    [[ "$(< "$supply/online")" == "1" ]] && return 0
+    return 1
+  done
+  return 0
+}
+
 _set_ac_profile() {
   local profiles=() profile
   while IFS= read -r profile; do
@@ -15,7 +25,19 @@ _set_ac_profile() {
   cfgr::set_string \
     --title "AC Profile" \
     --option "${profiles[@]}" \
-    --var VIBRANIUM_GLOBAL_POWER_PROFILE_AC
+    --var VIBRANIUM_GLOBAL_POWER_PROFILE_AC || return
+
+  source "$VIBRANIUM_USER_SETTINGS"
+
+  if _on_ac; then
+    local state="$VIBRANIUM_STATE/power-profile" current
+    [[ -f "$state" ]] || return
+    IFS=: read -r _ current <"$state"
+
+    if [[ "$current" != "$VIBRANIUM_GLOBAL_POWER_PROFILE_AC" ]]; then
+      vb-core-power --quiet "$VIBRANIUM_GLOBAL_POWER_PROFILE_AC"
+    fi
+  fi
 }
 
 _set_battery_profile() {
@@ -35,7 +57,18 @@ _set_battery_profile() {
   cfgr::set_string \
     --title "Battery Profile" \
     --option "${profiles[@]}" \
-    --var VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY
+    --var VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY || return
+
+  source "$VIBRANIUM_USER_SETTINGS"
+  if ! _on_ac && [[ "$VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY" != "last" ]]; then
+    local state="$VIBRANIUM_STATE/power-profile" current
+    [[ -f "$state" ]] || return
+    IFS=: read -r _ current <"$state"
+
+    if [[ "$current" != "$VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY" ]]; then
+      vb-core-power --quiet "$VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY"
+    fi
+  fi
 }
 
 _build() {
