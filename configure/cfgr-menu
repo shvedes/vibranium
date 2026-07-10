@@ -18,6 +18,11 @@ _build() {
   cfgr::item::action --func "cfgr-launcher" --label "App Launcher" --icon vb-launcher
   cfgr::item::action --func "cfgr-color-picker" --label "Color Picker" --icon vb-theme
   cfgr::item::action --func "cfgr-player" --label "Media Control" --icon vb-music
+
+  if ! [[ "$CHASSIS_TYPE" =~ desktop|vm ]]; then
+    cfgr::item::action --func "cfgr-power-profile" --label "Power Profiles" --icon vb-power
+  fi
+
   cfgr::item::action --func "cfgr-misc" --label "Miscellaneous" --icon vb-tools
 }
 

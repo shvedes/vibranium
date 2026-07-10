@@ -1,0 +1,105 @@
+#!/bin/bash
+
+SELF="${0##*/}"
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: $SELF --ac | --battery
+
+Set power profile based on power source.
+Called by udev on AC plug/unplug events.
+
+Options:
+  -a, --ac         Set the AC power profile
+  -b, --battery    Set the battery power profile
+  -h, --help   Display this help and exit
+EOF
+}
+
+MODE=""
+
+while (($# > 0)); do
+  case "$1" in
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -a | --ac)
+    MODE="ac"
+    shift
+    ;;
+  -b | --battery)
+    MODE="battery"
+    shift
+    ;;
+  *)
+    echo "$SELF: unknown option: $1" >&2
+    exit 1
+    ;;
+  esac
+done
+
+if [[ -z "$MODE" ]]; then
+  usage
+  exit 1
+fi
+
+source "$VIBRANIUM_USER_SETTINGS"
+
+LAST_FILE="$VIBRANIUM_STATE/power-profile-last"
+
+case "$MODE" in
+ac)
+  if [[ -f "$VIBRANIUM_STATE/power-profile" ]]; then
+    IFS=: read -r _ current <"$VIBRANIUM_STATE/power-profile"
+    printf '%s' "$current" >"$LAST_FILE"
+  fi
+  TARGET="${VIBRANIUM_GLOBAL_POWER_PROFILE_AC:-performance}"
+  ;;
+battery)
+  TARGET="${VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY:-last}"
+  if [[ "$TARGET" == "last" ]]; then
+    if [[ -f "$LAST_FILE" ]]; then
+      IFS= read -r target <"$LAST_FILE"
+    else
+      TARGET="balanced"
+    fi
+  fi
+  ;;
+esac
+
+available=()
+while IFS= read -r profile; do
+  [[ -n "$profile" ]] || continue
+  available+=("$profile")
+done < <(vb-core-power --list 2>/dev/null)
+
+found=false
+for p in "${available[@]}"; do
+  if [[ "$p" == "$TARGET" ]]; then
+    found=true
+    break
+  fi
+done
+
+if [[ $found == false ]]; then
+  for fallback in balanced performance power-saver; do
+    for p in "${available[@]}"; do
+      if [[ "$p" == "$fallback" ]]; then
+        TARGET="$fallback"
+        found=true
+        break 2
+      fi
+    done
+  done
+fi
+
+if [[ $found == true ]]; then
+  vb-core-power --quiet "$TARGET"
+fi

@@ -1,16 +1,53 @@
 #!/bin/bash
 
+_set_ac_profile() {
+  local profiles=() profile
+  while IFS= read -r profile; do
+    [[ -n "$profile" ]] || continue
+    profiles+=("${profile^}:$profile")
+  done < <(vb-core-power --list 2>/dev/null)
+
+  if [[ ${#profiles[@]} -eq 0 ]]; then
+    notify-send -r 4 -t 3000 -u critical "Power Profiles" "No profiles available"
+    return
+  fi
+
+  cfgr::set_string \
+    --title "AC Profile" \
+    --option "${profiles[@]}" \
+    --var VIBRANIUM_GLOBAL_POWER_PROFILE_AC
+}
+
+_set_battery_profile() {
+  local profiles=() profile
+  while IFS= read -r profile; do
+    [[ -n "$profile" ]] || continue
+    profiles+=("${profile^}:$profile")
+  done < <(vb-core-power --list 2>/dev/null)
+
+  if [[ ${#profiles[@]} -eq 0 ]]; then
+    notify-send -r 4 -t 3000 -u critical "Power Profiles" "No profiles available"
+    return
+  fi
+
+  profiles+=("Last Used:last")
+
+  cfgr::set_string \
+    --title "Battery Profile" \
+    --option "${profiles[@]}" \
+    --var VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY
+}
 
 _build() {
-  cfgr::item::bool \
-    --var   VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE \
-    --label "Respect power profiles"
+  cfgr::item::raw \
+    "On AC power : $VIBRANIUM_GLOBAL_POWER_PROFILE_AC" \
+    "action:_set_ac_profile"
 
-  cfgr::item::bool \
-    --var   VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK \
-    --label "Notify on change"
+  cfgr::item::raw \
+    "On battery : $VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY" \
+    "action:_set_battery_profile"
 }
 
 cfgr::run "Power Profiles" "_build" \
-  VIBRANIUM_GLOBAL_RESPECT_POWER_PROFILE \
-  VIBRANIUM_GLOBAL_POWER_PROFILE_USE_FEEDBACK
+  VIBRANIUM_GLOBAL_POWER_PROFILE_AC \
+  VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY
