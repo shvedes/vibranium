@@ -43,6 +43,22 @@ BEGIN {
   _d = "0123456789abcdef"
   for (_i = 0; _i <= 255; _i++)
     _hex2[_i] = substr(_d, int(_i / 16) + 1, 1) substr(_d, (_i % 16) + 1, 1)
+
+  _SELF = "vb-theme-set-templates"
+}
+
+# alpha= always sets the exact transparency level a template asks for;
+# unlike lightness or hue, there is no "current alpha" anywhere in the
+# pipeline for a leading +/- to shift relative to. This strips a leading
+# sign off an alpha operand and warns once per distinct token, rather than
+# silently letting the sign push the value toward the clamp boundary the
+# way it would for a signed lightness or scalar operand.
+function strip_alpha_sign(val_str) {
+  if (substr(val_str, 1, 1) == "+" || substr(val_str, 1, 1) == "-") {
+    print "[" _SELF "] Warn: alpha= does not support relative +/- values, sign ignored"
+    return substr(val_str, 2)
+  }
+  return val_str
 }
 
 # Restrict v to the closed range [lo, hi]. Nearly every operation below ends
@@ -292,6 +308,7 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
 
       if (fmt == "hex") {
         if (op_name == "alpha") {
+          op_val = strip_alpha_sign(op_val_str) + 0
           alpha_str = _hex2[int(clamp(op_val, 0.0, 1.0) * 255.0 + 0.5)]
           has_alpha = 1
         } else if (op_name == "lightness") {
@@ -309,7 +326,13 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
         }
       } else if (fmt == "rgb") {
         if (op_name == "alpha") {
-          alpha_str = op_val_str
+          # op_val is already the numeric coercion of op_val_str, sign and
+          # all. Re-deriving it here from the sign-stripped string, then
+          # clamping and letting awk stringify the number, keeps the
+          # fourth rgb() field a clean absolute number: no leading "+" or
+          # "-", no out-of-range value.
+          op_val = strip_alpha_sign(op_val_str) + 0
+          alpha_str = clamp(op_val, 0.0, 1.0) ""
           has_alpha = 1
         } else if (op_name == "red") {
           _r = int(clamp(_r + op_val, 0, 255))

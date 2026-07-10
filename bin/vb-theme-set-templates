@@ -147,6 +147,11 @@
 #   lightness operation above follows too, even on channels that are not
 #   lightness, like hue or whiteness.
 #
+#   alpha does not follow that rule. There is no "current alpha" for a
+#   sign to shift relative to, so alpha is always an absolute value:
+#   write alpha=0.5, not alpha=+0.5 or alpha=-0.5. A leading sign is
+#   dropped and a warning is printed to stderr rather than being applied.
+#
 #   Numbers can be written as 0.20 or .20, both work the same way.
 #
 #   One thing worth knowing before you chain operations: red=/green=/blue=

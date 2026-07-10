@@ -378,7 +378,7 @@ apply_theme() {
   fi
 
   if is_current_theme "$folder_name" && ! $FORCE; then
-    log Error "already on $chosen."
+    log Error "already on $chosen"
     notify-send -r 4 -t 1500 "Theme Selector" "Already on $chosen"
     exit 1
   fi

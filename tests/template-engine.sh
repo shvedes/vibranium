@@ -799,8 +799,9 @@ _run \
 
 # lightness=abc: op_val = "abc" + 0 = 0, substr("abc",1,1)="a" -> absolute 0 -> black
 log_case "lightness=abc (non-numeric)"  "#000000"  "$(_read_out gp1)"
-# alpha=-0.5: clamped to 0.0 -> 00
-log_case "alpha=-0.5 (clamped to 0)"   "#ff000000"  "$(_read_out gp2)"
+# alpha=-0.5: alpha= does not support relative +/- signs, so the leading
+# "-" is stripped with a warning rather than being applied, leaving 0.5
+log_case "alpha=-0.5 (sign stripped)"  "#ff000080"  "$(_read_out gp2)"
 # alpha=2.0: clamped to 1.0 -> ff
 log_case "alpha=2.0 (clamped to 1)"    "#ff0000ff"  "$(_read_out gp3)"
 # unknown op name silently skipped
@@ -864,5 +865,163 @@ _run \
 # |lightness=0.05| -> split on | gives ["", "lightness=-0.05"]; empty first
 # segment is skipped because it has no "=".
 log_case "double pipe with no op"  "#e60000"  "$(_read_out dp1)"
+
+# =============================================================================
+# 27. Alpha - leading sign is stripped, not treated as relative
+# =============================================================================
+
+section "alpha - leading sign stripped on hex and rgb"
+
+_clean
+
+_run \
+  --subs \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    ha1 ha1 \
+    ha2 ha2 \
+    ha3 ha3 \
+    ra1 ra1 \
+    ra2 ra2 \
+    ra3 ra3 \
+    ra4 ra4 \
+    ra5 ra5 \
+    ra6 ra6 \
+    ra7 ra7 \
+  -- \
+  --tpl \
+    ha1 '{{ red|alpha=0.5 }}' \
+    ha2 '{{ red|alpha=+0.5 }}' \
+    ha3 '{{ red|alpha=-0.5 }}' \
+    ra1 '{{ red_rgb|alpha=0.5 }}' \
+    ra2 '{{ red_rgb|alpha=+0.5 }}' \
+    ra3 '{{ red_rgb|alpha=-0.5 }}' \
+    ra4 '{{ red_rgb|alpha=2.0 }}' \
+    ra5 '{{ red_rgb|alpha=-2.0 }}' \
+    ra6 '{{ red_rgb|alpha=1.0 }}' \
+    ra7 '{{ red_rgb|alpha=0 }}'
+
+# alpha= is always an absolute value: there is no "current alpha" anywhere
+# in the pipeline for a sign to shift relative to. A leading "+" or "-" is
+# stripped before the number is parsed, rather than being applied and then
+# clamped, so alpha=-0.5 lands on 0.5, not on 0.
+log_case "hex alpha plain 0.5"        "#ff000080"    "$(_read_out ha1)"
+log_case "hex alpha +0.5 (sign stripped)" "#ff000080" "$(_read_out ha2)"
+log_case "hex alpha -0.5 (sign stripped)" "#ff000080" "$(_read_out ha3)"
+log_case "rgb alpha plain 0.5"        "255,0,0,0.5"  "$(_read_out ra1)"
+log_case "rgb alpha +0.5 (sign stripped)" "255,0,0,0.5"  "$(_read_out ra2)"
+log_case "rgb alpha -0.5 (sign stripped)" "255,0,0,0.5"  "$(_read_out ra3)"
+log_case "rgb alpha 2.0 (clamped)"    "255,0,0,1"    "$(_read_out ra4)"
+log_case "rgb alpha -2.0 (sign stripped, then clamped)" "255,0,0,1" "$(_read_out ra5)"
+log_case "rgb alpha 1.0"              "255,0,0,1"    "$(_read_out ra6)"
+log_case "rgb alpha 0"                "255,0,0,0"    "$(_read_out ra7)"
+
+# =============================================================================
+# 28. Channel nudge and lightness ordering
+# =============================================================================
+
+section "rgb channel nudge vs lightness ordering"
+
+_clean
+
+_run \
+  --subs \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    ord1 ord1 \
+    ord2 ord2 \
+  -- \
+  --tpl \
+    ord1 '{{ red_rgb|blue=-30|lightness=0.8 }}' \
+    ord2 '{{ red_rgb|lightness=0.8|blue=-30 }}'
+
+# lightness rebuilds red/green/blue from scratch via hsl_to_rgb, so a channel
+# nudge applied before it gets overwritten. Applied after, the nudge lands
+# on top of the already-rebuilt channels and survives.
+log_case "nudge before lightness (lost)"     "255,153,153"  "$(_read_out ord1)"
+log_case "lightness before nudge (survives)" "255,153,123"  "$(_read_out ord2)"
+
+# =============================================================================
+# 29. Negative hue rotation on hsl/hwb (not just scalar)
+# =============================================================================
+
+section "negative hue rotation - hsl and hwb formats"
+
+_clean
+
+_run \
+  --subs \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    nh1 nh1 \
+    nh2 nh2 \
+  -- \
+  --tpl \
+    nh1 '{{ red_hsl|hue=-45 }}' \
+    nh2 '{{ red_hwb|hue=-45 }}'
+
+# red_hsl = 0,100,50; -45 wraps to 315
+log_case "hsl hue=-45 wraps"  "315,100,50"  "$(_read_out nh1)"
+log_case "hwb hue=-45 wraps"  "315,0%,0%"   "$(_read_out nh2)"
+
+# =============================================================================
+# 30. Malformed op syntax - spaces around '=', unknown op names
+# =============================================================================
+
+section "malformed op syntax - silently ignored, not crashed"
+
+_clean
+
+_run \
+  --subs \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    mo1 mo1 \
+    mo2 mo2 \
+    mo3 mo3 \
+  -- \
+  --tpl \
+    mo1 '{{ red|lightness = -0.05 }}' \
+    mo2 '{{ red_RGB }}' \
+    mo3 '{{ red_r|foo=5 }}'
+
+# "lightness = -0.05" has spaces around the "=", so op_name becomes
+# "lightness " (trailing space) which never matches "lightness"; the op is
+# skipped rather than applied or crashing.
+log_case "spaces around = (op ignored)"  "#ff0000"      "$(_read_out mo1)"
+# Suffix matching is case-sensitive; "_RGB" is not a recognized suffix, so
+# the token falls through as an unresolved key and is left in place.
+log_case "uppercase suffix unresolved"   "{{ red_RGB }}" "$(_read_out mo2)"
+# "foo" is not a recognized op name on a scalar key, so it is skipped and
+# the scalar value passes through unchanged.
+log_case "unknown op on scalar key"      "255"          "$(_read_out mo3)"
+
+# =============================================================================
+# 31. Alpha sign warning - message format and presence/absence
+# =============================================================================
+
+section "alpha sign warning - stderr message"
+
+_clean
+printf 'red\x01#ff0000\n' >"$TMPDIR/subs"
+printf '%s\x01%s\n' "$TMPDIR/tpl_warn" "$TMPDIR/out_warn" >"$TMPDIR/outmap"
+printf '%s' '{{ red|alpha=+0.5 }}' >"$TMPDIR/tpl_warn"
+
+warn_output="$(awk -f "$AWK_SCRIPT" "$TMPDIR/subs" "$TMPDIR/outmap" "$TMPDIR/tpl_warn" 2>&1 >/dev/null)"
+log_case "warning printed for signed alpha" \
+  "[vb-theme-set-templates] Warn alpha= does not support relative +/- values, sign ignored." \
+  "$warn_output"
+
+_clean
+printf 'red\x01#ff0000\n' >"$TMPDIR/subs"
+printf '%s\x01%s\n' "$TMPDIR/tpl_nowarn" "$TMPDIR/out_nowarn" >"$TMPDIR/outmap"
+printf '%s' '{{ red|alpha=0.5 }}' >"$TMPDIR/tpl_nowarn"
+
+nowarn_output="$(awk -f "$AWK_SCRIPT" "$TMPDIR/subs" "$TMPDIR/outmap" "$TMPDIR/tpl_nowarn" 2>&1 >/dev/null)"
+log_case "no warning for unsigned alpha" "" "$nowarn_output"
 
 summary
