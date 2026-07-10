@@ -81,7 +81,7 @@ if [[ "$EUID" -eq 0 ]]; then
   declare -A SESSION_ENV
   while IFS='=' read -r -d '' key value; do
     case "$key" in
-      HOME|PATH|VIBRANIUM_PATH|XDG_*)
+      HOME|PATH|VIBRANIUM*|CHASSIS_TYPE|XDG_*)
         SESSION_ENV["$key"]="$value"
         ;;
     esac
@@ -96,7 +96,7 @@ if [[ "$EUID" -eq 0 ]]; then
   # Reconstruct the environment arguments
   ENV_ARGS=("HOME=${SESSION_ENV[HOME]}" "PATH=$TARGET_PATH")
   for key in "${!SESSION_ENV[@]}"; do
-    if [[ "$key" == XDG_* || "$key" == "VIBRANIUM_PATH" ]]; then
+    if [[ "$key" == XDG_* || "$key" == VIBRANIUM* || "$key" == "CHASSIS_TYPE" ]]; then
       ENV_ARGS+=("$key=${SESSION_ENV[$key]}")
     fi
   done
