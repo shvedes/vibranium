@@ -81,6 +81,7 @@ hypr::fetch() {
 
   for i in "${!opts[@]}"; do
     local opt="${opts[$i]}" val="${vals[$i]}"
+    [[ -z $opt ]] && continue
     case "${types[$i]}" in
     float)
       HYPR["$opt"]=$(LC_NUMERIC=C printf "%.2f" "$val")
@@ -93,7 +94,7 @@ hypr::fetch() {
 }
 
 # hypr::get <option>  - read from the last hypr::fetch result
-hypr::get() { printf "%s" "${HYPR[$1]}"; }
+hypr::get() { [[ -n $1 ]] && printf "%s" "${HYPR[$1]}"; }
 
 # hypr::set <option> <value> <config_file>
 hypr::set() { vb-cmd-edit-wm-config "${1}:${2}" "$3"; }
