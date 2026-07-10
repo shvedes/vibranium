@@ -193,15 +193,17 @@ cfgr::toggle_bool() {
   esac
 }
 
-# cfgr::build_menu  ITEM [ITEM ...]
+# cfgr::build_menu  OUT_VAR ITEM [ITEM ...]
 #
-# Aligns menu option labels to the same width for pretty column output.
+# Populates the array named by OUT_VAR with aligned menu option strings.
 # Expects items in "label : value" format, ignores HTML tags when measuring
 # label length, pads shorter labels with spaces, and normalises boolean
 # values (true/false -> yes/no). Non-matching lines are passed through unchanged.
 cfgr::build_menu() {
-  local options=("$@") # all arguments; each element is one "label : value" string
-  local max_len=0      # longest plain-text label length found across all options
+  local -n _out="$1"
+  shift
+  local items=("$@")
+  local max_len=0      # longest plain-text label length found across all items
 
   # Stored in a variable so bash doesn't re-parse the pattern on each iteration,
   # and to avoid backslash-escaping spaces inside [[ =~ ]] directly.
@@ -209,7 +211,7 @@ cfgr::build_menu() {
   local re_tag='<[^>]*>'
 
   # Pass 1: find the longest plain-text label length.
-  for option in "${options[@]}"; do
+  for option in "${items[@]}"; do
     if [[ "$option" =~ $re_col ]]; then
       # everything before " : "
       local clean_label="${BASH_REMATCH[1]}"
@@ -229,7 +231,7 @@ cfgr::build_menu() {
 
   # Pass 2: rebuild each option with padding so all value columns line up.
   local aligned_options=()
-  for option in "${options[@]}"; do
+  for option in "${items[@]}"; do
     if [[ "$option" =~ $re_col ]]; then
       # raw label, may still contain HTML tags
       local label="${BASH_REMATCH[1]}"
@@ -264,9 +266,7 @@ cfgr::build_menu() {
     fi
   done
 
-  for aligned in "${aligned_options[@]}"; do
-    printf '%s\n' "$aligned"
-  done
+  _out=("${aligned_options[@]}")
 }
 
 # cfgr::set_digit  --title TITLE  --type TYPE  [--min MIN]  [--max MAX]
@@ -1175,7 +1175,7 @@ cfgr::run() {
     unset _menu_id _umf
 
     local -a options
-    mapfile -t options < <(cfgr::build_menu "${_CFGR_ITEMS[@]}")
+    cfgr::build_menu options "${_CFGR_ITEMS[@]}"
 
     local chosen
     if _cfgr::has_icons; then
