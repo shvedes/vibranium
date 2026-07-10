@@ -407,16 +407,7 @@ hl.bind("CTRL + ALT + DELETE", hl.dsp.exec_raw("vb-core-launcher --power"), { de
 hl.bind(mainMod .. " + ALT + ESCAPE", hl.dsp.exec_raw("vb-core-launcher --power"), { description = "Power menu" })
 hl.bind("XF86PowerOff", hl.dsp.exec_raw("vb-core-launcher --power"), { description = "Power menu" })
 
-hl.bind("CTRL + ALT + W", function()
-  local win = hl.get_active_window()
-
-  if win == nil or win.floating then
-    --             ^ Assume that we have enough gap width around the window
-    --             so the wallpaper is surely visible.
-    hl.dispatch(hl.dsp.exec_raw("vb-core-wallpaper --next"))
-  end
-end, { description = "Change background" })
-
+hl.bind("CTRL + ALT + W", hl.dsp.exec_raw("vb-core-wallpaper --next"), { description = "Change background" })
 hl.bind("CTRL + ALT + T", hl.dsp.exec_raw("vb-theme-set"), { description = "Change theme" })
 
 hl.bind(mainMod .. " + A", hl.dsp.exec_raw("vb-core-launcher"), { description = "App launcher" })
