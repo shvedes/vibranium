@@ -80,25 +80,18 @@ if [[ "$EUID" -eq 0 ]]; then
   # Parse the active Wayland session environment
   declare -A SESSION_ENV
   while IFS='=' read -r -d '' key value; do
-    case "$key" in
-      HOME|PATH|VIBRANIUM*|CHASSIS_TYPE|XDG_*)
-        SESSION_ENV["$key"]="$value"
-        ;;
-    esac
+    SESSION_ENV["$key"]="$value"
   done < "/proc/$WM_PID/environ"
 
   # Ensure the custom path is injected into $PATH
-  TARGET_PATH="${SESSION_ENV[PATH]}"
-  if [[ -n "${SESSION_ENV[VIBRANIUM_PATH]}" && "$TARGET_PATH" != *"${SESSION_ENV[VIBRANIUM_PATH]}"* ]]; then
-    TARGET_PATH="${SESSION_ENV[VIBRANIUM_PATH]}:$TARGET_PATH"
+  if [[ -n "${SESSION_ENV[VIBRANIUM_PATH]}" && "${SESSION_ENV[PATH]}" != *"${SESSION_ENV[VIBRANIUM_PATH]}"* ]]; then
+    SESSION_ENV[PATH]="${SESSION_ENV[VIBRANIUM_PATH]}:${SESSION_ENV[PATH]}"
   fi
 
   # Reconstruct the environment arguments
-  ENV_ARGS=("HOME=${SESSION_ENV[HOME]}" "PATH=$TARGET_PATH")
+  ENV_ARGS=()
   for key in "${!SESSION_ENV[@]}"; do
-    if [[ "$key" == XDG_* || "$key" == VIBRANIUM* || "$key" == "CHASSIS_TYPE" ]]; then
-      ENV_ARGS+=("$key=${SESSION_ENV[$key]}")
-    fi
+    ENV_ARGS+=("$key=${SESSION_ENV[$key]}")
   done
 
   # Bridge Execution
