@@ -7,7 +7,7 @@ for entry in "$VIBRANIUM"/extras/etc/*; do
   helpers::copy "$entry" "/etc/${entry##*/}"
 done
 
-helpers::write_file /etc/modules-load.d/vb-ntsync.conf << EOF2
+helpers::write_file /etc/modules-load.d/vb-ntsync.conf <<EOF2
 # This file was created by Vibranium install scripts.
 # ################################################## #
 # Load ntsync driver for better gaming compatibility with Wine.
@@ -15,7 +15,7 @@ helpers::write_file /etc/modules-load.d/vb-ntsync.conf << EOF2
 ntsync
 EOF2
 
-helpers::write_file /etc/modprobe.d/vb-blacklist.conf << EOF2
+helpers::write_file /etc/modprobe.d/vb-blacklist.conf <<EOF2
 # # This file was created by Vibranium install scripts.
 # #################################################### #
 # Disable hardware watchdog
@@ -23,11 +23,11 @@ blacklist sp5100_tco
 blacklist iTCO_wdt
 EOF2
 
-helpers::write_file /etc/modprobe.d/vb-v4l-dkms.conf << EOF2
+helpers::write_file /etc/modprobe.d/vb-v4l-dkms.conf <<EOF2
 options v4l2loopback exclusive_caps=1 card_label="Virtual Camera Loopback"
 EOF2
 
-helpers::write_file /etc/polkit-1/rules.d/50-vb-udisks2.rules << EOF2
+helpers::write_file /etc/polkit-1/rules.d/50-vb-udisks2.rules <<EOF2
 // vim:ft=javascript
 // This file was created by Vibranium install scripts.
 // ///////////////////////////////////////////////////
@@ -42,16 +42,8 @@ polkit.addRule(function(action, subject) {
 });
 EOF2
 
-local_bin_files=()
 for entry in "$VIBRANIUM"/extras/usr/local/bin/*; do
   [[ -e "$entry" ]] || continue
   dest="/usr/local/bin/${entry##*/}"
   helpers::copy "$entry" "$dest"
-  local_bin_files+=("$dest")
 done
-
-for file in "${local_bin_files[@]}"; do
-  helpers::sed "$file" "s/user_placeholder/$USER/g"
-done
-
-helpers::sed "/etc/udev/rules.d/99-wifi-powersave.rules" "s/user_placeholder/$USER/g"
