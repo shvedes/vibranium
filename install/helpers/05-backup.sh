@@ -5,6 +5,10 @@ export _VB_BACKUP_SYSTEM_STORE="$HOME/.local/state/vibranium/backup/system"
 # Decide whether a path needs sudo to touch.
 helpers::_needs_sudo() {
   local path="$1"
+  while [[ ! -e "$path" && ! -L "$path" && "$path" != "/" && -n "$path" ]]; do
+    path="${path%/*}"
+  done
+  [[ -z "$path" ]] && path="/"
   [[ ! -O "$path" && ! -w "$path" ]]
 }
 
