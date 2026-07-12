@@ -1,0 +1,46 @@
+#!/bin/bash
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} <editor>
+
+Install Vibranium theme for editor.
+Intended to be used by pacman hooks.
+
+Editors:
+  code                    -> ~/.vscode-oss
+  visual-studio-code-bin  -> ~/.vscode
+  code-insiders           -> ~/.vscode-insiders
+  vscodium-bin            -> ~/.vscode-oss
+  cursor-bin              -> ~/.cursor
+EOF
+}
+
+if [[ -z "$1" ]]; then
+  usage
+  exit 1
+fi
+
+case "$1" in
+code)                   d="$HOME/.vscode-oss"       ;;
+visual-studio-code-bin) d="$HOME/.vscode"           ;;
+code-insiders)          d="$HOME/.vscode-insiders"  ;;
+vscodium-bin)           d="$HOME/.vscode-oss"       ;;
+cursor-bin)             d="$HOME/.cursor"           ;;
+*)                      usage; exit 1               ;;
+esac
+
+if ! [[ -d "$d/extensions" ]]; then
+  mkdir -p "$d/extensions"
+fi
+
+rm -rf "$d/extensions/vibranium.theme"
+cp -a "$VIBRANIUM/extras/vscode/vibranium.theme" "$d/extensions/"
+ln -sf "$XDG_CONFIG_HOME/vibranium/current/theme/vscode.json" \
+  "$d/extensions/vibranium.theme/themes/vibranium.json"

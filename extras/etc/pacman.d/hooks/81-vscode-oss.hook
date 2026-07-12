@@ -1,0 +1,9 @@
+[Trigger]
+Operation = Install
+Target = code
+Type = Package
+
+[Action]
+Description = Installing Vibranium theme for VS Code OSS
+When = PostTransaction
+Exec = /usr/local/bin/su-bridge vb-libalpm-editor-theme code
