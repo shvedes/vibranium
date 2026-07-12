@@ -67,23 +67,6 @@ _set_notification_timeout() {
   vb-refresh-dunst &
 }
 
-_term_hook() {
-  case "$(vb-cmd-get-option VIBRANIUM_GLOBAL_TERMINAL)" in
-  "foot")
-    desktop_id="footclient.desktop"
-    systemctl -q --user disable alacritty.service &
-    systemctl -q --user enable --now foot-server.socket &
-    ;;
-  "alacritty")
-    desktop_id="Alacritty.desktop"
-    systemctl -q --user disable foot-server.socket &
-    systemctl -q --user enable --now alacritty.service &
-    ;;
-  esac
-
-  printf "%s\n" "$desktop_id" >"$XDG_CONFIG_HOME/xdg-terminals.list"
-}
-
 _get_default_browser() {
   local browser
 
@@ -387,21 +370,10 @@ _build() {
   notif_timeout=$(_get_notification_timeout)
   default_browser=$(_get_default_browser)
 
-  if [[ "$VIBRANIUM_GLOBAL_TERMINAL" == alacritty ]]; then
-    term_opacity=$(_get_term_opacity)
-  fi
+  term_opacity=$(_get_term_opacity)
 
   cfgr::item::raw "Notification timeout : ${notif_timeout}s" "action:_set_notification_timeout"
   cfgr::item::bool --var VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK --label "Pause music on lock"
-
-  if command -v alacritty >/dev/null && command -v foot >/dev/null; then
-    cfgr::item::string \
-      --var VIBRANIUM_GLOBAL_TERMINAL \
-      --label "Default terminal" \
-      --title "Default Terminal" \
-      --hook "_term_hook" \
-      --option "Alacritty:alacritty" "Foot:foot"
-  fi
 
   cfgr::item::raw "Default browser : $default_browser" "action:_set_default_browser"
 
@@ -412,9 +384,7 @@ _build() {
       --hook "_toggle_wallpaper"
   fi
 
-  if [[ "$VIBRANIUM_GLOBAL_TERMINAL" == alacritty ]]; then
-    cfgr::item::raw "Term opacity : $term_opacity" "action:_set_term_opacity"
-  fi
+  cfgr::item::raw "Term opacity : $term_opacity" "action:_set_term_opacity"
 
   cfgr::item::raw "Cursor theme : $CURSOR_THEME" "action:_set_cursor_theme"
   cfgr::item::raw "Cursor size : $CURSOR_SIZE" "action:_set_cursor_size"
@@ -424,5 +394,4 @@ _build() {
 }
 
 cfgr::run "Misc" "_build" \
-  VIBRANIUM_GLOBAL_SHOW_WALLPAPER \
-  VIBRANIUM_GLOBAL_TERMINAL
+  VIBRANIUM_GLOBAL_SHOW_WALLPAPER

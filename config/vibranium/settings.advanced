@@ -25,7 +25,7 @@
 #
 # List the output filename without the .tpl suffix, matching exactly what
 # appears under ~/.config/vibranium/themed/ or $VIBRANIUM/default/themed/.
-# Example: ("alacritty.toml" "foot.ini" "my-cool-theme/waybar.css" "!nightfox-nordfox/dunstrc")
+# Example: ("alacritty.toml" "my-cool-theme/waybar.css" "!nightfox-nordfox/dunstrc")
 vb_force_template_files=(
   # Instead of letting every theme install
   # its own extension and clutter the

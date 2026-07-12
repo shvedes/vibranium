@@ -709,9 +709,7 @@ cfgr::item::digit() {
 #     --label "Video codec" --title "Codec" \
 #     --option "Auto:auto" "H264:h264" "HEVC:hevc" "AV1:av1"
 #
-#   cfgr::item::string --var VIBRANIUM_GLOBAL_TERMINAL \
-#     --label "Terminal" --title "Select terminal" --hook "_apply_terminal" \
-#     --option "Alacritty:alacritty" "Kitty:kitty" "Foot:foot"
+
 cfgr::item::string() {
   local var=""
   local label=""

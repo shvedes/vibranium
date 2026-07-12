@@ -49,11 +49,6 @@
 #                                              #
 
 # @type string
-# @values alacritty foot
-# @note Which terminal to use by default.
-VIBRANIUM_GLOBAL_TERMINAL="alacritty"
-
-# @type string
 # @values idle sleep
 # @desc Which inhibition type to use when using sleep inhibitor.
 # @note When 'sleep' is used, the session can lock automatically like normal,

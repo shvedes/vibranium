@@ -1,6 +1,0 @@
-[Desktop Entry]
-Type=Application
-Name=Foot Server
-Exec=foot --server
-NoDisplay=true
-Icon=foot
