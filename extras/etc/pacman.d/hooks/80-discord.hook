@@ -7,4 +7,4 @@ Type = Package
 [Action]
 Description = Updating Vencord
 When = PostTransaction
-Exec = /usr/local/bin/su-bridge vb-patch-discord
+Exec = /usr/local/bin/su-bridge vb-libalpm-patch-discord
