@@ -6,6 +6,7 @@ SELF="${0##*/}"
 STATE_FILE="$VIBRANIUM_RUNTIME/$SELF.state"
 LOCK_FILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 SLEEP_TIME=0.005
+FADE_CURVE="quadratic"
 
 STATE_PLAYER=""
 STATE_VOLUME=""
@@ -65,6 +66,7 @@ Options:
   --pause        Pause playback
   --next         Switch to next track
   --previous     Switch to previous track
+  -l, --linear   Use linear fade curve (default is quadratic)
   -v, --verbose  Enable verbose output
   -h, --help     Display this help and exit
 EOF
@@ -249,10 +251,11 @@ previous_track() {
 # All arithmetic is on hundredths-of-volume integers to avoid cumulative
 # floating-point rounding error across the N-step curve. The "0.75" float
 # becomes 75 via "${current//./}" with explicit base-10 prefix to protect
-# against leading-zero octal interpretation. Each step is computed as
-#   step_int = current_int * (N - i) / N
-# giving a linear ramp from current_int down to 0. The integer result is
-# converted back to the 0-1 float range via scientific notation (75e-2).
+# against leading-zero octal interpretation.
+#   curve=linear:    step_int = current_int * (N - i) / N
+#   curve=quadratic: step_int = current_int * (N - i)^2 / N^2
+# The integer result is converted back to the 0-1 float range via
+# scientific notation (75e-2).
 fade_out() {
   local num_steps=$1
   if [[ $num_steps == off ]]; then
@@ -271,18 +274,29 @@ fade_out() {
   fi
 
   local i new_vol_int new_vol
-  for ((i = 1; i <= num_steps; i++)); do
-    new_vol_int=$((current_int * (num_steps - i) / num_steps))
-    printf -v new_vol '%0.2f' "$((new_vol_int))e-2"
-    set_volume "$new_vol"
-    sleep "$SLEEP_TIME"
-  done
+  if [[ $FADE_CURVE == linear ]]; then
+    for ((i = 1; i <= num_steps; i++)); do
+      new_vol_int=$((current_int * (num_steps - i) / num_steps))
+      printf -v new_vol '%0.2f' "$((new_vol_int))e-2"
+      set_volume "$new_vol"
+      sleep "$SLEEP_TIME"
+    done
+  else
+    local denom=$((num_steps * num_steps))
+    for ((i = 1; i <= num_steps; i++)); do
+      new_vol_int=$((current_int * (num_steps - i) * (num_steps - i) / denom))
+      printf -v new_vol '%0.2f' "$((new_vol_int))e-2"
+      set_volume "$new_vol"
+      sleep "$SLEEP_TIME"
+    done
+  fi
   set_volume 0
 }
 
 # Smoothly fade volume from 0 to target over num_steps iterations.
-# Same integer-based approach as fade_out: step_int = target_int * i / N
-# gives a linear ramp from 0 to target_int.
+# Same integer-based approach as fade_out:
+#   curve=linear:    step_int = target_int * i / N
+#   curve=quadratic: step_int = target_int * i^2 / N^2
 fade_in() {
   local num_steps=$1 target=$2
 
@@ -301,12 +315,22 @@ fade_in() {
   fi
 
   local i new_vol_int new_vol
-  for ((i = 1; i <= num_steps; i++)); do
-    new_vol_int=$((target_int * i / num_steps))
-    printf -v new_vol '%0.2f' "$((new_vol_int))e-2"
-    set_volume "$new_vol"
-    sleep "$SLEEP_TIME"
-  done
+  if [[ $FADE_CURVE == linear ]]; then
+    for ((i = 1; i <= num_steps; i++)); do
+      new_vol_int=$((target_int * i / num_steps))
+      printf -v new_vol '%0.2f' "$((new_vol_int))e-2"
+      set_volume "$new_vol"
+      sleep "$SLEEP_TIME"
+    done
+  else
+    local denom=$((num_steps * num_steps))
+    for ((i = 1; i <= num_steps; i++)); do
+      new_vol_int=$((target_int * i * i / denom))
+      printf -v new_vol '%0.2f' "$((new_vol_int))e-2"
+      set_volume "$new_vol"
+      sleep "$SLEEP_TIME"
+    done
+  fi
 
   set_volume "$target"
 }
@@ -320,6 +344,10 @@ while [[ $# -gt 0 ]]; do
   -h | --help)
     usage
     exit 0
+    ;;
+  -l | --linear)
+    FADE_CURVE="linear"
+    shift
     ;;
   --toggle | --play | --pause | --next | --previous)
     ACTION="$1"
