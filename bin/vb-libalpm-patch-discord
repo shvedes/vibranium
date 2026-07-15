@@ -66,10 +66,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if ! [[ -d "$XDG_CONFIG_HOME/Vencord" ]]; then
+  log Info "Discord wasn't patched before. Aborting"
+  exit 0
+fi
+
 # VencordInstallerCli is a self-contained CLI binary that patches Discord
 # in-place.  OpenASAR (the Electron ASAR replacement) is also installed
 # by the same binary for better performance.
-PATCH_PATH="${XDG_CONFIG_HOME:-$HOME/.config}/discord"
+PATCH_PATH="$XDG_CONFIG_HOME/discord"
 URL='https://github.com/Vendicated/VencordInstaller/releases/latest/download/VencordInstallerCli-Linux'
 CLI="/tmp/vencord-installer"
 
@@ -95,7 +100,7 @@ if [ "$ACTION" = "uninstall" ]; then
   log Info "Uninstalling Vencord from Discord"
   "$CLI" -uninstall -uninstall-openasar -location "$PATCH_PATH"
 else
-  log Info "Patching Discord"
+  log Info "Patching Discord with Vencord"
   "$CLI" -install -install-openasar -location "$PATCH_PATH"
 fi
 
