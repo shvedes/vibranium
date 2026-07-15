@@ -70,7 +70,7 @@ _ensure_virt_manager() {
     if term::ask_yes_no Y "Install it now?"; then
       if vb-pkg-install --embedded -- virt-manager; then
         if term::ask_yes_no Y "Launch it now?"; then
-          app2unit virt-manager &>/dev/null
+          setsid -f app2unit virt-manager &>/dev/null
         fi
       else
         echo -e "${RED}[VIBRANIUM]${RESET} Failed to install ${YELLOW}virt-manager${RESET}"
