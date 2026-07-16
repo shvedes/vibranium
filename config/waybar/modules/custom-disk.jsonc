@@ -1,0 +1,13 @@
+{
+	"custom/disk": {
+		"format": "{text}",
+		"hide-empty-text": true,
+
+		"exec": "vb-bar-disk",
+		"return-type": "json",
+		"interval": 30,
+		"signal": 17,
+
+		"on-click": "vb-bar-disk --open"
+	}
+}

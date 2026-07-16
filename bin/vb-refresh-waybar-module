@@ -42,11 +42,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-waybar_pid=$(systemctl --user show waybar -p MainPID --value)
-
-if ((waybar_pid == 0)); then
-  exit 1
-fi
+waybar_pid=$(systemctl --user show waybar -p MainPID --value 2>/dev/null)
 
 declare -A signals
 
@@ -66,10 +62,22 @@ done
 module_name="${1/custom-/}"
 module_signal="${signals[$module_name]}"
 
+_send_signal() {
+  local sig=$1
+  if ((waybar_pid > 0)); then
+    kill -RTMIN+"$sig" "$waybar_pid" 2>/dev/null
+  else
+    pkill -RTMIN+"$sig" waybar 2>/dev/null
+  fi
+}
+
 if [[ -n "$module_signal" ]]; then
-  kill -RTMIN+"$module_signal" "$waybar_pid"
-  kill -RTMIN+"${signals[dynamic-separator]}" "$waybar_pid"
+  _send_signal "$module_signal"
 else
-  log Error "Unknown module: $module_name"
+  log Error "No signal defined for module: $module_name"
   exit 1
 fi
+
+# Always refresh separators
+[[ -n "${signals[dynamic-separator]}" ]] && _send_signal "${signals[dynamic-separator]}"
+[[ -n "${signals[mod-separator]}" ]] && _send_signal "${signals[mod-separator]}"

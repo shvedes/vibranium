@@ -1,0 +1,13 @@
+{
+	"custom/gpu-temp": {
+		"format": "{text}",
+		"hide-empty-text": true,
+
+		"exec": "vb-bar-temp --gpu",
+		"return-type": "json",
+		"interval": 1,
+		"signal": 17,
+
+		"on-click": "vb-launch-tui -- nvtop"
+	}
+}

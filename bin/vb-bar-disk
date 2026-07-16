@@ -1,0 +1,190 @@
+#!/bin/bash
+
+VERBOSE=false
+MOUNT="/"
+DO_OPEN=false
+
+log() {
+  local level="$1"; shift
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Output disk usage for Waybar.
+
+Options:
+      --path PATH   Monitor PATH instead of root (/)
+      --open        Open ncdu on the monitored path (for on-click)
+  -v, --verbose     Enable verbose output
+  -h, --help        Show this help and exit
+
+EOF
+}
+
+while (($# > 0)); do
+  case "$1" in
+  --path)
+    MOUNT="$2"
+    shift 2
+    ;;
+  --open)
+    DO_OPEN=true
+    shift
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    log Error "Unknown option: $1"
+    usage
+    exit 1
+    ;;
+  esac
+done
+
+if ! source vb-lib-core; then
+  log Error "Failed to source vb-lib-core"
+  exit 1
+fi
+
+helpers::check VIBRANIUM_BAR_DISK_MODULE_ENABLE VIBRANIUM_BAR_DISK_MODE
+
+if [[ "$VIBRANIUM_BAR_DISK_MODULE_ENABLE" != true ]]; then
+  printf '{"text": ""}\n'
+  exit 0
+fi
+
+if [[ "$DO_OPEN" == true ]]; then
+  command -v ncdu >/dev/null 2>&1 || {
+    log Error "ncdu not installed"
+    notify-send -r 3 -t 3000 "Vibranium" "ncdu not installed"
+    exit 1
+  }
+  exec vb-launch-tui -- ncdu -x "$MOUNT"
+fi
+
+# Single df call for both used and total in MiB
+{
+  read -r _ && read -r _ size used _ use_perc _
+} < <(df -BM "$MOUNT" 2>/dev/null) || {
+  log Error "cannot stat $MOUNT"
+  printf '{"text": "\\uf233 ERR", "tooltip": "cannot stat %s"}\n' "$MOUNT"
+  exit 0
+}
+
+use_perc=${use_perc%\%}
+size_m=${size%M}
+used_m=${used%M}
+
+label="root"
+[[ "$MOUNT" != "/" ]] && label="$MOUNT"
+
+if ((use_perc >= 97)); then
+  icon="<span foreground='${P_RED}'>\\uf233</span>"
+elif ((use_perc >= 93)); then
+  icon="<span foreground='${P_ORANGE}'>\\uf233</span>"
+elif ((use_perc >= 85)); then
+  icon="<span foreground='${P_YELLOW}'>\\uf233</span>"
+else
+  icon="\\uf233"
+fi
+
+size_gib_int=$((size_m / 1024))
+size_gib_dec=$(( (size_m % 1024) * 10 / 1024 ))
+used_gib_int=$((used_m / 1024))
+used_gib_dec=$(( (used_m % 1024) * 10 / 1024 ))
+
+# Comma-format the integer part of a number
+commify() {
+  local val=$1 int_part dec_part
+  int_part="${val%.*}"; dec_part="${val#*.}"
+  if [[ "$dec_part" == "$val" ]]; then
+    dec_part=""
+  fi
+
+  local rest="${int_part#-}" out="" sign=""
+  if [[ "$int_part" != "$rest" ]]; then
+    sign="-"
+  fi
+
+  while [[ ${#rest} -gt 3 ]]; do
+    out=",${rest: -3}${out}"
+    rest="${rest:0:${#rest}-3}"
+  done
+  out="${sign}${rest}${out}"
+  if [[ -n "$dec_part" ]]; then
+    echo "${out}.${dec_part}"
+  else
+    echo "${out}"
+  fi
+}
+
+# df values are in MiB — convert to target unit
+disk_value() {
+  local val=$1 unit=$2 int dec
+  case "$unit" in
+    perc) echo "${use_perc}"; return ;;
+    KiB)  int=$((val * 1024)); echo "${int}" ;;
+    MiB)  echo "${val}" ;;
+    GiB)
+      int=$((val / 1024)); dec=$(( (val % 1024) * 10 / 1024 ))
+      echo "${int}.${dec}"
+      ;;
+    KB)
+      int=$((val * 1048576 / 1000)); dec=$(( (val * 1048576 % 1000) * 10 / 1000 ))
+      echo "${int}.${dec}"
+      ;;
+    MB)
+      int=$((val * 1048576 / 1000000))
+      dec=$(( (val * 1048576 % 1000000) * 10 / 1000000 ))
+      echo "${int}.${dec}"
+      ;;
+    GB)
+      int=$((val * 1048576 / 1000000000))
+      dec=$(( (val * 1048576 % 1000000000) * 10 / 1000000000 ))
+      echo "${int}.${dec}"
+      ;;
+  esac
+}
+
+disk_unit() {
+  case "$1" in
+    perc) echo "%" ;;
+    KiB|KB|MiB|MB|GiB|GB) echo " $1" ;;
+  esac
+}
+
+mode="$VIBRANIUM_BAR_DISK_MODE"
+log Info "mode=$mode mount=$MOUNT used=${used_m}MiB" \
+  "size=${size_m}MiB use_perc=${use_perc}%"
+
+if [[ "$mode" == "perc" ]]; then
+  text="${icon} <b>${use_perc}</b>%"
+  tooltip="${label}: ${use_perc}%"
+  tooltip+=" (${used_gib_int}.${used_gib_dec} GiB"
+  tooltip+=" / ${size_gib_int}.${size_gib_dec} GiB)"
+else
+  usage="$(commify "$(disk_value "$used_m" "$mode")")"
+  unit="$(disk_unit "$mode")"
+  total="$(commify "$(disk_value "$size_m" "$mode")")"
+  text="${icon} <b>${usage}${unit}</b>"
+  tooltip="${label}: ${usage}${unit} / ${total}${unit}"
+fi
+
+printf '{"text": "%s", "tooltip": "%s"}\n' "$text" "$tooltip"

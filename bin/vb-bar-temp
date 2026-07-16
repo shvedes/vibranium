@@ -1,0 +1,193 @@
+#!/bin/bash
+
+VERBOSE=false
+TYPE=""
+
+log() {
+  local level="$1"; shift
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Output CPU or GPU temperature for Waybar.
+
+Options:
+  -c, --cpu         Output CPU temperature
+  -g, --gpu         Output GPU temperature
+  -v, --verbose     Enable verbose output
+  -h, --help        Show this help and exit
+
+EOF
+}
+
+while (($# > 0)); do
+  case "$1" in
+  -c | --cpu)
+    if [[ -n "$TYPE" && "$TYPE" != "cpu" ]]; then
+      log Error "Cannot combine --cpu and --gpu"
+      usage
+      exit 1
+    fi
+    TYPE="cpu"
+    shift
+    ;;
+  -g | --gpu)
+    if [[ -n "$TYPE" && "$TYPE" != "gpu" ]]; then
+      log Error "Cannot combine --cpu and --gpu"
+      usage
+      exit 1
+    fi
+    TYPE="gpu"
+    shift
+    ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    log Error "Unknown option: $1"
+    usage
+    exit 1
+    ;;
+  esac
+done
+
+if [[ -z "$TYPE" ]]; then
+  log Error "Missing --cpu or --gpu"
+  usage
+  exit 1
+fi
+
+if ! source vb-lib-core; then
+  log Error "Failed to source vb-lib-core"
+  exit 1
+fi
+
+if [[ "$TYPE" == "cpu" ]]; then
+  helpers::check VIBRANIUM_BAR_CPU_TEMP_MODULE_ENABLE
+  enable_var=VIBRANIUM_BAR_CPU_TEMP_MODULE_ENABLE
+  hwmon_var=VIBRANIUM_BAR_CPU_TEMP_HWMON_PATH
+  label="CPU"
+  patterns="^(coretemp|k10temp|zenpower)$"
+else
+  helpers::check VIBRANIUM_BAR_GPU_TEMP_MODULE_ENABLE
+  enable_var=VIBRANIUM_BAR_GPU_TEMP_MODULE_ENABLE
+  hwmon_var=VIBRANIUM_BAR_GPU_TEMP_HWMON_PATH
+  label="GPU"
+  patterns="^(amdgpu|radeon|nouveau|i915|xe)$"
+fi
+
+if [[ "${!enable_var}" != true ]]; then
+  printf '{"text": ""}\n'
+  exit 0
+fi
+
+# hwmon auto-detection — runs once, persists the path
+hwmon_path="${!hwmon_var}"
+if [[ "$hwmon_path" == "auto" ]] || [[ ! -r "$hwmon_path" ]]; then
+  hwmon_path=""
+  for hwmon in /sys/class/hwmon/hwmon*; do
+    [[ -r "$hwmon/name" ]] || continue
+    name=$(<"$hwmon/name")
+    [[ "$name" =~ $patterns ]] || continue
+    for temp_input in "$hwmon"/temp*_input; do
+      [[ -r "$temp_input" ]] || continue
+      hwmon_path="$temp_input"
+      break 2
+    done
+  done
+
+  # flock: multiple instances (different PIDs) may race writing
+  # VIBRANIUM_USER_SETTINGS; without the lock the file gets mangled.
+  if [[ -n "$hwmon_path" ]] && [[ -f "$VIBRANIUM_USER_SETTINGS" ]]; then
+    settings_lock="$VIBRANIUM_RUNTIME/vb-bar-temp-settings.lock"
+    exec {settings_lock_fd}>"$settings_lock"
+    flock "$settings_lock_fd"
+
+    found=false
+    sed -i "/^${hwmon_var}=/s|=.*|=\"${hwmon_path}\"|" "$VIBRANIUM_USER_SETTINGS"
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      if [[ "$line" == "${hwmon_var}="* ]]; then
+        found=true
+        break
+      fi
+    done < "$VIBRANIUM_USER_SETTINGS"
+
+    if [[ "$found" != true ]]; then
+      printf '%s\n' "${hwmon_var}=\"${hwmon_path}\"" >> "$VIBRANIUM_USER_SETTINGS"
+    fi
+
+    flock -u "$settings_lock_fd"
+    exec {settings_lock_fd}>&-
+  fi
+fi
+
+if [[ ! -r "$hwmon_path" ]]; then
+  printf '{"text": "\\uf2cb --", "tooltip": "%s: no sensor"}\n' "$label"
+  exit 0
+fi
+
+temp_milli=$(<"$hwmon_path")
+
+if [[ ! "$temp_milli" =~ ^-?[0-9]+$ ]]; then
+  printf '{"text": "\\uf2cb --", "tooltip": "%s: no sensor"}\n' "$label"
+  exit 0
+fi
+
+temp=$((temp_milli / 1000))
+
+if ((temp >= 95)); then
+  icon="<span foreground='${P_RED}'>\\uf2cb</span>"
+elif ((temp >= 90)); then
+  icon="<span foreground='${P_ORANGE}'>\\uf2cb</span>"
+elif ((temp >= 80)); then
+  icon="<span foreground='${P_YELLOW}'>\\uf2cb</span>"
+else
+  icon="\\udb84\\udcc2"
+fi
+
+tooltip="${label}: ${temp}°C"
+if [[ "$TYPE" == "gpu" ]]; then
+  driver_name=""
+
+  if [[ -r "${hwmon_path%/*}/name" ]]; then
+    driver_name=$(<"${hwmon_path%/*}/name")
+  fi
+
+  if [[ "$driver_name" == "amdgpu" ]]; then
+    hotspot_path="${hwmon_path%/*}/temp2_input"
+    if [[ -r "$hotspot_path" ]]; then
+      hotspot_milli=$(<"$hotspot_path")
+      if [[ "$hotspot_milli" =~ ^-?[0-9]+$ ]]; then
+        hotspot=$((hotspot_milli / 1000))
+        tooltip+=" | Hotspot: ${hotspot}°C"
+      fi
+    fi
+  fi
+
+  fan_path="${hwmon_path%/*}/fan1_input"
+  if [[ -r "$fan_path" ]]; then
+    fan_rpm=$(<"$fan_path")
+    if [[ "$fan_rpm" =~ ^[0-9]+$ ]]; then
+      tooltip+=" | Fan: ${fan_rpm} RPM"
+    fi
+  fi
+fi
+
+printf '{"text": "%s <b>%s°C</b>", "tooltip": "%s"}\n' "$icon" "$temp" "$tooltip"

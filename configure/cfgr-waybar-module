@@ -8,9 +8,6 @@ _load_cfg() {
   _CFG_CONTENT=$(<"$WAYBAR_CFG")
 }
 
-# Returns true if the module string appears anywhere in the config,
-# whether active or commented out. Used to skip menu entries for
-# modules that are simply not part of this installation's config.
 _module_in_cfg() {
   local module="$1"
   [[ "$_CFG_CONTENT" == *"\"$module\""* ]]
@@ -32,23 +29,50 @@ _updates_weather_menu() {
     VIBRANIUM_BAR_SHOW_ANIMATION
 }
 
+_monitoring_menu() {
+  _m_build() {
+    _module_in_cfg 'custom/ram' && cfgr::item::string \
+      --var VIBRANIUM_BAR_RAM_MODE \
+      --label "RAM display" \
+      --title "RAM format" \
+      --option "Percent:perc" "KiB:KiB" "MiB:MiB" "GiB:GiB" "KB:KB" "MB:MB" "GB:GB" \
+      --hook "vb-refresh-waybar-module ram"
+
+    _module_in_cfg 'custom/disk' && cfgr::item::string \
+      --var VIBRANIUM_BAR_DISK_MODE \
+      --label "Disk display" \
+      --title "Disk format" \
+      --option "Percent:perc" "KiB:KiB" "MiB:MiB" "GiB:GiB" "KB:KB" "MB:MB" "GB:GB" \
+      --hook "vb-refresh-waybar-module disk"
+
+
+  }
+
+  cfgr::run "Monitoring" "_m_build" \
+    VIBRANIUM_BAR_RAM_MODE \
+    VIBRANIUM_BAR_DISK_MODE
+}
+
 _build() {
-  # Show the combined submenu only when at least one of the two modules
-  # it covers is actually declared in the config.
   if _module_in_cfg 'custom/weather' || _module_in_cfg 'custom/pacman'; then
     cfgr::item::action \
       --func "_updates_weather_menu" \
       --label "Updates / Weather"
   fi
+
+  if _module_in_cfg 'custom/ram' || _module_in_cfg 'custom/disk' \
+    || _module_in_cfg 'custom/cpu-temp' || _module_in_cfg 'custom/gpu-temp'; then
+    cfgr::item::action \
+      --func "_monitoring_menu" \
+      --label "Monitoring"
+  fi
 }
 
-# Load config once up front so both the guard and _build share the same content
-# without a second read.
 _load_cfg
 
-# Bail out before handing off to cfgr::run - if neither module is present,
-# ::run would call _build and produce an empty menu with no useful entries.
-if ! _module_in_cfg 'custom/weather' && ! _module_in_cfg 'custom/pacman'; then
+if ! _module_in_cfg 'custom/weather' && ! _module_in_cfg 'custom/pacman' \
+  && ! _module_in_cfg 'custom/ram' && ! _module_in_cfg 'custom/disk' \
+  && ! _module_in_cfg 'custom/cpu-temp' && ! _module_in_cfg 'custom/gpu-temp'; then
   notify-send -r 1 -u normal "Vibranium" "No configurable modules are present in your Waybar config."
   exit 0
 fi

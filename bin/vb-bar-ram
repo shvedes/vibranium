@@ -1,0 +1,169 @@
+#!/bin/bash
+
+VERBOSE=false
+
+log() {
+  local level="$1"; shift
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
+
+usage() {
+  shcat <<EOF
+Usage: ${0##*/} [OPTION]
+
+Output RAM usage for Waybar.
+
+Options:
+  -v, --verbose     Enable verbose output
+  -h, --help        Show this help and exit
+
+EOF
+}
+
+while (($# > 0)); do
+  case "$1" in
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  *)
+    log Error "Unknown option: $1"
+    usage
+    exit 1
+    ;;
+  esac
+done
+
+if ! source vb-lib-core; then
+  log Error "Failed to source vb-lib-core"
+  exit 1
+fi
+
+helpers::check VIBRANIUM_BAR_RAM_MODULE_ENABLE VIBRANIUM_BAR_RAM_MODE
+
+if [[ "$VIBRANIUM_BAR_RAM_MODULE_ENABLE" != true ]]; then
+  printf '{"text": ""}\n'
+  exit 0
+fi
+
+# /proc/meminfo in KiB
+while read -r key val _; do
+  [[ "$key" == "MemTotal:" ]] && mem_total=$val
+  [[ "$key" == "SwapFree:" ]] && swap_free=$val
+  [[ "$key" == "SwapTotal:" ]] && swap_total=$val
+  [[ "$key" == "MemAvailable:" ]] && mem_avail=$val
+done < /proc/meminfo
+
+mem_used=$((mem_total - mem_avail))
+used_perc=$((mem_used * 100 / mem_total))
+
+used_gib_int=$((mem_used / 1048576))
+used_gib_dec=$(( (mem_used % 1048576) * 10 / 1048576 ))
+total_gib_int=$((mem_total / 1048576))
+total_gib_dec=$(( (mem_total % 1048576) * 10 / 1048576 ))
+
+tooltip="RAM: ${used_perc}% (${used_gib_int}.${used_gib_dec} GiB"
+tooltip+=" / ${total_gib_int}.${total_gib_dec} GiB)"
+
+if ((swap_total > 0)); then
+  swap_used=$((swap_total - swap_free))
+  swap_perc=$((swap_used * 100 / swap_total))
+  swap_used_gib_int=$((swap_used / 1048576))
+  swap_used_gib_dec=$(( (swap_used % 1048576) * 10 / 1048576 ))
+  swap_total_gib_int=$((swap_total / 1048576))
+  swap_total_gib_dec=$(( (swap_total % 1048576) * 10 / 1048576 ))
+  tooltip+="\nSwap: ${swap_perc}% (${swap_used_gib_int}.${swap_used_gib_dec} GiB"
+  tooltip+=" / ${swap_total_gib_int}.${swap_total_gib_dec} GiB)"
+fi
+
+# Comma-format the integer part of a number
+commify() {
+  local val=$1 int_part dec_part
+  int_part="${val%.*}"; dec_part="${val#*.}"
+  if [[ "$dec_part" == "$val" ]]; then
+    dec_part=""
+  fi
+
+  local rest="${int_part#-}" out="" sign=""
+  if [[ "$int_part" != "$rest" ]]; then
+    sign="-"
+  fi
+
+  while [[ ${#rest} -gt 3 ]]; do
+    out=",${rest: -3}${out}"
+    rest="${rest:0:${#rest}-3}"
+  done
+  out="${sign}${rest}${out}"
+  if [[ -n "$dec_part" ]]; then
+    echo "${out}.${dec_part}"
+  else
+    echo "${out}"
+  fi
+}
+
+# /proc/meminfo values are in KiB — convert to target unit
+ram_value() {
+  local val=$1 unit=$2 int dec
+  case "$unit" in
+    perc) echo "${used_perc}"; return ;;
+    KiB)  echo "${val}"; return ;;
+    MiB)
+      int=$((val / 1024)); dec=$(( (val % 1024) * 10 / 1024 ))
+      echo "${int}.${dec}"
+      ;;
+    GiB)
+      int=$((val / 1048576)); dec=$(( (val % 1048576) * 10 / 1048576 ))
+      echo "${int}.${dec}"
+      ;;
+    KB)
+      int=$((val * 1024 / 1000)); dec=$(( (val * 1024 % 1000) * 10 / 1000 ))
+      echo "${int}.${dec}"
+      ;;
+    MB)
+      int=$((val * 1024 / 1000000)); dec=$(( (val * 1024 % 1000000) * 10 / 1000000 ))
+      echo "${int}.${dec}"
+      ;;
+    GB)
+      int=$((val * 1024 / 1000000000))
+      dec=$(( (val * 1024 % 1000000000) * 10 / 1000000000 ))
+      echo "${int}.${dec}"
+      ;;
+  esac
+}
+
+ram_unit() {
+  case "$1" in
+    perc) echo "%" ;;
+    KiB|KB|MiB|MB|GiB|GB) echo " $1" ;;
+  esac
+}
+
+if ((used_perc >= 97)); then
+  icon="<span foreground='${P_RED}'>\\uf1c0</span>"
+elif ((used_perc >= 93)); then
+  icon="<span foreground='${P_ORANGE}'>\\uf1c0</span>"
+elif ((used_perc >= 85)); then
+  icon="<span foreground='${P_YELLOW}'>\\uf1c0</span>"
+else
+  icon="\\uf1c0"
+fi
+
+mode="$VIBRANIUM_BAR_RAM_MODE"
+log Info "mode=$mode mem_used=${mem_used}KiB used_perc=${used_perc}%"
+val="$(commify "$(ram_value "$mem_used" "$mode")")"
+unit="$(ram_unit "$mode")"
+text="${icon} <b>${val}${unit}</b>"
+
+printf '{"text": "%s", "tooltip": "%s"}\n' "$text" "$tooltip"

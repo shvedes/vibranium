@@ -87,6 +87,7 @@ tooltip, tooltip label {
 }
 
 #custom-separator,
+#custom-mod-separator,
 #custom-dynamic-separator {
   opacity: 0.4
 }

@@ -1,0 +1,13 @@
+{
+	"custom/cpu-temp": {
+		"format": "{text}",
+		"hide-empty-text": true,
+
+		"exec": "vb-bar-temp --cpu",
+		"return-type": "json",
+		"interval": 1,
+		"signal": 17,
+
+		"on-click": "vb-launch-tui -- btop"
+	}
+}

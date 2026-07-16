@@ -275,6 +275,42 @@ VIBRANIUM_BAR_WEATHER_MODULE_CITY="not_set"
 # @desc Applicable to updates and weather only.
 VIBRANIUM_BAR_SHOW_ANIMATION=true
 
+# @type bool
+# @desc Whether to enable the CPU temperature module.
+VIBRANIUM_BAR_CPU_TEMP_MODULE_ENABLE=false
+
+# @type bool
+# @desc Whether to enable the GPU temperature module.
+VIBRANIUM_BAR_GPU_TEMP_MODULE_ENABLE=false
+
+# @ignore
+# @desc Auto-detected hwmon path for CPU temperature sensor.
+# @note Set automatically on first run. "auto" triggers detection.
+VIBRANIUM_BAR_CPU_TEMP_HWMON_PATH="auto"
+
+# @ignore
+# @desc Auto-detected hwmon path for GPU temperature sensor.
+# @note Set automatically on first run. "auto" triggers detection.
+VIBRANIUM_BAR_GPU_TEMP_HWMON_PATH="auto"
+
+# @type bool
+# @desc Whether to enable the RAM module.
+VIBRANIUM_BAR_RAM_MODULE_ENABLE=false
+
+# @type bool
+# @desc Whether to enable the Disk module.
+VIBRANIUM_BAR_DISK_MODULE_ENABLE=false
+
+# @type string
+# @values perc KiB MiB GiB KB MB GB
+# @desc Display mode for RAM module.
+VIBRANIUM_BAR_RAM_MODE="perc"
+
+# @type string
+# @values perc KiB MiB GiB KB MB GB
+# @desc Display mode for Disk module.
+VIBRANIUM_BAR_DISK_MODE="perc"
+
 #         SCREEN RECORDING OPTIONS             #
 # ============================================ #
 #                                              #

@@ -615,6 +615,7 @@ cfgr::item::digit() {
   local min=""
   local max=""
   local icon=""
+  local hook=""
 
   while (($# > 0)); do
     case "$1" in
@@ -650,6 +651,10 @@ cfgr::item::digit() {
       icon="$2"
       shift 2
       ;;
+    --hook)
+      hook="$2"
+      shift 2
+      ;;
     *)
       shift
       ;;
@@ -662,10 +667,10 @@ cfgr::item::digit() {
   _CFGR_ICONS+=("$icon")
   _CFGR_ITEMS+=("$label : ${!var}")
 
-  # Descriptor format: digit:VAR:HINT:ROFI_TITLE:TYPE:MIN:MAX
+  # Descriptor format: digit:VAR:HINT:ROFI_TITLE:TYPE:MIN:MAX:HOOK
   # All fields are numbers or short identifiers with no colons, so a
   # plain IFS=: split in the dispatcher is safe for this type.
-  _CFGR_DISPATCH+=("digit:${var}:${hint}:${rofi_title}:${type}:${min}:${max}")
+  _CFGR_DISPATCH+=("digit:${var}:${hint}:${rofi_title}:${type}:${min}:${max}:${hook}")
 }
 
 # cfgr::item::string  --var VAR  --label LABEL  --title TITLE
@@ -960,7 +965,7 @@ cfgr::dispatch() {
     ;;
 
   digit)
-    # Descriptor format: digit:VAR:HINT:ROFI_TITLE:TYPE:MIN:MAX
+    # Descriptor format: digit:VAR:HINT:ROFI_TITLE:TYPE:MIN:MAX:HOOK
     # IFS=: split is safe here because all fields are short identifiers or
     # numbers; none of them contain colons.
     local -a fields
@@ -972,6 +977,7 @@ cfgr::dispatch() {
     local dtype="${fields[4]}"
     local min="${fields[5]}"
     local max="${fields[6]}"
+    local hook="${fields[7]:-}"
 
     # Pass --min/--max only when both bounds were recorded; omitting them
     # tells set_digit to accept any value of the correct type.
@@ -981,6 +987,10 @@ cfgr::dispatch() {
     else
       cfgr::set_digit --var "$var" --title "$rofi_title" --hint "$hint" \
         --type "$dtype"
+    fi
+
+    if [[ -n "$hook" ]]; then
+      eval "$hook"
     fi
     ;;
 
