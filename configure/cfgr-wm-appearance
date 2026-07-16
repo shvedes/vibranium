@@ -127,45 +127,59 @@ _int_to_rgba() {
     $(( ($1 >> 24) & 0xFF ))
 }
 
+_c() {
+  local v="${!1:-$2}"
+  printf "rgb(%s)" "${v#\#}"
+}
+
 _set_shadow_color() {
-  local colors_lua="$XDG_CONFIG_HOME/vibranium/current/theme/colors.lua"
   local -a opts=()
 
-  if [[ -f "$colors_lua" ]]; then
-    while IFS='|' read -r name shade color; do
-      opts+=("${name^} ${shade^}:$color")
-    done < <(awk '
-      /^Vibranium\.Colors = \{/ { in_colors = 1; next }
-      /^\}/ && in_colors { in_colors = 0; next }
-      in_colors && /^  [a-z_]+ = \{/ { name = $1; next }
-      in_colors && name && /^    [a-z_]+ = "rgb\(/ {
-        match($0, /"([^"]+)"/)
-        print name "|" $1 "|" substr($0, RSTART + 1, RLENGTH - 2)
-      }
-      in_colors && name && /^  \},?$/ { name = "" }
-    ' "$colors_lua")
-  fi
+  opts+=("Red:$(_c P_RED c94f6d)")
+  opts+=("Red Dim:$(_c P_RED_DIM c33c5e)")
+  opts+=("Red Bright:$(_c P_RED_BRIGHT d67186)")
+  opts+=("Pink:$(_c P_PINK d67ad2)")
+  opts+=("Pink Dim:$(_c P_PINK_DIM 975894)")
+  opts+=("Pink Bright:$(_c P_PINK_BRIGHT e39fdf)")
+  opts+=("Green:$(_c P_GREEN 81b29a)")
+  opts+=("Green Dim:$(_c P_GREEN_DIM 5d7e6e)")
+  opts+=("Green Bright:$(_c P_GREEN_BRIGHT aecebe)")
+  opts+=("Yellow:$(_c P_YELLOW dbc074)")
+  opts+=("Yellow Dim:$(_c P_YELLOW_DIM af9a5e)")
+  opts+=("Yellow Bright:$(_c P_YELLOW_BRIGHT e6d199)")
+  opts+=("Orange:$(_c P_ORANGE f4a261)")
+  opts+=("Orange Dim:$(_c P_ORANGE_DIM c3824f)")
+  opts+=("Orange Bright:$(_c P_ORANGE_BRIGHT fbbb8b)")
+  opts+=("Blue:$(_c P_BLUE 719cd6)")
+  opts+=("Blue Dim:$(_c P_BLUE_DIM 526f97)")
+  opts+=("Blue Bright:$(_c P_BLUE_BRIGHT 8dadde)")
+  opts+=("Purple:$(_c P_PURPLE 9d79d6)")
+  opts+=("Purple Dim:$(_c P_PURPLE_DIM 705797)")
+  opts+=("Purple Bright:$(_c P_PURPLE_BRIGHT b99ce2)")
+  opts+=("Cyan:$(_c P_CYAN 63cdcf)")
+  opts+=("Cyan Dim:$(_c P_CYAN_DIM 4a9092)")
+  opts+=("Cyan Bright:$(_c P_CYAN_BRIGHT 94dbdc)")
 
-  opts+=("Border color:border" "Black:rgb(000000)")
+  opts+=("Black Darkest:$(_c P_BACKGROUND_H 000000)")
+  opts+=("Black Darker:$(_c P_BACKGROUND_0 080808)")
+  opts+=("Black:$(_c P_BACKGROUND_1 101010)")
+  opts+=("Black Bright:$(_c P_BACKGROUND_2 181818)")
+  opts+=("Gray Darkest:$(_c P_BACKGROUND_3 202020)")
+  opts+=("Gray Darker:$(_c P_BACKGROUND_4 282828)")
+  opts+=("Gray:$(_c P_BACKGROUND_5 303030)")
+  opts+=("Gray Bright:$(_c P_GRAY_DIM 484848)")
+  opts+=("Gray Brighter:$(_c P_GRAY 606060)")
+  opts+=("Gray Brightest:$(_c P_GRAY_BRIGHT 787878)")
+  opts+=("White Dim:$(_c P_FOREGROUND_4 a0a0a0)")
+  opts+=("White Dark:$(_c P_FOREGROUND_3 b8b8b8)")
+  opts+=("White:$(_c P_FOREGROUND_2 d0d0d0)")
+  opts+=("White Bright:$(_c P_FOREGROUND_1 e8e8e8)")
+  opts+=("White Brightest:$(_c P_FOREGROUND_H ffffff)")
 
   local chosen
   chosen="$(cfgr::set_string --title "Shadow Color" --option "${opts[@]}")" || return
 
-  if [[ "$chosen" == "border" ]]; then
-    local gradient hex border_color
-    gradient="$(hyprctl -j getoption general:col.active_border \
-      | jq -r '.gradient' 2>/dev/null
-    )" || gradient=""
-    hex="${gradient%% *}"
-    if [[ -n "$hex" ]]; then
-      border_color="rgba(${hex:2:2}${hex:4:2}${hex:6:2}${hex:0:2})"
-    else
-      border_color="rgb(ffffff)"
-    fi
-    hypr::set "decoration:shadow:color" "$border_color" "$HYPR_CONF_LAF"
-  else
-    hypr::set "decoration:shadow:color" "$chosen" "$HYPR_CONF_LAF"
-  fi
+  hypr::set "decoration:shadow:color" "$chosen" "$HYPR_CONF_LAF"
 }
 
 _shadow_menu() {
