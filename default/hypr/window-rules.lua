@@ -191,6 +191,8 @@ hl.window_rule({
   center = true
 })
 
+local thunar_re = "(Rename\\s.*|Create (New Folder|Document from template.*)|File Operation Progress|New\\s.*)"
+
 -- Thunar special rules.
 -- Keeps small contextual windows always visible and focused.
 -- To revert, just tile the window.
@@ -198,9 +200,20 @@ hl.window_rule({
   name = "Thunar: File Operation",
   match = {
     class = "[Tt]hunar",
-    title = "(Rename\\s.*|Create (New Folder|Document from template.*)|File Operation Progress|New\\s.*)"
+    title = thunar_re
   },
+
   float = true,
+})
+
+hl.window_rule({
+  name = "Thunar: File Operation",
+  match = {
+    float = true,
+    class = "[Tt]hunar",
+    title = thunar_re
+  },
+
   center = true,
   dim_around = true,
 })
