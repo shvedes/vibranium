@@ -63,14 +63,14 @@
 @define-color osd_fg_color @foreground;
 
 /* Thumbnails and banners */
-@define-color thumbnail_bg_color background;
+@define-color thumbnail_bg_color @background;
 @define-color thumbnail_fg_color @foreground;
-@define-color banner_bg_color background;
+@define-color banner_bg_color @background;
 @define-color banner_fg_color @foreground;
 
 /* Scrollbar and shade */
-@define-color shade_color background;
-@define-color scrollbar_outline_color background;
+@define-color shade_color @background;
+@define-color scrollbar_outline_color @background;
 
 /* Semantic states */
 @define-color destructive_bg_color @red;
@@ -111,7 +111,7 @@
 /* GTK3 legacy extras */
 @define-color selected_bg_color @accent;
 @define-color selected_fg_color @background;
-@define-color tooltip_bg_color background;
+@define-color tooltip_bg_color @background;
 @define-color tooltip_fg_color @foreground;
 @define-color link_color @blue;
 @define-color visited_link_color @magenta;

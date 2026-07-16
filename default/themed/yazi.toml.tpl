@@ -10,7 +10,7 @@ find_keyword = { fg = "{{ color4|lightness=+0.20 }}", bg = "{{ color1 }}", under
 find_position = { }
 
 count_copied = { fg = "{{ color0 }}", bg = "{{ color2|lightness=+0.20 }}" }
-count_cut = { fg = "{{ color0 }}", bg = "{{ color1|lightness=+0.20}}" }
+count_cut = { fg = "{{ color0 }}", bg = "{{ color1|lightness=+0.20 }}" }
 count_selected = { fg = "{{ color0 }}", bg = "{{ color3|lightness=+0.20 }}" }
 
 border_symbol = "│"

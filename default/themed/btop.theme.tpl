@@ -5,7 +5,7 @@ theme[hi_fg]="{{ accent }}"
 
 theme[selected_bg]="{{ background|lightness=+0.03 }}"
 theme[selected_fg]="{{ accent|lightness=+0.05 }}"
-theme[inactive_fg]="{{ background|lightness=+0.05}}"
+theme[inactive_fg]="{{ background|lightness=+0.05 }}"
 
 theme[graph_text]="{{ background|lightness=+0.30 }}"
 theme[meter_bg]="{{ background|lightness=+0.15 }}"
