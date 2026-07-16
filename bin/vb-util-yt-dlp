@@ -95,7 +95,7 @@ _try_download() {
   # Fast path - cached cookies from a previous successful run.
   if [[ -f "$cookie_cache" ]]; then
     echo "${YELLOW}[VIBRANIUM]${RESET} Downloading..."
-    _stderr_tmp="/tmp/${0#**/}.tmp"
+    _stderr_tmp="/tmp/${0##*/}.tmp"
     if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url" 2>"$_stderr_tmp"; then
       # Download succeeded. If YouTube flagged our cookies as rotated, wipe the
       # cache now so the next run picks up a fresh jar - and swallow the warning
