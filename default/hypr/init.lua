@@ -70,7 +70,7 @@ source(VIBRANIUM .. "/autostart.lua")
 source(VIBRANIUM .. "/general.lua")
 source(VIBRANIUM .. "/look-and-feel.lua")
 
-source(CONFIG .. "/current/theme/vb-lib-theme.lua")
+source(CONFIG .. "/current/theme/colors.lua")
 source(CONFIG .. "/current/theme/hyprland.lua")
 
 source(VIBRANIUM .. "/window-rules.lua")

@@ -14,6 +14,12 @@ BLUR_SPEC=(
   "decoration.blur.noise|float"
 )
 
+GLOW_SPEC=(
+  "decoration.glow.enabled|bool"
+  "decoration.glow.range|int"
+  "decoration.glow.render_power|int"
+)
+
 SHADOW_SPEC=(
   "decoration.shadow.enabled|bool"
   "decoration.shadow.render_power|int"
@@ -113,6 +119,55 @@ _blur_menu() {
   cfgr::run "Blur" "_b"
 }
 
+_int_to_rgba() {
+  printf "rgba(%02x%02x%02x%02x)" \
+    $(( ($1 >> 16) & 0xFF )) \
+    $(( ($1 >> 8) & 0xFF )) \
+    $(( $1 & 0xFF )) \
+    $(( ($1 >> 24) & 0xFF ))
+}
+
+_set_shadow_color() {
+  local colors_lua="$XDG_CONFIG_HOME/vibranium/current/theme/colors.lua"
+  local -a opts=()
+
+  if [[ -f "$colors_lua" ]]; then
+    while IFS='|' read -r name shade color; do
+      opts+=("${name^} ${shade^}:$color")
+    done < <(awk '
+      /^Vibranium\.Colors = \{/ { in_colors = 1; next }
+      /^\}/ && in_colors { in_colors = 0; next }
+      in_colors && /^  [a-z_]+ = \{/ { name = $1; next }
+      in_colors && name && /^    [a-z_]+ = "rgb\(/ {
+        match($0, /"([^"]+)"/)
+        print name "|" $1 "|" substr($0, RSTART + 1, RLENGTH - 2)
+      }
+      in_colors && name && /^  \},?$/ { name = "" }
+    ' "$colors_lua")
+  fi
+
+  opts+=("Border color:border" "Black:rgb(000000)")
+
+  local chosen
+  chosen="$(cfgr::set_string --title "Shadow Color" --option "${opts[@]}")" || return
+
+  if [[ "$chosen" == "border" ]]; then
+    local gradient hex border_color
+    gradient="$(hyprctl -j getoption general:col.active_border \
+      | jq -r '.gradient' 2>/dev/null
+    )" || gradient=""
+    hex="${gradient%% *}"
+    if [[ -n "$hex" ]]; then
+      border_color="rgba(${hex:2:2}${hex:4:2}${hex:6:2}${hex:0:2})"
+    else
+      border_color="rgb(ffffff)"
+    fi
+    hypr::set "decoration:shadow:color" "$border_color" "$HYPR_CONF_LAF"
+  else
+    hypr::set "decoration:shadow:color" "$chosen" "$HYPR_CONF_LAF"
+  fi
+}
+
 _shadow_menu() {
   _b() {
     hypr::reload
@@ -123,6 +178,16 @@ _shadow_menu() {
       --func "_toggle 'decoration:shadow:enabled'"
 
     if [[ ${HYPR[decoration.shadow.enabled]} == true ]]; then
+      local shadow_color_int shadow_color
+      shadow_color_int="$(hyprctl -j getoption decoration:shadow:color \
+        | jq -r '.int // 0' 2>/dev/null
+      )" || shadow_color_int=0
+      shadow_color="$(_int_to_rgba "$shadow_color_int")"
+
+      cfgr::item::action \
+        --label "Color : $shadow_color" \
+        --func "_set_shadow_color"
+
       cfgr::item::action \
         --label "Power : ${HYPR[decoration.shadow.render_power]}" \
         --func "_set_int 'Shadow Power' 'Shadow power (int)' int 1 4 'decoration:shadow:render_power'"
@@ -136,7 +201,7 @@ _shadow_menu() {
         --func "_toggle 'decoration:shadow:sharp'"
     fi
   }
-  cfgr::run "Blur" "_b"
+  cfgr::run "Shadow" "_b"
 }
 
 _decoration_menu() {
@@ -226,6 +291,31 @@ _anim_submenu() {
     fi
   }
   cfgr::run "Animations" "_b"
+}
+
+_glow_submenu(){
+  _b(){
+    hypr::reload
+    hypr::fetch "${GLOW_SPEC[@]}"
+
+    local enabled
+    enabled="$(hypr::bool "decoration.glow.enabled")"
+
+    cfgr::item::action \
+      --label "Enabled : $enabled" \
+      --func "_toggle 'decoration:glow:enabled'"
+
+    if [[ "$enabled" == true ]]; then
+      cfgr::item::action \
+        --label "Range : ${HYPR[decoration.glow.range]}px" \
+        --func "_set_int 'Glow Range' 'Glow Range (int)' int 1 100 'decoration:glow:range'"
+
+      cfgr::item::action \
+        --label "Render Power : ${HYPR[decoration.glow.render_power]}" \
+        --func "_set_int 'Render Power' 'Render Power (int)' int 1 4 'decoration:glow:render_power'"
+    fi
+  }
+  cfgr::run "Glow" "_b"
 }
 
 _edit_roundness() {
@@ -434,6 +524,7 @@ _toggle() {
 _build() {
   cfgr::item::action --label "Gaps" --func "_gaps_menu"
   cfgr::item::action --label "Blur" --func "_blur_menu"
+  cfgr::item::action --label "Glow" --func "_glow_submenu"
   cfgr::item::action --label "Shadows" --func "_shadow_menu"
   cfgr::item::action --label "Decoration" --func "_decoration_menu"
   cfgr::item::action --label "Animations" --func "_anim_submenu"

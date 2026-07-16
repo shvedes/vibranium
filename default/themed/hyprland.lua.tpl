@@ -9,6 +9,13 @@ hl.config({
     },
   },
 
+  decoration = {
+    glow = {
+      color = "rgba({{ accent_strip|lightness=+0.05|alpha=0.70 }})",
+      color_inactive = "rgba({{ background_strip|lightness=+0.10|alpha=0.70 }})",
+    },
+  },
+
   misc = {
     col = {
       splash = "rgb({{ background_strip }})",

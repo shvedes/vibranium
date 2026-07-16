@@ -13,12 +13,12 @@ fi
 
 git clone -q https://github.com/shvedes/hyprland-config-editor --branch lua /tmp/hce && cd /tmp/hce
 
+rm -f "$VIBRANIUM/bin/vb-cmd-edit-wm-config"
 make install BINARY=vb-cmd-edit-wm-config PREFIX=~/.local/share/vibranium &>/dev/null
 
+cd "$base_cwd"
 rm -rf /tmp/hce
 
 if $delete_rust; then
   sudo pacman -Rnsc --noconfirm rust &>/dev/null
 fi
-
-cd "$base_cwd"
