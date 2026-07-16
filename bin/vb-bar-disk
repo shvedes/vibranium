@@ -175,7 +175,7 @@ log Info "mode=$mode mount=$MOUNT used=${used_m}MiB" \
   "size=${size_m}MiB use_perc=${use_perc}%"
 
 if [[ "$mode" == "perc" ]]; then
-  text="${icon} <b>${use_perc}</b>%"
+  text="${icon} ${use_perc}%"
   tooltip="${label}: ${use_perc}%"
   tooltip+=" (${used_gib_int}.${used_gib_dec} GiB"
   tooltip+=" / ${size_gib_int}.${size_gib_dec} GiB)"
@@ -183,7 +183,7 @@ else
   usage="$(commify "$(disk_value "$used_m" "$mode")")"
   unit="$(disk_unit "$mode")"
   total="$(commify "$(disk_value "$size_m" "$mode")")"
-  text="${icon} <b>${usage}${unit}</b>"
+  text="${icon} ${usage}${unit}"
   tooltip="${label}: ${usage}${unit} / ${total}${unit}"
 fi
 

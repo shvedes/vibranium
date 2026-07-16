@@ -164,6 +164,6 @@ mode="$VIBRANIUM_BAR_RAM_MODE"
 log Info "mode=$mode mem_used=${mem_used}KiB used_perc=${used_perc}%"
 val="$(commify "$(ram_value "$mem_used" "$mode")")"
 unit="$(ram_unit "$mode")"
-text="${icon} <b>${val}${unit}</b>"
+text="${icon} ${val}${unit}"
 
 printf '{"text": "%s", "tooltip": "%s"}\n' "$text" "$tooltip"

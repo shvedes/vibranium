@@ -190,4 +190,4 @@ if [[ "$TYPE" == "gpu" ]]; then
   fi
 fi
 
-printf '{"text": "%s <b>%s°C</b>", "tooltip": "%s"}\n' "$icon" "$temp" "$tooltip"
+printf '{"text": "%s %s°C", "tooltip": "%s"}\n' "$icon" "$temp" "$tooltip"
