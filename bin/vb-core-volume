@@ -11,7 +11,7 @@ shcat() {
 
 log() {
   local level="$1"; shift
-  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -113,8 +113,9 @@ show_volume_notification() {
   # Query fresh fullscreen state right before notification.
   # hyprctl is called here (not cached from earlier) because the
   # active window may have changed between volume adjustment and now.
-  local is_fullscreen
-  is_fullscreen="$(hyprctl -j activewindow | jq -r .fullscreen)"
+  local is_fullscreen=0 win_json
+  win_json=$(hyprctl -j activewindow)
+  [[ "$win_json" =~ \"fullscreen\":[[:space:]]*([0-9]) ]] && is_fullscreen="${BASH_REMATCH[1]}"
 
   if (( is_fullscreen == 0 )); then
     if [[ "$muted" == "true" ]]; then

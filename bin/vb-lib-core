@@ -145,13 +145,12 @@ helpers::ui::menu() {
   # Walk every line of the stripped input to find the longest visible entry.
   # The counter is incremented only when the current line's length exceeds the running maximum.
   local maxlen_input=0 lines=0 line
-  local IFS=$'\n'
-  for line in ${input_plain}; do
+  while IFS= read -r line; do
     if ((${#line} > maxlen_input)); then
       maxlen_input=${#line}
     fi
     ((lines++))
-  done
+  done <<< "$input_plain"
 
   # We don't need it anymore.
   unset input_plain

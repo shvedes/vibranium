@@ -22,7 +22,7 @@ shcat() {
 
 log() {
   local level="$1"; shift
-  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -223,13 +223,13 @@ save_state() {
     content+=":::$GAMMA"$'\n'
   else
     for output in "${!bus_map[@]}"; do
-      _write_mon "$output" "${bus_map[$output]}" \
+      _write_mon content "$output" "${bus_map[$output]}" \
         "${level_map[$output]}" "$GAMMA" "${mult_map[$output]}"
     done
 
     for output in "${!level_map[@]}"; do
       [[ -n "${bus_map[$output]+x}" ]] && continue
-      _write_mon "$output" "" "${level_map[$output]}" \
+      _write_mon content "$output" "" "${level_map[$output]}" \
         "$GAMMA" "${mult_map[$output]}"
     done
   fi
@@ -240,11 +240,12 @@ save_state() {
 # Append one monitor line to $content.  Omits trailing colon when last
 # field is empty so the file never accumulates ":<empty>" cruft.
 _write_mon() {
-  local out="$1" i2c="$2" lvl="$3" gam="$4" mlt="$5"
+  local -n _c="$1"
+  local out="$2" i2c="$3" lvl="$4" gam="$5" mlt="$6"
   if [[ -n "$mlt" ]]; then
-    content+="$out:$i2c:$lvl:$gam:$mlt"$'\n'
+    _c+="$out:$i2c:$lvl:$gam:$mlt"$'\n'
   else
-    content+="$out:$i2c:$lvl:$gam"$'\n'
+    _c+="$out:$i2c:$lvl:$gam"$'\n'
   fi
 }
 
@@ -253,12 +254,6 @@ _write_mon() {
 # Writing all lines keeps gamma in sync across monitors since it is a global
 # GPU property applied via hyprsunset, not per-output.
 GAMMA_MIN=10
-
-# Read gamma from the global GAMMA (set by load_state).
-load_gamma() {
-  local -n _out="$1"
-  _out=$GAMMA
-}
 
 # Update gamma in the global GAMMA and persist.  save_state writes every line
 # with the new gamma, so a missing file is handled automatically - the first

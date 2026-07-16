@@ -5,7 +5,7 @@ AUR_MODE=false
 
 log() {
   local level="$1"; shift
-  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }

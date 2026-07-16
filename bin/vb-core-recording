@@ -12,7 +12,7 @@ log() {
   # Only emit log lines when -v/--verbose is passed AND stdout is a terminal.
   # Without the terminal check, downstream tools (e.g. notification daemons)
   # that invoke this script would interleave log noise with their own output.
-  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }

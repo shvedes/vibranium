@@ -6,7 +6,7 @@ CLI_TIME=
 
 log() {
   local level="$1"; shift
-  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[$SELF] $level: $*" >&2
   fi
 }

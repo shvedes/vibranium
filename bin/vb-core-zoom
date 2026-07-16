@@ -5,7 +5,7 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -86,7 +86,7 @@ read_state100() {
     fi
   fi
 
-  : "${ref:="$v"}"
+  ref=$v
 }
 
 # Persist the zoom level as a x100 integer. When zoom is reset to 1.00
@@ -220,7 +220,9 @@ reset)
   exit 1
 esac
 
-log Info "Zoom: $(printf '%d.%02d' $((current100 / 100)) $((current100 % 100))) -> $(printf '%d.%02d' $((new100 / 100)) $((new100 % 100)))"
+_from_int100 current_float "$current100"
+_from_int100 new_float "$new100"
+log Info "Zoom: $current_float -> $new_float"
 
 if apply_zoom100 "$new100"; then
   write_state100 "$new100"

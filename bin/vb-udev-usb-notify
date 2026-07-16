@@ -5,7 +5,7 @@ SCRIPT_NAME="${0##*/}"
 
 log() {
   local level="$1"; shift
-  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[$SCRIPT_NAME] $level: $*" >&2
   fi
 }

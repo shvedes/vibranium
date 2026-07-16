@@ -14,7 +14,7 @@ STATE_ACTION=""
 
 log() {
   local level="$1"; shift
-  if [[ "$level" == "Error" ]] || ($VERBOSE && [[ -t 0 ]]); then
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
@@ -424,7 +424,11 @@ fi
 # Acquire an exclusive lock using O_EXCL via bash's noclobber option.
 # Returns 0 on success (lock acquired), 1 on contention (lock held).
 _acquire_lock() {
-  ( set -o noclobber; : > "$LOCK_FILE" ) 2>/dev/null
+  set -o noclobber
+  : > "$LOCK_FILE" 2>/dev/null
+  local rc=$?
+  set +o noclobber
+  return $rc
 }
 
 _release_lock() {
