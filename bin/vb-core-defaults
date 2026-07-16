@@ -152,7 +152,7 @@ VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT="variant1"
 VIBRANIUM_VOLUME_ADJUSTMENT_STEP=5
 
 # @type bool
-# @desc Allow volume level up to 150%.
+# @desc Allow volume level up to 200%.
 VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED=false
 
 # @type bool

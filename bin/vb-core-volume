@@ -92,7 +92,7 @@ show_volume_notification() {
     read -r _ vol muted_flag <<<"$vol_info"
 
     if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
-      max_vol=1.5
+      max_vol=2.0
     else
       max_vol=1.0
     fi
@@ -134,8 +134,8 @@ adjust_volume() {
   log Info "Adjusting $device_type $direction"
 
   if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
-    max_volume=1.5
-    osd_max_flag="--max-volume=150"
+    max_volume=2.0
+    osd_max_flag="--max-volume=200"
   else
     max_volume=1.0
     osd_max_flag=""
@@ -222,7 +222,7 @@ set_volume() {
   log Info "Setting volume to ${int_val}%"
 
   if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
-    max_volume=150
+    max_volume=200
   else
     max_volume=100
   fi
@@ -233,7 +233,7 @@ set_volume() {
   fi
 
   # Convert integer percent to wpctl's decimal format (e.g. 85 -> "0.85").
-  # wpctl accepts 2-decimal-place strings representing a 0.0-1.5 range.
+  # wpctl accepts 2-decimal-place strings representing a 0.0-2.0 range.
   local float_val
   printf -v float_val "%d.%02d" $((int_val / 100)) $((int_val % 100))
 
@@ -265,7 +265,7 @@ set_volume() {
 
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true && "$quiet" != true ]]; then
     if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-      # Scale absolute percent (0-150) to a 0-100 progress bar using
+      # Scale absolute percent (0-200) to a 0-100 progress bar using
       # x10000 fixed-point (4 decimal places) for swayosd's --custom-progress.
       local scaled=$((int_val * 10000 / max_volume))
       local osd_progress osd_icon

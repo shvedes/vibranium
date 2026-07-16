@@ -29,7 +29,7 @@
 #   value that was just written (false, since boost was turned off).
 #
 # Volume format from wpctl:
-#   "Volume: 1.23" - a float where 1.00 = 100%, 1.50 = 150%.
+#   "Volume: 1.23" - a float where 1.00 = 100%, 2.00 = 200%.
 #   The first regex captures the numeric part after "Volume: ".
 #   The second regex matches the boost range (1.10-1.50) plus a defensive
 #   upper bound for anything >= 2.00 that should never occur in practice.
@@ -43,9 +43,9 @@ _on_boost_toggled() {
     if [[ $current_vol =~ ([0-9]+\.[0-9]+) ]]; then
       current_vol="${BASH_REMATCH[1]}"
 
-      # 1.10-1.50 covers the boost range (110%-150%).
-      # The [2-9] arm catches anything >= 200% as a defensive upper bound.
-      if [[ $current_vol =~ ^(1\.[1-4][0-9]|1\.50|[2-9]) ]]; then
+      # 1.10-2.00 covers the boost range (110%-200%).
+      # The [3-9] arm catches anything >= 300% as a defensive upper bound.
+      if [[ $current_vol =~ ^(1\.[1-9][0-9]?|2\.00|[3-9]) ]]; then
         notify-send -r 2 -t 5000 "Vibranium" "Volume level has been set back to 100%"
         vb-core-volume --volume 100 &
       fi
@@ -216,7 +216,7 @@ _audio_feedback_submenu() {
 #
 # ── Bool rows ──────────────────────────────────────────────────────────────
 #
-#   "Boost up to 150%"
+#   "Boost up to 200%"
 #     --hook "_on_boost_toggled": after the bool is flipped, the hook runs
 #     to clamp the live volume back to 100% if boost was just disabled and
 #     the level is already above that threshold.
@@ -267,7 +267,7 @@ _audio_feedback_submenu() {
 _build() {
   cfgr::item::bool \
     --var VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
-    --label "Boost up to 150%" \
+    --label "Boost up to 200%" \
     --hook "_on_boost_toggled"
 
   cfgr::item::bool \
@@ -329,7 +329,7 @@ _build() {
 #     Suppose a user manually edits the settings file and writes
 #     VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED=alksjdlaksd instead of true/false.
 #     If that variable is NOT listed here, cfgr::run sources the garbage value
-#     and renders "Boost up to 150% : alksjdlaksd" in the menu. toggle_bool
+#     and renders "Boost up to 200% : alksjdlaksd" in the menu. toggle_bool
 #     would still recover (it calls the same check function internally), but
 #     the menu will have already drawn the garbage string before that happens.
 #     Listing the variable here means helpers::check corrects the bad value
