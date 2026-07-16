@@ -81,7 +81,7 @@ focus_or_launch() {
     hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
   else
     log Info "No matching terminal window, launching: ${cmd[*]}"
-    source xdg-terminal-exec \
+    exec setsid -f xdg-terminal-exec \
       --app-id="$APP_ID" \
       --title="$TITLE" \
       -- "${cmd[@]}"
