@@ -77,7 +77,7 @@ fi
 
 # Source the theme library for P_YELLOW and other colour variables used
 # in the notification markup.
-source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
+source "$XDG_CONFIG_HOME/vibranium/current/theme/colors.bash"
 
 msg="Missing required dependencies: <span foreground='${P_YELLOW}'><b>${DEPS[*]}</b></span>"
 # Replace notification ID 4 so repeated dep-notify calls update the same

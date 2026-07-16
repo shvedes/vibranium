@@ -15,7 +15,7 @@ source "$VIBRANIUM_PATH/vb-core-defaults"
 
 # Ignore error outputs while installing Vibranium (these files don't exist yet)
 source "$XDG_CONFIG_HOME/vibranium/settings" 2>/dev/null
-source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme" 2>/dev/null
+source "$XDG_CONFIG_HOME/vibranium/current/theme/colors.bash" 2>/dev/null
 
 RED=$'\e[0;31m'
 YELLOW=$'\e[0;33m'

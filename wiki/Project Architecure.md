@@ -29,7 +29,7 @@ vb-lib-core          (almost always sourced)
 
 [`vb-lib-core`](https://github.com/shvedes/vibranium/blob/master/bin/vb-lib-core) is the single source of truth for:
 - Sourcing user settings (`~/.config/vibranium/settings`)
-- Sourcing the active theme's runtime vars (`vb-lib-theme`)
+- Sourcing the active theme's runtime vars (`colors.bash`)
 - Terminal I/O (prompts, spinners, header printing)
 - The [rofi](https://github.com/davatorium/rofi) menu wrapper
 - The settings validator ⭐ (`helpers::check`)

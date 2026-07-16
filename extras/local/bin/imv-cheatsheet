@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source ~/.config/vibranium/current/theme/vb-lib-theme
+source ~/.config/vibranium/current/theme/colors.bash
 
 msg="\n<span foreground='${P_YELLOW}'><b>SHIFT + PLUS</b></span> - zoom in\n"
 msg+="<span foreground='${P_YELLOW}'><b>SHIFT + L</b></span>    - move right\n"

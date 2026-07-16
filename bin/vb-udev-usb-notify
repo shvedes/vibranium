@@ -99,7 +99,7 @@ if [[ -z "$ACTION" ]]; then
   exit 1
 fi
 
-source "$XDG_CONFIG_HOME/vibranium/current/theme/vb-lib-theme"
+source "$XDG_CONFIG_HOME/vibranium/current/theme/colors.bash"
 
 if [[ "$ACTION" == "add" ]]; then
   if [[ -n "$DEVNAME" ]]; then
