@@ -741,7 +741,7 @@ else
   if _choose_packages; then
     _filter_packages
   else
-    _operation_canceled
+    _operation_canceled --positive
     exit 0
   fi
 

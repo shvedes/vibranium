@@ -91,7 +91,11 @@ FZF_ARGS=(
 )
 
 _operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  local color="$RED"
+
+  [[ "$1" == "--positive" ]] && color="$GREEN"
+
+  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   term::disable_input
   # shellcheck disable=SC2034
@@ -133,8 +137,8 @@ term::enable_input
 rm -f "$VIBRANIUM_CACHE/${0##*/}.list"
 
 if [[ ${#chosen[@]} -eq 0 ]]; then
-  _operation_canceled
-  exit 1
+  _operation_canceled --positive
+  exit 0
 fi
 
 log Info "${#chosen[@]} font(s) selected"

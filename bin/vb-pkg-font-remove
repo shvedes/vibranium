@@ -79,7 +79,11 @@ FZF_ARGS=(
 )
 
 _operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  local color="$RED"
+
+  [[ "$1" == "--positive" ]] && color="$GREEN"
+
+  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
@@ -107,8 +111,8 @@ mapfile -t LIST < <(_get_fonts)
 mapfile -t CHOSEN < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
 
 if [[ ${#CHOSEN[@]} -eq 0 ]]; then
-  _operation_canceled
-  exit 1
+  _operation_canceled --positive
+  exit 0
 fi
 
 log Info "${#CHOSEN[@]} font(s) selected"
