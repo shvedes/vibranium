@@ -64,7 +64,7 @@
 			"custom/ram",
 			"custom/temp",
 			"custom/mod-separator",
-			"hyprland/language",
+			// "hyprland/language",
 			"custom/recording-indicator",
 			"custom/power-profile",
 			"custom/color-picker",

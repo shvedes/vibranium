@@ -45,6 +45,7 @@ export -f term::disable_input
 export -f term::enable_input
 export -f term::show_header
 export -f term::ask_yes_no
+export -f term::spinner
 
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CONFIG_HOME="$HOME/.config"
