@@ -4,7 +4,8 @@ VERBOSE=false
 TYPE=""
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -127,10 +128,10 @@ if [[ "$hwmon_path" == "auto" ]] || [[ ! -r "$hwmon_path" ]]; then
         found=true
         break
       fi
-    done < "$VIBRANIUM_USER_SETTINGS"
+    done <"$VIBRANIUM_USER_SETTINGS"
 
     if [[ "$found" != true ]]; then
-      printf '%s\n' "${hwmon_var}=\"${hwmon_path}\"" >> "$VIBRANIUM_USER_SETTINGS"
+      printf '%s\n' "${hwmon_var}=\"${hwmon_path}\"" >>"$VIBRANIUM_USER_SETTINGS"
     fi
 
     flock -u "$settings_lock_fd"
@@ -159,7 +160,7 @@ elif ((temp >= 90)); then
 elif ((temp >= 80)); then
   icon="<span foreground='${P_YELLOW}'>\\uf2cb</span>"
 else
-  icon="\\udb84\\udcc2"
+  icon="\\uf2cb"
 fi
 
 tooltip="${label}: ${temp}°C"

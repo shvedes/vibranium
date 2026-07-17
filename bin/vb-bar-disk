@@ -5,7 +5,8 @@ MOUNT="/"
 DO_OPEN=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -92,7 +93,7 @@ use_perc=${use_perc%\%}
 size_m=${size%M}
 used_m=${used%M}
 
-label="root"
+label="Root"
 [[ "$MOUNT" != "/" ]] && label="$MOUNT"
 
 if ((use_perc >= 97)); then
@@ -106,14 +107,13 @@ else
 fi
 
 size_gib_int=$((size_m / 1024))
-size_gib_dec=$(( (size_m % 1024) * 10 / 1024 ))
 used_gib_int=$((used_m / 1024))
-used_gib_dec=$(( (used_m % 1024) * 10 / 1024 ))
 
 # Comma-format the integer part of a number
 commify() {
   local val=$1 int_part dec_part
-  int_part="${val%.*}"; dec_part="${val#*.}"
+  int_part="${val%.*}"
+  dec_part="${val#*.}"
   if [[ "$dec_part" == "$val" ]]; then
     dec_part=""
   fi
@@ -139,34 +139,42 @@ commify() {
 disk_value() {
   local val=$1 unit=$2 int dec
   case "$unit" in
-    perc) echo "${use_perc}"; return ;;
-    KiB)  int=$((val * 1024)); echo "${int}" ;;
-    MiB)  echo "${val}" ;;
-    GiB)
-      int=$((val / 1024)); dec=$(( (val % 1024) * 10 / 1024 ))
-      echo "${int}.${dec}"
-      ;;
-    KB)
-      int=$((val * 1048576 / 1000)); dec=$(( (val * 1048576 % 1000) * 10 / 1000 ))
-      echo "${int}.${dec}"
-      ;;
-    MB)
-      int=$((val * 1048576 / 1000000))
-      dec=$(( (val * 1048576 % 1000000) * 10 / 1000000 ))
-      echo "${int}.${dec}"
-      ;;
-    GB)
-      int=$((val * 1048576 / 1000000000))
-      dec=$(( (val * 1048576 % 1000000000) * 10 / 1000000000 ))
-      echo "${int}.${dec}"
-      ;;
+  perc)
+    echo "${use_perc}"
+    return
+    ;;
+  KiB)
+    int=$((val * 1024))
+    echo "${int}"
+    ;;
+  MiB) echo "${val}" ;;
+  GiB)
+    int=$((val / 1024))
+    dec=$(((val % 1024) * 10 / 1024))
+    echo "${int}"
+    ;;
+  KB)
+    int=$((val * 1048576 / 1000))
+    dec=$(((val * 1048576 % 1000) * 10 / 1000))
+    echo "${int}"
+    ;;
+  MB)
+    int=$((val * 1048576 / 1000000))
+    dec=$(((val * 1048576 % 1000000) * 10 / 1000000))
+    echo "${int}"
+    ;;
+  GB)
+    int=$((val * 1048576 / 1000000000))
+    dec=$(((val * 1048576 % 1000000000) * 10 / 1000000000))
+    echo "${int}"
+    ;;
   esac
 }
 
 disk_unit() {
   case "$1" in
-    perc) echo "%" ;;
-    KiB|KB|MiB|MB|GiB|GB) echo " $1" ;;
+  perc) echo "%" ;;
+  KiB | KB | MiB | MB | GiB | GB) echo "$1" ;;
   esac
 }
 
@@ -177,8 +185,8 @@ log Info "mode=$mode mount=$MOUNT used=${used_m}MiB" \
 if [[ "$mode" == "perc" ]]; then
   text="${icon} ${use_perc}%"
   tooltip="${label}: ${use_perc}%"
-  tooltip+=" (${used_gib_int}.${used_gib_dec} GiB"
-  tooltip+=" / ${size_gib_int}.${size_gib_dec} GiB)"
+  tooltip+=" (${used_gib_int} GiB"
+  tooltip+=" / ${size_gib_int} GiB)"
 else
   usage="$(commify "$(disk_value "$used_m" "$mode")")"
   unit="$(disk_unit "$mode")"
