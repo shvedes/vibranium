@@ -24,8 +24,11 @@ THEMES=(
 
 mkdir -p "$DEST"
 
-for theme in "${THEMES[@]}"; do
-  helpers::log::info "Installing ${CYAN}$theme${RESET}"
-  git clone -q "${URL}-${theme}" "$DEST/$theme"
-done
+total=${#THEMES[@]}
+current=0
 
+for theme in "${THEMES[@]}"; do
+  ((current++))
+  git clone -q "${URL}-${theme}" "$DEST/$theme" &
+  term::spinner $! "${CYAN}[INFO]${RESET} Installing theme ${GRAY}[${current}/${total}]${RESET}"
+done
