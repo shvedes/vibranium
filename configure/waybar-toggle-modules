@@ -122,15 +122,10 @@ _build() {
     --label "Updates" \
     --hook "vb-refresh-waybar-module pacman"
 
-  _module_in_cfg 'custom/cpu-temp' && cfgr::item::bool \
-    --var VIBRANIUM_BAR_CPU_TEMP_MODULE_ENABLE \
-    --label "CPU temp" \
-    --hook "vb-refresh-waybar-module cpu-temp"
-
-  _module_in_cfg 'custom/gpu-temp' && cfgr::item::bool \
-    --var VIBRANIUM_BAR_GPU_TEMP_MODULE_ENABLE \
-    --label "GPU temp" \
-    --hook "vb-refresh-waybar-module gpu-temp"
+  _module_in_cfg 'custom/temp' && cfgr::item::bool \
+    --var VIBRANIUM_BAR_TEMP_MODULE_ENABLE \
+    --label "Temp" \
+    --hook "vb-refresh-waybar-module temp"
 
   _module_in_cfg 'custom/ram' && cfgr::item::bool \
     --var VIBRANIUM_BAR_RAM_MODULE_ENABLE \
@@ -152,7 +147,6 @@ cfgr::run "Waybar Modules" "_build" \
   VIBRANIUM_BAR_NIGHT_LIGHT_MOUDLE_ENABLE \
   VIBRANIUM_BAR_COLOR_PICKER_MODULE_ENABLE \
   VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE \
-  VIBRANIUM_BAR_CPU_TEMP_MODULE_ENABLE \
-  VIBRANIUM_BAR_GPU_TEMP_MODULE_ENABLE \
+  VIBRANIUM_BAR_TEMP_MODULE_ENABLE \
   VIBRANIUM_BAR_RAM_MODULE_ENABLE \
   VIBRANIUM_BAR_DISK_MODULE_ENABLE

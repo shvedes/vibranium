@@ -283,6 +283,10 @@ VIBRANIUM_BAR_CPU_TEMP_MODULE_ENABLE=false
 # @desc Whether to enable the GPU temperature module.
 VIBRANIUM_BAR_GPU_TEMP_MODULE_ENABLE=false
 
+# @type bool
+# @desc Whether to enable the unified temperature module (CPU + GPU).
+VIBRANIUM_BAR_TEMP_MODULE_ENABLE=false
+
 # @ignore
 # @desc Auto-detected hwmon path for CPU temperature sensor.
 # @note Set automatically on first run. "auto" triggers detection.
@@ -300,16 +304,6 @@ VIBRANIUM_BAR_RAM_MODULE_ENABLE=false
 # @type bool
 # @desc Whether to enable the Disk module.
 VIBRANIUM_BAR_DISK_MODULE_ENABLE=false
-
-# @type string
-# @values perc KiB MiB GiB KB MB GB
-# @desc Display mode for RAM module.
-VIBRANIUM_BAR_RAM_MODE="perc"
-
-# @type string
-# @values perc KiB MiB GiB KB MB GB
-# @desc Display mode for Disk module.
-VIBRANIUM_BAR_DISK_MODE="perc"
 
 #         SCREEN RECORDING OPTIONS             #
 # ============================================ #

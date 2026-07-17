@@ -54,13 +54,6 @@ tooltip, tooltip label {
 	margin: 0px 7px;
 }
 
-#custom-gpu-temp,
-#custom-cpu-temp,
-#custom-disk,
-#custom-ram {
-  font-size: 11px;
-}
-
 #workspaces button.empty,
 #custom-color-picker.empty,
 #custom-nightshift.suspended,

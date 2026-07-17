@@ -1,11 +1,11 @@
 {
-	"custom/disk": {
+	"custom/temp": {
 		"format": "{text}",
 		"hide-empty-text": true,
 
-		"exec": "vb-bar-disk",
+		"exec": "vb-bar-temp",
 		"return-type": "json",
-		"interval": 30,
+		"interval": 1,
 		"signal": 17,
 
 		"on-click": "vb-launch-tui -- btop"

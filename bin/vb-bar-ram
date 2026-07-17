@@ -20,7 +20,7 @@ usage() {
   shcat <<EOF
 Usage: ${0##*/} [OPTION]
 
-Output RAM usage for Waybar.
+Output RAM usage for Waybar. Shows detailed memory info in tooltip.
 
 Options:
   -v, --verbose     Enable verbose output
@@ -52,128 +52,79 @@ if ! source vb-lib-core; then
   exit 1
 fi
 
-helpers::check VIBRANIUM_BAR_RAM_MODULE_ENABLE VIBRANIUM_BAR_RAM_MODE
+helpers::check VIBRANIUM_BAR_RAM_MODULE_ENABLE
 
 if [[ "$VIBRANIUM_BAR_RAM_MODULE_ENABLE" != true ]]; then
   printf '{"text": ""}\n'
   exit 0
 fi
 
-# /proc/meminfo in KiB
+# Parse /proc/meminfo
+declare -A mem
 while read -r key val _; do
-  [[ "$key" == "MemTotal:" ]] && mem_total=$val
-  [[ "$key" == "SwapFree:" ]] && swap_free=$val
-  [[ "$key" == "SwapTotal:" ]] && swap_total=$val
-  [[ "$key" == "MemAvailable:" ]] && mem_avail=$val
+  mem["${key%:}"]=$val
 done </proc/meminfo
 
+gi1() {
+  local val=$1 int dec
+  if [[ -z "$val" ]] || ((val == 0)); then
+    printf "0"
+    return
+  fi
+  int=$((val / 1048576))
+  dec=$(((val % 1048576) * 10 / 1048576))
+  printf '%d.%d' "$int" "$dec"
+}
+
+mem_total=${mem[MemTotal]:-0}
+mem_avail=${mem[MemAvailable]:-0}
 mem_used=$((mem_total - mem_avail))
 used_perc=$((mem_used * 100 / mem_total))
 
-used_gib_int=$((mem_used / 1048576))
-total_gib_int=$((mem_total / 1048576))
+# Icon color based on used %
+if ((used_perc >= 97)); then
+  icon="<span foreground='${P_RED}'><big>\\uefc5</big></span>"
+elif ((used_perc >= 93)); then
+  icon="<span foreground='${P_ORANGE}'><big>\\uefc5</big></span>"
+elif ((used_perc >= 85)); then
+  icon="<span foreground='${P_YELLOW}'><big>\\uefc5</big></span>"
+else
+  icon="<big>\\uefc5</big>"
+fi
 
-tooltip="RAM: ${used_perc}% (${used_gib_int} GiB"
-tooltip+=" / ${total_gib_int} GiB)"
+pc() {
+  local p=$1
+  if ((p >= 95)); then printf '#ffb3ba'
+  elif ((p >= 85)); then printf '#ffd9b3'
+  else printf '#baffc9'
+  fi
+}
 
+tooltip="<tt><b>RAM</b>         <span foreground='$(pc "$used_perc")'>${used_perc}%</span>  $(gi1 "$mem_used") GiB / $(gi1 "$mem_total") GiB"
+
+swap_total=${mem[SwapTotal]:-0}
 if ((swap_total > 0)); then
+  swap_free=${mem[SwapFree]:-0}
   swap_used=$((swap_total - swap_free))
   swap_perc=$((swap_used * 100 / swap_total))
-  swap_used_gib_int=$((swap_used / 1048576))
-  swap_total_gib_int=$((swap_total / 1048576))
-  tooltip+="\nSwap: ${swap_perc}% (${swap_used_gib_int} GiB"
-  tooltip+=" / ${swap_total_gib_int} GiB)"
+  swap_used_g=$(gi1 "$swap_used")
+  swap_total_g=$(gi1 "$swap_total")
+  printf -v row "<span foreground='#ffd9b3'>Swap</span>        <span foreground='$(pc "$swap_perc")'>${swap_perc}%%</span>  (${swap_used_g} GiB / ${swap_total_g} GiB)"
+  tooltip+="\n$row"
 fi
 
-# Comma-format the integer part of a number
-commify() {
-  local val=$1 int_part dec_part
-  int_part="${val%.*}"
-  dec_part="${val#*.}"
-  if [[ "$dec_part" == "$val" ]]; then
-    dec_part=""
-  fi
+mem_free=${mem[MemFree]:-0}
+cache=${mem[Cached]:-0}
+buffers=${mem[Buffers]:-0}
+mem_avail=${mem[MemAvailable]:-0}
+bc_gib=$(gi1 $((cache + buffers)))
+free_gib=$(gi1 "$mem_free")
+avail_gib=$(gi1 "$mem_avail")
 
-  local rest="${int_part#-}" out="" sign=""
-  if [[ "$int_part" != "$rest" ]]; then
-    sign="-"
-  fi
+tooltip+="\n\n<span foreground='#a8e6cf'>Free</span>        ${free_gib} GiB"
+tooltip+="\n<span foreground='#baffc9'>Available</span>   ${avail_gib} GiB"
+tooltip+="\n<span foreground='#b3d9ff'>Buff/cache</span>  ${bc_gib} GiB"
 
-  while [[ ${#rest} -gt 3 ]]; do
-    out=",${rest: -3}${out}"
-    rest="${rest:0:${#rest}-3}"
-  done
+tooltip+="</tt>"
 
-  out="${sign}${rest}${out}"
-
-  if [[ -n "$dec_part" ]]; then
-    echo "${out}.${dec_part}"
-  else
-    echo "${out}"
-  fi
-}
-
-# /proc/meminfo values are in KiB — convert to target unit
-ram_value() {
-  local val=$1 unit=$2 int dec
-  case "$unit" in
-  perc)
-    echo "${used_perc}"
-    return
-    ;;
-  KiB)
-    echo "${val}"
-    return
-    ;;
-  MiB)
-    int=$((val / 1024))
-    dec=$(((val % 1024) * 10 / 1024))
-    echo "${int}"
-    ;;
-  GiB)
-    int=$((val / 1048576))
-    dec=$(((val % 1048576) * 10 / 1048576))
-    echo "${int}"
-    ;;
-  KB)
-    int=$((val * 1024 / 1000))
-    dec=$(((val * 1024 % 1000) * 10 / 1000))
-    echo "${int}"
-    ;;
-  MB)
-    int=$((val * 1024 / 1000000))
-    dec=$(((val * 1024 % 1000000) * 10 / 1000000))
-    echo "${int}"
-    ;;
-  GB)
-    int=$((val * 1024 / 1000000000))
-    dec=$(((val * 1024 % 1000000000) * 10 / 1000000000))
-    echo "${int}"
-    ;;
-  esac
-}
-
-ram_unit() {
-  case "$1" in
-  perc) echo "%" ;;
-  KiB | KB | MiB | MB | GiB | GB) echo "$1" ;;
-  esac
-}
-
-if ((used_perc >= 97)); then
-  icon="<span foreground='${P_RED}'>\\uf200</span>"
-elif ((used_perc >= 93)); then
-  icon="<span foreground='${P_ORANGE}'>\\uf200</span>"
-elif ((used_perc >= 85)); then
-  icon="<span foreground='${P_YELLOW}'>\\uf200</span>"
-else
-  icon="\\uf200"
-fi
-
-mode="$VIBRANIUM_BAR_RAM_MODE"
-log Info "mode=$mode mem_used=${mem_used}KiB used_perc=${used_perc}%"
-val="$(commify "$(ram_value "$mem_used" "$mode")")"
-unit="$(ram_unit "$mode")"
-text="${icon} ${val}${unit}"
-
-printf '{"text": "%s", "tooltip": "%s"}\n' "$text" "$tooltip"
+printf '{"text": "%s", "tooltip": "%s"}\n' "$icon" "$tooltip"

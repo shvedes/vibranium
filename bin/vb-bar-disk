@@ -1,8 +1,6 @@
 #!/bin/bash
 
 VERBOSE=false
-MOUNT="/"
-DO_OPEN=false
 
 log() {
   local level="$1"
@@ -22,11 +20,9 @@ usage() {
   shcat <<EOF
 Usage: ${0##*/} [OPTION]
 
-Output disk usage for Waybar.
+Output disk usage for all mounted devices for Waybar.
 
 Options:
-      --path PATH   Monitor PATH instead of root (/)
-      --open        Open ncdu on the monitored path (for on-click)
   -v, --verbose     Enable verbose output
   -h, --help        Show this help and exit
 
@@ -35,14 +31,6 @@ EOF
 
 while (($# > 0)); do
   case "$1" in
-  --path)
-    MOUNT="$2"
-    shift 2
-    ;;
-  --open)
-    DO_OPEN=true
-    shift
-    ;;
   -v | --verbose)
     VERBOSE=true
     shift
@@ -64,135 +52,73 @@ if ! source vb-lib-core; then
   exit 1
 fi
 
-helpers::check VIBRANIUM_BAR_DISK_MODULE_ENABLE VIBRANIUM_BAR_DISK_MODE
+helpers::check VIBRANIUM_BAR_DISK_MODULE_ENABLE
 
 if [[ "$VIBRANIUM_BAR_DISK_MODULE_ENABLE" != true ]]; then
   printf '{"text": ""}\n'
   exit 0
 fi
 
-if [[ "$DO_OPEN" == true ]]; then
-  command -v ncdu >/dev/null 2>&1 || {
-    log Error "ncdu not installed"
-    notify-send -r 3 -t 3000 "Vibranium" "ncdu not installed"
-    exit 1
-  }
-  exec vb-launch-tui -- ncdu -x "$MOUNT"
-fi
+lines=()
+worst_perc=0
+skip_header=true
 
-# Single df call for both used and total in MiB
-{
-  read -r _ && read -r _ size used _ use_perc _
-} < <(df -BM "$MOUNT" 2>/dev/null) || {
-  log Error "cannot stat $MOUNT"
-  printf '{"text": "\\uf233 ERR", "tooltip": "cannot stat %s"}\n' "$MOUNT"
+while IFS= read -r line; do
+  $skip_header && { skip_header=false; continue; }
+  read -r _ size used _ use_perc mount <<<"$line"
+  use_perc=${use_perc%\%}
+  size_m=${size%M}
+  used_m=${used%M}
+
+  ((use_perc > worst_perc)) && worst_perc=$use_perc
+
+  used_gib=$((used_m / 1024))
+  size_gib=$((size_m / 1024))
+
+  [[ "$mount" == "/" ]] && label="System" || label="$mount"
+  if ((use_perc >= 95)); then pc="#ffb3ba"
+  elif ((use_perc >= 90)); then pc="#ffd9b3"
+  elif ((use_perc >= 80)); then pc="#ffffba"
+  else pc="#baffc9"
+  fi
+
+  lines+=("$label|$use_perc|$pc|$used_gib|$size_gib")
+done < <(df -BM -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs \
+           -x proc -x sysfs -x cgroup2 -x devpts -x fusectl -x securityfs \
+           2>/dev/null) || {
+  printf '{"text": "\\uf233", "tooltip": "No mount data"}\n'
   exit 0
 }
 
-use_perc=${use_perc%\%}
-size_m=${size%M}
-used_m=${used%M}
+# Calculate max label width for alignment
+max_w=0
+for entry in "${lines[@]}"; do
+  lbl="${entry%%|*}"
+  w=${#lbl}
+  ((w > max_w)) && max_w=$w
+done
+((max_w < 6)) && max_w=6
 
-label="Root"
-[[ "$MOUNT" != "/" ]] && label="$MOUNT"
+tooltip="<tt>"
+for entry in "${lines[@]}"; do
+  IFS='|' read -r label use_perc pc used_gib size_gib <<<"$entry"
+  printf -v row "  <b>%-*s</b>  <span foreground='%s'>%3s%%</span>  %5s GiB / %5s GiB" \
+    "$max_w" "$label" "$pc" "$use_perc" "$used_gib" "$size_gib"
+  if [[ -n "$tooltip" && "$tooltip" != "<tt>" ]]; then
+    tooltip+="\n"
+  fi
+  tooltip+="$row"
+done
+tooltip+="</tt>"
 
-if ((use_perc >= 97)); then
-  icon="<span foreground='${P_RED}'>\\uf233</span>"
-elif ((use_perc >= 93)); then
-  icon="<span foreground='${P_ORANGE}'>\\uf233</span>"
-elif ((use_perc >= 85)); then
-  icon="<span foreground='${P_YELLOW}'>\\uf233</span>"
+if ((worst_perc >= 97)); then
+  icon="<span foreground='${P_RED}'>\uf233</span>"
+elif ((worst_perc >= 93)); then
+  icon="<span foreground='${P_ORANGE}'>\uf233</span>"
+elif ((worst_perc >= 85)); then
+  icon="<span foreground='${P_YELLOW}'>\uf233</span>"
 else
-  icon="\\uf233"
+  icon="\uf233"
 fi
 
-size_gib_int=$((size_m / 1024))
-used_gib_int=$((used_m / 1024))
-
-# Comma-format the integer part of a number
-commify() {
-  local val=$1 int_part dec_part
-  int_part="${val%.*}"
-  dec_part="${val#*.}"
-  if [[ "$dec_part" == "$val" ]]; then
-    dec_part=""
-  fi
-
-  local rest="${int_part#-}" out="" sign=""
-  if [[ "$int_part" != "$rest" ]]; then
-    sign="-"
-  fi
-
-  while [[ ${#rest} -gt 3 ]]; do
-    out=",${rest: -3}${out}"
-    rest="${rest:0:${#rest}-3}"
-  done
-  out="${sign}${rest}${out}"
-  if [[ -n "$dec_part" ]]; then
-    echo "${out}.${dec_part}"
-  else
-    echo "${out}"
-  fi
-}
-
-# df values are in MiB — convert to target unit
-disk_value() {
-  local val=$1 unit=$2 int dec
-  case "$unit" in
-  perc)
-    echo "${use_perc}"
-    return
-    ;;
-  KiB)
-    int=$((val * 1024))
-    echo "${int}"
-    ;;
-  MiB) echo "${val}" ;;
-  GiB)
-    int=$((val / 1024))
-    dec=$(((val % 1024) * 10 / 1024))
-    echo "${int}"
-    ;;
-  KB)
-    int=$((val * 1048576 / 1000))
-    dec=$(((val * 1048576 % 1000) * 10 / 1000))
-    echo "${int}"
-    ;;
-  MB)
-    int=$((val * 1048576 / 1000000))
-    dec=$(((val * 1048576 % 1000000) * 10 / 1000000))
-    echo "${int}"
-    ;;
-  GB)
-    int=$((val * 1048576 / 1000000000))
-    dec=$(((val * 1048576 % 1000000000) * 10 / 1000000000))
-    echo "${int}"
-    ;;
-  esac
-}
-
-disk_unit() {
-  case "$1" in
-  perc) echo "%" ;;
-  KiB | KB | MiB | MB | GiB | GB) echo "$1" ;;
-  esac
-}
-
-mode="$VIBRANIUM_BAR_DISK_MODE"
-log Info "mode=$mode mount=$MOUNT used=${used_m}MiB" \
-  "size=${size_m}MiB use_perc=${use_perc}%"
-
-if [[ "$mode" == "perc" ]]; then
-  text="${icon} ${use_perc}%"
-  tooltip="${label}: ${use_perc}%"
-  tooltip+=" (${used_gib_int} GiB"
-  tooltip+=" / ${size_gib_int} GiB)"
-else
-  usage="$(commify "$(disk_value "$used_m" "$mode")")"
-  unit="$(disk_unit "$mode")"
-  total="$(commify "$(disk_value "$size_m" "$mode")")"
-  text="${icon} ${usage}${unit}"
-  tooltip="${label}: ${usage}${unit} / ${total}${unit}"
-fi
-
-printf '{"text": "%s", "tooltip": "%s"}\n' "$text" "$tooltip"
+printf '{"text": "%s", "tooltip": "%s"}\n' "$icon" "$tooltip"
