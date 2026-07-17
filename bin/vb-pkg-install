@@ -290,7 +290,7 @@ _filter_packages() {
           NO_ASK=true
           SKIP_OVERVIEW=true
           FORCE_INSTALL=true
-          FILTERED=()
+          FILTERED=("${PACKAGES[@]}")
           return
         fi
       fi
@@ -455,6 +455,14 @@ _choose_packages() {
 
 _cleanup() {
   log Info "Running cleanup (aur=$AUR_MODE, keep_cache=$KEEP_CACHE)"
+
+  local state_file="$VIBRANIUM_STATE/${0##*/}"
+  local remove_cache=false
+
+  if [[ -f "$state_file" ]]; then
+    source "$state_file"
+  fi
+
   if [[ "$AUR_MODE" == true ]]; then
     echo -e "${BLUE}[VIBRANIUM]${RESET} Removing orphan packages"
     yay -Ycc --noconfirm &>/dev/null
@@ -462,12 +470,15 @@ _cleanup() {
     if [[ "$KEEP_CACHE" == false ]]; then
       local do_clean=false
 
-      if [[ -f "$VIBRANIUM_CACHE/${0##*/}.remove_cache" ]]; then
+      if [[ "$remove_cache" == true ]]; then
         do_clean=true
       elif term::ask_yes_no Y "Remove package cache?"; then
         do_clean=true
         if term::ask_yes_no Y "Remember this option?"; then
-          : >"$VIBRANIUM_CACHE/${0##*/}.remove_cache"
+          if ! [[ -d "$VIBRANIUM_STATE" ]]; then
+            mkdir -p "$VIBRANIUM_STATE"
+          fi
+          echo 'remove_cache=true' >"$state_file"
         fi
       fi
 
@@ -487,12 +498,13 @@ _cleanup() {
     if [[ "$KEEP_CACHE" == false ]]; then
       local do_clean=false
 
-      if [[ -f "$VIBRANIUM_CACHE/${0##*/}.remove_cache" ]]; then
+      if [[ "$remove_cache" == true ]]; then
         do_clean=true
       elif term::ask_yes_no Y "Remove package cache?"; then
         do_clean=true
         if term::ask_yes_no Y "Remember this option?"; then
-          : >"$VIBRANIUM_CACHE/${0##*/}.remove_cache"
+          mkdir -p "$VIBRANIUM_STATE"
+          echo 'remove_cache=true' >"$state_file"
         fi
       fi
 
@@ -747,6 +759,8 @@ fi
 _refresh_repos
 
 if _install_packages; then
+  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
+
   if [[ "$NO_SYSTEMD" == false ]]; then
     _handle_systemd
     _enable_systemd_units
