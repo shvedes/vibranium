@@ -11,6 +11,9 @@ grep -qE '^\[multilib\]' "$PACMAN_CONF" ||
 grep -q '^VerbosePkgLists' "$PACMAN_CONF" ||
   helpers::sed "$PACMAN_CONF" -E 's/^\s*#?VerbosePkgLists/VerbosePkgLists/'
 
+grep -q '^Color' "$PACMAN_CONF" ||
+  helpers::sed "$PACMAN_CONF" -E 's/^\s*#?Color/Color/'
+
 grep -q '^ParallelDownloads = 10' "$PACMAN_CONF" ||
   helpers::sed "$PACMAN_CONF" -E 's/^\s*#?ParallelDownloads.*/ParallelDownloads = 10/'
 
