@@ -28,9 +28,7 @@ _fail() {
 # stash them before the pull so the working tree is clean.  The stash
 # is re-applied after the update via _apply_stash / _restore_stash_and_fail.
 _check_and_stash() {
-  if ! git -C "$VIBRANIUM" diff --quiet HEAD ||
-    ! git -C "$VIBRANIUM" diff --cached --quiet ||
-    [[ -n "$(git -C "$VIBRANIUM" ls-files --others --exclude-standard)" ]]; then
+  if [[ -n "$(git -C "$VIBRANIUM" status --porcelain)" ]]; then
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Stashing local changes..."
 
     if ! git -C "$VIBRANIUM" stash push --include-untracked -m "autostash before update" -q; then
@@ -85,19 +83,25 @@ Options:
 EOF
 }
 
+_detect_channel() {
+  local branch
+  branch=$(git -C "$VIBRANIUM" branch --show-current)
+  if [[ -z "$branch" ]]; then
+    echo "release"
+  elif [[ "$branch" == "master" ]]; then
+    echo "upstream"
+  else
+    _fail "On unknown branch '$branch'. Specify a channel."
+  fi
+}
+
 _nuke() {
   local channel target
 
   if [[ -n "$channel_arg" ]]; then
     channel="$channel_arg"
-  elif [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
-    channel="$(<"$VIBRANIUM_STATE/update.channel")"
   else
-    channel="$(git -C "$VIBRANIUM" branch --show-current)"
-  fi
-
-  if [[ -z "$channel" ]]; then
-    _fail "Not on a branch. Specify a channel or switch to a branch before nuking."
+    channel="$(_detect_channel)"
   fi
 
   echo -e "${RED}[VIBRANIUM]${RESET} WARNING: This will DISCARD ALL local changes, stashes, and untracked files."
@@ -112,14 +116,14 @@ _nuke() {
     exit 0
   fi
 
-  git -C "$VIBRANIUM" fetch --all --prune --prune-tags &>/dev/null &
+  git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &>/dev/null &
   if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching latest from remote..." "${GREEN}✔${RESET}" "${RED}✘${RESET}"; then
     _fail "Failed to fetch updates."
   fi
 
   if [[ "$channel" == "release" ]]; then
     local latest_tag
-    latest_tag=$(git -C "$VIBRANIUM" tag --sort=-creatordate | head -n 1)
+    latest_tag=$(git -C "$VIBRANIUM" for-each-ref --sort=-version:refname --format='%(refname:short)' --count=1 'refs/tags/*')
     if [[ -z "$latest_tag" ]]; then
       _fail "No release tags found."
     fi
@@ -129,9 +133,6 @@ _nuke() {
     case "$channel" in
       upstream)
         remote_ref="origin/master"
-        ;;
-      dev)
-        remote_ref="origin/dev"
         ;;
       *)
         remote_ref="origin/$channel"
@@ -166,17 +167,11 @@ _update() {
 
   if [[ -n "$channel_arg" ]]; then
     channel="$channel_arg"
-  elif [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
-    channel="$(<"$VIBRANIUM_STATE/update.channel")"
   else
-    channel="$(git -C "$VIBRANIUM" branch --show-current)"
+    channel="$(_detect_channel)"
   fi
 
-  if [[ -z "$channel" ]]; then
-    _fail "Not on a branch. Please switch to a branch before updating."
-  fi
-
-  git -C "$VIBRANIUM" fetch --tags --prune --prune-tags &>/dev/null &
+  git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &>/dev/null &
   if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting updates from remote" "" ""; then
     _fail "Failed to fetch updates. Check your network or repository permissions."
   fi
@@ -184,14 +179,13 @@ _update() {
   if [[ "$channel" == "release" ]]; then
     local latest_tag current_tag latest_commit current_commit
 
-    latest_tag=$(git -C "$VIBRANIUM" tag --sort=-creatordate | head -n 1)
+    latest_tag=$(git -C "$VIBRANIUM" for-each-ref --sort=-version:refname --format='%(refname:short)' --count=1 'refs/tags/*')
 
     # Use ^{} to dereference annotated tags to their underlying commit,
     # so the comparison against HEAD (always a commit hash) is valid
     latest_commit=$(git -C "$VIBRANIUM" rev-parse "${latest_tag}^{}")
     current_commit=$(git -C "$VIBRANIUM" rev-parse HEAD)
-    current_tag=$(git -C "$VIBRANIUM" describe --tags --exact-match 2>/dev/null ||
-      git -C "$VIBRANIUM" rev-parse --short HEAD)
+    current_tag=$(git -C "$VIBRANIUM" describe --tags --exact-match --always --abbrev=7 2>/dev/null)
 
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Local:  $current_tag ($current_commit)"
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Remote: $latest_tag ($latest_commit)"
@@ -224,9 +218,6 @@ _update() {
     case "$channel" in
       upstream)
         remote_ref="origin/master"
-        ;;
-      dev)
-        remote_ref="origin/dev"
         ;;
       *)
         remote_ref="origin/$channel"

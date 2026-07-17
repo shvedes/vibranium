@@ -22,17 +22,13 @@ while ! ping -c 1 -W 2 8.8.8.8 &> /dev/null; do
   sleep 1
 done
 
-channel="release"
-
-if [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
-  channel="$(< "$VIBRANIUM_STATE/update.channel")"
-fi
+branch="$(git -C "$VIBRANIUM" branch --show-current)"
 
 content="$(< "$state")"
 icon="<span foreground='green3'>\uf071</span>"
 tooltip="<span foreground='CornflowerBlue'><b>Vibranium</b></span> update available!\n"
 
-if [[ "$channel" == "release" ]]; then
+if [[ -z "$branch" ]]; then
   tooltip+="<span foreground='CornflowerBlue'><b>New version</b></span>: <b>${content}</b>\n"
 else
   tooltip+="<span foreground='CornflowerBlue'><b>Commits behind</b></span>: <b>${content}</b>\n"

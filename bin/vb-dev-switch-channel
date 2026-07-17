@@ -26,7 +26,6 @@ CHANNEL must be one of:
 
   release         detach HEAD to the latest release tag
   upstream        switch to the upstream branch
-  dev             switch to the dev branch
 EOF
 }
 
@@ -66,15 +65,13 @@ if [[ -z "$CHANNEL" ]]; then
 fi
 
 case "$CHANNEL" in
-  release | upstream | dev) ;;
+  release | upstream) ;;
   *)
     log Error "Invalid channel: $CHANNEL"
     log Error "Try '${0##*/} --help' for more information."
     exit 1
     ;;
 esac
-
-GIT="git -C $VIBRANIUM"
 
 # Send a desktop notification when stdout is not a terminal (i.e. when
 # invoked from a launcher or hook rather than interactively).
@@ -92,12 +89,12 @@ die() {
   exit 1
 }
 
-CURRENT="$($GIT branch --show-current)"
+CURRENT="$(git -C "$VIBRANIUM" branch --show-current)"
 
-# When on a release tag (branch name starts with "v"), skip the dirty
-# check because detached HEAD is expected and the checkout is read-only.
-if [[ ! "$CURRENT" =~ ^v[0-9] ]]; then
-  CHANGES="$($GIT status --porcelain | wc -l)"
+# Skip dirty check when detached (release) so untracked files don't
+# block switching from a read-only checkout.
+if [[ -n "$CURRENT" ]]; then
+  CHANGES="$(git -C "$VIBRANIUM" status --porcelain | wc -l)"
 
   if ((CHANGES > 0)); then
     MSG="you have unsaved changes. Commit them first or stash them with: git stash"
@@ -109,35 +106,19 @@ if [[ ! "$CURRENT" =~ ^v[0-9] ]]; then
   fi
 fi
 
-# Each channel writes its name to update.channel so that vb-update-fetch
-# knows which remote ref to track.  The reload and update service are
-# backgrounded: the reload may take hundreds of ms and the update fetch
-# can pend on network I/O.
 case "$CHANNEL" in
   release)
-    LATEST="$($GIT tag --sort=-creatordate | head -n 1)"
-    $GIT switch --detach "$LATEST" || die "failed to switch to '$LATEST'"
-
-    echo "release" > "$VIBRANIUM_STATE/update.channel"
+    LATEST="$(git -C "$VIBRANIUM" for-each-ref --sort=-version:refname --format='%(refname:short)' --count=1 'refs/tags/*')"
+    git -C "$VIBRANIUM" switch --detach "$LATEST" || die "failed to switch to '$LATEST'"
     log Info "Switched to release: $LATEST"
     echo "Switched to $LATEST."
     notify "" "Switched to $LATEST"
     ;;
   upstream)
-    $GIT switch master || die "failed to switch to 'master'"
-
-    echo "upstream" > "$VIBRANIUM_STATE/update.channel"
+    git -C "$VIBRANIUM" switch master || die "failed to switch to 'master'"
     log Info "Switched to upstream"
     echo "Switched to upstream."
     notify "" "Switched to upstream"
-    ;;
-  dev)
-    $GIT switch dev || die "failed to switch to 'dev'"
-
-    echo "dev" > "$VIBRANIUM_STATE/update.channel"
-    log Info "Switched to dev"
-    echo "Switched to dev."
-    notify "" "Switched to dev"
     ;;
 esac
 

@@ -19,23 +19,17 @@ while ! ping -c 1 -W 2 8.8.8.8 &>/dev/null; do
   sleep 1
 done
 
-channel="release"
-
-if [[ -f "$VIBRANIUM_STATE/update.channel" ]]; then
-  channel="$(<"$VIBRANIUM_STATE/update.channel")"
-fi
-
-# Fetch once so both release and upstream comparisons work locally
 git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &>/dev/null || exit 1
 
-if [[ "$channel" == "release" ]]; then
-  remote_latest=$(git -C "$VIBRANIUM" tag --sort=-creatordate | head -n 1)
+branch="$(git -C "$VIBRANIUM" branch --show-current)"
+
+if [[ -z "$branch" ]]; then
+  remote_latest=$(git -C "$VIBRANIUM" for-each-ref --sort=-version:refname --format='%(refname:short)' --count=1 'refs/tags/*')
   if [[ -z "$remote_latest" ]]; then
     exit 0
   fi
 
-  local_latest=$(git -C "$VIBRANIUM" describe --tags --exact-match 2>/dev/null ||
-    git -C "$VIBRANIUM" rev-parse --short HEAD)
+  local_latest=$(git -C "$VIBRANIUM" describe --tags --exact-match --always --abbrev=7 2>/dev/null)
 
   if [[ "$remote_latest" != "$local_latest" ]]; then
     echo "$remote_latest" >"$VIBRANIUM_STATE/update.available"
@@ -50,15 +44,11 @@ if [[ "$channel" == "release" ]]; then
     fi
   fi
 else
-  # upstream/dev channel: count how many commits local is behind origin/<master/dev>
-  branch="$(git -C "$VIBRANIUM" branch --show-current)"
-
-  # Unknown branch - do nothing
-  if [[ ! "$branch" =~ ^(master|dev)$ ]]; then
+  if [[ "$branch" != "master" ]]; then
     exit 0
   fi
 
-  behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/"$branch" --count 2>/dev/null || echo 0)
+  behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/master --count 2>/dev/null || echo 0)
 
   if ((behind > 0)); then
     echo "$behind" >"$VIBRANIUM_STATE/update.available"
