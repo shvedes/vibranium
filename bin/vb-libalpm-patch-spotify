@@ -1,7 +1,6 @@
 #!/bin/bash
 
 VERBOSE=false
-MANUAL=false
 
 log() {
   local level="$1"; shift
@@ -37,7 +36,6 @@ Usage: ${0##*/} [OPTION]
 Check and re-apply Spicetify patches to Spotify.
 
 Options:
-  -m, --manual   Run manually, bypass prior-patch check
   -v, --verbose  Enable verbose output
   -h, --help     Show this help and exit
 EOF
@@ -53,10 +51,6 @@ while (($#)); do
     usage
     exit 0
     ;;
-  -m | --manual)
-    MANUAL=true
-    shift
-    ;;
   *)
     echo "${0##*/}: invalid option -- '$1'" >&2
     echo "Try '${0##*/} --help' for more information." >&2
@@ -71,24 +65,22 @@ if ! command -v spicetify >/dev/null; then
   exit 0
 fi
 
-if ! $MANUAL; then
-  log Info "Checking if Spotify was previously patched"
+log Info "Checking if Spotify was previously patched"
 
-  # Prefer ripgrep for speed when searching through the Spotify binary
-  # directory; fall back to grep if rg is unavailable.
-  if command -v rg >/dev/null; then
-    grep_cmd=(rg -q -m1 spicetify)
-  else
-    grep_cmd=(grep -q -m1 spicetify)
-  fi
+# Prefer ripgrep for speed when searching through the Spotify binary
+# directory; fall back to grep if rg is unavailable.
+if command -v rg >/dev/null; then
+  grep_cmd=(rg -q -m1 spicetify)
+else
+  grep_cmd=(grep -q -m1 spicetify)
+fi
 
-  # Check whether any file under /opt/spotify/ contains a spicetify
-  # reference.  If none do, the patch has already been reverted or was
-  # never applied, so skip the restore+apply cycle.
-  if ! find /opt/spotify/ -type f -exec "${grep_cmd[@]}" {} + >/dev/null; then
-    log Info "Spotify wasn't patched; skipping re-patch"
-    exit 0
-  fi
+# Check whether any file under /opt/spotify/ contains a spicetify
+# reference.  If none do, the patch has already been reverted or was
+# never applied, so skip the restore+apply cycle.
+if ! find /opt/spotify/ -type f -exec "${grep_cmd[@]}" {} + >/dev/null; then
+  log Info "Spotify wasn't patched; skipping re-patch"
+  exit 0
 fi
 
 if ! spicetify --no-restart --quiet restore &>/dev/null; then
