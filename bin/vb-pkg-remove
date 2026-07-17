@@ -370,6 +370,10 @@ NO_SYSTEMD=false
 CONSERVATIVE=false
 PACKAGES=()
 
+if [[ -f "$XDG_CONFIG_HOME/vibranium/current/theme/fzf" ]]; then
+  source "$XDG_CONFIG_HOME/vibranium/current/theme/fzf"
+fi
+
 FZF_ARGS=(
   --multi
   --ignore-case
@@ -396,7 +400,7 @@ FZF_ARGS=(
   --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
   --bind 'alt-k:preview-up,alt-j:preview-down'
 
-  --color 'pointer:white,marker:green'
+    --color "${FZF_COLORS:-pointer:white,marker:green}"
 )
 
 trap 'trap "exit 1" SIGHUP SIGINT SIGTERM SIGQUIT; printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT

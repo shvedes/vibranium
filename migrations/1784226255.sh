@@ -5,6 +5,6 @@ RESET=$'\e[0m'
 SELF="${0##*/}"
 SELF="${SELF/.sh/}"
 
-bash "$VIBRANIUM/install/post-install/15-build-utilities.sh"
+bash "$VIBRANIUM/install/post-install/15-build-utilities.sh" &>/dev/null
 current="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
 vb-theme-set --force "$current"

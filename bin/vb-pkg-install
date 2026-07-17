@@ -620,6 +620,10 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+if [[ -f "$XDG_CONFIG_HOME/vibranium/current/theme/fzf" ]]; then
+  source "$XDG_CONFIG_HOME/vibranium/current/theme/fzf"
+fi
+
 if [[ "$AUR_MODE" == true ]]; then
   YAY_FLAGS=(
     "--answerclean" "Y"
@@ -659,7 +663,7 @@ if [[ "$AUR_MODE" == true ]]; then
     --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
     --bind 'alt-k:preview-up,alt-j:preview-down'
 
-    --color 'pointer:white,marker:green'
+    --color "${FZF_COLORS:-pointer:white,marker:green}"
   )
 else
   FZF_ARGS=(
@@ -688,7 +692,7 @@ else
     --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
     --bind 'alt-k:preview-up,alt-j:preview-down'
 
-    --color 'pointer:white,marker:green'
+    --color "${FZF_COLORS:-pointer:white,marker:green}"
   )
 fi
 

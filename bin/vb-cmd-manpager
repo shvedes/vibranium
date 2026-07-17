@@ -69,6 +69,24 @@ fi
 
 export EDITOR
 
+if [[ -f "$XDG_CONFIG_HOME/vibranium/current/theme/fzf" ]]; then
+  source "$XDG_CONFIG_HOME/vibranium/current/theme/fzf"
+fi
+
+FZF_ARGS=(
+  --layout=reverse
+  --border=sharp
+  --border-label ' alt-p: toggle preview | alt-j/j: scroll preview '
+  --border-label-pos 'bottom'
+  --input-label 'search man pages'
+  --preview-window 'right:60%:border-sharp'
+  --bind 'alt-p:toggle-preview'
+  --bind 'alt-k:preview-up,alt-j:preview-down'
+  --preview 'MANPAGER=cat man {1} 2>/dev/null'
+  --prompt '> '
+)
+FZF_ARGS+=(--color "${FZF_COLORS:-pointer:white,marker:green}")
+
 # Set MANPAGER based on the detected editor so that opening a man page
 # from fzf uses the appropriate viewer. vim/nvim users get the +Man!
 # plugin integration; nano gets -v (view mode); others use the editor
@@ -95,16 +113,7 @@ while true; do
   selected=$(
     man -k . 2>/dev/null |
       sed 's/ - .*//; s/\([^ ]\)(/\1 (/' |
-      fzf --layout=reverse \
-        --border=sharp \
-        --border-label ' alt-p: toggle preview | alt-j/j: scroll preview ' \
-        --border-label-pos 'bottom' \
-        --input-label 'search man pages' \
-        --preview-window="right:60%:border-sharp" \
-        --bind 'alt-p:toggle-preview' \
-        --bind 'alt-k:preview-up,alt-j:preview-down' \
-        --preview 'MANPAGER=cat man {1} 2>/dev/null' \
-        --prompt="> "
+      fzf "${FZF_ARGS[@]}"
   )
 
   [[ -z "$selected" ]] && exit 0
