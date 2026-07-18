@@ -129,7 +129,7 @@ _enable_systemd_units() {
   local -a unique_pkgs
   mapfile -t unique_pkgs < <(printf '%s\n' "${provides_systemd_service[@]}" | sort -u)
 
-  local pkg unit_type scope unit_name
+  local pkg unit_type scope unit_name enabled active
   local -a pids=()
 
   for pkg in "${unique_pkgs[@]}"; do
@@ -142,16 +142,35 @@ _enable_systemd_units() {
       scope="${unit_scope[$i]}"
       unit_name="${unit_names[$i]}"
 
-      if term::ask_yes_no Y "Enable $unit_type '${BLUE}${unit_name}${RESET}' from package '${YELLOW}${pkg}${RESET}' ($scope scope)?"; then
-        term::disable_input
-        if [[ "$scope" == "user" ]]; then
-          systemctl -q --user --now enable "$unit_name" &
-        else
-          sudo systemctl -q --now enable "$unit_name" &
-        fi
-        pids+=($!)
-        break # Skip lower-priority units for this package
+      if [[ "$scope" == "user" ]]; then
+        enabled=$(systemctl --user is-enabled "$unit_name" 2>/dev/null)
+        active=$(systemctl --user is-active "$unit_name" 2>/dev/null)
+      else
+        enabled=$(systemctl is-enabled "$unit_name" 2>/dev/null)
+        active=$(systemctl is-active "$unit_name" 2>/dev/null)
       fi
+
+      if [[ "$active" == "active" ]]; then
+        echo -e "${BLUE}[VIBRANIUM]${RESET} ${GREEN}${unit_name}${RESET} is already active ($scope scope)"
+        break
+      fi
+
+      if [[ "$enabled" != "enabled" ]]; then
+        if ! term::ask_yes_no Y "Enable $unit_type '${BLUE}${unit_name}${RESET}' from package '${YELLOW}${pkg}${RESET}' ($scope scope)?"; then
+          continue
+        fi
+      else
+        echo -e "${BLUE}[VIBRANIUM]${RESET} Enabling ${GREEN}${unit_name}${RESET} ($scope scope)"
+      fi
+
+      term::disable_input
+      if [[ "$scope" == "user" ]]; then
+        systemctl -q --user --now enable "$unit_name" &
+      else
+        sudo systemctl -q --now enable "$unit_name" &
+      fi
+      pids+=($!)
+      break
     done
   done
 
