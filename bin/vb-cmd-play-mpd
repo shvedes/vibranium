@@ -22,9 +22,25 @@ shcat() {
   done
 }
 
+mpd_music_dir() {
+  local conf dir
+  conf="$HOME/.config/mpd/mpd.conf"
+  [[ -f "$conf" ]] || conf="/etc/mpd.conf"
+  [[ -f "$conf" ]] || return 1
+
+  dir=$(sed -n '/^[[:space:]]*music_directory[[:space:]]*/{
+    s/^[[:space:]]*music_directory[[:space:]]*//;s/^"//;s/"$//;s/^'\''//;s/'\''$//
+    p;q
+  }' "$conf" 2>/dev/null)
+
+  [[ -z "$dir" ]] && return 1
+  dir="${dir/#\~/$HOME}"
+  printf '%s' "$dir"
+}
+
 usage() {
   shcat <<EOF
-Usage: $SELF [OPTIONS]
+Usage: $SELF [OPTIONS] [FILE...]
 
 Add tracks to MPD queue and play a random one.
 
@@ -39,14 +55,19 @@ Options:
   -v, --verbose          Enable verbose output
   -h, --help             Display this help and exit
 
+Arguments:
+  FILE                  Literal filename or relative path in MPD database
+
 Notes:
   --artist, --album, and --track can be combined together.
   --genre, --random, and --search are standalone options.
+  FILE arguments are standalone and cannot combine with other modes.
 
   Artist/Album/Track use case-insensitive substring search,
   so --track "absolute in dou" matches "Absolute In Doubt".
   --genre uses exact matching.
   --search searches across all three fields and deduplicates results.
+  FILE arguments search the MPD database by file path substring.
 EOF
 }
 
@@ -89,8 +110,15 @@ while [[ $# -gt 0 ]]; do
     log Error "Unknown option: $1"
     exit 1
     ;;
+  *)
+    break
+    ;;
   esac
 done
+
+FILES=("$@")
+
+MUSIC_DIR=$(mpd_music_dir || true)
 
 if $RANDOM_MODE; then
   if [[ -n "$ARTIST" || -n "$GENRE" || -n "$ALBUM" || -n "$TRACK" || -n "$SEARCH" ]]; then
@@ -105,6 +133,11 @@ elif [[ -n "$GENRE" ]]; then
 elif [[ -n "$SEARCH" ]]; then
   if [[ -n "$ARTIST" || -n "$ALBUM" || -n "$TRACK" || -n "$GENRE" ]]; then
     log Error "--fuzzy cannot combine with other filters"
+    exit 1
+  fi
+elif [[ ${#FILES[@]} -gt 0 ]]; then
+  if [[ -n "$ARTIST" || -n "$ALBUM" || -n "$TRACK" || -n "$GENRE" || -n "$SEARCH" ]] || $RANDOM_MODE; then
+    log Error "FILE arguments cannot combine with other filters"
     exit 1
   fi
 elif [[ -z "$ARTIST" && -z "$ALBUM" && -z "$TRACK" && -z "$SEARCH" ]]; then
@@ -136,6 +169,27 @@ if $RANDOM_MODE; then
   mpc -q clear
   mpc add "${all[pick]}"
   mpc -q play
+  exit 0
+fi
+
+if [[ ${#FILES[@]} -gt 0 ]]; then
+  declare -A _fh
+  for f in "${FILES[@]}"; do
+    [[ -n "$MUSIC_DIR" && "$f" == "$MUSIC_DIR"* ]] && f="${f#"$MUSIC_DIR"/}"
+    while IFS= read -r t; do
+      [[ -n "$t" ]] && _fh["$t"]=1
+    done < <(mpc listall | grep -Fie "$f" || true)
+  done
+
+  if [[ ${#_fh[@]} -eq 0 ]]; then
+    log Error "No tracks found matching: ${FILES[*]}"
+    exit 1
+  fi
+
+  tracks=("${!_fh[@]}")
+  mpc -q clear
+  printf '%s\n' "${tracks[@]}" | mpc add
+  mpc -q play 1
   exit 0
 fi
 
