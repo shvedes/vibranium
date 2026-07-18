@@ -22,7 +22,7 @@ function Hypr.Helpers.ShellQuote(s)
   return (s:gsub("'", "'\\''"))
 end
 
--- Centers a floating window at 70 % of its monitor dimensions.
+-- Centers a floating window at 65 % of its monitor dimensions.
 -- No-op if the window is not floating.
 function Hypr.Helpers.CenterFloatingWindow(win)
   if not win.floating then
@@ -34,8 +34,8 @@ function Hypr.Helpers.CenterFloatingWindow(win)
     return
   end
 
-  local w = math.floor(mon.width * 0.7)
-  local h = math.floor(mon.height * 0.7)
+  local w = math.floor(mon.width * 0.65)
+  local h = math.floor(mon.height * 0.65)
 
   hl.dispatch(hl.dsp.window.resize({ x = w, y = h }))
   hl.dispatch(hl.dsp.window.center())
@@ -115,11 +115,11 @@ function Hypr.Helpers.ForceKillWindow()
     hl.dispatch(
       hl.dsp.exec_raw(
         "notify-send -r "
-          .. WIN_NOTIF
-          .. " 'Window Force-Killed'"
-          .. " '<b>"
-          .. Hypr.Helpers.ShellQuote(title)
-          .. "</b> was forcefully terminated'"
+        .. WIN_NOTIF
+        .. " 'Window Force-Killed'"
+        .. " '<b>"
+        .. Hypr.Helpers.ShellQuote(title)
+        .. "</b> was forcefully terminated'"
       )
     )
     hl.dispatch(hl.dsp.window.kill())
@@ -148,19 +148,18 @@ function Hypr.Helpers.CloseWindows()
   end
 end
 
-function Hypr.Helpers.FlashBorder(col)
+function Hypr.Helpers.FlashBorder()
   local win = hl.get_active_window()
+
   if not win then
     return
   end
 
-  local addr = win.address
-
-  apply_border_tag(addr, "FlashedBorder", col)
+  apply_border_tag(win.address, "FlashedBorder", Vibranium.Colors.accent.bright)
 
   hl.timer(function()
-    remove_border_tag(addr, "FlashedBorder")
-  end, { timeout = 200, type = "oneshot" })
+    remove_border_tag(win.address, "FlashedBorder")
+  end, { timeout = 250, type = "oneshot" })
 end
 
 -- Launches a TUI binary inside a terminal, sending a critical notification
@@ -172,12 +171,12 @@ function Hypr.Helpers.LaunchTUI(binary, command)
     hl.dispatch(
       hl.dsp.exec_raw(
         "notify-send -r "
-          .. WIN_NOTIF
-          .. " -u critical -t 5000"
-          .. " 'Cannot launch system monitor'"
-          .. " 'Missing dependency: <b>"
-          .. name
-          .. "</b>'"
+        .. WIN_NOTIF
+        .. " -u critical -t 5000"
+        .. " 'Cannot launch system monitor'"
+        .. " 'Missing dependency: <b>"
+        .. name
+        .. "</b>'"
       )
     )
     return

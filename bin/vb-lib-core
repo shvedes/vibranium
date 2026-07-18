@@ -696,7 +696,7 @@ hypr::is_fullscreen() {
 }
 
 hypr::flash::border() {
-  hyprctl -q eval "Hypr.Helpers.FlashBorder('0xff${P_FOREGROUND_0###}')"
+  hyprctl -q eval "Hypr.Helpers.FlashBorder()"
 }
 
 hypr::flash::screen() {

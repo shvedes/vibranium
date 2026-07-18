@@ -4,61 +4,45 @@ else
   BorderAttention = Vibranium.Colors.red.normal
 end
 
-hl.window_rule({
-  match = {
-    -- When using system instalation of glfw,
-    -- Minecraft window doens't always set its class,
-    -- so we make it totally optional for cases
-    -- when the window was launched using Xwayland
-    -- for example, which will set its class.
-    class = "(^Minecraft\\*\\s\\d\\.\\d\\d?)?",
-    title = "^Minecraft\\*\\s\\d\\.\\d\\d?"
-  },
-  tag = "+gameWindow",
-})
+-- Local, file-only helper: three rules further down apply the exact same
+-- two properties (a red-ish border + dimming everything else) keyed off
+-- either a title or a class match. This doesn't go in lib/actions.lua
+-- because it's specific to this file's BorderAttention variable, not a
+-- general Hyprland concept -- not every repeated shape needs to become a
+-- global library function, some just need a `local function` at the top
+-- of the file that already uses them.
+local function attention(match_key, pattern)
+  hl.window_rule({
+    match = { [match_key] = pattern },
+    border_color = BorderAttention,
+    dim_around = true,
+  })
+end
 
-hl.window_rule({
-  match = {
-    class = "(gamescope|osu\\!|cs(2|go_linux)|steam(_(app(_\\d+)?|proton)?))",
-  },
-  tag = "+gameWindow",
-})
+Hypr.Rule.tag_class(
+-- When using system instalation of glfw,
+-- Minecraft window doesn't always set its class,
+-- so we make it totally optional for cases
+-- when the window was launched using Xwayland
+-- for example, which will set its class.
+  "(^Minecraft\\*\\s\\d\\.\\d\\d?)?",
+  "gameWindow",
+  { title = "^Minecraft\\*\\s\\d\\.\\d\\d?" }
+)
 
-hl.window_rule({
-  match = {
-    class = "[\\w.]*?(.*\\.PrismLauncher|steam|heroic|lutris|prismlauncher|.*\\.RetroArch|dolphin-emu)",
-  },
-  tag = "+gameLauncher",
-})
+Hypr.Rule.tag_class("(gamescope|osu\\!|cs(2|go_linux)|steam(_(app(_\\d+)?|proton)?))", "gameWindow")
 
-hl.window_rule({
-  match = {
-    class = "((google-)?chrom(e|ium)|brave-browser|microsoft-edge|vivaldi-stable|helium)",
-  },
-  tag = "+chromiumBasedBrowser",
-})
+Hypr.Rule.tag_class(
+  "[\\w.]*?(.*\\.PrismLauncher|steam|heroic|lutris|prismlauncher|.*\\.RetroArch|dolphin-emu)", "gameLauncher"
+)
 
-hl.window_rule({
-  match = {
-    class = "(?i)(firefox|zen|librewolf)",
-  },
-  tag = "+firefoxBasedBrowser",
-})
+Hypr.Rule.tag_class("((google-)?chrom(e|ium)|brave-browser|microsoft-edge|vivaldi-stable|helium)", "chromiumBasedBrowser")
+Hypr.Rule.tag_class("(?i)(firefox|zen|librewolf)", "firefoxBasedBrowser")
 
-hl.window_rule({
-  match = { tag = "chromiumBasedBrowser" },
-  tag = "+browserWindow",
-})
+Hypr.Rule.tag_by_tag("chromiumBasedBrowser", "browserWindow")
+Hypr.Rule.tag_by_tag("firefoxBasedBrowser", "browserWindow")
 
-hl.window_rule({
-  match = { tag = "firefoxBasedBrowser" },
-  tag = "+browserWindow",
-})
-
-hl.window_rule({
-  match = { class = "[\\w.]*?(only|libre|s)office(?:-\\w+)*" },
-  tag = "+officeWindow",
-})
+Hypr.Rule.tag_class("[\\w.]*?(only|libre|s)office(?:-\\w+)*", "officeWindow")
 
 -- Some Omarchy themes may apply not only Hyprland colors, but also their
 -- own settings. By default, Omarchy applies an opacity rule of 0.97 to all
@@ -73,32 +57,14 @@ hl.window_rule({
 -- Some applications benefit from automatically regaining focus after certain actions.
 -- For example, when logging in through a browser, the original app window can take
 -- focus again once the login is complete. This approach has worked well over time.
-hl.window_rule({
-  match = { class = "(?i)(discord|vesktop|spotify|equibop)" },
-  tag = "+focusOnActivate",
-})
+Hypr.Rule.tag_class("(?i)(discord|vesktop|spotify|equibop)", "focusOnActivate")
+Hypr.Rule.tag_by_tag("browserWindow", "focusOnActivate")
+Hypr.Rule.tag_by_tag("gameWindow", "focusOnActivate")
 
-hl.window_rule({
-  match = { tag = "browserWindow" },
-  tag = "+focusOnActivate",
-})
+Hypr.Rule.by_tag("focusOnActivate", { focus_on_activate = true })
 
-hl.window_rule({
-  match = { tag = "gameWindow" },
-  tag = "+focusOnActivate",
-})
-
-hl.window_rule({
-  match = { tag = "focusOnActivate" },
-  focus_on_activate = true,
-})
-
--- Make game windows opaque, allow tearing (fullscreen only).
-hl.window_rule({
-  match = { tag = "gameWindow" },
-  immediate = true,
-  opaque = true,
-})
+-- Make game windows opaque, allow tearing.
+Hypr.Rule.by_tag("gameWindow", { immediate = true, opaque = true })
 
 -- Also fix Steam's login window that appears almost over the screen.
 hl.window_rule({
@@ -147,7 +113,7 @@ hl.window_rule({
     float = true,
   },
 
-  size = "monitor_w*0.7 monitor_h*0.7",
+  size = "monitor_w*0.6 monitor_h*0.6",
   center = true,
   dim_around = true,
   stay_focused = true,
@@ -174,7 +140,7 @@ hl.window_rule({
   },
 
   float = true,
-  size = "monitor_w*0.7 monitor_h*0.7",
+  size = "monitor_w*0.6 monitor_h*0.6",
   dim_around = true,
   center = true
 })
@@ -186,7 +152,7 @@ hl.window_rule({
   },
 
   float = true,
-  size = "monitor_w*0.7 monitor_h*0.7",
+  size = "monitor_w*0.6 monitor_h*0.6",
   dim_around = true,
   center = true
 })
@@ -204,16 +170,6 @@ hl.window_rule({
   },
 
   float = true,
-})
-
-hl.window_rule({
-  name = "Thunar: File Operation",
-  match = {
-    float = true,
-    class = "[Tt]hunar",
-    title = thunar_re
-  },
-
   center = true,
   dim_around = true,
 })
@@ -235,20 +191,6 @@ local warn_actions_classes = "(Pinentry-gtk)"
 local warn_titles = string.format("(?i)(%s|%s|%s|%s)([\\s\\w]*)?\\??", warn_actions, warn_states, warn_misc, warn_save)
 local warn_classes = string.format("(?i)(%s)([\\s\\w]*)?\\??", warn_titles)
 
-hl.window_rule({
-  match = { title = warn_titles },
-  border_color = BorderAttention,
-  dim_around = true,
-})
-
-hl.window_rule({
-  match = { class = warn_classes },
-  border_color = BorderAttention,
-  dim_around = true,
-})
-
-hl.window_rule({
-  match = { class = warn_actions_classes },
-  border_color = BorderAttention,
-  dim_around = true,
-})
+attention("title", warn_titles)
+attention("class", warn_classes)
+attention("class", warn_actions_classes)

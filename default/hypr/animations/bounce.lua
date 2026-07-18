@@ -1,28 +1,35 @@
-hl.curve("easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } })
-hl.curve("easeInOutCubic", { type = "bezier", points = { { 0.65, 0.05 }, { 0.36, 1 } } })
-hl.curve("linear", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } })
-hl.curve("almostLinear", { type = "bezier", points = { { 0.5, 0.5 }, { 0.75, 1 } } })
-hl.curve("quick", { type = "bezier", points = { { 0.1, 0 }, { 0.0, 1 } } })
+-- Animation preset: bounce -- data only, applied via Hypr.Anim.apply (see lib/actions.lua).
 
-hl.curve("easy", { type = "spring", mass = 1, stiffness = 71.2633, dampening = 15.8273644 })
-hl.curve("hobbyist", { type = "spring", mass = 1, stiffness = 40, dampening = 6 })
-hl.curve("cat", { type = "spring", mass = 1, stiffness = 30, dampening = 6 })
+Hypr.Anim.apply({
+  curves = {
+    { "easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } } },
+    { "easeInOutCubic", { type = "bezier", points = { { 0.65, 0.05 }, { 0.36, 1 } } } },
+    { "linear", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } } },
+    { "almostLinear", { type = "bezier", points = { { 0.5, 0.5 }, { 0.75, 1 } } } },
+    { "quick", { type = "bezier", points = { { 0.1, 0 }, { 0.0, 1 } } } },
+    { "easy", { type = "spring", mass = 1, stiffness = 71.2633, dampening = 15.8273644 } },
+    { "hobbyist", { type = "spring", mass = 1, stiffness = 40, dampening = 6 } },
+    { "cat", { type = "spring", mass = 1, stiffness = 30, dampening = 6 } }
+  },
 
-hl.animation({ leaf = "global", enabled = true, speed = 4, bezier = "default" })
-hl.animation({ leaf = "border", enabled = true, speed = 2, bezier = "almostLinear" })
-hl.animation({ leaf = "windows", enabled = true, speed = 5, spring = "cat", style = "slide" })
-hl.animation({ leaf = "windowsIn", enabled = true, speed = 5, spring = "cat", style = "slide" })
-hl.animation({ leaf = "windowsOut", enabled = true, speed = 5, spring = "cat", style = "slide bottom" })
-hl.animation({ leaf = "windowsMove", enabled = true, speed = 5, spring = "hobbyist" })
-hl.animation({ leaf = "fadeIn", enabled = true, speed = 0.865, bezier = "almostLinear" })
-hl.animation({ leaf = "fadeOut", enabled = true, speed = 0.73, bezier = "almostLinear" })
-hl.animation({ leaf = "fade", enabled = true, speed = 1.515, bezier = "quick" })
-hl.animation({ leaf = "layers", enabled = true, speed = 1.905, bezier = "easeOutQuint" })
-hl.animation({ leaf = "layersIn", enabled = true, speed = 2, bezier = "easeOutQuint", style = "slide" })
-hl.animation({ leaf = "layersOut", enabled = true, speed = 1.5, bezier = "linear", style = "slide" })
-hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 0.895, bezier = "almostLinear" })
-hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 0.695, bezier = "almostLinear" })
-hl.animation({ leaf = "workspaces", enabled = true, speed = 6, spring = "hobbyist", style = "slidevert" })
-hl.animation({ leaf = "workspacesIn", enabled = true, speed = 6, spring = "hobbyist", style = "slidevert" })
-hl.animation({ leaf = "workspacesOut", enabled = true, speed = 6, spring = "hobbyist", style = "slidevert" })
-hl.animation({ leaf = "zoomFactor", enabled = true, speed = 4, bezier = "quick" })
+  animations = {
+    { leaf = "global", enabled = true, speed = 4, bezier = "default" },
+    { leaf = "border", enabled = true, speed = 2, bezier = "almostLinear" },
+    { leaf = "windows", enabled = true, speed = 5, spring = "cat", style = "slide" },
+    { leaf = "windowsIn", enabled = true, speed = 5, spring = "cat", style = "slide" },
+    { leaf = "windowsOut", enabled = true, speed = 5, spring = "cat", style = "slide bottom" },
+    { leaf = "windowsMove", enabled = true, speed = 5, spring = "hobbyist" },
+    { leaf = "fadeIn", enabled = true, speed = 0.865, bezier = "almostLinear" },
+    { leaf = "fadeOut", enabled = true, speed = 0.73, bezier = "almostLinear" },
+    { leaf = "fade", enabled = true, speed = 1.515, bezier = "quick" },
+    { leaf = "layers", enabled = true, speed = 1.905, bezier = "easeOutQuint" },
+    { leaf = "layersIn", enabled = true, speed = 2, bezier = "easeOutQuint", style = "slide" },
+    { leaf = "layersOut", enabled = true, speed = 1.5, bezier = "linear", style = "slide" },
+    { leaf = "fadeLayersIn", enabled = true, speed = 0.895, bezier = "almostLinear" },
+    { leaf = "fadeLayersOut", enabled = true, speed = 0.695, bezier = "almostLinear" },
+    { leaf = "workspaces", enabled = true, speed = 6, spring = "hobbyist", style = "slidevert" },
+    { leaf = "workspacesIn", enabled = true, speed = 6, spring = "hobbyist", style = "slidevert" },
+    { leaf = "workspacesOut", enabled = true, speed = 6, spring = "hobbyist", style = "slidevert" },
+    { leaf = "zoomFactor", enabled = true, speed = 4, bezier = "quick" }
+  },
+})

@@ -83,8 +83,8 @@ hl.define_submap("resize", function()
   end
 
   local function exit_resize_mode()
-    Hypr.Helpers.FlashBorder(Vibranium.Colors.accent.bright)
-    hl.dispatch(hl.dsp.submap("reset"))
+    Hypr.Helpers.FlashBorder()
+    Hypr.Act.submap("reset")
   end
 
   -- Arrow key bindings: same deltas as the IJKL cluster above.
@@ -113,12 +113,10 @@ end)
 
 hl.bind(
   mainMod .. " + R",
-  function()
-    if hl.get_active_window() == nil then return end
-
-    Hypr.Helpers.FlashBorder(Vibranium.Colors.accent.bright)
-    hl.dispatch(hl.dsp.submap("resize"))
-  end,
+  Hypr.Guard.window(function()
+    Hypr.Helpers.FlashBorder()
+    Hypr.Act.submap("resize")
+  end),
   { description = "Enter resize mode" }
 )
 
@@ -135,25 +133,19 @@ hl.bind(mainMod .. " + SHIFT + Q", Hypr.Helpers.ForceKillWindow, { description =
 -- Window state
 
 -- Toggle fullscreen for the active window.
-hl.bind(mainMod .. " + F", function()
-  local win = hl.get_active_window()
-  if win == nil then return end
-
-  hl.dispatch(hl.dsp.window.fullscreen({ mode = "fullscreen" }))
+hl.bind(mainMod .. " + F", Hypr.Guard.window(function(win)
+  Hypr.Act.window.fullscreen({ mode = "fullscreen" })
   Hypr.Helpers.CenterFloatingWindow(win)
-end, { description = "Toggle fullscreen" })
+end), { description = "Toggle fullscreen" })
 
 -- Toggle floating for the active window.
 -- When a tiled window is switched to floating it often retains its full tiled
 -- dimensions and extends off-screen. To avoid needing a manual resize and
--- reposition, the window is automatically resized to 70% of the monitor and centered.
-hl.bind(mainMod .. " + SHIFT + F", function()
-  local win = hl.get_active_window()
-  if win == nil then return end
-
-  hl.dispatch(hl.dsp.window.float())
+-- reposition, the window is automatically resized to 65% of the monitor and centered.
+hl.bind(mainMod .. " + SHIFT + F", Hypr.Guard.window(function(win)
+  Hypr.Act.window.float()
   Hypr.Helpers.CenterFloatingWindow(win)
-end, { description = "Toggle floating" })
+end), { description = "Toggle floating" })
 
 -- Pin the active window so it follows across all workspaces.
 -- If the window is tiled, it is first floated and shrunk to 50% of the
@@ -162,20 +154,18 @@ end, { description = "Toggle floating" })
 -- Keyed by win.address, so it survives across multiple windows.
 local pin_memory = {}
 
-hl.bind(mainMod .. " + SHIFT + P", function()
-  local win = hl.get_active_window()
-  if win == nil then return end
-
+hl.bind(mainMod .. " + SHIFT + P", Hypr.Guard.window(function(win)
   if win.pinned then
     -- Unpinning
     local prev = pin_memory[win.address]
     pin_memory[win.address] = nil
 
-    hl.dispatch(hl.dsp.window.pin())
+    Hypr.Helpers.FlashBorder()
+    Hypr.Act.window.pin()
 
     -- Only restore to tiled if we're the ones who floated it.
     if prev and prev.was_tiled then
-      hl.dispatch(hl.dsp.window.float({ action = "unset" }))
+      Hypr.Act.window.float({ action = "unset" })
     end
   else
     -- Pinning
@@ -191,13 +181,14 @@ hl.bind(mainMod .. " + SHIFT + P", function()
       local w  = math.floor(lw * 0.5)
       local h  = math.floor(lh * 0.5)
 
-      hl.dispatch(hl.dsp.window.float())
-      hl.dispatch(hl.dsp.window.resize({ x = w, y = h }))
+      Hypr.Act.window.float()
+      Hypr.Act.window.resize({ x = w, y = h })
     end
 
-    hl.dispatch(hl.dsp.window.pin())
+    Hypr.Act.window.pin()
+    Hypr.Helpers.FlashBorder()
   end
-end, { description = "Pin active window" })
+end), { description = "Pin active window" })
 
 -- Toggle the dwindle split direction for the active container.
 hl.bind(mainMod .. " + S", function()
@@ -215,7 +206,7 @@ hl.bind(mainMod .. " + S", function()
     return
   end
 
-  hl.dispatch(hl.dsp.layout("togglesplit"))
+  Hypr.Act.layout("togglesplit")
 end, { description = "Toggle split direction (dwindle)", auto_consuming = true })
 
 -- Toggle pseudo-tiled for the active window. No-op on floating windows to
@@ -228,7 +219,7 @@ hl.bind(mainMod .. " + T", function()
   if win == nil then return end
   if win.floating then return end
 
-  hl.dispatch(hl.dsp.window.pseudo())
+  Hypr.Act.window.pseudo()
 end, { description = "Toggle pseudo-tile" })
 
 -- Center the active floating window on its monitor.
@@ -244,21 +235,18 @@ hl.bind(mainMod .. " + G", hl.dsp.group.toggle(), { description = "Toggle group"
 
 -- Eject the active window from its group. Direction-less by design: "out" is
 -- always relative to the group's tile slot, not a specific side.
-hl.bind(mainMod .. " + SHIFT + G", function()
-  local win = hl.get_active_window()
-  if win == nil or win.group == nil then return end
-  hl.dispatch(hl.dsp.window.move({ out_of_group = true }))
-end, { description = "Eject window from group" })
+hl.bind(mainMod .. " + SHIFT + G", Hypr.Guard.window(function(win)
+  if win.group == nil then return end
+  Hypr.Act.window.move({ out_of_group = true })
+end), { description = "Eject window from group" })
 
 -- Merge the active window into an existing group in the given direction.
 for _, d in ipairs(all_directions) do
   hl.bind(
     mainMod .. " + CTRL + " .. d.key,
-    function()
-      local win = hl.get_active_window()
-      if win == nil then return end
-      hl.dispatch(hl.dsp.window.move({ into_or_create_group = d.dir }))
-    end,
+    Hypr.Guard.window(function()
+      Hypr.Act.window.move({ into_or_create_group = d.dir })
+    end),
     { description = "Merge window into group " .. d.dir }
   )
 end
@@ -308,34 +296,28 @@ hl.bind(mainMod .. " + CTRL + SHIFT + L", hl.dsp.group.move_window(), {
 
 -- Jump to a specific group tab by index.
 for i = 1, 10 do
-  hl.bind("ALT + " .. (i % 10), function()
-    local win = hl.get_active_window()
-
-    if win == nil then
-      return
-    end
-
+  hl.bind("ALT + " .. (i % 10), Hypr.Guard.window(function(win)
     -- If currnt window is not in a group - pass the shortcut directly.
     -- ALT + N is usually consumed by browsers, so it have to be useful.
     -- hl.dsp.send_shortcut() leaves a bug where the keys are being repeatedly
     -- pressed after the key release.
     if win.group == nil then
-      hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "down" }))
-      hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "up" }))
+      Hypr.Act.send_key_state({ mods = "ALT", key = i, state = "down" })
+      Hypr.Act.send_key_state({ mods = "ALT", key = i, state = "up" })
       return
     end
 
     if win.group.size == 1 then
-      hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "down" }))
-      hl.dispatch(hl.dsp.send_key_state({ mods = "ALT", key = i, state = "up" }))
+      Hypr.Act.send_key_state({ mods = "ALT", key = i, state = "down" })
+      Hypr.Act.send_key_state({ mods = "ALT", key = i, state = "up" })
       return
     end
 
     -- Index out of range for the current group; do nothing.
     if i > win.group.size then return end
 
-    hl.dispatch(hl.dsp.group.active({ index = i }))
-  end, { description = "Group: jump to tab " .. i, non_consuming = false })
+    Hypr.Act.group.active({ index = i })
+  end), { description = "Group: jump to tab " .. i, non_consuming = false })
 end
 
 
@@ -455,10 +437,9 @@ hl.bind(mainMod .. " + SHIFT + Z", hl.dsp.exec_raw("vb-core-screenshot --screen"
 
 hl.bind("Print", hl.dsp.exec_raw("vb-core-screenshot --screen --annotate"), { description = "Screenshot (screen)" })
 
-hl.bind(mainMod .. " + SHIFT + A", function()
-  if hl.get_active_window() == nil then return end
-  hl.dispatch(hl.dsp.exec_raw("vb-core-screenshot --window"))
-end, { description = "Screenshot (window)" })
+hl.bind(mainMod .. " + SHIFT + A", Hypr.Guard.window(function()
+  Hypr.Act.exec_raw("vb-core-screenshot --window")
+end), { description = "Screenshot (window)" })
 
 
 -- Volume
@@ -495,15 +476,13 @@ hl.bind("XF86AudioPlay", hl.dsp.exec_raw("vb-core-mediacontrol --toggle"),
 
 -- Scroll up/down over any window to adjust its PipeWire sink volume
 -- independently of the global output volume.
-hl.bind(mainMod .. " + mouse_up", function()
-  if hl.get_active_window() == nil then return end
-  hl.dispatch(hl.dsp.exec_raw("vb-cmd-window-volume --down"))
-end, { description = "Window volume down" })
+hl.bind(mainMod .. " + mouse_up", Hypr.Guard.window(function()
+  Hypr.Act.exec_raw("vb-cmd-window-volume --down")
+end), { description = "Window volume down" })
 
-hl.bind(mainMod .. " + mouse_down", function()
-  if hl.get_active_window() == nil then return end
-  hl.dispatch(hl.dsp.exec_raw("vb-cmd-window-volume --up"))
-end, { description = "Window volume up" })
+hl.bind(mainMod .. " + mouse_down", Hypr.Guard.window(function()
+  Hypr.Act.exec_raw("vb-cmd-window-volume --up")
+end), { description = "Window volume up" })
 
 
 -- Zoom
@@ -559,7 +538,7 @@ hl.bind("SUPER + CTRL + minus", function()
 end, { description = "Decrease active display scale" })
 
 hl.bind("SUPER + CTRL + 0", function()
-  hl.dispatch(hl.dsp.exec_raw("hyprctl -q reload"))
+  Hypr.Act.exec_raw("hyprctl -q reload")
 end, { description = "Decrease active display scale" })
 
 -- System monitoring

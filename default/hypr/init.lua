@@ -27,31 +27,45 @@ local function exists_dir(path)
   return false
 end
 
+-- Runs a shell command, collects its output lines into a table, and sorts
+-- them before returning. `find`'s output order is filesystem-dependent, not
+-- alphabetical, so without this two files in the same directory could load
+-- in a different order on a different machine (or after an unrelated file
+-- got added/removed) even though nothing about THIS load changed. Since
+-- lib/*.lua files build on each other via shared globals (Vibranium,
+-- Hypr.Helpers), that's a silent-breakage risk, not just cosmetic -- hence
+-- sorting, rather than trusting directory order.
+local function popen_lines_sorted(cmd)
+  local lines = {}
+  local p = io.popen(cmd)
+  if not p then return lines end
+
+  for line in p:lines() do
+    table.insert(lines, line)
+  end
+  p:close()
+
+  table.sort(lines)
+  return lines
+end
+
 local function source(path)
   -- If path contains a glob/wildcard, expand it
   if path:find("[*?%[%]]") then
     local dir = path:match("^(.*)/[^/]+$") or "."
     local pattern = path:match("([^/]+)$")
 
-    local p = io.popen('find "' .. dir .. '" -maxdepth 1 -type f 2>/dev/null')
-    if p then
-      for file in p:lines() do
-        if pattern == "*" or file:match(pattern:gsub("%.", "%%."):gsub("%*", ".*"):gsub("%?", ".")) then
-          local fn = loadfile(file)
-          if fn then fn() end
-        end
+    for _, file in ipairs(popen_lines_sorted('find "' .. dir .. '" -maxdepth 1 -type f 2>/dev/null')) do
+      if pattern == "*" or file:match(pattern:gsub("%.", "%%."):gsub("%*", ".*"):gsub("%?", ".")) then
+        local fn = loadfile(file)
+        if fn then fn() end
       end
-      p:close()
     end
   else
     if exists_dir(path) then
-      local p = io.popen('find "' .. path .. '" -maxdepth 1 -type f -name "*.lua" 2>/dev/null')
-      if p then
-        for file in p:lines() do
-          local fn = loadfile(file)
-          if fn then fn() end
-        end
-        p:close()
+      for _, file in ipairs(popen_lines_sorted('find "' .. path .. '" -maxdepth 1 -type f -name "*.lua" 2>/dev/null')) do
+        local fn = loadfile(file)
+        if fn then fn() end
       end
     elseif exists_file(path) then
       local fn = loadfile(path)
@@ -64,7 +78,13 @@ end
 --          Core config           --
 -- ############################## --
 
-source(VIBRANIUM .. "/lib/*.lua")
+-- Explicit, not a glob: actions.lua bootstraps the Vibranium/Hypr namespace
+-- tables and must run before hyprland.lua, which adds functions onto
+-- Hypr.Helpers rather than creating it. A glob here would leave that order
+-- up to the filesystem again -- see git history for why that's a problem.
+
+source(VIBRANIUM .. "/lib/actions.lua")
+source(VIBRANIUM .. "/lib/hyprland.lua")
 
 source(VIBRANIUM .. "/autostart.lua")
 source(VIBRANIUM .. "/general.lua")
@@ -84,12 +104,6 @@ source(VIBRANIUM .. "/events.lua")
 -- ~/.config/hypr/hyprland.conf.d --
 -- ############################## --
 
-do
-  local p = io.popen('find "' .. HYPR .. '/hyprland.conf.d" -type f,l -name "*.lua" 2>/dev/null')
-  if p then
-    for file in p:lines() do
-      source(file)
-    end
-    p:close()
-  end
+for _, file in ipairs(popen_lines_sorted('find "' .. HYPR .. '/hyprland.conf.d" -type f,l -name "*.lua" 2>/dev/null')) do
+  source(file)
 end
