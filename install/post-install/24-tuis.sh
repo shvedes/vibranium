@@ -9,13 +9,11 @@ vb-tui-install \
   --category 'System' \
   --keywords 'Resource;Network;Disk;GPU;Process'
 
-if [[ -f /tmp/vibranium-impala-installed ]]; then
-  vb-tui-install \
-    --exec impala \
-    --name 'Wifi Manager' \
-    --icon 'network-wireless-signal-excellent-symbolic' \
-    --category 'System;Network'
-fi
+vb-tui-install \
+  --exec vb-launch-networkmanager \
+  --name 'Wifi Manager' \
+  --icon 'network-wireless-signal-excellent-symbolic' \
+  --category 'System;Network'
 
 vb-tui-install \
   --exec bluetui \

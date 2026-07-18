@@ -466,7 +466,7 @@ _choose_packages() {
   local -a chosen
 
   term::enable_input
-  mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | sort | fzf "${FZF_ARGS[@]}")
+  mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | sort -u | fzf "${FZF_ARGS[@]}")
   term::disable_input
 
   ((${#chosen[@]} == 0)) && return 1
