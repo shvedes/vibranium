@@ -242,6 +242,7 @@ if _check_important; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
 
   if term::ask_yes_no Y "Restart now?"; then
+    term::disable_input
     trap '' SIGHUP SIGINT SIGTERM SIGQUIT
 
     for i in {5..1}; do

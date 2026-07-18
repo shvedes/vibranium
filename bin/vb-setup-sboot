@@ -220,6 +220,7 @@ touch "$VIBRANIUM_STATE/secure-boot-setup.complete"
 
 echo -e "${GREEN}[VIBRANIUM]${RESET} Secure Boot setup complete"
 if term::ask_yes_no Y "Restart is required. Reboot now?"; then
+  term::disable_input
   for sec in {5..1}; do
     for step in {0..3}; do
       dots=$(printf "%.*s" "$step" "...")

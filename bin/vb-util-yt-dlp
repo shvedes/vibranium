@@ -57,19 +57,21 @@ if [[ -z "$1" ]]; then
   term::show_header
 fi
 
-trap 'trap "exit 1" INT; printf "\n";_operation_canceled; exit 1' INT
-
 _operation_canceled() {
+  term::disable_input
   printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
 _operation_complete() {
+  term::disable_input
   printf "%s[VIBRANIUM]%s Operation complete" "$GREEN" "$RESET"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
+
+trap 'trap "exit 1" INT; printf "\n";_operation_canceled; exit 1' INT
 
 # Try downloading with cookies from each installed browser in turn,
 # falling back to a cookieless attempt as a last resort.

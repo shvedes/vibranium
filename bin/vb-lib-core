@@ -548,11 +548,9 @@ term::ask_yes_no() {
 
     case "$input" in
     [Yy][Ee][Ss] | [Yy])
-      term::disable_input
       return 0
       ;;
     [Nn][Oo] | [Nn])
-      term::disable_input
       return 1
       ;;
     *)

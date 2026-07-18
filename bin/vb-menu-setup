@@ -1,6 +1,7 @@
 #!/bin/bash
 
 _build() {
+  cfgr::item::action --label "CachyOS Repo" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-cachyos -- vb-setup-cachyos; helpers::ui::close_menus " --icon vb-arch-linux
   cfgr::item::action --label "Secure Boot" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-sboot; helpers::ui::close_menus " --icon vb-secure-boot
   cfgr::item::action --label "Firewall" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-ufw -- vb-setup-ufw; helpers::ui::close_menus " --icon vb-lock
   cfgr::item::action --label "Docker" --func "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-docker -- vb-setup-docker; helpers::ui::close_menus " --icon vb-docker

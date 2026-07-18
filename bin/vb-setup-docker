@@ -166,6 +166,7 @@ if ! term::ask_yes_no Y "Proceed with setup?"; then
   exit 1
 fi
 
+term::disable_input
 if term::ask_yes_no Y "Would you like to install LazyDocker as well?"; then
   vb-tui-install \
     --exec "lazydocker" \
@@ -185,6 +186,7 @@ summary_rules=()
 
 # ── Systemd unit ──────────────────────────────────────────────
 if term::ask_yes_no Y "Enable systemd socket? (${GREEN}recommended${RESET} - starts Docker on first use)"; then
+  term::disable_input
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling docker.socket"
   sudo systemctl -q enable --now docker.socket
   summary_rules+=("Docker unit: ${GREEN}docker.socket${RESET} enabled and started")

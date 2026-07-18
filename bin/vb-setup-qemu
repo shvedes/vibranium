@@ -68,8 +68,10 @@ _ensure_virt_manager() {
   if ! command -v virt-manager >/dev/null; then
     echo -e "${RED}[VIBRANIUM]${RESET} However, you're missing the ${YELLOW}VM Manager${RESET} app"
     if term::ask_yes_no Y "Install it now?"; then
+      term::disable_input
       if vb-pkg-install --embedded -- virt-manager; then
         if term::ask_yes_no Y "Launch it now?"; then
+          term::disable_input
           setsid -f app2unit virt-manager &>/dev/null
         fi
       else
@@ -109,7 +111,6 @@ if command -v virsh >/dev/null; then
     term::show_header
     echo -e "${YELLOW}[VIBRANIUM]${RESET} The QEMU was set up before, but looks like required service is down"
 
-    term::enable_input
     if term::ask_yes_no Y "Would you like to fix it now?"; then
       if ! sudo systemctl -q enable --now libvirtd.socket; then
         log::error "Failed to enable systemd unit"
@@ -148,6 +149,7 @@ else
   qemu_variant="qemu-desktop"
 fi
 
+term::disable_input
 if ! vb-pkg-install --embedded -- $qemu_variant libvirt dnsmasq virt-manager; then
   _operation_canceled
   exit 1

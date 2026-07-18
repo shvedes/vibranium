@@ -108,6 +108,7 @@ if command -v ufw &>/dev/null; then
     term::show_header --color green
     echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall service is down"
     if term::ask_yes_no Y "Would you like to fix it now?"; then
+      term::disable_input
       if sudo systemctl -q enable --now ufw; then
         echo -e "${GREEN}[VIBRANIUM]${RESET} Enabled and started ${YELLOW}ufw.service${RESET}"
       else

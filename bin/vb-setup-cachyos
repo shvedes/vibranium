@@ -1,0 +1,167 @@
+#!/bin/bash
+
+source vb-lib-core
+
+export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
+
+CACHYOS_REPO_URL="https://mirror.cachyos.org/cachyos-repo.tar.xz"
+
+_operation_canceled() {
+  term::disable_input
+  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+}
+
+_operation_complete() {
+  term::disable_input
+  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
+  printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+  read -n1 -r -p $'. Press any key to exit ' dummy
+}
+
+_cleanup() {
+  if [[ -n $SUDO_KEEPALIVE_PID ]]; then
+    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null
+  fi
+
+  if [[ -n $INHIBITOR_PID ]]; then
+    kill "$INHIBITOR_PID" 2>/dev/null
+  fi
+
+  if [[ -n $TMPDIR ]]; then
+    rm -rf "$TMPDIR"
+  fi
+}
+
+_cachyos_detected() { sed -n '/^\[cachyos/q0; $q1' /etc/pacman.conf; }
+
+_sudoloop() {
+  if ! sudo -v; then
+    term::disable_input
+    _operation_canceled
+    exit 1
+  fi
+
+  (
+    while true; do
+      sudo -v
+      sleep 5
+    done
+  ) &
+
+  SUDO_KEEPALIVE_PID=$!
+}
+
+_download_and_run() {
+  TMPDIR=$(mktemp -d /tmp/cachyos-repo.XXXXXX)
+  local tarball="$TMPDIR/cachyos-repo.tar.xz"
+
+  if ! curl -fSL "$CACHYOS_REPO_URL" -o "$tarball"; then
+    echo -e "${RED}[VIBRANIUM]${RESET} Failed to download CachyOS repo archive"
+    return 1
+  fi
+
+  if ! tar -xf "$tarball" -C "$TMPDIR"; then
+    echo -e "${RED}[VIBRANIUM]${RESET} Failed to extract CachyOS repo archive"
+    return 1
+  fi
+
+  systemd-inhibit --what=sleep --who=Vibranium --why="CachyOS repo migration" -- sleep infinity &
+  INHIBITOR_PID=$!
+
+  # Bootstrap the migration script
+  (
+    cd "$TMPDIR/cachyos-repo" || return 1
+    sudo ./cachyos-repo.sh "$@" # <-- pass optional '--remove' to it
+  )
+
+  local rc=$?
+
+  # Release the inhibitor and clear stored PID.
+  kill "$INHIBITOR_PID" 2>/dev/null
+  INHIBITOR_PID=
+
+  return $rc
+}
+
+# =============================================================
+
+trap '_cleanup; exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
+
+if _cachyos_detected; then
+  term::show_header --color green
+  echo -e "${GREEN}[VIBRANIUM]${RESET} CachyOS repositories are already configured"
+
+  if term::ask_yes_no Y "Would you like to revert to official Arch Linux repositories?"; then
+    _sudoloop
+
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} This will remove CachyOS repos and restore your original ${BLUE}pacman.conf${RESET}"
+    echo -e "${YELLOW}[VIBRANIUM]${RESET} The CachyOS script will handle the rollback automatically"
+
+    # '--remove' passed to 'cachyos-repo.sh'
+    if ! _download_and_run --remove; then
+      term::disable_input
+      echo -e "${RED}[VIBRANIUM]${RESET} Failed to remove CachyOS repositories"
+      _operation_canceled
+      exit 1
+    fi
+
+    _cleanup
+    term::disable_input
+    echo -e "${GREEN}[VIBRANIUM]${RESET} CachyOS repositories removed. You are back to official Arch repos."
+    _operation_complete
+    exit 0
+  fi
+
+  _cleanup
+  term::disable_input
+  _operation_complete
+  exit 0
+fi
+
+term::show_header
+
+echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup CachyOS repositories"
+echo ""
+echo -e "${RED}[VIBRANIUM]${RESET} WARNING "
+echo -e "${RED}[VIBRANIUM]${RESET} CachyOS repositories are NOT official Arch Linux repositories."
+echo -e "${RED}[VIBRANIUM]${RESET} They are maintained by the CachyOS community and provide"
+echo -e "${RED}[VIBRANIUM]${RESET} CPU-optimized package builds (x86-64-v3/v4)."
+echo ""
+echo -e "${YELLOW}[VIBRANIUM]${RESET} CachyOS ships its own fork of pacman with enhanced features."
+echo -e "${YELLOW}[VIBRANIUM]${RESET} This replaces your system's package manager."
+echo ""
+echo -e "${BLUE}[VIBRANIUM]${RESET} The setup will:"
+echo -e "${BLUE}[VIBRANIUM]${RESET}   1. Download the CachyOS repo installer from"
+echo -e "${BLUE}[VIBRANIUM]${RESET}      ${CYAN}https://mirror.cachyos.org/cachyos-repo.tar.xz${RESET}"
+echo -e "${BLUE}[VIBRANIUM]${RESET}   2. Let CachyOS's own script handle the migration"
+echo -e "${BLUE}[VIBRANIUM]${RESET}   3. The script will forcefully update ALL packages - this"
+echo -e "${BLUE}[VIBRANIUM]${RESET}      downloads and reinstalls every package with optimized builds"
+echo ""
+echo -e "${RED}[VIBRANIUM]${RESET} This operation can take a long time and will consume"
+echo -e "${RED}[VIBRANIUM]${RESET} significant bandwidth. The system will be held awake"
+echo -e "${RED}[VIBRANIUM]${RESET} during the process to prevent suspend."
+
+if ! term::ask_yes_no Y "Proceed with CachyOS repository setup?"; then
+  term::disable_input
+  _operation_canceled
+  exit 1
+fi
+
+_sudoloop
+
+if ! _download_and_run; then
+  echo -e "${RED}[VIBRANIUM]${RESET} CachyOS setup failed"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Check the output above for details"
+  _operation_canceled
+  exit 1
+fi
+
+_cleanup
+echo ""
+echo -e "${GREEN}[VIBRANIUM]${RESET} CachyOS repositories have been configured"
+echo -e "${BLUE}[VIBRANIUM]${RESET} Your packages have been re-installed with CPU-specific optimizations"
+echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.cachyos.org${RESET} for further information"
+
+_operation_complete

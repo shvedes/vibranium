@@ -143,6 +143,7 @@ _enable_systemd_units() {
       unit_name="${unit_names[$i]}"
 
       if term::ask_yes_no Y "Enable $unit_type '${BLUE}${unit_name}${RESET}' from package '${YELLOW}${pkg}${RESET}' ($scope scope)?"; then
+        term::disable_input
         if [[ "$scope" == "user" ]]; then
           systemctl -q --user --now enable "$unit_name" &
         else
