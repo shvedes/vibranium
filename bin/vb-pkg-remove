@@ -323,6 +323,95 @@ _show_overview() {
   done
 }
 
+_load_core_packages() {
+  if ((${#CORE_PACKAGES[@]} > 0)); then
+    return
+  fi
+
+  mapfile -t CORE_PACKAGES < <(grep -Ehv '^(#|$)' "$VIBRANIUM"/install/vb-{base,fonts}.pkgs)
+
+  if [[ "${CHASSIS_TYPE:-}" != vm ]]; then
+    CORE_PACKAGES+=(bluez bluez-utils bluetui hyprsunset ddcutil wireless-regdb)
+  fi
+}
+
+_warn_core_packages() {
+  _load_core_packages
+  local -a core_hits=()
+  local pkg hit
+
+  for pkg in "${PACKAGES[@]}"; do
+    if [[ " ${CORE_PACKAGES[*]} " == *" $pkg "* ]]; then
+      core_hits+=("$pkg")
+    fi
+  done
+
+  if ((${#core_hits[@]} == 0)); then
+    return
+  fi
+
+  echo -e "${RED}[VIBRANIUM]${RESET} ${RED}WARNING: Removing core packages may break your system!${RESET}"
+  echo -e "${YELLOW}[VIBRANIUM]${RESET} Core packages to be removed:"
+
+  for pkg in "${core_hits[@]}"; do
+    echo -e "${BLUE}[VIBRANIUM]${RESET}   - ${YELLOW}${pkg}${RESET}"
+  done
+
+  term::enable_input
+
+  local choice confirm
+
+  echo -e "${BLUE}[VIBRANIUM]${RESET} Options:"
+  echo -e "${BLUE}[VIBRANIUM]${RESET}   1) Remove anyway"
+  echo -e "${BLUE}[VIBRANIUM]${RESET}   2) Exclude ${YELLOW}${#core_hits[@]}${RESET} core package(s)"
+
+  while true; do
+    read -rp "${BLUE}[VIBRANIUM]${RESET} Choice [1/2]: " choice
+
+    case "$choice" in
+    1)
+      echo -e "${RED}[VIBRANIUM]${RESET} ${RED}Are you absolutely sure?${RESET} Type 'YES, DO AS I SAY' to confirm:"
+      read -rp "> " confirm
+      # Match exact string
+      if [[ "$confirm" == "YES, DO AS I SAY" ]]; then
+        term::disable_input
+        return
+      fi
+      echo -e "${GREEN}[VIBRANIUM]${RESET} Excluding core packages from removal"
+      ;;
+    2)
+      local -a remaining=()
+      for pkg in "${PACKAGES[@]}"; do
+        local found=false
+        for hit in "${core_hits[@]}"; do
+          if [[ "$pkg" == "$hit" ]]; then
+            found=true
+            break
+          fi
+        done
+
+        if ! $found; then
+          remaining+=("$pkg")
+        fi
+      done
+
+      PACKAGES=("${remaining[@]}")
+      term::disable_input
+
+      if ((${#PACKAGES[@]} == 0)); then
+        echo -e "${YELLOW}[VIBRANIUM]${RESET} No packages remaining to remove"
+        _operation_canceled --positive
+        exit 0
+      fi
+      return
+      ;;
+    *)
+      printf "\e[A\r\e[K"
+      ;;
+    esac
+  done
+}
+
 _uninstall_packages() {
   log Info "Uninstalling ${#PACKAGES[@]} package(s)"
   term::enable_input
@@ -368,6 +457,7 @@ NO_LOGO=false
 NO_DUMMY=false
 NO_SYSTEMD=false
 CONSERVATIVE=false
+CORE_PACKAGES=()
 PACKAGES=()
 
 if [[ -f "$XDG_CONFIG_HOME/vibranium/current/theme/fzf" ]]; then
@@ -474,6 +564,7 @@ if (($# > 0)); then
   fi
 
   _show_overview
+  _warn_core_packages
 else
   if ! command -v fzf >/dev/null; then
     log::error "fzf is not installed!"
@@ -496,6 +587,7 @@ else
   fi
 
   _show_overview
+  _warn_core_packages
 fi
 
 if term::ask_yes_no Y "Proceed with uninstallation?"; then
