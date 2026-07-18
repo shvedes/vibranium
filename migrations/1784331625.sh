@@ -16,4 +16,4 @@ if [[ "$CHASSIS_TYPE" == "laptop" ]]; then
   sudo cp "$VIBRANIUM"/extras/etc/udev/rules.d/10-power-profile.rules /etc/udev/rules.d/
 fi
 
-sudo cp "$VIBRANIUM"/extras/usr/share/polkit-1/actions/io.github.shvedes.vibranium.su-bridge /usr/share/polkit-1/actions
+sudo cp "$VIBRANIUM"/extras/usr/share/polkit-1/actions/io.github.shvedes.vibranium.su-bridge.policy /usr/share/polkit-1/actions
