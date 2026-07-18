@@ -39,7 +39,9 @@ _build_apps() {
 
 _build_system() {
   _b() {
-    if [[ "$(sysctl -n kernel.core_pattern)" == "|/bin/false" ]]; then
+    local pattern
+    mapfile -t pattern < /proc/sys/kernel/core_pattern
+    if [[ "$pattern" == "|/bin/false" ]]; then
       local action="Enable"
     else
       local action="Disable"
@@ -47,8 +49,21 @@ _build_system() {
 
     cfgr::item::action \
       --icon vb-tools \
-      --label "$action systemd coredump" \
+      --label "$action coredump" \
       --func "vb-tweak-coredump; helpers::ui::close_menus"
+
+    local ipv6_val
+    mapfile -t ipv6_val < /proc/sys/net/ipv6/conf/all/disable_ipv6
+    if [[ "$ipv6_val" == "1" ]]; then
+      local action="Enable"
+    else
+      local action="Disable"
+    fi
+
+    cfgr::item::action \
+      --icon vb-tools \
+      --label "$action IPv6" \
+      --func "vb-tweak-ipv6; helpers::ui::close_menus"
   }
   cfgr::run "System Tweaks" "_b"
 }

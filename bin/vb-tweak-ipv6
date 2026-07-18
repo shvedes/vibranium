@@ -19,7 +19,7 @@ usage() {
   shcat <<EOF
 Usage: ${0##*/} [OPTION]
 
-Toggle systemd-coredump on/off.
+Toggle IPv6 on/off system-wide.
 
 Options:
   -v, --verbose  Enable verbose output
@@ -44,30 +44,32 @@ while [[ $# -gt 0 ]]; do
 done
 
 _is_disabled() {
-  local pattern
-  mapfile -t pattern < /proc/sys/kernel/core_pattern
-  [[ "$pattern" == "|/bin/false" ]]
+  local val
+  mapfile -t val < /proc/sys/net/ipv6/conf/all/disable_ipv6
+  [[ "$val" == "1" ]]
 }
 
 _as_root=(pkexec su-bridge --root --)
 [[ -t 1 ]] && _as_root=(sudo)
 
 if _is_disabled; then
-  log Info "Enabling coredumps"
+  log Info "Enabling IPv6"
+  c='net.ipv6.conf.all.disable_ipv6=0'
+  c+='\nnet.ipv6.conf.default.disable_ipv6=0'
   if ! "${_as_root[@]}" bash -c \
-    'rm -f /etc/sysctl.d/99-coredump.conf; sysctl --system >/dev/null'
+    "printf '$c' > /etc/sysctl.d/99-ipv6.conf; sysctl --system >/dev/null"
   then
     exit 1
   fi
-  echo "[${0##*/}] systemd-coredump enabled. No reboot required"
+  echo "[${0##*/}] IPv6 enabled systemwide. No reboot required"
 else
-  log Info "Disabling coredumps"
-  c='kernel.core_pattern=|/bin/false'
-  _r=' > /etc/sysctl.d/99-coredump.conf; sysctl --system >/dev/null'
+  log Info "Disabling IPv6"
+  c='net.ipv6.conf.all.disable_ipv6=1'
+  c+='\nnet.ipv6.conf.default.disable_ipv6=1'
   if ! "${_as_root[@]}" bash -c \
-    "printf '$c\n'$_r"
+    "printf '$c' > /etc/sysctl.d/99-ipv6.conf; sysctl --system >/dev/null"
   then
     exit 1
   fi
-  echo "[${0##*/}] systemd-coredump disabled. No reboot required"
+  echo "[${0##*/}] IPv6 disabled systemwide. No reboot required"
 fi
