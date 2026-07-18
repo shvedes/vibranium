@@ -1,10 +1,16 @@
+[app]
+overall = {}
+
 [mgr]
 marker_copied = { fg = "{{ color2 }}", bg = "{{ color2 }}" }
 marker_cut = { fg = "{{ color1 }}", bg = "{{ color1 }}" }
 marker_marked = { fg = "{{ color5 }}", bg = "{{ color5 }}" }
 marker_selected = { fg = "{{ color3 }}", bg = "{{ color3 }}" }
+marker_symbol = "│"
 
 cwd = { fg = "{{ color3|lightness=+0.20 }}" }
+
+symlink_target = { italic = true }
 
 find_keyword = { fg = "{{ color4|lightness=+0.20 }}", bg = "{{ color1 }}", underline = true }
 find_position = { }
@@ -17,9 +23,9 @@ border_symbol = "│"
 border_style = { fg = "{{ background|lightness=+0.25 }}" }
 
 [indicator]
-parent = { reversed = true }
+parent  = { reversed = false }
 current = { reversed = true }
-preview = { reversed = true }
+preview = { underline = false }
 padding = { open = " ", close = " " }
 
 [tabs]
@@ -44,9 +50,9 @@ sep_left = { open = "", close = "" }
 sep_right = { open = "", close = "" }
 overall = { fg = "{{ foreground }}", bg = "{{ color0 }}" }
 
-progress_label = { fg = "{{ color4 }}", bold = true }
-progress_normal = { fg = "{{ color0 }}", bg = "{{ color0 }}" }
-progress_error = { fg = "{{ color0 }}", bg = "{{ color0 }}" }
+progress_label  = { fg = "{{ color4 }}", bold = true }
+progress_normal = { fg = "{{ color2 }}", bg = "{{ color0 }}" }
+progress_error  = { fg = "{{ color3 }}", bg = "{{ color1 }}" }
 
 perm_type = { fg = "{{ color4 }}" }
 perm_read = { fg = "{{ color3 }}" }
@@ -55,10 +61,26 @@ perm_exec = { fg = "{{ color2 }}" }
 perm_sep = { fg = "{{ background|lightness=+0.40 }}" }
 
 
+[confirm]
+border     = { fg = "{{ color4 }}" }
+title      = { fg = "{{ color4 }}" }
+body       = {}
+list       = {}
+btn_yes    = { reversed = true }
+btn_no     = {}
+btn_labels = [ "  [Y]es  ", "  (N)o  " ]
+
 [pick]
 border = { fg = "{{ background|lightness=+0.40 }}" }
 active = { fg = "{{ color1 }}", bold = true }
 inactive = {}
+
+[spot]
+border = { fg = "{{ color4 }}" }
+title  = { fg = "{{ color4 }}" }
+
+tbl_col  = { fg = "{{ color4 }}" }
+tbl_cell = { fg = "{{ color3 }}", reversed = true }
 
 [input]
 border = { fg = "{{ color4 }}" }
@@ -66,18 +88,22 @@ title = {}
 value = {}
 selected = { reversed = true }
 
-[completion]
+[cmp]
 border = { fg = "{{ color4 }}" }
 active = { reversed = true }
 inactive = {}
 
+icon_file    = ""
+icon_folder  = ""
+icon_command = ""
+
 [tasks]
-border = { fg = "{{ color4 }}" }
-title = {}
-hovered = { fg = "{{ color5 }}" }
+border  = { fg = "{{ color4 }}" }
+title   = {}
+hovered = { fg = "{{ color5 }}", bold = true }
 
 [which]
-cols = 2
+cols = 3
 separator = " - "
 separator_style = { fg = "{{ background|lightness=+0.20 }}" }
 mask = { bg = "{{ background|lightness=+0.05 }}" }
@@ -86,16 +112,19 @@ cand = { fg = "{{ color4 }}" }
 desc = { fg = "{{ background|lightness=+0.50 }}" }
 
 [help]
-on = { fg = "{{ color2|lightness=+0.20 }}" }
-run = { fg = "{{ color5|lightness=+0.20 }}" }
-desc = {}
+border  = { fg = "{{ color4 }}" }
+chord   = { fg = "{{ color2|lightness=+0.20 }}" }
+action  = {}
 hovered = { reversed = true, bold = true }
-footer = { fg = "{{ foreground }}", bg = "{{ color0 }}" }
 
 [notify]
-title_info = { fg = "{{ color2 }}" }
-title_warn = { fg = "{{ color3 }}" }
-title_error = { fg = "{{ color3 }}" }
+title_info  = { fg = "{{ color2 }}" }
+title_warn  = { fg = "{{ color3 }}" }
+title_error = { fg = "{{ color1 }}" }
+
+icon_info  = ""
+icon_warn  = ""
+icon_error = ""
 
 [icon]
 globs = []
