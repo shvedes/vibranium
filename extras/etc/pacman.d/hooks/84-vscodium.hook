@@ -6,4 +6,4 @@ Type = Package
 [Action]
 Description = Installing Vibranium theme for VS Codium
 When = PostTransaction
-Exec = /usr/local/bin/su-bridge vb-libalpm-editor-theme vscodium-bin
+Exec = /usr/local/bin/su-bridge --user -- vb-libalpm-editor-theme vscodium-bin

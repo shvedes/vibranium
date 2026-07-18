@@ -7,4 +7,4 @@ Type = Package
 [Action]
 Description = Updating Spicetify patches
 When = PostTransaction
-Exec = /usr/local/bin/su-bridge vb-libalpm-patch-spotify
+Exec = /usr/local/bin/su-bridge --user -- vb-libalpm-patch-spotify

@@ -1,9 +1,9 @@
 # ADB
 SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:ff4201:*", ACTION=="add", \
-    RUN+="/usr/local/bin/su-bridge vb-udev-android-notify \
+    RUN+="/usr/local/bin/su-bridge --user -- vb-udev-android-notify \
         --id-model=$env{ID_MODEL} --id-vendor=$env{ID_VENDOR}"
 
 # MTP
 SUBSYSTEM=="usb", ENV{ID_USB_INTERFACES}=="*:060101:*", ACTION=="add", \
-    RUN+="/usr/local/bin/su-bridge vb-udev-android-notify \
+    RUN+="/usr/local/bin/su-bridge --user -- vb-udev-android-notify \
         --id-model=$env{ID_MODEL} --id-vendor=$env{ID_VENDOR}"

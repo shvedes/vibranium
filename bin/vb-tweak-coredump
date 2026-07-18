@@ -56,13 +56,13 @@ _is_disabled() {
 # via sysctl --system, so the change takes effect without a reboot.
 if _is_disabled; then
   log Info "Enabling coredumps"
-  if ! pkexec bash -c 'rm -f /etc/sysctl.d/99-coredump.conf; sysctl --system'; then
+  if ! pkexec su-bridge --root -- bash -c 'rm -f /etc/sysctl.d/99-coredump.conf; sysctl --system'; then
     exit 1
   fi
   notify-send -r 3 "Vibranium" "<b>systemd-coredump</b> enabled. No reboot required"
 else
   log Info "Disabling coredumps"
-  if ! pkexec bash -c 'printf "kernel.core_pattern=|/bin/false\n" > /etc/sysctl.d/99-coredump.conf; sysctl --system'; then
+  if ! pkexec su-bridge --root -- bash -c 'printf "kernel.core_pattern=|/bin/false\n" > /etc/sysctl.d/99-coredump.conf; sysctl --system'; then
     exit 1
   fi
   notify-send -r 3 "Vibranium" "<b>systemd-coredump</b> disabled. No reboot required"

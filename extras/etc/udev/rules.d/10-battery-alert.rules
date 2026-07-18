@@ -1,2 +1,2 @@
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains",   ACTION=="change", ATTR{online}=="0", RUN+="/usr/local/bin/su-bridge vb-udev-battery-notify"
-SUBSYSTEM=="power_supply", ATTR{type}=="Battery",                                      RUN+="/usr/local/bin/su-bridge vb-udev-battery-notify"
+SUBSYSTEM=="power_supply", ATTR{type}=="Mains",   ACTION=="change", ATTR{online}=="0", RUN+="/usr/local/bin/su-bridge --user -- vb-udev-battery-notify"
+SUBSYSTEM=="power_supply", ATTR{type}=="Battery",                                      RUN+="/usr/local/bin/su-bridge --user -- vb-udev-battery-notify"

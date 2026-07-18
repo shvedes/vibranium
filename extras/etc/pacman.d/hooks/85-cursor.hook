@@ -6,4 +6,4 @@ Type = Package
 [Action]
 Description = Installing Vibranium theme for Cursor
 When = PostTransaction
-Exec = /usr/local/bin/su-bridge vb-libalpm-editor-theme cursor-bin
+Exec = /usr/local/bin/su-bridge --user -- vb-libalpm-editor-theme cursor-bin

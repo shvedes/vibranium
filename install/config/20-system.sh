@@ -47,3 +47,6 @@ for entry in "$VIBRANIUM"/extras/usr/local/bin/*; do
   dest="/usr/local/bin/${entry##*/}"
   helpers::copy "$entry" "$dest"
 done
+
+polkit_rule="$VIBRANIUM/extras/usr/share/polkit-1/actions/io.github.shvedes.vibranium.su-bridge"
+helpers::copy "$polkit_rule" "/usr/share/polkit-1/actions/"

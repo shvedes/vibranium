@@ -8,7 +8,7 @@ shcat() {
 
 usage() {
     shcat <<EOF
-Usage: ${0##*/} [COMMAND] [ARGS]...
+Usage: ${0##*/} [MODE] [--] COMMAND [ARGS]...
 
 DESCRIPTION:
   Bridge (su) execution of a command into an active user's Hyprland session.
@@ -16,32 +16,44 @@ DESCRIPTION:
   the graphical session of the currently logged-in user, which is
   otherwise inaccessible due to environment isolation.
 
+  Use -- to mark the end of ${0##*/}'s own flags. Everything after --
+  is treated as the COMMAND, even if it starts with a dash.
+
+MODES:
+  --user    Reconstruct the active user's session environment and execute
+            the command as that user via runuser. This is the default
+            behavior when invoked as root without an explicit mode.
+  --root    Reconstruct the active user's session environment into the
+            current root process and execute the command as root. Intended
+            for use as a pkexec helper.
+
+  If no mode is given, ${0##*/} falls back to its legacy behavior: run
+  the --user logic when invoked as root, otherwise just exec the command.
+
 OPTIONS:
   -h, --help    Display this help and exit
 
 EXAMPLES:
-  ${0##*/} notify-send "Task Complete"
-  ${0##*/} my-custom-script --verbose
+  ${0##*/} -- notify-send "Task Complete"
+  ${0##*/} --user -- my-custom-script --verbose
+  pkexec ${0##*/} --root -- bash -c '...'
 EOF
+    exit "${1:-0}"
 }
 
-while [[ "$#" -gt 0 ]]; do
-    case "$1" in
-        -h|--help) usage 0 ;;
-        --) shift; break ;;
-        -*) echo "==> ERROR: ${0##*/}: invalid option '$1'" >&2; usage 1 ;;
-        *) break ;;
-    esac
-done
+# Determine the active desktop user.
+# Preference order: PKEXEC_UID, SUDO_USER, loginctl, then /etc/passwd.
+# Sets the global TARGET_USER variable.
+determine_target_user() {
+  TARGET_USER=""
 
-if [[ "$#" -eq 0 ]]; then
-    usage
-    exit 1
-fi
+  if [[ -n "$PKEXEC_UID" ]]; then
+    TARGET_USER=$(getent passwd "$PKEXEC_UID" | cut -d: -f1)
+  fi
 
-# Only trigger the bridge logic if run as root
-if [[ "$EUID" -eq 0 ]]; then
-  TARGET_USER="$SUDO_USER"
+  if [[ -z "$TARGET_USER" ]]; then
+    TARGET_USER="$SUDO_USER"
+  fi
 
   # Fallback 1: loginctl
   if [[ -z "$TARGET_USER" ]]; then
@@ -62,8 +74,11 @@ if [[ "$EUID" -eq 0 ]]; then
     echo "==> ERROR: ${0##*/}: could not determine target user" >&2
     exit 1
   fi
+}
 
-  # Find Hyprland PID
+# Locate the target user's Hyprland process.
+# Sets the global WM_PID variable.
+find_hyprland_pid() {
   WM_PID=""
   for pid in $(pidof Hyprland); do
     if [[ "$(stat -c '%U' "/proc/$pid")" == "$TARGET_USER" ]]; then
@@ -76,27 +91,90 @@ if [[ "$EUID" -eq 0 ]]; then
     echo "==> ERROR: Could not find running Hyprland instance for $TARGET_USER" >&2
     exit 1
   fi
+}
 
-  # Parse the active Wayland session environment
-  declare -A SESSION_ENV
+# Parse /proc/<WM_PID>/environ into the global SESSION_ENV associative array.
+parse_session_environ() {
+  unset SESSION_ENV
+  declare -gA SESSION_ENV
   while IFS='=' read -r -d '' key value; do
     SESSION_ENV["$key"]="$value"
   done < "/proc/$WM_PID/environ"
+}
 
-  # Ensure the custom path is injected into $PATH
+# Inject VIBRANIUM_PATH into PATH within SESSION_ENV, if not already present.
+inject_vibranium_path() {
   if [[ -n "${SESSION_ENV[VIBRANIUM_PATH]}" && "${SESSION_ENV[PATH]}" != *"${SESSION_ENV[VIBRANIUM_PATH]}"* ]]; then
     SESSION_ENV[PATH]="${SESSION_ENV[VIBRANIUM_PATH]}:${SESSION_ENV[PATH]}"
   fi
+}
 
-  # Reconstruct the environment arguments
+# Reconstruct the active user's session environment into SESSION_ENV.
+# Shared by both --user and --root modes; the only difference between
+# the two modes is what happens to SESSION_ENV afterward.
+reconstruct_session_env() {
+  determine_target_user
+  find_hyprland_pid
+  parse_session_environ
+  inject_vibranium_path
+}
+
+# Build the "KEY=value" argument list for env(1) from SESSION_ENV.
+# Sets the global ENV_ARGS array.
+build_env_args() {
   ENV_ARGS=()
   for key in "${!SESSION_ENV[@]}"; do
     ENV_ARGS+=("$key=${SESSION_ENV[$key]}")
   done
+}
 
-  # Bridge Execution
+# --user mode: reconstruct the environment, then run the command as
+# TARGET_USER via runuser.
+run_as_user() {
+  reconstruct_session_env
+  build_env_args
   exec runuser -u "$TARGET_USER" -- env "${ENV_ARGS[@]}" "$@"
+}
+
+# --root mode: reconstruct the environment, export it into the current
+# root process, then run the command as root.
+run_as_root() {
+  reconstruct_session_env
+  for key in "${!SESSION_ENV[@]}"; do
+    export "$key=${SESSION_ENV[$key]}"
+  done
+  exec "$@"
+}
+
+MODE=""
+
+while [[ "$#" -gt 0 ]]; do
+    case "$1" in
+        -h|--help) usage 0 ;;
+        --user) MODE="user"; shift ;;
+        --root) MODE="root"; shift ;;
+        --) shift; break ;;
+        -*) echo "==> ERROR: ${0##*/}: invalid option '$1'" >&2; usage 1 ;;
+        *) break ;;
+    esac
+done
+
+if [[ "$#" -eq 0 ]]; then
+    usage
+    exit 1
 fi
 
-# Fallback: if run directly as non-root, just execute the command
-exec "$@"
+case "$MODE" in
+    user) run_as_user "$@" ;;
+    root) run_as_root "$@" ;;
+    "")
+      # No mode specified: preserve legacy behavior.
+      # Only trigger the bridge logic if run as root.
+      if [[ "$EUID" -eq 0 ]]; then
+        run_as_user "$@"
+      fi
+
+      # Fallback: if run directly as non-root, just execute the command
+      exec "$@"
+      ;;
+esac
