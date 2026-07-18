@@ -24,6 +24,7 @@ log() {
   fi
 }
 
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -90,7 +91,20 @@ if ! $MANUAL; then
   # reference.  If none do, the patch has already been reverted or was
   # never applied, so skip the restore+apply cycle.
   if ! find /opt/spotify/ -type f -exec "${grep_cmd[@]}" {} + >/dev/null; then
-    echo "[${0##*/}] Info: Spotify wasn't patched; use ${0##*/} --manual to force" >&2
+    if [[ -t 0 ]]; then
+      echo "[${0##*/}] Info: Spotify wasn't patched; backing up current state" >&2
+    else
+      echo "==> Spotify wasn't patched; backing up current state"
+    fi
+
+    # For some reason, --quiet still prints two blank lines
+    # in the pacman hook output. &>/dev/null fixes this.
+    if ! spicetify --no-restart --quiet backup &>/dev/null; then
+      log Error "Couldn't backup Spotify state"
+      exit 1
+    fi
+    log Info "Spotify state has been backed up"
+    log Info "You can now apply patches"
     exit 0
   fi
 fi

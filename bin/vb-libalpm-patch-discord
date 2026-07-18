@@ -75,7 +75,11 @@ done
 $MANUAL && VERBOSE=true
 
 if ! $MANUAL && ! [[ -d "$XDG_CONFIG_HOME/Vencord" ]]; then
-  echo "[${0##*/}] Info: Discord wasn't patched before; use ${0##*/} --manual to force" >&2
+  if [[ -t 0 ]]; then
+    echo "[${0##*/}] Info: Discord wasn't patched before; use ${0##*/} --manual to force" >&2
+  else
+    echo "==> Discord wasn't patched before; use ${0##*/} --manual to force"
+  fi
   exit 0
 fi
 
