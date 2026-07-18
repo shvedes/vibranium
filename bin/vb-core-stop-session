@@ -27,6 +27,8 @@ Options:
 EOF
 }
 
+log Info "${0##*/} started"
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
   -v | --verbose)
@@ -66,9 +68,12 @@ done
 # failing hook does not abort the rest.
 HOOKS=("$XDG_CONFIG_HOME"/vibranium/hooks/shutdown/*.sh)
 
+log Info "Shutdown hooks: ${#HOOKS[@]} found"
+
 if ((${#HOOKS[@]} > 0)); then
   log Info "Running shutdown hooks"
   for hook in "${HOOKS[@]}"; do
+    log Info "Sourcing hook: $hook"
     bash "$hook"
   done
 fi
@@ -76,14 +81,21 @@ fi
 # Release any active sleep inhibitors so the session can terminate
 # cleanly without logind holding a lock.
 if systemctl -q --user is-active vibranium-inhibit@sleep; then
+  log Info "Stopping vibranium-inhibit@sleep"
   systemctl -q --user stop vibranium-inhibit@sleep
 elif systemctl -q --user is-active vibranium-inhibit@idle; then
+  log Info "Stopping vibranium-inhibit@idle"
   systemctl -q --user stop vibranium-inhibit@idle
+else
+  log Info "No active sleep/idle inhibit service found"
 fi
 
 # uwsm stop initiates the Wayland session shutdown via UWSM. If it
 # fails, show the error in a persistent notification so the user knows
 # the session may not have terminated fully.
 if ! out="$(uwsm stop 2>&1)"; then
+  log Error "uwsm stop failed: $out"
   notify-send -r 4 -t 15000 "Failed to Log Out!" "UWSM shows this error: \n\n${out}"
+else
+  log Info "uwsm stop completed successfully"
 fi

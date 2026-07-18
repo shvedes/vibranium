@@ -90,6 +90,8 @@ GAMESCOPE_FLAGS=(
   --default-touch-mode
   --generate-drm-mode
   --immediate-flips
+  --disable-color-management
+  --disable-xres
   # VR mode
   --vr-overlay-key
   --vr-app-overlay-key
@@ -141,6 +143,7 @@ is_known_gamescope_flag() {
   local flag="$1"
   local f
 
+  log Info "Validating gamescope flag: $flag"
   for f in "${GAMESCOPE_FLAGS[@]}"; do
     [[ "$flag" == "$f" ]] && return 0
   done
@@ -153,6 +156,7 @@ is_known_gamescope_flag() {
 has_extra_flag() {
   local flag="$1"
   local f
+  log Info "Checking extra flag: $flag"
   for f in "${EXTRA_GAMESCOPE_OPTS[@]}"; do
     [[ "$f" == "$flag" ]] && return 0
   done
@@ -164,7 +168,9 @@ has_extra_flag() {
 parse_gamescope_options() {
   local opts_str="$1"
   local -a tokens
+  log Info "Parsing gamescope opts: $opts_str"
   read -ra tokens <<<"$opts_str"
+  log Info "Tokens parsed: ${#tokens[@]}"
 
   local token prev_was_flag=false
   for token in "${tokens[@]}"; do
@@ -182,6 +188,7 @@ parse_gamescope_options() {
       fi
     fi
   done
+  log Info "Parsed opts count: ${#EXTRA_GAMESCOPE_OPTS[@]}"
 }
 
 OVERRIDE_LDPRELOAD=false
@@ -198,10 +205,12 @@ while [[ $# -gt 0 ]]; do
     ;;
   --mangohud)
     USE_MANGOHUD=true
+    log Info "Flag: mangohud enabled"
     shift
     ;;
   --ld-workaround)
     OVERRIDE_LDPRELOAD=true
+    log Info "Flag: LD_PRELOAD workaround enabled"
     shift
     ;;
   --gamescope-options=*)
@@ -219,6 +228,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --no-power-profile)
     NO_POWER_PROFILE=true
+    log Info "Flag: power profile disabled"
     shift
     ;;
   -v | --verbose)
@@ -241,11 +251,15 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+log Info "Extra gamescope opts: ${EXTRA_GAMESCOPE_OPTS[*]:-(none)}"
+
 if [[ $# -eq 0 ]]; then
   log Error "no command given"
   log Error "Try '$SELF --help' for more information."
   exit 1
 fi
+
+log Info "Command to launch: $*"
 
 # Mangohud availability check (done early so we can warn before any exec)
 if $USE_MANGOHUD; then
@@ -269,6 +283,7 @@ if ! command -v gamescope >/dev/null; then
     exec "$@"
   fi
 fi
+log Info "Gamescope binary found, proceeding with gamescope launch"
 
 # https://wiki.archlinux.org/title/Gamescope#Launching_gamescope_from_Steam,_stuttering_after_~24_minutes_(Gamescope_Lag_Bomb)
 # Always clear LD_PRELOAD for gamescope itself to prevent the ~24-minute lag
@@ -276,16 +291,21 @@ fi
 # re-injected into the game command via `env` so Steam features are preserved
 # for games that do not use a secondary launcher (Rockstar, EA, etc.).
 SAVED_LD_PRELOAD="${LD_PRELOAD-}"
+log Info "Saved LD_PRELOAD: ${SAVED_LD_PRELOAD:-(empty)}"
 unset LD_PRELOAD
 export LD_PRELOAD=""
+log Info "LD_PRELOAD cleared for gamescope"
 
 # Default to Wayland SDL backend unless the user has explicitly set one.
 # This is needed because some games default to X11 under gamescope even
 # though the native Wayland path is available and performs better.
 if ! [[ -n "$SDL_VIDEODRIVER" ]]; then
   export SDL_VIDEODRIVER="wayland"
+  log Info "Set SDL_VIDEODRIVER=wayland"
 fi
+log Info "SDL_VIDEODRIVER configured: ${SDL_VIDEODRIVER}"
 
+log Info "Querying focused monitor via hyprctl"
 read -r MONITOR_NAME MONITOR_REFRESH_RATE MONITOR_H MONITOR_W < <(
   hyprctl -j monitors | jq -r '
     .[] | select(.focused) | [.name, (.refreshRate | floor), .height, .width] | @tsv
@@ -311,18 +331,22 @@ if [[ $NO_POWER_PROFILE == false ]]; then
         --profile performance
         --
       )
+      log Info "Using powerprofilesctl performance"
     else
       log Warn "'performance' power profile not available, skipping"
     fi
   fi
 fi
+log Info "Power profile check complete, prefix: [${EXEC_CMDLINE[*]}]"
 
 # mangohud is added as a separate wrapper instead of using gamescope's
 # built-in --mangoapp flag, which has known stability issues and lacks
 # some mangohud overlay features.
 if $USE_MANGOHUD; then
+  log Info "Prepending mangohud to exec chain"
   EXEC_CMDLINE+=(mangohud)
 fi
+log Info "Mangohud added, total prefix: ${#EXEC_CMDLINE[@]} commands"
 
 # Build resolution/refresh/scaler defaults, skipping any flag the user
 # already supplied via --gamescope-options so their value takes effect.
@@ -336,11 +360,14 @@ has_extra_flag -h || has_extra_flag --nested-height || GAMESCOPE_DEFAULTS+=(-h "
 has_extra_flag -h || has_extra_flag --adaptive-sync || GAMESCOPE_DEFAULTS+=(--adaptive-sync)
 has_extra_flag -h || has_extra_flag --fullscreen || GAMESCOPE_DEFAULTS+=(--fullscreen)
 has_extra_flag -S || has_extra_flag --scaler || GAMESCOPE_DEFAULTS+=(-S auto)
+log Info "Gamescope defaults: ${GAMESCOPE_DEFAULTS[*]}"
 
 GAME_CMDLINE=()
 if $OVERRIDE_LDPRELOAD; then
   GAME_CMDLINE=(env LD_PRELOAD="$SAVED_LD_PRELOAD")
+  log Info "GAME_CMDLINE with LD_PRELOAD override"
 fi
+log Info "Game command prefixes: ${#GAME_CMDLINE[@]}"
 
 log Info "Gamescope log available in $VIBRANIUM_CACHE/gamescope_latest.log"
 log Info "Full cmdline: ${EXEC_CMDLINE[*]}"
@@ -352,6 +379,7 @@ log Info "Launching ${GAME_CMDLINE[*]}"
 #   3. gamescope with user extras -> built-in defaults -> hardcoded flags
 #   4. -- as separator, followed by the game command
 #   5. stdout+stderr redirected to a log file for debugging.
+log Info "Executing gamescope"
 exec "${EXEC_CMDLINE[@]}" gamescope \
   "${EXTRA_GAMESCOPE_OPTS[@]}" \
   "${GAMESCOPE_DEFAULTS[@]}" \

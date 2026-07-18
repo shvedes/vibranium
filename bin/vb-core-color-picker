@@ -10,6 +10,8 @@ log() {
   fi
 }
 
+log Info "History file: $HISTORY"
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -30,11 +32,13 @@ EOF
 }
 
 check_deps() {
+  log Info "Checking dep: hyprpicker"
   if ! command -v hyprpicker >/dev/null; then
     log Error "missing required dependencies: hyprpicker"
     vb-cmd-dep-notify --name "Color Picker" --deps "hyprpicker"
     return 1
   fi
+  log Info "hyprpicker found"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -49,6 +53,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     -c | --clear)
       CLEAR_MODE=true
+      log Info "Clear mode"
       shift
       ;;
     --)
@@ -64,8 +69,9 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ "$CLEAR_MODE" == true ]]; then
+  log Info "Truncating history: $HISTORY"
   : >"$HISTORY"
-  log Info "Clearing history file"
+  log Info "History cleared"
   vb-refresh-waybar-module color-picker
   exit 0
 fi
@@ -74,21 +80,18 @@ if ! check_deps; then
   exit 1
 fi
 
-# Reading mode applies a blue-light filter that shifts all colors on
-# screen; picking a color under that filter would give a distorted value,
-# so the picker is blocked while reading mode is active.
 if [[ -f "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.conf" ]]; then
-  log Info "Reading mode is active, aborting"
+  log Info "Reading mode active, aborting"
   notify-send -r 2 -t 3000 "Color Picker" \
     "<b>Color Picker</b> isn't available while <b>Reading Mode</b> is active!"
+  log Info "Reading mode notification sent"
   exit 1
 fi
 
-# Only one hyprpicker instance may run at a time. Kill any existing
-# process so the new picker starts with a clean slate.
 if pid=$(pidof hyprpicker); then
-  log Info "Killing existing hyprpicker process (PID: $pid)"
+  log Info "Killing existing hyprpicker (PID: $pid)"
   kill "$pid"
+  log Info "Existing hyprpicker killed, exit code: $?"
   exit 1
 fi
 
@@ -98,29 +101,21 @@ helpers::check \
   VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR \
   VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW \
   VIBRANIUM_COLOR_PICKER_HISTORY_SIZE
-
 SHOW_SELECTED="$VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR"
 HEX_PREVIEW="$VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW"
 HIST_SIZE="$VIBRANIUM_COLOR_PICKER_HISTORY_SIZE"
+log Info "Config: show_selected=$SHOW_SELECTED hex_preview=$HEX_PREVIEW hist_size=$HIST_SIZE"
 
-# hyprpicker flags:
-#   -a  auto-copy selected color to clipboard
-#   -b  enable mouse-grab crosshair overlay
-#   -l  enable live preview under cursor
-#   -r  render multiple frames (continuous mode)
-#   -f hex  output format as hex (e.g. #aabbcc)
-#   -d  disable live HEX preview window (set when HEX_PREVIEW is false)
 OPT_ARGS=()
 if [[ "$HEX_PREVIEW" == false ]]; then
+  log Info "HEX_PREVIEW disabled, adding -d flag"
   OPT_ARGS+=(-d)
 fi
 
 PICKER_CMD=(hyprpicker -a -b -l -r -f hex "${OPT_ARGS[@]}")
-log Info "Running: ${PICKER_CMD[*]}"
+log Info "Picker cmd: ${PICKER_CMD[*]}"
 
-# hyprpicker writes the picked color to stdout and logs any internal
-# errors prefixed with "[ERR]" on stderr (merged here). Skip error
-# lines so only the actual color value is captured.
+log Info "Starting hyprpicker, waiting for color"
 while IFS= read -r line; do
   if [[ $line == "[ERR]"* ]]; then
     continue
@@ -128,53 +123,60 @@ while IFS= read -r line; do
 
   SELECTED_COLOR=$line
 done < <("${PICKER_CMD[@]}")
+log Info "Hyprpicker output closed, selected: ${SELECTED_COLOR:-(none)}"
 
 if [[ -z "$SELECTED_COLOR" ]]; then
-  log Info "No color selected, exiting"
+  log Info "No color picked"
   exit 0
 fi
 
-log Info "Selected color: $SELECTED_COLOR"
+log Info "Picked color: $SELECTED_COLOR"
 
-# History file is a simple list of hex colors, one per line (FIFO by
-# insertion order). We maintain a maximum of HIST_SIZE entries.
 FOUND=false
 COUNT=0
 
+log Info "Checking history for duplicates"
 if [[ -f "$HISTORY" ]]; then
   while IFS= read -r line; do
     ((COUNT++))
 
     if [[ "$line" == "$SELECTED_COLOR" ]]; then
       FOUND=true
+      log Info "Duplicate found at line $COUNT"
     fi
   done <"$HISTORY"
 fi
 
-log Info "History size: $COUNT, max: $HIST_SIZE, duplicate: $FOUND"
+log Info "History: $COUNT entries, max $HIST_SIZE, duplicate=$FOUND"
 
-# Append new color when it is not a duplicate. If the limit is hit,
-# start fresh (oldest entries are discarded by truncation).
 if [[ "$FOUND" == false ]]; then
   if ((COUNT >= HIST_SIZE)); then
+    log Info "History full ($COUNT >= $HIST_SIZE), writing $SELECTED_COLOR from start"
     printf '%s\n' "$SELECTED_COLOR" >"$HISTORY"
   else
+    log Info "Appending $SELECTED_COLOR to history"
     printf '%s\n' "$SELECTED_COLOR" >>"$HISTORY"
   fi
 fi
 
-# Generate a 1×1 pixel PNG of the selected color for use as a
-# notification icon. The file is created in the runtime directory and
-# cleaned up immediately after notify-send displays it.
 if [[ $SHOW_SELECTED == true ]]; then
   PREVIEW_IMG="$VIBRANIUM_RUNTIME/color-picker.png"
+  log Info "Generating preview: $PREVIEW_IMG"
   if command -v magick >/dev/null; then
+    log Info "Running: magick -size 1x1 xc:$SELECTED_COLOR $PREVIEW_IMG"
     magick -size 1x1 xc:"${SELECTED_COLOR}" "$PREVIEW_IMG"
+    log Info "Preview image created, exit: $?"
   else
-    log Warn "ImageMagick is not installed!"
+    log Warn "ImageMagick not installed, skipping preview"
   fi
 fi
 
+log Info "Sending notification"
 notify-send -r 3 -t 1500 -i "$PREVIEW_IMG" "Color Picker" "Color copied to clipboard"
+log Info "Notification displayed"
+log Info "Refreshing waybar module"
 vb-refresh-waybar-module color-picker
+log Info "Waybar module refreshed"
+log Info "Cleaning up preview"
 rm -f "$PREVIEW_IMG"
+log Info "Preview image cleaned up"

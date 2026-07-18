@@ -114,6 +114,7 @@ done
 
 # No action flag was provided - print usage and exit cleanly
 if [[ -z "$ACTION" ]]; then
+  log Info "No action specified, showing usage"
   usage
   exit 0
 fi
@@ -129,6 +130,7 @@ if [[ -n "$MONITOR_ARG" && "$MONITOR_ARG" == *,* ]]; then
     if [[ "$arg" == --monitor ]]; then skip_next=true; continue; fi
     BASE_ARGS+=("$arg")
   done
+  log Info "Dispatching to ${#MONITORS[@]} monitors: ${MONITORS[*]}"
   for mon in "${MONITORS[@]}"; do
     mon="${mon//[[:space:]]/}"
     [[ -z "$mon" ]] && continue
@@ -145,6 +147,7 @@ exec 9>"$LOCKFILE" || {
   exit 1
 }
 flock -n 9 || exit 0
+log Info "Lock acquired ($LOCKFILE)"
 
 source vb-lib-core
 
@@ -152,6 +155,7 @@ helpers::check \
   VIBRANIUM_GLOBAL_USE_OSD \
   VIBRANIUM_BRIGHTNESS_STEP \
   VIBRANIUM_BRIGHTNESS_NOTIFY
+log Info "Config: OSD=$VIBRANIUM_GLOBAL_USE_OSD, step=$VIBRANIUM_BRIGHTNESS_STEP, notify=$VIBRANIUM_BRIGHTNESS_NOTIFY"
 
 # Global state maps - populated once by load_state, read/written by all
 # helpers in-memory instead of re-reading the state file on every access.
@@ -177,6 +181,7 @@ load_state() {
 
   read -r _first_line <"$STATE_FILE"
   if [[ "$_first_line" != "$STATE_HEADER" ]]; then
+    log Warn "State file is invalid. Removing."
     rm -f "$STATE_FILE"
     return 0
   fi
@@ -186,7 +191,10 @@ load_state() {
   mult_map=()
   GAMMA=100
 
+  log Info "Loading $STATE_FILE"
+
   while IFS=: read -r output i2c level gamma mult; do
+    # Ignore header comment ($STATE_HEADER)
     [[ "$output" == \#* ]] && continue
 
     # Monitor data line (non-empty output) populates the maps.
@@ -235,6 +243,7 @@ save_state() {
   fi
 
   printf '%s' "$content" >"$STATE_FILE"
+  log Info "State saved: $((${#bus_map[@]})) monitor(s), gamma=$GAMMA"
 }
 
 # Append one monitor line to $content.  Omits trailing colon when last
@@ -264,6 +273,7 @@ save_gamma() {
 }
 
 apply_gamma() {
+  log Info "Apply gamma: $1"
   hyprctl -q hyprsunset gamma "$1"
 }
 
@@ -294,12 +304,14 @@ load_mult() {
     _out=$MULT_HUNDREDTHS_DEFAULT
     MULT_CACHED=false
   fi
+  log Info "Multiplier for $ACTIVE_MONITOR: $_out (hundredths, cached=$MULT_CACHED)"
 }
 
 # Update sleep-multiplier for the active monitor in the global mult_map and
 # persist.  save_state writes every line, so the active monitor entry gets
 # the new value while others are preserved as-is.
 save_mult() {
+  log Info "Save multiplier for $ACTIVE_MONITOR: $1 (hundredths)"
   mult_map[$ACTIVE_MONITOR]=$1
   save_state
 }
@@ -309,6 +321,7 @@ save_mult() {
 _probe_mult() {
   local candidate="$1" output mf
   _mult_float mf "$candidate"
+  log Info "Probe multiplier $candidate ($mf) on bus $I2C_BUS"
   output=$(ddcutil --bus "$I2C_BUS" --sleep-multiplier "$mf" --noverify --skip-ddc-checks --maxtries 1,1,1 getvcp 10 2>/dev/null)
   [[ "$output" =~ current\ value\ =\ +([0-9]+) ]]
 }
@@ -357,6 +370,7 @@ calibrate_sleep_mult() {
   fi
 
   _mult_float SLEEP_MULT_FLOAT "$mult"
+  log Info "Calibrated multiplier for $ACTIVE_MONITOR: $mult ($SLEEP_MULT_FLOAT, cached=$MULT_CACHED)"
 }
 
 # Re-calibrate sleep-multiplier for every DDC-capable monitor.  Runs a fresh
@@ -450,6 +464,7 @@ get_i2c_bus() {
 
   # Load existing cache so levels (and other buses) survive the rewrite
   load_state
+  log Info "DDC detect: $(echo "$new_info" | grep -c .) monitor(s) found"
 
   # Merge newly detected buses (overrides cached bus entries only)
   while IFS=: read -r output bus; do
@@ -466,10 +481,11 @@ set_i2c_bus() {
 
   if [[ $FORCE == false && -n "${bus_map[$ACTIVE_MONITOR]:-}" ]]; then
     _result="${bus_map[$ACTIVE_MONITOR]}"
+    log Info "I2C cache hit: $ACTIVE_MONITOR -> bus $_result"
     return
   fi
 
-  log Info "I2C bus cache for the active monitor not found, running detect"
+  log Info "I2C cache miss for $ACTIVE_MONITOR, running detect"
   get_i2c_bus
   _result="${bus_map[$ACTIVE_MONITOR]}"
 }
@@ -482,10 +498,12 @@ get_brightness_cache() {
   fi
 
   _result="${level_map[$ACTIVE_MONITOR]:-}"
+  log Info "Brightness cache: $ACTIVE_MONITOR -> ${_result:-<empty>}"
 }
 
 update_brightness_cache() {
   local new_value="$1"
+  log Info "Cache update: $ACTIVE_MONITOR -> $new_value"
   level_map["$ACTIVE_MONITOR"]="$new_value"
   save_state
 }
@@ -545,9 +563,12 @@ osd() {
 # in-memory globals (bus_map, level_map, mult_map, GAMMA) and only hit the
 # state file again for writes.
 load_state
+log Info "State loaded: ${#bus_map[@]} monitor(s), gamma=$GAMMA"
 
 if [[ $ACTION == "--calibrate" ]]; then
+  log Info "Starting calibration for all monitors"
   calibrate_all
+  log Info "Calibration complete"
   exit 0
 fi
 
@@ -568,7 +589,7 @@ if [[ -n "$MONITOR_ARG" ]]; then
   ACTIVE_MONITOR="$MONITOR_ARG"
 fi
 
-log Info "Active monitor: $ACTIVE_MONITOR"
+log Info "Active monitor: $ACTIVE_MONITOR (${MONITOR_COUNT:-?} total, fullscreen=$FULLSCREEN_STATE)"
 
 if [[ -z "$ACTIVE_MONITOR" ]]; then
   notify-send -r 1 -t 3000 -u critical "Vibranium - Brightness" "Cannot get the active monitor!"
@@ -587,16 +608,18 @@ if ! compgen -G "/sys/class/backlight/*" >/dev/null; then
     exit 1
   fi
 
+  log Info "No backlight device found, using DDC"
   method="ddc"
   set_i2c_bus I2C_BUS
   log Info "Using DDC method, I2C bus: $I2C_BUS"
 else
   if [[ -n "$ACTIVE_MONITOR" && ! "$ACTIVE_MONITOR" =~ ^eDP ]]; then
+    log Info "External monitor ($ACTIVE_MONITOR) on laptop, using DDC"
     method="ddc"
     set_i2c_bus I2C_BUS
   else
+    log Info "Built-in panel ($ACTIVE_MONITOR), using raw sysfs"
     method="raw"
-    log Info "Using raw sysfs method"
   fi
 fi
 
@@ -611,15 +634,18 @@ if [[ "$method" == "ddc" ]]; then
     ddcutil_flags=(--sleep-multiplier "$SLEEP_MULT_FLOAT" --noverify --skip-ddc-checks --maxtries 1,1,1)
     log Info "Sleep multiplier: $SLEEP_MULT_FLOAT"
   else
+    log Info "Gamma dimming active, using fallback sleep-multiplier 0.13"
     ddcutil_flags=(--sleep-multiplier 0.13 --noverify --skip-ddc-checks --maxtries 1,1,1)
   fi
 fi
 
 if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
   if ! command -v swayosd-client >/dev/null; then
+    log Warn "swayosd-client not found, OSD unavailable"
     vb-cmd-dep-notify --name "Brightness Control" --deps swayosd
     exit 1
   fi
+  log Info "OSD enabled"
 fi
 
 step=$VIBRANIUM_BRIGHTNESS_STEP
@@ -640,17 +666,19 @@ case "$method" in
       if [[ "$line_output" =~ current\ value\ =\ +([0-9]+) ]]; then
         current="${BASH_REMATCH[1]}"
       fi
+      log Info "DDC getvcp attempt $((i+1))/10: current=$current"
       if [[ $current =~ ^[0-9]+$ ]]; then
           if ((current >= 0 && current <= 100)); then
             break
           fi
       fi
     done
-    [[ $FORCE == false ]] && log Warn "cache not found!"
+    [[ $FORCE == false ]] && log Warn "Cache miss, got DDC value: $current"
     # No need to persist "$current" here: the final value ("$new") is written
     # below, and doing both would race two background writers on the same file.
   fi
 
+  log Info "DDC current brightness: $current"
   case "$ACTION" in
   "--up")
     if ((GAMMA < 100)); then
@@ -711,12 +739,14 @@ case "$method" in
   fi
 
   if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == false ]]; then
+    log Info "Notifications disabled, exiting"
     exit 0
   fi
 
   if ((GAMMA < 100)); then
-    # Gamma dimming active - show the negative percentage via OSD or notify.
+    log Info "Gamma dimming active (gamma=$GAMMA), showing dimming notification"
     if ((FULLSCREEN_STATE == 2)); then
+      log Info "Fullscreen detected, suppressing notification"
       exit 0
     fi
     if [[ "$QUIET" == false ]]; then
@@ -742,6 +772,7 @@ case "$method" in
       # We don't apply this rule to OSD notifications because
       # it defeats the purpose of OSDs
       if ((FULLSCREEN_STATE == 2)); then
+        log Info "Fullscreen detected, suppressing DDC notification"
         exit 0
       fi
 
@@ -756,6 +787,7 @@ case "$method" in
   # swayosd-client --brightness only understands 0-100 and would conflict
   # with gamma-based dimming below that range.
   if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true && "$VIBRANIUM_BRIGHTNESS_NOTIFY" != "false" && "$QUIET" == false && "$GAMMA" == "100" ]]; then
+    log Info "Delegating to swayosd (gamma=100, raw method)"
     # Translate action into swayosd's (±)number / absolute syntax:
     #   --up   -> +<step>   e.g. +5
     #   --down -> -<step>   e.g. -5
@@ -772,6 +804,7 @@ case "$method" in
       ;;
     esac
 
+    log Info "swayosd-client --brightness=$swayosd_arg"
     if [[ "$QUIET" == false ]]; then
       swayosd-client --brightness="$swayosd_arg"
     fi
@@ -780,6 +813,7 @@ case "$method" in
     current_raw=$(</sys/class/backlight/*/brightness)
     max_raw=$(</sys/class/backlight/*/max_brightness)
     current=$((current_raw * 100 / max_raw))
+    log Info "Raw sysfs: current=$current_raw, max=$max_raw, pct=$current"
 
     case "$ACTION" in
     "--up")
@@ -859,14 +893,17 @@ case "$method" in
 
       new=$((new_raw * 100 / max_raw))
 
+      log Info "Write raw brightness: $new_raw/$max_raw ($new%)"
       echo "$new_raw" >/sys/class/backlight/*/brightness
     fi
 
     if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == "false" ]]; then
+      log Info "Notifications disabled, exiting"
       exit 0
     fi
 
     if ((GAMMA < 100)); then
+      log Info "Gamma dimming active (gamma=$GAMMA), raw notification"
       if [[ "$QUIET" == false ]]; then
         dim_bar=$(( (GAMMA - GAMMA_MIN) * 100 / (100 - GAMMA_MIN) ))
         if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then

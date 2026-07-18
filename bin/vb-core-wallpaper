@@ -9,6 +9,8 @@ log() {
   fi
 }
 
+log Info "${0##*/} started: state_file=$VIBRANIUM_STATE/wallpaper.state"
+
 WALLPAPER_STATE="$VIBRANIUM_STATE/wallpaper.state"
 WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
 
@@ -105,12 +107,15 @@ cycle_wallpaper() {
   local candidate
 
   mapfile -t files < <(find "$WALLS" -maxdepth 1 -xtype f 2>/dev/null | sort)
+  log Info "cycle_wallpaper: mode=$mode files=${#files[@]}"
 
   if ((${#files[@]} == 0)); then
+    log Info "No wallpaper files found in $WALLS"
     return 1
   fi
 
   get_wallpaper current
+  log Info "current wallpaper: $current"
 
   found=0
   idx=0
@@ -125,6 +130,8 @@ cycle_wallpaper() {
       fi
     done
   fi
+
+  log Info "current index: $idx (found=$found)"
 
   case "$mode" in
   --next)
@@ -145,11 +152,15 @@ cycle_wallpaper() {
     ;;
   esac
 
+  log Info "candidate: $candidate"
+
   if [[ "$candidate" == "$current" ]]; then
+    log Info "candidate matches current, nothing to do"
     return 0
   fi
 
   _result="$candidate"
+  log Info "new wallpaper selected: $candidate"
 }
 
 feature_enabled() {
@@ -165,35 +176,56 @@ feature_enabled() {
   fi
 }
 
+action=""
+raw_path=""
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
   -v | --verbose)
     VERBOSE=true
-    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -g | --get)
+    action="get"
+    ;;
+  --next)
+    action="next"
+    ;;
+  --prev)
+    action="prev"
     ;;
   --)
     shift
     break
     ;;
+  -*)
+    log Error "unknown option: $1"
+    log Error "Try ${0##*/} --help for more information."
+    exit 1
+    ;;
   *)
-    break
+    raw_path="$1"
     ;;
   esac
+  shift
 done
 
 # Normalize file extension to lowercase so that .JPG, .PNG, etc. are
-# treated identically to their lowercase counterparts by the case below.
-# A separate variable is used instead of rewriting $1 to preserve the
-# original path for file operations (realpath, cp, etc.) further down.
-_dispatch="$1"
-if [[ "$_dispatch" != -* ]]; then
-  _fname="${_dispatch##*/}"
-  if [[ "$_fname" == *"."* ]]; then
-    _ext="${_fname##*.}"
-    _ext_lower="${_ext,,}"
-    if [[ "$_ext" != "$_ext_lower" ]]; then
-      # Reconstruct the path with the lowered extension in place.
-      _dispatch="${_dispatch%"$_fname"}${_fname%"$_ext"}${_ext_lower}"
+# treated identically to their lowercase counterparts.
+_dispatch=""
+if [[ -n "$raw_path" ]]; then
+  _dispatch="$raw_path"
+  if [[ "$_dispatch" != -* ]]; then
+    _fname="${_dispatch##*/}"
+    if [[ "$_fname" == *"."* ]]; then
+      _ext="${_fname##*.}"
+      _ext_lower="${_ext,,}"
+      if [[ "$_ext" != "$_ext_lower" ]]; then
+        _dispatch="${_dispatch%"$_fname"}${_fname%"$_ext"}${_ext_lower}"
+      fi
     fi
   fi
 fi
@@ -201,66 +233,65 @@ fi
 THEME="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
 UWALLS="$XDG_CONFIG_HOME/vibranium/themes/$THEME/backgrounds"
 
-case "$_dispatch" in
-"" | -h | --help)
+if [[ -z "$action" && -z "$_dispatch" ]]; then
   usage
   exit 0
-  ;;
--g | --get)
+fi
+
+if [[ "$action" == "get" ]]; then
   get_wallpaper CURRENT
-  # shellcheck disable=SC2153
   echo "$CURRENT"
   exit 0
-  ;;
---next | --prev)
+fi
+
+if [[ "$action" == "next" || "$action" == "prev" ]]; then
   if ! feature_enabled; then
-    # Wallpaper feature is disabled globally - exit silently.
     exit 0
   fi
 
   WALLPAPER_PATH=""
-  cycle_wallpaper WALLPAPER_PATH "$_dispatch"
+  cycle_wallpaper WALLPAPER_PATH "--$action"
 
-  # cycle_wallpaper returns empty when there is only one
-  # wallpaper and it is already active - nothing to do
   if [[ -z "$WALLPAPER_PATH" ]]; then
     exit 0
   fi
-  ;;
-*.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
-  if ! feature_enabled; then
-    # Wallpaper feature is disabled globally - exit silently.
-    exit 0
-  fi
+elif [[ -n "$_dispatch" ]]; then
+  case "$_dispatch" in
+  *.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
+    if ! feature_enabled; then
+      exit 0
+    fi
 
-  WALLPAPER_PATH="$(realpath "$1")"
+    WALLPAPER_PATH="$(realpath "$raw_path")"
 
-  if [[ ! -f "$WALLPAPER_PATH" ]]; then
-    log Error "'$WALLPAPER_PATH' doesn't exist!"
+    if [[ ! -f "$WALLPAPER_PATH" ]]; then
+      log Error "'$WALLPAPER_PATH' doesn't exist!"
+      exit 1
+    fi
+
+    if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
+      log Info "Copying external wallpaper from $WALLPAPER_PATH to theme backgrounds"
+      mkdir -p "$UWALLS"
+      cp "$WALLPAPER_PATH" "$UWALLS/"
+      cp "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds/"
+      WALLPAPER_PATH="$UWALLS/${WALLPAPER_PATH##*/}"
+      log Info "Wallpaper copied, new path: $WALLPAPER_PATH"
+    fi
+    ;;
+  *)
+    log Error "unsupported file format: $_dispatch"
+    log Error "Try ${0##*/} --help for more information."
     exit 1
-  fi
-
-  # When the user sets a wallpaper from an external path (e.g. Thunar
-  # context menu, downloaded file), copy it into the theme's backgrounds
-  # directory so the file persists even if the original is deleted.
-  # Also copy into the current active theme so cycle_wallpaper can find it.
-  if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
-    mkdir -p "$UWALLS"
-    cp "$WALLPAPER_PATH" "$UWALLS/"
-    cp "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds/"
-    WALLPAPER_PATH="$UWALLS/${WALLPAPER_PATH##*/}"
-  fi
-  ;;
--*)
-  log Error "unknown option: $*"
-  log Error "Try ${0##*/} --help for more information."
-  exit 1
-  ;;
-esac
+    ;;
+  esac
+fi
 
 log Info "Setting wallpaper: $WALLPAPER_PATH"
+log Info "awww img command: fade duration=0.5 step=255 path=$WALLPAPER_PATH"
 awww img -t fade --transition-duration 0.5 --transition-step 255 "$WALLPAPER_PATH" &
 ln -sf "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/background"
+log Info "Symlink updated: $XDG_CONFIG_HOME/vibranium/current/background -> $WALLPAPER_PATH"
 
 # Update the state file
 write_wallpaper_state "$THEME" "$WALLPAPER_PATH"
+log Info "Wallpaper state written: theme=$THEME path=$WALLPAPER_PATH"

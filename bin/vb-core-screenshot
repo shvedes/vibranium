@@ -31,15 +31,17 @@ Options:
 EOF
 }
 
-# Copy the screenshot path to the clipboard as a text/uri-list so
-# pasting in a file manager or chat app treats it as a file reference
-# rather than a plain-text path.
 copy() {
+  log Info "Copying to clipboard: $1"
   printf 'file://%s' "$1" | wl-copy --type text/uri-list
+  log Info "Copied to clipboard: $1"
 }
 
 notify() {
+  log Info "Sending notification for target: $1"
+
   if [[ $VIBRANIUM_SCREENSHOT_SHOW_NOTIFICATION == false ]]; then
+    log Info "Notification suppressed"
     return 0
   fi
 
@@ -62,16 +64,15 @@ notify() {
   fi
 
   notify-send -r 3 -t 1500 'Screenshot' "$target $message"
+  log Info "Notification: $target $message"
 }
 
 set_output_file() {
   local -n _path=$1
 
-  # When saving to disk is disabled, the screenshot is written to the
-  # runtime directory (tmpfs) and exists only until reboot. Otherwise
-  # it goes to ~/Pictures/Screenshots/ with a timestamped filename.
   if [[ $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK == false ]]; then
     _path="$VIBRANIUM_RUNTIME/screenshot.$FILETYPE"
+    log Info "Output: $_path (tmpfs)"
     return
   fi
 
@@ -84,43 +85,41 @@ set_output_file() {
   fi
 
   _path="$dir/screenshot-$timestamp.$FILETYPE"
+  log Info "Output: $_path (disk)"
 }
 
-# slurp interactive region selector.
-#   -d  draw borders
-#   -w 1  border width in px
-#   -b / -c  overlay color from Vibranium theme variables
-# Output format matches grim's -g geometry syntax: WxH+X+Y
 select_region() {
   local -n _region=$1
   local result result_rc
 
+  log Info "Selecting region via slurp"
   result="$(slurp -d -w 1 -b "${P_GRAY}33" -c "${P_ACCENT}" 2>/dev/null)"
   result_rc=$?
 
   if ((result_rc != 0)) || [[ -z $result ]]; then
+    log Info "Region selection cancelled"
     return 1
   fi
 
   _region="$result"
+  log Info "Region selected: $_region"
 }
 
-# Extract the focused window's geometry from Hyprland as a grim-compatible
-# geometry string: "X,Y WxH" (e.g. "100,50 1920x1080").
-# hyprctl -j activewindow returns the window's at[] and size[] arrays;
-# the jq expression formats them directly.
 get_window_geometry() {
   local -n _geometry=$1
   local result expression
 
+  log Info "Getting active window geometry"
   expression='"\(.at[0]),\(.at[1]) \(.size[0])x\(.size[1])"'
   result="$(hyprctl -j activewindow | jq -r "$expression")"
 
   if [[ $result == *null* ]]; then
+    log Info "No active window geometry found"
     return 1
   fi
 
   _geometry="$result"
+  log Info "Window geometry: $_geometry"
 }
 
 capture() {
@@ -139,6 +138,7 @@ capture() {
     fi
 
     grim "${GRIM_OPTS[@]}" -g "$region" "$output_file"
+    log Info "grim: region=$region output=$output_file"
     ;;
   window)
     local geometry
@@ -147,34 +147,44 @@ capture() {
     fi
 
     grim "${GRIM_OPTS[@]}" -g "$geometry" "$output_file"
+    log Info "grim: geometry=$geometry output=$output_file"
 
     if [[ $FLASH_BORDER == true ]]; then
       hypr::flash::border
+      log Info "Border flash triggered"
     fi
     ;;
   screen)
     monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused) | .name')"
+    log Info "Monitor: $monitor"
     grim "${GRIM_OPTS[@]}" -o "$monitor" "$output_file"
+    log Info "grim: monitor=$monitor output=$output_file"
 
     if [[ $FLASH_SCREEN == true ]]; then
       hypr::flash::screen
+      log Info "Screen flash triggered"
     fi
     ;;
   esac
 
   if [[ ! -f $output_file ]]; then
+    log Error "Screenshot file not found: $output_file"
     exit 1
   fi
+
+  log Info "Screenshot saved: $output_file"
 
   copy "$output_file"
   notify "$target"
 
   if [[ $ANNOTATE == true ]]; then
+    log Info "Launching annotator for: $output_file"
     exec setsid -f app2unit vb-util-image-annotator "$output_file"
   fi
 }
 
 init() {
+  log Info "Initializing screenshot config"
   source vb-lib-core
 
   helpers::check \
@@ -195,21 +205,22 @@ init() {
 
   GRIM_OPTS=()
 
-  # grim -c includes the cursor in the screenshot.
   if [[ $CURSOR == true ]]; then
     GRIM_OPTS+=(-c)
   fi
 
   GRIM_OPTS+=(-t "$FILETYPE")
 
-  # grim -q sets JPEG quality (0-100); only applicable for jpeg/jpg output.
   if [[ $FILETYPE =~ ^jp(e)?g$ ]]; then
     GRIM_OPTS+=(-q "$VIBRANIUM_SCREENSHOT_JPEG_QUALITY")
   fi
+
+  log Info "Config loaded: filetype=$FILETYPE cursor=$CURSOR annotate=$ANNOTATE flash_screen=$FLASH_SCREEN flash_border=$FLASH_BORDER"
 }
 
 check_deps() {
   local dep missing=()
+  log Info "Verifying dependencies: grim slurp jq"
 
   for dep in grim slurp jq; do
     if ! command -v "$dep" >/dev/null; then
@@ -218,14 +229,13 @@ check_deps() {
   done
 
   if ((${#missing[@]} > 0)); then
+    log Error "Missing dependencies: ${missing[*]}"
     vb-cmd-dep-notify --name 'Screenshot Utility' --deps "${missing[*]}"
     return 1
   fi
 }
 
 MODE=''
-# Tracks whether --annotate was passed on the command line.
-# When true, annotation is forced regardless of VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE.
 EXPLICIT_ANNOTATE=false
 
 while [[ $# -gt 0 ]]; do
@@ -236,6 +246,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --region | --window | --screen)
     MODE="${1#--}"
+    log Info "Mode: $MODE"
     shift
     ;;
   --annotate)
@@ -254,13 +265,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# No capture mode given - nothing to do.
 if [[ -z $MODE ]]; then
   usage
   exit 0
 fi
 
 if slurp_pid="$(pidof slurp)"; then
+  log Info "Killing existing slurp (PID: $slurp_pid)"
   kill "$slurp_pid"
   exit 1
 fi
@@ -271,10 +282,10 @@ fi
 
 init
 
-# --annotate was passed explicitly: force annotation, ignoring the
-# VIBRANIUM_SCREENSHOT_AUTO_ANNOTATE builtin setting.
 if [[ $EXPLICIT_ANNOTATE == true ]]; then
   ANNOTATE=true
+  log Info "Annotation forced via --annotate flag"
 fi
 
+log Info "Capturing mode=$MODE"
 capture "$MODE"

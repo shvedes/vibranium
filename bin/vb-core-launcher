@@ -60,6 +60,7 @@ _open_file() {
   # source app2unit creates a transient systemd scope so the launched
   # xdg-open process is tracked and cleaned up with the session.
   source app2unit -s app-graphical.slice -- xdg-open "$file" &>/dev/null
+  log Info "File open done: $file"
 }
 
 _open_link() {
@@ -70,6 +71,7 @@ _open_link() {
   # already exists, the scope is created for nothing, but the overhead
   # is negligible and it prevents orphaned browser processes on logout.
   app2unit-open -s app-graphical.slice "$link" &>/dev/null &
+  log Info "Link open dispatched: $link"
 }
 
 # Keywords are defined in the user's advanced settings file as
@@ -82,12 +84,13 @@ _handle_keyword() {
   local input="$1"
   local entry keyword action extra
 
+  log Info "Keyword handler input: $input"
   for entry in "${vb_launcher_keywords[@]+"${vb_launcher_keywords[@]}"}"; do
     keyword="${entry%%:*}"
     action="${entry#*:}"
 
     if [[ "$input" == "$keyword" ]]; then
-      log Info "Keyword matched: $keyword -> $action"
+      log Info "Keyword exact match: $keyword -> $action"
       if ! eval "$action"; then
         log Error "Keyword '$keyword' returned non zero exit code!"
         exit 1
@@ -97,7 +100,7 @@ _handle_keyword() {
 
     if [[ "$input" == "$keyword "* ]]; then
       extra="${input#$keyword }"
-      log Info "Keyword matched with args: $keyword -> $action $extra"
+      log Info "Keyword match with args: $keyword -> $action $extra"
       if ! eval "$action $extra"; then
         log Error "Keyword '$keyword' returned non zero exit code!"
         exit 1
@@ -105,6 +108,7 @@ _handle_keyword() {
       return 0
     fi
   done
+  log Info "No keyword matched"
   return 1
 }
 
@@ -127,7 +131,7 @@ _search_the_internet() {
     ;;
   esac
 
-  log Info "Searching: $input via $SEARCH_ENGINE"
+  log Info "Searching $SEARCH_ENGINE for: $input"
   source app2unit -S both -s app-graphical.slice -- xdg-open "${engine}${input}" &>/dev/null
 }
 
@@ -145,6 +149,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --web | --ai | --power | --pwa)
     MODE="$1"
+    log Info "Mode: $1"
     shift
     break
     ;;
@@ -155,7 +160,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if pidof -q rofi; then
-  log Info "Killing existing rofi instance"
+  log Info "Existing rofi found, killing"
   killall rofi
   exit 0
 fi
@@ -163,9 +168,11 @@ fi
 source vb-lib-core
 
 if [[ -f "${VIBRANIUM_USER_SETTINGS}.functions" ]]; then
+  log Info "Sourcing user functions: ${VIBRANIUM_USER_SETTINGS}.functions"
   source "${VIBRANIUM_USER_SETTINGS}.functions"
 fi
 
+log Info "Sourcing advanced settings: ${VIBRANIUM_USER_SETTINGS}.advanced"
 source "${VIBRANIUM_USER_SETTINGS}.advanced"
 
 helpers::check \
@@ -177,10 +184,11 @@ helpers::check \
 AUTO_SELECT="$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT"
 SHOW_ICONS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_ICONS"
 SEARCH_ENGINE="$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
+log Info "Config: auto_select=$AUTO_SELECT show_icons=$SHOW_ICONS engine=$SEARCH_ENGINE"
 
 case "$MODE" in
 --web | --ai | --power | --pwa)
-  log Info "Launcher mode: ${MODE#--}"
+  log Info "Category mode: ${MODE#--}"
   OPT_ARGS+=(
     -disable-history
     -icon-theme Vibranium
@@ -195,6 +203,7 @@ case "$MODE" in
     # Don't enable auto-select for Power menu: accidentally confirming a
     # power action (logout, reboot) on single-result display is dangerous.
     if [[ "$LAUNCHER_MODE" =~ ^(ai|web|pwa)$ ]]; then
+      log Info "Auto-select enabled for $LAUNCHER_MODE"
       OPT_ARGS+=(-auto-select true)
     fi
   fi
@@ -202,20 +211,25 @@ case "$MODE" in
   case "$MODE" in
   --power)
     OPT_ARGS+=(-drun-categories Power -display-drun "Power")
+    log Info "drun categories: Power"
     ;;
   --web)
     OPT_ARGS+=(-drun-categories WebApp -display-drun "Web Apps")
+    log Info "drun categories: WebApp"
     ;;
   --pwa)
     OPT_ARGS+=(-drun-categories PWA -display-drun "PWA")
+    log Info "drun categories: PWA"
     ;;
   --ai)
     OPT_ARGS+=(-drun-categories AI -display-drun "AIs")
+    log Info "drun categories: AI"
     ;;
   esac
   ;;
 *)
   SHOW_WEBAPPS="$VIBRANIUM_GLOBAL_APP_LAUNCHER_SHOW_WEBAPPS"
+  log Info "SHOW_WEBAPPS=$SHOW_WEBAPPS"
 
   EXCLUDE="Power"
 
@@ -223,7 +237,7 @@ case "$MODE" in
     EXCLUDE+=",WebApp,PWA,AI"
   fi
 
-  log Info "Default mode: excluding categories: $EXCLUDE"
+  log Info "Excluding categories: $EXCLUDE"
   OPT_ARGS+=(-drun-exclude-categories "$EXCLUDE")
 
   if [[ "$SHOW_WEBAPPS" == true ]]; then
@@ -231,23 +245,26 @@ case "$MODE" in
   fi
 
   if [[ "$AUTO_SELECT" == true ]]; then
+    log Info "Auto-select enabled for default mode"
     OPT_ARGS+=(-auto-select true)
   fi
 
   LAUNCHER_MODE="default"
   ;;
 esac
+log Info "Launcher mode set: $LAUNCHER_MODE"
 
 if [[ "$SHOW_ICONS" = true ]]; then
+  log Info "Icons enabled via theme-str"
   OPT_ARGS+=(-theme-str 'configuration {show-icons: true;} element-icon {enabled: true;}')
 fi
 
 # rofi -show drun normally executes the selected entry directly. By
 # overriding run-command with "echo {cmd} {args}", we capture what would
 # be executed and handle the dispatch ourselves below.
+log Info "Launching rofi with args: ${OPT_ARGS[*]}"
 read -r INPUT < <(rofi -show drun -run-command "echo {cmd} {args}" "${OPT_ARGS[@]}" 2>/dev/null)
-
-log Info "Rofi input: $INPUT"
+log Info "Rofi exited, input: ${INPUT:-(empty)}"
 
 case "$INPUT" in
 "file://"*)
@@ -257,12 +274,13 @@ case "$INPUT" in
   _open_link "$INPUT"
   ;;
 "DBus launch" | "")
-  log Info "No selection or DBus launch, exiting"
+  log Info "Empty/DBus launch, exiting"
   exit 0
   ;;
 *)
   # Keywords take precedence over all other input types.
   if _handle_keyword "$INPUT"; then
+    log Info "Keyword handled, exiting"
     exit 0
   fi
 
@@ -270,9 +288,10 @@ case "$INPUT" in
   CMD="${INPUT%% *}"
   ARGS="${INPUT#"$CMD"}"
   ARGS="${ARGS# }"
+  log Info "Parsed: CMD=$CMD ARGS=$ARGS"
 
   if [[ -x "$CMD" ]] || command -v "$CMD" >/dev/null; then
-    log Info "Executing command: $CMD"
+    log Info "Executable found: $CMD"
     # Vibranium-internal commands are eval'd directly so they inherit the
     # caller's environment without spawning a new shell.
     if [[ "$CMD" == vb* ]]; then
@@ -287,10 +306,13 @@ case "$INPUT" in
       exit 0
     fi
 
+    log Info "Launching via vb-launch-cmd: $CMD $ARGS"
     source vb-launch-cmd -- $CMD $ARGS
+    log Info "vb-launch-cmd exit code: $?"
   elif [[ -e "$INPUT" ]]; then
-    log Info "Opening local file: $INPUT"
+    log Info "Local path exists: $INPUT"
     source app2unit -s app-graphical.slice -- xdg-open "$INPUT" &>/dev/null
+    log Info "app2unit path open exit: $?"
   else
     # Web search is only available in the default mode.
     # When auto-select is on, the first search result is selected instantly
@@ -301,8 +323,9 @@ case "$INPUT" in
         exit 1
       fi
       _search_the_internet "$INPUT"
+      log Info "Internet search dispatched"
     else
-      log Info "Web search unavailable in ${LAUNCHER_MODE} mode"
+      log Info "Web search unavailable in $LAUNCHER_MODE mode"
     fi
   fi
   ;;

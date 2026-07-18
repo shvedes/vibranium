@@ -28,6 +28,7 @@ EOF
 }
 
 _check_deps() {
+  log Info "Checking deps: cliphist rofi"
   local missing=()
   local deps=(cliphist rofi)
 
@@ -38,11 +39,13 @@ _check_deps() {
   done
 
   if ((${#missing[@]} > 0)); then
+    log Info "Missing deps: ${missing[*]}"
     vb-cmd-dep-notify \
       --name "Clipboard Manager" \
       --deps "${missing[*]}"
     return 1
   fi
+  log Info "All deps available"
 }
 
 MODE=""
@@ -55,10 +58,12 @@ while [[ $# -gt 0 ]]; do
     ;;
   --show)
     MODE="show"
+    log Info "Mode: show"
     shift
     ;;
   --clear)
     MODE="clear"
+    log Info "Mode: clear"
     shift
     ;;
   -h | --help)
@@ -75,12 +80,12 @@ done
 
 case "$MODE" in
 show)
-  log Info "Showing clipboard history"
+  log Info "Entering show mode"
 
-  # If rofi is already running from a previous --show, kill it to toggle
-  # the picker closed. This matches the common rofi-as-a-popup pattern.
   if pidof -q rofi; then
+    log Info "Existing rofi found, toggling off"
     killall rofi
+    log Info "Rofi killed, exiting show mode"
     exit 0
   fi
 
@@ -88,51 +93,70 @@ show)
     exit 1
   fi
 
+  log Info "Checking cliphist service"
   if ! systemctl -q --user is-active cliphist.service; then
+    log Info "cliphist.service inactive, starting"
     systemctl -q --user enable --now cliphist.service
+    log Info "cliphist.service started"
   fi
 
   source vb-lib-core
 
   ENTRIES=()
   mapfile -t ENTRIES < <(cliphist list)
+  log Info "Clipboard entries: ${#ENTRIES[@]}"
 
   if ((${#ENTRIES[@]} == 0)); then
+    log Info "Clipboard empty"
     notify-send -t 1000 -r 3 \
       "Clipboard Manager" \
       "<i>Clipboard is empty!</i>"
+    log Info "Empty clipboard notification sent"
     exit 1
   fi
 
+  log Info "Opening rofi menu with ${#ENTRIES[@]} entries"
   helpers::ui::menu chosen "Clipboard" "search..." \
     -display-columns 2 -- "${ENTRIES[@]}"
+  log Info "User selection received: ${chosen:-(none)}"
 
   if [[ -n "$chosen" ]]; then
-    # cliphist list entries with file:// URIs must be decoded and copied
-    # as text/uri-list so Wayland compositors handle them as file transfers
-    # rather than plain text. Non-URI entries are copied as plain text.
+    log Info "Selected: $chosen"
     if [[ "$chosen" =~ file:// ]]; then
+      log Info "Copying as text/uri-list"
       printf "%s" "$chosen" | cliphist decode | wl-copy -n --type text/uri-list
+      log Info "URI copy exit code: $?"
     else
+      log Info "Copying as plain text"
       printf "%s" "$chosen" | cliphist decode | wl-copy -n
+      log Info "Text copy exit code: $?"
     fi
+  else
+    log Info "No selection made"
   fi
   ;;
 clear)
-  log Info "Clearing clipboard history"
+  log Info "Entering clear mode"
 
   if ! _check_deps; then
     exit 1
   fi
 
+  log Info "Checking cliphist service"
   if ! systemctl -q --user is-active cliphist.service; then
+    log Info "cliphist.service inactive, starting"
     systemctl -q --user enable --now cliphist.service
+    log Info "Service enabled for clear, exit code: $?"
     exit 0
   fi
 
+  log Info "Clearing: rofi, wl-copy, cliphist"
   killall -q rofi
+  log Info "Rofi killed for clear"
   wl-copy --clear
+  log Info "wl-copy clear exit: $?"
   cliphist wipe
+  log Info "cliphist wipe exit: $?"
   ;;
 *)
   usage

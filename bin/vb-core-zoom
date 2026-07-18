@@ -33,10 +33,10 @@ Zoom in and out your entire screen.
 Options:
   -i, --increase         Increase zoom by step
   -d, --decrease         Decrease zoom by step (floor 1.00)
-  -v, --zoom-value <n>   Set zoom value directly
+  -V, --zoom-value <n>   Set zoom value directly
   -r, --reset            Reset zoom to 1.00
   -s, --step <value>     Set step (default: ${STEP_DEFAULT})
-      --verbose          Enable verbose output
+  -v, --verbose          Enable verbose output
   -h, --help             Display this help and exit
 
 Short forms: you may also pass a single argument "+" or "-" for increase/decrease.
@@ -86,6 +86,7 @@ read_state100() {
     fi
   fi
 
+  # shellcheck disable=SC2034 # nameref target, used by caller
   ref=$v
 }
 
@@ -129,7 +130,7 @@ while (($#)); do
     ACTION="decrease"
     shift
     ;;
-  -v | --zoom-value)
+  -V | --zoom-value)
     [[ -n "$2" ]] || {
       log Error "--zoom-value requires a value"
       exit 1
@@ -152,7 +153,7 @@ while (($#)); do
     STEP="$2"
     shift 2
     ;;
-  --verbose)
+  -v, --verbose)
     VERBOSE=true
     shift
     ;;

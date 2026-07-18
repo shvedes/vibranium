@@ -19,6 +19,8 @@ log() {
   fi
 }
 
+log Info "$SELF initialized: state_file=$STATE_FILE lock_file=$LOCK_FILE"
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -31,7 +33,7 @@ shcat() {
 # pending action before writing, preventing a concurrent queue write from being
 # silently overwritten.
 read_state() {
-  [[ -f "$STATE_FILE" ]] || return 0
+  [[ -f "$STATE_FILE" ]] || { log Info "State file not found: $STATE_FILE"; return 0; }
   while IFS='=' read -r key value; do
     case $key in
       player)
@@ -45,6 +47,7 @@ read_state() {
         ;;
     esac
   done < "$STATE_FILE"
+  log Info "State file read: player=$STATE_PLAYER volume=$STATE_VOLUME"
 }
 
 write_state() {
@@ -52,6 +55,7 @@ write_state() {
 player=${STATE_PLAYER}
 volume=${STATE_VOLUME}
 EOF
+  log Info "State file written: player=$STATE_PLAYER volume=$STATE_VOLUME"
 }
 
 usage() {
@@ -73,7 +77,9 @@ EOF
 }
 
 set_opts() {
+  log Info "set_opts: duration=$VIBRANIUM_PLAYER_FADE_DURATION"
   source vb-lib-core
+  log Info "vb-lib-core sourced"
 
   helpers::check VIBRANIUM_PLAYER_FADE_DURATION
 
@@ -85,6 +91,7 @@ set_opts() {
     very_fast) NUM_STEPS=10   ;;
     off)       NUM_STEPS=off  ;;
   esac
+  log Info "NUM_STEPS resolved: $NUM_STEPS (fade: $VIBRANIUM_PLAYER_FADE_DURATION)"
 }
 
 # Probe the given player backend and set the nameref result to "Playing" or
@@ -94,11 +101,14 @@ get_player_status() {
   local player=$1
   local -n result=$2
 
+  log Info "Probing player: $player"
+
   case "$player" in
   playerctl)
     read -r result < <(playerctl status 2>/dev/null)
     case "$result" in
     Playing | Paused)
+      log Info "Player $player status: $result"
       return 0
       ;;
     esac
@@ -107,22 +117,25 @@ get_player_status() {
     # Check whether mpd is running by testing for its FIFO in the runtime
     # directory (created by mpd when the daemon is active). This avoids
     # spawning a systemctl subprocess on every probe.
-    [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] || return 1
+    [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] || { log Info "MPD FIFO not found, mpd unreachable"; return 1; }
     # mpc status emits lines like "[playing] #1/1 0:42/3:30 (20%)".
     while read -r l; do
       case $l in
       *"[playing]"*)
         result="Playing"
+        log Info "Player mpd status: Playing"
         return 0
         ;;
       *"[paused]"*)
         result="Paused"
+        log Info "Player mpd status: Paused"
         return 0
         ;;
       esac
     done < <(mpc status 2>/dev/null)
     ;;
   esac
+  log Info "Player $player status: unreachable"
   return 1
 }
 
@@ -138,9 +151,13 @@ detect_active_player() {
   PLAYER=""
   STATUS=""
 
+  log Info "Detecting active player"
+
   if [[ -n "$STATE_PLAYER" ]]; then
+    log Info "Trying cached player: $STATE_PLAYER"
     if get_player_status "$STATE_PLAYER" STATUS && [[ "$STATUS" == "Playing" ]]; then
       PLAYER="$STATE_PLAYER"
+      log Info "Active player: $STATE_PLAYER (cached, Playing)"
       return 0
     fi
   fi
@@ -152,17 +169,21 @@ detect_active_player() {
     player_list=(playerctl)
   fi
 
+  log Info "Scanning players: ${player_list[*]}"
   for p in "${player_list[@]}"; do
     if get_player_status "$p" STATUS && [[ "$STATUS" == "Playing" ]]; then
       PLAYER="$p"
       STATE_PLAYER="$p"
+      log Info "Active player: $p (Playing)"
       return 0
     fi
   done
 
   if [[ -n "$STATE_PLAYER" ]]; then
+    log Info "Trying cached player (Paused): $STATE_PLAYER"
     if get_player_status "$STATE_PLAYER" STATUS && [[ "$STATUS" == "Paused" ]]; then
       PLAYER="$STATE_PLAYER"
+      log Info "Active player: $STATE_PLAYER (cached, Paused)"
       return 0
     fi
   fi
@@ -171,16 +192,19 @@ detect_active_player() {
     if get_player_status "$p" STATUS && [[ "$STATUS" == "Paused" ]]; then
       PLAYER="$p"
       STATE_PLAYER="$p"
+      log Info "Active player: $p (Paused)"
       return 0
     fi
   done
 
   PLAYER="playerctl"
   get_player_status "playerctl" STATUS || STATUS="Stopped"
+  log Info "Active player: $PLAYER (default), status: $STATUS"
 }
 
 get_volume() {
   local -n result=$1
+  log Info "Getting volume from player=$PLAYER"
   result="0.00"
 
   if [[ "$PLAYER" == "playerctl" ]]; then
@@ -194,11 +218,13 @@ get_volume() {
     vol=${vol%\%}
     printf -v result '%0.2f' "$((vol))e-2"
   fi
+  log Info "Volume retrieved: $result (player=$PLAYER)"
 }
 
 set_volume() {
   local vol="$1"
 
+  log Info "Setting volume to $vol (player=$PLAYER)"
   case "$PLAYER" in
   playerctl)
     playerctl volume "$vol" 2>/dev/null
@@ -220,6 +246,7 @@ play() {
     mpc -q play
   fi
   STATE_PLAYER="$PLAYER"
+  log Info "Play executed: player=$STATE_PLAYER"
 }
 
 pause() {
@@ -229,6 +256,7 @@ pause() {
     mpc -q pause
   fi
   STATE_PLAYER="$PLAYER"
+  log Info "Pause executed: player=$STATE_PLAYER"
 }
 
 next_track() {
@@ -237,6 +265,7 @@ next_track() {
   elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q next
   fi
+  log Info "Next track executed: player=$PLAYER"
 }
 
 previous_track() {
@@ -245,6 +274,7 @@ previous_track() {
   elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q prev
   fi
+  log Info "Previous track executed: player=$PLAYER"
 }
 
 # Smoothly fade volume from current to 0 over num_steps iterations.
@@ -258,18 +288,22 @@ previous_track() {
 # scientific notation (75e-2).
 fade_out() {
   local num_steps=$1
+  log Info "Fade out: steps=$num_steps curve=$FADE_CURVE"
   if [[ $num_steps == off ]]; then
+    log Info "Fade skipped (steps=off)"
     return 0
   fi
 
   local current
   get_volume current
   printf -v current '%.2f' "$current"
+  log Info "fade_out: current_volume=$current"
 
   local current_int
   current_int=$((10#${current//./}))
 
   if ((current_int <= 0)); then
+    log Info "Volume already zero"
     return
   fi
 
@@ -291,6 +325,7 @@ fade_out() {
     done
   fi
   set_volume 0
+  log Info "Fade out complete"
 }
 
 # Smoothly fade volume from 0 to target over num_steps iterations.
@@ -300,17 +335,21 @@ fade_out() {
 fade_in() {
   local num_steps=$1 target=$2
 
+  log Info "Fade in: steps=$num_steps target=$target curve=$FADE_CURVE"
   if [[ $num_steps == off ]]; then
+    log Info "Fade skipped (steps=off)"
     set_volume "$target"
     return
   fi
 
   printf -v target '%.2f' "$target"
+  log Info "fade_in: normalized_target=$target"
 
   local target_int
   target_int=$((10#${target//./}))
 
   if ((target_int <= 0)); then
+    log Info "Target volume zero"
     return
   fi
 
@@ -333,6 +372,7 @@ fade_in() {
   fi
 
   set_volume "$target"
+  log Info "Fade in complete"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -351,6 +391,7 @@ while [[ $# -gt 0 ]]; do
     ;;
   --toggle | --play | --pause | --next | --previous)
     ACTION="$1"
+    log Info "Action parsed: $ACTION"
     shift
     ;;
   *)
@@ -362,25 +403,31 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -z "$ACTION" ]]; then
+  log Info "No action provided, showing usage"
   usage
   exit 0
 fi
 
 set_opts
+log Info "Config loaded: num_steps=$NUM_STEPS curve=$FADE_CURVE"
 
 _is_spotify() {
   [[ "$PLAYER" == playerctl ]] || return 1
+  log Info "Checking Spotify status (player=$PLAYER)"
   while IFS= read -r line; do
     [[ "$line" == *spotify* ]] && return 0
   done < <(playerctl -l 2>/dev/null)
+  log Info "Spotify not active"
   return 1
 }
 
+log Info "Branch decision: num_steps=$NUM_STEPS"
 if [[ $NUM_STEPS == off ]]; then
   # Ramp-off fast path: the action is instantaneous (~7ms total), so no
   # lock or queue is needed. detect_active_player uses the same three-pass
   # probe as the slow path (Playing > Paused > default), so the cached
   # STATE_PLAYER is always validated against what is actually running.
+  log Info "Fast path (ramp off)"
   read_state
   detect_active_player
   write_state
@@ -418,6 +465,7 @@ if [[ $NUM_STEPS == off ]]; then
     fi
     ;;
   esac
+  log Info "Fast path action complete, exiting"
   exit 0
 fi
 
@@ -428,17 +476,24 @@ _acquire_lock() {
   : > "$LOCK_FILE" 2>/dev/null
   local rc=$?
   set +o noclobber
+  if ((rc == 0)); then
+    log Info "Lock acquired"
+  else
+    log Info "Lock contended"
+  fi
   return $rc
 }
 
 _release_lock() {
   rm -f "$LOCK_FILE"
+  log Info "Lock released"
 }
 
 # When the lock is held by a running instance (fade in progress), the new
 # action is appended to the state file. The running instance reads this
 # entry in its queue consumer (see above). This avoids blocking on rapid
 # key presses.
+log Info "Slow path: attempting lock"
 if _acquire_lock; then
   read_state
   while [[ -n "$ACTION" ]]; do
@@ -512,12 +567,13 @@ if _acquire_lock; then
       fi
       ;;
     esac
+    log Info "Action executed: $ACTION"
 
     # Queue consumer: read only the action field from the state file so that
     # a concurrent queuer write from a lock-contending instance is captured
     # before write_state persists the current STATE_PLAYER/STATE_VOLUME.
     # Calling read_state() here would overwrite those working values with
-    # stale data from the file, undoing updates from the action above.
+    # stale ones from the file, potentially losing the state we just wrote.
     STATE_ACTION=""
     if [[ -f "$STATE_FILE" ]]; then
       while IFS='=' read -r key value; do
@@ -525,14 +581,18 @@ if _acquire_lock; then
       done < "$STATE_FILE"
     fi
     if [[ -n "$STATE_ACTION" ]]; then
+      log Info "Queue consumer: dequeued action $STATE_ACTION"
       ACTION="$STATE_ACTION"
     else
       ACTION=""
     fi
     write_state
+    log Info "Main loop: state synced, next_action=$STATE_ACTION"
   done
   _release_lock
+  log Info "Lock released, slow path complete"
 else
+  log Info "Lock held, queuing action: $ACTION"
   {
     if [[ -f "$STATE_FILE" ]]; then
       while IFS='=' read -r key value; do
@@ -542,4 +602,5 @@ else
     fi
     echo "action=$ACTION"
   } > "$STATE_FILE"
+  log Info "Action queued to state file: $ACTION"
 fi

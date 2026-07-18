@@ -9,9 +9,6 @@ VERBOSE=false
 
 log() {
   local level="$1"; shift
-  # Only emit log lines when -v/--verbose is passed AND stdout is a terminal.
-  # Without the terminal check, downstream tools (e.g. notification daemons)
-  # that invoke this script would interleave log noise with their own output.
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -20,9 +17,8 @@ log() {
 SELF="${0##*/}"
 LOG_FILE="$VIBRANIUM_CACHE/$SELF.log"
 
-# Pure-bash heredoc shim: reads stdin line by line and prints it.
-# Unlike cat(1) this is a built-in, so it avoids spawning a process just to
-# dump a help string. Used in usage() for the --help output.
+log Info "$SELF started: log_file=$LOG_FILE"
+
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
@@ -47,15 +43,14 @@ EOF
 
 get_output_dir() {
   local -n _dir=$1
-  # Follow XDG base directory spec; fall back to ~/Videos/Screencasts when
-  # XDG_VIDEOS_DIR is unset (e.g. on non-XDG-compliant desktops).
+  log Info "Resolving output directory"
   _dir="${XDG_VIDEOS_DIR:-$HOME/Videos}/Screencasts"
 
-  # Lazily create the output directory on first invocation rather than at
-  # script startup - avoids creating empty directories when --help is used.
   if [[ ! -d "$_dir" ]]; then
     mkdir -p "$_dir"
+    log Info "Created output directory: $_dir"
   fi
+  log Info "Output directory resolved: $_dir"
 }
 
 output_file() {
@@ -63,31 +58,27 @@ output_file() {
   local dir timestamp
 
   get_output_dir dir
-  # Use printf -v with %()T date format (bash 4.2+) to avoid a subshell
-  # fork from $(date ...). The -1 argument means "now" for %T.
   printf -v timestamp '%(%Y-%m-%d_%H-%M-%S)T' -1
   _path="$dir/recording-$timestamp.$EXT"
+  log Info "Output file: $_path"
 }
 
 visualize() {
-  # Signal waybar to update the recording indicator icon so the user sees
-  # that a recording is active.
+  log Info "Visualizing recording state"
+
   vb-refresh-waybar-module recording
 
-  # Brief screen flash to provide immediate visual confirmation that
-  # recording started - useful for region/portal modes where there is no
-  # visible UI chrome otherwise.
   if [[ $VIBRANIUM_RECORDING_FLASH_SCREEN == true ]]; then
     hypr::flash::screen
+    log Info "Screen flash triggered"
   fi
 }
 
 copy() {
   local dir newest='' f
+  log Info "Copying latest recording to clipboard"
   get_output_dir dir
 
-  # Scan the output directory for the most recently modified recording.
-  # -nt (newer than) compares modification timestamps without needing stat(1).
   for f in "$dir"/recording-*; do
     if [[ ! -f $f ]]; then
       continue
@@ -98,10 +89,11 @@ copy() {
     fi
   done
 
+  log Info "Newest recording file: ${newest:-none}"
+
   if [[ -n $newest ]]; then
-    # Copy as text/uri-list so file managers and messengers understand the
-    # MIME type. A bare file:// URI would paste as plain text in many apps.
     printf 'file://%s' "$newest" | wl-copy -t text/uri-list
+    log Info "Copied to clipboard: $newest"
   fi
 }
 
@@ -109,32 +101,25 @@ set_recording_area() {
   local -n _area=$1
   local target="${2#--}"
 
+  log Info "Setting recording area: $target"
   case "$target" in
   portal)
-    # xdg-desktop-portal handles the area selection via a native chooser;
-    # gpu-screen-recorder will block until the portal dialog completes,
-    # so we just pass the literal string "portal" as the area value.
     _area="$target"
+    log Info "Recording area: portal"
     ;;
   region)
-    # slurp produces geometry strings in gpu-screen-recorder's expected
-    # format: "%wx%h+%x+%y" e.g. "1920x1080+0+0". The -b and -c flags set
-    # the overlay border/background colors from Vibranium theme variables.
-    # Stdout is redirected to /dev/null to suppress slurp's internal
-    # framebuffer warnings on some GPU configurations.
     local slurp_flags=(-b "${P_GRAY}33" -c "${P_ACCENT}" -f '%wx%h+%x+%y')
     local selected_region
 
     selected_region="$(slurp "${slurp_flags[@]}" 2>/dev/null)" || return 1
     _area="$selected_region"
+    log Info "Recording region: $_area"
     ;;
   screen)
-    # Fetch the name of the currently focused monitor from Hyprland's JSON
-    # IPC. jq filters for the monitor with focused==true and extracts .name
-    # (e.g. "eDP-1" or "DP-3").
     local monitor
     monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
     _area="$monitor"
+    log Info "Recording screen: $_area"
     ;;
   esac
 }
@@ -143,15 +128,17 @@ init_recording() {
   local opt_flags=()
   local fps frm codec quality capture_sink capture_source
 
-  # When --fallback is passed (non-empty $1 from start_recording), force
-  # CPU-side encoding to work around GPU codec incompatibilities.
   if [[ -n ${1:-} ]]; then
     opt_flags=(-encoder cpu)
+    log Info "Fallback mode: CPU encoding forced"
   fi
 
   if [[ -z $AREA ]]; then
+    log Error "Recording area not set"
     exit 1
   fi
+
+  log Info "init_recording: area=$AREA fallback=${1:-none}"
 
   fps="$VIBRANIUM_RECORDING_FPS"
   EXT="$VIBRANIUM_RECORDING_CONTAINER_TYPE"
@@ -162,25 +149,22 @@ init_recording() {
   capture_sink="$VIBRANIUM_RECORDING_CAPTURE_SINK"
   capture_source="$VIBRANIUM_RECORDING_CAPTURE_SOURCE"
 
-  # Map boolean audio flags to gpu-screen-recorder's -a option.
-  # Pipe-delimited "default_input|default_output" tells gsr to capture
-  # both mic and system audio simultaneously.
+  log Info "Recording config: fps=$fps ext=$EXT codec=$codec quality=$quality fm=$frm"
+
   if [[ $capture_source == true && $capture_sink == true ]]; then
     opt_flags+=(-a "default_input|default_output")
+    log Info "Audio: mic + system output"
   elif [[ $capture_source == true ]]; then
     opt_flags+=(-a "default_input")
+    log Info "Audio: mic only"
   elif [[ $capture_sink == true ]]; then
     opt_flags+=(-a 'default_output')
+    log Info "Audio: system output only"
   fi
 
-  # Resolve the output path before launch so copy() can later find the
-  # newest file reliably. Calling output_file() here also avoids a second
-  # call in start_recording() which would produce a different timestamp.
   local out_file
   output_file out_file
 
-  # Launch gpu-screen-recorder in the background. All output (both stdout
-  # and stderr) goes to LOG_FILE for post-mortem debugging.
   gpu-screen-recorder \
     "${opt_flags[@]}" \
     -q "$quality" \
@@ -192,12 +176,9 @@ init_recording() {
     -o "$out_file" &>"$LOG_FILE" &
 
   RECORDING_PID=$!
+  log Info "GSR launched -> $out_file"
 
   if [[ $AREA == portal ]]; then
-    # In portal mode gsr blocks the calling thread until the user dismisses
-    # the xdg-desktop-portal picker. Since we background gsr above, poll
-    # the PID for up to 3 seconds: if the process exits in this window the
-    # picker was dismissed or gsr failed before it could fork its worker.
     local deadline=$((SECONDS + 3))
     while ((SECONDS < deadline)); do
       if ! kill -0 "$RECORDING_PID" 2>/dev/null; then
@@ -207,9 +188,6 @@ init_recording() {
     done
     return 0
   else
-    # Region/screen mode starts gsr immediately. A 200ms cooldown is enough
-    # to catch most startup failures (missing encoder, bad area format, etc.)
-    # without adding noticeable latency.
     sleep 0.2
     kill -0 "$RECORDING_PID" 2>/dev/null
   fi
@@ -223,15 +201,9 @@ fallback_notification() {
   msg+="Please make sure your GPU supports selected codec.\n"
   msg+="Click here to see the logs"
 
-  # notify-send --action=true makes the notification clickable. When the
-  # user clicks, notify-send exits with the action index (0 for the first
-  # action, which is always the default action "default").
   local action
   action="$(notify-send --action=true -r 4 -u critical -t 25000 "Screen Recording" "$msg")"
 
-  # The default action's exit code may vary by desktop environment. gnome-
-  # and swaync-compatible daemons use 0; others may use a different value.
-  # Both 0 and "default" are handled here.
   if [[ $action == 0 ]]; then
     xdg-terminal-exec -- "${EDITOR:-nvim}" "${LOG_FILE}.latest_fallback"
   fi
@@ -253,9 +225,6 @@ both_failed_notification() {
 start_recording() {
   log Info "Initializing recording"
 
-  # Validate that all required Vibranium config variables are set before
-  # attempting to launch gpu-screen-recorder. helpers::check is defined in
-  # vb-lib-core and exits with a descriptive error if any var is empty.
   helpers::check \
     VIBRANIUM_RECORDING_FPS \
     VIBRANIUM_RECORDING_QUALITY \
@@ -270,6 +239,8 @@ start_recording() {
   init_recording
   rec_status=$?
 
+  log Info "init_recording exit status: $rec_status"
+
   if ((rec_status == 0)); then
     log Info "Recording started (PID: $RECORDING_PID)"
     echo "$RECORDING_PID" >"$VIBRANIUM_RUNTIME/recording-ongoing"
@@ -277,18 +248,12 @@ start_recording() {
     return 0
   fi
 
-  # In portal mode a non-zero exit without an output file always means
-  # the picker was dismissed - no encoder was ever selected so fallback
-  # makes no sense, and a second picker would just confuse the user.
   if [[ $AREA == portal ]]; then
     log Info "Recording cancelled by user"
     return 0
   fi
 
-  # Fallback: retry with CPU encoding (h264 + mp4) which has the broadest
-  # hardware compatibility. The original LOG_FILE is preserved with a
-  # .latest_fallback suffix for debugging.
-  log Info "Failed to start recording. Trying fallback mode"
+  log Info "init_recording exit code: $rec_status, trying fallback"
   VIBRANIUM_RECORDING_VIDEO_CODEC="h264"
   VIBRANIUM_RECORDING_CONTAINER_TYPE="mp4"
 
@@ -302,8 +267,6 @@ start_recording() {
   fi
 
   echo "$RECORDING_PID" >"$VIBRANIUM_RUNTIME/recording-ongoing"
-  # Mark fallback mode in the cache so stop_rec() knows to show a
-  # different notification explaining the CPU-encoding trade-off.
   touch "$VIBRANIUM_CACHE/fallback_mode"
   visualize
   log Info "Recording started in fallback mode"
@@ -312,22 +275,24 @@ start_recording() {
 stop_rec() {
   local pid="$1"
 
-  # Refresh waybar before killing to show a "stopping" state briefly.
+  log Info "Stopping recording (PID: $pid)"
+
   visualize
   kill "$pid"
+  log Info "Kill signal sent to PID $pid"
 
   if [[ -f "$VIBRANIUM_CACHE/fallback_mode" ]]; then
+    log Info "Fallback notification path"
     fallback_notification
     rm "$VIBRANIUM_CACHE/fallback_mode"
   else
+    log Info "Standard notification path"
     notify-send -r 3 "Screen Recorder" "Recording saved"
   fi
 
   rm -f "$VIBRANIUM_RUNTIME/recording-ongoing"
+  log Info "Recording state file removed"
 
-  # Brief pause so gpu-screen-recorder can flush its muxer and close the
-  # output file before copy() scans the directory for the newest recording.
-  # Without this sleep we risk copying a truncated or still-open file.
   sleep 0.1
 
   vb-refresh-waybar-module recording && copy
@@ -339,13 +304,16 @@ get_ongoing_pid() {
 
   state_file="$VIBRANIUM_RUNTIME/recording-ongoing"
   if [[ -f $state_file ]]; then
-    # Bash $(<file) reads the whole file without spawning cat or read.
     _pid="$(<"$state_file")"
+    log Info "Ongoing recording PID: $_pid"
+  else
+    log Info "No ongoing recording state file at $state_file"
   fi
 }
 
 ensure_deps() {
   local missing=()
+  log Info "Verifying dependencies: gpu-screen-recorder jq"
 
   for pkg in gpu-screen-recorder jq; do
     if ! command -v "$pkg" >/dev/null; then
@@ -354,6 +322,7 @@ ensure_deps() {
   done
 
   if ((${#missing[@]} > 0)); then
+    log Error "Missing dependencies: ${missing[*]}"
     vb-cmd-dep-notify \
       --name "Screen Recording" \
       --deps "${missing[*]}"
@@ -363,11 +332,6 @@ ensure_deps() {
 
 MODE=""
 
-# Parse CLI flags. Options that consume a positional value (e.g. --region)
-# use `break` so subsequent arguments can be forwarded to child programs or
-# treated as operands. Flags that come AFTER the mode keyword are ignored
-# by this loop - currently there are none, but this structure supports that
-# pattern without a refactor.
 while [[ $# -gt 0 ]]; do
   case "$1" in
   -v | --verbose)
@@ -396,12 +360,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+log Info "MODE parsed: $MODE"
+
 case "$MODE" in
 --region | --screen | --portal)
   log Info "Starting recording in ${MODE#--} mode"
 
-  # Check whether another recording session is still running by testing
-  # for the state file that start_recording creates.
   if [[ -f "$VIBRANIUM_RUNTIME/recording-ongoing" ]]; then
     log Error "Recording already in progress"
     log Error "Use --stop to stop the active recording"
@@ -412,15 +376,16 @@ case "$MODE" in
     exit 1
   fi
 
-  # vb-lib-core is sourced late (not at the top of the file) so that the
-  # --help path is fast and doesn't pull in the full library.
   source vb-lib-core
 
   if ! set_recording_area AREA "$MODE"; then
+    log Info "Area selection cancelled or failed"
     exit 1
   fi
 
+  log Info "Recording area set: AREA=$AREA"
   start_recording
+  log Info "start_recording returned"
   ;;
 --stop)
   log Info "Stopping active recording"
@@ -437,7 +402,6 @@ case "$MODE" in
   fi
   ;;
 "")
-  # No arguments at all - show usage and exit cleanly.
   usage
   exit 0
   ;;

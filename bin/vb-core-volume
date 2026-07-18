@@ -119,10 +119,14 @@ show_volume_notification() {
 
   if (( is_fullscreen == 0 )); then
     if [[ "$muted" == "true" ]]; then
+      log Info "Sending notification: $type Muted"
       notify-send -r 3 -t 1000 "$type Muted" &
     else
+      log Info "Sending notification: $type ${display_vol}% bar=$bar_value"
       notify-send -r 3 -t 1000 "$type ${display_vol}%" -h "int:value:$bar_value" &
     fi
+  else
+    log Info "Skipping notification (fullscreen)"
   fi
 
 }
@@ -157,8 +161,10 @@ adjust_volume() {
   local vol_info mute_state
   vol_info=$(wpctl get-volume "$device")
   read -r _ current_volume mute_state <<<"$vol_info"
+  log Info "Current volume: $current_volume (muted=${mute_state:-unknown})"
 
   if [[ "$mute_state" == "[MUTED]" ]]; then
+    log Info "Unmuting before adjustment"
     wpctl set-mute "$device" 0
   fi
 
@@ -166,11 +172,14 @@ adjust_volume() {
 
   _to_int100 cv100 "$current_volume"
   _to_int100 max100 "$max_volume"
+  log Info "Volume int100: $cv100 / $max100"
 
   # Stop if already at limits
   if [[ "$direction" == "+" ]] && ((cv100 >= max100)); then
+    log Info "Already at max volume ($max100), skipping"
     exit 0
   elif [[ "$direction" == "-" ]] && ((cv100 <= 0)); then
+    log Info "Already at min volume (0), skipping"
     exit 0
   fi
 
@@ -189,11 +198,9 @@ adjust_volume() {
     printf -v new_volume "%d.%02d" $((new100 / 100)) $((new100 % 100))
   }
 
-  # swayosd-client handles both the volume change and OSD atomically.
-  # When swayosd is unavailable or USE_OSD is false, fall back to
-  # manual wpctl set-volume + notify-send.
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
     if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+      log Info "Using swayosd: $osd_arg ${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}"
       if [[ -n "$osd_max_flag" ]]; then
         swayosd-client "$osd_arg" "${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}" "$osd_max_flag"
       else
@@ -201,16 +208,17 @@ adjust_volume() {
       fi
     else
       _calc_new_volume
+      log Info "Using wpctl: set-volume $device $new_volume"
       wpctl set-volume "$device" "$new_volume"
       if [[ "$quiet" == false ]]; then
-        # Pass pre-computed values: skip the redundant wpctl get-volume inside
-        # show_volume_notification. Volume is always unmuted at this point.
         local bar=$((new100 * 100 / max100))
+        log Info "Notification: $notification_type vol=$new100 bar=$bar"
         show_volume_notification "$device" "$notification_type" "$new100" "$bar"
       fi
     fi
   else
     _calc_new_volume
+    log Info "No visual feedback, wpctl: set-volume $device $new_volume"
     wpctl set-volume "$device" "$new_volume"
   fi
 }
@@ -261,12 +269,11 @@ set_volume() {
     wpctl set-mute "$device" 0
   fi
 
+  log Info "wpctl set-volume $device $float_val (absolute: ${int_val}%)"
   wpctl set-volume "$device" "$float_val"
 
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true && "$quiet" != true ]]; then
     if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-      # Scale absolute percent (0-200) to a 0-100 progress bar using
-      # x10000 fixed-point (4 decimal places) for swayosd's --custom-progress.
       local scaled=$((int_val * 10000 / max_volume))
       local osd_progress osd_icon
       printf -v osd_progress "%d.%04d" $((scaled / 10000)) $((scaled % 10000))
@@ -279,6 +286,7 @@ set_volume() {
         osd_icon="audio-volume-high-symbolic"
       fi
 
+      log Info "swayosd: icon=$osd_icon progress=$osd_progress"
       swayosd-client \
         --custom-icon="$osd_icon" \
         --custom-progress="$osd_progress"
@@ -308,19 +316,19 @@ toggle_mute() {
   esac
   log Info "Toggling mute for $device_type"
 
-  # Delegate to swayosd-client when OSD is active (handles both the
-  # mute toggle and the visual feedback atomically), otherwise invert
-  # mute through wpctl and send a notification manually.
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
     if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
+      log Info "swayosd: $osd_arg mute-toggle"
       swayosd-client "$osd_arg" mute-toggle
     else
+      log Info "wpctl: set-mute $device toggle"
       wpctl set-mute "$device" toggle
       if [[ "$quiet" == false ]]; then
         show_volume_notification "$device" "$type"
       fi
     fi
   else
+    log Info "No visual feedback: wpctl set-mute $device toggle"
     wpctl set-mute "$device" toggle
   fi
 }
@@ -331,10 +339,8 @@ feedback() {
 
   if [[ "$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK" == true ]]; then
     variant="$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
+    log Info "Audio feedback: variant=$variant"
 
-    # Variant 1/3: standard freedesktop.org sounds shipped by libcanberra.
-    # Variant 2:   custom Vibranium sound pack in XDG_DATA_HOME.
-    # Variant 3:   plays bell.oga instead of audio-volume-change.oga.
     case "$variant" in
     "variant1" | "variant3")
       dir="/usr/share/sounds/freedesktop/stereo"
@@ -349,6 +355,7 @@ feedback() {
       dir="/usr/share/sounds/freedesktop/stereo"
     fi
 
+    log Info "Playing: $dir/$([ "$variant" == "variant3" ] && echo 'bell.oga' || echo 'audio-volume-change.oga')"
     if [[ "$variant" == "variant3" ]]; then
       paplay "${dir}/bell.oga" &
     else
@@ -374,7 +381,6 @@ while [[ $# -gt 0 ]]; do
     ;;
   -v | --verbose)
     VERBOSE=true
-    shift
     ;;
   -q | --quiet)
     quiet=true
@@ -431,6 +437,7 @@ if [[ -z "$action" ]]; then
   exit 1
 fi
 
+log Info "${0##*/} started: action=$action quiet=$quiet"
 source vb-lib-core
 
 helpers::check \
@@ -440,6 +447,8 @@ helpers::check \
   VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK \
   VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
   VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
+
+log Info "Config: step=$VIBRANIUM_VOLUME_ADJUSTMENT_STEP max_above_100=$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED osd=$VIBRANIUM_GLOBAL_USE_OSD visual=$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK audio=$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK variant=$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
 
 # Mic operations intentionally do not call feedback(): the audio
 # feedback plays on the default (speaker) sink and would confuse the
