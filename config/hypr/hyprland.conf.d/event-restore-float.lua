@@ -57,7 +57,7 @@ end)
 
 -- When a window closes:
 --   1. Remove it from tracking
---   2. Check whether exactly one window remains
+--   2. Check whether exactly one eligible window remains
 --   3. Restore floating state if that remaining window
 --      originally floated before being auto-tiled
 hl.on("window.close", function(closed_win)
@@ -66,16 +66,19 @@ hl.on("window.close", function(closed_win)
   if closed_win.workspace == nil then return end
 
   -- Build a list of surviving windows on the workspace.
+  -- Pinned windows are excluded from the count, since they are
+  -- never subject to auto-tiling and should not block restoration
+  -- of the one remaining non-pinned window.
   local remaining = {}
 
   for _, w in ipairs(hl.get_workspace_windows(closed_win.workspace)) do
-    -- Exclude the just-closed window.
-    if w.address ~= closed_win.address then
+    -- Exclude the just-closed window and pinned windows.
+    if w.address ~= closed_win.address and not w.pinned then
       table.insert(remaining, w)
     end
   end
 
-  -- Restore only if exactly one window remains.
+  -- Restore only if exactly one eligible window remains.
   if #remaining ~= 1 then return end
 
   local sole = remaining[1]
@@ -85,6 +88,12 @@ hl.on("window.close", function(closed_win)
 
   -- Stop tracking before restoration.
   wants_float[sole.address] = nil
+
+  -- Skip restoration if the window is already floating.
+  -- This covers the case where the user manually re-floated it
+  -- themselves before this handler ran, so we don't force an
+  -- unwanted center and focus on a window the user already positioned.
+  if sole.floating then return end
 
   -- Restore original floating behavior,
   -- center the window, and focus it for convenience.
