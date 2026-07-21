@@ -1,26 +1,14 @@
 #!/bin/bash
 
-VERBOSE=false
+source vb-lib-cli
 
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
+VERBOSE=false
 
 SELF="${0##*/}"
 CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
 STATE_FILE="$VIBRANIUM_STATE/nightshift"
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 STEP=100
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF

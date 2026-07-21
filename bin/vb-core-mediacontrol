@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
 SELF="${0##*/}"
 STATE_FILE="$VIBRANIUM_RUNTIME/$SELF.state"
@@ -11,21 +13,7 @@ STATE_PLAYER=""
 STATE_VOLUME=""
 STATE_ACTION=""
 
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
 log Info "$SELF initialized: state_file=$STATE_FILE lock_file=$LOCK_FILE"
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 # The state file has two tiers: persistent fields (player, volume) written on
 # every action, and an ephemeral action queue field written by the lock-fallback

@@ -1,12 +1,8 @@
 #!/bin/bash
 
-SELF="${0##*/}"
+source vb-lib-cli
 
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
+SELF="${0##*/}"
 
 usage() {
   shcat << EOF
@@ -131,14 +127,6 @@ GAMESCOPE_FLAGS=(
   --allow-deferred-backend
   --keep-alive
 )
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
 
 is_known_gamescope_flag() {
   local flag="$1"

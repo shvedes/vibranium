@@ -1,20 +1,8 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
@@ -166,7 +154,7 @@ declare -A THEMES
 declare -A THEME_DIRS
 
 if [[ -n "$THEME_ARG" ]]; then
-  # Fast path: locate the named theme without scanning everything
+  log Info "Looking up theme: $THEME_ARG"
   for base in "${SEARCH_DIRS[@]}"; do
     if [[ -d "$base/$THEME_ARG/cursors" ]]; then
       register_theme "$base/$THEME_ARG"
@@ -175,11 +163,11 @@ if [[ -n "$THEME_ARG" ]]; then
   done
 
   if [[ ${#THEMES[@]} -eq 0 ]]; then
-    echo "error: theme not found $THEME_ARG" >&2
+    log Error "Theme not found: $THEME_ARG"
     exit 1
   fi
 else
-  # Full scan
+  log Info "Scanning cursor themes in ${SEARCH_DIRS[*]}"
   for base in "${SEARCH_DIRS[@]}"; do
     if [[ -d "$base" ]]; then
       for theme_dir in "$base"/*/; do
@@ -192,6 +180,7 @@ else
       done
     fi
   done
+  log Info "Found ${#THEMES[@]} cursor themes"
 fi
 
 if [[ $FLAG_SIZE == true ]]; then

@@ -1,25 +1,13 @@
 #!/bin/bash
 
-VERBOSE=false
+source vb-lib-cli
 
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
+VERBOSE=false
 
 log Info "${0##*/} started: state_file=$VIBRANIUM_STATE/wallpaper.state"
 
 WALLPAPER_STATE="$VIBRANIUM_STATE/wallpaper.state"
 WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF

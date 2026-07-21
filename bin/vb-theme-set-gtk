@@ -9,13 +9,9 @@
 #
 # Live reload works via the alternating slot mechanism.
 
-GTK_THEME="$XDG_CONFIG_HOME/vibranium/current/theme/gtk.css"
+source vb-lib-cli
 
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
+GTK_THEME="$XDG_CONFIG_HOME/vibranium/current/theme/gtk.css"
 
 # GTK3 -- alternating slots for live reload
 for slot in vibranium-a vibranium-b; do

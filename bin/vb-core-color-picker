@@ -1,23 +1,11 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 HISTORY="$VIBRANIUM_CACHE/color-picker.history"
 VERBOSE=false
 
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
 log Info "History file: $HISTORY"
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF

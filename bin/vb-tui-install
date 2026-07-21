@@ -2,18 +2,12 @@
 
 # shellcheck disable=SC2034
 
+source vb-lib-cli
+
 ICON_DIR="$XDG_DATA_HOME/applications/icons"
 SELF="${0##*/}"
 
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
 
 # ---------------------------------------------------------------------------
 # Flags populated by argument parsing below. All default to empty; interactive
@@ -31,12 +25,6 @@ EXEC_ARGS=""
 FLOAT=false
 INTERACTIVE_MODE=false
 
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
-
 usage() {
   shcat << EOF
 Usage: $SELF [OPTION]...
@@ -52,6 +40,7 @@ Options:
   --keywords KW       Extra keywords, semicolon-separated
   --category CAT      Extra Categories= value
   --float             Launch in a floating window
+  -v, --verbose       Enable verbose output
   -h, --help          Show this help and exit
 
 If --exec is not provided, the script runs in interactive mode and prompts
@@ -396,8 +385,10 @@ else
     APP_NAME="TUI - $APP_NAME"
   fi
 
-  # Same identity check as in interactive mode: match by TryExec, not by file name.
+  log Info "Installing TUI app: ${APP_NAME#TUI - } (exec=$TUI_EXEC_RAW)"
+
   if _find_tuiapp_by_tryexec "$TUI_EXEC_RAW" &> /dev/null; then
+    log Info "App already installed, exiting"
     exit 1
   fi
 
@@ -411,6 +402,7 @@ else
   EXEC_COMMAND="${CUSTOM_EXEC:-$(_build_exec_command "$TUI_EXEC" "$FLOAT")}"
 fi
 
+log Info "Writing desktop entry: $APP_NAME"
 _write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$EXTRA_KEYWORDS" "$CATEGORY"
 
 if [[ $INTERACTIVE_MODE == true ]]; then

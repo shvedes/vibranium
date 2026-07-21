@@ -1,20 +1,8 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
@@ -23,6 +11,7 @@ Usage: ${0##*/} MODULE_NAME
 Send a refresh signal to the Waybar module MODULE_NAME.
 
 Options:
+  -v, --verbose   Enable verbose output
   -h, --help   Show this help and exit
 EOF
 }
@@ -44,17 +33,28 @@ while [[ $# -gt 0 ]]; do
 done
 
 waybar_pid=$(systemctl --user show waybar -p MainPID --value 2> /dev/null)
+log Info "Waybar PID: ${waybar_pid:-not found}"
 
 declare -A signals
+files=("$XDG_CONFIG_HOME"/waybar/modules/custom-*.jsonc)
+log Info "Scanning ${#files[@]} module config files"
 
-for file in "$XDG_CONFIG_HOME"/waybar/modules/custom-*.jsonc; do
+for file in "${files[@]}"; do
+  [[ -f "$file" ]] || continue
+
   while IFS= read -r line; do
     [[ $line == *'"signal"'* ]] || continue
 
-    name="${file##*/}"     # remove path
-    name="${name%.jsonc}"  # remove file extension
-    name="${name#custom-}" # remove prefix
-    [[ $line =~ \"signal\":[[:space:]]*([0-9]+) ]] && sig="${BASH_REMATCH[1]}" || sig=""
+    name="${file##*/}"
+    name="${name%.jsonc}"
+    name="${name#custom-}"
+
+    if [[ $line =~ \"signal\":[[:space:]]*([0-9]+) ]]; then
+      sig="${BASH_REMATCH[1]}"
+      log Info "Module $name -> signal $sig"
+    else
+      sig=""
+    fi
 
     signals["$name"]="$sig"
   done < "$file"
@@ -66,24 +66,28 @@ module_signal="${signals[$module_name]}"
 _send_signal() {
   local sig=$1
   if ((waybar_pid > 0)); then
+    log Info "Kill RTMIN+$sig to PID $waybar_pid"
     kill -RTMIN+"$sig" "$waybar_pid" 2> /dev/null
   else
+    log Info "pkill RTMIN+$sig waybar"
     pkill -RTMIN+"$sig" waybar 2> /dev/null
   fi
 }
 
 if [[ -n "$module_signal" ]]; then
+  log Info "Refreshing module $module_name (signal $module_signal)"
   _send_signal "$module_signal"
 else
   log Error "No signal defined for module: $module_name"
   exit 1
 fi
 
-# Always refresh separators
 if [[ -n "${signals["dynamic-separator"]}" ]]; then
+  log Info "Refreshing separator: dynamic-separator (signal ${signals["dynamic-separator"]})"
   _send_signal "${signals["dynamic-separator"]}"
 fi
 
 if [[ -n "${signals["mod-separator"]}" ]]; then
+  log Info "Refreshing separator: mod-separator (signal ${signals["mod-separator"]})"
   _send_signal "${signals["mod-separator"]}"
 fi

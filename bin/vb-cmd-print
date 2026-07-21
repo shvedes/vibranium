@@ -1,20 +1,8 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
@@ -90,6 +78,8 @@ if [[ "$lpstat_out" == *"system default destination:"* ]]; then
   default_printer="${lpstat_out#*system default destination: }"
 fi
 
+log Info "Default printer: ${default_printer:-none}"
+
 if [[ -z "$default_printer" ]]; then
   notify-send -r 4 -u critical -t 10000 "No Default Printer Found" \
     "No system default printer is configured.\nTo add a printer, use <b>Print Settings</b> in app launcher"
@@ -137,26 +127,21 @@ print_file() {
       odp | otp | sxi | \
       ppt | pptx | pptm | pot | potx | \
       odg | otg)
-      if $have_libreoffice; then
-        # Set the converted PDF output path.
-        out="$WORK_DIR/${base%.*}.pdf"
-
-        # Convert.
-        libreoffice --headless --convert-to pdf \
-          --outdir "$WORK_DIR" "$file" &> /dev/null || return 1
+  if $have_libreoffice; then
+    log Info "Converting $file via LibreOffice"
+    out="$WORK_DIR/${base%.*}.pdf"
+    libreoffice --headless --convert-to pdf \
+      --outdir "$WORK_DIR" "$file" &> /dev/null || return 1
 
         # Print the converted PDF instead of the source file.
         to_print="$out"
       fi
       ;;
 
-    # SVG needs explicit conversion.
     svg)
       if $have_inkscape; then
-        # Set the converted PDF output path.
+        log Info "Converting $file via Inkscape"
         out="$WORK_DIR/${base%.*}.pdf"
-
-        # Convert.
         inkscape --export-type=pdf \
           --export-filename="$out" "$file" \
           &> /dev/null || return 1
@@ -171,7 +156,8 @@ print_file() {
       ;;
   esac
 
-  # Send the file to the default printer.
+  log Info "Spooling $to_print to $default_printer"
+
   if ! lp -d "$default_printer" "$to_print" &> /dev/null; then
     log Error "failed to print $to_print"
     return 1

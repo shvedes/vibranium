@@ -1,26 +1,15 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
 Usage: ${0##*/} [OPTION]... CHANNEL
 Switch the Vibranium update channel to CHANNEL.
 
+  -v, --verbose   enable verbose output
   -h, --help      display this help and exit
 
 CHANNEL must be one of:

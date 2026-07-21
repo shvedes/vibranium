@@ -1,13 +1,9 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 source vb-lib-core
 VERBOSE=false
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
@@ -36,14 +32,6 @@ If no PACKAGE is provided, refresh repositories and use fzf for interactive pack
 Packages are filtered to install only those not already present.
 Systemd units (services/sockets) from installed packages are detected and enabled with user prompts.
 EOF
-}
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
 }
 
 _ask_for_sudo() {

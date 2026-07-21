@@ -2,13 +2,9 @@
 
 # Credits: Omarchy
 
-shopt -s nocasematch
+source vb-lib-cli
 
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
+shopt -s nocasematch
 
 usage() {
   shcat << EOF

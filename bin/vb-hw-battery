@@ -1,20 +1,8 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
@@ -27,6 +15,7 @@ Exit status:
   1    No active battery detected
 
 Options:
+  -v, --verbose  Enable verbose output
   -h, --help    Show this help and exit
 
 EOF
@@ -48,18 +37,16 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Scan /sys/class/power_supply/BAT* entries. A battery is considered
-# "present" when three conditions hold: the directory exists, the
-# 'present' sysfs file reads "1", and the 'type' file reads "Battery"
-# (excluding AC adapters and wireless chargers that also appear here).
 for bat in /sys/class/power_supply/BAT*; do
   if [[ -r $bat/present ]]; then
     if [[ $(< "$bat"/present) == "1" ]]; then
       if [[ $(< "$bat"/type) == "Battery" ]]; then
+        log Info "Battery found: $bat"
         exit 0
       fi
     fi
   fi
 done
 
+log Info "No battery detected"
 exit 1

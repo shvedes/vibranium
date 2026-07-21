@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 CPU_VENDOR=
 CPU_FAMILY=
 CPU_MODEL_ID=
@@ -20,12 +22,6 @@ IS_ALL=0
 # Arrays to accumulate keys and values separately for clean alignment
 OUTPUT_LABELS=()
 OUTPUT_VALUES=()
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat <<EOF

@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 PERCENT=""
 URGENCY=""
 FORCE=0
@@ -17,12 +19,6 @@ declare -A THRESHOLD_URGENCY=(
   [15]="critical"
   [5]="critical"
 )
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat <<- EOF

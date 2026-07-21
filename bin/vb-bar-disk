@@ -1,20 +1,6 @@
 #!/bin/bash
 
-VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
+source vb-lib-cli
 
 usage() {
   shcat << EOF
@@ -23,7 +9,6 @@ Usage: ${0##*/} [OPTION]
 Output disk usage for all mounted devices for Waybar.
 
 Options:
-  -v, --verbose     Enable verbose output
   -h, --help        Show this help and exit
 
 EOF
@@ -31,10 +16,6 @@ EOF
 
 while (($# > 0)); do
   case "$1" in
-    -v | --verbose)
-      VERBOSE=true
-      shift
-      ;;
     -h | --help)
       usage
       exit 0

@@ -2,18 +2,12 @@
 
 # shellcheck disable=SC2034
 
+source vb-lib-cli
+
 ICON_DIR="$XDG_DATA_HOME/applications/icons"
 SELF="${0##*/}"
 
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
 
 # ---------------------------------------------------------------------------
 # Flags populated by argument parsing below. All default to empty; interactive
@@ -30,12 +24,6 @@ CATEGORY=""
 OWN_PROFILE=false
 INTERACTIVE_MODE=false
 
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
-
 usage() {
   shcat << EOF
 Usage: $SELF [OPTION]...
@@ -51,6 +39,7 @@ Options:
   --keywords KW       Extra keywords, semicolon-separated (appended to auto-generated ones)
   --category CAT      Categories= value for the .desktop file (e.g. Network;WebBrowser)
   --own-profile       Launch the PWA in its own isolated browser profile
+  -v, --verbose       Enable verbose output
   -h, --help          Show this help and exit
 
 If --url is not provided, the script runs in interactive mode and prompts
@@ -607,11 +596,17 @@ if [[ -z $APP_URL ]]; then
 else
   APP_URL="$(_normalize_url "$APP_URL")"
 
-  _find_webapp_by_url "$APP_URL" && exit 1
+  log Info "Installing PWA for $APP_URL"
+
+  _find_webapp_by_url "$APP_URL" > /dev/null && {
+    log Info "PWA already installed for $APP_URL, exiting"
+    exit 1
+  }
   _check_url_reachable "$APP_URL" || exit 1
 
   if [[ -z $APP_NAME ]]; then
     APP_NAME="$(_fetch_page_title "$APP_URL")" || true
+    log Info "Fetched page title: ${APP_NAME:-failed}"
   fi
 
   APP_NAME="$(_strip_title "$APP_NAME")"
@@ -619,13 +614,15 @@ else
 
   [[ $APP_NAME != "PWA - "* ]] && APP_NAME="PWA - $APP_NAME"
 
-  [[ -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]] && exit 1
+  [[ -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]] && {
+    log Info "Desktop file exists for $APP_NAME, exiting"
+    exit 1
+  }
 
   AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
   KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
   ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
 
-  # --exec overrides everything; --own-profile only applies to the default launcher
   if [[ -n $CUSTOM_EXEC ]]; then
     EXEC_COMMAND="$CUSTOM_EXEC"
   elif [[ $OWN_PROFILE == true ]]; then
@@ -635,6 +632,7 @@ else
   fi
 fi
 
+log Info "Writing desktop entry: $APP_NAME"
 _write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$KEYWORDS" "$MIME_TYPES" "$CATEGORY"
 
 if [[ $INTERACTIVE_MODE == true ]]; then

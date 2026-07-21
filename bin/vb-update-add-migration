@@ -17,7 +17,6 @@ SELF="${0##*/}"
 SELF="${SELF/.sh/}"
 
 
-
 # Remove if needed.
 echo "${GREEN}[MIGRATION|$SELF]${RESET} Message"
 EOF

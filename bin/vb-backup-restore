@@ -1,26 +1,8 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ -t 0 ]]; then
-    if $VERBOSE || [[ "$level" == "Error" ]]; then
-      echo "[${0##*/}] $level: $*" >&2
-    fi
-  else
-    if [[ "$level" == "Error" ]]; then
-      echo "[${0##*/}] $level: $*" >&2
-    fi
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
@@ -33,6 +15,7 @@ Commands:
   -r,--restore PATH  Restore backup from PATH
 
 Options:
+  -v, --verbose     Enable verbose output
   -h, --help        Display this help and exit
 
 EOF
@@ -99,6 +82,7 @@ while [[ $# -gt 0 ]]; do
         log Error "Try '${0##*/} --help' for more information."
         exit 1
       fi
+      log Info "Restoring backup from $2"
       helpers::backup_restore "$2"
       shift 2
       ;;

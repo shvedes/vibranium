@@ -1,21 +1,9 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
 SCRIPT_NAME="${0##*/}"
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[$SCRIPT_NAME] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
@@ -101,6 +89,8 @@ if [[ -z "$ACTION" ]]; then
 fi
 
 source "$XDG_CONFIG_HOME/vibranium/current/theme/colors.bash"
+
+log Info "USB $ACTION: $ID_MODEL${DEVNAME:+ on $DEVNAME}"
 
 if [[ "$ACTION" == "add" ]]; then
   if [[ -n "$DEVNAME" ]]; then

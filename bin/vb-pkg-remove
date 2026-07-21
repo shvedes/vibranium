@@ -1,13 +1,9 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 source vb-lib-core
 VERBOSE=false
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
@@ -28,14 +24,6 @@ If no PACKAGE is provided, list explicitly installed packages and use fzf for in
 Packages are filtered to those installed. After removal, detects and disables any enabled systemd units
 (services/sockets) from the removed packages to clean up broken symlinks in systemd directories.
 EOF
-}
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
 }
 
 _ask_for_sudo() {

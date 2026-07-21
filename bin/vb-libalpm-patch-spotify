@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
 MANUAL=false
 
@@ -23,12 +25,6 @@ log() {
         ;;
     esac
   fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
 }
 
 usage() {

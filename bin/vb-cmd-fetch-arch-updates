@@ -1,25 +1,13 @@
 #!/bin/bash
 
-VERBOSE=false
+source vb-lib-cli
 
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
+VERBOSE=false
 
 CACHE_FILE="$VIBRANIUM_CACHE/pkg-updates.list"
 TIMESTAMP_FILE="$VIBRANIUM_CACHE/pkg-updates.timestamp"
 INTERVAL=$((3 * 24 * 60 * 60)) # 3 real days
 THRESHOLD=125                  # packages
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF

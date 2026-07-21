@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Source guard
+if [[ -n "${_VB_LIB_CLI_LOADED:-}" ]]; then
+  return 0
+fi
+
+declare -gr _VB_LIB_CLI_LOADED=1
+
+log() {
+  local level="$1"
+  shift
+  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
+    echo "[${0##*/}] $level: $*" >&2
+  fi
+}
+
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}

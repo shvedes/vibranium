@@ -1,12 +1,8 @@
 #!/bin/bash
 
-SELF="${0##*/}"
+source vb-lib-cli
 
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
+SELF="${0##*/}"
 
 usage() {
   shcat << EOF

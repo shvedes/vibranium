@@ -8,22 +8,10 @@
 # Depends on: pass, gpg, git, ping, wl-copy, rofi, notify-send
 # Depends on vb-lib-core for: helpers::ui::menu, P_YELLOW
 
+source vb-lib-cli
+
 VERBOSE=false
 SYNC=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF

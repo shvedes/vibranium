@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 if [[ "$CHASSIS_TYPE" == "vm" ]]; then
   notify-send -r 4 "Vibranium - Brightness" -u critical -t 5000 \
     "Brightness control is not available inside of a Virtual Machine"
@@ -13,20 +15,6 @@ VERBOSE=false
 MONITOR_ARG=""
 ORIGINAL_ARGS=("$@")
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
 
 usage() {
   shcat << EOF

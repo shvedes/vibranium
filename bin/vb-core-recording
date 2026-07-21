@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 if [[ $CHASSIS_TYPE == vm ]]; then
   log Error "Screen recording is not available in a VM"
   exit 1
@@ -7,24 +9,10 @@ fi
 
 VERBOSE=false
 
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
 SELF="${0##*/}"
 LOG_FILE="$VIBRANIUM_CACHE/$SELF.log"
 
 log Info "$SELF started: log_file=$LOG_FILE"
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF

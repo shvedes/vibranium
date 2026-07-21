@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
 SELF="${0##*/}"
 ARTIST=""
@@ -8,20 +10,6 @@ ALBUM=""
 TRACK=""
 RANDOM_MODE=false
 SEARCH=""
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 mpd_music_dir() {
   local conf dir
@@ -167,6 +155,7 @@ if $RANDOM_MODE; then
   fi
 
   pick=$((RANDOM % count))
+  log Info "Random mode: adding ${all[pick]} ($count tracks available)"
   mpc -q clear
   mpc add "${all[pick]}"
   mpc -q play
@@ -188,6 +177,7 @@ if [[ ${#FILES[@]} -gt 0 ]]; then
   fi
 
   tracks=("${!_fh[@]}")
+  log Info "File mode: ${#tracks[@]} tracks match ${FILES[*]}"
   mpc -q clear
   printf '%s\n' "${tracks[@]}" | mpc add
   mpc -q play 1
@@ -315,6 +305,8 @@ if [[ -n "$SEARCH" ]]; then
     exit 1
   fi
 
+  log Info "Search mode: ${#tokens[@]} tokens, aggregating scores"
+
   # Aggregate per-track scores from all scoring sources.
   declare -A agg
   while IFS=$'\t' read -r score t; do
@@ -331,6 +323,7 @@ if [[ -n "$SEARCH" ]]; then
     done | sort -t$'\t' -k1,1rn
   )
 
+  log Info "Search mode: ${#tracks[@]} scored tracks queued"
   mpc -q clear
   printf '%s\n' "${tracks[@]}" | mpc add
   mpc -q play 1
@@ -355,6 +348,8 @@ if ((!count)); then
   exit 1
 fi
 
+log Info "Filter mode: $count tracks match${ARTIST:+ artist=$ARTIST}${GENRE:+ genre=$GENRE}${ALBUM:+ album=$ALBUM}${TRACK:+ track=$TRACK}"
+
 # When searching album without artist, multiple albums may share a name.
 # Use only the first matching album's tracks.
 if [[ -n "$ALBUM" && -z "$ARTIST" && -z "$GENRE" && -z "$TRACK" ]]; then
@@ -369,6 +364,7 @@ if [[ -n "$ALBUM" && -z "$ARTIST" && -z "$GENRE" && -z "$TRACK" ]]; then
   count=${#tracks[@]}
 fi
 
+log Info "Queuing $count tracks, starting random position"
 mpc -q clear
 printf '%s\n' "${tracks[@]}" | mpc add
 mpc -q play $((RANDOM % count + 1))

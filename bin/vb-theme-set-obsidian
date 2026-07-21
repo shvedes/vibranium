@@ -1,17 +1,13 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VB_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/theme"
 OBSIDIAN_CFG="$XDG_CONFIG_HOME/obsidian/obsidian.json"
 
 if [[ ! -f $VB_THEME_DIR/obsidian.css ]]; then
   exit 0
 fi
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 mapfile -t VAULTS < <(jq -r '.vaults | values[].path' "$OBSIDIAN_CFG")
 

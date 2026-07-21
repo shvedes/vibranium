@@ -1,10 +1,6 @@
 #!/bin/bash
 
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
+source vb-lib-cli
 
 usage() {
   shcat << EOF
@@ -19,14 +15,6 @@ EOF
 }
 
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

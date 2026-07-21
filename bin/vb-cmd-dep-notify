@@ -1,20 +1,8 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 VERBOSE=false
-
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
-}
 
 usage() {
   shcat << EOF
@@ -82,6 +70,8 @@ fi
 # Source the theme library for P_YELLOW and other colour variables used
 # in the notification markup.
 source "$XDG_CONFIG_HOME/vibranium/current/theme/colors.bash"
+
+log Info "Missing dependencies for $NAME: ${DEPS[*]}"
 
 msg="Missing required dependencies: <span foreground='${P_YELLOW}'><b>${DEPS[*]}</b></span>"
 # Replace notification ID 4 so repeated dep-notify calls update the same

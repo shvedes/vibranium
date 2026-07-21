@@ -1,14 +1,8 @@
 #!/bin/bash
 
-VERBOSE=false
+source vb-lib-cli
 
-log() {
-  local level="$1"
-  shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
-    echo "[${0##*/}] $level: $*" >&2
-  fi
-}
+VERBOSE=false
 
 shopt -s extglob dotglob nullglob
 
@@ -498,12 +492,6 @@ get_wallpaper() {
   if [[ ${#files[@]} -gt 0 ]]; then
     printf "%s" "${files[0]}"
   fi
-}
-
-shcat() {
-  while IFS= read -r line; do
-    printf '%s\n' "$line"
-  done
 }
 
 usage() {
