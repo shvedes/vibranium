@@ -39,8 +39,7 @@ MASTER_SPEC=(
   "master.slave_count_for_center_master|int"
   "master.special_scale_factor|float"
   "master.center_master_fallback|str"
-  # Not yet available in the stable release
-  # "master.focus_master_on_close|bool"
+  "master.focus_master_on_close|bool"
   "master.always_keep_position|bool"
   "master.allow_small_split|bool"
   "master.smart_resizing|bool"
@@ -708,6 +707,9 @@ _menu::master() {
       --label "Always keep position : ${HYPR[master.always_keep_position]}" \
       --func "hypr::toggle 'master:always_keep_position' "$HYPR_CONF_ADVANCED""
 
+    cfgr::item::action \
+      --label "Focus master on close : ${HYPR[master.focus_master_on_close]}" \
+      --func "hypr::toggle 'master:focus_master_on_close' "$HYPR_CONF_ADVANCED""
 
   }
 
