@@ -1,11 +1,10 @@
 #!/bin/bash
 
-# shellcheck disable=SC2206
-
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -46,7 +45,7 @@ FORCE=false
 # "tokyonight-night" -> "Tokyonight-Night"
 capitalize() {
   local IFS=- parts result=()
-  read -ra parts <<<"$1"
+  read -ra parts <<< "$1"
   local part
   for part in "${parts[@]}"; do
     result+=("${part^}")
@@ -59,7 +58,7 @@ capitalize() {
 # mis-parsed as a family/variant pair by the hyphen heuristic.
 capitalize_words() {
   local IFS=- parts=() part
-  read -ra parts <<<"$1"
+  read -ra parts <<< "$1"
   local out=""
   for part in "${parts[@]}"; do
     out+="${part^} "
@@ -108,7 +107,7 @@ _discover_in_dir() {
         [[ $key == FAMILY ]] && family=$val
         [[ $key == VARIANT ]] && variant=$val
         [[ $key == LIGHT ]] && light=$val
-      done <"$theme_dir/theme.info"
+      done < "$theme_dir/theme.info"
     else
       # Fallback: derive display name from folder name; do NOT write theme.info.
       # For official themes, a hyphen splits family from variant (e.g.
@@ -181,7 +180,7 @@ _discover_themes() {
 
 get_current_target_basename() {
   if [[ -f "$THEME_NAME_FILE" ]]; then
-    printf "%s" "$(<"$THEME_NAME_FILE")"
+    printf "%s" "$(< "$THEME_NAME_FILE")"
   else
     printf ""
   fi
@@ -190,7 +189,7 @@ get_current_target_basename() {
 is_current_theme() {
   local theme="$1" curr_basename
   [[ -f "$THEME_NAME_FILE" ]] || return 1
-  curr_basename="$(<"$THEME_NAME_FILE")"
+  curr_basename="$(< "$THEME_NAME_FILE")"
   [[ -z "$curr_basename" ]] && return 1
   [[ "${curr_basename,,}" == "${theme,,}" ]]
 }
@@ -232,13 +231,14 @@ _resolve_active_theme() {
 
   [[ -f "$THEME_NAME_FILE" ]] || return
   local curr_folder
-  curr_folder="$(<"$THEME_NAME_FILE")"
+  curr_folder="$(< "$THEME_NAME_FILE")"
   [[ -z "$curr_folder" ]] && return
 
   local family variant
   for family in "${!FAMILIES[@]}"; do
     for variant in ${FAMILIES[$family]}; do
-      if [[ "${FOLDER_MAP[${family}-${variant}]}" == "$curr_folder" ]]; then
+      local key="${family}-${variant}"
+      if [[ "${FOLDER_MAP[$key]}" == "$curr_folder" ]]; then
         ACTIVE_FAMILY="$family"
         ACTIVE_VARIANT="$variant"
         return
@@ -314,9 +314,11 @@ pick_family() {
 }
 
 pick_variant() {
+  local variants
   local family="$1"
   local selected_row="${2:-0}"
-  local variants=(${FAMILIES[$family]})
+
+  read -ra variants <<< "${FAMILIES[$family]}"
   _sort_by_length_desc variants
 
   local items=() v
@@ -419,7 +421,7 @@ apply_theme() {
   fi
 
   # Record the active theme name for is_current_theme and external tooling
-  printf "%s" "$folder_name" >"$THEME_NAME_FILE"
+  printf "%s" "$folder_name" > "$THEME_NAME_FILE"
 
   # Create missing config files from templates
   vb-theme-set-templates
@@ -487,7 +489,7 @@ get_wallpaper() {
         # Found the entry but the target is gone - stop searching.
         break
       fi
-    done <"$state_file"
+    done < "$state_file"
   fi
 
   # No valid saved path found: return the first wallpaper in the theme dir.
@@ -505,7 +507,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]... [THEME]
 
 Apply a Vibranium theme. With no THEME argument an interactive picker is
@@ -535,12 +537,13 @@ EOF
 }
 
 list_themes() {
-  local family variant
+  local key family variant
   local -a names=()
 
   for family in "${!FAMILIES[@]}"; do
     for variant in ${FAMILIES[$family]}; do
-      names+=("${FOLDER_MAP[${family}-${variant}]}")
+      key="${family}-${variant}"
+      names+=("${FOLDER_MAP[$key]}")
     done
   done
 
@@ -569,26 +572,26 @@ log Info "Starting theme selector"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -f | --force)
-    FORCE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -l | --list)
-    _discover_themes
-    list_themes
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -f | --force)
+      FORCE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -l | --list)
+      _discover_themes
+      list_themes
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -663,7 +666,7 @@ else
     fi
 
     # Remember which variant row was chosen for this family
-    _vvariants=(${FAMILIES[$FAMILY]})
+    read -ra _vvariants <<< "${FAMILIES[$FAMILY]}"
     _sort_by_length_desc _vvariants
     _vitems=()
 
@@ -706,6 +709,7 @@ done
 
 # Apply custom user hooks
 if [[ -d "$HOOK_DIR" ]]; then
+  # shellcheck disable=SC2206
   HOOK_FILES=($HOOK_DIR/*.sh)
 
   if ((${#HOOK_FILES[@]} == 0)); then

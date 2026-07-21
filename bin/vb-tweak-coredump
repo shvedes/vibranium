@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Toggle systemd-coredump on/off.
@@ -29,24 +30,25 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
 _is_disabled() {
   local pattern
+  # sysfs/procfs value is a single line, so pattern[0] is always the value.
   mapfile -t pattern < /proc/sys/kernel/core_pattern
-  [[ "$pattern" == "|/bin/false" ]]
+  [[ "${pattern[0]}" == "|/bin/false" ]]
 }
 
 _as_root=(pkexec su-bridge --root --)
@@ -55,8 +57,7 @@ _as_root=(pkexec su-bridge --root --)
 if _is_disabled; then
   log Info "Enabling coredumps"
   if ! "${_as_root[@]}" bash -c \
-    'rm -f /etc/sysctl.d/99-coredump.conf; sysctl --system >/dev/null'
-  then
+    'rm -f /etc/sysctl.d/99-coredump.conf; sysctl --system >/dev/null'; then
     exit 1
   fi
   echo "[${0##*/}] systemd-coredump enabled. No reboot required"
@@ -65,8 +66,7 @@ else
   c='kernel.core_pattern=|/bin/false'
   _r=' > /etc/sysctl.d/99-coredump.conf; sysctl --system >/dev/null'
   if ! "${_as_root[@]}" bash -c \
-    "printf '$c\n'$_r"
-  then
+    "printf '$c\n'$_r"; then
     exit 1
   fi
   echo "[${0##*/}] systemd-coredump disabled. No reboot required"

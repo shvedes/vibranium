@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -19,7 +20,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]
 
 Display information about the currently playing track.
@@ -33,25 +34,25 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -q | --quiet)
-    QUIET=true
-    shift
-    ;;
-  -*)
-    log Error "unknown option: $1"
-    exit 1
-    ;;
-  *)
-    break
-    ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -q | --quiet)
+      QUIET=true
+      shift
+      ;;
+    -*)
+      log Error "unknown option: $1"
+      exit 1
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -60,10 +61,10 @@ source vb-lib-core
 album_art="$VIBRANIUM_RUNTIME/$SELF.album-art"
 state_file="$VIBRANIUM_RUNTIME/now_playing.cache"
 
-pc_status="$(playerctl status 2>/dev/null || true)"
+pc_status="$(playerctl status 2> /dev/null || true)"
 
 if systemctl -q --user is-active mpd; then
-  mpd_status="$(mpc status 2>/dev/null)"
+  mpd_status="$(mpc status 2> /dev/null)"
 fi
 
 # Detect the active player: prefer a currently Playing player, then
@@ -72,22 +73,22 @@ fi
 # playerctl and MPD when both are installed but only one is active.
 if [[ "$pc_status" == "Playing" ]]; then
   player="playerctl"
-  echo "$player" >"$state_file"
-  IFS='^' read -r title artist <<<"$(playerctl metadata --format '{{title}}^{{artist}}')"
+  echo "$player" > "$state_file"
+  IFS='^' read -r title artist <<< "$(playerctl metadata --format '{{title}}^{{artist}}')"
 elif [[ -n "$mpd_status" && "$mpd_status" == *"[playing]"* ]]; then
   player="mpd"
-  echo "$player" >"$state_file"
-  IFS='^' read -r title artist <<<"$(mpc current -f '%title%^%artist%')"
+  echo "$player" > "$state_file"
+  IFS='^' read -r title artist <<< "$(mpc current -f '%title%^%artist%')"
 elif [[ -f "$state_file" ]]; then
-  player="$(<"$state_file")"
+  player="$(< "$state_file")"
   case "$player" in
-  playerctl)
-    IFS='^' read -r title artist <<< \
-      "$(playerctl metadata --format '{{title}}^{{artist}}')"
-    ;;
-  mpd)
-    IFS='^' read -r title artist <<<"$(mpc current -f '%title%^%artist%')"
-    ;;
+    playerctl)
+      IFS='^' read -r title artist <<< \
+        "$(playerctl metadata --format '{{title}}^{{artist}}')"
+      ;;
+    mpd)
+      IFS='^' read -r title artist <<< "$(mpc current -f '%title%^%artist%')"
+      ;;
   esac
 else
   log Error "No active players"
@@ -133,20 +134,20 @@ show_album_art="$VIBRANIUM_GLOBAL_NOW_PLAYING_SHOW_ALBUM_ART"
 
 if [[ "$show_album_art" = true ]]; then
   case "$player" in
-  "playerctl")
-    album_art_url="$(playerctl metadata mpris:artUrl)"
-    if [[ "$album_art_url" =~ ^https?:// ]]; then
-      # Online players (e.g. Spotify) expose a remote URL - download it.
-      curl -s "$album_art_url" -o "$album_art"
-    else
-      # Local players (e.g. mpv, VLC) expose a file:// path - use directly.
-      album_art="$album_art_url"
-    fi
-    ;;
-  "mpd")
-    mpd_file="$(mpc --format "%file%" current)"
-    mpc readpicture "$mpd_file" >"$album_art"
-    ;;
+    "playerctl")
+      album_art_url="$(playerctl metadata mpris:artUrl)"
+      if [[ "$album_art_url" =~ ^https?:// ]]; then
+        # Online players (e.g. Spotify) expose a remote URL - download it.
+        curl -s "$album_art_url" -o "$album_art"
+      else
+        # Local players (e.g. mpv, VLC) expose a file:// path - use directly.
+        album_art="$album_art_url"
+      fi
+      ;;
+    "mpd")
+      mpd_file="$(mpc --format "%file%" current)"
+      mpc readpicture "$mpd_file" > "$album_art"
+      ;;
   esac
 fi
 

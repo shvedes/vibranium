@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Remove an installed community theme.
@@ -29,19 +30,19 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "unknown option: $1"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "unknown option: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
 done
 
@@ -72,8 +73,8 @@ fi
 _capitalize() {
   parts=() result=()
 
-  local IFS=-            # Split words by '-'
-  read -ra parts <<<"$1" # Read input string into array 'parts' using IFS='-'
+  local IFS=-             # Split words by '-'
+  read -ra parts <<< "$1" # Read input string into array 'parts' using IFS='-'
 
   local part
   for part in "${parts[@]}"; do
@@ -128,7 +129,7 @@ fi
 # unreadable, leaving current_theme empty and skipping the fallback switch.
 current_theme=""
 if [[ -f "$THEME_NAME_FILE" ]]; then
-  current_theme="$(<"$THEME_NAME_FILE")"
+  current_theme="$(< "$THEME_NAME_FILE")"
 fi
 
 rm -rf "$chosen_path"
@@ -145,7 +146,7 @@ if [[ -f "$state_file" ]]; then
   # even if it doesn't end with a newline
   while IFS= read -r line || [[ -n "$line" ]]; do
     lines+=("$line")
-  done <"$state_file"
+  done < "$state_file"
 
   {
     # Iterate over the collected lines
@@ -156,7 +157,7 @@ if [[ -f "$state_file" ]]; then
       # Print all other lines as-is
       printf '%s\n' "$line"
     done
-  } >"$state_file" # Overwrite the original file with filtered content
+  } > "$state_file" # Overwrite the original file with filtered content
 fi
 
 # If the removed theme was the active one, fall back to the default

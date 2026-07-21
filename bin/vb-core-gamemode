@@ -9,7 +9,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]... -- COMMAND [ARG]...
 Launch COMMAND under gamescope
 
@@ -133,7 +133,8 @@ GAMESCOPE_FLAGS=(
 )
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -169,7 +170,7 @@ parse_gamescope_options() {
   local opts_str="$1"
   local -a tokens
   log Info "Parsing gamescope opts: $opts_str"
-  read -ra tokens <<<"$opts_str"
+  read -ra tokens <<< "$opts_str"
   log Info "Tokens parsed: ${#tokens[@]}"
 
   local token prev_was_flag=false
@@ -199,55 +200,55 @@ EXTRA_GAMESCOPE_OPTS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --mangohud)
-    USE_MANGOHUD=true
-    log Info "Flag: mangohud enabled"
-    shift
-    ;;
-  --ld-workaround)
-    OVERRIDE_LDPRELOAD=true
-    log Info "Flag: LD_PRELOAD workaround enabled"
-    shift
-    ;;
-  --gamescope-options=*)
-    parse_gamescope_options "${1#*=}"
-    shift
-    ;;
-  --gamescope-options)
-    if [[ -z "${2-}" ]]; then
-      log Error "'--gamescope-options' requires an argument"
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --mangohud)
+      USE_MANGOHUD=true
+      log Info "Flag: mangohud enabled"
+      shift
+      ;;
+    --ld-workaround)
+      OVERRIDE_LDPRELOAD=true
+      log Info "Flag: LD_PRELOAD workaround enabled"
+      shift
+      ;;
+    --gamescope-options=*)
+      parse_gamescope_options "${1#*=}"
+      shift
+      ;;
+    --gamescope-options)
+      if [[ -z "${2-}" ]]; then
+        log Error "'--gamescope-options' requires an argument"
+        log Error "Try '$SELF --help' for more information."
+        exit 1
+      fi
+      parse_gamescope_options "$2"
+      shift 2
+      ;;
+    --no-power-profile)
+      NO_POWER_PROFILE=true
+      log Info "Flag: power profile disabled"
+      shift
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      log Error "unrecognized option: '$1'"
       log Error "Try '$SELF --help' for more information."
       exit 1
-    fi
-    parse_gamescope_options "$2"
-    shift 2
-    ;;
-  --no-power-profile)
-    NO_POWER_PROFILE=true
-    log Info "Flag: power profile disabled"
-    shift
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --)
-    shift
-    break
-    ;;
-  -*)
-    log Error "unrecognized option: '$1'"
-    log Error "Try '$SELF --help' for more information."
-    exit 1
-    ;;
-  *)
-    # No '--' separator used - treat the rest as the game command.
-    break
-    ;;
+      ;;
+    *)
+      # No '--' separator used - treat the rest as the game command.
+      break
+      ;;
   esac
 done
 
@@ -263,7 +264,7 @@ log Info "Command to launch: $*"
 
 # Mangohud availability check (done early so we can warn before any exec)
 if $USE_MANGOHUD; then
-  if ! command -v mangohud >/dev/null; then
+  if ! command -v mangohud > /dev/null; then
     USE_MANGOHUD=false
     log Warn "--mangohud requested but 'mangohud' not found in PATH; ignoring"
   else
@@ -272,7 +273,7 @@ if $USE_MANGOHUD; then
 fi
 
 # Gamescope not available - fall back gracefully
-if ! command -v gamescope >/dev/null; then
+if ! command -v gamescope > /dev/null; then
   log Warn "gamescope is not installed"
   notify-send -r 1 -t 5000 "Vibranium" \
     "<b>gamescope</b> not found! Launching the game as is."
@@ -388,4 +389,4 @@ exec "${EXEC_CMDLINE[@]}" gamescope \
   --backend wayland \
   --expose-wayland \
   --rt -- "${GAME_CMDLINE[@]}" "$@" \
-    &> "$VIBRANIUM_CACHE/gamescope_latest.log"
+  &> "$VIBRANIUM_CACHE/gamescope_latest.log"

@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION] [URL|owner/repo]
 
 Install a community theme from a Git repository.
@@ -29,17 +30,17 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -187,7 +188,7 @@ fi
 
 # Match strictly against the JSON name field - guards against partial matches
 # (e.g. a file called "my-colors.toml" must not pass)
-CONTENTS="$(<"$CONTENTS_FILE")"
+CONTENTS="$(< "$CONTENTS_FILE")"
 if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] && [[ "$CONTENTS" != *'"name": "colors-extended.toml"'* ]]; then
   echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${GREEN}Omarchy${RESET} versions prior to ${BLUE}v3.3.0${RESET}"
 

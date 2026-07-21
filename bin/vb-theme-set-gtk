@@ -21,17 +21,17 @@ shcat() {
 for slot in vibranium-a vibranium-b; do
   gtk3_dir="$HOME/.local/share/themes/$slot/gtk-3.0"
   mkdir -p "$gtk3_dir"
-  shcat >"$gtk3_dir/gtk.css" <<-EOF
+  shcat > "$gtk3_dir/gtk.css" <<- EOF
 @import url("/usr/share/themes/adw-gtk3/gtk-3.0/gtk.css");
 
-$(<"$GTK_THEME")
+$(< "$GTK_THEME")
 EOF
 done
 
 # GTK4 -- write user override, applies on next app restart
 mkdir -p "$XDG_CONFIG_HOME/gtk-4.0"
-shcat >"$XDG_CONFIG_HOME/gtk-4.0/gtk.css" <<-EOF
-$(<"$GTK_THEME")
+shcat > "$XDG_CONFIG_HOME/gtk-4.0/gtk.css" <<- EOF
+$(< "$GTK_THEME")
 EOF
 
 # Alternate between slots to bust GTK3 cache

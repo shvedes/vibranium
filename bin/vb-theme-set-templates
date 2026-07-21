@@ -195,7 +195,7 @@ COLORS_EXTENDED_FILE="$NEXT_THEME_DIR/colors-extended.toml"
 
 # vb-theme-set writes the plain theme name here right before this script
 # runs, so we can match "theme-name/file.ext" scoped entries below.
-NEXT_THEME_NAME=$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")
+NEXT_THEME_NAME=$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")
 
 # Filenames in this list always get regenerated from their template, even
 # when a file of that name already exists in the theme folder. Built-in
@@ -210,12 +210,14 @@ _settings_adv="$XDG_CONFIG_HOME/vibranium/settings.advanced"
 [[ -f $_settings_adv ]] && source "$_settings_adv"
 unset _settings_adv
 
-# The ${array[@]+"..."} form below expands to nothing, rather than raising
-# an unbound-variable error, when vb_force_template_files was never set or
-# was left empty.
-force_template_files+=(
-  "${vb_force_template_files[@]+"${vb_force_template_files[@]}"}"
-)
+# Append the user-defined forced template files, if any, from the advanced settings.
+# (vb_force_template_files is sourced from ~/.config/vibranium/settings.advanced)
+if [[ -v vb_force_template_files ]]; then
+  force_template_files+=("${vb_force_template_files[@]}")
+fi
+if [[ -v vb_force_template_files ]]; then
+  force_template_files+=("${vb_force_template_files[@]}")
+fi
 
 # Gather whichever color files this theme actually provides. Order matters
 # here: extended is appended after the base file, so when the same key
@@ -249,8 +251,8 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
       value="${value%%[\"\']*}"
 
       printf '%s\x01%s\n' "$key" "$value"
-    done <"$src"
-  done >"$subs_file"
+    done < "$src"
+  done > "$subs_file"
 
   shopt -s nullglob
 
@@ -313,7 +315,7 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
         fi
       done
     done
-  } >"$outmap_file"
+  } > "$outmap_file"
 
   # Hand everything off to the awk engine in one call: the color table,
   # the output map, then every template that needs rendering.

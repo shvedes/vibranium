@@ -42,37 +42,37 @@ _enable_systemd_units() {
 
 _configure_virsh_network() {
   # Redirect to /dev/null in case it's already active
-  sudo virsh -q net-autostart default 2>/dev/null || true
-  sudo virsh -q net-start default 2>/dev/null || true
+  sudo virsh -q net-autostart default 2> /dev/null || true
+  sudo virsh -q net-start default 2> /dev/null || true
 }
 
 _configure_ufw() {
-  if ! command -v ufw &>/dev/null; then
+  if ! command -v ufw &> /dev/null; then
     return 2 # ufw absent
   fi
 
   local conf=/etc/libvirt/network.conf
   local desired=$'# Vibranium overrides below\nfirewall_backend = "iptables"'
 
-  if grep -q '^firewall_backend' "$conf" 2>/dev/null; then
+  if grep -q '^firewall_backend' "$conf" 2> /dev/null; then
     echo -e "${GREEN}[VIBRANIUM]${RESET} UFW libvirt config: already up to date, skipping"
     return 1 # unchanged
   fi
 
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring firewall for libvirt"
-  echo -e "\n\n$desired" | sudo tee -a "$conf" >/dev/null
+  echo -e "\n\n$desired" | sudo tee -a "$conf" > /dev/null
 }
 
 # Overengineered protection layer
 _ensure_virt_manager() {
-  if ! command -v virt-manager >/dev/null; then
+  if ! command -v virt-manager > /dev/null; then
     echo -e "${RED}[VIBRANIUM]${RESET} However, you're missing the ${YELLOW}VM Manager${RESET} app"
     if term::ask_yes_no Y "Install it now?"; then
       term::disable_input
       if vb-pkg-install --embedded -- virt-manager; then
         if term::ask_yes_no Y "Launch it now?"; then
           term::disable_input
-          setsid -f app2unit virt-manager &>/dev/null
+          setsid -f app2unit virt-manager &> /dev/null
         fi
       else
         echo -e "${RED}[VIBRANIUM]${RESET} Failed to install ${YELLOW}virt-manager${RESET}"
@@ -98,7 +98,7 @@ if [[ "$CHASSIS_TYPE" == vm ]] && [[ "$_allow_paravirtualization" == false ]]; t
   exit 1
 fi
 
-if command -v virsh >/dev/null; then
+if command -v virsh > /dev/null; then
   if systemctl -q is-enabled libvirtd.socket ||
     systemctl -q is-enabled libvirtd.service; then
 
@@ -160,15 +160,15 @@ summary_rules=()
 # ── UFW firewall rules ────────────────────────────────────────
 _configure_ufw
 case $? in
-0)
-  summary_rules+=("UFW: ${GREEN}libvirt iptables backend configured${RESET}")
-  ;;
-1)
-  summary_rules+=("UFW: ${CYAN}unchanged${RESET}")
-  ;;
-2)
-  summary_rules+=("UFW: ${YELLOW}not present${RESET}, skipped")
-  ;;
+  0)
+    summary_rules+=("UFW: ${GREEN}libvirt iptables backend configured${RESET}")
+    ;;
+  1)
+    summary_rules+=("UFW: ${CYAN}unchanged${RESET}")
+    ;;
+  2)
+    summary_rules+=("UFW: ${YELLOW}not present${RESET}, skipped")
+    ;;
 esac
 
 # ── User group ────────────────────────────────────────────────
@@ -199,7 +199,7 @@ echo ""
 echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/QEMU${RESET} for further, advanced configuration"
 
 if term::ask_yes_no Y "Launch VM Manager now?"; then
-  exec setsid -f app2unit virt-manager &>/dev/null
+  exec setsid -f app2unit virt-manager &> /dev/null
 else
   _operation_complete
 fi

@@ -5,7 +5,8 @@ SELF="${0##*/}"
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -18,7 +19,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF -- COMMAND [ARGS...]
 
 Focus existing window matching COMMAND, or launch it via app2unit.
@@ -186,23 +187,23 @@ source vb-lib-core
 
 while (($#)); do
   case "$1" in
-  --)
-    shift
-    break
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "unknown option -- $*"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    --)
+      shift
+      break
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "unknown option -- $*"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
 done
 

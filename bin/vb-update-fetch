@@ -9,7 +9,7 @@ set -euo pipefail
 
 # Wait for network, bail out after 60 attempts (~1 minute)
 attempts=0
-while ! ping -c 1 -W 2 8.8.8.8 &>/dev/null; do
+while ! ping -c 1 -W 2 8.8.8.8 &> /dev/null; do
   attempts=$((attempts + 1))
 
   if ((attempts >= 60)); then
@@ -19,7 +19,7 @@ while ! ping -c 1 -W 2 8.8.8.8 &>/dev/null; do
   sleep 1
 done
 
-git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &>/dev/null || exit 1
+git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &> /dev/null || exit 1
 
 branch="$(git -C "$VIBRANIUM" branch --show-current)"
 
@@ -29,10 +29,10 @@ if [[ -z "$branch" ]]; then
     exit 0
   fi
 
-  local_latest=$(git -C "$VIBRANIUM" describe --tags --exact-match --always --abbrev=7 2>/dev/null)
+  local_latest=$(git -C "$VIBRANIUM" describe --tags --exact-match --always --abbrev=7 2> /dev/null)
 
   if [[ "$remote_latest" != "$local_latest" ]]; then
-    echo "$remote_latest" >"$VIBRANIUM_STATE/update.available"
+    echo "$remote_latest" > "$VIBRANIUM_STATE/update.available"
     if systemctl -q --user is-active waybar; then
       # RTMIN+12 = pacman module, RTMIN+10 = update module
       pkill -RTMIN+12 waybar || true
@@ -48,10 +48,10 @@ else
     exit 0
   fi
 
-  behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/master --count 2>/dev/null || echo 0)
+  behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/master --count 2> /dev/null || echo 0)
 
   if ((behind > 0)); then
-    echo "$behind" >"$VIBRANIUM_STATE/update.available"
+    echo "$behind" > "$VIBRANIUM_STATE/update.available"
     if systemctl -q --user is-active waybar; then
       # RTMIN+12 = pacman module, RTMIN+10 = update module
       pkill -RTMIN+12 waybar || true

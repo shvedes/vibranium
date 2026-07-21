@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION] [FILE]
 
 Launch a photo editor for the given image file using satty.
@@ -47,24 +48,24 @@ if [[ $# -gt 1 ]]; then
 fi
 
 case "$1" in
--v | --verbose)
-  VERBOSE=true
-  shift
-  ;;
--h | --help)
-  usage
-  exit 0
-  ;;
--?*)
-  log Error "unknown option '$1'."
-  log Error "Try --help for more information"
-  exit 1
-  ;;
+  -v | --verbose)
+    VERBOSE=true
+    shift
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -?*)
+    log Error "unknown option '$1'."
+    log Error "Try --help for more information"
+    exit 1
+    ;;
 esac
 
 log Info "Starting image annotator"
 
-if ! command -v satty >/dev/null; then
+if ! command -v satty > /dev/null; then
   log Error "satty not found"
   vb-cmd-dep-notify --name "Image Editor" --deps "satty"
   exit 1
@@ -74,14 +75,14 @@ fi
 if [[ $# -eq 1 ]]; then
   image="$1"
 else
-  if ! command -v zenity >/dev/null; then
+  if ! command -v zenity > /dev/null; then
     [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Editor" --deps zenity
     log Error "no image file provided and zenity not available."
     exit 1
   fi
 
   image="$(zenity --title="Select File" --file-selection \
-    --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2>/dev/null)"
+    --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2> /dev/null)"
 
   if [[ -z "$image" ]]; then
     exit 0 # User canceled selection; exit quietly.
@@ -134,7 +135,7 @@ satty_flags=(
   --filename "$satty_input"
 )
 
-satty "${satty_flags[@]}" &>/dev/null
+satty "${satty_flags[@]}" &> /dev/null
 
 # Copy the edited file back if we were working on a /tmp copy.
 if [[ "$filetype" != "png" ]]; then

@@ -10,7 +10,8 @@ RANDOM_MODE=false
 SEARCH=""
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -31,7 +32,7 @@ mpd_music_dir() {
   dir=$(sed -n '/^[[:space:]]*music_directory[[:space:]]*/{
     s/^[[:space:]]*music_directory[[:space:]]*//;s/^"//;s/"$//;s/^'\''//;s/'\''$//
     p;q
-  }' "$conf" 2>/dev/null)
+  }' "$conf" 2> /dev/null)
 
   [[ -z "$dir" ]] && return 1
   dir="${dir/#\~/$HOME}"
@@ -39,7 +40,7 @@ mpd_music_dir() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTIONS] [FILE...]
 
 Add tracks to MPD queue and play a random one.
@@ -73,46 +74,46 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -A | --artist)
-    ARTIST="$2"
-    shift 2
-    ;;
-  -a | --album)
-    ALBUM="$2"
-    shift 2
-    ;;
-  -t | --track)
-    TRACK="$2"
-    shift 2
-    ;;
-  -g | --genre)
-    GENRE="$2"
-    shift 2
-    ;;
-  -r | --random)
-    RANDOM_MODE=true
-    shift
-    ;;
-  -s | --search)
-    shift
-    SEARCH="$*"
-    set --
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -*)
-    log Error "Unknown option: $1"
-    exit 1
-    ;;
-  *)
-    break
-    ;;
+    -A | --artist)
+      ARTIST="$2"
+      shift 2
+      ;;
+    -a | --album)
+      ALBUM="$2"
+      shift 2
+      ;;
+    -t | --track)
+      TRACK="$2"
+      shift 2
+      ;;
+    -g | --genre)
+      GENRE="$2"
+      shift 2
+      ;;
+    -r | --random)
+      RANDOM_MODE=true
+      shift
+      ;;
+    -s | --search)
+      shift
+      SEARCH="$*"
+      set --
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -*)
+      log Error "Unknown option: $1"
+      exit 1
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -146,12 +147,12 @@ elif [[ -z "$ARTIST" && -z "$ALBUM" && -z "$TRACK" && -z "$SEARCH" ]]; then
   exit 1
 fi
 
-if ! command -v mpc >/dev/null; then
+if ! command -v mpc > /dev/null; then
   log Error "MPD not installed"
   exit 1
 fi
 
-if ! mpc status >/dev/null 2>&1; then
+if ! mpc status > /dev/null 2>&1; then
   log Error "MPD not running"
   exit 1
 fi
@@ -206,8 +207,8 @@ if [[ -n "$SEARCH" ]]; then
   # Tracks matching the full query get a high base score and are always included.
   {
     while IFS= read -r t; do printf '10\t%s\n' "$t"; done < <(mpc search artist "$SEARCH")
-    while IFS= read -r t; do printf '8\t%s\n' "$t";  done < <(mpc search album "$SEARCH")
-    while IFS= read -r t; do printf '7\t%s\n' "$t";  done < <(mpc search title "$SEARCH")
+    while IFS= read -r t; do printf '8\t%s\n' "$t"; done < <(mpc search album "$SEARCH")
+    while IFS= read -r t; do printf '7\t%s\n' "$t"; done < <(mpc search title "$SEARCH")
   } >> "$sc"
 
   # Per-token per-field files. Identical tokens deduplicated so
@@ -219,9 +220,9 @@ if [[ -n "$SEARCH" ]]; then
     [[ -n "${tok_seen["$tok"]}" ]] && continue
     tok_seen["$tok"]=1
 
-    mpc search artist "$tok" 2>/dev/null > "$tmp/$n_tok.artist"
-    mpc search album  "$tok" 2>/dev/null > "$tmp/$n_tok.album"
-    mpc search title  "$tok" 2>/dev/null > "$tmp/$n_tok.title"
+    mpc search artist "$tok" 2> /dev/null > "$tmp/$n_tok.artist"
+    mpc search album "$tok" 2> /dev/null > "$tmp/$n_tok.album"
+    mpc search title "$tok" 2> /dev/null > "$tmp/$n_tok.title"
 
     # Union of per-field matches for this token (associative array dedup)
     declare -A _u
@@ -240,7 +241,7 @@ if [[ -n "$SEARCH" ]]; then
     declare -A int_set
     while IFS= read -r t; do int_set["$t"]=1; done < "$tmp/0"
 
-    for ((i=1; i<n_tok; i++)); do
+    for ((i = 1; i < n_tok; i++)); do
       declare -A tok_set
       while IFS= read -r t; do tok_set["$t"]=1; done < "$tmp/$i"
 
@@ -269,34 +270,37 @@ if [[ -n "$SEARCH" ]]; then
     declare -A in_int
     while IFS= read -r t; do in_int["$t"]=1; done < "$tmp/intersect"
 
-    for ((i=0; i<n_tok; i++)); do
+    for ((i = 0; i < n_tok; i++)); do
       while IFS= read -r t; do
         [[ -n "${in_int["$t"]}" ]] && printf '3\t%s\n' "$t"
-      done < "$tmp/$i.artist" >> "$sc"
+      done < "$tmp/$i.artist"
 
       while IFS= read -r t; do
         [[ -n "${in_int["$t"]}" ]] && printf '2\t%s\n' "$t"
-      done < "$tmp/$i.album" >> "$sc"
+      done < "$tmp/$i.album"
 
       while IFS= read -r t; do
         [[ -n "${in_int["$t"]}" ]] && printf '1\t%s\n' "$t"
-      done < "$tmp/$i.title" >> "$sc"
-    done
+      done < "$tmp/$i.title"
+    done >> "$sc"
 
     # Bonus: all tokens match within the same field.
     # Gives +5 (artist) / +4 (album) / +3 (title) to all intersection tracks.
     if ((n_tok >= 2)); then
       for field in artist album title; do
         missing=false
-        for ((i=0; i<n_tok; i++)); do
-          [[ ! -s "$tmp/$i.$field" ]] && { missing=true; break; }
+        for ((i = 0; i < n_tok; i++)); do
+          [[ ! -s "$tmp/$i.$field" ]] && {
+            missing=true
+            break
+          }
         done
         $missing && continue
 
         case $field in
           artist) bonus=5 ;;
-          album)  bonus=4 ;;
-          title)  bonus=3 ;;
+          album) bonus=4 ;;
+          title) bonus=3 ;;
         esac
 
         while IFS= read -r t; do

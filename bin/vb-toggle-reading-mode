@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]...
 
 Toggle reading mode in Hyprland by toggling a screen shader.
@@ -44,17 +45,17 @@ _grayscale_enabled() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -65,7 +66,7 @@ log Info "Toggling reading mode"
 if _grayscale_enabled; then
   rm -f "$CONFIG"
 else
-  shcat <<EOF >"$CONFIG"
+  shcat << EOF > "$CONFIG"
 hl.config({
   decoration = {
     screen_shader = "$SHADER"

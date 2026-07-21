@@ -15,7 +15,7 @@ _build() {
   cfgr::item::action --label "Close all windows" --func "hyprctl -q eval 'Hypr.Helpers.CloseWindows()'; exit" --icon vb-xmark
 
   if [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
-    mpd_status="$(mpc status 2>/dev/null)"
+    mpd_status="$(mpc status 2> /dev/null)"
   fi
 
   spotify_status="$(playerctl -p spotify status)"

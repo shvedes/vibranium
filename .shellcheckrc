@@ -1,1 +1,5 @@
-disable=SC1091,SC2054,SC1090,SC2164,SC2329
+# shellcheck disable=SC1091  # Source file not found
+# shellcheck disable=SC1090  # Dynamic source path
+# shellcheck disable=SC2329  # Function may disable errexit
+# shellcheck disable=SC2181  # Uses $? instead of command exit status directly
+disable=SC1091,SC1090,SC2329,SC2181

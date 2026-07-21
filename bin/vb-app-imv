@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION] <image>
 
 Open an image with imv in Vibranium.
@@ -30,33 +31,33 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --)
-    shift
-    break
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
 if [[ -z "$1" ]]; then
   log Info "No file arg, opening picker"
-  if ! command -v zenity >/dev/null; then
+  if ! command -v zenity > /dev/null; then
     log Error "Zenity not found"
     [[ -t 1 ]] && vb-cmd-dep-notify --name "Image Viewer" --deps zenity
     exit 1
   fi
 
-  file="$(zenity --title="Select File" --file-selection --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2>/dev/null)"
+  file="$(zenity --title="Select File" --file-selection --file-filter="Image File | *.png *.jpg *.jpeg *.ppm *.webp" 2> /dev/null)"
 
   # no files were chosen
   if [[ ! -f "$file" ]]; then

@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 A basic screenshot utility for Vibranium.
@@ -46,15 +47,15 @@ notify() {
   fi
 
   case "$1" in
-  region)
-    local target='Selected region'
-    ;;
-  window)
-    local target='Active window'
-    ;;
-  screen)
-    local target='Active screen'
-    ;;
+    region)
+      local target='Selected region'
+      ;;
+    window)
+      local target='Active window'
+      ;;
+    screen)
+      local target='Active screen'
+      ;;
   esac
 
   if [[ $VIBRANIUM_SCREENSHOT_SAVE_TO_DISK == true ]]; then
@@ -93,7 +94,7 @@ select_region() {
   local result result_rc
 
   log Info "Selecting region via slurp"
-  result="$(slurp -d -w 1 -b "${P_GRAY}33" -c "${P_ACCENT}" 2>/dev/null)"
+  result="$(slurp -d -w 1 -b "${P_GRAY}33" -c "${P_ACCENT}" 2> /dev/null)"
   result_rc=$?
 
   if ((result_rc != 0)) || [[ -z $result ]]; then
@@ -131,40 +132,40 @@ capture() {
   log Info "Capturing $target screenshot -> $output_file"
 
   case "$target" in
-  region)
-    local region
-    if ! select_region region; then
-      exit 1
-    fi
+    region)
+      local region
+      if ! select_region region; then
+        exit 1
+      fi
 
-    grim "${GRIM_OPTS[@]}" -g "$region" "$output_file"
-    log Info "grim: region=$region output=$output_file"
-    ;;
-  window)
-    local geometry
-    if ! get_window_geometry geometry; then
-      exit 1
-    fi
+      grim "${GRIM_OPTS[@]}" -g "$region" "$output_file"
+      log Info "grim: region=$region output=$output_file"
+      ;;
+    window)
+      local geometry
+      if ! get_window_geometry geometry; then
+        exit 1
+      fi
 
-    grim "${GRIM_OPTS[@]}" -g "$geometry" "$output_file"
-    log Info "grim: geometry=$geometry output=$output_file"
+      grim "${GRIM_OPTS[@]}" -g "$geometry" "$output_file"
+      log Info "grim: geometry=$geometry output=$output_file"
 
-    if [[ $FLASH_BORDER == true ]]; then
-      hypr::flash::border
-      log Info "Border flash triggered"
-    fi
-    ;;
-  screen)
-    monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused) | .name')"
-    log Info "Monitor: $monitor"
-    grim "${GRIM_OPTS[@]}" -o "$monitor" "$output_file"
-    log Info "grim: monitor=$monitor output=$output_file"
+      if [[ $FLASH_BORDER == true ]]; then
+        hypr::flash::border
+        log Info "Border flash triggered"
+      fi
+      ;;
+    screen)
+      monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused) | .name')"
+      log Info "Monitor: $monitor"
+      grim "${GRIM_OPTS[@]}" -o "$monitor" "$output_file"
+      log Info "grim: monitor=$monitor output=$output_file"
 
-    if [[ $FLASH_SCREEN == true ]]; then
-      hypr::flash::screen
-      log Info "Screen flash triggered"
-    fi
-    ;;
+      if [[ $FLASH_SCREEN == true ]]; then
+        hypr::flash::screen
+        log Info "Screen flash triggered"
+      fi
+      ;;
   esac
 
   if [[ ! -f $output_file ]]; then
@@ -223,7 +224,7 @@ check_deps() {
   log Info "Verifying dependencies: grim slurp jq"
 
   for dep in grim slurp jq; do
-    if ! command -v "$dep" >/dev/null; then
+    if ! command -v "$dep" > /dev/null; then
       missing+=("$dep")
     fi
   done
@@ -240,28 +241,28 @@ EXPLICIT_ANNOTATE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --region | --window | --screen)
-    MODE="${1#--}"
-    log Info "Mode: $MODE"
-    shift
-    ;;
-  --annotate)
-    EXPLICIT_ANNOTATE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "Unknown option: $1"
-    log Error "Try '${0##*/} --help' for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --region | --window | --screen)
+      MODE="${1#--}"
+      log Info "Mode: $MODE"
+      shift
+      ;;
+    --annotate)
+      EXPLICIT_ANNOTATE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "Unknown option: $1"
+      log Error "Try '${0##*/} --help' for more information"
+      exit 1
+      ;;
   esac
 done
 

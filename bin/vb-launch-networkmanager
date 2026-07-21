@@ -5,7 +5,8 @@ SELF="${0##*/}"
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -18,7 +19,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]
 
 Launch GUI / TUI for the active network manager.
@@ -30,36 +31,36 @@ EOF
 }
 
 case "$1" in
--v | --verbose)
-  VERBOSE=true
-  ;;
--h | --help)
-  usage
-  exit 0
-  ;;
-"") ;;
-*)
-  log Error "invalid option '$1'"
-  log Error "Try --help for more information"
-  exit 1
-  ;;
+  -v | --verbose)
+    VERBOSE=true
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  "") ;;
+  *)
+    log Error "invalid option '$1'"
+    log Error "Try --help for more information"
+    exit 1
+    ;;
 esac
 
 # Detect primary network interface utility
-if command -v nmtui >/dev/null 2>&1; then
+if command -v nmtui > /dev/null 2>&1; then
   log Info "Detected nmtui (NetworkManager), launching"
   vb-launch-tui --app-id=org.vb.term.float -- nmtui
   exit 0
-elif command -v iwctl >/dev/null 2>&1; then
-  if command -v impala >/dev/null 2>&1; then
+elif command -v iwctl > /dev/null 2>&1; then
+  if command -v impala > /dev/null 2>&1; then
     log Info "Detected impala (iwd frontend), launching"
     vb-launch-tui --app-id=org.vb.term.float -- impala
     exit 0
-  elif command -v iwmenu >/dev/null 2>&1; then
+  elif command -v iwmenu > /dev/null 2>&1; then
     log Info "Detected iwmenu, launching"
     vb-launch-cmd -- iwmenu
     exit 0
-  elif command -v iwgtk >/dev/null 2>&1; then
+  elif command -v iwgtk > /dev/null 2>&1; then
     log Info "Detected iwgtk, launching"
     vb-launch-cmd -- iwgtk
     exit 0

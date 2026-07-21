@@ -10,17 +10,16 @@ _has_line() {
     if [[ "$line" == *"$pattern"* ]]; then
       return 0
     fi
-  done <"$file"
+  done < "$file"
 
   return 1
 }
 
 _build_apps() {
-  local spicetify_file="$XDG_CONFIG_HOME/spicetify/config-xpui.ini"
   local chromium_file="$XDG_CONFIG_HOME/chromium-flags.conf"
 
   _b() {
-    if command -v chromium >/dev/null; then
+    if command -v chromium > /dev/null; then
       if _has_line "oauth2-client-id" "$chromium_file"; then
         cfgr::item::action \
           --icon vb-tools \
@@ -40,8 +39,10 @@ _build_apps() {
 _build_system() {
   _b() {
     local pattern
+    # sysfs/procfs value is a single line, so pattern[0] is always the value.
     mapfile -t pattern < /proc/sys/kernel/core_pattern
-    if [[ "$pattern" == "|/bin/false" ]]; then
+
+    if [[ "${pattern[0]}" == "|/bin/false" ]]; then
       local action="Enable"
     else
       local action="Disable"
@@ -53,8 +54,10 @@ _build_system() {
       --func "vb-tweak-coredump; helpers::ui::close_menus"
 
     local ipv6_val
+    # sysfs/procfs value is a single line, so pattern[0] is always the value.
     mapfile -t ipv6_val < /proc/sys/net/ipv6/conf/all/disable_ipv6
-    if [[ "$ipv6_val" == "1" ]]; then
+
+    if [[ "${ipv6_val[0]}" == "1" ]]; then
       local action="Enable"
     else
       local action="Disable"

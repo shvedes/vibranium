@@ -4,26 +4,26 @@ VERBOSE=false
 MANUAL=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ -t 0 ]]; then
     if $VERBOSE; then
       echo "[${0##*/}] $level: $*" >&2
     fi
   else
     case "$level" in
-    Error)
-      echo "==> ERROR: $*"
-      ;;
-    Warn)
-      echo "==> WARN: $*"
-      ;;
-    *)
-      echo "==> $*"
-      ;;
+      Error)
+        echo "==> ERROR: $*"
+        ;;
+      Warn)
+        echo "==> WARN: $*"
+        ;;
+      *)
+        echo "==> $*"
+        ;;
     esac
   fi
 }
-
 
 shcat() {
   while IFS= read -r line; do
@@ -32,7 +32,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Check and re-apply Spicetify patches to Spotify.
@@ -46,23 +46,23 @@ EOF
 
 while (($#)); do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -m | --manual)
-    MANUAL=true
-    shift
-    ;;
-  *)
-    echo "${0##*/}: invalid option -- '$1'" >&2
-    echo "Try '${0##*/} --help' for more information." >&2
-    exit 2
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -m | --manual)
+      MANUAL=true
+      shift
+      ;;
+    *)
+      echo "${0##*/}: invalid option -- '$1'" >&2
+      echo "Try '${0##*/} --help' for more information." >&2
+      exit 2
+      ;;
   esac
 done
 
@@ -71,7 +71,7 @@ if $MANUAL; then
 fi
 
 # If Spicetify was never installed, there is nothing to restore or apply.
-if ! command -v spicetify >/dev/null; then
+if ! command -v spicetify > /dev/null; then
   log Warn "Spicetify is not installed, skipping"
   exit 0
 fi
@@ -81,7 +81,7 @@ if ! $MANUAL; then
 
   # Prefer ripgrep for speed when searching through the Spotify binary
   # directory; fall back to grep if rg is unavailable.
-  if command -v rg >/dev/null; then
+  if command -v rg > /dev/null; then
     grep_cmd=(rg -q -m1 spicetify)
   else
     grep_cmd=(grep -q -m1 spicetify)
@@ -90,7 +90,7 @@ if ! $MANUAL; then
   # Check whether any file under /opt/spotify/ contains a spicetify
   # reference.  If none do, the patch has already been reverted or was
   # never applied, so skip the restore+apply cycle.
-  if ! find /opt/spotify/ -type f -exec "${grep_cmd[@]}" {} + >/dev/null; then
+  if ! find /opt/spotify/ -type f -exec "${grep_cmd[@]}" {} + > /dev/null; then
     if [[ -t 0 ]]; then
       echo "[${0##*/}] Info: Spotify wasn't patched; backing up current state" >&2
     else
@@ -99,7 +99,7 @@ if ! $MANUAL; then
 
     # For some reason, --quiet still prints two blank lines
     # in the pacman hook output. &>/dev/null fixes this.
-    if ! spicetify --no-restart --quiet backup &>/dev/null; then
+    if ! spicetify --no-restart --quiet backup &> /dev/null; then
       log Error "Couldn't backup Spotify state"
       exit 1
     fi
@@ -109,7 +109,7 @@ if ! $MANUAL; then
   fi
 fi
 
-if ! spicetify --no-restart --quiet restore &>/dev/null; then
+if ! spicetify --no-restart --quiet restore &> /dev/null; then
   log Info "Backing up Spotify state"
   spicetify --no-restart --quiet backup
 

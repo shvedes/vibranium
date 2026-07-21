@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTIONS]
 
 Checks that required dependencies are installed and shows a notification if something is missing.
@@ -31,37 +32,40 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  --name)
-    if [[ $# -lt 2 ]]; then usage; exit 1; fi
-    NAME=$2
-    shift 2
-    ;;
-  --deps)
-    shift
-    if [[ $# -eq 0 || $1 == --* ]]; then
-      log Error "expected at least one dependency after --deps"
-      exit 1
-    fi
-    # Collect all arguments following --deps until the next flag (--*)
-    # or end-of-args. This allows listing multiple deps in one invocation.
-    while [[ $# -gt 0 && $1 != --* ]]; do
-      DEPS+=("$1")
+    --name)
+      if [[ $# -lt 2 ]]; then
+        usage
+        exit 1
+      fi
+      NAME=$2
+      shift 2
+      ;;
+    --deps)
       shift
-    done
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help | "")
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "unknown argument: $1"
-    usage
-    exit 1
-    ;;
+      if [[ $# -eq 0 || $1 == --* ]]; then
+        log Error "expected at least one dependency after --deps"
+        exit 1
+      fi
+      # Collect all arguments following --deps until the next flag (--*)
+      # or end-of-args. This allows listing multiple deps in one invocation.
+      while [[ $# -gt 0 && $1 != --* ]]; do
+        DEPS+=("$1")
+        shift
+      done
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help | "")
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "unknown argument: $1"
+      usage
+      exit 1
+      ;;
   esac
 done
 

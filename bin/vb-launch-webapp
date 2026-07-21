@@ -5,7 +5,8 @@ SELF="${0##*/}"
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -18,7 +19,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]... URL
 
 Open a Progressive Web App (PWA) in Vibranium.
@@ -55,12 +56,12 @@ get_default_browser() {
       fi
       browser="${value%%;*}"
       break
-    done <"$XDG_CONFIG_HOME/mimeapps.list"
+    done < "$XDG_CONFIG_HOME/mimeapps.list"
   fi
 
   # Fallback
   if [[ -z $browser ]]; then
-    browser="$(xdg-mime query default x-scheme-handler/http 2>/dev/null)"
+    browser="$(xdg-mime query default x-scheme-handler/http 2> /dev/null)"
   fi
 
   _out="$browser"
@@ -118,7 +119,7 @@ focus_or_launch() {
           )
         | .address
       )
-    ' 2>/dev/null
+    ' 2> /dev/null
   )"
 
   if [[ -n "$window_address" ]]; then
@@ -138,31 +139,31 @@ OWN_PROFILE=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --own-profile)
-    OWN_PROFILE=true
-    shift
-    ;;
-  --)
-    shift
-    break
-    ;;
-  --* | -*)
-    log Error "unknown option: $1"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
-  *)
-    # First non-flag argument is the URL; stop parsing options.
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --own-profile)
+      OWN_PROFILE=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    --* | -*)
+      log Error "unknown option: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
+    *)
+      # First non-flag argument is the URL; stop parsing options.
+      break
+      ;;
   esac
 done
 
@@ -179,10 +180,10 @@ URL="$1"
 get_default_browser browser
 
 case $browser in
-google-chrome* | brave-browser* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
-*)
-  browser="chromium.desktop"
-  ;;
+  google-chrome* | brave-browser* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
+  *)
+    browser="chromium.desktop"
+    ;;
 esac
 
 execs=()
@@ -203,7 +204,7 @@ for dir in ~/.local/share/applications ~/.nix-profile/share/applications /usr/sh
       fi
       line=${line#Exec=}
       execs+=("${line%% *}")
-    done <"$f"
+    done < "$f"
   done
 done
 

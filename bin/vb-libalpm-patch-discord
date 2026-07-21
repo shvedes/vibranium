@@ -4,22 +4,23 @@ VERBOSE=false
 MANUAL=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ -t 0 ]]; then
     if $VERBOSE; then
       echo "[${0##*/}] $level: $*" >&2
     fi
   else
     case "$level" in
-    Error)
-      echo "==> ERROR: $*"
-      ;;
-    Warn)
-      echo "==> WARN: $*"
-      ;;
-    *)
-      echo "==> $*"
-      ;;
+      Error)
+        echo "==> ERROR: $*"
+        ;;
+      Warn)
+        echo "==> WARN: $*"
+        ;;
+      *)
+        echo "==> $*"
+        ;;
     esac
   fi
 }
@@ -31,7 +32,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Patch Discord with Vencord.
@@ -48,27 +49,27 @@ ACTION="install"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -m | --manual)
-    MANUAL=true
-    shift
-    ;;
-  -u | --uninstall | -uninstall)
-    ACTION="uninstall"
-    shift
-    ;;
-  *)
-    printf '%s: invalid option -- %s\n' "${0##*/}" "$1" >&2
-    printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
-    exit 2
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -m | --manual)
+      MANUAL=true
+      shift
+      ;;
+    -u | --uninstall | -uninstall)
+      ACTION="uninstall"
+      shift
+      ;;
+    *)
+      printf '%s: invalid option -- %s\n' "${0##*/}" "$1" >&2
+      printf 'Try "%s --help" for more information.\n' "${0##*/}" >&2
+      exit 2
+      ;;
   esac
 done
 
@@ -92,9 +93,9 @@ CLI="/tmp/vencord-installer"
 
 log Info "Downloading Vencord CLI installer"
 
-if command -v wget >/dev/null; then
+if command -v wget > /dev/null; then
   wget -q "$URL" -O "$CLI"
-elif command -v curl >/dev/null; then
+elif command -v curl > /dev/null; then
   curl -fsSL "$URL" -o "$CLI"
 else
   log Error "Neither wget nor curl is installed"

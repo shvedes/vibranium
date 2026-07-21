@@ -4,7 +4,8 @@ VERBOSE=false
 SELF="${0##*/}"
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -13,8 +14,8 @@ log() {
 copy_file() {
   local src="$1" dst="$2" bak="$3"
   if [[ -f $dst ]]; then
-    cp -f "$dst" "$bak" 2>/dev/null || true
-    cp -f "$src" "$dst" 2>/dev/null
+    cp -f "$dst" "$bak" 2> /dev/null || true
+    cp -f "$src" "$dst" 2> /dev/null
 
     if cmp -s "$dst" "$bak"; then
       rm -f "$bak"
@@ -23,7 +24,7 @@ copy_file() {
       log Info "Replaced $dst, backup at $bak"
     fi
   else
-    cp -f "$src" "$dst" 2>/dev/null
+    cp -f "$src" "$dst" 2> /dev/null
     log Info "Created $dst from Vibranium config"
   fi
 }
@@ -32,15 +33,15 @@ copy_dir() {
   local src="$1" dst="$2" bak="$3"
 
   if [[ -d $dst ]]; then
-    cp -rf "$dst" "$bak" 2>/dev/null || true
+    cp -rf "$dst" "$bak" 2> /dev/null || true
     log Info "Backed up $dst to $bak"
   fi
 
-  if ! [[ -d "$dir" ]]; then
+  if ! [[ -d "$dst" ]]; then
     mkdir -p "$dst"
   fi
 
-  cp -rf "$src"/. "$dst" 2>/dev/null
+  cp -rf "$src"/. "$dst" 2> /dev/null
   log Info "Synced $dst from Vibranium config"
 }
 
@@ -51,7 +52,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF CONFIG_PATH
 
 Copy the named config from \$VIBRANIUM/config back to ~/.config,
@@ -67,19 +68,19 @@ Options:
 EOF
 }
 
-while (( $# > 0 )); do
+while (($# > 0)); do
   case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  *)
-    break
-    ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 

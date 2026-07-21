@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Toggle IPv6 on/off system-wide.
@@ -29,24 +30,25 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
 _is_disabled() {
   local val
+  # sysfs/procfs value is a single line, so pattern[0] is always the value.
   mapfile -t val < /proc/sys/net/ipv6/conf/all/disable_ipv6
-  [[ "$val" == "1" ]]
+  [[ "${val[0]}" == "1" ]]
 }
 
 _as_root=(pkexec su-bridge --root --)
@@ -57,8 +59,7 @@ if _is_disabled; then
   c='net.ipv6.conf.all.disable_ipv6=0'
   c+='\nnet.ipv6.conf.default.disable_ipv6=0'
   if ! "${_as_root[@]}" bash -c \
-    "printf '$c' > /etc/sysctl.d/99-ipv6.conf; sysctl --system >/dev/null"
-  then
+    "printf '$c' > /etc/sysctl.d/99-ipv6.conf; sysctl --system >/dev/null"; then
     exit 1
   fi
   echo "[${0##*/}] IPv6 enabled systemwide. No reboot required"
@@ -67,8 +68,7 @@ else
   c='net.ipv6.conf.all.disable_ipv6=1'
   c+='\nnet.ipv6.conf.default.disable_ipv6=1'
   if ! "${_as_root[@]}" bash -c \
-    "printf '$c' > /etc/sysctl.d/99-ipv6.conf; sysctl --system >/dev/null"
-  then
+    "printf '$c' > /etc/sysctl.d/99-ipv6.conf; sysctl --system >/dev/null"; then
     exit 1
   fi
   echo "[${0##*/}] IPv6 disabled systemwide. No reboot required"

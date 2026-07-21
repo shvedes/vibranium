@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -18,7 +19,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [--on|--off|--get]
 
 Toggle Wi-Fi power saving on all wireless interfaces.
@@ -42,31 +43,31 @@ ACTION=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --on | --off)
-    ACTION="${1#--}"
-    shift
-    ;;
-  --get)
-    ACTION="get"
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  "")
-    usage >&2
-    exit 1
-    ;;
-  *)
-    log Error "unknown option: $1"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --on | --off)
+      ACTION="${1#--}"
+      shift
+      ;;
+    --get)
+      ACTION="get"
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    "")
+      usage >&2
+      exit 1
+      ;;
+    *)
+      log Error "unknown option: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
 done
 
@@ -86,7 +87,7 @@ found=0
 # from a udev rule), direct access is used; otherwise sudo is prepended.
 while IFS= read -r iface; do
   if [[ $value == "get" ]]; then
-    if state=$(iw dev "$iface" get power_save 2>/dev/null); then
+    if state=$(iw dev "$iface" get power_save 2> /dev/null); then
       printf "  %-12s %s\n" "$iface:" "$state"
       found=$((found + 1))
     else
@@ -98,7 +99,7 @@ while IFS= read -r iface; do
     else
       cmd=(iw)
     fi
-    if "${cmd[@]}" dev "$iface" set power_save "$value" 2>/dev/null; then
+    if "${cmd[@]}" dev "$iface" set power_save "$value" 2> /dev/null; then
       found=$((found + 1))
     fi
   fi

@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Interactive font package remover using fzf.
@@ -29,17 +30,17 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -75,7 +76,7 @@ FZF_ARGS=(
   --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
   --bind 'alt-k:preview-up,alt-j:preview-down'
 
-    --color "${FZF_COLORS:-pointer:white,marker:green}"
+  --color "${FZF_COLORS:-pointer:white,marker:green}"
 )
 
 _operation_canceled() {
@@ -96,9 +97,9 @@ _get_fonts() {
   local pkg
   for pkg in $(pacman -Qq); do
     case "$pkg" in
-    ttf* | otf* | *-nerd | *-nerd-mono)
-      printf '%s\n' "$pkg"
-      ;;
+      ttf* | otf* | *-nerd | *-nerd-mono)
+        printf '%s\n' "$pkg"
+        ;;
     esac
   done
 }

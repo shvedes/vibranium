@@ -17,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Output CPU and GPU temperature for Waybar as a single module.
@@ -31,19 +31,19 @@ EOF
 
 while (($# > 0)); do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "Unknown option: $1"
-    usage
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "Unknown option: $1"
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -66,7 +66,7 @@ _detect_hwmon() {
     hwmon_path=""
     for hwmon in /sys/class/hwmon/hwmon*; do
       [[ -r "$hwmon/name" ]] || continue
-      name=$(<"$hwmon/name")
+      name=$(< "$hwmon/name")
       [[ "$name" =~ $patterns ]] || continue
       for temp_input in "$hwmon"/temp*_input; do
         [[ -r "$temp_input" ]] || continue
@@ -77,7 +77,7 @@ _detect_hwmon() {
 
     if [[ -n "$hwmon_path" ]] && [[ -f "$VIBRANIUM_USER_SETTINGS" ]]; then
       settings_lock="$VIBRANIUM_RUNTIME/vb-bar-temp-settings.lock"
-      exec {settings_lock_fd}>"$settings_lock"
+      exec {settings_lock_fd}> "$settings_lock"
       flock "$settings_lock_fd"
 
       found=false
@@ -87,9 +87,9 @@ _detect_hwmon() {
           found=true
           break
         fi
-      done <"$VIBRANIUM_USER_SETTINGS"
+      done < "$VIBRANIUM_USER_SETTINGS"
       if [[ "$found" != true ]]; then
-        printf '%s\n' "${hwmon_var}=\"${hwmon_path}\"" >>"$VIBRANIUM_USER_SETTINGS"
+        printf '%s\n' "${hwmon_var}=\"${hwmon_path}\"" >> "$VIBRANIUM_USER_SETTINGS"
       fi
 
       flock -u "$settings_lock_fd"
@@ -106,7 +106,7 @@ read_temp() {
     printf ''
     return
   fi
-  val=$(<"$path")
+  val=$(< "$path")
   if [[ "$val" =~ ^-?[0-9]+$ ]]; then
     printf '%s' "$((val / 1000))"
   fi
@@ -122,13 +122,13 @@ gpu_hotspot=""
 gpu_fan=""
 if [[ -n "$gpu_hwmon" ]] && [[ -r "$gpu_hwmon" ]]; then
   drv=""
-  [[ -r "${gpu_hwmon%/*}/name" ]] && drv=$(<"${gpu_hwmon%/*}/name")
+  [[ -r "${gpu_hwmon%/*}/name" ]] && drv=$(< "${gpu_hwmon%/*}/name")
   if [[ "$drv" == "amdgpu" ]]; then
     gpu_hotspot=$(read_temp "${gpu_hwmon%/*}/temp2_input")
   fi
   fan_path="${gpu_hwmon%/*}/fan1_input"
   if [[ -r "$fan_path" ]]; then
-    fr=$(<"$fan_path")
+    fr=$(< "$fan_path")
     [[ "$fr" =~ ^[0-9]+$ ]] && gpu_fan="$fr"
   fi
 fi
@@ -149,10 +149,14 @@ fi
 
 pct() {
   local t=$1
-  if ((t >= 95)); then printf '#ffb3ba'
-  elif ((t >= 90)); then printf '#ffd9b3'
-  elif ((t >= 80)); then printf '#ffffba'
-  else printf '#baffc9'
+  if ((t >= 95)); then
+    printf '#ffb3ba'
+  elif ((t >= 90)); then
+    printf '#ffd9b3'
+  elif ((t >= 80)); then
+    printf '#ffffba'
+  else
+    printf '#baffc9'
   fi
 }
 

@@ -5,7 +5,8 @@ SELF="${0##*/}"
 CLI_TIME=
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[$SELF] $level: $*" >&2
   fi
@@ -18,7 +19,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]...
 
 Set a countdown timer. Without options, shows a rofi-based duration picker.
@@ -36,31 +37,31 @@ source vb-lib-core
 
 while (($# > 0)); do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -s | --seconds)
-    CLI_TIME=$((CLI_TIME + $2))
-    shift 2
-    ;;
-  -m | --minutes)
-    CLI_TIME=$((CLI_TIME + $2 * 60))
-    shift 2
-    ;;
-  -H | --hours)
-    CLI_TIME=$((CLI_TIME + $2 * 3600))
-    shift 2
-    ;;
-  *)
-    log Error "Unknown option: $1"
-    log Error "Try '$SELF --help' for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -s | --seconds)
+      CLI_TIME=$((CLI_TIME + $2))
+      shift 2
+      ;;
+    -m | --minutes)
+      CLI_TIME=$((CLI_TIME + $2 * 60))
+      shift 2
+      ;;
+    -H | --hours)
+      CLI_TIME=$((CLI_TIME + $2 * 3600))
+      shift 2
+      ;;
+    *)
+      log Error "Unknown option: $1"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
   esac
 done
 
@@ -74,22 +75,22 @@ inhibit_pid=""
 cleanup() {
   rm -f "$state" "$inhibit_pidfile"
   vb-refresh-waybar-module timer
-  [[ -n "$inhibit_pid" ]] && kill "$inhibit_pid" &>/dev/null
-  [[ -n "$paplay_pid" ]] && kill -s KILL "$paplay_pid" &>/dev/null
+  [[ -n "$inhibit_pid" ]] && kill "$inhibit_pid" &> /dev/null
+  [[ -n "$paplay_pid" ]] && kill -s KILL "$paplay_pid" &> /dev/null
 }
 
 trap 'cleanup; exit 0' EXIT INT TERM
 
 # If another timer instance is running, kill it by PID file.
 if [[ -f "$inhibit_pidfile" ]]; then
-  old_pid=$(<"$inhibit_pidfile")
-  kill "$old_pid" &>/dev/null
+  old_pid=$(< "$inhibit_pidfile")
+  kill "$old_pid" &> /dev/null
   sleep 0.5
 fi
 
 # Bypass interactive picker when CLI flags were given.
 if [[ -n "$CLI_TIME" ]]; then
-  if (( CLI_TIME <= 0 )); then
+  if ((CLI_TIME <= 0)); then
     log Error "Time must be a positive integer"
     exit 1
   fi
@@ -119,22 +120,22 @@ else
       fi
 
       case "$chosen" in
-      Seconds)
-        sleep_time="$sub_chosen"
-        ;;
-      Minutes)
-        sleep_time=$((sub_chosen * 60))
-        ;;
-      Hours)
-        sleep_time=$((sub_chosen * 3600))
-        ;;
+        Seconds)
+          sleep_time="$sub_chosen"
+          ;;
+        Minutes)
+          sleep_time=$((sub_chosen * 60))
+          ;;
+        Hours)
+          sleep_time=$((sub_chosen * 3600))
+          ;;
       esac
       break 2
     done
   done
 fi
 
-if [[ -z "$sleep_time" ]] || (( sleep_time <= 0 )); then
+if [[ -z "$sleep_time" ]] || ((sleep_time <= 0)); then
   exit 0
 fi
 
@@ -145,7 +146,7 @@ fi
 # the script's exit.  The PID is saved so cleanup can kill it precisely.
 setsid systemd-inhibit --what=idle --why="Sleep is inhibited because of the active timer" sleep "$sleep_time" &
 inhibit_pid=$!
-echo "$inhibit_pid" >"$inhibit_pidfile"
+echo "$inhibit_pid" > "$inhibit_pidfile"
 log Info "Timer started: ${sleep_time}s"
 
 # Countdown loop: write remaining seconds to the state file every tick
@@ -153,14 +154,14 @@ log Info "Timer started: ${sleep_time}s"
 # sub-second drift across iterations.
 time_remaining=$sleep_time
 while ((time_remaining > 0)); do
-  echo "$time_remaining" >"$state"
+  echo "$time_remaining" > "$state"
   vb-refresh-waybar-module timer
   ((time_remaining--))
   sleep 1 &
   wait $!
 done
 
-echo "timed out" >"$state"
+echo "timed out" > "$state"
 vb-refresh-waybar-module timer
 log Info "Timer expired"
 

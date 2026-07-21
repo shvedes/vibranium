@@ -25,7 +25,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<-EOF
+  shcat <<- EOF
 	Usage: ${SCRIPT_NAME} [OPTION]...
 
 	Send a desktop notification when battery capacity reaches a low threshold.
@@ -43,61 +43,61 @@ usage() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -p | --percent)
-    PERCENT="$2"
-    shift 2
-    ;;
+    -p | --percent)
+      PERCENT="$2"
+      shift 2
+      ;;
 
-  --percent=*)
-    PERCENT="${1#*=}"
-    shift
-    ;;
+    --percent=*)
+      PERCENT="${1#*=}"
+      shift
+      ;;
 
-  -p?*)
-    PERCENT="${1#-p}"
-    shift
-    ;;
+    -p?*)
+      PERCENT="${1#-p}"
+      shift
+      ;;
 
-  -u | --urgency)
-    URGENCY="$2"
-    shift 2
-    ;;
+    -u | --urgency)
+      URGENCY="$2"
+      shift 2
+      ;;
 
-  --urgency=*)
-    URGENCY="${1#*=}"
-    shift
-    ;;
+    --urgency=*)
+      URGENCY="${1#*=}"
+      shift
+      ;;
 
-  -u?*)
-    URGENCY="${1#-u}"
-    shift
-    ;;
+    -u?*)
+      URGENCY="${1#-u}"
+      shift
+      ;;
 
-  -f | --force)
-    FORCE=1
-    shift
-    ;;
+    -f | --force)
+      FORCE=1
+      shift
+      ;;
 
-  -h | --help)
-    usage
-    exit 0
-    ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
 
-  *)
-    printf '%s: unknown option: %s\n' "$SCRIPT_NAME" "$1" >&2
-    exit 1
-    ;;
+    *)
+      printf '%s: unknown option: %s\n' "$SCRIPT_NAME" "$1" >&2
+      exit 1
+      ;;
   esac
 done
 
 if [[ -n "$URGENCY" ]]; then
   case "$URGENCY" in
-  low | normal | critical)
-    ;;
-  *)
-    printf '%s: urgency must be low, normal, or critical\n' "$SCRIPT_NAME" >&2
-    exit 1
-    ;;
+    low | normal | critical)
+      ;;
+    *)
+      printf '%s: urgency must be low, normal, or critical\n' "$SCRIPT_NAME" >&2
+      exit 1
+      ;;
   esac
 fi
 
@@ -111,7 +111,7 @@ BATTERY_PATHS=()
 # $(<) strips the trailing newline present in all sysfs pseudo-files.
 # Without it the comparison "Battery\n" == "Battery" would always fail.
 for CANDIDATE in /sys/class/power_supply/*; do
-  if [[ -f "$CANDIDATE/type" ]] && [[ "$(<"$CANDIDATE/type")" == "Battery" ]]; then
+  if [[ -f "$CANDIDATE/type" ]] && [[ "$(< "$CANDIDATE/type")" == "Battery" ]]; then
     BATTERY_PATHS+=("$CANDIDATE")
   fi
 done
@@ -131,13 +131,13 @@ TOTAL_FULL=0
 #      CAPACITY = TOTAL_NOW * 100 / TOTAL_FULL yields the percentage directly.
 for BAT in "${BATTERY_PATHS[@]}"; do
   if [[ -f "$BAT/energy_now" ]] && [[ -f "$BAT/energy_full" ]]; then
-    ((TOTAL_NOW += $(<"$BAT/energy_now")))
-    ((TOTAL_FULL += $(<"$BAT/energy_full")))
+    ((TOTAL_NOW += $(< "$BAT/energy_now")))
+    ((TOTAL_FULL += $(< "$BAT/energy_full")))
   elif [[ -f "$BAT/charge_now" ]] && [[ -f "$BAT/charge_full" ]]; then
-    ((TOTAL_NOW += $(<"$BAT/charge_now")))
-    ((TOTAL_FULL += $(<"$BAT/charge_full")))
+    ((TOTAL_NOW += $(< "$BAT/charge_now")))
+    ((TOTAL_FULL += $(< "$BAT/charge_full")))
   else
-    ((TOTAL_NOW += $(<"$BAT/capacity")))
+    ((TOTAL_NOW += $(< "$BAT/capacity")))
     ((TOTAL_FULL += 100))
   fi
 done
@@ -158,7 +158,7 @@ if [[ -f "$STATE_FILE" ]]; then
   while IFS= read -r LINE; do
     [[ -n "$LINE" ]] || continue
     NOTIFIED+=("$LINE")
-  done <"$STATE_FILE"
+  done < "$STATE_FILE"
 fi
 
 # Prune stale thresholds from state so KNOWN_THRESHOLDS can be changed
@@ -217,7 +217,7 @@ write_state() {
   if [[ ${#NOTIFIED[@]} -eq 0 ]]; then
     rm -f "$STATE_FILE"
   else
-    printf '%s\n' "${NOTIFIED[@]}" >"$STATE_FILE"
+    printf '%s\n' "${NOTIFIED[@]}" > "$STATE_FILE"
   fi
 }
 
@@ -278,7 +278,7 @@ CAPACITY=$((TOTAL_NOW * 100 / TOTAL_FULL))
 # Clear all notified thresholds while the system is charging.
 # This allows notifications to trigger again after unplugging.
 if [[ -f /sys/class/power_supply/AC/online ]] &&
-  [[ "$(</sys/class/power_supply/AC/online)" == 1 ]]; then
+  [[ "$(< /sys/class/power_supply/AC/online)" == 1 ]]; then
   NOTIFIED=()
   write_state
   exit 0
@@ -290,7 +290,7 @@ fi
 CHARGING=0
 
 for BAT in "${BATTERY_PATHS[@]}"; do
-  if [[ -f "$BAT/status" ]] && [[ "$(<"$BAT/status")" == "Charging" ]]; then
+  if [[ -f "$BAT/status" ]] && [[ "$(< "$BAT/status")" == "Charging" ]]; then
     CHARGING=1
     break
   fi

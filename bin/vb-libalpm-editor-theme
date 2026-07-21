@@ -7,7 +7,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} <editor>
 
 Install Vibranium theme for editor.
@@ -28,12 +28,15 @@ if [[ -z "$1" ]]; then
 fi
 
 case "$1" in
-code)                   d="$HOME/.vscode-oss"       ;;
-visual-studio-code-bin) d="$HOME/.vscode"           ;;
-code-insiders)          d="$HOME/.vscode-insiders"  ;;
-vscodium-bin)           d="$HOME/.vscode-oss"       ;;
-cursor-bin)             d="$HOME/.cursor"           ;;
-*)                      usage; exit 1               ;;
+  code) d="$HOME/.vscode-oss" ;;
+  visual-studio-code-bin) d="$HOME/.vscode" ;;
+  code-insiders) d="$HOME/.vscode-insiders" ;;
+  vscodium-bin) d="$HOME/.vscode-oss" ;;
+  cursor-bin) d="$HOME/.cursor" ;;
+  *)
+    usage
+    exit 1
+    ;;
 esac
 
 if ! [[ -d "$d/extensions" ]]; then

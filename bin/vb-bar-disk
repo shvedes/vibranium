@@ -17,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Output disk usage for all mounted devices for Waybar.
@@ -31,19 +31,19 @@ EOF
 
 while (($# > 0)); do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "Unknown option: $1"
-    usage
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "Unknown option: $1"
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -64,8 +64,11 @@ worst_perc=0
 skip_header=true
 
 while IFS= read -r line; do
-  $skip_header && { skip_header=false; continue; }
-  read -r _ size used _ use_perc mount <<<"$line"
+  $skip_header && {
+    skip_header=false
+    continue
+  }
+  read -r _ size used _ use_perc mount <<< "$line"
   use_perc=${use_perc%\%}
   size_m=${size%M}
   used_m=${used%M}
@@ -76,16 +79,20 @@ while IFS= read -r line; do
   size_gib=$((size_m / 1024))
 
   [[ "$mount" == "/" ]] && label="System" || label="$mount"
-  if ((use_perc >= 95)); then pc="#ffb3ba"
-  elif ((use_perc >= 90)); then pc="#ffd9b3"
-  elif ((use_perc >= 80)); then pc="#ffffba"
-  else pc="#baffc9"
+  if ((use_perc >= 95)); then
+    pc="#ffb3ba"
+  elif ((use_perc >= 90)); then
+    pc="#ffd9b3"
+  elif ((use_perc >= 80)); then
+    pc="#ffffba"
+  else
+    pc="#baffc9"
   fi
 
   lines+=("$label|$use_perc|$pc|$used_gib|$size_gib")
 done < <(df -BM -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs \
-           -x proc -x sysfs -x cgroup2 -x devpts -x fusectl -x securityfs \
-           2>/dev/null) || {
+  -x proc -x sysfs -x cgroup2 -x devpts -x fusectl -x securityfs \
+  2> /dev/null) || {
   printf '{"text": "\\uf233", "tooltip": "No mount data"}\n'
   exit 0
 }
@@ -101,7 +108,7 @@ done
 
 tooltip="<tt>"
 for entry in "${lines[@]}"; do
-  IFS='|' read -r label use_perc pc used_gib size_gib <<<"$entry"
+  IFS='|' read -r label use_perc pc used_gib size_gib <<< "$entry"
   printf -v row "  <b>%-*s</b>  <span foreground='%s'>%3s%%</span>  %5s GiB / %5s GiB" \
     "$max_w" "$label" "$pc" "$use_perc" "$used_gib" "$size_gib"
   if [[ -n "$tooltip" && "$tooltip" != "<tt>" ]]; then

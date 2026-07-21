@@ -4,7 +4,8 @@ VERBOSE=false
 AUR_MODE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -17,7 +18,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Interactive font package installer using fzf.
@@ -31,21 +32,21 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --aur)
-    AUR_MODE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --aur)
+      AUR_MODE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -87,7 +88,7 @@ FZF_ARGS=(
   --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
   --bind 'alt-k:preview-up,alt-j:preview-down'
 
-    --color "${FZF_COLORS:-pointer:white,marker:green}"
+  --color "${FZF_COLORS:-pointer:white,marker:green}"
 )
 
 _operation_canceled() {
@@ -114,10 +115,10 @@ _get_fonts() {
 
   while IFS= read -r pkg; do
     case "$pkg" in
-    ttf*-nerd-mono | ttf*-nerd | ttf* | \
-      otf*-nerd-mono | otf*-nerd | otf*)
-      printf '%s\n' "$pkg"
-      ;;
+      ttf*-nerd-mono | ttf*-nerd | ttf* | \
+        otf*-nerd-mono | otf*-nerd | otf*)
+        printf '%s\n' "$pkg"
+        ;;
     esac
   done < <("${cmd[@]}")
 }
@@ -127,10 +128,10 @@ trap 'trap "exit 1" SIGINT; printf "\n"; _operation_canceled; exit 1' SIGINT
 term::show_header
 term::disable_input
 
-(_get_fonts >"$VIBRANIUM_CACHE/${0##*/}.list") &
+(_get_fonts > "$VIBRANIUM_CACHE/${0##*/}.list") &
 term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting font packages"
 
-LIST="$(<"$VIBRANIUM_CACHE/${0##*/}.list")"
+LIST="$(< "$VIBRANIUM_CACHE/${0##*/}.list")"
 mapfile -t chosen < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
 
 term::enable_input

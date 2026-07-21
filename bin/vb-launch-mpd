@@ -6,7 +6,8 @@ CLIENTS=(ncmpcpp rmpc cmus vimpc)
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -19,7 +20,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTIONS]
 
 Detect an installed MPD client.
@@ -36,24 +37,24 @@ EOF
 }
 
 case "$1" in
--v | --verbose)
-  VERBOSE=true
-  ;;
--h | --help)
-  usage
-  exit 0
-  ;;
-"") ;;
-*)
-  # if not option, treat as possible client override
-  if [[ "$1" != -* ]]; then
-    REQUESTED_CLIENT="$1"
-    shift
-  fi
-  ;;
+  -v | --verbose)
+    VERBOSE=true
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  "") ;;
+  *)
+    # if not option, treat as possible client override
+    if [[ "$1" != -* ]]; then
+      REQUESTED_CLIENT="$1"
+      shift
+    fi
+    ;;
 esac
 
-if ! command -v mpd >/dev/null; then
+if ! command -v mpd > /dev/null; then
   log Error "MPD is not installed"
   exit 1
 fi
@@ -61,33 +62,33 @@ fi
 CLIENT=""
 
 case "$1" in
--v | --verbose)
-  VERBOSE=true
-  ;;
--h | --help)
-  usage
-  exit 0
-  ;;
---client=*)
-  REQUESTED_CLIENT="${1#*=}"
-  shift
-  ;;
---client*)
-  shift
-  REQUESTED_CLIENT="$1"
-  ;;
-"") ;;
-*)
-  log Error "Unknown option: $*"
-  log Error "Try --help for more information"
-  exit 1
-  ;;
+  -v | --verbose)
+    VERBOSE=true
+    ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  --client=*)
+    REQUESTED_CLIENT="${1#*=}"
+    shift
+    ;;
+  --client*)
+    shift
+    REQUESTED_CLIENT="$1"
+    ;;
+  "") ;;
+  *)
+    log Error "Unknown option: $*"
+    log Error "Try --help for more information"
+    exit 1
+    ;;
 esac
 
 # If user requested specific client, validate it
 if [[ -n "$REQUESTED_CLIENT" ]]; then
   log Info "Requested client: $REQUESTED_CLIENT"
-  if command -v "$REQUESTED_CLIENT" >/dev/null 2>&1; then
+  if command -v "$REQUESTED_CLIENT" > /dev/null 2>&1; then
     CLIENT="$REQUESTED_CLIENT"
   else
     log Error "'$REQUESTED_CLIENT' is not installed"
@@ -95,7 +96,7 @@ if [[ -n "$REQUESTED_CLIENT" ]]; then
   fi
 else
   for c in "${CLIENTS[@]}"; do
-    if command -v "$c" >/dev/null 2>&1; then
+    if command -v "$c" > /dev/null 2>&1; then
       CLIENT="$c"
       log Info "Detected MPD client: $CLIENT"
       break

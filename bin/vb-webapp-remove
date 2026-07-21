@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -46,7 +47,7 @@ FZF_ARGS=(
 
   --bind 'alt-p:toggle-preview'
 
-    --color "${FZF_COLORS:-pointer:white,marker:green}"
+  --color "${FZF_COLORS:-pointer:white,marker:green}"
 )
 
 _operation_canceled() {
@@ -72,7 +73,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<'EOF'
+  shcat << 'EOF'
 Usage: vb-webapp-remove [OPTION]...
 
 Remove Progressive Web App shortcuts as .desktop launcher entries.
@@ -166,35 +167,35 @@ INTERACTIVE=true
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
 
-  --file)
-    INTERACTIVE=false
-    shift
-    if [[ $# -eq 0 ]]; then
-      log Error "--file requires at least one .desktop file argument"
-      log Error "Try --help for more information"
-      exit 1
-    fi
-    while [[ $# -gt 0 && "$1" != -* ]]; do
-      if [[ "$1" != *.desktop ]]; then
-        log Error "Not a .desktop file: $1"
+    --file)
+      INTERACTIVE=false
+      shift
+      if [[ $# -eq 0 ]]; then
+        log Error "--file requires at least one .desktop file argument"
         log Error "Try --help for more information"
         exit 1
       fi
-      DESKTOP_FILES+=("$1")
-      shift
-    done
-    ;;
+      while [[ $# -gt 0 && "$1" != -* ]]; do
+        if [[ "$1" != *.desktop ]]; then
+          log Error "Not a .desktop file: $1"
+          log Error "Try --help for more information"
+          exit 1
+        fi
+        DESKTOP_FILES+=("$1")
+        shift
+      done
+      ;;
 
-  *)
-    log Error "Unknown option: $1"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    *)
+      log Error "Unknown option: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
 done
 
@@ -208,8 +209,8 @@ if [[ $INTERACTIVE == true ]]; then
 
   shopt -s nullglob
   for file in "$DESKTOP_DIR"/'PWA - '*.desktop; do
-    _has_webapp_exec "$file" \
-    && PWA_MAP["$(_desktop_name "$file")"]="$file"
+    _has_webapp_exec "$file" &&
+      PWA_MAP["$(_desktop_name "$file")"]="$file"
   done
   shopt -u nullglob
 

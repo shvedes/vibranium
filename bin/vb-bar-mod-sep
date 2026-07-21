@@ -7,11 +7,11 @@ helpers::check \
   VIBRANIUM_BAR_RAM_MODULE_ENABLE \
   VIBRANIUM_BAR_DISK_MODULE_ENABLE
 
-if [[
+if [[ 
   "$VIBRANIUM_BAR_TEMP_MODULE_ENABLE" == true ||
   "$VIBRANIUM_BAR_RAM_MODULE_ENABLE" == true ||
-  "$VIBRANIUM_BAR_DISK_MODULE_ENABLE" == true
-]]; then
+  "$VIBRANIUM_BAR_DISK_MODULE_ENABLE" == true ]] \
+  ; then
   printf '{"text":"|","tooltip":false}'
 else
   printf '{"text":""}'

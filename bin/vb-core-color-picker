@@ -4,7 +4,8 @@ HISTORY="$VIBRANIUM_CACHE/color-picker.history"
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -19,7 +20,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Simple color picker for Vibranium.
@@ -33,7 +34,7 @@ EOF
 
 check_deps() {
   log Info "Checking dep: hyprpicker"
-  if ! command -v hyprpicker >/dev/null; then
+  if ! command -v hyprpicker > /dev/null; then
     log Error "missing required dependencies: hyprpicker"
     vb-cmd-dep-notify --name "Color Picker" --deps "hyprpicker"
     return 1
@@ -70,7 +71,7 @@ done
 
 if [[ "$CLEAR_MODE" == true ]]; then
   log Info "Truncating history: $HISTORY"
-  : >"$HISTORY"
+  : > "$HISTORY"
   log Info "History cleared"
   vb-refresh-waybar-module color-picker
   exit 0
@@ -144,7 +145,7 @@ if [[ -f "$HISTORY" ]]; then
       FOUND=true
       log Info "Duplicate found at line $COUNT"
     fi
-  done <"$HISTORY"
+  done < "$HISTORY"
 fi
 
 log Info "History: $COUNT entries, max $HIST_SIZE, duplicate=$FOUND"
@@ -152,17 +153,17 @@ log Info "History: $COUNT entries, max $HIST_SIZE, duplicate=$FOUND"
 if [[ "$FOUND" == false ]]; then
   if ((COUNT >= HIST_SIZE)); then
     log Info "History full ($COUNT >= $HIST_SIZE), writing $SELECTED_COLOR from start"
-    printf '%s\n' "$SELECTED_COLOR" >"$HISTORY"
+    printf '%s\n' "$SELECTED_COLOR" > "$HISTORY"
   else
     log Info "Appending $SELECTED_COLOR to history"
-    printf '%s\n' "$SELECTED_COLOR" >>"$HISTORY"
+    printf '%s\n' "$SELECTED_COLOR" >> "$HISTORY"
   fi
 fi
 
 if [[ $SHOW_SELECTED == true ]]; then
   PREVIEW_IMG="$VIBRANIUM_RUNTIME/color-picker.png"
   log Info "Generating preview: $PREVIEW_IMG"
-  if command -v magick >/dev/null; then
+  if command -v magick > /dev/null; then
     log Info "Running: magick -size 1x1 xc:$SELECTED_COLOR $PREVIEW_IMG"
     magick -size 1x1 xc:"${SELECTED_COLOR}" "$PREVIEW_IMG"
     log Info "Preview image created, exit: $?"

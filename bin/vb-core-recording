@@ -8,7 +8,8 @@ fi
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -26,7 +27,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Basic screen recording utility created for Vibranium.
@@ -103,24 +104,24 @@ set_recording_area() {
 
   log Info "Setting recording area: $target"
   case "$target" in
-  portal)
-    _area="$target"
-    log Info "Recording area: portal"
-    ;;
-  region)
-    local slurp_flags=(-b "${P_GRAY}33" -c "${P_ACCENT}" -f '%wx%h+%x+%y')
-    local selected_region
+    portal)
+      _area="$target"
+      log Info "Recording area: portal"
+      ;;
+    region)
+      local slurp_flags=(-b "${P_GRAY}33" -c "${P_ACCENT}" -f '%wx%h+%x+%y')
+      local selected_region
 
-    selected_region="$(slurp "${slurp_flags[@]}" 2>/dev/null)" || return 1
-    _area="$selected_region"
-    log Info "Recording region: $_area"
-    ;;
-  screen)
-    local monitor
-    monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
-    _area="$monitor"
-    log Info "Recording screen: $_area"
-    ;;
+      selected_region="$(slurp "${slurp_flags[@]}" 2> /dev/null)" || return 1
+      _area="$selected_region"
+      log Info "Recording region: $_area"
+      ;;
+    screen)
+      local monitor
+      monitor="$(hyprctl -j monitors | jq -r '.[] | select(.focused == true) | .name')"
+      _area="$monitor"
+      log Info "Recording screen: $_area"
+      ;;
   esac
 }
 
@@ -173,7 +174,7 @@ init_recording() {
     -fm "$frm" \
     -c "$EXT" \
     -f "$fps" \
-    -o "$out_file" &>"$LOG_FILE" &
+    -o "$out_file" &> "$LOG_FILE" &
 
   RECORDING_PID=$!
   log Info "GSR launched -> $out_file"
@@ -181,7 +182,7 @@ init_recording() {
   if [[ $AREA == portal ]]; then
     local deadline=$((SECONDS + 3))
     while ((SECONDS < deadline)); do
-      if ! kill -0 "$RECORDING_PID" 2>/dev/null; then
+      if ! kill -0 "$RECORDING_PID" 2> /dev/null; then
         return 1
       fi
       sleep 0.2
@@ -189,7 +190,7 @@ init_recording() {
     return 0
   else
     sleep 0.2
-    kill -0 "$RECORDING_PID" 2>/dev/null
+    kill -0 "$RECORDING_PID" 2> /dev/null
   fi
 }
 
@@ -243,7 +244,7 @@ start_recording() {
 
   if ((rec_status == 0)); then
     log Info "Recording started (PID: $RECORDING_PID)"
-    echo "$RECORDING_PID" >"$VIBRANIUM_RUNTIME/recording-ongoing"
+    echo "$RECORDING_PID" > "$VIBRANIUM_RUNTIME/recording-ongoing"
     visualize
     return 0
   fi
@@ -266,7 +267,7 @@ start_recording() {
     exit 1
   fi
 
-  echo "$RECORDING_PID" >"$VIBRANIUM_RUNTIME/recording-ongoing"
+  echo "$RECORDING_PID" > "$VIBRANIUM_RUNTIME/recording-ongoing"
   touch "$VIBRANIUM_CACHE/fallback_mode"
   visualize
   log Info "Recording started in fallback mode"
@@ -304,7 +305,7 @@ get_ongoing_pid() {
 
   state_file="$VIBRANIUM_RUNTIME/recording-ongoing"
   if [[ -f $state_file ]]; then
-    _pid="$(<"$state_file")"
+    _pid="$(< "$state_file")"
     log Info "Ongoing recording PID: $_pid"
   else
     log Info "No ongoing recording state file at $state_file"
@@ -316,7 +317,7 @@ ensure_deps() {
   log Info "Verifying dependencies: gpu-screen-recorder jq"
 
   for pkg in gpu-screen-recorder jq; do
-    if ! command -v "$pkg" >/dev/null; then
+    if ! command -v "$pkg" > /dev/null; then
       missing+=("$pkg")
     fi
   done
@@ -334,75 +335,75 @@ MODE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --region | --screen | --portal)
-    MODE="$1"
-    shift
-    break
-    ;;
-  --stop)
-    MODE="$1"
-    shift
-    break
-    ;;
-  *)
-    log Error "Unknown option: $*"
-    log Error "Try '$SELF --help' for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --region | --screen | --portal)
+      MODE="$1"
+      shift
+      break
+      ;;
+    --stop)
+      MODE="$1"
+      shift
+      break
+      ;;
+    *)
+      log Error "Unknown option: $*"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
   esac
 done
 
 log Info "MODE parsed: $MODE"
 
 case "$MODE" in
---region | --screen | --portal)
-  log Info "Starting recording in ${MODE#--} mode"
+  --region | --screen | --portal)
+    log Info "Starting recording in ${MODE#--} mode"
 
-  if [[ -f "$VIBRANIUM_RUNTIME/recording-ongoing" ]]; then
-    log Error "Recording already in progress"
-    log Error "Use --stop to stop the active recording"
-    exit 1
-  fi
+    if [[ -f "$VIBRANIUM_RUNTIME/recording-ongoing" ]]; then
+      log Error "Recording already in progress"
+      log Error "Use --stop to stop the active recording"
+      exit 1
+    fi
 
-  if ! ensure_deps; then
-    exit 1
-  fi
+    if ! ensure_deps; then
+      exit 1
+    fi
 
-  source vb-lib-core
-
-  if ! set_recording_area AREA "$MODE"; then
-    log Info "Area selection cancelled or failed"
-    exit 1
-  fi
-
-  log Info "Recording area set: AREA=$AREA"
-  start_recording
-  log Info "start_recording returned"
-  ;;
---stop)
-  log Info "Stopping active recording"
-
-  get_ongoing_pid GSR_PID
-
-  if [[ -n $GSR_PID ]]; then
     source vb-lib-core
-    stop_rec "$GSR_PID"
+
+    if ! set_recording_area AREA "$MODE"; then
+      log Info "Area selection cancelled or failed"
+      exit 1
+    fi
+
+    log Info "Recording area set: AREA=$AREA"
+    start_recording
+    log Info "start_recording returned"
+    ;;
+  --stop)
+    log Info "Stopping active recording"
+
+    get_ongoing_pid GSR_PID
+
+    if [[ -n $GSR_PID ]]; then
+      source vb-lib-core
+      stop_rec "$GSR_PID"
+      exit 0
+    else
+      log Error "No active recording to stop"
+      exit 1
+    fi
+    ;;
+  "")
+    usage
     exit 0
-  else
-    log Error "No active recording to stop"
-    exit 1
-  fi
-  ;;
-"")
-  usage
-  exit 0
-  ;;
+    ;;
 esac

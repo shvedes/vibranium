@@ -1,5 +1,4 @@
 #!/bin/bash
-# shellcheck disable=SC2015,SC2094
 
 VERBOSE=false
 SELF="${0##*/}"
@@ -13,7 +12,8 @@ STATE_VOLUME=""
 STATE_ACTION=""
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -33,7 +33,10 @@ shcat() {
 # pending action before writing, preventing a concurrent queue write from being
 # silently overwritten.
 read_state() {
-  [[ -f "$STATE_FILE" ]] || { log Info "State file not found: $STATE_FILE"; return 0; }
+  [[ -f "$STATE_FILE" ]] || {
+    log Info "State file not found: $STATE_FILE"
+    return 0
+  }
   while IFS='=' read -r key value; do
     case $key in
       player)
@@ -51,7 +54,7 @@ read_state() {
 }
 
 write_state() {
-  shcat > "$STATE_FILE" <<EOF
+  shcat > "$STATE_FILE" << EOF
 player=${STATE_PLAYER}
 volume=${STATE_VOLUME}
 EOF
@@ -59,7 +62,7 @@ EOF
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF  [OPTION]
 
 Media control script with smooth volume fade effects for playerctl and MPD.
@@ -84,12 +87,12 @@ set_opts() {
   helpers::check VIBRANIUM_PLAYER_FADE_DURATION
 
   case "$VIBRANIUM_PLAYER_FADE_DURATION" in
-    very_slow) NUM_STEPS=200  ;;
-    slow)      NUM_STEPS=100  ;;
-    normal)    NUM_STEPS=50   ;;
-    fast)      NUM_STEPS=30   ;;
-    very_fast) NUM_STEPS=10   ;;
-    off)       NUM_STEPS=off  ;;
+    very_slow) NUM_STEPS=200 ;;
+    slow) NUM_STEPS=100 ;;
+    normal) NUM_STEPS=50 ;;
+    fast) NUM_STEPS=30 ;;
+    very_fast) NUM_STEPS=10 ;;
+    off) NUM_STEPS=off ;;
   esac
   log Info "NUM_STEPS resolved: $NUM_STEPS (fade: $VIBRANIUM_PLAYER_FADE_DURATION)"
 }
@@ -104,36 +107,39 @@ get_player_status() {
   log Info "Probing player: $player"
 
   case "$player" in
-  playerctl)
-    read -r result < <(playerctl status 2>/dev/null)
-    case "$result" in
-    Playing | Paused)
-      log Info "Player $player status: $result"
-      return 0
-      ;;
-    esac
-    ;;
-  mpd)
-    # Check whether mpd is running by testing for its FIFO in the runtime
-    # directory (created by mpd when the daemon is active). This avoids
-    # spawning a systemctl subprocess on every probe.
-    [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] || { log Info "MPD FIFO not found, mpd unreachable"; return 1; }
-    # mpc status emits lines like "[playing] #1/1 0:42/3:30 (20%)".
-    while read -r l; do
-      case $l in
-      *"[playing]"*)
-        result="Playing"
-        log Info "Player mpd status: Playing"
-        return 0
-        ;;
-      *"[paused]"*)
-        result="Paused"
-        log Info "Player mpd status: Paused"
-        return 0
-        ;;
+    playerctl)
+      read -r result < <(playerctl status 2> /dev/null)
+      case "$result" in
+        Playing | Paused)
+          log Info "Player $player status: $result"
+          return 0
+          ;;
       esac
-    done < <(mpc status 2>/dev/null)
-    ;;
+      ;;
+    mpd)
+      # Check whether mpd is running by testing for its FIFO in the runtime
+      # directory (created by mpd when the daemon is active). This avoids
+      # spawning a systemctl subprocess on every probe.
+      [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] || {
+        log Info "MPD FIFO not found, mpd unreachable"
+        return 1
+      }
+      # mpc status emits lines like "[playing] #1/1 0:42/3:30 (20%)".
+      while read -r l; do
+        case $l in
+          *"[playing]"*)
+            result="Playing"
+            log Info "Player mpd status: Playing"
+            return 0
+            ;;
+          *"[paused]"*)
+            result="Paused"
+            log Info "Player mpd status: Paused"
+            return 0
+            ;;
+        esac
+      done < <(mpc status 2> /dev/null)
+      ;;
   esac
   log Info "Player $player status: unreachable"
   return 1
@@ -163,7 +169,7 @@ detect_active_player() {
   fi
 
   local player_list
-  if command -v mpc >/dev/null; then
+  if command -v mpc > /dev/null; then
     player_list=(playerctl mpd)
   else
     player_list=(playerctl)
@@ -209,12 +215,12 @@ get_volume() {
 
   if [[ "$PLAYER" == "playerctl" ]]; then
     # playerctl volume emits a decimal in 0-1 range.
-    read -r result < <(playerctl volume 2>/dev/null)
+    read -r result < <(playerctl volume 2> /dev/null)
   elif [[ "$PLAYER" == "mpd" ]]; then
     # mpc volume output: "vol: 75" - extract the middle field, strip the
     # trailing "%" if present, then convert 0-100 integer -> 0-1 float via
     # scientific notation (75 -> 0.75).
-    read -r _ vol _ < <(mpc volume 2>/dev/null) || return 1
+    read -r _ vol _ < <(mpc volume 2> /dev/null) || return 1
     vol=${vol%\%}
     printf -v result '%0.2f' "$((vol))e-2"
   fi
@@ -226,22 +232,22 @@ set_volume() {
 
   log Info "Setting volume to $vol (player=$PLAYER)"
   case "$PLAYER" in
-  playerctl)
-    playerctl volume "$vol" 2>/dev/null
-    ;;
-  mpd)
-    # Reverse of get_volume: 0-1 float -> 0-100 integer via "${vol}e2"
-    # scientific notation (e.g. "0.75e2" -> 75), rounded with %.0f.
-    local int_vol
-    printf -v int_vol '%.0f' "${vol}e2"
-    mpc -q volume "$int_vol"
-    ;;
+    playerctl)
+      playerctl volume "$vol" 2> /dev/null
+      ;;
+    mpd)
+      # Reverse of get_volume: 0-1 float -> 0-100 integer via "${vol}e2"
+      # scientific notation (e.g. "0.75e2" -> 75), rounded with %.0f.
+      local int_vol
+      printf -v int_vol '%.0f' "${vol}e2"
+      mpc -q volume "$int_vol"
+      ;;
   esac
 }
 
 play() {
   if [[ "$PLAYER" == "playerctl" ]]; then
-    playerctl play 2>/dev/null
+    playerctl play 2> /dev/null
   elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q play
   fi
@@ -251,7 +257,7 @@ play() {
 
 pause() {
   if [[ "$PLAYER" == "playerctl" ]]; then
-    playerctl pause 2>/dev/null
+    playerctl pause 2> /dev/null
   elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q pause
   fi
@@ -261,7 +267,7 @@ pause() {
 
 next_track() {
   if [[ "$PLAYER" == "playerctl" ]]; then
-    playerctl next 2>/dev/null
+    playerctl next 2> /dev/null
   elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q next
   fi
@@ -270,7 +276,7 @@ next_track() {
 
 previous_track() {
   if [[ "$PLAYER" == "playerctl" ]]; then
-    playerctl previous 2>/dev/null
+    playerctl previous 2> /dev/null
   elif [[ "$PLAYER" == "mpd" ]]; then
     mpc -q prev
   fi
@@ -377,28 +383,28 @@ fade_in() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -l | --linear)
-    FADE_CURVE="linear"
-    shift
-    ;;
-  --toggle | --play | --pause | --next | --previous)
-    ACTION="$1"
-    log Info "Action parsed: $ACTION"
-    shift
-    ;;
-  *)
-    log Error "Unknown argument: $*"
-    log Error "Try '$SELF --help' for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -l | --linear)
+      FADE_CURVE="linear"
+      shift
+      ;;
+    --toggle | --play | --pause | --next | --previous)
+      ACTION="$1"
+      log Info "Action parsed: $ACTION"
+      shift
+      ;;
+    *)
+      log Error "Unknown argument: $*"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
   esac
 done
 
@@ -416,7 +422,7 @@ _is_spotify() {
   log Info "Checking Spotify status (player=$PLAYER)"
   while IFS= read -r line; do
     [[ "$line" == *spotify* ]] && return 0
-  done < <(playerctl -l 2>/dev/null)
+  done < <(playerctl -l 2> /dev/null)
   log Info "Spotify not active"
   return 1
 }
@@ -432,38 +438,46 @@ if [[ $NUM_STEPS == off ]]; then
   detect_active_player
   write_state
   case "$ACTION" in
-  "--toggle")
-    log Info "Toggling play/pause"
-    if [[ $STATE_PLAYER == mpd ]]; then
-      mpc toggle >/dev/null 2>&1
-    else
-      playerctl play-pause >/dev/null 2>&1
-    fi
-    ;;
-  "--play")
-    log Info "Playing"
-    if [[ $STATE_PLAYER == mpd ]]; then
-      mpc play >/dev/null 2>&1
-    else
-      playerctl play >/dev/null 2>&1
-    fi
-    ;;
-  "--pause")
-    log Info "Pausing"
-    if [[ $STATE_PLAYER == mpd ]]; then
-      mpc pause >/dev/null 2>&1
-    else
-      playerctl pause >/dev/null 2>&1
-    fi
-    ;;
-  "--next" | "--previous")
-    log Info "Track: ${ACTION#--}"
-    if [[ $STATE_PLAYER == mpd ]]; then
-      [[ $ACTION == --next ]] && mpc next >/dev/null 2>&1 || mpc prev >/dev/null 2>&1
-    else
-      [[ $ACTION == --next ]] && playerctl next >/dev/null 2>&1 || playerctl previous >/dev/null 2>&1
-    fi
-    ;;
+    "--toggle")
+      log Info "Toggling play/pause"
+      if [[ $STATE_PLAYER == mpd ]]; then
+        mpc toggle > /dev/null 2>&1
+      else
+        playerctl play-pause > /dev/null 2>&1
+      fi
+      ;;
+    "--play")
+      log Info "Playing"
+      if [[ $STATE_PLAYER == mpd ]]; then
+        mpc play > /dev/null 2>&1
+      else
+        playerctl play > /dev/null 2>&1
+      fi
+      ;;
+    "--pause")
+      log Info "Pausing"
+      if [[ $STATE_PLAYER == mpd ]]; then
+        mpc pause > /dev/null 2>&1
+      else
+        playerctl pause > /dev/null 2>&1
+      fi
+      ;;
+    "--next" | "--previous")
+      log Info "Track: ${ACTION#--}"
+      if [[ $STATE_PLAYER == mpd ]]; then
+        if [[ $ACTION == --next ]]; then
+          mpc next
+        else
+          mpc prev
+        fi
+      else
+        if [[ $ACTION == --next ]]; then
+          playerctl next
+        else
+          playerctl previous
+        fi
+      fi > /dev/null 2>&1
+      ;;
   esac
   log Info "Fast path action complete, exiting"
   exit 0
@@ -473,7 +487,7 @@ fi
 # Returns 0 on success (lock acquired), 1 on contention (lock held).
 _acquire_lock() {
   set -o noclobber
-  : > "$LOCK_FILE" 2>/dev/null
+  : > "$LOCK_FILE" 2> /dev/null
   local rc=$?
   set +o noclobber
   if ((rc == 0)); then
@@ -498,74 +512,87 @@ if _acquire_lock; then
   read_state
   while [[ -n "$ACTION" ]]; do
     case "$ACTION" in
-    "--toggle")
-      log Info "Toggling play/pause"
-      detect_active_player
-      if _is_spotify; then
-        playerctl play-pause 2>/dev/null
-      elif [[ $STATUS == Playing ]]; then
-        get_volume CURRENT_VOLUME
-        STATE_VOLUME="$CURRENT_VOLUME"
-        fade_out "$NUM_STEPS"
-        pause
-        set_volume "$CURRENT_VOLUME"
-      else
-        if [[ -n "$STATE_VOLUME" ]]; then
-          set_volume 0
-          play
-          fade_in "$NUM_STEPS" "$STATE_VOLUME"
-          STATE_VOLUME=""
-        else
-          play
-        fi
-      fi
-      ;;
-    "--play")
-      log Info "Playing"
-      detect_active_player
-      if _is_spotify; then
-        playerctl play 2>/dev/null
-      elif [[ $STATUS != Playing ]]; then
-        if [[ -n "$STATE_VOLUME" ]]; then
-          set_volume 0
-          play
-          fade_in "$NUM_STEPS" "$STATE_VOLUME"
-          STATE_VOLUME=""
-        else
-          play
-        fi
-      fi
-      ;;
-    "--pause")
-      log Info "Pausing"
-      detect_active_player
-      if _is_spotify; then
-        playerctl pause 2>/dev/null
-      elif [[ $STATUS == Playing ]]; then
-        get_volume CURRENT_VOLUME
-        STATE_VOLUME="$CURRENT_VOLUME"
-        fade_out "$NUM_STEPS"
-        pause
-        set_volume "$CURRENT_VOLUME"
-      fi
-      ;;
-    "--next" | "--previous")
-      log Info "Track: ${ACTION#--}"
-      detect_active_player
-      if _is_spotify; then
-        [[ $ACTION == --next ]] && playerctl next 2>/dev/null || playerctl previous 2>/dev/null
-      else
-        get_volume CURRENT_VOLUME
-        if [[ $STATUS == Paused ]]; then
+      "--toggle")
+        log Info "Toggling play/pause"
+        detect_active_player
+        if _is_spotify; then
+          playerctl play-pause 2> /dev/null
+        elif [[ $STATUS == Playing ]]; then
+          get_volume CURRENT_VOLUME
+          STATE_VOLUME="$CURRENT_VOLUME"
           fade_out "$NUM_STEPS"
-          play
+          pause
+          set_volume "$CURRENT_VOLUME"
+        else
+          if [[ -n "$STATE_VOLUME" ]]; then
+            set_volume 0
+            play
+            fade_in "$NUM_STEPS" "$STATE_VOLUME"
+            STATE_VOLUME=""
+          else
+            play
+          fi
         fi
-        original_volume="$CURRENT_VOLUME"
-        fade_out "$NUM_STEPS"
-        [[ $ACTION == --next ]] && next_track || previous_track
-        fade_in "$NUM_STEPS" "$original_volume"
-      fi
-      ;;
+        ;;
+      "--play")
+        log Info "Playing"
+        detect_active_player
+        if _is_spotify; then
+          playerctl play 2> /dev/null
+        elif [[ $STATUS != Playing ]]; then
+          if [[ -n "$STATE_VOLUME" ]]; then
+            set_volume 0
+            play
+            fade_in "$NUM_STEPS" "$STATE_VOLUME"
+            STATE_VOLUME=""
+          else
+            play
+          fi
+        fi
+        ;;
+      "--pause")
+        log Info "Pausing"
+        detect_active_player
+
+        if _is_spotify; then
+          playerctl pause 2> /dev/null
+        elif [[ $STATUS == Playing ]]; then
+          get_volume CURRENT_VOLUME
+          STATE_VOLUME="$CURRENT_VOLUME"
+          fade_out "$NUM_STEPS"
+          pause
+          set_volume "$CURRENT_VOLUME"
+        fi
+        ;;
+      "--next" | "--previous")
+        log Info "Track: ${ACTION#--}"
+        detect_active_player
+        if _is_spotify; then
+          if [[ $ACTION == --next ]]; then
+            playerctl next 2> /dev/null
+          else
+            playerctl previous 2> /dev/null
+          fi
+        else
+          get_volume CURRENT_VOLUME
+
+          if [[ $STATUS == Paused ]]; then
+            fade_out "$NUM_STEPS"
+            play
+          fi
+
+          original_volume="$CURRENT_VOLUME"
+          fade_out "$NUM_STEPS"
+
+          if [[ $ACTION == --next ]]; then
+            next_track
+          else
+            previous_track
+          fi
+
+          fade_in "$NUM_STEPS" "$original_volume"
+        fi
+        ;;
     esac
     log Info "Action executed: $ACTION"
 
@@ -593,14 +620,20 @@ if _acquire_lock; then
   log Info "Lock released, slow path complete"
 else
   log Info "Lock held, queuing action: $ACTION"
-  {
-    if [[ -f "$STATE_FILE" ]]; then
-      while IFS='=' read -r key value; do
-        [[ $key == action ]] && continue
-        echo "$key=$value"
-      done < "$STATE_FILE"
-    fi
-    echo "action=$ACTION"
-  } > "$STATE_FILE"
+
+  lines=()
+  if [[ -f "$STATE_FILE" ]]; then
+    while IFS='=' read -r key value; do
+      if ! [[ $key == action ]]; then
+        lines+=("$key=$value")
+      fi
+    done < "$STATE_FILE"
+  fi
+
+  # Add/update the action line
+  lines+=("action=$ACTION")
+
+  # Write everything back atomically (the file is opened only for writing here)
+  printf '%s\n' "${lines[@]}" > "$STATE_FILE"
   log Info "Action queued to state file: $ACTION"
 fi

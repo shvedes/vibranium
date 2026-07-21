@@ -44,7 +44,7 @@ fi
 # This single check tells us both:
 #   1) that systemd-boot is active,
 #   2) which boot type is in use (UKI or BLS).
-CURRENT_ENTRY=$(bootctl status 2>/dev/null | awk -F': ' '/Current Entry/ {print $2}')
+CURRENT_ENTRY=$(bootctl status 2> /dev/null | awk -F': ' '/Current Entry/ {print $2}')
 
 if [[ ! "$CURRENT_ENTRY" == *.efi ]]; then
   term::show_header --color red
@@ -118,13 +118,13 @@ fi
 
 # Check NVRAM is actually writable before doing anything destructive
 _efi_nvram_writable() {
-  findmnt -n -o OPTIONS /sys/firmware/efi/efivars 2>/dev/null | grep -q '\brw\b' || return 1
+  findmnt -n -o OPTIONS /sys/firmware/efi/efivars 2> /dev/null | grep -q '\brw\b' || return 1
 
   # Canary write - catches firmware that reports rw but silently drops writes
   local canary="/sys/firmware/efi/efivars/VibraniumProbe-00000000-0000-0000-0000-000000000000"
-  printf '\x07\x00\x00\x00\x00' | sudo tee "$canary" &>/dev/null || return 1
-  sudo chattr -i "$canary" 2>/dev/null
-  sudo rm -f "$canary" 2>/dev/null
+  printf '\x07\x00\x00\x00\x00' | sudo tee "$canary" &> /dev/null || return 1
+  sudo chattr -i "$canary" 2> /dev/null
+  sudo rm -f "$canary" 2> /dev/null
   return 0
 }
 
@@ -137,7 +137,7 @@ fi
 
 # Use bootctl (already required) as the primary and most reliable ESP locator.
 # Fall back to well-known mount points only when bootctl comes up empty.
-ESP_MOUNT=$(bootctl --print-esp-path 2>/dev/null)
+ESP_MOUNT=$(bootctl --print-esp-path 2> /dev/null)
 
 if [[ -z "$ESP_MOUNT" ]]; then
   if [[ -d /boot/efi ]]; then
@@ -153,7 +153,7 @@ if [[ -z "$ESP_MOUNT" ]] || [[ ! -d "$ESP_MOUNT" ]]; then
   exit 1
 fi
 
-if ! command -v sbctl >/dev/null; then
+if ! command -v sbctl > /dev/null; then
   vb-pkg-install --embedded -- sbctl
 fi
 
@@ -189,7 +189,7 @@ for file in "${EFI_FILES[@]}"; do
   fi
 done
 
-sudo mkinitcpio -P &>/dev/null &
+sudo mkinitcpio -P &> /dev/null &
 if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Regenerating mkinitcpio" "- ${GREEN}Done${RESET}"; then
   echo -e "${RED}[VIBRANIUM]${RESET} Failed to regenerate initramfs"
   echo -e "${RED}[VIBRANIUM]${RESET} ${YELLOW}Warning${RESET}: your system may be unbootable without a valid initramfs."
@@ -206,13 +206,13 @@ for file in "${EFI_FILES[@]}"; do
   fi
 done
 
-QUIRK_URLS=$(sudo sbctl status 2>/dev/null | grep -oP 'https://\S+')
+QUIRK_URLS=$(sudo sbctl status 2> /dev/null | grep -oP 'https://\S+')
 
 if [[ -n "$QUIRK_URLS" ]]; then
   echo -e "${YELLOW}[VIBRANIUM]${RESET} Your firmware has known quirks that may affect security:"
   while IFS= read -r url; do
     echo -e "             ${CYAN}$url${RESET}"
-  done <<<"$QUIRK_URLS"
+  done <<< "$QUIRK_URLS"
 fi
 
 kill $sudo_pid

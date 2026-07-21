@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -18,7 +19,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]
 
 Switch keyboard layout for the main Hyprland keyboard.
@@ -42,44 +43,44 @@ action="next"
 
 while [[ $# -gt 0 ]]; do
   case "${1:-}" in
-  --next)
-    action="next"
-    shift
-    ;;
-  --prev)
-    action="prev"
-    shift
-    ;;
-  --notify)
-    NOTIFY=true
-    shift
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "invalid option: $1"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    --next)
+      action="next"
+      shift
+      ;;
+    --prev)
+      action="prev"
+      shift
+      ;;
+    --notify)
+      NOTIFY=true
+      shift
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "invalid option: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
 done
 
 log Info "Action: $action"
 
 devices_json="$(hyprctl -j devices)"
-device="$(jq -r '.keyboards[] | select(.main == true) | .name' <<<"$devices_json")"
+device="$(jq -r '.keyboards[] | select(.main == true) | .name' <<< "$devices_json")"
 
 if [[ -z "$device" ]]; then
   log Error "no main keyboard found"
   log Error "no main keyboard found"
 
-  if command -v notify-send >/dev/null 2>&1; then
+  if command -v notify-send > /dev/null 2>&1; then
     notify-send -r 4 -t 3000 -u critical \
       "Vibranium" \
       "Could not detect your default keyboard"

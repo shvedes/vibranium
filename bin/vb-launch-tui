@@ -5,7 +5,8 @@ SELF="${0##*/}"
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -18,7 +19,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTIONS] -- COMMAND [ARGS...]
 
 Focus existing window matching COMMAND, or launch it in a terminal.
@@ -73,7 +74,7 @@ focus_or_launch() {
           | .address
         )
       )
-    ' 2>/dev/null < <(hyprctl -j clients)
+    ' 2> /dev/null < <(hyprctl -j clients)
   )"
 
   if [[ -n "$window_address" ]]; then
@@ -98,47 +99,47 @@ TITLE=""
 
 while (($#)); do
   case "$1" in
-  --app-id=*)
-    APP_ID="${1#*=}"
-    shift
-    ;;
-  --app-id)
-    [[ -n "$2" ]] || {
-      log Error "missing value for --app-id"
+    --app-id=*)
+      APP_ID="${1#*=}"
+      shift
+      ;;
+    --app-id)
+      [[ -n "$2" ]] || {
+        log Error "missing value for --app-id"
+        exit 1
+      }
+      APP_ID="$2"
+      shift 2
+      ;;
+    --title=*)
+      TITLE="${1#*=}"
+      shift
+      ;;
+    --title)
+      [[ -n "$2" ]] || {
+        log Error "missing value for --title"
+        exit 1
+      }
+      TITLE="$2"
+      shift 2
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "unknown option -- $*"
+      log Error "Try --help for more information"
       exit 1
-    }
-    APP_ID="$2"
-    shift 2
-    ;;
-  --title=*)
-    TITLE="${1#*=}"
-    shift
-    ;;
-  --title)
-    [[ -n "$2" ]] || {
-      log Error "missing value for --title"
-      exit 1
-    }
-    TITLE="$2"
-    shift 2
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --)
-    shift
-    break
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "unknown option -- $*"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+      ;;
   esac
 done
 

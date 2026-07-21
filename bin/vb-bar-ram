@@ -17,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Output RAM usage for Waybar. Shows detailed memory info in tooltip.
@@ -31,19 +31,19 @@ EOF
 
 while (($# > 0)); do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "Unknown option: $1"
-    usage
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "Unknown option: $1"
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -63,7 +63,7 @@ fi
 declare -A mem
 while read -r key val _; do
   mem["${key%:}"]=$val
-done </proc/meminfo
+done < /proc/meminfo
 
 gi1() {
   local val=$1 int dec
@@ -94,9 +94,12 @@ fi
 
 pc() {
   local p=$1
-  if ((p >= 95)); then printf '#ffb3ba'
-  elif ((p >= 85)); then printf '#ffd9b3'
-  else printf '#baffc9'
+  if ((p >= 95)); then
+    printf '#ffb3ba'
+  elif ((p >= 85)); then
+    printf '#ffd9b3'
+  else
+    printf '#baffc9'
   fi
 }
 

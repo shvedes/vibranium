@@ -6,7 +6,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -22,7 +23,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]
 
 Handle media playback on session lock/unlock events.
@@ -39,17 +40,17 @@ EOF
 # checked first (fast MPRIS D-Bus query). For MPD, use the fifo check
 # to avoid triggering socket activation when the daemon is stopped.
 player_is_playing() {
-  if [[ "$(playerctl status 2>/dev/null)" == "Playing" ]]; then
+  if [[ "$(playerctl status 2> /dev/null)" == "Playing" ]]; then
     return 0
   else
     if [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]]; then
       while read -r l; do
         case $l in
-        *"[playing]"*)
-          return 0
-          ;;
+          *"[playing]"*)
+            return 0
+            ;;
         esac
-      done < <(mpc status 2>/dev/null)
+      done < <(mpc status 2> /dev/null)
     fi
   fi
 
@@ -60,71 +61,71 @@ MODE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --before | --after)
-    MODE="$1"
-    shift
-    ;;
-  *)
-    log Error "invalid option -- $*"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --before | --after)
+      MODE="$1"
+      shift
+      ;;
+    *)
+      log Error "invalid option -- $*"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
 done
 
 case "$MODE" in
---before)
-  log Info "Lock handler"
-  source vb-lib-core
+  --before)
+    log Info "Lock handler"
+    source vb-lib-core
 
-  helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
-  pause_music="$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+    helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK
+    pause_music="$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
 
-  # Skip music pause when the sleep inhibitor is active (user is watching
-  # a video or listening to music and explicitly prevented auto-lock).
-  if systemctl -q --user is-active vibranium-inhibit@sleep; then
-    log Info "Sleep inhibitor active, skipping pause"
-    exit 0
-  elif [[ $pause_music == false ]]; then
-    exit 0
-  fi
+    # Skip music pause when the sleep inhibitor is active (user is watching
+    # a video or listening to music and explicitly prevented auto-lock).
+    if systemctl -q --user is-active vibranium-inhibit@sleep; then
+      log Info "Sleep inhibitor active, skipping pause"
+      exit 0
+    elif [[ $pause_music == false ]]; then
+      exit 0
+    fi
 
-  if player_is_playing; then
-    log Info "Pausing music"
-    vb-core-mediacontrol --toggle &
-    # Create the restore flag so the --after handler can resume playback.
-    : >"$RESTORE_FLAG"
-  fi
-  ;;
-
---after)
-  log Info "Unlock handler"
-  source vb-lib-core
-  if [[ -f "$RESTORE_FLAG" ]]; then
-    rm -f "$RESTORE_FLAG"
-    if ! player_is_playing; then
-      log Info "Restoring music"
+    if player_is_playing; then
+      log Info "Pausing music"
       vb-core-mediacontrol --toggle &
+      # Create the restore flag so the --after handler can resume playback.
+      : > "$RESTORE_FLAG"
     fi
+    ;;
 
-    helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
-    if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
-      vb-cmd-now-playing
+  --after)
+    log Info "Unlock handler"
+    source vb-lib-core
+    if [[ -f "$RESTORE_FLAG" ]]; then
+      rm -f "$RESTORE_FLAG"
+      if ! player_is_playing; then
+        log Info "Restoring music"
+        vb-core-mediacontrol --toggle &
+      fi
+
+      helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING
+      if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true ]]; then
+        vb-cmd-now-playing
+      fi
     fi
-  fi
-  ;;
+    ;;
 
-*)
-  log Error "missing option"
-  log Error "Try --help for more information"
-  exit 1
-  ;;
+  *)
+    log Error "missing option"
+    log Error "Try --help for more information"
+    exit 1
+    ;;
 esac

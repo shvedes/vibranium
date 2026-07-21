@@ -1,10 +1,10 @@
 #!/bin/bash
-# shellcheck disable=SC2154
 
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -25,7 +25,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]
 
 Zoom in and out your entire screen.
@@ -79,14 +79,15 @@ read_state100() {
   local v=100
 
   if [[ -r "$STATE_FILE" ]]; then
-    IFS= read -r v <"$STATE_FILE" || v=100
+    IFS= read -r v < "$STATE_FILE" || v=100
 
     if [[ ! "$v" =~ ^[0-9]+$ ]]; then
       v=100
     fi
   fi
 
-  # shellcheck disable=SC2034 # nameref target, used by caller
+  # nameref target, used by caller
+  # shellcheck disable=SC2034
   ref=$v
 }
 
@@ -103,7 +104,7 @@ write_state100() {
     fi
   fi
 
-  printf '%s\n' "$new100" >"$STATE_FILE"
+  printf '%s\n' "$new100" > "$STATE_FILE"
 }
 
 # Apply the zoom factor to Hyprland using its Lua-style config eval API.
@@ -122,58 +123,58 @@ apply_zoom100() {
 
 while (($#)); do
   case "$1" in
-  -i | --increase)
-    ACTION="increase"
-    shift
-    ;;
-  -d | --decrease)
-    ACTION="decrease"
-    shift
-    ;;
-  -V | --zoom-value)
-    [[ -n "$2" ]] || {
-      log Error "--zoom-value requires a value"
-      exit 1
-    }
+    -i | --increase)
+      ACTION="increase"
+      shift
+      ;;
+    -d | --decrease)
+      ACTION="decrease"
+      shift
+      ;;
+    -V | --zoom-value)
+      [[ -n "$2" ]] || {
+        log Error "--zoom-value requires a value"
+        exit 1
+      }
 
-    ACTION="set"
-    ZOOM_VALUE="$2"
-    shift 2
-    ;;
-  -r | --reset)
-    ACTION="reset"
-    shift
-    ;;
-  -s | --step)
-    [[ -n "$2" ]] || {
-      log Error "--step requires a value"
-      exit 1
-    }
+      ACTION="set"
+      ZOOM_VALUE="$2"
+      shift 2
+      ;;
+    -r | --reset)
+      ACTION="reset"
+      shift
+      ;;
+    -s | --step)
+      [[ -n "$2" ]] || {
+        log Error "--step requires a value"
+        exit 1
+      }
 
-    STEP="$2"
-    shift 2
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  "+")
-    ACTION="increase"
-    shift
-    ;;
-  "-")
-    ACTION="decrease"
-    shift
-    ;;
-  *)
-    log Error "unknown option -- $1"
-    log Error "Try '$SELF --help' for more information"
-    exit 1
-    ;;
+      STEP="$2"
+      shift 2
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    "+")
+      ACTION="increase"
+      shift
+      ;;
+    "-")
+      ACTION="decrease"
+      shift
+      ;;
+    *)
+      log Error "unknown option -- $1"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
   esac
 done
 
@@ -183,6 +184,12 @@ if [[ -z "$ACTION" ]]; then
 fi
 
 log Info "Action: $ACTION, step: $STEP"
+
+# Used via nameref
+current_float=
+current100=
+step100=
+zoom100=
 
 _to_int100 step100 "$STEP"
 
@@ -203,22 +210,23 @@ fi
 read_state100 current100
 
 case "$ACTION" in
-increase)
-  new100=$((current100 + step100))
-  ;;
-decrease)
-  new100=$((current100 - step100))
-  ((new100 < 100)) && new100=100
-  ;;
-set)
-  new100="$zoom100"
-  ;;
-reset)
-  new100=100
-  ;;
-*)
-  usage
-  exit 1
+  increase)
+    new100=$((current100 + step100))
+    ;;
+  decrease)
+    new100=$((current100 - step100))
+    ((new100 < 100)) && new100=100
+    ;;
+  set)
+    new100="$zoom100"
+    ;;
+  reset)
+    new100=100
+    ;;
+  *)
+    usage
+    exit 1
+    ;;
 esac
 
 _from_int100 current_float "$current100"

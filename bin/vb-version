@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]...
 
 Print current Vibranium version and git status.
@@ -29,24 +30,24 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
 # Parse git output where INFO has the format "%cd|%h|%D" (date, hash, refs).
 # Parameter expansion strips the pipe-delimited fields without forking.
-DESCRIBE=$(git -C "$VIBRANIUM" describe --tags --long --abbrev=7 2>/dev/null)
-INFO=$(git -C "$VIBRANIUM" show -s --format="%cd|%h|%D" --date=short HEAD 2>/dev/null)
+DESCRIBE=$(git -C "$VIBRANIUM" describe --tags --long --abbrev=7 2> /dev/null)
+INFO=$(git -C "$VIBRANIUM" show -s --format="%cd|%h|%D" --date=short HEAD 2> /dev/null)
 
 DATE="${INFO%%|*}"
 REST="${INFO#*|}"
@@ -81,14 +82,14 @@ if [[ -n "$DESCRIBE" ]]; then
     # configured upstream; on other branches default to origin/master.
     case "$BRANCH" in
       master | main)
-        UPSTREAM=$(git -C "$VIBRANIUM" rev-parse --abbrev-ref '@{upstream}' 2>/dev/null)
+        UPSTREAM=$(git -C "$VIBRANIUM" rev-parse --abbrev-ref '@{upstream}' 2> /dev/null)
         ;;
       *)
         UPSTREAM="origin/master"
         ;;
     esac
 
-    if [[ -n "$UPSTREAM" ]] && git -C "$VIBRANIUM" rev-parse --verify "$UPSTREAM" &>/dev/null; then
+    if [[ -n "$UPSTREAM" ]] && git -C "$VIBRANIUM" rev-parse --verify "$UPSTREAM" &> /dev/null; then
       COMMITS_BEHIND=$(git -C "$VIBRANIUM" rev-list --count HEAD.."$UPSTREAM")
       if ((COMMITS_BEHIND > 0)); then
         echo "${COMMITS_BEHIND} commits behind ${UPSTREAM}"

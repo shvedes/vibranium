@@ -57,7 +57,7 @@ else
     rm -f "${MARKER%.*}".*
 
     # Create new one
-    : >"$MARKER"
+    : > "$MARKER"
   fi
 fi
 
@@ -83,7 +83,7 @@ if ((exit_status != 0)); then
   exit 0
 fi
 
-mapfile -t COUNT <"$PKG_LIST"
+mapfile -t COUNT < "$PKG_LIST"
 TOTAL_COUNT=${#COUNT[@]}
 
 text="<span foreground='${P_FOREGROUND_0}66'>|</span> "

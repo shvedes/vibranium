@@ -8,7 +8,7 @@ FILE="$VIBRANIUM/migrations/${TIMESTAMP}.sh"
 tmp="/dev/shm/vb-migration-$TIMESTAMP.sh"
 trap 'rm -f "$tmp"' EXIT
 
-cat >"$tmp" <<'EOF'
+cat > "$tmp" << 'EOF'
 #!/bin/bash
 
 GREEN=$'\e[0;32m'
@@ -39,5 +39,5 @@ current_hash="$(sha256sum "$tmp" | cut -d' ' -f1)"
 
 if [[ "$current_hash" != "$template_hash" ]]; then
   mv "$tmp" "$FILE"
-  : >"$VIBRANIUM_STATE/migrations/${TIMESTAMP}.sh"
+  : > "$VIBRANIUM_STATE/migrations/${TIMESTAMP}.sh"
 fi

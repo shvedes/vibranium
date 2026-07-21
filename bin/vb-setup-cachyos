@@ -17,16 +17,17 @@ _operation_complete() {
   term::disable_input
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+  # shellcheck disable=2034
   read -n1 -r -p $'. Press any key to exit ' dummy
 }
 
 _cleanup() {
   if [[ -n $SUDO_KEEPALIVE_PID ]]; then
-    kill "$SUDO_KEEPALIVE_PID" 2>/dev/null
+    kill "$SUDO_KEEPALIVE_PID" 2> /dev/null
   fi
 
   if [[ -n $INHIBITOR_PID ]]; then
-    kill "$INHIBITOR_PID" 2>/dev/null
+    kill "$INHIBITOR_PID" 2> /dev/null
   fi
 
   if [[ -n $TMPDIR ]]; then
@@ -34,7 +35,11 @@ _cleanup() {
   fi
 }
 
-_cachyos_detected() { sed -n '/^\[cachyos/q0; $q1' /etc/pacman.conf; }
+_cachyos_detected() {
+  local conf="/etc/pacman.conf"
+  # shellcheck disable=2016
+  sed -n '/^\[cachyos/q0; $q1' "$conf"
+}
 
 _sudoloop() {
   if ! sudo -v; then
@@ -79,7 +84,7 @@ _download_and_run() {
   local rc=$?
 
   # Release the inhibitor and clear stored PID.
-  kill "$INHIBITOR_PID" 2>/dev/null
+  kill "$INHIBITOR_PID" 2> /dev/null
   INHIBITOR_PID=
 
   return $rc

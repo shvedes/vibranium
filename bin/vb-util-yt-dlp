@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION] [URL]
 
 Download video/audio using yt-dlp with browser cookie extraction.
@@ -29,17 +30,17 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -68,6 +69,7 @@ _operation_complete() {
   term::disable_input
   printf "%s[VIBRANIUM]%s Operation complete" "$GREEN" "$RESET"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
+  # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
@@ -98,10 +100,13 @@ _try_download() {
   if [[ -f "$cookie_cache" ]]; then
     echo "${YELLOW}[VIBRANIUM]${RESET} Downloading..."
     _stderr_tmp="/tmp/${0##*/}.tmp"
-    if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url" 2>"$_stderr_tmp"; then
+    if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url" 2> "$_stderr_tmp"; then
       # Download succeeded. If YouTube flagged our cookies as rotated, wipe the
       # cache now so the next run picks up a fresh jar - and swallow the warning
       # (the current download is already done, nothing to act on).
+
+      # Not a bash expression.
+      # shellcheck disable=SC2016
       if sed -n '/no longer valid/q; $q1' "$_stderr_tmp"; then
         echo "${YELLOW}[VIBRANIUM]${RESET} YouTube cookies rotated - cache cleared for next run"
         rm -f "$cookie_cache"
@@ -122,7 +127,7 @@ _try_download() {
     echo "${YELLOW}[VIBRANIUM]${RESET} Trying ${BLUE}${browser}${RESET} cookies"
     # --cookies writes the merged jar to disk when the download succeeds.
     if yt-dlp "${base_args[@]}" --cookies-from-browser "$browser" \
-               --cookies "$cookie_cache" "$url" 2>/dev/null; then
+      --cookies "$cookie_cache" "$url" 2> /dev/null; then
       return 0
     fi
     # Discard any partial cookie file the failed attempt may have written.
@@ -160,7 +165,7 @@ _window_is_offscreen() {
   [[ "$our_ws" != "$active_ws" ]]
 }
 
-if ! command -v yt-dlp >/dev/null; then
+if ! command -v yt-dlp > /dev/null; then
   if ! term::ask_yes_no Y "${BLUE}yt-dlp${RESET} not found. Install it now?"; then
     _operation_canceled
     exit 1

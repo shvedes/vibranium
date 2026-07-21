@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]...
 
 Perform system update (official repos by default, AUR with --aur)
@@ -31,11 +32,8 @@ EOF
 }
 
 _operation_canceled() {
-  local color="$RED"
-
-  [[ "$1" == "--positive" ]] && color="$GREEN"
-
-  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
+  term::disable_input
+  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
 
   if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
     trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
@@ -59,7 +57,7 @@ _update_complete() {
 _check_updates() {
   log Info "Checking updates (aur=$AUR_MODE)"
   if [[ "$AUR_MODE" == true ]]; then
-    mapfile -t PKG_LIST < <(yay -Qum 2>/dev/null)
+    mapfile -t PKG_LIST < <(yay -Qum 2> /dev/null)
   else
     mapfile -t PKG_LIST < <(pacman -Qu)
   fi
@@ -145,37 +143,37 @@ trap 'trap "exit 1" SIGHUP SIGINT SIGTERM SIGQUIT; term::disable_input; _operati
 
 while (($# > 0)); do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --no-logo)
-    NO_LOGO=true
-    shift
-    ;;
-  --no-dummy)
-    NO_DUMMY=true
-    shift
-    ;;
-  --aur)
-    AUR_MODE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --)
-    shift
-    break
-    ;;
-  --*)
-    log Error "Unknown option: $1"
-    exit 1
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --no-logo)
+      NO_LOGO=true
+      shift
+      ;;
+    --no-dummy)
+      NO_DUMMY=true
+      shift
+      ;;
+    --aur)
+      AUR_MODE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    --*)
+      log Error "Unknown option: $1"
+      exit 1
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -185,7 +183,7 @@ fi
 
 # Refresh the sudo timestamp before the long-running pacman call so the
 # password prompt appears at the start rather than mid-update.
-if ! sudo -n true 2>/dev/null; then
+if ! sudo -n true 2> /dev/null; then
   if [[ "$AUR_MODE" == true ]]; then
     echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}yay${RESET} needs ${RED}sudo${RESET} for ${BLUE}AUR${RESET} operations"
   else
@@ -200,9 +198,9 @@ fi
 term::disable_input
 
 if [[ "$AUR_MODE" == true ]]; then
-  yay -Sy &>/dev/null &
+  yay -Sy &> /dev/null &
 else
-  sudo pacman -Sy &>/dev/null &
+  sudo pacman -Sy &> /dev/null &
 fi
 
 pid=$!

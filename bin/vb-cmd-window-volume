@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -20,7 +21,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<-EOF
+  shcat <<- EOF
 Usage: $SELF [OPTIONS]
 
 Adjust the volume of the currently focused Hyprland window.
@@ -40,31 +41,31 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -s | --step)
-    STEP="$2"
-    shift 2
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -u | -d | -t)
-    ACTION="${1#-}"
-    shift
-    ;;
-  --up | --down | --toggle)
-    ACTION="${1#--}"
-    shift
-    ;;
-  *)
-    log Error "Unknown option: $1"
-    usage >&2
-    exit 1
-    ;;
+    -s | --step)
+      STEP="$2"
+      shift 2
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -u | -d | -t)
+      ACTION="${1#-}"
+      shift
+      ;;
+    --up | --down | --toggle)
+      ACTION="${1#--}"
+      shift
+      ;;
+    *)
+      log Error "Unknown option: $1"
+      usage >&2
+      exit 1
+      ;;
   esac
 done
 
@@ -124,21 +125,21 @@ collect_pids() {
 CACHE_DIR="${VIBRANIUM_RUNTIME:-/tmp}/vb-cmd-window-volume"
 for f in "$CACHE_DIR"/*; do
   [ -f "$f" ] || continue
-  kill -0 "${f##*/}" 2>/dev/null || rm "$f"
+  kill -0 "${f##*/}" 2> /dev/null || rm "$f"
 done
 CACHE_FILE="$CACHE_DIR/$ACTIVE_PID"
 
 ALL_PIDS=()
 if [[ -f "$CACHE_FILE" ]]; then
   printf -v _now '%(%s)T' -1
-  if (( _now - $(stat -c %Y "$CACHE_FILE") < 2 )); then
-    mapfile -t ALL_PIDS <"$CACHE_FILE"
+  if ((_now - $(stat -c %Y "$CACHE_FILE") < 2)); then
+    mapfile -t ALL_PIDS < "$CACHE_FILE"
   fi
 fi
 if [[ ${#ALL_PIDS[@]} -eq 0 ]]; then
   mapfile -t ALL_PIDS < <(collect_pids "$ACTIVE_PID")
-  mkdir -p "$CACHE_DIR" 2>/dev/null
-  printf '%s\n' "${ALL_PIDS[@]}" >"$CACHE_FILE"
+  mkdir -p "$CACHE_DIR" 2> /dev/null
+  printf '%s\n' "${ALL_PIDS[@]}" > "$CACHE_FILE"
 fi
 
 # Collect binary names from all PIDs in the tree for fallback.
@@ -146,19 +147,19 @@ fi
 # application.process.binary, node.name, or application.name.
 #
 # Three fallbacks for root binary: comm, cmdline basename, ps.
-ROOT_BIN=$(<"/proc/$ACTIVE_PID/comm" 2>/dev/null)
+ROOT_BIN=$(< "/proc/$ACTIVE_PID/comm" 2> /dev/null)
 if [[ -z "$ROOT_BIN" ]]; then
-  IFS= read -r -d '' ROOT_BIN <"/proc/$ACTIVE_PID/cmdline" 2>/dev/null
+  IFS= read -r -d '' ROOT_BIN < "/proc/$ACTIVE_PID/cmdline" 2> /dev/null
   ROOT_BIN="${ROOT_BIN##*/}"
 fi
 if [[ -z "$ROOT_BIN" ]]; then
-  ROOT_BIN=$(ps -o comm= -p "$ACTIVE_PID" 2>/dev/null)
+  ROOT_BIN=$(ps -o comm= -p "$ACTIVE_PID" 2> /dev/null)
 fi
 
 declare -A _bins
 BINS_STR=
 for p in "${ALL_PIDS[@]}"; do
-  comm=$(<"/proc/$p/comm" 2>/dev/null) || continue
+  comm=$(< "/proc/$p/comm" 2> /dev/null) || continue
   [[ -n "${_bins[$comm]+set}" ]] && continue
   _bins[$comm]=1
   BINS_STR="$BINS_STR $comm"
@@ -258,27 +259,27 @@ first_new_vol=""
 first_new_muted=""
 
 for SINK_ENTRY in "${SINK_DATA[@]}"; do
-  read -r sink_id sink_vol sink_muted <<<"$SINK_ENTRY"
+  read -r sink_id sink_vol sink_muted <<< "$SINK_ENTRY"
 
   case "$ACTION" in
-  up)
-    new_vol=$((sink_vol + STEP))
-    ((new_vol > 100)) && new_vol=100
-    pactl set-sink-input-volume "$sink_id" "${new_vol}%"
-    new_muted="$sink_muted"
-    ;;
-  down)
-    new_vol=$((sink_vol - STEP))
-    ((new_vol < 0)) && new_vol=0
-    pactl set-sink-input-volume "$sink_id" "${new_vol}%"
-    new_muted="$sink_muted"
-    ;;
-  toggle)
-    pactl set-sink-input-mute "$sink_id" toggle
-    new_vol="$sink_vol"
-    # invert mute locally -- no re-query needed
-    [[ "$sink_muted" == "yes" ]] && new_muted="no" || new_muted="yes"
-    ;;
+    up)
+      new_vol=$((sink_vol + STEP))
+      ((new_vol > 100)) && new_vol=100
+      pactl set-sink-input-volume "$sink_id" "${new_vol}%"
+      new_muted="$sink_muted"
+      ;;
+    down)
+      new_vol=$((sink_vol - STEP))
+      ((new_vol < 0)) && new_vol=0
+      pactl set-sink-input-volume "$sink_id" "${new_vol}%"
+      new_muted="$sink_muted"
+      ;;
+    toggle)
+      pactl set-sink-input-mute "$sink_id" toggle
+      new_vol="$sink_vol"
+      # invert mute locally -- no re-query needed
+      [[ "$sink_muted" == "yes" ]] && new_muted="no" || new_muted="yes"
+      ;;
   esac
 
   # only the first stream drives the notification

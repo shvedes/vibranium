@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION] [FILE]...
 
 Print files via the system default CUPS printer.
@@ -36,21 +37,21 @@ fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --)
-    shift
-    break
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -70,8 +71,8 @@ trap cleanup EXIT
 have_libreoffice=false
 have_inkscape=false
 
-command -v libreoffice &>/dev/null && have_libreoffice=true
-command -v inkscape &>/dev/null && have_inkscape=true
+command -v libreoffice &> /dev/null && have_libreoffice=true
+command -v inkscape &> /dev/null && have_inkscape=true
 
 if ! systemctl -q is-active cups.service; then
   notify-send -r 4 -u critical -t 20000 "Print System Service Is Not Running" \
@@ -82,7 +83,7 @@ fi
 # Determine the system default printer via lpstat -d.
 # The LANG override ensures English output for the string match.
 # Format: "system default destination: <printer_name>"
-lpstat_out=$(env LANG="en_US.UTF-8" lpstat -d 2>/dev/null)
+lpstat_out=$(env LANG="en_US.UTF-8" lpstat -d 2> /dev/null)
 default_printer=""
 
 if [[ "$lpstat_out" == *"system default destination:"* ]]; then
@@ -117,61 +118,61 @@ print_file() {
   to_print="$file"
 
   case "$ext" in
-  # Reliable via CUPS (through cups-filters).
-  pdf | ps)
-    ;;
+    # Reliable via CUPS (through cups-filters).
+    pdf | ps)
+      ;;
 
-  # Usually fine via filters (images, text).
-  jpg | jpeg | png | gif | bmp | tiff | tif | \
-    txt | text | log | md | rst | csv | tsv | \
-    html | htm | xhtml | \
-    eps)
-    ;;
+    # Usually fine via filters (images, text).
+    jpg | jpeg | png | gif | bmp | tiff | tif | \
+      txt | text | log | md | rst | csv | tsv | \
+      html | htm | xhtml | \
+      eps)
+      ;;
 
-  # Better to convert via LibreOffice for consistency.
-  odt | ott | sxw | \
-    doc | docx | dot | dotx | rtf | \
-    ods | ots | sxc | \
-    xls | xlsx | xlsm | xlt | xltx | \
-    odp | otp | sxi | \
-    ppt | pptx | pptm | pot | potx | \
-    odg | otg)
-    if $have_libreoffice; then
-      # Set the converted PDF output path.
-      out="$WORK_DIR/${base%.*}.pdf"
+    # Better to convert via LibreOffice for consistency.
+    odt | ott | sxw | \
+      doc | docx | dot | dotx | rtf | \
+      ods | ots | sxc | \
+      xls | xlsx | xlsm | xlt | xltx | \
+      odp | otp | sxi | \
+      ppt | pptx | pptm | pot | potx | \
+      odg | otg)
+      if $have_libreoffice; then
+        # Set the converted PDF output path.
+        out="$WORK_DIR/${base%.*}.pdf"
 
-      # Convert.
-      libreoffice --headless --convert-to pdf \
-        --outdir "$WORK_DIR" "$file" &>/dev/null || return 1
+        # Convert.
+        libreoffice --headless --convert-to pdf \
+          --outdir "$WORK_DIR" "$file" &> /dev/null || return 1
 
-      # Print the converted PDF instead of the source file.
-      to_print="$out"
-    fi
-    ;;
+        # Print the converted PDF instead of the source file.
+        to_print="$out"
+      fi
+      ;;
 
-  # SVG needs explicit conversion.
-  svg)
-    if $have_inkscape; then
-      # Set the converted PDF output path.
-      out="$WORK_DIR/${base%.*}.pdf"
+    # SVG needs explicit conversion.
+    svg)
+      if $have_inkscape; then
+        # Set the converted PDF output path.
+        out="$WORK_DIR/${base%.*}.pdf"
 
-      # Convert.
-      inkscape --export-type=pdf \
-        --export-filename="$out" "$file" \
-        &>/dev/null || return 1
+        # Convert.
+        inkscape --export-type=pdf \
+          --export-filename="$out" "$file" \
+          &> /dev/null || return 1
 
-      # Print the converted PDF instead of the source file.
-      to_print="$out"
-    fi
-    ;;
+        # Print the converted PDF instead of the source file.
+        to_print="$out"
+      fi
+      ;;
 
-  # Everything else: let CUPS try
-  *)
-    ;;
+    # Everything else: let CUPS try
+    *)
+      ;;
   esac
 
   # Send the file to the default printer.
-  if ! lp -d "$default_printer" "$to_print" &>/dev/null; then
+  if ! lp -d "$default_printer" "$to_print" &> /dev/null; then
     log Error "failed to print $to_print"
     return 1
   fi

@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Check whether a battery is present and active in /sys/class/power_supply.
@@ -33,17 +34,17 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -h|--help)
-    usage
-    exit 0
-    ;;
-  -v|--verbose)
-    VERBOSE=true
-    shift
-    ;;
-  *)
-    break
-    ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -53,8 +54,8 @@ done
 # (excluding AC adapters and wireless chargers that also appear here).
 for bat in /sys/class/power_supply/BAT*; do
   if [[ -r $bat/present ]]; then
-    if [[ $(<"$bat"/present) == "1" ]]; then
-      if [[ $(<"$bat"/type) == "Battery" ]]; then
+    if [[ $(< "$bat"/present) == "1" ]]; then
+      if [[ $(< "$bat"/type) == "Battery" ]]; then
         exit 0
       fi
     fi

@@ -8,11 +8,11 @@ BRAVE_COLORS="$BRAVE_FOLDER/color.json"
 
 BROWSER_FILES=("$CHROME_COLORS")
 
-if command -v brave >/dev/null; then
+if command -v brave > /dev/null; then
   BROWSER_FILES+=("$BRAVE_COLORS")
 fi
 
-INPUT="$(<"$XDG_CONFIG_HOME/vibranium/current/theme/chromium.theme")"
+INPUT="$(< "$XDG_CONFIG_HOME/vibranium/current/theme/chromium.theme")"
 INPUT="${INPUT// /}"
 
 # HEX
@@ -21,15 +21,14 @@ if [[ "$INPUT" =~ ^#?[0-9a-fA-F]{6}$ ]]; then
   THEME_COLOR="#$hex"
 else
   # RGB
-  # shellcheck disable=SC2183
   IFS=',' read -r r g b <<< "$INPUT"
   printf -v THEME_COLOR '#%02x%02x%02x' "$r" "$g" "$b"
 fi
 
 for file in "${BROWSER_FILES[@]}"; do
-  printf '{ "BrowserThemeColor": "%s" }\n' "$THEME_COLOR" >"$file"
+  printf '{ "BrowserThemeColor": "%s" }\n' "$THEME_COLOR" > "$file"
 done
 
 # Refresh policies
-chromium --refresh-platform-policy --no-startup-window &>/dev/null
-command -v brave >/dev/null && brave --refresh-platform-policy --no-startup-window &>/dev/null
+chromium --refresh-platform-policy --no-startup-window &> /dev/null
+command -v brave > /dev/null && brave --refresh-platform-policy --no-startup-window &> /dev/null

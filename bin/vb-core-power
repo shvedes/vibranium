@@ -7,7 +7,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION | PROFILE]
 
 Set power profiles in Vibranium.
@@ -39,22 +39,22 @@ notify() {
   fi
 
   case "$profile" in
-  "performance")
-    icon="power-profile-performance-symbolic"
-    label="Performance"
-    ;;
-  "balanced")
-    icon="power-profile-balanced-symbolic"
-    label="Balanced"
-    ;;
-  "power-saver")
-    icon="power-profile-power-saver-symbolic"
-    label="Powersave"
-    ;;
-  *)
-    icon="battery-symbolic"
-    label="$profile"
-    ;;
+    "performance")
+      icon="power-profile-performance-symbolic"
+      label="Performance"
+      ;;
+    "balanced")
+      icon="power-profile-balanced-symbolic"
+      label="Balanced"
+      ;;
+    "power-saver")
+      icon="power-profile-power-saver-symbolic"
+      label="Powersave"
+      ;;
+    *)
+      icon="battery-symbolic"
+      label="$profile"
+      ;;
   esac
 
   source vb-lib-core
@@ -83,7 +83,7 @@ notify() {
 get_power_profile() {
   local state="$VIBRANIUM_STATE/power-profile"
   if [[ -f "$state" ]]; then
-    IFS=: read -r _ profile <"$state"
+    IFS=: read -r _ profile < "$state"
     printf '%s\n' "$profile"
     return
   fi
@@ -106,7 +106,7 @@ _write_state() {
   {
     printf 'current:%s\n\n' "$current"
     printf '%s\n' "${PROFILES[@]}"
-  } >"$VIBRANIUM_STATE/power-profile"
+  } > "$VIBRANIUM_STATE/power-profile"
   log Info "State saved: current=$current profiles=${PROFILES[*]}"
 }
 
@@ -117,7 +117,7 @@ _load_state() {
   log Info "Loading state from: $state (force=$FORCE)"
 
   if [[ -f "$state" ]] && [[ $FORCE == false ]]; then
-    mapfile -t _lines <"$state"
+    mapfile -t _lines < "$state"
     CURRENT="${_lines[0]#current:}"
     PROFILES=("${_lines[@]:2}")
 
@@ -161,7 +161,8 @@ _load_state() {
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -176,57 +177,57 @@ log Info "$SELF started"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -q | --quiet)
-    QUIET=true
-    shift
-    ;;
-  --next | --prev)
-    ACTION="${1/--/}"
-    log Info "Action: $ACTION"
-    shift
-    ;;
-  -f | --force)
-    FORCE=true
-    shift
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --get)
-    get_power_profile
-    exit 0
-    ;;
-  --list)
-    _load_state
-    printf "%s\n" \
-      "${PROFILES[@]}"
-    exit 0
-    ;;
-  "")
-    ACTION="next"
-    shift
-    ;;
-  -*)
-    log Error "Unknown option: $*"
-    log Error "Try '$SELF --help' for more information"
-    exit 1
-    ;;
-  *)
-    TARGET_PROFILE="$1"
-    log Info "Target profile: $TARGET_PROFILE"
-    shift
-    ;;
+    -q | --quiet)
+      QUIET=true
+      shift
+      ;;
+    --next | --prev)
+      ACTION="${1/--/}"
+      log Info "Action: $ACTION"
+      shift
+      ;;
+    -f | --force)
+      FORCE=true
+      shift
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --get)
+      get_power_profile
+      exit 0
+      ;;
+    --list)
+      _load_state
+      printf "%s\n" \
+        "${PROFILES[@]}"
+      exit 0
+      ;;
+    "")
+      ACTION="next"
+      shift
+      ;;
+    -*)
+      log Error "Unknown option: $*"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
+    *)
+      TARGET_PROFILE="$1"
+      log Info "Target profile: $TARGET_PROFILE"
+      shift
+      ;;
   esac
 done
 
 log Info "Args parsed: action=$ACTION quiet=$QUIET force=$FORCE target=$TARGET_PROFILE"
 
-if ! command -v powerprofilesctl >/dev/null; then
+if ! command -v powerprofilesctl > /dev/null; then
   log Error "missing required dependencies: power-profiles-daemon"
   vb-cmd-dep-notify --name "Power Management" --deps "power-profiles-daemon"
   exit 1
@@ -269,14 +270,14 @@ if [[ ! " ${PROFILES[*]} " == *" $TARGET_PROFILE "* ]]; then
   # The "+ ${#PROFILES[@]}" in the "prev" branch ensures the result
   # stays non-negative before the modulo.
   case "$ACTION" in
-  "next")
-    next_index=$(((current_index + 1) % ${#PROFILES[@]}))
-    log Info "Next profile: current_index=$current_index next_index=$next_index"
-    ;;
-  "prev")
-    next_index=$(((current_index - 1 + ${#PROFILES[@]}) % ${#PROFILES[@]}))
-    log Info "Previous profile: current_index=$current_index next_index=$next_index"
-    ;;
+    "next")
+      next_index=$(((current_index + 1) % ${#PROFILES[@]}))
+      log Info "Next profile: current_index=$current_index next_index=$next_index"
+      ;;
+    "prev")
+      next_index=$(((current_index - 1 + ${#PROFILES[@]}) % ${#PROFILES[@]}))
+      log Info "Previous profile: current_index=$current_index next_index=$next_index"
+      ;;
   esac
 
   TARGET_PROFILE="${PROFILES[$next_index]}"

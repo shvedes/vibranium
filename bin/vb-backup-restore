@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ -t 0 ]]; then
     if $VERBOSE || [[ "$level" == "Error" ]]; then
       echo "[${0##*/}] $level: $*" >&2
@@ -22,7 +23,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} COMMAND [OPTION]...
 
 Manage your backups Vibranium created during installation.
@@ -52,18 +53,18 @@ _list_aligned() {
     kinds+=("$kind")
 
     # Track widest value per column for printf padding.
-    (( ${#date} > max_date )) && max_date=${#date}
-    (( ${#orig} > max_orig )) && max_orig=${#orig}
-    (( ${#bk}    > max_bk  )) && max_bk=${#bk}
+    ((${#date} > max_date)) && max_date=${#date}
+    ((${#orig} > max_orig)) && max_orig=${#orig}
+    ((${#bk} > max_bk)) && max_bk=${#bk}
   done < <(helpers::backup_list)
 
   # Second pass: print each row with fixed-width columns.
   local i
-  for ((i=0; i<${#dates[@]}; i++)); do
+  for ((i = 0; i < ${#dates[@]}; i++)); do
     printf "%-*s  %-*s  %-*s  %s\n" \
       "$max_date" "${dates[i]}" \
       "$max_orig" "${origs[i]}" \
-      "$max_bk"   "${bks[i]}"  \
+      "$max_bk" "${bks[i]}" \
       "${kinds[i]}"
   done
 }
@@ -74,45 +75,45 @@ source "$VIBRANIUM/install/helpers/05-backup.sh"
 # format with [INFO]/[ERROR] headers).  When run interactively, override
 # those functions to use the conventional [basename] format instead.
 if [[ -t 0 ]]; then
-  helpers::log::info()    { echo "[${0##*/}] Info: $*"; }
-  helpers::log::warn()    { echo "[${0##*/}] Warn: $*"; }
+  helpers::log::info() { echo "[${0##*/}] Info: $*"; }
+  helpers::log::warn() { echo "[${0##*/}] Warn: $*"; }
   helpers::log::success() { echo "[${0##*/}] Success: $*"; }
-  helpers::log::error()   { echo "[${0##*/}] Error: $*" >&2; }
+  helpers::log::error() { echo "[${0##*/}] Error: $*" >&2; }
 else
   source "$VIBRANIUM/install/helpers/00-logs.sh"
 fi
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  --list | -l)
-    if [[ -t 1 ]]; then
-      _list_aligned
-    else
-      helpers::backup_list
-    fi
-    shift
-    ;;
-  --restore | -r)
-    if [[ -z "${2:-}" ]]; then
-      log Error "missing path to restore"
+    --list | -l)
+      if [[ -t 1 ]]; then
+        _list_aligned
+      else
+        helpers::backup_list
+      fi
+      shift
+      ;;
+    --restore | -r)
+      if [[ -z "${2:-}" ]]; then
+        log Error "missing path to restore"
+        log Error "Try '${0##*/} --help' for more information."
+        exit 1
+      fi
+      helpers::backup_restore "$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    *)
+      log Error "invalid command '$1'"
       log Error "Try '${0##*/} --help' for more information."
       exit 1
-    fi
-    helpers::backup_restore "$2"
-    shift 2
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  *)
-    log Error "invalid command '$1'"
-    log Error "Try '${0##*/} --help' for more information."
-    exit 1
-    ;;
+      ;;
   esac
 done

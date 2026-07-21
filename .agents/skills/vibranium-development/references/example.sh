@@ -4,7 +4,8 @@ VERBOSE=false
 SELF="${0##*/}"
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -17,7 +18,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTIONS]
 
 Do thing A
@@ -33,32 +34,32 @@ EOF
 
 while (($# > 0)); do
   case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --thing1)
-    # Something
-    shift
-    ;;
-  --thing2)
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --thing1)
+      # Something
+      shift
+      ;;
+    --thing2)
       # --thing2 accepts an argument
       # Something
-    shift 2
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -q | --quiet)
-    QUIET=true
-    shift
-    ;;
-  *)
-    log Error "Unknown option: $*" >&2 # < Redirection
-    log Error "Try '$SELF --help' for more information" >&2 # < Redirection
-    exit 1
-    ;;
+      shift 2
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -q | --quiet)
+      QUIET=true
+      shift
+      ;;
+    *)
+      log Error "Unknown option: $*" >&2                      # < Redirection
+      log Error "Try '$SELF --help' for more information" >&2 # < Redirection
+      exit 1
+      ;;
   esac
 done
 

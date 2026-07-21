@@ -7,7 +7,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTIONS] <VENDOR>
 
 Check for GPU presence and capabilities.
@@ -32,19 +32,19 @@ TARGET_VENDOR=""
 
 while (($# > 0)); do
   case "$1" in
-    -h|--help)
+    -h | --help)
       usage
       exit 0
       ;;
-    -v|--verbose)
+    -v | --verbose)
       VERBOSE=1
       shift
       ;;
-    -g|--gsr)
+    -g | --gsr)
       GSR_MODE=1
       shift
       ;;
-    -*|--*)
+    --* | -*)
       usage
       exit 1
       ;;
@@ -84,8 +84,8 @@ esac
 
 # GSR (GSP/GSR) capability is an NVIDIA-specific feature related to
 # firmware-controlled GPU scheduling. The flag is meaningless for AMD/Intel.
-if (( GSR_MODE )) && [[ "$TARGET_VENDOR" != "nvidia" ]]; then
-  if (( VERBOSE )); then
+if ((GSR_MODE)) && [[ "$TARGET_VENDOR" != "nvidia" ]]; then
+  if ((VERBOSE)); then
     printf "Error: The --gsr flag is designed for NVIDIA checks only and will not work with %s.\n" "${TARGET_VENDOR^^}" >&2
   fi
   exit 1
@@ -94,7 +94,7 @@ fi
 gpu_found=0
 matches=()
 
-if (( VERBOSE || GSR_MODE )); then
+if ((VERBOSE || GSR_MODE)); then
   # Use lspci -nn which annotates each device line with its vendor:device
   # PCI ID in square brackets, e.g. "[10de:2786]". Grep for the vendor
   # prefix to find all matching GPUs. The mapfile captures every line so
@@ -102,8 +102,8 @@ if (( VERBOSE || GSR_MODE )); then
   hex_id="${EXPECTED_ID#0x}"
   mapfile -t matches < <(lspci -nn | grep -E "\[${hex_id}:" || true)
 
-  if (( ${#matches[@]} > 0 )); then
-    if (( GSR_MODE )); then
+  if ((${#matches[@]} > 0)); then
+    if ((GSR_MODE)); then
       # GSR-capable models follow NVIDIA's naming conventions for recent
       # generations. The regex matches Turing/Ampere/Ada/Hopper/Blackwell
       # architectures. Entry-level GTX 16xx is excluded (no GSR).
@@ -135,8 +135,8 @@ else
   done
 fi
 
-if (( gpu_found )); then
-  if (( VERBOSE && ${#matches[@]} > 0 )); then
+if ((gpu_found)); then
+  if ((VERBOSE && ${#matches[@]} > 0)); then
     printf '%s\n' "${matches[@]}"
   fi
   exit 0

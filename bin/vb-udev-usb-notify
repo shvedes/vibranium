@@ -4,7 +4,8 @@ VERBOSE=false
 SCRIPT_NAME="${0##*/}"
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[$SCRIPT_NAME] $level: $*" >&2
   fi
@@ -17,7 +18,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SCRIPT_NAME [OPTION]... --add|--remove
 
 Send desktop notification on USB storage connect/disconnect.
@@ -38,58 +39,58 @@ ID_MODEL="USB device"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -a | --add)
-    ACTION="add"
-    shift
-    ;;
-  -r | --remove)
-    ACTION="remove"
-    shift
-    ;;
-  -d | --devname)
-    DEVNAME="$2"
-    shift 2
-    ;;
-  --devname=*)
-    DEVNAME="${1#*=}"
-    shift
-    ;;
-  -d?*)
-    DEVNAME="${1#-d}"
-    shift
-    ;;
-  -m | --id-model)
-    ID_MODEL="$2"
-    shift 2
-    ;;
-  --id-model=*)
-    ID_MODEL="${1#*=}"
-    shift
-    ;;
-  -m?*)
-    ID_MODEL="${1#-m}"
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --)
-    shift
-    break
-    ;;
-  -*)
-    log Error "Unknown option: $1"
-    log Error "Try '$SCRIPT_NAME --help' for more information"
-    exit 1
-    ;;
-  *)
-    break
-    ;;
+    -a | --add)
+      ACTION="add"
+      shift
+      ;;
+    -r | --remove)
+      ACTION="remove"
+      shift
+      ;;
+    -d | --devname)
+      DEVNAME="$2"
+      shift 2
+      ;;
+    --devname=*)
+      DEVNAME="${1#*=}"
+      shift
+      ;;
+    -d?*)
+      DEVNAME="${1#-d}"
+      shift
+      ;;
+    -m | --id-model)
+      ID_MODEL="$2"
+      shift 2
+      ;;
+    --id-model=*)
+      ID_MODEL="${1#*=}"
+      shift
+      ;;
+    -m?*)
+      ID_MODEL="${1#-m}"
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      log Error "Unknown option: $1"
+      log Error "Try '$SCRIPT_NAME --help' for more information"
+      exit 1
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 

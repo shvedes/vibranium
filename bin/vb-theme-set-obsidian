@@ -23,7 +23,7 @@ for vault in "${VAULTS[@]}"; do
     mkdir -p "$THEME_DIR"
   fi
 
-  [[ -f $THEME_DIR/manifest.json ]] || shcat >"$THEME_DIR/manifest.json" <<'EOF'
+  [[ -f $THEME_DIR/manifest.json ]] || shcat > "$THEME_DIR/manifest.json" << 'EOF'
 {
   "name": "Vibranium",
   "version": "1.0.0",

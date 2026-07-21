@@ -11,13 +11,13 @@ fi
 
 current="$(vb-core-power --get)"
 case "$current" in
-"power-saver")
+  "power-saver")
     icon='\uf06c'
     ;;
-"balanced")
+  "balanced")
     icon=''
     ;;
-"performance")
+  "performance")
     icon='\uf0e7'
     ;;
 esac

@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Run health checks on Vibranium installation.
@@ -29,19 +30,19 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "unknown option: $1"
-    usage
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "unknown option: $1"
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -50,10 +51,10 @@ log Info "Running health checks"
 # vb-cmd-edit-wm-config is a compiled binary (not a shell script). If it's
 # missing, the build step in 15-build-utilities.sh must be re-run to compile
 # it from its rust source.
-if ! command -v vb-cmd-edit-wm-config >/dev/null; then
+if ! command -v vb-cmd-edit-wm-config > /dev/null; then
   log Info "Repairing vb-cmd-edit-wm-config"
   log Info "This might take some time"
-  bash "$VIBRANIUM/install/post-install/15-build-utilities.sh" 2>/dev/null
+  bash "$VIBRANIUM/install/post-install/15-build-utilities.sh" 2> /dev/null
   log Info "Repaired vb-cmd-edit-wm-config"
 fi
 

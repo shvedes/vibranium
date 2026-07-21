@@ -12,14 +12,15 @@ shcat() {
 }
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION] [FONT]
 
 Set the system-wide default font across GTK, Alacritty, Waybar, Rofi, Dunst,
@@ -38,15 +39,15 @@ EOF
 }
 
 case "$1" in
--h | --help)
-  usage
-  exit 0
-  ;;
--*)
-  log Error "Unknown option - $*"
-  usage >&2
-  exit 1
-  ;;
+  -h | --help)
+    usage
+    exit 0
+    ;;
+  -*)
+    log Error "Unknown option - $*"
+    usage >&2
+    exit 1
+    ;;
 esac
 
 # Collect monospace fonts with family and style stored as separate fields
@@ -121,7 +122,7 @@ fi
 
 if [[ "$selected_display" == "$_import_entry" ]]; then
   font_raw=$(zenity --file-selection --multiple \
-    --title="Select font files" --file-filter="*.ttf *.otf *.ttc" 2>/dev/null)
+    --title="Select font files" --file-filter="*.ttf *.otf *.ttc" 2> /dev/null)
 
   if [[ -z "$font_raw" ]]; then
     exit 1
@@ -150,8 +151,8 @@ if [[ "$selected_display" == "$_import_entry" ]]; then
 fi
 
 _raw="${_font_map[$selected_display]}"
-font_family="${_raw%%|*}"   # e.g. "JetBrains Mono"
-font_style="${_raw##*|}"    # e.g. "Bold Italic"
+font_family="${_raw%%|*}" # e.g. "JetBrains Mono"
+font_style="${_raw##*|}"  # e.g. "Bold Italic"
 
 # selected_font is the "Family Style" display name kept for the vb-font-get
 # comparison and desktop notifications.
@@ -257,7 +258,7 @@ _pango_name() {
 _gtk_apply() {
   local file="$1"
   local cur_size
-  cur_size=$(grep -oP 'gtk-font-name[[:space:]]*=.*\s+\K[0-9]+(\.[0-9]+)?' "$file" 2>/dev/null)
+  cur_size=$(grep -oP 'gtk-font-name[[:space:]]*=.*\s+\K[0-9]+(\.[0-9]+)?' "$file" 2> /dev/null)
   cur_size="${cur_size:-12}"
   local name
   name="$(_pango_name) ${cur_size}"
@@ -274,7 +275,7 @@ _gtk_apply "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
 # restart.  Size is re-read from the file we just updated.
 _gtk3_size=$(
   grep -oP 'gtk-font-name[[:space:]]*=.*\s+\K[0-9]+(\.[0-9]+)?' \
-    "$XDG_CONFIG_HOME/gtk-3.0/settings.ini" 2>/dev/null || printf '12'
+    "$XDG_CONFIG_HOME/gtk-3.0/settings.ini" 2> /dev/null || printf '12'
 )
 
 gsettings set org.gnome.desktop.interface font-name "$(_pango_name) ${_gtk3_size:-10}"
@@ -289,9 +290,9 @@ gsettings set org.gnome.desktop.interface font-name "$(_pango_name) ${_gtk3_size
 # synthesis for fonts that ship without separate bold/italic files.
 _alacritty="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
 _toml_set_key "$_alacritty" "font.normal" "family" "$font_family"
-_toml_set_key "$_alacritty" "font.normal" "style"  "$font_style"
+_toml_set_key "$_alacritty" "font.normal" "style" "$font_style"
 for _sec in font.bold font.italic font.bold_italic; do
-  grep -qxF "[$_sec]" "$_alacritty" 2>/dev/null || continue
+  grep -qxF "[$_sec]" "$_alacritty" 2> /dev/null || continue
   _toml_set_key "$_alacritty" "$_sec" "family" "$font_family"
 done
 
@@ -303,7 +304,7 @@ sed_or_append "$XDG_CONFIG_HOME/waybar/style.css" \
   "  font-family: 'Symbols Nerd Font Mono', '${font_family}';"
 
 for _qt in "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf" \
-           "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"; do
+  "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"; do
   [[ -f "$_qt" ]] || continue
   sed_or_append "$_qt" \
     '^(fixed|general)=' \
@@ -314,7 +315,7 @@ done
 _dunst_apply() {
   local file="$1"
   local cur_size
-  cur_size=$(grep -oP '^font[[:space:]]*=.*\s+\K[0-9]+' "$file" 2>/dev/null)
+  cur_size=$(grep -oP '^font[[:space:]]*=.*\s+\K[0-9]+' "$file" 2> /dev/null)
   cur_size="${cur_size:-12}"
   local name
   name="$(_pango_name)"
@@ -328,7 +329,7 @@ _dunst_apply "$XDG_CONFIG_HOME/dunst/dunstrc"
 _rofi_apply() {
   local file="$1"
   local cur_size
-  cur_size=$(grep -oP 'font:[[:space:]]*"[^"]*\s\K[0-9]+(?=")' "$file" 2>/dev/null | head -1)
+  cur_size=$(grep -oP 'font:[[:space:]]*"[^"]*\s\K[0-9]+(?=")' "$file" 2> /dev/null | head -1)
   cur_size="${cur_size:-12}"
   sed_or_append "$file" \
     'font:[[:space:]]*"' \

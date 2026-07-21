@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -21,7 +22,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION] <image>
 
 Set wallpapers in Vibranium.
@@ -53,7 +54,7 @@ write_wallpaper_state() {
   if [[ -f "$WALLPAPER_STATE" ]]; then
     while IFS= read -r line || [[ -n "$line" ]]; do
       lines+=("$line")
-    done <"$WALLPAPER_STATE"
+    done < "$WALLPAPER_STATE"
   fi
 
   # Write all entries back, replacing the one for this theme in place.
@@ -72,10 +73,10 @@ write_wallpaper_state() {
     done
 
     # Theme not yet in the file - append as a new entry.
-    if (( found == 0 )); then
+    if ((found == 0)); then
       printf '%s="%s"\n' "$theme" "$path"
     fi
-  } >"$WALLPAPER_STATE"
+  } > "$WALLPAPER_STATE"
 }
 
 # Resolve the current wallpaper path. The symlink at
@@ -106,7 +107,7 @@ cycle_wallpaper() {
   local idx next prev found
   local candidate
 
-  mapfile -t files < <(find "$WALLS" -maxdepth 1 -xtype f 2>/dev/null | sort)
+  mapfile -t files < <(find "$WALLS" -maxdepth 1 -xtype f 2> /dev/null | sort)
   log Info "cycle_wallpaper: mode=$mode files=${#files[@]}"
 
   if ((${#files[@]} == 0)); then
@@ -134,22 +135,22 @@ cycle_wallpaper() {
   log Info "current index: $idx (found=$found)"
 
   case "$mode" in
-  --next)
-    if ((found)); then
-      next=$(((idx + 1) % ${#files[@]}))
-      candidate="${files[$next]}"
-    else
-      candidate="${files[0]}"
-    fi
-    ;;
-  --prev)
-    if ((found)); then
-      prev=$(((idx - 1 + ${#files[@]}) % ${#files[@]}))
-      candidate="${files[$prev]}"
-    else
-      candidate="${files[${#files[@]} - 1]}"
-    fi
-    ;;
+    --next)
+      if ((found)); then
+        next=$(((idx + 1) % ${#files[@]}))
+        candidate="${files[$next]}"
+      else
+        candidate="${files[0]}"
+      fi
+      ;;
+    --prev)
+      if ((found)); then
+        prev=$(((idx - 1 + ${#files[@]}) % ${#files[@]}))
+        candidate="${files[$prev]}"
+      else
+        candidate="${files[-1]}"
+      fi
+      ;;
   esac
 
   log Info "candidate: $candidate"
@@ -181,34 +182,34 @@ raw_path=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -g | --get)
-    action="get"
-    ;;
-  --next)
-    action="next"
-    ;;
-  --prev)
-    action="prev"
-    ;;
-  --)
-    shift
-    break
-    ;;
-  -*)
-    log Error "unknown option: $1"
-    log Error "Try ${0##*/} --help for more information."
-    exit 1
-    ;;
-  *)
-    raw_path="$1"
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -g | --get)
+      action="get"
+      ;;
+    --next)
+      action="next"
+      ;;
+    --prev)
+      action="prev"
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      log Error "unknown option: $1"
+      log Error "Try ${0##*/} --help for more information."
+      exit 1
+      ;;
+    *)
+      raw_path="$1"
+      ;;
   esac
   shift
 done
@@ -230,8 +231,9 @@ if [[ -n "$raw_path" ]]; then
   fi
 fi
 
-THEME="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+THEME="$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")"
 UWALLS="$XDG_CONFIG_HOME/vibranium/themes/$THEME/backgrounds"
+CURRENT=
 
 if [[ -z "$action" && -z "$_dispatch" ]]; then
   usage
@@ -257,32 +259,32 @@ if [[ "$action" == "next" || "$action" == "prev" ]]; then
   fi
 elif [[ -n "$_dispatch" ]]; then
   case "$_dispatch" in
-  *.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
-    if ! feature_enabled; then
-      exit 0
-    fi
+    *.png | *.jpg | *.jpeg | *.jpegxl | *.webp | *.pnm | *.tga | *.tiff | *.bmp | *.svg)
+      if ! feature_enabled; then
+        exit 0
+      fi
 
-    WALLPAPER_PATH="$(realpath "$raw_path")"
+      WALLPAPER_PATH="$(realpath "$raw_path")"
 
-    if [[ ! -f "$WALLPAPER_PATH" ]]; then
-      log Error "'$WALLPAPER_PATH' doesn't exist!"
+      if [[ ! -f "$WALLPAPER_PATH" ]]; then
+        log Error "'$WALLPAPER_PATH' doesn't exist!"
+        exit 1
+      fi
+
+      if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
+        log Info "Copying external wallpaper from $WALLPAPER_PATH to theme backgrounds"
+        mkdir -p "$UWALLS"
+        cp "$WALLPAPER_PATH" "$UWALLS/"
+        cp "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds/"
+        WALLPAPER_PATH="$UWALLS/${WALLPAPER_PATH##*/}"
+        log Info "Wallpaper copied, new path: $WALLPAPER_PATH"
+      fi
+      ;;
+    *)
+      log Error "unsupported file format: $_dispatch"
+      log Error "Try ${0##*/} --help for more information."
       exit 1
-    fi
-
-    if [[ ! -f "$WALLS/${WALLPAPER_PATH##*/}" ]]; then
-      log Info "Copying external wallpaper from $WALLPAPER_PATH to theme backgrounds"
-      mkdir -p "$UWALLS"
-      cp "$WALLPAPER_PATH" "$UWALLS/"
-      cp "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds/"
-      WALLPAPER_PATH="$UWALLS/${WALLPAPER_PATH##*/}"
-      log Info "Wallpaper copied, new path: $WALLPAPER_PATH"
-    fi
-    ;;
-  *)
-    log Error "unsupported file format: $_dispatch"
-    log Error "Try ${0##*/} --help for more information."
-    exit 1
-    ;;
+      ;;
   esac
 fi
 

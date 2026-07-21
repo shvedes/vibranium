@@ -7,7 +7,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]...
 
 Search and read installed manual pages using fzf.
@@ -21,7 +21,8 @@ EOF
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -29,28 +30,28 @@ log() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -*)
-    log Error "Invalid option: $1"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
-  *)
-    log Error "Unexpected argument: $1"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -*)
+      log Error "Invalid option: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
+    *)
+      log Error "Unexpected argument: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
 done
 
-if ! command -v fzf >/dev/null; then
+if ! command -v fzf > /dev/null; then
   log Error "fzf is not installed"
   exit 1
 fi
@@ -60,7 +61,7 @@ fi
 if [[ -z $EDITOR ]]; then
   log Info "EDITOR not set, detecting..."
   for ed in nvim vim neovide vi less; do
-    if command -v "$ed" >/dev/null 2>&1; then
+    if command -v "$ed" > /dev/null 2>&1; then
       EDITOR="$ed"
       break
     fi
@@ -93,15 +94,15 @@ FZF_ARGS+=(--color "${FZF_COLORS:-pointer:white,marker:green}")
 # directly as the pager.
 if [[ -z $MANPAGER ]]; then
   case "$EDITOR" in
-  *nvim | *vim)
-    export MANPAGER="$EDITOR +Man!"
-    ;;
-  *nano)
-    export MANPAGER="$EDITOR -v"
-    ;;
-  *)
-    export MANPAGER="$EDITOR"
-    ;;
+    *nvim | *vim)
+      export MANPAGER="$EDITOR +Man!"
+      ;;
+    *nano)
+      export MANPAGER="$EDITOR -v"
+      ;;
+    *)
+      export MANPAGER="$EDITOR"
+      ;;
   esac
 fi
 
@@ -111,7 +112,7 @@ fi
 # fzf's {1} extract matches the page name only.
 while true; do
   selected=$(
-    man -k . 2>/dev/null |
+    man -k . 2> /dev/null |
       sed 's/ - .*//; s/\([^ ]\)(/\1 (/' |
       fzf "${FZF_ARGS[@]}"
   )

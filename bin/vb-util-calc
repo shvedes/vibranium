@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -19,7 +20,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTIONS]
 
 Open / close rofi-based calculator.
@@ -32,28 +33,28 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
-exec 9>"$LOCKFILE"
+exec 9> "$LOCKFILE"
 
 # flock(1) with fd 9 implements a singleton toggle: the first invocation
 # acquires the lock and opens rofi-calc; a second invocation (while the
 # first still holds the lock) fails to acquire it and kills the existing
 # rofi calc session, effectively toggling it off.
 if ! flock -n 9; then
-  pkill -f "rofi.*-show calc" 2>/dev/null
+  pkill -f "rofi.*-show calc" 2> /dev/null
   exit 0
 fi
 
@@ -68,7 +69,7 @@ fi
 # Inline theme that reduces the calculator window to a single input
 # line (no listview, no history) with a placeholder hint.
 theme_str="$(
-  shcat <<EOF
+  shcat << EOF
 window {
     width: 30%;
 }

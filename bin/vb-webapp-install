@@ -8,7 +8,8 @@ SELF="${0##*/}"
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -36,7 +37,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]...
 
 Install a Progressive Web App shortcut as a .desktop launcher entry.
@@ -64,86 +65,86 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --url)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for --url"
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --url)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for --url"
+        exit 1
+      }
+      APP_URL="$2"
+      shift 2
+      ;;
+    --name)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for --name"
+        exit 1
+      }
+      APP_NAME="$2"
+      shift 2
+      ;;
+    --icon)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for --icon"
+        exit 1
+      }
+      ICON_REF="$2"
+      shift 2
+      ;;
+    --exec)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for --exec"
+        exit 1
+      }
+      CUSTOM_EXEC="$2"
+      shift 2
+      ;;
+    --mime-types)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for --mime-types"
+        exit 1
+      }
+      MIME_TYPES="$2"
+      shift 2
+      ;;
+    --keywords)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for --keywords"
+        exit 1
+      }
+      EXTRA_KEYWORDS="$2"
+      shift 2
+      ;;
+    --category)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for --category"
+        exit 1
+      }
+      CATEGORY="$2"
+      shift 2
+      ;;
+    --own-profile)
+      OWN_PROFILE=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    --* | -*)
+      log Error "Unknown option: $1"
       exit 1
-    }
-    APP_URL="$2"
-    shift 2
-    ;;
-  --name)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for --name"
+      ;;
+    *)
+      log Error "Unexpected argument: $1. Use flags to pass values"
       exit 1
-    }
-    APP_NAME="$2"
-    shift 2
-    ;;
-  --icon)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for --icon"
-      exit 1
-    }
-    ICON_REF="$2"
-    shift 2
-    ;;
-  --exec)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for --exec"
-      exit 1
-    }
-    CUSTOM_EXEC="$2"
-    shift 2
-    ;;
-  --mime-types)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for --mime-types"
-      exit 1
-    }
-    MIME_TYPES="$2"
-    shift 2
-    ;;
-  --keywords)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for --keywords"
-      exit 1
-    }
-    EXTRA_KEYWORDS="$2"
-    shift 2
-    ;;
-  --category)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for --category"
-      exit 1
-    }
-    CATEGORY="$2"
-    shift 2
-    ;;
-  --own-profile)
-    OWN_PROFILE=true
-    shift
-    ;;
-  --)
-    shift
-    break
-    ;;
-  --* | -*)
-    log Error "Unknown option: $1"
-    exit 1
-    ;;
-  *)
-    log Error "Unexpected argument: $1. Use flags to pass values"
-    exit 1
-    ;;
+      ;;
   esac
 done
 
@@ -184,7 +185,7 @@ _auto_keywords_from_url() {
   host="${host%%#*}"
   host="${host#www.}"
 
-  IFS='.' read -ra parts <<<"$host"
+  IFS='.' read -ra parts <<< "$host"
 
   local keywords=""
   local count="${#parts[@]}"
@@ -224,7 +225,7 @@ _auto_keywords_from_url() {
   last_segment="${last_segment//%2D/-}"
   last_segment="${last_segment//%5F/_}"
 
-  IFS=' -_./' read -ra words <<<"$last_segment"
+  IFS=' -_./' read -ra words <<< "$last_segment"
 
   local -A stop_words=(
     [the]=1 [a]=1 [an]=1 [and]=1 [or]=1 [of]=1 [in]=1 [on]=1 [for]=1
@@ -234,7 +235,7 @@ _auto_keywords_from_url() {
   )
 
   for word in "${words[@]}"; do
-    [[ -z "$word" ]] || (( ${#word} <= 2 )) && continue
+    [[ -z "$word" ]] || ((${#word} <= 2)) && continue
     local lower="${word,,}"
     [[ ${stop_words[$lower]} ]] && continue
     local capitalized="${word^}"
@@ -258,7 +259,7 @@ _fetch_page_title() {
   # serving real HTML. Using a Chrome UA string is the most widely accepted.
   local ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 
-  html="$(curl -sL --max-time 10 --max-redirs 3 -A "$ua" "$url" 2>/dev/null)" || return 1
+  html="$(curl -sL --max-time 10 --max-redirs 3 -A "$ua" "$url" 2> /dev/null)" || return 1
 
   sed -n '/<title/I{
     :a
@@ -284,7 +285,7 @@ _check_url_reachable() {
   fi
 
   for u in "${urls[@]}"; do
-    curl -sLI --max-time 10 --max-redirs 3 "$u" &>/dev/null && return 0
+    curl -sLI --max-time 10 --max-redirs 3 "$u" &> /dev/null && return 0
   done
 
   return 1
@@ -310,7 +311,7 @@ _find_webapp_by_url() {
         return 0
       fi
       [[ $line == '['*']' ]] && [[ $line != '[Desktop Entry]' ]] && break
-    done <"$f"
+    done < "$f"
   done
 
   return 1
@@ -331,13 +332,13 @@ _normalize_url() {
   fi
 
   # Try https first
-  if curl -sIL --max-time 5 "https://$url" >/dev/null 2>&1; then
+  if curl -sIL --max-time 5 "https://$url" > /dev/null 2>&1; then
     printf 'https://%s\n' "$url"
     return
   fi
 
   # Fallback to http
-  if curl -sIL --max-time 5 "http://$url" >/dev/null 2>&1; then
+  if curl -sIL --max-time 5 "http://$url" > /dev/null 2>&1; then
     printf 'http://%s\n' "$url"
     return
   fi
@@ -398,7 +399,7 @@ _resolve_icon() {
     local ext="${ref##*.}"
     [[ $ext =~ ^(png|jpg|jpeg|ico|svg)$ ]] || ext="png"
     local path="$ICON_DIR/$name.$ext"
-    if curl -fsSL -o "$path" "$ref" 2>/dev/null && [[ -s $path ]]; then
+    if curl -fsSL -o "$path" "$ref" 2> /dev/null && [[ -s $path ]]; then
       echo "$path"
     else
       echo "vb-pwa"
@@ -420,7 +421,7 @@ _write_desktop() {
   local name="$1" exec_cmd="$2" icon="$3" keywords="$4" mime="$5" category="$6"
   local file="$XDG_DATA_HOME/applications/$name.desktop"
 
-  cat >"$file" <<EOF
+  cat > "$file" << EOF
 [Desktop Entry]
 Version=1.0
 Name=${name#PWA - }
@@ -435,11 +436,11 @@ OnlyShowIn=Hyprland;
 EOF
 
   if [[ -n $mime ]]; then
-    printf 'MimeType=%s\n' "$mime" >>"$file"
+    printf 'MimeType=%s\n' "$mime" >> "$file"
   fi
 
   if [[ -n $keywords ]]; then
-    printf 'Keywords=%s\n' "$keywords" >>"$file"
+    printf 'Keywords=%s\n' "$keywords" >> "$file"
   fi
 }
 
@@ -488,9 +489,9 @@ if [[ -z $APP_URL ]]; then
     exit 1
   fi
 
-  _fetch_page_title "$APP_URL" >"$VIBRANIUM_RUNTIME/$SELF.tmp" &
+  _fetch_page_title "$APP_URL" > "$VIBRANIUM_RUNTIME/$SELF.tmp" &
   if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching page title"; then
-    PAGE_TITLE=$(<"$VIBRANIUM_RUNTIME/$SELF.tmp")
+    PAGE_TITLE=$(< "$VIBRANIUM_RUNTIME/$SELF.tmp")
   else
     PAGE_TITLE=""
   fi
@@ -512,9 +513,9 @@ if [[ -z $APP_URL ]]; then
   #   "Access Denied"      - generic WAF / CDN block
   #   "...Cloudflare"      - any title containing the Cloudflare brand name
   _title_is_challenge=false
-  if shopt -s nocasematch 2>/dev/null; then
-    [[ $PAGE_TITLE =~ ^(Just a moment|Please Wait|Attention Required|Access Denied)|Cloudflare ]] \
-      && _title_is_challenge=true
+  if shopt -s nocasematch 2> /dev/null; then
+    [[ $PAGE_TITLE =~ ^(Just a moment|Please Wait|Attention Required|Access Denied)|Cloudflare ]] &&
+      _title_is_challenge=true
     shopt -u nocasematch
   fi
 
@@ -579,7 +580,7 @@ if [[ -z $APP_URL ]]; then
 
   FAVICON_URL="https://www.google.com/s2/favicons?domain=${APP_URL}&sz=128"
   if term::ask_yes_no Y "Would you like to keep the web page's original icon?"; then
-    curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2>/dev/null &
+    curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2> /dev/null &
     if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading favicon of the URL" && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
       ICON_REF="$APP_NAME.png"
     else

@@ -10,7 +10,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]... [PACKAGE]...
 
 Install packages (official repos by default, AUR with --aur)
@@ -39,7 +39,8 @@ EOF
 }
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -47,7 +48,7 @@ log() {
 
 _ask_for_sudo() {
   log Info "_ask_for_sudo: checking sudo"
-  sudo -n true 2>/dev/null && return
+  sudo -n true 2> /dev/null && return
 
   term::enable_input
   sudo -v
@@ -80,7 +81,7 @@ _spinner() {
         "${GRAY}${spinner_frames[$i]}${RESET}" \
         "${YELLOW}${1}${RESET}" "${4}" "$2" "$3"
     fi
-    echo "$i" >"$5"
+    echo "$i" > "$5"
 
     i=$(((i + 1) % ${#spinner_frames[@]}))
     sleep 0.15
@@ -112,7 +113,7 @@ _handle_systemd() {
       unit_types+=("$unit_type")
       unit_scope+=("$scope")
       unit_names+=("${unit_path##*/}")
-    done < <(pacman -Ql "$pkg" 2>/dev/null | awk -f "$VIBRANIUM/awk/vb-pkg-parse-systemd.awk")
+    done < <(pacman -Ql "$pkg" 2> /dev/null | awk -f "$VIBRANIUM/awk/vb-pkg-parse-systemd.awk")
   done
 }
 
@@ -143,11 +144,11 @@ _enable_systemd_units() {
       unit_name="${unit_names[$i]}"
 
       if [[ "$scope" == "user" ]]; then
-        enabled=$(systemctl --user is-enabled "$unit_name" 2>/dev/null)
-        active=$(systemctl --user is-active "$unit_name" 2>/dev/null)
+        enabled=$(systemctl --user is-enabled "$unit_name" 2> /dev/null)
+        active=$(systemctl --user is-active "$unit_name" 2> /dev/null)
       else
-        enabled=$(systemctl is-enabled "$unit_name" 2>/dev/null)
-        active=$(systemctl is-active "$unit_name" 2>/dev/null)
+        enabled=$(systemctl is-enabled "$unit_name" 2> /dev/null)
+        active=$(systemctl is-active "$unit_name" 2> /dev/null)
       fi
 
       if [[ "$active" == "active" ]]; then
@@ -188,7 +189,7 @@ _refresh_repos() {
   else
     cmd="sudo pacman -Sy"
   fi
-  $cmd &>/dev/null &
+  $cmd &> /dev/null &
   local pid="$!"
   term::spinner "$pid" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"
 }
@@ -205,11 +206,11 @@ _ensure_if_exist() {
     printf "\r\033[K%s[VIBRANIUM]%s Verifying packages [%s/%s]" "$BLUE" "$RESET" "$index" "$total"
 
     if [[ "$AUR_MODE" == true ]]; then
-      if ! yay -Si "$pkg" &>/dev/null; then
+      if ! yay -Si "$pkg" &> /dev/null; then
         missing+=("$pkg")
       fi
     else
-      if ! pacman -Si "$pkg" &>/dev/null; then
+      if ! pacman -Si "$pkg" &> /dev/null; then
         missing+=("$pkg")
       fi
     fi
@@ -247,12 +248,12 @@ _operation_canceled() {
   local exit_after=false
 
   case "$1" in
-  --positive)
-    color="$GREEN"
-    ;;
-  --exit)
-    exit_after=true
-    ;;
+    --positive)
+      color="$GREEN"
+      ;;
+    --exit)
+      exit_after=true
+      ;;
   esac
 
   printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
@@ -294,7 +295,7 @@ _filter_packages() {
   fi
 
   for pkg in "${PACKAGES[@]}"; do
-    if ! pacman -Qq "$pkg" &>/dev/null; then
+    if ! pacman -Qq "$pkg" &> /dev/null; then
       FILTERED+=("$pkg")
     fi
   done
@@ -384,7 +385,7 @@ _embed_install() {
   local spinner_pid
   local frame_file
   frame_file=$(mktemp)
-  echo 0 >"$frame_file"
+  echo 0 > "$frame_file"
 
   if [[ "$AUR_MODE" == true ]]; then
     local yay_opts="--needed"
@@ -398,10 +399,10 @@ _embed_install() {
       _spinner "$pkg" "$current" "$total" "" "$frame_file" &
       spinner_pid=$!
 
-      yay --noconfirm $yay_opts -Sy "$pkg" &>/dev/null
+      yay --noconfirm $yay_opts -Sy "$pkg" &> /dev/null
 
-      kill "$spinner_pid" 2>/dev/null
-      wait "$spinner_pid" 2>/dev/null
+      kill "$spinner_pid" 2> /dev/null
+      wait "$spinner_pid" 2> /dev/null
     done
   else
     local pacman_opts="--needed"
@@ -415,10 +416,10 @@ _embed_install() {
       _spinner "$pkg" "$current" "$total" "" "$frame_file" &
       spinner_pid=$!
 
-      sudo pacman --noconfirm $pacman_opts -S "$pkg" &>/dev/null
+      sudo pacman --noconfirm $pacman_opts -S "$pkg" &> /dev/null
 
-      kill "$spinner_pid" 2>/dev/null
-      wait "$spinner_pid" 2>/dev/null
+      kill "$spinner_pid" 2> /dev/null
+      wait "$spinner_pid" 2> /dev/null
     done
   fi
 
@@ -440,21 +441,21 @@ _get_packages() {
     local aur_temp
     aur_temp=$(mktemp)
 
-    (yay -Slqa >"$aur_temp" 2>/dev/null) &
+    (yay -Slqa > "$aur_temp" 2> /dev/null) &
     term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching ${BLUE}AUR${RESET} packages" \
       "- ${GREEN}Done!${RESET}"
 
-    mapfile -t PACKAGES <"$aur_temp"
+    mapfile -t PACKAGES < "$aur_temp"
     rm -f "$aur_temp"
   else
     local arch_temp
     arch_temp=$(mktemp)
 
-    (pacman -Slq >"$arch_temp") &
+    (pacman -Slq > "$arch_temp") &
     term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching ${BLUE}official${RESET} packages" \
       "- ${GREEN}Done!${RESET}"
 
-    mapfile -t PACKAGES <"$arch_temp"
+    mapfile -t PACKAGES < "$arch_temp"
     rm -f "$arch_temp"
   fi
 }
@@ -485,7 +486,7 @@ _cleanup() {
 
   if [[ "$AUR_MODE" == true ]]; then
     echo -e "${BLUE}[VIBRANIUM]${RESET} Removing orphan packages"
-    yay -Ycc --noconfirm &>/dev/null
+    yay -Ycc --noconfirm &> /dev/null
 
     if [[ "$KEEP_CACHE" == false ]]; then
       local do_clean=false
@@ -498,21 +499,21 @@ _cleanup() {
           if ! [[ -d "$VIBRANIUM_STATE" ]]; then
             mkdir -p "$VIBRANIUM_STATE"
           fi
-          echo 'remove_cache=true' >"$state_file"
+          echo 'remove_cache=true' > "$state_file"
         fi
       fi
 
       if [[ "$do_clean" == true ]]; then
-        yay -Scc --noconfirm &>/dev/null &
+        yay -Scc --noconfirm &> /dev/null &
         term::spinner $! "${BLUE}[VIBRANIUM]${RESET} Removing package cache" "" ""
       fi
     fi
   else
     local orphans
-    orphans=$(pacman -Qdtq 2>/dev/null)
-    if [[ -n "$orphans" ]]; then
+    mapfile -t orphans < <(pacman -Qdtq 2> /dev/null)
+    if ((${#orphans[@]})); then
       echo -e "${BLUE}[VIBRANIUM]${RESET} Removing orphan packages"
-      sudo pacman -Rns --noconfirm $orphans &>/dev/null
+      sudo pacman -Rns --noconfirm "${orphans[@]}" &> /dev/null
     fi
 
     if [[ "$KEEP_CACHE" == false ]]; then
@@ -524,12 +525,12 @@ _cleanup() {
         do_clean=true
         if term::ask_yes_no Y "Remember this option?"; then
           mkdir -p "$VIBRANIUM_STATE"
-          echo 'remove_cache=true' >"$state_file"
+          echo 'remove_cache=true' > "$state_file"
         fi
       fi
 
       if [[ "$do_clean" == true ]]; then
-        sudo pacman -Scc --noconfirm &>/dev/null &
+        sudo pacman -Scc --noconfirm &> /dev/null &
         term::spinner $! "${BLUE}[VIBRANIUM]${RESET} Removing package cache" "" ""
       fi
     fi
@@ -569,74 +570,74 @@ trap 'trap "exit 1" SIGHUP SIGINT SIGTERM SIGQUIT; printf "\n"; _operation_cance
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  --help | -h)
-    usage
-    exit 0
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --embedded)
-    EMBEDDED=true
-    shift
-    ;;
-  --no-ask)
-    NO_ASK=true
-    shift
-    ;;
-  --no-logo)
-    NO_LOGO=true
-    shift
-    ;;
-  --no-dummy)
-    NO_DUMMY=true
-    shift
-    ;;
-  --no-verify)
-    NO_VERIFY=true
-    shift
-    ;;
-  --no-systemd)
-    NO_SYSTEMD=true
-    shift
-    ;;
-  --keep-cache)
-    KEEP_CACHE=true
-    shift
-    ;;
-  --conservative)
-    CONSERVATIVE=true
-    shift
-    ;;
-  --force-install)
-    FORCE_INSTALL=true
-    shift
-    ;;
-  --skip-overview)
-    SKIP_OVERVIEW=true
-    shift
-    ;;
-  --aur)
-    AUR_MODE=true
-    shift
-    ;;
-  --)
-    shift
-    if [[ $# -eq 0 ]]; then
+    --help | -h)
       usage
+      exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --embedded)
+      EMBEDDED=true
+      shift
+      ;;
+    --no-ask)
+      NO_ASK=true
+      shift
+      ;;
+    --no-logo)
+      NO_LOGO=true
+      shift
+      ;;
+    --no-dummy)
+      NO_DUMMY=true
+      shift
+      ;;
+    --no-verify)
+      NO_VERIFY=true
+      shift
+      ;;
+    --no-systemd)
+      NO_SYSTEMD=true
+      shift
+      ;;
+    --keep-cache)
+      KEEP_CACHE=true
+      shift
+      ;;
+    --conservative)
+      CONSERVATIVE=true
+      shift
+      ;;
+    --force-install)
+      FORCE_INSTALL=true
+      shift
+      ;;
+    --skip-overview)
+      SKIP_OVERVIEW=true
+      shift
+      ;;
+    --aur)
+      AUR_MODE=true
+      shift
+      ;;
+    --)
+      shift
+      if [[ $# -eq 0 ]]; then
+        usage
+        exit 1
+      fi
+      break
+      ;;
+    --* | -*)
+      log Error "Unknown option: $1"
       exit 1
-    fi
-    break
-    ;;
-  --* | -*)
-    log Error "Unknown option: $1"
-    exit 1
-    ;;
-  *)
-    log Error "Unexpected argument: $1. Use '--' to separate options from packages"
-    exit 1
-    ;;
+      ;;
+    *)
+      log Error "Unexpected argument: $1. Use '--' to separate options from packages"
+      exit 1
+      ;;
   esac
 done
 
@@ -751,7 +752,7 @@ if [[ $# -gt 0 ]]; then
   _filter_packages
   _show_overview
 else
-  if ! command -v fzf >/dev/null; then
+  if ! command -v fzf > /dev/null; then
     log::error "fzf not found!"
     exit 1
   fi

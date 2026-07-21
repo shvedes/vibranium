@@ -5,7 +5,8 @@ set -euo pipefail
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -72,7 +73,7 @@ shcat() {
 }
 
 usage() {
-  shcat >&2 <<EOF
+  shcat >&2 << EOF
 Usage: ${0##*/} [OPTION]... [CHANNEL]
 
 Update Vibranium to the latest version.
@@ -118,7 +119,7 @@ _nuke() {
     exit 0
   fi
 
-  git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &>/dev/null &
+  git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &> /dev/null &
   if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching latest from remote..." "${GREEN}✔${RESET}" "${RED}✘${RESET}"; then
     _fail "Failed to fetch updates."
   fi
@@ -140,7 +141,7 @@ _nuke() {
         remote_ref="origin/$channel"
         ;;
     esac
-    if ! git -C "$VIBRANIUM" rev-parse --verify "$remote_ref" &>/dev/null; then
+    if ! git -C "$VIBRANIUM" rev-parse --verify "$remote_ref" &> /dev/null; then
       _fail "Remote branch '$remote_ref' not found. Verify your channel name or check available remotes with 'git branch -r'."
     fi
     target="$remote_ref"
@@ -173,7 +174,7 @@ _update() {
     channel="$(_detect_channel)"
   fi
 
-  git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &>/dev/null &
+  git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &> /dev/null &
   if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting updates from remote" "" ""; then
     _fail "Failed to fetch updates. Check your network or repository permissions."
   fi
@@ -187,7 +188,7 @@ _update() {
     # so the comparison against HEAD (always a commit hash) is valid
     latest_commit=$(git -C "$VIBRANIUM" rev-parse "${latest_tag}^{}")
     current_commit=$(git -C "$VIBRANIUM" rev-parse HEAD)
-    current_tag=$(git -C "$VIBRANIUM" describe --tags --exact-match --always --abbrev=7 2>/dev/null)
+    current_tag=$(git -C "$VIBRANIUM" describe --tags --exact-match --always --abbrev=7 2> /dev/null)
 
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Local:  $current_tag ($current_commit)"
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Remote: $latest_tag ($latest_commit)"
@@ -226,7 +227,7 @@ _update() {
         ;;
     esac
 
-    if ! git -C "$VIBRANIUM" rev-parse --verify "$remote_ref" &>/dev/null; then
+    if ! git -C "$VIBRANIUM" rev-parse --verify "$remote_ref" &> /dev/null; then
       _fail "Remote branch '$remote_ref' not found. Verify your channel name or check available remotes with 'git branch -r'."
     fi
 
@@ -241,7 +242,7 @@ _update() {
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Local:  $current_short ($current_commit)"
     echo -e "${YELLOW}[VIBRANIUM]${RESET} Remote: $remote_short ($remote_commit)"
 
-    if (( behind == 0 )); then
+    if ((behind == 0)); then
       if [[ "$current_commit" == "$remote_commit" ]]; then
         echo -e "${GREEN}[VIBRANIUM]${RESET} You are up to date"
       else

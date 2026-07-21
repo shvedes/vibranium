@@ -8,7 +8,8 @@ SELF="${0##*/}"
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -37,7 +38,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]...
 
 Install a TUI application shortcut as a .desktop launcher entry.
@@ -60,87 +61,87 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --exec)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for $1"
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --exec)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for $1"
+        exit 1
+      }
+      TUI_EXEC="$2"
+      TUI_EXEC_RAW="$2"
+      shift 2
+      ;;
+    --args)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for $1"
+        exit 1
+      }
+      EXEC_ARGS="$2"
+      shift 2
+      ;;
+    --name)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for $1"
+        exit 1
+      }
+      APP_NAME="$2"
+      shift 2
+      ;;
+    --icon)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for $1"
+        exit 1
+      }
+      ICON_REF="$2"
+      shift 2
+      ;;
+    --custom-exec)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for $1"
+        exit 1
+      }
+      CUSTOM_EXEC="$2"
+      shift 2
+      ;;
+    --keywords)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for $1"
+        exit 1
+      }
+      EXTRA_KEYWORDS="$2"
+      shift 2
+      ;;
+    --category)
+      [[ $# -ge 2 ]] || {
+        log Error "Missing value for $1"
+        exit 1
+      }
+      CATEGORY="$2"
+      shift 2
+      ;;
+    --float)
+      FLOAT=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    --* | -*)
+      log Error "Unknown option: $1"
       exit 1
-    }
-    TUI_EXEC="$2"
-    TUI_EXEC_RAW="$2"
-    shift 2
-    ;;
-  --args)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for $1"
+      ;;
+    *)
+      log Error "Unexpected argument: $1. Use flags to pass values"
       exit 1
-    }
-    EXEC_ARGS="$2"
-    shift 2
-    ;;
-  --name)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for $1"
-      exit 1
-    }
-    APP_NAME="$2"
-    shift 2
-    ;;
-  --icon)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for $1"
-      exit 1
-    }
-    ICON_REF="$2"
-    shift 2
-    ;;
-  --custom-exec)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for $1"
-      exit 1
-    }
-    CUSTOM_EXEC="$2"
-    shift 2
-    ;;
-  --keywords)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for $1"
-      exit 1
-    }
-    EXTRA_KEYWORDS="$2"
-    shift 2
-    ;;
-  --category)
-    [[ $# -ge 2 ]] || {
-      log Error "Missing value for $1"
-      exit 1
-    }
-    CATEGORY="$2"
-    shift 2
-    ;;
-  --float)
-    FLOAT=true
-    shift
-    ;;
-  --)
-    shift
-    break
-    ;;
-  --* | -*)
-    log Error "Unknown option: $1"
-    exit 1
-    ;;
-  *)
-    log Error "Unexpected argument: $1. Use flags to pass values"
-    exit 1
-    ;;
+      ;;
   esac
 done
 
@@ -176,7 +177,7 @@ _name_from_exec() {
 # Returns 0 if found, 1 otherwise.
 # ---------------------------------------------------------------------------
 _check_exec_exists() {
-  command -v "$1" &>/dev/null
+  command -v "$1" &> /dev/null
 }
 
 # ---------------------------------------------------------------------------
@@ -197,23 +198,23 @@ _find_tuiapp_by_tryexec() {
     [[ -f $file ]] || continue
     while IFS= read -r line; do
       case "$line" in
-      TryExec=*)
-        value="${line#TryExec=}"
-        # Normalise the stored value as well, in case it contains a full path.
-        [[ "${value##*/}" == "$exec_cmd" ]] && {
-          echo "$file"
-          return 0
-        }
-        # TryExec appears at most once per [Desktop Entry]; stop reading.
-        break
-        ;;
-      # Any section header other than the opening [Desktop Entry] means we
-      # have left the main block; TryExec cannot appear below this point.
-      "["*)
-        [[ "$line" == "[Desktop Entry]" ]] || break
-        ;;
+        TryExec=*)
+          value="${line#TryExec=}"
+          # Normalise the stored value as well, in case it contains a full path.
+          [[ "${value##*/}" == "$exec_cmd" ]] && {
+            echo "$file"
+            return 0
+          }
+          # TryExec appears at most once per [Desktop Entry]; stop reading.
+          break
+          ;;
+        # Any section header other than the opening [Desktop Entry] means we
+        # have left the main block; TryExec cannot appear below this point.
+        "["*)
+          [[ "$line" == "[Desktop Entry]" ]] || break
+          ;;
       esac
-    done <"$file"
+    done < "$file"
   done
 
   return 1
@@ -243,7 +244,7 @@ _resolve_icon() {
     local ext="${ref##*.}"
     [[ $ext =~ ^(png|jpg|jpeg|ico|svg)$ ]] || ext="png"
     local path="$ICON_DIR/$name.$ext"
-    if curl -fsSL -o "$path" "$ref" 2>/dev/null && [[ -s $path ]]; then
+    if curl -fsSL -o "$path" "$ref" 2> /dev/null && [[ -s $path ]]; then
       echo "$path"
     else
       echo "vb-console"
@@ -279,7 +280,7 @@ _write_desktop() {
   local name="$1" exec_cmd="$2" icon="$3" keywords="$4" category="$5"
   local file="$XDG_DATA_HOME/applications/$name.desktop"
 
-  cat >"$file" <<EOF
+  cat > "$file" << EOF
 [Desktop Entry]
 Version=1.0
 Name=${name#TUI - }
@@ -332,7 +333,7 @@ if [[ -z $TUI_EXEC ]]; then
 
   # Check by exec identity, not by name, to catch the same binary registered
   # under a different display name.
-  if _find_tuiapp_by_tryexec "$TUI_EXEC" &>/dev/null; then
+  if _find_tuiapp_by_tryexec "$TUI_EXEC" &> /dev/null; then
     echo "${YELLOW}[VIBRANIUM]${RESET} A TUI app for ${BLUE}${TUI_EXEC##*/}${RESET} is already installed."
     if ! term::ask_yes_no Y "Overwrite it?"; then
       _operation_canceled
@@ -396,7 +397,7 @@ else
   fi
 
   # Same identity check as in interactive mode: match by TryExec, not by file name.
-  if _find_tuiapp_by_tryexec "$TUI_EXEC_RAW" &>/dev/null; then
+  if _find_tuiapp_by_tryexec "$TUI_EXEC_RAW" &> /dev/null; then
     exit 1
   fi
 

@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -19,7 +20,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]
 
 Toggle Hyprland smart gaps configuration.
@@ -32,17 +33,17 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
@@ -57,7 +58,7 @@ else
   # sets gaps_out/gaps_in to 0 on all non-float windows, and the window
   # rule suppresses decorations (title bars, borders) which would waste
   # space when gaps are removed.
-  shcat >"$FILE" <<EOF
+  shcat > "$FILE" << EOF
 hl.workspace_rule({
   workspace = "w[tv1] w[g0] s[false]", -- 1 tiled, no groups, not special
   gaps_out = 0,

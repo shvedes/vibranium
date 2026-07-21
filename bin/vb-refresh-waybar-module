@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -16,7 +17,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} MODULE_NAME
 
 Send a refresh signal to the Waybar module MODULE_NAME.
@@ -28,21 +29,21 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    break
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
   esac
 done
 
-waybar_pid=$(systemctl --user show waybar -p MainPID --value 2>/dev/null)
+waybar_pid=$(systemctl --user show waybar -p MainPID --value 2> /dev/null)
 
 declare -A signals
 
@@ -56,7 +57,7 @@ for file in "$XDG_CONFIG_HOME"/waybar/modules/custom-*.jsonc; do
     [[ $line =~ \"signal\":[[:space:]]*([0-9]+) ]] && sig="${BASH_REMATCH[1]}" || sig=""
 
     signals["$name"]="$sig"
-  done <"$file"
+  done < "$file"
 done
 
 module_name="${1/custom-/}"
@@ -65,9 +66,9 @@ module_signal="${signals[$module_name]}"
 _send_signal() {
   local sig=$1
   if ((waybar_pid > 0)); then
-    kill -RTMIN+"$sig" "$waybar_pid" 2>/dev/null
+    kill -RTMIN+"$sig" "$waybar_pid" 2> /dev/null
   else
-    pkill -RTMIN+"$sig" waybar 2>/dev/null
+    pkill -RTMIN+"$sig" waybar 2> /dev/null
   fi
 }
 
@@ -79,5 +80,10 @@ else
 fi
 
 # Always refresh separators
-[[ -n "${signals[dynamic-separator]}" ]] && _send_signal "${signals[dynamic-separator]}"
-[[ -n "${signals[mod-separator]}" ]] && _send_signal "${signals[mod-separator]}"
+if [[ -n "${signals["dynamic-separator"]}" ]]; then
+  _send_signal "${signals["dynamic-separator"]}"
+fi
+
+if [[ -n "${signals["mod-separator"]}" ]]; then
+  _send_signal "${signals["mod-separator"]}"
+fi

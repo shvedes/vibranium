@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -21,7 +22,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Fetch new updates from Arch Linux repositories and the AUR.
@@ -39,19 +40,19 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "unknown option: $*"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "unknown option: $*"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
 done
 
@@ -59,8 +60,8 @@ log Info "Fetching package updates"
 
 missing=()
 
-command -v checkupdates >/dev/null 2>&1 || missing+=("checkupdates")
-command -v yay >/dev/null 2>&1 || missing+=("yay")
+command -v checkupdates > /dev/null 2>&1 || missing+=("checkupdates")
+command -v yay > /dev/null 2>&1 || missing+=("yay")
 
 if ((${#missing[@]} > 0)); then
   notify-send -r 3 -t 120000 \
@@ -76,7 +77,7 @@ fi
 NETWORK_REACHABLE=false
 
 for _ in {1..30}; do
-  if ping -c 1 8.8.8.8 &>/dev/null; then
+  if ping -c 1 8.8.8.8 &> /dev/null; then
     NETWORK_REACHABLE=true
     break
   fi
@@ -88,11 +89,11 @@ if ! $NETWORK_REACHABLE; then
   exit 0
 fi
 
-: >"$CACHE_FILE"
-checkupdates --nocolor 2>/dev/null >>"$CACHE_FILE"
-yay -Qua --color=never 2>/dev/null >>"$CACHE_FILE"
+: > "$CACHE_FILE"
+checkupdates --nocolor 2> /dev/null >> "$CACHE_FILE"
+yay -Qua --color=never 2> /dev/null >> "$CACHE_FILE"
 
-mapfile -t LINES <"$CACHE_FILE"
+mapfile -t LINES < "$CACHE_FILE"
 TOTAL_COUNT=${#LINES[@]}
 
 # Only show the nag notification when the update count exceeds THRESHOLD
@@ -103,7 +104,7 @@ if ((TOTAL_COUNT >= THRESHOLD)); then
   TIMESTAMP_LAST=0
 
   if [[ -f "$TIMESTAMP_FILE" ]]; then
-    TIMESTAMP_LAST=$(<"$TIMESTAMP_FILE")
+    TIMESTAMP_LAST=$(< "$TIMESTAMP_FILE")
     # Validate that the stored value is a plausible Unix timestamp
     # (within a reasonable range for the current system).
     [[ $TIMESTAMP_LAST =~ ^[0-9]+$ ]] || TIMESTAMP_LAST=0
@@ -114,6 +115,6 @@ if ((TOTAL_COUNT >= THRESHOLD)); then
       "$TOTAL_COUNT Packages Are Awaiting Updates" \
       "On Arch it is recommended to update your system regularly"
 
-    printf "%s" "$TIMESTAMP_NOW" >"$TIMESTAMP_FILE"
+    printf "%s" "$TIMESTAMP_NOW" > "$TIMESTAMP_FILE"
   fi
 fi

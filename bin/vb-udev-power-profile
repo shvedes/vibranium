@@ -9,7 +9,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF --ac | --battery
 
 Set power profile based on power source.
@@ -26,22 +26,22 @@ MODE=""
 
 while (($# > 0)); do
   case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -a | --ac)
-    MODE="ac"
-    shift
-    ;;
-  -b | --battery)
-    MODE="battery"
-    shift
-    ;;
-  *)
-    echo "$SELF: unknown option: $1" >&2
-    exit 1
-    ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -a | --ac)
+      MODE="ac"
+      shift
+      ;;
+    -b | --battery)
+      MODE="battery"
+      shift
+      ;;
+    *)
+      echo "$SELF: unknown option: $1" >&2
+      exit 1
+      ;;
   esac
 done
 
@@ -55,30 +55,30 @@ source "$VIBRANIUM_USER_SETTINGS"
 LAST_FILE="$VIBRANIUM_STATE/power-profile-last"
 
 case "$MODE" in
-ac)
-  if [[ -f "$VIBRANIUM_STATE/power-profile" ]]; then
-    IFS=: read -r _ current <"$VIBRANIUM_STATE/power-profile"
-    printf '%s' "$current" >"$LAST_FILE"
-  fi
-  TARGET="${VIBRANIUM_GLOBAL_POWER_PROFILE_AC:-performance}"
-  ;;
-battery)
-  TARGET="${VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY:-last}"
-  if [[ "$TARGET" == "last" ]]; then
-    if [[ -f "$LAST_FILE" ]]; then
-      IFS= read -r target <"$LAST_FILE"
-    else
-      TARGET="balanced"
+  ac)
+    if [[ -f "$VIBRANIUM_STATE/power-profile" ]]; then
+      IFS=: read -r _ current < "$VIBRANIUM_STATE/power-profile"
+      printf '%s' "$current" > "$LAST_FILE"
     fi
-  fi
-  ;;
+    TARGET="${VIBRANIUM_GLOBAL_POWER_PROFILE_AC:-performance}"
+    ;;
+  battery)
+    TARGET="${VIBRANIUM_GLOBAL_POWER_PROFILE_BATTERY:-last}"
+    if [[ "$TARGET" == "last" ]]; then
+      if [[ -f "$LAST_FILE" ]]; then
+        IFS= read -r TARGET < "$LAST_FILE"
+      else
+        TARGET="balanced"
+      fi
+    fi
+    ;;
 esac
 
 available=()
 while IFS= read -r profile; do
   [[ -n "$profile" ]] || continue
   available+=("$profile")
-done < <(vb-core-power --list 2>/dev/null)
+done < <(vb-core-power --list 2> /dev/null)
 
 found=false
 for p in "${available[@]}"; do

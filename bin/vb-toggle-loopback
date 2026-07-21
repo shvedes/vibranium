@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -20,7 +21,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTIONS]
 
 Enable default microphone loopback (aka hear my voice)
@@ -99,22 +100,22 @@ find_sink_input_id() {
 # effects. The lib is sourced further below, only when an action needs it.
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --get-volume)
-    ACTION="get-volume"
-    shift
-    ;;
-  *)
-    printf '%s: unknown option: %s\n' "$SELF" "$1" >&2
-    exit 2
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --get-volume)
+      ACTION="get-volume"
+      shift
+      ;;
+    *)
+      printf '%s: unknown option: %s\n' "$SELF" "$1" >&2
+      exit 2
+      ;;
   esac
 done
 
@@ -130,62 +131,62 @@ VOL="${VIBRANIUM_VOLUME_SOURCE_LOOPBACK_VOLUME}%"
 log Info "Action: $ACTION"
 
 case "$ACTION" in
-get-volume)
-  get_loopback_volume
-  ;;
-apply)
-  # If the setting is not enabled, unload any existing loopback modules.
-  if [[ "$VIBRANIUM_VOLUME_SOURCE_LOOPBACK" != "true" ]]; then
+  get-volume)
+    get_loopback_volume
+    ;;
+  apply)
+    # If the setting is not enabled, unload any existing loopback modules.
+    if [[ "$VIBRANIUM_VOLUME_SOURCE_LOOPBACK" != "true" ]]; then
+      MODULE_IDS=$(find_module_ids || true)
+      if [[ -n "${MODULE_IDS}" ]]; then
+        # Unload every matching module id.
+        while IFS= read -r mid; do
+          [[ -z "$mid" ]] && continue
+          pactl unload-module "$mid" > /dev/null 2>&1 || true
+        done <<< "$MODULE_IDS"
+      fi
+      exit 0
+    fi
+
+    # If enabled: update volume for existing modules if present.
     MODULE_IDS=$(find_module_ids || true)
     if [[ -n "${MODULE_IDS}" ]]; then
-      # Unload every matching module id.
       while IFS= read -r mid; do
         [[ -z "$mid" ]] && continue
-        pactl unload-module "$mid" >/dev/null 2>&1 || true
-      done <<<"$MODULE_IDS"
-    fi
-    exit 0
-  fi
-
-  # If enabled: update volume for existing modules if present.
-  MODULE_IDS=$(find_module_ids || true)
-  if [[ -n "${MODULE_IDS}" ]]; then
-    while IFS= read -r mid; do
-      [[ -z "$mid" ]] && continue
-      SINK_INPUT_ID=$(find_sink_input_id "$mid")
-      if [[ -n "$SINK_INPUT_ID" ]]; then
-        pactl set-sink-input-volume "$SINK_INPUT_ID" "$VOL" >/dev/null 2>&1 || true
+        SINK_INPUT_ID=$(find_sink_input_id "$mid")
+        if [[ -n "$SINK_INPUT_ID" ]]; then
+          pactl set-sink-input-volume "$SINK_INPUT_ID" "$VOL" > /dev/null 2>&1 || true
+        fi
+      done <<< "$MODULE_IDS"
+      exit 0
+    else
+      # Create loopback.
+      SOURCE=$(get_default_source)
+      SINK=$(get_default_sink)
+      if [[ -z "${SOURCE:-}" || -z "${SINK:-}" ]]; then
+        exit 1
       fi
-    done <<<"$MODULE_IDS"
-    exit 0
-  else
-    # Create loopback.
-    SOURCE=$(get_default_source)
-    SINK=$(get_default_sink)
-    if [[ -z "${SOURCE:-}" || -z "${SINK:-}" ]]; then
-      exit 1
+
+      NEW_MODULE_ID=$(pactl load-module module-loopback \
+        source="$SOURCE" \
+        sink="$SINK" \
+        latency_msec=10 \
+        adjust_latency=true \
+        loopback_name="$LOOP_NAME" 2> /dev/null || true)
+
+      # Wait for the sink-input to appear, then set initial volume.
+      for ((count = 0; count < 10; count++)); do
+        SINK_INPUT_ID=$(find_sink_input_id "$NEW_MODULE_ID")
+        if [[ -n "$SINK_INPUT_ID" ]]; then
+          pactl set-sink-input-volume "$SINK_INPUT_ID" "$VOL" > /dev/null 2>&1 || true
+          break
+        fi
+        sleep 0.1
+      done
+      exit 0
     fi
-
-    NEW_MODULE_ID=$(pactl load-module module-loopback \
-      source="$SOURCE" \
-      sink="$SINK" \
-      latency_msec=10 \
-      adjust_latency=true \
-      loopback_name="$LOOP_NAME" 2>/dev/null || true)
-
-    # Wait for the sink-input to appear, then set initial volume.
-    for i in {1..10}; do
-      SINK_INPUT_ID=$(find_sink_input_id "$NEW_MODULE_ID")
-      if [[ -n "$SINK_INPUT_ID" ]]; then
-        pactl set-sink-input-volume "$SINK_INPUT_ID" "$VOL" >/dev/null 2>&1 || true
-        break
-      fi
-      sleep 0.1
-    done
-    exit 0
-  fi
-  ;;
-*)
-  exit 2
-  ;;
+    ;;
+  *)
+    exit 2
+    ;;
 esac

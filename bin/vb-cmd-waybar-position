@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -19,7 +20,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [--top|--bottom] [--help]
 
 Move Waybar and Dunst notifications to the top or bottom of the screen.
@@ -36,27 +37,27 @@ TARGET=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  --top)
-    TARGET="top"
-    shift
-    ;;
-  --bottom)
-    TARGET="bottom"
-    shift
-    ;;
-  -h | --help | "")
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "Unknown option: $1"
-    usage
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --top)
+      TARGET="top"
+      shift
+      ;;
+    --bottom)
+      TARGET="bottom"
+      shift
+      ;;
+    -h | --help | "")
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "Unknown option: $1"
+      usage
+      exit 1
+      ;;
   esac
 done
 
@@ -80,10 +81,10 @@ fi
 sed -i "/position/s/${CURRENT_POSITION}/${TARGET}/" "$WAYBAR_CONF"
 
 case "$TARGET" in
-top)
+  top)
     ORIGIN="top-right"
     ;;
-bottom)
+  bottom)
     ORIGIN="bottom-right"
     ;;
 esac
@@ -93,9 +94,9 @@ esac
 # If it exists but has no origin line, append one.
 # Otherwise replace the existing origin value inline.
 if [[ ! -f "$DUNST_CONF" ]]; then
-  printf "[global]\norigin = %s\n" "$ORIGIN" >"$DUNST_CONF"
+  printf "[global]\norigin = %s\n" "$ORIGIN" > "$DUNST_CONF"
 elif ! grep -q origin "$DUNST_CONF"; then
-  printf "\norigin = %s\n" "$ORIGIN" >>"$DUNST_CONF"
+  printf "\norigin = %s\n" "$ORIGIN" >> "$DUNST_CONF"
 else
   sed -i "/origin/s/${CURRENT_POSITION}/${TARGET}/" "$DUNST_CONF"
 fi

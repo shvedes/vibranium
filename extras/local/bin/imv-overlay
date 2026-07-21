@@ -3,32 +3,33 @@
 # This file is symlinked to $VIBRANIUM
 # DO NOT EDIT
 
-file=''"$1"''
+file=$1
 
-if [[ ! -f "$file" ]]; then
-  printf ""
-  exit 0
-fi
+[[ -f $file ]] || exit 0
 
 human_size() {
   local bytes=$1
-  [[ -z "$bytes" || ! "$bytes" =~ ^[0-9]+$ ]] && {
-    echo "-"
+  local whole frac
+
+  [[ $bytes =~ ^[0-9]+$ ]] || {
+    printf "-"
     return
   }
 
-  local kib=$((1024))
-  local mib=$((1024 * 1024))
-  local gib=$((1024 * 1024 * 1024))
-
-  if ((bytes >= gib)); then
-        awk -v b="$bytes" -v g="$gib" 'BEGIN {printf "%.2f GiB", b/g}'
-  elif   ((bytes >= mib)); then
-        awk -v b="$bytes" -v m="$mib" 'BEGIN {printf "%.2f MiB", b/m}'
-  elif   ((bytes >= kib)); then
-        awk -v b="$bytes" -v k="$kib" 'BEGIN {printf "%.2f KiB", b/k}'
+  if ((bytes >= 1073741824)); then
+    whole=$((bytes / 1073741824))
+    frac=$(((bytes % 1073741824) * 100 / 1073741824))
+    printf "%d.%02d GiB" "$whole" "$frac"
+  elif ((bytes >= 1048576)); then
+    whole=$((bytes / 1048576))
+    frac=$(((bytes % 1048576) * 100 / 1048576))
+    printf "%d.%02d MiB" "$whole" "$frac"
+  elif ((bytes >= 1024)); then
+    whole=$((bytes / 1024))
+    frac=$(((bytes % 1024) * 100 / 1024))
+    printf "%d.%02d KiB" "$whole" "$frac"
   else
-        printf "%d B" "$bytes"
+    printf "%d B" "$bytes"
   fi
 }
 
@@ -43,5 +44,10 @@ IFS=$'\t' read -r filename filesize resolution colorspace compression < <(
     } | [.filename, .filesize, .resolution, .colorspace, .compression] | @tsv'
 )
 
-printf " filename: %s \n filesize: %sB (%s) \n resolution: %s \n colorspace: %s \n compression: %s \n\n See keyboard shortcuts: Ctrl + H" \
-    "$(basename "$filename")" "$filesize" "$(human_size "$filesize")" "$resolution" "$colorspace" "${compression,,}"
+# basename without spawning a process
+filename=${filename##*/}
+
+printf " filename: %s \n filesize: %sB (" "$filename" "$filesize"
+human_size "$filesize"
+printf ") \n resolution: %s \n colorspace: %s \n compression: %s \n\n See keyboard shortcuts: Ctrl + H" \
+  "$resolution" "$colorspace" "${compression,,}"

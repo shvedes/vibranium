@@ -11,7 +11,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [OPTION] STRING
 
 Search DMI product information for a substring match (case-insensitive)
@@ -27,7 +27,7 @@ EOF
 }
 
 case "${1:-}" in
-  -h|--help)
+  -h | --help)
     usage
     exit 0
     ;;

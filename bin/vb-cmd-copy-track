@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -18,7 +19,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]
 
 Copy URI of the currently playing track to the clipboard.
@@ -42,7 +43,7 @@ mpd_music_dir() {
       dir="${BASH_REMATCH[1]}"
       break
     }
-  done <"$XDG_CONFIG_HOME/mpd/mpd.conf"
+  done < "$XDG_CONFIG_HOME/mpd/mpd.conf"
 
   if [[ -z "$dir" ]]; then
     return 1
@@ -76,30 +77,30 @@ _url_encode() {
 }
 
 mpd_is_playing() {
-  [[ "$(mpc status %state% 2>/dev/null)" == "playing" ]]
+  [[ "$(mpc status %state% 2> /dev/null)" == "playing" ]]
 }
 
 notify=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -n | --notify)
-    notify=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  *)
-    log Error "Invalid option: $1"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -n | --notify)
+      notify=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "Invalid option: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
 done
 
@@ -110,7 +111,7 @@ file=""
 # Prefer MPD when its control fifo exists (indicating the daemon is active
 # and reachable), falling back to playerctl for all other MPRIS players.
 # The fifo check avoids triggering socket activation on a stopped MPD.
-if command -v mpc >/dev/null && [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] && mpd_is_playing; then
+if command -v mpc > /dev/null && [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] && mpd_is_playing; then
   track="$(mpc current -f '%file%')"
   music_dir="$(mpd_music_dir)"
 
@@ -118,8 +119,8 @@ if command -v mpc >/dev/null && [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] && mpd_is_p
     file="file://$(_url_encode "$music_dir/$track")"
   fi
 
-elif playerctl status &>/dev/null; then
-  file="$(playerctl metadata --format '{{xesam:url}}' 2>/dev/null)"
+elif playerctl status &> /dev/null; then
+  file="$(playerctl metadata --format '{{xesam:url}}' 2> /dev/null)"
 fi
 
 if [[ -z "$file" ]]; then

@@ -3,7 +3,8 @@
 VERBOSE=false
 
 log() {
-  local level="$1"; shift
+  local level="$1"
+  shift
   if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
     echo "[${0##*/}] $level: $*" >&2
   fi
@@ -18,7 +19,7 @@ shcat() {
 }
 
 usage() {
-  shcat <<EOF
+  shcat << EOF
 Usage: $SELF [OPTION]...
 Cycle to the next available PipeWire audio output.
 
@@ -47,28 +48,28 @@ notify() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    shift
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --)
-    shift
-    break
-    ;;
-  *)
-    log Error "unknown option -- $*"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      log Error "unknown option -- $*"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
   esac
   shift
 done
 
-if ! command -v jq >/dev/null; then
+if ! command -v jq > /dev/null; then
   vb-cmd-dep-notify --name "Output Switcher" --deps "jq"
   exit 1
 fi
@@ -85,15 +86,15 @@ current_sink_name=$(pactl get-default-sink)
 IFS=$'\t' read -r sinks_count current_sink_index_str < <(
   jq -r --arg name "$current_sink_name" '
     [length, ((map(.name) | index($name)) // -1)] | @tsv
-  ' <<<"$sinks"
+  ' <<< "$sinks"
 )
 
-if (( sinks_count == 0 )); then
+if ((sinks_count == 0)); then
   notify "Vibranium" "No audio devices found"
   exit 1
 fi
 
-if (( sinks_count == 1 )); then
+if ((sinks_count == 1)); then
   notify-send -r 2 "Vibranium" "Only one audio output available - nothing to switch to"
   exit 0
 fi
@@ -107,7 +108,7 @@ else
 fi
 
 IFS=$'\t' read -r next_sink_name next_sink_description sink_id < <(
-  jq -r ".[$next_sink_index] | [.name, .description // \"\", .properties.\"object.id\" // \"\"] | @tsv" <<<"$sinks"
+  jq -r ".[$next_sink_index] | [.name, .description // \"\", .properties.\"object.id\" // \"\"] | @tsv" <<< "$sinks"
 )
 
 # Resolve human-readable description fallback
