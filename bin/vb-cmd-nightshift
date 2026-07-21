@@ -15,13 +15,13 @@ usage() {
 Usage: $SELF [OPTIONS]
 
 Options:
-  --toggle             Toggle night light
-  --inc, --increase    Increase temperature by STEP (or +)
-  --dec, --decrease    Decrease temperature by STEP (or -)
-  --set TEMPERATURE    Set absolute temperature (in Kelvin)
-  --step N             Use step N (default $STEP)
-  -v, --verbose        Enable verbose output
-  -h, --help           Show this help and exit
+  -i, --inc, --increase  Increase temperature by STEP (or +)
+  -d, --dec, --decrease  Decrease temperature by STEP (or -)
+  -t, --toggle           Toggle night light
+  -s, --set TEMP         Set absolute temperature (in Kelvin)
+  -n, --step N           Use step N (default is $STEP)
+  -v, --verbose          Enable verbose output
+  -h, --help             Show this help and exit
 
 Notes:
   Temperature must be between 1000 and 20000.
@@ -63,25 +63,25 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
-    --toggle)
+    -t | --toggle)
       action="toggle"
       shift
       ;;
-    --inc | --increase | +)
+    -i | --inc | --increase | +)
       action="inc"
       shift
       ;;
-    --dec | --decrease | -)
+    -d | --dec | --decrease | -)
       action="dec"
       shift
       ;;
-    --set)
+    -s | --set)
       action="set"
       shift
       ARG_TEMP="$1"
       shift
       ;;
-    --step)
+    -n | --step)
       shift
       STEP="$1"
       shift
