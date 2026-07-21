@@ -691,7 +691,10 @@ killall --quiet -s USR2 btop
 # Theme setters
 for f in "$VIBRANIUM"/bin/vb-theme-set-*; do
   # Not quite a setter, plus we called it earlier
-  [[ "${f##*/}" =~ templates$ ]] && continue
+  if [[ "${f##*/}" =~ templates$ ]]; then
+    continue
+  fi
+
   source "$f" &
 done
 
@@ -706,6 +709,6 @@ if [[ -d "$HOOK_DIR" ]]; then
   fi
 
   for hook in "${HOOK_FILES[@]}"; do
-    source "$hook" &
+    env THEME="$FOLDER_NAME" setsid -f "$hook" &
   done
 fi
