@@ -1,24 +1,26 @@
 # vim:ft=bash
+# shellcheck disable=all
 #
 # This is the advanced settings file, intended to be edited manually.
 # If you're changing values here, you likely know what you're doing.
 # All changes are applied instantly. If you're unfamiliar with these
 # options, refer to the wiki for guidance.
 
-
 # Extra files to always regenerate from templates, even when the active theme
 # ships its own version of the file.  Normally a theme-provided file blocks
 # template output; entries here override that and let the template win instead.
 #
-# Three entry formats are supported:
+# Entry formats:
 #
-#   "file.ext"               -- global: template always wins, for every theme
-#   "theme-name/file.ext"    -- scoped: template wins only for that one theme;
-#                               all other themes keep their own file untouched
-#   "!theme-name/file.ext"   -- inverse: template wins for every theme EXCEPT
-#                               that one; useful when a single theme ships a
-#                               file you want to preserve while managing all
-#                               others through the template system
+#   "file.ext"                   -- global: template always wins, for every theme
+#   "theme-name/file.ext"        -- scoped: template wins only for that one theme
+#   "!theme-name/file.ext"       -- inverse: template wins for every theme EXCEPT
+#                                   that one
+#
+#   Any entry supports bash glob wildcards (*, ?, [...]):
+#     "gruvbox-*/*.css"          -- force .css templates for all gruvbox-* themes
+#     "*.css"                    -- force .css templates for every theme
+#     "!gruvbox-*/vscode.json"   -- exclude vscode.json for gruvbox-* themes
 #
 # Use this when you maintain your own template for a file or want to fully
 # manage a file through Vibranium's template system.
@@ -75,4 +77,4 @@ vb_launcher_keywords=(
   # Type "play <query>" in the launcher to search MPD library.
   # The query is passed as --search argument to vb-cmd-play-mpd.
   "play:vb-cmd-play-mpd --search"
-  )
+)

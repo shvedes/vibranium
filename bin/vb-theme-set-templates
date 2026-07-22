@@ -207,7 +207,10 @@ force_template_files=()
 # environment already loaded, so settings.advanced is sourced explicitly
 # here to pick up vb_force_template_files.
 _settings_adv="$XDG_CONFIG_HOME/vibranium/settings.advanced"
-[[ -f $_settings_adv ]] && source "$_settings_adv"
+if [[ -f $_settings_adv ]]; then
+  source "$_settings_adv"
+fi
+
 unset _settings_adv
 
 # Append the user-defined forced template files, if any, from the advanced settings.
@@ -223,8 +226,13 @@ fi
 # here: extended is appended after the base file, so when the same key
 # somehow exists in both, the extended value is the one that survives.
 color_sources=()
-[[ -f $COLORS_FILE ]] && color_sources+=("$COLORS_FILE")
-[[ -f $COLORS_EXTENDED_FILE ]] && color_sources+=("$COLORS_EXTENDED_FILE")
+if [[ -f $COLORS_FILE ]]; then
+  color_sources+=("$COLORS_FILE")
+fi
+
+if [[ -f $COLORS_EXTENDED_FILE ]]; then
+  color_sources+=("$COLORS_EXTENDED_FILE")
+fi
 
 if [[ ${#color_sources[@]} -gt 0 ]]; then
   # Flatten every available color file into one "key<SOH>value" table for
@@ -256,13 +264,6 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
 
   shopt -s nullglob
 
-  # Turn force_template_files into a set for quick membership checks
-  # further down, rather than scanning the array on every template.
-  declare -A _force_set
-  for _f in "${force_template_files[@]}"; do
-    _force_set["$_f"]=1
-  done
-
   # outmap_file tells awk which output path each template renders to.
   # tpl_files is the actual list of templates that made the cut and will
   # be handed to awk for rendering.
@@ -292,19 +293,49 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
 
         # Render this template only if nothing higher-priority already
         # claimed the same output path this run, and either the output
-        # does not already exist on disk, or it is explicitly listed in
-        # force_template_files (globally by filename, or scoped to the
-        # current theme as "theme-name/filename").
+        # does not already exist on disk, or it matches a pattern in
+        # force_template_files (bash glob wildcards supported).
         if [[ -z ${seen_outputs[$output_path]+x} ]]; then
           should_write=false
 
           if [[ ! -f $output_path ]]; then
             should_write=true
-          elif [[ -n ${_force_set[$filename]+x} ]]; then
-            should_write=true
-          elif [[ -n $NEXT_THEME_NAME ]] &&
-            [[ -n ${_force_set[$NEXT_THEME_NAME / $filename]+x} ]]; then
-            should_write=true
+          else
+            for _entry in "${force_template_files[@]}"; do
+              _pat="$_entry"
+              _negate=0
+              [[ $_entry == '!'* ]] && {
+                _negate=1
+                _pat="${_entry#!}"
+              }
+              if [[ $_pat == */* ]]; then
+                _theme_pat="${_pat%%/*}"
+                _file_pat="${_pat#*/}"
+                if [[ -n $NEXT_THEME_NAME ]]; then
+                  # shellcheck disable=SC2053
+                  if ! [[ $NEXT_THEME_NAME == $_theme_pat ]]; then
+                    continue
+                  fi
+                  # shellcheck disable=SC2053
+                  if ! [[ $filename == $_file_pat ]]; then
+                    continue
+                  fi
+                  if ((_negate)); then
+                    should_write=false
+                    break
+                  fi
+                  should_write=true
+                fi
+              else
+                # shellcheck disable=SC2053
+                [[ $filename == $_pat ]] || continue
+                if ((_negate)); then
+                  should_write=false
+                  break
+                fi
+                should_write=true
+              fi
+            done
           fi
 
           if $should_write; then
