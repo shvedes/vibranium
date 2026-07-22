@@ -22,6 +22,7 @@ MIME_TYPES=""
 EXTRA_KEYWORDS=""
 CATEGORY=""
 OWN_PROFILE=false
+FORCE=false
 INTERACTIVE_MODE=false
 
 usage() {
@@ -39,6 +40,7 @@ Options:
   --keywords KW       Extra keywords, semicolon-separated (appended to auto-generated ones)
   --category CAT      Categories= value for the .desktop file (e.g. Network;WebBrowser)
   --own-profile       Launch the PWA in its own isolated browser profile
+  -f, --force         Install over existing .desktop file without prompting
   -v, --verbose       Enable verbose output
   -h, --help          Show this help and exit
 
@@ -117,6 +119,10 @@ while [[ $# -gt 0 ]]; do
       }
       CATEGORY="$2"
       shift 2
+      ;;
+    -f | --force)
+      FORCE=true
+      shift
       ;;
     --own-profile)
       OWN_PROFILE=true
@@ -431,6 +437,8 @@ EOF
   if [[ -n $keywords ]]; then
     printf 'Keywords=%s\n' "$keywords" >> "$file"
   fi
+
+  log Info "Created PWA file: '$file'"
 }
 
 # ---------------------------------------------------------------------------
@@ -439,7 +447,7 @@ EOF
 
 source vb-lib-core
 
-if [[ ! -f "$ICON_DIR" ]]; then
+if ! [[ -d "$ICON_DIR" ]]; then
   mkdir -p "$ICON_DIR"
 fi
 
@@ -461,7 +469,9 @@ if [[ -z $APP_URL ]]; then
   APP_URL="$(_normalize_url "$APP_URL")"
 
   _url_overwrite_confirmed=false
-  if _dup_file="$(_find_webapp_by_url "$APP_URL")"; then
+  if [[ $FORCE == true ]]; then
+    _url_overwrite_confirmed=true
+  elif _dup_file="$(_find_webapp_by_url "$APP_URL")"; then
     if term::ask_yes_no Y "This PWA is already installed. Overwrite it?"; then
       _url_overwrite_confirmed=true
     else
@@ -471,6 +481,7 @@ if [[ -z $APP_URL ]]; then
   fi
 
   _check_url_reachable "$APP_URL" &
+
   if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Verifying URL"; then
     echo "${RED}[VIBRANIUM]${RESET} Could not reach ${BLUE}http(s)://${APP_URL#*://}${RESET}"
     echo "${RED}[VIBRANIUM]${RESET} Check the URL or your connection."
@@ -531,7 +542,7 @@ if [[ -z $APP_URL ]]; then
   fi
   term::disable_input
 
-  if [[ $_url_overwrite_confirmed == false && -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]]; then
+  if [[ $_url_overwrite_confirmed == false && $FORCE == false && -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]]; then
     echo "${YELLOW}[VIBRANIUM]${RESET} A PWA named ${BLUE}${APP_NAME#PWA - }${RESET} is already installed."
     if ! _prompt_overwrite; then
       _operation_canceled
@@ -594,19 +605,40 @@ if [[ -z $APP_URL ]]; then
   fi
 
 else
+  log Info "Using CLI mode"
+
   APP_URL="$(_normalize_url "$APP_URL")"
 
-  log Info "Installing PWA for $APP_URL"
+  log Info "Using URL: '$APP_URL'"
 
-  _find_webapp_by_url "$APP_URL" > /dev/null && {
-    log Info "PWA already installed for $APP_URL, exiting"
+  log Info "Checking for duplicates"
+  if _find_webapp_by_url "$APP_URL" > /dev/null; then
+    if [[ $FORCE == false ]]; then
+      log Error "PWA already installed for '$APP_URL', exiting"
+      log Error "Use --force to mitigate this"
+      exit 1
+    fi
+
+    log Info "Found duplicate. --force is being used, ignoring"
+  else
+    log Info "No duplicates found"
+  fi
+
+  log Info "Checking URL availability"
+  if ! _check_url_reachable "$APP_URL"; then
+    log Error "Could not reach $APP_URL"
     exit 1
-  }
-  _check_url_reachable "$APP_URL" || exit 1
+  fi
+
+  log Info "URL '$APP_URL' is available"
 
   if [[ -z $APP_NAME ]]; then
-    APP_NAME="$(_fetch_page_title "$APP_URL")" || true
-    log Info "Fetched page title: ${APP_NAME:-failed}"
+    log Info "No --name provided; trying to fetch by URL title"
+    APP_NAME="$(_fetch_page_title "$APP_URL")" && {
+      log Info "Fetched page title: '$APP_NAME'"
+    } || {
+      log Warn "Failed to fetch URL title"
+    }
   fi
 
   APP_NAME="$(_strip_title "$APP_NAME")"
@@ -614,25 +646,34 @@ else
 
   [[ $APP_NAME != "PWA - "* ]] && APP_NAME="PWA - $APP_NAME"
 
-  [[ -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]] && {
-    log Info "Desktop file exists for $APP_NAME, exiting"
+  [[ $FORCE == false && -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]] && {
+    log Error "Desktop file exists for $APP_NAME, exiting"
     exit 1
   }
 
+  log Info "Generating keywords"
   AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
+
   KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
+  log Info "Desktop entry keywords: '$KEYWORDS'"
+
   ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
+  log Info "Desktop entry icon: '$ICON_PATH'"
 
   if [[ -n $CUSTOM_EXEC ]]; then
+    log Info "Using provided --exec: '$CUSTOM_EXEC'"
     EXEC_COMMAND="$CUSTOM_EXEC"
   elif [[ $OWN_PROFILE == true ]]; then
+    log Info "Using isolated profile"
     EXEC_COMMAND="vb-launch-webapp --own-profile $APP_URL"
   else
     EXEC_COMMAND="vb-launch-webapp $APP_URL"
   fi
 fi
 
-log Info "Writing desktop entry: $APP_NAME"
+log Info "Full exec command: '$EXEC_COMMAND'"
+
+log Info "Writing desktop entry: '${APP_NAME}.desktop'"
 _write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$KEYWORDS" "$MIME_TYPES" "$CATEGORY"
 
 if [[ $INTERACTIVE_MODE == true ]]; then
