@@ -1,58 +1,52 @@
 return {
   {
-    "bjarneo/aether.nvim",
-    branch = "v3",
-    name = "aether",
+    "shvedes/prism.nvim",
     priority = 1000,
     opts = {
-      transparent = true,
-      lualine_bold = true,
-      colors = {
-        bg = "{{ background_1 }}",
-        dark_bg = "{{ background_h }}",
-        darker_bg = "{{ background_h }}",
-        lighter_bg = "{{ background_1 }}",
+      palette = {
+        bg = "{{ background_0 }}", -- main editor b
+        bg_dim = "{{ background_1 }}", -- dimmed areas (statusline bg, lualine c)
+        bg_float = "{{ background_1 }}", -- floating windows (pmenu, telescope, etc.)
+        bg_highlight = "{{ background_2 }}", -- hover/selection highlights
+        bg_visual = "{{ background_2 }}", -- visual selection
+        bg_search = "{{ accent }}", -- search match background
 
-        fg = "{{ foreground_0 }}",
-        dark_fg = "{{ foreground_3 }}",
-        light_fg = "{{ foreground_h }}",
-        bright_fg = "{{ foreground_h }}",
-        muted = "{{ foreground_4 }}",
+        fg = "{{ foreground_0 }}", -- main foregorund
+        fg_dim = "{{ foreground_4 }}", -- muted text (line numbers, comments)
+        fg_gutter = "{{ foreground_4|lightness=-0.15 }}", -- signcolumn/gutter foreground
 
+        border = "{{ background_5 }}", -- borders
+
+        black = "{{ black }}",
         red = "{{ red }}",
-        yellow = "{{ yellow }}",
-        orange = "{{ orange }}",
         green = "{{ green }}",
-        cyan = "{{ cyan }}",
+        yellow = "{{ yellow }}",
         blue = "{{ blue }}",
-        purple = "{{ purple }}",
-        brown = "{{ orange }}",
+        magenta = "{{ purple }}",
+        cyan = "{{ cyan }}",
+        white = "{{ foreground_h }}",
+        orange = "{{ orange }}",
 
+        bright_black = "{{ foreground_4 }}",
         bright_red = "{{ red_bright }}",
-        bright_yellow = "{{ yellow_bright }}",
         bright_green = "{{ green_bright }}",
-        bright_cyan = "{{ cyan_bright }}",
+        bright_yellow = "{{ yellow_bright }}",
         bright_blue = "{{ blue_bright }}",
-        bright_purple = "{{ purple_bright }}",
-
-        accent = "{{ accent }}",
-        cursor = "{{ foreground_2 }}",
-        foreground = "{{ foreground_0 }}",
-        background = "{{ background_0 }}",
-        selection = "{{ background_3 }}",
-        selection_foreground = "{{ foreground_h }}",
-        selection_background = "{{ black }}",
+        bright_magenta = "{{ purple_bright }}",
+        bright_cyan = "{{ cyan_bright }}",
+        bright_white = "{{ foreground_h }}",
       },
+      transparent = true,
     },
     config = function(_, opts)
-      require("aether").setup(opts)
-      vim.cmd.colorscheme("aether")
+      require("prism").setup(opts)
+      vim.cmd.colorscheme("prism")
     end,
   },
   {
     "LazyVim/LazyVim",
     opts = {
-      colorscheme = "aether",
+      colorscheme = "prism",
     },
   },
 }
