@@ -3,28 +3,31 @@
  * when a custom Omarchy theme does not provide
  * a Waybar style.css.
  */
+
 @define-color foreground white;
 @define-color background black;
 @define-color urgent red;
 
-/* These colors and the entire Waybar appearance
+/*
+ * These colors and the entire Waybar appearance
  * may be overridden by the imported theme.
  */
+
 @import "../vibranium/current/theme/waybar.css";
 
 * {
-  /* Ignore installed GTK theme */
+  /* Ignore current GTK theme */
   all: initial;
 
-	background: @background;
-	color:      @foreground;
+  background: @background;
+  color:      @foreground;
 
-	font-family: 'Symbols Nerd Font Mono', 'Cascadia Code';
-	font-size:  12px;
+  font-family: 'Symbols Nerd Font Mono', 'Cascadia Mono';
+  font-size:  11px;
 }
 
 tooltip, tooltip label {
-	font-size: 12px;
+  font-size: 12px;
   background: black;
   color: white;
 }
@@ -38,11 +41,11 @@ tooltip, tooltip label {
 }
 
 @keyframes urgent-workspace {
-	0% { color: @urgent }
+  0% { color: @urgent }
 }
 
 #workspaces button.urgent {
-	animation: urgent-workspace 1s infinite;
+  animation: urgent-workspace 1s infinite;
 }
 
 .modules-right {
@@ -51,7 +54,11 @@ tooltip, tooltip label {
 
 .modules-right .module {
   font-size: 11.5px;
-	margin: 0px 7px;
+  margin: 0px 7px;
+}
+
+.modules-right .module:hover {
+  color: @accent;
 }
 
 #workspaces button.empty,
@@ -67,7 +74,7 @@ tooltip, tooltip label {
 }
 
 #tray {
-	margin-right: 8px;
+  margin-right: 8px;
 }
 
 @keyframes flashing-animation {
@@ -78,12 +85,12 @@ tooltip, tooltip label {
 }
 
 #custom-confirm-kill {
-	color: @foreground;
-	animation: flashing-animation 1s infinite
+  color: @foreground;
+  animation: flashing-animation 1s infinite
 }
 
 #custom-recording-indicator {
-	color: @urgent;
+  color: @urgent;
 }
 
 #custom-separator,
@@ -93,7 +100,7 @@ tooltip, tooltip label {
 }
 
 #network.disconnected {
-	color: @urgent
+  color: @urgent
 }
 
 #bluetooth, #bluetooth.disabled, #bluetooth.off {
@@ -127,8 +134,3 @@ tooltip, tooltip label {
     color: @foreground;
   }
 }
-
-window#waybar {
-    font-family: 'Symbols Nerd Font Mono', 'Cascadia Code';
-}
-
