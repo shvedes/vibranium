@@ -136,7 +136,7 @@ helpers::copy() {
     done < <(find "$src" \( -type f -o -type l \) -print0)
 
     $as_root mkdir -p "$dest"
-    $as_root cp -aT "$src" "$dest"
+    $as_root cp -aT --no-preserve=ownership "$src" "$dest"
   else
     target="$dest"
     [[ -d "$dest" ]] && target="$dest/$(basename "$src")"
@@ -149,7 +149,7 @@ helpers::copy() {
     fi
 
     $as_root mkdir -p "$target_dir"
-    $as_root cp -a "$src" "$target"
+    $as_root cp -a --no-preserve=ownership "$src" "$target"
   fi
 }
 
@@ -277,7 +277,7 @@ helpers::backup_restore() {
   # file type mismatch between the current path and the backup would
   # also fail.
   $as_root rm -rf "$original"
-  $as_root cp -a "$_VB_BK_PATH" "$original"
+  $as_root cp -a --no-preserve=ownership "$_VB_BK_PATH" "$original"
 
   helpers::log::success "Restored ${original} from backup"
 }
