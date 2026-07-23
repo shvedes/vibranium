@@ -80,7 +80,7 @@ if [[ -n "$1" ]]; then
   fi
 else
   while true; do
-    read -rp "${Y}[VIBRANIUM]${RS} Git repo: " REPO_URL
+    read -erp "${Y}[VIBRANIUM]${RS} Git repo: " REPO_URL || { _operation_canceled; exit 1; }
     REPO_URL="${REPO_URL%/}"
 
     if [[ -z "$REPO_URL" ]]; then
