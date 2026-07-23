@@ -1,0 +1,123 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+usage() {
+  shcat << EOF
+Usage: ${0##*/} [OPTION]
+
+Update all installed community themes.
+
+Options:
+  -h, --help     Display this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "unknown option: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
+  esac
+done
+
+source vb-lib-core
+
+_wait_for_key() {
+  local color="${1:-$RED}" msg="${2:-Operation canceled}"
+  printf "%s[VIBRANIUM]%s %s" "$color" "$RESET" "$msg"
+  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
+  term::disable_input
+
+  # shellcheck disable=SC2034
+  read -n1 -r -s -p $'. Press any key to exit' dummy
+}
+
+trap 'trap "exit 1" INT HUP; printf "\n"; _wait_for_key; exit 1' INT HUP
+
+_display_name() {
+  local name="$1" word out=
+  for word in ${name//-/ }; do
+    out+="${word^} "
+  done
+  printf "%s" "${out% }"
+}
+
+term::show_header
+
+THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
+UPDATED=0
+SKIPPED=0
+UPTODATE=0
+FAILED=()
+
+mapfile -t themes < <(
+  find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' |
+    while read -r folder; do
+      if [[ ! -d "$VIBRANIUM/themes/$folder" ]]; then
+        echo "$folder"
+      fi
+    done
+)
+
+if ((${#themes[@]} == 0)); then
+  echo "${YELLOW}[VIBRANIUM]${RESET} No community themes installed"
+  _wait_for_key "$GREEN" "No themes to update"
+  exit 0
+fi
+
+mapfile -t themes < <(printf '%s\n' "${themes[@]}" | sort)
+
+for theme in "${themes[@]}"; do
+  theme_path="$THEMES_DIR/$theme"
+  display="${BLUE}$(_display_name "$theme")${RESET}"
+
+  if [[ ! -d "$theme_path/.git" ]]; then
+    echo "${YELLOW}[VIBRANIUM]${RESET} $display is not a git repository, skipping"
+    ((SKIPPED++))
+    continue
+  fi
+
+  if ! git -C "$theme_path" diff --quiet HEAD 2> /dev/null; then
+    echo "${YELLOW}[VIBRANIUM]${RESET} $display has local changes, skipping"
+    ((SKIPPED++))
+    continue
+  fi
+
+  behind=$(git -C "$theme_path" rev-list --count 'HEAD..@{upstream}' 2> /dev/null)
+
+  if [[ -z "$behind" ]] || ((behind == 0)); then
+    echo "${BLUE}[VIBRANIUM]${RESET} $display is already up to date"
+    ((UPTODATE++))
+    continue
+  fi
+
+  git -C "$theme_path" pull --ff-only &
+  if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Updating $display" "- ${GREEN}Done${RESET}"; then
+    echo "${RED}[VIBRANIUM]${RESET} Failed to update $display"
+    FAILED+=("$display")
+    continue
+  fi
+
+  ((UPDATED++))
+done
+
+echo "${GREEN}[VIBRANIUM]${RESET} Updated $UPDATED theme(s), $UPTODATE already up to date, ${#FAILED[@]} failed, $SKIPPED skipped"
+
+if ((${#FAILED[@]} > 0)); then
+  for failed in "${FAILED[@]}"; do
+    echo "  ${RED}-${RESET} $failed"
+  done
+fi
+
+if ((UPDATED > 0)); then
+  notify-send -r 3 "Vibranium" "Updated $UPDATED theme(s)"
+fi
+
+_wait_for_key "$GREEN" "All done"
