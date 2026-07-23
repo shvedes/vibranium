@@ -17,17 +17,17 @@ source "$VIBRANIUM_PATH/vb-core-defaults"
 source "$XDG_CONFIG_HOME/vibranium/settings" 2> /dev/null
 source "$XDG_CONFIG_HOME/vibranium/current/theme/colors.bash" 2> /dev/null
 
-RED=$'\e[0;31m'
-YELLOW=$'\e[0;33m'
-BLUE=$'\e[0;34m'
-PURPLE=$'\e[0;35m'
-GREEN=$'\e[0;32m'
-CYAN=$'\e[0;36m'
-GRAY=$'\e[90m'
-RESET=$'\e[0m'
+Y=$'\e[0;33m' # Yellow
+P=$'\e[0;35m' # Purple
+G=$'\e[0;32m' # Green
+C=$'\e[0;36m' # Cyan
+B=$'\e[0;34m' # Blue
+GY=$'\e[90m'  # Gray
+R=$'\e[0;31m' # Red
+RS=$'\e[0m'   # Reset
 
 # PKG / Font Install / Removal scripts
-printf -v VIBRANIUM_SUDO_PROMPT '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER"
+printf -v VIBRANIUM_SUDO_PROMPT '%s[VIBRANIUM]%s Password for %s: ' "$R" "$RS" "$USER"
 export SUDO_PROMPT=$VIBRANIUM_SUDO_PROMPT
 export PATH="$PATH:$VIBRANIUM/configure"
 
@@ -638,28 +638,28 @@ term::show_header() {
   if [[ "${1-}" == "--color" ]]; then
     case "${2-}" in
       purple)
-        color="$PURPLE"
+        color="$P"
         ;;
       green)
-        color="$GREEN"
+        color="$G"
         ;;
       blue)
-        color="$BLUE"
+        color="$B"
         ;;
       cyan)
-        color="$CYAN"
+        color="$C"
         ;;
       red)
-        color="$RED"
+        color="$R"
         ;;
       *)
-        color="$YELLOW"
+        color="$Y"
         ;;
     esac
   fi
 
-  printf "\n%s%s%s\n\n" "${color:-$YELLOW}" \
-    "$(< "$VIBRANIUM/logo.txt")" "$RESET"
+  printf "\n%s%s%s\n\n" "${color:-$Y}" \
+    "$(< "$VIBRANIUM/logo.txt")" "$RS"
 }
 
 term::is_headless() {
@@ -670,24 +670,28 @@ term::is_headless() {
   fi
 }
 
+vb::print() {
+  echo -e "${1}[VIBRANIUM]${RS} ${*:2}"
+}
+
 log::error() {
   if [[ -t 2 ]]; then
     printf "%s[ERROR]%s %s\n" \
-      "$RED" "$RESET" "$*" >&2
+      "$R" "$RS" "$*" >&2
   fi
 }
 
 log::warn() {
   if [[ -t 1 ]]; then
     printf "%s[WARN]%s %s\n" \
-      "$YELLOW" "$RESET" "$*"
+      "$Y" "$RS" "$*"
   fi
 }
 
 log::info() {
   if [[ -t 1 ]]; then
     printf "%s[INFO]%s %s\n" \
-      "$BLUE" "$RESET" "$*"
+      "$B" "$RS" "$*"
   fi
 }
 

@@ -45,14 +45,14 @@ FZF_ARGS=(
 
 _operation_canceled() {
   term::disable_input
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   read -r -n1 -s -p $'. Press any key to exit' _dummy
 }
 
 _operation_complete() {
   term::disable_input
-  printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s " "$G" "$RS"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   read -r -n1 -p $'Removal complete. Press any key to exit ' _dummy
 }
@@ -93,7 +93,7 @@ _remove_tuiapp() {
   done
 
   if [[ "$removed" == true ]]; then
-    echo "${GREEN}[VIBRANIUM]${RESET} Removed ${BLUE}${name}${RESET}"
+    vb::print "$G" "Removed ${B}${name}${RS}"
   else
     log Error "No such TUI app: $name"
   fi
@@ -153,7 +153,7 @@ if [[ $INTERACTIVE == true ]]; then
 
   if ((${#TUI_MAP[@]} == 0)); then
     term::show_header --color red
-    echo "${RED}[VIBRANIUM]${RESET} No TUI apps found"
+    vb::print "$R" "No TUI apps found"
     _operation_canceled
     exit 1
   fi

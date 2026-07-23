@@ -21,7 +21,7 @@ EOF
 
 _operation_canceled() {
   term::disable_input
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
 
   if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
     trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
@@ -32,7 +32,7 @@ _operation_canceled() {
 
 _update_complete() {
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
-  printf "\r\033[K%s[VIBRANIUM]%s %s" "$GREEN" "$RESET" "$@"
+  printf "\r\033[K%s[VIBRANIUM]%s %s" "$G" "$RS" "$@"
 
   if [[ "$NO_DUMMY" == "false" && -t 0 ]]; then
     # shellcheck disable=SC2034
@@ -119,7 +119,7 @@ fi
 
 source vb-lib-core
 
-SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
+SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$R" "$RS" "$USER")"
 export SUDO_PROMPT
 
 NO_LOGO=false
@@ -173,9 +173,9 @@ fi
 # password prompt appears at the start rather than mid-update.
 if ! sudo -n true 2> /dev/null; then
   if [[ "$AUR_MODE" == true ]]; then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}yay${RESET} needs ${RED}sudo${RESET} for ${BLUE}AUR${RESET} operations"
+    vb::print "$Y" "${G}yay${RS} needs ${R}sudo${RS} for ${B}AUR${RS} operations"
   else
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}pacman${RESET} needs ${RED}sudo${RESET} to update repos"
+    vb::print "$Y" "${G}pacman${RS} needs ${R}sudo${RS} to update repos"
   fi
 fi
 if ! sudo -v; then
@@ -193,7 +193,7 @@ fi
 
 pid=$!
 
-term::spinner $pid "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"
+term::spinner $pid "${Y}[VIBRANIUM]${RS} Refreshing repositories" "- ${G}Done!${RS}"
 
 if ! _check_updates; then
   rm -f "$VIBRANIUM_CACHE"/pkg-updates.*
@@ -207,15 +207,15 @@ if ! _check_updates; then
 fi
 
 if [[ "$AUR_MODE" == true ]]; then
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} AUR package(s) are awaiting updates"
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting AUR update..."
+  vb::print "$Y" "${#PKG_LIST[@]} AUR package(s) are awaiting updates"
+  vb::print "$Y" "Starting AUR update..."
 else
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} ${#PKG_LIST[@]} package(s) are awaiting updates"
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Starting system update..."
+  vb::print "$Y" "${#PKG_LIST[@]} package(s) are awaiting updates"
+  vb::print "$Y" "Starting system update..."
 fi
 
 if ! _perform_update; then
-  echo -e "${RED}[VIBRANIUM]${RESET} Something went wrong"
+  vb::print "$R" "Something went wrong"
 
   _operation_canceled
   exit 1
@@ -225,7 +225,7 @@ rm -f "$VIBRANIUM_CACHE"/pkg-updates.*
 vb-refresh-waybar-module pacman &
 
 if _check_important; then
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Important system components have been updated"
+  vb::print "$Y" "Important system components have been updated"
 
   if term::ask_yes_no Y "Restart now?"; then
     term::disable_input
@@ -233,7 +233,7 @@ if _check_important; then
 
     for i in {5..1}; do
       for dots in "" "." ".." "..."; do
-        printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$YELLOW" "$RESET" "$i" "$dots"
+        printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" "$Y" "$RS" "$i" "$dots"
         sleep 0.25
       done
     done

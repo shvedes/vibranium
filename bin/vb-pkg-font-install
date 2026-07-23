@@ -80,11 +80,11 @@ FZF_ARGS=(
 )
 
 _operation_canceled() {
-  local color="$RED"
+  local color="$R"
 
-  [[ "$1" == "--positive" ]] && color="$GREEN"
+  [[ "$1" == "--positive" ]] && color="$G"
 
-  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   term::disable_input
   # shellcheck disable=SC2034
@@ -117,7 +117,7 @@ term::show_header
 term::disable_input
 
 (_get_fonts > "$VIBRANIUM_CACHE/${0##*/}.list") &
-term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Getting font packages"
+term::spinner $! "${Y}[VIBRANIUM]${RS} Getting font packages"
 
 LIST="$(< "$VIBRANIUM_CACHE/${0##*/}.list")"
 mapfile -t chosen < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")

@@ -10,7 +10,7 @@ mkdir -p "$STATE_DIR/skipped"
 for file in "$VIBRANIUM"/migrations/*.sh; do
   name="${file##*/}"
   if [[ ! -f "$STATE_DIR/$name" && ! -f "$STATE_DIR/skipped/$name" ]]; then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Running migration ${GREEN}${name}${RESET}"
+    vb::print "$Y" "Running migration ${G}${name}${RS}"
 
     if bash "$file"; then
       : > "$STATE_DIR/$name"

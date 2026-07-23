@@ -46,7 +46,7 @@ FZF_ARGS=(
 
 _operation_canceled() {
   term::disable_input
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   read -r -n1 -s -p $'. Press any key to exit' _dummy
   term::enable_input
@@ -54,7 +54,7 @@ _operation_canceled() {
 
 _operation_complete() {
   term::disable_input
-  printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s " "$G" "$RS"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   read -r -n1 -p $'Removal complete. Press any key to exit ' _dummy
   term::enable_input
@@ -139,12 +139,12 @@ _remove_pwa() {
     data_dir="$WEBAPP_DATA_DIR/$(_profile_dir_from_url "$url")"
     if [[ -d "$data_dir" ]]; then
       rm -rf -- "$data_dir"
-      echo "${GREEN}[VIBRANIUM]${RESET} Removed browser data for ${BLUE}${name}${RESET}"
+      vb::print "$G" "Removed browser data for ${B}${name}${RS}"
     fi
   fi
 
   if [[ "$removed" == true ]]; then
-    echo "${GREEN}[VIBRANIUM]${RESET} Removed ${BLUE}${name}${RESET}"
+    vb::print "$G" "Removed ${B}${name}${RS}"
   else
     log Error "No such PWA: $name"
   fi
@@ -204,7 +204,7 @@ if [[ $INTERACTIVE == true ]]; then
 
   if ((${#PWA_MAP[@]} == 0)); then
     term::show_header --color red
-    echo "${RED}[VIBRANIUM]${RESET} No PWAs found"
+    vb::print "$R" "No PWAs found"
     _operation_canceled
     exit 1
   fi

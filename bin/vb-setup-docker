@@ -7,14 +7,14 @@ export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
 PACKAGES=(docker docker-compose)
 
 _operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
 _operation_complete() {
-  printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s Setup complete" "$G" "$RS"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -p $'. Press any key to exit ' dummy
@@ -22,7 +22,7 @@ _operation_complete() {
 
 _add_user_to_group() {
   if ! id -nG "$USER" | grep -qw docker; then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Adding ${CYAN}${USER}${RESET} to the '${CYAN}docker${RESET}' group"
+    vb::print "$Y" "Adding ${P}${USER}${RS} to the '${P}docker${RS}' group"
     sudo usermod -aG docker "$USER"
     return 0 # was added
   fi
@@ -44,15 +44,15 @@ EOF
 
   if [ -f /etc/docker/daemon.json ] &&
     printf '%s' "$desired" | diff -q - /etc/docker/daemon.json &> /dev/null; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Docker daemon config: already up to date, skipping"
+    vb::print "$G" "Docker daemon config: already up to date, skipping"
     return 1 # unchanged
   fi
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring Docker daemon (log rotation + DNS)"
+  vb::print "$Y" "Configuring Docker daemon (log rotation + DNS)"
   sudo mkdir -p /etc/docker
 
   if [[ -f /etc/docker/daemon.json ]]; then
-    echo "${GREEN}[VIBRANIUM]${RESET} Backing up existing ${BLUE}deamon.json${RESET}"
+    vb::print "$G" "Backing up existing ${B}deamon.json${RS}"
     sudo mv /etc/docker/daemon.json /etc/docker/daemon.json.bak
   fi
 
@@ -66,15 +66,15 @@ _configure_resolved() {
 
   if [ -f "$conf" ] &&
     printf '%s' "$desired" | diff -q - "$conf" &> /dev/null; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} systemd-resolved config: already up to date, skipping"
+    vb::print "$G" "systemd-resolved config: already up to date, skipping"
     return 1 # unchanged
   fi
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Exposing systemd-resolved to the Docker network"
+  vb::print "$Y" "Exposing systemd-resolved to the Docker network"
   sudo mkdir -p /etc/systemd/resolved.conf.d
 
   if [[ -f "$conf" ]]; then
-    echo "${GREEN}[VIBRANIUM]${RESET} Backing up existing ${BLUE}20-docker-dns.conf${RESET}"
+    vb::print "$G" "Backing up existing ${B}20-docker-dns.conf${RS}"
     sudo mv "$conf" "$conf.bak"
   fi
 
@@ -89,15 +89,15 @@ _configure_no_block_boot() {
 
   if [ -f "$conf" ] &&
     printf '%s' "$desired" | diff -q - "$conf" &> /dev/null; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Boot-block prevention drop-in: already up to date, skipping"
+    vb::print "$G" "Boot-block prevention drop-in: already up to date, skipping"
     return 1 # unchanged
   fi
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Preventing Docker from blocking boot (${BLUE}network-online.target${RESET})"
+  vb::print "$Y" "Preventing Docker from blocking boot (${B}network-online.target${RS})"
   sudo mkdir -p /etc/systemd/system/docker.service.d
 
   if [[ -f "$conf" ]]; then
-    echo "${GREEN}[VIBRANIUM]${RESET} Backing up existing ${BLUE}no-block-boot.conf${RESET}"
+    vb::print "$G" "Backing up existing ${B}no-block-boot.conf${RS}"
     sudo mv "$conf" "$conf.bak"
   fi
 
@@ -128,11 +128,11 @@ _configure_ufw() {
   fi
 
   if $dns_rule_present && $ufw_docker_present; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} UFW Docker rules: already in place, skipping"
+    vb::print "$G" "UFW Docker rules: already in place, skipping"
     return 1 # unchanged
   fi
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring UFW for Docker"
+  vb::print "$Y" "Configuring UFW for Docker"
 
   if ! $dns_rule_present; then
     sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 \
@@ -154,12 +154,12 @@ term::disable_input
 
 if systemctl -q is-enabled docker.socket 2> /dev/null ||
   systemctl -q is-enabled docker.service 2> /dev/null; then
-  echo -e "${GREEN}[VIBRANIUM]${RESET} Docker is already set up and working"
+  vb::print "$G" "Docker is already set up and working"
   _operation_complete
   exit 0
 fi
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup Docker"
+vb::print "$Y" "You're about to setup Docker"
 
 if ! term::ask_yes_no Y "Proceed with setup?"; then
   _operation_canceled
@@ -185,69 +185,69 @@ fi
 summary_rules=()
 
 # ── Systemd unit ──────────────────────────────────────────────
-if term::ask_yes_no Y "Enable systemd socket? (${GREEN}recommended${RESET} - starts Docker on first use)"; then
+if term::ask_yes_no Y "Enable systemd socket? (${G}recommended${RS} - starts Docker on first use)"; then
   term::disable_input
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling docker.socket"
+  vb::print "$Y" "Enabling docker.socket"
   sudo systemctl -q enable --now docker.socket
-  summary_rules+=("Docker unit: ${GREEN}docker.socket${RESET} enabled and started")
+  summary_rules+=("Docker unit: ${G}docker.socket${RS} enabled and started")
 else
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling docker.service"
+  vb::print "$Y" "Enabling docker.service"
   sudo systemctl -q enable --now docker.service
-  summary_rules+=("Docker unit: ${GREEN}docker.service${RESET} enabled and started")
+  summary_rules+=("Docker unit: ${G}docker.service${RS} enabled and started")
 fi
 
 # ── Daemon configuration ──────────────────────────────────────
 if _configure_daemon; then
-  summary_rules+=("Daemon config: ${GREEN}written${RESET} (log rotation, DNS bridge)")
+  summary_rules+=("Daemon config: ${G}written${RS} (log rotation, DNS bridge)")
 else
-  summary_rules+=("Daemon config: ${CYAN}unchanged${RESET}")
+  summary_rules+=("Daemon config: ${P}unchanged${RS}")
 fi
 
 # ── systemd-resolved DNS stub ─────────────────────────────────
 if _configure_resolved; then
-  summary_rules+=("systemd-resolved: ${GREEN}updated${RESET} (172.17.0.1 stub listener added)")
+  summary_rules+=("systemd-resolved: ${G}updated${RS} (172.17.0.1 stub listener added)")
 else
-  summary_rules+=("systemd-resolved: ${CYAN}unchanged${RESET}")
+  summary_rules+=("systemd-resolved: ${P}unchanged${RS}")
 fi
 
 # ── Boot-block prevention ─────────────────────────────────────
 if _configure_no_block_boot; then
   sudo systemctl daemon-reload
-  summary_rules+=("Boot-block drop-in: ${GREEN}written${RESET}")
+  summary_rules+=("Boot-block drop-in: ${G}written${RS}")
 else
-  summary_rules+=("Boot-block drop-in: ${CYAN}unchanged${RESET}")
+  summary_rules+=("Boot-block drop-in: ${P}unchanged${RS}")
 fi
 
 # ── UFW firewall rules ────────────────────────────────────────
 _configure_ufw
 case $? in
   0)
-    summary_rules+=("UFW: ${GREEN}Docker rules applied${RESET} (DNS stub + ufw-docker)")
+    summary_rules+=("UFW: ${G}Docker rules applied${RS} (DNS stub + ufw-docker)")
     ;;
   1)
-    summary_rules+=("UFW: ${CYAN}unchanged${RESET}")
+    summary_rules+=("UFW: ${P}unchanged${RS}")
     ;;
   2)
-    summary_rules+=("UFW: ${YELLOW}not active${RESET}, skipped")
+    summary_rules+=("UFW: ${Y}not active${RS}, skipped")
     ;;
 esac
 
 # ── Docker group ──────────────────────────────────────────────
 if _add_user_to_group; then
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} A re-login is needed for the group change to take effect"
-  summary_rules+=("User ${CYAN}${USER}${RESET}: ${GREEN}added${RESET} to the ${CYAN}docker${RESET} group (re-login required)")
+  vb::print "$Y" "A re-login is needed for the group change to take effect"
+  summary_rules+=("User ${P}${USER}${RS}: ${G}added${RS} to the ${P}docker${RS} group (re-login required)")
 else
-  summary_rules+=("User ${CYAN}${USER}${RESET}: already in the ${CYAN}docker${RESET} group")
+  summary_rules+=("User ${P}${USER}${RS}: already in the ${P}docker${RS} group")
 fi
 
-echo -e "${BLUE}[VIBRANIUM]${RESET} If you want to fine-tune your Docker configuration, consider reading ${BLUE}docker(1)${RESET}"
+vb::print "$B" "If you want to fine-tune your Docker configuration, consider reading ${B}docker(1)${RS}"
 
 echo ""
-echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"
+vb::print "$B" "── Summary ─────────────────────────────"
 for rule in "${summary_rules[@]}"; do
-  echo -e "${BLUE}[VIBRANIUM]${RESET}  • $rule"
+  vb::print "$B" " • $rule"
 done
-echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
+vb::print "$B" "─────────────────────────────────────────"
 echo ""
 
 _operation_complete

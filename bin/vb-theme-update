@@ -30,8 +30,8 @@ done
 source vb-lib-core
 
 _wait_for_key() {
-  local color="${1:-$RED}" msg="${2:-Operation canceled}"
-  printf "%s[VIBRANIUM]%s %s" "$color" "$RESET" "$msg"
+  local color="${1:-$R}" msg="${2:-Operation canceled}"
+  printf "%s[VIBRANIUM]%s %s" "$color" "$RS" "$msg"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   term::disable_input
 
@@ -68,9 +68,10 @@ _display_name() {
 term::show_header
 
 THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
-UPDATED_THEMES=()
+# Updated themes
+UPD_THEMES=()
 SKIPPED=0
-UPTODATE=0
+UPTOD=0
 FAILED=()
 
 mapfile -t themes < <(
@@ -83,8 +84,8 @@ mapfile -t themes < <(
 )
 
 if ((${#themes[@]} == 0)); then
-  echo "${YELLOW}[VIBRANIUM]${RESET} No community themes installed"
-  _wait_for_key "$GREEN" "No themes to update"
+  vb::print "$Y" "No community themes installed"
+  _wait_for_key "$G" "No themes to update"
   exit 0
 fi
 
@@ -94,10 +95,10 @@ term::disable_input
 
 for theme in "${themes[@]}"; do
   theme_path="$THEMES_DIR/$theme"
-  display="${BLUE}$(_display_name "$theme")${RESET}"
+  display="${B}$(_display_name "$theme")${RS}"
 
   (sleep 0.1) &
-  _spinner $! "${YELLOW}[VIBRANIUM]${RESET} ${YELLOW}Checking${RESET} $display"
+  _spinner $! "${Y}[VIBRANIUM]${RS} ${Y}Checking${RS} $display"
 
   if [[ ! -d "$theme_path/.git" ]]; then
     ((SKIPPED++))
@@ -112,34 +113,34 @@ for theme in "${themes[@]}"; do
   behind=$(git -C "$theme_path" rev-list --count 'HEAD..@{upstream}' 2> /dev/null)
 
   if [[ -z "$behind" ]] || ((behind == 0)); then
-    ((UPTODATE++))
+    ((UPTOD++))
     continue
   fi
 
   git -C "$theme_path" pull --ff-only &
-  if ! _spinner $! "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}Updating${RESET} $display"; then
+  if ! _spinner $! "${Y}[VIBRANIUM]${RS} ${G}Updating${RS} $display"; then
     FAILED+=("$display")
     continue
   fi
 
-  UPDATED_THEMES+=("$display")
+  UPD_THEMES+=("$display")
 done
 
-printf '\r\033[K%s[VIBRANIUM]%s All themes processed\n' "$GREEN" "$RESET"
+printf '\r\033[K%s[VIBRANIUM]%s All themes processed\n' "$G" "$RS"
 
-if ((${#UPDATED_THEMES[@]} > 0)); then
-  echo "${GREEN}[VIBRANIUM]${RESET} Updated themes:"
-  for t in "${UPDATED_THEMES[@]}"; do
-    echo -e "\t   - ${BLUE}$t${RESET}"
+if ((${#UPD_THEMES[@]} > 0)); then
+  vb::print "$G" "Updated themes:"
+  for t in "${UPD_THEMES[@]}"; do
+    echo -e "\t   - ${B}$t${RS}"
   done
 fi
 
-echo "${GREEN}[VIBRANIUM]${RESET} Updated ${GREEN}${#UPDATED_THEMES[@]}${RESET} theme(s), ${CYAN}$UPTODATE${RESET} already up to date, ${RED}${#FAILED[@]}${RESET} failed, ${BLUE}$SKIPPED${RESET} skipped"
+vb::print "$G" "Updated ${G}${#UPD_THEMES[@]}${RS} theme(s), ${C}$UPTOD${RS} already up to date, ${R}${#FAILED[@]}${RS} failed, ${B}$SKIPPED${RS} skipped"
 
 if ((${#FAILED[@]} > 0)); then
   for failed in "${FAILED[@]}"; do
-    echo "  ${RED}-${RESET} $failed"
+    echo "  ${R}-${RS} $failed"
   done
 fi
 
-_wait_for_key "$GREEN" "All done"
+_wait_for_key "$G" "All done"

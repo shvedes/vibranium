@@ -87,32 +87,32 @@ _blur_menu() {
     hypr::fetch "${BLUR_SPEC[@]}"
 
     cfgr::item::action \
-      --label "Enabled : ${HYPR[decoration.blur.enabled]}" \
+      --label "Enabled : ${HYPR["decoration.blur.enabled"]}" \
       --func "_toggle 'decoration:blur:enabled'"
 
-    if [[ ${HYPR[decoration.blur.enabled]} == true ]]; then
+    if [[ ${HYPR["decoration.blur.enabled"]} == true ]]; then
       cfgr::item::action \
-        --label "Size : ${HYPR[decoration.blur.size]}" \
+        --label "Size : ${HYPR["decoration.blur.size"]}" \
         --func "_set_int 'Blur Size' 'Size in pixels (int)' int 1 512 'decoration:blur:size'"
 
       cfgr::item::action \
-        --label "Noise : ${HYPR[decoration.blur.noise]}" \
+        --label "Noise : ${HYPR["decoration.blur.noise"]}" \
         --func "_set_int 'Blur Noise' 'Noise (float)' float 0.0 1.0 'decoration:blur:noise'"
 
       cfgr::item::action \
-        --label "Passes : ${HYPR[decoration.blur.passes]}" \
+        --label "Passes : ${HYPR["decoration.blur.passes"]}" \
         --func "_set_int 'Blur Passes' 'Passes (int)' int 1 50 'decoration:blur:passes'"
 
       cfgr::item::action \
-        --label "Vibrancy : ${HYPR[decoration.blur.vibrancy]}" \
+        --label "Vibrancy : ${HYPR["decoration.blur.vibrancy"]}" \
         --func "_set_int 'Blur Vibrancy' 'Vibrancy (float)' float 0.0 1.0 'decoration:blur:vibrancy'"
 
       cfgr::item::action \
-        --label "Contrast : ${HYPR[decoration.blur.contrast]}" \
+        --label "Contrast : ${HYPR["decoration.blur.contrast"]}" \
         --func "_set_int 'Blur Contrast' 'Contrast (float)' float 0.0 2.0 'decoration:blur:contrast'"
 
       cfgr::item::action \
-        --label "Brightness : ${HYPR[decoration.blur.brightness]}" \
+        --label "Brightness : ${HYPR["decoration.blur.brightness"]}" \
         --func "_set_int 'Blur Brightness' 'Brightness (float)' float 0.0 2.0 'decoration:blur:brightness'"
     fi
   }
@@ -188,10 +188,10 @@ _shadow_menu() {
     hypr::fetch "${SHADOW_SPEC[@]}"
 
     cfgr::item::action \
-      --label "Enabled : ${HYPR[decoration.shadow.enabled]}" \
+      --label "Enabled : ${HYPR["decoration.shadow.enabled"]}" \
       --func "_toggle 'decoration:shadow:enabled'"
 
-    if [[ ${HYPR[decoration.shadow.enabled]} == true ]]; then
+    if [[ ${HYPR["decoration.shadow.enabled"]} == true ]]; then
       local shadow_color_int shadow_color
       shadow_color_int="$(hyprctl -j getoption decoration:shadow:color \
         | jq -r '.int // 0' 2>/dev/null
@@ -203,15 +203,15 @@ _shadow_menu() {
         --func "_set_shadow_color"
 
       cfgr::item::action \
-        --label "Power : ${HYPR[decoration.shadow.render_power]}" \
+        --label "Power : ${HYPR["decoration.shadow.render_power"]}" \
         --func "_set_int 'Shadow Power' 'Shadow power (int)' int 1 4 'decoration:shadow:render_power'"
 
       cfgr::item::action \
-        --label "Range : ${HYPR[decoration.shadow.range]}" \
+        --label "Range : ${HYPR["decoration.shadow.range"]}" \
         --func "_set_int 'Shadow Range' 'Shadow range (int)' int 1 128 'decoration:shadow:range'"
 
       cfgr::item::action \
-        --label "Sharp : ${HYPR[decoration.shadow.sharp]}" \
+        --label "Sharp : ${HYPR["decoration.shadow.sharp"]}" \
         --func "_toggle 'decoration:shadow:sharp'"
     fi
   }
@@ -224,49 +224,49 @@ _decoration_menu() {
     hypr::fetch "${DECORATION_SPEC[@]}"
 
     cfgr::item::action \
-      --label "Border size : ${HYPR[general.border_size]}" \
+      --label "Border size : ${HYPR["general.border_size"]}" \
       --func "_set_int 'Border Size' 'Border size (int)' int 0 50 'general:border_size'"
 
     cfgr::item::action \
-      --label "Border roundness : ${HYPR[decoration.rounding]}" \
+      --label "Border roundness : ${HYPR["decoration.rounding"]}" \
       --func "_edit_roundness"
 
     cfgr::item::action \
-      --label "Rounding power : ${HYPR[decoration.rounding_power]}" \
+      --label "Rounding power : ${HYPR["decoration.rounding_power"]}" \
       --func "_set_int 'Rounding Power' 'Rounding power (float)' float 0.0 10.0 'decoration:rounding_power'"
 
     cfgr::item::action \
-      --label "Active opacity : ${HYPR[decoration.active_opacity]}" \
+      --label "Active opacity : ${HYPR["decoration.active_opacity"]}" \
       --func "_set_int 'Active Opacity' 'Active opacity (float)' float 0.0 1.0 'decoration:active_opacity'"
 
     cfgr::item::action \
-      --label "Inactive opacity : ${HYPR[decoration.active_opacity]}" \
+      --label "Inactive opacity : ${HYPR["decoration.active_opacity"]}" \
       --func "_set_int 'Inactive Opacity' 'Inactive opacity (float)' float 0.0 1.0 'decoration:inactive_opacity'"
 
     cfgr::item::action \
-      --label "Fullscreen opacity : ${HYPR[decoration.fullscreen_opacity]}" \
+      --label "Fullscreen opacity : ${HYPR["decoration.fullscreen_opacity"]}" \
       --func "_set_int 'Fullscreen Opacity' 'Fullscreen opacity (float)' float 0.0 1.0 'decoration:fullscreen_opacity'"
 
     cfgr::item::action \
-      --label "Dim inactive window : ${HYPR[decoration.dim_inactive]}" \
+      --label "Dim inactive window : ${HYPR["decoration.dim_inactive"]}" \
       --func "_toggle 'decoration:dim_inactive'"
 
-    if [[ ${HYPR[decoration.dim_inactive]} == true ]]; then
+    if [[ ${HYPR["decoration.dim_inactive"]} == true ]]; then
       cfgr::item::action \
-        --label "Dim strength : ${HYPR[decoration.dim_strength]}" \
+        --label "Dim strength : ${HYPR["decoration.dim_strength"]}" \
         --func "_set_int 'Dim strength' 'Inactive dim (float)' float 0.0 1.0 'decoration:dim_strength'"
     fi
 
     cfgr::item::action \
-      --label "Dim modal windows : ${HYPR[decoration.dim_modal]}" \
+      --label "Dim modal windows : ${HYPR["decoration.dim_modal"]}" \
       --func "_toggle 'decoration:dim_modal'"
 
     cfgr::item::action \
-      --label "Dim special workspace : ${HYPR[decoration.dim_special]}" \
+      --label "Dim special workspace : ${HYPR["decoration.dim_special"]}" \
       --func "_set_int 'Dim Strength' 'Special workspace' float 0.0 1.0 'decoration:dim_special'"
 
     cfgr::item::action \
-      --label "Border part of window : ${HYPR[decoration.border_part_of_window]}" \
+      --label "Border part of window : ${HYPR["decoration.border_part_of_window"]}" \
       --func "_toggle 'decoration:border_part_of_window'"
   }
   cfgr::run "Decoration" "_b"
@@ -284,23 +284,25 @@ _anim_submenu() {
 
     if [[ "$enabled" == true ]]; then
       local active_preset
-      if [[ -L "$HYPR_CONF_ANIMATIONS" ]]; then
-        active_preset="$(readlink "$HYPR_CONF_ANIMATIONS")"
 
-        if [[ $active_preset =~ (vibranium|\.config/hypr/animations) ]]; then
-          active_preset="${active_preset##*/}"  # Strip path
-          active_preset="${active_preset%.lua}" # Strip extension
-          active_preset="${active_preset^}"     # Make the first letter uppercase
+      if [[ -L "$HYPR_CONF_ANIMATIONS" ]]; then
+        if [[ -e "$HYPR_CONF_ANIMATIONS" ]]; then
+          active_preset="$(readlink "$HYPR_CONF_ANIMATIONS")"
+
+          if [[ $active_preset =~ (vibranium|\.config/hypr/animations) ]]; then
+            active_preset="${active_preset##*/}"  # Strip path
+            active_preset="${active_preset%.lua}" # Strip extension
+            active_preset="${active_preset^}"     # Make the first letter uppercase
+          fi
+        else
+          active_preset="<span alpha='70%'><i>[hyprland's default]</i></span>"
         fi
       elif [[ -f "$HYPR_CONF_ANIMATIONS" ]]; then
         active_preset="<span alpha='70%'><i>[user defined]</i></span>"
-      elif [[ ! -f "$HYPR_CONF_ANIMATIONS" || ! -L "$HYPR_CONF_ANIMATIONS" ]]; then
+      else
         active_preset="<span alpha='70%'><i>[hyprland's default]</i></span>"
       fi
 
-      # If not, then most likely the file is deleted (default hyprland animations),
-      # it is not symlinked or the user wrote its own animations curve. Therefore
-      # we don't know what's the curve, so show [user defined] value.
       cfgr::item::action --label "Preset : $active_preset" --func "_set_anim_preset"
     fi
   }
@@ -321,11 +323,11 @@ _glow_submenu(){
 
     if [[ "$enabled" == true ]]; then
       cfgr::item::action \
-        --label "Range : ${HYPR[decoration.glow.range]}px" \
+        --label "Range : ${HYPR["decoration.glow.range"]}px" \
         --func "_set_int 'Glow Range' 'Glow Range (int)' int 1 100 'decoration:glow:range'"
 
       cfgr::item::action \
-        --label "Render Power : ${HYPR[decoration.glow.render_power]}" \
+        --label "Render Power : ${HYPR["decoration.glow.render_power"]}" \
         --func "_set_int 'Render Power' 'Render Power (int)' int 1 4 'decoration:glow:render_power'"
     fi
   }

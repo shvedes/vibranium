@@ -30,7 +30,7 @@ source vb-lib-core
 set -- "${1%/}"
 
 _operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   term::disable_input
 
@@ -65,8 +65,8 @@ if [[ -n "$1" ]]; then
   if _is_owner_repo_format "$1"; then
     # Run the existence check in the background so term::spinner can show progress
     curl -sf -o /dev/null "https://api.github.com/repos/$1" &
-    if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking repo $1"; then
-      echo "${RED}[VIBRANIUM]${RESET} GitHub repo $1 does not exist or could not be reached"
+    if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Checking repo $1"; then
+      vb::print "$R" "GitHub repo $1 does not exist or could not be reached"
       _operation_canceled
       exit 1
     fi
@@ -74,17 +74,17 @@ if [[ -n "$1" ]]; then
   elif [[ "$1" =~ ^https?:// ]]; then
     REPO_URL="$1"
   else
-    echo "${RED}[VIBRANIUM]${RESET} Argument must be an http(s) URL or owner/repo shorthand"
+    vb::print "$R" "Argument must be an http(s) URL or owner/repo shorthand"
     _operation_canceled
     exit 1
   fi
 else
   while true; do
-    read -rp "${YELLOW}[VIBRANIUM]${RESET} Git repo: " REPO_URL
+    read -rp "${Y}[VIBRANIUM]${RS} Git repo: " REPO_URL
     REPO_URL="${REPO_URL%/}"
 
     if [[ -z "$REPO_URL" ]]; then
-      echo "${RED}[VIBRANIUM]${RESET} No input provided. Try again."
+      vb::print "$R" "No input provided. Try again."
       continue
     fi
 
@@ -96,8 +96,8 @@ else
     # owner/repo shorthand: check that the repo actually exists before proceeding
     if _is_owner_repo_format "$REPO_URL"; then
       curl -sf -o /dev/null "https://api.github.com/repos/$REPO_URL" &
-      if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking repo $REPO_URL"; then
-        echo "${RED}[VIBRANIUM]${RESET} GitHub repo $REPO_URL does not exist. Try again."
+      if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Checking repo $REPO_URL"; then
+        vb::print "$R" "GitHub repo $REPO_URL does not exist. Try again."
         continue
       fi
 
@@ -105,7 +105,7 @@ else
       break
     fi
 
-    echo "${RED}[VIBRANIUM]${RESET} Provide an http(s) URL or owner/repo shorthand (e.g. user/repo)"
+    vb::print "$R" "Provide an http(s) URL or owner/repo shorthand (e.g. user/repo)"
   done
 fi
 
@@ -134,14 +134,14 @@ THEME_NAME="${THEME_NAME#-}"
 THEME_NAME="${THEME_NAME#theme-}"
 THEME_NAME="${THEME_NAME%-theme}"
 
-THEME_DISPLAY_NAME=""
+THEME_DISP_NAME=""
 
 for _word in ${THEME_NAME//-/ }; do
-  THEME_DISPLAY_NAME+="${_word^} "
+  THEME_DISP_NAME+="${_word^} "
 done
 
-THEME_DISPLAY_NAME="${THEME_DISPLAY_NAME% }"
-THEME_NAME_COLOR="${BLUE}${THEME_DISPLAY_NAME}${RESET}"
+THEME_DISP_NAME="${THEME_DISP_NAME% }"
+THEME_NAME_CLR="${B}${THEME_DISP_NAME}${RS}"
 
 THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
 THEME_PATH="$THEMES_DIR/$THEME_NAME"
@@ -149,45 +149,45 @@ THEME_PATH="$THEMES_DIR/$THEME_NAME"
 # Official themes ship inside the Vibranium repo itself. A community theme whose
 # derived name collides with an official one would silently shadow it after install,
 # so we refuse early rather than letting that happen.
-OFFICIAL_THEME_PATH="$VIBRANIUM/themes/$THEME_NAME"
-if [[ -d "$OFFICIAL_THEME_PATH" ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR is an official Vibranium theme and cannot be overwritten by a community install."
+OFF_THEME_PATH="$VIBRANIUM/themes/$THEME_NAME"
+if [[ -d "$OFF_THEME_PATH" ]]; then
+  vb::print "$R" "$THEME_NAME_CLR is an official Vibranium theme and cannot be overwritten by a community install."
   _operation_canceled
   exit 1
 fi
 
 # Fetch the repo root listing once - checks both candidate files in a single request
 # so we don't risk hitting the GitHub API rate limit with two separate calls
-CONTENTS_FILE="/tmp/${0##*/}.tmp"
-curl -sf "https://api.github.com/repos/$REPO_PATH/contents/" --output "$CONTENTS_FILE" &
+CONT_FILE="/tmp/${0##*/}.tmp"
+curl -sf "https://api.github.com/repos/$REPO_PATH/contents/" --output "$CONT_FILE" &
 
-if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Checking theme compatibility"; then
-  echo "${RED}[VIBRANIUM]${RESET} Could not reach repo or repo does not exist"
+if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Checking theme compatibility"; then
+  vb::print "$R" "Could not reach repo or repo does not exist"
   _operation_canceled
   exit 1
 fi
 
 # Match strictly against the JSON name field - guards against partial matches
 # (e.g. a file called "my-colors.toml" must not pass)
-CONTENTS="$(< "$CONTENTS_FILE")"
+CONTENTS="$(< "$CONT_FILE")"
 if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] && [[ "$CONTENTS" != *'"name": "colors-extended.toml"'* ]]; then
-  echo "${RED}[VIBRANIUM]${RESET} $THEME_NAME_COLOR was created for ${GREEN}Omarchy${RESET} versions prior to ${BLUE}v3.3.0${RESET}"
+  vb::print "$R" "$THEME_NAME_CLR was created for ${G}Omarchy${RS} versions prior to ${B}v3.3.0${RS}"
 
   # https://github.com/basecamp/omarchy/releases/tag/v3.3.0
-  echo -e "${RED}[VIBRANIUM]${RESET} Vibranium supports themes for ${GREEN}Omarchy${RESET} ${BLUE}v3.3.0+${RESET}"
+  vb::print "$R" "Vibranium supports themes for ${G}Omarchy${RS} ${B}v3.3.0+${RS}"
 
-  rm -f "$CONTENTS_FILE"
+  rm -f "$CONT_FILE"
   _operation_canceled
   exit 1
 fi
 
-echo "${GREEN}[VIBRANIUM]${RESET} $THEME_NAME_COLOR is compatible with Vibranium"
+vb::print "$G" "$THEME_NAME_CLR is compatible with Vibranium"
 
-rm -f "$CONTENTS_FILE"
+rm -f "$CONT_FILE"
 
 # Remove stale copy of this theme if one already exists
 if [[ -d "$THEME_PATH" ]]; then
-  if ! term::ask_yes_no Y "$THEME_NAME_COLOR already exists. Do you want to reinstall it?"; then
+  if ! term::ask_yes_no Y "$THEME_NAME_CLR already exists. Do you want to reinstall it?"; then
     _operation_canceled
     exit 1
   fi
@@ -196,8 +196,8 @@ if [[ -d "$THEME_PATH" ]]; then
 fi
 
 git clone --quiet --depth 1 "$REPO_URL" "$THEME_PATH" &
-if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading $THEME_NAME_COLOR" "- ${GREEN}Done${RESET}"; then
-  echo "${RED}[VIBRANIUM]${RESET} Failed to clone theme repo"
+if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Downloading $THEME_NAME_CLR" "- ${G}Done${RS}"; then
+  vb::print "$R" "Failed to clone theme repo"
   _operation_canceled
   exit 1
 fi

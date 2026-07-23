@@ -37,14 +37,15 @@ _ask_for_sudo() {
 # Delegates path categorization to the external awk script:
 #   "${VIBRANIUM}/awk/vb-pkg-parse-systemd.awk"
 # Populates global variables:
-#   - user_enabled_units:    Enabled user-scope unit names.
-#   - system_enabled_units:  Enabled system-scope unit names.
+#   - usr_enb_units:    Enabled user-scope unit names.
+#   - sys_enb_units:  Enabled system-scope unit names.
 #   - unit_pkg_user:         Associative map of user unit name -> package.
 #   - unit_pkg_system:       Associative map of system unit name -> package.
 _handle_systemd() {
   log Info "Checking systemd units for ${#PACKAGES[@]} packages"
-  user_enabled_units=()
-  system_enabled_units=()
+# User-scope enabled units
+  usr_enb_units=()
+  sys_enb_units=()
 
   declare -gA unit_pkg_user=()
   declare -gA unit_pkg_system=()
@@ -53,7 +54,7 @@ _handle_systemd() {
   local -A seen_system=()
   local pkg scope unit_path unit
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Getting systemd service information..."
+  vb::print "$Y" "Getting systemd service information..."
 
   for pkg in "${PACKAGES[@]}"; do
     # Shellcheck has no context.
@@ -72,7 +73,7 @@ _handle_systemd() {
         unit_pkg_user[$unit]="$pkg"
 
         if systemctl -q --user is-enabled "$unit" 2> /dev/null; then
-          user_enabled_units+=("$unit")
+          usr_enb_units+=("$unit")
         fi
       else
         if [[ -n "${seen_system[$unit]}" ]]; then
@@ -84,7 +85,7 @@ _handle_systemd() {
 
         # is-enabled does not require sudo even for system units
         if systemctl -q is-enabled "$unit" 2> /dev/null; then
-          system_enabled_units+=("$unit")
+          sys_enb_units+=("$unit")
         fi
       fi
     done < <(pacman -Ql "$pkg" 2> /dev/null | awk -f "$VIBRANIUM/awk/vb-pkg-parse-systemd.awk")
@@ -146,7 +147,7 @@ _disable_scope_units() {
     while ((${#remaining[@]} > 0)); do
       unit="${remaining[0]}"
 
-      _ask_yes_no_all Y "${BLUE}[VIBRANIUM]${RESET} Disable unit '${BLUE}${unit}${RESET}' from package '${GREEN}${pkg}${RESET}' ($scope scope)?"
+      _ask_yes_no_all Y "${B}[VIBRANIUM]${RS} Disable unit '${B}${unit}${RS}' from package '${G}${pkg}${RS}' ($scope scope)?"
       local response=$?
 
       case $response in
@@ -160,7 +161,7 @@ _disable_scope_units() {
           remaining=("${remaining[@]:1}")
           ;;
         2) # All
-          echo -e "${BLUE}[VIBRANIUM]${RESET} Disabling all units for '${GREEN}${pkg}${RESET}'..."
+          vb::print "$B" "Disabling all units for '${G}${pkg}${RS}'..."
           for u in "${remaining[@]}"; do
             if [[ "$scope" == "user" ]]; then
               systemctl -q --user disable --now "$u" &
@@ -192,12 +193,12 @@ _disable_systemd_units() {
 
   local unit pkg
 
-  for unit in "${user_enabled_units[@]}"; do
+  for unit in "${usr_enb_units[@]}"; do
     pkg="${unit_pkg_user[$unit]:-unknown}"
     pkg_user_units[$pkg]+="$unit "
   done
 
-  for unit in "${system_enabled_units[@]}"; do
+  for unit in "${sys_enb_units[@]}"; do
     pkg="${unit_pkg_system[$unit]:-unknown}"
     pkg_system_units[$pkg]+="$unit "
   done
@@ -216,17 +217,17 @@ _disable_systemd_units() {
 #   --exit      Exit with status 1 after the message.
 #   --newline   Print a leading newline (useful after trap output).
 _operation_canceled() {
-  if [[ $CONSERVATIVE == true ]]; then
+  if [[ $CONSERV == true ]]; then
     return
   fi
 
-  local color="$RED"
+  local color="$R"
   local exit_after=false
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --positive)
-        color="$GREEN"
+        color="$G"
         shift
         ;;
       --exit)
@@ -240,7 +241,7 @@ _operation_canceled() {
     esac
   done
 
-  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RS"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
     term::disable_input
@@ -249,7 +250,7 @@ _operation_canceled() {
   fi
 
   if [[ $exit_after == true ]]; then
-    if [[ "$color" == "$GREEN" ]]; then
+    if [[ "$color" == "$G" ]]; then
       exit 0
     else
       exit 1
@@ -258,13 +259,13 @@ _operation_canceled() {
 }
 
 _uninstallation_complete() {
-  if [[ "$CONSERVATIVE" == true ]]; then
+  if [[ "$CONSERV" == true ]]; then
     return
   fi
 
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
 
-  printf "%s[VIBRANIUM]%s Uninstallation complete" "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s Uninstallation complete" "$G" "$RS"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
     term::disable_input
@@ -286,9 +287,9 @@ _ensure_installed() {
   done
 
   if ((${#missing[@]} > 0)); then
-    echo -e "${RED}[VIBRANIUM]${RESET} The following packages are not installed:"
+    vb::print "$R" "The following packages are not installed:"
     for pkg in "${missing[@]}"; do
-      echo -e "\t   - ${RED}${pkg}${RESET}"
+      echo -e "\t   - ${R}${pkg}${RS}"
     done
     return 1
   fi
@@ -308,25 +309,25 @@ _show_overview() {
   fi
 
   if ((${#packages[@]} <= 5)); then
-    echo -e "${BLUE}[VIBRANIUM]${RESET} You're about to uninstall the following packages: ${YELLOW}${packages[*]}${RESET}"
+    vb::print "$B" "You're about to uninstall the following packages: ${Y}${packages[*]}${RS}"
     return
   fi
 
-  echo -e "${BLUE}[VIBRANIUM]${RESET} You're about to uninstall the following packages:"
+  vb::print "$B" "You're about to uninstall the following packages:"
   for pkg in "${packages[@]}"; do
-    echo -e "\t   - ${YELLOW}${pkg}${RESET}"
+    echo -e "\t   - ${Y}${pkg}${RS}"
   done
 }
 
 _load_core_packages() {
-  if ((${#CORE_PACKAGES[@]} > 0)); then
+  if ((${#CORE_PKGS[@]} > 0)); then
     return
   fi
 
-  mapfile -t CORE_PACKAGES < <(grep -Ehv '^(#|$)' "$VIBRANIUM"/install/vb-{base,fonts}.pkgs)
+  mapfile -t CORE_PKGS < <(grep -Ehv '^(#|$)' "$VIBRANIUM"/install/vb-{base,fonts}.pkgs)
 
   if [[ "${CHASSIS_TYPE:-}" != vm ]]; then
-    CORE_PACKAGES+=(bluez bluez-utils bluetui hyprsunset ddcutil wireless-regdb)
+    CORE_PKGS+=(bluez bluez-utils bluetui hyprsunset ddcutil wireless-regdb)
   fi
 }
 
@@ -336,7 +337,7 @@ _warn_core_packages() {
   local pkg hit
 
   for pkg in "${PACKAGES[@]}"; do
-    if [[ " ${CORE_PACKAGES[*]} " == *" $pkg "* ]]; then
+    if [[ " ${CORE_PKGS[*]} " == *" $pkg "* ]]; then
       core_hits+=("$pkg")
     fi
   done
@@ -345,34 +346,34 @@ _warn_core_packages() {
     return
   fi
 
-  echo -e "${RED}[VIBRANIUM]${RESET} ${RED}WARNING: Removing core packages may break your system!${RESET}"
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Core packages to be removed:"
+  vb::print "$R" "${R}WARNING: Removing core packages may break your system!${RS}"
+  vb::print "$Y" "Core packages to be removed:"
 
   for pkg in "${core_hits[@]}"; do
-    echo -e "${BLUE}[VIBRANIUM]${RESET}   - ${YELLOW}${pkg}${RESET}"
+    vb::print "$B" "  - ${Y}${pkg}${RS}"
   done
 
   term::enable_input
 
   local choice confirm
 
-  echo -e "${BLUE}[VIBRANIUM]${RESET} Options:"
-  echo -e "${BLUE}[VIBRANIUM]${RESET}   1) Remove anyway"
-  echo -e "${BLUE}[VIBRANIUM]${RESET}   2) Exclude ${YELLOW}${#core_hits[@]}${RESET} core package(s)"
+  vb::print "$B" "Options:"
+  vb::print "$B" "  1) Remove anyway"
+  vb::print "$B" "  2) Exclude ${Y}${#core_hits[@]}${RS} core package(s)"
 
   while true; do
-    read -rp "${BLUE}[VIBRANIUM]${RESET} Choice [1/2]: " choice
+    read -rp "${B}[VIBRANIUM]${RS} Choice [1/2]: " choice
 
     case "$choice" in
       1)
-        echo -e "${RED}[VIBRANIUM]${RESET} ${RED}Are you absolutely sure?${RESET} Type 'YES, DO AS I SAY' to confirm:"
+        vb::print "$R" "${R}Are you absolutely sure?${RS} Type 'YES, DO AS I SAY' to confirm:"
         read -rp "> " confirm
         # Match exact string
         if [[ "$confirm" == "YES, DO AS I SAY" ]]; then
           term::disable_input
           return
         fi
-        echo -e "${GREEN}[VIBRANIUM]${RESET} Excluding core packages from removal"
+        vb::print "$G" "Excluding core packages from removal"
         ;;
       2)
         local -a remaining=()
@@ -394,7 +395,7 @@ _warn_core_packages() {
         term::disable_input
 
         if ((${#PACKAGES[@]} == 0)); then
-          echo -e "${YELLOW}[VIBRANIUM]${RESET} No packages remaining to remove"
+          vb::print "$Y" "No packages remaining to remove"
           _operation_canceled --positive
           exit 0
         fi
@@ -434,7 +435,7 @@ _choose_packages() {
 
 _remove_orphans() {
   log Info "Removing orphan packages"
-  echo -e "${GREEN}[VIBRANIUM]${RESET} Removing orphan packages..."
+  vb::print "$G" "Removing orphan packages..."
   yay -Ycc --noconfirm &> /dev/null
 }
 
@@ -445,14 +446,15 @@ _update_bar_module() {
   vb-refresh-waybar-module pacman
 }
 
-SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$RED" "$RESET" "$USER")"
+SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$R" "$RS" "$USER")"
 export SUDO_PROMPT
 
 NO_LOGO=false
 NO_DUMMY=false
 NO_SYSTEMD=false
-CONSERVATIVE=false
-CORE_PACKAGES=()
+CONSERV=false
+# Core package list
+CORE_PKGS=()
 PACKAGES=()
 
 if [[ -f "$XDG_CONFIG_HOME/vibranium/current/theme/fzf" ]]; then
@@ -518,7 +520,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --conservative)
-      CONSERVATIVE=true
+      CONSERV=true
       shift
       ;;
     --)

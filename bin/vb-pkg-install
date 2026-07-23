@@ -60,14 +60,14 @@ _spinner() {
   while true; do
     if [[ "$3" == "1" ]]; then
       printf "\r\033[K%s[VIBRANIUM]%s %s Installing %s%s" \
-        "$YELLOW" "$RESET" \
-        "${GRAY}${spinner_frames[$i]}${RESET}" \
-        "${YELLOW}${1}${RESET}" "${4}"
+        "$Y" "$RS" \
+        "${GY}${spinner_frames[$i]}${RS}" \
+        "${Y}${1}${RS}" "${4}"
     else
       printf "\r\033[K%s[VIBRANIUM]%s %s Installing %s%s [%d/%d]" \
-        "$YELLOW" "$RESET" \
-        "${GRAY}${spinner_frames[$i]}${RESET}" \
-        "${YELLOW}${1}${RESET}" "${4}" "$2" "$3"
+        "$Y" "$RS" \
+        "${GY}${spinner_frames[$i]}${RS}" \
+        "${Y}${1}${RS}" "${4}" "$2" "$3"
     fi
     echo "$i" > "$5"
 
@@ -80,7 +80,7 @@ _spinner() {
 # Delegates all categorization and ordering to the external awk script:
 #   "${VIBRANIUM}/systemd-units.awk"
 # Populates global arrays (indexes are aligned across all four):
-#   - provides_systemd_service: Package that owns the unit.
+#   - prov_sysd_svc: Package that owns the unit.
 #   - unit_types:  "service" or "socket".
 #   - unit_scope:  "user" or "system".
 #   - unit_names:  Basename of the unit file.
@@ -88,7 +88,8 @@ _handle_systemd() {
   log Info "Checking systemd units for ${#FILTERED[@]} packages"
   local pkg unit_type scope unit_path
 
-  provides_systemd_service=()
+# Packages that provide systemd units
+  prov_sysd_svc=()
   unit_types=()
   unit_scope=()
   unit_names=()
@@ -97,7 +98,7 @@ _handle_systemd() {
     # Process substitution: awk reads pacman output, emits prioritized "type scope path" lines.
     # The while loop simply won't execute if awk produces no output (pkg has no units).
     while read -r unit_type scope unit_path; do
-      provides_systemd_service+=("$pkg")
+      prov_sysd_svc+=("$pkg")
       unit_types+=("$unit_type")
       unit_scope+=("$scope")
       unit_names+=("${unit_path##*/}")
@@ -109,21 +110,21 @@ _handle_systemd() {
 # For each package, asks in priority order (user socket > user service > sys socket > sys service).
 # If the user agrees to enable a unit, it enables it and skips lower-priority units for that package.
 _enable_systemd_units() {
-  if ((${#provides_systemd_service[@]} == 0)); then
+  if ((${#prov_sysd_svc[@]} == 0)); then
     log Info "No systemd units to enable"
     return
   fi
 
-  log Info "Processing ${#provides_systemd_service[@]} unit(s) for enablement"
+  log Info "Processing ${#prov_sysd_svc[@]} unit(s) for enablement"
   local -a unique_pkgs
-  mapfile -t unique_pkgs < <(printf '%s\n' "${provides_systemd_service[@]}" | sort -u)
+  mapfile -t unique_pkgs < <(printf '%s\n' "${prov_sysd_svc[@]}" | sort -u)
 
   local pkg unit_type scope unit_name enabled active
   local -a pids=()
 
   for pkg in "${unique_pkgs[@]}"; do
-    for i in "${!provides_systemd_service[@]}"; do
-      if [[ "${provides_systemd_service[$i]}" != "$pkg" ]]; then
+    for i in "${!prov_sysd_svc[@]}"; do
+      if [[ "${prov_sysd_svc[$i]}" != "$pkg" ]]; then
         continue
       fi
 
@@ -140,16 +141,16 @@ _enable_systemd_units() {
       fi
 
       if [[ "$active" == "active" ]]; then
-        echo -e "${BLUE}[VIBRANIUM]${RESET} ${GREEN}${unit_name}${RESET} is already active ($scope scope)"
+        vb::print "$B" "${G}${unit_name}${RS} is already active ($scope scope)"
         break
       fi
 
       if [[ "$enabled" != "enabled" ]]; then
-        if ! term::ask_yes_no Y "Enable $unit_type '${BLUE}${unit_name}${RESET}' from package '${YELLOW}${pkg}${RESET}' ($scope scope)?"; then
+        if ! term::ask_yes_no Y "Enable $unit_type '${B}${unit_name}${RS}' from package '${Y}${pkg}${RS}' ($scope scope)?"; then
           continue
         fi
       else
-        echo -e "${BLUE}[VIBRANIUM]${RESET} Enabling ${GREEN}${unit_name}${RESET} ($scope scope)"
+        vb::print "$B" "Enabling ${G}${unit_name}${RS} ($scope scope)"
       fi
 
       term::disable_input
@@ -164,7 +165,7 @@ _enable_systemd_units() {
   done
 
   if ((${#pids[@]} > 0)); then
-    echo -e "${BLUE}[VIBRANIUM]${RESET} Waiting for systemd units to be enabled..."
+    vb::print "$B" "Waiting for systemd units to be enabled..."
     wait "${pids[@]}"
   fi
 }
@@ -179,7 +180,7 @@ _refresh_repos() {
   fi
   $cmd &> /dev/null &
   local pid="$!"
-  term::spinner "$pid" "${YELLOW}[VIBRANIUM]${RESET} Refreshing repositories" "- ${GREEN}Done!${RESET}"
+  term::spinner "$pid" "${Y}[VIBRANIUM]${RS} Refreshing repositories" "- ${G}Done!${RS}"
 }
 
 # Verifies if the given packages exist in the repositories.
@@ -191,7 +192,7 @@ _ensure_if_exist() {
   local index=1
 
   for pkg in "${PACKAGES[@]}"; do
-    printf "\r\033[K%s[VIBRANIUM]%s Verifying packages [%s/%s]" "$BLUE" "$RESET" "$index" "$total"
+    printf "\r\033[K%s[VIBRANIUM]%s Verifying packages [%s/%s]" "$B" "$RS" "$index" "$total"
 
     if [[ "$AUR_MODE" == true ]]; then
       if ! yay -Si "$pkg" &> /dev/null; then
@@ -209,9 +210,9 @@ _ensure_if_exist() {
   printf "\n"
 
   if ((${#missing[@]} > 0)); then
-    echo -e "${RED}[VIBRANIUM]${RESET} Could not find the following packages:"
+    vb::print "$R" "Could not find the following packages:"
     for pkg in "${missing[@]}"; do
-      echo -e "\t   - ${RED}${pkg}${RESET}"
+      echo -e "\t   - ${R}${pkg}${RS}"
     done
     return 1
   fi
@@ -226,25 +227,25 @@ _ensure_if_exist() {
 _operation_canceled() {
   # Launched with --conservative.
   # Don't show anything.
-  if [[ "$CONSERVATIVE" == true ]]; then
+  if [[ "$CONSERV" == true ]]; then
     return
   fi
 
   term::disable_input
 
-  local color="$RED"
+  local color="$R"
   local exit_after=false
 
   case "$1" in
     --positive)
-      color="$GREEN"
+      color="$G"
       ;;
     --exit)
       exit_after=true
       ;;
   esac
 
-  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RS"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
     trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
@@ -259,14 +260,14 @@ _operation_canceled() {
 _installation_complete() {
   # Launched with --conservative.
   # Don't show anything.
-  if [[ "$CONSERVATIVE" == true ]]; then
+  if [[ "$CONSERV" == true ]]; then
     return
   fi
 
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   term::disable_input
 
-  printf "%s[VIBRANIUM]%s Installation complete" "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s Installation complete" "$G" "$RS"
 
   if [[ $NO_DUMMY == false && -t 0 ]]; then
     # shellcheck disable=SC2034
@@ -276,8 +277,8 @@ _installation_complete() {
 
 # Filters out already-installed packages from PACKAGES and populates FILTERED.
 _filter_packages() {
-  log Info "Filtering ${#PACKAGES[@]} package(s), force=$FORCE_INSTALL"
-  if [[ "$FORCE_INSTALL" == true ]]; then
+  log Info "Filtering ${#PACKAGES[@]} package(s), force=$FORCE_INST"
+  if [[ "$FORCE_INST" == true ]]; then
     FILTERED=("${PACKAGES[@]}")
     return
   fi
@@ -291,20 +292,22 @@ _filter_packages() {
   if ((${#FILTERED[@]} == 0)); then
     if ((${#PACKAGES[@]} == 1)); then
       # Since ${PACKAGES[@]} is a single package, we can refer it as a regular variable.
-      echo -e "${GREEN}[VIBRANIUM]${RESET} ${YELLOW}$PACKAGES${RESET} is already installed"
+      vb::print "$G" "${Y}$PACKAGES${RS} is already installed"
 
       if [[ "$NO_ASK" == false ]]; then
         # Only single package branch
         if term::ask_yes_no Y "Install it anyway?"; then
           NO_ASK=true
-          SKIP_OVERVIEW=true
-          FORCE_INSTALL=true
+# Skip overview flag
+          SKIP_OVW=true
+# Force reinstall flag
+          FORCE_INST=true
           FILTERED=("${PACKAGES[@]}")
           return
         fi
       fi
     else
-      echo -e "${GREEN}[VIBRANIUM]${RESET} Selected packages are already installed"
+      vb::print "$G" "Selected packages are already installed"
     fi
 
     if [[ $EMBEDDED == false ]]; then
@@ -314,9 +317,9 @@ _filter_packages() {
   elif ((${#PACKAGES[@]} != ${#FILTERED[@]})); then
     local diff=$((${#PACKAGES[@]} - ${#FILTERED[@]}))
     if ((diff == 1)); then
-      echo -e "${BLUE}[VIBRANIUM]${RESET} $diff package is already installed"
+      vb::print "$B" "$diff package is already installed"
     else
-      echo -e "${BLUE}[VIBRANIUM]${RESET} $diff packages are already installed"
+      vb::print "$B" "$diff packages are already installed"
     fi
   fi
 }
@@ -327,7 +330,7 @@ _filter_packages() {
 # (accounting for the header and the overview title line) and shows a
 # terminal-specific scrolling hint if it does.
 _show_overview() {
-  if [[ "$SKIP_OVERVIEW" == true ]]; then
+  if [[ "$SKIP_OVW" == true ]]; then
     return
   fi
 
@@ -338,26 +341,26 @@ _show_overview() {
   fi
 
   if ((${#packages[@]} <= 5)); then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to install the following packages: ${YELLOW}${packages[*]}${RESET}"
+    vb::print "$Y" "You're about to install the following packages: ${Y}${packages[*]}${RS}"
     return
   fi
 
-  echo -e "${BLUE}[VIBRANIUM]${RESET} You're about to install the following packages:"
+  vb::print "$B" "You're about to install the following packages:"
   for pkg in "${packages[@]}"; do
-    echo -e "\t   - ${YELLOW}${pkg}${RESET}"
+    echo -e "\t   - ${Y}${pkg}${RS}"
   done
 }
 
 _install_packages() {
-  log Info "Installing ${#FILTERED[@]} package(s) (aur=$AUR_MODE, force=$FORCE_INSTALL)"
+  log Info "Installing ${#FILTERED[@]} package(s) (aur=$AUR_MODE, force=$FORCE_INST)"
   if [[ "$AUR_MODE" == true ]]; then
-    if [[ "$FORCE_INSTALL" == true ]]; then
+    if [[ "$FORCE_INST" == true ]]; then
       yes | yay -S "${YAY_FLAGS[@]}" "${FILTERED[@]}"
     else
       yes | yay --needed -S "${YAY_FLAGS[@]}" "${FILTERED[@]}"
     fi
   else
-    if [[ "$FORCE_INSTALL" == true ]]; then
+    if [[ "$FORCE_INST" == true ]]; then
       sudo pacman -S --noconfirm "${FILTERED[@]}"
     else
       sudo pacman -S --noconfirm --needed "${FILTERED[@]}"
@@ -377,7 +380,7 @@ _embed_install() {
 
   if [[ "$AUR_MODE" == true ]]; then
     local yay_opts="--needed"
-    if [[ "$FORCE_INSTALL" == true ]]; then
+    if [[ "$FORCE_INST" == true ]]; then
       yay_opts=""
     fi
 
@@ -394,7 +397,7 @@ _embed_install() {
     done
   else
     local pacman_opts="--needed"
-    if [[ "$FORCE_INSTALL" == true ]]; then
+    if [[ "$FORCE_INST" == true ]]; then
       pacman_opts=""
     fi
 
@@ -415,10 +418,10 @@ _embed_install() {
 
   if ((total == 1)); then
     printf "\r\033[K%s[VIBRANIUM]%s %s installed\n" \
-      "$GREEN" "$RESET" "${YELLOW}${FILTERED[0]}${RESET}"
+      "$G" "$RS" "${Y}${FILTERED[0]}${RS}"
   else
     printf "\r\033[K%s[VIBRANIUM]%s Installed %d packages\n" \
-      "$GREEN" "$RESET" "$total"
+      "$G" "$RS" "$total"
   fi
 }
 
@@ -430,8 +433,8 @@ _get_packages() {
     aur_temp=$(mktemp)
 
     (yay -Slqa > "$aur_temp" 2> /dev/null) &
-    term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching ${BLUE}AUR${RESET} packages" \
-      "- ${GREEN}Done!${RESET}"
+    term::spinner $! "${Y}[VIBRANIUM]${RS} Fetching ${B}AUR${RS} packages" \
+      "- ${G}Done!${RS}"
 
     mapfile -t PACKAGES < "$aur_temp"
     rm -f "$aur_temp"
@@ -440,8 +443,8 @@ _get_packages() {
     arch_temp=$(mktemp)
 
     (pacman -Slq > "$arch_temp") &
-    term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching ${BLUE}official${RESET} packages" \
-      "- ${GREEN}Done!${RESET}"
+    term::spinner $! "${Y}[VIBRANIUM]${RS} Fetching ${B}official${RS} packages" \
+      "- ${G}Done!${RS}"
 
     mapfile -t PACKAGES < "$arch_temp"
     rm -f "$arch_temp"
@@ -473,7 +476,7 @@ _cleanup() {
   fi
 
   if [[ "$AUR_MODE" == true ]]; then
-    echo -e "${BLUE}[VIBRANIUM]${RESET} Removing orphan packages"
+    vb::print "$B" "Removing orphan packages"
     yay -Ycc --noconfirm &> /dev/null
 
     if [[ "$KEEP_CACHE" == false ]]; then
@@ -493,14 +496,14 @@ _cleanup() {
 
       if [[ "$do_clean" == true ]]; then
         yay -Scc --noconfirm &> /dev/null &
-        term::spinner $! "${BLUE}[VIBRANIUM]${RESET} Removing package cache" "" ""
+        term::spinner $! "${B}[VIBRANIUM]${RS} Removing package cache" "" ""
       fi
     fi
   else
     local orphans
     mapfile -t orphans < <(pacman -Qdtq 2> /dev/null)
     if ((${#orphans[@]})); then
-      echo -e "${BLUE}[VIBRANIUM]${RESET} Removing orphan packages"
+      vb::print "$B" "Removing orphan packages"
       sudo pacman -Rns --noconfirm "${orphans[@]}" &> /dev/null
     fi
 
@@ -519,21 +522,23 @@ _cleanup() {
 
       if [[ "$do_clean" == true ]]; then
         sudo pacman -Scc --noconfirm &> /dev/null &
-        term::spinner $! "${BLUE}[VIBRANIUM]${RESET} Removing package cache" "" ""
+        term::spinner $! "${B}[VIBRANIUM]${RS} Removing package cache" "" ""
       fi
     fi
   fi
 }
 
-_embedded_early=false
+# Embedded mode flag
+_emb_early=false
 for _arg in "$@"; do
   if [[ "$_arg" == "--embedded" ]]; then
-    _embedded_early=true
+# Embedded mode flag
+    _emb_early=true
     break
   fi
 done
 
-if [[ $_embedded_early == false ]] && term::is_headless; then
+if [[ $_emb_early == false ]] && term::is_headless; then
   xdg-terminal-exec --app-id=org.vb.term.float --title="${0##*/}" -- "$0" "$@"
   exit
 fi
@@ -546,9 +551,9 @@ NO_DUMMY=false
 NO_VERIFY=false
 NO_SYSTEMD=false
 KEEP_CACHE=false
-CONSERVATIVE=false
-FORCE_INSTALL=false
-SKIP_OVERVIEW=false
+CONSERV=false   # Suppress success/fail messages
+FORCE_INST=false   # Force reinstall
+SKIP_OVW=false   # Skip overview
 EMBEDDED=false
 AUR_MODE=false
 PACKAGES=()
@@ -595,15 +600,18 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --conservative)
-      CONSERVATIVE=true
+# No success/fail messages
+      CONSERV=true
       shift
       ;;
     --force-install)
-      FORCE_INSTALL=true
+# Force reinstall flag
+      FORCE_INST=true
       shift
       ;;
     --skip-overview)
-      SKIP_OVERVIEW=true
+# Skip overview flag
+      SKIP_OVW=true
       shift
       ;;
     --aur)

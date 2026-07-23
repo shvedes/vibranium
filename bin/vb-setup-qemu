@@ -13,14 +13,14 @@ for _arg in "$@"; do
 done
 
 _operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
 _operation_complete() {
-  printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s Setup complete" "$G" "$RS"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -p $'. Press any key to exit ' dummy
@@ -31,7 +31,7 @@ _add_user_to_group() {
     return 1 # already a member
   fi
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Adding ${CYAN}${USER}${RESET} to the '${CYAN}libvirt${RESET}' group"
+  vb::print "$Y" "Adding ${P}${USER}${RS} to the '${P}libvirt${RS}' group"
   sudo usermod -aG libvirt "$USER"
   return 0 # was added
 }
@@ -55,18 +55,18 @@ _configure_ufw() {
   local desired=$'# Vibranium overrides below\nfirewall_backend = "iptables"'
 
   if grep -q '^firewall_backend' "$conf" 2> /dev/null; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} UFW libvirt config: already up to date, skipping"
+    vb::print "$G" "UFW libvirt config: already up to date, skipping"
     return 1 # unchanged
   fi
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring firewall for libvirt"
+  vb::print "$Y" "Configuring firewall for libvirt"
   echo -e "\n\n$desired" | sudo tee -a "$conf" > /dev/null
 }
 
 # Overengineered protection layer
 _ensure_virt_manager() {
   if ! command -v virt-manager > /dev/null; then
-    echo -e "${RED}[VIBRANIUM]${RESET} However, you're missing the ${YELLOW}VM Manager${RESET} app"
+    vb::print "$R" "However, you're missing the ${Y}VM Manager${RS} app"
     if term::ask_yes_no Y "Install it now?"; then
       term::disable_input
       if vb-pkg-install --embedded -- virt-manager; then
@@ -75,13 +75,13 @@ _ensure_virt_manager() {
           setsid -f app2unit virt-manager &> /dev/null
         fi
       else
-        echo -e "${RED}[VIBRANIUM]${RESET} Failed to install ${YELLOW}virt-manager${RESET}"
+        vb::print "$R" "Failed to install ${Y}virt-manager${RS}"
       fi
     else
-      echo -e "${YELLOW}[VIBRANIUM]${RESET} Remember that you need the ${YELLOW}virt-manager${RESET} package to manage virtual machines"
+      vb::print "$Y" "Remember that you need the ${Y}virt-manager${RS} package to manage virtual machines"
     fi
   else
-    echo -e "${BLUE}[VIBRANIUM]${RESET} You can start using it by launching ${YELLOW}Virtual Machine Manager${RESET} in App Launcher"
+    vb::print "$B" "You can start using it by launching ${Y}Virtual Machine Manager${RS} in App Launcher"
   fi
 }
 
@@ -91,9 +91,9 @@ term::disable_input
 
 if [[ "$CHASSIS_TYPE" == vm ]] && [[ "$_allow_paravirtualization" == false ]]; then
   term::show_header --color red
-  echo -e "${RED}[VIBRANIUM]${RESET} Running in a VM!"
-  echo -e "${RED}[VIBRANIUM]${RESET} Paravirtualization is not recommended"
-  echo -e "${RED}[VIBRANIUM]${RESET} Use ${CYAN}${0##*/} --allow-paravirtualization${RESET} to bypass this check"
+  vb::print "$R" "Running in a VM!"
+  vb::print "$R" "Paravirtualization is not recommended"
+  vb::print "$R" "Use ${P}${0##*/} --allow-paravirtualization${RS} to bypass this check"
   _operation_canceled
   exit 1
 fi
@@ -105,11 +105,11 @@ if command -v virsh > /dev/null; then
     # Show green logo as indication of success
     term::show_header --color green
 
-    echo -e "${GREEN}[VIBRANIUM]${RESET} QEMU is already set up and running"
+    vb::print "$G" "QEMU is already set up and running"
     _ensure_virt_manager
   else
     term::show_header
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} The QEMU was set up before, but looks like required service is down"
+    vb::print "$Y" "The QEMU was set up before, but looks like required service is down"
 
     if term::ask_yes_no Y "Would you like to fix it now?"; then
       if ! sudo systemctl -q enable --now libvirtd.socket; then
@@ -119,16 +119,16 @@ if command -v virsh > /dev/null; then
         exit 1
       fi
 
-      echo -e "${GREEN}[VIBRANIUM]${RESET} Enabled and started ${YELLOW}libvirtd.socket${RESET}"
+      vb::print "$G" "Enabled and started ${Y}libvirtd.socket${RS}"
 
       term::disable_input
       _ensure_virt_manager
     else
-      echo -e "${YELLOW}[VIBRANIUM]${RESET} You've set up QEMU before. Don't forget to enable ${YELLOW}libvirtd.socket${RESET} manually"
+      vb::print "$Y" "You've set up QEMU before. Don't forget to enable ${Y}libvirtd.socket${RS} manually"
     fi
   fi
 
-  echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/QEMU${RESET} for further, advanced configuration"
+  vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/QEMU${RS} for further, advanced configuration"
   _operation_complete
   exit 0
 fi
@@ -136,7 +136,7 @@ fi
 # And the default yellow otherwise
 term::show_header
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup QEMU VM (${BLUE}libvirt${RESET})"
+vb::print "$Y" "You're about to setup QEMU VM (${B}libvirt${RS})"
 
 if ! term::ask_yes_no Y "Proceed with setup?"; then
   _operation_canceled
@@ -161,42 +161,42 @@ summary_rules=()
 _configure_ufw
 case $? in
   0)
-    summary_rules+=("UFW: ${GREEN}libvirt iptables backend configured${RESET}")
+    summary_rules+=("UFW: ${G}libvirt iptables backend configured${RS}")
     ;;
   1)
-    summary_rules+=("UFW: ${CYAN}unchanged${RESET}")
+    summary_rules+=("UFW: ${P}unchanged${RS}")
     ;;
   2)
-    summary_rules+=("UFW: ${YELLOW}not present${RESET}, skipped")
+    summary_rules+=("UFW: ${Y}not present${RS}, skipped")
     ;;
 esac
 
 # ── User group ────────────────────────────────────────────────
 if _add_user_to_group; then
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} A system restart is recommended for the group change to take effect"
-  summary_rules+=("User ${CYAN}${USER}${RESET}: ${GREEN}added${RESET} to the ${CYAN}libvirt${RESET} group (restart recommended)")
+  vb::print "$Y" "A system restart is recommended for the group change to take effect"
+  summary_rules+=("User ${P}${USER}${RS}: ${G}added${RS} to the ${P}libvirt${RS} group (restart recommended)")
 else
-  summary_rules+=("User ${CYAN}${USER}${RESET}: already in the ${CYAN}libvirt${RESET} group")
+  summary_rules+=("User ${P}${USER}${RS}: already in the ${P}libvirt${RS} group")
 fi
 
 # ── Systemd units ─────────────────────────────────────────────
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling systemd units"
+vb::print "$Y" "Enabling systemd units"
 _enable_systemd_units
-summary_rules+=("Systemd units: ${GREEN}enabled and started${RESET}")
+summary_rules+=("Systemd units: ${G}enabled and started${RS}")
 
 # ── Virtual network ───────────────────────────────────────────
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting up virtual network"
+vb::print "$Y" "Setting up virtual network"
 _configure_virsh_network
-summary_rules+=("Virtual network: ${GREEN}default network autostart configured${RESET}")
+summary_rules+=("Virtual network: ${G}default network autostart configured${RS}")
 
 echo ""
-echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"
+vb::print "$B" "── Summary ─────────────────────────────"
 for rule in "${summary_rules[@]}"; do
-  echo -e "${BLUE}[VIBRANIUM]${RESET}  • $rule"
+  vb::print "$B" " • $rule"
 done
-echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
+vb::print "$B" "─────────────────────────────────────────"
 echo ""
-echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/QEMU${RESET} for further, advanced configuration"
+vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/QEMU${RS} for further, advanced configuration"
 
 if term::ask_yes_no Y "Launch VM Manager now?"; then
   exec setsid -f app2unit virt-manager &> /dev/null

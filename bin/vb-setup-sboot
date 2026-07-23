@@ -8,14 +8,14 @@ fi
 source vb-lib-core
 
 _operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
 _operation_complete() {
-  printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s " "$G" "$RS"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -p $'Setup complete. Press any key to exit ' dummy
@@ -26,14 +26,14 @@ term::disable_input
 
 if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
   term::show_header --color red
-  echo -e "${RED}[VIBRANIUM]${RESET} Setup has been done. Pending reboot."
+  vb::print "$R" "Setup has been done. Pending reboot."
   _operation_canceled
   exit 1
 fi
 
 if [[ ! -f /sys/firmware/efi/fw_platform_size ]]; then
   term::show_header --color red
-  echo -e "${RED}[VIBRANIUM]${RESET} Not in ${CYAN}UEFI${RESET} mode"
+  vb::print "$R" "Not in ${P}UEFI${RS} mode"
   _operation_canceled
   exit 1
 fi
@@ -48,10 +48,10 @@ CURRENT_ENTRY=$(bootctl status 2> /dev/null | awk -F': ' '/Current Entry/ {print
 
 if [[ ! "$CURRENT_ENTRY" == *.efi ]]; then
   term::show_header --color red
-  echo -e "${RED}[VIBRANIUM]${RESET} Only ${CYAN}UKI${RESET} method is supported"
-  echo -e "${RED}[VIBRANIUM]${RESET} A ${CYAN}Unified Kernel Image (UKI)${RESET} is a single ${CYAN}.efi${RESET} file bundling the kernel, initramfs,"
-  echo -e "${RED}[VIBRANIUM]${RESET} and boot parameters - required for Secure Boot signing to work end-to-end."
-  echo -e "${RED}[VIBRANIUM]${RESET} See: ${CYAN}https://wiki.archlinux.org/title/Unified_kernel_image${RESET}"
+  vb::print "$R" "Only ${P}UKI${RS} method is supported"
+  vb::print "$R" "A ${P}Unified Kernel Image (UKI)${RS} is a single ${P}.efi${RS} file bundling the kernel, initramfs,"
+  vb::print "$R" "and boot parameters - required for Secure Boot signing to work end-to-end."
+  vb::print "$R" "See: ${P}https://wiki.archlinux.org/title/Unified_kernel_image${RS}"
   _operation_canceled
   exit 1
 fi
@@ -66,18 +66,18 @@ shopt -u nullglob
 
 if [[ ${#SECUREBOOT_EFIVAR[@]} -eq 0 || ${#SETUP_MODE_EFIVAR[@]} -eq 0 ]]; then
   term::show_header --color red
-  echo -e "${RED}[VIBRANIUM]${RESET} Could not locate Secure Boot EFI variables"
-  echo -e "${RED}[VIBRANIUM]${RESET} Is the system booted in UEFI mode with efivars mounted?"
+  vb::print "$R" "Could not locate Secure Boot EFI variables"
+  vb::print "$R" "Is the system booted in UEFI mode with efivars mounted?"
   _operation_canceled
   exit 1
 fi
 
 if [[ ${#SECUREBOOT_EFIVAR[@]} -gt 1 || ${#SETUP_MODE_EFIVAR[@]} -gt 1 ]]; then
   term::show_header --color red
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Warning: multiple EFI variable files found for the same name"
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} SecureBoot matches: ${SECUREBOOT_EFIVAR[*]}"
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} SetupMode matches:  ${SETUP_MODE_EFIVAR[*]}"
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Using first match - inspect your efivars if this looks wrong"
+  vb::print "$Y" "Warning: multiple EFI variable files found for the same name"
+  vb::print "$Y" "SecureBoot matches: ${SECUREBOOT_EFIVAR[*]}"
+  vb::print "$Y" "SetupMode matches:  ${SETUP_MODE_EFIVAR[*]}"
+  vb::print "$Y" "Using first match - inspect your efivars if this looks wrong"
 fi
 
 # Read first data byte (skip 4-byte attribute header), strip whitespace
@@ -86,16 +86,16 @@ SETUP_MODE_RAW=$(od -An -t u1 -j4 -N1 "${SETUP_MODE_EFIVAR[0]}" | tr -d ' ')
 
 if ((SECUREBOOT_RAW == 1)); then
   term::show_header --color green
-  echo -e "${GREEN}[VIBRANIUM]${RESET} ${CYAN}Secure Boot${RESET} is already active."
-  echo -e "${GREEN}[Vibranium]${RESET} See ${GREEN}sbctl ${YELLOW}--help${RESET} for more info."
+  vb::print "$G" "${P}Secure Boot${RS} is already active."
+  echo -e "${G}[Vibranium]${RS} See ${G}sbctl ${Y}--help${RS} for more info."
   _operation_complete
   exit 0
 fi
 
 if ((SETUP_MODE_RAW == 0)); then
   term::show_header --color red
-  echo -e "${RED}[VIBRANIUM]${RESET} Secure Boot cannot be enabled: firmware is locked (Setup Mode is off)"
-  echo -e "${RED}[VIBRANIUM]${RESET} Enter BIOS and enable Setup Mode first"
+  vb::print "$R" "Secure Boot cannot be enabled: firmware is locked (Setup Mode is off)"
+  vb::print "$R" "Enter BIOS and enable Setup Mode first"
   _operation_canceled
   exit 1
 fi
@@ -103,7 +103,7 @@ fi
 term::show_header
 
 if term::ask_yes_no Y "You're about to setup Secure Boot. Continue?"; then
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} To work with efivars, Vibranium needs sudo"
+  vb::print "$Y" "To work with efivars, Vibranium needs sudo"
   # Keep sudo credentials window open, just in case.
   # The subshell's pid is later killed.
   (while true; do
@@ -129,8 +129,8 @@ _efi_nvram_writable() {
 }
 
 if ! _efi_nvram_writable; then
-  echo -e "${RED}[VIBRANIUM]${RESET} EFI NVRAM is not writable - key enrollment will fail"
-  echo -e "${RED}[VIBRANIUM]${RESET} Try: ${RED}sudo ${GREEN}mount ${YELLOW}-o ${BLUE}remount,rw ${PURPLE}/sys/firmware/efi/efivars${RESET}"
+  vb::print "$R" "EFI NVRAM is not writable - key enrollment will fail"
+  vb::print "$R" "Try: ${R}sudo ${G}mount ${Y}-o ${B}remount,rw ${P}/sys/firmware/efi/efivars${RS}"
   _operation_canceled
   exit 1
 fi
@@ -148,7 +148,7 @@ if [[ -z "$ESP_MOUNT" ]]; then
 fi
 
 if [[ -z "$ESP_MOUNT" ]] || [[ ! -d "$ESP_MOUNT" ]]; then
-  echo -e "${RED}[VIBRANIUM]${RESET} Could not locate a valid ESP mount point"
+  vb::print "$R" "Could not locate a valid ESP mount point"
   _operation_canceled
   exit 1
 fi
@@ -158,15 +158,15 @@ if ! command -v sbctl > /dev/null; then
 fi
 
 sudo sbctl --quiet create-keys &
-if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Creating Secure Boot keys" "- ${GREEN}Done${RESET}"; then
-  echo -e "${RED}[VIBRANIUM]${RESET} Failed to create keys"
+if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Creating Secure Boot keys" "- ${G}Done${RS}"; then
+  vb::print "$R" "Failed to create keys"
   _operation_canceled
   exit 1
 fi
 
 sudo sbctl --quiet enroll-keys --microsoft --firmware-builtin &
-if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Enrolling keys into firmware" "- ${GREEN}Done${RESET}"; then
-  echo -e "${RED}[VIBRANIUM]${RESET} Key enrollment failed"
+if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Enrolling keys into firmware" "- ${G}Done${RS}"; then
+  vb::print "$R" "Key enrollment failed"
   _operation_canceled
   exit 1
 fi
@@ -179,10 +179,10 @@ while IFS= read -r f; do
 done < <(sudo find "$ESP_MOUNT" -type f \( -iname '*.efi' \))
 
 for file in "${EFI_FILES[@]}"; do
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Signing ${CYAN}$file${RESET}"
+  vb::print "$Y" "Signing ${P}$file${RS}"
   if ! sudo sbctl --quiet sign --save "$file"; then
-    echo -e "${RED}[VIBRANIUM]${RESET} Failed to sign $file"
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Rolling back: unenrolling keys from firmware"
+    vb::print "$R" "Failed to sign $file"
+    vb::print "$Y" "Rolling back: unenrolling keys from firmware"
     sudo sbctl --quiet reset
     _operation_canceled
     exit 1
@@ -190,18 +190,18 @@ for file in "${EFI_FILES[@]}"; do
 done
 
 sudo mkinitcpio -P &> /dev/null &
-if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Regenerating mkinitcpio" "- ${GREEN}Done${RESET}"; then
-  echo -e "${RED}[VIBRANIUM]${RESET} Failed to regenerate initramfs"
-  echo -e "${RED}[VIBRANIUM]${RESET} ${YELLOW}Warning${RESET}: your system may be unbootable without a valid initramfs."
-  echo -e "${RED}[VIBRANIUM]${RESET} Before rebooting, open another terminal and run: ${RED}sudo ${GREEN}mkinitcpio ${YELLOW}-P${RESET}"
+if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Regenerating mkinitcpio" "- ${G}Done${RS}"; then
+  vb::print "$R" "Failed to regenerate initramfs"
+  vb::print "$R" "${Y}Warning${RS}: your system may be unbootable without a valid initramfs."
+  vb::print "$R" "Before rebooting, open another terminal and run: ${R}sudo ${G}mkinitcpio ${Y}-P${RS}"
   _operation_canceled
   exit 1
 fi
 
 for file in "${EFI_FILES[@]}"; do
   if [[ "$file" == */Microsoft/* ]]; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Microsoft keys were enrolled alongside yours,"
-    echo -e "${GREEN}[VIBRANIUM]${RESET} so your Windows installation will continue to boot as usual"
+    vb::print "$G" "Microsoft keys were enrolled alongside yours,"
+    vb::print "$G" "so your Windows installation will continue to boot as usual"
     break
   fi
 done
@@ -209,23 +209,23 @@ done
 QUIRK_URLS=$(sudo sbctl status 2> /dev/null | grep -oP 'https://\S+')
 
 if [[ -n "$QUIRK_URLS" ]]; then
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Your firmware has known quirks that may affect security:"
+  vb::print "$Y" "Your firmware has known quirks that may affect security:"
   while IFS= read -r url; do
-    echo -e "             ${CYAN}$url${RESET}"
+    echo -e "             ${P}$url${RS}"
   done <<< "$QUIRK_URLS"
 fi
 
 kill $sudo_pid
 touch "$VIBRANIUM_STATE/secure-boot-setup.complete"
 
-echo -e "${GREEN}[VIBRANIUM]${RESET} Secure Boot setup complete"
+vb::print "$G" "Secure Boot setup complete"
 if term::ask_yes_no Y "Restart is required. Reboot now?"; then
   term::disable_input
   for sec in {5..1}; do
     for step in {0..3}; do
       dots=$(printf "%.*s" "$step" "...")
       printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" \
-        "$GREEN" "$RESET" "$sec" "$dots"
+        "$G" "$RS" "$sec" "$dots"
       sleep 0.25
     done
   done

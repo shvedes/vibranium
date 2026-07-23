@@ -68,11 +68,11 @@ FZF_ARGS=(
 )
 
 _operation_canceled() {
-  local color="$RED"
+  local color="$R"
 
-  [[ "$1" == "--positive" ]] && color="$GREEN"
+  [[ "$1" == "--positive" ]] && color="$G"
 
-  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy

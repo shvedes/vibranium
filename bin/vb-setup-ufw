@@ -8,14 +8,14 @@ fi
 source vb-lib-core
 
 _operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
 _operation_complete() {
-  printf "%s[VIBRANIUM]%s Setup complete" "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s Setup complete" "$G" "$RS"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   # shellcheck disable=SC2034
   read -n1 -r -p $'. Press any key to exit ' dummy
@@ -25,11 +25,11 @@ _configure_localsend() {
   command -v localsend &> /dev/null || return 2 # localsend absent
 
   if sudo ufw status verbose 2> /dev/null | grep -q '53317'; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} LocalSend rules: already in place, skipping"
+    vb::print "$G" "LocalSend rules: already in place, skipping"
     return 1 # unchanged
   fi
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Allowing LocalSend (port ${CYAN}53317${RESET})"
+  vb::print "$Y" "Allowing LocalSend (port ${C}53317${RS})"
   sudo ufw allow 53317/udp &> /dev/null
   sudo ufw allow 53317/tcp &> /dev/null
   return 0 # applied
@@ -38,25 +38,25 @@ _configure_localsend() {
 _configure_docker() {
   command -v docker &> /dev/null || return 2 # docker absent
 
-  local dns_rule_present=false
-  local ufw_docker_present=false
+  local dns_present=false
+  local ufw_dock_present=false
 
-  sudo ufw status verbose 2> /dev/null | grep -q 'allow-docker-dns' && dns_rule_present=true
-  grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2> /dev/null && ufw_docker_present=true
+  sudo ufw status verbose 2> /dev/null | grep -q 'allow-docker-dns' && dns_present=true
+  grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2> /dev/null && ufw_dock_present=true
 
-  if $dns_rule_present && $ufw_docker_present; then
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Docker UFW rules: already in place, skipping"
+  if $dns_present && $ufw_dock_present; then
+    vb::print "$G" "Docker UFW rules: already in place, skipping"
     return 1 # unchanged
   fi
 
-  echo -e "${YELLOW}[VIBRANIUM]${RESET} Configuring UFW for Docker"
+  vb::print "$Y" "Configuring UFW for Docker"
 
-  if ! $dns_rule_present; then
+  if ! $dns_present; then
     sudo ufw allow in proto udp from 172.16.0.0/12 to 172.17.0.1 port 53 \
       comment 'allow-docker-dns' &> /dev/null
   fi
 
-  if ! $ufw_docker_present; then
+  if ! $ufw_dock_present; then
     local ufw_docker_url="https://raw.githubusercontent.com/chaifeng/ufw-docker/refs/heads/master/ufw-docker"
     curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &> /dev/null
   fi
@@ -70,19 +70,19 @@ _configure_libvirt() {
   local changed=false
 
   if ! grep -q '^firewall_backend' /etc/libvirt/network.conf 2> /dev/null; then
-    echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting libvirt firewall backend to iptables"
+    vb::print "$Y" "Setting libvirt firewall backend to iptables"
     printf '\n\n# Vibranium overrides below\nfirewall_backend = "iptables"\n' |
       sudo tee -a /etc/libvirt/network.conf > /dev/null
     changed=true
   else
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Libvirt firewall config: already up to date, skipping"
+    vb::print "$G" "Libvirt firewall config: already up to date, skipping"
   fi
 
   if ! id -nG "$USER" | grep -qw libvirt; then
-    echo -e "${BLUE}[VIBRANIUM]${RESET} You are not in the '${BLUE}libvirt${RESET}' group."
-    echo -e "${BLUE}[VIBRANIUM]${RESET} This is not required, but it allows running VMs without sudo."
-    echo -e "${BLUE}[VIBRANIUM]${RESET} You can add yourself with:"
-    echo -e "${BLUE}[VIBRANIUM]${RESET} ${RED}sudo ${GREEN}usermod ${YELLOW}-aG ${CYAN}libvirt ${BLUE}${USER}${RESET}"
+    vb::print "$B" "You are not in the '${B}libvirt${RS}' group."
+    vb::print "$B" "This is not required, but it allows running VMs without sudo."
+    vb::print "$B" "You can add yourself with:"
+    vb::print "$B" "${R}sudo ${G}usermod ${Y}-aG ${C}libvirt ${B}${USER}${RS}"
   fi
 
   $changed && return 0
@@ -103,32 +103,32 @@ term::disable_input
 if command -v ufw &> /dev/null; then
   if systemctl -q is-enabled ufw; then
     term::show_header --color green
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall is already set up and running"
+    vb::print "$G" "Firewall is already set up and running"
   else
     term::show_header --color green
-    echo -e "${GREEN}[VIBRANIUM]${RESET} Firewall service is down"
+    vb::print "$G" "Firewall service is down"
     if term::ask_yes_no Y "Would you like to fix it now?"; then
       term::disable_input
       if sudo systemctl -q enable --now ufw; then
-        echo -e "${GREEN}[VIBRANIUM]${RESET} Enabled and started ${YELLOW}ufw.service${RESET}"
+        vb::print "$G" "Enabled and started ${Y}ufw.service${RS}"
       else
-        echo -e "${RED}[VIBRANIUM]${RESET} ${YELLOW}systemctl${RESET} failed"
+        vb::print "$R" "${Y}systemctl${RS} failed"
         _operation_canceled
         exit 1
       fi
     fi
   fi
 
-  echo -e "${BLUE}[VIBRANIUM]${RESET} Use ${RED}sudo ${GREEN}ufw${YELLOW} status${RESET} to see current profiles"
-  echo -e "${BLUE}[VIBRANIUM]${RESET} Use ${GREEN}man ${YELLOW}ufw${RESET} to see the documentation"
-  echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/Uncomplicated_Firewall${RESET} for further, advanced configuration"
+  vb::print "$B" "Use ${R}sudo ${G}ufw${Y} status${RS} to see current profiles"
+  vb::print "$B" "Use ${G}man ${Y}ufw${RS} to see the documentation"
+  vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/Uncomplicated_Firewall${RS} for further, advanced configuration"
   _operation_complete
   exit 0
 fi
 
 term::show_header
 
-echo -e "${YELLOW}[VIBRANIUM]${RESET} You're about to setup ufw (Uncomplicated Firewall)"
+vb::print "$Y" "You're about to setup ufw (Uncomplicated Firewall)"
 
 if ! term::ask_yes_no Y "Proceed with setup?"; then
   _operation_canceled
@@ -140,24 +140,24 @@ if ! vb-pkg-install --embedded -- ufw; then
   exit 1
 fi
 
-summary_rules=()
+sum_rules=()
 
 # ── Default policies ──────────────────────────────────────────
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Setting default firewall policies"
+vb::print "$Y" "Setting default firewall policies"
 sudo ufw default deny incoming &> /dev/null
 sudo ufw default allow outgoing &> /dev/null
 sudo ufw allow from 192.168.1.0/24 &> /dev/null
-summary_rules+=("Default policy (WAN): ${RED}deny incoming${RESET}, ${GREEN}allow outgoing${RESET}")
-summary_rules+=("Default policy (LAN): allow anything from LAN network")
+sum_rules+=("Default policy (WAN): ${R}deny incoming${RS}, ${G}allow outgoing${RS}")
+sum_rules+=("Default policy (LAN): allow anything from LAN network")
 
 # ── LocalSend ─────────────────────────────────────────────────
 _configure_localsend
 case $? in
   0)
-    summary_rules+=("LocalSend: allowed ${CYAN}53317/tcp${RESET} and ${CYAN}53317/udp${RESET}")
+    sum_rules+=("LocalSend: allowed ${C}53317/tcp${RS} and ${C}53317/udp${RS}")
     ;;
   1)
-    summary_rules+=("LocalSend: ${CYAN}unchanged${RESET}")
+    sum_rules+=("LocalSend: ${C}unchanged${RS}")
     ;;
 esac
 
@@ -165,10 +165,10 @@ esac
 _configure_docker
 case $? in
   0)
-    summary_rules+=("Docker: DNS stub rule added, ufw-docker hook installed")
+    sum_rules+=("Docker: DNS stub rule added, ufw-docker hook installed")
     ;;
   1)
-    summary_rules+=("Docker: ${CYAN}unchanged${RESET}")
+    sum_rules+=("Docker: ${C}unchanged${RS}")
     ;;
 esac
 
@@ -176,10 +176,10 @@ esac
 _configure_libvirt
 case $? in
   0)
-    summary_rules+=("Libvirt: iptables backend set")
+    sum_rules+=("Libvirt: iptables backend set")
     ;;
   1)
-    summary_rules+=("Libvirt: ${CYAN}unchanged${RESET}")
+    sum_rules+=("Libvirt: ${C}unchanged${RS}")
     ;;
 esac
 
@@ -187,32 +187,32 @@ esac
 _configure_syncthing
 case $? in
   0)
-    summary_rules+=("Syncthing: firewall profile set")
+    sum_rules+=("Syncthing: firewall profile set")
     ;;
   1)
-    summary_rules+=("Syncthing: ${CYAN}unchanged${RESET}")
+    sum_rules+=("Syncthing: ${C}unchanged${RS}")
     ;;
 esac
 
 # ── Enable ────────────────────────────────────────────────────
-echo -e "${YELLOW}[VIBRANIUM]${RESET} Enabling UFW"
+vb::print "$Y" "Enabling UFW"
 sudo systemctl -q enable ufw
 sudo ufw --force enable &> /dev/null
 sudo ufw reload &> /dev/null
-summary_rules+=("UFW service: ${GREEN}enabled${RESET} and ${GREEN}active${RESET}")
+sum_rules+=("UFW service: ${G}enabled${RS} and ${G}active${RS}")
 
-echo -e "${BLUE}[VIBRANIUM]${RESET} System restart is recommended."
-echo -e "${BLUE}[VIBRANIUM]${RESET} If you want to fine-tune your firewall rules, consider reading ${BLUE}ufw(8)${RESET}"
+vb::print "$B" "System restart is recommended."
+vb::print "$B" "If you want to fine-tune your firewall rules, consider reading ${B}ufw(8)${RS}"
 
 echo ""
-echo -e "${BLUE}[VIBRANIUM]${RESET} ── Summary ─────────────────────────────"
-for rule in "${summary_rules[@]}"; do
-  echo -e "${BLUE}[VIBRANIUM]${RESET}  • $rule"
+vb::print "$B" "── Summary ─────────────────────────────"
+for rule in "${sum_rules[@]}"; do
+  vb::print "$B" " • $rule"
 done
-echo -e "${BLUE}[VIBRANIUM]${RESET} ─────────────────────────────────────────"
+vb::print "$B" "─────────────────────────────────────────"
 echo ""
 
-echo -e "${BLUE}[VIBRANIUM]${RESET} Use ${RED}sudo ${GREEN}ufw${YELLOW} status${RESET} to see current profiles"
-echo -e "${BLUE}[VIBRANIUM]${RESET} Use ${GREEN}man ${YELLOW}ufw${RESET} to see the documentation"
-echo -e "${BLUE}[VIBRANIUM]${RESET} Refer to ${YELLOW}\033[4mhttps://wiki.archlinux.org/title/Uncomplicated_Firewall${RESET} for further, advanced configuration"
+vb::print "$B" "Use ${R}sudo ${G}ufw${Y} status${RS} to see current profiles"
+vb::print "$B" "Use ${G}man ${Y}ufw${RS} to see the documentation"
+vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/Uncomplicated_Firewall${RS} for further, advanced configuration"
 _operation_complete

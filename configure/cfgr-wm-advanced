@@ -325,42 +325,42 @@ _menu::cursor() {
 
     local hw_cursor_display= cpu_buf_display= warp_ws_display= warp_sp_display= no_break_vrr_display=
 
-    case "${HYPR[cursor.no_hardware_cursors]}" in
+    case "${HYPR["cursor.no_hardware_cursors"]}" in
       0) hw_cursor_display="auto" ;;
       1) hw_cursor_display="always software" ;;
       2) hw_cursor_display="force software" ;;
     esac
 
-    case "${HYPR[cursor.use_cpu_buffer]}" in
+    case "${HYPR["cursor.use_cpu_buffer"]}" in
       0) cpu_buf_display="auto" ;;
       1) cpu_buf_display="always" ;;
       2) cpu_buf_display="force" ;;
     esac
 
-    case "${HYPR[cursor.warp_on_change_workspace]}" in
+    case "${HYPR["cursor.warp_on_change_workspace"]}" in
       0) warp_ws_display="disabled" ;;
       1) warp_ws_display="enabled" ;;
       2) warp_ws_display="force center" ;;
     esac
 
-    case "${HYPR[cursor.warp_on_toggle_special]}" in
+    case "${HYPR["cursor.warp_on_toggle_special"]}" in
       0) warp_sp_display="disabled" ;;
       1) warp_sp_display="enabled" ;;
       2) warp_sp_display="force center" ;;
     esac
 
-    case "${HYPR[cursor.no_break_fs_vrr]}" in
+    case "${HYPR["cursor.no_break_fs_vrr"]}" in
       0) no_break_vrr_display="disabled" ;;
       1) no_break_vrr_display="enabled" ;;
       2) no_break_vrr_display="force" ;;
     esac
 
     cfgr::item::action \
-      --label "Enable hyprcursor : ${HYPR[cursor.enable_hyprcursor]}" \
+      --label "Enable hyprcursor : ${HYPR["cursor.enable_hyprcursor"]}" \
       --func "hypr::toggle 'cursor:enable_hyprcursor' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
-      --label "Sync gsettings theme : ${HYPR[cursor.sync_gsettings_theme]}" \
+      --label "Sync gsettings theme : ${HYPR["cursor.sync_gsettings_theme"]}" \
       --func "hypr::toggle 'cursor:sync_gsettings_theme' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
@@ -372,10 +372,10 @@ _menu::cursor() {
       --func "_set::cursor::use_cpu_buffer"
 
     cfgr::item::action \
-      --label "Invisible : ${HYPR[cursor.invisible]}" \
+      --label "Invisible : ${HYPR["cursor.invisible"]}" \
       --func "hypr::toggle 'cursor:invisible' \"$HYPR_CONF_ADVANCED\""
 
-    local timeout="${HYPR[cursor.inactive_timeout]}"
+    local timeout="${HYPR["cursor.inactive_timeout"]}"
     if [[ "${timeout%.*}" == 0 ]]; then
       timeout="never"
     else
@@ -387,35 +387,35 @@ _menu::cursor() {
       --func "_set::cursor::inactive_timeout"
 
     cfgr::item::action \
-      --label "Hotspot padding : ${HYPR[cursor.hotspot_padding]}px" \
+      --label "Hotspot padding : ${HYPR["cursor.hotspot_padding"]}px" \
       --func "_set::cursor::hotspot_padding"
 
     cfgr::item::action \
-      --label "Min refresh rate : ${HYPR[cursor.min_refresh_rate]}Hz" \
+      --label "Min refresh rate : ${HYPR["cursor.min_refresh_rate"]}Hz" \
       --func "_set::cursor::min_refresh_rate"
 
     cfgr::item::action \
-      --label "Hide on key press : ${HYPR[cursor.hide_on_key_press]}" \
+      --label "Hide on key press : ${HYPR["cursor.hide_on_key_press"]}" \
       --func "hypr::toggle 'cursor:hide_on_key_press' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
-      --label "Hide on touch : ${HYPR[cursor.hide_on_touch]}" \
+      --label "Hide on touch : ${HYPR["cursor.hide_on_touch"]}" \
       --func "hypr::toggle 'cursor:hide_on_touch' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
-      --label "Hide on tablet : ${HYPR[cursor.hide_on_tablet]}" \
+      --label "Hide on tablet : ${HYPR["cursor.hide_on_tablet"]}" \
       --func "hypr::toggle 'cursor:hide_on_tablet' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
-      --label "No warps : ${HYPR[cursor.no_warps]}" \
+      --label "No warps : ${HYPR["cursor.no_warps"]}" \
       --func "hypr::toggle 'cursor:no_warps' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
-      --label "Persistent warps : ${HYPR[cursor.persistent_warps]}" \
+      --label "Persistent warps : ${HYPR["cursor.persistent_warps"]}" \
       --func "hypr::toggle 'cursor:persistent_warps' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
-      --label "Warp back after non-mouse input : ${HYPR[cursor.warp_back_after_non_mouse_input]}" \
+      --label "Warp back after non-mouse input : ${HYPR["cursor.warp_back_after_non_mouse_input"]}" \
       --func "hypr::toggle 'cursor:warp_back_after_non_mouse_input' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
@@ -431,15 +431,15 @@ _menu::cursor() {
       --func "_set::cursor::no_break_fs_vrr"
 
     cfgr::item::action \
-      --label "Zoom rigid : ${HYPR[cursor.zoom_rigid]}" \
+      --label "Zoom rigid : ${HYPR["cursor.zoom_rigid"]}" \
       --func "hypr::toggle 'cursor:zoom_rigid' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
-      --label "Zoom detached camera : ${HYPR[cursor.zoom_detached_camera]}" \
+      --label "Zoom detached camera : ${HYPR["cursor.zoom_detached_camera"]}" \
       --func "hypr::toggle 'cursor:zoom_detached_camera' \"$HYPR_CONF_ADVANCED\""
 
     cfgr::item::action \
-      --label "Zoom disable anti-aliasing : ${HYPR[cursor.zoom_disable_aa]}" \
+      --label "Zoom disable anti-aliasing : ${HYPR["cursor.zoom_disable_aa"]}" \
       --func "hypr::toggle 'cursor:zoom_disable_aa' \"$HYPR_CONF_ADVANCED\""
   }
 
@@ -451,17 +451,17 @@ _menu::scrolling () {
     hypr::reload
     hypr::fetch "${SCROLLING_SPEC[@]}"
 
-    case "${HYPR[scrolling.focus_fit_method]}" in
+    case "${HYPR["scrolling.focus_fit_method"]}" in
       0) fit_method="center" ;;
       1) fit_method="fit" ;;
     esac
 
     cfgr::item::action \
-      --label "Direction : ${HYPR[scrolling.direction]}" \
+      --label "Direction : ${HYPR["scrolling.direction"]}" \
       --func "_set_scrolling_dir"
 
     cfgr::item::action \
-      --label "Follow focus : ${HYPR[scrolling.follow_focus]}" \
+      --label "Follow focus : ${HYPR["scrolling.follow_focus"]}" \
       --func "hypr::toggle 'scrolling:follow_focus' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
@@ -469,19 +469,19 @@ _menu::scrolling () {
       --func "_set::scrolling::focus_fit"
 
     cfgr::item::action \
-      --label "Column width : ${HYPR[scrolling.column_width]}" \
+      --label "Column width : ${HYPR["scrolling.column_width"]}" \
       --func "_set::scrolling::column_width"
 
     cfgr::item::action \
-      --label "Follow minimim visible : ${HYPR[scrolling.follow_min_visible]}" \
+      --label "Follow minimim visible : ${HYPR["scrolling.follow_min_visible"]}" \
       --func "_set::scrolling::follow_min_visible"
 
     cfgr::item::action \
-      --label "Wrap swapcol : ${HYPR[scrolling.wrap_swapcol]}" \
+      --label "Wrap swapcol : ${HYPR["scrolling.wrap_swapcol"]}" \
       --func "hypr::toggle 'scrolling:wrap_swapcol' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Wrap focus : ${HYPR[scrolling.wrap_focus]}" \
+      --label "Wrap focus : ${HYPR["scrolling.wrap_focus"]}" \
       --func "hypr::toggle 'scrolling:wrap_focus' "$HYPR_CONF_ADVANCED""
     }
 
@@ -495,13 +495,13 @@ _menu::dwindle() {
 
     local split_method= split_bias=
 
-    case "${HYPR[dwindle.force_split]}" in
+    case "${HYPR["dwindle.force_split"]}" in
       0) split_method="follow mouse" ;;
       1) split_method="left" ;;
       2) split_method="right" ;;
     esac
 
-    case "${HYPR[dwindle.split_bias]}" in
+    case "${HYPR["dwindle.split_bias"]}" in
       0) split_bias="directional" ;;
       1) split_bias="current window" ;;
     esac
@@ -511,39 +511,39 @@ _menu::dwindle() {
       --func "_set::dwindle::split_method"
 
     cfgr::item::action \
-      --label "Preserve split : ${HYPR[dwindle.preserve_split]}" \
+      --label "Preserve split : ${HYPR["dwindle.preserve_split"]}" \
       --func "hypr::toggle 'dwindle:preserve_split' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Smart split : ${HYPR[dwindle.smart_split]}" \
+      --label "Smart split : ${HYPR["dwindle.smart_split"]}" \
       --func "hypr::toggle 'dwindle:smart_split' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Smart resizing : ${HYPR[dwindle.smart_resizing]}" \
+      --label "Smart resizing : ${HYPR["dwindle.smart_resizing"]}" \
       --func "hypr::toggle 'dwindle:smart_resizing' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Direction override : ${HYPR[dwindle.permanent_direction_override]}" \
+      --label "Direction override : ${HYPR["dwindle.permanent_direction_override"]}" \
       --func "hypr::toggle 'dwindle:permanent_direction_override' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Special workspace scale : ${HYPR[dwindle.special_scale_factor]}" \
+      --label "Special workspace scale : ${HYPR["dwindle.special_scale_factor"]}" \
       --func "_set::dwindle::special_scale_factor"
 
     cfgr::item::action \
-      --label "Width multiplier : ${HYPR[dwindle.split_width_multiplier]}" \
+      --label "Width multiplier : ${HYPR["dwindle.split_width_multiplier"]}" \
       --func "_set::dwindle::split_width_multiplier"
 
     cfgr::item::action \
-      --label "Use active for splits : ${HYPR[dwindle.use_active_for_splits]}" \
+      --label "Use active for splits : ${HYPR["dwindle.use_active_for_splits"]}" \
       --func "hypr::toggle 'dwindle:use_active_for_splits' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Width multiplier : ${HYPR[dwindle.split_width_multiplier]}" \
+      --label "Width multiplier : ${HYPR["dwindle.split_width_multiplier"]}" \
       --func "_set::dwindle::split_width_multiplier"
 
     cfgr::item::action \
-      --label "Split ratio : ${HYPR[dwindle.default_split_ratio]}" \
+      --label "Split ratio : ${HYPR["dwindle.default_split_ratio"]}" \
       --func "_set::dwindle::default_split_ratio"
 
     cfgr::item::action \
@@ -551,7 +551,7 @@ _menu::dwindle() {
       --func "_set::dwindle::split_bias"
 
     cfgr::item::action \
-      --label "Precise mouse move : ${HYPR[dwindle.precise_mouse_move]}" \
+      --label "Precise mouse move : ${HYPR["dwindle.precise_mouse_move"]}" \
       --func "hypr::toggle 'dwindle:precise_mouse_move' "$HYPR_CONF_ADVANCED""
   }
 
@@ -660,55 +660,55 @@ _menu::master() {
     hypr::fetch "${MASTER_SPEC[@]}"
 
     cfgr::item::action \
-      --label "Orientation : ${HYPR[master.orientation]}" \
+      --label "Orientation : ${HYPR["master.orientation"]}" \
       --func "_set::master::orientation"
 
     cfgr::item::action \
-      --label "New window status : ${HYPR[master.new_status]}" \
+      --label "New window status : ${HYPR["master.new_status"]}" \
       --func "_set::master::new_status"
 
     cfgr::item::action \
-      --label "New on active : ${HYPR[master.new_on_active]}" \
+      --label "New on active : ${HYPR["master.new_on_active"]}" \
       --func "_set::master::new_on_active"
 
     cfgr::item::action \
-      --label "New on top : ${HYPR[master.new_on_top]}" \
+      --label "New on top : ${HYPR["master.new_on_top"]}" \
       --func "hypr::toggle 'master:new_on_top' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Master size factor : ${HYPR[master.mfact]}" \
+      --label "Master size factor : ${HYPR["master.mfact"]}" \
       --func "_set::master::mfact"
 
     cfgr::item::action \
-      --label "Center master fallback : ${HYPR[master.center_master_fallback]}" \
+      --label "Center master fallback : ${HYPR["master.center_master_fallback"]}" \
       --func "_set::master::center_master_fallback"
 
     cfgr::item::action \
-      --label "Slave count for center master : ${HYPR[master.slave_count_for_center_master]}" \
+      --label "Slave count for center master : ${HYPR["master.slave_count_for_center_master"]}" \
       --func "_set::master::slave_count_for_center_master"
 
     cfgr::item::action \
-      --label "Special workspace scale : ${HYPR[master.special_scale_factor]}" \
+      --label "Special workspace scale : ${HYPR["master.special_scale_factor"]}" \
       --func "_set::master::special_scale_factor"
 
      cfgr::item::action \
-       --label "Allow small split : ${HYPR[master.allow_small_split]}" \
+       --label "Allow small split : ${HYPR["master.allow_small_split"]}" \
        --func "hypr::toggle 'master:allow_small_split' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Smart resizing : ${HYPR[master.smart_resizing]}" \
+      --label "Smart resizing : ${HYPR["master.smart_resizing"]}" \
       --func "hypr::toggle 'master:smart_resizing' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Drop at cursor : ${HYPR[master.drop_at_cursor]}" \
+      --label "Drop at cursor : ${HYPR["master.drop_at_cursor"]}" \
       --func "hypr::toggle 'master:drop_at_cursor' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Always keep position : ${HYPR[master.always_keep_position]}" \
+      --label "Always keep position : ${HYPR["master.always_keep_position"]}" \
       --func "hypr::toggle 'master:always_keep_position' "$HYPR_CONF_ADVANCED""
 
     cfgr::item::action \
-      --label "Focus master on close : ${HYPR[master.focus_master_on_close]}" \
+      --label "Focus master on close : ${HYPR["master.focus_master_on_close"]}" \
       --func "hypr::toggle 'master:focus_master_on_close' "$HYPR_CONF_ADVANCED""
 
   }
@@ -723,13 +723,13 @@ _build() {
   # VRR / Direct Scanout has 3 states, map int -> display string
   local vrr_display= ds_display=
 
-  case "${HYPR[misc.vrr]}" in
+  case "${HYPR["misc.vrr"]}" in
     1) vrr_display="enabled" ;;
     0) vrr_display="disabled" ;;
     2) vrr_display="fullscreen only" ;;
   esac
 
-  case "${HYPR[render.direct_scanout]}" in
+  case "${HYPR["render.direct_scanout"]}" in
     1) ds_display="enabled" ;;
     0) ds_display="disabled" ;;
     2) ds_display="auto" ;;
@@ -740,19 +740,19 @@ _build() {
     --func "_set_vrr"
 
   cfgr::item::action \
-    --label "Variable frame rate : ${HYPR[debug.vfr]}" \
+    --label "Variable frame rate : ${HYPR["debug.vfr"]}" \
     --func "hypr::toggle 'debug:vfr' "$HYPR_CONF_ADVANCED""
 
   cfgr::item::action \
-    --label "Disable auto reload : ${HYPR[misc.disable_autoreload]}" \
+    --label "Disable auto reload : ${HYPR["misc.disable_autoreload"]}" \
     --func "hypr::toggle 'misc:disable_autoreload' "$HYPR_CONF_ADVANCED""
 
   cfgr::item::action \
-    --label "Middle click paste : ${HYPR[misc.middle_click_paste]}" \
+    --label "Middle click paste : ${HYPR["misc.middle_click_paste"]}" \
     --func "hypr::toggle 'misc:middle_click_paste' "$HYPR_CONF_ADVANCED""
 
   cfgr::item::action \
-    --label "Enable ANR dialog : ${HYPR[misc.enable_anr_dialog]}" \
+    --label "Enable ANR dialog : ${HYPR["misc.enable_anr_dialog"]}" \
     --func "hypr::toggle 'misc:enable_anr_dialog' "$HYPR_CONF_ADVANCED""
 
   cfgr::item::action \
@@ -760,7 +760,7 @@ _build() {
     --func "_set_ds"
 
   cfgr::item::action \
-    --label "Windows layout : ${HYPR[general.layout]}" \
+    --label "Windows layout : ${HYPR["general.layout"]}" \
     --func "_set_layout"
 
   cfgr::item::action \

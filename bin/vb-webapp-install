@@ -19,11 +19,11 @@ APP_NAME=""
 ICON_REF=""
 CUSTOM_EXEC=""
 MIME_TYPES=""
-EXTRA_KEYWORDS=""
+EXTRA_KW=""
 CATEGORY=""
 OWN_PROFILE=false
 FORCE=false
-INTERACTIVE_MODE=false
+INT_MODE=false
 
 usage() {
   shcat << EOF
@@ -109,7 +109,7 @@ while [[ $# -gt 0 ]]; do
         log Error "Missing value for --keywords"
         exit 1
       }
-      EXTRA_KEYWORDS="$2"
+      EXTRA_KW="$2"
       shift 2
       ;;
     --category)
@@ -145,18 +145,18 @@ done
 
 _operation_complete() {
   term::disable_input
-  printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s " "$G" "$RS"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   read -n1 -r -p $'Installation complete. Press any key to exit ' dummy
 }
 
 _operation_canceled() {
-  [[ $INTERACTIVE_MODE == true ]] || return
+  [[ $INT_MODE == true ]] || return
   term::disable_input
   if [[ "$1" == "--positive" ]]; then
-    printf "%s[VIBRANIUM]%s Operation canceled" "$GREEN" "$RESET"
+    printf "%s[VIBRANIUM]%s Operation canceled" "$G" "$RS"
   else
-    printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+    printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   fi
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   read -n1 -r -s -p $'. Press any key to exit' dummy
@@ -343,7 +343,7 @@ _normalize_url() {
 
 _ask_for_icon() {
   local ref
-  read -rp "${BLUE}[VIBRANIUM]${RESET} Icon URL / path / name (or Enter for default): ${BLUE}" ref
+  read -rp "${B}[VIBRANIUM]${RS} Icon URL / path / name (or Enter for default): ${B}" ref
   [[ -z $ref ]] && ref="vb-pwa"
   printf "%s" "$ref"
 }
@@ -452,13 +452,13 @@ if ! [[ -d "$ICON_DIR" ]]; then
 fi
 
 if [[ -z $APP_URL ]]; then
-  INTERACTIVE_MODE=true
+  INT_MODE=true
   trap "trap 'exit 1' INT; printf '\n'; _operation_canceled; exit 1" INT
   term::show_header
 
   while true; do
     term::enable_input
-    read -rp "${YELLOW}[VIBRANIUM]${RESET} PWA URL: ${BLUE}" APP_URL
+    read -rp "${Y}[VIBRANIUM]${RS} PWA URL: ${B}" APP_URL
     term::disable_input
 
     if [[ -n $APP_URL ]]; then
@@ -468,12 +468,12 @@ if [[ -z $APP_URL ]]; then
 
   APP_URL="$(_normalize_url "$APP_URL")"
 
-  _url_overwrite_confirmed=false
+  _url_ovw_ok=false
   if [[ $FORCE == true ]]; then
-    _url_overwrite_confirmed=true
+    _url_ovw_ok=true
   elif _dup_file="$(_find_webapp_by_url "$APP_URL")"; then
     if term::ask_yes_no Y "This PWA is already installed. Overwrite it?"; then
-      _url_overwrite_confirmed=true
+      _url_ovw_ok=true
     else
       _operation_canceled --positive
       exit 1
@@ -482,15 +482,15 @@ if [[ -z $APP_URL ]]; then
 
   _check_url_reachable "$APP_URL" &
 
-  if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Verifying URL"; then
-    echo "${RED}[VIBRANIUM]${RESET} Could not reach ${BLUE}http(s)://${APP_URL#*://}${RESET}"
-    echo "${RED}[VIBRANIUM]${RESET} Check the URL or your connection."
+  if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Verifying URL"; then
+    vb::print "$R" "Could not reach ${B}http(s)://${APP_URL#*://}${RS}"
+    vb::print "$R" "Check the URL or your connection."
     _operation_canceled
     exit 1
   fi
 
   _fetch_page_title "$APP_URL" > "$VIBRANIUM_RUNTIME/$SELF.tmp" &
-  if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Fetching page title"; then
+  if term::spinner $! "${Y}[VIBRANIUM]${RS} Fetching page title"; then
     PAGE_TITLE=$(< "$VIBRANIUM_RUNTIME/$SELF.tmp")
   else
     PAGE_TITLE=""
@@ -512,38 +512,38 @@ if [[ -z $APP_URL ]]; then
   #   "Attention Required" - Cloudflare WAF block page
   #   "Access Denied"      - generic WAF / CDN block
   #   "...Cloudflare"      - any title containing the Cloudflare brand name
-  _title_is_challenge=false
+  _title_chall=false
   if shopt -s nocasematch 2> /dev/null; then
     [[ $PAGE_TITLE =~ ^(Just a moment|Please Wait|Attention Required|Access Denied)|Cloudflare ]] &&
-      _title_is_challenge=true
+      _title_chall=true
     shopt -u nocasematch
   fi
 
-  if [[ $_title_is_challenge == true ]]; then
-    echo "${RED}[VIBRANIUM]${RESET} Page title could not be fetched (human verification detected)"
-    echo "${RED}[VIBRANIUM]${RESET} Enter the PWA name manually below"
+  if [[ $_title_chall == true ]]; then
+    vb::print "$R" "Page title could not be fetched (human verification detected)"
+    vb::print "$R" "Enter the PWA name manually below"
     PAGE_TITLE=""
   fi
 
   term::enable_input
   if [[ -n $PAGE_TITLE && $PAGE_TITLE != "App" ]]; then
-    echo "${YELLOW}[VIBRANIUM]${RESET} Auto-generated name: ${BLUE}${PAGE_TITLE}${RESET}"
-    read -rp "${BLUE}[VIBRANIUM]${RESET} PWA name (Enter to keep the name above): " APP_NAME
+    vb::print "$Y" "Auto-generated name: ${B}${PAGE_TITLE}${RS}"
+    read -rp "${B}[VIBRANIUM]${RS} PWA name (Enter to keep the name above): " APP_NAME
     APP_NAME="PWA - ${APP_NAME:-$PAGE_TITLE}"
   else
     while true; do
-      read -rp "${YELLOW}[VIBRANIUM]${RESET} PWA name: " APP_NAME
+      read -rp "${Y}[VIBRANIUM]${RS} PWA name: " APP_NAME
       if [[ -n $APP_NAME ]]; then
         break
       fi
-      echo "${RED}[VIBRANIUM]${RESET} Name cannot be empty"
+      vb::print "$R" "Name cannot be empty"
     done
     APP_NAME="PWA - $APP_NAME"
   fi
   term::disable_input
 
-  if [[ $_url_overwrite_confirmed == false && $FORCE == false && -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]]; then
-    echo "${YELLOW}[VIBRANIUM]${RESET} A PWA named ${BLUE}${APP_NAME#PWA - }${RESET} is already installed."
+  if [[ $_url_ovw_ok == false && $FORCE == false && -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]]; then
+    vb::print "$Y" "A PWA named ${B}${APP_NAME#PWA - }${RS} is already installed."
     if ! _prompt_overwrite; then
       _operation_canceled
       exit 1
@@ -558,34 +558,34 @@ if [[ -z $APP_URL ]]; then
     OWN_PROFILE=true
   fi
 
-  AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
+  AUTO_KW="$(_auto_keywords_from_url "$APP_URL")"
 
-  if [[ -n "$AUTO_KEYWORDS" ]]; then
-    echo "${BLUE}[VIBRANIUM]${RESET} Hint: keywords are special words that can be used as a search query in the app launcher"
-    echo "${YELLOW}[VIBRANIUM]${RESET} Auto-detected keywords: ${BLUE}${AUTO_KEYWORDS//;/ }${RESET}"
-    term::ask_yes_no Y "Would you like to keep auto-generated keywords?" || AUTO_KEYWORDS=""
+  if [[ -n "$AUTO_KW" ]]; then
+    vb::print "$B" "Hint: keywords are special words that can be used as a search query in the app launcher"
+    vb::print "$Y" "Auto-detected keywords: ${B}${AUTO_KW//;/ }${RS}"
+    term::ask_yes_no Y "Would you like to keep auto-generated keywords?" || AUTO_KW=""
   fi
 
   term::enable_input
-  read -rp "${BLUE}[VIBRANIUM]${RESET} Additional keywords (space-separated, or Enter to skip): $BLUE" EXTRA_KW_RAW
+  read -rp "${B}[VIBRANIUM]${RS} Additional keywords (space-separated, or Enter to skip): $B" EXTRA_KW_RAW
   term::disable_input
 
-  EXTRA_KEYWORDS=""
-  for kw in $EXTRA_KW_RAW; do EXTRA_KEYWORDS+="${kw};"; done
-  KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
+  EXTRA_KW=""
+  for kw in $EXTRA_KW_RAW; do EXTRA_KW+="${kw};"; done
+  KEYWORDS="${AUTO_KW}${EXTRA_KW}"
 
   term::enable_input
-  read -rp "${BLUE}[VIBRANIUM]${RESET} Category (e.g. Network;WebBrowser, or Enter to skip): ${BLUE}" CATEGORY
+  read -rp "${B}[VIBRANIUM]${RS} Category (e.g. Network;WebBrowser, or Enter to skip): ${B}" CATEGORY
   term::disable_input
 
   FAVICON_URL="https://www.google.com/s2/favicons?domain=${APP_URL}&sz=128"
   if term::ask_yes_no Y "Would you like to keep the web page's original icon?"; then
     curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2> /dev/null &
-    if term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Downloading favicon of the URL" && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
+    if term::spinner $! "${Y}[VIBRANIUM]${RS} Downloading favicon of the URL" && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
       ICON_REF="$APP_NAME.png"
     else
-      echo "${RED}[VIBRANIUM]${RESET} Could not fetch favicon automatically. Enter a PNG icon URL manually"
-      echo "${RED}[VIBRANIUM]${RESET} See ${BLUE}https://dashboardicons.com${RESET} for a large library"
+      vb::print "$R" "Could not fetch favicon automatically. Enter a PNG icon URL manually"
+      vb::print "$R" "See ${B}https://dashboardicons.com${RS} for a large library"
       term::enable_input
       ICON_REF="$(_ask_for_icon)"
       term::disable_input
@@ -652,9 +652,9 @@ else
   }
 
   log Info "Generating keywords"
-  AUTO_KEYWORDS="$(_auto_keywords_from_url "$APP_URL")"
+  AUTO_KW="$(_auto_keywords_from_url "$APP_URL")"
 
-  KEYWORDS="${AUTO_KEYWORDS}${EXTRA_KEYWORDS}"
+  KEYWORDS="${AUTO_KW}${EXTRA_KW}"
   log Info "Desktop entry keywords: '$KEYWORDS'"
 
   ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
@@ -676,8 +676,8 @@ log Info "Full exec command: '$EXEC_COMMAND'"
 log Info "Writing desktop entry: '${APP_NAME}.desktop'"
 _write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$KEYWORDS" "$MIME_TYPES" "$CATEGORY"
 
-if [[ $INTERACTIVE_MODE == true ]]; then
-  echo "${GREEN}[VIBRANIUM]${RESET} ${BLUE}${APP_NAME#PWA - }${RESET} has been installed"
-  echo "${GREEN}[VIBRANIUM]${RESET} You can find it in the app launcher"
+if [[ $INT_MODE == true ]]; then
+  vb::print "$G" "${B}${APP_NAME#PWA - }${RS} has been installed"
+  vb::print "$G" "You can find it in the app launcher"
   _operation_complete
 fi

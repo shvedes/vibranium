@@ -136,7 +136,7 @@ done
 
 _operation_complete() {
   term::disable_input
-  printf "%s[VIBRANIUM]%s " "$GREEN" "$RESET"
+  printf "%s[VIBRANIUM]%s " "$G" "$RS"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
   read -n1 -r -p $'Installation complete. Press any key to exit ' dummy
 }
@@ -144,7 +144,7 @@ _operation_complete() {
 _operation_canceled() {
   [[ $INTERACTIVE_MODE == true ]] || return
   term::disable_input
-  printf "%s[VIBRANIUM]%s Operation canceled" "$RED" "$RESET"
+  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
@@ -211,7 +211,7 @@ _find_tuiapp_by_tryexec() {
 
 _ask_for_icon() {
   local ref
-  read -rp "${BLUE}[VIBRANIUM]${RESET} Icon URL / path / name (or Enter for default): ${BLUE}" ref
+  read -rp "${B}[VIBRANIUM]${RS} Icon URL / path / name (or Enter for default): ${B}" ref
   [[ -z $ref ]] && ref="vb-console"
   printf "%s" "$ref"
 }
@@ -304,16 +304,16 @@ if [[ -z $TUI_EXEC ]]; then
   # -- Exec command ----------------------------------------------------------
   while true; do
     term::enable_input
-    read -rp "${YELLOW}[VIBRANIUM]${RESET} TUI command (e.g. lazygit, btop): ${BLUE}" TUI_EXEC
+    read -rp "${Y}[VIBRANIUM]${RS} TUI command (e.g. lazygit, btop): ${B}" TUI_EXEC
     term::disable_input
     if [[ -n $TUI_EXEC ]]; then
       break
     fi
-    echo "${RED}[VIBRANIUM]${RESET} Command cannot be empty"
+    vb::print "$R" "Command cannot be empty"
   done
 
   if ! _check_exec_exists "${TUI_EXEC%% *}"; then
-    echo "${YELLOW}[VIBRANIUM]${RESET} Warning: ${BLUE}${TUI_EXEC%% *}${RESET} was not found in \$PATH."
+    vb::print "$Y" "Warning: ${B}${TUI_EXEC%% *}${RS} was not found in \$PATH."
     if ! term::ask_yes_no N "Continue anyway?"; then
       _operation_canceled
       exit 1
@@ -323,7 +323,7 @@ if [[ -z $TUI_EXEC ]]; then
   # Check by exec identity, not by name, to catch the same binary registered
   # under a different display name.
   if _find_tuiapp_by_tryexec "$TUI_EXEC" &> /dev/null; then
-    echo "${YELLOW}[VIBRANIUM]${RESET} A TUI app for ${BLUE}${TUI_EXEC##*/}${RESET} is already installed."
+    vb::print "$Y" "A TUI app for ${B}${TUI_EXEC##*/}${RS} is already installed."
     if ! term::ask_yes_no Y "Overwrite it?"; then
       _operation_canceled
       exit 1
@@ -332,14 +332,14 @@ if [[ -z $TUI_EXEC ]]; then
 
   # -- Positional arguments --------------------------------------------------
   term::enable_input
-  read -rp "${BLUE}[VIBRANIUM]${RESET} Arguments (e.g. --option1 value --option2, or Enter to skip): ${BLUE}" EXEC_ARGS
+  read -rp "${B}[VIBRANIUM]${RS} Arguments (e.g. --option1 value --option2, or Enter to skip): ${B}" EXEC_ARGS
   term::disable_input
 
   # -- App name --------------------------------------------------------------
   _suggested_name="$(_name_from_exec "$TUI_EXEC")"
-  echo "${YELLOW}[VIBRANIUM]${RESET} Suggested name: ${BLUE}${_suggested_name}${RESET}"
+  vb::print "$Y" "Suggested name: ${B}${_suggested_name}${RS}"
   term::enable_input
-  read -rp "${BLUE}[VIBRANIUM]${RESET} App name (Enter to keep the name above): ${BLUE}" APP_NAME
+  read -rp "${B}[VIBRANIUM]${RS} App name (Enter to keep the name above): ${B}" APP_NAME
   term::disable_input
   APP_NAME="TUI - ${APP_NAME:-$_suggested_name}"
 
@@ -349,9 +349,9 @@ if [[ -z $TUI_EXEC ]]; then
   fi
 
   # -- Keywords --------------------------------------------------------------
-  echo "${BLUE}[VIBRANIUM]${RESET} Hint: keywords help the app launcher find this entry by search terms"
+  vb::print "$B" "Hint: keywords help the app launcher find this entry by search terms"
   term::enable_input
-  read -rp "${BLUE}[VIBRANIUM]${RESET} Keywords (space-separated, or Enter to skip): ${BLUE}" EXTRA_KW_RAW
+  read -rp "${B}[VIBRANIUM]${RS} Keywords (space-separated, or Enter to skip): ${B}" EXTRA_KW_RAW
   term::disable_input
 
   EXTRA_KEYWORDS=""
@@ -359,7 +359,7 @@ if [[ -z $TUI_EXEC ]]; then
 
   # -- Category --------------------------------------------------------------
   term::enable_input
-  read -rp "${BLUE}[VIBRANIUM]${RESET} Extra categories (e.g. System;Monitor, or Enter to skip): ${BLUE}" CATEGORY
+  read -rp "${B}[VIBRANIUM]${RS} Extra categories (e.g. System;Monitor, or Enter to skip): ${B}" CATEGORY
   term::disable_input
 
   # -- Icon ------------------------------------------------------------------
@@ -406,7 +406,7 @@ log Info "Writing desktop entry: $APP_NAME"
 _write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$EXTRA_KEYWORDS" "$CATEGORY"
 
 if [[ $INTERACTIVE_MODE == true ]]; then
-  echo "${GREEN}[VIBRANIUM]${RESET} ${BLUE}${APP_NAME#TUI - }${RESET} has been installed"
-  echo "${GREEN}[VIBRANIUM]${RESET} You can find it in the app launcher"
+  vb::print "$G" "${B}${APP_NAME#TUI - }${RS} has been installed"
+  vb::print "$G" "You can find it in the app launcher"
   _operation_complete
 fi
