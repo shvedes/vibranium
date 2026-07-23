@@ -10,7 +10,7 @@ helpers::symlink "$HOME/.config/vibranium/current/theme/btop.theme" \
   "$HOME/.config/btop/themes/vibranium.theme"
 
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
-gsettings set org.gnome.desktop.interface font-name "Cascadia Code"
+gsettings set org.gnome.desktop.interface font-name "Liberation Mono Bold"
 gsettings set org.gnome.desktop.interface icon-theme 'Vibranium'
 
 mkdir -p ~/.config/gtk-3.0

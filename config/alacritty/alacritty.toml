@@ -27,5 +27,5 @@ bindings = [
 ]
 
 [font.normal]
-family = "Cascadia Code"
+family = "Liberation Mono Bold"
 style  = "Regular"
