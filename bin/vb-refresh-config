@@ -3,19 +3,25 @@
 source vb-lib-cli
 
 VERBOSE=false
+NUKE=false
 SELF="${0##*/}"
 
 copy_file() {
   local src="$1" dst="$2" bak="$3"
   if [[ -f $dst ]]; then
-    cp -f "$dst" "$bak" 2> /dev/null || true
+    if [[ $NUKE == true ]]; then
+      rm -f "$dst"
+      log Info "Removed $dst"
+    else
+      cp -f "$dst" "$bak" 2> /dev/null || true
+    fi
     cp -f "$src" "$dst" 2> /dev/null
 
-    if cmp -s "$dst" "$bak"; then
+    if [[ $NUKE != true ]] && cmp -s "$dst" "$bak"; then
       rm -f "$bak"
       log Info "$dst unchanged, no backup needed"
     else
-      log Info "Replaced $dst, backup at $bak"
+      log Info "Replaced $dst"
     fi
   else
     cp -f "$src" "$dst" 2> /dev/null
@@ -27,8 +33,13 @@ copy_dir() {
   local src="$1" dst="$2" bak="$3"
 
   if [[ -d $dst ]]; then
-    cp -rf "$dst" "$bak" 2> /dev/null || true
-    log Info "Backed up $dst to $bak"
+    if [[ $NUKE == true ]]; then
+      rm -rf "$dst"
+      log Info "Removed $dst"
+    else
+      cp -rf "$dst" "$bak" 2> /dev/null || true
+      log Info "Backed up $dst to $bak"
+    fi
   fi
 
   if ! [[ -d "$dst" ]]; then
@@ -43,14 +54,14 @@ usage() {
   shcat << EOF
 Usage: $SELF CONFIG_PATH
 
-Copy the named config from \$VIBRANIUM/config back to ~/.config,
-backing up the current file with a timestamp.
+Copy the named config from \$VIBRANIUM/config back to ~/.config. Keeps backups.
 
 Example:
   $SELF hypr/hyprlock.conf
   $SELF waybar/config.jsonc
 
 Options:
+  --nuke         Delete existing target instead of backing up
   -v, --verbose  Enable verbose output
   -h, --help     Display this help and exit
 EOF
@@ -64,6 +75,10 @@ while (($# > 0)); do
       ;;
     -v | --verbose)
       VERBOSE=true
+      shift
+      ;;
+    --nuke)
+      NUKE=true
       shift
       ;;
     *)
