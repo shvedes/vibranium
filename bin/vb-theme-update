@@ -41,6 +41,22 @@ _wait_for_key() {
 
 trap 'trap "exit 1" INT HUP; printf "\n"; _wait_for_key; exit 1' INT HUP
 
+_spinner() {
+  local pid=$1 msg="$2" delay=0.07
+  # shellcheck disable=SC1003
+  local spinstr=('/' '-' '\' '|')
+
+  while kill -0 "$pid" 2> /dev/null; do
+    for c in "${spinstr[@]}"; do
+      printf '\r\033[K%s %s' "$msg" "$c"
+      sleep $delay
+    done
+  done
+
+  wait "$pid"
+  return $?
+}
+
 _display_name() {
   local name="$1" word out=
   for word in ${name//-/ }; do
@@ -52,7 +68,7 @@ _display_name() {
 term::show_header
 
 THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
-UPDATED=0
+UPDATED_THEMES=()
 SKIPPED=0
 UPTODATE=0
 FAILED=()
@@ -74,18 +90,21 @@ fi
 
 mapfile -t themes < <(printf '%s\n' "${themes[@]}" | sort)
 
+term::disable_input
+
 for theme in "${themes[@]}"; do
   theme_path="$THEMES_DIR/$theme"
   display="${BLUE}$(_display_name "$theme")${RESET}"
 
+  (sleep 0.1) &
+  _spinner $! "${YELLOW}[VIBRANIUM]${RESET} ${YELLOW}Checking${RESET} $display"
+
   if [[ ! -d "$theme_path/.git" ]]; then
-    echo "${YELLOW}[VIBRANIUM]${RESET} $display is not a git repository, skipping"
     ((SKIPPED++))
     continue
   fi
 
   if ! git -C "$theme_path" diff --quiet HEAD 2> /dev/null; then
-    echo "${YELLOW}[VIBRANIUM]${RESET} $display has local changes, skipping"
     ((SKIPPED++))
     continue
   fi
@@ -93,31 +112,34 @@ for theme in "${themes[@]}"; do
   behind=$(git -C "$theme_path" rev-list --count 'HEAD..@{upstream}' 2> /dev/null)
 
   if [[ -z "$behind" ]] || ((behind == 0)); then
-    echo "${BLUE}[VIBRANIUM]${RESET} $display is already up to date"
     ((UPTODATE++))
     continue
   fi
 
   git -C "$theme_path" pull --ff-only &
-  if ! term::spinner $! "${YELLOW}[VIBRANIUM]${RESET} Updating $display" "- ${GREEN}Done${RESET}"; then
-    echo "${RED}[VIBRANIUM]${RESET} Failed to update $display"
+  if ! _spinner $! "${YELLOW}[VIBRANIUM]${RESET} ${GREEN}Updating${RESET} $display"; then
     FAILED+=("$display")
     continue
   fi
 
-  ((UPDATED++))
+  UPDATED_THEMES+=("$display")
 done
 
-echo "${GREEN}[VIBRANIUM]${RESET} Updated $UPDATED theme(s), $UPTODATE already up to date, ${#FAILED[@]} failed, $SKIPPED skipped"
+printf '\r\033[K%s[VIBRANIUM]%s All themes processed\n' "$GREEN" "$RESET"
+
+if ((${#UPDATED_THEMES[@]} > 0)); then
+  echo "${GREEN}[VIBRANIUM]${RESET} Updated themes:"
+  for t in "${UPDATED_THEMES[@]}"; do
+    echo -e "\t   - ${BLUE}$t${RESET}"
+  done
+fi
+
+echo "${GREEN}[VIBRANIUM]${RESET} Updated ${GREEN}${#UPDATED_THEMES[@]}${RESET} theme(s), ${CYAN}$UPTODATE${RESET} already up to date, ${RED}${#FAILED[@]}${RESET} failed, ${BLUE}$SKIPPED${RESET} skipped"
 
 if ((${#FAILED[@]} > 0)); then
   for failed in "${FAILED[@]}"; do
     echo "  ${RED}-${RESET} $failed"
   done
-fi
-
-if ((UPDATED > 0)); then
-  notify-send -r 3 "Vibranium" "Updated $UPDATED theme(s)"
 fi
 
 _wait_for_key "$GREEN" "All done"
