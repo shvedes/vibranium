@@ -20,3 +20,4 @@ if set -q VIBRANIUM_STATE; and test -f "$VIBRANIUM_STATE/update.available"
 end
 
 alias omarchy-theme-install="vb-theme-install"
+alias vibranium-healthcheck="vb-cmd-healthcheck"
