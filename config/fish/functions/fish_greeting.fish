@@ -5,7 +5,7 @@ function fish_greeting
         echo "List additional shell functions: "(set_color green)"flist"(set_color normal)
 
         if functions -q fisher
-            echo "Fish plugin manager: "(set_color green)"fisher " (set_color cyan)"--help"$(set_color normal)
+            echo "Fish plugin manager: "(set_color green)"fisher "(set_color cyan)"--help"$(set_color normal)
         end
 
         echo "Fish shell documentation: "(set_color green)"help"(set_color normal)
