@@ -1,0 +1,11 @@
+<?xml version="1.1" encoding="UTF-8"?>
+
+<channel name="thunar" version="1.0">
+  <property name="last-menubar-visible" type="bool" value="false"/>
+  <property name="hidden-bookmarks" type="array">
+    <value type="string" value="computer:///"/>
+  </property>
+  <property name="misc-show-delete-action" type="bool" value="true"/>
+  <property name="misc-volume-management" type="bool" value="false"/>
+</channel>
+
