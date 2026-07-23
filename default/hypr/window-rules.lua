@@ -19,24 +19,27 @@ local function attention(match_key, pattern)
   })
 end
 
-Hypr.Rule.tag_class(
--- When using system instalation of glfw,
--- Minecraft window doesn't always set its class,
--- so we make it totally optional for cases
--- when the window was launched using Xwayland
--- for example, which will set its class.
-  "(^Minecraft\\*\\s\\d\\.\\d\\d?)?",
-  "gameWindow",
-  { title = "^Minecraft\\*\\s\\d\\.\\d\\d?" }
+Hypr.Rule.tag_title(
+  -- When using system instalation of glfw,
+  -- Minecraft window doesn't always set its class,
+  -- so we make it totally optional for cases
+  -- when the window was launched using Xwayland
+  -- for example, which will set its class.
+  "Minecraft\\*?\\s+\\d+\\.\\d+(\\.\\d+)?",
+  "gameWindow"
 )
 
 Hypr.Rule.tag_class("(gamescope|osu\\!|cs(2|go_linux)|steam(_(app(_\\d+)?|proton)?))", "gameWindow")
 
 Hypr.Rule.tag_class(
-  "[\\w.]*?(.*\\.PrismLauncher|steam|heroic|lutris|prismlauncher|.*\\.RetroArch|dolphin-emu)", "gameLauncher"
+  "[\\w.]*?(.*\\.PrismLauncher|steam|heroic|lutris|prismlauncher|.*\\.RetroArch|dolphin-emu)",
+  "gameLauncher"
 )
 
-Hypr.Rule.tag_class("((google-)?chrom(e|ium)|brave-browser|microsoft-edge|vivaldi-stable|helium)", "chromiumBasedBrowser")
+Hypr.Rule.tag_class(
+  "((google-)?chrom(e|ium)|brave-browser|microsoft-edge|vivaldi-stable|helium)",
+  "chromiumBasedBrowser"
+)
 Hypr.Rule.tag_class("(?i)(firefox|zen|librewolf)", "firefoxBasedBrowser")
 
 Hypr.Rule.tag_by_tag("chromiumBasedBrowser", "browserWindow")
@@ -86,7 +89,7 @@ hl.window_rule({
 hl.window_rule({
   match = {
     class = "xdg-desktop-portal-gtk|[Tt]hunar|virt-manager",
-    title = "^()$"
+    title = "^()$",
   },
   border_color = BorderAttention,
   stay_focused = true,
@@ -108,8 +111,7 @@ hl.window_rule({
 
     -- All package management scripts
     -- And pretty much every TUI that can be launched by clicking on a Waybar module.
-    title =
-    "(vb-(tui|font|webapp|update|pkg|setup|env|theme-install|util-yt-dlp).*|bluetui|vb-update|wiremix|nmtui|impala|iwctl|pass)",
+    title = "(vb-(tui|font|webapp|update|pkg|setup|env|theme-install|util-yt-dlp).*|bluetui|vb-update|wiremix|nmtui|impala|iwctl|pass)",
     float = true,
   },
 
@@ -121,28 +123,27 @@ hl.window_rule({
 
 hl.layer_rule({
   match = { namespace = "selection" },
-  no_anim = true
+  no_anim = true,
 })
 
 -- ============================================================================================================================= --
 
 hl.window_rule({
   match = {
-    title =
-        "(?i)^("
-        .. "Save\\s+as|"
-        .. "(Open|Choose|All|Select|Save)\\s(?:\\w+\\s)?(?:Image|Folder.*|(?:All\\s)?Files?)|"
-        .. "(Image|Video)\\sfile|"
-        .. "Local\\sfile|"
-        .. "File\\supload|"
-        .. "New\\sarchive"
-        .. ")$",
+    title = "(?i)^("
+      .. "Save\\s+as|"
+      .. "(Open|Choose|All|Select|Save)\\s(?:\\w+\\s)?(?:Image|Folder.*|(?:All\\s)?Files?)|"
+      .. "(Image|Video)\\sfile|"
+      .. "Local\\sfile|"
+      .. "File\\supload|"
+      .. "New\\sarchive"
+      .. ")$",
   },
 
   float = true,
   size = "monitor_w*0.6 monitor_h*0.6",
   dim_around = true,
-  center = true
+  center = true,
 })
 
 hl.window_rule({
@@ -154,7 +155,7 @@ hl.window_rule({
   float = true,
   size = "monitor_w*0.6 monitor_h*0.6",
   dim_around = true,
-  center = true
+  center = true,
 })
 
 local thunar_re = "(Rename\\s.*|Create (New Folder|Document from template.*)|File Operation Progress|New\\s.*)"
@@ -166,7 +167,7 @@ hl.window_rule({
   name = "Thunar: File Operation",
   match = {
     class = "[Tt]hunar",
-    title = thunar_re
+    title = thunar_re,
   },
 
   float = true,

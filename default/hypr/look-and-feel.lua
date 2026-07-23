@@ -54,7 +54,7 @@ hl.config({
           "rgba(ff9900b3)",
           "rgba(ff0000b3)",
         },
-        angle = 45
+        angle = 45,
       },
       border_locked_inactive = {
         colors = {
@@ -62,8 +62,8 @@ hl.config({
           "rgba(ff990059)",
           "rgba(ff000059)",
         },
-        angle = 45
-      }
+        angle = 45,
+      },
     },
 
     groupbar = {
@@ -80,8 +80,8 @@ hl.config({
       indicator_height = 8,
       render_titles = false,
       font_weight_active = "bold",
-      font_weight_inactive = "light"
-    }
+      font_weight_inactive = "light",
+    },
   },
 
   animations = {
@@ -93,6 +93,6 @@ hl.config({
       splash = "rgb(000000)",
     },
     animate_manual_resizes = true,
-    background_color = "rgb(000000)"
+    background_color = "rgb(000000)",
   },
 })

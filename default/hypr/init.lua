@@ -38,7 +38,9 @@ end
 local function popen_lines_sorted(cmd)
   local lines = {}
   local p = io.popen(cmd)
-  if not p then return lines end
+  if not p then
+    return lines
+  end
 
   for line in p:lines() do
     table.insert(lines, line)
@@ -58,18 +60,24 @@ local function source(path)
     for _, file in ipairs(popen_lines_sorted('find "' .. dir .. '" -maxdepth 1 -type f 2>/dev/null')) do
       if pattern == "*" or file:match(pattern:gsub("%.", "%%."):gsub("%*", ".*"):gsub("%?", ".")) then
         local fn = loadfile(file)
-        if fn then fn() end
+        if fn then
+          fn()
+        end
       end
     end
   else
     if exists_dir(path) then
       for _, file in ipairs(popen_lines_sorted('find "' .. path .. '" -maxdepth 1 -type f -name "*.lua" 2>/dev/null')) do
         local fn = loadfile(file)
-        if fn then fn() end
+        if fn then
+          fn()
+        end
       end
     elseif exists_file(path) then
       local fn = loadfile(path)
-      if fn then fn() end
+      if fn then
+        fn()
+      end
     end
   end
 end

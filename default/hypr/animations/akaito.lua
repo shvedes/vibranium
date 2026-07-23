@@ -3,7 +3,7 @@
 Hypr.Anim.apply({
   curves = {
     { "easeSoft", { type = "bezier", points = { { 0.18, 0.62 }, { 0.32, 1.0 } } } },
-    { "easeFade", { type = "bezier", points = { { 0.28, 0.0 }, { 0.22, 1.0 } } } }
+    { "easeFade", { type = "bezier", points = { { 0.28, 0.0 }, { 0.22, 1.0 } } } },
   },
 
   animations = {
@@ -22,6 +22,6 @@ Hypr.Anim.apply({
     { leaf = "specialWorkspace", enabled = true, speed = 2.2, bezier = "easeSoft" },
     { leaf = "border", enabled = true, speed = 2.8, bezier = "easeSoft" },
     { leaf = "borderangle", enabled = true, speed = 3.0, bezier = "easeSoft" },
-    { leaf = "fadeSwitch", enabled = true, speed = 1.4, bezier = "easeFade" }
+    { leaf = "fadeSwitch", enabled = true, speed = 1.4, bezier = "easeFade" },
   },
 })

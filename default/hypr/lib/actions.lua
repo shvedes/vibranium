@@ -91,7 +91,9 @@ Hypr.Act = {}
 function Hypr.Guard.window(fn)
   return function(...)
     local win = hl.get_active_window()
-    if win == nil then return end
+    if win == nil then
+      return
+    end
     return fn(win, ...)
   end
 end
@@ -99,7 +101,9 @@ end
 function Hypr.Guard.monitor(fn)
   return function(...)
     local mon = hl.get_active_monitor()
-    if mon == nil then return end
+    if mon == nil then
+      return
+    end
     return fn(mon, ...)
   end
 end
@@ -107,7 +111,9 @@ end
 function Hypr.Guard.workspace(fn)
   return function(...)
     local ws = hl.get_active_workspace()
-    if ws == nil then return end
+    if ws == nil then
+      return
+    end
     return fn(ws, ...)
   end
 end
@@ -139,40 +145,40 @@ local function wrap_dispatch(dsp_fn)
   end
 end
 
-Hypr.Act.window         = {
-  move       = wrap_dispatch(hl.dsp.window.move),
-  resize     = wrap_dispatch(hl.dsp.window.resize),
-  close      = wrap_dispatch(hl.dsp.window.close),
-  kill       = wrap_dispatch(hl.dsp.window.kill),
-  float      = wrap_dispatch(hl.dsp.window.float),
+Hypr.Act.window = {
+  move = wrap_dispatch(hl.dsp.window.move),
+  resize = wrap_dispatch(hl.dsp.window.resize),
+  close = wrap_dispatch(hl.dsp.window.close),
+  kill = wrap_dispatch(hl.dsp.window.kill),
+  float = wrap_dispatch(hl.dsp.window.float),
   fullscreen = wrap_dispatch(hl.dsp.window.fullscreen),
-  pin        = wrap_dispatch(hl.dsp.window.pin),
-  pseudo     = wrap_dispatch(hl.dsp.window.pseudo),
-  center     = wrap_dispatch(hl.dsp.window.center),
-  drag       = wrap_dispatch(hl.dsp.window.drag),
-  tag        = wrap_dispatch(hl.dsp.window.tag),
+  pin = wrap_dispatch(hl.dsp.window.pin),
+  pseudo = wrap_dispatch(hl.dsp.window.pseudo),
+  center = wrap_dispatch(hl.dsp.window.center),
+  drag = wrap_dispatch(hl.dsp.window.drag),
+  tag = wrap_dispatch(hl.dsp.window.tag),
 }
 
-Hypr.Act.group          = {
-  toggle      = wrap_dispatch(hl.dsp.group.toggle),
-  next        = wrap_dispatch(hl.dsp.group.next),
-  prev        = wrap_dispatch(hl.dsp.group.prev),
+Hypr.Act.group = {
+  toggle = wrap_dispatch(hl.dsp.group.toggle),
+  next = wrap_dispatch(hl.dsp.group.next),
+  prev = wrap_dispatch(hl.dsp.group.prev),
   lock_active = wrap_dispatch(hl.dsp.group.lock_active),
   move_window = wrap_dispatch(hl.dsp.group.move_window),
-  active      = wrap_dispatch(hl.dsp.group.active),
+  active = wrap_dispatch(hl.dsp.group.active),
 }
 
-Hypr.Act.workspace      = {
+Hypr.Act.workspace = {
   toggle_special = wrap_dispatch(hl.dsp.workspace.toggle_special),
 }
 
-Hypr.Act.focus          = wrap_dispatch(hl.dsp.focus)
-Hypr.Act.layout         = wrap_dispatch(hl.dsp.layout)
-Hypr.Act.submap         = wrap_dispatch(hl.dsp.submap)
+Hypr.Act.focus = wrap_dispatch(hl.dsp.focus)
+Hypr.Act.layout = wrap_dispatch(hl.dsp.layout)
+Hypr.Act.submap = wrap_dispatch(hl.dsp.submap)
 Hypr.Act.send_key_state = wrap_dispatch(hl.dsp.send_key_state)
-Hypr.Act.send_shortcut  = wrap_dispatch(hl.dsp.send_shortcut)
-Hypr.Act.exec_raw       = wrap_dispatch(hl.dsp.exec_raw)
-Hypr.Act.exec_cmd       = wrap_dispatch(hl.dsp.exec_cmd)
+Hypr.Act.send_shortcut = wrap_dispatch(hl.dsp.send_shortcut)
+Hypr.Act.exec_raw = wrap_dispatch(hl.dsp.exec_raw)
+Hypr.Act.exec_cmd = wrap_dispatch(hl.dsp.exec_cmd)
 
 -- ----------------------------------------------------------------------------
 -- Rule.* -- window-rule shorthand
@@ -195,9 +201,13 @@ Hypr.Act.exec_cmd       = wrap_dispatch(hl.dsp.exec_cmd)
 -- (e.g. Minecraft's rule matches both class AND title).
 local function merge(a, b)
   local out = {}
-  for k, v in pairs(a) do out[k] = v end
+  for k, v in pairs(a) do
+    out[k] = v
+  end
   if b then
-    for k, v in pairs(b) do out[k] = v end
+    for k, v in pairs(b) do
+      out[k] = v
+    end
   end
   return out
 end
@@ -234,7 +244,9 @@ end
 -- by_tag("browserWindow", { focus_on_activate = true }).
 function Hypr.Rule.by_tag(tag, props)
   local rule = { match = { tag = tag } }
-  for k, v in pairs(props) do rule[k] = v end
+  for k, v in pairs(props) do
+    rule[k] = v
+  end
   hl.window_rule(rule)
 end
 

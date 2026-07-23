@@ -2,7 +2,7 @@ hl.config({
   dwindle = {
     force_split = 2,
     preserve_split = true,
-    special_scale_factor = 0.98
+    special_scale_factor = 0.98,
   },
 
   misc = {
@@ -15,23 +15,23 @@ hl.config({
     disable_hyprland_guiutils_check = true,
     font_family = "Cascadia Code",
     enable_anr_dialog = true,
-    vrr = 2
+    vrr = 2,
   },
 
   binds = {
     hide_special_on_workspace_change = true,
-    scroll_event_delay = 0
+    scroll_event_delay = 0,
   },
 
   ecosystem = {
     no_update_news = true,
-    enforce_permissions = false
+    enforce_permissions = false,
   },
 
   render = {
     cm_auto_hdr = 0,
     cm_enabled = false,
-    send_content_type = false
+    send_content_type = false,
   },
 
   debug = {
@@ -40,18 +40,18 @@ hl.config({
 
   general = {
     resize_on_border = true,
-    allow_tearing = true
+    allow_tearing = true,
   },
 
   group = {
-    insert_after_current = false
+    insert_after_current = false,
   },
 
   scrolling = {
-    column_width = 0.5
+    column_width = 0.5,
   },
 
   cursor = {
-    zoom_detached_camera = false
-  }
+    zoom_detached_camera = false,
+  },
 })

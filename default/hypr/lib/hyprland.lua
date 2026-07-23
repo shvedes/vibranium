@@ -115,11 +115,11 @@ function Hypr.Helpers.ForceKillWindow()
     hl.dispatch(
       hl.dsp.exec_raw(
         "notify-send -r "
-        .. WIN_NOTIF
-        .. " 'Window Force-Killed'"
-        .. " '<b>"
-        .. Hypr.Helpers.ShellQuote(title)
-        .. "</b> was forcefully terminated'"
+          .. WIN_NOTIF
+          .. " 'Window Force-Killed'"
+          .. " '<b>"
+          .. Hypr.Helpers.ShellQuote(title)
+          .. "</b> was forcefully terminated'"
       )
     )
     hl.dispatch(hl.dsp.window.kill())
@@ -171,12 +171,12 @@ function Hypr.Helpers.LaunchTUI(binary, command)
     hl.dispatch(
       hl.dsp.exec_raw(
         "notify-send -r "
-        .. WIN_NOTIF
-        .. " -u critical -t 5000"
-        .. " 'Cannot launch system monitor'"
-        .. " 'Missing dependency: <b>"
-        .. name
-        .. "</b>'"
+          .. WIN_NOTIF
+          .. " -u critical -t 5000"
+          .. " 'Cannot launch system monitor'"
+          .. " 'Missing dependency: <b>"
+          .. name
+          .. "</b>'"
       )
     )
     return

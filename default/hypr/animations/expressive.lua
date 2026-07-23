@@ -2,7 +2,7 @@
 
 Hypr.Anim.apply({
   layer_rules = {
-    { animation = "slide", match = { namespace = "notifications" } }
+    { animation = "slide", match = { namespace = "notifications" } },
   },
 
   curves = {
@@ -12,7 +12,7 @@ Hypr.Anim.apply({
     { "WindowsIn", { type = "bezier", points = { { 0.2, 1.17 }, { 0.15, 1.0 } } } },
     { "screenZoom", { type = "bezier", points = { { 0.5, 1.35 }, { 0.32, 1.0 } } } },
     { "WindowsMove", { type = "bezier", points = { { 0.35, 1.11 }, { 0.35, 1.01 } } } },
-    { "notifications", { type = "bezier", points = { { 0.2, 1.3 }, { 0.65, 1.0 } } } }
+    { "notifications", { type = "bezier", points = { { 0.2, 1.3 }, { 0.65, 1.0 } } } },
   },
 
   animations = {
@@ -29,6 +29,6 @@ Hypr.Anim.apply({
     { leaf = "windowsIn", enabled = true, speed = 3.8, bezier = "WindowsIn", style = "gnomed" },
     { leaf = "windowsOut", enabled = true, speed = 5.0, bezier = "easeOutQuint", style = "gnomed" },
     { leaf = "windowsMove", enabled = true, speed = 4.0, bezier = "WindowsMove", style = "slide" },
-    { leaf = "zoomFactor", enabled = true, speed = 2.5, bezier = "screenZoom" }
+    { leaf = "zoomFactor", enabled = true, speed = 2.5, bezier = "screenZoom" },
   },
 })

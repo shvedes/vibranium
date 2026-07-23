@@ -9,7 +9,7 @@ Hypr.Anim.apply({
     { "quick", { type = "bezier", points = { { 0.1, 0 }, { 0.0, 1 } } } },
     { "easy", { type = "spring", mass = 1, stiffness = 71.2633, dampening = 15.8273644 } },
     { "hobbyist", { type = "spring", mass = 1, stiffness = 40, dampening = 6 } },
-    { "cat", { type = "spring", mass = 1, stiffness = 30, dampening = 6 } }
+    { "cat", { type = "spring", mass = 1, stiffness = 30, dampening = 6 } },
   },
 
   animations = {
@@ -30,6 +30,6 @@ Hypr.Anim.apply({
     { leaf = "workspaces", enabled = true, speed = 6, spring = "hobbyist", style = "slidevert" },
     { leaf = "workspacesIn", enabled = true, speed = 6, spring = "hobbyist", style = "slidevert" },
     { leaf = "workspacesOut", enabled = true, speed = 6, spring = "hobbyist", style = "slidevert" },
-    { leaf = "zoomFactor", enabled = true, speed = 4, bezier = "quick" }
+    { leaf = "zoomFactor", enabled = true, speed = 4, bezier = "quick" },
   },
 })

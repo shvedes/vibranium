@@ -6,7 +6,7 @@ Hypr.Anim.apply({
     { "easeInOutCubic", { type = "bezier", points = { { 0.65, 0.05 }, { 0.36, 1 } } } },
     { "linear", { type = "bezier", points = { { 0, 0 }, { 1, 1 } } } },
     { "almostLinear", { type = "bezier", points = { { 0.5, 0.5 }, { 0.75, 1.0 } } } },
-    { "quick", { type = "bezier", points = { { 0.15, 0 }, { 0.1, 1 } } } }
+    { "quick", { type = "bezier", points = { { 0.15, 0 }, { 0.1, 1 } } } },
   },
 
   animations = {
@@ -23,6 +23,6 @@ Hypr.Anim.apply({
     { leaf = "layersOut", enabled = true, speed = 1.5, bezier = "linear", style = "fade" },
     { leaf = "fadeLayersIn", enabled = true, speed = 1.79, bezier = "almostLinear" },
     { leaf = "fadeLayersOut", enabled = true, speed = 1.39, bezier = "almostLinear" },
-    { leaf = "workspaces", enabled = true, speed = 3.0, bezier = "easeOutQuint", style = "fade" }
+    { leaf = "workspaces", enabled = true, speed = 3.0, bezier = "easeOutQuint", style = "fade" },
   },
 })
