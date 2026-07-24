@@ -1,7 +1,7 @@
 /* Full documentation: man rofi | man 5 rofi-theme */
 
 window, mainbox {
-	font: "Liberation Mono Bold 10";
+	font: "Liberation Mono Regular 10";
 	border-radius: 0px;
 }
 

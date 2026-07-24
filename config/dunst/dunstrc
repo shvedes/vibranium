@@ -4,7 +4,7 @@
 [global]
 # Where to display on the screen.
 origin = top-right
-font = Liberation Mono Bold Bold 9
+font = Liberation Mono Regular 9
 
 # For how long to wait for a
 # notification to close.

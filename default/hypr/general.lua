@@ -13,7 +13,7 @@ hl.config({
     disable_splash_rendering = true,
     allow_session_lock_restore = true,
     disable_hyprland_guiutils_check = true,
-    font_family = "Liberation Mono Bold",
+    font_family = "Liberation Mono Regular",
     enable_anr_dialog = true,
     vrr = 2,
   },

@@ -27,5 +27,5 @@ bindings = [
 ]
 
 [font.normal]
-family = "Liberation Mono Bold"
+family = "Liberation Mono"
 style  = "Regular"

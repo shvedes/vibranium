@@ -22,7 +22,7 @@
   background: @background;
   color:      @foreground;
 
-  font-family: 'Symbols Nerd Font Mono', 'Liberation Mono Bold';
+  font-family: 'Symbols Nerd Font Mono', 'Liberation Mono Regular';
   font-size:  11px;
 }
 
