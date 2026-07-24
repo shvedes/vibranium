@@ -135,7 +135,7 @@ hl.window_rule({
       .. "(Open|Choose|All|Select|Save)\\s(?:\\w+\\s)?(?:Image|Folder.*|(?:All\\s)?Files?)|"
       .. "(Image|Video)\\sfile|"
       .. "Local\\sfile|"
-      .. "File\\supload|"
+      .. "File\\supload(.*)?|"
       .. "New\\sarchive"
       .. ")$",
   },
