@@ -294,20 +294,29 @@ _check_url_reachable() {
 # ---------------------------------------------------------------------------
 _find_webapp_by_url() {
   local url="$1"
-  local dir="$XDG_DATA_HOME/applications"
-  local f line
+  local domain="${url#*://}"
+  domain="${domain#www.}"
+  domain="${domain%%[/?#]*}"
 
-  for f in "$dir/PWA - "*.desktop; do
-    [[ -f "$f" ]] || continue
-
-    while IFS= read -r line || [[ -n $line ]]; do
-      if [[ $line == "Exec=vb-launch-webapp $url" || $line == "Exec=vb-launch-webapp --own-profile $url" ]]; then
+  if command -v rg &> /dev/null; then
+    local f
+    read -r f < <(rg -l -g 'PWA - *.desktop' -g 'chrome-*.desktop' -Fi "$domain" "$XDG_DATA_HOME/applications" 2> /dev/null)
+    if [[ -n "$f" ]]; then
+      echo "$f"
+      return 0
+    fi
+  else
+    local f
+    for f in "$XDG_DATA_HOME/applications"/'PWA - '*.desktop "$XDG_DATA_HOME/applications"/chrome-*.desktop; do
+      if [[ ! -f "$f" ]]; then
+        continue
+      fi
+      if grep -Fiq "$domain" "$f" &> /dev/null; then
         echo "$f"
         return 0
       fi
-      [[ $line == '['*']' ]] && [[ $line != '[Desktop Entry]' ]] && break
-    done < "$f"
-  done
+    done
+  fi
 
   return 1
 }
@@ -466,20 +475,45 @@ if [[ -z $APP_URL ]]; then
     fi
   done
 
-  APP_URL="$(_normalize_url "$APP_URL")"
+  # Quick scheme-less normalization for duplicate check (no curl probes)
+  while [[ $APP_URL == */ ]]; do APP_URL="${APP_URL%/}"; done
+  if [[ ! $APP_URL =~ ^[a-zA-Z][a-zA-Z0-9+.-]*: ]]; then
+    CHECK_URL="https://$APP_URL"
+  else
+    CHECK_URL="$APP_URL"
+  fi
 
   _url_ovw_ok=false
   if [[ $FORCE == true ]]; then
     _url_ovw_ok=true
-  elif _dup_file="$(_find_webapp_by_url "$APP_URL")"; then
-    if term::ask_yes_no Y "This PWA is already installed. Overwrite it?"; then
-      _url_ovw_ok=true
-    else
-      _operation_canceled --positive
-      exit 1
+  else
+    if _dup_file="$(_find_webapp_by_url "$CHECK_URL")"; then
+      vb::print "$Y" "Duplicate found: ${B}${_dup_file##*/}${RS}"
+      if term::ask_yes_no Y "This PWA is already installed. Overwrite it?"; then
+        _url_ovw_ok=true
+        if [[ "$_dup_file" == */chrome-*.desktop ]]; then
+          _icon=""
+          while IFS= read -r _line; do
+            if [[ "$_line" == Icon=* ]]; then
+              _icon="${_line#Icon=}"
+              break
+            fi
+          done < "$_dup_file"
+          rm -f -- "$_dup_file"
+
+          if [[ -n "$_icon" ]]; then
+            find "$XDG_DATA_HOME/icons" -name "${_icon}.png" -delete 2> /dev/null
+          fi
+        fi
+      else
+        _operation_canceled --positive
+        exit 1
+      fi
     fi
   fi
 
+  vb::print "$Y" "Probing URL availability..."
+  APP_URL="$(_normalize_url "$APP_URL")"
   _check_url_reachable "$APP_URL" &
 
   if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Verifying URL"; then
@@ -612,14 +646,26 @@ else
   log Info "Using URL: '$APP_URL'"
 
   log Info "Checking for duplicates"
-  if _find_webapp_by_url "$APP_URL" > /dev/null; then
+  if dup_file="$(_find_webapp_by_url "$APP_URL")"; then
+    log Info "Duplicate found: ${dup_file##*/}"
     if [[ $FORCE == false ]]; then
-      log Error "PWA already installed for '$APP_URL', exiting"
+      log Error "Already installed for '$APP_URL', exiting"
       log Error "Use --force to mitigate this"
       exit 1
     fi
 
     log Info "Found duplicate. --force is being used, ignoring"
+    if [[ "$dup_file" == */chrome-*.desktop ]]; then
+      _icon=""
+      while IFS= read -r _line; do
+        [[ "$_line" == Icon=* ]] && {
+          _icon="${_line#Icon=}"
+          break
+        }
+      done < "$dup_file"
+      rm -f -- "$dup_file"
+      [[ -n "$_icon" ]] && find "$XDG_DATA_HOME/icons" -name "${_icon}.png" -delete 2> /dev/null
+    fi
   else
     log Info "No duplicates found"
   fi

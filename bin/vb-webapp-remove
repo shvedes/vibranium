@@ -92,6 +92,16 @@ _desktop_name() {
   done < "$1"
 }
 
+_is_chrome_webapp() {
+  grep -q '^Exec=.*--app-id=' "$1" 2>/dev/null
+}
+
+_chrome_icon_basename() {
+  while IFS= read -r line; do
+    [[ "$line" == Icon=* ]] && { echo "${line#Icon=}"; return; }
+  done < "$1"
+}
+
 # ---------------------------------------------------------------------------
 # Derive the browser data directory name from a URL.
 # Must stay in sync with the identically named function in vb-launch-webapp;
@@ -125,10 +135,17 @@ _remove_pwa() {
     removed=true
   fi
 
-  [[ -f "$ICON_DIR/PWA - $name.png" ]] && {
+  if _is_chrome_webapp "$desktop_path"; then
+    local icon_basename
+    icon_basename="$(_chrome_icon_basename "$desktop_path")"
+    if [[ -n "$icon_basename" ]]; then
+      find "$XDG_DATA_HOME/icons" -name "${icon_basename}.png" -delete 2>/dev/null
+      removed=true
+    fi
+  elif [[ -f "$ICON_DIR/PWA - $name.png" ]]; then
     rm -f -- "$ICON_DIR/PWA - $name.png"
     removed=true
-  }
+  fi
 
   # If the PWA was installed with --own-profile, remove its isolated browser
   # data directory. The URL is always the last whitespace-separated token on
@@ -200,6 +217,12 @@ if [[ $INTERACTIVE == true ]]; then
     _has_webapp_exec "$file" &&
       PWA_MAP["$(_desktop_name "$file")"]="$file"
   done
+  for file in "$DESKTOP_DIR"/chrome-*.desktop; do
+    _is_chrome_webapp "$file" && {
+      cname="$(_desktop_name "$file")"
+      PWA_MAP["[chrome] $cname"]="$file"
+    }
+  done
   shopt -u nullglob
 
   if ((${#PWA_MAP[@]} == 0)); then
@@ -243,8 +266,8 @@ else
     fi
 
     filename="${desktop_path##*/}"
-    if [[ "$filename" != PWA\ -\ *.desktop ]]; then
-      log Warn "not a PWA file: $filename"
+    if [[ "$filename" != PWA\ -\ *.desktop && "$filename" != chrome-*.desktop ]]; then
+      log Warn "not a PWA/Chrome webapp file: $filename"
       continue
     fi
 
