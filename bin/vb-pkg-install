@@ -145,6 +145,11 @@ _enable_systemd_units() {
         break
       fi
 
+      if [[ "$enabled" == "static" ]]; then
+        vb::print "$B" "${G}${unit_name}${RS} is static ($scope scope) — skipping"
+        continue
+      fi
+
       if [[ "$enabled" != "enabled" ]]; then
         if ! term::ask_yes_no Y "Enable $unit_type '${B}${unit_name}${RS}' from package '${Y}${pkg}${RS}' ($scope scope)?"; then
           continue
