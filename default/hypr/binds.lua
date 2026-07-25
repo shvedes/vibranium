@@ -498,7 +498,7 @@ hl.bind(
 -- Scroll up/down over any window to adjust its PipeWire sink volume
 -- independently of the global output volume.
 hl.bind(
-  mainMod .. " + mouse_up",
+  mainMod .. " + mouse_down",
   Hypr.Guard.window(function()
     Hypr.Act.exec_raw("vb-cmd-window-volume --down")
   end),
@@ -506,7 +506,7 @@ hl.bind(
 )
 
 hl.bind(
-  mainMod .. " + mouse_down",
+  mainMod .. " + mouse_up",
   Hypr.Guard.window(function()
     Hypr.Act.exec_raw("vb-cmd-window-volume --up")
   end),
