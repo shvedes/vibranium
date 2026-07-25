@@ -290,13 +290,17 @@ EOF
 # Main logic
 # ---------------------------------------------------------------------------
 
+if [[ -z $TUI_EXEC_RAW && -n $CUSTOM_EXEC ]]; then
+  TUI_EXEC_RAW="${CUSTOM_EXEC%% *}"
+fi
+
 source vb-lib-core
 
 if [[ ! -f "$ICON_DIR" ]]; then
   mkdir -p "$ICON_DIR"
 fi
 
-if [[ -z $TUI_EXEC ]]; then
+if [[ -z $TUI_EXEC && -z $CUSTOM_EXEC ]]; then
   INTERACTIVE_MODE=true
   trap "trap 'exit 1' INT; printf '\n'; _operation_canceled; exit 1" INT
   term::show_header
@@ -378,7 +382,11 @@ if [[ -z $TUI_EXEC ]]; then
 
 else
   if [[ -z $APP_NAME ]]; then
-    APP_NAME="$(_name_from_exec "$TUI_EXEC")"
+    if [[ -n $TUI_EXEC ]]; then
+      APP_NAME="$(_name_from_exec "$TUI_EXEC")"
+    else
+      APP_NAME="TUI App"
+    fi
   fi
 
   if [[ $APP_NAME != "TUI - "* ]]; then
@@ -387,12 +395,14 @@ else
 
   log Info "Installing TUI app: ${APP_NAME#TUI - } (exec=$TUI_EXEC_RAW)"
 
-  if _find_tuiapp_by_tryexec "$TUI_EXEC_RAW" &> /dev/null; then
+  if [[ -n $TUI_EXEC_RAW ]] && _find_tuiapp_by_tryexec "$TUI_EXEC_RAW" &> /dev/null; then
     log Info "App already installed, exiting"
     exit 1
   fi
 
-  TUI_EXEC_RAW="$TUI_EXEC"
+  if [[ -n $TUI_EXEC ]]; then
+    TUI_EXEC_RAW="$TUI_EXEC"
+  fi
 
   if [[ -n $EXEC_ARGS ]]; then
     TUI_EXEC="$TUI_EXEC $EXEC_ARGS"

@@ -142,13 +142,11 @@ TARGET_NAMES=()
 TARGET_PATHS=()
 
 if [[ $INTERACTIVE == true ]]; then
-  # Build a name-to-path map from desktop files that were installed by
-  # vb-tui-install.  Only files whose Exec line references vb-launch-tui
-  # are considered TUI apps.
+  # Build a name-to-path map from all TUI - *.desktop files, including
+  # entries created with --custom-exec.
   declare -A TUI_MAP
   while IFS= read -r -d '' file; do
-    grep -q '^Exec=.*vb-launch-tui.*' "$file" &&
-      TUI_MAP["$(_desktop_name "$file")"]="$file"
+    TUI_MAP["$(_desktop_name "$file")"]="$file"
   done < <(find "$DESKTOP_DIR" -name 'TUI - *.desktop' -print0)
 
   if ((${#TUI_MAP[@]} == 0)); then
