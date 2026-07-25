@@ -54,7 +54,7 @@ if [[ -f "$VIBRANIUM_STATE/cursor-theme" ]]; then
   source "$VIBRANIUM_STATE/cursor-theme"
 
   [[ -n "$theme" ]] && export XCURSOR_THEME="$theme"
-  [[ -n "$size" ]]  && export XCURSOR_SIZE="$size"
+  [[ -n "$size" ]] && export XCURSOR_SIZE="$size"
 fi
 
 # Use Wayland when possible. Fallback to XWayland otherwise
@@ -63,19 +63,31 @@ export CLUTTER_BACKEND="wayland"
 export QT_QPA_PLATFORM="wayland;xcb"
 export ELECTRON_OZONE_PLATFORM_HINT="auto"
 
+# Make some apps XDG-compliant
+export HISTFILE="$XDG_STATE_HOME/bash/history"
+export CARGO_HOME="$XDG_DATA_HOME/cargo"
+export GOPATH="$XDG_DATA_HOME/go"
+export GNUPGHOME="$XDG_DATA_HOME/gnupg"
+export GTK2_RC_FILES="$XDG_CONFIG_HOME/gtk-2.0/gtkrc"
+
+if [[ "$SHELL" == "/usr/bin/zsh" ]]; then
+  export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
+fi
+
 # Keep in mind
 # https://github.com/basecamp/omarchy/issues/2564#issuecomment-3450877034
 export SDL_VIDEODRIVER="wayland"
 
-readonly CHASSIS_STATE="$VIBRANIUM_STATE/chassis-type"
+export CHASSIS_STATE="$VIBRANIUM_STATE/chassis-type"
 
 if [[ -f "$CHASSIS_STATE" ]]; then
-  CHASSIS_TYPE="$(<"$CHASSIS_STATE")"
+  CHASSIS_TYPE="$(< "$CHASSIS_STATE")"
   export CHASSIS_TYPE
 else
   CHASSIS_TYPE="$(hostnamectl chassis)"
   export CHASSIS_TYPE
-  printf "%s" "$CHASSIS_TYPE" >"$CHASSIS_STATE"
+  printf "%s" "$CHASSIS_TYPE" \
+    > "$CHASSIS_STATE"
 fi
 
 # Load standard user directories from ~/.config/user-dirs.dirs
@@ -90,7 +102,7 @@ if [[ -f "$XDG_CONFIG_HOME/user-dirs.dirs" ]]; then
     val="${val//\$HOME/$HOME}"
 
     export "$var"="$val"
-  done <"$XDG_CONFIG_HOME/user-dirs.dirs"
+  done < "$XDG_CONFIG_HOME/user-dirs.dirs"
 fi
 
 # Properly detect and export

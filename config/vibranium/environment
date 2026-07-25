@@ -1,4 +1,3 @@
-
 # Place your environment variables here.
 # The text below is just an example. Feel free to delete or change it
 # All changes are applied only after re-login!
@@ -12,12 +11,6 @@ export SYSTEMD_EDITOR="$EDITOR"
 export MANPAGER="$EDITOR +Man!"
 
 #########################################################################################
-
-# You can also reassign the default folders for userspace package managers.
-# Golang, for example, likes to create its home folder directly right in $HOME,
-# which can sometimes be annoying. You can reassign this directory to anywhere you want.
-export GOPATH="$XDG_DATA_HOME/go"
-export CARGO_HOME="$XDG_DATA_HOME/cargo"
 
 # And then you can add the these folders to the $PATH in this way
 path_add $GOPATH/bin
