@@ -10,7 +10,7 @@ vb-tui-install \
   --keywords 'Resource;Network;Disk;GPU;Process'
 
 vb-tui-install \
-  --exec vb-launch-networkmanager \
+  --custom-exec vb-launch-networkmanager \
   --name 'Wifi Manager' \
   --icon 'network-wireless-signal-excellent-symbolic' \
   --category 'System;Network'
