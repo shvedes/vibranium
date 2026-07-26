@@ -4,7 +4,7 @@ source vb-lib-cli
 
 SELF="${0##*/}"
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 usage() {
   shcat << EOF
@@ -18,21 +18,27 @@ Options:
 EOF
 }
 
-case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  "") ;;
-  *)
-    log Error "invalid option '$1'"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
-esac
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      log Error "invalid option '$1'"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
+  esac
+done
 
 # Detect primary network interface utility
 if command -v nmtui > /dev/null 2>&1; then

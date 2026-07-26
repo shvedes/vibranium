@@ -154,7 +154,7 @@ _load_state() {
   _write_state "$CURRENT"
 }
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 ACTION="next"
 QUIET="false"
@@ -179,7 +179,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

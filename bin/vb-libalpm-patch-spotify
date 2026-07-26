@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 MANUAL=false
 
 log() {
@@ -43,7 +43,7 @@ EOF
 while (($#)); do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)
@@ -63,7 +63,7 @@ while (($#)); do
 done
 
 if $MANUAL; then
-  VERBOSE=true
+  export VERBOSE=true
 fi
 
 # If Spicetify was never installed, there is nothing to restore or apply.

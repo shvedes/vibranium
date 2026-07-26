@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 SELF="${0##*/}"
 STEP_DEFAULT="0.20"
@@ -143,7 +143,7 @@ while (($#)); do
       shift 2
       ;;
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

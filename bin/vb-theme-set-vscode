@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 usage() {
   shcat << EOF
@@ -19,7 +19,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)
@@ -33,6 +33,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 THEME="$XDG_CONFIG_HOME/vibranium/current/theme/vscode.json"
+log Info "vscode theme file: $THEME"
 
 # Strip JS/C-style comments (// ...) from a JSONC file before passing
 # it to jq, which cannot parse JSONC natively.
@@ -45,16 +46,21 @@ set_theme() {
   local editor_cmd="$1"
   local settings_path="$2"
 
-  command -v "$editor_cmd" > /dev/null || return 0
+  command -v "$editor_cmd" > /dev/null || { log Info "$editor_cmd not found, skipping"; return 0; }
 
   if [[ -f $THEME ]]; then
     theme_name=$(_jsonc "$THEME" | jq -r '.name')
     extension=$(_jsonc "$THEME" | jq -r '.extension // empty')
 
+    log Info "set_theme: $editor_cmd theme=$theme_name extension=$extension"
+
     # Install the required theme extension if it is not already present.
     if [[ -n $extension ]] && ! "$editor_cmd" --list-extensions 2> /dev/null | grep -Fxq "$extension"; then
-      log Info "Installing extension $extension for $editor_cmd"
+      log Info "installing extension $extension for $editor_cmd"
       "$editor_cmd" --install-extension "$extension" > /dev/null 2>&1
+      log Info "extension $extension installed"
+    elif [[ -n $extension ]]; then
+      log Info "extension $extension already installed for $editor_cmd"
     fi
 
     mkdir -p "$(dirname "$settings_path")"

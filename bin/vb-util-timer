@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 SELF="${0##*/}"
 CLI_TIME=
 
@@ -26,7 +26,7 @@ source vb-lib-core
 while (($# > 0)); do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 CACHE_FILE="$VIBRANIUM_CACHE/pkg-updates.list"
 TIMESTAMP_FILE="$VIBRANIUM_CACHE/pkg-updates.timestamp"
@@ -29,7 +29,7 @@ EOF
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

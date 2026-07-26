@@ -11,7 +11,7 @@ fi
 SELF="${0##*/}"
 QUIET=false
 FORCE=false
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 MONITOR_ARG=""
 ORIGINAL_ARGS=("$@")
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
@@ -86,7 +86,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -q | --quiet)

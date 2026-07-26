@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 MANUAL=false
 
 log() {
@@ -46,7 +46,7 @@ ACTION="install"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)
@@ -69,7 +69,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-$MANUAL && VERBOSE=true
+$MANUAL && export VERBOSE=true
 
 if ! $MANUAL && ! [[ -d "$XDG_CONFIG_HOME/Vencord" ]]; then
   if [[ -t 0 ]]; then

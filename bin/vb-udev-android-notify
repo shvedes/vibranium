@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 SCRIPT_NAME="${0##*/}"
 
 usage() {
@@ -49,7 +49,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

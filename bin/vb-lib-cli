@@ -7,10 +7,12 @@ fi
 
 declare -gr _VB_LIB_CLI_LOADED=1
 
+VERBOSE=${VERBOSE:-false}
+
 log() {
   local level="$1"
   shift
-  if [[ "$level" == "Error" ]] || { $VERBOSE && [[ -t 0 ]]; }; then
+  if [[ "$level" == "Error" ]] || $VERBOSE; then
     echo "[${0##*/}] $level: $*" >&2
   fi
 }

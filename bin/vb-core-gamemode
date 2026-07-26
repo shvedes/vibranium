@@ -183,7 +183,7 @@ parse_gamescope_options() {
 OVERRIDE_LDPRELOAD=false
 NO_POWER_PROFILE=false
 USE_MANGOHUD=false
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 EXTRA_GAMESCOPE_OPTS=()
 
 while [[ $# -gt 0 ]]; do
@@ -221,7 +221,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     --)

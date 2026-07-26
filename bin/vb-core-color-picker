@@ -3,7 +3,7 @@
 source vb-lib-cli
 
 HISTORY="$VIBRANIUM_CACHE/color-picker.history"
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 log Info "History file: $HISTORY"
 
@@ -33,7 +33,7 @@ check_deps() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 NUKE=false
 SELF="${0##*/}"
 
@@ -74,7 +74,7 @@ while (($# > 0)); do
       exit 0
       ;;
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     --nuke)

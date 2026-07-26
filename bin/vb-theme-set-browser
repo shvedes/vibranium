@@ -1,5 +1,7 @@
 #!/bin/bash
 
+VERBOSE=${VERBOSE:-false}
+
 CHROME_FOLDER="/etc/chromium/policies/managed"
 CHROME_COLORS="$CHROME_FOLDER/color.json"
 
@@ -12,21 +14,28 @@ if command -v brave > /dev/null; then
   BROWSER_FILES+=("$BRAVE_COLORS")
 fi
 
+source vb-lib-cli
+
 INPUT="$(< "$XDG_CONFIG_HOME/vibranium/current/theme/chromium.theme")"
 INPUT="${INPUT// /}"
+
+log Info "browser theme input: $INPUT"
 
 # HEX
 if [[ "$INPUT" =~ ^#?[0-9a-fA-F]{6}$ ]]; then
   hex="${INPUT#\#}"
   THEME_COLOR="#$hex"
+  log Info "parsed as hex: $THEME_COLOR"
 else
   # RGB
   IFS=',' read -r r g b <<< "$INPUT"
   printf -v THEME_COLOR '#%02x%02x%02x' "$r" "$g" "$b"
+  log Info "parsed as rgb: $r,$g,$b -> $THEME_COLOR"
 fi
 
 for file in "${BROWSER_FILES[@]}"; do
   printf '{ "BrowserThemeColor": "%s" }\n' "$THEME_COLOR" > "$file"
+  log Info "wrote $file"
 done
 
 # Refresh policies

@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 log Info "${0##*/} started: state_file=$VIBRANIUM_STATE/wallpaper.state"
 
@@ -171,7 +171,7 @@ raw_path=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       ;;
     -h | --help)
       usage

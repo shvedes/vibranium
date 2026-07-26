@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 shopt -s extglob dotglob nullglob
 
@@ -83,6 +83,8 @@ _discover_in_dir() {
   local source_label="${2:-official}"
   local theme_dir folder family variant light chosen key val
 
+  log Info "discovering $source_label themes in $dir"
+
   for theme_dir in "$dir"/*/; do
     if [[ ! -d "$theme_dir" ]]; then
       continue
@@ -139,6 +141,7 @@ _discover_in_dir() {
     # A user folder with no official counterpart - regardless of whether it has
     # a .git directory - is a new user-authored theme and must be registered.
     if [[ "$source_label" == "user" && -d "$VIBRANIUM/themes/$folder" ]]; then
+      log Info "  $folder: user override of official theme, skipping re-registration"
       continue
     fi
 
@@ -157,6 +160,8 @@ _discover_in_dir() {
       chosen="${family}-${variant}"
       FOLDER_MAP["$chosen"]="$folder"
     fi
+
+    log Info "  $folder ($source_label) -> ${family:-standalone}${family:+/$variant}"
   done
 }
 
@@ -170,6 +175,8 @@ _discover_themes() {
   if [[ -d "$USER_THEMES_PATH" ]]; then
     _discover_in_dir "$USER_THEMES_PATH" "user"
   fi
+
+  log Info "discovery complete: ${#FAMILIES[@]} families, ${#STANDALONE_THEMES[@]} standalone"
 }
 
 get_current_target_basename() {
@@ -235,6 +242,7 @@ _resolve_active_theme() {
       if [[ "${FOLDER_MAP[$key]}" == "$curr_folder" ]]; then
         ACTIVE_FAMILY="$family"
         ACTIVE_VARIANT="$variant"
+        log Info "active theme resolved: $family/$variant ($curr_folder)"
         return
       fi
     done
@@ -244,6 +252,7 @@ _resolve_active_theme() {
     if [[ "${FOLDER_MAP[$family]}" == "$curr_folder" ]]; then
       ACTIVE_FAMILY="$family"
       ACTIVE_VARIANT=""
+      log Info "active theme resolved: $family ($curr_folder)"
       return
     fi
   done
@@ -368,6 +377,8 @@ apply_theme() {
     src_path="$VIBRANIUM/themes/$folder_name"
   fi
 
+  log Info "applying $chosen | folder=$folder_name source=$source_label src=$src_path"
+
   if [[ ! -d "$src_path" ]]; then
     log Error "theme folder $src_path does not exist."
     exit 1
@@ -403,6 +414,7 @@ apply_theme() {
   # Files present in USER_THEMES_PATH/$folder_name overwrite their official
   # counterparts; files absent from the overlay are inherited from the base.
   if [[ "$source_label" == "official" && -d "$USER_THEMES_PATH/$folder_name" ]]; then
+    log Info "user overlay found in $USER_THEMES_PATH/$folder_name, merging"
     files=("$USER_THEMES_PATH/$folder_name"/!(backgrounds))
 
     if ((${#files[@]} > 0)); then
@@ -435,6 +447,8 @@ apply_theme() {
     is_light=true
   fi
 
+  log Info "light/dark detection: is_light=$is_light"
+
   if $is_light; then
     local icon_theme="Papirus-Light"
     local color_scheme="prefer-light"
@@ -444,6 +458,8 @@ apply_theme() {
     local color_scheme="prefer-dark"
     custom_palette=true
   fi
+
+  log Info "scheme=$color_scheme icon=$icon_theme custom_palette=$custom_palette"
 
   for v in 5 6; do
     sed -i "/custom_palette/s/=.*/=$custom_palette/" \
@@ -561,7 +577,7 @@ log Info "Starting theme selector"
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -f | --force)
@@ -671,6 +687,8 @@ else
   done
 fi
 
+log Info "resolved: chosen=$CHOSEN folder=$FOLDER_NAME"
+
 if [[ -z "$FOLDER_NAME" ]]; then
   log Error "theme '$CHOSEN' could not be resolved to a folder."
   exit 1
@@ -683,11 +701,13 @@ if [[ ! -d "$VIBRANIUM/themes/$FOLDER_NAME" && ! -d "$USER_THEMES_PATH/$FOLDER_N
 fi
 
 apply_theme "$CHOSEN" "$FOLDER_NAME"
-source vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")" &
+log Info "theme files staged, applying wallpaper and reloading config"
+vb-core-wallpaper "$(get_wallpaper "$FOLDER_NAME")"
 touch "$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-source vb-cmd-reload --quiet &
+vb-cmd-reload --quiet
 killall --quiet -s USR2 btop
 
+log Info "running theme-set-* scripts"
 # Theme setters
 for f in "$VIBRANIUM"/bin/vb-theme-set-*; do
   # Not quite a setter, plus we called it earlier
@@ -695,7 +715,8 @@ for f in "$VIBRANIUM"/bin/vb-theme-set-*; do
     continue
   fi
 
-  source "$f" &
+  log Info "running '${f##*/}'"
+  "$f"
 done
 
 # Apply custom user hooks
@@ -709,6 +730,7 @@ if [[ -d "$HOOK_DIR" ]]; then
   fi
 
   for hook in "${HOOK_FILES[@]}"; do
-    env THEME="$FOLDER_NAME" setsid -f "$hook" &
+    log Info "running user hook '${hook##*/}'"
+    env THEME="$FOLDER_NAME" "$hook"
   done
 fi

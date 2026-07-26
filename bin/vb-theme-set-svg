@@ -3,9 +3,11 @@
 # Vibranium comes with its own custom icon set, mainly for entries in custom menus such as AI, Power, etc.
 # Since it is svg, we can change the colors of the icons, so we do.
 
+source vb-lib-cli
 source "$XDG_CONFIG_HOME/vibranium/current/theme/colors.bash"
 
 ICONS_DIR="$XDG_DATA_HOME/icons/Vibranium/scalable"
+log Info "recoloring svg icons in $ICONS_DIR with $P_FOREGROUND_0"
 
 sed -i -E '
   s/(^|[[:space:];"])fill[[:space:]]*:[[:space:]]*[^;" ]+/\1fill:'"$P_FOREGROUND_0"'/g;

@@ -5,7 +5,7 @@ source vb-lib-cli
 SELF="${0##*/}"
 CLIENTS=(ncmpcpp rmpc cmus vimpc)
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 usage() {
   shcat << EOF
@@ -24,23 +24,37 @@ Options:
 EOF
 }
 
-case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  "") ;;
-  *)
-    # if not option, treat as possible client override
-    if [[ "$1" != -* ]]; then
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --client=*)
+      REQUESTED_CLIENT="${1#*=}"
+      shift
+      ;;
+    --client)
+      shift
       REQUESTED_CLIENT="$1"
       shift
-    fi
-    ;;
-esac
+      ;;
+    *)
+      if [[ "$1" != -* ]]; then
+        REQUESTED_CLIENT="$1"
+        shift
+      else
+        log Error "Unknown option: $1"
+        log Error "Try --help for more information"
+        exit 1
+      fi
+      ;;
+  esac
+done
 
 if ! command -v mpd > /dev/null; then
   log Error "MPD is not installed"
@@ -48,30 +62,6 @@ if ! command -v mpd > /dev/null; then
 fi
 
 CLIENT=""
-
-case "$1" in
-  -v | --verbose)
-    VERBOSE=true
-    ;;
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  --client=*)
-    REQUESTED_CLIENT="${1#*=}"
-    shift
-    ;;
-  --client*)
-    shift
-    REQUESTED_CLIENT="$1"
-    ;;
-  "") ;;
-  *)
-    log Error "Unknown option: $*"
-    log Error "Try --help for more information"
-    exit 1
-    ;;
-esac
 
 # If user requested specific client, validate it
 if [[ -n "$REQUESTED_CLIENT" ]]; then

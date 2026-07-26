@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 SELF="${0##*/}"
 CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
@@ -56,7 +56,7 @@ ARG_TEMP=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

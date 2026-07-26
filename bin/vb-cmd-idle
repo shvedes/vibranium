@@ -5,7 +5,7 @@
 
 source vb-lib-cli
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 SELF="${0##*/}"
 RESTORE_FLAG="$VIBRANIUM_RUNTIME/restore-player"
@@ -50,7 +50,7 @@ MODE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

@@ -7,7 +7,7 @@ if [[ $CHASSIS_TYPE == vm ]]; then
   exit 1
 fi
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 SELF="${0##*/}"
 LOG_FILE="$VIBRANIUM_CACHE/$SELF.log"
@@ -324,7 +324,7 @@ MODE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

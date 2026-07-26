@@ -12,6 +12,7 @@
 source vb-lib-cli
 
 GTK_THEME="$XDG_CONFIG_HOME/vibranium/current/theme/gtk.css"
+log Info "source theme: $GTK_THEME"
 
 # GTK3 -- alternating slots for live reload
 for slot in vibranium-a vibranium-b; do
@@ -22,6 +23,7 @@ for slot in vibranium-a vibranium-b; do
 
 $(< "$GTK_THEME")
 EOF
+  log Info "wrote $slot GTK3 -> $gtk3_dir/gtk.css"
 done
 
 # GTK4 -- write user override, applies on next app restart
@@ -29,11 +31,13 @@ mkdir -p "$XDG_CONFIG_HOME/gtk-4.0"
 shcat > "$XDG_CONFIG_HOME/gtk-4.0/gtk.css" <<- EOF
 $(< "$GTK_THEME")
 EOF
+log Info "wrote GTK4 -> $XDG_CONFIG_HOME/gtk-4.0/gtk.css"
 
 # Alternate between slots to bust GTK3 cache
 current=$(gsettings get org.gnome.desktop.interface gtk-theme)
 current=${current#\'}
 current=${current%\'}
+log Info "current gtk-theme: $current"
 
 if [[ $current == vibranium-a ]]; then
   next="vibranium-b"
@@ -41,9 +45,11 @@ else
   next="vibranium-a"
 fi
 
+log Info "switching to slot: $next"
 gsettings set org.gnome.desktop.interface gtk-theme "$next"
 
 # Some windows like polkit prompts, Pinentry prompts and such
 # don't inherit the value from gsettings. Because of that, we
 # edit these files manually. Not a big deal.
 sed -i "/gtk-theme-name/s/=.*/=${next}/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
+log Info "updated gtk-{3,4}.0/settings.ini gtk-theme-name=$next"

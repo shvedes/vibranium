@@ -4,12 +4,15 @@ source vb-lib-cli
 
 VB_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/theme"
 OBSIDIAN_CFG="$XDG_CONFIG_HOME/obsidian/obsidian.json"
+log Info "obsidian theme dir: $VB_THEME_DIR"
 
 if [[ ! -f $VB_THEME_DIR/obsidian.css ]]; then
+  log Info "no obsidian.css, skipping"
   exit 0
 fi
 
 mapfile -t VAULTS < <(jq -r '.vaults | values[].path' "$OBSIDIAN_CFG")
+log Info "found ${#VAULTS[@]} obsidian vaults"
 
 for vault in "${VAULTS[@]}"; do
   [[ -d $vault/.obsidian ]] || continue
@@ -31,4 +34,5 @@ for vault in "${VAULTS[@]}"; do
 EOF
 
   cp "$VB_THEME_DIR/obsidian.css" "$THEME_DIR/theme.css"
+  log Info "applied obsidian theme to $vault"
 done

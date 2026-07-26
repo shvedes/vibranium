@@ -14,12 +14,12 @@ Options:
 EOF
 }
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
-      VERBOSE=true
+      export VERBOSE=true
       shift
       ;;
     -h | --help)

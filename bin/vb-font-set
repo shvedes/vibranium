@@ -4,7 +4,7 @@ source vb-lib-cli
 
 source vb-lib-core
 
-VERBOSE=false
+VERBOSE=${VERBOSE:-false}
 HOOK_FILE="$XDG_CONFIG_HOME/vibranium/hooks/font-change.sh"
 
 usage() {

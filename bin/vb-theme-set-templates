@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source vb-lib-cli
+
 # VIBRANIUM THEME TEMPLATES
 #
 # If you ended up reading this file because you went looking for how your
@@ -208,6 +210,7 @@ force_template_files=()
 # here to pick up vb_force_template_files.
 _settings_adv="$XDG_CONFIG_HOME/vibranium/settings.advanced"
 if [[ -f $_settings_adv ]]; then
+  log Info "sourcing settings.advanced"
   source "$_settings_adv"
 fi
 
@@ -217,9 +220,7 @@ unset _settings_adv
 # (vb_force_template_files is sourced from ~/.config/vibranium/settings.advanced)
 if [[ -v vb_force_template_files ]]; then
   force_template_files+=("${vb_force_template_files[@]}")
-fi
-if [[ -v vb_force_template_files ]]; then
-  force_template_files+=("${vb_force_template_files[@]}")
+  log Info "${#vb_force_template_files[@]} file(s) will be generated forefully"
 fi
 
 # Gather whichever color files this theme actually provides. Order matters
@@ -228,10 +229,12 @@ fi
 color_sources=()
 if [[ -f $COLORS_FILE ]]; then
   color_sources+=("$COLORS_FILE")
+  log Info "found base palette: $COLORS_FILE"
 fi
 
 if [[ -f $COLORS_EXTENDED_FILE ]]; then
   color_sources+=("$COLORS_EXTENDED_FILE")
+  log Info "found extended palette: $COLORS_EXTENDED_FILE"
 fi
 
 if [[ ${#color_sources[@]} -gt 0 ]]; then
@@ -351,9 +354,13 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
   # Hand everything off to the awk engine in one call: the color table,
   # the output map, then every template that needs rendering.
   if ((${#tpl_files[@]} > 0)); then
+    log Info "rendering ${#tpl_files[@]} templates via awk"
     awk -f "$VIBRANIUM/awk/vb-theme-set-templates.awk" \
       "$subs_file" "$outmap_file" "${tpl_files[@]}"
+  else
+    log Info "no templates to render (all outputs already exist or forced)"
   fi
 
   rm -f "$outmap_file" "$subs_file"
+  log Info "template processing complete"
 fi
