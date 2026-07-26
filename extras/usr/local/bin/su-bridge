@@ -1,6 +1,10 @@
 #!/bin/bash
 
-source vb-lib-cli
+shcat() {
+  while IFS= read -r line; do
+    printf '%s\n' "$line"
+  done
+}
 
 usage() {
     shcat <<EOF
