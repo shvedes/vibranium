@@ -548,6 +548,10 @@ if [[ $_emb_early == false ]] && term::is_headless; then
   exit
 fi
 
+if ! systemd-inhibit --json=short | jq -e '.[] | select(.why == "System update is active")' > /dev/null; then
+  exec systemd-inhibit --what=idle --who=Vibranium --why="System update is active" --mode=block -- "$0" "$@"
+fi
+
 export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
 
 NO_ASK=false

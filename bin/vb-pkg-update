@@ -117,6 +117,10 @@ if [[ ! -t 1 ]]; then
   exit
 fi
 
+if ! systemd-inhibit --json=short | jq -e '.[] | select(.why == "System update is active")' > /dev/null; then
+  exec systemd-inhibit --what=idle --who=Vibranium --why="System update is active" --mode=block -- "$0" "$@"
+fi
+
 source vb-lib-core
 
 SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$R" "$RS" "$USER")"

@@ -2,6 +2,10 @@
 
 source vb-lib-core
 
+if ! systemd-inhibit --json=short | jq -e '.[] | select(.why == "CachyOS repo migration")' > /dev/null; then
+  exec systemd-inhibit --what=sleep --who=Vibranium --why="CachyOS repo migration" --mode=block -- "$0" "$@"
+fi
+
 export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
 
 CACHYOS_REPO_URL="https://mirror.cachyos.org/cachyos-repo.tar.xz"
@@ -24,10 +28,6 @@ _operation_complete() {
 _cleanup() {
   if [[ -n $SUDO_KEEPALIVE_PID ]]; then
     kill "$SUDO_KEEPALIVE_PID" 2> /dev/null
-  fi
-
-  if [[ -n $INHIBITOR_PID ]]; then
-    kill "$INHIBITOR_PID" 2> /dev/null
   fi
 
   if [[ -n $TMPDIR ]]; then
@@ -72,9 +72,6 @@ _download_and_run() {
     return 1
   fi
 
-  systemd-inhibit --what=sleep --who=Vibranium --why="CachyOS repo migration" -- sleep infinity &
-  INHIBITOR_PID=$!
-
   # Bootstrap the migration script
   (
     cd "$TMPDIR/cachyos-repo" || return 1
@@ -82,10 +79,6 @@ _download_and_run() {
   )
 
   local rc=$?
-
-  # Release the inhibitor and clear stored PID.
-  kill "$INHIBITOR_PID" 2> /dev/null
-  INHIBITOR_PID=
 
   return $rc
 }
