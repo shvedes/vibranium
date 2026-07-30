@@ -570,8 +570,8 @@ hl.bind("SUPER + CTRL + minus", function()
 end, { description = "Decrease active display scale" })
 
 hl.bind("SUPER + CTRL + 0", function()
-  Hypr.Act.exec_raw("hyprctl -q reload")
-end, { description = "Decrease active display scale" })
+  Hypr.Helpers.ScaleStep(0)
+end, { description = "Reset active display scale" })
 
 -- System monitoring
 

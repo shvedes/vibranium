@@ -93,6 +93,7 @@ end
 
 source(VIBRANIUM .. "/lib/actions.lua")
 source(VIBRANIUM .. "/lib/hyprland.lua")
+source(VIBRANIUM .. "/lib/editor.lua")
 
 source(VIBRANIUM .. "/autostart.lua")
 source(VIBRANIUM .. "/general.lua")

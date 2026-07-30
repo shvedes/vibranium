@@ -247,10 +247,22 @@ end
 -- Steps the active monitor's scale to the next value that is both a
 -- multiple of 1/120 and divides the monitor resolution into whole
 -- logical pixels. direction must be 1 to increase scale or -1 to
--- decrease it.
+-- decrease it, or 0 to reset to Hyprland's default (auto).
 function Hypr.Helpers.ScaleStep(direction)
   local monitor = hl.get_active_monitor()
   if monitor == nil then
+    return
+  end
+
+  if direction == 0 then
+    hl.monitor({ output = monitor.name, scale = "auto" })
+    hyprEdit(
+      "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua",
+      { "scale" },
+      "auto",
+      { scope = "monitor", output = monitor.name }
+    )
+    hl.exec_cmd("notify-send -r 777 'Hyprland' 'Display scale: <b>default</b>'")
     return
   end
 
@@ -292,5 +304,17 @@ function Hypr.Helpers.ScaleStep(direction)
     scale = string.format("%.10f", new_scale),
   })
 
-  hl.exec_cmd("notify-send -r 777 'Vibranium' '" .. string.format("Display scale: <b>%.4g", new_scale) .. "x</b>'")
+  local ok, err = hyprEdit(
+    -- "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua",
+    "$HOME/hello.lua",
+    { "scale" },
+    new_scale,
+    { scope = "monitor", output = monitor.name }
+  )
+
+  if not ok then
+    hl.exec_cmd("notify-send -r 777 -u critical -t 10000 'Hyprland' 'Failed to write scale level to disk!'")
+  end
+
+  hl.exec_cmd("notify-send -r 777 'Hyprland' '" .. string.format("Display scale: <b>%.4g", new_scale) .. "x</b>'")
 end
