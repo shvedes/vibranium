@@ -40,7 +40,9 @@ _is_disabled() {
 }
 
 _as_root=(pkexec su-bridge --root --)
-[[ -t 1 ]] && _as_root=(sudo)
+if [[ -t 1 ]]; then
+  _as_root=(sudo)
+fi
 
 if _is_disabled; then
   log Info "Enabling IPv6"
@@ -50,6 +52,7 @@ if _is_disabled; then
     "printf '$c' > /etc/sysctl.d/99-ipv6.conf; sysctl --system >/dev/null"; then
     exit 1
   fi
+  notify-send -r 3 "IPv6 Enabled Systemwide" "No reboot required"
   echo "[${0##*/}] IPv6 enabled systemwide. No reboot required"
 else
   log Info "Disabling IPv6"
@@ -59,5 +62,6 @@ else
     "printf '$c' > /etc/sysctl.d/99-ipv6.conf; sysctl --system >/dev/null"; then
     exit 1
   fi
+  notify-send -r 3 "IPv6 Disabled Systemwide" "No reboot required"
   echo "[${0##*/}] IPv6 disabled systemwide. No reboot required"
 fi
