@@ -160,21 +160,42 @@ _set_shadow_color() {
   opts+=("Cyan Dim:$(_c P_CYAN_DIM 4a9092)")
   opts+=("Cyan Bright:$(_c P_CYAN_BRIGHT 94dbdc)")
 
-  opts+=("Black Darkest:$(_c P_BACKGROUND_H 000000)")
-  opts+=("Black Darker:$(_c P_BACKGROUND_0 080808)")
-  opts+=("Black:$(_c P_BACKGROUND_1 101010)")
-  opts+=("Black Bright:$(_c P_BACKGROUND_2 181818)")
-  opts+=("Gray Darkest:$(_c P_BACKGROUND_3 202020)")
-  opts+=("Gray Darker:$(_c P_BACKGROUND_4 282828)")
-  opts+=("Gray:$(_c P_BACKGROUND_5 303030)")
-  opts+=("Gray Bright:$(_c P_GRAY_DIM 484848)")
-  opts+=("Gray Brighter:$(_c P_GRAY 606060)")
-  opts+=("Gray Brightest:$(_c P_GRAY_BRIGHT 787878)")
-  opts+=("White Dim:$(_c P_FOREGROUND_4 a0a0a0)")
-  opts+=("White Dark:$(_c P_FOREGROUND_3 b8b8b8)")
-  opts+=("White:$(_c P_FOREGROUND_2 d0d0d0)")
-  opts+=("White Bright:$(_c P_FOREGROUND_1 e8e8e8)")
-  opts+=("White Brightest:$(_c P_FOREGROUND_H ffffff)")
+  local c=${P_BACKGROUND_H:-000000}; c=${c#\#}
+  local r=$((16#${c:0:2})) g=$((16#${c:2:2})) b=$((16#${c:4:2}))
+
+  if (( (r + g + b) > 384 )); then
+    opts+=("White Dim:$(_c P_BACKGROUND_H 000000)")
+    opts+=("White Dark:$(_c P_BACKGROUND_0 080808)")
+    opts+=("White:$(_c P_BACKGROUND_1 101010)")
+    opts+=("White Bright:$(_c P_BACKGROUND_2 181818)")
+    opts+=("Gray Darkest:$(_c P_BACKGROUND_3 202020)")
+    opts+=("Gray Darker:$(_c P_BACKGROUND_4 282828)")
+    opts+=("Gray:$(_c P_BACKGROUND_5 303030)")
+    opts+=("Gray Bright:$(_c P_GRAY_DIM 484848)")
+    opts+=("Gray Brighter:$(_c P_GRAY 606060)")
+    opts+=("Gray Brightest:$(_c P_GRAY_BRIGHT 787878)")
+    opts+=("Black Dim:$(_c P_FOREGROUND_4 a0a0a0)")
+    opts+=("Black Dark:$(_c P_FOREGROUND_3 b8b8b8)")
+    opts+=("Black:$(_c P_FOREGROUND_2 d0d0d0)")
+    opts+=("Black Bright:$(_c P_FOREGROUND_1 e8e8e8)")
+    opts+=("Black Brightest:$(_c P_FOREGROUND_H ffffff)")
+  else
+    opts+=("Black Darkest:$(_c P_BACKGROUND_H 000000)")
+    opts+=("Black Darker:$(_c P_BACKGROUND_0 080808)")
+    opts+=("Black:$(_c P_BACKGROUND_1 101010)")
+    opts+=("Black Bright:$(_c P_BACKGROUND_2 181818)")
+    opts+=("Gray Darkest:$(_c P_BACKGROUND_3 202020)")
+    opts+=("Gray Darker:$(_c P_BACKGROUND_4 282828)")
+    opts+=("Gray:$(_c P_BACKGROUND_5 303030)")
+    opts+=("Gray Bright:$(_c P_GRAY_DIM 484848)")
+    opts+=("Gray Brighter:$(_c P_GRAY 606060)")
+    opts+=("Gray Brightest:$(_c P_GRAY_BRIGHT 787878)")
+    opts+=("White Dim:$(_c P_FOREGROUND_4 a0a0a0)")
+    opts+=("White Dark:$(_c P_FOREGROUND_3 b8b8b8)")
+    opts+=("White:$(_c P_FOREGROUND_2 d0d0d0)")
+    opts+=("White Bright:$(_c P_FOREGROUND_1 e8e8e8)")
+    opts+=("White Brightest:$(_c P_FOREGROUND_H ffffff)")
+  fi
 
   local chosen
   chosen="$(cfgr::set_string --title "Shadow Color" --option "${opts[@]}")" || return
@@ -192,11 +213,12 @@ _shadow_menu() {
       --func "_toggle 'decoration:shadow:enabled'"
 
     if [[ ${HYPR["decoration.shadow.enabled"]} == true ]]; then
-      local shadow_color_int shadow_color
-      shadow_color_int="$(hyprctl -j getoption decoration:shadow:color \
-        | jq -r '.int // 0' 2>/dev/null
-      )" || shadow_color_int=0
-      shadow_color="$(_int_to_rgba "$shadow_color_int")"
+      local shadow_color_raw shadow_color
+      shadow_color_raw="$(hyprctl -j getoption decoration:shadow:color \
+        | jq -r 'if has("gradient") then (.gradient | split(" ")[0]) else (.int // 0 | tostring) end' 2>/dev/null
+      )" || shadow_color_raw=0
+      [[ $shadow_color_raw =~ [a-fA-F] ]] && shadow_color_raw="0x${shadow_color_raw}"
+      shadow_color="$(_int_to_rgba "$shadow_color_raw")"
 
       cfgr::item::action \
         --label "Color : $shadow_color" \
