@@ -3,6 +3,8 @@
 source vb-lib-cli
 
 VERBOSE=${VERBOSE:-false}
+HOOK_DIR="$VIBRANIUM/default/hooks/update"
+UHOOK_DIR="$XDG_CONFIG_HOME/vibranium/hooks/update"
 
 usage() {
   shcat << EOF
@@ -227,6 +229,11 @@ fi
 
 rm -f "$VIBRANIUM_CACHE"/pkg-updates.*
 vb-refresh-waybar-module pacman &
+
+shopt -s nullglob
+for _hook in "$HOOK_DIR"/*.sh "$UHOOK_DIR"/*.sh; do
+  setsid -f "$_hook" &> /dev/null
+done
 
 if _check_important; then
   vb::print "$Y" "Important system components have been updated"

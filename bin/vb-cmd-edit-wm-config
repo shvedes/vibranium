@@ -1,0 +1,165 @@
+#!/usr/bin/lua
+
+local VIBRANIUM = os.getenv("VIBRANIUM")
+local CACHE = os.getenv("VIBRANIUM_CACHE")
+local loaded = false
+
+if CACHE then
+  local f = io.open(CACHE .. "/editor.luac", "r")
+  if f then
+    f:close()
+    loaded = pcall(dofile, CACHE .. "/editor.luac")
+  end
+end
+
+if not loaded then
+  dofile(VIBRANIUM .. "/default/hypr/lib/editor.lua")
+end
+
+local me = arg[0]:match("([^/]+)$")
+
+local function split(s)
+  local parts = {}
+  local start = 1
+  while start <= #s + 1 do
+    local colon = s:find(":", start)
+    if colon then
+      parts[#parts + 1] = s:sub(start, colon - 1)
+      start = colon + 1
+    else
+      parts[#parts + 1] = s:sub(start)
+      break
+    end
+  end
+  return parts
+end
+
+local function parse_component(s)
+  local name, occ_str = s:match("^(.-)@(-?%d+)$")
+  if name then
+    return name, tonumber(occ_str)
+  end
+  return s, nil
+end
+
+local function infer_type(s)
+  if s == "true" then
+    return true
+  end
+  if s == "false" then
+    return false
+  end
+  if #s >= 2 and ((s:sub(1, 1) == '"' and s:sub(-1) == '"') or (s:sub(1, 1) == "'" and s:sub(-1) == "'")) then
+    return s:sub(2, -2)
+  end
+  local n = tonumber(s)
+  if n then
+    return n
+  end
+  return s
+end
+
+local function usage(exit_code)
+  io.stderr:write([[Usage:
+  ]] .. me .. [[ -h | --help
+  ]] .. me .. [[ --get <path> <file>         Read a value
+  ]] .. me .. [[ <path:value> <file>          Write a value
+]])
+  os.exit(exit_code or 0)
+end
+
+local args = { ... }
+if #args == 0 then
+  usage(1)
+end
+if args[1] == "-h" or args[1] == "--help" then
+  usage(0)
+end
+
+if args[1] == "--get" then
+  if #args < 3 then
+    usage(1)
+  end
+  local path_str = args[2]
+  local file = args[3]
+
+  local components = split(path_str)
+  if #components == 0 then
+    io.stderr:write("error: empty path\n")
+    os.exit(1)
+  end
+
+  local occurrence = 1
+  local clean = {}
+  for i, comp in ipairs(components) do
+    local name, occ = parse_component(comp)
+    clean[i] = name
+    if occ then
+      occurrence = occ
+    end
+  end
+
+  local result, rerr = hyprGet(file, clean, { occurrence = occurrence })
+  if result == nil then
+    io.stderr:write(rerr or "not found\n")
+    os.exit(1)
+  end
+
+  if type(result) == "boolean" then
+    io.write(tostring(result), "\n")
+  elseif type(result) == "number" then
+    if result == math.floor(result) then
+      io.write(string.format("%.0f", result), "\n")
+    else
+      io.write(tostring(result), "\n")
+    end
+  else
+    io.write(result, "\n")
+  end
+  os.exit(0)
+end
+
+-- Write mode
+if #args < 2 then
+  usage(1)
+end
+local path_str = args[1]
+local file = args[2]
+
+local components = split(path_str)
+if #components < 2 then
+  io.stderr:write("error: path must include option and value\n")
+  os.exit(1)
+end
+
+local value_str = components[#components]
+local option_name = components[#components - 1]
+
+local section_path = {}
+for i = 1, #components - 2 do
+  section_path[i] = components[i]
+end
+
+local occurrence = 1
+for i, comp in ipairs(section_path) do
+  local name, occ = parse_component(comp)
+  section_path[i] = name
+  if occ then
+    occurrence = occ
+  end
+end
+
+local value = infer_type(value_str)
+
+local full_path = {}
+for i, name in ipairs(section_path) do
+  full_path[i] = name
+end
+full_path[#full_path + 1] = option_name
+
+local wok, werr = hyprEdit(file, full_path, value, { occurrence = occurrence })
+if not wok then
+  io.stderr:write(werr or "write failed\n")
+  os.exit(1)
+end
+os.exit(0)
