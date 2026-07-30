@@ -240,7 +240,7 @@ _decoration_menu() {
       --func "_set_int 'Active Opacity' 'Active opacity (float)' float 0.0 1.0 'decoration:active_opacity'"
 
     cfgr::item::action \
-      --label "Inactive opacity : ${HYPR["decoration.active_opacity"]}" \
+      --label "Inactive opacity : ${HYPR["decoration.inactive_opacity"]}" \
       --func "_set_int 'Inactive Opacity' 'Inactive opacity (float)' float 0.0 1.0 'decoration:inactive_opacity'"
 
     cfgr::item::action \
