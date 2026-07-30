@@ -88,7 +88,7 @@ _handle_systemd() {
   log Info "Checking systemd units for ${#FILTERED[@]} packages"
   local pkg unit_type scope unit_path
 
-# Packages that provide systemd units
+  # Packages that provide systemd units
   prov_sysd_svc=()
   unit_types=()
   unit_scope=()
@@ -303,9 +303,9 @@ _filter_packages() {
         # Only single package branch
         if term::ask_yes_no Y "Install it anyway?"; then
           NO_ASK=true
-# Skip overview flag
+          # Skip overview flag
           SKIP_OVW=true
-# Force reinstall flag
+          # Force reinstall flag
           FORCE_INST=true
           FILTERED=("${PACKAGES[@]}")
           return
@@ -474,10 +474,10 @@ _cleanup() {
   log Info "Running cleanup (aur=$AUR_MODE, keep_cache=$KEEP_CACHE)"
 
   local state_file="$VIBRANIUM_STATE/${0##*/}"
-  local remove_cache=false
 
   if [[ -f "$state_file" ]]; then
     source "$state_file"
+    export remove_cache
   fi
 
   if [[ "$AUR_MODE" == true ]]; then
@@ -489,14 +489,27 @@ _cleanup() {
 
       if [[ "$remove_cache" == true ]]; then
         do_clean=true
-      elif term::ask_yes_no Y "Remove package cache?"; then
-        do_clean=true
-        if term::ask_yes_no Y "Remember this option?"; then
-          if ! [[ -d "$VIBRANIUM_STATE" ]]; then
-            mkdir -p "$VIBRANIUM_STATE"
-          fi
-          echo 'remove_cache=true' > "$state_file"
-        fi
+      elif [[ "$remove_cache" != false ]]; then
+        term::enable_input
+        local _cache_input
+        printf "%s" $'\e[0;33m[VIBRANIUM]\e[0m Remove package cache? [y/N/a (ask next time)]: '
+        read -r _cache_input
+        term::disable_input
+        case "${_cache_input,,}" in
+          y)
+            do_clean=true
+            if term::ask_yes_no Y "Remember this option?"; then
+              mkdir -p "$VIBRANIUM_STATE"
+              echo 'remove_cache=true' > "$state_file"
+            fi
+            ;;
+          n)
+            if term::ask_yes_no Y "Remember this option?"; then
+              mkdir -p "$VIBRANIUM_STATE"
+              echo 'remove_cache=false' > "$state_file"
+            fi
+            ;;
+        esac
       fi
 
       if [[ "$do_clean" == true ]]; then
@@ -517,12 +530,27 @@ _cleanup() {
 
       if [[ "$remove_cache" == true ]]; then
         do_clean=true
-      elif term::ask_yes_no Y "Remove package cache?"; then
-        do_clean=true
-        if term::ask_yes_no Y "Remember this option?"; then
-          mkdir -p "$VIBRANIUM_STATE"
-          echo 'remove_cache=true' > "$state_file"
-        fi
+      elif [[ "$remove_cache" != false ]]; then
+        term::enable_input
+        local _cache_input
+        printf "%s" $'\e[0;33m[VIBRANIUM]\e[0m Remove package cache? [y/N/a (ask next time)]: '
+        read -r _cache_input
+        term::disable_input
+        case "${_cache_input,,}" in
+          y)
+            do_clean=true
+            if term::ask_yes_no Y "Remember this option?"; then
+              mkdir -p "$VIBRANIUM_STATE"
+              echo 'remove_cache=true' > "$state_file"
+            fi
+            ;;
+          n)
+            if term::ask_yes_no Y "Remember this option?"; then
+              mkdir -p "$VIBRANIUM_STATE"
+              echo 'remove_cache=false' > "$state_file"
+            fi
+            ;;
+        esac
       fi
 
       if [[ "$do_clean" == true ]]; then
@@ -537,7 +565,7 @@ _cleanup() {
 _emb_early=false
 for _arg in "$@"; do
   if [[ "$_arg" == "--embedded" ]]; then
-# Embedded mode flag
+    # Embedded mode flag
     _emb_early=true
     break
   fi
@@ -560,8 +588,8 @@ NO_DUMMY=false
 NO_VERIFY=false
 NO_SYSTEMD=false
 KEEP_CACHE=false
-CONSERV=false   # Suppress success/fail messages
-FORCE_INST=false   # Force reinstall
+CONSERV=false    # Suppress success/fail messages
+FORCE_INST=false # Force reinstall
 SKIP_OVW=false   # Skip overview
 EMBEDDED=false
 AUR_MODE=false
@@ -609,17 +637,17 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --conservative)
-# No success/fail messages
+      # No success/fail messages
       CONSERV=true
       shift
       ;;
     --force-install)
-# Force reinstall flag
+      # Force reinstall flag
       FORCE_INST=true
       shift
       ;;
     --skip-overview)
-# Skip overview flag
+      # Skip overview flag
       SKIP_OVW=true
       shift
       ;;
