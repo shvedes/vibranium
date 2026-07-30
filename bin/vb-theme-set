@@ -452,12 +452,12 @@ apply_theme() {
   if $is_light; then
     local icon_theme="Papirus-Light"
     local color_scheme="prefer-light"
-    custom_palette=false
   else
     local icon_theme="Papirus-Dark"
     local color_scheme="prefer-dark"
-    custom_palette=true
   fi
+
+  custom_palette=true
 
   log Info "scheme=$color_scheme icon=$icon_theme custom_palette=$custom_palette"
 
