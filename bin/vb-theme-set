@@ -165,6 +165,19 @@ _discover_in_dir() {
   done
 }
 
+_promote_singles() {
+  local family variants chosen display
+  for family in "${!FAMILIES[@]}"; do
+    read -ra variants <<< "${FAMILIES[$family]}"
+    (( ${#variants[@]} == 1 )) || continue
+    chosen="${family}-${variants[0]}"
+    display="${family} ${variants[0]}"
+    STANDALONE_THEMES["$display"]="$display"
+    FOLDER_MAP["$display"]="${FOLDER_MAP[$chosen]}"
+    unset "FAMILIES[$family]"
+  done
+}
+
 _discover_themes() {
   _discover_in_dir "$VIBRANIUM/themes" "official"
 
@@ -175,6 +188,8 @@ _discover_themes() {
   if [[ -d "$USER_THEMES_PATH" ]]; then
     _discover_in_dir "$USER_THEMES_PATH" "user"
   fi
+
+  _promote_singles
 
   log Info "discovery complete: ${#FAMILIES[@]} families, ${#STANDALONE_THEMES[@]} standalone"
 }
@@ -620,26 +635,32 @@ if [[ -n "$1" ]]; then
     VARIANT="${INPUT_THEME#*-}"
 
     if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
-      log Error "family '$FAMILY' not found. Run '$SELF --list' to see available themes."
-      exit 1
-    fi
-
-    VARIANT_FOUND=false
-    for v in ${FAMILIES[$FAMILY]}; do
-      if [[ "${v,,}" == "${VARIANT,,}" ]]; then
-        VARIANT_FOUND=true
-        VARIANT="$v" # use the canonical casing from discovery
-        break
+      local _display="${FAMILY} ${VARIANT}"
+      if [[ -n "${STANDALONE_THEMES[$_display]+_}" ]]; then
+        CHOSEN="$_display"
+        FOLDER_NAME="${FOLDER_MAP[$_display]}"
+      else
+        log Error "family '$FAMILY' not found. Run '$SELF --list' to see available themes."
+        exit 1
       fi
-    done
+    else
+      VARIANT_FOUND=false
+      for v in ${FAMILIES[$FAMILY]}; do
+        if [[ "${v,,}" == "${VARIANT,,}" ]]; then
+          VARIANT_FOUND=true
+          VARIANT="$v" # use the canonical casing from discovery
+          break
+        fi
+      done
 
-    if ! $VARIANT_FOUND; then
-      log Error "variant '$VARIANT' not found in family '$FAMILY'. Run '$SELF --list' to see available themes."
-      exit 1
+      if ! $VARIANT_FOUND; then
+        log Error "variant '$VARIANT' not found in family '$FAMILY'. Run '$SELF --list' to see available themes."
+        exit 1
+      fi
+
+      CHOSEN="${FAMILY}-${VARIANT}"
+      FOLDER_NAME="${FOLDER_MAP[$CHOSEN]}"
     fi
-
-    CHOSEN="${FAMILY}-${VARIANT}"
-    FOLDER_NAME="${FOLDER_MAP[$CHOSEN]}"
   fi
 else
   source vb-lib-core
