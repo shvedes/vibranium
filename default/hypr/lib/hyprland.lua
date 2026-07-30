@@ -305,8 +305,7 @@ function Hypr.Helpers.ScaleStep(direction)
   })
 
   local ok, err = hyprEdit(
-    -- "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua",
-    "$HOME/hello.lua",
+    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua",
     { "scale" },
     new_scale,
     { scope = "monitor", output = monitor.name }
