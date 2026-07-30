@@ -716,7 +716,7 @@ for f in "$VIBRANIUM"/bin/vb-theme-set-*; do
   fi
 
   log Info "running '${f##*/}'"
-  "$f"
+  setsid -f "$f"
 done
 
 # Apply custom user hooks
@@ -731,6 +731,6 @@ if [[ -d "$HOOK_DIR" ]]; then
 
   for hook in "${HOOK_FILES[@]}"; do
     log Info "running user hook '${hook##*/}'"
-    env THEME="$FOLDER_NAME" "$hook"
+    env THEME="$FOLDER_NAME" setsid -f "$hook"
   done
 fi
