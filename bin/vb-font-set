@@ -58,6 +58,7 @@ mapfile -t _font_raw < <(
         m = split($2, stys, ",")
         sty = stys[1]
         gsub(/^[[:space:]]+|[[:space:]]+$/, "", sty)
+        if (sty == "") sty = "Regular"
 
         if (fam ~ /emoji|signwriting|symbols/i) next
 
@@ -141,6 +142,7 @@ fi
 _raw="${_font_map[$selected_display]}"
 font_family="${_raw%%|*}" # e.g. "JetBrains Mono"
 font_style="${_raw##*|}"  # e.g. "Bold Italic"
+font_style="${font_style:-Regular}"
 
 # selected_font is the "Family Style" display name kept for the vb-font-get
 # comparison and desktop notifications.
