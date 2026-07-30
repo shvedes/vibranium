@@ -28,8 +28,8 @@ helpers::prompt_err_action() {
 
     term::enable_input
     while true; do
-        printf '%s[FAIL]%s [R]etry  [S]kip  [A]bort: %s' "$RED" "$RESET" "$YELLOW"
-        read -r choice; printf '%s' "$RESET"
+        printf '%s[FAIL]%s [R]etry  [S]kip  [A]bort: %s' "$R" "$RS" "$Y"
+        read -r choice; printf '%s' "$RS"
 
         case "${choice,,}" in
             r|retry)
@@ -45,7 +45,7 @@ helpers::prompt_err_action() {
                 break
                 ;;
             *)
-                printf '%s[FAIL]%s Please enter R, S, or A.\n' "$RED" "$RESET"
+                printf '%s[FAIL]%s Please enter R, S, or A.\n' "$R" "$RS"
                 ;;
         esac
     done

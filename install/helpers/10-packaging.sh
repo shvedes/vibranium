@@ -34,8 +34,8 @@ helpers::install_pkg() {
       local tag
       tag=$(<"$4")
       printf "\r\033[K%s Installing %s%s [%d/%d]" \
-        "${GRAY}${spinner_frames[$i]}${RESET}" \
-        "${CYAN}${1}${RESET}" "$tag" "$3" "$5"
+        "${GY}${spinner_frames[$i]}${RS}" \
+        "${C}${1}${RS}" "$tag" "$3" "$5"
 
       echo "$i" > "$2"
       i=$(((i + 1) % ${#spinner_frames[@]}))
@@ -71,7 +71,7 @@ helpers::install_pkg() {
       if ! yay -Si "$pkg" &> /dev/null; then
         _stop_spinner
         printf "\r\033[K%s[PKGS]%s %s not found!\n" \
-          "$RED" "$RESET" "$pkg"
+          "$R" "$RS" "$pkg"
         sleep 1
         continue
       fi
@@ -88,9 +88,9 @@ helpers::install_pkg() {
 
   if (( installed == 0 )); then
     printf "\r\e[K%s[PKGS]%s No packages were installed\n" \
-      "$CYAN" "$RESET"
+      "$C" "$RS"
   else
     printf "\r\e[K%s[PKGS]%s %s%d%s packages installed\n" \
-      "$CYAN" "$RESET" "$GREEN" "$installed" "$RESET"
+      "$C" "$RS" "$G" "$installed" "$RS"
   fi
 }

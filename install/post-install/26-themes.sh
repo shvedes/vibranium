@@ -82,8 +82,8 @@ rm -f "$frame_file" "$tag_file"
 
 if (( installed == 0 )); then
   printf "\r\e[K%s[THEME]%s No themes installed\n" \
-    "$CYAN" "$RESET"
+    "$C" "$RS"
 else
   printf "\r\e[K%s[THEME]%s %s%d%s themes installed\n" \
-    "$CYAN" "$RESET" "$GREEN" "$installed" "$RESET"
+    "$C" "$RS" "$G" "$installed" "$RS"
 fi

@@ -23,23 +23,23 @@ browser_pkgs=(
   ""
 )
 
-printf "%s[QSTN]%s What is your browser of choice?\n" "$CYAN" "$RESET"
+printf "%s[QSTN]%s What is your browser of choice?\n" "$C" "$RS"
 
 for i in "${!browsers[@]}"; do
-  printf "%s[????]%s %s%d)%s %s\n" "$CYAN" "$RESET" "$YELLOW" "$((i + 1))" "$RESET" "${browsers[$i]}"
+  printf "%s[????]%s %s%d)%s %s\n" "$C" "$RS" "$Y" "$((i + 1))" "$RS" "${browsers[$i]}"
 done
 
-echo -e "${CYAN}[QSTN]${RESET} Note: ${CYAN}Chromium${RESET} is already included"
+echo -e "${C}[QSTN]${RS} Note: ${C}Chromium${RS} is already included"
 
 while true; do
-  printf "%s[>>>>]%s Enter number (1-%d): %s" "$CYAN" "$RESET" "${#browsers[@]}" "$YELLOW"
-  trap 'printf "%s" "$RESET"' INT
+  printf "%s[>>>>]%s Enter number (1-%d): %s" "$C" "$RS" "${#browsers[@]}" "$Y"
+  trap 'printf "%s" "$RS"' INT
 
   term::enable_input
   read -r browser_idx
   term::disable_input
 
-  printf "%s" "$RESET"
+  printf "%s" "$RS"
   trap - INT
 
   if [[ "$browser_idx" =~ ^[0-9]+$ ]] && ((browser_idx >= 1 && browser_idx <= ${#browsers[@]})); then
@@ -47,14 +47,14 @@ while true; do
     selected_browser_pkg="${browser_pkgs[$((browser_idx - 1))]}"
 
     if [[ "$selected_browser" == "Other" ]]; then
-      printf "%s[>>>>]%s Enter package name: %s" "$CYAN" "$RESET" "$YELLOW"
-      trap 'printf "%s" "$RESET"' INT
+      printf "%s[>>>>]%s Enter package name: %s" "$C" "$RS" "$Y"
+      trap 'printf "%s" "$RS"' INT
 
       term::enable_input
       read -r custom_browser_pkg
       term::disable_input
 
-      printf "%s" "$RESET"
+      printf "%s" "$RS"
       trap - INT
 
       [[ -n "$custom_browser_pkg" ]] && packages+=("$custom_browser_pkg")

@@ -12,22 +12,22 @@ shell_pkgs=(
   "fish"
 )
 
-printf "%s[QSTN]%s What is your shell of choice?\n" "$CYAN" "$RESET"
+printf "%s[QSTN]%s What is your shell of choice?\n" "$C" "$RS"
 
 for i in "${!shells[@]}"; do
-  printf "%s[????]%s %s%d)%s %s\n" "$CYAN" "$RESET" "$YELLOW" "$((i + 1))" "$RESET" "${shells[$i]}"
+  printf "%s[????]%s %s%d)%s %s\n" "$C" "$RS" "$Y" "$((i + 1))" "$RS" "${shells[$i]}"
 done
 
 while true; do
   printf "%s[>>>>]%s Enter number (1-%d) [default is %s]: %s" \
-    "$CYAN" "$RESET" "${#shells[@]}" "${SHELL##*/}" "$YELLOW"
-  trap 'printf "%s" "$RESET"' INT
+    "$C" "$RS" "${#shells[@]}" "${SHELL##*/}" "$Y"
+  trap 'printf "%s" "$RS"' INT
 
   term::enable_input
   read -r shell_idx
   term::disable_input
 
-  printf "%s" "$RESET"
+  printf "%s" "$RS"
   trap - INT
 
   default_shell_idx=1
@@ -47,14 +47,14 @@ while true; do
     selected_shell_pkg="${shell_pkgs[$((shell_idx - 1))]}"
 
     if [[ "$selected_shell" == "Other" ]]; then
-      printf "%s[>>>>]%s Enter package name: %s" "$CYAN" "$RESET" "$YELLOW"
-      trap 'printf "%s" "$RESET"' INT
+      printf "%s[>>>>]%s Enter package name: %s" "$C" "$RS" "$Y"
+      trap 'printf "%s" "$RS"' INT
 
       term::enable_input
       read -r custom_shell_pkg
       term::disable_input
 
-      printf "%s" "$RESET"
+      printf "%s" "$RS"
       trap - INT
 
       [[ -n "$custom_shell_pkg" ]] && packages+=("$custom_shell_pkg")

@@ -51,11 +51,11 @@ export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_CACHE_HOME="$HOME/.cache"
 
-export PURPLE GREEN CYAN
-export RED YELLOW BLUE
-export GRAY RESET
+export P G C
+export R Y B
+export GY RS
 
-SUDO_PROMPT="$(printf '%s[SUDO]%s Password for %s: ' "$RED" "$RESET" "$USER")"
+SUDO_PROMPT="$(printf '%s[SUDO]%s Password for %s: ' "$R" "$RS" "$USER")"
 export SUDO_PROMPT
 
 # Source helpers
@@ -152,7 +152,7 @@ tput cup 9999 0
 term::disable_input
 term::show_header
 
-helpers::log::info "Welcome to ${CYAN}Vibranium${RESET}, an ${GREEN}Omarchy${RESET}-like ${CYAN}Arch Linux${RESET} configuration."
+helpers::log::info "Welcome to ${C}Vibranium${RS}, an ${G}Omarchy${RS}-like ${C}Arch Linux${RS} configuration."
 helpers::log::info "It is designed to be simple, extremely fast, and highly customizable."
 helpers::log::info ""
 helpers::log::info "This installer will directly modify system files, install packages,"
@@ -163,7 +163,7 @@ helpers::log::info "In addition to performing automatic tasks, the installer wil
 helpers::log::info "a number of yes/no questions to tailor your installation to your needs."
 helpers::log::info ""
 helpers::log::info "Before changing or replacing a file that already exists, the installer"
-helpers::log::info "backs it up first. Your backup files are kept under ${CYAN}~/.local/state/vibranium/backup${RESET}."
+helpers::log::info "backs it up first. Your backup files are kept under ${C}~/.local/state/vibranium/backup${RS}."
 helpers::log::info ""
 
 if ! term::ask_yes_no Y "Proceed with Installation?"; then
@@ -224,7 +224,7 @@ if term::ask_yes_no Y "Reboot now?"; then
     for step in {0..3}; do
       dots=$(printf "%.*s" "$step" "...")
       printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" \
-        "$GREEN" "$RESET" "$sec" "$dots"
+        "$G" "$RS" "$sec" "$dots"
       sleep 0.25
     done
   done
