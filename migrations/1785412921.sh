@@ -22,4 +22,6 @@ in_array && /^\)/ {
     in_array=0
 }
 { print }
-' "$XDG_CONFIG_HOME/vibranium/settings.advanced"
+' "$XDG_CONFIG_HOME/vibranium/settings.advanced" > /tmp/settings.advanced &&
+  mv /tmp/settings.advanced "$XDG_CONFIG_HOME/vibranium/settings.advanced" &&
+  rm /tmp/settings.advanced
