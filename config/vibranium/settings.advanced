@@ -46,6 +46,17 @@ vb_force_template_files=(
   # Always prefer builtin GTK theme.
   "gtk.css"
 
+  # Always generate these files.
+  # Within the Vibranium ecosystem they have special semantics.
+  # For example, if a theme ships its own colors.lua, it will
+  # break Hyprland theming because Vibranium depends on specific
+  # variable names being present.
+  #
+  # The same applies to colors.css and any applications that use
+  # it for Vibranium-specific named color variables.
+  "colors.lua"
+  "colors.css"
+
   # The template system does a good job of generating Hyprland's appearance.
   # If you disable it, keep in mind that some Omarchy community themes define
   # their own animation curves. In such cases, the animation setting shown in
