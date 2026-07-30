@@ -33,6 +33,11 @@ _check_and_stash() {
   else
     vb::print "$G" "No local changes to stash"
   fi
+
+  if [[ -f "$VIBRANIUM/bin/vb-cmd-edit-wm-config" ]] && file "$VIBRANIUM/bin/vb-cmd-edit-wm-config" | grep -q ELF; then
+    rm -f "$VIBRANIUM/bin/vb-cmd-edit-wm-config"
+    vb::print "$Y" "Removed old compiled vb-cmd-edit-wm-config"
+  fi
 }
 
 _apply_stash() {
