@@ -667,10 +667,14 @@ cfgr::item::digit() {
   _CFGR_ICONS+=("$icon")
   _CFGR_ITEMS+=("$label : ${!var}")
 
-  # Descriptor format: digit:VAR:HINT:ROFI_TITLE:TYPE:MIN:MAX:HOOK
+  # Descriptor format: digit:VAR:HINT:ROFI_TITLE:TYPE:MIN:MAX[:HOOK]
   # All fields are numbers or short identifiers with no colons, so a
   # plain IFS=: split in the dispatcher is safe for this type.
-  _CFGR_DISPATCH+=("digit:${var}:${hint}:${rofi_title}:${type}:${min}:${max}:${hook}")
+  if [[ -n "$hook" ]]; then
+    _CFGR_DISPATCH+=("digit:${var}:${hint}:${rofi_title}:${type}:${min}:${max}:${hook}")
+  else
+    _CFGR_DISPATCH+=("digit:${var}:${hint}:${rofi_title}:${type}:${min}:${max}")
+  fi
 }
 
 # cfgr::item::string  --var VAR  --label LABEL  --title TITLE
