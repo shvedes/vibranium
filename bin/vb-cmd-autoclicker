@@ -1,0 +1,238 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+SELF="${0##*/}"
+
+BUTTON=272
+INTERVAL=5
+COUNT=""
+
+usage() {
+  shcat << EOF
+Usage: $SELF [OPTIONS]
+
+General autoclicker: sends mouse clicks to a target window.
+
+Options:
+    -b, --button BTN        Mouse button: code or name (default: 272)
+                            left=272 right=273 middle=274 side=275 extra=276
+    -i, --interval SEC      Seconds between clicks, float allowed (default: 5)
+    -c, --class REGEX       Click windows matching this class regex
+    -t, --title REGEX       Click windows matching this title regex
+    -a, --address ADDR      Click the window with this address (0x...)
+    -n, --count N           Click N times then exit (default: forever)
+    -v, --verbose           Enable verbose output
+    -h, --help              Show this help and exit
+
+Exactly one of --class, --title or --address is required. Clicks go to the
+matching window even when it is not focused; apps that ignore clicks while
+unfocused need the target to be focused.
+EOF
+}
+
+while (($# > 0)); do
+  case "$1" in
+    -b | --button)
+      BUTTON_ARG="$2"
+      shift 2
+      ;;
+    -i | --interval)
+      INTERVAL_ARG="$2"
+      shift 2
+      ;;
+    -c | --class)
+      CLASS_REGEX="$2"
+      shift 2
+      ;;
+    -t | --title)
+      TITLE_REGEX="$2"
+      shift 2
+      ;;
+    -a | --address)
+      ADDRESS="$2"
+      shift 2
+      ;;
+    -n | --count)
+      COUNT="$2"
+      shift 2
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "Unknown option: $1" >&2
+      log Error "Try '$SELF --help' for more information" >&2
+      exit 1
+      ;;
+  esac
+done
+
+if [[ -z "$CLASS_REGEX" && -z "$TITLE_REGEX" && -z "$ADDRESS" ]]; then
+  log Error "exactly one of --class, --title or --address is required" >&2
+  usage >&2
+  exit 1
+fi
+
+if [[ -n "$ADDRESS" ]]; then
+  if [[ ! "$ADDRESS" =~ ^0[xX][0-9a-fA-F]+$ ]]; then
+    log Error "invalid address: $ADDRESS (expected 0x...)" >&2
+    exit 1
+  fi
+  ADDRESS="${ADDRESS,,}"
+fi
+
+if [[ -n "$CLASS_REGEX" && -n "$TITLE_REGEX" ]]; then
+  log Error "--class and --title are mutually exclusive" >&2
+  exit 1
+fi
+
+if [[ -n "$CLASS_REGEX" && -n "$ADDRESS" ]]; then
+  log Error "--class and --address are mutually exclusive" >&2
+  exit 1
+fi
+
+if [[ -n "$TITLE_REGEX" && -n "$ADDRESS" ]]; then
+  log Error "--title and --address are mutually exclusive" >&2
+  exit 1
+fi
+
+case "${BUTTON_ARG:-$BUTTON}" in
+  left) BUTTON=272 ;;
+  right) BUTTON=273 ;;
+  middle) BUTTON=274 ;;
+  side) BUTTON=275 ;;
+  extra) BUTTON=276 ;;
+  *[!0-9]*)
+    log Error "invalid button: $BUTTON_ARG (use a code or a name)" >&2
+    exit 1
+    ;;
+  *)
+    BUTTON="${BUTTON_ARG:-$BUTTON}"
+    ;;
+esac
+
+if [[ -n "$INTERVAL_ARG" ]]; then
+  if [[ ! "$INTERVAL_ARG" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+    log Error "invalid interval: $INTERVAL_ARG" >&2
+    exit 1
+  fi
+  INTERVAL="$INTERVAL_ARG"
+fi
+
+if [[ -n "$COUNT" && ! "$COUNT" =~ ^[1-9][0-9]*$ ]]; then
+  log Error "invalid count: $COUNT" >&2
+  exit 1
+fi
+
+# The window selector becomes the body of a Lua long-bracket literal
+# ([=[ ... ]=]), so the regex reaches send_key_state unescaped: backslashes
+# and quotes stay raw and only the closing sequence matters. The bracket
+# level starts at 0 ([[ ]]) and climbs until the closing sequence cannot
+# occur in the pattern; POSIX classes like "[[:digit:]]" end in "]]" and
+# force level 1.
+regex="${CLASS_REGEX:-$TITLE_REGEX}"
+level=0
+eqs=""
+
+while ((level < 10)); do
+  if [[ "$regex" != *"]${eqs}]"* ]]; then
+    break
+  fi
+  eqs+="="
+  ((level++))
+done
+
+if ((level == 10)); then
+  log Error "regex needs too many bracket levels" >&2
+  exit 1
+fi
+
+if [[ -n "$CLASS_REGEX" ]]; then
+  WINDOW_SEL="class:$CLASS_REGEX"
+elif [[ -n "$TITLE_REGEX" ]]; then
+  WINDOW_SEL="title:$TITLE_REGEX"
+else
+  WINDOW_SEL="address:$ADDRESS"
+fi
+
+LB_OPEN="[${eqs}["
+LB_CLOSE="]${eqs}]"
+
+# One autoclicker per target: the pid file keyed by the selector lets a new
+# invocation shut down a running one for the same window and exit. The key
+# is a pure-bash FNV-1a hash of the selector (no external tools, no pipes).
+hash=2166136261
+for ((i = 0; i < ${#WINDOW_SEL}; i++)); do
+  printf -v ord '%d' "'${WINDOW_SEL:i:1}'"
+  ((hash = (hash ^ ord) * 16777619 & 0xFFFFFFFF))
+done
+
+LOCKFILE="$VIBRANIUM_RUNTIME/$SELF-$hash.lock"
+
+if [[ -f "$LOCKFILE" ]]; then
+  old_pid=""
+  read -r old_pid < "$LOCKFILE"
+
+  if [[ "$old_pid" =~ ^[0-9]+$ ]] && kill -0 "$old_pid" 2> /dev/null; then
+    kill "$old_pid"
+    log Info "stopped running autoclicker for $WINDOW_SEL (pid $old_pid)"
+    exit 0
+  fi
+
+  rm -f "$LOCKFILE"
+fi
+
+printf '%s\n' "$$" > "$LOCKFILE"
+
+# Background launches have no terminal to report to, so start and stop
+# events fall back to a desktop notification.
+notify_start() {
+  [[ -t 1 ]] && return 0
+  notify-send -r 7 -t 3000 "Vibranium" "Autoclicker started: $WINDOW_SEL"
+}
+
+notify_stop() {
+  if [[ -t 1 ]]; then
+    printf '\n'
+  else
+    notify-send -r 7 -t 3000 "Vibranium" "Autoclicker stopped: $WINDOW_SEL"
+  fi
+}
+
+notify_start
+
+cleanup() {
+  rm -f "$LOCKFILE"
+}
+
+trap 'notify_stop; cleanup; exit 0' INT TERM
+
+log Info "autoclicker: button $BUTTON every ${INTERVAL}s on $WINDOW_SEL"
+
+CLICKS=0
+while true; do
+  hyprctl -q eval "
+  hl.dispatch(hl.dsp.send_key_state({ mods = \"\", key = \"mouse:$BUTTON\", state = \"down\", window = ${LB_OPEN}${WINDOW_SEL}${LB_CLOSE} }));
+  hl.dispatch(hl.dsp.send_key_state({ mods = \"\", key = \"mouse:$BUTTON\", state = \"up\", window = ${LB_OPEN}${WINDOW_SEL}${LB_CLOSE} }))
+  "
+
+  ((CLICKS++))
+  if [[ -t 1 ]]; then
+    printf '\r\033[KClicks passed: %d ' "$CLICKS"
+  fi
+
+  if [[ -n "$COUNT" ]] && ((CLICKS >= COUNT)); then
+    notify_stop
+    cleanup
+    exit 0
+  fi
+
+  sleep "$INTERVAL"
+done
