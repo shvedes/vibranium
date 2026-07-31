@@ -55,7 +55,7 @@ BEGIN {
 # way it would for a signed lightness or scalar operand.
 function strip_alpha_sign(val_str) {
   if (substr(val_str, 1, 1) == "+" || substr(val_str, 1, 1) == "-") {
-    print "[" _SELF "] Warn: alpha= does not support relative +/- values, sign ignored"
+    print "[" _SELF "] Warn alpha= does not support relative +/- values, sign ignored." > "/dev/stderr"
     return substr(val_str, 2)
   }
   return val_str
