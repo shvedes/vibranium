@@ -280,10 +280,9 @@ done
 # scale current volume into 0-100 relative to max_vol_pct so the bar
 # stays proportional when the above-100% boost is enabled
 bar_value=${first_new_vol:-0}
-icons_folder="/usr/share/icons/Papirus/16x16/symbolic/status"
 
 if [[ "$first_new_muted" == "yes" ]]; then
-  notify-send -r 2 -i "$icons_folder/audio-volume-muted-symbolic.svg" -t 1000 "$WINDOW_TITLE Muted"
+  notify-send -r 2 -t 1000 "$WINDOW_TITLE Muted"
 else
-  notify-send -r 2 -i "$icons_folder/audio-volume-high-symbolic.svg" -t 1000 "$WINDOW_TITLE" -h "int:value:$bar_value"
+  notify-send -r 2 -t 1000 "$WINDOW_TITLE" -h "int:value:$bar_value"
 fi
