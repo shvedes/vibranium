@@ -130,7 +130,12 @@ if [[ ${#chosen[@]} -eq 0 ]]; then
   exit 0
 fi
 
+install_args=()
+if [[ "$AUR_MODE" == true ]]; then
+  install_args+=(--aur)
+fi
+
 log Info "${#chosen[@]} font(s) selected"
-if vb-pkg-install --no-logo --no-verify -- "${chosen[@]}"; then
+if vb-pkg-install --no-logo --no-verify "${install_args[@]}" -- "${chosen[@]}"; then
   exec setsid -f fc-cache -f
 fi
