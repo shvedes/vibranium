@@ -90,6 +90,9 @@ _discover_in_dir() {
       continue
     fi
 
+    # Archived wallpapers of an uninstalled community theme; not a theme.
+    [[ -e "$theme_dir/.uninstalled" ]] && continue
+
     folder="${theme_dir%/}"
     folder="${folder##*/}"
 
@@ -626,7 +629,7 @@ if [[ -n "$1" ]]; then
   if [[ -d "$VIBRANIUM/themes/${INPUT_THEME,,}" ]]; then
     FOLDER_NAME="${INPUT_THEME,,}"
     CHOSEN="$(capitalize "$FOLDER_NAME")"
-  elif [[ -d "$USER_THEMES_PATH/${INPUT_THEME,,}" ]]; then
+  elif [[ -d "$USER_THEMES_PATH/${INPUT_THEME,,}" && ! -e "$USER_THEMES_PATH/${INPUT_THEME,,}/.uninstalled" ]]; then
     FOLDER_NAME="${INPUT_THEME,,}"
     CHOSEN="$(capitalize "$FOLDER_NAME")"
   else
