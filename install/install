@@ -201,9 +201,11 @@ fi
 
 # ========================================== #
 
+# Hardware detection must run before packaging: it appends detected
+# packages (btrfs, nvme, ntfs, sata) to /tmp/vibranium.packages
 helpers::run_phase "System configuration"  "$SCRIPT_DIR/config"
-helpers::run_phase "Package installation"  "$SCRIPT_DIR/packaging"
 helpers::run_phase "Hardware setup"        "$SCRIPT_DIR/config/hardware"
+helpers::run_phase "Package installation"  "$SCRIPT_DIR/packaging"
 helpers::run_phase "Post-install"          "$SCRIPT_DIR/post-install"
 
 # ========================================== #
