@@ -47,7 +47,6 @@
 		{
 			"type": "packages",
 			"key": "\uf111",
-			"format": "{1} packages",
 			"keyColor": "yellow"
 		},
 		"break",
