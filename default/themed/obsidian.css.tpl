@@ -49,17 +49,12 @@
 /* Add barely visible border for settings sections */
 /* It's a small change, but it makes a big difference visually */
 .setting-group .setting-items,
-.setting-group .setting-item,
 .setting-group .setting-group-search {
   border: 1px solid {{ background|lightness=+0.15 }};
 }
 
 .setting-group .setting-group-search {
   border-bottom: none;
-}
-
-.setting-group .setting-item-heading {
-  border: none;
 }
 
 /* vim: set ft=css: */
