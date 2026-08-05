@@ -7,15 +7,19 @@ export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
 PACKAGES=(docker docker-compose)
 
 _operation_canceled() {
+  term::disable_input
   printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
   trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
+
   # shellcheck disable=SC2034
   read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
 _operation_complete() {
+  term::disable_input
   printf "%s[VIBRANIUM]%s Setup complete" "$G" "$RS"
   trap '' SIGHUP SIGINT SIGTERM SIGQUIT
+
   # shellcheck disable=SC2034
   read -n1 -r -p $'. Press any key to exit ' dummy
 }
