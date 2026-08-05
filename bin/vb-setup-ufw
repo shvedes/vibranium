@@ -96,6 +96,77 @@ _configure_syncthing() {
   sudo ufw allow syncthing-gui &> /dev/null
 }
 
+_ufw_rule_present() {
+  local iface="$1"
+  local dir="$2"
+
+  [[ "$dir" == in ]] && dir=IN || dir=OUT
+  sudo ufw status verbose 2> /dev/null | grep -qE "on ${iface}[[:space:]]+ALLOW ${dir}"
+}
+
+_allow_bridge() {
+  # Rule on an absent interface still applies once the bridge appears
+  local iface="$1"
+  local kind="$2"
+
+  if _ufw_rule_present "$iface" in && _ufw_rule_present "$iface" out; then
+    return 1
+  fi
+
+  vb::print "$Y" "Allowing ${kind} bridge ${C}${iface}${RS} (host <-> containers/VMs)"
+  sudo ufw allow in on "$iface" &> /dev/null
+  sudo ufw allow out on "$iface" &> /dev/null
+  return 0
+}
+
+_configure_routes() {
+  # Allow all traffic between the host and container/VM bridge networks
+  local iface kind
+  local changed=false
+
+  # Static default bridges: tools may not be installed yet, rules
+  # on absent interfaces apply once the bridge appears
+  while read -r iface kind; do
+    _allow_bridge "$iface" "$kind" && changed=true
+  done << EOF
+virbr0 Libvirt
+virbr1 Libvirt
+virbr2 Libvirt
+lxdbr0 LXD
+lxcbr0 LXD
+incusbr0 LXD
+docker0 Docker
+podman0 Podman
+cni-podman0 Podman
+EOF
+
+  # Existing bridges with custom names (docker compose, user networks...)
+  while read -r iface; do
+    case "$iface" in
+      docker* | br-*)
+        kind="Docker"
+        ;;
+      podman* | cni-podman*)
+        kind="Podman"
+        ;;
+      lxdbr* | lxcbr* | incusbr*)
+        kind="LXD"
+        ;;
+      virbr*)
+        kind="Libvirt"
+        ;;
+      *)
+        continue
+        ;;
+    esac
+
+    _allow_bridge "$iface" "$kind" && changed=true
+  done < <(ip -o link show type bridge 2> /dev/null | awk -F': ' '{print $2}')
+
+  $changed && return 0
+  return 1 # unchanged
+}
+
 # ─────────────────────────────────────────────────────────────
 
 term::disable_input
@@ -118,6 +189,8 @@ if command -v ufw &> /dev/null; then
       fi
     fi
   fi
+
+  _configure_routes
 
   vb::print "$B" "Use ${R}sudo ${G}ufw${Y} status${RS} to see current profiles"
   vb::print "$B" "Use ${G}man ${Y}ufw${RS} to see the documentation"
@@ -180,6 +253,17 @@ case $? in
     ;;
   1)
     sum_rules+=("Libvirt: ${C}unchanged${RS}")
+    ;;
+esac
+
+# ── Host <-> containers/VMs routes ─────────────────────────────
+_configure_routes
+case $? in
+  0)
+    sum_rules+=("Routes: host <-> container/VM bridges allowed")
+    ;;
+  1)
+    sum_rules+=("Routes: ${C}unchanged${RS}")
     ;;
 esac
 
