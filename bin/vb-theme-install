@@ -185,14 +185,34 @@ vb::print "$G" "$THEME_NAME_CLR is compatible with Vibranium"
 
 rm -f "$CONT_FILE"
 
-# Remove stale copy of this theme if one already exists
+# Remove stale copy of this theme if one already exists, keeping user
+# wallpapers: a community clone tracks its theme files, so untracked files
+# in backgrounds/ are user additions. An archived theme (see vb-theme-remove)
+# consists of user wallpapers only.
 if [[ -d "$THEME_PATH" ]]; then
   if ! term::ask_yes_no Y "$THEME_NAME_CLR already exists. Do you want to reinstall it?"; then
     _operation_canceled
     exit 1
   fi
 
+  preserved="$(mktemp -d)"
+  if [[ -d "$THEME_PATH/.git" ]]; then
+    uf=()
+    mapfile -d '' -t uf < <(git -C "$THEME_PATH" ls-files --others --exclude-standard -z -- backgrounds)
+    for f in "${uf[@]}"; do
+      mv "$THEME_PATH/$f" "$preserved"/
+    done
+  elif [[ -d "$THEME_PATH/backgrounds" ]]; then
+    shopt -s nullglob
+    for f in "$THEME_PATH/backgrounds"/*; do
+      mv "$f" "$preserved"/
+    done
+    shopt -u nullglob
+  fi
+
   rm -rf "$THEME_PATH"
+else
+  preserved=""
 fi
 
 git clone --quiet --depth 1 "$REPO_URL" "$THEME_PATH" &
@@ -200,6 +220,17 @@ if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Downloading $THEME_NAME_CLR" "- ${G}
   vb::print "$R" "Failed to clone theme repo"
   _operation_canceled
   exit 1
+fi
+
+# Restore preserved user wallpapers into the fresh clone
+if [[ -n "$preserved" ]]; then
+  mkdir -p "$THEME_PATH/backgrounds"
+  shopt -s nullglob
+  for f in "$preserved"/*; do
+    mv "$f" "$THEME_PATH/backgrounds"/
+  done
+  shopt -u nullglob
+  rm -rf "$preserved"
 fi
 
 exec setsid -f vb-theme-set "$THEME_NAME"
