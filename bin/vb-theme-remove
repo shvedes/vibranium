@@ -113,7 +113,35 @@ if [[ -f "$THEME_NAME_FILE" ]]; then
   current_theme="$(< "$THEME_NAME_FILE")"
 fi
 
-rm -rf "$chosen_path"
+# Preserve user wallpapers when removing a theme. A community clone tracks
+# its theme files, so untracked files in backgrounds/ are user additions.
+# They are archived in place as an overlay for a future reinstall; a second
+# removal of the archive purges it completely.
+preserved=""
+uf=()
+if [[ -e "$chosen_path/.uninstalled" ]]; then
+  rm -rf "$chosen_path"
+elif [[ -d "$chosen_path/.git" ]]; then
+  preserved="$(mktemp -d)"
+  mapfile -d '' -t uf < <(git -C "$chosen_path" ls-files --others --exclude-standard -z -- backgrounds)
+
+  for f in "${uf[@]}"; do
+    mv "$chosen_path/$f" "$preserved"/
+  done
+
+  rm -rf "$chosen_path"
+
+  if ((${#uf[@]} > 0)); then
+    mkdir -p "$chosen_path/backgrounds"
+    for f in "$preserved"/*; do
+      mv "$f" "$chosen_path/backgrounds"/
+    done
+    touch "$chosen_path/.uninstalled"
+  fi
+  rm -rf "$preserved"
+else
+  rm -rf "$chosen_path"
+fi
 
 # Update the state file;
 # don't store data of now deleted themes.
