@@ -148,9 +148,23 @@ _manage_user_wallpapers() {
     return
   fi
 
-  shopt -s nullglob
-  files=("$wallpaper_dir"/*)
-  shopt -u nullglob
+  local theme_dir="${wallpaper_dir%/*}"
+
+  # Community themes are git repos: their shipped wallpapers are tracked,
+  # so only untracked files are genuinely user-provided. Official-theme
+  # overlays have no .git - every file there is a user addition.
+  if [[ -d "$theme_dir/.git" ]]; then
+    local untracked f
+    files=()
+    mapfile -d '' -t untracked < <(git -C "$theme_dir" ls-files --others --exclude-standard -z -- backgrounds)
+    for f in "${untracked[@]}"; do
+      files+=("${f#backgrounds/}")
+    done
+  else
+    shopt -s nullglob
+    files=("$wallpaper_dir"/*)
+    shopt -u nullglob
+  fi
 
   if ((${#files[@]} == 0)); then
     notify-send -r 1 "Vibranium" "No user wallpapers found for current theme"
@@ -218,7 +232,7 @@ _manage_user_wallpapers() {
             return
           fi
 
-          rmdir "$wallpaper_dir"
+          rmdir "$wallpaper_dir" 2>/dev/null
           return
         fi
         ;;
@@ -232,7 +246,7 @@ _manage_user_wallpapers() {
 
   while true; do
     if [[ ${#files[@]} -eq 0 ]]; then
-      rmdir "$wallpaper_dir"
+      rmdir "$wallpaper_dir" 2>/dev/null
       return
     fi
 
