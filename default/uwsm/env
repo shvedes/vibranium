@@ -64,14 +64,20 @@ export QT_QPA_PLATFORM="wayland;xcb"
 export ELECTRON_OZONE_PLATFORM_HINT="auto"
 
 # Make some apps XDG-compliant
-export HISTFILE="$XDG_STATE_HOME/bash/history"
 export CARGO_HOME="$XDG_DATA_HOME/cargo"
-export GOPATH="$XDG_DATA_HOME/go"
 export GNUPGHOME="$XDG_DATA_HOME/gnupg"
 export GTK2_RC_FILES="$XDG_CONFIG_HOME/gtk-2.0/gtkrc"
 
+# Go(lang) home dir
+export GOPATH="$XDG_DATA_HOME/go"
+path_add $GOPATH/bin
+
 if [[ "$SHELL" == "/usr/bin/zsh" ]]; then
   export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
+fi
+
+if [[ "$SHELL" == "/usr/bin/bash" ]]; then
+  export HISTFILE="$XDG_STATE_HOME/bash/history"
 fi
 
 # Keep in mind

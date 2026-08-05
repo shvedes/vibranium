@@ -1,46 +1,81 @@
 #!/bin/bash
 
-# Get all active monitor names from hyprctl
+# Get all active monitor names from Hyprland.
 MONITOR_LIST=$(hyprctl -j monitors | jq -r '.[].name')
 if [[ -z "$MONITOR_LIST" ]]; then
   exit 0
 fi
 
-# Verify state file format before parsing
-read -r HEADER < "$VIBRANIUM_STATE/monitors" 2>/dev/null || exit 0
-[[ "$HEADER" == "# output:i2c:level:gamma:mult" ]] || exit 0
+# Verify the state file exists and has the expected format.
+read -r HEADER < "$VIBRANIUM_STATE/monitors" 2> /dev/null || exit 0
 
-# Pre-parse state: i2c bus + cached level per monitor
-# Also captures gamma from state to detect prior gamma dimming.
+if [[ "$HEADER" != "# output:i2c:level:gamma:mult" ]]; then
+  exit 0
+fi
+
+# Cached monitor data:
+#   BUS    -> DDC/CI bus number
+#   CACHED -> Cached hardware brightness
+#   GAMMA  -> Cached gamma value (100 = normal)
 declare -A BUS CACHED
 GAMMA=100
 FIRST_MON=""
-while IFS=: read -r output i2c level g _; do
-  [[ "$output" == \#* || -z "$output" ]] && continue
-  [[ -n "$i2c" ]] && BUS[$output]="$i2c"
-  [[ -n "$level" ]] && CACHED[$output]="$level"
-  [[ -n "$g" && "$g" =~ ^[0-9]+$ && "$g" != "100" ]] && GAMMA=$g
-  [[ -z "$FIRST_MON" ]] && FIRST_MON="$output"
+
+while IFS=: read -r output i2c level gamma _; do
+  # Ignore comments and empty lines.
+  if [[ "$output" != \#* && -n "$output" ]]; then
+
+    # Cache the DDC/CI bus.
+    if [[ -n "$i2c" ]]; then
+      BUS[$output]="$i2c"
+    fi
+
+    # Cache the last known hardware brightness.
+    if [[ -n "$level" ]]; then
+      CACHED[$output]="$level"
+    fi
+
+    # Remember whether gamma dimming was active.
+    if [[ -n "$gamma" && "$gamma" =~ ^[0-9]+$ ]]; then
+      if [[ "$gamma" != "100" ]]; then
+        GAMMA="$gamma"
+      fi
+    fi
+
+    # Save the first monitor for possible gamma restoration.
+    if [[ -z "$FIRST_MON" ]]; then
+      FIRST_MON="$output"
+    fi
+  fi
 done < "$VIBRANIUM_STATE/monitors"
 
-# Sync each monitor's cached level with actual hardware
+# Synchronize cached brightness with actual monitor brightness.
 while IFS= read -r monitor; do
   cached="${CACHED[$monitor]:-}"
   bus="${BUS[$monitor]:-}"
-  [[ -z "$cached" || -z "$bus" ]] && continue
 
-  raw=$(ddcutil --bus "$bus" getvcp 10 2>/dev/null)
-  [[ "$raw" =~ current\ value\ =\ +([0-9]+) ]] || continue
-  actual="${BASH_REMATCH[1]}"
-  [[ "$cached" == "$actual" ]] && continue
+  # Skip monitors without cached state or DDC support.
+  if [[ -n "$cached" && -n "$bus" ]]; then
 
-  vb-core-brightness --quiet --set "$actual" --monitor "$monitor"
+    raw=$(ddcutil --bus "$bus" getvcp 10 2> /dev/null)
+
+    # Parse the current hardware brightness.
+    if [[ "$raw" =~ current\ value\ =\ +([0-9]+) ]]; then
+      actual="${BASH_REMATCH[1]}"
+
+      # Update the cache only if hardware changed externally.
+      if [[ "$cached" != "$actual" ]]; then
+        vb-core-brightness --quiet --set "$actual" --monitor "$monitor"
+      fi
+    fi
+  fi
 done <<< "$MONITOR_LIST"
 
-# Restore gamma when it was dimmed (e.g. from negative brightness in prior session).
-# --set with a non-negative value triggers gamma restoration inside vb-core-brightness
-# even when the target brightness equals the current hardware level.
-if [[ "$GAMMA" != "100" && -n "$FIRST_MON" ]]; then
-  cached="${CACHED[$FIRST_MON]:-}"
-  vb-core-brightness --quiet --set "${cached:-0}" --monitor "$FIRST_MON"
+# Restore gamma if the previous session used software dimming.
+# Calling --set with the current brightness is enough to restore gamma.
+if [[ "$GAMMA" != "100" ]]; then
+  if [[ -n "$FIRST_MON" ]]; then
+    cached="${CACHED[$FIRST_MON]:-}"
+    vb-core-brightness --quiet --set "${cached:-0}" --monitor "$FIRST_MON"
+  fi
 fi

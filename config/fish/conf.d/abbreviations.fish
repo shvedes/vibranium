@@ -5,7 +5,7 @@ if command -q fastfetch
 end
 
 if not command -q nmtui
-    abbr restart-network "sudo systemctl restart iwd systemd-{network,resolve}d"
+    abbr restart-network "systemctl restart iwd systemd-{network,resolve}d"
 end
 
 abbr restart-pipewire "systemctl --user restart pipewire pipewire-pulse wireplumber"

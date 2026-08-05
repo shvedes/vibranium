@@ -12,8 +12,8 @@ export MANPAGER="$EDITOR +Man!"
 
 #########################################################################################
 
-# And then you can add the these folders to the $PATH in this way
-path_add $GOPATH/bin
+# You can add append to $PATH like so:
+# path_add "$HOME/bin"
 
 # This exact form is required.
 # path_add is a special command available only in environment files.
