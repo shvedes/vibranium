@@ -36,6 +36,18 @@ HOOK_DIR="$XDG_CONFIG_HOME/vibranium/hooks/theme"
 SELF="${0##*/}"
 FORCE=false
 
+# Populated by ~/.config/vibranium/settings.advanced.
+# Entries hide default themes from the picker: a bare family name, a
+# "family/variant" pair, or a theme folder name (globs allowed).
+vb_hidden_themes=()
+
+_settings_adv="$XDG_CONFIG_HOME/vibranium/settings.advanced"
+if [[ -f $_settings_adv ]]; then
+  log Info "sourcing settings.advanced"
+  source "$_settings_adv"
+fi
+unset _settings_adv
+
 # "tokyonight-night" -> "Tokyonight-Night"
 capitalize() {
   local IFS=- parts result=()
@@ -58,6 +70,50 @@ capitalize_words() {
     out+="${part^} "
   done
   printf "%s" "${out% }"
+}
+
+# Returns 0 if the theme should be hidden from the picker via the
+# vb_hidden_themes array in settings.advanced, 1 otherwise. Entries are
+# case-insensitive and support bash glob wildcards:
+#   "catppuccin"        -- hide the whole family
+#   "catppuccin/latte"  -- hide a single variant
+#   "gruvbox-*"         -- hide by folder-name glob
+_theme_hidden() {
+  local folder="$1" family="$2" variant="$3"
+  local entry fam var
+
+  ((${#vb_hidden_themes[@]} > 0)) || return 1
+
+  for entry in "${vb_hidden_themes[@]}"; do
+    if [[ "$entry" == */* ]]; then
+      fam="${entry%%/*}"
+      var="${entry#*/}"
+      if [[ -n "$family" ]]; then
+        # shellcheck disable=SC2053
+        if [[ "${family,,}" == ${fam,,} ]]; then
+          # shellcheck disable=SC2053
+          if [[ "${variant,,}" == ${var,,} ]]; then
+            return 0
+          fi
+        fi
+      fi
+    else
+      # shellcheck disable=SC2053
+      if [[ -n "$family" && "${family,,}" == ${entry,,} ]]; then
+        return 0
+      fi
+      # shellcheck disable=SC2053
+      if [[ -z "$family" && "${variant,,}" == ${entry,,} ]]; then
+        return 0
+      fi
+      # shellcheck disable=SC2053
+      if [[ "${folder,,}" == ${entry,,} ]]; then
+        return 0
+      fi
+    fi
+  done
+
+  return 1
 }
 
 # Process one themes directory and register every theme found into the
@@ -137,6 +193,11 @@ _discover_in_dir() {
     fi
 
     [[ -n "$light" ]] && THEME_LIGHT["$folder"]="$light"
+
+    if _theme_hidden "$folder" "$family" "$variant"; then
+      log Info "  $folder: hidden via vb_hidden_themes, skipping"
+      continue
+    fi
 
     # A user folder whose name matches an existing official theme is a plain
     # override: leave THEME_SOURCE as "official" so apply_theme performs the

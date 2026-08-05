@@ -64,6 +64,23 @@ vb_force_template_files=(
   "hyprland.lua"
 )
 
+# Default themes to hide from the theme picker (CTRL ALT T). Only built-in,
+# non-removable themes can be listed here; community themes are managed
+# through the remove menu instead.
+#
+# Entry formats (case-insensitive, bash glob wildcards supported):
+#
+#   "catppuccin"            -- hide an entire family
+#   "catppuccin/latte"      -- hide a single variant of a family
+#   "everforest-medium"     -- hide by theme folder name
+#   "gruvbox-*"             -- hide every theme matching the glob
+#
+# Hiding a theme does not uninstall it and does not affect the currently
+# applied theme; the picker simply stops listing it.
+vb_hidden_themes=(
+  # "catppuccin/latte"
+)
+
 # Launcher keywords: special words recognised in the rofi search bar.
 # Each entry has the form "keyword:action", where action is eval'd as a
 # shell command. Both inline expressions and function names work:
