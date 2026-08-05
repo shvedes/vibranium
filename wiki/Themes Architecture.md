@@ -87,6 +87,12 @@ The syntax extends any existing key with one or more pipe-separated operations:
 
 The base key before the first `|` must be a valid key as it appears in the substitution table — format suffix included. Plain `{{ key }}` keys (raw hex) also work. Operations are applied left to right, and the result is emitted in the same format as the base key.
 
+### Plain keys
+
+| Key | Value | Description |
+|---|---|---|
+| `is_light` | `true` / `false` | Whether the active theme is light or dark. Behaves like any other key — no pipe operations needed, just `{{ is_light }}`. |
+
 ### Available operations by format
 
 **HEX** — keys like `{{ background_0 }}`, `{{ color4_strip }}`, `{{ color4_upper }}`, `{{ color4_0x }}`
@@ -95,6 +101,10 @@ The base key before the first `|` must be a valid key as it appears in the subst
 |---|---|---|
 | `alpha` | `0.0` – `1.0` | Appends a two-digit hex alpha byte to the color |
 | `lightness` | `0.0` – `1.0` or signed | Sets or shifts HSL lightness; see below |
+| `dim` | `0.0` – `1.0`, unsigned only | Shifts lightness toward the background, whichever direction that is in the active theme; see [Theme-mode-aware operations](#theme-mode-aware-operations) |
+| `pop` | `0.0` – `1.0`, unsigned only | Shifts lightness toward the foreground, whichever direction that is in the active theme; see [Theme-mode-aware operations](#theme-mode-aware-operations) |
+| `light` | any value | Replaces the color outright, only if the active theme is light; see [Theme-mode-aware operations](#theme-mode-aware-operations) |
+| `dark` | any value | Replaces the color outright, only if the active theme is dark; see [Theme-mode-aware operations](#theme-mode-aware-operations) |
 
 **RGB** — keys ending in `_rgb`, e.g. `{{ background_0_rgb }}`
 
@@ -105,6 +115,8 @@ The base key before the first `|` must be a valid key as it appears in the subst
 | `green` | `+N` / `-N` | Offsets the green channel by N (0–255), clamped |
 | `blue` | `+N` / `-N` | Offsets the blue channel by N (0–255), clamped |
 | `lightness` | `0.0` – `1.0` or signed | Sets or shifts HSL lightness; see below |
+| `dim` | `0.0` – `1.0`, unsigned only | Shifts lightness toward the background, whichever direction that is in the active theme |
+| `pop` | `0.0` – `1.0`, unsigned only | Shifts lightness toward the foreground, whichever direction that is in the active theme |
 
 **HSL** — keys ending in `_hsl`, e.g. `{{ background_0_hsl }}`
 
@@ -115,6 +127,10 @@ The base key before the first `|` must be a valid key as it appears in the subst
 | `saturate` | `N` | Increases saturation by N percentage points, clamped to 100 |
 | `desaturate` | `N` | Decreases saturation by N percentage points, clamped to 0 |
 | `hue` | `+N` / `-N` | Rotates the hue by N degrees; wraps around 360 |
+| `dim` | `N`, unsigned only | Same as `lighten`/`darken`, whichever direction moves toward the background in the active theme |
+| `pop` | `N`, unsigned only | Same as `lighten`/`darken`, whichever direction moves toward the foreground in the active theme |
+
+`dim`/`pop` are not defined for HWB keys (`_hwb`) in this release — same "silently ignored, color still substituted" rule as any other operation outside its format applies (see Cautions). `light`/`dark` are only defined for HEX keys in this release; they are not available on `_rgb`, `_hsl`, `_hwb`, or the single-channel scalar suffixes (`_r`, `_h`, and so on).
 
 ### The `lightness` operation
 
@@ -179,6 +195,44 @@ Rotating the hue of a base color for a complementary accent:
 accent-alt: hsl({{ color4_hsl|hue=+180 }});
 ```
 
+### Theme-mode-aware operations
+
+`lightness`, `lighten`, and `darken` all hardcode a direction: `lightness=-0.05` always subtracts, regardless of what theme is active. In a dark theme, subtracting lightness moves a color toward the background — a subtle, correct "recede" effect. In a light theme, the same subtraction moves *away* from the background, increasing contrast in a spot the template intended to soften. `dim`/`pop` exist to fix this: `dim` always means "toward the background" and `pop` always means "toward the foreground," with the actual sign resolved against `is_light` at render time, so the same template line produces the right result in both modes. For cases `dim`/`pop` can't express — a hue change, a completely different color, anything beyond a lightness shift — `light=<value>`/`dark=<value>` are a full override: whichever one matches the active theme replaces the color outright before any later operation in the chain runs, and the other is a no-op. `light=#ffffff|dark=#000000` on one key is a common, valid pattern: a full manual override for both modes with no real base color needed at all.
+
+### `{{ #light }}` / `{{ #else }}` / `{{ #end }}` — block directives
+
+The operations above handle *value* divergence — the same line stays in the output, only a color or number differs by theme. Some templates need *structural* divergence instead: a whole rule that shouldn't be emitted at all in one mode. Block directives cover that case:
+
+```
+{{ #light }}
+  ... lines emitted only when the theme is light ...
+{{ #else }}
+  ... lines emitted only when the theme is dark ...
+{{ #end }}
+```
+
+`{{ #else }}` is optional; without it, the block simply emits nothing in the non-matching mode. A real example, from `default/themed/obsidian.css.extended.tpl`:
+
+```
+{{ #light }}
+.app-container {
+  box-shadow: none;
+}
+{{ #else }}
+.app-container {
+  box-shadow: 0 0 12px {{ background_0|alpha=0.45 }};
+}
+{{ #end }}
+```
+
+Obsidian's default drop shadow reads as depth on a dark panel; on a light one it just looks like gray fog around a flat surface, so the light branch removes it entirely instead of trying to recolor it.
+
+**A directive must be the entire line.** `{{ #light }}` only counts as a directive when the whole line — after trimming leading/trailing whitespace, and with the usual tolerance for whitespace just inside the braces (`{{#light}}`, `{{ #light }}`, and `{{   #light   }}` all count) — is nothing but that directive. `{{ #light }}` appearing alongside other text on the same line is not a directive; it's left alone and falls through to the normal unresolved-token handling, so it stays visible in the output verbatim.
+
+**No nesting.** A `{{ #light }}` opened while another one is already open is not supported — it's left as literal text in the output and a warning is printed, rather than silently doing something unexpected.
+
+**An unterminated block leaks into the next template.** All of a theme's template files render in a single pass, one after another, not one process per file. If a template opens `{{ #light }}` and forgets `{{ #end }}`, that open state does not reset itself at end of file — it carries into whichever template renders next in the same run, and starts dropping or keeping that file's lines too, with no error, unless caught. The engine checks for this at the start of every new template file and resets the state if it finds an open block, printing a warning to stderr that names the file the block was left open in. If you ever see an unrelated template rendering with unexpected lines missing, check stderr for this warning first.
+
 ### Cautions
 
 **Achromatic colors are hue-neutral.** Pure greys (saturation = 0) have no meaningful hue. Lightness operations on grey work correctly, but `hue` rotation and `saturate` on an HSL key have no visual effect because both H and S are zero for those colors.
@@ -190,6 +244,10 @@ accent-alt: hsl({{ color4_hsl|hue=+180 }});
 **`alpha` on a HEX key appends a byte, not a channel.** The result is an 8-character `#rrggbbaa` string. If the target config does not understand 8-character hex (e.g. some older GTK config formats), this will break it.
 
 **Operations outside their format are silently ignored.** Writing `{{ background_0_hsl|alpha=0.5 }}` does nothing, because `alpha` is not defined for HSL keys. The color is still substituted — just without the operation applied.
+
+**`dim`/`pop` reject a signed operand.** Unlike `lightness`, there is no absolute/relative mode to choose between — direction is always implied by the op name plus the active theme, never by the operand's sign. `dim=+0.1` or `dim=-0.1` prints a warning and the operation is skipped rather than applied with the sign silently stripped (contrast with `alpha`, which does strip a sign).
+
+**`light`/`dark` values are not re-tokenized.** Whatever follows `light=` or `dark=` up to the next `|` or the closing `}}` is used exactly as typed — it is not expanded as if it were itself a `{{ }}` template. If you need to reference another key's value conditionally rather than a literal, use `{{ #light }}`/`{{ #else }}` instead.
 
 ---
 

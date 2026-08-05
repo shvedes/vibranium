@@ -53,12 +53,47 @@ BEGIN {
 # sign off an alpha operand and warns once per distinct token, rather than
 # silently letting the sign push the value toward the clamp boundary the
 # way it would for a signed lightness or scalar operand.
+function warn(msg) {
+  print "[" _SELF "] Warn " msg > "/dev/stderr"
+}
+
 function strip_alpha_sign(val_str) {
   if (substr(val_str, 1, 1) == "+" || substr(val_str, 1, 1) == "-") {
     print "[" _SELF "] Warn alpha= does not support relative +/- values, sign ignored." > "/dev/stderr"
     return substr(val_str, 2)
   }
   return val_str
+}
+
+# dim= and pop= only ever mean "toward the background" / "toward the
+# foreground" - direction comes from the op name plus IS_LIGHT, never from
+# the operand. Unlike lightness=, there is no absolute/relative mode to
+# pick between, so a signed operand is always a mistake. Warn and tell the
+# caller to skip the op entirely, same as an unrecognized op_name would be
+# silently skipped elsewhere in this file - the difference here is the
+# warning, so the mistake is visible instead of quietly doing nothing.
+function reject_signed_dimpop(op_name, val_str) {
+  if (substr(val_str, 1, 1) == "+" || substr(val_str, 1, 1) == "-") {
+    print "[" _SELF "] Warn " op_name "= does not support a signed operand, operation ignored." > "/dev/stderr"
+    return 1
+  }
+  return 0
+}
+
+# Loads _h/_s/_l/_w/_bk for the color currently in _r/_g/_b. When the color
+# still matches base_key's original value untouched, the cached _ph/_ps/...
+# arrays from _precompute() are reused instead of recomputing. Once a
+# light=/dark= override has replaced _r/_g/_b with a different color, the
+# cache no longer describes what is actually loaded, so it is bypassed and
+# rgb_to_hsl() is called fresh against the override.
+function load_hsl(base_key, overridden) {
+  if (overridden) {
+    rgb_to_hsl(_r, _g, _b)
+  } else {
+    _h = _ph[base_key]; _s = _ps[base_key]; _l = _pl[base_key]
+    _w = _pw[base_key]; _bk = _pbk[base_key]
+  }
+  _hsl_done = 1
 }
 
 # Restrict v to the closed range [lo, hi]. Nearly every operation below ends
@@ -163,6 +198,14 @@ function hsl_to_rgb(h, s, l,    sn, ln, C, Hp, X, m, r1, g1, b1, hmod2, abshm1, 
 # directly into resolved[], so if a key name happens to collide with a
 # derived variant name the explicit value always wins.
 function _precompute(    key, val, stripped, ph, ps, pl, pw, pbk) {
+  # Theme-mode flag, injected by vb-theme-set-templates alongside the rest
+  # of the color table (see printf 'is_light\x01%s\n' in that script). Not
+  # every caller of this awk file is guaranteed to provide it (a hand-built
+  # subs file in testing, or a future caller predating this feature), so
+  # absence defaults to dark (0), matching the engine's pre-existing
+  # dark-biased behavior rather than failing.
+  IS_LIGHT = (("is_light" in subs) && subs["is_light"] == "true") ? 1 : 0
+
   for (key in subs) {
     val = subs[key]
 
@@ -212,7 +255,7 @@ function _precompute(    key, val, stripped, ph, ps, pl, pw, pbk) {
 # inner_expr string. Repeated occurrences of the same placeholder
 # (e.g. "background|lightness=+0.10" appearing 40 times in vscode.json)
 # skip all computation after the first hit.
-function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fmt, hex_variant, scalar_ch, raw_val, has_alpha, alpha_str, n_ops, ops, i, op, eq_pos, op_name, op_val_str, op_val, hex_modified, rebuilt, scalar_val, scalar_lo, scalar_hi) {
+function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fmt, hex_variant, scalar_ch, raw_val, has_alpha, alpha_str, n_ops, ops, i, op, eq_pos, op_name, op_val_str, op_val, hex_modified, rebuilt, scalar_val, scalar_lo, scalar_hi, overridden, have_rgb, opaque_val, fires, delta_sign) {
   if (inner_expr in _memo) return _memo[inner_expr]
 
   pipe_pos = index(inner_expr, "|")
@@ -252,19 +295,46 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
   if (!(base_key in subs)) return ""
   raw_val = subs[base_key]
 
-  if (raw_val !~ /^#/) {
-    if (ops_str != "" || fmt != "hex") return ""
+  # light=/dark= (section 4) can turn an opaque, non-hex value into a hex
+  # one (or vice versa) before any other op runs, so an opaque base value
+  # is no longer an automatic "nothing to do here" the way it was before
+  # this feature existed. Only fmt == "hex" placeholders can ever use
+  # light=/dark=, though (an opaque string has no rgb/hsl/hwb/scalar
+  # reading), so that half of the original short-circuit still applies
+  # unconditionally.
+  if (raw_val !~ /^#/ && fmt != "hex") return ""
+
+  if (raw_val !~ /^#/ && ops_str == "") {
     if (hex_variant == "upper") { _memo[inner_expr] = toupper(raw_val); return toupper(raw_val) }
     if (hex_variant == "lower") { _memo[inner_expr] = tolower(raw_val); return tolower(raw_val) }
     if (hex_variant == "strip") { sub(/^#/, "", raw_val); _memo[inner_expr] = raw_val; return raw_val }
     _memo[inner_expr] = raw_val; return raw_val
   }
 
-  # Use cached channel values from _precompute() instead of calling
-  # parse_hex() again. The _ph[] entries are only populated for hex
-  # colors (raw_val starts with #), so the existence of _pr[key]
-  # indicates the cache is warm.
-  _r = _pr[base_key]; _g = _pg[base_key]; _b = _pb[base_key]
+  # overridden tracks whether light=/dark= has replaced the working color
+  # with something other than base_key's own value. While false, HSL reads
+  # can use the _p*[base_key] caches from _precompute(); once true, those
+  # caches describe the wrong color and load_hsl() must recompute from
+  # whatever is currently in _r/_g/_b instead.
+  overridden = 0
+
+  if (raw_val !~ /^#/) {
+    # Opaque base value, but ops_str is non-empty: the only ops that can
+    # possibly apply are light=/dark=, since nothing else has a "current
+    # color" to work from. have_rgb stays 0 until/unless an override
+    # parses a real hex value; every other hex op below already checks
+    # have_rgb before touching _r/_g/_b, so this is safe.
+    have_rgb = 0
+    opaque_val = raw_val
+  } else {
+    # Use cached channel values from _precompute() instead of calling
+    # parse_hex() again. The _ph[] entries are only populated for hex
+    # colors (raw_val starts with #), so the existence of _pr[key]
+    # indicates the cache is warm.
+    _r = _pr[base_key]; _g = _pg[base_key]; _b = _pb[base_key]
+    have_rgb = 1
+    opaque_val = ""
+  }
   _hsl_done = 0
 
   if (fmt == "hsl" || fmt == "hwb") {
@@ -307,20 +377,58 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
       op_val = op_val_str + 0
 
       if (fmt == "hex") {
-        if (op_name == "alpha") {
+        if (op_name == "light" || op_name == "dark") {
+          # Direction is fixed by the op name; only the op matching the
+          # current mode ever fires. Whichever value was current before
+          # this op (parsed color or opaque string) is discarded outright,
+          # matching the "unconditional override" semantics in section 4 -
+          # this is deliberately not folded into the lightness/dim/pop
+          # math below.
+          fires = (op_name == "light") ? IS_LIGHT : (!IS_LIGHT)
+          if (fires) {
+            if (op_val_str ~ /^#/) {
+              parse_hex(op_val_str)
+              have_rgb = 1
+              overridden = 1
+              _hsl_done = 0
+              hex_modified = 1
+            } else {
+              have_rgb = 0
+              opaque_val = op_val_str
+              hex_modified = 0
+              has_alpha = 0
+            }
+          }
+        } else if (!have_rgb) {
+          # No parsed color to work with (opaque base, and no light=/dark=
+          # has fired yet to supply one) - every other hex op needs actual
+          # channels, so it is skipped silently rather than operating on
+          # garbage. E.g. {{ some_string|dark=#000 }} rendered while
+          # IS_LIGHT is true: dark= never fires, so this key just passes
+          # its opaque value through untouched.
+          continue
+        } else if (op_name == "alpha") {
           op_val = strip_alpha_sign(op_val_str) + 0
           alpha_str = _hex2[int(clamp(op_val, 0.0, 1.0) * 255.0 + 0.5)]
           has_alpha = 1
         } else if (op_name == "lightness") {
-          if (!_hsl_done) {
-            _h = _ph[base_key]; _s = _ps[base_key]; _l = _pl[base_key]
-            _w = _pw[base_key]; _bk = _pbk[base_key]
-            _hsl_done = 1
-          }
+          if (!_hsl_done) load_hsl(base_key, overridden)
           if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-")
             _l = clamp(_l + op_val * 100.0, 0, 100)
           else
             _l = clamp(op_val * 100.0, 0, 100)
+          hsl_to_rgb(_h, _s, _l)
+          hex_modified = 1
+        } else if (op_name == "dim" || op_name == "pop") {
+          # dim always moves toward the background, pop always moves toward
+          # the foreground, regardless of theme mode - so the sign handed
+          # to the shared lightness math flips depending on IS_LIGHT. This
+          # is a thin wrapper around the exact same HSL round-trip
+          # lightness= already uses above, not new color math.
+          if (reject_signed_dimpop(op_name, op_val_str)) continue
+          if (!_hsl_done) load_hsl(base_key, overridden)
+          delta_sign = (op_name == "dim") ? (IS_LIGHT ? 1 : -1) : (IS_LIGHT ? -1 : 1)
+          _l = clamp(_l + delta_sign * op_val * 100.0, 0, 100)
           hsl_to_rgb(_h, _s, _l)
           hex_modified = 1
         }
@@ -344,15 +452,17 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
           _b = int(clamp(_b + op_val, 0, 255))
           _hsl_done = 0
         } else if (op_name == "lightness") {
-          if (!_hsl_done) {
-            _h = _ph[base_key]; _s = _ps[base_key]; _l = _pl[base_key]
-            _w = _pw[base_key]; _bk = _pbk[base_key]
-            _hsl_done = 1
-          }
+          if (!_hsl_done) load_hsl(base_key, overridden)
           if (substr(op_val_str, 1, 1) == "+" || substr(op_val_str, 1, 1) == "-")
             _l = clamp(_l + op_val * 100.0, 0, 100)
           else
             _l = clamp(op_val * 100.0, 0, 100)
+          hsl_to_rgb(_h, _s, _l)
+        } else if (op_name == "dim" || op_name == "pop") {
+          if (reject_signed_dimpop(op_name, op_val_str)) continue
+          if (!_hsl_done) load_hsl(base_key, overridden)
+          delta_sign = (op_name == "dim") ? (IS_LIGHT ? 1 : -1) : (IS_LIGHT ? -1 : 1)
+          _l = clamp(_l + delta_sign * op_val * 100.0, 0, 100)
           hsl_to_rgb(_h, _s, _l)
         }
       } else if (fmt == "hsl") {
@@ -361,6 +471,15 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
         else if (op_name == "saturate")   _s = clamp(_s + op_val, 0, 100)
         else if (op_name == "desaturate") _s = clamp(_s - op_val, 0, 100)
         else if (op_name == "hue")        _h = ((_h + op_val) % 360.0 + 360.0) % 360.0
+        else if (op_name == "dim" || op_name == "pop") {
+          if (reject_signed_dimpop(op_name, op_val_str)) continue
+          delta_sign = (op_name == "dim") ? (IS_LIGHT ? 1 : -1) : (IS_LIGHT ? -1 : 1)
+          # lighten()/darken() are just +/- N on _l; dim/pop pick the sign
+          # for the *same* unsigned-integer-percentage-point convention
+          # lighten=/darken= already use, then fall through to the exact
+          # same clamp() call those ops use.
+          _l = clamp(_l + delta_sign * op_val, 0, 100)
+        }
       } else if (fmt == "hwb") {
         if      (op_name == "whiten")  _w = clamp(_w + op_val, 0, 100)
         else if (op_name == "blacken") _bk = clamp(_bk + op_val, 0, 100)
@@ -385,6 +504,19 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
         }
       }
     }
+  }
+
+  if (fmt == "hex" && !have_rgb) {
+    # Reached the end of the pipe chain with no parsed color at all -
+    # either the base value was opaque and no light=/dark= fired, or a
+    # light=/dark= override fired with a non-hex replacement. Format
+    # opaque_val with the same plain/_upper/_lower/_strip rules as the
+    # no-ops opaque path earlier in this function; _0x and any color math
+    # simply have nothing to work with here.
+    if (hex_variant == "upper") { _memo[inner_expr] = toupper(opaque_val); return toupper(opaque_val) }
+    if (hex_variant == "lower") { _memo[inner_expr] = tolower(opaque_val); return tolower(opaque_val) }
+    if (hex_variant == "strip") { sub(/^#/, "", opaque_val); _memo[inner_expr] = opaque_val; return opaque_val }
+    _memo[inner_expr] = opaque_val; return opaque_val
   }
 
   if (fmt == "hex") {
@@ -479,10 +611,66 @@ FILENAME == ARGV[2] {
 # it was assigned in the map above; every subsequent line of that file
 # writes to the same place. _precompute() runs on the first template seen,
 # after subs[] and outmap[] are both fully loaded.
+#
+# All template files are rendered by one long-running awk process, one
+# after another, not one process per file - so a template that forgets
+# {{ #end }} would otherwise leak its open block into whatever template
+# happens to run next, silently dropping or keeping lines it has no
+# business touching. Reset the block state here, at the top of every new
+# file, and say so on stderr if it actually had to reset something.
 FNR == 1 {
+  if (_block_active) {
+    warn("unterminated {{ #light }} block in " _block_file " (missing {{ #end }}); resetting before rendering " FILENAME)
+    _block_active = 0
+    _block_taking = 1
+  }
   if (!_precomputed) { _precompute(); _precomputed = 1 }
   outfile = outmap[FILENAME]
 }
+
+# {{ #light }} / {{ #else }} / {{ #end }} - block directives (section 5).
+# A line counts as a directive only when it is, after trimming
+# leading/trailing whitespace on the line and inside the braces, exactly
+# one of these three forms - nothing else on the line. Anything that
+# doesn't match falls through to the ordinary rendering rule below like
+# any other line.
+$0 ~ /^[[:space:]]*\{\{[[:space:]]*#light[[:space:]]*\}\}[[:space:]]*$/ {
+  if (_block_active) {
+    warn("nested {{ #light }} block, not supported (opened earlier in " _block_file "), leaving this line as literal text")
+    # Deliberately no "next" here: falls through to the catch-all below,
+    # same as any other line the engine can't make sense of - matches the
+    # existing "malformed input stays visible" convention.
+  } else {
+    _block_active = 1
+    _block_taking = IS_LIGHT
+    _block_file = FILENAME
+    next
+  }
+}
+
+$0 ~ /^[[:space:]]*\{\{[[:space:]]*#else[[:space:]]*\}\}[[:space:]]*$/ {
+  if (!_block_active) {
+    warn("stray {{ #else }} with no open {{ #light }}, leaving as literal text")
+  } else {
+    _block_taking = !_block_taking
+    next
+  }
+}
+
+$0 ~ /^[[:space:]]*\{\{[[:space:]]*#end[[:space:]]*\}\}[[:space:]]*$/ {
+  if (!_block_active) {
+    warn("stray {{ #end }} with no open {{ #light }}, leaving as literal text")
+  } else {
+    _block_active = 0
+    _block_taking = 1
+    next
+  }
+}
+
+# Lines inside a #light...#end region whose branch isn't the one currently
+# taking are dropped outright - never tokenized, never printed - rather
+# than left as blank lines.
+_block_active && !_block_taking { next }
 
 {
   print process_line($0) > outfile

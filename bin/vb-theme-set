@@ -447,15 +447,16 @@ apply_theme() {
   # Record the active theme name for is_current_theme and external tooling
   printf "%s" "$folder_name" > "$THEME_NAME_FILE"
 
-  # Create missing config files from templates
-  vb-theme-set-templates
-
-  # Atomic swap: replace current with the fully-built staging directory
-  rm -rf "$CURRENT_THEME_PATH"
-  mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"
-
   # Determine light/dark from discovery metadata; fall back to folder-name
   # regex for themes that carry no light flag in either theme.info or theme.light
+  #
+  # This has to happen before vb-theme-set-templates runs (moved up from
+  # right after the atomic swap below) so templates can see it: exported
+  # into VB_THEME_IS_LIGHT, it's what feeds is_light into the awk engine's
+  # subs table and lets dim=/pop=/light=/dark=/{{ #light }} in templates
+  # pick the right side of a theme-mode-relative operation. The resolution
+  # logic itself (THEME_LIGHT map, then folder-name regex) is unchanged -
+  # only its position and visibility are.
   local is_light=false
 
   if [[ -n "${THEME_LIGHT[$folder_name]+_}" ]]; then
@@ -466,6 +467,15 @@ apply_theme() {
   fi
 
   log Info "light/dark detection: is_light=$is_light"
+
+  export VB_THEME_IS_LIGHT="$is_light"
+
+  # Create missing config files from templates
+  vb-theme-set-templates
+
+  # Atomic swap: replace current with the fully-built staging directory
+  rm -rf "$CURRENT_THEME_PATH"
+  mv "$NEXT_THEME_PATH" "$CURRENT_THEME_PATH"
 
   if $is_light; then
     local icon_theme="Papirus-Light"

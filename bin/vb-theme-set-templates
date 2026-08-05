@@ -199,6 +199,70 @@ COLORS_EXTENDED_FILE="$NEXT_THEME_DIR/colors-extended.toml"
 # runs, so we can match "theme-name/file.ext" scoped entries below.
 NEXT_THEME_NAME=$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")
 
+# theme::resolve_is_light <theme_dir> <folder_name>
+#
+# Local light/dark resolver, mirroring the priority order vb-theme-set's
+# own discovery map establishes:
+#
+#   1. theme.info's LIGHT= field, if theme.info exists and sets it.
+#   2. theme.light file presence - only ever consulted when there is no
+#      theme.info at all (a theme.info that exists but omits LIGHT= does
+#      NOT fall back to checking for theme.light; it falls straight through
+#      to the folder-name regex below). This mirrors vb-theme-set exactly:
+#      theme.light is the Omarchy-compatible fallback for themes with no
+#      theme.info, not a secondary check for themes that have one.
+#   3. folder_name matched against the (light|latte|dawn)$ regex, as a
+#      last resort.
+#
+# theme_dir is whatever directory theme.info/theme.light would live in -
+# here, the staged next-theme directory COLORS_FILE above already points
+# at. folder_name is only used for the regex fallback; it does not have
+# to match theme_dir's own basename (the staged next-theme directory is
+# never named after the theme).
+#
+# Prints "true" or "false" on stdout:
+#   is_light=$(theme::resolve_is_light "$NEXT_THEME_DIR" "$NEXT_THEME_NAME")
+theme::resolve_is_light() {
+  local theme_dir="$1" folder_name="$2" light="" key val
+
+  if [[ -f "$theme_dir/theme.info" ]]; then
+    while IFS='=' read -r key val; do
+      [[ $key == LIGHT ]] && light="$val"
+    done < "$theme_dir/theme.info"
+  elif [[ -f "$theme_dir/theme.light" ]]; then
+    light="true"
+  else
+    light="false"
+  fi
+
+  if [[ -z "$light" ]]; then
+    if [[ "$folder_name" =~ (light|latte|dawn)$ ]]; then
+      light="true"
+    else
+      light="false"
+    fi
+  fi
+
+  printf '%s' "$light"
+}
+
+# Theme-mode detection, fed into the awk engine below as an ordinary
+# "is_light" entry in the subs table (see the printf near the end of the
+# color_sources block). vb-theme-set normally resolves this itself and
+# exports VB_THEME_IS_LIGHT before calling this script, so the common case
+# is just reading that back. But this script is documented above as being
+# invocable on its own, so it cannot assume that export exists: if it's
+# missing, fall back to resolving it locally via the exact same
+# theme::resolve_is_light priority vb-theme-set uses, reading theme.info /
+# theme.light straight out of the staged next-theme directory that
+# COLORS_FILE above already points at.
+if [[ -n "${VB_THEME_IS_LIGHT:-}" ]]; then
+  is_light="$VB_THEME_IS_LIGHT"
+else
+  is_light="$(theme::resolve_is_light "$NEXT_THEME_DIR" "$NEXT_THEME_NAME")"
+  log Info "VB_THEME_IS_LIGHT not set (standalone invocation), resolved locally: is_light=$is_light"
+fi
+
 # Filenames in this list always get regenerated from their template, even
 # when a file of that name already exists in the theme folder. Built-in
 # entries go here; anything the user added in ~/.config/vibranium/settings.advanced
@@ -264,6 +328,14 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
       printf '%s\x01%s\n' "$key" "$value"
     done < "$src"
   done > "$subs_file"
+
+  # Theme-mode flag for the awk engine's dim=/pop=/light=/dark=/{{ #light }}
+  # primitives (section 2 of the theme-variant-aware-templates spec). This
+  # is deliberately an ordinary line in the same key\x01value shape as
+  # every color above it, not a special case: {{ is_light }} resolves via
+  # the completely ordinary token lookup in the awk engine, same as any
+  # other key.
+  printf 'is_light\x01%s\n' "$is_light" >> "$subs_file"
 
   shopt -s nullglob
 

@@ -1024,4 +1024,320 @@ printf '%s' '{{ red|alpha=0.5 }}' >"$TMPDIR/tpl_nowarn"
 nowarn_output="$(awk -f "$AWK_SCRIPT" "$TMPDIR/subs" "$TMPDIR/outmap" "$TMPDIR/tpl_nowarn" 2>&1 >/dev/null)"
 log_case "no warning for unsigned alpha" "" "$nowarn_output"
 
+# =============================================================================
+# 32. is_light - plain token substitution
+# =============================================================================
+
+section "is_light - plain token"
+
+_clean
+
+_run \
+  --subs \
+    is_light true \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    lt lt \
+  -- \
+  --tpl \
+    lt '{{ is_light }}'
+
+log_case "is_light plain token resolves like any other key" "true" "$(_read_out lt)"
+
+# =============================================================================
+# 33. dim=/pop= - direction-relative lightness, hex/rgb/hsl, both modes
+# =============================================================================
+
+section "dim=/pop= - correctness in dark and light mode"
+
+_clean
+
+_run \
+  --subs \
+    is_light false \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    dd dd  dp dp  dr dr  dh dh \
+  -- \
+  --tpl \
+    dd '{{ red|dim=0.1 }}' \
+    dp '{{ red|pop=0.1 }}' \
+    dr '{{ red_rgb|dim=0.1 }}' \
+    dh '{{ red_hsl|dim=10 }}'
+
+# dim always moves toward the background; under a dark theme that means
+# darker (lower lightness), so dim reduces l and pop raises it.
+log_case "dark mode: dim= darkens (hex)"   "#cc0000"     "$(_read_out dd)"
+log_case "dark mode: pop= lightens (hex)"  "#ff3333"     "$(_read_out dp)"
+log_case "dark mode: dim= darkens (rgb)"   "204,0,0"     "$(_read_out dr)"
+log_case "dark mode: dim= darkens (hsl)"   "0,100,40"    "$(_read_out dh)"
+
+_clean
+
+_run \
+  --subs \
+    is_light true \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    ld ld  lp lp  lr lr  lh lh \
+  -- \
+  --tpl \
+    ld '{{ red|dim=0.1 }}' \
+    lp '{{ red|pop=0.1 }}' \
+    lr '{{ red_rgb|pop=0.1 }}' \
+    lh '{{ red_hsl|pop=10 }}'
+
+# Same ops, light theme: the direction flips because "toward the
+# background" is now "lighter", not "darker".
+log_case "light mode: dim= lightens (hex)"  "#ff3333"    "$(_read_out ld)"
+log_case "light mode: pop= darkens (hex)"   "#cc0000"    "$(_read_out lp)"
+log_case "light mode: pop= darkens (rgb)"   "204,0,0"    "$(_read_out lr)"
+log_case "light mode: pop= darkens (hsl)"   "0,100,40"   "$(_read_out lh)"
+
+# =============================================================================
+# 34. dim=/pop= - signed operand is rejected, not silently applied
+# =============================================================================
+
+section "dim=/pop= - signed operand rejected"
+
+_clean
+
+_run \
+  --subs \
+    is_light false \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    sd sd  sp sp \
+  -- \
+  --tpl \
+    sd '{{ red|dim=+0.1 }}' \
+    sp '{{ red|pop=-0.1 }}'
+
+# Unlike lightness=, dim=/pop= have no absolute/relative distinction -
+# direction is always implied by the op name plus theme mode, so a signed
+# operand is always a mistake. The op is skipped rather than applied with
+# the sign silently dropped (contrast with alpha=, which does drop it).
+log_case "dim=+0.1 rejected, base color unchanged" "#ff0000" "$(_read_out sd)"
+log_case "pop=-0.1 rejected, base color unchanged" "#ff0000" "$(_read_out sp)"
+
+_clean
+printf 'is_light\x01false\nred\x01#ff0000\n' >"$TMPDIR/subs"
+printf '%s\x01%s\n' "$TMPDIR/tpl_dwarn" "$TMPDIR/out_dwarn" >"$TMPDIR/outmap"
+printf '%s' '{{ red|dim=+0.1 }}' >"$TMPDIR/tpl_dwarn"
+
+dimwarn_output="$(awk -f "$AWK_SCRIPT" "$TMPDIR/subs" "$TMPDIR/outmap" "$TMPDIR/tpl_dwarn" 2>&1 >/dev/null)"
+log_case "warning printed for signed dim=" \
+  "[vb-theme-set-templates] Warn dim= does not support a signed operand, operation ignored." \
+  "$dimwarn_output"
+
+# =============================================================================
+# 35. light=/dark= - unconditional override
+# =============================================================================
+
+section "light=/dark= - override ops"
+
+_clean
+
+_run \
+  --subs \
+    is_light true \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    ov1 ov1  ov2 ov2  ov3 ov3  ov4 ov4 \
+  -- \
+  --tpl \
+    ov1 '{{ red|light=#ffffff|dark=#000000 }}' \
+    ov2 '{{ red|dark=#000000 }}' \
+    ov3 '{{ red|light=#808080|dim=0.1 }}' \
+    ov4 '{{ red|light=Serif|dark=Mono }}'
+
+# Only the op matching the current mode fires; the other is a no-op.
+log_case "light= fires under is_light=true"          "#ffffff" "$(_read_out ov1)"
+log_case "dark= does not fire under is_light=true"    "#ff0000" "$(_read_out ov2)"
+# An op after the override in the same chain operates on the override's
+# value, not on red's original value - dim=0.1 under light mode lightens
+# #808080, not #ff0000.
+log_case "op after light= operates on override value" "#9a9a9a" "$(_read_out ov3)"
+# <value> is not run back through the tokenizer and is treated as an
+# opaque string when it doesn't start with '#'.
+log_case "light=/dark= override on a non-color key"    "Serif"   "$(_read_out ov4)"
+
+_clean
+
+_run \
+  --subs \
+    is_light false \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    ov5 ov5 \
+  -- \
+  --tpl \
+    ov5 '{{ red|light=#ffffff|dark=#000000 }}'
+
+log_case "dark= fires under is_light=false" "#000000" "$(_read_out ov5)"
+
+# =============================================================================
+# 36. {{ #light }} / {{ #else }} / {{ #end }} - block directive basics
+# =============================================================================
+
+section "block directives - basic branching"
+
+_clean
+
+_run \
+  --subs \
+    is_light true \
+  -- \
+  --outmap \
+    bl bl \
+  -- \
+  --tpl \
+    bl 'before
+{{ #light }}
+light-line
+{{ #else }}
+dark-line
+{{ #end }}
+after'
+
+bl_out="$(_read_out bl)"
+log_case "light branch kept"       "1" "$( [[ $bl_out == *light-line* ]] && echo 1 || echo 0 )"
+log_case "dark branch fully absent, not blanked" "1" "$( [[ $bl_out != *dark-line* ]] && echo 1 || echo 0 )"
+log_case "surrounding lines survive" "before
+light-line
+after" "$bl_out"
+
+_clean
+
+_run \
+  --subs \
+    is_light false \
+  -- \
+  --outmap \
+    bd bd \
+  -- \
+  --tpl \
+    bd 'before
+{{ #light }}
+light-line
+{{ #else }}
+dark-line
+{{ #end }}
+after'
+
+log_case "dark mode takes the else branch" "before
+dark-line
+after" "$(_read_out bd)"
+
+# =============================================================================
+# 37. Block directives - edge cases
+# =============================================================================
+
+section "block directives - edge cases"
+
+_clean
+
+_run \
+  --subs \
+    is_light true \
+  -- \
+  --outmap \
+    partial partial \
+  -- \
+  --tpl \
+    partial '{{ #light }}text'
+
+# A directive must be the entire line (after trimming whitespace) to
+# count. "{{ #light }}text" has trailing content, so it is not a directive
+# at all - it falls through to the ordinary unresolved-token rule.
+log_case "partial-line {{ #light }} is not a directive" "{{ #light }}text" "$(_read_out partial)"
+
+_clean
+
+_run \
+  --subs \
+    is_light true \
+  -- \
+  --outmap \
+    stray1 stray1  stray2 stray2 \
+  -- \
+  --tpl \
+    stray1 '{{ #else }}
+line' \
+    stray2 '{{ #end }}
+line'
+
+log_case "stray {{ #else }} left as literal text" "{{ #else }}
+line" "$(_read_out stray1)"
+log_case "stray {{ #end }} left as literal text" "{{ #end }}
+line" "$(_read_out stray2)"
+
+_clean
+
+_run \
+  --subs \
+    is_light true \
+  -- \
+  --outmap \
+    nest nest \
+  -- \
+  --tpl \
+    nest '{{ #light }}
+outer-line
+{{ #light }}
+inner-line
+{{ #end }}
+{{ #end }}'
+
+nest_out="$(_read_out nest)"
+# The nested opener is left as literal text and a warning is printed
+# (checked separately below); the block that was already open when the
+# nested opener appeared keeps running as before.
+log_case "nested #light: outer content still kept" "1" "$( [[ $nest_out == *outer-line* ]] && echo 1 || echo 0 )"
+log_case "nested #light: nested opener left as literal text" "1" "$( [[ $nest_out == *'{{ #light }}'* ]] && echo 1 || echo 0 )"
+
+_clean
+printf 'is_light\x01true\n' >"$TMPDIR/subs"
+printf '%s\x01%s\n' "$TMPDIR/tpl_neststderr" "$TMPDIR/out_neststderr" >"$TMPDIR/outmap"
+printf '%s' '{{ #light }}
+{{ #light }}
+{{ #end }}
+{{ #end }}' >"$TMPDIR/tpl_neststderr"
+
+nest_warn="$(awk -f "$AWK_SCRIPT" "$TMPDIR/subs" "$TMPDIR/outmap" "$TMPDIR/tpl_neststderr" 2>&1 >/dev/null)"
+log_case "nested #light warns" "1" "$( [[ $nest_warn == *"nested"* ]] && echo 1 || echo 0 )"
+
+# =============================================================================
+# 38. Block directives - cross-file leak guard
+# =============================================================================
+
+section "block directives - cross-file leak guard"
+
+_clean
+printf 'is_light\x01true\n' >"$TMPDIR/subs"
+printf '%s\x01%s\n%s\x01%s\n' \
+  "$TMPDIR/tpl_leakfirst" "$TMPDIR/out_leakfirst" \
+  "$TMPDIR/tpl_leaksecond" "$TMPDIR/out_leaksecond" \
+  >"$TMPDIR/outmap"
+printf '%s' '{{ #light }}
+first-file-line' >"$TMPDIR/tpl_leakfirst"
+printf '%s' 'second-file-line' >"$TMPDIR/tpl_leaksecond"
+
+leak_stderr="$(awk -f "$AWK_SCRIPT" "$TMPDIR/subs" "$TMPDIR/outmap" \
+  "$TMPDIR/tpl_leakfirst" "$TMPDIR/tpl_leaksecond" 2>&1 >/dev/null)"
+
+# This is the most important case in the whole set: an unterminated block
+# in one template must not silently swallow or alter lines in the next
+# template rendered in the same awk invocation.
+log_case "leak guard: warning names the offending file" "1" \
+  "$( [[ $leak_stderr == *"tpl_leakfirst"* && $leak_stderr == *"unterminated"* ]] && echo 1 || echo 0 )"
+log_case "leak guard: second file renders untouched" "second-file-line" \
+  "$(cat "$TMPDIR/out_leaksecond" 2>/dev/null)"
+
 summary
