@@ -10,13 +10,13 @@ xdg-desktop-portal-hyprland
 ###### Essentials
 sound-theme-freedesktop
 xdg-desktop-portal-gtk
-alacritty-sixel-git
 gpu-screen-recorder
 papirus-icon-theme
 xdg-terminal-exec
 adw-gtk-theme
 gnome-keyring
 imagemagick
+alacritty
 chromium
 cliphist
 app2unit
