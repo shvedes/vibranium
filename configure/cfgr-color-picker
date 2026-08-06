@@ -9,8 +9,18 @@ _build() {
   command -v magick >/dev/null && cfgr::item::bool \
     --var VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR \
     --label "Prevew in notification"
+
+  cfgr::item::digit \
+    --var VIBRANIUM_COLOR_PICKER_HISTORY_SIZE \
+    --label "History size" \
+    --title "History Size" \
+    --prompt "Recent colors in the Waybar tooltip (int)" \
+    --type int \
+    --min 5 \
+    --max 50
 }
 
 cfgr::run "Color Picker" "_build" \
   VIBRANIUM_COLOR_PICKER_SHOW_SELECTED_COLOR \
-  VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW
+  VIBRANIUM_COLOR_PICKER_SHOW_HEX_PREVIEW \
+  VIBRANIUM_COLOR_PICKER_HISTORY_SIZE
