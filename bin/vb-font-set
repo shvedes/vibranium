@@ -334,11 +334,6 @@ if systemctl -q --user is-active waybar; then
   systemctl -q --user restart waybar
 fi
 
-helpers::check VIBRANIUM_GLOBAL_USE_OSD
-if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-  systemctl --user restart swayosd
-fi
-
 # Apply user-defined custom logic.
 # The $FONT is visible to the hook.
 if [[ -f "$HOOK_FILE" ]]; then

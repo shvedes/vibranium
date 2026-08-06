@@ -1,14 +1,5 @@
 #!/bin/bash
 
-_toggle_osd_service() {
-  # Since we're working with outdated value, flip the logic
-  if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-    systemctl -q --user disable --now swayosd &
-  else
-    systemctl -q --user enable --now swayosd &
-  fi
-}
-
 _set_update_channel() {
   local chosen
   chosen="$(cfgr::set_string \
@@ -48,15 +39,6 @@ _build() {
   local update_channel
   update_channel="$(_get_update_channel)"
 
-  # Don't show this option at all when
-  # SwayOSD isn't installed
-  if command -v swayosd-client >/dev/null; then
-    cfgr::item::bool \
-      --var VIBRANIUM_GLOBAL_USE_OSD \
-      --label "OSD enabled" \
-      --hook "_toggle_osd_service"
-  fi
-
   if _get_vb_updates; then
     local vb_updates_enabled="true"
   else
@@ -68,5 +50,4 @@ _build() {
 }
 
 cfgr::run "General" "_build" \
-  VIBRANIUM_GLOBAL_CONFIRM_TO_KILL \
-  VIBRANIUM_GLOBAL_USE_OSD
+  VIBRANIUM_GLOBAL_CONFIRM_TO_KILL

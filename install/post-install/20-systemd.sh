@@ -58,7 +58,6 @@ done
 override_services=(
   "awww"
   "waybar"
-  "swayosd"
   "hypridle"
   "cliphist"
   "alacritty"

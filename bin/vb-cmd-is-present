@@ -15,7 +15,7 @@ Options:
   -h, --help     Display this help and exit
 
 Examples:
-  ${0##*/} swayosd:swayosd swayosd:swayosd-client
+  ${0##*/} cliphist:cliphist
   ${0##*/} neovim:nvim,vi
 EOF
 }
@@ -54,7 +54,7 @@ log Info "Checking $(($#)) package(s)"
 # suffices). When no colon is present, the entire entry is treated as
 # both the package name and the binary name.
 #
-# Example: swayosd:swayosd-client  -> checks for swayosd-client binary
+# Example: cliphist:cliphist       -> checks for cliphist binary
 #          neovim:nvim,vi          -> checks for nvim OR vi binary
 missing=()
 

@@ -56,11 +56,6 @@
 # @note lock automatically.
 VIBRANIUM_GLOBAL_INHIBIT_TYPE="idle"
 
-# @type bool
-# @desc Whether to use OSD for events like:
-# @desc volume / brightness / power profiles.
-VIBRANIUM_GLOBAL_USE_OSD=false
-
 # @type string
 # @values balanced performance power-saver
 # @desc Power profile to use when on AC power.

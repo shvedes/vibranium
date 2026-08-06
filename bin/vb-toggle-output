@@ -22,16 +22,9 @@ EOF
 }
 
 notify() {
-  local summary="$1" body="$2" monitor icon
+  local summary="$1" body="$2"
 
-  icon="/usr/share/icons/Papirus/24x24/panel/volume-level-high.svg"
-
-  if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
-    monitor="$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')"
-    swayosd-client --monitor "$monitor" --custom-message "$body" ${icon:+--custom-icon "$icon"}
-  else
-    notify-send -r 2 -t 2000 -i "$icon" "$summary" "$body"
-  fi
+  notify-send -r 2 -t 2000 "$summary" "$body"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -63,8 +56,6 @@ if ! command -v jq > /dev/null; then
 fi
 
 source vb-lib-core
-
-helpers::check VIBRANIUM_GLOBAL_USE_OSD
 
 # Discover available sinks
 sinks=$(pactl -f json list sinks | jq '[.[] | select((.ports | length == 0) or ([.ports[]? | .availability != "not available"] | any))]')

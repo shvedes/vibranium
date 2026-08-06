@@ -46,13 +46,9 @@ source vb-lib-core
 log Info "Reloading configuration"
 
 # Build the list of user services to restart. cliphist is always restarted
-# to pick up any changes. swayosd and waybar are conditionally included
-# based on configuration and current running state respectively.
+# to pick up any changes. waybar is conditionally included based on its
+# current running state.
 SYSTEMD_TARGETS=("cliphist")
-
-if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-  SYSTEMD_TARGETS+=("swayosd")
-fi
 
 if systemctl -q --user is-active waybar; then
   SYSTEMD_TARGETS+=("waybar")

@@ -71,7 +71,7 @@ show_volume_notification() {
 
   # Dunst queues notifications during fullscreen and delivers them all
   # at once on exit.  Skip notify-send while a fullscreen window is
-  # focused to avoid stale volume bars.  OSDs are exempt from this rule.
+  # focused to avoid stale volume bars.
 
   # Only query wpctl when the caller couldn't supply pre-computed values
   # (i.e. toggle_mute, where the new state is genuinely unknown).
@@ -123,26 +123,22 @@ show_volume_notification() {
 adjust_volume() {
   local direction="$1"
   local device_type="$2"
-  local device osd_arg notification_type max_volume osd_max_flag current_volume new_volume
+  local device notification_type max_volume current_volume new_volume
   log Info "Adjusting $device_type $direction"
 
   if [[ "$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED" == true ]]; then
     max_volume=2.0
-    osd_max_flag="--max-volume=200"
   else
     max_volume=1.0
-    osd_max_flag=""
   fi
 
   case "$device_type" in
     vol)
       device="@DEFAULT_AUDIO_SINK@"
-      osd_arg="--output-volume"
       notification_type="Volume"
       ;;
     mic)
       device="@DEFAULT_AUDIO_SOURCE@"
-      osd_arg="--input-volume"
       notification_type="Microphone"
       ;;
   esac
@@ -188,22 +184,13 @@ adjust_volume() {
   }
 
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
-    if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-      log Info "Using swayosd: $osd_arg ${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}"
-      if [[ -n "$osd_max_flag" ]]; then
-        swayosd-client "$osd_arg" "${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}" "$osd_max_flag"
-      else
-        swayosd-client "$osd_arg" "${direction}${VIBRANIUM_VOLUME_ADJUSTMENT_STEP}"
-      fi
-    else
-      _calc_new_volume
-      log Info "Using wpctl: set-volume $device $new_volume"
-      wpctl set-volume "$device" "$new_volume"
-      if [[ "$quiet" == false ]]; then
-        local bar=$((new100 * 100 / max100))
-        log Info "Notification: $notification_type vol=$new100 bar=$bar"
-        show_volume_notification "$device" "$notification_type" "$new100" "$bar"
-      fi
+    _calc_new_volume
+    log Info "Using wpctl: set-volume $device $new_volume"
+    wpctl set-volume "$device" "$new_volume"
+    if [[ "$quiet" == false ]]; then
+      local bar=$((new100 * 100 / max100))
+      log Info "Notification: $notification_type vol=$new100 bar=$bar"
+      show_volume_notification "$device" "$notification_type" "$new100" "$bar"
     fi
   else
     _calc_new_volume
@@ -239,13 +226,7 @@ set_volume() {
     wpctl set-mute "$device" 1
 
     if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true && "$quiet" != true ]]; then
-      if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-        swayosd-client \
-          --custom-icon="audio-volume-muted-symbolic" \
-          --custom-progress="0.0001"
-      else
-        show_volume_notification "$device" "Volume" "0" "0" "true"
-      fi
+      show_volume_notification "$device" "Volume" "0" "0" "true"
     fi
     return
   fi
@@ -262,59 +243,33 @@ set_volume() {
   wpctl set-volume "$device" "$float_val"
 
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true && "$quiet" != true ]]; then
-    if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-      local scaled=$((int_val * 10000 / max_volume))
-      local osd_progress osd_icon
-      printf -v osd_progress "%d.%04d" $((scaled / 10000)) $((scaled % 10000))
-
-      if ((int_val <= 33)); then
-        osd_icon="audio-volume-low-symbolic"
-      elif ((int_val <= 66)); then
-        osd_icon="audio-volume-medium-symbolic"
-      else
-        osd_icon="audio-volume-high-symbolic"
-      fi
-
-      log Info "swayosd: icon=$osd_icon progress=$osd_progress"
-      swayosd-client \
-        --custom-icon="$osd_icon" \
-        --custom-progress="$osd_progress"
-    else
-      # int_val is already the display percentage; bar scales it to 0-100 of max_volume.
-      local bar=$((int_val * 100 / max_volume))
-      show_volume_notification "$device" "Volume" "$int_val" "$bar"
-    fi
+    # int_val is already the display percentage; bar scales it to 0-100 of max_volume.
+    local bar=$((int_val * 100 / max_volume))
+    show_volume_notification "$device" "Volume" "$int_val" "$bar"
   fi
 }
 
 toggle_mute() {
   local device_type="$1"
-  local device osd_arg type
+  local device type
 
   case "$device_type" in
     vol)
       device="@DEFAULT_AUDIO_SINK@"
-      osd_arg="--output-volume"
       type="Volume"
       ;;
     mic)
       device="@DEFAULT_AUDIO_SOURCE@"
-      osd_arg="--input-volume"
       type="Microphone"
       ;;
   esac
   log Info "Toggling mute for $device_type"
 
   if [[ "$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK" == true ]]; then
-    if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-      log Info "swayosd: $osd_arg mute-toggle"
-      swayosd-client "$osd_arg" mute-toggle
-    else
-      log Info "wpctl: set-mute $device toggle"
-      wpctl set-mute "$device" toggle
-      if [[ "$quiet" == false ]]; then
-        show_volume_notification "$device" "$type"
-      fi
+    log Info "wpctl: set-mute $device toggle"
+    wpctl set-mute "$device" toggle
+    if [[ "$quiet" == false ]]; then
+      show_volume_notification "$device" "$type"
     fi
   else
     log Info "No visual feedback: wpctl set-mute $device toggle"
@@ -430,14 +385,13 @@ log Info "${0##*/} started: action=$action quiet=$quiet"
 source vb-lib-core
 
 helpers::check \
-  VIBRANIUM_GLOBAL_USE_OSD \
   VIBRANIUM_VOLUME_ADJUSTMENT_STEP \
   VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK \
   VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK \
   VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED \
   VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT
 
-log Info "Config: step=$VIBRANIUM_VOLUME_ADJUSTMENT_STEP max_above_100=$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED osd=$VIBRANIUM_GLOBAL_USE_OSD visual=$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK audio=$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK variant=$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
+log Info "Config: step=$VIBRANIUM_VOLUME_ADJUSTMENT_STEP max_above_100=$VIBRANIUM_VOLUME_ALLOW_ABOVE_HUNDRED visual=$VIBRANIUM_VOLUME_USE_VISUAL_FEEDBACK audio=$VIBRANIUM_VOLUME_USE_AUDIO_FEEDBACK variant=$VIBRANIUM_VOLUME_AUDIO_FEEDBACK_VARIANT"
 
 # Mic operations intentionally do not call feedback(): the audio
 # feedback plays on the default (speaker) sink and would confuse the

@@ -408,29 +408,7 @@ _edit_roundness() {
     printf '\nwindow {\n\tborder-radius: %spx;\n}' "$input" >> "$rofi_conf"
   fi
 
-  local swayosd_css="$XDG_CONFIG_HOME/swayosd/style.css"
-  lines=()
-  found=0
-  if [[ -f "$swayosd_css" ]]; then
-    mapfile -t lines < "$swayosd_css"
-    for i in "${!lines[@]}"; do
-      if [[ ${lines[i]} == *border-radius* ]]; then
-        lines[i]=$'\t'"border-radius: ${input}px;"
-        found=1
-      fi
-    done
-  fi
-  if (( found )); then
-    printf '%s\n' "${lines[@]}" > "$swayosd_css"
-  else
-    printf '\nwindow {\n\tborder-radius: %spx;\n}' "$input" >> "$swayosd_css"
-  fi
-
   vb-refresh-dunst &
-  helpers::check VIBRANIUM_GLOBAL_USE_OSD
-  if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-    systemctl --user restart swayosd &
-  fi
 }
 
 _set_anim_preset() {

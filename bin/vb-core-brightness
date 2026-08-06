@@ -147,10 +147,9 @@ log Info "Lock acquired ($LOCKFILE)"
 source vb-lib-core
 
 helpers::check \
-  VIBRANIUM_GLOBAL_USE_OSD \
   VIBRANIUM_BRIGHTNESS_STEP \
   VIBRANIUM_BRIGHTNESS_NOTIFY
-log Info "Config: OSD=$VIBRANIUM_GLOBAL_USE_OSD, step=$VIBRANIUM_BRIGHTNESS_STEP, notify=$VIBRANIUM_BRIGHTNESS_NOTIFY"
+log Info "Config: step=$VIBRANIUM_BRIGHTNESS_STEP, notify=$VIBRANIUM_BRIGHTNESS_NOTIFY"
 
 # Global state maps - populated once by load_state, read/written by all
 # helpers in-memory instead of re-reading the state file on every access.
@@ -503,57 +502,6 @@ update_brightness_cache() {
   save_state
 }
 
-osd() {
-  local value="$1" label="${2:-}"
-  local icon progress
-
-  # Negative label (e.g. "-30%") means gamma dimming - always use low icon.
-  if [[ "$label" == -* ]]; then
-    icon="brightness-low-symbolic"
-  elif ((value <= 30)); then
-    icon="brightness-low-symbolic"
-  elif ((value <= 70)); then
-    icon="brightness-symbolic"
-  else
-    icon="brightness-high-symbolic"
-  fi
-
-  # Integer-only approximation:
-  # We scale everything by 100 to avoid floating point.
-  # Target formula: 0.02 + value * 0.0098
-  # Multiply by 100 -> 2 + value * 0.98
-  # Then approximate 0.98 as 98/100 (integer division will truncate).
-  local p
-  p=$((2 + value * 98 / 100))
-
-  # p is now in range:
-  # value=0   -> p=2   (represents 0.02)
-  # value=100 -> p=100 (represents 1.00)
-
-  # Handle the upper bound explicitly:
-  # Without this, p=100 would be formatted as "0.100" instead of "1.00"
-  if ((p == 100)); then
-    printf -v progress "1.00"
-  else
-    # Format as fixed-point:
-    # "0.%02d" -> always 2 digits after decimal (e.g. 2 -> 0.02, 37 -> 0.37)
-    printf -v progress "0.%02d" "$p"
-  fi
-
-  # I can't imagine a situation where this service would be turned off,
-  # but let it be here just in case
-  if ! systemctl -q --user is-active swayosd; then
-    log Info "Activating swayosd.service"
-    systemctl --user enable --now swayosd.service
-  fi
-
-  if [[ -n "$label" ]]; then
-    swayosd-client --custom-icon="$icon" --custom-progress="$progress" --custom-progress-text="$label"
-  else
-    swayosd-client --custom-icon="$icon" --custom-progress="$progress"
-  fi
-}
-
 # Load cached monitor metadata once.  All subsequent helpers read from the
 # in-memory globals (bus_map, level_map, mult_map, GAMMA) and only hit the
 # state file again for writes.
@@ -641,15 +589,6 @@ if [[ "$method" == "ddc" ]]; then
       --skip-ddc-checks
       --maxtries "1,1,1")
   fi
-fi
-
-if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true ]]; then
-  if ! command -v swayosd-client > /dev/null; then
-    log Warn "swayosd-client not found, OSD unavailable"
-    vb-cmd-dep-notify --name "Brightness Control" --deps swayosd
-    exit 1
-  fi
-  log Info "OSD enabled"
 fi
 
 step=$VIBRANIUM_BRIGHTNESS_STEP
@@ -755,172 +694,130 @@ case "$method" in
       fi
       if [[ "$QUIET" == false ]]; then
         dim_bar=$(((GAMMA - GAMMA_MIN) * 100 / (100 - GAMMA_MIN)))
-        if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
-          osd "$dim_bar" "-$((100 - GAMMA))%" &
-        else
-          notify-send -r 2 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
-        fi
+        notify-send -r 2 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
       fi
     elif [[ -n "$new" ]]; then
-      if [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $QUIET == false ]]; then
-        osd "$new" &
-      else
-        if ((MONITOR_COUNT > 1)); then
-          source="($ACTIVE_MONITOR) "
-        fi
+      if ((MONITOR_COUNT > 1)); then
+        source="($ACTIVE_MONITOR) "
+      fi
 
-        # Suppress the notification when the active window is fullscreen.
-        # Dunst queues notifications during fullscreen and shows them only
-        # after exiting fullscreen, which makes them stale and irrelevant.
-        #
-        # We don't apply this rule to OSD notifications because
-        # it defeats the purpose of OSDs
-        if ((FULLSCREEN_STATE == 2)); then
-          log Info "Fullscreen detected, suppressing DDC notification"
-          exit 0
-        fi
+      # Suppress the notification when the active window is fullscreen.
+      # Dunst queues notifications during fullscreen and shows them only
+      # after exiting fullscreen, which makes them stale and irrelevant.
+      if ((FULLSCREEN_STATE == 2)); then
+        log Info "Fullscreen detected, suppressing DDC notification"
+        exit 0
+      fi
 
-        if [[ "$QUIET" == false ]]; then
-          notify-send -r 2 -t 1000 "Brightness $source${new}%" -h int:value:"$new"
-        fi
+      if [[ "$QUIET" == false ]]; then
+        notify-send -r 2 -t 1000 "Brightness $source${new}%" -h int:value:"$new"
       fi
     fi
     ;;
   "raw")
-    # swayosd delegation is only safe when gamma is at normal (100) because
-    # swayosd-client --brightness only understands 0-100 and would conflict
-    # with gamma-based dimming below that range.
-    if [[ "$VIBRANIUM_GLOBAL_USE_OSD" == true && "$VIBRANIUM_BRIGHTNESS_NOTIFY" != "false" && "$QUIET" == false && "$GAMMA" == "100" ]]; then
-      log Info "Delegating to swayosd (gamma=100, raw method)"
-      # Translate action into swayosd's (±)number / absolute syntax:
-      #   --up   -> +<step>   e.g. +5
-      #   --down -> -<step>   e.g. -5
-      #   --set  -> <value>   e.g. 60  (swayosd treats bare integers as absolute)
-      case "$ACTION" in
-        "--up")
-          swayosd_arg="+${step}"
-          ;;
-        "--down")
-          swayosd_arg="-${step}"
-          ;;
-        "--set")
-          swayosd_arg="$SET_VALUE"
-          ;;
-      esac
+    # Read current and max brightness from the kernel
+    current_raw=$(< /sys/class/backlight/*/brightness)
+    max_raw=$(< /sys/class/backlight/*/max_brightness)
+    current=$((current_raw * 100 / max_raw))
+    log Info "Raw sysfs: current=$current_raw, max=$max_raw, pct=$current"
 
-      log Info "swayosd-client --brightness=$swayosd_arg"
+    case "$ACTION" in
+      "--up")
+        if ((GAMMA < 100)); then
+          new_gamma=$((GAMMA + step))
+          if ((new_gamma > 100)); then
+            new_gamma=100
+          fi
+
+          apply_gamma "$new_gamma"
+          save_gamma "$new_gamma"
+
+          GAMMA=$new_gamma
+
+          log Info "Gamma raised to $GAMMA (brightness unchanged at $current)"
+
+          if ((GAMMA == 100)); then
+            new_pct=$current
+            new_raw=$(((new_pct * max_raw + 99) / 100))
+          fi
+        else
+          new_pct=$((current + step))
+          ((new_pct > 100)) && new_pct=100
+          new_raw=$(((new_pct * max_raw + 99) / 100))
+        fi
+        ;;
+      "--down")
+        if ((current == 0 && GAMMA > GAMMA_MIN)); then
+          # Hardware at minimum; transition to gamma dimming.
+          new_gamma=$((GAMMA - step))
+          if ((new_gamma < GAMMA_MIN)); then
+            new_gamma=$GAMMA_MIN
+          fi
+          apply_gamma "$new_gamma"
+          save_gamma "$new_gamma"
+
+          GAMMA=$new_gamma
+
+          log Info "Gamma lowered to $GAMMA (brightness at minimum)"
+        else
+          new_pct=$((current - step))
+          ((new_pct < 0)) && new_pct=0
+          new_raw=$(((new_pct * max_raw + 99) / 100))
+        fi
+        ;;
+      "--set")
+        if ((SET_VALUE >= 0)); then
+          if ((GAMMA != 100)); then
+            apply_gamma 100
+            save_gamma 100
+            GAMMA=100
+          fi
+
+          new_pct=$SET_VALUE
+          new_raw=$(((new_pct * max_raw + 99) / 100))
+        else
+          new_pct=0
+          new_raw=0
+          new_gamma=$((100 + SET_VALUE))
+
+          if ((new_gamma < GAMMA_MIN)); then
+            new_gamma=$GAMMA_MIN
+          fi
+
+          if ((GAMMA != new_gamma)); then
+            apply_gamma "$new_gamma"
+            save_gamma "$new_gamma"
+            GAMMA=$new_gamma
+          fi
+        fi
+        ;;
+    esac
+
+    if [[ -n "${new_raw+x}" ]]; then
+      # Clamp raw value
+      ((new_raw > max_raw)) && new_raw=$max_raw
+      ((new_raw < 0)) && new_raw=0
+
+      new=$((new_raw * 100 / max_raw))
+
+      log Info "Write raw brightness: $new_raw/$max_raw ($new%)"
+      echo "$new_raw" > /sys/class/backlight/*/brightness
+    fi
+
+    if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == "false" ]]; then
+      log Info "Notifications disabled, exiting"
+      exit 0
+    fi
+
+    if ((GAMMA < 100)); then
+      log Info "Gamma dimming active (gamma=$GAMMA), raw notification"
       if [[ "$QUIET" == false ]]; then
-        swayosd-client --brightness="$swayosd_arg"
+        dim_bar=$(((GAMMA - GAMMA_MIN) * 100 / (100 - GAMMA_MIN)))
+        notify-send -r 1 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
       fi
-    else
-      # Read current and max brightness from the kernel
-      current_raw=$(< /sys/class/backlight/*/brightness)
-      max_raw=$(< /sys/class/backlight/*/max_brightness)
-      current=$((current_raw * 100 / max_raw))
-      log Info "Raw sysfs: current=$current_raw, max=$max_raw, pct=$current"
-
-      case "$ACTION" in
-        "--up")
-          if ((GAMMA < 100)); then
-            new_gamma=$((GAMMA + step))
-            if ((new_gamma > 100)); then
-              new_gamma=100
-            fi
-
-            apply_gamma "$new_gamma"
-            save_gamma "$new_gamma"
-
-            GAMMA=$new_gamma
-
-            log Info "Gamma raised to $GAMMA (brightness unchanged at $current)"
-
-            if ((GAMMA == 100)); then
-              new_pct=$current
-              new_raw=$(((new_pct * max_raw + 99) / 100))
-            fi
-          else
-            new_pct=$((current + step))
-            ((new_pct > 100)) && new_pct=100
-            new_raw=$(((new_pct * max_raw + 99) / 100))
-          fi
-          ;;
-        "--down")
-          if ((current == 0 && GAMMA > GAMMA_MIN)); then
-            # Hardware at minimum; transition to gamma dimming.
-            new_gamma=$((GAMMA - step))
-            if ((new_gamma < GAMMA_MIN)); then
-              new_gamma=$GAMMA_MIN
-            fi
-            apply_gamma "$new_gamma"
-            save_gamma "$new_gamma"
-
-            GAMMA=$new_gamma
-
-            log Info "Gamma lowered to $GAMMA (brightness at minimum)"
-          else
-            new_pct=$((current - step))
-            ((new_pct < 0)) && new_pct=0
-            new_raw=$(((new_pct * max_raw + 99) / 100))
-          fi
-          ;;
-        "--set")
-          if ((SET_VALUE >= 0)); then
-            if ((GAMMA != 100)); then
-              apply_gamma 100
-              save_gamma 100
-              GAMMA=100
-            fi
-
-            new_pct=$SET_VALUE
-            new_raw=$(((new_pct * max_raw + 99) / 100))
-          else
-            new_pct=0
-            new_raw=0
-            new_gamma=$((100 + SET_VALUE))
-
-            if ((new_gamma < GAMMA_MIN)); then
-              new_gamma=$GAMMA_MIN
-            fi
-
-            if ((GAMMA != new_gamma)); then
-              apply_gamma "$new_gamma"
-              save_gamma "$new_gamma"
-              GAMMA=$new_gamma
-            fi
-          fi
-          ;;
-      esac
-
-      if [[ -n "${new_raw+x}" ]]; then
-        # Clamp raw value
-        ((new_raw > max_raw)) && new_raw=$max_raw
-        ((new_raw < 0)) && new_raw=0
-
-        new=$((new_raw * 100 / max_raw))
-
-        log Info "Write raw brightness: $new_raw/$max_raw ($new%)"
-        echo "$new_raw" > /sys/class/backlight/*/brightness
-      fi
-
-      if [[ "$VIBRANIUM_BRIGHTNESS_NOTIFY" == "false" ]]; then
-        log Info "Notifications disabled, exiting"
-        exit 0
-      fi
-
-      if ((GAMMA < 100)); then
-        log Info "Gamma dimming active (gamma=$GAMMA), raw notification"
-        if [[ "$QUIET" == false ]]; then
-          dim_bar=$(((GAMMA - GAMMA_MIN) * 100 / (100 - GAMMA_MIN)))
-          if [[ $VIBRANIUM_GLOBAL_USE_OSD == true ]]; then
-            osd "$dim_bar" "-$((100 - GAMMA))%" &
-          else
-            notify-send -r 1 -t 1000 "Brightness -$((100 - GAMMA))%" -h int:value:"$dim_bar"
-          fi
-        fi
-      elif [[ -n "${new_raw+x}" ]]; then
-        if [[ "$QUIET" == false ]]; then
-          notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"
-        fi
+    elif [[ -n "${new_raw+x}" ]]; then
+      if [[ "$QUIET" == false ]]; then
+        notify-send -r 1 -t 1000 "Brightness ${new}%" -h int:value:"$new"
       fi
     fi
     ;;

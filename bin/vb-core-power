@@ -24,7 +24,6 @@ EOF
 
 notify() {
   local profile="$1"
-  local icon=""
   local label=""
 
   log Info "Preparing notification for profile=$profile"
@@ -36,19 +35,15 @@ notify() {
 
   case "$profile" in
     "performance")
-      icon="power-profile-performance-symbolic"
       label="Performance"
       ;;
     "balanced")
-      icon="power-profile-balanced-symbolic"
       label="Balanced"
       ;;
     "power-saver")
-      icon="power-profile-power-saver-symbolic"
       label="Powersave"
       ;;
     *)
-      icon="battery-symbolic"
       label="$profile"
       ;;
   esac
@@ -56,7 +51,6 @@ notify() {
   source vb-lib-core
 
   helpers::check \
-    VIBRANIUM_GLOBAL_USE_OSD \
     VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE
 
   # Skip notification when waybar is active AND the power-profile module
@@ -66,11 +60,7 @@ notify() {
   local module_enabled="$VIBRANIUM_BAR_POWER_PROFILE_MODULE_ENABLE"
 
   if ! systemctl -q --user is-active waybar || [[ ! $module_enabled == "true" ]]; then
-    if [[ $VIBRANIUM_GLOBAL_USE_OSD == "true" ]]; then
-      swayosd-client --custom-message "$label" --custom-icon "$icon"
-    else
-      notify-send -r 3 -t 1500 "Power Management" "Power profile set to <b>${label,,}</b>"
-    fi
+    notify-send -r 3 -t 1500 "Power Management" "Power profile set to <b>${label,,}</b>"
   fi
 
   log Info "Notification sent: profile=$profile label=$label"

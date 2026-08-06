@@ -67,7 +67,7 @@ _allowed_list() {
 # 1. Parse + cache spot-checks
 # =============================================================================
 
-helpers::check VIBRANIUM_GLOBAL_USE_OSD >/dev/null 2>&1
+helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING >/dev/null 2>&1
 
 section "cache"
 printf "  defaults=%d  types=%d  allowed=%d  mins=%d  maxs=%d\n" \
@@ -93,7 +93,7 @@ _spot_check() {
     "$tag" "$var" "${OPTION_DEFAULTS[$var]-<missing>}" "${OPTION_TYPES[$var]-<missing>}" "$extra"
 }
 
-_spot_check VIBRANIUM_GLOBAL_USE_OSD "false" "bool" "" ""
+_spot_check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING "false" "bool" "" ""
 _spot_check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK "true" "bool" "" ""
 _spot_check VIBRANIUM_VOLUME_ADJUSTMENT_STEP "5" "int" "" ""
 _spot_check VIBRANIUM_SCREENSHOT_JPEG_QUALITY "80" "int" "0..100" ""
@@ -103,7 +103,7 @@ _spot_check VIBRANIUM_GLOBAL_SEARCH_ENGINE "google" "string" "" "|google|duckduc
 # 2. Bool
 # =============================================================================
 
-B1="VIBRANIUM_GLOBAL_USE_OSD"
+B1="VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING"
 D1="${OPTION_DEFAULTS[$B1]}"
 B2="VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
 D2="${OPTION_DEFAULTS[$B2]}"
@@ -259,47 +259,47 @@ _assert_rc "string valid -> rc 0"      "$SE" "bing" "0" "bing"
 section "multi-variable check - nameref lifecycle"
 
 TOTAL=$((TOTAL + 1))
-VIBRANIUM_GLOBAL_USE_OSD="false"
+VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING="false"
 VIBRANIUM_VOLUME_ADJUSTMENT_STEP="10"
 VIBRANIUM_GLOBAL_SEARCH_ENGINE="duckduckgo"
-helpers::check VIBRANIUM_GLOBAL_USE_OSD VIBRANIUM_VOLUME_ADJUSTMENT_STEP VIBRANIUM_GLOBAL_SEARCH_ENGINE >/dev/null 2>&1
-if [[ $VIBRANIUM_GLOBAL_USE_OSD == false && $VIBRANIUM_VOLUME_ADJUSTMENT_STEP == 10 && $VIBRANIUM_GLOBAL_SEARCH_ENGINE == duckduckgo ]]; then
+helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING VIBRANIUM_VOLUME_ADJUSTMENT_STEP VIBRANIUM_GLOBAL_SEARCH_ENGINE >/dev/null 2>&1
+if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == false && $VIBRANIUM_VOLUME_ADJUSTMENT_STEP == 10 && $VIBRANIUM_GLOBAL_SEARCH_ENGINE == duckduckgo ]]; then
   printf "  ${_g}[PASS]${_R}  three vars in one call, all keep their valid values\n"
   PASS=$((PASS + 1))
 else
   printf "  ${_r}[FAIL]${_R}  osd='%s'  step='%s'  engine='%s'\n" \
-    "$VIBRANIUM_GLOBAL_USE_OSD" "$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" "$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
+    "$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING" "$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" "$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
   FAIL=$((FAIL + 1))
 fi
 
 # Mixed: first valid, second invalid -> both should resolve
 TOTAL=$((TOTAL + 1))
-VIBRANIUM_GLOBAL_USE_OSD="true"
+VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING="true"
 VIBRANIUM_VOLUME_ADJUSTMENT_STEP="garbage"
 VIBRANIUM_GLOBAL_SEARCH_ENGINE="brave"
 D3="${OPTION_DEFAULTS[$IP]}"
-helpers::check VIBRANIUM_GLOBAL_USE_OSD VIBRANIUM_VOLUME_ADJUSTMENT_STEP VIBRANIUM_GLOBAL_SEARCH_ENGINE >/dev/null 2>&1
-if [[ $VIBRANIUM_GLOBAL_USE_OSD == true && $VIBRANIUM_VOLUME_ADJUSTMENT_STEP == "$D3" && $VIBRANIUM_GLOBAL_SEARCH_ENGINE == brave ]]; then
+helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING VIBRANIUM_VOLUME_ADJUSTMENT_STEP VIBRANIUM_GLOBAL_SEARCH_ENGINE >/dev/null 2>&1
+if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == true && $VIBRANIUM_VOLUME_ADJUSTMENT_STEP == "$D3" && $VIBRANIUM_GLOBAL_SEARCH_ENGINE == brave ]]; then
   printf "  ${_g}[PASS]${_R}  mixed valid/invalid, invalid falls back, others untouched\n"
   PASS=$((PASS + 1))
 else
   printf "  ${_r}[FAIL]${_R}  osd='%s'  step='%s' (expected '%s')  engine='%s'\n" \
-    "$VIBRANIUM_GLOBAL_USE_OSD" "$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" "$D3" "$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
+    "$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING" "$VIBRANIUM_VOLUME_ADJUSTMENT_STEP" "$D3" "$VIBRANIUM_GLOBAL_SEARCH_ENGINE"
   FAIL=$((FAIL + 1))
 fi
 
 # Nameref release: two consecutive calls with different vars shouldn't cross-contaminate
 TOTAL=$((TOTAL + 1))
-VIBRANIUM_GLOBAL_USE_OSD="false"
+VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING="false"
 VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK="true"
-helpers::check VIBRANIUM_GLOBAL_USE_OSD >/dev/null 2>&1
+helpers::check VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING >/dev/null 2>&1
 helpers::check VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK >/dev/null 2>&1
-if [[ $VIBRANIUM_GLOBAL_USE_OSD == false && $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == true ]]; then
+if [[ $VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING == false && $VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK == true ]]; then
   printf "  ${_g}[PASS]${_R}  consecutive calls, no cross-contamination\n"
   PASS=$((PASS + 1))
 else
   printf "  ${_r}[FAIL]${_R}  osd='%s'  pause='%s'\n" \
-    "$VIBRANIUM_GLOBAL_USE_OSD" "$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
+    "$VIBRANIUM_GLOBAL_SHOW_NOW_PLAYING" "$VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK"
   FAIL=$((FAIL + 1))
 fi
 
