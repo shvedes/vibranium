@@ -265,7 +265,12 @@ _update() {
     vb::print "$G" "Vibranium updated to $remote_short ($channel)"
   fi
 
-  vb-cmd-reload --quiet
+  # Reload the configuration
+  setsid -f vb-cmd-reload --quiet
+
+  # And also reload the current theme in case if it was changed.
+  setsid -f vb-theme-set --force "$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+
   _pause
 }
 
@@ -311,7 +316,7 @@ fi
 
 if term::ask_yes_no Y "Proceed with update?"; then
   _update
-  rm -f "$VIBRANIUM_STATE/update.available" || true
+  rm -f "$VIBRANIUM_STATE/update.available"
   vb-refresh-waybar-module vb-update
 else
   vb::print "$R" "Operation aborted"
