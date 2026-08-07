@@ -233,7 +233,7 @@ _promote_singles() {
   local family variants chosen display
   for family in "${!FAMILIES[@]}"; do
     read -ra variants <<< "${FAMILIES[$family]}"
-    (( ${#variants[@]} == 1 )) || continue
+    ((${#variants[@]} == 1)) || continue
     chosen="${family}-${variants[0]}"
     display="${family} ${variants[0]}"
     STANDALONE_THEMES["$display"]="$display"
@@ -826,6 +826,6 @@ if [[ -d "$HOOK_DIR" ]]; then
 
   for hook in "${HOOK_FILES[@]}"; do
     log Info "running user hook '${hook##*/}'"
-    env THEME="$FOLDER_NAME" setsid -f "$hook"
+    env THEME="$FOLDER_NAME" setsid -f bash "$hook"
   done
 fi
