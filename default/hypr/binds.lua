@@ -447,7 +447,7 @@ hl.bind(
   { description = "Screenshot (screen)" }
 )
 
-hl.bind("Print", hl.dsp.exec_raw("vb-core-screenshot --screen --annotate"), { description = "Screenshot (screen)" })
+hl.bind("Print", hl.dsp.exec_raw("vb-core-screenshot --screen"), { description = "Screenshot (screen)" })
 
 hl.bind(
   mainMod .. " + SHIFT + A",
