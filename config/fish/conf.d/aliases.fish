@@ -22,5 +22,3 @@ end
 alias omarchy-theme-install="vb-theme-install"
 alias vibranium-healthcheck="vb-cmd-healthcheck"
 alias wget="wget --hsts-file=\$XDG_DATA_HOME/wget-hsts"
-
-alias sudo='run0 --background=""'
