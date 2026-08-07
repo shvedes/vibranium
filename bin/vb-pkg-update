@@ -222,13 +222,19 @@ fi
 
 if ! _perform_update; then
   vb::print "$R" "Something went wrong"
-
   _operation_canceled
   exit 1
 fi
 
+# Remove package list cache
 rm -f "$VIBRANIUM_CACHE"/pkg-updates.*
-vb-refresh-waybar-module pacman &
+
+# Update the Waybr module
+setsid -f vb-refresh-waybar-module pacman
+
+# Regenerate the Lua bytecode for the Hyprland config editor.
+# In case if Lua was updated.
+source vb-cmd-editor-luac
 
 shopt -s nullglob
 for _hook in "$HOOK_DIR"/*.sh "$UHOOK_DIR"/*.sh; do

@@ -123,6 +123,7 @@ end
 if #args < 2 then
   usage(1)
 end
+
 local path_str = args[1]
 local file = args[2]
 
@@ -155,6 +156,7 @@ local full_path = {}
 for i, name in ipairs(section_path) do
   full_path[i] = name
 end
+
 full_path[#full_path + 1] = option_name
 
 local wok, werr = hyprEdit(file, full_path, value, { occurrence = occurrence })
@@ -162,4 +164,5 @@ if not wok then
   io.stderr:write(werr or "write failed\n")
   os.exit(1)
 end
+
 os.exit(0)

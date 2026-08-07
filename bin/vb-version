@@ -36,7 +36,7 @@ done
 # Print subjects of the commits in REF that HEAD lacks, capped at 10.
 list_upcoming() {
   local ref="$1" total="$2"
-  echo "Upcoming from ${ref}: ${total} commit${total: 1:+s}"
+  echo "Upcoming from ${ref}: ${total} commit${total:1:+s}"
   while IFS= read -r line; do
     echo "  ${line}"
   done < <(git -C "$VIBRANIUM" log --format="%h %s" -n 10 HEAD.."$ref")
@@ -163,6 +163,17 @@ else
         list_upcoming master "$MASTER_BEHIND"
       fi
     fi
+  fi
+fi
+
+# On master, git describe finds no tag on shallow clones where the
+# tag history is truncated; count against the latest release tag,
+# picked by version sort, instead.
+if [[ -z "$DESCRIBE" && "$BRANCH" == master ]]; then
+  RELEASE_TAG=$(git -C "$VIBRANIUM" tag --sort=-version:refname 2> /dev/null | head -1)
+  if [[ -n "$RELEASE_TAG" ]]; then
+    MASTER_AHEAD_TAG=$(git -C "$VIBRANIUM" rev-list --count "$RELEASE_TAG"..HEAD 2> /dev/null)
+    echo "${MASTER_AHEAD_TAG} commits ahead of latest release ${RELEASE_TAG}"
   fi
 fi
 

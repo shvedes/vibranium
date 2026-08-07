@@ -1,0 +1,44 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+
+usage() {
+  shcat << EOF
+Usage: ${0##*/} [OPTION]...
+
+Rebuild the Hyprland config editor Lua bytecode.
+
+Options:
+  -v, --verbose   Enable verbose output
+  -h, --help      Display this help and exit
+
+Compiles default/hypr/lib/editor.lua into the cache as editor.luac.
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+log Info "Rebuilding editor Lua bytecode"
+if luac -o "$VIBRANIUM_CACHE/editor.luac" "$VIBRANIUM/default/hypr/lib/editor.lua"; then
+  log Info "Rebuilt editor Lua bytecode"
+else
+  log Error "Rebuild failed"
+  exit 1
+fi
