@@ -5,7 +5,7 @@ source vb-lib-cli
 VERBOSE=${VERBOSE:-false}
 
 SELF="${0##*/}"
-STEP_DEFAULT="0.20"
+STEP_DEFAULT="0.30"
 ACTION=""
 STEP="$STEP_DEFAULT"
 ZOOM_VALUE=""
