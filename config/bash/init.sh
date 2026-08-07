@@ -23,8 +23,10 @@ if ! [[ -d "${XDG_DATA_HOME:-$HOME/.local/state}/bash" ]]; then
   : > "${XDG_DATA_HOME:-$HOME/.local/state}/bash/history"
 fi
 
-source "$BASH_CONFIG_DIR/functions.sh"
+for f in "$BASH_CONFIG_DIR"/{functions,aliases}/*.sh; do
+  source "$f"
+done
+
 source "$BASH_CONFIG_DIR/greeting.sh"
-source "$BASH_CONFIG_DIR/aliases.sh"
 source "$BASH_CONFIG_DIR/prompt.sh"
 source "$BASH_CONFIG_DIR/binds.sh"
