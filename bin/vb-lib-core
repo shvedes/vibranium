@@ -659,7 +659,7 @@ term::show_header() {
   fi
 
   printf "\n%s%s%s\n\n" "${color:-$Y}" \
-    "$(< "$VIBRANIUM/logo.txt")" "$RS"
+    "$(< "$VIBRANIUM/banner.txt")" "$RS"
 }
 
 term::is_headless() {
