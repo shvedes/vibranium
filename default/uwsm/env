@@ -1,10 +1,9 @@
+# shellcheck source=/dev/null
 # This file linked to $VIBRANIUM. DO NOT EDIT!!!
 
 # If you want to edit / add / remove environment variables,
 # consider using "$XDG_CONFIG_HOME/vibranium/environment",
 # which will take priority over this file.
-
-# shellcheck source=/dev/null
 
 # We have two environment files:
 # 1) a mandatory (this one) that is always sourced
@@ -23,7 +22,9 @@
 
 path_add() {
   for d in "$@"; do
-    [[ -d "$d" && ! "$PATH" =~ (^|:)$d(:|$) ]] && PATH="$PATH:$d"
+    if [[ -d "$d" && ! "$PATH" =~ (^|:)$d(:|$) ]]; then
+      PATH="$PATH:$d"
+    fi
   done
 }
 
@@ -51,6 +52,10 @@ export XCURSOR_PATH="$XDG_DATA_HOME/icons:/usr/share/icons"
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
 if [[ -f "$VIBRANIUM_STATE/cursor-theme" ]]; then
+  # env=var foramt, so it's sourceable:
+  #
+  # theme=THEME
+  # sizze=SIZE
   source "$VIBRANIUM_STATE/cursor-theme"
 
   [[ -n "$theme" ]] && export XCURSOR_THEME="$theme"
@@ -70,7 +75,8 @@ export GTK2_RC_FILES="$XDG_CONFIG_HOME/gtk-2.0/gtkrc"
 
 # Go(lang) home dir
 export GOPATH="$XDG_DATA_HOME/go"
-path_add $GOPATH/bin
+
+path_add "$GOPATH/bin"
 
 if [[ "$SHELL" == "/usr/bin/zsh" ]]; then
   export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
@@ -109,12 +115,6 @@ if [[ -f "$XDG_CONFIG_HOME/user-dirs.dirs" ]]; then
 
     export "$var"="$val"
   done < "$XDG_CONFIG_HOME/user-dirs.dirs"
-fi
-
-# Properly detect and export
-# LIBVA_DRIVER_NAME & VDPAU_DRIVER
-if [[ ! "$CHASSIS_STATE" == "vm" ]]; then
-  source "$VIBRANIUM/default/uwsm/gpu-env"
 fi
 
 # Export user-defined environment

@@ -1,7 +1,9 @@
 #!/bin/bash
+
 _va_exports=$(
   # Run the heavy lifting in a subshell so local functions and variables do not
-  # pollute the caller's environment. We export back only the two variables.
+  # pollute the caller's environment. We export back only LIBVA_DRIVER_NAME,
+  # VDPAU_DRIVER, and (on nvidia) the extra nvidia GL/GBM/VDPAU/wlroots vars.
   # set -u inside the subshell; -e and -o pipefail for early-exit on errors.
   set -euo pipefail
 
@@ -33,7 +35,7 @@ _va_exports=$(
     for card in /sys/class/drm/card[0-9]*; do
       [[ -e "$card/device/driver" ]] || continue
 
-      drv_path=$(readlink -f "$card/device/driver" 2>/dev/null) || continue
+      drv_path=$(readlink -f "$card/device/driver" 2> /dev/null) || continue
       drv="${drv_path##*/}"
 
       local vendor=""
@@ -51,7 +53,7 @@ _va_exports=$(
       for connector in "$card/"*; do
         local status_file="$connector/status"
         [[ -f "$status_file" ]] || continue
-        if [[ "$(<"$status_file")" == "connected" ]]; then
+        if [[ "$(< "$status_file")" == "connected" ]]; then
           connected_vendors["$vendor"]=1
           break
         fi
@@ -89,54 +91,75 @@ _va_exports=$(
     _out_vdpau=""
 
     case "$vendor" in
-    nvidia)
-      _out_driver="nvidia"
-      _out_vdpau="nvidia"
-      ;;
-    intel)
-      # iHD (modern, gen8+) preferred over legacy i965.
-      if _driver_so_exists iHD; then
-        _out_driver="iHD"
-        _out_vdpau="va_gl"
-      elif _driver_so_exists i965; then
-        _out_driver="i965"
-        _out_vdpau="va_gl"
-      fi
-      ;;
-    amd)
-      _out_driver="radeonsi"
-      _out_vdpau="radeonsi"
-      ;;
+      nvidia)
+        _out_driver="nvidia"
+        _out_vdpau="nvidia"
+        ;;
+      intel)
+        # iHD (modern, gen8+) preferred over legacy i965.
+        if _driver_so_exists iHD; then
+          _out_driver="iHD"
+          _out_vdpau="va_gl"
+        elif _driver_so_exists i965; then
+          _out_driver="i965"
+          _out_vdpau="va_gl"
+        fi
+        ;;
+      amd)
+        _out_driver="radeonsi"
+        _out_vdpau="radeonsi"
+        ;;
     esac
   }
 
-  _main() {
-    # If both are already exported by the caller, respect them and exit.
-    if [[ -n "${LIBVA_DRIVER_NAME:-}" && -n "${VDPAU_DRIVER:-}" ]]; then
-      printf 'detect_va_driver: both variables already set, skipping.\n' >&2
-      return 0
+  # _export_if_unset NAME VALUE
+  # Prints an export line for NAME=VALUE unless NAME is already set in the
+  # caller's environment. Same "do not clobber caller" rule as everything
+  # else in this script.
+  _export_if_unset() {
+    local name="$1" value="$2"
+    if [[ -z "${!name:-}" ]]; then
+      printf 'export %s=%q\n' "$name" "$value"
+      printf 'detect_va_driver: %s=%s\n' "$name" "$value" >&2
     fi
+  }
 
+  _main() {
     local vendor
     vendor=$(_active_display_vendor)
 
-    local chosen_driver="" chosen_vdpau=""
-    _pick_va_driver "$vendor" chosen_driver chosen_vdpau
+    # LIBVA_DRIVER_NAME / VDPAU_DRIVER
+    if [[ -n "${LIBVA_DRIVER_NAME:-}" && -n "${VDPAU_DRIVER:-}" ]]; then
+      printf 'detect_va_driver: LIBVA_DRIVER_NAME/VDPAU_DRIVER already set, skipping.\n' >&2
+    else
+      local chosen_driver="" chosen_vdpau=""
+      _pick_va_driver "$vendor" chosen_driver chosen_vdpau
 
-    if [[ -z "$chosen_driver" ]]; then
-      printf 'detect_va_driver: no matching driver .so found; nothing exported.\n' >&2
-      return 0
+      if [[ -z "$chosen_driver" ]]; then
+        printf 'detect_va_driver: no matching driver .so found; nothing exported.\n' >&2
+      else
+        _export_if_unset LIBVA_DRIVER_NAME "$chosen_driver"
+        [[ -n "$chosen_vdpau" ]] && _export_if_unset VDPAU_DRIVER "$chosen_vdpau"
+      fi
     fi
 
-    # Print export statements for the parent shell to eval.
-    if [[ -z "${LIBVA_DRIVER_NAME:-}" && -n "$chosen_driver" ]]; then
-      printf 'export LIBVA_DRIVER_NAME=%q\n' "$chosen_driver"
-      printf 'detect_va_driver: LIBVA_DRIVER_NAME=%s\n' "$chosen_driver" >&2
-    fi
-
-    if [[ -z "${VDPAU_DRIVER:-}" && -n "$chosen_vdpau" ]]; then
-      printf 'export VDPAU_DRIVER=%q\n' "$chosen_vdpau"
-      printf 'detect_va_driver: VDPAU_DRIVER=%s\n' "$chosen_vdpau" >&2
+    # NVIDIA extras. These matter on top of LIBVA/VDPAU because the
+    # proprietary driver does not use GBM/EGL/GLX the same way Mesa does:
+    # https://wiki.archlinux.org/title/NVIDIA#Wayland
+    #   __GLX_VENDOR_LIBRARY_NAME - forces the GLX vendor lib to nvidia
+    #                               instead of letting glvnd guess wrong.
+    #   GBM_BACKEND               - tells GBM users (most Wayland
+    #                               compositors) to use nvidia's GBM backend.
+    #   NVD_BACKEND               - VDPAU nvidia backend, "direct" avoids
+    #                               going through VA-API translation.
+    #   WLR_NO_HARDWARE_CURSORS   - wlroots-only knob, works around cursor
+    #                               corruption on nvidia; no-op on non-wlroots
+    #                               compositors so it is safe to always set.
+    if [[ "$vendor" == "nvidia" ]]; then
+      _export_if_unset __GLX_VENDOR_LIBRARY_NAME nvidia
+      _export_if_unset GBM_BACKEND nvidia-drm
+      _export_if_unset NVD_BACKEND direct
+      _export_if_unset WLR_NO_HARDWARE_CURSORS 1
     fi
   }
 
@@ -151,6 +174,9 @@ _va_exports=$(
 # Only lines starting with "export " are eval'd as a safety allowlist;
 # printf %q in the subshell ensures values are already shell-quoted.
 while IFS= read -r _va_line; do
-  [[ "$_va_line" == export\ * ]] && eval "$_va_line"
-done <<<"$_va_exports"
+  if [[ "$_va_line" == export\ * ]]; then
+    eval "$_va_line"
+  fi
+done <<< "$_va_exports"
+
 unset _va_exports _va_line

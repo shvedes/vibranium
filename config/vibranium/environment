@@ -10,6 +10,26 @@ export EDITOR="nvim"
 export SYSTEMD_EDITOR="$EDITOR"
 export MANPAGER="$EDITOR +Man!"
 
+# If running on a real hardware, Vibranium will set all the GPU/graphics
+# related special environment variables for you automatically.
+# This file lives in the Vibranium installation folder, so do not edit it.
+# If you don't need it - just remove or comment out this line.
+# Variables:
+#
+#   NVIDIA:
+#                      WLR_NO_HARDWARE_CURSORS
+#                      NVD_BACKEND
+#                      GBM_BACKEND
+#                      __GLX_VENDOR_LIBRARY_NAME
+#
+#   AMD/Intel/NVIDIA:
+#                     LIBVA_DRIVER_NAME
+#                     VDPAU_DRIVER
+#
+if ! [[ "$CHASSIS_STATE" == "vm" ]]; then
+  source "$VIBRANIUM/default/uwsm/gpu-env"
+fi
+
 #########################################################################################
 
 # You can add append to $PATH like so:
