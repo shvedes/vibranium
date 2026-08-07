@@ -201,6 +201,15 @@ done
 }
 
 COMMAND=("$@")
+
+if ! command -v "${COMMAND[0]}"; then
+  log Error "command not found: ${COMMAND[0]}"
+  if ! [[ -t 0 ]]; then
+    notify-send -r 3 -u critical -t 5000 "${0*##/}" "Command not found: ${COMMAND[0]}"
+  fi
+  exit 1
+fi
+
 SKIP_REGEX='[Th]unar|nvim'
 
 helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
