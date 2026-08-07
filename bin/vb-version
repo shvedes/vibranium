@@ -2,13 +2,17 @@
 
 source vb-lib-cli
 
+QUIET=false
+
 usage() {
   shcat << EOF
 Usage: ${0##*/} [OPTION]...
 
-Print current Vibranium version and git status.
+Print current Vibranium version, git status, latest commit, and
+working tree state.
 
 Options:
+  -q, --quiet    Print only the release tag or commit hash
   -h, --help     Show this help and exit
 EOF
 }
@@ -19,21 +23,58 @@ while [[ $# -gt 0 ]]; do
       usage
       exit 0
       ;;
+    -q | --quiet)
+      QUIET=true
+      shift
+      ;;
     *)
       break
       ;;
   esac
 done
 
-# Parse git output where INFO has the format "%cd|%h|%D" (date, hash, refs).
-# Parameter expansion strips the pipe-delimited fields without forking.
+# Print subjects of the commits in REF that HEAD lacks, capped at 10.
+list_upcoming() {
+  local ref="$1" total="$2"
+  echo "Upcoming from ${ref}: ${total} commit${total: 1:+s}"
+  while IFS= read -r line; do
+    echo "  ${line}"
+  done < <(git -C "$VIBRANIUM" log --format="%h %s" -n 10 HEAD.."$ref")
+  if ((total > 10)); then
+    echo "  ... and $((total - 10)) more"
+  fi
+}
+
+# Parse git output where INFO has the format "%cd|%h|%D|%s"
+# (date, hash, refs, subject).  Parameter expansion strips the
+# pipe-delimited fields without forking.
 DESCRIBE=$(git -C "$VIBRANIUM" describe --tags --long --abbrev=7 2> /dev/null)
-INFO=$(git -C "$VIBRANIUM" show -s --format="%cd|%h|%D" --date=short HEAD 2> /dev/null)
+INFO=$(git -C "$VIBRANIUM" show -s --format="%cd|%h|%D|%s" --date=short HEAD 2> /dev/null)
 
 DATE="${INFO%%|*}"
 REST="${INFO#*|}"
 SHORT_HASH="${REST%%|*}"
-REFS="${REST#*|}"
+REST="${REST#*|}"
+REFS="${REST%%|*}"
+SUBJECT="${REST#*|}"
+
+# git describe output: "v1.0-5-gabcdef1"
+# Split on the last hyphen to get tag and commits-ahead count.
+if [[ -n "$DESCRIBE" ]]; then
+  DESCRIBE_NO_HASH="${DESCRIBE%-*}"
+  COMMITS_AHEAD="${DESCRIBE_NO_HASH##*-}"
+  TAG="${DESCRIBE_NO_HASH%-*}"
+fi
+
+# Quiet mode: the release tag name, or the commit hash everywhere else.
+if $QUIET; then
+  if [[ -n "$TAG" ]] && ((COMMITS_AHEAD == 0)); then
+    echo "$TAG"
+  else
+    echo "$SHORT_HASH"
+  fi
+  exit 0
+fi
 
 # Extract the branch name from the %D refs field which contains
 # "tag: v1.0, HEAD -> main, origin/main".  We want the part after
@@ -46,43 +87,123 @@ case "$REFS" in
 esac
 
 if [[ -n "$DESCRIBE" ]]; then
-  # git describe output: "v1.0-5-gabcdef1"
-  # Split on the last hyphen to get tag and commits-ahead count.
-  DESCRIBE_NO_HASH="${DESCRIBE%-*}"
-  COMMITS_AHEAD="${DESCRIBE_NO_HASH##*-}"
-  TAG="${DESCRIBE_NO_HASH%-*}"
-
   if ((COMMITS_AHEAD == 0)); then
     echo "Vibranium ${TAG} release (${DATE})"
   else
     echo "Vibranium dev ${TAG}+"
-    echo "Branch: ${BRANCH} @ ${SHORT_HASH} (${DATE})"
+    echo "Branch:     ${BRANCH} @ ${SHORT_HASH} (${DATE})"
     echo "${COMMITS_AHEAD} commits ahead of ${TAG}"
+  fi
+else
+  if [[ -n "$BRANCH" ]]; then
+    echo "Branch:     ${BRANCH} @ ${SHORT_HASH} (${DATE})"
+  else
+    echo "Vibranium ${SHORT_HASH} (${DATE})"
+  fi
+fi
 
-    # Determine upstream for behind-count.  On master/main resolve the
-    # configured upstream; on other branches default to origin/master.
-    case "$BRANCH" in
-      master | main)
-        UPSTREAM=$(git -C "$VIBRANIUM" rev-parse --abbrev-ref '@{upstream}' 2> /dev/null)
-        ;;
-      *)
-        UPSTREAM="origin/master"
-        ;;
-    esac
+# Detached HEAD: say so and name the checked-out tag instead of a branch.
+if [[ -n "$INFO" && -z "$BRANCH" ]]; then
+  TAG_REF=""
+  case "$REFS" in
+    *"tag: "*)
+      TAG_REF="${REFS##*"tag: "}"
+      TAG_REF="${TAG_REF%%,*}"
+      ;;
+  esac
+  if [[ -n "$TAG_REF" ]]; then
+    echo "Detached HEAD @ ${SHORT_HASH} (tag: ${TAG_REF})"
+  else
+    echo "Detached HEAD @ ${SHORT_HASH}"
+  fi
+fi
 
-    if [[ -n "$UPSTREAM" ]] && git -C "$VIBRANIUM" rev-parse --verify "$UPSTREAM" &> /dev/null; then
-      COMMITS_BEHIND=$(git -C "$VIBRANIUM" rev-list --count HEAD.."$UPSTREAM")
-      if ((COMMITS_BEHIND > 0)); then
-        echo "${COMMITS_BEHIND} commits behind ${UPSTREAM}"
+# Comparison against the latest release tag.  Skip when it is the tag
+# the summary already measured against.
+if [[ -n "$DESCRIBE" ]]; then
+  LATEST_TAG=$(git -C "$VIBRANIUM" describe --tags --abbrev=0 2> /dev/null)
+  if [[ -n "$LATEST_TAG" && "$LATEST_TAG" != "$TAG" ]]; then
+    AHEAD_TAG=$(git -C "$VIBRANIUM" rev-list --count "$LATEST_TAG"..HEAD 2> /dev/null)
+    BEHIND_TAG=$(git -C "$VIBRANIUM" rev-list --count HEAD.."$LATEST_TAG" 2> /dev/null)
+    echo
+    echo "${AHEAD_TAG} ahead, ${BEHIND_TAG} behind latest tag ${LATEST_TAG}"
+  fi
+fi
+
+# Comparison against the remote.  Attached: the branch upstream.
+# Detached: the default branch instead.
+REMOTE_URL=$(git -C "$VIBRANIUM" config --get remote.origin.url 2> /dev/null)
+if [[ -n "$REMOTE_URL" ]]; then
+  echo "Remote:     ${REMOTE_URL}"
+fi
+if [[ -n "$BRANCH" ]]; then
+  UPSTREAM=$(git -C "$VIBRANIUM" rev-parse --abbrev-ref '@{upstream}' 2> /dev/null)
+  if [[ -n "$UPSTREAM" ]] && git -C "$VIBRANIUM" rev-parse --verify "$UPSTREAM" &> /dev/null; then
+    AHEAD=$(git -C "$VIBRANIUM" rev-list --count "$UPSTREAM"..HEAD 2> /dev/null)
+    BEHIND=$(git -C "$VIBRANIUM" rev-list --count HEAD.."$UPSTREAM" 2> /dev/null)
+    if ((AHEAD == 0 && BEHIND == 0)); then
+      echo "Up to date with ${UPSTREAM}"
+    else
+      echo "${AHEAD} ahead, ${BEHIND} behind ${UPSTREAM}"
+      if ((BEHIND > 0)); then
+        list_upcoming "$UPSTREAM" "$BEHIND"
       fi
     fi
   fi
 else
-  if [[ -n "$BRANCH" ]]; then
-    echo "Branch: ${BRANCH} @ ${SHORT_HASH} (${DATE})"
-  else
-    echo "Vibranium ${SHORT_HASH} (${DATE})"
+  MASTER_AHEAD=$(git -C "$VIBRANIUM" rev-list --count master..HEAD 2> /dev/null)
+  MASTER_BEHIND=$(git -C "$VIBRANIUM" rev-list --count HEAD..master 2> /dev/null)
+  if [[ -n "$MASTER_AHEAD" ]]; then
+    if ((MASTER_AHEAD == 0 && MASTER_BEHIND == 0)); then
+      echo "Up to date with master"
+    else
+      echo "${MASTER_AHEAD} ahead, ${MASTER_BEHIND} behind master"
+      git -C "$VIBRANIUM" diff --shortstat master HEAD
+      if ((MASTER_BEHIND > 0)); then
+        list_upcoming master "$MASTER_BEHIND"
+      fi
+    fi
   fi
+fi
+
+# Precise committer timestamp and author from a separate call so the
+# summary date stays parseable.
+if [[ -n "$SUBJECT" ]]; then
+  COMMIT=$(git -C "$VIBRANIUM" show -s --format="%cI|%an" HEAD 2> /dev/null)
+  if [[ -n "$COMMIT" ]]; then
+    COMMIT_DATE="${COMMIT%%|*}"
+    COMMIT_AUTHOR="${COMMIT#*|}"
+    echo
+    echo "Last commit:  ${SHORT_HASH} ${SUBJECT}"
+    echo "Author:       ${COMMIT_AUTHOR}"
+    echo "Committed:    ${COMMIT_DATE}"
+  fi
+fi
+
+# Working tree state: count staged, modified, untracked from porcelain
+# lines.  First column is the staged status, second the unstaged one.
+STAGED=0
+MODIFIED=0
+UNTRACKED=0
+while IFS= read -r line; do
+  [[ "${line:0:1}" != " " && "${line:0:1}" != "?" ]] && ((STAGED++))
+  [[ "${line:1:1}" != " " && "${line:1:1}" != "?" ]] && ((MODIFIED++))
+  [[ "${line:0:1}" == "?" ]] && ((UNTRACKED++))
+done < <(git -C "$VIBRANIUM" status --porcelain 2> /dev/null)
+
+echo
+if ((STAGED == 0 && MODIFIED == 0 && UNTRACKED == 0)); then
+  echo "Working tree: clean"
+else
+  echo "Working tree: ${STAGED} staged, ${MODIFIED} modified, ${UNTRACKED} untracked"
+  if ((STAGED > 0 || MODIFIED > 0)); then
+    git -C "$VIBRANIUM" diff HEAD --stat
+  fi
+fi
+
+STASH_COUNT=$(git -C "$VIBRANIUM" stash list 2> /dev/null | wc -l)
+if ((STASH_COUNT > 0)); then
+  echo "Stashes:      ${STASH_COUNT}"
 fi
 
 # If an update-fetch run found a newer version, its tag was written
