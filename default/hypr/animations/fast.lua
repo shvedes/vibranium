@@ -2,7 +2,7 @@
 
 Hypr.Anim.apply({
   layer_rules = {
-    { animation = "slide", match = { namespace = "notifications" } },
+    { animation = "slide", match = { namespace = "notefications" } },
   },
 
   curves = {
@@ -21,5 +21,6 @@ Hypr.Anim.apply({
     { leaf = "windowsIn", enabled = true, speed = 2.25, bezier = "easeOutQuint", style = "popin 85%" },
     { leaf = "windowsOut", enabled = true, speed = 2.25, bezier = "easeOutQuint", style = "popin 90%" },
     { leaf = "workspaces", enabled = true, speed = 2.25, bezier = "easeOutQuint", style = "fade" },
+    { leaf = "zoomFactor", enabled = true, speed = 2, bezier = "easeOutQuint" },
   },
 })
