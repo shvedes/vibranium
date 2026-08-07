@@ -1,40 +1,43 @@
 #!/bin/bash
 
-mkdir -p "$VIBRANIUM_RUNTIME" "$VIBRANIUM_STATE" "$VIBRANIUM_CACHE"
+for dir in "$VIBRANIUM_RUNTIME" "$VIBRANIUM_STATE" "$VIBRANIUM_CACHE"; do
+  if [[ ! -d "$dir" ]]; then
+    mkdir -p "$dir"
+  fi
+done
 
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
   vb-util-first-run
   exit 0
 fi
 
+shopt -s nullglob
 source vb-lib-core
 export -f helpers::check
 
 # Point child bash processes at the lib so they auto-source it.
 export BASH_ENV="$VIBRANIUM/bin/vb-lib-core"
 
-shopt -s nullglob
+# shellcheck disable=SC2016
+awk_expr='/^Exec=/{print substr($0, 6); nextfile}'
+autostart_dir="$XDG_CONFIG_HOME/autostart"
 
 # XDG autostart entries
-for desktop in "$XDG_CONFIG_HOME"/autostart/*.desktop; do
-  if [[ ! -f "$desktop" ]]; then
+while IFS= read -r exec_cmd; do
+  if [[ ! -n "$exec_cmd" ]]; then
     continue
   fi
 
-  exec_cmd="$(awk -F= '/^Exec=/{print substr($0,6); exit}' "$desktop")"
-
-  if [[ -n "$exec_cmd" ]]; then
-    # shellcheck disable=SC2086
-    setsid -f app2unit -- $exec_cmd
-  fi
-done
+  # shellcheck disable=SC2086
+  setsid -f app2unit -- $exec_cmd
+done < <(awk "$awk_expr" "$autostart_dir" 2> /dev/null)
 
 # Run the default startup scripts first
 HOOKS=("$VIBRANIUM"/default/hooks/startup/*.sh)
 
 if ((${#HOOKS[@]} > 0)); then
   for hook in "${HOOKS[@]}"; do
-    bash "$hook" &
+    setsid -f bash "$hook"
   done
 fi
 
@@ -43,6 +46,6 @@ UHOOKS=("$XDG_CONFIG_HOME"/vibranium/hooks/startup/*.sh)
 
 if ((${#UHOOKS[@]} > 0)); then
   for hook in "${UHOOKS[@]}"; do
-    bash "$hook" &
+    setsid -f bash "$hook"
   done
 fi
