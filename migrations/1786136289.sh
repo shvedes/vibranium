@@ -23,7 +23,7 @@ cat <<- EOF >> "$XDG_CONFIG_HOME/vibranium/environment"
 #                     LIBVA_DRIVER_NAME
 #                     VDPAU_DRIVER
 #
-if ! [[ "$CHASSIS_TYPE" == "vm" ]]; then
+if ! [[ "\$CHASSIS_TYPE" == "vm" ]]; then
   source "\$VIBRANIUM/default/uwsm/gpu-env"
 fi
 EOF
