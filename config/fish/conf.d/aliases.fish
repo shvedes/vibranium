@@ -1,6 +1,6 @@
 if command -q eza
     alias l="eza --hyperlink=auto"
-    alias ls="ezaa --hyperlink=auto"
+    alias ls="eza --hyperlink=auto"
     alias sl="eza --hyperlink=auto"
     alias ll="eza -lhbg@ --group-directories-first --hyperlink=auto"
     alias la="eza -ahbg@ --group-directories-first --hyperlink=auto"
