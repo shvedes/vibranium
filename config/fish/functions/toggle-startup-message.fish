@@ -11,11 +11,11 @@ Options:
         return 0
     end
 
-    if test -f "$FISH_CONFIG_DIR/.silent"
-        rm -f -- "$FISH_CONFIG_DIR/.silent"
+    if test -f "$__fish_config_dir/.silent"
+        rm -f -- "$__fish_config_dir/.silent"
         echo "Startup message "$GRN"enabled"$RST
     else
-        touch "$FISH_CONFIG_DIR/.silent"
+        touch "$__fish_config_dir/.silent"
         echo "Startup message "$RED"disabled"$RST
     end
 end

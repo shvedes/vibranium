@@ -15,7 +15,7 @@ alias imv "imv-dir"
 # options in, we will force it to comply with XDG Base Directory via CLI.
 set -l xdg_data $XDG_DATA_HOME
 test -n "$xdg_data"; or set xdg_data "$HOME/.local/share"
-alias wget "wget --hsts-file=$xdg_data/wget-hsts"
+alias wget "wget --hsts-file=$xdg_data/wget/wget-hsts"
 set -e xdg_data
 
 if command -v nvim > /dev/null

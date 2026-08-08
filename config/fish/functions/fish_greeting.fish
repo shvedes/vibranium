@@ -1,12 +1,12 @@
 function fish_greeting
-    if test -f "$FISH_CONFIG_DIR/.silent"
+    if test -f "$$__fish_config_dir/.silent"
         return 0
     end
 
     echo "Edit config in: "$YEL"~/.config/fish"$RST
     echo "Hide this message: "$GRN"toggle-startup-message"$RST
     echo "Fish documentation: "$GRN"man "$YEL"fish"$RST
-    echo "Registered aliases: "${GRN}"alias"${RST}
+    echo "Registered aliases: "$GRN"alias"$RST
 
     if functions -q fisher
         echo "Plugin manager help: "$GRN"fisher "$YEL"--help"$RST

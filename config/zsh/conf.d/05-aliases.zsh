@@ -14,7 +14,7 @@ alias imv="imv-dir"
 
 # Since wget doesn't have special environment variables to store
 # options in, we will force it to comply with XDG Base Directory via CLI.
-alias wget="wget --hsts-file=\${XDG_DATA_HOME:-$HOME/.local/share}/wget-hsts"
+alias wget="wget --hsts-file=\${XDG_DATA_HOME:-$HOME/.local/share}/wget/wget-hsts"
 
 if command -v nvim > /dev/null; then
   alias v="nvim"
