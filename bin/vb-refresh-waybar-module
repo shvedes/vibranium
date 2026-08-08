@@ -33,6 +33,12 @@ while [[ $# -gt 0 ]]; do
 done
 
 waybar_pid=$(systemctl --user show waybar -p MainPID --value 2> /dev/null)
+
+if ((waybar_pid == 0)); then
+  log Error "Waybar is not running"
+  exit 1
+fi
+
 log Info "Waybar PID: ${waybar_pid:-not found}"
 
 declare -A signals
