@@ -1,3 +1,5 @@
+# Only configure ZLE when running interactively.
+[[ -o interactive ]] || return 0
 
 # Force emacs-style editing: EDITOR=nvim would otherwise make zsh auto-link
 # the main keymap to viins (vi mode), losing most default bindings.
