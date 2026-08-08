@@ -1,3 +1,4 @@
+
 # Use fish-like ^W word deletion.
 # When used with paths, it deletes the closest word instead of the full path.
 

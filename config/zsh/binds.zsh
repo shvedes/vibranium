@@ -1,41 +1,37 @@
 
-# Navigation
-bindkey '^A' beginning-of-line       # Ctrl+A
-bindkey '^E' end-of-line             # Ctrl+E
-bindkey '^B' backward-char           # Ctrl+B
-bindkey '^F' forward-char            # Ctrl+F
+# Force emacs-style editing: EDITOR=nvim would otherwise make zsh auto-link
+# the main keymap to viins (vi mode), losing most default bindings.
+bindkey -e
 
-# Word navigation
-bindkey '^[b' backward-word          # Alt+B
-bindkey '^[f' forward-word           # Alt+F
+# Use fish-like ^W word deletion.
+# When used with paths, it deletes the closest word instead of the full path.
 
-# History navigation
-bindkey '^P' up-line-or-history      # Ctrl+P
-bindkey '^N' down-line-or-history    # Ctrl+N
+# Disable tty-level word-erase handling so Ctrl+W reaches zle instead
+# of being consumed by the terminal driver first.
+stty werase undef
 
-# Editing
-bindkey '^U' backward-kill-line      # Ctrl+U
-bindkey '^K' kill-line               # Ctrl+K
-bindkey '^W' backward-kill-word      # Ctrl+W
-bindkey '^[^?' backward-kill-word    # Alt+Backspace
+# Rebind Ctrl+W to stop at slashes, not just whitespace.
+# Drop '/' from WORDCHARS so path components are separate words.
+WORDCHARS='*?_-.[]~=&;!#$%^()+{}'
+bindkey '^W' backward-kill-word
 
-bindkey '^R' history-incremental-search-backward   # Ctrl+R
-bindkey '^S' history-incremental-search-forward    # Ctrl+S (forward search)
+# ^P/^N: fish-like history cycling. With an empty buffer they recall
+# sequentially; with typed text they filter history by prefix.
+bindkey '^P' history-beginning-search-backward
+bindkey '^N' history-beginning-search-forward
 
-# Clear screen
-bindkey '^L' clear-screen
-
-# Prefix-aware history search
-autoload -U up-line-or-beginning-search
-autoload -U down-line-or-beginning-search
-
-zle -N up-line-or-beginning-search
-zle -N down-line-or-beginning-search
-
-# terminfo keys
-[[ -n "${terminfo[kcuu1]}" ]] && bindkey "${terminfo[kcuu1]}" up-line-or-beginning-search
-[[ -n "${terminfo[kcud1]}" ]] && bindkey "${terminfo[kcud1]}" down-line-or-beginning-search
-
-# Hardcoded ANSI fallback
-bindkey '^[[A' up-line-or-beginning-search
-bindkey '^[[B' down-line-or-beginning-search
+# ^E: accept the autosuggestion if one is shown, otherwise move the cursor
+# to the end of the line (like bash/fish).
+if (( ${+widgets[autosuggest-accept]} )); then
+  _zsh_end_of_line_accept() {
+    if [[ -n ${POSTDISPLAY-} ]]; then
+      zle autosuggest-accept
+    else
+      zle end-of-line
+    fi
+  }
+  zle -N _zsh_end_of_line_accept
+  bindkey '^E' _zsh_end_of_line_accept
+else
+  bindkey '^E' end-of-line
+fi

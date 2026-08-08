@@ -1,26 +1,29 @@
 function fish_greeting
-    if not test -f $XDG_CONFIG_HOME/fish/states/silent
-        echo "Edit config in: "(set_color yellow)"~/.config/fish/config.fish"(set_color normal)
-        echo "Hide this message: "(set_color green)"toggle-startup-message"(set_color normal)
-        echo "List additional shell functions: "(set_color green)"flist"(set_color normal)
+    if test -f "$FISH_CONFIG_DIR/.silent"
+        return 0
+    end
 
-        if functions -q fisher
-            echo "Fish plugin manager: "(set_color green)"fisher "(set_color cyan)"--help"$(set_color normal)
+    echo "Edit config in: "$YEL"~/.config/fish"$RST
+    echo "Hide this message: "$GRN"toggle-startup-message"$RST
+    echo "Fish documentation: "$GRN"man "$YEL"fish"$RST
+    echo "Registered aliases: "${GRN}"alias"${RST}
+
+    if functions -q fisher
+        echo "Plugin manager help: "$GRN"fisher "$YEL"--help"$RST
+    end
+
+    echo "Abbreviation list: "$GRN"abbr "$YEL"--list"$RST
+    echo
+
+    if not test -c /dev/tty; or test "$TERM" != linux
+        if test -n "$VIBRANIUM_STATE"; and test -f "$VIBRANIUM_STATE/update.available"
+            echo "Vibranium update available! Update in the settings."
+            echo
         end
+    end
 
-        echo "Fish shell documentation: "(set_color green)"help"(set_color normal)
-
-        if set -q VIBRANIUM_STATE
-            if test -f "$VIBRANIUM_STATE/update.available"
-                echo "New update available! Run "(set_color green)"update-vibranium"(set_color normal)" to update"
-            end
-        end
+    if test -n "$VIBRANIUM"; and test -f "$VIBRANIUM_STATE/errors_found"
+        echo "Vibranium "$RED"errors"$RST" found! Type "$GRN"vibranium-healthcheck"$RST" to repair."
         echo
     end
-end
-
-if set -q VIBRANIUM and test -f $VIBRANIUM_STATE/errors_found
-  echo "Vibrainum errors found!"
-  echo "Type "(set_color green)"vibranium-healthcheck"(set_color normal)" to repair"
-  echo
 end

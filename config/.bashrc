@@ -9,4 +9,5 @@ else
   echo "Using default shell setup"
 fi
 
-# Your overrides start here.
+# You can write your own config here, or, if you will,
+# consider reading the ~/.config/bash structure and overring there.

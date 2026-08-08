@@ -1,41 +1,34 @@
-# @vibranium
-function mkvenv --description "Create and activate Python virtualenv"
-    function __mkvenv_help
-        echo "Usage: mkvenv <name>"
-        echo ""
-        echo "Creates a Python virtual environment and activates it."
-        echo ""
-        echo "Options:"
-        echo "  -h, --help   Show this help"
-        echo ""
-        echo "Example:"
-        echo "  mkvenv .venv"
-        echo "  mkvenv env"
-    end
+function mkvenv --description 'create and activate a Python venv'
+    set -l usage 'Usage: mkvenv NAME
 
-    if test (count $argv) -eq 0
-        __mkvenv_help
-        return 1
-    end
+Create a Python virtual environment NAME and activate it.
+
+Options:
+  -h, --help              display this help and exit
+
+Examples:
+  mkvenv .venv
+
+Note: mkvenv is a custom shell function, not a command.'
 
     if test "$argv[1]" = -h; or test "$argv[1]" = --help
-        __mkvenv_help
+        echo $usage
         return 0
     end
 
-    set name $argv[1]
+    if test (count $argv) -eq 0
+        echo "mkvenv: missing NAME" >&2
+        echo >&2
+        echo $usage >&2
+        return 2
+    end
 
-    if test -d "$name"
-        echo "venv already exists: $name" >&2
+    python -m venv -- $argv[1]
+    or begin
+        echo "mkvenv: failed to create venv '$argv[1]'" >&2
         return 1
     end
 
-    python -m venv $name
-
-    if test -f "$name/bin/activate.fish"
-        source "$name/bin/activate.fish"
-    else
-        echo "activation script not found" >&2
-        return 1
-    end
+    # fish needs the .fish activation script, not the bash/zsh one.
+    source $argv[1]/bin/activate.fish
 end

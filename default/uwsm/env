@@ -78,13 +78,14 @@ export GOPATH="$XDG_DATA_HOME/go"
 
 path_add "$GOPATH/bin"
 
-if [[ "$SHELL" == "/usr/bin/zsh" ]]; then
-  export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
-fi
-
-if [[ "$SHELL" == "/usr/bin/bash" ]]; then
-  export HISTFILE="$XDG_STATE_HOME/bash/history"
-fi
+case "$SHELL" in
+  *zsh)
+    export ZDOTDIR="$XDG_CONFIG_HOME/zsh"
+    ;;
+  *bash)
+    export HISTFILE="$XDG_STATE_HOME/bash/history"
+    ;;
+esac
 
 # Keep in mind
 # https://github.com/basecamp/omarchy/issues/2564#issuecomment-3450877034

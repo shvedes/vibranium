@@ -1,32 +1,28 @@
-# shellcheck disable=all
 
-# If not running interactively, don't do anything
-if [[ $- != *i* ]]; then
-  return
-fi
-
-# Don't throw error when globs don't expand.
+# Don't throw errors when a used path is empty.
 shopt -s nullglob
 
-YELLOW=$'\e[0;33m'
-GREEN=$'\e[0;32m'
-RED=$'\e[0;31m'
-RESET=$'\e[0m'
+# Get *this* directory.
+# The $BASH_CONFIG_DIR is defined later.
+script_dir="${BASH_SOURCE[0]%/*}"
+script_dir="${script_dir:-.}"
 
-# Use :- in case if launched in TTY
-BASH_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/bash"
-
-# Create history folder / file if doesn't exist yet.
-# bash does not create it automatically, so cover it.
-if ! [[ -d "${XDG_DATA_HOME:-$HOME/.local/state}/bash" ]]; then
-  mkdir -p "${XDG_DATA_HOME:-$HOME/.local/state}/bash"
-  : > "${XDG_DATA_HOME:-$HOME/.local/state}/bash/history"
-fi
-
-for f in "$BASH_CONFIG_DIR"/{functions,aliases}/*.sh; do
-  source "$f"
+# Source each found .sh file in the conf.d/
+# subdirectory in alphanumerical order.
+for f in "$script_dir"/{conf.d,functions}/*.sh; do
+  if [[ -f "$f" ]]; then
+    source "$f"
+  fi
 done
 
-source "$BASH_CONFIG_DIR/greeting.sh"
-source "$BASH_CONFIG_DIR/prompt.sh"
+# Cleanup
+unset script_dir
+
+# Load custom binds
 source "$BASH_CONFIG_DIR/binds.sh"
+
+# Bash won't create the parent dir if it doesn't exist, so...
+# HISTFILE defined in conf.d/00-environment.sh.
+if [[ ! -d "${HISTFILE%/*}" ]]; then
+  mkdir -p -- "${HISTFILE%/*}"
+fi

@@ -1,18 +1,24 @@
-# @vibranium
-# @description Create directory and cd into it
+
+# ccd: create a directory and cd into it. Builtins only. No subshells.
+
 function ccd() {
-  if [[ $# -eq 0 ]]; then
-    echo "Usage: ${funcstack[1]} <directory>" >&2
-    echo "${funcstack[1]}: you must provide a directory name" >&2
-    return 1
+  local usage='Usage: ccd DIRECTORY
+
+Create DIRECTORY (with parents) and cd into it.
+
+Options:
+  -h, --help              display this help and exit
+
+Examples:
+  ccd src/components/header
+
+Note: ccd is a custom shell function, not a command.'
+
+  if (($# == 0)) || [[ $1 == -h || $1 == --help ]]; then
+    printf '%s\n' "$usage" >&2
+    return 2
   fi
 
-  if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-    echo "Usage: ${funcstack[1]} <directory>"
-    echo "Creates directory if it doesn't exist and changes into it"
-    return 0
-  fi
-
-  mkdir -p "$1" || return 1
-  cd "$1" || return 1
+  mkdir -p -- "$1" || return 1
+  cd -- "$1" || return 1
 }

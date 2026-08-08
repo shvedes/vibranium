@@ -60,13 +60,20 @@ while true; do
       [[ -n "$custom_shell_pkg" ]] && packages+=("$custom_shell_pkg")
     elif [[ -n "$selected_shell_pkg" ]]; then
       packages+=("$selected_shell_pkg")
+
+      if [[ "$selected_shell_pkg" == "zsh" ]]; then
+        packages+=(
+          "zsh-syntax-highlighting"
+          "zsh-autosuggestions"
+        )
+      fi
     fi
     break
   fi
 done
 
 for pkg in "${packages[@]}"; do
-  printf "%s\n" "$pkg" >>/tmp/vibranium.packages
+  printf "%s\n" "$pkg" >> /tmp/vibranium.packages
 done
 
-echo "$packages" >/tmp/shell
+echo "$packages" > /tmp/shell

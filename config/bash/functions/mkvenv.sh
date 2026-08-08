@@ -1,25 +1,31 @@
-# @vibranium
-# @description Create and activate Python virtualenv
+
 function mkvenv() {
-  if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
-    echo "Usage: ${FUNCNAME[0]} <name>"
-    echo "Creates a Python virtual environment and activates it"
+  local usage='Usage: mkvenv NAME
+
+Create a Python virtual environment NAME and activate it.
+
+Options:
+  -h, --help              display this help and exit
+
+Examples:
+  mkvenv .venv
+
+Note: mkvenv is a custom shell function, not a command.'
+
+  if [[ $1 == -h || $1 == --help ]]; then
+    printf '%s\n' "$usage"
     return 0
   fi
 
-  if [[ $# -eq 0 ]]; then
-    echo "Usage: ${FUNCNAME[0]} <name>" >&2
-    echo "You must provide a name" >&2
-    return 1
+  if (($# == 0)); then
+    printf '%s\n\n' 'mkvenv: missing NAME' "$usage" >&2
+    return 2
   fi
 
-  local venv="$1"
-
-  if ! python -m venv "$venv"; then
-    echo "Failed to create venv $venv" >&2
+  python -m venv -- "$1" || {
+    printf '%s\n' "mkvenv: failed to create venv '$1'" >&2
     return 1
-  fi
+  }
 
-  # shellcheck disable=SC1090
-  source "$venv/bin/activate"
+  source "$1/bin/activate"
 }
