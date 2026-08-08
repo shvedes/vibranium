@@ -18,7 +18,7 @@ opacity = 0.95
 dynamic_padding = true
 dynamic_title	= true
 startup_mode	= "Windowed"
-padding = { x = 10, y = 10 }
+padding = { x = 7, y = 7 }
 
 [keyboard]
 bindings = [
