@@ -141,10 +141,6 @@ alias pdoman="podman"
 alias kubecrl="kubectl"
 alias kubelt="kubectl"
 
-# systemctl
-alias systemclt="systemctl"
-alias systmectl="systemctl"
-
 # curl
 alias crul="curl"
 alias clur="curl"

@@ -46,7 +46,7 @@ abbr --add gut git
 
 # docker
 abbr --add dokcer docker
-abbr --add dockr docker
+abbr --add dockr  docker
 abbr --add dockre docker
 
 # podman
@@ -58,10 +58,8 @@ abbr --add kubecrl kubectl
 abbr --add kubelt kubectl
 
 # systemctl
-abbr --add systemclt systemctl
-abbr --add systmectl systemctl
-abbr --add sc        systemctl
-abbr --add scu       systemclt --user
+abbr --add sc  systemctl
+abbr --add scu systemctl --user
 
 # curl
 abbr --add crul curl

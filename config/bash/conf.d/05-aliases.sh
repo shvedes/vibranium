@@ -1,4 +1,3 @@
-
 #######################################################
 #                       Vibranium                     #
 #######################################################
@@ -140,10 +139,6 @@ alias pdoman="podman"
 # kubernetes
 alias kubecrl="kubectl"
 alias kubelt="kubectl"
-
-# systemctl
-alias systemclt="systemctl"
-alias systmectl="systemctl"
 
 # curl
 alias crul="curl"
