@@ -85,6 +85,12 @@ else
   REFRESH_BAR=true
 fi
 
-if $REFRESH_BAR; then
+if $REFRESH_BAR && systemctl -q --user is-active waybar; then
   vb-refresh-waybar-module inhibitor &
+else
+  if [[ -n "$_active_unit" ]]; then
+    notify-send -r 3 "Caffeine Mode Has Been Disabled" "System ${TYPE} is allowed"
+  else
+    notify-send -r 3 "Caffeine Mode Has Been Enabled" "System ${TYPE} is blocked"
+  fi
 fi
