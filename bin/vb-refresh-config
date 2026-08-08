@@ -3,8 +3,9 @@
 source vb-lib-cli
 
 VERBOSE=${VERBOSE:-false}
-NUKE=false
 SELF="${0##*/}"
+FORCE=false
+NUKE=false
 
 copy_file() {
   local src="$1" dst="$2" bak="$3"
@@ -61,9 +62,10 @@ Example:
   $SELF waybar/config.jsonc
 
 Options:
-  --nuke         Delete existing target instead of backing up
-  -v, --verbose  Enable verbose output
-  -h, --help     Display this help and exit
+  -n, --nuke         Delete existing target instead of backing up
+  -f, --force        With --nuke, skip the confirmation prompt
+  -v, --verbose      Enable verbose output
+  -h, --help         Display this help and exit
 EOF
 }
 
@@ -77,8 +79,12 @@ while (($# > 0)); do
       export VERBOSE=true
       shift
       ;;
-    --nuke)
+    -n | --nuke)
       NUKE=true
+      shift
+      ;;
+    -f | --force)
+      FORCE=true
       shift
       ;;
     *)
@@ -97,6 +103,14 @@ CONFIG_REL="$1"
 USER_FILE="$XDG_CONFIG_HOME/$CONFIG_REL"
 SRC_FILE="${VIBRANIUM}/config/$CONFIG_REL"
 printf -v BAK_FILE '%s.bak.%(%s)T' "$USER_FILE" -1
+
+if [[ $NUKE == true && $FORCE != true ]]; then
+  read -rp "Delete $USER_FILE instead of backing up? [y/N] " confirm
+  if [[ $confirm != [yY] ]]; then
+    log Info "Nuke declined, nothing changed"
+    exit 1
+  fi
+fi
 
 if [[ -d $SRC_FILE ]]; then
   DIR=${USER_FILE%/*}
