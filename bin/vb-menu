@@ -22,7 +22,7 @@ _build_help() {
 
   _b() {
     cfgr::item::action --label "Hyprland" --func "_launch 'https://wiki.hypr.land'" --icon vb-wm
-    cfgr::item::action --label "Vibranium" --func "_launch 'https://github.com/shvedes/vibranium/wiki'" --icon vb-github
+    cfgr::item::action --label "Vibranium" --func "_launch 'https://shvedes.github.io/vibranium'" --icon vb-github
     cfgr::item::action --label "Arch Linux" --func "_launch 'https://wiki.archlinux.org'" --icon vb-arch-linux
     cfgr::item::action --label "Keybindings" --func "_launch vb-cmd-keybindings" --icon vb-keyboard
   }
