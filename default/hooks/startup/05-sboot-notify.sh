@@ -4,7 +4,7 @@ if [[ "$CHASSIS_TYPE" == "vm" ]]; then
   exit 0
 fi
 
-SB_STATE="$(vb-cmd-sboot-status)"
+IFS= read -r SB_STATE < <(vb-cmd-sboot-status)
 
 if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
   rm "$VIBRANIUM_STATE/secure-boot-setup.complete"
@@ -31,7 +31,7 @@ else
 
       if [[ -n "$ACTION" ]]; then
         notify-send -r 1 -t 3000 "Vibranium" "Secure Boot notice has been disabled"
-        : >"$STATE"
+        : > "$STATE"
       fi
     fi
   fi

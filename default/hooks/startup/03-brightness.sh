@@ -2,12 +2,14 @@
 
 # Get all active monitor names from Hyprland.
 MONITOR_LIST=$(hyprctl -j monitors | jq -r '.[].name')
+
 if [[ -z "$MONITOR_LIST" ]]; then
   exit 0
 fi
 
-# Verify the state file exists and has the expected format.
-read -r HEADER < "$VIBRANIUM_STATE/monitors" 2> /dev/null || exit 0
+if [[ -f "$VIBRANIUM_STATE/monitors" ]]; then
+  read -r HEADER < "$VIBRANIUM_STATE/monitors"
+fi
 
 if [[ "$HEADER" != "# output:i2c:level:gamma:mult" ]]; then
   exit 0
@@ -18,8 +20,8 @@ fi
 #   CACHED -> Cached hardware brightness
 #   GAMMA  -> Cached gamma value (100 = normal)
 declare -A BUS CACHED
-GAMMA=100
 FIRST_MON=""
+GAMMA=100
 
 while IFS=: read -r output i2c level gamma _; do
   # Ignore comments and empty lines.

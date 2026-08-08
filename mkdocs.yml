@@ -1,0 +1,110 @@
+site_name: Vibranium
+site_description: Vibranium — an opinionated, self-maintaining Arch Linux desktop configuration
+site_url: https://shvedes.github.io/vibranium/
+repo_url: https://github.com/shvedes/vibranium
+edit_uri: blob/master/docs/
+
+theme:
+  name: material
+  palette:
+    scheme: gray
+  font:
+    text: Roboto
+    code: JetBrains Mono
+  icon:
+    repo: fontawesome/brands/github
+    logo: material/desktop-tower-monitor
+  favicon: assets/images/favicon.svg
+  language: en
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - navigation.footer
+
+extra_css:
+  - assets/stylesheets/theme.css
+
+markdown_extensions:
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - tables
+  - toc:
+      permalink: true
+  - pymdownx.details
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.snippets
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+
+plugins:
+  - search
+
+nav:
+  - Home: index.md
+  - User Guide:
+      - Installation: user/installation.md
+      - First steps: user/first-steps.md
+      - The Vibranium menu: user/menus.md
+      - Keyboard shortcuts: user/keybindings.md
+      - App launcher: user/app-launcher.md
+      - Wallpaper: user/wallpaper.md
+      - Screenshots: user/screenshots.md
+      - Screen recording: user/screen-recording.md
+      - Color picker: user/color-picker.md
+      - Clipboard: user/clipboard.md
+      - Brightness: user/brightness.md
+      - Media control: user/media-keys.md
+      - Window groups: user/window-groups.md
+      - Idle & power: user/idle-and-power.md
+      - Packages: user/packages.md
+      - Shell: user/shell.md
+      - PWAs & TUIs: user/pwas-and-tuis.md
+      - Video downloader: user/video-downloader.md
+      - Games: user/games.md
+      - Default browser: user/default-browser.md
+      - VS Code theme: user/vscode-theme.md
+      - Cursor themes: user/cursor-themes.md
+      - Hyprland: user/hyprland.md
+      - Password manager: user/password-manager.md
+      - Environment variables: user/environment-variables.md
+      - Hooks: user/hooks.md
+      - Overriding configs: user/overriding-configs.md
+      - Advanced settings: user/advanced-settings.md
+      - Scripting: user/scripting.md
+      - Custom Menus: user/custom-menus.md
+      - Setup wizards: user/setup.md
+      - General advice: user/general-advice.md
+  - Understanding Vibranium:
+      - Project philosophy: understanding/philosophy.md
+      - How Vibranium works: understanding/how-it-works.md
+      - Themes: understanding/themes.md
+      - Making your own theme: understanding/making-your-own-theme.md
+      - Settings & validation: understanding/settings.md
+      - The cfgr menu system: understanding/configuration-system.md
+      - Customizing keybindings: understanding/customize-keybindings.md
+      - Waybar modules: understanding/waybar-modules.md
+      - Updates & channels: understanding/updates.md
+      - Performance: understanding/performance.md
+  - Internals:
+      - Internals: internals/index.md

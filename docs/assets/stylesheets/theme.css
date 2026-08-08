@@ -1,0 +1,218 @@
+/*
+ * theme.css - the docs theme, matching the Gray theme.
+ *
+ * Colors taken verbatim from the Gray theme's colors-extended.toml
+ * (~/.config/vibranium/themes/gray), so the docs site and the desktop
+ * look the same. If the theme's palette ever changes, update the
+ * values here to match.
+ *
+ *   background_h   #0a0a0a    foreground_h  #f4f4f4
+ *   background_0   #141414    foreground_0  #dfdfdf
+ *   background_1   #242424    foreground_1  #d5d5d5
+ *   background_2   #393939    foreground_2  #cacaca
+ *   background_3   #434343    foreground_3  #c0c0c0
+ *   background_4   #4e4e4e    foreground_4  #b6b6b6
+ *   background_5   #585858
+ *   red #a88b8b   green #90a890   yellow #aea990   orange #b09b8b
+ *   cyan #90acad  purple #9c93b3  blue #90a4b3
+ *   gray/accent #8a8a8a   accent_dim #5a5a5a   accent_bright #b0b0b0
+ */
+
+[data-md-color-scheme="gray"] {
+  color-scheme: dark;
+
+  /* Branding */
+  --md-primary-fg-color: #242424;
+  --md-primary-fg-color--dark: #141414;
+  --md-primary-bg-color: #f4f4f4;
+
+  --md-accent-fg-color: #90a4b3;
+  --md-accent-fg-color--transparent: rgba(144, 164, 179, 0.15);
+  --md-accent-bg-color: #141414;
+
+  /* Defaults */
+  --md-default-fg-color: #dfdfdf;
+  --md-default-fg-color--light: #d5d5d5;
+  --md-default-fg-color--lighter: #c0c0c0;
+  /* Used for bars and separators (drawer title, search results, nav
+     item borders). Translucent, like Material's own dark scheme, so it
+     reads as a soft gray instead of a solid light bar. */
+  --md-default-fg-color--lightest: rgba(230, 230, 230, 0.12);
+
+  --md-default-bg-color: #141414;
+  --md-default-bg-color--light: #242424;
+  --md-default-bg-color--lighter: #393939;
+  --md-default-bg-color--lightest: #434343;
+
+  /* Code */
+  --md-code-fg-color: #dfdfdf;
+  --md-code-bg-color: #242424;
+  --md-code-hl-color: rgba(176, 176, 176, 0.15);
+
+  --md-code-hl-number-color: #b09b8b;
+  --md-code-hl-special-color: #aea990;
+  --md-code-hl-function-color: #90a4b3;
+  --md-code-hl-constant-color: #aea990;
+  --md-code-hl-keyword-color: #9c93b3;
+  --md-code-hl-string-color: #90a890;
+  --md-code-hl-name-color: #dfdfdf;
+  --md-code-hl-operator-color: #90acad;
+  --md-code-hl-punctuation-color: #cacaca;
+  --md-code-hl-comment-color: #585858;
+  --md-code-hl-generic-color: #dfdfdf;
+  --md-code-hl-variable-color: #b09b8b;
+
+  /* Typeset */
+  --md-typeset-color: #dfdfdf;
+  --md-typeset-a-color: #90a4b3;
+  --md-typeset-mark-color: rgba(174, 169, 144, 0.35);
+  --md-typeset-kbd-color: #242424;
+  --md-typeset-kbd-border-color: #434343;
+  --md-typeset-kbd-accent-color: #0a0a0a;
+  --md-typeset-table-color: rgba(67, 67, 67, 0.55);
+  --md-typeset-table-color--light: rgba(67, 67, 67, 0.35);
+  --md-typeset-hr-color: #434343;
+
+  /* Admonitions */
+  --md-admonition-bg-color: #242424;
+  --md-admonition-fg-color: #dfdfdf;
+
+  /* Footer */
+  --md-footer-bg-color: #0a0a0a;
+  --md-footer-fg-color: #c0c0c0;
+  --md-footer-fg-color--light: #dfdfdf;
+
+  /* Misc chrome */
+  --md-shadow-z1: 0 0.2rem 0.6rem rgba(0, 0, 0, 0.35);
+  --md-tabs-bg-color: #0a0a0a;
+}
+
+/* Header & nav */
+.md-header {
+  background-color: var(--md-primary-fg-color--dark);
+  box-shadow: 0 0.1rem 0.3rem rgba(0, 0, 0, 0.45);
+}
+
+.md-tabs {
+  border-bottom: 1px solid rgba(67, 67, 67, 0.4);
+}
+
+/* Sidebar: remove non-clickable section headers (they only repeat the
+   top tab bar) and flatten their children into the list. Section
+   children stay always-visible, so hiding the label is safe; the
+   `:not(.md-nav__container)` guard keeps index-page titles, which are
+   real links. */
+.md-nav__item--section > .md-nav__link:not(.md-nav__container) {
+  display: none;
+}
+
+.md-nav__item--section {
+  margin: 0;
+}
+
+/* The background covers mobile overscroll, which would otherwise
+   flash white around the edges */
+html {
+  background-color: #0a0a0a;
+}
+
+/* Wider content column (default is 61rem) */
+.md-grid {
+  max-width: 76rem;
+}
+
+/* Content */
+.md-typeset a:hover {
+  text-decoration: underline;
+}
+
+.md-typeset h1,
+.md-typeset h2,
+.md-typeset h3,
+.md-typeset h4 {
+  color: var(--md-default-fg-color);
+}
+
+/* Code: give blocks and inline code a border so they stand out
+   from the near-black page background */
+.md-typeset code {
+  border: 1px solid rgba(67, 67, 67, 0.4);
+  border-radius: 0.25rem;
+  padding: 0 0.25rem;
+}
+
+.md-typeset pre {
+  border: 1px solid rgba(67, 67, 67, 0.4);
+  border-radius: 0.4rem;
+}
+
+.md-typeset pre > code {
+  border: none;
+  border-radius: 0;
+  padding: 1em 1.5em;
+}
+
+/* Copy button: keep it out of the way. Idle is near-invisible, hover
+   brightens to the muted gray accent instead of the full accent. */
+.md-typeset .md-clipboard {
+  color: #585858;
+}
+
+.md-typeset .md-clipboard:hover,
+.md-typeset .md-clipboard:focus {
+  color: #8a8a8a;
+}
+
+/* Tables */
+.md-typeset table:not([class]) th {
+  background-color: var(--md-default-bg-color--lighter);
+  border-color: var(--md-typeset-table-color);
+}
+
+.md-typeset table:not([class]) td {
+  border-color: var(--md-typeset-table-color);
+}
+
+/* Admonitions - muted palette borders + titles */
+.md-typeset .admonition.note,
+.md-typeset details.note { border-color: #90a4b3; }
+.md-typeset .admonition.note > .admonition-title,
+.md-typeset details.note > summary { color: #90a4b3; }
+.md-typeset .admonition.tip,
+.md-typeset details.tip { border-color: #90a890; }
+.md-typeset .admonition.tip > .admonition-title,
+.md-typeset details.tip > summary { color: #90a890; }
+.md-typeset .admonition.warning,
+.md-typeset details.warning { border-color: #b09b8b; }
+.md-typeset .admonition.warning > .admonition-title,
+.md-typeset details.warning > summary { color: #b09b8b; }
+.md-typeset .admonition.danger,
+.md-typeset details.danger { border-color: #a88b8b; }
+.md-typeset .admonition.danger > .admonition-title,
+.md-typeset details.danger > summary { color: #a88b8b; }
+.md-typeset .admonition.info,
+.md-typeset details.info { border-color: #90acad; }
+.md-typeset .admonition.info > .admonition-title,
+.md-typeset details.info > summary { color: #90acad; }
+
+.media-note strong {
+  color: #aea990;
+}
+
+.md-code__nav {
+  background-color: #393939;
+}
+
+.md-code__nav:hover,
+:hover>.md-code__nav{
+  background-color: var(--md-accent-fg-color);
+}
+
+.md-code__button {
+  color: var(--md-accent-fg-color);
+}
+
+.md-code__button:hover,
+:hover>.md-code__button {
+  color: var(--md-primary-fg-color);
+}

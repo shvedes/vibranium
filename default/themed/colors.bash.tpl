@@ -1,3 +1,5 @@
+# shellcheck disable=all
+
 # P_ stands for Pango.
 #
 # These variables are used by other
