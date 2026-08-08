@@ -8,6 +8,8 @@ elif command -v vim > /dev/null; then
   alias v="vim"
 fi
 
+alias clearr="clear"
+alias cleart="clear"
 alias clera="clear"
 alias clea="clear"
 alias exti="exit"
@@ -16,8 +18,6 @@ alias mkidr="mkdir"
 
 alias grpe="grep"
 alias gerp="grep"
-
-alias cleart="clear"
 
 alias vibranium-healthcheck="vb-cmd-healthcheck"
 alias omarchy-theme-install="vb-theme-install"

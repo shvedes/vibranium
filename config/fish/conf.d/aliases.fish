@@ -1,8 +1,11 @@
 if command -q eza
-    alias ls="eza -XM"
-    alias ll="eza -XMhml --no-filesize --smart-group --time-style='+%y-%m-%d %H:%M'"
-    alias la="eza -1lXMhA --no-filesize --smart-group --time-style='+%y-%m-%d %H:%M'"
-    alias tree="eza --tree"
+    alias l="eza --hyperlink=auto"
+    alias ls="ezaa --hyperlink=auto"
+    alias sl="eza --hyperlink=auto"
+    alias ll="eza -lhbg@ --group-directories-first --hyperlink=auto"
+    alias la="eza -ahbg@ --group-directories-first --hyperlink=auto"
+    alias lla="eza -alhbg@ --group-directories-first --hyperlink=auto"
+    alias tree="eza --tree --hyperlink=auto"
 end
 
 if command -q trash
