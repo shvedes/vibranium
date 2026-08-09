@@ -65,8 +65,12 @@ lrzip
 unarj
 unrar
 unzip
+lhasa
+lzip
+lzop
 gvfs
 7zip
+arj
 zip
 
 ##### Rofi
