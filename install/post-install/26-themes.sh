@@ -34,16 +34,19 @@ tag_file="/tmp/${0##*/}.tag"
 
 echo 0 > "$frame_file"
 
-_spinner() {
-  local i
-  i=$(<"$2")
+  _spinner() {
+    local i
+    i=$(<"$2")
 
-  while true; do
-    local tag
-    tag=$(<"$4")
+    # Hide cursor; stdout is a pipe, so target the tty directly
+    printf '\e[?25l' >/dev/tty
+
+    while true; do
+      local tag
+      tag=$(<"$4")
     printf "\r\033[K%s Installing %s%s [%d/%d]" \
-      "${GRAY}${spinner_frames[$i]}${RESET}" \
-      "${CYAN}$1${RESET}" "$tag" "$3" "$5"
+      "${GY}${spinner_frames[$i]}${RS}" \
+      "${C}$1${RS}" "$tag" "$3" "$5"
 
     echo "$i" > "$2"
     i=$(((i + 1) % ${#spinner_frames[@]}))

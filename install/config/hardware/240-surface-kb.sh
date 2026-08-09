@@ -7,15 +7,15 @@ if [[ "$(</sys/class/dmi/id/sys_vendor 2>/dev/null)" == "Microsoft Corporation" 
     exit 1
   fi
 
-  helpers::log::info "Detected ${CYAN}Microsoft Surface${RESET} laptop"
-  helpers::log::info "Attempting to autodetect required ${CYAN}pinctrl${RESET} module"
+  helpers::log::info "Detected ${C}Microsoft Surface${RS} laptop"
+  helpers::log::info "Attempting to autodetect required ${C}pinctrl${RS} module"
 
   PINCTRL_MODULE=$(lsmod | grep pinctrl_ | cut -f 1 -d" ")
 
   if [[ -z $PINCTRL_MODULE ]]; then
     helpers::log::warn "Failed to autodetect pinctrl module."
   else
-    helpers::log::info "Detected pinctrl module: ${CYAN}${PINCTRL_MODULE}${RESET}"
+    helpers::log::info "Detected pinctrl module: ${C}${PINCTRL_MODULE}${RS}"
   fi
 
   helpers::write_file /etc/mkinitcpio.conf.d/vb-surface-kbd.conf <<EOF

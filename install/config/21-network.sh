@@ -218,7 +218,7 @@ use_networkd_and_iwd() {
   sudo systemctl -q restart systemd-resolved
 }
 
-if term::ask_yes_no N "Would you like to use ${CYAN}systemd-networkd${RESET} instead of ${CYAN}NetworkManager${RESET}?"; then
+if term::ask_yes_no N "Would you like to use ${C}systemd-networkd${RS} instead of ${C}NetworkManager${RS}?"; then
   helpers::log::info "Setting up networking"
   use_networkd_and_iwd
 else

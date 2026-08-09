@@ -28,7 +28,7 @@ fi
 
 if [[ -z "$gpu_arch" ]]; then
   helpers::log::warn "No compatible driver for your NVIDIA GPU"
-  helpers::log::warn "See: ${CYAN}https://wiki.archlinux.org/title/NVIDIA${RESET}"
+  helpers::log::warn "See: ${C}https://wiki.archlinux.org/title/NVIDIA${RS}"
   exit 0
 fi
 
@@ -46,4 +46,4 @@ helpers::log::info "Regenerating mkinitcpio"
 sudo mkinitcpio -P &>/dev/null
 
 printf '%s' "$gpu_arch" >/tmp/nvidia-arch
-helpers::log::info "NVIDIA driver installed for ${CYAN}${gpu_arch}${RESET}"
+helpers::log::info "NVIDIA driver installed for ${C}${gpu_arch}${RS}"

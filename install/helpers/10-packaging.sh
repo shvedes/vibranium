@@ -30,6 +30,9 @@ helpers::install_pkg() {
     local i
     i=$(<"$2")
 
+    # Hide cursor; stdout is a pipe, so target the tty directly
+    printf '\e[?25l' >/dev/tty
+
     while true; do
       local tag
       tag=$(<"$4")
