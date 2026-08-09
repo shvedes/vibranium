@@ -11,11 +11,25 @@ if [[ ! -f $VB_THEME_DIR/obsidian.css ]]; then
   exit 0
 fi
 
+if [[ ! -d "${OBSIDIAN_CFG%/*}" ]]; then
+  log Warn "no Obsidian config found. Aborting"
+  log Warn "is it installed?"
+  exit 0
+fi
+
+if [[ ! -f "$OBSIDIAN_CFG" ]]; then
+  log Warn "no Obsidian config found. Aborting"
+  log Warn "no vaults set up?"
+  exit 0
+fi
+
 mapfile -t VAULTS < <(jq -r '.vaults | values[].path' "$OBSIDIAN_CFG")
 log Info "found ${#VAULTS[@]} obsidian vaults"
 
 for vault in "${VAULTS[@]}"; do
-  [[ -d $vault/.obsidian ]] || continue
+  if [[ ! -d $vault/.obsidian ]]; then
+    continue
+  fi
 
   THEME_DIR="$vault/.obsidian/themes/Vibranium"
   if ! [[ -f "$THEME_DIR" ]]; then
