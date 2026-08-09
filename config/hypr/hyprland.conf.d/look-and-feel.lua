@@ -5,6 +5,11 @@
 -- These are Vibranium defaults. Use Vibranium Setttings to change.
 
 hl.config({
+  general = {
+    gaps_in = 5,
+    gaps_out = 7
+  },
+
   decoration = {
     dim_inactive = true,
     rounding = 0,
