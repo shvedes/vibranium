@@ -61,7 +61,9 @@ while true; do
     elif [[ -n "$selected_shell_pkg" ]]; then
       packages+=("$selected_shell_pkg")
 
-      if [[ "$selected_shell_pkg" == "zsh" ]]; then
+      if [[ "$selected_shell_pkg" == "bash" ]]; then
+        packages+=("bash-completion")
+      elif [[ "$selected_shell_pkg" == "zsh" ]]; then
         packages+=(
           "zsh-syntax-highlighting"
           "zsh-autosuggestions"
