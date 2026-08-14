@@ -16,7 +16,7 @@ if ! systemctl -q --user is-active awww; then
 fi
 
 CURRENT_THEME="$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")"
-WALLPAPER_REGISTRY="$VIBRANIUM_STATE/wallpapers"
+WALLPAPER_REGISTRY="$VIBRANIUM_STATE/wallpaper.state"
 WALLPAPER_PATH=""
 
 if ! [[ -f "$WALLPAPER_REGISTRY" ]]; then
