@@ -13,6 +13,31 @@ Options:
 EOF
 }
 
+path_to_file_uri() {
+  local path="$1"
+  local uri="file://"
+  local i char byte
+
+  # URI percent-encoding is byte-based. Force a byte-oriented locale.
+  LC_ALL=C
+
+  for ((i = 0; i < ${#path}; i++)); do
+    char="${path:i:1}"
+
+    case "$char" in
+      [a-zA-Z0-9.~_-]|/)
+        uri+="$char"
+        ;;
+      *)
+        printf -v byte '%02X' "'$char"
+        uri+="%$byte"
+        ;;
+    esac
+  done
+
+  printf '%s\n' "$uri"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -h | --help)
@@ -194,11 +219,10 @@ rm -f "$DL_PATH_FILE"
 
 # Copy the file URI to the clipboard so it can be pasted directly into
 # file managers, media players, or anything that accepts drag-and-drop.
-if [[ -n "$DL_FILE" && -f "$DL_FILE" ]]; then
-  printf 'file://%s' "$DL_FILE" | wl-copy --type text/uri-list
-  vb::print "$G" "Copied to clipboard: ${B}file://${DL_FILE}${RS}"
-fi
+DL_URI="$(path_to_file_uri "$DL_FILE")"
 
+printf '%s\r\n' "$DL_URI" | wl-copy --type text/uri-list
+vb::print "$G" "Copied to clipboard: ${B}${DL_URI}${RS}"
 vb::print "$G" "Video has been saved to ${B}$OUTPUT_DIR${RS}"
 
 if _window_is_offscreen; then
