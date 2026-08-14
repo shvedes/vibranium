@@ -36,12 +36,12 @@ if command -v eza > /dev/null
 
     alias l "eza $opts"
     alias ls "eza $opts"
-    alias la "eza -Ahbg@ $opts"
-    alias laa "eza -ahbg@ $opts"
+    alias la "eza -Ahbg $opts"
+    alias laa "eza -ahbg $opts"
 
-    alias ll "eza -lhbg@ $opts"
-    alias lla "eza -Alhbg@ $opts"
-    alias llaa "eza -aalhbg@ $opts"
+    alias ll "eza -lhbg $opts"
+    alias lla "eza -Alhbg $opts"
+    alias llaa "eza -aalhbg $opts"
     alias tree "eza --tree $opts"
 
 else
