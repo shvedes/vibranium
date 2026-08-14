@@ -25,7 +25,7 @@ Hypr.Anim.apply({
     { leaf = "layers", enabled = true, speed = 3.0, bezier = "notifications" },
     { leaf = "fadeLayersIn", enabled = true, speed = 3.0, bezier = "default" },
     { leaf = "fadeLayersOut", enabled = true, speed = 3.0, bezier = "default" },
-    { leaf = "workspaces", enabled = true, speed = 3.0, bezier = "easeOutQuint", style = "fade" },
+    { leaf = "workspaces", enabled = false, speed = 3.0, bezier = "easeOutQuint", style = "fade" },
     { leaf = "windowsIn", enabled = true, speed = 3.8, bezier = "WindowsIn", style = "gnomed" },
     { leaf = "windowsOut", enabled = true, speed = 5.0, bezier = "easeOutQuint", style = "gnomed" },
     { leaf = "windowsMove", enabled = true, speed = 4.0, bezier = "WindowsMove", style = "slide" },

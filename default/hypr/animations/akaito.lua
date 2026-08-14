@@ -18,7 +18,7 @@ Hypr.Anim.apply({
     { leaf = "layers", enabled = true, speed = 2.2, bezier = "easeSoft" },
     { leaf = "layersIn", enabled = true, speed = 2.0, bezier = "easeSoft" },
     { leaf = "layersOut", enabled = true, speed = 1.8, bezier = "easeFade" },
-    { leaf = "workspaces", enabled = true, speed = 2.4, bezier = "easeSoft" },
+    { leaf = "workspaces", enabled = false, speed = 2.4, bezier = "easeSoft" },
     { leaf = "specialWorkspace", enabled = true, speed = 2.2, bezier = "easeSoft" },
     { leaf = "border", enabled = true, speed = 2.8, bezier = "easeSoft" },
     { leaf = "borderangle", enabled = true, speed = 3.0, bezier = "easeSoft" },

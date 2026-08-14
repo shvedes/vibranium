@@ -33,10 +33,7 @@ Hypr.Anim.apply({
     { leaf = "windowsOut", enabled = true, speed = 4.5, bezier = "easeOutQuint", style = "popin 90%" },
     { leaf = "windowsMove", enabled = true, speed = 3.5, bezier = "easeOutQuint" },
 
-    { leaf = "workspaces", enabled = true, speed = 4.5, bezier = "easeOutQuint", style = "fade" },
-    { leaf = "workspacesIn", enabled = true, speed = 4.5, bezier = "easeOutQuint", style = "fade" },
-    { leaf = "workspacesOut", enabled = true, speed = 4.5, bezier = "easeOutQuint", style = "fade" },
-    { leaf = "specialWorkspace", enabled = true, speed = 4.5, bezier = "easeOutQuint", style = "fade" },
+    { leaf = "workspaces", enabled = false , speed = 4.5, bezier = "easeOutQuint", style = "fade" },
 
     { leaf = "zoomFactor", enabled = true, speed = 3.0, bezier = "easeOutQuint" },
   },
