@@ -709,7 +709,7 @@ if [[ -n "$1" ]]; then
     VARIANT="${INPUT_THEME#*-}"
 
     if [[ -z "${FAMILIES[$FAMILY]+_}" ]]; then
-      local _display="${FAMILY} ${VARIANT}"
+      _display="${FAMILY} ${VARIANT}"
       if [[ -n "${STANDALONE_THEMES[$_display]+_}" ]]; then
         CHOSEN="$_display"
         FOLDER_NAME="${FOLDER_MAP[$_display]}"

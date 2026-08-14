@@ -680,11 +680,11 @@ else
 
   if [[ -z $APP_NAME ]]; then
     log Info "No --name provided; trying to fetch by URL title"
-    APP_NAME="$(_fetch_page_title "$APP_URL")" && {
+    if APP_NAME="$(_fetch_page_title "$APP_URL")"; then
       log Info "Fetched page title: '$APP_NAME'"
-    } || {
+    else
       log Warn "Failed to fetch URL title"
-    }
+    fi
   fi
 
   APP_NAME="$(_strip_title "$APP_NAME")"
