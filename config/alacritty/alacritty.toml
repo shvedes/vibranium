@@ -14,11 +14,11 @@ draw_bold_text_with_bright_colors = true
 save_to_clipboard = true
 
 [window]
-opacity = 0.95
+opacity = 1.00
 dynamic_padding = true
 dynamic_title	= true
 startup_mode	= "Windowed"
-padding = { x = 7, y = 7 }
+padding = { x = 10, y = 10 }
 
 [keyboard]
 bindings = [

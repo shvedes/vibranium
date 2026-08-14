@@ -1,23 +1,5 @@
 #!/bin/bash
 
-_get_term_opacity() {
-  local config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-  sed -nE '/^\[window\]/,/^\[/{s/^[[:space:]]*opacity[[:space:]]*=[[:space:]]*"?([0-9.]+)"?/\1/p}' "$config"
-}
-
-_set_term_opacity() {
-  local input config
-  input="$(cfgr::set_digit \
-    --title "Opacity" \
-    --hint "Opacity value (float)" \
-    --type float \
-    --min 0.0 \
-    --max 1.0)" || return
-  config="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
-
-  sed -i -E '/^\[window\]/,/^\[/{s/^([[:space:]]*opacity[[:space:]]*=[[:space:]]*)"?[0-9.]+("?)/\1'"$input"'\2/}' "$config"
-}
-
 _edit_env() {
   local env_file="$XDG_CONFIG_HOME/vibranium/environment"
   xdg-terminal-exec --app-id=org.vb.term.float --title="vb-env" -- "${EDITOR:-nvim}" "$env_file"
@@ -26,14 +8,14 @@ _edit_env() {
 
 _toggle_wallpaper() {
   case "$(vb-cmd-get-option "VIBRANIUM_GLOBAL_SHOW_WALLPAPER")" in
-  false)
-    sed -i 's/path/# path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
-    systemctl -q --user disable --now awww &
-    ;;
-  true)
-    sed -i 's/# path/path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
-    systemctl -q --user enable --now awww &
-    ;;
+    false)
+      sed -i 's/path/# path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+      systemctl -q --user disable --now awww &
+      ;;
+    true)
+      sed -i 's/# path/path/' "$XDG_CONFIG_HOME/hypr/hyprlock.conf"
+      systemctl -q --user enable --now awww &
+      ;;
   esac
 }
 
@@ -49,7 +31,7 @@ _get_notification_timeout() {
     value="${value//[[:space:]]/}"
     printf "%s" "$value"
     return 0
-  done <"$config"
+  done < "$config"
 
   return 1
 }
@@ -80,13 +62,13 @@ _get_default_browser() {
 
       browser="${value%%;*}"
       break
-    done <"$XDG_CONFIG_HOME/mimeapps.list"
+    done < "$XDG_CONFIG_HOME/mimeapps.list"
   fi
 
   if [[ -z "$browser" ]]; then
     # Only use xdg-mime query as fallback
     # And instantly cache it for the loop above
-    browser=$(xdg-mime query default x-scheme-handler/http 2>/dev/null) &&
+    browser=$(xdg-mime query default x-scheme-handler/http 2> /dev/null) &&
       xdg-mime default "$browser" x-scheme-handler/https x-scheme-handler/http
   fi
 
@@ -96,14 +78,14 @@ _get_default_browser() {
   fi
 
   case "$browser" in
-  opera.desktop) printf "Opera" ;;
-  firefox.desktop) printf "Firefox" ;;
-  chromium.desktop) printf "Chromium" ;;
-  vivaldi.desktop) printf "Vivaldi" ;;
-  google-chrome.desktop) printf "Google Chrome" ;;
-  microsoft-edge.desktop) printf "Microsoft Edge" ;;
-  brave-browser.desktop) printf "Brave" ;;
-  org.qutebrowser.qutebrowser.desktop) printf "Qutebrowser" ;;
+    opera.desktop) printf "Opera" ;;
+    firefox.desktop) printf "Firefox" ;;
+    chromium.desktop) printf "Chromium" ;;
+    vivaldi.desktop) printf "Vivaldi" ;;
+    google-chrome.desktop) printf "Google Chrome" ;;
+    microsoft-edge.desktop) printf "Microsoft Edge" ;;
+    brave-browser.desktop) printf "Brave" ;;
+    org.qutebrowser.qutebrowser.desktop) printf "Qutebrowser" ;;
   esac
 }
 
@@ -140,7 +122,7 @@ _manage_user_wallpapers() {
   local wallpaper_dir files chosen
 
   local current_theme
-  current_theme="$(<"$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+  current_theme="$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")"
   wallpaper_dir="$XDG_CONFIG_HOME/vibranium/themes/$current_theme/backgrounds"
 
   if [[ ! -d "$wallpaper_dir" ]]; then
@@ -189,53 +171,53 @@ _manage_user_wallpapers() {
       fi
 
       case "$chosen" in
-      "Open")
-        imv "$wallpaper_dir/$target"
-        ;;
-      "Delete")
-        rm -f "$wallpaper_dir/$target"
-        notify-send -r 2 "Vibranium" "$target has been deleted"
+        "Open")
+          imv "$wallpaper_dir/$target"
+          ;;
+        "Delete")
+          rm -f "$wallpaper_dir/$target"
+          notify-send -r 2 "Vibranium" "$target has been deleted"
 
-        # Also remove overlayed file
-        local current_mirror="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
-        if [[ -f "$current_mirror/$target" ]]; then
-          rm -f "$current_mirror/$target"
-        fi
-
-        local current
-        current="$(vb-core-wallpaper --get)"
-        current="${current##*/}"
-
-        if [[ "$current" == "$target" ]]; then
-          vb-core-wallpaper --next
-        fi
-
-        # Refresh files list after delete
-        files=()
-        for f in "$wallpaper_dir"/*; do
-          if [[ -f "$f" ]]; then
-            files+=("${f##*/}")
+          # Also remove overlayed file
+          local current_mirror="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
+          if [[ -f "$current_mirror/$target" ]]; then
+            rm -f "$current_mirror/$target"
           fi
-        done
 
-        # If backgrounds/ is now empty, decide how much to clean up.
-        if ((${#files[@]} == 0)); then
-          local theme_dir="${wallpaper_dir%/*}"
-          local theme_contents=()
+          local current
+          current="$(vb-core-wallpaper --get)"
+          current="${current##*/}"
 
-          for entry in "$theme_dir"/*; do
-            [[ -e "$entry" ]] && theme_contents+=("$entry")
+          if [[ "$current" == "$target" ]]; then
+            vb-core-wallpaper --next
+          fi
+
+          # Refresh files list after delete
+          files=()
+          for f in "$wallpaper_dir"/*; do
+            if [[ -f "$f" ]]; then
+              files+=("${f##*/}")
+            fi
           done
 
-          if [[ ${#theme_contents[@]} -eq 1 && "${theme_contents[0]}" == "$wallpaper_dir" ]]; then
-            rm -r "$theme_dir"
+          # If backgrounds/ is now empty, decide how much to clean up.
+          if ((${#files[@]} == 0)); then
+            local theme_dir="${wallpaper_dir%/*}"
+            local theme_contents=()
+
+            for entry in "$theme_dir"/*; do
+              [[ -e "$entry" ]] && theme_contents+=("$entry")
+            done
+
+            if [[ ${#theme_contents[@]} -eq 1 && "${theme_contents[0]}" == "$wallpaper_dir" ]]; then
+              rm -r "$theme_dir"
+              return
+            fi
+
+            rmdir "$wallpaper_dir" 2> /dev/null
             return
           fi
-
-          rmdir "$wallpaper_dir" 2>/dev/null
-          return
-        fi
-        ;;
+          ;;
       esac
       break
     done
@@ -246,7 +228,7 @@ _manage_user_wallpapers() {
 
   while true; do
     if [[ ${#files[@]} -eq 0 ]]; then
-      rmdir "$wallpaper_dir" 2>/dev/null
+      rmdir "$wallpaper_dir" 2> /dev/null
       return
     fi
 
@@ -257,7 +239,8 @@ _manage_user_wallpapers() {
     [[ -z "$chosen" ]] && return
 
     if [[ "$chosen" == "$open_folder_opt" ]]; then
-      xdg-open "$wallpaper_dir"; exit
+      xdg-open "$wallpaper_dir"
+      exit
     fi
 
     for i in "${!files[@]}"; do
@@ -311,7 +294,7 @@ _set_cursor_size() {
   line=${line#* } # remove first (theme name) word and following space
 
   # Split remaining sizes into array
-  read -r -a sizes <<<"$line"
+  read -r -a sizes <<< "$line"
 
   chosen_size="$(cfgr::set_string \
     --title "Cursor Size" \
@@ -380,11 +363,9 @@ _build() {
   CURSOR_THEME="${theme:-$(_get_cursor_theme)}"
   CURSOR_SIZE="${size:-Default}"
 
-  local notif_timeout default_browser term_opacity
+  local notif_timeout default_browser
   notif_timeout=$(_get_notification_timeout)
   default_browser=$(_get_default_browser)
-
-  term_opacity=$(_get_term_opacity)
 
   cfgr::item::raw "Notification timeout : ${notif_timeout}s" "action:_set_notification_timeout"
   cfgr::item::bool --var VIBRANIUM_GLOBAL_PAUSE_MUSIC_ON_SESSION_LOCK --label "Pause music on lock"
@@ -397,8 +378,6 @@ _build() {
       --label "Show wallpaper" \
       --hook "_toggle_wallpaper"
   fi
-
-  cfgr::item::raw "Term opacity : $term_opacity" "action:_set_term_opacity"
 
   cfgr::item::raw "Cursor theme : $CURSOR_THEME" "action:_set_cursor_theme"
   cfgr::item::raw "Cursor size : $CURSOR_SIZE" "action:_set_cursor_size"
