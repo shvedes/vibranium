@@ -32,7 +32,7 @@ Note: open is a custom shell function, not a command.'
       continue
     fi
 
-    printf "opening %s...\n" "${ITL}${UND}$f${RST}"
+    printf "opening %s...\n" "${ITL}$f${RST}"
     setsid -f xdg-open "$f" > /dev/null 2>&1
   done
 
