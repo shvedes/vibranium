@@ -288,35 +288,40 @@ _check_url_reachable() {
 
 # ---------------------------------------------------------------------------
 # Scan all installed PWA .desktop files for one whose Exec= line matches
-# the given URL. Prints the matching file path and returns 0 if found.
+# the given URL exactly. Prints the matching file path and returns 0 if found.
+# Only the exact URL (same path, not just the same domain) is treated as a
+# duplicate, so e.g. deepl.com/en/translator and deepl.com/en/write can coexist.
 # Recognises both the plain and --own-profile Exec= variants so that
 # duplicate detection works regardless of how the PWA was originally installed.
+# Chromium-native installs (chrome-*.desktop) keep their URL in Comment/Name
+# rather than Exec=, so those are matched by full-URL substring instead.
 # ---------------------------------------------------------------------------
 _find_webapp_by_url() {
   local url="$1"
-  local domain="${url#*://}"
-  domain="${domain#www.}"
-  domain="${domain%%[/?#]*}"
+  local f line exec_val
 
-  if command -v rg &> /dev/null; then
-    local f
-    read -r f < <(rg -l -g 'PWA - *.desktop' -g 'chrome-*.desktop' -Fi "$domain" "$XDG_DATA_HOME/applications" 2> /dev/null)
-    if [[ -n "$f" ]]; then
-      echo "$f"
-      return 0
-    fi
-  else
-    local f
-    for f in "$XDG_DATA_HOME/applications"/'PWA - '*.desktop "$XDG_DATA_HOME/applications"/chrome-*.desktop; do
-      if [[ ! -f "$f" ]]; then
-        continue
-      fi
-      if grep -Fiq "$domain" "$f" &> /dev/null; then
+  for f in "$XDG_DATA_HOME/applications"/'PWA - '*.desktop "$XDG_DATA_HOME/applications"/chrome-*.desktop; do
+    [[ -f "$f" ]] || continue
+
+    if [[ "$f" == */chrome-*.desktop ]]; then
+      if grep -Fiq "$url" "$f" &> /dev/null; then
         echo "$f"
         return 0
       fi
-    done
-  fi
+      continue
+    fi
+
+    while IFS= read -r line; do
+      [[ $line == Exec=* ]] || continue
+      exec_val="${line#Exec=}"
+      case "$exec_val" in
+        "vb-launch-webapp $url" | "vb-launch-webapp --own-profile $url")
+          echo "$f"
+          return 0
+          ;;
+      esac
+    done < "$f"
+  done
 
   return 1
 }
