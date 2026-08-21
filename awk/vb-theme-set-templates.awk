@@ -2,7 +2,7 @@
 
 # This is the engine underneath vb-theme-set-templates. The bash side has
 # already done the boring parts by the time we get here: it merged
-# colors.toml and colors-extended.toml into one flat key/value table and
+# colors.list into one flat key/value table and
 # figured out which template files need rendering and where their output
 # should land. All this file does is the actual substitution: read every
 # template line, find {{ ... }} tokens, resolve each one, write the result.

@@ -125,8 +125,7 @@ _theme_hidden() {
 #
 # For each subdirectory the light/dark flag is resolved in priority order:
 #   1. LIGHT= field in theme.info  (native format)
-#   2. theme.light file            (Omarchy-compatible fallback)
-#   3. Absent - apply_theme falls back to a folder-name regex at runtime
+#   2. Absent - apply_theme falls back to a folder-name regex at runtime
 #
 # Family/variant metadata priority:
 #   1. theme.info (FAMILY= / VARIANT= fields)
@@ -182,13 +181,6 @@ _discover_in_dir() {
         local suffix="${folder#*-}"
         family="${prefix^}"
         variant="${suffix^}"
-      fi
-
-      # Omarchy-compatible light flag
-      if [[ -f "$theme_dir/theme.light" ]]; then
-        light="true"
-      else
-        light="false"
       fi
     fi
 
@@ -509,7 +501,7 @@ apply_theme() {
   printf "%s" "$folder_name" > "$THEME_NAME_FILE"
 
   # Determine light/dark from discovery metadata; fall back to folder-name
-  # regex for themes that carry no light flag in either theme.info or theme.light
+  # regex for themes that carry no LIGHT= flag in theme.info
   #
   # This has to happen before vb-theme-set-templates runs (moved up from
   # right after the atomic swap below) so templates can see it: exported

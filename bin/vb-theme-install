@@ -80,7 +80,10 @@ if [[ -n "$1" ]]; then
   fi
 else
   while true; do
-    read -erp "${Y}[VIBRANIUM]${RS} Git repo: " REPO_URL || { _operation_canceled; exit 1; }
+    read -erp "${Y}[VIBRANIUM]${RS} Git repo: " REPO_URL || {
+      _operation_canceled
+      exit 1
+    }
     REPO_URL="${REPO_URL%/}"
 
     if [[ -z "$REPO_URL" ]]; then
@@ -117,20 +120,19 @@ REPO_PATH="${REPO_PATH%/}" # guard against a trailing slash
 THEME_NAME="${REPO_URL%.git}"
 THEME_NAME="${THEME_NAME##*/}"
 
-# Strip the vendor prefix (omarchy or vibranium). This leaves a leading dash
-# when the repo name is "omarchy-foo-theme" or "vibranium-foo-theme", because
-# the prefix pattern ends right before the first separator.
-THEME_NAME="${THEME_NAME#omarchy}"
+# Strip the vendor prefix. This leaves a leading dash when the repo name is
+# "vibranium-foo-theme", because the prefix pattern ends right before the
+# first separator.
 THEME_NAME="${THEME_NAME#vibranium}"
 
 # Remove the leading dash that is left after stripping the vendor prefix above.
-# Without this, a repo named "omarchy-miasma-theme" produces "-miasma-theme",
+# Without this, a repo named "vibranium-miasma-theme" produces "-miasma-theme",
 # which becomes a folder with a leading dash and a leading space in menus.
 THEME_NAME="${THEME_NAME#-}"
 
 # Strip the word "theme" however it appears in what remains.
-# "omarchy-theme-miasma"  -> after prefix strip: "theme-miasma" -> strip "theme-" -> "miasma"
-# "omarchy-miasma-theme"  -> after prefix strip: "miasma-theme"  -> strip "-theme" -> "miasma"
+# "vibranium-theme-miasma" -> after prefix strip: "theme-miasma" -> strip "theme-" -> "miasma"
+# "vibranium-miasma-theme" -> after prefix strip: "miasma-theme" -> strip "-theme" -> "miasma"
 THEME_NAME="${THEME_NAME#theme-}"
 THEME_NAME="${THEME_NAME%-theme}"
 
@@ -168,13 +170,10 @@ if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Checking theme compatibility"; then
 fi
 
 # Match strictly against the JSON name field - guards against partial matches
-# (e.g. a file called "my-colors.toml" must not pass)
+# (e.g. a file called "my-colors.list" must not pass)
 CONTENTS="$(< "$CONT_FILE")"
-if [[ "$CONTENTS" != *'"name": "colors.toml"'* ]] && [[ "$CONTENTS" != *'"name": "colors-extended.toml"'* ]]; then
-  vb::print "$R" "$THEME_NAME_CLR was created for ${G}Omarchy${RS} versions prior to ${B}v3.3.0${RS}"
-
-  # https://github.com/basecamp/omarchy/releases/tag/v3.3.0
-  vb::print "$R" "Vibranium supports themes for ${G}Omarchy${RS} ${B}v3.3.0+${RS}"
+if [[ "$CONTENTS" != *'"name": "colors.list"'* ]]; then
+  vb::print "$R" "$THEME_NAME_CLR is not a Vibranium-compatible theme"
 
   rm -f "$CONT_FILE"
   _operation_canceled

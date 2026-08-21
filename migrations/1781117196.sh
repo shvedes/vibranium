@@ -15,7 +15,7 @@ awk '
 /^[[:space:]]*vb_force_template_files=\([[:space:]]*$/ {
   print
   print "  # The template system does a good job of generating Hyprland'\''s appearance."
-  print "  # If you disable it, keep in mind that some Omarchy community themes define"
+  print "  # If you disable it, keep in mind that some community themes define"
   print "  # their own animation curves. In such cases, the animation setting shown in"
   print "  # Vibranium settings may not match the animations actually being used."
   print "  \"hyprland.lua\""
@@ -27,7 +27,7 @@ awk '
 
 vb-theme-set --force "$theme"
 
-echo "${RED}[MIGRATION|$SELF]${RESET} If you've installed a community theme for Omarchy,"
+echo "${RED}[MIGRATION|$SELF]${RESET} If you've installed a community theme,"
 echo "${RED}[MIGRATION|$SELF]${RESET} keep in mind that, from now on, Hyprland's appearance"
 echo "${RED}[MIGRATION|$SELF]${RESET} will be generated exclusively by the template system."
 echo "${RED}[MIGRATION|$SELF]${RESET}"

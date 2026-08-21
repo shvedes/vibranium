@@ -47,11 +47,10 @@ Hypr.Rule.tag_by_tag("firefoxBasedBrowser", "browserWindow")
 
 Hypr.Rule.tag_class("[\\w.]*?(only|libre|s)office(?:-\\w+)*", "officeWindow")
 
--- Some Omarchy themes may apply not only Hyprland colors, but also their
--- own settings. By default, Omarchy applies an opacity rule of 0.97 to all
--- windows, using a special tag, and disables opacity for windows with
--- specific titles. Vibranium does not include such a rule by default, but
--- it is better to be prepared for these cases.
+-- Some community themes may apply not only Hyprland colors, but also their
+-- own settings, such as an opacity rule of 0.97 applied to all windows
+-- using a special tag. Vibranium does not include such a rule by default,
+-- but it is better to be prepared for these cases.
 hl.window_rule({
   match = { title = ".* - YouTube - .*" },
   opaque = true,

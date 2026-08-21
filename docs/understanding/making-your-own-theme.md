@@ -1,7 +1,7 @@
 # Making your own theme
 
 Vibranium themes are generated from a shared color palette.
-A complete theme can be created by defining `colors-extended.toml`, adding metadata, and providing wallpapers.
+A complete theme can be created by defining `colors.list`, adding metadata, and providing wallpapers.
 The theme engine then generates application configurations from templates.
 
 This page covers two approaches:
@@ -13,7 +13,7 @@ This page covers two approaches:
 
 A template-based theme requires three components:
 
-- `colors-extended.toml`
+- `colors.list`
 - `theme.info`
 - At least one image in `backgrounds/`
 
@@ -51,7 +51,7 @@ LIGHT=false
 The main theme file is:
 
 ```text
-colors-extended.toml
+colors.list
 ```
 
 Every color value must be defined.
@@ -65,53 +65,18 @@ Useful tools:
 ??? note "Click here to copy the empty tempalte"
 
     ```toml
-    black_dim = ""
-    black = ""
-    black_bright = ""
-
-    red_dim = ""
-    red = ""
-    red_bright = ""
-
-    pink_dim = ""
-    pink = ""
-    pink_bright = ""
-
-    green_dim = ""
-    green = ""
-    green_bright = ""
-
-    yellow_dim = ""
-    yellow = ""
-    yellow_bright = ""
-
-    orange_dim = ""
-    orange = ""
-    orange_bright = ""
-
-    blue_dim = ""
-    blue = ""
-    blue_bright = ""
-
-    purple_dim = ""
-    purple = ""
-    purple_bright = ""
-
-    cyan_dim = ""
-    cyan = ""
-    cyan_bright = ""
-
-    white_dim = ""
-    white = ""
-    white_bright = ""
-
-    gray_dim = ""
-    gray = ""
-    gray_bright = ""
-
-    accent_dim = ""
-    accent = ""
-    accent_bright = ""
+    black   = ""
+    red     = ""
+    pink    = ""
+    green   = ""
+    yellow  = ""
+    orange  = ""
+    blue    = ""
+    purple  = ""
+    cyan    = ""
+    white   = ""
+    gray    = ""
+    accent  = ""
 
     background_h = ""
     background_0 = ""
@@ -127,6 +92,7 @@ Useful tools:
     foreground_2 = ""
     foreground_3 = ""
     foreground_4 = ""
+    foreground_5 = ""
     ```
 
 Our example:
@@ -134,53 +100,18 @@ Our example:
 ??? note "Click to expand"
 
     ```toml
-    black_dim = "#1C1710"
-    black = "#2C2418"
-    black_bright = "#403520"
-
-    red_dim = "#8C2E1C"
-    red = "#C44030"
-    red_bright = "#E85C42"
-
-    pink_dim = "#7A2845"
-    pink = "#B84068"
-    pink_bright = "#E05888"
-
-    green_dim = "#4A6828"
-    green = "#6E9040"
-    green_bright = "#96BC58"
-
-    yellow_dim = "#AA8000"
-    yellow = "#E8B800"
-    yellow_bright = "#FFD840"
-
-    orange_dim = "#B05A14"
-    orange = "#E88020"
-    orange_bright = "#FFA840"
-
-    blue_dim = "#1E3C70"
-    blue = "#2E60AE"
-    blue_bright = "#4A88D8"
-
-    purple_dim = "#4C2278"
-    purple = "#7040B0"
-    purple_bright = "#9C60D8"
-
-    cyan_dim = "#1A6478"
-    cyan = "#2894B0"
-    cyan_bright = "#3CC0D0"
-
-    white_dim = "#A09080"
-    white = "#D8C8A8"
-    white_bright = "#F0E4C8"
-
-    gray_dim = "#3C3028"
-    gray = "#6A5C4C"
-    gray_bright = "#9C8C7A"
-
-    accent_dim = "#9C7000"
-    accent = "#E8A800"
-    accent_bright = "#FFCC00"
+    black   = "#2C2418"
+    red     = "#C44030"
+    pink    = "#B84068"
+    green   = "#6E9040"
+    yellow  = "#E8B800"
+    orange  = "#E88020"
+    blue    = "#2E60AE"
+    purple  = "#7040B0"
+    cyan    = "#2894B0"
+    white   = "#D8C8A8"
+    gray    = "#6A5C4C"
+    accent  = "#E8A800"
 
     background_h = "#090704"
     background_0 = "#100C06"
@@ -196,14 +127,17 @@ Our example:
     foreground_2 = "#B8A478"
     foreground_3 = "#9A8858"
     foreground_4 = "#7A6C42"
+    foreground_5 = "#5A502C"
     ```
 
 The palette contains:
 
-* 11 color families with dim, normal, and bright variants.
+* 11 color families.
 * 6 background shades.
-* 5 foreground shades.
+* 6 foreground shades.
 * Accent colors.
+
+Dimmed and brighter shades are not part of the palette. Templates compute them on the fly with `|dim=` and `|pop=` operations, which shift a color toward the background or the foreground relative to the current theme mode.
 
 These values are consumed by the theme templates to generate application configurations.
 For a complete example, see the default [Nightfox theme](https://github.com/shvedes/vibranium/tree/master/themes/nightfox).
@@ -238,7 +172,7 @@ The final structure:
 solar/
 ├── backgrounds/
 │   └── 01-solar-jpg.jpg
-├── colors-extended.toml
+├── colors.list
 └── theme.info
 ```
 
@@ -274,13 +208,13 @@ Generated configurations can include:
 
 The traditional method allows per-application customization.
 
-`colors-extended.toml` is still required because Vibranium generates base configurations regardless.
+`colors.list` is still required because Vibranium generates base configurations regardless.
 
 Additional files can be included in the theme directory to override generated configurations:
 
 ```text
 theme/
-├── colors-extended.toml
+├── colors.list
 ├── theme.info
 ├── backgrounds/
 └── application overrides

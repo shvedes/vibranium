@@ -23,32 +23,19 @@ Example:
 | Gruvbox family | Hard, Medium, Soft, Light |
 | Standalone themes | Dracula, Deep Forest, Ristretto |
 
-## Omarchy theme support
-
-Vibranium supports compatible Omarchy themes.
-Supported themes are those using the newer Base16-style format with the `colors.toml` file.
-This file provides the color information required for Vibranium to generate its own application configurations.
-
-Compatible community themes can be found at:
-
-- [omarchythemes.com](https://omarchythemes.com/)
-- [omarchy.deepaknes.com](https://omarchy.deepakness.com/themes)
-- [awesome-omarchy.com](https://awesome-omarchy.com/)
-- [Omarchy theme GitHub topic](https://github.com/topics/omarchy-theme)
-
 ## Installing community themes
 
 Open **Vibranium Menu** -> **Install** -> **Theme**.
 
 The installer accepts theme URLs or repository shortcuts.
-Before installation, Vibranium checks that the theme has the required structure. Unsupported themes are rejected before installation.
+Before installation, Vibranium checks that the theme has the required structure: a `colors.list` palette file. Unsupported themes are rejected before installation.
 After installation, the theme applies instantly and becomes available in the picker.
 
 
 You also can just copy-paste the installation command from a theme's README.md page like so:
 
 ```bash
-omarchy-theme-install <URL>
+vb-theme-install <URL>
 ```
 
 ## Removing themes

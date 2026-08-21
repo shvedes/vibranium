@@ -36,7 +36,7 @@ Every shell registers the same alias set, each guarded by `command -v` so it onl
 - **cd** — parent-directory shortcuts `..`, `...`, `....`, `.....`, typo fixes `dc`, `cd..`, `cd...`, `cd....`
 - **zoxide** — `zq`, `zz`, `za`, `zr`, `zrm`
 - **trash-cli** — `rm` becomes `trash -v` when available
-- **misc** — `wget` forced into XDG locations, `v` → `nvim` (or `vim`), `imv` → `imv-dir`, plus Vibranium aliases `vibranium-healthcheck` and `omarchy-theme-install`
+- **misc** — `wget` forced into XDG locations, `v` → `nvim` (or `vim`), `imv` → `imv-dir`, plus the Vibranium alias `vibranium-healthcheck`
 - **typos** — `sl`, `clearr`, `exti`, `sudp`, `gti`, `dokcer`, `pacamn`, `systemclt`, `crul`, `ffmepg`, and more
 
 Run `alias` in bash/zsh or `abbr --list` in fish to see the full list.

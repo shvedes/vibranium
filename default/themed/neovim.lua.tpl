@@ -4,37 +4,37 @@ return {
     priority = 1000,
     opts = {
       palette = {
-        bg = "{{ background }}", -- main editor b
-        bg_dim = "{{ background }}", -- dimmed areas (statusline bg, lualine c)
-        bg_float = "{{ background|lightness=+0.03 }}", -- floating windows (pmenu, telescope, etc.)
-        bg_highlight = "{{ background|lightness=+0.10 }}", -- hover/selection highlights
-        bg_visual = "{{ selection_background }}", -- visual selection
+        bg = "{{ background_0 }}", -- main editor b
+        bg_dim = "{{ background_1 }}", -- dimmed areas (statusline bg, lualine c)
+        bg_float = "{{ background_1 }}", -- floating windows (pmenu, telescope, etc.)
+        bg_highlight = "{{ background_2 }}", -- hover/selection highlights
+        bg_visual = "{{ background_2 }}", -- visual selection
         bg_search = "{{ accent }}", -- search match background
 
-        fg = "{{ foreground }}", -- main foregorund
-        fg_dim = "{{ foreground|lightness=-0.10 }}", -- muted text (line numbers, comments)
-        fg_gutter = "{{ foreground|lightness=-0.10 }}", -- signcolumn/gutter foreground
+        fg = "{{ foreground_0 }}", -- main foregorund
+        fg_dim = "{{ foreground_4 }}", -- muted text (line numbers, comments)
+        fg_gutter = "{{ foreground_4|lightness=-0.15 }}", -- signcolumn/gutter foreground
 
-        border = "{{ background|lightness=+0.30 }}", -- borders
+        border = "{{ background_5 }}", -- borders
 
-        black = "{{ color0 }}",
-        red = "{{ color1 }}",
-        green = "{{ color2 }}",
-        yellow = "{{ color3 }}",
-        blue = "{{ color4 }}",
-        magenta = "{{ color5 }}",
-        cyan = "{{ color6 }}",
-        white = "{{ color7 }}",
-        orange = "{{ color3|lightness=-0.03 }}",
+        black = "{{ black }}",
+        red = "{{ red }}",
+        green = "{{ green }}",
+        yellow = "{{ yellow }}",
+        blue = "{{ blue }}",
+        magenta = "{{ purple }}",
+        cyan = "{{ cyan }}",
+        white = "{{ foreground_h }}",
+        orange = "{{ orange }}",
 
-        bright_black = "{{ color0|lightness=+0.03 }}",
-        bright_red = "{{ color1|lightness=+0.03 }}",
-        bright_green = "{{ color2|lightness=+0.03 }}",
-        bright_yellow = "{{ color3|lightness=+0.03 }}",
-        bright_blue = "{{ color4|lightness=+0.03 }}",
-        bright_magenta = "{{ color5|lightness+=0.03 }}",
-        bright_cyan = "{{ color6|lightness=+0.03 }}",
-        bright_white = "{{ color7|lightness=+0.03 }}",
+        bright_black = "{{ foreground_4 }}",
+        bright_red = "{{ red|pop=0.10 }}",
+        bright_green = "{{ green|pop=0.10 }}",
+        bright_yellow = "{{ yellow|pop=0.10 }}",
+        bright_blue = "{{ blue|pop=0.10 }}",
+        bright_magenta = "{{ purple|pop=0.10 }}",
+        bright_cyan = "{{ cyan|pop=0.10 }}",
+        bright_white = "{{ foreground_h }}",
       },
       transparent = true,
     },

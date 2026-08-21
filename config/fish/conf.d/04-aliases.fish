@@ -3,7 +3,6 @@
 #######################################################
 
 alias vibranium-healthcheck "vb-cmd-healthcheck"
-alias omarchy-theme-install "vb-theme-install"
 
 alias imv "imv-dir"
 

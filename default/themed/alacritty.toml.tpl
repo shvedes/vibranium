@@ -1,61 +1,85 @@
 colors = {
   primary = {
-    background = "{{ background }}",
-    foreground = "{{ foreground }}"
+    background = "{{ background_0 }}",
+    foreground = "{{ foreground_0 }}",
+    dim_foreground = "{{ foreground_4 }}",
+    bright_foreground = "{{ foreground_h }}"
   },
 
   cursor = {
-    text = "{{ background }}",
-    cursor = "{{ cursor }}"
+    text = "{{ background_0 }}",
+    cursor = "{{ foreground_2 }}"
   },
 
   vi_mode_cursor = {
-    text = "{{ background }}",
-    cursor = "{{ cursor }}"
+    text = "{{ foreground_h }}",
+    cursor = "{{ blue }}"
   },
 
   search = {
     matches = {
-      foreground = "{{ selection_foreground }}",
-      background = "{{ selection_background }}"
-    },
-
-    focused_match = {
-      foreground = "{{ background }}",
-      background = "{{ color3|lightness=+0.10 }}"
+      background = "{{ background_2 }}",
+      foreground = "{{ foreground_0 }}"
     }
   },
 
+  hints = {
+    start = {
+      background = "{{ background_2 }}",
+      foreground = "{{ foreground_0 }}"
+    },
+    end = {
+      background = "{{ background_2 }}",
+      foreground = "{{ foreground_0 }}"
+    }
+  },
+
+  line_indicator = {
+    background = "{{ background_2 }}",
+    foreground = "{{ foreground_0 }}"
+  },
+
   footer_bar = {
-    foreground = "{{ foreground }}",
-    background = "{{ background|lightness=+0.10 }}"
+    background = "{{ background_2 }}",
+    foreground = "{{ foreground_0 }}"
   },
 
   selection = {
-    text = "{{ selection_foreground }}",
-    background = "{{ selection_background }}"
+    background = "{{ background_3 }}",
+    foreground = "{{ foreground_h }}"
   },
 
   normal = {
-    black   = "{{ background|lightness=+0.10 }}",
-    red     = "{{ color1 }}",
-    green   = "{{ color2 }}",
-    yellow  = "{{ color3 }}",
-    blue    = "{{ color4 }}",
-    magenta = "{{ color5 }}",
-    cyan    = "{{ color6 }}",
-    white   = "{{ color7 }}"
+    black   = "{{ background_4 }}",
+    red     = "{{ red }}",
+    green   = "{{ green }}",
+    yellow  = "{{ yellow }}",
+    blue    = "{{ blue }}",
+    magenta = "{{ purple }}",
+    cyan    = "{{ cyan }}",
+    white   = "{{ white }}"
   },
 
   bright = {
-    black   = "{{ background|lightness=+0.20 }}",
-    red     = "{{ color1|lightness=+0.05 }}",
-    green   = "{{ color2|lightness=+0.05 }}",
-    yellow  = "{{ color3|lightness=+0.05 }}",
-    blue    = "{{ color4|lightness=+0.05 }}",
-    magenta = "{{ color5|lightness=+0.05 }}",
-    cyan    = "{{ color6|lightness=+0.05 }}",
-    white   = "{{ color7|lightness=+0.05 }}"
+    black   = "{{ background_5 }}",
+    red     = "{{ red|pop=0.10 }}",
+    green   = "{{ green|pop=0.10 }}",
+    yellow  = "{{ yellow|pop=0.10 }}",
+    blue    = "{{ blue|pop=0.10 }}",
+    magenta = "{{ purple|pop=0.10 }}",
+    cyan    = "{{ cyan|pop=0.10 }}",
+    white   = "{{ white|pop=0.10 }}"
+  },
+
+  dim = {
+    black   = "{{ background_3 }}",
+    red     = "{{ red|dim=0.10 }}",
+    green   = "{{ green|dim=0.10 }}",
+    yellow  = "{{ yellow|dim=0.10 }}",
+    blue    = "{{ blue|dim=0.10 }}",
+    magenta = "{{ purple|dim=0.10 }}",
+    cyan    = "{{ cyan|dim=0.10 }}",
+    white   = "{{ white|dim=0.10 }}"
   }
 }
 

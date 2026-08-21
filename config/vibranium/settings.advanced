@@ -58,7 +58,7 @@ vb_force_template_files=(
   "colors.css"
 
   # The template system does a good job of generating Hyprland's appearance.
-  # If you disable it, keep in mind that some Omarchy community themes define
+  # If you disable it, keep in mind that some community themes define
   # their own animation curves. In such cases, the animation setting shown in
   # Vibranium settings may not match the animations actually being used.
   "hyprland.lua"

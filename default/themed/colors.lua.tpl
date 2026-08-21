@@ -4,56 +4,56 @@ Vibranium = {}
 
 Vibranium.Colors = {
   red = {
-    dim = "rgb({{ color1_strip|lightness=-0.15 }})",
-    normal = "rgb({{ color1_strip }})",
-    bright = "rgb({{ color1_strip|lightness=+0.15 }})",
+    dim = "rgb({{ red_strip|dim=0.10 }})",
+    normal = "rgb({{ red_strip }})",
+    bright = "rgb({{ red_strip|pop=0.10 }})",
   },
 
   pink = {
-    dim = "rgb({{ color5_strip|lightness=-0.15 }})",
-    normal = "rgb({{ color5_strip }})",
-    bright = "rgb({{ color5_strip|lightness=+0.15 }})",
+    dim = "rgb({{ pink_strip|dim=0.10 }})",
+    normal = "rgb({{ pink_strip }})",
+    bright = "rgb({{ pink_strip|pop=0.10 }})",
   },
 
   green = {
-    dim = "rgb({{ color2_strip|lightness=-0.15 }})",
-    normal = "rgb({{ color2_strip }})",
-    bright = "rgb({{ color2_strip|lightness=+0.15 }})",
+    dim = "rgb({{ green_strip|dim=0.10 }})",
+    normal = "rgb({{ green_strip }})",
+    bright = "rgb({{ green_strip|pop=0.10 }})",
   },
 
   yellow = {
-    dim = "rgb({{ color3_strip|lightness=-0.15 }})",
-    normal = "rgb({{ color3_strip }})",
-    bright = "rgb({{ color3_strip|lightness=+0.15 }})",
+    dim = "rgb({{ yellow_strip|dim=0.10 }})",
+    normal = "rgb({{ yellow_strip }})",
+    bright = "rgb({{ yellow_strip|pop=0.10 }})",
   },
 
   orange = {
-    dim = "rgb({{ color11_strip|lightness=-0.15 }})",
-    normal = "rgb({{ color11_strip }})",
-    bright = "rgb({{ color11_strip|lightness=+0.15 }})",
+    dim = "rgb({{ orange_strip|dim=0.10 }})",
+    normal = "rgb({{ orange_strip }})",
+    bright = "rgb({{ orange_strip|pop=0.10 }})",
   },
 
   blue = {
-    dim = "rgb({{ color4_strip|lightness=-0.15 }})",
-    normal = "rgb({{ color4_strip }})",
-    bright = "rgb({{ color4_strip|lightness=+0.15 }})",
+    dim = "rgb({{ blue_strip|dim=0.10 }})",
+    normal = "rgb({{ blue_strip }})",
+    bright = "rgb({{ blue_strip|pop=0.10 }})",
   },
 
   purple = {
-    dim = "rgb({{ color5_strip|lightness=-0.15 }})",
-    normal = "rgb({{ color5_strip }})",
-    bright = "rgb({{ color5_strip|lightness=+0.15 }})",
+    dim = "rgb({{ purple_strip|dim=0.10 }})",
+    normal = "rgb({{ purple_strip }})",
+    bright = "rgb({{ purple_strip|pop=0.10 }})",
   },
 
   cyan = {
-    dim = "rgb({{ color6_strip|lightness=-0.15 }})",
-    normal = "rgb({{ color6_strip }})",
-    bright = "rgb({{ color6_strip|lightness=+0.15 }})",
+    dim = "rgb({{ cyan_strip|dim=0.10 }})",
+    normal = "rgb({{ cyan_strip }})",
+    bright = "rgb({{ cyan_strip|pop=0.10 }})",
   },
 
   accent = {
-    dim = "rgb({{ accent_strip|lightness=-0.15 }})",
+    dim = "rgb({{ accent_strip|dim=0.10 }})",
     normal = "rgb({{ accent_strip }})",
-    bright = "rgb({{ accent_strip|lightness=+0.15 }})",
+    bright = "rgb({{ accent_strip|pop=0.10 }})",
   },
 }

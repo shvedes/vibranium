@@ -1,7 +1,7 @@
 /*
  * theme.css - the docs theme, matching the Gray theme.
  *
- * Colors taken verbatim from the Gray theme's colors-extended.toml
+ * Colors taken verbatim from the Gray theme's colors.list
  * (~/.config/vibranium/themes/gray), so the docs site and the desktop
  * look the same. If the theme's palette ever changes, update the
  * values here to match.
@@ -15,7 +15,7 @@
  *   background_5   #585858
  *   red #a88b8b   green #90a890   yellow #aea990   orange #b09b8b
  *   cyan #90acad  purple #9c93b3  blue #90a4b3
- *   gray/accent #8a8a8a   accent_dim #5a5a5a   accent_bright #b0b0b0
+ *   gray/accent #8a8a8a
  */
 
 [data-md-color-scheme="gray"] {

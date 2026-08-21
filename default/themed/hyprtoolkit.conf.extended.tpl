@@ -1,6 +1,0 @@
-background = rgb({{ background_0_strip }})
-base = rgb({{ background_1_strip }})
-alternative_base = rgb({{ background_2_strip }})
-bright_text = rgb({{ foreground_h_strip }})
-accent = rgb({{ accent_strip }})
-accent_secondary = rgb({{ accent_dim_strip }})

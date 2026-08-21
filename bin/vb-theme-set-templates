@@ -14,35 +14,20 @@ source vb-lib-cli
 #
 # WHERE YOUR COLORS COME FROM
 #
-#   Every theme directory can contain up to two files:
+#   Every theme directory contains one palette file:
 #
-#     colors.toml
-#       The base palette. Sixteen numbered colors (color0 through color15,
-#       following the standard base16 color order) plus a handful of named
-#       ones: foreground, background, cursor, accent, selection_foreground,
-#       selection_background. This is the file format most community
-#       themes ship with, since it matches what Omarchy uses.
+#     colors.list
+#       The Vibranium palette: one shade of each named color (black, red,
+#       pink, green, yellow, orange, blue, purple, cyan, white, gray,
+#       accent), plus a seven-step background ramp (background_h,
+#       background_0 through background_5) and a seven-step foreground
+#       ramp (foreground_h, foreground_0 through foreground_5).
+#       Having this many colors already defined means a template rarely
+#       needs to compute a shade on the fly, it can usually just reference
+#       the right step directly.
 #
-#     colors-extended.toml
-#       A Vibranium-specific file with a much larger palette: a dim, base,
-#       and bright shade of each named color (black, red, pink, green,
-#       yellow, orange, blue, purple, cyan, white, gray, accent), plus a
-#       seven-step background ramp (background_h, background_0 through
-#       background_5) and a six-step foreground ramp (foreground_h,
-#       foreground_0 through foreground_4). Having this many colors
-#       already defined means a template rarely needs to compute a shade
-#       on the fly, it can usually just reference the right step directly.
-#
-#   Both files are read when present and their colors are combined into one
-#   pool that templates can pull from. A theme does not have to ship both;
-#   plenty of themes only provide colors.toml, in which case any template
-#   that needs the extended palette is simply skipped (more on that
-#   below).
-#
-#   If a community theme does not follow the base16 color order for
-#   color0-color15, anything generated from those keys may end up looking
-#   a little off. That is a property of the theme file, not something this
-#   script can detect or correct.
+#   If a theme does not provide this file, there is nothing to render with
+#   and no templates are processed at all.
 #
 # WHERE TEMPLATES LIVE
 #
@@ -58,14 +43,10 @@ source vb-lib-cli
 #   customize how a particular app gets themed without editing anything
 #   under $VIBRANIUM itself.
 #
-#   A template can also come in two flavors for the same target file:
+#   A template is named after the file it produces, with a .tpl suffix
+#   marking it as a template:
 #
-#     foo.tpl              works with just the base palette
-#     foo.extended.tpl      wants the extended palette, and is skipped
-#                           entirely when colors-extended.toml is missing
-#
-#   Both produce a file simply named foo. If a theme provides the extended
-#   palette and both flavors exist, the extended one wins.
+#     foo.tpl      renders to a file simply named foo
 #
 # WRITING A PLACEHOLDER
 #
@@ -192,8 +173,7 @@ source vb-lib-cli
 TEMPLATES_DIR="$VIBRANIUM/default/themed"
 USER_TEMPLATES_DIR="$XDG_CONFIG_HOME/vibranium/themed"
 NEXT_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/next-theme"
-COLORS_FILE="$NEXT_THEME_DIR/colors.toml"
-COLORS_EXTENDED_FILE="$NEXT_THEME_DIR/colors-extended.toml"
+COLORS_FILE="$NEXT_THEME_DIR/colors.list"
 
 # vb-theme-set writes the plain theme name here right before this script
 # runs, so we can match "theme-name/file.ext" scoped entries below.
@@ -205,17 +185,11 @@ NEXT_THEME_NAME=$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")
 # own discovery map establishes:
 #
 #   1. theme.info's LIGHT= field, if theme.info exists and sets it.
-#   2. theme.light file presence - only ever consulted when there is no
-#      theme.info at all (a theme.info that exists but omits LIGHT= does
-#      NOT fall back to checking for theme.light; it falls straight through
-#      to the folder-name regex below). This mirrors vb-theme-set exactly:
-#      theme.light is the Omarchy-compatible fallback for themes with no
-#      theme.info, not a secondary check for themes that have one.
-#   3. folder_name matched against the (light|latte|dawn)$ regex, as a
-#      last resort.
+#   2. folder_name matched against the (light|latte|dawn)$ regex, as a
+#      last resort when there is no LIGHT= field.
 #
-# theme_dir is whatever directory theme.info/theme.light would live in -
-# here, the staged next-theme directory COLORS_FILE above already points
+# theme_dir is whatever directory theme.info would live in - here, the
+# staged next-theme directory COLORS_FILE above already points
 # at. folder_name is only used for the regex fallback; it does not have
 # to match theme_dir's own basename (the staged next-theme directory is
 # never named after the theme).
@@ -227,12 +201,10 @@ theme::resolve_is_light() {
 
   if [[ -f "$theme_dir/theme.info" ]]; then
     while IFS='=' read -r key val; do
-      [[ $key == LIGHT ]] && light="$val"
+      if [[ $key == LIGHT ]]; then
+        light="$val"
+      fi
     done < "$theme_dir/theme.info"
-  elif [[ -f "$theme_dir/theme.light" ]]; then
-    light="true"
-  else
-    light="false"
   fi
 
   if [[ -z "$light" ]]; then
@@ -253,9 +225,9 @@ theme::resolve_is_light() {
 # is just reading that back. But this script is documented above as being
 # invocable on its own, so it cannot assume that export exists: if it's
 # missing, fall back to resolving it locally via the exact same
-# theme::resolve_is_light priority vb-theme-set uses, reading theme.info /
-# theme.light straight out of the staged next-theme directory that
-# COLORS_FILE above already points at.
+# theme::resolve_is_light priority vb-theme-set uses, reading theme.info
+# straight out of the staged next-theme directory that COLORS_FILE
+# above already points at.
 if [[ -n "${VB_THEME_IS_LIGHT:-}" ]]; then
   is_light="$VB_THEME_IS_LIGHT"
 else
@@ -287,18 +259,12 @@ if [[ -v vb_force_template_files ]]; then
   log Info "${#vb_force_template_files[@]} file(s) will be generated forefully"
 fi
 
-# Gather whichever color files this theme actually provides. Order matters
-# here: extended is appended after the base file, so when the same key
-# somehow exists in both, the extended value is the one that survives.
+# Gather the theme palette. A theme without colors.list has
+# nothing to render with, so the whole run is skipped further down.
 color_sources=()
 if [[ -f $COLORS_FILE ]]; then
   color_sources+=("$COLORS_FILE")
-  log Info "found base palette: $COLORS_FILE"
-fi
-
-if [[ -f $COLORS_EXTENDED_FILE ]]; then
-  color_sources+=("$COLORS_EXTENDED_FILE")
-  log Info "found extended palette: $COLORS_EXTENDED_FILE"
+  log Info "found palette: $COLORS_FILE"
 fi
 
 if [[ ${#color_sources[@]} -gt 0 ]]; then
@@ -348,21 +314,14 @@ if [[ ${#color_sources[@]} -gt 0 ]]; then
 
   # A block redirect keeps a single file descriptor open for all printf
   # writes rather than reopening the file on each iteration with >>. The
-  # loop visits user templates before built-in ones, and extended before
-  # plain within each directory, so higher-priority versions claim their
-  # output filename first and lower-priority duplicates are dropped by the
+  # loop visits user templates before built-in ones, so user versions claim
+  # their output filename first and built-in duplicates are dropped by the
   # seen_outputs check below.
   {
     for tpl_dir in "$USER_TEMPLATES_DIR" "$TEMPLATES_DIR"; do
-      for tpl in "$tpl_dir"/*.extended.tpl "$tpl_dir"/*.tpl; do
-        filename="${tpl##*/}"            # drop the directory part
-        filename="${filename%.tpl}"      # drop the .tpl extension
-        filename="${filename%.extended}" # drop .extended if present
-
-        # An .extended.tpl with no extended palette available has nothing
-        # to render with, so it is skipped rather than producing a file
-        # full of empty placeholders.
-        [[ $tpl == *.extended.tpl && ! -f $COLORS_EXTENDED_FILE ]] && continue
+      for tpl in "$tpl_dir"/*.tpl; do
+        filename="${tpl##*/}"       # drop the directory part
+        filename="${filename%.tpl}" # drop the .tpl extension
 
         output_path="$NEXT_THEME_DIR/$filename"
 

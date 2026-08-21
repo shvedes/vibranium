@@ -47,7 +47,7 @@ mapfile -t community_themes < <(
 )
 
 if ((${#community_themes[@]} == 0)); then
-  notify-send -r 3 -t 2000 "Vibranium" "No Omarchy themes installed"
+  notify-send -r 3 -t 2000 "Vibranium" "No community themes installed"
   exit 0
 fi
 
@@ -78,11 +78,6 @@ for folder in "${community_themes[@]}"; do
   clean_name="${clean_name/-vibranium-theme/}"
   clean_name="${clean_name/theme-vibranium-/}"
   clean_name="${clean_name/-theme-vibranium/}"
-
-  clean_name="${clean_name/omarchy-theme-/}"
-  clean_name="${clean_name/-omarchy-theme/}"
-  clean_name="${clean_name/theme-omarchy-/}"
-  clean_name="${clean_name/-theme-omarchy/}"
 
   display="$(_capitalize "$clean_name")"
   menu_items+=("$display")

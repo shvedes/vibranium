@@ -2,25 +2,25 @@
 overall = {}
 
 [mgr]
-marker_copied = { fg = "{{ color2 }}", bg = "{{ color2 }}" }
-marker_cut = { fg = "{{ color1 }}", bg = "{{ color1 }}" }
-marker_marked = { fg = "{{ color5 }}", bg = "{{ color5 }}" }
-marker_selected = { fg = "{{ color3 }}", bg = "{{ color3 }}" }
+marker_copied = { fg = "{{ green }}", bg = "{{ green }}" }
+marker_cut = { fg = "{{ red }}", bg = "{{ red }}" }
+marker_marked = { fg = "{{ purple }}", bg = "{{ purple }}" }
+marker_selected = { fg = "{{ yellow }}", bg = "{{ yellow }}" }
 marker_symbol = "│"
 
-cwd = { fg = "{{ color3|lightness=+0.20 }}" }
+cwd = { fg = "{{ yellow|pop=0.10 }}" }
 
 symlink_target = { italic = true }
 
-find_keyword = { fg = "{{ color4|lightness=+0.20 }}", bg = "{{ color1 }}", underline = true }
+find_keyword = { fg = "{{ blue|pop=0.10 }}", underline = true }
 find_position = { }
 
-count_copied = { fg = "{{ color0 }}", bg = "{{ color2|lightness=+0.20 }}" }
-count_cut = { fg = "{{ color0 }}", bg = "{{ color1|lightness=+0.20 }}" }
-count_selected = { fg = "{{ color0 }}", bg = "{{ color3|lightness=+0.20 }}" }
+count_copied = { fg = "{{ black }}", bg = "{{ green|pop=0.10 }}" }
+count_cut = { fg = "{{ black }}", bg = "{{ red|pop=0.10 }}" }
+count_selected = { fg = "{{ black }}", bg = "{{ yellow|pop=0.10 }}" }
 
 border_symbol = "│"
-border_style = { fg = "{{ background|lightness=+0.25 }}" }
+border_style = { fg = "{{ background_5 }}" }
 
 [indicator]
 parent  = { reversed = false }
@@ -29,41 +29,41 @@ preview = { underline = false }
 padding = { open = " ", close = " " }
 
 [tabs]
-active = { fg = "{{ color0 }}", bg = "{{ color4 }}" }
-inactive = { fg = "{{ color0 }}", bg = "{{ color0 }}" }
+active = { fg = "{{ black }}", bg = "{{ blue }}" }
+inactive = { fg = "{{ blue }}", bg = "{{ black }}" }
 
 sep_inner = { open = "", close = "" }
 sep_outer = { open = "", close = "" }
 
 
 [mode]
-normal_main = { fg = "{{ color0 }}", bg = "{{ color4 }}" }
-normal_alt = { fg = "{{ foreground }}", bg = "{{ background|lightness=+0.30 }}" }
-select_main = { fg = "{{ color0 }}", bg = "{{ color5 }}" }
-select_alt = { fg = "{{ foreground }}", bg = "{{ background|lightness=+0.30 }}" }
-unset_main = { fg = "{{ color0 }}", bg = "{{ color3 }}" }
-unset_alt = { fg = "{{ foreground }}", bg = "{{ background|lightness=+0.30 }}" }
+normal_main = { fg = "{{ black }}", bg = "{{ blue }}" }
+normal_alt = { fg = "{{ white }}", bg = "{{ background_4 }}" }
+select_main = { fg = "{{ black }}", bg = "{{ purple }}" }
+select_alt = { fg = "{{ white }}", bg = "{{ background_4 }}" }
+unset_main = { fg = "{{ black }}", bg = "{{ yellow }}" }
+unset_alt = { fg = "{{ white }}", bg = "{{ background_4 }}" }
 
 
 [status]
 sep_left = { open = "", close = "" }
 sep_right = { open = "", close = "" }
-overall = { fg = "{{ foreground }}", bg = "{{ color0 }}" }
+overall = { fg = "{{ white }}", bg = "{{ black }}" }
 
-progress_label  = { fg = "{{ color4 }}", bold = true }
-progress_normal = { fg = "{{ color2 }}", bg = "{{ color0 }}" }
-progress_error  = { fg = "{{ color3 }}", bg = "{{ color1 }}" }
+progress_label  = { fg = "{{ blue }}", bold = true }
+progress_normal = { fg = "{{ green }}", bg = "{{ black }}" }
+progress_error  = { fg = "{{ yellow }}", bg = "{{ red }}" }
 
-perm_type = { fg = "{{ color4 }}" }
-perm_read = { fg = "{{ color3 }}" }
-perm_write = { fg = "{{ color1 }}" }
-perm_exec = { fg = "{{ color2 }}" }
-perm_sep = { fg = "{{ background|lightness=+0.40 }}" }
+perm_type = { fg = "{{ blue }}" }
+perm_read = { fg = "{{ yellow }}" }
+perm_write = { fg = "{{ red }}" }
+perm_exec = { fg = "{{ green }}" }
+perm_sep = { fg = "{{ background_5 }}" }
 
 
 [confirm]
-border     = { fg = "{{ color4 }}" }
-title      = { fg = "{{ color4 }}" }
+border     = { fg = "{{ blue }}" }
+title      = { fg = "{{ blue }}" }
 body       = {}
 list       = {}
 btn_yes    = { reversed = true }
@@ -71,25 +71,25 @@ btn_no     = {}
 btn_labels = [ "  [Y]es  ", "  (N)o  " ]
 
 [pick]
-border = { fg = "{{ background|lightness=+0.40 }}" }
-active = { fg = "{{ color1 }}", bold = true }
+border = { fg = "{{ background_5 }}" }
+active = { fg = "{{ red }}", bold = true }
 inactive = {}
 
 [spot]
-border = { fg = "{{ color4 }}" }
-title  = { fg = "{{ color4 }}" }
+border = { fg = "{{ blue }}" }
+title  = { fg = "{{ blue }}" }
 
-tbl_col  = { fg = "{{ color4 }}" }
-tbl_cell = { fg = "{{ color3 }}", reversed = true }
+tbl_col  = { fg = "{{ blue }}" }
+tbl_cell = { fg = "{{ yellow }}", reversed = true }
 
 [input]
-border = { fg = "{{ color4 }}" }
+border = { fg = "{{ blue }}" }
 title = {}
 value = {}
 selected = { reversed = true }
 
 [cmp]
-border = { fg = "{{ color4 }}" }
+border = { fg = "{{ blue }}" }
 active = { reversed = true }
 inactive = {}
 
@@ -98,29 +98,29 @@ icon_folder  = ""
 icon_command = ""
 
 [tasks]
-border  = { fg = "{{ color4 }}" }
+border  = { fg = "{{ blue }}" }
 title   = {}
-hovered = { fg = "{{ color5 }}", bold = true }
+hovered = { fg = "{{ purple }}", bold = true }
 
 [which]
 cols = 3
 separator = " - "
-separator_style = { fg = "{{ background|lightness=+0.20 }}" }
-mask = { bg = "{{ background|lightness=+0.05 }}" }
-rest = { fg = "{{ color1 }}" }
-cand = { fg = "{{ color4 }}" }
-desc = { fg = "{{ background|lightness=+0.50 }}" }
+separator_style = { fg = "{{ background_5 }}" }
+mask = { bg = "{{ background_1 }}" }
+rest = { fg = "{{ red }}" }
+cand = { fg = "{{ blue }}" }
+desc = { fg = "{{ foreground_2 }}" }
 
 [help]
-border  = { fg = "{{ color4 }}" }
-chord   = { fg = "{{ color2|lightness=+0.20 }}" }
+border  = { fg = "{{ blue }}" }
+chord   = { fg = "{{ green|pop=0.10 }}" }
 action  = {}
 hovered = { reversed = true, bold = true }
 
 [notify]
-title_info  = { fg = "{{ color2 }}" }
-title_warn  = { fg = "{{ color3 }}" }
-title_error = { fg = "{{ color1 }}" }
+title_info  = { fg = "{{ green }}" }
+title_warn  = { fg = "{{ yellow }}" }
+title_error = { fg = "{{ red }}" }
 
 icon_info  = ""
 icon_warn  = ""
@@ -133,62 +133,62 @@ files = []
 
 conds = [
   { if = "dir", text = "[D]" },
-  { if = "link", text = "[L]", fg = "{{ color2 }}" },
+  { if = "link", text = "[L]", fg = "{{ green }}" },
 
   { if = "socket", text = "[S]" },
   { if = "fifo", text = "[P]" },
-  { if = "block", text = "[B]", fg = "{{ color3 }}" },
-  { if = "char", text = "[C]", fg = "{{ color6 }}" },
+  { if = "block", text = "[B]", fg = "{{ orange }}" },
+  { if = "char", text = "[C]", fg = "{{ cyan }}" },
 
-  { if = "!(dir | link | socket | fifo | block | char)", text = "[F]", fg = "{{ background|lightness=+0.60 }}" },
+  { if = "!(dir | link | socket | fifo | block | char)", text = "[F]", fg = "{{ white|dim=0.10 }}" },
 ]
 
 exts = [
   # Archives
-  { name = "zip", text = "[A]", fg = "{{ color6 }}" },
-  { name = "tar", text = "[A]", fg = "{{ color6 }}" },
-  { name = "rar", text = "[A]", fg = "{{ color6 }}" },
-  { name = "7z", text = "[A]", fg = "{{ color6 }}" },
-  { name = "gz", text = "[A]", fg = "{{ color6 }}" },
+  { name = "zip", text = "[A]", fg = "{{ cyan }}" },
+  { name = "tar", text = "[A]", fg = "{{ cyan }}" },
+  { name = "rar", text = "[A]", fg = "{{ cyan }}" },
+  { name = "7z", text = "[A]", fg = "{{ cyan }}" },
+  { name = "gz", text = "[A]", fg = "{{ cyan }}" },
 
   # Images
-  { name = "png", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
-  { name = "ppm", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
-  { name = "svg", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
-  { name = "jpg", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
-  { name = "jxl", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
-  { name = "jpeg", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
-  { name = "heic", text = "[I]", fg = "{{ color4|lightness=+0.20 }}" },
+  { name = "png", text = "[I]", fg = "{{ blue|pop=0.10 }}" },
+  { name = "ppm", text = "[I]", fg = "{{ blue|pop=0.10 }}" },
+  { name = "svg", text = "[I]", fg = "{{ blue|pop=0.10 }}" },
+  { name = "jpg", text = "[I]", fg = "{{ blue|pop=0.10 }}" },
+  { name = "jxl", text = "[I]", fg = "{{ blue|pop=0.10 }}" },
+  { name = "jpeg", text = "[I]", fg = "{{ blue|pop=0.10 }}" },
+  { name = "heic", text = "[I]", fg = "{{ blue|pop=0.10 }}" },
 
   # Videos
-  { name = "mp4", text = "[V]", fg = "{{ color5|lightness=+0.20 }}" },
-  { name = "mkv", text = "[V]", fg = "{{ color5|lightness=+0.20 }}" },
-  { name = "webm", text = "[V]", fg = "{{ color5|lightness=+0.20 }}" },
+  { name = "mp4", text = "[V]", fg = "{{ purple }}" },
+  { name = "mkv", text = "[V]", fg = "{{ purple }}" },
+  { name = "webm", text = "[V]", fg = "{{ purple }}" },
 ]
 
 [filetype]
 rules = [
     # images
-    { mime = "image/*", fg = "{{ color3 }}" },
+    { mime = "image/*", fg = "{{ yellow }}" },
 
     # media
-    { mime = "{audio,video}/*", fg = "{{ color4 }}" },
+    { mime = "{audio,video}/*", fg = "{{ blue }}" },
 
     # archives
-    { mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "{{ color5 }}" },
+    { mime = "application/{zip,rar,7z*,tar,gzip,xz,zstd,bzip*,lzma,compress,archive,cpio,arj,xar,ms-cab*}", fg = "{{ cyan }}" },
 
     # documents
-    { mime = "application/{pdf,doc,rtf,vnd.*}", fg = "{{ color5 }}" },
+    { mime = "application/{pdf,doc,rtf,vnd.*}", fg = "{{ purple }}" },
 
     # broken links
-    { url = "*", is = "orphan", fg = "{{ color1 }}" },
+    { url = "*", is = "orphan", fg = "{{ red }}" },
 
     # executables
-    { url = "*", is = "exec", fg = "{{ color2 }}" },
+    { url = "*", is = "exec", fg = "{{ green }}" },
 
     # fallback
-    { url = "*", fg = "{{ color3 }}" },
-    { url = "*/", fg = "{{ color4 }}" },
+    { url = "*", fg = "{{ yellow }}" },
+    { url = "*/", fg = "{{ blue }}" },
 ]
 
 # vim:ft=toml
