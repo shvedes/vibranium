@@ -13,7 +13,7 @@
  * may be overridden by the imported theme.
  */
 
-@import "../vibranium/current/theme/waybar.css";
+@import "../../.local/state/vibranium/theme/waybar.css";
 
 * {
   /* Ignore current GTK theme */

@@ -7,7 +7,7 @@ VERBOSE=${VERBOSE:-false}
 log Info "${0##*/} started: state_file=$VIBRANIUM_STATE/wallpaper.state"
 
 WALLPAPER_STATE="$VIBRANIUM_STATE/wallpaper.state"
-WALLS="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
+WALLS="$VIBRANIUM_STATE/theme/backgrounds"
 
 usage() {
   shcat << EOF
@@ -67,17 +67,20 @@ write_wallpaper_state() {
   } > "$WALLPAPER_STATE"
 }
 
-# Resolve the current wallpaper path. The symlink at
-# vibranium/current/background is the primary source; if it is missing
+# Resolve the current wallpaper path. The background symlink in
+# $VIBRANIUM_STATE is the primary source; if it is missing
 # (e.g. on first run before any wallpaper has been set), fall back to
 # querying awww for its active image.
+#
+# -m canonicalizes the target, so the symlink may point anywhere using
+# either a relative or an absolute path.
 get_wallpaper() {
-  local link="$XDG_CONFIG_HOME/vibranium/current/background"
+  local link="$VIBRANIUM_STATE/background"
   local -n _source="$1"
 
-  _source="$(readlink -s "$link")"
+  _source="$(readlink -m "$link")"
 
-  if [[ -z "$_source" ]]; then
+  if [[ ! -f $_source ]]; then
     while IFS= read -r line; do
       # awww query output: "active: on\nimage: /path/to/img"
       _source="${line#*image: }"
@@ -219,7 +222,7 @@ if [[ -n "$raw_path" ]]; then
   fi
 fi
 
-THEME="$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+THEME="$(< "$VIBRANIUM_STATE/theme.name")"
 UWALLS="$XDG_CONFIG_HOME/vibranium/themes/$THEME/backgrounds"
 CURRENT=
 
@@ -263,7 +266,7 @@ elif [[ -n "$_dispatch" ]]; then
         log Info "Copying external wallpaper from $WALLPAPER_PATH to theme backgrounds"
         mkdir -p "$UWALLS"
         cp "$WALLPAPER_PATH" "$UWALLS/"
-        cp "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds/"
+        cp "$WALLPAPER_PATH" "$VIBRANIUM_STATE/theme/backgrounds/"
         WALLPAPER_PATH="$UWALLS/${WALLPAPER_PATH##*/}"
         log Info "Wallpaper copied, new path: $WALLPAPER_PATH"
       fi
@@ -279,8 +282,17 @@ fi
 log Info "Setting wallpaper: $WALLPAPER_PATH"
 log Info "awww img command: fade duration=0.5 step=255 path=$WALLPAPER_PATH"
 awww img -t fade --transition-duration 0.5 --transition-step 255 "$WALLPAPER_PATH" &
-ln -sf "$WALLPAPER_PATH" "$XDG_CONFIG_HOME/vibranium/current/background"
-log Info "Symlink updated: $XDG_CONFIG_HOME/vibranium/current/background -> $WALLPAPER_PATH"
+
+# Store the symlink target relative to $VIBRANIUM_STATE when possible so
+# the tree stays portable across home dirs and usernames; anything outside
+# the state dir keeps its absolute form.
+target="$WALLPAPER_PATH"
+if [[ $WALLPAPER_PATH == "$VIBRANIUM_STATE/"* ]]; then
+  target="${WALLPAPER_PATH#"$VIBRANIUM_STATE"/}"
+fi
+
+ln -sfn "$target" "$VIBRANIUM_STATE/background"
+log Info "Symlink updated: $VIBRANIUM_STATE/background -> $target"
 
 # Update the state file
 write_wallpaper_state "$THEME" "$WALLPAPER_PATH"

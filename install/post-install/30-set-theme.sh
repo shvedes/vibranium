@@ -2,11 +2,11 @@
 
 helpers::log::info "Applying default theme"
 
-THEME_DIR="$HOME/.config/vibranium/current/theme"
+THEME_DIR="$HOME/.local/state/vibranium/theme"
 mkdir -p "$THEME_DIR"
 
 mkdir -p "$HOME/.config/btop/themes"
-helpers::symlink "$HOME/.config/vibranium/current/theme/btop.theme" \
+helpers::symlink "$HOME/.local/state/vibranium/theme/btop.theme" \
   "$HOME/.config/btop/themes/vibranium.theme"
 
 gsettings set org.gnome.desktop.interface icon-theme "Papirus-Dark"
@@ -48,4 +48,4 @@ done
 
 printf 'theme=Adwaita\nsize=24' > "$HOME/.local/state/vibranium/cursor-theme"
 
-helpers::symlink ~/.config/vibranium/current/theme/neovim.lua ~/.config/nvim/lua/plugins/theme.lua
+helpers::symlink ~/.local/state/vibranium/theme/neovim.lua ~/.config/nvim/lua/plugins/theme.lua

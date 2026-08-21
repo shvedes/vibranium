@@ -6,7 +6,8 @@ local home = os.getenv("HOME")
 
 -- Base paths
 local VIBRANIUM = home .. "/.local/share/vibranium/default/hypr"
-local CONFIG = home .. "/.config/vibranium"
+local STATE = os.getenv("VIBRANIUM_STATE")
+  or (os.getenv("XDG_STATE_HOME") or home .. "/.local/state") .. "/vibranium"
 local HYPR = home .. "/.config/hypr"
 
 local function exists_file(path)
@@ -99,8 +100,8 @@ source(VIBRANIUM .. "/autostart.lua")
 source(VIBRANIUM .. "/general.lua")
 source(VIBRANIUM .. "/look-and-feel.lua")
 
-source(CONFIG .. "/current/theme/colors.lua")
-source(CONFIG .. "/current/theme/hyprland.lua")
+source(STATE .. "/theme/colors.lua")
+source(STATE .. "/theme/hyprland.lua")
 
 source(VIBRANIUM .. "/window-rules.lua")
 source(VIBRANIUM .. "/permissions.lua")

@@ -269,7 +269,7 @@ _update() {
   setsid -f vb-cmd-reload --quiet
 
   # And also reload the current theme in case if it was changed.
-  setsid -f vb-theme-set --force "$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+  setsid -f vb-theme-set --force "$(< "$VIBRANIUM_STATE/theme.name")"
 
   _pause
 }

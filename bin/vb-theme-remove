@@ -30,7 +30,7 @@ done
 source vb-lib-core
 
 THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
-THEME_NAME_FILE="$XDG_CONFIG_HOME/vibranium/current/theme.name"
+THEME_NAME_FILE="$VIBRANIUM_STATE/theme.name"
 FALLBACK_THEME="Nightfox"
 
 # Collect removable user themes: dirs inside USER_THEMES_PATH that have no

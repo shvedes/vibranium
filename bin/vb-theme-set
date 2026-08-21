@@ -27,9 +27,9 @@ declare -A THEME_LIGHT=()
 # as the base copy in apply_theme; user-only themes skip the official copy step.
 declare -A THEME_SOURCE=()
 
-CURRENT_THEME_PATH="$XDG_CONFIG_HOME/vibranium/current/theme"
-NEXT_THEME_PATH="$XDG_CONFIG_HOME/vibranium/current/next-theme"
-THEME_NAME_FILE="$XDG_CONFIG_HOME/vibranium/current/theme.name"
+CURRENT_THEME_PATH="$VIBRANIUM_STATE/theme"
+NEXT_THEME_PATH="$VIBRANIUM_CACHE/next-theme"
+THEME_NAME_FILE="$VIBRANIUM_STATE/theme.name"
 USER_THEMES_PATH="$XDG_CONFIG_HOME/vibranium/themes"
 HOOK_DIR="$XDG_CONFIG_HOME/vibranium/hooks/theme"
 
@@ -461,8 +461,8 @@ apply_theme() {
     exit 1
   fi
 
-  # Stage into next-theme first so the swap into current is atomic.
-  # This means a crash or signal mid-copy can't leave current/theme half-written.
+  # Stage into next-theme first so the swap into theme is atomic.
+  # This means a crash or signal mid-copy can't leave state theme half-written.
   rm -rf "$NEXT_THEME_PATH"
   mkdir -p "$NEXT_THEME_PATH" "$NEXT_THEME_PATH/backgrounds" "$CURRENT_THEME_PATH"
 

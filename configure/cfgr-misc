@@ -122,7 +122,7 @@ _manage_user_wallpapers() {
   local wallpaper_dir files chosen
 
   local current_theme
-  current_theme="$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")"
+  current_theme="$(< "$VIBRANIUM_STATE/theme.name")"
   wallpaper_dir="$XDG_CONFIG_HOME/vibranium/themes/$current_theme/backgrounds"
 
   if [[ ! -d "$wallpaper_dir" ]]; then
@@ -179,7 +179,7 @@ _manage_user_wallpapers() {
           notify-send -r 2 "Vibranium" "$target has been deleted"
 
           # Also remove overlayed file
-          local current_mirror="$XDG_CONFIG_HOME/vibranium/current/theme/backgrounds"
+          local current_mirror="$VIBRANIUM_STATE/theme/backgrounds"
           if [[ -f "$current_mirror/$target" ]]; then
             rm -f "$current_mirror/$target"
           fi

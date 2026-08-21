@@ -5,4 +5,4 @@
 
 dunstctl reload \
   "$XDG_CONFIG_HOME/dunst/dunstrc" \
-  "$XDG_CONFIG_HOME/vibranium/current/theme/dunstrc"
+  "$VIBRANIUM_STATE/theme/dunstrc"

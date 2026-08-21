@@ -41,5 +41,5 @@ fi
 
 rm -rf "$d/extensions/vibranium.theme"
 cp -a "$VIBRANIUM/extras/vscode/vibranium.theme" "$d/extensions/"
-ln -sf "$XDG_CONFIG_HOME/vibranium/current/theme/vscode.json" \
+ln -sf "$VIBRANIUM_STATE/theme/vscode.json" \
   "$d/extensions/vibranium.theme/themes/vibranium.json"

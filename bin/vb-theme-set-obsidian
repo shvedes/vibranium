@@ -2,7 +2,7 @@
 
 source vb-lib-cli
 
-VB_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/theme"
+VB_THEME_DIR="$VIBRANIUM_STATE/theme"
 OBSIDIAN_CFG="$XDG_CONFIG_HOME/obsidian/obsidian.json"
 log Info "obsidian theme dir: $VB_THEME_DIR"
 

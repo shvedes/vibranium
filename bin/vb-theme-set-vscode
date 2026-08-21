@@ -32,7 +32,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-THEME="$XDG_CONFIG_HOME/vibranium/current/theme/vscode.json"
+THEME="$VIBRANIUM_STATE/theme/vscode.json"
 log Info "vscode theme file: $THEME"
 
 # Strip JS/C-style comments (// ...) from a JSONC file before passing

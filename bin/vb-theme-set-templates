@@ -172,12 +172,12 @@ source vb-lib-cli
 
 TEMPLATES_DIR="$VIBRANIUM/default/themed"
 USER_TEMPLATES_DIR="$XDG_CONFIG_HOME/vibranium/themed"
-NEXT_THEME_DIR="$XDG_CONFIG_HOME/vibranium/current/next-theme"
+NEXT_THEME_DIR="$VIBRANIUM_CACHE/next-theme"
 COLORS_FILE="$NEXT_THEME_DIR/colors.list"
 
 # vb-theme-set writes the plain theme name here right before this script
 # runs, so we can match "theme-name/file.ext" scoped entries below.
-NEXT_THEME_NAME=$(< "$XDG_CONFIG_HOME/vibranium/current/theme.name")
+NEXT_THEME_NAME=$(< "$VIBRANIUM_STATE/theme.name")
 
 # theme::resolve_is_light <theme_dir> <folder_name>
 #

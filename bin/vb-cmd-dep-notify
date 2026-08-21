@@ -69,7 +69,7 @@ fi
 
 # Source the theme library for P_YELLOW and other colour variables used
 # in the notification markup.
-source "$XDG_CONFIG_HOME/vibranium/current/theme/colors.bash"
+source "$VIBRANIUM_STATE/theme/colors.bash"
 
 log Info "Missing dependencies for $NAME: ${DEPS[*]}"
 

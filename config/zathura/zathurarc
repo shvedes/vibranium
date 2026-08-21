@@ -1,4 +1,4 @@
-include ../vibranium/current/theme/zathurarc
+include ../../.local/state/vibranium/theme/zathurarc
 
 set font "Liberation Mono Regular 9"
 

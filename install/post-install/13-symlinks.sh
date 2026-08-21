@@ -4,8 +4,8 @@ helpers::log::info "Creating symlinks"
 
 declare -A LINKS=(
   ["$VIBRANIUM/default/uwsm/env"]="$HOME/.config/uwsm/env"
-  ["$HOME/.config/vibranium/current/theme/yazi.toml"]="$HOME/.config/yazi/theme.toml"
-  ["$HOME/.config/vibranium/current/theme/hyprtoolkit.conf"]="$HOME/.config/hypr/hyprtoolkit.conf"
+  ["$HOME/.local/state/vibranium/theme/yazi.toml"]="$HOME/.config/yazi/theme.toml"
+  ["$HOME/.local/state/vibranium/theme/hyprtoolkit.conf"]="$HOME/.config/hypr/hyprtoolkit.conf"
   ["$HOME/.config/zsh/.zshrc"]="$HOME/.zshrc"
 )
 

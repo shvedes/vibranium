@@ -7,8 +7,9 @@ const os     = require('os');
 
 const THEME_NAME  = 'Vibranium';
 const FALLBACK    = 'Default Dark Modern';
-const CONFIG_HOME = process.env.XDG_CONFIG_HOME ?? path.join(os.homedir(), '.config');
-const THEME_FILE  = path.join(CONFIG_HOME, 'vibranium/current/theme/vscode.json');
+const STATE_DIR = process.env.VIBRANIUM_STATE
+    ?? path.join(process.env.XDG_STATE_HOME ?? path.join(os.homedir(), '.local', 'state'), 'vibranium');
+const THEME_FILE = path.join(STATE_DIR, 'theme', 'vscode.json');
 
 let debounce;
 

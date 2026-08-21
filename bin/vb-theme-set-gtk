@@ -11,7 +11,7 @@
 
 source vb-lib-cli
 
-GTK_THEME="$XDG_CONFIG_HOME/vibranium/current/theme/gtk.css"
+GTK_THEME="$VIBRANIUM_STATE/theme/gtk.css"
 log Info "source theme: $GTK_THEME"
 
 # GTK3 -- alternating slots for live reload

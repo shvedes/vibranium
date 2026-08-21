@@ -88,7 +88,7 @@ if [[ -z "$ACTION" ]]; then
   exit 1
 fi
 
-source "$XDG_CONFIG_HOME/vibranium/current/theme/colors.bash"
+source "$VIBRANIUM_STATE/theme/colors.bash"
 
 log Info "USB $ACTION: $ID_MODEL${DEVNAME:+ on $DEVNAME}"
 

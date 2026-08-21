@@ -9,8 +9,8 @@ source vb-lib-core
 DESKTOP_DIR="$XDG_DATA_HOME/applications"
 ICON_DIR="$DESKTOP_DIR/icons"
 
-if [[ -f "$XDG_CONFIG_HOME/vibranium/current/theme/fzf" ]]; then
-  source "$XDG_CONFIG_HOME/vibranium/current/theme/fzf"
+if [[ -f "$VIBRANIUM_STATE/theme/fzf" ]]; then
+  source "$VIBRANIUM_STATE/theme/fzf"
 fi
 
 FZF_ARGS=(

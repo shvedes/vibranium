@@ -48,7 +48,7 @@ Hypr = Hypr or {}
 Hypr.Helpers = Hypr.Helpers or {}
 
 -- Everything below lives on `Hypr`, never on `Vibranium`. init.lua sources
--- ~/.config/vibranium/current/theme/colors.lua between this file loading and
+-- ~/.local/state/vibranium/theme/colors.lua between this file loading and
 -- binds.lua/window-rules.lua loading, and that generated file reassigns the
 -- whole `Vibranium` global (`Vibranium = { Colors = {...} }`) rather than
 -- setting `Vibranium.Colors` in place -- reasonable for a file that gets

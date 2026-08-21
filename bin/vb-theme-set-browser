@@ -16,7 +16,7 @@ fi
 
 source vb-lib-cli
 
-INPUT="$(< "$XDG_CONFIG_HOME/vibranium/current/theme/chromium.theme")"
+INPUT="$(< "$VIBRANIUM_STATE/theme/chromium.theme")"
 INPUT="${INPUT// /}"
 
 log Info "browser theme input: $INPUT"

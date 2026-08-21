@@ -1,6 +1,6 @@
 [general]
 live_config_reload = true
-import = ["../vibranium/current/theme/alacritty.toml"]
+import = ["~/.local/state/vibranium/theme/alacritty.toml"]
 
 [font]
 size = 10

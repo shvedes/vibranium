@@ -7,7 +7,18 @@ SELF="${0##*/}"
 SELF="${SELF/.sh/}"
 
 themes_dir="$XDG_CONFIG_HOME/vibranium/themes"
-current="<($XDG_CONFIG_HOME/vibranium/current/theme.name)"
+
+# Theme data lives in the config dir before the state-dir migration runs,
+# and in the state dir after it. Old path wins while both exist.
+name_file="$XDG_CONFIG_HOME/vibranium/current/theme.name"
+if ! [[ -f $name_file ]]; then
+  name_file="$VIBRANIUM_STATE/theme.name"
+fi
+
+current=""
+if [[ -f $name_file ]]; then
+  current="$(< "$name_file")"
+fi
 
 [[ -d "$themes_dir" ]] || exit 0
 
@@ -31,4 +42,6 @@ for gitdir in "${repos[@]}"; do
 done
 
 # Re-apply the active theme so generated configs pick up the updated palette.
-vb-theme-set --force "$current"
+if [[ -n "$current" ]]; then
+  vb-theme-set --force "$current"
+fi
