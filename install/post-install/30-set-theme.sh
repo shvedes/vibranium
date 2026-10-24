@@ -19,7 +19,7 @@ printf '* {\n\tborder-radius: 0;\n}\n\n@import "colors.css";' |
 helpers::sed "$HOME/.config/qt5ct/qt5ct.conf" "s/user/$USER/"
 helpers::sed "$HOME/.config/qt6ct/qt6ct.conf" "s/user/$USER/"
 
-helpers::symlink "$VIBRANIUM/default/hypr/animations/default.lua" \
+helpers::symlink "$VIBRANIUM/default/hypr/animations/fast.lua" \
 	"$HOME/.config/hypr/hyprland.conf.d/animations.lua"
 
 CHROME_FOLDER="/etc/chromium/policies/managed"
