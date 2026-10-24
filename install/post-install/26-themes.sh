@@ -1,10 +1,15 @@
 #!/bin/bash
 
+DEST="$HOME/.config/vibranium/themes"
+
+# The shell's theme picker lists this dir even when it holds no community
+# themes, and a missing dir never settles its listing - so the picker
+# stalls on fresh installs that decline the prompt below. Always create it.
+mkdir -p "$DEST"
+
 if ! term::ask_yes_no N "Would you like to install additional themes?"; then
   exit 0
 fi
-
-DEST="$HOME/.config/vibranium/themes"
 PREFIX="vibranium-theme-"
 
 repos=$(curl -sf "https://api.github.com/users/shvedes/repos?per_page=100" \

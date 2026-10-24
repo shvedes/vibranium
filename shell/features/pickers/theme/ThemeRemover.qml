@@ -113,14 +113,49 @@ Singleton {
     dirDebounce.restart()
   }
 
+  // A themes root that does not exist yet (a fresh install whose user
+  // declined the additional themes, so ~/.config/vibranium/themes was
+  // never created) never reaches Ready. Requiring Ready on both models
+  // stalls the remover forever with _pendingShow set and no page or
+  // "no community themes" notice. A model that has settled into any
+  // terminal state counts: a missing dir reads as empty (count 0).
+  function _isSettled(m) {
+    return m.status !== FolderListModel.Loading && m.status !== FolderListModel.Null
+  }
+
+  // A settled-but-not-Ready model names a directory that did not exist
+  // when it was armed. Re-aim it so a themes root created later (the
+  // first community theme install creates the user dir) is picked up;
+  // reassigning the same URL is a no-op, so the folder is blanked first
+  // on a later turn. _listed drops while the re-aim is in flight, so the
+  // transient working-directory listing the blank folder resolves to is
+  // never scanned as themes.
+  function _reaimUnready() {
+    if (!root._foldersArmed) return false
+    let rearmed = false
+    if (root._isSettled(officialModel) && officialModel.status !== FolderListModel.Ready) {
+      const url = "file://" + Paths.vibraniumHome + "/themes"
+      officialModel.folder = ""
+      Qt.callLater(() => { officialModel.folder = url })
+      rearmed = true
+    }
+    if (root._isSettled(userModel) && userModel.status !== FolderListModel.Ready) {
+      const url = "file://" + Paths.themesUserRoot
+      userModel.folder = ""
+      Qt.callLater(() => { userModel.folder = url })
+      rearmed = true
+    }
+    if (rearmed) root._listed = false
+    return rearmed
+  }
+
   // One listing landing is the only event that can finish a pending show or
   // refresh a live cache, so both status handlers route here. Both listings
   // are required: a half-armed pair is not a listing, and the scan waits for
   // the second one.
   function _onListingReady() {
     if (!root._foldersArmed) return
-    if (officialModel.status !== FolderListModel.Ready
-        || userModel.status !== FolderListModel.Ready) return
+    if (!root._isSettled(officialModel) || !root._isSettled(userModel)) return
     root._listed = true
     if (root._pendingShow) {
       root._doScan(true)
@@ -413,8 +448,11 @@ Singleton {
       return "ok"
     }
     // First real need: arming the listings is what starts the scan, and it
-    // runs from the status handler once both have landed.
+    // runs from the status handler once both have landed. A settled-but-
+    // not-Ready model is re-aimed first, so a themes root created after
+    // the arming still resolves instead of pinning the open behind it.
     root._armFolders()
+    root._reaimUnready()
     if (!root._listed) {
       root._pendingShow = true
       return "ok"
