@@ -8,11 +8,11 @@ usage() {
   shcat << EOF
 Usage: ${0##*/} [OPTION]
 
-Interactive font package remover using fzf.
+Remove fonts packages and files.
 
 Options:
   -v, --verbose  Enable verbose output
-  -h, --help     Show this help and exit
+  -h, --help     Display this help and exit
 EOF
 }
 
@@ -34,6 +34,8 @@ done
 
 source vb-lib-core
 
+FONTS_DIR="$XDG_DATA_HOME/fonts"
+
 if [[ -f "$VIBRANIUM_STATE/theme/fzf" ]]; then
   source "$VIBRANIUM_STATE/theme/fzf"
 fi
@@ -49,16 +51,18 @@ FZF_ARGS=(
   --border-label ' alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select '
   --border-label-pos 'bottom'
 
-  --list-label 'Package list'
+  --delimiter '\t'
+  --with-nth '2'
+  --list-label 'Font list'
   --list-border 'bold'
 
-  --input-label 'Filter packages'
+  --input-label 'Filter fonts'
   --input-border 'bold'
 
-  --preview 'pacman -Qii {1}'
+  --preview 'if [ "{r1}" = "pkg" ]; then pacman -Qii "{r2}"; fi'
   --preview-border 'bold'
   --preview-window 'right:75%:wrap'
-  --preview-label 'Package Information'
+  --preview-label 'Details'
 
   --bind 'alt-p:toggle-preview'
   --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
@@ -67,42 +71,115 @@ FZF_ARGS=(
   --color "${FZF_COLORS:-pointer:white,marker:green}"
 )
 
-_operation_canceled() {
-  local color="$R"
-
-  [[ "$1" == "--positive" ]] && color="$G"
-
-  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  # shellcheck disable=SC2034
-  read -n1 -r -s -p $'. Press any key to exit' dummy
+font_remove_prepare_result() {
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
 }
 
+font_remove_signal_canceled() {
+  trap - SIGHUP SIGINT SIGTERM SIGQUIT
+  font_remove_prepare_result
+  operation::result canceled
+  exit 1
+}
+
+# Pacman emits one package name per line; package names cannot contain the
+# whitespace that the command-substitution loop would otherwise split on.
 # List installed font packages by matching their names against common
 # font package prefixes (ttf, otf) and Nerd Font suffixes.
-_get_fonts() {
+_get_packages() {
   log Info "Fetching installed font packages"
   local pkg
-  for pkg in $(pacman -Qq); do
+  while IFS= read -r pkg; do
     case "$pkg" in
       ttf* | otf* | *-nerd | *-nerd-mono)
-        printf '%s\n' "$pkg"
+        printf 'pkg\t%s\n' "$pkg"
         ;;
     esac
+  done < <(pacman -Qq)
+}
+
+_get_font_files() {
+  log Info "Fetching user font files"
+  [[ -d "$FONTS_DIR" ]] || return 0
+  local f
+  # File rows contain kind, visible basename, and hidden full path; package
+  # rows contain kind and name. Tabs delimit fields, and fzf reads one row per
+  # line, so tabs or newlines in paths cannot round-trip through this format.
+  # Sorting happens after collection because find order is unspecified.
+  # LC_ALL=C fixes collation.
+  local _ff_files=() _ff_sorted=()
+  while IFS= read -r f; do
+    _ff_files+=("$f")
+  done < <(find "$FONTS_DIR" -type f \( -iname '*.ttf' -o -iname '*.otf' -o -iname '*.ttc' -o -iname '*.otc' -o -iname '*.woff' -o -iname '*.woff2' \))
+  local _saved_lc="${LC_ALL:-}" i j tmp
+  LC_ALL=C
+  for ((i = 0; i < ${#_ff_files[@]}; i++)); do
+    for ((j = 0; j < ${#_ff_files[@]} - i - 1; j++)); do
+      if [[ "${_ff_files[j]}" > "${_ff_files[j+1]}" ]]; then
+        tmp="${_ff_files[j]}"
+        _ff_files[j]="${_ff_files[j+1]}"
+        _ff_files[j+1]="$tmp"
+      fi
+    done
+  done
+  LC_ALL="$_saved_lc"
+  for f in "${_ff_files[@]}"; do
+    printf 'file\t%s\t%s\n' "${f##*/}" "$f"
   done
 }
 
-trap 'trap "exit 1" SIGINT; printf "\n"; _operation_canceled; exit 1' SIGINT
+trap 'font_remove_signal_canceled' SIGHUP SIGINT SIGTERM SIGQUIT
 
 term::show_header
 
-mapfile -t LIST < <(_get_fonts)
+mapfile -t LIST < <({
+  _get_packages
+  _get_font_files
+})
 mapfile -t CHOSEN < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
 
 if [[ ${#CHOSEN[@]} -eq 0 ]]; then
-  _operation_canceled --positive
+  font_remove_prepare_result
+  operation::result noop -- "Operation canceled"
   exit 0
 fi
 
-log Info "${#CHOSEN[@]} font(s) selected"
-vb-pkg-remove --no-logo -- "${CHOSEN[@]}"
+pkgs=()
+files=()
+line=""
+for line in "${CHOSEN[@]}"; do
+  [[ "$line" == *$'\t'* ]] || continue
+  if [[ "${line%%$'\t'*}" == "pkg" ]]; then
+    pkgs+=("${line#*$'\t'}")
+  else
+    files+=("${line##*$'\t'}")
+  fi
+done
+
+# Package rows and file rows are dispatched separately because pacman owns
+# package metadata while direct file deletion must update fontconfig manually.
+if ((${#pkgs[@]} > 0)); then
+  log Info "${#pkgs[@]} font package(s) selected"
+  vb-pkg-remove --no-logo -- "${pkgs[@]}"
+  # Pacman's own fontconfig hook rebuilds asynchronously and is not awaited, so
+  # the rebuild and the rescan that depends on it are owned here instead. The
+  # whole command is detached, not just its rebuild: the rescan has to follow
+  # it, and one detached process is what orders them.
+  setsid -f vb-cmd-font-refresh &> /dev/null
+fi
+
+if ((${#files[@]} > 0)); then
+  log Info "Removing ${#files[@]} font file(s)"
+  rm -f -- "${files[@]}"
+  # Direct deletes bypass pacman's hooks, so this dir's indexes are rebuilt
+  # explicitly or the removed faces linger as ghosts until the next full
+  # rebuild, and the shell's font list is rescanned once that lands.
+  setsid -f vb-cmd-font-refresh "$FONTS_DIR" &> /dev/null
+  for f in "${files[@]}"; do
+    printf '%sRemoved:%s %s\n' "$G" "$RS" "$f"
+  done
+  font_remove_prepare_result
+  operation::result success -- "Operation complete"
+fi

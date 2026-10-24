@@ -70,9 +70,12 @@ log Info "Wi-Fi powersave: $value"
 
 found=0
 
-# Enumerate wireless interfaces via iw (look for "Interface wlan0" etc.)
-# and either query or set power_save on each. When running as root (e.g.
-# from a udev rule), direct access is used; otherwise sudo is prepended.
+# The command is intentionally interface-driven: udev can invoke this once for
+# a wireless event, and each interface is handled independently.
+# Enumerate wireless interfaces via iw. The get path queries each interface
+# directly; the set path uses iw or sudo according to EUID.
+# The `found` counter records successful operations, so partial failures are
+# not treated as whole-batch failures unless every discovered operation fails.
 while IFS= read -r iface; do
   if [[ $value == "get" ]]; then
     if state=$(iw dev "$iface" get power_save 2> /dev/null); then
@@ -91,8 +94,12 @@ while IFS= read -r iface; do
       found=$((found + 1))
     fi
   fi
-done < <(iw dev | awk '/^\s+Interface / { print $2 }')
+done < <(iw dev | while IFS= read -r _iw_line; do
+  [[ $_iw_line =~ ^[[:space:]]*Interface[[:space:]]+(.+)$ ]] && printf '%s\n' "${BASH_REMATCH[1]}"
+done)
 
+# No cached state is consulted, so each invocation observes the current
+# interface configuration and remains suitable for a udev-triggered call.
 if ((found == 0)); then
   log Error "No wireless interfaces found"
   exit 1

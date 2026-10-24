@@ -1,0 +1,4 @@
+module qs.features.bar.modules.Volume
+
+Volume 1.0 Volume.qml
+VolumeIsland 1.0 VolumeIsland.qml

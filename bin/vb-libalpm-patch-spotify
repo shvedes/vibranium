@@ -66,7 +66,7 @@ if $MANUAL; then
   export VERBOSE=true
 fi
 
-# If Spicetify was never installed, there is nothing to restore or apply.
+# If Spicetify is unavailable, there is nothing to restore or apply.
 if ! command -v spicetify > /dev/null; then
   log Warn "Spicetify is not installed, skipping"
   exit 0
@@ -75,26 +75,29 @@ fi
 if ! $MANUAL; then
   log Info "Checking if Spotify was previously patched"
 
-  # Prefer ripgrep for speed when searching through the Spotify binary
-  # directory; fall back to grep if rg is unavailable.
-  if command -v rg > /dev/null; then
-    grep_cmd=(rg -q -m1 spicetify)
-  else
-    grep_cmd=(grep -q -m1 spicetify)
-  fi
-
-  # Check whether any file under /opt/spotify/ contains a spicetify
-  # reference.  If none do, the patch has already been reverted or was
-  # never applied, so skip the restore+apply cycle.
-  if ! find /opt/spotify/ -type f -exec "${grep_cmd[@]}" {} + > /dev/null; then
+  # Prefer ripgrep for speed; fall back to grep when rg is unavailable.
+  # The batched search is a heuristic: a nonzero aggregate status enters the
+  # unmanaged-state backup path rather than proving a per-file match.
+  # The no-reference path records a fresh backup and leaves patch application
+  # to the user.
+  _spicetify_found=false
+  while IFS= read -r -d '' _spotify_file; do
+    while IFS= read -r _spotify_line; do
+      if [[ $_spotify_line == *spicetify* ]]; then
+        _spicetify_found=true
+        break 2
+      fi
+    done < "$_spotify_file"
+  done < <(find /opt/spotify/ -type f -print0 2>/dev/null)
+  if ! $_spicetify_found; then
     if [[ -t 0 ]]; then
       echo "[${0##*/}] Info: Spotify wasn't patched; backing up current state" >&2
     else
       echo "==> Spotify wasn't patched; backing up current state"
     fi
 
-    # For some reason, --quiet still prints two blank lines
-    # in the pacman hook output. &>/dev/null fixes this.
+    # Redirect stdout and stderr because --quiet can emit two blank lines in
+    # hook output.
     if ! spicetify --no-restart --quiet backup &> /dev/null; then
       log Error "Couldn't backup Spotify state"
       exit 1
@@ -134,4 +137,6 @@ if (($?)); then
   exit 0
 fi
 
+# Restore or apply failures in a post-transaction hook return success so a
+# committed package update is not reported as failed; manual repair is requested.
 log Info "Spotify has been patched"

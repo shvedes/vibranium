@@ -1,0 +1,6 @@
+module qs.features.bar.modules.Tray
+
+Tray 1.0 Tray.qml
+TrayItem 1.0 TrayItem.qml
+TrayMenu 1.0 TrayMenu.qml
+TrayMenuRow 1.0 TrayMenuRow.qml

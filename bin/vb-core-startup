@@ -1,25 +1,31 @@
 #!/bin/bash
 
+# These directories are prerequisites for state, cache, and runtime writes
+# performed by the library and hooks. The loop attempts creation but does not
+# test mkdir status, so callers must handle a failed prerequisite.
 for dir in "$VIBRANIUM_RUNTIME" "$VIBRANIUM_STATE" "$VIBRANIUM_CACHE"; do
   if [[ ! -d "$dir" ]]; then
     mkdir -p "$dir"
   fi
 done
 
+# The marker routes this invocation to vb-util-first-run and exits; normal
+# autostart entries and startup hooks are skipped by this script, while
+# first-run setup remains the helper's responsibility.
 if [[ -f "$VIBRANIUM_STATE/first-run" ]]; then
   vb-util-first-run
   exit 0
 fi
 
+# nullglob is required for the hook arrays to represent an empty match as an
+# empty array; otherwise a literal glob path would count as one hook.
 shopt -s nullglob
 source vb-lib-core
-export -f helpers::check
 
-# Point child bash processes at the lib so they auto-source it.
+# BASH_ENV makes noninteractive Bash children source the library, which
+# projects settings.env into their scope; other interpreters ignore it.
 export BASH_ENV="$VIBRANIUM/bin/vb-lib-core"
 
-# shellcheck disable=SC2016
-awk_expr='/^Exec=/{print substr($0, 6); nextfile}'
 autostart_dir="$XDG_CONFIG_HOME/autostart"
 
 # XDG autostart entries
@@ -29,19 +35,33 @@ while IFS= read -r exec_cmd; do
   fi
 
   # shellcheck disable=SC2086
+  # app2unit receives the Exec tokens after Bash word splitting and pathname
+  # expansion; desktop field-code substitution is not performed by this shell.
   setsid -f app2unit -- $exec_cmd
-done < <(awk "$awk_expr" "$autostart_dir" 2> /dev/null)
+done < <(
+  for _desktop_file in "$autostart_dir"/*.desktop; do
+    [[ -f "$_desktop_file" ]] || continue
+    while IFS= read -r _desktop_line; do
+      if [[ "$_desktop_line" == Exec=* ]]; then
+        printf '%s\n' "${_desktop_line#Exec=}"
+        break
+      fi
+    done < "$_desktop_file"
+  done
+)
 
-# Run the default startup scripts first
+# Launch default startup hooks asynchronously.
 HOOKS=("$VIBRANIUM"/default/hooks/startup/*.sh)
 
 if ((${#HOOKS[@]} > 0)); then
+  # Each hook runs in a detached Bash process; completion order and exit status
+  # are not synchronization points for the parent.
   for hook in "${HOOKS[@]}"; do
     setsid -f bash "$hook"
   done
 fi
 
-# Then user scripts
+# Launch user startup hooks asynchronously after the default group.
 UHOOKS=("$XDG_CONFIG_HOME"/vibranium/hooks/startup/*.sh)
 
 if ((${#UHOOKS[@]} > 0)); then

@@ -44,10 +44,10 @@ Two update actions are provided:
 
 See [Updates & channels](../understanding/updates.md) for details about the Vibranium update process.
 
-## Updates Waybar module
+## Updates bar module
 
-Waybar includes an optional updates module that displays pending Arch and AUR updates.
+The bar includes an optional updates module that displays pending Arch and AUR updates.
 
-It can be enabled from **Vibranium Menu -> Settings -> Waybar -> Toggle modules**
+It can be enabled from **Vibranium Menu -> Settings -> Bar -> Toggle modules**
 
 The module displays the number of available updates and provides a detailed breakdown in its tooltip.

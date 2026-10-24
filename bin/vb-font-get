@@ -1,9 +1,25 @@
 #!/bin/bash
 
-gtk_font="$(gsettings get org.gnome.desktop.interface font-name)"
+# This helper does not source a library or parse options so it can be called
+# from command substitutions in font management paths.
+gtk_font=""
+IFS= read -r gtk_font < <(gsettings get org.gnome.desktop.interface font-name) || true
 
+# Only a nonempty command-substitution result selects the GSettings branch.
+# A failed query normally leaves it empty, while a literal quoted-empty value
+# can still pass this test and produce empty output.
 if [[ -n "$gtk_font" ]]; then
+  # GSettings returns a GVariant string commonly wrapped in single quotes;
+  # removing apostrophes is simple unquoting, not a general parser.
   printf '%s\n' "${gtk_font//\'/}"
 else
-  grep --color=NEVER -oP '(?<=^gtk-font-name=).*' ~/.config/gtk-3.0/settings.ini
+  # The fallback path is a literal INI scan, so it honors a key only at column
+  # zero; with no match, grep's nonzero status becomes the script's result.
+  # This fallback intentionally hard-codes ~/.config and ignores
+  # XDG_CONFIG_HOME, so its lookup follows that path.
+  while IFS= read -r _font_line; do
+    if [[ $_font_line == gtk-font-name=* ]]; then
+      printf '%s\n' "${_font_line#gtk-font-name=}"
+    fi
+  done < "$HOME/.config/gtk-3.0/settings.ini"
 fi

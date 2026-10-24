@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Source guard
+# When the readonly source marker is set, sourcing returns from the current
+# shell without defining the library body a second time.
 if [[ -n "${_VB_LIB_CLI_LOADED:-}" ]]; then
   return 0
 fi
@@ -17,8 +18,240 @@ log() {
   fi
 }
 
+# Reading with IFS= and printf preserves each input line's text while
+# normalizing the line terminator; callers use it to keep heredoc output
+# independent of external cat behavior.
 shcat() {
   while IFS= read -r line; do
     printf '%s\n' "$line"
   done
+}
+
+# The outcome vocabulary is a closed contract because it drives both the
+# default text and the color; callers cannot extend it with arbitrary text.
+declare -gr -a _OPERATION_RESULT_OUTCOMES=(success noop canceled error warning)
+
+# The core snapshot owns cursor state when the library is available. Without
+# core, emit one show sequence on the controlling terminal, then fall back to a
+# terminal stream; a redirected stdout never receives a cursor escape.
+_operation::restore_terminal() {
+  if declare -F term::enable_input > /dev/null; then
+    term::enable_input > /dev/null 2>&1 || true
+    return 0
+  fi
+
+  if [[ -r /dev/tty && -w /dev/tty ]]; then
+    printf '\e[?25h' 2> /dev/null > /dev/tty || true
+  elif [[ -t 2 ]]; then
+    printf '\e[?25h' >&2
+  elif [[ -t 1 ]]; then
+    printf '\e[?25h'
+  fi
+}
+
+# A mirrored result line exists on both stdout and the controlling terminal.
+# End both streams so a redirected stdout never leaves the terminal prompt
+# without a line break.
+_operation::result_newline() {
+  printf '\n' || true
+  if [[ ! -t 1 ]] && declare -F term::tty_available > /dev/null && term::tty_available; then
+    term::tty_print $'\n'
+  fi
+  return 0
+}
+
+# Signals are ignored after entry so a second interrupt cannot interrupt
+# terminal restoration; the handler exits with status 1 after cleanup.
+_operation::result_signal() {
+  trap '' HUP INT TERM QUIT PIPE
+  _operation::result_newline
+  _operation::restore_terminal
+  exit 1
+}
+
+# Message operands are joined with single spaces; `--` terminates option
+# parsing and allows message text to begin with '-'.
+operation::result() {
+  local function_name="${FUNCNAME[0]}"
+  local outcome="${1-}"
+  local color
+  local default_message
+  local message_text=
+  local no_wait=false
+  local separator=
+  local word
+  local hup_trap int_trap term_trap quit_trap pipe_trap
+  local valid_outcome
+  local outcome_valid=false
+  local valid_outcomes
+  local -a message=()
+
+  for valid_outcome in "${_OPERATION_RESULT_OUTCOMES[@]}"; do
+    if [[ "$outcome" == "$valid_outcome" ]]; then
+      outcome_valid=true
+      break
+    fi
+  done
+
+  if [[ "$outcome_valid" == false ]]; then
+    printf -v valid_outcomes '%s, ' "${_OPERATION_RESULT_OUTCOMES[@]}"
+    valid_outcomes="${valid_outcomes%, }"
+    if [[ -z "$outcome" ]]; then
+      log Error "$function_name: missing outcome (valid outcomes: $valid_outcomes)"
+    else
+      log Error "$function_name: invalid outcome '$outcome' (valid outcomes: $valid_outcomes)"
+    fi
+    _operation::restore_terminal
+    return 2
+  fi
+
+  case "$outcome" in
+    success)
+      color=$'\e[0;32m'
+      default_message="Operation complete"
+      ;;
+    noop)
+      color=$'\e[0;32m'
+      default_message="Operation skipped"
+      ;;
+    canceled)
+      color=$'\e[0;31m'
+      default_message="Operation canceled"
+      ;;
+    error)
+      color=$'\e[0;31m'
+      default_message="Operation failed"
+      ;;
+    warning)
+      color=$'\e[0;33m'
+      default_message="Operation completed with warnings"
+      ;;
+  esac
+
+  shift
+  while (($# > 0)); do
+    case "$1" in
+      --no-wait)
+        no_wait=true
+        shift
+        ;;
+      --)
+        shift
+        message+=("$@")
+        break
+        ;;
+      -*)
+        log Error "$function_name: unknown option '$1'; use '--' before a message beginning with '-'"
+        _operation::restore_terminal
+        return 2
+        ;;
+      *)
+        message+=("$1")
+        shift
+        ;;
+    esac
+  done
+
+  if ((${#message[@]} == 0)); then
+    message_text="$default_message"
+  else
+    for word in "${message[@]}"; do
+      message_text+="$separator$word"
+      separator=' '
+    done
+  fi
+
+  # Existing trap commands are captured for restoration. The temporary handler
+  # is installed only after capture, and prior commands or cleared traps are
+  # restored when presentation returns.
+  hup_trap=
+  IFS= read -r hup_trap < <(trap -p HUP) || hup_trap=
+  int_trap=
+  IFS= read -r int_trap < <(trap -p INT) || int_trap=
+  term_trap=
+  IFS= read -r term_trap < <(trap -p TERM) || term_trap=
+  quit_trap=
+  IFS= read -r quit_trap < <(trap -p QUIT) || quit_trap=
+  pipe_trap=
+  IFS= read -r pipe_trap < <(trap -p PIPE) || pipe_trap=
+
+  trap '_operation::result_signal' HUP INT TERM QUIT PIPE
+  term::disable_input
+
+  # A signal handler can call this while term::spinner still owns the current
+  # line. Clear that frame and print the result in its place rather than
+  # leaving an empty line behind. The spinner only claims the line on a TTY,
+  # so a redirected stdout never receives the cursor-control sequence.
+  if [[ ${_term_spinner_active:-0} == 1 ]]; then
+    if [[ -t 1 ]]; then
+      printf '\r\e[K' || true
+    fi
+    _term_spinner_active=0
+  fi
+
+  # NO_COLOR is presence-sensitive: even an empty value disables ANSI. A non-TTY
+  # stdout receives a plain copy of the message.
+  #
+  # The hold needs a terminal rather than a terminal on stdin: a caller that
+  # redirected stdin would end the hold at once, or have its input eaten by
+  # it. When stdout is redirected, mirror the status to the terminal so the
+  # presentation is visible while the redirected copy remains in the log.
+  if [[ "$no_wait" == false ]] && term::tty_available; then
+    if [[ -t 1 && -z "${NO_COLOR+x}" ]]; then
+      printf '%s[*]%s %s' "$color" $'\e[0m' "$message_text" || true
+    else
+      printf '[*] %s' "$message_text" || true
+      if [[ ! -t 1 ]]; then
+        if [[ -z "${NO_COLOR+x}" ]]; then
+          printf '%s[*]%s %s' "$color" $'\e[0m' "$message_text" 2> /dev/null > /dev/tty || true
+        else
+          printf '[*] %s' "$message_text" 2> /dev/null > /dev/tty || true
+        fi
+      fi
+    fi
+
+    # The keypress read occurs only in the default wait branch with a
+    # reachable terminal; --no-wait skips it. EOF is ignored so closing the
+    # terminal cannot turn a successful presentation into a failure, even
+    # when the caller enabled errexit.
+    term::wait_key '. Press any key to exit ' || true
+    _operation::result_newline
+  elif [[ -t 1 && -z "${NO_COLOR+x}" ]]; then
+    printf '%s[*]%s %s\n' "$color" $'\e[0m' "$message_text" || true
+  else
+    printf '[*] %s\n' "$message_text" || true
+  fi
+
+  _operation::restore_terminal || true
+
+  if [[ -n "$hup_trap" ]]; then
+    eval "$hup_trap"
+  else
+    trap - HUP
+  fi
+  if [[ -n "$int_trap" ]]; then
+    eval "$int_trap"
+  else
+    trap - INT
+  fi
+  if [[ -n "$term_trap" ]]; then
+    eval "$term_trap"
+  else
+    trap - TERM
+  fi
+  if [[ -n "$quit_trap" ]]; then
+    eval "$quit_trap"
+  else
+    trap - QUIT
+  fi
+  if [[ -n "$pipe_trap" ]]; then
+    eval "$pipe_trap"
+  else
+    trap - PIPE
+  fi
+
+  # Valid outcomes are presentation categories, not status codes: every valid
+  # invocation returns 0, so callers must inspect the outcome argument or their
+  # own operation status.
+  return 0
 }

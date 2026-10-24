@@ -1,0 +1,3 @@
+module qs.features.pickers.keybindings
+
+singleton Keybindings 1.0 Keybindings.qml

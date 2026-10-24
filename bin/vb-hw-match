@@ -38,13 +38,23 @@ fi
 # Read DMI strings from sysfs. These come from the motherboard firmware
 # (SMBIOS) and contain the vendor-assigned product name and family,
 # e.g. product_name="ThinkPad X1 Carbon Gen 11".
+# Keep the two DMI fields independent because product_family can be absent
+# even when product_name is readable; either field is sufficient to match.
 product_name=""
 product_family=""
 
-[[ -r /sys/class/dmi/id/product_name ]] && product_name=$(< /sys/class/dmi/id/product_name)
-[[ -r /sys/class/dmi/id/product_family ]] && product_family=$(< /sys/class/dmi/id/product_family)
+if [[ -r /sys/class/dmi/id/product_name ]]; then
+  product_name=
+  read -r product_name < /sys/class/dmi/id/product_name 2>/dev/null || product_name=
+fi
+if [[ -r /sys/class/dmi/id/product_family ]]; then
+  product_family=
+  read -r product_family < /sys/class/dmi/id/product_family 2>/dev/null || product_family=
+fi
 
 # Case-insensitive substring match (shopt -s nocasematch at the top of
 # the script makes == behave case-insensitively for [[ ]]). Exit 0 on
 # the first hit; exit 1 if neither field contains the needle.
+# Missing or unreadable DMI values stay empty, making the final predicate fail
+# closed rather than treating absent firmware metadata as a match.
 [[ $product_name == *"$needle"* ]] || [[ $product_family == *"$needle"* ]]

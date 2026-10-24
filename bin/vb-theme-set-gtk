@@ -1,39 +1,42 @@
 #!/bin/bash
 
-# GTK live-reload mechanism
-#
-# GTK caches CSS per theme name within a running session. Switching to the
-# same name again does nothing -- it serves from cache. Fix: keep two theme
-# slots (vibranium-a, vibranium-b) and alternate on every run. The new name
-# was never seen this session so GTK is forced to read from disk fresh.
-#
-# Live reload works via the alternating slot mechanism.
+# GTK providers can cache CSS by theme name within a session. Two persisted
+# slots alternate gsettings to change the selected name, but a provider that
+# has already cached a name is not guaranteed to reload it.
 
 source vb-lib-cli
 
 GTK_THEME="$VIBRANIUM_STATE/theme/gtk.css"
 log Info "source theme: $GTK_THEME"
 
-# GTK3 -- alternating slots for live reload
+# Both slot files are written so either slot has current CSS when selected.
 for slot in vibranium-a vibranium-b; do
   gtk3_dir="$HOME/.local/share/themes/$slot/gtk-3.0"
   mkdir -p "$gtk3_dir"
-  shcat > "$gtk3_dir/gtk.css" <<- EOF
-@import url("/usr/share/themes/adw-gtk3/gtk-3.0/gtk.css");
-
-$(< "$GTK_THEME")
-EOF
+  {
+    printf '@import url("/usr/share/themes/adw-gtk3/gtk-3.0/gtk.css");\n\n'
+    while IFS= read -r _gtk_css_line || [[ -n $_gtk_css_line ]]; do
+      printf '%s\n' "$_gtk_css_line"
+    done < "$GTK_THEME"
+  } | shcat > "$gtk3_dir/gtk.css"
   log Info "wrote $slot GTK3 -> $gtk3_dir/gtk.css"
 done
 
-# GTK4 -- write user override, applies on next app restart
+# GTK4 reads this user override on application startup. The GTK3 gsettings
+# value and both settings.ini files persist the selected slot; neither path
+# rewrites the GTK4 override.
 mkdir -p "$XDG_CONFIG_HOME/gtk-4.0"
-shcat > "$XDG_CONFIG_HOME/gtk-4.0/gtk.css" <<- EOF
-$(< "$GTK_THEME")
-EOF
+{
+  while IFS= read -r _gtk_css_line || [[ -n $_gtk_css_line ]]; do
+    printf '%s\n' "$_gtk_css_line"
+  done < "$GTK_THEME"
+} | shcat > "$XDG_CONFIG_HOME/gtk-4.0/gtk.css"
 log Info "wrote GTK4 -> $XDG_CONFIG_HOME/gtk-4.0/gtk.css"
 
-# Alternate between slots to bust GTK3 cache
+# gsettings returns a GVariant quoted string, so the surrounding single
+# quotes are removed, then the two slot names are compared. Any unrecognized
+# value selects slot A deterministically.
+# Select the slot opposite the persisted GTK3 name.
 current=$(gsettings get org.gnome.desktop.interface gtk-theme)
 current=${current#\'}
 current=${current%\'}
@@ -48,8 +51,17 @@ fi
 log Info "switching to slot: $next"
 gsettings set org.gnome.desktop.interface gtk-theme "$next"
 
-# Some windows like polkit prompts, Pinentry prompts and such
-# don't inherit the value from gsettings. Because of that, we
-# edit these files manually. Not a big deal.
-sed -i "/gtk-theme-name/s/=.*/=${next}/" "$XDG_CONFIG_HOME"/gtk-{3,4}.0/settings.ini
+# Polkit and pinentry windows may not observe the live gsettings value, so
+# both GTK settings.ini files are updated to the selected slot.
+for _gtk_ini in "$XDG_CONFIG_HOME"/gtk-3.0/settings.ini "$XDG_CONFIG_HOME"/gtk-4.0/settings.ini; do
+  [[ -f $_gtk_ini ]] || continue
+  _gtk_out=""
+  while IFS= read -r _gtk_line || [[ -n $_gtk_line ]]; do
+    if [[ $_gtk_line == *gtk-theme-name* && $_gtk_line == *=* ]]; then
+      _gtk_line=${_gtk_line%%=*}'='"$next"
+    fi
+    _gtk_out+="$_gtk_line"$'\n'
+  done < "$_gtk_ini"
+  printf '%s' "$_gtk_out" > "$_gtk_ini"
+done
 log Info "updated gtk-{3,4}.0/settings.ini gtk-theme-name=$next"

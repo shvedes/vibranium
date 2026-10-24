@@ -6,7 +6,7 @@
 -- `hl` is Hyprland's own Lua API (bind/dispatch/config/window_rule/etc.) --
 -- Vibranium doesn't define it, it's injected by the host process. Everything
 -- in THIS file is Vibranium's sugar layer on top of `hl`, added purely to
--- cut down repetition across binds.lua / window-rules.lua / animations/*.lua.
+-- cut down repetition across binds.lua / animations/*.lua.
 --
 -- Quick Lua notes for context (skip if this is old news to you):
 --
@@ -59,7 +59,6 @@ Hypr.Helpers = Hypr.Helpers or {}
 -- namespace added here should go on `Hypr` for the same reason.
 
 Hypr.Guard = {}
-Hypr.Rule = {}
 Hypr.Anim = {}
 Hypr.Act = {}
 
@@ -179,76 +178,6 @@ Hypr.Act.send_key_state = wrap_dispatch(hl.dsp.send_key_state)
 Hypr.Act.send_shortcut = wrap_dispatch(hl.dsp.send_shortcut)
 Hypr.Act.exec_raw = wrap_dispatch(hl.dsp.exec_raw)
 Hypr.Act.exec_cmd = wrap_dispatch(hl.dsp.exec_cmd)
-
--- ----------------------------------------------------------------------------
--- Rule.* -- window-rule shorthand
---
--- window-rules.lua repeats this exact two-line shape over and over:
---
---   hl.window_rule({ match = { class = "..." }, tag = "+someTag" })
---
--- and its counterpart, styling everything that carries a tag:
---
---   hl.window_rule({ match = { tag = "someTag" }, opaque = true, ... })
---
--- Rule.tag_class / Rule.tag_title / Rule.by_tag just name those two shapes
--- so the *intent* ("tag windows of this class" vs "style windows with this
--- tag") is visible at the call site instead of buried in a raw table.
--- ----------------------------------------------------------------------------
-
--- Shallow-merges two tables (b's keys win on conflict). Used so
--- tag_class/tag_title can accept an optional second match criterion
--- (e.g. Minecraft's rule matches both class AND title).
-local function merge(a, b)
-  local out = {}
-  for k, v in pairs(a) do
-    out[k] = v
-  end
-  if b then
-    for k, v in pairs(b) do
-      out[k] = v
-    end
-  end
-  return out
-end
-
-function Hypr.Rule.tag_class(class_pattern, tag_name, extra_match)
-  hl.window_rule({
-    match = merge({ class = class_pattern }, extra_match),
-    tag = "+" .. tag_name,
-  })
-end
-
-function Hypr.Rule.tag_title(title_pattern, tag_name, extra_match)
-  hl.window_rule({
-    match = merge({ title = title_pattern }, extra_match),
-    tag = "+" .. tag_name,
-  })
-end
-
--- tag_by_tag(from_tag, to_tag): windows already carrying `from_tag` also get
--- `to_tag`. This is how window-rules.lua builds up broader categories from
--- narrower ones (e.g. every chromiumBasedBrowser AND every firefoxBasedBrowser
--- window also becomes a browserWindow, and every browserWindow also becomes
--- focusOnActivate) without re-matching the underlying class regex each time.
-function Hypr.Rule.tag_by_tag(from_tag, to_tag)
-  hl.window_rule({
-    match = { tag = from_tag },
-    tag = "+" .. to_tag,
-  })
-end
-
--- by_tag(tag, props): apply `props` to every window carrying `tag`.
--- This is stage two of the "tag first, style second" pattern -- e.g.
--- tag_class(browserClasses, "browserWindow") followed by
--- by_tag("browserWindow", { focus_on_activate = true }).
-function Hypr.Rule.by_tag(tag, props)
-  local rule = { match = { tag = tag } }
-  for k, v in pairs(props) do
-    rule[k] = v
-  end
-  hl.window_rule(rule)
-end
 
 -- ----------------------------------------------------------------------------
 -- Anim.* -- data-driven animation presets

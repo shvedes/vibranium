@@ -18,7 +18,7 @@ EOF
 
 if [[ "$CHASSIS_TYPE" == vm ]]; then
   log Error "Not available in a VM"
-  notify-send -r 4 -t 3000 -u critical "Print Manager" \
+  notify-send -r 4 -a "Vibranium" -t 3000 -u critical "Print Manager" \
     "This feature is not available in a VM!"
   exit 1
 fi
@@ -45,7 +45,8 @@ done
 
 set -uo pipefail
 
-# Per-process temporary working directory.
+# The PID suffix isolates simultaneous invocations, and the EXIT trap removes
+# converter artifacts when a later file or spool operation fails.
 WORK_DIR="/tmp/vb-print-$$"
 
 cleanup() {
@@ -63,13 +64,14 @@ command -v libreoffice &> /dev/null && have_libreoffice=true
 command -v inkscape &> /dev/null && have_inkscape=true
 
 if ! systemctl -q is-active cups.service; then
-  notify-send -r 4 -u critical -t 20000 "Print System Service Is Not Running" \
+  notify-send -r 4 -a "Vibranium" -u critical -t 20000 "Print System Service Is Not Running" \
     "Enable with 'systemctl enable --now cups.service'"
   exit 1
 fi
 
-# Determine the system default printer via lpstat -d.
-# The LANG override ensures English output for the string match.
+# Determine the system default printer via lpstat -d. The command sets LANG,
+# but LC_ALL or LC_MESSAGES can take precedence; the parser matches the
+# English prefix when present.
 # Format: "system default destination: <printer_name>"
 lpstat_out=$(env LANG="en_US.UTF-8" lpstat -d 2> /dev/null)
 default_printer=""
@@ -81,19 +83,19 @@ fi
 log Info "Default printer: ${default_printer:-none}"
 
 if [[ -z "$default_printer" ]]; then
-  notify-send -r 4 -u critical -t 10000 "No Default Printer Found" \
+  notify-send -r 4 -a "Vibranium" -u critical -t 10000 "No Default Printer Found" \
     "No system default printer is configured.\nTo add a printer, use <b>Print Settings</b> in app launcher"
   exit 1
 fi
 
 mkdir -p "$WORK_DIR"
 
-succeeded=0    # Number of files printed successfully.
-failed=0       # Number of files that failed.
-failed_body="" # Notification body with failed file names.
+succeeded=0    # Files accepted by lp for queueing.
+failed=0       # Files that failed conversion or queue submission.
+failed_body="" # Notification body listing failed input names.
 
-# Converts the file if necessary, then spools it to the default printer.
-# Returns 0 on success, 1 on conversion or spool failure.
+# Convert when needed, then submit the selected path to lp. Return 0 when
+# conversion and queue submission succeed, 1 on either failure.
 print_file() {
   local file="$1"
 
@@ -101,25 +103,25 @@ print_file() {
   local ext="${base##*.}"  # Extract file extension.
   ext="${ext,,}"           # Normalize extension to lowercase.
 
-  # Path that will be sent to lp.
+  # Converter availability is established once per batch; a missing converter leaves
+  # the original path in place and lets CUPS decide whether it can print it.
   local to_print
 
-  # Defaults to direct printing.
   to_print="$file"
 
   case "$ext" in
-    # Reliable via CUPS (through cups-filters).
+    # PDF and PostScript are passed to CUPS without local conversion.
     pdf | ps)
       ;;
 
-    # Usually fine via filters (images, text).
+    # Images and text are passed to CUPS without local conversion.
     jpg | jpeg | png | gif | bmp | tiff | tif | \
       txt | text | log | md | rst | csv | tsv | \
       html | htm | xhtml | \
       eps)
       ;;
 
-    # Better to convert via LibreOffice for consistency.
+    # Office formats use LibreOffice conversion when available.
     odt | ott | sxw | \
       doc | docx | dot | dotx | rtf | \
       ods | ots | sxc | \
@@ -133,11 +135,11 @@ print_file() {
     libreoffice --headless --convert-to pdf \
       --outdir "$WORK_DIR" "$file" &> /dev/null || return 1
 
-        # Print the converted PDF instead of the source file.
         to_print="$out"
       fi
       ;;
 
+    # SVG uses Inkscape conversion when available.
     svg)
       if $have_inkscape; then
         log Info "Converting $file via Inkscape"
@@ -146,12 +148,11 @@ print_file() {
           --export-filename="$out" "$file" \
           &> /dev/null || return 1
 
-        # Print the converted PDF instead of the source file.
         to_print="$out"
       fi
       ;;
 
-    # Everything else: let CUPS try
+    # Unsupported extensions are passed to CUPS without local conversion.
     *)
       ;;
   esac
@@ -164,16 +165,14 @@ print_file() {
   fi
 }
 
-# Queue handling
 for file in "$@"; do
-  # Skip anything that is not a regular file.
+  # `-f` accepts paths that resolve to regular files, including symlinks.
   if [[ ! -f "$file" ]]; then
     ((failed++)) || true
     failed_body+=$'\n'"  ${file##*/} (not a file)"
     continue
   fi
 
-  # Print one file at a time.
   if print_file "$file"; then
     ((succeeded++)) || true
   else
@@ -183,10 +182,12 @@ for file in "$@"; do
 done
 
 # Summary notification
+# Replacement IDs coalesce repeated notifications; the title, body, severity,
+# and timeout distinguish the outcome shown to the user.
 if ((failed == 0)); then
-  notify-send -r 3 -t 5000 "$succeeded File(s) Queued" "Sent to: $default_printer"
+  notify-send -r 3 -a "Vibranium" -t 5000 "$succeeded File(s) Queued" "Sent to: $default_printer"
 elif ((succeeded == 0)); then
-  notify-send -r 4 -u critical -t 10000 "All $failed File(s) Failed" "$failed_body"
+  notify-send -r 4 -a "Vibranium" -u critical -t 10000 "All $failed File(s) Failed" "$failed_body"
 else
-  notify-send -r 3 -t 5000 "$succeeded File(s) Queued, $failed File(s) Failed" "Failed:$failed_body"
+  notify-send -r 3 -a "Vibranium" -t 5000 "$succeeded File(s) Queued, $failed File(s) Failed" "Failed:$failed_body"
 fi

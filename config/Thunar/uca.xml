@@ -17,7 +17,7 @@
 	<name>Set as wallpaper</name>
 	<submenu></submenu>
 	<unique-id>1761243531064717-1</unique-id>
-	<command>vb-core-wallpaper %f</command>
+	<command>vb-shell wallpaper set %f</command>
 	<description>Set selected image as desktop background</description>
 	<range>*</range>
 	<patterns>*</patterns>

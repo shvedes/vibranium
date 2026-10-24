@@ -13,7 +13,7 @@ The main components are:
 - **Scripts** — perform actions such as changing settings, applying themes, or running utilities
 - **Libraries** — shared Bash functionality used by scripts
 - **Menus** — interface for changing settings
-- **Custom Waybar modules** — provide status information through JSON output
+- **Bar modules** — provide status information for the bar
 - **Hyprland integration** — manages compositor-related configuration
 
 ## Runtime model
@@ -40,17 +40,13 @@ Most scripts use a shared library stack:
 
 ```mermaid
 flowchart TD
-    CORE[fa:fa-book vb-lib-core<br/>settings, validation, terminal I/O, rofi wrapper]
-    CFGR[fa:fa-book vb-lib-cfgr<br/>declarative rofi menus]
+    CORE[fa:fa-book vb-lib-core<br/>settings, validation, terminal I/O]
     HYPR[fa:fa-book vb-lib-hypr<br/>Hyprland interface]
-    MENUS[fa:fa-window-maximize cfgr-* and vb-menu-* scripts]
     WM[fa:fa-window-maximize WM configuration scripts]
     REST[fa:fa-file-code utilities and modules]
 
-    CORE --> CFGR
     CORE --> HYPR
     CORE --> REST
-    CFGR --> MENUS
     HYPR --> WM
 ```
 
@@ -61,19 +57,8 @@ Provides common functionality:
 - Settings access and validation.
 - Theme variable loading.
 - Terminal output helpers.
-- Rofi integration.
 - Logging utilities.
 - Common desktop helpers.
-
-### `vb-lib-cfgr`
-
-Provides the configuration menu framework.
-
-Scripts describe available options, and the library handles:
-
-- Menu generation.
-- User interaction.
-- Updating configuration values.
 
 ### `vb-lib-hypr`
 
@@ -89,17 +74,15 @@ Changing a setting through a menu follows this process:
 
 ```mermaid
 flowchart LR
-    A[User selects option] --> B[cfgr processes menu action]
-    B --> C[Configuration value is updated]
-    C --> D[Optional action runs]
-    D --> E[Menu reloads updated state]
+    A[User selects option] --> B[Shell updates configuration value]
+    B --> C[Optional action runs]
+    C --> D[Menu reloads updated state]
 ```
 
 Settings are stored as simple configuration values and validated when loaded.
 
 The detailed implementation is covered in:
 
-- [The cfgr menu system](configuration-system.md)
 - [Settings & validation](settings.md)
 
 ## Theme system

@@ -1,0 +1,105 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+
+usage() {
+  shcat << EOF
+Usage: ${0##*/} [OPTION]
+
+Notify the user about the Secure Boot state.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      log Error "unknown option: $1"
+      log Error "Try --help for more information"
+      exit 1
+      ;;
+  esac
+done
+
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  log Info "VM detected, skipping Secure Boot notifications"
+  exit 0
+fi
+
+SETUP_DONE=false
+
+# vb-setup-sboot leaves this marker to report pending reboot. Consume it so
+# the status query can read live bootctl state.
+if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
+  rm -f "$VIBRANIUM_STATE/secure-boot-setup.complete"
+  SETUP_DONE=true
+fi
+
+# vb-sboot-status uses stdout as its state protocol, so its exit code is not
+# consulted here; the branches consume the normalized state string.
+SB_STATE=""
+IFS= read -r SB_STATE < <(vb-sboot-status) || true
+
+if [[ "$SB_STATE" == "setup" ]]; then
+  if [[ "$SETUP_DONE" == true ]]; then
+    msg="Secure Boot is still in Setup mode!"
+    msg+="\nIs your firmware poorly implemented?"
+    notify-send -r 1 -t 60000 -a "Vibranium" -u critical "Secure Boot Setup Wizard" "$msg"
+    exit 0
+  fi
+
+  if [[ -f "$VIBRANIUM_STATE/sboot-notify.ignore" ]]; then
+    log Info "Secure Boot notice was disabled by the user"
+    exit 0
+  fi
+
+  msg="Your firmware is in Setup mode, meaning it's awaiting for key enrollment."
+  msg+="\nYou can setup Secure Boot using Setup scripts"
+
+  # notify-send runs directly with a zero timeout; the background subshell waits
+  # for the action result without blocking the caller.
+  (
+    ACTION=""
+    IFS= read -r ACTION < <(notify-send -a "Vibranium" -t 0 \
+      --action="setup=Setup Secure Boot" \
+      --action="ignore=Don't show again" \
+      "UEFI Is in Setup Mode" "$msg") || true
+
+    case "$ACTION" in
+      setup)
+        exec xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-sboot
+        ;;
+      ignore)
+        notify-send -r 1 -a "Vibranium" "Secure Boot Setup" "Secure Boot notice has been disabled"
+        : > "$VIBRANIUM_STATE/sboot-notify.ignore"
+        ;;
+    esac
+  ) &
+elif [[ "$SETUP_DONE" == true ]]; then
+  case "$SB_STATE" in
+    enabled)
+      notify-send -r 1 -t 10000 -a "Vibranium" "Secure Boot Setup Wizard" "Secure Boot setup complete!"
+      ;;
+    disabled)
+      msg="Secure Boot setup did not complete properly!\n"
+      msg+="See 'sbctl status' for detailed info"
+      notify-send -r 1 -t 60000 -a "Vibranium" -u critical "Secure Boot Setup Wizard" "$msg"
+      ;;
+    *)
+      log Error "unknown Secure Boot state: ${SB_STATE:-empty}"
+      ;;
+  esac
+fi

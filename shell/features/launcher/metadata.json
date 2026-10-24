@@ -1,0 +1,5 @@
+{
+  "id": "app-launcher",
+  "name": "App Launcher",
+  "description": "Native desktop-entry launcher with web-search plugins, prefix modes and per-plugin settings."
+}

@@ -1,0 +1,66 @@
+// Shell-owned pages (shell.*) for the Settings store.
+// Directory decides namespace: every option here must be shell.
+{
+  "pages": [
+    {
+      "label": "Audio",
+      "icon": "volume-max",
+      "showItemCount": true,
+      "items": [
+        {
+          "type": "separator"
+        },
+        {
+          "type": "action",
+          "label": "Volume mixer",
+          "icon": "settings-general",
+          "sub": "Open the shell's audio mixer",
+          "call": "audioMixer toggle"
+        }
+      ],
+      "options": [
+        {
+          "key": "shell.audio.loopback",
+          "type": "bool",
+          "default": false,
+          "label": "Hear my voice",
+          "sub": "Route input device to output device"
+        },
+        {
+          "key": "shell.volume.visualFeedback",
+          "type": "bool",
+          "default": true,
+          "label": "Visual feedback",
+          "sub": "Show the OSD when changing volume"
+        },
+        {
+          "key": "shell.volume.step",
+          "type": "int",
+          "default": 5,
+          "label": "Volume step",
+          "sub": "Volume adjustment step",
+          "range": {
+            "min": 1,
+            "max": 50
+          },
+          "step": 1,
+          "unit": "%"
+        },
+        {
+          "key": "shell.volume.allowAboveHundred",
+          "type": "bool",
+          "default": false,
+          "label": "Vol above 100%",
+          "sub": "Boost vol cap to 200%"
+        },
+        {
+          "key": "shell.volume.micAllowAboveHundred",
+          "type": "bool",
+          "default": false,
+          "label": "Mic above 100%",
+          "sub": "Boost mic cap to 200%"
+        }
+      ]
+    }
+  ]
+}

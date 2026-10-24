@@ -6,7 +6,6 @@ VERBOSE=${VERBOSE:-false}
 
 SELF="${0##*/}"
 CONF="$XDG_CONFIG_HOME/hypr/hyprsunset.conf"
-STATE_FILE="$VIBRANIUM_STATE/nightshift"
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF.lock"
 STEP=100
 
@@ -18,6 +17,8 @@ Options:
   -i, --inc, --increase  Increase temperature by STEP (or +)
   -d, --dec, --decrease  Decrease temperature by STEP (or -)
   -t, --toggle           Toggle night light
+  -A, --set-active 0|1   Converge night light to the given state
+                         (idempotent, safe to re-run)
   -s, --set TEMP         Set absolute temperature (in Kelvin)
   -n, --step N           Use step N (default is $STEP)
   -v, --verbose          Enable verbose output
@@ -25,7 +26,6 @@ Options:
 
 Notes:
   Temperature must be between 1000 and 20000.
-  The script expects a state file at: $STATE_FILE
 EOF
 }
 
@@ -36,8 +36,6 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 1
 fi
 
-# Lock on fd 10 to prevent concurrent adjustments from racing on the
-# config file write and the hyprsunset IPC call.
 exec 10> "$LOCKFILE" || {
   log Error "another instance of $SELF already running!"
   exit 1
@@ -45,6 +43,10 @@ exec 10> "$LOCKFILE" || {
 
 flock -n 10 || exit 0
 
+# The descriptor-based lock serializes the synchronous read, config write, and
+# command launch; it does not guarantee completion of detached operations.
+# A failed nonblocking acquisition exits successfully to make repeated key
+# actions harmless.
 if [[ $# -eq 0 ]]; then
   usage
   exit 0
@@ -52,6 +54,7 @@ fi
 
 action=""
 ARG_TEMP=""
+ARG_ACTIVE=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -65,6 +68,12 @@ while [[ $# -gt 0 ]]; do
       ;;
     -t | --toggle)
       action="toggle"
+      shift
+      ;;
+    -A | --set-active)
+      action="setactive"
+      shift
+      ARG_ACTIVE="$1"
       shift
       ;;
     -i | --inc | --increase | +)
@@ -99,16 +108,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ ! -f "$STATE_FILE" ]]; then
-  log Error "Night Light state file not found: $STATE_FILE"
-  exit 1
-fi
-
-state="$(< "$STATE_FILE")"
-
-# Read the current temperature from the hyprsunset config. Needed for
-# toggle (re-applies the configured value), inc, and dec actions.
-# Only read when the action actually needs the current value.
+# The config scan runs for toggle, increment, and decrement actions. Only
+# increment and decrement consume CURRENT_TEMP; toggle uses the unit state.
 if [[ $action =~ ^(toggle|inc|dec)$ ]]; then
   while IFS= read -r line; do
     case $line in
@@ -123,35 +124,57 @@ if [[ $action =~ ^(toggle|inc|dec)$ ]]; then
   done < "$CONF"
 fi
 
-# Toggle between active and suspended state. hyprsunset is called in
-# the background since the IPC involves a D-Bus round-trip. The state
-# file is updated synchronously before the module refresh.
-if [[ "$action" == "toggle" ]]; then
-  case "$state" in
-    suspended)
-      hyprctl -q hyprsunset temperature "$CURRENT_TEMP" &
-      printf "active" > "$STATE_FILE"
-      ;;
-    active)
-      hyprctl -q hyprsunset identity &
-      printf "suspended" > "$STATE_FILE"
-      ;;
-    *)
-      log Error "Unknown state in state file: $state"
-      exit 1
-      ;;
-  esac
+state="$(systemctl --user is-active hyprsunset)"
 
-  vb-refresh-waybar-module nightshift &
+# Unit status is sampled once for this invocation; the state branches use that
+# value to avoid issuing redundant enable or disable operations.
+# _sync_key treats settings.json as a best-effort cache only. A mismatch sends
+# the authoritative settings IPC update; the shell's in-memory state and
+# signals drive consumers, and this function does not wait for a file flush.
+_sync_key() {
+  local want="$1" cur
+  local file="${XDG_CONFIG_HOME:-$HOME/.config}/vibranium/settings.json"
+  [[ -f "$file" ]] || return
+  cur="$(jq -r '.shell.nightLight.enabled // false' "$file" 2>/dev/null)"
+  [[ "$cur" == "$want" ]] && return
+  qs -p "$VIBRANIUM/shell" ipc call settings set shell.nightLight.enabled "$want" >/dev/null 2>&1
+}
+
+# Setactive enables only when ARG_ACTIVE is exactly 1; every other value takes
+# the disable branch, and this parser does not validate a narrower domain.
+if [[ "$action" == "setactive" ]]; then
+  if [[ "$ARG_ACTIVE" == 1 ]]; then
+    [[ "$state" != active ]] && setsid -f systemctl -q --user enable --now hyprsunset
+    _sync_key true
+  else
+    [[ "$state" == active ]] && setsid -f systemctl -q --user disable --now hyprsunset
+    _sync_key false
+  fi
+  exit 0
+fi
+
+# Toggle changes the user unit through detached systemctl; this branch does
+# not invoke hyprctl directly.
+if [[ "$action" == "toggle" ]]; then
+  if [[ "$state" == "active" ]]; then
+    setsid -f systemctl -q --user disable --now hyprsunset
+    _sync_key false
+  else
+    setsid -f systemctl -q --user enable --now hyprsunset
+    _sync_key true
+  fi
   exit 0
 fi
 
 if [[ "$action" == "inc" || "$action" == "dec" ]]; then
-  if [[ "$state" == "suspended" ]]; then
+  if [[ "$state" == "inactive" ]]; then
     log Warn "Night Light is suspended"
     exit 1
   fi
 
+  # Increment and decrement pass CURRENT_TEMP and STEP to Bash arithmetic;
+  # leading-zero forms follow Bash's numeric base rules, and the result is
+  # checked against the Kelvin range below.
   case "$action" in
     inc)
       TEMP=$((CURRENT_TEMP + STEP))
@@ -163,6 +186,9 @@ if [[ "$action" == "inc" || "$action" == "dec" ]]; then
 fi
 
 if [[ "$action" == "set" ]]; then
+  # The absolute-set path accepts a digit-only string; Bash arithmetic then
+  # interprets its numeric form, including leading-zero base rules, and applies
+  # the Kelvin range check.
   if ! [[ "$ARG_TEMP" =~ ^[0-9]+$ ]]; then
     log Error "Invalid temperature: $ARG_TEMP"
     exit 1
@@ -180,11 +206,13 @@ if ((TEMP < 1000 || TEMP > 20000)); then
   exit 1
 fi
 
-# Write the hyprsunset config file with the new temperature.
-# The file is marked auto-generated so users know manual edits will be
-# overwritten. max-gamma = 150 limits the colour transformation range.
+# Write the hyprsunset config with the new temperature. The generated file
+# contains a header and one profile with the temperature field; manual edits
+# are overwritten.
+# The lock serializes cooperating writers, but a reader that ignores it can
+# observe the short interval between truncation and the appended profile.
 printf '# Auto-generated! All changes will be overwritten!\n' > "$CONF"
-printf '\nmax-gamma = 150\n\nprofile {\n\ttemperature = %s\n}\n' "$TEMP" >> "$CONF"
-hyprctl -q hyprsunset temperature "$TEMP" &
-
-vb-refresh-waybar-module nightshift &
+printf 'profile {\n\ttemperature = %s\n}\n' "$TEMP" >> "$CONF"
+# Detaching the compositor command lets the CLI return without waiting for
+# hyprctl to finish; the IPC request carries the new temperature.
+exec setsid -f hyprctl -q hyprsunset temperature "$TEMP" &

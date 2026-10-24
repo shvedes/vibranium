@@ -1,18 +1,33 @@
 #!/bin/bash
 
-# Source: omarchy
+# Each migration runs once per basename unless explicitly marked skipped.
 
 source vb-lib-core
 
 STATE_DIR="$VIBRANIUM_STATE/migrations"
 mkdir -p "$STATE_DIR/skipped"
+# Marker checks and writes are not locked, so callers must serialize runs that
+# share a Vibranium state directory.
 
+# Timestamp filenames are expanded in lexical order, matching timestamp order
+# while names share the constant width emitted by the migration creator.
+# Without nullglob, an empty migration set yields one literal *.sh path. With no
+# matching marker, the child fails and the normal skip prompt runs.
 for file in "$VIBRANIUM"/migrations/*.sh; do
   name="${file##*/}"
+  # Applied and skipped marker basenames equal migration names. A marker with
+  # that basename in either state directory suppresses execution; content is unused.
+  # Identity is the basename rather than script content, so replacing a script
+  # under a recorded name does not invalidate either marker.
   if [[ ! -f "$STATE_DIR/$name" && ! -f "$STATE_DIR/skipped/$name" ]]; then
     vb::print "$Y" "Running migration ${G}${name}${RS}"
 
+    # Each migration runs in a child Bash process, so its exit status,
+    # variables, and traps cannot alter the runner or the next migration.
     if bash "$file"; then
+      # The success marker is created only after a zero exit. A crash between
+      # migration side effects and marker creation causes a retry, so scripts
+      # must be idempotent.
       : > "$STATE_DIR/$name"
     else
       if term::ask_yes_no Y "Migration $file failed. Skip and continue?"; then

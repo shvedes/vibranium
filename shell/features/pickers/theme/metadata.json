@@ -1,0 +1,5 @@
+{
+  "id": "theme-picker",
+  "name": "Theme Picker",
+  "description": "Quickshell MenuLib theme picker with palette dots extracted from colors.list and the theme icon per row."
+}

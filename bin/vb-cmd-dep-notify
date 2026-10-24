@@ -69,11 +69,14 @@ fi
 
 # Source the theme library for P_YELLOW and other colour variables used
 # in the notification markup.
+# Argument validation completes prior to reading the theme color source.
 source "$VIBRANIUM_STATE/theme/colors.bash"
 
 log Info "Missing dependencies for $NAME: ${DEPS[*]}"
 
+# Array elements preserve each dependency as one argument even when a name
+# contains spaces; the notification renders the joined list as one markup body.
 msg="Missing required dependencies: <span foreground='${P_YELLOW}'><b>${DEPS[*]}</b></span>"
 # Replace notification ID 4 so repeated dep-notify calls update the same
 # notification bubble instead of stacking new ones.
-notify-send -r 4 "$NAME" "$msg"
+notify-send -r 4 -a "Vibranium" "$NAME" "$msg"

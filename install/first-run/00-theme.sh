@@ -1,3 +1,3 @@
 #!/bin/bash
 
-vb-theme-set Nightfox
+vb-theme-set Vibranium

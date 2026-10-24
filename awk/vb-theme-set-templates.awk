@@ -27,6 +27,18 @@
 #     untouched rather than replaced with an empty string. A literal
 #     {{ typo_key }} sitting in a generated config file is something a
 #     person will actually notice; a silently blank value is not.
+#
+# dim= and pop= are the ops a shade ramp is built from. Each one shifts a
+# color's HSL lightness by a fraction of the 0-100 range, picking the
+# direction from the theme mode rather than from the operand's sign: dim
+# moves toward the background, pop moves toward the foreground. A palette
+# names two ramp bases and nothing above them, so a template asking for the
+# fourth shade of the background writes {{ background|pop=0.24 }} and gets a
+# lighter surface under a dark theme and a darker one under a light theme,
+# from one placeholder. The hsl format is the exception: its ops, dim/pop
+# included, take unsigned percentage points rather than a fraction, so the
+# same shade read through that lens is {{ background_hsl|pop=24 }}. Every
+# other format takes the fraction.
 
 # Two lookup tables that pay for themselves many times over during template
 # rendering. _hv[] maps any hex digit character (both cases) directly to
@@ -484,6 +496,54 @@ function resolve_token(inner_expr,    pipe_pos, base_part, ops_str, base_key, fm
         if      (op_name == "whiten")  _w = clamp(_w + op_val, 0, 100)
         else if (op_name == "blacken") _bk = clamp(_bk + op_val, 0, 100)
         else if (op_name == "hue")     _h = ((_h + op_val) % 360.0 + 360.0) % 360.0
+        else if (op_name == "dim" || op_name == "pop") {
+          # HWB carries no lightness of its own to shift, so the ramp borrows
+          # the HSL round trip the hex and rgb branches already use, then
+          # reads whiteness and blackness back off the rebuilt color: those
+          # two are only knowable once the color exists again. The operand is
+          # a fraction here, matching hex, rgb and scalar rather than hsl's
+          # percentage points.
+          if (reject_signed_dimpop(op_name, op_val_str)) continue
+          load_hsl(base_key, overridden)
+          delta_sign = (op_name == "dim") ? (IS_LIGHT ? 1 : -1) : (IS_LIGHT ? -1 : 1)
+          _l = clamp(_l + delta_sign * op_val * 100.0, 0, 100)
+          hsl_to_rgb(_h, _s, _l)
+          # rgb_to_hsl() overwrites _h along with the two this branch needs.
+          # A lightness shift cannot change hue, so the exact value is put
+          # back rather than the one the 8-bit round trip guessed - on a
+          # color that is nearly gray, and so has almost no hue to lose,
+          # quantization moves that guess by tens of degrees.
+          ramped_hue = _h
+          rgb_to_hsl(_r, _g, _b)
+          _h = ramped_hue
+        }
+      } else if (fmt == "scalar" && (op_name == "dim" || op_name == "pop")) {
+        # The same ramp, projected back onto whichever single channel the
+        # token asked for. Rebuilding the color first is what makes the RGB
+        # channels agree with the hex ramp: a raw channel nudge would move
+        # _r by 0.06*255 while the hex ramp moves it by however much the
+        # lightness shift implies, and the two would not be one color.
+        if (reject_signed_dimpop(op_name, op_val_str)) continue
+        load_hsl(base_key, overridden)
+        delta_sign = (op_name == "dim") ? (IS_LIGHT ? 1 : -1) : (IS_LIGHT ? -1 : 1)
+        _l = clamp(_l + delta_sign * op_val * 100.0, 0, 100)
+        # Hue, saturation and lightness need no rebuild: a lightness shift
+        # leaves the first two exactly as they were and moves the third by
+        # exactly the amount asked for. Reading them from the working HSL
+        # state is both cheaper and exact where the rebuilt color is not -
+        # and it keeps the scalar forms in step with the hsl format's, which
+        # never rebuilds either.
+        if      (scalar_ch == "h") scalar_val = _h
+        else if (scalar_ch == "s") scalar_val = _s
+        else if (scalar_ch == "l") scalar_val = _l
+        else {
+          hsl_to_rgb(_h, _s, _l)
+          rgb_to_hsl(_r, _g, _b)
+          if      (scalar_ch == "r") scalar_val = _r
+          else if (scalar_ch == "g") scalar_val = _g
+          else if (scalar_ch == "b") scalar_val = _b
+          else                     scalar_val = _w
+        }
       } else if (fmt == "scalar" && op_name == "lightness") {
         if (scalar_ch == "r" || scalar_ch == "g" || scalar_ch == "b") {
           scalar_lo = 0; scalar_hi = 255

@@ -1,0 +1,297 @@
+#!/bin/bash
+
+# Foot has no config-reload signal: SIGUSR1/SIGUSR2 only switch the
+# colors-dark/colors-light sections. New windows read the rendered state-theme
+# output through config/foot/foot.ini's include; running windows are recolored
+# with OSC sequences.
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+SELF="${0##*/}"
+
+usage() {
+	shcat << EOF
+Usage: $SELF [OPTION]...
+
+Recolor running foot terminals to the active Vibranium theme without
+restarting them. New windows read the rendered theme file on launch.
+
+Options:
+  -v, --verbose     Enable verbose output
+  -h, --help        Show this help text and exit
+EOF
+}
+
+while (($# > 0)); do
+	case "$1" in
+		-v | --verbose)
+			VERBOSE=true
+			shift
+			;;
+		-h | --help)
+			usage
+			exit 0
+			;;
+		*)
+			log Error "Unknown option: $1" >&2
+			log Error "Try '$SELF --help' for more information"
+			exit 1
+			;;
+	esac
+done
+
+THEME_DIR="$VIBRANIUM_STATE/theme"
+COLORS_FILE="$THEME_DIR/colors.list"
+
+# Both conditions are deliberate no-ops: without a rendered palette there
+# is no OSC data to send, and without a foot process there is no tty target.
+# This path does not rewrite the theme file.
+if [[ ! -f $COLORS_FILE ]]; then
+	exit 0
+fi
+
+# Single snapshot of the process table. Foot's child processes (and any
+# deeper descendants) may be capability-bearing (e.g. btop), whose
+# /proc/<pid>/fd directory is root-owned and unreadable by us; reading
+# the controlling tty from /proc/<pid>/stat via ps avoids that and removes
+# the need for per-child pgrep/readlink calls.
+_PS_TABLE="$(ps -eo pid=,ppid=,tty=,comm=)"
+_found_foot=false
+while read -r _ps_pid _ps_ppid _ps_tty _ps_comm; do
+	[[ $_ps_comm == foot ]] && { _found_foot=true; break; }
+done <<< "$_PS_TABLE"
+if ! $_found_foot; then
+	exit 0
+fi
+
+log Info "source palette: $COLORS_FILE"
+
+# Same key/value split vb-theme-set-templates uses: strip quotes and
+# spaces from the key, take whatever sits between the first pair of
+# quotes on the value side.
+declare -A C=()
+
+while IFS='=' read -r key value; do
+	key="${key//[\"\' ]/}"
+	[[ $key && $key != \#* ]] || continue
+	value="${value#*[\"\']}"
+	value="${value%%[\"\']*}"
+	C[$key]="$value"
+done < "$COLORS_FILE"
+
+# pop= moves toward the foreground in dark mode and toward the
+# background in light mode, mirroring the awk template engine. Prefer
+# the export vb-theme-set provides; resolve locally on standalone runs.
+is_light="${VB_THEME_IS_LIGHT:-}"
+
+if [[ -z $is_light ]]; then
+	is_light=false
+
+	if [[ -f $THEME_DIR/theme.info ]]; then
+		while IFS='=' read -r key val; do
+			[[ $key == LIGHT && $val == true ]] && is_light=true
+		done < "$THEME_DIR/theme.info"
+	fi
+fi
+
+if $is_light; then
+	pop_sign=-1
+else
+	pop_sign=1
+fi
+
+log Info "is_light=$is_light pop_sign=$pop_sign"
+
+_valid_hex() {
+	[[ $1 =~ ^#[0-9a-fA-F]{6}$ ]]
+}
+
+# ramp <hex> <sign> <fraction> - one color shifted along the HSL lightness
+# axis, which is the math the template engine applies for pop= and dim=. The
+# palette names only background and foreground; every shade a terminal slot
+# needs is one step off the base at the same step default/themed asks for.
+# The live path mirrors the template math but does not guarantee
+# byte-identical output.
+#
+# A hex that is not a color yields nothing rather than black, so a palette
+# missing the key leaves the slot unset instead of painting it.
+_ramp() {
+	local -n _out="$1"
+	local hex="$2" sign="$3" frac="$4"
+
+	_valid_hex "$hex" || {
+		_out=""
+		return 1
+	}
+	read -r _out < <(awk -v sign="$sign" -v frac="$frac" '
+    function clamp(v, lo, hi) {
+      return v < lo ? lo : (v > hi ? hi : v)
+    }
+    function rgb_to_hsl(r, g, b,    rn, gn, bn, cmax, cmin, delta, lv, abs2l1, max_ch) {
+      rn = r / 255.0
+      gn = g / 255.0
+      bn = b / 255.0
+      if (rn >= gn && rn >= bn) { cmax = rn; max_ch = "r" }
+      else if (gn >= bn)        { cmax = gn; max_ch = "g" }
+      else                      { cmax = bn; max_ch = "b" }
+      cmin = (rn <= gn && rn <= bn) ? rn : (gn <= bn ? gn : bn)
+      delta = cmax - cmin
+      lv = (cmax + cmin) / 2.0
+      if (delta < 0.000001) {
+        _h = 0; _s = 0; _l = lv * 100.0
+        return
+      }
+      abs2l1 = 2.0 * lv - 1.0
+      if (abs2l1 < 0) abs2l1 = -abs2l1
+      _s = (delta / (1.0 - abs2l1)) * 100.0
+      if      (max_ch == "r") _h = 60.0 * (((gn - bn) / delta) % 6)
+      else if (max_ch == "g") _h = 60.0 * ((bn - rn) / delta + 2.0)
+      else                    _h = 60.0 * ((rn - gn) / delta + 4.0)
+      if (_h < 0) _h += 360.0
+      _l = lv * 100.0
+    }
+    function hsl_to_rgb(h, s, l,    sn, ln, C, Hp, X, m, r1, g1, b1, hmod2, abshm1, abs2l1) {
+      sn = s / 100.0
+      ln = l / 100.0
+      h = ((h % 360.0) + 360.0) % 360.0
+      abs2l1 = 2.0 * ln - 1.0
+      if (abs2l1 < 0) abs2l1 = -abs2l1
+      C = (1.0 - abs2l1) * sn
+      Hp = h / 60.0
+      hmod2 = Hp % 2.0
+      abshm1 = hmod2 - 1.0
+      if (abshm1 < 0) abshm1 = -abshm1
+      X = C * (1.0 - abshm1)
+      if      (Hp < 1) { r1=C; g1=X; b1=0 }
+      else if (Hp < 2) { r1=X; g1=C; b1=0 }
+      else if (Hp < 3) { r1=0; g1=C; b1=X }
+      else if (Hp < 4) { r1=0; g1=X; b1=C }
+      else if (Hp < 5) { r1=X; g1=0; b1=C }
+      else             { r1=C; g1=0; b1=X }
+      m = ln - C / 2.0
+      _r = int((r1 + m) * 255.0 + 0.5)
+      _g = int((g1 + m) * 255.0 + 0.5)
+      _b = int((b1 + m) * 255.0 + 0.5)
+    }
+    BEGIN {
+      _hv["0"]=0; _hv["1"]=1; _hv["2"]=2; _hv["3"]=3; _hv["4"]=4
+      _hv["5"]=5; _hv["6"]=6; _hv["7"]=7; _hv["8"]=8; _hv["9"]=9
+      _hv["a"]=10; _hv["b"]=11; _hv["c"]=12; _hv["d"]=13; _hv["e"]=14; _hv["f"]=15
+      _hv["A"]=10; _hv["B"]=11; _hv["C"]=12; _hv["D"]=13; _hv["E"]=14; _hv["F"]=15
+      _d = "0123456789abcdef"
+      for (_i = 0; _i <= 255; _i++)
+        _hex2[_i] = substr(_d, int(_i / 16) + 1, 1) substr(_d, (_i % 16) + 1, 1)
+    }
+    {
+      hex = substr($1, 2)
+      rgb_to_hsl(_hv[substr(hex, 1, 1)] * 16 + _hv[substr(hex, 2, 1)], \
+                 _hv[substr(hex, 3, 1)] * 16 + _hv[substr(hex, 4, 1)], \
+                 _hv[substr(hex, 5, 1)] * 16 + _hv[substr(hex, 6, 1)])
+      hsl_to_rgb(_h, _s, clamp(_l + sign * frac * 100.0, 0, 100))
+      print "#" _hex2[_r] _hex2[_g] _hex2[_b]
+    }
+  ' <<< "$hex")
+}
+
+# Slot mapping mirrors default/themed/alacritty.toml.tpl so foot and
+# alacritty agree on every theme.
+fg="${C[foreground]:-}"
+bg="${C[background]:-}"
+
+# The shades those slots want, each one a step off a base colour: the
+# high-contrast foreground, and the three background levels foot uses for
+# selection, the black slot and the bright black slot.
+declare fg_h bg_3 bg_4 bg_5
+_ramp fg_h "${C[foreground]:-}" "$pop_sign" 0.06
+_ramp bg_3 "${C[background]:-}" "$pop_sign" 0.18
+_ramp bg_4 "${C[background]:-}" "$pop_sign" 0.24
+_ramp bg_5 "${C[background]:-}" "$pop_sign" 0.30
+
+cursor="$fg_h"
+sel_bg="$bg_3"
+sel_fg="$fg_h"
+
+# Foot ANSI indices 0..7 use the regular ramp, index 8 is the dedicated
+# background bright slot, and indices 9..15 are derived bright hues. This
+# matches the ordering consumed by the generated foot template.
+regular=("$bg_4" "${C[red]:-}" "${C[green]:-}" "${C[yellow]:-}" "${C[blue]:-}"
+	"${C[purple]:-}" "${C[cyan]:-}" "${C[white]:-}")
+
+palette=()
+palette[8]="$bg_5"
+
+for i in {0..7}; do
+	palette[i]="${regular[$i]}"
+done
+
+# Every hue's bright slot is its base hue pushed 0.10 toward the foreground.
+declare bright
+for i in {0..6}; do
+	_ramp bright "${regular[$((i + 1))]}" "$pop_sign" 0.10 || continue
+	palette[i + 9]="$bright"
+done
+
+# OSC sequences are accumulated into one string and emitted only for valid
+# six-digit colors. A partial palette can still produce a sequence and
+# trigger traversal; only an empty sequence exits without /proc work.
+osc=""
+
+_emit() {
+	local seq
+	printf -v seq '\033]%s;%s\007' "$1" "$2"
+	osc+="$seq"
+}
+
+_valid_hex "$fg" && _emit 10 "$fg"
+_valid_hex "$bg" && _emit 11 "$bg"
+_valid_hex "$cursor" && _emit 12 "$cursor"
+_valid_hex "$sel_bg" && _emit 17 "$sel_bg"
+_valid_hex "$sel_fg" && _emit 19 "$sel_fg"
+
+for i in {0..15}; do
+	_valid_hex "${palette[$i]:-}" || continue
+	_emit "4;$i" "${palette[$i]}"
+done
+
+[[ -n $osc ]] || exit 0
+
+# The foot daemon's pseudo-terminal belongs to a descendant rather than the
+# daemon itself, and windows behind the server or a second fork sit deeper
+# than one level, so each daemon is walked through its whole subtree.
+# A raced process exit yields no tty and is skipped. Each pts is written
+# once; a repeat fork of the same target changes nothing visible.
+
+# Index the snapshot once: tty per pid, children per parent, foot pids.
+declare -A _TTY_OF=() _CHILDREN_OF=() _FOOT_PIDS=()
+while read -r _pid _ppid _tty _comm; do
+	[[ -n $_pid ]] || continue
+	_TTY_OF[$_pid]="$_tty"
+	if [[ -z ${_CHILDREN_OF[$_ppid]+_} ]]; then
+		_CHILDREN_OF[$_ppid]="$_pid"
+	else
+		_CHILDREN_OF[$_ppid]+=" $_pid"
+	fi
+	[[ $_comm == foot ]] && _FOOT_PIDS[$_pid]=1
+done <<< "$_PS_TABLE"
+
+declare -A _seen_pts=()
+for foot_pid in "${!_FOOT_PIDS[@]}"; do
+	_queue=("$foot_pid")
+	while ((${#_queue[@]} > 0)); do
+		_parent="${_queue[0]}"
+		_queue=("${_queue[@]:1}")
+		for child_pid in ${_CHILDREN_OF[$_parent]:-}; do
+			[[ -n $child_pid ]] || continue
+			_queue+=("$child_pid")
+			tty_name="${_TTY_OF[$child_pid]:-}"
+			pts=""
+			[[ $tty_name == pts/* ]] && pts="/dev/$tty_name"
+			if [[ $pts == /dev/pts/* && -z ${_seen_pts[$pts]+_} ]]; then
+				_seen_pts[$pts]=1
+				printf '%b' "$osc" > "$pts"
+				log Info "recolored $pts (foot pid $foot_pid)"
+			fi
+		done
+	done
+done

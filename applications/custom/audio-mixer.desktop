@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Volume Mixer
+Icon=volume-max
+TryExec=vb-shell
+Exec=vb-shell app audioMixer
+Comment=Open the shell's audio mixer
+OnlyShowIn=Hyprland;

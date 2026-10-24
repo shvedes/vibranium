@@ -1,0 +1,4 @@
+module qs.features.osd
+singleton OSD 1.0 OSD.qml
+OSDView 1.0 OSDView.qml
+OSDCard 1.0 OSDCard.qml

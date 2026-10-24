@@ -1,0 +1,170 @@
+// hypr.* pages for HyprlandSettings.
+// Directory decides namespace: every option here must be hypr.
+{
+  "pages": [
+    {
+      "id": "hyprland-appearance-blur",
+      "label": "Blur",
+      "icon": "blur",
+      "options": [
+        {
+          "key": "hypr.decoration.blur.enabled",
+          "type": "bool",
+          "default": false,
+          "label": "Enabled",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.blur.enabled"
+          }
+        },
+        {
+          "key": "hypr.decoration.blur.special",
+          "type": "bool",
+          "default": false,
+          "label": "Blur special",
+          "sub": "Blur special workspace",
+          "desc": "Whether to blur scratchpad.",
+          "warning": "Expensive!",
+          "showIf": [
+            {
+              "key": "hypr.decoration.blur.enabled",
+              "eq": true
+            }
+          ],
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.blur.special"
+          }
+        },
+        {
+          "key": "hypr.decoration.blur.size",
+          "type": "int",
+          "default": 3,
+          "unit": "px",
+          "label": "Size",
+          "range": {
+            "min": 1,
+            "max": 16
+          },
+          "step": 1,
+          "showIf": [
+            {
+              "key": "hypr.decoration.blur.enabled",
+              "eq": true
+            }
+          ],
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.blur.size"
+          }
+        },
+        {
+          "key": "hypr.decoration.blur.passes",
+          "type": "int",
+          "default": 3,
+          "unit": "times",
+          "label": "Passes",
+          "range": {
+            "min": 1,
+            "max": 10
+          },
+          "step": 1,
+          "showIf": [
+            {
+              "key": "hypr.decoration.blur.enabled",
+              "eq": true
+            }
+          ],
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.blur.passes"
+          }
+        },
+        {
+          "key": "hypr.decoration.blur.noise",
+          "type": "float",
+          "default": 0.0117,
+          "label": "Noise",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "step": 0.01,
+          "showIf": [
+            {
+              "key": "hypr.decoration.blur.enabled",
+              "eq": true
+            }
+          ],
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.blur.noise"
+          }
+        },
+        {
+          "key": "hypr.decoration.blur.vibrancy",
+          "type": "float",
+          "default": 0.1696,
+          "label": "Vibrancy",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "step": 0.01,
+          "showIf": [
+            {
+              "key": "hypr.decoration.blur.enabled",
+              "eq": true
+            }
+          ],
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.blur.vibrancy"
+          }
+        },
+        {
+          "key": "hypr.decoration.blur.contrast",
+          "type": "float",
+          "default": 0.8916,
+          "label": "Contrast",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "step": 0.01,
+          "showIf": [
+            {
+              "key": "hypr.decoration.blur.enabled",
+              "eq": true
+            }
+          ],
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.blur.contrast"
+          }
+        },
+        {
+          "key": "hypr.decoration.blur.brightness",
+          "type": "float",
+          "default": 0.8172,
+          "label": "Brightness",
+          "range": {
+            "min": 0,
+            "max": 2
+          },
+          "step": 0.01,
+          "showIf": [
+            {
+              "key": "hypr.decoration.blur.enabled",
+              "eq": true
+            }
+          ],
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.blur.brightness"
+          }
+        }
+      ]
+    }
+  ]
+}

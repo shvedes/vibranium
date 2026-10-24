@@ -1,0 +1,13 @@
+module qs.features.bar
+
+singleton Bar 1.0 Bar.qml
+BarModule 1.0 BarModule.qml
+CollapsibleSlot 1.0 CollapsibleSlot.qml
+BarView 1.0 BarView.qml
+BarShadow 1.0 BarShadow.qml
+ToolTipBind 1.0 ToolTipBind.qml
+ToolTipHost 1.0 ToolTipHost.qml
+Group 1.0 Group.qml
+Zone 1.0 Zone.qml
+MoveWindow 1.0 MoveWindow.qml
+PrivacyOverlay 1.0 PrivacyOverlay.qml

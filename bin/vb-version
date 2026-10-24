@@ -45,12 +45,16 @@ list_upcoming() {
   fi
 }
 
+# git describe selects the most recent reachable tag, not the globally highest
+# version; this anchors the release summary to repository ancestry.
 # Parse git output where INFO has the format "%cd|%h|%D|%s"
 # (date, hash, refs, subject).  Parameter expansion strips the
 # pipe-delimited fields without forking.
 DESCRIBE=$(git -C "$VIBRANIUM" describe --tags --long --abbrev=7 2> /dev/null)
 INFO=$(git -C "$VIBRANIUM" show -s --format="%cd|%h|%D|%s" --date=short HEAD 2> /dev/null)
 
+# INFO uses pipe-delimited fields. This parser assumes date, hash, and refs do
+# not contain pipes; a pipe in the final subject is preserved by # removal.
 DATE="${INFO%%|*}"
 REST="${INFO#*|}"
 SHORT_HASH="${REST%%|*}"
@@ -77,8 +81,8 @@ if $QUIET; then
 fi
 
 # Extract the branch name from the %D refs field which contains
-# "tag: v1.0, HEAD -> main, origin/main".  We want the part after
-# "HEAD -> " and before the first comma.
+# "tag: v1.0, HEAD -> main, origin/main". Extract the part after
+# "HEAD -> " up to the first comma.
 case "$REFS" in
   *"HEAD -> "*)
     BRANCH="${REFS#*HEAD -> }"
@@ -105,6 +109,8 @@ fi
 # Detached HEAD: say so and name the checked-out tag instead of a branch.
 if [[ -n "$INFO" && -z "$BRANCH" ]]; then
   TAG_REF=""
+  # The greedy expansion selects the final tag decoration in %D, which need
+  # not be the intended tag when several decorated refs are present.
   case "$REFS" in
     *"tag: "*)
       TAG_REF="${REFS##*"tag: "}"
@@ -118,8 +124,8 @@ if [[ -n "$INFO" && -z "$BRANCH" ]]; then
   fi
 fi
 
-# Comparison against the latest release tag.  Skip when it is the tag
-# the summary already measured against.
+# A second describe uses the same reachable-tag selection, so LATEST_TAG
+# normally equals TAG and this comparison is skipped.
 if [[ -n "$DESCRIBE" ]]; then
   LATEST_TAG=$(git -C "$VIBRANIUM" describe --tags --abbrev=0 2> /dev/null)
   if [[ -n "$LATEST_TAG" && "$LATEST_TAG" != "$TAG" ]]; then
@@ -130,8 +136,10 @@ if [[ -n "$DESCRIBE" ]]; then
   fi
 fi
 
-# Comparison against the remote.  Attached: the branch upstream.
-# Detached: the default branch instead.
+# Attached HEAD compares against its upstream; detached HEAD compares against
+# the local master ref.
+# The configured origin is printed literally; credentials embedded in its URL
+# are exposed in terminal output or captures.
 REMOTE_URL=$(git -C "$VIBRANIUM" config --get remote.origin.url 2> /dev/null)
 if [[ -n "$REMOTE_URL" ]]; then
   echo "Remote:     ${REMOTE_URL}"
@@ -151,6 +159,8 @@ if [[ -n "$BRANCH" ]]; then
     fi
   fi
 else
+  # Detached checkouts compare against the local master ref; no default branch
+  # is dynamically detected from origin.
   MASTER_AHEAD=$(git -C "$VIBRANIUM" rev-list --count master..HEAD 2> /dev/null)
   MASTER_BEHIND=$(git -C "$VIBRANIUM" rev-list --count HEAD..master 2> /dev/null)
   if [[ -n "$MASTER_AHEAD" ]]; then
@@ -166,11 +176,12 @@ else
   fi
 fi
 
-# On master, git describe finds no tag on shallow clones where the
-# tag history is truncated; count against the latest release tag,
-# picked by version sort, instead.
+# Shallow clones can lack reachable tag history. Fall back to the highest
+# version-sorted local tag regardless of ancestry; an unreachable tag can yield
+# an empty rev-list count.
 if [[ -z "$DESCRIBE" && "$BRANCH" == master ]]; then
-  RELEASE_TAG=$(git -C "$VIBRANIUM" tag --sort=-version:refname 2> /dev/null | head -1)
+  mapfile -t _tags < <(git -C "$VIBRANIUM" tag --sort=-version:refname 2> /dev/null)
+  RELEASE_TAG="${_tags[0]:-}"
   if [[ -n "$RELEASE_TAG" ]]; then
     MASTER_AHEAD_TAG=$(git -C "$VIBRANIUM" rev-list --count "$RELEASE_TAG"..HEAD 2> /dev/null)
     echo "${MASTER_AHEAD_TAG} commits ahead of latest release ${RELEASE_TAG}"
@@ -208,17 +219,22 @@ if ((STAGED == 0 && MODIFIED == 0 && UNTRACKED == 0)); then
 else
   echo "Working tree: ${STAGED} staged, ${MODIFIED} modified, ${UNTRACKED} untracked"
   if ((STAGED > 0 || MODIFIED > 0)); then
+    # The stat includes staged and unstaged tracked changes; untracked paths
+    # have no diff until they are staged.
     git -C "$VIBRANIUM" diff HEAD --stat
   fi
 fi
 
-STASH_COUNT=$(git -C "$VIBRANIUM" stash list 2> /dev/null | wc -l)
+mapfile -t _stashes < <(git -C "$VIBRANIUM" stash list 2> /dev/null)
+STASH_COUNT=${#_stashes[@]}
 if ((STASH_COUNT > 0)); then
   echo "Stashes:      ${STASH_COUNT}"
 fi
 
-# If an update-fetch run found a newer version, its tag was written
-# to this state file by vb-update-fetch.
+# vb-update-fetch stores a release tag or remote-only commit count in this
+# display-state file.
 if [[ -f "$VIBRANIUM_STATE/update.available" ]]; then
-  echo "New version available: $(< "$VIBRANIUM_STATE/update.available")"
+  _upd_avail=""
+  IFS= read -r _upd_avail < "$VIBRANIUM_STATE/update.available" || [[ -n $_upd_avail ]]
+  echo "New version available: $_upd_avail"
 fi

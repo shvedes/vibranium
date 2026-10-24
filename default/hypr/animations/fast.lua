@@ -1,10 +1,6 @@
 -- Animation preset: fast -- data only, applied via Hypr.Anim.apply (see lib/actions.lua).
 
 Hypr.Anim.apply({
-  layer_rules = {
-    { animation = "slide", match = { namespace = "notefications" } },
-  },
-
   curves = {
     { "easeOutQuint", { type = "bezier", points = { { 0.23, 1.0 }, { 0.32, 1.0 } } } },
     { "almostLinear", { type = "bezier", points = { { 0.5, 0.5 }, { 0.75, 1.0 } } } },

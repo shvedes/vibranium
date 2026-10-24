@@ -44,20 +44,25 @@ FZF_ARGS=(
   --color "${FZF_COLORS:-pointer:white,marker:green}"
 )
 
-_operation_canceled() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  read -r -n1 -s -p $'. Press any key to exit' _dummy
-  term::enable_input
+webapp_remove_prepare_result() {
+  if [[ -z "${term_original_settings+x}" ]]; then
+    term::disable_input
+  fi
 }
 
-_operation_complete() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s " "$G" "$RS"
-  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
-  read -r -n1 -p $'Removal complete. Press any key to exit ' _dummy
-  term::enable_input
+webapp_remove_canceled() {
+  webapp_remove_prepare_result
+  operation::result canceled
+}
+
+webapp_remove_error() {
+  webapp_remove_prepare_result
+  operation::result error
+}
+
+webapp_remove_complete() {
+  webapp_remove_prepare_result
+  operation::result success -- "Removal complete"
 }
 
 usage() {
@@ -82,47 +87,51 @@ _has_webapp_exec() {
 }
 
 _desktop_name() {
-  local line
-  while IFS= read -r line; do
-    if [[ "$line" == Name=* ]]; then
-      line="${line#Name=}"
-      echo "${line#PWA - }"
-      return
-    fi
-  done < "$1"
+  local -n _dn_out=$1
+  local _dn_file="$2" _dn_line _dn_val=""
+  while IFS= read -r _dn_line || [[ -n $_dn_line ]]; do
+    if [[ $_dn_line == Name=* ]]; then _dn_val=$_dn_line; break; fi
+  done < "$_dn_file"
+  _dn_val=${_dn_val#Name=}
+  _dn_out=${_dn_val#PWA - }
 }
 
 _is_chrome_webapp() {
-  grep -q '^Exec=.*--app-id=' "$1" 2>/dev/null
+  local _icw_line
+  while IFS= read -r _icw_line || [[ -n $_icw_line ]]; do
+    [[ $_icw_line == Exec=*--app-id=* ]] && return 0
+  done < "$1" 2>/dev/null
+  return 1
 }
 
 _chrome_icon_basename() {
-  while IFS= read -r line; do
-    [[ "$line" == Icon=* ]] && { echo "${line#Icon=}"; return; }
-  done < "$1"
+  local -n _cib_out=$1
+  local _cib_file="$2" _cib_line
+  _cib_out=""
+  while IFS= read -r _cib_line || [[ -n $_cib_line ]]; do
+    if [[ $_cib_line == Icon=* ]]; then _cib_out=${_cib_line#Icon=}; return 0; fi
+  done < "$_cib_file" 2>/dev/null
+  return 1
 }
 
-# ---------------------------------------------------------------------------
-# Derive the browser data directory name from a URL.
-# Must stay in sync with the identically named function in vb-launch-webapp;
-# both must produce the same string for the same URL or removal will miss the
-# data directory the launcher created.
-# ---------------------------------------------------------------------------
 _profile_dir_from_url() {
-  local url="$1"
-  local host="${url#*://}"
-  host="${host%%[/?#:]*}"
-  host="${host,,}"
-  host="${host//\./-}"
-  printf '%s' "$host"
+  # Host-only normalization intentionally aliases paths and ports on the same
+  # hostname to one browser data directory.
+  local -n _pdu_out=$1
+  local _pdu_url="$2"
+  local _pdu_host="${_pdu_url#*://}"
+  _pdu_host="${_pdu_host%%[/?#:]*}"
+  _pdu_host="${_pdu_host,,}"
+  _pdu_host="${_pdu_host//\./-}"
+  _pdu_out="$_pdu_host"
 }
 
 _remove_pwa() {
   local name="$1" desktop_path="$2"
   local removed=false exec_line=""
 
-  # Read the Exec= line before removing the file; the URL embedded in it is
-  # needed to derive the browser data directory path when --own-profile was used.
+  # Capture Exec= while the entry exists because profile cleanup needs its
+  # final token after desktop removal.
   if [[ -f "$desktop_path" ]]; then
     local line
     while IFS= read -r line; do
@@ -135,9 +144,11 @@ _remove_pwa() {
     removed=true
   fi
 
+  # The desktop file is already gone when classification runs, so the Chrome
+  # branch is skipped and native entries take the PWA icon path.
   if _is_chrome_webapp "$desktop_path"; then
-    local icon_basename
-    icon_basename="$(_chrome_icon_basename "$desktop_path")"
+    local icon_basename=""
+    _chrome_icon_basename icon_basename "$desktop_path" || true
     if [[ -n "$icon_basename" ]]; then
       find "$XDG_DATA_HOME/icons" -name "${icon_basename}.png" -delete 2>/dev/null
       removed=true
@@ -147,14 +158,18 @@ _remove_pwa() {
     removed=true
   fi
 
-  # If the PWA was installed with --own-profile, remove its isolated browser
-  # data directory. The URL is always the last whitespace-separated token on
-  # the Exec= line regardless of other flags between the command and the URL.
+  # Profile cleanup takes the text after the final literal space in any Exec=
+  # value. A trailing space yields an empty URL, which maps to WEBAPP_DATA_DIR
+  # itself; non-interactive mode does not validate command origin or URL shape.
   if [[ "$exec_line" == *--own-profile* ]]; then
     local url="${exec_line##* }"
+    local _pdu_host=""
+    _profile_dir_from_url _pdu_host "$url"
     local data_dir
-    data_dir="$WEBAPP_DATA_DIR/$(_profile_dir_from_url "$url")"
+    data_dir="$WEBAPP_DATA_DIR/$_pdu_host"
     if [[ -d "$data_dir" ]]; then
+      # Launcher deletion precedes recursive profile cleanup, so interruption
+      # can leave orphaned browser data without a desktop entry.
       rm -rf -- "$data_dir"
       vb::print "$G" "Removed browser data for ${B}${name}${RS}"
     fi
@@ -204,22 +219,27 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# --- Resolve targets ---
+# Resolve interactive or CLI targets into parallel name and path arrays.
 
 TARGET_NAMES=()
 TARGET_PATHS=()
 
 if [[ $INTERACTIVE == true ]]; then
   declare -A PWA_MAP
+  # Display names key the map, so duplicate Name= values retain only the last
+  # enumerated path for that name.
 
   shopt -s nullglob
+  _wdr_dn=""
+  cname=""
   for file in "$DESKTOP_DIR"/'PWA - '*.desktop; do
     _has_webapp_exec "$file" &&
-      PWA_MAP["$(_desktop_name "$file")"]="$file"
+      _desktop_name _wdr_dn "$file" &&
+      PWA_MAP["$_wdr_dn"]="$file"
   done
   for file in "$DESKTOP_DIR"/chrome-*.desktop; do
     _is_chrome_webapp "$file" && {
-      cname="$(_desktop_name "$file")"
+      _desktop_name cname "$file" &&
       PWA_MAP["[chrome] $cname"]="$file"
     }
   done
@@ -228,26 +248,38 @@ if [[ $INTERACTIVE == true ]]; then
   if ((${#PWA_MAP[@]} == 0)); then
     term::show_header --color red
     vb::print "$R" "No PWAs found"
-    _operation_canceled
+    webapp_remove_error
     exit 1
   fi
 
-  mapfile -t SELECTED < <(
-    for name in "${!PWA_MAP[@]}"; do
-      printf '%s\t%s\n' "$name" "${PWA_MAP[$name]}"
-    done | sort | fzf "${FZF_ARGS[@]}"
-  )
+  # The hidden tab-delimited field carries paths through fzf, so spaces remain
+  # inside each field. Literal tabs in either the display name or path break the
+  # two-field encoding and subsequent extraction.
+  _wdr_rows=()
+  for name in "${!PWA_MAP[@]}"; do
+    _wdr_rows+=("$name"$'\t'"${PWA_MAP[$name]}")
+  done
+  for ((_wdr_i = 1; _wdr_i < ${#_wdr_rows[@]}; _wdr_i++)); do
+    _wdr_key=${_wdr_rows[_wdr_i]}
+    _wdr_j=$((_wdr_i - 1))
+    while ((_wdr_j >= 0)) && [[ ${_wdr_rows[_wdr_j]} > $_wdr_key ]]; do
+      _wdr_rows[_wdr_j + 1]=${_wdr_rows[_wdr_j]}
+      _wdr_j=$((_wdr_j - 1))
+    done
+    _wdr_rows[_wdr_j + 1]=$_wdr_key
+  done
+  mapfile -t SELECTED < <(printf '%s\n' "${_wdr_rows[@]}" | fzf "${FZF_ARGS[@]}")
 
   term::show_header
 
   if ((${#SELECTED[@]} == 0)); then
-    _operation_canceled
+    webapp_remove_canceled
     exit 1
   fi
 
   ((${#SELECTED[@]} == 1)) && suffix="" || suffix="s"
   if ! term::ask_yes_no Y "You're about to remove ${#SELECTED[@]} PWA${suffix}. Continue?"; then
-    _operation_canceled
+    webapp_remove_canceled
     exit 1
   fi
 
@@ -257,7 +289,11 @@ if [[ $INTERACTIVE == true ]]; then
   done
 
 else
+  # Missing or foreign entries are skipped individually, and no aggregate
+  # error is retained for the final exit status.
   for file_arg in "${DESKTOP_FILES[@]}"; do
+    # Full paths are accepted verbatim; only PWA or Chrome filename shape is
+    # checked, rather than confinement to DESKTOP_DIR.
     [[ "$file_arg" == */* ]] && desktop_path="$file_arg" || desktop_path="$DESKTOP_DIR/$file_arg"
 
     if [[ ! -f "$desktop_path" ]]; then
@@ -271,13 +307,20 @@ else
       continue
     fi
 
-    TARGET_NAMES+=("$(_desktop_name "$desktop_path")")
+    _wdr_dn=""
+    _desktop_name _wdr_dn "$desktop_path"
+    TARGET_NAMES+=("$_wdr_dn")
     TARGET_PATHS+=("$desktop_path")
   done
 fi
 
+# Removal is sequential and non-transactional across a multi-selection; an
+# interruption can leave only the prefix that completed.
 for i in "${!TARGET_NAMES[@]}"; do
   _remove_pwa "${TARGET_NAMES[$i]}" "${TARGET_PATHS[$i]}"
 done
 
-[[ $INTERACTIVE == true ]] && _operation_complete
+if [[ $INTERACTIVE == true ]]; then
+  webapp_remove_complete
+  exit 0
+fi

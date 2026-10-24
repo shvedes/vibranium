@@ -24,6 +24,8 @@ EOF
 # Format helpers::backup_list output as aligned columns.
 # Output is tab-separated: date, original, backup-path, kind.
 _list_aligned() {
+  # Keeping rows in Bash arrays while measuring preserves fields containing
+  # spaces and avoids reparsing the helper's tab-delimited output.
   # First pass: slurp lines and measure each column's max width.
   local dates=() origs=() bks=() kinds=()
   local max_date=0 max_orig=0 max_bk=0
@@ -41,6 +43,8 @@ _list_aligned() {
     ((${#bk} > max_bk)) && max_bk=${#bk}
   done < <(helpers::backup_list)
 
+  # Process substitution keeps the producer outside this loop, so the helper
+  # output is consumed once while the arrays stay in the current shell.
   # Second pass: print each row with fixed-width columns.
   local i
   for ((i = 0; i < ${#dates[@]}; i++)); do
@@ -54,9 +58,9 @@ _list_aligned() {
 
 source "$VIBRANIUM/install/helpers/05-backup.sh"
 
-# helpers::backup_restore uses helpers::log::* from 00-logs.sh (installer
-# format with [INFO]/[ERROR] headers).  When run interactively, override
-# those functions to use the conventional [basename] format instead.
+# helpers::backup_restore uses helpers::log::* from 00-logs.sh, whose
+# installer logger emits colored [*] markers. Interactive runs replace
+# those functions with basename-prefixed messages.
 if [[ -t 0 ]]; then
   helpers::log::info() { echo "[${0##*/}] Info: $*"; }
   helpers::log::warn() { echo "[${0##*/}] Warn: $*"; }
@@ -69,6 +73,8 @@ fi
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --list | -l)
+      # TTY output gets aligned columns; redirected output keeps the helper's
+      # tab-separated records available to scripts and pipelines.
       if [[ -t 1 ]]; then
         _list_aligned
       else
@@ -83,6 +89,8 @@ while [[ $# -gt 0 ]]; do
         exit 1
       fi
       log Info "Restoring backup from $2"
+      # Forward the path as one argument so spaces and metacharacters remain
+      # data instead of becoming wrapper syntax.
       helpers::backup_restore "$2"
       shift 2
       ;;

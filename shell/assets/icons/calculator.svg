@@ -1,0 +1,13 @@
+<svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" id="Calculator--Streamline-Tabler">
+  <desc>
+    Calculator Streamline Icon: https://streamlinehq.com
+  </desc>
+  <path d="M4 5a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v14a2 2 0 0 1 -2 2H6a2 2 0 0 1 -2 -2z" stroke-width="2"></path>
+  <path d="M8 8a1 1 0 0 1 1 -1h6a1 1 0 0 1 1 1v1a1 1 0 0 1 -1 1H9a1 1 0 0 1 -1 -1z" stroke-width="2"></path>
+  <path d="m8 14 0 0.01" stroke-width="2"></path>
+  <path d="m12 14 0 0.01" stroke-width="2"></path>
+  <path d="m16 14 0 0.01" stroke-width="2"></path>
+  <path d="m8 17 0 0.01" stroke-width="2"></path>
+  <path d="m12 17 0 0.01" stroke-width="2"></path>
+  <path d="m16 17 0 0.01" stroke-width="2"></path>
+</svg>

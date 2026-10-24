@@ -1,0 +1,10 @@
+module qs.features.menu
+
+singleton Menu 1.0 Menu.qml
+MenuView 1.0 MenuView.qml
+MenuPanel 1.0 MenuPanel.qml
+Entry 1.0 Entry.qml
+GridCell 1.0 GridCell.qml
+InlineEditor 1.0 InlineEditor.qml
+NumberPicker 1.0 NumberPicker.qml
+OptionRow 1.0 OptionRow.qml

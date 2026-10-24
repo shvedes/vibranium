@@ -1,0 +1,5 @@
+module qs.boot
+
+Boot 1.0 Boot.qml
+BootLate 1.0 BootLate.qml
+singleton BootRegistry 1.0 BootRegistry.qml

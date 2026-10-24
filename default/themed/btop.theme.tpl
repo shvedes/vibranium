@@ -1,15 +1,15 @@
-theme[main_bg]="{{ background_0 }}"
-theme[main_fg]="{{ foreground_0 }}"
-theme[title]="{{ foreground_0 }}"
+theme[main_bg]="{{ background }}"
+theme[main_fg]="{{ foreground }}"
+theme[title]="{{ foreground }}"
 theme[hi_fg]="{{ accent }}"
 
-theme[selected_bg]="{{ background_1 }}"
+theme[selected_bg]="{{ background|pop=0.06 }}"
 theme[selected_fg]="{{ accent }}"
 theme[inactive_fg]="{{ gray }}"
 
 theme[graph_text]="{{ gray|pop=0.10 }}"
 theme[meter_bg]="{{ gray|dim=0.10 }}"
-theme[proc_misc]="{{ foreground_0 }}"
+theme[proc_misc]="{{ foreground }}"
 
 theme[cpu_box]="{{ gray|dim=0.10 }}"
 theme[mem_box]="{{ gray|dim=0.10 }}"

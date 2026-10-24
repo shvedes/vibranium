@@ -6,6 +6,9 @@ VB_THEME_DIR="$VIBRANIUM_STATE/theme"
 OBSIDIAN_CFG="$XDG_CONFIG_HOME/obsidian/obsidian.json"
 log Info "obsidian theme dir: $VB_THEME_DIR"
 
+# Missing CSS or an uninitialized Obsidian profile is a deliberate
+# fail-soft exit: an optional integration must not prevent the remaining
+# theme setters from configuring their applications.
 if [[ ! -f $VB_THEME_DIR/obsidian.css ]]; then
   log Info "no obsidian.css, skipping"
   exit 0
@@ -23,6 +26,9 @@ if [[ ! -f "$OBSIDIAN_CFG" ]]; then
   exit 0
 fi
 
+# jq emits one vault path per line. A vault without an .obsidian directory
+# is skipped rather than created, preserving the distinction between a
+# configured vault and an uninitialized directory.
 mapfile -t VAULTS < <(jq -r '.vaults | values[].path' "$OBSIDIAN_CFG")
 log Info "found ${#VAULTS[@]} obsidian vaults"
 
@@ -36,6 +42,9 @@ for vault in "${VAULTS[@]}"; do
     mkdir -p "$THEME_DIR"
   fi
 
+  # The manifest is created only when absent, so user edits to Obsidian
+  # metadata survive subsequent runs. The stylesheet is replaced from the
+  # active theme on every pass and is consumed on the next application load.
   [[ -f $THEME_DIR/manifest.json ]] || shcat > "$THEME_DIR/manifest.json" << 'EOF'
 {
   "name": "Vibranium",

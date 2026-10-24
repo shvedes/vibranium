@@ -1,0 +1,157 @@
+// hypr.* pages for HyprlandSettings.
+// Directory decides namespace: every option here must be hypr.
+{
+  "pages": [
+    {
+      "id": "hyprland-advanced",
+      "label": "Advanced",
+      "desc": "Compositor internals and layout engines.",
+      "icon": "tools",
+      "showItemCount": true,
+      "items": [
+        {
+          "type": "separator"
+        },
+        {
+          "type": "submenu",
+          "label": "Cursor",
+          "sub": "Mouse cursor options",
+          "icon": "cursor",
+          "page": "hyprland-advanced-cursor"
+        },
+        {
+          "type": "submenu",
+          "label": "Dwindle",
+          "sub": "Dwindle windows layout options",
+          "icon": "hypr-layout-dwindle",
+          "page": "hyprland-advanced-dwindle"
+        },
+        {
+          "type": "submenu",
+          "label": "Master",
+          "sub": "Mater windows layout options",
+          "icon": "hypr-layout-master",
+          "page": "hyprland-advanced-master"
+        },
+        {
+          "type": "submenu",
+          "label": "Scrolling",
+          "sub": "Scrolling windows layout options",
+          "icon": "hypr-layout-scrolling",
+          "page": "hyprland-advanced-scrolling"
+        }
+      ],
+      "options": [
+        {
+          "key": "hypr.misc.vrr",
+          "type": "int",
+          "default": 2,
+          "label": "Variable refresh rate",
+          "desc": "Monitor's VRR mode.",
+          "values": [
+            0,
+            1,
+            2
+          ],
+          "valueLabels": {
+            "0": "Disabled",
+            "1": "Enabled",
+            "2": "Fullscreen only"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "misc.vrr"
+          }
+        },
+        {
+          "key": "hypr.debug.vfr",
+          "type": "bool",
+          "default": true,
+          "label": "Variable frame rate",
+          "desc": "Monitor's VFR mode.",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "debug.vfr"
+          }
+        },
+        {
+          "key": "hypr.misc.disable_autoreload",
+          "type": "bool",
+          "default": true,
+          "label": "Config auto-reload",
+          "desc": "Toggle automatic config reload.",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "misc.disable_autoreload"
+          }
+        },
+        {
+          "key": "hypr.misc.middle_click_paste",
+          "type": "bool",
+          "default": true,
+          "label": "Middle click paste",
+          "desc": "Paste clipboard contents with middle click",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "misc.middle_click_paste"
+          }
+        },
+        {
+          "key": "hypr.misc.enable_anr_dialog",
+          "type": "bool",
+          "default": true,
+          "label": "Enable ANR dialog",
+          "desc": "\"Application is not responding\" messages.",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "misc.enable_anr_dialog"
+          }
+        },
+        {
+          "key": "hypr.render.direct_scanout",
+          "type": "int",
+          "default": 0,
+          "label": "Direct scanout",
+          "desc": "Configure direct scanout.",
+          "values": [
+            0,
+            1,
+            2
+          ],
+          "valueLabels": {
+            "0": "Disabled",
+            "1": "Enabled",
+            "2": "Auto"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "render.direct_scanout"
+          }
+        },
+        {
+          "key": "hypr.general.layout",
+          "type": "string",
+          "default": "dwindle",
+          "label": "Windows layout",
+          "desc": "Chose how new windows are placed.",
+          "values": [
+            "dwindle",
+            "master",
+            "monocle",
+            "scrolling"
+          ],
+          "valueLabels": {
+            "dwindle": "Dwindle",
+            "master": "Master",
+            "monocle": "Monocle",
+            "scrolling": "Scrolling"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "general.layout"
+          }
+        }
+      ]
+    }
+  ]
+}

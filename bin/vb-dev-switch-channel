@@ -65,32 +65,45 @@ esac
 
 # Send a desktop notification when stdout is not a terminal (i.e. when
 # invoked from a launcher or hook rather than interactively).
+# Empty urgency is intentionally passed as an empty expansion, which omits
+# notify-send's -u option while retaining normal notifications.
 notify() {
   local urgency="${1:-normal}" message="$2"
 
   if [[ ! -t 1 ]]; then
-    notify-send -r 1 ${urgency:+-u "$urgency"} "Vibranium" "$message"
+    notify-send -r 1 -a "Vibranium" ${urgency:+-u "$urgency"} "Vibranium" "$message"
   fi
 }
 
+# die converts a failed Git mutation into a user-visible notification when
+# stdout is noninteractive, then gives the caller a nonzero status.
 die() {
   log Error "$*"
   notify critical "$*"
   exit 1
 }
 
-CURRENT="$(git -C "$VIBRANIUM" branch --show-current)"
+# An empty branch name is treated as detached state. A failed git query can
+# also produce an empty result, so the dirty-worktree check is skipped in
+# either case.
+CURRENT=""
+IFS= read -r CURRENT < <(git -C "$VIBRANIUM" branch --show-current) || true
 
 # Skip dirty check when detached (release) so untracked files don't
 # block switching from a read-only checkout.
 if [[ -n "$CURRENT" ]]; then
-  CHANGES="$(git -C "$VIBRANIUM" status --porcelain | wc -l)"
+  # Porcelain output is captured as an array because each status record is one
+  # element; the count detects any tracked, staged, or untracked change without
+  # parsing filenames. Process-substitution failure can leave _st empty,
+  # which this code treats as a clean worktree.
+  mapfile -t _st < <(git -C "$VIBRANIUM" status --porcelain)
+  CHANGES=${#_st[@]}
 
   if ((CHANGES > 0)); then
     MSG="you have unsaved changes. Commit them first or stash them with: git stash"
     log Error "$MSG"
     if [[ ! -t 2 ]]; then
-      notify-send -r 4 -u critical -t 7000 "Vibranium" "$MSG"
+      notify-send -r 4 -a "Vibranium" -u critical -t 7000 "Vibranium" "$MSG"
     fi
     exit 1
   fi
@@ -98,12 +111,18 @@ fi
 
 case "$CHANNEL" in
   release)
-    LATEST="$(git -C "$VIBRANIUM" for-each-ref --sort=-version:refname --format='%(refname:short)' --count=1 'refs/tags/*')"
+    # Version sorting selects the greatest tag according to Git's
+    # version:refname comparator; an empty result makes the detach attempt
+    # fail through die.
+    LATEST=""
+    IFS= read -r LATEST < <(git -C "$VIBRANIUM" for-each-ref --sort=-version:refname --format='%(refname:short)' --count=1 'refs/tags/*') || true
     git -C "$VIBRANIUM" switch --detach "$LATEST" || die "failed to switch to '$LATEST'"
     log Info "Switched to release: $LATEST"
     echo "Switched to $LATEST."
     notify "" "Switched to $LATEST"
     ;;
+  # The upstream target is the local master branch, a repository layout
+  # assumption rather than a remote lookup or branch creation operation.
   upstream)
     git -C "$VIBRANIUM" switch master || die "failed to switch to 'master'"
     log Info "Switched to upstream"
@@ -112,5 +131,8 @@ case "$CHANNEL" in
     ;;
 esac
 
+# Reload and update service are deliberately backgrounded, so the channel
+# switch reports success once Git returns and does not wait for consumers to
+# reload or for the service to enter its running state.
 vb-cmd-reload -q &
 systemctl -q --user start vibranium-update.service &

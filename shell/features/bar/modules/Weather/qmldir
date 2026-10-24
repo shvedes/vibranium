@@ -1,0 +1,4 @@
+module qs.features.bar.modules.Weather
+
+Weather 1.0 Weather.qml
+WeatherIsland 1.0 WeatherIsland.qml

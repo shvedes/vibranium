@@ -40,17 +40,27 @@ done
 
 source vb-lib-core
 
-if [[ "$AUR_MODE" == true ]]; then
-  PREVIEW_CMD='yay -Sii {1}'
-else
-  PREVIEW_CMD='pacman -Si {1}'
-fi
+# Single preview entry point for the fzf font list: repository metadata
+# when the package exists in the official repos, AUR metadata otherwise.
+# Keeps FZF_FLAGS below static while preserving per-mode behavior (official
+# info in repo mode, AUR info in AUR mode). Exported so fzf's preview
+# subshell (bash -c) can call it.
+_pkg_info() {
+  local pkg=$1
+  if pacman -Si "$pkg" 2> /dev/null; then
+    return 0
+  fi
+  if command -v yay > /dev/null 2>&1; then
+    yay -Sii "$pkg" 2> /dev/null
+  fi
+}
+export -f _pkg_info
 
 if [[ -f "$VIBRANIUM_STATE/theme/fzf" ]]; then
   source "$VIBRANIUM_STATE/theme/fzf"
 fi
 
-FZF_ARGS=(
+FZF_FLAGS=(
   --multi
   --ignore-case
   --highlight-line
@@ -58,7 +68,7 @@ FZF_ARGS=(
   --info 'hidden'
   --border 'bold'
 
-  --border-label ' alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select '
+  --border-label ' alt-p: toggle description, alt-j/k: scroll description, alt-b/B: PKGBUILD, alt-i: info, ctrl-j/k: next/prev item, tab: multi-select '
   --border-label-pos 'bottom'
 
   --list-label 'Package list'
@@ -67,7 +77,7 @@ FZF_ARGS=(
   --input-label 'Filter packages'
   --input-border 'bold'
 
-  --preview "$PREVIEW_CMD"
+  --preview '_pkg_info {1}'
   --preview-border 'bold'
   --preview-window 'right:75%:wrap'
   --preview-label 'Package Information'
@@ -75,22 +85,31 @@ FZF_ARGS=(
   --bind 'alt-p:toggle-preview'
   --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
   --bind 'alt-k:preview-up,alt-j:preview-down'
+  --bind 'alt-b:change-preview:yay -Gpa {1} | tail -n +5'
+  --bind 'alt-B:change-preview:yay -Siia {1}'
+  --bind 'alt-i:change-preview:_pkg_info {1}'
 
   --color "${FZF_COLORS:-pointer:white,marker:green}"
 )
 
-_operation_canceled() {
-  local color="$R"
-
-  [[ "$1" == "--positive" ]] && color="$G"
-
-  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  term::disable_input
-  # shellcheck disable=SC2034
-  read -n1 -r -s -p $'. Press any key to exit' dummy
+font_install_prepare_result() {
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
 }
 
+font_install_signal_canceled() {
+  trap - SIGHUP SIGINT SIGTERM SIGQUIT
+  if [[ -n "${VIBRANIUM_CACHE:-}" ]]; then
+    rm -f "$VIBRANIUM_CACHE/${0##*/}.list"
+  fi
+  font_install_prepare_result
+  operation::result canceled
+  exit 1
+}
+
+# Case patterns are ordered from the most specific Nerd Font suffixes to broad
+# font prefixes, so one package name is emitted once despite overlapping globs.
 _get_fonts() {
   log Info "Fetching font packages"
   local pkg
@@ -111,22 +130,26 @@ _get_fonts() {
   done < <("${cmd[@]}")
 }
 
-trap 'trap "exit 1" SIGINT; printf "\n"; _operation_canceled; exit 1' SIGINT
+# The cache file is a hand-off between background enumeration and fzf; signal
+# cleanup removes it and restores terminal state so cancellation cannot leave
+# a spinner or stale selection list behind.
+trap 'font_install_signal_canceled' SIGHUP SIGINT SIGTERM SIGQUIT
 
 term::show_header
 term::disable_input
 
 (_get_fonts > "$VIBRANIUM_CACHE/${0##*/}.list") &
-term::spinner $! "${Y}[VIBRANIUM]${RS} Getting font packages"
+term::spinner $! "${Y}[*]${RS} Getting font packages"
 
-LIST="$(< "$VIBRANIUM_CACHE/${0##*/}.list")"
-mapfile -t chosen < <(printf "%s\n" "${LIST[@]}" | fzf "${FZF_ARGS[@]}")
+mapfile -t _font_list < "$VIBRANIUM_CACHE/${0##*/}.list"
+mapfile -t chosen < <(printf '%s\n' "${_font_list[@]}" | fzf "${FZF_FLAGS[@]}")
 
 term::enable_input
 rm -f "$VIBRANIUM_CACHE/${0##*/}.list"
 
 if [[ ${#chosen[@]} -eq 0 ]]; then
-  _operation_canceled --positive
+  font_install_prepare_result
+  operation::result noop -- "Operation canceled"
   exit 0
 fi
 
@@ -137,5 +160,10 @@ fi
 
 log Info "${#chosen[@]} font(s) selected"
 if vb-pkg-install --no-logo --no-verify "${install_args[@]}" -- "${chosen[@]}"; then
-  exec setsid -f fc-cache -f
+  # The font cache is rebuilt and the shell's font list rescanned without the
+  # installer waiting for either, so a freshly installed family shows up in
+  # Settings > General > Font Selection instead of on the next shell restart.
+  # The whole command is detached, not just its first step: the rescan has to
+  # follow the rebuild, and one detached process is what orders them.
+  setsid -f vb-cmd-font-refresh &> /dev/null
 fi

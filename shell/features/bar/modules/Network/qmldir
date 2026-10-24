@@ -1,0 +1,5 @@
+module qs.features.bar.modules.Network
+
+Network 1.0 Network.qml
+NetworkIsland 1.0 NetworkIsland.qml
+NetworkQrOverlay 1.0 NetworkQrOverlay.qml

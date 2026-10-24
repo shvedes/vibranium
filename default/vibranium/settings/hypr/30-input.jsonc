@@ -1,0 +1,311 @@
+// hypr.* pages for HyprlandSettings.
+// Directory decides namespace: every option here must be hypr.
+{
+  "pages": [
+    {
+      "id": "hyprland",
+      "label": "Hyprland",
+      "desc": "Window manager behavior",
+      "icon": "hyprland",
+      "showItemCount": true,
+      "items": [
+        {
+          "type": "submenu",
+          "label": "Input",
+          "sub": "Configure input devices",
+          "icon": "keyboard",
+          "page": "hyprland-input"
+        },
+        {
+          "type": "submenu",
+          "label": "Appearance",
+          "sub": "General look and feel",
+          "icon": "theme",
+          "page": "hyprland-appearance"
+        },
+        {
+          "type": "submenu",
+          "label": "Advanced",
+          "sub": "Hardware & low-level things",
+          "icon": "warning",
+          "page": "hyprland-advanced"
+        },
+        {
+          "type": "submenu",
+          "label": "Edit configs",
+          "sub": "Edit files manually",
+          "icon": "file-code",
+          "page": "hyprland-edit"
+        }
+      ],
+      "options": []
+    },
+    {
+      "id": "hyprland-edit",
+      "label": "Edit configs",
+      "desc": "Open a Hyprland config in a floating terminal.",
+      "items": [
+        {
+          "type": "action",
+          "label": "Window Rules",
+          "sub": "window-rules.lua",
+          "icon": "file-code",
+          "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.lua"
+        },
+        {
+          "type": "action",
+          "label": "Keybindings",
+          "sub": "binds.lua",
+          "icon": "keyboard",
+          "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.lua"
+        },
+        {
+          "type": "action",
+          "label": "Monitors",
+          "sub": "monitors.lua",
+          "icon": "monitor",
+          "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua"
+        },
+        {
+          "type": "action",
+          "label": "Input",
+          "sub": "input.lua",
+          "icon": "cursor",
+          "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua"
+        }
+      ],
+      "options": []
+    },
+    {
+      "id": "hyprland-input",
+      "label": "Input",
+      "desc": "Keyboard, mouse and touchpad behavior.",
+      "icon": "keyboard",
+      "showItemCount": true,
+      "items": [
+        {
+          "type": "separator"
+        },
+        {
+          "type": "submenu",
+          "label": "Touchpad",
+          "sub": "Touchpad options",
+          "icon": "hypr-touchpad",
+          "page": "hyprland-input-touchpad"
+        },
+        {
+          "type": "submenu",
+          "label": "Keyboard Layouts",
+          "sub": "Configure keyboard layouts",
+          "icon": "keyboard",
+          "page": "hyprland-input-layouts"
+        }
+      ],
+      "options": [
+        {
+          "key": "hypr.input.natural_scroll",
+          "type": "bool",
+          "default": false,
+          "label": "Natural scrolling",
+          "desc": "Reverse scroll direction.",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.natural_scroll"
+          }
+        },
+        {
+          "key": "hypr.input.accel_profile",
+          "type": "string",
+          "default": "flat",
+          "label": "Mouse acceleration",
+          "desc": "Mouse acceleration profile.",
+          "values": [
+            "adaptive",
+            "flat"
+          ],
+          "valueLabels": {
+            "adaptive": "Adaptive",
+            "flat": "Flat"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.accel_profile"
+          }
+        },
+        {
+          "key": "hypr.input.sensitivity",
+          "type": "float",
+          "default": 0,
+          "label": "Mouse sensitivity",
+          "desc": "Mouse cursor sensitivity.",
+          "range": {
+            "min": -1,
+            "max": 1
+          },
+          "step": 0.05,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.sensitivity"
+          }
+        },
+        {
+          "key": "hypr.input.scroll_factor",
+          "type": "float",
+          "default": 1,
+          "label": "Scrolling factor",
+          "desc": "Scrolling speed multiplier.",
+          "range": {
+            "min": 0.1,
+            "max": 10
+          },
+          "step": 0.1,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.scroll_factor"
+          }
+        },
+        {
+          "key": "hypr.input.repeat_rate",
+          "type": "int",
+          "default": 25,
+          "label": "Keyboard repeat rate",
+          "desc": "Repeat rate in repeats per second.",
+          "range": {
+            "min": 10,
+            "max": 50
+          },
+          "step": 1,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.repeat_rate"
+          }
+        },
+        {
+          "key": "hypr.input.repeat_delay",
+          "type": "int",
+          "default": 300,
+          "label": "Keyboard repeat delay",
+          "desc": "Delay in milliseconds before repeating.",
+          "range": {
+            "min": 200,
+            "max": 1000
+          },
+          "step": 10,
+          "unit": "ms",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.repeat_delay"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hyprland-input-touchpad",
+      "label": "Touchpad",
+      "icon": "mouse",
+      "showItemCount": true,
+      "options": [
+        {
+          "key": "hypr.input.touchpad.scroll_factor",
+          "type": "float",
+          "default": 0.4,
+          "label": "Scrolling factor",
+          "desc": "Scrolling speed multiplier.",
+          "range": {
+            "min": 0.1,
+            "max": 2.0
+          },
+          "step": 0.1,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.touchpad.scroll_factor"
+          }
+        },
+        {
+          "key": "hypr.input.touchpad.natural_scroll",
+          "type": "bool",
+          "default": true,
+          "label": "Natural scrolling",
+          "desc": "Reverse scroll direction.",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.touchpad.natural_scroll"
+          }
+        },
+        {
+          "key": "hypr.input.touchpad.tap_to_click",
+          "type": "bool",
+          "default": false,
+          "label": "Tap to click",
+          "desc": "Self-explanatory",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.touchpad.tap_to_click"
+          }
+        },
+        {
+          "key": "hypr.input.touchpad.disable_while_typing",
+          "type": "bool",
+          "default": true,
+          "label": "Disable while typing",
+          "desc": "Disable touchpad when typing text",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.touchpad.disable_while_typing"
+          }
+        }
+      ]
+    },
+    {
+      "id": "hyprland-input-layouts",
+      "label": "Keyboard Layouts",
+      "icon": "keyboard",
+      "options": [
+        {
+          "key": "hypr.input.kb_layout",
+          "type": "string",
+          "default": "us",
+          "label": "Keyboard layouts",
+          "sub": "Comma-separated layouts",
+          "desc": "Comma-separated list of xkb layouts (e.g. us,fr).",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.kb_layout"
+          }
+        },
+        {
+          "key": "hypr.input.kb_options",
+          "type": "string",
+          "default": "grp:alt_shift_toggle",
+          "label": "Switch layout with",
+          "sub": "Group toggle shortcut",
+          "desc": "Key combo to switch keyboard layout.",
+          "values": [
+            "grp:caps_toggle",
+            "grp:ctrl_alt_toggle",
+            "grp:win_space_toggle",
+            "grp:alt_space_toggle",
+            "grp:rshift_toggle",
+            "grp:ctrl_shift_toggle",
+            "grp:alt_shift_toggle",
+            "grp:rctrl_rshift_toggle"
+          ],
+          "valueLabels": {
+            "grp:caps_toggle": "Caps Lock",
+            "grp:ctrl_alt_toggle": "Ctrl + Alt",
+            "grp:win_space_toggle": "Win + Space",
+            "grp:alt_space_toggle": "Alt + Space",
+            "grp:rshift_toggle": "RShift",
+            "grp:ctrl_shift_toggle": "Ctrl + Shift",
+            "grp:alt_shift_toggle": "Alt + Shift",
+            "grp:rctrl_rshift_toggle": "RCtrl + RShift"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+            "ctl": "input.kb_options"
+          }
+        }
+      ]
+    }
+  ]
+}

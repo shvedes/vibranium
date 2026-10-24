@@ -1,10 +1,6 @@
 -- Animation preset: default -- data only, applied via Hypr.Anim.apply (see lib/actions.lua).
 
 Hypr.Anim.apply({
-  layer_rules = {
-    { animation = "slide", match = { namespace = "notifications" } },
-  },
-
   curves = {
     { "easeOutQuint", { type = "bezier", points = { { 0.23, 1.0 }, { 0.32, 1.0 } } } },
     { "almostLinear", { type = "bezier", points = { { 0.5, 0.5 }, { 0.75, 1.0 } } } },
@@ -30,7 +26,7 @@ Hypr.Anim.apply({
 
     { leaf = "windows", enabled = true, speed = 3.5, bezier = "easeOutQuint" },
     { leaf = "windowsIn", enabled = true, speed = 4.5, bezier = "easeOutQuint", style = "popin 85%" },
-    { leaf = "windowsOut", enabled = true, speed = 4.5, bezier = "easeOutQuint", style = "popin 90%" },
+    { leaf = "windowsOut", enabled = false, speed = 4.5, bezier = "easeOutQuint", style = "popin 70%" },
     { leaf = "windowsMove", enabled = true, speed = 3.5, bezier = "easeOutQuint" },
 
     { leaf = "workspaces", enabled = false , speed = 4.5, bezier = "easeOutQuint", style = "fade" },

@@ -38,10 +38,14 @@ done
 
 log Info "Checking Syncthing availability"
 
+# An installed executable does not imply that its user service is reachable,
+# so the availability check and service activation are separate decisions.
 if ! command -v syncthing > /dev/null; then
   log Error "Syncthing is not installed"
   if [[ ! -t 1 ]]; then
-    notify-send -r 4 -u critical -t 5000 \
+    # The check is on stdout: a TTY takes the log path, while non-TTY callers
+    # receive the desktop notification.
+    notify-send -r 4 -a "Vibranium" -u critical -t 5000 \
       "Vibranium" "Syncthing is not installed!"
   fi
 
@@ -54,6 +58,7 @@ log Info "Checking systemd unit"
 if ! systemctl -q --user is-active syncthing; then
   log Warn "Systemd unit isn't active"
   log Info "Enabling and starting syncthing.service"
+  # The systemctl invocation combines enablement and activation for the inactive unit.
   systemctl -q --user enable --now syncthing
 fi
 

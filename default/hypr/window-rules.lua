@@ -19,33 +19,54 @@ local function attention(match_key, pattern)
   })
 end
 
-Hypr.Rule.tag_title(
-  -- When using system instalation of glfw,
-  -- Minecraft window doesn't always set its class,
-  -- so we make it totally optional for cases
-  -- when the window was launched using Xwayland
-  -- for example, which will set its class.
-  "Minecraft\\*?\\s+\\d+\\.\\d+(\\.\\d+)?",
-  "gameWindow"
-)
+-- When using system instalation of glfw,
+-- Minecraft window doesn't always set its class,
+-- so we make it totally optional for cases
+-- when the window was launched using Xwayland
+-- for example, which will set its class.
+hl.window_rule({
+  match = {
+    title = "Minecraft\\*?\\s+\\d+\\.\\d+(\\.\\d+)?",
+  },
+  tag = "+gameWindow",
+})
 
-Hypr.Rule.tag_class("(gamescope|osu\\!|cs(2|go_linux)|steam(_(app(_\\d+)?|proton)?))", "gameWindow")
+hl.window_rule({
+  match = { class = "(gamescope|osu\\!|cs(2|go_linux)|steam(_(app(_\\d+)?|proton)?))" },
+  tag = "+gameWindow",
+})
 
-Hypr.Rule.tag_class(
-  "[\\w.]*?(.*\\.PrismLauncher|steam|heroic|lutris|prismlauncher|.*\\.RetroArch|dolphin-emu)",
-  "gameLauncher"
-)
+hl.window_rule({
+  match = { class = "[\\w.]*?(.*\\.PrismLauncher|steam|heroic|lutris|prismlauncher|.*\\.RetroArch|dolphin-emu)" },
+  tag = "+gameLauncher",
+})
 
-Hypr.Rule.tag_class(
-  "((google-)?chrom(e|ium)|brave-browser|microsoft-edge|vivaldi-stable|helium)",
-  "chromiumBasedBrowser"
-)
-Hypr.Rule.tag_class("(?i)(firefox|zen|librewolf)", "firefoxBasedBrowser")
+hl.window_rule({
+  match = { class = "((google-)?chrom(e|ium)|brave-browser|microsoft-edge|vivaldi-stable|helium)" },
+  tag = "+chromiumBasedBrowser",
+})
 
-Hypr.Rule.tag_by_tag("chromiumBasedBrowser", "browserWindow")
-Hypr.Rule.tag_by_tag("firefoxBasedBrowser", "browserWindow")
+hl.window_rule({
+  match = { class = "(?i)(firefox|zen|librewolf)" },
+  tag = "+firefoxBasedBrowser",
+})
 
-Hypr.Rule.tag_class("[\\w.]*?(only|libre|s)office(?:-\\w+)*", "officeWindow")
+-- Broader categories built from narrower tags, so each underlying class
+-- regex is matched once instead of repeated in every rule below.
+hl.window_rule({
+  match = { tag = "chromiumBasedBrowser" },
+  tag = "+browserWindow",
+})
+
+hl.window_rule({
+  match = { tag = "firefoxBasedBrowser" },
+  tag = "+browserWindow",
+})
+
+hl.window_rule({
+  match = { class = "[\\w.]*?(only|libre|s)office(?:-\\w+)*" },
+  tag = "+officeWindow",
+})
 
 -- Some community themes may apply not only Hyprland colors, but also their
 -- own settings, such as an opacity rule of 0.97 applied to all windows
@@ -59,31 +80,49 @@ hl.window_rule({
 -- Some applications benefit from automatically regaining focus after certain actions.
 -- For example, when logging in through a browser, the original app window can take
 -- focus again once the login is complete. This approach has worked well over time.
-Hypr.Rule.tag_class("(?i)(discord|vesktop|spotify|equibop)", "focusOnActivate")
-Hypr.Rule.tag_by_tag("browserWindow", "focusOnActivate")
-Hypr.Rule.tag_by_tag("gameWindow", "focusOnActivate")
+hl.window_rule({
+  match = { class = "(?i)(discord|vesktop|spotify|equibop)" },
+  tag = "+focusOnActivate",
+})
 
-Hypr.Rule.by_tag("focusOnActivate", { focus_on_activate = true })
+hl.window_rule({
+  match = { tag = "browserWindow" },
+  tag = "+focusOnActivate",
+})
+
+hl.window_rule({
+  match = { tag = "gameWindow" },
+  tag = "+focusOnActivate",
+})
+
+hl.window_rule({
+  match = { tag = "focusOnActivate" },
+  focus_on_activate = true,
+})
 
 -- Make game windows opaque, allow tearing.
-Hypr.Rule.by_tag("gameWindow", { immediate = true, opaque = true })
+hl.window_rule({
+  match = { tag = "gameWindow" },
+  immediate = true,
+  opaque = true,
+})
 
--- Also fix Steam's login window that appears almost over the screen.
+-- Also fix Steam Login and EA Game Installer windows that appears almost over the screen.
 hl.window_rule({
   match = {
-    class = "[Ss]team",
-    title = "Sign in to Steam",
+    class = "([Ss]team|steam_proton)",
+    title = "(Sign in to Steam|EA app installer)",
   },
   center = true,
 })
 
-hl.window_rule({
-  name = "Floating terminal",
-  match = { class = "org\\.vb\\.term\\.float" },
-  float = true,
-  center = true,
-  size = "monitor_w*0.7 monitor_h*0.7",
-})
+-- hl.window_rule({
+--   name = "Floating terminal",
+--   match = { class = "org\\.vb\\.term\\.float" },
+--   float = true,
+--   center = true,
+--   size = "monitor_w*0.7 monitor_h*0.7",
+-- })
 
 hl.window_rule({
   match = {
@@ -109,8 +148,8 @@ hl.window_rule({
     class = "org\\.vb\\.term\\.float",
 
     -- All package management scripts
-    -- And pretty much every TUI that can be launched by clicking on a Waybar module.
-    title = "(vb-(tui|font|webapp|update|pkg|setup|env|theme-(install|update)|util-yt-dlp).*|bluetui|vb-update|wiremix|nmtui|impala|iwctl|pass)",
+    -- And pretty much every TUI that Vibranium launches from its own UI.
+    title = "(vb-(tui|font|webapp|update|pkg|setup|env|theme-(install|update)|util-yt-dlp).*|vb-update|wiremix|nmtui|impala|iwctl)",
     float = true,
   },
 
@@ -120,23 +159,69 @@ hl.window_rule({
   stay_focused = true,
 })
 
+-- The notification pile animates itself: the cards fade in and out and the
+-- pile slides into its new shape. A compositor animation on top of that would
+-- animate the surface as well as its contents, so the pile is the one
+-- layer-shell namespace here that asks for no animation.
+--
+-- Deliberately scoped to this one namespace rather than the wide
+-- `^vibranium:.*$`. The wide form would silently change the compositor's
+-- animation for the bar, the OSD and every island, which is a different
+-- change's business entirely; a rule named for a feature has to be able to be
+-- deleted with the feature, and one rule covering every surface cannot be.
 hl.layer_rule({
-  match = { namespace = "selection" },
+  name = "Vibranium Notifications",
+  match = { namespace = "^vibranium:notifications$" },
   no_anim = true,
+})
+
+hl.layer_rule({
+  name = "Vibranium Status Bar Blur",
+  match = { namespace = "^vibranium:bar$" },
+  ignore_alpha = 0.2,
+  blur = true
+})
+
+-- Display the privacy dots overlay above other overlays.
+--
+-- `order` counts DOWN: Hyprland sorts the surfaces of a layer by this value
+-- in descending order and renders the list front to back, so the LOWEST
+-- value ends up on top of the layer. The dots take -1, which puts them over
+-- every overlay that does not ask for an order of its own.
+hl.layer_rule({
+  name = "Vibranium Privacy Indicator",
+  match = { namespace = "^vibranium:privacy$" },
+  above_lock = 1,
+  order = -1
+})
+
+-- The color picker takes -2, one step over the dots, so the pick surface is
+-- the topmost overlay on the screen.
+--
+-- The pick magnifies real pixels: the lens shows the captured frame, and the
+-- frame is the screen as it was. Anything drawn over it is a hole in the
+-- picture the user is aiming with - the dots would sit on top of the very
+-- pixels the lens claims to show. The same reasoning puts the pick over the
+-- menus and the tray: a full-screen pick that another overlay can cover is
+-- a pick that samples the overlay.
+hl.layer_rule({
+  name = "Vibranium Color Picker",
+  match = { namespace = "^vibranium:color-pick$" },
+  order = -2
 })
 
 -- ============================================================================================================================= --
 
 hl.window_rule({
   match = {
-    title = "(?i)^("
-      .. "Save\\s+as|"
-      .. "(Open|Choose|All|Select|Save)\\s(?:\\w+\\s)?(?:Image|Folder.*|(?:All\\s)?Files?)|"
-      .. "(Image|Video)\\sfile|"
-      .. "Local\\sfile|"
-      .. "File\\supload(.*)?|"
-      .. "New\\sarchive"
-      .. ")$",
+  title = "(?i)^("
+    .. "Save\\s+as|"
+    .. "(Open|Choose|All|Select|Save)\\s(?:\\w+\\s)?(?:Image|Folder.*|(?:All\\s)?Files?)|"
+    .. "(Image|Video)\\sfile|"
+    .. "Local\\sfile|"
+    .. "File\\supload(.*)?|"
+    .. "New\\sarchive"
+    .. ")(\\s[-—].*)?$",
   },
 
   float = true,
@@ -172,6 +257,16 @@ hl.window_rule({
   float = true,
   center = true,
   dim_around = true,
+})
+
+-- ============================================================================================================================= --
+
+-- Avoid accidental dims on tiled windows.
+hl.window_rule({
+  match = {
+    float = false
+  },
+  dim_around = false
 })
 
 -- ============================================================================================================================= --

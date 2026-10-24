@@ -1,2 +1,0 @@
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="0", RUN+="/usr/local/bin/su-bridge --user -- vb-udev-power-profile --battery"
-SUBSYSTEM=="power_supply", ATTR{type}=="Mains", ATTR{online}=="1", RUN+="/usr/local/bin/su-bridge --user -- vb-udev-power-profile --ac"

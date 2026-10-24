@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" id="Box-Padding--Streamline-Tabler">
+  <desc>
+    Box Padding Streamline Icon: https://streamlinehq.com
+  </desc>
+  <path d="M4 6a2 2 0 0 1 2 -2h12a2 2 0 0 1 2 2v12a2 2 0 0 1 -2 2H6a2 2 0 0 1 -2 -2z" stroke-width="2"></path>
+  <path d="M8 16v0.01" stroke-width="2"></path>
+  <path d="M8 12v0.01" stroke-width="2"></path>
+  <path d="M8 8v0.01" stroke-width="2"></path>
+  <path d="M16 16v0.01" stroke-width="2"></path>
+  <path d="M16 12v0.01" stroke-width="2"></path>
+  <path d="M16 8v0.01" stroke-width="2"></path>
+  <path d="M12 8v0.01" stroke-width="2"></path>
+  <path d="M12 16v0.01" stroke-width="2"></path>
+</svg>

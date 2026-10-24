@@ -1,0 +1,113 @@
+// hypr.* pages for HyprlandSettings.
+// Directory decides namespace: every option here must be hypr.
+{
+  "pages": [
+    {
+      "id": "hyprland-advanced-scrolling",
+      "label": "Scrolling",
+      "icon": "scroll",
+      "options": [
+        {
+          "key": "hypr.scrolling.direction",
+          "type": "string",
+          "default": "left",
+          "label": "Direction",
+          "values": [
+            "left",
+            "right",
+            "up",
+            "down"
+          ],
+          "valueLabels": {
+            "left": "Left",
+            "right": "Right",
+            "up": "Up",
+            "down": "Down"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "scrolling.direction"
+          }
+        },
+        {
+          "key": "hypr.scrolling.follow_focus",
+          "type": "bool",
+          "default": false,
+          "label": "Follow focus",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "scrolling.follow_focus"
+          }
+        },
+        {
+          "key": "hypr.scrolling.focus_fit_method",
+          "type": "int",
+          "default": 0,
+          "label": "Fit method",
+          "values": [
+            0,
+            1
+          ],
+          "valueLabels": {
+            "0": "Center",
+            "1": "Fit"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "scrolling.focus_fit_method"
+          }
+        },
+        {
+          "key": "hypr.scrolling.column_width",
+          "type": "float",
+          "default": 0.5,
+          "label": "Column width",
+          "range": {
+            "min": 0.1,
+            "max": 1
+          },
+          "step": 0.05,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "scrolling.column_width"
+          }
+        },
+        {
+          "key": "hypr.scrolling.follow_min_visible",
+          "type": "float",
+          "default": 0.2,
+          "label": "Follow minimum visible",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "step": 0.05,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "scrolling.follow_min_visible"
+          }
+        },
+        {
+          "key": "hypr.scrolling.wrap_swapcol",
+          "type": "bool",
+          "default": false,
+          "label": "Wrap swapcol",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "scrolling.wrap_swapcol"
+          }
+        },
+        {
+          "key": "hypr.scrolling.wrap_focus",
+          "type": "bool",
+          "default": false,
+          "label": "Wrap focus",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "scrolling.wrap_focus"
+          }
+        }
+      ]
+    }
+  ]
+}

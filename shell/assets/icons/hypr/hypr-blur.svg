@@ -1,0 +1,12 @@
+<svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" id="Blur--Streamline-Tabler">
+  <desc>
+    Blur Streamline Icon: https://streamlinehq.com
+  </desc>
+  <path d="M12 21a9.01 9.01 0 0 0 2.32 -0.302 9 9 0 0 0 1.74 -16.733A9 9 0 1 0 12 21z" stroke-width="2"></path>
+  <path d="M12 3v17" stroke-width="2"></path>
+  <path d="M12 12h9" stroke-width="2"></path>
+  <path d="M12 9h8" stroke-width="2"></path>
+  <path d="M12 6h6" stroke-width="2"></path>
+  <path d="M12 18h6" stroke-width="2"></path>
+  <path d="M12 15h8" stroke-width="2"></path>
+</svg>

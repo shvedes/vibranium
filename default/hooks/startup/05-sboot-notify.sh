@@ -4,7 +4,7 @@ if [[ "$CHASSIS_TYPE" == "vm" ]]; then
   exit 0
 fi
 
-IFS= read -r SB_STATE < <(vb-cmd-sboot-status)
+IFS= read -r SB_STATE < <(vb-sboot-status)
 
 if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
   rm "$VIBRANIUM_STATE/secure-boot-setup.complete"

@@ -29,16 +29,61 @@ source vb-lib-core
 
 set -- "${1%/}"
 
-_operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  term::disable_input
+CONT_FILE=""
+tmp_clone=""
+preserved=""
 
-  # shellcheck disable=SC2034
-  read -n1 -r -s -p $'. Press any key to exit' dummy
+# Error and INT/HUP handlers route through this cleanup. It removes known
+# staging/API paths and restores a preserved wallpaper directory when one
+# exists; the handoff path does not call it.
+theme_install_cleanup() {
+  if [[ -n "${tmp_clone:-}" ]]; then
+    rm -rf -- "$tmp_clone"
+  fi
+
+  if [[ -n "${preserved:-}" ]]; then
+    if [[ -n "${THEME_PATH:-}" ]]; then
+      mkdir -p "$THEME_PATH/backgrounds"
+      shopt -s nullglob
+      for f in "$preserved"/*; do
+        mv "$f" "$THEME_PATH/backgrounds/"
+      done
+      shopt -u nullglob
+    fi
+    rm -rf -- "$preserved"
+  fi
+
+  if [[ -n "${CONT_FILE:-}" ]]; then
+    rm -f -- "$CONT_FILE"
+  fi
 }
 
-trap 'trap "exit 1" INT HUP; printf "\n"; _operation_canceled; exit 1' INT HUP
+theme_install_result() {
+  local outcome="$1"
+
+  theme_install_cleanup
+  if [[ -z "${term_original_settings+x}" ]]; then
+    term::disable_input
+  fi
+  operation::result "$outcome"
+}
+
+theme_install_canceled() {
+  theme_install_result canceled
+}
+
+theme_install_error() {
+  theme_install_result error
+}
+
+theme_install_interrupt() {
+  trap 'exit 1' INT HUP
+  printf '\n'
+  theme_install_result canceled
+  exit 1
+}
+
+trap 'theme_install_interrupt' INT HUP
 
 # Return true if the input looks like a GitHub owner/repo shorthand.
 # Accepts alphanumeric characters, hyphens, underscores, and dots on
@@ -50,40 +95,40 @@ _is_owner_repo_format() {
 # Expand an owner/repo shorthand into a full GitHub HTTPS clone URL.
 # .git is appended so git-clone gets a canonical remote URL.
 _owner_repo_to_url() {
-  echo "https://github.com/$1.git"
+  local -n _url_out=$1
+  _url_out="https://github.com/$2.git"
 }
 
 if [[ -z "$1" ]]; then
   term::show_header
 fi
 
-# If an argument was passed, use it directly and skip the prompt loop.
-# If it is owner/repo shorthand, verify the repo exists on GitHub first,
-# then expand it to a full URL. A bare https URL is used as-is.
-# Otherwise, keep asking until the user gives valid input (or hits Ctrl+C).
+# A supplied owner/repo is checked and expanded; an http(s) URL is retained.
+# Without an argument, the prompt repeats until the input is accepted.
 if [[ -n "$1" ]]; then
   if _is_owner_repo_format "$1"; then
     # Run the existence check in the background so term::spinner can show progress
     curl -sf -o /dev/null "https://api.github.com/repos/$1" &
-    if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Checking repo $1"; then
+    if ! term::spinner $! "${Y}[*]${RS} Checking repo $1"; then
       vb::print "$R" "GitHub repo $1 does not exist or could not be reached"
-      _operation_canceled
+      theme_install_error
       exit 1
     fi
-    REPO_URL="$(_owner_repo_to_url "$1")"
+    _owner_repo_to_url REPO_URL "$1"
   elif [[ "$1" =~ ^https?:// ]]; then
     REPO_URL="$1"
   else
     vb::print "$R" "Argument must be an http(s) URL or owner/repo shorthand"
-    _operation_canceled
+    theme_install_error
     exit 1
   fi
 else
+  term::enable_input
   while true; do
-    read -erp "${Y}[VIBRANIUM]${RS} Git repo: " REPO_URL || {
-      _operation_canceled
+    if ! term::prompt_line REPO_URL "${Y}[*]${RS} Git repo: "; then
+      theme_install_canceled
       exit 1
-    }
+    fi
     REPO_URL="${REPO_URL%/}"
 
     if [[ -z "$REPO_URL" ]]; then
@@ -91,20 +136,20 @@ else
       continue
     fi
 
-    # A full https URL needs no further validation at this stage
+    # An http(s) URL is accepted without repository-shape validation at this stage.
     if [[ "$REPO_URL" =~ ^https?:// ]]; then
       break
     fi
 
-    # owner/repo shorthand: check that the repo actually exists before proceeding
+    # owner/repo shorthand: verify the repository exists, then expand it.
     if _is_owner_repo_format "$REPO_URL"; then
       curl -sf -o /dev/null "https://api.github.com/repos/$REPO_URL" &
-      if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Checking repo $REPO_URL"; then
+      if ! term::spinner $! "${Y}[*]${RS} Checking repo $REPO_URL"; then
         vb::print "$R" "GitHub repo $REPO_URL does not exist. Try again."
         continue
       fi
 
-      REPO_URL="$(_owner_repo_to_url "$REPO_URL")"
+      _owner_repo_to_url REPO_URL "$REPO_URL"
       break
     fi
 
@@ -112,7 +157,9 @@ else
   done
 fi
 
-# Extract owner/repo from GitHub URL for the API, stripping scheme, host, and .git suffix
+# REPO_PATH is literal: only the exact https://github.com/ prefix is removed;
+# .git and one trailing slash are stripped afterward. Other http(s) URLs are
+# not converted into a GitHub API path.
 REPO_PATH="${REPO_URL#https://github.com/}"
 REPO_PATH="${REPO_PATH%.git}"
 REPO_PATH="${REPO_PATH%/}" # guard against a trailing slash
@@ -120,19 +167,14 @@ REPO_PATH="${REPO_PATH%/}" # guard against a trailing slash
 THEME_NAME="${REPO_URL%.git}"
 THEME_NAME="${THEME_NAME##*/}"
 
-# Strip the vendor prefix. This leaves a leading dash when the repo name is
-# "vibranium-foo-theme", because the prefix pattern ends right before the
-# first separator.
+# Strip the vendor prefix and any separator left by its removal so the
+# resulting name remains suitable for a directory and display key.
 THEME_NAME="${THEME_NAME#vibranium}"
 
-# Remove the leading dash that is left after stripping the vendor prefix above.
-# Without this, a repo named "vibranium-miasma-theme" produces "-miasma-theme",
-# which becomes a folder with a leading dash and a leading space in menus.
+# Remove the leading separator that can remain after prefix removal.
 THEME_NAME="${THEME_NAME#-}"
 
-# Strip the word "theme" however it appears in what remains.
-# "vibranium-theme-miasma" -> after prefix strip: "theme-miasma" -> strip "theme-" -> "miasma"
-# "vibranium-miasma-theme" -> after prefix strip: "miasma-theme" -> strip "-theme" -> "miasma"
+# Remove only the `theme-` prefix and `-theme` suffix forms.
 THEME_NAME="${THEME_NAME#theme-}"
 THEME_NAME="${THEME_NAME%-theme}"
 
@@ -148,35 +190,41 @@ THEME_NAME_CLR="${B}${THEME_DISP_NAME}${RS}"
 THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
 THEME_PATH="$THEMES_DIR/$THEME_NAME"
 
-# Official themes ship inside the Vibranium repo itself. A community theme whose
-# derived name collides with an official one would silently shadow it after install,
-# so we refuse early rather than letting that happen.
+# Refuse a derived name that collides with an official theme, because user
+# themes would shadow the shipped directory during discovery.
 OFF_THEME_PATH="$VIBRANIUM/themes/$THEME_NAME"
 if [[ -d "$OFF_THEME_PATH" ]]; then
   vb::print "$R" "$THEME_NAME_CLR is an official Vibranium theme and cannot be overwritten by a community install."
-  _operation_canceled
+  theme_install_error
   exit 1
 fi
 
-# Fetch the repo root listing once - checks both candidate files in a single request
-# so we don't risk hitting the GitHub API rate limit with two separate calls
+# Fetch the repository root listing once into a script-derived /tmp response.
+# The predicate below tests colors.list without a second request; concurrent
+# installers can overwrite this shared file, and handled cleanup removes it.
 CONT_FILE="/tmp/${0##*/}.tmp"
 curl -sf "https://api.github.com/repos/$REPO_PATH/contents/" --output "$CONT_FILE" &
 
-if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Checking theme compatibility"; then
+if ! term::spinner $! "${Y}[*]${RS} Checking theme compatibility"; then
   vb::print "$R" "Could not reach repo or repo does not exist"
-  _operation_canceled
+  theme_install_error
   exit 1
 fi
 
-# Match strictly against the JSON name field - guards against partial matches
-# (e.g. a file called "my-colors.list" must not pass)
-CONTENTS="$(< "$CONT_FILE")"
-if [[ "$CONTENTS" != *'"name": "colors.list"'* ]]; then
+# Compatibility uses a literal substring test for the JSON name field, not a
+# full JSON parse; response formatting can affect the result.
+_compat_found=false
+while IFS= read -r _cont_line || [[ -n $_cont_line ]]; do
+  if [[ $_cont_line == *'"name": "colors.list"'* ]]; then
+    _compat_found=true
+    break
+  fi
+done < "$CONT_FILE"
+if [[ $_compat_found == false ]]; then
   vb::print "$R" "$THEME_NAME_CLR is not a Vibranium-compatible theme"
 
   rm -f "$CONT_FILE"
-  _operation_canceled
+  theme_install_error
   exit 1
 fi
 
@@ -184,18 +232,44 @@ vb::print "$G" "$THEME_NAME_CLR is compatible with Vibranium"
 
 rm -f "$CONT_FILE"
 
-# Remove stale copy of this theme if one already exists, keeping user
-# wallpapers: a community clone tracks its theme files, so untracked files
-# in backgrounds/ are user additions. An archived theme (see vb-theme-remove)
-# consists of user wallpapers only.
-if [[ -d "$THEME_PATH" ]]; then
+# Existing managed clones are replaced while user-owned wallpaper paths are
+# moved aside and restored. A directory without theme.info is treated as an
+# archive or leftover and restored without a prompt.
+restored_leftover=false
+if [[ -d "$THEME_PATH" && ! -e "$THEME_PATH/theme.info" ]]; then
+  vb::print "$Y" "$THEME_NAME_CLR leftovers found, restoring seamlessly"
+
+  tmp_clone="$(mktemp -d)"
+  git clone --quiet --depth 1 "$REPO_URL" "$tmp_clone" &
+  if ! term::spinner $! "${Y}[*]${RS} Downloading $THEME_NAME_CLR" "- ${G}Done${RS}"; then
+    rm -rf "$tmp_clone"
+    vb::print "$R" "Failed to clone theme repo"
+    theme_install_error
+    exit 1
+  fi
+
+  preserved="$(mktemp -d)"
+  shopt -s nullglob
+  for f in "$THEME_PATH/backgrounds"/*; do
+    mv "$f" "$preserved"/
+  done
+  shopt -u nullglob
+
+  rm -rf "$THEME_PATH"
+  mv "$tmp_clone" "$THEME_PATH"
+  restored_leftover=true
+elif [[ -d "$THEME_PATH" ]]; then
   if ! term::ask_yes_no Y "$THEME_NAME_CLR already exists. Do you want to reinstall it?"; then
-    _operation_canceled
+    theme_install_canceled
     exit 1
   fi
 
   preserved="$(mktemp -d)"
   if [[ -d "$THEME_PATH/.git" ]]; then
+    # git ls-files --others --exclude-standard returns untracked, non-ignored
+    # paths under backgrounds. Those paths are treated as user-owned
+    # wallpapers; tracked files and tracked wallpaper edits remain managed and
+    # are replaced by the fresh checkout.
     uf=()
     mapfile -d '' -t uf < <(git -C "$THEME_PATH" ls-files --others --exclude-standard -z -- backgrounds)
     for f in "${uf[@]}"; do
@@ -214,11 +288,13 @@ else
   preserved=""
 fi
 
-git clone --quiet --depth 1 "$REPO_URL" "$THEME_PATH" &
-if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Downloading $THEME_NAME_CLR" "- ${G}Done${RS}"; then
-  vb::print "$R" "Failed to clone theme repo"
-  _operation_canceled
-  exit 1
+if ! $restored_leftover; then
+  git clone --quiet --depth 1 "$REPO_URL" "$THEME_PATH" &
+  if ! term::spinner $! "${Y}[*]${RS} Downloading $THEME_NAME_CLR" "- ${G}Done${RS}"; then
+    vb::print "$R" "Failed to clone theme repo"
+    theme_install_error
+    exit 1
+  fi
 fi
 
 # Restore preserved user wallpapers into the fresh clone
@@ -232,4 +308,6 @@ if [[ -n "$preserved" ]]; then
   rm -rf "$preserved"
 fi
 
+# Hand off after clone and wallpaper restoration complete; theme-set performs
+# template rendering and dependent reloads.
 exec setsid -f vb-theme-set "$THEME_NAME"

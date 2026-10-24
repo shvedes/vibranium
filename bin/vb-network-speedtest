@@ -1,0 +1,205 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+SELF="${0##*/}"
+
+usage() {
+	shcat << EOF
+Usage: $SELF [OPTIONS] [down|up]
+
+Measure live internet speed for one direction.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
+set -e
+
+direction=""
+
+while (($# > 0)); do
+	case "$1" in
+		-v | --verbose)
+			export VERBOSE=true
+			shift
+			;;
+		-h | --help)
+			usage
+			exit 0
+			;;
+		--)
+			shift
+			break
+			;;
+		-*)
+			log Error "unknown option: $1"
+			log Error "Try '$SELF --help' for more information"
+			exit 1
+			;;
+		*)
+			direction="$1"
+			shift
+			;;
+	esac
+done
+
+probe=1.1.1.1
+parallel=8
+url_count=3
+
+case "$direction" in
+	down | up)
+		;;
+	*)
+		usage >&2
+		exit 2
+		;;
+esac
+
+log Info "Speedtest direction: $direction"
+
+# Keep one decimal at low rates where startup and sampling noise matter, then
+# round higher rates to whole Mbps to avoid unstable fractional readouts.
+format_mbps() {
+	local value=$1
+	local intpart=${value%%.*}
+	[[ -z $intpart ]] && intpart=0
+	if (( intpart <= 0 )); then
+		printf '0.0\n'
+	elif (( intpart < 10 )); then
+		printf '%.1f\n' "$value"
+	else
+		printf '%.0f\n' "$value"
+	fi
+}
+
+# RX and TX sysfs counters are the measurement inputs; each run selects one
+# direction, while the deltas also include concurrent interface traffic.
+iface=
+while IFS= read -r _route_line; do
+	read -ra _route_words <<< "$_route_line"
+	for ((i = 0; i + 1 < ${#_route_words[@]}; i++)); do
+		if [[ ${_route_words[i]} == "dev" ]]; then
+			iface="${_route_words[i+1]}"
+			break 2
+		fi
+	done
+done < <(ip route get "$probe" 2>/dev/null)
+
+if [[ -z "$iface" || ! -r "/sys/class/net/$iface/statistics/rx_bytes" || ! -r "/sys/class/net/$iface/statistics/tx_bytes" ]]; then
+	echo "No active network interface" >&2
+	exit 1
+fi
+
+fast_token="YXNkZmFzZGxmbnNkYWZoYXNkZmhrYWxm"
+
+# The API supplies multiple server URLs so independent workers can spread
+# requests and avoid measuring only one endpoint's transient behavior.
+fast_api_url="https://api.fast.com/netflix/speedtest/v2?https=true&token=$fast_token&urlCount=$url_count"
+
+mapfile -t fast_urls < <(curl -fsS "$fast_api_url" 2> /dev/null | jq -r '.targets[]?.url // empty')
+
+if ((${#fast_urls[@]} == 0)); then
+	echo "Failed to fetch speed test endpoints" >&2
+	exit 1
+fi
+
+traffic_pids=()
+
+# Workers run unbounded curl loops; termination must reach each child curl
+# process and then wait for the worker shell, while cleanup remains best effort
+# when a worker has already exited.
+cleanup() {
+	local pid
+	for pid in "${traffic_pids[@]}"; do
+		[[ -n "$pid" ]] || continue
+		pkill -TERM -P "$pid" 2> /dev/null || true
+		kill "$pid" 2> /dev/null || true
+	done
+	for pid in "${traffic_pids[@]}"; do
+		[[ -n "$pid" ]] || continue
+		wait "$pid" 2> /dev/null || true
+	done
+}
+trap cleanup EXIT
+
+# Round-robin across the returned URLs so load spreads across nodes.
+traffic_worker() {
+	local urls=("$@")
+	local count=${#urls[@]}
+	local idx=$RANDOM
+	local url
+	if [[ "$direction" == "down" ]]; then
+		while true; do
+			url=${urls[$((idx % count))]}
+			curl -fsS -o /dev/null "$url" 2> /dev/null || return
+			idx=$((idx + 1))
+		done
+	else
+		while true; do
+			url=${urls[$((idx % count))]}
+			dd if=/dev/zero bs=1M count=64 2> /dev/null | curl -fsS -o /dev/null -X POST --data-binary @- "$url" 2> /dev/null || return
+			idx=$((idx + 1))
+		done
+	fi
+}
+
+for ((i = 0; i < parallel; i++)); do
+	# Word-split the URL list into workers; each URL holds no spaces.
+	traffic_worker "${fast_urls[@]}" &
+	traffic_pids+=("$!")
+done
+
+# Counters are sampled every 0.5s and rebased after each reading, so each
+# output is an interval rate rather than a total since process start.
+rx_before=0
+read -r rx_before < "/sys/class/net/$iface/statistics/rx_bytes" 2>/dev/null || rx_before=0
+tx_before=0
+read -r tx_before < "/sys/class/net/$iface/statistics/tx_bytes" 2>/dev/null || tx_before=0
+
+any_alive() {
+	local pid
+	for pid in "${traffic_pids[@]}"; do
+		[[ -n "$pid" ]] || continue
+		if kill -0 "$pid" 2> /dev/null; then
+			return 0
+		fi
+	done
+	return 1
+}
+
+while any_alive; do
+	sleep 0.5
+	rx_after=0
+	read -r rx_after < "/sys/class/net/$iface/statistics/rx_bytes" 2>/dev/null || rx_after=0
+	tx_after=0
+	read -r tx_after < "/sys/class/net/$iface/statistics/tx_bytes" 2>/dev/null || tx_after=0
+
+	# Sysfs counters are bytes, so each 0.5s delta is multiplied by eight and
+	# divided by 500,000 for decimal megabits per second. A lower reading
+	# indicates a counter reset and is reported as zero rather than negative
+	# throughput.
+	if [[ "$direction" == "down" ]]; then
+		if (( rx_after < rx_before )); then
+			rate=0
+		else
+			rate=$(bc <<< "scale=6; ($rx_after - $rx_before) * 8 / 500000")
+		fi
+	else
+		if (( tx_after < tx_before )); then
+			rate=0
+		else
+			rate=$(bc <<< "scale=6; ($tx_after - $tx_before) * 8 / 500000")
+		fi
+	fi
+
+	format_mbps "$rate"
+	rx_before="$rx_after"
+	tx_before="$tx_after"
+done
+
+wait 2> /dev/null || true

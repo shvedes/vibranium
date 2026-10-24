@@ -45,9 +45,7 @@ If you want to customize an application manually, its documentation is usually t
 Many applications provide useful manual pages:
 
 ```bash
-man dunstrc
 man zathurarc
-man rofi
 ```
 
 For applications without detailed manual pages, refer to their official documentation online. 

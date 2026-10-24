@@ -16,20 +16,8 @@ Options:
 EOF
 }
 
-# Check whether a screen shader is currently active by inspecting
-# Hyprland's decoration:screen_shader option.  hyprctl returns the
-# literal string "[[EMPTY]]" when no shader is set, and jq strips
-# surrounding quotes so the empty case is also matched by ^()$.
-_grayscale_enabled() {
-  local opt
-  opt="$(hyprctl -j getoption decoration:screen_shader | jq -r '.str')"
-
-  if [[ "$opt" == "[[EMPTY]]" || "$opt" =~ ^()$ ]]; then
-    return 1
-  else
-    return 0
-  fi
-}
+SHADER="$VIBRANIUM/default/hypr/shaders/grayscale.glsl"
+CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,13 +35,14 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-SHADER="$VIBRANIUM/default/hypr/shaders/grayscale.glsl"
-CONFIG="$XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua"
-
+# The file itself is the toggle state: removing it disables the generated
+# config, while creating it enables the shader on the next Hyprland reload.
 log Info "Toggling reading mode"
-if _grayscale_enabled; then
+if [[ -f "$CONFIG" ]]; then
   rm -f "$CONFIG"
 else
+  # The heredoc expands SHADER at write time, so the config stores a concrete
+  # shader path rather than a runtime expression.
   shcat << EOF > "$CONFIG"
 hl.config({
   decoration = {
@@ -63,8 +52,6 @@ hl.config({
 EOF
 fi
 
-# Reload and refresh are backgrounded because hyprctl may take tens of
-# ms over the socket and the waybar module refresh depends on the new
-# state being visible to vb-hw-gpu first.
+# Reload runs detached, so the command returns without waiting for Hyprland
+# to apply the change.
 hyprctl -q reload config-only &
-vb-refresh-waybar-module reading-mode &

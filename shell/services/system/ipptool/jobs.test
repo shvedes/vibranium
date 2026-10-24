@@ -1,0 +1,14 @@
+{
+  NAME "Get server-wide jobs"
+  OPERATION Get-Jobs
+  GROUP operation-attributes-tag
+  ATTR charset attributes-charset utf-8
+  ATTR language attributes-natural-language en
+  ATTR uri printer-uri ipp://localhost/
+  ATTR name requesting-user-name $user
+  ATTR keyword which-jobs all
+  ATTR integer limit 50
+  GROUP job-attributes-tag
+  ATTR keyword requested-attributes job-id,job-name,document-name,document-name-supplied,job-state,job-state-reasons,job-originating-user-name,job-k-octets,job-printer-uri,time-at-creation,job-media-progress
+  STATUS successful-ok
+}

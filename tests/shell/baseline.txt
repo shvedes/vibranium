@@ -1,0 +1,15 @@
+# tests/shell/baseline.txt
+#
+# Recorded pre-existing failures. Format: <suite> <TAB> <assertion label> <TAB> <reason>.
+#
+# A suite whose failures are exactly these is reported BASELINE, not
+# REGRESSION. A suite with a failure that is NOT listed here is a REGRESSION
+# and the runner exits 1. A suite that lists entries here but is now green is
+# reported RESOLVED, because the entry has stopped being true and should be
+# deleted from this file.
+#
+# A reason is required, and that is deliberate: a baseline line with no reason
+# is indistinguishable from a test nobody got round to writing.
+#
+# There are currently no recorded failures. Every suite in the suite is green
+# as of this file being created, so run-all.sh has nothing to waive.

@@ -29,87 +29,114 @@ done
 
 source vb-lib-core
 
-_wait_for_key() {
-  local color="${1:-$R}" msg="${2:-Operation canceled}"
-  printf "%s[VIBRANIUM]%s %s" "$color" "$RS" "$msg"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  term::disable_input
-
-  # shellcheck disable=SC2034
-  read -n1 -r -s -p $'. Press any key to exit' dummy
+_theme_update_interrupt() {
+  trap '' HUP INT TERM QUIT
+  printf '\n'
+  term::enable_input
+  exit 1
 }
 
-trap 'trap "exit 1" INT HUP; printf "\n"; _wait_for_key; exit 1' INT HUP
+trap '_theme_update_interrupt' HUP INT TERM QUIT
 
 _spinner() {
-  local pid=$1 msg="$2" delay=0.07
+  local pid=$1 msg="$2" delay=0.07 interactive=false
   # shellcheck disable=SC1003
   local spinstr=('/' '-' '\' '|')
 
-  while kill -0 "$pid" 2> /dev/null; do
-    for c in "${spinstr[@]}"; do
-      printf '\r\033[K%s %s' "$msg" "$c"
-      sleep $delay
+  if [[ -t 1 && -z "${NO_COLOR+x}" ]]; then
+    interactive=true
+  fi
+
+  if $interactive; then
+    while kill -0 "$pid" 2> /dev/null; do
+      for c in "${spinstr[@]}"; do
+        printf '\r\033[K%s %s' "$msg" "$c"
+        sleep "$delay"
+      done
     done
-  done
+  fi
 
   wait "$pid"
   return $?
 }
 
 _display_name() {
-  local name="$1" word out=
-  for word in ${name//-/ }; do
-    out+="${word^} "
+  local -n _dn_out=$1
+  local _dn_name="$2" _dn_word _dn_text=
+  for _dn_word in ${_dn_name//-/ }; do
+    _dn_text+="${_dn_word^} "
   done
-  printf "%s" "${out% }"
+  _dn_out="${_dn_text% }"
 }
 
 term::show_header
 
 THEMES_DIR="$XDG_CONFIG_HOME/vibranium/themes"
-# Updated themes
 UPD_THEMES=()
 SKIPPED=0
 UPTOD=0
 FAILED=()
 
-mapfile -t themes < <(
-  find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' |
-    while read -r folder; do
-      if [[ ! -d "$VIBRANIUM/themes/$folder" ]]; then
-        echo "$folder"
-      fi
-    done
-)
+# Discovery includes every user theme directory without an official counterpart.
+# The .git check skips only directories without a repository; a user directory
+# with .git is treated as an updatable clone.
+if [[ -d "$THEMES_DIR" ]]; then
+  mapfile -t themes < <(
+    find "$THEMES_DIR" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' |
+      while read -r folder; do
+        if [[ ! -d "$VIBRANIUM/themes/$folder" ]]; then
+          echo "$folder"
+        fi
+      done
+  )
+else
+  themes=()
+fi
 
 if ((${#themes[@]} == 0)); then
   vb::print "$Y" "No community themes installed"
-  _wait_for_key "$G" "No themes to update"
+  operation::result success "No themes to update"
   exit 0
 fi
 
-mapfile -t themes < <(printf '%s\n' "${themes[@]}" | sort)
+_sorted_themes=("${themes[@]}")
+for ((_si = 1; _si < ${#_sorted_themes[@]}; _si++)); do
+  _sk=${_sorted_themes[_si]}
+  _sj=$((_si - 1))
+  while ((_sj >= 0)) && [[ ${_sorted_themes[_sj]} > $_sk ]]; do
+    _sorted_themes[_sj + 1]=${_sorted_themes[_sj]}
+    _sj=$((_sj - 1))
+  done
+  _sorted_themes[_sj + 1]=$_sk
+done
+themes=("${_sorted_themes[@]}")
 
 term::disable_input
 
 for theme in "${themes[@]}"; do
   theme_path="$THEMES_DIR/$theme"
-  display="${B}$(_display_name "$theme")${RS}"
+  _display_name display "$theme"
+  display="${B}${display}${RS}"
 
   (sleep 0.1) &
-  _spinner $! "${Y}[VIBRANIUM]${RS} ${Y}Checking${RS} $display"
+  _spinner $! "${Y}[*]${RS} ${Y}Checking${RS} $display"
 
   if [[ ! -d "$theme_path/.git" ]]; then
     ((SKIPPED++))
     continue
   fi
 
+  # A dirty tracked tree is skipped because ff-only cannot reconcile local
+  # edits safely. Untracked files are outside the check, but an incoming file
+  # collision still makes the fast-forward pull fail.
   if ! git -C "$theme_path" diff --quiet HEAD 2> /dev/null; then
     ((SKIPPED++))
     continue
   fi
 
+  # This count is local and does not fetch. A stale @{upstream} ref can
+  # undercount, while an absent ref produces an empty value that is treated
+  # as up to date.
   behind=$(git -C "$theme_path" rev-list --count 'HEAD..@{upstream}' 2> /dev/null)
 
   if [[ -z "$behind" ]] || ((behind == 0)); then
@@ -117,8 +144,10 @@ for theme in "${themes[@]}"; do
     continue
   fi
 
+  # Pulls run one theme at a time and may fail independently. Aggregate
+  # counters preserve partial progress instead of aborting the whole batch.
   git -C "$theme_path" pull --ff-only &
-  if ! _spinner $! "${Y}[VIBRANIUM]${RS} ${G}Updating${RS} $display"; then
+  if ! _spinner $! "${Y}[*]${RS} ${G}Updating${RS} $display"; then
     FAILED+=("$display")
     continue
   fi
@@ -126,7 +155,11 @@ for theme in "${themes[@]}"; do
   UPD_THEMES+=("$display")
 done
 
-printf '\r\033[K%s[VIBRANIUM]%s All themes processed\n' "$G" "$RS"
+if [[ -t 1 && -z "${NO_COLOR+x}" ]]; then
+  printf '\r\033[K%s[*]%s All themes processed\n' "$G" "$RS"
+else
+  printf '[*] All themes processed\n'
+fi
 
 if ((${#UPD_THEMES[@]} > 0)); then
   vb::print "$G" "Updated themes:"
@@ -143,4 +176,8 @@ if ((${#FAILED[@]} > 0)); then
   done
 fi
 
-_wait_for_key "$G" "All done"
+if ((${#FAILED[@]} > 0)); then
+  operation::result warning "All done"
+else
+  operation::result success "All done"
+fi

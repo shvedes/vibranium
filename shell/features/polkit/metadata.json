@@ -1,0 +1,5 @@
+{
+  "id": "polkit",
+  "name": "Polkit Agent",
+  "description": "The polkit authentication dialog for Vibranium."
+}

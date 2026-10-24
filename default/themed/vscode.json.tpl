@@ -3,8 +3,8 @@
   "semanticHighlighting": true,
 
   "semanticTokenColors": {
-    "operator":          "{{ foreground_0 }}",
-    "punctuation":       "{{ foreground_0 }}",
+    "operator":          "{{ foreground }}",
+    "punctuation":       "{{ foreground }}",
     "selfKeyword":       "{{ blue }}",
     "selfTypeKeyword":   "{{ blue }}"
   },
@@ -15,90 +15,90 @@
     "textLink.foreground":              "{{ accent }}",
     "textLink.activeForeground":        "{{ accent|pop=0.10 }}",
 
-    "welcomePage.tileBackground":       "{{ background_2 }}",
-    "welcomePage.tileHoverBackground":  "{{ background_3 }}",
-    "welcomePage.progress.background":  "{{ background_3 }}",
+    "welcomePage.tileBackground":       "{{ background|pop=0.12 }}",
+    "welcomePage.tileHoverBackground":  "{{ background|pop=0.18 }}",
+    "welcomePage.progress.background":  "{{ background|pop=0.18 }}",
     "welcomePage.progress.foreground":  "{{ accent }}",
 
-    "button.secondaryBackground":       "{{ background_2 }}",
-    "button.secondaryForeground":       "{{ foreground_1 }}",
-    "button.secondaryHoverBackground":  "{{ background_3 }}",
+    "button.secondaryBackground":       "{{ background|pop=0.12 }}",
+    "button.secondaryForeground":       "{{ foreground|dim=0.06 }}",
+    "button.secondaryHoverBackground":  "{{ background|pop=0.18 }}",
 
-    "descriptionForeground":            "{{ foreground_4 }}",
+    "descriptionForeground":            "{{ foreground|dim=0.24 }}",
 
     // -- Editor ------------------------------------------------
-    "editor.background":                  "{{ background_0 }}",
-    "editor.foreground":                  "{{ foreground_0 }}",
-    "editor.lineHighlightBackground":     "{{ background_1 }}",
-    "editor.selectionBackground":         "{{ background_2 }}",
-    "editor.inactiveSelectionBackground": "{{ background_1|lightness=-0.05 }}",
-    "editorCursor.foreground":            "{{ foreground_0 }}",
-    "editorLineNumber.foreground":        "{{ background_5 }}",
-    "editorLineNumber.activeForeground":  "{{ foreground_2 }}",
-    "editorIndentGuide.background1":      "{{ background_1 }}",
-    "editorIndentGuide.activeBackground1":"{{ background_2 }}",
+    "editor.background":                  "{{ background }}",
+    "editor.foreground":                  "{{ foreground }}",
+    "editor.lineHighlightBackground":     "{{ background|pop=0.06 }}",
+    "editor.selectionBackground":         "{{ background|pop=0.12 }}",
+    "editor.inactiveSelectionBackground": "{{ background|pop=0.06|lightness=-0.05 }}",
+    "editorCursor.foreground":            "{{ foreground }}",
+    "editorLineNumber.foreground":        "{{ background|pop=0.30 }}",
+    "editorLineNumber.activeForeground":  "{{ foreground|dim=0.12 }}",
+    "editorIndentGuide.background1":      "{{ background|pop=0.06 }}",
+    "editorIndentGuide.activeBackground1":"{{ background|pop=0.12 }}",
 
     // -- Activity Bar ------------------------------------------
-    "activityBar.background":             "{{ background_1 }}",
-    "activityBar.foreground":             "{{ foreground_1 }}",
-    "activityBar.inactiveForeground":     "{{ foreground_3 }}",
-    "activityBarBadge.background":        "{{ background_2 }}",
-    "activityBarBadge.foreground":        "{{ foreground_2 }}",
+    "activityBar.background":             "{{ background|pop=0.06 }}",
+    "activityBar.foreground":             "{{ foreground|dim=0.06 }}",
+    "activityBar.inactiveForeground":     "{{ foreground|dim=0.18 }}",
+    "activityBarBadge.background":        "{{ background|pop=0.12 }}",
+    "activityBarBadge.foreground":        "{{ foreground|dim=0.12 }}",
 
     // -- Side Bar ----------------------------------------------
-    "sideBar.background":                 "{{ background_1 }}",
-    "sideBar.foreground":                 "{{ foreground_1 }}",
-    "sideBar.border":                     "{{ background_3 }}",
-    "sideBarTitle.foreground":            "{{ foreground_h }}",
-    "sideBarSectionHeader.background":    "{{ background_1 }}",
-    "sideBarSectionHeader.foreground":    "{{ foreground_1 }}",
+    "sideBar.background":                 "{{ background|pop=0.06 }}",
+    "sideBar.foreground":                 "{{ foreground|dim=0.06 }}",
+    "sideBar.border":                     "{{ background|pop=0.18 }}",
+    "sideBarTitle.foreground":            "{{ foreground|pop=0.06 }}",
+    "sideBarSectionHeader.background":    "{{ background|pop=0.06 }}",
+    "sideBarSectionHeader.foreground":    "{{ foreground|dim=0.06 }}",
 
     // -- Status Bar --------------------------------------------
-    "statusBar.background":               "{{ background_2 }}",
-    "statusBar.foreground":               "{{ foreground_2 }}",
-    "statusBar.noFolderBackground":       "{{ background_2 }}",
+    "statusBar.background":               "{{ background|pop=0.12 }}",
+    "statusBar.foreground":               "{{ foreground|dim=0.12 }}",
+    "statusBar.noFolderBackground":       "{{ background|pop=0.12 }}",
     "statusBar.debuggingBackground":      "{{ orange|dim=0.10 }}",
 
     // -- Title Bar ---------------------------------------------
-    "titleBar.activeBackground":          "{{ background_0 }}",
-    "titleBar.activeForeground":          "{{ foreground_0 }}",
-    "titleBar.inactiveBackground":        "{{ background_1 }}",
-    "titleBar.inactiveForeground":        "{{ foreground_1 }}",
+    "titleBar.activeBackground":          "{{ background }}",
+    "titleBar.activeForeground":          "{{ foreground }}",
+    "titleBar.inactiveBackground":        "{{ background|pop=0.06 }}",
+    "titleBar.inactiveForeground":        "{{ foreground|dim=0.06 }}",
 
     // -- Tabs --------------------------------------------------
-    "tab.activeBackground":               "{{ background_1 }}",
-    "tab.activeForeground":               "{{ foreground_h }}",
-    "tab.inactiveBackground":             "{{ background_0 }}",
-    "tab.inactiveForeground":             "{{ foreground_3 }}",
-    "tab.border":                         "{{ background_0 }}",
-    "tab.activeBorder":                   "{{ background_3 }}",
-    "editorGroupHeader.tabsBackground":   "{{ background_0 }}",
+    "tab.activeBackground":               "{{ background|pop=0.06 }}",
+    "tab.activeForeground":               "{{ foreground|pop=0.06 }}",
+    "tab.inactiveBackground":             "{{ background }}",
+    "tab.inactiveForeground":             "{{ foreground|dim=0.18 }}",
+    "tab.border":                         "{{ background }}",
+    "tab.activeBorder":                   "{{ background|pop=0.18 }}",
+    "editorGroupHeader.tabsBackground":   "{{ background }}",
 
     // -- Panel -------------------------------------------------
-    "panel.background":                   "{{ background_1 }}",
-    "panel.border":                       "{{ background_5 }}",
-    "panelTitle.activeForeground":        "{{ foreground_h }}",
-    "panelTitle.inactiveForeground":      "{{ foreground_3 }}",
+    "panel.background":                   "{{ background|pop=0.06 }}",
+    "panel.border":                       "{{ background|pop=0.30 }}",
+    "panelTitle.activeForeground":        "{{ foreground|pop=0.06 }}",
+    "panelTitle.inactiveForeground":      "{{ foreground|dim=0.18 }}",
 
     // -- Input / Dropdown --------------------------------------
-    "input.background":                   "{{ background_1 }}",
-    "input.foreground":                   "{{ foreground_1 }}",
-    "input.border":                       "{{ background_3 }}",
-    "input.placeholderForeground":        "{{ foreground_4 }}",
-    "dropdown.background":                "{{ background_1 }}",
-    "dropdown.foreground":                "{{ foreground_1 }}",
+    "input.background":                   "{{ background|pop=0.06 }}",
+    "input.foreground":                   "{{ foreground|dim=0.06 }}",
+    "input.border":                       "{{ background|pop=0.18 }}",
+    "input.placeholderForeground":        "{{ foreground|dim=0.24 }}",
+    "dropdown.background":                "{{ background|pop=0.06 }}",
+    "dropdown.foreground":                "{{ foreground|dim=0.06 }}",
 
     // -- Lists -------------------------------------------------
-    "list.activeSelectionBackground":     "{{ background_1 }}",
-    "list.activeSelectionForeground":     "{{ foreground_h }}",
-    "list.inactiveSelectionBackground":   "{{ background_1 }}",
-    "list.hoverBackground":               "{{ background_2 }}",
-    "list.focusBackground":               "{{ background_2 }}",
-    "list.highlightForeground":           "{{ foreground_h }}",
+    "list.activeSelectionBackground":     "{{ background|pop=0.06 }}",
+    "list.activeSelectionForeground":     "{{ foreground|pop=0.06 }}",
+    "list.inactiveSelectionBackground":   "{{ background|pop=0.06 }}",
+    "list.hoverBackground":               "{{ background|pop=0.12 }}",
+    "list.focusBackground":               "{{ background|pop=0.12 }}",
+    "list.highlightForeground":           "{{ foreground|pop=0.06 }}",
 
     // -- Buttons -----------------------------------------------
     "button.background":                  "{{ accent|alpha=0.7 }}",
-    "button.foreground":                  "{{ foreground_h }}",
+    "button.foreground":                  "{{ foreground|pop=0.06 }}",
     "button.hoverBackground":             "{{ accent }}",
 
     // -- Scrollbar ---------------------------------------------
@@ -107,58 +107,58 @@
     "scrollbarSlider.activeBackground":   "{{ gray|pop=0.10 }}",
 
     // -- Badge -------------------------------------------------
-    "badge.background":                   "{{ background_4 }}",
-    "badge.foreground":                   "{{ foreground_h }}",
+    "badge.background":                   "{{ background|pop=0.24 }}",
+    "badge.foreground":                   "{{ foreground|pop=0.06 }}",
 
     // -- Notifications -----------------------------------------
-    "notifications.background":           "{{ background_2 }}",
-    "notifications.foreground":           "{{ foreground_1 }}",
+    "notifications.background":           "{{ background|pop=0.12 }}",
+    "notifications.foreground":           "{{ foreground|dim=0.06 }}",
     "notificationCenterHeader.background":"{{ accent|dim=0.10 }}",
 
     // -- Breadcrumb --------------------------------------------
-    "breadcrumb.background":                "{{ background_1 }}",
-    "breadcrumb.foreground":                "{{ foreground_3 }}",
-    "breadcrumb.activeSelectionForeground": "{{ background_3 }}",
+    "breadcrumb.background":                "{{ background|pop=0.06 }}",
+    "breadcrumb.foreground":                "{{ foreground|dim=0.18 }}",
+    "breadcrumb.activeSelectionForeground": "{{ background|pop=0.18 }}",
 
     // -- Git Decorations ---------------------------------------
     "gitDecoration.modifiedResourceForeground":    "{{ green }}",
     "gitDecoration.deletedResourceForeground":     "{{ red|dim=0.10 }}",
-    "gitDecoration.untrackedResourceForeground":   "{{ foreground_0|alpha=0.5 }}",
+    "gitDecoration.untrackedResourceForeground":   "{{ foreground|alpha=0.5 }}",
     "gitDecoration.ignoredResourceForeground":     "{{ orange }}",
     "gitDecoration.conflictingResourceForeground": "{{ red }}",
 
     // -- Quick Input / Search ----------------------------------
 
-    "quickInput.border":                  "{{ background_4 }}",
-    "quickInput.background":              "{{ background_1 }}",
-    "quickInput.foreground":              "{{ foreground_1 }}",
-    "quickInputTitle.background":         "{{ background_0 }}",
-    "quickInputTitle.foreground":         "{{ foreground_h }}",
+    "quickInput.border":                  "{{ background|pop=0.24 }}",
+    "quickInput.background":              "{{ background|pop=0.06 }}",
+    "quickInput.foreground":              "{{ foreground|dim=0.06 }}",
+    "quickInputTitle.background":         "{{ background }}",
+    "quickInputTitle.foreground":         "{{ foreground|pop=0.06 }}",
 
     "widget.shadow":                      "{{ accent|dim=0.10 }}",
 
     "pickerGroup.background":             "{{ red }}",
-    "pickerGroup.border":                 "{{ background_3 }}",
-    "pickerGroup.foreground":             "{{ foreground_1 }}",
+    "pickerGroup.border":                 "{{ background|pop=0.18 }}",
+    "pickerGroup.foreground":             "{{ foreground|dim=0.06 }}",
 
-    "quickInputList.focusBackground":     "{{ background_2 }}",
-    "quickInputList.focusForeground":     "{{ foreground_h }}",
-    "quickInputList.focusIconForeground": "{{ foreground_h }}",
+    "quickInputList.focusBackground":     "{{ background|pop=0.12 }}",
+    "quickInputList.focusForeground":     "{{ foreground|pop=0.06 }}",
+    "quickInputList.focusIconForeground": "{{ foreground|pop=0.06 }}",
 
     // -- Global -----------------------------------------------
     "focusBorder":                          "{{ accent|dim=0.10 }}",
-    "selection.background":                 "{{ background_2 }}",
+    "selection.background":                 "{{ background|pop=0.12 }}",
 
     // -- Editor Group -----------------------------------------
-    "editorGroup.border":                   "{{ background_3 }}",
-    "editorGroup.dropBackground":           "{{ background_2 }}",
+    "editorGroup.border":                   "{{ background|pop=0.18 }}",
+    "editorGroup.dropBackground":           "{{ background|pop=0.12 }}",
 
     // -- Editor Find / Word Highlights ------------------------
     "editor.findMatchBackground":           "{{ accent|dim=0.10 }}",
-    "editor.findMatchHighlightBackground":  "{{ background_3 }}",
-    "editor.wordHighlightBackground":       "{{ background_2 }}",
-    "editor.wordHighlightStrongBackground": "{{ background_3 }}",
-    "editor.rangeHighlightBackground":      "{{ background_1 }}",
+    "editor.findMatchHighlightBackground":  "{{ background|pop=0.18 }}",
+    "editor.wordHighlightBackground":       "{{ background|pop=0.12 }}",
+    "editor.wordHighlightStrongBackground": "{{ background|pop=0.18 }}",
+    "editor.rangeHighlightBackground":      "{{ background|pop=0.06 }}",
 
     // -- Editor Diagnostics -----------------------------------
     "editorError.foreground":               "{{ red }}",
@@ -166,8 +166,8 @@
     "editorInfo.foreground":                "{{ blue }}",
 
     // -- Editor Bracket Match ---------------------------------
-    "editorBracketMatch.background":        "{{ background_3 }}",
-    "editorBracketMatch.border":            "{{ foreground_3 }}",
+    "editorBracketMatch.background":        "{{ background|pop=0.18 }}",
+    "editorBracketMatch.border":            "{{ foreground|dim=0.18 }}",
 
     // -- Editor Gutter (git diff line markers) ----------------
     "editorGutter.addedBackground":         "{{ green|dim=0.10 }}",
@@ -175,43 +175,43 @@
     "editorGutter.deletedBackground":       "{{ red|dim=0.10 }}",
 
     // -- Editor Code Lens -------------------------------------
-    "editorCodeLens.foreground":            "{{ foreground_4 }}",
+    "editorCodeLens.foreground":            "{{ foreground|dim=0.24 }}",
 
     // -- Editor Inlay Hints -----------------------------------
-    "editorInlayHint.background":           "{{ background_2 }}",
-    "editorInlayHint.foreground":           "{{ foreground_4 }}",
+    "editorInlayHint.background":           "{{ background|pop=0.12 }}",
+    "editorInlayHint.foreground":           "{{ foreground|dim=0.24 }}",
     "editorInlayHint.typeForeground":       "{{ cyan }}",
-    "editorInlayHint.parameterForeground":  "{{ foreground_3 }}",
+    "editorInlayHint.parameterForeground":  "{{ foreground|dim=0.18 }}",
 
     // -- Suggest Widget ---------------------------------------
-    "editorSuggestWidget.background":        "{{ background_1 }}",
-    "editorSuggestWidget.border":            "{{ background_3 }}",
-    "editorSuggestWidget.foreground":        "{{ foreground_1 }}",
-    "editorSuggestWidget.selectedBackground":"{{ background_2 }}",
-    "editorSuggestWidget.highlightForeground":"{{ foreground_h }}",
+    "editorSuggestWidget.background":        "{{ background|pop=0.06 }}",
+    "editorSuggestWidget.border":            "{{ background|pop=0.18 }}",
+    "editorSuggestWidget.foreground":        "{{ foreground|dim=0.06 }}",
+    "editorSuggestWidget.selectedBackground":"{{ background|pop=0.12 }}",
+    "editorSuggestWidget.highlightForeground":"{{ foreground|pop=0.06 }}",
 
     // -- Hover Widget -----------------------------------------
-    "editorHoverWidget.background":         "{{ background_1 }}",
-    "editorHoverWidget.border":             "{{ background_3 }}",
-    "editorHoverWidget.foreground":         "{{ foreground_1 }}",
+    "editorHoverWidget.background":         "{{ background|pop=0.06 }}",
+    "editorHoverWidget.border":             "{{ background|pop=0.18 }}",
+    "editorHoverWidget.foreground":         "{{ foreground|dim=0.06 }}",
 
     // -- Sticky Scroll ----------------------------------------
-    "editorStickyScroll.background":        "{{ background_1 }}",
-    "editorStickyScrollHover.background":   "{{ background_2 }}",
+    "editorStickyScroll.background":        "{{ background|pop=0.06 }}",
+    "editorStickyScrollHover.background":   "{{ background|pop=0.12 }}",
 
     // -- Peek View --------------------------------------------
     "peekView.border":                         "{{ accent|dim=0.10 }}",
-    "peekViewEditor.background":               "{{ background_1 }}",
+    "peekViewEditor.background":               "{{ background|pop=0.06 }}",
     "peekViewEditor.matchHighlightBackground": "{{ accent|dim=0.10 }}",
-    "peekViewResult.background":               "{{ background_0 }}",
-    "peekViewResult.fileForeground":           "{{ foreground_h }}",
-    "peekViewResult.lineForeground":           "{{ foreground_2 }}",
+    "peekViewResult.background":               "{{ background }}",
+    "peekViewResult.fileForeground":           "{{ foreground|pop=0.06 }}",
+    "peekViewResult.lineForeground":           "{{ foreground|dim=0.12 }}",
     "peekViewResult.matchHighlightBackground": "{{ accent|dim=0.10 }}",
-    "peekViewResult.selectionBackground":      "{{ background_2 }}",
-    "peekViewResult.selectionForeground":      "{{ foreground_h }}",
-    "peekViewTitle.background":                "{{ background_2 }}",
-    "peekViewTitleLabel.foreground":           "{{ foreground_h }}",
-    "peekViewTitleDescription.foreground":     "{{ foreground_3 }}",
+    "peekViewResult.selectionBackground":      "{{ background|pop=0.12 }}",
+    "peekViewResult.selectionForeground":      "{{ foreground|pop=0.06 }}",
+    "peekViewTitle.background":                "{{ background|pop=0.12 }}",
+    "peekViewTitleLabel.foreground":           "{{ foreground|pop=0.06 }}",
+    "peekViewTitleDescription.foreground":     "{{ foreground|dim=0.18 }}",
 
     // -- Diff Editor ------------------------------------------
     "diffEditor.insertedLineBackground":    "{{ green|dim=0.10 }}",
@@ -220,26 +220,26 @@
     "diffEditor.removedTextBackground":     "{{ red|dim=0.10 }}",
 
     // -- Minimap ----------------------------------------------
-    "minimap.background":                   "{{ background_0 }}",
+    "minimap.background":                   "{{ background }}",
     "minimap.findMatchHighlight":           "{{ accent|dim=0.10 }}",
-    "minimap.selectionHighlight":           "{{ background_3 }}",
+    "minimap.selectionHighlight":           "{{ background|pop=0.18 }}",
     "minimapSlider.background":             "{{ gray|dim=0.10|alpha=0.3  }}",
     "minimapSlider.hoverBackground":        "{{ gray|alpha=0.3 }}",
     "minimapSlider.activeBackground":       "{{ gray|pop=0.10|alpha=0.5  }}",
 
     // -- Terminal ---------------------------------------------
-    "terminal.background":                  "{{ background_0 }}",
-    "terminal.foreground":                  "{{ foreground_1 }}",
-    "terminal.selectionBackground":         "{{ background_2 }}",
-    "terminalCursor.foreground":            "{{ foreground_0 }}",
-    "terminal.ansiBlack":                   "{{ background_3 }}",
+    "terminal.background":                  "{{ background }}",
+    "terminal.foreground":                  "{{ foreground|dim=0.06 }}",
+    "terminal.selectionBackground":         "{{ background|pop=0.12 }}",
+    "terminalCursor.foreground":            "{{ foreground }}",
+    "terminal.ansiBlack":                   "{{ background|pop=0.18 }}",
     "terminal.ansiRed":                     "{{ red }}",
     "terminal.ansiGreen":                   "{{ green }}",
     "terminal.ansiYellow":                  "{{ orange }}",
     "terminal.ansiBlue":                    "{{ blue }}",
     "terminal.ansiMagenta":                 "{{ purple }}",
     "terminal.ansiCyan":                    "{{ cyan }}",
-    "terminal.ansiWhite":                   "{{ foreground_2 }}",
+    "terminal.ansiWhite":                   "{{ foreground|dim=0.12 }}",
     "terminal.ansiBrightBlack":             "{{ gray|pop=0.10 }}",
     "terminal.ansiBrightRed":               "{{ red|pop=0.10 }}",
     "terminal.ansiBrightGreen":             "{{ green|pop=0.10 }}",
@@ -247,28 +247,28 @@
     "terminal.ansiBrightBlue":              "{{ blue|pop=0.10 }}",
     "terminal.ansiBrightMagenta":           "{{ purple|pop=0.10 }}",
     "terminal.ansiBrightCyan":              "{{ cyan|pop=0.10 }}",
-    "terminal.ansiBrightWhite":             "{{ foreground_h }}",
+    "terminal.ansiBrightWhite":             "{{ foreground|pop=0.06 }}",
 
     // -- Menu -------------------------------------------------
-    "menu.background":                      "{{ background_1 }}",
-    "menu.foreground":                      "{{ foreground_1 }}",
-    "menu.selectionBackground":             "{{ background_2 }}",
-    "menu.selectionForeground":             "{{ foreground_h }}",
-    "menu.separatorBackground":             "{{ background_3 }}",
-    "menu.border":                          "{{ background_3 }}",
+    "menu.background":                      "{{ background|pop=0.06 }}",
+    "menu.foreground":                      "{{ foreground|dim=0.06 }}",
+    "menu.selectionBackground":             "{{ background|pop=0.12 }}",
+    "menu.selectionForeground":             "{{ foreground|pop=0.06 }}",
+    "menu.separatorBackground":             "{{ background|pop=0.18 }}",
+    "menu.border":                          "{{ background|pop=0.18 }}",
 
     // -- Status Bar Items -------------------------------------
     "statusBarItem.errorBackground":        "{{ red|dim=0.10 }}",
-    "statusBarItem.errorForeground":        "{{ foreground_h }}",
+    "statusBarItem.errorForeground":        "{{ foreground|pop=0.06 }}",
     "statusBarItem.warningBackground":      "{{ orange|dim=0.10 }}",
-    "statusBarItem.warningForeground":      "{{ foreground_h }}",
+    "statusBarItem.warningForeground":      "{{ foreground|pop=0.06 }}",
     "statusBarItem.remoteBackground":       "{{ accent|dim=0.10 }}",
-    "statusBarItem.remoteForeground":       "{{ foreground_h }}",
+    "statusBarItem.remoteForeground":       "{{ foreground|pop=0.06 }}",
 
     // -- Panel Section ----------------------------------------
-    "panelSectionHeader.background":        "{{ background_2 }}",
-    "panelSectionHeader.foreground":        "{{ foreground_h }}",
-    "panelSection.border":                  "{{ background_3 }}"
+    "panelSectionHeader.background":        "{{ background|pop=0.12 }}",
+    "panelSectionHeader.foreground":        "{{ foreground|pop=0.06 }}",
+    "panelSection.border":                  "{{ background|pop=0.18 }}"
   },
 
   "tokenColors": [
@@ -332,7 +332,7 @@
       {
         "name": "Operators",
         "scope": ["keyword.operator"],
-        "settings": { "foreground": "{{ foreground_0 }}" }
+        "settings": { "foreground": "{{ foreground }}" }
       },
 
       // -- Variables ------------------------
@@ -446,7 +446,7 @@
           "meta.brace.curly",
           "meta.brace.square"
         ],
-        "settings": { "foreground": "{{ foreground_0 }}" }
+        "settings": { "foreground": "{{ foreground }}" }
       },
 
       // -- Tags (HTML/XML) --
@@ -482,7 +482,7 @@
           "meta.decorator",
           "punctuation.decorator"
         ],
-        "settings": { "foreground": "{{ foreground_h }}" }
+        "settings": { "foreground": "{{ foreground|pop=0.06 }}" }
       },
 
       // -- Regexp character classes --

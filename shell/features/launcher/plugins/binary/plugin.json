@@ -1,0 +1,6 @@
+{
+  "name": "Binary",
+  "description": "Offer to run a program on PATH when the query is exactly its name.",
+  "keyword": "",
+  "type": "binary"
+}

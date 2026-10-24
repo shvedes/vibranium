@@ -1,0 +1,4 @@
+module qs.features.bar.modules.Bluetooth
+
+Bluetooth 1.0 Bluetooth.qml
+BluetoothIsland 1.0 BluetoothIsland.qml

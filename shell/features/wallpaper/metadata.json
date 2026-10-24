@@ -1,0 +1,5 @@
+{
+  "id": "wallpaper",
+  "name": "Wallpaper",
+  "description": "Per-screen wallpaper renderer with crossfade transitions."
+}

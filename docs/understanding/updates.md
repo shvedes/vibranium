@@ -44,7 +44,7 @@ If restoring local changes causes conflicts, the update stops and provides instr
 
 Vibranium periodically checks for available updates using the `vibranium-update.timer` system unit.  
 The check runs without user interaction and stores the result in: `$VIBRANIUM_STATE/update.available`  
-The Waybar update module reads this state and displays when a new Vibranium version is available.
+The bar update module reads this state and displays when a new Vibranium version is available.
 
 Current installation information can be viewed with:
 

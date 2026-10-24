@@ -1,140 +1,247 @@
 # Settings & validation
 
-Every managed setting in Vibranium follows the same lifecycle:
+Every managed setting in Vibranium follows one pipeline:
 
-> **Defaults catalog -> Validation -> Settings file -> Runtime**
+> **Schema catalog -> Quickshell store -> settings.json -> settings.env -> scripts**
 
-This pipeline ensures that every component sees valid configuration values, whether they come from the graphical menus or manual edits.
+Validation happens once, at write time, inside the Vibranium shell. Bash
+scripts never validate - they read an already-valid projection.
 
-## Configuration files
+## The schema catalog
 
-| File | Purpose |
-|------|---------|
-| `$VIBRANIUM/bin/vb-core-defaults` | Defines every managed setting, its default value, type, and constraints. |
-| `~/.config/vibranium/settings` | Stores user-defined settings. Managed automatically by the Settings menu, but can also be edited manually. |
-| `~/.config/vibranium/settings.advanced` | Advanced settings intended for manual editing. |
-| `~/.config/vibranium/settings.functions` | Helper functions used by `settings.advanced`. |
-
-## The settings file
-
-The main configuration file is:
+Managed options live in a directory of small per-domain files:
 
 ```text
-~/.config/vibranium/settings
+$VIBRANIUM/default/vibranium/settings/
+  _index.jsonc            # root page chrome: { "width": 250, "title": "Settings" }
+  shell/10-wallpaper.jsonc ... shell/23-network.jsonc
+  env/21-recording.jsonc ... env/22-brightness.jsonc
+  hypr/30-input.jsonc ... hypr/42-master.jsonc
+  misc/50-cursor.jsonc
 ```
 
-It is a plain shell script containing `KEY=value` assignments.
+File order (numeric prefixes) is catalog order. Each file holds a `pages`
+array - one page per category. Each page becomes a generated menu page and
+declares its options:
 
-This allows Vibranium to source the file directly without requiring a custom parser. The Settings menu modifies individual variables automatically, while manual edits take effect the next time a component reads the corresponding setting.
+```jsonc
+{
+  "pages": [
+    {
+      "label": "Recording",
+      "options": [
+        {
+          "key": "RECORDING_FPS",
+          "type": "int",              // bool | int | float | string | layout | timers
+          "range": { "min": 15, "max": 120 },
+          "step": 15,
+          "default": 30,
+          "label": "FPS cap",
+          "desc": "Frames per second to record with."
+        }
+      ],
+      "items": [ /* plain menu rows: actions, separators, guards */ ]
+    }
+  ]
+}
+```
 
-Because the file is sourced by Bash, invalid shell syntax prevents it from being loaded.  
-If this happens, scripts fall back to their default values until the syntax error is corrected.
+Namespace equals directory: `shell/*` holds only `shell.*`, `env/*` only
+bare `UPPER_SNAKE`, `hypr/*` only `hypr.*`, `misc/*` only `misc.*`. A key in
+the wrong file is a parse error. One documented exception:
+`APP_LAUNCHER_ALWAYS_FOCUS` rides the App launcher page in
+`shell/11-launcher.jsonc` so the launcher UI stays on one page.
 
-## Validation
+Per-file inventory (186 keys after the `audioFeedback` removals and the
+`shell.osd.showOnLockscreen` removal):
 
-Every managed setting is validated before it is used.
+| File(s) | Pages | Keys |
+|---|---|---|
+| `shell/10-wallpaper.jsonc` | General, Misc | 7 shell |
+| `shell/11-launcher.jsonc` | App launcher, Enabled plugins | 7 shell + 1 env |
+| `shell/12-bar.jsonc` | Bar, Enabled modules, Module options | 10 shell |
+| `shell/13-bar-modules.jsonc` | 8 module pages | 18 shell |
+| `shell/14-audio.jsonc` | Audio | 3 shell |
+| `shell/15-screenshots.jsonc` | Screenshots | 6 shell |
+| `shell/16-osd.jsonc` | OSD | 1 shell |
+| `shell/17-nightlight.jsonc` | Night Light | 2 shell |
+| `shell/18-colorpicker.jsonc` | Color picker | 3 shell |
+| `shell/19-lockscreen.jsonc` | Lock screen | 9 shell |
+| `shell/20-idle.jsonc` | Idle | 2 shell |
+| `shell/22-power.jsonc` | Power | 5 shell |
+| `shell/23-network.jsonc` | Network | 2 shell |
+| `env/21-recording.jsonc` | Recording | 7 env |
+| `env/22-brightness.jsonc` | Brightness | 2 env |
+| `env/24-media.jsonc` | Media player | 1 env |
+| `hypr/30-input.jsonc` | Hyprland, Edit configs, Input, Touchpad, Layouts | 12 hypr |
+| `hypr/31-gaps.jsonc` | Appearance, Gaps | 3 hypr |
+| `hypr/32-blur.jsonc` | Blur | 8 hypr |
+| `hypr/33-glow.jsonc` | Glow | 3 hypr |
+| `hypr/34-shadow.jsonc` | Shadows | 4 hypr |
+| `hypr/35-decoration.jsonc` | Decoration | 9 hypr |
+| `hypr/36-dim.jsonc` | Window dimming | 4 hypr |
+| `hypr/37-animations.jsonc` | Animations | 2 hypr |
+| `hypr/38-general.jsonc` | Advanced | 7 hypr |
+| `hypr/39-cursor.jsonc` | Cursor | 20 hypr |
+| `hypr/40-scrolling.jsonc` | Scrolling | 7 hypr |
+| `hypr/41-dwindle.jsonc` | Dwindle | 11 hypr |
+| `hypr/42-master.jsonc` | Master | 13 hypr |
+| `misc/50-cursor.jsonc` | Cursor | 2 misc |
 
-If a setting is:
+By type: bool 86, string 43 (33 enum + 10 free), int 37, float 21,
+`layout` 1 (bar zone layout), `timers` 1 (idle list). `layout`/`timers`
+are first-class types with schema-side validators, not generic
+object/array passthrough.
 
-- missing,
-- empty,
-- outside its allowed range,
-- or contains an invalid value,
+Option keys are always `key`: dotted shell paths stored under
+`settings.json:shell`, bare names stored under `settings.json:options`
+and projected into settings.env. `var`/`id` remain as compat shims.
 
-Vibranium automatically falls back to the default value defined in the defaults catalog.  
-Validation occurs every time a script requests a setting. Invalid values therefore never propagate through the system.
+Each store scans only its own files: Settings reads `shell/` + `env/`,
+HyprlandSettings reads `hypr/`, MiscSettings reads `misc/`. The catalog
+lives in one place - `default/vibranium/settings/` - and `_index.jsonc`
+carries its root chrome. A catalog that cannot be read leaves the store
+with no options, and the reason is logged.
 
-Valid values are also normalized where appropriate. For example:
+### Descriptions and warnings
 
-- booleans are converted to lowercase
-- integers are normalized before use
+`desc` supports a minimal inline markup - `<b>`, `<i>`, `<u>` and `\n`
+line breaks; anything else renders literally, so typos can never break
+the menu. A `warning` adds cautionary copy (yellow notice box) below the
+description, shown only while the entry's dropdown is expanded - under a
+single separator above the description block. Warnings carry the same
+inline markup as `desc`.
 
-## The defaults catalog
+```jsonc
+{
+  "label": "Delete configuration",
+  "desc": "Deletes the current configuration.",
+  "warning": "This action cannot be undone."
+}
+```
 
-All managed settings are defined in `$VIBRANIUM/bin/vb-core-defaults`.  
-This file serves as the single source of truth for every configurable option.  
-Each managed variable is documented using machine-readable annotations:
+### Conditional visibility
+
+Three layers - pick by what the condition depends on.
+
+| Layer | Depends on | Form | Evaluated |
+|---|---|---|---|
+| `showIf` | other options' values | `{ "key": X, "eq" \| "neq" \| "in": arg }`, ANDed, transitive + cycle-safe | instantly in UI |
+| `requires` | machine reality, fixed vocabulary | `{ "chassis": "laptop" \| "vm" \| "!vm", "binary": "<name>" }` | via batched bash guard |
+| `visibility` | authorship intent | `"visible"` (default) \| `"hidden"` (click hooks) \| `"internal"` (layout, timers) | at parse |
+
+**`showIf` - other options' values.** Declarative, instant, no forks:
+
+```jsonc
+{
+  "key": "RECORDING_FPS",
+  "type": "int", "range": { "min": 15, "max": 120 }, "default": 30,
+  "showIf": { "key": "RECORDING_CAPTURE_SOURCE", "eq": true }
+}
+```
+
+- One condition is an object: `{ "key": X, "eq" | "neq" | "in": arg }`.
+  `"in"` takes an array (any-of). A bare object or an array of conditions
+  (ANDed) are both accepted.
+- Shell-only options are addressed by their full path:
+  `{ "key": "shell.lockscreen.blurPower", "eq": "high" }`.
+- Chains resolve transitively with cycle safety - if the parent option is
+  itself hidden, its dependents hide too. Cross-file references stay
+  intact: each entry resolves in its own store at runtime.
+- **UI-only.** Hidden options keep their value and stay projected into the
+  env file; scripts never see menu visibility.
+- Self references are pruned at load with a warning.
+
+**`requires` - machine reality.** Structured replacement for free-form
+option `when`/`disabled` (raw action `items` may still carry `when`
+bash; options may not):
+
+```jsonc
+{
+  "key": "shell.power.acProfile",
+  "requires": { "chassis": "laptop" }
+}
+```
+
+Rule of thumb: preference-dependent -> `showIf`; world-dependent with a
+fixed shape (laptop-only, not-a-VM, needs a binary) -> `requires`;
+programmatic state that is never a row -> `visibility: internal`.
+
+## The user config
+
+```text
+~/.config/vibranium/settings.json
+```
+
+Sparse JSONC: only overrides are stored, defaults live in the schema.
+Everything except `options` belongs to the Quickshell shell and lives under
+the `shell` namespace; `options` holds the env-projected overrides:
+
+```jsonc
+{
+  "shell": {
+    "debug": true,
+    "wallpaper": { "enabled": true },
+    "lockscreen": { "blurPower": "medium" },
+    "statusbar": { "position": "top", "layout": { "...": "..." } }
+  },
+  "options": {
+    "RECORDING_FPS": 60
+  }
+}
+```
+
+Hand edits are first-class - the shell watches the file, re-validates on
+change and regenerates the env projection. Files written in the legacy flat
+layout (top-level `wallpaper`/`lockscreen`/`statusbar`) fold into
+`shell.*` automatically and are rewritten normalized. Unknown sections pass
+through untouched; an unparsable file is never rewritten. Setting an option
+back to its default removes the override again.
+
+## The bash env projection
+
+```text
+$VIBRANIUM_RUNTIME/settings.env   # canonical, atomic-swapped on every change
+```
+
+A plain sourced `KEY=VAL` file rendered from validated in-memory state:
 
 ```bash
-# @type int
-# @range 0..100
-# @desc JPEG compression level.
-# @desc AKA JPEG quality.
-VIBRANIUM_SCREENSHOT_JPEG_QUALITY=80
-
-# @type string
-# @values png jpeg ppm
-# @desc File type used when taking a screenshot.
-VIBRANIUM_SCREENSHOT_FILE_TYPE="jpeg"
-
-# @type bool
-# @desc Whether to briefly flash the screen when taking a screenshot.
-VIBRANIUM_SCREENSHOT_FLASH_SCREEN=true
+RECORDING_FPS=30
+VOLUME_ADJUSTMENT_STEP=5
 ```
 
-Supported setting types:
+`vb-lib-core` sources it. The shell seeds the file on boot before user
+scripts run, so readers always see validated values. Writes are atomic (temp +
+rename): readers see either the old or the new content, never partial.
+File order follows catalog order (numeric filename prefixes keep it
+stable); reordering UI pages never reorders the env file.
 
-| Type | Constraints | Default format |
-|------|-------------|----------------|
-| `bool` | Must be `true` or `false` | Unquoted `true` / `false` |
-| `int` | Optional `@range N..M` | Unquoted integer |
-| `string` | `@values` is required | Double-quoted string |
+Only bare `UPPER_SNAKE` options appear here. Shell-internal config
+(wallpaper, lockscreen, statusbar) stays in settings.json only. Retired
+`VIBRANIUM_BAR_*` options no longer exist anywhere.
 
-Variables without a `@type` annotation are ignored by the validator.  
-Variables annotated with `@ignore` are also skipped, allowing unrestricted values where appropriate.
+## Changing values
 
-!!! warning
+Any of these routes land in the same store, validation and env swap:
 
-    The annotation format is strict.
+- the Settings menu (`qs.menu`, generated from the schema)
+- IPC: `vb-shell settings get|set|toggle|dump|reload <var> [json]`
+- hand edits to settings.json
 
-    `vb-core-defaults` is parsed by an AWK-based validator that verifies both annotations and default values.  
-    Invalid tags, malformed ranges, incorrectly quoted defaults, or defaults outside their declared ranges all produce validation errors.
+Invalid values are rejected at the boundary (out-of-range, enum violation,
+type mismatch) and never reach disk or scripts. Hooks declared on an option
+(`"hook": "..."`) run detached after the env swap completes.
 
-## The validator
+## Legacy migration
 
-Settings are validated through the `helpers::check()` function defined in `vb-lib-core`.  
-Scripts typically request settings like this:
-
-```bash
-helpers::check \
-    VIBRANIUM_RECORDING_FPS \
-    VIBRANIUM_RECORDING_QUALITY
-```
-
-On its first invocation, the validator parses `vb-core-defaults` into a set of associative arrays that are cached for the lifetime of the current process.
-
-For each requested variable, the validator performs the following steps:
-
-1. If the variable is missing or empty, the default value is applied.
-2. If the value is invalid, the default value is applied.
-3. If the value is valid, it is normalized before use.
-4. If the variable does not exist in the defaults catalog, a warning is emitted and the value is left unchanged.
-
-Normalization currently includes:
-
-- lowercasing boolean values
-- canonicalizing integer values
-- validating integer ranges using Bash's `10#` syntax to avoid octal interpretation
-
-Because every component validates settings through the same helper, the defaults catalog remains the authoritative definition of every managed option.
-
-## Reading settings
-
-Scripts can retrieve validated settings directly:
-
-```bash
-vb-cmd-get-option VIBRANIUM_SOME_SETTING
-```
-
-The command prints the validated runtime value.
-
-!!! warning
-
-    Do not use this command in loops. For a single VAR lookup, this approach is fairly expensive.  
-    If you need to read multiple VARs, use `helpers::check()` directly.
+The old annotated bash catalog (`bin/vb-core-defaults`) and the awk parser
+are gone. On first start the shell imports a legacy
+`~/.config/vibranium/settings` into settings.json and renames it to
+`settings.migrated`. Values dropped from the schema are skipped with a
+warning.
 
 ## Related pages
 
 - [Advanced settings](../user/advanced-settings.md)
-- [The cfgr menu system](configuration-system.md)
-- [Settings validation internals](../internals/settings-validation.md)
+- [How it works](how-it-works.md)

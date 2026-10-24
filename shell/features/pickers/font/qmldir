@@ -1,0 +1,3 @@
+module qs.features.pickers.font
+
+singleton FontPicker 1.0 FontPicker.qml

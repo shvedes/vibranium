@@ -8,7 +8,7 @@ fi
 # ========================================================================================== #
 
 EXPECTED_PATH="$HOME/.local/share/vibranium/install"
-SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &>/dev/null && pwd)
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
 
 if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   echo "ERROR: This script must be run from $EXPECTED_PATH" >&2
@@ -17,7 +17,8 @@ if [[ "$SCRIPT_DIR" != "$EXPECTED_PATH" ]]; then
   exit 1
 fi
 
-export CHASSIS_TYPE="$(hostnamectl chassis)"
+CHASSIS_TYPE="$(hostnamectl chassis)"
+export CHASSIS_TYPE
 export VIBRANIUM="$HOME/.local/share/vibranium"
 export VIBRANIUM_PATH="$VIBRANIUM/bin"
 export PATH="$PATH:$VIBRANIUM_PATH"
@@ -38,14 +39,20 @@ export _LOG_FILE="$HOME/vibranium-install.log"
 
 # ========================================== #
 
-source vb-lib-core &>/dev/null
+source vb-lib-core &> /dev/null
 
+export -f term::tty_available
+export -f term::tty_print
+export -f term::cursor_hide
+export -f term::cursor_show
 export -f term::discard_buffer
 export -f term::disable_input
 export -f term::enable_input
-export -f term::show_header
+export -f term::wait_key
+export -f term::readline_prompt
+export -f term::prompt_line
 export -f term::ask_yes_no
-export -f term::spinner
+export -f term::is_headless
 
 export XDG_DATA_HOME="$HOME/.local/share"
 export XDG_CONFIG_HOME="$HOME/.config"
@@ -67,8 +74,6 @@ done
 export -f helpers::log::info
 export -f helpers::log::warn
 export -f helpers::log::error
-export -f helpers::log::phase
-export -f helpers::log::success
 
 export -f helpers::_needs_sudo
 export -f helpers::_sudo_for
@@ -80,20 +85,8 @@ export -f helpers::symlink
 export -f helpers::sed
 export -f helpers::append_once
 export -f helpers::remove
-export -f helpers::backup_list
-export -f helpers::backup_restore
 
 export -f helpers::is_vm
-export -f helpers::has_wifi_adapter
-
-export -f helpers::install_yay
-export -f helpers::install_pkg
-
-export -f helpers::abort_install
-export -f helpers::prompt_err_action
-export -f helpers::run_step
-export -f helpers::run_phase
-export -f _shcat
 
 # ========================================== #
 
@@ -110,24 +103,24 @@ _INTERRUPT=false
 SUDO_KEEPALIVE_PID=""
 
 _cleanup_on_exit() {
-  kill "$SUDO_KEEPALIVE_PID" 2>/dev/null
-  wait "$SUDO_KEEPALIVE_PID" 2>/dev/null
+  kill "$SUDO_KEEPALIVE_PID" 2> /dev/null
+  wait "$SUDO_KEEPALIVE_PID" 2> /dev/null
   rm -f /tmp/vb-install-ongoing
   term::enable_input
 
   case "$_INSTALL_COMPLETE" in
     true) ;;
     aborted)
-      printf '[%(%H:%M:%S)T] aborted\n' -1 >> "$_LOG_FILE" 2>/dev/null
+      printf '[%(%H:%M:%S)T] aborted\n' -1 >> "$_LOG_FILE" 2> /dev/null
       helpers::log::error "Installation aborted"
       helpers::log::error "Log: ${_LOG_FILE}"
       ;;
     *)
       if [[ "$_INTERRUPT" == true ]]; then
-        printf '[%(%H:%M:%S)T] interrupted\n' -1 >> "$_LOG_FILE" 2>/dev/null
+        printf '[%(%H:%M:%S)T] interrupted\n' -1 >> "$_LOG_FILE" 2> /dev/null
         helpers::log::error "Installation interrupted"
       else
-        printf '[%(%H:%M:%S)T] unexpected exit\n' -1 >> "$_LOG_FILE" 2>/dev/null
+        printf '[%(%H:%M:%S)T] unexpected exit\n' -1 >> "$_LOG_FILE" 2> /dev/null
         helpers::log::error "Installation terminated unexpectedly"
       fi
       helpers::log::error "Log: ${_LOG_FILE}"
@@ -143,7 +136,10 @@ trap '_INTERRUPT=true; exit 143' TERM
 
 touch /tmp/vb-install-ongoing
 
-exec </dev/tty
+if ! { exec < /dev/tty; } 2> /dev/null; then
+  helpers::log::error "The installer requires a terminal"
+  exit 1
+fi
 
 # Clear TTY and move prompt to the bottom
 clear
@@ -189,7 +185,7 @@ fi
 
 SUDO_KEEPALIVE_PID=$!
 
-if ! command -v yay &>/dev/null; then
+if ! command -v yay &> /dev/null; then
   helpers::log::info "Installing AUR helper"
 
   if ! helpers::install_yay; then
@@ -203,10 +199,10 @@ fi
 
 # Hardware detection must run before packaging: it appends detected
 # packages (btrfs, nvme, ntfs, sata) to /tmp/vibranium.packages
-helpers::run_phase "System configuration"  "$SCRIPT_DIR/config"
-helpers::run_phase "Hardware setup"        "$SCRIPT_DIR/config/hardware"
-helpers::run_phase "Package installation"  "$SCRIPT_DIR/packaging"
-helpers::run_phase "Post-install"          "$SCRIPT_DIR/post-install"
+helpers::run_phase "System configuration" "$SCRIPT_DIR/config"
+helpers::run_phase "Hardware setup" "$SCRIPT_DIR/config/hardware"
+helpers::run_phase "Package installation" "$SCRIPT_DIR/packaging"
+helpers::run_phase "Post-install" "$SCRIPT_DIR/post-install"
 
 # ========================================== #
 
@@ -216,8 +212,12 @@ helpers::log::success "Installation complete. System restart required"
 helpers::log::success "You have to pick 'Hyprland (uwsm-managed)' in the login manager"
 helpers::log::success "Otherwise Vibranium will NOT WORK"
 
-while ! term::ask_yes_no N "Did you read the message above?"; do
-  :
+while true; do
+  term::ask_yes_no N "Did you read the message above?"
+  _read_rc=$?
+  if ((_read_rc == 0 || _read_rc == 2)); then
+    break
+  fi
 done
 
 if term::ask_yes_no Y "Reboot now?"; then
@@ -225,7 +225,7 @@ if term::ask_yes_no Y "Reboot now?"; then
   for sec in {5..1}; do
     for step in {0..3}; do
       dots=$(printf "%.*s" "$step" "...")
-      printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" \
+      printf "\r\033[K%s[*]%s Restarting in %d%s" \
         "$G" "$RS" "$sec" "$dots"
       sleep 0.25
     done

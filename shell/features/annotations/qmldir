@@ -1,0 +1,6 @@
+module qs.features.annotations
+
+AnnotationController 1.0 AnnotationController.qml
+AnnotationOverlay 1.0 AnnotationOverlay.qml
+AnnotationEditor 1.0 AnnotationEditor.qml
+CapturePicker 1.0 CapturePicker.qml

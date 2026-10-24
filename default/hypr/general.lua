@@ -13,7 +13,7 @@ hl.config({
     disable_splash_rendering = true,
     allow_session_lock_restore = true,
     disable_hyprland_guiutils_check = true,
-    font_family = "Liberation Mono Regular",
+    font_family = "Monospace",
     enable_anr_dialog = true,
     vrr = 2,
   },
@@ -39,7 +39,7 @@ hl.config({
   },
 
   general = {
-    resize_on_border = true,
+    resize_on_border = false,
     allow_tearing = true,
   },
 

@@ -39,6 +39,12 @@ if ! [[ -d "$d/extensions" ]]; then
   mkdir -p "$d/extensions"
 fi
 
+# Replace the extension directory as a unit so files removed from the packaged
+# theme cannot survive a refresh. The directory copy also preserves its assets
+# and metadata.
+# The generated JSON entry is a symlink to state, separating packaged extension
+# data from generated theme state; state updates are visible without another
+# editor-theme installation pass.
 rm -rf "$d/extensions/vibranium.theme"
 cp -a "$VIBRANIUM/extras/vscode/vibranium.theme" "$d/extensions/"
 ln -sf "$VIBRANIUM_STATE/theme/vscode.json" \

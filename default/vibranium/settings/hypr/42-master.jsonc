@@ -1,0 +1,204 @@
+// hypr.* pages for HyprlandSettings.
+// Directory decides namespace: every option here must be hypr.
+{
+  "pages": [
+    {
+      "id": "hyprland-advanced-master",
+      "label": "Master",
+      "icon": "layout",
+      "options": [
+        {
+          "key": "hypr.master.orientation",
+          "type": "string",
+          "default": "left",
+          "label": "Orientation",
+          "values": [
+            "left",
+            "right",
+            "top",
+            "bottom",
+            "center"
+          ],
+          "valueLabels": {
+            "left": "Left",
+            "right": "Right",
+            "top": "Top",
+            "bottom": "Bottom",
+            "center": "Center"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.orientation"
+          }
+        },
+        {
+          "key": "hypr.master.new_status",
+          "type": "string",
+          "default": "slave",
+          "label": "New window status",
+          "values": [
+            "master",
+            "slave",
+            "inherit"
+          ],
+          "valueLabels": {
+            "master": "Master",
+            "slave": "Slave",
+            "inherit": "Inherit"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.new_status"
+          }
+        },
+        {
+          "key": "hypr.master.new_on_active",
+          "type": "string",
+          "default": "none",
+          "label": "New on active",
+          "values": [
+            "before",
+            "after",
+            "none"
+          ],
+          "valueLabels": {
+            "before": "Before",
+            "after": "After",
+            "none": "None (boundary)"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.new_on_active"
+          }
+        },
+        {
+          "key": "hypr.master.new_on_top",
+          "type": "bool",
+          "default": false,
+          "label": "New on top",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.new_on_top"
+          }
+        },
+        {
+          "key": "hypr.master.mfact",
+          "type": "float",
+          "default": 0.55,
+          "label": "Master size factor",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "step": 0.05,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.mfact"
+          }
+        },
+        {
+          "key": "hypr.master.center_master_fallback",
+          "type": "string",
+          "default": "left",
+          "label": "Center master fallback",
+          "values": [
+            "left",
+            "right",
+            "top",
+            "bottom"
+          ],
+          "valueLabels": {
+            "left": "Left",
+            "right": "Right",
+            "top": "Top",
+            "bottom": "Bottom"
+          },
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.center_master_fallback"
+          }
+        },
+        {
+          "key": "hypr.master.slave_count_for_center_master",
+          "type": "int",
+          "default": 1,
+          "label": "Slave count for center master",
+          "range": {
+            "min": 0,
+            "max": 20
+          },
+          "step": 1,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.slave_count_for_center_master"
+          }
+        },
+        {
+          "key": "hypr.master.special_scale_factor",
+          "type": "float",
+          "default": 0.8,
+          "label": "Special workspace scale",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "step": 0.05,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.special_scale_factor"
+          }
+        },
+        {
+          "key": "hypr.master.allow_small_split",
+          "type": "bool",
+          "default": false,
+          "label": "Allow small split",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.allow_small_split"
+          }
+        },
+        {
+          "key": "hypr.master.smart_resizing",
+          "type": "bool",
+          "default": false,
+          "label": "Smart resizing",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.smart_resizing"
+          }
+        },
+        {
+          "key": "hypr.master.drop_at_cursor",
+          "type": "bool",
+          "default": false,
+          "label": "Drop at cursor",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.drop_at_cursor"
+          }
+        },
+        {
+          "key": "hypr.master.always_keep_position",
+          "type": "bool",
+          "default": false,
+          "label": "Always keep position",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.always_keep_position"
+          }
+        },
+        {
+          "key": "hypr.master.focus_master_on_close",
+          "type": "bool",
+          "default": false,
+          "label": "Focus master on close",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+            "ctl": "master.focus_master_on_close"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -92,7 +92,6 @@ nav:
       - Overriding configs: user/overriding-configs.md
       - Advanced settings: user/advanced-settings.md
       - Scripting: user/scripting.md
-      - Custom Menus: user/custom-menus.md
       - Setup wizards: user/setup.md
       - General advice: user/general-advice.md
   - Understanding Vibranium:
@@ -101,9 +100,7 @@ nav:
       - Themes: understanding/themes.md
       - Making your own theme: understanding/making-your-own-theme.md
       - Settings & validation: understanding/settings.md
-      - The cfgr menu system: understanding/configuration-system.md
       - Customizing keybindings: understanding/customize-keybindings.md
-      - Waybar modules: understanding/waybar-modules.md
       - Updates & channels: understanding/updates.md
       - Performance: understanding/performance.md
   - Internals:

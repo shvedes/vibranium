@@ -23,6 +23,6 @@ Hypr.Anim.apply({
     { leaf = "layersOut", enabled = true, speed = 1.5, bezier = "linear", style = "fade" },
     { leaf = "fadeLayersIn", enabled = true, speed = 1.79, bezier = "almostLinear" },
     { leaf = "fadeLayersOut", enabled = true, speed = 1.39, bezier = "almostLinear" },
-    { leaf = "workspaces", enabled = true, speed = 3.0, bezier = "easeOutQuint", style = "fade" },
+    { leaf = "workspaces", enabled = false, speed = 3.0, bezier = "easeOutQuint", style = "fade" },
   },
 })

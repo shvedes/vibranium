@@ -5,26 +5,22 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 1
 fi
 
+source vb-lib-cli
 source vb-lib-core
 
-_operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  # shellcheck disable=SC2034
-  read -n1 -r -s -p $'. Press any key to exit' dummy
-}
-
-_operation_complete() {
-  printf "%s[VIBRANIUM]%s Setup complete" "$G" "$RS"
-  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
-  # shellcheck disable=SC2034
-  read -n1 -r -p $'. Press any key to exit ' dummy
-}
-
+# Return 2 means the application is absent; return 1 means any UFW status
+# line contains 53317; return 0 is the path that runs both allow commands.
 _configure_localsend() {
   command -v localsend &> /dev/null || return 2 # localsend absent
 
-  if sudo ufw status verbose 2> /dev/null | grep -q '53317'; then
+  local _ls_has_rule=false _ls_line
+  while IFS= read -r _ls_line; do
+    if [[ "$_ls_line" == *53317* ]]; then
+      _ls_has_rule=true
+      break
+    fi
+  done < <(sudo ufw status verbose 2> /dev/null)
+  if $_ls_has_rule; then
     vb::print "$G" "LocalSend rules: already in place, skipping"
     return 1 # unchanged
   fi
@@ -38,11 +34,26 @@ _configure_localsend() {
 _configure_docker() {
   command -v docker &> /dev/null || return 2 # docker absent
 
+  # The DNS rule and ufw-docker marker are independent idempotency keys because
+  # either one can exist without the other after a partial setup.
   local dns_present=false
   local ufw_dock_present=false
 
-  sudo ufw status verbose 2> /dev/null | grep -q 'allow-docker-dns' && dns_present=true
-  grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2> /dev/null && ufw_dock_present=true
+  local _dk_line
+  while IFS= read -r _dk_line; do
+    if [[ "$_dk_line" == *allow-docker-dns* ]]; then
+      dns_present=true
+      break
+    fi
+  done < <(sudo ufw status verbose 2> /dev/null)
+  if [[ -r /etc/ufw/after.rules ]]; then
+    while IFS= read -r _dk_line || [[ -n "$_dk_line" ]]; do
+      if [[ "$_dk_line" == *"BEGIN UFW AND DOCKER"* ]]; then
+        ufw_dock_present=true
+        break
+      fi
+    done < /etc/ufw/after.rules
+  fi
 
   if $dns_present && $ufw_dock_present; then
     vb::print "$G" "Docker UFW rules: already in place, skipping"
@@ -56,6 +67,8 @@ _configure_docker() {
       comment 'allow-docker-dns' &> /dev/null
   fi
 
+  # The mutable upstream helper is streamed into a root shell; the function
+  # returns its explicit success status without validating the helper pipeline.
   if ! $ufw_dock_present; then
     local ufw_docker_url="https://raw.githubusercontent.com/chaifeng/ufw-docker/refs/heads/master/ufw-docker"
     curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &> /dev/null
@@ -67,9 +80,20 @@ _configure_docker() {
 _configure_libvirt() {
   command -v virsh &> /dev/null || return 2 # libvirt absent
 
+  # Group guidance is diagnostic only; changed tracks firewall-file mutation so
+  # a missing group does not make an unchanged firewall look updated.
   local changed=false
 
-  if ! grep -q '^firewall_backend' /etc/libvirt/network.conf 2> /dev/null; then
+  local _lv_has_backend=false _lv_line
+  if [[ -r /etc/libvirt/network.conf ]]; then
+    while IFS= read -r _lv_line || [[ -n "$_lv_line" ]]; do
+      if [[ "$_lv_line" == firewall_backend* ]]; then
+        _lv_has_backend=true
+        break
+      fi
+    done < /etc/libvirt/network.conf
+  fi
+  if ! $_lv_has_backend; then
     vb::print "$Y" "Setting libvirt firewall backend to iptables"
     printf '\n\n# Vibranium overrides below\nfirewall_backend = "iptables"\n' |
       sudo tee -a /etc/libvirt/network.conf > /dev/null
@@ -78,7 +102,17 @@ _configure_libvirt() {
     vb::print "$G" "Libvirt firewall config: already up to date, skipping"
   fi
 
-  if ! id -nG "$USER" | grep -qw libvirt; then
+  local _lv_groups="" _lv_g _lv_member=false
+  local -a _lv_list=()
+  IFS= read -r _lv_groups < <(id -nG "$USER" 2> /dev/null) || true
+  read -ra _lv_list <<< "$_lv_groups"
+  for _lv_g in "${_lv_list[@]}"; do
+    if [[ "$_lv_g" == libvirt ]]; then
+      _lv_member=true
+      break
+    fi
+  done
+  if ! $_lv_member; then
     vb::print "$B" "You are not in the '${B}libvirt${RS}' group."
     vb::print "$B" "This is not required, but it allows running VMs without sudo."
     vb::print "$B" "You can add yourself with:"
@@ -92,6 +126,8 @@ _configure_libvirt() {
 _configure_syncthing() {
   command -v syncthing > /dev/null || return 2 # syncthing absent
 
+  # There is no unchanged probe here; the two named service rules are delegated
+  # each time, and the caller's case uses the final command status.
   sudo ufw allow syncthing &> /dev/null
   sudo ufw allow syncthing-gui &> /dev/null
 }
@@ -101,7 +137,14 @@ _ufw_rule_present() {
   local dir="$2"
 
   [[ "$dir" == in ]] && dir=IN || dir=OUT
-  sudo ufw status verbose 2> /dev/null | grep -qE "on ${iface}[[:space:]]+ALLOW ${dir}"
+  local _ur_line
+  while IFS= read -r _ur_line; do
+    # shellcheck disable=SC2076
+    if [[ "$_ur_line" =~ on\ ${iface}[[:space:]]+ALLOW\ ${dir} ]]; then
+      return 0
+    fi
+  done < <(sudo ufw status verbose 2> /dev/null)
+  return 1
 }
 
 _allow_bridge() {
@@ -121,7 +164,7 @@ _allow_bridge() {
 
 _configure_routes() {
   # Allow all traffic between the host and container/VM bridge networks
-  local iface kind
+  local iface kind _br_line _br_rest
   local changed=false
 
   # Static default bridges: tools may not be installed yet, rules
@@ -140,8 +183,11 @@ podman0 Podman
 cni-podman0 Podman
 EOF
 
-  # Existing bridges with custom names (docker compose, user networks...)
-  while read -r iface; do
+  # Custom bridge names are classified by convention only; ownership is not
+  # verified by this route scan.
+  while IFS= read -r _br_line; do
+    _br_rest="${_br_line#*: }"
+    iface="${_br_rest%%': '*}"
     case "$iface" in
       docker* | br-*)
         kind="Docker"
@@ -161,33 +207,48 @@ EOF
     esac
 
     _allow_bridge "$iface" "$kind" && changed=true
-  done < <(ip -o link show type bridge 2> /dev/null | awk -F': ' '{print $2}')
+  done < <(ip -o link show type bridge 2> /dev/null)
 
   $changed && return 0
   return 1 # unchanged
 }
 
-# ─────────────────────────────────────────────────────────────
-
 term::disable_input
 
+# With UFW installed and enabled, this path exits after the service check.
+# A disabled service enters a confirmation-gated repair path; acceptance
+# reconciles bridge rules only after systemd successfully starts the service,
+# while decline exits without reconciliation.
 if command -v ufw &> /dev/null; then
   if systemctl -q is-enabled ufw; then
     term::show_header --color green
-    vb::print "$G" "Firewall is already set up and running"
-  else
-    term::show_header --color green
-    vb::print "$G" "Firewall service is down"
-    if term::ask_yes_no Y "Would you like to fix it now?"; then
+    if [[ -z "${term_original_settings:-}" ]]; then
       term::disable_input
-      if sudo systemctl -q enable --now ufw; then
-        vb::print "$G" "Enabled and started ${Y}ufw.service${RS}"
-      else
-        vb::print "$R" "${Y}systemctl${RS} failed"
-        _operation_canceled
-        exit 1
-      fi
     fi
+    operation::result noop -- "Firewall is already set up and running"
+    exit 0
+  fi
+
+  term::show_header --color green
+  vb::print "$G" "Firewall service is down"
+  if term::ask_yes_no Y "Would you like to fix it now?"; then
+    term::disable_input
+    if sudo systemctl -q enable --now ufw; then
+      vb::print "$G" "Enabled and started ${Y}ufw.service${RS}"
+    else
+      vb::print "$R" "${Y}systemctl${RS} failed"
+      if [[ -z "${term_original_settings:-}" ]]; then
+        term::disable_input
+      fi
+      operation::result error
+      exit 1
+    fi
+  else
+    if [[ -z "${term_original_settings:-}" ]]; then
+      term::disable_input
+    fi
+    operation::result canceled
+    exit 1
   fi
 
   _configure_routes
@@ -195,7 +256,10 @@ if command -v ufw &> /dev/null; then
   vb::print "$B" "Use ${R}sudo ${G}ufw${Y} status${RS} to see current profiles"
   vb::print "$B" "Use ${G}man ${Y}ufw${RS} to see the documentation"
   vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/Uncomplicated_Firewall${RS} for further, advanced configuration"
-  _operation_complete
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result success -- "Setup complete"
   exit 0
 fi
 
@@ -204,18 +268,26 @@ term::show_header
 vb::print "$Y" "You're about to setup ufw (Uncomplicated Firewall)"
 
 if ! term::ask_yes_no Y "Proceed with setup?"; then
-  _operation_canceled
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result canceled
   exit 1
 fi
 
 if ! vb-pkg-install --embedded -- ufw; then
-  _operation_canceled
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result error
   exit 1
 fi
 
 sum_rules=()
 
-# ── Default policies ──────────────────────────────────────────
+# Incoming traffic is denied by default while outgoing traffic remains allowed;
+# the explicit LAN allowance is limited to 192.168.1.0/24 and does not trust
+# other private prefixes automatically.
 vb::print "$Y" "Setting default firewall policies"
 sudo ufw default deny incoming &> /dev/null
 sudo ufw default allow outgoing &> /dev/null
@@ -223,7 +295,6 @@ sudo ufw allow from 192.168.1.0/24 &> /dev/null
 sum_rules+=("Default policy (WAN): ${R}deny incoming${RS}, ${G}allow outgoing${RS}")
 sum_rules+=("Default policy (LAN): allow anything from LAN network")
 
-# ── LocalSend ─────────────────────────────────────────────────
 _configure_localsend
 case $? in
   0)
@@ -234,7 +305,6 @@ case $? in
     ;;
 esac
 
-# ── Docker ────────────────────────────────────────────────────
 _configure_docker
 case $? in
   0)
@@ -245,7 +315,6 @@ case $? in
     ;;
 esac
 
-# ── Libvirt ───────────────────────────────────────────────────
 _configure_libvirt
 case $? in
   0)
@@ -256,7 +325,6 @@ case $? in
     ;;
 esac
 
-# ── Host <-> containers/VMs routes ─────────────────────────────
 _configure_routes
 case $? in
   0)
@@ -267,7 +335,6 @@ case $? in
     ;;
 esac
 
-# ── Syncthing ───────────────────────────────────────────────────
 _configure_syncthing
 case $? in
   0)
@@ -278,7 +345,6 @@ case $? in
     ;;
 esac
 
-# ── Enable ────────────────────────────────────────────────────
 vb::print "$Y" "Enabling UFW"
 sudo systemctl -q enable ufw
 sudo ufw --force enable &> /dev/null
@@ -289,14 +355,17 @@ vb::print "$B" "System restart is recommended."
 vb::print "$B" "If you want to fine-tune your firewall rules, consider reading ${B}ufw(8)${RS}"
 
 echo ""
-vb::print "$B" "── Summary ─────────────────────────────"
+vb::print "$B" "-- Summary -----------------------------"
 for rule in "${sum_rules[@]}"; do
   vb::print "$B" " • $rule"
 done
-vb::print "$B" "─────────────────────────────────────────"
+vb::print "$B" "-----------------------------------------"
 echo ""
 
 vb::print "$B" "Use ${R}sudo ${G}ufw${Y} status${RS} to see current profiles"
 vb::print "$B" "Use ${G}man ${Y}ufw${RS} to see the documentation"
 vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/Uncomplicated_Firewall${RS} for further, advanced configuration"
-_operation_complete
+if [[ -z "${term_original_settings:-}" ]]; then
+  term::disable_input
+fi
+operation::result success -- "Setup complete"

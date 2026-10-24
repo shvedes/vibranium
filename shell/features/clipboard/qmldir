@@ -1,0 +1,7 @@
+module qs.features.clipboard
+
+singleton Clipboard 1.0 Clipboard.qml
+ClipboardView 1.0 ClipboardView.qml
+ClipboardPanel 1.0 ClipboardPanel.qml
+ClipboardEntry 1.0 ClipboardEntry.qml
+ClipboardPreview 1.0 ClipboardPreview.qml

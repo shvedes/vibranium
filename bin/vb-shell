@@ -1,0 +1,398 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+SELF="${0##*/}"
+QS_ARGS=(-p "$VIBRANIUM/shell")
+# Array expansion keeps the project path as one argv element even when it
+# contains whitespace; every qs invocation reuses this option ordering.
+
+usage() {
+  shcat << EOF
+Usage: $SELF [OPTIONS] <target> [function] [args...]
+       $SELF help [unit]
+       $SELF <target> help [command]
+
+Call Vibranium shell IPC handlers through quickshell.
+
+Examples:
+  $SELF wallpaper set image.jpg
+  $SELF session lock
+  $SELF state ping
+  $SELF help wallpaper
+  $SELF wallpaper help set
+
+Options:
+  -l, --list      List available IPC targets and functions
+  -v, --verbose   Enable verbose output
+  -h, --help      Display this help and exit
+EOF
+}
+
+SEEN_DASHDASH=false
+
+# Grouped index over the live IPC surface: one section per target, one
+# function per line, sharing the help notation (`<arg>` required,
+# `[command]` the optional help filter).
+#
+# `qs ipc show` gives the target set and every signature. Descriptions come
+# from `shell help` (targets) and each unit's own `help` block (functions,
+# fanned out in parallel), so a full listing costs two sequential calls plus
+# one parallel wave. Anything unparseable or failing
+# degrades to a description-less row rather than dropped, and a failing
+# `qs ipc show` (no live shell) is reported as-is.
+_vb_shell_list() {
+  local show rc target block
+  local -a targets
+  local -A tdesc
+  # Row field separator. A tab cannot serve: tab is IFS whitespace, so
+  # consecutive tabs collapse and an empty middle field (a function without
+  # usage) is lost. The unit separator never occurs in help text.
+  local SEP
+  printf -v SEP '\037'
+  local LC_ALL=C
+  local line content uname urest tname i j tmp
+
+  show="$(qs "${QS_ARGS[@]}" ipc show 2>&1)"
+  rc=$?
+  if ((rc != 0)); then
+    printf '%s\n' "$show"
+    return "$rc"
+  fi
+
+  # Target set from `qs ipc show`, deduplicated and sorted in bash.
+  targets=()
+  local -A _tseen=()
+  while IFS= read -r line || [[ -n $line ]]; do
+    [[ $line == 'target '* ]] || continue
+    tname=${line#target }
+    tname=${tname%%[[:space:]]*}
+    [[ -n $tname && $line == "target $tname" ]] || continue
+    if [[ -z ${_tseen[$tname]+x} ]]; then
+      _tseen[$tname]=1
+      targets+=("$tname")
+    fi
+  done <<< "$show"
+  for ((i = 1; i < ${#targets[@]}; i++)); do
+    tmp=${targets[i]}
+    j=$((i - 1))
+    while ((j >= 0)) && [[ ${targets[j]} > $tmp ]]; do
+      targets[j + 1]=${targets[j]}
+      j=$((j - 1))
+    done
+    targets[j + 1]=$tmp
+  done
+
+  # Target descriptions from the units table. Best effort: without them the
+  # headers render as bare names.
+  if block="$(qs "${QS_ARGS[@]}" ipc call shell help 2>/dev/null)"; then
+    local in_units=false
+    while IFS= read -r line || [[ -n $line ]]; do
+      if [[ $in_units == false ]]; then
+        [[ $line == Units: ]] && in_units=true
+        continue
+      fi
+      [[ -z $line ]] && break
+      [[ $line == '  '* ]] || continue
+      content=${line#'  '}
+      [[ -n $content && $content != ' '* ]] || continue
+      uname=${content%%[[:space:]]*}
+      [[ -n $uname ]] || continue
+      urest=${content:${#uname}}
+      urest=${urest#"${urest%%[![:space:]]*}"}
+      [[ -n $urest ]] || continue
+      tdesc[$uname]=$urest
+    done <<< "$block"
+  fi
+
+  # One "name<SEP>usage" row per function of one target, from `qs ipc show`.
+  # The fallback listing when a unit help call fails or is prose.
+  _list_fallback_funcs() {
+    local want=$1
+    local fline tfield active=false
+    local fline_rest fn inside entry p trimmed
+    local -a parts
+    while IFS= read -r fline || [[ -n $fline ]]; do
+      if [[ $fline == 'target '* ]]; then
+        tfield=${fline#target }
+        tfield=${tfield%%[[:space:]]*}
+        if [[ $tfield == "$want" ]]; then active=true; else active=false; fi
+        continue
+      fi
+      $active || continue
+      [[ $fline == '  function '* ]] || continue
+      fline_rest=${fline#'  function '}
+      [[ $fline_rest == *'('* ]] || continue
+      fn=${fline_rest%%'('*}
+      inside=${fline_rest#*'('}
+      inside=${inside%%')'*}
+      if [[ $fn == help ]]; then
+        # Every unit help block spells its filter `[command]`; shell,
+        # boot and log keep a parameterless help, as reflection shows.
+        if [[ $want == shell || $want == boot || $want == log ]]; then
+          printf '%s%s\n' "$fn" "$SEP"
+        else
+          printf 'help%s[command]\n' "$SEP"
+        fi
+        continue
+      fi
+      trimmed=${inside//[[:space:]]/}
+      if [[ -z $trimmed ]]; then
+        printf '%s%s\n' "$fn" "$SEP"
+        continue
+      fi
+      entry=""
+      IFS=',' read -ra parts <<< "$inside"
+      for p in "${parts[@]}"; do
+        p=${p#"${p%%[![:space:]]*}"}
+        p=${p%"${p##*[![:space:]]}"}
+        p=${p%%:*}
+        p=${p#"${p%%[![:space:]]*}"}
+        p=${p%"${p##*[![:space:]]}"}
+        [[ -n $p ]] || continue
+        if [[ -z $entry ]]; then entry="<$p>"
+        else entry+=" <$p>"
+        fi
+      done
+      printf '%s%s%s\n' "$fn" "$SEP" "$entry"
+    done <<< "$show"
+  }
+
+  # One "name<SEP>usage<SEP>desc" row per command plus the unit Description,
+  # parsed out of a unit help block. The Commands head is single-spaced
+  # internally, so the description starts at the first run of two spaces.
+  _list_unit_rows() {
+    local input=$1
+    local uline desc="" in_cmds=false
+    local ucontent uname2 urest usage fdesc
+    local nr=0 k split_idx
+    while IFS= read -r uline || [[ -n $uline ]]; do
+      nr=$((nr + 1))
+      if ((nr == 3)) && [[ -n $uline ]]; then desc=$uline; fi
+      if [[ $uline == Commands: ]]; then in_cmds=true; continue; fi
+      $in_cmds || continue
+      [[ -z $uline ]] && break
+      [[ $uline == '  '* ]] || continue
+      ucontent=${uline#'  '}
+      [[ -n $ucontent && $ucontent != ' '* ]] || continue
+      uname2=${ucontent%%[[:space:]]*}
+      [[ -n $uname2 ]] || continue
+      urest=${ucontent:${#uname2}}
+      split_idx=-1
+      k=0
+      while ((k < ${#urest} - 1)); do
+        if [[ ${urest:k:1} == ' ' && ${urest:k+1:1} == ' ' ]]; then split_idx=$k; break; fi
+        k=$((k + 1))
+      done
+      if ((split_idx >= 0)); then
+        usage=${urest:0:split_idx}
+        fdesc=${urest:split_idx}
+      else
+        usage=$urest
+        fdesc=""
+      fi
+      usage=${usage#"${usage%%[![:space:]]*}"}
+      usage=${usage%"${usage##*[![:space:]]}"}
+      fdesc=${fdesc#"${fdesc%%[![:space:]]*}"}
+      printf 'F%s%s%s%s%s%s\n' "$SEP" "$uname2" "$SEP" "$usage" "$SEP" "$fdesc"
+    done <<< "$input"
+    if [[ -n $desc ]]; then printf 'D%s%s\n' "$SEP" "$desc"; fi
+  }
+
+  printf 'Available IPC targets and functions:\n'
+
+  # One `help` call per unit, fanned out: sequential round trips cost a
+  # second, parallel ones a fraction of it. Each job owns one file, so
+  # concurrent writes cannot interleave; the render loop below rejoins in
+  # sorted order. A failed job leaves no file and its target falls back to
+  # reflection rows, exactly like a failed sequential call would.
+  tmpdir="$(mktemp -d)" || return 1
+  trap 'rm -rf "$tmpdir"' RETURN
+  utargets=()
+  for target in "${targets[@]}"; do
+    [[ -n "$target" ]] || continue
+    case "$target" in
+      shell | boot | log) continue ;;
+      *) utargets+=("$target") ;;
+    esac
+  done
+  if ((${#utargets[@]} > 0)); then
+    export VIBRANIUM
+    export _VB_LIST_TMP="$tmpdir"
+    # shellcheck disable=SC2016 # the $vars expand in the xargs child, not here
+    printf '%s\n' "${utargets[@]}" \
+      | xargs -r -P 16 -n 1 bash -c '
+        t="$1"
+        if out="$(qs -p "$VIBRANIUM/shell" ipc call "$t" help "" 2>/dev/null)"; then
+          printf "%s\n" "$out" > "$_VB_LIST_TMP/$t"
+        fi
+      ' _
+    unset _VB_LIST_TMP
+  fi
+
+  for target in "${targets[@]}"; do
+    [[ -n "$target" ]] || continue
+    rows=()
+    udesc=""
+    # shell, boot and log keep a prose or parameterless help: their
+    # functions come from reflection, without descriptions.
+    if [[ -f "$tmpdir/$target" ]]; then
+      block=""
+      while IFS= read -r line || [[ -n $line ]]; do
+        if [[ -z $block ]]; then block=$line
+        else block+=$'\n'$line
+        fi
+      done < "$tmpdir/$target"
+      while IFS="$SEP" read -r kind a b c; do
+        if [[ "$kind" == D ]]; then
+          udesc="$a"
+        elif [[ -n "$a" ]]; then
+          rows+=("$a$SEP$b$SEP$c")
+        fi
+      done < <(_list_unit_rows "$block")
+    fi
+    if ((${#rows[@]} == 0)); then
+      # Fallback rows deduplicated and sorted in bash. SEP (0x1F) sorts
+      # below printables, so whole-line byte order matches the old
+      # `sort -t SEP -k1,1 -k2,2 -u` field order.
+      mapfile -t _func_rows < <(_list_fallback_funcs "$target")
+      local -A _fr_seen=()
+      local -a _func_uniq=()
+      local _fr _m _n _key
+      for _fr in "${_func_rows[@]}"; do
+        if [[ -z ${_fr_seen[$_fr]+x} ]]; then
+          _fr_seen[$_fr]=1
+          _func_uniq+=("$_fr")
+        fi
+      done
+      for ((_m = 1; _m < ${#_func_uniq[@]}; _m++)); do
+        _key=${_func_uniq[_m]}
+        _n=$((_m - 1))
+        while ((_n >= 0)) && [[ ${_func_uniq[_n]} > $_key ]]; do
+          _func_uniq[_n + 1]=${_func_uniq[_n]}
+          _n=$((_n - 1))
+        done
+        _func_uniq[_n + 1]=$_key
+      done
+      for _fr in "${_func_uniq[@]}"; do
+        IFS="$SEP" read -r name usage <<< "$_fr"
+        [[ -n $name ]] && rows+=("$name$SEP$usage$SEP")
+      done
+    fi
+    ((${#rows[@]} > 0)) || continue
+    # Target header: the units-table description wins; otherwise the unit
+    # Description sentence parsed above.
+    header_desc="${tdesc[$target]:-}"
+    # Without a units-table row the header falls back to the unit Description
+    # sentence; un-sentence it back to the table fragment style (lowercase,
+    # no closing period) so both sources read the same.
+    if [[ -z "$header_desc" && -n "$udesc" ]]; then
+      header_desc="${udesc,}"
+      header_desc="${header_desc%.}"
+    fi
+    printf '\n'
+    if [[ -n "$header_desc" ]]; then
+      printf '  %s: %s\n' "$target" "$header_desc"
+    else
+      printf '  %s\n' "$target"
+    fi
+    width=0
+    for row in "${rows[@]}"; do
+      IFS="$SEP" read -r name usage _ <<< "$row"
+      head="$name"
+      [[ -n "$usage" ]] && head+=" $usage"
+      ((${#head} > width)) && width=${#head}
+    done
+    for row in "${rows[@]}"; do
+      IFS="$SEP" read -r name usage fdesc <<< "$row"
+      head="$name"
+      [[ -n "$usage" ]] && head+=" $usage"
+      if [[ -n "$fdesc" ]]; then
+        padded="$head:"
+        while ((${#padded} < width + 1)); do padded+=" "; done
+        printf '    %s  %s\n' "$padded" "$fdesc"
+      else
+        printf '    %s\n' "$head"
+      fi
+    done
+  done
+  printf '\nRun "vb-shell <unit> help" for a unit block, "vb-shell help" for the units guide.\n'
+}
+
+while (($# > 0)); do
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -l | --list)
+      _vb_shell_list
+      exit "$?"
+      ;;
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    --)
+      # Treat every remaining token as IPC data rather than a vb-shell option.
+      SEEN_DASHDASH=true
+      shift
+      break
+      ;;
+    -*)
+      log Error "Unknown option: $1"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# IPC targets are positional, so option parsing ends at the first target and
+# leaves all remaining tokens for quickshell.
+if (($# == 0)); then
+  usage
+  exit 1
+fi
+
+# Bare `help` is the general listing, answered by the live shell. An explicit
+# `--` keeps it an IPC target name instead.
+#
+# shell and log keep a parameterless help (the units listing and the prose
+# doc), so they are called with no query; every other unit takes one.
+if ! $SEEN_DASHDASH && [[ "$1" == "help" ]]; then
+  shift
+  if (($# == 0)); then
+    set -- shell help
+  else
+    target="$1"
+    shift
+    if [[ "$target" == shell || "$target" == log ]]; then
+      set -- "$target" help "$@"
+    elif (($# == 0)); then
+      set -- "$target" help ""
+    else
+      set -- "$target" help "$@"
+    fi
+  fi
+fi
+
+# help() takes one command name. A bare `help` arrives with none, so the
+# empty query (the full block) is passed explicitly; anything longer is a
+# usage error rather than an IPC call.
+if ! $SEEN_DASHDASH && [[ "${2:-}" == "help" && $# -gt 3 ]]; then
+  log Error "Too many arguments for help: '$*'"
+  log Error "Try '$SELF --help' for more information"
+  exit 1
+fi
+if ! $SEEN_DASHDASH && [[ "${2:-}" == "help" && $# -eq 2 && "$1" != shell && "$1" != log ]]; then
+  set -- "$1" help ""
+fi
+
+log Info "ipc call $*"
+# exec replaces this wrapper so quickshell's status, signals, and process
+# lifetime are the command's direct result.
+exec qs "${QS_ARGS[@]}" ipc call "$@"

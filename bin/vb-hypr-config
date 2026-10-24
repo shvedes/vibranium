@@ -1,0 +1,122 @@
+#!/bin/bash
+
+# Reads and writes single values in Hyprland's text Lua config (hl.config /
+# hl.monitor) through the shell's config editor. The editor itself is plain JS,
+# so this command is how the Hyprland config VM, shell scripts and anything else
+# outside Quickshell reach it -- one entry point instead of a path into the
+# shell tree.
+#
+# One line is printed to stdout: the resolved config path on success, or
+# "err: <message>" on failure. A caller that cannot observe an exit status reads
+# that line; Hyprland's config VM cannot, because os.execute and io.popen both
+# fail to wait on a child there and report ECHILD whatever the child did.
+#
+# The write is a text rewrite, so it does not reload Hyprland: a config that
+# needs a reload to take effect has to ask for one itself.
+
+if ! source vb-lib-cli 2>/dev/null; then
+  _vb_dir="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+  # shellcheck source=/dev/null
+  # The fallback suppresses the second source error, but a successful source is
+  # still required for log and shcat to be defined.
+  source "$_vb_dir/vb-lib-cli" 2>/dev/null || true
+fi
+
+VERBOSE=${VERBOSE:-false}
+SELF="${0##*/}"
+
+EDITOR="$VIBRANIUM/shell/common/settings/HyprlandEditorCli.js"
+
+usage() {
+  shcat << EOF
+Usage: $SELF [OPTION]... <get|set> <path> <value> <file>
+       $SELF [OPTION]... get <path> <file>
+
+Read or write one value in a Hyprland Lua config file. The file is treated as
+text and rewritten in place, preserving its comments and indentation.
+
+Arguments:
+  get, set           operation to perform
+  <path>            colon-separated option path, e.g. general:border_size
+  <value>           boolean, number or string; set only
+  <file>            config file to read or rewrite
+
+Options:
+  --scope <scope>    root the path at an hl.config or hl.monitor block
+                     (default: config)
+  --output <name>    monitor block to select; required for monitor scope
+  --occurrence <n>   select the nth match instead of the first
+  -v, --verbose      enable verbose output
+  -h, --help         display this help and exit
+
+Examples:
+  $SELF get general:border_size ~/.config/hypr/hyprland.conf.d/look-and-feel.lua
+  $SELF set scale 1.5 ~/.config/hypr/hyprland.conf.d/monitors.lua \\
+    --scope monitor --output HDMI-A-1
+EOF
+}
+
+# A single leading dash is not accepted: the option set has no short forms
+# beyond -h and -v, and a bare "-" would otherwise read as a file named "-".
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -*)
+      log Error "Unknown option: $1"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+if [[ $# -lt 2 ]]; then
+  usage 1
+fi
+
+# The arity and the mode are checked here rather than left to the editor so a
+# mistake is reported against this command's own interface.
+case "$1" in
+  get)
+    if [[ $# -lt 3 ]]; then
+      log Error "get requires a path and a file"
+      usage 1
+    fi
+    ;;
+  set)
+    if [[ $# -lt 4 ]]; then
+      log Error "set requires a path, a value and a file"
+      usage 1
+    fi
+    ;;
+  *)
+    log Error "Unknown operation: $1"
+    log Error "Expected 'get' or 'set'"
+    exit 1
+    ;;
+esac
+
+if [[ ! -f "$EDITOR" ]]; then
+  log Error "Config editor not found: $EDITOR"
+  exit 1
+fi
+
+if ! command -v node > /dev/null 2>&1; then
+  log Error "node is required to run the Hyprland config editor"
+  exit 1
+fi
+
+log Info "Running config editor: $*"
+
+# exec keeps the editor's own stdout and exit status intact instead of routing
+# them through this shell.
+exec node "$EDITOR" "$@"

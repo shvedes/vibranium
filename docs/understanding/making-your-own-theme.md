@@ -78,21 +78,8 @@ Useful tools:
     gray    = ""
     accent  = ""
 
-    background_h = ""
-    background_0 = ""
-    background_1 = ""
-    background_2 = ""
-    background_3 = ""
-    background_4 = ""
-    background_5 = ""
-
-    foreground_h = ""
-    foreground_0 = ""
-    foreground_1 = ""
-    foreground_2 = ""
-    foreground_3 = ""
-    foreground_4 = ""
-    foreground_5 = ""
+    background = ""
+    foreground = ""
     ```
 
 Our example:
@@ -113,31 +100,50 @@ Our example:
     gray    = "#6A5C4C"
     accent  = "#E8A800"
 
-    background_h = "#090704"
-    background_0 = "#100C06"
-    background_1 = "#1A150D"
-    background_2 = "#261E13"
-    background_3 = "#352A1A"
-    background_4 = "#4C3C24"
-    background_5 = "#634F30"
-
-    foreground_h = "#F5EAD0"
-    foreground_0 = "#EAD9B8"
-    foreground_1 = "#D4C098"
-    foreground_2 = "#B8A478"
-    foreground_3 = "#9A8858"
-    foreground_4 = "#7A6C42"
-    foreground_5 = "#5A502C"
+    background = "#100C06"
+    foreground = "#EAD9B8"
     ```
 
 The palette contains:
 
 * 11 color families.
-* 6 background shades.
-* 6 foreground shades.
+* 1 background.
+* 1 foreground.
 * Accent colors.
 
-Dimmed and brighter shades are not part of the palette. Templates compute them on the fly with `|dim=` and `|pop=` operations, which shift a color toward the background or the foreground relative to the current theme mode.
+`background` and `foreground` are the bases of the two shade ladders every application theme is built from.
+A palette names no shade above them, and no shade below them either: the deepest surface and the brightest text are computed too.
+
+Templates build every other shade from those two keys with the `|pop=` and `|dim=` operations, which shift a color's lightness toward the foreground or toward the background relative to the current theme mode:
+
+| Shade | Placeholder |
+| --- | --- |
+| Deepest surface | `{{ background\|dim=0.03 }}` |
+| Base | `{{ background }}` |
+| Level 1 | `{{ background\|pop=0.06 }}` |
+| Level 2 | `{{ background\|pop=0.12 }}` |
+| Level 3 | `{{ background\|pop=0.18 }}` |
+| Level 4 | `{{ background\|pop=0.24 }}` |
+| Level 5 | `{{ background\|pop=0.30 }}` |
+
+The foreground ladder runs the other way, from `{{ foreground }}` through `|dim=` at the same steps, with its own extreme at `{{ foreground\|pop=0.06 }}`:
+
+| Shade | Placeholder |
+| --- | --- |
+| Brightest text | `{{ foreground\|pop=0.06 }}` |
+| Base | `{{ foreground }}` |
+| Level 1 | `{{ foreground\|dim=0.06 }}` |
+| Level 2 | `{{ foreground\|dim=0.12 }}` |
+| Level 3 | `{{ foreground\|dim=0.18 }}` |
+| Level 4 | `{{ foreground\|dim=0.24 }}` |
+| Level 5 | `{{ foreground\|dim=0.30 }}` |
+
+The two extremes are not the same distance from their base, and that is deliberate: a background already sits at the far end of its range, so the deepest surface is half a step away, while a foreground needs a full step to read as brighter text than the body copy.
+
+One step serves both directions because the operations read the theme mode: under `LIGHT=true` `pop=` darkens and `dim=` lightens, which is the ladder a light theme needs.
+The ramp holds a color's hue and saturation, so a theme whose base is a saturated cream shades toward a stronger cream rather than toward gray.
+
+Dimmed and brighter shades of the accent colours work the same way: they are not part of the palette either, and templates ask for them with `|dim=0.10` and `|pop=0.10`.
 
 These values are consumed by the theme templates to generate application configurations.
 For a complete example, see the default [Nightfox theme](https://github.com/shvedes/vibranium/tree/master/themes/nightfox).
@@ -194,8 +200,6 @@ Generated configurations can include:
 * GTK
 * Qt
 * terminal themes
-* Waybar
-* Rofi
 * notifications
 * lock screen
 * editor integrations
@@ -223,9 +227,8 @@ theme/
 Examples of manual overrides:
 
 ```text
-waybar.css
-rofi.rasi
-dunstrc
+foot.ini
+neovim.lua
 ```
 
 This method provides more control when a generated template does not match the desired result.

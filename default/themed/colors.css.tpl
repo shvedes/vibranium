@@ -204,224 +204,224 @@
 
 /* =========================================================== */
 
-  --foreground-h:      {{ foreground_h_lower }};
+  --foreground-h:      {{ foreground_lower|pop=0.06 }};
 
-  --foreground-h-rgb:  {{ foreground_h_rgb }};
-  --foreground-h-r:    {{ foreground_h_r }};
-  --foreground-h-g:    {{ foreground_h_g }};
-  --foreground-h-b:    {{ foreground_h_b }};
+  --foreground-h-rgb:  {{ foreground_rgb|pop=0.06 }};
+  --foreground-h-r:    {{ foreground_r|pop=0.06 }};
+  --foreground-h-g:    {{ foreground_g|pop=0.06 }};
+  --foreground-h-b:    {{ foreground_b|pop=0.06 }};
 
-  --foreground-h-hsl:  {{ foreground_h_hsl }};
-  --foreground-h-h:    {{ foreground_h_h }};
-  --foreground-h-s:    {{ foreground_h_s }};
-  --foreground-h-l:    {{ foreground_h_l }};
+  --foreground-h-hsl:  {{ foreground_hsl|pop=6 }};
+  --foreground-h-h:    {{ foreground_h|pop=0.06 }};
+  --foreground-h-s:    {{ foreground_s|pop=0.06 }};
+  --foreground-h-l:    {{ foreground_l|pop=0.06 }};
 
-  --foreground-h-hwb:  {{ foreground_h_hwb }};
-  --foreground-h-w:    {{ foreground_h_w }};
-
-/* =========================================================== */
-
-  --foreground-0:      {{ foreground_0_lower }};
-
-  --foreground-0-rgb:  {{ foreground_0_rgb }};
-  --foreground-0-r:    {{ foreground_0_r }};
-  --foreground-0-g:    {{ foreground_0_g }};
-  --foreground-0-b:    {{ foreground_0_b }};
-
-  --foreground-0-hsl:  {{ foreground_0_hsl }};
-  --foreground-0-h:    {{ foreground_0_h }};
-  --foreground-0-s:    {{ foreground_0_s }};
-  --foreground-0-l:    {{ foreground_0_l }};
-
-  --foreground-0-hwb:  {{ foreground_0_hwb }};
-  --foreground-0-w:    {{ foreground_0_w }};
+  --foreground-h-hwb:  {{ foreground_hwb|pop=0.06 }};
+  --foreground-h-w:    {{ foreground_w|pop=0.06 }};
 
 /* =========================================================== */
 
-  --foreground-1:      {{ foreground_1_lower }};
+  --foreground-0:      {{ foreground_lower }};
 
-  --foreground-1-rgb:  {{ foreground_1_rgb }};
-  --foreground-1-r:    {{ foreground_1_r }};
-  --foreground-1-g:    {{ foreground_1_g }};
-  --foreground-1-b:    {{ foreground_1_b }};
+  --foreground-0-rgb:  {{ foreground_rgb }};
+  --foreground-0-r:    {{ foreground_r }};
+  --foreground-0-g:    {{ foreground_g }};
+  --foreground-0-b:    {{ foreground_b }};
 
-  --foreground-1-hsl:  {{ foreground_1_hsl }};
-  --foreground-1-h:    {{ foreground_1_h }};
-  --foreground-1-s:    {{ foreground_1_s }};
-  --foreground-1-l:    {{ foreground_1_l }};
+  --foreground-0-hsl:  {{ foreground_hsl }};
+  --foreground-0-h:    {{ foreground_h }};
+  --foreground-0-s:    {{ foreground_s }};
+  --foreground-0-l:    {{ foreground_l }};
 
-  --foreground-1-hwb:  {{ foreground_1_hwb }};
-  --foreground-1-w:    {{ foreground_1_w }};
-
-/* =========================================================== */
-
-  --foreground-2:      {{ foreground_2_lower }};
-
-  --foreground-2-rgb:  {{ foreground_2_rgb }};
-  --foreground-2-r:    {{ foreground_2_r }};
-  --foreground-2-g:    {{ foreground_2_g }};
-  --foreground-2-b:    {{ foreground_2_b }};
-
-  --foreground-2-hsl:  {{ foreground_2_hsl }};
-  --foreground-2-h:    {{ foreground_2_h }};
-  --foreground-2-s:    {{ foreground_2_s }};
-  --foreground-2-l:    {{ foreground_2_l }};
-
-  --foreground-2-hwb:  {{ foreground_2_hwb }};
-  --foreground-2-w:    {{ foreground_2_w }};
+  --foreground-0-hwb:  {{ foreground_hwb }};
+  --foreground-0-w:    {{ foreground_w }};
 
 /* =========================================================== */
 
-  --foreground-3:      {{ foreground_3_lower }};
+  --foreground-1:      {{ foreground_lower|dim=0.06 }};
 
-  --foreground-3-rgb:  {{ foreground_3_rgb }};
-  --foreground-3-r:    {{ foreground_3_r }};
-  --foreground-3-g:    {{ foreground_3_g }};
-  --foreground-3-b:    {{ foreground_3_b }};
+  --foreground-1-rgb:  {{ foreground_rgb|dim=0.06 }};
+  --foreground-1-r:    {{ foreground_r|dim=0.06 }};
+  --foreground-1-g:    {{ foreground_g|dim=0.06 }};
+  --foreground-1-b:    {{ foreground_b|dim=0.06 }};
 
-  --foreground-3-hsl:  {{ foreground_3_hsl }};
-  --foreground-3-h:    {{ foreground_3_h }};
-  --foreground-3-s:    {{ foreground_3_s }};
-  --foreground-3-l:    {{ foreground_3_l }};
+  --foreground-1-hsl:  {{ foreground_hsl|dim=6 }};
+  --foreground-1-h:    {{ foreground_h|dim=0.06 }};
+  --foreground-1-s:    {{ foreground_s|dim=0.06 }};
+  --foreground-1-l:    {{ foreground_l|dim=0.06 }};
 
-  --foreground-3-hwb:  {{ foreground_3_hwb }};
-  --foreground-3-w:    {{ foreground_3_w }};
-
-/* =========================================================== */
-
-  --foreground-4:      {{ foreground_4_lower }};
-
-  --foreground-4-rgb:  {{ foreground_4_rgb }};
-  --foreground-4-r:    {{ foreground_4_r }};
-  --foreground-4-g:    {{ foreground_4_g }};
-  --foreground-4-b:    {{ foreground_4_b }};
-
-  --foreground-4-hsl:  {{ foreground_4_hsl }};
-  --foreground-4-h:    {{ foreground_4_h }};
-  --foreground-4-s:    {{ foreground_4_s }};
-  --foreground-4-l:    {{ foreground_4_l }};
-
-  --foreground-4-hwb:  {{ foreground_4_hwb }};
-  --foreground-4-w:    {{ foreground_4_w }};
+  --foreground-1-hwb:  {{ foreground_hwb|dim=0.06 }};
+  --foreground-1-w:    {{ foreground_w|dim=0.06 }};
 
 /* =========================================================== */
 
-  --background-h:      {{ background_h_lower }};
+  --foreground-2:      {{ foreground_lower|dim=0.12 }};
 
-  --background-h-rgb:  {{ background_h_rgb }};
-  --background-h-r:    {{ background_h_r }};
-  --background-h-g:    {{ background_h_g }};
-  --background-h-b:    {{ background_h_b }};
+  --foreground-2-rgb:  {{ foreground_rgb|dim=0.12 }};
+  --foreground-2-r:    {{ foreground_r|dim=0.12 }};
+  --foreground-2-g:    {{ foreground_g|dim=0.12 }};
+  --foreground-2-b:    {{ foreground_b|dim=0.12 }};
 
-  --background-h-hsl:  {{ background_h_hsl }};
-  --background-h-h:    {{ background_h_h }};
-  --background-h-s:    {{ background_h_s }};
-  --background-h-l:    {{ background_h_l }};
+  --foreground-2-hsl:  {{ foreground_hsl|dim=12 }};
+  --foreground-2-h:    {{ foreground_h|dim=0.12 }};
+  --foreground-2-s:    {{ foreground_s|dim=0.12 }};
+  --foreground-2-l:    {{ foreground_l|dim=0.12 }};
 
-  --background-h-hwb:  {{ background_h_hwb }};
-  --background-h-w:    {{ background_h_w }};
-
-/* =========================================================== */
-
-  --background-0:      {{ background_0_lower }};
-
-  --background-0-rgb:  {{ background_0_rgb }};
-  --background-0-r:    {{ background_0_r }};
-  --background-0-g:    {{ background_0_g }};
-  --background-0-b:    {{ background_0_b }};
-
-  --background-0-hsl:  {{ background_0_hsl }};
-  --background-0-h:    {{ background_0_h }};
-  --background-0-s:    {{ background_0_s }};
-  --background-0-l:    {{ background_0_l }};
-
-  --background-0-hwb:  {{ background_0_hwb }};
-  --background-0-w:    {{ background_0_w }};
+  --foreground-2-hwb:  {{ foreground_hwb|dim=0.12 }};
+  --foreground-2-w:    {{ foreground_w|dim=0.12 }};
 
 /* =========================================================== */
 
-  --background-1:      {{ background_1_lower }};
+  --foreground-3:      {{ foreground_lower|dim=0.18 }};
 
-  --background-1-rgb:  {{ background_1_rgb }};
-  --background-1-r:    {{ background_1_r }};
-  --background-1-g:    {{ background_1_g }};
-  --background-1-b:    {{ background_1_b }};
+  --foreground-3-rgb:  {{ foreground_rgb|dim=0.18 }};
+  --foreground-3-r:    {{ foreground_r|dim=0.18 }};
+  --foreground-3-g:    {{ foreground_g|dim=0.18 }};
+  --foreground-3-b:    {{ foreground_b|dim=0.18 }};
 
-  --background-1-hsl:  {{ background_1_hsl }};
-  --background-1-h:    {{ background_1_h }};
-  --background-1-s:    {{ background_1_s }};
-  --background-1-l:    {{ background_1_l }};
+  --foreground-3-hsl:  {{ foreground_hsl|dim=18 }};
+  --foreground-3-h:    {{ foreground_h|dim=0.18 }};
+  --foreground-3-s:    {{ foreground_s|dim=0.18 }};
+  --foreground-3-l:    {{ foreground_l|dim=0.18 }};
 
-  --background-1-hwb:  {{ background_1_hwb }};
-  --background-1-w:    {{ background_1_w }};
-
-/* =========================================================== */
-
-  --background-2:      {{ background_2_lower }};
-
-  --background-2-rgb:  {{ background_2_rgb }};
-  --background-2-r:    {{ background_2_r }};
-  --background-2-g:    {{ background_2_g }};
-  --background-2-b:    {{ background_2_b }};
-
-  --background-2-hsl:  {{ background_2_hsl }};
-  --background-2-h:    {{ background_2_h }};
-  --background-2-s:    {{ background_2_s }};
-  --background-2-l:    {{ background_2_l }};
-
-  --background-2-hwb:  {{ background_2_hwb }};
-  --background-2-w:    {{ background_2_w }};
+  --foreground-3-hwb:  {{ foreground_hwb|dim=0.18 }};
+  --foreground-3-w:    {{ foreground_w|dim=0.18 }};
 
 /* =========================================================== */
 
-  --background-3:      {{ background_3_lower }};
+  --foreground-4:      {{ foreground_lower|dim=0.24 }};
 
-  --background-3-rgb:  {{ background_3_rgb }};
-  --background-3-r:    {{ background_3_r }};
-  --background-3-g:    {{ background_3_g }};
-  --background-3-b:    {{ background_3_b }};
+  --foreground-4-rgb:  {{ foreground_rgb|dim=0.24 }};
+  --foreground-4-r:    {{ foreground_r|dim=0.24 }};
+  --foreground-4-g:    {{ foreground_g|dim=0.24 }};
+  --foreground-4-b:    {{ foreground_b|dim=0.24 }};
 
-  --background-3-hsl:  {{ background_3_hsl }};
-  --background-3-h:    {{ background_3_h }};
-  --background-3-s:    {{ background_3_s }};
-  --background-3-l:    {{ background_3_l }};
+  --foreground-4-hsl:  {{ foreground_hsl|dim=24 }};
+  --foreground-4-h:    {{ foreground_h|dim=0.24 }};
+  --foreground-4-s:    {{ foreground_s|dim=0.24 }};
+  --foreground-4-l:    {{ foreground_l|dim=0.24 }};
 
-  --background-3-hwb:  {{ background_3_hwb }};
-  --background-3-w:    {{ background_3_w }};
-
-/* =========================================================== */
-
-  --background-4:      {{ background_4_lower }};
-
-  --background-4-rgb:  {{ background_4_rgb }};
-  --background-4-r:    {{ background_4_r }};
-  --background-4-g:    {{ background_4_g }};
-  --background-4-b:    {{ background_4_b }};
-
-  --background-4-hsl:  {{ background_4_hsl }};
-  --background-4-h:    {{ background_4_h }};
-  --background-4-s:    {{ background_4_s }};
-  --background-4-l:    {{ background_4_l }};
-
-  --background-4-hwb:  {{ background_4_hwb }};
-  --background-4-w:    {{ background_4_w }};
+  --foreground-4-hwb:  {{ foreground_hwb|dim=0.24 }};
+  --foreground-4-w:    {{ foreground_w|dim=0.24 }};
 
 /* =========================================================== */
 
-  --background-5:      {{ background_5_lower }};
+  --background-h:      {{ background_lower|dim=0.03 }};
 
-  --background-5-rgb:  {{ background_5_rgb }};
-  --background-5-r:    {{ background_5_r }};
-  --background-5-g:    {{ background_5_g }};
-  --background-5-b:    {{ background_5_b }};
+  --background-h-rgb:  {{ background_rgb|dim=0.03 }};
+  --background-h-r:    {{ background_r|dim=0.03 }};
+  --background-h-g:    {{ background_g|dim=0.03 }};
+  --background-h-b:    {{ background_b|dim=0.03 }};
 
-  --background-5-hsl:  {{ background_5_hsl }};
-  --background-5-h:    {{ background_5_h }};
-  --background-5-s:    {{ background_5_s }};
-  --background-5-l:    {{ background_5_l }};
+  --background-h-hsl:  {{ background_hsl|dim=3 }};
+  --background-h-h:    {{ background_h|dim=0.03 }};
+  --background-h-s:    {{ background_s|dim=0.03 }};
+  --background-h-l:    {{ background_l|dim=0.03 }};
 
-  --background-5-hwb:  {{ background_5_hwb }};
-  --background-5-w:    {{ background_5_w }};
+  --background-h-hwb:  {{ background_hwb|dim=0.03 }};
+  --background-h-w:    {{ background_w|dim=0.03 }};
+
+/* =========================================================== */
+
+  --background-0:      {{ background_lower }};
+
+  --background-0-rgb:  {{ background_rgb }};
+  --background-0-r:    {{ background_r }};
+  --background-0-g:    {{ background_g }};
+  --background-0-b:    {{ background_b }};
+
+  --background-0-hsl:  {{ background_hsl }};
+  --background-0-h:    {{ background_h }};
+  --background-0-s:    {{ background_s }};
+  --background-0-l:    {{ background_l }};
+
+  --background-0-hwb:  {{ background_hwb }};
+  --background-0-w:    {{ background_w }};
+
+/* =========================================================== */
+
+  --background-1:      {{ background_lower|pop=0.06 }};
+
+  --background-1-rgb:  {{ background_rgb|pop=0.06 }};
+  --background-1-r:    {{ background_r|pop=0.06 }};
+  --background-1-g:    {{ background_g|pop=0.06 }};
+  --background-1-b:    {{ background_b|pop=0.06 }};
+
+  --background-1-hsl:  {{ background_hsl|pop=6 }};
+  --background-1-h:    {{ background_h|pop=0.06 }};
+  --background-1-s:    {{ background_s|pop=0.06 }};
+  --background-1-l:    {{ background_l|pop=0.06 }};
+
+  --background-1-hwb:  {{ background_hwb|pop=0.06 }};
+  --background-1-w:    {{ background_w|pop=0.06 }};
+
+/* =========================================================== */
+
+  --background-2:      {{ background_lower|pop=0.12 }};
+
+  --background-2-rgb:  {{ background_rgb|pop=0.12 }};
+  --background-2-r:    {{ background_r|pop=0.12 }};
+  --background-2-g:    {{ background_g|pop=0.12 }};
+  --background-2-b:    {{ background_b|pop=0.12 }};
+
+  --background-2-hsl:  {{ background_hsl|pop=12 }};
+  --background-2-h:    {{ background_h|pop=0.12 }};
+  --background-2-s:    {{ background_s|pop=0.12 }};
+  --background-2-l:    {{ background_l|pop=0.12 }};
+
+  --background-2-hwb:  {{ background_hwb|pop=0.12 }};
+  --background-2-w:    {{ background_w|pop=0.12 }};
+
+/* =========================================================== */
+
+  --background-3:      {{ background_lower|pop=0.18 }};
+
+  --background-3-rgb:  {{ background_rgb|pop=0.18 }};
+  --background-3-r:    {{ background_r|pop=0.18 }};
+  --background-3-g:    {{ background_g|pop=0.18 }};
+  --background-3-b:    {{ background_b|pop=0.18 }};
+
+  --background-3-hsl:  {{ background_hsl|pop=18 }};
+  --background-3-h:    {{ background_h|pop=0.18 }};
+  --background-3-s:    {{ background_s|pop=0.18 }};
+  --background-3-l:    {{ background_l|pop=0.18 }};
+
+  --background-3-hwb:  {{ background_hwb|pop=0.18 }};
+  --background-3-w:    {{ background_w|pop=0.18 }};
+
+/* =========================================================== */
+
+  --background-4:      {{ background_lower|pop=0.24 }};
+
+  --background-4-rgb:  {{ background_rgb|pop=0.24 }};
+  --background-4-r:    {{ background_r|pop=0.24 }};
+  --background-4-g:    {{ background_g|pop=0.24 }};
+  --background-4-b:    {{ background_b|pop=0.24 }};
+
+  --background-4-hsl:  {{ background_hsl|pop=24 }};
+  --background-4-h:    {{ background_h|pop=0.24 }};
+  --background-4-s:    {{ background_s|pop=0.24 }};
+  --background-4-l:    {{ background_l|pop=0.24 }};
+
+  --background-4-hwb:  {{ background_hwb|pop=0.24 }};
+  --background-4-w:    {{ background_w|pop=0.24 }};
+
+/* =========================================================== */
+
+  --background-5:      {{ background_lower|pop=0.30 }};
+
+  --background-5-rgb:  {{ background_rgb|pop=0.30 }};
+  --background-5-r:    {{ background_r|pop=0.30 }};
+  --background-5-g:    {{ background_g|pop=0.30 }};
+  --background-5-b:    {{ background_b|pop=0.30 }};
+
+  --background-5-hsl:  {{ background_hsl|pop=30 }};
+  --background-5-h:    {{ background_h|pop=0.30 }};
+  --background-5-s:    {{ background_s|pop=0.30 }};
+  --background-5-l:    {{ background_l|pop=0.30 }};
+
+  --background-5-hwb:  {{ background_hwb|pop=0.30 }};
+  --background-5-w:    {{ background_w|pop=0.30 }};
 
 }
 

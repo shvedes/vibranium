@@ -25,7 +25,7 @@ The most commonly used shortcuts are:
 - ++ctrl+alt+u++ — Utilities menu
 - ++super+return++ — terminal
 - ++super+q++ — close the active window
-- ++super+shift+s++ — capture a screen region
+- ++super+shift+s++ — pick a screenshot region or screen
 
 The complete shortcut reference is available on the [Keyboard shortcuts](keybindings.md) page.
 
@@ -49,12 +49,10 @@ Most configuration changes take effect immediately without requiring a logout.
 
 The default screenshot shortcuts are:
 
-- ++super++shift++s++ — select a region
-- ++super++shift++a++ — active window
-- ++super++shift++z++ — entire screen
+- ++super+shift+s++ — pick a region or screen
+- ++print++ — pick a region or screen
 
-The standard ++print-screen++ key is also supported.  
-Screenshots are saved to `~/Pictures/Screenshots` and copied to the clipboard automatically.
+Screenshots are saved by default to `~/Pictures/Screenshots` and copied to the clipboard.
 
 ## Directory layout
 
@@ -67,4 +65,3 @@ The most important directories are:
 | `~/.local/state/vibranium/` | Persistent application state. **Do not modify this directory** |
 | `~/.cache/vibranium/` | Cache/log files |
 | `~/.config/hypr/hyprland.conf.d/` | Your [Hyprland](hyprland.md) overrides |
-| `~/.config/waybar/` | Your Waybar configuration |

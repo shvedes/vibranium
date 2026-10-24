@@ -1,10 +1,18 @@
 #!/bin/bash
 
-source vb-lib-cli
+# Robust lib sourcing: works even when $VIBRANIUM/bin is not on PATH
+# (e.g. Quickshell services spawning via absolute path).
+if ! source vb-lib-cli 2>/dev/null; then
+  _vb_dir="$(cd "${BASH_SOURCE[0]%/*}" && pwd)"
+  # shellcheck source=/dev/null
+  # The fallback suppresses the second source error, but a successful source is
+  # still required for log and shcat to be defined.
+  source "$_vb_dir/vb-lib-cli" 2>/dev/null || true
+fi
 
 VERBOSE=${VERBOSE:-false}
 
-STATE_FILE="$VIBRANIUM_STATE/cursor-theme"
+STATE_FILE="$VIBRANIUM_STATE/cursor-theme.json"
 
 DEFAULT_THEME="Adwaita"
 DEFAULT_SIZE=24
@@ -13,27 +21,107 @@ SELECTED_THEME=""
 SELECTED_SIZE=""
 
 # ini_upsert <file> <section> <key> <value>
-#   Sets key=value inside [section].  Adds the key if absent; creates the
-#   file (with the section header) if it doesn't exist at all.
+# Existing-file key tests and replacements are global; the section argument
+# controls insertion for missing keys. Missing files are created with the
+# section header. Callers use literal keys and simple values.
 ini_upsert() {
   local file="$1" section="$2" key="$3" value="$4"
 
   if [[ ! -f "$file" ]]; then
-    mkdir -p "$(dirname "$file")"
+    mkdir -p "${file%/*}"
     printf '[%s]\n%s=%s\n' "$section" "$key" "$value" > "$file"
     return
   fi
 
-  if grep -q "^${key}\s*=" "$file"; then
-    # key exists - update in-place
-    sed -i "s|^${key}\s*=.*|${key}=${value}|" "$file"
-  else
-    # key absent - append after the section header, or at end of file
-    if grep -q "^\[${section}\]" "$file"; then
-      sed -i "/^\[${section}\]/a ${key}=${value}" "$file"
-    else
-      printf '\n[%s]\n%s=%s\n' "$section" "$key" "$value" >> "$file"
+  # Pure-bash key/section scan: a key line starts with the literal key
+  # followed by optional whitespace and '='; a section line starts with
+  # the literal '[section]' header.
+  local lines=() line rest has_key=false has_section=false
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    lines+=("$line")
+    if [[ "$line" == "$key"* ]]; then
+      rest="${line#"$key"}"
+      if [[ "$rest" =~ ^[[:space:]]*= ]]; then
+        has_key=true
+      fi
     fi
+    if [[ "$line" == "[$section]"* ]]; then
+      has_section=true
+    fi
+  done < "$file"
+
+  if $has_key; then
+    # key exists - update in-place
+    local i row
+    for ((i = 0; i < ${#lines[@]}; i++)); do
+      row="${lines[i]}"
+      if [[ "$row" == "$key"* ]]; then
+        rest="${row#"$key"}"
+        if [[ "$rest" =~ ^[[:space:]]*= ]]; then
+          lines[i]="$key=$value"
+        fi
+      fi
+    done
+    printf '%s\n' "${lines[@]}" > "$file"
+  elif $has_section; then
+    # key absent - append after the section header, or at end of file
+    local out=()
+    for line in "${lines[@]}"; do
+      out+=("$line")
+      if [[ "$line" == "[$section]"* ]]; then
+        out+=("$key=$value")
+      fi
+    done
+    printf '%s\n' "${out[@]}" > "$file"
+  else
+    printf '\n[%s]\n%s=%s\n' "$section" "$key" "$value" >> "$file"
+  fi
+}
+
+# Toggling cursor invisibility forces Hyprland to recreate the Xcursor theme;
+# the original state is captured and restored after a short delay because
+# visibility is a compositor-level workaround, not part of the selected theme.
+hypr_refresh_xcursor() {
+  local query original temporary interface
+
+  command -v hyprctl > /dev/null 2>&1 || return
+
+  # The eval interface is attempted first; keyword is a compatibility fallback.
+  # If both interface commands fail, the function returns their failure status.
+  if ! query="$(hyprctl -j getoption cursor:invisible 2> /dev/null)"; then
+    return
+  fi
+
+  original=""
+  IFS= read -r original < <(jq -r '.bool // empty' <<< "$query" 2> /dev/null) || true
+  case "$original" in
+    false)
+      temporary=true
+      ;;
+    true)
+      temporary=false
+      ;;
+    *)
+      return
+      ;;
+  esac
+
+  if hyprctl -q eval "hl.config({ cursor = { invisible = $temporary } })" 2> /dev/null; then
+    interface="eval"
+  elif hyprctl -q keyword cursor:invisible "$temporary" 2> /dev/null; then
+    interface="keyword"
+  else
+    return
+  fi
+
+  sleep 0.6
+
+  # Restoration is best effort; a failed original-interface call does not
+  # abort theme application.
+  if [[ "$interface" == "eval" ]]; then
+    hyprctl -q eval "hl.config({ cursor = { invisible = $original } })" 2> /dev/null || true
+  else
+    hyprctl -q keyword cursor:invisible "$original" 2> /dev/null || true
   fi
 }
 
@@ -53,6 +141,8 @@ Options:
 EOF
 }
 
+# The parser uses the first nonempty positional value as the theme; later
+# values are accepted and ignored.
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
@@ -84,20 +174,31 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# fall back to state values, then built-in defaults
+# fall back to state values, then built-in defaults - only for values
+# not given on the command line (CLI args must win)
+# jq failures and missing fields become empty values, allowing the built-in
+# defaults to apply without sourcing JSON as shell code.
 if [[ -f "$STATE_FILE" ]]; then
-  # shellcheck source=/dev/null
-  source "$STATE_FILE"
+  if [[ -z "$SELECTED_THEME" ]]; then
+    SELECTED_THEME=""
+    IFS= read -r SELECTED_THEME < <(jq -r '.theme // empty' "$STATE_FILE" 2> /dev/null) || true
+  fi
+  if [[ -z "$SELECTED_SIZE" ]]; then
+    SELECTED_SIZE=""
+    IFS= read -r SELECTED_SIZE < <(jq -r '.size // empty' "$STATE_FILE" 2> /dev/null) || true
+  fi
 fi
 
 if [[ -z "$SELECTED_THEME" ]]; then
-  SELECTED_THEME="${theme:-$DEFAULT_THEME}"
+  SELECTED_THEME="${SELECTED_THEME:-$DEFAULT_THEME}"
 fi
 
 if [[ -z "$SELECTED_SIZE" ]]; then
-  SELECTED_SIZE="${size:-$DEFAULT_SIZE}"
+  SELECTED_SIZE="${SELECTED_SIZE:-$DEFAULT_SIZE}"
 fi
 
+# The first matching directory wins, so user-local themes take precedence over
+# home and system locations in this command.
 SEARCH_DIRS=(
   "$XDG_DATA_HOME/icons"
   "$HOME/.icons"
@@ -105,8 +206,10 @@ SEARCH_DIRS=(
 )
 
 theme_found=0
+THEME_DIR=""
 for d in "${SEARCH_DIRS[@]}"; do
   if [[ -d "$d/$SELECTED_THEME/cursors" ]]; then
+    THEME_DIR="$d/$SELECTED_THEME"
     theme_found=1
     break
   fi
@@ -120,23 +223,37 @@ fi
 log Info "Setting cursor theme: $SELECTED_THEME size=${SELECTED_SIZE}px"
 
 # Validate that the resolved size exists in this theme using vb-cursor-list.
-available_sizes=$(vb-cursor-list --size "$SELECTED_THEME" 2> /dev/null | awk '{$1=""; print}')
+# vb-cursor-list prints a display token followed by sizes. The awk filter
+# clears only the first whitespace-delimited field, not an entire multi-word
+# display label. An empty result leaves the requested size unchallenged.
+# Strip the leading display token the way the awk filter did: only the
+# first whitespace-delimited field is dropped, so a multi-word display
+# label can leave extra words in the result.
+available_sizes=""
+while IFS= read -r _cl_line || [[ -n "$_cl_line" ]]; do
+  if [[ "$_cl_line" == *" "* ]]; then
+    available_sizes+="${_cl_line#* } "
+  fi
+done < <(vb-cursor-list --size "$SELECTED_THEME" 2> /dev/null)
+available_sizes="${available_sizes% }"
 
-if [[ -n "$available_sizes" ]] && ! grep -qw "$SELECTED_SIZE" <<< "$available_sizes"; then
+if [[ -n "$available_sizes" ]] && [[ " $available_sizes " != *" $SELECTED_SIZE "* ]]; then
   msg="Size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME' - falling back to ${DEFAULT_SIZE}px"
 
+  # Interactive callers get a hard error; non-TTY callers receive a notification
+  # and continue with the default.
   if [[ -t 1 ]]; then
     msg="size '${SELECTED_SIZE}px' is not available in theme '$SELECTED_THEME'"$'\n'"Run: vb-cursor-list --size '$SELECTED_THEME'"
     log Error "$msg"
     exit 1
   fi
 
-  notify-send -r 4 -t 10000 "Vibranium - Cursor Themes" "$msg"
-  # Carried-over size doesn't fit the new theme - silently use the default.
+  notify-send -r 4 -a "Vibranium" -t 10000 "Vibranium - Cursor Themes" "$msg"
+  # A carried-over size that is unavailable in the new theme uses the default.
   SELECTED_SIZE="$DEFAULT_SIZE"
 fi
 
-# X cursor default (used by legacy X11 apps)
+# Set the icon-theme inheritance used by X11 cursor consumers.
 ini_upsert "$XDG_DATA_HOME/icons/default/index.theme" "Icon Theme" "Inherits" "$SELECTED_THEME"
 
 # GTK 2 / 3 / 4 settings
@@ -147,9 +264,34 @@ GTK4_INI="$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
 log Info "Writing GTK 2 config: $GTK2_RC"
 
 if [[ -f "$GTK2_RC" ]]; then
-  if grep -q "^gtk-cursor-theme-name" "$GTK2_RC"; then
-    sed -i 's|^gtk-cursor-theme-name\s*=.*|gtk-cursor-theme-name="'"$SELECTED_THEME"'"|' "$GTK2_RC"
-    sed -i 's|^gtk-cursor-theme-size\s*=.*|gtk-cursor-theme-size='"$SELECTED_SIZE"'|' "$GTK2_RC"
+  _gtk2_lines=()
+  _gtk2_has_name=false
+  while IFS= read -r _gtk2_line || [[ -n "$_gtk2_line" ]]; do
+    if [[ "$_gtk2_line" == gtk-cursor-theme-name* ]]; then
+      _gtk2_has_name=true
+    fi
+    _gtk2_lines+=("$_gtk2_line")
+  done < "$GTK2_RC"
+  if $_gtk2_has_name; then
+    _gtk2_out=()
+    for _gtk2_line in "${_gtk2_lines[@]}"; do
+      if [[ "$_gtk2_line" == gtk-cursor-theme-name* ]]; then
+        _gtk2_rest="${_gtk2_line#gtk-cursor-theme-name}"
+        if [[ "$_gtk2_rest" =~ ^[[:space:]]*= ]]; then
+          _gtk2_out+=("gtk-cursor-theme-name=\"$SELECTED_THEME\"")
+          continue
+        fi
+      fi
+      if [[ "$_gtk2_line" == gtk-cursor-theme-size* ]]; then
+        _gtk2_rest="${_gtk2_line#gtk-cursor-theme-size}"
+        if [[ "$_gtk2_rest" =~ ^[[:space:]]*= ]]; then
+          _gtk2_out+=("gtk-cursor-theme-size=$SELECTED_SIZE")
+          continue
+        fi
+      fi
+      _gtk2_out+=("$_gtk2_line")
+    done
+    printf '%s\n' "${_gtk2_out[@]}" > "$GTK2_RC"
   else
     printf 'gtk-cursor-theme-name="%s"\ngtk-cursor-theme-size=%s\n' \
       "$SELECTED_THEME" "$SELECTED_SIZE" >> "$GTK2_RC"
@@ -167,7 +309,18 @@ XRESOURCES="$HOME/.Xresources"
 
 if [[ -f "$XRESOURCES" ]]; then
   # remove any previous Xcursor lines, then append a fresh one
-  sed -i '/^Xcursor\.\(theme\|size\)/d' "$XRESOURCES"
+  _xr_lines=()
+  while IFS= read -r _xr_line || [[ -n "$_xr_line" ]]; do
+    case "$_xr_line" in
+      Xcursor.theme* | Xcursor.size*) continue ;;
+      *) _xr_lines+=("$_xr_line") ;;
+    esac
+  done < "$XRESOURCES"
+  if ((${#_xr_lines[@]} > 0)); then
+    printf '%s\n' "${_xr_lines[@]}" > "$XRESOURCES"
+  else
+    : > "$XRESOURCES"
+  fi
 fi
 
 printf 'Xcursor.theme: %s\n' "$SELECTED_THEME" >> "$XRESOURCES"
@@ -175,9 +328,15 @@ printf 'Xcursor.size: %s\n' "$SELECTED_SIZE" >> "$XRESOURCES"
 
 xrdb -merge "$XRESOURCES" || true
 
-# hypr
+# Apply the selected theme to Hyprland.
 log Info "Setting Hyprland cursor: $SELECTED_THEME $SELECTED_SIZE"
 hyprctl -q setcursor "$SELECTED_THEME" "$SELECTED_SIZE"
+
+# The visibility-toggle workaround is limited to themes without either
+# manifest, so the explicit reload path is used only for that class of theme.
+if [[ ! -e "$THEME_DIR/manifest.hl" && ! -e "$THEME_DIR/manifest.toml" ]]; then
+  hypr_refresh_xcursor
+fi
 
 log Info "Setting GNOME cursor: $SELECTED_THEME $SELECTED_SIZE"
 gsettings set org.gnome.desktop.interface cursor-theme "$SELECTED_THEME"
@@ -193,7 +352,7 @@ dbus-update-activation-environment --systemd XCURSOR_THEME XCURSOR_SIZE 2> /dev/
 
 log Info "Writing state file: $STATE_FILE"
 
-{
-  printf 'theme="%s"\n' "$SELECTED_THEME"
-  printf 'size=%s\n' "$SELECTED_SIZE"
-} > "$STATE_FILE"
+mkdir -p "${STATE_FILE%/*}"
+
+jq -n --arg theme "$SELECTED_THEME" --argjson size "$SELECTED_SIZE" \
+  '{"theme": $theme, "size": $size}' > "$STATE_FILE"

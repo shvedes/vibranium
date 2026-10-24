@@ -1,0 +1,131 @@
+// Bare UPPER_SNAKE env pages for the Settings store.
+// Directory decides namespace: every option here must be env.
+{
+  "pages": [
+    {
+      "label": "Recording",
+      "icon": "recording",
+      "showItemCount": true,
+      "options": [
+        {
+          "key": "RECORDING_FPS",
+          "type": "int",
+          "default": 30,
+          "label": "FPS",
+          "sub": "FPS to record with",
+          "desc": "<b>FPS</b> to record videos with.",
+          "range": {
+            "min": 15,
+            "max": 240
+          },
+          "step": 15,
+          "unit": "FPS"
+        },
+        {
+          "key": "RECORDING_QUALITY",
+          "type": "string",
+          "default": "high",
+          "label": "Recording quality",
+          "sub": "Overall recording quality",
+          "desc": "Overall recording quality.",
+          "values": [
+            "medium",
+            "high",
+            "very_high",
+            "ultra"
+          ],
+          "valueLabels": {
+            "medium": "Medium",
+            "high": "High",
+            "very_high": "Very high",
+            "ultra": "Ultra"
+          }
+        },
+        {
+          "key": "RECORDING_CONTAINER_TYPE",
+          "type": "string",
+          "default": "mp4",
+          "label": "Filetype",
+          "sub": "Video file type",
+          "desc": "Container format for the output file.",
+          "warning": "<b><u>webm</u></b> forces the codec to <b><u>vp8</u></b>",
+          "values": [
+            "mp4",
+            "mkv",
+            "webm"
+          ],
+          "valueLabels": {
+            "mp4": "MP4",
+            "mkv": "MKV",
+            "webm": "WebM"
+          }
+        },
+        {
+          "key": "RECORDING_FRAMERATE_MODE",
+          "type": "string",
+          "default": "cfr",
+          "label": "Framerate mode",
+          "sub": "Frame capture method",
+          "desc": "- <b><u>CFR</u></b>: better quality; <b>increases</b> file size\n- <b><u>VFR</u></b>: resource-efficient; less compatible",
+          "values": [
+            "cfr",
+            "vfr"
+          ],
+          "valueLabels": {
+            "cfr": "Constant (CFR)",
+            "vfr": "Variable (VFR)"
+          }
+        },
+        {
+          "key": "RECORDING_VIDEO_CODEC",
+          "type": "string",
+          "default": "auto",
+          "label": "Video codec",
+          "sub": "Video codec to use",
+          "desc": "Video codec to use for recording.",
+          "warning": "Make sure your hardware supports the selected codec.\nSee <b>gpu-screen-recorder(1)</b> for info.",
+          "values": [
+            "auto",
+            "h264",
+            "hevc",
+            "av1",
+            "vp8",
+            "vp9",
+            "hevc_hdr",
+            "av1_hdr",
+            "hevc_10bit",
+            "av1_10bit"
+          ],
+          "valueLabels": {
+            "auto": "Auto",
+            "h264": "H264",
+            "hevc": "HEVC",
+            "av1": "AV1",
+            "vp8": "VP8",
+            "vp9": "VP9",
+            "hevc_hdr": "HEVC HDR",
+            "av1_hdr": "AV1 HDR",
+            "hevc_10bit": "HEVC 10-bit",
+            "av1_10bit": "AV1 10-bit"
+          }
+        },
+        {
+          "key": "RECORDING_CAPTURE_SOURCE",
+          "type": "bool",
+          "default": false,
+          "label": "Capture microphone",
+          "sub": "Capture microphone",
+          "desc": "Whether to include your microphone input in recordings."
+        },
+        {
+          "key": "RECORDING_CAPTURE_SINK",
+          "type": "bool",
+          "default": true,
+          "label": "Capture system",
+          "sub": "Capture system sound",
+          "desc": "Whether to include your system audio in recordings."
+        }
+      ]
+    }
+  ]
+}

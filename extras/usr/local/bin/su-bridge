@@ -7,7 +7,7 @@ shcat() {
 }
 
 usage() {
-    shcat <<EOF
+  shcat << EOF
 Usage: ${0##*/} [MODE] [--] COMMAND [ARGS]...
 
 DESCRIPTION:
@@ -38,7 +38,7 @@ EXAMPLES:
   ${0##*/} --user -- my-custom-script --verbose
   pkexec ${0##*/} --root -- bash -c '...'
 EOF
-    exit "${1:-0}"
+  exit "${1:-0}"
 }
 
 # Determine the active desktop user.
@@ -149,32 +149,43 @@ run_as_root() {
 MODE=""
 
 while [[ "$#" -gt 0 ]]; do
-    case "$1" in
-        -h|--help) usage 0 ;;
-        --user) MODE="user"; shift ;;
-        --root) MODE="root"; shift ;;
-        --) shift; break ;;
-        -*) echo "==> ERROR: ${0##*/}: invalid option '$1'" >&2; usage 1 ;;
-        *) break ;;
-    esac
+  case "$1" in
+    -h | --help) usage 0 ;;
+    --user)
+      MODE="user"
+      shift
+      ;;
+    --root)
+      MODE="root"
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      echo "==> ERROR: ${0##*/}: invalid option '$1'" >&2
+      usage 1
+      ;;
+    *) break ;;
+  esac
 done
 
 if [[ "$#" -eq 0 ]]; then
-    usage
-    exit 1
+  usage
 fi
 
 case "$MODE" in
-    user) run_as_user "$@" ;;
-    root) run_as_root "$@" ;;
-    "")
-      # No mode specified: preserve legacy behavior.
-      # Only trigger the bridge logic if run as root.
-      if [[ "$EUID" -eq 0 ]]; then
-        run_as_user "$@"
-      fi
+  user) run_as_user "$@" ;;
+  root) run_as_root "$@" ;;
+  "")
+    # No mode specified: preserve legacy behavior.
+    # Only trigger the bridge logic if run as root.
+    if [[ "$EUID" -eq 0 ]]; then
+      run_as_user "$@"
+    fi
 
-      # Fallback: if run directly as non-root, just execute the command
-      exec "$@"
-      ;;
+    # Fallback: if run directly as non-root, just execute the command
+    exec "$@"
+    ;;
 esac

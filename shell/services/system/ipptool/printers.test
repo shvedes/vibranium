@@ -1,0 +1,11 @@
+{
+  NAME "List printers"
+  OPERATION CUPS-Get-Printers
+  GROUP operation-attributes-tag
+  ATTR charset attributes-charset utf-8
+  ATTR language attributes-natural-language en
+  ATTR uri printer-uri ipp://localhost/
+  ATTR name requesting-user-name $user
+  ATTR keyword requested-attributes printer-name,printer-state,printer-state-reasons,printer-state-message,printer-is-accepting-jobs,printer-info,printer-location,printer-make-and-model,printer-device-uri,cups-printer-state-message,printer-up-time
+  STATUS successful-ok
+}

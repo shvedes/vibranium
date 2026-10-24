@@ -1,0 +1,5 @@
+{
+  "id": "powerMenu",
+  "name": "Power Menu",
+  "description": "Session power actions menu; execution goes through the session service"
+}

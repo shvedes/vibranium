@@ -1,0 +1,12 @@
+{
+  NAME "Renew sub"
+  OPERATION Renew-Subscription
+  GROUP operation-attributes-tag
+  ATTR charset attributes-charset utf-8
+  ATTR language attributes-natural-language en
+  ATTR uri printer-uri $puri
+  ATTR name requesting-user-name $user
+  ATTR integer notify-subscription-id $subid
+  ATTR integer notify-lease-duration 86400
+  STATUS successful-ok
+}

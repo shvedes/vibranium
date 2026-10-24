@@ -26,3 +26,8 @@ source "$ZSH_CONFIG_DIR/binds.zsh"
 if [[ ! -d "${HISTFILE%/*}" ]]; then
   mkdir -p -- "${HISTFILE%/*}"
 fi
+
+# Load user config
+if [[ -e "$HOME/.zshrc" ]]; then
+    source "$HOME/.zshrc"
+fi

@@ -1,0 +1,152 @@
+// hypr.* pages for HyprlandSettings.
+// Directory decides namespace: every option here must be hypr.
+{
+  "pages": [
+    {
+      "id": "hyprland-appearance-decoration",
+      "label": "Decoration",
+      "options": [
+        {
+          "key": "hypr.decoration.motion_blur.enabled",
+          "type": "bool",
+          "default": false,
+          "label": "Motion blur",
+          "desc": "Whether to enable motion blur.",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.motion_blur.enabled"
+          }
+        },
+        {
+          "key": "hypr.decoration.motion_blur.samples",
+          "type": "int",
+          "default": 7,
+          "label": "Motion blur samples",
+          "range": {
+            "min": 1,
+            "max": 25
+          },
+          "step": 1,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.motion_blur.samples"
+          },
+          "showIf": [
+            {
+              "key": "hypr.decoration.motion_blur.enabled",
+              "eq": true
+            }
+          ]
+        },
+        {
+          "key": "hypr.general.border_size",
+          "type": "int",
+          "default": 2,
+          "label": "Border size",
+          "desc": "Window border size.",
+          "range": {
+            "min": 0,
+            "max": 50
+          },
+          "step": 1,
+          "unit": "px",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "general.border_size"
+          }
+        },
+        {
+          "key": "hypr.decoration.rounding",
+          "type": "int",
+          "default": 0,
+          "label": "Rounding",
+          "desc": "Window border roundness.",
+          "range": {
+            "min": 0,
+            "max": 32
+          },
+          "step": 1,
+          "unit": "px",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.rounding"
+          }
+        },
+        {
+          "key": "hypr.decoration.rounding_power",
+          "type": "float",
+          "default": 2,
+          "label": "Rounding power",
+          "desc": "Window's rounding smoothness.",
+          "range": {
+            "min": 0,
+            "max": 10
+          },
+          "step": 0.1,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.rounding_power"
+          }
+        },
+        {
+          "key": "hypr.decoration.active_opacity",
+          "type": "float",
+          "default": 1,
+          "label": "Active opacity",
+          "desc": "Opacity of the active window.",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "step": 0.05,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.active_opacity"
+          }
+        },
+        {
+          "key": "hypr.decoration.inactive_opacity",
+          "type": "float",
+          "default": 1,
+          "label": "Inactive opacity",
+          "desc": "Opacity of inactive windows.",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "step": 0.05,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.inactive_opacity"
+          }
+        },
+        {
+          "key": "hypr.decoration.fullscreen_opacity",
+          "type": "float",
+          "default": 1,
+          "label": "Fullscreen opacity",
+          "desc": "Opacity of a fullscreen window.",
+          "range": {
+            "min": 0,
+            "max": 1
+          },
+          "step": 0.05,
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.fullscreen_opacity"
+          }
+        },
+        {
+          "key": "hypr.decoration.border_part_of_window",
+          "type": "bool",
+          "default": false,
+          "label": "Border part of window",
+          "hypr": {
+            "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+            "ctl": "decoration.border_part_of_window"
+          }
+        }
+      ]
+    }
+  ]
+}

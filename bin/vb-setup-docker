@@ -1,53 +1,43 @@
 #!/bin/bash
 
+source vb-lib-cli
 source vb-lib-core
-
-export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
 
 PACKAGES=(docker docker-compose)
 
-_operation_canceled() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-
-  # shellcheck disable=SC2034
-  read -n1 -r -s -p $'. Press any key to exit' dummy
-}
-
-_operation_complete() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s Setup complete" "$G" "$RS"
-  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
-
-  # shellcheck disable=SC2034
-  read -n1 -r -p $'. Press any key to exit ' dummy
-}
-
+# The helper's return value distinguishes a group mutation from existing
+# membership; the caller uses that distinction for the re-login summary.
 _add_user_to_group() {
-  if ! id -nG "$USER" | grep -qw docker; then
+  local _aug_groups="" _aug_g _aug_member=false
+  local -a _aug_list=()
+  IFS= read -r _aug_groups < <(id -nG "$USER" 2> /dev/null) || true
+  read -ra _aug_list <<< "$_aug_groups"
+  for _aug_g in "${_aug_list[@]}"; do
+    if [[ "$_aug_g" == docker ]]; then
+      _aug_member=true
+      break
+    fi
+  done
+  if ! $_aug_member; then
     vb::print "$Y" "Adding ${P}${USER}${RS} to the '${P}docker${RS}' group"
     sudo usermod -aG docker "$USER"
-    return 0 # was added
+    return 0
   fi
   return 1 # already a member
 }
 
 _configure_daemon() {
-  local desired
-  desired=$(
-    cat << 'EOF'
-{
+  local desired='{
     "log-driver": "json-file",
     "log-opts": { "max-size": "10m", "max-file": "5" },
     "dns": ["172.17.0.1"],
     "bip": "172.17.0.1/16"
-}
-EOF
-  )
+}'
 
+  # Byte comparison makes reruns idempotent only for exact content; a
+  # semantically equivalent file with different JSON formatting is replaced.
   if [ -f /etc/docker/daemon.json ] &&
-    printf '%s' "$desired" | diff -q - /etc/docker/daemon.json &> /dev/null; then
+    printf '%s' "$desired" | cmp -s - /etc/docker/daemon.json &> /dev/null; then
     vb::print "$G" "Docker daemon config: already up to date, skipping"
     return 1 # unchanged
   fi
@@ -69,7 +59,7 @@ _configure_resolved() {
   local desired=$'[Resolve]\nDNSStubListenerExtra=172.17.0.1'
 
   if [ -f "$conf" ] &&
-    printf '%s' "$desired" | diff -q - "$conf" &> /dev/null; then
+    printf '%s' "$desired" | cmp -s - "$conf" &> /dev/null; then
     vb::print "$G" "systemd-resolved config: already up to date, skipping"
     return 1 # unchanged
   fi
@@ -87,12 +77,15 @@ _configure_resolved() {
   return 0 # written
 }
 
+# DefaultDependencies=no removes the unit's automatic systemd dependencies,
+# including normal boot and shutdown ordering; the drop-in changes lifecycle
+# handling without altering the service command or socket configuration.
 _configure_no_block_boot() {
   local conf=/etc/systemd/system/docker.service.d/no-block-boot.conf
   local desired=$'[Unit]\nDefaultDependencies=no'
 
   if [ -f "$conf" ] &&
-    printf '%s' "$desired" | diff -q - "$conf" &> /dev/null; then
+    printf '%s' "$desired" | cmp -s - "$conf" &> /dev/null; then
     vb::print "$G" "Boot-block prevention drop-in: already up to date, skipping"
     return 1 # unchanged
   fi
@@ -109,12 +102,20 @@ _configure_no_block_boot() {
   return 0 # written
 }
 
+# Return 2 means UFW is unavailable or inactive, distinct from return 1 for
+# an already configured Docker ruleset.
 _configure_ufw() {
-  # Skip entirely if ufw is not installed or not active
   if ! command -v ufw &> /dev/null; then
     return 2 # ufw absent
   fi
-  if ! sudo ufw status 2> /dev/null | grep -q "^Status: active"; then
+  local _ufw_active=false _ufw_line
+  while IFS= read -r _ufw_line; do
+    if [[ "$_ufw_line" == "Status: active"* ]]; then
+      _ufw_active=true
+      break
+    fi
+  done < <(sudo ufw status 2> /dev/null)
+  if ! $_ufw_active; then
     return 2 # ufw inactive
   fi
 
@@ -122,13 +123,21 @@ _configure_ufw() {
   local ufw_docker_present=false
 
   # DNS rule: look for our comment tag in the ruleset
-  if sudo ufw status verbose 2> /dev/null | grep -q 'allow-docker-dns'; then
-    dns_rule_present=true
-  fi
+  while IFS= read -r _ufw_line; do
+    if [[ "$_ufw_line" == *allow-docker-dns* ]]; then
+      dns_rule_present=true
+      break
+    fi
+  done < <(sudo ufw status verbose 2> /dev/null)
 
   # ufw-docker: it appends a clearly-marked block to /etc/ufw/after.rules
-  if grep -q 'BEGIN UFW AND DOCKER' /etc/ufw/after.rules 2> /dev/null; then
-    ufw_docker_present=true
+  if [[ -r /etc/ufw/after.rules ]]; then
+    while IFS= read -r _ufw_line || [[ -n "$_ufw_line" ]]; do
+      if [[ "$_ufw_line" == *"BEGIN UFW AND DOCKER"* ]]; then
+        ufw_docker_present=true
+        break
+      fi
+    done < /etc/ufw/after.rules
   fi
 
   if $dns_rule_present && $ufw_docker_present; then
@@ -143,6 +152,8 @@ _configure_ufw() {
       comment 'allow-docker-dns' &> /dev/null
   fi
 
+  # The mutable upstream helper is streamed into a root shell; output is
+  # suppressed and the function returns 0 without validating the helper result.
   if ! $ufw_docker_present; then
     local ufw_docker_url="https://raw.githubusercontent.com/chaifeng/ufw-docker/refs/heads/master/ufw-docker"
     curl -ssfL "$ufw_docker_url" | sudo bash -s -- install &> /dev/null
@@ -151,22 +162,30 @@ _configure_ufw() {
   return 0 # applied
 }
 
-# ─────────────────────────────────────────────────────────────
-
-term::show_header
 term::disable_input
 
+# The early return treats an enabled Docker unit as a complete installation;
+# active state and configuration drift are not reconciled.
 if systemctl -q is-enabled docker.socket 2> /dev/null ||
   systemctl -q is-enabled docker.service 2> /dev/null; then
-  vb::print "$G" "Docker is already set up and working"
-  _operation_complete
+
+  term::show_header --color green
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result noop -- "Docker is already set up and working"
   exit 0
 fi
+
+term::show_header
 
 vb::print "$Y" "You're about to setup Docker"
 
 if ! term::ask_yes_no Y "Proceed with setup?"; then
-  _operation_canceled
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result canceled
   exit 1
 fi
 
@@ -182,13 +201,15 @@ if term::ask_yes_no Y "Would you like to install LazyDocker as well?"; then
 fi
 
 if ! vb-pkg-install --embedded -- "${PACKAGES[@]}"; then
-  _operation_canceled
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result error
   exit 1
 fi
 
 summary_rules=()
 
-# ── Systemd unit ──────────────────────────────────────────────
 if term::ask_yes_no Y "Enable systemd socket? (${G}recommended${RS} - starts Docker on first use)"; then
   term::disable_input
   vb::print "$Y" "Enabling docker.socket"
@@ -200,21 +221,18 @@ else
   summary_rules+=("Docker unit: ${G}docker.service${RS} enabled and started")
 fi
 
-# ── Daemon configuration ──────────────────────────────────────
 if _configure_daemon; then
   summary_rules+=("Daemon config: ${G}written${RS} (log rotation, DNS bridge)")
 else
   summary_rules+=("Daemon config: ${P}unchanged${RS}")
 fi
 
-# ── systemd-resolved DNS stub ─────────────────────────────────
 if _configure_resolved; then
   summary_rules+=("systemd-resolved: ${G}updated${RS} (172.17.0.1 stub listener added)")
 else
   summary_rules+=("systemd-resolved: ${P}unchanged${RS}")
 fi
 
-# ── Boot-block prevention ─────────────────────────────────────
 if _configure_no_block_boot; then
   sudo systemctl daemon-reload
   summary_rules+=("Boot-block drop-in: ${G}written${RS}")
@@ -222,7 +240,6 @@ else
   summary_rules+=("Boot-block drop-in: ${P}unchanged${RS}")
 fi
 
-# ── UFW firewall rules ────────────────────────────────────────
 _configure_ufw
 case $? in
   0)
@@ -236,7 +253,6 @@ case $? in
     ;;
 esac
 
-# ── Docker group ──────────────────────────────────────────────
 if _add_user_to_group; then
   vb::print "$Y" "A re-login is needed for the group change to take effect"
   summary_rules+=("User ${P}${USER}${RS}: ${G}added${RS} to the ${P}docker${RS} group (re-login required)")
@@ -247,11 +263,14 @@ fi
 vb::print "$B" "If you want to fine-tune your Docker configuration, consider reading ${B}docker(1)${RS}"
 
 echo ""
-vb::print "$B" "── Summary ─────────────────────────────"
+vb::print "$B" "-- Summary -----------------------------"
 for rule in "${summary_rules[@]}"; do
   vb::print "$B" " • $rule"
 done
-vb::print "$B" "─────────────────────────────────────────"
+vb::print "$B" "-----------------------------------------"
 echo ""
 
-_operation_complete
+if [[ -z "${term_original_settings:-}" ]]; then
+  term::disable_input
+fi
+operation::result success -- "Setup complete"

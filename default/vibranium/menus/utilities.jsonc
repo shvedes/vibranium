@@ -1,0 +1,112 @@
+{
+  "id": "utilities",
+  "label": "Utilities",
+  "items": [
+    {
+      "id": "timer",
+      "type": "number",
+      "label": "Timer",
+      "icon": "timer",
+      "min": 1,
+      "max": 180,
+      "step": 1,
+      "value": 5,
+      "unit": "min",
+      "sub": "A basic countdown timer",
+      "desc": "Set a countdown timer in minutes.",
+      "close": true
+    },
+    {
+      "id": "caffeine",
+      "type": "select",
+      "label": "Caffeine",
+      "sub": "Block system sleep",
+      "icon": "caffeine",
+      "value": "300",
+      "marker": false,
+      "options": [
+        {
+          "label": "5 min",
+          "value": "300"
+        },
+        {
+          "label": "10 min",
+          "value": "600"
+        },
+        {
+          "label": "15 min",
+          "value": "900"
+        },
+        {
+          "label": "30 min",
+          "value": "1800"
+        },
+        {
+          "label": "Infinite",
+          "value": "0"
+        }
+      ],
+      "onCall": "inhibitor start %v",
+      "desc": "Prevent system from sleep for a fixed time.",
+      "close": true
+    },
+    {
+      "id": "recording",
+      "type": "action",
+      "label": "Recording",
+      "icon": "recording",
+      "sub": "Screen recording",
+      "call": "recording toggle",
+      "close": true
+    },
+    {
+      "type": "separator"
+    },
+    {
+      "id": "reading.mode",
+      "type": "toggle",
+      "label": "Reading mode",
+      "sub": "Apply grayscale shader",
+      "icon": "book",
+      "checked": "[[ -f $XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua ]]",
+      "onToggle": "vb-toggle-reading-mode",
+      "close": true,
+      "desc": "Applies a grayscale screen shader to reduce eyestrain.",
+      "warning": "Visible on screenshots and screen recordings!"
+    },
+    {
+      "id": "copy.track",
+      "type": "action",
+      "label": "Copy current track",
+      "sub": "Copy currently playing track",
+      "icon": "music",
+      "command": "vb-cmd-copy-track --notify",
+      "when": "{ mpc status 2>/dev/null; playerctl status 2>/dev/null; } | grep -qiE '\\[playing\\]|^Playing'"
+    },
+    {
+      "type": "separator"
+    },
+    {
+      "id": "reload",
+      "type": "action",
+      "label": "Reload Vibranium",
+      "icon": "update",
+      "command": "vb-cmd-reload --quiet"
+    },
+    {
+      "id": "close.windows",
+      "type": "action",
+      "label": "Close all windows",
+      "icon": "xmark",
+      "command": "hyprctl -q eval 'Hypr.Helpers.CloseWindows()'",
+      "close": true,
+      "confirm": {
+        "stages": 2,
+        "hint": "Press <b>Enter</b> again to close all windows",
+        "armed": "<b><u>Press again to confirm</u></b>",
+        "label": "Close all windows",
+        "command": "hyprctl -q eval 'Hypr.Helpers.CloseWindows()'"
+      }
+    }
+  ]
+}

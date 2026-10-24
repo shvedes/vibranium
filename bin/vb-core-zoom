@@ -39,6 +39,9 @@ _to_int100() {
   local val="$2"
   local int_part frac_part
 
+  # The fractional field is padded or truncated to two digits and parsed
+  # with 10#; the integer part is not separately normalized, and malformed
+  # input is left to the arithmetic that follows.
   int_part="${val%.*}"
   if [[ "$val" == *.* ]]; then
     frac_part="${val#*.}"
@@ -53,15 +56,17 @@ _to_int100() {
 
 # Reverse of _to_int100: convert a x100 integer back to a decimal string
 # with two fractional digits (e.g. 150 -> "1.50").
+# Division and remainder are signed integer operations; this formatter does
+# not clamp values below 100, although the action paths normally produce 100
+# or greater after their own checks.
 _from_int100() {
   local -n _result="$1"
   local val100="$2"
   printf -v _result "%d.%02d" $((val100 / 100)) $((val100 % 100))
 }
 
-# Read the zoom state file (x100 integer, defaults to 100 = 1.00).
-# The file may contain arbitrary content from an interrupted write; guard
-# against non-numeric values by falling back to 100.
+# Read one integer from the zoom state file, defaulting to 100 when the path
+# is absent, the first line cannot be read, or its value is nonnumeric.
 read_state100() {
   local -n ref=$1
   local v=100
@@ -79,9 +84,8 @@ read_state100() {
   ref=$v
 }
 
-# Persist the zoom level as a x100 integer. When zoom is reset to 1.00
-# (the default) remove the state file so read_state100 returns the
-# default without any I/O.
+# Store a non-default zoom as an x100 integer. At 1.00, remove an existing
+# state file; if no file exists, the normal write records the default.
 write_state100() {
   local new100="$1"
 
@@ -95,11 +99,9 @@ write_state100() {
   printf '%s\n' "$new100" > "$STATE_FILE"
 }
 
-# Apply the zoom factor to Hyprland using its Lua-style config eval API.
-# Hyprland's cursor.zoom_factor controls the display magnification.
-# cursor.no_warps is intentionally not set here: the old --batch path
-# (commented out below) used both, but the current hl.config approach
-# only sets zoom_factor; no_warps remains at the user's global default.
+# Apply zoom_factor through hl.config; cursor.no_warps is left at the user's
+# global setting. The generated decimal contains only digits and one dot, so
+# interpolation cannot inherit caller formatting from STEP.
 apply_zoom100() {
   local new100="$1"
   local new_float
@@ -109,6 +111,7 @@ apply_zoom100() {
   hyprctl -q eval "hl.config({cursor = {zoom_factor = ${new_float}}})"
 }
 
+# The parser allows repeated action flags; the last action encountered wins.
 while (($#)); do
   case "$1" in
     -i | --increase)
@@ -179,6 +182,8 @@ current100=
 step100=
 zoom100=
 
+# Step and zoom strings have no separate lexical validator; conversion and
+# the arithmetic checks below determine whether they are usable.
 _to_int100 step100 "$STEP"
 
 if ((step100 <= 0)); then
@@ -195,12 +200,16 @@ if [[ "$ACTION" == "set" ]]; then
   fi
 fi
 
+# State is loaded after argument validation, while the persisted value can
+# still be arbitrary text; the reader supplies the safe arithmetic default.
 read_state100 current100
 
 case "$ACTION" in
   increase)
     new100=$((current100 + step100))
     ;;
+  # Decrease is a saturating operation at 1.00; it does not encode a requested
+  # lower zoom or leave a negative value in the state file.
   decrease)
     new100=$((current100 - step100))
     ((new100 < 100)) && new100=100
@@ -221,6 +230,8 @@ _from_int100 current_float "$current100"
 _from_int100 new_float "$new100"
 log Info "Zoom: $current_float -> $new_float"
 
+# Persistence is conditional on hyprctl success, so a failed compositor
+# update cannot make the next invocation believe the new level is active.
 if apply_zoom100 "$new100"; then
   write_state100 "$new100"
 fi

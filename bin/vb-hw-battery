@@ -5,7 +5,7 @@ source vb-lib-cli
 VERBOSE=${VERBOSE:-false}
 
 usage() {
-  shcat << EOF
+	shcat << EOF
 Usage: ${0##*/} [OPTION]
 
 Check whether a battery is present and active in /sys/class/power_supply.
@@ -22,30 +22,40 @@ EOF
 }
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    -v | --verbose)
-      export VERBOSE=true
-      shift
-      ;;
-    *)
-      break
-      ;;
-  esac
+	case "$1" in
+		-h | --help)
+			usage
+			exit 0
+			;;
+		-v | --verbose)
+			export VERBOSE=true
+			shift
+			;;
+		*)
+			break
+			;;
+	esac
 done
 
+# An unmatched glob remains a literal path when no battery directory exists, so
+# the readability check is also the guard against probing a nonexistent node.
+# Both sysfs predicates are required because a power_supply node can expose a
+# present flag while its type identifies a different device class.
 for bat in /sys/class/power_supply/BAT*; do
-  if [[ -r $bat/present ]]; then
-    if [[ $(< "$bat"/present) == "1" ]]; then
-      if [[ $(< "$bat"/type) == "Battery" ]]; then
-        log Info "Battery found: $bat"
-        exit 0
-      fi
-    fi
-  fi
+	if [[ -r $bat/present ]]; then
+		_present=
+		_type=
+
+		read -r _present < "$bat/present" 2> /dev/null || _present=
+		read -r _type < "$bat/type" 2> /dev/null || _type=
+
+		if [[ $_present == "1" ]]; then
+			if [[ $_type == "Battery" ]]; then
+				log Info "Battery found: $bat"
+				exit 0
+			fi
+		fi
+	fi
 done
 
 log Info "No battery detected"

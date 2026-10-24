@@ -1,0 +1,3 @@
+module qs.features.apps
+
+singleton AppHost 1.0 AppHost.qml

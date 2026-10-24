@@ -3,6 +3,8 @@
 TIMESTAMP="$(git -C "$VIBRANIUM" log -1 --format=%cd --date=unix)"
 FILE="$VIBRANIUM/migrations/${TIMESTAMP}.sh"
 
+# HEAD's committer timestamp gives the migration a deterministic Unix-seconds
+# name; chronological order relies on filename width and lexical sorting.
 # Write the template into RAM; the destination file is never touched unless
 # the user actually edits the content.
 tmp="/dev/shm/vb-migration-$TIMESTAMP.sh"
@@ -21,8 +23,10 @@ SELF="${SELF/.sh/}"
 echo "${GREEN}[MIGRATION|$SELF]${RESET} Message"
 EOF
 
-template_hash="$(sha256sum "$tmp" | cut -d' ' -f1)"
+read -r template_hash _ < <(sha256sum "$tmp")
 
+# EDITOR is one executable path, not a shell command line. The nvim branch
+# supplies insertion defaults because other editors receive only the file path.
 if [[ -z "${EDITOR:-}" || ${EDITOR##*/} == nvim ]]; then
   nvim +8 +'startinsert' "$tmp"
 else
@@ -34,9 +38,15 @@ if ! [[ -f "$tmp" ]]; then
   exit 0
 fi
 
-current_hash="$(sha256sum "$tmp" | cut -d' ' -f1)"
+read -r current_hash _ < <(sha256sum "$tmp")
 
+# Final content alone determines acceptance. Any net edit is accepted, while
+# an edit that restores the template exactly leaves no repository file.
 if [[ "$current_hash" != "$template_hash" ]]; then
+  # /dev/shm and the repository can use different filesystems, so mv may fall
+  # back to copy-and-unlink rather than providing atomic rename semantics.
   mv "$tmp" "$FILE"
+  # This empty state file is a handled marker, not evidence that the migration
+  # has run. If marker creation fails, the repository script remains eligible.
   : > "$VIBRANIUM_STATE/migrations/${TIMESTAMP}.sh"
 fi

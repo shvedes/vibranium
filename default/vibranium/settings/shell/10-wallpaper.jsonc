@@ -1,0 +1,248 @@
+// Shell-owned pages (shell.*) for the Settings store.
+// Directory decides namespace: every option here must be shell.
+{
+  "pages": [
+    {
+      "label": "General",
+      "icon": "settings-general",
+      "showItemCount": true,
+      "items": [
+        {
+          "type": "separator"
+        },
+        {
+          "type": "action",
+          "label": "Edit environment",
+          "sub": "Edit session environment variables",
+          "icon": "file",
+          "command": "xdg-terminal-exec --app-id=org.vb.term -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/vibranium/environment"
+        },
+        {
+          "type": "action",
+          "label": "Font selection",
+          "sub": "System font",
+          "icon": "font",
+          "call": "fontPicker open",
+          "keepOpen": true
+        },
+        {
+          "type": "action",
+          "label": "User wallpapers",
+          "sub": "View and manage wallpapers",
+          "icon": "file-image",
+          "call": "wallpaperPicker open"
+        }
+      ],
+      "options": [
+        {
+          "key": "shell.privacy.overlay",
+          "type": "bool",
+          "default": true,
+          "label": "Privacy dots",
+          "sub": "Always-visible capture indicator",
+          "desc": "Draw the capture dots on their own overlay surface."
+        },
+        {
+          "key": "shell.privacy.position",
+          "type": "string",
+          "default": "top-right",
+          "label": "Position",
+          "sub": "Corner holding the dots",
+          "desc": "Which screen corner the dots sit in.",
+          "values": [
+            "top-right",
+            "top-left",
+            "bottom-right",
+            "bottom-left"
+          ],
+          "valueLabels": {
+            "top-right": "Top right",
+            "top-left": "Top left",
+            "bottom-right": "Bottom right",
+            "bottom-left": "Bottom left"
+          },
+          "showIf": [
+            {
+              "key": "shell.privacy.overlay",
+              "eq": true
+            }
+          ]
+        },
+        {
+          "key": "shell.wallpaper.enabled",
+          "type": "bool",
+          "default": true,
+          "label": "Show wallpaper",
+          "sub": "Show desktop background",
+          "desc": "Whether to display desktop background"
+        },
+        {
+          "key": "shell.wallpaper.transition",
+          "type": "string",
+          "default": "fade",
+          "label": "Transition",
+          "sub": "Wallpaper swap animation",
+          "desc": "How the new wallpaper replaces the old one.",
+          "values": [
+            "none",
+            "fade",
+            "slide",
+            "swipe",
+            "circle",
+            "random"
+          ],
+          "valueLabels": {
+            "none": "None",
+            "fade": "Fade",
+            "slide": "Slide",
+            "swipe": "Swipe",
+            "circle": "Circle",
+            "random": "Random"
+          },
+          "showIf": [
+            {
+              "key": "shell.wallpaper.enabled",
+              "eq": true
+            },
+            {
+              "key": "hypr.animations.enabled",
+              "eq": true
+            }
+          ]
+        },
+        {
+          "key": "shell.wallpaper.transitionSpeed",
+          "type": "string",
+          "default": "default",
+          "label": "Transition speed",
+          "sub": "How fast swaps play",
+          "desc": "Duration applied to every transition type.",
+          "values": [
+            "slow",
+            "default",
+            "fast"
+          ],
+          "valueLabels": {
+            "slow": "Slow",
+            "default": "Default",
+            "fast": "Fast"
+          },
+          "showIf": [
+            {
+              "key": "shell.wallpaper.enabled",
+              "eq": true
+            },
+            {
+              "key": "shell.wallpaper.transition",
+              "neq": "none"
+            },
+            {
+              "key": "hypr.animations.enabled",
+              "eq": true
+            }
+          ]
+        },
+        {
+          "key": "shell.wallpaper.mosaic",
+          "type": "bool",
+          "default": false,
+          "label": "Show mosaic",
+          "sub": "Random monochrome emoji pattern",
+          "desc": "Whether to show emoji grid when wallpaper is off.",
+          "showIf": [
+            {
+              "key": "shell.wallpaper.enabled",
+              "eq": false
+            }
+          ]
+        },
+        {
+          "key": "shell.wallpaper.mosaicIntensity",
+          "type": "string",
+          "default": "medium",
+          "label": "Mosaic density",
+          "sub": "How many symbols are drawn",
+          "desc": "Density level of the mosaic symbols.",
+          "values": [
+            "sparse",
+            "medium",
+            "dense"
+          ],
+          "valueLabels": {
+            "sparse": "Sparse",
+            "medium": "Medium",
+            "dense": "Dense"
+          },
+          "showIf": [
+            {
+              "key": "shell.wallpaper.mosaic",
+              "eq": true
+            }
+          ]
+        },
+        {
+          "key": "shell.wallpaper.mosaicSize",
+          "type": "string",
+          "default": "medium",
+          "label": "Symbol size",
+          "sub": "Size of the mosaic symbols",
+          "desc": "Base size of the mosaic symbols.",
+          "values": [
+            "small",
+            "medium",
+            "large",
+            "very_large"
+          ],
+          "valueLabels": {
+            "small": "Small",
+            "medium": "Medium",
+            "large": "Large",
+            "very_large": "Very large"
+          },
+          "showIf": [
+            {
+              "key": "shell.wallpaper.mosaic",
+              "eq": true
+            }
+          ]
+        },
+        {
+          "key": "misc.cursorTheme",
+          "type": "string",
+          "default": "Adwaita",
+          "label": "Cursor theme",
+          "values": [
+            "Adwaita"
+          ],
+          "valueLabels": {
+            "Adwaita": "Adwaita"
+          }
+        },
+        {
+          "key": "misc.cursorSize",
+          "type": "int",
+          "default": 24,
+          "label": "Cursor size",
+          "range": {
+            "min": 16,
+            "max": 200
+          },
+          "step": 1,
+          "unit": " px",
+          "values": [
+            16,
+            24,
+            32,
+            48
+          ],
+          "valueLabels": {
+            "16": "16 px",
+            "24": "24 px",
+            "32": "32 px",
+            "48": "48 px"
+          }
+        }
+      ]
+    }
+  ]
+}

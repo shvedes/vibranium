@@ -34,5 +34,5 @@ The menu interface supports common password store operations:
 ## Clipboard handling
 
 Copied passwords are handled specially.  
-After copying a password, it will not appear in normal clipboard history (++control+v++).  
+After copying a password, it will not appear in normal clipboard history (++super+v++).  
 However, it remains available for the intended paste operation.

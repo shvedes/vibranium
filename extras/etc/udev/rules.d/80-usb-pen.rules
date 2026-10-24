@@ -1,2 +1,0 @@
-ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd*", SUBSYSTEMS=="usb", RUN+="/usr/local/bin/su-bridge --user -- vb-udev-usb-notify --add --devname=$env{DEVNAME} --id-model=$env{ID_MODEL}"
-ACTION=="remove", SUBSYSTEM=="block", KERNEL=="sd*", SUBSYSTEMS=="usb", RUN+="/usr/local/bin/su-bridge --user -- vb-udev-usb-notify --remove --devname=$env{DEVNAME}"

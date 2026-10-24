@@ -1,0 +1,221 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+SELF="${0##*/}"
+
+usage() {
+	shcat << EOF
+Usage: $SELF [OPTIONS] [--meta] [--ssid SSID] [interface]
+
+Generate a Wi-Fi QR matrix.
+
+Options:
+  --meta         Emit a meta header line before the matrix
+  --ssid SSID    Share a saved network by SSID instead of the active one
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
+set -euo pipefail
+
+# Resolve a saved connection profile by its wireless SSID. Profile names
+# often equal the SSID but must not be trusted to, so match the
+# 802-11-wireless.ssid field instead. UUID and TYPE columns hold no
+# colons, so the terse table parses safely.
+uuid_for_ssid() {
+	local -n _uuid_for_ssid_out=$1
+	local want="$2" uuid
+	while IFS= read -r uuid; do
+		[[ -n "$uuid" ]] || continue
+		local s
+
+		IFS= read -r s < <(nmcli --get-values 802-11-wireless.ssid connection show uuid "$uuid" 2> /dev/null) || true
+
+		if [[ "$s" == "$want" ]]; then
+			_uuid_for_ssid_out="$uuid"
+			return 0
+		fi
+
+	done < <(
+		while IFS=: read -r _u _type _rest; do
+			[[ $_type == "802-11-wireless" ]] && printf '%s\n' "$_u"
+		done < <(nmcli -t -f UUID,TYPE connection show 2> /dev/null)
+	)
+	return 1
+}
+
+interface=""
+want_ssid=""
+emit_meta=false
+
+while (($# > 0)); do
+	case "$1" in
+		-v | --verbose)
+			export VERBOSE=true
+			shift
+			;;
+		-h | --help)
+			usage
+			exit 0
+			;;
+		--meta)
+			emit_meta=true
+			shift
+			;;
+		--ssid)
+			want_ssid="${2:?Option --ssid needs an SSID}"
+			shift 2
+			;;
+		--)
+			shift
+			break
+			;;
+		-*)
+			log Error "unknown option: $1"
+			log Error "Try '$SELF --help' for more information"
+			exit 1
+			;;
+		*)
+			interface="$1"
+			shift
+			;;
+	esac
+done
+
+uuid=""
+
+if [[ -n "$want_ssid" ]]; then
+	if ! uuid_for_ssid uuid "$want_ssid"; then
+		echo "No saved connection for '$want_ssid'" >&2
+		exit 1
+	fi
+else
+	if [[ -z "$interface" ]]; then
+		# The route probe targets 1.1.1.1; accept its device only when sysfs marks
+		# it wireless, otherwise select the first connected NetworkManager Wi-Fi
+		# device. Pin the locale and accept connected states by prefix.
+		route_device=""
+		while IFS= read -r _route_line; do
+			read -ra _route_words <<< "$_route_line"
+			for ((i = 0; i + 1 < ${#_route_words[@]}; i++)); do
+				if [[ ${_route_words[i]} == "dev" ]]; then
+					route_device=${_route_words[i + 1]}
+					break 2
+				fi
+			done
+		done < <(ip route get 1.1.1.1 2> /dev/null)
+
+		if [[ -n "$route_device" && -d "/sys/class/net/$route_device/wireless" ]]; then
+			interface="$route_device"
+		else
+			interface=""
+			while IFS=: read -r _dev _type _state _rest; do
+				if [[ $_type == "wifi" && $_state == connected* ]]; then
+					interface=$_dev
+					break
+				fi
+			done < <(LC_ALL=C nmcli -t -f DEVICE,TYPE,STATE device status 2> /dev/null)
+		fi
+	fi
+
+	if [[ -z "$interface" ]]; then
+		echo "No active Wi-Fi connection" >&2
+		exit 1
+	fi
+
+	uuid=""
+	IFS= read -r uuid < <(nmcli --get-values GENERAL.CON-UUID device show "$interface" 2> /dev/null) || true
+	if [[ -z "$uuid" || "$uuid" == "--" ]]; then
+		echo "No active Wi-Fi connection" >&2
+		exit 1
+	fi
+fi
+
+# Request all fields in one call with NetworkManager escaping disabled so the
+# QR escaper is the only layer that serializes reserved characters.
+mapfile -t fields < <(nmcli --show-secrets --escape no --get-values \
+	802-11-wireless.ssid,802-11-wireless-security.key-mgmt,802-11-wireless-security.psk,802-11-wireless.hidden,802-11-wireless-security.wep-key0 \
+	connection show uuid "$uuid")
+
+ssid=${fields[0]:-}
+key_management=${fields[1]:-}
+password=${fields[2]:-}
+hidden=${fields[3]:-no}
+wep_key=${fields[4]:-}
+
+if [[ -z "$ssid" ]]; then
+	echo "Could not read the Wi-Fi name" >&2
+	exit 1
+fi
+
+if [[ "$key_management" == *eap* || "$key_management" == *ieee8021x* ]]; then
+	echo "Enterprise Wi-Fi cannot be shared with a password QR code" >&2
+	exit 1
+fi
+
+escape_wifi_qr() {
+	local -n _escape_wifi_qr_out=$1
+	local value="$2"
+	# Escape the backslash first; otherwise the backslashes added for later
+	# delimiters would be escaped a second time and the payload would change.
+	value=${value//\\/\\\\}
+	value=${value//;/\\;}
+	value=${value//,/\\,}
+	value=${value//:/\\:}
+	_escape_wifi_qr_out="$value"
+}
+
+# A nonempty key-management value with no PSK is an incomplete secret profile;
+# fail rather than construct a payload that a scanner could interpret as open.
+if [[ -n "$key_management" && "$key_management" != "none" ]]; then
+	if [[ -z "$password" ]]; then
+		echo "Could not read the Wi-Fi password" >&2
+		exit 1
+	fi
+	security=WPA
+elif [[ -n "$wep_key" ]]; then
+	# NetworkManager models WEP as key-mgmt "none" plus a wep-key; encoding it
+	# as an open network would produce a QR that silently fails to join.
+	password="$wep_key"
+	security=WEP
+else
+	security=nopass
+fi
+
+log Info "Sharing $ssid as $security"
+
+escaped_ssid=""
+escaped_password=""
+escape_wifi_qr escaped_ssid "$ssid"
+escape_wifi_qr escaped_password "$password"
+
+payload="WIFI:T:$security;S:$escaped_ssid;P:$escaped_password;"
+if [[ "$hidden" == "yes" ]]; then
+	payload+="H:true;"
+fi
+payload+=";"
+
+# Metadata carries interface, security, and SSID in that order. A saved
+# profile can leave interface empty; the card fetches the password separately.
+if [[ "$emit_meta" == "true" ]]; then
+	printf 'meta\t%s\t%s\t%s\n' "$interface" "$security" "$ssid"
+fi
+
+# ASCII uses two characters per module. Collapse each pair to one 0/1 value
+# so the shell can render a square matrix directly with native QML rectangles.
+# Margin 4 is the spec quiet zone; the card surround is dark, so this white
+# border is all the scanner gets.
+while IFS= read -r line; do
+	row=
+	for ((column = 0; column < ${#line}; column += 2)); do
+		if [[ "${line:column:2}" == *#* ]]; then
+			row="${row}1"
+		else
+			row="${row}0"
+		fi
+	done
+	printf '%s\n' "$row"
+done < <(printf '%s' "$payload" | qrencode --type ASCII --margin 4 --output -)

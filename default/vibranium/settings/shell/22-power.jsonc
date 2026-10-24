@@ -1,0 +1,112 @@
+// Shell-owned pages (shell.*) for the Settings store.
+// Directory decides namespace: every option here must be shell.
+//
+// requires is a UI hint, not the enforcement. The services gate themselves on
+// hardware facts: the AC policy on UPower.onBattery changing at all, the alert
+// on a device discharging. A machine that never transitions applies nothing,
+// whatever this page offers.
+{
+  "pages": [
+    {
+      "id": "power",
+      "label": "Power",
+      "icon": "power",
+      "showItemCount": true,
+      "options": [
+        {
+          "key": "shell.power.acProfile",
+          "type": "string",
+          "default": "performance",
+          "label": "Power profile (AC)",
+          "desc": "Switch to a specific power profile on AC",
+          "warning": "Falls back to <b>performance</b> then <b>balanced</b> if the configured profile is unavailable.",
+          "values": [
+            "balanced",
+            "performance",
+            "power-saver"
+          ],
+          "valueLabels": {
+            "balanced": "Balanced",
+            "performance": "Performance",
+            "power-saver": "Power saver"
+          },
+          "requires": {
+            "chassis": "laptop"
+          }
+        },
+        {
+          "key": "shell.power.batteryProfile",
+          "type": "string",
+          "default": "last",
+          "label": "Power profile (battery)",
+          "desc": "Switch to a specific power profile on <b>battery</b>",
+          "warning": "<b>Last active</b> is the profile that was active before AC was connected.\nFalls back to <b>balanced</b> if unavailable.",
+          "values": [
+            "last",
+            "balanced",
+            "performance",
+            "power-saver"
+          ],
+          "valueLabels": {
+            "last": "Last active",
+            "balanced": "Balanced",
+            "performance": "Performance",
+            "power-saver": "Power saver"
+          },
+          "requires": {
+            "chassis": "laptop"
+          }
+        },
+        {
+          "key": "shell.power.lowBattery",
+          "type": "bool",
+          "default": true,
+          "label": "Low battery alerts",
+          "sub": "Warn as the battery drains",
+          "desc": "Announce the charge levels a discharging battery crosses."
+        },
+        {
+          "key": "shell.power.warnLevel",
+          "type": "int",
+          "default": 20,
+          "range": {
+            "min": 5,
+            "max": 95
+          },
+          "step": 1,
+          "unit": " %",
+          "label": "Warning level",
+          "sub": "Charge level that warns",
+          "desc": "Charge level at which a discharging battery warns.",
+          "showIf": [
+            {
+              "key": "shell.power.lowBattery",
+              "eq": true
+            }
+          ]
+        },
+        {
+          "key": "shell.power.criticalLevel",
+          "type": "int",
+          "default": 5,
+          "range": {
+            "min": 1,
+            "max": 90
+          },
+          "step": 1,
+          "unit": " %",
+          "label": "Critical level",
+          "sub": "Charge level that warns hard",
+          "desc": "Charge level at which a discharging battery warns critically.",
+          "showIf": [
+            {
+              "key": "shell.power.lowBattery",
+              "eq": true
+            }
+          ]
+        }
+      ],
+      "items": []
+    }
+  ]
+}

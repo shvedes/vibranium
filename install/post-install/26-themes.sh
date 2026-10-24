@@ -63,7 +63,7 @@ mkdir -p "$DEST"
 
 for theme in "${themes[@]}"; do
   ((current++))
-  name="${theme#$PREFIX}"
+  name="${theme#"$PREFIX"}"
   display="${name^}"
   display="${display/-/ }"
 
@@ -71,7 +71,7 @@ for theme in "${themes[@]}"; do
   _spinner "$display" "$frame_file" "$current" "$tag_file" "$total" &
   spinner_pid=$!
 
-  if git clone -q "https://github.com/shvedes/$theme" "$DEST/$name" 2> /dev/null; then
+  if git clone "https://github.com/shvedes/$theme" "$DEST/$name"; then
     ((installed++))
     echo " -> $DEST/$name" > "$tag_file"
   else

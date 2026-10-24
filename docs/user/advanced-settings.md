@@ -21,7 +21,6 @@ Unlike `settings`, this file is not generated or maintained automatically. It is
 The file is used by internal Vibranium components, including:
 
 - `vb-theme-set-templates`
-- `vb-core-launcher`
 - other scripts that require advanced configuration
 
 Typical use cases include:
@@ -67,22 +66,6 @@ Controls which files should always be generated from Vibranium templates, even i
 Normally, theme-provided files take priority. This setting allows forcing specific files to use Vibranium's template system instead.
 
 This is useful for maintaining consistent generated files across themes or for overriding theme-specific implementations.
-
----
-
-## Launcher extensions
-
-Defines additional keywords recognized by the Vibranium launcher.
-
-Each keyword maps a user-facing command to a shell command or a custom function. This allows extending the launcher with personal utilities, shortcuts, and automation.
-
-Actions may use:
-
-* normal shell commands
-* functions from `settings.functions`
-* custom scripts
-
-Launcher keywords can also receive additional arguments typed after the keyword.
 
 ---
 

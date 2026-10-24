@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Image Viewer
+Icon=multimedia-photo-viewer
+Comment=Open images in the shell's image viewer
+TryExec=vb-app-imageviewer
+Exec=vb-app-imageviewer %F
+MimeType=image/jpeg;image/png;image/webp;image/gif;image/avif;image/heif;image/heic;image/svg+xml;image/vnd.adobe.photoshop;image/x-psd;image/x-canon-cr2;image/x-nikon-nef;

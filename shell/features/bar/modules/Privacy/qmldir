@@ -1,0 +1,4 @@
+module qs.features.bar.modules.Privacy
+
+Privacy 1.0 Privacy.qml
+PrivacyIsland 1.0 PrivacyIsland.qml

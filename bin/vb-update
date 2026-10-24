@@ -7,8 +7,18 @@ set -euo pipefail
 
 _pause() {
   term::disable_input
-  # shellcheck disable=SC2034
-  read -n1 -r -p $'\e[0;33m[VIBRANIUM]\e[0m Press any key to exit' dummy
+
+  trap 'printf "\n"; term::enable_input; exit' \
+    SIGHUP SIGINT SIGTERM SIGQUIT
+
+  # The keypress is read from the terminal rather than from stdin, so a
+  # caller that redirected stdin does not end the pause at once or have its
+  # input eaten by it.
+  if term::wait_key $'\e[0;33m[*]\e[0m Press any key to exit'; then
+    printf '\n'
+  fi
+
+  term::enable_input
 }
 
 _fail() {
@@ -17,9 +27,8 @@ _fail() {
   exit 1
 }
 
-# Check for any dirty state (unstaged, staged, or untracked files) and
-# stash them before the pull so the working tree is clean.  The stash
-# is re-applied after the update via _apply_stash / _restore_stash_and_fail.
+# Stash staged, unstaged, and untracked state when porcelain reports any.
+# Fast-forward helpers restore it on success or failure.
 _check_and_stash() {
   if [[ -n "$(git -C "$VIBRANIUM" status --porcelain)" ]]; then
     vb::print "$Y" "Stashing local changes..."
@@ -34,10 +43,6 @@ _check_and_stash() {
     vb::print "$G" "No local changes to stash"
   fi
 
-  if [[ -f "$VIBRANIUM/bin/vb-cmd-edit-wm-config" ]] && file "$VIBRANIUM/bin/vb-cmd-edit-wm-config" | grep -q ELF; then
-    rm -f "$VIBRANIUM/bin/vb-cmd-edit-wm-config"
-    vb::print "$Y" "Removed old compiled vb-cmd-edit-wm-config"
-  fi
 }
 
 _apply_stash() {
@@ -75,14 +80,15 @@ EOF
 }
 
 _detect_channel() {
-  local branch
-  branch=$(git -C "$VIBRANIUM" branch --show-current)
-  if [[ -z "$branch" ]]; then
-    echo "release"
-  elif [[ "$branch" == "master" ]]; then
-    echo "upstream"
+  local -n _dc_out=$1
+  local _dc_branch
+  _dc_branch=$(git -C "$VIBRANIUM" branch --show-current)
+  if [[ -z "$_dc_branch" ]]; then
+    _dc_out="release"
+  elif [[ "$_dc_branch" == "master" ]]; then
+    _dc_out="upstream"
   else
-    _fail "On unknown branch '$branch'. Specify a channel."
+    _fail "On unknown branch '$_dc_branch'."
   fi
 }
 
@@ -92,7 +98,7 @@ _nuke() {
   if [[ -n "$channel_arg" ]]; then
     channel="$channel_arg"
   else
-    channel="$(_detect_channel)"
+    _detect_channel channel
   fi
 
   vb::print "$R" "WARNING: This will DISCARD ALL local changes, stashes, and untracked files."
@@ -109,7 +115,7 @@ _nuke() {
   fi
 
   git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &> /dev/null &
-  if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Fetching latest from remote..." "${G}✔${RS}" "${R}✘${RS}"; then
+  if ! term::spinner $! "${Y}[*]${RS} Fetching latest from remote..." "${G}✔${RS}" "${R}✘${RS}"; then
     _fail "Failed to fetch updates."
   fi
 
@@ -136,6 +142,8 @@ _nuke() {
     target="$remote_ref"
   fi
 
+  # Reset, clean, and stash clear intentionally run in that order: tracked
+  # content, untracked or ignored content, then recoverable snapshots.
   vb::print "$Y" "Resetting to $target..."
   if ! git -C "$VIBRANIUM" reset --hard "$target"; then
     _fail "Failed to reset to $target."
@@ -148,7 +156,6 @@ _nuke() {
   git -C "$VIBRANIUM" stash clear
 
   rm -f "$VIBRANIUM_STATE/update.available" || true
-  vb-refresh-waybar-module vb-update
   vb::print "$G" "Repository reset to clean state"
 }
 
@@ -160,21 +167,25 @@ _update() {
   if [[ -n "$channel_arg" ]]; then
     channel="$channel_arg"
   else
-    channel="$(_detect_channel)"
+    _detect_channel channel
   fi
 
+  # Fetch remote refs while local changes remain visible. Availability is
+  # decided while the worktree is intact, minimizing the disruptive window.
   git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &> /dev/null &
-  if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Getting updates from remote" "" ""; then
+  if ! term::spinner $! "${Y}[*]${RS} Getting updates from remote" "" ""; then
     _fail "Failed to fetch updates. Check your network or repository permissions."
   fi
 
   if [[ "$channel" == "release" ]]; then
     local latest_tag current_tag latest_commit current_commit
 
+    # Version sorting chooses the highest tag across all local tag refs; unlike
+    # git describe, this selection does not require reachability from HEAD.
     latest_tag=$(git -C "$VIBRANIUM" for-each-ref --sort=-version:refname --format='%(refname:short)' --count=1 'refs/tags/*')
 
     # Use ^{} to dereference annotated tags to their underlying commit,
-    # so the comparison against HEAD (always a commit hash) is valid
+    # so the comparison against HEAD (always a commit hash) is valid.
     latest_commit=$(git -C "$VIBRANIUM" rev-parse "${latest_tag}^{}")
     current_commit=$(git -C "$VIBRANIUM" rev-parse HEAD)
     current_tag=$(git -C "$VIBRANIUM" describe --tags --exact-match --always --abbrev=7 2> /dev/null)
@@ -182,10 +193,12 @@ _update() {
     vb::print "$Y" "Local:  $current_tag ($current_commit)"
     vb::print "$Y" "Remote: $latest_tag ($latest_commit)"
 
+    # Equality is the only up-to-date result. Any unequal HEAD reaches the dirty-tree
+    # check and guarded fast-forward, which succeeds when the selected tag is a
+    # descendant and fails for local-only or divergent history.
     if [[ "$current_commit" == "$latest_commit" ]]; then
       vb::print "$G" "You are up to date"
       rm -f "$VIBRANIUM_STATE/update.available" || true
-      vb-refresh-waybar-module vb-update
       _pause
       exit 0
     fi
@@ -199,7 +212,11 @@ _update() {
 
     _apply_stash
 
+    # Migration code starts only after user state restoration, so it sees the
+    # final worktree. A stash conflict blocks migration execution.
     if ! vb-update-migrate; then
+      # The fast-forward and stash restoration remain in place; no rollback is
+      # attempted because repository history already contains the update.
       _fail "Update to $latest_tag succeeded but migration failed. Please check manually."
     fi
 
@@ -231,6 +248,8 @@ _update() {
     vb::print "$Y" "Local:  $current_short ($current_commit)"
     vb::print "$Y" "Remote: $remote_short ($remote_commit)"
 
+    # behind == 0 leaves the worktree untouched, including dirty state. A positive
+    # remote-only count triggers the guarded fast-forward even for divergent HEAD.
     if ((behind == 0)); then
       if [[ "$current_commit" == "$remote_commit" ]]; then
         vb::print "$G" "You are up to date"
@@ -240,7 +259,6 @@ _update() {
         vb::print "$G" "You are $ahead commit(s) ahead of remote, nothing to pull"
       fi
       rm -f "$VIBRANIUM_STATE/update.available" || true
-      vb-refresh-waybar-module vb-update
       _pause
       exit 0
     fi
@@ -265,11 +283,13 @@ _update() {
     vb::print "$G" "Vibranium updated to $remote_short ($channel)"
   fi
 
-  # Reload the configuration
+  # Detached reloads keep update completion independent of service startup
+  # latency and deliberately do not wait for either command to exit.
   setsid -f vb-cmd-reload --quiet
 
-  # And also reload the current theme in case if it was changed.
-  setsid -f vb-theme-set --force "$(< "$VIBRANIUM_STATE/theme.name")"
+  _upd_theme=""
+  IFS= read -r _upd_theme < "$VIBRANIUM_STATE/theme.name" || [[ -n $_upd_theme ]]
+  setsid -f vb-theme-set --force "$_upd_theme"
 
   _pause
 }
@@ -315,9 +335,11 @@ if [[ "$nuke" == true ]]; then
 fi
 
 if term::ask_yes_no Y "Proceed with update?"; then
+  term::disable_input
   _update
+  # Up-to-date branches remove the marker and exit inside _update. Reaching this
+  # line means the update path returned, so the successful path clears it here.
   rm -f "$VIBRANIUM_STATE/update.available"
-  vb-refresh-waybar-module vb-update
 else
   vb::print "$R" "Operation aborted"
   _pause

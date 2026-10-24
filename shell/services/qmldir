@@ -1,0 +1,23 @@
+module qs.services
+
+singleton Audio 1.0 audio/Audio.qml
+singleton PipeWireState 1.0 audio/PipeWireState.qml
+singleton Timer 1.0 media/Timer.qml
+singleton Recording 1.0 media/Recording.qml
+singleton MediaState 1.0 media/MediaState.qml
+singleton MediaArt 1.0 media/MediaArt.qml
+singleton MediaEvents 1.0 media/MediaEvents.qml
+singleton Screenshots 1.0 screenshots/Screenshots.qml
+singleton Session 1.0 session/Session.qml
+singleton IdleDaemon 1.0 session/IdleDaemon.qml
+singleton Inhibitor 1.0 power/Inhibitor.qml
+singleton Update 1.0 system/Update.qml
+singleton ArchUpdates 1.0 system/ArchUpdates.qml
+singleton PowerProfile 1.0 power/PowerProfile.qml
+singleton PowerPolicy 1.0 power/PowerPolicy.qml
+singleton BatteryAlert 1.0 power/BatteryAlert.qml
+singleton Connectivity 1.0 system/Connectivity.qml
+singleton Keyboard 1.0 system/Keyboard.qml
+singleton Printers 1.0 system/Printers.qml
+singleton Privacy 1.0 privacy/Privacy.qml
+singleton Weather 1.0 weather/Weather.qml

@@ -1,0 +1,97 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+
+SELF="${0##*/}"
+
+usage() {
+  shcat << EOF
+Usage: $SELF [OPTION] [DIR]
+
+Rebuild the fontconfig caches and rescan the shell's font list.
+
+The rescan runs after the rebuild because fc-list reads the rebuilt caches, so
+a list re-derived from stale caches is the very list that is missing the font
+that was just installed. With no DIR every font directory is rebuilt; with one
+only that directory is, which is what a user-local font change needs.
+
+Exit status is 0 when the rescan reached the shell, 1 otherwise. A missing
+fc-cache is reported but does not stop the rescan, which still reads whatever
+caches do exist.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      # Treat every remaining token as a font directory rather than an option.
+      shift
+      break
+      ;;
+    -*)
+      log Error "unknown option: $1"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# Shared settings are loaded only after option validation, so help and invalid
+# argument paths do not source the runtime settings projection.
+source vb-lib-core
+
+if (($# > 1)); then
+  log Error "expected at most one font directory, got $#"
+  log Error "Try '$SELF --help' for more information"
+  exit 1
+fi
+
+TARGET_DIR="${1:-}"
+
+if [[ -n "$TARGET_DIR" && ! -d "$TARGET_DIR" ]]; then
+  log Error "not a font directory: $TARGET_DIR"
+  log Error "Try '$SELF --help' for more information"
+  exit 1
+fi
+
+# Fontconfig tooling is optional in a minimal installation. A missing fc-cache
+# leaves nothing to rebuild, so it is reported and the rescan still runs.
+if command -v fc-cache > /dev/null 2>&1; then
+  if [[ -n "$TARGET_DIR" ]]; then
+    log Info "Rebuilding font cache for $TARGET_DIR"
+    fc-cache "$TARGET_DIR" > /dev/null 2>&1
+  else
+    log Info "Rebuilding font cache"
+    # A full rebuild ignores timestamps and re-scans every font directory.
+    # Without -f only directories whose mtime changed are considered, which a
+    # package transaction that replaced files in place does not always produce.
+    fc-cache -f > /dev/null 2>&1
+  fi
+else
+  log Error "fc-cache not found, skipping the font cache rebuild"
+fi
+
+log Info "Rescanning the shell font list"
+if ! vb-shell fontPicker refresh > /dev/null 2>&1; then
+  log Error "the shell rejected the rescan; is the Vibranium shell running?"
+  exit 1
+fi
+
+log Info "Done"

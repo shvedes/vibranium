@@ -1,0 +1,4 @@
+module qs.features.wallpaper
+
+singleton Wallpaper 1.0 Wallpaper.qml
+WallpaperView 1.0 WallpaperView.qml
