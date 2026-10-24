@@ -16,6 +16,7 @@ CHANNEL must be one of:
 
   release         detach HEAD to the latest release tag
   upstream        switch to the upstream branch
+  <branch>        switch to the named remote branch
 EOF
 }
 
@@ -56,7 +57,7 @@ fi
 
 case "$CHANNEL" in
   release | upstream) ;;
-  *)
+  *" "* | "")
     log Error "Invalid channel: $CHANNEL"
     log Error "Try '${0##*/} --help' for more information."
     exit 1
@@ -128,6 +129,16 @@ case "$CHANNEL" in
     log Info "Switched to upstream"
     echo "Switched to upstream."
     notify "" "Switched to upstream"
+    ;;
+  # Any other name is a remote branch. The fetch validates it: an unknown
+  # branch fails here through die instead of switching. A fetched
+  # origin/<branch> lets switch create the local tracking branch.
+  *)
+    git -C "$VIBRANIUM" fetch origin "$CHANNEL" || die "branch '$CHANNEL' not found on origin"
+    git -C "$VIBRANIUM" switch "$CHANNEL" || die "failed to switch to '$CHANNEL'"
+    log Info "Switched to branch: $CHANNEL"
+    echo "Switched to $CHANNEL."
+    notify "" "Switched to $CHANNEL"
     ;;
 esac
 

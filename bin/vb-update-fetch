@@ -46,13 +46,15 @@ if [[ -z "$branch" ]]; then
       "To update, open Vibranium Menu"
   fi
 else
-  if [[ "$branch" != "master" ]]; then
+  # Any attached branch tracks itself, so installs cloned from a custom
+  # branch are checked against that branch's remote ref.
+  if ! git -C "$VIBRANIUM" rev-parse --verify "origin/$branch" &> /dev/null; then
     exit 0
   fi
 
-  # A missing or invalid origin/master makes rev-list emit zero, suppressing
+  # A missing or invalid remote ref makes rev-list emit zero, suppressing
   # notifications when an update count cannot be established.
-  behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/master --count 2> /dev/null || echo 0)
+  behind=$(git -C "$VIBRANIUM" rev-list "HEAD..origin/$branch" --count 2> /dev/null || echo 0)
 
   if ((behind > 0)); then
     echo "$behind" > "$VIBRANIUM_STATE/update.available"

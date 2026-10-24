@@ -79,16 +79,17 @@ Options:
 EOF
 }
 
+# A detached HEAD tracks the release channel; any attached branch tracks
+# itself, so updates follow whatever branch the install was cloned from
+# (master included) without extra configuration.
 _detect_channel() {
   local -n _dc_out=$1
   local _dc_branch
   _dc_branch=$(git -C "$VIBRANIUM" branch --show-current)
   if [[ -z "$_dc_branch" ]]; then
     _dc_out="release"
-  elif [[ "$_dc_branch" == "master" ]]; then
-    _dc_out="upstream"
   else
-    _fail "On unknown branch '$_dc_branch'."
+    _dc_out="$_dc_branch"
   fi
 }
 
@@ -267,7 +268,7 @@ _update() {
 
     _check_and_stash
 
-    vb::print "$Y" "Updating to latest upstream..."
+    vb::print "$Y" "Updating to latest $channel..."
 
     # We already fetched, so merge rather than pull to avoid a second fetch
     if ! git -C "$VIBRANIUM" merge --ff-only "$remote_ref" -q; then
