@@ -27,8 +27,23 @@ for entry in "$VIBRANIUM"/applications/*.desktop; do
   helpers::copy "$entry" "$HOME/.local/share/applications/${entry##*/}"
 done
 
+# Custom entries are conditional: the shell cannot evaluate TryExec
+# (Quickshell's DesktopEntries only filters Hidden/NoDisplay), so an entry
+# whose backing executable is absent would linger in the launcher as a dead
+# row. Skip it here; the migration backfills it once the tool is installed.
+_tryexec_present() {
+  [[ -z "$1" ]] && return 0
+  command -v "$1" > /dev/null && return 0
+  [[ -x "$VIBRANIUM/bin/$1" ]] && return 0
+  return 1
+}
 for entry in "$VIBRANIUM"/applications/custom/*.desktop; do
   [[ -e "$entry" ]] || continue
+  tryexec="$(sed -n 's/^TryExec=//p' "$entry" | head -n1)"
+  if ! _tryexec_present "$tryexec"; then
+    helpers::log::info "Skipping ${entry##*/} ($tryexec not installed)"
+    continue
+  fi
   helpers::copy "$entry" "$HOME/.local/share/applications/${entry##*/}"
 done
 
