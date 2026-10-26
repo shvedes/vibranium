@@ -95,13 +95,6 @@ PanelCard {
   readonly property bool searching: AppLauncher.entry !== ""
   readonly property bool primarySurface: visible
 
-  // The show gate opening ends the open-time snap: height changes tween
-  // again from here (typing, late arrivals). Fires a full gate interval
-  // after the open, so no sizing instant shares its turn.
-  onShownChanged: {
-    if (panel.shown) panel.sizeSnap = false
-  }
-
   Component.onCompleted: { AppLauncher._attachPanel(panel); panel.syncRows(); panel.queueFit() }
   Component.onDestruction: AppLauncher._detachPanel(panel)
   TapHandler { onTapped: panel.focusSearch() }
@@ -119,21 +112,11 @@ PanelCard {
     }
 
     function onVisibleChanged() {
-      if (!AppLauncher.visible) {
-        // Arm the open-time snap while hidden: the next open's first
-        // sizing instant lands in the same turn as the show gate closing,
-        // and a Behavior reads the gate's pre-turn value - so a height
-        // delta to a new row set (a fresh clipboard suggestion, a changed
-        // pool) would glide instead of spawning. Armed here, a turn early,
-        // the snap is already in force when the height changes. Released
-        // by input while visible (onEntryChanged) or when the gate opens
-        // (onShownChanged), so typing still glides.
-        panel.sizeSnap = true
-        return
-      }
+      if (!AppLauncher.visible) return
       AppLauncher.pendingDelete = null
-      // sizeSnap stays as the close armed it: the open sizes itself
-      // under that snap and never inherits a glide from the gate.
+      // No snap outlives its row set: a pre-close flip must not pin the
+      // open's first sizing instant past the show gate.
+      panel.sizeSnap = false
       panel.show()
       panel._openSeat = true
       panel.syncRowsNow()
@@ -148,11 +131,6 @@ PanelCard {
     }
     function onEntryChanged() {
       if (searchField.text !== AppLauncher.entry) searchField.text = AppLauncher.entry
-      // User input while visible ends the open-time snap: the resize the
-      // typing drives glides like any other. Guarded on visible so the
-      // close-path reset (which runs hidden) cannot disarm the snap the
-      // close just armed.
-      if (AppLauncher.visible) panel.sizeSnap = false
     }
     function onModeChanged() {
       panel.closeTrailingInfo()
