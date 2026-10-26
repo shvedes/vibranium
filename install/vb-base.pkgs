@@ -7,15 +7,14 @@ hyprsunset
 hyprland
 
 ###### Essentials
-sound-theme-freedesktop
 xdg-desktop-portal-gtk
 gpu-screen-recorder
 papirus-icon-theme
 xdg-terminal-exec
 adw-gtk-theme
 gnome-keyring
-imagemagick
 wl-clipboard
+imagemagick
 qrencode
 chromium
 app2unit
@@ -71,7 +70,6 @@ mpv
 
 ##### System
 power-profiles-daemon
-realtime-privileges
 python-gobject
 pacman-contrib
 xdg-user-dirs

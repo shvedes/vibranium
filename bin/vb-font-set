@@ -8,7 +8,7 @@ VERBOSE=${VERBOSE:-false}
 HOOK_FILE="$XDG_CONFIG_HOME/vibranium/hooks/font-change.sh"
 
 usage() {
-  shcat << EOF
+	shcat << EOF
 Usage: ${0##*/} [OPTION] FAMILY [STYLE]
 
 Set the system-wide default font across all apps.
@@ -26,29 +26,29 @@ EOF
 }
 
 case "$1" in
-  -h | --help)
-    usage
-    exit 0
-    ;;
-  -*)
-    log Error "Unknown option - $*"
-    usage >&2
-    exit 1
-    ;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	-*)
+		log Error "Unknown option - $*"
+		usage >&2
+		exit 1
+		;;
 esac
 
 if (($# < 1)); then
-  log Error "missing FAMILY argument"
-  usage >&2
-  exit 1
+	log Error "missing FAMILY argument"
+	usage >&2
+	exit 1
 fi
 
 font_family="$1"
 if (($# >= 2)); then
-  shift
-  font_style="$*"
+	shift
+	font_style="$*"
 else
-  font_style="Regular"
+	font_style="Regular"
 fi
 font_style="${font_style:-Regular}"
 
@@ -56,299 +56,305 @@ selected_font="${font_family} ${font_style}"
 
 _current_font=""
 while IFS= read -r _font_line || [[ -n "$_font_line" ]]; do
-  if [[ -z "$_current_font" ]]; then
-    _current_font="$_font_line"
-  else
-    _current_font="$_current_font"$'\n'"$_font_line"
-  fi
+	if [[ -z "$_current_font" ]]; then
+		_current_font="$_font_line"
+	else
+		_current_font="$_current_font"$'\n'"$_font_line"
+	fi
 done < <(vb-font-get)
 
 if [[ "$selected_font" == "$_current_font" ]]; then
-  log Warn "'$selected_font' is already the default font"
-  notify-send -r 1 -a "Font Manager" "Already on ${selected_font}" \
-    "${selected_font} is already the default font!"
-  exit 1
+	log Warn "'$selected_font' is already the default font"
+	notify-send -r 1 -a "Font Manager" "Already on ${selected_font}" \
+		"${selected_font} is already the default font!"
+	exit 1
 fi
 
 _toml_set_key() {
-  local file="$1" section="$2" key="$3" value="$4"
-  local header="[$section]"
-  local dir line in_sec found re tmp
+	local file="$1" section="$2" key="$3" value="$4"
+	local header="[$section]"
+	local dir line in_sec found re tmp
 
-  if [[ ! -f "$file" ]]; then
-    log Warn "Alacritty config not found, creating: $file"
-    dir="${file%/*}"
-    [[ "$dir" == "$file" ]] && dir="."
-    mkdir -p "$dir"
-    printf '[%s]\n%s = "%s"\n' "$section" "$key" "$value" > "$file"
-    return
-  fi
+	if [[ ! -f "$file" ]]; then
+		log Warn "Alacritty config not found, creating: $file"
+		dir="${file%/*}"
+		[[ "$dir" == "$file" ]] && dir="."
+		mkdir -p "$dir"
+		printf '[%s]\n%s = "%s"\n' "$section" "$key" "$value" > "$file"
+		return
+	fi
 
-  local has_section=false
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" == "$header" ]] && { has_section=true; break; }
-  done < "$file"
+	local has_section=false
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ "$line" == "$header" ]] && {
+			has_section=true
+			break
+		}
+	done < "$file"
 
-  if ! $has_section; then
-    printf '\n[%s]\n%s = "%s"\n' "$section" "$key" "$value" >> "$file"
-    return
-  fi
+	if ! $has_section; then
+		printf '\n[%s]\n%s = "%s"\n' "$section" "$key" "$value" >> "$file"
+		return
+	fi
 
-  found=false
-  in_sec=false
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" == "$header" ]]; then
-      in_sec=true
-      continue
-    fi
-    if [[ "$line" == \[* ]]; then
-      in_sec=false
-      continue
-    fi
-    if $in_sec; then
-      re="^[[:space:]]*${key}[[:space:]]*="
-      if [[ "$line" =~ $re ]]; then
-        found=true
-        break
-      fi
-    fi
-  done < "$file"
+	found=false
+	in_sec=false
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		if [[ "$line" == "$header" ]]; then
+			in_sec=true
+			continue
+		fi
+		if [[ "$line" == \[* ]]; then
+			in_sec=false
+			continue
+		fi
+		if $in_sec; then
+			re="^[[:space:]]*${key}[[:space:]]*="
+			if [[ "$line" =~ $re ]]; then
+				found=true
+				break
+			fi
+		fi
+	done < "$file"
 
-  tmp="${file}.vb-tmp"
-  if $found; then
-    in_sec=false
-    : > "$tmp"
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      if [[ "$line" == "$header" ]]; then
-        in_sec=true
-        printf '%s\n' "$line" >> "$tmp"
-        continue
-      fi
-      if [[ "$line" == \[* ]]; then
-        in_sec=false
-      fi
-      if $in_sec; then
-        re="^[[:space:]]*${key}[[:space:]]*="
-        if [[ "$line" =~ $re ]]; then
-          re='^([^"]*)"([^"]*)"(.*)$'
-          if [[ "$line" =~ $re ]]; then
-            printf '%s"%s"%s\n' "${BASH_REMATCH[1]}" "$value" "${BASH_REMATCH[3]}" >> "$tmp"
-          else
-            printf '%s\n' "$line" >> "$tmp"
-          fi
-          continue
-        fi
-      fi
-      printf '%s\n' "$line" >> "$tmp"
-    done < "$file"
-    mv "$tmp" "$file"
-  else
-    in_sec=false
-    : > "$tmp"
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      printf '%s\n' "$line" >> "$tmp"
-      if [[ "$line" == "$header" ]]; then
-        printf '%s = "%s"\n' "$key" "$value" >> "$tmp"
-      fi
-    done < "$file"
-    mv "$tmp" "$file"
-  fi
+	tmp="${file}.vb-tmp"
+	if $found; then
+		in_sec=false
+		: > "$tmp"
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			if [[ "$line" == "$header" ]]; then
+				in_sec=true
+				printf '%s\n' "$line" >> "$tmp"
+				continue
+			fi
+			if [[ "$line" == \[* ]]; then
+				in_sec=false
+			fi
+			if $in_sec; then
+				re="^[[:space:]]*${key}[[:space:]]*="
+				if [[ "$line" =~ $re ]]; then
+					re='^([^"]*)"([^"]*)"(.*)$'
+					if [[ "$line" =~ $re ]]; then
+						printf '%s"%s"%s\n' "${BASH_REMATCH[1]}" "$value" "${BASH_REMATCH[3]}" >> "$tmp"
+					else
+						printf '%s\n' "$line" >> "$tmp"
+					fi
+					continue
+				fi
+			fi
+			printf '%s\n' "$line" >> "$tmp"
+		done < "$file"
+		mv "$tmp" "$file"
+	else
+		in_sec=false
+		: > "$tmp"
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			printf '%s\n' "$line" >> "$tmp"
+			if [[ "$line" == "$header" ]]; then
+				printf '%s = "%s"\n' "$key" "$value" >> "$tmp"
+			fi
+		done < "$file"
+		mv "$tmp" "$file"
+	fi
 }
 
 _ini_set_key() {
-  local file="$1" section="$2" key="$3" value="$4"
-  local header="[$section]"
-  local dir line in_sec found re tmp has_section
+	local file="$1" section="$2" key="$3" value="$4"
+	local header="[$section]"
+	local dir line in_sec found re tmp has_section
 
-  if [[ ! -f "$file" ]]; then
-    log Warn "Foot config not found, creating: $file"
-    dir="${file%/*}"
-    [[ "$dir" == "$file" ]] && dir="."
-    mkdir -p "$dir"
-    printf '[%s]\n%s=%s\n' "$section" "$key" "$value" > "$file"
-    return
-  fi
+	if [[ ! -f "$file" ]]; then
+		log Warn "Foot config not found, creating: $file"
+		dir="${file%/*}"
+		[[ "$dir" == "$file" ]] && dir="."
+		mkdir -p "$dir"
+		printf '[%s]\n%s=%s\n' "$section" "$key" "$value" > "$file"
+		return
+	fi
 
-  has_section=false
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    [[ "$line" == "$header" ]] && { has_section=true; break; }
-  done < "$file"
+	has_section=false
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		[[ "$line" == "$header" ]] && {
+			has_section=true
+			break
+		}
+	done < "$file"
 
-  if ! $has_section; then
-    printf '\n[%s]\n%s=%s\n' "$section" "$key" "$value" >> "$file"
-    return
-  fi
+	if ! $has_section; then
+		printf '\n[%s]\n%s=%s\n' "$section" "$key" "$value" >> "$file"
+		return
+	fi
 
-  found=false
-  in_sec=false
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" == "$header" ]]; then
-      in_sec=true
-      continue
-    fi
-    if [[ "$line" == \[* ]]; then
-      in_sec=false
-      continue
-    fi
-    if $in_sec; then
-      re="^[[:space:]]*${key}[[:space:]]*="
-      if [[ "$line" =~ $re ]]; then
-        found=true
-        break
-      fi
-    fi
-  done < "$file"
+	found=false
+	in_sec=false
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		if [[ "$line" == "$header" ]]; then
+			in_sec=true
+			continue
+		fi
+		if [[ "$line" == \[* ]]; then
+			in_sec=false
+			continue
+		fi
+		if $in_sec; then
+			re="^[[:space:]]*${key}[[:space:]]*="
+			if [[ "$line" =~ $re ]]; then
+				found=true
+				break
+			fi
+		fi
+	done < "$file"
 
-  tmp="${file}.vb-tmp"
-  if $found; then
-    in_sec=false
-    : > "$tmp"
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      if [[ "$line" == "$header" ]]; then
-        in_sec=true
-        printf '%s\n' "$line" >> "$tmp"
-        continue
-      fi
-      if [[ "$line" == \[* ]]; then
-        in_sec=false
-      fi
-      if $in_sec; then
-        re="^[[:space:]]*${key}[[:space:]]*="
-        if [[ "$line" =~ $re ]]; then
-          printf '%s=%s\n' "$key" "$value" >> "$tmp"
-          continue
-        fi
-      fi
-      printf '%s\n' "$line" >> "$tmp"
-    done < "$file"
-    mv "$tmp" "$file"
-  else
-    in_sec=false
-    : > "$tmp"
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      printf '%s\n' "$line" >> "$tmp"
-      if [[ "$line" == "$header" ]]; then
-        printf '%s=%s\n' "$key" "$value" >> "$tmp"
-      fi
-    done < "$file"
-    mv "$tmp" "$file"
-  fi
+	tmp="${file}.vb-tmp"
+	if $found; then
+		in_sec=false
+		: > "$tmp"
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			if [[ "$line" == "$header" ]]; then
+				in_sec=true
+				printf '%s\n' "$line" >> "$tmp"
+				continue
+			fi
+			if [[ "$line" == \[* ]]; then
+				in_sec=false
+			fi
+			if $in_sec; then
+				re="^[[:space:]]*${key}[[:space:]]*="
+				if [[ "$line" =~ $re ]]; then
+					printf '%s=%s\n' "$key" "$value" >> "$tmp"
+					continue
+				fi
+			fi
+			printf '%s\n' "$line" >> "$tmp"
+		done < "$file"
+		mv "$tmp" "$file"
+	else
+		in_sec=false
+		: > "$tmp"
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			printf '%s\n' "$line" >> "$tmp"
+			if [[ "$line" == "$header" ]]; then
+				printf '%s=%s\n' "$key" "$value" >> "$tmp"
+			fi
+		done < "$file"
+		mv "$tmp" "$file"
+	fi
 }
 
 _foot_escape() {
-  local -n _foot_escape_out="$1"
-  local value="$2"
-  value="${value//\\/\\\\}"
-  value="${value//:/\\:}"
-  value="${value//=/\\=}"
-  value="${value// /\\ }"
-  _foot_escape_out="$value"
+	local -n _foot_escape_out="$1"
+	local value="$2"
+	value="${value//\\/\\\\}"
+	value="${value//:/\\:}"
+	value="${value//=/\\=}"
+	value="${value// /\\ }"
+	_foot_escape_out="$value"
 }
 
 _foot_apply() {
-  local file="$1"
-  local size="" style="" value
-  local line in_main=false
-  local escaped_style escaped_family
+	local file="$1"
+	local size="" style="" value
+	local line in_main=false
+	local escaped_style escaped_family
 
-  if [[ -f "$file" ]]; then
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      if [[ "$line" == "[main]" ]]; then
-        in_main=true
-        continue
-      fi
-      if [[ "$line" == \[* ]]; then
-        in_main=false
-        continue
-      fi
-      if $in_main && [[ "$line" =~ ^[[:space:]]*font[[:space:]]*= ]]; then
-        line="${line#*=}"
-        line="${line#"${line%%[![:space:]]*}"}"
-        if [[ "$line" == *:size=* ]]; then
-          size="${line#*:size=}"
-          size="${size%%:*}"
-        fi
-        break
-      fi
-    done < "$file"
-  fi
-  size="${size:-10}"
+	if [[ -f "$file" ]]; then
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			if [[ "$line" == "[main]" ]]; then
+				in_main=true
+				continue
+			fi
+			if [[ "$line" == \[* ]]; then
+				in_main=false
+				continue
+			fi
+			if $in_main && [[ "$line" =~ ^[[:space:]]*font[[:space:]]*= ]]; then
+				line="${line#*=}"
+				line="${line#"${line%%[![:space:]]*}"}"
+				if [[ "$line" == *:size=* ]]; then
+					size="${line#*:size=}"
+					size="${size%%:*}"
+				fi
+				break
+			fi
+		done < "$file"
+	fi
+	size="${size:-10}"
 
-  case "$font_style" in
-    "" | Regular | Roman) ;;
-    *)
-      _foot_escape escaped_style "$font_style"
-      style=":style=$escaped_style"
-      ;;
-  esac
-  _foot_escape escaped_family "$font_family"
-  value="${escaped_family}${style}:size=$size"
-  _ini_set_key "$file" main font "$value"
+	case "$font_style" in
+		"" | Regular | Roman) ;;
+		*)
+			_foot_escape escaped_style "$font_style"
+			style=":style=$escaped_style"
+			;;
+	esac
+	_foot_escape escaped_family "$font_family"
+	value="${escaped_family}${style}:size=$size"
+	_ini_set_key "$file" main font "$value"
 }
 
 _pango_name() {
-  local -n _pango_name_out="$1"
-  if [[ "$font_style" == "Regular" ]] || [[ "$font_style" == "Roman" ]]; then
-    _pango_name_out="$font_family"
-  else
-    _pango_name_out="$font_family $font_style"
-  fi
+	local -n _pango_name_out="$1"
+	if [[ "$font_style" == "Regular" ]] || [[ "$font_style" == "Roman" ]]; then
+		_pango_name_out="$font_family"
+	else
+		_pango_name_out="$font_family $font_style"
+	fi
 }
 
 _gtk_apply() {
-  local file="$1"
-  local cur_size="" line found=false pango_name name dir tmp
+	local file="$1"
+	local cur_size="" line found=false pango_name name dir tmp
 
-  if [[ -f "$file" ]]; then
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      if [[ "$line" =~ ^gtk-font-name[[:space:]]*= ]]; then
-        if [[ "$line" =~ [[:space:]]([0-9]+(\.[0-9]+)?)[[:space:]]*$ ]]; then
-          cur_size="${BASH_REMATCH[1]}"
-        fi
-        break
-      fi
-    done < "$file"
-  fi
-  cur_size="${cur_size:-12}"
+	if [[ -f "$file" ]]; then
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			if [[ "$line" =~ ^gtk-font-name[[:space:]]*= ]]; then
+				if [[ "$line" =~ [[:space:]]([0-9]+(\.[0-9]+)?)[[:space:]]*$ ]]; then
+					cur_size="${BASH_REMATCH[1]}"
+				fi
+				break
+			fi
+		done < "$file"
+	fi
+	cur_size="${cur_size:-12}"
 
-  _pango_name pango_name
-  name="${pango_name} ${cur_size}"
+	_pango_name pango_name
+	name="${pango_name} ${cur_size}"
 
-  if [[ ! -f "$file" ]]; then
-    log Warn "Config not found, creating: $file"
-    dir="${file%/*}"
-    [[ "$dir" == "$file" ]] && dir="."
-    mkdir -p "$dir"
-    printf 'gtk-font-name=%s\n' "$name" > "$file"
-    return
-  fi
+	if [[ ! -f "$file" ]]; then
+		log Warn "Config not found, creating: $file"
+		dir="${file%/*}"
+		[[ "$dir" == "$file" ]] && dir="."
+		mkdir -p "$dir"
+		printf 'gtk-font-name=%s\n' "$name" > "$file"
+		return
+	fi
 
-  found=false
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" =~ ^gtk-font-name[[:space:]]*= ]]; then
-      found=true
-      break
-    fi
-  done < "$file"
+	found=false
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		if [[ "$line" =~ ^gtk-font-name[[:space:]]*= ]]; then
+			found=true
+			break
+		fi
+	done < "$file"
 
-  if $found; then
-    tmp="${file}.vb-tmp"
-    : > "$tmp"
-    while IFS= read -r line || [[ -n "$line" ]]; do
-      if [[ "$line" =~ ^gtk-font-name[[:space:]]*= ]]; then
-        if [[ "$line" =~ ^(gtk-font-name[[:space:]]*=[[:space:]]*) ]]; then
-          printf '%s%s\n' "${BASH_REMATCH[1]}" "$name" >> "$tmp"
-        else
-          printf 'gtk-font-name=%s\n' "$name" >> "$tmp"
-        fi
-      else
-        printf '%s\n' "$line" >> "$tmp"
-      fi
-    done < "$file"
-    mv "$tmp" "$file"
-  else
-    printf 'gtk-font-name=%s\n' "$name" >> "$file"
-  fi
+	if $found; then
+		tmp="${file}.vb-tmp"
+		: > "$tmp"
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			if [[ "$line" =~ ^gtk-font-name[[:space:]]*= ]]; then
+				if [[ "$line" =~ ^(gtk-font-name[[:space:]]*=[[:space:]]*) ]]; then
+					printf '%s%s\n' "${BASH_REMATCH[1]}" "$name" >> "$tmp"
+				else
+					printf 'gtk-font-name=%s\n' "$name" >> "$tmp"
+				fi
+			else
+				printf '%s\n' "$line" >> "$tmp"
+			fi
+		done < "$file"
+		mv "$tmp" "$file"
+	else
+		printf 'gtk-font-name=%s\n' "$name" >> "$file"
+	fi
 }
 
 _gtk_apply "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
@@ -356,14 +362,14 @@ _gtk_apply "$XDG_CONFIG_HOME/gtk-4.0/settings.ini"
 
 _gtk3_size=""
 if [[ -f "$XDG_CONFIG_HOME/gtk-3.0/settings.ini" ]]; then
-  while IFS= read -r line || [[ -n "$line" ]]; do
-    if [[ "$line" =~ ^gtk-font-name[[:space:]]*= ]]; then
-      if [[ "$line" =~ [[:space:]]([0-9]+(\.[0-9]+)?)[[:space:]]*$ ]]; then
-        _gtk3_size="${BASH_REMATCH[1]}"
-      fi
-      break
-    fi
-  done < "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
+	while IFS= read -r line || [[ -n "$line" ]]; do
+		if [[ "$line" =~ ^gtk-font-name[[:space:]]*= ]]; then
+			if [[ "$line" =~ [[:space:]]([0-9]+(\.[0-9]+)?)[[:space:]]*$ ]]; then
+				_gtk3_size="${BASH_REMATCH[1]}"
+			fi
+			break
+		fi
+	done < "$XDG_CONFIG_HOME/gtk-3.0/settings.ini"
 fi
 _gtk3_size="${_gtk3_size:-12}"
 
@@ -375,54 +381,57 @@ _alacritty="$XDG_CONFIG_HOME/alacritty/alacritty.toml"
 _toml_set_key "$_alacritty" "font.normal" "family" "$font_family"
 _toml_set_key "$_alacritty" "font.normal" "style" "$font_style"
 for _sec in font.bold font.italic font.bold_italic; do
-  [[ -f "$_alacritty" ]] || continue
-  _sec_present=false
-  while IFS= read -r _sec_line || [[ -n "$_sec_line" ]]; do
-    [[ "$_sec_line" == "[$_sec]" ]] && { _sec_present=true; break; }
-  done < "$_alacritty"
-  $_sec_present || continue
-  _toml_set_key "$_alacritty" "$_sec" "family" "$font_family"
+	[[ -f "$_alacritty" ]] || continue
+	_sec_present=false
+	while IFS= read -r _sec_line || [[ -n "$_sec_line" ]]; do
+		[[ "$_sec_line" == "[$_sec]" ]] && {
+			_sec_present=true
+			break
+		}
+	done < "$_alacritty"
+	$_sec_present || continue
+	_toml_set_key "$_alacritty" "$_sec" "family" "$font_family"
 done
 
 _foot_apply "$XDG_CONFIG_HOME/foot/foot.ini"
 
 for _qt in "$XDG_CONFIG_HOME/qt5ct/qt5ct.conf" \
-  "$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"; do
-  [[ -f "$_qt" ]] || continue
-  _qt_found=false
-  while IFS= read -r _qt_line || [[ -n "$_qt_line" ]]; do
-    if [[ "$_qt_line" =~ ^(fixed|general)= ]]; then
-      _qt_found=true
-      break
-    fi
-  done < "$_qt"
-  if $_qt_found; then
-    _qt_tmp="${_qt}.vb-tmp"
-    : > "$_qt_tmp"
-    while IFS= read -r _qt_line || [[ -n "$_qt_line" ]]; do
-      if [[ "$_qt_line" =~ ^(fixed|general)= ]]; then
-        if [[ "$_qt_line" =~ ^([^,\"]*=\") ]]; then
-          _qt_prefix="${BASH_REMATCH[1]}"
-          _qt_rest="${_qt_line#"$_qt_prefix"}"
-          _qt_family="${_qt_rest%%[,\"]*}"
-          _qt_suffix="${_qt_rest:"${#_qt_family}"}"
-          printf '%s%s%s\n' "$_qt_prefix" "$font_family" "$_qt_suffix" >> "$_qt_tmp"
-        else
-          printf '%s\n' "$_qt_line" >> "$_qt_tmp"
-        fi
-      else
-        printf '%s\n' "$_qt_line" >> "$_qt_tmp"
-      fi
-    done < "$_qt"
-    mv "$_qt_tmp" "$_qt"
-  else
-    printf '%s\n' "general=\"${font_family},12,-1,5,50,0,0,0,0,0\"" >> "$_qt"
-  fi
+	"$XDG_CONFIG_HOME/qt6ct/qt6ct.conf"; do
+	[[ -f "$_qt" ]] || continue
+	_qt_found=false
+	while IFS= read -r _qt_line || [[ -n "$_qt_line" ]]; do
+		if [[ "$_qt_line" =~ ^(fixed|general)= ]]; then
+			_qt_found=true
+			break
+		fi
+	done < "$_qt"
+	if $_qt_found; then
+		_qt_tmp="${_qt}.vb-tmp"
+		: > "$_qt_tmp"
+		while IFS= read -r _qt_line || [[ -n "$_qt_line" ]]; do
+			if [[ "$_qt_line" =~ ^(fixed|general)= ]]; then
+				if [[ "$_qt_line" =~ ^([^,\"]*=\") ]]; then
+					_qt_prefix="${BASH_REMATCH[1]}"
+					_qt_rest="${_qt_line#"$_qt_prefix"}"
+					_qt_family="${_qt_rest%%[,\"]*}"
+					_qt_suffix="${_qt_rest:"${#_qt_family}"}"
+					printf '%s%s%s\n' "$_qt_prefix" "$font_family" "$_qt_suffix" >> "$_qt_tmp"
+				else
+					printf '%s\n' "$_qt_line" >> "$_qt_tmp"
+				fi
+			else
+				printf '%s\n' "$_qt_line" >> "$_qt_tmp"
+			fi
+		done < "$_qt"
+		mv "$_qt_tmp" "$_qt"
+	else
+		printf '%s\n' "general=\"${font_family},12,-1,5,50,0,0,0,0,0\"" >> "$_qt"
+	fi
 done
 
 if [[ -f "$HOOK_FILE" ]]; then
-  FONT="$selected_font" bash "$HOOK_FILE"
+	FONT="$selected_font" bash "$HOOK_FILE"
 fi
 
 notify-send -r 1 -a "Font Manager" "Default font set to ${selected_font}" \
-  "The font has been applied in all apps"
+	"You might need to restart some apps"

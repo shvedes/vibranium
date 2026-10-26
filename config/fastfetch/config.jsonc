@@ -12,13 +12,13 @@
 		"break",
 		{
 			"type": "os",
-			"key": "\uf111",
+			"key": "*",
 			"format": "{2}",
 			"keyColor": "yellow"
 		},
 		{
 			"type": "command",
-			"key": "\uf111",
+			"key": "*",
 			"text": "uname -r | { IFS=- read ver _; echo $ver; }",
 			"format": "Linux {}",
 			"keyColor": "yellow"
@@ -26,39 +26,39 @@
 		{
 			"type": "command",
 			"text": "git -C $VIBRANIUM describe --tags --abbrev=0 2>/dev/null",
-			"key": "\uf111",
+			"key": "*",
 			"format": "Vibranium {}",
 			"keyColor": "yellow"
 		},
 		{
 			"type": "command",
 			"text": "birth_install=$(stat -c %W /); current=$(date +%s); days_difference=$(( (current - birth_install) / 86400 )); echo $days_difference",
-			"key": "\uf111",
+			"key": "*",
 			"format": "OS age {} days",
 			"keyColor": "yellow"
 		},
 		{
 			"type": "command",
 			"text": "birth_install=$(stat -c %W $VIBRANIUM); current=$(date +%s); days_difference=$(( (current - birth_install) / 86400 )); echo $days_difference",
-			"key": "\uf111",
+			"key": "*",
 			"format": "Vibranium age {} days",
 			"keyColor": "yellow"
 		},
 		{
 			"type": "packages",
-			"key": "\uf111",
+			"key": "*",
 			"keyColor": "yellow"
 		},
 		"break",
 		{
 			"type": "cpu",
-			"key": "\uf111",
+			"key": "*",
 			"format": "{1}",
 			"keyColor": "green"
 		},
 		{
 			"type": "gpu",
-			"key": "\uf111",
+			"key": "*",
 			"format": "{2}",
 			"keyColor": "green"
 		},
@@ -66,26 +66,26 @@
 		{
 			"type": "disk",
 			"folders": "/",
-			"key": "\uf111",
+			"key": "*",
 			"format": "Disk {1} / {2}",
 			"keyColor": "blue"
 		},
 		{
 			"type": "memory",
-			"key": "\uf111",
+			"key": "*",
 			"format": "RAM {1} / {2}",
 			"keyColor": "blue"
 		},
 		{
 			"type": "swap",
-			"key": "\uf111",
+			"key": "*",
 			"format": "Swap {1} / {2}",
 			"keyColor": "blue"
 		},
 		"break",
 		{
 			"type": "uptime",
-			"key": "\uf111",
+			"key": "*",
 			"keyColor": "red"
 		},
 		"break"
