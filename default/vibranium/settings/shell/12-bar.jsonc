@@ -319,11 +319,6 @@
           "type": "submenu",
           "label": "Color Picker",
           "page": "bar-module-colorpicker"
-        },
-        {
-          "type": "submenu",
-          "label": "Workspaces",
-          "page": "bar-module-workspaces"
         }
       ],
       "options": []

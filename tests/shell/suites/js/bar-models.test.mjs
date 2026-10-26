@@ -4,7 +4,7 @@
 //   shell/features/bar/BarLib.js                        the layout algebra
 //   shell/features/bar/modules/ArchUpdates/Model.js      search + selection
 //   shell/features/bar/modules/Volume/Model.js           stream classification
-//   shell/features/bar/modules/Workspaces/Model.js       pile geometry + identity
+//   shell/features/bar/modules/Workspaces/Model.js       number-strip geometry
 //   shell/common/NowPlaying.js                           the media helpers
 //
 // Every one of these sits on a binding that re-evaluates per keystroke or per
@@ -98,7 +98,7 @@ group('the five libraries load and publish a function surface', () => {
   eq('BarLib publishes the seventeen layout helpers plus the shared insert rule', Object.keys(B).length, 18)
   eq('ArchUpdates/Model publishes the seventeen model functions plus four table vars', Object.keys(AU).length, 21)
   eq('Volume/Model publishes thirteen functions', Object.keys(VO).length, 13)
-  eq('Workspaces/Model publishes the pile functions and its tags', Object.keys(WSM).length, 11)
+  eq('Workspaces/Model publishes the number-strip helpers', Object.keys(WSM).length, 3)
 })
 group('assert.mjs SHELL_DIR resolves the shell tree itself', () => {
   // The kit's export is the load root every JS suite shares, so it is worth
@@ -2535,270 +2535,30 @@ group('the keyless player case is a real identity, not a shared slot', () => {
 })
 
 
-section('workspaces: the grouping key and the icon lookup names')
-group('appKey is the exact lower-cased app id', () => {
-  eq('it lower-cases', WSM.appKey('Firefox'), 'firefox')
-  eq('and trims', WSM.appKey('  Telegram  '), 'telegram')
-  eq('two spellings of one app are one key', WSM.appKey('Firefox') === WSM.appKey('FIREFOX'), true)
-  eq('a missing id is the empty key', WSM.appKey(undefined), '')
-  eq('and so is a null one', WSM.appKey(null), '')
-  // The key is deliberately NOT reduced further: folding the id down to its
-  // last component would let two distinct apps of one vendor (org.gnome.Nautilus
-  // and org.gnome.Something) share a pile entry, which shows as one app
-  // silently standing in for the other.
-  eq('a dotted id stays whole', WSM.appKey('org.gnome.Nautilus'), 'org.gnome.nautilus')
-})
-group('iconCandidates offers the name an icon theme is keyed on', () => {
-  eq('a plain name is its own only candidate', WSM.iconCandidates('firefox'), ['firefox'])
-  eq('a reverse-DNS id also offers its last component', WSM.iconCandidates('org.telegram.desktop'), ['org.telegram.desktop', 'telegram'])
-  eq('the .desktop extension is not part of the name', WSM.iconCandidates('Telegram.desktop'), ['telegram.desktop', 'telegram'])
-  eq('a name that IS its last component is not repeated', WSM.iconCandidates('telegram'), ['telegram'])
-  eq('an empty id offers nothing', WSM.iconCandidates(''), [])
-  eq('and neither does a missing one', WSM.iconCandidates(undefined), [])
-  // A trailing dot must not produce an empty candidate - the caller would
-  // then ask the icon theme for the empty name. Splitting drops the empty
-  // component, so the name is recovered from the one before it.
-  eq('a trailing dot still recovers the name', WSM.iconCandidates('foo.'), ['foo.', 'foo'])
-  eq('no candidate is ever the empty string', ['foo.', '.foo', 'org.gnome.', '...'].every(id => WSM.iconCandidates(id).every(c => c.length > 0)), true)
-})
-
-section('workspaces: one entry per app, capped')
-group('pileItems folds one app\'s windows into one entry', () => {
-  const one = WSM.pileItems([
-    { appId: 'Firefox', address: 'a', title: 'one' },
-    { appId: 'firefox', address: 'b', title: 'two' },
-  ], 4)
-  eq('two windows of one app are one entry', one.items.length, 1)
-  eq('and the count is the window count', one.items[0].count, 2)
-  eq('with nothing hidden', one.overflow, 0)
-})
-group('the entry keeps the first window, and follows focus', () => {
-  const order = WSM.pileItems([
-    { appId: 'firefox', address: 'a', title: 'first' },
-    { appId: 'telegram', address: 'b', title: 'chat' },
-    { appId: 'alacritty', address: 'c', title: 'term' },
-  ], 4)
-  eq('entries are in first-appearance order, not sorted', order.items.map(i => i.appId), ['firefox', 'telegram', 'alacritty'])
-  eq('the representative is that first window', order.items[0].title, 'first')
-  const focused = WSM.pileItems([
-    { appId: 'firefox', address: 'a', title: 'first' },
-    { appId: 'firefox', address: 'b', title: 'second', activated: true },
-  ], 4)
-  eq('an activated window takes over the entry it shares', focused.items[0].address, 'b')
-  eq('and its title with it', focused.items[0].title, 'second')
-  eq('without becoming a second entry', focused.items.length, 1)
-  eq('while an unfocused entry is left alone', focused.items[0].activated, true)
-})
-group('the cap hides the tail and reports it', () => {
-  const many = WSM.pileItems(
-    ['a', 'b', 'c', 'd', 'e', 'f'].map((n) => ({ appId: n, address: n, title: n })), 4)
-  eq('at most MAX_ICONS entries are kept', many.items.length, 4)
-  eq('and the rest are counted, not dropped silently', many.overflow, 2)
-  eq('the kept ones are the first ones', many.items.map(i => i.appId), ['a', 'b', 'c', 'd'])
-  eq('MAX_ICONS is the default cap', WSM.MAX_ICONS, 4)
-  eq('pileItems uses it when the caller names none', WSM.pileItems(['a', 'b', 'c', 'd', 'e'].map(n => ({ appId: n, address: n })), 0).items.length, 4)
-  eq('a cap under one still keeps one entry rather than none', WSM.pileItems([{ appId: 'a', address: 'a' }], -3).items.length, 1)
-  eq('with the remainder still reported', WSM.pileItems([{ appId: 'a', address: 'a' }], -3).overflow, 0)
-  eq('nothing overflows at exactly the cap', WSM.pileItems(['a', 'b', 'c', 'd'].map(n => ({ appId: n, address: n })), 4).overflow, 0)
-  eq('one overflows by one', WSM.pileItems(['a', 'b', 'c', 'd', 'e'].map(n => ({ appId: n, address: n })), 4).overflow, 1)
-})
-group('windows with no usable identity', () => {
-  eq('an empty list is an empty pile', WSM.pileItems([], 4), { items: [], overflow: 0 })
-  eq('a missing list is an empty pile', WSM.pileItems(undefined, 4), { items: [], overflow: 0 })
-  // A window with neither an id nor an address cannot be told apart from any
-  // other, so collecting them under the empty key would render N identical
-  // tiles.
-  eq('an idless, addressless record is dropped', WSM.pileItems([{ appId: '', address: '', title: 'x' }], 4).items.length, 0)
-  eq('a null record is dropped', WSM.pileItems([null, { appId: 'a', address: 'a' }], 4).items.length, 1)
-  // An address is still an identity, so an idless window keeps its own slot
-  // and the workspace still reads as occupied.
-  const byAddr = WSM.pileItems([{ appId: '', address: '0x1', title: 'x' }], 4)
-  eq('an idless window with an address keeps a slot', byAddr.items.length, 1)
-  eq('keyed on the address', byAddr.items[0].key, 'addr:0x1')
-  eq('and two idless windows do not merge', WSM.pileItems([{ appId: '', address: '0x1' }, { appId: '', address: '0x2' }], 4).items.length, 2)
-})
-group('urgency propagates to the shared entry', () => {
-  const pile = WSM.pileItems([
-    { appId: 'firefox', address: 'a', urgent: false },
-    { appId: 'firefox', address: 'b', urgent: true },
-  ], 4)
-  eq('one urgent window marks the app urgent', pile.items[0].urgent, true)
-  eq('and a calm one does not', WSM.pileItems([{ appId: 'firefox', address: 'a' }], 4).items[0].urgent, false)
-})
-group('the caller array is not mutated', () => {
-  const records = [{ appId: 'a', address: 'a' }, { appId: 'a', address: 'b' }]
-  const before = JSON.stringify(records)
-  WSM.pileItems(records, 4)
-  eq('a QML binding survives a helper that mutates its input', JSON.stringify(records), before)
-})
-
-section('workspaces: geometry')
-group('metrics scale with the bar and keep a usable floor', () => {
-  const m = WSM.metrics(1, 0)
-  eq('at scale 1 the icon is a third under the bar glyph', m.icon, 12)
-  eq('the pill pads each edge', m.pad, 5)
-  eq('the number gap is wider than the icon gap', m.numGap > m.iconGap, true)
-  eq('the slot gap is the bar row spacing, passed in', m.gap, 0)
-  eq('and a caller may widen it', WSM.metrics(1, 3).gap, 3)
-  eq('a negative gap is clamped to the bar default', WSM.metrics(1, -4).gap, 0)
-  eq('scale 2 grows the icon', WSM.metrics(2, 0).icon, 24)
-  eq('scale 2 grows the pad', WSM.metrics(2, 0).pad, 10)
-  eq('a scale below one still yields a legible icon', WSM.metrics(0.3, 0).icon >= 8, true)
-  // A non-numeric or non-positive scale would otherwise produce NaN widths
-  // and silently collapse the strip.
+section('workspaces: the number strip geometry')
+group('the number pad scales with the bar and keeps a usable floor', () => {
+  eq('at scale 1 each edge is 2px', WSM.numberPad(1), 2)
+  eq('scale 2 doubles it', WSM.numberPad(2), 4)
+  eq('a small scale keeps one pixel', WSM.numberPad(0.2), 1)
   for (const bad of [0, -1, NaN, Infinity, undefined, null, 'two']) {
-    eq(`the scale ${String(bad)} falls back to 1`, WSM.metrics(bad, 0).icon, 12)
+    eq(`the scale ${String(bad)} falls back to 1`, WSM.numberPad(bad), 2)
   }
-  eq('a fractional scale rounds to a whole pixel', Number.isInteger(WSM.metrics(1.5, 0).icon), true)
+  eq('a fractional scale rounds to a whole pixel', Number.isInteger(WSM.numberPad(1.5)), true)
 })
-group('the icon gap is a quarter of an icon, not a hair', () => {
-  // Two app icons have no boundary of their own, so a narrow gap reads as
-  // one smear rather than as two apps. This is the assertion that keeps the
-  // gap from being tightened back to 1px.
-  const m = WSM.metrics(1, 0)
-  eq('the gap is a quarter of the icon', m.iconGap, Math.round(m.icon / 4))
-  eq('and never narrower than 3px at any scale', [0.3, 0.5, 1, 1.5, 2, 3].every(s => WSM.metrics(s, 0).iconGap >= 3), true)
-  eq('and never wider than a third of the icon', [1, 1.5, 2, 3].every(s => WSM.metrics(s, 0).iconGap <= m.icon * s / 3), true)
-  eq('the number gap is at least as wide as the icon gap', WSM.metrics(1, 0).numGap >= WSM.metrics(1, 0).iconGap, true)
+group('number slots keep a fixed gap', () => {
+  eq('three pixels apart', WSM.numberGap(), 3)
 })
-group('number shapes use reduced spacing or touch edge-to-edge', () => {
-  eq('plain labels use half the old 6px gap', WSM.numberGap(false), 3)
-  eq('boxes have no gap between adjacent surfaces', WSM.numberGap(true), 0)
-  eq('boxes and plain labels remain exclusive modes', WSM.numberGap(true) !== WSM.numberGap(false), true)
+group('a slot is the label plus equal padding', () => {
+  eq('an 8px label with a 2px pad is 12px wide', WSM.numberBoxWidth(8, 2), 12)
+  eq('the padding is charged on both edges', WSM.numberBoxWidth(8, 2) - 8, 4)
+  eq('a wider label widens the slot by the same amount', WSM.numberBoxWidth(14, 2) - WSM.numberBoxWidth(8, 2), 6)
+  eq('a negative label width contributes nothing', WSM.numberBoxWidth(-5, 2), 4)
+  eq('a fractional label width is floored', WSM.numberBoxWidth(8.9, 2), WSM.numberBoxWidth(8, 2))
+  eq('a negative pad is clamped', WSM.numberBoxWidth(8, -2), 8)
+  eq('a fractional pad is floored', WSM.numberBoxWidth(8, 2.9), WSM.numberBoxWidth(8, 2))
+  eq('a two-digit slot is wider than a one-digit one', WSM.numberBoxWidth(14, 2) > WSM.numberBoxWidth(8, 2), true)
 })
-group('the gap between two piles is a property of the shape', () => {
-  eq('at scale 1 the piles are 4px apart', WSM.pileGap(1), 4)
-  eq('scale 2 opens it', WSM.pileGap(2), 8)
-  eq('a small scale keeps a legible minimum', WSM.pileGap(0.2), 3)
-  for (const bad of [0, -1, NaN, undefined, null, 'two']) {
-    eq(`the gap scale ${String(bad)} falls back to 1`, WSM.pileGap(bad), 4)
-  }
-  // Number-only spacing is supplied by numberGap(); metrics() receives the
-  // chosen value so the strip geometry and its QML delegates stay in sync.
-  eq('the plain strip gap is 3px', WSM.metrics(1, WSM.numberGap(false)).gap, 3)
-  eq('boxes touch', WSM.metrics(1, WSM.numberGap(true)).gap, 0)
-})
-group('the pill is shorter than the bar it sits in', () => {
-  eq('a 28px bar yields a 22px pill', WSM.pillHeight(28, 1), 22)
-  eq('it is inset on both edges', 28 - WSM.pillHeight(28, 1), 6)
-  eq('a bigger bar yields a proportionally inset pill', WSM.pillHeight(40, 1) < 40, true)
-  eq('and it is never the full height', [20, 28, 40, 60].every(h => WSM.pillHeight(h, 1) < h), true)
-  eq('a tiny bar still yields a usable pill', WSM.pillHeight(8, 1), 8)
-  eq('the inset never eats the whole bar', [4, 8, 10, 20].every(h => WSM.pillHeight(h, 1) >= 8), true)
-  for (const bad of [0, -1, NaN, undefined, null, 'two']) {
-    eq(`the pill scale ${String(bad)} falls back to 1`, WSM.pillHeight(28, bad), 22)
-  }
-  eq('a fractional bar height rounds to a whole pixel', Number.isInteger(WSM.pillHeight(27.6, 1)), true)
-})
-group('the pill corners are a chip, not a stadium', () => {
-  // height/2 rounds the corners so far that the shape reads as a lozenge and
-  // the number stops looking like it sits in a box. This is the assertion
-  // that keeps the radius from being put back.
-  const stadium = h => WSM.pillHeight(h, 1) / 2
-  eq('a 28px bar yields a 4px radius', WSM.pillRadius(28, 1), 4)
-  eq('well under the 11px a stadium would use', WSM.pillRadius(28, 1) < stadium(28), true)
-  eq('and at least twice smaller than one', stadium(28) / WSM.pillRadius(28, 1) >= 2, true)
-  // Parallel sides and parallel top/bottom edges are what make it read as a
-  // container; a stadium has neither.
-  eq('it is never a stadium at any bar height', [16, 20, 28, 40, 60].every(h => WSM.pillRadius(h, 1) < stadium(h)), true)
-  // A fifth of the pill where that clears the floor. Below the floor the
-  // radius is a constant 3px, which is what keeps a short pill's corners
-  // visible at all - so the ratio is only claimed where it actually applies.
-  eq('it is about a fifth of the pill', [20, 28, 40, 60].every(h => WSM.pillRadius(h, 1) === Math.round(WSM.pillHeight(h, 1) / 5)), true)
-  eq('and it never exceeds a quarter where the floor is not binding', [20, 28, 40, 60].every(h => WSM.pillRadius(h, 1) <= WSM.pillHeight(h, 1) / 4), true)
-  eq('and never rounds a short pill into a circle', [4, 8, 10].every(h => WSM.pillRadius(h, 1) < WSM.pillHeight(h, 1) / 2), true)
-  eq('it has a visible floor', WSM.pillRadius(8, 1) >= 3, true)
-  eq('it tracks the pill rather than a fixed number', WSM.pillRadius(60, 1) > WSM.pillRadius(28, 1), true)
-  for (const bad of [0, -1, NaN, undefined, null, 'two']) {
-    eq(`the radius scale ${String(bad)} falls back to 1`, WSM.pillRadius(28, bad), 4)
-  }
-})
-group('the pile fill stays faint', () => {
-  const m = WSM.metrics(1, 0)
-  // The bar sits on a wallpaper, so a strong fill reads as a slab of flat
-  // colour and competes with the icons it is meant to be framing.
-  eq('the occupied fill is a whisper', m.pillFill, 0.06)
-  eq('the focused fill is stronger but still faint', m.pillFillFocused, 0.13)
-  eq('focused reads above occupied', m.pillFillFocused > m.pillFill, true)
-  eq('neither is opaque', [m.pillFill, m.pillFillFocused].every(a => a > 0 && a < 0.2), true)
-  eq('and neither is invisible', [m.pillFill, m.pillFillFocused].every(a => a >= 0.05), true)
-  // The two states must stay separable at a glance, or the strip loses the
-  // current/occupied/empty reading it is there to give.
-  eq('the two states are visibly apart', m.pillFillFocused - m.pillFill >= 0.05, true)
-})
-group('hover is a lift on top of the state, not a fourth state', () => {
-  const m = WSM.metrics(1, 0)
-  eq('the lift is 0.1', m.pillHover, 0.1)
-  // An offset rather than a parallel branch, so hovering composes with the
-  // state underneath instead of overriding it: the pile you point at always
-  // lifts by the same amount, and focused/occupied still read through it.
-  eq('a hovered occupied pile', m.pillFill + m.pillHover, 0.16)
-  eq('a hovered focused pile', m.pillFillFocused + m.pillHover, 0.23)
-  // An empty pile is transparent, so hover is the only affordance it has -
-  // and it must actually appear rather than lift nothing.
-  eq('a hovered empty pile lifts from nothing', 0 + m.pillHover, 0.1)
-  eq('every hovered state is fainter than opaque', [0.16, 0.23, 0.1].every(a => a < 0.35), true)
-  eq('and the lift is the same for all of them',
-    [m.pillFill, m.pillFillFocused, 0].every(base => Math.round((base + m.pillHover) * 100) - Math.round(base * 100) === 10), true)
-  eq('the lift is positive, so hover is visible at all', m.pillHover > 0, true)
-  // It is a tint ALPHA, so it has to stay a fraction.
-  eq('the lift is a fraction, not a percentage', m.pillHover > 0 && m.pillHover < 1, true)
-})
-group('pileWidth is the number, the icons and the padding', () => {
-  const m = WSM.metrics(1, 0)
-  // An empty pile is the number and the pill's own air, and nothing else.
-  // Reserving the number-to-icons gap unconditionally left dead pixels on
-  // the right of an empty workspace's label, so the number read off-centre.
-  const bare = m.pad * 2 + 8
-  eq('an empty pile is the number and its air', WSM.pileWidth(0, 0, 8, m), bare)
-  eq('and reserves no gap for icons that are not there', WSM.pileWidth(0, 0, 8, m), bare)
-  eq('which makes the number exactly centred in it', WSM.pileWidth(0, 0, 8, m) - bare, 0)
-  eq('one icon adds the gap and its side', WSM.pileWidth(1, 0, 8, m), bare + m.numGap + m.icon)
-  eq('two icons add a side and a gap', WSM.pileWidth(2, 0, 8, m), bare + m.numGap + 2 * m.icon + m.iconGap)
-  eq('three icons add a third side and a second gap', WSM.pileWidth(3, 0, 8, m), bare + m.numGap + 3 * m.icon + 2 * m.iconGap)
-  // The label is measured by the caller's Text, so a two-digit workspace
-  // really is wider than a one-digit one.
-  eq('a wider label widens the pile', WSM.pileWidth(1, 0, 14, m) - WSM.pileWidth(1, 0, 8, m), 6)
-  eq('and widens an empty pile by the same amount', WSM.pileWidth(0, 0, 14, m) - WSM.pileWidth(0, 0, 8, m), 6)
-  eq('the overflow chip costs a gap and the chip', WSM.pileWidth(2, 3, 8, m) - WSM.pileWidth(2, 0, 8, m), m.iconGap + m.overflow)
-  eq('an overflow with no icons shown costs no leading gap', WSM.pileWidth(0, 2, 8, m) - WSM.pileWidth(0, 0, 8, m), m.overflow)
-  eq('a negative count is treated as none', WSM.pileWidth(-2, 0, 8, m), bare)
-  eq('a negative label width contributes nothing', WSM.pileWidth(0, 0, -5, m), m.pad * 2)
-  eq('a fractional count is floored', WSM.pileWidth(2.9, 0, 8, m), WSM.pileWidth(2, 0, 8, m))
-  eq('widths grow monotonically with the icon count', [0, 1, 2, 3, 4].map(n => WSM.pileWidth(n, 0, 8, m)), [0, 1, 2, 3, 4].map(n => WSM.pileWidth(n, 0, 8, m)).sort((a, b) => a - b))
-  // The first icon is what the number-to-icons gap is FOR, so adding it must
-  // cost strictly more than the icon itself.
-  eq('the first icon costs a gap on top of its side', WSM.pileWidth(1, 0, 8, m) - bare > m.icon, true)
-})
-group('the fixed icon slots reproduce exactly the width that was budgeted', () => {
-  // The icon row renders a FIXED MAX_ICONS slots, each occupied one carrying
-  // its icon plus the gap that follows it and the last one carrying no
-  // trailing gap. This is that sum, spelled out here, because the row and
-  // pileWidth are two implementations of one number and nothing else holds
-  // them together: if either drifts, the icons overflow the pill or fall
-  // short of the space reserved for them.
-  const m = WSM.metrics(1, 0)
-  const slotRow = (shown) => {
-    let total = 0
-    for (let i = 0; i < shown; i++) total += m.icon + (i === shown - 1 ? 0 : m.iconGap)
-    return total
-  }
-  for (let n = 1; n <= WSM.MAX_ICONS; n++) {
-    // pileWidth also charges the gap between the number and the icons, and
-    // the label, neither of which belongs to the icon row.
-    const budgeted = WSM.pileWidth(n, 0, 0, m) - (m.pad * 2) - m.numGap
-    eq(`${n} icon${n === 1 ? '' : 's'} occupy the width that was budgeted`, slotRow(n), budgeted)
-  }
-  eq('no trailing gap after the last icon', slotRow(1) - slotRow(0), m.icon)
-  eq('each extra icon costs a side and a gap', slotRow(2) - slotRow(1), m.icon + m.iconGap)
-  eq('an empty row occupies nothing', slotRow(0), 0)
-  // An empty slot collapses to zero, so dropping an icon out of the middle of
-  // a run hands back its side AND the gap behind it, and the run closes over
-  // rather than holding a hole open.
-  eq('dropping the last of n icons frees its side and its gap',
-    slotRow(3) - slotRow(2), m.icon + m.iconGap)
-  eq('dropping the only icon frees just its side', slotRow(1) - slotRow(0), m.icon)
-})
+
 // One thing neither copy does, recorded so the gap is visible in the total
 // rather than silently absent.
 skip('the OSD/island consumers of the time-gated helpers', 'the callers are QML; only the pure halves are asserted here')

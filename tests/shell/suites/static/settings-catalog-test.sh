@@ -1219,10 +1219,10 @@ for ((i = 0; i < NF; i++)); do
   t_ne "${F_REL[$i]} contributes at least one option" "0" "${F_OPTS[$i]}"
 done
 t_eq "no catalog file failed to parse as JSONC" "0" "$BADJSON"
-t_eq "the 28 files declare 43 pages between them" "43" \
+t_eq "the 28 files declare 42 pages between them" "42" \
   "$(for ((i = 0; i < NF; i++)); do printf '%s\n' "${F_PAGES[$i]}"; done |
     awk '{ s += $1 } END { print s + 0 }')"
-t_eq "and 197 options" "197" \
+t_eq "and 196 options" "196" \
   "$(for ((i = 0; i < NF; i++)); do printf '%s\n' "${F_OPTS[$i]}"; done |
     awk '{ s += $1 } END { print s + 0 }')"
 
@@ -1238,14 +1238,14 @@ t_eq "and no store reported an error while claiming to have composed" "" \
   done)"
 t_eq "and the probe's err.tsv is empty: no store and no file reported anything" "0" \
   "$(grep -c . "$PROBE_DIR/err.tsv")"
-t_eq "the settings store's 25 pages carry 94 options" "94" "$(store_field settings OPTS)"
+t_eq "the settings store's 24 pages carry 93 options" "93" "$(store_field settings OPTS)"
 t_eq "the hypr store's 18 pages carry 103 options" "103" "$(store_field hypr OPTS)"
 t_eq "the misc store's one page carries 10 options" "10" "$(store_field misc OPTS)"
 t_eq "every store's page ids are unique" "" \
   "$(for ((i = 0; i < NST; i++)); do
     [[ "${ST_PAGES[$i]}" == "${ST_UNIQ[$i]}" ]] || printf '%s ' "${ST_NAME[$i]}"
   done)"
-t_eq "the two page-owning stores together hold 43 unique pages" "43" \
+t_eq "the two page-owning stores together hold 42 unique pages" "42" \
   "$(( $(store_field settings PAGES) + $(store_field hypr PAGES) ))"
 t_eq "and the misc store contributes no page of its own" "1" "$(store_field misc PAGES)"
 t_note "MiscSettings.qml:131 builds a synthetic page (id \"misc\") from the misc.* options it adopted and publishes only that, so the \"general\" page it re-parses from shell/10-wallpaper.jsonc never reaches a second bundle"
@@ -1266,7 +1266,7 @@ t_ne "and that class is non-empty, so the check above is not vacuous" "0" "$STRI
 # --------------------------------------------------------------------------
 
 t_section "every option: type, namespace and the engine's own verdict"
-t_eq "the catalog declares 197 options across the two page-owning stores" "197" "$NO"
+t_eq "the catalog declares 196 options across the two page-owning stores" "196" "$NO"
 declare -A TYPE_COUNT=()
 declare -A NS_COUNT=()
 declare -A VIS_COUNT=()
@@ -1443,7 +1443,7 @@ for ((i = 0; i < NI; i++)); do
   t_match "${I_PAGE[$i]}/${I_LABEL[$i]}'s target is a page id" \
     '^[a-z0-9_-]+$' "${I_TARGET[$i]}"
 done
-t_eq "the catalog declares 28 submenus" "28" "$SUBMENUS"
+t_eq "the catalog declares 27 submenus" "27" "$SUBMENUS"
 t_eq "all $SUBMENUS submenus resolve" "" "$(dangling_submenus)"
 
 t_section "raw items: only raw items carry free bash"
@@ -1521,8 +1521,8 @@ t_note "the catalog's shipped timer list is legal exactly as written: both comma
 # --------------------------------------------------------------------------
 
 t_section "page ids are unique, derived and never silently deduped"
-t_count "the settings and hypr stores declare 43 pages between them" "43" "$NG"
-t_unique "the 44 page ids are distinct" \
+t_count "the settings and hypr stores declare 42 pages between them" "42" "$NG"
+t_unique "the 43 page ids are distinct" \
   "$(for p in "${G_OWNED[@]}"; do printf '%s\n' "${G_PAGE[$p]}"; done)"
 NOICON=0
 for p in "${G_OWNED[@]}"; do
@@ -1536,7 +1536,7 @@ t_eq "no page id needed the engine's -2 dedupe suffix" "0" \
 t_contains "and the engine only appends that suffix on a collision" \
   'seenPages[page] !== undefined) page = sections[s].page + "-" + n++' \
   "$(grep -m1 'seenPages\[page\] !== undefined' "$SETTINGS_LIB")"
-t_note "$NOICON of $NG pages declare no icon: the 7 bar-module-* subpages, hyprland-edit and hyprland-appearance-decoration are reached as submenu rows, and a page with no icon still renders"
+t_note "$NOICON of $NG pages declare no icon: the 6 bar-module-* subpages, hyprland-edit and hyprland-appearance-decoration are reached as submenu rows, and a page with no icon still renders"
 
 t_section "the bar layout, through validateLayout"
 t_eq "exactly one option is a layout" "1" "$(sval layout.count)"
@@ -1560,16 +1560,16 @@ t_eq "every disabled module is one a live zone also carries" "0" \
 t_note "layout.disabled lists the 8 modules currently switched off, so all 8 also appear in a live zone: a zone id missing from disabled means the module is on, and a disabled id in no zone at all would be a module the user can never turn back on"
 
 t_section "the generated menu bundle, from the merged schema"
-t_eq "buildBundle emits 44 pages: the 43 catalog pages plus the settings index" \
-  "44" "$(sval bundle.pages)"
+t_eq "buildBundle emits 43 pages: the 42 catalog pages plus the settings index" \
+  "43" "$(sval bundle.pages)"
 t_eq "the synthetic index is page \"settings\"" "settings" "$(sval bundle.indexId)"
 t_eq "its title comes from _index.jsonc" "Settings" "$(sval bundle.indexTitle)"
 t_eq "and no width at all: the card measures the rows it shows" "-" \
   "$(sval bundle.indexWidth)"
 t_eq "the title is the root chrome _index.jsonc declares" "Settings" "$(sval index.title)"
-t_eq "the index links 15 top-level pages: the 28 submenu targets are children" \
+t_eq "the index links 15 top-level pages: the 27 submenu targets are children" \
   "15" "$(sval bundle.indexItems)"
-t_eq "and there are exactly 28 submenu targets" "28" "$(sval bundle.childPages)"
+t_eq "and there are exactly 27 submenu targets" "27" "$(sval bundle.childPages)"
 t_eq "exactly one bundle page is the synthetic index" "1" \
   "$(for ((i = 0; i < NB; i++)); do [[ "${B_KIND[$i]}" == "index" ]] && printf 'x'; done | grep -c .)"
 t_eq "and it is the one buildBundle unshifted at position 0" "settings" \
@@ -1599,7 +1599,7 @@ t_eq "no bundle page carries a width" "" "$WIDTHED"
 t_eq "no catalog page is dropped from the bundle for having nothing visible" "" "$DROPPED"
 t_eq "the bundle's only page the catalog does not declare is the index" \
   "settings " "$EXTRA"
-t_note "the index links 16 of the 44 pages because buildBundle keeps a page that is a submenu target out of the top level (SettingsLib.js:1349); the 28 children stay reachable through their parent"
+t_note "the index links 16 of the 43 pages because buildBundle keeps a page that is a submenu target out of the top level (SettingsLib.js:1349); the 27 children stay reachable through their parent"
 
 t_section "the bash env projection, from the same validated values"
 t_eq "renderEnv writes 11 KEY=VAL lines" "11" "$(sval env.lines)"

@@ -236,28 +236,6 @@
           "sub": "Fill the bar icon with last copied color"
         }
       ]
-    },
-    {
-      "id": "bar-module-workspaces",
-      "label": "Workspaces",
-      "desc": "Options of the bar workspaces module.",
-      "showItemCount": true,
-      "options": [
-        {
-          "key": "shell.statusbar.workspacesAppearance",
-          "type": "string",
-          "default": "plain",
-          "values": ["plain", "boxes", "piles"],
-          "valueLabels": {
-            "plain": "Numbers",
-            "boxes": "Boxes",
-            "piles": "Piles"
-          },
-          "label": "Appearance",
-          "sub": "Choose how workspaces are displayed",
-          "desc": "Numbers and boxes use equal-width slots; piles show icons for the apps on each workspace."
-        }
-      ]
     }
   ]
 }
