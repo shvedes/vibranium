@@ -409,11 +409,15 @@ Rectangle {
   // knows which. A filter surface that leaves this unbound snaps every
   // resize typed inside the window.
   property bool sizeMotionDuringGate: false
-  // Snap switch for regime replacements (launcher app-pool <-> engine
-  // answer). While true the size tweens below stand down and the card takes
-  // its fitted size instantly, so a row-set replacement lands opacity-only
-  // under the caller's fade instead of gliding its edge there. Default
-  // false: no consumer that never sets it can observe any change.
+  // Snap switch for sizing instants that must not tween (launcher regime
+  // replacements and opens). While true the size tweens below stand down
+  // and the card takes its fitted size instantly, so a row-set replacement
+  // lands opacity-only under the caller's fade instead of gliding its edge
+  // there. An open arms it while hidden - the open's first sizing instant
+  // shares a turn with the show gate closing, which a Behavior reads
+  // stale - and input or the gate opening releases it, so typing still
+  // glides. Default false: no consumer that never sets it can observe any
+  // change.
   property bool sizeSnap: false
   Timer {
     id: showGate

@@ -3175,11 +3175,12 @@ group('clipEntryKind is the verdict the entry settled for itself', () => {
 })
 
 group('the suggestion rides with the open via the copy-time hint', () => {
-  // A hinted local target renders from its copy-time hint on frame one, so
-  // the suggestion rides with the open instead of arriving a probe late; the
-  // async stat probe verifies in the background and a missing verdict drops
-  // the row when it lands. A hint-less path is withheld entirely, same
-  // withholding the typed-path fallback applies.
+  // Every unverified local target renders provisionally on frame one - from
+  // its copy-time hint when one exists, assumed a file otherwise - so the
+  // open sizes itself with the suggestion already counted instead of
+  // growing the window when the probe lands; the async stat probe verifies
+  // in the background, a dir/file verdict corrects the shape in place and
+  // a missing verdict drops the row. Only a verified missing path withholds.
   const controller = fs.readFileSync(path.join(LAUNCHER, 'AppLauncherController.qml'), 'utf8')
   notContains('the refresh no longer withholds the target while the probe runs',
     controller, 'root.clipTarget = null')
@@ -3187,12 +3188,12 @@ group('the suggestion rides with the open via the copy-time hint', () => {
     'if (resolved && resolved.kind === "local" && !BoundedCache.has(AppLauncher.statCache, resolved.value)) {')
   contains('a verified verdict renders from the verdict', controller,
     'if (st === "dir" || st === "file")')
-  contains('an unverified hinted path renders from the hint', controller,
-    't.hint === "dir" || t.hint === "file"')
-  contains('and the probe still re-arms itself per unknown path', controller,
-    'if (st === undefined && !(pathStatProc.running && pathStatProc.path === t.value)) root._statPath(t.value)')
-  // A missing verdict drops the hinted row when it lands; only a hint-less
-  // path is withheld up front.
+  contains('an unverified path renders provisionally, hint first and a file otherwise', controller,
+    '(t.hint === "dir" || t.hint === "file") ? t.hint : "file"')
+  contains('and the probe still arms itself per unknown path', controller,
+    'if (!(pathStatProc.running && pathStatProc.path === t.value)) root._statPath(t.value)')
+  // A missing verdict drops the provisional row when it lands; only a
+  // verified missing path is withheld up front.
   notContains('a bare missing guard is not the withholding rule', controller,
     'if (st === "missing") return null')
   contains('the hint travels with the resolved target', controller,
@@ -3205,6 +3206,23 @@ group('the suggestion rides with the open via the copy-time hint', () => {
     'label: kind === "dir" ? "Open folder from the clipboard" : "Open file from the clipboard"')
   contains('and only the icon names a path as a folder', controller,
     'LauncherLib.pathIconName(kind === "dir", t.value)')
+})
+
+group('the open spawns at its fitted size instead of growing into it', () => {
+  // The open's first sizing instant shares a turn with the show gate
+  // closing, which a Behavior reads stale - so a height delta to a new row
+  // set (a fresh clipboard suggestion) would glide from the old height
+  // instead of spawning. The panel arms PanelCard.sizeSnap while hidden, a
+  // turn early, and releases it on input or when the gate opens, so the
+  // open sizes itself under that snap while typing still glides.
+  const panel = fs.readFileSync(path.join(LAUNCHER, 'LauncherPanel.qml'), 'utf8')
+  contains('the close arms the open-time snap', panel, 'panel.sizeSnap = true')
+  notContains('and the open keeps the armed snap instead of disarming it', panel,
+    'panel.sizeSnap = false\n      panel.show()')
+  contains('input while visible releases it, so typing still glides', panel,
+    'if (AppLauncher.visible) panel.sizeSnap = false')
+  contains('and the gate opening releases it too', panel,
+    'if (panel.shown) panel.sizeSnap = false')
 })
 
 // =========================================================================

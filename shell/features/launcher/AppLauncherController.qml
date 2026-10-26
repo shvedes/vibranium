@@ -181,10 +181,10 @@ Item {
   // Openable target resolved from the newest clipboard entry:
   // { kind: "url" | "uri" | "local", value, basename, hint } or null. A local
   // target carries in `hint` the folder/file verdict the entry's own capture
-  // settled ("dir" | "file"); the row still withholds until the stat probe
-  // verifies it, so the hint never paints provisionally. The suggestion row
-  // rides above the idle app list; refreshed on open and on clipboard writes
-  // while visible.
+  // settled ("dir" | "file"); the row paints from it while the stat probe
+  // verifies it in the background, so the suggestion rides with the open at
+  // its final size instead of growing the window when the verdict lands.
+  // Refreshed on open and on clipboard writes while visible.
   property var clipTarget: null
 
   // Filesystem verdicts live on the facade (AppLauncher.statCache), not here:
@@ -975,9 +975,10 @@ Item {
     const v = LauncherLib.statVerdict(pathStatProc.out, pathStatProc.seq)
     if (v === null) return // aborted run's stale exit
     BoundedCache.put(AppLauncher.statCache, pathStatProc.path, v.verdict)
-    // A dir/file verdict for the live suggestion inserts the withheld row;
-    // a missing verdict leaves the withheld list unchanged, so neither
-    // paints a flash. Stale exits (seq mismatch above) return before this.
+    // The live suggestion already paints provisionally (hint, or an assumed
+    // file), so a dir/file verdict keeps or corrects that row in place -
+    // same row count, same height, no window resize - while a missing
+    // verdict drops it. Stale exits (seq mismatch above) return before this.
     if (AppLauncher.visible && AppLauncher.entry.trim() === "") {
       const live = root.clipTarget ? root.clipTarget.value : ""
       if (pathStatProc.path === live) root.recompute()
@@ -997,8 +998,9 @@ Item {
       BoundedCache.remove(AppLauncher.statCache, cur)
     }
     // The target is published while its probe is still in flight; _clipRow
-    // renders a hinted local path from the copy-time hint meanwhile, so the
-    // suggestion rides with the open and the probe only corrects it.
+    // renders the local path provisionally meanwhile (copy-time hint, or an
+    // assumed file), so the suggestion rides with the open at its final
+    // size and the probe only corrects it.
     if (resolved && resolved.kind === "local" && !BoundedCache.has(AppLauncher.statCache, resolved.value)) {
       root._statPath(resolved.value)
     }
@@ -1035,12 +1037,13 @@ Item {
   // local paths open in their default system app.
   //
   // A local path with a verified dir/file verdict renders from that verdict.
-  // A path the stat probe has not verified yet renders from the copy-time
-  // hint when one exists, so the suggestion rides with the open instead of
-  // arriving a probe late; the probe still runs in the background and a
-  // missing verdict drops the row when it lands. A hint-less path is
-  // withheld entirely, same as the typed-path fallback (see _appRows): no
-  // provisional row before the swap.
+  // A path the stat probe has not verified yet renders provisionally - from
+  // the copy-time hint when one exists, assumed a file otherwise - so the
+  // suggestion rides with the open at its final size instead of arriving a
+  // probe late and growing the window after it; the probe still runs in the
+  // background, a dir/file verdict corrects the provisional shape in place,
+  // and a missing verdict drops the row when it lands. Only a verified
+  // missing path withholds the row up front.
   function _clipRow() {
     if (!root.showClipSuggestion) return null
     const t = root.clipTarget
@@ -1064,14 +1067,15 @@ Item {
     let kind = ""
     if (st === "dir" || st === "file") {
       kind = st
-    } else if (st === undefined && (t.hint === "dir" || t.hint === "file")) {
-      kind = t.hint
+    } else if (st === undefined) {
+      // No verdict yet: render provisionally and verify in the background,
+      // so the open sizes itself with the suggestion already counted. The
+      // copy-time hint decides the provisional shape; a hint-less path
+      // assumes a file (the uri-list default too, see clipEntryKind).
+      kind = (t.hint === "dir" || t.hint === "file") ? t.hint : "file"
       if (!(pathStatProc.running && pathStatProc.path === t.value)) root._statPath(t.value)
     } else {
-      // No verdict yet (or missing): withhold the row and arm the probe.
-      // The verdict inserts the row when it lands; a hint-less path never
-      // paints provisionally.
-      if (st === undefined && !(pathStatProc.running && pathStatProc.path === t.value)) root._statPath(t.value)
+      // Verified missing: withhold the row.
       return null
     }
     return {
