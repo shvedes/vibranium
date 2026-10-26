@@ -186,15 +186,14 @@ Item {
                 opacity: 0.7
                 transformOrigin: Item.Center
 
-                // The spinner is motion whether or not it is a Behavior, so
-                // the policy gates the run itself: with it off the glyph
-                // holds a static angle while the reload is in flight.
+                // Activity feedback, not decoration: the spinner runs while a
+                // reload is in flight regardless of the motion policy.
                 RotationAnimation on rotation {
                   from: 0
                   to: 360
                   duration: 1000
                   loops: Animation.Infinite
-                  running: Svc.Printers.state === "loading" && MotionPolicy.enabled
+                  running: Svc.Printers.state === "loading"
                   onRunningChanged: if (!running) reloadSpin.rotation = 0
                 }
               }
@@ -573,7 +572,7 @@ Item {
                   to: 360
                   duration: 1000
                   loops: Animation.Infinite
-                  running: jobRow.processing && MotionPolicy.enabled
+                  running: jobRow.processing
                   onRunningChanged: if (!running) statusIcon.rotation = 0
                 }
               }
@@ -625,7 +624,7 @@ Item {
                 to: 360
                 duration: 1000
                 loops: Animation.Infinite
-                running: jobRow.pending && MotionPolicy.enabled
+                running: jobRow.pending
                 onRunningChanged: if (!running) pendingSpin.rotation = 0
               }
             }
