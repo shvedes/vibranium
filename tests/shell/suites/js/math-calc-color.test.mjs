@@ -3698,7 +3698,7 @@ group('SUGGEST_RANGE keeps the astronomical rows from padding a list', () => {
   // [smallest, largest] and it applies on top of readable(), so a reading has to
   // clear BOTH to earn a row.
   const R = UL.SUGGEST_RANGE
-  eq('the five bounded symbols are the astronomical ones',
+  eq('the eight bounded symbols are the astronomical ones',
     Object.keys(R).sort(), ['au', 'ld', 'lh', 'lmin', 'ls', 'ly', 'lw', 'pc'].filter((k) => k in R).sort())
   eq('every bound is a [smallest, largest] pair',
     Object.entries(R).filter(([, v]) => !Array.isArray(v) || v.length !== 2
@@ -3713,15 +3713,17 @@ group('SUGGEST_RANGE keeps the astronomical rows from padding a list', () => {
   // The head is exempt from every bound, which is the contract that keeps a
   // documented default in first place: pickDefault's answer is never filtered.
   eq('and the head is the default regardless', moon[0], UL.pickDefault(384400, UL.symLookup('km')))
-  // A parsec in light-minutes is 8.6 million, five decades past the ceiling,
-  // so a bare parsec offers only its own default. The head survives because the
-  // default is exempt from every bound, which is the same contract the whole
-  // shortlist rests on.
-  eq('a parsec offers only its default', UL.pickTargets(1, UL.symLookup('pc')), ['ly'])
+  // A parsec in light-minutes is 1.7 million, past the ceiling, so the small
+  // rungs drop out - but the hour, day and week rungs read well (28600 lh,
+  // 1191 ld, 170 lw), so a bare parsec offers them behind its default. The
+  // head survives because the default is exempt from every bound, which is
+  // the same contract the whole shortlist rests on.
+  eq('a parsec offers its light rungs behind the default', UL.pickTargets(1, UL.symLookup('pc')), ['ly', 'lh', 'ld', 'lw'])
   eq('and the default is what pickDefault said', UL.pickDefault(1, UL.symLookup('pc')), 'ly')
-  // A bare light-year keeps the astronomical neighbours and drops the rungs it
-  // would be a silly reading in: 1 ly is 5.3e8 light-minutes.
-  eq('a light-year keeps au and a parsec', UL.pickTargets(1, UL.symLookup('ly')), ['km', 'au', 'pc'])
+  // A bare light-year keeps the astronomical neighbours and the light rungs
+  // that still read well (8766 lh, 365 ld, 52 lw), and drops the ones that
+  // would be a silly reading: 1 ly is 31 million light-seconds.
+  eq('a light-year keeps its light rungs, au and a parsec', UL.pickTargets(1, UL.symLookup('ly')), ['km', 'lh', 'ld', 'lw', 'au', 'pc'])
   // And the bound is what changed: without it every one of these would appear.
   eq('so the astronomical names are in the shortlist to be filtered, not shown',
     UL.SUGGEST.length.filter((s) => s in R).length > 0, true)

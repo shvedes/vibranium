@@ -525,7 +525,7 @@ var MAX_TARGETS = 6;
 // The head of the row list is not here: it is pickDefault's answer, so the
 // first row of a bare query is the same row a single-answer engine showed.
 var SUGGEST = {
-  length: ["cm", "ft", "in", "mm", "km", "yd", "mi", "nmi", "ls", "lmin", "au", "ly", "pc"],
+  length: ["cm", "ft", "in", "mm", "km", "yd", "mi", "nmi", "ls", "lmin", "lh", "ld", "lw", "au", "ly", "pc"],
   mass: ["g", "lb", "oz", "st", "ton", "t", "mg", "Mearth", "Mjup", "Msun"],
   volume: ["ml", "l", "floz", "tsp", "tbsp", "cup", "gal", "pt", "qt"],
   speed: ["km/h", "mph", "m/s", "kn", "ft/s", "m/min"],
@@ -557,7 +557,7 @@ var SUGGEST = {
 // parsec answered as "8577260 light-minutes" are rows that only pad the list.
 // A bound is [smallest, largest] reading, and it applies on top of readable().
 var SUGGEST_RANGE = {
-  ls: [0.01, 1e5], lmin: [0.01, 1e5], au: [0.01, 1e5], ly: [0.01, 1e5], pc: [0.01, 1e5]
+  ls: [0.01, 1e5], lmin: [0.01, 1e5], lh: [0.01, 1e5], ld: [0.01, 1e5], lw: [0.01, 1e5], au: [0.01, 1e5], ly: [0.01, 1e5], pc: [0.01, 1e5]
 };
 
 // How far a reading may sit from a number a person says out loud. A value is
