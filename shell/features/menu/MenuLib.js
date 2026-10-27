@@ -513,8 +513,11 @@ function parseBundle(text) {
   // deliberate: a scalar document wraps into a one-page bundle at the default
   // id. Only null is refused, and it is refused HERE because reading raw.pages
   // off it raised a bare TypeError naming nothing about which file was bad.
+  // A unified catalog carries both settings `pages` and menu `menus`: the
+  // menu always reads `menus` from it, while the settings stores read
+  // `pages` through SettingsLib.parseUnifiedCatalog.
   if (raw === null) throw new Error("bundle is null")
-  const rawPages = Array.isArray(raw) ? raw : (Array.isArray(raw.pages) ? raw.pages : [raw])
+  const rawPages = Array.isArray(raw) ? raw : (Array.isArray(raw.menus) ? raw.menus : (Array.isArray(raw.pages) ? raw.pages : [raw]))
   const pages = []
   // Prototype-less: the keys are page ids, and they come from a file. A page
   // declared `"id": "__proto__"` did not create a key - it assigned byId's
@@ -847,6 +850,49 @@ function guardLine(uid, tag, expression) {
 // Each entry carries its breadcrumb path: the chain of submenu pages from
 // the entry page down to the owning page, so hits can show WHERE they live
 // (omarchy-style). Unreachable pages contribute their own title only.
+// Sub-bundle spanning an entry's reachable pages: the unified catalog holds
+// every menu, but search (and the external-half gate) span only the opened
+// entry's tree - the way one-file-per-menu scoped both before. Reachability
+// follows submenu links inside `base`; `extraIds` (user-extension pages,
+// always searched, as before) join the seeds. The entry names the bundle's
+// own entry so breadcrumbs read relative to the opened page, as before.
+function scopeBundle(base, entryId, extraIds) {
+  const seeds = []
+  const seed = (id) => {
+    if (typeof id !== "string" || id === "" || base.byId[id] === undefined) return
+    if (seeds.indexOf(id) < 0) seeds.push(id)
+  }
+  seed(entryId)
+  if (seeds.length === 0) seed(base.entry)
+  if (Array.isArray(extraIds)) for (let i = 0; i < extraIds.length; i++) seed(extraIds[i])
+  const seen = Object.create(null)
+  const queue = seeds.slice()
+  for (let i = 0; i < seeds.length; i++) seen[seeds[i]] = true
+  while (queue.length > 0) {
+    const id = queue.shift()
+    const pg = base.byId[id]
+    if (!pg || !Array.isArray(pg.items)) continue
+    for (let i = 0; i < pg.items.length; i++) {
+      const it = pg.items[i]
+      if (!it || it.type !== "submenu" || typeof it.page !== "string" || it.page === "") continue
+      if (seen[it.page] === true || base.byId[it.page] === undefined) continue
+      seen[it.page] = true
+      queue.push(it.page)
+    }
+  }
+  const pages = base.pages.filter(p => seen[p.id] === true)
+  const byId = Object.create(null)
+  for (let i = 0; i < pages.length; i++) byId[pages[i].id] = pages[i]
+  let entry = base.entry
+  if (typeof entryId === "string" && entryId !== "" && seen[entryId] === true) entry = entryId
+  else if (byId[base.entry] === undefined) entry = pages.length > 0 ? pages[0].id : base.entry
+  return {
+    entry: entry,
+    pages: pages,
+    byId: byId
+  }
+}
+
 function buildIndex(bundle) {
   // parent page id -> set of child page ids (via submenu items).
   // Prototype-less throughout: every key here is a page id, so a page named

@@ -409,9 +409,9 @@ hl.bind(mainMod .. " + E", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { descrip
 
 -- Vibranium menus
 
-hl.bind("CTRL + ALT + V", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/default/vibranium/menus/main.jsonc" ), { description = "Vibranium menu" })
-hl.bind("XF86Tools", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/default/vibranium/menus/main.jsonc"), { description = "Vibranium menu" })
-hl.bind("CTRL + ALT + U", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/default/vibranium/menus/utilities.jsonc"), { description = "Utilities menu" })
+hl.bind("CTRL + ALT + V", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/shell/common/settings/catalog.jsonc#main" ), { description = "Vibranium menu" })
+hl.bind("XF86Tools", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/shell/common/settings/catalog.jsonc#main"), { description = "Vibranium menu" })
+hl.bind("CTRL + ALT + U", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/shell/common/settings/catalog.jsonc#utilities"), { description = "Utilities menu" })
 hl.bind("CTRL + ALT + P", hl.dsp.exec_raw("qs -p \"$VIBRANIUM/shell\" ipc call pass open"), { description = "Password manager" })
 hl.bind(mainMod .. " + period", hl.dsp.exec_raw("vb-shell menu toggleFile \"$VIBRANIUM/shell/features/pickers/emoji/emojis.jsonc\""), { description = "Emoji picker" })
 

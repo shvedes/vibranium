@@ -473,7 +473,7 @@ group('a page is uniform: label metadata plus options plus custom items', () => 
   eq('the width', s.width, 420)
   eq('showItemCount', s.showItemCount, true)
   eq('no errors', s.errors, [])
-  eq('a fresh section shape', Object.keys(s), ['page', 'label', 'desc', 'icon', 'width', 'showItemCount', 'options', 'items', 'errors'])
+  eq('a fresh section shape', Object.keys(s), ['page', 'label', 'desc', 'icon', 'width', 'showItemCount', 'group', 'options', 'items', 'errors'])
 })
 
 group('label aliases, the fallback label and page-id rules', () => {
@@ -591,6 +591,42 @@ group('parseCatalogDir: one file per namespace, duplicates are fatal', () => {
   eq('page ids dedupe across files too', SL.parseCatalogDir([
     '{"pages":[{"label":"General"}]}', '{"pages":[{"label":"General"}]}',
   ], ['env', 'env'], 0, '').sections.map((s) => s.page), ['general', 'general-2'])
+})
+
+group('parseUnifiedCatalog: one file, groups own the pages', () => {
+  const doc = (pages, extra) => JSON.stringify(Object.assign(
+    { title: 'Settings', pages: pages }, extra || {}))
+  const shellPage = { group: 'shell', label: 'General',
+    options: [{ key: 'shell.debug', type: 'bool', default: true }] }
+  const u = SL.parseUnifiedCatalog(doc([shellPage]))
+  eq('the group is carried onto the section', u.sections[0].group, 'shell')
+  eq('the root title passes through', u.rootTitle, 'Settings')
+  eq('menus default to null', u.menus, null)
+  eq('menus pass through raw',
+    SL.parseUnifiedCatalog(doc([shellPage], { menus: [{ id: 'main' }] })).menus, [{ id: 'main' }])
+  eq('a duplicate key is a hard error', (() => {
+    try {
+      SL.parseUnifiedCatalog(doc([shellPage, shellPage]))
+      return 'no-throw'
+    } catch (e) { return String(e.message) }
+  })(), 'duplicate option: shell.debug')
+  eq('a page without pages is refused', (() => {
+    try { SL.parseUnifiedCatalog('{"title":"x"}'); return 'no-throw' }
+    catch (e) { return String(e.message) }
+  })(), 'unified catalog needs a pages array')
+  // The group is the namespace assertion the old per-file layout gave for
+  // free: a hypr key on a shell page is an authoring error, not a throw.
+  eq('a namespace mismatch on the wrong group is a section error',
+    SL.parseUnifiedCatalog(doc([{ group: 'env', label: 'E',
+      options: [{ key: 'shell.debug', type: 'bool', default: true }] }])
+    ).sections[0].errors, ['shell.debug: namespace mismatch - shell option in env file'])
+  eq('an unknown group is a section error',
+    SL.parseUnifiedCatalog(doc([{ group: 'nope', label: 'N', options: [] }])
+    ).sections[0].errors, ['unknown group "nope" - want shell|env|hypr'])
+  eq('page ids dedupe like directory mode',
+    SL.parseUnifiedCatalog(doc([{ group: 'shell', label: 'General' },
+      { group: 'shell', label: 'General' }])).sections.map((s) => s.page),
+    ['general', 'general-2'])
 })
 
 group('sectionPageId is the deterministic page identity', () => {

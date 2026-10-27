@@ -2,12 +2,11 @@
 // validation, bash env rendering and menu bundle generation.
 //
 // No Qt imports - everything here is deterministic and unit-drivable.
-// The schema lives in a directory, $VIBRANIUM/default/vibranium/settings/:
-// per-domain JSONC files (shell/, env/, hypr/, misc/) plus _index.jsonc
-// root chrome. Directory decides namespace: shell/* holds only shell.*,
-// env/* only bare UPPER_SNAKE, hypr/* only hypr.*, misc/* only misc.*.
-// A lone APP_LAUNCHER_ALWAYS_FOCUS rides the App launcher page in
-// shell/11-launcher.jsonc, PLAYER_FADE_DURATION rides the media page,
+// The schema lives in one file, $VIBRANIUM/shell/common/settings/catalog.jsonc
+// (settings `pages` plus menu `menus`). Keys carry their own namespace:
+// shell.*, bare UPPER_SNAKE env, hypr.*, misc.*.
+// A lone APP_LAUNCHER_ALWAYS_FOCUS rides the App launcher page,
+// PLAYER_FADE_DURATION rides the media page,
 // and misc.cursorTheme and misc.cursorSize ride
 // the General page as documented cross-namespace exceptions.
 //
@@ -467,10 +466,14 @@ function parseSection(raw, fallback, allowId, fileNamespace) {
     icon: "",
     width: 0,
     showItemCount: false,
+    group: null,
     options: [],
     items: [],
     errors: []
   }
+  if (raw && typeof raw === "object" && !Array.isArray(raw)
+    && typeof raw.group === "string" && raw.group !== "")
+    section.group = raw.group
 
   if (!raw || typeof raw !== "object") {
     section.errors.push("page is not an object")
@@ -645,6 +648,68 @@ function parseCatalogDir(fileTexts, fileNamespaces, rootWidth, rootTitle) {
     rootWidth: typeof rootWidth === "number" && rootWidth > 0 ? Math.round(rootWidth) : 0,
     rootTitle: typeof rootTitle === "string" ? rootTitle : "",
     allowId: true
+  }
+}
+
+// Parse the unified catalog: one JSONC file holding settings `pages` plus
+// menu `menus`. Settings parse exactly like the old directory catalog but
+// with no per-file namespace to assert (parseOption already derives
+// shell/env/hypr/misc from the key, and the stores filter by ownership).
+// Duplicate keys stay a hard error, page ids dedupe with a -2 suffix, and
+// showIf keeps the directory (non-strict) semantics so cross-store refs
+// (shell rows gated on hypr.*) survive until the menu resolves them.
+// `menus` passes through raw for MenuLib - this file never normalizes it.
+function parseUnifiedCatalog(text) {
+  const raw = JSON.parse(SU.stripJsonc(text))
+  if (raw === null || typeof raw !== "object" || Array.isArray(raw))
+    throw new Error("unified catalog must be an object with pages")
+  const rawSections = Array.isArray(raw.pages) ? raw.pages
+    : (Array.isArray(raw.sections) ? raw.sections : null)
+  if (!rawSections) throw new Error("unified catalog needs a pages array")
+  const sections = []
+  const byKey = {}
+  const GROUPS = { shell: true, env: true, hypr: true }
+  for (let i = 0; i < rawSections.length; i++) {
+    const rawPage = rawSections[i]
+    const g = rawPage && typeof rawPage === "object" && !Array.isArray(rawPage)
+      ? rawPage.group : undefined
+    // Every settings page declares which store owns it. The group doubles
+    // as the namespace assertion the old per-file layout gave for free:
+    // a hypr key on a shell page (or vice versa) is an authoring error.
+    const ns = typeof g === "string" && GROUPS[g] ? g : null
+    const section = parseSection(rawSections[i], "section " + (i + 1), true, ns)
+    if (g !== undefined && ns === null)
+      section.errors.push("unknown group " + JSON.stringify(g) + " - want shell|env|hypr")
+    for (let o = 0; o < section.options.length; o++) {
+      const k = section.options[o].key
+      if (byKey[k] !== undefined) throw new Error("duplicate option: " + k)
+      byKey[section.options[o].key] = section.options[o]
+    }
+    sections.push(section)
+  }
+  const seenPages = {}
+  for (let s = 0; s < sections.length; s++) {
+    let page = sections[s].page
+    let n = 2
+    while (seenPages[page] !== undefined) page = sections[s].page + "-" + n++
+    seenPages[page] = true
+    sections[s].page = page
+  }
+  pruneShowIf(sections, byKey, false)
+  let menus = null
+  if (raw.menus !== undefined && raw.menus !== null) {
+    menus = Array.isArray(raw.menus) ? raw.menus : [raw.menus]
+  }
+  const rootWidth = typeof raw.width === "number" && raw.width > 0 ? Math.round(raw.width) : 0
+  const rootTitle = typeof raw.title === "string" ? raw.title : ""
+  return {
+    sections: sections,
+    pages: sections,
+    byKey: byKey,
+    rootWidth: rootWidth,
+    rootTitle: rootTitle,
+    allowId: true,
+    menus: menus
   }
 }
 

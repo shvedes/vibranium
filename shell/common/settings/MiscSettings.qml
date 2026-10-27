@@ -10,7 +10,7 @@ import "GtkSettings.js" as GtkSettings
 import "../text/UnitIpc.js" as UnitIpc
 
 // Cursor theme and cursor size - the two options the settings schema
-// declares under the General page, in shell/10-wallpaper.jsonc.
+// declares under the General page, in catalog.jsonc.
 //
 // Not persisted in settings.json; the values live in cursor-theme.json,
 // written by vb-cursor-set. Settings projects this singleton's live values
@@ -79,54 +79,23 @@ Singleton {
     // a `vb-cursor-list` subprocess would make a missing script a slow shell
     // instead of an Adwaita-only picker.
     function _load() {
-        // The directory catalog: the misc/ files are already namespaced. It
-        // is the only catalog - there is no second copy to fall back to, so
-        // a catalog that cannot be read leaves the store with no options
-        // and says why.
+        // The unified catalog: this store adopts the misc.* options and
+        // drops everything else. It is the only catalog - there is no
+        // second copy to fall back to, so a catalog that cannot be read
+        // leaves the store on its fallback and says why.
         schemaLoader.path = ""
-        schemaLoader.path = Paths.settingsSchemaDir + "/_index.jsonc"
+        schemaLoader.path = Paths.settingsCatalogPath
         if (!schemaLoader.waitForJob()) {
-            Log.error("miscSettings: the catalog index could not be read: "
-                + Paths.settingsSchemaDir + "/_index.jsonc")
-            root._loadFallback()
-            return
-        }
-        let idx = null
-        try {
-            idx = JSON.parse(SL.stripJsonc(schemaLoader.text()))
-        } catch (e) {
-            Log.error("miscSettings: the catalog index did not parse: "
-                + (e && e.message ? e.message : String(e)))
-            idx = null
-        }
-        if (!idx || typeof idx !== "object") {
-            root._loadFallback()
-            return
-        }
-        const files = Paths.miscCatalogFiles
-        // General lives under shell/: derive namespace per file
-        // like Settings does, so shell rows pass natively and the 3
-        // misc riders pass via SHELL_CROSS_OK.
-        const namespaces = []
-        for (let i = 0; i < files.length; i++) {
-            namespaces.push(files[i].indexOf("/misc/") >= 0 ? "misc" : (files[i].indexOf("/env/") >= 0 ? "env" : "shell"))
-        }
-        // The read, and the all-or-nothing bail that goes with it, is
-        // Settings': one code path for both stores, so the two cannot
-        // drift on the part that decides whether a partial set reaches
-        // the parser. miscCatalogFiles names one file today, so there is
-        // nothing here to overlap - the point is that the shape is the
-        // same one, not that this store gets faster.
-        const texts = Settings.readCatalogTexts(root, files)
-        if (!texts) {
+            Log.error("miscSettings: the catalog could not be read: "
+                + Paths.settingsCatalogPath)
             root._loadFallback()
             return
         }
         let catalog = null
         try {
-            catalog = SL.parseCatalogDir(texts, namespaces, 0, "")
+            catalog = SL.parseUnifiedCatalog(schemaLoader.text())
         } catch (e) {
-            Log.error("miscSettings: the directory catalog did not parse: "
+            Log.error("miscSettings: the catalog did not parse: "
                 + (e && e.message ? e.message : String(e)))
         }
         if (!catalog) {

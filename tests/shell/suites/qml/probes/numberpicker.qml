@@ -117,7 +117,7 @@ Window {
     root.pickerMade = 1
   }
 
-  // The shipped Timer row, verbatim from default/vibranium/menus/utilities.jsonc:
+  // The shipped Timer row, verbatim from the utilities page in shell/common/settings/catalog.jsonc:
   // type number, min 1, max 180, step 1, value 5, unit "min".
   function seedFromTheRow() {
     root.picker.width = 240

@@ -3,7 +3,7 @@
 # the colour keys the shell and the theme engine actually read.
 #
 # Nothing in the tree tests this surface. The settings suites cover
-# default/vibranium/settings/, the assets suite covers shell/assets/, and the
+# shell/common/settings/catalog.jsonc, the assets suite covers shell/assets/, and the
 # theme picker is only ever probed with a synthetic /tmp tree
 # (ThemePicker.qml:153), so the 30 real themes, their 14-colour palettes and
 # their 183 wallpapers are untested data that a single dropped `colors.list`

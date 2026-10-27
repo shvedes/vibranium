@@ -16,7 +16,7 @@ import "../text/UnitIpc.js" as UnitIpc
 // Mirrors Settings.qml but for hyprland lua configs. Values live in hypr
 // files (look-and-feel.lua, input.lua, advanced.lua, smart-gaps.lua,
 // animations.lua) and are optionally shadowed by live hyprctl state.
-// The schema is the hypr subset of settings.jsonc (keys hypr.* with
+// The schema is the hypr subset of catalog.jsonc (keys hypr.* with
 // `hypr` binding). HyprlandSettings owns its pages, Settings owns shell/env.
 // Menu merges both bundles so navigation sees one tree: Settings -> Hyprland.
 //
@@ -153,76 +153,24 @@ Singleton {
 
     // --- schema loading ---
 
-    // One parked FileView per catalog file, all pointed before any
-    // waitForJob, so the nine hypr/ reads overlap instead of serialising
-    // on one re-pointed view. Same shape as the main store's catalog
-    // read: a view per file, because re-pointing a single view can only
-    // ever have one read in flight.
-    function _readCatalogTexts(parent, files) {
-        const n = files.length
-        const views = []
-        for (let i = 0; i < n; i++) {
-            const v = parkedReader.createObject(parent)
-            if (!v) {
-                for (let k = 0; k < views.length; k++) views[k].destroy()
-                return null
-            }
-            views.push(v)
-        }
-        for (let i = 0; i < n; i++) views[i].path = files[i]
-        const texts = []
-        let ok = true
-        for (let i = 0; i < n; i++) {
-            if (!views[i].waitForJob()) {
-                Log.error("hyprlandSettings: a catalog file could not be read: " + files[i])
-                ok = false
-            }
-            texts.push(views[i].text())
-            views[i].destroy()
-        }
-        return ok ? texts : null
-    }
-
     function _loadSchema() {
-        // The directory catalog: the hypr/ files are already namespaced, so
-        // no filter is needed. It is the only catalog - there is no second
-        // copy to fall back to, so a catalog that cannot be read leaves the
-        // store with no options and says why.
+        // The unified catalog: this store keeps the hypr.* options and
+        // drops everything else. It is the only catalog - there is no
+        // second copy to fall back to, so a catalog that cannot be read
+        // leaves the store with no options and says why.
         schemaLoader.path = ""
-        schemaLoader.path = Paths.settingsSchemaDir + "/_index.jsonc"
+        schemaLoader.path = Paths.settingsCatalogPath
         if (!schemaLoader.waitForJob()) {
-            Log.error("hyprlandSettings: the catalog index could not be read: "
-                + Paths.settingsSchemaDir + "/_index.jsonc")
+            Log.error("hyprlandSettings: the catalog could not be read: "
+                + Paths.settingsCatalogPath)
             root._schemaDoneEmpty()
             return
         }
-        let idx = null
-        try {
-            idx = JSON.parse(SL.stripJsonc(schemaLoader.text()))
-        } catch (e) {
-            Log.error("hyprlandSettings: the catalog index did not parse: "
-                + (e && e.message ? e.message : String(e)))
-            idx = null
-        }
-        if (!idx || typeof idx !== "object") {
-            root._schemaDoneEmpty()
-            return
-        }
-        const files = Paths.hyprCatalogFiles
-        const texts = root._readCatalogTexts(root, files)
-        if (!texts) {
-            root._schemaDoneEmpty()
-            return
-        }
-        const namespaces = []
-        for (let i = 0; i < files.length; i++) namespaces.push("hypr")
         let catalog = null
         try {
-            catalog = SL.parseCatalogDir(texts, namespaces,
-                (typeof idx.width === "number" && idx.width > 0) ? Math.round(idx.width) : 0,
-                (typeof idx.title === "string" && idx.title.trim() !== "") ? idx.title.trim() : "")
+            catalog = SL.parseUnifiedCatalog(schemaLoader.text())
         } catch (err) {
-            Log.error("hyprlandSettings: the directory catalog did not parse: "
+            Log.error("hyprlandSettings: the catalog did not parse: "
                 + (err && err.message ? err.message : String(err)))
         }
         if (!catalog) {
@@ -233,6 +181,10 @@ Singleton {
         const hyprByKey = {}
         for (let i = 0; i < catalog.sections.length; i++) {
             const pg = catalog.sections[i]
+            // The group is the ownership - including the items-only nav
+            // pages (hyprland, hyprland-edit, hyprland-appearance), which
+            // carry no option to infer it from.
+            if (pg.group !== "hypr") continue
             hyprPages.push(pg)
             for (let o = 0; o < pg.options.length; o++) hyprByKey[pg.options[o].key] = pg.options[o]
         }
@@ -584,18 +536,6 @@ Singleton {
     FileView {
         id: schemaLoader
         printErrors: false
-    }
-    // A reader with no path of its own. One per catalog file per load,
-    // created and destroyed inside _readCatalogTexts, so a load leaves no
-    // reader behind. watchChanges is stated: the catalog is read in bulk
-    // at load, and a watch on each parked view would be an inotify
-    // registration with no subscriber.
-    Component {
-        id: parkedReader
-        FileView {
-            printErrors: false
-            watchChanges: false
-        }
     }
     FileView {
         id: reader

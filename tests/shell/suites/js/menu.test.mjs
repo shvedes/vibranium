@@ -904,6 +904,36 @@ group('parseBundle accepts a page, a pages array, or a bare array', () => {
   eq('and a number wraps', bundle('5').pages.length, 1)
 })
 
+group('scopeBundle spans one entry tree, not the whole file', () => {
+  // The unified catalog holds every menu; search spans only the opened
+  // entry's tree. The reported bug was main-menu rows answering inside
+  // Utilities' search, the way one-file-per-menu scoped both before.
+  const catalog = JSON.parse(M.stripJsonc(fs.readFileSync(
+    path.join(SHELL_DIR, 'common/settings/catalog.jsonc'), 'utf8')))
+  const menus = M.parseBundle(JSON.stringify(catalog.menus))
+  const main = M.scopeBundle(menus, 'main', [])
+  eq('main keeps its own pages', main.pages.map(p => p.id),
+    ['main', 'setup', 'install', 'remove', 'update', 'help'])
+  eq('and utilities is out of its search', main.byId.utilities, undefined)
+  eq('the entry stays the opened page', main.entry, 'main')
+  const util = M.scopeBundle(menus, 'utilities', [])
+  eq('utilities spans one page', util.pages.map(p => p.id), ['utilities'])
+  eq('with itself as the entry', util.entry, 'utilities')
+  eq('every utilities index row belongs to utilities',
+    [...new Set(M.buildIndex(util).map(e => e.pageId))], ['utilities'])
+  eq('no main-tree index row belongs to utilities',
+    M.buildIndex(main).some(e => e.pageId === 'utilities'), false)
+  eq('an unknown entry falls back to the bundle entry',
+    [M.scopeBundle(menus, 'nope', []).entry,
+      M.scopeBundle(menus, 'nope', []).pages.map(p => p.id)],
+    ['main', ['main', 'setup', 'install', 'remove', 'update', 'help']])
+  const seeded = M.scopeBundle(menus, 'utilities', ['main'])
+  eq('extension pages always join the search',
+    seeded.pages.map(p => p.id).sort(),
+    ['help', 'install', 'main', 'remove', 'setup', 'update', 'utilities'])
+  eq('without moving the entry', seeded.entry, 'utilities')
+})
+
 group('two pages claiming one id cannot share a uid space', () => {
   // buildPage's dedupe is page-local, so both pages minted the same uid for
   // same-named rows: one runtime-state slot shared by two unrelated rows, two
@@ -1927,27 +1957,32 @@ group('the scope belongs to the bundle, so it is cached and restored with it', (
 })
 
 group('which shipped bundles scope the external half', () => {
+  // Menus live in the unified catalog's `menus`; each entry below is one
+  // openable bundle from it (the whole menus array, or one page alone).
+  const catalogRaw = fs.readFileSync(
+    path.join(SHELL_DIR, 'common/settings/catalog.jsonc'), 'utf8')
+  const catalog = JSON.parse(M.stripJsonc(catalogRaw))
   const bundles = {
-    'main.jsonc': path.join(SHELL_DIR, '../default/vibranium/menus/main.jsonc'),
-    'utilities.jsonc': path.join(SHELL_DIR, '../default/vibranium/menus/utilities.jsonc'),
-    'emojis.jsonc': path.join(SHELL_DIR, 'features/pickers/emoji/emojis.jsonc')
+    'catalog#main': JSON.stringify(catalog.menus),
+    'catalog#utilities': JSON.stringify(catalog.menus.find(m => m.id === 'utilities')),
+    'emojis.jsonc': fs.readFileSync(
+      path.join(SHELL_DIR, 'features/pickers/emoji/emojis.jsonc'), 'utf8')
   }
   const scope = {}
-  for (const [name, p] of Object.entries(bundles)) {
-    const b = M.parseBundle(M.stripJsonc(fs.readFileSync(p, 'utf8')))
+  for (const [name, text] of Object.entries(bundles)) {
+    const b = M.parseBundle(M.stripJsonc(text))
     scope[name] = linksSettingsFamily(b)
   }
   eq('the main menu links settings, so it keeps the external rows',
-    scope['main.jsonc'], true)
-  eq('the utilities bundle is standalone', scope['utilities.jsonc'], false)
+    scope['catalog#main'], true)
+  eq('the utilities bundle is standalone', scope['catalog#utilities'], false)
   eq('and so is the emoji picker', scope['emojis.jsonc'], false)
 
   // The consequence, on the real emoji corpus: 1870 builtin rows and a query
   // with no off-scope answer once the half is gated. "font" is the sharpest
   // demonstration - it reaches every registered row through the page title, so
   // the leak is total rather than incidental.
-  const emoji = M.parseBundle(M.stripJsonc(
-    fs.readFileSync(bundles['emojis.jsonc'], 'utf8')))
+  const emoji = M.parseBundle(M.stripJsonc(bundles['emojis.jsonc']))
   const ext = M.buildPageIndex(
     M.buildPage('font-picker', 'Font selection', 360,
       ['Inter', 'JetBrains Mono', 'Noto Sans'].map(l => ({ type: 'action', label: l })), {}),

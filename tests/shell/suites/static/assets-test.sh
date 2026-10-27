@@ -50,14 +50,14 @@ battery-charging"
 # Shipped svgs that the coverage scan above reports as unreferenced. The scan
 # reads .qml/.js under shell/ and the provenance table, so an entry here means
 # "nothing in shell/ names it" - not "nothing in the repo names it". Icons
-# reached through default/vibranium/ data files are invisible to it.
+# reached through shell/common/settings/catalog.jsonc data are invisible to it.
 #
 # The set is empty. Every shipped svg has a provenance row in
 # assets/icons/README.md, and a provenance row is a reference: the coverage
 # scan reads the table, so a documented glyph is a named glyph. Ten of the
 # hypr/ themed-settings set are named by nothing in shell/ at all - the
-# Hyprland settings catalog names them in 30-input.jsonc, 31-gaps.jsonc and
-# 38-general.jsonc, which flows SettingsLib -> Settings.qml -> Menu.qml ->
+# Hyprland settings catalog names them in shell/common/settings/catalog.jsonc
+# (hypr groups), which flows SettingsLib -> Settings.qml -> Menu.qml ->
 # Entry.qml -> Icon.qml - and the provenance table is what makes them
 # visible to the scan. The table is the reference those ten were missing.
 RECORDED_ORPHANS=""

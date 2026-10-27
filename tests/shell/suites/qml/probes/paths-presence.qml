@@ -153,6 +153,7 @@ Item {
     themesUserRoot: Paths.themesUserRoot,
     settingsFile: Paths.settingsFile,
     settingsBundlePath: Paths.settingsBundlePath,
+    settingsCatalogPath: Paths.settingsCatalogPath,
     settingsSchemaDir: Paths.settingsSchemaDir,
     runtimeEnvFile: Paths.runtimeEnvFile,
     themeNameFile: Paths.themeNameFile,
@@ -194,6 +195,7 @@ Item {
     "vibraniumHome", Paths.vibraniumHome,
     "settingsSchemaDir", Paths.settingsSchemaDir,
     "settingsBundlePath", Paths.settingsBundlePath,
+    "settingsCatalogPath", Paths.settingsCatalogPath,
     "drunCacheFile", Paths.drunCacheFile,
     "runtimeEnvFile", Paths.runtimeEnvFile,
     "screenshotsDir", Paths.screenshotsDir,
@@ -205,12 +207,12 @@ Item {
   // list before and after the run: a probe that wrote to the user's settings or
   // cache, or to a schema in the repo, shows up as a changed signature.
   readonly property var auditFiles: [
-    Paths.settingsFile, Paths.settingsBundlePath,
+    Paths.settingsFile, Paths.settingsCatalogPath,
     Paths.runtimeEnvFile, Paths.themeNameFile, Paths.themeColorsFile,
     Paths.wallpaperStateJson, Paths.drunCacheFile, Paths.hyprInputFile,
     Paths.hyprAppearanceFile, Paths.hyprAdvancedFile, Paths.hyprSmartGapsFile,
     Paths.hyprAnimationsFile
-  ].concat(Paths.shellCatalogFiles, Paths.envCatalogFiles, Paths.hyprCatalogFiles, Paths.miscCatalogFiles)
+  ]
 
   function buildSteps() {
     const pathsSteps = [
@@ -319,14 +321,17 @@ Item {
       Paths.hyprSmartGapsFile, Paths.hyprAnimationsFile].every(p => p.indexOf("/hyprland.conf.d/") > 0))
 
     kv("derive.settingsSchemaDir.under", under(Paths.vibraniumHome, Paths.settingsSchemaDir))
-    kv("derive.settingsSchemaDir.suffix", Paths.settingsSchemaDir === Paths.vibraniumHome + "/default/vibranium/settings")
-    // The bundle path is the catalog's index: the menu opens it to mean "the
-    // settings pages", and the menu renders the live bundle rather than the
-    // file's text.
+    kv("derive.settingsSchemaDir.suffix", Paths.settingsSchemaDir === Paths.vibraniumHome + "/shell/common/settings")
+    // The bundle path is the unified catalog: the menu opens it to mean
+    // "the settings pages" (bare) or a menu page (#main, #utilities), and
+    // the menu renders the live bundle rather than the file's text.
     kv("derive.settingsBundlePath.under", under(Paths.vibraniumHome, Paths.settingsBundlePath))
-    kv("derive.settingsBundlePath.suffix", Paths.settingsBundlePath === Paths.vibraniumHome + "/default/vibranium/settings/_index.jsonc")
-    kv("derive.settingsBundlePath.underSettingsDir", Paths.settingsBundlePath.indexOf("/default/vibranium/settings/") > 0)
-    kv("derive.settingsBundlePath.isTheIndex", Paths.settingsBundlePath === Paths.settingsSchemaDir + "/_index.jsonc")
+    kv("derive.settingsBundlePath.suffix", Paths.settingsBundlePath === Paths.vibraniumHome + "/shell/common/settings/catalog.jsonc")
+    kv("derive.settingsBundlePath.underSettingsDir", Paths.settingsBundlePath.indexOf("/shell/common/settings/") > 0)
+    kv("derive.settingsBundlePath.isTheCatalog", Paths.settingsBundlePath === Paths.settingsSchemaDir + "/catalog.jsonc")
+    kv("derive.settingsCatalogPath.under", under(Paths.vibraniumHome, Paths.settingsCatalogPath))
+    kv("derive.settingsCatalogPath.suffix", Paths.settingsCatalogPath === Paths.vibraniumHome + "/shell/common/settings/catalog.jsonc")
+    kv("derive.settingsCatalogPath.equalsBundle", Paths.settingsCatalogPath === Paths.settingsBundlePath)
 
     kv("derive.runtimeEnvFile.under", under(Paths.vibraniumRuntime, Paths.runtimeEnvFile))
     kv("derive.runtimeEnvFile.suffix", Paths.runtimeEnvFile === Paths.vibraniumRuntime + "/settings.env")
@@ -375,43 +380,18 @@ Item {
     }
   }
 
-  // The catalog is the one place in Paths where a name can silently go stale: a
-  // schema file that was renamed leaves its options parsed by nothing, with no
-  // error anywhere. The driver stats every entry; the probe checks the shape.
+  // The catalog is the one place in Paths where a name can silently go
+  // stale. A single unified file leaves no per-page name to go stale -
+  // the probe checks the shape: one jsonc file under the schema dir.
   function catalogContract() {
-    const lists = {
-      shell: Paths.shellCatalogFiles,
-      env: Paths.envCatalogFiles,
-      hypr: Paths.hyprCatalogFiles,
-      misc: Paths.miscCatalogFiles
-    }
-    for (const name in lists) {
-      const list = lists[name]
-      const basenames = list.map(p => p.slice(p.lastIndexOf("/") + 1))
-      kv("catalog." + name + ".count", list.length)
-      kv("catalog." + name + ".nonEmpty", list.length > 0)
-      kv("catalog." + name + ".allUnderSchemaDir", list.every(p => under(Paths.settingsSchemaDir, p)))
-      kv("catalog." + name + ".allJsonc", list.every(p => p.slice(-6) === ".jsonc"))
-      kv("catalog." + name + ".allNamed", list.every(p => p.length > p.lastIndexOf("/") + 1))
-      kv("catalog." + name + ".noDuplicates", new Set(list).size === list.length)
-      kv("catalog." + name + ".uniqueBasenames", new Set(basenames).size === basenames.length)
-      kv("catalog." + name + ".sorted", JSON.stringify(list) === JSON.stringify(list.slice().sort()))
-      show("catalog." + name + ".files", list)
-    }
-    // Settings.qml:547-548 dedupes misc against shell and env because the
-    // catalog treats a duplicate key across files as a hard error, so the
-    // overlap is by design and the loadable set is shell + env + the remainder.
-    const main = Paths.shellCatalogFiles.concat(Paths.envCatalogFiles)
-    kv("catalog.cross.shellEnv.noDuplicates", new Set(main).size === main.length)
-    const miscNew = Paths.miscCatalogFiles.filter(f => main.indexOf(f) < 0)
-    kv("catalog.misc.subsetOfShell", Paths.miscCatalogFiles.every(f => Paths.shellCatalogFiles.indexOf(f) >= 0))
-    kv("catalog.misc.contributesNoNewFiles", miscNew.length === 0)
-    // hyprCatalogFiles is owned by HyprlandSettings and is deliberately not in
-    // the Settings catalog, so it must not overlap the loadable set either.
-    const loadable = main.concat(miscNew)
-    kv("catalog.hypr.disjointFromLoadable", Paths.hyprCatalogFiles.every(f => loadable.indexOf(f) < 0))
-    kv("catalog.total.loadable", loadable.length)
-    kv("catalog.total.withHypr", loadable.length + Paths.hyprCatalogFiles.length)
+    const file = Paths.settingsCatalogPath
+    kv("catalog.count", 1)
+    kv("catalog.nonEmpty", file !== "")
+    kv("catalog.underSchemaDir", under(Paths.settingsSchemaDir, file))
+    kv("catalog.isJsonc", file.slice(-6) === ".jsonc")
+    kv("catalog.named", file.length > file.lastIndexOf("/") + 1)
+    kv("catalog.equalsBundle", file === Paths.settingsBundlePath)
+    show("catalog.files", [file])
   }
 
   // The three functions. userThemesDir is the base the theme pickers compose

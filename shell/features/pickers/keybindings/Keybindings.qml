@@ -245,7 +245,7 @@ Singleton {
       // Re-entrancy guard: a double summon queues two landings; the
       // second must not push a duplicate frame of the same page.
       if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) return
-      if (!Menu.open) Menu.openFile(Paths.vibraniumHome + "/default/vibranium/menus/main.jsonc")
+      if (!Menu.open) Menu.openFile(Paths.settingsCatalogPath + "#main")
       if (!Menu.hasDynamicPage(root.pageId)) root._compose()
       Menu.push(root.pageId)
       // Refresh behind the landed page so binds edited since the last

@@ -12,8 +12,8 @@ import "../text/UnitIpc.js" as UnitIpc
 // Schema-driven settings store. Single source of truth for every managed
 // option:
 //
-//   schema    $VIBRANIUM/default/vibranium/settings/ (a directory: one
-//             file per page family, with _index.jsonc for the root chrome)
+//   schema    $VIBRANIUM/shell/common/settings/catalog.jsonc (one file:
+//             settings `pages` plus menu `menus`)
 //   user      ~/.config/vibranium/settings.json          (sparse overrides)
 //
 //   File layout: EVERYTHING except "options" lives under the "shell"
@@ -591,130 +591,49 @@ Singleton {
 
   // --- schema loading ---
 
-  // Read a whole catalog file list concurrently, one parked FileView per file.
-  // Shared with MiscSettings, so the read shape and the bail below cannot drift
-  // between the two stores.
-  //
-  // Parked, not re-pointed, because overlap is the whole point: one view holds
-  // one path, so re-pointing a single view can only ever have one read in
-  // flight and the files serialise again - and re-pointing a view that has
-  // already loaded additionally needs the `path = ""` reset, or waitForJob
-  // answers false while text() hands back the previous body. A view per file
-  // needs neither.
-  //
-  // The barrier is the whole design: preload defaults true, so setting a path
-  // starts the read in the background, and every path is set before any
-  // waitForJob. Pointing a view and waiting on it immediately starts and
-  // finishes a read before the next path is set, which serialises exactly like
-  // the reused view did while also paying for N object constructions.
-  //
-  // Returns the texts in file order, or null if any read did not report
-  // success.
-  //
-  // What keeps the set all-or-nothing is that parseCatalogDir has no notion of
-  // a file that is missing: it merges what it is handed into one option set,
-  // so a set missing a file would yield a schema that looks complete and
-  // silently drops every option the unread file declared. Two things keep that
-  // from happening and both are load-bearing:
-  //
-  //   - null. Measured on this Quickshell: a path that does not exist, or one
-  //     that cannot be read, still answers waitForJob() true and hands back
-  //     the empty string, so this arm does not fire for a broken file and
-  //     cannot be the only guard.
-  //   - the empty string. parseCatalogDir throws on it (JSON.parse of the
-  //     stripped text), the caller's try/catch drops the catalog, and the
-  //     store is left with no options. That is the path a broken file
-  //     actually takes, and it is why the failure is reported rather than
-  //     swallowed: a store with no options is a settings page that says
-  //     nothing, and the reason belongs in the log.
-  //
-  // Neither is added here: the second is the caller's, unchanged.
-  function readCatalogTexts(parent, files) {
-    const n = files.length
-    const views = []
-    for (let i = 0; i < n; i++) {
-      const v = parkedReader.createObject(parent)
-      if (!v) {
-        for (let k = 0; k < views.length; k++) views[k].destroy()
-        return null
-      }
-      views.push(v)
-    }
-    for (let i = 0; i < n; i++) views[i].path = files[i]
-    const texts = []
-    let ok = true
-    for (let i = 0; i < n; i++) {
-      if (!views[i].waitForJob()) {
-        ok = false
-        // Same reason as the index read: a file that is named but cannot be
-        // read leaves the store with no options, so it is named.
-        Log.error("settings: a catalog file could not be read: " + files[i])
-      }
-      texts.push(views[i].text())
-      views[i].destroy()
-    }
-    return ok ? texts : null
-  }
-
+  // What keeps the set all-or-nothing is that parseUnifiedCatalog throws
+  // on an empty or unreadable file (JSON.parse of the stripped text),
+  // the caller's try/catch drops the catalog, and the store is left with
+  // no options. That is why the failure is reported rather than
+  // swallowed: a store with no options is a settings page that says
+  // nothing, and the reason belongs in the log.
   function _loadSchema() {
-    // The directory catalog: shell/ + env/ files share one parse so the
-    // option set stays whole (env order follows file order). It is the only
-    // catalog - there is no second copy to fall back to, so a catalog that
-    // cannot be read leaves the store with no options and says why.
+    // The unified catalog: one file holding settings `pages` plus menu
+    // `menus`. It is the only catalog - there is no second copy to fall
+    // back to, so a catalog that cannot be read leaves the store with
+    // no options and says why.
     schemaLoader.path = ""
-    schemaLoader.path = Paths.settingsSchemaDir + "/_index.jsonc"
+    schemaLoader.path = Paths.settingsCatalogPath
     if (!schemaLoader.waitForJob()) {
-      Log.error("settings: the catalog index could not be read: "
-        + Paths.settingsSchemaDir + "/_index.jsonc")
-      root._schemaDone()
-      return
-    }
-    let idx = null
-    try {
-      idx = JSON.parse(SL.stripJsonc(schemaLoader.text()))
-    } catch (e) {
-      Log.error("settings: the catalog index did not parse: "
-        + (e && e.message ? e.message : String(e)))
-      idx = null
-    }
-    if (!idx || typeof idx !== "object") {
-      root._schemaDone()
-      return
-    }
-    // misc/ files ride along so misc.* options resolve in this schema
-    // too: Settings.menuBundleText projects MiscSettings' live
-    // values/enums onto them for rendering, while MiscSettings stays
-    // the single writer (flush/renderEnv skip opt.misc below).
-    // Files already parsed above (e.g. shell/10-wallpaper.jsonc also
-    // hosts the misc page) must not parse twice - the catalog treats
-    // duplicate keys across files as a hard error.
-    const miscFiles = Paths.miscCatalogFiles.filter(f =>
-      Paths.shellCatalogFiles.indexOf(f) < 0 && Paths.envCatalogFiles.indexOf(f) < 0)
-    const files = Paths.shellCatalogFiles.concat(Paths.envCatalogFiles, miscFiles)
-    const namespaces = []
-    for (let i = 0; i < files.length; i++) {
-      namespaces.push(files[i].indexOf("/misc/") >= 0 ? "misc" : (files[i].indexOf("/env/") >= 0 ? "env" : "shell"))
-    }
-    const texts = root.readCatalogTexts(root, files)
-    if (!texts) {
+      Log.error("settings: the catalog could not be read: "
+        + Paths.settingsCatalogPath)
       root._schemaDone()
       return
     }
     let catalog = null
     try {
-      catalog = SL.parseCatalogDir(texts, namespaces,
-        (typeof idx.width === "number" && idx.width > 0) ? Math.round(idx.width) : 0,
-        (typeof idx.title === "string" && idx.title.trim() !== "") ? idx.title.trim() : "")
+      catalog = SL.parseUnifiedCatalog(schemaLoader.text())
     } catch (err) {
-      // A duplicate key across two catalog files lands here.
-      Log.error("settings: the directory catalog did not parse: "
+      Log.error("settings: the catalog did not parse: "
         + (err && err.message ? err.message : String(err)))
     }
     if (!catalog) {
       root._schemaDone()
       return
     }
-    root._collected = catalog.sections
+    // This store owns the shell/env groups: hypr pages ride the same file
+    // for the Hyprland store, and misc.* options resolve here too so
+    // menuBundleText can project MiscSettings' live values/enums onto
+    // them for rendering (MiscSettings stays the single writer). The group
+    // is the ownership - including the items-only pages (launcher-enabled,
+    // bar-enabled, bar-modules), which carry no option to infer it from.
+    const kept = []
+    for (let i = 0; i < catalog.sections.length; i++) {
+      const pg = catalog.sections[i]
+      if (pg.group !== "shell" && pg.group !== "env") continue
+      kept.push(pg)
+    }
+    root._collected = kept
     root._collectedRootWidth = catalog.rootWidth || 0
     root._collectedRootTitle = catalog.rootTitle || ""
     root._schemaDone()
@@ -1063,28 +982,11 @@ Singleton {
 
   // --- processes / file views ---
 
-  // Reads _index.jsonc, the root chrome of the directory catalog. The
-  // catalog files themselves go through parkedReader.
+  // Reads the unified catalog (settings pages plus menu menus).
   FileView {
     id: schemaLoader
 
     printErrors: false
-  }
-
-  // A reader with no path of its own. One per catalog file per read, created
-  // and destroyed inside readCatalogTexts, so a load leaves no reader behind.
-  // watchChanges is stated rather than inherited: the catalog is read once at
-  // boot, and a watch on each of the parked views would be an inotify
-  // registration with no subscriber. On this Quickshell the property already
-  // defaults false and the count is the same either way, so this documents the
-  // requirement rather than changing the number.
-  Component {
-    id: parkedReader
-
-    FileView {
-      printErrors: false
-      watchChanges: false
-    }
   }
 
   // Writer for the user file; watcher via Watch governor (K2)

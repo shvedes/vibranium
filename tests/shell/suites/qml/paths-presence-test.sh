@@ -74,7 +74,7 @@ trap qp_cleanup EXIT
 # covered; a name with no matching key fails loudly rather than going unnoticed.
 DERIVED_PATHS=(
   configHome cacheHome themesUserRoot settingsFile settingsBundlePath
-  settingsSchemaDir runtimeEnvFile themeNameFile
+  settingsCatalogPath settingsSchemaDir runtimeEnvFile themeNameFile
   themeStateDir themeBackgroundsDir themeColorsFile wallpaperStateJson
   screenshotsDir screenshotFallbackDir launcherUserPluginsDir drunCacheFile
   hyprInputFile hyprAppearanceFile hyprAdvancedFile hyprSmartGapsFile
@@ -159,15 +159,16 @@ assert_derivation() {
   local name
   for name in settingsFile themesUserRoot launcherUserPluginsDir hyprInputFile \
     hyprAppearanceFile hyprAdvancedFile hyprSmartGapsFile hyprAnimationsFile \
-    settingsSchemaDir settingsBundlePath runtimeEnvFile themeNameFile themeStateDir \
+    settingsSchemaDir settingsBundlePath settingsCatalogPath runtimeEnvFile themeNameFile themeStateDir \
     themeBackgroundsDir themeColorsFile wallpaperStateJson drunCacheFile \
     screenshotFallbackDir; do
     qp_assert "$name is under the root it was derived from" "derive.$name.under" "true"
   done
   qp_assert "settingsFile is configHome + /vibranium/settings.json" "derive.settingsFile.suffix" "true"
   qp_assert "themesUserRoot is configHome + /vibranium/themes" "derive.themesUserRoot.suffix" "true"
-  qp_assert "settingsSchemaDir is vibraniumHome + /default/vibranium/settings" "derive.settingsSchemaDir.suffix" "true"
-  qp_assert "settingsBundlePath is the catalog index under vibraniumHome" "derive.settingsBundlePath.suffix" "true"
+  qp_assert "settingsSchemaDir is vibraniumHome + /shell/common/settings" "derive.settingsSchemaDir.suffix" "true"
+  qp_assert "settingsBundlePath is the unified catalog under vibraniumHome" "derive.settingsBundlePath.suffix" "true"
+  qp_assert "settingsCatalogPath equals settingsBundlePath" "derive.settingsCatalogPath.equalsBundle" "true"
   qp_assert "runtimeEnvFile is vibraniumRuntime + /settings.env" "derive.runtimeEnvFile.suffix" "true"
   qp_assert "themeNameFile is vibraniumState + /theme.name" "derive.themeNameFile.suffix" "true"
   qp_assert "themeBackgroundsDir is themeStateDir + /backgrounds" "derive.themeBackgroundsDir.suffix" "true"
@@ -176,8 +177,8 @@ assert_derivation() {
   qp_assert "screenshotFallbackDir is vibraniumCache + /screenshot-clipboard-fallbacks" \
     "derive.screenshotFallbackDir.suffix" "true"
   qp_assert "the five hyprland files share one config dir" "derive.hyprFiles.sharedDir" "true"
-  qp_assert "settingsBundlePath sits under default/vibranium/settings" "derive.settingsBundlePath.underSettingsDir" "true"
-  qp_assert "settingsBundlePath is the catalog's own index" "derive.settingsBundlePath.isTheIndex" "true"
+  qp_assert "settingsBundlePath sits under shell/common/settings" "derive.settingsBundlePath.underSettingsDir" "true"
+  qp_assert "settingsBundlePath is the catalog itself" "derive.settingsBundlePath.isTheCatalog" "true"
   qp_assert "wallpaper.json is outside the theme payload" "derive.wallpaperStateJson.outsideTheme" "true"
   qp_assert "screenshotsDir is under the resolved pictures dir" "derive.screenshotsDir.under" "true"
   qp_assert "screenshotsDir ends in /Screenshots" "derive.screenshotsDir.suffix" "true"
@@ -209,26 +210,12 @@ assert_separator_hygiene() {
 # schema that was renamed leaves its options parsed by nothing, with no error
 # anywhere. Shape here, existence on disk in the group below.
 assert_catalog_shape() {
-  local list
-  for list in shell env hypr misc; do
-    qp_assert "the $list catalog is not empty" "catalog.$list.nonEmpty" "true"
-    qp_assert "every $list entry is under settingsSchemaDir" "catalog.$list.allUnderSchemaDir" "true"
-    qp_assert "every $list entry is a .jsonc" "catalog.$list.allJsonc" "true"
-    qp_assert "every $list entry is named" "catalog.$list.allNamed" "true"
-    qp_assert "the $list catalog has no duplicate entry" "catalog.$list.noDuplicates" "true"
-    qp_assert "no two $list entries share a basename" "catalog.$list.uniqueBasenames" "true"
-    qp_assert "the $list catalog is in a stable order" "catalog.$list.sorted" "true"
-  done
-  qp_assert "the shell catalog names 13 schemas" "catalog.shell.count" "13"
-  qp_assert "the env catalog names 2 schemas" "catalog.env.count" "2"
-  qp_assert "the hypr catalog names 13 schemas" "catalog.hypr.count" "13"
-  qp_assert "the misc catalog names 1 schema" "catalog.misc.count" "1"
-  qp_assert "shell and env do not overlap each other" "catalog.cross.shellEnv.noDuplicates" "true"
-  qp_assert "the misc catalog is a subset of the shell catalog" "catalog.misc.subsetOfShell" "true"
-  qp_assert "the misc catalog adds nothing Settings has to dedupe away" "catalog.misc.contributesNoNewFiles" "true"
-  qp_assert "the hypr catalog is disjoint from the Settings catalog" "catalog.hypr.disjointFromLoadable" "true"
-  qp_assert "the loadable Settings catalog is 15 schemas" "catalog.total.loadable" "15"
-  qp_assert "every catalog in the shell is 28 schemas" "catalog.total.withHypr" "28"
+  qp_assert "the unified catalog is a single file" "catalog.count" "1"
+  qp_assert "the unified catalog path is not empty" "catalog.nonEmpty" "true"
+  qp_assert "the unified catalog is under settingsSchemaDir" "catalog.underSchemaDir" "true"
+  qp_assert "the unified catalog is a .jsonc" "catalog.isJsonc" "true"
+  qp_assert "the unified catalog is named" "catalog.named" "true"
+  qp_assert "the unified catalog is the bundle path" "catalog.equalsBundle" "true"
 }
 
 # The cross-file contract: every name the catalog holds has to be a file that is
@@ -243,15 +230,12 @@ assert_catalog_on_disk() {
 
   while IFS= read -r entry; do
     [[ -n $entry ]] || continue
-    t_file "the catalog names a schema that exists: ${entry##*/}" "$entry"
-  done < <( { json_paths catalog.shell.files; json_paths catalog.env.files; json_paths catalog.hypr.files; } )
+    t_file "the unified catalog exists: ${entry##*/}" "$entry"
+  done < <(json_paths catalog.files)
 
-  t_eq "the catalog names exactly the schemas in the tree" \
-    "$(find "$schema_dir/shell" "$schema_dir/env" "$schema_dir/hypr" -type f -name '*.jsonc' | LC_ALL=C sort)" \
-    "$( { json_paths catalog.shell.files; json_paths catalog.env.files; json_paths catalog.hypr.files; } | LC_ALL=C sort -u )"
-  t_file "the schema directory has an index" "$schema_dir/_index.jsonc"
-  t_eq "the index is the only schema outside the subdirectories" "_index.jsonc" \
-    "$(find "$schema_dir" -maxdepth 1 -type f -printf '%f\n' | LC_ALL=C sort)"
+  t_eq "the unified catalog is the only schema in the tree" \
+    "$(find "$schema_dir" -maxdepth 1 -type f -name '*.jsonc' | LC_ALL=C sort)" \
+    "$(json_paths catalog.files | LC_ALL=C sort -u)"
 }
 
 # The three functions. userThemesDir is the base the theme pickers compose from,
@@ -505,9 +489,8 @@ assert_tempdir_after() {
 }
 
 # Fingerprint every file Paths names on this host, before the launch. The count
-# is exact and therefore load-bearing: 12 derived entries, plus
-# 12 + 3 + 13 + 1 catalog entries, of which miscCatalogFiles[0] is
-# shellCatalogFiles[0] by design - 40 distinct files.
+# is exact and therefore load-bearing: 12 derived file entries, the unified
+# catalog among them - 12 distinct files.
 assert_paths_files_fingerprint() {
   local label="$1" path
   audit_before=""
@@ -515,7 +498,7 @@ assert_paths_files_fingerprint() {
     [[ -n $path ]] || continue
     audit_before+="$path"$'\t'"$(signature "$path")"$'\n'
   done < <(kv_list paths.auditFiles | LC_ALL=C sort -u)
-  t_count "$label: every derived and catalogued file was fingerprinted" "40" \
+  t_count "$label: every derived and catalogued file was fingerprinted" "12" \
     "$(printf '%s' "$audit_before" | grep -c .)"
 }
 

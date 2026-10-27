@@ -27,51 +27,18 @@ Singleton {
   readonly property string settingsFile: root.configHome + "/vibranium/settings.json"
 
   // Schema-driven settings catalog: single source of truth for every
-  // managed option and its generated menu pages. The catalog is a
-  // DIRECTORY - one file per page family - and this is its index.
-  readonly property string settingsSchemaDir: root.vibraniumHome + "/default/vibranium/settings"
+  // managed option and its generated menu pages. One file next to the
+  // shell that reads it: settings `pages` plus menu `menus`.
+  readonly property string settingsSchemaDir: root.vibraniumHome + "/shell/common/settings"
   // The path that means "the settings bundle" to the menu. The menu renders
   // the live bundle the store builds, not this file's text, so the file is a
   // handle rather than a source: the pickers open it to route into the
   // settings pages, and the menu swaps in Settings.menuBundleText().
-  readonly property string settingsBundlePath: root.settingsSchemaDir + "/_index.jsonc"
-  readonly property var shellCatalogFiles: [
-    root.settingsSchemaDir + "/shell/10-wallpaper.jsonc",
-    root.settingsSchemaDir + "/shell/11-launcher.jsonc",
-    root.settingsSchemaDir + "/shell/12-bar.jsonc",
-    root.settingsSchemaDir + "/shell/13-bar-modules.jsonc",
-    root.settingsSchemaDir + "/shell/14-audio.jsonc",
-    root.settingsSchemaDir + "/shell/15-screenshots.jsonc",
-    root.settingsSchemaDir + "/shell/16-osd.jsonc",
-    root.settingsSchemaDir + "/shell/17-nightlight.jsonc",
-    root.settingsSchemaDir + "/shell/18-colorpicker.jsonc",
-    root.settingsSchemaDir + "/shell/19-lockscreen.jsonc",
-    root.settingsSchemaDir + "/shell/20-idle.jsonc",
-    root.settingsSchemaDir + "/shell/21-media.jsonc",
-    root.settingsSchemaDir + "/shell/22-power.jsonc"
-  ]
-  readonly property var envCatalogFiles: [
-    root.settingsSchemaDir + "/env/21-recording.jsonc",
-    root.settingsSchemaDir + "/env/22-brightness.jsonc"
-  ]
-  readonly property var hyprCatalogFiles: [
-    root.settingsSchemaDir + "/hypr/30-input.jsonc",
-    root.settingsSchemaDir + "/hypr/31-gaps.jsonc",
-    root.settingsSchemaDir + "/hypr/32-blur.jsonc",
-    root.settingsSchemaDir + "/hypr/33-glow.jsonc",
-    root.settingsSchemaDir + "/hypr/34-shadow.jsonc",
-    root.settingsSchemaDir + "/hypr/35-decoration.jsonc",
-    root.settingsSchemaDir + "/hypr/36-dim.jsonc",
-    root.settingsSchemaDir + "/hypr/37-animations.jsonc",
-    root.settingsSchemaDir + "/hypr/38-general.jsonc",
-    root.settingsSchemaDir + "/hypr/39-cursor.jsonc",
-    root.settingsSchemaDir + "/hypr/40-scrolling.jsonc",
-    root.settingsSchemaDir + "/hypr/41-dwindle.jsonc",
-    root.settingsSchemaDir + "/hypr/42-master.jsonc"
-  ]
-  readonly property var miscCatalogFiles: [
-    root.settingsSchemaDir + "/shell/10-wallpaper.jsonc"
-  ]
+  // Doubles as the menu bundle file: MenuLib.parseBundle reads `menus`
+  // from this same document, with an optional #page fragment selecting
+  // the entry (main, utilities) instead of the settings index.
+  readonly property string settingsCatalogPath: root.settingsSchemaDir + "/catalog.jsonc"
+  readonly property string settingsBundlePath: root.settingsCatalogPath
 
   // Validated KEY=VAL projection - the single bash contract. Rendered by
   // the shell from schema + user settings on boot, atomic-swapped on each

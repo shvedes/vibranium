@@ -180,6 +180,9 @@ Singleton {
     }
   }
 
+  // `path` may carry a #page fragment selecting the entry inside the
+  // unified catalog (catalog.jsonc#utilities). Bare catalog path means
+  // the settings index; menu keybinds pass #main / #utilities.
   function openFile(path) {
     if (root.open) {
       root.close()
@@ -187,9 +190,28 @@ Singleton {
     }
     if (!root._buildFromFile(path)) return false
     root._primeRuntime(root.bundle)
+    const frag = root._entryFragment(path)
+    if (frag !== "" && root.bundle && root.bundle.byId && root.bundle.byId[frag] !== undefined) {
+      root.stack = [{ id: frag, sel: 0, y: 0 }]
+    } else if (root._catalogFile(path) && root.bundle && root.bundle.byId
+      && root.bundle.byId["settings"] !== undefined) {
+      root.stack = [{ id: "settings", sel: 0, y: 0 }]
+    }
     root._claimToken = SurfaceClaim.claim("menu", root.close, root)
     Qt.callLater(root.evaluateGuards)
     return true
+  }
+
+  function _entryFragment(path) {
+    const i = String(path).indexOf("#")
+    return i < 0 ? "" : String(path).substring(i + 1)
+  }
+
+  function _catalogFile(path) {
+    const s = String(path)
+    const h = s.indexOf("#")
+    const file = h < 0 ? s : s.substring(0, h)
+    return file === Paths.settingsBundlePath || file === Paths.settingsCatalogPath
   }
 
   function toggleFile(path) {
@@ -225,12 +247,17 @@ Singleton {
     const prevFamily = root._settingsFamily
 
     // Reassigning the same path is a no-op for FileView, which would make
-    // a second open of one bundle skip loading entirely.
+    // a second open of one bundle skip loading entirely. A #page fragment
+    // selects the entry only - the file read strips it, and the cache is
+    // keyed by file so #main and #utilities share one built bundle.
+    const hashAt = String(path).indexOf("#")
+    const filePath = hashAt < 0 ? path : String(path).substring(0, hashAt)
+    const frag = hashAt < 0 ? "" : String(path).substring(hashAt + 1)
     loader.path = ""
-    loader.path = path
+    loader.path = filePath
     if (!loader.waitForJob()) return false
     root._lastPath = path
-    root._lastName = path.substring(path.lastIndexOf("/") + 1)
+    root._lastName = filePath.substring(filePath.lastIndexOf("/") + 1)
     const text = loader.text()
 
     // Repeat-summon cache: parsing/normalizing a bundle costs enough to
@@ -239,6 +266,8 @@ Singleton {
     const extPath = Paths.configHome
     extensionLoader.path = extPath + "/vibranium/user-menu.jsonc"
     const extText = extensionLoader.waitForJob() ? extensionLoader.text() : ""
+    // Keyed by the full path: each entry (#main, #utilities, bare) builds
+    // its own entry-scoped search index below.
     const cached = root._bundleCache[path]
     const sval = Settings.values
     const hrev = HyprlandSettings.ready ? HyprlandSettings.rev : 0
@@ -259,7 +288,7 @@ Singleton {
       return true
     }
     try {
-      root._loadContainers(text, extText)
+      root._loadContainers(text, extText, frag)
       const keys = Object.keys(root._bundleCache)
       if (keys.length >= 2) delete root._bundleCache[keys[0]]
       root._bundleCache[path] = {
@@ -323,13 +352,12 @@ Singleton {
       return
     }
     try {
-      const base = Paths.vibraniumHome + "/default/vibranium/menus/"
-      if (root._buildFromFile(base + "main.jsonc")) root.evaluateGuards()
+      if (root._buildFromFile(Paths.settingsCatalogPath + "#main")) root.evaluateGuards()
       if (root.open) {
         prewarmRetry.restart()
         return
       }
-      if (root._buildFromFile(base + "utilities.jsonc")) root.evaluateGuards()
+      if (root._buildFromFile(Paths.settingsCatalogPath + "#utilities")) root.evaluateGuards()
     } catch (e) {}
     root._prewarmed = true
   }
@@ -361,15 +389,16 @@ Singleton {
     Qt.callLater(root.evaluateGuards)
   }
 
-  function _loadContainers(text, extOverride) {
+  function _loadContainers(text, extOverride, entryFrag) {
     const t0 = Date.now()
-    let base = MenuLib.parseBundle(
-      root._lastPath === Paths.settingsBundlePath && Settings.ready
-        ? Settings.menuBundleText() : text)
+    // The unified catalog carries menu `menus`: parseBundle reads those,
+    // while a generated settings bundle carries `pages`. Either way the
+    // dynamic settings/hypr leaves merge below when linked.
+    let base = MenuLib.parseBundle(text)
     let searchBase = base
 
     const bare = base.pages.length === 1 && base.pages[0].items.length === 0
-    let linksSettings = root._lastPath === Paths.settingsBundlePath || bare
+    let linksSettings = root._catalogFile(root._lastPath) || bare
     for (let p = 0; p < base.pages.length && !linksSettings; p++) {
       const items = base.pages[p].items
       for (let i = 0; i < items.length; i++) {
@@ -476,24 +505,9 @@ Singleton {
       if (fb !== undefined && fb !== null && fb !== "") base.entry = fb
     }
 
-    const registry = [
-      Paths.vibraniumHome + "/default/vibranium/menus/main.jsonc",
-      Paths.vibraniumHome + "/default/vibranium/menus/utilities.jsonc"
-    ]
-    const dir = MenuLib.pathDirname(root._lastPath)
-    const familyDir = Paths.vibraniumHome + "/default/vibranium/menus"
-    if (dir === familyDir || root._lastPath === Paths.settingsBundlePath) {
-      for (let r = 0; r < registry.length; r++) {
-        const path = registry[r]
-        if (path === "" || path === root._lastPath) continue
-        siblingLoader.path = ""
-        siblingLoader.path = path
-        if (!siblingLoader.waitForJob() || siblingLoader.text().trim() === "") continue
-        try {
-          base = MenuLib.mergeSibling(base, siblingLoader.text())
-        } catch (e) {}
-      }
-    }
+    // No sibling registry: the unified catalog already carries every menu
+    // page (`menus`), and the dynamic settings/hypr leaves merged above.
+    // Unrelated picker bundles opened via openJson stay untouched.
 
     let extText = extOverride
     if (extText === undefined) {
@@ -511,6 +525,43 @@ Singleton {
           searchBase = MenuLib.applyExtension(searchBase, extText)
         }
       } catch (e) {}
+    }
+
+    // Entry scope for the unified catalog: the file holds every menu, but
+    // search and the external-half gate span only the opened entry's tree,
+    // the way one-file-per-menu scoped both before. Other bundles keep
+    // their file scope.
+    const isCatalog = root._catalogFile(root._lastPath)
+    if (isCatalog) {
+      let entry = base.entry
+      if (typeof entryFrag === "string" && entryFrag !== ""
+        && base.byId[entryFrag] !== undefined)
+        entry = entryFrag
+      else if (base.byId["settings"] !== undefined)
+        entry = "settings"
+      let extIds = []
+      if (typeof extText === "string" && extText.trim() !== "") {
+        try {
+          const parsedExt = MenuLib.parseBundle(extText)
+          for (let i = 0; i < parsedExt.pages.length; i++) extIds.push(parsedExt.pages[i].id)
+        } catch (e) {}
+      }
+      searchBase = MenuLib.scopeBundle(base, entry, extIds)
+      let fam = entry === "settings"
+        || Settings.menuHasPage(entry) || HyprlandSettings.menuHasPage(entry)
+      if (!fam) {
+        const epg = base.byId[entry]
+        if (epg !== undefined && epg !== null && Array.isArray(epg.items)) {
+          for (let i = 0; i < epg.items.length && !fam; i++) {
+            const it = epg.items[i]
+            if (it && it.type === "submenu" && typeof it.page === "string" && it.page !== ""
+              && (it.page === "settings"
+                || Settings.menuHasPage(it.page) || HyprlandSettings.menuHasPage(it.page)))
+              fam = true
+          }
+        }
+      }
+      root._settingsFamily = fam
     }
 
     root.bundle = base
