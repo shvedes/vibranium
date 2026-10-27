@@ -564,19 +564,24 @@ Singleton {
     const ctrl = root._demand()
     if (ctrl === null) return false
     closeSettle.stop()
+    // Compute before showing: the panel's open path installs panel.rows
+    // synchronously on the visible flip, so the row model must already be
+    // the open's (fresh usage, fresh clipboard target) before it flips.
+    // Computing after the flip painted the stale set first and landed the
+    // fresh one a turn later behind it - the window visibly growing to fit
+    // a suggestion that was known before the summon.
+    root._openCompute()
     root.visible = true
     // Claimed once the panel is up, not before: the stored closer is
     // close, which refuses to run while `visible` is false, so a claim
     // taken earlier would install a closer that provably does nothing and
     // leave a claim nobody can retire if the rest of the opening throws.
     root._claimToken = SurfaceClaim.claim("appLauncher", root.close, root)
-    root._openCompute()
     return true
   }
   function _openCompute() {
     const ctrl = root._controller
     if (ctrl === null) return
-    if (!root.visible) return
     ctrl.onOpened()
   }
 

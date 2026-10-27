@@ -3225,6 +3225,34 @@ group('the open spawns at its fitted size instead of growing into it', () => {
     'if (panel.shown) panel.sizeSnap = false')
 })
 
+group('the open computes before it shows, so the first paint is final', () => {
+  // open() used to flip visible first and recompute after, so the panel
+  // installed the stale row set synchronously and the fresh one (a new
+  // clipboard suggestion) landed a turn later behind it - the window
+  // growing after it appeared. A cold demand masked it (construction
+  // refreshes first); a warm controller showed it. Computing first makes
+  // the open deterministic instead of frame-timing luck.
+  const facade = fs.readFileSync(path.join(LAUNCHER, 'AppLauncher.qml'), 'utf8')
+  const panel = fs.readFileSync(path.join(LAUNCHER, 'LauncherPanel.qml'), 'utf8')
+  const controller = fs.readFileSync(path.join(LAUNCHER, 'AppLauncherController.qml'), 'utf8')
+  contains('the open recomputes before the visible flip', facade,
+    'root._openCompute()\n    root.visible = true')
+  notContains('and nothing recomputes after the claim', facade,
+    '_claimToken = SurfaceClaim.claim("appLauncher", root.close, root)\n    root._openCompute()')
+  contains('the compute no longer waits for visible', facade,
+    'function _openCompute() {\n    const ctrl = root._controller\n    if (ctrl === null) return\n    ctrl.onOpened()')
+  // The pre-flip recompute schedules a deferred install while hidden; the
+  // open seat steals it and installs inline, under the close-armed snap,
+  // instead of painting stale first. A non-open caller still bails.
+  contains('an open seat steals the pending install', panel,
+    'if (panel._openSeat !== true) return false\n      panel._rowsPending = false')
+  // onOpened now runs hidden, so the stat revalidate it performs cannot
+  // require visible - it exists precisely for verdicts that went stale
+  // while the panel was down.
+  notContains('the revalidate is not gated on visible', controller,
+    '&& AppLauncher.visible\n      && !(pathStatProc.running')
+})
+
 // =========================================================================
 section('TimeLib - city normalisation and the query detector')
 // =========================================================================

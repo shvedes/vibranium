@@ -478,8 +478,21 @@ PanelCard {
     // Synchronous open-path seat: runs the pending-rows body inline
     // without callLater when rows are already computed, so the first
     // frame maps at final size and scroll. Returns false when the
-    // deferred syncRows() must handle it (cold boot, pending swap).
-    if (panel._rowsPending || panel.rows.length === 0) return false
+    // deferred syncRows() must handle it (cold boot with no rows yet).
+    if (panel.rows.length === 0) return false
+    // The open owns the first paint, so an open seat steals a pending
+    // deferred install instead of bailing behind it: the facade computes
+    // before the visible flip, which schedules exactly such an install
+    // while hidden, and bailing would paint the stale set first and land
+    // the fresh one a turn later - the post-open growth. The stolen flag
+    // only cancels the deferral: the scheduled callback still fires and
+    // reinstalls the same set, which is a sequence-identical no-op. The
+    // open-seat path below never calls _maybeSwapFade, so the
+    // close-armed sizeSnap stays in force across the stolen install.
+    if (panel._rowsPending) {
+      if (panel._openSeat !== true) return false
+      panel._rowsPending = false
+    }
     // Open seat: never reuse the cursor, install with zeroed durations,
     // first-normal selection, origin scroll. The diff keeps the delegates
     // a previous summon already built, which is the table the List would

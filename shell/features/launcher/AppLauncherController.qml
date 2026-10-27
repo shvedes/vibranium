@@ -1005,7 +1005,6 @@ Item {
       root._statPath(resolved.value)
     }
     if (resolved && resolved.kind === "local" && BoundedCache.has(AppLauncher.statCache, resolved.value)
-      && AppLauncher.visible
       && !(pathStatProc.running && pathStatProc.path === resolved.value)) {
       // Same target as the last refresh still carries its old verdict,
       // which may predate a deletion or a re-creation while the panel was
@@ -1013,7 +1012,9 @@ Item {
       // render, so an unchanged verdict changes no row and a changed one
       // corrects in place instead of staying stale. Skipped while its own
       // probe is still running, so the construction arming above is never
-      // aborted and restarted here.
+      // aborted and restarted here. Runs hidden too: the open computes
+      // before the visible flip, so this is where the open's revalidate
+      // happens, and a changed verdict recomputes before the first paint.
       root._statPath(resolved.value, true)
     }
     root.clipTarget = resolved
