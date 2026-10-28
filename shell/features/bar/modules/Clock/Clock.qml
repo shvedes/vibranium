@@ -48,7 +48,11 @@ BarModule {
     // AM/PM, a literal suffix would print "AP".
     return root.use12h ? Qt.formatDateTime(clock.date, " AP") : ""
   }
-  readonly property real restingY: (root.height - segments.height) / 2
+  // Same optical correction as Title's verticalCenterOffset (see
+  // common/ui/Title.qml): the segments Row is placed by y, not by a
+  // vertical-center anchor, so the Title offset never applies to it and
+  // the correction rides here instead.
+  readonly property real restingY: (root.height - segments.height) / 2 + Math.round(Ui.fontM * root.textScale * 0.08)
 
   // Bar.slotInset on both sides: the zone row has zero gap and an icon-only
   // slot keeps (slot - canvas) / 2 of air at each edge, so the text module

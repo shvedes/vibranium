@@ -97,12 +97,12 @@ BarModule {
             running: slot.urgent
             loops: Animation.Infinite
             NumberAnimation {
-              to: 0.25
-              duration: 400
+              to: 0.35
+              duration: 800
             }
             NumberAnimation {
               to: 1.0
-              duration: 400
+              duration: 800
             }
           }
         }

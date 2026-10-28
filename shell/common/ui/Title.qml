@@ -43,4 +43,13 @@ Text {
   elide: Text.ElideRight
   textFormat: Text.PlainText
   wrapMode: Text.NoWrap
+
+  // Optical centering: a single-line Text box reserves the font's full
+  // descent even when the string carries none (digits, caps, "us",
+  // "72°F"), so geometrically centering the box parks cap-height glyphs
+  // ~1px high next to icons whose canvas is truly centered. Nudging the
+  // vertical-center anchor down by ~8% of the pixel size puts the cap
+  // height on the module middle. Only applies where callers anchor the
+  // vertical center; top/baseline/Row layouts ignore it.
+  anchors.verticalCenterOffset: Math.round(font.pixelSize * 0.08)
 }
