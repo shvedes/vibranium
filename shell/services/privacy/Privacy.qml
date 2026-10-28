@@ -64,11 +64,47 @@ Singleton {
   // qmllint disable unresolved-type missing-property
   // (the singleton line for PipeWireState in shell/services/qmldir is spec
   // 09's registration; until it is in, qmllint cannot resolve the type. The
-  // disable covers those two rules for these three lines only.)
+  // disable covers those two rules for these four lines only.)
   readonly property var nodes: Core.PipeWireState.nodes
   readonly property var links: Core.PipeWireState.links
   readonly property var source: Core.PipeWireState.source
+  readonly property var sink: Core.PipeWireState.sink
   // qmllint enable unresolved-type missing-property
+
+  // Shell-owned "Hear my voice" loopback (shell.audio.loopback): a direct
+  // source -> sink device route the Audio service creates with pw-link.
+  // The mic is live while it routes, and it leaves no stream node behind
+  // for the ledger to attribute - so the guard below names it explicitly
+  // and the ledger carries a synthetic row for it. Reads the same setting
+  // the Audio service reads, not the service, so this file keeps no
+  // dependency on it.
+  readonly property bool _loopbackOn: Settings.value("shell.audio.loopback") === true
+
+  // Raw links as id pairs for the library's loopback predicates. The
+  // topology rule itself lives in PrivacyLib (unit-tested); this is only
+  // the adaptation of PwLink objects, whose source/target carry the node
+  // objects the library must never see directly.
+  readonly property var _linkPairs: {
+    var out = []
+    for (var l = 0; l < root.links.length; l++) {
+      var lk = root.links[l]
+      if (!lk) continue
+      var s = lk.source ? lk.source.id : undefined
+      var t = lk.target ? lk.target.id : undefined
+      out.push({ s: s, t: t })
+    }
+    return out
+  }
+
+  // True when every raw link touching the default source has the default
+  // sink on the other end (and there is at least one). That is exactly the
+  // loopback shape: device-to-device, no app stream involved. Any peer
+  // that is not the sink - an app capture stream - answers false, so a
+  // real capture alongside the loopback still lights the dot.
+  readonly property bool _sourceOnlyLoopback: root._loopbackOn
+    && PrivacyLib.isLoopbackOnly(root._linkPairs,
+      root.source ? root.source.id : undefined,
+      root.sink ? root.sink.id : undefined)
 
   // Audio capture streams, mirrored from the microphone module's Model
   // (isCaptureStream): any app holding the mic shows the green dot.
@@ -300,9 +336,14 @@ Singleton {
   // module also reads. Those are documented as deduplicated non-monitor
   // topology, so "is anything consuming the mic" is a topology question and
   // the answer is the number of link groups on that node.
+  //
+  // Plus the shell's own loopback: source -> sink device links the Audio
+  // service owns (see _sourceOnlyLoopback above). The mic is live while
+  // it routes, so the dot lights and the ledger carries a row for it
+  // instead of leaving the overlay and the island to disagree.
   // qmllint disable unresolved-type missing-property
   readonly property bool micOn: Core.PipeWireState.sourceLinkCount > 0
-    || root.captureStreams.length > 0
+    || root.captureStreams.length > 0 || root._sourceOnlyLoopback
   // qmllint enable unresolved-type missing-property
   readonly property bool camOn: root.camStreams.length > 0
   readonly property bool shareOn: root.shareSourceLive || root.shareStreams.length > 0
@@ -1088,8 +1129,33 @@ Singleton {
   }
 
   // Per-app usage ledger: app -> {app, icon, targets, line1, line2}.
-  readonly property var appEntries:
-    PrivacyLib.ledger(root._ledgerRows(), root.severed)
+  // Plus the shell's own loopback row while it routes: a device link
+  // leaves no stream node to attribute, so the ledger would otherwise
+  // stay empty behind a lit dot. The need decision lives in PrivacyLib
+  // (unit-tested); this only resolves the row icon through the same
+  // shell-asset-first lookup stream rows use, so the island never gets a
+  // bare asset name IconImage cannot load. Not actionable by design -
+  // there is no stream to cut, and cutting device links would fight the
+  // Audio service that owns and reconciles them - so the island shows a
+  // plain glyph instead of a cut button for it.
+  // qmllint disable unresolved-type missing-property
+  readonly property var appEntries: {
+    const base = PrivacyLib.ledger(root._ledgerRows(), root.severed)
+    const need = PrivacyLib.needsLoopbackRow({
+      loopbackOn: root._loopbackOn,
+      micOn: root.micOn,
+      entries: base,
+      pairs: root._linkPairs,
+      sourceId: root.source ? root.source.id : undefined,
+      sinkId: root.sink ? root.sink.id : undefined,
+      sourceLinkCount: Core.PipeWireState.sourceLinkCount,
+      captureCount: root.captureStreams.length
+    })
+    if (!need) return base
+    return PrivacyLib.ensureLoopbackRow(base,
+      root._iconForName("headset", "audio-input-microphone"))
+  }
+  // qmllint enable unresolved-type missing-property
 
   // Island model and tooltip: the two published projections, each a library
   // call over the ledger. The lit set is this file's state, the theme lookup

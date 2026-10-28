@@ -375,9 +375,9 @@
         "options": [],
         "items": [
             {
-                "id": "launcher-calc",
+                "id": "launcher-fx",
                 "type": "toggle",
-                "label": "Calculator"
+                "label": "Currency converter"
             },
             {
                 "id": "launcher-unit",
@@ -385,24 +385,24 @@
                 "label": "Unit converter"
             },
             {
-                "id": "launcher-fx",
+                "id": "launcher-calc",
                 "type": "toggle",
-                "label": "Currency"
-            },
-            {
-                "id": "launcher-time",
-                "type": "toggle",
-                "label": "Time in city"
-            },
-            {
-                "id": "launcher-color",
-                "type": "toggle",
-                "label": "Color"
+                "label": "Calculator"
             },
             {
                 "id": "launcher-websearch",
                 "type": "toggle",
                 "label": "Web search"
+            },
+            {
+                "id": "launcher-time",
+                "type": "toggle",
+                "label": "Timezone"
+            },
+            {
+                "id": "launcher-color",
+                "type": "toggle",
+                "label": "Colors"
             }
         ]
     },

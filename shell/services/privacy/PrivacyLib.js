@@ -7,7 +7,7 @@
 // so the process object, the RequestGate generation, the watchdog and the
 // PipeWire subscriptions all stay in the controller.
 //
-// The library owns three vocabularies, in this order:
+// The library owns four vocabularies, in this order:
 //
 //   1. The process boundary. A PipeWire cut is three commands: snapshot the
 //      live link endpoints with one pw-dump, cut with pw-link -d, restore
@@ -18,6 +18,12 @@
 //      restore handle: pw-link resolves "node:port" by first match and
 //      streams routinely share one node.name (OBS names every stream "obs"),
 //      so a name spec can re-link the wrong twin node entirely.
+//
+//   4. The shell loopback ("Hear my voice"). A source -> sink device route
+//      leaves no stream node behind, so the dot would light with an empty
+//      ledger. The topology predicates and the synthetic ledger row live
+//      here so the rule is unit-tested; the controller only adapts its
+//      PwLink objects into id pairs and resolves the row icon.
 //
 //   2. The redaction policy. gateDigest() is fixed-width on purpose:
 //      RequestGate refuses a label longer than its 128-character limit and
@@ -317,4 +323,133 @@ function tooltipRows(entries, lit, severed, colorOf) {
   if (lit.share && rows.share.length === 0)
     rows.share.push({ icon: "screen-capture", text: "Screen sharing" })
   return rows.mic.concat(rows.cam, rows.share)
+}
+
+// --- shell loopback ("Hear my voice") ----------------------------------------
+//
+// The Audio service routes the default source straight into the default
+// sink while shell.audio.loopback is on. The mic is live, but the route is
+// device-to-device: no stream node exists for the ledger to attribute, so
+// the indicator would light with empty island/tooltip projections. These
+// helpers name that shape and carry the synthetic row, and the controller
+// only adapts PwLink objects into {s, t} id pairs and resolves the icon.
+// The row is deliberately NOT actionable: there is no stream to cut, and
+// cutting device links would fight the Audio service that owns them, so
+// the island renders a plain glyph for it.
+function loopbackAppName() {
+  return "Hear my voice"
+}
+
+function loopbackRow(icon) {
+  return {
+    app: loopbackAppName(),
+    icon: icon || "",
+    targets: [{
+      key: "mic",
+      icon: "mic-on",
+      colorKey: "green",
+      label: "Microphone",
+      classText: "Audio loopback",
+      titleText: "Input device to output device",
+      actionable: false,
+      linkIds: [],
+      severed: false
+    }]
+  }
+}
+
+function hasMicTarget(entries) {
+  const list = Array.isArray(entries) ? entries : []
+  for (let i = 0; i < list.length; i++) {
+    const e = list[i]
+    if (!e || !Array.isArray(e.targets)) continue
+    for (let j = 0; j < e.targets.length; j++) {
+      if (e.targets[j] && e.targets[j].key === "mic") return true
+    }
+  }
+  return false
+}
+
+function _loopId(v) {
+  if (v === null || v === undefined) return ""
+  if (typeof v === "number") {
+    if (!isFinite(v) || v < 0) return ""
+    return String(Math.round(v))
+  }
+  const s = String(v).trim()
+  return /^\d+$/.test(s) ? s.replace(/^0+(?=\d)/, "") || "0" : ""
+}
+
+function _loopPair(p) {
+  if (!p) return null
+  const s = _loopId(p.s !== undefined ? p.s : (p.source !== undefined ? p.source : p[0]))
+  const t = _loopId(p.t !== undefined ? p.t : (p.target !== undefined ? p.target : p[1]))
+  if (s === "" && t === "") return null
+  return { s: s, t: t }
+}
+
+// Every raw link touching the source has the sink on the other end, with at
+// least one such link. Any other peer - an app capture stream - answers
+// false, so a real capture alongside the loopback is never mistaken for it.
+// Accepts {s, t}, {source, target} or [s, t] pairs; ids may be numbers or
+// numeric strings to tolerate both QML and test callers.
+function isLoopbackOnly(pairs, sourceId, sinkId) {
+  const src = _loopId(sourceId)
+  const snk = _loopId(sinkId)
+  if (src === "" || snk === "" || src === snk) return false
+  if (!Array.isArray(pairs)) return false
+  let found = false
+  for (let i = 0; i < pairs.length; i++) {
+    const pr = _loopPair(pairs[i])
+    if (pr === null) continue
+    if (pr.s !== src && pr.t !== src) continue
+    found = true
+    const peer = pr.s === src ? pr.t : pr.s
+    if (peer !== snk) return false
+  }
+  return found
+}
+
+// Same peer test without the liveness requirement: true when no touching
+// link contradicts the loopback shape (vacuously true with none). Used as
+// the fallback while the link-group tracker already reports busy but the
+// raw list has not synced yet.
+function allSourcePeersSink(pairs, sourceId, sinkId) {
+  const src = _loopId(sourceId)
+  const snk = _loopId(sinkId)
+  if (src === "" || snk === "" || src === snk) return false
+  if (!Array.isArray(pairs)) return false
+  for (let i = 0; i < pairs.length; i++) {
+    const pr = _loopPair(pairs[i])
+    if (pr === null) continue
+    if (pr.s !== src && pr.t !== src) continue
+    const peer = pr.s === src ? pr.t : pr.s
+    if (peer !== snk) return false
+  }
+  return true
+}
+
+// Whether the ledger needs the synthetic loopback row: the setting is on,
+// the mic reads busy, no stream row claims it, and the topology matches
+// the loopback shape. The tracker/stream counts ride along for the sync
+// race where the count moved before the raw list did.
+function needsLoopbackRow(args) {
+  if (!args || args.loopbackOn !== true || args.micOn !== true) return false
+  if (hasMicTarget(args.entries)) return false
+  if (isLoopbackOnly(args.pairs, args.sourceId, args.sinkId)) return true
+  if (Number(args.captureCount) > 0) return false
+  if (Number(args.sourceLinkCount) <= 0) return false
+  return allSourcePeersSink(args.pairs, args.sourceId, args.sinkId)
+}
+
+// Base ledger plus the synthetic row, unless a mic row (or the row itself)
+// is already present. Never duplicates, never steals a real app's claim.
+function ensureLoopbackRow(entries, icon) {
+  const base = Array.isArray(entries) ? entries.slice() : []
+  if (hasMicTarget(base)) return base
+  for (let i = 0; i < base.length; i++) {
+    if (base[i] && base[i].app === loopbackAppName()) return base
+  }
+  base.push(loopbackRow(icon))
+  return base
 }

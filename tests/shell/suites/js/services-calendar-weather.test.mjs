@@ -885,6 +885,105 @@ group('tooltip rows carry the target glyph and tint for the host lines path', ()
   eq('every row opts into rich text', rows.every((r) => r.markup === true), true)
 })
 
+section('PrivacyLib - shell loopback ("Hear my voice")')
+
+group('loopback row identity and shape', () => {
+  eq('the app name matches the settings label', PL.loopbackAppName(), 'Hear my voice')
+  const row = PL.loopbackRow('ICON')
+  eq('the row carries the resolved icon', row.icon, 'ICON')
+  eq('one mic target', row.targets.length, 1)
+  eq('target key', row.targets[0].key, 'mic')
+  eq('target glyph is the mic dot glyph', row.targets[0].icon, 'mic-on')
+  eq('not actionable, so the island renders a plain glyph', row.targets[0].actionable, false)
+  eq('no remembered links', row.targets[0].linkIds, [])
+  eq('never severed', row.targets[0].severed, false)
+  eq('an empty icon falls back to empty, not a name', PL.loopbackRow('').icon, '')
+})
+
+group('hasMicTarget reads the ledger, not the rows', () => {
+  eq('empty ledger', PL.hasMicTarget([]), false)
+  eq('nullish ledger', PL.hasMicTarget(null), false)
+  eq('mic entry', PL.hasMicTarget([{ app: 'x', targets: [{ key: 'mic' }] }]), true)
+  eq('cam-only entry', PL.hasMicTarget([{ app: 'x', targets: [{ key: 'cam' }] }]), false)
+  eq('entry without targets', PL.hasMicTarget([{ app: 'x' }]), false)
+  eq('a null entry is skipped', PL.hasMicTarget([null, { app: 'x', targets: [{ key: 'mic' }] }]), true)
+})
+
+group('isLoopbackOnly names the device-to-device shape', () => {
+  eq('single source->sink link', PL.isLoopbackOnly([{ s: 10, t: 20 }], 10, 20), true)
+  eq('sink->source direction also counts', PL.isLoopbackOnly([{ s: 20, t: 10 }], 10, 20), true)
+  eq('two loopback links still only loopback', PL.isLoopbackOnly([{ s: 10, t: 20 }, { s: 10, t: 20 }], 10, 20), true)
+  eq('array pairs are accepted', PL.isLoopbackOnly([[10, 20]], 10, 20), true)
+  eq('string ids match numeric ones', PL.isLoopbackOnly([{ s: '10', t: '20' }], 10, 20), true)
+  eq('unrelated links are ignored', PL.isLoopbackOnly([{ s: 30, t: 40 }, { s: 10, t: 20 }], 10, 20), true)
+  eq('no links is not a route', PL.isLoopbackOnly([], 10, 20), false)
+  eq('no touching link is not a route', PL.isLoopbackOnly([{ s: 30, t: 40 }], 10, 20), false)
+  eq('an app peer breaks it', PL.isLoopbackOnly([{ s: 10, t: 20 }, { s: 10, t: 30 }], 10, 20), false)
+  eq('source alone with no peer breaks it', PL.isLoopbackOnly([{ s: 10, t: undefined }], 10, 20), false)
+  eq('same device is not a route', PL.isLoopbackOnly([{ s: 10, t: 10 }], 10, 10), false)
+  eq('missing source', PL.isLoopbackOnly([{ s: 10, t: 20 }], null, 20), false)
+  eq('missing sink', PL.isLoopbackOnly([{ s: 10, t: 20 }], 10, null), false)
+  eq('non-array pairs', PL.isLoopbackOnly(null, 10, 20), false)
+  eq('null entries are skipped', PL.isLoopbackOnly([null, { s: 10, t: 20 }], 10, 20), true)
+})
+
+group('allSourcePeersSink is the vacuous guard for the sync race', () => {
+  eq('no links is vacuously true', PL.allSourcePeersSink([], 10, 20), true)
+  eq('loopback peers', PL.allSourcePeersSink([{ s: 10, t: 20 }], 10, 20), true)
+  eq('an app peer breaks it', PL.allSourcePeersSink([{ s: 10, t: 30 }], 10, 20), false)
+  eq('invalid devices', PL.allSourcePeersSink([], null, 20), false)
+})
+
+group('needsLoopbackRow gates on setting, busyness and attribution', () => {
+  const base = (pairs, src = 10, snk = 20, extra = {}) => ({
+    loopbackOn: true, micOn: true, entries: [], pairs, sourceId: src, sinkId: snk,
+    sourceLinkCount: 1, captureCount: 0, ...extra,
+  })
+  eq('pure loopback route', PL.needsLoopbackRow(base([{ s: 10, t: 20 }])), true)
+  eq('setting off never needs a row', PL.needsLoopbackRow(base([{ s: 10, t: 20 }], 10, 20, { loopbackOn: false })), false)
+  eq('idle mic never needs a row', PL.needsLoopbackRow(base([{ s: 10, t: 20 }], 10, 20, { micOn: false })), false)
+  eq('a real mic row wins over the synthetic one',
+    PL.needsLoopbackRow(base([{ s: 10, t: 20 }], 10, 20, { entries: [{ app: 'firefox', targets: [{ key: 'mic' }] }] })), false)
+  eq('an app peer is a real capture, not loopback',
+    PL.needsLoopbackRow(base([{ s: 10, t: 20 }, { s: 10, t: 30 }])), false)
+  eq('tracker busy with no stream and sink-only peers (sync race)',
+    PL.needsLoopbackRow(base([], 10, 20, { sourceLinkCount: 2 })), true)
+  eq('capture streams block the fallback',
+    PL.needsLoopbackRow(base([], 10, 20, { sourceLinkCount: 2, captureCount: 1 })), false)
+  eq('tracker idle with no raw route needs nothing',
+    PL.needsLoopbackRow(base([], 10, 20, { sourceLinkCount: 0 })), false)
+  eq('nullish args', PL.needsLoopbackRow(null), false)
+})
+
+group('ensureLoopbackRow never duplicates and never steals a claim', () => {
+  const withIcon = PL.ensureLoopbackRow([], 'ICON')
+  eq('adds the row to an empty ledger', withIcon.map(e => e.app), ['Hear my voice'])
+  eq('the added row carries the icon', withIcon[0].icon, 'ICON')
+  eq('second call is idempotent', PL.ensureLoopbackRow(withIcon, 'ICON').length, 1)
+  eq('a mic row blocks it', PL.ensureLoopbackRow([{ app: 'firefox', targets: [{ key: 'mic' }] }], 'ICON').length, 1)
+  eq('a cam-only ledger still gains it',
+    PL.ensureLoopbackRow([{ app: 'obs', targets: [{ key: 'cam' }] }], 'ICON').map(e => e.app),
+    ['obs', 'Hear my voice'])
+  eq('nullish ledger becomes just the row', PL.ensureLoopbackRow(null, 'I').map(e => e.app), ['Hear my voice'])
+})
+
+group('the loopback row flows through island and tooltip', () => {
+  const led = PL.ensureLoopbackRow([], 'ICON')
+  const lit = { mic: true, cam: false, share: false }
+  const island = PL.islandRows(led, lit)
+  eq('island shows one row', island.map(e => e.app), ['Hear my voice'])
+  eq('island line names the app', island[0].line1, '<b>Hear my voice</b>')
+  eq('island subtext names the route', island[0].line2, 'Input device to output device')
+  const tip = PL.tooltipRows(led, lit, {}, colorOf)
+  eq('tooltip shows one mic row', tip.length, 1)
+  eq('tooltip verb', tip[0].verb, 'is using microphone')
+  eq('tooltip glyph', tip[0].icon, 'mic-on')
+  eq('dark mic hides it again', PL.islandRows(led, { mic: false, cam: false, share: false }), [])
+  // A real app alongside keeps its own row and the synthetic one stays out.
+  const mixed = PL.ledger([{ app: 'firefox', kind: 'mic', linkIds: [11] }], {})
+  eq('mixed ledger keeps the app and gains nothing', PL.ensureLoopbackRow(mixed, 'I').map(e => e.app), ['firefox'])
+})
+
 // ---------------------------------------------------------------------------
 // PrintersLib
 // ---------------------------------------------------------------------------
