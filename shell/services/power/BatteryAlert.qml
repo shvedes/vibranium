@@ -252,7 +252,7 @@ Singleton {
   // One card, for one level of one device. The argv is the shared one rather
   // than an arrangement kept here, because the notification card is the other
   // end of it: `NotificationsLib.iconColorOf` reads the hint name and
-  // `NotificationCard.iconUrl` resolves it against the live palette. A
+  // `NotificationCard.appIconUrl` resolves it against the live palette. A
   // synthetic fleet drives this same function, so what a demo sends and what
   // this unit sends cannot drift apart.
   function _announce(d: var, level: string) {

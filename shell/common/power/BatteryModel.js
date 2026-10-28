@@ -377,7 +377,7 @@ function alertFor(pct, levels) {
 // This lives beside alertFor rather than in the service that posts it because
 // the wire format is the contract the notification card actually receives -
 // `NotificationsLib.iconColorOf` reads the hint name below and
-// `NotificationCard.iconUrl` hands it to Icons.url - so it is a fact two
+// `NotificationCard.appIconUrl` hands it to Icons.url - so it is a fact two
 // readers depend on rather than one caller's private arrangement, and a
 // synthetic fleet has to be able to reproduce it byte for byte.
 //

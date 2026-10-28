@@ -625,23 +625,10 @@ Rectangle {
     return image.indexOf(":") > 0 ? image : "file://" + image
   }
 
-  // The icon: the sender's own image first, then the app icon resolved through
-  // the shared lookup (shipped glyph, then the platform theme), then the app
-  // name as the last resort. "" when none of them resolve, which is what makes
-  // the column zero-width above rather than a broken texture.
-  //
   // `shot.iconColor` paints the appIcon leg only, and within that leg only the
   // glyph the shell ships itself: AppIcons threads the tone into Icons.url and
   // nowhere else, and a shipped asset is one Icons.recolor rewrites to a single
   // hex, so it has no color of its own to keep. `shot.image` is the sender's own
   // artwork and is never recolored, because repainting somebody else's icon in a
   // tone they did not choose is a different change from choosing a tone for ours.
-  readonly property string iconUrl: {
-    const image = String(root.shot.image)
-    if (image !== "") return image.indexOf(":") > 0 ? image : "file://" + image
-    const name = String(root.shot.appIcon)
-    const tone = String(root.shot.iconColor ?? "")
-    if (name !== "") return AppIcons.url(name, String(root.shot.appName), tone)
-    return AppIcons.url(String(root.shot.appName), "", tone)
-  }
 }
