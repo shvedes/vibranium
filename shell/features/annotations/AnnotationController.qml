@@ -152,6 +152,7 @@ Item {
       savePath: String(request.savePath ?? ""),
       saveToDisk: request.saveToDisk === true,
       fileType: String(request.fileType ?? "png"),
+      showNotification: request.showNotification !== false,
       runtimeDir: String(request.runtimeDir ?? ""),
       directSource: request.directSource === true,
       screen: request.screen,

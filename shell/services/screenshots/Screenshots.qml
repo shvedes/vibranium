@@ -1084,7 +1084,7 @@ Singleton {
     const opened = AnnotationActions.request("editor", {
       shotPath: target, savePath: savePath, saveToDisk: direct ? true : config.saveToDisk,
       fileType: config.fileType, runtimeDir: root.runtimeDir, directSource: direct,
-      screen: s, flowId: flowId
+      screen: s, flowId: flowId, showNotification: config.showNotification === true
     })
     if (!opened.ok) {
       if (root._activeFlow === flowId) root._cancelActiveFlow("editor-unavailable")

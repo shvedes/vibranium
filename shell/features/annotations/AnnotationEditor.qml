@@ -44,6 +44,9 @@ PanelWindow {
   // False in clipboard-only flows: Save copies pixels, writes no file.
   property bool saveToDisk: true
   property string fileType: "png"
+  // Snapshot of shell.screenshots.showNotification at capture time.
+  // Gates only the success toasts below; failures still notify.
+  property bool showNotification: true
 
   // Each item: { tool, color, width, points: [{x,y}], text?, fontSize? }
   // in document pixels (== source image pixels pre-crop). Blur strokes
@@ -735,7 +738,7 @@ PanelWindow {
     editor.exporting = false
     editor._saveTargetExisted = true
     const dir = output.substring(0, Math.max(0, output.lastIndexOf("/")))
-    editor._daemonNotify("Screenshot Saved", "Saved to " + dir)
+    if (editor.showNotification) editor._daemonNotify("Screenshot Saved", "Saved to " + dir)
     Registry.call("screenshots", "noteSaved", editor._uid, output)
     editor._close()
     gc()
@@ -756,7 +759,7 @@ PanelWindow {
       editor.exporting = false
       if (kind === "copy" || !editor.saveToDisk) {
         Registry.call("screenshots", "noteCancelled", editor._uid)
-         editor._daemonNotify("Screenshot Copied", "Copied to clipboard")
+        if (editor.showNotification) editor._daemonNotify("Screenshot Copied", "Copied to clipboard")
         editor._close()
         gc()
         return

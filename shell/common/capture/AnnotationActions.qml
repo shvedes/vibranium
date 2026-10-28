@@ -263,7 +263,7 @@ Singleton {
       return ["url", "frameW", "frameH", "immediate", "jobId", "flowId"]
     }
     return ["shotPath", "savePath", "saveToDisk", "fileType", "runtimeDir",
-      "directSource", "flowId"]
+      "directSource", "flowId", "showNotification"]
   }
 
   function _codes(kind) {
