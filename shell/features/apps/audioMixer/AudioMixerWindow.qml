@@ -90,13 +90,17 @@ QtObject {
   property var expandedDevices: []
 
   // The tab set, in order, and the one place the order is written: Apps first
-  // because it is what the window is opened for.
+  // because it is what the window is opened for. Each tab carries the icon
+  // its chip draws ahead of the label - the tab's empty-state glyph, so a tab
+  // reads the same with rows and without. Recording is the one deliberate
+  // exception: its empty state uses "recording", which is a video camera,
+  // while the tab lists audio capture streams and gets the microphone.
   readonly property var tabs: [
-    { key: "apps", label: "Apps" },
-    { key: "devices", label: "Devices" },
-    { key: "recording", label: "Recording" },
-    { key: "configuration", label: "Configuration" },
-    { key: "graph", label: "Graph" }
+    { key: "apps", label: "Apps", icon: "music" },
+    { key: "devices", label: "Devices", icon: "speaker" },
+    { key: "recording", label: "Recording", icon: "mic-on" },
+    { key: "configuration", label: "Configuration", icon: "settings-general" },
+    { key: "graph", label: "Graph", icon: "link" }
   ]
 
   // Left/Right walk the set rather than naming two tabs, so the arrow keys and
@@ -149,24 +153,25 @@ QtObject {
   readonly property int minW: 640
   readonly property int minH: 240
   readonly property int margin: Ui.xl
-  // The compact tab chip's height: `Chip`'s own implicit height - its label's
-  // line plus the component's fixed padding - with HALF a spacing unit taken
-  // back off that padding. Read from the component rather than written as a
-  // number so the chip cannot go shorter than the text inside it when the font
-  // scale moves: a hardcoded height is a height that clips its own label at
-  // some other user's font size, and a tab row whose labels are cut in half is
-  // a tab bar nobody can read. `Chip`'s padding is 4px a side, so this halves
-  // it to 2px, which is the whole of "compact".
+  // The tab chip's height: `Chip`'s own implicit height - its label's line
+  // plus the component's fixed 4px padding a side - taken as is. It used to
+  // carry half a spacing unit less, which left 2px of padding around a bare
+  // label; beside an icon that reads as a cramped strip rather than a tab.
+  // Read from the component rather than written as a number so the chip
+  // cannot go shorter than the text inside it when the font scale moves: a
+  // hardcoded height is a height that clips its own label at some other
+  // user's font size, and a tab row whose labels are cut in half is a tab bar
+  // nobody can read.
   readonly property int chipNatH: tabBar.children.length > 0
     ? tabBar.children[0].implicitHeight : 0
-  readonly property int chipH: chipNatH - Ui.s / 2
-  // The air the bar keeps above the chip row: the same half spacing unit the
-  // compact height takes back off `Chip`'s own padding, so a chip is not the
-  // whole height of the bar. The row is ANCHORED at this margin rather than
-  // centred in the bar, and that is the load-bearing half: a centred row drops
-  // by half of every pixel the bar grows, so the room given to the separator
-  // below would be paid for out of the air above the chips.
-  readonly property int chipAir: Ui.s / 2
+  readonly property int chipH: chipNatH
+  // The air the bar keeps above the chip row: one full spacing unit, so the
+  // chips sit inside the bar rather than forming its top edge. The row is
+  // ANCHORED at this margin rather than centred in the bar, and that is the
+  // load-bearing half: a centred row drops by half of every pixel the bar
+  // grows, so the room given to the separator below would be paid for out of
+  // the air above the chips.
+  readonly property int chipAir: Ui.s
   // The separator's own breathing room, one token either side of the hairline
   // - `sepAir` under the line and `sepAir` above it, the latter coming out of
   // the bar's height below. A margin on the line only exists where there is
@@ -714,7 +719,10 @@ QtObject {
 
               color: opt.marked ? Ui.tint("foreground_1", 0.08) : "transparent"
 
-              Behavior on color { ColorAnim {} }
+              // No Behavior on color here: the highlight is the pointer's own
+              // position report, and a tween on it lags behind a moving cursor
+              // so the entry under the pointer never looks fully marked until
+              // the pointer stops. The highlight must track the hover exactly.
             }
 
             Row {
@@ -794,8 +802,9 @@ QtObject {
     }
 
     // The wheel over the open list, and the one place its two cases are
-    // decided. `notches` is the wheel delta measured in rows, so a discrete
-    // wheel reports whole ones and a trackpad reports fractions of one.
+    // decided. `notches` is the wheel delta measured in rows, positive for a
+    // wheel-up, so a discrete wheel reports whole ones and a trackpad reports
+    // fractions of one.
     //
     // A list with something to scroll takes the gesture itself. A list that
     // fits has nothing to scroll, and the gesture is then the page's: the
@@ -803,10 +812,14 @@ QtObject {
     // moved it would turn every scroll of a short list into a `pactl` move the
     // user did not ask for. Nothing here can close the list either - a scroll
     // that is not a choice is not a dismissal.
+    //
+    // A wheel-up carries a positive delta and scrolls the list up, which is a
+    // contentY DECREASE, hence the subtraction: adding it here scrolled the
+    // list down under a wheel-up, the touch-style "natural" direction.
     function wheelBy(notches) {
       if (pop.overflows) {
         const maxY = Math.max(0, list.contentHeight - list.height)
-        list.contentY = Math.max(0, Math.min(maxY, list.contentY + notches * pop.rowH))
+        list.contentY = Math.max(0, Math.min(maxY, list.contentY - notches * pop.rowH))
         return
       }
       pop.paged(notches)
@@ -1037,17 +1050,16 @@ QtObject {
             required property var modelData
 
             text: tabChip.modelData.label
+            iconName: tabChip.modelData.icon
+            // The icon follows the label's own state color, so the glyph reads
+            // as part of the tab rather than as a separate muted mark beside
+            // an accent one.
+            iconColorKey: tabChip.selected ? "accent" : "foreground_1"
             selected: mixer.tab === tabChip.modelData.key
-            // Compact: the chip is a label plus a quarter of a spacing unit
-            // above and below it, rather than the `Chip` component's own fixed
-            // 4px either side. It is published on the holder rather than
-            // written here because the bar's height is this number plus the
-            // margin either side of it, and the body starts below the bar - one
+            // The holder's chip height: `Chip`'s own implicit height, published
+            // there because the bar's height is this number plus the margin
+            // either side of it and the body starts below the bar - one
             // measurement, three readers.
-            // Compact: the chip's own implicit height less half a spacing unit of
-            // padding, published on the holder because the bar's height is this
-            // number plus the margin either side of it and the body starts
-            // below the bar - one measurement, three readers.
             height: mixer.chipH
             // One step dimmer than the shell's own chip, in the dimming idiom
             // the rows and the tree use: a foreground tint rather than a second
@@ -1553,7 +1565,7 @@ QtObject {
         // while a list is up, and the scrollbar is the other.
         onPaged: function(notches) {
           const maxY = Math.max(0, body.contentHeight - body.height)
-          body.contentY = Math.max(0, Math.min(maxY, body.contentY + notches * pop.rowH))
+          body.contentY = Math.max(0, Math.min(maxY, body.contentY - notches * pop.rowH))
         }
       }
     }

@@ -48,6 +48,7 @@ pragma ComponentBehavior: Bound
 // decides what that means for the pairs already there.
 
 import QtQuick
+import QtQuick.Effects
 import qs.common
 import qs.services as Core
 import "MixerModel.js" as Model
@@ -464,6 +465,30 @@ Item {
   // them may be set at a time, and one flag cannot say which.
   property bool cutting: false
 
+  // A slight drop shadow under the card: a hidden source rect, so the blur is
+  // rendered once and cached rather than repainted on every meter tick - the
+  // AnnotationEditor board's idiom, where the shadow item sits behind the
+  // content it lifts. Declared before the plate so it paints beneath it.
+  // Auto padding (the default) keeps the blur and the downward offset inside
+  // the effect's own area, so nothing here clips against the card's rect.
+  Rectangle {
+    id: cardShadowSource
+
+    anchors.fill: parent
+    visible: false
+    radius: RoundingPolicy.radius
+    color: "#000000"
+  }
+
+  MultiEffect {
+    anchors.fill: parent
+    source: cardShadowSource
+    shadowEnabled: true
+    shadowBlur: 0.5
+    shadowColor: "#66000000"
+    shadowVerticalOffset: 2
+  }
+
   Rectangle {
     id: plate
 
@@ -479,9 +504,15 @@ Item {
     color: card.linked ? Ui.tint("accent", 0.09)
       : (card.connectable ? Ui.solid("background_2") : Ui.tint("background_2", 0.45))
     border.width: card.linked ? 2 : 1
+    // The edge is the card's own surface lifted a little toward the
+    // foreground, so the border follows the theme instead of naming a second
+    // palette leaf: on a dark palette that is just brighter, on a light one
+    // just darker, and either way barely there. The linked accent edge and
+    // the unsupported faint edge are selection and state, not the surface,
+    // so they keep their own colours.
     border.color: card.linked
       ? Ui.tint("accent", 0.7)
-      : (card.connectable ? Ui.tint("background_3", 0.8) : Ui.tint("foreground_1", 0.14))
+      : (card.connectable ? Ui.mix("background_2", "foreground_0", 0.14) : Ui.tint("foreground_1", 0.14))
 
     Behavior on color { ColorAnim {} }
     Behavior on border.color { ColorAnim {} }
