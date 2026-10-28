@@ -103,6 +103,20 @@ Item {
   // Set while a cover that has already loaded is waiting for the flash
   // boundary that is allowed to fade it in. See the art frame.
   property bool _artArmed: false
+  // The url this island holds in the shared art warmer (MediaArt), so a
+  // reopen on the same track hits the decoded pixmap instead of fetching
+  // again. Requested when the url arrives, released when it leaves or the
+  // island is destroyed - the hold lasts as long as the track is shown.
+  property string _demandedArt: ""
+  function _syncArtDemand() {
+    if (root._demandedArt !== "" && root._demandedArt !== root.artUrl) {
+      Core.MediaArt.release(root._demandedArt)
+      root._demandedArt = ""
+    }
+    if (root.artUrl !== "" && root._demandedArt !== root.artUrl) {
+      if (Core.MediaArt.request(root.artUrl)) root._demandedArt = root.artUrl
+    }
+  }
   // Direct track link from raw MPRIS metadata (xesam:url), refreshed
   // on title/player change (metadata itself carries no usable notify).
   // http/file only: player-internal schemes never leave the player.
@@ -185,6 +199,7 @@ Item {
   }
   onArtUrlChanged: {
     root._artArmed = false
+    root._syncArtDemand()
     artFade.stop()
     artReveal.stop()
     if (root.artUrl === "") {
@@ -510,6 +525,7 @@ Item {
   }
 
   Component.onCompleted: {
+    root._syncArtDemand()
     OSD.retainMediaIsland(root)
     // Body focus wins over the host sink deliberately (see IslandHost),
     // but only once the island is actually shown: a focus request
@@ -520,10 +536,24 @@ Item {
     // The island opens on a track whose cover is usually still loading, and
     // the plain box is what the frame shows until it arrives. An artUrl that
     // was never anything else raises no change, so the flash is seeded from
-    // the state the frame already opens in.
-    artFrame.waitingArt = root.animOn && root.artUrl !== ""
+    // the state the frame already opens in - unless the cover is already
+    // warm (the active track's decode the warmer holds, or this island's own
+    // demand from a previous open). A warm cover shows instantly like the
+    // OSD instead of replaying the skeleton for a track that never left.
+    if (root.artUrl !== "" && art.status === Image.Ready) {
+      art.opacity = 1
+      artFrame.waitingArt = false
+    } else {
+      let warm = false
+      try { warm = Core.MediaArt.warmUrls.indexOf(root.artUrl) >= 0 } catch (e) { warm = false }
+      artFrame.waitingArt = root.animOn && root.artUrl !== "" && !warm
+    }
   }
-  Component.onDestruction: OSD.releaseMediaIsland(root)
+  Component.onDestruction: {
+    if (root._demandedArt !== "") Core.MediaArt.release(root._demandedArt)
+    root._demandedArt = ""
+    OSD.releaseMediaIsland(root)
+  }
 
   // Focus request, on visible only: fires when the island shows (and at
   // construction when built shown), never while hidden.
@@ -727,6 +757,11 @@ Item {
             cache: true
             retainWhileLoading: true
             fillMode: Image.PreserveAspectCrop
+            // Same decode size as the warmer and the OSD card, so a cover
+            // warmed for one surface hits the shared pixmap cache for this
+            // one instead of decoding a second raster for the same url.
+            sourceSize.width: 256
+            sourceSize.height: 256
 
             onStatusChanged: {
               if (status === Image.Ready && root.artUrl !== "") artFrame.coverLanded()
@@ -745,6 +780,8 @@ Item {
             asynchronous: true
             cache: true
             fillMode: Image.PreserveAspectCrop
+            sourceSize.width: 256
+            sourceSize.height: 256
 
             onStatusChanged: {
               if (status === Image.Ready && root.artUrl !== ""
