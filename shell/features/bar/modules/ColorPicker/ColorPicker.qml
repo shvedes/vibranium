@@ -371,6 +371,30 @@ BarModule {
     }
   }
 
+  // Last copied color code shown in the bar flash (plain foreground text,
+  // never tinted with the color itself). Set at the moment the record
+  // lands in history; the reveal window below times how long it stays up.
+  property string flashText: ""
+  function _recordDisplay(rec): string {
+    if (!rec || typeof rec !== "object") return ""
+    const f = rec.formats && typeof rec.formats === "object" ? rec.formats : null
+    const fmt = typeof rec.fmt === "string" ? rec.fmt : "hex"
+    if (f !== null && typeof f[fmt] === "string" && f[fmt] !== "") return String(f[fmt])
+    const c = ColorMath.parse(String(rec.color || ""))
+    if (c === null) return String(rec.color || "")
+    const a = typeof rec.alpha === "number" ? ColorMath.clampAlpha(rec.alpha) : 1
+    return ColorMath.hex8(c, a)
+  }
+  function _fireCopyFlash(text) {
+    const s = String(text === undefined || text === null ? "" : text)
+    if (s === "") return
+    root.flashText = s
+    if (root._fsActive) {
+      root._flashPending = true
+      return
+    }
+    codeFlash.pulse()
+  }
   // Add a color (normalized "#rrggbb" from the island or a pick) with
   // alpha. `meta` optionally carries `formats`: a map of every supported
   // serialization of the entry at add time, stored on the record so each
@@ -405,7 +429,9 @@ BarModule {
       if (root._recKey(base[i]) === key) continue
       next.push(base[i])
     }
-    return root._persist(next)
+    const ok = root._persist(next)
+    if (ok === true) root._fireCopyFlash(root._recordDisplay(root.records.length > 0 ? root.records[0] : rec))
+    return ok
   }
 
   // Move an existing entry to the front without re-adding it - the
@@ -429,7 +455,9 @@ BarModule {
     // The key was computed from a record the island is still holding, so a miss
     // here is a delete/re-add race rather than a user error.
     if (moved === null) return false
-    return root._persist([moved].concat(rest))
+    const ok = root._persist([moved].concat(rest))
+    if (ok === true) root._fireCopyFlash(root._recordDisplay(root.records.length > 0 ? root.records[0] : moved))
+    return ok
   }
 
   // Delete by normalized key (history rows route through the island by
@@ -1014,15 +1042,101 @@ BarModule {
     }
   }
 
+  // --- copy flash ---
+  // Builtin, with no setting behind it: the window is the shared one
+  // (common/ui/FlashReveal.qml) and the reveal is the same shape the
+  // Now Playing track name uses - a real animated 0..1 gating a label
+  // inside the pill. Unlike the network/bt flashes the code stays in
+  // the plain foreground tone: the color itself is the announcement,
+  // so no green blink and no tint of the text with the picked color.
+  FlashReveal {
+    id: codeFlash
+    durationMs: 1500
+  }
+  // Fullscreen defer: a pick that lands while a fullscreen window owns
+  // this screen must not flash under it - the pill would expand over the
+  // fullscreen content. The event is parked in _flashPending and replayed
+  // when the fullscreen ends, so the announcement lands when the bar is
+  // visible again. An in-flight flash cut off by entering fullscreen is
+  // parked the same way. The reveal itself never reads fullscreen: while
+  // fullscreen is up nothing pulses and nothing shows.
+  readonly property bool _fsActive: root.barScreen ? FullscreenProbe.screenActive(root.barScreen.name) : FullscreenProbe.anyActive
+  property bool _flashPending: false
+  on_FsActiveChanged: {
+    if (root._fsActive) {
+      // Entering fullscreen with a flash up: park it and take it off
+      // screen instead of letting it run under the fullscreen window.
+      if (codeFlash.active) {
+        if (root.flashText !== "") root._flashPending = true
+        codeFlash.clear()
+      }
+      return
+    }
+    if (root._flashPending) {
+      root._flashPending = false
+      if (root.flashText !== "") codeFlash.pulse()
+    }
+  }
+  // Whether the reveal is up. Read by the slide rather than each reading
+  // the window on its own: one event - the reveal timer's expiry - flips
+  // the collapse, so the pill's collapse and the label's hide stay together.
+  readonly property bool revealed: codeFlash.active && root.flashText !== ""
+  property real codeSlide: root.revealed ? 1 : 0
+  Behavior on codeSlide {
+    Glide { duration: Ui.slowMs }
+  }
+
   // --- module surface ---
 
-  implicitWidth: Bar.iconSlot
+  // Dynamic pill (the NowPlaying convention): a `codeSlide` real animates
+  // 0..1 and the width rounds to whole pixels every frame, so neighbours
+  // never sit at a fractional x while the pill grows. `clip` keeps the
+  // collapsing label inside the module.
+  clip: true
+  implicitWidth: Math.round(root.codeSlide > 0 ? pill.width : Bar.iconSlot)
 
-  Icon {
-    anchors.centerIn: parent
-    name: "droplet"
-    colorKey: "foreground_0"
-    accentKey: root._tintEnabled && root._lastColor !== "" ? root._lastColor : ""
+  Item {
+    id: pill
+
+    anchors.left: parent.left
+    anchors.verticalCenter: parent.verticalCenter
+    width: Bar.iconSlot + root.codeSlide * (Math.min(labelText.implicitWidth, 240) + 4 + Bar.slotInset)
+    height: root.height
+
+    Item {
+      id: glyph
+
+      anchors.left: parent.left
+      anchors.verticalCenter: parent.verticalCenter
+      width: Bar.iconSlot
+      height: parent.height
+
+      Icon {
+        // Centered in the slot when the code is hidden; docked left ahead of
+        // the label otherwise (assigned at runtime so the analyzer never sees
+        // an illegal left+horizontalCenter combination).
+        anchors.left: root.codeSlide > 0 ? parent.left : undefined
+        anchors.horizontalCenter: root.codeSlide > 0 ? undefined : parent.horizontalCenter
+        anchors.verticalCenter: parent.verticalCenter
+        name: "droplet"
+        colorKey: "foreground_0"
+        accentKey: root._tintEnabled && root._lastColor !== "" ? root._lastColor : ""
+      }
+    }
+
+    Title {
+      id: labelText
+
+      anchors.left: glyph.right
+      anchors.leftMargin: 4
+      anchors.verticalCenter: parent.verticalCenter
+      visible: root.codeSlide > 0
+      level: 3
+      width: Math.min(implicitWidth, 240)
+      font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
+      text: root.flashText
+      elide: Text.ElideRight
+    }
   }
 
   // Strict routing: left picks, middle clears, right opens the island.

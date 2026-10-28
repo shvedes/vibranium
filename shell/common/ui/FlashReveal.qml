@@ -14,12 +14,12 @@ import QtQuick
 //
 // Declared once rather than written per module because every copy carried
 // its own number: two 3000s that agree by coincidence can only be retuned one
-// module at a time. The span is readonly for the same reason - one window for
-// every site, not a span per site.
+// module at a time. The default span is 3000; a site that needs its own
+// window sets durationMs (the color picker flash is shorter).
 Item {
   id: root
 
-  readonly property int durationMs: 3000
+  property int durationMs: 3000
   readonly property bool active: flashTimer.running
 
   // A reveal is an event, never a boot artifact, so the window refuses to open
