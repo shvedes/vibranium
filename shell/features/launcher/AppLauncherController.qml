@@ -973,8 +973,25 @@ Item {
 
   function _onStatProbed() {
     const v = LauncherLib.statVerdict(pathStatProc.out, pathStatProc.seq)
-    if (v === null) return // aborted run's stale exit
+    if (v === null) {
+      // Aborted run's stale exit. While an open is waiting, a stale exit
+      // means the waited path was superseded (clipboard changed mid-open
+      // or a revalidate replaced the run): finish now if the current target
+      // is settled, otherwise keep waiting on the newer run - the timeout
+      // bounds the wait either way.
+      if (AppLauncher._openWaiting && root._clipSettled()) AppLauncher._finishOpen()
+      return
+    }
     BoundedCache.put(AppLauncher.statCache, pathStatProc.path, v.verdict)
+    // A pending open owns this verdict: finish the open (which recomputes
+    // with it before the first paint) instead of recomputing under a
+    // hidden panel. Probes for typed-path fallback rows also land here -
+    // only the clip path completes the open.
+    if (AppLauncher._openWaiting) {
+      const waited = root.clipTarget ? root.clipTarget.value : ""
+      if (pathStatProc.path === waited) AppLauncher._finishOpen()
+      return
+    }
     // The live suggestion already paints provisionally (hint, or an assumed
     // file), so a dir/file verdict keeps or corrects that row in place -
     // same row count, same height, no window resize - while a missing
@@ -987,7 +1004,45 @@ Item {
 
   // --- clipboard suggestion ---
 
-  function _refreshClipTarget() {
+  // Pure check the open path gates on: is the clipboard suggestion ready to
+  // paint, with no probe outstanding for it? Non-local targets (url/uri),
+  // a null target and a cached verdict with no revalidate running are all
+  // settled - the open pays no wait for them. Uncached locals and locals
+  // with a revalidate in flight are not.
+  function _clipSettled() {
+    if (!root.showClipSuggestion) return true
+    const t = root.clipTarget
+    if (!t || t.kind !== "local") return true
+    if (!BoundedCache.has(AppLauncher.statCache, t.value)) return false
+    if (pathStatProc.running && pathStatProc.path === t.value) return false
+    return true
+  }
+
+  // The facade's open gate: refresh the target (cheap and synchronous
+  // except for arming the probe) and answer whether the open must wait for
+  // the verdict before its first paint.
+  function clipProbePending() {
+    // The suggestion only renders on the blank idle view; a filtered open
+    // never paints it, so it never waits for it either.
+    if (String(AppLauncher.entry ?? "").trim() !== "") return false
+    root._refreshClipTarget()
+    return !root._clipSettled()
+  }
+
+  // The finishing half of a waited open: everything onOpened() does except
+  // the force revalidate, which the wait just settled - revalidating here
+  // would start a second probe and replay the post-open correction the
+  // wait avoided. The verdict the wait landed is the one this paints.
+  function onOpenedSettled() {
+    if (!saveDebounce.running) {
+      root._loadUsage()
+    }
+    root._rebuildAppIndex()
+    root._refreshClipTarget(false)
+    root.recompute()
+  }
+
+  function _refreshClipTarget(revalidate) {
     const prev = root.clipTarget ? root.clipTarget.value : ""
     const hist = Clipboard.history
     const resolved = hist && hist.length > 0 ? root._resolveClipTarget(hist[0]) : null
@@ -1004,7 +1059,8 @@ Item {
     if (resolved && resolved.kind === "local" && !BoundedCache.has(AppLauncher.statCache, resolved.value)) {
       root._statPath(resolved.value)
     }
-    if (resolved && resolved.kind === "local" && BoundedCache.has(AppLauncher.statCache, resolved.value)
+    const doRevalidate = revalidate !== false
+    if (doRevalidate && resolved && resolved.kind === "local" && BoundedCache.has(AppLauncher.statCache, resolved.value)
       && !(pathStatProc.running && pathStatProc.path === resolved.value)) {
       // Same target as the last refresh still carries its old verdict,
       // which may predate a deletion or a re-creation while the panel was

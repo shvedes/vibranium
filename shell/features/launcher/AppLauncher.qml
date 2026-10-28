@@ -557,13 +557,38 @@ Singleton {
 
   // --- open/close/toggle ---
 
+  // True while an open is waiting for the clipboard suggestion's stat
+  // verdict before its first paint (see open()). The window stays hidden
+  // until the verdict lands or the timeout fires, so the suggestion is
+  // ready before any UI is drawn and no row is added, dropped or resized
+  // after the open.
+  property bool _openWaiting: false
+
   function open() {
     if (root.visible) return true
+    // A second summon while the first is still waiting on its stat probe
+    // is the same open, not a second one: starting another probe would
+    // abort the run the first is waiting for (seq guard) and hang both
+    // on the timeout.
+    if (root._openWaiting) return true
     // Demand first: without a controller there is no window to show, so
     // the claim must not be taken and `visible` must not be set.
     const ctrl = root._demand()
     if (ctrl === null) return false
     closeSettle.stop()
+    // A local clipboard target whose verdict is not settled (no cache, or
+    // a revalidate in flight) holds the open: flipping visible now would
+    // paint the provisional row first and land the verdict a probe later
+    // behind it - the window growing or shrinking to fit a suggestion that
+    // was known before the summon. Non-local targets (url/uri), a null
+    // target and a settled verdict answer synchronously with zero added
+    // latency; only the unsettled local case waits, bounded by
+    // openProbeTimeout below.
+    if (ctrl.clipProbePending()) {
+      root._openWaiting = true
+      openProbeTimeout.restart()
+      return true
+    }
     // Compute before showing: the panel's open path installs panel.rows
     // synchronously on the visible flip, so the row model must already be
     // the open's (fresh usage, fresh clipboard target) before it flips.
@@ -579,6 +604,22 @@ Singleton {
     root._claimToken = SurfaceClaim.claim("appLauncher", root.close, root)
     return true
   }
+  // The waiting probe settled (or the timeout fired): compute with the
+  // settled verdict and show. The finishing compute skips the force
+  // revalidate - the verdict it reads just landed, so revalidating here
+  // would start a second probe and replay the very post-open correction
+  // the wait just avoided.
+  function _finishOpen() {
+    if (!root._openWaiting) return
+    root._openWaiting = false
+    openProbeTimeout.stop()
+    if (root.visible) return
+    const ctrl = root._controller
+    if (ctrl === null) return
+    ctrl.onOpenedSettled()
+    root.visible = true
+    root._claimToken = SurfaceClaim.claim("appLauncher", root.close, root)
+  }
   function _openCompute() {
     const ctrl = root._controller
     if (ctrl === null) return
@@ -586,6 +627,17 @@ Singleton {
   }
 
   function close() {
+    // A close inside the open wait retires the pending open before it ever
+    // painted: no claim was taken and no window mapped, so there is nothing
+    // to hide or release. The controller stays warm (usage, index and the
+    // verdict the probe just landed all serve the next summon); the idle
+    // grace hands it back if nothing wants it.
+    if (root._openWaiting) {
+      root._openWaiting = false
+      openProbeTimeout.stop()
+      root._armDemandSettle()
+      return
+    }
     if (!root.visible) return
     // The tree stays attached while the window hides: panel items are
     // destroyed only with their Loader, never against a torn-down surface
@@ -604,6 +656,10 @@ Singleton {
   }
 
   function toggle() {
+    if (root._openWaiting) {
+      root.close()
+      return
+    }
     root.visible ? root.close() : root.open()
   }
 
@@ -1159,6 +1215,18 @@ Singleton {
     onTriggered: root._settleDemand()
   }
 
+  // Bounds the open wait above: a local stat probe normally lands in a few
+  // milliseconds, and a hung probe must never pin the launcher shut. On
+  // timeout the open completes with whatever verdict exists (provisional
+  // row or withheld row) - the same paint the old code produced, minus
+  // the indefinite hang.
+  Timer {
+    id: openProbeTimeout
+    interval: 350
+    repeat: false
+    onTriggered: root._finishOpen()
+  }
+
   // --- ipc ---
   //
   // Every client delegates here; `status` doubles as the unit's liveness
@@ -1299,16 +1367,17 @@ Singleton {
 
   function _openVerb() {
     root.open()
-    return root.controllerState === "ready" && root.visible ? "ok" : root._unavailableVerb()
+    if (root.controllerState === "ready" && (root.visible || root._openWaiting)) return "ok"
+    return root._unavailableVerb()
   }
 
   // open is the shell's toggle key, so both halves answer "ok"; the
   // opening half answers the controller's state instead when the panel
   // could not be built.
   function _toggleVerb() {
-    const wasVisible = root.visible
+    const wasVisible = root.visible || root._openWaiting
     root.toggle()
     if (wasVisible) return "ok"
-    return root.controllerState === "ready" && root.visible ? "ok" : root._unavailableVerb()
+    return root.controllerState === "ready" && (root.visible || root._openWaiting) ? "ok" : root._unavailableVerb()
   }
 }
