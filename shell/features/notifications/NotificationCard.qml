@@ -345,6 +345,7 @@ Rectangle {
     Row {
       width: parent.width
       spacing: root.gap
+      visible: appIcon.visible || appName.visible || time.visible
 
       Image {
         id: appIcon
@@ -414,6 +415,7 @@ Rectangle {
 
       width: parent.width
       spacing: 0
+      visible: bodyText.visible || providedIcon.visible
       // The row is as tall as the body TEXT, not as tall as the artwork -
       // see bodyRowHeight for why, and for the one case where the artwork
       // still decides.
@@ -424,7 +426,7 @@ Rectangle {
 
         width: root.providedImageUrl !== ""
           ? Math.max(0, parent.width - providedIcon.width) : parent.width
-        visible: text !== ""
+        visible: String(root.shot.body) !== ""
         text: root.bodyMarkup
         textFormat: Text.RichText
         color: Ui.solid("foreground_1")
