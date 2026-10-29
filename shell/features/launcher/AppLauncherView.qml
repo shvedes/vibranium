@@ -48,8 +48,9 @@ Variants {
       // surface death). Secondary screens hold no panel tree at all (no
       // `|| AppLauncher.visible` tail): building one per open only to tear
       // it down on the matching close is the same race on every other
-      // output. The controller still unloads in closeSettle; its
-      // children hold no windows, so that cascade is safe.
+      // output. The controller stays resident once prewarmed; its
+      // children hold no windows, so even a unit teardown cascade
+      // (Boot's hook) is safe.
       active: win.primary
       sourceComponent: launcherPanelComp
     }

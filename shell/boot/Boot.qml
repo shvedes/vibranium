@@ -305,13 +305,14 @@ Item {
     {
       id: "appLauncher",
       criticality: "optional",
-      // Facade resident, controller first use. The descriptor is drained so
+      // Facade resident, controller prewarmed. The descriptor is drained so
       // the singleton - and therefore the `appLauncher` IPC target and the
       // menu providers it claims - exists before any keybinding can call it;
-      // _drainNext returns that lease immediately, so nothing heavy runs and
-      // the unit is only held while the facade's own demand holds it. The
-      // usage read, the index build, the plugin scan and the panel tree are
-      // the controller's, and they are built on the first open.
+      // _drainNext returns that lease immediately, so nothing heavy runs.
+      // The usage read, the index build, the plugin scan and the panel tree
+      // are the controller's: the facade prewarms it right after drain and
+      // keeps it resident, so the first open paints the app list on frame
+      // one instead of an empty window.
       activation: "facade",
       dependencies: ["settings", "state", "watch", "paths"],
       resolver: function() { return boot._resolveDescriptor("appLauncher") },

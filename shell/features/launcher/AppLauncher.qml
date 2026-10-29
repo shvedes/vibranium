@@ -30,14 +30,15 @@ import "../../common/collections/BoundedCache.js" as BoundedCache
 // claims and one settings-store lookup of the persisted plugin
 // enablement - a map read, not a scan - and nothing else.
 //
-// AppLauncherController.qml is the first-use controller. It arrives through
-// a Loader on the first meaningful use and owns the usage-data load, the
-// index build, the plugin scan and hosts, the models, the stat/clock/launch
-// children and the whole panel tree. UnitGate leases the unit on the
-// facade's own owner string, the close settle releases the lease only after
-// the fade has played, and a shell that never summons the launcher pays for
-// none of the construction work - which is the whole point of the unit
-// being first_use in Boot's catalog.
+// AppLauncherController.qml is the eager controller. It arrives through
+// a Loader shortly after boot (see _prewarm) and owns the usage-data load,
+// the index build, the plugin scan and hosts, the models, the stat/clock/
+// launch children and the whole panel tree. It then stays resident: the
+// first summon must paint the app list on frame one, not an empty window
+// while the index builds and the desktop-entry scan lands, and tearing the
+// tree down after every close would replay that cold start on every open.
+// UnitGate leases the unit on the facade's own owner string for the
+// demand that builds it.
 //
 // Nothing here hands out the controller. The public read surface below is a
 // small projection of it that the controller publishes as it works and this
@@ -146,9 +147,9 @@ Singleton {
   // two leaves the launcher with no registered target at all, so
   // the two are separate properties with separate meanings.
   readonly property bool facadeReady: root.tag !== ""
-  // Controllers built since boot. 0 until the first use, then one per
-  // open: the visible proof that a facade construction does no work and a
-  // demand builds exactly one controller.
+  // Controllers built since boot. 0 until the prewarm lands, then one:
+  // the visible proof that a facade construction does no work and the
+  // resident controller is built exactly once.
   readonly property int constructions: root._constructions
 
   // --- public read surface (published) ---
@@ -528,10 +529,12 @@ Singleton {
       ]
     })
     Registry.register("appLauncher", root)
-    // The provider claims are the only work this construction does: six
-    // records the menu reads. No usage read, no index build, no plugin
-    // scan, no window - a demand builds all of that.
+    // The provider claims are the only work this construction does
+    // synchronously: six records the menu reads. The controller - usage
+    // read, index build, plugin scan, no window - follows on its own
+    // prewarm below, so the first summon finds it already built.
     root._registerMenuProvider()
+    Qt.callLater(root._prewarm)
     // A reload with the panel open lands here with visible already true
     // and no claim (a claim is memory-only), so the open is replayed
     // through open() after clearing the flag: the claim and the
@@ -630,12 +633,11 @@ Singleton {
     // A close inside the open wait retires the pending open before it ever
     // painted: no claim was taken and no window mapped, so there is nothing
     // to hide or release. The controller stays warm (usage, index and the
-    // verdict the probe just landed all serve the next summon); the idle
-    // grace hands it back if nothing wants it.
+    // verdict the probe just landed all serve the next summon) - it is
+    // resident, so there is no idle grace to arm.
     if (root._openWaiting) {
       root._openWaiting = false
       openProbeTimeout.stop()
-      root._armDemandSettle()
       return
     }
     if (!root.visible) return
@@ -648,10 +650,10 @@ Singleton {
     root.visible = false
     SurfaceClaim.release(root._claimToken)
     root._claimToken = null
-    // The window fades out over Ui.fastMs; the controller outlives the
-    // fade by one settle window, then goes. Tearing the tree down on the
-    // hide tick would pop the panel instead of closing it, and the lease
-    // is released with it - after the close animation, never before.
+    // The window fades out over Ui.fastMs; the close settle outlasts the
+    // fade by a beat and then recomputes the rows back to idle while still
+    // hidden. The controller itself stays resident - a close never tears
+    // the tree down, so the next summon repaints from a warm index.
     closeSettle.restart()
   }
 
@@ -1004,17 +1006,31 @@ Singleton {
   }
 
   // --- demand / teardown ---
-  // Build the controller on first use and keep exactly one. Repeated
-  // callers - a held key, a second IPC verb, the panel's own close - all
-  // land here, and every path out (refused lease, failed construction,
-  // unload) drops the lease again, so a refused or failed caller leaves
-  // the next one a clean unit.
+  // Demand the resident controller, building it if the prewarm has not
+  // landed yet. Repeated callers - a held key, a second IPC verb, the
+  // panel's own close - all land here, and every path out (refused
+  // lease, failed construction, unload) drops the lease again, so a
+  // refused or failed caller leaves the next one a clean unit.
+  // The controller is built once, shortly after boot, and stays resident
+  // after that: the usage read, the index build, the plugin scan and the
+  // desktop-entry snapshot all land before the first summon, so the first
+  // open paints the app list on frame one instead of an empty window that
+  // fills in a moment later. A demand that arrives before the prewarm
+  // finished still builds it inline; a failed build retries on the timer
+  // below rather than failing the session's opens.
+  property bool _prewarmed: false
+
+  function _prewarm() {
+    if (root._prewarmed) return
+    const ctrl = root._demand()
+    if (ctrl !== null) {
+      root._prewarmed = true
+      return
+    }
+    if (root.controllerState !== "failed") prewarmRetry.restart()
+  }
+
   function _demand() {
-    // Every demand is a use, so it cancels a pending release exactly as an
-    // open does - including the one that reuses a live controller, which is
-    // what stops a second toggle inside the idle grace from losing the tree
-    // under itself.
-    demandSettle.stop()
     if (root.controllerState === "ready" && root._controller !== null) return root._controller
     const result = UnitGate.ensure(root.unitId, root.gateOwner)
     if (result === undefined || result === null || result.ok !== true) {
@@ -1067,36 +1083,15 @@ Singleton {
     root._setState(next, code)
   }
 
-  // A demand that does not open the panel still builds the whole tree - the
-  // usage read, the index, the plugin scan, the models, the processes and
-  // the watcher - so it has to hand the tree back. This is the one place
-  // that policy lives: the settings menu's eight toggles, the Registry
+  // A demand that does not open the panel reaches the same resident tree
+  // the prewarm built - the usage read, the index, the plugin scan, the
+  // models, the processes and the watcher. This is the one place that
+  // policy lives: the settings menu's eight toggles, the Registry
   // clear-history writer and the pluginSet/reload/clearHistory verbs all
-  // reach the controller through here and nothing else.
+  // reach the controller through here and nothing else. Nothing here hands
+  // the tree back: the controller stays resident once built.
   function _demandTransient() {
-    const ctrl = root._demand()
-    if (ctrl !== null) root._armDemandSettle()
-    return ctrl
-  }
-
-  // Arm the idle grace, or cancel it if the panel came up meanwhile. The
-  // grace is what keeps two quick toggles from thrashing a rebuild, and it
-  // is cancelled by anything that means the tree is wanted after all.
-  function _armDemandSettle() {
-    if (root.visible) {
-      demandSettle.stop()
-      return
-    }
-    demandSettle.restart()
-  }
-
-  // Fires only while the panel is genuinely down. An open that raced the
-  // grace has already set visible, so a late tick can never tear a live
-  // panel down, and nothing to tear down is not an error.
-  function _settleDemand() {
-    if (root.visible) return
-    if (root._controller === null) return
-    root.teardownController()
+    return root._demand()
   }
 
   // Drop the controller and the lease without touching the reported state.
@@ -1105,8 +1100,6 @@ Singleton {
   // flapping through "unloaded" on the way there.
   function _unload() {
     closeSettle.stop()
-    // A release already in flight is moot once the tree is gone.
-    demandSettle.stop()
     const held = root._lease !== null || controllerLoader.item !== null
     controllerLoader.active = false
     root._dropLease()
@@ -1137,7 +1130,7 @@ Singleton {
     root.controllerState = next
     root.controllerError = detail
     // The unit's own ready probe reads controllerReady, and nothing polls
-    // a first_use unit, so the record is settled here instead: the gate
+    // an on-demand unit, so the record is settled here instead: the gate
     // must not sit in "starting" once the controller is up.
     if (next === "ready") UnitGate.refresh(root.unitId)
   }
@@ -1152,17 +1145,18 @@ Singleton {
 
   // --- panel body: windows live here, not under the controller ---
   // The view is a facade child so its windows outlive every controller
-  // unload. Parked under the controller, each close destroyed windows
-  // WITH their panel trees, and the deferred half of that teardown
-  // landed in derefWindow on a dead surface (SIGSEGV after close).
+  // unload (a unit teardown still unloads the controller, e.g. through
+  // Boot's hook). Parked under the controller, each close destroyed
+  // windows WITH their panel trees, and the deferred half of that
+  // teardown landed in derefWindow on a dead surface (SIGSEGV after
+  // close).
   // Every panel reads the facade for the state it draws; nothing below
   // names the controller, so the unload cascade only ever takes data.
   AppLauncherView {}
 
-  // The controller, and nothing else: a Loader with no source until the
-  // first demand, so a facade that is only an IPC target holds no usage
-  // cache, no file read, no plugin host and no process. Windows and
-  // panels live above, outside this Loader, for the reason stated there.
+  // The controller, and nothing else: a Loader the prewarm activates
+  // shortly after boot. Windows and panels live above, outside this
+  // Loader, for the reason stated there.
   Loader {
     id: controllerLoader
     active: false
@@ -1175,14 +1169,25 @@ Singleton {
     AppLauncherController {}
   }
 
+  // Retries the boot prewarm until the gate lets the controller build:
+  // a demand that lands while a dependency is still settling reports
+  // unavailable, and the next tick tries again instead of leaving the
+  // session's opens cold. Stops on the first success or a hard failure.
+  Timer {
+    id: prewarmRetry
+    interval: 500
+    repeat: false
+    onTriggered: root._prewarm()
+  }
+
   // The exit fade is Ui.fastMs long; the settle outlasts it by a frame
   // and a half plus one frame window, so the window is fully faded and
-  // the UI settled before the tree goes. Single one-shot: a two-phase
+  // the UI settled before the rows go idle. Single one-shot: a two-phase
   // split would do nothing between its phases (phase one only
   // restarts phase two), and the panels staged around it stay
   // attached for the window's whole life (see the Loader note in
-  // AppLauncherView), so the only thing this drops is the panel-less
-  // controller. Bounded, and an open that arrives first stops it.
+  // AppLauncherView). The controller stays resident - the settle only
+  // recomputes. Bounded, and an open that arrives first stops it.
   Timer {
     id: closeSettle
     interval: Ui.fastMs + 200
@@ -1192,27 +1197,12 @@ Singleton {
       // the query without recomputing (recomputing there would replay the
       // open layout behind the close fade), so the live rows are still the
       // filtered set from before the close. Recomputing here - window gone,
-      // nothing to jump - publishes idle to the facade before the teardown,
-      // so the next open starts from idle instead of rebuilding the wall
-      // from a filtered set it immediately discards.
+      // nothing to jump - publishes idle to the facade, so the next open
+      // starts from idle instead of rebuilding the wall from a filtered
+      // set it immediately discards.
       const ctrl = root._controller
       if (ctrl !== null && !root.visible) ctrl.recompute()
-      root.teardownController()
     }
-  }
-
-  // How long a demand that never opened the panel keeps its controller
-  // before giving it back. Long enough that the second of two quick
-  // settings toggles finds the tree already up instead of rebuilding it,
-  // short enough that a closed feature is not still owning a model, a
-  // process and a watcher half a second later. Bounded and one-shot, and
-  // the same contract as the close settle: a demand or an open that
-  // arrives first stops it, and the tick it fires checks visibility again.
-  Timer {
-    id: demandSettle
-    interval: Ui.fastMs + 300
-    repeat: false
-    onTriggered: root._settleDemand()
   }
 
   // Bounds the open wait above: a local stat probe normally lands in a few

@@ -12,13 +12,12 @@ import "CalcLib.js" as CalcLib
 import "LauncherLib.js" as LauncherLib
 import "../../common/collections/BoundedCache.js" as BoundedCache
 
-// Demand-loaded child of the AppLauncher facade: every piece of expensive
-// launcher work lives here and nothing here survives a close. The usage-data
+// Prewarmed child of the AppLauncher facade: every piece of expensive
+// launcher work lives here and stays resident once built. The usage-data
 // load, the desktop-entry index build, the plugin directory scan, the plugin
 // hosts, the models, the stat/clock/launch processes and the whole panel tree
-// are constructed with this object and go with it, so a shell that never
-// opens the launcher never pays for any of it - which is the whole point of
-// the unit being first_use in Boot's catalog.
+// are constructed with this object, shortly after boot, so the first summon
+// paints the app list on frame one instead of an empty window.
 //
 // The facade is the only writer of this object's lifetime: it arrives
 // through a Loader, it leaves the same way. Nothing here reaches into the
@@ -285,9 +284,9 @@ Item {
         root._setUsageMap(AppLauncher.usageMap)
         root.hasUsageHistory = AppLauncher.hasUsageHistory === true
       }
-      // Frequency data is on-demand - the controller's own construction is
-      // the first open's warm-up. Don't keep druncache.json resident at
-      // boot: a shell that never summons the launcher never reads it.
+      // Frequency data loads with the prewarm: the controller's own
+      // construction is the first open's warm-up, so the usage file is
+      // read here, once, instead of on the open path.
       if (!saveDebounce.running) root._loadUsage()
       // The async read above lands after the build below, which is the
       // alphabetical flash frequency mode opens with. A blocking read of
