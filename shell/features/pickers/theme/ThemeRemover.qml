@@ -86,6 +86,27 @@ Singleton {
     onStatusChanged: root._onListingReady()
   }
 
+  // Inotify fallback for added/removed theme dirs. A FileView pointed at a
+  // directory emits fileChanged when entries come and go, and one pointed
+  // at a missing path emits it when that path is created, so every
+  // add/remove/created-root funnels into the same debounced rescan even
+  // when the models' own count signals miss it (a model aimed at a missing
+  // root settles to Null and never emits again on its own).
+  FileView {
+    id: officialDirWatch
+    path: Paths.vibraniumHome + "/themes"
+    watchChanges: true
+    printErrors: false
+    onFileChanged: root._onDirChanged()
+  }
+  FileView {
+    id: userDirWatch
+    path: Paths.themesUserRoot
+    watchChanges: true
+    printErrors: false
+    onFileChanged: root._onDirChanged()
+  }
+
   // Assigning the folder is the only thing that starts a directory scan, so
   // this is the one place it happens. Both are assigned together because
   // every scan needs both listings Ready; arming one alone would scan a
@@ -109,40 +130,85 @@ Singleton {
     // first population, not a directory change: the scan it would schedule
     // is the one the first real need already asked for. Letting it through
     // would rescan and recompose the page 250ms after the reader opened it.
+    // Count events only ever come from a live model, so unlike the dir
+    // watchers below this never re-arms: re-aiming here would chase the
+    // working-directory flash a resolving model reports before settling.
     if (!root._listed) return
     dirDebounce.restart()
   }
 
-  // A themes root that does not exist yet (a fresh install whose user
-  // declined the additional themes, so ~/.config/vibranium/themes was
-  // never created) never reaches Ready. Requiring Ready on both models
-  // stalls the remover forever with _pendingShow set and no page or
-  // "no community themes" notice. A model that has settled into any
-  // terminal state counts: a missing dir reads as empty (count 0).
-  function _isSettled(m) {
-    return m.status !== FolderListModel.Loading && m.status !== FolderListModel.Null
+  // The FileView dir watchers land here. External changes are the one
+  // thing that can leave a model behind (a root created after the arming
+  // sits at Null, dead to further model events), so the models are
+  // re-aimed first and the listing-ready handler picks up the settle.
+  function _onDirChanged() {
+    if (!root._foldersArmed) return
+    root._reaimUnready()
+    root._onListingReady()
+    if (!root._listed) return
+    dirDebounce.restart()
   }
 
-  // A settled-but-not-Ready model names a directory that did not exist
-  // when it was armed. Re-aim it so a themes root created later (the
-  // first community theme install creates the user dir) is picked up;
-  // reassigning the same URL is a no-op, so the folder is blanked first
-  // on a later turn. _listed drops while the re-aim is in flight, so the
-  // transient working-directory listing the blank folder resolves to is
-  // never scanned as themes.
+  // Whether a listing model freshly lists its root: Ready with rows under
+  // it, or Ready and empty. Anything else - still loading, settled to Null
+  // on a missing root, or Ready with the working directory's rows (the
+  // flash a missing root reports before settling to Null) - needs a
+  // re-aim before it can be scanned.
+  function _modelFresh(m, rootPath) {
+    if (m.status !== FolderListModel.Ready) return false
+    if (m.count === 0) return true
+    const p = String(m.get(0, "filePath"))
+    return p.lastIndexOf(rootPath + "/", 0) === 0
+  }
+
+  function _modelsFresh() {
+    return root._modelFresh(officialModel, Paths.vibraniumHome + "/themes")
+      && root._modelFresh(userModel, Paths.themesUserRoot)
+  }
+
+  // Whether the pair can be scanned: fresh, or settled to Null on a
+  // missing root, which reads as empty (a missing dir contributes no
+  // rows). The flash above never passes: it is Ready with foreign rows.
+  function _modelsUsable() {
+    const ou = officialModel.status === FolderListModel.Null || root._modelFresh(officialModel, Paths.vibraniumHome + "/themes")
+    const uu = userModel.status === FolderListModel.Null || root._modelFresh(userModel, Paths.themesUserRoot)
+    return ou && uu
+  }
+
+  // A themes root that does not exist yet (a fresh install whose user
+  // declined the additional themes, so ~/.config/vibranium/themes was
+  // never created) settles its model to Null. Null is terminal - the model
+  // will not recover on its own - so it counts as settled and reads as
+  // empty (count 0) while the official names still filter. Only Loading is
+  // still in flight.
+  function _isSettled(m) {
+    return m.status !== FolderListModel.Loading
+  }
+
+  // Re-aim every model that does not freshly list its root: still loading,
+  // settled to Null on a directory that did not exist when it was armed
+  // (a themes root created later - the first community theme install
+  // creates the user dir - is picked up), or Ready with foreign rows (the
+  // working-directory flash a missing root reports before settling).
+  // Reassigning the same URL is a no-op, so the folder is blanked first on
+  // a later turn. _listed drops while the re-aim is in flight, so the
+  // transient listing the blank folder resolves to is never scanned as
+  // themes. Only ever called from open() and the dir-watcher handler,
+  // never from the listing-ready handler and never from a count event, so
+  // a flash can never retrigger its own re-aim in a loop.
   function _reaimUnready() {
     if (!root._foldersArmed) return false
     let rearmed = false
-    if (root._isSettled(officialModel) && officialModel.status !== FolderListModel.Ready) {
-      const url = "file://" + Paths.vibraniumHome + "/themes"
-      officialModel.folder = ""
-      Qt.callLater(() => { officialModel.folder = url })
-      rearmed = true
-    }
-    if (root._isSettled(userModel) && userModel.status !== FolderListModel.Ready) {
-      const url = "file://" + Paths.themesUserRoot
-      userModel.folder = ""
-      Qt.callLater(() => { userModel.folder = url })
+    const jobs = [
+      [officialModel, "file://" + Paths.vibraniumHome + "/themes", Paths.vibraniumHome + "/themes"],
+      [userModel, "file://" + Paths.themesUserRoot, Paths.themesUserRoot]
+    ]
+    for (let i = 0; i < jobs.length; i++) {
+      const m = jobs[i][0]
+      if (root._modelFresh(m, jobs[i][2])) continue
+      m.folder = ""
+      const url = jobs[i][1]
+      Qt.callLater(() => { m.folder = url })
       rearmed = true
     }
     if (rearmed) root._listed = false
@@ -156,12 +222,22 @@ Singleton {
   function _onListingReady() {
     if (!root._foldersArmed) return
     if (!root._isSettled(officialModel) || !root._isSettled(userModel)) return
+    // Never latch or scan the working-directory flash: a model aimed at a
+    // missing root reports Ready with foreign rows before settling to Null.
+    // Dropping _listed keeps the debounced scan and the pending show gated
+    // until the settle that follows re-invokes this handler.
+    if (!root._modelsUsable()) {
+      root._listed = false
+      return
+    }
     root._listed = true
     if (root._pendingShow) {
       root._doScan(true)
       return
     }
-    if (root._cached !== null) root._doScan(false)
+    // Background refresh recomposes live when the remover is the top frame,
+    // so a change that lands while it is open never leaves a stale page up.
+    if (root._cached !== null) root._doScan(Menu.open && Menu.frame && Menu.frame.id === root.pageId)
   }
 
   function _onDirCountChangedDebounced() {
@@ -230,6 +306,14 @@ Singleton {
     // is not armed is not an empty user themes root, so it produces no
     // uninstall rows and no "no community themes" notice.
     if (!root._listed) return
+    // The latch above verified the rows, but the flash can land between the
+    // latch and a scan. Never scan it: re-arm and hold the pending show
+    // for the settle that follows.
+    if (!root._modelsUsable()) {
+      root._reaimUnready()
+      root._pendingShow = show
+      return
+    }
     const t0 = Date.now()
     const official = {}
     for (let i = 0; i < officialModel.count; i++) {
@@ -438,19 +522,11 @@ Singleton {
 
   function open() {
     if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) return "ok"
-    if (root._cached !== null) {
-      const cached = root._cached.slice()
-      cached.sort((a, b) => a.label.localeCompare(b.label))
-      root._show(cached)
-      // No background rescan: the directory watcher keeps the cache fresh
-      // (same contract as ThemePicker). Refresh explicitly via `refresh`
-      // after editing theme files in place.
-      return "ok"
-    }
-    // First real need: arming the listings is what starts the scan, and it
-    // runs from the status handler once both have landed. A settled-but-
-    // not-Ready model is re-aimed first, so a themes root created after
-    // the arming still resolves instead of pinning the open behind it.
+    // The user shelf is external state: a folder added/removed while the
+    // remover was closed leaves any served cache stale. The community set
+    // is small and the scan is synchronous, so every open re-arms (picks
+    // up a root created since) and rescans instead of serving the cache.
+    // Refresh explicitly via `refresh` after editing theme files in place.
     root._armFolders()
     root._reaimUnready()
     if (!root._listed) {
