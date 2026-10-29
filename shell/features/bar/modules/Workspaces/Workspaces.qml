@@ -5,10 +5,13 @@ import QtQuick
 import Quickshell.Hyprland
 import qs.common
 import qs.features.bar
+import "Model.js" as WSM
 
 // Barebones workspaces: plain numbers, flashing red for urgents.
-// No occupied/empty states, no opacity dimming, no submap badge, no
-// timers - the strip syncs off compositor events instead.
+// No occupied/empty states, no opacity dimming, no timers - the strip
+// syncs off compositor events instead. While a keybind submap is active
+// a little "[R]" superscript trails the last index (resize is the only
+// submap today).
 
 BarModule {
   id: root
@@ -33,6 +36,7 @@ BarModule {
 
   builtinFill: false
   implicitWidth: row.implicitWidth
+    + (root.submapActive ? WSM.numberGap() + submapText.implicitWidth + Bar.slotInset : 0)
 
   // The ids the strip renders, synced off compositor events rather than
   // a timer. A create, destroy or focus change schedules a sync, so a
@@ -57,15 +61,37 @@ BarModule {
   }
   Component.onDestruction: Hyprland.rawEvent.disconnect(root.onRawEvent)
 
+  // Live submap from the hyprland event socket; empty string = default.
+  property string submap: ""
+  readonly property bool submapActive: root.submap === "resize"
+
   function onRawEvent(event) {
+    if (event.name === "submap") {
+      root.submap = String(event.data ?? "").trim()
+      return
+    }
     if (event.name === "createworkspace" || event.name === "destroyworkspace" || event.name === "workspacev2" || event.name === "focusedmon") Qt.callLater(root.syncIds)
+  }
+
+  readonly property int cellPad: WSM.numberPad(root.textScale)
+  readonly property int cellWidth: WSM.numberBoxWidth(measure.implicitWidth, root.cellPad)
+
+  // Hidden two-digit ruler: every slot is sized for "00" plus padding,
+  // so the active icon, single digits and double digits all share one
+  // fixed cell and switching focus never resizes the strip.
+  Text {
+    id: measure
+    visible: false
+    font.family: Ui.fontFamily
+    font.pixelSize: Ui.fontS
+    text: "00"
   }
 
   Row {
     id: row
 
     anchors.verticalCenter: parent.verticalCenter
-    spacing: 12
+    spacing: WSM.numberGap()
 
     Repeater {
       model: root.shown
@@ -80,7 +106,7 @@ BarModule {
         readonly property bool focused: root.activeId === wsId
         readonly property bool urgent: slot.ws !== null && slot.ws.urgent === true
 
-        width: label.implicitWidth + 4
+        width: root.cellWidth
         height: Bar.height
         onUrgentChanged: if (!slot.urgent) label.opacity = 1
 
@@ -89,8 +115,10 @@ BarModule {
 
           level: 3
           anchors.centerIn: parent
-          text: String(slot.wsId)
-          color: slot.urgent ? Ui.solid("red") : slot.focused ? Ui.solid("accent") : Ui.solid("foreground_0")
+          anchors.verticalCenterOffset: slot.focused ? 0 : Math.round(Ui.fontS * 0.08)
+          font.pixelSize: slot.focused ? Math.round(Ui.fontS / 1.2) : Ui.fontS
+          text: slot.focused ? "\uDB85\uDCFB" : String(slot.wsId)
+          color: slot.urgent ? Ui.solid("red") : Ui.solid("foreground_0")
 
           // The only animation in this module: urgents flash.
           SequentialAnimation on opacity {
@@ -115,5 +143,20 @@ BarModule {
         }
       }
     }
+  }
+
+  // Superscript "[R]" trailing the indexes while a submap is active.
+  Title {
+    id: submapText
+
+    level: 4
+    x: row.width + (root.submapActive ? WSM.numberGap() : 0)
+    y: 3
+    visible: root.submapActive
+    text: "[R]"
+    color: Ui.solid("yellow")
+    font.pixelSize: 8
+    font.family: Ui.fontFamily
+    font.bold: true
   }
 }
