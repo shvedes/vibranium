@@ -179,6 +179,7 @@ Singleton {
     command: CL.buildMkdirCmd(root.imgDir, root.cacheDir)
     stdout: StdioCollector {}
     stderr: StdioCollector {}
+    onExited: root._sweepOrphanSnapshots()
   }
 
   Process {
@@ -1040,6 +1041,68 @@ Singleton {
     }
   }
 
+  // Re-serve a freshly captured row so this shell owns the system selection
+  // from now on. Silent where copyEntry notifies: an external copy arriving
+  // while another copy is in flight simply keeps its original owner rather
+  // than popping a warning. Secrets are skipped - a credential source owns
+  // its own lifetime and the shell must not prolong it.
+  function _takeOwnership(id) {
+    if (copyProc.running) return
+    const entry = root.findById(id)
+    if (!entry || entry.type === "secret" || entry.unavailable === true) return
+    if (entry.type === "image" && !entry.imageDataFile && !entry.imageFile) return
+    let cmdArr = null
+    let sink = null
+    if (entry.type === "network") {
+      const rawNet = String(entry.raw || "")
+      let uris = rawNet
+      if (entry.filePaths && entry.filePaths.length > 0) {
+        const nets = entry.filePaths.filter(p => CL.isNetworkUri(p))
+        if (nets.length > 0) uris = nets.join("\n")
+        else uris = entry.filePaths.join("\n")
+      }
+      if (uris.indexOf("://") >= 0) {
+        cmdArr = CL.buildCopyUriListCmd()
+        sink = () => copyProc.write(uris)
+      } else {
+        cmdArr = CL.buildCopyTextCmd()
+        sink = () => copyProc.write(uris)
+      }
+    } else if (entry.type === "text" || entry.type === "url") {
+      cmdArr = CL.buildCopyTextCmd()
+      sink = () => copyProc.write(String(entry.raw || ""))
+    } else if (entry.type === "image" && entry.imageDataFile && !entry.imageFile) {
+      cmdArr = CL.buildCopyImageDataCmd(entry.mime, entry.imageDataFile)
+    } else if ((entry.type === "file" || entry.type === "folder"
+        || entry.type === "archive" || entry.type === "files"
+        || entry.type === "folders")) {
+      const uris = (entry.filePaths || []).map(p => CL.toFileUri(p)).join("\n")
+      cmdArr = CL.buildCopyUrisCmd(uris)
+    } else if (entry.type === "image" && entry.imageFile) {
+      cmdArr = CL.buildCopyImageFileCmd(entry.imageFile)
+    } else {
+      return
+    }
+    // Hash-predictable echo suppression for the serve, same shape as a
+    // manual re-copy, so the watcher's echo of our own serve is swallowed
+    // instead of duplicating the row it just stored.
+    root._suppressHash = ""
+    if (entry.type === "image" && entry.imageDataFile && !entry.imageFile) {
+      root._suppressHash = "uri:" + CL.toFileUri(entry.imageDataFile)
+    } else if (entry.type === "image" && entry.imageFile) {
+      root._suppressHash = "uri:" + CL.toFileUri(entry.imageFile)
+    } else if (entry.filePaths && entry.filePaths.length > 0) {
+      root._suppressHash = "uri:" + entry.filePaths.join("|")
+    } else {
+      root._suppressHash = "text:" + String(entry.raw || "")
+    }
+    root._muting = true
+    muteTimer.restart()
+    root._pendingCopyPaths = CL.entryPaths(entry)
+    pendingCopyTimer.restart()
+    root._startCopy(cmdArr, sink)
+  }
+
   // --- clipboard change detection ---
   // Watch is the primary signal; the slow reconciler is a seatbelt.
   property string _lastHash: ""
@@ -1234,7 +1297,13 @@ Singleton {
     // anything arriving now is presumed to be its echo.
     if (root._muting) return
     const entry = buildFn()
-    if (entry) root._addEntry(entry)
+    if (!entry) return
+    const live = root._addEntry(entry)
+    // Take ownership of the fresh capture so the content stays pasteable
+    // after the source app closes. Wayland drops the selection with its
+    // owner; without this the shell only stored the bytes and the user had
+    // to re-select the row manually to paste again.
+    if (live) Qt.callLater(() => root._takeOwnership(live.id))
   }
 
   function _onReadText(text, types) {
@@ -1434,8 +1503,7 @@ Singleton {
   // unusable report, our own echo, and a duplicate of bytes already held.
   function _discardPendingSnapshot() {
     if (root._pendingPath === "") return
-    rmProc.command = CL.buildRmPathCmd(root._pendingPath)
-    rmProc.running = true
+    root._enqueueRmPaths([root._pendingPath])
   }
 
   // One fused flight: write the snapshot, size it, hash it, and print
@@ -1853,6 +1921,28 @@ Singleton {
   // retries. It rides _pendingPurgePaths until the window lapses, and the
   // flush below reaps it.
   property var _pendingPurgePaths: []
+  // Serial rm queue: rmProc is single-flight, so a second unlink requested
+  // while one is running must wait instead of overwriting the in-flight
+  // command (which silently dropped it and leaked the file forever).
+  property var _rmQueue: []
+  function _enqueueRmPaths(paths) {
+    let queued = false
+    for (let i = 0; i < (paths || []).length; i++) {
+      const f = String(paths[i] == null ? "" : paths[i])
+      if (f === "") continue
+      root._rmQueue = root._rmQueue.concat([f])
+      queued = true
+    }
+    if (queued) root._pumpRm()
+  }
+  function _pumpRm() {
+    if (rmProc.running) return
+    if (root._rmQueue.length === 0) return
+    const batch = root._rmQueue
+    root._rmQueue = []
+    rmProc.command = CL.buildRmPathsCmd(batch)
+    rmProc.running = true
+  }
   function _purgeSnapshots(entries) {
     const paths = []
     for (let i = 0; i < entries.length; i++) {
@@ -1866,8 +1956,7 @@ Singleton {
       paths.push(f)
     }
     if (paths.length === 0) return
-    rmProc.command = CL.buildRmPathsCmd(paths)
-    rmProc.running = true
+    root._enqueueRmPaths(paths)
   }
   // Reap deferred snapshot files: anything the copy window protected at
   // purge time, minus files a live entry references again (paranoia -
@@ -1891,8 +1980,18 @@ Singleton {
     }
     root._pendingPurgePaths = parked
     if (paths.length === 0) return
-    rmProc.command = CL.buildRmPathsCmd(paths)
-    rmProc.running = true
+    root._enqueueRmPaths(paths)
+  }
+  // Boot orphan sweep: snapshot files are unique per capture, so any file
+  // under the snapshot dir that no history row references is a leftover -
+  // a delete that predated the rm queue, a crash between capture and
+  // persist, or a trimmed row from before. Without this the cache dir only
+  // ever grows. Only session snapshots are ever unlinked; user files
+  // referenced by copied paths live elsewhere and are never touched.
+  function _sweepOrphanSnapshots() {
+    if (root.imgDir === "" || sweepProc.running) return
+    sweepProc.command = ["ls", "-1", "--", root.imgDir]
+    sweepProc.running = true
   }
   // Bytes about to be released, summed from the entries' own recorded sizes.
   // A pure function of history, which is what makes it testable off a live
@@ -1927,6 +2026,30 @@ Singleton {
     running: false
     stdout: StdioCollector {}
     stderr: StdioCollector {}
+    onExited: root._pumpRm()
+  }
+  Process {
+    id: sweepProc
+    running: false
+    stdout: StdioCollector { id: sweepOut }
+    stderr: StdioCollector {}
+    onExited: (exitCode, exitStatus) => {
+      if (exitCode !== 0) return
+      const live = Object.create(null)
+      for (let i = 0; i < root.history.length; i++) {
+        const f = root.history[i].imageDataFile
+        if (f && f !== "") live[f] = true
+      }
+      const orphans = []
+      const names = String(sweepOut.text).split("\n")
+      for (let i = 0; i < names.length; i++) {
+        const n = names[i].trim()
+        if (n === "") continue
+        const full = root.imgDir + "/" + n
+        if (live[full] !== true) orphans.push(full)
+      }
+      if (orphans.length > 0) root._enqueueRmPaths(orphans)
+    }
   }
 
   Process {
@@ -2038,6 +2161,10 @@ Singleton {
 
   // --- history insertion ---
 
+  // Returns the live row that now holds the capture (the pinned original on
+  // a pinned re-copy, the promoted existing row on a duplicate, the fresh
+  // row otherwise). The caller uses it to take clipboard ownership without
+  // re-resolving the row.
   function _addEntry(entry) {
     const hist = root.history.slice()
     // Same content again? Bump it to the top instead of duplicating.
@@ -2065,7 +2192,7 @@ Singleton {
       // put, which is correct.
       if (existing.secretHandle !== entry.secretHandle)
         root._forgetEntrySecret(entry)
-      if (existing.pinned) return
+      if (existing.pinned) return existing
       // Move the surviving row to the front rather than unshifting the fresh
       // one. Unshifting the fresh entry installed a row pointing at the slot
       // released two lines up, so that row could never be copied again
@@ -2130,6 +2257,7 @@ Singleton {
         + ", " + root.totalCount + " of " + root.maxHistory)
     }
     root._persist()
+    return hist[0]
   }
   // One entry's size in bytes, from whatever that entry happens to know about
   // itself: the recorded size for a file or an image, the stored string's
