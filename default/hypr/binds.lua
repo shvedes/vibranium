@@ -272,7 +272,7 @@ for _, d in ipairs(all_directions) do
 end
 
 -- Lock or unlock the active group so it stops accepting new members.
-hl.bind(mainMod .. " + CTRL + G", hl.dsp.group.lock_active(), {
+hl.bind(mainMod .. " + CTRL + G", hl.dsp.group.lock(), {
   description = "Lock / unlock active group",
 })
 
