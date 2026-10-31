@@ -52,15 +52,15 @@ stays on one page: `APP_LAUNCHER_ALWAYS_FOCUS` (App launcher),
 `PLAYER_FADE_DURATION` (Media controls), `misc.cursorTheme` and
 `misc.cursorSize` (General).
 
-Inventory (196 keys on 42 pages: 22 shell + 2 env + 18 hypr):
+Inventory (193 keys on 42 pages: 22 shell + 2 env + 18 hypr):
 
 | Group | Pages | Keys |
 |---|---|---|
-| `shell` | General, App launcher, Bar, modules, Audio, Screenshots, OSD, Night Light, Color picker, Lock screen, Idle, Media, Power, ... | 80 shell + 2 misc |
+| `shell` | General, App launcher, Bar, modules, Audio, Screenshots, OSD, Night Light, Color picker, Lock screen, Idle, Media, Power, ... | 77 shell + 2 misc |
 | `env` | Recording, Brightness | 11 env |
 | `hypr` | Hyprland, Edit configs, Input, Appearance, Gaps, Blur, Glow, Shadows, Decoration, Dim, Animations, Advanced, Cursor, Scrolling, Dwindle, Master, ... | 103 hypr |
 
-By type: bool 92, string 42, int 39, float 21,
+By type: bool 91, string 40, int 39, float 21,
 `layout` 1 (bar zone layout), `timers` 1 (idle list). `layout`/`timers`
 are first-class types with schema-side validators, not generic
 object/array passthrough.

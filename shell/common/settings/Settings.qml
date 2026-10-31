@@ -223,19 +223,6 @@ Singleton {
   signal optionError(string key, string message)
 
   readonly property bool wallpaperEnabled: root.value("shell.wallpaper.enabled") !== false
-  // Monochrome emoji mosaic fallback for the wallpaper-off state; safe default is off so
-  // existing installs keep the plain theme tint.
-  readonly property bool wallpaperMosaic: root.value("shell.wallpaper.mosaic") === true
-  // Mosaic density (filled grid cells). Malformed values fall back to medium.
-  readonly property string wallpaperMosaicIntensity: {
-        const v = root.value("shell.wallpaper.mosaicIntensity")
-    return root.wallpaperMosaicIntensityLevels.indexOf(v) >= 0 ? v : "medium"
-  }
-  // Mosaic glyph size. Malformed values fall back to medium.
-  readonly property string wallpaperMosaicSize: {
-        const v = root.value("shell.wallpaper.mosaicSize")
-    return root.wallpaperMosaicSizeLevels.indexOf(v) >= 0 ? v : "medium"
-  }
   // The bar's master switch is a schema option (values.read, instant) that
   // flushes to the same shell.statusbar.enabled leaf; raw statusbar readers
   // that also name it stay in sync via the flush-echo. Guarded to true
@@ -332,8 +319,6 @@ Singleton {
   readonly property var vignetteLevels: ["off", "small", "medium", "large", "gigantic"]
   readonly property var statusbarPositions: ["top", "bottom"]
   readonly property var privacyPositions: ["top-right", "top-left", "bottom-right", "bottom-left"]
-  readonly property var wallpaperMosaicIntensityLevels: ["sparse", "medium", "dense"]
-  readonly property var wallpaperMosaicSizeLevels: ["small", "medium", "large", "very_large"]
 
   // --- idle daemon settings (shell.idle) ---
   //
@@ -807,10 +792,6 @@ Singleton {
 
   function toggleWallpaper() {
     root.toggleOption("shell.wallpaper.enabled")
-  }
-
-  function toggleMosaic() {
-    root.toggleOption("shell.wallpaper.mosaic")
   }
 
   function toggleBlurBackground() {

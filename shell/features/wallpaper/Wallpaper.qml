@@ -68,14 +68,6 @@ Singleton {
     }
   }
 
-  // Bumped to re-roll the mosaic. Every wallpaper event (next, set,
-  // theme swap) rerolls so each change yields a fresh pattern; views bind
-  // their seed to this plus their own per-screen local randomness.
-  property int mosaicRev: 0
-  function rerollMosaic() {
-    root.mosaicRev += 1
-  }
-
   // ---- wallpaper.json (replaces wallpaper.state + the background symlink) ----
   //   { "<theme>": "<path: relative-to-state or absolute>" }
   // Relative resolves under $VIBRANIUM_STATE; absolute is used verbatim.
@@ -457,7 +449,6 @@ Singleton {
       if (record.mode === "next") idx = (idx + 1) % files.length
       else idx = (idx - 1 + files.length) % files.length
       root._commit(record.theme, files[idx])
-      root.rerollMosaic()
       // The direction, where it landed, and the size of the set - and not the
       // file. A wallpaper basename is a user's own file, and this component
       // already treats a theme name as user data reaching a path.
@@ -757,7 +748,6 @@ Singleton {
     // file is gone, all before the pointer is published.
     root._retire(record.key, "committed")
     root._commit(record.theme, record.base)
-    root.rerollMosaic()
   }
 
   // A copy that did not finish leaves no pointer behind, and the scratch file
@@ -1203,7 +1193,6 @@ Singleton {
   }
 
   function refresh() {
-    root.rerollMosaic()
     root.refreshBackground()
   }
 

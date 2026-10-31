@@ -423,171 +423,6 @@ PanelWindow {
     }
   }
 
-    // Monochrome emoji mosaic for the wallpaper-off state: whitelisted
-  // common emojis (smileys, hearts, coffee, lightning, weather, party)
-  // placed one per grid cell at 30% alpha over the theme tint. Pure text
-  // nodes - no image is involved. A single MultiEffect on this layer
-  // desaturates and tints the whole pattern into the foreground color
-  // Android-style, so every glyph shares one tone regardless of which
-  // font (color or text) resolved it. At most one glyph lives in a cell,
-  // so neighbors never overlap, and every row carries a random phase so
-  // no lattice lines show through; density only decides how many cells
-  // stay filled. Glyph, offset and rotation all come from a seeded hash, so
-  // the pattern is stable until the seed changes; Wallpaper bumps its
-  // mosaicRev on any wallpaper event
-  Item {
-    id: mosaic
-
-    anchors.fill: parent
-    // Only while settings have landed and the wallpaper is actually off; the
-    // mosaic must never show through a live image or race the first boot.
-    // Opacity fade is gated by the global animation switch so disabling
-    // animations snaps the mosaic instantly like the wallpaper.
-    visible: opacity > 0
-    opacity: (Settings.ready && !Settings.wallpaperEnabled && Settings.wallpaperMosaic) ? 0.3 : 0
-
-    // One layer for the whole pattern: far cheaper than an effect per
-    // glyph, and it guarantees a uniform single-color look. Contrast is
-    // compressed and brightness lifted slightly so the colorized tone
-    // clusters around one mid value: without it, dark fills (browns,
-    // blacks) would crush into near-black blobs while bright faces stay
-    // light. All four are plain color tweaks sharing one shader pass.
-    // `visible` is the render verdict and the single gate for the offscreen
-    // pass: it is false until settings have landed, while the wallpaper is
-    // on, with the option off, and once the fade has reached zero - and true
-    // for the whole fade in between, so a visible mosaic renders exactly as
-    // before.
-    layer.enabled: mosaic.visible
-    layer.effect: MultiEffect {
-      saturation: -1.0
-      contrast: -0.55
-      brightness: 0.12
-      colorization: 1.0
-      colorizationColor: Ui.solid("foreground_0")
-    }
-
-    Behavior on opacity {
-      enabled: MotionPolicy.enabled
-      NumberAnimation {
-        duration: win.fadeMs
-      }
-    }
-
-    // Service rev plus per-view randomness: a wallpaper event re-rolls every
-    // screen to an independent pattern. optionRev re-rolls when density or
-    // size changes so a new option value also yields a fresh layout.
-    property int seed: Wallpaper.mosaicRev * 1000003
-      + mosaic.optionRev * 7919 + Math.floor(Math.random() * 0x7fffffff)
-    // Bumped when a mosaic option changes; only the two sizing choices count,
-    // not the enable toggle itself.
-    property int optionRev: 0
-
-    // Nominal glyph ruler; the grid cell derives from it so even the
-    // largest rotated glyph stays inside its own cell.
-    readonly property real nominal: 64
-    readonly property real density: {
-      const levels = { "sparse": 0.15, "medium": 0.35, "dense": 0.65 }
-      return levels[Settings.wallpaperMosaicIntensity] ?? 0.35
-    }
-    readonly property real sizeK: {
-      const levels = { "small": 0.55, "medium": 0.75, "large": 0.95, "very_large": 1.2 }
-      return levels[Settings.wallpaperMosaicSize] ?? 0.75
-    }
-    readonly property real baseSize: mosaic.nominal * 0.55 * mosaic.sizeK
-    // Raster size for the glyphs: Noto Color Emoji ships fixed bitmap
-    // strikes (109px here, 128px in most builds), and rasterizing such a
-    // strike far below its native size crunches detail. Rendering near
-    // the strike and minifying on the GPU stays smooth at every mosaic
-    // size, and is equally crisp for vector fonts.
-    readonly property real glyphPx: 128
-    readonly property real cell: Math.max(56, mosaic.baseSize * 2.4)
-    readonly property int columns: Math.max(1, Math.ceil(mosaic.width / mosaic.cell))
-    readonly property int rows: Math.max(1, Math.ceil(mosaic.height / mosaic.cell))
-    // Exact tiling so cell centers cover the surface edge to edge.
-    readonly property real cellW: mosaic.columns > 0 ? mosaic.width / mosaic.columns : mosaic.width
-    readonly property real cellH: mosaic.rows > 0 ? mosaic.height / mosaic.rows : mosaic.height
-
-    // Deterministic 0..1 stream from seed + index + salt, so every glyph
-    // keeps its identity while the surface lives.
-    function rnd(i, salt) {
-      let h = mosaic.seed + Math.imul(i, 374761393) + Math.imul(salt, 668265263)
-      h = Math.imul(h ^ (h >>> 13), 1274126177)
-      h = h ^ (h >>> 16)
-      return ((h >>> 0) % 10000) / 10000
-    }
-
-    // Whitelist of common single-codepoint emojis: smileys, hearts,
-    // coffee, lightning and other everyday pictographs. No dingbats or
-    // geometric symbols. BMP entries carry VS16 (U+FE0F) so they resolve
-    // through the color emoji font like the rest instead of falling back
-    // to a text font with different metrics; the layer effect above then
-    // tints everything into one monochrome tone.
-    function glyphAt(r) {
-      const pool = ["😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃", "😉", "😊", "😇", "🥰", "😍", "🤩", "😋", "😛", "😜", "🤪", "😢", "😭", "😡", "🥳", "😴", "❤️", "💛", "💚", "💙", "💜", "🤍", "☕️", "⚡️", "🔥", "⭐", "🌟", "✨️", "☀️", "🌙", "☁️", "❄️", "🎉", "🎵", "✈️", "🚀", "🌈"]
-      return pool[Math.floor(r * pool.length)]
-    }
-
-    // One delegate per grid cell; density rolls per cell whether it stays
-    // filled, so filled cells spread evenly instead of clustering. A mosaic
-    // that cannot be seen asks for no delegates at all: a transparent grid of
-    // glyph Text items is still constructed, bound and laid out, and opacity
-    // alone keeps it off screen.
-    Repeater {
-      model: mosaic.visible ? mosaic.columns * mosaic.rows : 0
-
-      Item {
-        id: cellBox
-        required property int index
-        readonly property int col: index % mosaic.columns
-        readonly property int row: Math.floor(index / mosaic.columns)
-        readonly property bool filled: mosaic.rnd(index, 0) < mosaic.density
-        // Random phase per row: columns never line up across rows, so no
-        // vertical lattice lines survive. Pure function of the row, shared
-        // by every cell in it. The row offset decorrelates from cell
-        // streams via the +7919 shift.
-        readonly property real rowPhase: mosaic.rnd(row + 7919, 6) * mosaic.cellW
-        // Wide jitter inside the slot for organic scatter; the bound keeps
-        // the (uniformly sized, diagonally accounted) glyph off neighbors.
-        readonly property real jx: (mosaic.rnd(index, 1) * 2 - 1) * Math.max(0, (mosaic.cellW - mosaic.baseSize * 1.15) / 2) * 0.8
-        readonly property real jy: (mosaic.rnd(index, 2) * 2 - 1) * Math.max(0, (mosaic.cellH - mosaic.baseSize * 1.15) / 2) * 0.8
-
-        // Wrapped horizontally so a phase-shifted row spills over the edge
-        // back to its own start gap instead of clipping.
-        x: mosaic.width > 0 ? (((col + 0.5) * mosaic.cellW + rowPhase + jx) % mosaic.width + mosaic.width) % mosaic.width : 0
-        y: (row + 0.5) * mosaic.cellH + jy
-        width: 0
-        height: 0
-
-        Text {
-          anchors.centerIn: parent
-          visible: cellBox.filled
-          text: mosaic.glyphAt(mosaic.rnd(cellBox.index, 3))
-          color: Ui.solid("foreground_0")
-          font.family: Ui.fontFamily
-          // Rasterized near the emoji strike size, then minified on the
-          // GPU to the display size: keeps bitmap strikes smooth instead
-          // of pixelated. Near-uniform scale (+-6%) just breaks the
-          // stamped-out lattice feel; the Size setting still scales the
-          // whole pattern via baseSize.
-          font.pixelSize: mosaic.glyphPx
-          scale: mosaic.baseSize * (0.94 + 0.12 * mosaic.rnd(cellBox.index, 4)) / mosaic.glyphPx
-          // Continuous random angle, not snapped to steps.
-          rotation: mosaic.rnd(cellBox.index, 5) * 360
-        }
-      }
-    }
-
-    Connections {
-      target: Settings
-
-      function onOptionChanged(key) {
-        if (key === "shell.wallpaper.mosaicIntensity" || key === "shell.wallpaper.mosaicSize") {
-          mosaic.optionRev += 1
-        }
-      }
-    }
-  }
-
   function copyCurrentWallpaper() {
     if (!Wallpaper.enabled) return
     const path = Wallpaper.current
@@ -604,16 +439,12 @@ PanelWindow {
   }
 
   // Keep the input surface live while hidden so left double-click can
-  // re-enable wallpaper. Right-click copies the image while enabled and
-  // toggles the mosaic while disabled.
+  // re-enable wallpaper. Right-click copies the current image.
   MouseArea {
     anchors.fill: parent
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     onClicked: mouse => {
-      if (mouse.button === Qt.RightButton) {
-        if (Wallpaper.enabled) win.copyCurrentWallpaper()
-        else Settings.toggleMosaic()
-      }
+      if (mouse.button === Qt.RightButton) win.copyCurrentWallpaper()
     }
     onDoubleClicked: mouse => {
       if (mouse.button === Qt.LeftButton) Settings.toggleWallpaper()
