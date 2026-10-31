@@ -1503,7 +1503,7 @@ Item {
       }
 
       Column {
-        width: parent.width - wifiHeaderIcon.width - wifiToggle.implicitWidth - 2 * parent.spacing
+        width: parent.width - wifiHeaderIcon.width - (wifiToggle.visible ? wifiToggle.implicitWidth + 2 * parent.spacing : parent.spacing)
         spacing: 2
 
         Title {
@@ -1525,6 +1525,9 @@ Item {
         id: wifiToggle
 
         anchors.verticalCenter: parent.verticalCenter
+        // No radio, no switch: systems without a wifi adapter (wired-only,
+        // VMs) hide the toggle and keep the header as a "No adapter" label.
+        visible: root.wifiPresent
         checked: Networking.wifiEnabled
         // Never dimmed, never gated: this is the bar middle-click as a
         // switch, and soft-off must always be undoable from the island.
