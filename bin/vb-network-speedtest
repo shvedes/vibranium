@@ -63,17 +63,18 @@ esac
 log Info "Speedtest direction: $direction"
 
 # Keep one decimal at low rates where startup and sampling noise matter, then
-# round higher rates to whole Mbps to avoid unstable fractional readouts.
+# round higher rates to whole Mbps to avoid unstable fractional readouts. The
+# argument is an integer in thousandths of a megabit.
 format_mbps() {
-	local value=$1
-	local intpart=${value%%.*}
-	[[ -z $intpart ]] && intpart=0
+	local thousandths=$1
+	local intpart=$((thousandths / 1000))
 	if (( intpart <= 0 )); then
 		printf '0.0\n'
 	elif (( intpart < 10 )); then
-		printf '%.1f\n' "$value"
+		local tenths=$(((thousandths + 50) / 100))
+		printf '%d.%d\n' $((tenths / 10)) $((tenths % 10))
 	else
-		printf '%.0f\n' "$value"
+		printf '%d\n' $(((thousandths + 500) / 1000))
 	fi
 }
 
@@ -179,21 +180,18 @@ while any_alive; do
 	tx_after=0
 	read -r tx_after < "/sys/class/net/$iface/statistics/tx_bytes" 2>/dev/null || tx_after=0
 
-	# Sysfs counters are bytes, so each 0.5s delta is multiplied by eight and
-	# divided by 500,000 for decimal megabits per second. A lower reading
-	# indicates a counter reset and is reported as zero rather than negative
-	# throughput.
+	# Sysfs counters are bytes, so a 0.5s delta in thousandths of a megabit is
+	# delta * 8 / 500000 * 1000 = delta * 16 / 1000. Integer bash arithmetic
+	# keeps the precision without depending on bc. A lower reading indicates a
+	# counter reset and is reported as zero rather than negative throughput.
+	rate=0
 	if [[ "$direction" == "down" ]]; then
-		if (( rx_after < rx_before )); then
-			rate=0
-		else
-			rate=$(bc <<< "scale=6; ($rx_after - $rx_before) * 8 / 500000")
+		if (( rx_after >= rx_before )); then
+			rate=$(((rx_after - rx_before) * 16 / 1000))
 		fi
 	else
-		if (( tx_after < tx_before )); then
-			rate=0
-		else
-			rate=$(bc <<< "scale=6; ($tx_after - $tx_before) * 8 / 500000")
+		if (( tx_after >= tx_before )); then
+			rate=$(((tx_after - tx_before) * 16 / 1000))
 		fi
 	fi
 
