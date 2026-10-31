@@ -43,40 +43,6 @@
         ],
         "options": [
             {
-                "key": "shell.privacy.overlay",
-                "type": "bool",
-                "default": true,
-                "label": "Privacy dots",
-                "sub": "Always-visible capture indicator",
-                "desc": "Draw the capture dots on their own overlay surface."
-            },
-            {
-                "key": "shell.privacy.position",
-                "type": "string",
-                "default": "top-right",
-                "label": "Position",
-                "sub": "Corner holding the dots",
-                "desc": "Which screen corner the dots sit in.",
-                "values": [
-                    "top-right",
-                    "top-left",
-                    "bottom-right",
-                    "bottom-left"
-                ],
-                "valueLabels": {
-                    "top-right": "Top right",
-                    "top-left": "Top left",
-                    "bottom-right": "Bottom right",
-                    "bottom-left": "Bottom left"
-                },
-                "showIf": [
-                    {
-                        "key": "shell.privacy.overlay",
-                        "eq": true
-                    }
-                ]
-            },
-            {
                 "key": "shell.wallpaper.enabled",
                 "type": "bool",
                 "default": true,
@@ -210,6 +176,40 @@
                 "showIf": [
                     {
                         "key": "shell.wallpaper.mosaic",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.privacy.overlay",
+                "type": "bool",
+                "default": true,
+                "label": "Privacy dots",
+                "sub": "Always-visible capture indicator",
+                "desc": "Draw the capture dots on their own overlay surface."
+            },
+            {
+                "key": "shell.privacy.position",
+                "type": "string",
+                "default": "top-right",
+                "label": "Position",
+                "sub": "Corner holding the dots",
+                "desc": "Which screen corner the dots sit in.",
+                "values": [
+                    "top-right",
+                    "top-left",
+                    "bottom-right",
+                    "bottom-left"
+                ],
+                "valueLabels": {
+                    "top-right": "Top right",
+                    "top-left": "Top left",
+                    "bottom-right": "Bottom right",
+                    "bottom-left": "Bottom left"
+                },
+                "showIf": [
+                    {
+                        "key": "shell.privacy.overlay",
                         "eq": true
                     }
                 ]
