@@ -179,7 +179,9 @@ Rectangle {
     // here while the glyphs themselves render in displayRow below, which
     // can animate each symbol landing - something a text control cannot do.
     anchors.fill: parent
-    anchors.leftMargin: 20
+    // Reserve the leading glyph's slot: the echo centers in what remains,
+    // so a long secret stops at the icon instead of painting over it.
+    anchors.leftMargin: fieldIcon.visible ? Ui.m + fieldIcon.size + 8 : 20
     anchors.rightMargin: 20
     // Nothing of the control is seen, so its chrome is switched off rather
     // than painted over the box: the shell draws every visible pixel, and the
