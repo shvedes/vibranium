@@ -45,7 +45,12 @@ Singleton {
       tooltipText: root.tooltipText
     })
   }
-  onInfoChanged: root._publish()
+  // Deferred past the notification cascade: the payload reads the
+  // `available`/`tooltipText` bindings over `info`, which re-evaluate
+  // only after change handlers run. Publishing synchronously would send
+  // the previous step's values, so a deleted marker would keep
+  // available:true on the bus and the bar icon stuck on screen.
+  onInfoChanged: Qt.callLater(() => root._publish())
 
   property var _watchUnsub: null
 
