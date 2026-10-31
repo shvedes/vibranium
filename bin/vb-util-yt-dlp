@@ -3,7 +3,7 @@
 source vb-lib-cli
 
 usage() {
-  shcat << EOF
+	shcat << EOF
 Usage: ${0##*/} [OPTION] [URL]
 
 Download video/audio using yt-dlp with browser cookie extraction.
@@ -14,41 +14,41 @@ EOF
 }
 
 path_to_file_uri() {
-  local -n _p2u_out=$1
-  local _p2u_path="$2"
-  local _p2u_uri="file://"
-  local i char byte
+	local -n _p2u_out=$1
+	local _p2u_path="$2"
+	local _p2u_uri="file://"
+	local i char byte
 
-  # URI percent-encoding is byte-based. Force a byte-oriented locale.
-  LC_ALL=C
+	# URI percent-encoding is byte-based. Force a byte-oriented locale.
+	LC_ALL=C
 
-  for ((i = 0; i < ${#_p2u_path}; i++)); do
-    char="${_p2u_path:i:1}"
+	for ((i = 0; i < ${#_p2u_path}; i++)); do
+		char="${_p2u_path:i:1}"
 
-    case "$char" in
-      [a-zA-Z0-9.~_-] | /)
-        _p2u_uri+="$char"
-        ;;
-      *)
-        printf -v byte '%02X' "'$char"
-        _p2u_uri+="%$byte"
-        ;;
-    esac
-  done
+		case "$char" in
+			[a-zA-Z0-9.~_-] | /)
+				_p2u_uri+="$char"
+				;;
+			*)
+				printf -v byte '%02X' "'$char"
+				_p2u_uri+="%$byte"
+				;;
+		esac
+	done
 
-  _p2u_out="$_p2u_uri"
+	_p2u_out="$_p2u_uri"
 }
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    *)
-      break
-      ;;
-  esac
+	case "$1" in
+		-h | --help)
+			usage
+			exit 0
+			;;
+		*)
+			break
+			;;
+	esac
 done
 
 source vb-lib-core
@@ -61,112 +61,97 @@ OUTPUT_DIR="$XDG_DOWNLOAD_DIR"
 COOKIE_BR=(chrome chromium firefox brave vivaldi edge opera)
 
 if [[ -z "$1" ]]; then
-  term::show_header
+	term::show_header
 fi
 
 # Try cached cookies, then each browser profile, then cookieless. A successful
 # browser attempt writes the merged cookie jar for later runs; any cached-cookie
 # failure discards that cache and restarts profile selection.
 _try_download() {
-  local url="$1"
-  local cookie_cache="$VIBRANIUM_CACHE/${0##*/}"
-  local _stderr_tmp
+	local url="$1"
+	local cookie_cache="$VIBRANIUM_CACHE/${0##*/}"
+	local _stderr_tmp
 
-  local base_args=(
-    -f "bestvideo+bestaudio/best"
-    --remux-video mp4
-    --quiet --progress
-    --extractor-args "youtube:player_client=tv"
-    --throttled-rate 100K
-    -P "$OUTPUT_DIR"
-    --print-to-file "after_move:filepath" "$DL_PATH_FILE"
-  )
+	local base_args=(
+		-f "bestvideo+bestaudio/best"
+		--remux-video mp4
+		--quiet --progress
+		--extractor-args "youtube:player_client=tv"
+		--throttled-rate 100K
+		-P "$OUTPUT_DIR"
+		--print-to-file "after_move:filepath" "$DL_PATH_FILE"
+	)
 
-  # Cached-cookie diagnostics use a script-specific path, allowing concurrent
-  # invocations to overwrite and remove each other's stderr files.
-  if [[ -f "$cookie_cache" ]]; then
-    vb::print "$Y" "Downloading..."
-    _stderr_tmp="/tmp/${0##*/}.tmp"
-    if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url" 2> "$_stderr_tmp"; then
-      # A "no longer valid" diagnostic means YouTube rotated the cookies.
-      # An empty diagnostic file also selects this branch, matching the
-      # previous sed exit status when no input line ran its address range.
-      _cookies_rotated=true
-      while IFS= read -r _se_line || [[ -n $_se_line ]]; do
-        _cookies_rotated=false
-        if [[ $_se_line == *'no longer valid'* ]]; then
-          _cookies_rotated=true
-          break
-        fi
-      done < "$_stderr_tmp"
-      if $_cookies_rotated; then
-        vb::print "$Y" "YouTube cookies rotated - cache cleared for next run"
-        rm -f "$cookie_cache"
-      fi
-      rm -f "$_stderr_tmp"
-      return 0
-    fi
-    # Any cached-cookie failure discards diagnostics and cache, then retries the
-    # profile sequence; cookieless fallback can still expose the original error.
-    rm -f "$_stderr_tmp" "$cookie_cache"
-    vb::print "$Y" "Cached cookies stale - re-scanning browsers"
-  fi
+	# Cached-cookie diagnostics use a script-specific path, allowing concurrent
+	# invocations to overwrite and remove each other's stderr files.
+	if [[ -f "$cookie_cache" ]]; then
+		vb::print "$Y" "Downloading..."
+		_stderr_tmp="/tmp/${0##*/}.tmp"
+		if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url" 2> "$_stderr_tmp"; then
+			# A "no longer valid" diagnostic means YouTube rotated the cookies.
+			# An empty diagnostic file also selects this branch, matching the
+			# previous sed exit status when no input line ran its address range.
+			_cookies_rotated=true
+			while IFS= read -r _se_line || [[ -n $_se_line ]]; do
+				_cookies_rotated=false
+				if [[ $_se_line == *'no longer valid'* ]]; then
+					_cookies_rotated=true
+					break
+				fi
+			done < "$_stderr_tmp"
+			if $_cookies_rotated; then
+				vb::print "$Y" "YouTube cookies rotated - cache cleared for next run"
+				rm -f "$cookie_cache"
+			fi
+			rm -f "$_stderr_tmp"
+			return 0
+		fi
+		# Any cached-cookie failure discards diagnostics and cache, then retries the
+		# profile sequence; cookieless fallback can still expose the original error.
+		rm -f "$_stderr_tmp" "$cookie_cache"
+		vb::print "$Y" "Cached cookies stale - re-scanning browsers"
+	fi
 
-  for browser in "${COOKIE_BR[@]}"; do
-    vb::print "$Y" "Trying ${B}${browser}${RS} cookies"
-    # --cookies writes the merged jar to disk when the download succeeds.
-    if yt-dlp "${base_args[@]}" --cookies-from-browser "$browser" \
-      --cookies "$cookie_cache" "$url" 2> /dev/null; then
-      return 0
-    fi
-    # Discard any partial cookie file the failed attempt may have written.
-    rm -f "$cookie_cache"
-  done
+	for browser in "${COOKIE_BR[@]}"; do
+		vb::print "$Y" "Trying ${B}${browser}${RS} cookies"
+		# --cookies writes the merged jar to disk when the download succeeds.
+		if yt-dlp "${base_args[@]}" --cookies-from-browser "$browser" \
+			--cookies "$cookie_cache" "$url" 2> /dev/null; then
+			return 0
+		fi
+		# Discard any partial cookie file the failed attempt may have written.
+		rm -f "$cookie_cache"
+	done
 
-  vb::print "$Y" "No browser cookies worked. Downloading without cookies"
-  yt-dlp "${base_args[@]}" "$url"
-}
-
-# Compare the exact-title client's workspace with the active workspace. An empty
-# match is treated as onscreen; duplicate title matches can return multiple IDs.
-_window_is_offscreen() {
-  local active_ws our_ws
-
-  active_ws="$(hyprctl -j activeworkspace | jq -r '.id')"
-
-  our_ws="$(hyprctl -j clients | jq -r \
-    '.[] | select(.title == "vb-util-yt-dlp") | .workspace.id')"
-
-  [[ -z "$our_ws" ]] && return 1
-
-  [[ "$our_ws" != "$active_ws" ]]
+	vb::print "$Y" "No browser cookies worked. Downloading without cookies"
+	yt-dlp "${base_args[@]}" "$url"
 }
 
 if ! command -v yt-dlp > /dev/null; then
-  if ! term::ask_yes_no Y "${B}yt-dlp${RS} not found. Install it now?"; then
-    operation::result canceled
-    exit 1
-  fi
+	if ! term::ask_yes_no Y "${B}yt-dlp${RS} not found. Install it now?"; then
+		operation::result canceled
+		exit 1
+	fi
 
-  vb-pkg-install --embedded -- yt-dlp
-  term::enable_input
+	vb-pkg-install --embedded -- yt-dlp
+	term::enable_input
 fi
 
 term::enable_input
 while true; do
-  if [[ -z "$URL" ]]; then
-    if ! term::prompt_line URL "${Y}[*]${RS} Enter video URL: "; then
-      operation::result canceled "No URL provided"
-      exit 1
-    fi
-  fi
+	if [[ -z "$URL" ]]; then
+		if ! term::prompt_line URL "${Y}[*]${RS} Enter video URL: "; then
+			operation::result canceled "No URL provided"
+			exit 1
+		fi
+	fi
 
-  if [[ $URL =~ ^https?:// ]]; then
-    break
-  fi
+	if [[ $URL =~ ^https?:// ]]; then
+		break
+	fi
 
-  vb::print "$R" "Not a valid URL!"
-  URL=""
+	vb::print "$R" "Not a valid URL!"
+	URL=""
 done
 term::disable_input
 
@@ -176,19 +161,10 @@ DL_PATH_FILE="$(mktemp)"
 trap 'trap "exit 1" INT; rm -f "$DL_PATH_FILE"; printf "\n"; operation::result canceled; exit 1' INT
 
 if ! _try_download "$URL"; then
-  rm -f "$DL_PATH_FILE"
-  if _window_is_offscreen; then
-    term::enable_input
-    # URL is embedded in notification markup verbatim, so markup characters
-    # are interpreted by the notification backend rather than escaped.
-    notify-send -r 3 -a "Vibranium" -t 10000 -u critical "Video Downloader" \
-      "Failed to download:\n<span foreground='${P_RED}'>$URL</span>!"
-    exit 1
-  fi
-
-  vb::print "$R" "Something went wrong!"
-  operation::result error
-  exit 1
+	rm -f "$DL_PATH_FILE"
+	vb::print "$R" "Something went wrong!"
+	operation::result error
+	exit 1
 fi
 
 # Command substitution strips all trailing newlines; explicit single-newline
@@ -207,14 +183,5 @@ path_to_file_uri DL_URI "$DL_FILE"
 printf '%s\r\n' "$DL_URI" | wl-copy --type text/uri-list
 vb::print "$G" "Copied to clipboard: ${B}${DL_URI}${RS}"
 vb::print "$G" "Video has been saved to ${B}$OUTPUT_DIR${RS}"
-
-if _window_is_offscreen; then
-  term::enable_input
-  # OUTPUT_DIR is also notification markup, so characters such as ampersands
-  # are interpreted rather than escaped for display.
-  notify-send -r 3 -a "Vibranium" -t 5000 "Video Downloader" \
-    "Video has been successfully saved to <b><span foreground='${P_BLUE}'>$OUTPUT_DIR</span></b>"
-  exit 0
-fi
 
 operation::result success
