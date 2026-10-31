@@ -202,11 +202,6 @@ PanelWindow {
             anchors.fill: parent
             color: Ui.tint("foreground_0", 0.07)
             opacity: backHover.containsMouse ? 1 : 0
-
-            Behavior on opacity {
-              enabled: MotionPolicy.enabled
-              NumberAnimation { duration: Ui.fastMs }
-            }
           }
 
           MouseArea {

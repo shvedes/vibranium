@@ -42,17 +42,12 @@ Item {
   implicitHeight: height
   opacity: row.isSep || row.isEnabled ? 1 : Ui.disabledOpacity
 
-  // Hover fill - instant, no lingering tint (pointer-driven menu).
+  // Hover fill - instant, no animation (pointer-driven menu).
   Rectangle {
     anchors.fill: parent
     visible: !row.isSep
     color: Ui.tint("foreground_0", 0.07)
     opacity: hoverArea.containsMouse ? 1 : 0
-
-    Behavior on opacity {
-      enabled: MotionPolicy.enabled
-      NumberAnimation { duration: Ui.fastMs }
-    }
   }
 
   MouseArea {
