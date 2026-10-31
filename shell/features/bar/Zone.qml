@@ -1035,14 +1035,19 @@ Item {
       // gives.
       anchors.right: parent.right
       anchors.verticalCenter: parent.verticalCenter
-      // Asynchronous so one heavy module cannot stall the row behind it:
-      // during boot every slot is held at intro 0 while its Loader builds,
-      // then Bar releases them together into one slidefade; post-boot the
-      // enter/grow animation above covers the arrival. Geometry survives
-      // the gap through the geoSnapshot copy (an uninstantiated delegate
-      // reads 0 there), and the construction clock still brackets
-      // resolveSlot -> onLoaded, only longer.
-      asynchronous: true
+      // Asynchronous only until the boot entrance latches: during boot
+      // every slot is held at intro 0 while its Loader builds, then Bar
+      // releases them together into one slidefade, and async keeps one
+      // heavy module from stalling the row behind it. After the latch a
+      // membership change rebuilds every delegate, so an async Loader
+      // would collapse every kept slot to zero width and pop them back
+      // staggered - the whole bar replaying the boot motion for one
+      // toggle. Synchronous post-boot births land at full width in the
+      // same frame instead, so only the toggled slot's grow/enter moves.
+      // Geometry survives the boot gap through the geoSnapshot copy (an
+      // uninstantiated delegate reads 0 there), and the construction
+      // clock still brackets resolveSlot -> onLoaded, only longer.
+      asynchronous: !Bar.entranceReady
 
       sourceComponent: root.resolveSlot(slot.modelData.id)
 

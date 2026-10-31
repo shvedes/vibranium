@@ -46,9 +46,12 @@ Item {
       delegate: Loader {
         required property string modelData
 
-        // Asynchronous so one heavy member cannot stall its sibling: the
-        // row adopts each member's implicit size as it arrives.
-        asynchronous: true
+        // Asynchronous only until the boot entrance latches (same reason as
+        // Zone's slot loader): a membership change rebuilds every member,
+        // so an async Loader would collapse the kept sibling to zero width
+        // and pop it back while the toggled one slides. Synchronous
+        // post-boot births land at full width in the same frame instead.
+        asynchronous: !Bar.entranceReady
         // No explicit size: the Loader adopts the member's own implicit
         // size (an explicit width/height would collapse the member instead).
         //
