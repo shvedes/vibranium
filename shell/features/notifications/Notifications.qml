@@ -86,23 +86,28 @@ Singleton {
   // One flag per forced source rather than a single one, because each source
   // has to be answerable for itself: a screen share starting must not be undone
   // by fullscreen ending, and a notification pile that needs a reason can only
-  // be given one by naming it. `status` reads all three.
+  // be given one by naming it. `status` reads all four.
   //
   // Fullscreen forces DND on so a notification cannot appear over a video. A
   // screen share forces it on for the same reason about a wider audience: the
   // recorder's dot is already on the bar, so the pile is the other half of the
-  // same warning. Both are read from a service rather than re-derived here -
-  // fullscreen from the compositor, the share from the privacy service, which
-  // is the one place that already classifies the PipeWire graph and knows a
-  // portal screencast from a camera.
+  // same warning. A locked session forces it on so a notification cannot
+  // appear over the lockscreen. Fullscreen is read from the compositor, the
+  // share from the privacy service (the one place that already classifies the
+  // PipeWire graph and knows a portal screencast from a camera), and the lock
+  // from the lockscreen's Bus state - via the bus rather than a direct import
+  // so the daemon stays decoupled from the lock feature (same pattern as
+  // Screenshots.sessionLocked).
   //
-  // Neither may clear a DND the user set by hand, and neither clearing may
+  // None may clear a DND the user set by hand, and none clearing may
   // clear it either - hence the manual flag, the forced flags, and the
   // effective state as their disjunction.
   property bool dndManual: false
   readonly property bool dndForcedFullscreen: FullscreenProbe.anyActive
   readonly property bool dndForcedShare: Core.Privacy.shareOn
-  readonly property bool dndForced: root.dndForcedFullscreen || root.dndForcedShare
+  readonly property var _lockState: Bus.latest("lockscreen.state")
+  readonly property bool dndForcedLock: root._lockState !== null && root._lockState.locked === true
+  readonly property bool dndForced: root.dndForcedFullscreen || root.dndForcedShare || root.dndForcedLock
   readonly property bool dnd: root.dndManual || root.dndForced
 
   // --- placement ----------------------------------------------------------
@@ -1080,10 +1085,12 @@ Singleton {
         dnd: root.dnd,
         dndManual: root.dndManual,
         dndForced: root.dndForced,
-        // Per source, because "why is DND on" has two different answers and a
-        // caller that has to guess cannot tell a video from a screen share.
+        // Per source, because "why is DND on" has three different answers and a
+        // caller that has to guess cannot tell a video from a screen share
+        // from a locked session.
         dndForcedFullscreen: root.dndForcedFullscreen,
         dndForcedShare: root.dndForcedShare,
+        dndForcedLock: root.dndForcedLock,
         atTop: root.atTop,
         surfaceVisible: root.surfaceVisible,
         // Both halves, because "is a deadline frozen" has a cause and a state
