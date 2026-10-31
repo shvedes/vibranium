@@ -1,0 +1,57 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+SELF="${0##*/}"
+
+VERBOSE=${VERBOSE:-false}
+
+usage() {
+  shcat << EOF
+Usage: $SELF [OPTIONS] [--] [COMMAND [ARGS...]]
+
+Launch a terminal in its own transient systemd scope.
+
+The terminal is owned by the user manager rather than the service that
+started it, so restarting that service does not close the window. Without
+COMMAND, the default terminal opens.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
+
+Terminal options are passed through to the terminal launcher:
+  --app-id=ID    Set the terminal application ID
+  --title=TITLE  Set the terminal window title
+  --dir=PATH     Set the working directory
+
+Examples:
+  $SELF --app-id=org.vb.term.float --title=btop -- btop
+  $SELF -- \${EDITOR:-nvim} "\$XDG_CONFIG_HOME/vibranium/environment"
+EOF
+}
+
+while (($#)); do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      break
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+# app2unit -T runs the terminal launch in a transient systemd scope. setsid
+# detaches the session, and the redirects keep the caller from retaining pipes
+# or waiting for the terminal.
+log Info "Launching terminal: ${*:-default}"
+exec setsid -f app2unit -T "$@" </dev/null >/dev/null 2>&1

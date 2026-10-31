@@ -78,7 +78,7 @@ focus_or_launch() {
     hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
   else
     log Info "No matching terminal window, launching: ${cmd[*]}"
-    exec setsid -f xdg-terminal-exec \
+    exec vb-launch-terminal \
       --app-id="$APP_ID" \
       --title="$TITLE" \
       -- "${cmd[@]}" \
@@ -171,10 +171,10 @@ if [[ "$APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
   focus_or_launch "${COMMAND[@]}"
 else
   log Info "Always-focus disabled, launching directly"
-  # Detached stdio and exec transfer terminal lifetime to xdg-terminal-exec,
-  # keeping this wrapper from retaining pipes or blocking the caller.
+  # vb-launch-terminal owns the transient scope and detached stdio, so the
+  # terminal outlives this wrapper and the service that started it.
   # shellcheck disable=SC2068
-  exec setsid -f xdg-terminal-exec \
+  exec vb-launch-terminal \
     --app-id="$APP_ID" \
     --title="$TITLE" \
     -- "${COMMAND[@]}" \

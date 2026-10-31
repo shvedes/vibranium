@@ -137,7 +137,7 @@ _check_important() {
 # A non-TTY invocation cannot show the interactive flow, so it is relaunched
 # in a terminal window.
 if [[ ! -t 1 ]]; then
-  xdg-terminal-exec --title="${0##*/}" --app-id=org.vb.term.float -- "$0" "$@"
+  vb-launch-terminal --title="${0##*/}" --app-id=org.vb.term.float -- "$0" "$@"
   exit
 fi
 

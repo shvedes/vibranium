@@ -389,7 +389,7 @@ hl.bind(
 
 -- Vibranium
 
-hl.bind(mainMod .. " + Return", hl.dsp.exec_raw("xdg-terminal-exec"), { description = "Open terminal" })
+hl.bind(mainMod .. " + Return", hl.dsp.exec_raw("vb-launch-terminal"), { description = "Open terminal" })
 
 hl.bind("CTRL + ALT + L", hl.dsp.exec_raw("vb-shell lockscreen lock"), { description = "Lock session" })
 hl.bind("switch:on:Lid Switch", hl.dsp.exec_raw("vb-shell lockscreen lock"), { description = "Lock session on lid close" })

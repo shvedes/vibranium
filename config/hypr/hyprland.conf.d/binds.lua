@@ -55,7 +55,7 @@ end
 hl.bind(mainMod .. " + SHIFT + D", cycle_layout, { description = "Cycle window layout" })
 
 -- Or of you want to launch the terminal in a floating window.
--- hl.bind(mainMod .. " + SHIFT + Return", hl.dsp.exec_raw("xdg-terminal-exec --app-id=org.vb.term.float"), { description = "Open terminal (floating)" })
+-- hl.bind(mainMod .. " + SHIFT + Return", hl.dsp.exec_raw("vb-launch-terminal --app-id=org.vb.term.float"), { description = "Open terminal (floating)" })
 
 -- Bind file manager to extra keys on the keyboard.
 -- hl.bind("XF86HomePage", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "Open file manager" })

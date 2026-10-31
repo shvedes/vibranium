@@ -23,7 +23,7 @@
                 "label": "Edit environment",
                 "sub": "Edit session environment variables",
                 "icon": "file",
-                "command": "xdg-terminal-exec --app-id=org.vb.term -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/vibranium/environment"
+                "command": "vb-launch-terminal --app-id=org.vb.term -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/vibranium/environment"
             },
             {
                 "type": "action",
@@ -1815,28 +1815,28 @@
                 "label": "Window Rules",
                 "sub": "window-rules.lua",
                 "icon": "file-code",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.lua"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.lua"
             },
             {
                 "type": "action",
                 "label": "Keybindings",
                 "sub": "binds.lua",
                 "icon": "keyboard",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.lua"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.lua"
             },
             {
                 "type": "action",
                 "label": "Monitors",
                 "sub": "monitors.lua",
                 "icon": "monitor",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua"
             },
             {
                 "type": "action",
                 "label": "Input",
                 "sub": "input.lua",
                 "icon": "cursor",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua"
             }
         ],
         "options": []
@@ -3735,35 +3735,35 @@
                 "label": "Secure Boot",
                 "sub": "Configure Secure Boot easily",
                 "icon": "cpu",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-sboot"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-sboot"
             },
             {
                 "type": "action",
                 "label": "Firewall",
                 "sub": "Basic firewall setup",
                 "icon": "firewall",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-ufw"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-ufw"
             },
             {
                 "type": "action",
                 "label": "Docker",
                 "sub": "Install & confiure Docker",
                 "icon": "docker",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-docker"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-docker"
             },
             {
                 "type": "action",
                 "label": "QEMU",
                 "sub": "Install and configure VMs",
                 "icon": "qemu",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-qemu"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-qemu"
             },
             {
                 "type": "action",
                 "label": "CUPS",
                 "sub": "Install & configure printing",
                 "icon": "printer",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-cups"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-cups"
             }
         ]
     },
@@ -3777,14 +3777,14 @@
                 "label": "Arch Package",
                 "sub": "Install official packages",
                 "icon": "archlinux",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-install -- vb-pkg-install"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-pkg-install -- vb-pkg-install"
             },
             {
                 "type": "action",
                 "label": "AUR Package",
                 "sub": "Install AUR packages",
                 "icon": "package-aur",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-install-aur -- vb-pkg-install --aur"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-pkg-install-aur -- vb-pkg-install --aur"
             },
             {
                 "type": "separator"
@@ -3794,21 +3794,21 @@
                 "label": "Theme",
                 "sub": "Install Vibranium themes",
                 "icon": "theme",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-install -- vb-theme-install"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-theme-install -- vb-theme-install"
             },
             {
                 "type": "action",
                 "label": "Font",
                 "sub": "Install font packages",
                 "icon": "font",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-font-install -- vb-pkg-font-install"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-pkg-font-install -- vb-pkg-font-install"
             },
             {
                 "type": "action",
                 "label": "Font (AUR)",
                 "sub": "Install font packages",
                 "icon": "font",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-font-install-aur -- vb-pkg-font-install --aur"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-pkg-font-install-aur -- vb-pkg-font-install --aur"
             },
             {
                 "type": "separator"
@@ -3818,14 +3818,14 @@
                 "label": "PWA",
                 "sub": "Install web apps",
                 "icon": "webapp",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-install -- vb-webapp-install"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-webapp-install -- vb-webapp-install"
             },
             {
                 "type": "action",
                 "label": "TUI",
                 "sub": "Install terminal apps",
                 "icon": "tui",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-install -- vb-tui-install"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-tui-install -- vb-tui-install"
             }
         ]
     },
@@ -3839,7 +3839,7 @@
                 "label": "Package",
                 "sub": "Uninstall packages",
                 "icon": "package",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-remove -- vb-pkg-remove"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-pkg-remove -- vb-pkg-remove"
             },
             {
                 "type": "separator"
@@ -3857,7 +3857,7 @@
                 "label": "Font",
                 "sub": "Uninstall font packages",
                 "icon": "font",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-font-remove -- vb-pkg-font-remove"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-font-remove -- vb-pkg-font-remove"
             },
             {
                 "type": "separator"
@@ -3867,14 +3867,14 @@
                 "label": "PWA",
                 "sub": "Uninstall web apps",
                 "icon": "webapp-remove",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-remove -- vb-webapp-remove"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-webapp-remove -- vb-webapp-remove"
             },
             {
                 "type": "action",
                 "label": "TUI",
                 "sub": "Uninstall terminal apps",
                 "icon": "tui-remove",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-remove -- vb-tui-remove"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-tui-remove -- vb-tui-remove"
             }
         ]
     },
@@ -3888,14 +3888,14 @@
                 "label": "OS",
                 "sub": "Update system packages",
                 "icon": "archlinux",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-update -- vb-pkg-update"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-pkg-update -- vb-pkg-update"
             },
             {
                 "type": "action",
                 "label": "AUR",
                 "sub": "Update AUR packages",
                 "icon": "package-aur",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-update-aur -- vb-pkg-update --aur"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-pkg-update-aur -- vb-pkg-update --aur"
             },
             {
                 "type": "separator"
@@ -3905,14 +3905,14 @@
                 "label": "Themes",
                 "sub": "Update community themes",
                 "icon": "theme",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-update -- vb-theme-update"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-theme-update -- vb-theme-update"
             },
             {
                 "type": "action",
                 "label": "Vibranium",
                 "sub": "Update Vibranium",
                 "icon": "github",
-                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-update -- vb-update"
+                "command": "vb-launch-terminal --app-id=org.vb.term.float --title=vb-update -- vb-update"
             }
         ]
     },

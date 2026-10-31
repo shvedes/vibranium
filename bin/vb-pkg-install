@@ -607,7 +607,7 @@ for _arg in "$@"; do
 done
 
 if [[ $_emb_early == false ]] && term::is_headless; then
-	xdg-terminal-exec --app-id=org.vb.term.float --title="${0##*/}" -- "$0" "$@"
+	vb-launch-terminal --app-id=org.vb.term.float --title="${0##*/}" -- "$0" "$@"
 	exit
 fi
 

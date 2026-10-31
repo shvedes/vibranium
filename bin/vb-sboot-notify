@@ -80,7 +80,7 @@ if [[ "$SB_STATE" == "setup" ]]; then
 
     case "$ACTION" in
       setup)
-        exec xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-sboot
+        exec vb-launch-terminal --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-sboot
         ;;
       ignore)
         notify-send -r 1 -a "Vibranium" "Secure Boot Setup" "Secure Boot notice has been disabled"

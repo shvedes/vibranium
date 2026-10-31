@@ -119,5 +119,5 @@ else
   log Info "No matching MPD client window, launching: $CLIENT"
   # The terminal wrapper supplies stable app metadata, while `--` keeps the
   # client executable at the end of the command argument boundary.
-  xdg-terminal-exec --app-id=mpd --title="$CLIENT" -- "$CLIENT"
+  vb-launch-terminal --app-id=mpd --title="$CLIENT" -- "$CLIENT"
 fi

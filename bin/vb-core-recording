@@ -177,7 +177,7 @@ fallback_notification() {
   IFS= read -r action < <(notify-send --action=true -r 4 -a "Screen Recorder" -u critical -t 25000 "Screen Recording" "$msg") || true
 
   if [[ $action == 0 ]]; then
-    xdg-terminal-exec -- "${EDITOR:-nvim}" "${LOG_FILE}.latest_fallback"
+    vb-launch-terminal -- "${EDITOR:-nvim}" "${LOG_FILE}.latest_fallback"
   fi
 }
 
@@ -190,7 +190,7 @@ both_failed_notification() {
   IFS= read -r action < <(notify-send --action=true -r 4 -a "Screen Recorder" -u critical -t 25000 "Screen Recording" "$msg") || true
 
   if [[ $action == 0 ]]; then
-    xdg-terminal-exec -- "${EDITOR:-nvim}" "${LOG_FILE}.latest_failed"
+    vb-launch-terminal -- "${EDITOR:-nvim}" "${LOG_FILE}.latest_failed"
   fi
 }
 
