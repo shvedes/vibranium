@@ -1,0 +1,3 @@
+module qs.features.bar.modules.Printers
+Printers 1.0 Printers.qml
+PrintersIsland 1.0 PrintersIsland.qml

@@ -56,6 +56,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# The launcher checks for the mpd executable first; client availability is
+# resolved separately, and neither check proves that a daemon is running.
 if ! command -v mpd > /dev/null; then
   log Error "MPD is not installed"
   exit 1
@@ -63,7 +65,8 @@ fi
 
 CLIENT=""
 
-# If user requested specific client, validate it
+# An explicit client is accepted by executable lookup even when it is absent
+# from CLIENTS; automatic selection stops at the first installed preference.
 if [[ -n "$REQUESTED_CLIENT" ]]; then
   log Info "Requested client: $REQUESTED_CLIENT"
   if command -v "$REQUESTED_CLIENT" > /dev/null 2>&1; then
@@ -83,12 +86,16 @@ else
 fi
 
 if [[ -z "$CLIENT" ]]; then
+  # A keybinding caller may have no visible stderr, so the failure also uses
+  # a desktop notification while returning a nonzero status.
   log Warn "No MPD client found"
   [[ -t 2 ]] && log Error "Could not find installed MPD client"
-  notify-send -r 4 -t 3000 "Vibranium" "Could not find installed MPD client!"
+  notify-send -r 4 -a "Vibranium" -t 3000 "Vibranium" "Could not find installed MPD client!"
   exit 1
 fi
 
+# The client name is interpolated into a jq regular expression, so class and
+# title matching follows jq regex semantics rather than literal substring rules.
 WINDOW_ADDRESS="$(
   jq -r --arg p "$CLIENT" '
     first(
@@ -104,9 +111,13 @@ WINDOW_ADDRESS="$(
 )"
 
 if [[ -n "$WINDOW_ADDRESS" ]]; then
+  # `first` follows Hyprland's client order; this path does not rank multiple
+  # matching windows by focus history.
   log Info "Focusing existing MPD client: address=$WINDOW_ADDRESS"
   hyprctl -q dispatch "hl.dsp.focus({window = 'address:${WINDOW_ADDRESS}'})"
 else
   log Info "No matching MPD client window, launching: $CLIENT"
+  # The terminal wrapper supplies stable app metadata, while `--` keeps the
+  # client executable at the end of the command argument boundary.
   xdg-terminal-exec --app-id=mpd --title="$CLIENT" -- "$CLIENT"
 fi

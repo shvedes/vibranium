@@ -44,8 +44,10 @@ if ! command -v fzf > /dev/null; then
   exit 1
 fi
 
-# Auto-detect an editor if none is set. The preference order is nvim ->
-# vim -> neovide -> vi -> less, matching the most common terminal editors.
+# The fzf preview explicitly sets MANPAGER=cat for that child process; a
+# post-selection man invocation uses the exported MANPAGER when configured.
+# When EDITOR is unset, the first installed command in this order is used:
+# nvim, vim, neovide, vi, then less.
 if [[ -z $EDITOR ]]; then
   log Info "EDITOR not set, detecting..."
   for ed in nvim vim neovide vi less; do
@@ -62,6 +64,8 @@ if [[ -f "$VIBRANIUM_STATE/theme/fzf" ]]; then
   source "$VIBRANIUM_STATE/theme/fzf"
 fi
 
+# Keep all UI options in one array so theme values and preview commands retain
+# their boundaries when the array is expanded into fzf.
 FZF_ARGS=(
   --layout=reverse
   --border=sharp
@@ -76,10 +80,9 @@ FZF_ARGS=(
 )
 FZF_ARGS+=(--color "${FZF_COLORS:-pointer:white,marker:green}")
 
-# Set MANPAGER based on the detected editor so that opening a man page
-# from fzf uses the appropriate viewer. vim/nvim users get the +Man!
-# plugin integration; nano gets -v (view mode); others use the editor
-# directly as the pager.
+# When MANPAGER is unset, derive it from the detected editor: vim/nvim use
+# +Man!, nano uses -v, and other editors run directly. An explicit MANPAGER
+# remains unchanged.
 if [[ -z $MANPAGER ]]; then
   case "$EDITOR" in
     *nvim | *vim)
@@ -94,17 +97,24 @@ if [[ -z $MANPAGER ]]; then
   esac
 fi
 
-# Loop: show fzf with a live preview of the selected man page.
-# man -k . lists every installed man page; sed strips the description
-# after " - " and inserts a space before the section parenthesis so
-# fzf's {1} extract matches the page name only.
+# man -k . searches installed manual-page descriptions; sed strips the
+# description after " - " and inserts a space before the section parenthesis
+# so fzf's {1} extract matches the page name only.
 while true; do
   selected=$(
     man -k . 2> /dev/null |
-      sed 's/ - .*//; s/\([^ ]\)(/\1 (/' |
+      while IFS= read -r _man_line; do
+        _man_line="${_man_line%% - *}"
+        if [[ $_man_line =~ ([^[:space:]])\((.*) ]]; then
+          _man_line="${BASH_REMATCH[1]} (${BASH_REMATCH[2]}"
+        fi
+        printf '%s\n' "$_man_line"
+      done |
       fzf "${FZF_ARGS[@]}"
   )
 
+  # Command substitution carries only fzf's selected line into this loop; an
+  # empty result is treated as cancellation rather than a malformed page.
   [[ -z "$selected" ]] && exit 0
 
   # Parse the selected entry: extract page name (before paren) and section.
@@ -115,5 +125,7 @@ while true; do
   tmp="${selected#*(}"
   section="${tmp%%)*}"
 
+  # The split relies on the normalized `name (section)` shape produced above;
+  # after man exits, the loop starts a new fzf invocation with a fresh query.
   man "$section" "$page"
 done

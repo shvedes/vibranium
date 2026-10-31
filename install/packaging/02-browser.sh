@@ -1,6 +1,8 @@
 #!/bin/bash
 
 packages=()
+browser_idx=""
+custom_browser_pkg=""
 
 browsers=(
   "Firefox"
@@ -32,11 +34,15 @@ done
 echo -e "${C}[QSTN]${RS} Note: ${C}Chromium${RS} is already included"
 
 while true; do
-  printf "%s[>>>>]%s Enter number (1-%d): %s" "$C" "$RS" "${#browsers[@]}" "$Y"
   trap 'printf "%s" "$RS"' INT
 
   term::enable_input
-  read -r browser_idx
+  if ! term::prompt_line browser_idx "${C}[>>>>]${RS} Enter number (1-${#browsers[@]}): ${Y}"; then
+    term::disable_input
+    printf "%s" "$RS"
+    trap - INT
+    exit 1
+  fi
   term::disable_input
 
   printf "%s" "$RS"
@@ -47,11 +53,15 @@ while true; do
     selected_browser_pkg="${browser_pkgs[$((browser_idx - 1))]}"
 
     if [[ "$selected_browser" == "Other" ]]; then
-      printf "%s[>>>>]%s Enter package name: %s" "$C" "$RS" "$Y"
       trap 'printf "%s" "$RS"' INT
 
       term::enable_input
-      read -r custom_browser_pkg
+      if ! term::prompt_line custom_browser_pkg "${C}[>>>>]${RS} Enter package name: ${Y}"; then
+        term::disable_input
+        printf "%s" "$RS"
+        trap - INT
+        exit 1
+      fi
       term::disable_input
 
       printf "%s" "$RS"
@@ -67,5 +77,5 @@ while true; do
 done
 
 for pkg in "${packages[@]}"; do
-  printf "%s\n" "$pkg" >>/tmp/vibranium.packages
+  printf "%s\n" "$pkg" >> /tmp/vibranium.packages
 done

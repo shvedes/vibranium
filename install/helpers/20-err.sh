@@ -24,12 +24,16 @@ helpers::prompt_err_action() {
         "$phase" "$script" "$exit_code" >> "$_LOG_FILE" 2>/dev/null
 
     helpers::log::error "Script '${script}' failed in phase '${phase}' (exit ${exit_code})"
-    helpers::log::warn  "Full output is in ${_LOG_FILE}"
+    helpers::log::warn  "Installer metadata log: ${_LOG_FILE}"
 
     term::enable_input
     while true; do
-        printf '%s[FAIL]%s [R]etry  [S]kip  [A]bort: %s' "$R" "$RS" "$Y"
-        read -r choice; printf '%s' "$RS"
+        if ! term::prompt_line choice "${R}[FAIL]${RS} [R]etry  [S]kip  [A]bort: ${Y}"; then
+            printf '%s' "$RS"
+            _LAST_ERROR_ACTION=abort
+            break
+        fi
+        printf '%s' "$RS"
 
         case "${choice,,}" in
             r|retry)
@@ -53,8 +57,6 @@ helpers::prompt_err_action() {
 }
 
 # Run a single .sh file as a named step within a phase.
-# The script's stdout+stderr are tee'd to $helpers::log::FILE so the output is
-# available on the terminal and persisted for post-mortem inspection.
 # On non-zero exit the user is offered retry / skip / abort.
 helpers::run_step() {
     local phase="$1"
@@ -66,25 +68,8 @@ helpers::run_step() {
      "$phase" "$script_name" >> "$_LOG_FILE" 2>/dev/null
 
     while true; do
-        # Capture output to the log while keeping it visible on the terminal.
-        # PIPESTATUS[0] is the exit code of bash itself, not of tee.
-        if [[ -n "${_LOG_FILE:-}" ]]; then
-        # Strip all ANSI escape characters before writing to the log file.
-        # Keep the log  readable.
-            bash "$script" 2>&1 | tee >(
-                local esc=$'\x1b'
-                shopt -s extglob
-                while IFS= read -r line || [[ -n "$line" ]]; do
-                    line="${line//${esc}\[*([0-9;])[A-Za-z]/}"
-                    line="${line//$'\r'/}"
-                    printf '%s\n' "$line"
-                done >> "$_LOG_FILE"
-            )
-            exit_code="${PIPESTATUS[0]}"
-        else
-            bash "$script"
-            exit_code=$?
-        fi
+        bash -e "$script"
+        exit_code=$?
 
         # Restore non-interactive TTY state regardless of how the child exited.
         # A child that failed mid-prompt may have left echo enabled.

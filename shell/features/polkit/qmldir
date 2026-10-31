@@ -1,0 +1,4 @@
+module qs.features.polkit
+
+singleton Polkit 1.0 Polkit.qml
+PolkitView 1.0 PolkitView.qml

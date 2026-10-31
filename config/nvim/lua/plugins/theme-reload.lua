@@ -7,6 +7,69 @@ return {
     config = function()
       local transparency_file = vim.fn.stdpath("config") .. "/plugin/after/transparency.lua"
 
+      -- Live trigger for the reload below: the host theme manager replaces
+      -- the whole state theme directory on every switch (remove + rename),
+      -- so the watch sits on its parent, which survives the swap. An event
+      -- alone is not enough to reload (theme.name and the background link
+      -- move on wallpaper-only switches too), so the debounced callback
+      -- compares neovim.lua's mtime and only fires when the spec itself
+      -- changed. A 2s mtime poll covers filesystems where fs_event is
+      -- unreliable. Started on UIEnter so headless runs never watch.
+      local start_watcher = function()
+        local uv = vim.uv or vim.loop
+        if not uv then
+          return
+        end
+        local theme_file = vim.fn.expand("~/.local/state/vibranium/theme/neovim.lua")
+        local watch_dir = vim.fn.fnamemodify(theme_file, ":h:h")
+        if vim.fn.isdirectory(watch_dir) == 0 then
+          return
+        end
+        local last_mtime = -1
+        local stat = uv.fs_stat(theme_file)
+        if stat and stat.mtime then
+          last_mtime = stat.mtime.sec
+        end
+        local debounce_timer = nil
+        local function changed()
+          local cur = uv.fs_stat(theme_file)
+          local mtime = cur and cur.mtime and cur.mtime.sec or -1
+          if mtime ~= -1 and mtime ~= last_mtime then
+            last_mtime = mtime
+            return true
+          end
+          return false
+        end
+        local function fire()
+          if changed() then
+            vim.api.nvim_exec_autocmds("User", { pattern = "LazyReload" })
+          end
+        end
+        local function arm()
+          if debounce_timer then
+            debounce_timer:stop()
+            debounce_timer:close()
+          end
+          debounce_timer = uv.new_timer()
+          debounce_timer:start(300, 0, vim.schedule_wrap(fire))
+        end
+        local fs = uv.new_fs_event()
+        if fs then
+          pcall(function()
+            fs:start(watch_dir, {}, function(err)
+              if not err then
+                arm()
+              end
+            end)
+          end)
+        end
+        local poll = uv.new_timer()
+        if poll then
+          poll:start(2000, 2000, vim.schedule_wrap(fire))
+        end
+      end
+      vim.api.nvim_create_autocmd("UIEnter", { once = true, callback = start_watcher })
+
       vim.api.nvim_create_autocmd("User", {
         pattern = "LazyReload",
         callback = function()

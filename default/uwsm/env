@@ -43,6 +43,8 @@ export VIBRANIUM_STATE="$XDG_STATE_HOME/vibranium"
 export VIBRANIUM_CACHE="$XDG_CACHE_HOME/vibranium"
 export VIBRANIUM="$XDG_DATA_HOME/vibranium"
 
+export QS_CONFIG_PATH="$VIBRANIUM/shell"
+
 path_add "$HOME/.local/bin"
 path_add "$VIBRANIUM_PATH"
 
@@ -51,15 +53,13 @@ path_add "$VIBRANIUM_PATH"
 export XCURSOR_PATH="$XDG_DATA_HOME/icons:/usr/share/icons"
 export QT_QPA_PLATFORMTHEME="qt6ct"
 
-if [[ -f "$VIBRANIUM_STATE/cursor-theme" ]]; then
-  # env=var foramt, so it's sourceable:
-  #
-  # theme=THEME
-  # sizze=SIZE
-  source "$VIBRANIUM_STATE/cursor-theme"
+if [[ -f "$VIBRANIUM_STATE/cursor-theme.json" ]]; then
+  _cursor_theme="$(jq -r '.theme // empty' "$VIBRANIUM_STATE/cursor-theme.json" 2> /dev/null)"
+  _cursor_size="$(jq -r '.size // empty' "$VIBRANIUM_STATE/cursor-theme.json" 2> /dev/null)"
 
-  [[ -n "$theme" ]] && export XCURSOR_THEME="$theme"
-  [[ -n "$size" ]] && export XCURSOR_SIZE="$size"
+  [[ -n "$_cursor_theme" ]] && export XCURSOR_THEME="$_cursor_theme"
+  [[ -n "$_cursor_size" ]] && export XCURSOR_SIZE="$_cursor_size"
+  unset _cursor_theme _cursor_size
 fi
 
 # Use Wayland when possible. Fallback to XWayland otherwise

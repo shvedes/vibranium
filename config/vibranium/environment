@@ -23,8 +23,8 @@ export MANPAGER="$EDITOR +Man!"
 #                      __GLX_VENDOR_LIBRARY_NAME
 #
 #   AMD/Intel/NVIDIA:
-#                     LIBVA_DRIVER_NAME
-#                     VDPAU_DRIVER
+#                      LIBVA_DRIVER_NAME
+#                      VDPAU_DRIVER
 #
 if ! [[ "$CHASSIS_STATE" == "vm" ]]; then
   source "$VIBRANIUM/default/uwsm/gpu-env"

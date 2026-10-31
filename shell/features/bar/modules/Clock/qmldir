@@ -1,0 +1,4 @@
+module qs.features.bar.modules.Clock
+
+Clock 1.0 Clock.qml
+ClockIsland 1.0 ClockIsland.qml

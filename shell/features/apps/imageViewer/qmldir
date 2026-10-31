@@ -1,0 +1,5 @@
+module qs.features.apps.imageViewer
+
+singleton ImageViewer 1.0 ImageViewer.qml
+ImageViewerController 1.0 ImageViewerController.qml
+ImageViewerWindow 1.0 ImageViewerWindow.qml

@@ -1,56 +1,56 @@
 colors = {
   primary = {
-    background = "{{ background_0 }}",
-    foreground = "{{ foreground_0 }}",
-    dim_foreground = "{{ foreground_4 }}",
-    bright_foreground = "{{ foreground_h }}"
+    background = "{{ background }}",
+    foreground = "{{ foreground }}",
+    dim_foreground = "{{ foreground|dim=0.24 }}",
+    bright_foreground = "{{ foreground|pop=0.06 }}"
   },
 
   cursor = {
-    text = "{{ background_0 }}",
-    cursor = "{{ foreground_2 }}"
+    text = "{{ background }}",
+    cursor = "{{ foreground|dim=0.12 }}"
   },
 
   vi_mode_cursor = {
-    text = "{{ foreground_h }}",
+    text = "{{ foreground|pop=0.06 }}",
     cursor = "{{ blue }}"
   },
 
   search = {
     matches = {
-      background = "{{ background_2 }}",
-      foreground = "{{ foreground_0 }}"
+      background = "{{ background|pop=0.12 }}",
+      foreground = "{{ foreground }}"
     }
   },
 
   hints = {
     start = {
-      background = "{{ background_2 }}",
-      foreground = "{{ foreground_0 }}"
+      background = "{{ background|pop=0.12 }}",
+      foreground = "{{ foreground }}"
     },
     end = {
-      background = "{{ background_2 }}",
-      foreground = "{{ foreground_0 }}"
+      background = "{{ background|pop=0.12 }}",
+      foreground = "{{ foreground }}"
     }
   },
 
   line_indicator = {
-    background = "{{ background_2 }}",
-    foreground = "{{ foreground_0 }}"
+    background = "{{ background|pop=0.12 }}",
+    foreground = "{{ foreground }}"
   },
 
   footer_bar = {
-    background = "{{ background_2 }}",
-    foreground = "{{ foreground_0 }}"
+    background = "{{ background|pop=0.12 }}",
+    foreground = "{{ foreground }}"
   },
 
   selection = {
-    background = "{{ background_3 }}",
-    foreground = "{{ foreground_h }}"
+    background = "{{ background|pop=0.18 }}",
+    foreground = "{{ foreground|pop=0.06 }}"
   },
 
   normal = {
-    black   = "{{ background_4 }}",
+    black   = "{{ background|pop=0.24 }}",
     red     = "{{ red }}",
     green   = "{{ green }}",
     yellow  = "{{ yellow }}",
@@ -61,7 +61,7 @@ colors = {
   },
 
   bright = {
-    black   = "{{ background_5 }}",
+    black   = "{{ background|pop=0.30 }}",
     red     = "{{ red|pop=0.10 }}",
     green   = "{{ green|pop=0.10 }}",
     yellow  = "{{ yellow|pop=0.10 }}",
@@ -72,7 +72,7 @@ colors = {
   },
 
   dim = {
-    black   = "{{ background_3 }}",
+    black   = "{{ background|pop=0.18 }}",
     red     = "{{ red|dim=0.10 }}",
     green   = "{{ green|dim=0.10 }}",
     yellow  = "{{ yellow|dim=0.10 }}",

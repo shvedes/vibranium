@@ -1,9 +1,10 @@
 #!/bin/bash
 
+source vb-lib-cli
 source vb-lib-core
 
-export SUDO_PROMPT="$VIBRANIUM_SUDO_PROMPT"
-
+# The scan is intentionally narrow and position-independent: it recognizes the
+# one setup-specific override without making argument order significant.
 _allow_paravirtualization=false
 
 for _arg in "$@"; do
@@ -12,32 +13,26 @@ for _arg in "$@"; do
   fi
 done
 
-_operation_canceled() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-
-  # shellcheck disable=SC2034
-  read -n1 -r -s -p $'. Press any key to exit' dummy
-}
-
-_operation_complete() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s Setup complete" "$G" "$RS"
-  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
-
-  # shellcheck disable=SC2034
-  read -n1 -r -p $'. Press any key to exit ' dummy
-}
-
 _add_user_to_group() {
-  if groups | grep -qw libvirt; then
+  # The check uses the current process group set, so a membership added during
+  # this run is not mistaken for an already-active session membership.
+  local _aug_groups="" _aug_g _aug_member=false
+  local -a _aug_list=()
+  IFS= read -r _aug_groups < <(groups 2> /dev/null) || true
+  read -ra _aug_list <<< "$_aug_groups"
+  for _aug_g in "${_aug_list[@]}"; do
+    if [[ "$_aug_g" == libvirt ]]; then
+      _aug_member=true
+      break
+    fi
+  done
+  if $_aug_member; then
     return 1 # already a member
   fi
 
   vb::print "$Y" "Adding ${P}${USER}${RS} to the '${P}libvirt${RS}' group"
   sudo usermod -aG libvirt "$USER"
-  return 0 # was added
+  return 0
 }
 
 _enable_systemd_units() {
@@ -45,11 +40,15 @@ _enable_systemd_units() {
 }
 
 _configure_virsh_network() {
-  # Redirect to /dev/null in case it's already active
+  # -q suppresses normal virsh output and 2>/dev/null suppresses diagnostics;
+  # both commands are best effort, so their failures do not reach the caller.
   sudo virsh -q net-autostart default 2> /dev/null || true
   sudo virsh -q net-start default 2> /dev/null || true
 }
 
+# An existing firewall_backend line is treated as authoritative, even when
+# its value differs; appending another directive would make precedence harder
+# to reason about.
 _configure_ufw() {
   if ! command -v ufw &> /dev/null; then
     return 2 # ufw absent
@@ -58,7 +57,16 @@ _configure_ufw() {
   local conf=/etc/libvirt/network.conf
   local desired=$'# Vibranium overrides below\nfirewall_backend = "iptables"'
 
-  if grep -q '^firewall_backend' "$conf" 2> /dev/null; then
+  local _ufw_has_backend=false _ufw_line
+  if [[ -r "$conf" ]]; then
+    while IFS= read -r _ufw_line || [[ -n "$_ufw_line" ]]; do
+      if [[ "$_ufw_line" == firewall_backend* ]]; then
+        _ufw_has_backend=true
+        break
+      fi
+    done < "$conf"
+  fi
+  if $_ufw_has_backend; then
     vb::print "$G" "UFW libvirt config: already up to date, skipping"
     return 1 # unchanged
   fi
@@ -67,7 +75,6 @@ _configure_ufw() {
   echo -e "\n\n$desired" | sudo tee -a "$conf" > /dev/null
 }
 
-# Overengineered protection layer
 _ensure_virt_manager() {
   if ! command -v virt-manager > /dev/null; then
     vb::print "$R" "However, you're missing the ${Y}VM Manager${RS} app"
@@ -89,7 +96,6 @@ _ensure_virt_manager() {
   fi
 }
 
-# ─────────────────────────────────────────────────────────────
 
 term::disable_input
 
@@ -98,55 +104,78 @@ if [[ "$CHASSIS_TYPE" == vm ]] && [[ "$_allow_paravirtualization" == false ]]; t
   vb::print "$R" "Running in a VM!"
   vb::print "$R" "Paravirtualization is not recommended"
   vb::print "$R" "Use ${P}${0##*/} --allow-paravirtualization${RS} to bypass this check"
-  _operation_canceled
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result error
   exit 1
 fi
 
+# This branch treats an installed virsh plus an enabled libvirt unit as the
+# setup sentinel; it does not check active state or configuration drift.
 if command -v virsh > /dev/null; then
   if systemctl -q is-enabled libvirtd.socket ||
     systemctl -q is-enabled libvirtd.service; then
 
-    # Show green logo as indication of success
     term::show_header --color green
 
     vb::print "$G" "QEMU is already set up and running"
     _ensure_virt_manager
-  else
-    term::show_header
-    vb::print "$Y" "The QEMU was set up before, but looks like required service is down"
-
-    if term::ask_yes_no Y "Would you like to fix it now?"; then
-      if ! sudo systemctl -q enable --now libvirtd.socket; then
-        log::error "Failed to enable systemd unit"
-        term::disable_input
-        _operation_canceled
-        exit 1
-      fi
-
-      vb::print "$G" "Enabled and started ${Y}libvirtd.socket${RS}"
-
+    vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/QEMU${RS} for further, advanced configuration"
+    if [[ -z "${term_original_settings:-}" ]]; then
       term::disable_input
-      _ensure_virt_manager
-    else
-      vb::print "$Y" "You've set up QEMU before. Don't forget to enable ${Y}libvirtd.socket${RS} manually"
     fi
+    operation::result noop -- "QEMU is already set up and running"
+    exit 0
   fi
 
-  vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/QEMU${RS} for further, advanced configuration"
-  _operation_complete
-  exit 0
+  term::show_header
+  vb::print "$Y" "The QEMU was set up before, but looks like required service is down"
+
+  if term::ask_yes_no Y "Would you like to fix it now?"; then
+    if ! sudo systemctl -q enable --now libvirtd.socket; then
+      log::error "Failed to enable systemd unit"
+      if [[ -z "${term_original_settings:-}" ]]; then
+        term::disable_input
+      fi
+      operation::result error
+      exit 1
+    fi
+
+    vb::print "$G" "Enabled and started ${Y}libvirtd.socket${RS}"
+
+    term::disable_input
+    _ensure_virt_manager
+    vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/QEMU${RS} for further, advanced configuration"
+    if [[ -z "${term_original_settings:-}" ]]; then
+      term::disable_input
+    fi
+    operation::result success -- "Setup complete"
+    exit 0
+  fi
+
+  vb::print "$Y" "You've set up QEMU before. Don't forget to enable ${Y}libvirtd.socket${RS} manually"
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result canceled
+  exit 1
 fi
 
-# And the default yellow otherwise
 term::show_header
 
 vb::print "$Y" "You're about to setup QEMU VM (${B}libvirt${RS})"
 
 if ! term::ask_yes_no Y "Proceed with setup?"; then
-  _operation_canceled
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result canceled
   exit 1
 fi
 
+# qemu-full adds non-x86 system emulation; the desktop package is sufficient
+# for the common x86_64 host path and keeps the installed set smaller.
 if term::ask_yes_no N "Would you like to include non-X86 emulation?"; then
   qemu_variant="qemu-full"
 else
@@ -155,13 +184,15 @@ fi
 
 term::disable_input
 if ! vb-pkg-install --embedded -- $qemu_variant libvirt dnsmasq virt-manager; then
-  _operation_canceled
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result error
   exit 1
 fi
 
 summary_rules=()
 
-# ── UFW firewall rules ────────────────────────────────────────
 _configure_ufw
 case $? in
   0)
@@ -175,7 +206,6 @@ case $? in
     ;;
 esac
 
-# ── User group ────────────────────────────────────────────────
 if _add_user_to_group; then
   vb::print "$Y" "A system restart is recommended for the group change to take effect"
   summary_rules+=("User ${P}${USER}${RS}: ${G}added${RS} to the ${P}libvirt${RS} group (restart recommended)")
@@ -183,27 +213,30 @@ else
   summary_rules+=("User ${P}${USER}${RS}: already in the ${P}libvirt${RS} group")
 fi
 
-# ── Systemd units ─────────────────────────────────────────────
 vb::print "$Y" "Enabling systemd units"
 _enable_systemd_units
 summary_rules+=("Systemd units: ${G}enabled and started${RS}")
 
-# ── Virtual network ───────────────────────────────────────────
 vb::print "$Y" "Setting up virtual network"
 _configure_virsh_network
 summary_rules+=("Virtual network: ${G}default network autostart configured${RS}")
 
 echo ""
-vb::print "$B" "── Summary ─────────────────────────────"
+vb::print "$B" "-- Summary -----------------------------"
 for rule in "${summary_rules[@]}"; do
   vb::print "$B" " • $rule"
 done
-vb::print "$B" "─────────────────────────────────────────"
+vb::print "$B" "-----------------------------------------"
 echo ""
 vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/QEMU${RS} for further, advanced configuration"
 
+# exec transfers the terminal process to the detached manager launch, so
+# the script's result path is skipped.
 if term::ask_yes_no Y "Launch VM Manager now?"; then
   exec setsid -f app2unit virt-manager &> /dev/null
 else
-  _operation_complete
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result success -- "Setup complete"
 fi

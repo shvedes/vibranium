@@ -1,32 +1,26 @@
 # vim:ft=cfg
 
 ###### Hyprland
-hyprland
-hyprlock
-hypridle
-hyprpicker
 xdg-desktop-portal-hyprland
+quickshell
+hyprsunset
+hyprland
 
 ###### Essentials
-sound-theme-freedesktop
 xdg-desktop-portal-gtk
 gpu-screen-recorder
 papirus-icon-theme
 xdg-terminal-exec
 adw-gtk-theme
 gnome-keyring
+wl-clipboard
 imagemagick
-alacritty
+qrencode
 chromium
-cliphist
 app2unit
 starship
 zenity
-slurp
-satty
-awww
-grim
-imv
+foot
 
 ##### Zathura
 zathura
@@ -37,19 +31,15 @@ zathura-pdf-mupdf
 
 ##### CLIs & TUIs
 
-# PKGBUILD of wttrbar-bin was manually
-# reviewed. The AUR package is clean.
-wttrbar-bin
 # Needed for cusror themes
 xorg-xrdb
 fastfetch
-# Used by imv's helper script
+# Used for media cards in the clipboard
 mediainfo
 neovim
 # Must have
 man-db
 btop
-ncdu
 wget
 fzf
 jq
@@ -73,27 +63,18 @@ gvfs
 arj
 zip
 
-##### Rofi
-rofi
-rofi-calc
-rofi-emoji
-
 ##### Other
-polkit-gnome
-waybar
-dunst
 qt5ct
 qt6ct
 mpv
 
 ##### System
 power-profiles-daemon
-realtime-privileges
 python-gobject
-zram-generator
 pacman-contrib
 xdg-user-dirs
 uwsm
+
 # Display Manager
 ly
 
@@ -103,4 +84,3 @@ pipewire-pulse
 pipewire-jack
 pipewire-alsa
 wireplumber
-wiremix

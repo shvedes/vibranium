@@ -1,4 +1,5 @@
 #!/bin/bash
+
 export _VB_BACKUP_HOME_STORE="$HOME/.local/state/vibranium/backup/home"
 export _VB_BACKUP_SYSTEM_STORE="$HOME/.local/state/vibranium/backup/system"
 
@@ -68,7 +69,7 @@ helpers::backup_path() {
 
   $as_root mkdir -p "$bk_dir"
 
-  if ! $as_root cp -a "$original" "$_VB_BK_PATH" 2>/dev/null; then
+  if ! $as_root cp -a "$original" "$_VB_BK_PATH" 2> /dev/null; then
     helpers::log::warn "Could not back up ${original}, continuing without a backup for it"
     return 1
   fi
@@ -89,7 +90,7 @@ helpers::backup_path() {
   $as_root mkdir -p "$manifest_dir"
 
   printf '%(%Y-%m-%d %H:%M:%S)T\t%s\t%s\t%s\n' -1 \
-    "$original" "$_VB_BK_PATH" "$kind" | $as_root tee -a "$_VB_BK_MANIFEST" >/dev/null
+    "$original" "$_VB_BK_PATH" "$kind" | $as_root tee -a "$_VB_BK_MANIFEST"
 
   return 0
 }
@@ -112,7 +113,7 @@ helpers::write_file() {
 
   as_root=$(helpers::_sudo_for "$dest")
   $as_root mkdir -p "$dir"
-  $as_root tee "$dest" >/dev/null
+  $as_root tee "$dest"
 }
 
 # Copy a single file, or a whole directory tree, onto a destination,
@@ -198,7 +199,7 @@ helpers::append_once() {
 
   as_root=$(helpers::_sudo_for "$file")
 
-  if [[ -f "$file" ]] && $as_root grep -qF "$marker" "$file" 2>/dev/null; then
+  if [[ -f "$file" ]] && $as_root grep -qF "$marker" "$file" 2> /dev/null; then
     return 0
   fi
 
@@ -210,7 +211,7 @@ helpers::append_once() {
   fi
 
   $as_root mkdir -p "$dir"
-  printf '%s\n' "$text" | $as_root tee -a "$file" >/dev/null
+  printf '%s\n' "$text" | $as_root tee -a "$file"
 }
 
 # Remove a file, directory, or symlink, backing it up first.

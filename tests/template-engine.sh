@@ -1340,4 +1340,205 @@ log_case "leak guard: warning names the offending file" "1" \
 log_case "leak guard: second file renders untouched" "second-file-line" \
   "$(cat "$TMPDIR/out_leaksecond" 2>/dev/null)"
 
+# =============================================================================
+# 39. dim=/pop= - the hwb and scalar lenses, and ramp cross-format agreement
+# =============================================================================
+
+section "dim=/pop= - hwb and scalar lenses"
+
+# The shade ramp the templates use is one base color stepped by |pop= / |dim=
+# on every format a template might ask for, so a ramped color has to read the
+# same whichever lens it is seen through. These cases pin that: the hex,
+# rgb, hsl, hwb and per-channel forms of one ramp level must all describe one
+# color, and a ramp must still be a ramp on a lens that has no lightness of
+# its own.
+#
+# background #1e1e2e is 240,21,15 to one decimal in HSL, with 11.8%
+# whiteness and 82.0% blackness. pop=0.06 lifts the lightness by 6 points to
+# 20.9, which is rgb 42,42,65. Reading that back through each lens gives the
+# numbers below; every one of them is the same color.
+_clean
+
+_run \
+  --subs \
+    is_light false \
+    background '#1e1e2e' \
+  -- \
+  --outmap \
+    rh rh  rrgb rrgb  rhsl rhsl  rhwb rhwb \
+    rr rr  rg rg  rb rb  rh_ rh_  rs rs  rl rl  rw rw \
+  -- \
+  --tpl \
+    rh   '{{ background|pop=0.06 }}' \
+    rrgb '{{ background_rgb|pop=0.06 }}' \
+    rhsl '{{ background_hsl|pop=6 }}' \
+    rhwb '{{ background_hwb|pop=0.06 }}' \
+    rr   '{{ background_r|pop=0.06 }}' \
+    rg   '{{ background_g|pop=0.06 }}' \
+    rb   '{{ background_b|pop=0.06 }}' \
+    rh_  '{{ background_h|pop=0.06 }}' \
+    rs   '{{ background_s|pop=0.06 }}' \
+    rl   '{{ background_l|pop=0.06 }}' \
+    rw   '{{ background_w|pop=0.06 }}'
+
+log_case "ramp hex"             "#2a2a41"      "$(_read_out rh)"
+log_case "ramp rgb"             "42,42,65"     "$(_read_out rrgb)"
+log_case "ramp hsl (points)"    "240,21,21"    "$(_read_out rhsl)"
+log_case "ramp hwb"             "240,16%,75%"  "$(_read_out rhwb)"
+log_case "ramp r"               "42"           "$(_read_out rr)"
+log_case "ramp g"               "42"           "$(_read_out rg)"
+log_case "ramp b"               "65"           "$(_read_out rb)"
+log_case "ramp h, held by a lightness shift"   "240"  "$(_read_out rh_)"
+log_case "ramp s, held by a lightness shift"   "21"   "$(_read_out rs)"
+log_case "ramp l"               "21"           "$(_read_out rl)"
+# 16%, not the base color's 12%: a lightness lift moves the darkest channel
+# up too, so whiteness is only knowable after the round trip.
+log_case "ramp w, read off the rebuilt color"  "16"  "$(_read_out rw)"
+
+_clean
+
+_run \
+  --subs \
+    is_light false \
+    red '#ff0000' \
+  -- \
+  --outmap \
+    hw1 hw1  hw2 hw2  hw3 hw3  hw4 hw4 \
+    sl1 sl1  sl2 sl2  sl3 sl3  sl4 sl4 \
+  -- \
+  --tpl \
+    hw1 '{{ red_hwb|pop=0.1 }}' \
+    hw2 '{{ red_hwb|pop=0.3 }}' \
+    hw3 '{{ red_hwb|pop=0.5 }}' \
+    hw4 '{{ red_hwb|pop=1.0 }}' \
+    sl1 '{{ red_l|pop=0.1 }}' \
+    sl2 '{{ red_l|pop=0.3 }}' \
+    sl3 '{{ red_l|pop=0.5 }}' \
+    sl4 '{{ red_l|pop=1.0 }}'
+
+# red is 0,100,50 in HSL. Every pop below raises _l and leaves the hue at 0.
+# Whiteness climbs faster than lightness on a fully saturated color: at l=60
+# the color is #ff3333, whose lowest channel is 51/255 = 20%. Past l=100 the
+# ramp is clamped and the color is white, so only the hue survives.
+log_case "hwb pop=0.1"  "0,20%,0%"   "$(_read_out hw1)"
+log_case "hwb pop=0.3"  "0,60%,0%"   "$(_read_out hw2)"
+log_case "hwb pop=0.5"  "0,100%,0%"  "$(_read_out hw3)"
+log_case "hwb pop=1.0"  "0,100%,0%"  "$(_read_out hw4)"
+log_case "scalar l pop=0.1"  "60"    "$(_read_out sl1)"
+log_case "scalar l pop=0.3"  "80"    "$(_read_out sl2)"
+log_case "scalar l pop=0.5"  "100"   "$(_read_out sl3)"
+log_case "scalar l pop=1.0"  "100"   "$(_read_out sl4)"
+
+_clean
+
+_run \
+  --subs \
+    is_light true \
+    background '#1e1e2e' \
+  -- \
+  --outmap \
+    lp lp  lprgb lprgb  lphwb lphwb  lpl lpl \
+  -- \
+  --tpl \
+    lp    '{{ background|pop=0.06 }}' \
+    lprgb '{{ background_rgb|pop=0.06 }}' \
+    lphwb '{{ background_hwb|pop=0.06 }}' \
+    lpl   '{{ background_l|pop=0.06 }}'
+
+# The same base and the same step under a light theme ramps the other way:
+# lightness 14.9 falls to 8.9, which is rgb 18,18,27. That inversion is the
+# whole reason a template writes one placeholder for both theme modes.
+log_case "light mode ramp hex"  "#12121b"      "$(_read_out lp)"
+log_case "light mode ramp rgb"  "18,18,27"     "$(_read_out lprgb)"
+log_case "light mode ramp hwb"  "240,7%,89%"   "$(_read_out lphwb)"
+log_case "light mode ramp l"    "9"            "$(_read_out lpl)"
+
+_clean
+
+_run \
+  --subs \
+    is_light false \
+    font '"Fira Code"' \
+  -- \
+  --outmap \
+    np np  npr npr  nphwb nphwb  npl npl \
+  -- \
+  --tpl \
+    np   '{{ font|pop=0.1 }}' \
+    npr  '{{ font_r|pop=0.1 }}' \
+    nphwb '{{ font_hwb|pop=0.1 }}' \
+    npl  '{{ font_l|pop=0.1 }}'
+
+# A non-hex value has no channels to shift, so a ramp on one is skipped and
+# the value passes through untouched - the same rule lightness= already
+# follows, and the reason a ramp never turns a font name into a color.
+log_case "opaque base, hex ramp passes through"   '"Fira Code"'  "$(_read_out np)"
+log_case "opaque base, r ramp unresolvable"       "{{ font_r|pop=0.1 }}"  "$(_read_out npr)"
+log_case "opaque base, hwb ramp unresolvable"     "{{ font_hwb|pop=0.1 }}"  "$(_read_out nphwb)"
+log_case "opaque base, l ramp unresolvable"       "{{ font_l|pop=0.1 }}"  "$(_read_out npl)"
+
+_clean
+printf 'is_light\x01false\nred\x01#ff0000\n' >"$TMPDIR/subs"
+printf '%s\x01%s\n%s\x01%s\n' \
+  "$TMPDIR/tpl_hwbwarn" "$TMPDIR/out_hwbwarn" \
+  "$TMPDIR/tpl_sclwarn" "$TMPDIR/out_sclwarn" \
+  >"$TMPDIR/outmap"
+printf '%s' '{{ red_hwb|pop=-0.1 }}' >"$TMPDIR/tpl_hwbwarn"
+printf '%s' '{{ red_l|pop=+0.1 }}' >"$TMPDIR/tpl_sclwarn"
+
+ramp_warn="$(awk -f "$AWK_SCRIPT" "$TMPDIR/subs" "$TMPDIR/outmap" \
+  "$TMPDIR/tpl_hwbwarn" "$TMPDIR/tpl_sclwarn" 2>&1 >/dev/null)"
+
+# The lenses that gained the ramp inherit the operand rule the hex branch has
+# always used, so a signed ramp on either is refused rather than applied with
+# the sign silently dropped.
+log_case "a signed ramp warns on each lens" "2" \
+  "$(grep -c "does not support a signed operand" <<<"$ramp_warn")"
+log_case "and the warning names pop=, not dim=, both times" "1" \
+  "$( [[ $ramp_warn == *"pop= does not support"* && $ramp_warn != *"dim= does not support"* ]] && echo 1 || echo 0 )"
+log_case "the signed hwb ramp leaves the color alone" "0,0%,0%" "$(_read_out hwbwarn)"
+log_case "the signed scalar ramp leaves the scalar alone" "50" "$(_read_out sclwarn)"
+
+# =============================================================================
+# 40. dim=/pop= - the lenses agree with each other on a near-gray color
+# =============================================================================
+
+section "dim=/pop= - cross-lens agreement on a near-gray ramp"
+
+# #cdcecf is 210,2,81: two percent saturation, so the hue is barely there to
+# begin with. Reading it back after an 8-bit round trip is where a color like
+# this loses it - an earlier revision of the scalar branch rebuilt the color
+# before reading every channel off it, and reported a hue of 240 where the hsl
+# format, which never rebuilds, reported 210. Two rows of one generated
+# stylesheet then disagreed about the same color.
+#
+# Hue, saturation and lightness need no rebuild at all: a lightness shift
+# leaves the first two alone and moves the third by exactly the amount asked
+# for. Only the RGB channels and whiteness are properties of a color that has
+# to exist before it can be read.
+_clean
+
+_run \
+  --subs \
+    is_light false \
+    fg '#cdcecf' \
+  -- \
+  --outmap \
+    gh gh  gs gs  gl gl  ghsl ghsl  ghwb ghwb \
+  -- \
+  --tpl \
+    gh   '{{ fg_h|dim=0.06 }}' \
+    gs   '{{ fg_s|dim=0.06 }}' \
+    gl   '{{ fg_l|dim=0.06 }}' \
+    ghsl '{{ fg_hsl|dim=6 }}' \
+    ghwb '{{ fg_hwb|dim=0.06 }}'
+
+# Every lens below describes one color, and each of them must agree with the
+# hsl format's reading of the same ramp.
+log_case "the hue survives the ramp"          "210"        "$(_read_out gh)"
+log_case "saturation is held"                "2"          "$(_read_out gs)"
+log_case "lightness moves by exactly the step" "75"        "$(_read_out gl)"
+log_case "and the hsl format agrees"          "210,2,75"   "$(_read_out ghsl)"
+log_case "and so does hwb on the hue"        "210,74%,25%" "$(_read_out ghwb)"
+
 summary

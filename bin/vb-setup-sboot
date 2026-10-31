@@ -5,36 +5,43 @@ if [[ "$CHASSIS_TYPE" == vm ]]; then
   exit 1
 fi
 
+source vb-lib-cli
 source vb-lib-core
 
-_operation_canceled() {
-  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  # shellcheck disable=SC2034
-  read -n1 -r -s -p $'. Press any key to exit' dummy
+# The background sudo refresh is disposable; cancellation signals its recorded
+# shell, while descendant processes are not explicitly enumerated.
+secure_boot_cleanup_sudo() {
+  if [[ -n "${sudo_pid:-}" ]]; then
+    kill "$sudo_pid" 2> /dev/null || true
+    sudo_pid=
+  fi
 }
 
-_operation_complete() {
-  printf "%s[VIBRANIUM]%s " "$G" "$RS"
-  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
-  # shellcheck disable=SC2034
-  read -n1 -r -p $'Setup complete. Press any key to exit ' dummy
+secure_boot_signal_canceled() {
+  trap - SIGHUP SIGINT SIGTERM SIGQUIT
+  secure_boot_cleanup_sudo
+  operation::result canceled
+  exit 1
 }
 
-trap 'trap "exit 1" INT TERM HUP; _operation_canceled; exit 1' INT TERM HUP
+trap 'secure_boot_signal_canceled' SIGHUP SIGINT SIGTERM SIGQUIT
 term::disable_input
 
+# The completion marker is an idempotency guard: rerunning setup after a
+# completed enrollment would repeat firmware mutations while reboot is pending.
 if [[ -f "$VIBRANIUM_STATE/secure-boot-setup.complete" ]]; then
   term::show_header --color red
   vb::print "$R" "Setup has been done. Pending reboot."
-  _operation_canceled
+  operation::result noop -- "Setup has been done. Pending reboot."
   exit 1
 fi
 
+# fw_platform_size exposes the firmware platform size; it is only a UEFI
+# presence check, while SecureBoot and SetupMode variables carry the state.
 if [[ ! -f /sys/firmware/efi/fw_platform_size ]]; then
   term::show_header --color red
   vb::print "$R" "Not in ${P}UEFI${RS} mode"
-  _operation_canceled
+  operation::result error
   exit 1
 fi
 
@@ -44,7 +51,14 @@ fi
 # This single check tells us both:
 #   1) that systemd-boot is active,
 #   2) which boot type is in use (UKI or BLS).
-CURRENT_ENTRY=$(bootctl status 2> /dev/null | awk -F': ' '/Current Entry/ {print $2}')
+CURRENT_ENTRY=""
+while IFS= read -r _ce_line; do
+  if [[ "$_ce_line" == *"Current Entry"* ]]; then
+    _ce_rest="${_ce_line#*: }"
+    CURRENT_ENTRY="${_ce_rest%%': '*}"
+    break
+  fi
+done < <(bootctl status 2> /dev/null)
 
 if [[ ! "$CURRENT_ENTRY" == *.efi ]]; then
   term::show_header --color red
@@ -52,7 +66,7 @@ if [[ ! "$CURRENT_ENTRY" == *.efi ]]; then
   vb::print "$R" "A ${P}Unified Kernel Image (UKI)${RS} is a single ${P}.efi${RS} file bundling the kernel, initramfs,"
   vb::print "$R" "and boot parameters - required for Secure Boot signing to work end-to-end."
   vb::print "$R" "See: ${P}https://wiki.archlinux.org/title/Unified_kernel_image${RS}"
-  _operation_canceled
+  operation::result error
   exit 1
 fi
 
@@ -68,7 +82,7 @@ if [[ ${#SECUREBOOT_EFIVAR[@]} -eq 0 || ${#SETUP_MODE_EFIVAR[@]} -eq 0 ]]; then
   term::show_header --color red
   vb::print "$R" "Could not locate Secure Boot EFI variables"
   vb::print "$R" "Is the system booted in UEFI mode with efivars mounted?"
-  _operation_canceled
+  operation::result error
   exit 1
 fi
 
@@ -80,15 +94,20 @@ if [[ ${#SECUREBOOT_EFIVAR[@]} -gt 1 || ${#SETUP_MODE_EFIVAR[@]} -gt 1 ]]; then
   vb::print "$Y" "Using first match - inspect your efivars if this looks wrong"
 fi
 
-# Read first data byte (skip 4-byte attribute header), strip whitespace
-SECUREBOOT_RAW=$(od -An -t u1 -j4 -N1 "${SECUREBOOT_EFIVAR[0]}" | tr -d ' ')
-SETUP_MODE_RAW=$(od -An -t u1 -j4 -N1 "${SETUP_MODE_EFIVAR[0]}" | tr -d ' ')
+# Read the EFI variable data byte at offset 4 after the four-byte attribute
+# header, then strip whitespace from od's output.
+SECUREBOOT_RAW=""
+IFS= read -r SECUREBOOT_RAW < <(od -An -t u1 -j4 -N1 "${SECUREBOOT_EFIVAR[0]}") || true
+SECUREBOOT_RAW="${SECUREBOOT_RAW//[[:space:]]/}"
+SETUP_MODE_RAW=""
+IFS= read -r SETUP_MODE_RAW < <(od -An -t u1 -j4 -N1 "${SETUP_MODE_EFIVAR[0]}") || true
+SETUP_MODE_RAW="${SETUP_MODE_RAW//[[:space:]]/}"
 
 if ((SECUREBOOT_RAW == 1)); then
   term::show_header --color green
   vb::print "$G" "${P}Secure Boot${RS} is already active."
-  echo -e "${G}[Vibranium]${RS} See ${G}sbctl ${Y}--help${RS} for more info."
-  _operation_complete
+  echo -e "${G}[*]${RS} See ${G}sbctl ${Y}--help${RS} for more info."
+  operation::result noop -- "Secure Boot is already active"
   exit 0
 fi
 
@@ -96,7 +115,7 @@ if ((SETUP_MODE_RAW == 0)); then
   term::show_header --color red
   vb::print "$R" "Secure Boot cannot be enabled: firmware is locked (Setup Mode is off)"
   vb::print "$R" "Enter BIOS and enable Setup Mode first"
-  _operation_canceled
+  operation::result error
   exit 1
 fi
 
@@ -104,23 +123,25 @@ term::show_header
 
 if term::ask_yes_no Y "You're about to setup Secure Boot. Continue?"; then
   vb::print "$Y" "To work with efivars, Vibranium needs sudo"
-  # Keep sudo credentials window open, just in case.
-  # The subshell's pid is later killed.
+  # Refresh the sudo timestamp while the setup commands run.
   (while true; do
     sudo -v
     sleep 5
   done) &
   sudo_pid=$!
 else
-  _operation_canceled
+  operation::result canceled
   exit 1
 fi
 
-# Check NVRAM is actually writable before doing anything destructive
+# Check NVRAM mount options and a canary write to gate firmware mutation.
 _efi_nvram_writable() {
-  findmnt -n -o OPTIONS /sys/firmware/efi/efivars 2> /dev/null | grep -q '\brw\b' || return 1
+  local _mnt_opts=""
+  IFS= read -r _mnt_opts < <(findmnt -n -o OPTIONS /sys/firmware/efi/efivars 2> /dev/null) || true
+  [[ "$_mnt_opts" == *rw* ]] || return 1
 
-  # Canary write - catches firmware that reports rw but silently drops writes
+  # The canary write tests command success and cleanup; it does not verify
+  # persistence or read the value back.
   local canary="/sys/firmware/efi/efivars/VibraniumProbe-00000000-0000-0000-0000-000000000000"
   printf '\x07\x00\x00\x00\x00' | sudo tee "$canary" &> /dev/null || return 1
   sudo chattr -i "$canary" 2> /dev/null
@@ -131,13 +152,15 @@ _efi_nvram_writable() {
 if ! _efi_nvram_writable; then
   vb::print "$R" "EFI NVRAM is not writable - key enrollment will fail"
   vb::print "$R" "Try: ${R}sudo ${G}mount ${Y}-o ${B}remount,rw ${P}/sys/firmware/efi/efivars${RS}"
-  _operation_canceled
+  secure_boot_cleanup_sudo
+  operation::result error
   exit 1
 fi
 
 # Use bootctl (already required) as the primary and most reliable ESP locator.
 # Fall back to well-known mount points only when bootctl comes up empty.
-ESP_MOUNT=$(bootctl --print-esp-path 2> /dev/null)
+ESP_MOUNT=""
+IFS= read -r ESP_MOUNT < <(bootctl --print-esp-path 2> /dev/null) || true
 
 if [[ -z "$ESP_MOUNT" ]]; then
   if [[ -d /boot/efi ]]; then
@@ -149,7 +172,8 @@ fi
 
 if [[ -z "$ESP_MOUNT" ]] || [[ ! -d "$ESP_MOUNT" ]]; then
   vb::print "$R" "Could not locate a valid ESP mount point"
-  _operation_canceled
+  secure_boot_cleanup_sudo
+  operation::result error
   exit 1
 fi
 
@@ -158,16 +182,18 @@ if ! command -v sbctl > /dev/null; then
 fi
 
 sudo sbctl --quiet create-keys &
-if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Creating Secure Boot keys" "- ${G}Done${RS}"; then
+if ! term::spinner $! "${Y}[*]${RS} Creating Secure Boot keys" "- ${G}Done${RS}"; then
   vb::print "$R" "Failed to create keys"
-  _operation_canceled
+  secure_boot_cleanup_sudo
+  operation::result error
   exit 1
 fi
 
 sudo sbctl --quiet enroll-keys --microsoft --firmware-builtin &
-if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Enrolling keys into firmware" "- ${G}Done${RS}"; then
+if ! term::spinner $! "${Y}[*]${RS} Enrolling keys into firmware" "- ${G}Done${RS}"; then
   vb::print "$R" "Key enrollment failed"
-  _operation_canceled
+  secure_boot_cleanup_sudo
+  operation::result error
   exit 1
 fi
 
@@ -180,21 +206,25 @@ done < <(sudo find "$ESP_MOUNT" -type f \( -iname '*.efi' \))
 
 for file in "${EFI_FILES[@]}"; do
   vb::print "$Y" "Signing ${P}$file${RS}"
+  # Enrollment and signing are separate phases. Firmware enrollment can already
+  # be active when signing fails, so the failure path resets it and returns.
   if ! sudo sbctl --quiet sign --save "$file"; then
     vb::print "$R" "Failed to sign $file"
     vb::print "$Y" "Rolling back: unenrolling keys from firmware"
     sudo sbctl --quiet reset
-    _operation_canceled
+    secure_boot_cleanup_sudo
+    operation::result error
     exit 1
   fi
 done
 
 sudo mkinitcpio -P &> /dev/null &
-if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Regenerating mkinitcpio" "- ${G}Done${RS}"; then
+if ! term::spinner $! "${Y}[*]${RS} Regenerating mkinitcpio" "- ${G}Done${RS}"; then
   vb::print "$R" "Failed to regenerate initramfs"
   vb::print "$R" "${Y}Warning${RS}: your system may be unbootable without a valid initramfs."
   vb::print "$R" "Before rebooting, open another terminal and run: ${R}sudo ${G}mkinitcpio ${Y}-P${RS}"
-  _operation_canceled
+  secure_boot_cleanup_sudo
+  operation::result error
   exit 1
 fi
 
@@ -206,7 +236,18 @@ for file in "${EFI_FILES[@]}"; do
   fi
 done
 
-QUIRK_URLS=$(sudo sbctl status 2> /dev/null | grep -oP 'https://\S+')
+QUIRK_URLS=""
+while IFS= read -r _q_line; do
+  _q_rest="$_q_line"
+  while [[ "$_q_rest" == *https://* ]]; do
+    _q_rest="${_q_rest#*https://}"
+    _q_url="https://${_q_rest%%[[:space:]]*}"
+    if [[ -n "$QUIRK_URLS" ]]; then
+      QUIRK_URLS+=$'\n'
+    fi
+    QUIRK_URLS+="$_q_url"
+  done
+done < <(sudo sbctl status 2> /dev/null)
 
 if [[ -n "$QUIRK_URLS" ]]; then
   vb::print "$Y" "Your firmware has known quirks that may affect security:"
@@ -215,7 +256,9 @@ if [[ -n "$QUIRK_URLS" ]]; then
   done <<< "$QUIRK_URLS"
 fi
 
-kill $sudo_pid
+secure_boot_cleanup_sudo
+# The marker is written only after signing and initramfs regeneration succeed;
+# status consumers use it to defer a successful-state claim until reboot.
 touch "$VIBRANIUM_STATE/secure-boot-setup.complete"
 
 vb::print "$G" "Secure Boot setup complete"
@@ -223,8 +266,8 @@ if term::ask_yes_no Y "Restart is required. Reboot now?"; then
   term::disable_input
   for sec in {5..1}; do
     for step in {0..3}; do
-      dots=$(printf "%.*s" "$step" "...")
-      printf "\r\033[K%s[VIBRANIUM]%s Restarting in %d%s" \
+      printf -v dots '%.*s' "$step" "..."
+      printf "\r\033[K%s[*]%s Restarting in %d%s" \
         "$G" "$RS" "$sec" "$dots"
       sleep 0.25
     done
@@ -232,5 +275,5 @@ if term::ask_yes_no Y "Restart is required. Reboot now?"; then
 
   systemctl reboot
 else
-  _operation_complete
+  operation::result success -- "Setup complete"
 fi

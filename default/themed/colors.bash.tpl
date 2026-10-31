@@ -6,20 +6,20 @@
 # bash scripts that invoke notifications
 # with formatted output.
 
-P_BACKGROUND_H="{{ background_h_lower }}"
-P_BACKGROUND_0="{{ background_0_lower }}"
-P_BACKGROUND_1="{{ background_1_lower }}"
-P_BACKGROUND_2="{{ background_2_lower }}"
-P_BACKGROUND_3="{{ background_3_lower }}"
-P_BACKGROUND_4="{{ background_4_lower }}"
-P_BACKGROUND_5="{{ background_5_lower }}"
+P_BACKGROUND_H="{{ background_lower|dim=0.03 }}"
+P_BACKGROUND_0="{{ background_lower }}"
+P_BACKGROUND_1="{{ background_lower|pop=0.06 }}"
+P_BACKGROUND_2="{{ background_lower|pop=0.12 }}"
+P_BACKGROUND_3="{{ background_lower|pop=0.18 }}"
+P_BACKGROUND_4="{{ background_lower|pop=0.24 }}"
+P_BACKGROUND_5="{{ background_lower|pop=0.30 }}"
 
-P_FOREGROUND_H="{{ foreground_h_lower }}"
-P_FOREGROUND_0="{{ foreground_0_lower }}"
-P_FOREGROUND_1="{{ foreground_1_lower }}"
-P_FOREGROUND_2="{{ foreground_2_lower }}"
-P_FOREGROUND_3="{{ foreground_3_lower }}"
-P_FOREGROUND_4="{{ foreground_4_lower }}"
+P_FOREGROUND_H="{{ foreground_lower|pop=0.06 }}"
+P_FOREGROUND_0="{{ foreground_lower }}"
+P_FOREGROUND_1="{{ foreground_lower|dim=0.06 }}"
+P_FOREGROUND_2="{{ foreground_lower|dim=0.12 }}"
+P_FOREGROUND_3="{{ foreground_lower|dim=0.18 }}"
+P_FOREGROUND_4="{{ foreground_lower|dim=0.24 }}"
 
 P_ACCENT_DIM="{{ accent_lower|dim=0.10 }}"
 P_ACCENT="{{ accent_lower }}"

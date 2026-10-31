@@ -6,16 +6,15 @@
  * look the same. If the theme's palette ever changes, update the
  * values here to match.
  *
- *   background_h   #0a0a0a    foreground_h  #f4f4f4
- *   background_0   #141414    foreground_0  #dfdfdf
- *   background_1   #242424    foreground_1  #d5d5d5
- *   background_2   #393939    foreground_2  #cacaca
- *   background_3   #434343    foreground_3  #c0c0c0
- *   background_4   #4e4e4e    foreground_4  #b6b6b6
- *   background_5   #585858
+ *   background     #141414    foreground     #dfdfdf
  *   red #a88b8b   green #90a890   yellow #aea990   orange #b09b8b
  *   cyan #90acad  purple #9c93b3  blue #90a4b3
  *   gray/accent #8a8a8a
+ *
+ * A palette names those and nothing else. The shades the old palette spelled
+ * out as background_1..5 and foreground_1..5, and the _h extremes, are
+ * computed by the template engine from background and foreground, and the
+ * values this file uses are those ramps as they landed for this theme.
  */
 
 [data-md-color-scheme="gray"] {

@@ -36,10 +36,8 @@ These shortcuts cover everyday desktop usage.
 | ++super+e++ | File manager |
 | ++super+v++ | Clipboard history |
 | ++super+shift+v++ | Clear clipboard |
-| ++super+shift+s++ | Screenshot: region |
-| ++super+shift+a++ | Screenshot: active window |
-| ++super+shift+z++ | Screenshot: entire screen |
-| ++print++ | Annotated screenshot |
+| ++super+shift+s++ | Screenshot: pick region or screen |
+| ++print++ | Screenshot: pick region or screen |
 | ++super+m++ | Toggle microphone mute |
 | ++super+b++ | Cycle power profiles |
 | ++super+period++ | Emoji picker |
@@ -75,7 +73,7 @@ These shortcuts open menus and Vibranium-specific functionality.
 | ++ctrl+alt+t++ | Theme picker |
 | ++ctrl+alt+w++ | Next wallpaper |
 | ++ctrl+alt+c++ | Color picker |
-| ++ctrl+alt+r++ | Recording menu |
+| ++ctrl+alt+r++ | Start/stop screen recording |
 | ++ctrl+alt+p++ | Password manager |
 | ++ctrl+alt+l++ | Lock session |
 | ++ctrl+alt+delete++ | Power menu |
@@ -116,15 +114,7 @@ See [Window groups](window-groups.md) for complete documentation.
 
 ## Listing all shortcuts
 
-The complete list of active shortcuts can be viewed in two ways.
-
-From the menu: **Vibranium Menu -> Help -> Keybindings**, or from a terminal:
-
-```bash
-vb-cmd-keybindings --list
-```
-
-Both methods display the currently active configuration, including user-defined shortcuts.
+The complete list of active shortcuts is shown in **Vibranium Menu -> Help -> Keybindings**, a searchable list covering user-defined shortcuts as well as the defaults.
 
 ## Customizing shortcuts
 

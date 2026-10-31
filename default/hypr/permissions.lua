@@ -1,11 +1,12 @@
 hl.config({
   ecosystem = {
-    enforce_permissions = true,
+    -- Disabled by default.
+    enforce_permissions = false,
   },
 })
 
 hl.permission({
-  binary = "/usr/bin/(grim|hyprpicker|hyprlock|(gpu-screen|w(f|l))-recorder)",
+  binary = "/usr/bin/(qs|quickshell|(gpu-screen|w(f|l))-recorder)",
   type = "screencopy",
   mode = "allow",
   -- LSP server freaks out if I don't

@@ -71,6 +71,9 @@ done
 
 $MANUAL && export VERBOSE=true
 
+# Automatic package-triggered runs are limited to an existing Vencord state;
+# an absent state is treated as an unmanaged installation and exits without
+# changing Discord.
 if ! $MANUAL && ! [[ -d "$XDG_CONFIG_HOME/Vencord" ]]; then
   if [[ -t 0 ]]; then
     echo "[${0##*/}] Info: Discord wasn't patched before; use ${0##*/} --manual to force" >&2
@@ -81,12 +84,13 @@ if ! $MANUAL && ! [[ -d "$XDG_CONFIG_HOME/Vencord" ]]; then
 fi
 
 # VencordInstallerCli is a self-contained CLI binary that patches Discord
-# in-place.  OpenASAR (the Electron ASAR replacement) is also installed
-# by the same binary for better performance.
+# in-place. The same binary installs OpenASAR, the Electron ASAR replacement.
 PATCH_PATH="$XDG_CONFIG_HOME/discord"
 URL='https://github.com/Vendicated/VencordInstaller/releases/latest/download/VencordInstallerCli-Linux'
 CLI="/tmp/vencord-installer"
 
+# The helper uses a constant temporary path; the success path removes it, while
+# download or installer failures can leave the file in place.
 log Info "Downloading Vencord CLI installer"
 
 if command -v wget > /dev/null; then

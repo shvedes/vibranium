@@ -1,0 +1,6 @@
+module qs.features.pass
+
+singleton Pass 1.0 Pass.qml
+PassController 1.0 PassController.qml
+PassPanel 1.0 PassPanel.qml
+PassEntry 1.0 PassEntry.qml

@@ -9,71 +9,73 @@ ACTION=""
 SELF="${0##*/}"
 
 usage() {
-  shcat <<- EOF
-Usage: $SELF [OPTIONS]
+	shcat <<- EOF
+		Usage: $SELF [OPTIONS]
 
-Adjust the volume of the currently focused Hyprland window.
+		Adjust the volume of the currently focused Hyprland window.
 
-Please note that processes that use ALSA as their output
-may not be picked up by this script (e.g. Telegram).
+		Please note that processes that use ALSA as their output
+		may not be picked up by this script (e.g. Telegram).
 
-Options:
-  -u, --up             Window volume up
-  -d, --down           Window volume down
-  -t, --toggle         Window volume toggle
-  -s, --step PERCENT   Volume step size in percent (default: $STEP)
-  -v, --verbose        Enable verbose output
-  -h, --help           Show this help message and exit
-EOF
+		Options:
+		  -u, --up             Window volume up
+		  -d, --down           Window volume down
+		  -t, --toggle         Window volume toggle
+		  -s, --step PERCENT   Volume step size in percent (default: $STEP)
+		  -v, --verbose        Enable verbose output
+		  -h, --help           Show this help message and exit
+	EOF
 }
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -s | --step)
-      STEP="$2"
-      shift 2
-      ;;
-    -v | --verbose)
-      export VERBOSE=true
-      shift
-      ;;
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    -u | -d | -t)
-      ACTION="${1#-}"
-      shift
-      ;;
-    --up | --down | --toggle)
-      ACTION="${1#--}"
-      shift
-      ;;
-    *)
-      log Error "Unknown option: $1"
-      usage >&2
-      exit 1
-      ;;
-  esac
+	case "$1" in
+		-s | --step)
+			STEP="$2"
+			shift 2
+			;;
+		-v | --verbose)
+			export VERBOSE=true
+			shift
+			;;
+		-h | --help)
+			usage
+			exit 0
+			;;
+		-u | -d | -t)
+			ACTION="${1#-}"
+			shift
+			;;
+		--up | --down | --toggle)
+			ACTION="${1#--}"
+			shift
+			;;
+		*)
+			log Error "Unknown option: $1"
+			usage >&2
+			exit 1
+			;;
+	esac
 done
 
 if [[ -z "$ACTION" ]]; then
-  log Error "Action required (--up, --down, or --toggle)"
-  usage >&2
-  exit 1
+	log Error "Action required (--up, --down, or --toggle)"
+	usage >&2
+	exit 1
 fi
 
 # Extract the focused window's PID and title from a single hyprctl call
 # using jq's @tsv output, avoiding a second jq fork on the same JSON.
+# Process substitution keeps the parsed fields in this shell; an empty
+# workspace or null PID is handled by the guard that follows.
 read -r ACTIVE_PID WINDOW_TITLE < <(
-  hyprctl -j activewindow | jq -r '[.pid, .title] | @tsv'
+	hyprctl -j activewindow | jq -r '[.pid, .title] | @tsv'
 )
 
 log Info "Action: $ACTION, window: $WINDOW_TITLE"
 
 # hyprctl returns {} on an empty workspace; jq outputs "null" for .pid
 if [[ -z "$ACTIVE_PID" || "$ACTIVE_PID" == "null" ]]; then
-  exit 1
+	exit 1
 fi
 
 # Build a flat list of the focused window's PID and all its descendants.
@@ -84,50 +86,59 @@ fi
 # The algorithm reads the full process table once, builds a parent->children
 # adjacency map in awk, then does a BFS from the root PID.
 collect_pids() {
-  local root="$1"
+	local root="$1"
 
-  ps -e -o pid=,ppid= | awk -v root="$root" '
-    { children[$2] = children[$2] " " $1 }
-    END {
-      queue[1] = root
-      depth = 1
-      while (depth > 0) {
-        new_depth = 0
-        for (i = 1; i <= depth; i++) {
-          p = queue[i]
-          print p
-          if (p in children) {
-            n = split(children[p], kids)
-            for (j = 1; j <= n; j++)
-              next_queue[++new_depth] = kids[j]
-          }
-        }
-        depth = new_depth
-        for (i = 1; i <= depth; i++) queue[i] = next_queue[i]
-        delete next_queue
-      }
-    }
-  '
+	local -A _children=()
+	local _pid _ppid _p _i _depth _new_depth
+	local -a _queue=() _next_queue=()
+	while read -r _pid _ppid; do
+		_children[$_ppid]+=" $_pid"
+	done < <(ps -e -o pid=,ppid=)
+	_queue=("$root")
+	_depth=1
+	while ((_depth > 0)); do
+		_new_depth=0
+		_next_queue=()
+		for ((_i = 0; _i < _depth; _i++)); do
+			_p="${_queue[$_i]}"
+			printf '%s\\n' "$_p"
+			if [[ -n "${_children[$_p]:-}" ]]; then
+				for _kid in ${_children[$_p]}; do
+					_next_queue[_new_depth++]="$_kid"
+				done
+			fi
+		done
+		_depth=$_new_depth
+		_queue=("${_next_queue[@]}")
+	done
 }
 
-CACHE_DIR="${VIBRANIUM_RUNTIME:-/tmp}/vb-cmd-window-volume"
+# The cache is an optimization only: entries are keyed by the root PID and
+# cleanup probes PID addressability, not process identity; PID reuse or a
+# zombie can pass, while a fresh miss triggers a new process-tree walk.
+CACHE_DIR="$VIBRANIUM_RUNTIME/vb-cmd-window-volume"
 for f in "$CACHE_DIR"/*; do
-  [ -f "$f" ] || continue
-  kill -0 "${f##*/}" 2> /dev/null || rm "$f"
+	[ -f "$f" ] || continue
+	kill -0 "${f##*/}" 2> /dev/null || rm "$f"
 done
+
 CACHE_FILE="$CACHE_DIR/$ACTIVE_PID"
 
 ALL_PIDS=()
+
 if [[ -f "$CACHE_FILE" ]]; then
-  printf -v _now '%(%s)T' -1
-  if ((_now - $(stat -c %Y "$CACHE_FILE") < 2)); then
-    mapfile -t ALL_PIDS < "$CACHE_FILE"
-  fi
+	printf -v _now '%(%s)T' -1
+	_cache_mtime=0
+	read -r _cache_mtime < <(stat -c %Y "$CACHE_FILE" 2> /dev/null) || _cache_mtime=0
+	if ((_now - _cache_mtime < 2)); then
+		mapfile -t ALL_PIDS < "$CACHE_FILE"
+	fi
 fi
+
 if [[ ${#ALL_PIDS[@]} -eq 0 ]]; then
-  mapfile -t ALL_PIDS < <(collect_pids "$ACTIVE_PID")
-  mkdir -p "$CACHE_DIR" 2> /dev/null
-  printf '%s\n' "${ALL_PIDS[@]}" > "$CACHE_FILE"
+	mapfile -t ALL_PIDS < <(collect_pids "$ACTIVE_PID")
+	mkdir -p "$CACHE_DIR" 2> /dev/null
+	printf '%s\n' "${ALL_PIDS[@]}" > "$CACHE_FILE"
 fi
 
 # Collect binary names from all PIDs in the tree for fallback.
@@ -135,37 +146,55 @@ fi
 # application.process.binary, node.name, or application.name.
 #
 # Three fallbacks for root binary: comm, cmdline basename, ps.
-ROOT_BIN=$(< "/proc/$ACTIVE_PID/comm" 2> /dev/null)
+# /proc reads can return empty when a process exits; the root value falls back
+# through cmdline and then ps, while descendant comm reads skip missing PIDs.
+ROOT_BIN=
+read -r ROOT_BIN < "/proc/$ACTIVE_PID/comm" 2> /dev/null || ROOT_BIN=
+
 if [[ -z "$ROOT_BIN" ]]; then
-  IFS= read -r -d '' ROOT_BIN < "/proc/$ACTIVE_PID/cmdline" 2> /dev/null
-  ROOT_BIN="${ROOT_BIN##*/}"
+	ROOT_BIN=
+	IFS= read -r -d '' ROOT_BIN < "/proc/$ACTIVE_PID/cmdline" 2> /dev/null || ROOT_BIN=
+	ROOT_BIN="${ROOT_BIN##*/}"
 fi
+
 if [[ -z "$ROOT_BIN" ]]; then
-  ROOT_BIN=$(ps -o comm= -p "$ACTIVE_PID" 2> /dev/null)
+	ROOT_BIN=
+	read -r ROOT_BIN < <(ps -o comm= -p "$ACTIVE_PID" 2> /dev/null) || ROOT_BIN=
 fi
 
 declare -A _bins
 BINS_STR=
 for p in "${ALL_PIDS[@]}"; do
-  comm=$(< "/proc/$p/comm" 2> /dev/null) || continue
-  [[ -n "${_bins[$comm]+set}" ]] && continue
-  _bins[$comm]=1
-  BINS_STR="$BINS_STR $comm"
+	comm=
+	read -r comm < "/proc/$p/comm" 2> /dev/null || continue
+	[[ -z "$comm" ]] && continue
+
+	if [[ -n "${_bins[$comm]+set}" ]]; then
+		continue
+	fi
+
+	_bins[$comm]=1
+	BINS_STR="$BINS_STR $comm"
 done
-[[ -n "$ROOT_BIN" && -z "${_bins[$ROOT_BIN]+set}" ]] && BINS_STR="$BINS_STR $ROOT_BIN"
+
+if [[ -n "$ROOT_BIN" && -z "${_bins[$ROOT_BIN]+set}" ]]; then
+	BINS_STR="$BINS_STR $ROOT_BIN"
+fi
+
 BINS_STR="${BINS_STR:1}"
 
 # Extract first word of window title for media.name fallback.
+# A single lowercased word is intentionally only a heuristic; a generic title
+# can match unrelated media metadata, while PID and binary matches remain the
+# stronger identifiers in the stream parser.
 TITLE_TOKEN="${WINDOW_TITLE%% *}"
 TITLE_TOKEN="${TITLE_TOKEN,,}"
 
 log Info "Window PID tree: ${ALL_PIDS[*]}"
 log Info "Root binary: $ROOT_BIN binaries: $BINS_STR title_token: $TITLE_TOKEN"
 
-# Parse PipeWire/PulseAudio sink-inputs via pactl to find audio streams
-# belonging to the focused window tree. pactl list sink-inputs is used
-# instead of pw-dump because it only enumerates active streams (typically
-# <10 entries vs. hundreds of PipeWire objects).
+# Enumerate active sink inputs with pactl, then match their metadata against
+# the focused window's process tree and naming fallbacks.
 #
 # Matching (any of):
 #   1. application.process.id    in PID tree
@@ -175,114 +204,138 @@ log Info "Root binary: $ROOT_BIN binaries: $BINS_STR title_token: $TITLE_TOKEN"
 #
 # Output: one line per matching stream:
 #   SINK_INPUT_ID VOLUME_PCT MUTED
+# The awk state machine flushes a record at the next sink header or at end of
+# input, and missing volume or mute fields default to full volume and unmuted.
 mapfile -t SINK_DATA < <(
-  pactl list sink-inputs | awk \
-    -v pids="${ALL_PIDS[*]}" \
-    -v bins="$BINS_STR" \
-    -v root_bin="$ROOT_BIN" \
-    -v title_token="$TITLE_TOKEN" '
-    function in_bin_set(s) {
-      return (s in bin_set) || (s == root_lower)
-    }
-    function try_match(s) {
-      if (matched) return
-      if (in_bin_set(s)) { matched = 1; return }
-      if (title_token != "" && index(s, title_token) > 0) matched = 1
-    }
-    BEGIN {
-      n = split(pids, a)
-      for (i = 1; i <= n; i++) pid_set[a[i]] = 1
-      m = split(bins, b)
-      for (i = 1; i <= m; i++) bin_set[b[i]] = 1
-      root_lower = tolower(root_bin)
-    }
-
-    /^Sink Input #/ {
-      if (id != "" && matched) print id, vol, muted
-      id   = $3;  sub(/#/, "", id)
-      vol  = 100
-      muted = "no"
-      matched = 0
-    }
-
-    /^[[:space:]]+Mute:/ { muted = $2 }
-
-    /^[[:space:]]+Volume:/ {
-      for (i = 1; i <= NF; i++) {
-        if ($i ~ /^[0-9]+%[,]?$/) {
-          vol = $i + 0
-          break
-        }
-      }
-    }
-
-    /application\.process\.id/ {
-      gsub(/"/, "", $NF)
-      if ($NF in pid_set) matched = 1
-    }
-
-    /application\.process\.binary/ {
-      gsub(/"/, "", $NF)
-      if ($NF in bin_set) matched = 1
-    }
-
-    /(application|node|media)\.name/ {
-      gsub(/[";]/, "", $NF)
-      try_match(tolower($NF))
-    }
-
-    END { if (id != "" && matched) print id, vol, muted }
-  '
+	pids="${ALL_PIDS[*]}"
+	bins="$BINS_STR"
+	root_bin="$ROOT_BIN"
+	title_token="$TITLE_TOKEN"
+	declare -A _pid_set _bin_set
+	for _p in $pids; do _pid_set[$_p]=1; done
+	for _b in $bins; do _bin_set[$_b]=1; done
+	_root_lower="${root_bin,,}"
+	_id=""
+	_vol=100
+	_muted="no"
+	_matched=0
+	_flush() {
+		if [[ -n "$_id" && "$_matched" == 1 ]]; then
+			printf '%s %s %s\n' "$_id" "$_vol" "$_muted"
+		fi
+	}
+	while IFS= read -r _line; do
+		if [[ $_line =~ ^Sink[[:space:]]+Input[[:space:]]+#(.+)$ ]]; then
+			_flush
+			_id="${BASH_REMATCH[1]}"
+			_vol=100
+			_muted="no"
+			_matched=0
+			continue
+		fi
+		if [[ $_line =~ ^[[:space:]]+Mute:[[:space:]]+(.+)$ ]]; then
+			_muted="${BASH_REMATCH[1]}"
+		fi
+		if [[ $_line =~ ^[[:space:]]+Volume: ]]; then
+			for _tok in $_line; do
+				if [[ $_tok =~ ^[0-9]+%[,]?$ ]]; then
+					_vol="${_tok%\%}"
+					_vol="${_vol%,}"
+					break
+				fi
+			done
+		fi
+		if [[ $_line == *application.process.id* ]]; then
+			_tok="${_line##* }"
+			_tok="${_tok//\"/}"
+			if [[ -n "${_pid_set[$_tok]+set}" ]]; then _matched=1; fi
+		fi
+		if [[ $_line == *application.process.binary* ]]; then
+			_tok="${_line##* }"
+			_tok="${_tok//\"/}"
+			if [[ -n "${_bin_set[$_tok]+set}" ]]; then _matched=1; fi
+		fi
+		if [[ $_line =~ (application|node|media)\.name ]]; then
+			_tok="${_line##* }"
+			_tok="${_tok//\"/}"
+			_tok="${_tok//;/}"
+			_lower="${_tok,,}"
+			if [[ -n "${_bin_set[$_lower]+set}" || "$_lower" == "$_root_lower" ]]; then
+				_matched=1
+			elif [[ -n "$title_token" && "$_lower" == *"$title_token"* ]]; then
+				_matched=1
+			fi
+		fi
+	done < <(pactl list sink-inputs)
+	_flush
 )
 
 log Info "SINK_DATA: ${SINK_DATA[*]:-(none)}"
 
 if [[ ${#SINK_DATA[@]} -eq 0 ]]; then
-  exit 0
+	# No identifiable stream is a successful no-op; the command does not change
+	# unrelated system volume when the focused window has no matching sink input.
+	exit 0
 fi
 
-# track the first matched stream's resulting state for the notification;
-# computed here rather than re-queried via wpctl get-volume after the fact
+# Each sink receives an independent pactl request. The notification uses a
+# locally predicted first-stream state rather than a result re-query.
 first_new_vol=""
 first_new_muted=""
 
 for SINK_ENTRY in "${SINK_DATA[@]}"; do
-  read -r sink_id sink_vol sink_muted <<< "$SINK_ENTRY"
+	read -r sink_id sink_vol sink_muted <<< "$SINK_ENTRY"
 
-  case "$ACTION" in
-    up)
-      new_vol=$((sink_vol + STEP))
-      ((new_vol > 100)) && new_vol=100
-      pactl set-sink-input-volume "$sink_id" "${new_vol}%"
-      new_muted="$sink_muted"
-      ;;
-    down)
-      new_vol=$((sink_vol - STEP))
-      ((new_vol < 0)) && new_vol=0
-      pactl set-sink-input-volume "$sink_id" "${new_vol}%"
-      new_muted="$sink_muted"
-      ;;
-    toggle)
-      pactl set-sink-input-mute "$sink_id" toggle
-      new_vol="$sink_vol"
-      # invert mute locally -- no re-query needed
-      [[ "$sink_muted" == "yes" ]] && new_muted="no" || new_muted="yes"
-      ;;
-  esac
+	case "$ACTION" in
+		up)
+			new_vol=$((sink_vol + STEP))
+			((new_vol > 100)) && new_vol=100
+			pactl set-sink-input-volume "$sink_id" "${new_vol}%"
+			new_muted="$sink_muted"
+			;;
+		down)
+			new_vol=$((sink_vol - STEP))
+			((new_vol < 0)) && new_vol=0
+			pactl set-sink-input-volume "$sink_id" "${new_vol}%"
+			new_muted="$sink_muted"
+			;;
+		toggle)
+			pactl set-sink-input-mute "$sink_id" toggle
+			new_vol="$sink_vol"
+			[[ "$sink_muted" == "yes" ]] && new_muted="no" || new_muted="yes"
+			;;
+	esac
 
-  # only the first stream drives the notification
-  if [[ -z "$first_new_vol" ]]; then
-    first_new_vol="$new_vol"
-    first_new_muted="$new_muted"
-  fi
+	# only the first stream drives the notification
+	if [[ -z "$first_new_vol" ]]; then
+		first_new_vol="$new_vol"
+		first_new_muted="$new_muted"
+	fi
 done
 
-# scale current volume into 0-100 relative to max_vol_pct so the bar
-# stays proportional when the above-100% boost is enabled
+# The daemon's volume lane (`x-vb-vol`, percent 0..100) renders the
+# NowPlaying slider language: tiered speaker icon, lane, percent. Mute is a
+# separate flag so the lane keeps showing the level while the icon reads
+# volume-off, the OSD's own split.
 bar_value=${first_new_vol:-0}
 
+# Synchronous replace tag: the daemon lets the live card carrying the same
+# tag adopt the new arrival in place, so a volume drag reads as one moving
+# bar rather than a pile of stale cards, and the timer restarts on every
+# send. No id file is needed. A fixed `-r` id cannot do this: the D-Bus
+# `replaces_id` is matched against live server-allocated ids, and an unknown
+# one allocates a FRESH id instead of claiming the requested one - so every
+# keypress stacked a new card. The tag is the slot; the server id is just
+# the current incarnation.
 if [[ "$first_new_muted" == "yes" ]]; then
-  notify-send -r 2 -t 1000 "$WINDOW_TITLE Muted"
+	notify-send -a "Vibranium" -t 1000 "$WINDOW_TITLE Muted" \
+		-h "int:x-vb-vol:$bar_value" \
+		-h "boolean:x-vb-vol-muted:true" \
+		-h "boolean:x-vb-hide-meta:true" \
+		-h "string:x-dunst-stack-tag:vb-window-volume"
 else
-  notify-send -r 2 -t 1000 "$WINDOW_TITLE" -h "int:value:$bar_value"
+	notify-send -a "Vibranium" -t 1000 "$WINDOW_TITLE" \
+		-h "int:x-vb-vol:$bar_value" \
+		-h "boolean:x-vb-hide-meta:true" \
+		-h "string:x-dunst-stack-tag:vb-window-volume"
 fi

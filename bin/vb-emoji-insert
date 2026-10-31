@@ -1,0 +1,81 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+SELF="${0##*/}"
+
+usage() {
+  shcat << EOF
+Usage: $SELF [OPTIONS] <emoji>
+
+Copy an emoji to the clipboard and paste it into the focused application
+(wtype missing or --copy: clipboard only).
+
+Options:
+    --copy            Copy only; skip pasting
+    -v, --verbose     Enable verbose output
+    -h, --help        Show this help and exit
+
+Examples:
+    $SELF '😀'
+    $SELF --copy '🎉'
+EOF
+}
+
+PASTE=1
+
+while (($# > 0)); do
+  case "$1" in
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    -v | --verbose)
+      VERBOSE=true
+      shift
+      ;;
+    --copy)
+      PASTE=0
+      shift
+      ;;
+    -*)
+      log Error "Unknown option: $1" >&2
+      log Error "Try '$SELF --help' for more information" >&2
+      exit 1
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+emoji="${1:-}"
+
+[[ -n $emoji ]] || {
+  log Error "missing emoji argument" >&2
+  log Error "Try '$SELF --help' for more information" >&2
+  exit 1
+}
+(($# == 1)) || {
+  log Error "too many arguments: $*" >&2
+  log Error "Try '$SELF --help' for more information" >&2
+  exit 1
+}
+
+# The positional emoji must be one shell word, but quoted whitespace remains
+# part of the value and is not split by the wrapper.
+log Info "emoji: $emoji (paste: $PASTE)"
+
+# stdio detached: the surviving wl-copy must not hold the caller's pipes.
+# The pipeline is asynchronous so this wrapper does not wait for the clipboard
+# provider to finish, and its own output cannot contaminate launcher streams.
+printf '%s' "$emoji" | wl-copy > /dev/null 2>&1 &
+
+if ((PASTE)) && command -v wtype > /dev/null; then
+  # The sleep is commented out, so the paste chord has no active delay and can
+  # race wl-copy or a focus change.
+  wtype -M shift -k Insert -m shift 2> /dev/null || true
+  # Synthetic input failure is ignored because the clipboard operation remains
+  # useful when the focused client rejects the paste chord.
+fi

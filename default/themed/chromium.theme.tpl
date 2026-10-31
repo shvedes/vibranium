@@ -1,1 +1,1 @@
-{{ background_0 }}
+{{ background }}

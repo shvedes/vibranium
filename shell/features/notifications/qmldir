@@ -1,0 +1,6 @@
+module qs.features.notifications
+
+singleton Notifications 1.0 Notifications.qml
+NotificationsView 1.0 NotificationsView.qml
+NotificationCard 1.0 NotificationCard.qml
+NotificationEntry 1.0 NotificationEntry.qml

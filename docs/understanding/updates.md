@@ -6,18 +6,21 @@ and then applies any required migrations for structural changes.
 
 ## Update channels
 
-Vibranium provides two update channels:
+Vibranium provides these update channels:
 
 | Channel | Description |
 |---------|-------------|
 | **release** | Stable releases. The default channel installed for normal users. |
 | **upstream** | The latest `master` branch state. Intended for testing newer changes. |
+| **`<branch>`** | A specific remote branch, e.g. a feature branch. Tracks that branch's remote state. |
 
-The channel is selected during installation and can be changed later in **Vibranium Menu** -> **Settings** -> **General**, or with:
+The channel is selected during installation (release, upstream, or a typed branch name) and can be changed later in **Vibranium Menu** -> **Settings** -> **General**, or with:
 
 ```bash
-vb-dev-switch-channel
+vb-dev-switch-channel <release|upstream|branch>
 ```
+
+Without an argument, `vb-update` detects the channel automatically: a detached HEAD follows releases, while any attached branch follows its own remote ref.
 
 Switching channels performs a repository checkout operation.  
 If the installation contains uncommitted changes, the operation is refused until they are handled.
@@ -44,7 +47,7 @@ If restoring local changes causes conflicts, the update stops and provides instr
 
 Vibranium periodically checks for available updates using the `vibranium-update.timer` system unit.  
 The check runs without user interaction and stores the result in: `$VIBRANIUM_STATE/update.available`  
-The Waybar update module reads this state and displays when a new Vibranium version is available.
+The bar update module reads this state and displays when a new Vibranium version is available.
 
 Current installation information can be viewed with:
 

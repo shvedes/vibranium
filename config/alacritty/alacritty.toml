@@ -15,7 +15,7 @@ save_to_clipboard = true
 
 [window]
 opacity = 1.00
-dynamic_padding = true
+dynamic_padding = false
 dynamic_title	= true
 startup_mode	= "Windowed"
 padding = { x = 10, y = 10 }
@@ -27,5 +27,5 @@ bindings = [
 ]
 
 [font.normal]
-family = "Liberation Mono"
+family = "Monospace"
 style  = "Regular"

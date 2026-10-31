@@ -20,6 +20,8 @@ Options:
 EOF
 }
 
+# APP_ID and TITLE are terminal-launch metadata; the focus query independently
+# matches only the executable basename against .class and .initialClass.
 focus_or_launch() {
   local -a cmd=("$@")
 
@@ -27,6 +29,10 @@ focus_or_launch() {
   match_key="${match_key,,}"
   log Info "Focus or launch TUI: key=$match_key app_id=$APP_ID title=$TITLE cmd=${cmd[*]}"
 
+  # Matching is limited to class metadata and is deliberately ordered: an
+  # exact name wins over the broader substring phase.
+  # jq errors are suppressed because an invalid client list has the same
+  # user-visible outcome as no match: launch a new terminal window.
   local window_address
   window_address="$(
     jq -r --arg key "$match_key" '
@@ -66,6 +72,8 @@ focus_or_launch() {
   )"
 
   if [[ -n "$window_address" ]]; then
+    # The address branch focuses the existing window; only an empty match
+    # transfers ownership to a newly launched terminal.
     log Info "Focusing existing terminal window: address=$window_address"
     hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
   else
@@ -73,7 +81,8 @@ focus_or_launch() {
     exec setsid -f xdg-terminal-exec \
       --app-id="$APP_ID" \
       --title="$TITLE" \
-      -- "${cmd[@]}"
+      -- "${cmd[@]}" \
+      </dev/null >/dev/null 2>&1
   fi
 }
 
@@ -140,20 +149,34 @@ source vb-lib-core
 
 COMMAND=("$@")
 
-# Derive defaults
+# Executable validation runs prior to the focus/launch decision, including when
+# a matching window already exists; unavailable commands still exit.
+if ! command -v "${COMMAND[0]}" > /dev/null; then
+  log::error "${COMMAND[0]} not found int PATH!"
+  [[ -t 0 ]] || notify-send -r 3 -a Vibranium -u critical -t 10000 \
+    "TUI Applcations" "<b>${COMMAND[0]}</b> not found in PATH!"
+  exit 1
+fi
+
+# Identity metadata is filled only after option parsing, so explicit values
+# remain unchanged while the basename supplies stable fallback identities.
 APP_NAME="${COMMAND[0]##*/}"
 : "${APP_ID:=org.vb.term.$APP_NAME}"
 : "${TITLE:=$APP_NAME}"
 
-helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
-if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
+# An absent focus preference does not prevent a launch; the direct path remains
+# available.
+if [[ "$APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
   # shellcheck disable=SC2068
   focus_or_launch "${COMMAND[@]}"
 else
   log Info "Always-focus disabled, launching directly"
+  # Detached stdio and exec transfer terminal lifetime to xdg-terminal-exec,
+  # keeping this wrapper from retaining pipes or blocking the caller.
   # shellcheck disable=SC2068
   exec setsid -f xdg-terminal-exec \
     --app-id="$APP_ID" \
     --title="$TITLE" \
-    -- "${COMMAND[@]}"
+    -- "${COMMAND[@]}" \
+    </dev/null >/dev/null 2>&1
 fi

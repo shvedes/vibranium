@@ -16,28 +16,35 @@ fi
 
 source vb-lib-cli
 
-INPUT="$(< "$VIBRANIUM_STATE/theme/chromium.theme")"
+# The rendered template supplies one color token; removing spaces tolerates
+# surrounding formatting. The value may be six-digit hex or comma-separated
+# RGB: hex is validated and normalized, while RGB relies on printf numeric
+# conversion without rejecting extra fields or empty components.
+IFS= read -r INPUT < "$VIBRANIUM_STATE/theme/chromium.theme" || [[ -n $INPUT ]]
 INPUT="${INPUT// /}"
 
 log Info "browser theme input: $INPUT"
 
-# HEX
 if [[ "$INPUT" =~ ^#?[0-9a-fA-F]{6}$ ]]; then
   hex="${INPUT#\#}"
   THEME_COLOR="#$hex"
   log Info "parsed as hex: $THEME_COLOR"
 else
-  # RGB
   IFS=',' read -r r g b <<< "$INPUT"
   printf -v THEME_COLOR '#%02x%02x%02x' "$r" "$g" "$b"
   log Info "parsed as rgb: $r,$g,$b -> $THEME_COLOR"
 fi
 
+# Each managed policy object is replaced as a complete JSON document,
+# rather than merged with an existing file. The browser set is explicit so
+# a missing Brave executable does not receive a policy file from this run.
 for file in "${BROWSER_FILES[@]}"; do
   printf '{ "BrowserThemeColor": "%s" }\n' "$THEME_COLOR" > "$file"
   log Info "wrote $file"
 done
 
-# Refresh policies
+# Policy refreshes run synchronously with no startup window. The script does
+# not inspect their exit status, and the managed file remains authoritative
+# if a browser rejects the refresh.
 chromium --refresh-platform-policy --no-startup-window &> /dev/null
 command -v brave > /dev/null && brave --refresh-platform-policy --no-startup-window &> /dev/null

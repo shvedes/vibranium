@@ -1,12 +1,16 @@
 #!/bin/bash
 
 source vb-lib-cli
+source vb-lib-core
 
 VERBOSE=${VERBOSE:-false}
 SELF="${0##*/}"
 FORCE=false
 NUKE=false
 
+# File refreshes preserve the previous destination in a timestamped sibling
+# unless --nuke is selected. A byte-identical replacement removes that backup
+# immediately, keeping successful no-op refreshes from accumulating files.
 copy_file() {
   local src="$1" dst="$2" bak="$3"
   if [[ -f $dst ]]; then
@@ -33,6 +37,9 @@ copy_file() {
 copy_dir() {
   local src="$1" dst="$2" bak="$3"
 
+  # Directory refreshes copy the complete existing tree and then overlay the
+  # source. They do not delete source-absent entries unless --nuke first removes
+  # the destination, so this is an additive sync by design.
   if [[ -d $dst ]]; then
     if [[ $NUKE == true ]]; then
       rm -rf "$dst"
@@ -56,10 +63,6 @@ usage() {
 Usage: $SELF CONFIG_PATH
 
 Copy the named config from \$VIBRANIUM/config back to ~/.config. Keeps backups.
-
-Example:
-  $SELF hypr/hyprlock.conf
-  $SELF waybar/config.jsonc
 
 Options:
   -n, --nuke         Delete existing target instead of backing up
@@ -104,9 +107,10 @@ USER_FILE="$XDG_CONFIG_HOME/$CONFIG_REL"
 SRC_FILE="${VIBRANIUM}/config/$CONFIG_REL"
 printf -v BAK_FILE '%s.bak.%(%s)T' "$USER_FILE" -1
 
+# Destructive mode requires an explicit confirmation unless --force is also
+# supplied, so a routine refresh cannot remove an existing target by accident.
 if [[ $NUKE == true && $FORCE != true ]]; then
-  read -rp "Delete $USER_FILE instead of backing up? [y/N] " confirm
-  if [[ $confirm != [yY] ]]; then
+  if ! term::ask_yes_no N "Delete $USER_FILE instead of backing up?"; then
     log Info "Nuke declined, nothing changed"
     exit 1
   fi

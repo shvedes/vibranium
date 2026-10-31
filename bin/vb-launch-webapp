@@ -37,6 +37,8 @@ get_default_browser() {
   log Info "Detecting default browser"
 
   # Fast path: mimeapps.list
+  # Only the first HTTP handler is considered; semicolon-separated alternatives
+  # are discarded, and xdg-mime is consulted only when that field is absent.
   if [[ -f "$XDG_CONFIG_HOME/mimeapps.list" ]]; then
     while IFS='=' read -r key value; do
       if [[ ! $key == "x-scheme-handler/http" ]]; then
@@ -49,28 +51,26 @@ get_default_browser() {
 
   # Fallback
   if [[ -z $browser ]]; then
-    browser="$(xdg-mime query default x-scheme-handler/http 2> /dev/null)"
+    IFS= read -r browser < <(xdg-mime query default x-scheme-handler/http 2> /dev/null) || browser=""
   fi
 
   _out="$browser"
 }
 
-# ---------------------------------------------------------------------------
-# Derive a unique directory name from a URL for use as a Chromium user-data-dir.
-# Strips the scheme and everything after the hostname (path, port, query,
-# fragment), lowercases it, and replaces dots with hyphens.
-# The result is used as the last component of $XDG_DATA_HOME/webapps/<name>,
-# not as a profile subdirectory inside an existing data dir; therefore it is
-# invisible to the main browser instance.
+# Derive a Chromium user-data directory name from a URL. The normalized host
+# is a sharing key, so distinct URLs on one host can resolve to the same
+# directory; path, port, query, and fragment distinctions are dropped.
+# The directory is stored under $XDG_DATA_HOME/webapps/<name>, separate from
+# the main browser data directory.
 # Example: https://app.example.com/path -> app-example-com
-# ---------------------------------------------------------------------------
 _profile_dir_from_url() {
-  local url="$1"
+  local -n _pdu_out="$1"
+  local url="$2"
   local host="${url#*://}"
   host="${host%%[/?#:]*}"
   host="${host,,}"
   host="${host//\./-}"
-  printf '%s' "$host"
+  _pdu_out="$host"
 }
 
 focus_or_launch() {
@@ -85,15 +85,12 @@ focus_or_launch() {
   host="${host%%[/?#:]*}"
   host="${host,,}"
 
-  # Chrome PWA windows have class "chrome-{encoded_url}-{profile}", with
-  # the hostname appearing immediately after the "chrome-" prefix.
-  # startswith("chrome-{host}") is precise: it targets only PWA windows
-  # for this exact site and can't collide with other Chrome PWA windows
-  # whose hostnames begin differently.
-  # When --own-profile is active, --user-data-dir gives the PWA its own
-  # data root with a default profile named "Default" inside it, so the
-  # window class is still "chrome-{host}-Default" -- the same prefix
-  # match covers both the shared-profile and own-profile cases.
+  # Chrome PWA window classes begin with `chrome-` followed by the encoded
+  # hostname and a profile suffix. A raw startswith match can also accept a
+  # longer hostname that shares this prefix; --own-profile uses the same class
+  # shape with a separate data root.
+  # jq `try` only suppresses errors raised while evaluating the expression; it
+  # neither repairs malformed input JSON nor filters a null .address.
   local window_address
   window_address="$(
     hyprctl -j clients | jq -r --arg host "$host" '
@@ -119,9 +116,7 @@ focus_or_launch() {
   fi
 }
 
-# ---------------------------------------------------------------------------
 # Argument parsing
-# ---------------------------------------------------------------------------
 
 OWN_PROFILE=false
 
@@ -167,6 +162,8 @@ URL="$1"
 
 get_default_browser browser
 
+# This selects a supported desktop-entry family; the actual Exec token is
+# resolved from matching .desktop files below.
 case $browser in
   google-chrome* | brave-browser* | microsoft-edge* | opera* | vivaldi* | helium*) ;;
   *)
@@ -191,36 +188,44 @@ for dir in ~/.local/share/applications ~/.nix-profile/share/applications /usr/sh
         continue
       fi
       line=${line#Exec=}
+      # Only the first Exec token is retained; desktop-entry arguments and
+      # field codes are not interpreted by this wrapper.
       execs+=("${line%% *}")
     done < "$f"
   done
 done
 
 # Fallback if nothing found
+# The first collected token is used without local validation; the no-entry
+# fallback is the literal name `chromium`.
 if ! ((${#execs[@]})); then
   execs=("chromium")
 fi
 
-# Each own-profile PWA gets a completely separate Chromium user data
-# directory stored here. Using --user-data-dir instead of
-# --profile-directory is the key distinction: a profile subdirectory
-# inside the shared data dir is registered in the browser's Local State
-# and appears in the profile picker; a separate data dir is entirely
-# unknown to the main browser instance.
+# An own-profile launch uses a separate Chromium user-data directory under
+# this root. The normalized host key can be shared by distinct same-host URLs;
+# isolation is per data-directory key, not a guarantee of one directory per
+# URL. A separate data dir remains outside the main browser's profile picker.
 WEBAPP_DATA_DIR="$XDG_DATA_HOME/webapps"
 
+# Passing the URL through --app requests browser app-mode metadata, which is
+# the identity used by the PWA window matcher.
 browser_cmd=("${execs[0]}" --app="$URL")
 if [[ $OWN_PROFILE == true ]]; then
-  profile_dir="$(_profile_dir_from_url "$URL")"
+  profile_dir=""
+  _profile_dir_from_url profile_dir "$URL"
   log Info "Own profile enabled, data dir: $WEBAPP_DATA_DIR/$profile_dir"
   browser_cmd+=(--user-data-dir="$WEBAPP_DATA_DIR/$profile_dir")
 fi
 
 log Info "Browser command: ${browser_cmd[*]}"
-helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
-if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
+# The focus preference comes from the shared settings projection; when it is
+# disabled, the direct branch skips compositor lookup and starts a new app.
+if [[ "$APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
   focus_or_launch "${browser_cmd[@]}"
 else
   log Info "Always-focus disabled, launching directly"
+  # setsid detaches app2unit from the terminal session, but inherited stdio
+  # remains attached unless the command itself redirects it.
   exec setsid -f app2unit -- "${browser_cmd[@]}"
 fi

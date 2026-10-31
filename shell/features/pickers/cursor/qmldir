@@ -1,0 +1,3 @@
+module qs.features.pickers.cursor
+
+singleton CursorPicker 1.0 CursorPicker.qml

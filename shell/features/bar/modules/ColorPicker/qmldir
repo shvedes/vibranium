@@ -1,0 +1,6 @@
+module qs.features.bar.modules.ColorPicker
+
+ColorPicker 1.0 ColorPicker.qml
+ColorPickerIsland 1.0 ColorPickerIsland.qml
+ColorPickerHistory 1.0 ColorPickerHistory.qml
+ColorPickerOverlay 1.0 ColorPickerOverlay.qml

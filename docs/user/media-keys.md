@@ -25,12 +25,13 @@ This works with both regular players (via playerctl) and **MPD** (via mpc, if in
 
 ## Now playing
 
-Enable "**Show now playing notification**" in the media control settings, and every time you unlock a locked session you get a **Now Playing** notification with the current track.  
-Optionally toggle *Album art* — for web-based players (e.g. Spotify) the art is fetched from the web, so it may take a moment; for offline players (e.g. MPD) it's instant.
+Enable **Track change OSD** in the media control settings to briefly show the current track when you skip tracks or change playback state. This works independently of the bar's **Now Playing** module. The progress display follows the active MPRIS player, including seeks and rewinds while the card is visible.
+
+Optionally enable **Show cover art**. For web-based players the art is fetched asynchronously; the card keeps a music fallback until the image is ready.
 
 
 ## Tips
 
-When something is playing, the "**Copy Current Track**" entry in the Utilities menu will apper.
-When selected, the URI, URL, or FILE of the currenly plyaing track will be copied to clipboard,
+When something is playing, the "**Copy Current Track**" entry in the Utilities menu will appear.
+When selected, the URI, URL, or FILE of the currently playing track will be copied to clipboard,
 making it easy to share your music with friends.

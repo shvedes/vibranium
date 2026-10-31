@@ -101,7 +101,7 @@ function Hypr.Helpers.ForceKillWindow()
 
       hl.dispatch(
         hl.dsp.exec_raw(
-          "notify-send -r " .. WIN_NOTIF .. " -t 4000 'Kill Cancelled' 'The active window changed before confirmation'"
+          "notify-send -a 'Hyprland' -r " .. WIN_NOTIF .. " -t 4000 'Kill Cancelled' 'The active window changed before confirmation'"
         )
       )
       return
@@ -114,7 +114,7 @@ function Hypr.Helpers.ForceKillWindow()
 
     hl.dispatch(
       hl.dsp.exec_raw(
-        "notify-send -r "
+        "notify-send -a 'Hyprland' -r "
           .. WIN_NOTIF
           .. " 'Window Force-Killed'"
           .. " '<b>"
@@ -213,7 +213,7 @@ function Hypr.Helpers.WindowToggleFreeze()
 
   hl.dispatch(hl.dsp.exec_cmd("kill -" .. sig .. " " .. target_pid))
   hl.dispatch(
-    hl.dsp.exec_cmd(string.format("notify-send -r 3 'PID Freezer' '<b>%s</b> %s'", win.title:gsub("'", "'\\''"), verb))
+    hl.dsp.exec_cmd(string.format("notify-send -a 'Vibranium' -r 3 'PID Freezer' '<b>%s</b> %s'", win.title:gsub("'", "'\\''"), verb))
   )
 end
 
@@ -244,6 +244,52 @@ local function Gcd(a, b)
   return a
 end
 
+-- Notification replace IDs for the scale step. Success and failure are kept
+-- apart so a failure is not replaced by the success message that follows it,
+-- while repeated presses of one key still collapse into a single bubble each.
+SCALE_NOTIF = 22
+SCALE_FAIL_NOTIF = 23
+
+-- Persists a monitor scale into the user config so it survives a restart. The
+-- config is a text file, so the write belongs to the shell's config editor
+-- rather than to this compositor-side helper; only the compositor state that
+-- makes a scale legal stays here.
+--
+-- The command runs to completion before returning because the write is a
+-- read-modify-write of one file, and two quick presses would otherwise
+-- interleave their passes and lose one of the two values. Its exit status is
+-- unusable from here -- the config VM cannot wait on a child, so both
+-- os.execute and io.popen report the same failure whatever the command did --
+-- which is why the command's single result line is the contract instead.
+-- Returns ok, message where message is only meaningful when ok is false.
+local function persist_monitor_scale(output, value)
+  local pipe = io.popen(
+    "vb-hypr-config set scale "
+      .. Hypr.Helpers.ShellQuote(value)
+      .. ' "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua"'
+      .. " --scope monitor --output "
+      .. Hypr.Helpers.ShellQuote(output)
+  )
+
+  if pipe == nil then
+    return false, "config editor could not be started"
+  end
+
+  local line = (pipe:read("*a") or ""):match("^%s*(.-)%s*$")
+  pipe:close()
+
+  if line == "" then
+    return false, "config editor produced no result"
+  end
+
+  local message = line:match("^err:%s*(.+)$")
+  if message then
+    return false, message
+  end
+
+  return true
+end
+
 -- Steps the active monitor's scale to the next value that is both a
 -- multiple of 1/120 and divides the monitor resolution into whole
 -- logical pixels. direction must be 1 to increase scale or -1 to
@@ -256,13 +302,10 @@ function Hypr.Helpers.ScaleStep(direction)
 
   if direction == 0 then
     hl.monitor({ output = monitor.name, scale = "auto" })
-    hyprEdit(
-      "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua",
-      { "scale" },
-      "auto",
-      { scope = "monitor", output = monitor.name }
-    )
-    hl.exec_cmd("notify-send -r 777 'Hyprland' 'Display scale: <b>default</b>'")
+    local ok = persist_monitor_scale(monitor.name, "auto")
+    if not ok then
+      hl.exec_cmd("notify-send -r " .. SCALE_FAIL_NOTIF .. " -a 'Hyprland' -u critical -t 10000 'Hyprland' 'Failed to write scale level to disk!'")
+    end
     return
   end
 
@@ -304,16 +347,14 @@ function Hypr.Helpers.ScaleStep(direction)
     scale = string.format("%.10f", new_scale),
   })
 
-  local ok, err = hyprEdit(
-    "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua",
-    { "scale" },
-    new_scale,
-    { scope = "monitor", output = monitor.name }
-  )
+  -- The scale crosses a process boundary as text, so it is rendered here with
+  -- the same precision the in-process editor used when it stringified the
+  -- number itself; the editor re-reads it and normalises the result.
+  local ok = persist_monitor_scale(monitor.name, string.format("%.14g", new_scale))
 
   if not ok then
-    hl.exec_cmd("notify-send -r 777 -u critical -t 10000 'Hyprland' 'Failed to write scale level to disk!'")
+    hl.exec_cmd("notify-send -r " .. SCALE_FAIL_NOTIF .. " -a 'Hyprland' -u critical -t 10000 'Hyprland' 'Failed to write scale level to disk!'")
   end
 
-  hl.exec_cmd("notify-send -r 777 'Hyprland' '" .. string.format("Display scale: <b>%.4g", new_scale) .. "x</b>'")
+  -- hl.exec_cmd("notify-send -r " .. SCALE_NOTIF .. " -a 'Hyprland' '" .. string.format("Display scale: <b>%.4g", new_scale) .. "x</b>'")
 end

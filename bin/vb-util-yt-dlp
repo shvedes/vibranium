@@ -14,28 +14,29 @@ EOF
 }
 
 path_to_file_uri() {
-  local path="$1"
-  local uri="file://"
+  local -n _p2u_out=$1
+  local _p2u_path="$2"
+  local _p2u_uri="file://"
   local i char byte
 
   # URI percent-encoding is byte-based. Force a byte-oriented locale.
   LC_ALL=C
 
-  for ((i = 0; i < ${#path}; i++)); do
-    char="${path:i:1}"
+  for ((i = 0; i < ${#_p2u_path}; i++)); do
+    char="${_p2u_path:i:1}"
 
     case "$char" in
-      [a-zA-Z0-9.~_-]|/)
-        uri+="$char"
+      [a-zA-Z0-9.~_-] | /)
+        _p2u_uri+="$char"
         ;;
       *)
         printf -v byte '%02X' "'$char"
-        uri+="%$byte"
+        _p2u_uri+="%$byte"
         ;;
     esac
   done
 
-  printf '%s\n' "$uri"
+  _p2u_out="$_p2u_uri"
 }
 
 while [[ $# -gt 0 ]]; do
@@ -55,38 +56,17 @@ source vb-lib-core
 URL="${1:-}"
 OUTPUT_DIR="$XDG_DOWNLOAD_DIR"
 
-# All browsers yt-dlp supports, in priority order.
-# Each will be tried in turn; cookieless is the final fallback.
+# Ordered browser-profile names are tried when no usable cache exists. This is
+# a subset; unavailable profiles fail through yt-dlp, then cookieless is used.
 COOKIE_BR=(chrome chromium firefox brave vivaldi edge opera)
 
-# Show the header only in interactive mode.
 if [[ -z "$1" ]]; then
   term::show_header
 fi
 
-_operation_canceled() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  read -n1 -r -s -p $'. Press any key to exit' dummy
-}
-
-_operation_complete() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s Operation complete" "$G" "$RS"
-  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
-  # shellcheck disable=SC2034
-  read -n1 -r -s -p $'. Press any key to exit' dummy
-}
-
-trap 'trap "exit 1" INT; printf "\n";_operation_canceled; exit 1' INT
-
-# Try downloading with cookies from each installed browser in turn,
-# falling back to a cookieless attempt as a last resort.
-# On first success the winning browser's cookies are written to the cache
-# file; subsequent runs load that file directly and skip the browser
-# scan entirely. If the cached cookies ever stop working the cache is
-# wiped and the full scan runs again, writing a fresh winner.
+# Try cached cookies, then each browser profile, then cookieless. A successful
+# browser attempt writes the merged cookie jar for later runs; any cached-cookie
+# failure discards that cache and restarts profile selection.
 _try_download() {
   local url="$1"
   local cookie_cache="$VIBRANIUM_CACHE/${0##*/}"
@@ -102,33 +82,36 @@ _try_download() {
     --print-to-file "after_move:filepath" "$DL_PATH_FILE"
   )
 
-  # Fast path - cached cookies from a previous successful run.
+  # Cached-cookie diagnostics use a script-specific path, allowing concurrent
+  # invocations to overwrite and remove each other's stderr files.
   if [[ -f "$cookie_cache" ]]; then
     vb::print "$Y" "Downloading..."
     _stderr_tmp="/tmp/${0##*/}.tmp"
     if yt-dlp "${base_args[@]}" --cookies "$cookie_cache" "$url" 2> "$_stderr_tmp"; then
-      # Download succeeded. If YouTube flagged our cookies as rotated, wipe the
-      # cache now so the next run picks up a fresh jar - and swallow the warning
-      # (the current download is already done, nothing to act on).
-
-      # Not a bash expression.
-      # shellcheck disable=SC2016
-      if sed -n '/no longer valid/q; $q1' "$_stderr_tmp"; then
+      # A "no longer valid" diagnostic means YouTube rotated the cookies.
+      # An empty diagnostic file also selects this branch, matching the
+      # previous sed exit status when no input line ran its address range.
+      _cookies_rotated=true
+      while IFS= read -r _se_line || [[ -n $_se_line ]]; do
+        _cookies_rotated=false
+        if [[ $_se_line == *'no longer valid'* ]]; then
+          _cookies_rotated=true
+          break
+        fi
+      done < "$_stderr_tmp"
+      if $_cookies_rotated; then
         vb::print "$Y" "YouTube cookies rotated - cache cleared for next run"
         rm -f "$cookie_cache"
       fi
       rm -f "$_stderr_tmp"
       return 0
     fi
-    # Download failed. Discard stderr - DRM/format errors here are just symptoms
-    # of stale cached cookies; the browser re-scan below will sort it out, and
-    # any genuine URL problem will surface again during the cookieless fallback.
+    # Any cached-cookie failure discards diagnostics and cache, then retries the
+    # profile sequence; cookieless fallback can still expose the original error.
     rm -f "$_stderr_tmp" "$cookie_cache"
     vb::print "$Y" "Cached cookies stale - re-scanning browsers"
   fi
 
-  # Slow path - try every browser; write cookies on first success so
-  # the next invocation takes the fast path.
   for browser in "${COOKIE_BR[@]}"; do
     vb::print "$Y" "Trying ${B}${browser}${RS} cookies"
     # --cookies writes the merged jar to disk when the download succeeds.
@@ -140,21 +123,12 @@ _try_download() {
     rm -f "$cookie_cache"
   done
 
-  # All browsers exhausted - attempt without cookies (this will also
-  # surface the real error if the URL itself is the problem).
   vb::print "$Y" "No browser cookies worked. Downloading without cookies"
   yt-dlp "${base_args[@]}" "$url"
 }
 
-# Returns 0 (true) when the terminal window is NOT on the currently focused
-# workspace, meaning the user has switched away and a notification is useful.
-# Returns 1 when the window is on the active workspace (user can see the
-# terminal output directly).
-#
-# The window is identified by its fixed class and title, which Vibranium
-# sets via window rules when launching this script. This is more reliable
-# than PID (shared across all Alacritty windows) or address (requires
-# capturing activewindow at startup before the user can switch away).
+# Compare the exact-title client's workspace with the active workspace. An empty
+# match is treated as onscreen; duplicate title matches can return multiple IDs.
 _window_is_offscreen() {
   local active_ws our_ws
 
@@ -163,17 +137,14 @@ _window_is_offscreen() {
   our_ws="$(hyprctl -j clients | jq -r \
     '.[] | select(.title == "vb-util-yt-dlp") | .workspace.id')"
 
-  # If the window is not found in the client list (e.g. it was closed),
-  # treat it as onscreen to avoid spurious notifications.
   [[ -z "$our_ws" ]] && return 1
 
-  # Return 0 when the workspace IDs differ (window is offscreen).
   [[ "$our_ws" != "$active_ws" ]]
 }
 
 if ! command -v yt-dlp > /dev/null; then
   if ! term::ask_yes_no Y "${B}yt-dlp${RS} not found. Install it now?"; then
-    _operation_canceled
+    operation::result canceled
     exit 1
   fi
 
@@ -181,9 +152,13 @@ if ! command -v yt-dlp > /dev/null; then
   term::enable_input
 fi
 
+term::enable_input
 while true; do
   if [[ -z "$URL" ]]; then
-    read -rp "${Y}[VIBRANIUM]${RS} Enter video URL: " URL
+    if ! term::prompt_line URL "${Y}[*]${RS} Enter video URL: "; then
+      operation::result canceled "No URL provided"
+      exit 1
+    fi
   fi
 
   if [[ $URL =~ ^https?:// ]]; then
@@ -193,42 +168,53 @@ while true; do
   vb::print "$R" "Not a valid URL!"
   URL=""
 done
+term::disable_input
 
-# Tmpfile receives the final file path from yt-dlp via --print-to-file.
-# Reset the trap so the tmpfile is removed on Ctrl-C as well.
+# yt-dlp writes the final path to a side-channel mktemp. The first trap handles
+# INT; TERM and KILL have no cleanup handler and can leave the file behind.
 DL_PATH_FILE="$(mktemp)"
-trap 'trap "exit 1" INT; rm -f "$DL_PATH_FILE"; printf "\n"; _operation_canceled; exit 1' INT
+trap 'trap "exit 1" INT; rm -f "$DL_PATH_FILE"; printf "\n"; operation::result canceled; exit 1' INT
 
 if ! _try_download "$URL"; then
   rm -f "$DL_PATH_FILE"
   if _window_is_offscreen; then
-    notify-send -r 3 -t 10000 -u critical "Video Downloader" \
+    term::enable_input
+    # URL is embedded in notification markup verbatim, so markup characters
+    # are interpreted by the notification backend rather than escaped.
+    notify-send -r 3 -a "Vibranium" -t 10000 -u critical "Video Downloader" \
       "Failed to download:\n<span foreground='${P_RED}'>$URL</span>!"
     exit 1
   fi
 
   vb::print "$R" "Something went wrong!"
-  _operation_canceled
+  operation::result error
   exit 1
 fi
 
-# Read and strip the trailing newline that --print-to-file appends.
-DL_FILE="$(< "$DL_PATH_FILE")"
+# Command substitution strips all trailing newlines; explicit single-newline
+# removal follows, so a filename ending in newline bytes cannot round-trip.
+DL_FILE=""
+IFS= read -r DL_FILE < "$DL_PATH_FILE" || [[ -n $DL_FILE ]]
 DL_FILE="${DL_FILE%$'\n'}"
 rm -f "$DL_PATH_FILE"
 
-# Copy the file URI to the clipboard so it can be pasted directly into
-# file managers, media players, or anything that accepts drag-and-drop.
-DL_URI="$(path_to_file_uri "$DL_FILE")"
+# The encoder does not normalize its input. An absolute path yields an empty
+# file:// authority; a relative path would be parsed as a host instead.
+path_to_file_uri DL_URI "$DL_FILE"
 
+# text/uri-list uses CRLF record termination; percent-encoding keeps path bytes
+# intact while the URI crosses clipboard consumers.
 printf '%s\r\n' "$DL_URI" | wl-copy --type text/uri-list
 vb::print "$G" "Copied to clipboard: ${B}${DL_URI}${RS}"
 vb::print "$G" "Video has been saved to ${B}$OUTPUT_DIR${RS}"
 
 if _window_is_offscreen; then
-  notify-send -r 3 -t 5000 "Video Downloader" \
+  term::enable_input
+  # OUTPUT_DIR is also notification markup, so characters such as ampersands
+  # are interpreted rather than escaped for display.
+  notify-send -r 3 -a "Vibranium" -t 5000 "Video Downloader" \
     "Video has been successfully saved to <b><span foreground='${P_BLUE}'>$OUTPUT_DIR</span></b>"
   exit 0
 fi
 
-_operation_complete
+operation::result success

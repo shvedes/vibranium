@@ -1,0 +1,10 @@
+module qs.features.apps.audioMixer
+
+singleton AudioMixer 1.0 AudioMixer.qml
+AudioMixerController 1.0 AudioMixerController.qml
+AudioMixerWindow 1.0 AudioMixerWindow.qml
+GraphTab 1.0 GraphTab.qml
+GraphNode 1.0 GraphNode.qml
+DeviceRow 1.0 DeviceRow.qml
+StreamRow 1.0 StreamRow.qml
+VolumeSlider 1.0 VolumeSlider.qml

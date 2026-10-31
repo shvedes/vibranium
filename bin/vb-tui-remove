@@ -43,18 +43,25 @@ FZF_ARGS=(
   --color "${FZF_COLORS:-pointer:white,marker:green}"
 )
 
-_operation_canceled() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  read -r -n1 -s -p $'. Press any key to exit' _dummy
+tui_remove_prepare_result() {
+  if [[ -z "${term_original_settings+x}" ]]; then
+    term::disable_input
+  fi
 }
 
-_operation_complete() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s " "$G" "$RS"
-  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
-  read -r -n1 -p $'Removal complete. Press any key to exit ' _dummy
+tui_remove_canceled() {
+  tui_remove_prepare_result
+  operation::result canceled
+}
+
+tui_remove_error() {
+  tui_remove_prepare_result
+  operation::result error
+}
+
+tui_remove_complete() {
+  tui_remove_prepare_result
+  operation::result success -- "Removal complete"
 }
 
 usage() {
@@ -71,10 +78,13 @@ EOF
 }
 
 _desktop_name() {
-  local name
-  name=$(grep '^Name=' "$1" | head -1)
-  name="${name#Name=}"
-  echo "${name#TUI - }"
+  local -n _dn_out=$1
+  local _dn_file="$2" _dn_line _dn_val=""
+  while IFS= read -r _dn_line || [[ -n $_dn_line ]]; do
+    if [[ $_dn_line == Name=* ]]; then _dn_val=$_dn_line; break; fi
+  done < "$_dn_file"
+  _dn_val=${_dn_val#Name=}
+  _dn_out=${_dn_val#TUI - }
 }
 
 _remove_tuiapp() {
@@ -85,6 +95,9 @@ _remove_tuiapp() {
     removed=true
   }
 
+  # Icon cleanup reconstructs a path from the desktop display name rather than
+  # reading Icon=. Same-name entries can share the file and remove each other's
+  # icon; arbitrary Icon= references remain untouched.
   for ext in png jpg jpeg ico svg; do
     [[ -f "$ICON_DIR/TUI - $name.$ext" ]] && {
       rm -f -- "$ICON_DIR/TUI - $name.$ext"
@@ -136,7 +149,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# --- Resolve targets ---
+# Resolve interactive or CLI targets into parallel name and path arrays.
 
 TARGET_NAMES=()
 TARGET_PATHS=()
@@ -144,35 +157,51 @@ TARGET_PATHS=()
 if [[ $INTERACTIVE == true ]]; then
   # Build a name-to-path map from all TUI - *.desktop files, including
   # entries created with --custom-exec.
+  # One map entry is exposed per display name; duplicate Name= values resolve
+  # to whichever matching file is enumerated last.
   declare -A TUI_MAP
+  _tui_dn=""
   while IFS= read -r -d '' file; do
-    TUI_MAP["$(_desktop_name "$file")"]="$file"
+    _desktop_name _tui_dn "$file"
+    TUI_MAP["$_tui_dn"]="$file"
   done < <(find "$DESKTOP_DIR" -name 'TUI - *.desktop' -print0)
 
   if ((${#TUI_MAP[@]} == 0)); then
     term::show_header --color red
     vb::print "$R" "No TUI apps found"
-    _operation_canceled
+    tui_remove_error
     exit 1
   fi
 
-  mapfile -t SELECTED < <(
-    for name in "${!TUI_MAP[@]}"; do
-      printf '%s\t%s\n' "$name" "${TUI_MAP[$name]}"
-    done | sort | fzf "${FZF_ARGS[@]}"
-  )
+  # The hidden tab-delimited field carries paths through fzf, so spaces remain
+  # inside each field. Literal tabs in either the display name or path break the
+  # two-field encoding and subsequent extraction.
+  _tui_rows=()
+  for name in "${!TUI_MAP[@]}"; do
+    _tui_rows+=("$name"$'\t'"${TUI_MAP[$name]}")
+  done
+  for ((_tui_i = 1; _tui_i < ${#_tui_rows[@]}; _tui_i++)); do
+    _tui_key=${_tui_rows[_tui_i]}
+    _tui_j=$((_tui_i - 1))
+    while ((_tui_j >= 0)) && [[ ${_tui_rows[_tui_j]} > $_tui_key ]]; do
+      _tui_rows[_tui_j + 1]=${_tui_rows[_tui_j]}
+      _tui_j=$((_tui_j - 1))
+    done
+    _tui_rows[_tui_j + 1]=$_tui_key
+  done
+  mapfile -t SELECTED < <(printf '%s\n' "${_tui_rows[@]}" | fzf "${FZF_ARGS[@]}")
 
   term::show_header
 
   if ((${#SELECTED[@]} == 0)); then
-    _operation_canceled
+    tui_remove_canceled
     exit 1
   fi
 
   ((${#SELECTED[@]} == 1)) && suffix="" || suffix="s"
 
   if ! term::ask_yes_no Y "You're about to remove ${#SELECTED[@]} TUI app${suffix}. Continue?"; then
-    _operation_canceled
+    tui_remove_canceled
     exit 1
   fi
 
@@ -184,7 +213,11 @@ if [[ $INTERACTIVE == true ]]; then
 else
   # Non-interactive mode: accept paths or basenames on the CLI.
   # Basenames are resolved against the standard desktop directory.
+  # Missing or foreign-name targets are skipped individually, and no
+  # aggregate error is retained for the final exit status.
   for file_arg in "${DESKTOP_FILES[@]}"; do
+    # A value containing a slash is accepted verbatim; filename shape is the
+    # ownership check, not confinement to DESKTOP_DIR.
     [[ "$file_arg" == */* ]] && desktop_path="$file_arg" || desktop_path="$DESKTOP_DIR/$file_arg"
 
     if [[ ! -f "$desktop_path" ]]; then
@@ -198,13 +231,20 @@ else
       continue
     fi
 
-    TARGET_NAMES+=("$(_desktop_name "$desktop_path")")
+    _tui_dn=""
+    _desktop_name _tui_dn "$desktop_path"
+    TARGET_NAMES+=("$_tui_dn")
     TARGET_PATHS+=("$desktop_path")
   done
 fi
 
+# Removal is sequential and non-transactional across a multi-selection; an
+# interruption can leave only the prefix that completed.
 for i in "${!TARGET_NAMES[@]}"; do
   _remove_tuiapp "${TARGET_NAMES[$i]}" "${TARGET_PATHS[$i]}"
 done
 
-[[ $INTERACTIVE == true ]] && _operation_complete
+if [[ $INTERACTIVE == true ]]; then
+  tui_remove_complete
+  exit 0
+fi

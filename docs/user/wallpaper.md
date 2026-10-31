@@ -1,6 +1,6 @@
 # Wallpaper
 
-Wallpapers in Vibranium are **per-theme** and handled by `vb-core-wallpaper` on top of [awww](https://codeberg.org/LGFae/awww).
+Wallpapers in Vibranium are **per-theme** and handled natively by the shell's wallpaper service (`Wallpaper.qml`). The per-theme pointer is cached in `wallpaper.json`.
 
 ## Setting a wallpaper
 
@@ -13,15 +13,24 @@ Wallpapers in Vibranium are **per-theme** and handled by `vb-core-wallpaper` on 
 **CLI way**:
 
 ```bash
-vb-core-wallpaper /path/to/your/beautiful_wallpaper.png
+vb-shell wallpaper /path/to/your/beautiful_wallpaper.png
 ```
 
-`vb-core-wallpaper --help` shows the full options list.
+`vb-shell wallpaper` accepts `--next`, `--prev`, `refresh`, `get`, and a bare image path (which sets it). It routes every verb through the shell's wallpaper IPC handler.
 
 ## The wallpaper cycle
 
 ++ctrl+alt+w++ cycles to the next wallpaper of the active theme.
 Your custom wallpapers are **included** in the cycle, alongside the theme's defaults — Vibranium merges the theme's `backgrounds/` folder with your own picks.
+
+## Transitions
+
+**Vibranium Menu** -> **Settings** -> **Wallpaper** (visible while the wallpaper is on):
+
+- **Transition** — how the new wallpaper replaces the old one: instant cut, crossfade, a slide from a random edge, a slanted band sweeping from a random angle and origin, a circle that randomly grows or shrinks from anywhere, or a random pick per swap.
+- **Transition speed** — Slow, Default or Fast. Every effect follows the preset; each keeps its own motion curve.
+
+With animations disabled globally, swaps always cut instantly regardless of these options.
 
 ## Per-theme, on purpose
 

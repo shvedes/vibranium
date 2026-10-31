@@ -1,0 +1,220 @@
+#!/bin/bash
+
+if [[ "$CHASSIS_TYPE" == vm ]]; then
+  echo "Not available in a VM" >&2
+  exit 1
+fi
+
+source vb-lib-cli
+source vb-lib-core
+
+PACKAGES=(
+  cups
+  nss-mdns
+  cups-pdf
+  cups-browsed
+  cups-filters
+  system-config-printer
+
+  # https://wiki.archlinux.org/title/CUPS#Printer_drivers
+  gutenprint
+  foomatic-db
+  foomatic-db-ppds
+  foomatic-db-engine
+  foomatic-db-nonfree
+  foomatic-db-nonfree-ppds
+  foomatic-db-gutenprint-ppds
+)
+
+# True when the file contains a line exactly equal to the given string.
+_file_has_line() {
+  local file="$1" want="$2" _fhl_line
+  [[ -f "$file" ]] || return 1
+  while IFS= read -r _fhl_line || [[ -n "$_fhl_line" ]]; do
+    if [[ "$_fhl_line" == "$want" ]]; then
+      return 0
+    fi
+  done < "$file"
+  return 1
+}
+
+# _write_file returns 1 when the content comparison reports matching content;
+# otherwise it returns 0 after the write path, which is not a write-success
+# check because the pipeline status is not inspected.
+_write_file() {
+  local dest="$1"
+  local content="$2"
+
+  if [[ -f "$dest" ]]; then
+    local _wf_current="" _wf_line
+    while IFS= read -r _wf_line || [[ -n "$_wf_line" ]]; do
+      _wf_current+="$_wf_line"$'\n'
+    done < "$dest"
+    while [[ "$_wf_current" == *$'\n' ]]; do _wf_current="${_wf_current%$'\n'}"; done
+    if [[ "$_wf_current" == "$content" ]]; then
+      return 1 # unchanged
+    fi
+  fi
+
+  # A predictable .bak suffix keeps the backup path stable while avoiding
+  # timestamp proliferation when the setup is repeated.
+  if [[ -f "$dest" ]]; then
+    vb::print "$G" "Backing up existing ${B}${dest}${RS}"
+    sudo cp -a "$dest" "${dest}.bak"
+  fi
+
+  sudo mkdir -p "${dest%/*}"
+  printf "%s" "$content" | sudo tee "$dest" > /dev/null
+  return 0 # written
+}
+
+_configure_resolved() {
+  local conf=/etc/systemd/resolved.conf.d/10-disable-multicast.conf
+  # Disable multicast DNS in resolved. Avahi provides this instead,
+  # for better network printer discovery.
+  # https://wiki.archlinux.org/title/Avahi#Installation
+  local desired=$'[Resolve]\nMulticastDNS=no\n'
+
+  if _write_file "$conf" "$desired"; then
+    vb::print "$Y" "Disabled multicast DNS in systemd-resolved"
+    sudo systemctl restart systemd-resolved 2> /dev/null
+    return 0 # applied
+  fi
+
+  vb::print "$G" "systemd-resolved config: already up to date, skipping"
+  return 1 # unchanged
+}
+
+# The hosts source order gives local machine and mdns_minimal priority;
+# NOTFOUND=return stops later NSS sources after an mDNS miss, so a .local
+# lookup is not handed to ordinary DNS.
+_configure_nsswitch() {
+  local desired="hosts: mymachines mdns_minimal [NOTFOUND=return] resolve files myhostname dns"
+
+  if _file_has_line /etc/nsswitch.conf "$desired"; then
+    vb::print "$G" "nsswitch hosts line: already up to date, skipping"
+    return 1 # unchanged
+  fi
+
+  vb::print "$Y" "Pointing nsswitch hosts at mdns_minimal"
+  local _ns_has_hosts=false _ns_line
+  if [[ -r /etc/nsswitch.conf ]]; then
+    while IFS= read -r _ns_line || [[ -n "$_ns_line" ]]; do
+      if [[ "$_ns_line" == hosts:* ]]; then
+        _ns_has_hosts=true
+        break
+      fi
+    done < /etc/nsswitch.conf
+  fi
+  if $_ns_has_hosts; then
+    local _ns_lines=() _ns_rewrite
+    while IFS= read -r _ns_rewrite || [[ -n "$_ns_rewrite" ]]; do
+      if [[ "$_ns_rewrite" == hosts:* ]]; then
+        _ns_lines+=("$desired")
+      else
+        _ns_lines+=("$_ns_rewrite")
+      fi
+    done < /etc/nsswitch.conf
+    printf '%s\n' "${_ns_lines[@]}" | sudo tee /etc/nsswitch.conf > /dev/null
+  else
+    printf "%s\n" "$desired" | sudo tee -a /etc/nsswitch.conf > /dev/null
+  fi
+  return 0 # applied
+}
+
+_configure_browsed() {
+  local conf=/etc/cups/cups-browsed.conf
+  local line="CreateRemotePrinters Yes"
+
+  if _file_has_line "$conf" "$line"; then
+    vb::print "$G" "cups-browsed config: already up to date, skipping"
+    return 1 # unchanged
+  fi
+
+  vb::print "$Y" "Enabling remote printer creation in cups-browsed"
+  sudo mkdir -p /etc/cups
+  sudo touch "$conf"
+  if ! _file_has_line "$conf" "$line"; then
+    printf "%s\n" "$line" | sudo tee -a "$conf" > /dev/null
+  fi
+  return 0 # applied
+}
+
+term::disable_input
+
+# This fast path checks systemd enablement only; it does not verify active
+# state, service health, or configuration drift.
+if systemctl -q is-enabled cups.service 2> /dev/null &&
+  systemctl -q is-enabled cups-browsed.service 2> /dev/null &&
+  systemctl -q is-enabled avahi-daemon.service 2> /dev/null; then
+  term::show_header --color green
+  vb::print "$B" "Use ${Y}system-config-printer${RS} to manage printers"
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result noop -- "Printing support is already set up and working"
+  exit 0
+fi
+
+term::show_header
+
+vb::print "$Y" "You're about to setup printing support (CUPS, Avahi & mDNS)"
+
+if ! term::ask_yes_no Y "Proceed with setup?"; then
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result canceled
+  exit 1
+fi
+
+term::disable_input
+if ! vb-pkg-install --embedded -- "${PACKAGES[@]}"; then
+  if [[ -z "${term_original_settings:-}" ]]; then
+    term::disable_input
+  fi
+  operation::result error
+  exit 1
+fi
+
+summary_rules=()
+
+if _configure_resolved; then
+  summary_rules+=("systemd-resolved: ${G}multicast DNS disabled${RS} (Avahi takes over)")
+else
+  summary_rules+=("systemd-resolved: ${P}unchanged${RS}")
+fi
+
+if _configure_nsswitch; then
+  summary_rules+=("nsswitch: ${G}hosts line pointed at mdns_minimal${RS}")
+else
+  summary_rules+=("nsswitch: ${P}unchanged${RS}")
+fi
+
+if _configure_browsed; then
+  summary_rules+=("cups-browsed: ${G}remote printer creation enabled${RS}")
+else
+  summary_rules+=("cups-browsed: ${P}unchanged${RS}")
+fi
+
+vb::print "$Y" "Enabling systemd units"
+# The three units form the discovery path: cups serves queues, cups-browsed
+# discovers remote printers, and avahi publishes the mDNS records.
+sudo systemctl -q enable --now cups.service cups-browsed.service avahi-daemon.service
+summary_rules+=("Systemd units: ${G}cups, cups-browsed and avahi-daemon enabled and started${RS}")
+
+echo ""
+vb::print "$B" "-- Summary -----------------------------"
+for rule in "${summary_rules[@]}"; do
+  vb::print "$B" " • $rule"
+done
+vb::print "$B" "-----------------------------------------"
+echo ""
+
+vb::print "$B" "Use ${Y}system-config-printer${RS} to add and manage printers"
+vb::print "$B" "Refer to ${Y}\033[4mhttps://wiki.archlinux.org/title/CUPS${RS} for further, advanced configuration"
+
+if [[ -z "${term_original_settings:-}" ]]; then
+  term::disable_input
+fi
+operation::result success -- "Setup complete"

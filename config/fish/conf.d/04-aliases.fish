@@ -2,8 +2,6 @@
 #                       Vibranium                     #
 #######################################################
 
-alias vibranium-healthcheck "vb-cmd-healthcheck"
-
 alias imv "imv-dir"
 
 #######################################################

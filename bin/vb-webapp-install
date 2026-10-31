@@ -9,10 +9,8 @@ SELF="${0##*/}"
 
 VERBOSE=${VERBOSE:-false}
 
-# ---------------------------------------------------------------------------
-# Flags populated by argument parsing below. All default to empty; interactive
-# mode fills them via prompts, non-interactive mode via --flags.
-# ---------------------------------------------------------------------------
+# Parser state starts with empty strings and false booleans. Interactive mode
+# populates the fields it prompts for; flags can still set non-prompted state.
 
 APP_URL=""
 APP_NAME=""
@@ -143,36 +141,53 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-_operation_complete() {
-  term::disable_input
-  printf "%s[VIBRANIUM]%s " "$G" "$RS"
-  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
-  read -n1 -r -p $'Installation complete. Press any key to exit ' dummy
-}
+# The absence of --url selects interactive mode. Resolving it here lets the
+# Chromium preflight report through the same result helpers as the prompts.
+[[ -z $APP_URL ]] && INT_MODE=true
 
-_operation_canceled() {
-  [[ $INT_MODE == true ]] || return
-  term::disable_input
-  if [[ "$1" == "--positive" ]]; then
-    printf "%s[VIBRANIUM]%s Operation canceled" "$G" "$RS"
-  else
-    printf "%s[VIBRANIUM]%s Operation canceled" "$R" "$RS"
+webapp_install_prepare_result() {
+  if [[ -z "${term_original_settings+x}" ]]; then
+    term::disable_input
   fi
-  trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-  read -n1 -r -s -p $'. Press any key to exit' dummy
 }
 
-# ---------------------------------------------------------------------------
-# Derive auto-keywords from a URL.
-# Strips the protocol and www., splits the hostname on dots, drops the TLD
-# (last component), capitalizes each part, and emits them joined by semicolons.
-# Additionally extracts the last path segment, splits it on -, _, ., and spaces,
-# skips common English stop words (the, to, a, an, etc.), capitalizes the
-# remaining words, and appends them.
-# Example: https://www.nasa.gov/gallery/journey-to-the-moon/ -> "Nasa;Journey;Moon;"
-# ---------------------------------------------------------------------------
+webapp_install_canceled() {
+  [[ $INT_MODE == true ]] || return
+  webapp_install_prepare_result
+  operation::result canceled
+}
+
+webapp_install_interrupt() {
+  trap 'exit 1' INT
+  printf '\n'
+  webapp_install_canceled
+  exit 1
+}
+
+webapp_install_duplicate_canceled() {
+  [[ $INT_MODE == true ]] || return
+  webapp_install_prepare_result
+  operation::result noop -- "Operation canceled"
+}
+
+webapp_install_error() {
+  [[ $INT_MODE == true ]] || return
+  webapp_install_prepare_result
+  operation::result error
+}
+
+webapp_install_complete() {
+  webapp_install_prepare_result
+  operation::result success -- "Installation complete"
+}
+
+# Derive semicolon-separated keywords from a URL. Multi-label hosts contribute
+# components longer than two characters; a one-label host contributes itself.
+# The last path segment is split on space, hyphen, underscore, dot, and slash,
+# then short and common stop-word tokens are removed before capitalization.
 _auto_keywords_from_url() {
-  local url="$1"
+  local -n _akw_out=$1
+  local url="$2"
 
   local host="${url#*://}"
   host="${host%%/*}"
@@ -205,7 +220,7 @@ _auto_keywords_from_url() {
   fi
 
   if [[ -z "$path" || "$path" == "/" ]]; then
-    echo "$keywords"
+    _akw_out="$keywords"
     return
   fi
 
@@ -237,37 +252,61 @@ _auto_keywords_from_url() {
     keywords+="${capitalized};"
   done
 
-  printf '%s' "$keywords"
+  _akw_out="$keywords"
 }
 
-# ---------------------------------------------------------------------------
-# Fetch the HTML of a URL and extract the content of the <title> tag.
-# Prints the title (stripped of leading/trailing whitespace) on stdout.
-# Returns 0 on any HTTP response, 1 if curl could not connect at all.
-# ---------------------------------------------------------------------------
+# Fetch with bounded time and redirects, then extract the title with sed. curl
+# without --fail accepts HTTP error bodies; transport, timeout, redirect-limit,
+# and URL errors return 1, while a successful fetch with no title yields no output.
 _fetch_page_title() {
-  local url="$1"
-  local html
+  local -n _fpt_out=$1
+  local _fpt_url="$2"
+  local _fpt_html _fpt_line _fpt_low _fpt_after _fpt_seg _fpt_raw _fpt_cap _fpt_tail
+  local _fpt_in=false
 
-  # Spoof a real browser UA; many sites reject the default "curl/X.Y.Z" agent
-  # with a challenge page or an "upgrade your browser" redirect rather than
-  # serving real HTML. Using a Chrome UA string is the most widely accepted.
-  local ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
+  # Override curl's default user agent; challenge pages can still be returned
+  # and are handled by the title checks below.
+  local _fpt_ua='Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36'
 
-  html="$(curl -sL --max-time 10 --max-redirs 3 -A "$ua" "$url" 2> /dev/null)" || return 1
+  _fpt_out=""
+  _fpt_html="$(curl -sL --max-time 10 --max-redirs 3 -A "$_fpt_ua" "$_fpt_url" 2> /dev/null)" || return 1
 
-  sed -n '/<title/I{
-    :a
-    /<\/title>/!{N; ba}
-    s/.*<title[^>]*>[[:space:]]*\([^<]*\)[[:space:]]*<\/title>.*/\1/ip
-    q
-  }' <<< "$html"
+  # Collect from the first case-insensitive <title line through the first
+  # case-sensitive </title>, mirroring the previous sed address range.
+  _fpt_acc=""
+  while IFS= read -r _fpt_line || [[ -n $_fpt_line ]]; do
+    if ! $_fpt_in; then
+      _fpt_low=${_fpt_line,,}
+      [[ $_fpt_low == *'<title'* ]] || continue
+      _fpt_in=true
+      _fpt_acc=$_fpt_line
+    else
+      _fpt_acc+=$'\n'$_fpt_line
+    fi
+    [[ $_fpt_acc == *'</title>'* ]] && break
+  done <<< "$_fpt_html"
+  [[ -n $_fpt_acc ]] || return 0
+
+  # Inner text between the tags with edge whitespace trimmed. Offsets map
+  # one-to-one because tag matching only inspects ASCII characters.
+  _fpt_low=${_fpt_acc,,}
+  _fpt_after=${_fpt_low#*<title}
+  _fpt_seg=${_fpt_acc:$((${#_fpt_low} - ${#_fpt_after}))}
+  [[ $_fpt_seg == *'>'* ]] || return 0
+  _fpt_seg=${_fpt_seg#*>}
+  _fpt_raw=${_fpt_seg%%'<'*}
+  _fpt_tail=${_fpt_seg:${#_fpt_raw}}
+  _fpt_tail=${_fpt_tail#'<'}
+  _fpt_tail=${_fpt_tail#"${_fpt_tail%%[![:space:]]*}"}
+  [[ $_fpt_tail == '/title>'* ]] || return 0
+  _fpt_cap=${_fpt_raw#"${_fpt_raw%%[![:space:]]*}"}
+  _fpt_cap=${_fpt_cap%"${_fpt_cap##*[![:space:]]}"}
+  _fpt_out=$_fpt_cap
+  return 0
 }
 
-# ---------------------------------------------------------------------------
-# Check that a URL is reachable by sending an HTTP HEAD request.
-# Returns 0 if the server responds with any HTTP status, 1 otherwise.
-# ---------------------------------------------------------------------------
+# Send HEAD with bounded time and redirects. Without --fail, any completed HTTP
+# response succeeds; transport, timeout, and redirect-limit errors fail.
 _check_url_reachable() {
   local url="$1"
   local urls=()
@@ -286,28 +325,26 @@ _check_url_reachable() {
   return 1
 }
 
-# ---------------------------------------------------------------------------
-# Scan all installed PWA .desktop files for one whose Exec= line matches
-# the given URL exactly. Prints the matching file path and returns 0 if found.
-# Only the exact URL (same path, not just the same domain) is treated as a
-# duplicate, so e.g. deepl.com/en/translator and deepl.com/en/write can coexist.
-# Recognises both the plain and --own-profile Exec= variants so that
-# duplicate detection works regardless of how the PWA was originally installed.
-# Chromium-native installs (chrome-*.desktop) keep their URL in Comment/Name
-# rather than Exec=, so those are matched by full-URL substring instead.
-# ---------------------------------------------------------------------------
+# Generated entries match exact Exec= patterns. Native Chrome entries use a
+# case-insensitive whole-file fixed-string search, so unrelated fields containing
+# the URL can also match. Print the first path and return 0, or return 1.
 _find_webapp_by_url() {
-  local url="$1"
-  local f line exec_val
+  local -n _fwb_out=$1
+  local _fwb_url="$2"
+  local _fwb_lc="${_fwb_url,,}"
+  local f line exec_val _fwb_flc
 
   for f in "$XDG_DATA_HOME/applications"/'PWA - '*.desktop "$XDG_DATA_HOME/applications"/chrome-*.desktop; do
     [[ -f "$f" ]] || continue
 
     if [[ "$f" == */chrome-*.desktop ]]; then
-      if grep -Fiq "$url" "$f" &> /dev/null; then
-        echo "$f"
-        return 0
-      fi
+      while IFS= read -r line || [[ -n $line ]]; do
+        _fwb_flc=${line,,}
+        if [[ $_fwb_flc == *"$_fwb_lc"* ]]; then
+          _fwb_out="$f"
+          return 0
+        fi
+      done < "$f"
       continue
     fi
 
@@ -315,8 +352,8 @@ _find_webapp_by_url() {
       [[ $line == Exec=* ]] || continue
       exec_val="${line#Exec=}"
       case "$exec_val" in
-        "vb-launch-webapp $url" | "vb-launch-webapp --own-profile $url")
-          echo "$f"
+        "vb-launch-webapp $_fwb_url" | "vb-launch-webapp --own-profile $_fwb_url")
+          _fwb_out="$f"
           return 0
           ;;
       esac
@@ -327,115 +364,120 @@ _find_webapp_by_url() {
 }
 
 _normalize_url() {
-  local url="$1"
+  local -n _nu_out=$1
+  local url="$2"
 
-  # Strip trailing slashes so that example.com/a and example.com/a/ are treated
-  # as the same URL by duplicate detection. Applied before scheme probing so all
-  # four exit paths below produce a canonical result.
+  # Remove trailing slashes only. Scheme-less input uses the first completed
+  # HEAD response, preferring HTTPS; host case, ports, dots, queries, and
+  # fragments remain part of duplicate identity.
   while [[ $url == */ ]]; do url="${url%/}"; done
 
-  # Already has scheme -> leave as is
+  # Generic scheme detection preserves non-HTTP schemes, but the subsequent
+  # reachability check accepts only HTTP(S) and rejects them.
   if [[ $url =~ ^[a-zA-Z][a-zA-Z0-9+.-]*: ]]; then
-    printf '%s\n' "$url"
+    _nu_out="$url"
     return
   fi
 
-  # Try https first
   if curl -sIL --max-time 5 "https://$url" > /dev/null 2>&1; then
-    printf 'https://%s\n' "$url"
+    _nu_out="https://$url"
     return
   fi
 
-  # Fallback to http
   if curl -sIL --max-time 5 "http://$url" > /dev/null 2>&1; then
-    printf 'http://%s\n' "$url"
+    _nu_out="http://$url"
     return
   fi
 
-  printf 'https://%s' "$url"
+  _nu_out="https://$url"
 }
 
 _ask_for_icon() {
-  local ref
-  read -rp "${B}[VIBRANIUM]${RS} Icon URL / path / name (or Enter for default): ${B}" ref
-  [[ -z $ref ]] && ref="vb-pwa"
-  printf "%s" "$ref"
+  local -n _afi_out=$1
+  local _afi_ref
+  term::prompt_line _afi_ref "${B}[*]${RS} Icon URL / path / name (or Enter for default): ${B}" || _afi_ref=""
+  _afi_out="$_afi_ref"
 }
 
 _strip_title() {
-  local s="$1"
+  local -n _st_out=$1
+  local s="$2"
 
-  # Remove newlines and tabs (most annoying cases)
+  # Flatten line breaks and tabs, replace slash, collapse and trim spaces,
+  # remove one leading dot, and use App for an empty result.
   s=${s//$'\n'/ }
   s=${s//$'\r'/ }
   s=${s//$'\t'/ }
-
-  # Replace slash (only truly illegal char)
   s=${s//\//-}
 
-  # Collapse double spaces (cheap pass)
   while [[ $s == *"  "* ]]; do
     s=${s//"  "/" "}
   done
 
-  # Trim leading/trailing spaces
   s="${s#"${s%%[![:space:]]*}"}"
   s="${s%"${s##*[![:space:]]}"}"
 
-  # Prevent hidden files
   [[ $s == .* ]] && s="${s#.}"
-
-  # Fallback
   [[ -z $s ]] && s="App"
 
-  printf '%s\n' "$s"
+  _st_out="$s"
 }
 
-# ---------------------------------------------------------------------------
-# Resolve ICON_REF to a local path, downloading if it is a URL.
-# Falls back to the generic "vb-pwa" system icon on any failure.
-# ---------------------------------------------------------------------------
-_resolve_icon() {
-  local ref="$1"
-  local name="$2"
+# Return the themed fallback icon key.
+_fallback_icon() {
+  local -n _fbi_out=$1
+  _fbi_out="web-browser"
+}
 
-  if [[ -z $ref ]]; then
-    echo "vb-pwa"
+# Resolve HTTP(S) icon URLs to ICON_DIR downloads, use a matching file under
+# ICON_DIR, or pass other references through. Empty and failed URLs emit
+# web-browser.
+_resolve_icon() {
+  local -n _ri_out=$1
+  local _ri_ref="$2"
+  local _ri_name="$3"
+
+  if [[ -z $_ri_ref ]]; then
+    _fallback_icon _ri_out
     return
   fi
 
-  if [[ $ref =~ ^https?:// ]]; then
-    local ext="${ref##*.}"
-    [[ $ext =~ ^(png|jpg|jpeg|ico|svg)$ ]] || ext="png"
-    local path="$ICON_DIR/$name.$ext"
-    if curl -fsSL -o "$path" "$ref" 2> /dev/null && [[ -s $path ]]; then
-      echo "$path"
+  if [[ $_ri_ref =~ ^https?:// ]]; then
+    # curl writes the final path directly. Failure short-circuits the size check
+    # and can leave a partial file, which is neither selected nor cleaned here.
+    local _ri_ext="${_ri_ref##*.}"
+    [[ $_ri_ext =~ ^(png|jpg|jpeg|ico|svg)$ ]] || _ri_ext="png"
+    local _ri_path="$ICON_DIR/$_ri_name.$_ri_ext"
+    if curl -fsSL -o "$_ri_path" "$_ri_ref" 2> /dev/null && [[ -s $_ri_path ]]; then
+      _ri_out="$_ri_path"
     else
-      echo "vb-pwa"
+      _fallback_icon _ri_out
     fi
     return
   fi
 
-  if [[ -f "$ICON_DIR/$ref" ]]; then
-    echo "$ICON_DIR/$ref"
-  else
-    echo "$ref"
+  if [[ -f "$ICON_DIR/$_ri_ref" ]]; then
+    _ri_out="$ICON_DIR/$_ri_ref"
+    return
   fi
+
+  _ri_out="$_ri_ref"
 }
 
-# ---------------------------------------------------------------------------
-# Write the .desktop file for the given PWA.
-# ---------------------------------------------------------------------------
 _write_desktop() {
   local name="$1" exec_cmd="$2" icon="$3" keywords="$4" mime="$5" category="$6"
   local file="$XDG_DATA_HOME/applications/$name.desktop"
 
-  cat > "$file" << EOF
+  # Shell redirection truncates the destination and streams the base heredoc
+  # non-atomically; optional fields are appended later. Values are not escaped,
+  # and Exec= percent sequences are emitted for the launcher parser to interpret.
+  shcat > "$file" << EOF
 [Desktop Entry]
 Version=1.0
 Name=${name#PWA - }
 Comment=$name
 Exec=$exec_cmd
+TryExec=chromium
 Terminal=false
 Type=Application
 Icon=$icon
@@ -444,6 +486,8 @@ Categories=PWA;${category}
 OnlyShowIn=Hyprland;
 EOF
 
+  # Optional fields are appended only when populated, avoiding empty MimeType
+  # and Keywords keys with ambiguous desktop-entry semantics.
   if [[ -n $mime ]]; then
     printf 'MimeType=%s\n' "$mime" >> "$file"
   fi
@@ -455,32 +499,50 @@ EOF
   log Info "Created PWA file: '$file'"
 }
 
-# ---------------------------------------------------------------------------
-# Main logic
-# ---------------------------------------------------------------------------
+# Shared state and colors load after argument parsing, keeping help and option
+# errors independent of the runtime environment.
 
 source vb-lib-core
+
+# Generated entries launch the site in Chromium's app mode, so the desktop file
+# is inert without the binary. A custom --exec can replace the launcher, but the
+# entry still has to be Chromium-backed to be a PWA at all.
+if ! command -v chromium &> /dev/null; then
+  if [[ $INT_MODE == true ]]; then
+    term::show_header --color red
+    vb::print "$R" "Chromium is not installed"
+    vb::print "$R" "PWA entries run as Chromium app windows, so they cannot be created without it"
+  else
+    log Error "Chromium is not installed"
+    log Error "PWA entries run as Chromium app windows, so they cannot be created without it"
+  fi
+
+  webapp_install_canceled
+  exit 1
+fi
 
 if ! [[ -d "$ICON_DIR" ]]; then
   mkdir -p "$ICON_DIR"
 fi
 
-if [[ -z $APP_URL ]]; then
-  INT_MODE=true
-  trap "trap 'exit 1' INT; printf '\n'; _operation_canceled; exit 1" INT
+if [[ $INT_MODE == true ]]; then
+  trap 'webapp_install_interrupt' INT
   term::show_header
 
+  term::enable_input
   while true; do
-    term::enable_input
-    read -rp "${Y}[VIBRANIUM]${RS} PWA URL: ${B}" APP_URL
-    term::disable_input
+    if ! term::prompt_line APP_URL "${Y}[*]${RS} PWA URL: ${B}"; then
+      webapp_install_canceled
+      exit 1
+    fi
 
     if [[ -n $APP_URL ]]; then
       break
     fi
   done
 
-  # Quick scheme-less normalization for duplicate check (no curl probes)
+  # Duplicate preflight uses HTTPS for scheme-less input without probing, so an
+  # existing HTTP entry can survive both this check and the later name check.
   while [[ $APP_URL == */ ]]; do APP_URL="${APP_URL%/}"; done
   if [[ ! $APP_URL =~ ^[a-zA-Z][a-zA-Z0-9+.-]*: ]]; then
     CHECK_URL="https://$APP_URL"
@@ -492,7 +554,8 @@ if [[ -z $APP_URL ]]; then
   if [[ $FORCE == true ]]; then
     _url_ovw_ok=true
   else
-    if _dup_file="$(_find_webapp_by_url "$CHECK_URL")"; then
+    _dup_file=""
+    if _find_webapp_by_url _dup_file "$CHECK_URL"; then
       vb::print "$Y" "Duplicate found: ${B}${_dup_file##*/}${RS}"
       if term::ask_yes_no Y "This PWA is already installed. Overwrite it?"; then
         _url_ovw_ok=true
@@ -504,6 +567,9 @@ if [[ -z $APP_URL ]]; then
               break
             fi
           done < "$_dup_file"
+          # Native Chrome cleanup removes the prior entry prior to replacement
+          # validation and deletes icons by basename across the tree, so a
+          # later failure can also remove an icon shared by another entry.
           rm -f -- "$_dup_file"
 
           if [[ -n "$_icon" ]]; then
@@ -511,46 +577,40 @@ if [[ -z $APP_URL ]]; then
           fi
         fi
       else
-        _operation_canceled --positive
+        webapp_install_duplicate_canceled
         exit 1
       fi
     fi
   fi
 
   vb::print "$Y" "Probing URL availability..."
-  APP_URL="$(_normalize_url "$APP_URL")"
+  _normalize_url APP_URL "$APP_URL"
   _check_url_reachable "$APP_URL" &
 
-  if ! term::spinner $! "${Y}[VIBRANIUM]${RS} Verifying URL"; then
+  if ! term::spinner $! "${Y}[*]${RS} Verifying URL"; then
     vb::print "$R" "Could not reach ${B}http(s)://${APP_URL#*://}${RS}"
     vb::print "$R" "Check the URL or your connection."
-    _operation_canceled
+    webapp_install_error
     exit 1
   fi
 
+  # The title spool uses a script-specific runtime path, so concurrent
+  # interactive installs can overwrite or remove each other's title data.
   _fetch_page_title "$APP_URL" > "$VIBRANIUM_RUNTIME/$SELF.tmp" &
-  if term::spinner $! "${Y}[VIBRANIUM]${RS} Fetching page title"; then
-    PAGE_TITLE=$(< "$VIBRANIUM_RUNTIME/$SELF.tmp")
+  if term::spinner $! "${Y}[*]${RS} Fetching page title"; then
+    PAGE_TITLE=""
+    IFS= read -r PAGE_TITLE < "$VIBRANIUM_RUNTIME/$SELF.tmp" || [[ -n $PAGE_TITLE ]]
   else
     PAGE_TITLE=""
   fi
 
   rm -f "$VIBRANIUM_RUNTIME/$SELF.tmp" &
 
-  PAGE_TITLE="$(_strip_title "$PAGE_TITLE")"
+  _strip_title PAGE_TITLE "$PAGE_TITLE"
 
-  # Cloudflare and similar bot-protection pages serve a challenge document
-  # whose <title> is a fixed string like "Just a moment..." instead of the
-  # real page title. Detect these and fall back to manual entry so the user
-  # does not end up with a PWA named after the challenge interstitial.
-  # The shopt is set locally so it does not affect the rest of the script.
-  #
-  # Matched patterns (case-insensitive):
-  #   "Just a moment..."   - Cloudflare JS challenge
-  #   "Please Wait..."     - Cloudflare managed challenge
-  #   "Attention Required" - Cloudflare WAF block page
-  #   "Access Denied"      - generic WAF / CDN block
-  #   "...Cloudflare"      - any title containing the Cloudflare brand name
+  # Challenge pages can replace the requested title. Match their common title
+  # prefixes or Cloudflare branding case-insensitively; nocasematch is
+  # shell-global, and successful setup is cleared rather than restored.
   _title_chall=false
   if shopt -s nocasematch 2> /dev/null; then
     [[ $PAGE_TITLE =~ ^(Just a moment|Please Wait|Attention Required|Access Denied)|Cloudflare ]] &&
@@ -567,11 +627,17 @@ if [[ -z $APP_URL ]]; then
   term::enable_input
   if [[ -n $PAGE_TITLE && $PAGE_TITLE != "App" ]]; then
     vb::print "$Y" "Auto-generated name: ${B}${PAGE_TITLE}${RS}"
-    read -rp "${B}[VIBRANIUM]${RS} PWA name (Enter to keep the name above): " APP_NAME
+    if ! term::prompt_line APP_NAME "${B}[*]${RS} PWA name (Enter to keep the name above): "; then
+      webapp_install_canceled
+      exit 1
+    fi
     APP_NAME="PWA - ${APP_NAME:-$PAGE_TITLE}"
   else
     while true; do
-      read -rp "${Y}[VIBRANIUM]${RS} PWA name: " APP_NAME
+      if ! term::prompt_line APP_NAME "${Y}[*]${RS} PWA name: "; then
+        webapp_install_canceled
+        exit 1
+      fi
       if [[ -n $APP_NAME ]]; then
         break
       fi
@@ -579,25 +645,21 @@ if [[ -z $APP_URL ]]; then
     done
     APP_NAME="PWA - $APP_NAME"
   fi
-  term::disable_input
 
   if [[ $_url_ovw_ok == false && $FORCE == false && -f "$XDG_DATA_HOME/applications/$APP_NAME.desktop" ]]; then
     vb::print "$Y" "A PWA named ${B}${APP_NAME#PWA - }${RS} is already installed."
     if ! _prompt_overwrite; then
-      _operation_canceled
+      webapp_install_canceled
       exit 1
     fi
   fi
 
-  # Ask whether to isolate this PWA in its own browser profile. Defaulting to N
-  # because most PWAs share the default profile without issue; isolation is only
-  # needed when separate login sessions or cookies are required (e.g. two
-  # accounts on the same service).
   if term::ask_yes_no N "Launch this PWA in its own isolated browser profile?"; then
     OWN_PROFILE=true
   fi
 
-  AUTO_KW="$(_auto_keywords_from_url "$APP_URL")"
+  AUTO_KW=""
+  _auto_keywords_from_url AUTO_KW "$APP_URL"
 
   if [[ -n "$AUTO_KW" ]]; then
     vb::print "$B" "Hint: keywords are special words that can be used as a search query in the app launcher"
@@ -606,37 +668,44 @@ if [[ -z $APP_URL ]]; then
   fi
 
   term::enable_input
-  read -rp "${B}[VIBRANIUM]${RS} Additional keywords (space-separated, or Enter to skip): $B" EXTRA_KW_RAW
+  term::prompt_line EXTRA_KW_RAW "${B}[*]${RS} Additional keywords (space-separated, or Enter to skip): $B" || EXTRA_KW_RAW=""
   term::disable_input
 
   EXTRA_KW=""
+  # Prompt input is whitespace-tokenized, so shell-style quoting does not preserve
+  # grouped keyword tokens; each token becomes one semicolon-terminated keyword.
   for kw in $EXTRA_KW_RAW; do EXTRA_KW+="${kw};"; done
   KEYWORDS="${AUTO_KW}${EXTRA_KW}"
 
   term::enable_input
-  read -rp "${B}[VIBRANIUM]${RS} Category (e.g. Network;WebBrowser, or Enter to skip): ${B}" CATEGORY
+  term::prompt_line CATEGORY "${B}[*]${RS} Category (e.g. Network;WebBrowser, or Enter to skip): ${B}" || CATEGORY=""
   term::disable_input
 
+  # APP_URL is interpolated into the favicon query without URL encoding. curl
+  # writes the final PNG directly, so failure can leave a partial artifact.
   FAVICON_URL="https://www.google.com/s2/favicons?domain=${APP_URL}&sz=128"
   if term::ask_yes_no Y "Would you like to keep the web page's original icon?"; then
     curl -fsSL -o "$ICON_DIR/$APP_NAME.png" "$FAVICON_URL" 2> /dev/null &
-    if term::spinner $! "${Y}[VIBRANIUM]${RS} Downloading favicon of the URL" && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
+    if term::spinner $! "${Y}[*]${RS} Downloading favicon of the URL" && [[ -s "$ICON_DIR/$APP_NAME.png" ]]; then
       ICON_REF="$APP_NAME.png"
     else
       vb::print "$R" "Could not fetch favicon automatically. Enter a PNG icon URL manually"
       vb::print "$R" "See ${B}https://dashboardicons.com${RS} for a large library"
       term::enable_input
-      ICON_REF="$(_ask_for_icon)"
+      _ask_for_icon ICON_REF
       term::disable_input
     fi
   else
     term::enable_input
-    ICON_REF="$(_ask_for_icon)"
+    _ask_for_icon ICON_REF
     term::disable_input
   fi
 
-  ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
+  _resolve_icon ICON_PATH "$ICON_REF" "$APP_NAME"
 
+  # Interactive mode always constructs vb-launch-webapp; CUSTOM_EXEC is
+  # consulted only in the CLI branch. OWN_PROFILE selects the --own-profile
+  # launcher flag, while vb-launch-webapp owns browser data-directory persistence.
   if [[ $OWN_PROFILE == true ]]; then
     EXEC_COMMAND="vb-launch-webapp --own-profile $APP_URL"
   else
@@ -646,12 +715,13 @@ if [[ -z $APP_URL ]]; then
 else
   log Info "Using CLI mode"
 
-  APP_URL="$(_normalize_url "$APP_URL")"
+  _normalize_url APP_URL "$APP_URL"
 
   log Info "Using URL: '$APP_URL'"
 
   log Info "Checking for duplicates"
-  if dup_file="$(_find_webapp_by_url "$APP_URL")"; then
+  dup_file=""
+  if _find_webapp_by_url dup_file "$APP_URL"; then
     log Info "Duplicate found: ${dup_file##*/}"
     if [[ $FORCE == false ]]; then
       log Error "Already installed for '$APP_URL', exiting"
@@ -659,6 +729,8 @@ else
       exit 1
     fi
 
+    # --force suppresses refusal for generated entries too, but only native Chrome
+    # matches are removed here. A generated duplicate at another path remains.
     log Info "Found duplicate. --force is being used, ignoring"
     if [[ "$dup_file" == */chrome-*.desktop ]]; then
       _icon=""
@@ -668,6 +740,9 @@ else
           break
         }
       done < "$dup_file"
+      # As in interactive mode, native cleanup removes the prior entry prior to
+      # replacement validation and deletes icons by basename, so a later failure
+      # can remove an icon shared by another entry.
       rm -f -- "$dup_file"
       [[ -n "$_icon" ]] && find "$XDG_DATA_HOME/icons" -name "${_icon}.png" -delete 2> /dev/null
     fi
@@ -685,14 +760,14 @@ else
 
   if [[ -z $APP_NAME ]]; then
     log Info "No --name provided; trying to fetch by URL title"
-    if APP_NAME="$(_fetch_page_title "$APP_URL")"; then
+    if _fetch_page_title APP_NAME "$APP_URL"; then
       log Info "Fetched page title: '$APP_NAME'"
     else
       log Warn "Failed to fetch URL title"
     fi
   fi
 
-  APP_NAME="$(_strip_title "$APP_NAME")"
+  _strip_title APP_NAME "$APP_NAME"
   [[ -z $APP_NAME || $APP_NAME == "App" ]] && exit 1
 
   [[ $APP_NAME != "PWA - "* ]] && APP_NAME="PWA - $APP_NAME"
@@ -703,12 +778,13 @@ else
   }
 
   log Info "Generating keywords"
-  AUTO_KW="$(_auto_keywords_from_url "$APP_URL")"
+  AUTO_KW=""
+  _auto_keywords_from_url AUTO_KW "$APP_URL"
 
   KEYWORDS="${AUTO_KW}${EXTRA_KW}"
   log Info "Desktop entry keywords: '$KEYWORDS'"
 
-  ICON_PATH="$(_resolve_icon "$ICON_REF" "$APP_NAME")"
+  _resolve_icon ICON_PATH "$ICON_REF" "$APP_NAME"
   log Info "Desktop entry icon: '$ICON_PATH'"
 
   if [[ -n $CUSTOM_EXEC ]]; then
@@ -730,5 +806,6 @@ _write_desktop "$APP_NAME" "$EXEC_COMMAND" "$ICON_PATH" "$KEYWORDS" "$MIME_TYPES
 if [[ $INT_MODE == true ]]; then
   vb::print "$G" "${B}${APP_NAME#PWA - }${RS} has been installed"
   vb::print "$G" "You can find it in the app launcher"
-  _operation_complete
+  webapp_install_complete
+  exit 0
 fi

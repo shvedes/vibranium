@@ -24,8 +24,12 @@ EOF
 # optional leading whitespace, the directive, and the quoted path.
 # Expands a leading ~ to $HOME since MPD allows tilde paths in config.
 mpd_music_dir() {
-  local dir
+  local -n _mpd_music_dir_out=$1
+  local dir=
+  local line
 
+  # The scan stops at the first matching directive, so duplicate entries later
+  # in the file do not replace the selected music directory.
   while IFS= read -r line; do
     [[ $line =~ ^[[:space:]]*music_directory[[:space:]]*\"(.*)\" ]] && {
       dir="${BASH_REMATCH[1]}"
@@ -41,29 +45,35 @@ mpd_music_dir() {
     dir="${dir/#\~/$HOME}"
   fi
 
-  printf '%s\n' "$dir"
+  _mpd_music_dir_out="$dir"
 }
 
 # Decode %XX sequences back to their original bytes. Replaces % with \x
 # and lets printf '%b' interpret the resulting escape sequences.
 _url_decode() {
-  local str="$1"
-  printf '%b\n' "${str//%/\\x}"
+  local -n _url_decode_out=$1
+  local str="$2"
+  printf -v _url_decode_out '%b' "${str//%/\\x}"
 }
 
-# URL-encode a string for use in a URI path by converting each byte
-# outside the RFC 3986 unreserved set to %XX.
+# URL-encode a URI path using Bash's character-wise substring loop. The
+# unreserved case preserves `/` as a path separator; other characters use
+# printf's numeric-character conversion for %XX.
 _url_encode() {
-  local str="$1" c i
+  local -n _url_encode_out=$1
+  local str="$2" c i hex
+  _url_encode_out=""
   for ((i = 0; i < ${#str}; i++)); do
     c="${str:i:1}"
     case "$c" in
-      [a-zA-Z0-9./_~-]) printf '%s' "$c" ;;
-      *) printf '%%%02X' "'$c" ;;
+      [a-zA-Z0-9./_~-]) _url_encode_out+="$c" ;;
+      *) printf -v hex '%%%02X' "'$c"; _url_encode_out+="$hex" ;;
     esac
   done
 }
 
+# The status probe is separate from fifo existence: a fifo can remain after
+# the daemon stops, while `%state%` reflects the live control connection.
 mpd_is_playing() {
   [[ "$(mpc status %state% 2> /dev/null)" == "playing" ]]
 }
@@ -101,31 +111,43 @@ file=""
 # The fifo check avoids triggering socket activation on a stopped MPD.
 if command -v mpc > /dev/null && [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] && mpd_is_playing; then
   track="$(mpc current -f '%file%')"
-  music_dir="$(mpd_music_dir)"
+  music_dir=
+  mpd_music_dir music_dir || exit $?
 
+  # An empty track or directory must not become a misleading `file://` URI.
   if [[ -n "$track" && -n "$music_dir" ]]; then
-    file="file://$(_url_encode "$music_dir/$track")"
+    encoded=
+    _url_encode encoded "$music_dir/$track"
+    file="file://$encoded"
   fi
 
 elif playerctl status &> /dev/null; then
+  # Playerctl supplies the URL directly, so this branch preserves whatever URI
+  # the active MPRIS player reports without local path conversion.
   file="$(playerctl metadata --format '{{xesam:url}}' 2> /dev/null)"
 fi
 
 if [[ -z "$file" ]]; then
   log Error "no track currently playing"
   if [[ "$notify" == true ]]; then
-    notify-send -u critical -t 3000 -r 4 "Vibranium" "No track currently playing"
+    notify-send -a "Vibranium" -u critical -t 3000 -r 4 "Vibranium" "No track currently playing"
   fi
   exit 1
 fi
 
+# The explicit MIME type selects the URI-list clipboard offer; the pipeline
+# sends the URI bytes without appending a newline.
 printf '%s' "$file" | wl-copy --type text/uri-list
 
 if [[ "$notify" == true ]]; then
   if [[ "$file" =~ ^https?:// ]]; then
+    # The clipboard retains the complete URI; the non-HTTP(S) notification
+    # path percent-decodes its final URI component for display.
     msg="Link copied to clipboard"
   else
-    msg="<i><b>$(_url_decode "${file##*/}")</b></i> copied to clipboard"
+    decoded=
+    _url_decode decoded "${file##*/}"
+    msg="<i><b>$decoded</b></i> copied to clipboard"
   fi
-  notify-send -r 3 "Vibranium" "$msg"
+  notify-send -r 3 -a "Vibranium" "Vibranium" "$msg"
 fi

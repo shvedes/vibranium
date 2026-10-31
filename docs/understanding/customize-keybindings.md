@@ -40,8 +40,8 @@ Custom bindings are added with the same API used by Vibranium.
 Example:
 
 ```lua
--- Open calculator with Super + C
-hl.bind("SUPER + C", hl.dsp.exec_raw("vb-util-calc"))
+-- Open app launcher with Super + C (type an expression for the calculator)
+hl.bind("SUPER + C", hl.dsp.exec_raw("vb-shell appLauncher toggle"))
 
 -- Open btop with Super + Shift + B
 hl.bind("SUPER + SHIFT + B", hl.dsp.exec_raw("vb-launch-tui -- btop"))
@@ -70,13 +70,7 @@ Bindings are processed in configuration order, so placement can matter.
 
 ## Viewing active bindings
 
-The complete active keymap can be viewed from **Vibranium Menu -> Help -> Keybindings**, or:
-
-```bash
-vb-cmd-keybindings --list | less
-```
-
-Both methods show the final binds, including user overrides.
+The complete active keymap is shown in **Vibranium Menu -> Help -> Keybindings**, including your user overrides.
 
 ## Mouse bindings
 

@@ -52,7 +52,7 @@ command -v checkupdates > /dev/null 2>&1 || missing+=("checkupdates")
 command -v yay > /dev/null 2>&1 || missing+=("yay")
 
 if ((${#missing[@]} > 0)); then
-  notify-send -r 3 -t 120000 \
+  notify-send -r 3 -a "Vibranium" -t 120000 \
     "Could Not Fetch System Updates" \
     "Missing required dependencies: ${missing[*]}"
   exit 1
@@ -92,14 +92,15 @@ if ((TOTAL_COUNT >= THRESHOLD)); then
   TIMESTAMP_LAST=0
 
   if [[ -f "$TIMESTAMP_FILE" ]]; then
-    TIMESTAMP_LAST=$(< "$TIMESTAMP_FILE")
+    TIMESTAMP_LAST=
+    read -r TIMESTAMP_LAST < "$TIMESTAMP_FILE" || TIMESTAMP_LAST=0
     # Validate that the stored value is a plausible Unix timestamp
     # (within a reasonable range for the current system).
     [[ $TIMESTAMP_LAST =~ ^[0-9]+$ ]] || TIMESTAMP_LAST=0
   fi
 
   if ((TIMESTAMP_NOW - TIMESTAMP_LAST >= INTERVAL)); then
-    notify-send -r 3 -t 120000 \
+    notify-send -r 3 -a "Vibranium" -t 120000 \
       "$TOTAL_COUNT Packages Are Awaiting Updates" \
       "On Arch it is recommended to update your system regularly"
 

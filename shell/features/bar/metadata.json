@@ -1,0 +1,5 @@
+{
+  "id": "bar",
+  "name": "Bar",
+  "description": "Top/bottom status bar with left, center and right module zones."
+}

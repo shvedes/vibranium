@@ -19,12 +19,15 @@ for i in "${!shells[@]}"; do
 done
 
 while true; do
-  printf "%s[>>>>]%s Enter number (1-%d) [default is %s]: %s" \
-    "$C" "$RS" "${#shells[@]}" "${SHELL##*/}" "$Y"
   trap 'printf "%s" "$RS"' INT
 
   term::enable_input
-  read -r shell_idx
+  if ! term::prompt_line shell_idx "${C}[>>>>]${RS} Enter number (1-${#shells[@]}) [default is ${SHELL##*/}]: ${Y}"; then
+    term::disable_input
+    printf "%s" "$RS"
+    trap - INT
+    exit 1
+  fi
   term::disable_input
 
   printf "%s" "$RS"
@@ -47,11 +50,10 @@ while true; do
     selected_shell_pkg="${shell_pkgs[$((shell_idx - 1))]}"
 
     if [[ "$selected_shell" == "Other" ]]; then
-      printf "%s[>>>>]%s Enter package name: %s" "$C" "$RS" "$Y"
       trap 'printf "%s" "$RS"' INT
 
       term::enable_input
-      read -r custom_shell_pkg
+      term::prompt_line custom_shell_pkg "${C}[>>>>]${RS} Enter package name: ${Y}" || custom_shell_pkg=""
       term::disable_input
 
       printf "%s" "$RS"
@@ -78,4 +80,4 @@ for pkg in "${packages[@]}"; do
   printf "%s\n" "$pkg" >> /tmp/vibranium.packages
 done
 
-echo "$packages" > /tmp/shell
+printf '%s\n' "${packages[0]}" > /tmp/shell

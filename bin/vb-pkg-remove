@@ -6,7 +6,7 @@ source vb-lib-core
 VERBOSE=${VERBOSE:-false}
 
 usage() {
-  shcat << EOF
+	shcat << EOF
 Usage: ${0##*/} [OPTIONS]... [--] [PACKAGE]...
 
 Uninstall packages in Vibranium
@@ -27,10 +27,10 @@ EOF
 }
 
 _ask_for_sudo() {
-  log Info "Acquiring sudo for removal"
-  term::enable_input
-  sudo -v
-  term::disable_input
+	log Info "Acquiring sudo for removal"
+	term::enable_input
+	sudo -v
+	term::disable_input
 }
 
 # Detects which systemd units provided by PACKAGES are currently enabled.
@@ -42,85 +42,78 @@ _ask_for_sudo() {
 #   - unit_pkg_user:         Associative map of user unit name -> package.
 #   - unit_pkg_system:       Associative map of system unit name -> package.
 _handle_systemd() {
-  log Info "Checking systemd units for ${#PACKAGES[@]} packages"
-# User-scope enabled units
-  usr_enb_units=()
-  sys_enb_units=()
+	log Info "Checking systemd units for ${#PACKAGES[@]} packages"
+	usr_enb_units=()
+	sys_enb_units=()
 
-  declare -gA unit_pkg_user=()
-  declare -gA unit_pkg_system=()
+	declare -gA unit_pkg_user=()
+	declare -gA unit_pkg_system=()
 
-  local -A seen_user=()
-  local -A seen_system=()
-  local pkg scope unit_path unit
+	local -A seen_user=()
+	local -A seen_system=()
+	local pkg scope unit_path unit
 
-  vb::print "$Y" "Getting systemd service information..."
+	vb::print "$Y" "Getting systemd service information..."
 
-  for pkg in "${PACKAGES[@]}"; do
-    # Shellcheck has no context.
-    # Pipe below return 3 values -> `while` loop read 3 values - all  good.
+	for pkg in "${PACKAGES[@]}"; do
+		# shellcheck disable=2034
+		while read -r unit_type scope unit_path; do
+			unit="${unit_path##*/}"
 
-    # shellcheck disable=2034
-    while read -r unit_type scope unit_path; do
-      unit="${unit_path##*/}"
+			if [[ "$scope" == "user" ]]; then
+				if [[ -n "${seen_user[$unit]}" ]]; then
+					continue
+				fi
 
-      if [[ "$scope" == "user" ]]; then
-        if [[ -n "${seen_user[$unit]}" ]]; then
-          continue
-        fi
+				seen_user[$unit]=1
+				unit_pkg_user[$unit]="$pkg"
 
-        seen_user[$unit]=1
-        unit_pkg_user[$unit]="$pkg"
+				if systemctl -q --user is-enabled "$unit" 2> /dev/null; then
+					usr_enb_units+=("$unit")
+				fi
+			else
+				if [[ -n "${seen_system[$unit]}" ]]; then
+					continue
+				fi
 
-        if systemctl -q --user is-enabled "$unit" 2> /dev/null; then
-          usr_enb_units+=("$unit")
-        fi
-      else
-        if [[ -n "${seen_system[$unit]}" ]]; then
-          continue
-        fi
+				seen_system[$unit]=1
+				unit_pkg_system[$unit]="$pkg"
 
-        seen_system[$unit]=1
-        unit_pkg_system[$unit]="$pkg"
-
-        # is-enabled does not require sudo even for system units
-        if systemctl -q is-enabled "$unit" 2> /dev/null; then
-          sys_enb_units+=("$unit")
-        fi
-      fi
-    done < <(pacman -Ql "$pkg" 2> /dev/null | awk -f "$VIBRANIUM/awk/vb-pkg-parse-systemd.awk")
-  done
+				# is-enabled does not require sudo even for system units
+				if systemctl -q is-enabled "$unit" 2> /dev/null; then
+					sys_enb_units+=("$unit")
+				fi
+			fi
+		done < <(pacman -Ql "$pkg" 2> /dev/null | awk -f "$VIBRANIUM/awk/vb-pkg-parse-systemd.awk")
+	done
 }
 
-# Prompts the user with Y/n/all for a given question.
+# Reads a Y/n/all response and returns 0 for yes, 1 for no, or 2 for all.
 _ask_yes_no_all() {
-  local default="$1"
-  local prompt="$2"
+	local default="$1"
+	local prompt="$2"
+	local answer
 
-  term::enable_input
+	term::enable_input
 
-  while true; do
-    read -rp "$prompt (Y/n/all): " answer
-    answer="${answer:-$default}"
+	while true; do
+		if ! term::prompt_line answer "$prompt (Y/n/all): "; then
+			return 1
+		fi
+		answer="${answer:-$default}"
 
-    case "$answer" in
-      [Yy][Ee][Ss] | [Yy])
-        return 0
-        ;;
-      [Nn][Oo] | [Nn])
-        return 1
-        ;;
-      [Aa][Ll][Ll])
-        return 2
-        ;;
-      # Re-draw the question line.
-      *)
-        printf "\r\e[K"
-        ;;
-    esac
-  done
-
-  # Note: cursor is re-hidden by term::disable_input in the caller.
+		case "$answer" in
+			[Yy][Ee][Ss] | [Yy])
+				return 0
+				;;
+			[Nn][Oo] | [Nn])
+				return 1
+				;;
+			[Aa][Ll][Ll])
+				return 2
+				;;
+		esac
+	done
 }
 
 # Helper for _disable_systemd_units.
@@ -131,484 +124,473 @@ _ask_yes_no_all() {
 #   $2 (nref)  - associative array mapping pkg -> space-separated unit names
 #   $3 (nref)  - indexed array to append background PIDs into
 _disable_scope_units() {
-  local scope="$1"
-  log Info "Disabling units (scope=$scope)"
-  local -n _pkg_map="$2"
-  local -n _pids="$3"
+	local scope="$1"
+	log Info "Disabling units (scope=$scope)"
+	local -n _pkg_map="$2"
+	local -n _pids="$3"
 
-  local pkg unit u
-  local -a remaining
+	local pkg unit u
+	local -a remaining
 
-  term::enable_input
+	# _ask_yes_no_all returns 0 for yes, 1 for no, and 2 for all. Only those
+	# accepted responses consume queued units; invalid input leaves the current
+	# unit queued. systemctl runs in the background, and package removal starts
+	# after the caller waits for all collected PIDs.
+	term::enable_input
 
-  for pkg in "${!_pkg_map[@]}"; do
-    read -ra remaining <<< "${_pkg_map[$pkg]}"
+	for pkg in "${!_pkg_map[@]}"; do
+		read -ra remaining <<< "${_pkg_map[$pkg]}"
 
-    while ((${#remaining[@]} > 0)); do
-      unit="${remaining[0]}"
+		while ((${#remaining[@]} > 0)); do
+			unit="${remaining[0]}"
 
-      _ask_yes_no_all Y "${B}[VIBRANIUM]${RS} Disable unit '${B}${unit}${RS}' from package '${G}${pkg}${RS}' ($scope scope)?"
-      local response=$?
+			_ask_yes_no_all Y "${B}[*]${RS} Disable unit '${B}${unit}${RS}' from package '${G}${pkg}${RS}' ($scope scope)?"
+			local response=$?
 
-      case $response in
-        0) # Yes
-          if [[ "$scope" == "user" ]]; then
-            systemctl -q --user disable --now "$unit" &
-          else
-            sudo systemctl -q disable --now "$unit" &
-          fi
-          _pids+=($!)
-          remaining=("${remaining[@]:1}")
-          ;;
-        2) # All
-          vb::print "$B" "Disabling all units for '${G}${pkg}${RS}'..."
-          for u in "${remaining[@]}"; do
-            if [[ "$scope" == "user" ]]; then
-              systemctl -q --user disable --now "$u" &
-            else
-              sudo systemctl -q disable --now "$u" &
-            fi
-            _pids+=($!)
-          done
-          remaining=()
-          ;;
-        *) # No
-          remaining=("${remaining[@]:1}")
-          ;;
-      esac
-    done
-  done
+			case $response in
+				0)
+					if [[ "$scope" == "user" ]]; then
+						systemctl -q --user disable --now "$unit" &
+					else
+						sudo systemctl -q disable --now "$unit" &
+					fi
+					_pids+=($!)
+					remaining=("${remaining[@]:1}")
+					;;
+				2)
+					vb::print "$B" "Disabling all units for '${G}${pkg}${RS}'..."
+					for u in "${remaining[@]}"; do
+						if [[ "$scope" == "user" ]]; then
+							systemctl -q --user disable --now "$u" &
+						else
+							sudo systemctl -q disable --now "$u" &
+						fi
+						_pids+=($!)
+					done
+					remaining=()
+					;;
+				*)
+					remaining=("${remaining[@]:1}")
+					;;
+			esac
+		done
+	done
 
-  term::disable_input
+	term::disable_input
 }
 
-# Disables enabled systemd units from packages being removed.
-# Prompts per unit with Y/n/all.
+# Disables enabled units per package, prompting for each unit with Y/n/all.
 _disable_systemd_units() {
-  local -a pids=()
+	local -a pids=()
 
-  # Build pkg -> "unit1 unit2 ..." maps for each scope
-  declare -A pkg_user_units=()
-  declare -A pkg_system_units=()
+	# Build pkg -> "unit1 unit2 ..." maps for each scope
+	declare -A pkg_user_units=()
+	declare -A pkg_system_units=()
 
-  local unit pkg
+	local unit pkg
 
-  for unit in "${usr_enb_units[@]}"; do
-    pkg="${unit_pkg_user[$unit]:-unknown}"
-    pkg_user_units[$pkg]+="$unit "
-  done
+	for unit in "${usr_enb_units[@]}"; do
+		pkg="${unit_pkg_user[$unit]:-unknown}"
+		pkg_user_units[$pkg]+="$unit "
+	done
 
-  for unit in "${sys_enb_units[@]}"; do
-    pkg="${unit_pkg_system[$unit]:-unknown}"
-    pkg_system_units[$pkg]+="$unit "
-  done
+	for unit in "${sys_enb_units[@]}"; do
+		pkg="${unit_pkg_system[$unit]:-unknown}"
+		pkg_system_units[$pkg]+="$unit "
+	done
 
-  _disable_scope_units "user" pkg_user_units pids
-  _disable_scope_units "system" pkg_system_units pids
+	_disable_scope_units "user" pkg_user_units pids
+	_disable_scope_units "system" pkg_system_units pids
 
-  wait "${pids[@]}"
+	# Waiting here makes unit cleanup complete, so pacman removal starts only
+	# after the files that back those units are handled. With no PIDs, Bash
+	# wait has no operands and covers active child jobs, so this phase must
+	# not accumulate unrelated background work.
+	wait "${pids[@]}"
 }
 
-# Prints a cancellation message, optionally waits for a keypress, and optionally exits.
-# Always re-enables terminal input before returning or exiting.
-#
-# Flags (can be combined):
-#   --positive  Use green instead of red.
-#   --exit      Exit with status 1 after the message.
-#   --newline   Print a leading newline (useful after trap output).
-_operation_canceled() {
-  if [[ $CONSERV == true ]]; then
-    return
-  fi
-
-  local color="$R"
-  local exit_after=false
-
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      --positive)
-        color="$G"
-        shift
-        ;;
-      --exit)
-        exit_after=true
-        shift
-        ;;
-      --newline)
-        printf '\n'
-        shift
-        ;;
-    esac
-  done
-
-  printf "%s[VIBRANIUM]%s Operation canceled" "$color" "$RS"
-
-  if [[ $NO_DUMMY == false && -t 0 ]]; then
-    term::disable_input
-    trap 'exit 1' SIGHUP SIGINT SIGTERM SIGQUIT
-    read -n1 -r -s -p $'. Press any key to exit' dummy
-  fi
-
-  if [[ $exit_after == true ]]; then
-    if [[ "$color" == "$G" ]]; then
-      exit 0
-    else
-      exit 1
-    fi
-  fi
+pkg_prepare_result() {
+	if [[ -z "${term_original_settings:-}" ]]; then
+		term::disable_input
+	fi
 }
 
-_uninstallation_complete() {
-  if [[ "$CONSERV" == true ]]; then
-    return
-  fi
+pkg_result() {
+	local outcome="$1"
+	shift
 
-  trap '' SIGHUP SIGINT SIGTERM SIGQUIT
+	if [[ "$CONSERV" == true ]]; then
+		if [[ -n "${term_original_settings:-}" ]]; then
+			term::enable_input > /dev/null 2>&1 || true
+		fi
+		return 0
+	fi
 
-  printf "%s[VIBRANIUM]%s Uninstallation complete" "$G" "$RS"
+	pkg_prepare_result
+	if [[ "$NO_DUMMY" == true ]]; then
+		operation::result "$outcome" --no-wait "$@"
+	else
+		operation::result "$outcome" "$@"
+	fi
+}
 
-  if [[ $NO_DUMMY == false && -t 0 ]]; then
-    term::disable_input
-    # shellcheck disable=SC2034
-    read -n1 -r -s -p $'. Press any key to exit' dummy
-  fi
+pkg_signal_canceled() {
+	trap - SIGHUP SIGINT SIGTERM SIGQUIT
+
+	if [[ "$CONSERV" == true ]]; then
+		if [[ -n "${term_original_settings:-}" ]]; then
+			term::enable_input > /dev/null 2>&1 || true
+		fi
+	else
+		pkg_prepare_result
+		if [[ "$NO_DUMMY" == true ]]; then
+			operation::result canceled --no-wait
+		else
+			operation::result canceled
+		fi
+	fi
+
+	exit 1
 }
 
 # Verifies that all CLI-provided packages are actually installed.
 # Reports any that aren't. Returns 1 if any are missing.
 _ensure_installed() {
-  log Info "Verifying ${#PACKAGES[@]} package(s) are installed"
-  local -a missing=()
+	log Info "Verifying ${#PACKAGES[@]} package(s) are installed"
+	local -a missing=()
 
-  for pkg in "${PACKAGES[@]}"; do
-    if ! pacman -Qq "$pkg" &> /dev/null; then
-      missing+=("$pkg")
-    fi
-  done
+	for pkg in "${PACKAGES[@]}"; do
+		if ! pacman -Qq "$pkg" &> /dev/null; then
+			missing+=("$pkg")
+		fi
+	done
 
-  if ((${#missing[@]} > 0)); then
-    vb::print "$R" "The following packages are not installed:"
-    for pkg in "${missing[@]}"; do
-      echo -e "\t   - ${R}${pkg}${RS}"
-    done
-    return 1
-  fi
+	if ((${#missing[@]} > 0)); then
+		vb::print "$R" "The following packages are not installed:"
+		for pkg in "${missing[@]}"; do
+			echo -e "    * ${R}${pkg}${RS}"
+		done
+		return 1
+	fi
 }
 
-# Displays an overview of packages about to be uninstalled.
-# Formats differently based on the number of packages for readability.
-# For long lists, calculates whether the output exceeds the terminal height
-# (accounting for the header and the overview title line) and shows a
-# terminal-specific scrolling hint if it does.
+# Selections of up to five packages stay inline; longer selections are
+# rendered one per line. No terminal-height calculation is performed.
 _show_overview() {
-  log Info "Showing overview for ${#PACKAGES[@]} package(s)"
-  local packages=("${PACKAGES[@]}")
+	log Info "Showing overview for ${#PACKAGES[@]} package(s)"
+	local packages=("${PACKAGES[@]}")
 
-  if ((${#packages[@]} == 0)); then
-    return
-  fi
+	if ((${#packages[@]} == 0)); then
+		return
+	fi
 
-  if ((${#packages[@]} <= 5)); then
-    vb::print "$B" "You're about to uninstall the following packages: ${Y}${packages[*]}${RS}"
-    return
-  fi
+	if ((${#packages[@]} <= 5)); then
+		vb::print "$B" "You're about to uninstall the following packages: ${Y}${packages[*]}${RS}"
+		return
+	fi
 
-  vb::print "$B" "You're about to uninstall the following packages:"
-  for pkg in "${packages[@]}"; do
-    echo -e "\t   - ${Y}${pkg}${RS}"
-  done
+	vb::print "$B" "You're about to uninstall the following packages:"
+	for pkg in "${packages[@]}"; do
+		echo -e "\t   - ${Y}${pkg}${RS}"
+	done
 }
 
+# The package files are a policy list rather than a dependency graph. VM
+# installations omit hardware-control packages because their presence is
+# not a meaningful core-removal hazard in that environment.
 _load_core_packages() {
-  if ((${#CORE_PKGS[@]} > 0)); then
-    return
-  fi
+	if ((${#CORE_PKGS[@]} > 0)); then
+		return
+	fi
 
-  mapfile -t CORE_PKGS < <(grep -Ehv '^(#|$)' "$VIBRANIUM"/install/vb-{base,fonts}.pkgs)
+	CORE_PKGS=()
+	local _cp_file _cp_line
+	for _cp_file in "$VIBRANIUM"/install/vb-base.pkgs "$VIBRANIUM"/install/vb-fonts.pkgs; do
+		[[ -f "$_cp_file" ]] || continue
+		while IFS= read -r _cp_line || [[ -n "$_cp_line" ]]; do
+			case "$_cp_line" in
+				'' | \#*) continue ;;
+			esac
+			CORE_PKGS+=("$_cp_line")
+		done < "$_cp_file"
+	done
 
-  if [[ "${CHASSIS_TYPE:-}" != vm ]]; then
-    CORE_PKGS+=(bluez bluez-utils bluetui hyprsunset ddcutil wireless-regdb)
-  fi
+	if [[ "${CHASSIS_TYPE:-}" != vm ]]; then
+		CORE_PKGS+=(bluez bluez-utils bluetui hyprsunset ddcutil wireless-regdb)
+	fi
 }
 
+# Core-package protection is a two-stage gate: the exact confirmation
+# phrase permits destructive removal, while the exclusion path rewrites
+# PACKAGES in place so subsequent validation and transactions use the
+# reduced set.
 _warn_core_packages() {
-  _load_core_packages
-  local -a core_hits=()
-  local pkg hit
+	_load_core_packages
+	local -a core_hits=()
+	local pkg hit
 
-  for pkg in "${PACKAGES[@]}"; do
-    if [[ " ${CORE_PKGS[*]} " == *" $pkg "* ]]; then
-      core_hits+=("$pkg")
-    fi
-  done
+	for pkg in "${PACKAGES[@]}"; do
+		if [[ " ${CORE_PKGS[*]} " == *" $pkg "* ]]; then
+			core_hits+=("$pkg")
+		fi
+	done
 
-  if ((${#core_hits[@]} == 0)); then
-    return
-  fi
+	if ((${#core_hits[@]} == 0)); then
+		return
+	fi
 
-  vb::print "$R" "${R}WARNING: Removing core packages may break your system!${RS}"
-  vb::print "$Y" "Core packages to be removed:"
+	vb::print "$R" "${R}WARNING: Removing core packages may break your system!${RS}"
+	vb::print "$Y" "Core packages to be removed:"
 
-  for pkg in "${core_hits[@]}"; do
-    vb::print "$B" "  - ${Y}${pkg}${RS}"
-  done
+	for pkg in "${core_hits[@]}"; do
+		vb::print "$B" "  - ${Y}${pkg}${RS}"
+	done
 
-  term::enable_input
+	term::enable_input
 
-  local choice confirm
+	local choice confirm
 
-  vb::print "$B" "Options:"
-  vb::print "$B" "  1) Remove anyway"
-  vb::print "$B" "  2) Exclude ${Y}${#core_hits[@]}${RS} core package(s)"
+	vb::print "$B" "Options:"
+	vb::print "$B" "  1) Remove anyway"
+	vb::print "$B" "  2) Exclude ${Y}${#core_hits[@]}${RS} core package(s)"
 
-  while true; do
-    read -rp "${B}[VIBRANIUM]${RS} Choice [1/2]: " choice
+	while true; do
+		if ! term::prompt_line choice "${B}[*]${RS} Choice [1/2]: "; then
+			choice=2
+		fi
 
-    case "$choice" in
-      1)
-        vb::print "$R" "${R}Are you absolutely sure?${RS} Type 'YES, DO AS I SAY' to confirm:"
-        read -rp "> " confirm
-        # Match exact string
-        if [[ "$confirm" == "YES, DO AS I SAY" ]]; then
-          term::disable_input
-          return
-        fi
-        vb::print "$G" "Excluding core packages from removal"
-        ;;
-      2)
-        local -a remaining=()
-        for pkg in "${PACKAGES[@]}"; do
-          local found=false
-          for hit in "${core_hits[@]}"; do
-            if [[ "$pkg" == "$hit" ]]; then
-              found=true
-              break
-            fi
-          done
+		case "$choice" in
+			1)
+				vb::print "$R" "${R}Are you absolutely sure?${RS} Type 'YES, DO AS I SAY' to confirm:"
+				term::prompt_line confirm "> " || confirm=""
+				if [[ "$confirm" == "YES, DO AS I SAY" ]]; then
+					term::disable_input
+					return
+				fi
+				vb::print "$G" "Excluding core packages from removal"
+				;;
+			2)
+				local -a remaining=()
+				for pkg in "${PACKAGES[@]}"; do
+					local found=false
+					for hit in "${core_hits[@]}"; do
+						if [[ "$pkg" == "$hit" ]]; then
+							found=true
+							break
+						fi
+					done
 
-          if ! $found; then
-            remaining+=("$pkg")
-          fi
-        done
+					if ! $found; then
+						remaining+=("$pkg")
+					fi
+				done
 
-        PACKAGES=("${remaining[@]}")
-        term::disable_input
+				PACKAGES=("${remaining[@]}")
+				term::disable_input
 
-        if ((${#PACKAGES[@]} == 0)); then
-          vb::print "$Y" "No packages remaining to remove"
-          _operation_canceled --positive
-          exit 0
-        fi
-        return
-        ;;
-      *)
-        printf "\e[A\r\e[K"
-        ;;
-    esac
-  done
+				if ((${#PACKAGES[@]} == 0)); then
+					vb::print "$Y" "No packages remaining to remove"
+					pkg_result noop
+					exit 0
+				fi
+				return
+				;;
+		esac
+	done
 }
 
+# Rs makes pacman remove the requested packages, their no-longer-needed
+# dependencies, and the resulting unneeded dependency chain in one
+# transaction.
 _uninstall_packages() {
-  log Info "Uninstalling ${#PACKAGES[@]} package(s)"
-  term::enable_input
-  sudo pacman -Rns "${PACKAGES[@]}"
+	log Info "Uninstalling ${#PACKAGES[@]} package(s)"
+	term::enable_input
+	sudo pacman -Rs "${PACKAGES[@]}"
 }
 
+# Interactive selection is limited to explicitly installed packages, so
+# dependency-only packages cannot be selected directly for removal.
 _get_installed_packages() {
-  log Info "Fetching installed packages"
-  mapfile -t PACKAGES < <(pacman -Qqe)
+	log Info "Fetching installed packages"
+	mapfile -t PACKAGES < <(pacman -Qqe)
 }
 
 # Allows the user to select packages using fzf with preview.
 # Populates PACKAGES with selected items. Returns 1 if none selected.
 _choose_packages() {
-  log Info "Opening fzf for package selection"
-  local -a chosen
+	log Info "Opening fzf for package selection"
+	local -a chosen
 
-  term::enable_input
-  mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | fzf "${FZF_ARGS[@]}")
-  term::disable_input
+	term::enable_input
+	mapfile -t chosen < <(printf "%s\n" "${PACKAGES[@]}" | fzf "${FZF_ARGS[@]}")
+	term::disable_input
 
-  ((${#chosen[@]} == 0)) && return 1
-  PACKAGES=("${chosen[@]}")
+	((${#chosen[@]} == 0)) && return 1
+	PACKAGES=("${chosen[@]}")
 }
 
 _remove_orphans() {
-  log Info "Removing orphan packages"
-  vb::print "$G" "Removing orphan packages..."
-  yay -Ycc --noconfirm &> /dev/null
+	log Info "Removing orphan packages"
+	vb::print "$G" "Removing orphan packages..."
+	yay -Ycc --noconfirm &> /dev/null
 }
 
-_update_bar_module() {
-  log Info "Updating Waybar pacman module"
-  # Edge case: explicitly update the Waybar module
-  # in case if we deleted a package that was in update queue.
-  vb-refresh-waybar-module pacman
-}
-
-SUDO_PROMPT="$(printf '%s[VIBRANIUM]%s Password for %s: ' "$R" "$RS" "$USER")"
+printf -v SUDO_PROMPT '%s[*]%s Password for %s: ' "$R" "$RS" "$USER"
 export SUDO_PROMPT
 
 NO_LOGO=false
 NO_DUMMY=false
 NO_SYSTEMD=false
 CONSERV=false
-# Core package list
 CORE_PKGS=()
 PACKAGES=()
 
 if [[ -f "$VIBRANIUM_STATE/theme/fzf" ]]; then
-  source "$VIBRANIUM_STATE/theme/fzf"
+	source "$VIBRANIUM_STATE/theme/fzf"
 fi
 
 FZF_ARGS=(
-  --multi
-  --ignore-case
-  --highlight-line
+	--multi
+	--ignore-case
+	--highlight-line
 
-  --info 'hidden'
-  --border 'bold'
+	--info 'hidden'
+	--border 'bold'
 
-  --border-label ' alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select '
-  --border-label-pos 'bottom'
+	--border-label ' alt-p: toggle description, alt-j/k: scroll description, ctrl-j/k: next/prev item, tab: multi-select '
+	--border-label-pos 'bottom'
 
-  --list-label 'Package list'
-  --list-border 'bold'
+	--list-label 'Package list'
+	--list-border 'bold'
 
-  --input-label 'Filter packages'
-  --input-border 'bold'
+	--input-label 'Filter packages'
+	--input-border 'bold'
 
-  --preview 'pacman -Qii {1}'
-  --preview-border 'bold'
-  --preview-window 'right:75%:wrap'
-  --preview-label 'Package Information'
+	--preview 'pacman -Qii {1}'
+	--preview-border 'bold'
+	--preview-window 'up:55%:wrap'
+	--preview-label 'Package Information'
 
-  --bind 'alt-p:toggle-preview'
-  --bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
-  --bind 'alt-k:preview-up,alt-j:preview-down'
+	--bind 'alt-p:toggle-preview'
+	--bind 'alt-d:preview-half-page-down,alt-u:preview-half-page-up'
+	--bind 'alt-k:preview-up,alt-j:preview-down'
 
-  --color "${FZF_COLORS:-pointer:white,marker:green}"
+	--color "${FZF_COLORS:-pointer:white,marker:green}"
 )
 
-trap 'trap "exit 1" SIGHUP SIGINT SIGTERM SIGQUIT; printf "\n"; _operation_canceled --exit' SIGHUP SIGINT SIGTERM SIGQUIT
+trap 'pkg_signal_canceled' SIGHUP SIGINT SIGTERM SIGQUIT
 
 while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --help | -h)
-      usage
-      exit 0
-      ;;
-    -v | --verbose)
-      export VERBOSE=true
-      shift
-      ;;
-    --no-logo)
-      NO_LOGO=true
-      shift
-      ;;
-    --no-dummy)
-      NO_DUMMY=true
-      shift
-      ;;
-    --no-verify)
-      # No-op
-      # NO_VERIFY=true
-      shift
-      ;;
-    --no-systemd)
-      NO_SYSTEMD=true
-      shift
-      ;;
-    --conservative)
-      CONSERV=true
-      shift
-      ;;
-    --)
-      shift
-      if [[ $# -eq 0 ]]; then
-        usage
-        exit 1
-      fi
-      break
-      ;;
-    --*)
-      log Error "Unknown option: $1"
-      exit 1
-      ;;
-    *)
-      break
-      ;;
-  esac
+	case "$1" in
+		--help | -h)
+			usage
+			exit 0
+			;;
+		-v | --verbose)
+			export VERBOSE=true
+			shift
+			;;
+		--no-logo)
+			NO_LOGO=true
+			shift
+			;;
+		--no-dummy)
+			NO_DUMMY=true
+			shift
+			;;
+		--no-verify)
+			shift
+			;;
+		--no-systemd)
+			NO_SYSTEMD=true
+			shift
+			;;
+		--conservative)
+			CONSERV=true
+			shift
+			;;
+		--)
+			shift
+			if [[ $# -eq 0 ]]; then
+				usage
+				exit 1
+			fi
+			break
+			;;
+		--*)
+			log Error "Unknown option: $1"
+			exit 1
+			;;
+		*)
+			break
+			;;
+	esac
 done
 
 term::disable_input
 
 if (($# > 0)); then
-  PACKAGES=("$@")
+	PACKAGES=("$@")
 
-  # We need this because when we launch without PACKAGES, we go straight to the fzf menu, but before that,
-  # we validate the entered PACKAGES. On low-end systems, this validation can take a little longer than a moment,
-  # which is why a huge yellow logo will be visible for a fraction of a second before fzf launches. That's why we do it this way.
-  #
-  # This also applies to the same constructions below.
-  if [[ $NO_LOGO == false ]]; then
-    term::show_header
-  fi
+	if [[ $NO_LOGO == false ]]; then
+		term::show_header
+	fi
 
-  if ! _ensure_installed; then
-    _operation_canceled
-    exit 1
-  fi
+	if ! _ensure_installed; then
+		pkg_result error
+		exit 1
+	fi
 
-  _show_overview
-  _warn_core_packages
+	_show_overview
+	_warn_core_packages
 else
-  if ! command -v fzf > /dev/null; then
-    log::error "fzf is not installed!"
-    exit 1
-  fi
+	if ! command -v fzf > /dev/null; then
+		log::error "fzf is not installed!"
+		term::enable_input
+		exit 1
+	fi
 
-  _get_installed_packages
+	_get_installed_packages
 
-  if ! _choose_packages; then
-    if [[ $NO_LOGO == false ]]; then
-      term::show_header --color green
-    fi
+	if ! _choose_packages; then
+		if [[ $NO_LOGO == false ]]; then
+			term::show_header --color green
+		fi
 
-    _operation_canceled --positive
-    exit 0
-  fi
+		pkg_result noop
+		exit 0
+	fi
 
-  if [[ $NO_LOGO == false ]]; then
-    term::show_header
-  fi
+	if [[ $NO_LOGO == false ]]; then
+		term::show_header
+	fi
 
-  _show_overview
-  _warn_core_packages
+	_show_overview
+	_warn_core_packages
 fi
 
 if term::ask_yes_no Y "Proceed with uninstallation?"; then
-  if ! _ask_for_sudo; then
-    _operation_canceled
-    exit 1
-  fi
+	if ! _ask_for_sudo; then
+		pkg_result error
+		exit 1
+	fi
 
-  # Collect enabled unit info now, while
-  # pacman -Ql still knows about the packages.
-  if [[ $NO_SYSTEMD == false ]]; then
-    _handle_systemd
-    _disable_systemd_units
-  fi
+	# Collect unit ownership while pacman still has package contents; the
+	# mapping supports unit disable during removal.
+	if [[ $NO_SYSTEMD == false ]]; then
+		_handle_systemd
+		_disable_systemd_units
+	fi
 
-  if _uninstall_packages; then
-    _remove_orphans
-    _update_bar_module
-    _uninstallation_complete
-  else
-    _operation_canceled
-    exit 1
-  fi
+	if _uninstall_packages; then
+		_remove_orphans
+		pkg_result success -- "Uninstallation complete"
+		vb-shell arch-updates refresh
+	else
+		pkg_result error
+		exit 1
+	fi
 else
-  _operation_canceled
-  exit 1
+	pkg_result canceled
+	exit 1
 fi

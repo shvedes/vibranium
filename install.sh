@@ -38,12 +38,13 @@ mkdir -p "$HOME/.config"
 # Create .local/share/vibranium directory
 mkdir -p "$HOME/.local/share/vibranium"
 
-# Ask user which branch to clone
+# Ask user which version to clone
 echo "Which version would you like to install?"
 echo "  [1] release  - latest stable release (default)"
 echo "  [2] upstream - latest git commit"
+echo "  [3] branch   - type a specific branch name"
 while true; do
-  echo -n "Enter your choice [1/2] or press Enter for default: " > /dev/tty
+  echo -n "Enter your choice [1/2/3] or press Enter for default: " > /dev/tty
   read -r branch_choice < /dev/tty
 
   case "${branch_choice:-1}" in
@@ -59,8 +60,23 @@ while true; do
       git clone --depth 1 --branch master "$REPO_URL" "$INSTALL_DIR"
       break
       ;;
+    3 | "branch")
+      echo -n "Enter the branch name: " > /dev/tty
+      read -r custom_branch < /dev/tty
+      if [[ -z "$custom_branch" ]]; then
+        echo "Branch name cannot be empty."
+        continue
+      fi
+      if ! git ls-remote --heads "$REPO_URL" "$custom_branch" | grep -q .; then
+        echo "Branch '$custom_branch' not found on remote."
+        continue
+      fi
+      echo "Cloning vibranium repository ($custom_branch branch)..."
+      git clone --depth 1 --branch "$custom_branch" "$REPO_URL" "$INSTALL_DIR"
+      break
+      ;;
     *)
-      echo "Invalid choice: '$branch_choice'. Please enter 1 or 2"
+      echo "Invalid choice: '$branch_choice'. Please enter 1, 2 or 3"
       ;;
   esac
 done

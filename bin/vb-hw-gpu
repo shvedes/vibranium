@@ -78,8 +78,8 @@ case "$TARGET_VENDOR" in
     ;;
 esac
 
-# GSR (GSP/GSR) capability is an NVIDIA-specific feature related to
-# firmware-controlled GPU scheduling. The flag is meaningless for AMD/Intel.
+# The --gsr path uses NVIDIA model names as a heuristic for GSP/open-module
+# firmware capability; it does not query device or firmware state directly.
 if ((GSR_MODE)) && [[ "$TARGET_VENDOR" != "nvidia" ]]; then
   if ((VERBOSE)); then
     printf "Error: The --gsr flag is designed for NVIDIA checks only and will not work with %s.\n" "${TARGET_VENDOR^^}" >&2
@@ -94,15 +94,20 @@ if ((VERBOSE || GSR_MODE)); then
   # Use lspci -nn which annotates each device line with its vendor:device
   # PCI ID in square brackets, e.g. "[10de:2786]". Grep for the vendor
   # prefix to find all matching GPUs. The mapfile captures every line so
-  # GSR mode can match model names, and verbose mode can print them.
+  # capability mode can match model names, and verbose mode can print them.
+  # A missing lspci match is intentionally non-fatal; it becomes an empty match
+  # set and the caller reports absence rather than a pipeline failure.
   hex_id="${EXPECTED_ID#0x}"
-  mapfile -t matches < <(lspci -nn | grep -E "\[${hex_id}:" || true)
+  mapfile -t matches < <(
+    while IFS= read -r _lspci_line; do
+      [[ $_lspci_line == *"[${hex_id}:"* ]] && printf '%s\n' "$_lspci_line"
+    done < <(lspci -nn 2>/dev/null || true)
+  )
 
   if ((${#matches[@]} > 0)); then
     if ((GSR_MODE)); then
-      # GSR-capable models follow NVIDIA's naming conventions for recent
-      # generations. The regex matches Turing/Ampere/Ada/Hopper/Blackwell
-      # architectures. Entry-level GTX 16xx is excluded (no GSR).
+      # This is a broad model-name heuristic, including GTX 16xx; it does not
+      # establish GSP/open-module capability from firmware.
       for line in "${matches[@]}"; do
         if [[ $line =~ (GTX\ 16[0-9]{2}|RTX\ (PRO\ [0-9]{4}|[2-5][0-9]{3})|Quadro\ RTX|RTX\ A[0-9]{4}|A[1-9][0-9]{2}|H[1-9][0-9]{2}|T4|L[0-9]+) ]]; then
           gpu_found=1
@@ -114,8 +119,8 @@ if ((VERBOSE || GSR_MODE)); then
     fi
   fi
 else
-  # Fast path: iterate /sys/bus/pci/devices/*/vendor files directly
-  # without spawning lspci. This is purely sysfs-based and much faster.
+  # Fast path: read PCI vendor and class directly from sysfs and avoid
+  # spawning lspci.
   for vendor_file in /sys/bus/pci/devices/*/vendor; do
     [[ -f "$vendor_file" ]] || continue
     read -r vendor < "$vendor_file"

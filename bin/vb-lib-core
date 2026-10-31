@@ -1,512 +1,245 @@
 #!/bin/bash
 
-# shellcheck disable=all
-
-# Source guard: prevent the library body from executing more than once.
-# In other words, exit if the library has already been sourced.
+# When _VB_LIB_CORE_LOADED is set, sourcing returns from the current shell
+# without defining the body again. BASH_ENV can make a child Bash evaluate
+# its own unset marker; the library does not export the marker.
 if [[ -n "${_VB_LIB_CORE_LOADED:-}" ]]; then
   return 0
 fi
 
 declare -gr _VB_LIB_CORE_LOADED=1
 
-# Load defaults first
-source "$VIBRANIUM_PATH/vb-core-defaults"
+# settings.env is a schema-validated environment projection rendered by the
+# Vibranium shell. When readable, it is sourced in the caller's scope. The
+# shell validates every value before writing, so consumers read the projection
+# directly and supply their own fallback for absent keys.
+if [[ -r "$VIBRANIUM_RUNTIME/settings.env" ]]; then
+  # shellcheck source=/dev/null
+  source "$VIBRANIUM_RUNTIME/settings.env"
+fi
 
-# Ignore error outputs while installing Vibranium (these files don't exist yet)
-source "$XDG_CONFIG_HOME/vibranium/settings" 2> /dev/null
-source "$VIBRANIUM_STATE/theme/colors.bash" 2> /dev/null
+# Theme colors are optional: both VIBRANIUM_STATE and colors.bash must be
+# available before the file is sourced.
+if [[ -n "$VIBRANIUM_STATE" ]]; then
+  if [[ -f "$VIBRANIUM_STATE/theme/colors.bash" ]]; then
+    # shellcheck source=/dev/null
+    source "$VIBRANIUM_STATE/theme/colors.bash"
+  fi
+fi
 
+# These globals are escape sequences rather than semantic color names; callers
+# may compose them, and RS provides the shared reset boundary.
 Y=$'\e[0;33m' # Yellow
 P=$'\e[0;35m' # Purple
 G=$'\e[0;32m' # Green
 C=$'\e[0;36m' # Cyan
 B=$'\e[0;34m' # Blue
+
+# GY is consumed only by scripts outside the library, which source it here and
+# read the exported name; shellcheck cannot see those consumers.
+# shellcheck disable=SC2034
 GY=$'\e[90m'  # Gray
 R=$'\e[0;31m' # Red
 RS=$'\e[0m'   # Reset
 
-# PKG / Font Install / Removal scripts
-printf -v VIBRANIUM_SUDO_PROMPT '%s[VIBRANIUM]%s Password for %s: ' "$R" "$RS" "$USER"
+# Export the shared sudo prompt used by package and font helpers.
+printf -v VIBRANIUM_SUDO_PROMPT '%s[*]%s Password for %s: ' "$R" "$RS" "$USER"
 export SUDO_PROMPT=$VIBRANIUM_SUDO_PROMPT
+# Appending the configure directory preserves existing PATH precedence while
+# making helper commands available to later processes that inherit this
+# library's environment.
 export PATH="$PATH:$VIBRANIUM/configure"
 
-# helpers::ui::menu - Dynamic rofi dmenu wrapper with automatic window sizing
+# The keyboard is the terminal, not stdin. A caller may have redirected stdin
+# - a pipe, /dev/null, a here-doc - while the terminal the user is looking at
+# is still there, and a keypress read from stdin would then come from that
+# redirection instead of from the keyboard.
 #
-# PURPOSE:
-#   Launches a rofi dmenu prompt whose window width auto-scales to fit the longest
-#   entry or prompt string, avoiding both truncation and excessive whitespace.
-#   Returns the selected entry via nameref-style printf -v.
-#
-# USAGE:
-#   helpers::ui::menu <result_var> <prompt> [placeholder] [rofi_args...] -- [ entry1 entry2 ...]
-#
-#   <result_var>   - Name of the variable in the caller's scope that will receive
-#                    the selected string.
-#   <prompt>       - The label shown before the input field in rofi (e.g. "Open:").
-#   [placeholder]  - Optional placeholder text inside the input field. Gets a leading
-#                    space prepended so it doesn't butt up against the cursor.
-#   [rofi_args]    - Any extra rofi flags (e.g. -kb-custom-1 "Alt+x"). Collected until
-#                    '--' is encountered or arguments run out.
-#                    Special flag: -plain-fd FD  (used internally by cfgr::run)
-#   [-- entry ...]  - Inline menu entries passed as individual arguments after '--'.
-#                    If '--' is absent, entries are read from stdin instead (pipe-friendly).
-#
-# RETURN VALUE:
-#   0 if the user selected something, 1 if rofi was killed (already running) or
-#   the user dismissed the menu with Escape / no selection.
-helpers::ui::menu() {
-  # Capture the caller's variable name first.
-  local var_name="$1"
-  shift
+# The device node is there whether or not a terminal is behind it, so opening
+# it is the only test that means anything.
+term::tty_available() {
+  : 2> /dev/null <> /dev/tty
+}
 
-  # Lookup table: character-count thresholds -> pixel widths for the rofi window.
-  # Each key is the minimum text length that maps to the paired pixel value.
-  # The values were empirically derived for the configured rofi font/theme so that
-  # the window is never too narrow to display the longest entry without clipping.
-  local -A map=(
-    [80]=816 [78]=799 [76]=782 [74]=765 [72]=748 [70]=731
-    [68]=714 [66]=697 [64]=680 [62]=663 [60]=646
-    [58]=629 [56]=612 [54]=595 [52]=578 [50]=561
-    [48]=544 [46]=527 [44]=510 [42]=493 [40]=476
-    [38]=459 [36]=442 [34]=425 [32]=408 [30]=391
-    [28]=374 [26]=357 [24]=340 [22]=323 [20]=306
-    [18]=289 [16]=272 [14]=255 [12]=238 [10]=221
-    [8]=208 [6]=200 [0]=196
-  )
-
-  # The prompt is the label rofi renders to the left of the text input field.
-  local prompt="$1"
-  shift
-
-  # Placeholder is always the third positional argument.
-  # Pass "" to omit it. Previously this was detected heuristically
-  # by checking whether the argument started with '-', which broke
-  # any value containing a leading dash (e.g. ranges like "-5 -10").
-  local placeholder=""
-  if [[ $# -gt 0 ]]; then
-    [[ -n "$1" ]] && placeholder=" $1"
-    shift
-  fi
-
-  local user_rofi_args=()
-  local plain_fd=""
-  local input_file=""
-
-  while [[ $# -gt 0 && "$1" != "--" ]]; do
-    case "$1" in
-      -plain-fd)
-        plain_fd="$2"
-        shift 2
-        ;;
-      -input-file)
-        input_file="$2"
-        shift 2
-        ;;
-      *)
-        user_rofi_args+=("$1")
-        shift
-        ;;
-    esac
-  done
-
-  # Build input_plain (for width/line measurement) and rofi_input
-  #
-  # inline=true  -> entries came as '--' args; rofi_input is pre-built, use <<<
-  # plain_fd set -> caller provided a separate fd with clean (icon-stripped) text
-  # else         -> read everything from stdin into rofi_input
-  local inline=false rofi_input="" input_plain=""
-
-  # Globbing crosses newlines; [[ =~ ]] is the correct regex for this.
-  local _vb_strip_html
-  _vb_strip_html() {
-    local s="$1" re='<[^>]*>'
-    while [[ "$s" =~ $re ]]; do
-      s="${s//"${BASH_REMATCH[0]}"/}"
-    done
-    printf '%s\n' "$s"
-  }
-
-  if [[ "$1" == "--" ]]; then
-    shift
-    inline=true
-    for arg in "$@"; do
-      rofi_input+="${rofi_input:+$'\n'}$arg"
-    done
-    input_plain=$(_vb_strip_html "$rofi_input")
-  elif [[ -n "$plain_fd" ]]; then
-    IFS= read -r -d '' input_plain <&"$plain_fd" || true
-    input_plain=$(_vb_strip_html "$input_plain")
+# Prompts and terminal status belong on the controlling terminal. Falling
+# back to stderr keeps the text visible when stdout is redirected and no
+# terminal is available.
+term::tty_print() {
+  if term::tty_available; then
+    printf '%s' "$1" 2> /dev/null > /dev/tty || true
   else
-    IFS= read -r -d '' rofi_input || true
-    input_plain=$(_vb_strip_html "$rofi_input")
+    printf '%s' "$1" >&2 || true
+  fi
+}
+
+term::cursor_hide() {
+  if ! term::tty_available; then
+    return 0
   fi
 
-  # Walk every line of the stripped input to find the longest visible entry.
-  # The counter is incremented only when the current line's length exceeds the running maximum.
-  local maxlen_input=0 lines=0 line
-  while IFS= read -r line; do
-    if ((${#line} > maxlen_input)); then
-      maxlen_input=${#line}
+  printf '\e[?25l' 2> /dev/null > /dev/tty || true
+}
+
+term::cursor_show() {
+  if ! term::tty_available; then
+    return 0
+  fi
+
+  printf '\e[?25h' 2> /dev/null > /dev/tty || true
+}
+
+# `read -n 100` consumes up to 100 characters per successful call. The loop
+# repeats until the short timeout or EOF ends input. The cap keeps a terminal
+# that is streaming input from holding a prompt indefinitely.
+term::discard_buffer() {
+  local _discard _drain_count=0
+
+  while ((_drain_count < 100)); do
+    if ! IFS= read -r -n 100 -t 0.001 _discard 2> /dev/null < /dev/tty; then
+      break
     fi
-    ((lines++))
-  done <<< "$input_plain"
+    ((++_drain_count))
+  done
+}
 
-  # We don't need it anymore.
-  unset input_plain
+# Capture settings from the terminal, suppress echo, and hide the cursor.
+# The exported snapshot makes the operation idempotent: a repeated disable
+# keeps the first snapshot instead of capturing the echo-off state as the
+# baseline. A snapshot inherited from a parent is already a valid disable.
+term::disable_input() {
+  if [[ -n "${term_original_settings:-}" ]]; then
+    stty -echo 2> /dev/null < /dev/tty
+    term::cursor_hide
+    return 0
+  fi
 
-  local promptlen=$((${#prompt} + ${#placeholder}))
-  local maxlen=$((maxlen_input > promptlen ? maxlen_input : promptlen))
+  # A terminal that is not there is not a failure: there is no cursor to hide
+  # and no echo to suppress, and the caller carries on without a keyboard.
+  #
+  # stderr is redirected before the input redirect, so the shell's own
+  # complaint about a missing terminal is swallowed with it.
+  term_original_settings=""
+  if ! IFS= read -r term_original_settings < <(stty -g 2> /dev/null < /dev/tty); then
+    return 0
+  fi
 
-  local width=$maxlen
-  for k in 80 78 76 74 72 70 68 66 64 62 60 58 56 54 52 50 48 46 44 42 40 38 36 34 32 30 28 26 24 22 20 18 16 14 12 10 8 6 0; do
-    if ((width >= k)); then
-      width=${map[$k]}
+  export term_original_settings
+
+  # Disable echoing: keystrokes are accepted but not shown.
+  stty -echo 2> /dev/null < /dev/tty
+  term::cursor_hide
+}
+
+# Restore the saved terminal settings, discard queued input, and show the
+# cursor. Calling this without a snapshot is a no-op, so no terminal escape is
+# written when nothing disabled input.
+term::enable_input() {
+  if [[ -z "${term_original_settings:-}" ]]; then
+    return 0
+  fi
+
+  stty "$term_original_settings" 2> /dev/null < /dev/tty || true
+  unset term_original_settings
+  term::discard_buffer
+  term::cursor_show
+}
+
+# Waits for a single keypress on the terminal and prints the placeholder
+# there. The caller owns terminal state; this only reads one key.
+#
+# An earlier prompt leaves its replies queued on the terminal; drop those or
+# they answer the keypress for the user. EOF returns failure so callers can
+# distinguish a closed terminal from an actual keypress.
+term::wait_key() {
+  local placeholder="$1"
+  local _wait_key_char
+
+  if ! term::tty_available; then
+    return 1
+  fi
+
+  term::discard_buffer
+  term::tty_print "$placeholder"
+
+  if ! IFS= read -r -s -n 1 _wait_key_char 2> /dev/null < /dev/tty; then
+    return 1
+  fi
+}
+
+# Readline treats bytes between \001 and \002 as non-printing. Prompt color
+# sequences must be wrapped or redisplay miscalculates the cursor column once
+# the input wraps or is edited.
+term::readline_prompt() {
+  local -n _rlp_out="$1"
+  local text="$2"
+  local _rlp_acc="" head params final
+
+  while [[ $text == *$'\e['* ]]; do
+    head=${text%%$'\e['*}
+    _rlp_acc+=$head
+    text=${text#*$'\e['}
+    params=${text%%[!0-9;?]*}
+    final=${text:${#params}:1}
+
+    if [[ $final == [@-~] ]]; then
+      _rlp_acc+=$'\001\e['"$params$final"$'\002'
+      text=${text:${#params}+1}
+    else
+      _rlp_acc+=$'\e['
       break
     fi
   done
 
-  # Build the dynamic portion of the rofi option list.
-  local rofi_opts=()
+  _rlp_out="$_rlp_acc$text"
+}
 
-  # -auto-select makes rofi immediately confirm the entry if only one matches the
-  # current search string. We only enable it when:
-  #   a) The user opted in via the global config flag.
-  #   b) There are multiple entries (auto-select on a single entry would close them enu instantly).
-  #   c) This isn't a clipboard menu, where auto-selection would be jarring.
-  helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT
-  if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_AUTO_SELECT" == true ]]; then
-    if ((lines > 1)) && [[ ! "${BASH_SOURCE[1]}" =~ vb-core-clipboard ]]; then
-      rofi_opts+=(-auto-select)
-    fi
+# Read one line from the controlling terminal with GNU Readline editing.
+#
+# Usage: term::prompt_line <variable> <prompt>
+# Returns 0 on a line, 1 on EOF, and 2 when no controlling terminal exists.
+# The caller is responsible for enabling echo before calling this.
+term::prompt_line() {
+  local _term_prompt_var="$1"
+  local _term_prompt_text="$2"
+  local _term_prompt_safe _term_prompt_value
+  local _term_prompt_vi=false
+
+  if ! term::tty_available; then
+    return 2
   fi
 
-  # Enable Pango markup rendering unless the caller is the clipboard script.
-  # Clipboard content is arbitrary text; if it contains '<' or '>' characters rofi
-  # would try to parse them as tags and either mangle the display or throw an error.
-  # BASH_SOURCE[1] is the path of the script that called this function (index 0 is
-  # this file itself), so matching "vb-core-clipboard" in it is a reliable caller-identity check.
-  if [[ ! "${BASH_SOURCE[1]}" =~ vb-core-clipboard ]]; then
-    rofi_opts+=(-markup-rows)
+  _term_prompt_safe=""
+  term::readline_prompt _term_prompt_safe "$_term_prompt_text"
+
+  # Scripts use one editing model regardless of the caller's shell options.
+  # Readline has no sentence commands, so M-a is bound to beginning-of-line.
+  # Skip in an interactive shell so a sourced library does not rewrite the
+  # user's keymap or editing mode.
+  if [[ $- != *i* ]]; then
+    if [[ -o vi ]]; then
+      _term_prompt_vi=true
+    fi
+    set -o emacs
+    bind '"\ea": beginning-of-line' 2> /dev/null || true
   fi
 
-  # Build the common argument list once;
-  # only the input source differs per branch.
-  local common_args=(
-    rofi -i -dmenu -p "$prompt" -sync
-    -theme-str 'entry {placeholder: "'"${placeholder}"'";}'
-    -theme-str "window {width: ${width}px;}"
-    -matching-negate-char ''
-    "${rofi_opts[@]}"
-    "${user_rofi_args[@]}"
-  )
-
-  local selected
-  local -n out="$var_name"
-
-  if [[ -n "$input_file" ]]; then
-    read -r selected < <("${common_args[@]}" < "$input_file" 2> /dev/null)
-  elif $inline || [[ -z "$plain_fd" ]]; then
-    read -r selected < <("${common_args[@]}" <<< "$rofi_input" 2> /dev/null)
-  else
-    read -r selected < <("${common_args[@]}" 2> /dev/null)
+  if ! IFS= read -e -r -p "$_term_prompt_safe" _term_prompt_value \
+    2> /dev/tty < /dev/tty; then
+    if $_term_prompt_vi; then
+      set -o vi
+    fi
+    return 1
   fi
 
-  out=$selected
-}
-
-# helpers::ui::close_menus - terminate the entire menu chain
-#
-# In the single-process model the whole chain lives in one bash process,
-# so exiting that process is equivalent to killing every menu in the chain.
-# exit 0 causes any EXIT traps registered by the top-level script to fire,
-# so temp-file cleanup and similar teardown still runs correctly.
-#
-# The old implementation sent SIGTERM to each PID in VIBRANIUM_MENU_PIDS;
-# that variable is no longer maintained and can be safely ignored.
-#
-# Leaving this for the context.
-helpers::ui::close_menus() {
-  exit 0
-}
-
-helpers::bar::spinner() {
-  local tooltip="$1"
-  shift
-
-  local spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-  local delay=0.1
-
-  local sep_pos="right" left_pad=0 right_pad=1
-  case "${BASH_SOURCE[1]##*/}" in
-    vb-bar-pacman)
-      sep_pos="left"
-      left_pad=0
-      right_pad=2
-      ;;
-    vb-bar-weather)
-      sep_pos="right"
-      left_pad=0
-      right_pad=2
-      ;;
-  esac
-
-  local sep="<span foreground='${P_FOREGROUND_0}66'>|</span>"
-
-  print_frame() {
-    local ch="$1"
-    local inner="<span rise='-2pt' foreground='${P_FOREGROUND_0}'>$ch</span>"
-
-    if [[ "$sep" ]]; then
-      if [[ "$sep_pos" == "left" ]]; then
-        printf '{"text":"%*s%s%*s%s","tooltip":"%s"}\n' \
-          "$left_pad" "" "$sep" "$right_pad" "" "$inner" "$tooltip"
-      else
-        printf '{"text":"%*s%s%*s%s","tooltip":"%s"}\n' \
-          "$left_pad" "" "$inner" "$right_pad" "" "$sep" "$tooltip"
-      fi
-    else
-      printf '{"text":"%s","tooltip":"%s"}\n' "$inner" "$tooltip"
-    fi
-  }
-
-  if (($# > 0)); then
-    # Main loop: PID-waiting mode
-    while kill -0 "$@" 2> /dev/null; do
-      for ch in "${spinstr[@]}"; do
-        print_frame "$ch"
-        sleep "$delay"
-
-        if ! kill -0 "$@" 2> /dev/null; then
-          return
-        fi
-      done
-    done
-  else
-    # Single-pass mode (no PIDs) - exactly one full rotation
-    for ch in "${spinstr[@]}"; do
-      print_frame "$ch"
-      sleep "$delay"
-    done
-  fi
-}
-
-#####################################
-### VIBRANIUM SETTINGS VALIDATION ###
-#####################################
-
-# Provides a unified configuration validation system for Vibranium options.
-# Metadata (types, defaults, allowed values, ranges) is parsed from vb-core-defaults
-# by vb-defaults.awk on the first call and cached in associative arrays.
-# This caching allows efficient validation of many variables with a single awk fork.
-#
-# Purpose:
-# - Centralize validation logic to avoid hard-coded defaults in multiple functions.
-# - Enable easy updates by editing vb-core-defaults without touching this code.
-# - Support bool, int (with optional range), and string (with required enum list) types.
-#
-# How it works:
-# - On the first call to helpers::check, awk parses vb-core-defaults and emits
-#   bash assignments that are eval'd directly into the global associative arrays.
-# - helpers::check uses the cache to validate and normalize a given variable.
-# - If invalid or unset, it falls back to the default value and logs a warning.
-
-# Declare global associative arrays to cache parsed metadata
-declare -A OPTION_DEFAULTS OPTION_TYPES OPTION_ALLOWEDS OPTION_MINS OPTION_MAXS
-
-# Precompiled regex stored in a variable so bash reuses the compiled form across
-# calls rather than recompiling the pattern from a string literal every time.
-# _RE_INT: matches an optional-sign, optional-leading-zeros integer with optional fraction.
-declare -r _RE_INT='^(-?)0*([0-9]+)(\.[0-9]+)?$'
-
-# This function validates one or more variables using cached metadata.
-# It checks if each variable is set and valid based on its type and constraints.
-# If unset or invalid, it sets the default and logs a warning.
-# Normalization is applied where applicable (e.g., lowercase bool, clean int).
-#
-# Usage: helpers::check <var_name> [<var_name> ...]
-# Returns: 0 on success (all validated or fallback), 1 if any not found in cache.
-helpers::check() {
-  # Lazy-load: only run awk on the very first call.
-  # ${#OPTION_DEFAULTS[@]} gives the number of keys - 0 means the cache is cold.
-  if ((${#OPTION_DEFAULTS[@]} == 0)); then
-    local awk_script="$VIBRANIUM/awk/vb-parse-defaults.awk"
-
-    eval "$(awk -f "$awk_script" "$VIBRANIUM_PATH/vb-core-defaults")"
+  if $_term_prompt_vi; then
+    set -o vi
   fi
 
-  # all_found uses 1/0 integers rather than "true"/"false" strings to avoid repeated
-  # string comparisons in the hot path - (( all_found )) at the end converts to exit code.
-  local all_found=1
-
-  # All scalars hoisted above the loop so bash doesn't re-execute the `local`
-  # declaration and allocation on every iteration.
-  local var_name val normalized is_valid type default_value
-  local min max sign int_part frac_part signed_int
-  local allowed_str
-
-  # Iterate $@ directly - no need to copy into a local array first.
-  for var_name in "$@"; do
-    # Special var; it has no predetermined values. Just skip.
-    if [[ "$var_name" == "VIBRANIUM_BAR_WEATHER_MODULE_CITY" ]]; then
-      continue
-    fi
-
-    # declare -n creates a transparent nameref alias to the caller's variable.
-    # All subsequent reads (val=$ref) and writes (ref=...) go directly through it,
-    # paying the indirection cost once here rather than on every ${!var_name} read
-    # and printf -v write throughout the loop body.
-    declare -n ref="$var_name"
-
-    val=$ref
-
-    # ${OPTION_DEFAULTS[$var_name]+x}: the +x trick tests key *existence* in the associative
-    # array without caring about the value. Without +x, an empty string would look like unset.
-    if [[ -z ${OPTION_DEFAULTS[$var_name]+x} ]]; then
-      printf "[${0##*/}] Warn: Variable %s not found in defaults\n" "$var_name"
-      all_found=0
-      unset -n ref # must release before continue - rebinding a live nameref is undefined
-      continue
-    fi
-
-    default_value=${OPTION_DEFAULTS[$var_name]}
-
-    type=${OPTION_TYPES[$var_name]}
-
-    # If the variable is completely empty/unset, skip validation and just apply the default
-    if [[ -z $val ]]; then
-      printf "[${0##*/}] Warn: %s is unset. Using default (%s)\n" "$var_name" "$default_value"
-
-      # Direct assignment through the nameref - no printf -v overhead.
-      ref=$default_value
-      unset -n ref
-      continue
-    fi
-
-    # normalized will hold the cleaned-up version of val to write back if valid.
-    # We don't mutate val itself so we can still reference the original in error messages.
-    normalized=$val
-
-    # is_valid as integer - 1=valid, 0=invalid. Avoids string comparisons at the
-    # bottom of the loop where we decide whether to apply the default or write back.
-    is_valid=1
-
-    case $type in
-      bool)
-        # Lowercase via ,, operator so "True"/"TRUE"/"true" all pass
-        normalized=${val,,}
-
-        # Booleans must be exactly "true" or "false" - nothing else
-        [[ $normalized != true && $normalized != false ]] && is_valid=0
-        ;;
-      int)
-        # Normalize comma-as-decimal-separator (e.g. European locale "3,14" -> "3.14")
-        normalized=${val//,/.}
-
-        # _RE_INT is a precompiled variable reference - bash reuses its compiled form
-        # across calls, unlike an inline string literal which is recompiled each time.
-        if [[ ! $normalized =~ $_RE_INT ]]; then
-          is_valid=0
-        else
-          sign=${BASH_REMATCH[1]}
-          int_part=${BASH_REMATCH[2]}  # leading zeros already stripped by 0* group
-          frac_part=${BASH_REMATCH[3]} # empty or ".digits"
-
-          # Rebuild a clean normalized form: sign + stripped-zero int + optional fraction
-          normalized="${sign}${int_part}${frac_part}"
-
-          # Only do range check if a min was defined for this variable
-          min=${OPTION_MINS[$var_name]-} # -} gives empty string if key absent
-          if [[ -n $min ]]; then
-            max=${OPTION_MAXS[$var_name]}
-
-            # 10# prefix forces base-10 interpretation so "08" and "09" don't
-            # trigger bash's "invalid octal" arithmetic error.
-            # The sign is prepended *outside* the 10# to handle negatives correctly.
-            signed_int=$((${sign}10#$int_part))
-            ((signed_int < 10#$min || signed_int > 10#$max)) && is_valid=0
-          fi
-        fi
-        ;;
-      string)
-        # OPTION_ALLOWEDS stores values as |val1|val2|valN| (pipe-delimited with
-        # sentinel pipes at both ends, set by vb-defaults.awk).
-        # A single glob test replaces the former read-ra + for loop entirely:
-        # O(1) regardless of how many allowed values there are.
-        allowed_str=${OPTION_ALLOWEDS[$var_name]-}
-
-        if [[ -n $allowed_str ]]; then
-          [[ $allowed_str == *"|${val}|"* ]] || is_valid=0
-        fi
-
-        # If no allowed list exists, any non-empty string is considered valid
-        ;;
-    esac
-    # (( is_valid )) exits 0 when is_valid=1 (valid), 1 when is_valid=0 (invalid)
-    if ((is_valid)); then
-      # Write the normalized form back through the nameref - this is the important part
-      # for int/bool: the caller's variable ends up with leading zeros stripped, correct
-      # case, etc.
-      ref=$normalized
-    else
-      printf "[${0##*/}] Warn: Invalid value for %s. Using default (%s)\n" "$var_name" "$default_value"
-      ref=$default_value
-    fi
-
-    # Release the nameref before the next iteration - without this, the next
-    # `declare -n ref=...` would re-bind an already-live nameref, which in some
-    # bash versions causes the old target to linger or the new bind to be skipped.
-    unset -n ref
-  done
-
-  # (( all_found )) exits 0 when all_found=1 (every variable found), 1 when any was missing.
-  # Cleaner than return $(( 1 - all_found )) - no arithmetic expansion subshell, just a test.
-  ((all_found))
+  printf -v "$_term_prompt_var" '%s' "$_term_prompt_value"
 }
 
-# Loop to discard buffered input: reads 1 char at a time non-blockingly.
-# -t 0: immediate timeout, no wait if no input.
-# Continues until buffer is empty (read fails).
-# Use larger -n (e.g., 100) for efficiency: reads up to 100 chars per iteration.
-# Adjust if buffers are very large, but 100 balances speed and safety.
-term::discard_buffer() {
-  while IFS= read -r -n 100 -t 0.001 discard; do
-    :
-  done
-}
-
-# Function to disable terminal input echoing.
-# This prevents user keystrokes from appearing on screen, keeping UI/output clean.
-# Saves original stty settings in a global variable for later restoration.
-# Uses stty -echo to disable local echo; input is still buffered but not displayed.
-term::disable_input() {
-  # Capture and store current terminal settings globally.
-  term_original_settings=$(stty -g)
-  # Export the variable to make it accessible in subshells or sourced scripts if needed.
-  export term_original_settings
-  # Disable echoing: keystrokes are accepted but not shown.
-  stty -echo
-  # Hide cursor
-  printf '\e[?25l'
-}
-
-# Function to enable terminal input echoing and flush buffered input.
-# Restores echoing, discards any queued keystrokes to prevent spillover,
-# and reverts to original stty settings for full reset.
-# The flush loop lives here to clear the buffer after disable period.
-term::enable_input() {
-  # Restore original settings from global variable for complete reset.
-  stty "$term_original_settings"
-  # Restore echoing to allow normal display if needed post-flush.
-  stty echo
-  # Unset the global variable to clean up.
-  unset term_original_settings
-  # Clear input buffer first
-  term::discard_buffer
-  # Show cursor
-  printf '\e[?25h'
-}
-
+# The install marker changes only the prompt prefix; the normalized yes/no
+# input and retry loop remain the same.
 term::ask_yes_no() {
   local default="${1:-Y}"
   local message="$2"
@@ -514,7 +247,6 @@ term::ask_yes_no() {
 
   default="${default^^}"
 
-  # Set hint based on default
   case "$default" in
     Y)
       hint="(Y/n)"
@@ -532,16 +264,15 @@ term::ask_yes_no() {
 
   while true; do
     if [[ -f /tmp/vb-install-ongoing ]]; then
-      # Used once when installing Vibranium. Nowhere else.
       prompt=$'\e[0;36m[QSTN]\e[0m '"${message} ${hint}: "
     else
-      prompt=$'\e[0;33m[VIBRANIUM]\e[0m '"${message} ${hint}: "
+      prompt=$'\e[0;33m[*]\e[0m '"${message} ${hint}: "
     fi
 
-    printf "%s" "$prompt"
-    read -r input
+    if ! term::prompt_line input "$prompt"; then
+      return 2
+    fi
 
-    # Use default if empty
     if [[ -z "$input" ]]; then
       input="$default"
     fi
@@ -553,27 +284,13 @@ term::ask_yes_no() {
       [Nn][Oo] | [Nn])
         return 1
         ;;
-      *)
-        # Clear line and retry
-        printf "\r\e[K"
-        ;;
     esac
   done
 }
 
-# A term::spinner utility function.
-# Displays an animated term::spinner in the terminal while a given process (PID) is running.
-#
 # Usage: long_running_command & term::spinner $! "Doing stuff..." "Done" "Failed"
-#
-# Parameters:
-# $1 - PID of the process to wait for.
-# $2 - Message to display alongside the term::spinner.
-# $3 - (Optional) Final message to display when the process completes successfully (exit code 0).
-# $4 - (Optional) Final message to display when the process fails (non-zero exit code).
-#
-# The term::spinner uses Unicode braille characters for a smooth animation.
-# It clears itself once the process finishes, and optionally prints a success or error message.
+# Polls the child with kill -0, then waits for its exit status and returns it.
+# The active frame set is ASCII and the final line is cleared.
 term::spinner() {
   # The PID of the process to watch
   local pid=$1
@@ -588,48 +305,85 @@ term::spinner() {
   local error_msg="$4"
 
   local delay=0.07
-  # spinstr=('⠋' '⠙' '⠹' '⠸' '⠼' '⠴' '⠦' '⠧' '⠇' '⠏')
-  local spinstr=('/' '-' '\' '|')
+  local spinstr=('/' '-' $'\\' '|')
+  local clear_line=$'\r\e[K'
+  local interactive=false
+  local exit_code
+  local i
+  local int_trap term_trap
+  local trapped_int=false trapped_term=false
 
-  # ANSI sequence to clear the current line
-  local clear_line="\r\033[K"
+  _term_spinner_active=0
 
-  term::disable_input
+  # Animation is terminal presentation. A redirected stdout stays free of
+  # carriage-return frames, and a terminal without color support keeps a
+  # stable final line only.
+  if [[ -t 1 ]] && term::tty_available && [[ -z "${NO_COLOR+x}" ]]; then
+    interactive=true
 
-  # While the process exists, animate the term::spinner
-  while kill -0 "$pid" 2> /dev/null; do
-    for i in "${spinstr[@]}"; do
-      printf "\r${msg} %s" "${i} "
-      sleep $delay
+    # Restore the terminal before exiting on a signal when the caller has not
+    # installed its own handler. A caller-owned trap keeps ownership of
+    # cleanup and exit status.
+    int_trap=
+    IFS= read -r int_trap < <(trap -p INT) || int_trap=
+    term_trap=
+    IFS= read -r term_trap < <(trap -p TERM) || term_trap=
+    if [[ -z "$int_trap" ]]; then
+      trap 'printf "\n"; term::enable_input; exit 130' INT
+      trapped_int=true
+    fi
+    if [[ -z "$term_trap" ]]; then
+      trap 'printf "\n"; term::enable_input; exit 143' TERM
+      trapped_term=true
+    fi
+
+    term::disable_input
+    _term_spinner_active=1
+  fi
+
+  if $interactive; then
+    while kill -0 "$pid" 2> /dev/null; do
+      for i in "${spinstr[@]}"; do
+        printf '\r%s %s' "$msg" "${i} "
+        sleep "$delay" || true
+      done
     done
-  done
+  fi
 
-  # Capture exit code
-  wait "$pid"
-  local exit_code=$?
+  # Keep the child status without letting errexit bypass terminal cleanup.
+  if wait "$pid"; then
+    exit_code=0
+  else
+    exit_code=$?
+  fi
 
-  # Clear the spinner once finished
-  printf "%b" "$clear_line"
+  if $interactive; then
+    printf '%s' "$clear_line" || true
+    term::enable_input
+    _term_spinner_active=0
+    if $trapped_int; then
+      trap - INT
+    fi
+    if $trapped_term; then
+      trap - TERM
+    fi
+  fi
 
-  # Print the final message depending on exit status
-  if [ $exit_code -eq 0 ]; then
-    # Success case
-    if [ -n "$success_msg" ]; then
+  if ((exit_code == 0)); then
+    if [[ -n "$success_msg" ]]; then
       printf "%s %s\n" "$msg" "$success_msg"
     else
       printf "%s\n" "$msg"
     fi
   else
-    # Failure case
-    if [ -n "$error_msg" ]; then
+    if [[ -n "$error_msg" ]]; then
       printf "%s %s\n" "$msg" "$error_msg"
     else
       printf "%s\n" "$msg"
     fi
   fi
 
-  # propagate the exit code
-  return $exit_code
+  return "$exit_code"
 }
 
 term::show_header() {
@@ -658,12 +412,24 @@ term::show_header() {
     esac
   fi
 
+  _banner=
+  while IFS= read -r _banner_line || [[ -n "${_banner_line:-}" ]]; do
+    if [[ -z "$_banner" ]]; then
+      _banner="$_banner_line"
+    else
+      _banner+=$'\n'"$_banner_line"
+    fi
+  done < "$VIBRANIUM/banner.txt"
+  while [[ "$_banner" == *$'\n' ]]; do _banner="${_banner%$'\n'}"; done
   printf "\n%s%s%s\n\n" "${color:-$Y}" \
-    "$(< "$VIBRANIUM/banner.txt")" "$RS"
+    "$_banner" "$RS"
 }
 
+# The terminal device, not stdout, decides whether interactive presentation is
+# possible. A redirected stdout with a live terminal can still show prompts and
+# wait for input; a process without a controlling terminal cannot.
 term::is_headless() {
-  if [[ -t 1 ]]; then
+  if term::tty_available; then
     return 1
   else
     return 0
@@ -671,64 +437,12 @@ term::is_headless() {
 }
 
 vb::print() {
-  echo -e "${1}[VIBRANIUM]${RS} ${*:2}"
+  echo -e "${1}[*]${RS} ${*:2}"
 }
 
 log::error() {
   if [[ -t 2 ]]; then
-    printf "%s[ERROR]%s %s\n" \
+    printf "%s[error]%s %s\n" \
       "$R" "$RS" "$*" >&2
   fi
-}
-
-log::warn() {
-  if [[ -t 1 ]]; then
-    printf "%s[WARN]%s %s\n" \
-      "$Y" "$RS" "$*"
-  fi
-}
-
-log::info() {
-  if [[ -t 1 ]]; then
-    printf "%s[INFO]%s %s\n" \
-      "$B" "$RS" "$*"
-  fi
-}
-
-hypr::is_fullscreen() {
-  [[ "$(hyprctl -j activewindow | jq '.fullscreen')" = 2 ]]
-}
-
-hypr::flash::border() {
-  hyprctl -q eval "Hypr.Helpers.FlashBorder()"
-}
-
-hypr::flash::screen() {
-  [[ "$(hyprctl -j getoption 'animations.enabled' | jq -r '.bool')" == false ]] && return
-
-  local gamma_before=100
-  local target_gamma=
-  local state_file="$VIBRANIUM_STATE/monitors"
-
-  [[ -f "$state_file" ]] && while IFS=: read -r _ _ _ gamma_before; do
-    if [[ "$gamma_before" =~ ^[0-9]+$ ]]; then
-      if ((gamma_before >= 10 && gamma_before <= 100)); then
-        break
-      fi
-    fi
-    gamma_before=100
-  done < "$state_file"
-
-  if ! [[ "$gamma_before" =~ ^[0-9]+$ ]]; then
-    gamma_before=100
-  fi
-
-  # hyprsunset caps at 150 - flash is gamma_before + 100, so anything
-  # above 50 would get truncated without this clamp.
-  target_gamma=$((gamma_before + 100))
-  ((target_gamma > 150)) && target_gamma=150
-
-  hyprctl -q hyprsunset gamma "$target_gamma"
-  sleep 0.15
-  hyprctl -q hyprsunset gamma "$gamma_before"
 }

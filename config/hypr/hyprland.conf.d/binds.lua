@@ -1,198 +1,108 @@
 -- Full binds documentation:
 -- https://wiki.hypr.land/Configuring/Basics/Binds
 
--- ###########################################################################
--- BASIC SYNTAX
--- ###########################################################################
---
--- hl.bind(keys, dispatcher|function, { options? })
---
--- Example:
--- hl.bind("Print", hl.dsp.exec_raw("flameshot"), { description = "Open Flameshot" })
---
--- This binds the Print Screen key to launch Flameshot.
---
--- You can also use modifiers:
--- hl.bind("SUPER + SHIFT + G", hl.dsp.exec_raw("app2unit steam"))
---
--- This launches Steam when you press SUPER + SHIFT + G.
---
--- Notes:
--- - SUPER usually means the Windows key.
--- - Key order does not matter, but spacing should be consistent for readability.
---
--- ###########################################################################
--- UNBINDING KEYS
--- ###########################################################################
---
--- hl.unbind("SUPER + SHIFT + G")
---
--- This removes a keybind.
---
--- If multiple binds use the same keys, all of them will trigger unless unbound.
---
--- You can also unbind dynamically:
---
--- hyprctl eval 'hl.unbind("SUPER + SHIFT + G")'
---
--- Note:
--- The bind will reappear after config reload unless removed from config.
---
--- ###########################################################################
--- MOUSE BINDS
--- ###########################################################################
---
--- Mouse buttons and scroll can also be bound.
---
--- Example (scroll up):
--- hl.bind("SUPER + mouse_up", hl.dsp.exec_raw("notify-send 'Hello there!'"))
---
--- Example (left click with modifiers):
--- hl.bind("SUPER + SHIFT + mouse:272", hl.dsp.exec_raw("vb-cmd-reload"))
---
--- This reloads Vibranium config when pressing SUPER + SHIFT + left click.
---
--- Note:
--- mouse_up and mouse_down are intentionally inverted in behavior.
---
--- ###########################################################################
--- BIND OPTIONS
--- ###########################################################################
---
--- locked           (bool)   - Works even when input is locked (for example lockscreen)
--- release          (bool)   - Triggers on key release instead of press
--- click            (bool)   - Triggers on click release if cursor stays within drag threshold
--- drag             (bool)   - Triggers on release if cursor moves outside drag threshold
--- long_press       (bool)   - Triggers after holding a key for a longer time
--- repeating        (bool)   - Repeats action while key is held
--- non_consuming    (bool)   - Passes key event to active window as well
--- auto_consuming   (bool)   - Passes event only if dispatcher fails
--- mouse            (bool)   - Marks bind as a mouse input
--- transparent      (bool)   - Cannot be overridden by other binds
--- ignore_mods      (bool)   - Ignores modifier keys
--- separate         (bool)   - Treats modifier combinations independently
--- description      (string) - Human-readable description of the bind
--- bypass           (bool)   - Ignores application input inhibition requests
--- submap_universal (bool)   - Active in all submaps
--- devices          (table)  - Restrict bind to specific input devices
---
--- More details:
--- https://wiki.hypr.land/Configuring/Basics/Binds/#keysym-combos
---
--- ###########################################################################
--- DISPATCHERS
--- ###########################################################################
---
--- The "dispatcher" is NOT limited to hl.dsp.* functions.
---
--- It can be ANY Lua function.
---
--- This means:
--- - You can call system commands
--- - You can run custom Lua logic
--- - You can modify config state dynamically
--- - You can wrap multiple actions into one bind
---
--- In short: this is just Lua.
--- You can do basically anything you want here.
---
--- Examples:
---
--- 1. Standard dispatcher (most common):
---
--- hl.bind("SUPER + RETURN", hl.dsp.exec_raw("alacritty"))
---
---
--- 2. Custom Lua function:
---
--- hl.bind("SUPER + H", function()
---   -- You won't technically see anything,
---   -- since it ran by Hyprland internaly.
---   print("Hello from Lua bind!")
--- end)
---
---
--- 3. Multiple actions in one bind:
---
--- hl.bind("SUPER + J", function()
---   hl.dsp.exec_raw("notify-send 'First action'")()
---   hl.dsp.exec_raw("alacritty")()
--- end)
---
---
--- 4. Conditional logic:
---
--- hl.bind("SUPER + K", function()
---   local hour = os.date("*t").hour
---
---   if hour < 12 then
---     hl.dsp.exec_raw("notify-send 'Good morning'")()
---   else
---     hl.dsp.exec_raw("notify-send 'Good day'")()
---   end
--- end)
---
---
--- 5. Using it like a real programming language:
---
--- hl.bind("SUPER + L", function()
---   local file = io.open(os.getenv("HOME") .. "/log.txt", "a")
---   if file then
---     file:write("Bind triggered at " .. os.date() .. "\n")
---     file:close()
---   end
--- end)
---
--- ###########################################################################
--- WEB SHORTCUTS (OPTIONAL)
--- ###########################################################################
---
--- Vibranium includes optional shortcuts for web services such as AI chat,
--- Gmail, and so on.
---
--- These are disabled by default to avoid excessive global hotkeys.
--- They also may conflict with ALT-based shortcuts in some applications.
---
--- NOTE:
--- Requires a Chromium-based browser.
---
--- Example (disabled by default):
---
--- hl.bind("ALT + W", hl.dsp.exec_raw("vb-core-launcher --web"), { description = "PWA Launcher" })
--- hl.bind("ALT + A", hl.dsp.exec_raw("vb-core-launcher --ai"), { description = "AI Launcher" })
---
--- ###########################################################################
--- EXTRA UTILITIES (OPTIONAL)
--- ###########################################################################
---
--- Example:
---
--- hl.bind("SUPER + SHIFT + W", hl.dsp.exec_raw("vb-toggle-waybar"), { description = "Toggle status bar" })
---
--- This toggles the visibility of the status bar.
---
--- ###########################################################################
+-- Below are some optional binds that you can enable by uncommenting them.
 
-hl.bind("SUPER + SHIFT + D", function()
-  local LAYOUTS = { "dwindle", "master", "scrolling", "monocle" }
+-- ======================================================================= --
 
-  local LAYOUT_INDEX = {}
-  for i, name in ipairs(LAYOUTS) do
-    LAYOUT_INDEX[name] = i
-  end
+-- Cycle through the available window layouts.
+local function cycle_layout()
+    -- Layouts are cycled in the order defined here.
+    local layouts = {
+        "dwindle",
+        "master",
+        "scrolling",
+        "monocle",
+    }
 
-  local current, err = hl.get_config("general.layout")
+    -- Create a lookup table for each layout's index.
+    local layout_index = {}
 
-  if err then
-    return
-  end
+    for index, name in ipairs(layouts) do
+        layout_index[name] = index
+    end
 
-  local current_index = LAYOUT_INDEX[current] or 0
-  local next_index = (current_index % #LAYOUTS) + 1
-  local next_layout = LAYOUTS[next_index]
+    -- Get the currently active layout.
+    local current, err = hl.get_config("general.layout")
 
-  hl.config({ ["general.layout"] = next_layout })
-  -- You can make it optional.
-  -- You can also use hl.notification().
-  -- hl.dispatch(hl.dsp.exec_raw("notify-send -t 2000 -r 100 'Hyprland' 'Current layout: " .. next_layout .. "'"))
-end, { description = "Cycle window layout" })
+    -- Stop if the current layout cannot be retrieved.
+    if err then
+        return
+    end
+
+    -- Find the current layout's index.
+    -- Default to 0 if the layout is not in the list.
+    local current_index = layout_index[current] or 0
+
+    -- Calculate the next index, wrapping back to the first layout.
+    local next_index = (current_index % #layouts) + 1
+    local next_layout = layouts[next_index]
+
+    -- Apply the new layout.
+    hl.config({ ["general.layout"] = next_layout })
+
+    -- Display a notification showing the active layout.
+    hl.dispatch(
+        hl.dsp.exec_raw(
+            "notify-send -t 2000 -r 100 'Hyprland' 'Current layout: "
+                .. next_layout
+                .. "'"
+        )
+    )
+end
+
+-- SUPER + SHIFT + D: Cycle window layouts.
+hl.bind(mainMod .. " + SHIFT + D", cycle_layout, { description = "Cycle window layout" })
+
+-- Or of you want to launch the terminal in a floating window.
+-- hl.bind(mainMod .. " + SHIFT + Return", hl.dsp.exec_raw("xdg-terminal-exec --app-id=org.vb.term.float"), { description = "Open terminal (floating)" })
+
+-- Bind file manager to extra keys on the keyboard.
+-- hl.bind("XF86HomePage", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "Open file manager" })
+-- hl.bind("XF86Explorer", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "Open file manager" })
+
+-- You can take screenshots directly by a key press.
+-- hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_raw("vb-shell screenshots region"), { description = "Screenshots: capture region" })
+-- hl.bind(mainMod .. " + SHIFT + Z", hl.dsp.exec_raw("vb-shell screenshots screen"), { description = "Screenshots: capture screen" })
+
+-- If you're keyboard doesn't have XF86AudioMicMute.
+hl.bind(mainMod .. " + M", hl.dsp.exec_raw("vb-shell audio mictoggle"), { description = "Mute microphone" })
+
+-- Maybe you need to adjust display scale live!
+-- ============================================
+
+hl.bind(mainMod .. " + CTRL + equal", function()
+  Hypr.Helpers.ScaleStep(1)
+end, { description = "Increase active display scale" })
+
+hl.bind(mainMod .. " + CTRL + minus", function()
+  Hypr.Helpers.ScaleStep(-1)
+end, { description = "Decrease active display scale" })
+
+hl.bind(mainMod .. " + CTRL + 0", function()
+  Hypr.Helpers.ScaleStep(0)
+end, { description = "Reset active display scale" })
+
+-- Or maybe you want to adjust per-window volume by scrolling over them:
+-- =====================================================================
+hl.bind(
+  mainMod .. " + mouse_down",
+  Hypr.Guard.window(function()
+    Hypr.Act.exec_raw("vb-cmd-window-volume --down")
+  end),
+  { description = "Window volume down" }
+)
+
+hl.bind(
+  mainMod .. " + mouse_up",
+  Hypr.Guard.window(function()
+    Hypr.Act.exec_raw("vb-cmd-window-volume --up")
+  end),
+  { description = "Window volume up" }
+)
+
+
+-- Temporary freeze window's PID?
+hl.bind("CTRL + ALT + F", function()
+  Hypr.Helpers.WindowToggleFreeze()
+end, { description = "Freeze window" })

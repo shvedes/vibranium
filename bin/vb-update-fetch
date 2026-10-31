@@ -4,10 +4,12 @@ set -euo pipefail
 
 # This script is triggered by a systemd timer and runs non-interactively.
 # It is intentionally silent (no log/usage functions) because all output
-# goes to the journal and the user is notified via Waybar or notify-send
+# goes to the journal and the user is notified via statusbar or notify-send
 # only when an update is actually found.
 
-# Wait for network, bail out after 60 attempts (~1 minute)
+# ping targets a hard-coded public address as an availability heuristic, not a
+# repository-specific connectivity test. Each failed attempt can consume two
+# seconds plus sleep, so 60 attempts can span about 179 seconds.
 attempts=0
 while ! ping -c 1 -W 2 8.8.8.8 &> /dev/null; do
   attempts=$((attempts + 1))
@@ -24,42 +26,42 @@ git -C "$VIBRANIUM" fetch --all --tags --prune --prune-tags &> /dev/null || exit
 branch="$(git -C "$VIBRANIUM" branch --show-current)"
 
 if [[ -z "$branch" ]]; then
+  # Version sorting chooses the highest tag name across refs; commit ancestry
+  # is not considered during the detached release availability check.
   remote_latest=$(git -C "$VIBRANIUM" for-each-ref --sort=-version:refname --format='%(refname:short)' --count=1 'refs/tags/*')
   if [[ -z "$remote_latest" ]]; then
     exit 0
   fi
 
+  # Exact-match describe returns HEAD's abbreviated hash whenever HEAD has no
+  # reachable exact tag, so any non-tag name mismatches the selected release tag.
   local_latest=$(git -C "$VIBRANIUM" describe --tags --exact-match --always --abbrev=7 2> /dev/null)
 
   if [[ "$remote_latest" != "$local_latest" ]]; then
+    # Shell redirection truncates the polled state file prior to writing its
+    # single line, so a concurrent reader can briefly observe an empty payload.
     echo "$remote_latest" > "$VIBRANIUM_STATE/update.available"
-    if systemctl -q --user is-active waybar; then
-      # RTMIN+12 = pacman module, RTMIN+10 = update module
-      pkill -RTMIN+12 waybar || true
-      pkill -RTMIN+10 waybar || true
-    else
-      notify-send -r 1 -t 180000 \
-        "New Version Available" \
-        "To update, open Vibranium Menu"
-    fi
+    notify-send -r 1 -a "Vibranium" -t 180000 \
+      "New Version Available" \
+      "To update, open Vibranium Menu"
   fi
 else
-  if [[ "$branch" != "master" ]]; then
+  # Any attached branch tracks itself, so installs cloned from a custom
+  # branch are checked against that branch's remote ref.
+  if ! git -C "$VIBRANIUM" rev-parse --verify "origin/$branch" &> /dev/null; then
     exit 0
   fi
 
-  behind=$(git -C "$VIBRANIUM" rev-list HEAD..origin/master --count 2> /dev/null || echo 0)
+  # A missing or invalid remote ref makes rev-list emit zero, suppressing
+  # notifications when an update count cannot be established.
+  behind=$(git -C "$VIBRANIUM" rev-list "HEAD..origin/$branch" --count 2> /dev/null || echo 0)
 
   if ((behind > 0)); then
     echo "$behind" > "$VIBRANIUM_STATE/update.available"
-    if systemctl -q --user is-active waybar; then
-      # RTMIN+12 = pacman module, RTMIN+10 = update module
-      pkill -RTMIN+12 waybar || true
-      pkill -RTMIN+10 waybar || true
-    else
-      notify-send -r 1 -t 180000 \
-        "New Version Available" \
-        "To update, go to Vibranium Menu"
-    fi
+    notify-send -r 1 -a "Vibranium" -t 180000 \
+      "New Version Available" \
+      "To update, go to Vibranium Menu"
   fi
 fi
+# A no-update result leaves an existing marker untouched; update handling is
+# responsible for removing that persisted notification state.

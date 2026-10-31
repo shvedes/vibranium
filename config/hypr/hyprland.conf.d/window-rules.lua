@@ -1,22 +1,18 @@
--- Full documentation:
+-- Window rules documentation:
 -- https://wiki.hypr.land/Configuring/Basics/Window-Rules/
 
--- ###########################################################################
--- BASIC IDEA
--- ###########################################################################
+-- Window rules
 --
--- Window rules define how specific windows should behave
--- based on their properties (class, title, tags, etc).
+-- Window rules define how windows behave based on
+-- their properties, such as class, title, or tag.
 --
--- Common use cases:
--- - Force apps to float
--- - Send apps to specific workspaces
--- - Resize / move windows automatically
--- - Disable blur / animations for certain apps
+-- Common uses:
+-- - Float windows
+-- - Assign workspaces
+-- - Set size and position
+-- - Disable blur or animations
 --
--- ###########################################################################
--- BASIC SYNTAX
--- ###########################################################################
+-- Basic syntax:
 --
 -- hl.window_rule({
 --   match = {
@@ -25,32 +21,25 @@
 --   float = true,
 -- })
 --
--- Optional name (useful for debugging / organization):
+-- A rule has two parts:
+-- 1. match: conditions
+-- 2. effects: changes to apply
 --
--- hl.window_rule({
---   name = "float-my-app",
---   match = { class = "my-app" },
---   float = true,
--- })
---
--- ###########################################################################
--- HOW IT WORKS
--- ###########################################################################
---
--- A rule has 2 parts:
---
--- 1. match (conditions)
--- 2. effects (what to apply)
---
--- All match fields must pass.
--- If they do, effects are applied.
---
+-- All match conditions must pass.
 -- Rules are evaluated from top to bottom.
 -- Multiple rules can affect the same window.
 --
--- ###########################################################################
--- MATCH (CONDITIONS)
--- ###########################################################################
+-- Match conditions:
+--
+-- Most fields support regex.
+-- Common fields:
+-- - class
+-- - title
+-- - initialClass
+-- - initialTitle
+-- - tag
+--
+-- Use `hyprctl clients` to gather window info.
 --
 -- Example:
 --
@@ -59,15 +48,7 @@
 --   title = ".*YouTube.*",
 -- }
 --
--- Notes:
--- - Most fields support regex
--- - Common fields: class, title, initialClass, initialTitle, tag
---
--- ###########################################################################
--- EFFECTS
--- ###########################################################################
---
--- Examples:
+-- Effects:
 --
 -- float = true
 -- workspace = "3"
@@ -75,35 +56,29 @@
 -- move = "100 100"
 -- center = true
 --
--- You can combine multiple effects in one rule.
+-- You can combine multiple effects.
 --
--- ###########################################################################
--- STATIC VS DYNAMIC RULES
--- ###########################################################################
+-- Static vs dynamic rules:
 --
--- Static:
--- - Applied once on window creation
--- - Example: workspace, float, move, size
+-- Static rules run once when a window opens.
+-- Examples: workspace, float, move, size
 --
--- Dynamic:
--- - Re-evaluated when window state changes
--- - Example: opacity, blur rules, focus-related behavior
+-- Dynamic rules update when the window state changes.
+-- Examples: opacity and blur-related rules
 --
--- ###########################################################################
--- EXPRESSIONS (MOVE / SIZE)
--- ###########################################################################
+-- Expressions:
 --
--- You can use expressions:
+-- Use expressions for dynamic positioning and sizing.
 --
 -- move = "(monitor_w*0.5) (monitor_h*0.5)"
 -- size = "(monitor_w*0.5) (monitor_h*0.5)"
 --
 -- Available variables include:
--- monitor_w, monitor_h, window_w, window_h, cursor_x, cursor_y
+-- monitor_w, monitor_h
+-- window_w, window_h
+-- cursor_x, cursor_y
 --
--- ###########################################################################
--- EXAMPLES
--- ###########################################################################
+-- Examples:
 --
 -- Float and center pavucontrol:
 --
@@ -114,14 +89,12 @@
 --   center = true,
 -- })
 --
---
 -- Open Firefox on workspace 2:
 --
 -- hl.window_rule({
 --   match = { class = "firefox" },
 --   workspace = "2",
 -- })
---
 --
 -- Disable blur for mpv:
 --
@@ -130,8 +103,9 @@
 --   no_blur = true,
 -- })
 --
---
 -- Match multiple conditions:
+--
+-- All conditions must match.
 --
 -- hl.window_rule({
 --   match = {
@@ -142,38 +116,45 @@
 --   pin = true,
 -- })
 --
--- ###########################################################################
--- LAYER RULES (SPECIAL CASE)
--- ###########################################################################
+-- Layer rules:
 --
--- Some UI elements (launchers, overlays, etc) are "layers", not normal windows.
+-- Some UI elements, such as launchers and overlays,
+-- are layers instead of normal windows.
 --
--- Use hl.layer_rule for them:
+-- Use hl.layer_rule for layer surfaces.
 --
--- hl.layer_rule({
---   match = { namespace = "rofi" },
---   no_anim = true,
--- })
---
--- Full docs:
+-- Documentation:
 -- https://wiki.hypr.land/Configuring/Window-Rules/#layer-rules
 --
--- ###########################################################################
--- VIBRANIUM TAGS (PREDEFINED GROUPS)
--- ###########################################################################
+-- Example of a special window rule:
 --
--- Vibranium provides predefined tags to group windows.
+-- hl.window_rule({
+--   name = "xwayland-video-bridge-fixes",
+--   match = {
+--     class = "xwaylandvideobridge"
+--   },
+--   no_initial_focus = true,
+--   no_focus = true,
+--   no_anim = true,
+--   no_blur = true,
+--   max_size = {1,1},
+--   opacity = 0.0
+-- })
 --
--- Examples:
---   gameWindow     - most (Proton) games
---   officeWindow   - LibreOffice, Obsidian, PDF viewers
---   gameLauncher   - Steam, Heroic, Lutris, PrismLauncher
---   browserWindow  - most popular browsers
+-- Vibranium tags:
 --
--- These tags DO NOT apply rules by themselves.
--- They only help you target groups of apps.
+-- Vibranium provides predefined tags for app groups.
+-- Tags help you target multiple apps with one rule.
 --
--- Example usage:
+-- Common tags:
+-- - gameWindow: most Proton games
+-- - officeWindow: LibreOffice, Obsidian, PDF viewers
+-- - gameLauncher: Steam, Heroic, Lutris, PrismLauncher
+-- - browserWindow: popular browsers
+--
+-- Tags do not apply rules automatically.
+--
+-- Example:
 --
 -- hl.window_rule({
 --   match = { tag = "officeWindow" },
@@ -195,49 +176,25 @@
 --   workspace = "10",
 -- })
 --
--- ###########################################################################
--- SPECIAL INTERACTIVE WINDOWS
--- ###########################################################################
+-- Special interactive windows:
 --
--- Vibranium applies special handling for windows that require user attention:
+-- Auto-focus:
 --
--- Examples:
--- - Confirmation dialogs
--- - "Save file" prompts
--- - Password / polkit dialogs
--- - File deletion dialogs
+-- Some apps regain focus automatically when needed.
 --
--- Behavior:
--- - Open as floating
--- - Red border
--- - Background dimmed
---
--- Similar to UAC dialogs on Windows.
---
--- ###########################################################################
--- AUTO-FOCUS BEHAVIOR
--- ###########################################################################
---
--- Some apps automatically regain focus when needed.
---
--- Includes:
+-- This includes:
 -- - Windows with the browserWindow tag
--- - Apps like Discord, Spotify, etc (URI-based workflows)
---
--- Reason:
--- Some workflows depend on focus returning to the original app.
+-- - Apps such as Discord and Spotify
+-- - URI-based workflows
 --
 -- Example:
--- - Login via browser
--- - Original app regains focus after completion
+-- 1. Log in through a browser.
+-- 2. Return focus to the original app.
 --
--- ###########################################################################
--- IMPORTANT NOTES
--- ###########################################################################
+-- Remember:
 --
--- - Rules are evaluated from top to bottom
--- - All match conditions must pass
--- - Static rules run once, dynamic rules update over time
--- - Multiple rules can stack
---
--- ###########################################################################
+-- - Rules run from top to bottom.
+-- - All match conditions must pass.
+-- - Static rules run once.
+-- - Dynamic rules update over time.
+-- - Multiple rules can stack.

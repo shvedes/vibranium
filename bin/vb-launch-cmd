@@ -18,13 +18,21 @@ Options:
 EOF
 }
 
+# Callers below pass the command array unquoted, so shell splitting and pathname
+# expansion occur when the function or app2unit receives the arguments.
 focus_or_launch() {
   local -a cmd=("$@")
 
   local match_key="${cmd[0]##*/}"
   match_key="${match_key,,}"
+  # Matching uses the executable basename in lower case, not the full path or
+  # its arguments, so invocations of one binary share a focus target.
   log Info "Focus or launch: key=$match_key cmd=${cmd[*]}"
 
+  # The reverse-DNS helper omits only the reverse plain-prefix test; its
+  # component-starts-with-key startswith call remains part of rule 1.
+  # A failed compositor query or malformed client JSON produces no address;
+  # the caller treats that state the same as an ordinary no-match result.
   local window_address
   window_address="$(
     jq -r --arg key "$match_key" '
@@ -158,10 +166,14 @@ focus_or_launch() {
   )"
 
   if [[ -n "$window_address" ]]; then
+    # A non-empty address selects the focus path; an empty result deliberately
+    # falls through to a new application instance.
     log Info "Focusing existing window: address=$window_address"
     hyprctl -q dispatch "hl.dsp.focus({window = 'address:${window_address}'})"
   else
     log Info "No matching window found, launching: ${cmd[*]}"
+    # Detaching app2unit prevents the launcher from waiting for a graphical
+    # application and lets the new process outlive this shell.
     exec setsid -f app2unit -- "${cmd[@]}"
   fi
 }
@@ -202,20 +214,23 @@ done
 
 COMMAND=("$@")
 
+# Resolve the executable ahead of any focus attempt, so an unavailable command
+# cannot select a stale window when no new instance can be launched.
 if ! command -v "${COMMAND[0]}"; then
   log Error "command not found: ${COMMAND[0]}"
   if ! [[ -t 0 ]]; then
-    notify-send -r 3 -u critical -t 5000 "${0*##/}" "Command not found: ${COMMAND[0]}"
+    notify-send -r 3 -a "Vibranium" -u critical -t 5000 "${0*##/}" "Command not found: ${COMMAND[0]}"
   fi
   exit 1
 fi
 
 SKIP_REGEX='[Th]unar|nvim'
 
-helpers::check VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS
-
-if [[ "$VIBRANIUM_GLOBAL_APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
-  # You probably want multiple file managers open simultaneously
+# An absent focus preference is treated as false, which still permits a direct
+# launch.
+if [[ "$APP_LAUNCHER_ALWAYS_FOCUS" == true ]]; then
+  # Thunar and nvim matches bypass focus and launch directly, allowing multiple
+  # instances.
   if [[ "${COMMAND[0]}" =~ $SKIP_REGEX ]]; then
     log Info "Command ${COMMAND[0]} matches skip regex, launching directly"
     # shellcheck disable=SC2068

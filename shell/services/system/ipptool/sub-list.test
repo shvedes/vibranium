@@ -1,0 +1,13 @@
+{
+  NAME "List subs"
+  OPERATION Get-Subscriptions
+  GROUP operation-attributes-tag
+  ATTR charset attributes-charset utf-8
+  ATTR language attributes-natural-language en
+  ATTR uri printer-uri $puri
+  ATTR name requesting-user-name $user
+  GROUP subscription-attributes-tag
+  ATTR keyword requested-attributes notify-subscription-id,notify-recipient-uri,notify-user-data
+  STATUS successful-ok
+  STATUS client-error-not-found
+}

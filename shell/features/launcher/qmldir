@@ -1,0 +1,8 @@
+module qs.features.launcher
+
+singleton AppLauncher 1.0 AppLauncher.qml
+AppLauncherController 1.0 AppLauncherController.qml
+AppLauncherView 1.0 AppLauncherView.qml
+LauncherPanel 1.0 LauncherPanel.qml
+LauncherEntry 1.0 LauncherEntry.qml
+PluginInstance 1.0 PluginInstance.qml

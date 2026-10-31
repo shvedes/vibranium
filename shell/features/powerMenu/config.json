@@ -1,0 +1,44 @@
+[
+  {
+    "id": "lock",
+    "name": "Lock",
+    "description": "Lock session",
+    "icon": "lock",
+    "action": "lock"
+  },
+  {
+    "id": "logout",
+    "name": "Logout",
+    "description": "End session",
+    "icon": "logout",
+    "action": "logout"
+  },
+  {
+    "id": "suspend",
+    "name": "Suspend",
+    "description": "Suspend system",
+    "icon": "suspend",
+    "action": "suspend"
+  },
+  {
+    "id": "reboot",
+    "name": "Reboot",
+    "description": "Restart system",
+    "icon": "update",
+    "action": "reboot"
+  },
+  {
+    "id": "poweroff",
+    "name": "Power Off",
+    "description": "Shut down",
+    "icon": "power",
+    "action": "poweroff"
+  },
+  {
+    "id": "uefi-setup",
+    "name": "UEFI Setup",
+    "description": "Reboot into firmware",
+    "icon": "settings",
+    "action": "uefi-reboot"
+  }
+]

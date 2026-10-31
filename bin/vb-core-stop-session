@@ -36,25 +36,26 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# When terminating a session correctly (systemd-way), some applications freeze completely,
-# and sometimes you have to wait for logind to time out to completely terminate the session.
-# I don't know why this happens, but it's annoying, so we take a rough approach with these applications.
+# Some applications can remain alive during session teardown and block the
+# UWSM stop request.
 
-# Hard-kill known troublemakers before uwsm stop: Electron apps (Discord,
-# vesktop, Spotify) and Steam frequently hang during orderly shutdown
-# because they ignore SIGTERM or wait on child processes.  SIGKILL bypasses
-# their cleanup routines, which is safe because these apps persist state
-# incrementally and data loss on force-close is negligible.
+# Target names are matched globally, not limited to descendants of this shell;
+# SIGKILL bypasses application cleanup handlers before the stop request.
 APPS=("Discord" "vesktop" "spotify" "steam" "steamwebhelper")
 
+# Forced application cleanup is isolated from the hook run below, so hooks
+# cannot prevent signal delivery but can act after it completes.
 log Info "Killing frozen applications: ${APPS[*]}"
+# A missing name makes killall return nonzero, but the loop has no errexit
+# behavior and continues so one absent application cannot suppress the others.
 for app in "${APPS[@]}"; do
   killall -s KILL "$app"
 done
 
-# Source user-defined shutdown hooks from the hooks directory.
-# Each .sh file is sourced in a sub-shell (bash "$hook") so a single
-# failing hook does not abort the rest.
+# Shutdown hooks run as child Bash processes. Their variables and traps are
+# isolated, and a nonzero child status does not stop later hooks.
+# Without nullglob, an unmatched pattern remains a literal path in the array;
+# the non-empty count can therefore include a path that is not a hook file.
 HOOKS=("$XDG_CONFIG_HOME"/vibranium/hooks/shutdown/*.sh)
 
 log Info "Shutdown hooks: ${#HOOKS[@]} found"
@@ -62,29 +63,21 @@ log Info "Shutdown hooks: ${#HOOKS[@]} found"
 if ((${#HOOKS[@]} > 0)); then
   log Info "Running shutdown hooks"
   for hook in "${HOOKS[@]}"; do
-    log Info "Sourcing hook: $hook"
+    log Info "Executing hook: $hook"
     bash "$hook"
   done
-fi
-
-# Release any active sleep inhibitors so the session can terminate
-# cleanly without logind holding a lock.
-if systemctl -q --user is-active vibranium-inhibit@sleep; then
-  log Info "Stopping vibranium-inhibit@sleep"
-  systemctl -q --user stop vibranium-inhibit@sleep
-elif systemctl -q --user is-active vibranium-inhibit@idle; then
-  log Info "Stopping vibranium-inhibit@idle"
-  systemctl -q --user stop vibranium-inhibit@idle
-else
-  log Info "No active sleep/idle inhibit service found"
 fi
 
 # uwsm stop initiates the Wayland session shutdown via UWSM. If it
 # fails, show the error in a persistent notification so the user knows
 # the session may not have terminated fully.
+# The failure branch preserves the captured text in the notification, but it
+# does not re-raise uwsm's exit status; callers must use the notification or
+# log rather than this script's final status.
 if ! out="$(uwsm stop 2>&1)"; then
   log Error "uwsm stop failed: $out"
-  notify-send -r 4 -t 15000 "Failed to Log Out!" "UWSM shows this error: \n\n${out}"
+  notify-send -r 4 -a "Vibranium Shell" -u critical \
+    "Failed to Log Out!" "UWSM shows this error: \n\n${out}"
 else
   log Info "uwsm stop completed successfully"
 fi

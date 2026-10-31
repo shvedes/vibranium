@@ -1,0 +1,109 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+SELF="${0##*/}"
+
+usage() {
+  shcat << EOF
+Usage: $SELF [OPTIONS]
+
+Print the active Wi-Fi access point's BSSID (AP MAC address).
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Display this help and exit
+EOF
+}
+
+set -euo pipefail
+
+while (($# > 0)); do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    --)
+      shift
+      break
+      ;;
+    -*)
+      log Error "unknown option: $1"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
+    *)
+      log Error "unknown option: $1"
+      log Error "Try '$SELF --help' for more information"
+      exit 1
+      ;;
+  esac
+done
+
+# The route probe targets 1.1.1.1; accept its device only when sysfs marks
+# it wireless, otherwise select the first connected NetworkManager Wi-Fi
+# device. Pin the locale and accept connected states by prefix.
+route_device=
+while IFS= read -r _route_line; do
+  read -ra _route_words <<< "$_route_line"
+  for ((i = 0; i + 1 < ${#_route_words[@]}; i++)); do
+    if [[ ${_route_words[i]} == "dev" ]]; then
+      route_device="${_route_words[i+1]}"
+      break 2
+    fi
+  done
+done < <(ip route get 1.1.1.1 2>/dev/null)
+if [[ -n "$route_device" && -d "/sys/class/net/$route_device/wireless" ]]; then
+  interface="$route_device"
+else
+  interface=
+  while IFS=: read -r _dev _type _state; do
+    if [[ $_type == "wifi" && $_state == connected* ]]; then
+      interface="$_dev"
+      break
+    fi
+  done < <(LC_ALL=C nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null)
+fi
+
+if [[ -z "$interface" ]]; then
+  echo "No active Wi-Fi connection" >&2
+  exit 1
+fi
+
+# iw names the AP MAC exactly; nmcli's terse table splits it on colons,
+# so that path reassembles the six fields by hand.
+bssid=
+while IFS= read -r _iw_line; do
+  if [[ $_iw_line == *"Connected to"* ]]; then
+    read -ra _iw_words <<< "$_iw_line"
+    bssid="${_iw_words[2]}"
+    break
+  fi
+done < <(iw dev "$interface" link 2>/dev/null)
+# nmcli marks the active BSSID with a leading '*' and separates octets with
+# colons, so only that row is reassembled.
+if [[ -z "$bssid" ]]; then
+  bssid=
+  while IFS=: read -r _inuse _b1 _b2 _b3 _b4 _b5 _b6 _rest; do
+    if [[ $_inuse == "*" ]]; then
+      bssid="$_b1:$_b2:$_b3:$_b4:$_b5:$_b6"
+      break
+    fi
+  done < <(nmcli -t -f IN-USE,BSSID device wifi list ifname "$interface" --rescan no 2>/dev/null)
+fi
+
+# The shape check rejects empty or truncated tool output; it does not validate
+# the hexadecimal contents beyond the six colon-separated fields.
+if [[ ! "$bssid" == ??:??:??:??:??:?? ]]; then
+  echo "Could not read the access point address" >&2
+  exit 1
+fi
+
+log Info "AP $bssid on $interface"
+printf '%s\n' "$bssid"

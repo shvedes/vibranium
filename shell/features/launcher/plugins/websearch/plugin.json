@@ -1,0 +1,6 @@
+{
+  "name": "Web",
+  "description": "Search the configured engine when no application matches.",
+  "keyword": "",
+  "type": "websearch"
+}

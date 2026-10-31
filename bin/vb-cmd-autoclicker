@@ -10,7 +10,7 @@ INTERVAL=5
 COUNT=""
 
 usage() {
-  shcat << EOF
+	shcat << EOF
 Usage: $SELF [OPTIONS]
 
 General autoclicker: sends mouse clicks to a target window.
@@ -33,102 +33,104 @@ EOF
 }
 
 while (($# > 0)); do
-  case "$1" in
-    -b | --button)
-      BUTTON_ARG="$2"
-      shift 2
-      ;;
-    -i | --interval)
-      INTERVAL_ARG="$2"
-      shift 2
-      ;;
-    -c | --class)
-      CLASS_REGEX="$2"
-      shift 2
-      ;;
-    -t | --title)
-      TITLE_REGEX="$2"
-      shift 2
-      ;;
-    -a | --address)
-      ADDRESS="$2"
-      shift 2
-      ;;
-    -n | --count)
-      COUNT="$2"
-      shift 2
-      ;;
-    -v | --verbose)
-      VERBOSE=true
-      shift
-      ;;
-    -h | --help)
-      usage
-      exit 0
-      ;;
-    *)
-      log Error "Unknown option: $1" >&2
-      log Error "Try '$SELF --help' for more information" >&2
-      exit 1
-      ;;
-  esac
+	case "$1" in
+		-b | --button)
+			BUTTON_ARG="$2"
+			shift 2
+			;;
+		-i | --interval)
+			INTERVAL_ARG="$2"
+			shift 2
+			;;
+		-c | --class)
+			CLASS_REGEX="$2"
+			shift 2
+			;;
+		-t | --title)
+			TITLE_REGEX="$2"
+			shift 2
+			;;
+		-a | --address)
+			ADDRESS="$2"
+			shift 2
+			;;
+		-n | --count)
+			COUNT="$2"
+			shift 2
+			;;
+		-v | --verbose)
+			VERBOSE=true
+			shift
+			;;
+		-h | --help)
+			usage
+			exit 0
+			;;
+		*)
+			log Error "Unknown option: $1" >&2
+			log Error "Try '$SELF --help' for more information" >&2
+			exit 1
+			;;
+	esac
 done
 
+# Selector validation precedes lock creation, so a malformed request
+# cannot displace a live autoclicker belonging to a different target.
 if [[ -z "$CLASS_REGEX" && -z "$TITLE_REGEX" && -z "$ADDRESS" ]]; then
-  log Error "exactly one of --class, --title or --address is required" >&2
-  usage >&2
-  exit 1
+	log Error "exactly one of --class, --title or --address is required" >&2
+	usage >&2
+	exit 1
 fi
 
 if [[ -n "$ADDRESS" ]]; then
-  if [[ ! "$ADDRESS" =~ ^0[xX][0-9a-fA-F]+$ ]]; then
-    log Error "invalid address: $ADDRESS (expected 0x...)" >&2
-    exit 1
-  fi
-  ADDRESS="${ADDRESS,,}"
+	if [[ ! "$ADDRESS" =~ ^0[xX][0-9a-fA-F]+$ ]]; then
+		log Error "invalid address: $ADDRESS (expected 0x...)" >&2
+		exit 1
+	fi
+	ADDRESS="${ADDRESS,,}"
 fi
 
 if [[ -n "$CLASS_REGEX" && -n "$TITLE_REGEX" ]]; then
-  log Error "--class and --title are mutually exclusive" >&2
-  exit 1
+	log Error "--class and --title are mutually exclusive" >&2
+	exit 1
 fi
 
 if [[ -n "$CLASS_REGEX" && -n "$ADDRESS" ]]; then
-  log Error "--class and --address are mutually exclusive" >&2
-  exit 1
+	log Error "--class and --address are mutually exclusive" >&2
+	exit 1
 fi
 
 if [[ -n "$TITLE_REGEX" && -n "$ADDRESS" ]]; then
-  log Error "--title and --address are mutually exclusive" >&2
-  exit 1
+	log Error "--title and --address are mutually exclusive" >&2
+	exit 1
 fi
 
 case "${BUTTON_ARG:-$BUTTON}" in
-  left) BUTTON=272 ;;
-  right) BUTTON=273 ;;
-  middle) BUTTON=274 ;;
-  side) BUTTON=275 ;;
-  extra) BUTTON=276 ;;
-  *[!0-9]*)
-    log Error "invalid button: $BUTTON_ARG (use a code or a name)" >&2
-    exit 1
-    ;;
-  *)
-    BUTTON="${BUTTON_ARG:-$BUTTON}"
-    ;;
+	left) BUTTON=272 ;;
+	right) BUTTON=273 ;;
+	middle) BUTTON=274 ;;
+	side) BUTTON=275 ;;
+	extra) BUTTON=276 ;;
+	*[!0-9]*)
+		log Error "invalid button: $BUTTON_ARG (use a code or a name)" >&2
+		exit 1
+		;;
+	*)
+		BUTTON="${BUTTON_ARG:-$BUTTON}"
+		;;
 esac
 
 if [[ -n "$INTERVAL_ARG" ]]; then
-  if [[ ! "$INTERVAL_ARG" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
-    log Error "invalid interval: $INTERVAL_ARG" >&2
-    exit 1
-  fi
-  INTERVAL="$INTERVAL_ARG"
+	if [[ ! "$INTERVAL_ARG" =~ ^[0-9]+([.][0-9]+)?$ ]]; then
+		log Error "invalid interval: $INTERVAL_ARG" >&2
+		exit 1
+	fi
+	INTERVAL="$INTERVAL_ARG"
 fi
 
 if [[ -n "$COUNT" && ! "$COUNT" =~ ^[1-9][0-9]*$ ]]; then
-  log Error "invalid count: $COUNT" >&2
-  exit 1
+	log Error "invalid count: $COUNT" >&2
+	exit 1
 fi
 
 # The window selector becomes the body of a Lua long-bracket literal
@@ -142,24 +144,24 @@ level=0
 eqs=""
 
 while ((level < 10)); do
-  if [[ "$regex" != *"]${eqs}]"* ]]; then
-    break
-  fi
-  eqs+="="
-  ((level++))
+	if [[ "$regex" != *"]${eqs}]"* ]]; then
+		break
+	fi
+	eqs+="="
+	((level++))
 done
 
 if ((level == 10)); then
-  log Error "regex needs too many bracket levels" >&2
-  exit 1
+	log Error "regex needs too many bracket levels" >&2
+	exit 1
 fi
 
 if [[ -n "$CLASS_REGEX" ]]; then
-  WINDOW_SEL="class:$CLASS_REGEX"
+	WINDOW_SEL="class:$CLASS_REGEX"
 elif [[ -n "$TITLE_REGEX" ]]; then
-  WINDOW_SEL="title:$TITLE_REGEX"
+	WINDOW_SEL="title:$TITLE_REGEX"
 else
-  WINDOW_SEL="address:$ADDRESS"
+	WINDOW_SEL="address:$ADDRESS"
 fi
 
 LB_OPEN="[${eqs}["
@@ -168,25 +170,31 @@ LB_CLOSE="]${eqs}]"
 # One autoclicker per target: the pid file keyed by the selector lets a new
 # invocation shut down a running one for the same window and exit. The key
 # is a pure-bash FNV-1a hash of the selector (no external tools, no pipes).
+# The hash is an identity key, not a security boundary; its only purpose is to
+# provide a short, filesystem-safe name for the per-selector lock.
+# Masking each multiplication limits the state to the 32-bit FNV-1a domain.
 hash=2166136261
 for ((i = 0; i < ${#WINDOW_SEL}; i++)); do
-  printf -v ord '%d' "'${WINDOW_SEL:i:1}'"
-  ((hash = (hash ^ ord) * 16777619 & 0xFFFFFFFF))
+	printf -v ord '%d' "'${WINDOW_SEL:i:1}'"
+	((hash = (hash ^ ord) * 16777619 & 0xFFFFFFFF))
 done
 
 LOCKFILE="$VIBRANIUM_RUNTIME/$SELF-$hash.lock"
 
+# The lockfile is advisory: kill -0 only tests PID addressability, not process
+# identity; PID reuse or a zombie can still pass, while malformed or
+# unaddressable records are removed.
 if [[ -f "$LOCKFILE" ]]; then
-  old_pid=""
-  read -r old_pid < "$LOCKFILE"
+	old_pid=""
+	read -r old_pid < "$LOCKFILE"
 
-  if [[ "$old_pid" =~ ^[0-9]+$ ]] && kill -0 "$old_pid" 2> /dev/null; then
-    kill "$old_pid"
-    log Info "stopped running autoclicker for $WINDOW_SEL (pid $old_pid)"
-    exit 0
-  fi
+	if [[ "$old_pid" =~ ^[0-9]+$ ]] && kill -0 "$old_pid" 2> /dev/null; then
+		kill "$old_pid"
+		log Info "stopped running autoclicker for $WINDOW_SEL (pid $old_pid)"
+		exit 0
+	fi
 
-  rm -f "$LOCKFILE"
+	rm -f "$LOCKFILE"
 fi
 
 printf '%s\n' "$$" > "$LOCKFILE"
@@ -194,22 +202,22 @@ printf '%s\n' "$$" > "$LOCKFILE"
 # Background launches have no terminal to report to, so start and stop
 # events fall back to a desktop notification.
 notify_start() {
-  [[ -t 1 ]] && return 0
-  notify-send -r 7 -t 3000 "Vibranium" "Autoclicker started: $WINDOW_SEL"
+	[[ -t 1 ]] && return 0
+	notify-send -r 7 -a "Vibranium" -t 3000 "Vibranium" "Autoclicker started: $WINDOW_SEL"
 }
 
 notify_stop() {
-  if [[ -t 1 ]]; then
-    printf '\n'
-  else
-    notify-send -r 7 -t 3000 "Vibranium" "Autoclicker stopped: $WINDOW_SEL"
-  fi
+	if [[ -t 1 ]]; then
+		printf '\n'
+	else
+		notify-send -r 7 -a "Vibranium" -t 3000 "Vibranium" "Autoclicker stopped: $WINDOW_SEL"
+	fi
 }
 
 notify_start
 
 cleanup() {
-  rm -f "$LOCKFILE"
+	rm -f "$LOCKFILE"
 }
 
 trap 'notify_stop; cleanup; exit 0' INT TERM
@@ -217,22 +225,29 @@ trap 'notify_stop; cleanup; exit 0' INT TERM
 log Info "autoclicker: button $BUTTON every ${INTERVAL}s on $WINDOW_SEL"
 
 CLICKS=0
+
+# Each iteration dispatches a down/up pair through Hyprland IPC. The script
+# does not inspect the dispatch result, so CLICKS counts attempts rather than
+# compositor responses.
 while true; do
-  hyprctl -q eval "
+	hyprctl -q eval "
   hl.dispatch(hl.dsp.send_key_state({ mods = \"\", key = \"mouse:$BUTTON\", state = \"down\", window = ${LB_OPEN}${WINDOW_SEL}${LB_CLOSE} }));
   hl.dispatch(hl.dsp.send_key_state({ mods = \"\", key = \"mouse:$BUTTON\", state = \"up\", window = ${LB_OPEN}${WINDOW_SEL}${LB_CLOSE} }))
   "
 
-  ((CLICKS++))
-  if [[ -t 1 ]]; then
-    printf '\r\033[KClicks passed: %d ' "$CLICKS"
-  fi
+	((CLICKS++))
 
-  if [[ -n "$COUNT" ]] && ((CLICKS >= COUNT)); then
-    notify_stop
-    cleanup
-    exit 0
-  fi
+	if [[ -t 1 ]]; then
+		printf '\r\033[KClicks passed: %d ' "$CLICKS"
+	fi
 
-  sleep "$INTERVAL"
+	# Count is checked after dispatch, so a positive count always produces one
+	# click and the terminal iteration exits without an extra sleep.
+	if [[ -n "$COUNT" ]] && ((CLICKS >= COUNT)); then
+		notify_stop
+		cleanup
+		exit 0
+	fi
+
+	sleep "$INTERVAL"
 done

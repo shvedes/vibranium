@@ -11,18 +11,18 @@ declare -A mime_apps=(
 
   [inode/directory]=thunar.desktop
 
-  [image/jpeg]=imv-dir.desktop
-  [image/png]=imv-dir.desktop
-  [image/webp]=imv-dir.desktop
-  [image/gif]=imv-dir.desktop
-  [image/avif]=imv-dir.desktop
-  [image/heif]=imv-dir.desktop
-  [image/heic]=imv-dir.desktop
-  [image/svg+xml]=imv.desktop
-  [image/vnd.adobe.photoshop]=imv-dir.desktop
-  [image/x-psd]=imv-dir.desktop
-  [image/x-canon-cr2]=imv-dir.desktop
-  [image/x-nikon-nef]=imv-dir.desktop
+  [image/jpeg]=image-viewer.desktop
+  [image/png]=image-viewer.desktop
+  [image/webp]=image-viewer.desktop
+  [image/gif]=image-viewer.desktop
+  [image/avif]=image-viewer.desktop
+  [image/heif]=image-viewer.desktop
+  [image/heic]=image-viewer.desktop
+  [image/svg+xml]=image-viewer.desktop
+  [image/vnd.adobe.photoshop]=image-viewer.desktop
+  [image/x-psd]=image-viewer.desktop
+  [image/x-canon-cr2]=image-viewer.desktop
+  [image/x-nikon-nef]=image-viewer.desktop
 
   [video/mp4]=mpv.desktop
   [video/webm]=mpv.desktop

@@ -20,7 +20,7 @@ count_cut = { fg = "{{ black }}", bg = "{{ red|pop=0.10 }}" }
 count_selected = { fg = "{{ black }}", bg = "{{ yellow|pop=0.10 }}" }
 
 border_symbol = "│"
-border_style = { fg = "{{ background_5 }}" }
+border_style = { fg = "{{ background|pop=0.30 }}" }
 
 [indicator]
 parent  = { reversed = false }
@@ -38,11 +38,11 @@ sep_outer = { open = "", close = "" }
 
 [mode]
 normal_main = { fg = "{{ black }}", bg = "{{ blue }}" }
-normal_alt = { fg = "{{ white }}", bg = "{{ background_4 }}" }
+normal_alt = { fg = "{{ white }}", bg = "{{ background|pop=0.24 }}" }
 select_main = { fg = "{{ black }}", bg = "{{ purple }}" }
-select_alt = { fg = "{{ white }}", bg = "{{ background_4 }}" }
+select_alt = { fg = "{{ white }}", bg = "{{ background|pop=0.24 }}" }
 unset_main = { fg = "{{ black }}", bg = "{{ yellow }}" }
-unset_alt = { fg = "{{ white }}", bg = "{{ background_4 }}" }
+unset_alt = { fg = "{{ white }}", bg = "{{ background|pop=0.24 }}" }
 
 
 [status]
@@ -58,7 +58,7 @@ perm_type = { fg = "{{ blue }}" }
 perm_read = { fg = "{{ yellow }}" }
 perm_write = { fg = "{{ red }}" }
 perm_exec = { fg = "{{ green }}" }
-perm_sep = { fg = "{{ background_5 }}" }
+perm_sep = { fg = "{{ background|pop=0.30 }}" }
 
 
 [confirm]
@@ -71,7 +71,7 @@ btn_no     = {}
 btn_labels = [ "  [Y]es  ", "  (N)o  " ]
 
 [pick]
-border = { fg = "{{ background_5 }}" }
+border = { fg = "{{ background|pop=0.30 }}" }
 active = { fg = "{{ red }}", bold = true }
 inactive = {}
 
@@ -105,11 +105,11 @@ hovered = { fg = "{{ purple }}", bold = true }
 [which]
 cols = 3
 separator = " - "
-separator_style = { fg = "{{ background_5 }}" }
-mask = { bg = "{{ background_1 }}" }
+separator_style = { fg = "{{ background|pop=0.30 }}" }
+mask = { bg = "{{ background|pop=0.06 }}" }
 rest = { fg = "{{ red }}" }
 cand = { fg = "{{ blue }}" }
-desc = { fg = "{{ foreground_2 }}" }
+desc = { fg = "{{ foreground|dim=0.12 }}" }
 
 [help]
 border  = { fg = "{{ blue }}" }

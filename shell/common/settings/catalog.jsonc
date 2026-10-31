@@ -1,0 +1,4071 @@
+// Vibranium unified catalog: settings pages + menu pages in one file.
+// Lives with the shell because every row is editable from the menus.
+// Edit this file directly: keep `pages` for settings, `menus` for menus.
+// Every settings page carries a `group` (shell|env|hypr) naming the
+// store that owns it: Settings keeps shell+env, HyprlandSettings keeps
+// hypr. Groups double as the namespace assertion the old per-file
+// layout gave for free - a hypr key on a shell page fails to parse.
+{
+  "title": "Settings",
+  "pages": [
+    // --- settings page 1/42 (shell) ---
+    {
+        "group": "shell",
+        "label": "General",
+        "icon": "settings-general",
+        "showItemCount": true,
+        "items": [
+            {
+                "type": "separator"
+            },
+            {
+                "type": "action",
+                "label": "Edit environment",
+                "sub": "Edit session environment variables",
+                "icon": "file",
+                "command": "xdg-terminal-exec --app-id=org.vb.term -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/vibranium/environment"
+            },
+            {
+                "type": "action",
+                "label": "Font selection",
+                "sub": "System font",
+                "icon": "font",
+                "call": "fontPicker open",
+                "keepOpen": true
+            },
+            {
+                "type": "action",
+                "label": "User wallpapers",
+                "sub": "View and manage wallpapers",
+                "icon": "file-image",
+                "call": "wallpaperPicker open"
+            }
+        ],
+        "options": [
+            {
+                "key": "shell.privacy.overlay",
+                "type": "bool",
+                "default": true,
+                "label": "Privacy dots",
+                "sub": "Always-visible capture indicator",
+                "desc": "Draw the capture dots on their own overlay surface."
+            },
+            {
+                "key": "shell.privacy.position",
+                "type": "string",
+                "default": "top-right",
+                "label": "Position",
+                "sub": "Corner holding the dots",
+                "desc": "Which screen corner the dots sit in.",
+                "values": [
+                    "top-right",
+                    "top-left",
+                    "bottom-right",
+                    "bottom-left"
+                ],
+                "valueLabels": {
+                    "top-right": "Top right",
+                    "top-left": "Top left",
+                    "bottom-right": "Bottom right",
+                    "bottom-left": "Bottom left"
+                },
+                "showIf": [
+                    {
+                        "key": "shell.privacy.overlay",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.wallpaper.enabled",
+                "type": "bool",
+                "default": true,
+                "label": "Show wallpaper",
+                "sub": "Show desktop background",
+                "desc": "Whether to display desktop background"
+            },
+            {
+                "key": "shell.wallpaper.transition",
+                "type": "string",
+                "default": "fade",
+                "label": "Transition",
+                "sub": "Wallpaper swap animation",
+                "desc": "How the new wallpaper replaces the old one.",
+                "values": [
+                    "none",
+                    "fade",
+                    "slide",
+                    "swipe",
+                    "circle",
+                    "random"
+                ],
+                "valueLabels": {
+                    "none": "None",
+                    "fade": "Fade",
+                    "slide": "Slide",
+                    "swipe": "Swipe",
+                    "circle": "Circle",
+                    "random": "Random"
+                },
+                "showIf": [
+                    {
+                        "key": "shell.wallpaper.enabled",
+                        "eq": true
+                    },
+                    {
+                        "key": "hypr.animations.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.wallpaper.transitionSpeed",
+                "type": "string",
+                "default": "default",
+                "label": "Transition speed",
+                "sub": "How fast swaps play",
+                "desc": "Duration applied to every transition type.",
+                "values": [
+                    "slow",
+                    "default",
+                    "fast"
+                ],
+                "valueLabels": {
+                    "slow": "Slow",
+                    "default": "Default",
+                    "fast": "Fast"
+                },
+                "showIf": [
+                    {
+                        "key": "shell.wallpaper.enabled",
+                        "eq": true
+                    },
+                    {
+                        "key": "shell.wallpaper.transition",
+                        "neq": "none"
+                    },
+                    {
+                        "key": "hypr.animations.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.wallpaper.mosaic",
+                "type": "bool",
+                "default": false,
+                "label": "Show mosaic",
+                "sub": "Random monochrome emoji pattern",
+                "desc": "Whether to show emoji grid when wallpaper is off.",
+                "showIf": [
+                    {
+                        "key": "shell.wallpaper.enabled",
+                        "eq": false
+                    }
+                ]
+            },
+            {
+                "key": "shell.wallpaper.mosaicIntensity",
+                "type": "string",
+                "default": "medium",
+                "label": "Mosaic density",
+                "sub": "How many symbols are drawn",
+                "desc": "Density level of the mosaic symbols.",
+                "values": [
+                    "sparse",
+                    "medium",
+                    "dense"
+                ],
+                "valueLabels": {
+                    "sparse": "Sparse",
+                    "medium": "Medium",
+                    "dense": "Dense"
+                },
+                "showIf": [
+                    {
+                        "key": "shell.wallpaper.mosaic",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.wallpaper.mosaicSize",
+                "type": "string",
+                "default": "medium",
+                "label": "Symbol size",
+                "sub": "Size of the mosaic symbols",
+                "desc": "Base size of the mosaic symbols.",
+                "values": [
+                    "small",
+                    "medium",
+                    "large",
+                    "very_large"
+                ],
+                "valueLabels": {
+                    "small": "Small",
+                    "medium": "Medium",
+                    "large": "Large",
+                    "very_large": "Very large"
+                },
+                "showIf": [
+                    {
+                        "key": "shell.wallpaper.mosaic",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "misc.cursorTheme",
+                "type": "string",
+                "default": "Adwaita",
+                "label": "Cursor theme",
+                "values": [
+                    "Adwaita"
+                ],
+                "valueLabels": {
+                    "Adwaita": "Adwaita"
+                }
+            },
+            {
+                "key": "misc.cursorSize",
+                "type": "int",
+                "default": 24,
+                "label": "Cursor size",
+                "range": {
+                    "min": 16,
+                    "max": 200
+                },
+                "step": 1,
+                "unit": " px",
+                "values": [
+                    16,
+                    24,
+                    32,
+                    48
+                ],
+                "valueLabels": {
+                    "16": "16 px",
+                    "24": "24 px",
+                    "32": "32 px",
+                    "48": "48 px"
+                }
+            }
+        ]
+    },
+    // --- settings page 2/42 (shell) ---
+    {
+        "group": "shell",
+        "label": "App launcher",
+        "icon": "grid",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.launcher.searchEngine",
+                "type": "string",
+                "default": "duckduckgo",
+                "label": "Search engine",
+                "sub": "Where to search your queries",
+                "desc": "What search engine to use for the search shortcut.",
+                "values": [
+                    "google",
+                    "duckduckgo",
+                    "bing",
+                    "brave"
+                ],
+                "valueLabels": {
+                    "google": "Google",
+                    "duckduckgo": "DuckDuckGo",
+                    "bing": "Bing",
+                    "brave": "Brave"
+                }
+            },
+            {
+                "key": "shell.launcher.showIcons",
+                "type": "bool",
+                "default": true,
+                "label": "Show icons",
+                "sub": "Show/hide app icons"
+            },
+            {
+                "key": "shell.launcher.showBadges",
+                "type": "bool",
+                "default": true,
+                "label": "Show PWA/TUI badges",
+                "sub": "Show/hide PWA & TUI badges"
+            },
+            {
+                "key": "shell.launcher.showDescriptions",
+                "type": "bool",
+                "default": true,
+                "label": "Show descriptions",
+                "sub": "Show/hide app description"
+            },
+            {
+                "key": "shell.launcher.sortMethod",
+                "type": "string",
+                "default": "alphabetical",
+                "label": "Sort order (idle)",
+                "sub": "Sorting method",
+                "desc": "How to sort apps. Search results are always <u>by relevance</u>.",
+                "values": [
+                    "alphabetical",
+                    "frequency"
+                ],
+                "valueLabels": {
+                    "alphabetical": "Alphabetical",
+                    "frequency": "Most used"
+                }
+            },
+            {
+                "key": "shell.launcher.autoSelect",
+                "type": "bool",
+                "default": false,
+                "label": "Auto-select",
+                "sub": "Auto-select remaining entry"
+            },
+            {
+                "key": "shell.launcher.showClipboardSuggestion",
+                "type": "bool",
+                "default": true,
+                "label": "Clipboard suggestion",
+                "sub": "Suggest clipboard contents",
+                "desc": "Suggest opening the newest copied file/path/link."
+            },
+            {
+                "key": "APP_LAUNCHER_ALWAYS_FOCUS",
+                "type": "bool",
+                "default": false,
+                "label": "Focus first",
+                "sub": "Focus existing windows instead",
+                "desc": "Focus existing windows instad of opening new instances.",
+                "warning": "Sometimes it can misbehave!"
+            }
+        ],
+        "items": [
+            {
+                "type": "submenu",
+                "label": "Enabled plugins",
+                "sub": "Toggle AppLauncher plugins",
+                "icon": "list",
+                "page": "launcher-enabled"
+            },
+            {
+                "id": "clearUsageHistory",
+                "type": "action",
+                "icon": "remove",
+                "label": "Clear usage history",
+                "sub": "Erase the most-used cache",
+                "after": "shell.launcher.sortMethod",
+                "showIf": [
+                    {
+                        "key": "shell.launcher.sortMethod",
+                        "eq": "frequency"
+                    }
+                ]
+            }
+        ]
+    },
+    // --- settings page 3/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "launcher-enabled",
+        "label": "Enabled plugins",
+        "icon": "list",
+        "showItemCount": true,
+        "options": [],
+        "items": [
+            {
+                "id": "launcher-fx",
+                "type": "toggle",
+                "label": "Currency converter"
+            },
+            {
+                "id": "launcher-unit",
+                "type": "toggle",
+                "label": "Unit converter"
+            },
+            {
+                "id": "launcher-calc",
+                "type": "toggle",
+                "label": "Calculator"
+            },
+            {
+                "id": "launcher-websearch",
+                "type": "toggle",
+                "label": "Web search"
+            },
+            {
+                "id": "launcher-time",
+                "type": "toggle",
+                "label": "Timezone"
+            },
+            {
+                "id": "launcher-color",
+                "type": "toggle",
+                "label": "Colors"
+            }
+        ]
+    },
+    // --- settings page 4/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar",
+        "label": "Statusbar",
+        "icon": "monitor",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.statusbar.enabled",
+                "type": "bool",
+                "default": true,
+                "label": "Show statusbar",
+                "sub": "Display the top/bottom bar",
+                "desc": "Master switch for the bar itself."
+            },
+            {
+                "key": "shell.statusbar.showBorder",
+                "type": "bool",
+                "default": false,
+                "label": "Show border",
+                "sub": "Add a 1px line to the bar",
+                "desc": "Adds a 1px border on the edge facing the screen.",
+                "showIf": [
+                    {
+                        "key": "shell.statusbar.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.statusbar.showShadow",
+                "type": "bool",
+                "default": true,
+                "label": "Show shadow",
+                "sub": "Add a soft shadow to the bar",
+                "desc": "Adds a subtle shadow along the edge facing the screen.",
+                "showIf": [
+                    {
+                        "key": "shell.statusbar.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.statusbar.blurred",
+                "type": "bool",
+                "default": false,
+                "label": "Transparent",
+                "sub": "Make the bar background translucent",
+                "desc": "Makes the bar background translucent for compositor blur.",
+                "showIf": [
+                    {
+                        "key": "shell.statusbar.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.statusbar.position",
+                "type": "string",
+                "default": "top",
+                "label": "Position",
+                "sub": "Which screen edge the bar sits on",
+                "values": [
+                    "top",
+                    "bottom"
+                ],
+                "valueLabels": {
+                    "top": "Top",
+                    "bottom": "Bottom"
+                },
+                "showIf": [
+                    {
+                        "key": "shell.statusbar.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.statusbar.layout",
+                "type": "layout",
+                "label": "Zone layout",
+                "default": {
+                    "left": [
+                        "workspaces"
+                    ],
+                    "center": [
+                        "clock"
+                    ],
+                    "right": [
+                        "keyboardLayout",
+                        "caffeine",
+                        "timer",
+                        "update",
+                        "readingMode",
+                        "recording",
+                        "weather",
+                        "nowPlaying",
+                        "colorPicker",
+                        "powerProfile",
+                        "privacy",
+                        "printers",
+                        "archUpdates",
+                        "nightLight",
+                        "bluetooth",
+                        "network",
+                        "volume",
+                        "battery",
+                        "session"
+                    ],
+                    "disabled": [
+                        "archUpdates",
+                        "colorPicker",
+                        "nightLight",
+                        "keyboardLayout",
+                        "weather",
+                        "printers",
+                        "privacy",
+                        "nowPlaying"
+                    ]
+                },
+                "visibility": "internal"
+            },
+            {
+                "key": "shell.statusbar.networkRightClick",
+                "type": "string",
+                "default": "vb-launch-networkmanager",
+                "label": "Right-click action",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.bluetoothRightClick",
+                "type": "string",
+                "default": "",
+                "label": "Right-click action",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.workspacesRightClick",
+                "type": "string",
+                "default": "",
+                "label": "Right-click action",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.trayRightClick",
+                "type": "string",
+                "default": "",
+                "label": "Right-click action",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.logoutRightClick",
+                "type": "string",
+                "default": "",
+                "label": "Right-click action",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            }
+        ],
+        "items": [
+            {
+                "type": "submenu",
+                "label": "Enabled modules",
+                "icon": "list",
+                "page": "bar-enabled",
+                "showIf": [
+                    {
+                        "key": "shell.statusbar.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Module options",
+                "icon": "settings",
+                "page": "bar-modules",
+                "showIf": [
+                    {
+                        "key": "shell.statusbar.enabled",
+                        "eq": true
+                    }
+                ]
+            }
+        ]
+    },
+    // --- settings page 5/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-enabled",
+        "label": "Enabled modules",
+        "desc": "Which static modules are shown in the bar.",
+        "icon": "apps",
+        "showItemCount": true,
+        "options": [],
+        "items": [
+            {
+                "id": "bar-privacy",
+                "type": "toggle",
+                "label": "Privacy"
+            },
+            {
+                "id": "bar-clock",
+                "type": "toggle",
+                "label": "Clock"
+            },
+            {
+                "id": "bar-keyboardLayout",
+                "type": "toggle",
+                "label": "Keyboard layout"
+            },
+            {
+                "id": "bar-bluetooth",
+                "type": "toggle",
+                "label": "Bluetooth"
+            },
+            {
+                "id": "bar-network",
+                "type": "toggle",
+                "label": "Network"
+            },
+            {
+                "id": "bar-battery",
+                "type": "toggle",
+                "label": "Battery"
+            },
+            {
+                "id": "bar-volume",
+                "type": "toggle",
+                "label": "Volume"
+            },
+            {
+                "id": "bar-powerProfile",
+                "type": "toggle",
+                "label": "Power profile"
+            },
+            {
+                "id": "bar-session",
+                "type": "toggle",
+                "label": "Power & Tray"
+            },
+            {
+                "id": "bar-archUpdates",
+                "type": "toggle",
+                "label": "Arch updates"
+            },
+            {
+                "id": "bar-colorPicker",
+                "type": "toggle",
+                "label": "Color picker"
+            },
+            {
+                "id": "bar-nightLight",
+                "type": "toggle",
+                "label": "Night Light",
+                "when": "[[ \"$CHASSIS_TYPE\" != vm ]]"
+            },
+            {
+                "id": "bar-weather",
+                "type": "toggle",
+                "label": "Weather"
+            },
+            {
+                "id": "bar-printers",
+                "type": "toggle",
+                "label": "Printers"
+            },
+            {
+                "id": "bar-nowPlaying",
+                "type": "toggle",
+                "label": "Now Playing"
+            }
+        ]
+    },
+    // --- settings page 6/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-modules",
+        "label": "Module options",
+        "desc": "Options of each bar module.",
+        "icon": "settings",
+        "showItemCount": true,
+        "items": [
+            {
+                "type": "submenu",
+                "label": "Clock",
+                "page": "bar-module-clock"
+            },
+            {
+                "type": "submenu",
+                "label": "Volume",
+                "page": "bar-module-volume"
+            },
+            {
+                "type": "submenu",
+                "label": "Weather",
+                "page": "bar-module-weather"
+            },
+            {
+                "type": "submenu",
+                "label": "Arch updates",
+                "page": "bar-module-archupdates"
+            },
+            {
+                "type": "submenu",
+                "label": "Now Playing",
+                "page": "bar-module-nowplaying"
+            },
+            {
+                "type": "submenu",
+                "label": "Recording",
+                "page": "bar-module-recording"
+            },
+            {
+                "type": "submenu",
+                "label": "Color Picker",
+                "page": "bar-module-colorpicker"
+            }
+        ],
+        "options": []
+    },
+    // --- settings page 7/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-module-nowplaying",
+        "label": "Now Playing",
+        "desc": "Options of the bar now playing module.",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.statusbar.nowPlayingTitle",
+                "type": "bool",
+                "default": false,
+                "label": "Show track name",
+                "sub": "Title next to the icon",
+                "desc": "Show the track name next to the icon."
+            },
+            {
+                "key": "shell.statusbar.nowPlayingFlash",
+                "type": "bool",
+                "default": true,
+                "label": "Flash track name",
+                "sub": "Reveal the name on track changes",
+                "desc": "When enabled, the track name is briefly revealed on each track change."
+            }
+        ]
+    },
+    // --- settings page 8/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-module-recording",
+        "label": "Recording",
+        "desc": "Options of the bar recording module.",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.statusbar.recordingElapsed",
+                "type": "bool",
+                "default": false,
+                "label": "Elapsed time pill",
+                "sub": "Dot plus duration",
+                "desc": "Show a pill with elapsed recording time."
+            }
+        ]
+    },
+    // --- settings page 9/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-module-volume",
+        "label": "Volume",
+        "desc": "Options of the bar volume module.",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.statusbar.volumeShowMic",
+                "type": "bool",
+                "default": false,
+                "label": "Show microphone",
+                "sub": "Always show mic pill"
+            },
+            {
+                "key": "shell.statusbar.volumeRightClick",
+                "type": "string",
+                "default": "vb-shell app audioMixer",
+                "label": "Right-click action",
+                "sub": "Command on right-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            },
+            {
+                "key": "shell.statusbar.volumeMiddleClick",
+                "type": "string",
+                "default": "",
+                "label": "Middle-click action",
+                "sub": "Command on middle-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            }
+        ]
+    },
+    // --- settings page 10/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-module-clock",
+        "label": "Clock",
+        "desc": "Options of the bar clock module.",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.statusbar.clockSeconds",
+                "type": "bool",
+                "default": false,
+                "label": "Show seconds",
+                "sub": "Display seconds",
+                "desc": "Show seconds in the bar clock.",
+                "warning": "Heavily affects CPU usage!"
+            },
+            {
+                "key": "shell.statusbar.clockSecondsTooltip",
+                "type": "bool",
+                "default": false,
+                "label": "Show in tooltip",
+                "sub": "Display seconds on hover",
+                "desc": "Show seconds only in the clock tooltip.",
+                "showIf": [
+                    {
+                        "key": "shell.statusbar.clockSeconds",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.statusbar.clockFormat",
+                "type": "string",
+                "default": "24",
+                "label": "Time format",
+                "sub": "12- or 24-hour clock",
+                "desc": "How the bar clock displays the time.\n24-hour shows 21:30, 12-hour shows 09:30 PM.",
+                "values": [
+                    "12",
+                    "24"
+                ],
+                "valueLabels": {
+                    "12": "12-hour (AM/PM)",
+                    "24": "24-hour"
+                }
+            },
+            {
+                "key": "shell.statusbar.clockFullDate",
+                "type": "bool",
+                "default": false,
+                "label": "Show full date",
+                "sub": "Date before time",
+                "desc": "Show full date before time.\nMon, Sep 21 21:30."
+            },
+            {
+                "key": "shell.statusbar.clockRightClick",
+                "type": "string",
+                "default": "",
+                "label": "Right-click action",
+                "sub": "Command on right-click",
+                "allowEmpty": true,
+                "visibility": "hidden"
+            }
+        ]
+    },
+    // --- settings page 11/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-module-weather",
+        "label": "Weather",
+        "desc": "Options of the bar weather module.",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.statusbar.weatherShowTemp",
+                "type": "bool",
+                "default": false,
+                "label": "Show temperature",
+                "sub": "Temperature next to the icon",
+                "desc": "Show temperature next to the icon."
+            },
+            {
+                "key": "shell.statusbar.weatherFlash",
+                "type": "bool",
+                "default": true,
+                "label": "Flash temperature",
+                "sub": "Reveal temperature on updates",
+                "desc": "When enabled, the temperature is briefly revealed on each data update.",
+                "showIf": [
+                    {
+                        "key": "shell.statusbar.weatherShowTemp",
+                        "eq": false
+                    }
+                ]
+            },
+            {
+                "key": "shell.statusbar.weatherUnit",
+                "type": "string",
+                "default": "auto",
+                "label": "Units",
+                "sub": "Temperature units",
+                "values": [
+                    "auto",
+                    "metric",
+                    "imperial"
+                ],
+                "valueLabels": {
+                    "auto": "Auto",
+                    "metric": "Metric (°C, km/h)",
+                    "imperial": "Imperial (°F, mph)"
+                }
+            },
+            {
+                "key": "shell.statusbar.weatherRefreshMinutes",
+                "type": "int",
+                "default": 15,
+                "label": "Refresh interval",
+                "sub": "Minutes between forecasts",
+                "range": {
+                    "min": 5,
+                    "max": 120
+                },
+                "step": 5,
+                "unit": " min"
+            },
+            {
+                "key": "shell.statusbar.weatherVerbose",
+                "type": "bool",
+                "default": false,
+                "label": "Verbose forecast",
+                "sub": "Per-day details"
+            }
+        ]
+    },
+    // --- settings page 12/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-module-archupdates",
+        "label": "Arch updates",
+        "desc": "Options of the bar updates module.",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.statusbar.archUpdatesHeavyWarning",
+                "type": "bool",
+                "default": true,
+                "label": "Heavy backlog warning",
+                "sub": "See description below",
+                "desc": "Show the warning message when accumulating many package updates."
+            }
+        ]
+    },
+    // --- settings page 13/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-module-colorpicker",
+        "label": "Color Picker",
+        "desc": "Options of the bar color picker module.",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.colorPicker.showLastColor",
+                "type": "bool",
+                "default": true,
+                "label": "Fill last color",
+                "sub": "Fill the bar icon with last copied color"
+            }
+        ]
+    },
+    // --- settings page 14/42 (shell) ---
+    {
+        "group": "shell",
+        "label": "Audio",
+        "icon": "volume-max",
+        "showItemCount": true,
+        "items": [
+            {
+                "type": "separator"
+            },
+            {
+                "type": "action",
+                "label": "Volume mixer",
+                "icon": "settings-general",
+                "sub": "Open the shell's audio mixer",
+                "call": "audioMixer toggle"
+            }
+        ],
+        "options": [
+            {
+                "key": "shell.audio.loopback",
+                "type": "bool",
+                "default": false,
+                "label": "Hear my voice",
+                "sub": "Route input device to output device"
+            },
+            {
+                "key": "shell.volume.visualFeedback",
+                "type": "bool",
+                "default": true,
+                "label": "Visual feedback",
+                "sub": "Show the OSD when changing volume"
+            },
+            {
+                "key": "shell.volume.step",
+                "type": "int",
+                "default": 5,
+                "label": "Volume step",
+                "sub": "Volume adjustment step",
+                "range": {
+                    "min": 1,
+                    "max": 50
+                },
+                "step": 1,
+                "unit": "%"
+            },
+            {
+                "key": "shell.volume.allowAboveHundred",
+                "type": "bool",
+                "default": false,
+                "label": "Vol above 100%",
+                "sub": "Boost vol cap to 200%"
+            },
+            {
+                "key": "shell.volume.micAllowAboveHundred",
+                "type": "bool",
+                "default": false,
+                "label": "Mic above 100%",
+                "sub": "Boost mic cap to 200%"
+            }
+        ]
+    },
+    // --- settings page 15/42 (shell) ---
+    {
+        "group": "shell",
+        "label": "Screenshots",
+        "icon": "screenshot",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.screenshots.fileType",
+                "type": "string",
+                "default": "jpeg",
+                "label": "File type",
+                "sub": "Default filetype",
+                "desc": "Default filetype.",
+                "values": [
+                    "png",
+                    "jpeg"
+                ],
+                "valueLabels": {
+                    "png": "PNG",
+                    "jpeg": "JPEG"
+                }
+            },
+            {
+                "key": "shell.screenshots.showNotification",
+                "type": "bool",
+                "default": true,
+                "label": "Notification",
+                "sub": "Notify when taking screenshots",
+                "desc": "Notify when taking screenshots."
+            },
+            {
+                "key": "shell.screenshots.autoAnnotate",
+                "type": "bool",
+                "default": false,
+                "label": "Auto-annotate",
+                "sub": "Auto-annotate screenshots",
+                "desc": "Open the annotation overlay after every capture."
+            },
+            {
+                "key": "shell.screenshots.saveToDisk",
+                "type": "bool",
+                "default": true,
+                "label": "Save to disk",
+                "sub": "Save screenshots on disk",
+                "desc": "Whether to save screenshots on disk. Off = clipboard only.",
+                "showIf": [
+                    {
+                        "key": "shell.screenshots.autoAnnotate",
+                        "eq": false
+                    }
+                ]
+            },
+            {
+                "key": "shell.screenshots.captureCursor",
+                "type": "bool",
+                "default": false,
+                "label": "Capture cursor",
+                "sub": "Capture mouse cursor",
+                "desc": "Whether to capture mouse cursor."
+            },
+            {
+                "key": "shell.screenshots.uiSize",
+                "type": "string",
+                "default": "small",
+                "label": "Annotator UI size",
+                "sub": "Toolbar scale",
+                "desc": "Toolbar scale in the annotation overlay.",
+                "values": [
+                    "small",
+                    "medium",
+                    "large"
+                ],
+                "valueLabels": {
+                    "small": "Small",
+                    "medium": "Medium",
+                    "large": "Large"
+                }
+            }
+        ]
+    },
+    // --- settings page 16/42 (shell) ---
+    {
+        "group": "shell",
+        "label": "OSD",
+        "icon": "monitor",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.osd.offset",
+                "type": "int",
+                "default": 80,
+                "label": "Offset",
+                "sub": "OSD offset level",
+                "range": {
+                    "min": 0,
+                    "max": 400
+                },
+                "step": 4,
+                "unit": " px"
+            }
+        ]
+    },
+    // --- settings page 17/42 (shell) ---
+    {
+        "group": "shell",
+        "label": "Night Light",
+        "icon": "night-light",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.nightLight.enabled",
+                "type": "bool",
+                "default": false,
+                "label": "Night light",
+                "sub": "Enable blue light filter",
+                "requires": {
+                    "chassis": "!vm"
+                }
+            },
+            {
+                "key": "shell.statusbar.nightLightTemperature",
+                "type": "int",
+                "default": 6000,
+                "range": {
+                    "min": 2000,
+                    "max": 20000
+                },
+                "step": 100,
+                "unit": " K",
+                "label": "Temperature",
+                "sub": "Night light temperature in Kelvin",
+                "showIf": [
+                    {
+                        "key": "shell.nightLight.enabled",
+                        "eq": true
+                    }
+                ],
+                "requires": {
+                    "chassis": "!vm"
+                }
+            }
+        ]
+    },
+    // --- settings page 18/42 (shell) ---
+    {
+        "group": "shell",
+        "label": "Color picker",
+        "icon": "pipette",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.colorPicker.notifyOnPick",
+                "type": "bool",
+                "default": true,
+                "label": "Notifications",
+                "sub": "Notify after each pick"
+            },
+            {
+                "key": "shell.colorPicker.historySize",
+                "type": "int",
+                "default": 10,
+                "label": "Color history size",
+                "sub": "Color history size",
+                "range": {
+                    "min": 1,
+                    "max": 50
+                },
+                "step": 1
+            }
+        ]
+    },
+    // --- settings page 19/42 (shell) ---
+    {
+        "group": "shell",
+        "label": "Lock screen",
+        "icon": "lock",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.lockscreen.backgroundMode",
+                "type": "string",
+                "default": "background",
+                "label": "Background",
+                "sub": "Lock screen backdrop source",
+                "desc": "Select lockscreen background type.",
+                "values": [
+                    "screen",
+                    "background"
+                ],
+                "valueLabels": {
+                    "screen": "Screen contents",
+                    "background": "Wallpaper"
+                }
+            },
+            {
+                "key": "shell.lockscreen.vignette",
+                "type": "string",
+                "default": "off",
+                "label": "Vignette",
+                "sub": "Darken the backdrop edges",
+                "values": [
+                    "off",
+                    "small",
+                    "medium",
+                    "large",
+                    "gigantic"
+                ],
+                "valueLabels": {
+                    "off": "Off",
+                    "small": "Small",
+                    "medium": "Medium",
+                    "large": "Large",
+                    "gigantic": "Gigantic"
+                }
+            },
+            {
+                "key": "shell.lockscreen.blurBackground",
+                "type": "bool",
+                "default": true,
+                "label": "Blurred backdrop",
+                "sub": "Blur lockscreen background",
+                "desc": "Whether to use blurred background."
+            },
+            {
+                "key": "shell.lockscreen.blurPower",
+                "type": "string",
+                "default": "medium",
+                "label": "Blur strength",
+                "sub": "Adjust blur strenght",
+                "desc": "Background blur level.",
+                "values": [
+                    "low",
+                    "medium",
+                    "high"
+                ],
+                "valueLabels": {
+                    "low": "Low",
+                    "medium": "Medium",
+                    "high": "High"
+                },
+                "showIf": [
+                    {
+                        "key": "shell.lockscreen.blurBackground",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.lockscreen.dim",
+                "type": "int",
+                "default": 70,
+                "label": "Dim strength",
+                "sub": "Backdrop dim level",
+                "desc": "How strongly to dim the background when blur is disabled.",
+                "range": {
+                    "min": 0,
+                    "max": 100
+                },
+                "step": 5,
+                "unit": "%",
+                "showIf": [
+                    {
+                        "key": "shell.lockscreen.blurBackground",
+                        "eq": false
+                    }
+                ]
+            },
+            {
+                "key": "shell.lockscreen.dimBlurred",
+                "type": "int",
+                "default": 40,
+                "label": "Dim strength",
+                "sub": "Backdrop dim level",
+                "desc": "How strongly to dim the background when blur is enabled.",
+                "range": {
+                    "min": 0,
+                    "max": 100
+                },
+                "step": 5,
+                "unit": "%",
+                "showIf": [
+                    {
+                        "key": "shell.lockscreen.blurBackground",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.lockscreen.nowPlaying",
+                "type": "bool",
+                "default": true,
+                "label": "Now playing box",
+                "sub": "Current media box"
+            },
+            {
+                "key": "shell.lockscreen.pauseMusic",
+                "type": "bool",
+                "default": true,
+                "label": "Pause music on lock",
+                "sub": "(un)pause media automatically",
+                "desc": "Automatically (un)pause music when (un)locking."
+            }
+        ]
+    },
+    // --- settings page 20/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "idle",
+        "label": "Idle",
+        "icon": "timer",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.idle.enabled",
+                "type": "bool",
+                "default": true,
+                "label": "Idle daemon",
+                "sub": "Lock and suspend automatically",
+                "desc": "Automatically locks the session and suspends the system\nafter configured periods of inactivity."
+            },
+            {
+                "key": "shell.idle.timers",
+                "type": "timers",
+                "default": [
+                    {
+                        "minutes": 10,
+                        "action": "command",
+                        "command": "vb-shell session lock"
+                    },
+                    {
+                        "minutes": 15,
+                        "action": "command",
+                        "command": "vb-shell session suspend"
+                    }
+                ],
+                "label": "Idle timers",
+                "desc": "Ordered idle timers, strictly increasing by minute.\nManaged by the idle service through its IPC verbs.",
+                "visibility": "internal"
+            }
+        ],
+        "items": []
+    },
+    // --- settings page 21/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "media-controls",
+        "label": "Media Controls",
+        "icon": "music",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.osd.nowPlaying",
+                "type": "bool",
+                "default": false,
+                "label": "Track change OSD",
+                "sub": "Show track skips and play/pause changes"
+            },
+            {
+                "key": "shell.osd.nowPlayingArt",
+                "type": "bool",
+                "default": false,
+                "label": "Show cover art",
+                "sub": "Show cover in track OSD",
+                "desc": "Show track's cover art instead in OSD.",
+                "showIf": [
+                    {
+                        "key": "shell.osd.nowPlaying",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.osd.nowPlayingPosition",
+                "type": "string",
+                "default": "bottom",
+                "label": "Track OSD position",
+                "sub": "Top or bottom edge",
+                "values": [
+                    "top",
+                    "bottom"
+                ],
+                "valueLabels": {
+                    "top": "Top",
+                    "bottom": "Bottom"
+                },
+                "showIf": [
+                    {
+                        "key": "shell.osd.nowPlaying",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.osd.nowPlayingOffset",
+                "type": "int",
+                "default": 80,
+                "label": "Track OSD offset",
+                "sub": "Pixels from the edge",
+                "desc": "How far the track OSD sits from its edge.",
+                "range": {
+                    "min": 0,
+                    "max": 400
+                },
+                "step": 5,
+                "unit": " px",
+                "showIf": [
+                    {
+                        "key": "shell.osd.nowPlaying",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.osd.blockBrowsers",
+                "type": "bool",
+                "default": true,
+                "label": "Block browser media",
+                "sub": "Hide browsers from media controls and OSD",
+                "desc": "Ignore browser MPRIS clients in resident media controls and OSD events."
+            },
+            {
+                "key": "PLAYER_FADE_DURATION",
+                "type": "string",
+                "default": "off",
+                "label": "Volume fade speed",
+                "sub": "Volume fade duration",
+                "desc": "How fast the fade effect should be when (un)pausing media.",
+                "values": [
+                    "very_slow",
+                    "slow",
+                    "normal",
+                    "fast",
+                    "very_fast",
+                    "off"
+                ],
+                "valueLabels": {
+                    "very_slow": "Very slow",
+                    "slow": "Slow",
+                    "normal": "Normal",
+                    "fast": "Fast",
+                    "very_fast": "Very fast",
+                    "off": "Off"
+                }
+            }
+        ]
+    },
+    // --- settings page 22/42 (shell) ---
+    {
+        "group": "shell",
+        "id": "power",
+        "label": "Power",
+        "icon": "power",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.power.acProfile",
+                "type": "string",
+                "default": "performance",
+                "label": "Power profile (AC)",
+                "desc": "Switch to a specific power profile on AC",
+                "warning": "Falls back to <b>performance</b> then <b>balanced</b> if the configured profile is unavailable.",
+                "values": [
+                    "balanced",
+                    "performance",
+                    "power-saver"
+                ],
+                "valueLabels": {
+                    "balanced": "Balanced",
+                    "performance": "Performance",
+                    "power-saver": "Power saver"
+                },
+                "requires": {
+                    "chassis": "laptop"
+                }
+            },
+            {
+                "key": "shell.power.batteryProfile",
+                "type": "string",
+                "default": "last",
+                "label": "Power profile (battery)",
+                "desc": "Switch to a specific power profile on <b>battery</b>",
+                "warning": "<b>Last active</b> is the profile that was active before AC was connected.\nFalls back to <b>balanced</b> if unavailable.",
+                "values": [
+                    "last",
+                    "balanced",
+                    "performance",
+                    "power-saver"
+                ],
+                "valueLabels": {
+                    "last": "Last active",
+                    "balanced": "Balanced",
+                    "performance": "Performance",
+                    "power-saver": "Power saver"
+                },
+                "requires": {
+                    "chassis": "laptop"
+                }
+            },
+            {
+                "key": "shell.power.lowBattery",
+                "type": "bool",
+                "default": true,
+                "label": "Low battery alerts",
+                "sub": "Warn as the battery drains",
+                "desc": "Announce the charge levels a discharging battery crosses."
+            },
+            {
+                "key": "shell.power.warnLevel",
+                "type": "int",
+                "default": 20,
+                "range": {
+                    "min": 5,
+                    "max": 95
+                },
+                "step": 1,
+                "unit": " %",
+                "label": "Warning level",
+                "sub": "Charge level that warns",
+                "desc": "Charge level at which a discharging battery warns.",
+                "showIf": [
+                    {
+                        "key": "shell.power.lowBattery",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "shell.power.criticalLevel",
+                "type": "int",
+                "default": 5,
+                "range": {
+                    "min": 1,
+                    "max": 90
+                },
+                "step": 1,
+                "unit": " %",
+                "label": "Critical level",
+                "sub": "Charge level that warns hard",
+                "desc": "Charge level at which a discharging battery warns critically.",
+                "showIf": [
+                    {
+                        "key": "shell.power.lowBattery",
+                        "eq": true
+                    }
+                ]
+            }
+        ],
+        "items": []
+    },
+    // --- settings page 23/42 (env) ---
+    {
+        "group": "env",
+        "label": "Recording",
+        "icon": "recording",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "RECORDING_FPS",
+                "type": "int",
+                "default": 30,
+                "label": "FPS",
+                "sub": "FPS to record with",
+                "desc": "<b>FPS</b> to record videos with.",
+                "range": {
+                    "min": 15,
+                    "max": 240
+                },
+                "step": 15,
+                "unit": "FPS"
+            },
+            {
+                "key": "RECORDING_QUALITY",
+                "type": "string",
+                "default": "high",
+                "label": "Recording quality",
+                "sub": "Overall recording quality",
+                "desc": "Overall recording quality.",
+                "values": [
+                    "medium",
+                    "high",
+                    "very_high",
+                    "ultra"
+                ],
+                "valueLabels": {
+                    "medium": "Medium",
+                    "high": "High",
+                    "very_high": "Very high",
+                    "ultra": "Ultra"
+                }
+            },
+            {
+                "key": "RECORDING_CONTAINER_TYPE",
+                "type": "string",
+                "default": "mp4",
+                "label": "Filetype",
+                "sub": "Video file type",
+                "desc": "Container format for the output file.",
+                "warning": "<b><u>webm</u></b> forces the codec to <b><u>vp8</u></b>",
+                "values": [
+                    "mp4",
+                    "mkv",
+                    "webm"
+                ],
+                "valueLabels": {
+                    "mp4": "MP4",
+                    "mkv": "MKV",
+                    "webm": "WebM"
+                }
+            },
+            {
+                "key": "RECORDING_FRAMERATE_MODE",
+                "type": "string",
+                "default": "cfr",
+                "label": "Framerate mode",
+                "sub": "Frame capture method",
+                "desc": "- <b><u>CFR</u></b>: better quality; <b>increases</b> file size\n- <b><u>VFR</u></b>: resource-efficient; less compatible",
+                "values": [
+                    "cfr",
+                    "vfr"
+                ],
+                "valueLabels": {
+                    "cfr": "Constant (CFR)",
+                    "vfr": "Variable (VFR)"
+                }
+            },
+            {
+                "key": "RECORDING_VIDEO_CODEC",
+                "type": "string",
+                "default": "auto",
+                "label": "Video codec",
+                "sub": "Video codec to use",
+                "desc": "Video codec to use for recording.",
+                "warning": "Make sure your hardware supports the selected codec.\nSee <b>gpu-screen-recorder(1)</b> for info.",
+                "values": [
+                    "auto",
+                    "h264",
+                    "hevc",
+                    "av1",
+                    "vp8",
+                    "vp9",
+                    "hevc_hdr",
+                    "av1_hdr",
+                    "hevc_10bit",
+                    "av1_10bit"
+                ],
+                "valueLabels": {
+                    "auto": "Auto",
+                    "h264": "H264",
+                    "hevc": "HEVC",
+                    "av1": "AV1",
+                    "vp8": "VP8",
+                    "vp9": "VP9",
+                    "hevc_hdr": "HEVC HDR",
+                    "av1_hdr": "AV1 HDR",
+                    "hevc_10bit": "HEVC 10-bit",
+                    "av1_10bit": "AV1 10-bit"
+                }
+            },
+            {
+                "key": "RECORDING_CAPTURE_SOURCE",
+                "type": "bool",
+                "default": false,
+                "label": "Capture microphone",
+                "sub": "Capture microphone",
+                "desc": "Whether to include your microphone input in recordings."
+            },
+            {
+                "key": "RECORDING_CAPTURE_SINK",
+                "type": "bool",
+                "default": true,
+                "label": "Capture system",
+                "sub": "Capture system sound",
+                "desc": "Whether to include your system audio in recordings."
+            }
+        ]
+    },
+    // --- settings page 24/42 (env) ---
+    {
+        "group": "env",
+        "label": "Brightness",
+        "icon": "brightness",
+        "showItemCount": true,
+        "items": [
+            {
+                "type": "separator"
+            },
+            {
+                "type": "action",
+                "label": "Calibrate DDC timeouts",
+                "sub": "External monitors only",
+                "icon": "monitor",
+                "command": "vb-core-brightness --calibrate -q",
+                "when": "[[ $CHASSIS_TYPE != vm ]]"
+            }
+        ],
+        "options": [
+            {
+                "key": "BRIGHTNESS_STEP",
+                "type": "int",
+                "default": 5,
+                "label": "Brightness step",
+                "sub": "Brightness adjustment step",
+                "range": {
+                    "min": 1,
+                    "max": 25
+                },
+                "step": 1,
+                "unit": "%"
+            },
+            {
+                "key": "BRIGHTNESS_NOTIFY",
+                "type": "bool",
+                "default": true,
+                "label": "Brightness notifications",
+                "sub": "Notify brightness changes"
+            }
+        ]
+    },
+    // --- settings page 25/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland",
+        "label": "Hyprland",
+        "desc": "Window manager behavior",
+        "icon": "hyprland",
+        "showItemCount": true,
+        "items": [
+            {
+                "type": "submenu",
+                "label": "Input",
+                "sub": "Configure input devices",
+                "icon": "keyboard",
+                "page": "hyprland-input"
+            },
+            {
+                "type": "submenu",
+                "label": "Appearance",
+                "sub": "General look and feel",
+                "icon": "theme",
+                "page": "hyprland-appearance"
+            },
+            {
+                "type": "submenu",
+                "label": "Advanced",
+                "sub": "Hardware & low-level things",
+                "icon": "warning",
+                "page": "hyprland-advanced"
+            },
+            {
+                "type": "submenu",
+                "label": "Edit configs",
+                "sub": "Edit files manually",
+                "icon": "file-code",
+                "page": "hyprland-edit"
+            }
+        ],
+        "options": []
+    },
+    // --- settings page 26/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-edit",
+        "label": "Edit configs",
+        "desc": "Open a Hyprland config in a floating terminal.",
+        "items": [
+            {
+                "type": "action",
+                "label": "Window Rules",
+                "sub": "window-rules.lua",
+                "icon": "file-code",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/window-rules.lua"
+            },
+            {
+                "type": "action",
+                "label": "Keybindings",
+                "sub": "binds.lua",
+                "icon": "keyboard",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/binds.lua"
+            },
+            {
+                "type": "action",
+                "label": "Monitors",
+                "sub": "monitors.lua",
+                "icon": "monitor",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/monitors.lua"
+            },
+            {
+                "type": "action",
+                "label": "Input",
+                "sub": "input.lua",
+                "icon": "cursor",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float -- ${EDITOR:-nvim} $XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua"
+            }
+        ],
+        "options": []
+    },
+    // --- settings page 27/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-input",
+        "label": "Input",
+        "desc": "Keyboard, mouse and touchpad behavior.",
+        "icon": "keyboard",
+        "showItemCount": true,
+        "items": [
+            {
+                "type": "separator"
+            },
+            {
+                "type": "submenu",
+                "label": "Touchpad",
+                "sub": "Touchpad options",
+                "icon": "hypr-touchpad",
+                "page": "hyprland-input-touchpad"
+            },
+            {
+                "type": "submenu",
+                "label": "Keyboard Layouts",
+                "sub": "Configure keyboard layouts",
+                "icon": "keyboard",
+                "page": "hyprland-input-layouts"
+            }
+        ],
+        "options": [
+            {
+                "key": "hypr.input.natural_scroll",
+                "type": "bool",
+                "default": false,
+                "label": "Natural scrolling",
+                "desc": "Reverse scroll direction.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.natural_scroll"
+                }
+            },
+            {
+                "key": "hypr.input.accel_profile",
+                "type": "string",
+                "default": "flat",
+                "label": "Mouse acceleration",
+                "desc": "Mouse acceleration profile.",
+                "values": [
+                    "adaptive",
+                    "flat"
+                ],
+                "valueLabels": {
+                    "adaptive": "Adaptive",
+                    "flat": "Flat"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.accel_profile"
+                }
+            },
+            {
+                "key": "hypr.input.sensitivity",
+                "type": "float",
+                "default": 0,
+                "label": "Mouse sensitivity",
+                "desc": "Mouse cursor sensitivity.",
+                "range": {
+                    "min": -1,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.sensitivity"
+                }
+            },
+            {
+                "key": "hypr.input.scroll_factor",
+                "type": "float",
+                "default": 1,
+                "label": "Scrolling factor",
+                "desc": "Scrolling speed multiplier.",
+                "range": {
+                    "min": 0.1,
+                    "max": 10
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.scroll_factor"
+                }
+            },
+            {
+                "key": "hypr.input.repeat_rate",
+                "type": "int",
+                "default": 25,
+                "label": "Keyboard repeat rate",
+                "desc": "Repeat rate in repeats per second.",
+                "range": {
+                    "min": 10,
+                    "max": 50
+                },
+                "step": 1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.repeat_rate"
+                }
+            },
+            {
+                "key": "hypr.input.repeat_delay",
+                "type": "int",
+                "default": 300,
+                "label": "Keyboard repeat delay",
+                "desc": "Delay in milliseconds before repeating.",
+                "range": {
+                    "min": 200,
+                    "max": 1000
+                },
+                "step": 10,
+                "unit": "ms",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.repeat_delay"
+                }
+            }
+        ]
+    },
+    // --- settings page 28/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-input-touchpad",
+        "label": "Touchpad",
+        "icon": "mouse",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "hypr.input.touchpad.scroll_factor",
+                "type": "float",
+                "default": 0.4,
+                "label": "Scrolling factor",
+                "desc": "Scrolling speed multiplier.",
+                "range": {
+                    "min": 0.1,
+                    "max": 2.0
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.touchpad.scroll_factor"
+                }
+            },
+            {
+                "key": "hypr.input.touchpad.natural_scroll",
+                "type": "bool",
+                "default": true,
+                "label": "Natural scrolling",
+                "desc": "Reverse scroll direction.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.touchpad.natural_scroll"
+                }
+            },
+            {
+                "key": "hypr.input.touchpad.tap_to_click",
+                "type": "bool",
+                "default": false,
+                "label": "Tap to click",
+                "desc": "Self-explanatory",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.touchpad.tap_to_click"
+                }
+            },
+            {
+                "key": "hypr.input.touchpad.disable_while_typing",
+                "type": "bool",
+                "default": true,
+                "label": "Disable while typing",
+                "desc": "Disable touchpad when typing text",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.touchpad.disable_while_typing"
+                }
+            }
+        ]
+    },
+    // --- settings page 29/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-input-layouts",
+        "label": "Keyboard Layouts",
+        "icon": "keyboard",
+        "options": [
+            {
+                "key": "hypr.input.kb_layout",
+                "type": "string",
+                "default": "us",
+                "label": "Keyboard layouts",
+                "sub": "Comma-separated layouts",
+                "desc": "Comma-separated list of xkb layouts (e.g. us,fr).",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.kb_layout"
+                }
+            },
+            {
+                "key": "hypr.input.kb_options",
+                "type": "string",
+                "default": "grp:alt_shift_toggle",
+                "label": "Switch layout with",
+                "sub": "Group toggle shortcut",
+                "desc": "Key combo to switch keyboard layout.",
+                "values": [
+                    "grp:caps_toggle",
+                    "grp:ctrl_alt_toggle",
+                    "grp:win_space_toggle",
+                    "grp:alt_space_toggle",
+                    "grp:rshift_toggle",
+                    "grp:ctrl_shift_toggle",
+                    "grp:alt_shift_toggle",
+                    "grp:rctrl_rshift_toggle"
+                ],
+                "valueLabels": {
+                    "grp:caps_toggle": "Caps Lock",
+                    "grp:ctrl_alt_toggle": "Ctrl + Alt",
+                    "grp:win_space_toggle": "Win + Space",
+                    "grp:alt_space_toggle": "Alt + Space",
+                    "grp:rshift_toggle": "RShift",
+                    "grp:ctrl_shift_toggle": "Ctrl + Shift",
+                    "grp:alt_shift_toggle": "Alt + Shift",
+                    "grp:rctrl_rshift_toggle": "RCtrl + RShift"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
+                    "ctl": "input.kb_options"
+                }
+            }
+        ]
+    },
+    // --- settings page 30/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance",
+        "label": "Appearance",
+        "desc": "Window decoration and visual effects.",
+        "icon": "theme",
+        "showItemCount": true,
+        "items": [
+            {
+                "type": "submenu",
+                "label": "Gaps",
+                "sub": "Window spacing",
+                "desc": "Spacing between windows.",
+                "icon": "hypr-gaps",
+                "page": "hyprland-appearance-gaps"
+            },
+            {
+                "type": "submenu",
+                "label": "Blur",
+                "sub": "Blur options",
+                "desc": "Configure blur under windows.",
+                "icon": "hypr-blur",
+                "page": "hyprland-appearance-blur"
+            },
+            {
+                "type": "submenu",
+                "label": "Glow",
+                "sub": "Window glow",
+                "desc": "Configure glow effects.",
+                "icon": "hypr-glow",
+                "page": "hyprland-appearance-glow"
+            },
+            {
+                "type": "submenu",
+                "label": "Shadows",
+                "sub": "Window shadows",
+                "desc": "Configure window shadows.",
+                "icon": "hypr-shadow",
+                "page": "hyprland-appearance-shadow"
+            },
+            {
+                "type": "submenu",
+                "label": "Decoration",
+                "sub": "General look-n-feel",
+                "desc": "Visuals of the WM.",
+                "icon": "hypr-decoration",
+                "page": "hyprland-appearance-decoration"
+            },
+            {
+                "type": "submenu",
+                "label": "Dimming",
+                "sub": "Window dimming",
+                "desc": "Window dimming options.",
+                "icon": "hypr-dim",
+                "page": "hyprland-appearance-dim"
+            },
+            {
+                "type": "submenu",
+                "label": "Animations",
+                "sub": "Animation presets",
+                "desc": "Animations and their curves.",
+                "icon": "hypr-animations",
+                "page": "hyprland-appearance-animations"
+            }
+        ],
+        "options": []
+    },
+    // --- settings page 31/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-gaps",
+        "label": "Gaps",
+        "icon": "view-grid",
+        "options": [
+            {
+                "key": "hypr.general.gaps_in",
+                "type": "int",
+                "default": 5,
+                "label": "Gaps in",
+                "sub": "Inner gaps",
+                "range": {
+                    "min": 0,
+                    "max": 50
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "general.gaps_in"
+                }
+            },
+            {
+                "key": "hypr.general.gaps_out",
+                "type": "int",
+                "default": 5,
+                "label": "Gaps out",
+                "sub": "Outer gaps",
+                "range": {
+                    "min": 0,
+                    "max": 50
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "general.gaps_out"
+                }
+            },
+            {
+                "key": "hypr.general.smart_gaps",
+                "type": "bool",
+                "default": false,
+                "label": "Smart gaps",
+                "sub": "No gaps when single window",
+                "desc": "Removes gaps and borders when only one tiled window is visible.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.lua",
+                    "kind": "smartGaps"
+                }
+            }
+        ]
+    },
+    // --- settings page 32/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur",
+        "label": "Blur",
+        "icon": "blur",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.enabled",
+                "type": "bool",
+                "default": false,
+                "label": "Enabled",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.enabled"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.special",
+                "type": "bool",
+                "default": false,
+                "label": "Blur special",
+                "sub": "Blur special workspace",
+                "desc": "Whether to blur scratchpad.",
+                "warning": "Expensive!",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.special"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.size",
+                "type": "int",
+                "default": 3,
+                "unit": "px",
+                "label": "Size",
+                "range": {
+                    "min": 1,
+                    "max": 16
+                },
+                "step": 1,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.size"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.passes",
+                "type": "int",
+                "default": 3,
+                "unit": "times",
+                "label": "Passes",
+                "range": {
+                    "min": 1,
+                    "max": 10
+                },
+                "step": 1,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.passes"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.noise",
+                "type": "float",
+                "default": 0.0117,
+                "label": "Noise",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.01,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.noise"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.vibrancy",
+                "type": "float",
+                "default": 0.1696,
+                "label": "Vibrancy",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.01,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.vibrancy"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.contrast",
+                "type": "float",
+                "default": 0.8916,
+                "label": "Contrast",
+                "range": {
+                    "min": 0,
+                    "max": 2
+                },
+                "step": 0.01,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.contrast"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.brightness",
+                "type": "float",
+                "default": 0.8172,
+                "label": "Brightness",
+                "range": {
+                    "min": 0,
+                    "max": 2
+                },
+                "step": 0.01,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.brightness"
+                }
+            }
+        ]
+    },
+    // --- settings page 33/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-glow",
+        "label": "Glow",
+        "icon": "glow",
+        "options": [
+            {
+                "key": "hypr.decoration.glow.enabled",
+                "type": "bool",
+                "default": false,
+                "label": "Enabled",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.glow.enabled"
+                }
+            },
+            {
+                "key": "hypr.decoration.glow.range",
+                "type": "int",
+                "default": 20,
+                "label": "Range",
+                "range": {
+                    "min": 1,
+                    "max": 100
+                },
+                "step": 1,
+                "unit": "px",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.glow.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.glow.range"
+                }
+            },
+            {
+                "key": "hypr.decoration.glow.render_power",
+                "type": "int",
+                "default": 2,
+                "label": "Power",
+                "range": {
+                    "min": 1,
+                    "max": 4
+                },
+                "step": 1,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.glow.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.glow.render_power"
+                }
+            }
+        ]
+    },
+    // --- settings page 34/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-shadow",
+        "label": "Shadows",
+        "icon": "shadow",
+        "options": [
+            {
+                "key": "hypr.decoration.shadow.enabled",
+                "type": "bool",
+                "default": true,
+                "label": "Enabled",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.shadow.enabled"
+                }
+            },
+            {
+                "key": "hypr.decoration.shadow.sharp",
+                "type": "bool",
+                "default": false,
+                "label": "Sharp",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.shadow.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.shadow.sharp"
+                }
+            },
+            {
+                "key": "hypr.decoration.shadow.range",
+                "type": "int",
+                "default": 4,
+                "label": "Range",
+                "range": {
+                    "min": 1,
+                    "max": 128
+                },
+                "step": 1,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.shadow.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.shadow.range"
+                }
+            },
+            {
+                "key": "hypr.decoration.shadow.render_power",
+                "type": "int",
+                "default": 3,
+                "label": "Power",
+                "range": {
+                    "min": 1,
+                    "max": 4
+                },
+                "step": 1,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.shadow.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.shadow.render_power"
+                }
+            }
+        ]
+    },
+    // --- settings page 35/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-decoration",
+        "label": "Decoration",
+        "options": [
+            {
+                "key": "hypr.decoration.motion_blur.enabled",
+                "type": "bool",
+                "default": false,
+                "label": "Motion blur",
+                "desc": "Whether to enable motion blur.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.motion_blur.enabled"
+                }
+            },
+            {
+                "key": "hypr.decoration.motion_blur.samples",
+                "type": "int",
+                "default": 7,
+                "label": "Motion blur samples",
+                "range": {
+                    "min": 1,
+                    "max": 25
+                },
+                "step": 1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.motion_blur.samples"
+                },
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.motion_blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "key": "hypr.general.border_size",
+                "type": "int",
+                "default": 2,
+                "label": "Border size",
+                "desc": "Window border size.",
+                "range": {
+                    "min": 0,
+                    "max": 50
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "general.border_size"
+                }
+            },
+            {
+                "key": "hypr.decoration.rounding",
+                "type": "int",
+                "default": 0,
+                "label": "Rounding",
+                "desc": "Window border roundness.",
+                "range": {
+                    "min": 0,
+                    "max": 32
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.rounding"
+                }
+            },
+            {
+                "key": "hypr.decoration.rounding_power",
+                "type": "float",
+                "default": 2,
+                "label": "Rounding power",
+                "desc": "Window's rounding smoothness.",
+                "range": {
+                    "min": 0,
+                    "max": 10
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.rounding_power"
+                }
+            },
+            {
+                "key": "hypr.decoration.active_opacity",
+                "type": "float",
+                "default": 1,
+                "label": "Active opacity",
+                "desc": "Opacity of the active window.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.active_opacity"
+                }
+            },
+            {
+                "key": "hypr.decoration.inactive_opacity",
+                "type": "float",
+                "default": 1,
+                "label": "Inactive opacity",
+                "desc": "Opacity of inactive windows.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.inactive_opacity"
+                }
+            },
+            {
+                "key": "hypr.decoration.fullscreen_opacity",
+                "type": "float",
+                "default": 1,
+                "label": "Fullscreen opacity",
+                "desc": "Opacity of a fullscreen window.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.fullscreen_opacity"
+                }
+            },
+            {
+                "key": "hypr.decoration.border_part_of_window",
+                "type": "bool",
+                "default": false,
+                "label": "Border part of window",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.border_part_of_window"
+                }
+            }
+        ]
+    },
+    // --- settings page 36/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-dim",
+        "label": "Window dimming",
+        "icon": "hypr-dim",
+        "options": [
+            {
+                "key": "hypr.decoration.dim_inactive",
+                "type": "bool",
+                "default": true,
+                "label": "Dim inactive",
+                "desc": "Whether to dim inactive windows.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.dim_inactive"
+                }
+            },
+            {
+                "key": "hypr.decoration.dim_strength",
+                "type": "float",
+                "default": 0.1,
+                "label": "Dim strength",
+                "desc": "Dim strength of inactive windows.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.dim_inactive",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.dim_strength"
+                }
+            },
+            {
+                "key": "hypr.decoration.dim_modal",
+                "type": "bool",
+                "default": true,
+                "label": "Dim modal",
+                "desc": "Whether to dim modal windows (pop ups).",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.dim_modal"
+                }
+            },
+            {
+                "key": "hypr.decoration.dim_special",
+                "type": "float",
+                "default": 0.4,
+                "label": "Dim special",
+                "desc": "Scratchpad's dim level.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.dim_special"
+                }
+            }
+        ]
+    },
+    // --- settings page 37/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-animations",
+        "label": "Animations",
+        "icon": "animation",
+        "options": [
+            {
+                "key": "hypr.animations.enabled",
+                "type": "bool",
+                "default": true,
+                "label": "Enabled",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "animations.enabled"
+                }
+            },
+            {
+                "key": "hypr.animations.preset",
+                "type": "string",
+                "default": "default",
+                "label": "Preset",
+                "sub": "Set animation curve",
+                "values": [
+                    "akaito",
+                    "bounce",
+                    "default",
+                    "expressive",
+                    "fast",
+                    "omarchy",
+                    "slide"
+                ],
+                "valueLabels": {
+                    "akaito": "Akaito",
+                    "bounce": "Bounce",
+                    "default": "Default",
+                    "expressive": "Expressive",
+                    "fast": "Fast",
+                    "omarchy": "Omarchy",
+                    "slide": "Slide"
+                },
+                "showIf": [
+                    {
+                        "key": "hypr.animations.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/animations.lua",
+                    "kind": "animPreset"
+                }
+            }
+        ]
+    },
+    // --- settings page 38/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-advanced",
+        "label": "Advanced",
+        "desc": "Compositor internals and layout engines.",
+        "icon": "tools",
+        "showItemCount": true,
+        "items": [
+            {
+                "type": "separator"
+            },
+            {
+                "type": "submenu",
+                "label": "Cursor",
+                "sub": "Mouse cursor options",
+                "icon": "cursor",
+                "page": "hyprland-advanced-cursor"
+            },
+            {
+                "type": "submenu",
+                "label": "Dwindle",
+                "sub": "Dwindle windows layout options",
+                "icon": "hypr-layout-dwindle",
+                "page": "hyprland-advanced-dwindle"
+            },
+            {
+                "type": "submenu",
+                "label": "Master",
+                "sub": "Mater windows layout options",
+                "icon": "hypr-layout-master",
+                "page": "hyprland-advanced-master"
+            },
+            {
+                "type": "submenu",
+                "label": "Scrolling",
+                "sub": "Scrolling windows layout options",
+                "icon": "hypr-layout-scrolling",
+                "page": "hyprland-advanced-scrolling"
+            }
+        ],
+        "options": [
+            {
+                "key": "hypr.misc.vrr",
+                "type": "int",
+                "default": 2,
+                "label": "Variable refresh rate",
+                "desc": "Monitor's VRR mode.",
+                "values": [
+                    0,
+                    1,
+                    2
+                ],
+                "valueLabels": {
+                    "0": "Disabled",
+                    "1": "Enabled",
+                    "2": "Fullscreen only"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "misc.vrr"
+                }
+            },
+            {
+                "key": "hypr.debug.vfr",
+                "type": "bool",
+                "default": true,
+                "label": "Variable frame rate",
+                "desc": "Monitor's VFR mode.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "debug.vfr"
+                }
+            },
+            {
+                "key": "hypr.misc.disable_autoreload",
+                "type": "bool",
+                "default": true,
+                "label": "Config auto-reload",
+                "desc": "Toggle automatic config reload.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "misc.disable_autoreload"
+                }
+            },
+            {
+                "key": "hypr.misc.middle_click_paste",
+                "type": "bool",
+                "default": true,
+                "label": "Middle click paste",
+                "desc": "Paste clipboard contents with middle click",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "misc.middle_click_paste"
+                }
+            },
+            {
+                "key": "hypr.misc.enable_anr_dialog",
+                "type": "bool",
+                "default": true,
+                "label": "Enable ANR dialog",
+                "desc": "\"Application is not responding\" messages.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "misc.enable_anr_dialog"
+                }
+            },
+            {
+                "key": "hypr.render.direct_scanout",
+                "type": "int",
+                "default": 0,
+                "label": "Direct scanout",
+                "desc": "Configure direct scanout.",
+                "values": [
+                    0,
+                    1,
+                    2
+                ],
+                "valueLabels": {
+                    "0": "Disabled",
+                    "1": "Enabled",
+                    "2": "Auto"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "render.direct_scanout"
+                }
+            },
+            {
+                "key": "hypr.general.layout",
+                "type": "string",
+                "default": "dwindle",
+                "label": "Windows layout",
+                "desc": "Chose how new windows are placed.",
+                "values": [
+                    "dwindle",
+                    "master",
+                    "monocle",
+                    "scrolling"
+                ],
+                "valueLabels": {
+                    "dwindle": "Dwindle",
+                    "master": "Master",
+                    "monocle": "Monocle",
+                    "scrolling": "Scrolling"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "general.layout"
+                }
+            }
+        ]
+    },
+    // --- settings page 39/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-advanced-cursor",
+        "label": "Cursor",
+        "icon": "cursor",
+        "options": [
+            {
+                "key": "hypr.cursor.enable_hyprcursor",
+                "type": "bool",
+                "default": true,
+                "label": "Enable hyprcursor",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.enable_hyprcursor"
+                }
+            },
+            {
+                "key": "hypr.cursor.sync_gsettings_theme",
+                "type": "bool",
+                "default": true,
+                "label": "Sync gsettings theme",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.sync_gsettings_theme"
+                }
+            },
+            {
+                "key": "hypr.cursor.no_hardware_cursors",
+                "type": "int",
+                "default": 0,
+                "label": "Hardware cursors",
+                "values": [
+                    0,
+                    1,
+                    2
+                ],
+                "valueLabels": {
+                    "0": "Auto",
+                    "1": "Always software",
+                    "2": "Force software"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.no_hardware_cursors"
+                }
+            },
+            {
+                "key": "hypr.cursor.use_cpu_buffer",
+                "type": "int",
+                "default": 0,
+                "label": "CPU buffer",
+                "values": [
+                    0,
+                    1,
+                    2
+                ],
+                "valueLabels": {
+                    "0": "Auto",
+                    "1": "Always",
+                    "2": "Force"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.use_cpu_buffer"
+                }
+            },
+            {
+                "key": "hypr.cursor.invisible",
+                "type": "bool",
+                "default": false,
+                "label": "Hide cursor",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.invisible"
+                }
+            },
+            {
+                "key": "hypr.cursor.inactive_timeout",
+                "type": "float",
+                "default": 0,
+                "label": "Hide after",
+                "range": {
+                    "min": 0,
+                    "max": 60
+                },
+                "step": 0.5,
+                "unit": "s",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.inactive_timeout"
+                }
+            },
+            {
+                "key": "hypr.cursor.hotspot_padding",
+                "type": "int",
+                "default": 0,
+                "label": "Hotspot padding",
+                "range": {
+                    "min": 0,
+                    "max": 32
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.hotspot_padding"
+                }
+            },
+            {
+                "key": "hypr.cursor.min_refresh_rate",
+                "type": "int",
+                "default": 60,
+                "label": "Min refresh rate",
+                "range": {
+                    "min": 60,
+                    "max": 360
+                },
+                "step": 1,
+                "unit": "Hz",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.min_refresh_rate"
+                }
+            },
+            {
+                "key": "hypr.cursor.hide_on_key_press",
+                "type": "bool",
+                "default": false,
+                "label": "Hide on key press",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.hide_on_key_press"
+                }
+            },
+            {
+                "key": "hypr.cursor.hide_on_touch",
+                "type": "bool",
+                "default": false,
+                "label": "Hide on touch",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.hide_on_touch"
+                }
+            },
+            {
+                "key": "hypr.cursor.hide_on_tablet",
+                "type": "bool",
+                "default": false,
+                "label": "Hide on tablet",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.hide_on_tablet"
+                }
+            },
+            {
+                "key": "hypr.cursor.no_warps",
+                "type": "bool",
+                "default": false,
+                "label": "No warps",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.no_warps"
+                }
+            },
+            {
+                "key": "hypr.cursor.persistent_warps",
+                "type": "bool",
+                "default": false,
+                "label": "Persistent warps",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.persistent_warps"
+                }
+            },
+            {
+                "key": "hypr.cursor.warp_back_after_non_mouse_input",
+                "type": "bool",
+                "default": false,
+                "label": "Warp back after non-mouse input",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.warp_back_after_non_mouse_input"
+                }
+            },
+            {
+                "key": "hypr.cursor.warp_on_change_workspace",
+                "type": "int",
+                "default": 0,
+                "label": "Warp on workspace change",
+                "values": [
+                    0,
+                    1,
+                    2
+                ],
+                "valueLabels": {
+                    "0": "Disabled",
+                    "1": "Enabled",
+                    "2": "Force center"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.warp_on_change_workspace"
+                }
+            },
+            {
+                "key": "hypr.cursor.warp_on_toggle_special",
+                "type": "int",
+                "default": 0,
+                "label": "Warp on special toggle",
+                "values": [
+                    0,
+                    1,
+                    2
+                ],
+                "valueLabels": {
+                    "0": "Disabled",
+                    "1": "Enabled",
+                    "2": "Force center"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.warp_on_toggle_special"
+                }
+            },
+            {
+                "key": "hypr.cursor.no_break_fs_vrr",
+                "type": "int",
+                "default": 0,
+                "label": "No break fullscreen VRR",
+                "values": [
+                    0,
+                    1,
+                    2
+                ],
+                "valueLabels": {
+                    "0": "Disabled",
+                    "1": "Enabled",
+                    "2": "Force"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.no_break_fs_vrr"
+                }
+            },
+            {
+                "key": "hypr.cursor.zoom_rigid",
+                "type": "bool",
+                "default": false,
+                "label": "Zoom rigid",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.zoom_rigid"
+                }
+            },
+            {
+                "key": "hypr.cursor.zoom_detached_camera",
+                "type": "bool",
+                "default": false,
+                "label": "Zoom detached camera",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.zoom_detached_camera"
+                }
+            },
+            {
+                "key": "hypr.cursor.zoom_disable_aa",
+                "type": "bool",
+                "default": false,
+                "label": "Zoom disable anti-aliasing",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "cursor.zoom_disable_aa"
+                }
+            }
+        ]
+    },
+    // --- settings page 40/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-advanced-scrolling",
+        "label": "Scrolling",
+        "icon": "scroll",
+        "options": [
+            {
+                "key": "hypr.scrolling.direction",
+                "type": "string",
+                "default": "left",
+                "label": "Direction",
+                "values": [
+                    "left",
+                    "right",
+                    "up",
+                    "down"
+                ],
+                "valueLabels": {
+                    "left": "Left",
+                    "right": "Right",
+                    "up": "Up",
+                    "down": "Down"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "scrolling.direction"
+                }
+            },
+            {
+                "key": "hypr.scrolling.follow_focus",
+                "type": "bool",
+                "default": false,
+                "label": "Follow focus",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "scrolling.follow_focus"
+                }
+            },
+            {
+                "key": "hypr.scrolling.focus_fit_method",
+                "type": "int",
+                "default": 0,
+                "label": "Fit method",
+                "values": [
+                    0,
+                    1
+                ],
+                "valueLabels": {
+                    "0": "Center",
+                    "1": "Fit"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "scrolling.focus_fit_method"
+                }
+            },
+            {
+                "key": "hypr.scrolling.column_width",
+                "type": "float",
+                "default": 0.5,
+                "label": "Column width",
+                "range": {
+                    "min": 0.1,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "scrolling.column_width"
+                }
+            },
+            {
+                "key": "hypr.scrolling.follow_min_visible",
+                "type": "float",
+                "default": 0.2,
+                "label": "Follow minimum visible",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "scrolling.follow_min_visible"
+                }
+            },
+            {
+                "key": "hypr.scrolling.wrap_swapcol",
+                "type": "bool",
+                "default": false,
+                "label": "Wrap swapcol",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "scrolling.wrap_swapcol"
+                }
+            },
+            {
+                "key": "hypr.scrolling.wrap_focus",
+                "type": "bool",
+                "default": false,
+                "label": "Wrap focus",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "scrolling.wrap_focus"
+                }
+            }
+        ]
+    },
+    // --- settings page 41/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-advanced-dwindle",
+        "label": "Dwindle",
+        "icon": "layout",
+        "options": [
+            {
+                "key": "hypr.dwindle.force_split",
+                "type": "int",
+                "default": 2,
+                "label": "Split method",
+                "values": [
+                    0,
+                    1,
+                    2
+                ],
+                "valueLabels": {
+                    "0": "Follow mouse",
+                    "1": "Left",
+                    "2": "Right"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.force_split"
+                }
+            },
+            {
+                "key": "hypr.dwindle.preserve_split",
+                "type": "bool",
+                "default": true,
+                "label": "Preserve split",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.preserve_split"
+                }
+            },
+            {
+                "key": "hypr.dwindle.smart_split",
+                "type": "bool",
+                "default": false,
+                "label": "Smart split",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.smart_split"
+                }
+            },
+            {
+                "key": "hypr.dwindle.smart_resizing",
+                "type": "bool",
+                "default": false,
+                "label": "Smart resizing",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.smart_resizing"
+                }
+            },
+            {
+                "key": "hypr.dwindle.permanent_direction_override",
+                "type": "bool",
+                "default": false,
+                "label": "Direction override",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.permanent_direction_override"
+                }
+            },
+            {
+                "key": "hypr.dwindle.special_scale_factor",
+                "type": "float",
+                "default": 0.98,
+                "label": "Special workspace scale",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.01,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.special_scale_factor"
+                }
+            },
+            {
+                "key": "hypr.dwindle.split_width_multiplier",
+                "type": "float",
+                "default": 1,
+                "label": "Width multiplier",
+                "range": {
+                    "min": 0,
+                    "max": 10
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.split_width_multiplier"
+                }
+            },
+            {
+                "key": "hypr.dwindle.use_active_for_splits",
+                "type": "bool",
+                "default": false,
+                "label": "Use active for splits",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.use_active_for_splits"
+                }
+            },
+            {
+                "key": "hypr.dwindle.default_split_ratio",
+                "type": "float",
+                "default": 1,
+                "label": "Split ratio",
+                "range": {
+                    "min": 0.1,
+                    "max": 1.9
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.default_split_ratio"
+                }
+            },
+            {
+                "key": "hypr.dwindle.split_bias",
+                "type": "int",
+                "default": 0,
+                "label": "Split bias",
+                "values": [
+                    0,
+                    1
+                ],
+                "valueLabels": {
+                    "0": "Directional",
+                    "1": "Current window"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.split_bias"
+                }
+            },
+            {
+                "key": "hypr.dwindle.precise_mouse_move",
+                "type": "bool",
+                "default": false,
+                "label": "Precise mouse move",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "dwindle.precise_mouse_move"
+                }
+            }
+        ]
+    },
+    // --- settings page 42/42 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-advanced-master",
+        "label": "Master",
+        "icon": "layout",
+        "options": [
+            {
+                "key": "hypr.master.orientation",
+                "type": "string",
+                "default": "left",
+                "label": "Orientation",
+                "values": [
+                    "left",
+                    "right",
+                    "top",
+                    "bottom",
+                    "center"
+                ],
+                "valueLabels": {
+                    "left": "Left",
+                    "right": "Right",
+                    "top": "Top",
+                    "bottom": "Bottom",
+                    "center": "Center"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.orientation"
+                }
+            },
+            {
+                "key": "hypr.master.new_status",
+                "type": "string",
+                "default": "slave",
+                "label": "New window status",
+                "values": [
+                    "master",
+                    "slave",
+                    "inherit"
+                ],
+                "valueLabels": {
+                    "master": "Master",
+                    "slave": "Slave",
+                    "inherit": "Inherit"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.new_status"
+                }
+            },
+            {
+                "key": "hypr.master.new_on_active",
+                "type": "string",
+                "default": "none",
+                "label": "New on active",
+                "values": [
+                    "before",
+                    "after",
+                    "none"
+                ],
+                "valueLabels": {
+                    "before": "Before",
+                    "after": "After",
+                    "none": "None (boundary)"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.new_on_active"
+                }
+            },
+            {
+                "key": "hypr.master.new_on_top",
+                "type": "bool",
+                "default": false,
+                "label": "New on top",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.new_on_top"
+                }
+            },
+            {
+                "key": "hypr.master.mfact",
+                "type": "float",
+                "default": 0.55,
+                "label": "Master size factor",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.mfact"
+                }
+            },
+            {
+                "key": "hypr.master.center_master_fallback",
+                "type": "string",
+                "default": "left",
+                "label": "Center master fallback",
+                "values": [
+                    "left",
+                    "right",
+                    "top",
+                    "bottom"
+                ],
+                "valueLabels": {
+                    "left": "Left",
+                    "right": "Right",
+                    "top": "Top",
+                    "bottom": "Bottom"
+                },
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.center_master_fallback"
+                }
+            },
+            {
+                "key": "hypr.master.slave_count_for_center_master",
+                "type": "int",
+                "default": 1,
+                "label": "Slave count for center master",
+                "range": {
+                    "min": 0,
+                    "max": 20
+                },
+                "step": 1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.slave_count_for_center_master"
+                }
+            },
+            {
+                "key": "hypr.master.special_scale_factor",
+                "type": "float",
+                "default": 0.8,
+                "label": "Special workspace scale",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.special_scale_factor"
+                }
+            },
+            {
+                "key": "hypr.master.allow_small_split",
+                "type": "bool",
+                "default": false,
+                "label": "Allow small split",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.allow_small_split"
+                }
+            },
+            {
+                "key": "hypr.master.smart_resizing",
+                "type": "bool",
+                "default": false,
+                "label": "Smart resizing",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.smart_resizing"
+                }
+            },
+            {
+                "key": "hypr.master.drop_at_cursor",
+                "type": "bool",
+                "default": false,
+                "label": "Drop at cursor",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.drop_at_cursor"
+                }
+            },
+            {
+                "key": "hypr.master.always_keep_position",
+                "type": "bool",
+                "default": false,
+                "label": "Always keep position",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.always_keep_position"
+                }
+            },
+            {
+                "key": "hypr.master.focus_master_on_close",
+                "type": "bool",
+                "default": false,
+                "label": "Focus master on close",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "master.focus_master_on_close"
+                }
+            }
+        ]
+    }
+  ],
+  "menus": [
+    // --- menu page 1/7: main ---
+    {
+        "id": "main",
+        "label": "Vibranium",
+        "items": [
+            {
+                "id": "settings",
+                "type": "submenu",
+                "label": "Settings",
+                "icon": "settings",
+                "page": "settings"
+            },
+            {
+                "id": "install",
+                "desc": "Packages, themes and fonts.",
+                "type": "submenu",
+                "label": "Install",
+                "icon": "install",
+                "page": "install"
+            },
+            {
+                "id": "remove",
+                "desc": "Uninstall packages, themes and fonts.",
+                "type": "submenu",
+                "label": "Remove",
+                "icon": "remove",
+                "page": "remove"
+            },
+            {
+                "id": "update",
+                "desc": "OS packages, AUR, themes and Vibranium itself.",
+                "type": "submenu",
+                "label": "Update",
+                "icon": "update",
+                "page": "update"
+            },
+            {
+                "id": "setup",
+                "desc": "Hardware and service provisioning presets.",
+                "type": "submenu",
+                "label": "Setup",
+                "icon": "setup",
+                "page": "setup",
+                "when": "[[ $CHASSIS_TYPE != vm ]]"
+            },
+            {
+                "id": "help",
+                "desc": "Documentation and keybinding cheatsheet.",
+                "type": "submenu",
+                "label": "Help",
+                "icon": "help",
+                "page": "help"
+            }
+        ]
+    },
+    // --- menu page 2/7: setup ---
+    {
+        "id": "setup",
+        "label": "Setup",
+        "items": [
+            {
+                "type": "action",
+                "label": "Secure Boot",
+                "sub": "Configure Secure Boot easily",
+                "icon": "cpu",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-sboot"
+            },
+            {
+                "type": "action",
+                "label": "Firewall",
+                "sub": "Basic firewall setup",
+                "icon": "firewall",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-ufw"
+            },
+            {
+                "type": "action",
+                "label": "Docker",
+                "sub": "Install & confiure Docker",
+                "icon": "docker",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-docker"
+            },
+            {
+                "type": "action",
+                "label": "QEMU",
+                "sub": "Install and configure VMs",
+                "icon": "qemu",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-qemu"
+            },
+            {
+                "type": "action",
+                "label": "CUPS",
+                "sub": "Install & configure printing",
+                "icon": "printer",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-setup-sboot -- vb-setup-cups"
+            }
+        ]
+    },
+    // --- menu page 3/7: install ---
+    {
+        "id": "install",
+        "label": "Install",
+        "items": [
+            {
+                "type": "action",
+                "label": "Arch Package",
+                "sub": "Install official packages",
+                "icon": "archlinux",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-install -- vb-pkg-install"
+            },
+            {
+                "type": "action",
+                "label": "AUR Package",
+                "sub": "Install AUR packages",
+                "icon": "package-aur",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-install-aur -- vb-pkg-install --aur"
+            },
+            {
+                "type": "separator"
+            },
+            {
+                "type": "action",
+                "label": "Theme",
+                "sub": "Install Vibranium themes",
+                "icon": "theme",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-install -- vb-theme-install"
+            },
+            {
+                "type": "action",
+                "label": "Font",
+                "sub": "Install font packages",
+                "icon": "font",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-font-install -- vb-pkg-font-install"
+            },
+            {
+                "type": "action",
+                "label": "Font (AUR)",
+                "sub": "Install font packages",
+                "icon": "font",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-font-install-aur -- vb-pkg-font-install --aur"
+            },
+            {
+                "type": "separator"
+            },
+            {
+                "type": "action",
+                "label": "PWA",
+                "sub": "Install web apps",
+                "icon": "webapp",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-install -- vb-webapp-install"
+            },
+            {
+                "type": "action",
+                "label": "TUI",
+                "sub": "Install terminal apps",
+                "icon": "tui",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-install -- vb-tui-install"
+            }
+        ]
+    },
+    // --- menu page 4/7: remove ---
+    {
+        "id": "remove",
+        "label": "Remove",
+        "items": [
+            {
+                "type": "action",
+                "label": "Package",
+                "sub": "Uninstall packages",
+                "icon": "package",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-remove -- vb-pkg-remove"
+            },
+            {
+                "type": "separator"
+            },
+            {
+                "type": "action",
+                "label": "Theme",
+                "sub": "Uninstall community themes",
+                "icon": "theme",
+                "call": "themeRemover summon",
+                "keepOpen": true
+            },
+            {
+                "type": "action",
+                "label": "Font",
+                "sub": "Uninstall font packages",
+                "icon": "font",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-font-remove -- vb-pkg-font-remove"
+            },
+            {
+                "type": "separator"
+            },
+            {
+                "type": "action",
+                "label": "PWA",
+                "sub": "Uninstall web apps",
+                "icon": "webapp-remove",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-webapp-remove -- vb-webapp-remove"
+            },
+            {
+                "type": "action",
+                "label": "TUI",
+                "sub": "Uninstall terminal apps",
+                "icon": "tui-remove",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-tui-remove -- vb-tui-remove"
+            }
+        ]
+    },
+    // --- menu page 5/7: update ---
+    {
+        "id": "update",
+        "label": "Update",
+        "items": [
+            {
+                "type": "action",
+                "label": "OS",
+                "sub": "Update system packages",
+                "icon": "archlinux",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-update -- vb-pkg-update"
+            },
+            {
+                "type": "action",
+                "label": "AUR",
+                "sub": "Update AUR packages",
+                "icon": "package-aur",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-pkg-update-aur -- vb-pkg-update --aur"
+            },
+            {
+                "type": "separator"
+            },
+            {
+                "type": "action",
+                "label": "Themes",
+                "sub": "Update community themes",
+                "icon": "theme",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-theme-update -- vb-theme-update"
+            },
+            {
+                "type": "action",
+                "label": "Vibranium",
+                "sub": "Update Vibranium",
+                "icon": "github",
+                "command": "xdg-terminal-exec --app-id=org.vb.term.float --title=vb-update -- vb-update"
+            }
+        ]
+    },
+    // --- menu page 6/7: help ---
+    {
+        "id": "help",
+        "label": "Help",
+        "items": [
+            {
+                "type": "action",
+                "label": "Hyprland",
+                "sub": "Get help with the <b>Hyprland</b> window manager",
+                "icon": "hyprland",
+                "command": "vb-launch-webapp -- https://wiki.hypr.land"
+            },
+            {
+                "type": "action",
+                "label": "Vibranium",
+                "sub": "Get help with the <b>Vibranium</b> project",
+                "icon": "github",
+                "command": "vb-launch-webapp -- https://shvedes.github.io/vibranium"
+            },
+            {
+                "type": "action",
+                "label": "Arch Linux",
+                "sub": "Get help with the <b>Arch Linux</b> OS",
+                "icon": "archlinux",
+                "command": "vb-launch-webapp -- https://wiki.archlinux.org"
+            },
+            {
+                "type": "separator"
+            },
+            {
+                "type": "action",
+                "label": "Keybindings",
+                "sub": "Get help with the current keybindings",
+                "icon": "keyboard",
+                "call": "keybindings open"
+            }
+        ]
+    },
+    // --- menu page 7/7: utilities ---
+    {
+        "id": "utilities",
+        "label": "Utilities",
+        "items": [
+            {
+                "id": "timer",
+                "type": "number",
+                "label": "Timer",
+                "icon": "timer",
+                "min": 1,
+                "max": 180,
+                "step": 1,
+                "value": 5,
+                "unit": "min",
+                "sub": "A basic countdown timer",
+                "desc": "Set a countdown timer in minutes.",
+                "close": true
+            },
+            {
+                "id": "caffeine",
+                "type": "select",
+                "label": "Caffeine",
+                "sub": "Block system sleep",
+                "icon": "caffeine",
+                "value": "300",
+                "marker": false,
+                "options": [
+                    {
+                        "label": "5 min",
+                        "value": "300"
+                    },
+                    {
+                        "label": "10 min",
+                        "value": "600"
+                    },
+                    {
+                        "label": "15 min",
+                        "value": "900"
+                    },
+                    {
+                        "label": "30 min",
+                        "value": "1800"
+                    },
+                    {
+                        "label": "Infinite",
+                        "value": "0"
+                    }
+                ],
+                "onCall": "inhibitor start %v",
+                "desc": "Prevent system from sleep for a fixed time.",
+                "close": true
+            },
+            {
+                "id": "recording",
+                "type": "action",
+                "label": "Recording",
+                "icon": "recording",
+                "sub": "Screen recording",
+                "call": "recording toggle",
+                "close": true
+            },
+            {
+                "type": "separator"
+            },
+            {
+                "id": "reading.mode",
+                "type": "toggle",
+                "label": "Reading mode",
+                "sub": "Apply grayscale shader",
+                "icon": "book",
+                "checked": "[[ -f $XDG_CONFIG_HOME/hypr/hyprland.conf.d/reading-mode.lua ]]",
+                "onToggle": "vb-toggle-reading-mode",
+                "close": true,
+                "desc": "Applies a grayscale screen shader to reduce eyestrain.",
+                "warning": "Visible on screenshots and screen recordings!"
+            },
+            {
+                "id": "copy.track",
+                "type": "action",
+                "label": "Copy current track",
+                "sub": "Copy currently playing track",
+                "icon": "music",
+                "command": "vb-cmd-copy-track --notify",
+                "when": "{ mpc status 2>/dev/null; playerctl status 2>/dev/null; } | grep -qiE '\\[playing\\]|^Playing'"
+            },
+            {
+                "type": "separator"
+            },
+            {
+                "id": "reload",
+                "type": "action",
+                "label": "Reload Vibranium",
+                "icon": "update",
+                "command": "vb-cmd-reload --quiet"
+            },
+            {
+                "id": "close.windows",
+                "type": "action",
+                "label": "Close all windows",
+                "icon": "xmark",
+                "command": "hyprctl -q eval 'Hypr.Helpers.CloseWindows()'",
+                "close": true,
+                "confirm": {
+                    "stages": 2,
+                    "hint": "Press <b>Enter</b> again to close all windows",
+                    "armed": "<b><u>Press again to confirm</u></b>",
+                    "label": "Close all windows",
+                    "command": "hyprctl -q eval 'Hypr.Helpers.CloseWindows()'"
+                }
+            }
+        ]
+    }
+  ]
+}

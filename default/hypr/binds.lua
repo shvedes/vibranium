@@ -1,5 +1,7 @@
-local mainMod = "SUPER"
-local chassis_type = os.getenv("CHASSIS_TYPE") or "desktop"
+-- Keep these global so they can be reused in hyprland.conf.d
+
+mainMod = "SUPER"
+chassis_type = os.getenv("CHASSIS_TYPE") or "desktop"
 
 -- Direction keys: IJKL acts as a vim-style HJKL cluster shifted one column
 -- right. Arrow keys are kept as a secondary mapping for the same actions.
@@ -270,7 +272,7 @@ for _, d in ipairs(all_directions) do
 end
 
 -- Lock or unlock the active group so it stops accepting new members.
-hl.bind(mainMod .. " + CTRL + G", hl.dsp.group.lock_active(), {
+hl.bind(mainMod .. " + CTRL + G", hl.dsp.group.lock(), {
   description = "Lock / unlock active group",
 })
 
@@ -388,94 +390,63 @@ hl.bind(
 -- Vibranium
 
 hl.bind(mainMod .. " + Return", hl.dsp.exec_raw("xdg-terminal-exec"), { description = "Open terminal" })
-hl.bind(
-  mainMod .. " + SHIFT + Return",
-  hl.dsp.exec_raw("xdg-terminal-exec --app-id=org.vb.term.float"),
-  { description = "Open floating terminal" }
-)
 
-hl.bind("CTRL + ALT + L", hl.dsp.exec_raw("vb-cmd-lock-session"), { description = "Lock session" })
-hl.bind("switch:on:Lid Switch", hl.dsp.exec_raw("vb-cmd-lock-session"), { description = "Lock session on lid close" })
+hl.bind("CTRL + ALT + L", hl.dsp.exec_raw("vb-shell lockscreen lock"), { description = "Lock session" })
+hl.bind("switch:on:Lid Switch", hl.dsp.exec_raw("vb-shell lockscreen lock"), { description = "Lock session on lid close" })
 
-hl.bind("CTRL + ALT + DELETE", hl.dsp.exec_raw("vb-core-launcher --power"), { description = "Power menu" })
-hl.bind(mainMod .. " + ALT + ESCAPE", hl.dsp.exec_raw("vb-core-launcher --power"), { description = "Power menu" })
-hl.bind("XF86PowerOff", hl.dsp.exec_raw("vb-core-launcher --power"), { description = "Power menu" })
+hl.bind("CTRL + ALT + C", hl.dsp.exec_raw("vb-shell colorPicker pick"), { description = "Power menu" })
+hl.bind("CTRL + ALT + DELETE", hl.dsp.exec_raw("vb-shell power toggle"), { description = "Power menu" })
+hl.bind(mainMod .. " + ALT + ESCAPE", hl.dsp.exec_raw("vb-shell power toggle"), { description = "Power menu" })
+hl.bind("XF86PowerOff", hl.dsp.exec_raw("vb-shell power toggle"), { description = "Power menu" })
 
-hl.bind("CTRL + ALT + W", hl.dsp.exec_raw("vb-core-wallpaper --next"), { description = "Change background" })
-hl.bind("CTRL + ALT + T", hl.dsp.exec_raw("vb-theme-set"), { description = "Change theme" })
+hl.bind("CTRL + ALT + W", hl.dsp.exec_raw("vb-shell wallpaper next"), { description = "Change background" })
+hl.bind("CTRL + ALT + T", hl.dsp.exec_raw("vb-shell themePicker toggle"), { description = "Change theme" })
 
-hl.bind(mainMod .. " + A", hl.dsp.exec_raw("vb-core-launcher"), { description = "App launcher" })
-hl.bind("XF86Search", hl.dsp.exec_raw("vb-core-launcher"), { description = "App launcher" })
-hl.bind("CTRL + ALT + C", hl.dsp.exec_raw("vb-core-color-picker"), { description = "Color picker" })
+hl.bind(mainMod .. " + A", hl.dsp.exec_raw("vb-shell appLauncher toggle"), { description = "App launcher" })
+hl.bind("XF86Search", hl.dsp.exec_raw("vb-shell appLauncher toggle"), { description = "App launcher" })
 
-hl.bind("XF86Explorer", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "File manager" })
-hl.bind("XF86HomePage", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "File manager" })
 hl.bind(mainMod .. " + E", hl.dsp.exec_raw("vb-launch-cmd -- thunar"), { description = "File manager" })
-
--- Freeze the active window's process (SIGSTOP/SIGCONT).
-hl.bind("CTRL + ALT + F", function()
-  Hypr.Helpers.WindowToggleFreeze()
-end, { description = "Freeze window" })
 
 -- Vibranium menus
 
-hl.bind("CTRL + ALT + V", hl.dsp.exec_raw("vb-menu"), { description = "Vibranium menu" })
-hl.bind("XF86Tools", hl.dsp.exec_raw("vb-menu"), { description = "Vibranium menu" })
-hl.bind("CTRL + ALT + U", hl.dsp.exec_raw("vb-menu-utilities"), { description = "Utilities menu" })
-hl.bind("CTRL + ALT + P", hl.dsp.exec_raw("vb-util-pass"), { description = "Password manager" })
-hl.bind(mainMod .. " + period", hl.dsp.exec_raw("vb-menu-emoji"), { description = "Emoji picker" })
+hl.bind("CTRL + ALT + V", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/shell/common/settings/catalog.jsonc#main" ), { description = "Vibranium menu" })
+hl.bind("XF86Tools", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/shell/common/settings/catalog.jsonc#main"), { description = "Vibranium menu" })
+hl.bind("CTRL + ALT + U", hl.dsp.exec_raw("vb-shell menu openFile $VIBRANIUM/shell/common/settings/catalog.jsonc#utilities"), { description = "Utilities menu" })
+hl.bind("CTRL + ALT + P", hl.dsp.exec_raw("qs -p \"$VIBRANIUM/shell\" ipc call pass open"), { description = "Password manager" })
+hl.bind(mainMod .. " + period", hl.dsp.exec_raw("vb-shell menu toggleFile \"$VIBRANIUM/shell/features/pickers/emoji/emojis.jsonc\""), { description = "Emoji picker" })
 
 if chassis_type ~= "vm" then
-  hl.bind("CTRL + ALT + R", hl.dsp.exec_raw("vb-menu-recording"), { description = "Record screen" })
+  hl.bind("CTRL + ALT + R", hl.dsp.exec_raw("qs -p \"$VIBRANIUM/shell\" ipc call recording toggle"), { description = "Record screen" })
 end
 
 -- Clipboard
 
-hl.bind(mainMod .. " + V", hl.dsp.exec_raw("vb-core-clipboard --show"), { description = "Show clipboard" })
-hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_raw("vb-core-clipboard --clear"), { description = "Clear clipboard" })
+hl.bind(mainMod .. " + V", hl.dsp.exec_raw("qs -p \"$VIBRANIUM/shell\" ipc call clipboard toggle"), { description = "Show clipboard" })
+hl.bind(mainMod .. " + SHIFT + V", hl.dsp.exec_raw("qs -p \"$VIBRANIUM/shell\" ipc call clipboard clear"), { description = "Clear clipboard" })
 
 -- Screenshots
 
-hl.bind(
-  mainMod .. " + SHIFT + S",
-  hl.dsp.exec_raw("vb-core-screenshot --region"),
-  { description = "Screenshot (region)" }
-)
-hl.bind(
-  mainMod .. " + SHIFT + Z",
-  hl.dsp.exec_raw("vb-core-screenshot --screen"),
-  { description = "Screenshot (screen)" }
-)
-
-hl.bind("Print", hl.dsp.exec_raw("vb-core-screenshot --screen"), { description = "Screenshot (screen)" })
-
-hl.bind(
-  mainMod .. " + SHIFT + A",
-  Hypr.Guard.window(function()
-    Hypr.Act.exec_raw("vb-core-screenshot --window")
-  end),
-  { description = "Screenshot (window)" }
-)
+hl.bind(mainMod .. " + SHIFT + S", hl.dsp.exec_raw("vb-shell screenshots picker"), { description = "Screenshots: open overlay" })
+hl.bind("Print", hl.dsp.exec_raw("vb-shell screenshots picker"), { description = "Screenshots: open overlay" })
 
 -- Volume
 
 hl.bind(
   "XF86AudioLowerVolume",
-  hl.dsp.exec_raw("vb-core-volume --volume-down"),
+  hl.dsp.exec_raw("vb-shell audio voldown"),
   { description = "Volume down", locked = true, repeating = true }
 )
 hl.bind(
   "XF86AudioRaiseVolume",
-  hl.dsp.exec_raw("vb-core-volume --volume-up"),
+  hl.dsp.exec_raw("vb-shell audio volup"),
   { description = "Volume up", locked = true, repeating = true }
 )
-hl.bind("XF86AudioMute", hl.dsp.exec_raw("vb-core-volume --volume-toggle"), { description = "Volume mute" })
-hl.bind("XF86AudioMicMute", hl.dsp.exec_raw("vb-core-volume --microphone-toggle"), { description = "Mute microphone" })
+hl.bind("XF86AudioMute", hl.dsp.exec_raw("vb-shell audio voltoggle"), { description = "Volume mute" })
+hl.bind("XF86AudioMicMute", hl.dsp.exec_raw("vb-shell audio mictoggle"), { description = "Mute microphone" })
 
-hl.bind(mainMod .. " + M", hl.dsp.exec_raw("vb-core-volume --microphone-toggle"), { description = "Mute microphone" })
 hl.bind(
   mainMod .. " + SHIFT + XF86AudioMute",
-  hl.dsp.exec_raw("vb-core-volume --microphone-toggle"),
+  hl.dsp.exec_raw("vb-shell audio mictoggle"),
   { description = "Mute microphone" }
 )
 
@@ -493,42 +464,18 @@ hl.bind(
   { description = "Play / pause", locked = true }
 )
 
--- Per-window volume
-
--- Scroll up/down over any window to adjust its PipeWire sink volume
--- independently of the global output volume.
-hl.bind(
-  mainMod .. " + mouse_down",
-  Hypr.Guard.window(function()
-    Hypr.Act.exec_raw("vb-cmd-window-volume --down")
-  end),
-  { description = "Window volume down" }
-)
-
-hl.bind(
-  mainMod .. " + mouse_up",
-  Hypr.Guard.window(function()
-    Hypr.Act.exec_raw("vb-cmd-window-volume --up")
-  end),
-  { description = "Window volume up" }
-)
-
 -- Zoom
 
 hl.bind(mainMod .. " + SHIFT + mouse_up", hl.dsp.exec_raw("vb-core-zoom --increase"), { description = "Zoom in" })
 hl.bind(mainMod .. " + SHIFT + mouse_down", hl.dsp.exec_raw("vb-core-zoom --decrease"), { description = "Zoom out" })
-hl.bind(
-  mainMod .. " + SHIFT + mouse:274",
-  hl.dsp.exec_raw("vb-core-zoom --reset"),
-  { description = "Reset zoom level" }
-)
+hl.bind(mainMod .. " + SHIFT + mouse:274", hl.dsp.exec_raw("vb-core-zoom --reset"), { description = "Reset zoom level" })
 
 -- Mouse drag and resize
 
 hl.bind(mainMod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 hl.bind(mainMod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
--- Brightness (not applicable in VMs)
+-- Brightness
 
 if chassis_type ~= "vm" then
   hl.bind(
@@ -555,23 +502,7 @@ end
 
 -- Power profile
 
-hl.bind(mainMod .. " + B", hl.dsp.exec_raw("vb-core-power --next"), { description = "Next power profile" })
-
--- Other
-
-hl.bind("XF86Calculator", hl.dsp.exec_raw("vb-util-calc"), { description = "Toggle calculator" })
-
-hl.bind("SUPER + CTRL + equal", function()
-  Hypr.Helpers.ScaleStep(1)
-end, { description = "Increase active display scale" })
-
-hl.bind("SUPER + CTRL + minus", function()
-  Hypr.Helpers.ScaleStep(-1)
-end, { description = "Decrease active display scale" })
-
-hl.bind("SUPER + CTRL + 0", function()
-  Hypr.Helpers.ScaleStep(0)
-end, { description = "Reset active display scale" })
+hl.bind(mainMod .. " + B", hl.dsp.exec_raw("vb-shell powerProfile next"), { description = "Next power profile" })
 
 -- System monitoring
 

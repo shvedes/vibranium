@@ -1,0 +1,17 @@
+[Unit]
+Description=Vibranium Shell
+PartOf=graphical-session.target
+After=graphical-session.target
+ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland
+
+[Service]
+Type=simple
+Environment=QS_CONFIG_PATH=%h/.local/share/vibranium/shell
+Environment=VIBRANIUM=%h/.local/share/vibranium
+ExecStart=qs
+Restart=always
+
+[Install]
+WantedBy=graphical-session.target
+
+# vim:ft=systemd

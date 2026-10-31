@@ -1,0 +1,3 @@
+module qs.features.bar.modules.KeyboardLayout
+
+KeyboardLayout 1.0 KeyboardLayout.qml

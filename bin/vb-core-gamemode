@@ -142,6 +142,9 @@ is_known_gamescope_flag() {
 }
 
 # Return 0 if FLAG was supplied via --gamescope-options, 1 otherwise.
+# Exact token matching is intentional: it lets a user-supplied spelling
+# suppress its matching default, while forms that combine a flag and value in
+# one token cannot participate in that comparison.
 has_extra_flag() {
   local flag="$1"
   local f
@@ -154,6 +157,9 @@ has_extra_flag() {
 
 # Parse and validate a quoted gamescope options string, appending valid tokens
 # to EXTRA_GAMESCOPE_OPTS.
+# An unknown option and an immediately following non-option value are both
+# dropped, while a known option may pass exactly one following non-option
+# token as its value.
 parse_gamescope_options() {
   local opts_str="$1"
   local -a tokens
@@ -161,6 +167,8 @@ parse_gamescope_options() {
   read -ra tokens <<< "$opts_str"
   log Info "Tokens parsed: ${#tokens[@]}"
 
+  # `read -ra` treats the option string as whitespace-separated tokens; the
+  # resulting array cannot preserve an embedded quoted value as one argument.
   local token prev_was_flag=false
   for token in "${tokens[@]}"; do
     if [[ "$token" == -* ]]; then
@@ -180,6 +188,9 @@ parse_gamescope_options() {
   log Info "Parsed opts count: ${#EXTRA_GAMESCOPE_OPTS[@]}"
 }
 
+# The first non-option ends option parsing, so a command beginning with '-'
+# requires the explicit -- boundary; everything after that boundary remains
+# untouched.
 OVERRIDE_LDPRELOAD=false
 NO_POWER_PROFILE=false
 USE_MANGOHUD=false
@@ -250,7 +261,7 @@ fi
 
 log Info "Command to launch: $*"
 
-# Mangohud availability check (done early so we can warn before any exec)
+# Check Mangohud availability as part of exec-prefix construction.
 if $USE_MANGOHUD; then
   if ! command -v mangohud > /dev/null; then
     USE_MANGOHUD=false
@@ -260,10 +271,10 @@ if $USE_MANGOHUD; then
   fi
 fi
 
-# Gamescope not available - fall back gracefully
+# Without gamescope, exec dispatches either mangohud or the game directly.
 if ! command -v gamescope > /dev/null; then
   log Warn "gamescope is not installed"
-  notify-send -r 1 -t 5000 "Vibranium" \
+  notify-send -r 1 -a "Vibranium" -t 5000 "Vibranium" \
     "<b>gamescope</b> not found! Launching the game as is."
 
   if $USE_MANGOHUD; then
@@ -274,20 +285,16 @@ if ! command -v gamescope > /dev/null; then
 fi
 log Info "Gamescope binary found, proceeding with gamescope launch"
 
-# https://wiki.archlinux.org/title/Gamescope#Launching_gamescope_from_Steam,_stuttering_after_~24_minutes_(Gamescope_Lag_Bomb)
-# Always clear LD_PRELOAD for gamescope itself to prevent the ~24-minute lag
-# bomb. When --override-ldpreload is set, the original value is saved and
-# re-injected into the game command via `env` so Steam features are preserved
-# for games that do not use a secondary launcher (Rockstar, EA, etc.).
+# Clear LD_PRELOAD for gamescope. When the script's --ld-workaround option is
+# enabled, prepend the saved value to the game command with env; gamescope
+# itself receives an empty value.
 SAVED_LD_PRELOAD="${LD_PRELOAD-}"
 log Info "Saved LD_PRELOAD: ${SAVED_LD_PRELOAD:-(empty)}"
 unset LD_PRELOAD
 export LD_PRELOAD=""
 log Info "LD_PRELOAD cleared for gamescope"
 
-# Default to Wayland SDL backend unless the user has explicitly set one.
-# This is needed because some games default to X11 under gamescope even
-# though the native Wayland path is available and performs better.
+# Default SDL_VIDEODRIVER to wayland when the caller has not selected a backend.
 if ! [[ -n "$SDL_VIDEODRIVER" ]]; then
   export SDL_VIDEODRIVER="wayland"
   log Info "Set SDL_VIDEODRIVER=wayland"
@@ -295,6 +302,9 @@ fi
 log Info "SDL_VIDEODRIVER configured: ${SDL_VIDEODRIVER}"
 
 log Info "Querying focused monitor via hyprctl"
+# jq emits one tab-delimited row for the focused monitor. A missing focus row
+# leaves the read fields empty; default construction still proceeds, so
+# callers must tolerate incomplete monitor metadata.
 read -r MONITOR_NAME MONITOR_REFRESH_RATE MONITOR_H MONITOR_W < <(
   hyprctl -j monitors | jq -r '
     .[] | select(.focused) | [.name, (.refreshRate | floor), .height, .width] | @tsv
@@ -309,9 +319,20 @@ EXEC_CMDLINE=()
 
 # Power profile
 
-log Info "Getting available power profiles"
+# Profile names come from default/hooks/startup/02-power-profiles.sh, which
+# stores one canonical profile name per line for launch-time lookup.
+log Info "Reading cached power profiles from $VIBRANIUM_STATE/power-profiles"
 if [[ $NO_POWER_PROFILE == false ]]; then
-  mapfile -t POWERPROFILES < <(vb-core-power --list)
+  POWERPROFILES=()
+  if [[ -f "$VIBRANIUM_STATE/power-profiles" ]]; then
+    while IFS= read -r profile; do
+      [[ -n "$profile" ]] || continue
+      POWERPROFILES+=("$profile")
+    done < "$VIBRANIUM_STATE/power-profiles"
+  else
+    log Warn "power profiles cache missing, skipping power profile setup"
+  fi
+  log Info "Available profiles: ${POWERPROFILES[*]:-(none)}"
 
   if ((${#POWERPROFILES[@]} > 0)); then
     if [[ "${POWERPROFILES[*]}" =~ performance ]]; then
@@ -324,22 +345,22 @@ if [[ $NO_POWER_PROFILE == false ]]; then
     else
       log Warn "'performance' power profile not available, skipping"
     fi
+  else
+    log Warn "no cached power profiles, skipping"
   fi
 fi
 log Info "Power profile check complete, prefix: [${EXEC_CMDLINE[*]}]"
 
-# mangohud is added as a separate wrapper instead of using gamescope's
-# built-in --mangoapp flag, which has known stability issues and lacks
-# some mangohud overlay features.
+# Mangohud is inserted as a separate wrapper in the exec prefix.
 if $USE_MANGOHUD; then
   log Info "Prepending mangohud to exec chain"
   EXEC_CMDLINE+=(mangohud)
 fi
 log Info "Mangohud added, total prefix: ${#EXEC_CMDLINE[@]} commands"
 
-# Build resolution/refresh/scaler defaults, skipping any flag the user
-# already supplied via --gamescope-options so their value takes effect.
-# Each line checks the short and long flag name before appending the default.
+# Build defaults only for options absent as exact user tokens. Most defaults
+# use short and long spellings; adaptive-sync and fullscreen both test `-h`
+# literally, and each default is appended only when both checks fail.
 GAMESCOPE_DEFAULTS=()
 has_extra_flag -r || has_extra_flag --nested-refresh || GAMESCOPE_DEFAULTS+=(--nested-refresh "$MONITOR_REFRESH_RATE")
 has_extra_flag -W || has_extra_flag --output-width || GAMESCOPE_DEFAULTS+=(-W "$MONITOR_W")
@@ -369,6 +390,10 @@ log Info "Launching ${GAME_CMDLINE[*]}"
 #   4. -- as separator, followed by the game command
 #   5. stdout+stderr redirected to a log file for debugging.
 log Info "Executing gamescope"
+
+# Array expansion preserves spaces in the game command and wrapper prefixes;
+# an empty optional prefix contributes no argument, while the explicit -- keeps
+# the remaining command boundary intact.
 exec "${EXEC_CMDLINE[@]}" gamescope \
   "${EXTRA_GAMESCOPE_OPTS[@]}" \
   "${GAMESCOPE_DEFAULTS[@]}" \

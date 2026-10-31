@@ -1,0 +1,6 @@
+module qs.features.wallpaperPicker
+
+singleton WallpaperPicker 1.0 WallpaperPicker.qml
+WallpaperPickerView 1.0 WallpaperPickerView.qml
+WallpaperPickerPanel 1.0 WallpaperPickerPanel.qml
+WallpaperEntry 1.0 WallpaperEntry.qml

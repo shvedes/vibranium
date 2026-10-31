@@ -1,8 +1,8 @@
-@define-color background {{ background_0 }};
-@define-color foreground {{ foreground_0 }};
+@define-color background {{ background }};
+@define-color foreground {{ foreground }};
 
 @define-color accent {{ accent }};
-@define-color black {{ background_0 }};
+@define-color black {{ background }};
 @define-color red {{ red }};
 @define-color green {{ green }};
 @define-color yellow {{ yellow }};
@@ -35,10 +35,10 @@
 @define-color sidebar_shade_color @black;
 
 /* Secondary sidebar (libadwaita) */
-@define-color secondary_sidebar_bg_color {{ background_h }};
+@define-color secondary_sidebar_bg_color {{ background|dim=0.03 }};
 @define-color secondary_sidebar_fg_color @foreground;
-@define-color secondary_sidebar_backdrop_color {{ background_h }};
-@define-color secondary_sidebar_shade_color {{ background_h }};
+@define-color secondary_sidebar_backdrop_color {{ background|dim=0.03 }};
+@define-color secondary_sidebar_shade_color {{ background|dim=0.03 }};
 
 /* Headerbar */
 @define-color headerbar_bg_color @background;
@@ -58,18 +58,18 @@
 @define-color dialog_fg_color @foreground;
 
 /* OSD (on-screen display, e.g. volume overlay) */
-@define-color osd_bg_color {{ background_1 }};
+@define-color osd_bg_color {{ background|pop=0.06 }};
 @define-color osd_fg_color @foreground;
 
 /* Thumbnails and banners */
-@define-color thumbnail_bg_color {{ background_2 }};
+@define-color thumbnail_bg_color {{ background|pop=0.12 }};
 @define-color thumbnail_fg_color @foreground;
-@define-color banner_bg_color {{ background_2 }};
+@define-color banner_bg_color {{ background|pop=0.12 }};
 @define-color banner_fg_color @foreground;
 
 /* Scrollbar and shade */
-@define-color shade_color {{ background_1 }};
-@define-color scrollbar_outline_color {{ background_1 }};
+@define-color shade_color {{ background|pop=0.06 }};
+@define-color scrollbar_outline_color {{ background|pop=0.06 }};
 
 /* Semantic states */
 @define-color destructive_bg_color @red;
@@ -110,7 +110,7 @@
 /* GTK3 legacy extras */
 @define-color selected_bg_color @accent;
 @define-color selected_fg_color @background;
-@define-color tooltip_bg_color {{ background_1 }};
+@define-color tooltip_bg_color {{ background|pop=0.06 }};
 @define-color tooltip_fg_color @foreground;
 @define-color link_color @blue;
 @define-color visited_link_color @magenta;
@@ -124,8 +124,8 @@
 @define-color wm_bg_color @background;
 @define-color wm_fg_color @foreground;
 @define-color wm_border_color alpha(@foreground, 0.1);
-@define-color wm_button_hover_color {{ background_1 }};
-@define-color wm_button_active_color {{ background_2 }};
+@define-color wm_button_hover_color {{ background|pop=0.06 }};
+@define-color wm_button_active_color {{ background|pop=0.12 }};
 @define-color wm_close_hover_color @red;
 @define-color wm_close_active_color @bright_red;
 
@@ -190,7 +190,7 @@ filechooser .dialog-action-box:backdrop {
 }
 
 filechooser #pathbarbox {
-    border-bottom: 1px solid {{ background_3 }};
+    border-bottom: 1px solid {{ background|pop=0.18 }};
 }
 
 filechooserbutton:drop(active) {
@@ -212,7 +212,7 @@ toast button.circular.flat.image-button:hover {
 
 /* Menu background */
 menu, popover.menu contents {
-    background-color: {{ background_1 }};
+    background-color: {{ background|pop=0.06 }};
 }
 
 /* Menu item */

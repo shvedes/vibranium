@@ -1,0 +1,4 @@
+module qs.features.bar.modules.Battery
+
+Battery 1.0 Battery.qml
+BatteryIsland 1.0 BatteryIsland.qml

@@ -1,0 +1,5 @@
+{
+  "id": "menu",
+  "name": "Menu",
+  "description": "JSON(C) menu framework: simple options-and-values lists, stacked pages, batched state guards, nested search, id-based user extensions."
+}

@@ -1,0 +1,195 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+SELF="${0##*/}"
+
+VERBOSE=${VERBOSE:-false}
+
+# The shell's image viewer is reached through the `app` IPC handle, which
+# dispatches to the app named in its table. Both names are the ones the table
+# publishes: the id is the app, the verb is the one that carries a path.
+readonly APP_ID="imageViewer"
+readonly APP_VERB="openPath"
+
+# The image types the viewer can show. The set is the viewer's own folder
+# filter (shell/features/apps/imageViewer/ImageViewerWindow.qml) joined with
+# the static image extensions the project keeps in one table
+# (shell/common/text/ImageExts.js). A file outside the set is not refused
+# here - the viewer draws its own load-error line for bytes it cannot decode -
+# so the list filters the chooser and nothing else.
+declare -gr IMAGE_EXTENSIONS=(
+	avif bmp gif heic heif icns ico jfif j2k jpc jpeg jpg jp2 jpx
+	pbm pgm png pnm ppm svg svgz tga tif tiff wbmp webp
+)
+
+# The desktop entry runs with the session environment, where VIBRANIUM points
+# at the installation. The fallback keeps the wrapper working when it is
+# called from a context that does not carry it.
+: "${VIBRANIUM:=$(cd -- "${BASH_SOURCE[0]%/*}/.." && pwd)}"
+export VIBRANIUM
+
+usage() {
+	shcat << EOF
+Usage: $SELF [OPTIONS] [FILE...]
+
+Open images in the Vibranium shell's image viewer.
+
+Without a FILE a chooser opens, filtered to the image types the viewer can
+show. With FILEs the first one is opened and the viewer lists the folder it
+is in, so the rest are one keypress away in the window itself.
+
+Options:
+  -v, --verbose   Enable verbose output
+  -h, --help      Display this help and exit
+EOF
+}
+
+# The chooser's filter line: one glob per supported extension. Zenity reads a
+# filter as "<label> | <glob> [<glob>...]", so the globs follow the separator
+# as a single space-separated list.
+_image_filter() {
+	local -n _image_filter_out=$1
+	local globs=""
+	local ext
+	for ext in "${IMAGE_EXTENSIONS[@]}"; do
+		globs+=" *.$ext"
+	done
+	_image_filter_out="Images |$globs"
+}
+
+while (($# > 0)); do
+	case "$1" in
+		-v | --verbose)
+			export VERBOSE=true
+			shift
+			;;
+		-h | --help)
+			usage
+			exit 0
+			;;
+		--)
+			shift
+			break
+			;;
+		-*)
+			log Error "Unknown option: $1"
+			log Error "Try '$SELF --help' for more information"
+			exit 1
+			;;
+		*)
+			break
+			;;
+	esac
+done
+
+# No path means a chooser. It is single-select because the viewer shows a
+# single image; the window lists the folder it is in for everything else.
+if (($# == 0)); then
+	if ! command -v zenity > /dev/null; then
+		log Error "zenity is not installed"
+		notify-send -r 4 -a "Vibranium" -u critical -t 5000 "Image Viewer" \
+			"zenity is not installed - it provides the file chooser"
+		exit 1
+	fi
+
+	filter=
+	_image_filter filter
+	chosen="$(zenity --file-selection --title="Open Image" --file-filter="$filter" 2> /dev/null)"
+
+	if (($? != 0)); then
+		echo "No image chosen"
+		exit 1
+	fi
+
+	# A chooser that answered more than one path still names one image.
+	chosen="${chosen%%$'\n'*}"
+	if [[ -z "$chosen" ]]; then
+		log Info "No image chosen"
+		exit 0
+	fi
+	set -- "$chosen"
+fi
+
+# Every path is resolved before the first one is opened: a name that does not
+# exist is a mistake worth reporting, and reporting it after the window is
+# already up would leave the viewer open on a different file.
+#
+# The viewer refuses a relative path because it would have to guess a base,
+# and the caller's working directory is not the shell's. The path is made
+# absolute here instead.
+paths=()
+
+for arg in "$@"; do
+	if [[ ! -e "$arg" ]]; then
+		log Error "No such file: $arg"
+		exit 1
+	fi
+
+	if [[ -d "$arg" ]]; then
+		log Error "Not a file: $arg"
+		exit 1
+	fi
+
+	resolved="$(realpath -- "$arg" 2> /dev/null)" || resolved=""
+	if [[ -z "$resolved" ]]; then
+		log Error "Cannot resolve path: $arg"
+		exit 1
+	fi
+
+	paths+=("$resolved")
+done
+
+absolute="${paths[0]}"
+
+# The window shows one image and lists the folder it is in, so a second path
+# is not a second window - it is a file the window already knows about.
+if ((${#paths[@]} > 1)); then
+	log Info "Opening $absolute; not opened: ${paths[*]:1}"
+fi
+
+# The IPC surface carries its arguments as JSON text, and `qs ipc call`
+# re-encodes what it parses, so the path travels as a JSON string: a name
+# with a space, a quote or a backslash in it survives the round trip.
+payload="$(jq -n --arg path "$absolute" '$path')"
+
+# The answer is stdout alone: the child logs its own call on stderr, and a
+# verbose run would otherwise mix that line into the answer the case below
+# reads.
+err_file="$(mktemp)"
+answer="$(vb-shell app call "$APP_ID" "$APP_VERB" "$payload" 2> "$err_file")"
+status=$?
+err=
+while IFS= read -r _err_line || [[ -n "${_err_line:-}" ]]; do
+	if [[ -z "$err" ]]; then
+		err="$_err_line"
+	else
+		err+=$'\n'"$_err_line"
+	fi
+done < "$err_file"
+while [[ "$err" == *$'\n' ]]; do err="${err%$'\n'}"; done
+rm -f "$err_file"
+
+if ((status == 0)) && [[ -n "$err" ]]; then
+	# The child's logging is not part of the answer, but a verbose run still
+	# shows what was called.
+	printf '%s\n' "$err" >&2
+fi
+
+if ((status != 0)); then
+	reason="${answer:-$err}"
+	log Error "Image viewer call failed: $reason"
+	notify-send -r 4 -a "Vibranium" -u critical -t 5000 "Image Viewer" "$reason"
+	exit 1
+fi
+
+case "$answer" in
+	opened:*)
+		log Info "Opened $absolute"
+		;;
+	*)
+		log Error "$answer"
+		notify-send -r 4 -a "Vibranium" -u critical -t 5000 "Image Viewer" "$answer"
+		exit 1
+		;;
+esac

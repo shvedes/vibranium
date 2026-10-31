@@ -15,16 +15,16 @@ STATE_ACTION=""
 
 log Info "$SELF initialized: state_file=$STATE_FILE lock_file=$LOCK_FILE"
 
-# The state file has two tiers: persistent fields (player, volume) written on
-# every action, and an ephemeral action queue field written by the lock-fallback
-# path. write_state omits action intentionally - the queue consumer reads the
-# pending action before writing, preventing a concurrent queue write from being
-# silently overwritten.
+# The state file has persistent player/volume fields and one ephemeral action
+# slot. The owner reads the slot separately because write_state omits it; direct
+# rewrites are not an atomic transaction.
 read_state() {
   [[ -f "$STATE_FILE" ]] || {
     log Info "State file not found: $STATE_FILE"
     return 0
   }
+  # Redirection keeps this loop in the current shell, so assignments update the
+  # global state rather than a process-substitution subshell.
   while IFS='=' read -r key value; do
     case $key in
       player)
@@ -68,13 +68,11 @@ EOF
 }
 
 set_opts() {
-  log Info "set_opts: duration=$VIBRANIUM_PLAYER_FADE_DURATION"
+  log Info "set_opts: duration=$PLAYER_FADE_DURATION"
   source vb-lib-core
   log Info "vb-lib-core sourced"
 
-  helpers::check VIBRANIUM_PLAYER_FADE_DURATION
-
-  case "$VIBRANIUM_PLAYER_FADE_DURATION" in
+  case "$PLAYER_FADE_DURATION" in
     very_slow) NUM_STEPS=200 ;;
     slow) NUM_STEPS=100 ;;
     normal) NUM_STEPS=50 ;;
@@ -82,7 +80,7 @@ set_opts() {
     very_fast) NUM_STEPS=10 ;;
     off) NUM_STEPS=off ;;
   esac
-  log Info "NUM_STEPS resolved: $NUM_STEPS (fade: $VIBRANIUM_PLAYER_FADE_DURATION)"
+  log Info "NUM_STEPS resolved: $NUM_STEPS (fade: $PLAYER_FADE_DURATION)"
 }
 
 # Probe the given player backend and set the nameref result to "Playing" or
@@ -105,9 +103,8 @@ get_player_status() {
       esac
       ;;
     mpd)
-      # Check whether mpd is running by testing for its FIFO in the runtime
-      # directory (created by mpd when the daemon is active). This avoids
-      # spawning a systemctl subprocess on every probe.
+      # The FIFO is only a cheap reachability hint; mpc status below is
+      # authoritative for MPD's Playing or Paused state.
       [[ -p "$XDG_RUNTIME_DIR/mpd.fifo" ]] || {
         log Info "MPD FIFO not found, mpd unreachable"
         return 1
@@ -133,14 +130,9 @@ get_player_status() {
   return 1
 }
 
-# Three-pass probe: first try the cached STATE_PLAYER (only if Playing), then
-# scan all players for a Playing one, then for a Paused one (preferring the
-# cached STATE_PLAYER before falling back to the ordered list). This ensures
-# that a player the user started after the state file was written (e.g. Spotify
-# via playerctl while MPD is paused) is always picked up when it is Playing,
-# but when resuming from Paused the last-used player wins over a stale
-# playerctl process that happens to be paused too. Falls back to playerctl
-# when nothing is detected.
+# Probe cached Playing first, then the ordered player list for Playing, then
+# cached Paused, then the list for Paused. Use playerctl as the final fallback
+# when no recognized status is available.
 detect_active_player() {
   PLAYER=""
   STATUS=""
@@ -271,6 +263,9 @@ previous_track() {
   log Info "Previous track executed: player=$PLAYER"
 }
 
+# Each set_volume call is synchronous, so the caller holds the slow-path
+# lock for the complete curve and any queued action waits until the final
+# zero or target write.
 # Smoothly fade volume from current to 0 over num_steps iterations.
 # All arithmetic is on hundredths-of-volume integers to avoid cumulative
 # floating-point rounding error across the N-step curve. The "0.75" float
@@ -369,6 +364,8 @@ fade_in() {
   log Info "Fade in complete"
 }
 
+# Action options are intentionally last-one-wins rather than a mutually
+# exclusive set; the selected ACTION is the only value consumed below.
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --verbose)
@@ -416,11 +413,9 @@ _is_spotify() {
 }
 
 log Info "Branch decision: num_steps=$NUM_STEPS"
+# With ramp-off selected, update persistent state and dispatch one player
+# command without the fade lock or action queue.
 if [[ $NUM_STEPS == off ]]; then
-  # Ramp-off fast path: the action is instantaneous (~7ms total), so no
-  # lock or queue is needed. detect_active_player uses the same three-pass
-  # probe as the slow path (Playing > Paused > default), so the cached
-  # STATE_PLAYER is always validated against what is actually running.
   log Info "Fast path (ramp off)"
   read_state
   detect_active_player
@@ -471,6 +466,9 @@ if [[ $NUM_STEPS == off ]]; then
   exit 0
 fi
 
+# The lock is represented by file existence, so a process killed between
+# creation and release can leave a stale marker that no later invocation can
+# reclaim automatically.
 # Acquire an exclusive lock using O_EXCL via bash's noclobber option.
 # Returns 0 on success (lock acquired), 1 on contention (lock held).
 _acquire_lock() {
@@ -491,10 +489,8 @@ _release_lock() {
   log Info "Lock released"
 }
 
-# When the lock is held by a running instance (fade in progress), the new
-# action is appended to the state file. The running instance reads this
-# entry in its queue consumer (see above). This avoids blocking on rapid
-# key presses.
+# A contending invocation replaces the single action slot. The owner reads
+# that slot after its current action; a direct rewrite can race the read.
 log Info "Slow path: attempting lock"
 if _acquire_lock; then
   read_state
@@ -506,6 +502,9 @@ if _acquire_lock; then
         if _is_spotify; then
           playerctl play-pause 2> /dev/null
         elif [[ $STATUS == Playing ]]; then
+          # STATE_VOLUME is the pre-fade target, not the live volume. It is
+          # captured for restoration, restored after pause, and cleared after
+          # a resume consumes it.
           get_volume CURRENT_VOLUME
           STATE_VOLUME="$CURRENT_VOLUME"
           fade_out "$NUM_STEPS"
@@ -584,11 +583,10 @@ if _acquire_lock; then
     esac
     log Info "Action executed: $ACTION"
 
-    # Queue consumer: read only the action field from the state file so that
-    # a concurrent queuer write from a lock-contending instance is captured
-    # before write_state persists the current STATE_PLAYER/STATE_VOLUME.
-    # Calling read_state() here would overwrite those working values with
-    # stale ones from the file, potentially losing the state we just wrote.
+    # Read only the action field so a concurrent write from a lock-contending
+    # instance is captured before write_state persists the current
+    # STATE_PLAYER/STATE_VOLUME; a full read_state() call would overwrite
+    # those working values with stale file contents.
     STATE_ACTION=""
     if [[ -f "$STATE_FILE" ]]; then
       while IFS='=' read -r key value; do
@@ -621,7 +619,7 @@ else
   # Add/update the action line
   lines+=("action=$ACTION")
 
-  # Write everything back atomically (the file is opened only for writing here)
+  # Rewrite the state file directly; this is not an atomic transaction.
   printf '%s\n' "${lines[@]}" > "$STATE_FILE"
   log Info "Action queued to state file: $ACTION"
 fi
