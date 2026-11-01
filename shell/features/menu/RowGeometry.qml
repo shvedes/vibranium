@@ -1,0 +1,80 @@
+pragma Singleton
+pragma ComponentBehavior: Bound
+
+import QtQuick
+import qs.common
+import "RowRule.js" as RowRule
+
+// The menu row's token set: the theme's two line registers and the numbers the
+// rest-height rule is asked with. The RULE is RowRule.js; this file supplies
+// what the theme and the font say and hands every caller the same answers.
+//
+// WHY IT IS A SINGLETON. The rule is a constant of the theme and the font, not
+// of a row or a card. It used to be an Item that MenuPanel owned one of and
+// every delegate instantiated another of - two FontMetrics per live row, each
+// answering the same two numbers for the same two fonts. Nothing here is
+// per-instance, and a module singleton is the one copy that Qt will make.
+//
+// WHY THE LINE IS PINNED. A laid-out line box is not one number per font -
+// measured on this host it spans 17..19px for a title line across sixteen
+// strings, and 13..25px for a sub line - so a card sized from the MODEL and a
+// delegate sized from its own laid-out Text could only agree by shaping the
+// same string twice, which is what the per-string height cache existed for.
+// With the line pinned to ceil(FontMetrics.height) on both sides, a rest height
+// follows from the row's KIND alone and neither side has to know what the other
+// shaped. MEASURED, NOT ASSERTED: `tests/shell/suites/qml/menu-row-height-test.sh`
+// measures the pin against the engine's own line boxes at four font scales,
+// fallback faces included.
+QtObject {
+  id: root
+
+  // The two line registers a row draws at rest: its title (fontL) and its sub
+  // line - or a separator's breadcrumb - (fontXs).
+  readonly property real labelLineH: Math.ceil(root.labelMetrics.height)
+  readonly property real subLineH: Math.ceil(root.subMetrics.height)
+
+  // The row constants, read from the rule so the strip, the breathing and the
+  // hairline are spelled once.
+  readonly property int swatchH: RowRule.SWATCH_H
+  readonly property int sepPadV: RowRule.SEP_PAD_V
+  readonly property int bareSepH: RowRule.BARE_SEP_H
+
+  // Everything the rule needs, in one object. A theme or font change moves a
+  // token and every reader re-asks; nobody has to be told which function
+  // depends on what.
+  readonly property var tokens: ({
+    labelLineH: root.labelLineH,
+    subLineH: root.subLineH,
+    swatchH: root.swatchH,
+    sepPadV: root.sepPadV,
+    bareSepH: root.bareSepH,
+    rowMinH: Ui.rowMinH,
+    rowPadV: Ui.rowPadV
+  })
+
+  // The metrics are PROPERTIES, not bare children: QtObject has no default
+  // property, so a child object has to be assigned to a declared one. (As a
+  // child it is a construction error, and every delegate that reads this
+  // singleton then fails to build.)
+  readonly property FontMetrics labelMetrics: FontMetrics {
+    font.pixelSize: Ui.fontL
+    font.family: Ui.fontFamily
+  }
+
+  readonly property FontMetrics subMetrics: FontMetrics {
+    font.pixelSize: Ui.fontXs
+    font.family: Ui.fontFamily
+  }
+
+  function colH(kind) {
+    return RowRule.colH(kind, root.tokens)
+  }
+
+  function restH(kind) {
+    return RowRule.restH(kind, root.tokens)
+  }
+
+  function restSeparator(hasLabel) {
+    return RowRule.restSeparator(hasLabel, root.tokens)
+  }
+}

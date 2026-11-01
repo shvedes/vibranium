@@ -611,11 +611,26 @@ Singleton {
   }
 
   function _rebuildSearchIndex() {
+    const builtinCount = root._builtinIndex.length
     const merged = root._builtinIndex.slice()
     if (root._settingsFamily) {
       for (const ownerId in root._indexRegistrations) {
         const entries = root._indexRegistrations[ownerId]
         if (Array.isArray(entries)) merged.push(...entries)
+      }
+      // A live dynamic page SHADOWS the bundle page of the same id: pageById
+      // resolves that id to the published page, so the bundle's rows for it are
+      // entries for a page the id no longer names. Keeping both put the same
+      // (pageId, row) pair in the index twice - two hits for one row - and the
+      // projection's keyed model refuses the WHOLE install on a repeated key,
+      // so every query that reached such a page read as a dead search bar while
+      // the page's own rows stayed on screen. The Idle page is exactly this
+      // case: the schema ships a one-row "idle" page (the toggle) and the idle
+      // daemon publishes the live timer list under the same id. Dropped from
+      // the end so the indices of the rows that stay are never renumbered.
+      const regs = root._indexRegistrations
+      for (let i = builtinCount - 1; i >= 0; i--) {
+        if (regs[merged[i].pageId] !== undefined) merged.splice(i, 1)
       }
     }
     root.searchIndex = merged
@@ -862,41 +877,33 @@ Singleton {
 
   function subFor(item) {
     if (!item) return ""
+    // The value contract is MenuLib's (hookValue): a nullish or empty answer is
+    // a decline and the bundle's own copy stands.
     const p = root._providerFor(item.id)
-    if (p && typeof p.sub === "function") {
-      const r = p.sub(item, root._hookCtx(item))
-      if (r !== null && r !== undefined && r !== "") return String(r)
-    }
+    const hooked = MenuLib.hookValue(p, "sub", item, root._hookCtx(item), "")
+    if (hooked !== "") return String(hooked)
     return String(item?.sub ?? "")
   }
 
   function displayFor(item) {
     if (!item) return null
     const p = root._providerFor(item.id)
-    if (p && typeof p.display === "function") {
-      const r = p.display(item, root._hookCtx(item))
-      if (r !== null && r !== undefined && r !== "") return r
-    }
-    return null
+    return MenuLib.hookValue(p, "display", item, root._hookCtx(item), null)
   }
 
   function widestDisplayFor(item) {
     if (!item) return null
     const p = root._providerFor(item.id)
-    if (p && typeof p.widestDisplay === "function") {
-      const r = p.widestDisplay(item, root._hookCtx(item))
-      if (r !== null && r !== undefined && r !== "") return r
-    }
-    return null
+    return MenuLib.hookValue(p, "widestDisplay", item, root._hookCtx(item), null)
   }
 
   function isToggleOn(item) {
     if (!item || item.type !== "toggle") return false
+    // Strict boolean is MenuLib's rule (hookBool): a truthy stand-in a surface
+    // returned by mistake has not answered, so the bundle's own truth stands.
     const p = root._providerFor(item.id)
-    if (p && typeof p.checked === "function") {
-      const r = p.checked(item, root._hookCtx(item))
-      if (r === true || r === false) return r
-    }
+    const hooked = MenuLib.hookBool(p, "checked", item, root._hookCtx(item), null)
+    if (hooked !== null) return hooked
     if (typeof item.checked === "string" && item.checked !== "") return root.isChecked(item)
     // Use stateOf so var-bound toggles initialise from Settings and track rev
     const s = root.stateOf(item)
@@ -906,21 +913,15 @@ Singleton {
   function isValueActive(item) {
     if (!item) return false
     const p = root._providerFor(item.id)
-    if (p && typeof p.valueActive === "function") {
-      const r = p.valueActive(item, root._hookCtx(item))
-      if (r === true || r === false) return r
-    }
-    return false
+    const hooked = MenuLib.hookBool(p, "valueActive", item, root._hookCtx(item), null)
+    return hooked !== null ? hooked : false
   }
 
   function isNumberActive(item) {
     if (!item) return false
     const p = root._providerFor(item.id)
-    if (p && typeof p.numberActive === "function") {
-      const r = p.numberActive(item, root._hookCtx(item))
-      if (r === true || r === false) return r
-    }
-    return false
+    const hooked = MenuLib.hookBool(p, "numberActive", item, root._hookCtx(item), null)
+    return hooked !== null ? hooked : false
   }
 
   // Palette key a provider wants its row glyph accented with (caffeine's
@@ -938,12 +939,12 @@ Singleton {
   function confirmFor(item) {
     if (!item) return null
     const p = root._providerFor(item.id)
-    if (p && typeof p.confirm === "function") {
-      const r = p.confirm(item, root._hookCtx(item))
-      if (r !== null && r !== undefined) return r
-    }
-    if (item.confirm && typeof item.confirm === "object") return item.confirm
-    return null
+    let provided = null
+    if (p && typeof p.confirm === "function") provided = p.confirm(item, root._hookCtx(item))
+    // A surface's descriptor wins, including a falsy one - that is how a
+    // surface arms NOTHING for a row the bundle would otherwise arm. Only null
+    // and undefined fall through, and the bundle side must be an object.
+    return MenuLib.resolveConfirm(item, provided)
   }
 
   function handleConfirm(item) {
@@ -1832,6 +1833,19 @@ Singleton {
     }
     root.rev
     return Object.assign({}, root._rawState(item))
+  }
+
+  // A row's stored value, read WITHOUT the defensive copy stateOf makes.
+  //
+  // stateOf hands out a fresh map because a caller may keep it and compare it,
+  // and it captures rev so a BINDING that calls it re-evaluates when state
+  // changes. This one is for the width pass, which is imperative: it walks a
+  // page of rows on every navigation and every open and must not allocate a map
+  // per row, and a dependency it never reads would only register a binding this
+  // function is not written for. A caller inside a binding wants stateOf.
+  function valueOf(item) {
+    if (!item || !item.uid) return undefined
+    return root._rawState(item).value
   }
 
   function setChecked(item, value) {

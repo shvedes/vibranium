@@ -225,7 +225,7 @@ EDGES="$(wc -l <"$WORK/resolved.tsv" | tr -d ' ')"
 
 # --------------------------------------------------------------------------
 t_section "the four layers exist, and the README's file counts still hold"
-# The table: composition 1, boot 3, features 148, services 26, common 127.
+# The table: composition 1, boot 3, features 151, services 26, common 127.
 # layer_files counts .qml and .js together, which is the set the README's "Files"
 # column counts and the set the resolver below reads, so a count here says the
 # direction rules are being applied to the tree the README describes. A count that
@@ -234,7 +234,7 @@ for layer in boot common features services; do
   t_true "the $layer/ layer directory exists" test -d "$SHELL_DIR/$layer"
 done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
-t_count "features/ holds the 148 files the README publishes" "148" "$(layer_files features)"
+t_count "features/ holds the 151 files the README publishes" "151" "$(layer_files features)"
 t_count "services/ holds the 26 files the README publishes" "26" "$(layer_files services)"
 t_count "common/ holds the 127 files the README publishes" "127" "$(layer_files common)"
 t_count "boot/ holds the 3 files the README publishes" "3" "$(layer_files boot)"

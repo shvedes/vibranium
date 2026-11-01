@@ -111,7 +111,15 @@ Rectangle {
   // otherwise the current page decides.
   function layoutPage() {
     if (!Menu.bundle) return null
+    // Search results inherit the ENTRY page's mode (an emoji bundle filters
+    // within its own grid), so that branch keeps its own answer.
     if (panel.searching) return Menu.bundle.byId[Menu.bundle.entry] || null
+    // Otherwise the page this panel LAID OUT: the record installed beside the
+    // row set, not the navigation singleton. currentPageId is a cached binding
+    // that hands back the previous page inside a change handler - the class of
+    // staleness that sized the card from the page it was leaving - and this is
+    // the one accessor the grid rules read.
+    if (panel.installedPage) return panel.installedPage
     return Menu.pageById(panel.currentPageId)
   }
 
@@ -202,6 +210,16 @@ Rectangle {
   function lastSelectableIndex() {
     return MenuLib.selectableEdge(panel.rowsModel, panel.isSelectableIndex, true)
   }
+
+  // The page record this panel LAID OUT, with the row set below it. Written in
+  // one place - the install (recomputeRows) - and read by every layout answer
+  // that needs the page: the width engine's declared width and the row-sync
+  // plan. Deliberately NOT Menu.page (a binding over pageId) and not
+  // Menu.frame: both still name the outgoing page while a change handler runs,
+  // which is how the card came back from the idle timer list (declared 340)
+  // carrying that width onto the page it returned to.
+  property var installedPage: null
+  property string installedPageId: ""
 
   // Guard-filtered rows: managed identity-stable model (a naive binding
   // would rebuild delegates mid-interaction).
@@ -551,8 +569,10 @@ Rectangle {
     // keystroke; animating that reads as shimmer and gaps, so it installs
     // incrementally (the cursor reseat is explicit) but without motion.
     // Small pages keep the reveal motion.
-    const frame = Menu.frame
-    const srcPage = frame ? Menu.pageById(frame.id) : null
+    // The page the rows being planned belong to, taken from the last install's
+    // record rather than from the frame: a plan is decided for a ROW SET, and
+    // the frame can still name the page being left while that decision runs.
+    const srcPage = panel.installedPage
     const scopedGiant = reveal && Menu.scopedActive && !panel.searching
       && !!srcPage && Array.isArray(srcPage.items) && srcPage.items.length > Ui.listFullRows
     const wholesale = !reveal || wideProjection
@@ -603,6 +623,14 @@ Rectangle {
     // onGridColsChanged re-triggers recomposition once width settles;
     // minimum card widths keep cols > 1 in every legitimate layout.
     if (panel.gridMode && panel.gridCols <= 1 && !panel.searching) return
+    // The page record these rows belong to, read from the FRAME rather than from
+    // Menu.page (a binding over pageId, still the outgoing page inside a change
+    // handler - the same reason the branch below reads the id fresh). Published
+    // as the panel's layout page here, so the width pass and the row-sync plan
+    // read the page this row set belongs to instead of asking a singleton
+    // mid-transition.
+    panel.installedPageId = Menu.frame ? Menu.frame.id : ""
+    panel.installedPage = panel.installedPageId !== "" ? Menu.pageById(panel.installedPageId) : null
     let candidate
     if (panel.searching) {
       // Sectioning (bucket per owning page, separators opening each group)
@@ -631,8 +659,7 @@ Rectangle {
       // binding) hands back the PREVIOUS page inside change handlers,
       // which would latch restore-protection onto the wrong page and let
       // mid-swap cursor churn pollute the destination's saved state.
-      const pgId = Menu.frame ? Menu.frame.id : ""
-      const pg = Menu.pageById(pgId)
+      const pg = panel.installedPage
       const src = pg ? pg.items : []
       candidate = src.filter(item => Menu.isVisible(item))
       // Grid pages weave section headers and row-fill spacers into the
@@ -682,11 +709,8 @@ Rectangle {
       if (same && !plan.wholesale) return
     }
 
-    // Height caches BEFORE the swap: bindings evaluate synchronously on
-    // assignment and would otherwise snap from cold-cache fallbacks with
-    // no re-notification to correct them (short pages stuck scrollable).
-    panel.cacheRowHeights(candidate)
     if (!panel.syncRowsList(candidate, plan, records)) return
+    panel.projectRows(candidate)
     // A close latch belongs to a row this model still lists. `candidate` is
     // the authoritative "what the model will show", so the reconcile needs
     // no view timing: keyed sync destroys a delegate exactly when its key
@@ -694,7 +718,7 @@ Rectangle {
     Menu.pruneSlotCloses(candidate)
     panel.rowsModel = candidate
     panel.queueFit()
-    panel.recalcWidth()
+    metrics.recalcWidth()
   }
 
   function queueFit() {
@@ -868,6 +892,18 @@ Rectangle {
     })
   }
 
+  // The rows' own height, with no delegate read. Final - not an estimate - for
+  // a card too young to have anything open on it, and that is the whole
+  // condition queueFit's measurement turns wait on, so a caller that knows it
+  // holds can commit the height now instead of three frames from now.
+  function fitFromModel() {
+    panel._fitGen++
+    panel._latchedListH = -1
+    panel._fitPending = false
+    panel._fitAttempts = 0
+    panel._resolveFit(-1, panel._fitGen, panel._transitionGen)
+  }
+
   // Fit retry beat, named (one frame): re-runs a fit that landed
   // mid-settle on the next frame rather than spinning.
   readonly property int fitRetryMs: 16
@@ -919,9 +955,6 @@ Rectangle {
   // instance changes -> same string, no behavior change.
   property var _keySeqSrc: null
   property string _keySeqVal: ""
-  // Height-cache warm marker: the candidate instance already shaped by
-  // cacheRowHeights -> recalcWidth skips its second warm for the same instance.
-  property var _warmedHeightsFor: null
   // Tracked open-slot row: uid plus index of the row holding expanded or
   // info-open state -> onRevChanged checks it O(1), scans only when absent.
   property string _openSlotUid: ""
@@ -1065,12 +1098,66 @@ Rectangle {
   // moves no index at all, so the keep would outlive the change it was
   // armed for - holding the bar at a width the card has already left, and
   // swallowing the first cursor move the user makes afterwards.
+  // Where the cursor belongs in `next`, given where it was in the CURRENT row
+  // set (panel._records). The row is named by its uid in the payload this panel
+  // owns, never by asking the view: the view still holds the row set being
+  // replaced, so an identity lookup through it answers with the row that
+  // inherited the old index - in a menu, a separator. When that row is gone (a
+  // Delete on the row under the cursor) the answer is the nearest row that can
+  // hold a cursor: forward from the old index, else backward, so the cursor
+  // never parks on a separator or on the Add row. rowsModel already holds the
+  // set that is landing, which is what the selectable test must answer for.
+  // -1 means there is no row to put it on.
+  function cursorIndexAfter(fromIndex, next) {
+    if (!Array.isArray(next) || next.length === 0) return -1
+    if (fromIndex >= 0 && panel._records !== null) {
+      const was = panel._records[fromIndex]
+      const uid = was ? was.uid : null
+      if (uid !== null && uid !== undefined) {
+        for (let i = 0; i < next.length; i++) {
+          if (next[i].uid === uid) return i
+        }
+      }
+    }
+    const from = Math.min(Math.max(fromIndex, 0), next.length - 1)
+    for (let i = from; i < next.length; i++) {
+      if (panel.isSelectableIndex(i)) return i
+    }
+    for (let i = from - 1; i >= 0; i--) {
+      if (panel.isSelectableIndex(i)) return i
+    }
+    return -1
+  }
+
   function _writeRecords(records, keepRow) {
+    // An install that changes the row COUNT is a live row edit, not a
+    // re-order: a row was added or removed under the cursor while the cursor
+    // stayed on the row the user was looking at. Two answers follow, and this
+    // is the only place that holds the row set the view is leaving AND the one
+    // it is about to read.
+    //
+    // 1. The cursor's ROW keeps its place at a new index, resolved in the
+    //    payload: a lookup in the view answers with whatever row inherited the
+    //    old index (in a menu, a separator), because the view still holds the
+    //    previous row set. reseatAfter applies the index once the count has
+    //    moved (see List.onCountChanged).
+    // 2. The bar is put where the row is in the same frame instead of gliding
+    //    across the gap the edit opened - a glide from the row's old y to its
+    //    new one is a bar covering the bottom of the row above and the top of
+    //    the row below. Re-orders (equal counts) keep the ordinary glide.
+    const countEdit = panel._records !== null && panel._records.length !== records.length
+    if (countEdit) {
+      list.snapHighlight()
+      list.reseatAfter(panel.cursorIndexAfter(list.currentIndex, records))
+    }
     // The model is about to change, and a model change moves the cursor off
     // the row it was on. The view puts it back on that row - the view is the
     // only thing that knows a row by identity, and this is the only thing
-    // that knows a change is coming.
-    if (keepRow !== false) list.keepCursor()
+    // that knows a change is coming. A count edit is the exception: the
+    // destination above already names the row, and arming the identity
+    // restore as well would spend the arm on the stale lookup this avoids.
+    if (keepRow !== false && !countEdit) list.keepCursor()
+    else if (keepRow !== false) list.pinHighlight()
     panel._records = records
     // A model replacement ends user-motion provenance: any cursor move
     // after this point is the view adjusting, not the user asking, until
@@ -1178,14 +1265,38 @@ Rectangle {
   // diff untouched, so every frame until the landing seat is empty rather
   // than wrong. Outside a summon this is a no-op by contract: callers only
   // invoke it on the install paths below while _summonSeat is armed.
-  function _clearCursorForSwap() {
+  function _clearCursorForSwap(records) {
     if (!panel._summonSeat) return
     if (panel.gridMode) {
       if (grid.currentIndex !== -1) grid.currentIndex = -1
       return
     }
+    // A cursor whose ROW the incoming set still lists crosses the write
+    // instead of being cleared for it: _writeRecords arms the identity
+    // restore (hence keepCursor/PinHighlight), the bar holds the row's
+    // geometry, and the landing seat finds the cursor already where it was.
+    // Clearing it in this case made the first open of a page drop its
+    // selection bar - and the row under it - for one frame every time:
+    // the install cleared a cursor it then put back on the very same row.
+    if (panel._cursorSurvives(records)) return
     list._hlHeld = false
     if (list.currentIndex !== -1) list.seat(-1, "land", true)
+  }
+
+  // Whether the row under the cursor is still in `records`. Looked up by uid
+  // in the payload, never in the view: the view has not adopted the new set
+  // yet, so a lookup there answers with whatever row inherited the index.
+  function _cursorSurvives(records) {
+    const at = list.currentIndex
+    if (at < 0 || panel._records === null) return false
+    const was = panel._records[at]
+    const uid = was ? was.uid : null
+    if (uid === null || uid === undefined) return false
+    const next = records || []
+    for (let i = 0; i < next.length; i++) {
+      if (next[i] && next[i].uid === uid) return true
+    }
+    return false
   }
 
   function _installRows(records, plan, generation) {
@@ -1203,7 +1314,7 @@ Rectangle {
     panel.syncAnimated = plan.glide
 
     if (!plan.wholesale) {
-      panel._clearCursorForSwap()
+      panel._clearCursorForSwap(records)
       if (!panel._sameRecords(records)) {
         panel._writeRecords(records, !panel.searching && !panel.scopedSearching)
         if (plan.glide) panel._quiesceDisarm()
@@ -1245,7 +1356,7 @@ Rectangle {
        panel._swapping = true
      }
       panel._swapPendingGen = generation
-      panel._clearCursorForSwap()
+      panel._clearCursorForSwap(records)
       if (!sameContent) {
         // The same answer as the incremental path above: the search
         // projections seat the head of the new order instead of keeping
@@ -1253,6 +1364,14 @@ Rectangle {
         panel._writeRecords(records, !panel.searching && !panel.scopedSearching)
         // Wholesale never glides, so every write here arms the handshake.
         panel._quiesceArm()
+        // The summon's own install: the deferred fit below lands three turns
+        // after the card is already on screen, so the region held a
+        // provisional height and the card grew once - on the first open of a
+        // page and never again, because a later open installs nothing. The
+        // show gate has not released, so no click can have opened a row; with
+        // nothing open and nothing closing, the model height is final.
+        if (!panel.shown && !panel.searching && !panel.scopedSearching
+          && panel.expansionNeedH <= 0 && !Menu.slotClosing) panel.fitFromModel()
       }
  
     Idle.run(() => {
@@ -1592,7 +1711,7 @@ Rectangle {
       // reused summon must keep the warm ones.
       if (Menu.bundle === panel._seenBundle) return
       panel._seenBundle = Menu.bundle
-      panel.clearMetricCaches()
+      metrics.clearShapeCache()
       panel._quiesceDisarm()
       // Different containers mean a different row set outright, and the
       // metric maps above were just dropped with nothing to glide.
@@ -1637,7 +1756,7 @@ Rectangle {
       // Expand/collapse rides the store rev: grow for the open dropdown,
       // fall back to the closed measure when it shuts. Idempotent -
       // assigning the settled width notifies nothing.
-      panel._applyDropdownWidth()
+      metrics.applyDropdownWidth()
     }
 
     function onOpenChanged() {
@@ -1863,10 +1982,8 @@ Rectangle {
   readonly property real cappedAvailH: {
     const avail = panel.availListH
     // Grid cards never size from row heights (gridRows * gridSide, see
-    // snappedListH/listRegionH and the width rule below), so summing the
-    // row set here is pure first-open cost: every cache miss shapes through
-    // the probes, and providers stamp per-row fonts (previewFontFamily)
-    // that each resolve on first use.
+    // snappedListH/listRegionH and the width rule below), so the row set is
+    // not worth summing here even though the sum is now plain arithmetic.
     if (panel.gridMode) return avail
     if (panel.rowsModel.length === 0) return avail
     const total = panel._sumRowsH(panel.rowsModel, 10)
@@ -1964,102 +2081,97 @@ Rectangle {
   readonly property real screenMaxListH: Math.max(availListH,
     hardMaxHeight - panel.regionChromeH)
 
-  function rowFontFamily(itm) {
-    const family = itm && typeof itm.previewFontFamily === "string" ? itm.previewFontFamily : ""
-    return family !== "" ? family : Ui.fontFamily
-  }
-  function rowHeightKey(text, family) {
-    return String(family) + "\u0001" + String(text)
+  // What the layout needs to know about a row's provider, resolved ONCE per
+  // install (see projectRows): the sub line it will draw, the rest kind that
+  // follows from it, and the widest display a value slot can be asked to hold.
+  //
+  // WHY A SIDE MAP AND NOT KEYS ON THE ROW. The rows are Menu's own records,
+  // and a layout fact is not a property of a bundle; stamping it onto the
+  // record would publish it in `dump` and travel with the page. The map is
+  // keyed by uid, which keyedRows has already proven unique across the model,
+  // and is rebuilt wholesale on install - so it is bounded by the installed
+  // row set, not by a session.
+  property var _rowFacts: ({})
+
+  // Resolve every provider answer the layout reads, at the one moment a row set
+  // is installed. Heights and widths then measure a projection instead of
+  // calling a provider hook in the middle of a measurement - a dispatch that
+  // can allocate, run a user surface, or depend on the very geometry being
+  // computed.
+  function projectRows(rows) {
+    const facts = {}
+    for (let i = 0; i < rows.length; i++) {
+      const it = rows[i]
+      if (!it || it.type === "separator" || it.uid === undefined || it.uid === null) continue
+      const sub = Menu.subFor(it)
+      const subText = sub !== "" ? sub : String(it.sub ?? "")
+      const widest = Menu.widestDisplayFor(it)
+      facts[String(it.uid)] = {
+        sub: subText,
+        kind: MenuLib.restKind(it, subText),
+        widest: widest === null || widest === undefined ? "" : String(widest)
+      }
+    }
+    panel._rowFacts = facts
   }
 
-  // Rest height of one row from the MODEL alone - the same numbers
-  // Entry.qml derives from its texts (desc/expand slots are closed at
-  // rest). Delegate-walking is forbidden here: ListView instantiates
-  // lazily, so any sum over the created set changes while scrolling,
-  // which resized the card on every tick and opened pages half-cut.
-  // Line heights are per-text, shaped in recomputeRows ahead of the swap
-  // and cached by string: glyph overflow is content-dependent ("App launcher"
-  // renders a pixel taller than "Mg"), so proxies drifted +4px per sub
-  // row and cut the snap. Fallbacks cover strings recalcWidth never saw.
+  // The projection for one row, with a cold fallback for a row no install has
+  // seen (a delegate built from a record the panel has not adopted). The
+  // fallback is the only path here that asks a provider, and it is not on the
+  // install path.
+  function rowFacts(itm) {
+    if (!itm) return { sub: "", kind: "line", widest: "" }
+    const hit = panel._rowFacts[String(itm.uid)]
+    if (hit !== undefined) return hit
+    const sub = Menu.subFor(itm)
+    const subText = sub !== "" ? sub : String(itm.sub ?? "")
+    const widest = Menu.widestDisplayFor(itm)
+    return {
+      sub: subText,
+      kind: MenuLib.restKind(itm, subText),
+      widest: widest === null || widest === undefined ? "" : String(widest)
+    }
+  }
+
+  // The card's WIDTH rule (see MenuWidth): the page's rows measured through
+  // the shaping probes, cached and bounded, with the open-dropdown growth.
+  // Heights are RowGeometry's and never consult any of it.
+  MenuWidth {
+    id: metrics
+    host: panel
+  }
+  // Content width as the width engine measured it. The card's width binding and
+  // the saved frame read this projection; only the engine writes it.
+  readonly property real contentW: metrics.contentW
+
+  // Rest height of one row from the MODEL alone - RowGeometry's rule, which
+  // the delegate applies to its own lines (desc/expand slots are closed at
+  // rest). A row's height is a function of its KIND: a title line, plus the
+  // second line the row spends on a sub line or on a theme's swatch strip,
+  // plus the row's vertical padding, floored at Ui.rowMinH.
   //
-  // A height binding (cappedAvailH, restingContentHeight, listRegionH)
-  // reaches this function, so a cold string is measured from inside that
-  // binding's own evaluation. Nothing written here may be a property the
-  // binding reads: the maps, the metric counters and _metricCap are all read
-  // on the way here, and writing one re-invalidates the binding mid-pass.
-  // Inserting a key and moving the probe family are both safe - a key
-  // insertion is a member write and _rowProbeFamily is a plain property the
-  // height bindings never read - and the miss accounting goes through
-  // _metricFillMissed, which spends the shared budget held outside the
-  // property system.
+  // Nothing here shapes a string, and that is the point. The estimate used to
+  // measure each label and sub through probe Texts and cache the line box by
+  // string, because a laid-out line box is not one number per font - "App
+  // launcher" renders a pixel taller than "Mg", a fallback face taller still -
+  // so the card and the delegate agreed only while both shaped the same text.
+  // The line is pinned on both sides now, so there is nothing to measure, no
+  // dictionary of strings to bound, and no reason for a height binding to read
+  // a probe at all.
+  //
+  // Delegate-walking is forbidden here: ListView instantiates lazily, so any
+  // sum over the created set changes while scrolling, which resized the card
+  // on every tick and opened pages half-cut.
   function rowRestHeight(itm) {
     if (!itm) return Ui.rowMinH
     // Group separators carry the breadcrumb as their label; the delegate
-    // (Entry sepH) adds the same top-plus-bottom breathing below, so the
-    // two stay one number. Unlabeled separators keep the bare 10px line.
-    if (itm.type === "separator") {
-      const label = String(itm.label ?? "")
-      if (label === "") return 10
-      const family = panel.rowFontFamily(itm)
-      const sepKey = panel.rowHeightKey(label, family)
-      let sepH = panel._subHCache[sepKey]
-      if (sepH === undefined) {
-        panel._rowProbeFamily = family
-        measureRowSub.text = label
-        sepH = measureRowSub.implicitHeight
-        panel._metricFillMissed()
-        panel._subHCache[sepKey] = sepH
-      }
-      return sepH + 6
-    }
-    const family = panel.rowFontFamily(itm)
-    const labelKey = panel.rowHeightKey(itm.label, family)
-    let labelColH = panel._labelHCache[labelKey]
-    if (labelColH === undefined) {
-      panel._rowProbeFamily = family
-      measureRowLabel.text = itm.label
-      labelColH = measureRowLabel.implicitHeight
-      panel._metricFillMissed()
-      panel._labelHCache[labelKey] = labelColH
-    }
-    const light = typeof itm.light === "string" ? itm.light : ""
-    if (light !== "") {
-      // Theme rows: the title line, the swatch strip, and the one spacing unit
-      // between them (Entry.qml's lbl + paletteRow). The strip is dots alone,
-      // so the dot size is the whole line and nothing here needs a probe.
-      labelColH += 1 + 8
-    } else {
-      const subText = panel.restSubText(itm)
-      if (subText !== "") {
-        const subKey = panel.rowHeightKey(subText, family)
-        let sh = panel._subHCache[subKey]
-        if (sh === undefined) {
-          panel._rowProbeFamily = family
-          measureRowSub.text = subText
-          sh = measureRowSub.implicitHeight
-          panel._metricFillMissed()
-          panel._subHCache[subKey] = sh
-        }
-        labelColH += 1 + sh // Entry StyledText sub line
-      }
-    }
-    return Math.max(Ui.rowMinH, labelColH + 2 * Ui.rowPadV)
-  }
-
-  // Sub line a row renders at rest: live provider value, the declared
-  // sub, or the leading accent copy. Shared by rowRestHeight (estimate)
-  // and recalcWidth (cache fill) so both shape the same string. The lead
-  // counts: lead-only rows render two lines with an empty muted copy, and
-  // the estimate must reserve both.
-  function restSubText(itm) {
-    if (!itm) return ""
-    const ov = Menu.subFor(itm)
-    if (ov !== "") return ov
-    const sub = String(itm.sub ?? "")
-    if (sub !== "") return sub
-    // Same font metrics as the muted copy (fontXs both), so the height
-    // cache stays exact.
-    return typeof itm.subLead === "string" ? itm.subLead : ""
+    // (Entry sepH) reads the same rule, so the two stay one number.
+    if (itm.type === "separator")
+      return RowGeometry.restSeparator(String(itm.label ?? "") !== "")
+    // The kind was decided once, when this row set was installed: the estimate
+    // reads the projection and never re-classifies (or asks a provider) behind
+    // a binding.
+    return RowGeometry.restH(panel.rowFacts(itm).kind)
   }
 
   // Largest prefix of the MODEL's row heights that fits avail with no
@@ -2084,17 +2196,12 @@ Rectangle {
   // The inter-row gap is the list's own spacing, which is not part of
   // delegate height but counts toward contentHeight.
   function modelContentH() {
-    const rows = panel.rowsModel || []
-    // Giant pages extrapolate from the head sample: the first listFullRows
-    // rows are cache-backed through rowRestHeight, and the sole caller is
-    // the list's restingContentHeight fits-check, where any giant set reads
-    // scrollable either way, so the extrapolation is exact where it matters.
-    if (rows.length > Ui.listFullRows) {
-      let headH = 0
-      for (let i = 0; i < Ui.listFullRows; i++) headH += panel.rowRestHeight(rows[i])
-      return headH / Ui.listFullRows * rows.length + panel.rowSpacing * (rows.length - 1)
-    }
-    return RowMetrics.contentH(panel.rowsModel || [], 0, panel.rowRestHeight, panel.rowSpacing)
+    // The whole set, whatever its size: a row height is RowGeometry's
+    // arithmetic on the row's kind, so a four-digit page costs a walk and no
+    // shaping. The head-sample extrapolation this used to carry existed only
+    // to keep per-string measurement off a giant page.
+    return RowMetrics.contentH(panel.rowsModel || [], 0, panel.rowRestHeight,
+      panel.rowSpacing)
   }
 
   readonly property real listRegionH: {
@@ -2162,677 +2269,6 @@ Rectangle {
     return SlotGrowth.regionForSlot(list, base, panel.screenMaxListH, Ui.s)
   }
 
-  // Width fits the longest visible entry: its label or sub line, plus
-  // whatever the row reserves on the right (toggle, chevron, value slot,
-  // dropdown) and the card's own chrome. Imperative recompute (NOT a
-  // binding): measuring mutates the helper probes, so a declarative
-  // contentW would depend on what it writes - an instant binding loop.
-  //
-  // The measurement itself, with nothing under or over it: the card is
-  // exactly as wide as the widest row in it, so every row's text and every
-  // value slot lands with room to spare. 0 means "not measured yet", and the
-  // width binding answers it with the card's floor - a cold frame, not a
-  // claim about the content.
-  property real contentW: 0
-
-  // Closed-row width: what recalcWidth measured with every dropdown shut.
-  // The card rests here; an open select dropdown widens past it through
-  // _applyDropdownWidth and falls back to it on close.
-  property real _closedContentW: 0
-
-  // Value probe. TextMetrics, because that is what Entry's own value slots
-  // shape with (valueMetrics/selectMetrics/pctMetrics), so a trail reserved
-  // here is the trail the slot renders. The LABEL probes below are Text for
-  // the same reason: that is what a label renders with.
-  TextMetrics {
-    id: measureValue
-
-    font.pixelSize: Ui.fontS
-    font.family: Ui.fontFamily
-  }
-
-  // Prototype matching Entry's sub line exactly (see Entry subMain):
-  // it renders StyledText, whose line box runs ~2px taller than the
-  // PlainText metrics above. The whole-row snap needs the real number.
-  Text {
-    id: measureSubStyled
-
-    visible: false
-    text: "Mg"
-    font.pixelSize: Ui.fontXs
-    font.family: panel._rowProbeFamily
-    textFormat: Text.StyledText
-  }
-
-  // The group separator's own label: a Text, because a separator renders
-  // one (Entry sepText) and the width has to be the width of what is drawn.
-  Text {
-    id: measureSepLabel
-
-    visible: false
-    font.pixelSize: Ui.fontXs
-    font.family: panel._rowProbeFamily
-    font.bold: true
-    textFormat: Text.PlainText
-  }
-
-  // Imperative per-text probes, shared by the width pass (recalcWidth) and
-  // the height pass (rowRestHeight/cacheRowHeights): both read the same
-  // probes and both cache by string, so one shaping serves both.
-  //
-  // They are Text items rather than TextMetrics on purpose. The two do not
-  // agree: for the same string, family and size, TextMetrics.width is a
-  // couple of pixels off Text.implicitWidth in either direction ("Deep
-  // Forest" 84 vs 85.8, "Grape Soda" 79 vs 78). A reservation shaped with
-  // TextMetrics is therefore a reservation for a string nobody draws, and
-  // with no floor under it the card came up short by exactly that.
-  // Never read from bindings - the passes own their text.
-  Text {
-    id: measureRowLabel
-
-    visible: false
-    font.pixelSize: Ui.fontL
-    font.family: panel._rowProbeFamily
-    textFormat: Text.PlainText
-  }
-  Text {
-    id: measureRowSub
-
-    visible: false
-    font.pixelSize: Ui.fontXs
-    font.family: panel._rowProbeFamily
-    textFormat: Text.StyledText
-  }
-
-  // Dropdown option probes. OptionRow paints its label at Ui.fontM under
-  // the system family - never the value slot's fontS the trail is reserved
-  // with and never the themed row family - so the width pass shapes
-  // options here instead of reusing either of those probes.
-  Text {
-    id: measureOptLabel
-
-    visible: false
-    font.pixelSize: Ui.fontM
-    font.family: Ui.fontFamily
-    textFormat: Text.PlainText
-  }
-  Text {
-    id: measureOptLight
-
-    visible: false
-    font.pixelSize: Ui.fontXs
-    font.family: Ui.fontFamily
-    textFormat: Text.PlainText
-  }
-
-  // Family the row probes shape with. Assigning font.family on a probe
-  // writes the font GROUP, and Qt counts a group write from inside a
-  // binding evaluation as a loop on that binding, whether or not the
-  // binding reads anything of the probe, so a height binding that falls
-  // back to measurement would report one per row. The probes take the
-  // family from this plain property instead, which no height binding
-  // reads, and the family still lands on the probe before its line box
-  // is measured.
-  property string _rowProbeFamily: Ui.fontFamily
-
-  // Persistent width caches for recalcWidth - survives across keystrokes
-  // so typing "c" -> "cu" reuses the same label/path shapings.
-  property var _labelWCache: ({})
-  property var _subWCache: ({})
-  property var _optWCache: ({})
-  // Per-text line-height caches for the whole-row snap (see
-  // rowRestHeight). Same lifetime as the width caches.
-  property var _labelHCache: ({})
-  property var _subHCache: ({})
-
-  // Every key in those five dictionaries is a row string, and row strings
-  // are not a closed set: each bundle contributes its own labels, and each
-  // search hit adds a breadcrumb key ("Settings > General > Displays"), so
-  // a session that walks many bundles would otherwise grow the maps for as
-  // long as the panel lives. One shared budget over all four keeps the
-  // bound total; spending it drops every map at once rather than tracking
-  // per-entry ages, which costs a re-shaping pass on the next open and no
-  // bookkeeping in between. One giant page files ~1870 labels x height+width,
-  // so 2048 evicts mid-open; 8192 covers it with headroom.
-  readonly property int _metricCap: 8192
-  // Keys the imperative recompute points have inserted (recalcWidth,
-  // cacheRowHeights) since the last drop.
-  property int _metricCount: 0
-  // Keys the four maps hold, counted by BOTH fill paths. A member of a
-  // plain object rather than a property of its own: the height-binding
-  // fallback inserts from inside a binding evaluation and must not write a
-  // reactive property the height bindings read, while the imperative
-  // recount needs the same number so that one cap covers both paths
-  // instead of each of them spending the whole of it.
-  property var _metricLive: ({ n: 0 })
-
-  // Text metrics are only valid for the font and the palette they were
-  // shaped under, and only describe the rows of one bundle generation.
-  // Both a bundle swap and a theme swap drop the maps; a font change
-  // arrives with the theme swap, since a theme carries the font choice.
-  // Drop the metrics and re-shape the model under whatever they are about to
-  // become. Both the width and the height pass read the label/sub maps, and both
-  // are shaped under one font and one theme: a change to either invalidates
-  // every measurement, and neither pass runs again until the next row
-  // install - which for an open card is the next navigation, or never.
-  function reshapeMetrics() {
-    panel.clearMetricCaches()
-    panel.cacheRowHeights(panel.rowsModel)
-    panel.recalcWidth()
-  }
-
-  function clearMetricCaches() {
-    // The counters go first. Assigning a map notifies, and a height binding
-    // re-evaluating right there refills the fresh map through rowRestHeight,
-    // so zeroing them afterwards would drop the count of keys that are
-    // still live and the budget would stop describing the maps.
-    panel._metricLive.n = 0
-    panel._metricCount = 0
-    panel._warmedHeightsFor = null
-    panel._labelWCache = ({})
-    panel._subWCache = ({})
-    panel._optWCache = ({})
-    panel._labelHCache = ({})
-    panel._subHCache = ({})
-  }
-
-  // Drop the maps without reassigning them: deleting a key emits no change,
-  // so a caller inside a binding evaluation stays uninvalidated.
-  // Reassignment is reserved for clearMetricCaches, which only runs from
-  // imperative call sites.
-  function _dropMetricMaps() {
-    for (const cache of [panel._labelWCache, panel._subWCache,
-      panel._optWCache, panel._labelHCache, panel._subHCache]) {
-      // Over a snapshot of the keys: deleting the one for-in is standing on
-      // makes the iteration skip the next, which strands half the map while
-      // the budget reports the maps as empty.
-      const keys = Object.keys(cache)
-      for (let i = 0; i < keys.length; i++) delete cache[keys[i]]
-    }
-    // Maps dropped in place -> any warmed instance is cold again.
-    panel._warmedHeightsFor = null
-  }
-
-  // Called on every cache miss from an imperative recompute, before the
-  // value is stored, and it accounts for the key the caller is about to add.
-  // Reports the eviction so the caller can re-shape what the drop took with
-  // it. The budget is what the maps hold, which the height-binding fallback
-  // spends from the same pool, and the live count is optional so this also
-  // runs against a bare counter and cap.
-  function _metricMissed() {
-    const live = panel._metricLive
-    if (panel._metricCount >= panel._metricCap
-        || (live !== undefined && live.n >= panel._metricCap)) {
-      panel.clearMetricCaches()
-      if (live !== undefined) live.n++
-      return true
-    }
-    panel._metricCount++
-    if (live !== undefined) live.n++
-    return false
-  }
-
-  // The same accounting for the fills rowRestHeight performs from inside a
-  // height binding, and for the key the caller is about to add. The maps it
-  // fills, the counters and _metricCap are all dependencies of that binding,
-  // so a spent budget drops the maps IN PLACE, which holds all four inside
-  // _metricCap without a reactive write. Such a drop strands _metricCount,
-  // which the live count no longer depends on, so the stranded counter only
-  // makes the imperative path drop earlier.
-  function _metricFillMissed() {
-    const live = panel._metricLive
-    if (live.n >= panel._metricCap) {
-      panel._dropMetricMaps()
-      live.n = 0
-    }
-    live.n++
-  }
-
-  Connections {
-    target: Theme
-    function onColorsChanged() { panel.reshapeMetrics() }
-  }
-
-  // The system font lands asynchronously (a gsettings/ini probe behind
-  // SystemFont.family) and every shaping here is done under it. A card
-  // measured against the fallback family would keep that width once the
-  // real one arrived - a few pixels short of every row - and nothing else
-  // re-runs the pass until the next navigation.
-  Connections {
-    target: SystemFont
-    function onFamilyChanged() { panel.reshapeMetrics() }
-  }
-
-  // Unified value-column width for perfect bar alignment (lib addition).
-  // When a page shows ≥2 little bars, all value boxes share the same
-  // width so bars form one column. Updated in recalcWidth().
-  //
-  // This is the PRODUCER of the shared column; MenuLib.valueSlotW is the
-  // consumer rule Entry.qml applies, and the two are not a pair of halves
-  // to be merged: recalcWidth measures the widest value on the page with
-  // the shared probe, then mirrors the number into Menu.unifiedBarValueW
-  // so the delegates can read one number instead of each re-deriving it.
-  property int unifiedValueW: 0
-
-  function _widestStepperWidth(items) {
-    let maxW = 0
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i]
-      if (it.type !== "range" && it.type !== "number") continue
-      // The same string the row's own slot shapes (see _valueProbeText), so
-      // the shared column is never narrower than a value it has to hold.
-      measureValue.text = panel._valueProbeText(it)
-      maxW = Math.max(maxW, measureValue.width)
-    }
-    if (maxW > 0) maxW = Math.min(maxW + 6, 140)
-    return maxW
-  }
-
-  // Trailing width a row reserves. This is the SAME rule the row renders
-  // (Entry's trail cluster), read from the same tokens and the same shared
-  // slot formula, because the card has to be as wide as the row is and the
-  // row is drawn before any card has measured anything. The widgets are
-  // Ui.toggleW / Ui.chevronW / Ui.optMarkW - the very properties Entry
-  // binds them to - and the value columns go through MenuLib.valueSlotW
-  // with the pads and caps Entry passes it. A reservation that came up
-  // short has nowhere to hide: there is no floor under it, so the label
-  // elides.
-  //
-  // The one deliberate excess is a select's widest option rather than its
-  // current one (Entry renders the current label): a value that grows when
-  // the user picks a longer option must not re-cut the card under the row
-  // that holds it.
-  function trailWidthFor(itm) {
-    switch (itm.type) {
-      case "toggle":
-        return Ui.toggleW
-      case "submenu":
-        return Ui.chevronW
-      case "expandable":
-        // The chevron only rides a row that has something to unfold.
-        return (itm.desc !== undefined && itm.desc !== null && String(itm.desc) !== "")
-          || (itm.body !== undefined && itm.body !== null && String(itm.body) !== "")
-          ? Ui.chevronW : 0
-      case "option":
-        return Ui.optMarkW
-      case "progress": {
-        if (panel.unifiedValueW > 0) return Ui.barW + Ui.barGap + panel.unifiedValueW
-        measureValue.text = "100 %"
-        return Ui.barW + Ui.barGap + MenuLib.valueSlotW(0, measureValue.width, 4, 80)
-      }
-      case "number": {
-        if (panel.unifiedValueW > 0) return panel.unifiedValueW
-        measureValue.text = panel._valueProbeText(itm)
-        return MenuLib.valueSlotW(0, measureValue.width, 6, 140)
-      }
-      case "range": {
-        if (panel.unifiedValueW > 0) return Ui.barW + Ui.barGap + panel.unifiedValueW
-        measureValue.text = panel._valueProbeText(itm)
-        return Ui.barW + Ui.barGap + MenuLib.valueSlotW(0, measureValue.width, 6, 140)
-      }
-      case "select": {
-        if (itm.var === "" && itm.onSelect !== "" && itm.onSelect !== undefined) return 0
-        // Reserve for the widest option so the card never elides the value.
-        let maxW = 0
-        for (const o of (itm.options ?? [])) {
-          measureValue.text = o.label
-          maxW = Math.max(maxW, measureValue.width)
-        }
-        if (maxW === 0) {
-          const cur = Menu.stateOf(itm).value
-          let label = ""
-          for (const o of (itm.options ?? [])) if (o.value === cur) { label = o.label; break }
-          measureValue.text = label !== "" ? label : "value"
-          maxW = measureValue.width
-        }
-        return MenuLib.valueSlotW(0, maxW, 0, 220)
-      }
-      case "text": {
-        // Placeholder is what an empty row shows; the stored value is what
-        // a filled one shows, and it is free-form (a path, a query). Both,
-        // under the cap Entry applies to the slot itself.
-        const v = String(itm.placeholder ?? "")
-        measureValue.text = v !== "" ? v : "value"
-        const phW = measureValue.width
-        const cur = Menu.stateOf(itm).value
-        const curS = String(cur ?? "")
-        if (curS !== "") {
-          measureValue.text = curS
-          return MenuLib.valueSlotW(0, Math.max(phW, measureValue.width), 0, 180)
-        }
-        return MenuLib.valueSlotW(0, phW, 0, 180)
-      }
-      default:
-        return 0
-    }
-  }
-
-  // Card-coordinate width a select's inline dropdown needs so none of its
-  // entries elides. The closed row only reserves the widest option through
-  // the capped value slot (fontS, 220 cap), while OptionRow paints every
-  // entry full-width at fontM: a long option fits the slot's reservation
-  // on the row and still clips inside its own expansion. Shaped at
-  // OptionRow's own size, through the same grid and inner margins the
-  // expansion renders (optsGrid inset, option side margins, the gap kept
-  // from an optional light note). Two-column dropdowns (>6 options) hold
-  // half a row per cell, so the grid needs twice the widest entry plus
-  // the column gap. Input kinds need nothing: their editors live in the
-  // value slot the trail already reserves.
-  function _dropdownNeedW(itm) {
-    const opts = itm.options ?? []
-    let maxOpt = 0
-    let maxLight = 0
-    for (let k = 0; k < opts.length; k++) {
-      const o = opts[k] ?? {}
-      const label = o.label ?? String(o.value ?? "")
-      const light = String(o.light ?? "")
-      const key = label + "\u0001" + light
-      let shaped = panel._optWCache[key]
-      if (shaped === undefined) {
-        measureOptLabel.text = label
-        let lw = 0
-        if (light !== "") {
-          measureOptLight.text = light
-          lw = measureOptLight.implicitWidth
-        }
-        shaped = { o: measureOptLabel.implicitWidth, l: lw }
-        panel._metricMissed()
-        panel._optWCache[key] = shaped
-      }
-      if (shaped.o > maxOpt) maxOpt = shaped.o
-      if (shaped.l > maxLight) maxLight = shaped.l
-    }
-    if (opts.length === 0) return 0
-    // Card coordinates: rowChromeW carries the card padding, the row side
-    // margins and the label spacing; the remainder is the dropdown's own
-    // chrome (grid inset, option side margins, light gap) plus the text.
-    if (MenuLib.optionColumnCount(opts.length) > 1)
-      return panel.rowChromeW() + 5 * Ui.m - Ui.s + 16 + 2 * (maxOpt + maxLight)
-    return panel.rowChromeW() + 2 * Ui.m - Ui.s + 8 + maxOpt + maxLight
-  }
-
-  // Width the open select dropdown needs right now, or 0 when no select
-  // dropdown is open. Closed rows keep the capped value-slot reservation,
-  // so the card rests at the closed measure and only grows for the
-  // expansion that is actually on screen - then falls back on close.
-  function _openSelectNeedW() {
-    // Fast path: the tracked open-slot row, exact while one row is open.
-    const at = panel._trackedOpenIdx()
-    if (at >= 0) {
-      const one = panel.rowsModel[at]
-      if (one && one.type === "select" && Menu.isExpanded(one)
-          && Array.isArray(one.options) && one.options.length > 0)
-        return panel._dropdownNeedW(one)
-    }
-    // Otherwise (untracked, or an info row sitting beside an open
-    // dropdown) take the widest open select on the page.
-    let best = 0
-    for (let i = 0; i < panel.rowsModel.length; i++) {
-      const it = panel.rowsModel[i]
-      if (!it || it.type !== "select" || !Menu.isExpanded(it)) continue
-      if (!Array.isArray(it.options) || it.options.length === 0) continue
-      const need = panel._dropdownNeedW(it)
-      if (need > best) best = need
-    }
-    return best
-  }
-
-  // Grow the card for the open dropdown, shrink it back on close. The
-  // width binding clamps to the viewport and onWidthChanged arms the
-  // settle reveal, so the entries unveil with the growth instead of
-  // starting a beat elided - the same treatment a wider page gets.
-  function _applyDropdownWidth() {
-    panel.contentW = Math.max(panel._closedContentW, panel._openSelectNeedW())
-  }
-
-  // What Entry's valueMetrics shapes for a numeric row: the widest reading
-  // the row can show, or its own numeric fallback when it has none. The
-  // provider's display override wins over the row's own, because that is
-  // what the slot renders.
-  function _valueProbeText(itm) {
-    const widest = Menu.widestDisplayFor(itm)
-    if (widest) return String(widest)
-    return MenuLib.widestValueString(itm) || "888.88"
-  }
-
-  // What a row costs before any of its own content: the card's padding on
-  // both sides, the row's side margins inside it, and the one spacing unit
-  // the label column keeps clear of the trail cluster. Entry's own anchors
-  // (mainLine's Ui.m margins, listBox's outerPad, labelCol's rightMargin)
-  // are the same three numbers; the card adds them up per row and the row
-  // applies them one by one, which is why they live in one function.
-  function rowChromeW() {
-    return Ui.outerPad * 2 + Ui.m * 2 + Ui.s
-  }
-
-  // Declared page width is deliberately NOT part of the width rule below.
-  // A page that names one (settings sections, manifests, injected pickers)
-  // carries it, and the settings schema names 420 for every page it
-  // generates: a card sized by that number opens 50% wider than the rows in
-  // it, and nothing about the page could narrow it again. Sizing reads the
-  // rows, so a card is exactly as wide as its
-  // content; Menu.pageById still carries `width` for a bundle that
-  // declares one, but no card is sized by it.
-  //
-  // The width Behavior (see below) smooths navigation between pages whose
-  // content measures differently.
-
-  function recalcWidth() {
-    if (panel.gridMode) {
-      // A grid page has no row text to shape, and its columns are derived
-      // FROM this width, so there is nothing to measure: the module default
-      // is the grid's own size. Written on every grid pass so a grid summon
-      // never inherits the list width of the page before it.
-      panel._closedContentW = Ui.defWidth
-      panel.contentW = Ui.defWidth
-      return
-    }
-    const items = panel.rowsModel
-    // Compute unified value-column width first so all little bars share one column.
-    const hasMultipleBars = items.filter(it => it && (it.type === "range" || it.type === "progress")).length >= 2
-    if (hasMultipleBars) {
-      panel.unifiedValueW = panel._widestStepperWidth(items)
-      // Publish to Menu singleton so delegates (Entry) can read it without
-      // needing a direct panel reference (delegates are in separate file).
-      if (typeof Menu !== "undefined" && Menu.unifiedBarValueW !== undefined) Menu.unifiedBarValueW = panel.unifiedValueW
-    } else {
-      panel.unifiedValueW = 0
-      if (typeof Menu !== "undefined" && Menu.unifiedBarValueW !== undefined) Menu.unifiedBarValueW = 0
-    }
-    // The pass measures the page's own width and never consults the
-    // viewport. The card is content-sized, so the window is sized to the
-    // card, and a viewport read here reports whatever width the previous
-    // contentW produced - on a cold summon the cardMinW floor, which is a
-    // plausible few hundred pixels rather than an obviously unresolved
-    // zero. Measured against that, a "stop once a row is already wider
-    // than the screen" exit fires on row 0 and answers with that one row's
-    // width instead of the page's widest, and the card then widens once the
-    // window reports its real width.
-    //
-    // The viewport clamp belongs where it already is, in the width binding.
-    // A content width that reads the viewport is circular: the window cannot
-    // be sized until contentW is written, and contentW cannot be written
-    // correctly until the window is sized.
-    //
-    // A giant page installs its head window only (see recomputeRows), so the
-    // pass shapes at most that many rows, and every string it sees is a
-    // dictionary hit the second time.
-    const headN = Math.min(items.length, Ui.listFullRows)
-    // SYNCHRONOUS: the card paints on the turn this runs in, and a
-    // contentW that arrives a turn after that turn is a resize the user
-    // watches the window do.
-    //
-    // The probes do not need the deferral. A Text answers implicitWidth from
-    // its own content on the turn its text is assigned - a probe read cold,
-    // before any layout pass, returns the same number as one read a turn
-    // later ("grinning face with smiling eyes..." 476px both ways, and every
-    // other string identical). What makes a cold read look unreliable is the
-    // empty-page shape a deferral also produces: contentW stays 0, and 0 is
-    // indistinguishable from "no rows".
-    let maxRow = 0
-    for (let i = 0; i < headN; i++) {
-      const it = items[i]
-      if (!it || !it.label) continue
-      // Row chrome and icon column, both the row's own numbers
-      // (rowChromeW, Ui.rowIconW). The column is reserved for an icon NAME
-      // or a glyph (the emoji picker's rows), whichever Entry paints there -
-      // reserving only the name left a glyph row 28px narrower than it
-      // renders, and the label clipped against its own preview.
-      let w = panel.rowChromeW()
-      if (it.icon || (it.glyph !== undefined && it.glyph !== null
-        && String(it.glyph) !== "")) w += Ui.rowIconW + Ui.s
-      let labelW = 0
-      {
-        // Shaped in the row's OWN font: a theme row draws its name in the
-        // font it previews, which is routinely wider than the system one
-        // (rowFontFamily, the family the height pass already uses). The
-        // cache is keyed by family AND string for the same reason the height
-        // maps are (rowHeightKey): one string under two fonts is two
-        // widths, and a font picker page holds both.
-        //
-        // Search results take this path too. A per-character estimate would
-        // keep a keystroke off the shaping path, and it costs correctness
-        // twice over: it guesses 7px per character against a
-        // 13px font, so a result whose glyphs run wide comes up short, and
-        // the 360 cap it shares with the measured branch elides the longest
-        // names outright (the emoji picker: a 536px row in a 420px card).
-        // Shaping a result row is a dictionary hit once the string has been
-        // seen, and a miss is one TextMetrics assignment.
-        const family = panel.rowFontFamily(it)
-        const labelKey = panel.rowHeightKey(it.label, family)
-        labelW = panel._labelWCache[labelKey]
-        if (labelW === undefined) {
-          panel._rowProbeFamily = family
-          measureRowLabel.text = it.label
-          labelW = measureRowLabel.implicitWidth
-          panel._metricMissed()
-          panel._labelWCache[labelKey] = labelW
-        }
-        // Sub line: lead + muted copy + trailing accent. The card must fit
-        // the widest of label/sub, otherwise the subtext elides. Use the
-        // displayed sub (provider override wins) so the measure matches
-        // what Entry.qml actually paints.
-        const dispSub = (typeof Menu !== "undefined"
-          && typeof Menu.subFor === "function")
-          ? (Menu.subFor(it) || it.sub) : it.sub
-        const subKey = family + "\u0001" + String(it.subLead || "") + "\u0001"
-          + String(dispSub || "") + "\u0001" + String(it.subAccent || "")
-        let subW = panel._subWCache[subKey]
-        if (subW === undefined) {
-          let sw = 0
-          panel._rowProbeFamily = family
-          if (it.subLead) {
-            measureRowSub.text = it.subLead
-            sw += measureRowSub.implicitWidth + 4
-          }
-          if (dispSub) {
-            measureSubStyled.text = MenuLib.styledMarkup(String(dispSub))
-            sw += measureSubStyled.implicitWidth
-          }
-          if (it.subAccent) {
-            measureRowSub.text = it.subAccent
-            sw += (sw > 0 ? 4 : 0) + measureRowSub.implicitWidth
-          }
-          subW = sw
-          panel._metricMissed()
-          panel._subWCache[subKey] = subW
-        }
-        if (subW > labelW) labelW = subW
-      }
-      w += labelW
-      // Every search result is a link forward, so the card reserves the
-      // chevron on results whatever the row's own type is (Entry reads
-      // `searchResult`, not the type, to decide).
-      if (panel.searching) w += Ui.chevronW
-      w += trailWidthFor(it)
-      if (w > maxRow) maxRow = w
-    }
-    // Group separators / search breadcrumbs may be the widest line.
-    if (!panel.searching) {
-      for (let i = 0; i < headN; i++) {
-        const it = items[i]
-        if (!it || it.type !== "separator") continue
-        const lbl = String(it.label || "")
-        if (lbl === "") continue
-        panel._rowProbeFamily = panel.rowFontFamily(it)
-        measureSepLabel.text = lbl
-        const sw = measureSepLabel.implicitWidth + panel.rowChromeW()
-        if (sw > maxRow) maxRow = sw
-      }
-    }
-    // The rows are installed and laid out at the card's CURRENT width
-    // before this write lands, so a page whose content measures wider opens
-    // with its longest copy already clipped. Arm the settle flag HERE, at
-    // the decision, rather than on the first width change a turn later: the
-    // rows then reveal with the growth instead of starting a beat elided.
-    if (Math.abs(maxRow - panel.width) > 0.5) panel._armWidthSettle()
-    panel._closedContentW = maxRow
-    panel._applyDropdownWidth()
-    // A drop in the width pass takes the height maps with it, and this runs
-    // last in recomputeRows: re-shape the live model so the height bindings
-    // never find it cold. Skipped when the pre-swap warm already shaped this
-    // same instance -> one warm per install.
-    if (items !== panel._warmedHeightsFor) panel.cacheRowHeights(items)
-  }
-
-  // Shape each distinct label/sub once for the whole-row snap (see
-  // rowRestHeight). Runs in recomputeRows ahead of the rowsModel swap, so
-  // height bindings always read warm caches; post-warmup iterations are
-  // pure dictionary hits. Two passes: spending the budget drops every map,
-  // so the rows shaped before that are cold again, and re-shaping them is
-  // exactly what has to stay out of a binding evaluation. A page holding
-  // more distinct strings than the cap cannot be warmed whole - its tail
-  // rows measure themselves through the rowRestHeight fallback.
-  function cacheRowHeights(items) {
-    // Grid pages never read these caches: their height is pure model math
-    // (gridRows * gridSide, see snappedListH/listRegionH), so shaping every
-    // label/sub here is pure first-open cost. Grid height is pure model
-    // math (gridRows * gridSide), so shaping every label/sub on a grid
-    // page would pay thousands of synchronous Text shapings for numbers
-    // no reader uses.
-    if (panel.gridMode) {
-      panel._warmedHeightsFor = items
-      return
-    }
-    // Giant pages warm the head window only: shaping every label/sub on a
-    // 4-digit page is seconds of open-time font work. Tail rows resolve
-    // through the rowRestHeight fallback, which shapes on demand and stays
-    // cache-backed afterwards. The stamp below still covers the whole
-    // instance so the tail never re-triggers a full warm.
-    const headN = Math.min(items.length, Ui.listFullRows)
-    for (let pass = 0; pass < 2; pass++) {
-      let evicted = false
-      for (let i = 0; i < headN; i++) {
-        const it = items[i]
-        if (!it) continue
-        const family = panel.rowFontFamily(it)
-        const labelKey = panel.rowHeightKey(it.label, family)
-        if (it.label !== undefined && it.label !== ""
-            && panel._labelHCache[labelKey] === undefined) {
-          panel._rowProbeFamily = family
-          measureRowLabel.text = it.label
-          if (panel._metricMissed()) evicted = true
-          panel._labelHCache[labelKey] = measureRowLabel.implicitHeight
-        }
-        const subText = panel.restSubText(it)
-        if (subText !== "") {
-          const subKey = panel.rowHeightKey(subText, family)
-          if (panel._subHCache[subKey] === undefined) {
-            panel._rowProbeFamily = family
-            measureRowSub.text = subText
-            if (panel._metricMissed()) evicted = true
-            panel._subHCache[subKey] = measureRowSub.implicitHeight
-          }
-        }
-      }
-      if (!evicted) {
-        panel._warmedHeightsFor = items
-        return
-      }
-    }
-    panel._warmedHeightsFor = items
-  }
-
   // Size animations stay disabled until the opening layout has fully
   // settled - otherwise the first real sizing catches the Behavior and
   // the card visibly grows on every summon (gap geometry rendering
@@ -2866,6 +2302,14 @@ Rectangle {
   property bool _widthSettling: false
 
   function _armWidthSettle() {
+    // Nothing to unveil before the card is on screen. The settle exists so a
+    // width the user is WATCHING grow unveils its rows instead of clipping them
+    // (Entry.textReveal), and a cold frame has no earlier width to unveil from:
+    // the card is being sized for the first time, from the floor to its measure,
+    // before it has ever been painted. Arming it there faded every row in - and
+    // blinked the selection bar for a frame - on exactly the first open of a
+    // picker in a process, while every later open already had its width.
+    if (!panel.shown) return
     panel._widthSettling = true
     widthSettle.restart()
   }
@@ -3288,7 +2732,7 @@ Rectangle {
     // Content decides the width: the widest row this page shows, plus
     // whatever that row reserves on the right (see recalcWidth) - the
     // title and the sub line at rest, the open dropdown's entries while
-    // one is expanded (see _applyDropdownWidth).
+    // one is expanded (see MenuWidth.applyDropdownWidth).
     //
     // One floor, and a small one: never narrower than Ui.cardMinW, so a
     // page of six short submenus opens as a card rather than a strip. It

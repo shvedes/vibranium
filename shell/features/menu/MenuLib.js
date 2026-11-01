@@ -473,6 +473,70 @@ function buildPage(id, title, width, rawItems, opts) {
   }
 }
 
+// The page a select opens: one option row per choice.
+//
+// WHY IT IS HERE AND NOT IN A PANEL. A select is a row that names a set, and
+// opening it is the same normalization every other row gets - the same uid
+// scheme, the same defaults, the same hay. A panel that built these rows
+// itself would be the second place a row's shape is decided, and the two would
+// drift on the first field either of them added. So the parent select goes in
+// and a PAGE comes out, with the parent's commit and call commands carried onto
+// every option row and the parent's uid as the back-link the row uses to mirror
+// and commit the choice.
+//
+// The parent is never written to: reading it is the whole contract, and a page
+// field on a row that is also a row is how one row's expansion would leak into
+// the next page build.
+//
+// An option is described by its label, falling back to its value (a JSON
+// boolean or a zero is a label, not a missing one - `!== null && !== undefined`,
+// never `||`), and anything it carries that a row cannot hold is dropped at the
+// boundary rather than copied through: a non-array palette becomes no palette,
+// a non-string light flag becomes none.
+function buildOptionsPage(sel) {
+  const parent = sel || {}
+  const uid = parent.uid
+  const id = String(uid) + "::options"
+  const list = Array.isArray(parent.options) ? parent.options : []
+  const items = []
+  for (let i = 0; i < list.length; i++) {
+    // A null option is a throw, not a skipped row: the bundle named a choice
+    // and cannot say what it is, which is a broken select rather than a short
+    // one. buildPage skips a null because a page's raw list is data; an option
+    // list is a vocabulary.
+    const o = list[i]
+    const labelled = o.label !== null && o.label !== undefined
+    const it = normalizeItem({
+      type: "option",
+      label: labelled ? o.label : String(o.value),
+      value: o.value,
+      onSelect: parent.onSelect,
+      onCall: parent.onCall,
+      palette: Array.isArray(o.palette) ? o.palette : [],
+      light: typeof o.light === "string" ? o.light : ""
+    }, id, i)
+    // The back-link is a page fact, not a row field: it names the select this
+    // page expands, so it is stamped here rather than declared in defaultsFor
+    // where every row type would carry a field only option rows use.
+    it._parentUid = uid
+    items.push(it)
+  }
+  return {
+    id: id,
+    label: typeof parent.label === "string" && parent.label !== "" ? parent.label : id,
+    width: typeof parent._pageWidth === "number" ? parent._pageWidth : 0,
+    // An option page is always a plain list of choices: no cells, no ceiling
+    // of its own, and no scoped filter (typing narrows the options through the
+    // panel's existing filter, not through a page default).
+    layout: "list",
+    cell: 0,
+    maxHeight: 0,
+    filterDefault: false,
+    items: items,
+    _raw: list
+  }
+}
+
 // Layout fields an extension may override per page. Absent ext fields
 // keep the base page's values.
 function mergedPageOpts(extPage, base) {
@@ -1439,14 +1503,52 @@ function hookValue(provider, name, item, ctx, fallback) {
 
 // Strict boolean: only true/false is an answer, so a truthy stand-in a
 // surface returned by mistake cannot flip a row the bundle owns.
+//
+// The three-line dispatch is spelled out rather than delegated to hookValue
+// with a sentinel fallback: a sentinel would be a sixth module-level binding,
+// and this library's namespace IS its top-level declarations (the surface is
+// pinned by tests/js/menu.test.mjs), so a private marker is not available.
+function hookBool(provider, name, item, ctx, fallback) {
+  if (!provider) return fallback
+  const hook = provider[name]
+  if (typeof hook !== "function") return fallback
+  const r = hook.call(provider, item, ctx)
+  return r === true || r === false ? r : fallback
+}
+
 // Ran-or-not: true means the surface owned the action, false means it
 // declined and the caller keeps the default. `arg` is the action's own
 // payload (the new number, the staged values, the requested toggle state)
 // and rides ahead of the context.
+//
+// There is no fallback to hand back, and `false` is the answer for every
+// reason a hook did not run: "it ran" is not something to be toggled by a
+// truthy stand-in, and a caller that needs to tell "declined" from "absent"
+// asks hookValue instead.
+function hookRan(provider, name, item, arg, ctx) {
+  if (!provider) return false
+  const hook = provider[name]
+  if (typeof hook !== "function") return false
+  return hook.call(provider, item, arg, ctx) === true
+}
+
 // A row's staged-confirmation descriptor. A surface's own descriptor wins
 // over the one the bundle declared: the surface knows the row's live state
 // and can refuse a confirmation the bundle would otherwise arm. Absent
 // either, the row arms nothing and its dropdown stays a plain dropdown.
+//
+// The provided side is tested with `!== null && !== undefined`, so false, 0
+// and "" are ANSWERS - a surface arms nothing by handing back a falsy value,
+// and that is distinguishable from declining because null is the decline. The
+// bundle side must be an object: a string or a number there is a bundle that
+// does not know the shape, and arming a confirmation from it would arm
+// whatever the row's renderer happens to do with a truthy scalar.
+function resolveConfirm(item, provided) {
+  if (provided !== null && provided !== undefined) return provided
+  const declared = item === null || item === undefined ? null : item.confirm
+  return declared !== null && typeof declared === "object" ? declared : null
+}
+
 // Staged-flow helpers: pure, unit-testable, no Menu import.
 function isFlow(item) {
   return !!item && Array.isArray(item.flow) && item.flow.length > 0
@@ -1495,6 +1597,30 @@ function nextFlowIndex(item, from, stored) {
 // the model already carries, so a bundle's rows can be checked without a
 // shell. None of it reads Menu, a QML item or the state store: the row
 // reads those and hands the answer over.
+
+// The shape a row takes at rest: which second line it spends, if any. THE
+// rule - MenuPanel's model-side estimate and Entry's own layout both ask this,
+// so the card's height and the row it holds cannot classify a row differently.
+//
+// `providerSub` is the sub line a provider overlay would draw for this row,
+// already resolved by the caller: a provider call is the caller's business
+// (this library never reads Menu), and the delegate has that very string in
+// hand anyway because it renders it. An empty or non-string provider value is
+// "no override", and the row's own copy decides on its own.
+//
+// ORDER MATTERS. A theme row spends its second line on the swatch strip, so
+// "theme" is asked first, whatever copy the row carries; a row with any sub
+// copy - provider, declared, leading or trailing accent - is "sub"; a row with
+// none is a single title line.
+function restKind(item, providerSub) {
+  if (!item) return "line"
+  if (typeof item.light === "string" && item.light !== "") return "theme"
+  if (typeof providerSub === "string" && providerSub !== "") return "sub"
+  if (item.sub !== undefined && item.sub !== null && String(item.sub) !== "") return "sub"
+  if (typeof item.subLead === "string" && item.subLead !== "") return "sub"
+  if (typeof item.subAccent === "string" && item.subAccent !== "") return "sub"
+  return "line"
+}
 
 // Copy a flow stage declares for itself, or null when it declares none.
 // A stage's own string wins while that stage renders - an EMPTY one too,
@@ -1636,22 +1762,25 @@ function leadingNumber(text) {
 // before it is compared, so the caller lowercases the query - which is what
 // the search bar already does. A query that was not folded would match
 // nothing, and folding it here would fold it twice for no gain.
-function optionText(v) {
-  return v === undefined || v === null ? "" : String(v).toLowerCase().trim()
-}
-
+//
+// The fold is a local arrow rather than a module-level helper on purpose: a
+// pragma library exports every top-level declaration, so a shared `optionText`
+// was part of the public surface whether or not anyone asked for it. The one
+// line below is the whole rule, and both readers spell it the same way.
 function exactOptionIndex(options, query, family) {
   const q = String(query)
   if (q === "") return -1
+  const lower = (v) => v === undefined || v === null ? "" : String(v).toLowerCase().trim()
   const fam = String(family === undefined || family === null ? "" : family)
     .toLowerCase().trim()
   const list = Array.isArray(options) ? options : []
   for (let o = 0; o < list.length; o++) {
     const opt = list[o] || {}
-    // optionText, not `|| ""`: a value of 0 (the "never" of a timeout) is
-    // falsy and read as an option with no value, so "0" could not name it.
-    const varLower = optionText(opt.label)
-    const valLower = optionText(opt.value || "")
+    // The fold, not `|| ""`: a value of 0 (the "never" of a timeout) is
+    // falsy and would read as an option with no value, so "0" could not name
+    // it. The fold itself turns null/undefined into empty and leaves 0 alone.
+    const varLower = lower(opt.label)
+    const valLower = lower(opt.value)
     if (q === varLower || q === valLower
       || q === fam + " " + varLower || q === fam + "-" + varLower)
       return o
@@ -1686,6 +1815,8 @@ function bestOptionIndex(options, query, family) {
   if (exact >= 0) return exact
   const q = String(query)
   if (q === "") return -1
+  // The same fold exactOptionIndex applies, for the same reason it is local.
+  const lower = (v) => v === undefined || v === null ? "" : String(v).toLowerCase().trim()
   const fam = String(family === undefined || family === null ? "" : family)
     .toLowerCase().trim()
   const list = Array.isArray(options) ? options : []
@@ -1694,8 +1825,8 @@ function bestOptionIndex(options, query, family) {
   let tied = false
   for (let o = 0; o < list.length; o++) {
     const opt = list[o] || {}
-    const varLower = optionText(opt.label)
-    const valLower = optionText(opt.value)
+    const varLower = lower(opt.label)
+    const valLower = lower(opt.value)
     if (varLower === "" && valLower === "") continue
     // Value first: it carries the family as a prefix, so a query naming the
     // family alone scores every option at once and ties, which is the case

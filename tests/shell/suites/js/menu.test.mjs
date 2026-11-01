@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // Suite: shell/features/menu/MenuLib.js - the menu framework's pure layer.
 //
-// This is the largest single-library surface in the shell: 60 exported
-// functions over four concerns that only meet at the panel boundary.
+// This is the largest single-library surface in the shell: 67 functions over
+// four concerns that only meet at the panel boundary.
 //
 //   text/paths    clamp, pathDirname, quantize, decimalsOf, unitSuffix,
 //                 widestValueString, stripForHay, hayFromItem
@@ -62,6 +62,10 @@ import {
 const MENU_FILE = path.join(SHELL_DIR, 'features/menu/MenuLib.js')
 const M = loadLib(MENU_FILE)
 const SU = loadLib(path.join(SHELL_DIR, 'common/text/StringUtils.js'))
+// The menu's row geometry rule. It reads no Menu and no item: a caller hands
+// over the token set, which is what makes it askable at a scale a display has
+// and this suite does not.
+const R = loadLib(path.join(SHELL_DIR, 'features/menu/RowRule.js'))
 
 // ---------------------------------------------------------------------------
 // fixtures
@@ -114,7 +118,27 @@ function liveMenuLib() {
 const bundle = (text) => M.parseBundle(text)
 const page = (id, items, opts) => M.buildPage(id, id, 0, items, opts)
 
-// The 66-function public surface, named once so the coverage claim is
+// Every row the shell's own catalog declares: the menu bundles AND the settings
+// pages, normalized the way the loader normalizes them. A corpus taken from
+// `menus` alone is a fixture that happens to be shipped - the settings pages are
+// the larger half and the copy that produced the original width bugs.
+const catalogRows = () => {
+  const raw = JSON.parse(M.stripJsonc(
+    fs.readFileSync(path.join(SHELL_DIR, 'common/settings/catalog.jsonc'), 'utf8')))
+  const rows = []
+  for (const rp of [...(raw.menus ?? []), ...(raw.pages ?? [])]) {
+    let p
+    try {
+      p = M.normalizePage(rp, 'corpus')
+    } catch (e) {
+      continue
+    }
+    for (const it of p.items) rows.push(it)
+  }
+  return rows
+}
+
+// The 67-function public surface, named once so the coverage claim is
 // checkable rather than asserted in prose.
 const SURFACE = [
   'stripJsonc', 'styledMarkup', 'shellQuote', 'clamp', 'pathDirname', 'quantize',
@@ -127,7 +151,7 @@ const SURFACE = [
   'filterCounter', 'scopedFilter', 'substitute', 'substituteQuoted',
   'groupSearchResults',
   'hookValue', 'hookBool', 'hookRan', 'resolveConfirm', 'isFlow', 'flowStep', 'flowCount',
-  'nextFlowIndex', 'stageText', 'stageUnitSuffix', 'stageSeedText', 'numberDisplay', 'valueSlotW',
+  'nextFlowIndex', 'stageText', 'stageUnitSuffix', 'stageSeedText', 'restKind', 'numberDisplay', 'valueSlotW',
   'optionLabelFor', 'optionSeedIndex', 'optionColumnCount', 'optionRowCount',
   'optionColumnStride', 'optionCellCol', 'optionCellRow', 'leadingNumber',
   'exactOptionIndex', 'bestOptionIndex', 'selectableEdge', 'keyRoute',
@@ -147,17 +171,17 @@ const routeName = (over) => {
   return r === null ? null : r.name
 }
 
-suite('menu/MenuLib', 'the menu framework\'s pure layer - 60 functions')
+suite('menu/MenuLib', 'the menu framework\'s pure layer - 67 functions')
 
 // ======================================================================
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // 67 functions plus the five search-cache `var`s, which the loader picks up
+  // 68 functions plus the five search-cache `var`s, which the loader picks up
   // because a `.pragma library` namespace is its top-level declarations.
-  eq('72 declarations', Object.keys(M).length, 72)
+  eq('73 declarations', Object.keys(M).length, 73)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
-  eq('all 66 named functions are callable', missing, [])
+  eq('all 67 named functions are callable', missing, [])
   for (const n of SURFACE) {
     is(`${n} is a function`, M[n], (v) => typeof v === 'function', 'a function')
   }
@@ -177,7 +201,7 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 72 names', Object.keys(F).length, 72)
+  eq('the live view publishes the same 73 names', Object.keys(F).length, 73)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
@@ -3511,12 +3535,14 @@ group('exactOptionIndex folds the option text and drops falsy values', () => {
   eq('option values are trimmed', M.exactOptionIndex([{ label: 'L', value: '  v  ' }], 'v'), 0)
   eq('and lowercased', M.exactOptionIndex([{ label: 'L', value: 'V' }], 'v'), 0)
   eq('a numeric value is stringified', M.exactOptionIndex([{ label: 'Five', value: 5 }], '5'), 0)
-  // `String(opt.value || "")` - a 0 value folds to the empty string, so a
-  // zero-valued option is reachable by its label but NOT by its value. Pinned
-  // with its real value: it is a real, if narrow, gap in the value lookup.
-  eq('a zero value is unreachable as a query', M.exactOptionIndex([{ label: 'Zero', value: 0 }], '0'), -1)
-  eq('but its label still names it', M.exactOptionIndex([{ label: 'Zero', value: 0 }], 'zero'), 0)
-  eq('a false value is unreachable as a query too', M.exactOptionIndex([{ label: 'No', value: false }], 'false'), -1)
+  // The fold, not `opt.value || ""`: 0 (the "never" of a timeout) and false are
+  // values, and a query spelling one names the option. The `|| ""` form folded
+  // both to the empty string, so a falsy-valued option was reachable by its
+  // label and not by its value - a gap that only showed on those options, which
+  // is why it survived: no ordinary option has a falsy value.
+  eq('a zero value is reachable by its value', M.exactOptionIndex([{ label: 'Zero', value: 0 }], '0'), 0)
+  eq('and its label still names it', M.exactOptionIndex([{ label: 'Zero', value: 0 }], 'zero'), 0)
+  eq('a false value is reachable by its value too', M.exactOptionIndex([{ label: 'No', value: false }], 'false'), 0)
   eq('an option with only a value', M.exactOptionIndex([{ value: 'v' }], 'v'), 0)
   eq('an option with only a label', M.exactOptionIndex([{ label: 'l' }], 'l'), 0)
   eq('an option with neither is unreachable', M.exactOptionIndex([{}], ''), -1)
@@ -3815,15 +3841,128 @@ group('grid activation holds while filtering (emoji picker)', () => {
   contains('and it guards non-selectable cells', panel, 'itm.selectable === false')
 })
 
+// ======================================================================
+section('restKind: one classification per row, from the record alone')
+group('the rule reads the row record and the provider sub line', () => {
+  eq('a bare row is one title line', M.restKind({ label: 'A' }), 'line')
+  eq('a declared sub spends the second line', M.restKind({ sub: 'x' }), 'sub')
+  eq('a blank sub does not', M.restKind({ sub: '' }), 'line')
+  eq('a leading accent spends it', M.restKind({ subLead: 'timer' }), 'sub')
+  eq('a trailing accent spends it', M.restKind({ subAccent: 'active' }), 'sub')
+  eq('a theme row spends it on swatches', M.restKind({ light: 'dark', palette: [] }), 'theme')
+  // The strip IS the second line, so a theme row that also carries sub copy
+  // stays a theme row: the alternative reserves a third line for a row that
+  // renders two.
+  eq('and a theme row stays one whatever copy it carries', M.restKind({ light: 'dark', sub: 'x' }), 'theme')
+  eq('a provider sub line spends it', M.restKind({ label: 'A' }, 'now playing'), 'sub')
+  eq('an empty provider sub declares nothing', M.restKind({ label: 'A' }, ''), 'line')
+  eq('nor does a null one', M.restKind({ label: 'A' }, null), 'line')
+  eq('nor a number', M.restKind({ label: 'A' }, 0), 'line')
+  eq('the provider copy outranks a row carrying an empty sub', M.restKind({ sub: '' }, 'x'), 'sub')
+  eq('a null row is a line', M.restKind(null), 'line')
+  eq('and an undefined one', M.restKind(undefined), 'line')
+  // A verdict, never a string: the vocabulary is closed to the three shapes
+  // RowRule has a height for.
+  eq('the vocabulary is closed', [...new Set([M.restKind({}), M.restKind({ sub: 'x' }),
+    M.restKind({ light: 'l' })])].sort(), ['line', 'sub', 'theme'])
+})
+
+group('every row of the shipped catalog classifies, and the copy agrees', () => {
+  const rows = catalogRows()
+  eq('the catalog is the corpus', rows.length > 100, true)
+  // Both halves of the menu ask the same rule with the sub line they have: the
+  // panel resolves a provider override at install (none is registered here),
+  // the delegate renders the very string it draws. A difference between these
+  // two projections is a card sized for a row the delegate lays out taller.
+  const disagree = []
+  const counts = { line: 0, sub: 0, theme: 0 }
+  for (const it of rows) {
+    const panelKind = M.restKind(it, '')
+    const delegateKind = M.restKind(it, String(it.sub ?? ''))
+    if (panelKind !== delegateKind) disagree.push(String(it.uid))
+    counts[panelKind] = (counts[panelKind] ?? 0) + 1
+  }
+  eq('the two projections agree on every row', disagree, [])
+  eq('and no row lands outside the three kinds',
+    Object.keys(counts).filter(k => !['line', 'sub', 'theme'].includes(k)), [])
+  eq('and the corpus exercises more than one kind',
+    Object.values(counts).filter(n => n > 0).length > 1, true)
+  // The kind is about copy the row carries: a one-line row has no second line
+  // to draw, so a row classified "line" that carries sub copy is a row the
+  // card is one line short for.
+  const liars = rows.filter(it => M.restKind(it, '') === 'line'
+    && (String(it.sub ?? '') !== '' || String(it.subLead ?? '') !== ''
+      || String(it.subAccent ?? '') !== ''))
+  eq('and no one-line row carries sub copy', liars, [])
+})
+
+// ======================================================================
+section('RowRule: the rest-height arithmetic, at any token set')
+
+group('the shipped tokens at 1.0 give the shipped heights', () => {
+  const g = {
+    labelLineH: 17, subLineH: 13, rowMinH: 34, rowPadV: 7,
+    swatchH: R.SWATCH_H, sepPadV: R.SEP_PAD_V, bareSepH: R.BARE_SEP_H,
+  }
+  // 17 + 14 = 31 is under the 34 floor, so the one-line row IS the floor.
+  eq('a one-line row is the title line and padding, floored', R.restH('line', g), 34)
+  eq('a two-line row is taller than the floor', R.restH('sub', g), 17 + 1 + 13 + 14)
+  eq('a theme row spends the swatch strip, not a sub line', R.restH('theme', g), 17 + 1 + 8 + 14)
+  eq('a labeled separator is its breadcrumb plus breathing', R.restSeparator(true, g), 13 + 6)
+  eq('a bare separator is the bare hairline', R.restSeparator(false, g), 10)
+  eq('and it is shorter than a row on purpose', R.restSeparator(false, g) < g.rowMinH, true)
+  eq('an unknown kind is a one-line row', R.restH('', g), 34)
+  eq('colH is the rule without the padding', R.colH('sub', g) + 2 * g.rowPadV, R.restH('sub', g))
+  eq('the column of a bare line is the title line', R.colH('line', g), 17)
+})
+
+group('the same rows hold at 1.0, 1.25, 1.5 and 2.0', () => {
+  const rows = catalogRows()
+  // A line box scales with its font; these are the two registered sizes the
+  // rule is asked at. The engine's own numbers for each scale are measured by
+  // menu-row-height-test.sh - this group checks the ARITHMETIC holds at every
+  // one of them, which is the half a shell cannot add to.
+  const tokensAt = (scale) => ({
+    labelLineH: Math.ceil(17 * scale), subLineH: Math.ceil(13 * scale),
+    rowMinH: Math.ceil(34 * scale), rowPadV: Math.ceil(7 * scale),
+    swatchH: R.SWATCH_H, sepPadV: R.SEP_PAD_V, bareSepH: R.BARE_SEP_H,
+  })
+  for (const scale of [1, 1.25, 1.5, 2]) {
+    const g = tokensAt(scale)
+    const heightOf = new Map()
+    const bad = []
+    for (const it of rows) {
+      const kind = M.restKind(it, '')
+      const h = R.restH(kind, g)
+      // THE property: the height depends on the kind and nothing else, so two
+      // rows of one kind cannot be two heights.
+      const prev = heightOf.get(kind)
+      if (prev !== undefined && prev !== h) bad.push(`${kind}:${it.uid}`)
+      heightOf.set(kind, h)
+      if (h < g.rowMinH) bad.push(`floor:${it.uid}`)
+      if (kind === 'sub' && !(h > R.restH('line', g))) bad.push(`sub:${it.uid}`)
+    }
+    eq(`scale ${scale}: every row is one height per kind, on or above the floor`, bad, [])
+  }
+  // The axis has to be an axis: a bigger font makes every row taller, and the
+  // two-line row never collapses into the one-line one.
+  const g1 = tokensAt(1)
+  const g2 = tokensAt(2)
+  eq('a 2.0 two-line row is taller than a 1.0 one', R.restH('sub', g2) > R.restH('sub', g1), true)
+  eq('and a 2.0 one-line row is taller too', R.restH('line', g2) > R.restH('line', g1), true)
+  eq('while a two-line row still exceeds a one-line row at 2.0',
+    R.restH('sub', g2) > R.restH('line', g2), true)
+})
+
 section('coverage ledger')
-group('every one of the 66 functions was exercised above', () => {
+group('every one of the 67 functions was exercised above', () => {
   // A machine-checkable statement, not a claim in prose. The surface list at
   // the top of this file is checked against the loaded namespace, and then
   // each name is required to appear in this file's OWN source as a call - so
   // removing a function, renaming one, or dropping a cluster turns this group
   // red rather than quietly shrinking the coverage.
-  eq('the surface list is 66 long', SURFACE.length, 66)
-  eq('with no duplicates', new Set(SURFACE).size, 66)
+  eq('the surface list is 67 long', SURFACE.length, 67)
+  eq('with no duplicates', new Set(SURFACE).size, 67)
   eq('and all of them resolve on the namespace', SURFACE.filter(n => typeof M[n] !== 'function'), [])
   const selfSource = fs.readFileSync(path.join(import.meta.dirname, 'menu.test.mjs'), 'utf8')
   for (const name of SURFACE) {

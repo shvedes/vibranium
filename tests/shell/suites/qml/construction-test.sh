@@ -190,7 +190,7 @@ BOOT_EXCLUDED="qs.boot${KEY_TAB}Boot"
 # from the installed quickshell-*.qmltypes and the root object of each entry's
 # file - so the pin is what stops a new C++ root from quietly widening the set.
 #
-# EXPECTED_NEEDS_ENVIRONMENT is 95 of the 230 declared types, and every one of them
+# EXPECTED_NEEDS_ENVIRONMENT is 100 of the 232 declared types, and every one of them
 # through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
 # PanelWindow backend, so any type that reaches a window - directly as a
 # PanelWindow root, or through a singleton that builds one while it is being
@@ -231,6 +231,9 @@ qs.features.apps.audioMixer.GraphNode
 qs.features.apps.audioMixer.GraphTab
 qs.features.apps.audioMixer.StreamRow
 qs.features.apps.audioMixer.VolumeSlider
+qs.features.apps.imageViewer.ImageViewer
+qs.features.apps.imageViewer.ImageViewerController
+qs.features.apps.imageViewer.ImageViewerWindow
 qs.features.bar.Bar
 qs.features.bar.BarModule
 qs.features.bar.CollapsibleSlot
@@ -271,8 +274,10 @@ qs.features.menu.GridCell
 qs.features.menu.InlineEditor
 qs.features.menu.Menu
 qs.features.menu.MenuPanel
+qs.features.menu.MenuWidth
 qs.features.menu.NumberPicker
 qs.features.menu.OptionRow
+qs.features.menu.RowGeometry
 qs.features.notifications.NotificationCard
 qs.features.notifications.NotificationEntry
 qs.features.notifications.Notifications
@@ -329,12 +334,15 @@ EXPECTED_SUPPLIED="supplied.qs.common.ScrollBar=flickable: null
 supplied.qs.features.bar.modules.Tray.TrayMenuRow=entry: null"
 
 # The counts, for a reader who wants the shape without counting lines.
-# 230 declared entries over 46 qmldir files, one of which is excluded from the
-# work list (boot/Boot.qml), so 229 cases are built. The 117 that are not built
-# are the needs-environment and declared-but-uncreatable sets below.
+# 232 declared entries over 46 qmldir files, one of which is excluded from the
+# work list (boot/Boot.qml), so 231 cases are built. The 118 that are not built
+# are the needs-environment and declared-but-uncreatable sets below. A
+# singleton (RowGeometry, Paths) is not creatable either; the probe's case for
+# one names it and lets the engine build it, which is why a singleton that
+# reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=230
+EXPECTED_DECLARED_COUNT=232
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -353,8 +361,8 @@ EXPECTED_DECLARED_COUNT=230
 # window constructs without any environment behind it.
 # qs.common.Vignette is in the same class: a plain Item over a Shape and a
 # radial gradient, with no singleton and no window behind it.
-EXPECTED_CLEAN_COUNT=112
-EXPECTED_NEEDS_COUNT=95
+EXPECTED_CLEAN_COUNT=109
+EXPECTED_NEEDS_COUNT=100
 EXPECTED_UNCREATABLE_COUNT=22
 
 # --------------------------------------------------------------------------

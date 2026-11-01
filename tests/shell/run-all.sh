@@ -170,6 +170,7 @@ describe() {
   ui-rest) printf 'the rest of common/ui: Icon, GridList, ScrollBar, DropdownSlot, panels' ;;
   list) printf 'List.qml: selection, keyboard navigation and the scroll model' ;;
   list-instantiation) printf 'List.qml: what the cacheBuffer policy actually instantiates' ;;
+  menu-row-height) printf 'a menu row height from its kind: the pinned line-box rule, measured' ;;
   textinput) printf 'InputField and PasswordBox: masking, reveal, signals, focus' ;;
   host-button) printf 'IslandHost open state and frozen footprints; IconButton interaction' ;;
   calendar-graph) printf 'Calendar month grid and FunctionGraph sampling and axis maths' ;;

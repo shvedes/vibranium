@@ -8,3 +8,5 @@ GridCell 1.0 GridCell.qml
 InlineEditor 1.0 InlineEditor.qml
 NumberPicker 1.0 NumberPicker.qml
 OptionRow 1.0 OptionRow.qml
+singleton RowGeometry 1.0 RowGeometry.qml
+MenuWidth 1.0 MenuWidth.qml

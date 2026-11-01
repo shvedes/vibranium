@@ -337,6 +337,24 @@ ListView {
     root._hlPin = true
     return true
   }
+  // A row set edited while the cursor stays where it is (a timer added or
+  // removed in a submenu) is not a cursor move: the rows shift around the
+  // cursor and the bar follows its row through the same shift. With a live
+  // glide duration that is a bar caught halfway between two rows, covering
+  // the bottom of one and the top of the next. The consumer that writes the
+  // model knows it edited a live row set (see MenuPanel._writeRecords), so
+  // it asks for the landing here: the bar is put where the row is in the
+  // same frame and the lease releases once the rearrange settles, which
+  // leaves the next user step gliding as before.
+  //
+  // No cursor requirement: a wholesale install clears the cursor before it
+  // writes, and the lease is exactly what has to outlive that clear so the
+  // seat that lands after it (applyFrameState, a re-seat) is instant too.
+  function snapHighlight() {
+    if (!root.selectionHighlight) return false
+    root._stillAcquire()
+    return true
+  }
   // Dropping the pin hands the bar back to live cursor geometry, so the
   // release IS the seat: the bar eases from the pinned origin to wherever
   // the cursor row is by then.
@@ -630,6 +648,16 @@ ListView {
     root._keepCursor = true
     root.pinHighlight()
   }
+  // The index the cursor belongs at once the next row set lands. Set by the
+  // consumer that edited the row set under the cursor - it is the only one
+  // holding both the old and the new rows, so it is the only one that can
+  // name the destination without reading a model the view has not adopted
+  // yet - and consumed by onCountChanged, which is when the count has moved.
+  // -1 when nothing is pending.
+  property int _reseatIndex: -1
+  function reseatAfter(nextIndex) {
+    root._reseatIndex = typeof nextIndex === "number" ? nextIndex : -1
+  }
 
   // Put the cursor back on the row it was on before the model was replaced.
   // The row is found by identity, so a row that appeared or disappeared
@@ -776,6 +804,25 @@ ListView {
   onCountChanged: {
     root._noteWindowing()
     root._syncIdentitySet()
+    // A row added or removed ABOVE the cursor moves the cursor's row to a new
+    // index while leaving the index itself untouched: neither
+    // onCurrentIndexChanged nor onModelChanged fires, and an identity lookup
+    // made at write time reads the row set the write has not replaced yet, so
+    // it answers with the row that inherited the old index. The consumer that
+    // owns both row sets hands the destination over before the write
+    // (reseatAfter) and it is applied here - the first moment the view's
+    // count has moved with the model, so the index is neither clamped nor
+    // searched for.
+    if (root._reseatIndex >= 0) {
+      const next = root._reseatIndex
+      root._reseatIndex = -1
+      if (next < root.count && next !== root.currentIndex) {
+        root._engineIndexWrite = true
+        root.currentIndex = next
+        root._engineIndexWrite = false
+      }
+      root.unpinHighlight()
+    }
   }
 
   onIdentityRevisionChanged: root._syncIdentitySet()

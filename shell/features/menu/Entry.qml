@@ -307,26 +307,15 @@ Item {
     if (searchResult || !itm) return false
     return Menu.isChecked(itm) || itm.active === true
   }
-  // Live font metrics for the separator label below (fontXs, the
-  // breadcrumb register's size), so a newborn delegate reports the resting
-  // height before its own Text polishes - the same floor pattern the
-  // main line uses for its label column.
-  FontMetrics {
-    id: sepMetrics
-
-    font.pixelSize: Ui.fontXs
-    font.family: Ui.fontFamily
-  }
   // The group path a search separator names, "" for a bare hairline.
   // Plain breadcrumb text ("a > b"), rendered in the sub-line register.
   readonly property string sepLabel: row.isSep ? String(itm?.label ?? "") : ""
-  // Breathing above and below the separator label; the hairline itself
-  // needs none. Added on both sides of the line box on the delegate and
-  // in the panel estimator alike, so the two stay one number.
-  readonly property int sepPadV: 3
-  readonly property real sepLineH: Math.max(sepText.implicitHeight, Math.ceil(sepMetrics.height))
+  // The separator's rest height, from the shared row rule (RowGeometry): the
+  // breadcrumb's pinned line plus its breathing, or the bare hairline. A
+  // newborn delegate reports this before its own Text polishes because the
+  // number is the shared line token rather than this row's laid-out text.
   readonly property real sepH: !row.isSep ? 0
-    : sepLabel === "" ? 10 : sepLineH + 2 * row.sepPadV
+    : RowGeometry.restSeparator(row.sepLabel !== "")
   readonly property string iconName: itm ? String(itm.icon ?? "") : ""
   // The emoji the row stands for, painted in the icon slot when the row
   // declares no icon NAME. Carried by the emoji picker's bundle as `glyph`
@@ -418,13 +407,31 @@ Item {
   readonly property real selectRise: 14
 
   // --- geometry ---
+  //
+  // The rest height is RowGeometry's rule applied to the row's KIND, never to
+  // its text: the panel sizes the card from the model with the same rule,
+  // before this delegate exists, so the two cannot disagree about a string one
+  // of them shaped. Slots are the only thing that moves a live row off it.
+  // Which of the three resting shapes this row is: a theme row spends its
+  // second line on the swatch strip, a row with any sub-line copy spends it on
+  // that line, and everything else is one line. The gate is the COPY itself -
+  // an empty Text draws no line, and a pinned one must not be allowed to claim
+  // one it does not draw.
+  // The row's rest shape, from MenuLib's rule - the same call MenuPanel makes
+  // for the card's estimate. It reads the copy this row RENDERS (subText),
+  // which already carries the provider override, so classifying a row costs no
+  // provider call beyond the one the sub line itself makes.
+  readonly property string restKind: MenuLib.restKind(itm, row.subText)
+  // The second line is spent when the kind says so. A pinned line box cannot
+  // answer this (a Text that held copy and was cleared reports its old line
+  // until the next layout pass), and a measured copy disagreed with the card
+  // the moment the row was classified from copy the delegate had not laid out.
+  readonly property bool hasSubLine: row.restKind === "sub"
   width: ListView.view ? ListView.view.width : 240
   // Progress bars and range tracks live INLINE in the trail cluster, so
   // every row keeps the same height as its neighbors.
   height: isSep ? sepH
-    : Math.max(Ui.rowMinH,
-        mainLine.height + 2 * Ui.rowPadV)
-      + descSlot.height + expandSlot.height
+    : RowGeometry.restH(row.restKind) + descSlot.height + expandSlot.height
   opacity: enabled_ ? 1 : 0.4
   readonly property real labelWidth: labelCol.width
   // What this row's own left side needs: the label, or the sub line when it
@@ -526,9 +533,7 @@ Item {
   // so a dropdown on the last row is scrolled into view in ONE ease that
   // runs alongside the slot's own, instead of being chased frame by frame
   // - chasing it decelerates to a stop at each handover and lurches on.
-  readonly property real restHeight: isSep ? sepH
-    : Math.max(Ui.rowMinH,
-        mainLine.height + 2 * Ui.rowPadV)
+  readonly property real restHeight: isSep ? sepH : RowGeometry.restH(row.restKind)
   readonly property real settledHeight: isSep ? sepH
     : restHeight + descSlot.settledH + expandSlot.settledH
 
@@ -1045,6 +1050,10 @@ Item {
       font.pixelSize: Ui.fontXs
       font.family: Ui.fontFamily
       font.bold: true
+      // The breadcrumb's line is the sub-line token too: the weight changes
+      // the face's width, not the line it is set on.
+      lineHeightMode: Text.FixedHeight
+      lineHeight: RowGeometry.subLineH
       elide: Text.ElideRight
       textFormat: Text.PlainText
     }
@@ -1091,20 +1100,11 @@ Item {
     // incremental inserts using creation-time geometry, but a Column only
     // reports its height after its first polish pass - one frame late,
     // which made revealed rows overlap the entry under them by exactly
-    // the missing delta. The Texts know their metrics immediately, so
-    // compute the stack from those; the Column below remains THE layout -
-    // it settles to this same number a frame later.
-      readonly property int labelColH: isThemeRow
-        // Theme rows: the title line, the 8px swatch strip, and the Column's
-        // one spacing unit between them. The strip is dots alone, so the dot
-        // size is the line's height - no text on it to measure, and the
-        // estimate MenuPanel snaps the card against reads this same number.
-        ? lbl.implicitHeight + 1 + 8
-        // The second line, measured off the Row's own height: tallest of the
-        // copy that is actually there, usually the muted text, and the lead
-        // on a lead-only row, so an empty muted Text can never clip it. A
-        // visibility flag cannot decide this - see the Row below.
-        : lbl.implicitHeight + (subRow.height > 0 ? 1 + subRow.height : 0)
+    // the missing delta. The stack is RowGeometry's, so the number exists at
+    // creation; the Column below remains THE layout - it settles to this same
+    // number a frame later, and the panel's model-side estimate is the same
+    // rule asked about the row record.
+      readonly property int labelColH: RowGeometry.colH(row.restKind)
 
     height: labelColH
 
@@ -1188,6 +1188,10 @@ Item {
           color: (row.isThemeRow && row.mark) ? Theme.color("accent") : Theme.color("foreground_0")
           font.pixelSize: Ui.fontL
            font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
+           // Pinned line box: the row reserved this line, so the row's height
+           // cannot be a function of this label's glyphs (see RowGeometry).
+           lineHeightMode: Text.FixedHeight
+           lineHeight: RowGeometry.labelLineH
            elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
            clip: row.textReveal < 1
            opacity: row.textReveal
@@ -1215,20 +1219,17 @@ Item {
           spacing: 4
           // No visibility flag anywhere in this subtree, and the Row's height
           // IS the gate. Each child below carries an empty `text` rather than
-          // a `visible: false`, and the height is the tallest child that
-          // actually has copy to show - a lead-only row measures the lead, so
-          // a near-zero muted Text can never clip it.
+          // a `visible: false`, and the line is the shared sub-line token when
+          // any child has copy to show - a lead-only row spends the line on
+          // the lead, so a near-zero muted Text can never clip it.
           //
           // A `visible` gate here is read once while the delegate is mid-swap
           // and nothing re-asserts it: a row that opened with its subtext lost
           // the line for the rest of the session, and the flag then drifted
-          // onto rows that have no subtext at all. An empty Text still
-          // measures one line, so "no copy" alone cannot stand in for the
-          // gate either - hence the measurement.
-          height: Math.max(
-            subLeadEl.text !== "" ? subLeadEl.implicitHeight : 0,
-            subMain.text !== "" ? subMain.implicitHeight : 0,
-            subTail.text !== "" ? subTail.implicitHeight : 0)
+          // onto rows that have no subtext at all. A `Text`'s own height can
+          // no longer answer it either: every line here is pinned, so the copy
+          // itself is the only honest gate.
+          height: row.hasSubLine ? RowGeometry.subLineH : 0
 
           Text {
             id: subLeadEl
@@ -1242,6 +1243,8 @@ Item {
             color: Ui.solid("accent")
             font.pixelSize: Ui.fontXs
             font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
+            lineHeightMode: Text.FixedHeight
+            lineHeight: RowGeometry.subLineH
             elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
             clip: row.textReveal < 1
             opacity: row.textReveal
@@ -1280,6 +1283,8 @@ Item {
             color: Ui.tint("foreground_1", 0.55)
             font.pixelSize: Ui.fontXs
             font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
+            lineHeightMode: Text.FixedHeight
+            lineHeight: RowGeometry.subLineH
             elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
             clip: row.textReveal < 1
             opacity: row.textReveal
@@ -1294,6 +1299,8 @@ Item {
             color: Ui.solid("accent")
             font.pixelSize: Ui.fontXs
             font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
+            lineHeightMode: Text.FixedHeight
+            lineHeight: RowGeometry.subLineH
             elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
             clip: row.textReveal < 1
             opacity: row.textReveal
@@ -1318,9 +1325,9 @@ Item {
             delegate: Rectangle {
               required property var modelData
               required property int index
-              width: 8
-              height: 8
-              radius: 4
+              width: RowGeometry.swatchH
+              height: RowGeometry.swatchH
+              radius: RowGeometry.swatchH / 2
               color: modelData
               border.width: 0.6
               border.color: Ui.tint("background_3", 0.5)
