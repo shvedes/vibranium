@@ -60,12 +60,12 @@ for p in "${pkg_to_remove[@]}"; do
 		installed+=("$p")
 	fi
 done
-if (( ${#installed[@]} > 0 )); then
+if ((${#installed[@]} > 0)); then
 	sudo pacman -Rns --noconfirm "${installed[@]}" || true
 fi
 
 # Quickshell itself. Fatal: without it there is no bar, lock, or launcher.
-if ! vb-pkg-install --embedded -- quickshell; then
+if ! vb-pkg-install --embedded -- quickshell networkmanager; then
 	echo "${GREEN}[MIGRATION|$SELF]${RESET} quickshell install failed" >&2
 	exit 1
 fi
