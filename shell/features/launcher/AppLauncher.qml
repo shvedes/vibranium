@@ -388,28 +388,6 @@ Singleton {
     root._panels = root._panels.filter(p => p !== panel)
   }
 
-  // --- provider id ownership ---
-  // ProviderHost hands a record to the host Menu once and refuses a
-  // re-registration whose owner is a different object, so a record is only
-  // ever replaceable by the object that owns it. Every id below is owned
-  // for as long as this unit is alive and is released in its teardown; a
-  // refused id would otherwise pin the surface to a dead closure and drop
-  // the row's confirm stage.
-  function _claimProviderId(id, surface, deferred) {
-    if (ProviderHost.registerProvider(id, surface, root)) return true
-    ProviderHost.unregisterProvider(id, root)
-    if (ProviderHost.registerProvider(id, surface, root)) return true
-    // A predecessor that has not finalized yet still holds the id and
-    // frees it only from its own teardown, which is itself a deferred
-    // step, so a recreated unit gets one late attempt past this turn. The
-    // id is bounded and re-entrant: this path can only ever claim a free
-    // id, so a late miss is reported and never blocks a live owner.
-    if (deferred) {
-      DeferredQueue.run(() => { root._claimProviderId(id, surface, false) }, 2, 0, root.tag + " provider retry")
-      return false
-    }
-    return false
-  }
 
   // Ids of the plugin toggle rows the launcher overlays. One source for
   // registration and teardown, so the two sets cannot drift apart.
@@ -437,7 +415,7 @@ Singleton {
   // the clear-history row out of the menu for the whole session. What they
   // read is the projection above, and what they write is a demand.
   function _registerMenuProvider() {
-    root._claimProviderId("clearUsageHistory", {
+    ProviderHost.claimProvider("clearUsageHistory", {
       visible: () => root.hasUsageHistory !== false,
       sub: (item, ctx) => (ctx && ctx.isExpanded(item)) ? "Select to confirm clear" : null,
       confirm: () => ({
@@ -457,13 +435,13 @@ Singleton {
         if (ctx) ctx.bumpCondRev()
         return cleared === true
       }
-    }, false)
+    }, root)
     const ids = root._pluginToggleIds()
     for (let i = 0; i < ids.length; i++) {
-      root._claimProviderId(ids[i], {
+      ProviderHost.claimProvider(ids[i], {
         checked: (item) => root._pluginToggleState(item.id),
         runToggle: (item, state) => root._pluginToggleCommit(item.id, state)
-      }, false)
+      }, root)
     }
   }
 

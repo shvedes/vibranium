@@ -1182,34 +1182,13 @@ Singleton {
     root._retireSaMonitor()
   }
 
-  // Provider id ownership: ProviderHost hands a record to the host Menu
-  // once and refuses a re-registration whose owner is a different object,
-  // so a record is only ever replaceable by the object that owns it. This
-  // unit owns `caffeine` for as long as it is alive and must release it
-  // in its teardown; a refused id would otherwise pin the surface to a
-  // dead closure and drop the row's confirm stage.
-  function _claimProviderId(id, surface, deferred) {
-    if (ProviderHost.registerProvider(id, surface, root)) return true
-    ProviderHost.unregisterProvider(id, root)
-    if (ProviderHost.registerProvider(id, surface, root)) return true
-    // A predecessor that has not finalized yet still holds the id and
-    // frees it only from its own teardown, which is itself a deferred
-    // step, so a recreated unit gets one late attempt past this turn. The
-    // id is bounded and re-entrant: this path can only ever claim a free
-    // id, so a late miss is reported and never blocks a live owner.
-    if (deferred) {
-      DeferredQueue.run(() => { root._claimProviderId(id, surface, false) }, 2, 0, root.tag + " provider retry")
-      return false
-    }
-    return false
-  }
 
   // Menu provider surface: overlays caffeine-row semantics onto the
   // bundle-declared row by id. ProviderHost holds the surface under this
   // unit as owner and replays it when Menu registers as its host, so drain
   // order does not gate the row.
   function _registerMenuProvider() {
-    root._claimProviderId("caffeine", {
+    ProviderHost.claimProvider("caffeine", {
       sub: () => {
         if (!root.active) return null
         return root.infinite ? "Infinite" : root.formatted + " remaining"
@@ -1237,7 +1216,7 @@ Singleton {
       // inhibit is active; the infinite tail recolors the whole glyph
       // accent to match the bar module.
       iconAccent: () => root.infinite ? "accent" : (root.active ? "red" : "")
-    }, false)
+    }, root)
   }
 
   Component.onCompleted: {

@@ -480,27 +480,6 @@ Singleton {
     }
   }
 
-  // Provider id ownership: ProviderHost hands a record to the host Menu
-  // once and refuses a re-registration whose owner is a different object,
-  // so a record is only ever replaceable by the object that owns it. Every
-  // `bar-<id>` record is owned for as long as this unit is alive and is
-  // released in its teardown; a refused id would otherwise pin the surface
-  // to a dead closure and drop the row's toggle behavior.
-  function _claimProviderId(id, surface, deferred) {
-    if (ProviderHost.registerProvider(id, surface, root)) return true
-    ProviderHost.unregisterProvider(id, root)
-    if (ProviderHost.registerProvider(id, surface, root)) return true
-    // A predecessor that has not finalized yet still holds the id and
-    // frees it only from its own teardown, which is itself a deferred
-    // step, so a recreated unit gets one late attempt past this turn. The
-    // id is bounded and re-entrant: this path can only ever claim a free
-    // id, so a late miss is reported and never blocks a live owner.
-    if (deferred) {
-      DeferredQueue.run(() => { root._claimProviderId(id, surface, false) }, 2, 0, root.tag + " provider retry")
-      return false
-    }
-    return false
-  }
 
   function _releaseMenuProviders() {
     // Snapshot first: the loop must not walk a collection it rewrites.
@@ -515,7 +494,7 @@ Singleton {
   // host, so drain order does not gate the rows.
   function _registerMenuProviders() {
     for (const id of root._toggleIds())
-      root._claimProviderId("bar-" + id, root._moduleSurface(id), false)
+      ProviderHost.claimProvider("bar-" + id, root._moduleSurface(id), root)
   }
 
   // Standalone slot ids in iteration order: plain modules plus group
