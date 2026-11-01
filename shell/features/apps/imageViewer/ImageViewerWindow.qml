@@ -5,7 +5,10 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Effects
 import Qt.labs.folderlistmodel
+import "ImageViewerMeta.js" as Meta
+import "../../../common/capture/ShotLib.js" as ShotLib
 import qs.common
+import qs.features.wallpaper
 
 // The image viewer window: one image, its neighbours in the folder, and a
 // floating frosted toolbar and status bar over it.
@@ -146,6 +149,24 @@ QtObject {
   // percent-decoded, case-insensitively.
   readonly property bool isVector: /\.svgz?$/i.test(root.currentFileName)
 
+  // The palette key of the open file's format family (see ImageViewerMeta.js),
+  // "" for a format the table does not name. The status dot is the one place
+  // that answers "what kind of file is this" at a glance.
+  readonly property string fileTypeKey: Meta.typeKey(root.currentFileName)
+
+  // The status bar's cells after the file name - position, resolution, zoom and
+  // size - with the separator dots already interleaved. Vectors report the
+  // probe's intrinsic extent rather than the raster: the raster is a bucketed
+  // display-size detail, while the intrinsic size is the file's own answer.
+  // Stated once here so the row does not repeat the expression per cell.
+  readonly property var statusItems: Meta.statusItems(
+    root.currentIndex,
+    root.folderModel.count,
+    root.isVector ? vectorProbe.implicitWidth : img.sourceSize.width,
+    root.isVector ? vectorProbe.implicitHeight : img.sourceSize.height,
+    root.fitToWindow ? img.fitScale : root.zoomFactor,
+    root.currentIndex >= 0 ? root.folderModel.get(root.currentIndex, "fileSize") : 0)
+
   // View transform. `fitToWindow` is the mode and `zoomFactor` is what it
   // overrides: panning is only meaningful once the fit has been broken, which
   // is what the guard on the drag reads.
@@ -160,6 +181,28 @@ QtObject {
   property bool chromeVisible: true
   property bool hoverNearTop: false
   property bool hoverNearBottom: false
+
+  // Context menu. The position is the click point in the content item's
+  // coordinates and the card clamps itself against that item, so no card size
+  // is guessed at open time.
+  property bool menuOpen: false
+  property real menuX: 0
+  property real menuY: 0
+
+  // The entries, ordered by label length: longest first, shortest last, so the
+  // card tapers downward like a reversed pyramid and the widest line is read
+  // first. Sorting here rather than in the markup keeps the ladder true when an
+  // entry is renamed or added - there is no second list to keep in step.
+  readonly property var menuEntries: {
+    const entries = [
+      { label: "Open containing folder", icon: "file-folder", action: "folder" },
+      { label: "Set as wallpaper", icon: "image", action: "wallpaper" },
+      { label: "Copy image path", icon: "link", action: "path" },
+      { label: "Copy image", icon: "copy", action: "image" }
+    ]
+    entries.sort((a, b) => b.label.length - a.label.length)
+    return entries
+  }
 
   // Whether the transient zoom badge wants to be up. The badge answers for the
   // status bar rather than competing with it: with the chrome shown the status
@@ -419,6 +462,58 @@ QtObject {
     }
   }
 
+  // A row in the viewer's context menu. Hover is a hard state change, not a
+  // transition: the mixer's and the tray's menus switch their fill on the
+  // pointer and nothing eases, so the viewer's rows do the same. The glyph
+  // comes from the shipped set under assets/icons, through the same `Icon` the
+  // toolbar draws with.
+  component MenuRow: Item {
+    id: mrow
+
+    property string label: ""
+    property string iconName: ""
+
+    signal triggered()
+
+    width: parent ? parent.width : 0
+    height: 30
+
+    Rectangle {
+      anchors.fill: parent
+      color: mrowMa.containsMouse ? Ui.tint("foreground_0", 0.12) : "transparent"
+    }
+
+    Row {
+      anchors.fill: parent
+      anchors.leftMargin: 10
+      anchors.rightMargin: 10
+      spacing: 9
+
+      Icon {
+        name: mrow.iconName
+        size: 16
+        anchors.verticalCenter: parent.verticalCenter
+      }
+
+      Text {
+        anchors.verticalCenter: parent.verticalCenter
+        text: mrow.label
+        color: Ui.solid("foreground_0")
+        font.pixelSize: 12
+        font.family: Ui.fontFamily
+      }
+    }
+
+    MouseArea {
+      id: mrowMa
+
+      anchors.fill: parent
+      hoverEnabled: true
+      cursorShape: Qt.PointingHandCursor
+      onClicked: mrow.triggered()
+    }
+  }
+
   // ------------------------------------------------------------------- model
 
   // The open folder's images, in name order. This is the only source for
@@ -432,9 +527,9 @@ QtObject {
   // `folder` is only ever reassigned between completed loads, so the model is
   // never reset mid-flight and emits no begin/endReset pair.
   property FolderListModel folderModel: FolderListModel {
-    nameFilters: ["*.png", "*.PNG", "*.jpg", "*.JPG", "*.jpeg", "*.JPEG", "*.bmp", "*.BMP",
-                  "*.gif", "*.GIF", "*.webp", "*.WEBP", "*.svg", "*.SVG",
-                  "*.ico", "*.ICO", "*.tif", "*.TIF", "*.tiff", "*.TIFF"]
+    // One table, in ImageViewerMeta.js, spells both the filter pairs and the
+    // format families the status dot colours.
+    nameFilters: Meta.nameFilters()
     showDirs: false
     sortField: FolderListModel.Name
 
@@ -605,17 +700,88 @@ QtObject {
     root.chromeVisible = !goingFullscreen
   }
 
-  function humanFileSize(bytes) {
-    if (bytes === undefined || bytes <= 0)
-      return ""
-    const units = ["B", "KiB", "MiB", "GiB", "TiB"]
-    let i = 0
-    let v = bytes
-    while (v >= 1024 && i < units.length - 1) {
-      v /= 1024
-      i++
+  // ---- context menu ----
+
+  // The folder the open file sits in, "" when there is no file to place.
+  // `currentPath` is already decoded, so this is the plain directory path a
+  // file manager takes as an argument.
+  function containingFolder() {
+    const path = root.currentPath
+    if (path === "") return ""
+    const slash = path.lastIndexOf("/")
+    if (slash < 0) return ""
+    return slash === 0 ? "/" : path.substring(0, slash)
+  }
+
+  // Every entry below answers whether it had anything to act on, so a caller
+  // can tell a refusal from an action that ran. The menu closes either way: it
+  // was opened over a picture and the picture has not changed.
+  function openContainingFolder() {
+    const dir = root.containingFolder()
+    root.closeMenu()
+    if (dir === "") return false
+    Exec.run(["xdg-open", dir])
+    return true
+  }
+
+  // `Wallpaper.set` is the wallpaper unit's own verb: it copies an external
+  // image into the active theme and records it there, which is the whole of
+  // "set as wallpaper" for a file the viewer opened from anywhere.
+  function setAsWallpaper() {
+    const path = root.currentPath
+    root.closeMenu()
+    if (path === "") return false
+    Wallpaper.set(path)
+    return true
+  }
+
+  // The path as characters: the entry is a path copy, so it is a `text/plain`
+  // offer and pastes into an editor, a shell or a config file as written.
+  function copyImagePath() {
+    const path = root.currentPath
+    root.closeMenu()
+    if (path === "") return false
+    Exec.run(["wl-copy", "--type", "text/plain", path])
+    return true
+  }
+
+  // The picture's own bytes, offered under the format's media type: a paste
+  // target that accepts an image receives the image, not a location. wl-copy
+  // reads the file through a redirection, so the bytes never pass through this
+  // process, and the MIME table is the same one the status dot colours from.
+  function copyImage() {
+    const path = root.currentPath
+    const mime = Meta.mimeType(root.currentFileName)
+    root.closeMenu()
+    if (path === "" || mime === "") return false
+    Exec.run(["sh", "-c", "wl-copy --type " + ShotLib.sq(mime) + " < " + ShotLib.sq(path)])
+    return true
+  }
+
+  // One dispatcher for the card: an entry carries an action name, and the row
+  // reports which one was clicked, so the markup holds no per-entry branches.
+  function runMenuEntry(action) {
+    switch (action) {
+    case "folder": return root.openContainingFolder()
+    case "wallpaper": return root.setAsWallpaper()
+    case "path": return root.copyImagePath()
+    case "image": return root.copyImage()
     }
-    return (i === 0 ? v : v.toFixed(1)) + " " + units[i]
+    return false
+  }
+
+  // No menu over an empty viewer: all three entries would have nothing to act
+  // on, and a menu of dead rows is worse than no menu.
+  function openMenuAt(x, y) {
+    if (!root.hasFile) return
+    root.menuX = x
+    root.menuY = y
+    root.menuOpen = true
+  }
+
+  function closeMenu() {
+    if (!root.menuOpen) return
+    root.menuOpen = false
   }
 
   // ------------------------------------------------------------------ window
@@ -861,22 +1027,6 @@ QtObject {
           // The vector scale in effect: the fit, or the user's zoom.
           readonly property real vecEff: root.fitToWindow ? vecFit : root.zoomFactor
 
-          // Decode-size buckets, same steps as ClipboardPreview's still:
-          // the decoder re-runs on every sourceSize change, so a live
-          // viewport/zoom binding would re-decode per pixel without them.
-          // Snapping the LONG side to 256/512/1024/2048/4096 decodes once
-          // per bucket instead. Capped at 4096 a side to bound the texture
-          // (4096x4096 RGBA is ~67MB); past that the GPU upscales, which is
-          // still one crisp raster rather than a 64px one.
-          function bucketLong(n) {
-            const v = Math.ceil(Number(n) || 0)
-            if (v <= 256) return 256
-            if (v <= 512) return 512
-            if (v <= 1024) return 1024
-            if (v <= 2048) return 2048
-            return 4096
-          }
-
           // The vector raster size in device pixels: the logical display
           // extent (`width`/`height` times the effective scale) times the
           // DPR, bucketed. Both sides scale by the ONE long-side factor so
@@ -896,7 +1046,7 @@ QtObject {
             const dh = vh * vecEff * vecDpr
             const need = Math.max(dw, dh)
             if (!(need > 0)) return Qt.size(0, 0)
-            const k = bucketLong(need) / need
+            const k = Meta.bucketLong(need) / need
             return Qt.size(Math.max(1, Math.round(dw * k)), Math.max(1, Math.round(dh * k)))
           }
 
@@ -1021,6 +1171,12 @@ QtObject {
         MouseArea {
           anchors.fill: parent
           hoverEnabled: true
+          acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+          onClicked: function(mouse) {
+            if (mouse.button === Qt.RightButton)
+              root.openMenuAt(mouse.x, mouse.y)
+          }
 
           // Panning is a delta, not an absolute position: the drag is
           // accumulated from the last pointer position, so a press that lands
@@ -1039,7 +1195,9 @@ QtObject {
             // window puts both away again.
             root.hoverNearTop = mouse.y < 72
             root.hoverNearBottom = mouse.y > viewport.height - 76
-            if (pressed && !root.fitToWindow) {
+            // Panning is the left button's drag only; a right-button drag is
+            // the gesture that opens the context menu, not a move of the image.
+            if (pressed && mouse.button === Qt.LeftButton && !root.fitToWindow) {
               root.panX += mouse.x - _lastX
               root.panY += mouse.y - _lastY
               _lastX = mouse.x
@@ -1056,7 +1214,11 @@ QtObject {
             else
               root.zoomOut()
           }
-          onDoubleClicked: root.fitToWindow ? root.zoomActual() : root.zoomFit()
+          onDoubleClicked: function(mouse) {
+            if (mouse.button !== Qt.LeftButton) return
+            if (root.fitToWindow) root.zoomActual()
+            else root.zoomFit()
+          }
         }
 
         DropArea {
@@ -1105,7 +1267,7 @@ QtObject {
           anchors.centerIn: parent
           // The same number the status bar prints, so a zoom badge and the
           // status readout can never report two different scales.
-          text: Math.round((root.fitToWindow ? img.fitScale : root.zoomFactor) * 100) + "%"
+          text: Meta.percent(root.fitToWindow ? img.fitScale : root.zoomFactor)
           color: Ui.solid("foreground_0")
           font.pixelSize: 12
           font.family: Ui.fontFamily
@@ -1136,6 +1298,12 @@ QtObject {
           case Qt.Key_Tab: root.chromeVisible = !root.chromeVisible; break
           case Qt.Key_F: case Qt.Key_F11: root.toggleFullscreen(); break
           case Qt.Key_Escape:
+            // The menu is the top layer while it is up, so Escape dismisses it
+            // before it reaches the window state.
+            if (root.menuOpen) {
+              root.closeMenu()
+              break
+            }
             // The window's own `visibility` is the state, not a flag of ours:
             // Escape leaves fullscreen and nothing else, so it cannot close a
             // windowed viewer out from under the user.
@@ -1203,6 +1371,57 @@ QtObject {
         }
       }
 
+      // ---- context menu ----
+      //
+      // In-window, not a popup surface: the viewer is a plain toplevel, so the
+      // menu is an item above the chrome and needs no second window to be
+      // reachable. The net underneath is what dismisses it - a press anywhere
+      // else closes the menu instead of reaching the picture behind it.
+      MouseArea {
+        anchors.fill: parent
+        z: 20
+        enabled: root.menuOpen
+        acceptedButtons: Qt.AllButtons
+        onPressed: root.closeMenu()
+      }
+
+      Rectangle {
+        id: contextMenu
+
+        visible: root.menuOpen
+        z: 21
+        // Clamped against the content item, measured after layout, so the card
+        // opens fully inside the window whichever edge the pointer is near.
+        x: Math.max(8, Math.min(root.menuX, content.width - width - 8))
+        y: Math.max(8, Math.min(root.menuY, content.height - height - 8))
+        width: 218
+        height: menuCol.implicitHeight + 10
+        color: Ui.tint("background_0", 0.97)
+        radius: RoundingPolicy.radius
+        border.width: 1
+        border.color: Ui.tint("foreground_0", 0.22)
+
+        Column {
+          id: menuCol
+
+          anchors.centerIn: parent
+          width: parent.width - 8
+          spacing: 1
+
+          Repeater {
+            model: root.menuEntries
+
+            delegate: MenuRow {
+              required property var modelData
+
+              label: modelData.label
+              iconName: modelData.icon
+              onTriggered: root.runMenuEntry(modelData.action)
+            }
+          }
+        }
+      }
+
       Frost {
         target: statusbar
         shown: root.chromeVisible || root.hoverNearBottom || statusbarHoverHandler.hovered
@@ -1234,15 +1453,22 @@ QtObject {
           id: statusRow
 
           anchors.centerIn: parent
-          spacing: 16
+          spacing: 10
 
+          // The file name, led by the format dot. The dot carries the format
+          // family rather than the accent: which kind of file is open is
+          // information, and an accent dot is a second copy of the zoom cell's
+          // colour.
           Row {
             spacing: 7
             Layout.alignment: Qt.AlignVCenter
             Rectangle {
               anchors.verticalCenter: parent.verticalCenter
               width: 6; height: 6; radius: 3
-              color: root.hasFile ? Ui.solid("accent") : Ui.tint("foreground_0", 0.40)
+              color: !root.hasFile
+                     ? Ui.tint("foreground_0", 0.40)
+                     : (root.fileTypeKey !== "" ? Ui.solid(root.fileTypeKey)
+                                                : Ui.tint("foreground_0", 0.55))
             }
             Text {
               anchors.verticalCenter: parent.verticalCenter
@@ -1254,35 +1480,43 @@ QtObject {
               width: Math.min(implicitWidth, root.win.width * 0.35)
             }
           }
-          Text {
-            text: root.folderModel.count > 0 ? (root.currentIndex + 1) + " / " + root.folderModel.count : ""
-            color: Ui.tint("foreground_0", 0.78)
-            font.pixelSize: 12
-            font.family: Ui.fontFamily
-          }
-          Text {
-            // Vectors report the probe's intrinsic extent, not the raster:
-            // the raster is a display-size implementation detail (bucketed
-            // device pixels), while the intrinsic size is the file's answer.
-            text: root.isVector
-                  ? (vectorProbe.implicitWidth > 0 ? vectorProbe.implicitWidth + " x " + vectorProbe.implicitHeight : "")
-                  : (img.sourceSize.width > 0 ? img.sourceSize.width + " x " + img.sourceSize.height : "")
-            color: Ui.tint("foreground_0", 0.78)
-            font.pixelSize: 12
-            font.family: Ui.fontFamily
-          }
-          Text {
-            text: Math.round((root.fitToWindow ? img.fitScale : root.zoomFactor) * 100) + "%"
-            color: Ui.solid("accent")
-            font.pixelSize: 12
-            font.family: Ui.fontFamily
-            font.weight: Font.DemiBold
-          }
-          Text {
-            text: root.currentIndex >= 0 ? root.humanFileSize(root.folderModel.get(root.currentIndex, "fileSize")) : ""
-            color: Ui.tint("foreground_0", 0.78)
-            font.pixelSize: 12
-            font.family: Ui.fontFamily
+
+          // Position, resolution, zoom and size. `statusItems` owns the strings
+          // and the separators between them, so a cell with nothing to say
+          // drops its dot too instead of leaving one hanging.
+          Repeater {
+            model: root.statusItems
+
+            delegate: Item {
+              id: cell
+
+              required property var modelData
+
+              readonly property bool separator: cell.modelData.kind === "sep"
+
+              Layout.alignment: Qt.AlignVCenter
+              implicitWidth: cell.separator ? 3 : value.implicitWidth
+              implicitHeight: cell.separator ? 3 : value.implicitHeight
+
+              Rectangle {
+                anchors.centerIn: parent
+                visible: cell.separator
+                width: 3; height: 3; radius: 1.5
+                color: Ui.solid("foreground_0")
+                opacity: 0.5
+              }
+
+              Text {
+                id: value
+
+                visible: !cell.separator
+                text: cell.separator ? "" : cell.modelData.text
+                color: cell.modelData.kind === "zoom" ? Ui.solid("accent") : Ui.tint("foreground_0", 0.78)
+                font.pixelSize: 12
+                font.family: Ui.fontFamily
+                font.weight: cell.modelData.kind === "zoom" ? Font.DemiBold : Font.Normal
+              }
+            }
           }
         }
       }
