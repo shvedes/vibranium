@@ -49,10 +49,8 @@ PanelWindow {
   property bool showNotification: true
 
   // Each item: { tool, color, width, points: [{x,y}], text?, fontSize? }
-  // in document pixels (== source image pixels pre-crop). Blur strokes
-  // carry corner points only: the paint pass samples the composited
-  // backing live (see _liveBlur), so every tool overlays the previous
-  // ones and replays can never go stale.
+  // in document pixels (== source image pixels pre-crop). Every tool paints
+  // from these alone, so a replay can never go stale.
   property var strokes: []
   property int redoIndex: 0  // strokes.length == committed; redo past it
   // Dirty means visible work exists (fully undone counts as clean).
@@ -66,6 +64,15 @@ PanelWindow {
     || editor.textRect !== null || editor.textAnchor !== null
 
   property string tool: "brush"
+  // A tool switch commits an open field, the same as a press outside it: the
+  // toolbar sits outside the input box, and a tool chosen there must not leave
+  // a live field behind on a canvas that now belongs to another tool.
+  onToolChanged: {
+    if (editor.textAnchor !== null) editor._finishText(true)
+    // A tool switch drops the active element: the focus the last release left
+    // behind is that tool's, and the next tool starts with nothing selected.
+    if (editor.selectedIndex >= 0) editor.selectedIndex = -1
+  }
   property string ink: "#ffffff"
   property real penWidth: 3
   property int fontSize: 24
@@ -73,13 +80,6 @@ PanelWindow {
   // Base image pixel size once decoded (0 until then).
   property int imgW: 0
   property int imgH: 0
-  property int _pixelsRevision: 0
-  property int _bakedRevision: -1
-  property int _pendingBakedRevision: -1
-  property bool _commitPixelsHold: false
-  property var _pendingPreview: null
-  property int _pendingPreviewRevision: -1
-  property bool _rotationBakePaused: false
   // Document view into the base image: full frame, narrowed by crops.
   property var viewRect: ({ x: 0, y: 0, w: 0, h: 0 })
   property bool boardReady: false
@@ -100,6 +100,36 @@ PanelWindow {
   property var _childProcesses: []
   property bool _saveDialogOpen: false
   readonly property bool interactionLocked: editor.exporting || editor._saveTargetPending || editor._saveDialogOpen
+
+  // ---- blur (the picture only) ----
+  // One GPU-blurred copy of the picture, grabbed to a PNG once per shot. The
+  // on-screen overlay and the export canvas both draw from that file, so a
+  // region costs a clipped texture copy and nothing per frame. The plate is
+  // bounded to _blurPlateMax on its long side: blur is low-frequency, so a
+  // downscaled plate upscales without visible loss and costs a fraction of a
+  // full-resolution layer.
+  readonly property int _blurPlateMax: 2048
+  readonly property real _blurPlateK: editor.imgW > 0 && editor.imgH > 0
+    ? Math.min(1, editor._blurPlateMax / Math.max(editor.imgW, editor.imgH)) : 1
+  readonly property int _blurPlateW: Math.max(1, Math.round(editor.imgW * editor._blurPlateK))
+  readonly property int _blurPlateH: Math.max(1, Math.round(editor.imgH * editor._blurPlateK))
+  // Blur radius in document pixels: ~96 at plate scale, scaled up for large
+  // shots and capped. Measured on a text page: 96 and up left nothing legible,
+  // 60 left the words readable.
+  readonly property int _blurRadius: Math.min(240, Math.max(96, Math.round(96 / editor._blurPlateK)))
+  property string blurPlateUrl: ""
+  property string _blurPlatePath: ""
+  property bool _blurPlatePending: false
+  // Set once the grab has run: the effect item hides from then on.
+  property bool _blurPlateDone: false
+  property int _blurPlateTries: 0
+  // Blur regions in document pixels, clipped to the applied crop frame. The
+  // overlay and the export both read this list, so a staged frame trims what
+  // the canvas would have clipped anyway.
+  readonly property var blurRects: editor._blurRects()
+  // The live drag's region (null when it is not a blur drag, or when it sits
+  // on area that is already blurred).
+  readonly property var previewBlurRect: editor._previewBlurRect()
 
   // In-progress stroke (preview), pending crop rect and pending text
   // rect, all in document pixels.
@@ -138,12 +168,65 @@ PanelWindow {
 
   readonly property var palette: ["#ffffff", "#000000", "#ff5555", "#50fa7b",
     "#8be9fd", "#f1fa8c", "#bd93f9", "#ffb86c"]
+
+  // The selected element, or -1. A selection only counts while it is live:
+  // inside the committed range and inside the stroke list, the same bounds
+  // the paint and the handles test against.
+  readonly property int selectedStrokeIndex: {
+    const i = editor.selectedIndex
+    return i >= 0 && i < editor.redoIndex && i < editor.strokes.length ? i : -1
+  }
+
+  // The colour the palette is editing: the active element's own colour while
+  // one is active - a Select selection or the element the last drag just
+  // committed - and the next-stroke ink otherwise. One expression for the tile
+  // highlight and the screen-reader state, so they cannot disagree about which
+  // swatch is current.
+  readonly property string activeColor: {
+    const i = editor.selectedStrokeIndex
+    return i >= 0 ? String(editor.strokes[i].color || "") : editor.ink
+  }
+
+  // A palette tile. While an element is active it recolours that element -
+  // text included, since a text stroke paints from its own colour - and with
+  // nothing active it chooses the ink for the next one. Select with nothing
+  // selected leaves both alone rather than recolouring whatever happens to be
+  // next.
+  function applyColor(color) {
+    const i = editor.selectedStrokeIndex
+    if (i >= 0) {
+      const kept = editor.strokes.slice()
+      kept[i] = Object.assign({}, kept[i], { color: color })
+      editor.strokes = kept
+      board.requestPaint()
+      return true
+    }
+    if (editor.tool === "select") return false
+    editor.ink = color
+    return true
+  }
+
+  // The pen-width control, with the same rule as the palette: the active
+  // element's own line is resized, and the width is remembered for the next
+  // one either way. Text carries its size in fontSize, so a text element is not
+  // touched here.
+  function applyWidth(v) {
+    editor.penWidth = v
+    const i = editor.selectedStrokeIndex
+    if (i < 0 || editor.strokes[i].tool === "text") return false
+    const kept = editor.strokes.slice()
+    kept[i] = Object.assign({}, kept[i], { width: v })
+    editor.strokes = kept
+    board.requestPaint()
+    return true
+  }
+
   // tool -> [icon, fallback glyph]. The eraser svg is still to come and
   // renders its letter until it lands in assets/icons - Icons.url("")
   // keeps the binding pending, so adding the file lights the button up
   // after a shell restart with no code change.
   readonly property var tools: ["select", "brush", "line", "eraser", "arrow", "arrowCorner", "rect",
-    "ellipse", "text", "pixelate", "crop"]
+    "ellipse", "text", "blur", "crop"]
   readonly property var toolMeta: ({
     brush: { icon: "brush", glyph: "B", key: "B", tip: "Brush (B)" },
     line: { icon: "line", glyph: "L", key: "L", tip: "Line (L)" },
@@ -152,8 +235,8 @@ PanelWindow {
     arrowCorner: { icon: "arrow-corner", glyph: "N", key: "N", tip: "Elbow arrow (N)" },
     rect: { icon: "selection", glyph: "R", key: "G", tip: "Rectangle (G)" },
     ellipse: { icon: "circle", glyph: "O", key: "O", tip: "Ellipse (O)" },
+    blur: { icon: "hypr-blur", glyph: "D", key: "D", tip: "Blur (D)" },
     text: { icon: "text", glyph: "T", key: "T", tip: "Text (T)" },
-    pixelate: { icon: "hypr-blur", glyph: "D", key: "D", tip: "Pixelate (D)" },
     crop: { icon: "crop", glyph: "C", key: "C", tip: "Crop (C)" },
     select: { icon: "cursor", glyph: "V", key: "V", tip: "Select (V)" }
   })
@@ -218,31 +301,16 @@ PanelWindow {
 
   readonly property string fileUrl: Paths.toFileUrl(editor.shotPath)
 
-  Timer {
-    id: pixelsBakeTimer
-
-    interval: 1
-    repeat: false
-    onTriggered: editor._requestPixelsBake()
-  }
-
    onLoadStateChanged: {
       if (loadState === "ready") {
         panel.reveal()
         editor._settleBoardZoom()
-        // After the reveal's first frame, not on the same tick: the bake is a
-        // full-resolution fill and has no business competing with the frame
-        // that finally puts the editor on screen. The board paints from the
-        // file until it lands, and the first stroke re-requests it anyway.
-        Qt.callLater(() => editor._requestPixelsBake())
       }
      else {
        slideAnim.stop()
        panel.visible = false
      }
    }
-   onStrokesChanged: editor._pixelsChanged()
-  onRedoIndexChanged: editor._pixelsChanged()
    onCropFrameChanged: {
      if (boardReady) board.requestPaint()
    }
@@ -460,85 +528,29 @@ PanelWindow {
     return AnnotationTools.hitTolerance(editor._paintK)
   }
 
-  function _currentBakeValid() {
-    return editor._bakedRevision === editor._pixelsRevision
-      && bakedCanvas.bakeRevision === editor._pixelsRevision
-      && bakedCanvas.isImageLoaded(editor.fileUrl)
-  }
-
-  function _heldBakeValid() {
-    return editor._pendingBakedRevision >= 0
-      && editor._bakedRevision === editor._pendingBakedRevision
-      && bakedCanvas.isImageLoaded(editor.fileUrl)
-  }
-
-  function _clearPendingPreview(revision = -1) {
-    if (revision >= 0 && editor._pendingPreviewRevision > revision
-      && editor._pendingPreviewRevision === editor._pixelsRevision) return
-    if (editor._pendingPreview !== null && editor._pendingPreview === editor.preview)
-      editor.preview = null
-    editor._pendingPreview = null
-    editor._pendingPreviewRevision = -1
-  }
-
-  function _failPendingBake(revision = -1) {
-    editor._clearPendingPreview(revision)
-    if (editor._pendingBakedRevision < 0) return
-    editor._pendingBakedRevision = -1
-    editor._commitPixelsHold = false
-    editor._bakedRevision = -1
-    if (editor.boardReady) board.requestPaint()
-  }
-
   function _commit(stroke) {
-    const holdBake = stroke.tool === "pixelate"
-      && (editor._currentBakeValid() || editor._heldBakeValid())
-    editor._pendingBakedRevision = holdBake ? editor._bakedRevision : -1
-    editor._commitPixelsHold = holdBake
-    const keepPreview = stroke.tool === "pixelate" && editor._heldBakeValid()
-    editor._pendingPreview = keepPreview ? editor.preview : null
-    editor._pendingPreviewRevision = -1
+    // A blur region needs an area: a click, or a drag shorter than a few
+    // pixels, would push a region that paints nothing anywhere.
+    if (stroke.tool === "blur") {
+      const pts = stroke.points || []
+      const r = pts.length >= 2
+        ? AnnotationTools.normRect(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y)
+        : null
+      if (r === null || r.w < 4 || r.h < 4) return
+      // Already blurred: the area is not blurred twice and no stroke is kept
+      // for it, so a drag over a blind spot leaves the history untouched.
+      if (editor._blurCoverage(r) >= 0.9) return
+    }
     const kept = editor.strokes.slice(0, editor.redoIndex)
     kept.push(stroke)
     editor.strokes = kept
     editor.redoIndex = kept.length
-    if (keepPreview) editor._pendingPreviewRevision = editor._pixelsRevision
-    editor._commitPixelsHold = false
+    // The new element stays active after release, with no selection chrome:
+    // the palette and the width control keep editing it until a new drag or a
+    // tool switch takes the focus away. The outline is drawn for the Select
+    // tool only, which is what makes this focus invisible.
+    editor.selectedIndex = kept.length - 1
     board.requestPaint()
-  }
-
-  function _pixelsChanged() {
-    if (editor._rotationBakePaused) return
-    const holdBake = editor._commitPixelsHold && editor._heldBakeValid()
-    editor._pixelsRevision++
-    if (!holdBake) {
-      editor._pendingBakedRevision = -1
-      editor._bakedRevision = -1
-    }
-    pixelsBakeTimer.restart()
-  }
-
-  function _requestPixelsBake() {
-    if (editor.imgW <= 0 || editor.imgH <= 0) {
-      editor._failPendingBake()
-      return
-    }
-    if (!bakedCanvas.isImageLoaded(editor.fileUrl)) {
-      bakedCanvas.loadImage(editor.fileUrl)
-      return
-    }
-    if (bakedCanvas.canvasSize.width !== editor.imgW
-      || bakedCanvas.canvasSize.height !== editor.imgH) {
-      pixelsBakeTimer.restart()
-      return
-    }
-    if (editor._currentBakeValid()) {
-      editor._pendingBakedRevision = -1
-      editor._commitPixelsHold = false
-      return
-    }
-    bakedCanvas.bakeRevision = editor._pixelsRevision
-    bakedCanvas.requestPaint()
   }
 
    function undo() {
@@ -572,7 +584,6 @@ PanelWindow {
    }
 
   function clearAll() {
-    editor._clearPendingPreview()
     editor.strokes = []
     editor.redoIndex = 0
     editor.preview = null
@@ -597,6 +608,9 @@ PanelWindow {
     settleTimer.stop()
     editor.boardReady = true
     editor.loadState = "ready"
+    // The plate can decode before the probe reports the size, which leaves its
+    // grab waiting on this: same deferred call, same guard, one grab.
+    blurPlateTimer.start()
     board.requestPaint()
   }
 
@@ -1131,7 +1145,6 @@ PanelWindow {
     editor._saveCheckSeq++
     editor._saveTargetPending = false
     editor._saveDialogOpen = false
-    editor._clearPendingPreview()
       editor.exporting = false
       editor._activeOutput = ""
       editor._stopProcesses()
@@ -1144,12 +1157,11 @@ PanelWindow {
   }
 
    Component.onDestruction: {
-     editor._pendingPreview = null
-     editor._pendingPreviewRevision = -1
      editor._stopProcesses()
     editor._cleanupExportOutput(editor._activeOutput)
     editor._cleanupPreservedOutput()
     editor._cleanupFallbackTarget()
+    editor._cleanupBlurPlate()
   }
 
   Timer {
@@ -1233,12 +1245,6 @@ PanelWindow {
          editor.imgW = Math.round(implicitWidth)
          editor.imgH = Math.round(implicitHeight)
          editor.viewRect = { x: 0, y: 0, w: editor.imgW, h: editor.imgH }
-         editor._pendingBakedRevision = -1
-         editor._commitPixelsHold = false
-         editor._pendingPreview = null
-         editor._pendingPreviewRevision = -1
-         editor._bakedRevision = -1
-         bakedCanvas.bakeRevision = -1
          // State before the load, not after: a canvas whose image is already
          // cached can report it as loaded from inside loadImage(), and a
          // readiness handler that ran then would be looking at the previous
@@ -1372,6 +1378,202 @@ PanelWindow {
         asynchronous: false
         cache: true
       }
+
+      // The blur plate: the picture decoded at plate size, blurred by an effect
+      // item, and grabbed once into the PNG that both the overlay and the
+      // export draw from. The effect is its own item rather than layer.effect
+      // on purpose - a grab of a layered item comes back with the unblurred
+      // source (measured), while an effect item's own rendering is the blurred
+      // result, and that still holds while the picture covers it.
+      //
+      // It is hidden again the moment the grab lands, so the blur shader is not
+      // paid for on every frame the editor redraws while it is open.
+      // One deferred pass owns the export plate: it runs when the picture or
+      // the plate size lands, and retries a bounded number of times while the
+      // source is still decoding at the old size.
+      Timer {
+        id: blurPlateTimer
+
+        interval: 150
+        repeat: false
+        onTriggered: editor._grabBlurPlate()
+      }
+
+      Item {
+        id: blurPlateBox
+
+        anchors.fill: parent
+        z: -1
+        clip: true
+
+        Image {
+          id: blurSource
+
+          width: editor._blurPlateW
+          height: editor._blurPlateH
+          source: editor.fileUrl
+          sourceSize.width: editor._blurPlateW
+          sourceSize.height: editor._blurPlateH
+          fillMode: Image.Stretch
+          smooth: true
+          visible: false
+
+          // Grabbing straight from status is a frame early: the effect has not
+          // rendered yet, so the grab would be blank.
+          onStatusChanged: if (status === Image.Ready) blurPlateTimer.start()
+        }
+
+        MultiEffect {
+          id: blurPlate
+
+          width: editor._blurPlateW
+          height: editor._blurPlateH
+          visible: editor.imgW > 0 && !editor._blurPlateDone
+          source: blurSource
+          blurEnabled: true
+          blurMax: 96
+          blur: 1.0
+        }
+      }
+    }
+
+    // Blur regions: the picture blurred inside each committed rectangle, sitting
+    // above the picture and below the ink. Ordering between blur and the other
+    // tools is deliberately not modelled - blur is a picture treatment here, so
+    // every annotation stays legible above it.
+    Item {
+      id: blurLayer
+
+      x: board.x
+      y: board.y
+      width: board.width
+      height: board.height
+      scale: board.scale
+      transformOrigin: Item.TopLeft
+      visible: editor.imgW > 0
+      clip: true
+
+      // Document pixels -> canvas backing pixels, rotation about the document
+      // centre, then the view offset: the chain the board paints with.
+      Item {
+        scale: editor._boardPaintK
+        transformOrigin: Item.TopLeft
+
+        Item {
+          width: editor._docW
+          height: editor._docH
+          rotation: editor._rotAnim
+          transformOrigin: Item.Center
+
+          Item {
+            x: editor._docW / 2 - (editor.viewRect.x + editor.viewRect.w / 2)
+            y: editor._docH / 2 - (editor.viewRect.y + editor.viewRect.h / 2)
+
+            Repeater {
+              model: editor.blurRects
+
+              delegate: Item {
+                id: blurRegion
+
+                required property var modelData
+
+                // The blur pulls pixels in from beyond the region, so it reads a
+                // window grown by twice the radius and the clip keeps that margin
+                // outside the rectangle: taps that run off the texture edge
+                // sample transparency, and at a corner the shortfall is diagonal,
+                // which reads as rounded corners.
+                readonly property real pad: editor._blurRadius * 2
+                readonly property real srcX: Math.max(0, modelData.x - pad)
+                readonly property real srcY: Math.max(0, modelData.y - pad)
+                readonly property real srcW: Math.max(1,
+                  Math.min(editor.imgW, modelData.x + modelData.w + pad) - srcX)
+                readonly property real srcH: Math.max(1,
+                  Math.min(editor.imgH, modelData.y + modelData.h + pad) - srcY)
+
+                x: modelData.x
+                y: modelData.y
+                width: modelData.w
+                height: modelData.h
+                clip: true
+
+                Image {
+                  id: regionSource
+
+                  x: blurRegion.srcX - modelData.x
+                  y: blurRegion.srcY - modelData.y
+                  width: blurRegion.srcW
+                  height: blurRegion.srcH
+                  source: editor.fileUrl
+                  sourceClipRect: Qt.rect(blurRegion.srcX, blurRegion.srcY,
+                    blurRegion.srcW, blurRegion.srcH)
+                  fillMode: Image.Stretch
+                  smooth: true
+                  visible: false
+                }
+
+                MultiEffect {
+                  x: blurRegion.srcX - modelData.x
+                  y: blurRegion.srcY - modelData.y
+                  width: blurRegion.srcW
+                  height: blurRegion.srcH
+                  source: regionSource
+                  blurEnabled: true
+                  blurMax: editor._blurRadius
+                  blur: 1.0
+                }
+              }
+            }
+
+            // The live drag, newest of all.
+            Item {
+              id: previewBlur
+
+              readonly property var rect: editor.previewBlurRect
+              readonly property bool on: rect !== null
+              readonly property real pad: editor._blurRadius * 2
+              readonly property real srcX: Math.max(0, (on ? rect.x : 0) - pad)
+              readonly property real srcY: Math.max(0, (on ? rect.y : 0) - pad)
+              readonly property real srcW: Math.max(1,
+                Math.min(editor.imgW, (on ? rect.x + rect.w : 0) + pad) - srcX)
+              readonly property real srcH: Math.max(1,
+                Math.min(editor.imgH, (on ? rect.y + rect.h : 0) + pad) - srcY)
+
+              visible: on
+              x: on ? rect.x : 0
+              y: on ? rect.y : 0
+              width: on ? rect.w : 1
+              height: on ? rect.h : 1
+              clip: true
+
+              Image {
+                id: previewSource
+
+                x: previewBlur.srcX - (previewBlur.on ? previewBlur.rect.x : 0)
+                y: previewBlur.srcY - (previewBlur.on ? previewBlur.rect.y : 0)
+                width: previewBlur.srcW
+                height: previewBlur.srcH
+                source: editor.fileUrl
+                sourceClipRect: Qt.rect(previewBlur.srcX, previewBlur.srcY,
+                  previewBlur.srcW, previewBlur.srcH)
+                fillMode: Image.Stretch
+                smooth: true
+                visible: false
+              }
+
+              MultiEffect {
+                x: previewBlur.srcX - (previewBlur.on ? previewBlur.rect.x : 0)
+                y: previewBlur.srcY - (previewBlur.on ? previewBlur.rect.y : 0)
+                width: previewBlur.srcW
+                height: previewBlur.srcH
+                source: previewSource
+                blurEnabled: true
+                blurMax: editor._blurRadius
+                blur: 1.0
+              }
+            }
+          }
+        }
+      }
     }
 
     Canvas {
@@ -1476,19 +1678,13 @@ PanelWindow {
           ctx.rect(f.x - vr.x, f.y - vr.y, f.w, f.h)
           ctx.clip()
         }
+        // Every committed stroke in one pass, then the live preview. Blur
+        // regions are the overlay below this canvas, so ink is never buried.
         for (let i = 0; i < editor.redoIndex && i < editor.strokes.length; i++) {
-          editor._paintStroke(ctx, editor.strokes[i], undefined, undefined, undefined, 1)
+          editor._paintStroke(ctx, editor.strokes[i], undefined, undefined, 1)
         }
-        // A committed-but-still-held preview (_commit keeps it so the
-        // pixelate mosaic does not blink while the bake catches up) is the
-        // SAME stroke object that is now in `strokes`, which the loop above
-        // has already drawn. Painting it again put a second copy of the
-        // region over the first - both pixelated, one over the other, only
-        // visible at a display scale other than 1 where the two cell phases
-        // stop lining up. Held, not drawn.
-        if (editor.preview !== null && editor.preview !== editor._pendingPreview) {
-          editor._paintStroke(ctx, editor.preview, undefined, undefined, undefined, 1)
-        }
+        if (editor.preview !== null)
+          editor._paintStroke(ctx, editor.preview, undefined, undefined, 1)
         ctx.restore()
         ctx.restore()
         // ---- above this line: strokes (clipped), over boardImage
@@ -1499,7 +1695,8 @@ PanelWindow {
         ctx.translate(editor._docW / 2, editor._docH / 2)
         ctx.rotate(editor._rotAnim * Math.PI / 180)
         ctx.translate(-vr.w / 2, -vr.h / 2)
-        if (editor.selectedIndex >= 0 && editor.selectedIndex < editor.redoIndex
+        if (editor.tool === "select"
+          && editor.selectedIndex >= 0 && editor.selectedIndex < editor.redoIndex
           && editor.selectedIndex < editor.strokes.length) {
           const b = editor._strokeBounds(editor.strokes[editor.selectedIndex])
           if (b !== null) {
@@ -1552,86 +1749,6 @@ PanelWindow {
      }
 
     Canvas {
-      id: bakedCanvas
-
-      width: Math.max(1, editor.imgW)
-      height: Math.max(1, editor.imgH)
-      canvasSize: Qt.size(Math.max(1, editor.imgW), Math.max(1, editor.imgH))
-      visible: true
-      opacity: 0
-      enabled: false
-      contextType: "2d"
-      renderStrategy: Canvas.Immediate
-      renderTarget: Canvas.Image
-
-      property int bakeRevision: -1
-
-      onImageLoaded: {
-        if (editor.imgW > 0 && editor.imgH > 0) pixelsBakeTimer.restart()
-      }
-
-      onPaint: {
-        const revision = bakedCanvas.bakeRevision
-         if (revision < 0 || revision !== editor._pixelsRevision) {
-           editor._failPendingBake(revision)
-           return
-         }
-        if (!bakedCanvas.isImageLoaded(editor.fileUrl)) return
-        const width = Math.max(1, editor.imgW)
-        const height = Math.max(1, editor.imgH)
-        const ctx = bakedCanvas.getContext("2d")
-         if (ctx === null) {
-           editor._failPendingBake(revision)
-           return
-         }
-        let saved = false
-        let complete = false
-        try {
-          ctx.save()
-          saved = true
-          ctx.setTransform(1, 0, 0, 1, 0, 0)
-          ctx.clearRect(0, 0, width, height)
-          ctx.drawImage(editor.fileUrl, 0, 0, width, height, 0, 0, width, height)
-          const vr = editor.viewRect
-          const size = { w: width, h: height }
-          for (let i = 0; i < editor.redoIndex && i < editor.strokes.length; i++) {
-            const stroke = editor.strokes[i]
-            if (stroke.tool === "pixelate") {
-              const cells = editor._exportPixelate(ctx, stroke, vr, size, 0)
-              if (cells === null) {
-                 ctx.restore()
-                 saved = false
-                 editor._failPendingBake(revision)
-                 return
-              }
-              editor._paintStroke(ctx, stroke, -vr.x, -vr.y, cells, 1)
-            } else {
-              editor._paintStroke(ctx, stroke, -vr.x, -vr.y, undefined, 1)
-            }
-          }
-          ctx.restore()
-          saved = false
-          complete = true
-        } catch (e) {
-           if (saved) {
-             try { ctx.restore() } catch (e2) {}
-           }
-           editor._failPendingBake(revision)
-         }
-        if (complete && revision === editor._pixelsRevision
-          && bakedCanvas.bakeRevision === revision) {
-           editor._bakedRevision = revision
-           editor._pendingBakedRevision = -1
-           editor._commitPixelsHold = false
-           editor._clearPendingPreview(revision)
-           if (editor.boardReady) board.requestPaint()
-         } else {
-           editor._failPendingBake(revision)
-        }
-      }
-    }
-
-    Canvas {
       id: exportCanvas
 
        property string pendingPath: ""
@@ -1659,6 +1776,17 @@ PanelWindow {
           const height = Math.max(1, Math.round(size.h))
            exportCanvas.pendingPath = String(path ?? "")
            exportCanvas.pendingDone = done
+           // A blur region can only be drawn from the plate. While its grab is
+           // still in flight the export waits for it instead of writing a shot
+           // with the blur missing; the 5s exportPaintTimer still fails the
+           // save if the grab never lands.
+           if (editor._blurPlatePending && editor.blurRects.length > 0) {
+             exportPaintTimer.restart()
+             return
+           }
+           if (editor.blurPlateUrl !== "") {
+             try { exportCanvas.loadImage(editor.blurPlateUrl) } catch (e) {}
+           }
            exportCanvas.width = width
            exportCanvas.height = height
            exportCanvas.canvasSize = Qt.size(width, height)
@@ -1716,24 +1844,9 @@ PanelWindow {
         ctx.rect(0, 0, vr.w, vr.h)
         ctx.clip()
         for (let i = 0; i < editor.redoIndex && i < editor.strokes.length; i++) {
-          const stroke = editor.strokes[i]
-          if (stroke.tool === "pixelate") {
-            const points = stroke.points || []
-            const region = AnnotationTools.normRect(points[0].x, points[0].y,
-              points[points.length - 1].x, points[points.length - 1].y)
-            if (region.x + region.w <= vr.x || region.x >= vr.x + vr.w
-              || region.y + region.h <= vr.y || region.y >= vr.y + vr.h) continue
-            const cells = editor._exportPixelate(ctx, stroke, vr, size)
-            if (cells === null) {
-              ctx.restore()
-              ctx.restore()
-              exportCanvas.complete(false)
-              return
-            }
-            editor._paintStroke(ctx, stroke, -vr.x, -vr.y, cells)
-          } else {
-            editor._paintStroke(ctx, stroke, -vr.x, -vr.y)
-          }
+          const s = editor.strokes[i]
+          if (s.tool === "blur") editor._drawBlurRegion(ctx, s, -vr.x, -vr.y)
+          else editor._paintStroke(ctx, s, -vr.x, -vr.y)
         }
          ctx.restore()
          ctx.restore()
@@ -1852,9 +1965,6 @@ PanelWindow {
 
         property var anchor: null
         property var moveBase: null
-        // Locked text-staging aspect (w/h), 0 = seeding. One-shot per
-        // drag: reseeded on every text press, cleared on release.
-        property real textLockR: 0
         property bool resizeMode: false
         property var resizeFixed: null
         property var resizeOrig: null
@@ -1965,7 +2075,6 @@ PanelWindow {
            const hadTransient = editor.preview !== null || editor.cropRect !== null
              || editor.cropFrame !== null || editor.textRect !== null
              || editor.textAnchor !== null || editor.selectedIndex >= 0
-           editor._clearPendingPreview()
      editor.preview = null
     editor.cropRect = null
     editor.cropFrame = null
@@ -1977,7 +2086,19 @@ PanelWindow {
           if (!hadTransient) editor.cancel()
           return
         }
+         // A press anywhere outside the open text field accepts the text.
+         // The field handles its own clicks, and it is the only thing above
+         // this area, so a press arriving here is a press outside it -
+         // whether it lands on the picture or on the letterbox round it.
+         if (editor.textAnchor !== null) {
+           editor._finishText(true)
+           return
+         }
          if (!drawArea._inside(mouse)) return
+         // A new element takes the focus: whatever the last release left active
+         // stops being the colour and width target here. Select keeps its own
+         // selection, which its press handler decides.
+         if (editor.tool !== "select") editor.selectedIndex = -1
          const raw = editor._toDoc(mouse.x, mouse.y)
         // Frame-managing drags (crop tool; select with a staged frame)
         // work in raw coords - they resize/move the frame itself and
@@ -1993,7 +2114,6 @@ PanelWindow {
         // getting cut away, so it should not be paintable in the
         // meantime either.
          if (editor.tool !== "crop" && editor.tool !== "select" && !editor._insideFrame(raw)) return
-         editor._clearPendingPreview()
          editor.preview = null
          drawArea.anchor = p
         drawArea.resizeMode = false
@@ -2004,11 +2124,10 @@ PanelWindow {
           editor.redoIndex = editor.strokes.length
           editor._eraseAt(p)
         } else if (editor.tool === "text") {
-          // Drag stages an aspect-locked sizing rect (font fits its
-          // height); a plain click keeps the slider size.
+          // Drag stages a sizing rect that follows the pointer freely (font
+          // fits its height); a plain click keeps the slider size.
           editor.textRect = { x: p.x, y: p.y, w: 0, h: 0 }
           editor.textAnchor = null
-          drawArea.textLockR = 0
           textField.text = ""
         } else if (editor.tool === "crop") {
           // A selected crop area is adjusted by grabs only: handles
@@ -2154,19 +2273,10 @@ PanelWindow {
         } else if (editor.tool === "eraser") {
           editor._eraseAt(p)
           } else if ((editor.tool === "line" || editor.tool === "arrow" || editor.tool === "arrowCorner"
-            || editor.tool === "rect" || editor.tool === "ellipse") && editor.preview !== null) {
+            || editor.tool === "rect" || editor.tool === "ellipse" || editor.tool === "blur")
+            && editor.preview !== null) {
             editor.preview = {
               tool: editor.tool, color: editor.ink, width: editor.penWidth,
-              points: [drawArea.anchor, p]
-            }
-            board.requestPaint()
-          } else if (editor.tool === "pixelate" && editor.preview !== null) {
-            // Corners only: the paint pass samples the composited
-            // backing live (base plus every earlier stroke), so the
-            // drag shows the final look and release commits the preview
-            // as-is - single path, preview and commit can never diverge.
-            editor.preview = {
-              tool: "pixelate", color: editor.ink, width: editor.penWidth,
               points: [drawArea.anchor, p]
             }
             board.requestPaint()
@@ -2222,20 +2332,10 @@ PanelWindow {
              editor.cropFrame = editor._clampDocumentRect({ x: nx, y: ny, w: f.w, h: f.h })
             board.requestPaint()
           } else if (editor.tool === "text" && editor.textRect !== null) {
-            // Aspect-locked staging: the first move past a seed size
-            // freezes the ratio, further moves preserve it (dominant
-            // axis wins, quadrant around the anchor kept). A locked
-            // box keeps font and caret deterministic - free distortion
-            // is what let oversized text spill past the rect.
-            const free = AnnotationTools.normRect(drawArea.anchor.x, drawArea.anchor.y, p.x, p.y)
-            if (free.w < 8 || free.h < 8) {
-              drawArea.textLockR = 0
-              editor.textRect = free
-            } else {
-              if (!(drawArea.textLockR > 0)) drawArea.textLockR = free.w / free.h
-              editor.textRect = AnnotationTools.lockRect(
-                drawArea.anchor.x, drawArea.anchor.y, p.x, p.y, drawArea.textLockR)
-            }
+            // The box follows the pointer on both axes: the first move past a
+            // seed size grows it, later moves resize it freely, and dragging
+            // past the anchor flips it through normRect.
+            editor.textRect = AnnotationTools.normRect(drawArea.anchor.x, drawArea.anchor.y, p.x, p.y)
             board.requestPaint()
           } else if (editor.tool === "select" && editor.selectedIndex >= 0 && drawArea.moveBase !== null) {
             if (drawArea.resizeMode && drawArea.resizeFixed !== null && drawArea.resizeOrig !== null
@@ -2311,7 +2411,6 @@ PanelWindow {
           return
         }
         if (mouse.button !== Qt.LeftButton || drawArea.anchor === null) return
-        const preview = editor.preview
         // The release point must honor the same clamp as the moves: the
         // pointer can leave the window mid-drag and release out of
         // bounds, and this last point is what gets committed into the
@@ -2323,11 +2422,10 @@ PanelWindow {
          if (editor.tool === "crop" && editor.cropRect !== null
            && (editor.cropRect.w <= 1 || editor.cropRect.h <= 1)) editor.cropRect = null
          if (editor.tool === "text" && editor.textRect !== null) {
-          // Dragged sizing rect: aspect-locked while staging, the field
-          // opens inside it with the line fitted to its height, and it
-          // stays visible while typing so the caret can never sit
-          // outside the selected area. A plain click has no box: it
-          // keeps the slider size and anchors at the point.
+          // Dragged sizing rect: the field opens inside it with the line
+          // fitted to its height, and it stays visible while typing so the
+          // caret can never sit outside the selected area. A plain click
+          // has no box: it keeps the slider size and anchors at the point.
           const t = editor.textRect
           if (t.w > 8 && t.h > 8) {
             editor.fontSize = Math.max(10, Math.min(72, Math.round(t.h)))
@@ -2352,21 +2450,6 @@ PanelWindow {
           // bounds; every stroke point was already clamped to the kept
           // area as it arrived, so the commit is safe as-is - a click
           // (anchor == release point) is a deliberate dot and commits too.
-          if (editor.tool === "pixelate" && editor.preview.points.length >= 2) {
-            // Degenerate rect: drop instead of committing an empty
-            // stroke. (Size is validated here because sampling happens
-            // in the paint pass, not on the move path.)
-            const pp = editor.preview.points
-            const pr = AnnotationTools.normRect(pp[0].x, pp[0].y,
-              pp[pp.length - 1].x, pp[pp.length - 1].y)
-             if (pr.w < 2 || pr.h < 2) {
-               editor._clearPendingPreview()
-               editor.preview = null
-               drawArea.anchor = null
-              drawArea.moveBase = null
-              return
-            }
-          }
           // A release outside the kept area must not drag the trail's
           // tail along the boundary: the moves already cut it at the
           // edge, so an out-of-bounds release keeps the trail's own last
@@ -2378,14 +2461,13 @@ PanelWindow {
           const stroke = {
             tool: editor.preview.tool, color: editor.preview.color,
             width: editor.preview.width,
-            points: editor.tool === "pixelate" ? editor.preview.points : pts
+            points: pts
           }
            editor._commit(stroke)
          }
-           if (editor._pendingPreview !== preview) editor.preview = null
+           editor.preview = null
            drawArea.anchor = null
           drawArea.moveBase = null
-          drawArea.textLockR = 0
           drawArea.dragCursor = -1
           drawArea.resizeMode = false
           drawArea.resizeFixed = null
@@ -2795,40 +2877,33 @@ PanelWindow {
 
           activeFocusOnTab: true
           enabled: !editor.interactionLocked
-          opacity: editor.tool === "select" ? 0.5 : 1
+          // Dimmed only when the tile would do nothing: Select is active and no
+          // element is selected for it to recolour.
+          opacity: editor.tool === "select" && editor.selectedStrokeIndex < 0 ? 0.5 : 1
            Accessible.role: Accessible.Button
            Accessible.name: "Color " + editor._colorName(swatch.modelData)
            Accessible.checkable: true
-           Accessible.checked: editor.ink === swatch.modelData
-           Accessible.onPressAction: {
-             if (editor.tool !== "select") editor.ink = swatch.modelData
-           }
+           Accessible.checked: editor.activeColor === swatch.modelData
+           Accessible.onPressAction: editor.applyColor(swatch.modelData)
 
-          Keys.onReturnPressed: {
-            if (editor.tool !== "select") editor.ink = swatch.modelData
-          }
-          Keys.onEnterPressed: {
-            if (editor.tool !== "select") editor.ink = swatch.modelData
-          }
-          Keys.onSpacePressed: {
-            if (editor.tool !== "select") editor.ink = swatch.modelData
-          }
+          Keys.onReturnPressed: editor.applyColor(swatch.modelData)
+          Keys.onEnterPressed: editor.applyColor(swatch.modelData)
+          Keys.onSpacePressed: editor.applyColor(swatch.modelData)
 
           width: Math.round(27 * editor.uiScale)
           height: Math.round(27 * editor.uiScale)
           radius: RoundingPolicy.radius
           anchors.verticalCenter: parent.verticalCenter
           color: swatch.modelData
-          border.width: editor.ink === swatch.modelData || swatch.activeFocus ? 2 : 0
+          border.width: editor.activeColor === swatch.modelData || swatch.activeFocus ? 2 : 0
           border.color: Ui.solid("accent")
 
           MouseArea {
             anchors.fill: parent
             hoverEnabled: true
-            cursorShape: editor.tool === "select" ? Qt.ForbiddenCursor : Qt.PointingHandCursor
-            onClicked: {
-              if (editor.tool !== "select") editor.ink = swatch.modelData
-            }
+            cursorShape: editor.tool === "select" && editor.selectedStrokeIndex < 0
+              ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+            onClicked: editor.applyColor(swatch.modelData)
           }
         }
       }
@@ -2841,7 +2916,7 @@ PanelWindow {
         step: 1
         value: editor.penWidth
         tip: "Pen width"
-        onMoved: v => editor.penWidth = v
+        onMoved: v => editor.applyWidth(v)
       }
     }
 
@@ -3030,14 +3105,14 @@ PanelWindow {
     onActivated: editor.tool = "text"
   }
   Shortcut {
-    sequence: "D"
-    enabled: !editor.interactionLocked && editor.textAnchor === null
-    onActivated: editor.tool = "pixelate"
-  }
-  Shortcut {
     sequence: "C"
     enabled: !editor.interactionLocked && editor.textAnchor === null
     onActivated: editor.tool = "crop"
+  }
+  Shortcut {
+    sequence: "D"
+    enabled: !editor.interactionLocked && editor.textAnchor === null
+    onActivated: editor.tool = "blur"
   }
   Shortcut {
     sequence: "N"
@@ -3069,14 +3144,11 @@ PanelWindow {
     // live item geometry.)
      editor._finishText(true)
      editor.docRot = editor.docRot + (dir > 0 ? 90 : -90)
-     editor._rotationBakePaused = true
      editor.strokes = editor.strokes.slice(0, editor.redoIndex)
      editor.redoIndex = editor.strokes.length
-     editor._rotationBakePaused = false
-     editor.selectedIndex = -1
-     editor._clearPendingPreview()
-     editor.preview = null
-     editor.cropRect = null
+    editor.selectedIndex = -1
+    editor.preview = null
+    editor.cropRect = null
      editor.textRect = null
     editor.textAnchor = null
     board.requestPaint()
@@ -3106,14 +3178,15 @@ PanelWindow {
 
   // Select press: a repeat click on the current selection (same spot,
   // quick) cycles through the stack beneath it, so overlapped strokes
-  // stay reachable; otherwise the topmost hit wins and drags.
+  // stay reachable; otherwise the topmost hit wins and drags. Hits are
+  // box hits, not ink hits: an object is grabbable anywhere inside the
+  // bounds its outline draws, so a circle takes a click through its middle.
   property var _lastSelectPress: null
 
   function _selectAt(p, mx, my) {
-    const tol = editor._hitTolerance()
     const hits = []
     for (let i = editor.redoIndex - 1; i >= 0; i--) {
-      if (AnnotationTools.hitStroke(editor.strokes[i], p.x, p.y, tol)) hits.push(i)
+      if (AnnotationTools.hitStrokeBox(editor.strokes[i], p.x, p.y)) hits.push(i)
     }
     const prev = editor._lastSelectPress
     editor._lastSelectPress = { x: mx, y: my, t: Date.now() }
@@ -3166,86 +3239,184 @@ PanelWindow {
     }
   }
 
-  function _pixelateGrid(r) {
-    return AnnotationTools.pixelateGrid(r, editor.viewRect)
-  }
-
-  // Where the export reads a mosaic's samples, and the per-cell source
-  // offsets inside that box. The two halves are one plan, so the box and
-  // the offsets can never be built against different transforms.
-  function _exportPixelate(ctx, stroke, vr, size, rotation = editor.docRot) {
-    const pts = stroke.points || []
-    if (pts.length < 2) return null
-    const r = AnnotationTools.normRect(pts[0].x, pts[0].y,
-      pts[pts.length - 1].x, pts[pts.length - 1].y)
-    if (r.w < 2 || r.h < 2) return null
-    const grid = editor._pixelateGrid(r)
-    if (grid.length === 0) return null
-    const box = AnnotationTools.pixelateBox(r, vr, size, rotation)
-    if (box === null) return null
-    try {
-      const px = ctx.getImageData(box.x, box.y, box.w, box.h)
-      if (!px || !px.data || px.data.length < 4) return null
-      const colors = []
-      const rects = []
-      const samples = AnnotationTools.pixelateSamples(grid, vr, size, rotation, box)
-      for (let i = 0; i < samples.length; i++) {
-        const mean = AnnotationTools.cellMean(px, box, samples[i].box)
-        if (mean === null) continue
-        colors.push(mean)
-        rects.push(samples[i].rect)
-      }
-      return { colors: colors, rects: rects }
-    } catch (e) {
-      return null
+  // Blur regions in paint order: committed strokes up to the redo point, then
+  // the live preview. Intersecting with the crop frame here (rather than
+  // clipping the overlay as a whole) trims each region the way the canvas
+  // would have clipped the ink.
+  // Fraction of a blur region already covered by committed ones, sampled on
+  // a grid. Overlap is not cumulative - every region blurs the same picture -
+  // so re-blurring an area that is already blurred is pure work: the preview
+  // hides and the commit drops once the area is essentially all covered.
+  function _blurCoverage(r) {
+    if (r === null || r === undefined || !(r.w > 0) || !(r.h > 0)) return 0
+    const regions = []
+    for (let i = 0; i < editor.redoIndex && i < editor.strokes.length; i++) {
+      const s = editor.strokes[i]
+      if (s === null || s === undefined || s.tool !== "blur") continue
+      const pts = Array.isArray(s.points) ? s.points : []
+      if (pts.length < 2) continue
+      regions.push(AnnotationTools.normRect(pts[0].x, pts[0].y,
+        pts[pts.length - 1].x, pts[pts.length - 1].y))
     }
-  }
-
-  function _liveBlur(n) {
-    try {
-      const w = Math.round(n.w)
-      const h = Math.round(n.h)
-      if (w < 2 || h < 2) return null
-      const grid = editor._pixelateGrid(n)
-      if (grid.length === 0) return null
-      const colors = []
-      const rects = []
-      const vr = editor.viewRect
-       if (editor._currentBakeValid() || editor._heldBakeValid()) {
-        const ctx = bakedCanvas.getContext("2d")
-        if (ctx === null) return null
-        const bb = AnnotationTools.blurSampleBox(grid, vr, editor.imgW, editor.imgH)
-        if (bb === null) return null
-        const px = ctx.getImageData(bb.x, bb.y, bb.w, bb.h)
-        if (!px || !px.data || px.data.length < 4) return null
-        const samples = AnnotationTools.blurSamples(grid, vr, bb)
-        // Colours and rects are appended together, never separately: a cell
-        // that falls off the sampled block contributes no colour, and a rect
-        // list built from the whole grid would then be longer than the
-        // colours and the paint would drop the entire mosaic.
-        for (let i = 0; i < samples.length; i++) {
-          const mean = AnnotationTools.cellMean(px, bb, samples[i].box)
-          if (mean === null) continue
-          colors.push(mean)
-          rects.push(samples[i].rect)
+    if (regions.length === 0) return 0
+    const n = 10
+    let hit = 0
+    for (let gy = 0; gy < n; gy++) {
+      for (let gx = 0; gx < n; gx++) {
+        const px = r.x + (gx + 0.5) * r.w / n
+        const py = r.y + (gy + 0.5) * r.h / n
+        for (let i = 0; i < regions.length; i++) {
+          const q = regions[i]
+          if (px >= q.x && px <= q.x + q.w && py >= q.y && py <= q.y + q.h) {
+            hit++
+            break
+          }
         }
-        return { colors: colors, rects: rects }
       }
-      // No bake yet, and the board cannot answer: the picture lives on
-      // boardImage now, so the board's backing is transparent wherever there
-      // is no ink, and reading it would sample transparency and paint the
-      // pixelate preview the wrong colours. Report "no preview" instead and
-      // let the next drag event try again - the bake is requested on a 1ms
-      // timer, so this is a frame or two at the start of a drag.
-      return null
-    } catch (e) {
-      return null
+    }
+    return hit / (n * n)
+  }
+
+  // Blur rect for a corner pair, clipped to the applied frame. One place for
+  // the geometry the layer stack, the drag preview and the export all use.
+  function _blurRectOf(x1, y1, x2, y2) {
+    let r = AnnotationTools.normRect(x1, y1, x2, y2)
+    if (!(r.w > 0) || !(r.h > 0)) return null
+    const f = editor.cropFrame
+    if (f !== null) {
+      const x0 = Math.max(f.x, r.x)
+      const y0 = Math.max(f.y, r.y)
+      const x1b = Math.min(f.x + f.w, r.x + r.w)
+      const y1b = Math.min(f.y + f.h, r.y + r.h)
+      if (!(x1b > x0) || !(y1b > y0)) return null
+      r = { x: x0, y: y0, w: x1b - x0, h: y1b - y0 }
+    }
+    return r
+  }
+
+  function _blurRectAt(i) {
+    const s = editor.strokes[i]
+    if (s === null || s === undefined || s.tool !== "blur") return null
+    const pts = Array.isArray(s.points) ? s.points : []
+    if (pts.length < 2) return null
+    return editor._blurRectOf(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y)
+  }
+
+  // Committed blur regions in paint order, for the export walk.
+  function _blurRects() {
+    const out = []
+    const total = Math.min(editor.redoIndex, editor.strokes.length)
+    for (let i = 0; i < total; i++) {
+      const r = editor._blurRectAt(i)
+      if (r !== null) out.push(r)
+    }
+    return out
+  }
+
+  // The document layer stack in stroke order: contiguous runs of ink and the
+  // blur regions between them. A blur covers everything below it - the picture
+  // and the ink committed before it - and ink committed after it comes later
+  // in the stack, so it draws on top. The export walks the strokes in this same
+  // order, which is what keeps a saved shot equal to what was on screen.
+
+  // The live drag's blur rect, or null. Read by the preview layer only: the
+  // stack's model deliberately ignores the preview, so a brush drag does not
+  // rebuild the ink canvases on every mouse sample.
+  function _previewBlurRect() {
+    const p = editor.preview
+    if (p === null || p === undefined || p.tool !== "blur") return null
+    const pts = Array.isArray(p.points) ? p.points : []
+    if (pts.length < 2) return null
+    const r = editor._blurRectOf(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y)
+    if (r === null) return null
+    // Dragging across an area that is already blurred paints nothing.
+    return editor._blurCoverage(r) >= 0.9 ? null : r
+  }
+
+
+  // One blur region into a canvas whose transform maps document pixels onto
+  // its backing: the plate covers the whole document at document size, so the
+  // clip does the cropping and no source-rect math is needed - the same
+  // geometry the on-screen overlay clips to, at any plate size.
+  function _drawBlurRegion(ctx, s, offsetX, offsetY) {
+    if (editor.blurPlateUrl === "" || !Array.isArray(s.points) || s.points.length < 2) return
+    const r = AnnotationTools.normRect(s.points[0].x, s.points[0].y,
+      s.points[s.points.length - 1].x, s.points[s.points.length - 1].y)
+    if (!(r.w > 0) || !(r.h > 0)) return
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(r.x + offsetX, r.y + offsetY, r.w, r.h)
+    ctx.clip()
+    ctx.drawImage(editor.blurPlateUrl, offsetX, offsetY, editor.imgW, editor.imgH)
+    ctx.restore()
+  }
+
+  // Blur the plate once and keep it as a PNG. This grab is the only pixel
+  // readback in the blur path - once per shot, never per stroke.
+  function _grabBlurPlate() {
+    if (editor._blurPlatePending || editor._blurPlateDone
+      || editor.imgW <= 0 || editor._blurPlateW < 16) return
+    // The source must be decoded at the plate's size: a status that reads
+    // Ready while sourceSize is still the placeholder means a 1x1 texture,
+    // and a grab of that writes a blank plate.
+    if (blurSource.status !== Image.Ready
+      || blurSource.sourceSize.width !== editor._blurPlateW
+      || blurSource.sourceSize.height !== editor._blurPlateH) {
+      if (editor._blurPlateTries < 20) {
+        editor._blurPlateTries++
+        blurPlateTimer.restart()
+      }
+      return
+    }
+    const path = editor.runtimeDir + "/blur-" + editor._sessionId + ".png"
+    editor._blurPlatePending = true
+    const grabbed = blurPlate.grabToImage(result => {
+      editor._blurPlatePending = false
+      if (result === null || result === undefined
+        || typeof result.saveToFile !== "function"
+        || result.saveToFile(path) === false) {
+        // Retryable on purpose: one failed grab must not cost every later
+        // export its blur for the rest of the session.
+        if (editor._blurPlateTries < 20) {
+          editor._blurPlateTries++
+          blurPlateTimer.restart()
+        }
+        return
+      }
+      editor._blurPlatePath = path
+      editor._blurPlateDone = true
+      editor.blurPlateUrl = Paths.toFileUrl(path)
+      // An export that arrived while the plate was still rendering waited
+      // for this: repaint it now instead of letting it time out.
+      if (exportCanvas.pendingPath !== "") {
+        try { exportCanvas.loadImage(editor.blurPlateUrl) } catch (e) {}
+        exportCanvas.requestPaint()
+        exportPaintTimer.restart()
+      }
+    }, Qt.size(editor._blurPlateW, editor._blurPlateH))
+    if (!grabbed) {
+      editor._blurPlatePending = false
+      if (editor._blurPlateTries < 20) {
+        editor._blurPlateTries++
+        blurPlateTimer.restart()
+      }
     }
   }
 
-  function _paintStroke(ctx, s, offsetX, offsetY, pixelCells, displayScale) {
+  function _cleanupBlurPlate() {
+    const path = editor._blurPlatePath
+    editor._blurPlatePath = ""
+    editor.blurPlateUrl = ""
+    editor._blurPlatePending = false
+    if (path !== "" && String(path).startsWith(editor.runtimeDir + "/")) Exec.rm(path)
+  }
+
+  function _paintStroke(ctx, s, offsetX, offsetY, displayScale) {
     const pts = s.points || []
     if (pts.length === 0) return
+    // Blur is not ink: the region is a clipped copy of the blurred plate,
+    // drawn by the QML overlay on screen and by _drawBlurRegion on export.
+    if (s.tool === "blur") return
     const vr = editor.viewRect
     const ox = offsetX === undefined ? -vr.x : offsetX
     const oy = offsetY === undefined ? -vr.y : offsetY
@@ -3319,6 +3490,10 @@ PanelWindow {
       ctx.fill()
     } else if (s.tool === "rect") {
       const n = AnnotationTools.normRect(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y)
+      // Square corners on purpose: the round join above is there for the brush
+      // and arrow, and on a rectangle it reads as a rounded box. strokeRect
+      // takes its joins from the context, so it has to be set here.
+      ctx.lineJoin = "miter"
       ctx.strokeRect(n.x + ox, n.y + oy, n.w, n.h)
     } else if (s.tool === "ellipse") {
       const n = AnnotationTools.normRect(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y)
@@ -3345,41 +3520,6 @@ PanelWindow {
       const lines = String(s.text || "").split("\n")
       for (let i = 0; i < lines.length; i++) {
         ctx.fillText(lines[i], pts[0].x + ox, pts[0].y + oy + i * fs * 1.2)
-      }
-    } else if (s.tool === "pixelate") {
-      // Overlay blur: sample the composited backing (base image plus
-      // every earlier stroke) right here in the paint pass, then mosaic
-      // over it. Nothing is stored on the stroke, so repaints, undos
-      // and later strokes can never stale the look - each tool always
-      // overlays the previous ones.
-      if (pts.length < 2) {
-        ctx.restore()
-        return
-      }
-      const r = AnnotationTools.normRect(pts[0].x, pts[0].y, pts[pts.length - 1].x, pts[pts.length - 1].y)
-      const live = pixelCells === undefined ? editor._liveBlur(r) : pixelCells
-      if (live === null) {
-        ctx.restore()
-        return
-      }
-      const colors = live.colors
-      const rects = live.rects
-      if (!Array.isArray(colors) || !Array.isArray(rects) || colors.length !== rects.length) {
-        ctx.restore()
-        return
-      }
-      // Cells are laid out in document pixels and scaled into the backing, so
-      // at any display scale other than 1 their edges land between backing
-      // pixels and every seam shows as a grid drawn over the mosaic. Outset
-      // each cell by half a backing pixel so neighbours overlap instead: the
-      // overlap is sub-pixel, and at scale 1 it is half a document pixel.
-      const grow = 0.5 / (editor._boardPaintK > 0 ? editor._boardPaintK : 1)
-      for (let i = 0; i < colors.length; i++) {
-        const color = colors[i]
-        const rect = rects[i]
-        ctx.fillStyle = "rgb(" + color[0] + "," + color[1] + "," + color[2] + ")"
-        ctx.fillRect(rect.x + ox - grow, rect.y + oy - grow,
-          rect.w + grow * 2, rect.h + grow * 2)
       }
     }
     ctx.restore()
