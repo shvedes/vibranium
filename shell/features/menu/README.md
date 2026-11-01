@@ -28,7 +28,7 @@ about one of them:
 | `Menu.qml` | The singleton: bundle loading and extension merges, the page stack, the row state store, provider dispatch, search index and wiring. |
 | `MenuView.qml` | The overlay window: screen-following placement of the card and the host for `MenuPanel`. |
 | `MenuPanel.qml` | The card itself: row-set delivery, the fit trajectory and its history, slot claims, keyboard routing, frame persistence. |
-| `MenuWidth.qml` | The card's width rule: shaping probes, the bounded width caches, the trail reservation and the open-dropdown growth. |
+| `MenuWidth.qml` | The card's width rule: shaping probes, the bounded shape cache, the trail reservation and the open-dropdown growth. |
 | `RowGeometry.qml` | The row's token set as a singleton: the pinned line boxes from the theme's fonts, and the rule's entry points. |
 | `RowRule.js` | The rest-height arithmetic itself: `colH`/`restH`/`restSeparator` over a token set, so the rule can be asked at any scale without a shell. |
 | `Entry.qml` | The one list delegate, covering every row type: main line, trail cluster, dropdown slot, expansion slot. |

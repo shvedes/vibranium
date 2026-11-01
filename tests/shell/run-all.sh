@@ -166,7 +166,7 @@ describe() {
   registry-bus) printf 'the service locator and the one-way notification bus' ;;
   
   paths-presence) printf 'path derivation invariants and refcounted file presence' ;;
-  provider-claim) printf 'ProviderHost owns the provider-id claim and its one late retry' ;;
+  provider-claim) printf 'ProviderHost owns the provider-id claim: one call, one owner' ;;
   ui) printf 'common/ui: layout, derived state, signals and animation, event-loop driven' ;;
   ui-rest) printf 'the rest of common/ui: Icon, GridList, ScrollBar, DropdownSlot, panels' ;;
   list) printf 'List.qml: selection, keyboard navigation and the scroll model' ;;

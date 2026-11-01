@@ -9,10 +9,10 @@ import "MenuLib.js" as MenuLib
 // The menu card's WIDTH: how wide a page of rows has to be.
 //
 // WHY IT IS ITS OWN FILE. The card is content-sized - exactly as wide as its
-// widest row - and that one answer needs seven shaping probes, three
-// dictionaries bounded by a shared budget, a dropdown that widens the card past
-// its resting measure, and two singleton connections that drop the lot when the
-// font or the palette changes. That is a rule, not a corner of a card: it is
+// widest row - and that one answer needs seven shaping probes, one bounded
+// shape cache keyed by the text (see _shapes), a dropdown that widens the card
+// past its resting measure, and two singleton connections that drop the lot
+// when the font or the palette changes. That is a rule, not a corner of a card: it is
 // read by the card's own width binding, by the dropdown open/close handlers and
 // by the row-set install, and none of those need to know how a text is shaped.
 // It lived in the middle of a 4.8k-line panel beside the fit trajectory, the
