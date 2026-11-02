@@ -2907,6 +2907,71 @@ group('the merged row is a copy carrying the hit breadcrumb', () => {
 })
 
 // ======================================================================
+group('a section whose label spells the query leads the list, entries below', () => {
+  // Typing a page's name matches the page's link AND every row inside it (the
+  // breadcrumb joins the row hay), so the link - one row among dozens - was
+  // filed into its parent's bucket below the entry matches: "blur" listed the
+  // Blur section third, behind "Blurred backdrop" and "Blur strength" from
+  // Lock screen, with fifty Blur rows under the buckets that followed. The
+  // link is hoisted into a "Sections" group ahead of every bucket.
+  const b = bundle(`{"pages":[
+    {"id":"main","title":"Main","items":[{"type":"submenu","id":"s1","label":"Blur","page":"blur"}]},
+    {"id":"blur","title":"Blur","items":[
+      {"type":"action","id":"b1","label":"Enabled"},
+      {"type":"action","id":"b2","label":"Passes"}
+    ]},
+    {"id":"lock","title":"Lock screen","items":[{"type":"action","id":"l1","label":"Blurred backdrop"}]}
+  ]}`)
+  const idx = M.buildIndex(b)
+  const rows = M.groupSearchResults(M.search(idx, 'blur'), b.byId, () => true, 'blur')
+  eq('the sections group opens the list', rows[0], { type: 'separator', uid: 'sep:sections', label: 'Sections' })
+  eq('and the section is the first row under it', rows[1].label, 'Blur')
+  eq('the row is still the link, so Enter opens the page',
+    [rows[1].type, rows[1].page, rows[1].uid], ['submenu', 'blur', 'main#s1'])
+  eq('and it is not listed a second time under its own bucket',
+    rows.filter(r => r.uid === 'main#s1').length, 1)
+  eq('the entries keep their own buckets below the section',
+    rows.filter(r => r.type === 'separator').map(r => r.label), ['Sections', 'Lock screen', 'Blur'])
+  eq('with every entry still present',
+    ['Blurred backdrop', 'Enabled', 'Passes'].filter(l => rows.some(r => r.label === l)),
+    ['Blurred backdrop', 'Enabled', 'Passes'])
+  eq('the row is a fresh copy, as every grouped row is', rows[1] === b.byId.main.items[0], false)
+  // The query is compared the way search compares it, so a padded or shouted
+  // query is the same request.
+  eq('case and surrounding space do not matter',
+    M.groupSearchResults(M.search(idx, 'blur'), b.byId, () => true, '  BLUR  ')[1].label, 'Blur')
+})
+
+group('only a literal label match on a real destination is a section', () => {
+  const build = (items, other) => bundle(`{"pages":[
+    {"id":"main","title":"Main","items":${items}},
+    {"id":"lock","title":"Lock screen","items":${other || '[{"type":"action","id":"l1","label":"Blurred backdrop"}]'}}
+  ]}`)
+  const rowsOf = (b, q) => M.groupSearchResults(M.search(M.buildIndex(b), q), b.byId, () => true, q)
+  const isHoisted = (rows) => rows.some(r => r.uid === 'sep:sections')
+
+  // A description is not a name: this link matched "blur" through its desc.
+  const desc = build('[{"type":"submenu","id":"s1","label":"Appearance","desc":"Configure blur under windows","page":"app"}]')
+  eq('a link matched through its description stays filed', isHoisted(rowsOf(desc, 'blur')), false)
+  // Two words do not spell a page name, even when the AND-search finds it.
+  const two = build('[{"type":"submenu","id":"s1","label":"Motion blur","page":"app"}]')
+  eq('a two-word query is not a section name', isHoisted(rowsOf(two, 'blur motion')), false)
+  eq('while the same words as the label are', isHoisted(rowsOf(two, 'motion blur')), true)
+  // A submenu with no target cannot lead the list - it is a dead row.
+  const dead = build('[{"type":"submenu","id":"s1","label":"Blur"}]')
+  eq('a submenu with no page is not a section', isHoisted(rowsOf(dead, 'blur')), false)
+  // A hidden link is dropped before anything is hoisted.
+  const blur = build('[{"type":"submenu","id":"s1","label":"Blur","page":"app"}]')
+  eq('a hidden section takes its header with it',
+    M.groupSearchResults(M.search(M.buildIndex(blur), 'blur'), blur.byId, () => false, 'blur'), [])
+  // No query argument at all is the pre-section contract, unchanged:
+  // MenuPanel is the only caller that passes one.
+  const rows = M.groupSearchResults(M.search(M.buildIndex(blur), 'blur'), blur.byId, () => true)
+  eq('without a query the link is filed, not hoisted', isHoisted(rows), false)
+  eq('but it is still in the results', rows.some(r => r.uid === 'main#s1'), true)
+})
+
+// ======================================================================
 section('provider hook dispatch - the three accept rules')
 group('hookValue passes a non-nullish, non-empty answer through uncoerced', () => {
   // "a nullish or empty answer is a decline, anything else passes through

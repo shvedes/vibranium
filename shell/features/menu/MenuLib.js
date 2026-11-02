@@ -1375,13 +1375,44 @@ function substituteQuoted(command, value) {
 // entry-only row is keyed from the entry. A row that can be neither drawn nor
 // keyed does not belong in the result.
 //
-function groupSearchResults(hits, lookup, isVisible) {
+function groupSearchResults(hits, lookup, isVisible, query) {
   const rows = []
   const buckets = []
   // Prototype-less, like every other map keyed by a page id in this file: a
   // page named "constructor" or "__proto__" read as an existing bucket here and
   // threw on the push below, for every search that reached the page.
   const bucketIndex = Object.create(null)
+  // The query, lowercased/trimmed like every other search comparison, is what
+  // lets a hit be read as a SECTION rather than as an entry. Absent it (a
+  // caller that only wants the sectioning) no hit is hoisted, which is the
+  // behaviour every pre-section caller already had.
+  const q = typeof query === "string" ? query.toLowerCase().trim() : ""
+  // Whether a hit is a SECTION - a row that opens a page, under the query's
+  // own name - rather than an entry found inside one.
+  //
+  // WHY THE LINK NEEDS ITS OWN TIER. Typing a page's name matches the page's
+  // link and every row inside it (the breadcrumb joins the row hay), and the
+  // link is one row competing against dozens: "blur" ranked the Blur link
+  // third and filed it in the Appearance bucket, under "Blurred backdrop"
+  // and "Blur strength" from Lock screen, while fifty Blur rows filled the
+  // buckets after it. The user asked for a section by name and got everything
+  // except it. Hoisting the link turns the answer into what was typed: the
+  // section first, its matching entries below.
+  //
+  // Label-only, literal, and only for a submenu that actually opens a page. A
+  // link that matched through its description ("Configure blur under
+  // windows") is an entry like any other - a description is not a name. A
+  // query of two words ("blur motion") is not a page name, so it stays filed.
+  // And a submenu with no `page` is a dead row, not a destination, so it
+  // cannot lead the list. Local rather than a top-level helper: the library's
+  // declaration list is its published surface, and this is one caller's rule.
+  const isSection = (hit, item) => {
+    if (q === "") return false
+    if (!item || item.type !== "submenu") return false
+    if (typeof item.page !== "string" || item.page === "") return false
+    return String(hit.label).toLowerCase().indexOf(q) >= 0
+  }
+  const sections = []
   for (let i = 0; i < hits.length; i++) {
     const hit = hits[i]
     // A hit is only renderable if it can name itself. A row with no label
@@ -1439,6 +1470,16 @@ function groupSearchResults(hits, lookup, isVisible) {
     // carries does not move when its page starts resolving.
     if (merged.uid === undefined || merged.uid === null)
       merged.uid = hit.pageId + "#" + hit.row
+    // A submenu link whose own LABEL spells the query is the section the user
+    // is looking for, and it is hoisted instead of filed (see isSectionHit).
+    // The test is on the label, not on the hit, because the hit only says the
+    // row matched somewhere: the breadcrumb a section's children inherit means
+    // every child of "Blur" matched the moment the user typed the page name,
+    // and those children outrank and outnumber the link that names the page.
+    if (isSection(merged, item)) {
+      sections.push(merged)
+      continue
+    }
     // `hits` arrives ranked, so appending keeps rank order inside the
     // bucket. Unshifting a submenu to the head of the page it opens would
     // put a weaker match above the stronger ones filed with
@@ -1447,6 +1488,19 @@ function groupSearchResults(hits, lookup, isVisible) {
     // "PWA" (2000, matched on its label), and the cursor the caller seats
     // on row 0 would land on the wrong row.
     buckets[bucketIndex[group]].push(merged)
+  }
+  // Sections lead the list, in hit order - rank order among themselves, since
+  // the hit set is already sorted. Their own bucket is skipped entirely below
+  // (`sections` rows never enter one), so no link is listed twice. The header
+  // names the group rather than a breadcrumb: these rows live in different
+  // places, and where each one lives is the thing the header cannot say.
+  if (sections.length > 0) {
+    rows.push({
+      type: "separator",
+      uid: "sep:sections",
+      label: "Sections"
+    })
+    for (let s = 0; s < sections.length; s++) rows.push(sections[s])
   }
   for (let b = 0; b < buckets.length; b++) {
     // The group header names where the bucket lives: the first row's

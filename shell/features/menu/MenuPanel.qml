@@ -645,7 +645,10 @@ Rectangle {
       // on the first unkeyable row - so one font family or keybinding anywhere
       // in the hit set suppressed the whole result, and a query with real
       // matches read as a dead search bar.
-      candidate = MenuLib.groupSearchResults(Menu.results, Menu.pageById, Menu.isVisible)
+      // The query rides along so a row that names a section the user typed
+      // (the Blur link, under "blur") can lead the list instead of being
+      // filed under the page it lives on, after the rows it opens.
+      candidate = MenuLib.groupSearchResults(Menu.results, Menu.pageById, Menu.isVisible, Menu.query)
     } else if (panel.scopedSearching) {
       // "/" quick-filter: already scoped by the lib to the current page's
       // visible fields. A trim, not the cross-page search - grid chrome
