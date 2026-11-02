@@ -99,6 +99,11 @@ Singleton {
   // a scoped logger.
   function allows(level, scope) {
     if (typeof scope === "string" && scope !== "") return Core.allows(level, scope)
+    // A level no scope carries is answered without the capture: the guard is
+    // asked most often exactly where the answer is no (a DEBUG payload under
+    // the default level), and paying for a trace to hear that is the cost this
+    // pre-flight exists to avoid.
+    if (!Core.mayEmit(level)) return false
     return Core.allows(level, Scope.scopeFromStack(new Error().stack, 1))
   }
 

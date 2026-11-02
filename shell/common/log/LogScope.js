@@ -41,6 +41,15 @@ var SKIP_DIRS = ["modules"]
 // empty scope nothing can be silenced against.
 var FALLBACK = "shell"
 
+// path -> the scope derived from it.
+//
+// A scope is a pure function of the file path and a file has one path, so the
+// derivation only ever has to happen once per call site. Without this, every
+// record re-splits the path and rebuilds the name - which a TRACE inside a
+// draw handler pays for on every frame. Bounded by the number of files that
+// log, so it cannot grow past the tree.
+var _pathScopes = ({})
+
 // stripLine(text) -> the frame's location without its line number.
 //
 // Quickshell prints a frame as `name@url:line`. The line is stripped here
@@ -91,6 +100,9 @@ function scopeFromPath(filePath) {
   const scheme = /^[A-Za-z][A-Za-z0-9+.-]*:/.exec(text)
   if (scheme !== null) text = text.slice(scheme[0].length)
 
+  const known = _pathScopes[text]
+  if (known !== undefined) return known
+
   const parts = []
   const raw = text.split("/")
   for (let i = 0; i < raw.length; i++) {
@@ -125,7 +137,9 @@ function scopeFromPath(filePath) {
   for (let i = 0; i < kept.length; i++) {
     if (kept[i] !== "") named.push(lowerFirst(kept[i]))
   }
-  return named.length === 0 ? FALLBACK : named.join(".")
+  const scope = named.length === 0 ? FALLBACK : named.join(".")
+  _pathScopes[text] = scope
+  return scope
 }
 
 // stripExtension(name) -> the file stem, for the two spellings this tree

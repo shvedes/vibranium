@@ -729,6 +729,46 @@ group('levelList reports the set most severe first, whatever the key order', () 
   eq('no set', Spec.levelList(null), [])
 })
 
+group('mayAllow answers the cheap half of the gate, without a scope to answer for', () => {
+  // The scope IS an input to the gate, and deriving one costs a stack capture.
+  // `mayAllow` is the question that can be settled before paying for it: could
+  // ANY scope carry this level? False is then a definite suppression.
+  const r = (spec, base) => Spec.resolve(Spec.parseSpec(spec), base)
+  eq('a level the global set carries', Spec.mayAllow(r('debug', 'info'), 'debug'), true)
+  eq('a level nothing carries', Spec.mayAllow(r('info', 'info'), 'debug'), false)
+  eq('an absent configuration follows the default level', Spec.mayAllow(null, 'info'), true)
+  eq('and holds its DEBUG line back', Spec.mayAllow(null, 'debug'), false)
+  eq('off carries nothing', Spec.mayAllow(r('off', 'info'), 'error'), false)
+  // The direction that must not regress: a pin widens one subtree, so a level
+  // absent from the global set can still be live somewhere and the capture is
+  // worth taking.
+  eq('a per-scope pin keeps the level live', Spec.mayAllow(r('info,bar.clock=debug', 'info'), 'debug'), true)
+  eq('a bare scope term pins the base level, so it counts too',
+    Spec.mayAllow(r('clipboard', 'debug'), 'debug'), true)
+  eq('a pin of off adds nothing', Spec.mayAllow(r('bar=off', 'info'), 'debug'), false)
+})
+group('mayAllow is a sound upper bound: it is never false where allows is true', () => {
+  // The property the emitter relies on. A false here that `allows` contradicts
+  // would drop a record the configuration asked for - silently, and only in the
+  // scopes someone went out of their way to turn up.
+  const specs = ['', 'off', '*', 'info', 'debug', 'trace', 'info,bar=debug', '-bar,bar.clock=trace',
+    'clipboard', 'bar=off,bar.clock=debug', 'warn,-debug', 'debug,-warn', '-clipboard,clipboard=trace']
+  const scopes = ['bar', 'bar.clock', 'bar.network', 'clipboard', 'clipboard.clipboardLib', 'shell']
+  const levels = ['error', 'warn', 'info', 'debug', 'trace']
+  const wrong = []
+  for (const spec of specs) {
+    const r = Spec.resolve(Spec.parseSpec(spec), 'info')
+    for (const scope of scopes) {
+      for (const level of levels) {
+        if (Spec.allows(r, scope, level) && !Spec.mayAllow(r, level)) {
+          wrong.push(`${spec || '(none)'} ${scope} ${level}`)
+        }
+      }
+    }
+  }
+  eq('no scope allows a level the bound calls dead', wrong, [])
+})
+
 // ---------------------------------------------------------------------------
 section('LogSpec.describe and grammar - what status and help report')
 // ---------------------------------------------------------------------------
@@ -839,6 +879,38 @@ group('an explicit scope short-circuits the trace, so no depth has to be right',
     Core.emit('info', ['no depth given'], 'claimed.scope', undefined)
   })
   eq('the claimed scope is used verbatim', emitted('info'), ['claimed.scope: no depth given'])
+})
+group('a derived-scope record is refused before its trace is captured', () => {
+  // The optimisation is invisible from outside except as a cost, so what is
+  // pinned here is the pair of behaviours it must preserve: a level no scope
+  // carries still prints nothing, and the scoped gate agrees with the emission.
+  // (That a widened scope is NOT refused is the Spec group above, which is where
+  // the risk actually lives: an over-eager pre-gate would drop pinned records.)
+  const out = captureConsole(() => {
+    Core.configure('')
+    eq('a suppressed derived record reports nothing printed', Core.emit('debug', ['x'], '', 2), false)
+    eq('and the scoped gate agrees', Core.at('').allows('debug'), false)
+    Core.configure('debug')
+    eq('the same call prints once the level is live', Core.emit('debug', ['x'], 'derived.claim', 2), true)
+  })
+  // Exactly one record reaches a console at a level the sink sees as non-info:
+  // the one emitted after DEBUG went live. The rest of the capture is the
+  // startup announcement, which is a record about the configuration.
+  eq('nothing but the live record was printed',
+    out.filter((p) => p.level !== 'info').map((p) => p.text),
+    ['log: configuration source VIBRANIUM_SHELL_LOG, settings not consulted', 'derived.claim: x'])
+})
+group('mayEmit is that bound, over the live configuration', () => {
+  // The public form, so a caller about to build a payload can ask the cheap
+  // question before the exact one - `Log.allows(level)` is that caller.
+  Core.configure('')
+  eq('the default level carries info', Core.mayEmit('info'), true)
+  eq('and not debug', Core.mayEmit('debug'), false)
+  Core.configure('info,bar.clock=trace')
+  eq('a pinned subtree keeps the level live', Core.mayEmit('trace'), true)
+  eq('and agrees with the per-scope answer where it is pinned', Core.allows('trace', 'bar.clock'), true)
+  Core.configure('off')
+  eq('off carries nothing', Core.mayEmit('error'), false)
 })
 group('configure replaces the configuration rather than merging into it', () => {
   Core.configure('debug')

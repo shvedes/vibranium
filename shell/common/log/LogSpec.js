@@ -373,6 +373,33 @@ function allows(resolved, scope, level) {
   return levelsFor(resolved, scope)[level] === true
 }
 
+// mayAllow(resolved, level) -> whether ANY scope could allow `level`.
+//
+// An upper bound, and the reason it exists: deciding a record's fate needs its
+// scope, and a derived scope needs a stack capture. When no scope in the
+// configuration can carry a level, that capture is dead work - so the emitter
+// asks this first, which is two map reads instead of a V8 stack capture on
+// every suppressed DEBUG line. That is most lines: the default level is INFO,
+// so DEBUG and TRACE are off unless someone asked for them.
+//
+// Sound in the direction that matters. `false` means no scope allows, because
+// a scope's set is the global set WIDENED by the pins covering it and silence
+// can only remove - so a level absent from the global set and from every pin
+// is absent everywhere. `true` is not a promise that this scope allows; it
+// only says the exact answer is worth computing.
+//
+// This cannot replace `allows`: a pin widens one subtree, so `bar=x=debug`
+// over an INFO base makes DEBUG live in exactly that scope and nowhere else.
+function mayAllow(resolved, level) {
+  if (!resolved) return baseLevels(DEFAULT_LEVEL)[level] === true
+  if (resolved.levels[level] === true) return true
+  const keys = Object.keys(resolved.overrides)
+  for (let i = 0; i < keys.length; i++) {
+    if (baseLevels(resolved.overrides[keys[i]])[level] === true) return true
+  }
+  return false
+}
+
 // stringify(value) -> the printed form of one message part.
 //
 // Objects and arrays are expanded rather than left as `[object Object]`,

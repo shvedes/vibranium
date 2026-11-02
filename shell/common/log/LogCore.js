@@ -16,10 +16,12 @@
 // stays the tree's `Log` and owns *when* the configuration is resolved; this
 // file owns what it resolves to.
 //
-// The gate comes before anything is printed, and the trace is captured by the
-// caller rather than here, so a suppressed record costs one map read and no
-// stack capture at all - which is what keeps a DEBUG line inside a per-frame
-// binding free when DEBUG is off.
+// A suppressed record must not cost a stack capture, or a DEBUG line inside a
+// per-frame binding is expensive precisely where nobody is reading the log.
+// The capture cannot simply be moved to the caller: the scope it derives IS the
+// gate's input. So the gate is answered in two steps - `mayEmit`, which asks
+// only whether any scope could allow the level, then the capture and the exact
+// per-scope answer. See `emit`.
 .pragma library
 
 .import "LogSpec.js" as Spec
@@ -175,6 +177,14 @@ function levelsFor(scope) {
   return levels
 }
 
+// mayEmit(level) -> whether any scope in the configuration could allow it.
+//
+// The cheap half of the gate, public because a caller that is about to build a
+// payload has the same question `emit` does and should not pay a stack capture
+// to hear a definite no. False is exact - no scope allows - while true only
+// means the per-scope answer is worth asking.
+function mayEmit(level) { return Spec.mayAllow(_resolved, level) }
+
 // allows(level, scope) -> whether a record would be emitted. A caller wrapping
 // expensive work in a debug log asks this first, rather than building a
 // payload that is then thrown away.
@@ -198,7 +208,13 @@ function allows(level, scope) {
 // only entry that accepts a depth and therefore the only one a caller outside
 // this file needs.
 function emit(level, parts, scopeName, depth) {
-  const scope = (scopeName !== undefined && scopeName !== null && scopeName !== "")
+  const named = (scopeName !== undefined && scopeName !== null && scopeName !== "")
+  // The cheap half of the gate, before the expensive half can be paid for: a
+  // level no scope can carry is rejected without taking the trace that would
+  // have told us WHICH scope was carrying it. A named scope needs no trace and
+  // is answered exactly by `allows` below, so it skips this.
+  if (!named && !mayEmit(level)) return false
+  const scope = named
     ? scopeName
     : Scope.scopeFromStack(new Error().stack, typeof depth === "number" ? depth : JS_DEPTH)
   if (!allows(level, scope)) return false
@@ -270,14 +286,18 @@ function scoped(scopeName) {
     // drift - which is how a guard silently starts protecting the wrong scope.
     //
     // The derived form (an empty `scopeName`, i.e. `at()`) costs a stack
-    // capture. That is the right trade and not a regression of the "a
-    // suppressed record costs one map read" rule: that rule is about `emit`,
-    // and this is an explicit caller asking before building a payload, which a
-    // capture is far cheaper than. The capture happens in the arrow below, so
-    // index 0 is the arrow and 1 is whoever called `allows`.
+    // capture - but only once `mayEmit` has established that the level is live
+    // SOMEWHERE, because a capture taken for a level no scope carries is paid
+    // for and then discarded. That is the right trade and not a regression of
+    // the "a suppressed record costs one map read" rule: that rule is about
+    // `emit`, and this is an explicit caller asking before building a payload,
+    // which a capture is far cheaper than. The capture happens in the arrow
+    // below, so index 0 is the arrow and 1 is whoever called `allows`.
     allows: (level) => named
       ? allows(level, scopeName)
-      : allows(level, Scope.scopeFromStack(new Error().stack, 1)),
+      : (mayEmit(level)
+        ? allows(level, Scope.scopeFromStack(new Error().stack, 1))
+        : false),
     info: (...parts) => emit("info", parts, scopeName, JS_DEPTH),
     warn: (...parts) => emit("warn", parts, scopeName, JS_DEPTH),
     error: (...parts) => emit("error", parts, scopeName, JS_DEPTH),
