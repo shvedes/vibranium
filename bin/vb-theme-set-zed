@@ -1,0 +1,161 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+VERBOSE=${VERBOSE:-false}
+
+usage() {
+  shcat << EOF
+Usage: ${0##*/} [OPTION]
+
+Apply the active Vibranium color theme to the Zed editor.
+
+Options:
+  -v, --verbose  Enable verbose output
+  -h, --help     Show this help and exit
+EOF
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -v | --verbose)
+      export VERBOSE=true
+      shift
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+THEME="$VIBRANIUM_STATE/theme/zed.json"
+log Info "zed theme file: $THEME"
+
+# Strip full-line `//` comments from JSONC for jq. Unlike the VS Code setter,
+# inline `//` is not touched: zed.json carries a "$schema" URL that would be
+# truncated otherwise.
+_jsonc() {
+  local _jc_line
+  while IFS= read -r _jc_line || [[ -n $_jc_line ]]; do
+    [[ $_jc_line =~ ^[[:space:]]*// ]] && continue
+    printf '%s\n' "$_jc_line"
+  done < "$1"
+}
+
+# _set_value <line-var> <key> <value>
+# Replaces the string value after "<key>" in the line stored in <line-var>.
+# A line where the key is not followed by a string is left untouched.
+_set_value() {
+  local -n _sv_line=$1
+  local _sv_key=$2 _sv_val=$3
+  local _sv_before _sv_after _sv_pre _sv_mid _sv_tail
+
+  _sv_before=${_sv_line%%"\"$_sv_key\""*}
+  _sv_after=${_sv_line#*"\"$_sv_key\""}
+  _sv_pre=${_sv_after%%'"'*}
+
+  if [[ $_sv_pre == *:* && $_sv_after == *'"'* ]]; then
+    _sv_mid=${_sv_after#*'"'}
+    if [[ $_sv_mid == *'"'* ]]; then
+      _sv_tail=${_sv_mid#*'"'}
+      _sv_line="$_sv_before\"$_sv_key\"${_sv_after%%'"'*}\"$_sv_val\"$_sv_tail"
+    fi
+  fi
+}
+
+# Apply the theme to Zed. The command check precedes any file creation, so
+# a system without Zed is left untouched (the Arch package ships `zeditor`).
+set_theme() {
+  local editor_cmd="$1"
+  local config_dir="$2"
+  local settings_path="$config_dir/settings.json"
+  local link="$config_dir/themes/vibranium.json"
+
+  command -v "$editor_cmd" > /dev/null || { log Info "$editor_cmd not found, skipping"; return 0; }
+
+  if [[ ! -f $THEME ]]; then
+    log Info "theme provides no zed.json, skipping"
+    return 0
+  fi
+
+  theme_name=$(_jsonc "$THEME" | jq -r '.themes[0].name // empty')
+  if [[ -z $theme_name ]]; then
+    log Error "could not read theme name from $THEME"
+    return 1
+  fi
+
+  log Info "set_theme: $editor_cmd theme=$theme_name"
+
+  # $VIBRANIUM_STATE/theme is replaced on every theme change, but the path
+  # stays the same, so the link is created once and then left alone. Zed
+  # only ever sees the link, never the replacement of the file behind it.
+  mkdir -p "${link%/*}"
+  if [[ $(readlink "$link") != "$THEME" ]]; then
+    ln -sfn "$THEME" "$link"
+    log Info "linked $link -> $THEME"
+  fi
+
+  [[ -f $settings_path ]] || printf '{\n}\n' > "$settings_path"
+
+  # Zed's "theme" setting is either a plain string or an object with
+  # mode/light/dark; both forms are updated in place. This is a textual edit
+  # (settings.json is JSONC), the same approach as the VS Code setter.
+  log Info "Applying theme $theme_name to $editor_cmd"
+  _zs_out=""
+  _zs_found=false
+  _zs_in_obj=false
+
+  while IFS= read -r _zs_line || [[ -n $_zs_line ]]; do
+    # An empty settings object receives a placeholder key so the
+    # replacement below has a match target.
+    if [[ ${_zs_line//[[:space:]]/} == '{}' ]]; then
+      _zs_line='{"theme": ""}'
+    fi
+
+    if $_zs_in_obj; then
+      _set_value _zs_line light "$theme_name"
+      _set_value _zs_line dark "$theme_name"
+      [[ $_zs_line == *'}'* ]] && _zs_in_obj=false
+    elif [[ $_zs_line == *'"theme"'* ]]; then
+      _zs_after=${_zs_line#*'"theme"'}
+      if [[ $_zs_after == *:* ]]; then
+        _zs_found=true
+        _zs_rest=${_zs_after#*:}
+        _zs_rest=${_zs_rest#"${_zs_rest%%[![:space:]]*}"}
+        if [[ $_zs_rest == '{'* ]]; then
+          _set_value _zs_line light "$theme_name"
+          _set_value _zs_line dark "$theme_name"
+          [[ $_zs_rest == *'}'* ]] || _zs_in_obj=true
+        else
+          _set_value _zs_line theme "$theme_name"
+        fi
+      fi
+    fi
+
+    _zs_out+="$_zs_line"$'\n'
+  done < "$settings_path"
+
+  # No "theme" key at all: insert one right after the opening brace.
+  if ! $_zs_found; then
+    _zs_head=${_zs_out%%\{*}
+    _zs_tail=${_zs_out#*\{}
+    printf -v _zs_out '%s{\n  "theme": "%s",%s' "$_zs_head" "$theme_name" "$_zs_tail"
+  fi
+
+  # Rewrite only when something changed, so Zed is not told to reload its
+  # settings for nothing.
+  if ! printf '%s' "$_zs_out" | cmp -s - "$settings_path"; then
+    printf '%s' "$_zs_out" > "$settings_path"
+    log Info "updated $settings_path"
+  fi
+}
+
+if command -v zed > /dev/null; then
+  set_theme "zed" "$XDG_CONFIG_HOME/zed"
+else
+  set_theme "zeditor" "$XDG_CONFIG_HOME/zed"
+fi
