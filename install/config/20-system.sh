@@ -6,6 +6,7 @@ for entry in "$VIBRANIUM"/extras/etc/*; do
 	if ! [[ -e "$entry" ]]; then
 		continue
 	fi
+
 	helpers::copy "$entry" "/etc/${entry##*/}"
 done
 
