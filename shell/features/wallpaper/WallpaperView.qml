@@ -34,7 +34,14 @@ PanelWindow {
   // The first resolved wallpaper often lands before that, so
   // show() parks its URL here instead of snapping; a later show()
   // overwrites it, latest wins. Replayed from onAnimKnownChanged.
-  property bool animKnown: HyprlandSettings.ready
+  // Two gates, one flag: the animation switch has to resolve, AND boot
+  // construction has to settle. The second half is what makes the first fade
+  // one uninterrupted 200ms instead of a starved 433ms: the bar is still
+  // building its modules on this thread when the decode lands, so a fade that
+  // started then spent three quarters of its life behind that work. Parking
+  // the URL here is the existing mechanism, not a new one - it just waits for
+  // one more answer.
+  property bool animKnown: HyprlandSettings.ready && DesktopLayoutState.bootEntranceSettled
   property string pendingUrl: ""
 
   onAnimKnownChanged: {

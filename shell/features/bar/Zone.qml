@@ -979,8 +979,13 @@ Item {
     // keeps a slot whose async build lands after the global release (a
     // second screen a frame behind) sliding in instead of popping.
     property bool _bootHeld: true
+    // Held at Bar.entranceWarmOpacity rather than 0: an item at opacity 0 is
+    // culled by the renderer, so a bar held at 0 has uploaded nothing by the
+    // time the entrance releases it - and then pays all of it on the first
+    // frame of the animation (measured: 85ms inside the boot fade). The warm
+    // opacity is drawn but not visible. See Bar._latchEntrance.
     property real intro: slot._bootHeld
-      ? ((Bar.entranceReady && contentLoader.status === Loader.Ready) ? 1 : 0) : 1
+      ? ((Bar.entranceReady && contentLoader.status === Loader.Ready) ? 1 : Bar.entranceWarmOpacity) : 1
     Behavior on intro {
       enabled: slot._bootHeld && MotionPolicy.enabled
       NumberAnimation { duration: Ui.slowMs; easing.type: Easing.OutCubic }

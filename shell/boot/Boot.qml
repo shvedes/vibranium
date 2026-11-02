@@ -673,6 +673,11 @@ Item {
   // with nothing to dispatch to, so the demand is replayed in _adoptLate
   // instead of leaving the unit starting forever.
   property var _pendingLateResolves: []
+  // That replay, taken over by the pump once the late half lands.
+  property var _replayQueue: []
+  // A drain asked for before the entrance played; the milestone's change runs
+  // it (see _beginDrain).
+  property bool _drainRequested: false
 
   function _loadLate() {
     if (boot._late || boot._lateComponent) return
@@ -713,23 +718,52 @@ Item {
     // now that there is something to dispatch to, then refresh it so a
     // unit with no ready predicate (or an already-true one) settles
     // instead of sitting in starting. Units with a pending predicate
-    // settle through their own refresh hooks.
-    const pending = boot._pendingLateResolves
+    // settle through their own refresh hooks. The replay goes through the
+    // same frame budget as the drain: resolving a unit constructs a real
+    // singleton (a window, a device handle, a history read), and the
+    // stashed list is every service the bar demanded during Phase 1 - one
+    // unbounded turn of exactly that work is the stall this budget removes.
+    boot._replayQueue = boot._pendingLateResolves
     boot._pendingLateResolves = []
-    for (let i = 0; i < pending.length; i++) {
+    boot._replayNext()
+  }
+
+  // One turn of the late replay. The drain starts once this empties, which
+  // is the order the two always had (the drain may need what the replay
+  // settles), so the yield points only split the burst into frames.
+  function _replayNext() {
+    const deadline = Date.now() + boot.frameBudgetMs
+    while (boot._replayQueue.length > 0) {
+      const id = boot._replayQueue.shift()
+      let resolved = true
       try {
-        boot._late.resolve(pending[i])
+        boot._late.resolve(id)
       } catch (error) {
-        Log.error("boot: late replay for unit " + pending[i] + " failed: " + String((error && error.message) || error))
-        continue
+        resolved = false
+        Log.error("boot: late replay for unit " + id + " failed: " + String((error && error.message) || error))
       }
-      UnitGate.refresh(pending[i])
+      if (resolved) UnitGate.refresh(id)
+      if (Date.now() >= deadline) break
+    }
+    if (boot._replayQueue.length > 0) {
+      Idle.run(boot._replayNext, 0, 0, "boot-replay")
+      return
     }
     boot._beginDrain()
   }
 
   function _beginDrain() {
     if (boot._drainStarted) return
+    // Phase order, not a delay: construction settles first, then the entrance
+    // animation plays, and only then does the background drain spend this
+    // thread. The drain used to start the instant the late half landed, which
+    // is mid-entrance - traced on a cold boot, it put 70-150ms stalls inside a
+    // 200ms wallpaper crossfade and stretched the whole entrance.
+    if (!DesktopLayoutState.bootEntrancePlayed) {
+      boot._drainRequested = true
+      return
+    }
+    boot._drainRequested = false
     boot._drainStarted = true
     // The drain resolves what the shell needs up front. A first_use unit is
     // none of that: it is built by whoever demands it, through its own
@@ -1221,6 +1255,15 @@ Item {
     function on_ReportChanged() { boot._requestSyncReport() }
   }
 
+  // The entrance milestone owns when the background phases start (see
+  // _beginDrain): the drain request parked there runs on this edge.
+  Connections {
+    target: DesktopLayoutState
+    function onBootEntrancePlayedChanged() {
+      if (boot._drainRequested) boot._beginDrain()
+    }
+  }
+
   function _bootP0() {
     const floor = boot._catalog.filter(descriptor => descriptor.activation === "eager")
     for (let i = 0; i < floor.length; i++) {
@@ -1262,17 +1305,38 @@ Item {
     }
   }
 
-  function _drainNext() {
+  // What one background turn may spend on this thread, in milliseconds.
+  //
+  // The entrance animation is drawing through the same thread, and the drain
+  // starts the moment the late half lands - ~190ms of async type loading in,
+  // which is the tail of that animation. Batching by unit count cannot bound
+  // a frame: four facades are a millisecond and four units that build a
+  // window, read a history file and open a device are ten times that, which
+  // is the hitch this replaces. Only elapsed time holds across units whose
+  // cost differs by two orders of magnitude, so every background phase
+  // (drain, deferred drain, late replay) spends this per turn and hands the
+  // thread back. Half a 60Hz frame leaves the scene-graph sync that draws the
+  // animation its own half.
+  readonly property real frameBudgetMs: 8
+
+  // One turn of a background phase: run whole units until the budget is gone.
+  // At least one unit always runs - an entry already over budget must still
+  // make progress, or the pump would reschedule forever without advancing.
+  // Returns nothing; callers own the queue and the rescheduling.
+  function _budgetedTurn(queue) {
     boot._coalesceReports = true
-    const BATCH = 4
-    for (let b = 0; b < BATCH; b++) {
-      const descriptor = boot._queue.shift()
-      if (!descriptor) break
-      boot._drainOne(descriptor)
+    const deadline = Date.now() + boot.frameBudgetMs
+    while (queue.length > 0) {
+      boot._drainOne(queue.shift())
+      if (Date.now() >= deadline) break
     }
     boot._coalesceReports = false
     if (boot._reportPending) boot._reportPending = false
     boot._syncReport()
+  }
+
+  function _drainNext() {
+    boot._budgetedTurn(boot._queue)
     if (boot._queue.length > 0) {
       Idle.run(boot._drainNext, 0, 0, "boot-drain")
       return
@@ -1283,16 +1347,7 @@ Item {
   }
 
   function _drainDeferred() {
-    boot._coalesceReports = true
-    const BATCH = 4
-    for (let b = 0; b < BATCH; b++) {
-      const descriptor = boot._deferredQueue.shift()
-      if (!descriptor) break
-      boot._drainOne(descriptor)
-    }
-    boot._coalesceReports = false
-    if (boot._reportPending) boot._reportPending = false
-    boot._syncReport()
+    boot._budgetedTurn(boot._deferredQueue)
     if (boot._deferredQueue.length > 0) {
       Idle.run(boot._drainDeferred, 2, 0, "boot-drain-deferred")
     }

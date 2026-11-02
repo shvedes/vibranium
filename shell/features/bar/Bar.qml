@@ -728,6 +728,11 @@ Singleton {
   // that guarantees the bar cannot stay held forever (a Loader that errors
   // never reports, so without it one broken module would blank the bar).
   property bool entranceReady: false
+  // Warm frame state (see _latchEntrance). Held slots draw at
+  // entranceWarmOpacity for one frame before the release, so their first
+  // composite is paid while nobody is looking rather than inside it.
+  property bool entranceWarming: false
+  readonly property real entranceWarmOpacity: root.entranceWarming ? 0.004 : 0
 
   Timer {
     id: entranceFallback
@@ -760,7 +765,52 @@ Singleton {
 
   function _latchEntrance() {
     if (root.entranceReady) return
+    // A held slot sits at opacity 0, and the renderer culls what is fully
+    // transparent: nothing in a held bar uploads a texture or compiles an
+    // effect shader, and the entrance's first visible frame pays for all of
+    // it. That frame used to land inside the boot animations. Traced on a
+    // cold boot with the wallpaper fade as the yardstick: releasing straight
+    // from opacity 0 stretched a 200ms fade to 299ms with one 85ms stall in
+    // the middle of it; drawing one warm frame first restored the nominal
+    // 200ms. So the release is two steps - draw at an opacity that is
+    // invisible on screen but still drawn, then release.
+    if (!root.entranceWarming) {
+      root.entranceWarming = true
+      entranceWarmFrame.restart()
+      return
+    }
+    // A settle re-check while the warm frame is pending must not jump the gun.
+    if (entranceWarmFrame.running) return
     root.entranceReady = true
+    // Every placed module is built, which is the shell's own answer to "boot
+    // construction settled" - the surfaces that play a boot animation (the
+    // wallpaper's first fade) read it instead of racing this construction.
+    DesktopLayoutState.noteBootEntranceSettled()
+    // ...and this bar owns the entrance animation itself, so it is also what
+    // reports the end of it. The interval is the very duration the intro
+    // Behavior above runs on, so the two cannot drift apart.
+    entrancePlayed.stop()
+    entrancePlayed.start()
+  }
+
+  // The warm frame itself: one frame is the whole requirement, so the
+  // interval is a frame at 60Hz rather than a tuned duration.
+  Timer {
+    id: entranceWarmFrame
+
+    interval: 16
+    repeat: false
+    onTriggered: root._latchEntrance()
+  }
+
+  // Reports the entrance's end to the shared milestone. Background boot work
+  // (the drain) waits for it, so the slidefade plays on an idle thread.
+  Timer {
+    id: entrancePlayed
+
+    interval: Ui.slowMs
+    repeat: false
+    onTriggered: DesktopLayoutState.noteBootEntrancePlayed()
   }
 
   // Is `kind` on the bar, either as a slot of its own or as a member of a

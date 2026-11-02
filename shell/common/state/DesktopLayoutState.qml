@@ -1,5 +1,6 @@
 pragma Singleton
 
+import QtQuick
 import Quickshell
 import qs.common
 
@@ -18,6 +19,53 @@ Singleton {
   readonly property real barHeight: root._barLayout.height
   readonly property bool wallpaperEnabled: Settings.ready && Settings.wallpaperEnabled
   readonly property var primaryScreen: Ui.primaryScreen
+
+  // --- boot entrance -------------------------------------------------------
+  //
+  // True once the shell's boot construction has settled, which is when the
+  // entrance animation may play. The bar latches it the moment every placed
+  // module has built (and immediately when it has nothing to wait for), so the
+  // surfaces that paint a boot animation start it on a warm frame instead of
+  // playing while modules are still constructing. Traced on a cold boot: the
+  // wallpaper's 200ms fade took 433ms because it overlapped exactly that
+  // construction, and the hitch at its tail was the overlap, not the fade.
+  //
+  // The backstop is not a tuning knob: a shell with no bar, or one whose bar
+  // never latches, must not hold a boot animation forever, and 900ms is a
+  // boot's own outer bound rather than a frame budget. The timer stops the
+  // moment the real latch lands.
+  readonly property int bootEntranceBackstopMs: 900
+  property bool bootEntranceSettled: false
+  // The same milestone, one animation later: construction settled AND the
+  // entrance has played. Background work that only needs to exist (the boot
+  // drain, the late-demand replay) waits for this one, so it cannot spend the
+  // entrance's frames - measured on a cold boot, a drain that started with the
+  // fade put 70-150ms stalls inside a 200ms crossfade.
+  property bool bootEntrancePlayed: false
+
+  function noteBootEntranceSettled() {
+    if (root.bootEntranceSettled) return false
+    root.bootEntranceSettled = true
+    return true
+  }
+
+  function noteBootEntrancePlayed() {
+    if (root.bootEntrancePlayed) return false
+    root.bootEntrancePlayed = true
+    return true
+  }
+
+  // The backstop lands both milestones: a shell with no bar, or one whose bar
+  // never reports, still boots its background phases.
+  Timer {
+    interval: root.bootEntranceBackstopMs
+    running: !root.bootEntrancePlayed
+    repeat: false
+    onTriggered: {
+      root.noteBootEntranceSettled()
+      root.noteBootEntrancePlayed()
+    }
+  }
 
   // --- island pile-clearance ------------------------------------------------
   //
