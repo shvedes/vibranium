@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source vb-lib-cli
+source vb-lib-network
 
 VERBOSE=${VERBOSE:-false}
 SELF="${0##*/}"
@@ -20,35 +21,6 @@ EOF
 }
 
 set -euo pipefail
-
-# Resolve a saved connection profile by its wireless SSID. Profile names
-# often equal the SSID but must not be trusted to, so match the
-# 802-11-wireless.ssid field instead. UUID and TYPE columns hold no
-# colons, so the terse table parses safely.
-uuid_for_ssid() {
-	local -n _uuid_for_ssid_out=$1
-	# The loop variable is deliberately not named after the caller's variable:
-	# a local of that name shadows the nameref target, so the assignment below
-	# would land on this function's own copy and vanish on return.
-	local want="$2" candidate
-	while IFS= read -r candidate; do
-		[[ -n "$candidate" ]] || continue
-		local s
-
-		IFS= read -r s < <(nmcli --get-values 802-11-wireless.ssid connection show uuid "$candidate" 2> /dev/null) || true
-
-		if [[ "$s" == "$want" ]]; then
-			_uuid_for_ssid_out="$candidate"
-			return 0
-		fi
-
-	done < <(
-		while IFS=: read -r _u _type _rest; do
-			[[ $_type == "802-11-wireless" ]] && printf '%s\n' "$_u"
-		done < <(nmcli -t -f UUID,TYPE connection show 2> /dev/null)
-	)
-	return 1
-}
 
 interface=""
 want_ssid=""
@@ -91,37 +63,14 @@ done
 uuid=""
 
 if [[ -n "$want_ssid" ]]; then
-	if ! uuid_for_ssid uuid "$want_ssid"; then
+	if ! network::uuid_for_ssid uuid "$want_ssid"; then
 		echo "No saved connection for '$want_ssid'" >&2
 		exit 1
 	fi
 else
 	if [[ -z "$interface" ]]; then
-		# The route probe targets 1.1.1.1; accept its device only when sysfs marks
-		# it wireless, otherwise select the first connected NetworkManager Wi-Fi
-		# device. Pin the locale and accept connected states by prefix.
-		route_device=""
-		while IFS= read -r _route_line; do
-			read -ra _route_words <<< "$_route_line"
-			for ((i = 0; i + 1 < ${#_route_words[@]}; i++)); do
-				if [[ ${_route_words[i]} == "dev" ]]; then
-					route_device=${_route_words[i + 1]}
-					break 2
-				fi
-			done
-		done < <(ip route get 1.1.1.1 2> /dev/null)
-
-		if [[ -n "$route_device" && -d "/sys/class/net/$route_device/wireless" ]]; then
-			interface="$route_device"
-		else
-			interface=""
-			while IFS=: read -r _dev _type _state _rest; do
-				if [[ $_type == "wifi" && $_state == connected* ]]; then
-					interface=$_dev
-					break
-				fi
-			done < <(LC_ALL=C nmcli -t -f DEVICE,TYPE,STATE device status 2> /dev/null)
-		fi
+		# One owner for the active-link lookup: see vb-lib-network.
+		network::wifi_interface interface || true
 	fi
 
 	if [[ -z "$interface" ]]; then
@@ -129,9 +78,7 @@ else
 		exit 1
 	fi
 
-	uuid=""
-	IFS= read -r uuid < <(nmcli --get-values GENERAL.CON-UUID device show "$interface" 2> /dev/null) || true
-	if [[ -z "$uuid" || "$uuid" == "--" ]]; then
+	if ! network::active_uuid uuid "$interface"; then
 		echo "No active Wi-Fi connection" >&2
 		exit 1
 	fi

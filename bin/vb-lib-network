@@ -1,0 +1,105 @@
+#!/bin/bash
+
+# Sourcing is idempotent, same contract as vb-lib-cli: the marker makes a
+# second source return without redefining the body.
+if [[ -n "${_VB_LIB_NETWORK_LOADED:-}" ]]; then
+	return 0
+fi
+
+declare -gr _VB_LIB_NETWORK_LOADED=1
+
+# network::wifi_interface <out-var>
+#
+# The active Wi-Fi interface: the device the kernel routes 1.1.1.1 through
+# when sysfs marks it wireless, else the first connected NetworkManager wifi
+# device. The route probe is a hint, not an answer - a wired default route on
+# a laptop with Wi-Fi up must not be read as the Wi-Fi link - so its device is
+# accepted only with /sys/class/net/<dev>/wireless behind it. The locale is
+# pinned and connected states are matched by prefix because the terse table is
+# the contract here and its text is locale-dependent.
+#
+# Returns non-zero when there is no active Wi-Fi link, with the out-var empty.
+network::wifi_interface() {
+	local -n _wifi_interface_out=$1
+	local route_device="" found=""
+	local _route_line _dev _type _state _rest
+	local -a _route_words=()
+	local i
+
+	# A reply reads "1.1.1.1 dev wlan0 src 10.0.0.5 uid 1000": the interface is
+	# the word after the first `dev`, and nothing here reaches a shell.
+	while IFS= read -r _route_line; do
+		_route_words=()
+		read -ra _route_words <<< "$_route_line"
+		for ((i = 0; i + 1 < ${#_route_words[@]}; i++)); do
+			if [[ ${_route_words[i]} == "dev" ]]; then
+				route_device="${_route_words[i + 1]}"
+				break 2
+			fi
+		done
+	done < <(ip route get 1.1.1.1 2> /dev/null)
+
+	if [[ -n "$route_device" && -d "/sys/class/net/$route_device/wireless" ]]; then
+		found="$route_device"
+	else
+		while IFS=: read -r _dev _type _state _rest; do
+			if [[ $_type == "wifi" && $_state == connected* ]]; then
+				found="$_dev"
+				break
+			fi
+		done < <(LC_ALL=C nmcli -t -f DEVICE,TYPE,STATE device status 2> /dev/null)
+	fi
+
+	_wifi_interface_out="$found"
+	[[ -n "$found" ]]
+}
+
+# network::active_uuid <out-var> <interface>
+#
+# The UUID of the profile behind an active interface. NetworkManager reports
+# `--` for an unset property; that placeholder is rejected here rather than by
+# every caller, so an unassociated interface cannot look like a valid profile.
+#
+# Returns non-zero when the interface has no profile, with the out-var empty.
+network::active_uuid() {
+	local -n _active_uuid_out=$1
+	local interface="$2" found=""
+	IFS= read -r found < <(nmcli --get-values GENERAL.CON-UUID device show "$interface" 2> /dev/null) || true
+	if [[ -z "$found" || "$found" == "--" ]]; then
+		_active_uuid_out=""
+		return 1
+	fi
+	_active_uuid_out="$found"
+	return 0
+}
+
+# network::uuid_for_ssid <out-var> <ssid>
+#
+# The saved profile whose 802-11-wireless.ssid field equals <ssid>. Matching
+# the field rather than the profile name is deliberate: the two usually agree
+# and must not be assumed to. UUID and TYPE columns hold no colons, so the
+# terse table parses safely, and the SSID itself is read with --get-values so
+# a name containing a colon cannot be misread.
+#
+# Returns non-zero when no saved profile carries that SSID.
+network::uuid_for_ssid() {
+	local -n _uuid_for_ssid_out=$1
+	# The loop variable is deliberately not named after the caller's variable:
+	# a local of that name would shadow the nameref target, so the assignment
+	# below would land on this function's own copy and vanish on return.
+	local want="$2" candidate="" found=""
+	while IFS= read -r candidate; do
+		[[ -n "$candidate" ]] || continue
+		found=""
+		IFS= read -r found < <(nmcli --get-values 802-11-wireless.ssid connection show uuid "$candidate" 2> /dev/null) || true
+		if [[ "$found" == "$want" ]]; then
+			_uuid_for_ssid_out="$candidate"
+			return 0
+		fi
+	done < <(
+		while IFS=: read -r _u _type _rest; do
+			[[ $_type == "802-11-wireless" ]] && printf '%s\n' "$_u"
+		done < <(nmcli -t -f UUID,TYPE connection show 2> /dev/null)
+	)
+	return 1
+}

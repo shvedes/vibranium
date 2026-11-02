@@ -1,6 +1,7 @@
 #!/bin/bash
 
 source vb-lib-cli
+source vb-lib-network
 
 VERBOSE=${VERBOSE:-false}
 SELF="${0##*/}"
@@ -46,30 +47,8 @@ while (($# > 0)); do
   esac
 done
 
-# The route probe targets 1.1.1.1; accept its device only when sysfs marks
-# it wireless, otherwise select the first connected NetworkManager Wi-Fi
-# device. Pin the locale and accept connected states by prefix.
-route_device=
-while IFS= read -r _route_line; do
-  read -ra _route_words <<< "$_route_line"
-  for ((i = 0; i + 1 < ${#_route_words[@]}; i++)); do
-    if [[ ${_route_words[i]} == "dev" ]]; then
-      route_device="${_route_words[i+1]}"
-      break 2
-    fi
-  done
-done < <(ip route get 1.1.1.1 2>/dev/null)
-if [[ -n "$route_device" && -d "/sys/class/net/$route_device/wireless" ]]; then
-  interface="$route_device"
-else
-  interface=
-  while IFS=: read -r _dev _type _state; do
-    if [[ $_type == "wifi" && $_state == connected* ]]; then
-      interface="$_dev"
-      break
-    fi
-  done < <(LC_ALL=C nmcli -t -f DEVICE,TYPE,STATE device status 2>/dev/null)
-fi
+# The active link is the shared library's question (see vb-lib-network).
+network::wifi_interface interface || true
 
 if [[ -z "$interface" ]]; then
   echo "No active Wi-Fi connection" >&2
