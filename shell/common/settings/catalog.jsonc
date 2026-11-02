@@ -8,7 +8,7 @@
 {
   "title": "Settings",
   "pages": [
-    // --- settings page 1/42 (shell) ---
+    // --- settings page 1/52 (shell) ---
     {
         "group": "shell",
         "label": "General",
@@ -188,7 +188,7 @@
             }
         ]
     },
-    // --- settings page 2/42 (shell) ---
+    // --- settings page 2/52 (shell) ---
     {
         "group": "shell",
         "label": "App launcher",
@@ -301,7 +301,7 @@
             }
         ]
     },
-    // --- settings page 3/42 (shell) ---
+    // --- settings page 3/52 (shell) ---
     {
         "group": "shell",
         "id": "launcher-enabled",
@@ -342,7 +342,7 @@
             }
         ]
     },
-    // --- settings page 4/42 (shell) ---
+    // --- settings page 4/52 (shell) ---
     {
         "group": "shell",
         "id": "bar",
@@ -534,7 +534,7 @@
             }
         ]
     },
-    // --- settings page 5/42 (shell) ---
+    // --- settings page 5/52 (shell) ---
     {
         "group": "shell",
         "id": "bar-enabled",
@@ -622,7 +622,7 @@
             }
         ]
     },
-    // --- settings page 6/42 (shell) ---
+    // --- settings page 6/52 (shell) ---
     {
         "group": "shell",
         "id": "bar-modules",
@@ -669,7 +669,7 @@
         ],
         "options": []
     },
-    // --- settings page 7/42 (shell) ---
+    // --- settings page 7/52 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-nowplaying",
@@ -695,7 +695,7 @@
             }
         ]
     },
-    // --- settings page 8/42 (shell) ---
+    // --- settings page 8/52 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-recording",
@@ -713,7 +713,7 @@
             }
         ]
     },
-    // --- settings page 9/42 (shell) ---
+    // --- settings page 9/52 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-volume",
@@ -748,7 +748,7 @@
             }
         ]
     },
-    // --- settings page 10/42 (shell) ---
+    // --- settings page 10/52 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-clock",
@@ -814,7 +814,7 @@
             }
         ]
     },
-    // --- settings page 11/42 (shell) ---
+    // --- settings page 11/52 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-weather",
@@ -883,7 +883,7 @@
             }
         ]
     },
-    // --- settings page 12/42 (shell) ---
+    // --- settings page 12/52 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-archupdates",
@@ -901,7 +901,7 @@
             }
         ]
     },
-    // --- settings page 13/42 (shell) ---
+    // --- settings page 13/52 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-colorpicker",
@@ -918,7 +918,7 @@
             }
         ]
     },
-    // --- settings page 14/42 (shell) ---
+    // --- settings page 14/52 (shell) ---
     {
         "group": "shell",
         "label": "Audio",
@@ -980,7 +980,7 @@
             }
         ]
     },
-    // --- settings page 15/42 (shell) ---
+    // --- settings page 15/52 (shell) ---
     {
         "group": "shell",
         "label": "Screenshots",
@@ -1061,7 +1061,7 @@
             }
         ]
     },
-    // --- settings page 16/42 (shell) ---
+    // --- settings page 16/52 (shell) ---
     {
         "group": "shell",
         "label": "OSD",
@@ -1083,7 +1083,7 @@
             }
         ]
     },
-    // --- settings page 17/42 (shell) ---
+    // --- settings page 17/52 (shell) ---
     {
         "group": "shell",
         "label": "Night Light",
@@ -1124,7 +1124,7 @@
             }
         ]
     },
-    // --- settings page 18/42 (shell) ---
+    // --- settings page 18/52 (shell) ---
     {
         "group": "shell",
         "label": "Color picker",
@@ -1152,7 +1152,7 @@
             }
         ]
     },
-    // --- settings page 19/42 (shell) ---
+    // --- settings page 19/52 (shell) ---
     {
         "group": "shell",
         "label": "Lock screen",
@@ -1285,7 +1285,7 @@
             }
         ]
     },
-    // --- settings page 20/42 (shell) ---
+    // --- settings page 20/52 (shell) ---
     {
         "group": "shell",
         "id": "idle",
@@ -1323,7 +1323,7 @@
         ],
         "items": []
     },
-    // --- settings page 21/42 (shell) ---
+    // --- settings page 21/52 (shell) ---
     {
         "group": "shell",
         "id": "media-controls",
@@ -1427,7 +1427,7 @@
             }
         ]
     },
-    // --- settings page 22/42 (shell) ---
+    // --- settings page 22/52 (shell) ---
     {
         "group": "shell",
         "id": "power",
@@ -1530,7 +1530,7 @@
         ],
         "items": []
     },
-    // --- settings page 23/42 (env) ---
+    // --- settings page 23/52 (env) ---
     {
         "group": "env",
         "label": "Recording",
@@ -1657,7 +1657,7 @@
             }
         ]
     },
-    // --- settings page 24/42 (env) ---
+    // --- settings page 24/52 (env) ---
     {
         "group": "env",
         "label": "Brightness",
@@ -1699,7 +1699,7 @@
             }
         ]
     },
-    // --- settings page 25/42 (hypr) ---
+    // --- settings page 25/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland",
@@ -1739,7 +1739,7 @@
         ],
         "options": []
     },
-    // --- settings page 26/42 (hypr) ---
+    // --- settings page 26/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-edit",
@@ -1777,7 +1777,7 @@
         ],
         "options": []
     },
-    // --- settings page 27/42 (hypr) ---
+    // --- settings page 27/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-input",
@@ -1810,7 +1810,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Natural scrolling",
-                "desc": "Reverse scroll direction.",
+                "sub": "Invert scroll direction",
+                "desc": "Reverses the scroll direction so content moves with the pointer instead of against it.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
                     "ctl": "input.natural_scroll"
@@ -1821,7 +1822,8 @@
                 "type": "string",
                 "default": "flat",
                 "label": "Mouse acceleration",
-                "desc": "Mouse acceleration profile.",
+                "sub": "Pointer speed curve",
+                "desc": "How pointer speed responds to movement: flat keeps it proportional, adaptive speeds up fast strokes.",
                 "values": [
                     "adaptive",
                     "flat"
@@ -1840,7 +1842,8 @@
                 "type": "float",
                 "default": 0,
                 "label": "Mouse sensitivity",
-                "desc": "Mouse cursor sensitivity.",
+                "sub": "Pointer speed multiplier",
+                "desc": "Scales pointer movement; negative values make the cursor slower.",
                 "range": {
                     "min": -1,
                     "max": 1
@@ -1856,7 +1859,8 @@
                 "type": "float",
                 "default": 1,
                 "label": "Scrolling factor",
-                "desc": "Scrolling speed multiplier.",
+                "sub": "Scroll speed multiplier",
+                "desc": "Scroll distance covered per wheel notch or gesture.",
                 "range": {
                     "min": 0.1,
                     "max": 10
@@ -1872,7 +1876,8 @@
                 "type": "int",
                 "default": 25,
                 "label": "Keyboard repeat rate",
-                "desc": "Repeat rate in repeats per second.",
+                "sub": "Repeats per second",
+                "desc": "How many times a held key repeats each second.",
                 "range": {
                     "min": 10,
                     "max": 50
@@ -1888,7 +1893,8 @@
                 "type": "int",
                 "default": 300,
                 "label": "Keyboard repeat delay",
-                "desc": "Delay in milliseconds before repeating.",
+                "sub": "Delay before repeating",
+                "desc": "How long a key must be held before it starts repeating.",
                 "range": {
                     "min": 200,
                     "max": 1000
@@ -1902,7 +1908,7 @@
             }
         ]
     },
-    // --- settings page 28/42 (hypr) ---
+    // --- settings page 28/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-input-touchpad",
@@ -1915,7 +1921,8 @@
                 "type": "float",
                 "default": 0.4,
                 "label": "Scrolling factor",
-                "desc": "Scrolling speed multiplier.",
+                "sub": "Scroll speed multiplier",
+                "desc": "Scroll distance covered per touchpad gesture.",
                 "range": {
                     "min": 0.1,
                     "max": 2.0
@@ -1931,7 +1938,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Natural scrolling",
-                "desc": "Reverse scroll direction.",
+                "sub": "Content follows your fingers",
+                "desc": "Scrolls with the gesture instead of against it.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
                     "ctl": "input.touchpad.natural_scroll"
@@ -1942,7 +1950,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Tap to click",
-                "desc": "Self-explanatory",
+                "sub": "Tap instead of pressing",
+                "desc": "Registers a tap on the pad as a click, so no physical press is needed.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
                     "ctl": "input.touchpad.tap_to_click"
@@ -1953,7 +1962,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Disable while typing",
-                "desc": "Disable touchpad when typing text",
+                "sub": "Ignore pad while typing",
+                "desc": "Locks the touchpad while keys are pressed, so thumbs and palms do not move the cursor.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
                     "ctl": "input.touchpad.disable_while_typing"
@@ -1961,7 +1971,7 @@
             }
         ]
     },
-    // --- settings page 29/42 (hypr) ---
+    // --- settings page 29/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-input-layouts",
@@ -1974,7 +1984,7 @@
                 "default": "us",
                 "label": "Keyboard layouts",
                 "sub": "Comma-separated layouts",
-                "desc": "Comma-separated list of xkb layouts (e.g. us,fr).",
+                "desc": "The xkb layouts to cycle through, comma-separated (for example us,fr).",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/input.lua",
                     "ctl": "input.kb_layout"
@@ -1986,7 +1996,7 @@
                 "default": "grp:alt_shift_toggle",
                 "label": "Switch layout with",
                 "sub": "Group toggle shortcut",
-                "desc": "Key combo to switch keyboard layout.",
+                "desc": "Key combination that switches between the layouts above.",
                 "values": [
                     "grp:caps_toggle",
                     "grp:ctrl_alt_toggle",
@@ -2014,7 +2024,7 @@
             }
         ]
     },
-    // --- settings page 30/42 (hypr) ---
+    // --- settings page 30/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance",
@@ -2065,6 +2075,14 @@
             },
             {
                 "type": "submenu",
+                "label": "Wobble",
+                "sub": "Window wobble effect",
+                "desc": "Spring-based window wobble.",
+                "icon": "hypr-animations",
+                "page": "hyprland-appearance-wobble"
+            },
+            {
+                "type": "submenu",
                 "label": "Dimming",
                 "sub": "Window dimming",
                 "desc": "Window dimming options.",
@@ -2082,7 +2100,7 @@
         ],
         "options": []
     },
-    // --- settings page 31/42 (hypr) ---
+    // --- settings page 31/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-gaps",
@@ -2095,6 +2113,7 @@
                 "default": 5,
                 "label": "Gaps in",
                 "sub": "Inner gaps",
+                "desc": "Space between tiled windows.",
                 "range": {
                     "min": 0,
                     "max": 50
@@ -2112,6 +2131,7 @@
                 "default": 5,
                 "label": "Gaps out",
                 "sub": "Outer gaps",
+                "desc": "Space between windows and the screen edge.",
                 "range": {
                     "min": 0,
                     "max": 50
@@ -2124,11 +2144,47 @@
                 }
             },
             {
+                "key": "hypr.general.gaps_workspaces",
+                "type": "int",
+                "default": 0,
+                "label": "Workspace gaps",
+                "sub": "Gaps between workspaces",
+                "desc": "Spacing between workspaces.",
+                "range": {
+                    "min": 0,
+                    "max": 50
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "general.gaps_workspaces"
+                }
+            },
+            {
+                "key": "hypr.general.float_gaps",
+                "type": "int",
+                "default": 0,
+                "label": "Float gaps",
+                "sub": "Gaps around floating windows",
+                "desc": "Spacing between floating windows.",
+                "range": {
+                    "min": 0,
+                    "max": 50
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "general.float_gaps"
+                }
+            },
+            {
                 "key": "hypr.general.smart_gaps",
                 "type": "bool",
                 "default": false,
                 "label": "Smart gaps",
-                "sub": "No gaps when single window",
+                "sub": "No gaps with one window",
                 "desc": "Removes gaps and borders when only one tiled window is visible.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/smart-gaps.lua",
@@ -2137,7 +2193,7 @@
             }
         ]
     },
-    // --- settings page 32/42 (hypr) ---
+    // --- settings page 32/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur",
@@ -2149,9 +2205,56 @@
                 "type": "bool",
                 "default": false,
                 "label": "Enabled",
+                "sub": "Blur behind windows",
+                "desc": "Blurs the desktop behind translucent windows.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.blur.enabled"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.variant",
+                "type": "int",
+                "default": 0,
+                "label": "Variant",
+                "sub": "Blur algorithm",
+                "desc": "Which blur algorithm renders the backdrop; each variant brings its own parameters and cost.",
+                "warning": "May significantly increase GPU and CPU usage.",
+                "values": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4,
+                    5,
+                    6,
+                    7,
+                    8,
+                    9,
+                    10
+                ],
+                "valueLabels": {
+                    "0": "Kawase",
+                    "1": "Frost",
+                    "2": "Ripple",
+                    "3": "Drops",
+                    "4": "Water",
+                    "5": "Fluid jar",
+                    "6": "Prism",
+                    "7": "Heat shimmer",
+                    "8": "Acrylic",
+                    "9": "Aurora",
+                    "10": "Haze"
+                },
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.variant"
                 }
             },
             {
@@ -2159,8 +2262,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Blur special",
-                "sub": "Blur special workspace",
-                "desc": "Whether to blur scratchpad.",
+                "sub": "Blur scratchpad",
+                "desc": "Blurs the special workspace like regular workspaces.",
                 "warning": "Expensive!",
                 "showIf": [
                     {
@@ -2177,13 +2280,15 @@
                 "key": "hypr.decoration.blur.size",
                 "type": "int",
                 "default": 3,
-                "unit": "px",
                 "label": "Size",
+                "sub": "Blur radius",
+                "desc": "Radius of the blur in pixels.",
                 "range": {
                     "min": 1,
                     "max": 16
                 },
                 "step": 1,
+                "unit": "px",
                 "showIf": [
                     {
                         "key": "hypr.decoration.blur.enabled",
@@ -2199,13 +2304,15 @@
                 "key": "hypr.decoration.blur.passes",
                 "type": "int",
                 "default": 3,
-                "unit": "times",
                 "label": "Passes",
+                "sub": "Blur quality steps",
+                "desc": "How many blur passes the backdrop goes through; more passes smooth it further and cost more GPU time.",
                 "range": {
                     "min": 1,
                     "max": 10
                 },
                 "step": 1,
+                "unit": "times",
                 "showIf": [
                     {
                         "key": "hypr.decoration.blur.enabled",
@@ -2222,6 +2329,8 @@
                 "type": "float",
                 "default": 0.0117,
                 "label": "Noise",
+                "sub": "Grain over the blur",
+                "desc": "Noise mixed into the blur to hide colour banding.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -2243,6 +2352,8 @@
                 "type": "float",
                 "default": 0.1696,
                 "label": "Vibrancy",
+                "sub": "Backdrop saturation",
+                "desc": "Saturation boost applied to what shows through the blur.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -2264,6 +2375,8 @@
                 "type": "float",
                 "default": 0.8916,
                 "label": "Contrast",
+                "sub": "Backdrop contrast",
+                "desc": "Contrast applied to the blurred backdrop.",
                 "range": {
                     "min": 0,
                     "max": 2
@@ -2285,6 +2398,8 @@
                 "type": "float",
                 "default": 0.8172,
                 "label": "Brightness",
+                "sub": "Backdrop brightness",
+                "desc": "Brightness applied to the blurred backdrop.",
                 "range": {
                     "min": 0,
                     "max": 2
@@ -2300,10 +2415,883 @@
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.blur.brightness"
                 }
+            },
+            {
+                "key": "hypr.decoration.blur.ignore_opacity",
+                "type": "bool",
+                "default": true,
+                "label": "Ignore opacity",
+                "sub": "Blur transparent windows",
+                "desc": "Also blurs windows that are fully transparent.",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.ignore_opacity"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.new_optimizations",
+                "type": "bool",
+                "default": true,
+                "label": "New optimizations",
+                "sub": "Faster blur path",
+                "desc": "Runs the newer, cheaper blur pipeline.",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.new_optimizations"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.proportional",
+                "type": "bool",
+                "default": false,
+                "label": "Proportional",
+                "sub": "Scale with window",
+                "desc": "Grows the blur with the size of the surface instead of keeping it fixed.",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.proportional"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.vibrancy_darkness",
+                "type": "float",
+                "default": 0,
+                "label": "Vibrancy darkness",
+                "sub": "Darken the vibrancy",
+                "desc": "Darkening applied on top of the vibrancy.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.vibrancy_darkness"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.xray",
+                "type": "bool",
+                "default": false,
+                "label": "Xray",
+                "sub": "Blur through windows",
+                "desc": "Blurs everything behind a window instead of only what the window covers.",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.xray"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.popups",
+                "type": "bool",
+                "default": false,
+                "label": "Blur popups",
+                "sub": "Blur popup windows",
+                "desc": "Blurs menus and other popup surfaces.",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.popups"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.popups_ignorealpha",
+                "type": "float",
+                "default": 0.2,
+                "label": "Popup ignore alpha",
+                "sub": "Skip near-invisible popups",
+                "desc": "Alpha below which popups are left unblurred.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.popups",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.popups_ignorealpha"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.input_methods",
+                "type": "bool",
+                "default": false,
+                "label": "Blur input methods",
+                "sub": "Blur IME popups",
+                "desc": "Blurs input method popups such as candidate windows.",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.input_methods"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.input_methods_ignorealpha",
+                "type": "float",
+                "default": 0.2,
+                "label": "Input method ignore alpha",
+                "sub": "Skip near-invisible IME popups",
+                "desc": "Alpha below which input method popups are left unblurred.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.input_methods",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.input_methods_ignorealpha"
+                }
+            }
+        ],
+        "items": [
+            {
+                "type": "separator",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Acrylic",
+                "sub": "Liquid-glass blur",
+                "icon": "settings-general",
+                "page": "hyprland-appearance-blur-acrylic",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Aurora",
+                "sub": "Light streaks",
+                "icon": "settings-general",
+                "page": "hyprland-appearance-blur-aurora",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Drops",
+                "sub": "Rain on a window",
+                "icon": "settings-general",
+                "page": "hyprland-appearance-blur-drops",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Fluid jar",
+                "sub": "2D fluid simulation",
+                "icon": "settings-general",
+                "page": "hyprland-appearance-blur-fluid_jar",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Glass",
+                "sub": "Shared by aurora, drops, prism",
+                "icon": "settings-general",
+                "page": "hyprland-appearance-blur-glass",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Haze",
+                "sub": "Diffused sheen",
+                "icon": "settings-general",
+                "page": "hyprland-appearance-blur-haze",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Heat shimmer",
+                "sub": "Shimmer with aberration",
+                "icon": "settings-general",
+                "page": "hyprland-appearance-blur-heat_shimmer",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Ripple",
+                "sub": "Ripple on click",
+                "icon": "settings-general",
+                "page": "hyprland-appearance-blur-ripple",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
+            },
+            {
+                "type": "submenu",
+                "label": "Water",
+                "sub": "Heightmap ripple",
+                "icon": "settings-general",
+                "page": "hyprland-appearance-blur-water",
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.blur.enabled",
+                        "eq": true
+                    }
+                ]
             }
         ]
     },
-    // --- settings page 33/42 (hypr) ---
+    // --- settings page 33/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur-acrylic",
+        "label": "Acrylic",
+        "icon": "settings-general",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.acrylic.aberration",
+                "type": "float",
+                "default": 0.025,
+                "label": "Aberration",
+                "sub": "Edge colour fringing",
+                "desc": "How far colours separate at the curved acrylic edge.",
+                "range": {
+                    "min": 0,
+                    "max": 0.25
+                },
+                "step": 0.005,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.acrylic.aberration"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.acrylic.bulb",
+                "type": "float",
+                "default": 48,
+                "label": "Bulb width",
+                "sub": "Curved edge width",
+                "desc": "Width of the rounded lens edge that bends the backdrop.",
+                "range": {
+                    "min": 4,
+                    "max": 256
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.acrylic.bulb"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.acrylic.clarity",
+                "type": "float",
+                "default": 0.82,
+                "label": "Clarity",
+                "sub": "Backdrop sharpness",
+                "desc": "How much unblurred backdrop shows through the acrylic surface.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.01,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.acrylic.clarity"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.acrylic.refraction",
+                "type": "float",
+                "default": 24,
+                "label": "Refraction",
+                "sub": "Lens bend strength",
+                "desc": "Maximum displacement the acrylic lens applies to the backdrop.",
+                "range": {
+                    "min": 0,
+                    "max": 48
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.acrylic.refraction"
+                }
+            }
+        ]
+    },
+    // --- settings page 34/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur-aurora",
+        "label": "Aurora",
+        "icon": "settings-general",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.aurora.intensity",
+                "type": "float",
+                "default": 0.35,
+                "label": "Intensity",
+                "sub": "Sheen strength",
+                "desc": "How strongly the aurora colours tint the blur.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.aurora.intensity"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.aurora.speed",
+                "type": "float",
+                "default": 1,
+                "label": "Speed",
+                "sub": "Drift speed",
+                "desc": "How fast the aurora pattern moves; 0 freezes it.",
+                "range": {
+                    "min": 0,
+                    "max": 10
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.aurora.speed"
+                }
+            }
+        ]
+    },
+    // --- settings page 35/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur-drops",
+        "label": "Drops",
+        "icon": "settings-general",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.drops.speed",
+                "type": "float",
+                "default": 3,
+                "label": "Speed",
+                "sub": "Drop speed",
+                "desc": "How fast the drops fall; 0 stops the animation.",
+                "range": {
+                    "min": 0,
+                    "max": 10
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.drops.speed"
+                }
+            }
+        ]
+    },
+    // --- settings page 36/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur-fluid_jar",
+        "label": "Fluid jar",
+        "icon": "settings-general",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.fluid_jar.distortion",
+                "type": "float",
+                "default": 8,
+                "label": "Distortion",
+                "sub": "Fluid distortion",
+                "desc": "How far the fluid bends the backdrop.",
+                "range": {
+                    "min": 0,
+                    "max": 10
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.fluid_jar.distortion"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.fluid_jar.fill_amount",
+                "type": "float",
+                "default": 0.5,
+                "label": "Fill amount",
+                "sub": "Fluid level",
+                "desc": "How full the jar is, from empty to brim.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.fluid_jar.fill_amount"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.fluid_jar.mass",
+                "type": "float",
+                "default": 1.4,
+                "label": "Mass",
+                "sub": "Fluid weight",
+                "desc": "Inertia of the fluid: heavier fluid sloshes more slowly.",
+                "range": {
+                    "min": 0.1,
+                    "max": 10
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.fluid_jar.mass"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.fluid_jar.precision",
+                "type": "float",
+                "default": 2,
+                "label": "Precision",
+                "sub": "Simulation precision",
+                "desc": "Precision of the fluid simulation; 2x is a good compromise, 8x is extreme.",
+                "range": {
+                    "min": 0.5,
+                    "max": 8
+                },
+                "step": 0.5,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.fluid_jar.precision"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.fluid_jar.speed",
+                "type": "float",
+                "default": 3.7,
+                "label": "Speed",
+                "sub": "Slosh speed",
+                "desc": "How fast the fluid moves.",
+                "range": {
+                    "min": 0,
+                    "max": 10
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.fluid_jar.speed"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.fluid_jar.turbulence",
+                "type": "float",
+                "default": 1.2,
+                "label": "Turbulence",
+                "sub": "Interior swirl",
+                "desc": "How much the fluid swirls inside the jar.",
+                "range": {
+                    "min": 0,
+                    "max": 5
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.fluid_jar.turbulence"
+                }
+            }
+        ]
+    },
+    // --- settings page 37/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur-glass",
+        "label": "Glass",
+        "icon": "settings-general",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.glass.refraction",
+                "type": "float",
+                "default": 20,
+                "label": "Refraction",
+                "sub": "Pattern bend strength",
+                "desc": "Maximum displacement of the glass pattern.",
+                "range": {
+                    "min": 0,
+                    "max": 20
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.glass.refraction"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.glass.roughness",
+                "type": "float",
+                "default": 1,
+                "label": "Roughness",
+                "sub": "Relief strength",
+                "desc": "How pronounced the relief shading on the glass is.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.glass.roughness"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.glass.size",
+                "type": "float",
+                "default": 40,
+                "label": "Pattern size",
+                "sub": "Pattern tile size",
+                "desc": "Size of one glass pattern tile.",
+                "range": {
+                    "min": 4,
+                    "max": 512
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.glass.size"
+                }
+            }
+        ]
+    },
+    // --- settings page 38/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur-haze",
+        "label": "Haze",
+        "icon": "settings-general",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.haze.intensity",
+                "type": "float",
+                "default": 0.35,
+                "label": "Intensity",
+                "sub": "Sheen strength",
+                "desc": "How strongly the haze sheen sits over the blur.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.haze.intensity"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.haze.iridescence",
+                "type": "float",
+                "default": 0.7,
+                "label": "Iridescence",
+                "sub": "Colour shift",
+                "desc": "Amount of pearlescent colour shift across the haze.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.haze.iridescence"
+                }
+            }
+        ]
+    },
+    // --- settings page 39/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur-heat_shimmer",
+        "label": "Heat shimmer",
+        "icon": "settings-general",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.heat_shimmer.speed",
+                "type": "float",
+                "default": 1,
+                "label": "Speed",
+                "sub": "Shimmer speed",
+                "desc": "How fast the shimmer waves travel; 0 stops them.",
+                "range": {
+                    "min": 0,
+                    "max": 10
+                },
+                "step": 0.1,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.heat_shimmer.speed"
+                }
+            }
+        ]
+    },
+    // --- settings page 40/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur-ripple",
+        "label": "Ripple",
+        "icon": "settings-general",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.ripple.duration",
+                "type": "float",
+                "default": 0.45,
+                "label": "Duration",
+                "sub": "Ripple lifetime",
+                "desc": "How long a ripple keeps moving before it fades.",
+                "range": {
+                    "min": 0.05,
+                    "max": 5
+                },
+                "step": 0.05,
+                "unit": "s",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.ripple.duration"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.ripple.radius",
+                "type": "float",
+                "default": 400,
+                "label": "Radius",
+                "sub": "Reach from pointer",
+                "desc": "How far from the pointer a ripple spreads.",
+                "range": {
+                    "min": 1,
+                    "max": 1000
+                },
+                "step": 10,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.ripple.radius"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.ripple.strength",
+                "type": "float",
+                "default": 30,
+                "label": "Strength",
+                "sub": "Wave height",
+                "desc": "How far the ripple displaces the backdrop.",
+                "range": {
+                    "min": 0,
+                    "max": 32
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.ripple.strength"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.ripple.width",
+                "type": "float",
+                "default": 32,
+                "label": "Wave width",
+                "sub": "Wave thickness",
+                "desc": "Thickness of a single ripple ring.",
+                "range": {
+                    "min": 1,
+                    "max": 200
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.ripple.width"
+                }
+            }
+        ]
+    },
+    // --- settings page 41/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-blur-water",
+        "label": "Water",
+        "icon": "settings-general",
+        "options": [
+            {
+                "key": "hypr.decoration.blur.water.damping",
+                "type": "float",
+                "default": 0.95,
+                "label": "Damping",
+                "sub": "How fast ripples settle",
+                "desc": "How quickly the water stops moving after a disturbance.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.01,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.water.damping"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.water.duration",
+                "type": "float",
+                "default": 12,
+                "label": "Duration",
+                "sub": "Ripple lifetime",
+                "desc": "Longest time a ripple stays active.",
+                "range": {
+                    "min": 0.5,
+                    "max": 60
+                },
+                "step": 0.5,
+                "unit": "s",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.water.duration"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.water.radius",
+                "type": "float",
+                "default": 20,
+                "label": "Pointer radius",
+                "sub": "Pointer touch size",
+                "desc": "Radius of the area the pointer disturbs.",
+                "range": {
+                    "min": 1,
+                    "max": 1000
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.water.radius"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.water.speed",
+                "type": "float",
+                "default": 0.76,
+                "label": "Speed",
+                "sub": "Wave travel speed",
+                "desc": "How fast waves travel through the water.",
+                "range": {
+                    "min": 0,
+                    "max": 10
+                },
+                "step": 0.01,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.water.speed"
+                }
+            },
+            {
+                "key": "hypr.decoration.blur.water.strength",
+                "type": "float",
+                "default": 32,
+                "label": "Strength",
+                "sub": "Wave height",
+                "desc": "How far the water displaces the backdrop.",
+                "range": {
+                    "min": 0,
+                    "max": 32
+                },
+                "step": 1,
+                "unit": "px",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.blur.water.strength"
+                }
+            }
+        ]
+    },
+    // --- settings page 42/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-glow",
@@ -2315,6 +3303,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Enabled",
+                "sub": "Glow around windows",
+                "desc": "Draws a soft glow around window borders.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.glow.enabled"
@@ -2325,6 +3315,8 @@
                 "type": "int",
                 "default": 20,
                 "label": "Range",
+                "sub": "Glow spread",
+                "desc": "How far the glow reaches from the border.",
                 "range": {
                     "min": 1,
                     "max": 100
@@ -2347,6 +3339,8 @@
                 "type": "int",
                 "default": 2,
                 "label": "Power",
+                "sub": "Render quality",
+                "desc": "Blur passes used for the glow; higher is smoother and slower.",
                 "range": {
                     "min": 1,
                     "max": 4
@@ -2365,7 +3359,7 @@
             }
         ]
     },
-    // --- settings page 34/42 (hypr) ---
+    // --- settings page 43/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-shadow",
@@ -2377,6 +3371,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Enabled",
+                "sub": "Shadow under windows",
+                "desc": "Draws a drop shadow behind windows.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.shadow.enabled"
@@ -2387,6 +3383,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Sharp",
+                "sub": "Hard shadow edge",
+                "desc": "Renders the shadow edge hard instead of soft.",
                 "showIf": [
                     {
                         "key": "hypr.decoration.shadow.enabled",
@@ -2403,6 +3401,8 @@
                 "type": "int",
                 "default": 4,
                 "label": "Range",
+                "sub": "Shadow spread",
+                "desc": "How far the shadow reaches from the window.",
                 "range": {
                     "min": 1,
                     "max": 128
@@ -2424,6 +3424,8 @@
                 "type": "int",
                 "default": 3,
                 "label": "Power",
+                "sub": "Render quality",
+                "desc": "Blur passes used for the shadow; higher is smoother and slower.",
                 "range": {
                     "min": 1,
                     "max": 4
@@ -2439,10 +3441,33 @@
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.shadow.render_power"
                 }
+            },
+            {
+                "key": "hypr.decoration.shadow.scale",
+                "type": "float",
+                "default": 1,
+                "label": "Scale",
+                "sub": "Shadow size",
+                "desc": "Shadow size relative to the window.",
+                "range": {
+                    "min": 0.1,
+                    "max": 5
+                },
+                "step": 0.1,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.shadow.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.shadow.scale"
+                }
             }
         ]
     },
-    // --- settings page 35/42 (hypr) ---
+    // --- settings page 44/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-decoration",
@@ -2453,7 +3478,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Motion blur",
-                "desc": "Whether to enable motion blur.",
+                "sub": "Blur on movement",
+                "desc": "Blurs windows while they are moving.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.motion_blur.enabled"
@@ -2464,6 +3490,8 @@
                 "type": "int",
                 "default": 7,
                 "label": "Motion blur samples",
+                "sub": "Blur samples",
+                "desc": "Samples taken per pixel; higher is smoother and heavier.",
                 "range": {
                     "min": 1,
                     "max": 25
@@ -2485,7 +3513,8 @@
                 "type": "int",
                 "default": 2,
                 "label": "Border size",
-                "desc": "Window border size.",
+                "sub": "Border thickness",
+                "desc": "Thickness of the window border.",
                 "range": {
                     "min": 0,
                     "max": 50
@@ -2502,7 +3531,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "Rounding",
-                "desc": "Window border roundness.",
+                "sub": "Corner radius",
+                "desc": "Corner roundness of windows.",
                 "range": {
                     "min": 0,
                     "max": 32
@@ -2519,7 +3549,8 @@
                 "type": "float",
                 "default": 2,
                 "label": "Rounding power",
-                "desc": "Window's rounding smoothness.",
+                "sub": "Corner falloff",
+                "desc": "Shape of the rounding curve; lower values look squarer.",
                 "range": {
                     "min": 0,
                     "max": 10
@@ -2535,7 +3566,8 @@
                 "type": "float",
                 "default": 1,
                 "label": "Active opacity",
-                "desc": "Opacity of the active window.",
+                "sub": "Focused window opacity",
+                "desc": "Opacity of the focused window.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -2551,7 +3583,8 @@
                 "type": "float",
                 "default": 1,
                 "label": "Inactive opacity",
-                "desc": "Opacity of inactive windows.",
+                "sub": "Unfocused window opacity",
+                "desc": "Opacity of windows that are not focused.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -2567,7 +3600,8 @@
                 "type": "float",
                 "default": 1,
                 "label": "Fullscreen opacity",
-                "desc": "Opacity of a fullscreen window.",
+                "sub": "Fullscreen window opacity",
+                "desc": "Opacity of a window while it is fullscreen.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -2583,6 +3617,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Border part of window",
+                "sub": "Border counts in size",
+                "desc": "Treats the border as part of the window surface instead of something drawn around it.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.border_part_of_window"
@@ -2590,7 +3626,189 @@
             }
         ]
     },
-    // --- settings page 36/42 (hypr) ---
+    // --- settings page 45/52 (hypr) ---
+    {
+        "group": "hypr",
+        "id": "hyprland-appearance-wobble",
+        "label": "Wobble",
+        "icon": "hypr-animations",
+        "options": [
+            {
+                "key": "hypr.decoration.wobble.enabled",
+                "type": "bool",
+                "default": false,
+                "label": "Enabled",
+                "sub": "Spring window deform",
+                "desc": "Deforms windows with a spring-driven wobble.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.wobble.enabled"
+                }
+            },
+            {
+                "key": "hypr.decoration.wobble.intensity",
+                "type": "float",
+                "default": 0.2,
+                "label": "Intensity",
+                "sub": "Wobble amplitude",
+                "desc": "How far windows deform.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.01,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.wobble.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.wobble.intensity"
+                }
+            },
+            {
+                "key": "hypr.decoration.wobble.stiffness",
+                "type": "float",
+                "default": 200,
+                "label": "Stiffness",
+                "sub": "Spring stiffness",
+                "desc": "Spring stiffness; higher pulls the window back faster.",
+                "range": {
+                    "min": 1,
+                    "max": 1000
+                },
+                "step": 5,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.wobble.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.wobble.stiffness"
+                }
+            },
+            {
+                "key": "hypr.decoration.wobble.damping",
+                "type": "float",
+                "default": 12,
+                "label": "Damping",
+                "sub": "How fast it settles",
+                "desc": "Spring damping; higher settles the wobble sooner.",
+                "range": {
+                    "min": 0,
+                    "max": 100
+                },
+                "step": 0.5,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.wobble.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.wobble.damping"
+                }
+            },
+            {
+                "key": "hypr.decoration.wobble.mass",
+                "type": "float",
+                "default": 1,
+                "label": "Mass",
+                "sub": "Window weight",
+                "desc": "Spring mass; a heavier window wobbles slower.",
+                "range": {
+                    "min": 0.1,
+                    "max": 10
+                },
+                "step": 0.1,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.wobble.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.wobble.mass"
+                }
+            },
+            {
+                "key": "hypr.decoration.wobble.mesh",
+                "type": "int",
+                "default": 12,
+                "label": "Mesh",
+                "sub": "Deform grid",
+                "desc": "Grid resolution the wobble deforms the window with.",
+                "range": {
+                    "min": 2,
+                    "max": 32
+                },
+                "step": 1,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.wobble.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.wobble.mesh"
+                }
+            },
+            {
+                "key": "hypr.decoration.wobble.value_epsilon",
+                "type": "float",
+                "default": 0.25,
+                "label": "Value epsilon",
+                "sub": "Rest threshold",
+                "desc": "Displacement at which the wobble counts as settled.",
+                "range": {
+                    "min": 0,
+                    "max": 10
+                },
+                "step": 0.05,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.wobble.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.wobble.value_epsilon"
+                }
+            },
+            {
+                "key": "hypr.decoration.wobble.velocity_epsilon",
+                "type": "float",
+                "default": 2,
+                "label": "Velocity epsilon",
+                "sub": "Rest speed threshold",
+                "desc": "Velocity at which the wobble counts as settled.",
+                "range": {
+                    "min": 0,
+                    "max": 50
+                },
+                "step": 0.1,
+                "showIf": [
+                    {
+                        "key": "hypr.decoration.wobble.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.wobble.velocity_epsilon"
+                }
+            }
+        ]
+    },
+    // --- settings page 46/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-dim",
@@ -2602,7 +3820,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Dim inactive",
-                "desc": "Whether to dim inactive windows.",
+                "sub": "Dim unfocused windows",
+                "desc": "Darkens windows that are not focused.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.dim_inactive"
@@ -2613,7 +3832,8 @@
                 "type": "float",
                 "default": 0.1,
                 "label": "Dim strength",
-                "desc": "Dim strength of inactive windows.",
+                "sub": "Dim amount",
+                "desc": "How dark inactive windows are drawn.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -2635,7 +3855,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Dim modal",
-                "desc": "Whether to dim modal windows (pop ups).",
+                "sub": "Dim modals",
+                "desc": "Dims modal windows such as dialogs and popups.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.dim_modal"
@@ -2646,7 +3867,8 @@
                 "type": "float",
                 "default": 0.4,
                 "label": "Dim special",
-                "desc": "Scratchpad's dim level.",
+                "sub": "Scratchpad dim level",
+                "desc": "How dark the special workspace is drawn.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -2656,10 +3878,27 @@
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "decoration.dim_special"
                 }
+            },
+            {
+                "key": "hypr.decoration.dim_around",
+                "type": "float",
+                "default": 0.4,
+                "label": "Dim around",
+                "sub": "Dim around floating windows",
+                "desc": "Dims everything around a floating window.",
+                "range": {
+                    "min": 0,
+                    "max": 1
+                },
+                "step": 0.05,
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "decoration.dim_around"
+                }
             }
         ]
     },
-    // --- settings page 37/42 (hypr) ---
+    // --- settings page 47/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-animations",
@@ -2671,6 +3910,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Enabled",
+                "sub": "Window and workspace motion",
+                "desc": "Enables the animation engine for windows, workspaces and layers.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
                     "ctl": "animations.enabled"
@@ -2682,6 +3923,7 @@
                 "default": "default",
                 "label": "Preset",
                 "sub": "Set animation curve",
+                "desc": "Bundle of curves and speeds applied to every animation.",
                 "values": [
                     "akaito",
                     "bounce",
@@ -2710,10 +3952,28 @@
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/animations.lua",
                     "kind": "animPreset"
                 }
+            },
+            {
+                "key": "hypr.animations.workspace_wraparound",
+                "type": "bool",
+                "default": false,
+                "label": "Workspace wraparound",
+                "sub": "Jump between first and last",
+                "desc": "Animate the jump between the first and the last workspace.",
+                "showIf": [
+                    {
+                        "key": "hypr.animations.enabled",
+                        "eq": true
+                    }
+                ],
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/look-and-feel.lua",
+                    "ctl": "animations.workspace_wraparound"
+                }
             }
         ]
     },
-    // --- settings page 38/42 (hypr) ---
+    // --- settings page 48/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced",
@@ -2760,7 +4020,8 @@
                 "type": "int",
                 "default": 2,
                 "label": "Variable refresh rate",
-                "desc": "Monitor's VRR mode.",
+                "sub": "Monitor VRR mode",
+                "desc": "Variable refresh rate mode: off, on, or only in fullscreen.",
                 "values": [
                     0,
                     1,
@@ -2781,7 +4042,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Variable frame rate",
-                "desc": "Monitor's VFR mode.",
+                "sub": "Variable frame rate",
+                "desc": "Varies the compositor frame rate with the content instead of rendering continuously.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "debug.vfr"
@@ -2792,7 +4054,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Config auto-reload",
-                "desc": "Toggle automatic config reload.",
+                "sub": "Reload on file save",
+                "desc": "Reloads the config when its files change.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "misc.disable_autoreload"
@@ -2803,7 +4066,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Middle click paste",
-                "desc": "Paste clipboard contents with middle click",
+                "sub": "Paste on middle click",
+                "desc": "Pastes the clipboard contents when the middle mouse button is clicked.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "misc.middle_click_paste"
@@ -2814,7 +4078,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Enable ANR dialog",
-                "desc": "\"Application is not responding\" messages.",
+                "sub": "App stopped responding prompt",
+                "desc": "Shows a dialog when an application stops responding.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "misc.enable_anr_dialog"
@@ -2825,7 +4090,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "Direct scanout",
-                "desc": "Configure direct scanout.",
+                "sub": "Skip compositing",
+                "desc": "Lets fullscreen windows take over the display directly; off, on, or auto.",
                 "values": [
                     0,
                     1,
@@ -2846,7 +4112,8 @@
                 "type": "string",
                 "default": "dwindle",
                 "label": "Windows layout",
-                "desc": "Chose how new windows are placed.",
+                "sub": "Tiling algorithm",
+                "desc": "How new windows are placed: dwindle, master, scrolling or a plugin.",
                 "values": [
                     "dwindle",
                     "master",
@@ -2863,10 +4130,22 @@
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "general.layout"
                 }
+            },
+            {
+                "key": "hypr.general.allow_tearing",
+                "type": "bool",
+                "default": false,
+                "label": "Allow tearing",
+                "sub": "Permit tearing requests",
+                "desc": "Lets windows tear when they ask for it.",
+                "hypr": {
+                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
+                    "ctl": "general.allow_tearing"
+                }
             }
         ]
     },
-    // --- settings page 39/42 (hypr) ---
+    // --- settings page 49/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-cursor",
@@ -2878,6 +4157,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Enable hyprcursor",
+                "sub": "Hyprcursor themes",
+                "desc": "Loads cursor themes through hyprcursor when the theme provides them.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.enable_hyprcursor"
@@ -2888,6 +4169,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Sync gsettings theme",
+                "sub": "Follow desktop theme",
+                "desc": "Applies the cursor theme set in the desktop settings to Hyprland.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.sync_gsettings_theme"
@@ -2898,6 +4181,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "Hardware cursors",
+                "sub": "Hardware cursor mode",
+                "desc": "Whether the cursor is drawn on the GPU's hardware plane or by the compositor; auto follows the driver.",
                 "values": [
                     0,
                     1,
@@ -2918,6 +4203,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "CPU buffer",
+                "sub": "CPU cursor buffer",
+                "desc": "Sends cursor images through CPU memory, working around broken hardware cursors.",
                 "values": [
                     0,
                     1,
@@ -2938,6 +4225,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Hide cursor",
+                "sub": "Never draw the cursor",
+                "desc": "Hides the cursor everywhere.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.invisible"
@@ -2948,6 +4237,8 @@
                 "type": "float",
                 "default": 0,
                 "label": "Hide after",
+                "sub": "Hide after inactivity",
+                "desc": "Hides the cursor after this many seconds without pointer movement; 0 disables it.",
                 "range": {
                     "min": 0,
                     "max": 60
@@ -2964,6 +4255,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "Hotspot padding",
+                "sub": "Extra click area",
+                "desc": "Expands the clickable area around the cursor hotspot.",
                 "range": {
                     "min": 0,
                     "max": 32
@@ -2980,6 +4273,8 @@
                 "type": "int",
                 "default": 60,
                 "label": "Min refresh rate",
+                "sub": "Minimum redraw rate",
+                "desc": "Lowest rate at which the cursor is redrawn while the screen is idle.",
                 "range": {
                     "min": 60,
                     "max": 360
@@ -2996,6 +4291,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Hide on key press",
+                "sub": "Hide while typing",
+                "desc": "Hides the cursor as soon as a key is pressed.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.hide_on_key_press"
@@ -3006,6 +4303,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Hide on touch",
+                "sub": "Hide on touch input",
+                "desc": "Hides the cursor when the screen is touched.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.hide_on_touch"
@@ -3016,6 +4315,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Hide on tablet",
+                "sub": "Hide on tablet input",
+                "desc": "Hides the cursor while a tablet stylus is in use.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.hide_on_tablet"
@@ -3026,6 +4327,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "No warps",
+                "sub": "Disable cursor warps",
+                "desc": "Stops the compositor from teleporting the cursor to a new position.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.no_warps"
@@ -3036,6 +4339,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Persistent warps",
+                "sub": "Keep the warp target",
+                "desc": "Keeps a warp in place until the pointer actually moves.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.persistent_warps"
@@ -3046,6 +4351,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Warp back after non-mouse input",
+                "sub": "Return after keyboard input",
+                "desc": "Moves the cursor back where it was after typing or another non-mouse input.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.warp_back_after_non_mouse_input"
@@ -3056,6 +4363,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "Warp on workspace change",
+                "sub": "Warp to new workspace",
+                "desc": "Places the cursor on the workspace you switch to; auto decides from the layout.",
                 "values": [
                     0,
                     1,
@@ -3076,6 +4385,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "Warp on special toggle",
+                "sub": "Warp to scratchpad",
+                "desc": "Moves the cursor to the special workspace when it is toggled on.",
                 "values": [
                     0,
                     1,
@@ -3096,6 +4407,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "No break fullscreen VRR",
+                "sub": "Keep VRR in fullscreen",
+                "desc": "Keeps variable refresh rate on while a fullscreen app plays video.",
                 "values": [
                     0,
                     1,
@@ -3116,6 +4429,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Zoom rigid",
+                "sub": "Fixed zoom centre",
+                "desc": "Zooms around a fixed point instead of following the cursor.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.zoom_rigid"
@@ -3126,6 +4441,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Zoom detached camera",
+                "sub": "Zoom ignores focus",
+                "desc": "Leaves the zoomed view in place while focus moves elsewhere.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.zoom_detached_camera"
@@ -3136,6 +4453,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Zoom disable anti-aliasing",
+                "sub": "Crisp zoomed pixels",
+                "desc": "Skips smoothing when zoomed in, keeping pixels sharp.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "cursor.zoom_disable_aa"
@@ -3143,7 +4462,7 @@
             }
         ]
     },
-    // --- settings page 40/42 (hypr) ---
+    // --- settings page 50/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-scrolling",
@@ -3155,6 +4474,8 @@
                 "type": "string",
                 "default": "left",
                 "label": "Direction",
+                "sub": "New column side",
+                "desc": "Where new columns are added: left, right, up or down.",
                 "values": [
                     "left",
                     "right",
@@ -3177,6 +4498,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Follow focus",
+                "sub": "Scroll to focused window",
+                "desc": "Keeps the focused window in view by scrolling the layout.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "scrolling.follow_focus"
@@ -3187,6 +4510,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "Fit method",
+                "sub": "How focus fits the view",
+                "desc": "How the view adjusts to a focused window that does not fit.",
                 "values": [
                     0,
                     1
@@ -3205,6 +4530,8 @@
                 "type": "float",
                 "default": 0.5,
                 "label": "Column width",
+                "sub": "Column width ratio",
+                "desc": "Width of each column as a fraction of the screen.",
                 "range": {
                     "min": 0.1,
                     "max": 1
@@ -3220,6 +4547,8 @@
                 "type": "float",
                 "default": 0.2,
                 "label": "Follow minimum visible",
+                "sub": "Focus visibility threshold",
+                "desc": "How much of a focused window must be on screen before the layout scrolls to it.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -3235,6 +4564,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Wrap swapcol",
+                "sub": "Wrap column swapping",
+                "desc": "Wraps column swaps around the ends of the row instead of stopping.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "scrolling.wrap_swapcol"
@@ -3245,6 +4576,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Wrap focus",
+                "sub": "Wrap focus at the ends",
+                "desc": "Moves focus to the first window when moving past the last, and the other way round.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "scrolling.wrap_focus"
@@ -3252,7 +4585,7 @@
             }
         ]
     },
-    // --- settings page 41/42 (hypr) ---
+    // --- settings page 51/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-dwindle",
@@ -3264,6 +4597,8 @@
                 "type": "int",
                 "default": 2,
                 "label": "Split method",
+                "sub": "Split direction rule",
+                "desc": "Where a new split goes: follow the cursor, always before, or always after.",
                 "values": [
                     0,
                     1,
@@ -3284,6 +4619,8 @@
                 "type": "bool",
                 "default": true,
                 "label": "Preserve split",
+                "sub": "Keep the first direction",
+                "desc": "Keeps the original split direction when resizing, even after that window becomes the largest.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "dwindle.preserve_split"
@@ -3294,6 +4631,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Smart split",
+                "sub": "Split where there is room",
+                "desc": "Splits the window with enough space instead of the focused one.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "dwindle.smart_split"
@@ -3304,6 +4643,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Smart resizing",
+                "sub": "Resize by layout",
+                "desc": "Resizes the window that matches the layout direction rather than the one under the cursor.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "dwindle.smart_resizing"
@@ -3314,6 +4655,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Direction override",
+                "sub": "Keep the cursor direction",
+                "desc": "Once a direction is chosen with the cursor, keeps it for later splits in the group.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "dwindle.permanent_direction_override"
@@ -3324,6 +4667,8 @@
                 "type": "float",
                 "default": 0.98,
                 "label": "Special workspace scale",
+                "sub": "Scratchpad scale",
+                "desc": "Size of windows in the special workspace relative to the screen.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -3339,6 +4684,8 @@
                 "type": "float",
                 "default": 1,
                 "label": "Width multiplier",
+                "sub": "New window width",
+                "desc": "Width of a newly created window as a fraction of its parent.",
                 "range": {
                     "min": 0,
                     "max": 10
@@ -3354,6 +4701,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Use active for splits",
+                "sub": "Split from active window",
+                "desc": "Splits the active window instead of the one under the cursor.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "dwindle.use_active_for_splits"
@@ -3364,6 +4713,8 @@
                 "type": "float",
                 "default": 1,
                 "label": "Split ratio",
+                "sub": "Default split ratio",
+                "desc": "Width ratio used when a window is split.",
                 "range": {
                     "min": 0.1,
                     "max": 1.9
@@ -3379,6 +4730,8 @@
                 "type": "int",
                 "default": 0,
                 "label": "Split bias",
+                "sub": "Favour earlier windows",
+                "desc": "Which window takes the space freed by a closing split.",
                 "values": [
                     0,
                     1
@@ -3397,6 +4750,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Precise mouse move",
+                "sub": "Accurate drag resizing",
+                "desc": "Uses the raw pointer position while dragging instead of snapping to window edges.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "dwindle.precise_mouse_move"
@@ -3404,7 +4759,7 @@
             }
         ]
     },
-    // --- settings page 42/42 (hypr) ---
+    // --- settings page 52/52 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-master",
@@ -3416,6 +4771,8 @@
                 "type": "string",
                 "default": "left",
                 "label": "Orientation",
+                "sub": "Master placement",
+                "desc": "Where the master column sits: left, right, top or bottom.",
                 "values": [
                     "left",
                     "right",
@@ -3440,6 +4797,8 @@
                 "type": "string",
                 "default": "slave",
                 "label": "New window status",
+                "sub": "New window role",
+                "desc": "Whether a new window joins as a master or as a slave.",
                 "values": [
                     "master",
                     "slave",
@@ -3460,6 +4819,8 @@
                 "type": "string",
                 "default": "none",
                 "label": "New on active",
+                "sub": "Place beside focus",
+                "desc": "Puts a new window beside the focused one instead of on a fixed edge.",
                 "values": [
                     "before",
                     "after",
@@ -3480,6 +4841,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "New on top",
+                "sub": "New windows on top",
+                "desc": "Inserts new windows at the top of their column.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "master.new_on_top"
@@ -3490,6 +4853,8 @@
                 "type": "float",
                 "default": 0.55,
                 "label": "Master size factor",
+                "sub": "Master area size",
+                "desc": "Fraction of the screen given to the master area.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -3505,6 +4870,8 @@
                 "type": "string",
                 "default": "left",
                 "label": "Center master fallback",
+                "sub": "Fallback when centred",
+                "desc": "Which side behaves like master when centring is not possible.",
                 "values": [
                     "left",
                     "right",
@@ -3527,6 +4894,8 @@
                 "type": "int",
                 "default": 1,
                 "label": "Slave count for center master",
+                "sub": "Windows needed to centre",
+                "desc": "Number of slave windows required before the master column is centred.",
                 "range": {
                     "min": 0,
                     "max": 20
@@ -3542,6 +4911,8 @@
                 "type": "float",
                 "default": 0.8,
                 "label": "Special workspace scale",
+                "sub": "Scratchpad scale",
+                "desc": "Size of windows in the special workspace relative to the screen.",
                 "range": {
                     "min": 0,
                     "max": 1
@@ -3557,6 +4928,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Allow small split",
+                "sub": "Allow tiny splits",
+                "desc": "Lets a split make windows smaller than the usual minimum.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "master.allow_small_split"
@@ -3567,6 +4940,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Smart resizing",
+                "sub": "Resize by layout",
+                "desc": "Resizes the window that matches the layout direction rather than the one under the cursor.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "master.smart_resizing"
@@ -3577,6 +4952,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Drop at cursor",
+                "sub": "Drop window at pointer",
+                "desc": "Moves a dragged window to where the pointer is rather than to the edge.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "master.drop_at_cursor"
@@ -3587,6 +4964,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Always keep position",
+                "sub": "Keep master position",
+                "desc": "Keeps the master window in place when another window closes instead of promoting a slave.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "master.always_keep_position"
@@ -3597,6 +4976,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Focus master on close",
+                "sub": "Return focus to master",
+                "desc": "Focuses the master window whenever a window closes.",
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "master.focus_master_on_close"

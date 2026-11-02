@@ -433,61 +433,57 @@ function get_scope_root(lines, opts, occurrence, unit, create) {
 
 function navigate_section_readonly(lines, root, section_path, occurrence) {
   if (section_path.length === 0) return { start: root.start, end: root.end }
-  let current_line = root.start
-  let bounds = null
-  for (let depth = 0; depth < section_path.length; depth++) {
-    const sub = section_path.slice(0, depth + 1)
-    const occ = depth < section_path.length - 1 ? 1 : occurrence
-    bounds = find_section_bounds(lines, sub, current_line, root.end, occ)
-    if (!bounds) return null
-    current_line = bounds.start
+  // The whole path is matched in ONE walk from the root:
+  // find_all_section_bounds carries its own section stack, so nesting resolves
+  // at any depth. Descending one level at a time loses the ancestors once a
+  // section line becomes the walk start, which left every section three levels
+  // deep (e.g. decoration.blur.acrylic) unreadable.
+  const bounds = find_section_bounds(lines, section_path, root.start, root.end, occurrence)
+  return bounds ? { start: bounds.start, end: bounds.end } : null
+}
+
+// Longest prefix of `path` that already exists, plus the section the missing
+// levels belong in: { start, end, depth } where depth counts matched levels
+// (0 is the root itself). One full-path walk per candidate depth keeps deep
+// sections addressable, and the caller creates only what is absent.
+function find_existing_prefix(lines, root, path, occurrence) {
+  for (let d = path.length; d >= 1; d--) {
+    const occ = d === path.length ? occurrence : 1
+    const bounds = find_section_bounds(lines, path.slice(0, d), root.start, root.end, occ)
+    if (bounds) return { start: bounds.start, end: bounds.end, depth: d }
   }
-  return { start: bounds.start, end: bounds.end }
+  return { start: root.start, end: root.end, depth: 0 }
 }
 
 function resolve_section(lines, root, path, occurrence, unit) {
   if (path.length === 0) return { start: root.start, end: root.end }
-  let current_line = root.start
-  for (let depth = 0; depth < path.length; depth++) {
-    const sub = path.slice(0, depth + 1)
-    const occ = depth < path.length - 1 ? 1 : occurrence
-    let bounds = find_section_bounds(lines, sub, current_line, root.end, occ)
-    if (bounds) {
-      current_line = bounds.start
-      if (depth === path.length - 1) return { start: bounds.start, end: bounds.end }
-    } else {
-      let parent_start, parent_end
-      if (depth === 0) {
-        parent_start = root.start; parent_end = root.end
-      } else {
-        const parent_sub = path.slice(0, depth)
-        const pb = find_section_bounds(lines, parent_sub, root.start, root.end, 1)
-        parent_start = pb.start; parent_end = pb.end
-      }
-      const insert_pos = parent_end
-      const base_indent = infer_child_indent(lines, parent_start, parent_end, unit)
-      const to_insert = []
-      if (insert_pos - 1 >= 0) {
-        const prev = trim(lines[insert_pos - 1])
-        if (prev === "}," || prev === "}") to_insert.push("")
-      }
-      for (let i = depth; i < path.length; i++) {
-        const ind = base_indent + unit.repeat(i - depth)
-        to_insert.push(ind + lua_key_fmt(path[i]) + " = {")
-      }
-      const levels = path.length - depth
-      for (let i = levels - 1; i >= 0; i--) {
-        const ind = base_indent + unit.repeat(i)
-        to_insert.push(ind + "},")
-      }
-      const blank = to_insert[0] === "" ? 1 : 0
-      const target_start = insert_pos + blank + (levels - 1)
-      const target_end = target_start + 1
-      for (let k = to_insert.length - 1; k >= 0; k--) lines.splice(insert_pos, 0, to_insert[k])
-      root.end += to_insert.length
-      return { start: target_start, end: target_end }
-    }
+  const hit = find_existing_prefix(lines, root, path, occurrence)
+  if (hit.depth === path.length) return { start: hit.start, end: hit.end }
+  const depth = hit.depth
+  const parent_start = hit.start
+  const parent_end = hit.end
+  const insert_pos = parent_end
+  const base_indent = infer_child_indent(lines, parent_start, parent_end, unit)
+  const to_insert = []
+  if (insert_pos - 1 >= 0) {
+    const prev = trim(lines[insert_pos - 1])
+    if (prev === "}," || prev === "}") to_insert.push("")
   }
+  for (let i = depth; i < path.length; i++) {
+    const ind = base_indent + unit.repeat(i - depth)
+    to_insert.push(ind + lua_key_fmt(path[i]) + " = {")
+  }
+  const levels = path.length - depth
+  for (let i = levels - 1; i >= 0; i--) {
+    const ind = base_indent + unit.repeat(i)
+    to_insert.push(ind + "},")
+  }
+  const blank = to_insert[0] === "" ? 1 : 0
+  const target_start = insert_pos + blank + (levels - 1)
+  const target_end = target_start + 1
+  for (let k = to_insert.length - 1; k >= 0; k--) lines.splice(insert_pos, 0, to_insert[k])
+  root.end += to_insert.length
+  return { start: target_start, end: target_end }
 }
 
 function write_scalar_option(lines, root, section_path, option_name, lua_val, occurrence, unit) {
@@ -507,58 +503,42 @@ function write_scalar_option(lines, root, section_path, option_name, lua_val, oc
     root.end += 1
     return
   }
-  let current_line = root.start
-  for (let depth = 0; depth < section_path.length; depth++) {
-    const sub = section_path.slice(0, depth + 1)
-    const occ = depth < section_path.length - 1 ? 1 : occurrence
-    let bounds = find_section_bounds(lines, sub, current_line, root.end, occ)
-    if (bounds) {
-      current_line = bounds.start
-      if (depth === section_path.length - 1) {
-        const sec_start = bounds.start, sec_end = bounds.end
-        const opt_line = find_option_in_section(lines, sec_start, sec_end, option_name)
-        if (opt_line !== null) {
-          lines[opt_line] = leading_ws(lines[opt_line]) + opt_key + " = " + lua_val + ","
-        } else {
-          const opt_indent = infer_child_indent(lines, sec_start, sec_end, unit)
-          lines.splice(sec_end, 0, opt_indent + opt_key + " = " + lua_val + ",")
-          root.end += 1
-        }
-        return
-      }
+  const hit = find_existing_prefix(lines, root, section_path, occurrence)
+  if (hit.depth === section_path.length) {
+    const sec_start = hit.start, sec_end = hit.end
+    const opt_line = find_option_in_section(lines, sec_start, sec_end, option_name)
+    if (opt_line !== null) {
+      lines[opt_line] = leading_ws(lines[opt_line]) + opt_key + " = " + lua_val + ","
     } else {
-      let parent_start, parent_end
-      if (depth === 0) { parent_start = root.start; parent_end = root.end }
-      else {
-        const parent_sub = section_path.slice(0, depth)
-        const pb = find_section_bounds(lines, parent_sub, root.start, root.end, 1)
-        parent_start = pb.start; parent_end = pb.end
-      }
-      const insert_pos = parent_end
-      const base_indent = infer_child_indent(lines, parent_start, parent_end, unit)
-      const to_insert = []
-      if (insert_pos - 1 >= 0) {
-        const prev = trim(lines[insert_pos - 1])
-        if (prev === "}," || prev === "}") to_insert.push("")
-      }
-      for (let i = depth; i < section_path.length; i++) {
-        const ind = base_indent + unit.repeat(i - depth)
-        to_insert.push(ind + lua_key_fmt(section_path[i]) + " = {")
-      }
-      const opt_ind = base_indent + unit.repeat(section_path.length - depth)
-      to_insert.push(opt_ind + opt_key + " = " + lua_val + ",")
-      const levels = section_path.length - depth + 1 - 1
-      // close levels = section_path.length - depth
-      const lvl = section_path.length - depth
-      for (let i = lvl - 1; i >= 0; i--) {
-        const ind = base_indent + unit.repeat(i)
-        to_insert.push(ind + "},")
-      }
-      for (let k = to_insert.length - 1; k >= 0; k--) lines.splice(insert_pos, 0, to_insert[k])
-      root.end += to_insert.length
-      return
+      const opt_indent = infer_child_indent(lines, sec_start, sec_end, unit)
+      lines.splice(sec_end, 0, opt_indent + opt_key + " = " + lua_val + ",")
+      root.end += 1
     }
+    return
   }
+  const depth = hit.depth
+  const parent_start = hit.start, parent_end = hit.end
+  const insert_pos = parent_end
+  const base_indent = infer_child_indent(lines, parent_start, parent_end, unit)
+  const to_insert = []
+  if (insert_pos - 1 >= 0) {
+    const prev = trim(lines[insert_pos - 1])
+    if (prev === "}," || prev === "}") to_insert.push("")
+  }
+  for (let i = depth; i < section_path.length; i++) {
+    const ind = base_indent + unit.repeat(i - depth)
+    to_insert.push(ind + lua_key_fmt(section_path[i]) + " = {")
+  }
+  const lvl = section_path.length - depth
+  const opt_ind = base_indent + unit.repeat(lvl)
+  to_insert.push(opt_ind + opt_key + " = " + lua_val + ",")
+  for (let i = lvl - 1; i >= 0; i--) {
+    const ind = base_indent + unit.repeat(i)
+    to_insert.push(ind + "},")
+  }
+  for (let k = to_insert.length - 1; k >= 0; k--) lines.splice(insert_pos, 0, to_insert[k])
+  root.end += to_insert.length
+  return
 }
 
 function normalize_path(path) {
