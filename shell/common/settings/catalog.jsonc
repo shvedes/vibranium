@@ -4663,23 +4663,6 @@
                 }
             },
             {
-                "key": "hypr.dwindle.special_scale_factor",
-                "type": "float",
-                "default": 0.98,
-                "label": "Special workspace scale",
-                "sub": "Scratchpad scale",
-                "desc": "Size of windows in the special workspace relative to the screen.",
-                "range": {
-                    "min": 0,
-                    "max": 1
-                },
-                "step": 0.01,
-                "hypr": {
-                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
-                    "ctl": "dwindle.special_scale_factor"
-                }
-            },
-            {
                 "key": "hypr.dwindle.split_width_multiplier",
                 "type": "float",
                 "default": 1,
@@ -4904,23 +4887,6 @@
                 "hypr": {
                     "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
                     "ctl": "master.slave_count_for_center_master"
-                }
-            },
-            {
-                "key": "hypr.master.special_scale_factor",
-                "type": "float",
-                "default": 0.8,
-                "label": "Special workspace scale",
-                "sub": "Scratchpad scale",
-                "desc": "Size of windows in the special workspace relative to the screen.",
-                "range": {
-                    "min": 0,
-                    "max": 1
-                },
-                "step": 0.05,
-                "hypr": {
-                    "file": "$XDG_CONFIG_HOME/hypr/hyprland.conf.d/advanced.lua",
-                    "ctl": "master.special_scale_factor"
                 }
             },
             {
