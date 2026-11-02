@@ -250,9 +250,16 @@ CollapsibleSlot {
       property string _aName: currentName
       property string _bName: ""
       property bool _aFront: true
+      // The currentName binding evaluates before _aName is initialised, so
+      // the handler below would read an empty front layer and stage a birth
+      // swap: every delegate rebuild (any settings toggle) replayed the
+      // album glyph sliding in on itself. Seed the buffers first; only real
+      // glyph flips after construction animate.
+      property bool _seeded: false
 
       Component.onCompleted: {
         _aName = currentName
+        _seeded = true
       }
 
       function _layer(i) { return i === 0 ? iconA : iconB }
@@ -260,6 +267,7 @@ CollapsibleSlot {
       function _slideOut(i) { return i === 0 ? slideOutA : slideOutB }
 
       onCurrentNameChanged: {
+        if (!_seeded) return
         const showing = _aFront ? _aName : _bName
         if (currentName === showing) return
         if (currentName === "play") slideDir = 1
