@@ -27,15 +27,18 @@ set -euo pipefail
 # colons, so the terse table parses safely.
 uuid_for_ssid() {
 	local -n _uuid_for_ssid_out=$1
-	local want="$2" uuid
-	while IFS= read -r uuid; do
-		[[ -n "$uuid" ]] || continue
+	# The loop variable is deliberately not named after the caller's variable:
+	# a local of that name shadows the nameref target, so the assignment below
+	# would land on this function's own copy and vanish on return.
+	local want="$2" candidate
+	while IFS= read -r candidate; do
+		[[ -n "$candidate" ]] || continue
 		local s
 
-		IFS= read -r s < <(nmcli --get-values 802-11-wireless.ssid connection show uuid "$uuid" 2> /dev/null) || true
+		IFS= read -r s < <(nmcli --get-values 802-11-wireless.ssid connection show uuid "$candidate" 2> /dev/null) || true
 
 		if [[ "$s" == "$want" ]]; then
-			_uuid_for_ssid_out="$uuid"
+			_uuid_for_ssid_out="$candidate"
 			return 0
 		fi
 
