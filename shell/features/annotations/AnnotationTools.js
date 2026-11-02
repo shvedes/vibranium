@@ -329,6 +329,24 @@ function exportViewRect(vr, cropFrame) {
   return clampDocumentRect(cropFrame, vr)
 }
 
+// On-screen size of the picture itself, before rotation: the view rect times
+// the fit and zoom the display box is built with. The box is that rect
+// ROTATED, so laying the picture out against the box would resample its
+// pixels to the swapped aspect and then spin the distortion - a quarter turn
+// squeezed a 16:9 shot towards 9:16 on an unchanged wide footprint. At this
+// size the rotation alone produces the box's footprint, because the box is
+// exactly the rotated bounding box of this rect.
+function pictureSize(vr, fit, zoom) {
+  if (vr === null || vr === undefined) return { w: 1, h: 1 }
+  const vw = _finite(vr.w) && vr.w > 0 ? vr.w : 0
+  const vh = _finite(vr.h) && vr.h > 0 ? vr.h : 0
+  const kFit = _finite(fit) && fit > 0 ? fit : 1
+  const kZoom = _finite(zoom) && zoom > 0 ? zoom : 1
+  const w = vw * kFit * kZoom
+  const h = vh * kFit * kZoom
+  return { w: _finite(w) && w > 0 ? w : 1, h: _finite(h) && h > 0 ? h : 1 }
+}
+
 // Exported pixel size. A quarter turn swaps the axes; the angle is
 // reduced modulo 180 first so -90, 90 and 270 all swap exactly once, and
 // an animated in-between angle does not, because the export never runs

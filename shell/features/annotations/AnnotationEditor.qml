@@ -385,6 +385,12 @@ PanelWindow {
     stage.width, stage.height, editor._docW, editor._docH,
     editor._fit, editor._boardZoom, editor.viewPan)
 
+  // The picture's own display size, before rotation: the view rect at the
+  // same fit and board zoom the box above is built with. The box is this
+  // rect ROTATED, so the picture must never be sized from the box itself.
+  readonly property var _pictureSize: AnnotationTools.pictureSize(
+    editor.viewRect, editor._fit, editor._boardZoom)
+
   // Live board geometry from synchronous state only. Every mapping
   // read goes through here so handlers never mix binding generations.
   readonly property var _geom: AnnotationTools.boardGeom(
@@ -1366,7 +1372,17 @@ PanelWindow {
       Image {
         id: boardImage
 
-        anchors.fill: parent
+        // The box around this item is the ROTATED bounding box of the
+        // document, so filling it would scale the picture to the swapped
+        // aspect first and then rotate that distortion - a quarter turn left
+        // a 16:9 shot squeezed towards 9:16 on an unchanged wide footprint.
+        // The picture keeps its own unrotated size, centred in the box, and
+        // the rotation alone produces the box's footprint: at any angle the
+        // rotated size is exactly the box (docW/docH are that same bounding
+        // box), and the ink canvas paints through the identical mapping.
+        width: Math.max(1, Math.round(editor._pictureSize.w))
+        height: Math.max(1, Math.round(editor._pictureSize.h))
+        anchors.centerIn: parent
         rotation: editor._rotAnim
         transformOrigin: Item.Center
         visible: editor.imgW > 0 && status === Image.Ready

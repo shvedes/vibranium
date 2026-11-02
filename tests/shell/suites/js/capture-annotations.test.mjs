@@ -1808,6 +1808,47 @@ group('exportSize swaps the axes for a quarter turn and only that', () => {
   is('the return shape is w,h only', AT.exportSize(vr, 0), (v) => Object.keys(v).join(',') === 'w,h', 'w,h')
 })
 
+group('pictureSize keeps the picture’s own aspect, so a turn only rotates it', () => {
+  // The display box is the ROTATED bounding box of the view (docW/docH), so a
+  // picture laid out against that box is resampled to the swapped aspect and
+  // then spun: a quarter turn squeezes a 16:9 shot towards 9:16 on an
+  // unchanged wide footprint. Sizing it from the view rect instead keeps its
+  // pixels, and the rotation alone reproduces the box.
+  const vr = { x: 0, y: 0, w: 1920, h: 1080 }
+  for (const [fit, zoom] of [[1, 1], [0.5, 1], [0.8333, 1.2], [1, 0.8333]]) {
+    const pic = AT.pictureSize(vr, fit, zoom)
+    approx(`the aspect is the view rect’s own (fit ${fit}, zoom ${zoom})`,
+      pic.w / pic.h, vr.w / vr.h, 1e-9)
+    const rest = AT.boardGeom(1920, 1080, vr.w, vr.h, fit, zoom, { x: 0, y: 0 })
+    approx(`at rest it fills the box exactly (fit ${fit}, zoom ${zoom})`, pic.w, rest.w, 1e-9)
+    approx(`at rest it fills the box vertically (fit ${fit}, zoom ${zoom})`, pic.h, rest.h, 1e-9)
+    // A quarter turn: the editor hands the box the swapped pair, which is this
+    // picture's own footprint turned. It has to match exactly, or the turn
+    // leaves a letterbox or an overflow - the visible half of the same bug.
+    const turned = AT.boardGeom(1920, 1080, vr.h, vr.w, fit, zoom, { x: 0, y: 0 })
+    approx(`turned, the box’s wide side is the picture’s height (fit ${fit})`, pic.h, turned.w, 1e-9)
+    approx(`turned, the box’s tall side is the picture’s width (fit ${fit})`, pic.w, turned.h, 1e-9)
+  }
+  // The control: the turned box’s own ratio is a different number from the
+  // picture’s, which is why filling it was a resample and not a rotation.
+  const box = AT.boardGeom(1920, 1080, vr.h, vr.w, 0.5, 1, { x: 0, y: 0 })
+  const pic = AT.pictureSize(vr, 0.5, 1)
+  is('the turned box ratio is not the picture ratio', box.w / box.h,
+    v => Math.abs(v - pic.w / pic.h) > 0.1, 'a different ratio')
+})
+
+group('pictureSize guards a degenerate view rect', () => {
+  eq('no view rect', AT.pictureSize(null, 1, 1), { w: 1, h: 1 })
+  eq('an undefined view rect', AT.pictureSize(undefined, 1, 1), { w: 1, h: 1 })
+  eq('a zero-size view', AT.pictureSize({ x: 0, y: 0, w: 0, h: 0 }, 1, 1), { w: 1, h: 1 })
+  eq('a NaN view size', AT.pictureSize({ x: 0, y: 0, w: NaN, h: NaN }, 1, 1), { w: 1, h: 1 })
+  eq('a NaN fit falls back to 1', AT.pictureSize({ x: 0, y: 0, w: 10, h: 5 }, NaN, 2), { w: 20, h: 10 })
+  eq('a zero zoom is not a scale', AT.pictureSize({ x: 0, y: 0, w: 10, h: 5 }, 2, 0), { w: 20, h: 10 })
+  noThrow('a string fit and zoom', () => AT.pictureSize({ x: 0, y: 0, w: 10, h: 5 }, '2', '2'))
+  is('the return shape is w,h only', AT.pictureSize({ x: 0, y: 0, w: 10, h: 5 }, 1, 1),
+    v => Object.keys(v).join(',') === 'w,h', 'w,h')
+})
+
 group('clampDocPoint folds the frame into the bounds in place', () => {
   // Documented: "The bounds are folded in place rather than through an
   // intersection rect, because rebuilding x from a width loses bits."
