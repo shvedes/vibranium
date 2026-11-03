@@ -13,7 +13,14 @@ The pick is modal: it takes the screen for as long as it runs.
 | Move the pointer | The lens magnifies the pixels under it |
 | Wheel | Zooms the lens in and out |
 | Left click | Picks the color and copies it to the clipboard |
+| Arrow keys | Steps the cross by one pixel (fine aim) |
+| ++enter++ | Picks the pixel the cross marks |
 | Right click, ++escape++ | Cancels the pick |
+
+Near a screen edge the lens is flattened against the edge, and the cross then
+travels one magnified pixel per pixel of pointer movement - fast enough that a
+single pixel is hard to hit with the mouse. The arrow keys step the cross one
+pixel at a time there, and a pick takes the pixel the cross marks.
 
 An open menu is closed when the pick starts, so the frozen frame is the
 desktop and not the menu that was in the way. The pick is drawn over every

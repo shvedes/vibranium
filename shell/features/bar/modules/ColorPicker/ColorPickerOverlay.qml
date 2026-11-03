@@ -17,8 +17,11 @@ import "../../../../common/capture/ShotLib.js" as ShotLib
 // magScale block per source pixel - and a cross marks the exact pixel
 // the click samples. Near screen
 // edges the circle flattens into a rectangle that fits the remaining
-// space (always animated); a non-directional drop shadow follows the
-// shape. The module grabs captureItem and reads the pixel in-process.
+// space (always animated), and the magnified view is clamped inside the
+// frame: the aimed pixel then travels magScale screen pixels per pointer
+// pixel, which no mouse can aim finely, so the arrow keys step the cross by
+// whole frame pixels; a non-directional drop shadow follows the shape. The
+// module grabs captureItem and reads the pixel in-process.
 //
 // The lens is an Image, not a Canvas, and that is load-bearing twice over.
 // Qt's Context2D has no imageSmoothingEnabled state - the assignment is
@@ -40,10 +43,11 @@ PanelWindow {
   // abandons on its own for a screen that went away or a bar that was disabled.
   signal cancelled()
 
-  // Cursor position in window coordinates, maintained by the click
-  // surface; the magnifier is centered on it.
-  property real cursorX: -1
-  property real cursorY: -1
+  // The aimed point in window coordinates: the magnifier is centered on it
+  // and a pick samples it. Pointer motion re-aims it at the pointer, and the
+  // arrow keys step it off the pointer by whole frame pixels.
+  property real aimX: -1
+  property real aimY: -1
 
   // Magnifier scale in integer steps (source px -> lens px). Every step
   // draws a hard-edged block per source pixel on the Canvas.
@@ -75,6 +79,39 @@ PanelWindow {
   // The rendered frame view; the module grabs this for the pixel read.
   property alias captureItem: view
   readonly property bool frameReady: view.hasContent
+
+  // Step the aim by whole frame pixels. The landing point is the CENTRE of
+  // the target pixel: the module's probe floors a window coordinate into a
+  // frame pixel, so a centre is the one place a step can neither round into a
+  // neighbour nor leave the cross sitting on a block boundary.
+  function nudgeAim(dx, dy) {
+    const fw = view.sourceSize.width
+    const fh = view.sourceSize.height
+    const r = overlay.frameRatio
+    if (fw <= 0 || fh <= 0 || !(r > 0)) return false
+    const px = Math.floor(overlay.aimX * r)
+    const py = Math.floor(overlay.aimY * r)
+    const nx = Math.max(0, Math.min(fw - 1, px + dx))
+    const ny = Math.max(0, Math.min(fh - 1, py + dy))
+    if (nx === px && ny === py) return false
+    overlay.aimX = (nx + 0.5) / r
+    overlay.aimY = (ny + 0.5) / r
+    return true
+  }
+
+  // Commit the aimed pixel. A click and the confirm key both come through
+  // here, so the cross and what a pick samples can never name different
+  // pixels. An aim outside this surface has no pixel to sample: the exclusive
+  // surface keeps the pointer even when the cursor sits on another output, and
+  // the module's probe clamps an out-of-frame coordinate to the frame's edge -
+  // a real colour from the wrong place.
+  function pickAim() {
+    if (overlay.aimX < 0 || overlay.aimY < 0) return false
+    if (overlay.aimX > overlay.width) return false
+    if (overlay.aimY > overlay.height) return false
+    overlay.pickedAt(overlay.aimX, overlay.aimY)
+    return true
+  }
 
   // Wall clock of the map that started the capture cycle, 0 while the
   // overlay is closed. The frame's arrival is the one piece of timing a
@@ -160,8 +197,8 @@ PanelWindow {
   // context"); first attempt 120 ms in, retries at 250 ms, bounded at
   // eight attempts.
   onVisibleChanged: {
-    overlay.cursorX = -1
-    overlay.cursorY = -1
+    overlay.aimX = -1
+    overlay.aimY = -1
     overlay.frameUrl = ""
     if (visible) {
       view.attempts = 0
@@ -199,7 +236,7 @@ PanelWindow {
   Item {
     id: magnifier
 
-    readonly property bool shown: view.hasContent && overlay.cursorX >= 0
+    readonly property bool shown: view.hasContent && overlay.aimX >= 0
     readonly property real size: 150
     readonly property real half: size / 2
     // Logical pixels per frame pixel: what magScale asks for, expressed in
@@ -208,12 +245,12 @@ PanelWindow {
     readonly property real magStep: overlay.frameRatio > 0
       ? overlay.magScale / overlay.frameRatio
       : 1
-    // Pointer point in box-local coordinates. It drives the shape only: the
+    // Aimed point in box-local coordinates. It drives the shape only: the
     // cross below is read back off the magnified view's own transform.
-    readonly property real lensX: overlay.cursorX - x
-    readonly property real lensY: overlay.cursorY - y
+    readonly property real lensX: overlay.aimX - x
+    readonly property real lensY: overlay.aimY - y
     // Corner radius fraction 1..0: 1 = circle, 0 = sharp rectangle.
-    // Driven by the pointer's distance to the nearest box edge, so the
+    // Driven by the aim's distance to the nearest box edge, so the
     // lens flattens exactly as far as the screen forces it to. This one
     // is instant and functional: the mask and the shadow shape must match
     // the current box, never a lagging value.
@@ -237,35 +274,35 @@ PanelWindow {
       }
     }
 
-    // Box around the pointer: full circle extent where the screen
+    // Box around the aimed point: full circle extent where the screen
     // allows it, flush against each edge otherwise.
-    x: overlay.cursorX - Math.min(half, overlay.cursorX)
-    y: overlay.cursorY - Math.min(half, overlay.cursorY)
-    width: Math.min(half, overlay.cursorX)
-      + Math.min(half, overlay.width - overlay.cursorX)
-    height: Math.min(half, overlay.cursorY)
-      + Math.min(half, overlay.height - overlay.cursorY)
+    x: overlay.aimX - Math.min(half, overlay.aimX)
+    y: overlay.aimY - Math.min(half, overlay.aimY)
+    width: Math.min(half, overlay.aimX)
+      + Math.min(half, overlay.width - overlay.aimX)
+    height: Math.min(half, overlay.aimY)
+      + Math.min(half, overlay.height - overlay.aimY)
     visible: shown
 
-    // Where the magnified view sits: the pointer's frame pixel at the box
+    // Where the magnified view sits: the aim's frame pixel at the box
     // centre, then kept inside the frame, so a box flush against a screen
     // edge never magnifies past the frame's border. Two named values because
     // the cross reads the same numbers back rather than repeating them.
     readonly property real lensViewX: Math.max(width - overlay.width * magStep,
-      Math.min(0, width / 2 - overlay.cursorX * magStep))
+      Math.min(0, width / 2 - overlay.aimX * magStep))
     readonly property real lensViewY: Math.max(height - overlay.height * magStep,
-      Math.min(0, height / 2 - overlay.cursorY * magStep))
+      Math.min(0, height / 2 - overlay.aimY * magStep))
     // The cross marks the pixel a click samples: exactly where that magnified
-    // view renders the pointer, inset by 7px so the 13px bars stay inside the
-    // shape. Reading the position off the view's own transform is the whole
+    // view renders the aimed point, inset by 7px so the 13px bars stay inside
+    // the shape. Reading the position off the view's own transform is the whole
     // point - a cross placed by its own separate formula is how the marked
     // pixel and the sampled one drift apart. Where the view was shifted to
     // stay inside the frame the cross follows it, so near a screen edge it
     // marks the sampled pixel rather than sitting under the pointer.
     readonly property real crossX: Math.max(7,
-      Math.min(width - 7, lensViewX + overlay.cursorX * magStep))
+      Math.min(width - 7, lensViewX + overlay.aimX * magStep))
     readonly property real crossY: Math.max(7,
-      Math.min(height - 7, lensViewY + overlay.cursorY * magStep))
+      Math.min(height - 7, lensViewY + overlay.aimY * magStep))
 
     // Drop shadow under the lens, painted before lensClip so the lens
     // covers it. Its source is a dedicated hidden rounded rectangle -
@@ -400,6 +437,19 @@ PanelWindow {
       overlay.cancelled()
       event.accepted = true
     }
+    // Fine aim, one frame pixel per press, and the confirm key picks the
+    // aimed pixel. The exclusive surface holds the keyboard for the whole
+    // pick, so these cannot leak into another surface.
+    Keys.onPressed: event => {
+      if (event.key === Qt.Key_Left) overlay.nudgeAim(-1, 0)
+      else if (event.key === Qt.Key_Right) overlay.nudgeAim(1, 0)
+      else if (event.key === Qt.Key_Up) overlay.nudgeAim(0, -1)
+      else if (event.key === Qt.Key_Down) overlay.nudgeAim(0, 1)
+      else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
+        overlay.pickAim()
+      else return
+      event.accepted = true
+    }
   }
 
   MouseArea {
@@ -419,17 +469,15 @@ PanelWindow {
         overlay.cancelled()
         return
       }
-      // A click that landed outside this surface has no pixel to sample.
-      // The exclusive surface keeps the pointer even when the cursor is on
-      // another output, and the sampler clamps an out-of-frame coordinate to
-      // the frame's edge - a real colour from the wrong place.
-      if (mouse.x < 0 || mouse.y < 0
-        || mouse.x > overlay.width || mouse.y > overlay.height) return
-      overlay.pickedAt(mouse.x, mouse.y)
+      // The aimed point, not the press point: an arrow-key step moves the
+      // cross off the pointer, and the cross is what a pick samples.
+      overlay.pickAim()
     }
     onPositionChanged: mouse => {
-      overlay.cursorX = mouse.x
-      overlay.cursorY = mouse.y
+      // A moved pointer re-aims at itself, so a keyboard step holds only
+      // until the pointer speaks again.
+      overlay.aimX = mouse.x
+      overlay.aimY = mouse.y
     }
     onWheel: wheel => {
       // One notch per 120 delta; integer scale keeps pixels crisp.
