@@ -104,6 +104,7 @@ hl.window_rule({
 hl.window_rule({
   match = { tag = "gameWindow" },
   immediate = true,
+  content = "game",
   opaque = true,
 })
 

@@ -10,8 +10,11 @@ import "../../../../services/system/PrintersLib.js" as Model
 // the caps + leading glyph the ArchUpdates island uses for its own
 // header) with the muted subtitle underneath and the CUPS-settings and
 // reload affordances on the right. Sections use the same caps style:
-// KNOWN PRINTERS (always visible, with an info placeholder while empty)
-// and JOBS (five rows visible at most, the rest scrolls). Job rows are
+// KNOWN PRINTERS and JOBS (five rows visible at most, the rest scrolls).
+// When there is nothing usable to list - a VM, a stopped or missing CUPS, or
+// no default queue - one setup block replaces every section: the lib
+// EmptyState over the reason, with the action that fixes it underneath.
+// Job rows are
 // Finder-style zebra rows with a file-type icon, a pending spinner,
 // Hold/Release/Delete; printer rows carry connect / options / remove
 // plus the two-press test page. The default printer wears the accent printer icon. Renaming a printer edits a local
@@ -67,10 +70,54 @@ Item {
       // Jobs as shown (the service already minus locally cleared history).
       readonly property var jobs: Svc.Printers.shownJobs
       readonly property var printers: Svc.Printers.printers
-      // CUPS down: the island shows the warning block only - every
-      // section and hint below the header hides.
+      // CUPS down: the service is missing or stopped, so no queue can be
+      // read at all.
       readonly property bool cupsDown: Svc.Printers.cupsHealth === "inactive"
         || Svc.Printers.cupsHealth === "missing"
+      // No queue a job can land on: nothing configured yet, or no default
+      // picked.
+      readonly property bool noDefault: Svc.Printers.defaultPrinter === ""
+      // Nothing usable to list, so the setup block owns the body: a VM has no
+      // printing at all, a service that is not running has no queue to read,
+      // and a default queue is what makes the rest of the card actionable.
+      readonly property bool setupState: Svc.Printers.vmUnavailable
+        || contentRoot.cupsDown || contentRoot.noDefault
+      // What the block says, in the order the causes are checked. Generic on
+      // purpose: queue names and job titles are not part of "why is there
+      // nothing here".
+      readonly property string setupText: {
+        if (Svc.Printers.vmUnavailable) return "Printing is not available in a virtual machine"
+        if (Svc.Printers.cupsHealth === "missing") return "The CUPS package is not installed"
+        if (contentRoot.cupsDown) return "The CUPS service is not running"
+        if (contentRoot.printers.length === 0) return "No printers are configured"
+        return "No default printer is set"
+      }
+      // The one line under the reason: what the button will do about it.
+      readonly property string setupDetail: {
+        if (Svc.Printers.vmUnavailable) return "This machine has no printer devices to hand to the system"
+        if (contentRoot.cupsDown) return "Run the CUPS setup to install and enable the printing service"
+        if (contentRoot.printers.length === 0) return "Open print settings to add a printer"
+        return "Open print settings and pick the queue jobs should go to"
+      }
+      // The way out of the state. Empty on a VM: there is nothing to run.
+      readonly property string setupActionLabel: {
+        if (Svc.Printers.vmUnavailable) return ""
+        return contentRoot.cupsDown ? "Run CUPS setup" : "Open print settings"
+      }
+      function runSetupAction() {
+        if (contentRoot.setupActionLabel === "") return
+        // The setup script installs and enables the stack, so it is the
+        // answer only when the stack itself is missing or stopped; a healthy
+        // service with no default queue needs the settings app. Both leave
+        // the island: the terminal or the settings window is the context now.
+        if (contentRoot.cupsDown) {
+          Exec.run(["vb-launch-terminal", "--app-id=org.vb.term.float",
+            "--title=vb-setup-cups", "--", "vb-setup-cups"])
+        } else {
+          Svc.Printers.openPrinterConfig("")
+        }
+        root.islandHost.close()
+      }
       // True while any shown job already left the queue (the clear
       // button below has something to do).
       readonly property bool hasHistory: {
@@ -99,6 +146,7 @@ Item {
       // Subtitle under the caps header: the default queue plus the
       // live queue depth.
       readonly property string subtitleText: {
+        if (Svc.Printers.vmUnavailable) return "Not available in a virtual machine"
         if (Svc.Printers.printers.length === 0 && Svc.Printers.shownJobs.length === 0)
           return "No printers configured"
         const parts = []
@@ -142,7 +190,7 @@ Item {
           spacing: Ui.m
 
           Column {
-            width: parent.width - headerBtns.width - parent.spacing
+            width: parent.width - (headerBtns.visible ? headerBtns.width + parent.spacing : 0)
             anchors.verticalCenter: parent.verticalCenter
             spacing: 2
 
@@ -213,6 +261,9 @@ Item {
           Row {
             id: headerBtns
 
+            // The setup block below owns the whole card and carries its own
+            // action, so the affordances that act on the lists stay out of it.
+            visible: !contentRoot.setupState
             anchors.verticalCenter: parent.verticalCenter
             spacing: Ui.s
 
@@ -244,31 +295,51 @@ Item {
           }
         }
 
-        // CUPS liveness: red warning glyph over a plain-language line
-        // when neither cups.service nor cups.socket runs (package
-        // missing or service down). The empty lists below would
-        // otherwise read as "no printers" with no hint why. The text
-        // stays the muted body color - only the glyph carries red.
-        Column {
-          visible: contentRoot.cupsDown
+        // Setup state: the whole body is the reason plus the one action that
+        // fixes it. Every section below hides, so a box with nothing to list
+        // (a VM, a service that is not running, no default queue) reads as
+        // one story instead of three empty lists. The glyph is the failed-queue
+        // printer (red xmark at its corner) in the shared EmptyState treatment -
+        // half-transparent, with the reason under it.
+        Item {
+          visible: contentRoot.setupState
           width: parent.width
-          spacing: Ui.s
+          height: setupBlock.implicitHeight + Ui.xl
 
-          Icon {
-            anchors.horizontalCenter: parent.horizontalCenter
-            name: "warning"
-            colorKey: "red"
-            size: 28
-          }
+          Column {
+            id: setupBlock
 
-          Title {
-            level: 5
+            // Own margin under the header, on top of the column's gap: the
+            // header names the card, this block is its content, so the two do
+            // not read as one stack.
+            anchors.top: parent.top
+            anchors.topMargin: Ui.xl
             width: parent.width
-            horizontalAlignment: Text.AlignHCenter
-            wrapMode: Text.WordWrap
-            text: Svc.Printers.cupsHealth === "missing"
-              ? "No printer service found - install the CUPS package to manage printers"
-              : "Printer service is not running - enable cups.service or cups.socket"
+            spacing: Ui.m
+
+            EmptyState {
+              width: parent.width
+              iconName: "printer-error"
+              iconAccentKey: "red"
+              text: contentRoot.setupText
+            }
+
+            Title {
+              level: 5
+              width: parent.width
+              horizontalAlignment: Text.AlignHCenter
+              wrapMode: Text.WordWrap
+              text: contentRoot.setupDetail
+              color: Ui.tint("foreground_1", 0.5)
+            }
+
+            Button {
+              visible: contentRoot.setupActionLabel !== ""
+              anchors.horizontalCenter: parent.horizontalCenter
+              variant: "outline"
+              label: contentRoot.setupActionLabel
+              onClicked: contentRoot.runSetupAction()
+            }
           }
         }
 
@@ -278,7 +349,7 @@ Item {
         // story (it would just repeat "cupsd unreachable" under it).
         Title {
           level: 5
-          visible: Svc.Printers.errorText !== "" && !contentRoot.cupsDown
+          visible: Svc.Printers.errorText !== "" && !contentRoot.setupState
           width: parent.width
           text: Svc.Printers.errorText
           color: Ui.solid("red")
@@ -286,28 +357,16 @@ Item {
 
         Title {
           level: 5
-          visible: Svc.Printers.actionError !== "" && !contentRoot.cupsDown
+          visible: Svc.Printers.actionError !== "" && !contentRoot.setupState
           width: parent.width
           text: Svc.Printers.actionError
           color: Ui.solid("red")
         }
 
-        // No default printer yet (fresh setup, or the default queue was
-        // deleted): point at the link action on a printer row instead of
-        // leaving every row's connect button unexplained.
-        Title {
-          level: 5
-          visible: !contentRoot.cupsDown && Svc.Printers.printers.length > 0 && Svc.Printers.defaultPrinter === ""
-          width: parent.width
-          text: "No default printer - press the link icon on a printer to set it"
-          wrapMode: Text.WordWrap
-        }
-
-        // Printers section: always visible, even with zero queues - the
-        // empty slot reads as a placeholder, never as a missing list.
-        // Hidden while CUPS is down (warning owns the island then).
+        // Printers section: the setup block above owns the no-queue and
+        // no-default cases, so this reads only when there is a queue to show.
         Column {
-          visible: !contentRoot.cupsDown
+          visible: !contentRoot.setupState
           width: parent.width
           spacing: Ui.s
 
@@ -329,37 +388,6 @@ Item {
             }
           }
 
-          // Empty slot: centered info glyph with the pointer text
-          // underneath (no queues yet, or the last one was deleted).
-          Column {
-            visible: contentRoot.printers.length === 0
-            width: parent.width
-            spacing: Ui.s
-
-            Icon {
-              anchors.horizontalCenter: parent.horizontalCenter
-              name: "info"
-              colorKey: "foreground_1"
-              size: 28
-              opacity: 0.3
-            }
-
-            Title {
-              level: 5
-              width: parent.width
-              horizontalAlignment: Text.AlignHCenter
-              text: "Known printers will appear here"
-            }
-
-            Title {
-              level: 5
-              width: parent.width
-              horizontalAlignment: Text.AlignHCenter
-              text: "Add one in CUPS settings (top-right icon)"
-              color: Ui.tint("foreground_1", 0.5)
-            }
-          }
-
           List {
             id: printersList
 
@@ -377,9 +405,9 @@ Item {
 
         // Jobs section: always visible, even with an empty queue - the
         // empty slot reads as a placeholder, never as a missing list.
-        // Hidden while CUPS is down (warning owns the island then).
+        // Hidden behind the setup block, which speaks for the whole card.
         Column {
-          visible: !contentRoot.cupsDown
+          visible: !contentRoot.setupState
           width: parent.width
           spacing: Ui.s
 

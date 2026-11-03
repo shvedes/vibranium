@@ -6,7 +6,11 @@ import qs.services as Svc
 import qs.features.bar
 import "../../../../services/system/PrintersLib.js" as Model
 
-// Printers bar module. One slot in the right zone, hidden in a VM.
+// Printers bar module. One slot in the right zone, always shown while the
+// slot is enabled: a box with no printing set up (or a VM, which has none at
+// all) still gets the icon, and the island explains the state and offers the
+// way out. Nothing here is hidden - the module is the entry point to that
+// explanation.
 // Icon states (printer.* assets only, all static - no blinking):
 //   printer-error (red xmark) - at least one job failed / queue stopped
 //   printer (yellow page) - a job is printing right now
@@ -69,6 +73,9 @@ CollapsibleSlot {
   // per printer (alias, state line, default mark) plus one row per
   // nonzero job bucket over the shown queue.
   readonly property var tipLines: {
+    // A VM has no CUPS at all (the service never refreshes there), so the
+    // queue lines would only say "no printers" without the reason.
+    if (root.vmUnavailable) return [{ icon: "printer", text: "Printing is not available in a virtual machine" }]
     const rows = []
     const printers = Svc.Printers.printers ?? []
     for (let i = 0; i < printers.length; i++) {
@@ -91,10 +98,10 @@ CollapsibleSlot {
     if (b.failed > 0) rows.push({ icon: "xmark", text: b.failed + " failed" })
     return rows
   }
-  readonly property bool shown: !root.vmUnavailable
-
-  // Collapsible slot (see CollapsibleSlot.qml).
-  collapseShown: root.shown
+  // Collapsible slot (see CollapsibleSlot.qml): always in the row while the
+  // slot is enabled. The island, not the bar, is where a missing service or
+  // queue is explained.
+  collapseShown: true
 
   Icon {
     anchors.centerIn: parent
@@ -108,7 +115,8 @@ CollapsibleSlot {
 
   ToolTipBind {
     active: root.hovered && !root.barWindow.islandHost.isOpenFor(root)
-    text: root.failed || root.printerDown ? "Printers - attention"
+    text: root.vmUnavailable ? "Printers - not available in a VM"
+      : root.failed || root.printerDown ? "Printers - attention"
       : Svc.Printers.anyPrinting ? "Printers - printing"
       : Svc.Printers.hasActiveJobs ? "Printers - " + root.activeJobCount + (root.activeJobCount === 1 ? " job" : " jobs")
       : Svc.Printers.state === "error" ? "Printers - unreachable" : "Printers"
