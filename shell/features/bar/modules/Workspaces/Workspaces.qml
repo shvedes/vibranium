@@ -51,9 +51,12 @@ BarModule {
     if (root.shown.join(",") !== root.ids.join(",")) root.shown = root.ids
   }
 
-  // Backstop for startup when the model fills in after us; steady-state
-  // updates come from the socket events below.
-  onIdsChanged: if (root.shown.length === 0) root.syncIds()
+  // The strip follows the live ids on every change, not only at startup. A
+  // workspace the model drops while the socket reports nothing further about
+  // it would otherwise stay rendered as a slot whose workspaceFor() answer is
+  // null - a number that swallows the click on it, at the end of the strip
+  // where workspaces are created and destroyed.
+  onIdsChanged: root.syncIds()
 
   Component.onCompleted: {
     root.syncIds()
@@ -139,7 +142,13 @@ BarModule {
           anchors.fill: parent
           cursorShape: Qt.PointingHandCursor
           acceptedButtons: Qt.LeftButton
-          onClicked: if (slot.ws !== null) slot.ws.activate()
+          onClicked: {
+            // A slot the model no longer backs is not a workspace to switch
+            // to; re-deriving the strip drops it instead of keeping a number
+            // that can never be clicked.
+            if (slot.ws === null) root.syncIds()
+            else slot.ws.activate()
+          }
         }
       }
     }
