@@ -237,7 +237,7 @@ t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
 t_count "features/ holds the 151 files the README publishes" "151" "$(layer_files features)"
 t_count "services/ holds the 26 files the README publishes" "26" "$(layer_files services)"
 t_count "common/ holds the 127 files the README publishes" "127" "$(layer_files common)"
-t_count "boot/ holds the 3 files the README publishes" "3" "$(layer_files boot)"
+t_count "boot/ holds the 2 files the README publishes" "2" "$(layer_files boot)"
 t_count "the composition root is the single file the README publishes" "1" "$(layer_files composition)"
 
 t_section "every module sits inside one of the four layers, and every file inside one"
@@ -364,10 +364,10 @@ t_eq "shell.qml, the composition root, is the one non-boot importer" \
   "1" "$(awk -F'\t' '$7 == "boot" && $9 != "boot"' "$WORK/resolved.tsv" | wc -l | tr -d ' ')"
 t_eq "and it is shell.qml that reads it" \
   "shell/shell.qml" "$(awk -F'\t' '$7 == "boot" && $9 != "boot" { print $1 }' "$WORK/resolved.tsv" | LC_ALL=C sort -u)"
-# A self-read inside boot/ is intra-module, not a dependency: BootRegistry is
-# declared by qs.boot and referenced at Boot.qml:967, so the import at
-# Boot.qml:31 is what makes the sibling visible. What must not exist is a boot
-# edge onto a *different* module.
+# A self-read inside boot/ is intra-module, not a dependency: boot/qmldir
+# declares the module's types and Boot.qml imports qs.boot, so the sibling
+# declarations are visible there. What must not exist is a boot edge onto a
+# *different* module.
 rule "no boot/ file imports a boot module other than its own" \
   '$9 == "boot" && $7 == "boot" && $3 == "module" && $4 != "qs.boot"'
 t_note "boot/ reads its own module $(awk -F'\t' '$9 == "boot" && $7 == "boot" { printf "%s:%s (%s)\n", $1, $2, $4 }' "$WORK/resolved.tsv" | tr '\n' ' ')"

@@ -604,10 +604,12 @@ Item {
   // instead of O(units) per step.
   property var _byId: ({})
   property var _dependents: ({})
+  // Construction time per settled unit, keyed by id. Rebuilt only when a
+  // reader asks for it (the two `boot` IPC verbs), because it is a diagnostic
+  // snapshot and not boot state: nothing in the boot path reads it, so a
+  // rebuild on every unit event is a full pass over the catalog for nobody.
   property var _report: ({})
   property bool _refreshingReadiness: false
-  property bool _reportPending: false
-  property bool _coalesceReports: false
   property bool _catalogValid: false
   property string _catalogValidationError: ""
   // The last lifecycle milestone each unit reached. The unit events are
@@ -675,8 +677,8 @@ Item {
   property var _pendingLateResolves: []
   // That replay, taken over by the pump once the late half lands.
   property var _replayQueue: []
-  // A drain asked for before the entrance played; the milestone's change runs
-  // it (see _beginDrain).
+  // A drain asked for before boot construction settled; the milestone's change
+  // runs it (see _beginDrain).
   property bool _drainRequested: false
 
   function _loadLate() {
@@ -754,12 +756,13 @@ Item {
 
   function _beginDrain() {
     if (boot._drainStarted) return
-    // Phase order, not a delay: construction settles first, then the entrance
-    // animation plays, and only then does the background drain spend this
-    // thread. The drain used to start the instant the late half landed, which
-    // is mid-entrance - traced on a cold boot, it put 70-150ms stalls inside a
-    // 200ms wallpaper crossfade and stretched the whole entrance.
-    if (!DesktopLayoutState.bootEntrancePlayed) {
+    // Phase order, not a delay: the drain waits for boot construction to
+    // settle, so it cannot overlap the module build the entrance is
+    // choreographed around. It does not wait for the entrance itself: every
+    // resident service would then come up one animation late for frames the
+    // entrance already draws, and the per-turn budget below is what keeps the
+    // drain off those frames anyway.
+    if (!DesktopLayoutState.bootEntranceSettled) {
       boot._drainRequested = true
       return
     }
@@ -958,6 +961,8 @@ Item {
     boot._late.teardown(id)
   }
 
+  // Rebuild the diagnostic report. Called by the verbs that read it, never by
+  // a boot phase.
   function _syncReport() {
     const next = ({})
     for (let i = 0; i < boot._catalog.length; i++) {
@@ -968,19 +973,6 @@ Item {
       next[id] = state.constructionMs
     }
     boot._report = next
-  }
-
-  function _requestSyncReport() {
-    if (boot._coalesceReports) {
-      boot._reportPending = true
-      return
-    }
-    if (boot._reportPending) return
-    boot._reportPending = true
-    Qt.callLater(() => {
-      boot._reportPending = false
-      boot._syncReport()
-    })
   }
 
   function _essentialCount() {
@@ -1018,7 +1010,6 @@ Item {
       }
     } finally {
       boot._refreshingReadiness = false
-      boot._requestSyncReport()
     }
   }
 
@@ -1159,7 +1150,6 @@ Item {
     // for the session. A live request is the only thing worth waiting for,
     // and it is checked above.
     UnitGate.releaseOwner(boot.annotationsOwner)
-    boot._requestSyncReport()
   }
 
   function _stateSnapshot() {
@@ -1189,7 +1179,6 @@ Item {
       boot._refreshUnit(id)
       boot._unitMilestone(id)
     }
-    function onStatesChanged() { boot._requestSyncReport() }
   }
 
   // The annotation controller exists only between a request and its
@@ -1202,11 +1191,6 @@ Item {
     onLoaded: {
       if (boot._refreshingReadiness) return
       UnitGate.refresh("annotations")
-      boot._requestSyncReport()
-    }
-    onStatusChanged: {
-      if (boot._refreshingReadiness) return
-      boot._requestSyncReport()
     }
   }
 
@@ -1250,16 +1234,11 @@ Item {
     function onReadyChanged() { boot._refreshUnit("icons") }
   }
 
-  Connections {
-    target: BootRegistry
-    function on_ReportChanged() { boot._requestSyncReport() }
-  }
-
-  // The entrance milestone owns when the background phases start (see
+  // The construction milestone owns when the background phases start (see
   // _beginDrain): the drain request parked there runs on this edge.
   Connections {
     target: DesktopLayoutState
-    function onBootEntrancePlayedChanged() {
+    function onBootEntranceSettledChanged() {
       if (boot._drainRequested) boot._beginDrain()
     }
   }
@@ -1271,7 +1250,6 @@ Item {
       UnitGate.ensure(descriptor.id, "boot")
       UnitGate.refresh(descriptor.id)
     }
-    boot._syncReport()
   }
 
   function _bootVisuals() {
@@ -1289,7 +1267,6 @@ Item {
         // Recorded on the unit's record by UnitGate.
       }
     }
-    boot._syncReport()
   }
 
   function _drainOne(descriptor) {
@@ -1324,15 +1301,11 @@ Item {
   // make progress, or the pump would reschedule forever without advancing.
   // Returns nothing; callers own the queue and the rescheduling.
   function _budgetedTurn(queue) {
-    boot._coalesceReports = true
     const deadline = Date.now() + boot.frameBudgetMs
     while (queue.length > 0) {
       boot._drainOne(queue.shift())
       if (Date.now() >= deadline) break
     }
-    boot._coalesceReports = false
-    if (boot._reportPending) boot._reportPending = false
-    boot._syncReport()
   }
 
   function _drainNext() {

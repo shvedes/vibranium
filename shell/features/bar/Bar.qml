@@ -784,13 +784,9 @@ Singleton {
     root.entranceReady = true
     // Every placed module is built, which is the shell's own answer to "boot
     // construction settled" - the surfaces that play a boot animation (the
-    // wallpaper's first fade) read it instead of racing this construction.
+    // wallpaper's first fade) and the background boot phases read it instead
+    // of racing this construction.
     DesktopLayoutState.noteBootEntranceSettled()
-    // ...and this bar owns the entrance animation itself, so it is also what
-    // reports the end of it. The interval is the very duration the intro
-    // Behavior above runs on, so the two cannot drift apart.
-    entrancePlayed.stop()
-    entrancePlayed.start()
   }
 
   // The warm frame itself: one frame is the whole requirement, so the
@@ -801,16 +797,6 @@ Singleton {
     interval: 16
     repeat: false
     onTriggered: root._latchEntrance()
-  }
-
-  // Reports the entrance's end to the shared milestone. Background boot work
-  // (the drain) waits for it, so the slidefade plays on an idle thread.
-  Timer {
-    id: entrancePlayed
-
-    interval: Ui.slowMs
-    repeat: false
-    onTriggered: DesktopLayoutState.noteBootEntrancePlayed()
   }
 
   // Is `kind` on the bar, either as a slot of its own or as a member of a
