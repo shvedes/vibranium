@@ -140,6 +140,12 @@ BarModule {
 
         MouseArea {
           anchors.fill: parent
+          // This module turns the shared fill off (builtinFill: false), so the
+          // cell areas are the whole hover surface. A MouseArea without hover
+          // takes no hover events, and cursorShape is only applied through
+          // them - the hand cursor would then trail whatever module it came
+          // from instead of following the cell under the pointer.
+          hoverEnabled: true
           cursorShape: Qt.PointingHandCursor
           acceptedButtons: Qt.LeftButton
           onClicked: {
