@@ -12,8 +12,8 @@ import qs.common
 //
 // Disabled is a full state, not just a click guard: visuals key off
 // `enabled` itself (never hover/press alone, which can stick), the click
-// surface gates on it, and the shared disabled fade applies - same
-// treatment as Button/IconButton.
+// surface refuses presses and reports the forbidden cursor, and the shared
+// disabled fade applies - same treatment as Button/IconButton.
 Rectangle {
   id: btn
 
@@ -57,9 +57,12 @@ Rectangle {
     id: area
 
     anchors.fill: parent
-    enabled: btn.enabled
     hoverEnabled: true
-    cursorShape: Qt.PointingHandCursor
+    // `enabled: false` on the area would drop it out of hover delivery, and an
+    // inert button could then never show the forbidden cursor. The gate rides
+    // the accepted buttons instead: no button, no click, hover still reported.
+    acceptedButtons: btn.enabled ? Qt.LeftButton : Qt.NoButton
+    cursorShape: btn.enabled ? Qt.PointingHandCursor : Qt.ForbiddenCursor
     onClicked: btn.clicked()
   }
 }

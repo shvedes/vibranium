@@ -87,8 +87,11 @@ Rectangle {
 
   MouseArea {
     anchors.fill: parent
-    enabled: root.enabled_ && !root.dimmed
-    cursorShape: Qt.PointingHandCursor
+    // The gate rides `toggle()` rather than the area: a disabled area takes no
+    // hover, and an inert switch would then never show the forbidden cursor.
+    hoverEnabled: true
+    cursorShape: (root.enabled_ && !root.dimmed)
+      ? Qt.PointingHandCursor : Qt.ForbiddenCursor
     onClicked: {
       root.toggle()
     }

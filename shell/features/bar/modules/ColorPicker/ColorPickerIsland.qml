@@ -413,7 +413,7 @@ Item {
 
     // Clear-all: themed red, hover-deepened; wipes the whole history
     // through the module (which persists the empty file). Inert while
-    // the history is empty: dimmed, no hover/cursor, taps refused.
+    // the history is empty: dimmed, forbidden cursor, taps refused.
     Rectangle {
       id: clearBtn
 
@@ -451,7 +451,7 @@ Item {
       HoverHandler {
         id: clearHover
 
-        cursorShape: clearBtn.hasEntries ? Qt.PointingHandCursor : Qt.ArrowCursor
+        cursorShape: clearBtn.hasEntries ? Qt.PointingHandCursor : Qt.ForbiddenCursor
       }
 
       TapHandler {

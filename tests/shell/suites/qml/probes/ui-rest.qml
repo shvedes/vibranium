@@ -976,8 +976,12 @@ Item {
     kv("toggle.off.color", togOff.color)
     kv("toggle.dimmed.opacity", togDim.opacity)
     kv("toggle.dimmed.thumbX", firstRect(togDim).x)
+    // The area stays enabled on an inert toggle so hover still reaches it and
+    // the pointer can read as a refusal; the press gate is toggle() itself.
     kv("toggle.dimmed.areaEnabled", areaOf(togDim).enabled)
     kv("toggle.on.areaEnabled", areaOf(togOn).enabled)
+    kv("toggle.dimmed.cursorForbidden", areaOf(togDim).cursorShape === Qt.ForbiddenCursor)
+    kv("toggle.on.cursorPointing", areaOf(togOn).cursorShape === Qt.PointingHandCursor)
     kv("toggle.dimmed.stillChecked", togDim.checked)
     let dimToggled = 0
     togDim.toggled.connect(function () { dimToggled++ })
@@ -1062,8 +1066,14 @@ Item {
     kv("dbtn.off.opacity", dbtnOff.opacity)
     kv("dbtn.off.opacityExpected", Ui.disabledOpacity)
     kv("dbtn.off.color", dbtnOff.color)
+    // The area stays enabled on a disabled button so hover still reaches it and
+    // the pointer can read as a refusal; presses are refused through the
+    // accepted buttons instead.
     kv("dbtn.off.areaEnabled", areaOf(dbtnOff).enabled)
     kv("dbtn.on.areaEnabled", areaOf(dbtnOn).enabled)
+    kv("dbtn.off.areaButtons", areaOf(dbtnOff).acceptedButtons)
+    kv("dbtn.off.cursorForbidden", areaOf(dbtnOff).cursorShape === Qt.ForbiddenCursor)
+    kv("dbtn.on.cursorPointing", areaOf(dbtnOn).cursorShape === Qt.PointingHandCursor)
     kv("dbtn.clicks", dbtnClicks)
 
     // Card: the padded content host and the click-capture net under it.
@@ -1557,7 +1567,7 @@ Item {
     dbtnOff.clicked()
     kv("dbtn.offClicks.afterEmit", dbtnOffClicks)
     kv("dbtn.offSignalIsUngated", dbtnOffClicks === 1)
-    kv("dbtn.enabledGateIsTheArea", areaOf(dbtnOff).enabled)
+    kv("dbtn.enabledGateIsAcceptedButtons", areaOf(dbtnOff).acceptedButtons === Qt.NoButton)
     zebra0.clicked(null)
     kv("zebra.clicks.afterEmit", zebraClicks)
 

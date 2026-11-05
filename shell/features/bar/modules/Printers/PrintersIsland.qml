@@ -287,9 +287,10 @@ Item {
               name: "rotate-cw"
               iconSize: 16
               tipText: "Reload printers and jobs"
-              // Dims mid-load (the subtitle spinner owns the feedback);
-              // the service drops overlapping refreshes anyway.
-              enabled: Svc.Printers.state !== "loading"
+              // Dims mid-load (the subtitle spinner owns the feedback); the
+              // service drops overlapping refreshes anyway.
+              actionable: Svc.Printers.state !== "loading"
+              opacity: actionable ? 1 : 0.4
               onClicked: Svc.Printers.refresh()
             }
           }

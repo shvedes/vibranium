@@ -574,7 +574,7 @@ Item {
             // Shrink to fit so it sits centered without clipping.
             height: 22
             implicitHeight: 22
-            enabled: !root.refreshing
+            actionable: !root.refreshing
             onClicked: root.refreshScan()
           }
         }
@@ -971,10 +971,11 @@ Item {
       MouseArea {
         id: hoverArea
         anchors.fill: baseRow
-        enabled: !root.busy
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: root.connectRow(row.dev)
+        // Soft gate: busy is a refusal, not an invisible surface, so the area
+        // stays in hover delivery and the click guards itself.
+        cursorShape: root.busy ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+        onClicked: if (!root.busy) root.connectRow(row.dev)
       }
     }
   }

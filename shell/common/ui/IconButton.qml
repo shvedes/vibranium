@@ -60,10 +60,10 @@ Item {
   // drops the whole subtree out of the hit-test chain, which also means a
   // disabled button can no longer set a cursor. `actionable` is the soft
   // gate - the button stays in the chain so an inert one can still show
-  // the forbidden cursor and still clears its own hover chrome, and a
-  // consumer's own `cursorShape` (a HoverHandler over this item) reaches
-  // the user. The guard on `live` is what makes the button inert. Same
-  // split the annotator's ToolBtn uses.
+  // the forbidden cursor and still clears its own hover chrome; the
+  // HoverHandler below is what puts that cursor on the pointer. The guard
+  // on `live` is what makes the button inert. Same split the annotator's
+  // ToolBtn uses.
   property bool actionable: true
   readonly property bool live: root.enabled && root.actionable
   // Hover hint, opt-in: a small bubble above the button while the cursor
@@ -141,6 +141,16 @@ Item {
   // never appears on an island button is either a missing tipText or the
   // `live` gate, and these are the two lines that tell them apart.
   on_TipShownChanged: {
+  }
+
+  // The pointer: a live slot reads as a click, an inert one (the soft
+  // `actionable` gate) as a refusal. A HoverHandler rather than a MouseArea,
+  // because an area over the native button takes the press with it - the area
+  // is a sibling of the button, not an ancestor, so the button never sees the
+  // click. The hard `enabled` lock is out of hover delivery entirely and can
+  // set no cursor at all.
+  HoverHandler {
+    cursorShape: root.live ? Qt.PointingHandCursor : Qt.ForbiddenCursor
   }
 
   Ctl.Button {

@@ -591,10 +591,12 @@ Item {
       MouseArea {
         id: selMouse
         anchors.fill: parent
-        enabled: sel.interactive
-        hoverEnabled: sel.interactive
-        cursorShape: sel.interactive ? Qt.PointingHandCursor : Qt.ArrowCursor
-        onClicked: root.popOpen = sel.expanded ? "" : sel.popKey
+        hoverEnabled: true
+        // Soft gate: a single-candidate selector is a refusal, not an
+        // invisible surface, so the area stays in hover delivery and the
+        // click guards itself.
+        cursorShape: sel.interactive ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+        onClicked: if (sel.interactive) root.popOpen = sel.expanded ? "" : sel.popKey
       }
     }
 

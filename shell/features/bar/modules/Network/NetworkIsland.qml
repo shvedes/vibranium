@@ -1337,9 +1337,10 @@ Item {
           anchors.verticalCenter: parent.verticalCenter
           width: speedTitleRow.width
           height: speedTitleRow.height
-          enabled: root.hasLink
           hoverEnabled: true
-          cursorShape: root.hasLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+          // Soft gate: the area stays in hover delivery so a speed test on a
+          // dead link reads as a refusal instead of a dead click.
+          cursorShape: root.hasLink ? Qt.PointingHandCursor : Qt.ForbiddenCursor
           onClicked: {
             if (!root.hasLink) return
             if (root.speedtestRunning) root.stopSpeedtest()
@@ -2147,10 +2148,11 @@ Item {
         id: hoverArea
 
         anchors.fill: baseRow
-        enabled: !root.busy
         hoverEnabled: true
-        cursorShape: Qt.PointingHandCursor
-        onClicked: root.connectRow(row.modelData)
+        // Soft gate: busy is a refusal, not an invisible surface, so the area
+        // stays in hover delivery and the click guards itself.
+        cursorShape: root.busy ? Qt.ForbiddenCursor : Qt.PointingHandCursor
+        onClicked: if (!root.busy) root.connectRow(row.modelData)
       }
     }
   }

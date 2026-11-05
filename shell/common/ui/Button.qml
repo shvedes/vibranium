@@ -55,10 +55,19 @@ Item {
   // lands instantly. Defaults on for standalone consumers off the menu.
   property bool animationsEnabled: true
 
-  readonly property bool pressed: btn.pressed
+  // Two gates, mirroring IconButton. `enabled` is the hard lock: it drops the
+  // whole subtree out of the hit-test chain, which also means a disabled
+  // button can no longer set a cursor. `actionable` is the soft gate - the
+  // button stays in the chain so an inert one can still show the forbidden
+  // cursor and still clears its own hover chrome. The guard on `live` is what
+  // makes the button inert.
+  property bool actionable: true
+  readonly property bool live: root.enabled && root.actionable
+
+  readonly property bool pressed: btn.pressed && root.live
   // Qt keeps hovered true over a disabled control, so the shell's ground
   // reads the gated state rather than the raw one.
-  readonly property bool hovered: btn.hovered && root.enabled
+  readonly property bool hovered: btn.hovered && root.live
   readonly property bool _focused: btn.activeFocus
 
   signal clicked()
@@ -66,7 +75,7 @@ Item {
   implicitWidth: row.implicitWidth + 2 * root.padH
   implicitHeight: Ui.buttonHeight
   enabled: true
-  opacity: root.enabled ? 1 : 0.45
+  opacity: root.live ? 1 : 0.45
 
   scale: root.pressed ? 0.97 : 1
 
@@ -82,8 +91,16 @@ Item {
   // loop produces the values, so this is where a press is visible as a curve
   // rather than as two end states.
 
+  // The pointer: an inert button (the soft `actionable` gate) reads as a
+  // refusal. A HoverHandler rather than a MouseArea, because the native
+  // control owns the press; the hard `enabled` lock is out of hover delivery
+  // and can set no cursor at all.
+  HoverHandler {
+    cursorShape: root.live ? Qt.ArrowCursor : Qt.ForbiddenCursor
+  }
+
   // The interaction edges the native control reports. The wrapper already
-  // gates its own chrome on them - `hovered` reads through `enabled`, because
+  // gates its own chrome on them - `hovered` reads through `live`, because
   // Qt keeps hovering a disabled control - so these lines are the record of
   // what that gate saw rather than a parallel state machine. The label is
   // shell chrome declared in the source, not anything the user typed.
@@ -105,19 +122,19 @@ Item {
     // The chrome is full-bleed: the shell's own background and content
     // items replace the style's, so no style padding may sit between them.
     padding: 0
-    enabled: root.enabled
+    enabled: root.live
     // Panels own Tab for their own row traversal (MenuPanel, PowerMenuPanel,
     // LauncherPanel and ClipboardPanel all route it to a selection move), so
     // the button takes focus but is not a tab stop: a click still focuses it
     // and Space/Enter activate it.
     activeFocusOnTab: false
-    onClicked: root.clicked()
+    onClicked: if (root.live) root.clicked()
 
     background: Rectangle {
       color: root.color
       radius: root.radius
       border.width: root.variant === "outline" ? 1 : 0
-      border.color: !root.enabled || root.variant !== "outline"
+      border.color: !root.live || root.variant !== "outline"
         ? "transparent" : (root.hovered ? Ui.tint("accent", 0.7) : Ui.tint("accent", 0.45))
 
       Behavior on color {

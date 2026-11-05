@@ -1019,13 +1019,14 @@ Item {
 
                 MouseArea {
                   anchors.fill: parent
-                  enabled: root.hasTrackLink
                   hoverEnabled: true
-                  cursorShape: root.hasTrackLink ? Qt.PointingHandCursor : Qt.ArrowCursor
+                  // Soft gate: the area stays in hover delivery so a title with
+                  // no link reads as a refusal instead of a dead click.
+                  cursorShape: root.hasTrackLink ? Qt.PointingHandCursor : Qt.ForbiddenCursor
                   acceptedButtons: Qt.LeftButton
                   onEntered: root.titleHover = true
                   onExited: root.titleHover = false
-                  onClicked: root.flashCopied()
+                  onClicked: if (root.hasTrackLink) root.flashCopied()
                 }
               }
             }
@@ -1288,8 +1289,7 @@ Item {
           // hidden: the row still shows what the player reports, and the
           // annotator's split says how. `actionable` keeps the button and
           // the lane in the hit-test chain so Qt.ForbiddenCursor actually
-          // reaches the user, the handlers guard on the same flag to stay
-          // inert, and the row's opacity carries the dim.
+          // reaches the user, and the row's opacity carries the dim.
           //
           // The row is [icon][lane][percentage]: the pad at the row's left edge
           // where the icon rows above put theirs, the lane hard against it, the
@@ -1326,13 +1326,6 @@ Item {
               animationsEnabled: root.animOn
               actionable: root.canSetVolume
               onClicked: root.togglePlayerMute()
-
-              // A handler rather than a mouse area: it does not take the
-              // click, and unlike `enabled: false` it keeps setting the
-              // cursor for a button the shell has made inert.
-              HoverHandler {
-                cursorShape: root.canSetVolume ? Qt.PointingHandCursor : Qt.ForbiddenCursor
-              }
 
               WheelHandler {
                 acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
@@ -1444,7 +1437,8 @@ Item {
               flat: true
               cornerRadius: RoundingPolicy.radius
               animationsEnabled: root.animOn
-              enabled: root.canPrev
+              actionable: root.canPrev
+              opacity: live ? 1 : 0.4
               onClicked: root.prevPlayer()
             }
 
@@ -1478,8 +1472,8 @@ Item {
                 cornerRadius: RoundingPolicy.radius
                 colorKey: "foreground_0"
                 animationsEnabled: root.animOn
-                enabled: root.canShuffle
-                opacity: enabled ? 1 : 0.4
+                actionable: root.canShuffle
+                opacity: live ? 1 : 0.4
                 iconOpacity: 1 - shuffleWrap.shuffleTint
                 onClicked: root.toggleShuffle()
 
@@ -1488,7 +1482,7 @@ Item {
                   name: "shuffle"
                   colorKey: "accent"
                   size: 20
-                  opacity: (shuffleBtn.enabled ? 1 : 0.4) * shuffleWrap.shuffleTint
+                  opacity: (shuffleBtn.live ? 1 : 0.4) * shuffleWrap.shuffleTint
                 }
               }
             }
@@ -1500,7 +1494,8 @@ Item {
               flat: true
               cornerRadius: RoundingPolicy.radius
               animationsEnabled: root.animOn
-              enabled: root.hasTrack && root.player?.canGoPrevious !== false
+              actionable: root.hasTrack && root.player?.canGoPrevious !== false
+              opacity: live ? 1 : 0.4
               onClicked: root.previousTrack()
             }
 
@@ -1520,7 +1515,7 @@ Item {
                 x: !root.playing ? 0 : -8
                 visible: opacity > 0.01
                 z: root.playing ? 0 : 1
-                enabled: root.hasClient && root.player?.canTogglePlaying !== false && !root.playing
+                actionable: root.hasClient && root.player?.canTogglePlaying !== false && !root.playing
                 onClicked: root.resumePlayer()
 
                 Behavior on opacity {
@@ -1551,7 +1546,7 @@ Item {
                 x: root.playing ? 0 : 8
                 visible: opacity > 0.01
                 z: root.playing ? 1 : 0
-                enabled: root.hasClient && root.player?.canTogglePlaying !== false && root.playing
+                actionable: root.hasClient && root.player?.canTogglePlaying !== false && root.playing
                 onClicked: root.player.togglePlaying()
 
                 Behavior on opacity {
@@ -1578,7 +1573,8 @@ Item {
               flat: true
               cornerRadius: RoundingPolicy.radius
               animationsEnabled: root.animOn
-              enabled: root.hasTrack && root.player?.canGoNext !== false
+              actionable: root.hasTrack && root.player?.canGoNext !== false
+              opacity: live ? 1 : 0.4
               onClicked: root.nextTrack()
             }
 
@@ -1611,8 +1607,8 @@ Item {
                 cornerRadius: RoundingPolicy.radius
                 colorKey: "foreground_0"
                 animationsEnabled: root.animOn
-                enabled: root.canLoop
-                opacity: enabled ? 1 : 0.4
+                actionable: root.canLoop
+                opacity: live ? 1 : 0.4
                 iconOpacity: 1 - repeatWrap.repeatTint
                 onClicked: root.cycleLoop()
 
@@ -1621,7 +1617,7 @@ Item {
                   name: root.loopOne ? "repeat-1" : "repeat"
                   colorKey: "accent"
                   size: 20
-                  opacity: (repeatBtn.enabled ? 1 : 0.4) * repeatWrap.repeatTint
+                  opacity: (repeatBtn.live ? 1 : 0.4) * repeatWrap.repeatTint
                 }
               }
             }
@@ -1633,7 +1629,8 @@ Item {
               flat: true
               cornerRadius: RoundingPolicy.radius
               animationsEnabled: root.animOn
-              enabled: root.canNext
+              actionable: root.canNext
+              opacity: live ? 1 : 0.4
               onClicked: root.nextPlayer()
             }
           }

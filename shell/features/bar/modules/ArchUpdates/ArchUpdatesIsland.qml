@@ -523,10 +523,10 @@ Item {
         accentColor: Ui.solid("blue")
         height: 22
         implicitHeight: 22
-        // Unclickable while a refresh is in flight (islandState "loading")
-        // or an update runs - the Button lib dims to 0.45 and kills hover
-        // on enabled: false.
-        enabled: !root.updating && root.islandState !== "loading"
+        // Inert while a refresh is in flight (islandState "loading") or an
+        // update runs - the Button lib dims to 0.45, refuses the press and
+        // shows the forbidden cursor.
+        actionable: !root.updating && root.islandState !== "loading"
         onClicked: root.refreshRequested()
       }
 
@@ -545,7 +545,7 @@ Item {
           accentColor: Ui.solid("green")
           height: 22
           implicitHeight: 22
-          enabled: !root.updating && root.selectedCount > 0
+          actionable: !root.updating && root.selectedCount > 0
           onClicked: {
             // Full selection is not a partial upgrade -> skip the warning.
             if (root.selectedCount > 0 && root.selectedCount === root.packages.length) {
@@ -567,7 +567,7 @@ Item {
           accentColor: Ui.solid("orange")
           height: 22
           implicitHeight: 22
-          enabled: !root.updating && (root.officialCount > 0 || root.aurCount > 0)
+          actionable: !root.updating && (root.officialCount > 0 || root.aurCount > 0)
           onClicked: {
             root.warnOpen = false
             root.updateSystemRequested()

@@ -329,16 +329,6 @@ Item {
           id: copyBtn
           animationsEnabled: MotionPolicy.enabled
 
-          // The pointer cursor, without an area laid over the button. A
-          // MouseArea over the native button takes the press with it: the
-          // press lands on the area, is not accepted, and travels up the
-          // item chain - the button underneath is a sibling of the area,
-          // not an ancestor, so it never sees the click. A hover handler
-          // sets the cursor and leaves the press alone.
-          HoverHandler {
-            cursorShape: Qt.PointingHandCursor
-          }
-
           anchors.verticalCenter: parent.verticalCenter
           name: "copy"
           colorKey: row.copied ? "accent" : "foreground_0"
@@ -358,12 +348,6 @@ Item {
         IconButton {
           id: deleteBtn
           animationsEnabled: MotionPolicy.enabled
-
-          // The same cursor without the area over the button; see the
-          // copy button above for why.
-          HoverHandler {
-            cursorShape: Qt.PointingHandCursor
-          }
 
           anchors.verticalCenter: parent.verticalCenter
           name: "remove"
