@@ -467,53 +467,6 @@ QtObject {
   // pointer and nothing eases, so the viewer's rows do the same. The glyph
   // comes from the shipped set under assets/icons, through the same `Icon` the
   // toolbar draws with.
-  component MenuRow: Item {
-    id: mrow
-
-    property string label: ""
-    property string iconName: ""
-
-    signal triggered()
-
-    width: parent ? parent.width : 0
-    height: 30
-
-    Rectangle {
-      anchors.fill: parent
-      color: mrowMa.containsMouse ? Ui.tint("foreground_0", 0.12) : "transparent"
-    }
-
-    Row {
-      anchors.fill: parent
-      anchors.leftMargin: 10
-      anchors.rightMargin: 10
-      spacing: 9
-
-      Icon {
-        name: mrow.iconName
-        size: 16
-        anchors.verticalCenter: parent.verticalCenter
-      }
-
-      Text {
-        anchors.verticalCenter: parent.verticalCenter
-        text: mrow.label
-        color: Ui.solid("foreground_0")
-        font.pixelSize: 12
-        font.family: Ui.fontFamily
-      }
-    }
-
-    MouseArea {
-      id: mrowMa
-
-      anchors.fill: parent
-      hoverEnabled: true
-      cursorShape: Qt.PointingHandCursor
-      onClicked: mrow.triggered()
-    }
-  }
-
   // ------------------------------------------------------------------- model
 
   // The open folder's images, in name order. This is the only source for
@@ -1385,41 +1338,18 @@ QtObject {
         onPressed: root.closeMenu()
       }
 
-      Rectangle {
+      ContextMenu {
         id: contextMenu
 
         visible: root.menuOpen
         z: 21
+        entries: root.menuEntries
         // Clamped against the content item, measured after layout, so the card
         // opens fully inside the window whichever edge the pointer is near.
         x: Math.max(8, Math.min(root.menuX, content.width - width - 8))
         y: Math.max(8, Math.min(root.menuY, content.height - height - 8))
-        width: 218
-        height: menuCol.implicitHeight + 10
-        color: Ui.tint("background_0", 0.97)
-        radius: RoundingPolicy.radius
-        border.width: 1
-        border.color: Ui.tint("foreground_0", 0.22)
 
-        Column {
-          id: menuCol
-
-          anchors.centerIn: parent
-          width: parent.width - 8
-          spacing: 1
-
-          Repeater {
-            model: root.menuEntries
-
-            delegate: MenuRow {
-              required property var modelData
-
-              label: modelData.label
-              iconName: modelData.icon
-              onTriggered: root.runMenuEntry(modelData.action)
-            }
-          }
-        }
+        onActivated: entry => root.runMenuEntry(entry.action)
       }
 
       Frost {

@@ -37,7 +37,7 @@ import "../../common/text/DropPayload.js" as DropPayload
 Singleton {
   id: root
 
-  // Toggled by double-clicking the wallpaper; persisted in settings.json.
+  // Toggled from the wallpaper's right-click menu; persisted in settings.json.
   // Gated on Settings.ready so a cold start shows the theme fill first.
   readonly property bool enabled: Settings.ready && Settings.wallpaperEnabled
   // Resolved absolute path of the active wallpaper ("" => plain tint). Bound

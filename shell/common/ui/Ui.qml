@@ -70,12 +70,16 @@ Singleton {
   readonly property int inputHeight: 32
   readonly property int expandMs: 140
 
-  // Tray DBusMenu rows are pointer-only compact rows, denser than buttons
-  // and menu rows alike. One token feeds the row height in TrayMenuRow and
-  // the default in TrayMenu (plus its back row), so the compact rhythm
-  // cannot drift between the two.
-  readonly property int trayRowH: 24
-  readonly property int trayListSpacing: 1
+  // The rhythm of every pointer-driven menu in the tree: the tray's DBusMenu,
+  // the wallpaper's context menu and the image viewer's, all three drawn by
+  // the shared ContextMenu type. 26px leaves a 16px glyph and a 12px label
+  // room above and below without the text touching the row's edges; `menuPad`
+  // is the inset from the card's own edge to the rows, and `menuRowGap` is the
+  // empty space BETWEEN rows, enough that one row's hover fill never touches
+  // its neighbour.
+  readonly property int menuRowH: 26
+  readonly property int menuRowGap: 2
+  readonly property int menuPad: 10
 
   // Row / chrome metrics (merged from MenuUi for single-token source).
   readonly property int rowMinH: 34

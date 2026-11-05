@@ -327,11 +327,12 @@ qs.services.Weather"
 EXPECTED_NEEDS_REASONS="No PanelWindow backend loaded"
 
 # A `required property` is correct code refusing an incomplete construction, so
-# the probe supplies null for what the engine names and asks again. The two
-# types that needed it are pinned: a type that starts demanding
-# caller-supplied state is a change to notice, not to absorb.
-EXPECTED_SUPPLIED="supplied.qs.common.ScrollBar=flickable: null
-supplied.qs.features.bar.modules.Tray.TrayMenuRow=entry: null"
+# the probe supplies null for what the engine names and asks again. The type
+# that needs it is pinned: a type that starts demanding caller-supplied state
+# is a change to notice, not to absorb. (TrayMenuRow was the second until the
+# tray menu moved onto the shared ContextMenu, whose rows take a plain record
+# rather than a required DBusMenu entry.)
+EXPECTED_SUPPLIED="supplied.qs.common.ScrollBar=flickable: null"
 
 # The counts, for a reader who wants the shape without counting lines.
 # 231 declared entries over 46 qmldir files, one of which is excluded from the

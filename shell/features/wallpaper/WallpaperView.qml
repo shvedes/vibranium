@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import QtQuick.Effects
 import Quickshell
+import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.common
 import qs.features.wallpaper
@@ -20,7 +21,7 @@ import "WallpaperTrans.js" as Trans
 // theme fill instead of an outgoing frame.
 //
 // The window never closes: disabled state only hides the images, keeping
-// the surface alive so a double-click can bring the wallpaper back.
+// the surface alive so the right-click menu can bring the wallpaper back.
 PanelWindow {
   id: win
 
@@ -430,31 +431,145 @@ PanelWindow {
     }
   }
 
-  function copyCurrentWallpaper() {
-    if (!Wallpaper.enabled) return
-    const path = Wallpaper.current
-    if (path === "") return
-    const command = Exec.setsidTimeoutCmd(ShotLib.copyImageCmd(path), 10)
-    if (command === null) return
-    const proc = Exec.run(command)
+  // The copy names the image the surface is showing, so it is refused when
+  // nothing is: a copy of "whatever was last resolved" while the wallpaper is
+  // off would put an invisible image on the clipboard.
+  readonly property bool hasImage: Wallpaper.enabled && Wallpaper.current !== ""
+
+  // The card's entries. Each carries the action name the row reports back, so
+  // the markup holds no per-entry branch. The toggle row names the state it
+  // would produce, not the switch it performs: the label is the setting's own
+  // answer, read from the same `Wallpaper.enabled` that hides the images, so
+  // "Show" is offered exactly when nothing is on screen.
+  // The copy acts on the image on screen, so it dims out when there is none: a
+  // row that is a no-op is worse than one that says so. `action` is the
+  // record's payload, handed back untouched when the row is clicked.
+  readonly property var menuEntries: [
+    { label: Wallpaper.enabled ? "Hide wallpaper" : "Show wallpaper", icon: "image", action: "toggle" },
+    { label: "Copy image", icon: "copy", action: "image", enabled: win.hasImage }
+  ]
+
+  // Open at the click point, in the surfaced window's coordinates (the menu
+  // surface covers the same screen, so the two agree).
+  property bool menuOpen: false
+  property real menuX: 0
+  property real menuY: 0
+
+  function openMenu(x, y) {
+    win.menuX = x
+    win.menuY = y
+    win.menuOpen = true
+    // On the next tick, when the surface is mapped: the key scope is what
+    // makes Escape reach the menu.
+    Qt.callLater(menuKeyScope.forceActiveFocus)
+  }
+
+  function closeMenu() {
+    if (!win.menuOpen) return
+    win.menuOpen = false
+  }
+
+  function runMenuAction(action) {
+    win.closeMenu()
+    switch (action) {
+    case "toggle": return Settings.toggleWallpaper()
+    case "image": return win.copyImage()
+    }
+  }
+
+  function copyImage() {
+    if (!win.hasImage) return
+    win._copy("Image copied to clipboard", ShotLib.copyImageCmd(Wallpaper.current))
+  }
+
+  // The argv reaches the child as written, not through the setsid/timeout
+  // helpers: those judge their tail against the CommandSpec allowlist, which
+  // holds the file tools and a shell but not wl-copy, so a prefixed build
+  // answers null - the click copied nothing and said nothing. wl-copy forks
+  // and returns, so there is no long-lived child for a timeout to bound.
+  function _copy(what, argv) {
+    const proc = Exec.run(argv)
     if (proc === null) return
     proc.exited.connect(code => {
       if (code !== 0) return
       Exec.run(["notify-send", "-r", "3", "-t", "3000", "-a", "Vibranium",
-        "Wallpaper", "Image copied to clipboard"])
+        "Wallpaper", what])
     })
   }
 
-  // Keep the input surface live while hidden so left double-click can
-  // re-enable wallpaper. Right-click copies the current image.
+  // Left click does nothing. Right click opens the menu, and the input area
+  // stays live while the wallpaper is hidden - which is what makes the menu's
+  // re-enable reachable at all.
   MouseArea {
     anchors.fill: parent
     acceptedButtons: Qt.LeftButton | Qt.RightButton
     onClicked: mouse => {
-      if (mouse.button === Qt.RightButton) win.copyCurrentWallpaper()
+      if (mouse.button === Qt.RightButton) win.openMenu(mouse.x, mouse.y)
     }
-    onDoubleClicked: mouse => {
-      if (mouse.button === Qt.LeftButton) Settings.toggleWallpaper()
+  }
+
+  // The menu surface. A window of its own rather than a card drawn on this
+  // one: the wallpaper sits on the Background layer, where anything painted is
+  // behind every window on screen. Overlay is the layer above them, and the
+  // full-screen transparent net beneath the card is the outside-click
+  // dismissal.
+  PanelWindow {
+    id: menuWin
+
+    screen: win.screen
+    visible: win.menuOpen
+    color: "transparent"
+    exclusionMode: ExclusionMode.Ignore
+    exclusiveZone: -1
+    anchors.left: true
+    anchors.right: true
+    anchors.top: true
+    anchors.bottom: true
+
+    WlrLayershell.layer: WlrLayer.Overlay
+    WlrLayershell.namespace: "vibranium:wallpaper-menu"
+    // OnDemand only while open, so Escape can reach the key scope; the
+    // wallpaper surface itself never takes the keyboard.
+    WlrLayershell.keyboardFocus: win.menuOpen ? WlrKeyboardFocus.OnDemand : WlrKeyboardFocus.None
+
+    // A click the compositor routes anywhere but here clears the grab, which
+    // closes the card.
+    HyprlandFocusGrab {
+      active: win.menuOpen
+      windows: [menuWin]
+      onCleared: win.closeMenu()
+    }
+
+    MouseArea {
+      anchors.fill: parent
+      enabled: win.menuOpen
+      acceptedButtons: Qt.AllButtons
+      onPressed: win.closeMenu()
+    }
+
+    // The card, its rows and their rhythm are the shared ContextMenu; what
+    // stays here is the anchoring - clamped against the surface after layout,
+    // so a click near an edge still opens the whole card on screen.
+    ContextMenu {
+      id: menuCard
+
+      entries: win.menuEntries
+      x: Math.max(Ui.m, Math.min(Math.round(win.menuX), menuWin.width - width - Ui.m))
+      y: Math.max(Ui.m, Math.min(Math.round(win.menuY), menuWin.height - height - Ui.m))
+
+      onActivated: entry => win.runMenuAction(entry.action)
+    }
+
+    FocusScope {
+      id: menuKeyScope
+
+      anchors.fill: parent
+      focus: win.menuOpen
+
+      Keys.onEscapePressed: event => {
+        win.closeMenu()
+        event.accepted = true
+      }
     }
   }
 

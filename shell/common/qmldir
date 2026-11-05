@@ -67,6 +67,7 @@ InputField 1.0 ui/InputField.qml
 List 1.0 ui/List.qml
 GridList 1.0 ui/GridList.qml
 Card 1.0 ui/Card.qml
+ContextMenu 1.0 ui/ContextMenu.qml
 Notice 1.0 ui/Notice.qml
 ProgressBar 1.0 ui/ProgressBar.qml
 RowHeightProbe 1.0 ui/RowHeightProbe.qml

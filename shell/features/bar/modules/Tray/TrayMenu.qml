@@ -26,7 +26,6 @@ PanelWindow {
   property var anchorWindow: null
   property string barPosition: "top"
   property int margin: Ui.s
-  property int rowHeight: Ui.trayRowH
   property int maxHeight: 480
 
   property bool open: false
@@ -99,10 +98,9 @@ PanelWindow {
   function openFor(handle, anchor) {
     if (!handle) return
     root.menuHandle = handle
-    root.updateCardWidth()
     root.anchorItem = anchor
     root.stack = []
-    list.contentY = 0
+    card.contentY = 0
     root.open = true
     root.refreshCurrent()
   }
@@ -116,8 +114,7 @@ PanelWindow {
 
   function pushSubmenu(entry) {
     root.stack = root.stack.concat([entry])
-    list.contentY = 0
-    root.updateCardWidth()
+    card.contentY = 0
     Qt.callLater(root.refreshCurrent)
     Qt.callLater(root.positionCard)
   }
@@ -125,44 +122,49 @@ PanelWindow {
   function popSubmenu() {
     if (root.stack.length === 0) return
     root.stack = root.stack.slice(0, -1)
-    root.updateCardWidth()
     Qt.callLater(root.positionCard)
   }
 
-  // Content-fit width like the settings menus: longest visible label
-  // plus the fixed chrome columns, clamped.
-  TextMetrics {
-    id: measure
-
-    font.pixelSize: Ui.fontM
-    font.family: Ui.fontFamily
-  }
-
-  property int cardWidth: 180
-
-  // Content-fit width: longest visible label plus the fixed chrome columns
-  // (84 = margins + three chrome columns + spacings), clamped to 180..320.
-  // Imperative because measuring mutates the shared TextMetrics; doing it
-  // inside a binding that reads the metrics is a binding loop.
-  function updateCardWidth() {
-    let maxW = 0
+  // The card's rows: the current level's DBusMenu entries, plus a leading Back
+  // row while inside a submenu. Mapped into the shared menu's record shape
+  // here, so the menu itself knows nothing about DBus. `payload` carries the
+  // QsMenuEntry untouched - activation still forwards to the application
+  // through the entry's own `triggered()`.
+  readonly property var rows: {
+    const out = []
+    if (root.stack.length > 0) {
+      // The shipped icon set has no left chevron, so the glyph stays in the
+      // label rather than becoming an empty 16px icon slot.
+      out.push({ label: "‹ Back", payload: { back: true } })
+    }
     const entries = root.menuEntries
     for (let i = 0; i < entries.length; i++) {
       const e = entries[i]
-      if (!e || e.isSeparator === true) continue
-      measure.text = String(e.text ?? "")
-      if (measure.width > maxW) maxW = measure.width
+      if (!e) continue
+      out.push({
+        label: String(e.text ?? ""),
+        iconSource: String(e.icon ?? ""),
+        enabled: e.enabled !== false,
+        separator: e.isSeparator === true,
+        indicator: e.buttonType === QsMenuButtonType.CheckBox ? "check"
+          : (e.buttonType === QsMenuButtonType.RadioButton ? "radio" : ""),
+        checked: e.checkState === Qt.Checked,
+        partial: e.checkState === Qt.PartiallyChecked,
+        hasChildren: e.hasChildren === true,
+        payload: { entry: e }
+      })
     }
-    root.cardWidth = Math.max(180, Math.min(Math.round(maxW) + 84, 320))
+    return out
   }
-  onMenuEntriesChanged: root.updateCardWidth()
 
-  // The card, parked under the anchor item -> shared Card primitive.
-  Card {
+  // The card, parked under the anchor item -> the shared menu primitive.
+  ContextMenu {
     id: card
 
-    width: root.cardWidth
-    height: Math.min(listCol.implicitHeight, root.maxHeight) + 2 * Ui.outerPad
+    entries: root.rows
+    // A remote menu can be longer than the screen; the shared card scrolls
+    // past `maxHeight`.
+    maxHeight: root.maxHeight
     opacity: root.open ? 1 : 0
 
     // Menu content can land after open (DBus aboutToShow, late layout
@@ -176,86 +178,24 @@ PanelWindow {
       NumberAnimation { duration: Ui.fastMs }
     }
 
-    Flickable {
-      id: list
-
-      anchors.fill: card.contentArea
-      contentWidth: width
-      contentHeight: listCol.implicitHeight
-      boundsBehavior: Flickable.StopAtBounds
-      clip: true
-
-      Column {
-        id: listCol
-
-        width: parent.width
-        spacing: Ui.trayListSpacing
-
-        // Back row while inside a submenu.
-        Item {
-          width: root.cardWidth - 2 * Ui.outerPad
-          height: root.stack.length > 0 ? root.rowHeight : 0
-          visible: root.stack.length > 0
-          clip: true
-
-          Rectangle {
-            anchors.fill: parent
-            color: Ui.tint("foreground_0", 0.07)
-            opacity: backHover.containsMouse ? 1 : 0
-          }
-
-          MouseArea {
-            id: backHover
-
-            anchors.fill: parent
-            hoverEnabled: true
-            cursorShape: Qt.PointingHandCursor
-            onClicked: root.popSubmenu()
-          }
-
-          Row {
-            anchors.fill: parent
-            anchors.leftMargin: Ui.m
-            anchors.rightMargin: Ui.m
-            spacing: 8
-
-            Title {
-              level: 3
-              text: "‹"
-              color: Ui.solid("foreground_0")
-              verticalAlignment: Text.AlignVCenter
-            }
-
-            Title {
-              level: 3
-              text: "Back"
-              color: Ui.solid("foreground_0")
-              verticalAlignment: Text.AlignVCenter
-            }
-          }
-        }
-
-        Repeater {
-          model: root.menuEntries
-
-          delegate: TrayMenuRow {
-            required property var modelData
-
-            entry: modelData
-            rowHeight: root.rowHeight
-            rowWidth: root.cardWidth - 2 * Ui.outerPad
-            onActivated: entry => {
-              // Emitting the `triggered` signal is how a QsMenuEntry is
-              // activated; for a DBusMenuItem the C++ side forwards it to
-              // the app as the "clicked" event. Without this, selecting an
-              // entry only closed the menu and did nothing.
-              if (entry && typeof entry.triggered === "function") entry.triggered()
-              root.close()
-            }
-            onSubmenuRequested: entry => root.pushSubmenu(entry)
-          }
-        }
+    onActivated: entry => {
+      const payload = entry.payload ?? ({})
+      if (payload.back === true) {
+        root.popSubmenu()
+        return
       }
+      const target = payload.entry
+      if (!target) return
+      if (target.hasChildren === true) {
+        root.pushSubmenu(target)
+        return
+      }
+      // Emitting the `triggered` signal is how a QsMenuEntry is activated;
+      // for a DBusMenuItem the C++ side forwards it to the app as the
+      // "clicked" event. Without this, selecting an entry only closed the
+      // menu and did nothing.
+      if (typeof target.triggered === "function") target.triggered()
+      root.close()
     }
   }
 
@@ -298,7 +238,6 @@ PanelWindow {
   onAnchorItemChanged: if (root.open) Qt.callLater(root.positionCard)
   onAnchorWindowChanged: if (root.open) Qt.callLater(root.positionCard)
   onBarPositionChanged: if (root.open) Qt.callLater(root.positionCard)
-  onCardWidthChanged: if (root.open) Qt.callLater(root.positionCard)
   onBackingWindowVisibleChanged: if (root.backingWindowVisible && root.open) Qt.callLater(root.positionCard)
   onWidthChanged: if (root.width > 100 && root.open) Qt.callLater(root.positionCard)
   onHeightChanged: if (root.height > 100 && root.open) Qt.callLater(root.positionCard)
