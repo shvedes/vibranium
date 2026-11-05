@@ -173,6 +173,56 @@ PanelWindow {
     }
   }
 
+  // --- committing the idle region ---
+  //
+  // A Region is only surface *state*. `updateMask()` schedules the new input
+  // region for the window's next polish and `onPolished` is what hands it to
+  // the compositor, and polish runs as part of a rendered frame. This window
+  // has nothing to render - it is transparent, holds no content and animates
+  // nothing while a gesture is not running - so an idle proxy can go minutes
+  // without a frame and the region it is holding stays the one from the last
+  // frame it drew.
+  //
+  // That matters because the idle strip is cut from LIVE zone widths: the
+  // workspaces strip grows every time a workspace is created, which moves the
+  // left hole's right edge, and until this window paints again the compositor
+  // keeps the previous hole over the number that moved past it. That number
+  // is painted by the bar underneath and looks perfectly normal, but the
+  // overlay still owns that strip: no hand cursor, no click, until something
+  // unrelated repaints this window. One frame per settled region keeps the
+  // hole and the strip in step.
+  //
+  // The signature spells out the mask's own inputs rather than deriving
+  // something from them: a change that moves none of these numbers cannot
+  // move the region, so it needs no frame.
+  readonly property string regionSig: root.excl0X + "," + root.excl0Y
+    + "," + root.excl0W + "," + root.excl0H
+    + "," + root.excl1X + "," + root.excl1Y
+    + "," + root.excl1W + "," + root.excl1H
+    + "," + root.excl2X + "," + root.excl2Y
+    + "," + root.excl2W + "," + root.excl2H
+  // Bursts are the norm rather than the exception - a zone gliding through its
+  // grow animation crosses a whole-pixel boundary once per frame - so the
+  // frame is deferred until the numbers stop moving instead of one per step.
+  onRegionSigChanged: regionCommit.restart()
+
+  Timer {
+    id: regionCommit
+
+    interval: 16
+    repeat: false
+    onTriggered: {
+      if (!root.visible) return
+      // The render switch is the one QML lever that draws an otherwise static
+      // window: Quickshell renders a frame when updates are re-enabled, and
+      // that frame is what polishes the pending region. Nothing is on screen
+      // to flicker - the window is transparent - and the two writes settle on
+      // the value the property started with.
+      root.updatesEnabled = false
+      root.updatesEnabled = true
+    }
+  }
+
   onWinScreenChanged: root.invalidateScreen()
 
   Connections {
