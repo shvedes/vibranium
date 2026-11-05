@@ -100,9 +100,16 @@ Singleton {
         "ping",
       ]
     })
-    gsettingsProc.running = true
-    gtk3File.reload()
-    gtk4File.reload()
+    // These three are floor work: this singleton is constructed in the eager
+    // pass, before anything paints, and each is a fork (gsettings) or a
+    // synchronous file read. The default family is already a valid value, so
+    // one callLater moves all of them past the first frame and the store
+    // updates through its own bindings when they land.
+    Qt.callLater(() => {
+      gsettingsProc.running = true
+      gtk3File.reload()
+      gtk4File.reload()
+    })
   }
 
   // For debugging: allow `qs ipc call systemFont dump`

@@ -95,8 +95,9 @@ Singleton {
         changed.push(entry.unit)
       }
     }
-    for (let i = 0; i < changed.length; i++) root.unitChanged(changed[i].id)
-    if (changed.length > 0) root.statesChanged()
+    // Through _changed, so a release that moves no record out of its state
+    // does not announce one.
+    for (let i = 0; i < changed.length; i++) root._changed(changed[i])
     return removed
   }
 
@@ -170,7 +171,22 @@ Singleton {
     return refreshed
   }
 
+  // One event per transition, not per call. ensure(), refresh(), retain() and
+  // release() all end here, and boot calls them in bursts: 52 registrations,
+  // then two cascades per eager unit, then one per drain step. Firing on every
+  // call made each of those a whole-boot report rebuild and a dependency walk
+  // that found nothing it did not already know (Bar.qml documents the same
+  // cost from the consumer side). The emitted fields are this record's
+  // last-published view; a call that moved none of them has nothing to say.
   function _changed(record) {
+    if (record.emittedState === record.state
+      && record.emittedHealth === record.health
+      && record.emittedError === record.lastError
+      && record.emittedRetryCount === record.retryCount) return
+    record.emittedState = record.state
+    record.emittedHealth = record.health
+    record.emittedError = record.lastError
+    record.emittedRetryCount = record.retryCount
     root.unitChanged(record.id)
     root.statesChanged()
   }
@@ -232,6 +248,11 @@ Singleton {
     if (descriptor === null || typeof descriptor !== "object" || Array.isArray(descriptor)) return null
     if (descriptor.criticality !== "essential" && descriptor.criticality !== "optional") return null
     if (["eager", "resident", "settings", "first_use", "gated_compat", "facade"].indexOf(descriptor.activation) < 0) return null
+    // The boot phase decides which queue boot drains the unit in. Optional for
+    // a self-registering unit (the activation implies the stage), but when it
+    // is declared it has to be one boot actually runs.
+    const phase = typeof descriptor.phase === "string" ? descriptor.phase : root._defaultPhase(descriptor.activation)
+    if (["floor", "visual", "early", "entrance", "deferred", "first_use", "on_demand"].indexOf(phase) < 0) return null
     if (!Array.isArray(descriptor.dependencies)) return null
     for (let i = 0; i < descriptor.dependencies.length; i++) {
       const dependency = descriptor.dependencies[i]
@@ -250,6 +271,7 @@ Singleton {
       descriptor: {
         criticality: descriptor.criticality,
         activation: descriptor.activation,
+        phase: phase,
         dependencies: descriptor.dependencies.slice(),
         resolver: descriptor.resolver,
         ready: typeof descriptor.ready === "function" ? descriptor.ready : null,
@@ -282,7 +304,12 @@ Singleton {
       retryCount: 0,
       nextRetryMs: 0,
       startedAtMs: 0,
-      teardownDone: false
+      teardownDone: false,
+      // What the last emitted event said. See _changed.
+      emittedState: "",
+      emittedHealth: "",
+      emittedError: "",
+      emittedRetryCount: 0
     }
   }
 
@@ -475,6 +502,7 @@ Singleton {
       id: record.id,
       criticality: record.descriptor.criticality,
       activation: record.descriptor.activation,
+      phase: record.descriptor.phase,
       dependencies: record.descriptor.dependencies.slice(),
       state: record.state,
       health: record.health,
@@ -546,6 +574,18 @@ Singleton {
   function _onDemand(record) {
     return record.descriptor.activation === "first_use" || record.descriptor.activation === "gated_compat"
     || record.descriptor.activation === "facade"
+  }
+
+  // The stage a unit belongs to when the descriptor does not name one. The
+  // catalog always names it; this keeps a self-registering unit legal.
+  function _defaultPhase(activation) {
+    switch (activation) {
+      case "eager":        return "floor"
+      case "facade":       return "early"
+      case "first_use":    return "first_use"
+      case "gated_compat": return "on_demand"
+      default:             return "entrance"
+    }
   }
 
   function _validId(id) {

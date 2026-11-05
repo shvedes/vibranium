@@ -68,7 +68,6 @@ Singleton {
     function menuBundleText() { return "" }
     function menuHasPage(pageId) { return false }
 
-    FileView { id: schemaLoader; printErrors: false }
     property var _schema: null
     readonly property var pages: root._schema ? root._schema.pages : []
 
@@ -83,22 +82,12 @@ Singleton {
         // drops everything else. It is the only catalog - there is no
         // second copy to fall back to, so a catalog that cannot be read
         // leaves the store on its fallback and says why.
-        schemaLoader.path = ""
-        schemaLoader.path = Paths.settingsCatalogPath
-        if (!schemaLoader.waitForJob()) {
-            Log.error("miscSettings: the catalog could not be read: "
-                + Paths.settingsCatalogPath)
-            root._loadFallback()
-            return
-        }
-        let catalog = null
-        try {
-            catalog = SL.parseUnifiedCatalog(schemaLoader.text())
-        } catch (e) {
-            Log.error("miscSettings: the catalog did not parse: "
-                + (e && e.message ? e.message : String(e)))
-        }
+        // Shared read + parse with Settings and HyprlandSettings (see
+        // SettingsCatalog): this store only projects the misc.* options out
+        // of it, so it should not pay for a second pass over the file.
+        const catalog = SettingsCatalog.load()
         if (!catalog) {
+            Log.error("miscSettings: " + SettingsCatalog.error)
             root._loadFallback()
             return
         }

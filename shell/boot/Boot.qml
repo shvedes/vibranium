@@ -27,6 +27,7 @@ Item {
       // side is adopted a tick later, so a unit that logs before `settings`
       // is drained still gets a gate rather than an unfiltered stream.
       id: "log",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: [],
@@ -39,6 +40,7 @@ Item {
     },
     {
       id: "paths",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: [],
@@ -49,6 +51,7 @@ Item {
     },
     {
       id: "watch",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["paths"],
@@ -59,6 +62,7 @@ Item {
     },
     {
       id: "settings",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["paths", "watch"],
@@ -69,6 +73,7 @@ Item {
     },
     {
       id: "hyprlandSettings",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["settings"],
@@ -79,6 +84,7 @@ Item {
     },
     {
       id: "miscSettings",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["settings"],
@@ -89,6 +95,7 @@ Item {
     },
     {
       id: "systemFont",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["settings"],
@@ -98,6 +105,7 @@ Item {
     },
     {
       id: "theme",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["settings"],
@@ -107,6 +115,7 @@ Item {
     },
     {
       id: "ui",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["settings", "theme"],
@@ -116,6 +125,7 @@ Item {
     },
     {
       id: "icons",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["settings", "theme"],
@@ -126,6 +136,7 @@ Item {
     },
     {
       id: "exec",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["paths"],
@@ -135,6 +146,7 @@ Item {
     },
     {
       id: "state",
+      phase: "floor",
       criticality: "essential",
       activation: "eager",
       dependencies: ["paths"],
@@ -144,84 +156,100 @@ Item {
     },
     {
       id: "idleDaemon",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("idleDaemon") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "inhibitor",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("inhibitor") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "session",
+      phase: "early",
       criticality: "essential",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("session") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "lockscreen",
+      phase: "early",
       criticality: "essential",
       activation: "resident",
       dependencies: ["settings", "session", "state", "watch", "theme"],
       resolver: function() { return boot._resolveDescriptor("lockscreen") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "wallpaper",
+      phase: "visual",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "theme", "paths", "state", "watch", "ui"],
       resolver: function() { return boot._resolveDescriptor("wallpaper") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "clipboard",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("clipboard") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "privacy",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("privacy") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "bar",
+      phase: "visual",
       criticality: "optional",
       activation: "resident",
-      dependencies: ["settings", "theme", "ui", "icons", "state", "watch"],
+      // `icons` is deliberately not an edge. The icon scan is a `bash find`
+      // over every shipped SVG whose result fills bindings in place when it
+      // lands (Icons swaps `_raw` wholesale), so the only thing the edge bought
+      // was a bar that could not start until the whole asset set had been read
+      // - which delayed the entrance latch, and the whole drain behind it.
+      dependencies: ["settings", "theme", "ui", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("bar") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "osd",
+      phase: "entrance",
       criticality: "optional",
       activation: "resident",
-      dependencies: ["settings", "theme", "ui", "icons", "state"],
+      // Same reasoning as the bar: an icon that is not loaded yet paints
+      // nothing for a frame, it does not fail the surface.
+      dependencies: ["settings", "theme", "ui", "state"],
       resolver: function() { return boot._resolveDescriptor("osd") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       // The notification daemon. Resident rather than first_use because the
@@ -232,65 +260,72 @@ Item {
       // catalog graph check refuses a dependency declared at or after its
       // dependent - and all five of these are essential units drained first.
       id: "notifications",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       // `privacy` for Privacy.shareOn, the screen-share forced-DND source. It
       // is a service and not a peer unit, so it is named here the way
       // mediaArt names `audio` and powerMenu names `menu`: the daemon reads the
       // service, so the service has to be resolved before it.
-      dependencies: ["settings", "theme", "ui", "icons", "state", "privacy"],
+      dependencies: ["settings", "theme", "ui", "state", "privacy"],
       resolver: function() { return boot._resolveDescriptor("notifications") },
       ready: function() { return boot._lateReady("notifications") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "mediaEvents",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("mediaEvents") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "menu",
+      phase: "deferred",
       criticality: "optional",
       activation: "resident",
-      dependencies: ["settings", "state", "watch", "ui", "icons"],
+      dependencies: ["settings", "state", "watch", "ui"],
       resolver: function() { return boot._resolveDescriptor("menu") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "audio",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("audio") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "mediaArt",
+      phase: "deferred",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch", "audio", "mediaEvents"],
       resolver: function() { return boot._resolveDescriptor("mediaArt") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "keyboard",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("keyboard") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "app",
+      phase: "early",
       criticality: "optional",
       // The offer, the IPC target and this unit id are one string. Boot's
       // audit reads the offered ids off the registry and compares them with
@@ -303,10 +338,11 @@ Item {
       resolver: function() { return boot._resolveDescriptor("app") },
       ready: function() { return boot._lateReady("app") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "appLauncher",
+      phase: "early",
       criticality: "optional",
       // Facade resident, controller prewarmed. The descriptor is drained so
       // the singleton - and therefore the `appLauncher` IPC target and the
@@ -321,100 +357,111 @@ Item {
       resolver: function() { return boot._resolveDescriptor("appLauncher") },
       ready: function() { return boot._lateReady("appLauncher") },
       teardown: function() { boot._lateTeardown("appLauncher") },
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "timer",
+      phase: "entrance",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("timer") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "recording",
+      phase: "entrance",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("recording") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "update",
+      phase: "entrance",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "paths", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("update") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "polkit",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
-      dependencies: ["settings", "theme", "ui", "icons", "state", "watch", "session"],
+      dependencies: ["settings", "theme", "ui", "state", "watch", "session"],
       resolver: function() { return boot._resolveDescriptor("polkit") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "emojiPicker",
+      phase: "deferred",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("emojiPicker") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "keybindings",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("keybindings") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "themePicker",
+      phase: "deferred",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch", "theme"],
       resolver: function() { return boot._resolveDescriptor("themePicker") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "themeRemover",
+      phase: "deferred",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch", "theme"],
       resolver: function() { return boot._resolveDescriptor("themeRemover") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "cursorPicker",
+      phase: "deferred",
       criticality: "optional",
       activation: "resident",
-      dependencies: ["settings", "state", "watch", "theme", "icons"],
+      dependencies: ["settings", "state", "watch", "theme"],
       resolver: function() { return boot._resolveDescriptor("cursorPicker") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "wallpaperPicker",
+      phase: "deferred",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch", "paths", "theme"],
       resolver: function() { return boot._resolveDescriptor("wallpaperPicker") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "fontPicker",
+      phase: "deferred",
       criticality: "optional",
       activation: "resident",
       // menu is a dependency, not a race: the boot scan composes a page and
@@ -425,10 +472,11 @@ Item {
       dependencies: ["settings", "state", "watch", "theme", "menu"],
       resolver: function() { return boot._resolveDescriptor("fontPicker") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "pass",
+      phase: "early",
       criticality: "optional",
       // Facade resident, controller first use, for the same reason as
       // appLauncher: the `pass` IPC target has to answer before anything can
@@ -439,10 +487,11 @@ Item {
       resolver: function() { return boot._resolveDescriptor("pass") },
       ready: function() { return boot._lateReady("pass") },
       teardown: function() { boot._lateTeardown("pass") },
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "audioMixer",
+      phase: "early",
       criticality: "optional",
       // Facade resident, controller first use, for the same reason as
       // appLauncher: the mixer answers `app audioMixer` before anything can
@@ -455,10 +504,11 @@ Item {
       resolver: function() { return boot._resolveDescriptor("audioMixer") },
       ready: function() { return boot._lateReady("audioMixer") },
       teardown: function() { boot._lateTeardown("audioMixer") },
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "imageViewer",
+      phase: "early",
       criticality: "optional",
       // Facade resident, controller first use: the singleton answers the app
       // host on every verb and is built once, and the window plus the folder
@@ -468,10 +518,11 @@ Item {
       resolver: function() { return boot._resolveDescriptor("imageViewer") },
       ready: function() { return boot._lateReady("imageViewer") },
       teardown: function() { boot._lateTeardown("imageViewer") },
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "annotations",
+      phase: "first_use",
       criticality: "optional",
       // First use: the headless capture service is resident and asks for a
       // region selector, a picker or an editor through the neutral
@@ -483,16 +534,17 @@ Item {
       resolver: function() { return boot._resolveDescriptor("annotations") },
       ready: function() { return boot._annotationsReady() },
       teardown: function() { boot._teardownAnnotations() },
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "archUpdates",
+      phase: "on_demand",
       criticality: "optional",
       activation: "gated_compat",
       dependencies: ["settings", "state", "watch", "paths"],
       resolver: function() { return boot._resolveDescriptor("archUpdates") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       // Resident rather than gated_compat: the AC policy unit is resident and
@@ -504,21 +556,23 @@ Item {
       // with what exists - and the profile daemon is the machine's business,
       // not one bar module's.
       id: "powerProfile",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch", "paths"],
       resolver: function() { return boot._resolveDescriptor("powerProfile") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "printers",
+      phase: "on_demand",
       criticality: "optional",
       activation: "gated_compat",
       dependencies: ["settings", "state", "watch", "paths"],
       resolver: function() { return boot._resolveDescriptor("printers") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       // The AC policy: which profile the machine runs on, from the adapter.
@@ -536,12 +590,13 @@ Item {
       // state, watcher and paths every service's configuration and logging
       // path goes through.
       id: "powerPolicy",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch", "paths", "powerProfile"],
       resolver: function() { return boot._resolveDescriptor("powerPolicy") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       // Low battery alerts. Resident for the same reason as `powerPolicy`: a
@@ -555,12 +610,13 @@ Item {
       // library rather than a unit. So the floor is the same four common
       // primitives the other service units declare, and no service edge.
       id: "batteryAlert",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch", "paths"],
       resolver: function() { return boot._resolveDescriptor("batteryAlert") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       // Captive-portal and metered-network announcements. Resident for the
@@ -572,31 +628,34 @@ Item {
       // same primitives minus the settings store it never reads, and no
       // service edge.
       id: "connectivity",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["state", "watch", "paths"],
       resolver: function() { return boot._resolveDescriptor("connectivity") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "screenshots",
+      phase: "early",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "paths", "state", "watch"],
       resolver: function() { return boot._resolveDescriptor("screenshots") },
       ready: function() { return boot._lateReady("screenshots") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
       id: "powerMenu",
+      phase: "deferred",
       criticality: "optional",
       activation: "resident",
       dependencies: ["settings", "state", "watch", "menu", "session"],
       resolver: function() { return boot._resolveDescriptor("powerMenu") },
       teardown: null,
-      retry: { maxAttempts: 0, backoffMs: 0, maxBackoffMs: 1000 }
+      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     }
   ]
 
@@ -630,6 +689,19 @@ Item {
   // elapsed figure computed against it comes out as noise - a boot reported
   // as 1791001363123ms. Epoch millis do not fit an int.
   readonly property real _bootStartedAtMs: Date.now()
+  // Process start, stamped by the launcher that exec'd qs (the systemd unit
+  // exports VIBRANIUM_SHELL_START_MS). 0 when the shell was started by hand,
+  // in which case the boot figures fall back to this file's construction -
+  // which is after Qt initialised and after this module's import set compiled,
+  // so it under-reports the boot it names.
+  property real processStartedAtMs: 0
+  readonly property real _processStartedAtMs:
+    boot.processStartedAtMs > 0 && boot.processStartedAtMs <= Date.now()
+      ? boot.processStartedAtMs : boot._bootStartedAtMs
+
+  function _sinceProcessStart() {
+    return Math.max(0, Date.now() - boot._processStartedAtMs)
+  }
   // shell.start names the build the line came from. Nothing else in the tree
   // publishes a version, so the boot contract declares its own: it moves when
   // the catalog's shape does, which is the only change that can make two boot
@@ -723,6 +795,12 @@ Item {
       return
     }
     annotationLoader.sourceComponent = boot._late.annotationComponent()
+    // Services before surfaces (see _startEarly): one budgeted turn of the
+    // early tier runs before the bar's construction is demanded, so the
+    // bus-name daemons exist while the bar is still compiling instead of one
+    // entrance later. It is bounded by frameBudgetMs, so it cannot starve the
+    // bar build it precedes.
+    boot._startEarly()
     // The bar's construction belongs to this half (its singleton imports the
     // module registry, so BootLate carries the compile), and it is demanded
     // here rather than in _bootVisuals for the record's sake: a demand with
@@ -766,7 +844,7 @@ Item {
       if (Date.now() >= deadline) break
     }
     if (boot._replayQueue.length > 0) {
-      Idle.run(boot._replayNext, 0, 0, "boot-replay")
+      boot._requestPump(boot._replayNext)
       return
     }
     boot._beginDrain()
@@ -782,11 +860,7 @@ Item {
     // build) holds itself back on its own milestone - see
     // AppLauncher._prewarm - so nothing expensive moves onto the module build
     // this phase exists to keep clear.
-    if (!boot._earlyStarted) {
-      boot._earlyStarted = true
-      boot._earlyQueue = boot._earlyDescriptors()
-      Idle.run(boot._drainEarly, 0, 0, "boot-drain-early")
-    }
+    boot._startEarly()
     // Phase order, not a delay: the drain waits for boot construction to
     // settle, so it cannot overlap the module build the entrance is
     // choreographed around. It does not wait for the entrance itself: every
@@ -799,27 +873,35 @@ Item {
     }
     boot._drainRequested = false
     boot._drainStarted = true
-    // The drain resolves what the shell needs up front. A first_use unit is
-    // none of that: it is built by whoever demands it, through its own
-    // UnitGate lease, so draining it here would both do the work the split
-    // exists to defer and leave a boot owner the demand can never release.
-    // A facade unit is the exception that proves the rule: its resident half
-    // is a cheap singleton that must exist so its IPC target answers, so it
-    // IS drained - and _drainNext hands the lease straight back.
-    // Visual surfaces are constructed in Phase 1 (see _bootVisuals) instead of
-    // the idle drain, so they appear on the first frames after the floor. Keep
-    // them out of the drain queue so they are not constructed twice.
-    const _visualIds = ["wallpaper", "bar"]
-    const _deferredIds = ["menu", "mediaArt", "timer", "recording", "update", "polkit", "emojiPicker", "keybindings", "themePicker", "themeRemover", "cursorPicker", "wallpaperPicker", "fontPicker", "powerProfile", "powerPolicy", "batteryAlert", "connectivity", "screenshots", "powerMenu"]
-    const _full = boot._catalog.filter(descriptor => descriptor.activation !== "eager" && descriptor.activation !== "gated_compat" && descriptor.activation !== "first_use" && _visualIds.indexOf(descriptor.id) < 0)
-    boot._queue = _full.filter(descriptor => _deferredIds.indexOf(descriptor.id) < 0)
-    boot._deferredQueue = _full.filter(descriptor => _deferredIds.indexOf(descriptor.id) >= 0)
+    // The entrance queue resolves what the shell needs on screen. A first_use
+    // unit is none of that: it is built by whoever demands it, through its own
+    // UnitGate lease, and `first_use` is not a drain phase at all. Visual
+    // surfaces are constructed by _bootVisuals and _adoptLate instead, which is
+    // why neither is in either queue.
+    // The phases are data on the descriptor, not two lists here. The pair this
+    // replaces was a hardcoded 19-id deferral plus a hardcoded visual pair, so
+    // adding a unit meant remembering to leave it out of the drain, and the
+    // facades and `session` appeared in both the early queue and this one -
+    // they were constructed, released (which runs the facade teardown) and
+    // then ensured a second time, and their reported construction was the
+    // second, trivial pass.
+    //
+    // `deferred` is not "everything left over": it is the units whose own
+    // construction composes pages, scans directories or builds a panel tree
+    // (the menu, the pickers, media art, the power menu). They run after the
+    // entrance queue so that work cannot land on the frames the entrance is
+    // drawing, which is the reason the drain itself waits for the milestone.
+    boot._queue = boot._catalog.filter(descriptor => descriptor.phase === "entrance")
+    boot._deferredQueue = boot._catalog.filter(descriptor => descriptor.phase === "deferred")
     // The contract is neutral, so the hook is bound here rather than by the
     // controller: a capture that asks for a view before any controller has
     // existed still gets one, because the demand reaches the layer that is
     // allowed to build it.
     AnnotationActions.bind(boot._ensureAnnotations)
-    Idle.run(boot._drainNext, 0, 0, "boot-drain")
+    // Through the pump, like every later turn: Idle.run posts the turn as a
+    // callLater, which the render loop services back to back with the other
+    // callLaters before it draws - the 105ms frame the pump exists to avoid.
+    boot._requestPump(boot._drainNext)
   }
 
   // Self-registration entry point: a unit (or the catalog loader) hands in a
@@ -1005,6 +1087,30 @@ Item {
     boot._report = next
   }
 
+  // The wider boot table, ordered by arrival. `status` keeps its
+  // id -> constructionMs shape (the audit and vb-shell read it); this reports
+  // the whole record per unit, which is what makes a regression - a unit that
+  // constructs fast but lands late because it waited on a dependency -
+  // visible instead of guessed at.
+  function _timeline() {
+    const rows = []
+    for (let i = 0; i < boot._catalog.length; i++) {
+      const id = boot._catalog[i].id
+      const state = UnitGate.state(id)
+      if (!state || state.state === "not_started") continue
+      rows.push({
+        id: id,
+        phase: state.phase,
+        state: state.state,
+        constructionMs: state.constructionMs,
+        readyMs: state.readyMs,
+        totalMs: state.totalMs
+      })
+    }
+    rows.sort((a, b) => a.totalMs - b.totalMs)
+    return rows
+  }
+
   function _essentialCount() {
     let essential = 0
     for (let i = 0; i < boot._catalog.length; i++) {
@@ -1102,7 +1208,7 @@ Item {
     boot._shellMilestone = verdict
     if (verdict === "starting") return
     const line = "shell " + verdict + " in "
-      + Math.max(0, Date.now() - boot._bootStartedAtMs) + "ms, start " + boot.start
+      + boot._sinceProcessStart() + "ms, start " + boot.start
     if (verdict === "degraded") {
       Log.warn(line)
       return
@@ -1208,6 +1314,7 @@ Item {
       }
       boot._refreshUnit(id)
       boot._unitMilestone(id)
+      boot._scheduleRetryFor(id)
     }
   }
 
@@ -1265,11 +1372,21 @@ Item {
   }
 
   // The construction milestone owns when the background phases start (see
-  // _beginDrain): the drain request parked there runs on this edge.
+  // _beginDrain): the drain request parked there runs on this edge. The two
+  // milestones are also the tail the verdict excludes - the bar's module build
+  // and the entrance motion - so they are logged against the process start.
   Connections {
     target: DesktopLayoutState
     function onBootEntranceSettledChanged() {
       if (boot._drainRequested) boot._beginDrain()
+      if (DesktopLayoutState.bootEntranceSettled) {
+        Log.debug("boot: entrance settled in " + boot._sinceProcessStart() + "ms")
+      }
+    }
+    function onBootEntrancePlayedChanged() {
+      if (DesktopLayoutState.bootEntrancePlayed) {
+        Log.debug("boot: entrance played in " + boot._sinceProcessStart() + "ms")
+      }
     }
   }
 
@@ -1345,19 +1462,37 @@ Item {
     }
   }
 
-  // Units whose resident half exists to answer: every `facade` activation, plus
-  // `session`. Everything else constructs a window, a history read or a device
-  // handle and waits for the entrance milestone with the rest of the drain.
+  // The early tier: units that exist to answer or to keep machine state (the
+  // session verbs, the lock, the notification bus name, the clipboard, the
+  // policy daemons) and that construct no window of their own. The entrance
+  // milestone exists to keep *surface* construction off the frames the
+  // entrance draws, so these do not belong behind it: a notification sent
+  // while the bar was still compiling used to be dropped, and a lock request
+  // had no lock to reach.
+  //
+  // The tier is a phase on the descriptor, not a list here.
   function _earlyDescriptors() {
-    return boot._catalog.filter(descriptor =>
-      descriptor.activation === "facade" || descriptor.id === "session")
+    return boot._catalog.filter(descriptor => descriptor.phase === "early")
+  }
+
+  // Begin the early tier. The first turn runs inline (called from _adoptLate,
+  // just before the bar's construction is demanded) and the rest go through the
+  // pump, so they land in the gaps between frames instead of in a chain of
+  // callLaters the render loop services before it draws.
+  function _startEarly() {
+    if (boot._earlyStarted) return
+    boot._earlyStarted = true
+    boot._earlyQueue = boot._earlyDescriptors()
+    boot._budgetedTurn(boot._earlyQueue)
+    if (boot._earlyQueue.length > 0) boot._requestPump(boot._drainEarly)
   }
 
   function _drainEarly() {
     boot._budgetedTurn(boot._earlyQueue)
-    if (boot._earlyQueue.length > 0) {
-      Idle.run(boot._drainEarly, 0, 0, "boot-drain-early")
-    }
+    // Through the pump, not Idle.run: the early tier is now ~20 units, and a
+    // chain of callLaters is serviced back to back before the render loop gets
+    // its turn - the 105ms frame the pump exists to prevent.
+    if (boot._earlyQueue.length > 0) boot._requestPump(boot._drainEarly)
   }
 
   function _drainNext() {
@@ -1388,17 +1523,24 @@ Item {
   // one-shot timer of a frame leaves the thread free between turns, so the
   // frame the entrance is drawing lands on schedule and the drain continues
   // in the next gap.
-  property var _pumpedFn: null
+  // A single pump carries every background phase, in arrival order: a phase
+  // that is mid-queue when another asks to start (the early tier is still
+  // running when the drain is released at the milestone) must not lose its
+  // continuation, which is what a one-slot `_pumpedFn` would do - it would
+  // overwrite the early turn and leave the rest of that queue undrained.
+  property var _pumpedFns: []
 
   function _requestPump(fn) {
-    boot._pumpedFn = fn
+    if (boot._pumpedFns.indexOf(fn) >= 0) return
+    boot._pumpedFns = boot._pumpedFns.concat([fn])
     drainPump.restart()
   }
 
   function _pumpTurn() {
-    const fn = boot._pumpedFn
-    boot._pumpedFn = null
-    if (fn !== null) fn()
+    const pending = boot._pumpedFns
+    if (pending.length === 0) return
+    boot._pumpedFns = pending.slice(1)
+    pending[0]()
   }
 
   Timer {
@@ -1409,10 +1551,40 @@ Item {
     onTriggered: boot._pumpTurn()
   }
 
-  // retryTimer is gone: every catalog entry declares maxAttempts: 0, so
-  // _retryPollingRequired is always false and the timer never ran. Boot
-  // already orders retries through UnitGate itself; a poll that can never
-  // fire is not a safety net.
+  // Bounded retries. Every non-floor descriptor declares one: a failure is the
+  // one arrival nothing else wakes up, and at boot the plausible causes are
+  // transient (a bus name not claimed yet, a PipeWire socket not listening, a
+  // device handle not exported). The floor's failures are deterministic - a
+  // missing path, an unparsable catalog - and retrying them only delays the
+  // verdict. The delay is UnitGate's backoff, doubled per attempt and capped
+  // by the descriptor.
+  property string _retryUnit: ""
+
+  function _scheduleRetryFor(id) {
+    const state = UnitGate.state(id)
+    if (!state || state.state !== "failed") return
+    const descriptor = boot._byId[id]
+    if (!descriptor || !descriptor.retry) return
+    if (descriptor.retry.maxAttempts <= 0) return
+    if (state.retryCount >= descriptor.retry.maxAttempts) return
+    boot._retryUnit = id
+    retryPump.interval = Math.max(1, Math.min(descriptor.retry.maxBackoffMs,
+      descriptor.retry.backoffMs * Math.pow(2, state.retryCount)))
+    retryPump.restart()
+  }
+
+  function _retryNow() {
+    const id = boot._retryUnit
+    boot._retryUnit = ""
+    if (id === "") return
+    if (UnitGate.retry(id)) boot._refreshUnit(id)
+  }
+
+  QQ.Timer {
+    id: retryPump
+    repeat: false
+    onTriggered: boot._retryNow()
+  }
 
   IpcHandler {
     target: "boot"
@@ -1423,6 +1595,9 @@ Item {
     }
     function state(): string {
       return JSON.stringify(boot._stateSnapshot())
+    }
+    function timeline(): string {
+      return JSON.stringify(boot._timeline())
     }
   }
 

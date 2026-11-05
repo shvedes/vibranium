@@ -82,7 +82,10 @@ Item {
       case "cursorPicker":     void CursorPicker.tag; break
       case "wallpaperPicker":  void WallpaperPicker.tag; break
       case "fontPicker":       void FontPicker.tag; break
-      case "pass":             void Pass.tag; break
+      case "pass":
+        void Pass.tag
+        late._observePass()
+        break
       case "audioMixer":       void AudioMixer.tag; break
       case "imageViewer":      void ImageViewer.tag; break
       case "archUpdates":      void Services.ArchUpdates.tag; break
@@ -91,7 +94,10 @@ Item {
       case "powerPolicy":      void Services.PowerPolicy.tag; break
       case "batteryAlert":     void Services.BatteryAlert.tag; break
       case "connectivity":     void Services.Connectivity.tag; break
-      case "screenshots":      void Screenshots.tag; break
+      case "screenshots":
+        void Screenshots.tag
+        late._observeScreenshots()
+        break
       case "powerMenu":        void PowerMenu.tag; break
       default:                 return false
     }
@@ -132,15 +138,32 @@ Item {
     return annotationComp
   }
 
+  // Observation edges, attached when the unit is first resolved rather than
+  // when this half is constructed. A Connections element evaluates `target`
+  // at creation, so `target: Screenshots` here instantiated both singletons
+  // the moment _adoptLate built this object - before either unit's turn and
+  // inside the window the split exists to keep clear. Boot refreshes each unit
+  // right after resolve(), so the initial state needs no connection; these
+  // only carry later transitions.
+  function _observeScreenshots() {
+    if (screenshotsConnection.target === null) screenshotsConnection.target = Screenshots
+  }
+
+  function _observePass() {
+    if (passConnection.target === null) passConnection.target = Pass
+  }
+
   Connections {
-    target: Screenshots
+    id: screenshotsConnection
+    target: null
     function on_RuntimeReadyChanged() {
       if (late.boot) late.boot._refreshUnit("screenshots")
     }
   }
 
   Connections {
-    target: Pass
+    id: passConnection
+    target: null
     function onInitializedChanged() {
       if (late.boot) late.boot._refreshUnit("pass")
     }

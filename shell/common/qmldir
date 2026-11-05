@@ -6,6 +6,7 @@ singleton SecretStore 1.0 security/SecretStore.qml
 singleton Settings 1.0 settings/Settings.qml
 singleton HyprlandSettings 1.0 settings/HyprlandSettings.qml
 singleton MiscSettings 1.0 settings/MiscSettings.qml
+singleton SettingsCatalog 1.0 settings/SettingsCatalog.qml
 singleton SystemFont 1.0 settings/SystemFont.qml
 singleton Theme 1.0 theme/Theme.qml
 singleton Icons 1.0 theme/Icons.qml

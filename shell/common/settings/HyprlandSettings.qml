@@ -158,22 +158,12 @@ Singleton {
         // drops everything else. It is the only catalog - there is no
         // second copy to fall back to, so a catalog that cannot be read
         // leaves the store with no options and says why.
-        schemaLoader.path = ""
-        schemaLoader.path = Paths.settingsCatalogPath
-        if (!schemaLoader.waitForJob()) {
-            Log.error("hyprlandSettings: the catalog could not be read: "
-                + Paths.settingsCatalogPath)
-            root._schemaDoneEmpty()
-            return
-        }
-        let catalog = null
-        try {
-            catalog = SL.parseUnifiedCatalog(schemaLoader.text())
-        } catch (err) {
-            Log.error("hyprlandSettings: the catalog did not parse: "
-                + (err && err.message ? err.message : String(err)))
-        }
+        // Shared read + parse with Settings and MiscSettings (see
+        // SettingsCatalog): this store only keeps the hypr.* pages, so a
+        // second pass over the same ~5k lines bought nothing.
+        const catalog = SettingsCatalog.load()
         if (!catalog) {
+            Log.error("hyprlandSettings: " + SettingsCatalog.error)
             root._schemaDoneEmpty()
             return
         }
@@ -533,10 +523,6 @@ Singleton {
 
     // --- processes / file views ---
 
-    FileView {
-        id: schemaLoader
-        printErrors: false
-    }
     FileView {
         id: reader
         printErrors: false

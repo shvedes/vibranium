@@ -67,7 +67,7 @@ DOC_ESSENTIAL_CSV='log,paths,watch,settings,hyprlandSettings,miscSettings,system
 DOC_GATED_CSV='archUpdates,printers'
 DOC_FACADE_CSV='appLauncher,pass,audioMixer,imageViewer'
 
-DESC_KEYS='activation,criticality,dependencies,id,ready,resolver,retry,teardown'
+DESC_KEYS='activation,criticality,dependencies,id,phase,ready,resolver,retry,teardown'
 
 # --------------------------------------------------------------------------
 # extraction: Boot.qml's _catalog literal, evaluated
@@ -168,6 +168,7 @@ for (let n = 0; n < catalog.length; n++) {
     idAt < 0 ? 0 : lineOf(idAt),
     field(d.id),
     typeof d.id === "string" && d.id.trim() !== "" ? "ok" : "bad",
+    field(d.phase),
     field(d.criticality),
     field(d.activation),
     deps === null ? field(d.dependencies) : deps.map(field).join(","),
@@ -198,6 +199,7 @@ trap 'rm -f "$BC_RECORDS" "$BC_ERR"' EXIT
 U_ID=()
 U_LINE=()
 U_IDOK=()
+U_PHASE=()
 U_CRIT=()
 U_ACT=()
 U_DEPS=()
@@ -221,13 +223,14 @@ if ! catalog_records >"$BC_RECORDS" 2>"$BC_ERR"; then
   t_block "the _catalog literal could not be read: $(cat "$BC_ERR")"
 fi
 
-while IFS='|' read -r r_idx r_line r_id r_idok r_crit r_act r_deps r_arr r_depn r_depbad \
+while IFS='|' read -r r_idx r_line r_id r_idok r_phase r_crit r_act r_deps r_arr r_depn r_depbad \
   r_rkind r_rself r_readykind r_readybody r_tdkind r_tdbody \
   r_retrykind r_maxa r_back r_maxb r_keys; do
   U_INDEX["$r_id"]="$r_idx"
   U_ID+=("$r_id")
   U_LINE+=("$r_line")
   U_IDOK+=("$r_idok")
+  U_PHASE+=("$r_phase")
   U_CRIT+=("$r_crit")
   U_ACT+=("$r_act")
   U_DEPS+=("$r_deps")
@@ -271,6 +274,7 @@ unit_field() {
   i="$(unit_index "$want")" || return 1
   case "$which" in
     LINE) printf '%s' "${U_LINE[$i]}" ;;
+    PHASE) printf '%s' "${U_PHASE[$i]}" ;;
     CRIT) printf '%s' "${U_CRIT[$i]}" ;;
     ACT) printf '%s' "${U_ACT[$i]}" ;;
     READYKIND) printf '%s' "${U_READYKIND[$i]}" ;;
@@ -492,10 +496,30 @@ t_count "one record per descriptor came back" "$U_N" "$(wc -l <"$BC_RECORDS" | t
 t_eq "Boot.qml still declares _catalog as a var array" \
   'readonly property var _catalog:' \
   "$(sed -n 's/^[[:space:]]*\(readonly property var _catalog:\).*/\1/p' "$BOOT_QML")"
-t_unique "every descriptor declares the same eight fields" \
+t_unique "every descriptor declares the same nine fields" \
   "$(printf '%s\n' "${U_KEYS[@]}" | LC_ALL=C sort -u)"
-t_eq "and the eight fields are the documented set" \
+t_eq "and the nine fields are the documented set" \
   "$DESC_KEYS" "$(printf '%s\n' "${U_KEYS[@]}" | head -1)"
+
+t_section "the boot phases: data on the descriptor, not lists in _beginDrain"
+t_eq "every unit declares a phase" "" "$(units_with PHASE -)"
+t_eq "no unit names a phase boot does not run" "" \
+  "$(printf '%s\n' "${U_PHASE[@]}" | grep -vE '^(floor|visual|early|entrance|deferred|first_use|on_demand)$' | paste -sd, -)"
+t_eq "the phases partition the catalog" "$U_N" \
+  "$(printf '%s\n' "${U_PHASE[@]}" | wc -l | tr -d ' ')"
+t_eq "the floor is exactly the eager 12" "12" "$(count_field PHASE floor)"
+t_eq "the visual pair is wallpaper and bar" "wallpaper,bar" "$(units_with PHASE visual)"
+t_eq "the early tier is every facade plus the daemons behind them" \
+  "idleDaemon,inhibitor,session,lockscreen,clipboard,privacy,notifications,mediaEvents,audio,keyboard,app,appLauncher,polkit,keybindings,pass,audioMixer,imageViewer,powerProfile,powerPolicy,batteryAlert,connectivity,screenshots" \
+  "$(units_with PHASE early)"
+t_eq "the deferred tier is the page-building, scanning units" \
+  "menu,mediaArt,emojiPicker,themePicker,themeRemover,cursorPicker,wallpaperPicker,fontPicker,powerMenu" \
+  "$(units_with PHASE deferred)"
+t_not_contains "_beginDrain no longer hardcodes the deferral" "_deferredIds" \
+  "$(awk '/^  function _beginDrain\(\) \{$/,/^  \}$/' "$BOOT_QML")"
+t_contains "the entrance queue is derived from the descriptor phase" \
+  'descriptor.phase === "entrance"' \
+  "$(awk '/^  function _beginDrain\(\) \{$/,/^  \}$/' "$BOOT_QML")"
 
 t_section "the criticality split: 14 essential, 38 optional"
 expect_count "essential units" "$DOC_ESSENTIAL" "$(count_field CRIT essential)"

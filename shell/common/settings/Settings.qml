@@ -587,22 +587,12 @@ Singleton {
     // `menus`. It is the only catalog - there is no second copy to fall
     // back to, so a catalog that cannot be read leaves the store with
     // no options and says why.
-    schemaLoader.path = ""
-    schemaLoader.path = Paths.settingsCatalogPath
-    if (!schemaLoader.waitForJob()) {
-      Log.error("settings: the catalog could not be read: "
-        + Paths.settingsCatalogPath)
-      root._schemaDone()
-      return
-    }
-    let catalog = null
-    try {
-      catalog = SL.parseUnifiedCatalog(schemaLoader.text())
-    } catch (err) {
-      Log.error("settings: the catalog did not parse: "
-        + (err && err.message ? err.message : String(err)))
-    }
+    // One read and one parse for all three stores (see SettingsCatalog). The
+    // catalog is ~5k lines, and each store paying for it on the floor was
+    // three blocking parses of the same bytes before the first frame.
+    const catalog = SettingsCatalog.load()
     if (!catalog) {
+      Log.error("settings: " + SettingsCatalog.error)
       root._schemaDone()
       return
     }
@@ -641,10 +631,13 @@ Singleton {
   // way, so the verdict arrives out of band (see _onLoadFailed) and the
   // write path stays closed until it does.
   function _loadUser() {
-    // The FIRST read is not a phase at all: Component.onCompleted subscribes
-    // the file watcher before it starts the schema scan, and the subscription
-    // delivers the current contents immediately, so this runs once with no
-    // schema and _applyUserData drops the result on its `!root._schema` guard.
+    // The first call arrives from the file watcher's subscribe, which delivers
+    // the current contents immediately, so it runs before the schema chain has
+    // built one - and _applyUserData would drop the result on its
+    // `!root._schema` guard. That made it a blocking read of settings.json
+    // whose only effect was to be discarded. The schema path calls this again
+    // once it is ready, so there is nothing to read before then.
+    if (!root._schema) return
     //
     // Reads go through a parked loader: the watched settingsView may be in
     // a failed state (file not created yet) and must never be read from.
@@ -963,12 +956,6 @@ Singleton {
 
   // --- processes / file views ---
 
-  // Reads the unified catalog (settings pages plus menu menus).
-  FileView {
-    id: schemaLoader
-
-    printErrors: false
-  }
 
   // Writer for the user file; watcher via Watch governor (K2)
   FileView {
