@@ -997,9 +997,24 @@ Singleton {
   // finished still builds it inline; a failed build retries on the timer
   // below rather than failing the session's opens.
   property bool _prewarmed: false
+  // A prewarm that arrived before the boot entrance finished playing. The
+  // facade exists from the drain on so its IPC target answers; what sits
+  // behind it waits for the motion to end.
+  property bool _prewarmPending: false
 
   function _prewarm() {
     if (root._prewarmed) return
+    // The index build, the usage read and the plugin scan are tens of
+    // milliseconds on the GUI thread - the desktop-entry scan alone was
+    // measured as a 92ms frame inside the boot entrance. The facade is what
+    // has to answer early, so the controller behind it waits for the
+    // entrance to finish drawing and builds inline for a demand that beats
+    // this timer (see _demand).
+    if (!DesktopLayoutState.bootEntrancePlayed) {
+      root._prewarmPending = true
+      return
+    }
+    root._prewarmPending = false
     const ctrl = root._demand()
     if (ctrl !== null) {
       root._prewarmed = true
@@ -1156,6 +1171,14 @@ Singleton {
     interval: 500
     repeat: false
     onTriggered: root._prewarm()
+  }
+
+  // The boot entrance finished drawing, which is the prewarm's gate above.
+  Connections {
+    target: DesktopLayoutState
+    function onBootEntrancePlayedChanged() {
+      if (root._prewarmPending) root._prewarm()
+    }
   }
 
   // The exit fade is Ui.fastMs long; the settle outlasts it by a frame

@@ -787,6 +787,18 @@ Singleton {
     // wallpaper's first fade) and the background boot phases read it instead
     // of racing this construction.
     DesktopLayoutState.noteBootEntranceSettled()
+    // The slidefade is what the entrance draws last, so its own duration is
+    // the played milestone: work that must not contend with the motion (the
+    // launcher's index build) reads that instead of guessing at this one.
+    entrancePlayedTimer.interval = MotionPolicy.duration(Ui.slowMs)
+    entrancePlayedTimer.restart()
+  }
+
+  Timer {
+    id: entrancePlayedTimer
+
+    repeat: false
+    onTriggered: DesktopLayoutState.noteBootEntrancePlayed("bar")
   }
 
   // The warm frame itself: one frame is the whole requirement, so the

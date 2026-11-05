@@ -37,10 +37,12 @@ Singleton {
   //
   // The backstop is not a tuning knob: a shell with no bar, or one whose bar
   // never latches, must not hold a boot animation - or every service waiting
-  // on the same milestone - forever, and 900ms is a boot's own outer bound
-  // rather than a frame budget. The timer stops the moment the real latch
-  // lands.
-  readonly property int bootEntranceBackstopMs: 900
+  // on the same milestone - forever. Its number is a boot's own outer bound
+  // rather than a frame budget, and it has to cover the bar's deferred load:
+  // the bar's module registry rides the async half (see Boot._bootVisuals),
+  // so the latch lands a type-load after first paint instead of during it.
+  // The timer stops the moment the real latch lands.
+  readonly property int bootEntranceBackstopMs: 2000
   property bool bootEntranceSettled: false
 
   function noteBootEntranceSettled() {
@@ -54,6 +56,58 @@ Singleton {
     running: !root.bootEntranceSettled
     repeat: false
     onTriggered: root.noteBootEntranceSettled()
+  }
+
+  // True once the boot entrance has finished DRAWING. The milestone above says
+  // when the surfaces may start animating; this one says when the motion is
+  // over, and it exists for work that is cheap to postpone and expensive to run
+  // inside an animation: the launcher's index build and the menu's bundle
+  // prewarm were each measured as frame stalls of ~100ms in the middle of the
+  // boot entrance.
+  //
+  // Two surfaces draw that entrance and they do not finish together: the bar's
+  // slidefade is a fixed window from the latch, while the wallpaper's first
+  // fade starts after its own decode and routinely ends later. So the milestone
+  // is what the LAST of them reports - a first-report-wins flag would release
+  // background work into the other one's motion, which is the stall this
+  // exists to remove. The backstop covers a shell whose surface never reports
+  // (no bar, wallpaper switched off), the same reasoning as the settle backstop
+  // above.
+  readonly property int bootEntrancePlayedBackstopMs: 1000
+  property bool bootEntrancePlayed: false
+  property var _bootPlayLeft: ({ bar: true, wallpaper: true })
+
+  // A surface reports when its own boot motion ends; the milestone is what the
+  // last of them reports. There is deliberately no "settled" precondition: the
+  // wallpaper's fade now runs before the bar's construction settles (the bar
+  // rides the async half), so requiring it would discard that report and leave
+  // the milestone to its backstop.
+  function noteBootEntrancePlayed(participant): bool {
+    if (root.bootEntrancePlayed) return false
+    const key = String(participant === undefined || participant === null ? "" : participant)
+    if (root._bootPlayLeft[key] !== true) return false
+    const left = Object.assign({}, root._bootPlayLeft)
+    delete left[key]
+    root._bootPlayLeft = left
+    if (Object.keys(left).length > 0) return false
+    root.bootEntrancePlayed = true
+    return true
+  }
+
+  // The backstop: a surface that never reports (the wallpaper switched off, a
+  // bar that was never built) must not hold the background prewarms off for
+  // the whole session.
+  function _forceBootEntrancePlayed() {
+    if (root.bootEntrancePlayed) return
+    root._bootPlayLeft = ({})
+    root.bootEntrancePlayed = true
+  }
+
+  Timer {
+    interval: root.bootEntrancePlayedBackstopMs
+    running: root.bootEntranceSettled && !root.bootEntrancePlayed
+    repeat: false
+    onTriggered: root._forceBootEntrancePlayed()
   }
 
   // --- island pile-clearance ------------------------------------------------

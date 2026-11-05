@@ -338,6 +338,16 @@ Singleton {
   property string _lastName: ""
   property var _bundleCache: ({})
   property bool _prewarmed: false
+  // A prewarm that arrived before the boot entrance finished drawing; the
+  // milestone's change runs it (see _maybePrewarm).
+  property bool _prewarmPending: false
+
+  Connections {
+    target: DesktopLayoutState
+    function onBootEntrancePlayedChanged() {
+      if (root._prewarmPending) root._maybePrewarm()
+    }
+  }
 
   // Boot-time prewarm for the two most-opened bundles (see onCompleted).
   // Builds each container into the repeat-summon cache and runs its guard
@@ -350,6 +360,17 @@ Singleton {
   // prewarm simply retries later in that case.
   function _maybePrewarm() {
     if (root._prewarmed) return
+    // The two bundle builds, their guard batches and the index rebuild are
+    // tens of milliseconds on the GUI thread, and the boot entrance is drawing
+    // through it - measured as a 100ms frame in the middle of the entrance
+    // (see DesktopLayoutState.bootEntrancePlayed). A summon before the
+    // milestone builds the bundle it needs on its own, so nothing waits on
+    // this prewarm.
+    if (!DesktopLayoutState.bootEntrancePlayed) {
+      root._prewarmPending = true
+      return
+    }
+    root._prewarmPending = false
     if (root.open) {
       prewarmRetry.restart()
       return

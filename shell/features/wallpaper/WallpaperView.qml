@@ -35,14 +35,12 @@ PanelWindow {
   // The first resolved wallpaper often lands before that, so
   // show() parks its URL here instead of snapping; a later show()
   // overwrites it, latest wins. Replayed from onAnimKnownChanged.
-  // Two gates, one flag: the animation switch has to resolve, AND boot
-  // construction has to settle. The second half is what makes the first fade
-  // one uninterrupted 200ms instead of a starved 433ms: the bar is still
-  // building its modules on this thread when the decode lands, so a fade that
-  // started then spent three quarters of its life behind that work. Parking
-  // the URL here is the existing mechanism, not a new one - it just waits for
-  // one more answer.
-  property bool animKnown: HyprlandSettings.ready && DesktopLayoutState.bootEntranceSettled
+  // The decode starts as soon as the animation switch resolves, and the fade is
+  // not held for anything else. On a boot this surface is the one that maps
+  // first - the bar's module registry rides the async half (see
+  // Boot._bootVisuals) - so its crossfade over the theme fill is the first
+  // motion on screen, and the bar's slidefade follows on its own latch.
+  property bool animKnown: HyprlandSettings.ready
   property string pendingUrl: ""
 
   onAnimKnownChanged: {
@@ -51,6 +49,19 @@ PanelWindow {
     win.pendingUrl = ""
     win.show(url)
   }
+
+  // Start the tween for a decode that already landed. Mask kinds wait a few
+  // frames before the tween samples them: a cached decode lands Ready with
+  // zero intervening frames, so the mask FBOs (warmed from show()) and the
+  // receiver layer have never rendered and the effect samples emptiness - the
+  // intermittent "swipe/circle sometimes cut or jump". Fade and slide sample
+  // no mask and start at once.
+  function _startPendingFade() {
+    if (!win.pendingFade) return
+    if (MotionPolicy.enabled && Trans.isMaskKind(win.transKind)) warmupTimer.restart()
+    else    win.startTrans()
+  }
+
   // Resolved transition kind for the in-flight swap ("" when idle).
   // `random` is resolved once per swap, never re-rolled mid-flight.
   property string transKind: ""
@@ -107,6 +118,10 @@ PanelWindow {
     if (!win.swapActive) return
     win.swapActive = false
     Wallpaper._swapEnd()
+    // The first fade is the boot entrance's last motion on this surface, and
+    // it ends after the bar's slidefade whenever the decode lands late. See
+    // DesktopLayoutState.noteBootEntrancePlayed.
+    DesktopLayoutState.noteBootEntrancePlayed("wallpaper")
   }
 
   function transSetting() {
@@ -332,15 +347,7 @@ PanelWindow {
       }
       onStatusChanged: {
         if (status === Image.Ready && win.pendingFade) {
-          // Mask kinds wait a few frames before the tween samples them: a
-          // cached decode lands Ready with zero intervening frames, so the
-          // mask FBOs (warmed above) and the receiver layer have never
-          // rendered and the effect samples emptiness - the intermittent
-          // "swipe/circle sometimes cut or jump". Slow first-time decodes
-          // span frames anyway, which is why those always worked. Fade and
-          // slide sample no mask and start at once, as before.
-          if (MotionPolicy.enabled && Trans.isMaskKind(win.transKind)) warmupTimer.restart()
-          else win.startTrans()
+          win._startPendingFade()
         }
         if (status === Image.Error) {
           warmupTimer.stop()

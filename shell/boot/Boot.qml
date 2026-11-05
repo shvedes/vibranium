@@ -6,12 +6,15 @@ import Quickshell.Io
 import qs.common
 import qs.common as Common
 import qs.features.wallpaper
-import qs.features.bar
 import qs.boot
 // NOTE: qs.services and the other qs.features.* modules are imported by
 // BootLate.qml, not here. Importing a module loads its whole file set
 // before anything paints, so every module named here is on the
-// time-to-paint path. Floor and Phase-1 need only the four above.
+// time-to-paint path. The bar is the largest of those sets by far - its
+// singleton imports the whole module registry - so it is a late unit: the
+// wallpaper is the surface that compiles and maps first, and the bar arrives
+// when the async half lands (see _bootVisuals). Floor and Phase 1 need only
+// the three above.
 
 Item {
   id: boot
@@ -599,6 +602,10 @@ Item {
 
   property var _queue: []
   property var _deferredQueue: []
+  // The residents that exist to answer rather than to build, drained before
+  // the entrance milestone (see _beginDrain and _earlyDescriptors).
+  property var _earlyQueue: []
+  property bool _earlyStarted: false
   // id -> descriptor and id -> [dependent ids], built once during
   // registration so the dependency cascade and lookups are O(edges)
   // instead of O(units) per step.
@@ -716,6 +723,17 @@ Item {
       return
     }
     annotationLoader.sourceComponent = boot._late.annotationComponent()
+    // The bar's construction belongs to this half (its singleton imports the
+    // module registry, so BootLate carries the compile), and it is demanded
+    // here rather than in _bootVisuals for the record's sake: a demand with
+    // nothing to dispatch to would leave UnitGate marking the unit ready with
+    // the bar nonexistent. Now the resolver has a target and the record's
+    // construction figure is the bar's own.
+    try {
+      UnitGate.ensure("bar", "boot")
+    } catch (error) {
+      // Recorded on the unit's record by UnitGate.
+    }
     // Replay the demands the late half missed: resolve each stashed unit
     // now that there is something to dispatch to, then refresh it so a
     // unit with no ready predicate (or an already-true one) settles
@@ -756,6 +774,19 @@ Item {
 
   function _beginDrain() {
     if (boot._drainStarted) return
+    // The IPC surface does not wait for the construction milestone. A facade
+    // unit's resident half is a singleton whose only job is to answer, and
+    // `session` holds the lock/logout verbs, so a keybinding pressed while the
+    // bar is still building its modules has to find its target rather than
+    // fail. What those units put behind the facade (the launcher's index
+    // build) holds itself back on its own milestone - see
+    // AppLauncher._prewarm - so nothing expensive moves onto the module build
+    // this phase exists to keep clear.
+    if (!boot._earlyStarted) {
+      boot._earlyStarted = true
+      boot._earlyQueue = boot._earlyDescriptors()
+      Idle.run(boot._drainEarly, 0, 0, "boot-drain-early")
+    }
     // Phase order, not a delay: the drain waits for boot construction to
     // settle, so it cannot overlap the module build the entrance is
     // choreographed around. It does not wait for the entrance itself: every
@@ -928,7 +959,6 @@ Item {
       case "exec":             void Exec.run; break
       case "state":            void Common.AppState.tag; break
       case "wallpaper":        void Wallpaper.enabled; break
-      case "bar":              void Bar.tag; break
       case "annotations":      annotationLoader.active = true; break
       default:                  return boot._lateResolve(id)
     }
@@ -1253,16 +1283,23 @@ Item {
   }
 
   function _bootVisuals() {
-    // Phase 1: construct the two visual surfaces synchronously right after the
-    // floor, so the bar and wallpaper are on screen before the rest of the
-    // resident units drain. Their dependencies are all in the floor, so they
-    // are ready immediately; the drain queue excludes them (see onCompleted).
-    for (const id of ["wallpaper", "bar"]) {
-      const descriptor = boot._byId[id]
-      if (!descriptor) continue
+    // Phase 1: construct the visual surfaces right after the floor, before the
+    // rest of the resident units drain. The drain queue excludes them (see
+    // onCompleted).
+    //
+    // The wallpaper is constructed here, on this thread: it is the surface the
+    // first frame paints, and its file set is small - the view, the transition
+    // helper and its shader. The bar is the opposite: Bar.qml imports the
+    // module registry, and a module import compiles its whole file set before
+    // anything paints, so the bar is a late unit that _adoptLate demands. That
+    // is what lets this surface map and fade while the registry is still being
+    // compiled on the async half's worker thread. Both have their dependencies
+    // in the floor, so neither waits for a service.
+    const descriptor = boot._byId["wallpaper"]
+    if (descriptor) {
       try {
-        UnitGate.ensure(id, "boot")
-        UnitGate.refresh(id)
+        UnitGate.ensure("wallpaper", "boot")
+        UnitGate.refresh("wallpaper")
       } catch (error) {
         // Recorded on the unit's record by UnitGate.
       }
@@ -1308,22 +1345,68 @@ Item {
     }
   }
 
+  // Units whose resident half exists to answer: every `facade` activation, plus
+  // `session`. Everything else constructs a window, a history read or a device
+  // handle and waits for the entrance milestone with the rest of the drain.
+  function _earlyDescriptors() {
+    return boot._catalog.filter(descriptor =>
+      descriptor.activation === "facade" || descriptor.id === "session")
+  }
+
+  function _drainEarly() {
+    boot._budgetedTurn(boot._earlyQueue)
+    if (boot._earlyQueue.length > 0) {
+      Idle.run(boot._drainEarly, 0, 0, "boot-drain-early")
+    }
+  }
+
   function _drainNext() {
     boot._budgetedTurn(boot._queue)
     if (boot._queue.length > 0) {
-      Idle.run(boot._drainNext, 0, 0, "boot-drain")
+      boot._requestPump(boot._drainNext)
       return
     }
     if (boot._deferredQueue.length > 0) {
-      Idle.run(boot._drainDeferred, 2, 0, "boot-drain-deferred")
+      boot._requestPump(boot._drainDeferred)
     }
   }
 
   function _drainDeferred() {
     boot._budgetedTurn(boot._deferredQueue)
     if (boot._deferredQueue.length > 0) {
-      Idle.run(boot._drainDeferred, 2, 0, "boot-drain-deferred")
+      boot._requestPump(boot._drainDeferred)
     }
+  }
+
+  // The pump's hand-back to the render loop.
+  //
+  // A budgeted turn bounds what ONE turn costs, not how many turns share a
+  // frame: rescheduling through Idle.run posts the next turn as a callLater,
+  // and a stream of those is serviced back to back before the render loop
+  // gets its turn - measured on a cold boot as a 105ms frame inside the
+  // entrance, because eight residents were constructed in one pass. A
+  // one-shot timer of a frame leaves the thread free between turns, so the
+  // frame the entrance is drawing lands on schedule and the drain continues
+  // in the next gap.
+  property var _pumpedFn: null
+
+  function _requestPump(fn) {
+    boot._pumpedFn = fn
+    drainPump.restart()
+  }
+
+  function _pumpTurn() {
+    const fn = boot._pumpedFn
+    boot._pumpedFn = null
+    if (fn !== null) fn()
+  }
+
+  Timer {
+    id: drainPump
+
+    interval: 16
+    repeat: false
+    onTriggered: boot._pumpTurn()
   }
 
   // retryTimer is gone: every catalog entry declares maxAttempts: 0, so

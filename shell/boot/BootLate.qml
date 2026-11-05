@@ -3,6 +3,7 @@ import QtQml
 import QtQuick
 import qs.services
 import qs.services as Services
+import qs.features.bar
 import qs.features.menu
 import qs.features.launcher
 import qs.features.lock
@@ -52,6 +53,12 @@ Item {
       case "idleDaemon":       void IdleDaemon.tag; break
       case "inhibitor":        void Inhibitor.tag; break
       case "session":          void Session.tag; break
+      // The bar is here for its import set, not its timing: Bar.qml imports
+      // the whole module registry, and a module import compiles its file set
+      // before anything paints. Loading it with this half keeps that compile
+      // on a worker thread and lets the wallpaper - a much smaller set - map
+      // on the first frame (see Boot._bootVisuals).
+      case "bar":              void Bar.tag; break
       case "lockscreen":       void Lockscreen.locked; break
       case "clipboard":        void Clipboard.tag; break
       case "privacy":          void Privacy.tag; break
