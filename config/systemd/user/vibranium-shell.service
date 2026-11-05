@@ -8,6 +8,7 @@ ConditionEnvironment=XDG_CURRENT_DESKTOP=Hyprland
 Type=simple
 Environment=QS_CONFIG_PATH=%h/.local/share/vibranium/shell
 Environment=VIBRANIUM=%h/.local/share/vibranium
+Environment="MALLOC_CONF=thp:never,narenas:4,dirty_decay_ms:3000"
 ExecStart=qs
 Restart=always
 
