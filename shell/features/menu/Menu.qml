@@ -314,16 +314,24 @@ Singleton {
     return true
   }
 
-  // The external pages - the idle timer list - belong to the settings
-  // family. The surface drops its page table on every container reload and
-  // the owners republish after the drop, but a cached reload does not
-  // reload the containers: the table then keeps whatever the last reload
+  // The external pages - the idle timer list, the font rows - belong to the
+  // settings family. The surface drops its page table on every container
+  // reload and the owners republish after the drop, but a cached reload does
+  // not reload the containers: the table then keeps whatever the last reload
   // left in it, and that reload may have been a bundle which does not take
   // these pages. Ask for them again, so the table matches the bundle that
   // is actually active.
+  //
+  // Index providers are asked on the same terms: their page composition is
+  // what registers their search rows, so a reload that dropped the page took
+  // the rows with it. Republishing here puts both back before the first
+  // query, which the container drop alone never did.
   function _restoreExternalPages() {
     if (!root.externalPagesAllowed()) return
     PageHost.replayPages()
+    for (const owner of root._indexProviders) {
+      if (owner && typeof owner.republishIndex === "function") owner.republishIndex()
+    }
   }
 
   property string _lastPath: ""
@@ -351,14 +359,32 @@ Singleton {
       prewarmRetry.restart()
       return
     }
+    // A build installs its containers as the active bundle, and the warm set
+    // ends on the utilities entry - a menu page, not a settings page. The
+    // menu is closed while this runs, so that container is not the surface in
+    // hand: external pages (the font rows indexed at boot) are composed only
+    // into a settings-family bundle, and the utilities entry refuses them
+    // until the menu opens on something else. Restore the containers the warm
+    // builds replaced - on a cold boot, no bundle at all - and let the first
+    // open install the bundle it actually shows.
+    const prevBundle = root.bundle
+    const prevIndex = root._builtinIndex
+    const prevFamily = root._settingsFamily
+    let interrupted = false
     try {
       if (root._buildFromFile(Paths.settingsCatalogPath + "#main")) root.evaluateGuards()
-      if (root.open) {
-        prewarmRetry.restart()
-        return
-      }
-      if (root._buildFromFile(Paths.settingsCatalogPath + "#utilities")) root.evaluateGuards()
+      if (root.open) interrupted = true
+      else if (root._buildFromFile(Paths.settingsCatalogPath + "#utilities"))
+        root.evaluateGuards()
     } catch (e) {}
+    root.bundle = prevBundle
+    root._builtinIndex = prevIndex
+    root._settingsFamily = prevFamily
+    root._rebuildSearchIndex()
+    if (interrupted) {
+      prewarmRetry.restart()
+      return
+    }
     root._prewarmed = true
   }
 
@@ -1443,6 +1469,17 @@ Singleton {
     root._indexRegistrations = next
     root._rebuildSearchIndex()
     return true
+  }
+
+  // Whether `pageId` currently answers a global query: a registration merged
+  // into the live index. A registration alone is not enough - the index merges
+  // them only while a settings-family bundle is active, so the same row set
+  // reads as absent (and no query can reach it) under the utilities entry or a
+  // standalone picker bundle.
+  function hasExternalIndex(pageId) {
+    if (typeof pageId !== "string" || pageId === "") return false
+    if (root._settingsFamily !== true) return false
+    return root._indexRegistrations[pageId] !== undefined
   }
 
   // A container reload drops every injected page (see _loadContainers), so

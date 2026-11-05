@@ -351,36 +351,53 @@ Singleton {
   // index entries. Without this a boot-time scan is unsearchable from the
   // first bundle open onward, and because the cache is warm nothing else
   // ever asks for the rows again.
+  //
+  // The page table and the index registration are dropped together by a
+  // reload, so either half missing means both must be composed again.
   function republishIndex() {
     if (root._cached === null) return
-    if (Menu.hasDynamicPage(root.pageId)) return
+    if (Menu.hasDynamicPage(root.pageId) && Menu.hasExternalIndex(root.pageId)) return
     root._compose()
   }
 
   // The arm above fires once past construction; no retry timer (Boot
   // orders the menu before this picker).
 
-  // True once the rows are in the index, which is what Menu asks before it
-  // holds a query back. The page composition registers them, so "cached" and
-  // "indexed" are the same condition here.
+  // True once the rows answer a global query, which is what Menu asks before
+  // it defers one. Scanned is not enough: the rows live in the menu's
+  // registration table, and only a settings-family bundle merges them into
+  // the index. A cache-filled picker whose page a container reload dropped
+  // therefore reports not ready, so a query naming a family is held and
+  // ensureScanned() repairs the registration instead of answering "No
+  // matches" from an index the rows are missing from.
   //
   // A FUNCTION, not a property: Menu holds a plain object as the provider, so
   // a QML property would arrive as an opaque QObject that answers nothing -
   // `owner.indexReady()` on a bool is not a call, and it threw instead of
   // deferring. The call shape is the contract; see Menu._indexProviderFor.
   function indexReady() {
-    return root._hay !== null
+    return root._hay !== null && Menu.hasExternalIndex(root.pageId)
   }
 
-  // Menu calls this when a query names fonts and nothing is indexed yet.
-  // Returns true when it took the scan on, so Menu knows to re-run the
-  // held query once the rows land; false when the rows are already there or
-  // a scan is in flight, and the caller should just search.
+  // Menu calls this when a query names fonts and indexReady() says the rows
+  // are not reachable. Returns true when a re-run of the held query can reach
+  // them, so Menu defers; false when waiting cannot change the answer and the
+  // caller should search the index it already has.
+  //
+  // Two ways to be unindexed: the scan never ran (arm it), or it ran and a
+  // container reload dropped the page composition (republish it now - the
+  // rows are cached, so the repair is synchronous). A bundle that does not
+  // take settings pages answers false: no wait makes its search reach rows it
+  // is not allowed to hold.
   function ensureScanned() {
-    if (root._hay !== null) return false
-    if (root._scanRunning) return true
-    root._armScan()
-    return true
+    if (root._hay === null) {
+      if (root._scanRunning) return true
+      root._armScan()
+      return true
+    }
+    if (Menu.hasExternalIndex(root.pageId)) return false
+    root.republishIndex()
+    return Menu.hasExternalIndex(root.pageId)
   }
 
   // Drop the rows from the global index without touching the page. Used when
