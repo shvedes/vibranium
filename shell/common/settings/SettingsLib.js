@@ -1345,14 +1345,22 @@ function enumLabel(opt, v) {
   return prettify(v)
 }
 
-// Build the raw bundle injected into every opened menu: a "settings" root
-// page listing all categories that define at least one option, plus one page
-// per category with generated rows followed by the file's custom items.
-// Uniform pages model: `sections` alias kept, each entry is a page.
-// The root page takes the top-level `title` when provided. No page carries
-// a width: each card measures the rows it shows. Single menu type - no
-// parent/child split.
-function buildBundle(schema, values) {
+// The pages one store contributes to the menu tree, as DESCRIPTORS: plain
+// {id, title, items} objects whose rows are still raw for the menu to
+// normalize. Nothing is stringified here. The caller normalizes one store's
+// pages once per generation and appends them by reference, so this half is
+// built once instead of serialized here, parsed back on the other side and
+// normalized again per merge.
+//
+// A store builds a "settings" root page listing all categories that define
+// at least one visible option, plus one page per category with generated
+// rows followed by the file's custom items. `index` carries that root page's
+// rows separately, and `hasIndex` says whether this store owns one, so a
+// caller composing a single tree can place the index itself instead of
+// deducing it from pages[0]. The root page takes the top-level `title` when
+// provided. No page carries a width: each card measures the rows it shows.
+// Single menu type - no parent/child split.
+function buildPages(schema, values) {
   const src = schema.pages || schema.sections || []
   const pages = []
   const indexItems = []
@@ -1416,12 +1424,25 @@ function buildBundle(schema, values) {
     if (!childPages[section.page]) indexItems.push(link)
   }
 
-  const hasExplicitSettings = src.some(p => p.page === "settings")
-  if (!hasExplicitSettings) {
+  return {
+    pages: pages,
+    index: indexItems,
+    indexTitle: schema.rootTitle || "Settings",
+    hasIndex: !src.some(p => p.page === "settings")
+  }
+}
+
+// One store's pages as a whole bundle, with the synthetic index page in
+// front unless the catalog declares an explicit "settings" page. Same shape
+// as before for callers that want a complete bundle from a single store.
+function buildBundle(schema, values) {
+  const built = buildPages(schema, values)
+  const pages = built.pages.slice()
+  if (built.hasIndex) {
     pages.unshift({
       id: "settings",
-      title: schema.rootTitle || "Settings",
-      items: indexItems
+      title: built.indexTitle,
+      items: built.index
     })
   }
   return { pages: pages }

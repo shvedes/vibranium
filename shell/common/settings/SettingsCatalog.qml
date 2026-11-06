@@ -31,6 +31,9 @@ Singleton {
   // Why the catalog is unavailable, with no store prefix: the caller logs it
   // under its own name. Empty while it is simply unasked.
   property string error: ""
+  // True when the last attempt failed only because the catalog path could
+  // not be resolved yet; such a failure is not latched.
+  property bool _pathPending: false
 
   FileView {
     id: catalogFile
@@ -39,7 +42,22 @@ Singleton {
 
   // Read and parse once. Returns the catalog, or null with `error` set.
   function load() {
-    if (catalog !== null || error !== "") return catalog
+    if (catalog !== null) return catalog
+    // An unresolved VIBRANIUM home (a session that starts the shell without
+    // the env file) makes the path relative to "/", and a read that fails
+    // there would latch a "could not be read" verdict about a file nobody
+    // looked for. Report the real reason and stay retryable: a later call
+    // re-resolves the path instead of replaying a stale failure.
+    if (_pathPending) {
+      _pathPending = false
+      error = ""
+    }
+    if (error !== "") return catalog
+    if (!Paths.vibraniumHome) {
+      _pathPending = true
+      error = "the catalog path is unresolved (VIBRANIUM is unset)"
+      return null
+    }
     catalogFile.path = ""
     catalogFile.path = Paths.settingsCatalogPath
     if (!catalogFile.waitForJob()) {

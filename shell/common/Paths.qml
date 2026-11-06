@@ -33,7 +33,8 @@ Singleton {
   // The path that means "the settings bundle" to the menu. The menu renders
   // the live bundle the store builds, not this file's text, so the file is a
   // handle rather than a source: the pickers open it to route into the
-  // settings pages, and the menu swaps in Settings.menuBundleText().
+  // settings pages, and the menu swaps in the pages Settings.menuPages()
+  // derives from it.
   // Doubles as the menu bundle file: MenuLib.parseBundle reads `menus`
   // from this same document, with an optional #page fragment selecting
   // the entry (main, utilities) instead of the settings index.

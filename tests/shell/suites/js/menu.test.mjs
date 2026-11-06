@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Suite: shell/features/menu/MenuLib.js - the menu framework's pure layer.
 //
-// This is the largest single-library surface in the shell: 67 functions over
+// This is the largest single-library surface in the shell: 69 functions over
 // four concerns that only meet at the panel boundary.
 //
 //   text/paths    clamp, pathDirname, quantize, decimalsOf, unitSuffix,
@@ -144,7 +144,7 @@ const SURFACE = [
   'stripJsonc', 'styledMarkup', 'shellQuote', 'clamp', 'pathDirname', 'quantize',
   'decimalsOf', 'unitSuffix', 'widestValueString', 'defaultsFor', 'stripForHay',
   'hayFromItem', 'hayForFilter', 'normalizeItem', 'buildOptionsPage', 'buildPage', 'mergedPageOpts',
-  'normalizePage', 'parseBundle', 'orderSettingsIndex', 'mergeSibling', 'applyExtension',
+  'normalizePage', 'normalizePages', 'parseBundle', 'bundleFromPages', 'orderSettingsIndex', 'mergePages', 'applyExtension',
   'mergedLabel', 'mergedWidth', 'replacePage', 'mergeRawItems', 'buildGuardScript',
   'uidKey', 'requiresExpr', 'requiresGuard', 'hideLine', 'guardLine', 'buildIndex',
   'buildPageIndex', 'fuzzyScore', 'search',
@@ -171,17 +171,17 @@ const routeName = (over) => {
   return r === null ? null : r.name
 }
 
-suite('menu/MenuLib', 'the menu framework\'s pure layer - 67 functions')
+suite('menu/MenuLib', 'the menu framework\'s pure layer - 69 functions')
 
 // ======================================================================
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // 68 functions plus the five search-cache `var`s, which the loader picks up
+  // 70 functions plus the five search-cache `var`s, which the loader picks up
   // because a `.pragma library` namespace is its top-level declarations.
-  eq('73 declarations', Object.keys(M).length, 73)
+  eq('75 declarations', Object.keys(M).length, 75)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
-  eq('all 67 named functions are callable', missing, [])
+  eq('all 69 named functions are callable', missing, [])
   for (const n of SURFACE) {
     is(`${n} is a function`, M[n], (v) => typeof v === 'function', 'a function')
   }
@@ -201,7 +201,7 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 73 names', Object.keys(F).length, 73)
+  eq('the live view publishes the same 75 names', Object.keys(F).length, 75)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
@@ -1313,31 +1313,51 @@ group('mergeRawItems copies the override shallowly and leaves the base alone', (
   is("appended rows are the extension's own objects", M.mergeRawItems([], ext)[0] === ext[0], (v) => v === true, 'shared')
 })
 
-group('mergeSibling appends a registry bundle and never displaces the opened one', () => {
-  // "pages append when their id is free, existing ids are left untouched
-  // (the opened file keeps authority). Entry page never changes."
+group('mergePages appends normalized pages and never displaces the opened one', () => {
+  // The ONE merge every contributor to the tree goes through. Stores hand over
+  // page descriptors (SettingsLib.buildPages) and normalizePages normalizes
+  // them once; mergePages then appends them by reference. Pages append when
+  // their id is free, an id the opened bundle claims keeps its page (the
+  // opened file has authority), and the entry page never changes.
   const base = bundle(`{"pages":[
     {"id":"main","title":"Main","items":[{"type":"action","id":"one","label":"One","command":"orig %v"}]},
     {"id":"sub","title":"Sub","width":400,"command":"pagecmd %v","items":[{"type":"toggle","id":"t1","label":"T1","var":"V1"}]}
   ]}`)
   const snapshot = JSON.stringify(base)
-  const s = M.mergeSibling(base, '{"pages":[{"id":"extra","title":"Extra","items":[{"type":"action","label":"E"}]},{"id":"main","title":"IGNORED"}]}')
+  const extra = M.normalizePages([
+    { id: 'extra', title: 'Extra', items: [{ type: 'action', label: 'E' }] },
+    { id: 'main', title: 'IGNORED' },
+  ])
+  eq('normalizePages builds one page per descriptor', extra.map(p => p.id), ['extra', 'main'])
+  const s = M.mergePages(base, extra)
   eq('a free id appends', s.pages.map(p => p.id), ['main', 'sub', 'extra'])
   eq('byId gains it', Object.keys(s.byId), ['main', 'sub', 'extra'])
   eq('the entry page never changes', s.entry, 'main')
   eq('a taken id is left untouched', s.byId.main.label, 'Main')
-  eq('the opened page object is the same one, not a re-parse', s.byId.main === base.byId.main, true)
+  eq('the opened page object is the same one, not a copy', s.byId.main === base.byId.main, true)
   eq('the appended page is normalized', s.byId.extra.items.map(i => i.uid), ['extra#0'])
+  // The bundle owns the page SHELL, the store cache keeps the rows: that is
+  // what lets orderSettingsIndex assign `page.items` in place without
+  // reordering the cache one bundle over.
+  eq('the appended page has its own shell', s.byId.extra === extra[0], false)
+  eq('and shares the cached rows', s.byId.extra.items === extra[0].items, true)
   eq('the base bundle is byte-for-byte unchanged', JSON.stringify(base), snapshot)
   eq('and did not gain the page', base.pages.length, 2)
-  eq('a single page object merges too', M.mergeSibling(bundle('{"id":"a"}'), '{"id":"solo","title":"Solo"}').pages.map(p => p.id), ['a', 'solo'])
-  eq('a bare array merges too', M.mergeSibling(bundle('{"id":"a"}'), '[{"id":"arr"}]').pages.map(p => p.id), ['a', 'arr'])
-  eq('unnamed sibling pages get positional ids', M.mergeSibling(bundle('{"id":"a"}'), '[{"title":"A"},{"title":"B"}]').pages.map(p => p.id), ['a', 'sibling0', 'sibling1'])
-  eq('an empty sibling bundle is a no-op', M.mergeSibling(bundle('{"id":"a"}'), '{"pages":[]}').pages.map(p => p.id), ['a'])
-  // mergeSibling does NOT fail soft (applyExtension does): a registry file
-  // that does not parse is a hard error the caller has to handle.
-  throws('a sibling that does not parse throws', () => M.mergeSibling(bundle('{"id":"a"}'), 'nope'), /JSON|token|Unexpected/)
-  throws('and so does a null document', () => M.mergeSibling(bundle('{"id":"a"}'), null), /JSON|token|Unexpected|end of input/)
+  eq('a bundle that adds nothing is handed back as the same object', M.mergePages(base, []) === base, true)
+  eq('so is one whose ids are all taken', M.mergePages(base, [extra[1]]) === base, true)
+  eq('a non-array is refused', M.mergePages(base, null) === base, true)
+  eq('a page with no id is skipped', M.mergePages(base, [{ title: 'X' }]).pages.length, 2)
+  // The catalog path: SettingsCatalog parses the file once at boot, so the menu
+  // builds containers from those pages instead of stripJsonc + JSON.parse over
+  // the same 5k lines again. Same normalization, same uids as the text path.
+  const fromMenus = M.bundleFromPages([
+    { id: 'm', title: 'M', items: [{ type: 'action', label: 'A' }] },
+    { id: 'm', title: 'Dup', items: [] },
+  ])
+  eq('bundleFromPages normalizes an already-parsed menus array',
+    fromMenus.byId.m.items.map(i => i.uid), ['m#0'])
+  eq('and applies the same duplicate-id rule as the text path', fromMenus.pages.map(p => p.id), ['m', 'm~2'])
+  eq('with the first page as the entry', fromMenus.entry, 'm')
 })
 
 group('applyExtension merges a user extension over the parsed base', () => {
@@ -4020,14 +4040,14 @@ group('the same rows hold at 1.0, 1.25, 1.5 and 2.0', () => {
 })
 
 section('coverage ledger')
-group('every one of the 67 functions was exercised above', () => {
+group('every one of the 69 functions was exercised above', () => {
   // A machine-checkable statement, not a claim in prose. The surface list at
   // the top of this file is checked against the loaded namespace, and then
   // each name is required to appear in this file's OWN source as a call - so
   // removing a function, renaming one, or dropping a cluster turns this group
   // red rather than quietly shrinking the coverage.
-  eq('the surface list is 67 long', SURFACE.length, 67)
-  eq('with no duplicates', new Set(SURFACE).size, 67)
+  eq('the surface list is 69 long', SURFACE.length, 69)
+  eq('with no duplicates', new Set(SURFACE).size, 69)
   eq('and all of them resolve on the namespace', SURFACE.filter(n => typeof M[n] !== 'function'), [])
   const selfSource = fs.readFileSync(path.join(import.meta.dirname, 'menu.test.mjs'), 'utf8')
   for (const name of SURFACE) {

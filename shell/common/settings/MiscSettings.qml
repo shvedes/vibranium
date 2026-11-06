@@ -62,11 +62,11 @@ Singleton {
         root.rev
         return SL.conditionsMet(root._byKey, root.values, showIf)
     }
-    // This unit publishes no page of its own. The two cursor options are
-    // declared by the schema under General, and Settings projects their live
-    // values from here; the menu is never handed a bundle by this singleton.
-    function menuBundleText() { return "" }
-    function menuHasPage(pageId) { return false }
+    // This unit publishes no page of its own, so it contributes nothing to
+    // the menu tree: the two cursor options are declared by the schema under
+    // General, and Settings projects their live values into the pages it
+    // already owns. There is deliberately no bundle here and no stub to call
+    // - a store joins the tree by handing over pages, or it does not.
 
     property var _schema: null
     readonly property var pages: root._schema ? root._schema.pages : []
@@ -168,7 +168,7 @@ Singleton {
             let o = null
             try { o = JSON.parse(stateReader.text()) } catch (e) { o = null }
             if (o && typeof o === "object") {
-                if (typeof o.theme === "string" && o.theme !== "") theme = o.theme
+                if (typeof o.theme === "string" && o.theme.trim() !== "") theme = o.theme.trim()
                 const n = parseInt(o.size, 10)
                 if (!isNaN(n)) size = n
             }
@@ -184,6 +184,17 @@ Singleton {
                 const n = GtkSettings.cursorSizeOf(txt, -1)
                 if (n >= 0) size = n
             }
+        }
+        // The state file is external input: a hand-edited size must not
+        // reach the option, the menu stepper or Settings' projection without
+        // passing the schema range the store validates writable values
+        // against. The catalog's `values` list stays out of this check - it
+        // is the dropdown's suggestion set, and the scan replaces it.
+        const sizeOpt = root._byKey["misc.cursorSize"]
+        if (sizeOpt && typeof sizeOpt.min === "number" && typeof sizeOpt.max === "number") {
+            const inRange = typeof size === "number" && isFinite(size)
+                && size >= sizeOpt.min && size <= sizeOpt.max && Math.floor(size) === size
+            if (!inRange) size = sizeOpt.default
         }
         const next = Object.assign({}, root.values)
         const themeChanged = next["misc.cursorTheme"] !== theme
@@ -215,7 +226,13 @@ Singleton {
         if (key === "misc.cursorTheme") {
             const proc = themeProc.createObject(root, { command: [Paths.vibraniumHome + "/bin/vb-cursor-set", check.value] })
             proc.exited.connect((code, status) => {
-                if (code === 0) root._readCurrentState()
+                // A refused write leaves the store holding a value the disk
+                // never took, so both outcomes re-read: success republishes
+                // what landed, failure puts the real value back.
+                if (code !== 0) {
+                    Log.error("miscSettings: vb-cursor-set failed (exit " + code + ")")
+                }
+                root._readCurrentState()
                 proc.destroy()
             })
             proc.running = true
@@ -227,7 +244,10 @@ Singleton {
             // Actually vb-cursor-set [THEME] --size SIZE, so we need to handle correctly
             // For size change, keep current theme
             proc.exited.connect((code, status) => {
-                if (code === 0) root._readCurrentState()
+                if (code !== 0) {
+                    Log.error("miscSettings: vb-cursor-set --size failed (exit " + code + ")")
+                }
+                root._readCurrentState()
                 proc.destroy()
             })
             proc.running = true
@@ -375,6 +395,10 @@ Singleton {
         if (!Paths.vibraniumHome) {
             return
         }
+        // The watcher and the catalog load both ask for the list at boot, and
+        // a running scan already answers for the directory state they are
+        // both asking about.
+        if (themeScan.running) return
         const bin = Paths.vibraniumHome + "/bin/vb-cursor-list"
         // Single-process --pairs run: one "folder<TAB>pretty" row per
         // theme, sorted. No paste-of-two-runs (fragile pairing) and no

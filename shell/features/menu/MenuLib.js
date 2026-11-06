@@ -582,6 +582,16 @@ function parseBundle(text) {
   // `pages` through SettingsLib.parseUnifiedCatalog.
   if (raw === null) throw new Error("bundle is null")
   const rawPages = Array.isArray(raw) ? raw : (Array.isArray(raw.menus) ? raw.menus : (Array.isArray(raw.pages) ? raw.pages : [raw]))
+  return bundleFromPages(rawPages)
+}
+
+// Containers from ALREADY-PARSED page objects: the same normalization and the
+// same duplicate-id rule as parseBundle, without the parse. The unified
+// catalog is read and parsed once for the settings stores (SettingsCatalog),
+// so the menu takes its `menus` from there instead of stripJsonc + JSON.parse
+// over the same ~5k lines on every container rebuild - which measured as 80%
+// of what was left of a rebuild.
+function bundleFromPages(rawPages) {
   const pages = []
   // Prototype-less: the keys are page ids, and they come from a file. A page
   // declared `"id": "__proto__"` did not create a key - it assigned byId's
@@ -617,13 +627,11 @@ function parseBundle(text) {
 // after all known rows. A bundle whose settings page has no Hyprland
 // link gets one appended, so the row is present even before
 // HyprlandSettings is ready to join its pages.
-// The reorder writes through the page it read, and that is deliberate: the
-// only caller runs inside _loadContainers, on containers it has just parsed,
-// and the repeat-summon cache path returns before ever reaching it - so no
-// cached or shared page object is ever in hand here. A copy-on-write variant
-// would have to rebuild the page AND the bundle to be honest about it, and the
-// half of that which still assigned `page.items` at the call site would have
-// been the worst of both.
+//
+// The reorder writes through the page it is handed, which is safe because
+// mergePages gives every bundle its OWN page shells: the rows are shared with
+// the store's cache, the page object is not, so assigning `page.items` here
+// cannot reorder the cache and leak one bundle's layout into the next.
 function orderSettingsIndex(base) {
   const order = ["general", "bar", "app-launcher", "audio", "brightness",
     "screenshots", "recording", "night-light", "media-controls",
@@ -670,25 +678,55 @@ function orderSettingsIndex(base) {
   page.items = known.concat(unknown)
 }
 
-// Merge a registry sibling bundle into an already-parsed primary: pages
-// append when their id is free, existing ids are left untouched (the
-// opened file keeps authority). Entry page never changes.
-function mergeSibling(base, text) {
-  const raw = JSON.parse(stripJsonc(text))
-  if (raw === null) throw new Error("bundle is null")
-  const rawPages = Array.isArray(raw) ? raw : (Array.isArray(raw.pages) ? raw.pages : [raw])
-  const pages = base.pages.slice()
-  const byId = Object.assign(Object.create(null), base.byId)
-  for (let i = 0; i < rawPages.length; i++) {
-    const page = normalizePage(rawPages[i], "sibling" + i)
-    if (byId[page.id] !== undefined) continue
-    pages.push(page)
-    byId[page.id] = page
+// Normalize a store's page descriptors ONE time. Descriptors are the plain
+// {id, title, items} objects SettingsLib.buildPages emits; the result is what
+// the menu navigates, so a caller that keeps it across container loads must
+// leave it alone - mergePages appends by reference and orderSettingsIndex
+// copies the one page it reorders.
+function normalizePages(descriptors) {
+  const out = []
+  if (!Array.isArray(descriptors)) return out
+  for (let i = 0; i < descriptors.length; i++) {
+    const d = descriptors[i]
+    const fallback = d && typeof d.id === "string" && d.id !== "" ? d.id : "page" + i
+    out.push(normalizePage(d, fallback))
   }
+  return out
+}
+
+// Append already-normalized pages from another store: the one merge every
+// contributor to the tree goes through. Pages are shared by reference - that
+// is the point, one normalization per store generation however many bundles
+// are built from it - so nothing here mutates them. An id the opened bundle
+// already claims keeps the bundle's page, the authority rule the text merge
+// used to apply. Returns `base` itself when nothing was added, so a caller can
+// compare identity to know whether the tree changed at all.
+function mergePages(base, pages) {
+  if (!Array.isArray(pages) || pages.length === 0) return base
+  let outPages = null
+  let outById = null
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i]
+    if (!page || typeof page.id !== "string" || page.id === "") continue
+    if ((outById === null ? base.byId : outById)[page.id] !== undefined) continue
+    if (outPages === null) {
+      outPages = base.pages.slice()
+      outById = Object.assign(Object.create(null), base.byId)
+    }
+    // The shell is copied, the rows are not: the bundle owns a page object it
+    // may reorder in place (see orderSettingsIndex) while the store's cached
+    // page - and every row object in it - stays shared by reference. pages and
+    // byId must name the SAME shell, or a reorder would reach one and not the
+    // other.
+    const shell = Object.assign({}, page)
+    outPages.push(shell)
+    outById[page.id] = shell
+  }
+  if (outPages === null) return base
   return {
     entry: base.entry,
-    pages: pages,
-    byId: byId
+    pages: outPages,
+    byId: outById
   }
 }
 

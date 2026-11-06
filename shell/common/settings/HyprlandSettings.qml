@@ -247,11 +247,16 @@ Singleton {
 
     // --- file helpers ---
 
-    function _readFileContent(expandedPath) {
+    // `cache` is an optional per-pass map: the live fetch falls back to disk
+    // per option, and every option in one file would otherwise re-read that
+    // whole file through a blocking read of its own.
+    function _readFileContent(expandedPath, cache) {
+        if (cache !== undefined && cache[expandedPath] !== undefined) return cache[expandedPath]
         reader.path = ""
         reader.path = expandedPath
-        if (!reader.waitForJob()) return ""
-        return reader.text()
+        const text = reader.waitForJob() ? reader.text() : ""
+        if (cache !== undefined) cache[expandedPath] = text
+        return text
     }
 
     function _writeFileContent(expandedPath, content) {
@@ -489,17 +494,24 @@ Singleton {
     property var _fetchTypeByCtl: ({})
     property string _fetchBuf: ""
 
-    // --- bundling for menu ---
+    // --- pages for the menu tree ---
 
-    function menuBundleText() {
-        if (!root._schema || !root.ready) return ""
-        const b = SL.buildBundle(root._schema, root.values)
-        // Hypr leaves merge as siblings into the main Settings tree - drop
-        // the synthetic \"settings\" index that buildBundle prepends when no
-        // explicit page with id \"settings\" exists. Settings already owns it.
-        const pages = b.pages.filter(p => p.id !== "settings")
-        return JSON.stringify({ pages: pages })
+    // This store's half of the one menu tree: page descriptors from the same
+    // builder Settings uses, cached per generation. No stringify here, no
+    // synthetic index page (Settings owns that) and no second normalization
+    // on the menu's side - see SL.buildPages and MenuLib.mergePages.
+    function menuPages() {
+        if (!root._schema || !root.ready) return null
+        // One build per store generation: the menu asks on every container
+        // load, and this half is the larger part of the catalog.
+        if (root._pageCache !== null && root._pageRev === root.rev) return root._pageCache
+        root._pageCache = SL.buildPages(root._schema, root.values).pages
+        root._pageRev = root.rev
+        return root._pageCache
     }
+
+    property var _pageCache: null
+    property int _pageRev: -1
 
     function menuHasPage(pageId) {
         if (!root._schema || !root.ready) return false
@@ -592,6 +604,7 @@ Singleton {
             const keys = root._fetchKeys
             const ctls = root._fetchCtls
             const typeMap = root._fetchTypeByCtl
+            const fileCache = {}
             for (let i = 0; i < keys.length && i < arr.length; i++) {
                 const key = keys[i]
                 const ctl = ctls[i]
@@ -623,7 +636,7 @@ Singleton {
                     // fallback to file - use Paths-aware expansion to avoid literal $XDG_... folder
                     const meta = opt.hypr
                     const file = root._expandFile(meta.file)
-                    const content = root._readFileContent(file)
+                    const content = root._readFileContent(file, fileCache)
                     const res = HE.hyprGetContent(content, meta.path, { occurrence: 1 })
                     if (res.ok) v = res.value
                 }
@@ -648,12 +661,15 @@ Singleton {
 
     function _fallbackToFiles() {
         const next = Object.assign({}, root.values)
+        // One read per file, not one per option: the catalog's options cluster
+        // into four lua files, and this path is the hyprctl-less boot.
+        const fileCache = {}
         for (const k in root._byKey) {
             const opt = root._byKey[k]
             if (!opt.hypr || opt.hypr.kind !== "option") continue
             const meta = opt.hypr
             const file = root._expandFile(meta.file)
-            const content = root._readFileContent(file)
+            const content = root._readFileContent(file, fileCache)
             const res = HE.hyprGetContent(content, meta.path, { occurrence: 1 })
             if (res.ok) {
                 const check = SL.validateValue(opt, res.value)

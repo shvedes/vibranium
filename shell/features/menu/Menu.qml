@@ -436,115 +436,97 @@ Singleton {
     Qt.callLater(root.evaluateGuards)
   }
 
+  // Normalized pages for one store payload, cached by PAYLOAD IDENTITY: a
+  // store hands back the same object until its generation changes, so an
+  // unchanged store costs one strict comparison per container load instead of
+  // a re-normalization of every row. Two entries and two stores - a store's
+  // entry is replaced when its generation moves, never accumulated.
+  property var _normCache: ({})
+  function _mergeStorePages(base, key, payload) {
+    if (payload === null || payload === undefined) return base
+    let hit = root._normCache[key]
+    if (hit === undefined || hit.src !== payload) {
+      const list = Array.isArray(payload) ? payload : payload.pages
+      let pages = MenuLib.normalizePages(list)
+      // A store that owns the synthetic index hands its rows over separately:
+      // the index is the FIRST page of the tree, in front of that store's own.
+      if (!Array.isArray(payload) && payload.hasIndex === true) {
+        pages = [MenuLib.normalizePage({
+          id: "settings",
+          title: payload.indexTitle,
+          items: payload.index
+        }, "settings")].concat(pages)
+      }
+      hit = { src: payload, pages: pages }
+      const next = Object.assign({}, root._normCache)
+      next[key] = hit
+      root._normCache = next
+    }
+    return MenuLib.mergePages(base, hit.pages)
+  }
+
+  // Does any submenu row in `base` point at a page that store owns? The one
+  // place the question is asked, for both stores.
+  function _linksPage(base, store) {
+    for (let p = 0; p < base.pages.length; p++) {
+      const items = base.pages[p].items
+      for (let i = 0; i < items.length; i++) {
+        const it = items[i]
+        if (!it || it.type !== "submenu") continue
+        if (store === "hypr" ? HyprlandSettings.menuHasPage(it.page)
+          : Settings.menuHasPage(it.page)) return true
+      }
+    }
+    return false
+  }
+
   function _loadContainers(text, extOverride, entryFrag) {
     const t0 = Date.now()
     // The unified catalog carries menu `menus`: parseBundle reads those,
     // while a generated settings bundle carries `pages`. Either way the
     // dynamic settings/hypr leaves merge below when linked.
-    let base = MenuLib.parseBundle(text)
+    // The unified catalog is already parsed for the settings stores
+    // (SettingsCatalog memoizes one read + parse at boot), so the menu does not
+    // parse the same ~5k lines again on every rebuild - it builds its
+    // containers from the parsed `menus`. Every other bundle, and the catalog
+    // before it has been read, still goes through the text path.
+    let base = null
+    if (root._catalogFile(root._lastPath)) {
+      const catalog = SettingsCatalog.load()
+      if (catalog && Array.isArray(catalog.menus)) {
+        try {
+          base = MenuLib.bundleFromPages(catalog.menus)
+        } catch (e) {
+          base = null
+        }
+      }
+    }
+    if (base === null) base = MenuLib.parseBundle(text)
     let searchBase = base
 
     const bare = base.pages.length === 1 && base.pages[0].items.length === 0
-    let linksSettings = root._catalogFile(root._lastPath) || bare
-    for (let p = 0; p < base.pages.length && !linksSettings; p++) {
-      const items = base.pages[p].items
-      for (let i = 0; i < items.length; i++) {
-        const it = items[i]
-        if (it.type === "submenu" && Settings.menuHasPage(it.page)) {
-          linksSettings = true
-          break
-        }
-      }
-    }
+    const linksSettings = root._catalogFile(root._lastPath) || bare
+      || root._linksPage(base, "settings")
     root._settingsFamily = linksSettings
+
+    // One tree, one merge. Each store hands over page descriptors for its own
+    // half of the catalog (SettingsLib.buildPages) and _mergeStorePages
+    // normalizes that store's pages ONCE per generation, appending them by
+    // reference. Before this each half was stringified in its store, parsed
+    // back here and re-normalized per merge - and the hypr half was merged
+    // twice, once into the displayed bundle and once into the search bundle,
+    // which is exactly why the two could not stay one object.
     if (linksSettings) {
-      const dynamic = Settings.menuBundleText()
-      if (dynamic !== "") {
-        try {
-          const joined = MenuLib.mergeSibling(base, dynamic)
-          base = joined
-          searchBase = joined
-        } catch (e) {}
-      }
-      if (HyprlandSettings.ready) {
-        const hdyn = HyprlandSettings.menuBundleText()
-        if (hdyn !== "") {
-          try {
-            base = MenuLib.mergeSibling(base, hdyn)
-            searchBase = MenuLib.mergeSibling(searchBase, hdyn)
-          } catch (e) {}
-        }
-      }
+      base = root._mergeStorePages(base, "settings", Settings.menuPages())
+      if (HyprlandSettings.ready)
+        base = root._mergeStorePages(base, "hypr", HyprlandSettings.menuPages())
       MenuLib.orderSettingsIndex(base)
-      let linksMisc = false
-      if (MiscSettings.ready) {
-        for (let p = 0; p < base.pages.length && !linksMisc; p++) {
-          const items = base.pages[p].items
-          for (let i = 0; i < items.length; i++) {
-            const it = items[i]
-            if (it.type === "submenu" && MiscSettings.menuHasPage(it.page)) {
-              linksMisc = true
-              break
-            }
-          }
-        }
-        if (!linksMisc && base.byId["misc"] !== undefined) linksMisc = true
-        if (linksMisc) {
-          const mdyn = MiscSettings.menuBundleText()
-          if (mdyn !== "") {
-            try {
-              base = MenuLib.mergeSibling(base, mdyn)
-              searchBase = MenuLib.mergeSibling(searchBase, mdyn)
-            } catch (e) {}
-          }
-        }
-      }
-    } else {
-      if (HyprlandSettings.ready) {
-        let linksHyprDirect = false
-        for (let p = 0; p < base.pages.length && !linksHyprDirect; p++) {
-          const items = base.pages[p].items
-          for (let i = 0; i < items.length; i++) {
-            const it = items[i]
-            if (it.type === "submenu" && HyprlandSettings.menuHasPage(it.page)) {
-              linksHyprDirect = true
-              break
-            }
-          }
-        }
-        if (linksHyprDirect) {
-          const hdyn = HyprlandSettings.menuBundleText()
-          if (hdyn !== "") {
-            try {
-              base = MenuLib.mergeSibling(base, hdyn)
-              searchBase = MenuLib.mergeSibling(searchBase, hdyn)
-            } catch (e) {}
-          }
-        }
-      }
-      if (MiscSettings.ready) {
-        let linksMiscDirect = false
-        for (let p = 0; p < base.pages.length && !linksMiscDirect; p++) {
-          const items = base.pages[p].items
-          for (let i = 0; i < items.length; i++) {
-            const it = items[i]
-            if (it.type === "submenu" && MiscSettings.menuHasPage(it.page)) {
-              linksMiscDirect = true
-              break
-            }
-          }
-        }
-        if (linksMiscDirect || base.byId["misc"] !== undefined) {
-          const mdyn = MiscSettings.menuBundleText()
-          if (mdyn !== "") {
-            try {
-              base = MenuLib.mergeSibling(base, mdyn)
-              searchBase = MenuLib.mergeSibling(searchBase, mdyn)
-            } catch (e) {}
-          }
-        }
-      }
+    } else if (HyprlandSettings.ready && root._linksPage(base, "hypr")) {
+      // A bundle with its own link to a compositor page still gets those
+      // pages; it never gets the settings tree.
+      base = root._mergeStorePages(base, "hypr", HyprlandSettings.menuPages())
     }
+    searchBase = base
 
     if (base.byId[base.entry] !== undefined && base.byId[base.entry].items.length === 0) {
       const fb = base.byId["settings"] !== undefined ? "settings"
@@ -563,15 +545,14 @@ Singleton {
       extText = extensionLoader.waitForJob() ? extensionLoader.text() : ""
     }
     if (extText !== undefined && extText !== null && extText.trim() !== "") {
+      // base and searchBase are one object here (see the merge above), so the
+      // extension is applied once instead of twice.
       try {
-        if (searchBase === base) {
-          base = MenuLib.applyExtension(base, extText)
-          searchBase = base
-        } else {
-          base = MenuLib.applyExtension(base, extText)
-          searchBase = MenuLib.applyExtension(searchBase, extText)
-        }
-      } catch (e) {}
+        base = MenuLib.applyExtension(base, extText)
+      } catch (e) {
+        Log.warn(root.tag, "user-menu.jsonc ignored: " + e)
+      }
+      searchBase = base
     }
 
     // Entry scope for the unified catalog: the file holds every menu, but

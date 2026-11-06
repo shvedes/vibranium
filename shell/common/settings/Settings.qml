@@ -336,10 +336,19 @@ Singleton {
   // list is the project's own session verbs, the same two the catalog
   // ships.
 
-  readonly property var _defaultIdleTimers: [
+  // The shipped list answers only when the schema never landed. The catalog
+  // default is the one source of truth while it exists, so the two cannot
+  // drift into a shape mismatch that makes every timer commit look deviant.
+  readonly property var _fallbackIdleTimers: [
     { minutes: 10, action: "command", command: "vb-shell session lock", commandClass: "lock" },
     { minutes: 15, action: "command", command: "vb-shell session suspend", commandClass: "suspend" }
   ]
+
+  readonly property var _defaultIdleTimers: {
+    const opt = root.byKey("shell.idle.timers")
+    if (opt !== null && Array.isArray(opt.default)) return opt.default.slice()
+    return root._fallbackIdleTimers.slice()
+  }
 
   readonly property bool idleEnabled: root.value("shell.idle.enabled") !== false
 
@@ -411,7 +420,7 @@ Singleton {
     })
 
     root._envWatchUnsub = Watch.subscribe(Paths.runtimeEnvFile, (text) => {
-      root._restoreRuntimeEnv()
+      root._restoreRuntimeEnv(text)
     })
     // Single deterministic boot chain: schema scan -> user load. Runtime
     // and state dirs exist by then - created at session startup.
@@ -444,12 +453,37 @@ Singleton {
       root.optionError(key, "unknown option")
       return false
     }
+    // misc.* values are file-backed by MiscSettings (cursor-theme.json) and
+    // are never persistable here: composeManaged skips them, so committing
+    // one would report success, change nothing on disk, and be reverted by
+    // the next publish. Route the write to the store that owns the file.
+    if (opt.misc) return root._setMisc(key, v)
     const check = SL.validateValue(opt, v)
     if (!check.ok) {
       root.optionError(key, check.error)
       return false
     }
     root._commit(key, check.value, hook || "")
+    return true
+  }
+
+  // The misc half of setOption. MiscSettings validates with the same option
+  // record and the same SettingsLib rule, and its optionChanged is what
+  // refreshes this store's shard for the key.
+  function _setMisc(key, v) {
+    const check = SL.validateValue(root.byKey(key), v)
+    if (!check.ok) {
+      root.optionError(key, check.error)
+      return false
+    }
+    if (typeof MiscSettings === "undefined" || !MiscSettings.ready) {
+      root.optionError(key, "the misc settings store is not ready")
+      return false
+    }
+    if (!MiscSettings.setOption(key, check.value)) {
+      root.optionError(key, "the misc settings store refused the value")
+      return false
+    }
     return true
   }
 
@@ -598,8 +632,8 @@ Singleton {
     }
     // This store owns the shell/env groups: hypr pages ride the same file
     // for the Hyprland store, and misc.* options resolve here too so
-    // menuBundleText can project MiscSettings' live values/enums onto
-    // them for rendering (MiscSettings stays the single writer). The group
+    // menuPages can carry MiscSettings' live cursor values into the one
+    // menu tree (MiscSettings stays the single writer). The group
     // is the ownership - including the items-only pages (launcher-enabled,
     // bar-enabled, bar-modules), which carry no option to infer it from.
     const kept = []
@@ -740,12 +774,27 @@ Singleton {
 
   function _publish(resolved) {
     const prev = root.values
+    const prevIssues = root._issues
     // A resolve can move any key, so every shard is replaced. This is the
     // rare bulk path (schema load, file reload).
-    root._replaceAllShards(resolved.values)
+    //
+    // misc.* values are owned by MiscSettings, so they are overlaid here
+    // rather than reset to the catalog default: the two keys riding the
+    // General page must not flip for a turn every time the user file is
+    // re-read, and `values` must never disagree with the cursor picker.
+    root._replaceAllShards(root._overlayMisc(resolved.values))
     root._overrides = resolved.validOverrides
     root._raw = resolved.raw
     root._issues = resolved.issues
+
+    // One rejected override is a setting the user believes they saved. The
+    // count rides IPC status; the reason is the only thing that says which
+    // key and why, so each new issue is logged once instead of sitting
+    // invisible behind `settings status`.
+    if (root._issues.length > 0 && root._issues.join("|") !== prevIssues.join("|")) {
+      const line = Log.at("settings")
+      for (let i = 0; i < root._issues.length; i++) line.warn(root._issues[i])
+    }
 
     // Emit one change per externally-flipped key so bound views resettle.
     // The key set is SettingsLib's; the signals stay here.
@@ -823,6 +872,10 @@ Singleton {
   // Coalesced flush: one event-loop tick batches rapid commits.
   property bool _flushPending: false
 
+  // Last text written to the bash projection. A render that matches it is
+  // not a write, and not writing also means no watcher event comes back.
+  property string _lastEnvText: ""
+
   function _scheduleFlush() {
     if (root._flushPending) return
     root._flushPending = true
@@ -868,8 +921,14 @@ Singleton {
     // flush that lands.
 
     // Derived from the validated in-memory values, so the bash projection
-    // stays correct even while the user file is held back.
-    runtimeEnv.setText(SL.renderEnv(root._schema, root.values))
+    // stays correct even while the user file is held back. A render that
+    // matches the last one written is not a write: every write echoes back
+    // through the watcher, so skipping it also skips the echo.
+    const expected = SL.renderEnv(root._schema, root.values)
+    if (expected !== root._lastEnvText) {
+      root._lastEnvText = expected
+      runtimeEnv.setText(expected)
+    }
 
     if (root._pendingHooks.length > 0) {
       const hooks = root._pendingHooks.splice(0, root._pendingHooks.length)
@@ -890,54 +949,86 @@ Singleton {
   // Self-heal for the bash projection. Any watcher event (deletion,
   // hand edit, our own write echo) re-renders from live values and
   // rewrites unless the file already holds exactly that content.
-  // Deleted or failed reads never match, so removal always restores;
-  // identical echo content short-circuits before any write.
-  function _restoreRuntimeEnv() {
+  //
+  // `text` is the body the watcher just handed over, so the tamper check
+  // costs no read of its own; null means the file is absent or unreadable,
+  // which is exactly the case the restore exists for.
+  function _restoreRuntimeEnv(text) {
     if (!root._schema || !root.ready) return
     const expected = SL.renderEnv(root._schema, root.values)
-    envReader.path = ""
-    envReader.path = Paths.runtimeEnvFile
-    if (envReader.waitForJob() && envReader.text() === expected) return
+    root._lastEnvText = expected
+    if (typeof text === "string" && text === expected) return
     runtimeEnv.setText(expected)
-    runtimeEnv.waitForJob()
   }
 
-  // Menu integration: raw bundle text for dynamic page injection.
-  // Hypr pages are owned by HyprlandSettings - this bundle only carries
-  // shell/env. HyprlandSettings merges its leaves as sibling pages so
-  // Settings -> Hyprland navigation stays one tree.
-  property string _bundleCache: ""
-  property int _bundleRev: -1
-  property int _bundleMiscRev: -1
-  function menuBundleText() {
-    if (!root._schema || !root.ready) return ""
-    const miscRev = (typeof MiscSettings !== "undefined" && MiscSettings.ready) ? MiscSettings.rev : -1
-    if (root._bundleCache !== "" && root._bundleRev === root.rev && root._bundleMiscRev === miscRev) return root._bundleCache
-    // misc.* options are file-backed by MiscSettings (never persisted in
-    // settings.json): project its live values AND option enums at build
-    // time so dropdowns render truth. The old path (a one-way mirror
-    // fired after async scans) lost every race where the scan landed
-    // before this schema existed, pinning the dropdown to the catalog
-    // default and its single placeholder entry forever.
-    if (typeof MiscSettings !== "undefined" && MiscSettings.ready) {
-      for (const mkey in MiscSettings._byKey) {
-        const src = MiscSettings._byKey[mkey]
-        const dst = root._schema.byKey[mkey]
-        if (!dst) continue
-        if (src.values) dst.values = src.values.slice()
-        dst.valueLabels = src.valueLabels ? Object.assign({}, src.valueLabels) : null
-        if (src.keywords) dst.keywords = src.keywords.slice()
-      }
-      const merged = Object.assign({}, root.values, MiscSettings.values)
-      root._bundleCache = JSON.stringify(SL.buildBundle(root._schema, merged))
-      root._bundleRev = root.rev
-      root._bundleMiscRev = miscRev
-      return root._bundleCache
+  // --- misc.* projection ---
+  //
+  // The two cursor options are declared by the catalog (General page) but
+  // WRITTEN by MiscSettings, from cursor-theme.json. This store owns their
+  // schema entries, so the two have to agree or one row renders one value
+  // and persists another: the live values are projected into the shards and
+  // kept current by MiscSettings' own change signal.
+  function _miscValues() {
+    if (typeof MiscSettings === "undefined" || !MiscSettings.ready) return null
+    const src = MiscSettings.values
+    return src !== null && typeof src === "object" ? src : null
+  }
+
+  function _overlayMisc(map) {
+    const misc = root._miscValues()
+    if (misc === null || root._schema === null) return map
+    const out = Object.assign({}, map)
+    for (const k in misc) {
+      if (root._schema.byKey[k] !== undefined) out[k] = misc[k]
     }
-    root._bundleCache = JSON.stringify(SL.buildBundle(root._schema, root.values))
-    root._bundleRev = root.rev
-    root._bundleMiscRev = miscRev
-    return root._bundleCache
+    return out
+  }
+
+  function _syncMisc() {
+    const misc = root._miscValues()
+    if (misc === null || root._schema === null) return
+    for (const k in misc) {
+      if (root._schema.byKey[k] === undefined) continue
+      if (root._shardOfMap(k)[k] !== misc[k]) root._putShard(k, misc[k])
+    }
+  }
+
+  Connections {
+    target: MiscSettings
+
+    // A picker write lands here directly: no user-file round trip and no
+    // bundle rebuild is involved in a cursor change.
+    function onOptionChanged(key, value) {
+      if (root._schema !== null && root._schema.byKey[key] !== undefined) root._putShard(key, value)
+    }
+    function onReadyChanged() {
+      root._syncMisc()
+    }
+  }
+
+  // Menu integration: the page descriptors this store contributes to the one
+  // menu tree (see SL.buildPages). Descriptors, not text - the menu normalizes
+  // each store's pages once per generation and appends them by reference, so
+  // this half is never serialized here and never parsed back on the other
+  // side. Hypr pages belong to HyprlandSettings; this half carries shell/env
+  // (and the misc.* options, whose live values ride the shards above).
+  //
+  // Cached on the store generation, MiscSettings' included: a cursor change
+  // rewrites two rows, not the whole catalog.
+  property var _pageCache: null
+  property int _pageRev: -1
+  property int _pageMiscRev: -1
+  function menuPages() {
+    if (!root._schema || !root.ready) return null
+    const miscRev = (typeof MiscSettings !== "undefined" && MiscSettings.ready) ? MiscSettings.rev : -1
+    if (root._pageCache !== null && root._pageRev === root.rev
+      && root._pageMiscRev === miscRev) return root._pageCache
+    // Shared with the menu's page cache, so nothing may write to the pages
+    // returned here: the one reorder copies the page it touches.
+    root._pageCache = SL.buildPages(root._schema, root.values)
+    root._pageRev = root.rev
+    root._pageMiscRev = miscRev
+    return root._pageCache
   }
 
   // Cheap link-target probe for menu joins: names `pageId` either the
@@ -991,15 +1082,6 @@ Singleton {
 
   // Paranoia net via Watch governor (K2)
   property var _envWatchUnsub: null
-
-  // Parked reader for the restore check; same failed-state rules as
-  // userLoader - the watched view itself is never read from.
-  FileView {
-    id: envReader
-
-    printErrors: false
-  }
-
   Component {
     id: hookComponent
 

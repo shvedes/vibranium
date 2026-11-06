@@ -1308,12 +1308,14 @@
                     {
                         "minutes": 10,
                         "action": "command",
-                        "command": "vb-shell session lock"
+                        "command": "vb-shell session lock",
+                        "commandClass": "lock"
                     },
                     {
                         "minutes": 15,
                         "action": "command",
-                        "command": "vb-shell session suspend"
+                        "command": "vb-shell session suspend",
+                        "commandClass": "suspend"
                     }
                 ],
                 "label": "Idle timers",
