@@ -465,6 +465,8 @@ PanelCard {
       // instead of handing the view a new one - the view keeps its state.
       model: actionModel
       interactive: false
+      // The same rule the settings menu keeps: the wheel does not walk rows.
+      wheelSteps: false
       // Library highlight glides for focus moves, filtered or not
       // - same gate as MenuPanel, narrowed to the cursor-row rule every panel
       // with in-flow slots keeps: the bar snaps while the focused row carries
@@ -698,5 +700,14 @@ PanelCard {
     anchors.topMargin: Ui.s
     tone: "danger"
     message: panel.faultMessage
+  }
+
+  // Same rule as the settings menu: the card refuses the pointer. Above the
+  // rows and their confirm slots, so a click inside the power menu lands on
+  // nothing - the cursor keys walk it, Enter commits, Escape dismisses.
+  MouseArea {
+    anchors.fill: parent
+    z: 10000
+    acceptedButtons: Qt.AllButtons
   }
 }

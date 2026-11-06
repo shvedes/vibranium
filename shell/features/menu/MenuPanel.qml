@@ -4225,6 +4225,11 @@ Rectangle {
 
         anchors.fill: parent
         interactive: false
+        // A menu is walked by the keyboard and nothing else: a wheel over the
+        // card used to step the cursor, which is a gesture the menu does not
+        // own - the pointer cannot stay on the row it named while the card
+        // glides under it.
+        wheelSteps: false
         // NO trailing space here: outerPad below the region is the single
         // bottom-gap authority. An in-content pad would stack with it on
         // short lists (22px) while scrollable lists showed only 10.
@@ -4431,6 +4436,19 @@ Rectangle {
         return "red"
       }
     }
+  }
+
+  // Full keyboard operation: the card refuses the pointer, all the way down.
+  // This net sits above every row, slot, editor and grid cell, so a click
+  // inside the menu lands on nothing. Rows are reached with the cursor keys,
+  // committed with Enter, and the menu is dismissed from the scrim or with
+  // Escape. Hover is deliberately NOT taken here - the net does not enable it,
+  // and no menu row paints a hover state - so the card keeps answering the
+  // pointer with nothing while the keyboard keeps the whole menu.
+  MouseArea {
+    anchors.fill: parent
+    z: 10000
+    acceptedButtons: Qt.AllButtons
   }
 
   // keySink now lives inside PanelFocus (focusCtrl.keySink) so

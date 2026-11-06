@@ -1078,11 +1078,9 @@ Item {
     }
   }
 
-  WheelHandler {
-    enabled: row.hasStepper && row.enabled_
-
-    onWheel: wheel => row.stepBy(wheel.angleDelta.y > 0 ? 1 : -1)
-  }
+  // No wheel on a row. The menu is keyboard-only, so a scroll over a stepper
+  // row no longer moves its value: the wheel is the one input a menu refuses,
+  // all the way down to the rows.
 
   // --- main line: icon | label | trail cluster ---
 
