@@ -205,9 +205,9 @@ Item {
   function _resetCursor() {
     if (pkgList && pkgList.currentIndex !== -1) pkgList.seat(-1, "land")
   }
-  // First open while the deferred boot refresh has not run yet: fetch
-  // now instead of showing the idle empty state until the 90s timer
-  // fires. Single-flight guarded in the service, so a concurrent boot
+  // First open while the deferred boot refresh has not run yet: fetch now
+  // instead of showing the idle empty state until the shell's first quiet
+  // frame. Single-flight guarded in the service, so a concurrent boot
   // refresh collapses into one cycle.
   Component.onCompleted: {
     root.measureTable()

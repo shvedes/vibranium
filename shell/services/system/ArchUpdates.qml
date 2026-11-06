@@ -408,23 +408,33 @@ Singleton {
     }
   }
 
-  // First refresh deferred past the boot window: checkupdates plus the
-  // AUR helper are the heaviest forks in the tree, and firing them from
-  // onCompleted contends with first paint. Skipped when something else
-  // already refreshed (island open, IPC verb): state leaves "idle" on
-  // the first refresh of any kind.
-  Timer {
-    id: bootRefresh
+  // First refresh, held until the boot entrance has finished DRAWING:
+  // checkupdates plus the AUR helper are the heaviest forks in the tree, and
+  // firing them from onCompleted contends with first paint. The milestone is
+  // the one the launcher's index build and the menu's prewarm already wait
+  // on, so the check lands on the first quiet frame of the session instead of
+  // a blind clock delay - a service built after the milestone has already
+  // passed (the bar module enabled mid-session, an IPC demand, the island's
+  // first open) checks on its next turn rather than never.
+  //
+  // Skipped when something else already refreshed (island open, IPC verb):
+  // state leaves "idle" on the first refresh of any kind.
+  function _bootRefresh() {
+    if (root.state === "idle") root.refresh("boot")
+  }
 
-    interval: 90000
-    repeat: false
-    running: true
-    onTriggered: {
-      if (root.state === "idle") root.refresh("boot")
+  Connections {
+    target: DesktopLayoutState
+
+    function onBootEntrancePlayedChanged() {
+      if (DesktopLayoutState.bootEntrancePlayed) root._bootRefresh()
     }
   }
 
   Component.onCompleted: {
+    // The milestone is already behind us when the service is built late;
+    // the connection above only carries the transition.
+    if (DesktopLayoutState.bootEntrancePlayed) Qt.callLater(() => root._bootRefresh())
     Registry.offer("archUpdates", {
       title: "Arch updates",
       description: "system update polling + apply",
