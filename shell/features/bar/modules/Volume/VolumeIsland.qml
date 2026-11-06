@@ -505,11 +505,12 @@ Item {
 
   }
 
-  // In-place device selector: a chip showing the active device that unfolds
-  // its option list right below itself - the island window grows to fit,
-  // and no separate dropdown window is drawn under the trigger. Height
-  // eases open/closed on the shared Glide curve (clipped reveal + fade) and
-  // the island's height tracks it 1:1.
+  // In-place device selector: a chip naming the active device that opens
+  // into the device list itself - the chip's own name becomes the list's
+  // first row, so the active device is never drawn twice. The island window
+  // grows to fit and no separate dropdown window is drawn. Height eases
+  // open/closed on the shared Glide curve (clipped reveal + fade) and the
+  // island's height tracks it 1:1.
   component DeviceSelector: Item {
     id: sel
 
@@ -525,13 +526,35 @@ Item {
     // Option rows: a dropdown list, not a menu - deliberately slimmer than
     // Ui.rowMinH (34), which is for full-width list rows.
     readonly property int rowH: 26
+    // Inset from the open plate's edge to the rows inside it, every side
+    // alike, so a chosen row's fill never runs into the outline.
+    readonly property int pad: Ui.s
+    // The rows to draw: the active device first, then the rest in candidate
+    // order. Opening swaps the chip for this list, and the chip's name is
+    // the row it becomes - repeating it above the list is the duplicate the
+    // swap exists to remove.
+    readonly property var rows: {
+      const a = sel.active
+      const list = sel.candidates
+      if (!a) return list
+      const out = []
+      const rest = []
+      for (let i = 0; i < list.length; i++) {
+        const n = list[i]
+        if (n && n.id === a.id) out.push(n)
+        else rest.push(n)
+      }
+      for (let j = 0; j < rest.length; j++) out.push(rest[j])
+      return out
+    }
 
     anchors.left: parent.left
     anchors.right: parent.right
-    // Collapsed: just the chip. Expanded: chip + gap + list + breathing
-    // room. The window height follows this 1:1 via the island's
-    // islandSelfAnimating mode.
-    height: sel.expanded ? chip.height + Ui.listTopGap + list.height + Ui.s : chip.height
+    // Both states are the same box around one 26px row: the trigger's row
+    // when collapsed, the option rows when open. Opening therefore adds rows
+    // below the name instead of moving it. The window height follows this 1:1
+    // via the island's islandSelfAnimating mode.
+    height: sel.expanded ? list.height : 2 * sel.pad + sel.rowH
 
     Behavior on height {
       enabled: root.animationsEnabled
@@ -540,14 +563,48 @@ Item {
 
     clip: true
 
+    // The open selector is ONE surface: the chip and its options share this
+    // plate, so an unfolded control reads as a single box instead of a label
+    // with a list parked under it. One step above the card it opens over,
+    // with the same 1px inset hairline the menus draw around a focused entry.
+    Rectangle {
+      id: selPlate
+
+      anchors.fill: parent
+      radius: RoundingPolicy.radius
+      color: Ui.solid("background_1")
+      border.width: 1
+      border.color: Ui.solid("background_3")
+      opacity: sel.expanded ? 1 : 0
+      visible: sel.expanded || selPlate.opacity > 0
+
+      Behavior on opacity {
+        enabled: root.animationsEnabled
+        Glide { duration: Ui.expandMs; easing.type: Easing.OutCubic }
+      }
+    }
+
     // Chip: active device name + caret, inset by the spacing token on both
     // sides so the hover band breathes around the label instead of touching
     // its edges. A single candidate is still shown (it names the device)
     // but is not clickable - nothing to choose.
+    // The trigger is the list's first row in everything that can be seen:
+    // the same height, the same inset from the plate's edge, the same text
+    // position. So opening cannot move the name - it fades this copy out
+    // while the row's copy, with its fill, fades in underneath it.
     Item {
       id: chip
-      width: parent.width
-      height: 24
+      x: sel.pad
+      y: sel.pad
+      width: parent.width - 2 * sel.pad
+      height: sel.rowH
+      opacity: sel.expanded ? 0 : 1
+      visible: !sel.expanded || chip.opacity > 0
+
+      Behavior on opacity {
+        enabled: root.animationsEnabled
+        Glide { duration: Ui.expandMs; easing.type: Easing.OutCubic }
+      }
 
       Rectangle {
         anchors.fill: parent
@@ -595,6 +652,10 @@ Item {
         id: selMouse
         anchors.fill: parent
         hoverEnabled: true
+        // While open this copy is only fading out, and the row underneath it
+        // owns the pointer: a live trigger would swallow the click meant for
+        // the first option.
+        enabled: !sel.expanded
         // Soft gate: a single-candidate selector is a refusal, not an
         // invisible surface, so the area stays in hover delivery and the
         // click guards itself.
@@ -603,18 +664,18 @@ Item {
       }
     }
 
-    // The unfolded option list - in flow below the chip, on the island
-    // surface (no box): the selector grows and the sections below follow.
-    // Ui.listTopGap is the house gap between a control and its list.
+    // The device list - the plate's only content while open, since the chip
+    // that used to sit above it has become its first row. The selector grows
+    // and the sections below follow.
     Rectangle {
       id: list
-      anchors.top: chip.bottom
-      anchors.topMargin: Ui.listTopGap
+      anchors.top: parent.top
       anchors.left: parent.left
       anchors.right: parent.right
-      implicitHeight: selCol.implicitHeight
+      // The rows plus the plate's inset on both edges: this block is what
+      // the padding above is measured around.
+      implicitHeight: selCol.implicitHeight + 2 * sel.pad
       height: implicitHeight
-      radius: RoundingPolicy.radius
       color: "transparent"
       opacity: sel.expanded ? 1 : 0
       visible: sel.expanded || list.opacity > 0
@@ -629,12 +690,15 @@ Item {
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.top: parent.top
-        anchors.leftMargin: Ui.m
-        anchors.rightMargin: Ui.m
-        spacing: 2
+        anchors.leftMargin: sel.pad
+        anchors.rightMargin: sel.pad
+        anchors.topMargin: sel.pad
+        // A hair of air between rows, so two adjacent fills never read as
+        // one tall row.
+        spacing: 3
 
         Repeater {
-          model: sel.candidates
+          model: sel.rows
 
           delegate: Rectangle {
             id: opt
@@ -645,10 +709,18 @@ Item {
             width: selCol.width
             height: sel.rowH
             radius: RoundingPolicy.radius
-            // The active device is marked by its accent dot (and bold/bright
-            // label) alone - no permanent background. Hover tints every row
-            // the same, active or not.
-            color: optMouse.containsMouse ? Ui.tint("foreground_1", 0.06) : "transparent"
+            // The chosen device is the row the trigger became, so it is the
+            // one row that sits a step above the plate: with the plate
+            // painted background_1, an active row that filled nothing would
+            // read as a hole in the surface rather than as the chosen one.
+            // Hover tints the rest of the rows the same.
+            color: opt.isActive ? Ui.tint("background_2", 0.7)
+              : (optMouse.containsMouse ? Ui.tint("foreground_1", 0.06) : "transparent")
+            // The chosen row wears the same 1px hairline as the plate it sits
+            // on and as a focused entry in the menus: an inset border, so the
+            // row gains an edge and no size.
+            border.width: opt.isActive ? 1 : 0
+            border.color: Ui.solid("background_3")
 
             Row {
               anchors.fill: parent
@@ -656,20 +728,14 @@ Item {
               anchors.rightMargin: Ui.s
               spacing: Ui.s
 
-              Text {
-                id: gutter
-                width: 14
-                anchors.verticalCenter: parent.verticalCenter
-                text: opt.isActive ? "\u2022" : ""
-                color: Ui.solid("accent")
-                font.pixelSize: 12
-                font.family: Ui.fontFamily
-                verticalAlignment: Text.AlignVCenter
-              }
-
+              // No leading gutter: the row's text starts where the trigger's
+              // text starts, so the name does not slide sideways when the chip
+              // becomes this row. A dot column also charged every other row
+              // its width, and the chosen device is already carried by the
+              // fill, the weight and the brightness.
               Title {
                 level: 3
-                width: parent.width - gutter.width - parent.spacing
+                width: parent.width
                 anchors.verticalCenter: parent.verticalCenter
                 text: Model.nodeLabel(opt.modelData)
                 elide: Text.ElideRight
