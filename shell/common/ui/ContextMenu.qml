@@ -34,6 +34,11 @@ import qs.common
 Card {
   id: root
 
+  // A pointer menu is a hairline over the desktop rather than a framed panel:
+  // the shared card's 2px edge reads as a box on a surface this small, so the
+  // edge here is the 1px faint token every other one in the shell uses.
+  border.width: 1
+
   // Rows, in the order they draw. See the record shape above.
   property var entries: []
 

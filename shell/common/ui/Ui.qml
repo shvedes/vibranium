@@ -74,12 +74,13 @@ Singleton {
   // the wallpaper's context menu and the image viewer's, all three drawn by
   // the shared ContextMenu type. 26px leaves a 16px glyph and a 12px label
   // room above and below without the text touching the row's edges; `menuPad`
-  // is the inset from the card's own edge to the rows, and `menuRowGap` is the
-  // empty space BETWEEN rows, enough that one row's hover fill never touches
-  // its neighbour.
+  // is the inset from the card's own edge to the rows - 8px, because that edge
+  // is a 1px hairline now and 10 left the rows floating inside it - and
+  // `menuRowGap` is the empty space BETWEEN rows, enough that one row's hover
+  // fill never touches its neighbour.
   readonly property int menuRowH: 26
   readonly property int menuRowGap: 2
-  readonly property int menuPad: 10
+  readonly property int menuPad: 8
 
   // Row / chrome metrics (merged from MenuUi for single-token source).
   readonly property int rowMinH: 34
