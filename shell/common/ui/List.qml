@@ -406,8 +406,16 @@ ListView {
     Rectangle {
       id: selBar
 
-      color: Theme.color("background_2")
+      color: Theme.color("background_1")
       radius: RoundingPolicy.radius
+      // The cursor is an EDGE, not a plate. The bar sits one shade off the
+      // card, and inside an expanded row the dropdown's own cursor sits on
+      // this same shade, so a hairline is what the eye reads as "this row"
+      // while the fill stays a whisper. A Rectangle border is inset, so it
+      // paints in the bar's own outermost pixel rather than a ring around
+      // it: nothing here can move a row.
+      border.width: 1
+      border.color: Ui.solid("background_3")
       // Live geometry, read off the cursor's row, or the latch on the view
       // while that row is not there yet. A model swap releases every
       // delegate and the replacements are laid out a frame later, so

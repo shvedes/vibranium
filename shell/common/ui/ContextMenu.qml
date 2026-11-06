@@ -138,6 +138,12 @@ Card {
             // rounding as the card it sits in (Qt clamps it to half the row).
             radius: RoundingPolicy.radius
             color: Ui.tint("foreground_0", 0.07)
+            // A pointer menu has no keyboard cursor, so the hovered row is
+            // the one the cursor is on. It wears the same 1px edge the menu's
+            // focus bar carries, so a highlighted row reads the same whether
+            // it was reached by a key or by the pointer.
+            border.width: 1
+            border.color: Ui.solid("background_3")
             opacity: rowMa.containsMouse && entryRow.rowEnabled ? 1 : 0
           }
 

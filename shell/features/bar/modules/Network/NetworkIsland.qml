@@ -1681,6 +1681,11 @@ Item {
       color: (row.isPasswordRow || row.isDisconnectRow) ? Ui.solid("background_2")
         : (hoverArea.containsMouse ? Ui.tint("foreground_1", 0.06) : "transparent")
       radius: RoundingPolicy.radius
+      // The open row is this surface's cursor, so it wears the same 1px edge
+      // the menus draw around a focused entry. A Rectangle border is inset,
+      // so the row gains an edge and no size.
+      border.width: (row.isPasswordRow || row.isDisconnectRow) ? 1 : 0
+      border.color: Ui.solid("background_3")
 
       // The owning shared List, reached through the view attached
       // property. Held as var so the reveal contract is written against

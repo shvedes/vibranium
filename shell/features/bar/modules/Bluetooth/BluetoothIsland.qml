@@ -777,6 +777,11 @@ Item {
         color: row.isDropdownRow ? Ui.solid("background_2")
           : (hoverArea.containsMouse ? Ui.tint("foreground_1", 0.06) : "transparent")
         radius: RoundingPolicy.radius
+        // The open row is this surface's cursor, so it wears the same 1px
+        // edge the menus draw around a focused entry. Inset, so the row gains
+        // an edge and no size.
+        border.width: row.isDropdownRow ? 1 : 0
+        border.color: Ui.solid("background_3")
       }
 
       Item {

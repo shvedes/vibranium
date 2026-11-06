@@ -2117,7 +2117,18 @@ Item {
         id: optCursor
 
         visible: row.dropdownOpen
-        color: Theme.color("background_1")
+        // One step ABOVE the surface this sits on, the way the list bar is one
+        // step above the card. The open row's own bar already paints the whole
+        // dropdown background_1 - it unfolds inside the focused row - so a
+        // background_1 plate here would be a same-shade fill and the edge
+        // would carry the cursor alone. Held at 0.7 alpha so the step above
+        // arrives as a wash over that surface rather than a slab on it. Same
+        // inset hairline and same rounding as the entry cursor, so an option
+        // and an entry read alike.
+        color: Ui.tint("background_2", 0.7)
+        radius: RoundingPolicy.radius
+        border.width: 1
+        border.color: Ui.solid("background_3")
         x: Ui.m + optsRoot.optCol(row.optionIndex) * (optsRoot.cellW + Ui.m)
         y: optsRoot.optRowY(row.optionIndex)
         width: optsRoot.cellW

@@ -109,7 +109,11 @@ Rectangle {
 
   height: Ui.inputHeight
   radius: RoundingPolicy.radius
-  color: Theme.color("background_1")
+  // One step above the surface it sits on: this box only ever opens inside an
+  // expanded row, and that row's selection bar paints the whole slot
+  // background_1, so a background_1 field here would be a field with no fill
+  // at all until it took focus and grew its accent border.
+  color: Theme.color("background_2")
   border.width: input.activeFocus ? 1 : 0
   border.color: Theme.color("accent")
 
