@@ -49,6 +49,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Effects
+import QtQuick.Shapes
 import qs.common
 import qs.services as Core
 import "MixerModel.js" as Model
@@ -108,13 +109,28 @@ Item {
   // for the same reason it publishes `reach`: it derives the tolerance above from
   // this, and derives the gap between two marks from it as well, so all three
   // numbers are one measurement rather than three that can disagree.
-  property int handleSize: 14
+  property int handleSize: 18
   // The two marks this card can carry, both answering the same question - what
   // the next click, or the next release, acts on - so they are the same
   // question and the same visual weight. `linked` is an end of the selected
   // line; `dropTarget` is the card a dragged line is over.
   property bool linked: false
   property bool dropTarget: false
+  // The mark the pointer is on, as its place on `hoverSide`, and -1 for none. A
+  // place rather than an index because the place is what `portHandles` gave the
+  // canvas and what a snapped wire reports back, so one number names the mark on
+  // both sides of the handoff. Every mark sits between a third and three
+  // quarters of the card's height, so -1 is a place no mark can have.
+  property real hoverY: -1
+  property int hoverSide: -1
+  // The mark a wire in flight would stand on, handed in by the canvas for the
+  // same reason it hands in the edges: the wire's pointer position is in world
+  // units, and only the canvas knows the transform between those and a mark.
+  property real dropY: -1
+  property int dropSide: -1
+  // One over the canvas's zoom. The card paints in world units, so this is what
+  // holds each mark at one SCREEN size: see the note beside the marks below.
+  property real markScale: 1
 
   // A press that took hold of a port mark, reporting which edge it came from
   // and where that mark is. The canvas draws the wire from there, so the y is
@@ -404,6 +420,37 @@ Item {
     return card._nearestMark(side, localY) >= 0 ? side : -1
   }
 
+  // The mark a press at this point would take hold of, as that mark's place on
+  // its edge. The same side test and the same nearest-neighbour rule `gripAt`
+  // uses, so what lights up under the pointer is what the press would grab
+  // rather than a second opinion about it.
+  //
+  // Hover only: a card whose ports have not been read has no marks to light, and
+  // a card nothing can be paired with has no grip on its edges at all.
+  function _hoverAt(localX, localY) {
+    if (!card.connectable || !card.portsKnown) {
+      card._clearHover()
+      return
+    }
+    const side = card._edgeSide(localX)
+    if (side < 0) {
+      card._clearHover()
+      return
+    }
+    const index = card._nearestMark(side, localY)
+    if (index < 0) {
+      card._clearHover()
+      return
+    }
+    card.hoverSide = side
+    card.hoverY = Number(card._marks(side)[index].y)
+  }
+
+  function _clearHover() {
+    card.hoverSide = -1
+    card.hoverY = -1
+  }
+
   // --- the peak hold ---
   //
   // `PipeWireState` owns one monitor per node and hands out refcounted holds,
@@ -560,6 +607,12 @@ Item {
     // take is a button the pan surface behind the world does not see either,
     // and a right-click beside a handle is exactly the press that pans.
     acceptedButtons: Qt.LeftButton | Qt.RightButton
+    // Hover is the aim: the mark under the pointer lights up and the cursor turns
+    // into a hand, so a press near an edge is a press the user has already seen
+    // land. Without it a press has to guess between two fanned marks that are
+    // both inside one tolerance at the smallest zoom.
+    hoverEnabled: true
+    cursorShape: card.hoverSide >= 0 ? Qt.PointingHandCursor : Qt.ArrowCursor
     // A CLICK on the card does nothing at all. A connect is a drag from a port
     // handle and a reroute is a drag from a line's end, so there is no click on
     // a card that means a specific pair - and a click that armed a destination
@@ -600,7 +653,13 @@ Item {
         mouse.accepted = false
     }
     onPositionChanged: function(mouse) {
-      if (!pressed) return
+      // A pointer merely passing is the aim, not the gesture: the mark it is on
+      // lights up and nothing else happens. Once the button is down the mark
+      // stays lit as the one the drag holds, and this handler is the drag.
+      if (!pressed) {
+        card._hoverAt(mouse.x, mouse.y)
+        return
+      }
       // A press that took hold of a wire reports travel and nothing else: a
       // card the user is pulling a line from must not also slide away from
       // that line.
@@ -633,6 +692,7 @@ Item {
       card.cutting = false
       card.wiring = false
     }
+    onExited: card._clearHover()
 
     // A grouping rather than a button: a card is moved by a drag and connected
     // by a grip, and it has no click action of its own to announce. The mute
@@ -801,11 +861,30 @@ Item {
   // than starting a new one. It is drawn as a rim OUTSIDE the mark, so the mark's
   // own shape still says the side and the tab still reads with no colour at all.
   //
+  // ANTI-ALIASING is why the mark is a `Shape` and not a rounded `Rectangle`. A
+  // Rectangle's rounded corners are drawn as a shader edge with no coverage
+  // filtering, so a sixteen-unit circle stair-steps along its rim at 1x and
+  // reads as a blob of pixels - which is what a port mark must not be, because it
+  // is a thing to aim at. A `ShapePath` is rasterised through the antialiasing
+  // pass, so the same circle is a circle at 2x and a soft dot at 0.35x.
+  //
+  // A mark LIGHTS UP under the pointer and under a wire in flight. Both are the
+  // same question - what would this press, or this release, take hold of - and
+  // the pick region around a mark is wider than the mark, so the answer has to
+  // be shown before the button goes down. It grows and gains a ring of the
+  // side's own hue; the card it belongs to is what decides which mark that is.
+  //
   // Painted last, so a mark is never half hidden by the name behind it, and
-  // sized in this card's own units like everything else on the card. The card is
-  // what shrinks when the canvas zooms out; what has to stay the same size on
-  // screen is the TOLERANCE around it, which is `reach` and which the canvas
-  // derives from `handleSize`.
+  // sized in this card's own units like everything else on the card.
+  //
+  // It is then COUNTER-SCALED by `markScale`, which is one over the canvas's
+  // zoom, so a mark is the same eighteen screen pixels at every zoom. That is what
+  // keeps it a target: at the fit zoom a card is barely eighty pixels wide, and a
+  // mark drawn in card units alone would be eight pixels of stair-stepped dot -
+  // neither readable nor hittable, and a mark is the one thing here that has to
+  // be found with a pointer rather than read from a distance. The transform is
+  // about the mark's own centre, so the centre `portHandles` placed does not
+  // move.
   //
   // The marks are painted and never hit-tested. They are items with no input,
   // because the card's own area is what answers a press and it answers it with a
@@ -823,17 +902,45 @@ Item {
     // answer rather than from "this edge has a line", which would put a rim on
     // every mark of an edge when only one of them carries one.
     required property bool linked
+    // A mark the pointer is on, or one a wire in flight would land on. See the
+    // note above: the pick region is the mark plus ten screen pixels, so the
+    // marked one is what a press would actually take hold of.
+    property bool highlighted: false
     // The side's own palette key, from the mapping above. Two keys and not the
     // card's kind key: what this mark is FOR and what this card IS are two
     // different facts, and the kind has a colour of its own already.
     readonly property string sideKey: grip.input ? "purple" : "orange"
-    // How far the rim sits off the mark, which is also the slack the grip keeps
-    // on every side so the mark's CENTRE - what `portHandles` placed and what the
-    // press tolerance is measured from - does not move when the rim appears.
-    readonly property int rim: 2
+    // The ring's stroke: a ninth of the mark, so the hole it leaves is seven
+    // ninths of it. A quarter-wide stroke at this size is a four-pixel donut
+    // round a ten-pixel hole, which at every zoom reads as a blocky pip; the
+    // thin ring's own edge is one antialiased pixel instead of a staircase.
+    readonly property real ringW: Math.max(1.5, grip.diameter / 9)
+    // The rim's stroke, outside the mark. This is also the slack the grip keeps
+    // around the mark, so the mark's CENTRE - what `portHandles` placed and what
+    // the press tolerance is measured from - does not move when the mark grows
+    // or the rim appears.
+    readonly property real rimW: Math.max(1, grip.diameter / 12)
+    // A highlighted mark grows by a third. Growth is the mark's own radius and
+    // not an item `scale`, because the geometry below is what the antialiasing
+    // pass rasterises and a scaled shape is a resampled one.
+    readonly property real bodyR: grip.diameter / 2 * (grip.highlighted ? 1.34 : 1)
+    // Where the body's stroke is centred: an input's ring is inset by half its
+    // own width so the ring stays inside the mark's box, and an output is filled
+    // to the mark's edge because a disc has no stroke to seat.
+    readonly property real ringR: grip.input ? grip.bodyR - grip.ringW / 2 : grip.bodyR
+    // The rim just outside the body, and the highlight ring just outside that.
+    readonly property real rimR: grip.bodyR + grip.rimW / 2 + 1
+    readonly property real haloR: grip.bodyR + grip.rimW + 2.5
+    // Half the item: the largest ring plus its stroke plus a unit of slack, so
+    // the highlight is not clipped by the item that carries it.
+    readonly property real half: grip.haloR + 1.5
 
-    width: grip.diameter + 2 * grip.rim
+    width: 2 * grip.half
     height: width
+    // Counter-scale about the CENTRE: the mark's painted size is a screen
+    // measurement, while its place is the canvas's.
+    scale: card.markScale
+    transformOrigin: Item.Center
 
     // What this mark is, in words: which edge it is on and what a drag from it
     // does. It restates the shape and the rim rather than adding a third answer,
@@ -846,32 +953,95 @@ Item {
       ? "A link is attached here, so a drag from this mark moves that link's end."
       : "Nothing is attached here yet."
 
-    Rectangle {
-      id: mark
+    // The mark itself, as a path.
+    //
+    // The circle is TWO half-arcs and not one 360-degree sweep: a full sweep
+    // starts and ends on the same point, which is the degenerate case an arc
+    // command is allowed to drop.
+    Shape {
+      id: markShape
 
-      anchors.centerIn: parent
-      width: grip.diameter
-      height: width
-      radius: width / 2
-      color: grip.input ? "transparent" : Ui.solid(grip.sideKey)
-      // A quarter of the mark, so the hole a ring leaves is a sixth of it and the
-      // ring is still a ring rather than a dot with a lighter dot in it.
-      border.width: grip.input ? Math.max(2, Math.round(width / 4)) : 0
-      border.color: Ui.tint(grip.sideKey, 0.9)
-    }
+      anchors.fill: parent
+      antialiasing: true
 
-    // The rim, outside the mark and drawn only on a mark a line stands on. Its
-    // own colour is the side's at a lower weight: the rim is a second fact about
-    // the same mark, not a third hue.
-    Rectangle {
-      anchors.centerIn: parent
-      width: parent.width
-      height: width
-      radius: width / 2
-      color: "transparent"
-      border.width: grip.rim
-      border.color: Ui.tint(grip.sideKey, 0.6)
-      visible: grip.linked
+      readonly property real cx: markShape.width / 2
+      readonly property real cy: markShape.height / 2
+
+      // The body: a hollow ring for an input, a solid disc for an output.
+      ShapePath {
+        fillColor: grip.input ? "transparent" : Ui.solid(grip.sideKey)
+        strokeColor: grip.input ? Ui.tint(grip.sideKey, 0.9) : "transparent"
+        strokeWidth: grip.input ? grip.ringW : 0
+
+        PathAngleArc {
+          centerX: markShape.cx
+          centerY: markShape.cy
+          radiusX: grip.ringR
+          radiusY: grip.ringR
+          sweepAngle: 180
+        }
+
+        PathAngleArc {
+          centerX: markShape.cx
+          centerY: markShape.cy
+          radiusX: grip.ringR
+          radiusY: grip.ringR
+          startAngle: 180
+          sweepAngle: 180
+        }
+      }
+
+      // The rim, outside the body and drawn only on a mark a line stands on. Its
+      // own colour is the side's at a lower weight: the rim is a second fact
+      // about the same mark, not a third hue.
+      ShapePath {
+        fillColor: "transparent"
+        strokeColor: grip.linked ? Ui.tint(grip.sideKey, 0.6) : "transparent"
+        strokeWidth: grip.rimW
+
+        PathAngleArc {
+          centerX: markShape.cx
+          centerY: markShape.cy
+          radiusX: grip.rimR
+          radiusY: grip.rimR
+          sweepAngle: 180
+        }
+
+        PathAngleArc {
+          centerX: markShape.cx
+          centerY: markShape.cy
+          radiusX: grip.rimR
+          radiusY: grip.rimR
+          startAngle: 180
+          sweepAngle: 180
+        }
+      }
+
+      // The highlight, on the mark the pointer or a wire in flight is on. The
+      // side's own hue at full weight, because it is the one thing on this
+      // canvas that has to be found while the hand is moving.
+      ShapePath {
+        fillColor: "transparent"
+        strokeColor: grip.highlighted ? Ui.tint(grip.sideKey, 0.95) : "transparent"
+        strokeWidth: 2
+
+        PathAngleArc {
+          centerX: markShape.cx
+          centerY: markShape.cy
+          radiusX: grip.haloR
+          radiusY: grip.haloR
+          sweepAngle: 180
+        }
+
+        PathAngleArc {
+          centerX: markShape.cx
+          centerY: markShape.cy
+          radiusX: grip.haloR
+          radiusY: grip.haloR
+          startAngle: 180
+          sweepAngle: 180
+        }
+      }
     }
 
     Accessible.role: Accessible.Graphic
@@ -888,6 +1058,8 @@ Item {
       diameter: card.handleSize
       input: false
       linked: modelData.linked === true
+      highlighted: (card.hoverSide === 1 && Number(modelData.y) === card.hoverY)
+        || (card.dropSide === 1 && Number(modelData.y) === card.dropY)
       x: card.width - width / 2
       y: Number(modelData.y) - height / 2
     }
@@ -902,6 +1074,8 @@ Item {
       diameter: card.handleSize
       input: true
       linked: modelData.linked === true
+      highlighted: (card.hoverSide === 0 && Number(modelData.y) === card.hoverY)
+        || (card.dropSide === 0 && Number(modelData.y) === card.dropY)
       x: 0
       y: Number(modelData.y) - height / 2
     }

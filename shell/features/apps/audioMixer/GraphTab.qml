@@ -40,7 +40,16 @@ pragma ComponentBehavior: Bound
 //
 //   CONNECTING is a gesture on the wire: a press on a card's port handle and a
 //   release over another card. The pairing behind it is `Graph.pairPorts`, and
-//   which ports match is never decided here.
+//   which ports match is never decided here. While the button is down the band's
+//   end snaps to the nearest mark of the card under the pointer and that mark
+//   lights up on the card, so the gesture shows the connection it is about to
+//   make before it is let go.
+//
+//   WHAT THE MARKS MEAN is on the tab rather than only in this comment: the
+//   `info` button in the chrome opens a tooltip over the canvas that names the
+//   two port shapes, the four kind colours, the dashed monitor route and the
+//   gestures themselves. A canvas whose whole language is a gesture has to be
+//   able to say what that language is.
 //
 //   Every drawn line meets a card ON one of its port marks rather than on the
 //   card's dead middle, so the mark a line starts from and the mark a press can
@@ -259,44 +268,38 @@ Item {
 
   // --- the grips and the wire ---
   //
-  // The drawn mark and its pick tolerance, in ONE space, with the mark the input
-  // and the tolerance derived from it.
+  // The drawn mark and its pick tolerance, in ONE measurement: the mark is a
+  // fixed number of SCREEN pixels at every zoom (the card counter-scales its own
+  // units by `markScale`, see GraphNode), and the tolerance is that mark plus a
+  // floor of SLOP screen pixels, converted into the world units this file
+  // measures in:
   //
-  // Stated as two independent numbers they are two numbers free to disagree, and
-  // the disagreement is what makes a press miss: a mark stated in WORLD units
-  // grows with the zoom while a tolerance stated in SCREEN pixels does not, so
-  // past 1x the target ends up smaller than the thing it is the target for. At 2x
-  // with a 16-unit mark, a tolerance of eleven screen pixels is a 22-pixel target
-  // around a 32-pixel ring, and the outer five pixels of every ring answer to
-  // nothing - a press there reaches the background, and the background pans.
+  //   reach = (handleSize / 2 + handleSlop) / zoom
   //
-  // So the mark is WORLD units - it is painted inside the world item and scales
-  // with the canvas like everything else on a card - and the tolerance is the
-  // mark's own radius plus a floor of SLOP screen pixels, so the hit region is
-  // ALWAYS the mark plus that floor and cannot be smaller than what is drawn:
-  //
-  //   reach * zoom >= handleSize / 2 * zoom + slop
-  //
-  // which is an identity at every zoom by construction. Measured, radius in
-  // screen pixels, at 1 / 0.35 / 2:
+  // so the hit region is ALWAYS the drawn mark plus ten screen pixels: never
+  // smaller than what is drawn, and never wider than the pointer's own
+  // neighbourhood. Measured, radius in screen pixels:
   //
   //   zoom   mark radius   tolerance (screen px)   contains the mark
-  //   1.00        8             14                   yes, +6
-  //   0.35        2.80           8.80                 yes, +6
-  //   2.00       16             22                   yes, +6
+  //   1.00        9             19                   yes, +10
+  //   0.35        9             19                   yes, +10
+  //   2.00        9             19                   yes, +10
   //
-  // The floor is what keeps a three-pixel mark hittable at the smallest zoom, and
-  // it is in SCREEN pixels because that is the one thing that must not shrink:
-  // the canvas is scaled, the pointer is not.
-  readonly property int handleSize: 16
-  // The extra reach beyond the drawn mark, in screen pixels, at every zoom. Six
+  // Both numbers are fixed on screen because the pointer is: the canvas is
+  // scaled, the thing being aimed at is not. A mark drawn in world units alone
+  // would be a seven-pixel stair-stepped dot at the fit zoom - neither readable
+  // nor hittable, and the reason this file does not simply scale the card.
+  readonly property int handleSize: 18
+  // The extra reach beyond the drawn mark, in screen pixels, at every zoom. Ten
   // is about the width of a pointer's own imprecision at the extremes of the
-  // zoom range, and it is deliberately not larger: the tolerance also decides
-  // which edge a press near the middle of a card belongs to, and a tolerance
-  // wider than the card's own half would make every press on a card a press on
-  // one of its two edges.
-  readonly property real handleSlop: 6
-  readonly property real handleReach: tab.handleSize / 2 + tab.handleSlop / tab.zoom
+  // zoom range, and it is the number that makes a mark a target rather than a
+  // pixel hunt: the mark is eighteen screen pixels, and these ten around it are
+  // what is left to aim with. It is deliberately not
+  // larger: the tolerance also decides which edge a press near the middle of a
+  // card belongs to, and a tolerance wider than the card's own half would make
+  // every press on a card a press on one of its two edges.
+  readonly property real handleSlop: 10
+  readonly property real handleReach: (tab.handleSize / 2 + tab.handleSlop) / tab.zoom
   // The band the handles of one edge are spread over, and the largest gap
   // between two of them. A fan wider than the band would put a handle under the
   // card's own name and mute control, which are the two things above this band.
@@ -402,6 +405,10 @@ Item {
   // one thing on the canvas that outlives the gesture, because a write that
   // failed with nothing else to show reads as a canvas that ignored the drag.
   property string notice: ""
+  // Whether the legend is over the canvas. The canvas's language is marks and
+  // gestures and nothing on it can say what it is, so the tab has to be able to
+  // put that into words. See the help panel at the foot of this file.
+  property bool legendOpen: false
 
   readonly property var link: tab._linkGroup(tab.linkKey)
   // What letting go of the wire right now would write, or null for nothing.
@@ -409,6 +416,10 @@ Item {
   // and the release all have to agree about whether this drop writes anything.
   readonly property var wireTarget: tab._wireTarget()
   readonly property var status: tab._status()
+  // The port the wire would meet if it were released now, or null. See
+  // `_wireSnap`: the band's far end and the mark the target card lights up are
+  // the same answer.
+  readonly property var wireSnap: tab._wireSnap()
 
   readonly property var curves: tab._buildCurves()
 
@@ -1000,6 +1011,55 @@ Item {
     return { reroute: false, sourceKey: sourceKey, targetKey: targetKey }
   }
 
+  // The port a wire in flight would meet, or null.
+  //
+  // A release anywhere on a card makes the pair for the two NODES, and the port
+  // it meets is the channel match `pairPorts` finds. That makes the pair certain
+  // and the MEETING POINT invisible: the band ends wherever the pointer is, so
+  // nothing on screen says which mark the line is going to stand on. So while
+  // the pointer is over a card the release would write against, the band's own
+  // end is placed on the nearest mark of the edge it arrives at, and that mark
+  // lights up on the card. It is qpwgraph's drag preview with this canvas's own
+  // rule kept: nothing is written until the release, and the write is still the
+  // controller's.
+  //
+  // An unwanted drop does not snap. A band over a card that would write nothing
+  // is already drawn grey, and pulling its end onto a port would promise a
+  // connection the release is going to refuse.
+  function _wireSnap() {
+    if (!tab.wiring || tab.wireDropKey === "" || tab.wireTarget === null) return null
+    const at = tab._positions[tab.wireDropKey]
+    if (at === undefined || at === null) return null
+    // The edge the wire arrives at: a fresh wire taken from an INPUT runs the
+    // other way, so the card under the pointer is the source and the wire meets
+    // its outputs. A reroute always moves the link's target end, so it arrives
+    // at an input too.
+    const side = tab.wireLinkKey === "" && tab.wireFromSide === 0 ? 1 : 0
+    const ys = tab.portHandles(tab.wireDropKey, side === 0)
+    // The card's own middle when the edge has no mark, which is the same
+    // fallback `_markY` makes for a line whose edge has nothing to land on.
+    let localY = tab.cardH / 2
+    if (ys.length > 0) {
+      const from = tab.wireY - at.y
+      localY = ys[0]
+      let nearest = Math.abs(ys[0] - from)
+      for (let i = 1; i < ys.length; i++) {
+        const d = Math.abs(ys[i] - from)
+        if (d < nearest) {
+          nearest = d
+          localY = ys[i]
+        }
+      }
+    }
+    return {
+      key: tab.wireDropKey,
+      side: side,
+      localY: localY,
+      x: at.x + (side === 1 ? tab.cardW : 0),
+      y: at.y + localY
+    }
+  }
+
   // --- the lines ---
   //
   // One entry per link group, with the curve it is drawn along and the box that
@@ -1116,12 +1176,21 @@ Item {
   // The card whose box holds this world point, or "". The first match in the
   // delegate order rather than the topmost, because two cards can be dragged on
   // top of each other and the delegate array is the only order this file has.
+  //
+  // The box is grown by the HANDLE TOLERANCE, and that is the aiming half of the
+  // drop: marks hang half outside the card's edge and the band snaps to them, so
+  // a release on the outer half of a target mark is a release a few world units
+  // outside the card's rectangle - and a drop zone that stopped at the rectangle
+  // would refuse exactly the most carefully aimed release. The grown boxes cannot
+  // overlap: two cards are a whole gap apart and the tolerance is the mark plus
+  // ten screen pixels, which is a third of that gap even at 1x.
   function _cardAt(worldX, worldY) {
+    const grow = tab.handleReach
     for (let i = 0; i < tab._cards.length; i++) {
       const at = tab._positions[tab._cards[i].key]
       if (at === undefined || at === null) continue
-      if (worldX < at.x || worldX > at.x + tab.cardW) continue
-      if (worldY < at.y || worldY > at.y + tab.cardH) continue
+      if (worldX < at.x - grow || worldX > at.x + tab.cardW + grow) continue
+      if (worldY < at.y - grow || worldY > at.y + tab.cardH + grow) continue
       return tab._cards[i].key
     }
     return ""
@@ -1576,12 +1645,21 @@ Item {
         outEdge: tab.edgeAt(modelData.key, 1)
         reach: tab.handleReach
         handleSize: tab.handleSize
+        // One over the zoom: this file paints the card in world units, and the
+        // mark inside it has to hold one screen size. See `handleReach` above.
+        markScale: 1 / tab.zoom
         // One mark for a selected line's two ends and one for the card a wire
         // is over: both answer "what would this release or this click act on".
         linked: tab.link !== null && (modelData.key === tab.link.sourceKey
           || modelData.key === tab.link.targetKey)
         dropTarget: tab.wireTarget !== null
           && modelData.key === tab.wireTarget.targetKey
+        // The mark the wire would stand on, handed in as a place on the edge it
+        // arrives at: the card's marks are its own list, and a place is what
+        // both sides already speak.
+        dropSide: tab.wireSnap === null ? -1 : tab.wireSnap.side
+        dropY: tab.wireSnap !== null && tab.wireSnap.key === modelData.key
+          ? tab.wireSnap.localY : -1
         onGrabbed: function(side, markY) {
           tab.beginWire(modelData.key, side, "", markY)
         }
@@ -1614,6 +1692,11 @@ Item {
       anchors.fill: parent
       visible: tab.wiring
 
+      // The band's far end is the port the release would meet, when there is
+      // one: see `wireSnap`. A band over nothing follows the pointer, because
+      // there is no mark it is heading for.
+      readonly property var tip: tab.wireSnap
+
       // One shape and one path for the whole drag: a rubber band is a gesture, so
       // it costs a path whose four points move and nothing that has to be laid
       // out, walked or rebuilt. `Graph.curveBetween` is the same curve the drawn
@@ -1622,7 +1705,8 @@ Item {
       // canvas's, so it needs no offset of its own.
       readonly property var curve: Graph.curveBetween(
         tab.wireFromX * tab.zoom + tab.panX, tab.wireFromY * tab.zoom + tab.panY,
-        tab.wireX * tab.zoom + tab.panX, tab.wireY * tab.zoom + tab.panY)
+        (wire.tip === null ? tab.wireX : wire.tip.x) * tab.zoom + tab.panX,
+        (wire.tip === null ? tab.wireY : wire.tip.y) * tab.zoom + tab.panY)
 
       ShapePath {
         // Accent only where letting go would write something. There is no dashed
@@ -1722,6 +1806,24 @@ Item {
       enabled: tab.link !== null
       onTriggered: tab.commitDisconnect()
     }
+
+    // The one control in this row that writes nothing: the shipped `info` mark,
+    // wearing the shell's own icon button so it hovers and presses like every
+    // other icon in the tree. Its hover tip names it; the click pins the legend
+    // below it, which is a tooltip with more in it than a line of text.
+    IconButton {
+      id: helpButton
+
+      name: "info"
+      tipText: "How the graph works"
+      slotSize: 24
+      // Eighteen in a twenty-four slot rather than fifteen: the difference has
+      // to be even for the glyph to land on a whole pixel, and the info mark
+      // needs the room - at fifteen its dot merges into the stem and the glyph
+      // reads as leaning off its own centre.
+      iconSize: 18
+      onClicked: tab.legendOpen = !tab.legendOpen
+    }
   }
 
   Title {
@@ -1738,5 +1840,262 @@ Item {
     // The status function's empty states carry no colour, and a Title with a
     // blank colour is a runtime error rather than an invisible one.
     color: tab.status.color !== "" ? tab.status.color : "transparent"
+  }
+
+  // --- the legend ---
+  //
+  // The canvas's whole language is a mark and a gesture, and neither can say
+  // what it is: a hollow ring and a solid disc are the two ends of a wire and
+  // nothing in the picture says which is which, a hue names a kind only to
+  // someone who already knows the four, and "drag from here to there" is not
+  // written on a drag. So the tab says it, in the tab, and only while it is
+  // asked for: the panel lies over the canvas rather than beside it, because it
+  // is read once and the canvas is what the user came for.
+  //
+  // Every kind colour here is READ from `MixerModel.kindColorKey`, which is the
+  // one place that pairing is written down, so a legend that disagreed with the
+  // cards would have to be wrong twice. The two port keys are the same pair the
+  // card's own marks are drawn in (`GraphNode`'s `Handle`).
+
+  // A port mark as the legend draws it: the same two shapes with the same two
+  // palette keys as the cards' marks, at label size. A picture of the mark and
+  // not the mark itself - the canvas's marks are sized against a press
+  // tolerance and grow under the pointer, neither of which a legend row needs.
+  component LegendPort: Shape {
+    id: legendPort
+
+    property bool input: true
+    property bool linked: false
+
+    readonly property int size: 14
+    readonly property string sideKey: legendPort.input ? "purple" : "orange"
+    readonly property real ringW: Math.max(1.5, legendPort.size / 4.5)
+    readonly property real bodyR: legendPort.size / 2
+    readonly property real ringR: legendPort.input
+      ? legendPort.bodyR - legendPort.ringW / 2 : legendPort.bodyR
+    readonly property real rimR: legendPort.bodyR + 1.5
+
+    width: legendPort.size + 6
+    height: width
+    antialiasing: true
+
+    ShapePath {
+      fillColor: legendPort.input ? "transparent" : Ui.solid(legendPort.sideKey)
+      strokeColor: legendPort.input ? Ui.tint(legendPort.sideKey, 0.9) : "transparent"
+      strokeWidth: legendPort.input ? legendPort.ringW : 0
+
+      PathAngleArc {
+        centerX: legendPort.width / 2
+        centerY: legendPort.height / 2
+        radiusX: legendPort.ringR
+        radiusY: legendPort.ringR
+        sweepAngle: 180
+      }
+
+      PathAngleArc {
+        centerX: legendPort.width / 2
+        centerY: legendPort.height / 2
+        radiusX: legendPort.ringR
+        radiusY: legendPort.ringR
+        startAngle: 180
+        sweepAngle: 180
+      }
+    }
+
+    ShapePath {
+      fillColor: "transparent"
+      strokeColor: legendPort.linked ? Ui.tint(legendPort.sideKey, 0.6) : "transparent"
+      strokeWidth: 1.5
+
+      PathAngleArc {
+        centerX: legendPort.width / 2
+        centerY: legendPort.height / 2
+        radiusX: legendPort.rimR
+        radiusY: legendPort.rimR
+        sweepAngle: 180
+      }
+
+      PathAngleArc {
+        centerX: legendPort.width / 2
+        centerY: legendPort.height / 2
+        radiusX: legendPort.rimR
+        radiusY: legendPort.rimR
+        startAngle: 180
+        sweepAngle: 180
+      }
+    }
+  }
+
+  // A kind's colour as the card's own top stripe draws it: three units of the
+  // kind's palette key, from the mixer's classifier rather than from a literal.
+  component LegendChip: Rectangle {
+    property string kind: ""
+
+    width: 3
+    height: 12
+    radius: 1.5
+    color: Ui.solid(Model.kindColorKey(kind))
+  }
+
+  // The dash a monitor leg is drawn with, at label size: three marks and the
+  // gaps between them, which is the pattern and not a second description of it.
+  component LegendDash: Row {
+    spacing: 3
+    height: 16
+
+    Repeater {
+      model: 3
+
+      Rectangle {
+        y: 7
+        width: 6
+        height: 2
+        radius: 1
+        color: Ui.tint("foreground_1", 0.6)
+      }
+    }
+  }
+
+  // One legend sentence: body text rather than a row's muted subtitle, because
+  // it is read at rest and has to be legible without being the subject.
+  component LegendText: Title {
+    level: 5
+    wrapMode: Text.WordWrap
+    elide: Text.ElideNone
+    color: Ui.tint("foreground_1", 0.8)
+  }
+
+  // The panel itself: an info tooltip over the canvas, hanging off the button
+  // that opens it and closed until that click. Its right edge is the chrome
+  // row's right edge, which is the info button's - the button is the last thing
+  // in that row - because a bubble that does not point at its trigger is a panel
+  // that has to be hunted for. Anchoring to the ROW rather than to the button is
+  // an anchors rule, not a preference: this item is the row's sibling, and an
+  // anchor can only name a parent or a sibling.
+  //
+  // Its ground is the shell's own tooltip ground (`IconButton`'s bubble), so it
+  // reads as the same kind of object as every other hint in the tree.
+  //
+  // It swallows its own presses. A press on a sentence must not pan the canvas
+  // under it, and the pan surface is the canvas's, not the tab's - so the panel
+  // has to take the press rather than passing it down.
+  Rectangle {
+    id: helpPanel
+
+    anchors.top: chrome.bottom
+    anchors.right: chrome.right
+    anchors.topMargin: 6
+    width: Math.min(320, tab.width - 2 * Ui.m)
+    height: helpBody.implicitHeight + 2 * Ui.m
+    visible: tab.legendOpen
+    radius: RoundingPolicy.radius
+    color: Ui.solid("background_0")
+    border.width: 1
+    border.color: Ui.solid("background_3")
+    z: 1
+
+    MouseArea { anchors.fill: parent }
+
+    Column {
+      id: helpBody
+
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.top: parent.top
+      anchors.margins: Ui.m
+      spacing: Ui.s
+
+      Title {
+        level: 2
+        text: "PORTS"
+      }
+
+      Row {
+        spacing: Ui.s
+
+        LegendPort { input: true }
+        LegendText { text: "input, drag to link" }
+      }
+
+      Row {
+        spacing: Ui.s
+
+        LegendPort { input: false }
+        LegendText { text: "output, drag to link" }
+      }
+
+      Row {
+        spacing: Ui.s
+
+        LegendPort {
+          input: true
+          linked: true
+        }
+        LegendText { text: "a ring means a link is attached" }
+      }
+
+      Title {
+        level: 2
+        text: "COLORS"
+      }
+
+      Row {
+        spacing: Ui.s
+
+        LegendChip { kind: "playbackStream" }
+        LegendText { text: "playback" }
+        Item {
+          width: Ui.s
+          height: 1
+        }
+        LegendChip { kind: "captureStream" }
+        LegendText { text: "capture" }
+      }
+
+      Row {
+        spacing: Ui.s
+
+        LegendChip { kind: "outputDevice" }
+        LegendText { text: "output" }
+        Item {
+          width: Ui.s
+          height: 1
+        }
+        LegendChip { kind: "inputDevice" }
+        LegendText { text: "input" }
+      }
+
+      Row {
+        spacing: Ui.s
+
+        LegendDash {}
+        LegendText { text: "monitor route" }
+      }
+
+      Title {
+        level: 2
+        text: "GESTURES"
+      }
+
+      LegendText {
+        width: helpBody.width
+        text: "Drag a line's end to reroute it."
+      }
+
+      LegendText {
+        width: helpBody.width
+        text: "Drag a card to move it."
+      }
+
+      LegendText {
+        width: helpBody.width
+        text: "Right-click a mark to disconnect it."
+      }
+
+      LegendText {
+        width: helpBody.width
+        text: "Wheel zooms, middle-drag pans."
+      }
+    }
   }
 }
