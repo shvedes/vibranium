@@ -1162,6 +1162,7 @@ QtObject {
             root.hoverNearBottom = false
           }
           onWheel: function(wheel) {
+            if (root.menuOpen) return
             if (wheel.angleDelta.y > 0)
               root.zoomIn()
             else
