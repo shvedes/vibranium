@@ -559,7 +559,7 @@ group('each device class gets a distinctive stem', () => {
   eq('Audio Card', BAT.deviceIconName('Audio Card'), 'speaker')
   eq('Monitor', BAT.deviceIconName('Monitor'), 'monitor')
   eq('Computer', BAT.deviceIconName('Computer'), 'monitor')
-  eq('Battery', BAT.deviceIconName('Battery'), 'monitor')
+  eq('Battery', BAT.deviceIconName('Battery'), 'laptop')
   eq('UPS', BAT.deviceIconName('UPS'), 'power')
   eq('Printer', BAT.deviceIconName('Printer'), 'printer')
   eq('Scanner', BAT.deviceIconName('Scanner'), 'printer')
@@ -737,10 +737,11 @@ group('a charging device reports the rate and the time to full', () => {
   eq('the full line', BAT.rowSubtext({ percentage: 85, stateLabel: 'Charging', charging: true, changeRate: 8.4, timeToFull: 3600 }), '85% - Charging - 8.4 W - Full in 1h')
   eq('without a rate', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true }), '50% - Charging')
   eq('without a time to full', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true, changeRate: 5 }), '50% - Charging - 5.0 W')
-  eq('a time to empty is ignored while charging', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true, timeToEmpty: 3600 }), '50% - Charging')
+  eq('a time to empty prints while charging too', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true, timeToEmpty: 3600 }), '50% - Charging - 1h left')
+  eq('and it follows the full-in fragment', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true, changeRate: 5, timeToFull: 600, timeToEmpty: 7200 }), '50% - Charging - 5.0 W - Full in 10m - 2h left')
   // The branch is a truthiness test, so a device that reports a positive rate
   // while discharging (a laptop on AC that also drains) still takes the
-  // charging arm and prints no "left" fragment.
+  // charging arm.
   eq('a truthy non-boolean flag takes the charging arm', BAT.rowSubtext({ percentage: 50, charging: 1, changeRate: 5, timeToFull: 60 }), '50% - Unknown - 5.0 W - Full in 1m')
   eq('a negative rate still prints while charging', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true, changeRate: -2, timeToFull: 60 }), '50% - Charging - -2.0 W - Full in 1m')
 })
@@ -861,8 +862,10 @@ group('telemetry first, then device facts', () => {
     { label: 'Power supply', value: 'No' },
     { label: 'Laptop battery', value: 'Yes' },
     { label: 'Native path', value: '/sys/devices/x' },
-    { label: 'Icon', value: 'mouse' },
   ])
+  // The icon name is collected but deliberately not a row: the glyph it names
+  // is the class icon already drawn beside the label.
+  eq('the icon name is never a row', BAT.detailRows({ stateLabel: 'Charging', percentage: 85, iconName: 'mouse' }).map((r) => r.label), ['State', 'Charge'])
   eq('and a discharging device swaps the time row', BAT.detailRows({ stateLabel: 'Discharging', percentage: 50, timeToEmpty: 5400, timeToFull: 0 }).map((r) => r.label), ['State', 'Charge', 'Time to empty'])
   eq('a zero time is skipped on both sides', BAT.detailRows({ percentage: 50, timeToEmpty: 0, timeToFull: 0 }).map((r) => r.label), ['Charge'])
 })
@@ -924,7 +927,7 @@ section('Battery/Model.tooltipRows - the bar tooltip')
 group('one "Label - 85%" row per device', () => {
   eq('two devices', BAT.tooltipRows([{ label: 'Mouse', typeString: 'Mouse', percentage: 80 }, { label: 'Laptop', typeString: 'Battery', percentage: 15 }]), [
     { icon: 'mice', text: 'Mouse - 80%' },
-    { icon: 'monitor', text: 'Laptop - 15%' }
+    { icon: 'laptop', text: 'Laptop - 15%' }
   ])
   eq('the order is the caller\'s, not a sort', BAT.tooltipRows([{ label: 'B', percentage: 8 }, { label: 'A', percentage: 12 }]), [
     { icon: 'battery-1', text: 'B - 8%' },
@@ -942,8 +945,9 @@ group('the glyph is the device class, and the level when there is none', () => {
   eq('a gamepad', iconOf({ label: 'x', typeString: 'GamingInput', percentage: 80 }), 'gamepad')
   eq('speakers', iconOf({ label: 'x', typeString: 'Speakers', percentage: 80 }), 'speaker')
   // UPower spells the laptop battery "Battery", and deviceIconName reads it
-  // as the machine it sits in - the same glyph the island's row shows.
-  eq('the laptop battery reads as the machine', iconOf({ label: 'x', typeString: 'Battery', percentage: 80 }), 'monitor')
+  // as the machine it sits in - the laptop glyph, the same one the island's
+  // row shows.
+  eq('the laptop battery takes the laptop glyph', iconOf({ label: 'x', typeString: 'Battery', percentage: 80 }), 'laptop')
   eq('a phone has no class glyph and takes the level', iconOf({ label: 'x', typeString: 'Phone', percentage: 25 }), 'battery-2')
   eq('no type at all takes the level', iconOf({ label: 'x', percentage: 25 }), 'battery-2')
   eq('the charging glyph wins over the level', iconOf({ label: 'x', typeString: 'Phone', percentage: 25, charging: true }), 'battery-charging')
@@ -982,7 +986,7 @@ group('the tooltip never carries state or telemetry', () => {
   // "Deliberately just the name and the charge - state and telemetry live in
   // the island" - asserted so a future extra fragment is a visible diff.
   const out = BAT.tooltipRows([{ label: 'Laptop', typeString: 'Battery', percentage: 15, stateLabel: 'Discharging', charging: false, timeToEmpty: 3600, changeRate: 8 }])
-  eq('only the two fragments', out, [{ icon: 'monitor', text: 'Laptop - 15%' }])
+  eq('only the two fragments', out, [{ icon: 'laptop', text: 'Laptop - 15%' }])
   notContains('no state word', JSON.stringify(out), 'Discharging')
   notContains('no time fragment', JSON.stringify(out), 'left')
   notContains('no rate', JSON.stringify(out), 'W')
@@ -992,7 +996,7 @@ group('the whole tooltip follows the row sort', () => {
   // the same order the island does.
   const rows = [{ label: 'Mouse', typeString: 'Mouse', percentage: 80 }, { label: 'Laptop', typeString: 'Battery', percentage: 15 }, { label: 'Pad', typeString: 'GamingInput', percentage: 15 }]
   eq('critical first, then alphabetical', BAT.tooltipRows(BAT.sortRows(rows)), [
-    { icon: 'monitor', text: 'Laptop - 15%' },
+    { icon: 'laptop', text: 'Laptop - 15%' },
     { icon: 'gamepad', text: 'Pad - 15%' },
     { icon: 'mice', text: 'Mouse - 80%' }
   ])

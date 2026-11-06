@@ -100,6 +100,14 @@ Item {
       var typeStr = root.typeString(d.type)
       var nativePath = String(d.nativePath || "")
       var pct = Model.normalizePct(d.percentage)
+      // healthPercentage arrives on the SAME 0..1 scale as percentage
+      // (Quickshell normalizes both - the ecosystem guards for either scale,
+      // and percentage is pinned as a fraction in BatteryModel), so it goes
+      // through the same normalizer before anything prints it as a percent.
+      // Absent stays NaN rather than falling to normalizePct's "full"
+      // fallback, so a device that reports no health adds no row.
+      var healthRaw = Number(d.healthPercentage)
+      var health = isFinite(healthRaw) ? Model.normalizePct(healthRaw) : NaN
       var charging = d.state === UPowerDeviceState.Charging
       var stateLabel = Model.prettyState(root.stateString(d.state))
       var typeIcon = Model.deviceIconName(typeStr)
@@ -123,7 +131,7 @@ Item {
           energy: Number(d.energy),
           energyCapacity: Number(d.energyCapacity),
           healthSupported: d.healthSupported === true,
-          healthPercentage: Number(d.healthPercentage)
+          healthPercentage: health
         }),
         details: Model.detailRows({
           stateLabel: stateLabel,
@@ -134,13 +142,12 @@ Item {
           energy: Number(d.energy),
           energyCapacity: Number(d.energyCapacity),
           healthSupported: d.healthSupported === true,
-          healthPercentage: Number(d.healthPercentage),
+          healthPercentage: health,
           typeLabel: typeStr,
           present: d.isPresent,
           powerSupply: d.powerSupply,
           laptopBattery: d.isLaptopBattery,
-          nativePath: nativePath,
-          iconName: String(d.iconName || "")
+          nativePath: nativePath
         })
       })
     }
@@ -328,6 +335,24 @@ Item {
           onIsOpenChanged: revealOpen()
           Component.onCompleted: Qt.callLater(revealOpen)
 
+          // This device's detail rows, as a real JS array.
+          //
+          // The snapshot crosses the list's model boundary on the way here, and
+          // its nested detail list arrives array-like rather than as a JS array
+          // (`Array.isArray` is false on it while `.length` and indexing work -
+          // measured in-engine at the delegate, the same boundary
+          // ColorPicker._sharedRecords converts). Testing it with
+          // Array.isArray therefore rejected EVERY device's details, which is
+          // why the dropdown showed "No additional information" even for a
+          // laptop battery reporting times, rate, energy and health. Converted
+          // once here, so the Repeater's model and the hint's emptiness test
+          // read the same value.
+          readonly property var detailRows: {
+            const d = row.modelData ? row.modelData.details : null
+            if (d === null || d === undefined) return []
+            return Array.isArray(d) ? d : Array.prototype.slice.call(d)
+          }
+
           // Selected (dropdown open) reads like Settings/menus: the whole
           // row - base line plus its dropdown - tints with background_2
           // instantly, not a hover wash.
@@ -412,7 +437,7 @@ Item {
               }
 
               Repeater {
-                model: Array.isArray(row.modelData.details) ? row.modelData.details : []
+                model: row.detailRows
 
                 Item {
                   required property var modelData
@@ -448,7 +473,7 @@ Item {
 
               Title {
                 level: 5
-                visible: !Array.isArray(row.modelData.details) || row.modelData.details.length === 0
+                visible: row.detailRows.length === 0
                 width: parent.width
                 text: "No additional information"
                 wrapMode: Text.WordWrap

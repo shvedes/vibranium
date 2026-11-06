@@ -136,7 +136,11 @@ function deviceIconName(typeString) {
   if (/headphon/.test(t)) return "headphones"
   if (/speaker|audio/.test(t)) return "speaker"
   if (/monitor/.test(t)) return "monitor"
-  if (/computer|battery/.test(t)) return "monitor"
+  // A laptop battery is the machine it sits in, and it takes that machine's
+  // own glyph (assets/icons/laptop.svg) rather than the desktop monitor it
+  // used to share with Computer devices.
+  if (/battery/.test(t)) return "laptop"
+  if (/computer/.test(t)) return "monitor"
   if (/ups/.test(t)) return "power"
   if (/printer|scanner/.test(t)) return "printer"
   if (/modem|network/.test(t)) return "ethernet"
@@ -189,14 +193,20 @@ function rowSubtext(row) {
   if (!isFinite(pct)) pct = 0
   var parts = [pct + "%", String(r.stateLabel || "Unknown")]
   var charging = !!r.charging
+  // The remaining time answers "how long have I got", and the dropdown lists
+  // it, so the sub-line says it too - in BOTH arms. A device on AC can still
+  // report a time to empty (a laptop draining on a weak adapter, firmware that
+  // keeps an estimate regardless of state), and skipping it there left the one
+  // useful number reachable only by opening the dropdown.
+  var left = formatDuration(r.timeToEmpty)
   if (charging) {
     var rate = formatRate(r.changeRate)
     if (rate !== "") parts.push(rate)
     var full = formatDuration(r.timeToFull)
     if (full !== "") parts.push("Full in " + full)
-  } else {
-    var left = formatDuration(r.timeToEmpty)
     if (left !== "") parts.push(left + " left")
+  } else if (left !== "") {
+    parts.push(left + " left")
   }
   var health = Number(r.healthPercentage)
   if (r.healthSupported && isFinite(health) && health > 0) {
@@ -266,7 +276,8 @@ function detailRows(info) {
   if (r.laptopBattery === true) out.push({ label: "Laptop battery", value: "Yes" })
   else if (r.laptopBattery === false) out.push({ label: "Laptop battery", value: "No" })
   add("Native path", r.nativePath)
-  add("Icon", r.iconName)
+  // No row for `iconName`: it is the name of the class glyph already drawn
+  // beside the label, so printing it again says nothing the row does not.
   return out
 }
 
