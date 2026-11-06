@@ -36,7 +36,11 @@ PanelCard {
   //
   // `slotOpen` is separate from the region override because a slot that fits
   // in the resting region asks for no resize while still making the content
-  // taller; see PanelCard._latchRestingBuffer.
+  // taller; see PanelCard._latchRestingBuffer. It reads the claim, which is
+  // the rule every card keeps, and no slot is open across a filter's rebuild
+  // on this panel: a destructive row leaves the filter behind before its
+  // dropdown is armed (see activateCurrent), so the restore the user watches
+  // is the card's own size tween and not a slot's geometry standing in for it.
   slotOpen: list.revealNeedH > 0
   slotRegionH: SlotGrowth.regionForSlot(
     list, panel.restingListH, panel.screenMaxListH, Ui.s)
@@ -173,7 +177,13 @@ PanelCard {
       if (!panel.searching) panel.recalcWidth()
     }
     function onVisibleChanged() {
-      if (!PowerMenu.visible) { focusCtrl.mode = "list"; return }
+      if (!PowerMenu.visible) {
+        focusCtrl.mode = "list"
+        landTimer.stop()
+        panel._pendingActivate = null
+        panel._pendingActivateKey = ""
+        return
+      }
       panel.show()
       searchField.text = ""
       list.settle(0, true)
@@ -204,7 +214,9 @@ PanelCard {
         // both writes were skipped: the previous rows stay on screen until a
         // set that passes arrives.
         if (rows !== null) panel._records = rows
-        list.settle(0, true)
+        // A held activation is a row of the set that just installed, so it
+        // takes the seat the head-row default would otherwise take.
+        if (!panel.landPendingActivate()) list.settle(0, true)
       })
       Qt.callLater(() => panel.reassertFocus())
     })
@@ -276,6 +288,10 @@ PanelCard {
     list.autoRevealIndex = -1
   }
   function activateCurrent() {
+    // A landing already in flight owns the activation: the query is cleared and
+    // its row is held for the rebuild, so a second press in that window must
+    // not read the restored list's head row instead.
+    if (panel._pendingActivate !== null) return
     const idx = list.currentIndex
     if (idx < 0 || idx >= panel._rows.length) { list.settle(0, true); return }
     // An armed dropdown is modal for its own row: the next activation on it
@@ -283,11 +299,80 @@ PanelCard {
     // answers nothing - its own activation routes instead.
     if (panel.armed && panel._confirmIndex === idx) { panel.advanceConfirm(); return }
     panel.closeConfirm()
-    PowerMenu.activate(panel._rows[idx])
+    const it = panel._rows[idx]
+    // A destructive row hit through the filter leaves the filter behind first,
+    // exactly as a menu leaves search for the hit it runs: the bar clears, the
+    // whole action set comes back with the card's own resize tween, and only
+    // then is that row's dropdown armed on it. Arming inside the filtered list
+    // kept an open slot across the filter's rebuild, where the card can only
+    // restore itself with a dropdown's height folded into the geometry.
+    if (panel.searching && PowerMenu.isDestructive(String(it.action ?? ""))) {
+      // Held by key, not by reference: the install that rebuilds the row set
+      // lands it, and the card's own resize arms it (see landPendingActivate
+      // and armPendingActivate).
+      panel._pendingActivate = it
+      panel._pendingActivateKey = String(it.id ?? "")
+      PowerMenu.clearQuery()
+      if (searchField.text !== "") searchField.text = ""
+      focusCtrl.grabList()
+      return
+    }
+    PowerMenu.activate(it)
     // A destructive row arms the service's stage instead of dispatching, and
     // the dropdown is that stage seen on the row that asked for it. Reading
     // the armed flag rather than testing destructiveness here keeps the
     // one rule in the service, where the allowlist lives.
+    if (PowerMenu.confirmationArmed) panel.armConfirm(idx)
+  }
+  // A destructive row taken out of a filter: the record and its key are held
+  // across the clear, because the row set that names the row is rebuilt after
+  // it (see landPendingActivate, which the install calls).
+  property var _pendingActivate: null
+  property string _pendingActivateKey: ""
+  // The dropdown is armed once the card has finished its own resize to the
+  // restored row set. The slot override owns the height for as long as the
+  // dropdown is open, so arming inside that tween replaces the re-expand the
+  // user is watching with a snap. The interval is the tween's own length plus
+  // the turn the install takes to arm it.
+  Timer {
+    id: landTimer
+    interval: Ui.resizeMs + Ui.fastMs
+    repeat: false
+    onTriggered: panel.armPendingActivate()
+  }
+  function indexOfAction(key) {
+    const recs = panel._records
+    for (let i = 0; i < recs.length; i++) {
+      const rec = recs[i]
+      if (String(rec && rec.id !== undefined ? rec.id : "") === key) return i
+    }
+    return -1
+  }
+  // Called by the install, BEFORE its head-row seat: the held activation is a
+  // row of the set that just installed, so the cursor lands on it and the head
+  // row never becomes the selection. Answered by key, not by object identity -
+  // the id is this panel's identity for a row (keyedRows, List.rowIdentity).
+  function landPendingActivate() {
+    const key = panel._pendingActivateKey
+    if (key === "") return false
+    const idx = panel.indexOfAction(key)
+    if (idx < 0) {
+      panel._pendingActivate = null
+      panel._pendingActivateKey = ""
+      return false
+    }
+    list.settle(idx, true)
+    landTimer.restart()
+    return true
+  }
+  function armPendingActivate() {
+    const it = panel._pendingActivate
+    panel._pendingActivate = null
+    panel._pendingActivateKey = ""
+    if (!it || !PowerMenu.visible) return
+    const idx = panel.indexOfAction(String(it.id ?? ""))
+    if (idx < 0) return
+    PowerMenu.activate(it)
     if (PowerMenu.confirmationArmed) panel.armConfirm(idx)
   }
   function escapeChain() {

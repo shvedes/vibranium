@@ -3456,6 +3456,18 @@ Rectangle {
       return
     }
     if (it.type === "action") {
+      // A staged confirmation is the row's dropdown, and the row is where it
+      // renders: a hit that carries one lands on its page and arms it there
+      // through the row's own activation - the path a browsed row takes -
+      // instead of dispatching the action blind and closing the menu.
+      if (Menu.confirmFor(it)) {
+        const targetUid = it.uid !== undefined && it.uid !== null ? String(it.uid) : ""
+        panel.whenSettled((row) => {
+          if (row.itm && String(row.itm.uid) === targetUid) row.activate()
+        }, (row) => row.confirm !== null && row.itm !== null
+          && String(row.itm.uid) === targetUid)
+        return
+      }
       panel.activateItem(it)
       return
     }
