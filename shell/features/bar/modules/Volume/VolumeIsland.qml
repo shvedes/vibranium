@@ -363,6 +363,9 @@ Item {
     readonly property bool press: toggleTap.pressed
     width: 26
     height: 22
+    // Corners follow the compositor's rounding, like every other framed
+    // control in the shell (the mixer's twin of this toggle already does).
+    radius: RoundingPolicy.radius
     anchors.verticalCenter: parent.verticalCenter
     color: toggle.boosting
       ? (toggle.press ? Ui.tint("red", 0.3)

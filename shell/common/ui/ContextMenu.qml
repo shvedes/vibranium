@@ -134,6 +134,9 @@ Card {
           Rectangle {
             anchors.fill: parent
             visible: !entryRow.isSeparator
+            // The hover fill is a row's own chrome, so it follows the same
+            // rounding as the card it sits in (Qt clamps it to half the row).
+            radius: RoundingPolicy.radius
             color: Ui.tint("foreground_0", 0.07)
             opacity: rowMa.containsMouse && entryRow.rowEnabled ? 1 : 0
           }
