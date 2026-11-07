@@ -20,8 +20,15 @@ notify_update() {
 	) || true
 
 	if [[ "$action" == "update" ]]; then
-		setsid -f "$VIBRANIUM/bin/vb-launch-tui" -- vb-update \
-			< /dev/null > /dev/null 2>&1 || true
+		# This unit is oneshot, so its cgroup is torn down as soon as this
+		# script exits. A launcher forked here is killed before vb-launch-tui
+		# hands the terminal to app2unit, and no window ever appears. Start
+		# the launcher as a transient unit of its own and hold that unit open
+		# until the handoff is done (ExitType=cgroup), so the terminal outlives
+		# this service the same way it outlives any other caller.
+		systemd-run --user --quiet --collect \
+			--property=Type=exec --property=ExitType=cgroup \
+			"$VIBRANIUM/bin/vb-launch-tui" -- vb-update || true
 	fi
 }
 
