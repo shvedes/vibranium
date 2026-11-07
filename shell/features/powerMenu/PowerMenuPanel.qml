@@ -464,6 +464,16 @@ PanelCard {
       // change writes only its `values`, so the diff happens inside the model
       // instead of handing the view a new one - the view keeps its state.
       model: actionModel
+      // Center-lock scrolloff, as every other List surface has it: keyboard
+      // steps keep the cursor riding the viewport middle while scrolling is
+      // possible, and the seat eases under the animation gate. This list
+      // was the one surface that never opted in, so it kept List's default
+      // `smoothScroll: false` - a scaled display makes the action list
+      // overflow, every step then scrolls, and each one landed instantly.
+      // That instant seat IS the jump: same follow policy as the menu, with
+      // the tween switched off.
+      centerCursor: true
+      smoothScroll: MotionPolicy.enabled
       interactive: false
       // The same rule the settings menu keeps: the wheel does not walk rows.
       wheelSteps: false
