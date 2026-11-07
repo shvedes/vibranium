@@ -98,6 +98,15 @@ Rectangle {
   // Width fitting.
   property int contentW: baseWidth
   property int _maxLabelW: 360
+  // Measure the row's sub line as part of its width. Off by default: the sub
+  // is often a long description whose width the surface does not want the
+  // card to follow (the launcher's app descriptions), and the width policy is
+  // the surface's to choose. The pass card turns it on, because there the sub
+  // IS the identifying line.
+  property bool fitSub: false
+  // The row's icon column: the glyph plus the gap before its text column,
+  // charged once for a row that carries an icon. A surface whose rows draw a
+  // 20px glyph 8px from the text declares 28, not the glyph's own size.
   property int rowIconW: 24
   property int rowBadgeW: 0
 
@@ -159,6 +168,13 @@ Rectangle {
     root._latchRestingBuffer()
   }
   onRowsChanged: {
+    // Measure it here too, not only where a surface happens to ask. The width
+    // rule is the card's, and a row set is the thing it follows: a consumer
+    // that had to call recalcWidth on its own data edge could (and the pass
+    // panel did) bind that edge to a signal this card never declares, leaving
+    // the card at its floor for the session. Coalesced inside, so a burst of
+    // row writes still costs one pass.
+    root.recalcWidth()
     const key = root._rowSetKeyForRows()
     if (key !== null && key === root._rowSetKey) return
     root._rowSetKey = key
@@ -497,10 +513,27 @@ Rectangle {
   clip: true
   anchors.centerIn: parent
 
-  // Width measuring - coalesced to one pass per frame. TextMetrics, and the
-  // row's own label assigned per measurement: a WIDTH is genuinely a property
-  // of the string, so a probe of one fixed string is the wrong tool here too.
-  TextMetrics { id: measureLabel; text: "Mg"; font.pixelSize: Ui.fontL; font.family: Ui.fontFamily }
+  // Width measuring - coalesced to one pass per frame, and Text rather than
+  // TextMetrics: for the same string the two disagree by a pixel or two, and
+  // a row elides against the Text it draws, so a TextMetrics reservation is a
+  // reservation for a string nobody renders. The row's own text drives the
+  // assignment; a probe of one fixed string is the wrong tool here too.
+  Text {
+    id: measureLabel
+
+    visible: false
+    font.pixelSize: Ui.fontL
+    font.family: Ui.fontFamily
+    textFormat: Text.PlainText
+  }
+  Text {
+    id: measureSub
+
+    visible: false
+    font.pixelSize: Ui.fontXs
+    font.family: Ui.fontFamily
+    textFormat: Text.PlainText
+  }
 
   // Height measuring - a real Text's line box instead, which is what every row
   // delegate reads. The "Mg" probe this replaces could not stand in for a
@@ -563,12 +596,24 @@ Rectangle {
       const limit = Math.min(root.rows.length, 200)
       for (let i = 0; i < limit; i++) {
         const it = root.rows[i]
-        if (!it || !it.label) continue
+        if (!it) continue
+        const label = String(it.label ?? "")
+        // The second line is as much a row's text as its label: a row whose
+        // identifying line is the sub (a vault path, a result's description)
+        // elides that line the moment the card is narrower than it, and the
+        // card's own height rule already reads the same field.
+        const sub = root.fitSub ? String(it.sub ?? it.subLeft ?? "") : ""
+        if (label === "" && sub === "") continue
         let w = Ui.m * 2 + root.outerPad * 2 + 10
         if (it.icon) w += root.rowIconW
         if (it.badge) w += root.rowBadgeW
-        measureLabel.text = it.label
-        w += Math.min(measureLabel.width, root._maxLabelW)
+        measureLabel.text = label
+        measureSub.text = sub
+        // Ceiled: the column is a whole number of pixels inside an int card
+        // width, so a fractional advance that is not rounded up lands the line
+        // a pixel over the column reserved for it and the Text elides.
+        w += Math.min(Math.ceil(Math.max(measureLabel.implicitWidth,
+          measureSub.implicitWidth)), root._maxLabelW)
         maxRow = Math.max(maxRow, w)
       }
       root.contentW = Math.max(maxRow, root.baseWidth)

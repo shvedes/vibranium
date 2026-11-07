@@ -451,10 +451,11 @@ Singleton {
       root._notifyEmpty()
       return
     }
+    // No width: the card is as wide as the rows it shows (MenuPanel measures
+    // them), and a declared width only holds a gutter open beside short rows.
     const page = {
       id: root.pageId,
       title: "Uninstall theme",
-      width: 360,
       items: root._buildItems(data)
     }
     const bundleText = JSON.stringify(page)

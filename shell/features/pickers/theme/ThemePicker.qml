@@ -723,10 +723,11 @@ Singleton {
       return
     }
     const items = root._buildItems(data)
+    // No width: the card is as wide as the rows it shows (MenuPanel measures
+    // them), and a declared width only holds a gutter open beside short rows.
     const page = {
       id: root.pageId,
       title: "Themes",
-      width: 360,
       items: items
     }
     const bundleText = JSON.stringify(page)

@@ -576,7 +576,6 @@ Item {
     rows: [{ label: "one" }]
   }
 
-  TextMetrics { id: labelMetrics; text: "a really quite long label indeed"; font.pixelSize: Ui.fontL; font.family: Ui.fontFamily }
   TextMetrics { id: capMetrics; text: "Mg"; font.pixelSize: Ui.fontL; font.family: Ui.fontFamily }
   TextMetrics { id: subMetrics; text: "Mg"; font.pixelSize: Ui.fontXs; font.family: Ui.fontFamily }
   // The basis the row estimate is now measured against: a real Text's line
@@ -592,6 +591,19 @@ Item {
     text: "x"
     font.pixelSize: Ui.fontL
     font.family: Ui.fontFamily
+  }
+  // The width rule's own basis: a real Text. PanelCard measures through Text
+  // rather than TextMetrics, because the two disagree by a pixel or two for
+  // the same string and the row elides against the Text it draws.
+  Text {
+    id: realLongLabel
+    visible: false
+    width: 1
+    wrapMode: Text.NoWrap
+    text: "a really quite long label indeed"
+    font.pixelSize: Ui.fontL
+    font.family: Ui.fontFamily
+    textFormat: Text.PlainText
   }
   Text {
     id: realSubLine
@@ -1972,7 +1984,7 @@ Item {
   function turn20() {
     cardRows.recalcWidth()
     cardNoLabels.recalcWidth()
-    kv("pc.width.labelWidth", labelMetrics.width)
+    kv("pc.width.labelWidth", Math.ceil(realLongLabel.implicitWidth))
     kv("pc.capMetrics.height", capMetrics.height)
     kv("pc.subMetrics.height", subMetrics.height)
     kv("pc.rowRest.plainSettled", cardRows.rowRestHeight({ label: "x" }))
@@ -1995,7 +2007,7 @@ Item {
   function turn24() {
     kv("pc.contentW.longLabel", cardRows.contentW)
     kv("pc.contentW.expected", Math.max(cardRows.baseWidth,
-      Math.min(labelMetrics.width, cardRows._maxLabelW)
+      Math.min(Math.ceil(realLongLabel.implicitWidth), cardRows._maxLabelW)
       + 2 * Ui.m + cardRows.outerPad * 2 + 10))
     kv("pc.contentW.noLabels", cardNoLabels.contentW)
     kv("pc.contentW.noLabelsIsBase", feq(cardNoLabels.contentW, cardNoLabels.baseWidth))

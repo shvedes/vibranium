@@ -32,10 +32,18 @@ PanelCard {
   hardMaxHeight: 1200
   vPad: Ui.outerPad + 8
   hPad: Ui.outerPad
-  baseWidth: 380
-  rowIconW: 26
+  // Content-sized like a menu page: the floor is the shared card minimum, so a
+  // page of short rows opens as a card rather than at a width the vault does
+  // not use.
+  baseWidth: Ui.cardMinW
+  // The icon column, glyph plus its gap: PassEntry draws a 20px icon 8px from
+  // the text column, and PanelCard adds this once for a row that has an icon.
+  rowIconW: 28
   rowBadgeW: 22
   _maxLabelW: 420
+  // The sub line is the identifying text here (the vault path), so the card
+  // follows the wider of the two.
+  fitSub: true
   // Package-missing state: the card keeps its normal shape - the dead
   // filter box stays visible, dimmed under the warning backdrop (the
   // island pattern: dead content dims, it does not vanish). The
