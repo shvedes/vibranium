@@ -1541,6 +1541,11 @@ Item {
     if (pending.length === 0) return
     boot._pumpedFns = pending.slice(1)
     pending[0]()
+    // One function runs per tick, and a finished phase does not reschedule
+    // itself - the early drain stops when its queue is empty while the drain
+    // it shared the pump with is still queued. Wake whatever is left, or that
+    // continuation sits in the queue with no timer running.
+    if (boot._pumpedFns.length > 0) drainPump.restart()
   }
 
   Timer {
