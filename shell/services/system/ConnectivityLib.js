@@ -30,10 +30,10 @@ function isOnline(connectivity) {
 // client like AmneziaVPN owns its own tun device, so no NM active
 // connection ever appears), and an NM VPN has the same effect on the
 // check. A default route through a tunnel device therefore counts as
-// internet alongside a full NM reading - but never over a portal, which
-// still gates first at every call site.
+// internet alongside a full NM reading, including while the NM check still
+// reports a portal: the login gates the verdict at the call sites, not here,
+// so the tunnel is not lost for the polls it takes to sign in.
 function hasInternet(connectivity, vpnUp) {
-  if (isPortal(connectivity)) return false
   if (vpnUp === true) return true
   return Number(connectivity) === 4
 }
