@@ -182,41 +182,18 @@ function formatRate(watts) {
   return Format.formatWatts(watts)
 }
 
-// Secondary row line: "85% - Discharging", extended with whatever else
-// UPower reports for the device - charge rate while charging (live),
-// time to empty/full, health and energy (peripherals report zeros and
-// hide those fragments, laptop batteries show them). Takes one object
-// so call sites stay readable.
+// Secondary row line: "85% - 2h 15m left". The island entry gives it one
+// line, so it carries the two basics and nothing else - the charge and
+// how long it has left. State, time to full, charge rate, health and
+// energy all live in the row's dropdown (detailRows), where there is
+// room for them.
 function rowSubtext(row) {
   var r = row || {}
   var pct = Math.round(Number(r.percentage))
   if (!isFinite(pct)) pct = 0
-  var parts = [pct + "%", String(r.stateLabel || "Unknown")]
-  var charging = !!r.charging
-  // The remaining time answers "how long have I got", and the dropdown lists
-  // it, so the sub-line says it too - in BOTH arms. A device on AC can still
-  // report a time to empty (a laptop draining on a weak adapter, firmware that
-  // keeps an estimate regardless of state), and skipping it there left the one
-  // useful number reachable only by opening the dropdown.
+  var parts = [pct + "%"]
   var left = formatDuration(r.timeToEmpty)
-  if (charging) {
-    var rate = formatRate(r.changeRate)
-    if (rate !== "") parts.push(rate)
-    var full = formatDuration(r.timeToFull)
-    if (full !== "") parts.push("Full in " + full)
-    if (left !== "") parts.push(left + " left")
-  } else if (left !== "") {
-    parts.push(left + " left")
-  }
-  var health = Number(r.healthPercentage)
-  if (r.healthSupported && isFinite(health) && health > 0) {
-    parts.push("Health " + Math.round(health) + "%")
-  }
-  var energy = Number(r.energy)
-  var capacity = Number(r.energyCapacity)
-  if (isFinite(energy) && energy > 0 && isFinite(capacity) && capacity > 0) {
-    parts.push(energy.toFixed(1) + " / " + capacity.toFixed(1) + " Wh")
-  }
+  if (left !== "") parts.push(left + " left")
   return parts.join(" - ")
 }
 

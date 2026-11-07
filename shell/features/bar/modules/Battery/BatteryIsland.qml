@@ -9,8 +9,8 @@ import "../../../../common/power/BatteryModel.js" as Model
 // list - every UPower device with a battery, lowest charge first. Each
 // row pairs the device's representative glyph (mouse, keyboard, gamepad,
 // headset...) with a level battery icon in the dynamic colors, plus the
-// percentage, the (dis)charging state and the charge rate while
-// charging.
+// percentage and the time left. Everything else the device reports lives
+// in the row's dropdown.
 // Clicking a row unfolds its details dropdown with every other UPower
 // field the device reports (times, rate, energy, health and the device
 // facts); fields a device does not report are skipped, and a device
@@ -121,17 +121,11 @@ Item {
         batteryIcon: Model.batteryIconFor(pct, charging),
         batteryColor: Model.batteryColorFor(pct, charging),
         batteryAccent: Model.batteryAccentFor(pct, charging),
+        // The entry's one sub-line: charge and time left only. The rest
+        // of the device's readings are in `details` below.
         subtext: Model.rowSubtext({
           percentage: pct,
-          stateLabel: stateLabel,
-          charging: charging,
-          changeRate: Number(d.changeRate),
-          timeToEmpty: Number(d.timeToEmpty),
-          timeToFull: Number(d.timeToFull),
-          energy: Number(d.energy),
-          energyCapacity: Number(d.energyCapacity),
-          healthSupported: d.healthSupported === true,
-          healthPercentage: health
+          timeToEmpty: Number(d.timeToEmpty)
         }),
         details: Model.detailRows({
           stateLabel: stateLabel,

@@ -724,72 +724,39 @@ group('a numeric string is coerced', () => {
 })
 
 section('Battery/Model.rowSubtext - the island sub-line')
-group('a discharging device reports the time left', () => {
-  eq('the full line', BAT.rowSubtext({ percentage: 85, stateLabel: 'Discharging', charging: false, timeToEmpty: 8100 }), '85% - Discharging - 2h 15m left')
-  eq('without an estimate', BAT.rowSubtext({ percentage: 50, stateLabel: 'Discharging', charging: false }), '50% - Discharging')
-  eq('a zero estimate is skipped, not printed as <1m', BAT.rowSubtext({ percentage: 50, stateLabel: 'Discharging', charging: false, timeToEmpty: 0 }), '50% - Discharging')
-  eq('a sub-minute estimate prints as <1m left', BAT.rowSubtext({ percentage: 50, stateLabel: 'Discharging', charging: false, timeToEmpty: 30 }), '50% - Discharging - <1m left')
-  // The discharging branch never prints the charge rate or the time to
-  // full, even when the device reports them.
-  eq('a time to full is ignored while discharging', BAT.rowSubtext({ percentage: 50, stateLabel: 'Discharging', charging: false, timeToEmpty: 60, timeToFull: 3600 }), '50% - Discharging - 1m left')
+group('the line carries the charge and the time left, and nothing else', () => {
+  eq('the full line', BAT.rowSubtext({ percentage: 85, timeToEmpty: 8100 }), '85% - 2h 15m left')
+  eq('without an estimate', BAT.rowSubtext({ percentage: 50 }), '50%')
+  eq('a zero estimate is skipped, not printed as <1m', BAT.rowSubtext({ percentage: 50, timeToEmpty: 0 }), '50%')
+  eq('a sub-minute estimate prints as <1m left', BAT.rowSubtext({ percentage: 50, timeToEmpty: 30 }), '50% - <1m left')
+  eq('a time to empty prints while charging too', BAT.rowSubtext({ percentage: 50, charging: true, timeToEmpty: 3600 }), '50% - 1h left')
+  eq('a numeric string estimate coerces', BAT.rowSubtext({ percentage: 50, timeToEmpty: '60' }), '50% - 1m left')
 })
-group('a charging device reports the rate and the time to full', () => {
-  eq('the full line', BAT.rowSubtext({ percentage: 85, stateLabel: 'Charging', charging: true, changeRate: 8.4, timeToFull: 3600 }), '85% - Charging - 8.4 W - Full in 1h')
-  eq('without a rate', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true }), '50% - Charging')
-  eq('without a time to full', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true, changeRate: 5 }), '50% - Charging - 5.0 W')
-  eq('a time to empty prints while charging too', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true, timeToEmpty: 3600 }), '50% - Charging - 1h left')
-  eq('and it follows the full-in fragment', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true, changeRate: 5, timeToFull: 600, timeToEmpty: 7200 }), '50% - Charging - 5.0 W - Full in 10m - 2h left')
-  // The branch is a truthiness test, so a device that reports a positive rate
-  // while discharging (a laptop on AC that also drains) still takes the
-  // charging arm.
-  eq('a truthy non-boolean flag takes the charging arm', BAT.rowSubtext({ percentage: 50, charging: 1, changeRate: 5, timeToFull: 60 }), '50% - Unknown - 5.0 W - Full in 1m')
-  eq('a negative rate still prints while charging', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging', charging: true, changeRate: -2, timeToFull: 60 }), '50% - Charging - -2.0 W - Full in 1m')
-})
-group('the first two fragments are always percentage and state', () => {
-  eq('an object with nothing but a percentage', BAT.rowSubtext({ percentage: 85 }), '85% - Unknown')
-  eq('a null row', BAT.rowSubtext(null), '0% - Unknown')
-  eq('no argument', BAT.rowSubtext(), '0% - Unknown')
-  eq('an empty object', BAT.rowSubtext({}), '0% - Unknown')
-  // "String(r.stateLabel || "Unknown")" - a falsy label is the generic word.
-  eq('an empty state label', BAT.rowSubtext({ percentage: 50, stateLabel: '' }), '50% - Unknown')
-  eq('a null state label', BAT.rowSubtext({ percentage: 50, stateLabel: null }), '50% - Unknown')
-  eq('a zero state label is stringified', BAT.rowSubtext({ percentage: 50, stateLabel: 0 }), '50% - Unknown')
-  eq('a numeric state label', BAT.rowSubtext({ percentage: 50, stateLabel: 7 }), '50% - 7')
+group('the fields the dropdown owns are not repeated here', () => {
+  eq('the state', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging' }), '50%')
+  eq('the rate and the time to full while charging', BAT.rowSubtext({ percentage: 85, charging: true, changeRate: 8.4, timeToFull: 3600 }), '85%')
+  eq('a time to full on a discharging device', BAT.rowSubtext({ percentage: 50, timeToEmpty: 60, timeToFull: 3600 }), '50% - 1m left')
+  eq('health', BAT.rowSubtext({ percentage: 50, healthSupported: true, healthPercentage: 98.6 }), '50%')
+  eq('the energy pair', BAT.rowSubtext({ percentage: 50, energy: 48.2, energyCapacity: 51 }), '50%')
+  eq('every other field at once', BAT.rowSubtext({ percentage: 40, stateLabel: 'Charging', charging: true, changeRate: 12.3, timeToFull: 1800, healthSupported: true, healthPercentage: 95, energy: 30, energyCapacity: 45 }),
+    '40%')
 })
 group('the percentage is rounded, and an unusable one reads as 0', () => {
-  eq('rounds down', BAT.rowSubtext({ percentage: 85.4 }), '85% - Unknown')
-  eq('rounds up', BAT.rowSubtext({ percentage: 85.5 }), '86% - Unknown')
-  eq('a fraction is not scaled here - the caller normalizes first', BAT.rowSubtext({ percentage: 0.85 }), '1% - Unknown')
-  eq('a non-numeric percentage', BAT.rowSubtext({ percentage: 'x' }), '0% - Unknown')
-  eq('a negative percentage is printed, not clamped', BAT.rowSubtext({ percentage: -20 }), '-20% - Unknown')
-  eq('a numeric string percentage', BAT.rowSubtext({ percentage: '42' }), '42% - Unknown')
-})
-group('health prints only when the device supports it', () => {
-  eq('supported and positive', BAT.rowSubtext({ percentage: 50, healthSupported: true, healthPercentage: 98.6 }), '50% - Unknown - Health 99%')
-  eq('unsupported but reported', BAT.rowSubtext({ percentage: 50, healthSupported: false, healthPercentage: 90 }), '50% - Unknown')
-  eq('supported but zero', BAT.rowSubtext({ percentage: 50, healthSupported: true, healthPercentage: 0 }), '50% - Unknown')
-  eq('supported but negative', BAT.rowSubtext({ percentage: 50, healthSupported: true, healthPercentage: -5 }), '50% - Unknown')
-  eq('supported but NaN', BAT.rowSubtext({ percentage: 50, healthSupported: true, healthPercentage: 'x' }), '50% - Unknown')
-  eq('a truthy non-boolean healthSupported', BAT.rowSubtext({ percentage: 50, healthSupported: 1, healthPercentage: 90 }), '50% - Unknown - Health 90%')
-  eq('supported and exactly 100', BAT.rowSubtext({ percentage: 50, healthSupported: true, healthPercentage: 100 }), '50% - Unknown - Health 100%')
-})
-group('energy needs both halves of the pair', () => {
-  eq('both present', BAT.rowSubtext({ percentage: 50, energy: 48.2, energyCapacity: 51 }), '50% - Unknown - 48.2 / 51.0 Wh')
-  eq('no capacity drops the pair', BAT.rowSubtext({ percentage: 50, energy: 10, energyCapacity: 0 }), '50% - Unknown')
-  eq('no energy drops the pair', BAT.rowSubtext({ percentage: 50, energy: 0, energyCapacity: 51 }), '50% - Unknown')
-  eq('a negative capacity drops the pair', BAT.rowSubtext({ percentage: 50, energy: 10, energyCapacity: -1 }), '50% - Unknown')
-  eq('a NaN capacity drops the pair', BAT.rowSubtext({ percentage: 50, energy: 10, energyCapacity: 'x' }), '50% - Unknown')
-  eq('a numeric string capacity coerces', BAT.rowSubtext({ percentage: 50, energy: '10', energyCapacity: '20' }), '50% - Unknown - 10.0 / 20.0 Wh')
-  eq('energy without a state still prints', BAT.rowSubtext({ energy: 1, energyCapacity: 2 }), '0% - Unknown - 1.0 / 2.0 Wh')
+  eq('an object with nothing but a percentage', BAT.rowSubtext({ percentage: 85 }), '85%')
+  eq('a null row', BAT.rowSubtext(null), '0%')
+  eq('no argument', BAT.rowSubtext(), '0%')
+  eq('an empty object', BAT.rowSubtext({}), '0%')
+  eq('rounds down', BAT.rowSubtext({ percentage: 85.4 }), '85%')
+  eq('rounds up', BAT.rowSubtext({ percentage: 85.5 }), '86%')
+  eq('a fraction is not scaled here - the caller normalizes first', BAT.rowSubtext({ percentage: 0.85 }), '1%')
+  eq('a non-numeric percentage', BAT.rowSubtext({ percentage: 'x' }), '0%')
+  eq('a negative percentage is printed, not clamped', BAT.rowSubtext({ percentage: -20 }), '-20%')
+  eq('a numeric string percentage', BAT.rowSubtext({ percentage: '42' }), '42%')
 })
 group('the fragments are joined in one fixed order', () => {
-  eq('everything at once', BAT.rowSubtext({ percentage: 40, stateLabel: 'Charging', charging: true, changeRate: 12.3, timeToFull: 1800, healthSupported: true, healthPercentage: 95, energy: 30, energyCapacity: 45 }),
-    '40% - Charging - 12.3 W - Full in 30m - Health 95% - 30.0 / 45.0 Wh')
-  eq('a full discharging line', BAT.rowSubtext({ percentage: 40, stateLabel: 'Discharging', charging: false, timeToEmpty: 1800, healthSupported: true, healthPercentage: 95, energy: 30, energyCapacity: 45 }),
-    '40% - Discharging - 30m left - Health 95% - 30.0 / 45.0 Wh')
+  eq('percentage first, then the time', BAT.rowSubtext({ percentage: 40, timeToEmpty: 1800 }), '40% - 30m left')
   for (const out of [
-    BAT.rowSubtext({ percentage: 40, stateLabel: 'Charging', charging: true, changeRate: 12.3 }),
-    BAT.rowSubtext({ percentage: 40, stateLabel: 'Discharging', charging: false }),
+    BAT.rowSubtext({ percentage: 40, timeToEmpty: 1800 }),
     BAT.rowSubtext({ percentage: 40 }),
   ]) {
     is(`"${out}" uses the " - " separator`, out, (s) => s.split(' - ')[0] === '40%', 'the percentage leads')
@@ -899,7 +866,7 @@ group('the charge row is guarded on a finite percentage', () => {
   // unreadable percentage to 0% (it is the always-present first fragment),
   // while the dropdown drops the row entirely. Both asserted so the
   // divergence is not mistaken for a defect.
-  eq('rowSubtext folds it to zero', BAT.rowSubtext({ percentage: 'x' }), '0% - Unknown')
+  eq('rowSubtext folds it to zero', BAT.rowSubtext({ percentage: 'x' }), '0%')
   eq('detailRows drops it', BAT.detailRows({ percentage: 'x' }), [])
   eq('a negative percentage is a valid reading', BAT.detailRows({ percentage: -20 }).map((r) => r.value), ['-20%'])
 })
