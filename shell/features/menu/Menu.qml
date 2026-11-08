@@ -891,11 +891,20 @@ Singleton {
   // Hook context handed to provider calls: lets a surface read menu state
   // (expanded confirm rows) and trigger conditional-reveal refreshes
   // without importing the menu framework.
+  //
+  // ONE object for the session. The context is stateless - it names the
+  // singleton, never the row the hook was dispatched for - and the panel
+  // resolves it per row on every install (projectRows asks subFor and
+  // widestDisplayFor) plus once per visible delegate. Building a fresh object
+  // with two closures per call was pure allocation churn on the search
+  // keystroke path, where a projection is resolved again for every result.
+  property var _hookCtxShared: ({
+    isExpanded: (it) => root.isExpanded(it),
+    bumpCondRev: () => root.bumpCondRev()
+  })
+
   function _hookCtx(item) {
-    return {
-      isExpanded: (it) => root.isExpanded(it),
-      bumpCondRev: () => root.bumpCondRev()
-    }
+    return root._hookCtxShared
   }
 
   // --- generic item helpers (provider-backed, Entry/MenuPanel delegate
@@ -923,6 +932,24 @@ Singleton {
     if (!item) return null
     const p = root._providerFor(item.id)
     return MenuLib.hookValue(p, "widestDisplay", item, root._hookCtx(item), null)
+  }
+
+  // Both layout facts for one row in ONE provider resolution. The install
+  // (MenuPanel.projectRows) asks for the sub line and the widest value of
+  // every installed row, and resolving subFor/widestDisplayFor separately
+  // looked the same provider up twice per row and crossed the QML boundary
+  // twice. The value contracts are still MenuLib's (hookValue) - only the
+  // lookup is shared, and a row with no provider pays one miss and no call.
+  function rowFactsFor(item) {
+    if (!item) return { sub: "", widest: "" }
+    const p = root._providerFor(item.id)
+    const hooked = MenuLib.hookValue(p, "sub", item, root._hookCtxShared, "")
+    const sub = hooked !== "" ? String(hooked) : String(item.sub ?? "")
+    const wide = MenuLib.hookValue(p, "widestDisplay", item, root._hookCtxShared, null)
+    return {
+      sub: sub,
+      widest: wide === null || wide === undefined ? "" : String(wide)
+    }
   }
 
   function isToggleOn(item) {

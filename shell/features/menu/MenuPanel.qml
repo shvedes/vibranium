@@ -724,6 +724,31 @@ Rectangle {
     metrics.recalcWidth()
   }
 
+  // Whether this install can be sized from the MODEL: nothing open, closing,
+  // moving or swapping anywhere, so every row rests at RowGeometry's height
+  // and no delegate has to be read. The measured path exists to absorb an
+  // open slot's live geometry; without one it defers two event-loop turns and
+  // retries for a number the model already knows exactly. A ranked search
+  // projection is the shape this matters most for: it never renders a slot,
+  // and it re-installs on every keystroke.
+  function _restFitReady() {
+    if (panel.expansionNeedH > 0) return false
+    if (Menu.slotClosing || panel._rowsMoving || list._inSwap) return false
+    const rows = panel.rowsModel || []
+    for (let i = 0; i < rows.length; i++) {
+      const it = rows[i]
+      if (it && (Menu.isExpanded(it) || Menu.infoOpen(it) || Menu.isSlotClosing(it)))
+        return false
+    }
+    const kids = list.contentItem ? list.contentItem.children : []
+    for (let i = 0; i < kids.length; i++) {
+      const d = kids[i]
+      if (!(d instanceof Entry)) continue
+      if (d.slotMotionMs > 0 || d.descSlotH > 0 || d.expandSlotH > 0) return false
+    }
+    return true
+  }
+
   function queueFit() {
     const rows = panel.rowsModel || []
     if (panel._fitPending) {
@@ -758,6 +783,19 @@ Rectangle {
       panel._resolveFit(
         panel.snappedListH(panel.availListH, Math.min(10, rows.length)),
         fitGen, transitionGen)
+      return
+    }
+    // Motion is on, but there is nothing for it to absorb: with no slot open,
+    // closing or moving, the model height IS the final height, so commit it
+    // now instead of parking _fitPending and spending two event-loop turns
+    // plus up to eight 16ms retries waiting for delegates to confirm
+    // arithmetic. This is the common keystroke: a search projection has no
+    // slots to measure.
+    if (panel._restFitReady()) {
+      panel._latchedListH = -1
+      panel._fitPending = false
+      panel._fitAttempts = 0
+      panel._resolveFit(-1, fitGen, transitionGen)
       return
     }
     panel._fitPending = true
@@ -2106,13 +2144,13 @@ Rectangle {
     for (let i = 0; i < rows.length; i++) {
       const it = rows[i]
       if (!it || it.type === "separator" || it.uid === undefined || it.uid === null) continue
-      const sub = Menu.subFor(it)
-      const subText = sub !== "" ? sub : String(it.sub ?? "")
-      const widest = Menu.widestDisplayFor(it)
+      // One provider resolution for both facts (see Menu.rowFactsFor): the
+      // install runs per keystroke over the whole projection.
+      const f = Menu.rowFactsFor(it)
       facts[String(it.uid)] = {
-        sub: subText,
-        kind: MenuLib.restKind(it, subText),
-        widest: widest === null || widest === undefined ? "" : String(widest)
+        sub: f.sub,
+        kind: MenuLib.restKind(it, f.sub),
+        widest: f.widest
       }
     }
     panel._rowFacts = facts
@@ -2126,13 +2164,11 @@ Rectangle {
     if (!itm) return { sub: "", kind: "line", widest: "" }
     const hit = panel._rowFacts[String(itm.uid)]
     if (hit !== undefined) return hit
-    const sub = Menu.subFor(itm)
-    const subText = sub !== "" ? sub : String(itm.sub ?? "")
-    const widest = Menu.widestDisplayFor(itm)
+    const f = Menu.rowFactsFor(itm)
     return {
-      sub: subText,
-      kind: MenuLib.restKind(itm, subText),
-      widest: widest === null || widest === undefined ? "" : String(widest)
+      sub: f.sub,
+      kind: MenuLib.restKind(itm, f.sub),
+      widest: f.widest
     }
   }
 

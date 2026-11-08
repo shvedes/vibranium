@@ -170,20 +170,58 @@ Item {
   //
   // The cap is per-entry accounting: one giant page files ~1870 labels, so 4096
   // holds a page's labels, subs and dropdown options with room to spare and
-  // still bounds a session that walks every bundle.
+  // still bounds a session that walks every bundle. Eviction is FIFO, not LRU:
+  // a hit is the common case on the search path and must not write three map
+  // entries (delete + re-insert) just to refresh its age. A page's whole
+  // vocabulary fits several times over, so recency buys nothing here.
   property var _shapes: new Map()
   readonly property int _metricCap: 4096
+
+  // Whole-row width memo. This pass runs on every row install, and a search
+  // keystroke re-installs a projection in which most rows survived with the
+  // same label, sub line and trail inputs. A row's width is a pure function of
+  // exactly the fields compared below - the label and sub shapes, the icon
+  // column, the chevron, the trail's own measurements and the two page-wide
+  // terms (searching, unified bar column) - so a hit skips three shaping cache
+  // lookups, a select row's option loop and a number row's value probe.
+  // Keyed by uid, which the panel's keyed install has already proven unique
+  // across the installed row set. FIFO for the same reason as _shapes: a hit
+  // must not write.
+  property var _rowW: new Map()
+  readonly property int _rowWCap: 2048
+
+  function _memoRowW(uid, type, label, family, subLead, sub, subAccent,
+                     icon, glyph, fold, opts, widest, value, searching, unified) {
+    const hit = root._rowW.get(uid)
+    if (hit === undefined) return -1
+    if (hit.type !== type || hit.label !== label || hit.family !== family
+      || hit.subLead !== subLead || hit.sub !== sub || hit.subAccent !== subAccent
+      || hit.icon !== icon || hit.glyph !== glyph || hit.fold !== fold
+      || hit.opts !== opts || hit.widest !== widest || hit.value !== value
+      || hit.searching !== searching || hit.unified !== unified) return -1
+    return hit.w
+  }
+
+  function _memoRowWStore(uid, type, label, family, subLead, sub, subAccent,
+                          icon, glyph, fold, opts, widest, value, searching,
+                          unified, w) {
+    root._rowW.set(uid, {
+      type: type, label: label, family: family, subLead: subLead, sub: sub,
+      subAccent: subAccent, icon: icon, glyph: glyph, fold: fold, opts: opts,
+      widest: widest, value: value, searching: searching, unified: unified, w: w
+    })
+    if (root._rowW.size > root._rowWCap) {
+      const oldest = root._rowW.keys().next()
+      if (oldest.done !== true) root._rowW.delete(oldest.value)
+    }
+  }
 
   // One shaping, cached. `produce` runs only on a miss and owns whatever probe
   // state it needs. The Map is never reassigned - only mutated - so no binding
   // can depend on it, and the pass is imperative in the first place.
   function _shape(key, produce) {
     const hit = root._shapes.get(key)
-    if (hit !== undefined) {
-      root._shapes.delete(key)
-      root._shapes.set(key, hit)
-      return hit
-    }
+    if (hit !== undefined) return hit
     const value = produce()
     root._shapes.set(key, value)
     if (root._shapes.size > root._metricCap) {
@@ -211,6 +249,7 @@ Item {
   // binding's own evaluation.
   function clearShapeCache() {
     root._shapes.clear()
+    root._rowW.clear()
   }
 
   Connections {
@@ -481,8 +520,14 @@ Item {
     // The page's own width, or 0 when it names none.
     const declared = root.declaredPageWidth()
     // Compute unified value-column width first so all little bars share one
-    // column.
-    const hasMultipleBars = items.filter(it => it && (it.type === "range" || it.type === "progress")).length >= 2
+    // column. Counted in place: filter() allocated a whole array per install
+    // (so per keystroke on a search projection) to answer a boolean.
+    let barRows = 0
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i]
+      if (it && (it.type === "range" || it.type === "progress")) barRows++
+    }
+    const hasMultipleBars = barRows >= 2
     if (hasMultipleBars) {
       root.unifiedValueW = root._widestStepperWidth(items)
       // Publish to the Menu singleton so delegates (Entry) can read it without
@@ -510,17 +555,45 @@ Item {
     // empty-page shape a deferral also produces: contentW stays 0, and 0 is
     // indistinguishable from "no rows".
     let maxRow = 0
+    const searching = root.host.searching
+    const unified = root.unifiedValueW
     for (let i = 0; i < headN; i++) {
       const it = items[i]
       if (!it || !it.label) continue
+      const facts = root.host.rowFacts(it)
+      const family = root.rowFontFamily(it)
+      const fold = (it.desc !== undefined && it.desc !== null && String(it.desc) !== "")
+        || (it.body !== undefined && it.body !== null && String(it.body) !== "")
+      const glyph = it.glyph !== undefined && it.glyph !== null && String(it.glyph) !== ""
+      const icon = !!it.icon
+      const opts = Array.isArray(it.options) ? it.options : null
+      // Only the trail kinds that read the live value have to: a text row's
+      // stored string and a select with no options at all. Everything else
+      // keeps "" so the memo is not invalidated by state the width never reads.
+      let value = ""
+      if (it.type === "text"
+        || (it.type === "select" && (opts === null || opts.length === 0))) {
+        const cur = Menu.valueOf(it)
+        value = cur === undefined || cur === null ? "" : String(cur)
+      }
+      const uid = it.uid !== undefined && it.uid !== null ? String(it.uid) : ""
+      const subLead = String(it.subLead || "")
+      const subAccent = String(it.subAccent || "")
+      let w = uid !== ""
+        ? root._memoRowW(uid, it.type, it.label, family, subLead, facts.sub,
+          subAccent, icon, glyph, fold, opts, facts.widest, value, searching, unified)
+        : -1
+      if (w >= 0) {
+        if (w > maxRow) maxRow = w
+        continue
+      }
       // Row chrome and icon column, both the row's own numbers (rowChromeW,
       // Ui.rowIconW). The column is reserved for an icon NAME or a glyph (the
       // emoji picker's rows), whichever Entry paints there - reserving only the
       // name left a glyph row 28px narrower than it renders, and the label
       // clipped against its own preview.
-      let w = root.rowChromeW()
-      if (it.icon || (it.glyph !== undefined && it.glyph !== null
-        && String(it.glyph) !== "")) w += Ui.rowIconW + Ui.s
+      w = root.rowChromeW()
+      if (icon || glyph) w += Ui.rowIconW + Ui.s
       let labelW = 0
       {
         // Shaped in the row's OWN font (rowFontFamily). Search results take
@@ -531,7 +604,6 @@ Item {
         // elides the longest names outright (the emoji picker: a 536px row in a
         // 420px card). Shaping a result row is a dictionary hit once the string
         // has been seen, and a miss is one Text assignment.
-        const family = root.rowFontFamily(it)
         labelW = root._shape(root.shapeKey(it.label, family), () => {
           root._rowProbeFamily = family
           measureRowLabel.text = it.label
@@ -544,9 +616,9 @@ Item {
         // The displayed sub line was resolved at install (rowFacts), so the
         // pass shapes a string it was handed instead of asking a provider from
         // inside a measurement.
-        const dispSub = root.host.rowFacts(it).sub
-        const subKey = family + "\u0001" + String(it.subLead || "") + "\u0001"
-          + dispSub + "\u0001" + String(it.subAccent || "")
+        const dispSub = facts.sub
+        const subKey = family + "\u0001" + subLead + "\u0001"
+          + dispSub + "\u0001" + subAccent
         const subW = root._shape(subKey, () => {
           let sw = 0
           root._rowProbeFamily = family
@@ -570,8 +642,12 @@ Item {
       // Every search result is a link forward, so the card reserves the chevron
       // on results whatever the row's own type is (Entry reads `searchResult`,
       // not the type, to decide).
-      if (root.host.searching) w += Ui.chevronW
+      if (searching) w += Ui.chevronW
       w += root.trailWidthFor(it)
+      if (uid !== "")
+        root._memoRowWStore(uid, it.type, it.label, family, subLead, facts.sub,
+          subAccent, icon, glyph, fold, opts, facts.widest, value, searching,
+          unified, w)
       if (w > maxRow) maxRow = w
     }
     // Group separators / search breadcrumbs may be the widest line.

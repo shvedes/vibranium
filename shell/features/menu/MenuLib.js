@@ -1234,7 +1234,13 @@ function search(index, query) {
     source = _searchCacheHitSet
   }
 
-  const scored = []
+  // Parallel arrays, not one object per hit. A one-character query matches a
+  // large share of the index, and minting a fresh {entry, score, pos} for
+  // every hit is thousands of short-lived objects on the GUI thread per
+  // keypress - garbage the next collection has to walk while the user is still
+  // typing. The scan position never has to be stored: it IS the array index.
+  const hitEntries = []
+  const hitScores = []
   const n = source.length
   const tlen = tokens.length
 
@@ -1247,7 +1253,10 @@ function search(index, query) {
       const hay = entry.hay
       if (LauncherLib.SearchPlumbing.lengthReject(tok, hay)) continue
       const s = fuzzyScore(hay, entry.words, tok)
-      if (s >= 0) scored.push({ entry: entry, score: s, pos: i })
+      if (s >= 0) {
+        hitEntries.push(entry)
+        hitScores.push(s)
+      }
     }
   } else {
     // Longest token first -> the cheapest reject runs first. The AND total
@@ -1265,7 +1274,10 @@ function search(index, query) {
         if (s < 0) { ok = false; break }
         total += s
       }
-      if (ok) scored.push({ entry: entry, score: total, pos: i })
+      if (ok) {
+        hitEntries.push(entry)
+        hitScores.push(total)
+      }
     }
   }
 
@@ -1290,9 +1302,11 @@ function search(index, query) {
   // induction (the full scan is, and a subset of an ordered set is), which is
   // exactly what a fresh search gives, and the explicit position tiebreak
   // stops the result depending on the engine's sort being stable.
-  const full = new Array(scored.length)
-  for (let i = 0; i < scored.length; i++) full[i] = scored[i].entry
-  scored.sort((a, b) => b.score - a.score || a.pos - b.pos)
+  // Rank an ORDER ARRAY over the parallel hit arrays. The position term is
+  // the array index, so equal scores keep scan order exactly as the previous
+  // stable sort of score plus explicit position did - and only the returned
+  // window is materialized, never the ranked whole.
+  const m = hitEntries.length
   // The cap is on what is RETURNED and it grows with what the user has typed:
   // a one-character query ranks the index almost evenly, so handing back the
   // whole index makes the panel project a screenful of rows for a keystroke
@@ -1303,14 +1317,21 @@ function search(index, query) {
   // set stays complete either way, because the incremental branch above scans
   // it - anything past the cap is one more keystroke away, never one lost.
   const capLen = q.length >= 5 ? 200 : 40 * q.length
-  const cap = scored.length > capLen ? capLen : scored.length
+  const cap = m > capLen ? capLen : m
   const out = new Array(cap)
-  for (let i = 0; i < cap; i++) out[i] = scored[i].entry
+  if (m === 1) {
+    out[0] = hitEntries[0]
+  } else if (m > 1) {
+    const order = new Array(m)
+    for (let i = 0; i < m; i++) order[i] = i
+    order.sort((a, b) => hitScores[b] - hitScores[a] || a - b)
+    for (let i = 0; i < cap; i++) out[i] = hitEntries[order[i]]
+  }
 
   _searchCacheIndex = index
   _searchCacheLen = index.length
   _searchCacheQ = q
-  _searchCacheHitSet = full
+  _searchCacheHitSet = hitEntries
   _searchCacheEntries = out
   return out
 }
