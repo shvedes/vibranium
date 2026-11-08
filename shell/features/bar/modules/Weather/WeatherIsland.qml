@@ -706,19 +706,14 @@ Item {
     function onLocationSuggestionsChanged() { root.resetSuggestionView() }
   }
 
-  // Refresh on every show: the content is incubated fresh, so
-  // creation is open. Focus target for the suggestion-navigation Keys
+  // No fetch on show: the service refreshes on its own cadence and stays
+  // warm, so creation binds last-good data and an open only has to focus the
+  // content. A refresh started here would flash the temperature the user
+  // just came to read. Focus target for the suggestion-navigation Keys
   // handlers above (the Clock island focuses its content the same way).
   // Teardown exits an open location editor, back to the city label.
-  //
-  // A show is a user open, not a boot construction: IslandHost keeps the
-  // content Loader inactive while the island is closed, so the cycle started
-  // here is one the user asked for and reports as one.
   Component.onCompleted: {
-    if (root.weather) {
-      root.weather.refresh("user")
-      Qt.callLater(() => body.forceActiveFocus())
-    }
+    if (root.weather) Qt.callLater(() => body.forceActiveFocus())
   }
   Component.onDestruction: {
     if (root.weather && root.weather.editingLocation) root.weather.cancelEditingLocation()
