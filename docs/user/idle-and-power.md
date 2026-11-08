@@ -94,3 +94,9 @@ Two batteries each get their own notification instead of one replacing the other
 !!! note
     The two profile rows are hidden on desktops, virtual machines, and other systems that never switch power source.
     The menu adapts to your hardware.
+
+## Battery percentage in the bar
+
+**Vibranium Menu** -> **Settings** -> **Statusbar** -> **Module options** -> **Power** -> **Show percentage** prints the charge next to the battery icon.
+The readout follows the machine's own battery pack; mice, keyboards and other peripheral batteries stay in the tooltip and never widen the bar.
+On a machine with no builtin battery the option does nothing.

@@ -8,7 +8,7 @@
 {
   "title": "Settings",
   "pages": [
-    // --- settings page 1/52 (shell) ---
+    // --- settings page 1/53 (shell) ---
     {
         "group": "shell",
         "label": "General",
@@ -188,7 +188,7 @@
             }
         ]
     },
-    // --- settings page 2/52 (shell) ---
+    // --- settings page 2/53 (shell) ---
     {
         "group": "shell",
         "label": "App launcher",
@@ -301,7 +301,7 @@
             }
         ]
     },
-    // --- settings page 3/52 (shell) ---
+    // --- settings page 3/53 (shell) ---
     {
         "group": "shell",
         "id": "launcher-enabled",
@@ -342,7 +342,7 @@
             }
         ]
     },
-    // --- settings page 4/52 (shell) ---
+    // --- settings page 4/53 (shell) ---
     {
         "group": "shell",
         "id": "bar",
@@ -534,7 +534,7 @@
             }
         ]
     },
-    // --- settings page 5/52 (shell) ---
+    // --- settings page 5/53 (shell) ---
     {
         "group": "shell",
         "id": "bar-enabled",
@@ -622,7 +622,7 @@
             }
         ]
     },
-    // --- settings page 6/52 (shell) ---
+    // --- settings page 6/53 (shell) ---
     {
         "group": "shell",
         "id": "bar-modules",
@@ -665,11 +665,34 @@
                 "type": "submenu",
                 "label": "Color Picker",
                 "page": "bar-module-colorpicker"
+            },
+            {
+                "type": "submenu",
+                "label": "Power",
+                "page": "bar-module-power"
             }
         ],
         "options": []
     },
-    // --- settings page 7/52 (shell) ---
+    // --- settings page 7/53 (shell) ---
+    {
+        "group": "shell",
+        "id": "bar-module-power",
+        "label": "Power",
+        "desc": "Options of the bar power module.",
+        "showItemCount": true,
+        "options": [
+            {
+                "key": "shell.statusbar.batteryPercent",
+                "type": "bool",
+                "default": false,
+                "label": "Show percentage",
+                "sub": "Always show next to the icon",
+                "desc": "Show the builtin battery percentage next to the bar icon. Peripheral batteries are unaffected."
+            }
+        ]
+    },
+    // --- settings page 8/53 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-nowplaying",
@@ -695,7 +718,7 @@
             }
         ]
     },
-    // --- settings page 8/52 (shell) ---
+    // --- settings page 9/53 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-recording",
@@ -713,7 +736,7 @@
             }
         ]
     },
-    // --- settings page 9/52 (shell) ---
+    // --- settings page 10/53 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-volume",
@@ -748,7 +771,7 @@
             }
         ]
     },
-    // --- settings page 10/52 (shell) ---
+    // --- settings page 11/53 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-clock",
@@ -814,7 +837,7 @@
             }
         ]
     },
-    // --- settings page 11/52 (shell) ---
+    // --- settings page 12/53 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-weather",
@@ -883,7 +906,7 @@
             }
         ]
     },
-    // --- settings page 12/52 (shell) ---
+    // --- settings page 13/53 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-archupdates",
@@ -901,7 +924,7 @@
             }
         ]
     },
-    // --- settings page 13/52 (shell) ---
+    // --- settings page 14/53 (shell) ---
     {
         "group": "shell",
         "id": "bar-module-colorpicker",
@@ -918,7 +941,7 @@
             }
         ]
     },
-    // --- settings page 14/52 (shell) ---
+    // --- settings page 15/53 (shell) ---
     {
         "group": "shell",
         "label": "Audio",
@@ -980,7 +1003,7 @@
             }
         ]
     },
-    // --- settings page 15/52 (shell) ---
+    // --- settings page 16/53 (shell) ---
     {
         "group": "shell",
         "label": "Screenshots",
@@ -1061,7 +1084,7 @@
             }
         ]
     },
-    // --- settings page 16/52 (shell) ---
+    // --- settings page 17/53 (shell) ---
     {
         "group": "shell",
         "label": "OSD",
@@ -1083,7 +1106,7 @@
             }
         ]
     },
-    // --- settings page 17/52 (shell) ---
+    // --- settings page 18/53 (shell) ---
     {
         "group": "shell",
         "label": "Night Light",
@@ -1124,7 +1147,7 @@
             }
         ]
     },
-    // --- settings page 18/52 (shell) ---
+    // --- settings page 19/53 (shell) ---
     {
         "group": "shell",
         "label": "Color picker",
@@ -1152,7 +1175,7 @@
             }
         ]
     },
-    // --- settings page 19/52 (shell) ---
+    // --- settings page 20/53 (shell) ---
     {
         "group": "shell",
         "label": "Lock screen",
@@ -1285,7 +1308,7 @@
             }
         ]
     },
-    // --- settings page 20/52 (shell) ---
+    // --- settings page 21/53 (shell) ---
     {
         "group": "shell",
         "id": "idle",
@@ -1325,7 +1348,7 @@
         ],
         "items": []
     },
-    // --- settings page 21/52 (shell) ---
+    // --- settings page 22/53 (shell) ---
     {
         "group": "shell",
         "id": "media-controls",
@@ -1429,7 +1452,7 @@
             }
         ]
     },
-    // --- settings page 22/52 (shell) ---
+    // --- settings page 23/53 (shell) ---
     {
         "group": "shell",
         "id": "power",
@@ -1532,7 +1555,7 @@
         ],
         "items": []
     },
-    // --- settings page 23/52 (env) ---
+    // --- settings page 24/53 (env) ---
     {
         "group": "env",
         "label": "Recording",
@@ -1659,7 +1682,7 @@
             }
         ]
     },
-    // --- settings page 24/52 (env) ---
+    // --- settings page 25/53 (env) ---
     {
         "group": "env",
         "label": "Brightness",
@@ -1701,7 +1724,7 @@
             }
         ]
     },
-    // --- settings page 25/52 (hypr) ---
+    // --- settings page 26/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland",
@@ -1741,7 +1764,7 @@
         ],
         "options": []
     },
-    // --- settings page 26/52 (hypr) ---
+    // --- settings page 27/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-edit",
@@ -1779,7 +1802,7 @@
         ],
         "options": []
     },
-    // --- settings page 27/52 (hypr) ---
+    // --- settings page 28/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-input",
@@ -1910,7 +1933,7 @@
             }
         ]
     },
-    // --- settings page 28/52 (hypr) ---
+    // --- settings page 29/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-input-touchpad",
@@ -1973,7 +1996,7 @@
             }
         ]
     },
-    // --- settings page 29/52 (hypr) ---
+    // --- settings page 30/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-input-layouts",
@@ -2026,7 +2049,7 @@
             }
         ]
     },
-    // --- settings page 30/52 (hypr) ---
+    // --- settings page 31/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance",
@@ -2102,7 +2125,7 @@
         ],
         "options": []
     },
-    // --- settings page 31/52 (hypr) ---
+    // --- settings page 32/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-gaps",
@@ -2195,7 +2218,7 @@
             }
         ]
     },
-    // --- settings page 32/52 (hypr) ---
+    // --- settings page 33/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur",
@@ -2725,7 +2748,7 @@
             }
         ]
     },
-    // --- settings page 33/52 (hypr) ---
+    // --- settings page 34/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-acrylic",
@@ -2804,7 +2827,7 @@
             }
         ]
     },
-    // --- settings page 34/52 (hypr) ---
+    // --- settings page 35/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-aurora",
@@ -2847,7 +2870,7 @@
             }
         ]
     },
-    // --- settings page 35/52 (hypr) ---
+    // --- settings page 36/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-drops",
@@ -2873,7 +2896,7 @@
             }
         ]
     },
-    // --- settings page 36/52 (hypr) ---
+    // --- settings page 37/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-fluid_jar",
@@ -2984,7 +3007,7 @@
             }
         ]
     },
-    // --- settings page 37/52 (hypr) ---
+    // --- settings page 38/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-glass",
@@ -3046,7 +3069,7 @@
             }
         ]
     },
-    // --- settings page 38/52 (hypr) ---
+    // --- settings page 39/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-haze",
@@ -3089,7 +3112,7 @@
             }
         ]
     },
-    // --- settings page 39/52 (hypr) ---
+    // --- settings page 40/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-heat_shimmer",
@@ -3115,7 +3138,7 @@
             }
         ]
     },
-    // --- settings page 40/52 (hypr) ---
+    // --- settings page 41/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-ripple",
@@ -3196,7 +3219,7 @@
             }
         ]
     },
-    // --- settings page 41/52 (hypr) ---
+    // --- settings page 42/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-blur-water",
@@ -3293,7 +3316,7 @@
             }
         ]
     },
-    // --- settings page 42/52 (hypr) ---
+    // --- settings page 43/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-glow",
@@ -3361,7 +3384,7 @@
             }
         ]
     },
-    // --- settings page 43/52 (hypr) ---
+    // --- settings page 44/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-shadow",
@@ -3469,7 +3492,7 @@
             }
         ]
     },
-    // --- settings page 44/52 (hypr) ---
+    // --- settings page 45/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-decoration",
@@ -3628,7 +3651,7 @@
             }
         ]
     },
-    // --- settings page 45/52 (hypr) ---
+    // --- settings page 46/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-wobble",
@@ -3810,7 +3833,7 @@
             }
         ]
     },
-    // --- settings page 46/52 (hypr) ---
+    // --- settings page 47/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-dim",
@@ -3900,7 +3923,7 @@
             }
         ]
     },
-    // --- settings page 47/52 (hypr) ---
+    // --- settings page 48/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-appearance-animations",
@@ -3975,7 +3998,7 @@
             }
         ]
     },
-    // --- settings page 48/52 (hypr) ---
+    // --- settings page 49/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced",
@@ -4147,7 +4170,7 @@
             }
         ]
     },
-    // --- settings page 49/52 (hypr) ---
+    // --- settings page 50/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-cursor",
@@ -4464,7 +4487,7 @@
             }
         ]
     },
-    // --- settings page 50/52 (hypr) ---
+    // --- settings page 51/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-scrolling",
@@ -4587,7 +4610,7 @@
             }
         ]
     },
-    // --- settings page 51/52 (hypr) ---
+    // --- settings page 52/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-dwindle",
@@ -4744,7 +4767,7 @@
             }
         ]
     },
-    // --- settings page 52/52 (hypr) ---
+    // --- settings page 53/53 (hypr) ---
     {
         "group": "hypr",
         "id": "hyprland-advanced-master",
