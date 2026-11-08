@@ -68,8 +68,8 @@ function moduleVisible(layout, groups, id) {
 // The boot-entrance expectation: every module the rendered layout shows,
 // with group keys expanded to their members (a group key renders its
 // members, never itself). Deduped, in first-seen order. The bar's entrance
-// gate waits until each of these has reported Ready, then releases all
-// slots together into one slidefade.
+// gate waits until each of these has reported Ready, then releases all slots
+// together, once the bar's own strip has slid in, into one slidefade.
 function entranceExpectedIds(layout, groups) {
   const out = []
   const seen = {}

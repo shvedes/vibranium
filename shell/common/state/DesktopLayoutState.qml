@@ -66,8 +66,9 @@ Singleton {
   // boot entrance.
   //
   // Two surfaces draw that entrance and they do not finish together: the bar's
-  // slidefade is a fixed window from the latch, while the wallpaper's first
-  // fade starts after its own decode and routinely ends later. So the milestone
+  // entrance is a fixed window from the latch (its strip slides in, then the
+  // modules fade onto it), while the wallpaper's first fade starts after its
+  // own decode and routinely ends later. So the milestone
   // is what the LAST of them reports - a first-report-wins flag would release
   // background work into the other one's motion, which is the stall this
   // exists to remove. The backstop covers a shell whose surface never reports

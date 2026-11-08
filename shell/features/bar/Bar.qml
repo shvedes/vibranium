@@ -718,8 +718,10 @@ Singleton {
   //
   // Holds every slot hidden until all placed modules have built, then
   // releases them together into one slidefade (down from the top edge,
-  // up from the bottom). One-shot: once latched it never closes again,
-  // so toggles and drags keep their existing grow/enter motion.
+  // up from the bottom) - but only after the bar's own strip has slid in,
+  // so the modules arrive on a surface that is already in place. One-shot:
+  // once latched it never closes again, so toggles and drags keep their
+  // existing grow/enter motion.
   //
   // Expected ids are the rendered layout expanded through groups (a group
   // key renders its members, never itself). Each must have reached `ready`
@@ -734,15 +736,19 @@ Singleton {
   property bool entranceWarming: false
   readonly property real entranceWarmOpacity: root.entranceWarming ? 0.004 : 0
   // The bar's own travel during the entrance: the whole surface starts one
-  // bar height outside the screen edge and glides home with the slots' fade,
-  // so the strip enters instead of being painted in place from the first
-  // frame. BarView translates its backdrop and modules by this and BarShadow
-  // its gradient, which keeps the shadow glued to the strip's trailing edge
-  // while it travels. One bar height is exactly enough to leave the window
-  // empty at the start. It is a distance toward the current screen edge, so a
-  // top/bottom flip mid-entrance re-aims the travel.
+  // bar height outside the screen edge and glides home before the modules
+  // fade, so the strip enters instead of being painted in place from the
+  // first frame. BarView translates its backdrop and modules by this and
+  // BarShadow its gradient, which keeps the shadow glued to the strip's
+  // trailing edge while it travels. One bar height is exactly enough to leave
+  // the window empty at the start. It is a distance toward the current screen
+  // edge, so a top/bottom flip mid-entrance re-aims the travel.
   readonly property real entranceSlideFrom: root.position === "top" ? -root.height : root.height
   property real entranceSlide: 0
+  // The modules' own release, one step behind the strip: the bar's surface
+  // slides in first, and only once that travel ends does this flip and let
+  // the held slots run their intro. Without motion it lands with the strip.
+  property bool entranceModulesReady: false
 
   Timer {
     id: entranceFallback
@@ -792,12 +798,16 @@ Singleton {
     // A settle re-check while the warm frame is pending must not jump the gun.
     if (entranceWarmFrame.running) return
     root.entranceReady = true
-    // The strip starts at the edge and travels home on the slots' curve and
-    // duration, so the bar's slide and the modules' fade are one motion.
-    // Without motion it simply rests in place.
+    // The strip starts at the edge and travels home first; the held slots
+    // follow once it has landed (entranceModulesPause below), so the modules
+    // fade onto a bar that is already in place. Without motion it simply
+    // rests in place and the slots land with it.
     if (MotionPolicy.enabled) {
       root.entranceSlide = root.entranceSlideFrom
       entranceSlideAnim.restart()
+    } else {
+      // No travel to wait for: the slots land with the strip.
+      root.entranceModulesReady = true
     }
     // Every placed module is built, which is the shell's own answer to "boot
     // construction settled" - the surfaces that play a boot animation (the
@@ -822,17 +832,33 @@ Singleton {
   // A pause advances on the driver that drives the slots' own tweens, so one
   // spanning the motion plus a frame ends on the first tick after the last
   // frame that drew it, whatever the refresh rate or the timer precision. 16
-  // names a frame at 60Hz, the convention entranceWarmFrame uses below.
+  // names a frame at 60Hz, the convention entranceWarmFrame uses below. The
+  // entrance is two motions now - the strip's slide, then the slots' intro -
+  // so the pause spans both.
   PauseAnimation {
     id: entrancePlayedPause
 
     running: root.entranceReady
-    duration: MotionPolicy.duration(Ui.slowMs) + 16
+    duration: MotionPolicy.duration(Ui.slowMs) * 2 + 16
     onFinished: DesktopLayoutState.noteBootEntrancePlayed("bar")
   }
 
-  // The entrance travel: same curve and duration as a slot's intro fade
-  // (Zone.intro), so the strip and its contents arrive together.
+  // The modules' release waits out the strip's travel: it starts from the
+  // same latch and runs for the slide's own duration on the animation driver,
+  // so it ends on the first tick after the last frame that drew the bar and
+  // the slots' intro then plays over a settled backdrop. The duration is 0
+  // without motion, where the slots land with the strip anyway.
+  PauseAnimation {
+    id: entranceModulesPause
+
+    running: root.entranceReady && !root.entranceModulesReady
+    duration: MotionPolicy.duration(Ui.slowMs)
+    onFinished: root.entranceModulesReady = true
+  }
+
+  // The entrance travel: the strip's own slide, with the curve and duration a
+  // slot's intro uses (Zone.intro). The slots start only after it (see
+  // entranceModulesPause), so the bar is in place before its contents fade on.
   NumberAnimation {
     id: entranceSlideAnim
 

@@ -961,17 +961,18 @@ Item {
     // departures stay fully visible while sliding shut.
     //
     // Boot entrance (intro below) multiplies this: during the boot hold
-    // both are live (enter 1, intro 0 -> opacity 0), on release intro
-    // carries the slidefade. Post-boot toggles ride enter alone.
+    // both are live (enter 1, intro 0 -> opacity 0), and once the bar's own
+    // slide has landed intro carries the slidefade. Post-boot toggles ride
+    // enter alone.
     opacity: slot.enter * slot.intro
     // Boot slide: held above the bar (top) or below it (bottom) until
-    // Bar releases the entrance, then glides home with the fade above.
+    // Bar releases the modules, then glides home with the fade above.
     // Position-driven, so a top/bottom flip mid-hold re-aims the travel;
     // at rest (intro 1) this is 0 whatever the position is.
     y: (1 - slot.intro) * slot.introOffset
     readonly property real introOffset: Bar.position === "top" ? -Ui.s : Ui.s
-    // Boot entrance hold: 0 until Bar.entranceReady AND this slot's own
-    // Loader is Ready, then 1 together with every other held slot.
+    // Boot entrance hold: 0 until the bar's strip has slid in AND this
+    // slot's own Loader is Ready, then 1 together with every other held slot.
     // _bootHeld captures birth before the release - only those animate.
     // Post-boot births (toggles, owned arrivals) are born after the latch
     // and skip straight to 1 with the Behavior below gated off, keeping
@@ -985,7 +986,7 @@ Item {
     // frame of the animation (measured: 85ms inside the boot fade). The warm
     // opacity is drawn but not visible. See Bar._latchEntrance.
     property real intro: slot._bootHeld
-      ? ((Bar.entranceReady && contentLoader.status === Loader.Ready) ? 1 : Bar.entranceWarmOpacity) : 1
+      ? ((Bar.entranceModulesReady && contentLoader.status === Loader.Ready) ? 1 : Bar.entranceWarmOpacity) : 1
     Behavior on intro {
       enabled: slot._bootHeld && MotionPolicy.enabled
       NumberAnimation { duration: Ui.slowMs; easing.type: Easing.OutCubic }
@@ -997,10 +998,10 @@ Item {
     // live slot widths, so they track each frame with no easing on top.
     property real grow: root._initialGrow(slot.modelData.id)
     Component.onCompleted: {
-      // Capture birth before/after the entrance release: boot slots (born
+      // Capture birth before/after the modules' release: boot slots (born
       // held) keep the intro tween armed, post-boot births disarm it (see
       // the Behavior above) and skip straight to visible.
-      slot._bootHeld = !Bar.entranceReady
+      slot._bootHeld = !Bar.entranceModulesReady
       slot.grow = root._targetGrow(slot.modelData.id)
       // Arm the simultaneous fade: breaks the binding (stays 1), so the
       // later enteringIds cleanup cannot replay a second, delayed fade.
