@@ -495,12 +495,20 @@ Singleton {
     // so the picker never builds an inverted range; the commit validation
     // still rejects anything that breaks the increasing order.
     if (minMinutes > 10080) minMinutes = 10080
+    // With nothing configured the add row opens on a short 5-minute wait
+    // rather than the first legal minute; the picker floor stays at 1, so a
+    // shorter wait can still be typed. A non-empty list keeps opening on its
+    // own floor, which is the only minute that can be added. The stage
+    // carries the seed as well as the row: a row's state is seeded once per
+    // menu session, so deleting the last timers with the page open would
+    // otherwise keep suggesting the minute the row first rendered with.
+    const suggestedMinutes = root.timers.length === 0 ? 5 : minMinutes
     items.push({
       type: "select",
       id: "idle-add",
       label: "Add timer",
       sub: "Add new idle timer",
-      value: minMinutes,
+      value: suggestedMinutes,
       marker: false,
       keepOpen: true,
       hideValue: true,
@@ -514,7 +522,7 @@ Singleton {
         // fragile across the collapse transition (settled visible=false
         // with healthy text), while accent flips land every time - so the
         // narration rides the tail and the base never moves.
-        { kind: "number", min: minMinutes, max: 10080, step: 1, unit: "min", sub: "Add new idle timer", subAccent: "Trigger in..." },
+        { kind: "number", min: minMinutes, max: 10080, step: 1, value: suggestedMinutes, unit: "min", sub: "Add new idle timer", subAccent: "Trigger in..." },
         { kind: "text", placeholder: "e.g. vb-shell session lock", sub: "Add new idle timer", subAccent: "Command to run on trigger..." }
       ],
       onCall: "idle addFull %v"

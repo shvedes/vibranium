@@ -24,11 +24,12 @@
 # surface cannot be constructed headlessly (no PanelWindow backend under
 # QT_QPA_PLATFORM=offscreen), so the flow literal is lifted out of the
 # daemon and evaluated - the same way boot-catalog-test.sh lifts
-# Boot.qml's catalog. The two names the literal closes over (the minute
-# floor and the daemon's own action list) are stubbed: the minute floor
-# is a number, and the action list is empty, so a flow that reached for
-# it would evaluate to a select stage with no options rather than a
-# crash - which is the shape the "no action stage" assertion then fails.
+# Boot.qml's catalog. The names the literal closes over (the minute floor,
+# the opening minute the Add row suggests, and the daemon's own action
+# list) are stubbed: both minutes are numbers, and the action list is
+# empty, so a flow that reached for it would evaluate to a select stage
+# with no options rather than a crash - which is the shape the "no action
+# stage" assertion then fails.
 
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/lib.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/../../lib/harness.sh"
@@ -102,8 +103,8 @@ if (end < 0) {
 
 let flow = null
 try {
-  flow = new Function("minMinutes", "root",
-    "return (" + src.slice(start, end + 1) + ")")(1, { _actionOptions: () => [] })
+  flow = new Function("minMinutes", "suggestedMinutes", "root",
+    "return (" + src.slice(start, end + 1) + ")")(1, 5, { _actionOptions: () => [] })
 } catch (e) {
   process.stdout.write("error=the flow literal does not evaluate: " + String(e.message) + "\n")
   process.exit(0)
@@ -123,6 +124,7 @@ const number = flow.find(s => s.kind === "number")
 rec("numberMin", number ? number.min : "-")
 rec("numberMax", number ? number.max : "-")
 rec("numberUnit", number ? (number.unit === undefined ? "-" : number.unit) : "-")
+rec("numberSeed", number ? (number.value === undefined ? "-" : number.value) : "-")
 const text = flow.find(s => s.kind === "text")
 rec("textPlaceholder", text ? (text.placeholder === undefined ? "-" : text.placeholder) : "-")
 process.stdout.write(out.join("\n") + "\n")
@@ -141,6 +143,8 @@ t_eq "a number stage and a text stage, in that order" "number,text" "$(flow_fact
 t_eq "the number stage is the minutes" "1" "$(flow_fact numberMin)"
 t_eq "capped at a week" "10080" "$(flow_fact numberMax)"
 t_eq "and carries its unit" "min" "$(flow_fact numberUnit)"
+t_eq "and carries the minute it opens on" "5" "$(flow_fact numberSeed)"
+t_contains "an empty list opens on five minutes" 'root.timers.length === 0 ? 5 : minMinutes' "$DAEMON_SRC"
 t_eq "the text stage names the hint it shows" "e.g. vb-shell session lock" "$(flow_fact textPlaceholder)"
 
 t_section "no stage offers a choice"

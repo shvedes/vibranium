@@ -799,16 +799,26 @@ Item {
   }
 
   // Seeded number for flow number/range stages: the stored stage value
-  // when parseable, else the row value. One place feeds both the picker's
-  // value and its seed text, so Back-restored input and first-open
-  // defaults always agree (and the seed text below can pair the value
-  // with the STAGE suffix - the row-level display uses the top-level
-  // unit, which one-shot rows like Add timer do not declare).
+  // when parseable, else the stage's own declared value, else the row
+  // value. One place feeds both the picker's value and its seed text, so
+  // Back-restored input and first-open defaults always agree (and the seed
+  // text below can pair the value with the STAGE suffix - the row-level
+  // display uses the top-level unit, which one-shot rows like Add timer do
+  // not declare).
   function flowSeedNumber() {
     if (row.isFlow && (row.flowKind === "number" || row.flowKind === "range")) {
       const raw = Menu.flowValuesOf(itm)[String(row.flowIndex)]
       if (raw !== undefined) {
         const n = Number(String(raw).trim().split(/\s+/)[0])
+        if (!isNaN(n)) return n
+      }
+      // The stage's own value, read live rather than through the row state:
+      // a row's state is seeded once per menu session, so a page republished
+      // while it is open (idle timers deleted) would keep the old suggested
+      // minute from its first render.
+      const stage = row.flowStep
+      if (stage && stage.value !== undefined) {
+        const n = Number(stage.value)
         if (!isNaN(n)) return n
       }
     }
