@@ -134,7 +134,12 @@ PanelWindow {
   }
 
   visible: Bar.enabled && !Bar.hideToggle
-  color: Bar.blurred ? Ui.tint("background_0", 0.8) : Ui.solid("background_0")
+  // Transparent: the backdrop is drawn by barBackdrop below so that it can
+  // travel with the boot entrance slide. A surface color is painted by the
+  // window itself and cannot move, and it would leave the strip on screen
+  // while the contents slid in. The compositor's blur rule keys on alpha
+  // (ignore_alpha), so the blur follows the backdrop as it enters.
+  color: "transparent"
   // exclusiveZone implies ExclusionMode.Normal (reserves space for tiled
   // windows); an explicit Ignore would let windows slide under the bar.
   // A transient IPC-only hide (hideToggle) releases the zone like a
@@ -155,62 +160,83 @@ PanelWindow {
   // Uniform inset between the zones and every window edge. Zones anchor to
   // this filled container (not the window) so module positions stay
   // consistent for both positions.
+  //
+  // The slide wraps everything the bar paints - backdrop, modules, border -
+  // and the boot entrance translates it. The window itself stays where the
+  // compositor put it, so the exclusive zone and the geometry the zones
+  // publish never move, only what the bar draws inside it.
   Item {
-    id: content
+    id: barSlide
 
     anchors.fill: parent
-    anchors.topMargin: Ui.s
-    anchors.bottomMargin: Ui.s
-    anchors.leftMargin: Ui.s
-    anchors.rightMargin: Ui.s
+    y: Bar.entranceSlide
 
-    // Left hugs the start edge, center sits fixed on the horizontal
-    // center (fixed-center anchoring: independent of the side zones'
-    // widths), right hugs the end edge. Each instantiates its layout +
-    // owned slots and wires them to this window for popup anchoring.
-    // (Paint order lives in Zone itself: center above the sides, and a
-    // zone carrying a module above everything.)
-    Zone {
-      id: leftZone
-      region: "left"
-      hostWindow: win
+    // The bar's background, as an item rather than the window color so it
+    // rides the entrance slide with the modules (see the color above).
+    Rectangle {
+      id: barBackdrop
+
+      anchors.fill: parent
+      color: Bar.blurred ? Ui.tint("background_0", 0.8) : Ui.solid("background_0")
     }
 
-    Zone {
-      id: centerZone
-      region: "center"
-      hostWindow: win
+    Item {
+      id: content
+
+      anchors.fill: parent
+      anchors.topMargin: Ui.s
+      anchors.bottomMargin: Ui.s
+      anchors.leftMargin: Ui.s
+      anchors.rightMargin: Ui.s
+
+      // Left hugs the start edge, center sits fixed on the horizontal
+      // center (fixed-center anchoring: independent of the side zones'
+      // widths), right hugs the end edge. Each instantiates its layout +
+      // owned slots and wires them to this window for popup anchoring.
+      // (Paint order lives in Zone itself: center above the sides, and a
+      // zone carrying a module above everything.)
+      Zone {
+        id: leftZone
+        region: "left"
+        hostWindow: win
+      }
+
+      Zone {
+        id: centerZone
+        region: "center"
+        hostWindow: win
+      }
+
+      Zone {
+        id: rightZone
+        region: "right"
+        hostWindow: win
+      }
+
+      IslandHost {
+        id: islandHost
+
+        barPosition: Bar.position
+      }
+
+      ToolTipHost {
+        id: toolTipHost
+
+        barPosition: Bar.position
+      }
     }
 
-    Zone {
-      id: rightZone
-      region: "right"
-      hostWindow: win
+    Rectangle {
+      id: barBorder
+
+      z: 1
+      x: 0
+      y: Bar.position === "top" ? parent.height - height : 0
+      width: parent.width
+      height: 1
+      visible: Bar.showBorder
+      color: Ui.solid("background_3")
     }
-
-    IslandHost {
-      id: islandHost
-
-      barPosition: Bar.position
-    }
-
-    ToolTipHost {
-      id: toolTipHost
-
-      barPosition: Bar.position
-    }
-  }
-
-  Rectangle {
-    id: barBorder
-
-    z: 1
-    x: 0
-    y: Bar.position === "top" ? parent.height - height : 0
-    width: parent.width
-    height: 1
-    visible: Bar.showBorder
-    color: Ui.solid("background_3")
   }
 
   // Wallpaper drop target for the module zones. The move proxy's input

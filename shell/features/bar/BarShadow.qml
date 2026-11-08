@@ -31,7 +31,9 @@ PanelWindow {
 
   Rectangle {
     x: 0
-    y: Bar.position === "top" ? Bar.height : 0
+    // Travels with the strip (Bar.entranceSlide), so the gradient stays glued
+    // to the bar's trailing edge while the bar enters from the screen edge.
+    y: (Bar.position === "top" ? Bar.height : 0) + Bar.entranceSlide
     width: parent.width
     height: root.extent
     gradient: Gradient {

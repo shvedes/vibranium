@@ -35,16 +35,30 @@ PanelWindow {
   // The first resolved wallpaper often lands before that, so
   // show() parks its URL here instead of snapping; a later show()
   // overwrites it, latest wins. Replayed from onAnimKnownChanged.
-  // The decode starts as soon as the animation switch resolves, and the fade is
-  // not held for anything else. On a boot this surface is the one that maps
-  // first - the bar's module registry rides the async half (see
-  // Boot._bootVisuals) - so its crossfade over the theme fill is the first
-  // motion on screen, and the bar's slidefade follows on its own latch.
+  // The decode starts as soon as the animation switch resolves; the fade then
+  // waits for the boot's construction to finish (bootBuilt below) so it plays
+  // on a quiet thread. On a boot this surface is the one that maps first - the
+  // bar's module registry rides the async half (see Boot._bootVisuals) - so its
+  // crossfade over the theme fill opens the entrance, and the bar's slidefade
+  // follows on its own latch.
   property bool animKnown: HyprlandSettings.ready
   property string pendingUrl: ""
 
-  onAnimKnownChanged: {
-    if (!win.animKnown || win.pendingUrl === "") return
+  // The shell's one-time boot construction has to finish before the first
+  // fade starts: that construction blocks the GUI thread in turns of 100ms and
+  // 150ms, and a fade running through it freezes at whatever opacity it had
+  // reached and jumps ahead - measured on a cold boot as the first fade losing
+  // its middle and its tail, which reads as a flicker. The theme fill holds
+  // the surface until the milestone lands; a later swap is never gated.
+  readonly property bool bootBuilt: DesktopLayoutState.bootConstructionSettled
+
+  onAnimKnownChanged: win._replayPending()
+  onBootBuiltChanged: win._replayPending()
+
+  // Latest wins: a show() that arrives while either gate is closed parks its
+  // url, and the gate that opens last plays it.
+  function _replayPending() {
+    if (!win.animKnown || !win.bootBuilt || win.pendingUrl === "") return
     const url = win.pendingUrl
     win.pendingUrl = ""
     win.show(url)
@@ -154,7 +168,7 @@ PanelWindow {
   }
 
   function show(url) {
-    if (!win.animKnown) {
+    if (!win.animKnown || !win.bootBuilt) {
       win.pendingUrl = url
       warmupTimer.stop()
       return

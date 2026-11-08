@@ -110,6 +110,41 @@ Singleton {
     onTriggered: root._forceBootEntrancePlayed()
   }
 
+  // --- boot construction ---------------------------------------------------
+  //
+  // True once every late boot half has loaded and been adopted, which is the
+  // end of the shell's one-time construction: the bar half builds the bar and
+  // the services, the feature half the module singletons, and each adoption
+  // makes its units in single GUI turns. Measured on a cold boot those turns
+  // are 100ms and 150ms of blocked thread, so a surface animating through them
+  // freezes at whatever point it reached and jumps: the wallpaper's first fade
+  // lost its middle and its tail to exactly that, which reads as a flicker
+  // rather than a crossfade. So the first fade waits for this milestone
+  // (WallpaperView.show) and nothing else does.
+  //
+  // Earlier than bootEntranceSettled, which waits for the bar's module build
+  // after it: that build runs on the async halves' worker threads and is quiet
+  // on this thread, while the construction before it is not.
+  //
+  // The backstop is the same last resort as the two milestones above: a half
+  // that never lands must not hold a surface on the theme fill for the
+  // session, and the construction declares itself settled either way.
+  readonly property int bootConstructionBackstopMs: 2000
+  property bool bootConstructionSettled: false
+
+  function noteBootConstructionSettled(): bool {
+    if (root.bootConstructionSettled) return false
+    root.bootConstructionSettled = true
+    return true
+  }
+
+  Timer {
+    interval: root.bootConstructionBackstopMs
+    running: !root.bootConstructionSettled
+    repeat: false
+    onTriggered: root.noteBootConstructionSettled()
+  }
+
   // --- island pile-clearance ------------------------------------------------
   //
   // One IslandHost per bar view (per screen) publishes its card footprint

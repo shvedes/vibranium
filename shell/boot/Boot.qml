@@ -794,8 +794,15 @@ Item {
   function _halfSettled() {
     if (boot._halvesPending > 0) boot._halvesPending--
     // The last half settling is the moment a stashed demand has nowhere left
-    // to go: the replay drops what no half owns and releases the drain.
-    if (boot._halvesPending === 0) boot._replayNext()
+    // to go: the replay drops what no half owns and releases the drain. It is
+    // also the end of the boot's one-time construction - every adoption has
+    // run its units - which is what the wallpaper's first fade waits for
+    // (DesktopLayoutState.bootConstructionSettled). The replay runs first: it
+    // is the turn that constructs the last of those units.
+    if (boot._halvesPending === 0) {
+      boot._replayNext()
+      DesktopLayoutState.noteBootConstructionSettled()
+    }
   }
 
   function _loadBarHalf() {

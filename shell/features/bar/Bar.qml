@@ -733,6 +733,16 @@ Singleton {
   // composite is paid while nobody is looking rather than inside it.
   property bool entranceWarming: false
   readonly property real entranceWarmOpacity: root.entranceWarming ? 0.004 : 0
+  // The bar's own travel during the entrance: the whole surface starts one
+  // bar height outside the screen edge and glides home with the slots' fade,
+  // so the strip enters instead of being painted in place from the first
+  // frame. BarView translates its backdrop and modules by this and BarShadow
+  // its gradient, which keeps the shadow glued to the strip's trailing edge
+  // while it travels. One bar height is exactly enough to leave the window
+  // empty at the start. It is a distance toward the current screen edge, so a
+  // top/bottom flip mid-entrance re-aims the travel.
+  readonly property real entranceSlideFrom: root.position === "top" ? -root.height : root.height
+  property real entranceSlide: 0
 
   Timer {
     id: entranceFallback
@@ -782,23 +792,55 @@ Singleton {
     // A settle re-check while the warm frame is pending must not jump the gun.
     if (entranceWarmFrame.running) return
     root.entranceReady = true
+    // The strip starts at the edge and travels home on the slots' curve and
+    // duration, so the bar's slide and the modules' fade are one motion.
+    // Without motion it simply rests in place.
+    if (MotionPolicy.enabled) {
+      root.entranceSlide = root.entranceSlideFrom
+      entranceSlideAnim.restart()
+    }
     // Every placed module is built, which is the shell's own answer to "boot
     // construction settled" - the surfaces that play a boot animation (the
     // wallpaper's first fade) and the background boot phases read it instead
     // of racing this construction.
     DesktopLayoutState.noteBootEntranceSettled()
-    // The slidefade is what the entrance draws last, so its own duration is
-    // the played milestone: work that must not contend with the motion (the
-    // launcher's index build) reads that instead of guessing at this one.
-    entrancePlayedTimer.interval = MotionPolicy.duration(Ui.slowMs)
-    entrancePlayedTimer.restart()
+    // The played milestone is reported by entrancePlayedPause, which starts
+    // with this release (see its own note).
   }
 
-  Timer {
-    id: entrancePlayedTimer
+  // The played milestone: the entrance's own clock, not a nominal duration.
+  //
+  // Whatever it releases (the launcher's index build, the menu's bundle
+  // prewarm) must not contend with the motion, so it has to mean the last
+  // motion frame has been drawn. A duration alone cannot say that: the slots'
+  // tweens are applied on frame ticks, and a coarse Qt timer may fire up to 5%
+  // before its interval, so a timer of Ui.slowMs landed on the very tick that
+  // applied the last tween value - measured across cold boots, where it then
+  // paid for ~190ms of prewarm work in the frame that draws the landing, and
+  // the motion read as hitching as it arrived.
+  //
+  // A pause advances on the driver that drives the slots' own tweens, so one
+  // spanning the motion plus a frame ends on the first tick after the last
+  // frame that drew it, whatever the refresh rate or the timer precision. 16
+  // names a frame at 60Hz, the convention entranceWarmFrame uses below.
+  PauseAnimation {
+    id: entrancePlayedPause
 
-    repeat: false
-    onTriggered: DesktopLayoutState.noteBootEntrancePlayed("bar")
+    running: root.entranceReady
+    duration: MotionPolicy.duration(Ui.slowMs) + 16
+    onFinished: DesktopLayoutState.noteBootEntrancePlayed("bar")
+  }
+
+  // The entrance travel: same curve and duration as a slot's intro fade
+  // (Zone.intro), so the strip and its contents arrive together.
+  NumberAnimation {
+    id: entranceSlideAnim
+
+    target: root
+    property: "entranceSlide"
+    to: 0
+    duration: Ui.slowMs
+    easing.type: Easing.OutCubic
   }
 
   // The warm frame itself: one frame is the whole requirement, so the
