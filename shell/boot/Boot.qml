@@ -969,6 +969,10 @@ Item {
     const deadline = Date.now() + boot.frameBudgetMs
     const pending = []
     let progressed = false
+    // Whether this turn stopped on the budget with ids it never reached. Those
+    // are owed another turn; the ids that failed are the only ones a turn has
+    // actually proved something about.
+    let cutShort = false
     while (boot._replayQueue.length > 0) {
       const id = boot._replayQueue.shift()
       let resolved = false
@@ -983,15 +987,30 @@ Item {
       } else {
         pending.push(id)
       }
-      if (Date.now() >= deadline) break
+      if (Date.now() >= deadline) {
+        cutShort = boot._replayQueue.length > 0
+        break
+      }
     }
     boot._replayQueue = pending.concat(boot._replayQueue)
-    if (boot._replayQueue.length > 0 && boot._halvesPending > 0) {
+    if (boot._replayQueue.length > 0) {
+      // A turn that ran out of frame budget never looked at what it left, so it
+      // comes back for it even when the last half has already settled: the
+      // early tier stashes a facade whose half is still compiling, and the
+      // replay is the only thing that ever constructs it. Clearing the queue
+      // here on a budget cut dropped those demands whole - a facade unit then
+      // stayed stopped with nothing behind it, so its IPC target never existed.
+      if (cutShort && progressed) {
+        boot._requestPump(boot._replayNext)
+        return
+      }
       // What is left belongs to a half that has not landed. Only reschedule
       // while this turn made progress, so a half that never loads cannot spin
       // the pump; its adoption calls this again.
-      if (progressed) boot._requestPump(boot._replayNext)
-      return
+      if (boot._halvesPending > 0) {
+        if (progressed) boot._requestPump(boot._replayNext)
+        return
+      }
     }
     // No half left that could serve these: the same demand today would sit
     // behind an always-missing half and hold the drain with it.
