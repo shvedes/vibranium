@@ -7,14 +7,19 @@ import qs.common
 import qs.common as Common
 import qs.features.wallpaper
 import qs.boot
-// NOTE: qs.services and the other qs.features.* modules are imported by
-// BootLate.qml, not here. Importing a module loads its whole file set
-// before anything paints, so every module named here is on the
-// time-to-paint path. The bar is the largest of those sets by far - its
-// singleton imports the whole module registry - so it is a late unit: the
-// wallpaper is the surface that compiles and maps first, and the bar arrives
-// when the async half lands (see _bootVisuals). Floor and Phase 1 need only
-// the three above.
+// NOTE: qs.services and the other qs.features.* modules are imported by the
+// late halves, not here. Importing a module loads its whole file set before
+// anything paints, so every module named here is on the time-to-paint path.
+// The bar is the largest of those sets by far - its singleton imports the
+// whole module registry - so it is a late unit: the wallpaper is the surface
+// that compiles and maps first, and the bar arrives when the async half lands
+// (see _bootVisuals). Floor and Phase 1 need only the three above.
+//
+// The late work is split into two components so the bar does not wait for
+// modules it never uses: BootBar.qml carries the services and the bar itself,
+// BootLate.qml carries the feature modules (menu, launcher, apps, pickers,
+// annotations, notifications). Both load in the same turn and are adopted
+// independently.
 
 Item {
   id: boot
@@ -738,16 +743,32 @@ Item {
     hyprlandSettingsReadyConnection.target = HyprlandSettings
     miscSettingsReadyConnection.target = MiscSettings
     iconsReadyConnection.target = Icons
-    // Phase 2+ (the drain) needs the late half first: its imports are what
-    // resolving any late unit compiles, so the drain waits for it while
+    // Phase 2+ (the drain) needs both late halves: their imports are what
+    // resolving any late unit compiles, so the drain waits for them while
     // the floor and Phase 1 are already on screen.
   }
 
-  // The late half of boot (see BootLate.qml). Loaded asynchronously so its
-  // ~190ms of type loading happens off the UI thread instead of blocking
-  // first paint; the drain starts when it lands.
-  property var _late: null
-  property var _lateComponent: null
+  // The late halves of boot: BootBar.qml (the bar surface), BootServices.qml
+  // (the qs.services singletons) and BootLate.qml (feature modules). All three
+  // load asynchronously so their type loading happens off the UI thread
+  // instead of blocking first paint. Each half imports only the module set it
+  // resolves, so a half's compile is its own set rather than the union; that
+  // is what keeps the bar, the surface a boot is waiting on, off the services'
+  // and feature modules' file sets. They are adopted independently: the bar
+  // half demands the bar and starts the early service tier, while the drain
+  // waits for the feature half because the entrance and deferred queues
+  // resolve types that live there.
+  property var _lateBar: null
+  property var _lateBarComponent: null
+  property var _lateServices: null
+  property var _lateServicesComponent: null
+  property var _lateFeatures: null
+  property var _lateFeaturesComponent: null
+  // Halves that have not landed yet (Ready or Error). A demand that arrives
+  // while this is above zero is stashed for the replay; a failed half stops
+  // counting too, so one broken half cannot hold demands - or the drain that
+  // sits behind them - forever.
+  property int _halvesPending: 3
   property bool _drainStarted: false
   // Late-unit demands that arrived before the late half loaded (a bar
   // module hook ensuring its service during Phase 1). The resolver ran
@@ -761,93 +782,221 @@ Item {
   property bool _drainRequested: false
 
   function _loadLate() {
-    if (boot._late || boot._lateComponent) return
+    // Order is the bar first (measured: the smallest set is the one on the
+    // critical path), then the services the bar's modules read, then the
+    // feature modules nothing on the first screen needs.
+    boot._loadBarHalf()
+    boot._loadServicesHalf()
+    boot._loadFeaturesHalf()
+  }
+
+  // One half has landed, or failed and will never land.
+  function _halfSettled() {
+    if (boot._halvesPending > 0) boot._halvesPending--
+    // The last half settling is the moment a stashed demand has nowhere left
+    // to go: the replay drops what no half owns and releases the drain.
+    if (boot._halvesPending === 0) boot._replayNext()
+  }
+
+  function _loadBarHalf() {
+    if (boot._lateBar || boot._lateBarComponent) return
+    const comp = Qt.createComponent("BootBar.qml", Component.Asynchronous)
+    if (comp.status === Component.Ready) {
+      boot._adoptBarHalf(comp)
+    } else if (comp.status === Component.Error) {
+      Log.error("boot: bar half failed to load: " + comp.errorString())
+      boot._halfSettled()
+    } else {
+      boot._lateBarComponent = comp
+      comp.statusChanged.connect(boot._onBarHalfStatus)
+    }
+  }
+
+  function _onBarHalfStatus() {
+    const comp = boot._lateBarComponent
+    if (!comp || comp.status === Component.Loading) return
+    comp.statusChanged.disconnect(boot._onBarHalfStatus)
+    boot._lateBarComponent = null
+    if (comp.status === Component.Ready) {
+      boot._adoptBarHalf(comp)
+      return
+    }
+    // The shell degrades to no bar; the feature half still lands and starts
+    // the drain, and the entrance milestone falls back to its backstop.
+    Log.error("boot: bar half failed to load: " + comp.errorString())
+    boot._halfSettled()
+  }
+
+  function _loadServicesHalf() {
+    if (boot._lateServices || boot._lateServicesComponent) return
+    const comp = Qt.createComponent("BootServices.qml", Component.Asynchronous)
+    if (comp.status === Component.Ready) {
+      boot._adoptServicesHalf(comp)
+    } else if (comp.status === Component.Error) {
+      Log.error("boot: services half failed to load: " + comp.errorString())
+      boot._halfSettled()
+    } else {
+      boot._lateServicesComponent = comp
+      comp.statusChanged.connect(boot._onServicesHalfStatus)
+    }
+  }
+
+  function _onServicesHalfStatus() {
+    const comp = boot._lateServicesComponent
+    if (!comp || comp.status === Component.Loading) return
+    comp.statusChanged.disconnect(boot._onServicesHalfStatus)
+    boot._lateServicesComponent = null
+    if (comp.status === Component.Ready) {
+      boot._adoptServicesHalf(comp)
+      return
+    }
+    // The shell degrades to no service singletons: the demands that waited on
+    // this half have nowhere to go, and _halfSettled lets the replay drop them
+    // instead of holding the drain behind a half that will never land.
+    Log.error("boot: services half failed to load: " + comp.errorString())
+    boot._halfSettled()
+  }
+
+  function _loadFeaturesHalf() {
+    if (boot._lateFeatures || boot._lateFeaturesComponent) return
     const comp = Qt.createComponent("BootLate.qml", Component.Asynchronous)
     if (comp.status === Component.Ready) {
       boot._adoptLate(comp)
     } else if (comp.status === Component.Error) {
       Log.error("boot: late half failed to load: " + comp.errorString())
+      boot._halfSettled()
       boot._beginDrain()
     } else {
-      boot._lateComponent = comp
-      comp.statusChanged.connect(boot._onLateStatus)
+      boot._lateFeaturesComponent = comp
+      comp.statusChanged.connect(boot._onFeaturesHalfStatus)
     }
   }
 
-  function _onLateStatus() {
-    const comp = boot._lateComponent
+  function _onFeaturesHalfStatus() {
+    const comp = boot._lateFeaturesComponent
     if (!comp || comp.status === Component.Loading) return
-    comp.statusChanged.disconnect(boot._onLateStatus)
-    boot._lateComponent = null
+    comp.statusChanged.disconnect(boot._onFeaturesHalfStatus)
+    boot._lateFeaturesComponent = null
     if (comp.status === Component.Ready) {
       boot._adoptLate(comp)
       return
     }
     Log.error("boot: late half failed to load: " + comp.errorString())
+    boot._halfSettled()
     boot._beginDrain()
   }
 
-  function _adoptLate(comp) {
-    boot._late = comp.createObject(boot, { boot: boot })
-    if (!boot._late) {
-      Log.error("boot: late half failed to instantiate")
-      boot._beginDrain()
+  // The bar half landed. Services before the surface (see _startEarly): one
+  // budgeted turn of the early tier runs before the bar's construction is
+  // demanded, so the bus-name daemons exist while the bar is still compiling
+  // instead of one entrance later. It is bounded by frameBudgetMs, so it
+  // cannot starve the bar build it precedes.
+  function _adoptBarHalf(comp) {
+    boot._lateBar = comp.createObject(boot, { boot: boot })
+    if (!boot._lateBar) {
+      Log.error("boot: bar half failed to instantiate")
+      boot._halfSettled()
       return
     }
-    annotationLoader.sourceComponent = boot._late.annotationComponent()
-    // Services before surfaces (see _startEarly): one budgeted turn of the
-    // early tier runs before the bar's construction is demanded, so the
-    // bus-name daemons exist while the bar is still compiling instead of one
-    // entrance later. It is bounded by frameBudgetMs, so it cannot starve the
-    // bar build it precedes.
     boot._startEarly()
-    // The bar's construction belongs to this half (its singleton imports the
-    // module registry, so BootLate carries the compile), and it is demanded
-    // here rather than in _bootVisuals for the record's sake: a demand with
-    // nothing to dispatch to would leave UnitGate marking the unit ready with
-    // the bar nonexistent. Now the resolver has a target and the record's
-    // construction figure is the bar's own.
+    // The demand lives with the half that can serve it: a demand with nothing
+    // to dispatch to would leave UnitGate marking the unit ready with the bar
+    // nonexistent. The record's construction figure is the bar's own.
     try {
       UnitGate.ensure("bar", "boot")
     } catch (error) {
       // Recorded on the unit's record by UnitGate.
     }
-    // Replay the demands the late half missed: resolve each stashed unit
-    // now that there is something to dispatch to, then refresh it so a
-    // unit with no ready predicate (or an already-true one) settles
-    // instead of sitting in starting. Units with a pending predicate
-    // settle through their own refresh hooks. The replay goes through the
-    // same frame budget as the drain: resolving a unit constructs a real
-    // singleton (a window, a device handle, a history read), and the
-    // stashed list is every service the bar demanded during Phase 1 - one
-    // unbounded turn of exactly that work is the stall this budget removes.
-    boot._replayQueue = boot._pendingLateResolves
-    boot._pendingLateResolves = []
     boot._replayNext()
+    boot._halfSettled()
   }
 
-  // One turn of the late replay. The drain starts once this empties, which
-  // is the order the two always had (the drain may need what the replay
-  // settles), so the yield points only split the burst into frames.
-  function _replayNext() {
-    const deadline = Date.now() + boot.frameBudgetMs
-    while (boot._replayQueue.length > 0) {
-      const id = boot._replayQueue.shift()
-      let resolved = true
-      try {
-        boot._late.resolve(id)
-      } catch (error) {
-        resolved = false
-        Log.error("boot: late replay for unit " + id + " failed: " + String((error && error.message) || error))
-      }
-      if (resolved) UnitGate.refresh(id)
-      if (Date.now() >= deadline) break
-    }
-    if (boot._replayQueue.length > 0) {
-      boot._requestPump(boot._replayNext)
+  // The services half landed. Nothing is demanded from it here: the early tier
+  // belongs to the bar half's adoption, and a unit whose turn has come is
+  // resolved by the replay. Adopting this half is what lets the stashed
+  // service demands move on.
+  function _adoptServicesHalf(comp) {
+    boot._lateServices = comp.createObject(boot, { boot: boot })
+    if (!boot._lateServices) {
+      Log.error("boot: services half failed to instantiate")
+      boot._halfSettled()
       return
     }
-    boot._beginDrain()
+    boot._replayNext()
+    boot._halfSettled()
+  }
+
+  // The feature half landed. The annotation controller component lives here
+  // with its import, and the drain is released now: its queues resolve feature
+  // types, so it could not start earlier even if the bar half already had.
+  function _adoptLate(comp) {
+    boot._lateFeatures = comp.createObject(boot, { boot: boot })
+    if (!boot._lateFeatures) {
+      Log.error("boot: late half failed to instantiate")
+      boot._beginDrain()
+      return
+    }
+    annotationLoader.sourceComponent = boot._lateFeatures.annotationComponent()
+    boot._replayNext()
+    boot._halfSettled()
+  }
+
+  // Resolve one unit through whichever half is loaded and owns it. A half
+  // answers false for an id it does not own, so this also answers "is the
+  // owner here yet" without a second list of ids to keep in step.
+  function _resolveLateNow(id) {
+    if (boot._lateBar && boot._lateBar.resolve(id)) return true
+    if (boot._lateServices && boot._lateServices.resolve(id)) return true
+    if (boot._lateFeatures && boot._lateFeatures.resolve(id)) return true
+    return false
+  }
+
+  // One turn of the late replay: resolve each stashed unit that has an owner
+  // now, then refresh it so a unit with no ready predicate (or an already-true
+  // one) settles instead of sitting in starting. A demand whose owner half is
+  // still compiling keeps its place for that half's adoption. The replay goes
+  // through the same frame budget as the drain: resolving a unit constructs a
+  // real singleton (a window, a device handle, a history read), and the
+  // stashed list is every service the bar demanded during Phase 1 - one
+  // unbounded turn of exactly that work is the stall this budget removes.
+  function _replayNext() {
+    // Demands that arrived while a half was compiling are held off the queue;
+    // an adoption (or the turn already scheduled) is what moves them on.
+    if (boot._pendingLateResolves.length > 0) {
+      boot._replayQueue = boot._replayQueue.concat(boot._pendingLateResolves)
+      boot._pendingLateResolves = []
+    }
+    const deadline = Date.now() + boot.frameBudgetMs
+    const pending = []
+    let progressed = false
+    while (boot._replayQueue.length > 0) {
+      const id = boot._replayQueue.shift()
+      let resolved = false
+      try {
+        resolved = boot._resolveLateNow(id)
+      } catch (error) {
+        Log.error("boot: late replay for unit " + id + " failed: " + String((error && error.message) || error))
+      }
+      if (resolved) {
+        UnitGate.refresh(id)
+        progressed = true
+      } else {
+        pending.push(id)
+      }
+      if (Date.now() >= deadline) break
+    }
+    boot._replayQueue = pending.concat(boot._replayQueue)
+    if (boot._replayQueue.length > 0 && boot._halvesPending > 0) {
+      // What is left belongs to a half that has not landed. Only reschedule
+      // while this turn made progress, so a half that never loads cannot spin
+      // the pump; its adoption calls this again.
+      if (progressed) boot._requestPump(boot._replayNext)
+      return
+    }
+    // No half left that could serve these: the same demand today would sit
+    // behind an always-missing half and hold the drain with it.
+    boot._replayQueue = []
+    if (boot._lateFeatures) boot._beginDrain()
   }
 
   function _beginDrain() {
@@ -1047,30 +1196,32 @@ Item {
     return true
   }
 
-  // Late-unit dispatch. A demand that lands before the late half has
-  // loaded is expected, not broken - Phase-1 surfaces ensure their
-  // services while the late half still compiles - so it is stashed for
-  // the replay in _adoptLate rather than resolved half-built. The drain
-  // itself only starts after the late half lands.
+  // Late-unit dispatch. A demand that lands before its half has loaded is
+  // expected, not broken - Phase-1 surfaces ensure their services while the
+  // halves still compile - so it is stashed for the replay rather than
+  // resolved half-built. The drain itself only starts after the feature half
+  // lands.
   function _lateResolve(id) {
-    if (!boot._late) {
+    if (boot._resolveLateNow(id)) return true
+    if (boot._halvesPending > 0) {
       if (boot._pendingLateResolves.indexOf(id) < 0) {
         boot._pendingLateResolves = boot._pendingLateResolves.concat([id])
       }
       Log.debug("boot: late half not loaded yet for unit " + id + ", demand stashed")
       return false
     }
-    return boot._late.resolve(id)
+    return false
   }
 
   function _lateReady(id) {
-    if (!boot._late) return false
-    return boot._late.readyState(id)
+    if (boot._lateFeatures && boot._lateFeatures.readyState(id)) return true
+    if (boot._lateServices && boot._lateServices.readyState(id)) return true
+    if (boot._lateBar && boot._lateBar.readyState(id)) return true
+    return false
   }
 
   function _lateTeardown(id) {
-    if (!boot._late) return
-    boot._late.teardown(id)
+    if (boot._lateFeatures) boot._lateFeatures.teardown(id)
   }
 
   // Rebuild the diagnostic report. Called by the verbs that read it, never by
@@ -1233,10 +1384,10 @@ Item {
   // must stay retryable or a capture keypress during startup would kill the
   // annotation flow for the whole session.
   function _ensureAnnotations() {
-    // A demand before the late half loads has no controller component to
+    // A demand before the feature half loads has no controller component to
     // build yet: stay retryable rather than failing the flow for the
     // whole session over a startup race.
-    if (!boot._late) return "pending"
+    if (!boot._lateFeatures) return "pending"
     // The resolver is what activates the loader, so the lease is taken on
     // the demand and the readiness read happens after the controller has
     // adopted - not before.

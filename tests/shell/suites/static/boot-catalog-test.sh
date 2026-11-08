@@ -42,6 +42,8 @@ t_init "boot-catalog" "the _catalog data: counts, the essential 14, activation m
 require_tools node awk sed grep sort paste tr wc uniq
 
 BOOT_QML="$SHELL_DIR/boot/Boot.qml"
+BOOTBAR_QML="$SHELL_DIR/boot/BootBar.qml"
+BOOTSERVICES_QML="$SHELL_DIR/boot/BootServices.qml"
 BOOTLATE_QML="$SHELL_DIR/boot/BootLate.qml"
 BOOT_README="$SHELL_DIR/boot/README.md"
 SHELL_README="$SHELL_DIR/README.md"
@@ -340,9 +342,14 @@ expect_count() {
 # resolver_cases prints the case labels of Boot.qml's _resolveDescriptor.
 resolver_cases() {
   # The resolver map is split: floor, Phase-1 and demand-driven cases live
-  # in Boot.qml (pre-paint), everything else in BootLate.qml (post-paint).
-  # The union is what has to cover the catalog exactly once.
+  # in Boot.qml (pre-paint), the bar in BootBar.qml, the service singletons
+  # in BootServices.qml and the feature modules in BootLate.qml (all three
+  # post-paint). The union is what has to cover the catalog exactly once.
   awk '/^  function _resolveDescriptor\(id\) \{$/,/^    return true$/' "$BOOT_QML" |
+    sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
+  awk '/^  function resolve\(id\) \{$/,/^    return true$/' "$BOOTBAR_QML" |
+    sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
+  awk '/^  function resolve\(id\) \{$/,/^    return true$/' "$BOOTSERVICES_QML" |
     sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
   awk '/^  function resolve\(id\) \{$/,/^    return true$/' "$BOOTLATE_QML" |
     sed -n 's/^[[:space:]]*case "\([^"]*\)":.*/\1/p'
@@ -686,6 +693,8 @@ t_contains "appLauncher's teardown delegates to the late half" "_lateTeardown" \
   "$(unit_field appLauncher TDBODY)"
 t_contains "pass's teardown delegates to the late half" "_lateTeardown" \
   "$(unit_field pass TDBODY)"
+t_file "BootBar.qml exists" "$BOOTBAR_QML"
+t_file "BootServices.qml exists" "$BOOTSERVICES_QML"
 t_file "BootLate.qml exists" "$BOOTLATE_QML"
 t_contains "the late half releases the appLauncher controller" "AppLauncher.teardownController()" \
   "$(latelate_body)"

@@ -1,4 +1,6 @@
 module qs.boot
 
 Boot 1.0 Boot.qml
+BootBar 1.0 BootBar.qml
+BootServices 1.0 BootServices.qml
 BootLate 1.0 BootLate.qml

@@ -1,9 +1,6 @@
 pragma ComponentBehavior: Bound
 import QtQml
 import QtQuick
-import qs.services
-import qs.services as Services
-import qs.features.bar
 import qs.features.menu
 import qs.features.launcher
 import qs.features.lock
@@ -24,23 +21,26 @@ import qs.features.pickers.font
 import qs.features.wallpaperPicker
 import qs.features.powerMenu
 
-// Late boot half: every feature-module import and every singleton touch
-// that is not needed before first paint.
+// Feature half of the late boot: the feature modules nothing on the first
+// screen needs (menu, launcher, apps, pickers, annotations, notifications,
+// clipboard, polkit, OSD, power menu) and the singleton touches that reach
+// them.
 //
-// Boot.qml keeps the whole catalog (ids, dependencies, counts) plus the
-// floor and Phase-1 resolvers, so the static catalog suite and the graph
-// validation see one unchanged table. What moves here is the *code* behind
-// the late resolvers, ready predicates and teardowns, together with the
-// imports that pull those types in. Importing a module loads its whole
-// file set before anything paints, so holding these imports here - and
-// constructing this object asynchronously after Phase 1 - keeps ~190ms of
-// type loading off the time-to-paint path (measured best-of-3, in-probe:
-// 687ms full import set vs 492ms floor+P1 set).
+// The services and the bar live in BootBar.qml, not here. Splitting the two
+// is what keeps the bar off this file's compile: a component's imports load
+// their whole file sets before it is ready, so when the bar shared this half
+// it could not be demanded until every feature module had been loaded too.
 //
-// Loaded via Qt.createComponent(..., Component.Asynchronous) from Boot,
-// never via `import qs.boot` member access, so no pre-paint import edge
-// reaches this file. Nothing here runs at construction: resolve/ready/
-// teardown are pure dispatches, and the two Connections only observe.
+// Boot.qml keeps the whole catalog (ids, dependencies, counts) plus the floor
+// and Phase-1 resolvers, so the static catalog suite and the graph validation
+// see one unchanged table. What moves here is the *code* behind the late
+// resolvers, ready predicates and teardowns, together with the imports that
+// pull those types in.
+//
+// Loaded via Qt.createComponent(..., Component.Asynchronous) from Boot, never
+// via `import qs.boot` member access, so no pre-paint import edge reaches this
+// file. Nothing here runs at construction: resolve/ready/teardown are pure
+// dispatches, and the Connections only observe.
 Item {
   id: late
 
@@ -50,30 +50,13 @@ Item {
 
   function resolve(id) {
     switch (id) {
-      case "idleDaemon":       void IdleDaemon.tag; break
-      case "inhibitor":        void Inhibitor.tag; break
-      case "session":          void Session.tag; break
-      // The bar is here for its import set, not its timing: Bar.qml imports
-      // the whole module registry, and a module import compiles its file set
-      // before anything paints. Loading it with this half keeps that compile
-      // on a worker thread and lets the wallpaper - a much smaller set - map
-      // on the first frame (see Boot._bootVisuals).
-      case "bar":              void Bar.tag; break
       case "lockscreen":       void Lockscreen.locked; break
       case "clipboard":        void Clipboard.tag; break
-      case "privacy":          void Privacy.tag; break
       case "osd":              void OSD.tag; break
       case "notifications":    void Notifications.tag; break
-      case "mediaEvents":      void Services.MediaEvents.tag; break
       case "menu":             void Menu.tag; break
-      case "audio":            void Audio.tag; break
-      case "mediaArt":         void MediaArt.tag; break
-      case "keyboard":         void Keyboard.tag; break
       case "app":              void AppHost.tag; break
       case "appLauncher":      void AppLauncher.tag; break
-      case "timer":            void Services.Timer.tag; break
-      case "recording":        void Recording.tag; break
-      case "update":           void Update.tag; break
       case "polkit":           void Polkit.tag; break
       case "emojiPicker":      void EmojiPicker.tag; break
       case "keybindings":      void Keybindings.tag; break
@@ -88,16 +71,6 @@ Item {
         break
       case "audioMixer":       void AudioMixer.tag; break
       case "imageViewer":      void ImageViewer.tag; break
-      case "archUpdates":      void Services.ArchUpdates.tag; break
-      case "powerProfile":     void Services.PowerProfile.tag; break
-      case "printers":         void Services.Printers.tag; break
-      case "powerPolicy":      void Services.PowerPolicy.tag; break
-      case "batteryAlert":     void Services.BatteryAlert.tag; break
-      case "connectivity":     void Services.Connectivity.tag; break
-      case "screenshots":
-        void Screenshots.tag
-        late._observeScreenshots()
-        break
       case "powerMenu":        void PowerMenu.tag; break
       default:                 return false
     }
@@ -112,7 +85,6 @@ Item {
       case "pass":          return Pass.facadeReady === true
       case "audioMixer":    return AudioMixer.facadeReady === true
       case "imageViewer":   return ImageViewer.facadeReady === true
-      case "screenshots":   return Screenshots._runtimeReady === true
       default:              return false
     }
   }
@@ -138,27 +110,15 @@ Item {
     return annotationComp
   }
 
-  // Observation edges, attached when the unit is first resolved rather than
+  // An observation edge, attached when the unit is first resolved rather than
   // when this half is constructed. A Connections element evaluates `target`
-  // at creation, so `target: Screenshots` here instantiated both singletons
-  // the moment _adoptLate built this object - before either unit's turn and
-  // inside the window the split exists to keep clear. Boot refreshes each unit
-  // right after resolve(), so the initial state needs no connection; these
-  // only carry later transitions.
-  function _observeScreenshots() {
-    if (screenshotsConnection.target === null) screenshotsConnection.target = Screenshots
-  }
-
+  // at creation, so `target: Pass` here instantiated the singleton the moment
+  // _adoptLate built this object - before its turn and inside the window the
+  // split exists to keep clear. Boot refreshes each unit right after
+  // resolve(), so the initial state needs no connection; this only carries
+  // later transitions.
   function _observePass() {
     if (passConnection.target === null) passConnection.target = Pass
-  }
-
-  Connections {
-    id: screenshotsConnection
-    target: null
-    function on_RuntimeReadyChanged() {
-      if (late.boot) late.boot._refreshUnit("screenshots")
-    }
   }
 
   Connections {
