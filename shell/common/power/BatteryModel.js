@@ -182,19 +182,30 @@ function formatRate(watts) {
   return Format.formatWatts(watts)
 }
 
-// Secondary row line: "85% - 2h 15m left". The island entry gives it one
-// line, so it carries the two basics and nothing else - the charge and
-// how long it has left. State, time to full, charge rate, health and
-// energy all live in the row's dropdown (detailRows), where there is
-// room for them.
+// Secondary row line: "85% - 2h 15m left" while running down, and
+// "85% - charging - 1h to full" while on the charger. The island entry
+// gives it one line, so it carries the direction of the charge and the
+// estimate that goes with it and nothing else. The other telemetry -
+// charge rate, health and energy - lives in the row's dropdown
+// (detailRows), where there is room for it.
+//
+// The direction decides the estimate: a charging device reports
+// timeToFull (and UPower leaves timeToEmpty at zero), a discharging one
+// reports timeToEmpty, so neither estimate is read on the wrong side.
 function rowSubtext(row) {
   var r = row || {}
   var pct = Math.round(Number(r.percentage))
   if (!isFinite(pct)) pct = 0
-  var parts = [pct + "%"]
-  var left = formatDuration(r.timeToEmpty)
-  if (left !== "") parts.push(left + " left")
-  return parts.join(" - ")
+  var text = pct + "%"
+  if (!!r.charging) {
+    text += " - charging"
+    var full = formatDuration(r.timeToFull)
+    if (full !== "") text += " - " + full + " to full"
+  } else {
+    var left = formatDuration(r.timeToEmpty)
+    if (left !== "") text += " - " + left + " left"
+  }
+  return text
 }
 
 // Lowest charge first so the critical device tops the island, ties by
@@ -264,8 +275,12 @@ function detailRows(info) {
 // asset, so a row always carries a glyph that says what the device is. The
 // level glyph is resolved from the SAME sanitized percentage the text
 // prints, so a row can never glyph a level that disagrees with its own
-// number. Deliberately just the device, its glyph and the charge - state
-// and telemetry live in the island.
+// number.
+//
+// The text is the device name and its charge, plus the charge direction
+// when the device is on the charger and, if UPower carries that estimate,
+// the time to full - the same shape the island entry's sub-line uses. The
+// rest of the telemetry stays in the island's per-device dropdown.
 function tooltipRows(entries) {
   var list = Array.isArray(entries) ? entries : []
   var rows = []
@@ -273,12 +288,61 @@ function tooltipRows(entries) {
     var e = list[i] || {}
     var pct = Math.round(Number(e.percentage))
     if (!isFinite(pct)) pct = 0
+    var text = String(e.label || "Unknown device") + " - " + pct + "%"
+    if (!!e.charging) text += " - charging"
+    var full = !!e.charging ? formatDuration(e.timeToFull) : ""
+    if (full !== "") text += " - " + full + " to full"
     rows.push({
       icon: deviceIconName(e.typeString) || batteryIconFor(pct, !!e.charging),
-      text: String(e.label || "Unknown device") + " - " + pct + "%"
+      text: text
     })
   }
   return rows
+}
+
+// The row a remembered device key names, or null when no row carries it.
+// `rows` holds plain snapshots with a `key` field (Model.deviceKey); a
+// remembered device that is no longer present resolves to null so the
+// caller can fall back to its own default.
+function rowForKey(rows, key) {
+  var k = String(key === undefined || key === null ? "" : key)
+  if (k === "") return null
+  var list = Array.isArray(rows) ? rows : []
+  for (var i = 0; i < list.length; i++) {
+    var r = list[i]
+    if (r && String(r.key === undefined || r.key === null ? "" : r.key) === k) return r
+  }
+  return null
+}
+
+// The device key one wheel notch lands on: rows[(at + step + n) % n], with
+// `step` read as a direction (+/-1), not a stride, so a fast wheel never
+// skips a device. A remembered key that is no longer in the list starts the
+// walk at the first row going forward and the last going back, so a stale
+// pick still enters the list instead of leaving the readout stuck.
+// Returns "" when there is nothing to move to: an empty list, a zero or
+// non-finite step, or a landing row that carries no key.
+function cycleKey(rows, currentKey, step) {
+  var list = Array.isArray(rows) ? rows : []
+  var n = list.length
+  var s = Number(step)
+  if (n === 0 || !isFinite(s) || s === 0) return ""
+  s = s > 0 ? 1 : -1
+  var cur = String(currentKey === undefined || currentKey === null ? "" : currentKey)
+  var at = -1
+  if (cur !== "") {
+    for (var i = 0; i < n; i++) {
+      var r = list[i]
+      if (r && String(r.key === undefined || r.key === null ? "" : r.key) === cur) {
+        at = i
+        break
+      }
+    }
+  }
+  var idx = at < 0 ? (s > 0 ? 0 : n - 1) : (at + s + n) % n
+  var hit = list[idx]
+  if (!hit) return ""
+  return String(hit.key === undefined || hit.key === null ? "" : hit.key)
 }
 
 // Stable key for one device, for the maps a reader keys on: the levels a
@@ -459,6 +523,8 @@ if (typeof module !== "undefined") {
     detailRows: detailRows,
     tooltipRows: tooltipRows,
     deviceKey: deviceKey,
+    rowForKey: rowForKey,
+    cycleKey: cycleKey,
     resolveLevels: resolveLevels,
     alertFor: alertFor,
     notifyArgv: notifyArgv,

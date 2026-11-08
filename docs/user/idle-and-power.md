@@ -98,5 +98,8 @@ Two batteries each get their own notification instead of one replacing the other
 ## Battery percentage in the bar
 
 **Vibranium Menu** -> **Settings** -> **Statusbar** -> **Module options** -> **Power** -> **Show percentage** prints the charge next to the battery icon.
-The readout follows the machine's own battery pack; mice, keyboards and other peripheral batteries stay in the tooltip and never widen the bar.
-On a machine with no builtin battery the option does nothing.
+The readout starts on the machine's own battery pack; scrolling over the module steps it through every battery device, mice and keyboards included, without widening the bar.
+The last device you scrolled to is remembered across shell restarts, and with no builtin battery the readout starts on the lowest device.
+
+The tooltip and each row of the island's device list state when a device is charging, and the time to full whenever UPower reports one.
+A discharging device shows the time left instead.

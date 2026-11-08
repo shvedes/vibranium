@@ -96,7 +96,7 @@ group('all six libraries load and publish a namespace', () => {
   // The counts are the ledger's own inputs, asserted here so a change to a
   // library's surface is a visible diff rather than a silent ledger shrink.
   eq('UnitIpc publishes one helper', Object.keys(UI).length, 1)
-  eq('Battery/Model publishes twenty', Object.keys(BAT).length, 20)
+  eq('Battery/Model publishes twenty-two', Object.keys(BAT).length, 22)
   eq('Bluetooth/Model publishes nine', Object.keys(BT).length, 9)
   // 28 functions plus the two table vars the module also declares. QML only
   // ever sees the functions, so the vars are the loader's extra surface.
@@ -729,17 +729,27 @@ group('the line carries the charge and the time left, and nothing else', () => {
   eq('without an estimate', BAT.rowSubtext({ percentage: 50 }), '50%')
   eq('a zero estimate is skipped, not printed as <1m', BAT.rowSubtext({ percentage: 50, timeToEmpty: 0 }), '50%')
   eq('a sub-minute estimate prints as <1m left', BAT.rowSubtext({ percentage: 50, timeToEmpty: 30 }), '50% - <1m left')
-  eq('a time to empty prints while charging too', BAT.rowSubtext({ percentage: 50, charging: true, timeToEmpty: 3600 }), '50% - 1h left')
+  eq('a time to empty is dropped while charging', BAT.rowSubtext({ percentage: 50, charging: true, timeToEmpty: 3600 }), '50% - charging')
   eq('a numeric string estimate coerces', BAT.rowSubtext({ percentage: 50, timeToEmpty: '60' }), '50% - 1m left')
+})
+group('a charging device states it, with the time to full when UPower carries one', () => {
+  eq('charging with an estimate', BAT.rowSubtext({ percentage: 85, charging: true, timeToFull: 3600 }), '85% - charging - 1h to full')
+  eq('charging without an estimate', BAT.rowSubtext({ percentage: 85, charging: true }), '85% - charging')
+  eq('a zero estimate is skipped, not printed as <1m', BAT.rowSubtext({ percentage: 85, charging: true, timeToFull: 0 }), '85% - charging')
+  eq('a sub-minute estimate prints as <1m', BAT.rowSubtext({ percentage: 85, charging: true, timeToFull: 30 }), '85% - charging - <1m to full')
+  eq('a numeric string estimate coerces', BAT.rowSubtext({ percentage: 85, charging: true, timeToFull: '60' }), '85% - charging - 1m to full')
+  eq('a full estimate', BAT.rowSubtext({ percentage: 85, charging: true, timeToFull: 8100 }), '85% - charging - 2h 15m to full')
+  eq('a time to full is ignored on a discharging device', BAT.rowSubtext({ percentage: 50, timeToFull: 3600 }), '50%')
 })
 group('the fields the dropdown owns are not repeated here', () => {
   eq('the state', BAT.rowSubtext({ percentage: 50, stateLabel: 'Charging' }), '50%')
-  eq('the rate and the time to full while charging', BAT.rowSubtext({ percentage: 85, charging: true, changeRate: 8.4, timeToFull: 3600 }), '85%')
+  eq('the rate', BAT.rowSubtext({ percentage: 85, charging: true, changeRate: 8.4 }), '85% - charging')
+  eq('a rate without a charger', BAT.rowSubtext({ percentage: 50, changeRate: 8.4 }), '50%')
   eq('a time to full on a discharging device', BAT.rowSubtext({ percentage: 50, timeToEmpty: 60, timeToFull: 3600 }), '50% - 1m left')
   eq('health', BAT.rowSubtext({ percentage: 50, healthSupported: true, healthPercentage: 98.6 }), '50%')
   eq('the energy pair', BAT.rowSubtext({ percentage: 50, energy: 48.2, energyCapacity: 51 }), '50%')
   eq('every other field at once', BAT.rowSubtext({ percentage: 40, stateLabel: 'Charging', charging: true, changeRate: 12.3, timeToFull: 1800, healthSupported: true, healthPercentage: 95, energy: 30, energyCapacity: 45 }),
-    '40%')
+    '40% - charging - 30m to full')
 })
 group('the percentage is rounded, and an unusable one reads as 0', () => {
   eq('an object with nothing but a percentage', BAT.rowSubtext({ percentage: 85 }), '85%')
@@ -807,6 +817,56 @@ group('the degenerate row lists', () => {
   eq('a null row sorts as full', BAT.sortRows([null, { label: 'x', percentage: 1 }]).map((r) => (r ? r.label : 'null')), ['x', 'null'])
   eq('a numeric label is stringified for the tie-break', BAT.sortRows([{ label: 2, percentage: 1 }, { label: 10, percentage: 1 }]).map((r) => r.label), [10, 2])
   eq('a missing label compares as empty', BAT.sortRows([{ percentage: 1 }, { percentage: 1 }]).length, 2)
+})
+
+section('Battery/Model.rowForKey - the remembered device')
+group('a stored key resolves to its row', () => {
+  const rows = [
+    { key: '/sys/class/power_supply/BAT0', label: 'Laptop', percentage: 80 },
+    { key: 'mouse', label: 'Mouse', percentage: 40 },
+  ]
+  eq('the first device', BAT.rowForKey(rows, '/sys/class/power_supply/BAT0'), rows[0])
+  eq('the second', BAT.rowForKey(rows, 'mouse'), rows[1])
+  eq('an unknown key', BAT.rowForKey(rows, '/nope'), null)
+  eq('an empty key', BAT.rowForKey(rows, ''), null)
+  eq('a null key', BAT.rowForKey(rows, null), null)
+  eq('a missing key', BAT.rowForKey(rows), null)
+  eq('a null list', BAT.rowForKey(null, 'mouse'), null)
+  eq('a non-array list', BAT.rowForKey('mouse', 'mouse'), null)
+  noThrow('a null row inside the list', () => BAT.rowForKey([null, { key: 'x' }], 'x'))
+})
+group('a row without a key never matches', () => {
+  eq('a missing row key', BAT.rowForKey([{ label: 'x', percentage: 50 }], 'x'), null)
+  eq('an empty stored key matches nothing', BAT.rowForKey([{ key: '', label: 'x' }], ''), null)
+})
+
+section('Battery/Model.cycleKey - one wheel notch')
+group('a step walks the list and wraps', () => {
+  const rows = [{ key: 'a' }, { key: 'b' }, { key: 'c' }]
+  eq('forward from the first', BAT.cycleKey(rows, 'a', 1), 'b')
+  eq('forward from the last wraps', BAT.cycleKey(rows, 'c', 1), 'a')
+  eq('back from the first wraps', BAT.cycleKey(rows, 'a', -1), 'c')
+  eq('back from the last', BAT.cycleKey(rows, 'c', -1), 'b')
+  // A notch's magnitude is a direction, not a stride: five detents in one
+  // event never skip four devices.
+  eq('a positive magnitude is one step forward', BAT.cycleKey(rows, 'a', 5), 'b')
+  eq('a negative magnitude is one step back', BAT.cycleKey(rows, 'b', -5), 'a')
+})
+group('a stale or missing key starts from an edge', () => {
+  const rows = [{ key: 'a' }, { key: 'b' }]
+  eq('forward from an unknown key', BAT.cycleKey(rows, 'gone', 1), 'a')
+  eq('back from an unknown key', BAT.cycleKey(rows, 'gone', -1), 'b')
+  eq('forward from no memory at all', BAT.cycleKey(rows, '', 1), 'a')
+  eq('a null remembered key', BAT.cycleKey(rows, null, 1), 'a')
+})
+group('degenerate inputs make no move', () => {
+  eq('an empty list', BAT.cycleKey([], 'a', 1), '')
+  eq('a null list', BAT.cycleKey(null, 'a', 1), '')
+  eq('a zero step', BAT.cycleKey([{ key: 'a' }], 'a', 0), '')
+  eq('a non-numeric step', BAT.cycleKey([{ key: 'a' }], 'a', 'x'), '')
+  eq('a missing step', BAT.cycleKey([{ key: 'a' }], 'a'), '')
+  eq('a single row comes back to itself', BAT.cycleKey([{ key: 'a' }], 'a', 1), 'a')
+  eq('a landing row without a key is no move', BAT.cycleKey([{ key: '' }], '', 1), '')
 })
 
 section('Battery/Model.detailRows - the per-device details dropdown')
@@ -949,13 +1009,21 @@ group('an empty or missing list is an empty tooltip', () => {
   eq('a number', BAT.tooltipRows(7), [])
   noThrow('an object', () => BAT.tooltipRows({}))
 })
-group('the tooltip never carries state or telemetry', () => {
-  // "Deliberately just the name and the charge - state and telemetry live in
-  // the island" - asserted so a future extra fragment is a visible diff.
+group('a charging device states it, with the time to full when UPower carries one', () => {
+  eq('charging with an estimate', BAT.tooltipRows([{ label: 'Laptop', typeString: 'Battery', percentage: 85, charging: true, timeToFull: 3600 }]),
+    [{ icon: 'laptop', text: 'Laptop - 85% - charging - 1h to full' }])
+  eq('charging without an estimate', BAT.tooltipRows([{ label: 'Laptop', typeString: 'Battery', percentage: 85, charging: true }]),
+    [{ icon: 'laptop', text: 'Laptop - 85% - charging' }])
+  eq('a zero estimate is skipped', BAT.tooltipRows([{ label: 'a', percentage: 85, charging: true, timeToFull: 0 }])[0].text, 'a - 85% - charging')
+  eq('a numeric string estimate coerces', BAT.tooltipRows([{ label: 'a', percentage: 85, charging: true, timeToFull: '60' }])[0].text, 'a - 85% - charging - 1m to full')
+  eq('a time to full is ignored on a discharging device', BAT.tooltipRows([{ label: 'a', percentage: 50, timeToFull: 3600 }])[0].text, 'a - 50%')
+})
+group('the rest of the telemetry stays in the island', () => {
+  // Asserted so a future extra fragment is a visible diff.
   const out = BAT.tooltipRows([{ label: 'Laptop', typeString: 'Battery', percentage: 15, stateLabel: 'Discharging', charging: false, timeToEmpty: 3600, changeRate: 8 }])
-  eq('only the two fragments', out, [{ icon: 'laptop', text: 'Laptop - 15%' }])
+  eq('only the name and the charge', out, [{ icon: 'laptop', text: 'Laptop - 15%' }])
   notContains('no state word', JSON.stringify(out), 'Discharging')
-  notContains('no time fragment', JSON.stringify(out), 'left')
+  notContains('no time left fragment', JSON.stringify(out), 'left')
   notContains('no rate', JSON.stringify(out), 'W')
 })
 group('the whole tooltip follows the row sort', () => {
@@ -4000,6 +4068,9 @@ const SURFACE = {
     'normalizePct', 'batteryIconFor', 'batteryAccentFor', 'batteryColorFor', 'isTrackedType',
     'deviceLabel', 'deviceIconName', 'prettyState', 'formatDuration', 'formatRate',
     'rowSubtext', 'sortRows', 'detailRows', 'tooltipRows',
+    // The wheel readout's remembered-device pair: the bar module's own
+    // selection and cycle walk over its row snapshots.
+    'rowForKey', 'cycleKey',
     // The six helpers services/power reads. Same file, other reader, so
     // they are listed here (the surface check is about the namespace) and
     // covered in services-power.test.mjs - see COVERED_ELSEWHERE.
@@ -4055,12 +4126,12 @@ group('the surface lists match the loaded namespaces exactly', () => {
     for (const t of TABLES[label]) eq(`${label}.${t} is an array`, Array.isArray(ns[t]), true)
   }
   eq('UnitIpc: 1 export', SURFACE['UnitIpc'].length, 1)
-  eq('Battery/Model: 20 exports', SURFACE['Battery/Model'].length, 20)
+  eq('Battery/Model: 22 exports', SURFACE['Battery/Model'].length, 22)
   eq('Bluetooth/Model: 9 exports', SURFACE['Bluetooth/Model'].length, 9)
   eq('Network/Model: 30 functions plus 2 table vars', SURFACE['Network/Model'].length + TABLES['Network/Model'].length, 32)
   eq('pass/Model: 24 exports', SURFACE['pass/Model'].length, 24)
   eq('WallpaperTrans: 18 exports', SURFACE['WallpaperTrans'].length, 18)
-  eq('104 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 104)
+  eq('106 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 106)
   // Six names are genuinely shared between two libraries - deviceLabel,
   // deviceIconName, formatRate, subtextFor, sectionTitleFor and listEntries -
   // and each is called through ITS OWN namespace, so the call check above

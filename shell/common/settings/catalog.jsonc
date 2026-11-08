@@ -687,8 +687,8 @@
                 "type": "bool",
                 "default": false,
                 "label": "Show percentage",
-                "sub": "Always show next to the icon",
-                "desc": "Show the builtin battery percentage next to the bar icon. Peripheral batteries are unaffected."
+                "sub": "Show one battery percentage",
+                "desc": "Show one battery percentage next to the bar icon."
             }
         ]
     },
