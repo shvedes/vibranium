@@ -1187,7 +1187,12 @@ Rectangle {
     //    new one is a bar covering the bottom of the row above and the top of
     //    the row below. Re-orders (equal counts) keep the ordinary glide.
     const countEdit = panel._records !== null && panel._records.length !== records.length
-    if (countEdit) {
+    // A projection seats its own head (see _installRows and seatFilteredHead),
+    // so it must not arm the identity restore: the arm is consumed by the
+    // count change the head seat races, and applying it afterwards puts the
+    // cursor back on the row it held before the query at whatever index that
+    // row now has - the last row of a narrowed projection, not the head.
+    if (countEdit && keepRow !== false) {
       list.snapHighlight()
       list.reseatAfter(panel.cursorIndexAfter(list.currentIndex, records))
     }
@@ -1356,6 +1361,12 @@ Rectangle {
 
     if (!plan.wholesale) {
       panel._clearCursorForSwap(records)
+      // A projection is a new row set, not a delta: the view goes to the
+      // head before the write, so the model change has no old offset to
+      // anchor to. Anchoring while scrolled is what leaves an origin gap
+      // (originY) above row 0 - the empty space a re-ranked search opens
+      // over, with the head row pushed down by the offset it remembered.
+      if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
       if (!panel._sameRecords(records)) {
         panel._writeRecords(records, !panel.searching && !panel.scopedSearching)
         if (plan.glide) panel._quiesceDisarm()
@@ -1389,6 +1400,10 @@ Rectangle {
        return
     }
 
+     // The same answer as the incremental path above: park the view at the
+     // head before the write, so the swap captures and restores the top
+     // rather than the offset the previous query was scrolled to.
+     if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
      panel._swapGen++
      const g = panel._swapGen
      const sameContent = panel._sameRecords(records)
@@ -3028,8 +3043,8 @@ Rectangle {
   // and the "/" quick-filter. The best match is the head of the new
   // projection, and the list has to show it: an install that keeps the
   // current item would otherwise carry the cursor onto whatever survived
-  // the re-rank. Re-ranks snap, so the viewport and the selection bar
-  // stay stationary while results update instead of gliding/flickering.
+  // the re-rank. Re-ranks snap, so the selection bar does not glide after
+  // the head while results update.
   function seatFilteredHead() {
     // Both views scan forward from 0 to the first cell they can focus, so
     // a head a guard disabled lands on the best row that can take it.
@@ -3037,7 +3052,19 @@ Rectangle {
       grid.settle(0, true)
       return
     }
-    list.settle(0, true)
+    // A pinned bar belongs to an install that is about to put the cursor
+    // back on the row it was on. A projection is the opposite - the cursor
+    // goes to the head - and the pin would keep the bar on the geometry
+    // captured before the query while the cursor moved off that row.
+    list.unpinHighlight()
+    list._hlHeld = false
+    // The head is usually not index 0: every result set opens with a section
+    // separator, and List.seat only returns the view to the top for index 0.
+    // Any other row is left to the follow, which measures the outgoing
+    // delegates during a re-rank and either holds or seats to a stale offset.
+    // restoreAt names both halves of the answer in one motionless seat: the
+    // first selectable row, and the top of the content.
+    list.restoreAt(0, 0)
   }
 
   // What the view is seated on, and what it is owed when the row set moves
