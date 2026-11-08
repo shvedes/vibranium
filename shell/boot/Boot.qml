@@ -769,6 +769,12 @@ Item {
   // counting too, so one broken half cannot hold demands - or the drain that
   // sits behind them - forever.
   property int _halvesPending: 3
+  // The halves whose adoption builds units on this thread: the bar (its
+  // demand constructs the surface) and the services. The feature half only
+  // dispatches - BootLate.qml builds nothing at construction - so the surfaces
+  // waiting on the construction milestone must not be held behind its compile,
+  // which is the longest of the three.
+  property int _constructHalvesPending: 2
   property bool _drainStarted: false
   // Late-unit demands that arrived before the late half loaded (a bar
   // module hook ensuring its service during Phase 1). The resolver ran
@@ -790,19 +796,22 @@ Item {
     boot._loadFeaturesHalf()
   }
 
-  // One half has landed, or failed and will never land.
-  function _halfSettled() {
+  // One half has landed, or failed and will never land. `heavy` marks a half
+  // whose adoption constructs units on this thread; see
+  // _constructHalvesPending.
+  function _halfSettled(heavy) {
     if (boot._halvesPending > 0) boot._halvesPending--
+    if (boot._constructHalvesPending > 0 && heavy === true) boot._constructHalvesPending--
+    // The construction milestone: the wallpaper's first fade waits for it
+    // (DesktopLayoutState.bootConstructionSettled) and nothing else does, so
+    // it names the end of the turns that block this thread rather than the end
+    // of the feature half's compile. Each heavy adoption replays its stashed
+    // demands before this, so the turn that constructs the last of its units
+    // has already run.
+    if (boot._constructHalvesPending === 0) DesktopLayoutState.noteBootConstructionSettled()
     // The last half settling is the moment a stashed demand has nowhere left
-    // to go: the replay drops what no half owns and releases the drain. It is
-    // also the end of the boot's one-time construction - every adoption has
-    // run its units - which is what the wallpaper's first fade waits for
-    // (DesktopLayoutState.bootConstructionSettled). The replay runs first: it
-    // is the turn that constructs the last of those units.
-    if (boot._halvesPending === 0) {
-      boot._replayNext()
-      DesktopLayoutState.noteBootConstructionSettled()
-    }
+    // to go: the replay drops what no half owns and releases the drain.
+    if (boot._halvesPending === 0) boot._replayNext()
   }
 
   function _loadBarHalf() {
@@ -812,7 +821,7 @@ Item {
       boot._adoptBarHalf(comp)
     } else if (comp.status === Component.Error) {
       Log.error("boot: bar half failed to load: " + comp.errorString())
-      boot._halfSettled()
+      boot._halfSettled(true)
     } else {
       boot._lateBarComponent = comp
       comp.statusChanged.connect(boot._onBarHalfStatus)
@@ -831,7 +840,7 @@ Item {
     // The shell degrades to no bar; the feature half still lands and starts
     // the drain, and the entrance milestone falls back to its backstop.
     Log.error("boot: bar half failed to load: " + comp.errorString())
-    boot._halfSettled()
+    boot._halfSettled(true)
   }
 
   function _loadServicesHalf() {
@@ -841,7 +850,7 @@ Item {
       boot._adoptServicesHalf(comp)
     } else if (comp.status === Component.Error) {
       Log.error("boot: services half failed to load: " + comp.errorString())
-      boot._halfSettled()
+      boot._halfSettled(true)
     } else {
       boot._lateServicesComponent = comp
       comp.statusChanged.connect(boot._onServicesHalfStatus)
@@ -861,7 +870,7 @@ Item {
     // this half have nowhere to go, and _halfSettled lets the replay drop them
     // instead of holding the drain behind a half that will never land.
     Log.error("boot: services half failed to load: " + comp.errorString())
-    boot._halfSettled()
+    boot._halfSettled(true)
   }
 
   function _loadFeaturesHalf() {
@@ -902,7 +911,7 @@ Item {
     boot._lateBar = comp.createObject(boot, { boot: boot })
     if (!boot._lateBar) {
       Log.error("boot: bar half failed to instantiate")
-      boot._halfSettled()
+      boot._halfSettled(true)
       return
     }
     boot._startEarly()
@@ -915,7 +924,7 @@ Item {
       // Recorded on the unit's record by UnitGate.
     }
     boot._replayNext()
-    boot._halfSettled()
+    boot._halfSettled(true)
   }
 
   // The services half landed. Nothing is demanded from it here: the early tier
@@ -926,11 +935,11 @@ Item {
     boot._lateServices = comp.createObject(boot, { boot: boot })
     if (!boot._lateServices) {
       Log.error("boot: services half failed to instantiate")
-      boot._halfSettled()
+      boot._halfSettled(true)
       return
     }
     boot._replayNext()
-    boot._halfSettled()
+    boot._halfSettled(true)
   }
 
   // The feature half landed. The annotation controller component lives here

@@ -35,12 +35,13 @@ PanelWindow {
   // The first resolved wallpaper often lands before that, so
   // show() parks its URL here instead of snapping; a later show()
   // overwrites it, latest wins. Replayed from onAnimKnownChanged.
-  // The decode starts as soon as the animation switch resolves; the fade then
-  // waits for the boot's construction to finish (bootBuilt below) so it plays
-  // on a quiet thread. On a boot this surface is the one that maps first - the
-  // bar's module registry rides the async half (see Boot._bootVisuals) - so its
-  // crossfade over the theme fill opens the entrance, and the bar's slidefade
-  // follows on its own latch.
+  // The decode starts as soon as the animation switch resolves; only the tween
+  // waits for the boot's construction to finish (bootBuilt below), so the fade
+  // plays on a quiet thread without putting the decode behind the build. On a
+  // boot this surface is the one that maps first - the bar's module registry
+  // rides the async half (see Boot._bootVisuals) - so its crossfade over the
+  // theme fill opens the entrance, and the bar's slidefade follows on its own
+  // latch.
   property bool animKnown: HyprlandSettings.ready
   property string pendingUrl: ""
 
@@ -48,17 +49,24 @@ PanelWindow {
   // fade starts: that construction blocks the GUI thread in turns of 100ms and
   // 150ms, and a fade running through it freezes at whatever opacity it had
   // reached and jumps ahead - measured on a cold boot as the first fade losing
-  // its middle and its tail, which reads as a flicker. The theme fill holds
-  // the surface until the milestone lands; a later swap is never gated.
+  // its middle and its tail, which reads as a flicker. So the milestone holds
+  // the tween, and only the tween: the decode runs from the moment the
+  // animation switch resolves, because it spends that time on the decoder's
+  // own thread and starting it here instead would put a 5K decode on the far
+  // side of the build. The theme fill holds the surface meanwhile, and a later
+  // swap is never gated.
   readonly property bool bootBuilt: DesktopLayoutState.bootConstructionSettled
 
   onAnimKnownChanged: win._replayPending()
-  onBootBuiltChanged: win._replayPending()
+  onBootBuiltChanged: {
+    win._replayPending()
+    if (win.pendingFade && frontImg.status === Image.Ready) win._startPendingFade()
+  }
 
-  // Latest wins: a show() that arrives while either gate is closed parks its
-  // url, and the gate that opens last plays it.
+  // Latest wins: a show() that arrives before the animation switch resolves
+  // parks its url, and the switch opening plays it.
   function _replayPending() {
-    if (!win.animKnown || !win.bootBuilt || win.pendingUrl === "") return
+    if (!win.animKnown || win.pendingUrl === "") return
     const url = win.pendingUrl
     win.pendingUrl = ""
     win.show(url)
@@ -72,6 +80,11 @@ PanelWindow {
   // no mask and start at once.
   function _startPendingFade() {
     if (!win.pendingFade) return
+    // The tween waits out the boot construction (bootBuilt); the decode behind
+    // it does not. A snap is exempt: it promotes with one source assignment,
+    // which cannot freeze mid-flight, and holding it would keep the wallpaper
+    // invisible after a decode that is already done.
+    if (!win.bootBuilt && MotionPolicy.enabled && win.transKind !== "") return
     if (MotionPolicy.enabled && Trans.isMaskKind(win.transKind)) warmupTimer.restart()
     else    win.startTrans()
   }
@@ -168,7 +181,7 @@ PanelWindow {
   }
 
   function show(url) {
-    if (!win.animKnown || !win.bootBuilt) {
+    if (!win.animKnown) {
       win.pendingUrl = url
       warmupTimer.stop()
       return

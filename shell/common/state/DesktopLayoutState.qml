@@ -113,15 +113,20 @@ Singleton {
 
   // --- boot construction ---------------------------------------------------
   //
-  // True once every late boot half has loaded and been adopted, which is the
-  // end of the shell's one-time construction: the bar half builds the bar and
-  // the services, the feature half the module singletons, and each adoption
+  // True once every late boot half that adopts units on this thread has
+  // loaded, which is the end of the shell's one-time construction: the bar
+  // half builds the bar, the services half the singletons, and each adoption
   // makes its units in single GUI turns. Measured on a cold boot those turns
   // are 100ms and 150ms of blocked thread, so a surface animating through them
   // freezes at whatever point it reached and jumps: the wallpaper's first fade
   // lost its middle and its tail to exactly that, which reads as a flicker
   // rather than a crossfade. So the first fade waits for this milestone
-  // (WallpaperView.show) and nothing else does.
+  // (WallpaperView) and nothing else does.
+  //
+  // The feature half is deliberately not part of it. Its adoption builds
+  // nothing - BootLate.qml only dispatches - while its compile is the longest
+  // of the three, so counting it would hold the first fade behind a type load
+  // that cannot block this thread.
   //
   // Earlier than bootEntranceSettled, which waits for the bar's module build
   // after it: that build runs on the async halves' worker threads and is quiet
