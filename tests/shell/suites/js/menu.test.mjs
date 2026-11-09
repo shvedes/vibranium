@@ -177,9 +177,9 @@ suite('menu/MenuLib', 'the menu framework\'s pure layer - 69 functions')
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // 70 functions plus the five search-cache `var`s, which the loader picks up
+  // 70 functions plus the six search-cache `var`s, which the loader picks up
   // because a `.pragma library` namespace is its top-level declarations.
-  eq('75 declarations', Object.keys(M).length, 75)
+  eq('76 declarations', Object.keys(M).length, 76)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
   eq('all 69 named functions are callable', missing, [])
   for (const n of SURFACE) {
@@ -201,7 +201,7 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 75 names', Object.keys(F).length, 75)
+  eq('the live view publishes the same 76 names', Object.keys(F).length, 76)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
@@ -2423,7 +2423,7 @@ group('a growing query narrows, a diverging one rescans', () => {
   eq('one character', labels(M.search(g, 'p')), ['Power', 'Powder', 'Pave'])
   eq('two characters', labels(M.search(g, 'po')), ['Power', 'Powder'])
   eq('three characters', labels(M.search(g, 'pow')), ['Power', 'Powder'])
-  eq('shrinking back rescans the whole index', labels(M.search(g, 'p')), ['Power', 'Powder', 'Pave'])
+  eq('shrinking back reuses the earlier scan', labels(M.search(g, 'p')), ['Power', 'Powder', 'Pave'])
   eq('diverging rescans too, and finds what the subset could not', labels(M.search(g, 'no')), ['Nower'])
   eq('a query the subset path would have hidden is still answered', labels(M.search(g, 'nw')), [])
   eq('because "nw" is not a substring of "nower" nor a word prefix', M.fuzzyScore('nower', ['nower'], 'nw'), -1)
@@ -2443,6 +2443,7 @@ group('a fresh namespace starts with an empty cache', () => {
   eq('no query cached', F._searchCacheQ, '')
   eq('no entries cached', F._searchCacheEntries, null)
   eq('no hit set cached', F._searchCacheHitSet, null)
+  eq('no recent queries cached', F._searchCacheRecent, [])
   eq('and a search still works', labels(F.search(indexOf([['Power', 'power']]), 'pow')), ['Power'])
 })
 
@@ -4053,9 +4054,9 @@ group('every one of the 69 functions was exercised above', () => {
   for (const name of SURFACE) {
     is(`${name} is called by this suite`, selfSource, (s) => new RegExp('\\b' + name + '\\s*\\(').test(s), 'called somewhere below')
   }
-  // The four cache `var`s are declarations, not functions, so they get the
+  // The cache `var`s are declarations, not functions, so they get the
   // read-side check instead.
-  for (const name of ['_searchCacheIndex', '_searchCacheQ', '_searchCacheEntries', '_searchCacheHitSet']) {
+  for (const name of ['_searchCacheIndex', '_searchCacheQ', '_searchCacheEntries', '_searchCacheHitSet', '_searchCacheRecent']) {
     contains(`${name} is read by this suite`, selfSource, name)
   }
 })

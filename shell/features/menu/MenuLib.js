@@ -1175,6 +1175,17 @@ var _searchCacheQ = ""
 var _searchCacheEntries = null
 var _searchCacheHitSet = null
 
+// Queries already scored against THIS index, oldest first, as
+// { q, hits, rows }. The incremental cache above only helps while the query
+// GROWS; backspacing ("power" -> "powe" -> "pow") is a shrink, and a query
+// that is not a prefix of the last one is a full scan of the index plus a
+// full sort of its hits. Those keys were scored seconds ago against the same
+// index, so their hit set and capped projection are still exact. Bounded to
+// eight queries because a hit set can be the whole index and the window only
+// has to span one editing session. Named with the other cache vars because
+// this is module state, not a published function.
+var _searchCacheRecent = []
+
 // Tokenized AND-search: every space-separated term must match on its own
 // (substring, or word-prefix like "fcap" -> "FPS cap"). "ins pack" finds
 // "Install" pages containing "Package"; single garbage tokens reject.
@@ -1187,6 +1198,9 @@ var _searchCacheHitSet = null
 // - per-entry fast reject: token longer than hay -> skip scoring
 // - incremental path: when query grows as a string prefix, scan only
 //   previous hits (typically 2-8 entries) instead of the full index
+// - recent-query path: a query already scored in this editing session
+//   (backspace, a removed token, toggling between two queries) is restored
+//   from a bounded cache instead of rescanning the index
 //
 // The index is not a fixed size and must not be reasoned about as one. It is
 // the bundle's own selectable rows PLUS every externally registered row
@@ -1198,6 +1212,17 @@ var _searchCacheHitSet = null
 // by the whole external half.
 function search(index, query) {
   const q = query.toLowerCase().trim()
+  // Length-aware identity lives in SearchLib.sameCacheIndex, reached here
+  // through LauncherLib's SearchPlumbing alias: the same array with a
+  // different length is a different index.
+  // Menu.indexExternal appends entries into the array it already searched,
+  // and an identity-only key answered the next identical query from before
+  // the append, without the new rows. The recent map rides the same test: a
+  // hit set scored against another index is not evidence about this one.
+  const sameIndex = LauncherLib.SearchPlumbing.sameCacheIndex(_searchCacheIndex, _searchCacheLen, index)
+  if (!sameIndex) {
+    _searchCacheRecent = []
+  }
   if (q === "") {
     _searchCacheIndex = index
     _searchCacheLen = index.length
@@ -1206,17 +1231,35 @@ function search(index, query) {
     _searchCacheHitSet = []
     return []
   }
-  // Length-aware identity lives in SearchLib.sameCacheIndex, reached here
-  // through LauncherLib's SearchPlumbing alias: the same array with a
-  // different length is a different index.
-  // Menu.indexExternal appends entries into the array it already searched,
-  // and an identity-only key answered the next identical query from before
-  // the append, without the new rows.
-  const sameIndex = LauncherLib.SearchPlumbing.sameCacheIndex(_searchCacheIndex, _searchCacheLen, index)
 
   // Cache hit: identical query on same index instance.
   if (LauncherLib.SearchPlumbing.identicalQuery(sameIndex, _searchCacheQ, q, _searchCacheEntries)) {
     return _searchCacheEntries.slice()
+  }
+
+  // Cache hit: a query already scored in this editing session. Restore it as
+  // the active cache as well, so the next forward key narrows from these hits
+  // instead of falling back to a full scan. Its projection was capped for
+  // this exact query length, which is the only input the cap reads.
+  let recent = null
+  for (let i = 0; i < _searchCacheRecent.length; i++) {
+    if (_searchCacheRecent[i].q === q) {
+      recent = _searchCacheRecent[i]
+      break
+    }
+  }
+  if (recent !== null) {
+    _searchCacheIndex = index
+    _searchCacheLen = index.length
+    _searchCacheQ = q
+    _searchCacheHitSet = recent.hits
+    _searchCacheEntries = recent.rows
+    const at = _searchCacheRecent.indexOf(recent)
+    if (at >= 0) {
+      _searchCacheRecent.splice(at, 1)
+      _searchCacheRecent.push(recent)
+    }
+    return recent.rows.slice()
   }
 
   // No empty-token guard: `q` is trimmed and non-empty past the check above,
@@ -1333,6 +1376,12 @@ function search(index, query) {
   _searchCacheQ = q
   _searchCacheHitSet = hitEntries
   _searchCacheEntries = out
+  // Remember this query for the editing session (see _searchCacheRecent): the
+  // scan-order hits feed the next forward key's subset scan, and the capped
+  // projection is what a backspace to this query returns. A recent-hit query
+  // returned above, so this list never holds a duplicate.
+  _searchCacheRecent.push({ q: q, hits: hitEntries, rows: out })
+  if (_searchCacheRecent.length > 8) _searchCacheRecent.shift()
   return out
 }
 
