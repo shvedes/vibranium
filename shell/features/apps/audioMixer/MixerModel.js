@@ -722,7 +722,10 @@ function parsePulseObjects(input) {
   }
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].replace(/\r$/, "")
+    // No replace for the CRLF case: it scanned and allocated a line that
+    // almost never carries a CR. A charCode test costs one comparison.
+    const rawLine = lines[i]
+    const line = rawLine.charCodeAt(rawLine.length - 1) === 13 ? rawLine.substring(0, rawLine.length - 1) : rawLine
     const header = HEADER_RE.exec(line)
     if (header !== null) {
       commit()
@@ -733,7 +736,9 @@ function parsePulseObjects(input) {
     // Fields are tab-indented. A continuation line (`Volume:`'s own
     // `balance 0.00` tail) is indented deeper and is not a field.
     if (line.charAt(0) !== "\t") continue
-    const body = line.replace(/^\t+/, "")
+    let tabs = 0
+    while (line.charCodeAt(tabs) === 9) tabs++
+    const body = line.substring(tabs)
     if (inProps) {
       // Property entries are `key = "value"` and carry no colon, which is
       // what keeps them out of the field branch below. Only two of them are
@@ -855,7 +860,10 @@ function parseStreamRoutes(input) {
   }
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].replace(/\r$/, "")
+    // No replace for the CRLF case: it scanned and allocated a line that
+    // almost never carries a CR. A charCode test costs one comparison.
+    const rawLine = lines[i]
+    const line = rawLine.charCodeAt(rawLine.length - 1) === 13 ? rawLine.substring(0, rawLine.length - 1) : rawLine
     const header = HEADER_RE.exec(line)
     if (header !== null) {
       commit()
@@ -868,7 +876,9 @@ function parseStreamRoutes(input) {
     // line that does not start with a tab is a block separator rather than
     // anything this walk reads.
     if (line.charAt(0) !== "\t") continue
-    const body = line.replace(/^\t+/, "")
+    let tabs = 0
+    while (line.charCodeAt(tabs) === 9) tabs++
+    const body = line.substring(tabs)
     if (inProps) {
       const eq = body.indexOf("=")
       if (eq > 0 && body.substring(0, eq).trim() === "object.id") {
@@ -1241,7 +1251,10 @@ function parseCardProfiles(input) {
   }
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].replace(/\r$/, "")
+    // No replace for the CRLF case: it scanned and allocated a line that
+    // almost never carries a CR. A charCode test costs one comparison.
+    const rawLine = lines[i]
+    const line = rawLine.charCodeAt(rawLine.length - 1) === 13 ? rawLine.substring(0, rawLine.length - 1) : rawLine
     const header = CARD_HEADER_RE.exec(line)
     if (header !== null) {
       commit()
@@ -1260,7 +1273,9 @@ function parseCardProfiles(input) {
     }
     if (card === null) continue
     const indent = line.length - line.replace(/^\t+/, "").length
-    const body = line.replace(/^\t+/, "")
+    let tabs = 0
+    while (line.charCodeAt(tabs) === 9) tabs++
+    const body = line.substring(tabs)
     // Indent first, state second, and the order is the whole parse: a card's
     // own fields are at one tab and its nested blocks at two, and
     // `Active Profile:` - the line that CLOSES the profile block - is itself a
