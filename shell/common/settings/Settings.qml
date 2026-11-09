@@ -242,9 +242,10 @@ Singleton {
   }
   // Backdrop source mode. Any malformed or missing value resolves to screen
   // so pre-existing configs keep the captured-screen backdrop unchanged.
+  // "none" paints the plain theme background and skips the backdrop layer.
   readonly property string lockscreenBackgroundMode: {
         const v = root.value("shell.lockscreen.backgroundMode")
-    return v === "background" ? v : "screen"
+    return v === "background" || v === "none" ? v : "screen"
   }
   // Backdrop vignette level. Unknown or missing values resolve to off so
   // pre-existing configs keep the unmodified backdrop.
@@ -357,8 +358,8 @@ Singleton {
   // list is the feature policy: the daemon must always arm. A valid empty
   // list stays empty in any state - nothing armed, nothing fires. Rows
   // stored before the class field existed are reconciled on read against
-  // the project's own session verbs, so a stored lock or suspend timer
-  // reaches the inhibitor guard instead of running ungated.
+  // the session verbs Vibranium itself runs, so a stored lock or suspend
+  // timer reaches the inhibitor guard instead of running ungated.
   readonly property var idleTimers: {
         const list = root.value("shell.idle.timers")
     if (SL.validateIdleTimers(list) !== "") return root._defaultIdleTimers.slice()

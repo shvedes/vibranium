@@ -1191,11 +1191,13 @@
                 "desc": "Select lockscreen background type.",
                 "values": [
                     "screen",
-                    "background"
+                    "background",
+                    "none"
                 ],
                 "valueLabels": {
                     "screen": "Screen contents",
-                    "background": "Wallpaper"
+                    "background": "Wallpaper",
+                    "none": "None"
                 }
             },
             {
@@ -1225,7 +1227,13 @@
                 "default": true,
                 "label": "Blurred backdrop",
                 "sub": "Blur lockscreen background",
-                "desc": "Whether to use blurred background."
+                "desc": "Whether to use blurred background. Unavailable without a backdrop.",
+                "showIf": [
+                    {
+                        "key": "shell.lockscreen.backgroundMode",
+                        "neq": "none"
+                    }
+                ]
             },
             {
                 "key": "shell.lockscreen.blurPower",
@@ -1248,6 +1256,10 @@
                     {
                         "key": "shell.lockscreen.blurBackground",
                         "eq": true
+                    },
+                    {
+                        "key": "shell.lockscreen.backgroundMode",
+                        "neq": "none"
                     }
                 ]
             },
@@ -1268,6 +1280,10 @@
                     {
                         "key": "shell.lockscreen.blurBackground",
                         "eq": false
+                    },
+                    {
+                        "key": "shell.lockscreen.backgroundMode",
+                        "neq": "none"
                     }
                 ]
             },
@@ -1288,6 +1304,10 @@
                     {
                         "key": "shell.lockscreen.blurBackground",
                         "eq": true
+                    },
+                    {
+                        "key": "shell.lockscreen.backgroundMode",
+                        "neq": "none"
                     }
                 ]
             },

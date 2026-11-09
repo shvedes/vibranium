@@ -14,7 +14,8 @@ import qs.features.lock
 // configurable level and optionally blurred when blurBackground is enabled,
 // with the auth field dead center. Field text mirrors Lockscreen.password so
 // every screen types in lockstep even though only the focused one receives
-// keys.
+// keys. In "none" mode there is no backdrop layer at all: the surface paints
+// the plain theme background color.
 WlSessionLockSurface {
   id: surface
 
@@ -22,6 +23,10 @@ WlSessionLockSurface {
   // chip and layout hint) animate unconditionally. Follows the global
   // animation switch.
   readonly property bool anims: MotionPolicy.enabled
+
+  // Backdrop source for this surface. "none" is a deliberate absence: the
+  // plain theme color paints and no backdrop layer is built at all.
+  readonly property string backgroundMode: Settings.lockscreenBackgroundMode
 
   // The compositor's name for this output. It is the only way to say which
   // screen a surface is about on a multi-monitor lock, where two screens can
@@ -39,7 +44,10 @@ WlSessionLockSurface {
   // settings here. "medium" and anything unrecognised fall back the same way in
   // each table, so a hand-edited store paints a sane surface rather than an
   // undrawable one.
-  readonly property bool blurEnabled: Settings.blurBackground === true
+  // "none" has no backdrop to blur, so blur is unavailable there even when a
+  // persisted blurBackground value still says true.
+  readonly property bool blurEnabled: surface.backgroundMode !== "none"
+    && Settings.blurBackground === true
 
   // Blur radius per power preset, as MultiEffect.blurMax. The MultiEffect
   // below keeps `blur` (intensity) and `blurMultiplier` fixed at 1.0, so this
@@ -79,10 +87,12 @@ WlSessionLockSurface {
     String(Settings.lockscreenBlurPower === undefined || Settings.lockscreenBlurPower === null
       ? "" : Settings.lockscreenBlurPower))
   // Dim fraction from separate settings for blurred vs non-blurred backdrops
-  // (0-100 -> 0-1). Picks the active dim based on blurEnabled.
-  readonly property real dim: surface._dimFraction(surface.blurEnabled
-    ? Settings.lockscreenDimBlurred
-    : Settings.lockscreenDim)
+  // (0-100 -> 0-1). Picks the active dim based on blurEnabled. A surface with
+  // no backdrop is not dimmed: the plain theme color is what "none" shows.
+  readonly property real dim: surface.backgroundMode === "none" ? 0
+    : surface._dimFraction(surface.blurEnabled
+      ? Settings.lockscreenDimBlurred
+      : Settings.lockscreenDim)
   readonly property real vignetteK: surface._vignetteFactor(
     String(Settings.lockscreenVignette === undefined || Settings.lockscreenVignette === null
       ? "" : Settings.lockscreenVignette))
@@ -214,7 +224,7 @@ WlSessionLockSurface {
 
       Loader {
         anchors.fill: parent
-        active: Settings.lockscreenBackgroundMode === "screen"
+        active: surface.backgroundMode === "screen"
         sourceComponent: screencopyComp
       }
 
@@ -228,7 +238,7 @@ WlSessionLockSurface {
       Image {
         id: backdropImg
         anchors.fill: parent
-        visible: Settings.lockscreenBackgroundMode === "background"
+        visible: surface.backgroundMode === "background"
         source: Lockscreen.backdropPath !== "" ? Paths.toFileUrl(Lockscreen.backdropPath) : ""
         fillMode: Image.PreserveAspectCrop
         asynchronous: true
@@ -263,19 +273,20 @@ WlSessionLockSurface {
     }
   }
 
-  // Backdrop is always needed - blurred or just dimmed - so the loader stays
-  // active. Capture warmup in Lockscreen.qml primes the backend regardless of
-  // blur state. Suppress the loader entirely for placeholder screens to
+  // Backdrop is needed whenever there is a source - blurred or just dimmed -
+  // so the loader stays active for screen and background mode. "none" skips
+  // it outright: no capture, no wallpaper decode, and the surface color is the
+  // whole backdrop. Suppress the loader entirely for placeholder screens to
   // avoid the "Layershell screen does not correspond to a real screen"
   // warning on wakeup when the compositor briefly advertises a fallback.
   //
-  // surface.screenValid is the one predicate: the same one the ScreencopyView
-  // above reads, so a suppressed backdrop and a captured frame cannot disagree
-  // about what a valid screen is.
+  // surface.screenValid is the one predicate for a real screen: the same one
+  // the ScreencopyView above reads, so a suppressed backdrop and a captured
+  // frame cannot disagree about what a valid screen is.
   Loader {
     id: backdropLoader
     anchors.fill: parent
-    active: surface.screenValid
+    active: surface.screenValid && surface.backgroundMode !== "none"
     sourceComponent: backdropComp
   }
 
