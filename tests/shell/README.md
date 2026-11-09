@@ -43,6 +43,7 @@ grepping the suites for a filename, which a single comment can fake.
 | Launcher plugins | **7/7** | through the real `PluginInstance.qml` host contract |
 | Settings catalog | 32 `.jsonc` | `suites/static/settings-catalog-test.sh` |
 | Themes | 30 | `suites/static/themes-test.sh` |
+| JS engine load | 64/64 libraries | every `.pragma library` file imported by a live Quickshell, `suites/static/js-engine-test.sh` |
 
 **The honest headline is the QML line.** Every `.qml` file is checked for import
 correctness, module-boundary correctness, `singleton` declaration agreement, and
@@ -152,7 +153,8 @@ tests/shell/
     architecture/       layer rules, import resolution, qmldir, the kit itself
     js/                 one .test.mjs per library area
     qml/                one probe .qml plus its driver, per component area
-    static/             boot catalog, ipptool, qmllint, assets, catalog, themes
+    static/             boot catalog, ipptool, qmllint, assets, catalog, themes,
+                        js-engine (load every JS library in the engine)
     cli/                the Hyprland editor CLI
 ```
 

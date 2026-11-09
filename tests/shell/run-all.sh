@@ -179,6 +179,7 @@ describe() {
   harness) printf 'the assertion kit itself fails when it should' ;;
   modules-wallpaper) printf 'the last pure-JS files: bar module models and WallpaperTrans' ;;
   settings-catalog) printf 'the 32 settings catalog files, run through the real engine' ;;
+  js-engine) printf 'every .pragma library JS file parses and binds in the QML engine' ;;
   themes) printf 'the 30 shipped themes and the palette the shell reads' ;;
   *) printf '' ;;
   esac
