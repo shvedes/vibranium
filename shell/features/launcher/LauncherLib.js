@@ -824,7 +824,10 @@ function searchRecords(records, query, cap, tiebreak) {
   // -> policy (sameCacheIndex + narrowsQuery): the same array with a different
   // -> length is a different pool, and the subset is scanned in pool order.
   if (SL.narrowsQuery(sameRecords, _searchCacheQ, q, _searchCacheHits)) source = _searchCacheHits
-  const scored = []
+  // Parallel arrays: one {rec, score, idx} per hit was thousands of objects
+  // per keypress on a one-letter query. The scan position is the push index.
+  const hitRecs = []
+  const hitScores = []
   for (let i = 0; i < source.length; i++) {
     const rec = source[i]
     let total = 0
@@ -834,26 +837,30 @@ function searchRecords(records, query, cap, tiebreak) {
       if (s < 0) ok = false
       else total += s
     }
-    if (ok) scored.push({ rec: rec, score: total, idx: i })
+    if (ok) {
+      hitRecs.push(rec)
+      hitScores.push(total)
+    }
   }
   // Cache the FULL hit set (pre-cap) for incremental filtering; callers
   // cap via slice, so we keep canonical hits untruncated for the next pass.
   // -> Two stores: scan-order for the subset scan, sorted for identical-query
   // -> cap slices. The scan-order copy is taken before the sort, the way the
   // -> menu keeps its hit set, so ties rank by pool order either way.
-  const hits = new Array(scored.length)
-  for (let i = 0; i < scored.length; i++) hits[i] = scored[i].rec
+  const hits = hitRecs
   const tb = typeof tiebreak === "function" ? tiebreak : null
-  scored.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score
+  const order = new Array(hitRecs.length)
+  for (let i = 0; i < order.length; i++) order[i] = i
+  order.sort((a, b) => {
+    if (hitScores[b] !== hitScores[a]) return hitScores[b] - hitScores[a]
     if (tb) {
-      const d = tb(b.rec) - tb(a.rec)
+      const d = tb(hitRecs[b]) - tb(hitRecs[a])
       if (d !== 0) return d
     }
-    return a.idx - b.idx
+    return a - b
   })
-  const full = new Array(scored.length)
-  for (let i = 0; i < scored.length; i++) full[i] = scored[i].rec
+  const full = new Array(order.length)
+  for (let i = 0; i < order.length; i++) full[i] = hitRecs[order[i]]
   _searchCacheRecords = records
   _searchCacheLen = records.length
   _searchCacheQ = q
