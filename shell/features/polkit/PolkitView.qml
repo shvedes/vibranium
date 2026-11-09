@@ -43,7 +43,7 @@ Variants {
     readonly property real dim: Settings.lockscreenDim / 100
     // Vignette darkness at the corners: the lockscreen's medium level,
     // fixed rather than configurable.
-    readonly property real vignetteK: 0.45
+    readonly property real vignetteK: 0.8
     // The vignette's animated factor, 0 -> vignetteK. Its own ramp, the
     // lockscreen's: the darkening settles in over a second rather than
     // arriving with the card.
