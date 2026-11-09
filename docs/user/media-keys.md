@@ -23,13 +23,6 @@ The fade curve is quadratic — it starts fast and slows down near the end. The 
 
 This works with both regular players (via playerctl) and **MPD** (via mpc, if installed).
 
-## Now playing
-
-Enable **Track change OSD** in the media control settings to briefly show the current track when you skip tracks or change playback state. This works independently of the bar's **Now Playing** module. The progress display follows the active MPRIS player, including seeks and rewinds while the card is visible.
-
-Optionally enable **Show cover art**. For web-based players the art is fetched asynchronously; the card keeps a music fallback until the image is ready.
-
-
 ## Tips
 
 When something is playing, the "**Copy Current Track**" entry in the Utilities menu will appear.

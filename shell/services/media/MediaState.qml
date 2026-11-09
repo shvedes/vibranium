@@ -18,7 +18,7 @@ import "../../common/NowPlaying.js" as NP
 //
 // MediaEvents observes the backend and publishes here; surfaces read
 // here. Nothing in this file decides whether an event is shown, where, or
-// for how long - that is the OSD's (see OSD.qml). What this file owes a
+// for how long - that belongs to the surface. What this file owes a
 // subscriber is a normalized, frozen description of what the backend did,
 // so a surface never re-reads the player object it was handed.
 //

@@ -16,8 +16,7 @@ import "../../common/NowPlaying.js" as NP
 // that fills the sample ring the pop policy reads. What it produces is a
 // classification - a new track, a start, a pause, a stop, a player swap -
 // published to MediaState. Whether that is shown, and how, belongs to the
-// surface (OSD.qml): this file reads no setting, names no view, and never
-// mentions the OSD.
+// subscriber: this file reads no setting and names no view.
 //
 // Why it stays resident instead of tracking lazily: the pop policy needs
 // the sample ring, and an empty ring reads as a skip, so a tracker that

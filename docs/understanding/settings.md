@@ -56,7 +56,7 @@ Inventory (193 keys on 42 pages: 22 shell + 2 env + 18 hypr):
 
 | Group | Pages | Keys |
 |---|---|---|
-| `shell` | General, App launcher, Bar, modules, Audio, Screenshots, OSD, Night Light, Color picker, Lock screen, Idle, Media, Power, ... | 77 shell + 2 misc |
+| `shell` | General, App launcher, Bar, modules, Audio, Screenshots, OSD, Night Light, Color picker, Lock screen, Idle, Media, Power, ... | 73 shell + 2 misc |
 | `env` | Recording, Brightness | 11 env |
 | `hypr` | Hyprland, Edit configs, Input, Appearance, Gaps, Blur, Glow, Shadows, Decoration, Dim, Animations, Advanced, Cursor, Scrolling, Dwindle, Master, ... | 103 hypr |
 

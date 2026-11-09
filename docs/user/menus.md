@@ -31,7 +31,7 @@ Press ++ctrl+alt+v++ (or the `Tools` key if your keyboard has one) and the Vibra
 | **Screenshots** | File type, save to disk, notifications, auto-annotate, cursor capture, annotator UI size |
 | **App Launcher** | Launcher behavior: icons, webapps, auto-select, search engine, PWAs |
 | **Color Picker** | HEX preview, history size, notifications |
-| **Media Control** | Fade duration, track-change and playback OSD, cover art, browser filtering |
+| **Media Controls** | Fade duration, browser filtering |
 | **Power Profiles** | Which profile on AC, which on battery |
 | **Miscellaneous** | Cursor theme, default browser, user wallpapers, environment editor, and more |
 

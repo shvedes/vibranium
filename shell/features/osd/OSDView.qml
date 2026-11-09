@@ -35,18 +35,13 @@ PanelWindow {
   WlrLayershell.layer: WlrLayer.Overlay
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.None
 
-  // Placement: meter kinds sit `offset` px above the bottom edge;
-  // the now-playing card uses its own position + offset. Horizontal
-  // is always centered.
+  // Placement: `shell.osd.offset` px above the bottom edge, horizontally
+  // centered.
   OSDCard {
     id: card
     anchors.horizontalCenter: parent.horizontalCenter
     maxWidth: Math.max(0, win.width - 24)
-    readonly property bool onTop: card.isMedia && OSD.nowPlayingPosition === "top"
-    readonly property int parkOffset: card.isMedia ? OSD.nowPlayingOffset : OSD.offset
-    readonly property real preferredY: card.onTop
-      ? card.parkOffset
-      : win.height - card.height - card.parkOffset
+    readonly property real preferredY: win.height - card.height - OSD.offset
     readonly property real maxY: Math.max(12, win.height - card.height - 12)
     y: Math.max(12, Math.min(card.preferredY, card.maxY))
   }

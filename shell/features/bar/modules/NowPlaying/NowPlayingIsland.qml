@@ -4,7 +4,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Services.Mpris
 import qs.common
-import qs.features.osd
 import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
 
@@ -264,8 +263,8 @@ Item {
   // the write the shell made, so both MPRIS flags stay true. MediaState owns
   // the round trip that settles it; see its volume section.
   readonly property bool canSetVolume: Core.MediaState.volumeCapable(root.player)
-  // The player's own length, through the shared accessor the OSD, MediaState
-  // and MediaEvents all read. Reading `player.length` raw is what made a live
+  // The player's own length, through the shared accessor MediaState and
+  // MediaEvents read. Reading `player.length` raw is what made a live
   // stream look like a finished track: Quickshell reports `length` as the
   // current position when the player publishes no `mpris:length`, so the
   // ratio came out as 1 and the bar sat permanently full.
@@ -526,7 +525,6 @@ Item {
 
   Component.onCompleted: {
     root._syncArtDemand()
-    OSD.retainMediaIsland(root)
     // Body focus wins over the host sink deliberately (see IslandHost),
     // but only once the island is actually shown: a focus request
     // recorded while hidden dies with the construction turn. The visible
@@ -538,8 +536,8 @@ Item {
     // was never anything else raises no change, so the flash is seeded from
     // the state the frame already opens in - unless the cover is already
     // warm (the active track's decode the warmer holds, or this island's own
-    // demand from a previous open). A warm cover shows instantly like the
-    // OSD instead of replaying the skeleton for a track that never left.
+    // demand from a previous open). A warm cover shows instantly instead of
+    // replaying the skeleton for a track that never left.
     if (root.artUrl !== "" && art.status === Image.Ready) {
       art.opacity = 1
       artFrame.waitingArt = false
@@ -552,7 +550,6 @@ Item {
   Component.onDestruction: {
     if (root._demandedArt !== "") Core.MediaArt.release(root._demandedArt)
     root._demandedArt = ""
-    OSD.releaseMediaIsland(root)
   }
 
   // Focus request, on visible only: fires when the island shows (and at
@@ -757,9 +754,9 @@ Item {
             cache: true
             retainWhileLoading: true
             fillMode: Image.PreserveAspectCrop
-            // Same decode size as the warmer and the OSD card, so a cover
-            // warmed for one surface hits the shared pixmap cache for this
-            // one instead of decoding a second raster for the same url.
+            // Same decode size as the warmer, so a cover warmed for the
+            // island hits the shared pixmap cache instead of decoding a
+            // second raster for the same url.
             sourceSize.width: 256
             sourceSize.height: 256
 
