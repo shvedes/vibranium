@@ -40,6 +40,23 @@ function pileDock(barDock, sharing, islandEdge, margin) {
   return want > baseOk ? want : baseOk
 }
 
+// Whether an open island's footprint overlaps the pile's column, which is
+// the only island that moves the pile. The pile is docked to the screen's
+// right edge; an island in the centre of the bar shares the bar edge with
+// the pile but not its column, so sliding the pile clear of it would drag
+// every notification towards the middle of the screen for no overlap at all.
+// Ranges are half-open: an island ending exactly where the pile starts does
+// not overlap it, and a zero-width island is no footprint rather than an
+// overlap.
+function islandOverlapsPile(islandLeft, islandRight, pileLeft, pileRight) {
+  const il = Number(islandLeft)
+  const ir = Number(islandRight)
+  const pl = Number(pileLeft)
+  const pr = Number(pileRight)
+  if (!isFinite(il) || !isFinite(ir) || !isFinite(pl) || !isFinite(pr)) return false
+  return ir > il && pr > pl && il < pr && ir > pl
+}
+
 // Deadline in milliseconds, or 0 for none.
 //
 // `expireTimeout` is the raw D-Bus `expire_timeout`, in MILLIMECONDS; the

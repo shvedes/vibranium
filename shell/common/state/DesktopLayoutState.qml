@@ -161,26 +161,35 @@ Singleton {
   // open/close edges). Copy-on-write, no-op-guarded.
   property var _islands: ({})
 
-  // Upsert the record for `screenName`. A no-op (same showing/top/bottom)
-  // writes nothing and returns false, so parks that change nothing stay
-  // silent.
-  function publishIsland(screenName, showing, top, bottom) {
+  // Upsert the record for `screenName`. The footprint is the parked card's
+  // vertical span (`top`, `bottom`) and its horizontal span (`left`, `right`),
+  // all in screen coordinates; the notification pile reads the horizontal span
+  // to tell an island over its column from one elsewhere on the bar. A no-op
+  // (same six values) writes nothing and returns false, so parks that change
+  // nothing stay silent.
+  function publishIsland(screenName, showing, top, bottom, left, right) {
     const key = String(screenName || "")
     if (key === "") return false
     const on = showing === true
     const t = Number(top)
     const b = Number(bottom)
+    const l = Number(left)
+    const r = Number(right)
     const cur = root._islands
     const old = cur[key]
     if (old !== undefined && old !== null && typeof old === "object"
       && old.showing === on
       && Number(old.top) === (isFinite(t) ? t : 0)
-      && Number(old.bottom) === (isFinite(b) ? b : 0)) return false
+      && Number(old.bottom) === (isFinite(b) ? b : 0)
+      && Number(old.left) === (isFinite(l) ? l : 0)
+      && Number(old.right) === (isFinite(r) ? r : 0)) return false
     const next = Object.assign({}, cur)
     next[key] = {
       showing: on,
       top: isFinite(t) ? t : 0,
-      bottom: isFinite(b) ? b : 0
+      bottom: isFinite(b) ? b : 0,
+      left: isFinite(l) ? l : 0,
+      right: isFinite(r) ? r : 0
     }
     root._islands = next
     return true

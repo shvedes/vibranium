@@ -220,6 +220,30 @@ group('tag comparison is trimmed and stable', () => {
 })
 
 // ---------------------------------------------------------------------------
+section('islandOverlapsPile - only an island over the pile column moves it')
+
+group('an island over the pile column overlaps it', () => {
+  eq('the whole island inside the column', NL.islandOverlapsPile(900, 1000, 850, 1150), true)
+  eq('an island crossing the column edge', NL.islandOverlapsPile(800, 900, 850, 1150), true)
+  eq('a full-width island', NL.islandOverlapsPile(0, 1920, 850, 1150), true)
+})
+
+group('an island clear of the column does not overlap it', () => {
+  eq('an island ending exactly at the column start', NL.islandOverlapsPile(700, 850, 850, 1150), false)
+  eq('an island starting exactly at the column end', NL.islandOverlapsPile(1150, 1200, 850, 1150), false)
+  eq('an island left of the column', NL.islandOverlapsPile(200, 500, 850, 1150), false)
+  eq('an island right of the column', NL.islandOverlapsPile(1160, 1400, 850, 1150), false)
+})
+
+group('garbage and empty footprints never claim an overlap', () => {
+  eq('a non-numeric island edge', NL.islandOverlapsPile('x', 1000, 850, 1150), false)
+  eq('a missing pile edge', NL.islandOverlapsPile(900, 1000, undefined, 1150), false)
+  eq('a NaN island', NL.islandOverlapsPile(NaN, 1000, 850, 1150), false)
+  eq('a zero-width island', NL.islandOverlapsPile(900, 900, 850, 1150), false)
+  eq('a closed record with no footprint', NL.islandOverlapsPile(0, 0, 850, 1150), false)
+})
+
+// ---------------------------------------------------------------------------
 section('pileDock - the pile clears an open island on its own screen')
 
 group('no island is the bar dock unchanged', () => {

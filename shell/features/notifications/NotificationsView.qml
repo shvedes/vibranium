@@ -96,24 +96,39 @@ PanelWindow {
   // one question rather than two, so the pile cannot end up docked to the top
   // while its bottom inset clears a bar it is not next to.
   //
-  // An open island on this screen adopts the dock (see islandSharing
-  // below): the pile parks past the island's far edge instead of over the
-  // island, so a notification never covers the card and a click on either
-  // one lands where it looks. Not held until the island closes - shifted
-  // past it - and following resizes live, because the edge below is plain
-  // data republished on every park.
+  // An island that overlaps the pile's column adopts the dock (see
+  // islandSharing below): the pile parks past the island's far edge instead
+  // of over the island, so a notification never covers the card and a click
+  // on either one lands where it looks. An island elsewhere on the bar - the
+  // centre, say - leaves the pile at the bar dock, because it shares the bar
+  // edge with the pile but not its column. Not held until the island closes -
+  // shifted past it - and following resizes live, because the edge below is
+  // plain data republished on every park.
   readonly property real barDock: (DesktopLayoutState.barEnabled ? DesktopLayoutState.barHeight : 0) + win.margin
   // The island host serving this screen, if any: one IslandHost per bar
   // view registers itself in DesktopLayoutState under its screen name.
-  // The island record for this screen ({showing, top, bottom}) or null.
+  // The island record for this screen ({showing, top, bottom, left, right})
+  // or null.
   // Fresh object per publish, so any host move re-fires this chain by
   // value: opens shift the pile, closes return it, resizes glide it.
   readonly property string pileScreen: win.screen ? String(win.screen.name || "") : ""
   readonly property var islandRect: DesktopLayoutState.islandFor(win.pileScreen)
-  // An open island on this screen shifts the pile past its far edge.
-  // Anything else is the bar dock alone: records carry showing=false after
-  // close, and a null record (no island, torn-down host) is the same answer.
-  readonly property bool islandSharing: win.islandRect !== null && win.islandRect.showing === true
+  // The pile's own column in the same full-screen coordinates as the island
+  // footprint: right-docked, one card wide, with the same margin on both
+  // sides. This is what decides whether an island is actually near the pile.
+  readonly property real pileLeft: win.width - win.margin - win.cardWidth
+  readonly property real pileRight: win.width - win.margin
+  // An open island on this screen shifts the pile past its far edge, but only
+  // when the island's footprint overlaps the pile's column: an island under a
+  // module in the middle of the bar shares the bar edge with the pile, not its
+  // column, so shifting for it would drag every notification towards the
+  // middle of the screen. Anything else is the bar dock alone: records carry
+  // showing=false after close, and a null record (no island, torn-down host)
+  // is the same answer.
+  readonly property bool islandSharing: win.islandRect !== null
+    && win.islandRect.showing === true
+    && NotificationsLib.islandOverlapsPile(win.islandRect.left, win.islandRect.right,
+      win.pileLeft, win.pileRight)
   // The island's far edge in pile coordinates (same screen, so the same
   // full-screen geometry): the bottom edge for a top dock, the top edge
   // mirrored through the window height for a bottom dock.

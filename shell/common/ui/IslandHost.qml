@@ -224,8 +224,8 @@ PanelWindow {
 
   // Notification-pile clearance, published as plain data per screen (see
   // DesktopLayoutState.publishIsland): target geometry from positionCard
-  // below - the parked y/h - never the animated card props, so a mid-glide
-  // park can never freeze a half height in. `open` rides along as the
+  // below - the parked x/y/w/h - never the animated card props, so a
+  // mid-glide park can never freeze a half footprint in. `open` rides along as the
   // showing flag, so close() clears the pile through the requestPark above
   // it, and resizes repark through the existing size/content triggers.
   // `_islandKey` is the last published screen: a rewired anchor evicts the
@@ -518,8 +518,8 @@ PanelWindow {
     card.x = Math.round(x)
     card.y = Math.round(y)
     // Clearance for the notification pile: this park's target geometry (the
-    // clamped y/h above, the footprints the card is actually parked at) plus
-    // the showing flag. Plain data keyed by this window's screen, no-op when
+    // clamped x/y/w/h above, the footprint the card is actually parked at)
+    // plus the showing flag. Plain data keyed by this window's screen, no-op when
     // unchanged - every open, close, move and resize funnels through here,
     // so the pile follows opens, closes and dynamic resizes by value.
     //
@@ -534,7 +534,7 @@ PanelWindow {
     if (islandName !== "") root._islandKey = islandName
     if (islandName !== "") {
       if (screenW > 100 && screenH > 100) {
-        DesktopLayoutState.publishIsland(islandName, root.open, y, y + h)
+        DesktopLayoutState.publishIsland(islandName, root.open, y, y + h, x, x + w)
       } else if (!root.open) {
         DesktopLayoutState.publishIsland(islandName, false, 0, 0)
       }
