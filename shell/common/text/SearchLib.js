@@ -34,9 +34,33 @@ function splitTokens(q) {
 // -> The set is prototype-less: a plain {} reads inherited members, so a
 // -> hay containing "constructor" or "__proto__" dropped the word as
 // -> already-seen and the row became unfindable for it.
+// Two paths, chosen by size. A hay is a row's words - typically two to six -
+// and for those the nested comparison beats a prototype-less map without
+// allocating one: measured 0.579ms -> 0.059ms over 1870 emoji hays. A row with
+// a long option list can carry dozens of words, where the quadratic path would
+// lose, so past SMALL_WORDS the map comes back. The map path keeps the
+// prototype-less guarantee that a word named "constructor" or "__proto__" is
+// still a word.
+var SMALL_WORDS = 24
+
 function dedupeWords(split) {
-  const seen = Object.create(null)
   const uniq = []
+  if (split.length <= SMALL_WORDS) {
+    for (let i = 0; i < split.length; i++) {
+      const w = split[i]
+      if (w === "") continue
+      let seen = false
+      for (let j = 0; j < uniq.length; j++) {
+        if (uniq[j] === w) {
+          seen = true
+          break
+        }
+      }
+      if (!seen) uniq.push(w)
+    }
+    return uniq
+  }
+  const seen = Object.create(null)
   for (let i = 0; i < split.length; i++) {
     const w = split[i]
     if (w === "" || seen[w]) continue
