@@ -1558,17 +1558,19 @@ function groupSearchResults(hits, lookup, isVisible, query) {
     // `sub` in place ("N items") without replacing the index entry, so a cached
     // row kept a count the page had already moved past. The copy is also what
     // makes "the candidate changed" mean "the projection changed".
-    // Spread rather than Object.assign: this copy is made once per hit per
-    // keystroke, and over a 200-hit result set Assign measured 0.415ms against
-    // 0.155ms for the literal - the same own enumerable properties either way.
-    const merged = {
-      ...(item || {}),
+    // Object.assign, NOT a spread literal. QML's JS engine rejects object
+    // spread ("Expected token `}'") and the parse failure takes the whole
+    // library down, which takes every menu surface with it - the node suite
+    // accepts the syntax, so only the engine can catch this. The spread was
+    // measured at 0.155ms against 0.415ms for Assign over a 200-hit projection;
+    // 0.26ms is the price of a library that loads.
+    const merged = Object.assign({}, item || {}, {
       label: hit.label,
       hay: hit.hay,
       path: hit.path,
       pageId: hit.pageId,
       row: hit.row
-    }
+    })
     // An entry-only row has to be KEYED as well as drawn. The panel installs
     // a search projection through a keyed model, and its keying step refuses
     // the WHOLE install on the first row it cannot key instead of skipping
