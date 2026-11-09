@@ -153,30 +153,40 @@ function buildAppIndex(entries, sortMethod, usageMap, missingTryExec) {
   // - frequency: most-used first (cached across sessions),
   //   tie → alphabetical. Only affects the
   //   blank view; filtered search is always by fuzzy relevance.
-  if (sortMethod === "frequency" && usageMap && typeof usageMap === "object") {
-    out.sort((a, b) => {
-      // Snapshot id first: records are snapshotted into plain records, so the
-      // rank must survive the live DesktopEntry going away. A live read faults
-      // to "" on a destroyed handle, which zeroes the count and pins frequency
-      // sort to alphabetical. Live is only the fallback for a record minted
-      // without one.
-      const aid = String(a.id ?? (a.app ? a.app.id ?? "" : ""))
-      const bid = String(b.id ?? (b.app ? b.app.id ?? "" : ""))
-      const ac = usageCountFor(usageMap, aid)
-      const bc = usageCountFor(usageMap, bid)
-      if (ac !== bc) return bc - ac
-      const al = a.label.toLowerCase()
-      const bl = b.label.toLowerCase()
-      return al < bl ? -1 : al > bl ? 1 : 0
-    })
-  } else {
-    out.sort((a, b) => {
-      const al = a.label.toLowerCase()
-      const bl = b.label.toLowerCase()
-      return al < bl ? -1 : al > bl ? 1 : 0
-    })
+  //
+  // The comparator runs O(n log n) times, so its inputs are computed once per
+  // record instead of per comparison: a lowercase label and, on the frequency
+  // path, a usage count. Both were the entire cost of a build over a real
+  // entry set (toLowerCase and a map read were being repaid thousands of
+  // times for ~400 rows). `order` is sorted rather than `out`, so the record
+  // objects themselves are handed back untouched; the index term keeps ties
+  // in input order the way a stable sort did.
+  const n = out.length
+  const order = new Array(n)
+  const keys = new Array(n)
+  for (let i = 0; i < n; i++) {
+    order[i] = i
+    keys[i] = out[i].label.toLowerCase()
   }
-  return out
+  if (sortMethod === "frequency" && usageMap && typeof usageMap === "object") {
+    // Snapshot id first: records are snapshotted into plain records, so the
+    // rank must survive the live DesktopEntry going away. A live read faults
+    // to "" on a destroyed handle, which zeroes the count and pins frequency
+    // sort to alphabetical. Live is only the fallback for a record minted
+    // without one.
+    const counts = new Array(n)
+    for (let i = 0; i < n; i++) {
+      const rec = out[i]
+      counts[i] = usageCountFor(usageMap, String(rec.id ?? (rec.app ? rec.app.id ?? "" : "")))
+    }
+    order.sort((a, b) => counts[b] - counts[a]
+      || (keys[a] < keys[b] ? -1 : keys[a] > keys[b] ? 1 : a - b))
+  } else {
+    order.sort((a, b) => keys[a] < keys[b] ? -1 : keys[a] > keys[b] ? 1 : a - b)
+  }
+  const sorted = new Array(n)
+  for (let i = 0; i < n; i++) sorted[i] = out[order[i]]
+  return sorted
 }
 
 // Numeric usage count for a desktop id in a druncache map. The map
@@ -670,6 +680,14 @@ function tokenScore(words, t) {
 // One transposition counts as one, which is what separates this from a
 // plain Levenshtein cap: "fireofx" is two substitutions apart and one swap,
 // and a swap is the typo a fast typist actually makes.
+// The table is module state: it is (la + 1) x (lb + 1), and the typo pass
+// calls this once per candidate word, so a fresh table per call is thousands
+// of short-lived arrays on the GUI thread per dead-end keystroke. Flat and
+// grown in place rather than nested rows, which is what makes the reuse
+// cheap. It is non-reentrant by construction - nothing in this file calls
+// back into typoDistance while a table is in use.
+var _typoDistanceTable = new Int32Array(64)
+
 function typoDistance(a, b) {
   const x = String(a ?? "")
   const y = String(b ?? "")
@@ -677,24 +695,32 @@ function typoDistance(a, b) {
   const la = x.length
   const lb = y.length
   if (Math.abs(la - lb) > 2) return 3
-  const d = []
-  for (let i = 0; i <= la; i++) {
-    d.push([i])
-    for (let j = 1; j <= lb; j++) d[i].push(0)
-  }
-  for (let j = 1; j <= lb; j++) d[0][j] = j
+  const w = lb + 1
+  const need = (la + 1) * w
+  if (need > _typoDistanceTable.length) _typoDistanceTable = new Int32Array(need * 2)
+  const d = _typoDistanceTable
+  for (let i = 0; i <= la; i++) d[i * w] = i
+  for (let j = 0; j <= lb; j++) d[j] = j
   for (let i = 1; i <= la; i++) {
+    const row = i * w
+    const prev = row - w
+    const xi = x.charCodeAt(i - 1)
     for (let j = 1; j <= lb; j++) {
-      const cost = x.charCodeAt(i - 1) === y.charCodeAt(j - 1) ? 0 : 1
-      let v = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + cost)
-      if (i > 1 && j > 1 && x.charCodeAt(i - 1) === y.charCodeAt(j - 2)
+      const cost = xi === y.charCodeAt(j - 1) ? 0 : 1
+      let v = d[prev + j] + 1
+      const left = d[row + j - 1] + 1
+      if (left < v) v = left
+      const diag = d[prev + j - 1] + cost
+      if (diag < v) v = diag
+      if (i > 1 && j > 1 && xi === y.charCodeAt(j - 2)
         && x.charCodeAt(i - 2) === y.charCodeAt(j - 1)) {
-        v = Math.min(v, d[i - 2][j - 2] + 1)
+        const swap = d[prev - w + j - 2] + 1
+        if (swap < v) v = swap
       }
-      d[i][j] = v
+      d[row + j] = v
     }
   }
-  const dist = d[la][lb]
+  const dist = d[la * w + lb]
   return dist <= 2 ? dist : 3
 }
 
