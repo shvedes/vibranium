@@ -442,18 +442,20 @@ function sameGroups(current, next) {
   if (current === next) return true
   if (!Array.isArray(current) || !Array.isArray(next)) return false
   if (current.length !== next.length) return false
+  // Key index, built once: the walk below compared every next entry against
+  // every current one, quadratic in the pair count on every graph tick. First
+  // key wins, exactly as the index-wise search did.
+  const byKey = Object.create(null)
+  for (let i = 0; i < current.length; i++) {
+    const held = current[i]
+    if (held === undefined || held === null) continue
+    if (byKey[held.key] === undefined) byKey[held.key] = held
+  }
   for (let i = 0; i < next.length; i++) {
     const want = next[i]
     if (want === undefined || want === null) return false
-    let held = null
-    for (let j = 0; j < current.length; j++) {
-      if (current[j] !== undefined && current[j] !== null
-        && current[j].key === want.key) {
-        held = current[j]
-        break
-      }
-    }
-    if (held === null) return false
+    const held = byKey[want.key]
+    if (held === undefined) return false
     const a = held.ids
     const b = want.ids
     if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false
