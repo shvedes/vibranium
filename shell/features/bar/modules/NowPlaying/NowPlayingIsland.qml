@@ -1063,15 +1063,72 @@ Item {
                   size: 15
                 }
 
-                Text {
+                Item {
+                  id: artistMarquee
+
                   width: parent.width - 15 - 7
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: root.artist !== "" ? root.artist : "--"
-                  color: Ui.tint("foreground_1", 0.7)
-                  font.pixelSize: 11
-                  font.family: Ui.fontFamily
-                  elide: Text.ElideRight
-                  textFormat: Text.PlainText
+                  height: artistText.implicitHeight
+                  clip: true
+
+                  readonly property real overflow: Math.max(0, artistText.implicitWidth - width)
+                  readonly property int legMs: Math.max(1800, Math.min(9000,
+                    Math.round(1800 + overflow * 24)))
+                  readonly property int endpointPauseMs: 400
+
+                  function reset() {
+                    artistText.x = 0
+                    if (root.marqueeEnabled && artistMarquee.overflow > 0)
+                      artistMarqueeAnimation.restart()
+                    else
+                      artistMarqueeAnimation.stop()
+                  }
+
+                  onWidthChanged: artistMarquee.reset()
+
+                  SequentialAnimation {
+                    id: artistMarqueeAnimation
+
+                    running: root.marqueeEnabled && artistMarquee.overflow > 0
+                    loops: Animation.Infinite
+                    NumberAnimation {
+                      target: artistText
+                      property: "x"
+                      from: 0
+                      to: -artistMarquee.overflow
+                      duration: artistMarquee.legMs
+                      easing.type: Easing.InOutSine
+                    }
+                    PauseAnimation {
+                      duration: artistMarquee.endpointPauseMs
+                    }
+                    NumberAnimation {
+                      target: artistText
+                      property: "x"
+                      from: -artistMarquee.overflow
+                      to: 0
+                      duration: artistMarquee.legMs
+                      easing.type: Easing.InOutSine
+                    }
+                    PauseAnimation {
+                      duration: artistMarquee.endpointPauseMs
+                    }
+                    onStopped: artistText.x = 0
+                  }
+
+                  Text {
+                    id: artistText
+
+                    width: root.marqueeEnabled ? implicitWidth : artistMarquee.width
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.artist !== "" ? root.artist : "--"
+                    color: Ui.tint("foreground_1", 0.7)
+                    font.pixelSize: 11
+                    font.family: Ui.fontFamily
+                    elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
+                    wrapMode: Text.NoWrap
+                    textFormat: Text.PlainText
+                    onTextChanged: artistMarquee.reset()
+                  }
                 }
               }
 
