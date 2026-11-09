@@ -548,11 +548,50 @@ function deviceLinks(links, devices, current) {
   const held = current === null || current === undefined ? ({}) : current
   let keys = 0
   let changed = false
+  // One walk of the link list, not one per device: the per-device scanner
+  // revisited every link for every device, which is devices x links per graph
+  // tick. Each link still contributes to both of its ends, in link order.
+  const rawLinks = links === null || links === undefined ? 0 : links.length
+  const linkCount = typeof rawLinks === "number" && rawLinks >= 0 ? Math.round(rawLinks) : 0
+  const pairsOf = ({})
+  const seenOf = ({})
+  for (let i = 0; i < linkCount; i++) {
+    const link = links[i]
+    if (link === null || link === undefined) continue
+    const source = link.source
+    const target = link.target
+    if (source === undefined || target === undefined) continue
+    if (source === null || target === null) continue
+    const sourceKey = nodeKey(source)
+    const targetKey = nodeKey(target)
+    if (sourceKey === "" && targetKey === "") continue
+    const pairId = sourceKey + ":" + targetKey
+    const pair = linkPair(source, target)
+    if (pair === null) continue
+    if (sourceKey !== "") {
+      const seen = seenOf[sourceKey] === undefined
+        ? (seenOf[sourceKey] = Object.create(null)) : seenOf[sourceKey]
+      if (seen[pairId] !== true) {
+        seen[pairId] = true
+        if (pairsOf[sourceKey] === undefined) pairsOf[sourceKey] = []
+        pairsOf[sourceKey].push(pair)
+      }
+    }
+    if (targetKey !== "" && targetKey !== sourceKey) {
+      const seen = seenOf[targetKey] === undefined
+        ? (seenOf[targetKey] = Object.create(null)) : seenOf[targetKey]
+      if (seen[pairId] !== true) {
+        seen[pairId] = true
+        if (pairsOf[targetKey] === undefined) pairsOf[targetKey] = []
+        pairsOf[targetKey].push(pair)
+      }
+    }
+  }
   for (let i = 0; i < devices.length; i++) {
     const key = nodeKey(devices[i])
     if (key === "") continue
     keys++
-    const pairs = deviceLinkPairs(links, key)
+    const pairs = pairsOf[key] === undefined ? [] : pairsOf[key]
     const entry = held[key]
     if (entry !== undefined && entry !== null && samePairs(entry.links, pairs)) {
       out[key] = entry
