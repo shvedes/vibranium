@@ -88,6 +88,14 @@ CollapsibleSlot {
   // and only while there is a track to like.
   readonly property bool canLike: root.hasTrack && NP.canLikePlayer(root.player)
   readonly property bool shown: root.hasClient
+  // Read the host at trigger time: a property binding on the host can lag the
+  // open, and an anchor check can miss the island while the bar is already
+  // hosting another card. Any open island owns the bar, so the track flash
+  // waits until it closes.
+  function _islandOpen(): bool {
+    const host = root.barWindow ? root.barWindow.islandHost : null
+    return !!host && host.open
+  }
 
   // Title text switch (shell.statusbar.nowPlayingTitle, default
   // off): on shows the title next to the icon, off collapses the
@@ -142,6 +150,10 @@ CollapsibleSlot {
   // change what the slot shows.
   function _startFlash() {
     if (!root.flashEnabled || !root.hasTrack) return
+    if (root._islandOpen()) {
+      root._stopFlash()
+      return
+    }
     root.flashActive = true
     flashTimer.restart()
   }
@@ -157,7 +169,7 @@ CollapsibleSlot {
     // A title landing while the name is up is a mid-flash swap:
     // kick it. An opening flash skips this (titleSlide is still 0)
     // and rides the width reveal instead.
-    if (root.titleSlide > 0) labelText.kickName()
+    if (root.titleSlide > 0 && !root._islandOpen()) labelText.kickName()
   }
   onArtistChanged: root._queueTrackObservation()
   onAlbumChanged: root._queueTrackObservation()
@@ -166,6 +178,15 @@ CollapsibleSlot {
   }
   onFlashEnabledChanged: {
     if (!root.flashEnabled) root._stopFlash()
+  }
+  // Opening an island shows the track there, so a flash already running ends
+  // with the open rather than playing out behind the card.
+  Connections {
+    target: root.barWindow ? root.barWindow.islandHost : null
+
+    function onOpenChanged() {
+      if (root._islandOpen()) root._stopFlash()
+    }
   }
   Component.onCompleted: {
     root._transportSeeded = true

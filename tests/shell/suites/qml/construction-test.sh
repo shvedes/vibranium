@@ -334,7 +334,7 @@ EXPECTED_NEEDS_REASONS="No PanelWindow backend loaded"
 # tray menu moved onto the shared ContextMenu, whose rows take a plain record
 # rather than a required DBusMenu entry.)
 EXPECTED_SUPPLIED="supplied.qs.common.ScrollBar=flickable: null
-supplied.qs.features.bar.modules.NowPlaying.LyricsPane=player: null"
+supplied.qs.common.LyricsPane=player: null"
 
 # The counts, for a reader who wants the shape without counting lines.
 # 231 declared entries over 46 qmldir files, one of which is excluded from the

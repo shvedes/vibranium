@@ -225,7 +225,7 @@ EDGES="$(wc -l <"$WORK/resolved.tsv" | tr -d ' ')"
 
 # --------------------------------------------------------------------------
 t_section "the four layers exist, and the README's file counts still hold"
-# The table: composition 1, boot 3, features 150, services 26, common 128.
+# The table: composition 1, boot 3, features 150, services 26, common 130.
 # features/ lost TrayMenuRow and common/ gained ContextMenu when the tray menu
 # moved onto the shared context menu the three menus now use; the tree-wide
 # file count is unchanged.
@@ -239,7 +239,7 @@ done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
 t_count "features/ holds the 150 files the README publishes" "150" "$(layer_files features)"
 t_count "services/ holds the 25 files the README publishes" "25" "$(layer_files services)"
-t_count "common/ holds the 128 files the README publishes" "128" "$(layer_files common)"
+t_count "common/ holds the 130 files the README publishes" "130" "$(layer_files common)"
 t_count "boot/ holds the 2 files the README publishes" "2" "$(layer_files boot)"
 t_count "the composition root is the single file the README publishes" "1" "$(layer_files composition)"
 

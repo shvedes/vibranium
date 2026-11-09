@@ -3,16 +3,16 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters
 import QtQuick
 import qs.common
-import "../../../../common/NowPlaying.js" as NP
+import "NowPlaying.js" as NP
 
-// Synced lyrics in the controls column, opened by the lyrics pad and dismissed
-// with a right-click. MPRIS carries no lyrics, so the text comes from LRCLIB
-// (no key, LRC bodies), with `xesam:asText` as the fallback for a client that
-// publishes its own. The ask starts with the track rather than with the pane,
-// because the pad reads `unavailable` to decide whether it opens at all; the
-// lines are centred and the cue under the playhead is the one held in the
-// middle of the slot, driven by the island's position feed, so this pane needs
-// no clock of its own.
+// Synced lyrics over a slot: the bar island's lyrics pad and the lockscreen
+// card both render this pane. MPRIS carries no lyrics, so the text comes from
+// LRCLIB (no key, LRC bodies), with `xesam:asText` as the fallback for a client
+// that publishes its own. The ask starts with the track rather than with the
+// pane, because the island's pad reads `unavailable` to decide whether it opens
+// at all; the lines are centred and the cue under the playhead is the one held
+// in the middle of the slot, driven by the caller's position feed, so this pane
+// needs no clock of its own.
 Item {
   id: root
 
@@ -25,12 +25,16 @@ Item {
   property bool active: false
 
   signal dismissed
-  // A clicked line names a time; the island owns the position write, because
+  // A clicked line names a time; the caller owns the position write, because
   // only it knows whether the transport takes one.
   signal seekRequested(real seconds)
   // False while the player cannot take an absolute write, so a click on a
   // line is inert and the transcript stays a document.
   property bool seekable: false
+  // False on a presentation surface: a right-click should not dismiss and a
+  // drag should not take the transcript away from the current cue.
+  property bool dismissable: true
+  property bool scrollable: true
 
   readonly property string title: root.player ? String(root.player.trackTitle ?? "") : ""
   readonly property string artist: root.player ? String(root.player.trackArtist ?? "") : ""
@@ -58,9 +62,20 @@ Item {
   // metadata has words for dims the pad and refuses the click. An unfinished
   // or failed ask is not absence, so those stay openable.
   readonly property bool unavailable: root.status === "none"
+  readonly property bool ready: root.status === "ready"
   property string _requestedKey: ""
   property var _request: null
   readonly property bool animOn: MotionPolicy.enabled
+  // Whether a cue change glides the transcript to its new centre. The island
+  // has room for the travel; a caller can turn it off to place cues directly.
+  property bool glide: true
+  // Type multiplier for the cue column. The island's cover slot sets the
+  // baseline; a wider surface without artwork can spend that space on larger
+  // words.
+  property real textScale: 1
+  // How many cues on each side of the current one stay on screen. -1 is the
+  // island's full transcript; a caller can narrow it to a three-line window.
+  property int contextLines: -1
   // Auto-scroll yields to the reader. Once the transcript has been scrolled
   // so the current line is no longer under the middle of the slot, the cue
   // changes keep moving the accent but stop moving the view, so a line can be
@@ -76,20 +91,34 @@ Item {
   // transcript. Opening asks again, which is a cache hit once the track has
   // been answered.
   Component.onCompleted: root._load()
+  Component.onDestruction: root._abort()
   onActiveChanged: if (root.active) root._load()
   onTrackKeyChanged: root._load()
   onPositionChanged: root._track()
   onActiveIndexChanged: Qt.callLater(root._follow)
+  // The slot can resize under the transcript while the card grows or shrinks;
+  // keep the cue in the middle without waiting for the next position tick.
+  onHeightChanged: Qt.callLater(root._follow)
 
   function _load() {
     const key = root.trackKey
-    if (key === "") return
+    if (key === "") {
+      root._abort()
+      root._requestedKey = ""
+      root.lines = []
+      root.synced = false
+      root.activeIndex = -1
+      root._pinnedByUser = false
+      root.status = "idle"
+      return
+    }
     // An answered track, lyrics or not, is kept: the island is destroyed when
     // it closes, so the answer lives in the shared library rather than on this
-    // pane, and reopening on the same track must not cost a second round trip
-    // to say "No lyrics".
+    // pane, and a second surface (or a reopen) on the same track must not cost
+    // a round trip to say "No lyrics".
     const cached = NP.lyricsCacheGet(key)
     if (cached !== null) {
+      root._abort()
       root._apply(key, cached.result)
       return
     }
@@ -179,7 +208,9 @@ Item {
     // follows again with the view up.
     if (!root.active) return
     if (root.synced && root.currentIndex >= 0) {
-      if (root._pinnedByUser) {
+      // The island's transcript yields to a reader who scrolled away; a
+      // presentation surface disables scrolling, so its pin never sets.
+      if (root._pinnedByUser && root.glide) {
         scrollTo.stop()
         return
       }
@@ -204,7 +235,7 @@ Item {
   function _centre(index) {
     const row = view.itemAtIndex(index)
     scrollTo.stop()
-    if (row === null || !root.animOn) {
+    if (row === null || !root.animOn || !root.glide) {
       root._placing = true
       view.positionViewAtIndex(index, ListView.Center)
       root._placing = false
@@ -310,6 +341,7 @@ Item {
       anchors.leftMargin: 4
       anchors.rightMargin: 4
       clip: true
+      interactive: root.scrollable
       spacing: 6
       model: root.lines
       boundsBehavior: Flickable.StopAtBounds
@@ -348,6 +380,10 @@ Item {
         required property var modelData
         required property int index
 
+        readonly property bool inWindow: root.contextLines < 0
+          || root.currentIndex < 0
+          || Math.abs(index - root.currentIndex) <= root.contextLines
+        visible: inWindow
         width: view.width
         text: modelData.x
         // The cue under the playhead is the one the eye is on: bigger and in
@@ -365,7 +401,9 @@ Item {
             easing.type: Easing.OutCubic
           }
         }
-        font.pixelSize: index === root.currentIndex ? Ui.fontL : Ui.fontXs
+        font.pixelSize: index === root.currentIndex
+          ? Math.round(Ui.fontL * root.textScale)
+          : Math.round(Ui.fontXs * root.textScale)
         font.family: Ui.fontFamily
         font.bold: index === root.currentIndex
         horizontalAlignment: Text.AlignHCenter
@@ -408,8 +446,9 @@ Item {
     // the transcript and a left click does nothing.
     MouseArea {
       anchors.fill: parent
+      enabled: root.dismissable
       acceptedButtons: Qt.RightButton
-      cursorShape: Qt.PointingHandCursor
+      cursorShape: root.dismissable ? Qt.PointingHandCursor : Qt.ArrowCursor
       onClicked: root.dismissed()
     }
   }

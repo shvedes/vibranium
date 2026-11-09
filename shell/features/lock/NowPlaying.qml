@@ -8,9 +8,13 @@ import "../../common/NowPlaying.js" as NP
 
 // Now-playing pill riding the lockscreen's bottom edge. Flat-box language:
 // policy-rounded corners, translucent theme fill, 1px keyline. Album art when the
-// player supplies it (note-glyph fallback otherwise), track title over an
-// artist-album line, and a tiny equalizer that dances during playback and
-// freezes while the card dims for pause. Vanishes entirely with no track.
+// player supplies it (note-glyph fallback otherwise), and a track title over
+// an artist-album line. Vanishes entirely with no track.
+// While a track plays and a lyric sheet is ready, the body crossfades to the
+// shared lyrics pane and the frame grows to the lyrics footprint. The compact
+// track card stays centred underneath, while the keyline and progress strip
+// follow the new size. Pause - or a track with no words - shrinks the frame and
+// fades the names back in.
 //
 // Player pick: none. The pill pins the player that was active when the lock
 // engaged (head of the sorted view) and keeps showing only that client for
@@ -44,16 +48,31 @@ Item {
     ? (root.players.length > 0 ? root.players[0] ?? null : null)
     : (root.players.indexOf(root.pinned) >= 0 ? root.pinned : null)
   readonly property bool playing: root.player !== null && root.player.playbackState === MprisPlaybackState.Playing
+  // Pause-on-lock sends its pause as the surface is being built, and players
+  // report the state change a beat later. Hold the transcript for the start of
+  // this surface only, releasing as soon as the pause lands; later play/pause
+  // transitions must not wait on it.
+  property bool _lockPauseSettled: true
+  Timer {
+    interval: 600
+    repeat: false
+    running: !root._lockPauseSettled
+    onTriggered: root._lockPauseSettled = true
+  }
+  // The body swaps to lyrics only for a playing track whose sheet is ready. A
+  // playing track the provider has no words for keeps the names: the pane's
+  // "No lyrics" state is an offer in the island and noise on a lock screen.
+  readonly property bool lyricsUp: root.playing && root._lockPauseSettled
+    && root.hasTrack && lyrics.ready
   readonly property string title: root.player !== null ? root.player.trackTitle ?? "" : ""
   readonly property string artist: root.player !== null ? root.player.trackArtist ?? "" : ""
   readonly property string album: root.player !== null ? root.player.trackAlbum ?? "" : ""
   readonly property bool hasTrack: root.player !== null && root.title !== "" && root.player.playbackState !== MprisPlaybackState.Stopped
 
   // Progress tracking: same idea as lib/ProgressBar.qml - discrete
-  // MPRIS position (polled) drives `shownPosition`, the fill width
+  // MPRIS position (polled) drives `shownPosition`, while the fill width
   // (`progressRatio`) glides via a Behavior (lib/Glide, OutCubic) like
-  // the menu's numeric/range bars. Paused / length-less pins.
-  property real anchorPosition: 0
+  // the menu's numeric/range bars.
   property real shownPosition: 0
 
   // The player's own length, through the shared accessor the island and
@@ -70,22 +89,7 @@ Item {
   property real progressAppear: 0
 
   function reanchor() {
-    const newPos = root.player !== null ? root.player.position ?? 0 : 0
-    const len = root.lengthSec
-    if (root.player === null) {
-      root.anchorPosition = 0
-      root.shownPosition = 0
-      return
-    }
-    if (!root.playing || len <= 0) {
-      root.anchorPosition = newPos
-      root.shownPosition = newPos
-      return
-    }
-    // Backward jumps are always honored: a manual rewind must paint at
-    // once, never read as "nothing happened" until the next poll.
-    root.anchorPosition = newPos
-    root.shownPosition = newPos
+    root.shownPosition = NP.playerPosition(root.player)
   }
 
   onPlayerChanged: root.reanchor()
@@ -99,13 +103,21 @@ Item {
   Component.onCompleted: {
     root._pinHead()
     root.reanchor()
+    // A pause-on-lock pause needs a beat to land. Hold only when there is a
+    // playing client or the client list is not known yet; a paused lock or a
+    // later play must not wait.
+    root._lockPauseSettled = !(Settings.lockscreenPauseMusic
+      && (root.playing || root.player === null))
     if (root.hasTrack) {
       root.progressAppear = 0
       progressAppearAnim.restart()
     }
   }
   onLengthSecChanged: root.reanchor()
-  onPlayingChanged: root.reanchor()
+  onPlayingChanged: {
+    root.reanchor()
+    if (!root.playing) root._lockPauseSettled = true
+  }
 
   // Keep position fresh while playing - MPRIS only pushes on seeks,
   // so we poll via positionChanged() as recommended in the docs.
@@ -139,8 +151,38 @@ Item {
   // Settings.lockscreenNowPlaying, we additionally hide when there is no track.
   visible: root.hasTrack
 
-  width: 400
-  height: 94
+  // Compact for track data, roomier only while the transcript is up. The
+  // height drives everything inside the card, so the lyrics, their type and
+  // the progress strip grow together instead of being sized for the big frame.
+  readonly property int compactWidth: 400
+  readonly property int compactHeight: 94
+  readonly property int lyricsWidth: 520
+  readonly property int lyricsHeight: 120
+  readonly property int targetWidth: root.lyricsUp ? root.lyricsWidth : root.compactWidth
+  readonly property int targetHeight: root.lyricsUp ? root.lyricsHeight : root.compactHeight
+  readonly property real lyricsGrowth: Math.max(0, Math.min(1,
+    (root.height - root.compactHeight) / (root.lyricsHeight - root.compactHeight)))
+  // True while the frame is tweening between footprints. The progress fill
+  // must track the moving width directly rather than animate toward it.
+  readonly property bool _sizeMoving: Math.abs(root.width - root.targetWidth) > 0.5
+    || Math.abs(root.height - root.targetHeight) > 0.5
+  width: root.targetWidth
+  height: root.targetHeight
+
+  Behavior on width {
+    enabled: MotionPolicy.enabled
+    NumberAnimation {
+      duration: Ui.normalMs
+      easing.type: Easing.OutCubic
+    }
+  }
+  Behavior on height {
+    enabled: MotionPolicy.enabled
+    NumberAnimation {
+      duration: Ui.normalMs
+      easing.type: Easing.OutCubic
+    }
+  }
 
   onHasTrackChanged: {
     if (root.hasTrack) {
@@ -178,13 +220,31 @@ Item {
     clip: true
 
     Behavior on opacity {
+      enabled: MotionPolicy.enabled
       NumberAnimation {
         duration: 200
       }
     }
 
     Item {
-      anchors.fill: parent
+      id: cardBody
+
+      // The track card keeps its compact footprint and stays centred while the
+      // frame grows around it; only the transcript spends the extra room.
+      width: root.compactWidth
+      height: root.compactHeight
+      anchors.centerIn: parent
+      // Crossfade against the transcript below. The body stays on its compact
+      // footprint, so the track content does not move while the frame grows
+      // around it.
+      opacity: root.lyricsUp ? 0 : 1
+      Behavior on opacity {
+        enabled: MotionPolicy.enabled
+        NumberAnimation {
+          duration: Ui.normalMs
+          easing.type: Easing.OutCubic
+        }
+      }
 
       Row {
         id: row
@@ -198,22 +258,15 @@ Item {
           anchors.bottomMargin: 18
           spacing: 14
 
-          // Art frame: cropped cover when decoded; while it loads or when the
-          // player ships none, the frame itself turns into the visualizer
-          // stage. With art present the bars ride a bottom scrim instead.
+          // Art frame: cropped cover when decoded; the empty frame is the
+          // fallback while it loads or when the player ships none.
           Rectangle {
-            id: artFrame
-
-            readonly property bool hasArt: art.status === Image.Ready || art.status === Image.Loading
-
             width: 64
             height: 64
             anchors.verticalCenter: parent.verticalCenter
             color: Ui.tint("background_3", 0.5)
 
             Image {
-              id: art
-
               anchors.fill: parent
               source: root.player !== null ? root.player.trackArtUrl ?? "" : ""
               asynchronous: true
@@ -232,34 +285,6 @@ Item {
               }
             }
 
-            // Full-frame dim so the compact white bars read on near-white
-            // covers: 38% black over art only, under scrim + bars.
-            Rectangle {
-              anchors.fill: parent
-              visible: artFrame.hasArt && root.hasTrack
-              color: Qt.rgba(0, 0, 0, 0.38)
-            }
-
-            // Readability scrim under the compact bars on top of covers.
-            Rectangle {
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.bottom: parent.bottom
-              height: 18
-              visible: artFrame.hasArt && root.hasTrack
-              gradient: Gradient {
-                orientation: Gradient.Vertical
-                GradientStop {
-                  position: 0
-                  color: Qt.rgba(0, 0, 0, 0)
-                }
-                GradientStop {
-                  position: 1
-                  color: Qt.rgba(0, 0, 0, 0.55)
-                }
-              }
-            }
-
             // Placeholder when no MPRIS player - 50% transparent music.svg
             Icon {
               anchors.centerIn: parent
@@ -268,62 +293,6 @@ Item {
               colorKey: "foreground_0"
               size: 36
               opacity: 0.5
-            }
-
-            // Visualizer field spanning the frame's full width. On covers the
-            // bars run compact and white over the scrim; on the bare stage they
-            // go tall and accent-colored. Bottom-anchored so they stand up,
-            // phase-driven so pause freezes them mid-bounce.
-            Row {
-              id: vizBars
-              visible: root.hasTrack
-
-              readonly property bool compact: artFrame.hasArt
-              readonly property int barCount: 11
-              readonly property real barWidth: (width - (barCount - 1) * spacing) / barCount
-
-              anchors.left: parent.left
-              anchors.right: parent.right
-              anchors.bottom: parent.bottom
-              anchors.leftMargin: compact ? 4 : 2
-              anchors.rightMargin: compact ? 4 : 2
-              anchors.bottomMargin: compact ? 3 : 4
-              spacing: compact ? 3 : 2
-              opacity: 0.5
-
-              Repeater {
-                model: vizBars.barCount
-
-                Rectangle {
-                  id: bar
-
-                  required property int index
-
-                  // Phase 0..1 drives bar length.
-                  property real phase: 0.5
-
-                  width: vizBars.barWidth
-                  radius: RoundingPolicy.radius
-                  anchors.bottom: parent.bottom
-                  color: vizBars.compact ? Qt.rgba(1, 1, 1, 0.92) : Theme.color("accent")
-                  height: (vizBars.compact ? 3 : 8) + phase * (vizBars.compact ? 10 : 46)
-
-                  SequentialAnimation on phase {
-                    loops: Animation.Infinite
-                    running: root.playing
-                    NumberAnimation {
-                      to: 1
-                      duration: 420 + bar.index * 120
-                      easing.type: Easing.InOutQuad
-                    }
-                    NumberAnimation {
-                      to: 0
-                      duration: 360 + bar.index * 90
-                      easing.type: Easing.InOutQuad
-                    }
-                  }
-                }
-              }
             }
           }
 
@@ -432,6 +401,46 @@ Item {
       }
     }
 
+    LyricsPane {
+      id: lyrics
+
+      anchors.fill: parent
+      // The strip is painted inside the bottom keyline; keep the words above
+      // it rather than over it as the strip thickens with the card.
+      anchors.bottomMargin: 6 + 2 * root.lyricsGrowth
+      // No ask for a box the user switched off: the pane otherwise fetches a
+      // sheet on every lock even while the card is hidden. A later enable
+      // re-points the player, and the track key change loads the sheet.
+      player: Settings.lockscreenNowPlaying ? root.player : null
+      position: root.shownPosition
+      // Always live so the cue under the playhead is already centred when
+      // playback starts and the fade only reveals it. `active` drives the
+      // island's slide, not this card's crossfade.
+      active: true
+      // Presentation only: no seek, no dismiss, no drag.
+      seekable: false
+      dismissable: false
+      scrollable: false
+      // Cue changes glide to the next line like the island; only the body
+      // swap itself is a crossfade.
+      glide: true
+      // The card's own growth drives the transcript's type: base size on the
+      // compact track card, the larger size only once the lyrics frame opens.
+      textScale: 1 + 0.4 * root.lyricsGrowth
+      // Only the passed, current and upcoming cues: a glanceable three-line
+      // window rather than the island's full transcript.
+      contextLines: 1
+      opacity: root.lyricsUp ? 1 : 0
+      visible: opacity > 0.001
+      Behavior on opacity {
+        enabled: MotionPolicy.enabled
+        NumberAnimation {
+          duration: Ui.normalMs
+          easing.type: Easing.OutCubic
+        }
+      }
+    }
+
     // Progress strip tucked just inside the keyline, painted last so the
     // card's translucent fill cannot mute it; hidden for streams that
     // report no length.
@@ -440,7 +449,11 @@ Item {
       anchors.right: parent.right
       anchors.bottom: parent.bottom
       anchors.margins: 1
-      height: 5
+      // Follows the card's growth exactly, so the strip and the lyrics bottom
+      // edge stay aligned while the frame opens.
+      height: 5 + 2 * root.lyricsGrowth
+      // Keep the fill from painting past the strip while the frame shrinks.
+      clip: true
       visible: root.lengthSec > 0
 
       Rectangle {
@@ -455,13 +468,16 @@ Item {
         // Spawn: cubic 0->current via progressAppear (600ms OutCubic).
         // Position changes (playback polls and user seeks alike) glide with
         // Ui.normalMs OutCubic, including seeks while paused (prev-track):
-        // the Behavior runs whenever a length exists and the spawn finished,
-        // so a paused jump animates instead of snapping.
+        // the Behavior runs whenever a length exists, the spawn finished and
+        // the card is at rest, so a paused jump animates instead of snapping.
         width: parent.width * Math.min(1, Math.max(0, root.progressRatio)) * root.progressAppear
         color: Theme.color("accent")
 
         Behavior on width {
-          enabled: root.lengthSec > 0 && root.progressAppear >= 0.99
+          // Follow a resizing frame in lockstep; only animate progress
+          // changes that happen at rest.
+          enabled: MotionPolicy.enabled && root.lengthSec > 0
+            && root.progressAppear >= 0.99 && !root._sizeMoving
           NumberAnimation {
             duration: Ui.normalMs
             easing.type: Easing.OutCubic

@@ -28,14 +28,14 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # suite's own measurement. Kept in one place so a diff in the numbers is
 # readable.
 #
-# RECORDED_FILE_COUNT: 234 .qml files under shell/. This is the file set the
+# RECORDED_FILE_COUNT: 235 .qml files under shell/. This is the file set the
 #   README's one-liner hands to the tool and the set the suite hands to it, and
 #   every counted diagnostic is attributed to one of these paths ("every
 #   diagnosed file is one that was linted"), so the count and the warning set
 #   below always describe the same tree. A file added here with a root object
 #   Quickshell registers from C++ adds no new unresolved name and no
 #   missing-property, so it can move the file count without moving either.
-# RECORDED_WARNING_COUNT: 146 "Warning:" diagnostics. This is the sum of the
+# RECORDED_WARNING_COUNT: 147 "Warning:" diagnostics. This is the sum of the
 #   per-kind breakdown below and is not an independent figure, so it cannot
 #   distinguish a kind that stopped firing from a kind that started. What makes
 #   the total legible is the breakdown, which is why every kind is pinned
@@ -48,7 +48,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   that shape and the total are not independent facts and a total recorded
 #   against a tree that has one is only satisfiable while the defect is there.
 #   54 `missing-property` warnings is the current measured figure, and the
-#   warning total is 146. Eleven additional dynamic/property-access diagnostics
+#   warning total is 147. Eleven additional dynamic/property-access diagnostics
 #   are retained rather than suppressed; the component probes pin those runtime
 #   contracts separately. A reader who sees the total fall with
 #   `missing-property` should identify the exact reads that changed before
@@ -84,7 +84,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   probe was measured to return the new body where the bare reload returned
 #   the old one.
 #
-# RECORDED_INFO_COUNT: 71 "Info:" diagnostics: 17 `[unused-imports]` and 54
+# RECORDED_INFO_COUNT: 72 "Info:" diagnostics: 17 `[unused-imports]` and 55
 #   untagged "X is a member of a parent element" notes. Untagged at the tail,
 #   and a severity this suite counts separately, so neither reaches the warning
 #   total above.
@@ -109,8 +109,11 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #
 #   The parent-element note counts a name that resolves through scopes the
 #   delegate scopes up. That naming is deliberate across the bar and menu
-#   surfaces, so 54 is a shape of the tree rather than 54 defects, and it moves
+#   surfaces, so 55 is a shape of the tree rather than 55 defects, and it moves
 #   with those files.
+#   common/LyricsPane.qml is one of them: the delegate's click handler reads
+#   `modelData` through its parent Text, and qmllint reports the same read as
+#   an unqualified warning.
 #
 #   Recorded against a measured tree, which is the only property worth stating
 #   about any of these numbers: a count recorded off a modified tree describes
@@ -122,10 +125,10 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   word of it is then read as a category name. The sentence that documents this
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
-RECORDED_FILE_COUNT=234
-RECORDED_WARNING_COUNT=146
-RECORDED_INFO_COUNT=71
-README_WARNING_COUNT=146
+RECORDED_FILE_COUNT=235
+RECORDED_WARNING_COUNT=147
+RECORDED_INFO_COUNT=72
+README_WARNING_COUNT=147
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see
@@ -151,7 +154,7 @@ missing-property 54
 property-override 5
 redundant-optional-chaining 3
 uncreatable-type 3
-unqualified 68
+unqualified 69
 unresolved-type 5"
 
 t_section "the tool under test"

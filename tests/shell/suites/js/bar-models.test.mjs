@@ -2585,6 +2585,16 @@ group('the cache is bounded', () => {
   eq('an explicit clear empties it', CN.lyricsCacheSize(), 0)
 })
 
+group('a sheet read again survives the cold prune', () => {
+  CN.lyricsCacheClear()
+  for (let i = 0; i < 12; i++) CN.lyricsCachePut('r' + i, { synced: false, lines: [] }, 1000 + i)
+  CN.lyricsCacheGet('r0', 1000 + 20)
+  CN.lyricsCachePut('r12', { synced: false, lines: [] }, 1000 + 21)
+  eq('the read entry is no longer cold', CN.lyricsCacheGet('r0', 1000 + 22) !== null, true)
+  eq('the unread coldest entry went', CN.lyricsCacheGet('r1', 1000 + 22), null)
+  CN.lyricsCacheClear()
+})
+
 // One thing neither copy does, recorded so the gap is visible in the total
 // rather than silently absent.
 skip('the OSD/island consumers of the time-gated helpers', 'the callers are QML; only the pure halves are asserted here')
