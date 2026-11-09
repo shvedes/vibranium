@@ -306,9 +306,10 @@ Singleton {
     return list
   }
 
-  // Camera: role-tagged streams, linked camera devices (a device with
-  // links is streaming; dormant ones stay dark) and linked video nodes
-  // that sharing did not claim.
+  // Camera: only capture streams that are actually being used. A role-tagged
+  // node with media.role=camera is included only when something links it.
+  // Dormant devices must stay dark even though the device node itself always
+  // sits in the graph. Share sources and share streams are excluded above.
   readonly property var camStreams: {
     var list = []
     for (var l = 0; l < root.videoNodes.length; l++) {
@@ -317,7 +318,7 @@ Singleton {
       if (root._isShareStream(m)) continue
       var role = String(root._nodeProps(m)["media.role"] || "").toLowerCase()
       if (role === "camera") {
-        list.push(m)
+        if (root.linkedIds[m.id]) list.push(m)
         continue
       }
       if (root.linkedIds[m.id]) list.push(m)
