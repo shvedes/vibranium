@@ -89,7 +89,7 @@ qp_assert "flicking stops at the bounds" d.boundsBehavior 0
 t_eq "snapping is off, so seatTo is the only contentY writer" "0" "$(qp_get d.snapMode)"
 qp_assert "the view is non-interactive by default" d.interactive false
 qp_assert "and owns no key navigation" d.keyNavigationEnabled false
-qp_assert "wheel stepping is on by default" d.wheelSteps true
+qp_assert "wheel stepping is off by default" d.wheelSteps false
 qp_assert "the compatibility cache gate is on" d.autoCache true
 qp_assert "the bar is decoupled from contentY" d.highlightFollows false
 qp_assert "a highlight component is installed" d.highlightSet true

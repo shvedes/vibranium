@@ -3199,10 +3199,9 @@ Rectangle {
   // size, so the place the follow policy puts the row in can be named for
   // real.
   //
-  // The user has moved on by the time this runs - a key step or a wheel
-  // notch takes the cursor elsewhere - and then the row they are on now is
-  // the one that matters: the follow policy places it, and this placement
-  // is dropped.
+  // The user has moved on by the time this runs - a key step takes the
+  // cursor elsewhere - and then the row they are on now is the one that
+  // matters: the follow policy places it, and this placement is dropped.
   function _placeFocusedRow() {
     const idx = panel._placeIdx
     if (idx < 0) return
@@ -4288,11 +4287,6 @@ Rectangle {
 
         anchors.fill: parent
         interactive: false
-        // A menu is walked by the keyboard and nothing else: a wheel over the
-        // card used to step the cursor, which is a gesture the menu does not
-        // own - the pointer cannot stay on the row it named while the card
-        // glides under it.
-        wheelSteps: false
         // NO trailing space here: outerPad below the region is the single
         // bottom-gap authority. An in-content pad would stack with it on
         // short lists (22px) while scrollable lists showed only 10.

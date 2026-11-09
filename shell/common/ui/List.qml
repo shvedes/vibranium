@@ -24,10 +24,12 @@ import "NavKeys.js" as NavKeys
 // centre of a viewport that no longer exists.
 //
 // Keyboard scrolling is the consumer's routing (move() walks
-// selectable rows via isSelectable, wrapping per `wrap`); the wheel
-// steps entries directly when wheelSteps is on and the list is
-// non-interactive (default). interactive: true restores native
-// drag/flick (menu) and disables wheel stepping.
+// selectable rows via isSelectable, wrapping per `wrap`). The wheel
+// does not step rows by default: a menu is walked by the keyboard,
+// and a wheel notch names no row for the pointer to stay on while the
+// card glides past it. A non-interactive list can opt back into
+// entry-per-notch stepping with wheelSteps; interactive: true gives the
+// view native drag/flick instead, and disables that stepping.
 //
 // Geometry authority: a measured, identity-keyed height table
 // (rowIdentity; default index). Native estimate machinery never
@@ -2258,13 +2260,16 @@ ListView {
     function onYChanged() { root.pursue() }
   }
 
-  property bool wheelSteps: true
+  // Opt-in wheel stepping (see the header): the library default is that a
+  // list does not walk its rows on the wheel, so a consumer that does not
+  // ask for it cannot inherit the gesture by accident.
+  property bool wheelSteps: false
 
   // --- wheel ---
 
   // Wheel stepping: one entry per notch, through move() so wheel and
   // keyboard share the follow policy and the single seat writer.
-  // Native flick stays available via interactive: true (menu), which
+  // Native flick stays available via interactive: true, which
   // auto-disables this handler.
   WheelHandler {
     acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad

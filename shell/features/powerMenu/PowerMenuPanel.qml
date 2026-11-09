@@ -475,8 +475,6 @@ PanelCard {
       centerCursor: true
       smoothScroll: MotionPolicy.enabled
       interactive: false
-      // The same rule the settings menu keeps: the wheel does not walk rows.
-      wheelSteps: false
       // Library highlight glides for focus moves, filtered or not
       // - same gate as MenuPanel, narrowed to the cursor-row rule every panel
       // with in-flow slots keeps: the bar snaps while the focused row carries
