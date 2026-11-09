@@ -1,3 +1,4 @@
 module qs.features.bar.modules.NowPlaying
 NowPlaying 1.0 NowPlaying.qml
 NowPlayingIsland 1.0 NowPlayingIsland.qml
+LyricsPane 1.0 LyricsPane.qml

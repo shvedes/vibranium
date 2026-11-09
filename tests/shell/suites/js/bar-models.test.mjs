@@ -1791,7 +1791,7 @@ group('the whole published surface is here, and it is the only copy', () => {
   // the assertion is the full surface: every documented helper publishes, and
   // the set is exactly these - which still catches a helper being dropped.
   const shared = ['sortPlayers', 'isBrowserPlayer', 'filterBrowsers', 'fmtTime', 'clampRatio', 'noteManual', 'manualFresh', 'manualDir']
-  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex', 'canLikePlayer', 'likeShortcutScript', 'playerRating', 'playerLiked', 'toggleLiked']
+  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex', 'canLikePlayer', 'likeShortcutScript', 'playerRating', 'playerLiked', 'toggleLiked', 'parseLrc', 'lyricIndexAt', 'parsePlainLyrics', 'lyricsFromSearch', 'lyricsCacheKey', 'lyricsCacheGet', 'lyricsCachePut', 'lyricsCacheSize', 'lyricsCacheClear']
   for (const k of shared) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   for (const k of unique) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   is('BROWSER_TOKENS publishes the client table', CN.BROWSER_TOKENS, (v) => Array.isArray(v) && v.every((t) => t === String(t).toLowerCase()), 'lowercase tokens')
@@ -2482,6 +2482,107 @@ group('a slot is the label plus equal padding', () => {
   eq('a negative pad is clamped', WSM.numberBoxWidth(8, -2), 8)
   eq('a fractional pad is floored', WSM.numberBoxWidth(8, 2.9), WSM.numberBoxWidth(8, 2))
   eq('a two-digit slot is wider than a one-digit one', WSM.numberBoxWidth(14, 2) > WSM.numberBoxWidth(8, 2), true)
+})
+
+section('now playing: synced lyrics')
+group('LRC stamps become sorted cues', () => {
+  eq('two cues in order', CN.parseLrc('[00:12.50]Hello\n[00:15.00]World'),
+    [{ t: 12.5, x: 'Hello' }, { t: 15, x: 'World' }])
+  eq('one line with two stamps is two cues', CN.parseLrc('[00:01.00][00:03.00]Again'),
+    [{ t: 1, x: 'Again' }, { t: 3, x: 'Again' }])
+  eq('an unsorted body is sorted', CN.parseLrc('[00:09.00]b\n[00:02.00]a').map((l) => l.x), ['a', 'b'])
+  eq('centiseconds keep their place', CN.parseLrc('[00:01.05]x')[0].t, 1.05)
+  eq('a colon fraction is read the same way', CN.parseLrc('[00:01:50]x')[0].t, 1.5)
+  eq('minutes carry into seconds', CN.parseLrc('[01:02.00]x')[0].t, 62)
+  eq('metadata tags are not cues', CN.parseLrc('[ar:Someone]\n[ti:Something]'), [])
+  eq('a row with no words is dropped', CN.parseLrc('[00:01.00]\n[00:02.00]a').map((l) => l.x), ['a'])
+})
+group('the offset tag shifts every cue', () => {
+  eq('a negative offset moves them earlier', CN.parseLrc('[offset:-500]\n[00:02.00]a')[0].t, 1.5)
+  eq('a positive offset moves them later', CN.parseLrc('[offset:250]\n[00:02.00]a')[0].t, 2.25)
+  eq('a shift below zero clamps at the start', CN.parseLrc('[offset:-5000]\n[00:02.00]a')[0].t, 0)
+})
+group('degenerate lyric bodies read as nothing', () => {
+  eq('null', CN.parseLrc(null), [])
+  eq('a number', CN.parseLrc(7), [])
+  eq('empty text', CN.parseLrc(''), [])
+  eq('plain text has no cues', CN.parseLrc('just words\nand more'), [])
+  eq('plain lyrics split into trimmed rows', CN.parsePlainLyrics('a\n\n  b  \n'), ['a', 'b'])
+  eq('a non-string plain body', CN.parsePlainLyrics(null), [])
+})
+group('a cue is looked up by playback time', () => {
+  const lines = [{ t: 1, x: 'a' }, { t: 3, x: 'b' }, { t: 5, x: 'c' }]
+  eq('before the first cue', CN.lyricIndexAt(lines, 0), -1)
+  eq('exactly on a cue', CN.lyricIndexAt(lines, 3), 1)
+  eq('between cues holds the previous one', CN.lyricIndexAt(lines, 4.9), 1)
+  eq('past the last cue', CN.lyricIndexAt(lines, 99), 2)
+  eq('an empty list', CN.lyricIndexAt([], 4), -1)
+  eq('a non-array', CN.lyricIndexAt(null, 4), -1)
+  eq('a non-finite time', CN.lyricIndexAt(lines, NaN), -1)
+})
+group('the provider pick prefers timed lyrics and the right recording', () => {
+  const synced = (t) => ({ duration: t, syncedLyrics: '[00:01.00]a', plainLyrics: 'a' })
+  const plain = (t) => ({ duration: t, syncedLyrics: '', plainLyrics: 'a\nb' })
+  eq('timed lyrics win over untimed ones', CN.lyricsFromSearch([plain(100), synced(100)], 100).synced, true)
+  eq('the closer duration wins between two timed records',
+    CN.lyricsFromSearch([{ duration: 400, syncedLyrics: '[00:01.00]far' }, { duration: 101, syncedLyrics: '[00:02.00]near' }], 100).lines[0].x, 'near')
+  eq('untimed lyrics still render as lines', CN.lyricsFromSearch([plain(0)], 0).lines.length, 2)
+  eq('an untimed line carries no cue', CN.lyricsFromSearch([plain(0)], 0).lines[0].t, 0)
+  eq('no lyrics in any record', CN.lyricsFromSearch([{ duration: 1, syncedLyrics: '', plainLyrics: '  ' }], 1), null)
+  eq('an empty result set', CN.lyricsFromSearch([], 10), null)
+  eq('a non-array payload', CN.lyricsFromSearch(null, 10), null)
+  eq('holes are skipped', CN.lyricsFromSearch([null, synced(10)], 10).synced, true)
+})
+
+section('now playing: the lyrics cache outlives the pane')
+group('a sheet is served from the library, not fetched again', () => {
+  // The island is destroyed when it closes, so a per-pane memo cannot answer a
+  // reopen; the answer has to live beside the library the next island loads.
+  CN.lyricsCacheClear()
+  const key = CN.lyricsCacheKey('Song', 'Artist', 'Album', 200.4)
+  eq('a track nobody asked about is a miss', CN.lyricsCacheGet(key), null)
+  eq('a put is reported', CN.lyricsCachePut(key, { synced: true, lines: [{ t: 1, x: 'a' }] }), true)
+  eq('the sheet reads back', CN.lyricsCacheGet(key).result.lines[0].x, 'a')
+  eq('and it is one entry', CN.lyricsCacheSize(), 1)
+})
+
+group('the key is the recording, not the client', () => {
+  CN.lyricsCacheClear()
+  eq('case and padding do not split a track', CN.lyricsCacheKey(' Song ', 'ARTIST', 'album', 200),
+    CN.lyricsCacheKey('song', 'artist', 'Album', 200.4))
+  eq('a different length is another recording',
+    CN.lyricsCacheKey('s', 'a', 'b', 200) === CN.lyricsCacheKey('s', 'a', 'b', 260), false)
+  eq('an unknown length reads as zero', CN.lyricsCacheKey('s', 'a', 'b', 0), CN.lyricsCacheKey('s', 'a', 'b', NaN))
+  eq('an empty key is refused', CN.lyricsCachePut('', null), false)
+  eq('and never answers', CN.lyricsCacheGet(''), null)
+})
+
+group('"no lyrics" is an answer worth keeping', () => {
+  CN.lyricsCacheClear()
+  const key = CN.lyricsCacheKey('Unknown', 'Nobody', '', 180)
+  CN.lyricsCachePut(key, null)
+  eq('it is not a miss', CN.lyricsCacheGet(key) !== null, true)
+  eq('and it carries no lines', CN.lyricsCacheGet(key).result, null)
+})
+
+group('a sheet is temporary', () => {
+  CN.lyricsCacheClear()
+  const key = CN.lyricsCacheKey('ttl', 'a', 'b', 100)
+  const lastRead = 1000 + 29 * 60 * 1000
+  CN.lyricsCachePut(key, { synced: false, lines: [] }, 1000)
+  eq('still served inside the window', CN.lyricsCacheGet(key, lastRead) !== null, true)
+  eq('gone a window after the last read', CN.lyricsCacheGet(key, lastRead + 30 * 60 * 1000 + 1), null)
+  eq('and dropped rather than hidden', CN.lyricsCacheSize(), 0)
+})
+
+group('the cache is bounded', () => {
+  CN.lyricsCacheClear()
+  for (let i = 0; i < 15; i++) CN.lyricsCachePut('k' + i, { synced: false, lines: [] }, 1000 + i)
+  eq('it never grows past twelve entries', CN.lyricsCacheSize(), 12)
+  eq('the coldest entry went first', CN.lyricsCacheGet('k0', 1000 + 20), null)
+  eq('the newest is still there', CN.lyricsCacheGet('k14', 1000 + 20) !== null, true)
+  CN.lyricsCacheClear()
+  eq('an explicit clear empties it', CN.lyricsCacheSize(), 0)
 })
 
 // One thing neither copy does, recorded so the gap is visible in the total

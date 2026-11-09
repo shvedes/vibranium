@@ -11,6 +11,9 @@ import "../../../../common/NowPlaying.js" as NP
 // translucent theme fill, 1px keyline): large art left, track lines +
 // seekable progress + times + control pads in the right column.
 // Player pads stay visible and dim out while a single client is alive.
+// A lyrics pad in the transport row swaps the controls column for the track's
+// synced lyrics, artwork kept; right-clicking the transcript brings the
+// controls back (see LyricsPane).
 //
 // SPLIT MAP (one owner each, no behavior change): Strip (transport
 // strip: art column, meta column, seek/volume lanes, pads, player
@@ -99,6 +102,10 @@ Item {
   readonly property string artist: root.player !== null ? root.player.trackArtist ?? "" : ""
   readonly property string album: root.player !== null ? root.player.trackAlbum ?? "" : ""
   readonly property string artUrl: root.player !== null ? root.player.trackArtUrl ?? "" : ""
+  // The transcript replaces the controls column, artwork untouched: the
+  // column stays laid out underneath (see sideSlot), so the card keeps its
+  // size and the toggle is a swap inside the column, not a second layout.
+  property bool lyricsMode: false
   // Set while a cover that has already loaded is waiting for the flash
   // boundary that is allowed to fade it in. See the art frame.
   property bool _artArmed: false
@@ -425,6 +432,17 @@ Item {
     root.player.position = t
     // Optimistic adopt so the strip jumps at once; the live
     // onPositionChanged above corrects on daemon notify.
+    root.shownPosition = t
+    if (root.player) root.player.positionChanged()
+  }
+
+  // Lyric jump: a clicked line names a time rather than a ratio, so this is
+  // the lane's release write with the time already resolved. Adopted at once
+  // like seekAt, then corrected on the daemon's notify.
+  function seekTo(seconds) {
+    if (!root.canSeekPosition) return
+    const t = Math.max(0, Math.min(root.lengthSec, Number(seconds) || 0))
+    root.player.position = t
     root.shownPosition = t
     if (root.player) root.player.positionChanged()
   }
@@ -873,7 +891,7 @@ Item {
             // The frame's placeholder: a client with nothing named in it
             // (no title yet, or a fresh one that never played).
             visible: !root.hasTrack
-            name: "music"
+            name: "eighth-note"
             colorKey: "foreground_1"
             size: 48
           }
@@ -899,278 +917,259 @@ Item {
           }
         }
 
-        Column {
-          id: metaCol
+        // The column owns its own height, and keeps it whether the controls
+        // or the transcript are showing: the pane fills the slot the controls
+        // stand down from, and nothing on the card resizes on the toggle.
+        Item {
+          id: sideSlot
 
           width: root.metaColumnWidth
-          anchors.verticalCenter: parent.verticalCenter
-          spacing: 5
+          height: metaCol.height
 
           Column {
-            id: metaText
+            id: metaCol
 
-            width: parent.width
+            width: root.metaColumnWidth
+            anchors.verticalCenter: parent.verticalCenter
             spacing: 5
-            clip: true
+            // Hidden, not unmade: its height still sizes the card.
+            visible: !root.lyricsMode
 
-            // Track-change entrance: same slide-fade language as the
-            // player-swap kickSwap above, scoped to the three name
-            // rows only. Clipped, so text never slides over the art;
-            // progress and pads never move (island-wide motion is for
-            // player switches only).
-            function kickMeta() {
-              if (root.animOn) {
-                metaSlide.from = root._swapDir >= 0 ? 24 : -24
-                metaSlide.restart()
-                metaFade.restart()
-              } else {
-                metaText.x = 0
-                metaText.opacity = 1
-              }
-            }
+            Column {
+              id: metaText
 
-            Row {
               width: parent.width
-              spacing: 7
+              spacing: 5
+              clip: true
 
-              Icon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: "music-track"
-                colorKey: "accent"
-                size: 16
+              // Track-change entrance: same slide-fade language as the
+              // player-swap kickSwap above, scoped to the three name
+              // rows only. Clipped, so text never slides over the art;
+              // progress and pads never move (island-wide motion is for
+              // player switches only).
+              function kickMeta() {
+                if (root.animOn) {
+                  metaSlide.from = root._swapDir >= 0 ? 24 : -24
+                  metaSlide.restart()
+                  metaFade.restart()
+                } else {
+                  metaText.x = 0
+                  metaText.opacity = 1
+                }
               }
 
-              Item {
-                id: titleMarquee
+              Row {
+                width: parent.width
+                spacing: 7
 
-                width: parent.width - 16 - 7
-                height: titleText.implicitHeight
-                clip: true
-
-                readonly property real overflow: Math.max(0, titleText.implicitWidth - width)
-                readonly property int legMs: Math.max(1800, Math.min(9000,
-                  Math.round(1800 + overflow * 24)))
-                readonly property int endpointPauseMs: 400
-
-                function reset() {
-                  titleText.x = 0
-                  if (root.marqueeEnabled && !root.linkCopied && titleMarquee.overflow > 0)
-                    titleMarqueeAnimation.restart()
-                  else
-                    titleMarqueeAnimation.stop()
+                Icon {
+                  anchors.verticalCenter: parent.verticalCenter
+                  name: "music-track"
+                  colorKey: "accent"
+                  size: 16
                 }
 
-                onWidthChanged: titleMarquee.reset()
+                Item {
+                  id: titleMarquee
 
-                SequentialAnimation {
-                  id: titleMarqueeAnimation
+                  width: parent.width - 16 - 7
+                  height: titleText.implicitHeight
+                  clip: true
 
-                  running: root.marqueeEnabled && !root.linkCopied && titleMarquee.overflow > 0
-                  loops: Animation.Infinite
-                  NumberAnimation {
-                    target: titleText
-                    property: "x"
-                    from: 0
-                    to: -titleMarquee.overflow
-                    duration: titleMarquee.legMs
-                    easing.type: Easing.InOutSine
+                  readonly property real overflow: Math.max(0, titleText.implicitWidth - width)
+                  readonly property int legMs: Math.max(1800, Math.min(9000,
+                    Math.round(1800 + overflow * 24)))
+                  readonly property int endpointPauseMs: 400
+
+                  function reset() {
+                    titleText.x = 0
+                    if (root.marqueeEnabled && !root.linkCopied && titleMarquee.overflow > 0)
+                      titleMarqueeAnimation.restart()
+                    else
+                      titleMarqueeAnimation.stop()
                   }
-                  PauseAnimation {
-                    duration: titleMarquee.endpointPauseMs
+
+                  onWidthChanged: titleMarquee.reset()
+
+                  SequentialAnimation {
+                    id: titleMarqueeAnimation
+
+                    running: root.marqueeEnabled && !root.linkCopied && titleMarquee.overflow > 0
+                    loops: Animation.Infinite
+                    NumberAnimation {
+                      target: titleText
+                      property: "x"
+                      from: 0
+                      to: -titleMarquee.overflow
+                      duration: titleMarquee.legMs
+                      easing.type: Easing.InOutSine
+                    }
+                    PauseAnimation {
+                      duration: titleMarquee.endpointPauseMs
+                    }
+                    NumberAnimation {
+                      target: titleText
+                      property: "x"
+                      from: -titleMarquee.overflow
+                      to: 0
+                      duration: titleMarquee.legMs
+                      easing.type: Easing.InOutSine
+                    }
+                    PauseAnimation {
+                      duration: titleMarquee.endpointPauseMs
+                    }
+                    onStopped: titleText.x = 0
                   }
-                  NumberAnimation {
-                    target: titleText
-                    property: "x"
-                    from: -titleMarquee.overflow
-                    to: 0
-                    duration: titleMarquee.legMs
-                    easing.type: Easing.InOutSine
+
+                  Text {
+                    id: titleText
+
+                    width: root.marqueeEnabled ? implicitWidth : titleMarquee.width
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.linkCopied ? "Copied!" : (root.title !== "" ? root.title : "--")
+                    color: Ui.solid("foreground_0")
+                    font.pixelSize: 12
+                    font.family: Ui.fontFamily
+                    font.bold: true
+                    font.underline: root.titleHover && root.hasTrackLink
+                    elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
+                    wrapMode: Text.NoWrap
+                    textFormat: Text.PlainText
+                    onTextChanged: titleMarquee.reset()
                   }
-                  PauseAnimation {
-                    duration: titleMarquee.endpointPauseMs
+
+                  MouseArea {
+                    anchors.fill: parent
+                    hoverEnabled: true
+                    // Soft gate: the area stays in hover delivery so a title with
+                    // no link reads as a refusal instead of a dead click.
+                    cursorShape: root.hasTrackLink ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                    acceptedButtons: Qt.LeftButton
+                    onEntered: root.titleHover = true
+                    onExited: root.titleHover = false
+                    onClicked: if (root.hasTrackLink) root.flashCopied()
                   }
-                  onStopped: titleText.x = 0
+                }
+              }
+
+              Row {
+                width: parent.width
+                spacing: 7
+
+                Icon {
+                  anchors.verticalCenter: parent.verticalCenter
+                  name: "music-artist"
+                  colorKey: "foreground_1"
+                  size: 15
                 }
 
                 Text {
-                  id: titleText
-
-                  width: root.marqueeEnabled ? implicitWidth : titleMarquee.width
+                  width: parent.width - 15 - 7
                   anchors.verticalCenter: parent.verticalCenter
-                  text: root.linkCopied ? "Copied!" : (root.title !== "" ? root.title : "--")
-                  color: Ui.solid("foreground_0")
-                  font.pixelSize: 12
-                  font.family: Ui.fontFamily
-                  font.bold: true
-                  font.underline: root.titleHover && root.hasTrackLink
-                  elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
-                  wrapMode: Text.NoWrap
-                  textFormat: Text.PlainText
-                  onTextChanged: titleMarquee.reset()
-                }
-
-                MouseArea {
-                  anchors.fill: parent
-                  hoverEnabled: true
-                  // Soft gate: the area stays in hover delivery so a title with
-                  // no link reads as a refusal instead of a dead click.
-                  cursorShape: root.hasTrackLink ? Qt.PointingHandCursor : Qt.ForbiddenCursor
-                  acceptedButtons: Qt.LeftButton
-                  onEntered: root.titleHover = true
-                  onExited: root.titleHover = false
-                  onClicked: if (root.hasTrackLink) root.flashCopied()
-                }
-              }
-            }
-
-            Row {
-              width: parent.width
-              spacing: 7
-
-              Icon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: "music-artist"
-                colorKey: "foreground_1"
-                size: 15
-              }
-
-              Text {
-                width: parent.width - 15 - 7
-                anchors.verticalCenter: parent.verticalCenter
-                text: root.artist !== "" ? root.artist : "--"
-                color: Ui.tint("foreground_1", 0.7)
-                font.pixelSize: 11
-                font.family: Ui.fontFamily
-                elide: Text.ElideRight
-                textFormat: Text.PlainText
-              }
-            }
-
-            Row {
-              width: parent.width
-              spacing: 7
-
-              Icon {
-                anchors.verticalCenter: parent.verticalCenter
-                name: "music-album"
-                colorKey: "foreground_1"
-                size: 16
-              }
-
-              Item {
-                id: albumMarquee
-
-                width: parent.width - 16 - 7
-                height: albumText.implicitHeight
-                clip: true
-
-                readonly property real overflow: Math.max(0, albumText.implicitWidth - width)
-                readonly property int legMs: Math.max(1800, Math.min(9000,
-                  Math.round(1800 + overflow * 24)))
-                readonly property int endpointPauseMs: 400
-
-                function reset() {
-                  albumText.x = 0
-                  if (root.marqueeEnabled && albumMarquee.overflow > 0)
-                    albumMarqueeAnimation.restart()
-                  else
-                    albumMarqueeAnimation.stop()
-                }
-
-                onWidthChanged: albumMarquee.reset()
-
-                SequentialAnimation {
-                  id: albumMarqueeAnimation
-
-                  running: root.marqueeEnabled && albumMarquee.overflow > 0
-                  loops: Animation.Infinite
-                  NumberAnimation {
-                    target: albumText
-                    property: "x"
-                    from: 0
-                    to: -albumMarquee.overflow
-                    duration: albumMarquee.legMs
-                    easing.type: Easing.InOutSine
-                  }
-                  PauseAnimation {
-                    duration: albumMarquee.endpointPauseMs
-                  }
-                  NumberAnimation {
-                    target: albumText
-                    property: "x"
-                    from: -albumMarquee.overflow
-                    to: 0
-                    duration: albumMarquee.legMs
-                    easing.type: Easing.InOutSine
-                  }
-                  PauseAnimation {
-                    duration: albumMarquee.endpointPauseMs
-                  }
-                  onStopped: albumText.x = 0
-                }
-
-                Text {
-                  id: albumText
-
-                  width: root.marqueeEnabled ? implicitWidth : albumMarquee.width
-                  anchors.verticalCenter: parent.verticalCenter
-                  text: root.album !== "" ? root.album : "--"
-                  color: Ui.tint("foreground_1", 0.55)
+                  text: root.artist !== "" ? root.artist : "--"
+                  color: Ui.tint("foreground_1", 0.7)
                   font.pixelSize: 11
                   font.family: Ui.fontFamily
-                  elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
-                  wrapMode: Text.NoWrap
+                  elide: Text.ElideRight
                   textFormat: Text.PlainText
-                  onTextChanged: albumMarquee.reset()
+                }
+              }
+
+              Row {
+                width: parent.width
+                spacing: 7
+
+                Icon {
+                  anchors.verticalCenter: parent.verticalCenter
+                  name: "music-album"
+                  colorKey: "foreground_1"
+                  size: 16
+                }
+
+                Item {
+                  id: albumMarquee
+
+                  width: parent.width - 16 - 7
+                  height: albumText.implicitHeight
+                  clip: true
+
+                  readonly property real overflow: Math.max(0, albumText.implicitWidth - width)
+                  readonly property int legMs: Math.max(1800, Math.min(9000,
+                    Math.round(1800 + overflow * 24)))
+                  readonly property int endpointPauseMs: 400
+
+                  function reset() {
+                    albumText.x = 0
+                    if (root.marqueeEnabled && albumMarquee.overflow > 0)
+                      albumMarqueeAnimation.restart()
+                    else
+                      albumMarqueeAnimation.stop()
+                  }
+
+                  onWidthChanged: albumMarquee.reset()
+
+                  SequentialAnimation {
+                    id: albumMarqueeAnimation
+
+                    running: root.marqueeEnabled && albumMarquee.overflow > 0
+                    loops: Animation.Infinite
+                    NumberAnimation {
+                      target: albumText
+                      property: "x"
+                      from: 0
+                      to: -albumMarquee.overflow
+                      duration: albumMarquee.legMs
+                      easing.type: Easing.InOutSine
+                    }
+                    PauseAnimation {
+                      duration: albumMarquee.endpointPauseMs
+                    }
+                    NumberAnimation {
+                      target: albumText
+                      property: "x"
+                      from: -albumMarquee.overflow
+                      to: 0
+                      duration: albumMarquee.legMs
+                      easing.type: Easing.InOutSine
+                    }
+                    PauseAnimation {
+                      duration: albumMarquee.endpointPauseMs
+                    }
+                    onStopped: albumText.x = 0
+                  }
+
+                  Text {
+                    id: albumText
+
+                    width: root.marqueeEnabled ? implicitWidth : albumMarquee.width
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: root.album !== "" ? root.album : "--"
+                    color: Ui.tint("foreground_1", 0.55)
+                    font.pixelSize: 11
+                    font.family: Ui.fontFamily
+                    elide: root.marqueeEnabled ? Text.ElideNone : Text.ElideRight
+                    wrapMode: Text.NoWrap
+                    textFormat: Text.PlainText
+                    onTextChanged: albumMarquee.reset()
+                  }
                 }
               }
             }
-          }
 
-          // Spotify-style progress: elapsed, seek lane, total in one
-          // row. The lane keeps the click/drag/wheel seek contract.
-          //
-          // The row stays visible for a player with no length, because the
-          // elapsed counter is the only time information a stream has. The
-          // dim lives on the lane rather than here: the row is a readout and
-          // the lane is the control, and the row already carries a dim of its
-          // own for a client that is not playing, which is a transport state
-          // and not a capability.
-          Row {
-            width: parent.width
-            spacing: root.laneGap
-            visible: root.hasClient
-            opacity: root.playing ? 1 : 0.5
-
-            Behavior on opacity {
-              enabled: root.animOn
-              NumberAnimation {
-                duration: Ui.fastMs
-                easing.type: Easing.OutCubic
-              }
-            }
-
-            // The elapsed counter, at the column's left edge with no glyph
-            // ahead of it: the row is two readouts and a control, and a leading
-            // icon only borrowed width the lane could have had. The column is
-            // the track's own length, so the digits sit against the lane with
-            // no leftover between them.
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              width: root.timeColumnWidth
-              text: root.lengthSec > 0 ? root.fmtTime(root.shownPosition, root.lengthSec) : "--:--"
-              color: Ui.tint("foreground_1", 0.55)
-              font.pixelSize: Ui.fontXs
-              font.family: Ui.fontFamily
-              textFormat: Text.PlainText
-              elide: Text.ElideRight
-            }
-
-            Item {
-              width: root.seekLaneWidth
-              height: 18
-              anchors.verticalCenter: parent.verticalCenter
-              opacity: root.canSeekPosition ? 1 : 0.5
+            // Spotify-style progress: elapsed, seek lane, total in one
+            // row. The lane keeps the click/drag/wheel seek contract.
+            //
+            // The row stays visible for a player with no length, because the
+            // elapsed counter is the only time information a stream has. The
+            // dim lives on the lane rather than here: the row is a readout and
+            // the lane is the control, and the row already carries a dim of its
+            // own for a client that is not playing, which is a transport state
+            // and not a capability.
+            Row {
+              width: parent.width
+              spacing: root.laneGap
+              visible: root.hasClient
+              opacity: root.playing ? 1 : 0.5
 
               Behavior on opacity {
                 enabled: root.animOn
@@ -1180,451 +1179,513 @@ Item {
                 }
               }
 
-              Rectangle {
-                width: parent.width
-                height: 6
+              // The elapsed counter, at the column's left edge with no glyph
+              // ahead of it: the row is two readouts and a control, and a leading
+              // icon only borrowed width the lane could have had. The column is
+              // the track's own length, so the digits sit against the lane with
+              // no leftover between them.
+              Text {
                 anchors.verticalCenter: parent.verticalCenter
-                color: Ui.tint("foreground_1", 0.25)
+                width: root.timeColumnWidth
+                text: root.lengthSec > 0 ? root.fmtTime(root.shownPosition, root.lengthSec) : "--:--"
+                color: Ui.tint("foreground_1", 0.55)
+                font.pixelSize: Ui.fontXs
+                font.family: Ui.fontFamily
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+              }
+
+              Item {
+                width: root.seekLaneWidth
+                height: 18
+                anchors.verticalCenter: parent.verticalCenter
+                opacity: root.canSeekPosition ? 1 : 0.5
+
+                Behavior on opacity {
+                  enabled: root.animOn
+                  NumberAnimation {
+                    duration: Ui.fastMs
+                    easing.type: Easing.OutCubic
+                  }
+                }
 
                 Rectangle {
-                  width: parent.width * root.progressRatio
-                  height: parent.height
-                  color: Ui.solid("accent")
+                  width: parent.width
+                  height: 6
+                  anchors.verticalCenter: parent.verticalCenter
+                  color: Ui.tint("foreground_1", 0.25)
 
-                  Behavior on width {
-                    enabled: root.animOn && root.lengthSec > 0 && !root._seeking
-                    NumberAnimation {
-                      duration: Ui.normalMs
-                      easing.type: Easing.OutCubic
+                  Rectangle {
+                    width: parent.width * root.progressRatio
+                    height: parent.height
+                    color: Ui.solid("accent")
+
+                    Behavior on width {
+                      enabled: root.animOn && root.lengthSec > 0 && !root._seeking
+                      NumberAnimation {
+                        duration: Ui.normalMs
+                        easing.type: Easing.OutCubic
+                      }
                     }
+                  }
+                }
+
+                MouseArea {
+                  anchors.fill: parent
+                  hoverEnabled: true
+                  cursorShape: root.canSeekPosition ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                  onPressed: mouse => {
+                    if (!root.canSeekPosition) return
+                    root._pressX = mouse.x
+                  }
+                  onPositionChanged: mouse => {
+                    if (!root.canSeekPosition || !pressed) return
+                    if (Math.abs(mouse.x - root._pressX) > 6) {
+                      root._seeking = true
+                      root.scrubTo(mouse.x, width)
+                    }
+                  }
+                  onReleased: mouse => {
+                    if (root.canSeekPosition) {
+                      if (root._seeking) {
+                        // The drag commits once, here, on release - the same
+                        // reason `scrubTo` writes nothing: a per-move position
+                        // write replays back and forth after the release.
+                        root.player.position = root.shownPosition
+                        root.player.positionChanged()
+                      } else {
+                        root.seekAt(mouse.x, width)
+                      }
+                    }
+                    root._seeking = false
+                  }
+                  onCanceled: {
+                    root._seeking = false
+                    root.reanchor()
+                  }
+                }
+
+                WheelHandler {
+                  acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                  onWheel: event => {
+                    if (event.angleDelta.y === 0) return
+                    if (!root.canSeekPosition) return
+                    const d = event.angleDelta.y > 0 ? 5 : -5
+                    const t = Math.min(root.lengthSec, Math.max(0, root.shownPosition + d))
+                    root.player.position = t
+                    root.shownPosition = t
+                    if (root.player) root.player.positionChanged()
+                    event.accepted = true
                   }
                 }
               }
 
-              MouseArea {
-                anchors.fill: parent
-                hoverEnabled: true
-                cursorShape: root.canSeekPosition ? Qt.PointingHandCursor : Qt.ForbiddenCursor
-                onPressed: mouse => {
-                  if (!root.canSeekPosition) return
-                  root._pressX = mouse.x
-                }
-                onPositionChanged: mouse => {
-                  if (!root.canSeekPosition || !pressed) return
-                  if (Math.abs(mouse.x - root._pressX) > 6) {
-                    root._seeking = true
-                    root.scrubTo(mouse.x, width)
-                  }
-                }
-                onReleased: mouse => {
-                  if (root.canSeekPosition) {
-                    if (root._seeking) {
-                      // The drag commits once, here, on release - the same
-                      // reason `scrubTo` writes nothing: a per-move position
-                      // write replays back and forth after the release.
-                      root.player.position = root.shownPosition
-                      root.player.positionChanged()
-                    } else {
-                      root.seekAt(mouse.x, width)
-                    }
-                  }
-                  root._seeking = false
-                }
-                onCanceled: {
-                  root._seeking = false
-                  root.reanchor()
-                }
-              }
-
-              WheelHandler {
-                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                onWheel: event => {
-                  if (event.angleDelta.y === 0) return
-                  if (!root.canSeekPosition) return
-                  const d = event.angleDelta.y > 0 ? 5 : -5
-                  const t = Math.min(root.lengthSec, Math.max(0, root.shownPosition + d))
-                  root.player.position = t
-                  root.shownPosition = t
-                  if (root.player) root.player.positionChanged()
-                  event.accepted = true
-                }
+              // The total, at the row's right end in the same column as the
+              // elapsed counter, so the two ends of the lane are readouts of
+              // identical measure and the row reads as the shape of the thing it
+              // controls: how far in, how far to go, and the control between.
+              //
+              // Both take the length as their reference, so the hour appears for
+              // both or neither and the shape cannot change mid-track at the
+              // 59:59 -> 1:00:00 crossing. A player with no length gets the
+              // placeholder rather than a running counter: a counter with nothing
+              // to count toward reads as a broken bar.
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.timeColumnWidth
+                text: root.lengthSec > 0 ? root.fmtTime(root.lengthSec, root.lengthSec) : "--:--"
+                color: Ui.tint("foreground_1", 0.55)
+                font.pixelSize: Ui.fontXs
+                font.family: Ui.fontFamily
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
               }
             }
 
-            // The total, at the row's right end in the same column as the
-            // elapsed counter, so the two ends of the lane are readouts of
-            // identical measure and the row reads as the shape of the thing it
-            // controls: how far in, how far to go, and the control between.
+            // Player volume: the Volume island slider language (sharp
+            // 6px track, direct drag, wheel steps). Icon tiers follow
+            // the level through the Audio service thirds.
             //
-            // Both take the length as their reference, so the hour appears for
-            // both or neither and the shape cannot change mid-track at the
-            // 59:59 -> 1:00:00 crossing. A player with no length gets the
-            // placeholder rather than a running counter: a counter with nothing
-            // to count toward reads as a broken bar.
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              width: root.timeColumnWidth
-              text: root.lengthSec > 0 ? root.fmtTime(root.lengthSec, root.lengthSec) : "--:--"
-              color: Ui.tint("foreground_1", 0.55)
-              font.pixelSize: Ui.fontXs
-              font.family: Ui.fontFamily
-              textFormat: Text.PlainText
-              elide: Text.ElideRight
-            }
-          }
+            // A player that does not take a volume write is grayed, not
+            // hidden: the row still shows what the player reports, and the
+            // annotator's split says how. `actionable` keeps the button and
+            // the lane in the hit-test chain so Qt.ForbiddenCursor actually
+            // reaches the user, and the row's opacity carries the dim.
+            //
+            // The row is [icon][lane][percentage]: the pad at the row's left edge
+            // where the icon rows above put theirs, the lane hard against it, the
+            // level at the right end. One lead and one short readout against the
+            // progress row's two time columns and no lead, so this lane is the
+            // longer of the two - by exactly what the progress row spends on
+            // readouts - and neither row has width reserved against it.
+            Row {
+              width: parent.width
+              spacing: root.laneGap
+              visible: root.hasClient
+              opacity: root.canSetVolume ? 1 : 0.5
 
-          // Player volume: the Volume island slider language (sharp
-          // 6px track, direct drag, wheel steps). Icon tiers follow
-          // the level through the Audio service thirds.
-          //
-          // A player that does not take a volume write is grayed, not
-          // hidden: the row still shows what the player reports, and the
-          // annotator's split says how. `actionable` keeps the button and
-          // the lane in the hit-test chain so Qt.ForbiddenCursor actually
-          // reaches the user, and the row's opacity carries the dim.
-          //
-          // The row is [icon][lane][percentage]: the pad at the row's left edge
-          // where the icon rows above put theirs, the lane hard against it, the
-          // level at the right end. One lead and one short readout against the
-          // progress row's two time columns and no lead, so this lane is the
-          // longer of the two - by exactly what the progress row spends on
-          // readouts - and neither row has width reserved against it.
-          Row {
-            width: parent.width
-            spacing: root.laneGap
-            visible: root.hasClient
-            opacity: root.canSetVolume ? 1 : 0.5
-
-            Behavior on opacity {
-              enabled: root.animOn
-              NumberAnimation {
-                duration: Ui.fastMs
-                easing.type: Easing.OutCubic
-              }
-            }
-
-            // `slotSize` is the button's own square target and its own width
-            // (IconButton sizes itself from it), so the lane's lead is the pad
-            // and nothing more.
-            IconButton {
-              name: Core.Audio.volumeIconFor(root.playerVolume, false)
-              colorKey: "foreground_1"
-              accentKey: root.playerVolume <= 0.01 ? "red" : ""
-              dimTiers: Core.Audio.volumeDimTiersFor(root.playerVolume, false)
-              iconSize: root.muteSlot
-              slotSize: root.muteSlot
-              flat: true
-              cornerRadius: RoundingPolicy.radius
-              animationsEnabled: root.animOn
-              actionable: root.canSetVolume
-              onClicked: root.togglePlayerMute()
-
-              WheelHandler {
-                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                onWheel: event => {
-                  if (!root.adjustPlayerVolume(event.angleDelta.y)) return
-                  event.accepted = true
+              Behavior on opacity {
+                enabled: root.animOn
+                NumberAnimation {
+                  duration: Ui.fastMs
+                  easing.type: Easing.OutCubic
                 }
               }
-            }
 
-            Item {
-              id: volLane
+              // `slotSize` is the button's own square target and its own width
+              // (IconButton sizes itself from it), so the lane's lead is the pad
+              // and nothing more.
+              IconButton {
+                name: Core.Audio.volumeIconFor(root.playerVolume, false)
+                colorKey: "foreground_1"
+                accentKey: root.playerVolume <= 0.01 ? "red" : ""
+                dimTiers: Core.Audio.volumeDimTiersFor(root.playerVolume, false)
+                iconSize: root.muteSlot
+                slotSize: root.muteSlot
+                flat: true
+                cornerRadius: RoundingPolicy.radius
+                animationsEnabled: root.animOn
+                actionable: root.canSetVolume
+                onClicked: root.togglePlayerMute()
 
-              width: root.volumeLaneWidth
-              height: 18
-              anchors.verticalCenter: parent.verticalCenter
+                WheelHandler {
+                  acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                  onWheel: event => {
+                    if (!root.adjustPlayerVolume(event.angleDelta.y)) return
+                    event.accepted = true
+                  }
+                }
+              }
 
-              property bool dragging: false
-              property real pressX: 0
+              Item {
+                id: volLane
 
-              Rectangle {
-                width: parent.width
-                height: 6
+                width: root.volumeLaneWidth
+                height: 18
                 anchors.verticalCenter: parent.verticalCenter
-                color: Ui.tint("foreground_1", 0.25)
+
+                property bool dragging: false
+                property real pressX: 0
 
                 Rectangle {
-                  width: parent.width * Math.max(0, Math.min(1, root.playerVolume))
-                  height: parent.height
-                  color: Ui.solid("accent")
+                  width: parent.width
+                  height: 6
+                  anchors.verticalCenter: parent.verticalCenter
+                  color: Ui.tint("foreground_1", 0.25)
 
-                  Behavior on width {
-                    enabled: root.animOn && !volLane.dragging
+                  Rectangle {
+                    width: parent.width * Math.max(0, Math.min(1, root.playerVolume))
+                    height: parent.height
+                    color: Ui.solid("accent")
+
+                    Behavior on width {
+                      enabled: root.animOn && !volLane.dragging
+                      NumberAnimation {
+                        duration: Ui.normalMs
+                        easing.type: Easing.OutCubic
+                      }
+                    }
+                  }
+                }
+
+                MouseArea {
+                  anchors.fill: parent
+                  anchors.topMargin: -6
+                  anchors.bottomMargin: -6
+                  hoverEnabled: true
+                  cursorShape: root.canSetVolume ? Qt.PointingHandCursor : Qt.ForbiddenCursor
+                  acceptedButtons: Qt.LeftButton
+                  // Seek-lane rule: clicks glide to the point, sustained
+                  // drags (past 6px) snap and commit on release. Every
+                  // write is guarded on the gate, which is what leaves an
+                  // inert lane inert while its cursor still reads as
+                  // forbidden.
+                  onPressed: mouse => {
+                    if (!root.canSetVolume) return
+                    volLane.pressX = mouse.x
+                  }
+                  onPositionChanged: mouse => {
+                    if (!root.canSetVolume || !pressed) return
+                    if (Math.abs(mouse.x - volLane.pressX) > 6) {
+                      volLane.dragging = true
+                      root.setPlayerVolume(mouse.x / width)
+                    }
+                  }
+                  onReleased: mouse => {
+                    if (root.canSetVolume) root.setPlayerVolume(mouse.x / width)
+                    volLane.dragging = false
+                  }
+                  // Same release rule as the seek lane above: an
+                  // interrupted drag must never stick `dragging` on.
+                  onCanceled: volLane.dragging = false
+                }
+
+                WheelHandler {
+                  acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                  onWheel: event => {
+                    if (!root.adjustPlayerVolume(event.angleDelta.y)) return
+                    event.accepted = true
+                  }
+                }
+              }
+
+              // The level, at the row's right end in a three-digit reserve so
+              // `9%` and `100%` leave the lane exactly where it is, and
+              // right-aligned so the number sits on the card's right margin
+              // where the volume row's edge is, rather than drifting with its own
+              // width.
+              Text {
+                anchors.verticalCenter: parent.verticalCenter
+                width: root.percentColumnWidth
+                horizontalAlignment: Text.AlignRight
+                text: Math.round(root.playerVolume * 100) + "%"
+                color: Ui.tint("foreground_1", 0.55)
+                font.pixelSize: Ui.fontXs
+                font.family: Ui.fontFamily
+                textFormat: Text.PlainText
+                elide: Text.ElideRight
+              }
+            }
+
+            Row {
+              width: parent.width
+              // Eight pads share the old 280px column now, so the gaps are
+              // tighter than before: 8 x 30 + 7 x 5 = 275 inside 280.
+              spacing: 5
+
+              IconButton {
+                name: "arrow-left-to-line"
+                iconSize: 20
+                slotSize: 30
+                flat: true
+                cornerRadius: RoundingPolicy.radius
+                animationsEnabled: root.animOn
+                actionable: root.canPrev
+                opacity: live ? 1 : 0.4
+                onClicked: root.prevPlayer()
+              }
+
+              // Tint crossfade: the icon raster cannot morph, so a
+              // foreground layer and an accent layer blend in opposite
+              // directions on state change. No dip, no flicker; the slot
+              // (hover wash, border, clicks) stays on the bottom button.
+              Item {
+                id: shuffleWrap
+
+                width: 30
+                height: 30
+
+                property real shuffleTint: root.shuffling ? 1 : 0
+                Behavior on shuffleTint {
+                  enabled: root.animOn
+                  NumberAnimation {
+                    duration: Ui.slowMs
+                    easing.type: Easing.OutCubic
+                  }
+                }
+
+                IconButton {
+                  id: shuffleBtn
+
+                  anchors.fill: parent
+                  name: "shuffle"
+                    iconSize: 20
+                  slotSize: 30
+                  flat: true
+                  cornerRadius: RoundingPolicy.radius
+                  colorKey: "foreground_0"
+                  animationsEnabled: root.animOn
+                  actionable: root.canShuffle
+                  opacity: live ? 1 : 0.4
+                  iconOpacity: 1 - shuffleWrap.shuffleTint
+                  onClicked: root.toggleShuffle()
+
+                  Icon {
+                    anchors.centerIn: parent
+                    name: "shuffle"
+                    colorKey: "accent"
+                    size: 20
+                    opacity: (shuffleBtn.live ? 1 : 0.4) * shuffleWrap.shuffleTint
+                  }
+                }
+              }
+
+              IconButton {
+                name: "skip-back"
+                iconSize: 20
+                slotSize: 30
+                flat: true
+                cornerRadius: RoundingPolicy.radius
+                animationsEnabled: root.animOn
+                actionable: root.hasTrack && root.player?.canGoPrevious !== false
+                opacity: live ? 1 : 0.4
+                onClicked: root.previousTrack()
+              }
+
+              Item {
+                width: 30
+                height: 30
+
+                IconButton {
+                  anchors.centerIn: parent
+                  name: "play"
+                    iconSize: 20
+                  slotSize: 30
+                  flat: true
+                  cornerRadius: RoundingPolicy.radius
+                  animationsEnabled: root.animOn
+                  opacity: !root.playing && root.hasClient ? 1 : 0
+                  x: !root.playing ? 0 : -8
+                  visible: opacity > 0.01
+                  z: root.playing ? 0 : 1
+                  actionable: root.hasClient && root.player?.canTogglePlaying !== false && !root.playing
+                  onClicked: root.resumePlayer()
+
+                  Behavior on opacity {
+                    enabled: root.animOn
                     NumberAnimation {
-                      duration: Ui.normalMs
+                      duration: Ui.fastMs
+                      easing.type: Easing.OutCubic
+                    }
+                  }
+                  Behavior on x {
+                    enabled: root.animOn
+                    NumberAnimation {
+                      duration: Ui.fastMs
+                      easing.type: Easing.OutCubic
+                    }
+                  }
+                }
+
+                IconButton {
+                  anchors.centerIn: parent
+                  name: "pause"
+                    iconSize: 20
+                  slotSize: 30
+                  flat: true
+                  cornerRadius: RoundingPolicy.radius
+                  animationsEnabled: root.animOn
+                  opacity: root.playing && root.hasClient ? 1 : 0
+                  x: root.playing ? 0 : 8
+                  visible: opacity > 0.01
+                  z: root.playing ? 1 : 0
+                  actionable: root.hasClient && root.player?.canTogglePlaying !== false && root.playing
+                  onClicked: root.player.togglePlaying()
+
+                  Behavior on opacity {
+                    enabled: root.animOn
+                    NumberAnimation {
+                      duration: Ui.fastMs
+                      easing.type: Easing.OutCubic
+                    }
+                  }
+                  Behavior on x {
+                    enabled: root.animOn
+                    NumberAnimation {
+                      duration: Ui.fastMs
                       easing.type: Easing.OutCubic
                     }
                   }
                 }
               }
 
-              MouseArea {
-                anchors.fill: parent
-                anchors.topMargin: -6
-                anchors.bottomMargin: -6
-                hoverEnabled: true
-                cursorShape: root.canSetVolume ? Qt.PointingHandCursor : Qt.ForbiddenCursor
-                acceptedButtons: Qt.LeftButton
-                // Seek-lane rule: clicks glide to the point, sustained
-                // drags (past 6px) snap and commit on release. Every
-                // write is guarded on the gate, which is what leaves an
-                // inert lane inert while its cursor still reads as
-                // forbidden.
-                onPressed: mouse => {
-                  if (!root.canSetVolume) return
-                  volLane.pressX = mouse.x
-                }
-                onPositionChanged: mouse => {
-                  if (!root.canSetVolume || !pressed) return
-                  if (Math.abs(mouse.x - volLane.pressX) > 6) {
-                    volLane.dragging = true
-                    root.setPlayerVolume(mouse.x / width)
+              IconButton {
+                name: "skip-forward"
+                iconSize: 20
+                slotSize: 30
+                flat: true
+                cornerRadius: RoundingPolicy.radius
+                animationsEnabled: root.animOn
+                actionable: root.hasTrack && root.player?.canGoNext !== false
+                opacity: live ? 1 : 0.4
+                onClicked: root.nextTrack()
+              }
+
+              // Tint crossfade, same as shuffle above: foreground and
+              // accent layers blend on loop change. Glyph swaps with the
+              // loop mode on both layers at once (no blank frame).
+              Item {
+                id: repeatWrap
+
+                width: 30
+                height: 30
+
+                property real repeatTint: root.looping ? 1 : 0
+                Behavior on repeatTint {
+                  enabled: root.animOn
+                  NumberAnimation {
+                    duration: Ui.slowMs
+                    easing.type: Easing.OutCubic
                   }
                 }
-                onReleased: mouse => {
-                  if (root.canSetVolume) root.setPlayerVolume(mouse.x / width)
-                  volLane.dragging = false
+
+                IconButton {
+                  id: repeatBtn
+
+                  anchors.fill: parent
+                  name: root.loopOne ? "repeat-1" : "repeat"
+                    iconSize: 20
+                  slotSize: 30
+                  flat: true
+                  cornerRadius: RoundingPolicy.radius
+                  colorKey: "foreground_0"
+                  animationsEnabled: root.animOn
+                  actionable: root.canLoop
+                  opacity: live ? 1 : 0.4
+                  iconOpacity: 1 - repeatWrap.repeatTint
+                  onClicked: root.cycleLoop()
+
+                  Icon {
+                    anchors.centerIn: parent
+                    name: root.loopOne ? "repeat-1" : "repeat"
+                    colorKey: "accent"
+                    size: 20
+                    opacity: (repeatBtn.live ? 1 : 0.4) * repeatWrap.repeatTint
+                  }
                 }
-                // Same release rule as the seek lane above: an
-                // interrupted drag must never stick `dragging` on.
-                onCanceled: volLane.dragging = false
               }
 
-              WheelHandler {
-                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
-                onWheel: event => {
-                  if (!root.adjustPlayerVolume(event.angleDelta.y)) return
-                  event.accepted = true
-                }
+              IconButton {
+                name: "arrow-right-to-line"
+                iconSize: 20
+                slotSize: 30
+                flat: true
+                cornerRadius: RoundingPolicy.radius
+                animationsEnabled: root.animOn
+                actionable: root.canNext
+                opacity: live ? 1 : 0.4
+                onClicked: root.nextPlayer()
               }
-            }
 
-            // The level, at the row's right end in a three-digit reserve so
-            // `9%` and `100%` leave the lane exactly where it is, and
-            // right-aligned so the number sits on the card's right margin
-            // where the volume row's edge is, rather than drifting with its own
-            // width.
-            Text {
-              anchors.verticalCenter: parent.verticalCenter
-              width: root.percentColumnWidth
-              horizontalAlignment: Text.AlignRight
-              text: Math.round(root.playerVolume * 100) + "%"
-              color: Ui.tint("foreground_1", 0.55)
-              font.pixelSize: Ui.fontXs
-              font.family: Ui.fontFamily
-              textFormat: Text.PlainText
-              elide: Text.ElideRight
+              // The mode pad, last in the row: the transcript takes the column
+              // the controls are in, so this one is only ever the way in - the
+              // way back is a right-click on the words themselves.
+              IconButton {
+                name: "lyrics"
+                iconSize: 20
+                slotSize: 30
+                flat: true
+                cornerRadius: RoundingPolicy.radius
+                animationsEnabled: root.animOn
+                // No lyrics for this track: the pad dims and its hover is the
+                // forbidden cursor, while the transport around it stays live.
+                actionable: !lyricsPane.unavailable
+                opacity: live ? 1 : 0.4
+                onClicked: root.lyricsMode = true
+              }
             }
           }
 
-          Row {
-            width: parent.width
-            spacing: Ui.s
+          LyricsPane {
+            id: lyricsPane
 
-            IconButton {
-              name: "arrow-left-to-line"
-              iconSize: 20
-              slotSize: 32
-              flat: true
-              cornerRadius: RoundingPolicy.radius
-              animationsEnabled: root.animOn
-              actionable: root.canPrev
-              opacity: live ? 1 : 0.4
-              onClicked: root.prevPlayer()
-            }
-
-            // Tint crossfade: the icon raster cannot morph, so a
-            // foreground layer and an accent layer blend in opposite
-            // directions on state change. No dip, no flicker; the slot
-            // (hover wash, border, clicks) stays on the bottom button.
-            Item {
-              id: shuffleWrap
-
-              width: 32
-              height: 32
-
-              property real shuffleTint: root.shuffling ? 1 : 0
-              Behavior on shuffleTint {
-                enabled: root.animOn
-                NumberAnimation {
-                  duration: Ui.slowMs
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              IconButton {
-                id: shuffleBtn
-
-                anchors.fill: parent
-                name: "shuffle"
-                  iconSize: 20
-                slotSize: 32
-                flat: true
-                cornerRadius: RoundingPolicy.radius
-                colorKey: "foreground_0"
-                animationsEnabled: root.animOn
-                actionable: root.canShuffle
-                opacity: live ? 1 : 0.4
-                iconOpacity: 1 - shuffleWrap.shuffleTint
-                onClicked: root.toggleShuffle()
-
-                Icon {
-                  anchors.centerIn: parent
-                  name: "shuffle"
-                  colorKey: "accent"
-                  size: 20
-                  opacity: (shuffleBtn.live ? 1 : 0.4) * shuffleWrap.shuffleTint
-                }
-              }
-            }
-
-            IconButton {
-              name: "skip-back"
-              iconSize: 20
-              slotSize: 32
-              flat: true
-              cornerRadius: RoundingPolicy.radius
-              animationsEnabled: root.animOn
-              actionable: root.hasTrack && root.player?.canGoPrevious !== false
-              opacity: live ? 1 : 0.4
-              onClicked: root.previousTrack()
-            }
-
-            Item {
-              width: 32
-              height: 32
-
-              IconButton {
-                anchors.centerIn: parent
-                name: "play"
-                  iconSize: 20
-                slotSize: 32
-                flat: true
-                cornerRadius: RoundingPolicy.radius
-                animationsEnabled: root.animOn
-                opacity: !root.playing && root.hasClient ? 1 : 0
-                x: !root.playing ? 0 : -8
-                visible: opacity > 0.01
-                z: root.playing ? 0 : 1
-                actionable: root.hasClient && root.player?.canTogglePlaying !== false && !root.playing
-                onClicked: root.resumePlayer()
-
-                Behavior on opacity {
-                  enabled: root.animOn
-                  NumberAnimation {
-                    duration: Ui.fastMs
-                    easing.type: Easing.OutCubic
-                  }
-                }
-                Behavior on x {
-                  enabled: root.animOn
-                  NumberAnimation {
-                    duration: Ui.fastMs
-                    easing.type: Easing.OutCubic
-                  }
-                }
-              }
-
-              IconButton {
-                anchors.centerIn: parent
-                name: "pause"
-                  iconSize: 20
-                slotSize: 32
-                flat: true
-                cornerRadius: RoundingPolicy.radius
-                animationsEnabled: root.animOn
-                opacity: root.playing && root.hasClient ? 1 : 0
-                x: root.playing ? 0 : 8
-                visible: opacity > 0.01
-                z: root.playing ? 1 : 0
-                actionable: root.hasClient && root.player?.canTogglePlaying !== false && root.playing
-                onClicked: root.player.togglePlaying()
-
-                Behavior on opacity {
-                  enabled: root.animOn
-                  NumberAnimation {
-                    duration: Ui.fastMs
-                    easing.type: Easing.OutCubic
-                  }
-                }
-                Behavior on x {
-                  enabled: root.animOn
-                  NumberAnimation {
-                    duration: Ui.fastMs
-                    easing.type: Easing.OutCubic
-                  }
-                }
-              }
-            }
-
-            IconButton {
-              name: "skip-forward"
-              iconSize: 20
-              slotSize: 32
-              flat: true
-              cornerRadius: RoundingPolicy.radius
-              animationsEnabled: root.animOn
-              actionable: root.hasTrack && root.player?.canGoNext !== false
-              opacity: live ? 1 : 0.4
-              onClicked: root.nextTrack()
-            }
-
-            // Tint crossfade, same as shuffle above: foreground and
-            // accent layers blend on loop change. Glyph swaps with the
-            // loop mode on both layers at once (no blank frame).
-            Item {
-              id: repeatWrap
-
-              width: 32
-              height: 32
-
-              property real repeatTint: root.looping ? 1 : 0
-              Behavior on repeatTint {
-                enabled: root.animOn
-                NumberAnimation {
-                  duration: Ui.slowMs
-                  easing.type: Easing.OutCubic
-                }
-              }
-
-              IconButton {
-                id: repeatBtn
-
-                anchors.fill: parent
-                name: root.loopOne ? "repeat-1" : "repeat"
-                  iconSize: 20
-                slotSize: 32
-                flat: true
-                cornerRadius: RoundingPolicy.radius
-                colorKey: "foreground_0"
-                animationsEnabled: root.animOn
-                actionable: root.canLoop
-                opacity: live ? 1 : 0.4
-                iconOpacity: 1 - repeatWrap.repeatTint
-                onClicked: root.cycleLoop()
-
-                Icon {
-                  anchors.centerIn: parent
-                  name: root.loopOne ? "repeat-1" : "repeat"
-                  colorKey: "accent"
-                  size: 20
-                  opacity: (repeatBtn.live ? 1 : 0.4) * repeatWrap.repeatTint
-                }
-              }
-            }
-
-            IconButton {
-              name: "arrow-right-to-line"
-              iconSize: 20
-              slotSize: 32
-              flat: true
-              cornerRadius: RoundingPolicy.radius
-              animationsEnabled: root.animOn
-              actionable: root.canNext
-              opacity: live ? 1 : 0.4
-              onClicked: root.nextPlayer()
-            }
+            anchors.fill: parent
+            player: root.player
+            position: root.shownPosition
+            active: root.lyricsMode
+            seekable: root.canSeekPosition
+            onDismissed: root.lyricsMode = false
+            onSeekRequested: seconds => root.seekTo(seconds)
           }
         }
       }

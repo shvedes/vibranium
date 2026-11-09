@@ -1,0 +1,416 @@
+pragma ComponentBehavior: Bound
+
+// qmllint disable signal-handler-parameters
+import QtQuick
+import qs.common
+import "../../../../common/NowPlaying.js" as NP
+
+// Synced lyrics in the controls column, opened by the lyrics pad and dismissed
+// with a right-click. MPRIS carries no lyrics, so the text comes from LRCLIB
+// (no key, LRC bodies), with `xesam:asText` as the fallback for a client that
+// publishes its own. The ask starts with the track rather than with the pane,
+// because the pad reads `unavailable` to decide whether it opens at all; the
+// lines are centred and the cue under the playhead is the one held in the
+// middle of the slot, driven by the island's position feed, so this pane needs
+// no clock of its own.
+Item {
+  id: root
+
+  // The transcript travels inside the cover slot, so it is clipped to it
+  // rather than sliding out over the meta column.
+  clip: true
+
+  required property var player
+  property real position: 0
+  property bool active: false
+
+  signal dismissed
+  // A clicked line names a time; the island owns the position write, because
+  // only it knows whether the transport takes one.
+  signal seekRequested(real seconds)
+  // False while the player cannot take an absolute write, so a click on a
+  // line is inert and the transcript stays a document.
+  property bool seekable: false
+
+  readonly property string title: root.player ? String(root.player.trackTitle ?? "") : ""
+  readonly property string artist: root.player ? String(root.player.trackArtist ?? "") : ""
+  readonly property string album: root.player ? String(root.player.trackAlbum ?? "") : ""
+  readonly property real lengthSec: NP.playerLength(root.player)
+  // One identity per recording, normalized in the shared library, so the same
+  // track on another client is the same sheet and a regroup inside a track
+  // does not re-ask the provider.
+  readonly property string trackKey: root.player === null || root.player === undefined ? ""
+    : NP.lyricsCacheKey(root.title, root.artist, root.album, root.lengthSec)
+
+  property bool synced: false
+  property var lines: []
+  property int activeIndex: -1
+  // The line the pane treats as the current one: the cue under the playhead,
+  // or the first cue while the track is still before it, so the opening line
+  // is already the big one as it approaches instead of jumping at its stamp.
+  readonly property int currentIndex: root.activeIndex >= 0
+    ? root.activeIndex
+    : (root.synced && root.lines.length > 0 ? 0 : -1)
+  // Not `state`: Item already has one, and this is a load state rather than a
+  // QML state machine.
+  property string status: "idle" // idle | loading | ready | none | error
+  // For the pad that opens this pane: a track neither the provider nor the
+  // metadata has words for dims the pad and refuses the click. An unfinished
+  // or failed ask is not absence, so those stay openable.
+  readonly property bool unavailable: root.status === "none"
+  property string _requestedKey: ""
+  property var _request: null
+  readonly property bool animOn: MotionPolicy.enabled
+  // Auto-scroll yields to the reader. Once the transcript has been scrolled
+  // so the current line is no longer under the middle of the slot, the cue
+  // changes keep moving the accent but stop moving the view, so a line can be
+  // read and then clicked to jump to. Scrolling back onto the current line
+  // hands the view to the clock again - see the contentY handler on the view.
+  property bool _pinnedByUser: false
+  // True for the synchronous moment a placement changes contentY, so that
+  // change is not mistaken for the reader scrolling.
+  property bool _placing: false
+
+  // Asking starts with the track, not with the pane: the lyrics pad reads
+  // `unavailable` so the answer has to be known before anyone opens the
+  // transcript. Opening asks again, which is a cache hit once the track has
+  // been answered.
+  Component.onCompleted: root._load()
+  onActiveChanged: if (root.active) root._load()
+  onTrackKeyChanged: root._load()
+  onPositionChanged: root._track()
+  onActiveIndexChanged: Qt.callLater(root._follow)
+
+  function _load() {
+    const key = root.trackKey
+    if (key === "") return
+    // An answered track, lyrics or not, is kept: the island is destroyed when
+    // it closes, so the answer lives in the shared library rather than on this
+    // pane, and reopening on the same track must not cost a second round trip
+    // to say "No lyrics".
+    const cached = NP.lyricsCacheGet(key)
+    if (cached !== null) {
+      root._apply(key, cached.result)
+      return
+    }
+    if (root._requestedKey === key && root.status === "loading") return
+    const url = root._searchUrl()
+    root._requestedKey = key
+    root.lines = []
+    root.synced = false
+    root.activeIndex = -1
+    if (url === "") {
+      root.status = "none"
+      return
+    }
+    root.status = "loading"
+    root._abort()
+    root._request = root._get(url, 6000, (text, code) => {
+      root._request = null
+      root._receive(key, text, code)
+    })
+  }
+
+  function _searchUrl() {
+    if (root.title === "") return ""
+    let url = "https://lrclib.net/api/search?track_name=" + encodeURIComponent(root.title)
+    if (root.artist !== "") url += "&artist_name=" + encodeURIComponent(root.artist)
+    if (root.album !== "") url += "&album_name=" + encodeURIComponent(root.album)
+    return url
+  }
+
+  function _receive(key, text, code) {
+    if (key !== root._requestedKey || key !== root.trackKey) return
+    let parsed = null
+    try {
+      parsed = text !== "" ? JSON.parse(text) : null
+    } catch (e) {
+      parsed = null
+    }
+    const found = NP.lyricsFromSearch(parsed, root.lengthSec)
+    if (found !== null) {
+      root._apply(key, found)
+      return
+    }
+    // No provider result: a client that ships its own text still has words,
+    // they are just untimed.
+    const embedded = NP.parsePlainLyrics(root._embeddedText())
+    if (embedded.length > 0) {
+      root._apply(key, { synced: false, lines: embedded.map(x => ({ t: 0, x })) })
+      return
+    }
+    // A failed or unreadable answer is not an answer: the pane reports it and
+    // leaves the track uncached, so reopening the pane asks again.
+    const unreadable = text !== "" && parsed === null
+    if (unreadable || (code !== "" && code !== "http_404")) {
+      root.lines = []
+      root.synced = false
+      root.activeIndex = -1
+      root.status = "error"
+      return
+    }
+    root._apply(key, null)
+  }
+
+  function _apply(key, result) {
+    if (key !== root.trackKey) return
+    root._requestedKey = key
+    NP.lyricsCachePut(key, result)
+    const lines = result !== null && Array.isArray(result.lines) ? result.lines : []
+    root.synced = lines.length > 0 && result.synced === true
+    root.lines = lines
+    root.status = lines.length > 0 ? "ready" : "none"
+    root.activeIndex = -1
+    // A freshly answered track is read from the top of its first cue, not
+    // from wherever the last transcript was left.
+    root._pinnedByUser = false
+    root._track()
+    Qt.callLater(root._follow)
+  }
+
+  function _track() {
+    root.activeIndex = root.synced ? NP.lyricIndexAt(root.lines, root.position) : -1
+  }
+
+  // The cue that holds the middle of the slot. Untimed text has no cue to hold,
+  // so it starts at the top and stays where the user scrolls it.
+  function _follow() {
+    // A closed pane has nothing to place; opening runs _load -> _apply, which
+    // follows again with the view up.
+    if (!root.active) return
+    if (root.synced && root.currentIndex >= 0) {
+      if (root._pinnedByUser) {
+        scrollTo.stop()
+        return
+      }
+      root._centre(root.currentIndex)
+      return
+    }
+    scrollTo.stop()
+    if (!root.synced && root.lines.length > 0) root._placeBeginning()
+  }
+
+  function _placeBeginning() {
+    root._placing = true
+    view.positionViewAtBeginning()
+    root._placing = false
+  }
+
+  // Glide to a cue instead of dropping onto it. The row is read off the view
+  // because the next cue is always the row just below the centred one, which
+  // is laid out for real; a row the view has not created yet (a seek landing
+  // several lines away) has only a guessed y, so that move is the view's own
+  // placement and happens at once.
+  function _centre(index) {
+    const row = view.itemAtIndex(index)
+    scrollTo.stop()
+    if (row === null || !root.animOn) {
+      root._placing = true
+      view.positionViewAtIndex(index, ListView.Center)
+      root._placing = false
+      return
+    }
+    // `row.y` is already in content coordinates, so the resting offset is the
+    // row's centre pulled to the middle of the viewport. Adding the live
+    // contentY here would count the current scroll twice and overshoot.
+    scrollTo.to = row.y + row.height / 2 - view.height / 2
+    scrollTo.start()
+  }
+
+  NumberAnimation {
+    id: scrollTo
+
+    target: view
+    property: "contentY"
+    duration: Ui.normalMs
+    easing.type: Easing.OutCubic
+  }
+
+  function _embeddedText() {
+    const md = root.player ? root.player.metadata : null
+    if (!md || typeof md !== "object") return ""
+    const v = md["xesam:asText"]
+    return typeof v === "string" ? v : ""
+  }
+
+  function _abort() {
+    if (root._request === null) return
+    root._request.abort()
+    root._request = null
+  }
+
+  // GET with the response as text, or "" and a short reason. Mirrors the
+  // weather transport: a superseded handle never calls back, and a request is
+  // never torn down mid-handshake.
+  function _get(url, timeoutMs, onDone) {
+    let xhr = null
+    try {
+      xhr = new XMLHttpRequest()
+    } catch (e) {
+      Qt.callLater(() => onDone("", "no_transport"))
+      return { abort() {} }
+    }
+    const handle = { dead: false, abort() { handle.dead = true } }
+    const finish = (text, code) => {
+      if (handle.dead) return
+      handle.dead = true
+      onDone(text, code)
+    }
+    xhr.onreadystatechange = () => {
+      if (xhr.readyState !== XMLHttpRequest.DONE) return
+      if (xhr.status === 200) {
+        finish(String(xhr.responseText || ""), "")
+        return
+      }
+      finish("", "http_" + xhr.status)
+    }
+    try {
+      xhr.timeout = timeoutMs
+      xhr.open("GET", url)
+      // LRCLIB rejects a request without an agent.
+      try {
+        xhr.setRequestHeader("User-Agent", "vibranium-shell/1.0")
+      } catch (e) {}
+      xhr.send()
+    } catch (e) {
+      finish("", "send_failed")
+    }
+    return handle
+  }
+
+  // No fill of its own: the slot's own surface (the cover or the plain box)
+  // is what the words sit on, so the card does not gain a second background
+  // when it swaps to lyrics.
+  Item {
+    id: slot
+
+    width: parent.width
+    height: parent.height
+    // The swap is a slide, not a frame: the transcript rises from the bottom
+    // edge of the slot on open and sinks back into it on dismiss, revealing
+    // the cover behind it. The visible test reads the animated y, so the slot
+    // stays alive for the length of the travel and is dropped at the end.
+    y: root.active ? 0 : height
+    visible: root.active || y < height - 0.5
+    Behavior on y {
+      enabled: root.animOn
+      NumberAnimation {
+        duration: Ui.normalMs
+        easing.type: Easing.OutCubic
+      }
+    }
+
+    ListView {
+      id: view
+
+      anchors.fill: parent
+      anchors.margins: 10
+      // The column is the full card width now and the words take it: only a
+      // hair of padding is left on the left and right edges.
+      anchors.leftMargin: 4
+      anchors.rightMargin: 4
+      clip: true
+      spacing: 6
+      model: root.lines
+      boundsBehavior: Flickable.StopAtBounds
+      // Both ends pad by half the slot, so the first and last cues can reach
+      // the middle instead of stopping at an edge.
+      header: Item {
+        width: view.width
+        height: Math.max(0, Math.round(view.height / 2) - 13)
+      }
+      footer: Item {
+        width: view.width
+        height: Math.max(0, Math.round(view.height / 2) - 13)
+      }
+      onCountChanged: Qt.callLater(root._follow)
+      // A drag owns the view until the reader comes back to the current line:
+      // the transcript must not yank itself away from the line about to be
+      // clicked.
+      onMovementStarted: scrollTo.stop()
+      // Every contentY change that is not ours is the reader's - a drag, a
+      // flick, or the wheel. Pinned simply means "the current line is not
+      // under the middle of the slot", so scrolling it back there releases
+      // the view without needing a second gesture.
+      onContentYChanged: {
+        if (root._placing || scrollTo.running) return
+        if (view.contentHeight <= view.height) return
+        const row = root.currentIndex >= 0 ? view.itemAtIndex(root.currentIndex) : null
+        if (row === null) {
+          root._pinnedByUser = true
+          return
+        }
+        const off = Math.abs(view.contentY + view.height / 2 - (row.y + row.height / 2))
+        root._pinnedByUser = off > view.height * 0.15
+      }
+
+      delegate: Text {
+        required property var modelData
+        required property int index
+
+        width: view.width
+        text: modelData.x
+        // The cue under the playhead is the one the eye is on: bigger and in
+        // the accent, its neighbours two steps down in size and held faint so
+        // the column reads as one line with context rather than as a list.
+        color: index === root.currentIndex ? Ui.solid("accent") : Ui.tint("foreground_1", 0.4)
+
+        // The cue changing is a colour handover as well as a scroll, so the
+        // old line dims as the new one takes the accent instead of both
+        // swapping in one frame.
+        Behavior on color {
+          enabled: root.animOn
+          ColorAnimation {
+            duration: Ui.fastMs
+            easing.type: Easing.OutCubic
+          }
+        }
+        font.pixelSize: index === root.currentIndex ? Ui.fontL : Ui.fontXs
+        font.family: Ui.fontFamily
+        font.bold: index === root.currentIndex
+        horizontalAlignment: Text.AlignHCenter
+        wrapMode: Text.Wrap
+        textFormat: Text.PlainText
+
+        // Click a timed line to move the track there. A drag still scrolls:
+        // the flickable takes the gesture back once it passes its threshold,
+        // which cancels this click.
+        MouseArea {
+          anchors.fill: parent
+          enabled: root.seekable && root.synced
+          cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
+          onClicked: {
+            // Acting on a line asks for the clock to take the view back: the
+            // seek moves the cue, and following centres it again.
+            root._pinnedByUser = false
+            root.seekRequested(modelData.t)
+          }
+        }
+      }
+    }
+
+    Text {
+      anchors.centerIn: parent
+      width: parent.width - 16
+      visible: root.status !== "ready"
+      text: root.status === "loading" ? "Loading lyrics..."
+        : root.status === "none" ? "No lyrics"
+        : root.status === "error" ? "Lyrics unavailable" : ""
+      color: Ui.tint("foreground_1", 0.55)
+      font.pixelSize: Ui.fontM
+      font.family: Ui.fontFamily
+      horizontalAlignment: Text.AlignHCenter
+      wrapMode: Text.Wrap
+      textFormat: Text.PlainText
+    }
+
+    // Back to the cover. Only the right button, so a left drag still scrolls
+    // the transcript and a left click does nothing.
+    MouseArea {
+      anchors.fill: parent
+      acceptedButtons: Qt.RightButton
+      cursorShape: Qt.PointingHandCursor
+      onClicked: root.dismissed()
+    }
+  }
+}

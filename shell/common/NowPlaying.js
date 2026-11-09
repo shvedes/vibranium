@@ -447,3 +447,181 @@ function fmtDuration(s) {
   const seconds = total % 60
   const tail = Format.pad2(minutes) + ":" + Format.pad2(seconds)
   return hours > 0 ? hours + ":" + tail : tail}
+
+// --- synced lyrics ---------------------------------------------------------
+//
+// MPRIS carries no lyrics: the nearest field is `xesam:asText`, which is plain
+// text and most players never publish. Timed lyrics therefore come from a
+// provider (LRCLIB, no key), and these helpers are the pure half of that path
+// so the parsing and the pick can be asserted without a fetch.
+//
+// `parseLrc` reads the LRC body a provider returns: one or more `[mm:ss.cc]`
+// stamps ahead of the text they time, metadata tags such as `[ar:...]` ignored,
+// and an `[offset:...]` tag shifting every stamp. Several stamps on one line
+// are several cues for the same words - the format's repeat notation - and a
+// row without a stamp or without words (an instrumental gap) is dropped.
+function parseLrc(text) {
+  const out = []
+  if (typeof text !== "string" || text === "") return out
+  const stamp = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g
+  const offsetTag = /^\s*\[offset:\s*([+-]?\d+)\]\s*$/i
+  let offset = 0
+  for (const row of text.split(/\r?\n/)) {
+    const tag = offsetTag.exec(row)
+    if (tag !== null) {
+      offset = Number(tag[1]) / 1000
+      continue
+    }
+    const times = []
+    stamp.lastIndex = 0
+    let match
+    while ((match = stamp.exec(row)) !== null) {
+      const frac = match[3] === undefined ? 0 : Number("0." + match[3])
+      times.push(Number(match[1]) * 60 + Number(match[2]) + frac)
+    }
+    if (times.length === 0) continue
+    const x = row.replace(stamp, "").trim()
+    if (x === "") continue
+    for (const t of times) out.push({ t: Math.max(0, t + offset), x })
+  }
+  return out.sort((a, b) => a.t - b.t)
+}
+
+// The cue sounding at `time`: the last line whose stamp has passed, or -1
+// before the first one. Binary search, because it runs on every position tick.
+function lyricIndexAt(lines, time) {
+  if (!Array.isArray(lines) || lines.length === 0) return -1
+  const t = Number(time)
+  if (!isFinite(t)) return -1
+  let low = 0
+  let high = lines.length - 1
+  let found = -1
+  while (low <= high) {
+    const mid = (low + high) >> 1
+    if (Number(lines[mid].t) <= t) {
+      found = mid
+      low = mid + 1
+    } else {
+      high = mid - 1
+    }
+  }
+  return found
+}
+
+// Plain lyrics, one trimmed non-empty row per line.
+function parsePlainLyrics(text) {
+  if (typeof text !== "string") return []
+  const out = []
+  for (const row of text.split(/\r?\n/)) {
+    const x = row.trim()
+    if (x !== "") out.push(x)
+  }
+  return out
+}
+
+// The record to show out of a provider search: timed lyrics beat untimed ones,
+// and among equals the length identifies the right recording - a live or
+// remastered cut shares the title and artist and times its words elsewhere.
+function lyricsFromSearch(records, lengthSec) {
+  if (!Array.isArray(records)) return null
+  const len = Number(lengthSec) > 0 ? Number(lengthSec) : 0
+  let best = null
+  let bestScore = 0
+  for (const record of records) {
+    if (record === null || typeof record !== "object") continue
+    const synced = parseLrc(record.syncedLyrics)
+    const plain = parsePlainLyrics(record.plainLyrics)
+    if (synced.length === 0 && plain.length === 0) continue
+    let score = synced.length > 0 ? 6 : 1
+    const d = Number(record.duration)
+    if (len > 0 && isFinite(d) && d > 0) {
+      const delta = Math.abs(d - len)
+      if (delta <= 2) score += 3
+      else if (delta <= 8) score += 1
+    }
+    if (score <= bestScore) continue
+    bestScore = score
+    best = synced.length > 0
+      ? { synced: true, lines: synced }
+      : { synced: false, lines: plain.map(x => ({ t: 0, x })) }
+  }
+  return best
+}
+
+// --- lyrics cache ----------------------------------------------------------
+//
+// The lyrics counterpart of the artwork warmer: it holds what was already
+// fetched instead of asking again. Unlike the warmer it is not demand-held -
+// a lyric sheet is not something a surface refcounts - so it is bounded by
+// time instead: an entry is worth keeping for a while after the track leaves
+// the screen, and worth forgetting after that.
+//
+// It lives in this library because the island is destroyed whenever it closes
+// (see IslandHost), so a pane's own memo dies with the pane and every reopen
+// on the same track would be another round trip. A .pragma library is shared
+// per QML engine, which is exactly the lifetime this wants.
+//
+// Keyed on the recording, not the client: the same track on another player is
+// the same words, and normalization makes `Song ` and `song` one entry. A
+// negative answer is an answer and is cached too - a track the provider does
+// not know should not cost a request on every open.
+const LYRICS_CACHE_MAX = 12
+const LYRICS_CACHE_TTL_MS = 30 * 60 * 1000
+
+var _lyricsCache = {}
+
+function lyricsCacheKey(title, artist, album, lengthSec) {
+  const norm = (v) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ")
+  const n = Number(lengthSec)
+  const len = isFinite(n) && n > 0 ? Math.round(n) : 0
+  return JSON.stringify([norm(title), norm(artist), norm(album), len])
+}
+
+// `null` for a miss, `{ result }` for a hit - the wrapper is what keeps a
+// cached "no lyrics" (result null) distinguishable from nothing cached at
+// all. `now` is for the tests; callers leave it out.
+function lyricsCacheGet(key, now) {
+  if (typeof key !== "string" || key === "") return null
+  const entry = _lyricsCache[key]
+  if (entry === undefined) return null
+  const at = now === undefined ? Date.now() : Number(now)
+  if (!isFinite(at) || at - entry.at > LYRICS_CACHE_TTL_MS) {
+    delete _lyricsCache[key]
+    return null
+  }
+  // A read is a use: the sheet stays while a track keeps coming back.
+  entry.at = at
+  return { result: entry.value }
+}
+
+function lyricsCachePut(key, result, now) {
+  if (typeof key !== "string" || key === "") return false
+  const at = now === undefined ? Date.now() : Number(now)
+  if (!isFinite(at)) return false
+  _lyricsCache[key] = { value: result === undefined ? null : result, at: at }
+  _pruneLyricsCache(at)
+  return true
+}
+
+// Drop what expired, then the coldest entries past the cap. The list is
+// rebuilt rather than deleted in place so eviction order is the timestamps'
+// and not the object's key order, which is insertion order only.
+function _pruneLyricsCache(now) {
+  const keys = Object.keys(_lyricsCache)
+  for (let i = 0; i < keys.length; i++) {
+    if (now - _lyricsCache[keys[i]].at > LYRICS_CACHE_TTL_MS) delete _lyricsCache[keys[i]]
+  }
+  const live = Object.keys(_lyricsCache)
+  if (live.length <= LYRICS_CACHE_MAX) return
+  live.sort((a, b) => _lyricsCache[a].at - _lyricsCache[b].at)
+  for (let i = 0; i < live.length - LYRICS_CACHE_MAX; i++) delete _lyricsCache[live[i]]
+}
+
+function lyricsCacheSize() {
+  return Object.keys(_lyricsCache).length
+}
+
+function lyricsCacheClear() {
+  _lyricsCache = {}
+}
+
