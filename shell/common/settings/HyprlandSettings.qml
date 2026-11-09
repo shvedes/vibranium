@@ -445,10 +445,46 @@ Singleton {
         return true
     }
 
+    // One reload per settled change, not one per write.
+    //
+    // A range row commits on every pointer move (Entry.seek -> Menu.setValue ->
+    // setOption -> _commitHypr), and each commit used to spawn `hyprctl reload
+    // config-only` immediately: measured at 8.6ms of process per call here, plus
+    // a full compositor config reload, so one drag across the bar ran dozens of
+    // them. The file writes stay immediate - they are one read plus one atomic
+    // write, 0.02ms - and only the reload coalesces, trailing-edge, so the last
+    // value written is the one that lands. A toggle now applies 80ms later,
+    // which is below noticing, and a drag applies once instead of per pixel.
     function _reloadHyprland() {
-        const proc = reloadComponent.createObject(root, { command: ["hyprctl", "-q", "reload", "config-only"] })
-        proc.exited.connect(proc.destroy)
-        proc.running = true
+        reloadTimer.restart()
+    }
+
+    function _reloadNow() {
+        if (reloadProc.running) {
+            root._reloadPending = true
+            return
+        }
+        root._reloadPending = false
+        reloadProc.command = ["hyprctl", "-q", "reload", "config-only"]
+        reloadProc.running = true
+    }
+
+    property bool _reloadPending: false
+
+    Timer {
+        id: reloadTimer
+        interval: 80
+        repeat: false
+        onTriggered: root._reloadNow()
+    }
+
+    Process {
+        id: reloadProc
+        stdout: StdioCollector {}
+        stderr: StdioCollector {}
+        onExited: {
+            if (root._reloadPending) root._reloadNow()
+        }
     }
 
     // --- live fetch via hyprctl ---
@@ -777,13 +813,6 @@ Singleton {
         onLoaded: root._probeAnimPreset()
     }
 
-    Component {
-        id: reloadComponent
-        Process {
-            stdout: StdioCollector {}
-            stderr: StdioCollector {}
-        }
-    }
     Component {
         id: hookComponent
         Process {
