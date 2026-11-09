@@ -516,9 +516,3 @@ end, { description = "System monitor (btop)" })
 hl.bind("CTRL + SHIFT + ESCAPE", function()
   Hypr.Helpers.LaunchTUI("/usr/bin/btop", "vb-launch-tui -- btop")
 end, { description = "System monitor (btop)" })
-
-if chassis_type ~= "vm" then
-  hl.bind(mainMod .. " + Grave", function()
-    Hypr.Helpers.LaunchTUI("/usr/bin/nvtop", "vb-launch-tui -- nvtop")
-  end, { description = "GPU monitor (nvtop)" })
-end
