@@ -21,6 +21,12 @@ Singleton {
 
   // How long the surface stays mapped after the last show().
   readonly property int visibleMs: 1500
+  // How long the overlay window outlives the payload after its exit fade.
+  // Mapping a layer-shell surface is the one step of a flash outside this
+  // process, so keeping the window mapped across a burst of keypresses
+  // leaves a repeat press repainting the card instead of remapping the
+  // window. Bounded, so an idle shell holds no fullscreen surface.
+  readonly property int lingerMs: 3000
 
   property bool visible: false
   property bool dismissing: false
@@ -33,13 +39,17 @@ Singleton {
     if (!root.desktopSuppressed) return
     hideTimer.stop()
     exitTimer.stop()
+    lingerTimer.stop()
+    root._lingering = false
     root.visible = false
     root.dismissing = false
   }
   // A payload is up while it is mapped or fading out. The desktop surface
-  // maps only when that is true and the lock is not suppressing it.
+  // maps while that is true, during the linger window after it, and never
+  // while the lock is suppressing it.
   readonly property bool payloadVisible: root.visible || root.dismissing
-  readonly property bool surfaceVisible: root.payloadVisible && !root.desktopSuppressed
+  readonly property bool surfaceVisible: (root.payloadVisible || root._lingering) && !root.desktopSuppressed
+  property bool _lingering: false
 
   // Payload shown while visible. `value` is 0..100, `muted` when set
   // forces the muted glyph/label and dims the meter.
@@ -111,6 +121,9 @@ Singleton {
     else v = Math.max(0, Math.min(100, v))
     const lb = String(label || "")
     const ic = String(icon || "").trim()
+    // A new payload owns the window: cancel a pending linger so a show
+    // that arrives mid-window is not racing its expiry.
+    root._cancelLinger()
     exitTimer.stop()
     root.dismissing = false
     root.kind = k
@@ -154,11 +167,28 @@ Singleton {
     if (!root.animationsEnabled) {
       root.visible = false
       root.dismissing = false
+      root._keepSurface()
       return
     }
     root.dismissing = true
     root.visible = false
     exitTimer.restart()
+  }
+
+  // Hold the overlay mapped for the linger window. Called when the payload
+  // is fully gone, never while it is still on screen.
+  function _keepSurface() {
+    if (root.desktopSuppressed) {
+      root._lingering = false
+      return
+    }
+    root._lingering = true
+    lingerTimer.restart()
+  }
+
+  function _cancelLinger() {
+    lingerTimer.stop()
+    root._lingering = false
   }
 
   Timer {
@@ -172,7 +202,17 @@ Singleton {
     id: exitTimer
     interval: Ui.fastMs
     repeat: false
-    onTriggered: root.dismissing = false
+    onTriggered: {
+      root.dismissing = false
+      root._keepSurface()
+    }
+  }
+
+  Timer {
+    id: lingerTimer
+    interval: root.lingerMs
+    repeat: false
+    onTriggered: root._lingering = false
   }
 
   // Instantiate the surface once the singleton is boot-touched. The
