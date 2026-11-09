@@ -1616,14 +1616,20 @@ function groupSearchResults(hits, lookup, isVisible, query) {
     // of the bucket shares it with. Entries below keep their own
     // subtexts; the path moves out of them and onto this line, which is
     // also what sizes the card for it (a labelled separator carries its
-    // label like any row's). Every bucket opens with one, including the
-    // first: without it the head group reads as unlocated. A bucket with
-    // no breadcrumb (the entry page) opens with no header, so the list
-    // never starts with a bare hairline.
+    // label like any row's). Every bucket with a location opens with one,
+    // including the first: without it the head group reads as unlocated.
+    //
+    // A bucket with NO breadcrumb (the entry page) opens with no header at
+    // all, not an empty one. The empty header rendered as a plain hairline
+    // between two result groups - and next to a submenu's own bare separator
+    // it read as a separator row copied out of that submenu. An unlocated
+    // bucket simply runs on until the next named header; the absence of a
+    // header is not a thing to draw. (An empty bucket, every row of it
+    // hoisted into Sections above, opens nothing for the same reason.)
     const head = buckets[b][0]
     const headPath = head && Array.isArray(head.path) ? head.path : []
     const headLabel = headPath.join(" > ")
-    if (b > 0 || headLabel !== "") {
+    if (headLabel !== "") {
       rows.push({
         type: "separator",
         uid: "sep:group" + b,

@@ -2879,6 +2879,14 @@ group('the separator uid counts the buckets, starting at the second', () => {
   eq('numbered from 0, one per bucket', rows.filter(r => r.type === 'separator').map(r => r.uid), ['sep:group0', 'sep:group1', 'sep:group2'])
   eq('so the head bucket carries its header too', rows[0], { type: 'separator', uid: 'sep:group0', label: 'Main' })
   eq('one bucket opens with its own header', M.groupSearchResults([hit('main', 'Main', 0, 'A one')], three.byId, () => true).filter(r => r.type === 'separator').length, 1)
+  // The entry page has no breadcrumb, so its bucket has nothing to name. It
+  // opens with no header rather than an empty one, which rendered as a plain
+  // separator between result groups (see the Audio page's bare hairline).
+  const unlocated = M.groupSearchResults([
+    hit('p2', 'Two', 0, 'B two'),
+    Object.assign(hit('main', 'Main', 0, 'A one'), { path: [] }),
+  ], three.byId, () => true)
+  eq('an unlocated bucket opens with no header', unlocated.map(r => r.label || r.type), ['Two', 'B two', 'A one'])
   // Two hits on the SAME page share a bucket, however they are ordered in the
   // hit list, so one separator covers both.
   const twice = M.groupSearchResults([hit('main', 'Main', 0, 'A one'), hit('p2', 'Two', 0, 'B two'), hit('main', 'Main', 0, 'A one')], three.byId, () => true)
