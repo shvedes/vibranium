@@ -332,15 +332,35 @@ function pushHistory(history, snapshot, limit) {
   const id = Number(snapshot.id)
   const tag = typeof snapshot.replaceTag === "string" ? snapshot.replaceTag.trim() : ""
   if (tag !== "") {
-    for (let i = list.length - 1; i >= 0; i--) {
+    // Compaction, not splice-per-victim: a volume drag replaces one tag many
+    // times, and each splice shifted the whole tail (quadratic in the tag's
+    // rows). Kept rows are written back in place, then the length is cut.
+    let kept = 0
+    for (let i = 0; i < list.length; i++) {
       const row = list[i]
-      if (!row || typeof row !== "object") continue
-      if (isFinite(id) && Number(row.id) === id) continue
+      if (!row || typeof row !== "object") {
+        list[kept++] = row
+        continue
+      }
+      if (isFinite(id) && Number(row.id) === id) {
+        list[kept++] = row
+        continue
+      }
       const rowTag = typeof row.replaceTag === "string" ? row.replaceTag.trim() : ""
-      if (rowTag === tag) list.splice(i, 1)
+      if (rowTag !== tag) list[kept++] = row
+    }
+    list.length = kept
+  }
+  let at = -1
+  if (isFinite(id)) {
+    for (let i = 0; i < list.length; i++) {
+      const row = list[i]
+      if (row && Number(row.id) === id) {
+        at = i
+        break
+      }
     }
   }
-  const at = isFinite(id) ? list.findIndex(row => Number(row && row.id) === id) : -1
   if (at >= 0) list[at] = snapshot
   else list.unshift(snapshot)
   // Oldest out first: the bound is on how many records are kept, not on how
