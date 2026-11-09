@@ -9,8 +9,10 @@ import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
 
 // Now Playing bar module (opt-in, off by default). Shows the active
-// MPRIS track title in the bar; click opens the island, middle and right
-// click toggle play/pause on the active client. Player pick:
+// MPRIS track title in the bar; left click opens the island, right click
+// toggles play/pause, and middle click likes the current track when the
+// active client has a like action (otherwise it toggles play/pause too).
+// Player pick:
 // a playing client keeps the slot, a silent one hands it to the head
 // while anything is playing, and an all-paused set keeps the last-used
 // player instead of falling back to slot 0.
@@ -44,8 +46,9 @@ CollapsibleSlot {
   readonly property bool playing: root.player !== null && root.player.playbackState === MprisPlaybackState.Playing
   // Transport flash: on (un)pause the bar icon slide-fades from the
   // default album glyph to the direction it moved (play on resume, pause
-  // on pause), holds 1s, then slide-fades back. The hold is a dwell,
-  // not motion, so it is not gated by MotionPolicy.
+  // on pause), holds 1s, then slide-fades back. A like reuses the same
+  // flash with the heart (added) or heart-off (removed) glyph. The hold is
+  // a dwell, not motion, so it is not gated by MotionPolicy.
   property string transportIcon: ""
   property bool _transportSeeded: false
   Timer {
@@ -80,6 +83,10 @@ CollapsibleSlot {
   // well as in the island so the answer is already settled by the time the
   // island opens.
   readonly property bool canSetVolume: Core.MediaState.volumeCapable(root.player)
+  // A like action is not part of MPRIS; it is a per-client capability. The
+  // bar offers it only for the client whose like shortcut the shell knows,
+  // and only while there is a track to like.
+  readonly property bool canLike: root.hasTrack && NP.canLikePlayer(root.player)
   readonly property bool shown: root.hasClient
 
   // Title text switch (shell.statusbar.nowPlayingTitle, default
@@ -240,12 +247,24 @@ CollapsibleSlot {
       height: parent.height
       clip: true
 
-      // Pause/play only: next/previous never change this glyph, so a
-      // track change only reveals the title beside the album glyph.
+      // Pause/play and the like confirmation share this glyph: a track
+      // change only reveals the title beside the album glyph, and the
+      // 1s flash then hands the slot back to the album.
       readonly property string currentName: root.transportIcon !== "" ? root.transportIcon : "music-album"
       // Travel of the incoming glyph: +1 arrives from the right (play),
       // -1 from the left (pause).
       property int slideDir: 1
+
+      // Two-tone like glyphs: the added heart is red whole, while the
+      // removed heart keeps the body tone and lets its slash carry the red
+      // (heart-off marks only that path as class="indicator"). Every other
+      // transport glyph stays in the regular foreground tone.
+      function toneFor(glyph) {
+        return glyph === "heart" ? "red" : "foreground_0"
+      }
+      function accentFor(glyph) {
+        return glyph === "heart-off" ? "red" : ""
+      }
 
       property string _aName: currentName
       property string _bName: ""
@@ -320,7 +339,8 @@ CollapsibleSlot {
         x: (parent.width - width) / 2 + slideOff
         y: (parent.height - height) / 2
         name: trackIcon._aName
-        colorKey: "foreground_0"
+        colorKey: trackIcon.toneFor(trackIcon._aName)
+        accentKey: trackIcon.accentFor(trackIcon._aName)
         opacity: 1
       }
 
@@ -331,7 +351,8 @@ CollapsibleSlot {
         x: (parent.width - width) / 2 + slideOff
         y: (parent.height - height) / 2
         name: trackIcon._bName
-        colorKey: "foreground_0"
+        colorKey: trackIcon.toneFor(trackIcon._bName)
+        accentKey: trackIcon.accentFor(trackIcon._bName)
         opacity: 0
       }
 
@@ -445,15 +466,28 @@ CollapsibleSlot {
     }
   }
 
-  // Click contract: left opens the island, middle and right toggle transport.
-  // Middle and right are the same action on purpose - the two that a hand
-  // reaches for without aiming at the bar - and the toggle is the one action
-  // worth having without opening anything. `canTogglePlaying` is a
-  // declaration a client can publish false, so a client that opts out of
-  // Playback/Pause swallows the press instead of taking it and doing
-  // nothing.
+  // Spotify's own Save/Remove shortcut. The MPRIS bus has no like method, so
+  // the action is delivered to the client's window the same way the user
+  // would: a key press targeted by window class, with no focus switch. The
+  // dispatch is fire-and-forget because the player publishes no state to
+  // read back; the flash is the optimistic confirmation.
+  function _sendLikeShortcut() {
+    Exec.run(["hyprctl", "-q", "eval", NP.likeShortcutScript()])
+  }
+
+  // Click contract: left opens the island; middle likes the track when the
+  // active client has a like action and otherwise toggles transport; right
+  // always toggles transport. `canTogglePlaying` is a declaration a client
+  // can publish false, so a client that opts out of Playback/Pause swallows
+  // the transport press instead of taking it and doing nothing.
   fillButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
   onClicked: mouse => {
+    if (mouse.button === Qt.MiddleButton && root.canLike) {
+      const liked = NP.toggleLiked(root.player)
+      root._flashTransport(liked ? "heart" : "heart-off")
+      root._sendLikeShortcut()
+      return
+    }
     if (mouse.button === Qt.MiddleButton || mouse.button === Qt.RightButton) {
       // A client that publishes canTogglePlaying=false swallows the press: the
       // shell behaved correctly and the pad is inert because the client said so.

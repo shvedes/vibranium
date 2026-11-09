@@ -1791,7 +1791,7 @@ group('the whole published surface is here, and it is the only copy', () => {
   // the assertion is the full surface: every documented helper publishes, and
   // the set is exactly these - which still catches a helper being dropped.
   const shared = ['sortPlayers', 'isBrowserPlayer', 'filterBrowsers', 'fmtTime', 'clampRatio', 'noteManual', 'manualFresh', 'manualDir']
-  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex']
+  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex', 'canLikePlayer', 'likeShortcutScript', 'playerRating', 'playerLiked', 'toggleLiked']
   for (const k of shared) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   for (const k of unique) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   is('BROWSER_TOKENS publishes the client table', CN.BROWSER_TOKENS, (v) => Array.isArray(v) && v.every((t) => t === String(t).toLowerCase()), 'lowercase tokens')
@@ -2404,6 +2404,61 @@ group('the keyless player case is a real identity, not a shared slot', () => {
   eq('a NaN volume is silent', CN.togglePlayerVolume({ dbusName: 'v.m', volume: NaN }, 0.3), 0.3)
 })
 
+
+section('common/NowPlaying.js - the per-client like action')
+const spotifyTrack = (tag, md) => ({
+  dbusName: 'org.mpris.MediaPlayer2.spotify',
+  uniqueId: `u-${tag}`,
+  metadata: Object.assign({ 'mpris:trackid': `/track/${tag}` }, md || {}),
+})
+group('the capability is the client, not a metadata guess', () => {
+  // MPRIS has no like method and xesam:userRating is read-only, so a rating
+  // field cannot make an action appear. Spotify is the one client whose own
+  // like shortcut the shell can drive.
+  eq('the Spotify bus', CN.canLikePlayer({ dbusName: 'org.mpris.MediaPlayer2.spotify' }), true)
+  eq('an instance-suffixed Spotify bus', CN.canLikePlayer({ dbusName: 'org.mpris.MediaPlayer2.spotify.instance42' }), true)
+  eq('the bus match folds case', CN.canLikePlayer({ dbusName: 'org.mpris.MediaPlayer2.Spotify' }), true)
+  eq('VLC is not like-capable', CN.canLikePlayer({ dbusName: 'org.mpris.MediaPlayer2.vlc' }), false)
+  eq('a Spotify identity on another bus is not enough', CN.canLikePlayer({ dbusName: 'org.mpris.MediaPlayer2.chromium', identity: 'Spotify' }), false)
+  eq('a rating field does not invent a writer', CN.canLikePlayer({ dbusName: 'org.mpris.MediaPlayer2.vlc', metadata: { 'xesam:userRating': 1 } }), false)
+  eq('null', CN.canLikePlayer(null), false)
+  eq('undefined', CN.canLikePlayer(undefined), false)
+})
+group('the delivered shortcut is Spotify Save/Remove, not a guess', () => {
+  const script = CN.likeShortcutScript()
+  contains('it targets the Spotify class selector', script, 'class:(?i)^spotify$')
+  contains('with the official Save/Remove chord', script, 'mods = "ALT SHIFT", key = "B"')
+  contains('as a key-down', script, 'state = "down"')
+  contains('and a key-up', script, 'state = "up"')
+  eq('exactly one down/up pair', script.split('hl.dispatch').length - 1, 2)
+})
+group('the optimistic answer follows the track on screen', () => {
+  const a = spotifyTrack('a')
+  const b = spotifyTrack('b')
+  eq('a fresh track reads unliked', CN.playerLiked(a), false)
+  eq('the first toggle adds it', CN.toggleLiked(a), true)
+  eq('and the answer sticks', CN.playerLiked(a), true)
+  eq('the second toggle removes it', CN.toggleLiked(a), false)
+  eq('and that answer sticks too', CN.playerLiked(a), false)
+  eq('a different track starts unliked', CN.playerLiked(b), false)
+  eq('liking it replaces the one-track answer', CN.toggleLiked(b), true)
+  eq('and the previous track no longer carries it', CN.playerLiked(a), false)
+})
+group('a published rating seeds the answer until the first toggle', () => {
+  eq('a positive rating reads liked', CN.playerLiked(spotifyTrack('rated', { 'xesam:userRating': 0.8 })), true)
+  eq('zero reads unliked', CN.playerLiked(spotifyTrack('zero', { 'xesam:userRating': 0 })), false)
+  eq('a negative rating reads unliked', CN.playerLiked(spotifyTrack('negative', { 'xesam:userRating': -1 })), false)
+  eq('a missing rating reads unliked', CN.playerLiked(spotifyTrack('missing')), false)
+  eq('a non-numeric rating reads unliked', CN.playerLiked(spotifyTrack('bad', { 'xesam:userRating': 'yes' })), false)
+  eq('a toggle overrides the seed', CN.toggleLiked(spotifyTrack('rated2', { 'xesam:userRating': 1 })), false)
+  eq('and the override is what the next read reports', CN.playerLiked(spotifyTrack('rated2', { 'xesam:userRating': 1 })), false)
+})
+group('degenerate players read unliked rather than throwing', () => {
+  eq('null', CN.playerLiked(null), false)
+  eq('undefined', CN.playerLiked(undefined), false)
+  eq('no metadata', CN.playerLiked({ dbusName: 'org.mpris.MediaPlayer2.spotify' }), false)
+  eq('metadata that is not an object', CN.playerLiked({ dbusName: 'org.mpris.MediaPlayer2.spotify', metadata: 7 }), false)
+})
 
 section('workspaces: the number strip geometry')
 group('the number pad scales with the bar and keeps a usable floor', () => {

@@ -328,6 +328,66 @@ function playerKey(p) {
   return JSON.stringify([String(p.dbusName ?? ""), uid, trackid, fallback])
 }
 
+// --- track likes -----------------------------------------------------------
+//
+// MPRIS has no like/dislike method, and `xesam:userRating` is read-only
+// metadata, so a like action is a per-client capability rather than a
+// protocol feature. Spotify is the client the shell can drive: its own
+// Save/Remove shortcut toggles the track in Liked Songs, and the bar offers
+// the action only when the active bus name is Spotify. Every other client
+// keeps the transport toggle.
+//
+// Spotify does not publish whether the current track is already liked, so the
+// shell keeps one optimistic answer for the track on screen. It is keyed by
+// playerKey, which moves with the track, so the next track starts from
+// unliked instead of inheriting the previous verdict. A client that does
+// publish a rating seeds the answer through `playerRating`.
+var _likeKey = ""
+var _likeValue = false
+
+function canLikePlayer(p) {
+  if (!p) return false
+  return String(p.dbusName || "").toLowerCase()
+    .indexOf("org.mpris.mediaplayer2.spotify") === 0
+}
+
+// The Hyprland Lua that delivers Spotify's Save/Remove shortcut to its
+// window. `class:` is the same selector the window rules use, and the
+// down/up pair avoids the stuck-key bug of send_shortcut. Kept here rather
+// than in QML so the exact payload is assertion-testable.
+function likeShortcutScript() {
+  const win = JSON.stringify("class:(?i)^spotify$")
+  const down = 'hl.dispatch(hl.dsp.send_key_state({ mods = "ALT SHIFT", key = "B", state = "down", window = ' + win + ' }))'
+  const up = 'hl.dispatch(hl.dsp.send_key_state({ mods = "ALT SHIFT", key = "B", state = "up", window = ' + win + ' }))'
+  return down + "; " + up
+}
+
+function playerRating(p) {
+  if (!p) return -1
+  const md = p.metadata && typeof p.metadata === "object" ? p.metadata : {}
+  const raw = md["xesam:userRating"]
+  if (raw === undefined || raw === null || raw === "") return -1
+  const n = Number(raw)
+  return isFinite(n) ? n : -1
+}
+
+function playerLiked(p) {
+  if (!p) return false
+  const key = playerKey(p)
+  if (key !== "" && key === _likeKey) return _likeValue
+  return playerRating(p) > 0
+}
+
+function toggleLiked(p) {
+  const next = !playerLiked(p)
+  const key = playerKey(p)
+  if (key !== "") {
+    _likeKey = key
+    _likeValue = next
+  }
+  return next
+}
+
 function playerPosition(p) {
   const n = Number(p && p.position != null ? p.position : 0)
   return isFinite(n) ? Math.max(0, n) : 0
