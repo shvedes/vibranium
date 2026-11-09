@@ -863,11 +863,11 @@ const FIREFOX = {
   execString: 'firefox %u',
 }
 
-group('indexFingerprint is a total function of exactly its three inputs', () => {
+group('indexFingerprint is a total function of exactly its four inputs', () => {
   // "The controller skips a rebuild when the string is unchanged, so it has
-  // to be a total function of exactly those three and nothing else - an input
+  // to be a total function of exactly those four and nothing else - an input
   // it ignores would read as 'unchanged' and freeze a stale order."
-  eq('the exact shape', LL.indexFingerprint(3, 'frequency', { a: 1 }), '3|frequency|{"a":1}')
+  eq('the exact shape', LL.indexFingerprint(3, 'frequency', { a: 1 }, ['x.desktop']), '3|frequency|{"a":1}|["x.desktop"]')
   eq('the same inputs give the same string', LL.indexFingerprint(3, 'frequency', { a: 1 }), LL.indexFingerprint(3, 'frequency', { a: 1 }))
   ne('a different count', LL.indexFingerprint(3, 'frequency', {}), LL.indexFingerprint(4, 'frequency', {}))
   ne('a different sort method', LL.indexFingerprint(3, 'frequency', {}), LL.indexFingerprint(3, 'alphabetical', {}))
@@ -877,24 +877,26 @@ group('indexFingerprint is a total function of exactly its three inputs', () => 
   // is a different fingerprint. That is deliberate: the map the controller
   // holds is one object, and a reserialised read is a genuine change.
   ne('a reordered usage map', LL.indexFingerprint(1, 'a', { a: 1, b: 2 }), LL.indexFingerprint(1, 'a', { b: 2, a: 1 }))
+  ne('a different TryExec set', LL.indexFingerprint(3, 'a', {}, ['x.desktop']), LL.indexFingerprint(3, 'a', {}, []))
+  eq('an absent TryExec set is the empty one', LL.indexFingerprint(3, 'a', {}), LL.indexFingerprint(3, 'a', {}, []))
 })
 
 group('indexFingerprint survives nullish and falsy inputs', () => {
   // `(entryCount || 0)` folds the nullish count to 0 and `String(sortMethod
   // ?? "")` folds a nullish method to the empty string, while the map goes
   // through JSON.stringify, whose answer for null and undefined differ.
-  eq('all undefined', LL.indexFingerprint(undefined, undefined, undefined), '0||undefined')
+  eq('all undefined', LL.indexFingerprint(undefined, undefined, undefined), '0||undefined|[]')
   // `String(sortMethod ?? "")` folds a nullish method to the empty string
   // before stringifying, so null and "" produce the same second field - only
   // the map distinguishes a null from an absent one.
-  eq('all null', LL.indexFingerprint(null, null, null), '0||null')
-  eq('an empty map', LL.indexFingerprint(0, '', {}), '0||{}')
+  eq('all null', LL.indexFingerprint(null, null, null), '0||null|[]')
+  eq('an empty map', LL.indexFingerprint(0, '', {}), '0||{}|[]')
   eq('so a nullish sort method and an empty one agree', LL.indexFingerprint(1, null, {}), LL.indexFingerprint(1, '', {}))
-  eq('a zero count and a real zero are the same count', LL.indexFingerprint(0, 'a', {}), '0|a|{}')
-  eq('a negative count is kept verbatim', LL.indexFingerprint(-1, 'a', {}), '-1|a|{}')
-  eq('a numeric sort method is stringified', LL.indexFingerprint(1, 2, {}), '1|2|{}')
-  eq('false count folds to 0', LL.indexFingerprint(false, false, false), '0|false|false')
-  eq('a method carrying the separator cannot forge a collision with two fields', LL.indexFingerprint(1, 'a|b', {}), '1|a|b|{}')
+  eq('a zero count and a real zero are the same count', LL.indexFingerprint(0, 'a', {}), '0|a|{}|[]')
+  eq('a negative count is kept verbatim', LL.indexFingerprint(-1, 'a', {}), '-1|a|{}|[]')
+  eq('a numeric sort method is stringified', LL.indexFingerprint(1, 2, {}), '1|2|{}|[]')
+  eq('false count folds to 0', LL.indexFingerprint(false, false, false), '0|false|false|[]')
+  eq('a method carrying the separator cannot forge a collision with two fields', LL.indexFingerprint(1, 'a|b', {}), '1|a|b|{}|[]')
   // JSON.stringify cannot serialise a cycle, and this runs on the warm-summon
   // path, so the failure is a crash rather than a sentinel. Not reachable from
   // a druncache read, pinned so a cycle-shaped map would be a known verdict.
@@ -1058,6 +1060,23 @@ group('buildAppIndex drops Power entries and nameless entries', () => {
   eq('an empty index is an empty array, not null', LL.buildAppIndex([], 'alphabetical', {}), [])
   eq('every entry dropped gives an empty array',
     LL.buildAppIndex([{ name: '', id: 'e' }], 'alphabetical', {}), [])
+})
+
+group('buildAppIndex drops ids whose TryExec is missing', () => {
+  const entries = [
+    { name: 'Keep', id: 'keep.desktop' },
+    { name: 'Drop', id: 'drop.desktop' },
+    { name: 'Keep2', id: 'keep2.desktop' },
+  ]
+  eq('only the installed entry survives', LL.buildAppIndex(entries, 'alphabetical', {}, ['drop.desktop']).map((r) => r.id),
+    ['keep.desktop', 'keep2.desktop'])
+  eq('an empty verdict drops nothing', LL.buildAppIndex(entries, 'alphabetical', {}, []).map((r) => r.id),
+    ['drop.desktop', 'keep.desktop', 'keep2.desktop'])
+  eq('an absent verdict drops nothing', LL.buildAppIndex(entries, 'alphabetical', {}).map((r) => r.id),
+    ['drop.desktop', 'keep.desktop', 'keep2.desktop'])
+  eq('an id the index does not hold is harmless',
+    LL.buildAppIndex(entries, 'alphabetical', {}, ['not-there.desktop']).length, 3)
+  eq('the input is untouched', entries.map((e) => e.name), ['Keep', 'Drop', 'Keep2'])
 })
 
 group('buildAppIndex is a pure rebuild, not a mutation', () => {
@@ -2540,6 +2559,83 @@ group('sameNameSet compares scans by content, so a settled row can rest', () => 
   const before = { names: ['a', 'b'], at: 1000 }
   const after = { names: ['a', 'b'], at: 2000 }
   eq('a rescan that found nothing new', LL.sameNameSet(before.names, after.names), true)
+})
+
+group('desktopEntryRoots mirrors the live scanner s XDG precedence', () => {
+  eq('XDG_DATA_HOME first, then the data dirs',
+    LL.desktopEntryRoots('/home/u/.local/share', '/usr/local/share:/usr/share', '/home/u'),
+    ['/home/u/.local/share/applications', '/usr/local/share/applications', '/usr/share/applications'])
+  eq('an unset data home falls back to ~/.local/share',
+    LL.desktopEntryRoots('', '', '/home/u'),
+    ['/home/u/.local/share/applications', '/usr/local/share/applications', '/usr/share/applications'])
+  eq('an unset data dirs list uses the platform default',
+    LL.desktopEntryRoots('/d', '', '/home/u'),
+    ['/d/applications', '/usr/local/share/applications', '/usr/share/applications'])
+  eq('empty segments are skipped', LL.desktopEntryRoots('/d', '/a::/b:', '/h'),
+    ['/d/applications', '/a/applications', '/b/applications'])
+  eq('no home and no data home leaves only the system roots',
+    LL.desktopEntryRoots('', '', ''),
+    ['/usr/local/share/applications', '/usr/share/applications'])
+})
+
+group('tryExecVerdict dedupes and sorts the scan output', () => {
+  eq('a single id', LL.tryExecVerdict('x.desktop\n'), ['x.desktop'])
+  eq('sorted, not walk order', LL.tryExecVerdict('z.desktop\na.desktop\n'), ['a.desktop', 'z.desktop'])
+  eq('a duplicate is one id', LL.tryExecVerdict('a.desktop\na.desktop\n'), ['a.desktop'])
+  eq('blank lines are dropped', LL.tryExecVerdict('\n\na.desktop\n\n'), ['a.desktop'])
+  eq('surrounding space is trimmed', LL.tryExecVerdict('  a.desktop  \n'), ['a.desktop'])
+  eq('empty output', LL.tryExecVerdict(''), [])
+  eq('nullish', LL.tryExecVerdict(null), [])
+  eq('undefined', LL.tryExecVerdict(undefined), [])
+})
+
+group('the TryExec scan really resolves entries against PATH and $VIBRANIUM/bin', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vbtryexec-'))
+  const dataHome = path.join(root, 'data')
+  const dataDir = path.join(root, 'system')
+  const bin = path.join(root, 'vibranium-bin')
+  const appsHome = path.join(dataHome, 'applications')
+  const appsSystem = path.join(dataDir, 'applications')
+  fs.mkdirSync(path.join(appsSystem, 'sub'), { recursive: true })
+  fs.mkdirSync(appsHome, { recursive: true })
+  fs.mkdirSync(bin, { recursive: true })
+  fs.writeFileSync(path.join(bin, 'vb-tool'), '#!/bin/sh\n')
+  fs.chmodSync(path.join(bin, 'vb-tool'), 0o755)
+  const write = (dir, name, body) => fs.writeFileSync(path.join(dir, name), body)
+  const entry = (name, tryExec) => '[Desktop Entry]\nType=Application\nName=' + name
+    + '\nExec=x\n' + (tryExec === null ? '' : 'TryExec=' + tryExec + '\n')
+  try {
+    write(appsHome, 'ok.desktop', entry('Ok', 'sh'))
+    write(appsHome, 'missing.desktop', entry('Missing', 'definitely-not-a-real-binary-xyz'))
+    write(appsHome, 'absolute.desktop', entry('Absolute', path.join(root, 'gone')))
+    write(appsHome, 'absolute-ok.desktop', entry('AbsoluteOk', '/bin/sh'))
+    write(appsHome, 'vbtool.desktop', entry('Vb', 'vb-tool'))
+    write(appsHome, 'none.desktop', entry('None', null))
+    write(appsHome, 'localized.desktop', entry('Localized', null).replace('Exec=x\n', 'Exec=x\nTryExec[de]=definitely-not-a-real-binary-xyz\n'))
+    write(appsHome, 'action.desktop', entry('Action', null) + '[Desktop Action one]\nTryExec=definitely-not-a-real-binary-xyz\n')
+    write(appsSystem, 'sub/nested.desktop', entry('Nested', 'definitely-not-a-real-binary-xyz'))
+    // The higher-priority copy wins a duplicate id, exactly as the live list
+    // resolves it: present at home hides a missing system copy, and the
+    // reverse hides the entry.
+    write(appsHome, 'dup-ok.desktop', entry('DupOk', 'sh'))
+    write(appsSystem, 'dup-ok.desktop', entry('DupOk', 'definitely-not-a-real-binary-xyz'))
+    write(appsHome, 'dup-missing.desktop', entry('DupMissing', 'definitely-not-a-real-binary-xyz'))
+    write(appsSystem, 'dup-missing.desktop', entry('DupMissing', 'sh'))
+
+    const roots = LL.desktopEntryRoots(dataHome, dataDir, root)
+    const argv = LL.tryExecScanArgv(roots, bin)
+    const run = spawnSync(argv[0], argv.slice(1), { encoding: 'utf8' })
+    eq('the scan exits cleanly', run.status, 0)
+    eq('and prints no diagnostics', run.stderr, '')
+    eq('only the effective missing TryExec entries', LL.tryExecVerdict(run.stdout),
+      ['absolute', 'dup-missing', 'missing', 'sub-nested'])
+    // A scan with no roots is a clean empty verdict rather than an error.
+    const empty = spawnSync('/bin/bash', ['-c', LL.tryExecScanArgv([], bin)[2], 'tryexec', bin], { encoding: 'utf8' })
+    eq('no roots is a clean run', empty.status, 0)
+    eq('with no ids', LL.tryExecVerdict(empty.stdout), [])
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
 })
 
 group('timeProbeFormat reads each zone on its own dial, never the OS one', () => {

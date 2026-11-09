@@ -28,7 +28,8 @@ for entry in "$VIBRANIUM"/applications/*.desktop; do
 done
 
 # Custom entries install unconditionally; TryExec names the backing
-# executable, so the entry is ready once the tool is installed.
+# executable, so the entry is ready once the tool is installed and the
+# launcher hides it until then.
 for entry in "$VIBRANIUM"/applications/custom/*.desktop; do
   [[ -e "$entry" ]] || continue
   helpers::copy "$entry" "$HOME/.local/share/applications/${entry##*/}"

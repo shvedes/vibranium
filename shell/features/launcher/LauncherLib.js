@@ -32,11 +32,11 @@ function styledMarkup(text) { return SU.styledMarkup(text) }
 const BASE_EXCLUDED_CATEGORIES = ["Power"]
 
 // Change-detector for an index build: the live entry count, the sort
-// method, and the usage signal the caller holds. The controller skips a
-// rebuild when the string is unchanged, which is the warm-summon fast
-// path, so it has to be a total function of exactly those three and
-// nothing else - an input it ignores would read as "unchanged" and freeze
-// a stale order.
+// method, the usage signal the caller holds and the desktop ids whose
+// TryExec is missing. The controller skips a rebuild when the string is
+// unchanged, which is the warm-summon fast path, so it has to be a total
+// function of exactly those four and nothing else - an input it ignores
+// would read as "unchanged" and freeze a stale order.
 //
 // The usage term is a REVISION, a counter the caller moves whenever the
 // usage map moves, and not the map itself. Fingerprinting the map answers
@@ -46,8 +46,12 @@ const BASE_EXCLUDED_CATEGORIES = ["Power"]
 // path that runs on the first summon and again after every usage bump. A
 // counter is O(1) in the map's size, and two different maps cannot land
 // on the same revision.
-function indexFingerprint(entryCount, sortMethod, usageSignal) {
+//
+// The TryExec term is the sorted id list the scan verdict produces, so its
+// order is deterministic and an unchanged set cannot look like a move.
+function indexFingerprint(entryCount, sortMethod, usageSignal, tryExecSignal) {
   return (entryCount || 0) + "|" + String(sortMethod ?? "") + "|" + JSON.stringify(usageSignal)
+    + "|" + JSON.stringify(tryExecSignal ?? [])
 }
 
 // Snapshot one DesktopEntry into a plain record. DesktopEntry objects are
@@ -121,10 +125,24 @@ function isManagedEntry(entry, cats) {
   return tui || pwa
 }
 
-function buildAppIndex(entries, sortMethod, usageMap) {
+// `missingTryExec` is the sorted id list tryExecVerdict produces: entries
+// whose TryExec names an executable this system does not have. They are
+// dropped before the record is built, so a stale desktop file is neither
+// searchable nor counted in the "matched/total" counter.
+function buildAppIndex(entries, sortMethod, usageMap, missingTryExec) {
+  const hidden = Object.create(null)
+  let hasHidden = false
+  if (Array.isArray(missingTryExec)) {
+    for (let i = 0; i < missingTryExec.length; i++) {
+      hidden[String(missingTryExec[i])] = true
+      hasHidden = true
+    }
+  }
   const out = []
   for (let i = 0; i < entries.length; i++) {
-    const rec = appRecord(entries[i])
+    const entry = entries[i]
+    if (hasHidden && hidden[String(entry.id ?? "")] === true) continue
+    const rec = appRecord(entry)
     if (rec && rec.label !== "") out.push(rec)
   }
   // Base order for the idle view (no query). Search results re-rank by
@@ -1019,6 +1037,103 @@ function pluginScanArgv(builtinRoot, userRoot) {
     + "  [[ -d \"$r\" ]] || continue\n"
     + "  for d in \"$r\"/*; do [[ -d \"$d\" ]] && echo \"${d%/}\"; done\n"
     + "done"]
+}
+
+// The applications directories the desktop-entry scanner reads, in the
+// precedence order Quickshell's DesktopEntryManager applies: XDG_DATA_HOME
+// first, then each XDG_DATA_DIRS entry (default
+// /usr/local/share:/usr/share), with /applications appended. Empty segments
+// are skipped. The first root that holds a desktop id is the entry the live
+// list uses, which is why the TryExec scan walks the same order.
+function desktopEntryRoots(dataHome, dataDirs, home) {
+  const out = []
+  const dh = String(dataHome ?? "")
+  if (dh !== "") out.push(dh + "/applications")
+  else if (String(home ?? "") !== "") out.push(String(home) + "/.local/share/applications")
+  const dirs = String(dataDirs ?? "") !== "" ? String(dataDirs) : "/usr/local/share:/usr/share"
+  const parts = dirs.split(":")
+  for (let i = 0; i < parts.length; i++) {
+    if (parts[i] !== "") out.push(parts[i] + "/applications")
+  }
+  return out
+}
+
+// TryExec scan: one desktop id per line for entries whose TryExec names an
+// executable that is not installed. Roots arrive in precedence order and the
+// first file for an id wins, matching the live list; subdirectory files get
+// the same hyphen-joined id the scanner mints. A value that is not an
+// absolute path is resolved through PATH and then $VIBRANIUM/bin, which is
+// the same pair the installer and migrations use. The `TryExec=` line is
+// read from the [Desktop Entry] group only, so an action's own key cannot
+// hide the application.
+function tryExecScanArgv(roots, binDir) {
+  const script = [
+    "bin=\"$1\"; shift",
+    "declare -A seen",
+    "_tryexec_of() {",
+    "  local -n out=$2",
+    "  local file=$1 group=\"\" line value=\"\"",
+    "  out=\"\"",
+    "  while IFS= read -r line || [[ -n \"$line\" ]]; do",
+    "    line=\"${line#\"${line%%[![:space:]]*}\"}\"",
+    "    line=\"${line%\"${line##*[![:space:]]}\"}\"",
+    "    [[ -z \"$line\" || \"$line\" == \\#* ]] && continue",
+    "    if [[ \"$line\" == \\[*\\] ]]; then",
+    "      group=\"${line:1:${#line}-2}\"",
+    "      continue",
+    "    fi",
+    "    [[ \"$group\" == \"Desktop Entry\" ]] || continue",
+    "    [[ \"$line\" == TryExec=* ]] || continue",
+    "    value=\"${line#TryExec=}\"",
+    "  done < \"$file\"",
+    "  out=\"$value\"",
+    "}",
+    "for root in \"$@\"; do",
+    "  [[ -d \"$root\" ]] || continue",
+    "  while IFS= read -r -d '' file; do",
+    "    [[ -f \"$file\" ]] || continue",
+    "    rel=\"${file#\"$root\"/}\"",
+    "    id=\"${rel%.desktop}\"",
+    "    id=\"${id//\\//-}\"",
+    "    [[ -n \"${seen[$id]}\" ]] && continue",
+    "    seen[$id]=1",
+    "    _tryexec_of \"$file\" try",
+    "    [[ -z \"$try\" ]] && continue",
+    "    if [[ \"$try\" == /* ]]; then",
+    "      [[ -f \"$try\" && -x \"$try\" ]] && continue",
+    "    else",
+    "      command -v \"$try\" > /dev/null 2>&1 && continue",
+    "      [[ -n \"$bin\" && -f \"$bin/$try\" && -x \"$bin/$try\" ]] && continue",
+    "    fi",
+    "    printf '%s\\n' \"$id\"",
+    "  done < <(find \"$root\" \\( -type f -o -type l \\) -name '*.desktop' -print0)",
+    "done",
+    "exit 0"
+  ].join("\n")
+  const argv = ["/bin/bash", "-c", script, "tryexec", String(binDir ?? "")]
+  const list = Array.isArray(roots) ? roots : []
+  for (let i = 0; i < list.length; i++) argv.push(String(list[i]))
+  return argv
+}
+
+// The ids a finished TryExec scan printed, deduped and sorted. The sort is
+// what makes the index fingerprint stable across directory-walk order; an
+// empty list means every entry either has no TryExec or has one that is
+// installed.
+function tryExecVerdict(out) {
+  const text = String(out ?? "")
+  if (text === "") return []
+  const seen = Object.create(null)
+  const ids = []
+  const lines = text.split("\n")
+  for (let i = 0; i < lines.length; i++) {
+    const id = lines[i].trim()
+    if (id === "" || seen[id] === true) continue
+    seen[id] = true
+    ids.push(id)
+  }
+  ids.sort()
+  return ids
 }
 
 // The PATH scan behind the binary-launch fallback: one executable basename per

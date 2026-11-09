@@ -96,8 +96,8 @@ for entry in "$VIBRANIUM"/applications/*.desktop; do
 	cp -a --no-preserve=ownership "$entry" "$data_dir/applications/${entry##*/}" || exit 1
 done
 
-# Custom entries are conditional: the shell cannot evaluate TryExec, so an
-# entry whose backing executable is absent would linger as a dead row.
+# Custom entries are conditional: an entry whose backing executable is
+# absent would otherwise leave a dead copy in the applications directory.
 _tryexec_present() {
 	[[ -z "$1" ]] && return 0
 	command -v "$1" > /dev/null && return 0

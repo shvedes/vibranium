@@ -16,7 +16,9 @@ Type to filter across every installed desktop entry - names, generic
 names, descriptions and categories all match. A query with no exact
 match falls back to a typo rescue before anything else, so
 `sotify` still offers Spotify. One edit is tolerated on short queries,
-two on longer ones, keeping short matches precise. ++enter++ launches the
+two on longer ones, keeping short matches precise. Entries whose
+`TryExec` names a program that is not installed are hidden, so a stale
+desktop file never appears as a dead row. ++enter++ launches the
 selected entry; descriptions of the highlighted app are available via
 ++ctrl+i++ as a dropdown under the row.
 

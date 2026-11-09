@@ -5,14 +5,14 @@ RESET=$'\e[0m'
 SELF="${0##*/}"
 SELF="${SELF/.sh/}"
 
-# The launcher cannot evaluate TryExec (Quickshell's DesktopEntries only
-# filters Hidden/NoDisplay), so custom entries copied unconditionally by
-# older installs linger as dead rows when their tool is absent (MPD,
-# Syncthing on fresh installs). Reconcile each one: remove the stale copy
-# when the backing executable is missing, install it when present. Fresh
-# installs are gated in install/post-install/00-configs.sh; this covers the
-# installs that already copied them, and backfills entries for tools the
-# user installed afterwards. Idempotent: safe to re-run.
+# Older installs copied custom entries unconditionally, so a tool that is
+# not installed leaves a stale desktop file behind. The launcher honors
+# TryExec and hides it, but the applications directory should not carry the
+# dead copy either: reconcile each entry, removing it when the backing
+# executable is missing and installing it when present. Fresh installs are
+# gated in install/post-install/00-configs.sh; this covers installs that
+# already copied them, and backfills entries for tools the user installed
+# afterwards. Idempotent: safe to re-run.
 data_dir="${XDG_DATA_HOME:-$HOME/.local/share}"
 
 _tryexec_present() {

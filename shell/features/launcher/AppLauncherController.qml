@@ -54,6 +54,12 @@ Item {
   // Desktop entries snapshotted into plain records (rebuilt when
   // applications change or category visibility flips).
   property var appIndex: []
+  // Desktop ids whose TryExec names an executable this system does not have.
+  // Quickshell's DesktopEntries exposes no TryExec, so the scan below
+  // resolves it and the index drops these ids. Empty until the first scan
+  // lands, which keeps construction from waiting on a filesystem walk.
+  property var tryExecMissing: []
+  property bool _tryExecQueued: false
   // Change-detector of the last index build: entry count + sort method +
   // usage revision. Rebuilds skip when it is unchanged (warm summon fast
   // path).
@@ -78,10 +84,42 @@ Item {
   // reaches the gate as a distinct value.
   function _rebuildAppIndex() {
     const entries = DesktopEntries.applications ? DesktopEntries.applications.values : []
-    const fp = LauncherLib.indexFingerprint(entries ? entries.length : 0, root.sortMethod, root._usageRev)
+    const fp = LauncherLib.indexFingerprint(entries ? entries.length : 0, root.sortMethod, root._usageRev, root.tryExecMissing)
     if (fp === root._indexFp) return
     root._indexFp = fp
-    root.appIndex = LauncherLib.buildAppIndex(entries, root.sortMethod, root.usageMap)
+    root.appIndex = LauncherLib.buildAppIndex(entries, root.sortMethod, root.usageMap, root.tryExecMissing)
+  }
+
+  // TryExec is the desktop entry's own install check, and DesktopEntries
+  // neither exposes nor applies it. One scan resolves every entry's
+  // effective TryExec against PATH and $VIBRANIUM/bin, mirroring the XDG
+  // directory precedence of the live list; the index drops the ids it
+  // reports. A walk already in flight is not aborted: the request is queued
+  // and runs after it, so a stale verdict is never published by a killed
+  // run.
+  function _scanTryExec() {
+    if (tryExecProc.running) {
+      root._tryExecQueued = true
+      return
+    }
+    root._tryExecQueued = false
+    tryExecProc.command = LauncherLib.tryExecScanArgv(
+      LauncherLib.desktopEntryRoots(
+        Quickshell.env("XDG_DATA_HOME"),
+        Quickshell.env("XDG_DATA_DIRS"),
+        Paths.home),
+      Paths.vibraniumHome !== "" ? Paths.vibraniumHome + "/bin" : "")
+    tryExecProc.running = true
+  }
+
+  function _onTryExecScanned() {
+    root.tryExecMissing = LauncherLib.tryExecVerdict(tryExecOut.text)
+    root._rebuildAppIndex()
+    if (AppLauncher.visible) root.recompute()
+    // Defer the restart out of this exit handler: setting `running` on the
+    // Process whose onExited is still unwinding is a reentrancy the other
+    // scan queues avoid the same way.
+    if (root._tryExecQueued) Qt.callLater(() => root._scanTryExec())
   }
 
   // --- publishing the reads the facade serves ---
@@ -273,6 +311,10 @@ Item {
     // cannot raise a construction error to its caller.
     try {
       root._syncHasHistory()
+      // Resolve TryExec before the first index build can be asked for the
+      // final list. The walk is async, so the first build may still run with
+      // an empty verdict; the scan's own completion rebuilds and recomputes.
+      root._scanTryExec()
       // Seed the ranking before the first index build: this controller is
       // rebuilt on every open, but the facade keeps serving the last
       // published map across the teardown gap. Starting from it instead of
@@ -396,6 +438,9 @@ Item {
     target: DesktopEntries
 
     function onApplicationsChanged() {
+      // A rescan is queued behind any walk already in flight, so the new
+      // entry set gets a fresh TryExec verdict without aborting the run.
+      root._scanTryExec()
       root._rebuildAppIndex()
       root.recompute()
     }
@@ -1851,6 +1896,17 @@ Item {
     }
 
     onExited: root._onStatProbed()
+  }
+
+  // TryExec scan for the app index (see _scanTryExec). One desktop id per
+  // line, collected whole at exit because the walk can print many.
+  Process {
+    id: tryExecProc
+
+    stdout: StdioCollector { id: tryExecOut }
+    stderr: StdioCollector {}
+
+    onExited: root._onTryExecScanned()
   }
 
   // PATH scan for the binary-launch fallback row (see requestBinaries).
