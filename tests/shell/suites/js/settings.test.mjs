@@ -755,10 +755,12 @@ group('declaresOwnCommand matches whole argv words only', () => {
   eq('the session lock verb', SL.declaresOwnCommand('vb-shell session lock'), true)
   eq('the lockscreen lock verb', SL.declaresOwnCommand('vb-shell lockscreen lock'), true)
   eq('the session suspend verb', SL.declaresOwnCommand('vb-shell session suspend'), true)
+  eq('the plain system suspend the shell itself runs', SL.declaresOwnCommand('systemctl suspend'), true)
   eq('surrounding whitespace is trimmed first', SL.declaresOwnCommand('  vb-shell session lock  '), true)
   eq('another tool\'s lock is not the project\'s verb', SL.declaresOwnCommand('loginctl lock-session'), false)
   eq('a wrapped spelling is not a match', SL.declatesOwnCommand || SL.declaresOwnCommand('echo vb-shell session lock'), false)
   eq('a piped spelling is not a match', SL.declaresOwnCommand('vb-shell session lock | tee log'), false)
+  eq('a wrapped system suspend is not a match', SL.declaresOwnCommand('echo systemctl suspend'), false)
   eq('a suffixed word is not a match', SL.declaresOwnCommand('vb-shell session lockx'), false)
   eq('an empty command', SL.declaresOwnCommand(''), false)
   eq('a non-string command', SL.declaresOwnCommand(5), false)
@@ -777,6 +779,9 @@ group('normalizeIdleTimers fills only an absent class, and is idempotent', () =>
     { minutes: 2, action: 'command', command: 'echo hi' },
     { minutes: 3, action: 'lock' },
   ])
+  eq('the plain system suspend command gets the suspend class', SL.normalizeIdleTimers([
+    { minutes: 1, action: 'command', command: 'systemctl suspend' },
+  ]), [{ minutes: 1, action: 'command', command: 'systemctl suspend', commandClass: 'suspend' }])
   eq('a declared class is kept, even against the verb', SL.normalizeIdleTimers([
     { minutes: 1, action: 'command', command: 'vb-shell session lock', commandClass: 'suspend' },
   ]), [{ minutes: 1, action: 'command', command: 'vb-shell session lock', commandClass: 'suspend' }])

@@ -20,7 +20,7 @@ Every timer row runs a **command** of your own. The **Add timer** row asks for t
 
 The shipped timers are `vb-shell session lock` after 10 minutes and `vb-shell session suspend` after 15.
 
-A command row is *declared* before it is saved: declare it as a lock and the idle inhibitor holds it back, declare it as a suspend and the sleep inhibitor does. An undeclared command is never held back, whatever its text happens to look like - Vibranium does not guess what a command does to your session. The Idle page shows which of the two applies to each row. A command that is one of Vibranium's own session verbs (`vb-shell session lock`, `vb-shell lockscreen lock`, `vb-shell session suspend`) is recognized as such on its own, so a timer saved before the declaration existed still behaves. A timer saved by an older version as a plain lock or suspend still runs the way it did.
+A command row is *declared* before it is saved: declare it as a lock and the idle inhibitor holds it back, declare it as a suspend and the sleep inhibitor does. An undeclared command is never held back, whatever its text happens to look like - Vibranium does not guess what a command does to your session. The Idle page shows which of the two applies to each row. A command that is one of Vibranium's own session verbs (`vb-shell session lock`, `vb-shell lockscreen lock`, `vb-shell session suspend`), or the plain `systemctl suspend` its own suspend runs, is recognized as such on its own, so a timer saved before the declaration existed still behaves. A timer saved by an older version as a plain lock or suspend still runs the way it did.
 
 ## The sleep inhibitor
 

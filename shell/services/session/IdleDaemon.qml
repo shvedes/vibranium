@@ -192,7 +192,7 @@ Singleton {
   // command row may declare. A command is never reclassified by reading
   // its text - an arbitrary string says nothing about what it does to the
   // session - so only a declared class reaches the inhibitor guard. The
-  // store fills a class for the project's own session verbs on read
+  // store fills a class for the session verbs Vibranium itself runs on read
   // (SettingsLib.normalizeIdleTimers), and the Add wizard and `setClass`
   // write one directly; everything else stays undeclared and ungated.
   function _actionMeta(row) {
@@ -481,9 +481,9 @@ Singleton {
     // a command - there is no action stage to pick from, so a new timer
     // cannot be a bare lock or suspend row and the command's own text is
     // the whole of what the timer does. The inhibitor guard reads the
-    // class that command declares: the project's own session verbs
-    // declare themselves on read, anything else declares nothing and is
-    // never held back. The final commit carries every stage at once; the
+    // class that command declares: the session verbs Vibranium itself
+    // runs declare themselves on read, anything else declares nothing and
+    // is never held back. The final commit carries every stage at once; the
     // menu stays open so several timers can be added in a row.
     let minMinutes = 1
     for (let u = 0; u < root.timers.length; u++) {

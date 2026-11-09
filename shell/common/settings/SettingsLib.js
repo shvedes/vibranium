@@ -842,14 +842,17 @@ function declaredIdleClass(r) {
     ? "" : String(r.commandClass)
 }
 
-// Whole-argv-word spellings of the project's own session verbs. A stored
-// timer written before the class field existed is reconciled with this
-// closed list; the match is on complete words, so `loginctl lock-session`
-// and any wrapped or piped variant stay undeclared.
+// Whole-argv-word spellings of the session verbs Vibranium itself runs: the
+// project's own verbs, plus the plain `systemctl suspend` that
+// Session.suspend() hands to logind. A stored timer written before the class
+// field existed is reconciled with this closed list; the match is on complete
+// words, so `loginctl lock-session` and any wrapped or piped variant stay
+// undeclared.
 const IDLE_VERB_CLASS = {
   "vb-shell session lock": "lock",
   "vb-shell lockscreen lock": "lock",
-  "vb-shell session suspend": "suspend"
+  "vb-shell session suspend": "suspend",
+  "systemctl suspend": "suspend"
 }
 
 // Fill an absent class for a row whose command is one of the project's own
