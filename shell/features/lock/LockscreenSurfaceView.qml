@@ -86,13 +86,11 @@ WlSessionLockSurface {
   readonly property real blurRadius: surface._blurRadius(
     String(Settings.lockscreenBlurPower === undefined || Settings.lockscreenBlurPower === null
       ? "" : Settings.lockscreenBlurPower))
-  // Dim fraction from separate settings for blurred vs non-blurred backdrops
-  // (0-100 -> 0-1). Picks the active dim based on blurEnabled. A surface with
-  // no backdrop is not dimmed: the plain theme color is what "none" shows.
+  // Dim fraction (0-100 -> 0-1), one level for a blurred and a sharp backdrop
+  // alike. A surface with no backdrop is not dimmed: the plain theme color is
+  // what "none" shows.
   readonly property real dim: surface.backgroundMode === "none" ? 0
-    : surface._dimFraction(surface.blurEnabled
-      ? Settings.lockscreenDimBlurred
-      : Settings.lockscreenDim)
+    : surface._dimFraction(Settings.lockscreenDim)
   readonly property real vignetteK: surface._vignetteFactor(
     String(Settings.lockscreenVignette === undefined || Settings.lockscreenVignette === null
       ? "" : Settings.lockscreenVignette))

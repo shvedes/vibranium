@@ -117,10 +117,13 @@ Three layers - pick by what the condition depends on.
   (ANDed) are both accepted.
 - Shell-only options are addressed by their full path:
   `{ "key": "shell.lockscreen.blurPower", "eq": "high" }`.
-- Chains resolve transitively with cycle safety - if the parent option is
-  itself hidden, its dependents hide too. Cross-store references (shell
-  rows gated on `hypr.*`) stay intact: the file holds every key, and each
-  entry resolves in its own store at runtime.
+- Chains resolve transitively with cycle safety - if the parent option's
+  own condition fails, its dependents report unavailable too. Cross-store
+  references (shell rows gated on `hypr.*`) stay intact: the file holds
+  every key, and each entry resolves in its own store at runtime.
+- A row whose condition fails stays listed: it renders muted, in a box that
+  fades away once the condition holds, and the cursor steps over it. Search
+  only surfaces rows whose condition holds.
 - **UI-only.** Hidden options keep their value and stay projected into the
   env file; scripts never see menu visibility.
 - Self references are pruned at load with a warning.

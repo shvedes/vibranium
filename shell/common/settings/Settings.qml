@@ -253,12 +253,9 @@ Singleton {
         const v = root.value("shell.lockscreen.vignette")
     return root.vignetteLevels.indexOf(v) >= 0 ? v : "off"
   }
+  // The one backdrop dim level, used whether or not the backdrop is blurred.
   readonly property int lockscreenDim: {
         const v = root.value("shell.lockscreen.dim")
-    return typeof v === "number" && v >= 0 && v <= 100 ? v : 50
-  }
-  readonly property int lockscreenDimBlurred: {
-        const v = root.value("shell.lockscreen.dimBlurred")
     return typeof v === "number" && v >= 0 && v <= 100 ? v : 50
   }
   readonly property bool lockscreenNowPlaying: root.value("shell.lockscreen.nowPlaying") !== false

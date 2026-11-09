@@ -1266,50 +1266,16 @@
             {
                 "key": "shell.lockscreen.dim",
                 "type": "int",
-                "default": 70,
+                "default": 50,
                 "label": "Dim strength",
                 "sub": "Backdrop dim level",
-                "desc": "How strongly to dim the background when blur is disabled.",
+                "desc": "How strongly to dim the lockscreen backdrop, blurred or not.",
                 "range": {
                     "min": 0,
                     "max": 100
                 },
                 "step": 5,
-                "unit": "%",
-                "showIf": [
-                    {
-                        "key": "shell.lockscreen.blurBackground",
-                        "eq": false
-                    },
-                    {
-                        "key": "shell.lockscreen.backgroundMode",
-                        "neq": "none"
-                    }
-                ]
-            },
-            {
-                "key": "shell.lockscreen.dimBlurred",
-                "type": "int",
-                "default": 40,
-                "label": "Dim strength",
-                "sub": "Backdrop dim level",
-                "desc": "How strongly to dim the background when blur is enabled.",
-                "range": {
-                    "min": 0,
-                    "max": 100
-                },
-                "step": 5,
-                "unit": "%",
-                "showIf": [
-                    {
-                        "key": "shell.lockscreen.blurBackground",
-                        "eq": true
-                    },
-                    {
-                        "key": "shell.lockscreen.backgroundMode",
-                        "neq": "none"
-                    }
-                ]
+                "unit": "%"
             },
             {
                 "key": "shell.lockscreen.nowPlaying",

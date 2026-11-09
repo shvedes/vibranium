@@ -221,8 +221,9 @@ Rectangle {
   property var installedPage: null
   property string installedPageId: ""
 
-  // Guard-filtered rows: managed identity-stable model (a naive binding
-  // would rebuild delegates mid-interaction).
+  // Listed rows: guard-hidden rows are filtered out, while store-gated
+  // (showIf) rows stay installed and render muted. Managed identity-stable
+  // model (a naive binding would rebuild delegates mid-interaction).
   property var rowsModel: []
   property real _latchedListH: -1
   property bool _fitPending: false
@@ -664,7 +665,10 @@ Rectangle {
       // mid-swap cursor churn pollute the destination's saved state.
       const pg = panel.installedPage
       const src = pg ? pg.items : []
-      candidate = src.filter(item => Menu.isVisible(item))
+      // isListed, not isVisible: a store-gated row keeps its slot while its
+      // condition fails and is drawn under a mute box, so the row set only
+      // changes when a guard verdict or a dead link takes a row away.
+      candidate = src.filter(item => Menu.isListed(item))
       // Grid pages weave section headers and row-fill spacers into the
       // flat slot list; search results stay flat (no chrome mid-filter).
       if (!panel.searching)
@@ -1779,6 +1783,7 @@ Rectangle {
     // out from under its parent instead of popping.
     function onCondRevChanged() {
       panel.scheduleCondReveal()
+      panel.seatPastUnavailable()
     }
 
     // A store mutation can hand focus around (editor adoption, collapse);
@@ -3189,6 +3194,8 @@ Rectangle {
     const at = panel.indexOfUid(panel._frameSelUid)
     if (at >= 0) want = at
     if (want >= list.count) return
+    want = panel.seatableNear(want)
+    if (want < 0) return
     if (list.currentIndex === want) return
     viewSettle(want, true)
     panel.recordSeat()
@@ -3279,6 +3286,10 @@ Rectangle {
       sel = 0
       y = 0
     }
+    // The seat may name a row a condition has since made unavailable: land on
+    // the nearest row that can hold the cursor instead of parking it there.
+    const takeable = panel.seatableNear(sel)
+    if (takeable >= 0) sel = takeable
     // All pages settle synchronously so the first paint is already at
     // the restored cursor - no row-0 frame, no top-to-center tween.
     // Snap only when no explicit pending selection exists (restore);
@@ -3760,6 +3771,43 @@ Rectangle {
     const m = panel.rowsModel
     if (index < 0 || index >= m.length) return false
     return m[index].selectable === true && !Menu.isDisabled(m[index])
+      && !Menu.isUnavailable(m[index])
+  }
+
+  // Nearest row that can take the cursor: forward first, then back, like the
+  // ends scan. A remembered or requested seat can name a store-gated row whose
+  // condition stopped holding while the cursor was elsewhere.
+  function seatableNear(index) {
+    const n = panel.rowsModel.length
+    if (n === 0) return -1
+    const start = Math.min(Math.max(0, Math.round(index)), n - 1)
+    for (let i = start; i < n; i++) {
+      if (panel.isSelectableIndex(i)) return i
+    }
+    for (let i = start - 1; i >= 0; i--) {
+      if (panel.isSelectableIndex(i)) return i
+    }
+    return -1
+  }
+
+  // A store change can strand the cursor on a row whose condition just stopped
+  // holding. The row stays installed (it only turns muted), so no install moves
+  // the cursor: step to the next row that can take it, forward first, else back.
+  function seatPastUnavailable() {
+    const idx = panel.gridMode ? grid.currentIndex : list.currentIndex
+    if (idx < 0 || idx >= panel.rowsModel.length) return
+    if (panel.isSelectableIndex(idx)) return
+    const rows = panel.rowsModel
+    let target = -1
+    for (let i = idx + 1; i < rows.length && target < 0; i++) {
+      if (panel.isSelectableIndex(i)) target = i
+    }
+    for (let i = idx - 1; i >= 0 && target < 0; i--) {
+      if (panel.isSelectableIndex(i)) target = i
+    }
+    if (target < 0) return
+    if (panel.gridMode) grid.settle(target, false)
+    else list.seat(target, "step")
   }
 
   function focusIndex(index) {

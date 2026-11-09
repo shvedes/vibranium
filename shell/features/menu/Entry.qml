@@ -109,8 +109,15 @@ Item {
     Menu.rev
     return searchResult || !itm ? null : Menu.stateOf(itm)
   }
+  // A listed row whose store-gated (showIf) condition fails: drawn under a
+  // mute box, skipped by the cursor, inert. condRev is read so a store write
+  // re-answers this binding - a condition flip never changes the row set.
+  readonly property bool unavailable_: {
+    Menu.condRev
+    return itm && !searchResult ? Menu.isUnavailable(itm) : false
+  }
   readonly property bool enabled_: itm && !searchResult
-    ? itm.enabled !== false && !Menu.isDisabled(itm) : true
+    ? itm.enabled !== false && !Menu.isDisabled(itm) && !row.unavailable_ : true
 
   // Expansion (editors / info body) syncs imperatively from the service
   // store: rev bumps re-apply the canonical value immune to delegate
@@ -432,7 +439,11 @@ Item {
   // every row keeps the same height as its neighbors.
   height: isSep ? sepH
     : RowGeometry.restH(row.restKind) + descSlot.height + expandSlot.height
-  opacity: enabled_ ? 1 : 0.4
+  // Guard-disabled rows fade (they stay reachable); an unavailable row keeps
+  // its contrast and is muted by its mute box instead, so the two hints stay
+  // distinguishable.
+  opacity: itm && !searchResult && (itm.enabled === false || Menu.isDisabled(itm))
+    ? 0.4 : 1
   readonly property real labelWidth: labelCol.width
   // What this row's own left side needs: the label, or the sub line when it
   // is the wider of the two (with its lead and tail beside it). Compared
@@ -2268,6 +2279,58 @@ Item {
           if (itm && itm.close === true) Menu.close()
         }
       }
+    }
+  }
+
+  // Store-gated row that cannot be used right now: a card-toned fill over the
+  // whole row mutes the copy underneath instead of the row vanishing, and it
+  // fades out the moment the condition starts holding. Drawn last so it covers
+  // the open slots too. No outline: the fill is the card colour, so it only
+  // mutes what is behind it and consecutive muted rows read as one area.
+  //
+  // The fade is an explicit tween started by the verdict's own change, not a
+  // Behavior on the opacity binding. A Behavior also eases the binding's first
+  // value at construction - and a page must never fade its muted rows in, they
+  // are built muted - so it needs a gate armed from Component.onCompleted,
+  // which is one turn after the value it has to leave alone. Starting the
+  // tween from the change instead has neither problem: construction only sets
+  // the resting value, and a flip that lands mid-fade redirects the box from
+  // wherever it already is rather than from an endpoint.
+  Rectangle {
+    id: muteBox
+
+    anchors.fill: parent
+    color: Ui.solid("background_0")
+    opacity: 0
+    // Change detector for row.unavailable_, so the tween is started from a
+    // handler of this box's own rather than from a signal name derived from a
+    // trailing-underscore property. The initial binding is not a change.
+    property bool muted: row.unavailable_
+
+    onMutedChanged: muteBox.settle(MotionPolicy.enabled)
+
+    Component.onCompleted: muteBox.settle(false)
+
+    // `motion` false means "land on the resting value at once": construction,
+    // and the animations-off case, which is the same landing without the ease.
+    function settle(motion) {
+      const want = row.unavailable_ ? 0.6 : 0
+      if (!motion) {
+        muteFade.stop()
+        muteBox.opacity = want
+        return
+      }
+      muteFade.to = want
+      muteFade.restart()
+    }
+
+    NumberAnimation {
+      id: muteFade
+
+      target: muteBox
+      property: "opacity"
+      duration: Ui.normalMs
+      easing.type: Easing.OutCubic
     }
   }
 }

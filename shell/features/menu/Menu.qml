@@ -797,9 +797,10 @@ Singleton {
   }
 
   // Re-derive the "N items" sub line of every counted section row on the
-  // settings root. Counting runs against the BUILT page with live
-  // visibility - showIf conditions AND bash when-guards both resolve
-  // here - so the number always matches what entering the section shows.
+  // settings root. Counting runs against the BUILT page with live listing -
+  // bash when-guards and provider vetoes resolve here, and store-gated
+  // (showIf) rows count even while muted - so the number always matches what
+  // entering the section shows.
   // In-place mutation + rev bump: the mirror holds these same objects,
   // so patched strings reach delegates without any model rebuild.
   function refreshSectionCounts() {
@@ -816,7 +817,7 @@ Singleton {
       for (let j = 0; j < page.items.length; j++) {
         const cand = page.items[j]
         if (!cand || cand.type === "separator") continue
-        if (!Menu.isVisible(cand)) continue
+        if (!Menu.isListed(cand)) continue
         n++
         if (cand.var === undefined) hasItems = true
       }
@@ -1404,7 +1405,7 @@ Singleton {
           for (let j = 0; j < tpg.items.length; j++) {
             const tIt = tpg.items[j]
             if (!tIt || !tIt.selectable || dead[tIt.uid]) continue
-            if (!root.isVisible(tIt)) continue
+            if (!root.isListed(tIt)) continue
             alive = true
             break
           }
@@ -1418,17 +1419,22 @@ Singleton {
     root._deadLinks = dead
   }
 
-  function isVisible(item) {
+  // Whether a row is listed at all. Bash when/requires guards, dead links and
+  // provider vetoes remove a row outright; a store-gated (showIf) row stays
+  // listed even while its condition fails - it is drawn muted and the cursor
+  // steps over it (see isUnavailable), so a page keeps its shape and turning
+  // a parent option off leaves its dependents visible where they are.
+  function isListed(item) {
     if (!item) return true
     const v = root.guardWhen[item.uid]
     if (v === false) return false
     // Fail-closed while a `when`/`requires` verdict is still pending: the
     // batch runs async after the summon, so fail-open painted the row for a
     // frame and then removed it (Utilities "Copy current track" appearing
-    // with no icon, then vanishing, yanking focus). A pending guard hides;
-    // a verdict of true shows. Boot-time prewarm (see _maybePrewarm) fills
-    // the verdicts before the first summon, so the pending state is only
-    // the cold-boot edge, not every open.
+    // with no icon, then vanishing, yanking focus). A pending guard is not
+    // listed; a verdict of true lists. Boot-time prewarm (see _maybePrewarm)
+    // fills the verdicts before the first summon, so the pending state is
+    // only the cold-boot edge, not every open.
     if (v === undefined) {
       const w = item.when
       if (w !== undefined && w !== null && String(w).trim() !== "") return false
@@ -1436,20 +1442,37 @@ Singleton {
       if (rq !== undefined && rq !== null) return false
     }
     if (item.type === "submenu" && root._deadLinks[item.uid]) return false
-    // Store-driven conditions (showIf), each leg against its owning store.
-    if (item.showIf !== undefined && item.showIf !== null) {
-      if (!root.conditionsMet(item.showIf)) return false
-    }
     // Provider visibility predicate: clearUsageHistory hides when history
     // is empty (frequency sort's companion row). Providers may veto
     // visibility of any row they own; everything else stays visible.
-    if (item && item.id) {
+    if (item.id) {
       const p = root._providerFor(item.id)
       if (p && typeof p.visible === "function") {
         if (p.visible(item, root._hookCtx(item)) === false) return false
       }
     }
     return true
+  }
+
+  // Full visibility: listed AND its store-driven condition holds. Search, the
+  // search index and every path that offers a row to act on read this; the
+  // page view reads isListed and mutes whatever isUnavailable.
+  function isVisible(item) {
+    if (!item) return true
+    if (!root.isListed(item)) return false
+    // Store-driven conditions (showIf), each leg against its owning store.
+    if (item.showIf !== undefined && item.showIf !== null) {
+      if (!root.conditionsMet(item.showIf)) return false
+    }
+    return true
+  }
+
+  // A listed row whose showIf condition currently fails: it renders under a
+  // card-toned box that mutes it, the cursor steps over it, and nothing
+  // activates it.
+  function isUnavailable(item) {
+    if (!item || item.showIf === undefined || item.showIf === null) return false
+    return !root.conditionsMet(item.showIf)
   }
 
   // EmojiPicker prewarm hook – delegates to the active panel when present.
@@ -1754,18 +1777,18 @@ Singleton {
   // Jump anywhere in the bundle: fresh stack rooted at the target page
   // with the target row preselected, bypassing any remembered position.
   // Used by search activation. `row` indexes the RAW items array; the
-  // selection lands on the row's VISIBLE position since hidden rows
-  // guards, showIf) never make it into the list model.
+  // selection lands on the row's LISTED position since guard-hidden rows
+  // never make it into the list model, while store-gated rows stay listed.
   function visibleIndexOf(page, rawRow) {
     let n = 0
     const items = page ? page.items : []
     for (let i = 0; i < rawRow && i < items.length; i++) {
-      if (root.isVisible(items[i])) n++
+      if (root.isListed(items[i])) n++
     }
     return n
   }
 
-  // Where a uid sits in the LIVE page, counting visible rows only. -1
+  // Where a uid sits in the LIVE page, counting listed rows only. -1
   // when the page is unknown or the row is not on it.
   function visibleIndexOfUid(pageId, uid) {
     if (uid === undefined || uid === null || uid === "") return -1
@@ -1774,7 +1797,7 @@ Singleton {
     let n = 0
     for (let i = 0; i < page.items.length; i++) {
       const it = page.items[i]
-      if (!root.isVisible(it)) continue
+      if (!root.isListed(it)) continue
       if (it.uid === uid) return n
       n++
     }
@@ -1788,10 +1811,11 @@ Singleton {
     delete vs[pageId]
     root.viewState = vs
     root.resetSearch()
-    // The frame seats the VISIBLE position, not the raw page index: hidden
-    // rows (guards, showIf) never reach the list model, so a raw slot is a
-    // seat no row owns. The same number drives the landing (pendingSel) and
-    // the fallback the frame keeps for a revisit without remembered state.
+    // The frame seats the LISTED position, not the raw page index: guard-
+    // hidden rows never reach the list model, so a raw slot is a seat no row
+    // owns (store-gated rows stay listed and keep their slot). The same number
+    // drives the landing (pendingSel) and the fallback the frame keeps for a
+    // revisit without remembered state.
     const at = visibleIndexOf(root.pageById(pageId), row)
     root.pendingSel = at
     root.beginRestore(pageId)
@@ -1815,10 +1839,11 @@ Singleton {
 
   function setScopedQuery(q) {
     const text = String(q ?? "")
-    // Scope is what's actually on screen: the current page's VISIBLE
-    // items, matched through the lib across label/sub/desc/options.
+    // Scope is what's actually on screen: the current page's LISTED items,
+    // matched through the lib across label/sub/desc/options. Muted rows stay
+    // in scope so the filter trims the page the user is looking at.
     const pg = root.pageById(root.frame ? root.frame.id : "")
-    const visible = pg ? pg.items.filter(root.isVisible) : []
+    const visible = pg ? pg.items.filter(root.isListed) : []
     // Small scopes install instantly like before; only giant ones ride
     // the debounce (see scopedTimer). Empty queries always apply at once.
     if (text === "" || visible.length <= Ui.listFullRows) {
@@ -1836,7 +1861,7 @@ Singleton {
     let visible = pre
     if (!Array.isArray(visible)) {
       const pg = root.pageById(root.frame ? root.frame.id : "")
-      visible = pg ? pg.items.filter(root.isVisible) : []
+      visible = pg ? pg.items.filter(root.isListed) : []
     }
     root.scopedRows = MenuLib.scopedFilter(visible, q)
   }
@@ -2191,8 +2216,13 @@ Singleton {
       const rows = []
       for (let i = 0; i < pg.items.length; i++) {
         const it = pg.items[i]
-        if (!root.isVisible(it)) continue
-        rows.push({ id: it.id ?? "", kind: it.type ?? "", label: it.label ?? "" })
+        if (!root.isListed(it)) continue
+        rows.push({
+          id: it.id ?? "",
+          kind: it.type ?? "",
+          label: it.label ?? "",
+          available: !root.isUnavailable(it)
+        })
       }
       return JSON.stringify(rows)
     }
@@ -2212,6 +2242,8 @@ Singleton {
             type: it.type,
             label: it.label,
             visible: root.isVisible(it),
+            listed: root.isListed(it),
+            available: !root.isUnavailable(it),
             disabled: root.isDisabled(it),
             checked: root.isChecked(it)
           })
@@ -2236,13 +2268,14 @@ Singleton {
       const rows = []
       for (let i = 0; i < pg.items.length; i++) {
         const it = pg.items[i]
-        if (!root.isVisible(it)) continue
+        if (!root.isListed(it)) continue
         const cf = root.confirmFor(it)
         rows.push({
           id: it.id ?? "",
           kind: it.type ?? "",
           label: it.label ?? "",
           checked: root.isToggleOn(it) || root.isChecked(it),
+          available: !root.isUnavailable(it),
           hint: cf ? cf.hint : ""
         })
       }

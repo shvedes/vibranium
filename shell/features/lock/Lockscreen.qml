@@ -327,7 +327,6 @@ Singleton {
         vignette: Settings.lockscreenVignette,
         blurBackground: Settings.blurBackground,
         dim: Settings.lockscreenDim,
-        dimBlurred: Settings.lockscreenDimBlurred,
         nowPlaying: Settings.lockscreenNowPlaying,
         blurPower: Settings.lockscreenBlurPower,
         pauseMusic: Settings.lockscreenPauseMusic

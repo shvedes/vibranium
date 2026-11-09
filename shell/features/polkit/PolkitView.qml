@@ -39,8 +39,7 @@ Variants {
     required property ShellScreen modelData
     readonly property bool primary: modelData === Ui.primaryScreen
     // The dim over the desktop. The lockscreen's own dim, in the same
-    // units: the prompt paints a flat scrim, which is the case the
-    // lockscreen's unblurred dim is for.
+    // units: the prompt paints a flat scrim over the desktop.
     readonly property real dim: Settings.lockscreenDim / 100
     // Vignette darkness at the corners: the lockscreen's medium level,
     // fixed rather than configurable.
