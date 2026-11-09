@@ -91,8 +91,15 @@ function rdnsMatch(appId, key) {
 // boundary visible at all). A flattened key has no boundaries left, so
 // asking it to match a prefix would only ever fail.
 function phaseFor(appId, rawKey, flatKey) {
+  return phaseForFlat(appId, flatten(appId), rawKey, flatKey)
+}
+
+// phaseFor with the row's flattened form already in hand. The match scan runs
+// three phases times every key over the same rows, and both the lowercasing
+// and the flatten were being redone on every one of those passes.
+function phaseForFlat(appId, flatId, rawKey, flatKey) {
   if (appId === "" || rawKey === "") return -1
-  if (appId === rawKey || flatten(appId) === flatKey) return 0
+  if (appId === rawKey || flatId === flatKey) return 0
   if (sepPrefix(appId, rawKey)) return 1
   if (rdnsMatch(appId, rawKey) || rdnsMatch(appId, flatKey)) return 2
   return -1
@@ -143,6 +150,8 @@ function candidateKeys(sender) {
 function matchIndex(sender, rows) {
   if (!rows || rows.length === 0) return -1
   const keys = candidateKeys(sender)
+  const appIds = []
+  const flats = []
   for (let phase = 0; phase < 3; phase++) {
     for (const key of keys) {
       for (let i = 0; i < rows.length; i++) {
@@ -150,8 +159,15 @@ function matchIndex(sender, rows) {
         if (!row) continue
         const recency = Number(row.recency ?? NO_RECENT)
         if (!Number.isFinite(recency) || recency < NO_RECENT) continue
-        const appId = String(row.appId ?? "").toLowerCase()
-        if (phaseFor(appId, key.raw, key.flat) === phase) return i
+        let appId = appIds[i]
+        let flatId = flats[i]
+        if (appId === undefined) {
+          appId = String(row.appId ?? "").toLowerCase()
+          flatId = flatten(appId)
+          appIds[i] = appId
+          flats[i] = flatId
+        }
+        if (phaseForFlat(appId, flatId, key.raw, key.flat) === phase) return i
       }
     }
   }
