@@ -596,7 +596,10 @@ if [[ $INT_MODE == true ]]; then
 
   # The title spool uses a script-specific runtime path, so concurrent
   # interactive installs can overwrite or remove each other's title data.
-  _fetch_page_title "$APP_URL" > "$VIBRANIUM_RUNTIME/$SELF.tmp" &
+  (
+    _fetch_page_title PAGE_TITLE "$APP_URL"
+    printf '%s\n' "$PAGE_TITLE"
+  ) > "$VIBRANIUM_RUNTIME/$SELF.tmp" &
   if term::spinner $! "${Y}[*]${RS} Fetching page title"; then
     PAGE_TITLE=""
     IFS= read -r PAGE_TITLE < "$VIBRANIUM_RUNTIME/$SELF.tmp" || [[ -n $PAGE_TITLE ]]
