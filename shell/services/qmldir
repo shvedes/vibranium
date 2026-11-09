@@ -6,7 +6,6 @@ singleton Timer 1.0 media/Timer.qml
 singleton Recording 1.0 media/Recording.qml
 singleton MediaState 1.0 media/MediaState.qml
 singleton MediaArt 1.0 media/MediaArt.qml
-singleton MediaEvents 1.0 media/MediaEvents.qml
 singleton Screenshots 1.0 screenshots/Screenshots.qml
 singleton Session 1.0 session/Session.qml
 singleton IdleDaemon 1.0 session/IdleDaemon.qml

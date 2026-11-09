@@ -1718,74 +1718,6 @@ group('clampRatio is the seek thumb, guarded on a positive width', () => {
   approx('a fractional thumb', CN.clampRatio(1, 3), 1 / 3, 1e-9)
   approx('a tiny thumb', CN.clampRatio(0.001, 100), 0.00001, 1e-12)
 })
-group('freshSkipPosition is the settle budget for a switch flash', () => {
-  eq('a fresh track', CN.freshSkipPosition(0), 0)
-  eq('a fraction of a second in', CN.freshSkipPosition(1), 1)
-  eq('exactly the budget', CN.freshSkipPosition(2), 2)
-  // "Players report Position after Metadata, so an immediate read can still
-  // carry the old track's position; anything above the settle budget reads as
-  // stale and snaps to 0."
-  eq('a hair over the budget snaps to 0', CN.freshSkipPosition(2.0001), 0)
-  eq('a stale position snaps to 0', CN.freshSkipPosition(3), 0)
-  eq('a long position snaps to 0', CN.freshSkipPosition(300), 0)
-  eq('a fraction inside the budget is kept as-is', CN.freshSkipPosition(1.5), 1.5)
-  eq('a string is coerced', CN.freshSkipPosition('1.5'), 1.5)
-  eq('a negative snaps to 0', CN.freshSkipPosition(-1), 0)
-  eq('NaN snaps to 0', CN.freshSkipPosition(NaN), 0)
-  eq('null snaps to 0', CN.freshSkipPosition(null), 0)
-  eq('undefined snaps to 0', CN.freshSkipPosition(undefined), 0)
-  eq('a non-numeric string snaps to 0', CN.freshSkipPosition('abc'), 0)
-  eq('Infinity snaps to 0', CN.freshSkipPosition(Infinity), 0)
-  eq('-Infinity snaps to 0', CN.freshSkipPosition(-Infinity), 0)
-  eq('true is one second', CN.freshSkipPosition(true), 1)
-})
-group('endedNaturally reads the four-second end tolerance', () => {
-  eq('a null sample', CN.endedNaturally(null), false)
-  eq('an undefined sample', CN.endedNaturally(undefined), false)
-  eq('an empty sample is a stream, so it ended on its own', CN.endedNaturally({}), true)
-  eq('a zero length is a stream', CN.endedNaturally({ pos: 10, len: 0 }), true)
-  eq('a negative length is a stream', CN.endedNaturally({ pos: 10, len: -1 }), true)
-  eq('a missing length is a stream', CN.endedNaturally({ pos: 10 }), true)
-  eq('a NaN length is a stream', CN.endedNaturally({ pos: 10, len: NaN }), true)
-  eq('four seconds from the end is natural', CN.endedNaturally({ pos: 96, len: 100 }), true)
-  eq('exactly four seconds short of it is not', CN.endedNaturally({ pos: 95.9, len: 100 }), false)
-  eq('at the end', CN.endedNaturally({ pos: 100, len: 100 }), true)
-  eq('past the end', CN.endedNaturally({ pos: 130, len: 100 }), true)
-  eq('half way is not', CN.endedNaturally({ pos: 50, len: 100 }), false)
-  // A track shorter than the tolerance is always "natural", so a skip inside
-  // a four-second intro reads as an auto-advance. That is the deliberate
-  // "false silence" the header trades for not flashing on every short clip.
-  eq('a three-second track at zero is natural', CN.endedNaturally({ pos: 0, len: 3 }), true)
-  eq('a four-second track at zero is natural', CN.endedNaturally({ pos: 0, len: 4 }), true)
-  eq('a five-second track at zero is not', CN.endedNaturally({ pos: 0, len: 5 }), false)
-  eq('a five-second track at four is natural', CN.endedNaturally({ pos: 4, len: 5 }), true)
-  // Anything short enough that `len - 4` is at or below 0 is *always*
-  // natural, so a one-second skip in a five-second track reads as an
-  // auto-advance. That is the deliberate "false silence" of the header.
-  eq('a one-second skip in a five-second track is still natural', CN.endedNaturally({ pos: 1, len: 5 }), true)
-  eq('a six-second track needs two seconds of slack', CN.endedNaturally({ pos: 1, len: 6 }), false)
-})
-group('shouldPopOsd is the pop policy for a track change', () => {
-  const natural = { pos: 99, len: 100 }
-  const skip = { pos: 50, len: 100 }
-  const stream = { pos: 0, len: 0 }
-  eq('a fresh stamp always pops, whatever the sample says', CN.shouldPopOsd(true, natural, true), true)
-  eq('a stamp with no previous sample pops', CN.shouldPopOsd(true, null, true), true)
-  eq('a stamp on a track that was never seen pops', CN.shouldPopOsd(true, null, false), true)
-  eq('no track seen and no stamp is silent', CN.shouldPopOsd(false, null, false), false)
-  eq('an auto-advance is silent', CN.shouldPopOsd(false, natural, true), false)
-  eq('a real skip pops', CN.shouldPopOsd(false, skip, true), true)
-  eq('a stream with no length is silent', CN.shouldPopOsd(false, stream, true), false)
-  // "prev === null on an established track means it lived under one sample
-  // window - a skip - and pops".
-  eq('an established track with no sample pops', CN.shouldPopOsd(false, null, true), true)
-  eq('an undefined sample also pops, not silently', CN.shouldPopOsd(false, undefined, true), true)
-  eq('an established track past the tolerance pops', CN.shouldPopOsd(false, { pos: 20, len: 100 }, true), true)
-  eq('a falsy hadTrack short-circuits before the sample', CN.shouldPopOsd(false, skip, 0), false)
-  eq('an undefined hadTrack too', CN.shouldPopOsd(false, skip, undefined), false)
-  eq('a truthy non-boolean stamp is a stamp', CN.shouldPopOsd(1, natural, true), true)
-  eq('an empty-string stamp is not a stamp', CN.shouldPopOsd('', natural, true), false)
-})
 
 section('common/NowPlaying.js - the time-gated transport stamp')
 group('an unstamped library reports no manual intent at all', () => {
@@ -1850,68 +1782,6 @@ group('manualDir maps the kind to a direction, and expires with the stamp', () =
   eq('even though the kind is still remembered', np.noteManual('next') === undefined, true)
   eq('re-stamping restores it', np.manualDir(), 1)
 })
-group('noteSample appends and keeps the newest four', () => {
-  const np = clocked(path.join(SHELL, 'common', 'NowPlaying.js'))
-  const ring = []
-  np.noteSample(ring, 't1', 10, 100)
-  np.noteSample(ring, 't1', 20, 100)
-  np.noteSample(ring, 't2', 0, 50)
-  np.noteSample(ring, 't1', 30, 100)
-  eq('four samples is the cap', ring.length, 4)
-  eq('the ring holds the last four in order', ring.map((s) => s.id), ['t1', 't1', 't2', 't1'])
-  np.noteSample(ring, 't3', 5, 60)
-  eq('the fifth drops the oldest', ring.map((s) => s.id), ['t1', 't2', 't1', 't3'])
-  eq('the dropped sample was the first one', ring[0].pos, 20)
-  eq('the sample shape', Object.keys(ring[0]), ['id', 'pos', 'len'])
-})
-group('noteSample coerces its three fields', () => {
-  const np = clocked(path.join(SHELL, 'common', 'NowPlaying.js'))
-  const ring = []
-  np.noteSample(ring, 'a', '12', '34')
-  eq('a string position is coerced', ring[0], { id: 'a', pos: 12, len: 34 })
-  const r2 = []
-  np.noteSample(r2, null, undefined, null)
-  eq('nullish fields fold to 0 or ""', r2[0], { id: '', pos: 0, len: 0 })
-  const r3 = []
-  np.noteSample(r3, 7, NaN, 'x')
-  eq('a numeric id is stringified, NaN folds to 0', r3[0], { id: '7', pos: 0, len: 0 })
-  const r4 = []
-  np.noteSample(r4, 'x', -5, -1)
-  eq('a negative position is kept, not clamped', r4[0], { id: 'x', pos: -5, len: -1 })
-  const r5 = []
-  np.noteSample(r5, 'x', Infinity, 0)
-  eq('an infinite position is kept', r5[0].pos, Infinity)
-})
-group('noteSample mutates the caller ring and returns nothing useful', () => {
-  const np = clocked(path.join(SHELL, 'common', 'NowPlaying.js'))
-  const ring = []
-  eq('the return value is undefined', np.noteSample(ring, 'a', 1, 2), undefined)
-  eq('the ring grew in place', ring.length, 1)
-  is('so the caller\'s own array is the buffer', ring[0], (v) => v === ring[0] && v.id === 'a', 'the sample landed in the caller array')
-})
-group('lastSampleFor finds the newest sample for an id', () => {
-  const np = clocked(path.join(SHELL, 'common', 'NowPlaying.js'))
-  const ring = [{ id: 't1', pos: 10, len: 100 }, { id: 't2', pos: 0, len: 50 }, { id: 't1', pos: 30, len: 100 }]
-  eq('the newest of the matching samples', np.lastSampleFor(ring, 't1'), { id: 't1', pos: 30, len: 100 })
-  eq('a single match', np.lastSampleFor(ring, 't2'), { id: 't2', pos: 0, len: 50 })
-  eq('an unknown id is null', np.lastSampleFor(ring, 'zz'), null)
-  eq('an empty ring is null', np.lastSampleFor([], 't1'), null)
-  is('the returned object is the caller\'s own', np.lastSampleFor(ring, 't1') === ring[2], (v) => v === true, 'the ring entry itself')
-  eq('a hole in the ring is skipped', np.lastSampleFor([null, { id: 'a', pos: 1, len: 2 }], 'a'), { id: 'a', pos: 1, len: 2 })
-  eq('a hole and no match', np.lastSampleFor([null, { id: 'a' }], 'b'), null)
-  eq('a numeric id is stringified for the compare', np.lastSampleFor([{ id: '7' }], 7), { id: '7' })
-  eq('and undefined does not match an empty id', np.lastSampleFor([{ id: '' }], undefined), null)
-  eq('the ring is never mutated', (() => { const before = JSON.stringify(ring); np.lastSampleFor(ring, 't1'); return JSON.stringify(ring) === before })(), true)
-})
-group('lastSampleFor is the one ring reader that is not nullish-guarded', () => {
-  // `ring.length` with no `ring || []`, unlike every other ring reader in
-  // these two files. Asserted as the real behaviour - see the report.
-  const np = clocked(path.join(SHELL, 'common', 'NowPlaying.js'))
-  throws('a null ring throws', () => np.lastSampleFor(null, 'x'), /length/)
-  throws('an undefined ring throws', () => np.lastSampleFor(undefined, 'x'), /length/)
-  noThrow('an empty ring is fine', () => np.lastSampleFor([], 'x'))
-  noThrow('a hole inside the ring is fine', () => np.lastSampleFor([null, { id: 'a' }], 'a'))
-})
 
 section('common/NowPlaying.js - the media surface every consumer shares')
 group('the whole published surface is here, and it is the only copy', () => {
@@ -1920,7 +1790,7 @@ group('the whole published surface is here, and it is the only copy', () => {
   // a second implementation. With one library that distinction is gone, so
   // the assertion is the full surface: every documented helper publishes, and
   // the set is exactly these - which still catches a helper being dropped.
-  const shared = ['sortPlayers', 'isBrowserPlayer', 'filterBrowsers', 'fmtTime', 'clampRatio', 'noteManual', 'manualFresh', 'manualDir', 'noteSample', 'lastSampleFor', 'endedNaturally', 'shouldPopOsd', 'freshSkipPosition']
+  const shared = ['sortPlayers', 'isBrowserPlayer', 'filterBrowsers', 'fmtTime', 'clampRatio', 'noteManual', 'manualFresh', 'manualDir']
   const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex']
   for (const k of shared) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   for (const k of unique) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')

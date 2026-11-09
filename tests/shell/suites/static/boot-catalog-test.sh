@@ -15,7 +15,7 @@
 #
 # The rules under test, quoted:
 #
-#   shell/boot/README.md:12   "52 descriptors, 14 `essential` and 38 optional."
+#   shell/boot/README.md:12   "51 descriptors, 14 `essential` and 37 optional."
 #   shell/boot/README.md:30   "`id` | unique; the dependency graph is keyed on it"
 #   shell/boot/README.md:31   "`criticality` | `essential` or `optional`"
 #   shell/boot/README.md:32   "`activation` | `eager`, `resident`,
@@ -56,11 +56,11 @@ LEGAL_ACT_RE='^(eager|resident|settings|first_use|gated_compat|facade)$'
 
 # The numbers both READMEs publish. A count that has drifted is reported, not
 # asserted stale: `expect_count` notes the difference and pins the real value.
-DOC_TOTAL=52
+DOC_TOTAL=51
 DOC_ESSENTIAL=14
-DOC_OPTIONAL=38
+DOC_OPTIONAL=37
 DOC_EAGER=12
-DOC_RESIDENT=33
+DOC_RESIDENT=32
 DOC_GATED=2
 DOC_FACADE=4
 DOC_FIRST_USE=1
@@ -497,8 +497,8 @@ t_match "maxBackoffMs must be positive and finite" \
   'isFinite\(value\) && value > 0' \
   "$(grep -m1 -A1 '_positiveFinite(value) {' "$GATE_QML" | tail -1)"
 
-t_section "the catalog is data: 52 plain descriptor literals"
-expect_count "the catalog holds 52 descriptors" "$DOC_TOTAL" "$U_N"
+t_section "the catalog is data: $DOC_TOTAL plain descriptor literals"
+expect_count "the catalog holds $DOC_TOTAL descriptors" "$DOC_TOTAL" "$U_N"
 t_count "one record per descriptor came back" "$U_N" "$(wc -l <"$BC_RECORDS" | tr -d ' ')"
 t_eq "Boot.qml still declares _catalog as a var array" \
   'readonly property var _catalog:' \
@@ -517,7 +517,7 @@ t_eq "the phases partition the catalog" "$U_N" \
 t_eq "the floor is exactly the eager 12" "12" "$(count_field PHASE floor)"
 t_eq "the visual pair is wallpaper and bar" "wallpaper,bar" "$(units_with PHASE visual)"
 t_eq "the early tier is every facade plus the daemons behind them" \
-  "idleDaemon,inhibitor,session,lockscreen,clipboard,privacy,notifications,mediaEvents,audio,keyboard,app,appLauncher,polkit,keybindings,pass,audioMixer,imageViewer,powerProfile,powerPolicy,batteryAlert,connectivity,screenshots" \
+  "idleDaemon,inhibitor,session,lockscreen,clipboard,privacy,notifications,audio,keyboard,app,appLauncher,polkit,keybindings,pass,audioMixer,imageViewer,powerProfile,powerPolicy,batteryAlert,connectivity,screenshots" \
   "$(units_with PHASE early)"
 t_eq "the deferred tier is the page-building, scanning units" \
   "menu,mediaArt,emojiPicker,themePicker,themeRemover,cursorPicker,wallpaperPicker,fontPicker,powerMenu" \
@@ -528,7 +528,7 @@ t_contains "the entrance queue is derived from the descriptor phase" \
   'descriptor.phase === "entrance"' \
   "$(awk '/^  function _beginDrain\(\) \{$/,/^  \}$/' "$BOOT_QML")"
 
-t_section "the criticality split: 14 essential, 38 optional"
+t_section "the criticality split: $DOC_ESSENTIAL essential, $DOC_OPTIONAL optional"
 expect_count "essential units" "$DOC_ESSENTIAL" "$(count_field CRIT essential)"
 expect_count "optional units" "$DOC_OPTIONAL" "$(count_field CRIT optional)"
 t_eq "the two criticalities account for every unit" "$U_N" \

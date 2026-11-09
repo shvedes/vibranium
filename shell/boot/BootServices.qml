@@ -36,15 +36,14 @@ Item {
 
   function resolve(id) {
     switch (id) {
-      // Timer, MediaEvents, ArchUpdates and Connectivity are prefixed
-      // because qs.services shares those names with the bar's own modules and
-      // with QtQuick's Timer; the qualified name is the one that cannot
-      // resolve to the wrong type.
+      // Timer, ArchUpdates and Connectivity are prefixed because qs.services
+      // shares those names with the bar's own modules and with QtQuick's
+      // Timer; the qualified name is the one that cannot resolve to the wrong
+      // type.
       case "idleDaemon":    void IdleDaemon.tag; break
       case "inhibitor":     void Inhibitor.tag; break
       case "session":       void Session.tag; break
       case "privacy":       void Privacy.tag; break
-      case "mediaEvents":   void Services.MediaEvents.tag; break
       case "audio":         void Audio.tag; break
       case "mediaArt":      void MediaArt.tag; break
       case "keyboard":      void Keyboard.tag; break

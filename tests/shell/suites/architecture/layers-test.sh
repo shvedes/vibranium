@@ -238,7 +238,7 @@ for layer in boot common features services; do
 done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
 t_count "features/ holds the 150 files the README publishes" "150" "$(layer_files features)"
-t_count "services/ holds the 26 files the README publishes" "26" "$(layer_files services)"
+t_count "services/ holds the 25 files the README publishes" "25" "$(layer_files services)"
 t_count "common/ holds the 128 files the README publishes" "128" "$(layer_files common)"
 t_count "boot/ holds the 2 files the README publishes" "2" "$(layer_files boot)"
 t_count "the composition root is the single file the README publishes" "1" "$(layer_files composition)"
@@ -286,8 +286,6 @@ t_true "common/ does read sibling common code, so the rule above is not vacuous"
 t_section "services/ never imports features/: the handoff count is zero"
 # "services/ -> features/ is forbidden, because a service that calls into a
 # feature has inverted the lifetime."
-# "services/media/MediaEvents.qml -> qs.features.osd was the last such edge and
-# the code no longer has it - the suite reports handoffs=0."
 HANDOFFS="$(awk -F'\t' '$9 == "services" && $7 == "features"' "$WORK/resolved.tsv" | wc -l | tr -d ' ')"
 t_note "handoffs=$HANDOFFS (services/ -> features/, every edge kind)"
 t_eq "handoffs: no resolved services/ -> features/ edge" "0" "$HANDOFFS"
@@ -297,8 +295,6 @@ rule "no services/ file reads a member of a features module" \
   '$9 == "services" && $3 == "member" && $7 == "features"'
 rule "no services/ file reaches into features/ by relative path" \
   '$9 == "services" && ($3 == "reljs" || $3 == "relqml") && $7 == "features"'
-rule "MediaEvents.qml reaches no features layer, the edge the README calls the last one" \
-  '$1 == "shell/services/media/MediaEvents.qml" && $7 == "features"'
 # The mirror direction is real and legal, so the resolver is proved able to see
 # the edge it is being forbidden from seeing in the other direction.
 t_note "features/ -> services/ is real and legal: $(awk -F'\t' '$9 == "features" && $7 == "services" { print $1 }' "$WORK/resolved.tsv" | LC_ALL=C sort -u | wc -l | tr -d ' ') files do it"

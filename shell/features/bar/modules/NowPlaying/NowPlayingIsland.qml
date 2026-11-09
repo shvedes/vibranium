@@ -263,8 +263,8 @@ Item {
   // the write the shell made, so both MPRIS flags stay true. MediaState owns
   // the round trip that settles it; see its volume section.
   readonly property bool canSetVolume: Core.MediaState.volumeCapable(root.player)
-  // The player's own length, through the shared accessor MediaState and
-  // MediaEvents read. Reading `player.length` raw is what made a live
+  // The player's own length, through the shared accessor MediaState
+  // reads. Reading `player.length` raw is what made a live
   // stream look like a finished track: Quickshell reports `length` as the
   // current position when the player publishes no `mpris:length`, so the
   // ratio came out as 1 and the bar sat permanently full.
@@ -495,16 +495,11 @@ Item {
   function fmtTime(s) { return NP.fmtTime(s) }
 
   // Discrete MPRIS position, polled like the lockscreen: the notify
-  // re-evaluates shownPosition, the strip width follows.
-  //
-  // Skipped while the card is on the active player: MediaEvents ticks that
-  // one permanently, and this card is already re-evaluated by it. The card
-  // can be parked on a second client with the arrows, and nothing else ticks
-  // that one.
+  // re-evaluates shownPosition, the strip width follows. The card polls
+  // whichever client it shows, including the active one.
   Timer {
     interval: 1000
-    running: root.playing && !root._seeking
-      && root.player !== null && root.player !== Core.MediaState.activePlayer
+    running: root.playing && !root._seeking && root.player !== null
     repeat: true
     onTriggered: {
       if (root.player) root.player.positionChanged()

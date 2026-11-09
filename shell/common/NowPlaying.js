@@ -75,8 +75,8 @@ function pickPlayerIndex(previous, next, currentIndex, isPlaying) {
 // Covered: the Chromium family (chrome, chromium, edge, brave, opera,
 // vivaldi), the Gecko family (firefox, zen, waterfox), the WebKit ones
 // with a Linux build (epiphany, falkon), and Telegram Desktop, whose
-// voice messages would otherwise pop the OSD. No Safari: it ships no
-// Linux build, so a token for it could only ever collide.
+// voice messages would otherwise surface as a media track. No Safari: it
+// ships no Linux build, so a token for it could only ever collide.
 // Pure: takes plain strings so QML callers pass p.dbusName/p.identity.
 var BROWSER_TOKENS = ["chromium", "chrome", "firefox", "edge", "msedge",
   "brave", "opera", "vivaldi", "zen", "waterfox", "epiphany", "falkon",
@@ -315,53 +315,6 @@ function manualDir() {
   if (_manualKind === "previous") return -1
   if (_manualKind === "next") return 1
   return 0
-}
-
-// Newest-first ring is kept by the caller (max 4 at 1s poll).
-function noteSample(ring, id, pos, len) {
-  ring.push({ id: String(id || ""), pos: Number(pos) || 0, len: Number(len) || 0 })
-  while (ring.length > 4) ring.shift()
-}
-
-function lastSampleFor(ring, id) {
-  for (let i = ring.length - 1; i >= 0; i--) {
-    if (ring[i] && ring[i].id === String(id)) return ring[i]
-  }
-  return null
-}
-
-// True when the finished track played to (near) its end: the new
-// title arrived on its own. len <= 0 (streams, unknown length)
-// reads as automatic unless a shell stamp says otherwise.
-function endedNaturally(sample) {
-  if (!sample) return false
-  if (!(sample.len > 0)) return true
-  return sample.pos >= sample.len - 4
-}
-
-// Pop policy for a track change on the bar pill. `stamp` is a
-// fresh shell transport stamp (manualFresh), `prev` the old
-// track's newest sample or null, `hadTrack` whether the old
-// track id was seen at all. Auto-advance (sample near the end)
-// stays silent; everything else pops. prev === null on an
-// established track means it lived under one sample window -
-// a skip - and pops: the false pop on a sub-second auto track
-// costs one brief flash, the false silence hides real skips.
-function shouldPopOsd(stamp, prev, hadTrack) {
-  if (stamp) return true
-  if (!hadTrack) return false
-  if (prev === null) return true
-  return !endedNaturally(prev)
-}
-
-// Elapsed seconds for a switch flash. Players report Position
-// after Metadata, so an immediate read can still carry the old
-// track's position; anything above the settle budget reads as
-// stale and snaps to 0 so the flash starts at 00-01 seconds.
-function freshSkipPosition(pos) {
-  const p = Number(pos)
-  if (!isFinite(p) || p < 0) return 0
-  return p <= 2 ? p : 0
 }
 
 function playerKey(p) {

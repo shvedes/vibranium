@@ -4,11 +4,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell.Services.Mpris
 import qs.common
-// qs.services publishes a Timer singleton of its own, so it is taken under
-// an alias: an unaliased import would shadow the QtQuick Timer this file's
-// position tick below is a QtQuick.Timer. Same disambiguation MediaState.qml
-// uses for the same reason.
-import qs.services as Core
 import "../../common/NowPlaying.js" as NP
 
 // Now-playing pill riding the lockscreen's bottom edge. Flat-box language:
@@ -61,8 +56,8 @@ Item {
   property real anchorPosition: 0
   property real shownPosition: 0
 
-  // The player's own length, through the shared accessor the island,
-  // MediaState and MediaEvents all read. Reading `player.length` raw makes a
+  // The player's own length, through the shared accessor the island and
+  // MediaState read. Reading `player.length` raw makes a
   // live stream look like a finished track: Quickshell reports `length` as
   // the current position when the player publishes no `mpris:length`, so the
   // ratio came out as 1 and the strip sat permanently full.
@@ -115,18 +110,13 @@ Item {
   // Keep position fresh while playing - MPRIS only pushes on seeks,
   // so we poll via positionChanged() as recommended in the docs.
   //
-  // Only when this pill is showing a client that is *not* the active one.
-  // MediaEvents runs a permanent 1s tick over the active player, and every
-  // surface watching that player is already re-evaluated by it, so ticking
-  // it again here would fire the same signal twice a second for no gain.
-  // The pinned client can fall out of the head mid-lock (a newcomer starts
-  // playing), and then nobody else ticks it, so its own tick is the only
-  // thing keeping it moving.
+  // The pill polls whichever client it shows, including the active one:
+  // nothing else ticks that player, and the pinned client can fall out of
+  // the head mid-lock (a newcomer starts playing).
   Timer {
     id: poll
     interval: 1000
     running: root.playing && root.player !== null
-      && root.player !== Core.MediaState.activePlayer
     repeat: true
     onTriggered: {
       if (root.player) root.player.positionChanged()

@@ -268,13 +268,12 @@ enforces that `ordered` is exactly the movable set.
 
 *Reproduced by `suites/js/bar-models.test.mjs`.*
 
-### 11. `lastSampleFor` and `filterPackages` throw on a null collection
+### 11. `filterPackages` throws on a null collection
 
-Both read `.length` / `.name` on their argument with no guard, while their
-siblings in the same files tolerate a missing argument:
+It reads `.name` on its argument with no guard, while its siblings in the
+same files tolerate a missing argument:
 
 ```js
-lastSampleFor(null, "x")     // TypeError: Cannot read properties of null
 filterPackages([null], "x")   // TypeError: Cannot read properties of null (reading 'name')
 filterPackages(pkgs, undefined) // silently filters for the string "undefined"
 ```
@@ -396,9 +395,6 @@ rather than facts for a test to assert.
 - `shell/features/bar/modules/Volume/Model.js:105` — `Math.round(volume * 100)`
   with a bare `=== 0`, so a tiny negative volume rounds to `-0` and reports
   "Silenced" while `-0.5` reports "Quiet".
-- `common/NowPlaying.js:94-96` — `endedNaturally` is `pos >= len - 4`, so any
-  track of 4s or less is *always* natural. A one-second skip in a five-second
-  track reads as an auto-advance and stays silent.
 - `shell/common/settings/UnitIpc.js` was the one `.pragma library` in the tree
   no suite read; it is now covered by `suites/js/modules-wallpaper.test.mjs`.
 

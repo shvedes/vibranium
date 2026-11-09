@@ -501,7 +501,7 @@ CollapsibleSlot {
 
   // Scroll adjusts the active player's own volume (never the system
   // sink) and stays silent: the tooltip already carries the live
-  // volume line, so popping the OSD would only be noise. The island
+  // volume line, so an OSD for it would only be noise. The island
   // has no player-volume control and the sink path (Volume.qml via
   // the Audio service) keeps its own OSD.
   //

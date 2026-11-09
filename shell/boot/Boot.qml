@@ -279,16 +279,6 @@ Item {
       retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
     },
     {
-      id: "mediaEvents",
-      phase: "early",
-      criticality: "optional",
-      activation: "resident",
-      dependencies: ["settings", "state", "watch"],
-      resolver: function() { return boot._resolveDescriptor("mediaEvents") },
-      teardown: null,
-      retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }
-    },
-    {
       id: "menu",
       phase: "deferred",
       criticality: "optional",
@@ -313,7 +303,7 @@ Item {
       phase: "deferred",
       criticality: "optional",
       activation: "resident",
-      dependencies: ["settings", "state", "watch", "audio", "mediaEvents"],
+      dependencies: ["settings", "state", "watch", "audio"],
       resolver: function() { return boot._resolveDescriptor("mediaArt") },
       teardown: null,
       retry: { maxAttempts: 3, backoffMs: 200, maxBackoffMs: 800 }

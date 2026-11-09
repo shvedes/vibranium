@@ -190,7 +190,7 @@ BOOT_EXCLUDED="qs.boot${KEY_TAB}Boot"
 # from the installed quickshell-*.qmltypes and the root object of each entry's
 # file - so the pin is what stops a new C++ root from quietly widening the set.
 #
-# EXPECTED_NEEDS_ENVIRONMENT is 102 of the 234 declared types, and every one of them
+# EXPECTED_NEEDS_ENVIRONMENT is 101 of the 233 declared types, and every one of them
 # through the same door. Under QT_QPA_PLATFORM=offscreen Quickshell loads no
 # PanelWindow backend, so any type that reaches a window - directly as a
 # PanelWindow root, or through a singleton that builds one while it is being
@@ -309,7 +309,6 @@ qs.services.IdleDaemon
 qs.services.Inhibitor
 qs.services.Keyboard
 qs.services.MediaArt
-qs.services.MediaEvents
 qs.services.MediaState
 qs.services.PipeWireState
 qs.services.PowerPolicy
@@ -345,7 +344,7 @@ EXPECTED_SUPPLIED="supplied.qs.common.ScrollBar=flickable: null"
 # reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=234
+EXPECTED_DECLARED_COUNT=233
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -365,7 +364,7 @@ EXPECTED_DECLARED_COUNT=234
 # qs.common.Vignette is in the same class: a plain Item over a Shape and a
 # radial gradient, with no singleton and no window behind it.
 EXPECTED_CLEAN_COUNT=109
-EXPECTED_NEEDS_COUNT=102
+EXPECTED_NEEDS_COUNT=101
 EXPECTED_UNCREATABLE_COUNT=22
 
 # --------------------------------------------------------------------------
