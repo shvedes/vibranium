@@ -450,18 +450,17 @@ function attachedStreams(links, deviceKey) {
   const key = typeof deviceKey === "string" ? deviceKey : ""
   if (key === "" || !Array.isArray(links) || links.length === 0) return []
   const out = []
+  // One key lookup per link's far end, instead of rescanning every stream
+  // already collected: the duplicate check was quadratic in the attached
+  // stream count, and a graph tick can report every link on the bus.
+  const seen = ({})
   for (let i = 0; i < links.length; i++) {
     const peer = peerStreamNode(links[i], key)
     if (peer === null) continue
     const peerKey = nodeKey(peer)
-    let seen = false
-    for (let j = 0; j < out.length; j++) {
-      if (nodeKey(out[j]) === peerKey) {
-        seen = true
-        break
-      }
-    }
-    if (!seen) out.push(peer)
+    if (seen[peerKey] === true) continue
+    seen[peerKey] = true
+    out.push(peer)
   }
   return out
 }
