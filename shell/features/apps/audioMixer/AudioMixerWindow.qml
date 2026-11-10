@@ -651,14 +651,15 @@ QtObject {
     // opens leftwards rather than hanging outside - and leaves a margin rather
     // than sitting flush against the frame it was clamped to.
     x: pop.host === null ? 0
-      : Math.max(0, Math.min(pop.host.width - pop.edge - pop.width, pop.origin.x))
+      : Range.clamp(pop.origin.x, 0, Math.max(0, pop.host.width - pop.edge - pop.width))
     // The same token on the bottom edge, which is the one an unflipped list runs
     // into on a full window; the top is already clear by the gap plus the edge,
     // because the list hangs from a chip that is always below the tab bar.
     y: pop.host === null ? 0
-      : Math.max(0, Math.min(pop.host.height - pop.edge - pop.height, pop.openDown
+      : Range.clamp(pop.openDown
         ? pop.origin.y + pop.anchorH + pop.gap
-        : pop.origin.y - pop.gap - pop.height))
+        : pop.origin.y - pop.gap - pop.height,
+        0, Math.max(0, pop.host.height - pop.edge - pop.height))
 
     Flickable {
       id: list
@@ -1490,10 +1491,10 @@ QtObject {
         readonly property real anchorH: mixer.tipAnchor === null
           || mixer.tipAnchor === undefined ? 0 : mixer.tipAnchor.height
 
-        width: Math.min(tipLabel.implicitWidth + 2 * Ui.m,
-          Math.max(0, popLayer.width - 2 * Ui.m))
+        width: Range.clamp(tipLabel.implicitWidth + 2 * Ui.m,
+          0, Math.max(0, popLayer.width - 2 * Ui.m))
         height: tipLabel.implicitHeight + 2 * Ui.s
-        x: Math.max(Ui.m, Math.min(popLayer.width - Ui.m - width, origin.x))
+        x: Range.clamp(origin.x, Ui.m, Math.max(Ui.m, popLayer.width - Ui.m - width))
         // Under the control when there is room for it, over it when there is not:
         // the chip a window's last row sits on has nothing below it, and a bubble
         // clamped to the bottom edge reads as a second row of the list rather
@@ -1506,7 +1507,7 @@ QtObject {
           id: tipLabel
 
           anchors.centerIn: parent
-          width: Math.min(implicitWidth, Math.max(0, tipBox.width - 2 * Ui.m))
+          width: Range.clamp(implicitWidth, 0, Math.max(0, tipBox.width - 2 * Ui.m))
           level: 5
           text: mixer.tipText
           color: Ui.solid("foreground_0")
