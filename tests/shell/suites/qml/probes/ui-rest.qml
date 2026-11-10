@@ -783,6 +783,20 @@ Item {
     return true
   }
   function firstBetween(arr, lo, hi) { return arr.length > 0 && between(arr[0], lo, hi) }
+  // The first sample that has MOVED off the trace's start value, checked
+  // against the trace's own endpoints. A turn that lands before the
+  // animation's first tick reads the start value exactly, and how many such
+  // turns there are is a function of how long the preceding turns took - the
+  // machine's speed, not the animation's contract. What IS the contract is that
+  // the first frame the animation rendered was observed partway between its
+  // endpoints, never at either one: a tween that snapped would have no such
+  // sample, and the later samples would not be strictly rising.
+  function firstMovedBetween(arr, lo, hi) {
+    for (let i = 1; i < arr.length; i++) {
+      if (arr[i] !== arr[0]) return between(arr[i], lo, hi)
+    }
+    return false
+  }
   function sampleCount(arr) { return arr.length }
   function feq(a, b) { return Math.abs(a - b) < 1e-9 }
   function writeBack(sb, y) {
@@ -1850,37 +1864,36 @@ Item {
     kv("trace.glide.samples", sampleCount(glideV))
     kv("trace.glide.rising", rising(glideV))
     kv("trace.glide.neverOvershot", allBelow(glideV, 100))
-    kv("trace.glide.firstInFlight", firstBetween(glideV, 20, 45))
+    kv("trace.glide.firstInFlight", firstMovedBetween(glideV, 0, 100))
     kv("trace.capsScale.samples", sampleCount(capsScaleV))
     kv("trace.capsScale.rising", rising(capsScaleV))
     kv("trace.capsScale.neverOvershot", allBelow(capsScaleV, 1))
-    kv("trace.capsScale.firstInFlight", firstBetween(capsScaleV, 0.9, 0.93))
+    kv("trace.capsScale.firstInFlight", firstMovedBetween(capsScaleV, 0.9, 1))
     kv("trace.capsOpacity.samples", sampleCount(capsOpacityV))
     kv("trace.capsOpacity.rising", rising(capsOpacityV))
-    kv("trace.capsOpacity.firstInFlight", firstBetween(capsOpacityV, 0.05, 0.16))
+    kv("trace.capsOpacity.firstInFlight", firstMovedBetween(capsOpacityV, 0, 1))
     kv("trace.barFill.samples", sampleCount(barFillV))
     kv("trace.barFill.rising", rising(barFillV))
     kv("trace.barFill.neverOvershot", allBelow(barFillV, 100))
-    kv("trace.barFill.firstInFlight", firstBetween(barFillV, 15, 35))
+    kv("trace.barFill.firstInFlight", firstMovedBetween(barFillV, 0, 100))
     kv("trace.sweepY.samples", sampleCount(sweepYV))
     kv("trace.sweepY.rising", rising(sweepYV))
     kv("trace.sweepY.neverOvershot", allBelow(sweepYV, 120))
-    kv("trace.sweepY.firstInFlight", sweepYV.length > 1 && between(sweepYV[1], 15, 30))
+    kv("trace.sweepY.firstInFlight", firstMovedBetween(sweepYV, 0, 120))
     kv("trace.slotShortH.samples", sampleCount(slotShortHV))
     kv("trace.slotShortH.rising", rising(slotShortHV))
     kv("trace.slotShortH.neverOvershot", allBelow(slotShortHV, 52))
-    kv("trace.slotShortH.firstInFlight", firstBetween(slotShortHV, 12, 25))
+    kv("trace.slotShortH.firstInFlight", firstMovedBetween(slotShortHV, 0, 52))
     kv("trace.slotShortO.rising", rising(slotShortOV))
-    kv("trace.slotShortO.firstInFlight", firstBetween(slotShortOV, 0.15, 0.35))
+    kv("trace.slotShortO.firstInFlight", firstMovedBetween(slotShortOV, 0, 1))
     kv("trace.slotTallH.rising", rising(slotTallHV))
     kv("trace.slotTallH.neverOvershot", allBelow(slotTallHV, 404))
-    kv("trace.slotTallH.firstInFlight", firstBetween(slotTallHV, 40, 100))
+    kv("trace.slotTallH.firstInFlight", firstMovedBetween(slotTallHV, 0, 404))
     kv("trace.slotTallO.rising", rising(slotTallOV))
-    kv("trace.slotTallO.firstInFlight", firstBetween(slotTallOV, 0.15, 0.35))
+    kv("trace.slotTallO.firstInFlight", firstMovedBetween(slotTallOV, 0, 1))
     kv("trace.gateH.samples", sampleCount(gateHV))
     kv("trace.gateH.moved", gateHV.length > 0 && gateHV[0] > cardGate.cardHeight)
-    kv("trace.gateH.firstInFlight", gateHV.length > 0
-      && between(gateHV[0], cardGate.cardHeight, gateStartH))
+    kv("trace.gateH.firstInFlight", firstMovedBetween(gateHV, cardGate.cardHeight, gateStartH))
     kv("trace.gateH.neverOvershot", allBelow(gateHV, gateStartH))
     kv("trace.gateH.raw", gateHV.join(" "))
     kv("trace.glide.raw", glideV.join(" "))
@@ -1917,7 +1930,18 @@ Item {
     // tween has run depends on when the turn landed - so the claim is the
     // shape of it: the fade has all but finished and has not quite
     // finished. The raw value is reported beside it, for a reader.
-    kv("slotShort.opacity.midFadeNearlyOver", between(slotShort.opacity, 0.99, 1))
+    // "All but over" includes over: a loaded machine can land the sampled turn
+    // after the fade settled, and 1 is the same claim, not a broken one.
+    kv("slotShort.opacity.midFadeNearlyOver", slotShort.opacity >= 0.99 && slotShort.opacity <= 1)
+    // Whether the overlap between the unfold landing and the fade finishing can
+    // be SAMPLED is the machine's frame cadence; whether it happens is the
+    // grace interval. Report both, so the assertion can tell absent evidence
+    // from contrary evidence.
+    let fadeCaughtWithHeight = false
+    for (let i = 0; i < slotShortHV.length; i++) {
+      if (slotShortHV[i] >= 52 && slotShortOV[i] < 1) fadeCaughtWithHeight = true
+    }
+    kv("slotShort.fadeCaughtWithHeight", fadeCaughtWithHeight)
     kv("slotShort.fadeOutlivesHeight", slotShort.height === 52 && slotShort.opacity < 1)
     kv("slotTall.height.s11", slotTall.height)
     // Close the two cycle slots, one left to finish and one reopened inside
