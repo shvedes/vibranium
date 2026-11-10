@@ -111,17 +111,19 @@ elif [[ -d "$chosen_path/.git" ]]; then
 
   mapfile -d '' -t uf < <(git -C "$chosen_path" ls-files --others --exclude-standard -z -- backgrounds)
 
+  # The archive keeps each path's directory shape: two untracked wallpapers
+  # named alike in different subdirectories are distinct users of the tree,
+  # and a flat move would overwrite one with the other on the way back.
   for f in "${uf[@]}"; do
-    mv "$chosen_path/$f" "$preserved"/
+    mkdir -p "$preserved/$(dirname "$f")"
+    mv "$chosen_path/$f" "$preserved/$f"
   done
 
   rm -rf "$chosen_path"
 
   if ((${#uf[@]} > 0)); then
-    mkdir -p "$chosen_path/backgrounds"
-    for f in "$preserved"/*; do
-      mv "$f" "$chosen_path/backgrounds"/
-    done
+    mkdir -p "$chosen_path"
+    cp -a "$preserved/." "$chosen_path/"
     touch "$chosen_path/.uninstalled"
   fi
   rm -rf "$preserved"
