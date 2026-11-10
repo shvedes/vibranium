@@ -1592,9 +1592,17 @@ Item {
   function _bootP0() {
     const floor = boot._catalog.filter(descriptor => descriptor.activation === "eager")
     for (let i = 0; i < floor.length; i++) {
-      const descriptor = floor[i]
-      UnitGate.ensure(descriptor.id, "boot")
-      UnitGate.refresh(descriptor.id)
+      // One floor unit that throws must not take the rest of the floor with
+      // it. An uncaught throw here aborts Component.onCompleted, which leaves
+      // the visual phase unbuilt and the readiness connections unattached -
+      // the whole shell with no surface, from one service. Every other phase
+      // already isolates a unit this way (_drainOne, _bootVisuals), and the
+      // gate records the error on the unit's own record.
+      try {
+        UnitGate.ensure(floor[i].id, "boot")
+        UnitGate.refresh(floor[i].id)
+      } catch (error) {
+      }
     }
   }
 
