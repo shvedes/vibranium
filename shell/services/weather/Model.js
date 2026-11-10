@@ -219,10 +219,6 @@ function kmhToMph(value) {
 // below was days x hours over the same series. The series is one response
 // object, so identity plus length is enough to know the map still describes
 // it - the same rule SearchLib.sameCacheIndex uses for its caches.
-var _humMaxTimes = null
-var _humMaxLen = -1
-var _humMaxMap = null
-
 // Peak relative humidity for one calendar date from the hourly series
 // (hourly.time entries are "YYYY-MM-DDTHH:MM" in the requested timezone).
 // "" when the series is absent - verbose rows then omit humidity.
@@ -230,7 +226,12 @@ function humidityMaxForDate(hourly, dateString) {
   var day = String(dateString || "").slice(0, 10)
   if (!day || !hourly || !hourly.time || !hourly.relative_humidity_2m) return ""
   var times = hourly.time
-  if (_humMaxTimes !== times || _humMaxLen !== times.length) {
+  // The cache rides on the function object: a `.pragma library` publishes its
+  // top-level declarations, and this is not part of the library's surface.
+  if (humidityMaxForDate._cache === undefined)
+    humidityMaxForDate._cache = { times: null, len: -1, map: null }
+  var cache = humidityMaxForDate._cache
+  if (cache.times !== times || cache.len !== times.length) {
     var map = Object.create(null)
     var hum = hourly.relative_humidity_2m
     for (var i = 0; i < times.length; i++) {
@@ -241,11 +242,11 @@ function humidityMaxForDate(hourly, dateString) {
       var was = map[key]
       if (was === undefined || n > was) map[key] = n
     }
-    _humMaxTimes = times
-    _humMaxLen = times.length
-    _humMaxMap = map
+    cache.times = times
+    cache.len = times.length
+    cache.map = map
   }
-  var best = _humMaxMap[day]
+  var best = cache.map[day]
   return best === undefined ? "" : String(Math.round(best))
 }
 
