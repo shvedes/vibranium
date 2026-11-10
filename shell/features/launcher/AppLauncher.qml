@@ -125,35 +125,24 @@ Singleton {
   property var pendingDelete: null
 
   // --- controller lifecycle ---
-  // One owner string for every demand. UnitGate matches leases by owner,
-  // so a constant owner means the second keypress finds the lease that
-  // already exists instead of minting a parallel one, and it is neither
-  // Boot's "boot", nor pass's "pass-facade", nor a bar module's
-  // "bar:<id>", so a release here can never take down a lease someone else
-  // is holding.
+  // The lease, the state and the Loader are the shared UnitLease; what each
+  // facade keeps is when to give the controller back.
   readonly property string gateOwner: "appLauncher-facade"
-  property var _lease: null
-  property int _constructions: 0
 
-  // unloaded | loading | ready | unavailable | failed. A verb that cannot
-  // run answers from this instead of vanishing: the string a caller sees
-  // is _unavailableVerb().
-  property string controllerState: "unloaded"
-  property string controllerError: ""
-  readonly property bool controllerReady: root.controllerState === "ready"
-  // The facade itself is ready the moment this singleton is constructed,
-  // which is what the boot drain waits for: the drain's job is to make the
-  // `appLauncher` IPC target exist, not to build a controller. Confusing the
-  // two leaves the launcher with no registered target at all, so
-  // the two are separate properties with separate meanings.
+  UnitLease {
+    id: lease
+    unitId: root.unitId
+    owner: root.gateOwner
+    controllerComponent: controllerComp
+  }
+
+  readonly property alias controllerState: lease.phase
+  readonly property alias controllerError: lease.error
+  readonly property bool controllerReady: lease.phase === "ready"
   readonly property bool facadeReady: root.tag !== ""
-  // Controllers built since boot. 0 until the prewarm lands, then one:
-  // the visible proof that a facade construction does no work and the
-  // resident controller is built exactly once.
-  readonly property int constructions: root._constructions
+  readonly property alias constructions: lease.constructions
 
   // --- public read surface (published) ---
-  readonly property var _controller: controllerLoader.item
   // Result rows consumed by the panel, plus the filter counter. The
   // controller publishes all three on every recompute that assigns (see
   // _publishRows), and this file keeps serving the last publication after
@@ -166,10 +155,10 @@ Singleton {
   property var _lastResults: []
   property int _lastMatched: 0
   property int _lastTotal: 0
-  readonly property var results: root._controller !== null ? root._controller.results : root._lastResults
-  readonly property var enabledPrefixes: root._controller !== null ? root._controller.enabledPrefixes : []
-  readonly property int matchedCount: root._controller !== null ? root._controller.matchedCount : root._lastMatched
-  readonly property int totalCount: root._controller !== null ? root._controller.totalCount : root._lastTotal
+  readonly property var results: lease.controller !== null ? lease.controller.results : root._lastResults
+  readonly property var enabledPrefixes: lease.controller !== null ? lease.controller.enabledPrefixes : []
+  readonly property int matchedCount: lease.controller !== null ? lease.controller.matchedCount : root._lastMatched
+  readonly property int totalCount: lease.controller !== null ? lease.controller.totalCount : root._lastTotal
   function _publishRows(rows, matched, total) {
     root._lastResults = rows
     root._lastMatched = matched
@@ -178,17 +167,17 @@ Singleton {
   // Clock verdicts for the "time in <city>" rows, read by a granted
   // plugin through the capability host below. A plugin only exists while
   // a controller does, so this cache is not published.
-  readonly property var timeCache: root._controller !== null ? root._controller.timeCache : ({})
+  readonly property var timeCache: lease.controller !== null ? lease.controller.timeCache : ({})
   // Response bodies for the "value <CUR> in <CUR>" rows, keyed by URL, read
   // by a granted plugin through the capability host below. Same reasoning as
   // timeCache: a plugin lives exactly as long as a controller, so this cache
   // is not published either.
-  readonly property var netCache: root._controller !== null ? root._controller.netCache : ({})
+  readonly property var netCache: lease.controller !== null ? lease.controller.netCache : ({})
   // The last PATH scan behind the binary-launch fallback: { names, at: ms },
   // read by a granted plugin through the capability host below. Same
   // reasoning as timeCache and netCache - a plugin lives exactly as long as a
   // controller, so this cache is not published either.
-  readonly property var binariesCache: root._controller !== null ? root._controller.binCache : null
+  readonly property var binariesCache: lease.controller !== null ? lease.controller.binCache : null
   // Filesystem verdicts for openable local targets: path -> "dir" | "file"
   // | "missing". Unlike the caches above this one outlives the controller by
   // design: the clipboard suggestion's row withholds or paints from it, and
@@ -251,7 +240,7 @@ Singleton {
   // the published snapshot is not a live answer, and a state written through
   // settings meanwhile would be argued down by it.
   function _liveToggles() {
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null || ctrl.pluginsResolved !== true) return null
     return root._publishedToggles
   }
@@ -454,7 +443,7 @@ Singleton {
   // is; discovery repaints via rev.
   function _pluginToggleState(menuId) {
     const pid = String(menuId ?? "").replace(/^launcher-/, "")
-    const ctrl = root._controller
+    const ctrl = lease.controller
     // An unresolved registry holds no config, so pluginEnabled answers off
     // for every id - which would paint the whole page off for as long as a
     // tree's scan is in flight. Read the configuration until it resolves.
@@ -554,7 +543,7 @@ Singleton {
     if (root._openWaiting) return true
     // Demand first: without a controller there is no window to show, so
     // the claim must not be taken and `visible` must not be set.
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     if (ctrl === null) return false
     closeSettle.stop()
     // A local clipboard target whose verdict is not settled (no cache, or
@@ -595,14 +584,14 @@ Singleton {
     root._openWaiting = false
     openProbeTimeout.stop()
     if (root.visible) return
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return
     ctrl.onOpenedSettled()
     root.visible = true
     root._claimToken = SurfaceClaim.claim("appLauncher", root.close, root)
   }
   function _openCompute() {
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return
     ctrl.onOpened()
   }
@@ -684,7 +673,7 @@ Singleton {
   // prefixes; unknown or disabled prefixes are ignored silently.
   function enterMode(prefix, payload) {
     if (root.mode !== "normal") return
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return
     const plugin = ctrl.pluginForPrefix(prefix)
     if (plugin === null) return
@@ -718,7 +707,7 @@ Singleton {
     const now = Date.now()
     if (now - root.lastActivateAt < 300) return
     root.lastActivateAt = now
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return
     ctrl.activate(row)
   }
@@ -733,7 +722,7 @@ Singleton {
   function confirmDelete() {
     const row = root.pendingDelete
     if (!row || !row.app || !row.app.id) return
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return
     ctrl.confirmDelete(row)
     root.pendingDelete = null
@@ -747,7 +736,7 @@ Singleton {
   // a controller cannot throw.
 
   function _recompute() {
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return
     ctrl.recompute()
   }
@@ -913,7 +902,7 @@ Singleton {
   // The granted file read, forwarded: the reader is the controller's, so a
   // plugin only reaches one FileView and the facade holds none.
   function _readFileText(path) {
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return null
     return ctrl.readPluginFile(path)
   }
@@ -922,7 +911,7 @@ Singleton {
   // is projected above, so cachedBinaries() answers with no controller and
   // only the request half needs one.
   function _requestBinaries() {
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return
     ctrl.requestBinaries()
   }
@@ -930,7 +919,7 @@ Singleton {
   // The granted clock probe, forwarded for the same reason. The verdict
   // cache is projected above, so cachedTime() answers with no controller.
   function _requestTime(tz) {
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return
     ctrl.requestTime(tz)
   }
@@ -950,7 +939,7 @@ Singleton {
   function _requestNet(url, timeoutMs) {
     const u = String(url ?? "")
     if (!/^https:\/\//i.test(u)) return
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return
     // The scheme is named and the rest is cut, so a reader can tell WHICH
     // plugin endpoint was asked for without the line carrying a query string.
@@ -1015,7 +1004,7 @@ Singleton {
       return
     }
     root._prewarmPending = false
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     if (ctrl !== null) {
       root._prewarmed = true
       return
@@ -1023,59 +1012,11 @@ Singleton {
     if (root.controllerState !== "failed") prewarmRetry.restart()
   }
 
-  function _demand() {
-    if (root.controllerState === "ready" && root._controller !== null) return root._controller
-    const result = UnitGate.ensure(root.unitId, root.gateOwner)
-    if (result === undefined || result === null || result.ok !== true) {
-      // A blocked, failed or unregistered unit still hands back a lease
-      // for two of those three; give it straight back so the record
-      // cannot collect owners for a demand that never loaded.
-      if (result !== undefined && result !== null && result.lease !== undefined && result.lease !== null)
-        root._lease = result.lease
-      root._dropLease()
-      root._setState(result !== undefined && result !== null && result.state === "failed" ? "failed" : "unavailable",
-        result !== undefined && result !== null && result.state === "failed" ? "unit" : "gate")
-      return null
-    }
-    if (result.lease !== root._lease) {
-      root._lease = result.lease
-      // Retained, not merely held: a stray single release (a dropped
-      // claim, a failed caller unwinding) must not be able to drop the
-      // unit under a live panel.
-      UnitGate.retain(result.lease)
-    }
-    root._setState("loading")
-    controllerLoader.active = true
-    if (root._controller === null) {
-      root._unloadFor("unavailable", "load")
-      return null
-    }
-    if (root._controller.startupError !== "") {
-      // A Loader cannot raise a construction error to its caller, so the
-      // controller reports it and the facade answers error:<code> and
-      // unloads: the next caller starts from an unloaded unit.
-      root._unloadFor("failed", root._controller.startupError)
-      return null
-    }
-    root._constructions++
-    root._setState("ready")
-    return root._controller
-  }
-
   // Drop the controller and the lease, then state the outcome. The flag is
   // what keeps the teardown the gate performs on the way out - it runs
   // teardownController() from inside the release - from restating
   // "unloaded" in the middle of a demand that is about to report why it
   // failed, so the state sequence a consumer sees is the facade's own.
-  property bool _unwinding: false
-
-  function _unloadFor(next, code) {
-    root._unwinding = true
-    root._unload()
-    root._unwinding = false
-    root._setState(next, code)
-  }
-
   // A demand that does not open the panel reaches the same resident tree
   // the prewarm built - the usage read, the index, the plugin scan, the
   // models, the processes and the watcher. This is the one place that
@@ -1084,50 +1025,27 @@ Singleton {
   // reach the controller through here and nothing else. Nothing here hands
   // the tree back: the controller stays resident once built.
   function _demandTransient() {
-    return root._demand()
+    return lease.demand()
+  }
+
+  // Boot's unit teardown hook calls this by name on every facade. The launcher
+  // keeps its controller resident once built, so the only thing to settle here
+  // is the close timer the boot drain can arrive behind.
+  function teardownController() {
+    closeSettle.stop()
+    return lease.teardown()
   }
 
   // Drop the controller and the lease without touching the reported state.
   // A caller that is about to answer unavailable or failed unwinds through
   // here, so the state it reports is the last one a consumer sees instead of
   // flapping through "unloaded" on the way there.
-  function _unload() {
-    closeSettle.stop()
-    const held = root._lease !== null || controllerLoader.item !== null
-    controllerLoader.active = false
-    root._dropLease()
-    return held
-  }
-
   // Idempotent and callable with nothing loaded: Boot's unit teardown
   // hook and the close settle both land here, and the second call is a
   // no-op rather than a double release.
-  function teardownController() {
-    const held = root._unload()
-    if (!root._unwinding) root._setState("unloaded")
-    return held
-  }
-
   // The gate's teardown hook drops this owner's whole lease set in one
   // call, so the ensure and the retain that came with it go together and
   // a lost release cannot leave the record counting an owner nobody holds.
-  function _dropLease() {
-    if (root._lease === null) return false
-    root._lease = null
-    return UnitGate.releaseOwner(root.gateOwner) > 0
-  }
-
-  function _setState(next, code) {
-    const detail = code || ""
-    if (root.controllerState === next && root.controllerError === detail) return
-    root.controllerState = next
-    root.controllerError = detail
-    // The unit's own ready probe reads controllerReady, and nothing polls
-    // an on-demand unit, so the record is settled here instead: the gate
-    // must not sit in "starting" once the controller is up.
-    if (next === "ready") UnitGate.refresh(root.unitId)
-  }
-
   // Defined answer for every verb while the controller is not there, so
   // an IPC caller learns why instead of getting a silent no-op.
   function _unavailableVerb() {
@@ -1150,12 +1068,6 @@ Singleton {
   // The controller, and nothing else: a Loader the prewarm activates
   // shortly after boot. Windows and panels live above, outside this
   // Loader, for the reason stated there.
-  Loader {
-    id: controllerLoader
-    active: false
-    sourceComponent: controllerComp
-  }
-
   Component {
     id: controllerComp
 
@@ -1201,7 +1113,7 @@ Singleton {
       // nothing to jump - publishes idle to the facade, so the next open
       // starts from idle instead of rebuilding the wall from a filtered
       // set it immediately discards.
-      const ctrl = root._controller
+      const ctrl = lease.controller
       if (ctrl !== null && !root.visible) ctrl.recompute()
     }
   }
@@ -1351,7 +1263,7 @@ Singleton {
   // projection after it. status() must answer an object either way, so an
   // uncollected list is [] with reads.plugins reporting it as such.
   function _pluginSummary() {
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return root.pluginRows
     return ctrl.pluginSummary()
   }

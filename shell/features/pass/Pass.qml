@@ -240,41 +240,34 @@ Singleton {
   property var _claimToken: null
 
   // --- controller lifecycle ---
-  // One owner string for every demand. UnitGate matches leases by owner,
-  // so a constant owner means the second keypress finds the lease that
-  // already exists instead of minting a parallel one, and it is not
-  // Boot's "boot" nor a bar module's "bar:<id>", so a release here can
-  // never take down a lease someone else is holding.
+  // The lease, the state and the Loader are the shared UnitLease; what each
+  // facade keeps is when to give the controller back.
   readonly property string gateOwner: "pass-facade"
-  property var _lease: null
-  property int _constructions: 0
 
-  // unloaded | loading | ready | unavailable | failed. A verb that
-  // cannot run answers from this instead of vanishing: the string a
-  // caller sees is _unavailableVerb().
-  property string controllerState: "unloaded"
-  property string controllerError: ""
-  readonly property bool controllerReady: root.controllerState === "ready"
-  // The facade is ready as soon as this singleton exists; the boot drain
-  // waits for that, not for a controller. See AppLauncher.facadeReady.
+  UnitLease {
+    id: lease
+    unitId: root.unitId
+    owner: root.gateOwner
+    controllerComponent: controllerComp
+  }
+
+  readonly property alias controllerState: lease.phase
+  readonly property alias controllerError: lease.error
+  readonly property bool controllerReady: lease.phase === "ready"
   readonly property bool facadeReady: root.tag !== ""
-  // Controllers built since boot. 0 until the first use, then one per
-  // open: the visible proof that a facade construction does no work and
-  // a demand builds exactly one controller.
-  readonly property int constructions: root._constructions
+  readonly property alias constructions: lease.constructions
 
   // --- public read surface (projected) ---
-  readonly property var _controller: controllerLoader.item
-  readonly property string storeDir: root._controller !== null ? root._controller.storeDir : ""
-  readonly property bool initialized: root._controller !== null ? root._controller.initialized : false
-  readonly property var entries: root._controller !== null ? root._controller.entries : []
-  readonly property var allDirs: root._controller !== null ? root._controller.allDirs : []
-  readonly property bool busy: root._controller !== null ? root._controller.busy : false
+  readonly property string storeDir: lease.controller !== null ? lease.controller.storeDir : ""
+  readonly property bool initialized: lease.controller !== null ? lease.controller.initialized : false
+  readonly property var entries: lease.controller !== null ? lease.controller.entries : []
+  readonly property var allDirs: lease.controller !== null ? lease.controller.allDirs : []
+  readonly property bool busy: lease.controller !== null ? lease.controller.busy : false
   readonly property string lastError: Model.statusError(
-    root._controller === null ? "" : root._controller.lastError, root._copyError)
-  readonly property string passBinary: root._controller !== null ? root._controller.passBinary : "unknown"
-  readonly property bool gitReady: root._controller !== null ? root._controller.gitReady : false
-  readonly property var keyChoices: root._controller !== null ? root._controller.keyChoices : []
+    lease.controller === null ? "" : lease.controller.lastError, root._copyError)
+  readonly property string passBinary: lease.controller !== null ? lease.controller.passBinary : "unknown"
+  readonly property bool gitReady: lease.controller !== null ? lease.controller.gitReady : false
+  readonly property var keyChoices: lease.controller !== null ? lease.controller.keyChoices : []
   readonly property bool passInstalled: root.passBinary !== "missing"
 
   Component.onCompleted: {
@@ -300,9 +293,9 @@ Singleton {
     // A shell without `pass` installed still pays one cheap probe - the
     // price of an instant first frame.
     Idle.run(() => {
-      if (root._controller !== null) return
+      if (lease.controller !== null) return
       if (root.visible) return
-      const ctrl = root._demand()
+      const ctrl = lease.demand()
       if (ctrl !== null) {
         idleRelease.stop()
         closeSettle.stop()
@@ -345,7 +338,7 @@ Singleton {
     if (root.visible) return true
     // Demand first: without a controller there is no window to show, so
     // the claim must not be taken and `visible` must not be set.
-    if (root._demand() === null) return false
+    if (lease.demand() === null) return false
     closeSettle.stop()
     // The new session owns the grace: a flow still reporting from a close
     // before this one must not extend the wait this close will take.
@@ -409,80 +402,18 @@ Singleton {
   // land here, and every path out (refused lease, failed construction,
   // unload) drops the lease again, so a refused or failed caller leaves
   // the next one a clean unit.
-  function _demand() {
-    if (root.controllerState === "ready" && root._controller !== null) return root._controller
-    const result = UnitGate.ensure(root.unitId, root.gateOwner)
-    if (result === undefined || result === null || result.ok !== true) {
-      // A blocked, failed or unregistered unit still hands back a lease
-      // for two of those three; give it straight back so the record
-      // cannot collect owners for a demand that never loaded.
-      if (result !== undefined && result !== null && result.lease !== undefined && result.lease !== null)
-        root._lease = result.lease
-      root._dropLease()
-      root._setState(result !== undefined && result !== null && result.state === "failed" ? "failed" : "unavailable",
-        result !== undefined && result !== null && result.state === "failed" ? "unit" : "gate")
-      return null
-    }
-    if (result.lease !== root._lease) {
-      root._lease = result.lease
-      // Retained, not merely held: a stray single release (a dropped
-      // claim, a failed caller unwinding) must not be able to drop the
-      // unit under a live panel.
-      UnitGate.retain(result.lease)
-    }
-    root._setState("loading")
-    controllerLoader.active = true
-    if (root._controller === null) {
-      root._unloadFor("unavailable", "load")
-      return null
-    }
-    if (root._controller.startupError !== "") {
-      // A Loader cannot raise a construction error to its caller, so the
-      // controller reports it and the facade answers error:<code> and
-      // unloads: the next caller starts from an unloaded unit.
-      root._unloadFor("failed", root._controller.startupError)
-      return null
-    }
-    root._constructions++
-    root._setState("ready")
-    return root._controller
-  }
-
   // Drop the controller and the lease, then state the outcome. The flag is
   // what keeps the teardown the gate performs on the way out - it runs
   // teardownController() from inside the release - from restating
   // "unloaded" in the middle of a demand that is about to report why it
   // failed, so the state sequence a consumer sees is the facade's own.
-  property bool _unwinding: false
-
-  function _unloadFor(next, code) {
-    root._unwinding = true
-    root._unload()
-    root._unwinding = false
-    root._setState(next, code)
-  }
-
   // Drop the controller and the lease without touching the reported state.
   // A caller that is about to answer unavailable or failed unwinds through
   // here, so the state it reports is the last one a consumer sees instead of
   // flapping through "unloaded" on the way there.
-  function _unload() {
-    closeSettle.stop()
-    const held = root._lease !== null || controllerLoader.item !== null
-    controllerLoader.active = false
-    root._dropLease()
-    return held
-  }
-
   // Idempotent and callable with nothing loaded: Boot's unit teardown
   // hook and the close settle both land here, and the second call is a
   // no-op rather than a double release.
-  function teardownController() {
-    const held = root._unload()
-    if (!root._unwinding) root._setState("unloaded")
-    return held
-  }
-
   // How long the close settle waits for a flow the panel started before it
   // hands the controller back anyway. The window is already gone by then, so
   // the wait costs the user nothing they can see; the bound is what stops a
@@ -495,6 +426,13 @@ Singleton {
   // close can never extend the next one.
   property double _flowDeadline: 0
 
+  // Boot's unit teardown hook calls this by name on every facade, so the
+  // shared lease teardown is republished under the name the hook owns.
+  function teardownController() {
+    closeSettle.stop()
+    return lease.teardown()
+  }
+
   // The settle, asked whether the controller still owes someone an answer.
   // A flow reports through an onExited that lives in the controller, so
   // releasing the tree on the fade destroyed the process that was going to
@@ -502,7 +440,7 @@ Singleton {
   // password simply never reached the clipboard and a push or a pull never
   // notified. Wait for the child instead, then release on its own terms.
   function _settleClose() {
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl !== null && ctrl.childBusy === true && Date.now() < root._flowDeadline) {
       closeSettle.restart()
       return false
@@ -514,12 +452,6 @@ Singleton {
   // The gate's teardown hook drops this owner's whole lease set in one
   // call, so the ensure and the retain that came with it go together and
   // a lost release cannot leave the record counting an owner nobody holds.
-  function _dropLease() {
-    if (root._lease === null) return false
-    root._lease = null
-    return UnitGate.releaseOwner(root.gateOwner) > 0
-  }
-
   // --- idle release ---
   // The close settle only runs when a panel was opened, so the one demand
   // that opens nothing - the copy verb - had no way back to teardown: the
@@ -534,7 +466,7 @@ Singleton {
     // would restate that as "unloaded". A panel that is up owns its
     // controller outright - the close settle is the path that gives it
     // back, and a copy the panel itself asked for arms this timer too.
-    if (root.controllerState !== "ready" || root._controller === null) return false
+    if (root.controllerState !== "ready" || lease.controller === null) return false
     if (root.visible) return false
     // A panel that has ever been opened keeps its controller resident (see
     // hidePanel): the next open must show a warm vault in one frame, not a
@@ -546,7 +478,7 @@ Singleton {
     // controller's own teardown - once, whether it runs from here or from
     // the close settle.
     if (copyProc.running || root._secretHandles.length > 0
-      || root._controller.copyPending === true) {
+      || lease.controller.copyPending === true) {
       idleRelease.restart()
       return false
     }
@@ -560,22 +492,11 @@ Singleton {
   // that got installed or a .gpg-id that appeared between two opens still
   // reaches the panel.
   function _refreshOnOpen() {
-    const ctrl = root._controller
+    const ctrl = lease.controller
     if (ctrl === null) return false
     ctrl.probeBinary()
     ctrl.refresh()
     return true
-  }
-
-  function _setState(next, code) {
-    const detail = code || ""
-    if (root.controllerState === next && root.controllerError === detail) return
-    root.controllerState = next
-    root.controllerError = detail
-    // The unit's own ready probe reads controllerReady, and nothing polls
-    // a first_use unit, so the record is settled here instead: the gate
-    // must not sit in "starting" once the controller is up.
-    if (next === "ready") UnitGate.refresh(root.unitId)
   }
 
   // Defined answer for every verb while the controller is not there, so
@@ -586,50 +507,50 @@ Singleton {
 
   // --- command verbs: one controller, a defined refusal when there is none ---
   function copyEntry(path) {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.copyEntry(path) === true
   }
   function createFolder(path) {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.createFolder(path) === true
   }
   function moveEntry(from, to) {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.moveEntry(from, to) === true
   }
   function removeEntry(path) {
     return root.requestDelete(path)
   }
   function requestDelete(path) {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.requestDelete(path) === true
   }
   function insertEntry(path, secret, force) {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.insertEntry(path, secret, force) === true
   }
   function generateEntry(path, force) {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.generateEntry(path, force) === true
   }
   function editEntry(path) {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.editEntry(path) === true
   }
   function initStore(key) {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.initStore(key) === true
   }
   function requestKeys() {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.requestKeys() === true
   }
   function push() {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.push() === true
   }
   function pull() {
-    const ctrl = root._demand()
+    const ctrl = lease.demand()
     return ctrl !== null && ctrl.pull() === true
   }
 
@@ -670,7 +591,7 @@ Singleton {
       })
     }
     function copy(path: string): string {
-      const ctrl = root._demand()
+      const ctrl = lease.demand()
       if (ctrl === null) return root._unavailableVerb()
       return ctrl.copyEntry(path || "") ? "ok" : "error:copy"
     }
@@ -688,16 +609,6 @@ Singleton {
   // child, no file read, no window and no panel tree. The two signals the
   // facade re-emits are wired here, at the only place the controller is
   // named.
-  Loader {
-    id: controllerLoader
-    active: false
-    sourceComponent: controllerComp
-    // Every construction is a demand, so arming here is what covers the
-    // demand that opens no panel: the grace starts where the controller
-    // arrives, and an open or a close stops it.
-    onLoaded: idleRelease.restart()
-  }
-
   Component {
     id: controllerComp
 
