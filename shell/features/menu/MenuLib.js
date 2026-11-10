@@ -267,7 +267,23 @@ function stripForHay(s) {
   // collapses the second pass used to do. Identical output on the whole
   // catalog corpus and a fuzz set; measured 1.92ms -> 1.35ms over 3000
   // description strings.
-  return String(s).replace(/(?:\s*<[^>]*>)+\s*|\s+/g, " ").trim()
+  //
+  // Memoized on the input string: the descriptions this runs over come from
+  // the catalog, so a rebuild re-runs the same regex over the same text - the
+  // pages are re-normalized whenever the store publishes, and the catalog's
+  // descriptions do not move. Keyed by the text and emptied whole when it
+  // fills, so a cache that is not paying for itself cannot grow without bound.
+  // The cache rides on the function object: a `.pragma library` publishes its
+  // top-level declarations, and this is not part of the library's surface.
+  const text = String(s)
+  let cache = stripForHay._cache
+  if (cache === undefined) cache = stripForHay._cache = new Map()
+  const hit = cache.get(text)
+  if (hit !== undefined) return hit
+  const out = text.replace(/(?:\s*<[^>]*>)+\s*|\s+/g, " ").trim()
+  if (cache.size >= 512) cache.clear()
+  cache.set(text, out)
+  return out
 }
 
 function hayFromItem(item, includeMetadata) {
