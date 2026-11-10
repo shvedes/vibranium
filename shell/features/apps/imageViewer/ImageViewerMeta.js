@@ -1,5 +1,7 @@
 .pragma library
 
+.import "../../../common/text/StringUtils.js" as SU
+
 // Metadata for the image viewer: which formats it opens, what colour each
 // format family gets, and the strings its status bar prints.
 //
@@ -53,10 +55,7 @@ function nameFilters() {
 
 // The lower-case extension of a file name, "" when it has none.
 function extensionOf(fileName) {
-  const name = String(fileName === undefined || fileName === null ? "" : fileName)
-  const dot = name.lastIndexOf(".")
-  if (dot < 0 || dot === name.length - 1) return ""
-  return name.substring(dot + 1).toLowerCase()
+  return SU.extname(fileName)
 }
 
 // The palette key for a file's format family, "" for a format with no family

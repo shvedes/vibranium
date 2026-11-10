@@ -15,6 +15,8 @@
 // the animated exclusion above is the contract both keep.
 .pragma library
 
+.import "StringUtils.js" as SU
+
 var EXTS = ({
   png: 1, jpg: 1, jpeg: 1, jfif: 1, webp: 1, ppm: 1, pgm: 1, pbm: 1,
   pnm: 1, tiff: 1, tif: 1, bmp: 1, svg: 1, svgz: 1, jp2: 1, jpx: 1,
@@ -22,8 +24,5 @@ var EXTS = ({
 })
 
 function ok(name) {
-  const s = String(name || "")
-  const dot = s.lastIndexOf(".")
-  if (dot < 0) return false
-  return !!EXTS[s.slice(dot + 1).toLowerCase()]
+  return !!EXTS[SU.extname(name)]
 }

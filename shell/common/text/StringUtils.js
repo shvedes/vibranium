@@ -36,6 +36,18 @@ function basename(path) {
   return p.substring(i + 1)
 }
 
+// Lowercased extension of a path, without the dot, "" when it has none.
+// A dot in a directory is not an extension, and a leading dot in the name
+// is one - the full-path contract FileIcons, ImageExts and the image viewer
+// share (".png" -> "png").
+function extname(path) {
+  const p = String(path ?? "")
+  const slash = p.lastIndexOf("/")
+  const dot = p.lastIndexOf(".")
+  if (dot <= slash || dot < 0) return ""
+  return p.substring(dot + 1).toLowerCase()
+}
+
 function styledMarkup(text) {
   const s = String(text ?? "")
   if (s === "") return ""

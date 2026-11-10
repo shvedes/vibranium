@@ -112,10 +112,7 @@ function isAnimatedExt(ext) {
 // form (the ImageExts contract, pinned by the text suite): a leading
 // dot still names an extension (".png" -> "png").
 function extOf(path) {
-  var s = String(path || "")
-  var dot = s.lastIndexOf(".")
-  if (dot < 0) return ""
-  return s.slice(dot + 1).toLowerCase()
+  return SU.extname(path)
 }
 
 // Icon basename for a concrete filesystem path. Falls back to "" so
