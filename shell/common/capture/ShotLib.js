@@ -16,9 +16,10 @@
 //     the service, which owns the processes, timers and windows.
 .pragma library
 .import "../text/StringUtils.js" as SU
+.import "../text/Format.js" as Format
 
 function _pad(n) {
-  return String(n).padStart(2, "0")
+  return Format.pad2(n)
 }
 
 // Qt's device pixel ratio, floored at 1 when the platform reports nothing
