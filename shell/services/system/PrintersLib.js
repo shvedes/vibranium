@@ -253,6 +253,12 @@ function failedJobs(jobs) {
 // page), held -> hourglass, otherwise check (pending/stopped).
 // (Kept for API compatibility; the island now leads with jobFileIcon and
 // a pending spinner instead.)
+function jobStateIcon(state) {
+  const s = jobStateNum(state)
+  if (s === 4) return "hourglass"
+  if (s === 5) return "printer"
+  return "check"
+}
 // True while the job still occupies the queue (pending/held/processing/
 // stopped). Completed/canceled/aborted are history: shown with Delete so
 // the user can clear them, but they drive no spinner, no flash, no toast.
@@ -427,6 +433,27 @@ function filterDismissed(rows, dismissed) {
 
 // Case-insensitive filter over printer rows: queue name, local alias,
 // model, location. Empty q -> all rows. Never mutates the input.
+function filterPrinters(rows, q, aliases) {
+  if (!q || String(q).trim() === "") return rows
+  const needle = String(q).toLowerCase()
+  const out = []
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row || typeof row !== "object") continue
+    const name = String(row["printer-name"] ?? "")
+    const alias = aliases && typeof aliases === "object" ? String(aliases[name] ?? "") : ""
+    const hay = name + " " + alias + " " + String(row["printer-make-and-model"] ?? "")
+      + " " + String(row["printer-location"] ?? "")
+    if (hay.toLowerCase().indexOf(needle) !== -1) out.push(row)
+  }
+  return out
+}
+
+// Case-insensitive filter over job rows (name, user, printer).
+function filterJobs(rows, q) {
+  return filterRows(rows, q, ["job-name", "job-originating-user-name", "printer"])
+}
+
 // Case-insensitive filter over job rows (name, user, printer).
 function filterRows(rows, q, keys) {
   if (!q || String(q).trim() === "") return rows

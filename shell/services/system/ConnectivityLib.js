@@ -490,8 +490,93 @@ function connectArgv(ssid) {
 
 // Default-route interface: the first `default` line's `dev`, ignoring
 // /1 hijack lines that are not defaults.
+function parseDefaultIface(table) {
+  const lines = String(table === undefined || table === null ? "" : table).split("\n")
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (line.indexOf("default ") !== 0) continue
+    const m = /(?:^|\s)dev\s+(\S+)/.exec(line)
+    if (m !== null) return m[1]
+  }
+  return ""
+}
+
 function usageKey(ssid) {
   return "ssid:" + String(ssid === undefined || ssid === null ? "" : ssid)
+}
+
+// One metered poll: the byte counters are sysfs totals for the default-route
+// interface, and only the growth between two metered samples is the user's
+// mobile data. A reseed condition - first sample, unmetered gap, a different
+// interface, a different network, or a counter that went backwards after a
+// reboot - files nothing and re-bases the totals, so no gap is ever counted.
+function meteredUsageStep(prev, tick, ssid, metered) {
+  const name = String(ssid === undefined || ssid === null ? "" : ssid)
+  if (metered !== true) {
+    return { state: { iface: "", rx: 0, tx: 0, metered: false, ssid: name }, delta: 0, key: "" }
+  }
+  const p = prev !== null && typeof prev === "object" ? prev : null
+  if (tick === null || typeof tick !== "object") {
+    return { state: { iface: "", rx: 0, tx: 0, metered: true, ssid: name }, delta: 0, key: usageKey(name) }
+  }
+  const iface = String(tick.iface || "")
+  const rx = Number(tick.rx) || 0
+  const tx = Number(tick.tx) || 0
+  const state = { iface: iface, rx: rx, tx: tx, metered: true, ssid: name }
+  if (p === null || p.metered !== true || String(p.iface || "") !== iface
+    || String(p.ssid === undefined || p.ssid === null ? "" : p.ssid) !== name
+    || rx < (Number(p.rx) || 0) || tx < (Number(p.tx) || 0)) {
+    return { state: state, delta: 0, key: usageKey(name) }
+  }
+  return { state: state, delta: (rx - (Number(p.rx) || 0)) + (tx - (Number(p.tx) || 0)), key: usageKey(name) }
+}
+
+// Threshold crossing for a running total: announce once the total has moved
+// a whole step past what was already announced, and report the total the
+// card names so a jump over two thresholds still posts one card.
+function meteredMilestone(total, notified, threshold) {
+  const step = Number(threshold)
+  if (!isFinite(step) || step <= 0) return { announce: false, notified: 0 }
+  const used = Number(total)
+  const have = Number(notified)
+  const filed = isFinite(have) ? have : 0
+  const usedTotal = isFinite(used) ? used : 0
+  if (usedTotal - filed < step) return { announce: false, notified: filed }
+  return { announce: true, notified: usedTotal }
+}
+
+// Section copy carrying one network's total and its announced milestone.
+// Pure, like withMuted: the caller writes the result back through the cache,
+// and the mute map rides along untouched.
+function withMeteredUsage(section, key, total, notified) {
+  const s = section !== null && typeof section === "object" && !Array.isArray(section)
+    ? section : {}
+  const next = Object.assign({}, s)
+  const usage = s.meteredUsage !== null && typeof s.meteredUsage === "object" && !Array.isArray(s.meteredUsage)
+    ? s.meteredUsage : {}
+  const notifiedMap = s.meteredUsageNotified !== null && typeof s.meteredUsageNotified === "object" && !Array.isArray(s.meteredUsageNotified)
+    ? s.meteredUsageNotified : {}
+  const filed = String(key === undefined || key === null ? "" : key)
+  next.meteredUsage = Object.assign({}, usage)
+  next.meteredUsage[filed] = total
+  next.meteredUsageNotified = Object.assign({}, notifiedMap)
+  next.meteredUsageNotified[filed] = notified
+  return next
+}
+
+// The usage milestone card: names the whole gigabytes used and the network
+// they were used on. No action flag - there is nothing to click through to.
+function meteredUsageArgv(ssid, gb) {
+  const name = escapeMarkup(ssid).trim()
+  const n = Math.max(0, Math.round(Number(gb) || 0))
+  const body = name !== ""
+    ? "You have used <b>" + n + " GB</b> of metered data on <b>" + name + "</b>."
+    : "You have used <b>" + n + " GB</b> of metered data."
+  return ["notify-send", "-a", "Vibranium", "-u", "normal",
+    "-t", "8000",
+    "-n", "wifi-3",
+    "-h", "string:x-vb-tag:" + METERED_USAGE_TAG,
+    "Metered data used", body]
 }
 
 if (typeof module !== "undefined") {
@@ -540,6 +625,11 @@ if (typeof module !== "undefined") {
     OFFLINE_TAG: OFFLINE_TAG,
     GB_BYTES: GB_BYTES,
     METERED_USAGE_TAG: METERED_USAGE_TAG,
+    parseDefaultIface: parseDefaultIface,
     usageKey: usageKey,
+    meteredUsageStep: meteredUsageStep,
+    meteredMilestone: meteredMilestone,
+    withMeteredUsage: withMeteredUsage,
+    meteredUsageArgv: meteredUsageArgv,
   }
 }
