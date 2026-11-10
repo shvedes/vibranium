@@ -1579,6 +1579,42 @@ function groupSearchResults(hits, lookup, isVisible, query) {
     if (typeof item.page !== "string" || item.page === "") return false
     return String(hit.label).toLowerCase().indexOf(q) >= 0
   }
+
+  // A fresh copy per hit, every call. A copy cached by index entry would make
+  // an identity comparison in the panel succeed where the live candidate
+  // fails it, which is only a safe shortcut if the copy can never go stale -
+  // and it can. Menu.refreshSectionCounts rewrites a submenu link's `sub` in
+  // place ("N items") without replacing the index entry, so a cached row kept
+  // a count the page had already moved past. The copy is also what makes "the
+  // candidate changed" mean "the projection changed".
+  //
+  // Object.assign, NOT a spread literal. QML's JS engine rejects object
+  // spread ("Expected token `}'") and the parse failure takes the whole
+  // library down, which takes every menu surface with it - the node suite
+  // accepts the syntax, so only the engine can catch this.
+  function mergedRow(hit, item) {
+    const row = Object.assign({}, item || {}, {
+      label: hit.label,
+      hay: hit.hay,
+      path: hit.path,
+      pageId: hit.pageId,
+      row: hit.row
+    })
+    // An entry-only row has to be KEYED as well as drawn. The panel installs a
+    // search projection through a keyed model, and its keying step refuses the
+    // WHOLE install on the first row it cannot key instead of skipping that
+    // row, so a hit carrying no `uid` took every other hit down with it - a
+    // single registered picker row in the set was enough to answer a query
+    // that demonstrably had results. The entry already holds the two halves
+    // the key is composed from, and an entry that could not name its page is a
+    // page whose rows are anonymous (normalizeItem keys a blank id by row
+    // index), so this reproduces the key that row WOULD have had rather than
+    // inventing one. A resolved item keeps its own uid, so the key a row
+    // carries does not move when its page starts resolving.
+    if (row.uid === undefined || row.uid === null)
+      row.uid = hit.pageId + "#" + hit.row
+    return row
+  }
   const sections = []
   for (let i = 0; i < hits.length; i++) {
     const hit = hits[i]
@@ -1609,40 +1645,7 @@ function groupSearchResults(hits, lookup, isVisible, query) {
     // one - so the entry supplies the fields a row draws from. The `type` and
     // `call` the entry cannot carry are the reason an external row needs its
     // page: without them it would render and do nothing on Enter.
-    //
-    // A fresh copy per hit, every call. A copy cached by index entry would
-    // make an identity comparison in the panel succeed where the live
-    // candidate fails it, which is only a safe shortcut if the copy can never
-    // go stale - and it can. Menu.refreshSectionCounts rewrites a submenu link's
-    // `sub` in place ("N items") without replacing the index entry, so a cached
-    // row kept a count the page had already moved past. The copy is also what
-    // makes "the candidate changed" mean "the projection changed".
-    // Object.assign, NOT a spread literal. QML's JS engine rejects object
-    // spread ("Expected token `}'") and the parse failure takes the whole
-    // library down, which takes every menu surface with it - the node suite
-    // accepts the syntax, so only the engine can catch this. The spread was
-    // measured at 0.155ms against 0.415ms for Assign over a 200-hit projection;
-    // 0.26ms is the price of a library that loads.
-    const merged = Object.assign({}, item || {}, {
-      label: hit.label,
-      hay: hit.hay,
-      path: hit.path,
-      pageId: hit.pageId,
-      row: hit.row
-    })
-    // An entry-only row has to be KEYED as well as drawn. The panel installs
-    // a search projection through a keyed model, and its keying step refuses
-    // the WHOLE install on the first row it cannot key instead of skipping
-    // that row, so a hit carrying no `uid` took every other hit down with it -
-    // a single registered picker row in the set was enough to answer a query
-    // that demonstrably had results. The entry already holds the two halves
-    // the key is composed from, and an entry that could not name its page is
-    // a page whose rows are anonymous (normalizeItem keys a blank id by row
-    // index), so this reproduces the key that row WOULD have had rather than
-    // inventing one. A resolved item keeps its own uid, so the key a row
-    // carries does not move when its page starts resolving.
-    if (merged.uid === undefined || merged.uid === null)
-      merged.uid = hit.pageId + "#" + hit.row
+    const merged = mergedRow(hit, item)
     // A submenu link whose own LABEL spells the query is the section the user
     // is looking for, and it is hoisted instead of filed (see isSectionHit).
     // The test is on the label, not on the hit, because the hit only says the
