@@ -222,20 +222,21 @@ function parseOption(raw, fileNamespace) {
   const key = rawKey
 
   // Hyprland backend detection: explicit `hypr` object or key prefix hypr.
-  let isHypr = false
-  let hyprMeta = null
-  if (raw.hypr !== undefined && raw.hypr !== null) {
-    if (typeof raw.hypr !== "object" || Array.isArray(raw.hypr))
-      return { error: key + ": hypr must be an object" }
-    isHypr = true
-  } else if (HYPR_ID_RE.test(key)) {
-    isHypr = true
-    // Implicit hypr from key prefix - synthesize minimal meta
-    raw.hypr = {}
-  }
+  // The whole binding, including the path/ctl fallbacks, is one nested step so
+  // parseOption's body stays the field projection below.
+  function parseHypr() {
+    let isHypr = false
+    if (raw.hypr !== undefined && raw.hypr !== null) {
+      if (typeof raw.hypr !== "object" || Array.isArray(raw.hypr))
+        return { error: key + ": hypr must be an object" }
+      isHypr = true
+    } else if (HYPR_ID_RE.test(key)) {
+      isHypr = true
+      // Implicit hypr from key prefix - synthesize minimal meta
+      raw.hypr = {}
+    }
+    if (!isHypr) return { meta: null }
 
-  if (isHypr) {
-    // Validate hypr binding
     const h = raw.hypr
     let kind = typeof h.kind === "string" && h.kind !== "" ? h.kind : "option"
     const allowedKinds = { option: true, smartGaps: true, animPreset: true }
@@ -265,13 +266,17 @@ function parseOption(raw, fileNamespace) {
       if (!HYPR_ID_RE.test(key)) return { error: key + ": hypr option key must be hypr.*" }
       hyprPath = key.slice(5).split(".")
     }
-    let ctl = typeof h.ctl === "string" && h.ctl !== "" ? h.ctl : (hyprPath ? hyprPath.join(".") : "")
+    const ctl = typeof h.ctl === "string" && h.ctl !== "" ? h.ctl : (hyprPath ? hyprPath.join(".") : "")
     if (kind === "option" && (!hyprPath || hyprPath.length === 0 || ctl === ""))
       return { error: key + ": hypr option needs path/ctl" }
     if (!HYPR_ID_RE.test(key))
       return { error: key + ": hypr key must be hypr.* (e.g. hypr.input.sensitivity)" }
-    hyprMeta = { file: file, path: hyprPath, ctl: ctl, kind: kind }
+    return { meta: { file: file, path: hyprPath, ctl: ctl, kind: kind } }
   }
+  const hypr = parseHypr()
+  if (hypr.error) return { error: hypr.error }
+  const isHypr = hypr.meta !== null
+  const hyprMeta = hypr.meta
 
   const isMisc = MISC_ID_RE.test(key)
   const isEnv = !isHypr && !isMisc && key.indexOf(".") < 0
@@ -357,32 +362,38 @@ function parseOption(raw, fileNamespace) {
   // ({chassis} and/or {binary}); free bash survives only on raw `items`
   // (actions), which keep `when` verbatim. An option `when` from an
   // older catalog translates with a warning, then lint rejects it.
-  let requires = null
-  if (raw.requires !== undefined && raw.requires !== null) {
-    if (typeof raw.requires !== "object" || Array.isArray(raw.requires))
-      return { error: key + ": requires must be an object" }
-    const rq = {}
-    if (raw.requires.chassis !== undefined) {
-      if (typeof raw.requires.chassis !== "string" || raw.requires.chassis.trim() === "")
-        return { error: key + ": requires.chassis must be non-empty string" }
-      rq.chassis = raw.requires.chassis.trim()
+  function parseRequires() {
+    if (raw.requires !== undefined && raw.requires !== null) {
+      if (typeof raw.requires !== "object" || Array.isArray(raw.requires))
+        return { error: key + ": requires must be an object" }
+      const rq = {}
+      if (raw.requires.chassis !== undefined) {
+        if (typeof raw.requires.chassis !== "string" || raw.requires.chassis.trim() === "")
+          return { error: key + ": requires.chassis must be non-empty string" }
+        rq.chassis = raw.requires.chassis.trim()
+      }
+      if (raw.requires.binary !== undefined) {
+        if (typeof raw.requires.binary !== "string" || raw.requires.binary.trim() === "")
+          return { error: key + ": requires.binary must be non-empty string" }
+        rq.binary = raw.requires.binary.trim()
+      }
+      if (Object.keys(rq).length === 0) return { error: key + ": requires needs at least chassis or binary" }
+      return { requires: rq }
     }
-    if (raw.requires.binary !== undefined) {
-      if (typeof raw.requires.binary !== "string" || raw.requires.binary.trim() === "")
-        return { error: key + ": requires.binary must be non-empty string" }
-      rq.binary = raw.requires.binary.trim()
+    if (raw.when !== undefined || raw.disabled !== undefined) {
+      const w = typeof raw.when === "string" ? raw.when.trim() : ""
+      if (w !== "") {
+        if (w.indexOf("wiremix") >= 0) return { requires: { binary: "wiremix" } }
+        if (w.indexOf("CHASSIS_TYPE") >= 0 && w.indexOf("laptop") >= 0) return { requires: { chassis: "laptop" } }
+        if (w.indexOf("CHASSIS_TYPE") >= 0 && w.indexOf("!= vm") >= 0) return { requires: { chassis: "!vm" } }
+        return { error: key + ": when not translatable - use requires" }
+      }
     }
-    if (Object.keys(rq).length === 0) return { error: key + ": requires needs at least chassis or binary" }
-    requires = rq
-  } else if (raw.when !== undefined || raw.disabled !== undefined) {
-    const w = typeof raw.when === "string" ? raw.when.trim() : ""
-    if (w !== "") {
-      if (w.indexOf("wiremix") >= 0) requires = { binary: "wiremix" }
-      else if (w.indexOf("CHASSIS_TYPE") >= 0 && w.indexOf("laptop") >= 0) requires = { chassis: "laptop" }
-      else if (w.indexOf("CHASSIS_TYPE") >= 0 && w.indexOf("!= vm") >= 0) requires = { chassis: "!vm" }
-      else return { error: key + ": when not translatable - use requires" }
-    }
+    return { requires: null }
   }
+  const req = parseRequires()
+  if (req.error) return { error: req.error }
+  const requires = req.requires
 
   // Staged input flow (spec 41): ordered steps rendered one at a time in
   // a single expansion (see MenuLib flow contract). Passthrough - parsed
