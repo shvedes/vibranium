@@ -10,6 +10,7 @@
 .pragma library
 
 .import "../text/Format.js" as Format
+.import "../math/Range.js" as Range
 
 var MS_PER_DAY = 86400000
 
@@ -79,7 +80,7 @@ function daysInYear(year) {
 function yearProgress(year, month, day) {
   var total = daysInYear(year)
   if (total <= 0) return 0
-  return Math.max(0, Math.min(1, (dayOfYear(year, month, day) - 1) / total))
+  return Range.clamp01((dayOfYear(year, month, day) - 1) / total)
 }
 
 function yearProgressPercent(year, month, day) {

@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.common
+import "../math/Range.js" as Range
 
 // Live level meter: the shell's one peak bar. The volume island's two inline
 // meters and the audio mixer's row meters are this same type, so their
@@ -30,7 +31,7 @@ Rectangle {
       if (h.active !== true) return 0
       const p = Number(h.peak)
       if (!isFinite(p)) return 0
-      return Math.max(0, Math.min(1, p * meter.gain))
+      return Range.clamp01(p * meter.gain)
     }
     return meter.peak
   }
@@ -59,7 +60,7 @@ Rectangle {
     anchors.left: parent.left
     anchors.top: parent.top
     anchors.bottom: parent.bottom
-    width: parent.width * (meter.muted ? 0 : Math.max(0, Math.min(1, meter.level)))
+    width: parent.width * (meter.muted ? 0 : Range.clamp01(meter.level))
     // The fill is the level, so the clip state rides the fill: the
     // track stays the neutral trough behind it and the bar reads as
     // loud-then-clipping rather than fully red at any level.
