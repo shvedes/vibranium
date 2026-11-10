@@ -1444,8 +1444,21 @@ function timeVerdict(line, previous) {
 // (`--` / `--url`, e.g. `discord --url -- %u`) which is peeled so the shim
 // never receives it. Parsing only: handing the result to a process is the
 // controller's.
+//
+// The command is a sequence detected by shape, not with Array.isArray:
+// Quickshell's DesktopEntry.command is a QStringList that QML converts into an
+// array object its engine's Array.isArray still answers false for (measured in
+// Quickshell 0.3.2: `Array.isArray(command)` is false while
+// `command instanceof Array` is true). Rejecting it silently forced the
+// raw-Exec fallback for every entry, and that fallback only splits on
+// whitespace - so `Exec="/opt/My App/app" --flag %U` reached the launch shim
+// as the literal quoted words instead of the parsed argv, and the shim
+// reported the quote-wrapped executable as a missing command. A string is
+// deliberately not a sequence: it falls through to the raw Exec below.
 function execArgs(entry) {
-  let parts = (entry && Array.isArray(entry.command)) ? entry.command : []
+  const parsed = entry ? entry.command : null
+  const hasCommand = parsed !== null && typeof parsed === "object" && typeof parsed.length === "number"
+  let parts = hasCommand ? parsed : []
   if (parts.length === 0) {
     const raw = entry ? String(entry.execString ?? "").trim() : ""
     if (raw === "") return []

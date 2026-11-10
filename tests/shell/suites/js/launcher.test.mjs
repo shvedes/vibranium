@@ -2799,6 +2799,40 @@ group('execArgs prefers the parsed command array', () => {
   eq('an empty member is skipped', LL.execArgs({ command: ['a', '', 'b'] }), ['a', 'b'])
 })
 
+// What QML actually hands over for DesktopEntries.command: a QStringList
+// converted into an object whose prototype chain is Array.prototype, but for
+// which the engine's `Array.isArray` answers false. Measured in Quickshell
+// 0.3.2, and the reason execArgs no longer uses Array.isArray: the false
+// answer dropped the parsed argv and whitespace-split the raw Exec instead,
+// keeping quote characters in the arguments.
+function qmlCommandList(items) {
+  const seq = Object.create(Array.prototype)
+  for (let i = 0; i < items.length; i++) seq[i] = items[i]
+  seq.length = items.length
+  return seq
+}
+
+group('execArgs accepts the command sequence QML hands over', () => {
+  const cmd = qmlCommandList(['/opt/My App/bin/app', '--flag=a b', '%U'])
+  eq('Array.isArray does not see the QML sequence', Array.isArray(cmd), false)
+  eq('although it is an Array by prototype', cmd instanceof Array, true)
+  eq('so the parsed argv is used instead of the raw Exec',
+    LL.execArgs({ command: cmd, execString: '"/opt/My App/bin/app" "--flag=a b" %U' }),
+    ['/opt/My App/bin/app', '--flag=a b'])
+  // The empty check is on length, so an empty sequence is still the documented
+  // "nothing parsed" state and the raw string answers.
+  eq('an empty QML sequence falls through to the raw string',
+    LL.execArgs({ command: qmlCommandList([]), execString: 'x --y' }), ['x', '--y'])
+  // The sequence is detected by shape, so a plain array-like object indexes the
+  // same way and needs no Array prototype at all.
+  eq('a bare array-like object is a command too',
+    LL.execArgs({ command: { length: 2, 0: 'x', 1: '--y' } }), ['x', '--y'])
+  // Pinned against the shape check swallowing a string: `command: 'x'` was
+  // never an argv and still falls through (the group below records it too).
+  eq('a string command is still not a sequence',
+    LL.execArgs({ command: 'x', execString: 'y' }), ['y'])
+})
+
 group('execArgs falls back to the raw Exec string', () => {
   eq('whitespace splitting', LL.execArgs({ execString: 'discord --no-sandbox' }), ['discord', '--no-sandbox'])
   eq('a trailing %U is dropped', LL.execArgs({ execString: 'discord %U' }), ['discord'])
