@@ -808,9 +808,7 @@ Singleton {
           && (!root._hasGit || root._gitFresh)
         if (known && root._userFiles.length === 0 && root.backgroundsDir !== "") {
             // No wallpapers – notify
-            const proc = notifyProc.createObject(root, { command: ["notify-send", "-r", "1", "Vibranium", "No user wallpapers found for current theme"] })
-            proc.exited.connect(proc.destroy)
-            proc.running = true
+            Exec.notify("No user wallpapers found for current theme", null, { replaceId: 1 })
             return "ok"
         }
         root.query = ""
@@ -1035,13 +1033,6 @@ Singleton {
         root.close()
     }
 
-    Component {
-        id: notifyProc
-        Process {
-            stdout: StdioCollector {}
-            stderr: StdioCollector {}
-        }
-    }
     Component {
         id: delProc
         Process {

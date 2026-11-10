@@ -140,7 +140,7 @@ Singleton {
   }
 
   function _notifyVm() {
-    Quickshell.execDetached(["notify-send", "Screen Recorder", "screen recording isn't available in a VM!"])
+    Exec.notify("Screen Recorder", "screen recording isn't available in a VM!")
   }
 
   function _stopOngoing() {
