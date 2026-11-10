@@ -2308,8 +2308,8 @@ PanelWindow {
             const spot = editor.handleSpots[drawArea.cropHandle] || { fx: 0, fy: 0 }
             const g = drawArea.cropGrab
             const vr2 = editor.viewRect
-            const cx = v => Math.max(vr2.x, Math.min(vr2.x + vr2.w, v))
-            const cy = v => Math.max(vr2.y, Math.min(vr2.y + vr2.h, v))
+            const cx = v => Range.clamp(v, vr2.x, vr2.x + vr2.w)
+            const cy = v => Range.clamp(v, vr2.y, vr2.y + vr2.h)
             const ex0 = spot.fx === 0 ? p.x : g.x0
             const ex1 = spot.fx === 1 ? p.x : g.x1
             const ey0 = spot.fy === 0 ? p.y : g.y0
@@ -2446,7 +2446,7 @@ PanelWindow {
           // has no box: it keeps the slider size and anchors at the point.
           const t = editor.textRect
           if (t.w > 8 && t.h > 8) {
-            editor.fontSize = Math.max(10, Math.min(72, Math.round(t.h)))
+            editor.fontSize = Range.clamp(Math.round(t.h), 10, 72)
             // Font from the inset box itself (see _textFieldInner), so
             // preview, commit and outline all share one size.
             const ti = editor._textFieldInner
@@ -2765,7 +2765,7 @@ PanelWindow {
         anchors.left: parent.left
         anchors.top: parent.top
         anchors.bottom: parent.bottom
-        width: parent.width * Math.max(0, Math.min(1, knob.frac))
+        width: parent.width * Range.clamp01(knob.frac)
         radius: RoundingPolicy.radius
         color: Theme.color("accent")
       }
