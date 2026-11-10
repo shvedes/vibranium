@@ -41,7 +41,7 @@ PanelWindow {
     window: root
   }
 
-  color: Ui.solid("background_0")
+  color: "transparent"
   exclusionMode: ExclusionMode.Ignore
   exclusiveZone: -1
   anchors.left: true
@@ -87,6 +87,39 @@ PanelWindow {
   // island's lane.
   property bool _seeking: false
   property real _pressX: 0
+
+  // Backdrop density. The surface paints the theme background solid under the
+  // transcript; a double click on empty space swaps it for the same colour at
+  // 80% opacity, which lets the desktop read faintly behind the lyrics while
+  // they stay legible. A view preference rather than a setting, so it lives in
+  // the shell cache ($VIBRANIUM_CACHE/shell.json, "lyrics" section) instead of
+  // the settings catalog.
+  //
+  // The fill is a Rectangle inside the window, not the window's own `color`:
+  // a surface colour reaches the compositor with the surface, so a live change
+  // to it only shows up the next time the surface is mapped - the backdrop
+  // stayed opaque until the overlay was reopened. A Rectangle is ordinary
+  // scene graph and repaints on the tick the cache write lands, which is also
+  // what lets the compositor's blur follow the alpha (see the vibranium:lyrics
+  // layer rule in default/hypr/window-rules.lua).
+  readonly property real dimBackdropAlpha: 0.8
+
+  // Read through the cache on every evaluation, so a restart and a second
+  // overlay (one per bar) both land on the saved value; toggleBackdrop is the
+  // only writer. Anything outside (0, 1) - absent, hand-edited, a future
+  // value this switch does not own - reads as the solid backdrop rather than
+  // as a half-painted surface.
+  readonly property real backdropAlpha: {
+    const a = ShellCache.number("lyrics", "backdropAlpha", 1)
+    return a > 0 && a < 1 ? a : 1
+  }
+
+  readonly property color backdropColor: Ui.tint("background_0", root.backdropAlpha)
+
+  function toggleBackdrop() {
+    ShellCache.updateSection("lyrics",
+      { backdropAlpha: root.backdropAlpha >= 1 ? root.dimBackdropAlpha : 1 })
+  }
 
   function open(p) {
     if (p === null || p === undefined) return
@@ -276,12 +309,34 @@ PanelWindow {
     function onPlaybackStateChanged() { root.reanchor() }
   }
 
+
+
   Item {
     id: content
 
     anchors.fill: parent
     focus: root.opened
     Keys.onEscapePressed: root.close()
+
+    // The surface's own backdrop, under everything else. See backdropColor for
+    // why this is a Rectangle rather than the window's colour.
+    Rectangle {
+      id: backdrop
+
+      anchors.fill: parent
+      color: root.backdropColor
+    }
+
+    // Empty space is the gesture surface: a double click anywhere the pads,
+    // the lane and the transcript do not reach swaps the backdrop. Declared
+    // under the rest, so every other child keeps its own clicks.
+    MouseArea {
+      id: backdropHit
+
+      anchors.fill: parent
+      acceptedButtons: Qt.LeftButton
+      onDoubleClicked: root.toggleBackdrop()
+    }
 
     // Screen-relative margins: a 1080p output and a 3:2 laptop get the same
     // composition instead of the same pixel inset.
@@ -652,6 +707,11 @@ PanelWindow {
         id: pane
 
         anchors.fill: parent
+        // The pane answers "no lyrics" in one small line of its own; an empty
+        // state above it says the same thing at presentation scale. With a
+        // translucent backdrop that line would read through the cover, so the
+        // pane steps out of the way while a cover is over it.
+        opacity: pane.status === "none" || !root.hasTrack ? 0 : 1
         player: root.player
         position: root.shownPosition
         active: root.opened
@@ -672,7 +732,7 @@ PanelWindow {
       Rectangle {
         anchors.fill: parent
         visible: pane.status === "none"
-        color: Ui.solid("background_0")
+        color: root.backdropColor
 
         Column {
           anchors.centerIn: parent
@@ -705,7 +765,7 @@ PanelWindow {
       Rectangle {
         anchors.fill: parent
         visible: !root.hasTrack
-        color: Ui.solid("background_0")
+        color: root.backdropColor
 
         Column {
           anchors.centerIn: parent

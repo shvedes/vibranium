@@ -183,6 +183,18 @@ hl.layer_rule({
   blur = true
 })
 
+-- The fullscreen lyrics surface, the bar's rule applied to its backdrop: at
+-- the double-click density the fill is 80% and the desktop reads through it,
+-- so what shows through has to be the blur rather than the sharp desktop.
+-- `ignore_alpha` is the half that makes this work - without it the rule blurs
+-- the fully opaque backdrop too, which is a cost paid for nothing.
+hl.layer_rule({
+  name = "Vibranium Lyrics Blur",
+  match = { namespace = "^vibranium:lyrics$" },
+  ignore_alpha = 0.2,
+  blur = true
+})
+
 -- Display the privacy dots overlay above other overlays.
 --
 -- `order` counts DOWN: Hyprland sorts the surfaces of a layer by this value
