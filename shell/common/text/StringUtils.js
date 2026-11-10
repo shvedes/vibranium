@@ -48,6 +48,17 @@ function extname(path) {
   return p.substring(dot + 1).toLowerCase()
 }
 
+// Path with its lowercased final extension removed, dot included, or the
+// path itself when it carries none. Uses the same dot rule as extname(),
+// so a dot in a directory is not an extension.
+function stem(path) {
+  const p = String(path ?? "")
+  const slash = p.lastIndexOf("/")
+  const dot = p.lastIndexOf(".")
+  if (dot <= slash || dot < 0) return p
+  return p.substring(0, dot)
+}
+
 // Join a directory and an entry name with exactly one separator. An empty
 // directory names the entry itself, so a vault root and a child share one
 // spelling.
