@@ -1169,6 +1169,23 @@ function parseGitInfoOutput(text) {
     if (x !== " " && x !== "?") g.staged++
     if (y !== " " && y !== "?") g.unstaged++
   }
+
+  // The head and remote lines outside the two sections.
+  function applyHeadLine(line) {
+    const sp = line.indexOf(" ")
+    const key = sp < 0 ? line : line.substring(0, sp)
+    const val = sp < 0 ? "" : line.substring(sp + 1).trim()
+    if (key === "head") {
+      const h = parseHead(val)
+      g.branch = h.branch
+      g.upstream = h.upstream
+      g.ahead = h.ahead
+      g.behind = h.behind
+      g.gone = h.gone
+      g.detached = h.detached
+    }
+    else if (key === "remote") g.remote = cleanGitRemote(val)
+  }
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]
     if (line === "---STATUS---") { inStatus = true; inCommit = false; continue }
@@ -1183,19 +1200,7 @@ function parseGitInfoOutput(text) {
       applyStatusLine(line)
       continue
     }
-    const sp = line.indexOf(" ")
-    const key = sp < 0 ? line : line.substring(0, sp)
-    const val = sp < 0 ? "" : line.substring(sp + 1).trim()
-    if (key === "head") {
-      const h = parseHead(val)
-      g.branch = h.branch
-      g.upstream = h.upstream
-      g.ahead = h.ahead
-      g.behind = h.behind
-      g.gone = h.gone
-      g.detached = h.detached
-    }
-    else if (key === "remote") g.remote = cleanGitRemote(val)
+    applyHeadLine(line)
   }
   return g
 }
