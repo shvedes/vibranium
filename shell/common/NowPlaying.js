@@ -55,7 +55,7 @@ function pickPlayerIndex(previous, next, currentIndex, isPlaying) {
   const last = next.length - 1
   if (last < 0) return 0
   const raw = Number(currentIndex)
-  const at = isFinite(raw) ? Math.min(last, Math.max(0, Math.trunc(raw))) : 0
+  const at = isFinite(raw) ? Range.clamp(Math.trunc(raw), 0, last) : 0
   const held = previous[at]
   if (held === null || held === undefined) return 0
   const found = next.indexOf(held)
@@ -446,7 +446,7 @@ function normalizePosition(pos, len) {
 function progressPercent(pos, len) {
   const l = Number(len)
   if (!isFinite(l) || l <= 0) return -1
-  return Math.min(100, Math.max(0, normalizePosition(pos, l) / l * 100))
+  return Range.clamp(normalizePosition(pos, l) / l * 100, 0, 100)
 }
 
 // The position a media surface should show for `player`: its own reading,
