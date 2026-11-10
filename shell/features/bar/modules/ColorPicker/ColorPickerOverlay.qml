@@ -289,10 +289,10 @@ PanelWindow {
     // centre, then kept inside the frame, so a box flush against a screen
     // edge never magnifies past the frame's border. Two named values because
     // the cross reads the same numbers back rather than repeating them.
-    readonly property real lensViewX: Math.max(width - overlay.width * magStep,
-      Math.min(0, width / 2 - overlay.aimX * magStep))
-    readonly property real lensViewY: Math.max(height - overlay.height * magStep,
-      Math.min(0, height / 2 - overlay.aimY * magStep))
+    readonly property real lensViewX: Range.clamp(
+      width / 2 - overlay.aimX * magStep, width - overlay.width * magStep, 0)
+    readonly property real lensViewY: Range.clamp(
+      height / 2 - overlay.aimY * magStep, height - overlay.height * magStep, 0)
     // The cross marks the pixel a click samples: exactly where that magnified
     // view renders the aimed point, inset by 7px so the 13px bars stay inside
     // the shape. Reading the position off the view's own transform is the whole
