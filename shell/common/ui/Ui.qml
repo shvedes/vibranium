@@ -215,16 +215,6 @@ Singleton {
   // The two contrast ratios are compared against each other rather than
   // against a brightness threshold: both candidates move with the theme, so a
   // threshold tuned for one palette misreads the next.
-  function contrastOn(key) {
-    const fill = root.luminance(Theme.color(key))
-    const onFill = root.luminance(Theme.color("background_0"))
-    const againstFill = root.luminance(Theme.color("foreground_0"))
-    // Nothing measured: the foreground is the safe answer on an unknown fill,
-    // and the real palette lands within milliseconds and rebinds.
-    if (fill === null || onFill === null || againstFill === null) return root.solid("foreground_0")
-    const ratio = (a, b) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05)
-    return root.solid(ratio(fill, onFill) >= ratio(fill, againstFill) ? "background_0" : "foreground_0")
-  }
 
   // Card geometry helpers re-exported for declarative panels (no JS import needed).
   function chromeHeight(outerPad, filterH, listTopGap) {
