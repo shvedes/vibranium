@@ -146,11 +146,6 @@ Singleton {
   property var _prevLinkUp: null
   property var _prevWifiUp: null
   property var _prevWifiOn: null
-  // The offline card came from the optimistic edge (link loss) rather
-  // than a poll verdict. A radio toggle under one retires it silently;
-  // a poll verdict stands on its own reading.
-  property bool _offlineOptimistic: false
-
   // The blocked metered sender (its stdout is the mute button) and the
   // in-flight connectivity-URI read. At most one of each; killed on
   // episode end and on teardown.
@@ -323,24 +318,16 @@ Singleton {
   // Fresh association: the link just (re)associated, possibly onto a new
   // SSID. Re-stamps the offline grace for the network that is up now, so a
   // roam A->B waits out the grace on B instead of announcing instantly on
-  // A's old stamp. Cancels a pending link-loss edge (the gap healed) and
-  // retires a stale link-loss card for the network just left; the next dark
-  // poll then defers and, if still dark after the grace, announces with the
-  // current name. A poll-verdict card stays: same-network flaps keep it
-  // instead of flashing. Idempotent.
+  // A's old stamp. Cancels a pending link-loss edge (the gap healed); the
+  // next dark poll then defers and, if still dark after the grace,
+  // announces with the current name. A standing card stays: same-network
+  // flaps keep it instead of flashing. Idempotent.
   function _noteFreshLink() {
     root._linkUpAtMs = Date.now()
     root._prevLinked = false
     optimisticTimer.stop()
     root._linkDownAtMs = 0
     root._linkDownWifi = false
-    if (!root._offlineShown || !root._offlineOptimistic) return
-    root._offlineShown = false
-    root._offlineOptimistic = false
-    root._offlineSeq++
-    const id = root._offlineNotifId
-    root._offlineNotifId = 0
-    if (id > 0) Exec.run(Lib.closeArgv(id))
   }
 
   // Transition effects live here; the decisions live in the library as
@@ -366,7 +353,6 @@ Singleton {
       // Both still retire together when the link recovers.
       if (root._offlineShown) {
         root._offlineShown = false
-        root._offlineOptimistic = false
         root._offlineSeq++
         const oid = root._offlineNotifId
         root._offlineNotifId = 0
@@ -443,7 +429,6 @@ Singleton {
         }
         Log.info("connectivity offline")
         root._offlineShown = true
-        root._offlineOptimistic = false
         root._offlineSeq++
         const mySeq = root._offlineSeq
         root._pollDone(seq)
@@ -466,7 +451,6 @@ Singleton {
       // no card, so there is nothing to close and no toast to send
       // instead - the request was no toast on recovery.
       root._offlineShown = false
-      root._offlineOptimistic = false
       root._offlineSeq++
       const id = root._offlineNotifId
       root._offlineNotifId = 0
@@ -703,24 +687,15 @@ Singleton {
     // Mirror ordering of the toggle race: the device update landed first
     // and armed (or fired) optimistically, then the toggle arrived. A radio
     // toggle explains a wifi-carried loss even when it arrives second, so it
-    // cancels the pending edge as well as retiring the card - otherwise the
-    // deferred edge fires minutes of intent later with a false card, and
-    // toggling everything off is silence, not news. A pending wired loss
-    // survives the toggle: it was unexpected either way. A poll verdict
-    // stands on its own reading and stays.
+    // cancels the pending edge - otherwise the deferred edge fires minutes
+    // of intent later with a false card, and toggling everything off is
+    // silence, not news. A pending wired loss survives the toggle: it was
+    // unexpected either way.
     if (root._prevWifiOn === true && wifiOn === false) {
       if (optimisticTimer.running && root._linkDownWifi) {
         optimisticTimer.stop()
         root._linkDownAtMs = 0
         root._linkDownWifi = false
-      }
-      if (root._offlineShown && root._offlineOptimistic) {
-        root._offlineOptimistic = false
-        root._offlineShown = false
-        root._offlineSeq++
-        const id = root._offlineNotifId
-        root._offlineNotifId = 0
-        if (id > 0) Exec.run(Lib.closeArgv(id))
       }
     }
     root._prevLinkUp = up
@@ -831,20 +806,6 @@ Singleton {
   // from the deferred edge above, so a roam gap that healed in the meantime
   // never reaches here; a false alarm that still slips through costs a flash
   // and no toast, since the recovery close is silent.
-  function _optimisticOffline() {
-    if (root._offlineShown) return
-    root._offlineShown = true
-    root._offlineOptimistic = true
-    root._linkDownAtMs = 0
-    root._linkDownWifi = false
-    root._offlineSeq++
-    const mySeq = root._offlineSeq
-    Log.info("connectivity offline (link lost)")
-    root._resolveSsid(name => {
-      if (mySeq !== root._offlineSeq || !root._offlineShown) return
-      root._sendOfflineCard(Lib.offlineArgv(name), mySeq)
-    })
-  }
 
   // One watcher per network device, mirroring BatteryAlert's per-device
   // set: the devices model only moves as a SET, while association moves
