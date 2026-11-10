@@ -7,6 +7,7 @@ import qs.common
 import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/text/Format.js" as Format
+import "../../../../common/motion/Marquee.js" as Marquee
 
 // Now Playing island. Lockscreen flat-box language (square corners,
 // translucent theme fill, 1px keyline): large art left, track lines +
@@ -959,8 +960,7 @@ Item {
                   clip: true
 
                   readonly property real overflow: Math.max(0, titleText.implicitWidth - width)
-                  readonly property int legMs: Math.max(1800, Math.min(9000,
-                    Math.round(1800 + overflow * 24)))
+                  readonly property int legMs: Marquee.legMs(overflow)
                   readonly property int endpointPauseMs: 400
 
                   function reset() {
@@ -1053,8 +1053,7 @@ Item {
                   clip: true
 
                   readonly property real overflow: Math.max(0, artistText.implicitWidth - width)
-                  readonly property int legMs: Math.max(1800, Math.min(9000,
-                    Math.round(1800 + overflow * 24)))
+                  readonly property int legMs: Marquee.legMs(overflow)
                   readonly property int endpointPauseMs: 400
 
                   function reset() {
@@ -1133,8 +1132,7 @@ Item {
                   clip: true
 
                   readonly property real overflow: Math.max(0, albumText.implicitWidth - width)
-                  readonly property int legMs: Math.max(1800, Math.min(9000,
-                    Math.round(1800 + overflow * 24)))
+                  readonly property int legMs: Marquee.legMs(overflow)
                   readonly property int endpointPauseMs: 400
 
                   function reset() {

@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.features.clipboard
+import "../../common/motion/Marquee.js" as Marquee
 
 // Clipboard row - mirrors LauncherEntry with descriptions enabled:
 // icon 20px, title, subLeft - time, pin indicator. Looks like AppLauncher
@@ -152,8 +153,7 @@ Item {
         readonly property bool scrollable: row.pathLike && MotionPolicy.enabled
           && titleText.implicitWidth > width
         readonly property real overflow: Math.max(0, titleText.implicitWidth - width)
-        readonly property int legMs: Math.max(1800, Math.min(9000,
-          Math.round(1800 + overflow * 24)))
+        readonly property int legMs: Marquee.legMs(overflow)
         readonly property int startPauseMs: 1200
         readonly property int endpointPauseMs: 400
 
