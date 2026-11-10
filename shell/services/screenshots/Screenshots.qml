@@ -1774,7 +1774,8 @@ Singleton {
       root._fail(win, "empty frame", flowId, jobId)
       return
     }
-    const plan = root._planShotPaths(config, mode, pendingCrop, root._nextStem())
+    const stem = root._nextStem()
+    const plan = root._planShotPaths(config, mode, pendingCrop, stem)
     const defer = plan.defer
     const cropDst = plan.cropDst
     const fullTemp = plan.fullTemp
