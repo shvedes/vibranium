@@ -24,8 +24,12 @@ function isPotentialCalc(query) {
     // must contain digit
     if (!/[0-9]/.test(s)) return false
     // must contain operator or parentheses to be expression-like
-    // otherwise "123" would hide apps incorrectly
-    if (!/[+\-*/%^()]/.test(s)) return false
+    // otherwise "123" would hide apps incorrectly. A single leading unary
+    // sign is part of the number, not proof of an expression: strip it first
+    // so "-42", "+42" and "- 42" are refused like "42". A second sign is a
+    // negation of a negation, which is an expression, so "--5" still passes.
+    var expr = s.replace(/^[+\-]\s*/, "")
+    if (!/[+\-*/%^()]/.test(expr)) return false
     return true
 }
 

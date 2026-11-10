@@ -1083,31 +1083,33 @@ group('a bare number is NOT calc, and that is the documented reason', () => {
   eq('1234567890', CL.isPotentialCalc('1234567890'), false)
   eq('5.', CL.isPotentialCalc('5.'), false)
   eq('.5', CL.isPotentialCalc('.5'), false)
-  eq('a signed number is the documented exception, see below', CL.isPotentialCalc('-42'), true)
+  eq('a signed number too', CL.isPotentialCalc('-42'), false)
   // The gate is not a "looks numeric" heuristic; it demands an operator or a
   // paren, so the unsigned form falls through to app search.
   eq('and tryEvaluate agrees', CL.tryEvaluate('42'), null)
   eq('and on 5.', CL.tryEvaluate('5.'), null)
 })
 
-group('a *signed* bare number is calc anyway, because the sign is the operator', () => {
+group('a leading sign is part of the number, not an operator', () => {
   // The "must contain an operator or paren" test is a character test, and a
-  // leading '-' or '+' satisfies it. So the documented reason - "avoid hiding
-  // apps when typing a number" - holds for an unsigned number but not for a
-  // negative one: typing -42 in the launcher shows -42 instead of the app
-  // list. Pinned as observed, with the gap recorded.
-  eq('-42 passes the gate', CL.isPotentialCalc('-42'), true)
-  eq('+42 passes the gate', CL.isPotentialCalc('+42'), true)
-  eq('-4.2 passes the gate', CL.isPotentialCalc('-4.2'), true)
-  eq('- 42 with a space passes too', CL.isPotentialCalc('- 42'), true)
-  eq('and tryEvaluate evaluates it', CL.tryEvaluate('-42').value, -42)
-  eq('formatted', CL.tryEvaluate('-42').formatted, '-42')
-  eq('a signed decimal is evaluated', CL.tryEvaluate('-4.2').formatted, '-4.2')
-  eq('a positive signed number is evaluated', CL.tryEvaluate('+42').formatted, '42')
-  // The unadorned number is the one the comment is about, and it is refused.
-  eq('while the unsigned form is still refused', CL.isPotentialCalc('42'), false)
-  eq('and so is a parenthesised one', CL.tryEvaluate('(42)').formatted, '42')
-  skip('a single number alone is NOT considered calc to avoid hiding apps', 'CalcLib.js:13-14 - the /[+\\-*\\/%^()]/ operator test is satisfied by a leading sign, so -42 is treated as calc')
+  // leading '-' or '+' used to satisfy it, so typing -42 in the launcher hid
+  // the app list for a bare number - the exact case the gate exists to avoid.
+  // The sign run is stripped before the operator test now.
+  eq('-42 is refused', CL.isPotentialCalc('-42'), false)
+  eq('+42 is refused', CL.isPotentialCalc('+42'), false)
+  eq('-4.2 is refused', CL.isPotentialCalc('-4.2'), false)
+  eq('- 42 with a space is refused', CL.isPotentialCalc('- 42'), false)
+  // A second sign negates a negation, which is an expression rather than a
+  // number, so it keeps passing through the gate.
+  eq('a doubled sign is an expression', CL.isPotentialCalc('--42'), true)
+  // Real expressions keep passing, and the evaluator still computes them.
+  eq('a signed expression passes', CL.isPotentialCalc('-42+1'), true)
+  eq('and is evaluated', CL.tryEvaluate('-42+1').value, -41)
+  eq('a bare signed number is not evaluated', CL.tryEvaluate('-42'), null)
+  eq('nor a signed decimal', CL.tryEvaluate('-4.2'), null)
+  eq('nor a signed integer with a plus', CL.tryEvaluate('+42'), null)
+  eq('the unsigned form is refused', CL.isPotentialCalc('42'), false)
+  eq('and a parenthesised number still evaluates', CL.tryEvaluate('(42)').formatted, '42')
 })
 
 group('an expression is calc', () => {

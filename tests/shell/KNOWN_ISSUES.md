@@ -209,21 +209,20 @@ header explicitly discusses, and it is the one that does not work.
 
 *Reproduced by `suites/js/math-calc-color.test.mjs`.*
 
-### 8. `CalcLib` treats a signed number as a calc query, hiding the app list
+### 8. (fixed) `CalcLib` treats a signed number as a calc query, hiding the app list
 
-`shell/features/launcher/CalcLib.js:13-14, 28` — the quick-reject charset
+`shell/features/launcher/CalcLib.js` — the quick-reject charset
 `^[0-9+\-*/%^().\s]+$` admits `-`, and the "must look like an expression" test
-is satisfied by a leading sign.
+was satisfied by a leading sign, so `isPotentialCalc("-42")` answered `true`
+while `isPotentialCalc("42")` answered `false`. Typing a negative number hid
+every application match, which is the case the gate exists to prevent.
 
-```
-isPotentialCalc("42")   => false   (correct: documented intent)
-isPotentialCalc("-42")  => true    (typing a negative number hides every app)
-```
+The operator test now runs on the query with one leading unary sign stripped,
+so `-42`, `+42` and `- 42` are refused like `42`, while `-42+1` and `-(1)` keep
+passing and `--5` - a negation of a negation, which is an expression - is still
+accepted.
 
-The header states the operator requirement exists so that "typing a number does
-not hide every application match."
-
-*Reproduced by `suites/js/math-calc-color.test.mjs`.*
+*Reproduced and now verified by `suites/js/math-calc-color.test.mjs`.*
 
 ### 9. `isBrowserPlayer` checks the wrong variable on its identity branch
 
@@ -473,25 +472,25 @@ drops the pending delta rather than coalescing it - a one-line fix.
 
 *Reproduced by `suites/qml/calendar-graph-test.sh`.*
 
-### 22. `InputField.revealed` does not consult `revealable`
+### 22. (fixed) `InputField.revealed` does not consult `revealable`
 
-`shell/common/ui/InputField.qml:237-238`:
+`shell/common/ui/InputField.qml` computed
 
 ```qml
 echoMode: root.revealed ? TextInput.Normal : (root.sensitive ? TextInput.Password : root.echoMode)
 ```
 
-There is no `root.revealable` term, so `sensitive: true, revealable: false,
-revealed: true` unmasks the field.
+with no `root.revealable` term, so `sensitive: true, revealable: false,
+revealed: true` unmasked the field. `revealable` gated the affordance (the eye
+item and the Ctrl+H branch) but not the reveal state itself, so a consumer
+setting `revealed` from a binding could unmask a field it had declared
+un-revealable.
 
-**Honest severity: not reachable from user input.** The only two paths to
-`revealed` are the eye `MouseArea` (`eyeButton.visible: root.revealable`, so it
-takes no clicks) and the Ctrl+H branch, which is itself gated on
-`revealable`. It is reachable only from a consumer binding, so this is a
-hardening gap in a shared primitive rather than a live exposure -
-`root.revealed && root.revealable` would close it.
+The echo now reads `root.revealed && root.revealable`, which makes the two
+flags describe one piece of state. The property stays writable; it just cannot
+unmask a field whose consumer refused the reveal.
 
-*Reproduced by `suites/qml/textinput-test.sh`.*
+*Reproduced and now verified by `suites/qml/textinput-test.sh`.*
 
 ### 23. `Calendar.viewMonth` is a writable int with no normalisation
 
@@ -532,15 +531,18 @@ that was ever on screen**. Fix: carry the character in the model
 
 ## Low
 
-### 25. `InputField.clear()` does not emit `edited`
+### 25. (fixed) `InputField.clear()` does not emit `edited`
 
-`shell/common/ui/InputField.qml:117-119` assigns `input.text = ""` and emits
-nothing, while the clear affordance at `:370-374` assigns the same string *and*
-emits `root.edited("")`. `InputField.qml:158` documents `edited()` as the
-consumption path ("Panels simply listen to edited()"), so a consumer mirroring
-the field through that signal goes stale on every `clear()`.
+`shell/common/ui/InputField.qml` assigned `input.text = ""` and emitted
+nothing, while the clear affordance assigned the same string *and* emitted
+`root.edited("")`. `edited()` is the documented consumption path ("Panels
+simply listen to edited()"), so a consumer mirroring the field through that
+signal went stale on every `clear()`.
 
-*Reproduced by `suites/qml/textinput-test.sh`.*
+`clear()` now emits `edited("")` after emptying the field, so the method and
+the affordance have one signal contract.
+
+*Reproduced and now verified by `suites/qml/textinput-test.sh`.*
 
 ### 26. `PasswordBox.busy` paints a border and does nothing else
 
