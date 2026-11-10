@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "MixerModel.js" as Model
+import "../../../common/math/Range.js" as Range
 
 // The mixer window: a regular toplevel.
 //
@@ -120,7 +121,7 @@ QtObject {
     if (keys.length === 0) return
     let at = keys.indexOf(mixer.tab)
     if (at === -1) at = 0
-    mixer.tab = keys[Math.max(0, Math.min(keys.length - 1, at + delta))]
+    mixer.tab = keys[Range.clamp(at + delta, 0, keys.length - 1)]
   }
 
   // --- the output this window opens on ---
@@ -819,7 +820,7 @@ QtObject {
     function wheelBy(notches) {
       if (pop.overflows) {
         const maxY = Math.max(0, list.contentHeight - list.height)
-        list.contentY = Math.max(0, Math.min(maxY, list.contentY - notches * pop.rowH))
+        list.contentY = Range.clamp(list.contentY - notches * pop.rowH, 0, maxY)
         return
       }
       pop.paged(notches)
@@ -931,9 +932,9 @@ QtObject {
     // size and the clamp would size nothing. The screen's width/height are
     // logical pixels, the same unit as the base size.
     width: geo.width <= 0 ? mixer.baseW
-      : Math.max(mixer.minW, Math.min(mixer.baseW, geo.width - 2 * mixer.margin))
+      : Range.clamp(geo.width - 2 * mixer.margin, mixer.minW, mixer.baseW)
     height: geo.height <= 0 ? mixer.baseH
-      : Math.max(mixer.minH, Math.min(mixer.baseH, geo.height - 2 * mixer.margin))
+      : Range.clamp(geo.height - 2 * mixer.margin, mixer.minH, mixer.baseH)
 
     // Where the window asks to be: the centre of the output. Unlike the
     // layer-shell placement block, x/y are real settable properties on a
@@ -1090,7 +1091,7 @@ QtObject {
         text: mixer.statusNote
         color: Ui.solid("yellow")
         elide: Text.ElideRight
-        width: Math.max(0, Math.min(implicitWidth, 240))
+        width: Range.clamp(implicitWidth, 0, 240)
       }
 
       Divider {
@@ -1535,7 +1536,7 @@ QtObject {
         // while a list is up, and the scrollbar is the other.
         onPaged: function(notches) {
           const maxY = Math.max(0, body.contentHeight - body.height)
-          body.contentY = Math.max(0, Math.min(maxY, body.contentY - notches * pop.rowH))
+          body.contentY = Range.clamp(body.contentY - notches * pop.rowH, 0, maxY)
         }
       }
     }
