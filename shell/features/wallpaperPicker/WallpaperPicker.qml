@@ -17,6 +17,7 @@ import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/text/ImageExts.js" as ImageExts
 import "../../common/process/JobResult.js" as Job
+import "../../common/process/PanelList.js" as PanelList
 
 // Efficient user wallpaper picker – clipboard-like two-pane window.
 //
@@ -289,12 +290,10 @@ Singleton {
     // For panel attachment (mirrors Clipboard pattern, efficient)
     property var _panels: []
     function _attachPanel(p) {
-        const n = root._panels.slice()
-        n.push(p)
-        root._panels = n
+        root._panels = PanelList.attach(root._panels, p)
     }
     function _detachPanel(p) {
-        root._panels = root._panels.filter(x => x !== p)
+        root._panels = PanelList.detach(root._panels, p)
     }
 
     // --- theme via Watch governor (trio) ---

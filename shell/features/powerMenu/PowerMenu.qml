@@ -11,6 +11,7 @@ import qs.services
 // logic, not menu-row building; kill by moving it to a shared lib later.
 import "../menu/MenuLib.js" as MenuLib
 import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/process/PanelList.js" as PanelList
 
 // Power menu UI - lists actions from config.json (name, description, icon)
 // and delegates every activation to the session service. No
@@ -40,13 +41,11 @@ Singleton {
   property var _claimToken: null
 
   function _attachPanel(panel) {
-    const next = root._panels.slice()
-    next.push(panel)
-    root._panels = next
+    root._panels = PanelList.attach(root._panels, panel)
   }
 
   function _detachPanel(panel) {
-    root._panels = root._panels.filter(p => p !== panel)
+    root._panels = PanelList.detach(root._panels, panel)
   }
 
   readonly property string effectiveFocusMode: {

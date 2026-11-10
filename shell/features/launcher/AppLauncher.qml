@@ -14,6 +14,7 @@ import "LauncherLib.js" as LauncherLib
 import "PluginPolicy.js" as PluginPolicy
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/collections/BoundedCache.js" as BoundedCache
+import "../../common/process/PanelList.js" as PanelList
 
 // Native application launcher service: desktop-entry search and
 // launching, action plugins, web-search plugins and per-plugin
@@ -368,13 +369,11 @@ Singleton {
   property var _panels: []
 
   function _attachPanel(panel) {
-    const next = root._panels.slice()
-    next.push(panel)
-    root._panels = next
+    root._panels = PanelList.attach(root._panels, panel)
   }
 
   function _detachPanel(panel) {
-    root._panels = root._panels.filter(p => p !== panel)
+    root._panels = PanelList.detach(root._panels, panel)
   }
 
 

@@ -8,6 +8,7 @@ import Quickshell.Io
 import qs.common
 import "ClipboardLib.js" as CL
 import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/process/PanelList.js" as PanelList
 
 // Clipboard service in the shell's own process - no helper daemon. Fast
 // in-memory history, image/credential/pinning/preview support; history
@@ -82,12 +83,10 @@ Singleton {
   onModeChanged: persist.mode = mode
 
   function _attachPanel(p) {
-    const n = root._panels.slice()
-    n.push(p)
-    root._panels = n
+    root._panels = PanelList.attach(root._panels, p)
   }
   function _detachPanel(p) {
-    root._panels = root._panels.filter(x => x !== p)
+    root._panels = PanelList.detach(root._panels, p)
   }
 
   readonly property int totalCount: root.history.length
