@@ -146,6 +146,50 @@ Singleton {
     return true
   }
 
+  // --- namespaced section helpers ---
+  //
+  // The shell's JSON documents are section maps: one object per feature
+  // ({"audio": {...}, "cursor": {...}}). These helpers are the whole
+  // read/write vocabulary over such a map, so a facade that owns a slot
+  // (ShellState, ShellCache) names its key once instead of restating the
+  // same validation, copy and shallow merge.
+
+  // Reactive section read, or null when the section is absent.
+  function section(key, name) {
+    const s = root.value(key)
+    const v = s ? s[String(name)] : undefined
+    return v !== undefined ? v : null
+  }
+
+  // Replace a section wholesale. A section is always an object: anything
+  // else is stored as given, which is how a facade can clear one to null.
+  function setSection(key, name, obj) {
+    if (typeof name !== "string" || name === "") return false
+    const cur = root.value(key)
+    const base = cur !== null && typeof cur === "object" && !Array.isArray(cur) ? cur : {}
+    const next = Object.assign({}, base)
+    next[name] = obj !== undefined && obj !== null && typeof obj === "object" && !Array.isArray(obj)
+      ? Object.assign({}, obj) : obj
+    return root.set(key, next)
+  }
+
+  // Shallow-merge `patch` into a section (created when absent).
+  function updateSection(key, name, patch) {
+    if (typeof name !== "string" || name === "") return false
+    if (!patch || typeof patch !== "object" || Array.isArray(patch)) return false
+    const cur = root.section(key, name)
+    const base = cur !== null && typeof cur === "object" && !Array.isArray(cur) ? cur : {}
+    return root.setSection(key, name, Object.assign({}, base, patch))
+  }
+
+  // Numeric field read with fallback: validated finite number or `fallback`.
+  function sectionNumber(key, name, field, fallback) {
+    const s = root.section(key, name)
+    const v = s ? Number(s[String(field)]) : NaN
+    const fb = typeof fallback === "number" && isFinite(fallback) ? fallback : 0
+    return isFinite(v) ? v : fb
+  }
+
   // --- internals ---
 
   function _ensureSlot(key, defaultValue, scope, file) {

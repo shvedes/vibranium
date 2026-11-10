@@ -72,9 +72,7 @@ Singleton {
   // writes. Returns the section object, or null when absent.
   function section(name) {
     root._ensure()
-    const s = AppState.value(root.slotKey)
-    const v = s ? s[String(name)] : undefined
-    return v !== undefined ? v : null
+    return AppState.section(root.slotKey, name)
   }
 
   // Replace a section wholesale and schedule a debounced flush.
@@ -84,12 +82,7 @@ Singleton {
       return false
     }
     root._ensure()
-    const cur = AppState.value(root.slotKey)
-    const base = cur !== null && typeof cur === "object" && !Array.isArray(cur) ? cur : {}
-    const next = Object.assign({}, base)
-    next[name] = obj !== undefined && obj !== null && typeof obj === "object" && !Array.isArray(obj)
-      ? Object.assign({}, obj) : obj
-    return AppState.set(root.slotKey, next)
+    return AppState.setSection(root.slotKey, name, obj)
   }
 
   // Shallow-merge `patch` into a section (created when absent).
@@ -101,17 +94,13 @@ Singleton {
       return false
     }
     root._ensure()
-    const cur = root.section(name)
-    const base = cur !== null && typeof cur === "object" && !Array.isArray(cur) ? cur : {}
-    return root.setSection(name, Object.assign({}, base, patch))
+    return AppState.updateSection(root.slotKey, name, patch)
   }
 
   // Numeric field read with fallback: validated finite number or
   // `fallback` otherwise. Audio's restore level reads through here.
   function number(sectionName, field, fallback) {
-    const s = root.section(sectionName)
-    const v = s ? Number(s[String(field)]) : NaN
-    const fb = typeof fallback === "number" && isFinite(fallback) ? fallback : 0
-    return isFinite(v) ? v : fb
+    root._ensure()
+    return AppState.sectionNumber(root.slotKey, sectionName, field, fallback)
   }
 }
