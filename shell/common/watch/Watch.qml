@@ -223,7 +223,6 @@ Singleton {
       const e = root._watchers[path]
       out[path] = { subs: e.subs.length, refCount: e.refCount, events: e.eventCount, pending: e.pending }
     }
-    const json = JSON.stringify(out)
     return out
   }
 
