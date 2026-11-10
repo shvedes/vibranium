@@ -105,21 +105,32 @@ PanelWindow {
   // layer rule in default/hypr/window-rules.lua).
   readonly property real dimBackdropAlpha: 0.8
 
-  // Read through the cache on every evaluation, so a restart and a second
-  // overlay (one per bar) both land on the saved value; toggleBackdrop is the
-  // only writer. Anything outside (0, 1) - absent, hand-edited, a future
-  // value this switch does not own - reads as the solid backdrop rather than
-  // as a half-painted surface.
-  readonly property real backdropAlpha: {
+  // Read from the cache when the surface is built and again when it opens, so
+  // a restart and a second overlay (one per bar) both land on the saved value;
+  // toggleBackdrop is the only writer. Anything outside (0, 1) - absent,
+  // hand-edited, a future value this switch does not own - reads as the solid
+  // backdrop rather than as a half-painted surface.
+  //
+  // A plain property, NOT a binding. The first cache read creates the slot,
+  // which bumps AppState.rev, so a binding that reads the cache depends on rev
+  // while its own evaluation is what changes it - Qt reports that as a binding
+  // loop on this property. The constructor and the open handler read the same
+  // cache outside any binding and cost nothing while the surface is closed.
+  property real backdropAlpha: 1
+
+  function _readBackdrop() {
     const a = ShellCache.number("lyrics", "backdropAlpha", 1)
-    return a > 0 && a < 1 ? a : 1
+    root.backdropAlpha = a > 0 && a < 1 ? a : 1
   }
+
+  Component.onCompleted: root._readBackdrop()
 
   readonly property color backdropColor: Ui.tint("background_0", root.backdropAlpha)
 
   function toggleBackdrop() {
-    ShellCache.updateSection("lyrics",
-      { backdropAlpha: root.backdropAlpha >= 1 ? root.dimBackdropAlpha : 1 })
+    const next = root.backdropAlpha >= 1 ? root.dimBackdropAlpha : 1
+    ShellCache.updateSection("lyrics", { backdropAlpha: next })
+    root.backdropAlpha = next
   }
 
   function open(p) {
@@ -198,6 +209,9 @@ PanelWindow {
   onOpenedChanged: {
     root._seeking = false
     if (root.opened) {
+      // A toggle made in another bar's overlay is a cache write, and this is
+      // the only read that follows it: the property itself is not a binding.
+      root._readBackdrop()
       root.reanchor()
       root._holdStart()
     } else {

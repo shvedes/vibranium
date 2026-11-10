@@ -2515,6 +2515,13 @@ group('LRC stamps become sorted cues', () => {
   eq('minutes carry into seconds', CN.parseLrc('[01:02.00]x')[0].t, 62)
   eq('metadata tags are not cues', CN.parseLrc('[ar:Someone]\n[ti:Something]'), [])
   eq('a row with no words is dropped', CN.parseLrc('[00:01.00]\n[00:02.00]a').map((l) => l.x), ['a'])
+  eq('inline word stamps are stripped, not sung',
+    CN.parseLrc('[00:12.00]<00:12.00>Hello <00:12.50>world'),
+    [{ t: 12, x: 'Hello world' }])
+  eq('a word stamp on every word still leaves one line',
+    CN.parseLrc('[00:01.00]<00:01.00>a <00:01.50>b <00:02.00>c')[0].x, 'a b c')
+  eq('angle brackets that are not stamps stay words',
+    CN.parseLrc('[00:01.00]<3 you')[0].x, '<3 you')
 })
 group('the offset tag shifts every cue', () => {
   eq('a negative offset moves them earlier', CN.parseLrc('[offset:-500]\n[00:02.00]a')[0].t, 1.5)

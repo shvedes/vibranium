@@ -489,6 +489,10 @@ function parseLrc(text) {
   const out = []
   if (typeof text !== "string" || text === "") return out
   const stamp = /\[(\d{1,3}):(\d{1,2})(?:[.:](\d{1,3}))?\]/g
+  // Enhanced LRC times individual words with `<mm:ss.cc>` tags inline, after
+  // the line stamp. They time the same cue the line stamp already named, so
+  // they are stripped from the words rather than rendered as text.
+  const wordStamp = /<\d{1,3}:\d{1,2}(?:[.:]\d{1,3})?>/g
   const offsetTag = /^\s*\[offset:\s*([+-]?\d+)\]\s*$/i
   let offset = 0
   for (const row of text.split(/\r?\n/)) {
@@ -505,7 +509,7 @@ function parseLrc(text) {
       times.push(Number(match[1]) * 60 + Number(match[2]) + frac)
     }
     if (times.length === 0) continue
-    const x = row.replace(stamp, "").trim()
+    const x = row.replace(stamp, "").replace(wordStamp, "").replace(/[ \t]{2,}/g, " ").trim()
     if (x === "") continue
     for (const t of times) out.push({ t: Math.max(0, t + offset), x })
   }
