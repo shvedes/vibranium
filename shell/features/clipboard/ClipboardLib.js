@@ -329,18 +329,51 @@ function countSymbols(s) {
 // Secrets contribute ONLY the generic hint - their payload never enters
 // any searchable surface.
 function hayFor(entry) {
+  // The fields the hay is built from, captured before it is built so the
+  // cache below can be validated against exactly what it read.
+  const title = entry.title ? String(entry.title) : ""
+  const subLeft = entry.subLeft ? String(entry.subLeft) : ""
+  const preview = entry.preview ? String(entry.preview).substring(0, 200) : ""
+  const mime = entry.mime ? String(entry.mime) : ""
+  const type = String(entry.type || "")
+  // Every rebuild re-derives every row it shows - a mode switch, a time-format
+  // change, the panel re-deriving after a capture - and each derive asked for
+  // the same hay over fields that had not moved. Building it is a join, a
+  // toLowerCase, a split, a dedupe and a join again over ~250 characters, and
+  // it measured as the single largest cost of a clipboard rebuild (27% of the
+  // profile for the rows it was rebuilding).
+  //
+  // Keyed by the entry and stamped with the fields, not by the entry alone:
+  // entries are mutated in place (deriveEntry writes title and subLeft back
+  // onto them, a title decode replaces title/content later), so identity does
+  // not say the hay still holds. The stamp is five object reads and a string
+  // compare against a build that lowercases and re-splits the whole text.
+  //
+  // The cache rides on the function object rather than a module-level `var`,
+  // because a `.pragma library` publishes its top-level declarations and this
+  // is not part of the library's surface.
+  let cache = hayFor._cache
+  if (cache === undefined) cache = hayFor._cache = new WeakMap()
+  const hit = cache.get(entry)
+  if (hit !== undefined && hit.title === title && hit.subLeft === subLeft
+    && hit.preview === preview && hit.mime === mime && hit.type === type)
+    return hit.hay
   const parts = []
-  if (entry.title) parts.push(String(entry.title))
-  if (entry.subLeft) parts.push(String(entry.subLeft))
-  if (entry.preview) parts.push(String(entry.preview).substring(0, 200))
-  if (entry.mime) parts.push(String(entry.mime))
-  parts.push(String(entry.type || ""))
-  if (entry.type === "secret") parts.push("secret credentials password")
-  if (entry.type === "network") parts.push("network storage ftp sftp smb nfs ssh s3")
+  if (title !== "") parts.push(title)
+  if (subLeft !== "") parts.push(subLeft)
+  if (preview !== "") parts.push(preview)
+  if (mime !== "") parts.push(mime)
+  parts.push(type)
+  if (type === "secret") parts.push("secret credentials password")
+  if (type === "network") parts.push("network storage ftp sftp smb nfs ssh s3")
   // Lowercase once, dedupe via SearchLib (prototype-less, for the reason
   // stated there - a plain {} drops "constructor" / "__proto__" words).
   const raw = parts.join(" ").toLowerCase()
-  return SL.dedupeWords(raw.split(RE_WS_SPLIT)).join(" ")
+  const hay = SL.dedupeWords(raw.split(RE_WS_SPLIT)).join(" ")
+  cache.set(entry, {
+    title: title, subLeft: subLeft, preview: preview, mime: mime, type: type, hay: hay
+  })
+  return hay
 }
 
 function wordsFor(hay) {
