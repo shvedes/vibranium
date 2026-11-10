@@ -321,13 +321,14 @@ group('the list is mutated in place, as its header documents', () => {
   is('the same array comes back', out, (v) => v === list, 'returns its argument')
   eq('and it was changed in place', list, ['a', 'b', 'new'])
 })
-group('the pin lookup is unguarded, so an inherited key reads as a pin', () => {
-  // `pinned[list[i]] !== undefined` walks the prototype chain, so a slot id
-  // that happens to be an Object.prototype member is treated as a pin wall.
-  // Nothing in the registry uses such an id today; pinned as a trap.
-  eq('"toString" in the list is a wall', B.insertBeforePin(['toString', 'a'], {}, 'new'), ['new', 'toString', 'a'])
-  eq('"constructor" in the list is a wall', B.insertBeforePin(['constructor'], {}, 'new'), ['new', 'constructor'])
-  eq('"__proto__" in the list is a wall', B.insertBeforePin(['__proto__', 'z'], {}, 'new'), ['new', '__proto__', 'z'])
+group('the pin lookup is own-property only, so an inherited key is not a wall', () => {
+  // A plain `pinned[e] !== undefined` walks the prototype chain, so a slot id
+  // that happens to be an Object.prototype member read as a pin wall. The
+  // lookup asks the map itself, so those ids take the ordinary append path.
+  eq('"toString" in the list is not a pin', B.insertBeforePin(['toString', 'a'], {}, 'new'), ['toString', 'a', 'new'])
+  eq('"constructor" in the list is not a pin', B.insertBeforePin(['constructor'], {}, 'new'), ['constructor', 'new'])
+  eq('"__proto__" in the list is not a pin', B.insertBeforePin(['__proto__', 'z'], {}, 'new'), ['__proto__', 'z', 'new'])
+  eq('an own pin still wins', B.insertBeforePin(['a'], { a: 'left' }, 'new'), ['new', 'a'])
 })
 
 section('BarLib.insertBeforeAnchor - the static-module placement rule')

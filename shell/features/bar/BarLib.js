@@ -134,13 +134,16 @@ function insertBefore(list, matches, id) {
   return list
 }
 
-// The owned-module rule: `matches` is a membership test against the
-// controller's id -> pinned-zone map `pinned`, so any value counts as a pin
-// and an undefined one is not. A pinned slot is a wall at the zone end, so
-// this keeps owned indicators ahead of the corner without displacing
-// anything the user dragged.
+// The owned-module rule: `matches` is an own-property membership test
+// against the controller's id -> pinned-zone map `pinned`, so any value
+// counts as a pin and an undefined one is not. The own-property guard keeps
+// an id that happens to name an Object.prototype member ("toString",
+// "constructor") out of the wall set. A pinned slot is a wall at the zone
+// end, so this keeps owned indicators ahead of the corner without
+// displacing anything the user dragged.
 function insertBeforePin(list, pinned, id) {
-  return insertBefore(list, e => pinned[e] !== undefined, id)
+  return insertBefore(list,
+    e => Object.prototype.hasOwnProperty.call(pinned, e) && pinned[e] !== undefined, id)
 }
 
 // The static-module rule: `anchor` is the controller's _placeBefore answer
