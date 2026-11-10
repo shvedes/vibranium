@@ -47,6 +47,7 @@ THEME_AWK="$VIBRANIUM_DIR/awk/vb-theme-set-templates.awk"
 THEME_QML="$SHELL_DIR/common/theme/Theme.qml"
 THEME_PICKER="$SHELL_DIR/features/pickers/theme/ThemePicker.qml"
 THEME_REMOVER="$SHELL_DIR/features/pickers/theme/ThemeRemover.qml"
+THEME_ROOTS="$SHELL_DIR/features/pickers/theme/ThemeRoots.qml"
 # The palette reader both theme pages call. The rules below are stated here
 # rather than in either page: the two had carried identical copies of the
 # key set and the hex check, and a key added to one page was invisible to a
@@ -803,9 +804,9 @@ t_eq "no manifest or index file names the shipped themes" "0" \
 t_contains "so the bash tool's index is a directory scan" \
   'for theme_dir in "$dir"/*/;' "$(<"$THEME_SET")"
 t_contains "and the picker's is a FolderListModel over the same root" \
-  'officialModel.folder = "file://" + Paths.vibraniumHome + "/themes"' "$(<"$THEME_PICKER")"
+  'officialModel.folder = "file://" + root.officialRoot' "$(<"$THEME_ROOTS")"
 t_contains "which lists directories and skips dot entries" \
-  'showDotAndDotDot: false' "$(<"$THEME_PICKER")"
+  'showDotAndDotDot: false' "$(<"$THEME_ROOTS")"
 # Direction one: a theme the scan cannot reach is hidden in both listings.
 UNREACHABLE=0
 for theme in "${THEMES[@]}"; do

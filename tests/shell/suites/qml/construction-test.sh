@@ -295,6 +295,7 @@ qs.features.pickers.font.FontPicker
 qs.features.pickers.keybindings.Keybindings
 qs.features.pickers.theme.ThemePicker
 qs.features.pickers.theme.ThemeRemover
+qs.features.pickers.theme.ThemeRoots
 qs.features.polkit.Polkit
 qs.features.powerMenu.PowerMenu
 qs.features.powerMenu.PowerMenuPanel
@@ -346,7 +347,7 @@ supplied.qs.common.LyricsPane=player: null"
 # reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=235
+EXPECTED_DECLARED_COUNT=236
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -366,7 +367,7 @@ EXPECTED_DECLARED_COUNT=235
 # qs.common.Vignette is in the same class: a plain Item over a Shape and a
 # radial gradient, with no singleton and no window behind it.
 EXPECTED_CLEAN_COUNT=110
-EXPECTED_NEEDS_COUNT=101
+EXPECTED_NEEDS_COUNT=102
 EXPECTED_UNCREATABLE_COUNT=23
 
 # --------------------------------------------------------------------------
