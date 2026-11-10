@@ -794,6 +794,11 @@ function parsePactl(input) {
       pulseIndex = parseInt(header[2], 10)
       continue
     }
+    // A Client, Module or Card block feeds neither map, and a real capture is
+    // mostly those blocks - every client on the bus carries its property tail
+    // here. Its lines are skipped as a block: inProps is false until the next
+    // header, which commits and resets the record.
+    if (bucket === "" && routeBucket === "") continue
     // Fields are tab-indented. A continuation line (`Volume:`'s own
     // `balance 0.00` tail) is indented deeper and is not a field.
     if (line.charAt(0) !== "\t") continue
