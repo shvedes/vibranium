@@ -312,7 +312,10 @@ function homeTilde(path) {
 // still carry the scheme.
 function stripFileScheme(s) {
   const t = String(s)
-  return t.toLowerCase().indexOf("file://") === 0 ? t.substring(7) : t
+  // Seven characters decide this, and the test used to lowercase the WHOLE
+  // path to ask - a copy of a multi-kilobyte URI per row per rebuild. The
+  // prefix is lowercased instead; the verdict is the same.
+  return t.substring(0, 7).toLowerCase() === "file://" ? t.substring(7) : t
 }
 
 function countWords(s) {
@@ -1631,7 +1634,7 @@ function entryPaths(entry) {
   const add = value => {
     const raw = String(value == null ? "" : value)
     if (raw === "") return
-    if (raw.toLowerCase().indexOf("file://") === 0) {
+    if (raw.substring(0, 7).toLowerCase() === "file://") {
       const parsed = parseUriList(raw)
       for (let i = 0; i < parsed.length; i++) paths.push(parsed[i])
     } else if (raw.charAt(0) === "/") {
