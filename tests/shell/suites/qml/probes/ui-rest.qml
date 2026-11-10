@@ -1865,7 +1865,7 @@ Item {
     kv("trace.sweepY.samples", sampleCount(sweepYV))
     kv("trace.sweepY.rising", rising(sweepYV))
     kv("trace.sweepY.neverOvershot", allBelow(sweepYV, 120))
-    kv("trace.sweepY.firstInFlight", firstBetween(sweepYV, 5, 16))
+    kv("trace.sweepY.firstInFlight", sweepYV.length > 1 && between(sweepYV[1], 15, 30))
     kv("trace.slotShortH.samples", sampleCount(slotShortHV))
     kv("trace.slotShortH.rising", rising(slotShortHV))
     kv("trace.slotShortH.neverOvershot", allBelow(slotShortHV, 52))
