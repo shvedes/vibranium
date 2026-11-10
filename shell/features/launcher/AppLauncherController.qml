@@ -856,49 +856,57 @@ Item {
     // anyway. The synthetic row never counts toward matchedCount.
     // Suppress it for math-like input: "2+" should not offer web search
     // while the user is mid-expression; it would compete with the calc path.
-    if ((rows.length === 0 || forced) && query !== "" && !CalcLib.isPotentialCalc(query)) {
-      // File opener: a path- or URI-looking query resolves to an open
-      // target. An existing local file/folder - or any openable URI -
-      // replaces the slot with a single "Open <basename>" entry; a
-      // miss keeps the fallback. While a stat probe is in flight
-      // the list stays empty - no fallback-row flash before the swap.
-      const target = LauncherLib.openTarget(query, Paths.home)
-      if (target) {
-        if (target.kind !== "local") {
-          rows.push(root._fileRow(target, false))
-          return rows
-        }
-        const st = BoundedCache.get(AppLauncher.statCache, target.path)
-        if (st === "dir" || st === "file") {
-          rows.push(root._fileRow(target, st === "dir"))
-          return rows
-        }
-        if (st === undefined) {
-          root._statPath(target.path)
-          return rows
-        }
-        // missing: falls through to the plugin chain below
+    if ((rows.length === 0 || forced) && query !== "" && !CalcLib.isPotentialCalc(query))
+      return root._fallbackRows(query, forced, rows)
+    return rows
+  }
+
+  // Fallback slot: nothing local matched, or a "!" forced it to run anyway.
+  // The synthetic row never counts toward matchedCount. Math-like input is
+  // suppressed: "2+" should not offer web search while the user is
+  // mid-expression; it would compete with the calc path.
+  function _fallbackRows(query, forced, rows) {
+    // File opener: a path- or URI-looking query resolves to an open target.
+    // An existing local file/folder - or any openable URI - replaces the slot
+    // with a single "Open <basename>" entry; a miss keeps the fallback. While
+    // a stat probe is in flight the list stays empty - no fallback-row flash
+    // before the swap.
+    const target = LauncherLib.openTarget(query, Paths.home)
+    if (target) {
+      if (target.kind !== "local") {
+        rows.push(root._fileRow(target, false))
+        return rows
       }
-      // The slot is a chain, not one owner: the first live plugin in
-      // LauncherLib's fallback order that claims the query fills it, and a
-      // plugin that declines (the binary plugin on anything but an exact
-      // program name) hands it to the next type rather than erasing it.
-      //
-      // A forced query gets the binary type alone. "!" is the user asserting
-      // that the query IS a program name, so the only question it can be
-      // asking is "run this" - a name nothing provides leaves the slot empty
-      // rather than falling through to a web search that cannot be what was
-      // meant. An unforced query keeps the whole chain, where the web search
-      // IS the right answer to "nothing here matches".
-      const hit = LauncherLib.firstFallbackClaiming(root.plugins, query,
-        p => root._safeItems(p, query),
-        forced ? LauncherLib.forcedOrder() : undefined,
-        p => root._loadOne(p))
-      if (hit !== null) {
-        const slot = root._webRows(query, hit.plugin, hit.rows)
-        if (forced) return slot.concat(rows)
-        rows.push(...slot)
+      const st = BoundedCache.get(AppLauncher.statCache, target.path)
+      if (st === "dir" || st === "file") {
+        rows.push(root._fileRow(target, st === "dir"))
+        return rows
       }
+      if (st === undefined) {
+        root._statPath(target.path)
+        return rows
+      }
+      // missing: falls through to the plugin chain below
+    }
+    // The slot is a chain, not one owner: the first live plugin in
+    // LauncherLib's fallback order that claims the query fills it, and a
+    // plugin that declines (the binary plugin on anything but an exact
+    // program name) hands it to the next type rather than erasing it.
+    //
+    // A forced query gets the binary type alone. "!" is the user asserting
+    // that the query IS a program name, so the only question it can be asking
+    // is "run this" - a name nothing provides leaves the slot empty rather
+    // than falling through to a web search that cannot be what was meant. An
+    // unforced query keeps the whole chain, where the web search IS the right
+    // answer to "nothing here matches".
+    const hit = LauncherLib.firstFallbackClaiming(root.plugins, query,
+      p => root._safeItems(p, query),
+      forced ? LauncherLib.forcedOrder() : undefined,
+      p => root._loadOne(p))
+    if (hit !== null) {
+      const slot = root._webRows(query, hit.plugin, hit.rows)
+      if (forced) return slot.concat(rows)
+      rows.push(...slot)
     }
     return rows
   }
