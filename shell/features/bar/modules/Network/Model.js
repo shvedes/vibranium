@@ -227,16 +227,14 @@ function sectionTitleFor(index, rows) {
 // at most one page of rows. Single argument - there is no divider row left
 // to sniff for.
 function wifiListViewportHeight(contentHeight) {
-  var content = Number(contentHeight)
-  if (!isFinite(content) || content <= 0) return 0
-  return Math.min(content, 250)
+  return DeviceList.viewportH(contentHeight)
 }
 
 // Stable key for a display row: the ssid under its namespace. The key is
 // never empty - a missing row still keys - and the "ssid:" prefix keeps the
 // shape the model diff was written against.
 function wifiDisplayKey(row) {
-  return "ssid:" + String((row && row.ssid) || "")
+  return DeviceList.displayKey(row, "ssid", (row && row.ssid) || "")
 }
 
 // Whole wifi display-model derivation, as one pure step: the caller
