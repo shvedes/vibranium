@@ -353,50 +353,14 @@ function jobSub(row, aliases) {
 function trim1(n) {
   return Format.trim1(n)
 }
-// Extension sets steering the job row's file icon (clipboard tables,
-// adapted). Declared above their reader so the QML engine never warns
-// about use-before-declaration.
-const ARCHIVE_EXTS = {
-  zip: true, tar: true, gz: true, tgz: true, bz2: true,
-  xz: true, "7z": true, rar: true, zst: true, lz: true, lzma: true
-}
-
+// Extension sets steering the job row's file icon. The shared vocabulary
+// in common/theme/FileIcons.js is the single table: only the image set
+// differs (a printed document is not a still to decode, so gif stays out),
+// and that difference is named here rather than restated.
 const IMAGE_EXTS = {
   png: true, jpg: true, jpeg: true, webp: true, gif: true,
   bmp: true, tiff: true, tif: true, avif: true,
   heic: true, heif: true
-}
-
-const SHEET_EXTS = { xls: true, xlsx: true, ods: true, csv: true, tsv: true }
-const DB_EXTS = {
-  db: true, sqlite: true, sqlite3: true, sql: true, mdb: true, accdb: true
-}
-
-const FONT_EXTS = {
-  ttf: true, otf: true, woff: true, woff2: true, eot: true, fon: true, pfb: true
-}
-const MUSIC_EXTS = {
-  mp3: true, flac: true, ogg: true, oga: true, opus: true, wav: true,
-  m4a: true, aac: true, wma: true, mid: true, midi: true, it: true, xm: true
-}
-const CODE_EXTS = {
-  rs: true, ts: true, tsx: true, js: true, jsx: true, mjs: true, cjs: true,
-  py: true, c: true, h: true, cc: true, cpp: true, hh: true, hpp: true,
-  go: true, rb: true, java: true, kt: true, kts: true, swift: true,
-  lua: true, sh: true, bash: true, zsh: true, fish: true, nu: true,
-  vim: true, el: true, nix: true, pl: true, pm: true, php: true, cs: true,
-  dart: true, zig: true, hs: true, ml: true,
-  clj: true, ex: true, exs: true, erl: true, gleam: true, rkt: true,
-  vue: true, svelte: true, astro: true,
-  html: true, htm: true, css: true, scss: true, sass: true, less: true,
-  styl: true, xml: true, json: true, jsonc: true, json5: true, toml: true,
-  yaml: true, yml: true, ini: true, cfg: true, conf: true,
-  service: true, timer: true, socket: true, desktop: true,
-  properties: true, env: true, gradle: true, cmake: true, mk: true,
-  makefile: true, dockerfile: true, justfile: true,
-  editorconfig: true, proto: true, graphql: true, gql: true,
-  prisma: true, tf: true, tfvars: true, hcl: true, md: true, markdown: true,
-  rst: true, adoc: true, org: true, tex: true, bib: true
 }
 
 // Leading icon for a job row, picked from the document extension.
@@ -409,13 +373,13 @@ function jobFileIcon(row) {
   if (e === "pdf") return "file-pdf"
   if (e === "svg") return "file-svg"
   if (IMAGE_EXTS[e] === true) return "file-image"
-  if (ARCHIVE_EXTS[e] === true) return "file-archive"
-  if (SHEET_EXTS[e] === true) return "file-xls"
-  if (DB_EXTS[e] === true) return "file-db"
-  if (FileIcons.DIFF_EXTS[e]) return "file-diff"
-  if (FONT_EXTS[e] === true) return "file-font"
-  if (MUSIC_EXTS[e] === true) return "file-music"
-  if (CODE_EXTS[e] === true) return "file-code"
+  if (FileIcons.ARCHIVE_EXTS[e] === 1) return "file-archive"
+  if (FileIcons.SHEET_EXTS[e] === 1) return "file-xls"
+  if (FileIcons.DB_EXTS[e] === 1) return "file-db"
+  if (FileIcons.DIFF_EXTS[e] === 1) return "file-diff"
+  if (FileIcons.FONT_EXTS[e] === 1) return "file-font"
+  if (FileIcons.MUSIC_EXTS[e] === 1) return "file-music"
+  if (FileIcons.CODE_EXTS[e] === 1) return "file-code"
   return "file"
 }
 
