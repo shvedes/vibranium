@@ -78,6 +78,10 @@ Item {
     && row.node.audio !== undefined ? row.node.audio : null
   readonly property real volume: row.audio !== null ? Number(row.audio.volume) : 0
   readonly property bool muted: row.audio !== null ? row.audio.muted === true : false
+  // Nothing audible: the explicit mute or a level at zero. The level glyph
+  // reads this; the toggle and the "Muted" readout keep `muted`.
+  readonly property bool silent: row.audio !== null
+    && Core.Audio.silentFor(row.volume, row.muted)
   readonly property string nodeKey: Model.nodeKey(row.node)
 
   // Two defaults (a sink and a source) and two writes, so the row asks the
@@ -940,8 +944,8 @@ Item {
           anchors.centerIn: parent
           name: row.audio === null ? "volume-off"
             : Core.Audio.volumeIconFor(row.volume, row.muted)
-          colorKey: row.muted ? "red" : "foreground_1"
-          accentKey: row.muted ? "red" : ""
+          colorKey: row.silent ? "red" : "foreground_1"
+          accentKey: row.silent ? "red" : ""
           dimTiers: row.audio === null ? 0
             : Core.Audio.volumeDimTiersFor(row.volume, row.muted)
           size: row.levelW

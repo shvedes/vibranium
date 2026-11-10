@@ -170,6 +170,10 @@ Item {
     && card.node.audio !== undefined ? card.node.audio : null
   readonly property real volume: card.audio !== null ? Number(card.audio.volume) : 0
   readonly property bool muted: card.audio !== null ? card.audio.muted === true : false
+  // Nothing audible: the explicit mute or a level at zero. The glyph reads
+  // this; the title colour and the toggle keep `muted`.
+  readonly property bool silent: card.audio !== null
+    && Core.Audio.silentFor(card.volume, card.muted)
   readonly property string kind: Model.classify(card.node)
 
   // The kind's own glyph, through the model's media-class map rather than a
@@ -754,8 +758,8 @@ Item {
         anchors.centerIn: parent
         name: card.audio === null ? "volume-off"
           : Core.Audio.volumeIconFor(card.volume, card.muted)
-        colorKey: card.muted ? "red" : "foreground_1"
-        accentKey: card.muted ? "red" : ""
+        colorKey: card.silent ? "red" : "foreground_1"
+        accentKey: card.silent ? "red" : ""
         dimTiers: card.audio === null ? 0
           : Core.Audio.volumeDimTiersFor(card.volume, card.muted)
         size: 15

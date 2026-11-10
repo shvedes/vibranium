@@ -53,7 +53,9 @@ Singleton {
   property bool _lingering: false
 
   // Payload shown while visible. `value` is 0..100, `muted` when set
-  // forces the muted glyph/label and dims the meter.
+  // forces the muted glyph/label and dims the meter. Callers pass the
+  // SILENT state here (muted or level zero): the off-mark is the same mark
+  // either way, and the fill is already empty at zero.
   property string kind: "volume"
   property real value: 0
   property string label: ""

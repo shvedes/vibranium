@@ -264,6 +264,9 @@ Item {
   readonly property bool outputMuted: root.sink && root.sink.audio ? root.sink.audio.muted : false
   readonly property real inputVolume: root.source && root.source.audio ? root.source.audio.volume : 0
   readonly property bool inputMuted: root.source && root.source.audio ? root.source.audio.muted : false
+  // Nothing audible on the output: an explicit mute or a level at zero.
+  readonly property bool outputSilent: root.sink && root.sink.audio
+    ? Core.Audio.silentFor(root.outputVolume, root.outputMuted) : false
 
   // Shared step/max come from the Audio core singleton; sliders still
   // write node values directly for 1:1 drag latency.
@@ -930,9 +933,10 @@ Item {
             return Core.Audio.volumeIconFor(root.outputVolume, root.outputMuted)
           }
           colorKey: (!root.sink || !root.sink.audio) ? "red" : "foreground_1"
-          // Muted: only the X goes red, the speaker keeps the foreground
-          // (the X paths carry class="indicator" - see Icon/Icons).
-          accentKey: root.outputMuted ? "red" : ""
+          // Silent (muted or at zero): only the X goes red, the speaker
+          // keeps the foreground (the X paths carry class="indicator" -
+          // see Icon/Icons).
+          accentKey: root.outputSilent ? "red" : ""
           dimTiers: Core.Audio.volumeDimTiersFor(root.outputVolume, root.outputMuted)
           size: 18
           MouseArea {
@@ -1229,6 +1233,9 @@ Item {
       readonly property var node: row.modelData
       readonly property real vol: row.node && row.node.audio ? row.node.audio.volume : 0
       readonly property bool muted: row.node && row.node.audio ? row.node.audio.muted : false
+      // Nothing audible: the explicit mute or a level at zero. The glyph
+      // reads this; the title and the "Muted" readout keep `muted`.
+      readonly property bool silent: Core.Audio.silentFor(row.vol, row.muted)
 
       Column {
         id: col
@@ -1278,7 +1285,7 @@ Item {
               id: muteIcon
               anchors.centerIn: parent
               name: Core.Audio.volumeIconFor(row.vol, row.muted)
-              colorKey: row.muted ? "red" : "foreground_1"
+              colorKey: row.silent ? "red" : "foreground_1"
               dimTiers: Core.Audio.volumeDimTiersFor(row.vol, row.muted)
               size: 16
             }

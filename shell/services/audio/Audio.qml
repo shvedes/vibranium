@@ -123,6 +123,12 @@ Singleton {
   readonly property bool sinkMuted: root.sink && root.sink.audio ? root.sink.audio.muted : false
   readonly property real sourceVolume: root.source && root.source.audio ? root.source.audio.volume : 0
   readonly property bool sourceMuted: root.source && root.source.audio ? root.source.audio.muted : false
+  // Nothing audible: the explicit mute, or a level driven to zero. The
+  // glyph's red off-mark reads this; the mute verbs, the toggles and the
+  // "Muted" readouts keep the raw flags above, because a level the user
+  // turned down is not a mute anyone performed.
+  readonly property bool sinkSilent: DeviceIcons.silentFor(root.sinkVolume, root.sinkMuted)
+  readonly property bool sourceSilent: DeviceIcons.silentFor(root.sourceVolume, root.sourceMuted)
 
   // --- mute transitions ---
   //
@@ -605,6 +611,13 @@ Singleton {
     return DeviceIcons.volumeDimTiersFor(volume, muted)
   }
 
+  // Whether a level reads as silence (muted or at zero). Canonical in
+  // common/theme/DeviceIcons.js; consumers colour the off glyph with it
+  // and keep the raw mute flag for their own readouts and toggles.
+  function silentFor(volume, muted) {
+    return DeviceIcons.silentFor(volume, muted)
+  }
+
   function _sinkBar() {
     return Range.clamp(Math.round(root.sinkVolume / root.maxVolume * 100), 0, 100)
   }
@@ -619,13 +632,16 @@ Singleton {
 
   function _showSinkOSD() {
     if (!root.visualFeedback) return
-    Registry.call("osd", "show", "volume", root._sinkBar(), "", root._sinkIcon(), root.sinkMuted)
+    // The last argument is the OSD's "nothing audible" half: the off-mark
+    // goes red and the meter reads empty. A level at zero is that state
+    // even when the sink is not muted, and the fill is already zero then.
+    Registry.call("osd", "show", "volume", root._sinkBar(), "", root._sinkIcon(), root.sinkSilent)
   }
 
   function _showSourceOSD() {
     if (!root.visualFeedback) return
     Registry.call("osd", "show", "microphone", root._sourceBar(), "",
-      root.sourceMuted ? "mic-off" : "mic-on", root.sourceMuted)
+      root.sourceMuted ? "mic-off" : "mic-on", root.sourceSilent)
   }
 
   Component.onCompleted: {

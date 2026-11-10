@@ -89,6 +89,11 @@ BarModule {
   readonly property bool outputMuted: root.sink && root.sink.audio ? root.sink.audio.muted : false
   readonly property real inputVolume: root.source && root.source.audio ? root.source.audio.volume : 0
   readonly property bool inputMuted: root.source && root.source.audio ? root.source.audio.muted : false
+  // Nothing audible on the output: an explicit mute or a level at zero.
+  // The off glyph's red mark reads this; `outputMuted` still owns the
+  // "Muted" readout and the toggle.
+  readonly property bool outputSilent: root.sink && root.sink.audio
+    ? Core.Audio.silentFor(root.outputVolume, root.outputMuted) : false
 
   // Preferred device label for the tooltip.
   readonly property string sinkLabel: Model.nodeLabel(root.sink)
@@ -136,10 +141,10 @@ BarModule {
       { icon: "grid", text: appsText },
       { icon: Model.sinkTooltipIcon(root.sink), text: root.sinkLabel !== "" ? root.sinkLabel : "Output" },
       {
-        icon: root.outputMuted ? "volume-off" : "volume-max",
+        icon: root.outputSilent ? "volume-off" : "volume-max",
         text: root.outputMuted ? "Muted" : Format.percent(root.outputVolume),
-        dimTiers: root.outputMuted ? 0 : root.volumeDimTiers,
-        accentKey: root.outputMuted ? "red" : ""
+        dimTiers: root.outputSilent ? 0 : root.volumeDimTiers,
+        accentKey: root.outputSilent ? "red" : ""
       }
     ]
   }
@@ -252,8 +257,9 @@ BarModule {
         anchors.centerIn: parent
         name: root.volumeIconName
         colorKey: root.volumeIconColor
-        // Muted: only the X goes red (class="indicator" in volume-off).
-        accentKey: root.outputMuted ? "red" : ""
+        // Silent (muted or at zero): only the X goes red
+        // (class="indicator" in volume-off).
+        accentKey: root.outputSilent ? "red" : ""
         dimTiers: root.volumeDimTiers
       }
 

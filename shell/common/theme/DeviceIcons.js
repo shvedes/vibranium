@@ -11,15 +11,29 @@
 
 // --- tiered volume level --------------------------------------------
 
+// The level at or below which a glyph reads as silence. PipeWire reports
+// 0..1 fractions and the shell's own steps land exactly on 0, so the
+// threshold only absorbs float dust; it is not a "quiet" band.
+var SILENT_LEVEL = 0.01
+
+// Whether a level reads as silence: explicitly muted, or driven to zero.
+// This is the glyph's own question - volume-off is the answer for both -
+// and it is also the colour's: the red off-mark means "nothing audible",
+// which a zero level is whether or not anyone pressed mute. Keep the raw
+// `muted` for the controls that must not claim a mute the user never
+// performed (a toggle, a "Muted" readout).
+function silentFor(volume, muted) {
+  var v = Number(volume)
+  return muted === true || !isFinite(v) || v <= SILENT_LEVEL
+}
+
 // Level icon for a 0..1 volume fraction. Single tiered asset:
 // volume-max renders every level through dimTiers below, so this never
 // names per-tier files (volume-low/mid ship no SVGs and would paint
 // blank). Canonical home of Audio.volumeIconFor and its
 // Notifications/OSD mirrors.
 function volumeIconFor(volume, muted) {
-  var v = Number(volume)
-  if (muted || !isFinite(v) || v <= 0.01) return "volume-off"
-  return "volume-max"
+  return silentFor(volume, muted) ? "volume-off" : "volume-max"
 }
 
 // Wave groups kept opaque on the tiered volume-max glyph, same thirds as
@@ -27,8 +41,8 @@ function volumeIconFor(volume, muted) {
 // wave, 3 = everything. volume-off has no tiers and gets 0. Canonical
 // home of Audio.volumeDimTiersFor and its mirrors.
 function volumeDimTiersFor(volume, muted) {
+  if (silentFor(volume, muted)) return 0
   var v = Number(volume)
-  if (muted || !isFinite(v) || v <= 0.01) return 0
   if (v < 1 / 3) return 1
   if (v < 2 / 3) return 2
   return 3
@@ -123,6 +137,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     volumeIconFor: volumeIconFor,
     volumeDimTiersFor: volumeDimTiersFor,
+    silentFor: silentFor,
     iconForDeviceClass: iconForDeviceClass,
     iconForFormFactor: iconForFormFactor,
     iconForMediaClass: iconForMediaClass,
