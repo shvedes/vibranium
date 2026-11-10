@@ -28,6 +28,15 @@ var NAME_RE = /^[A-Za-z0-9._+-]+$/
 // The executable name the live query asks for, or "" when it asks for none.
 // A leading FORCE_PREFIX is one escape rather than a mode: the plugin answers
 // the same row either way, and only the launcher's gate reads the difference.
+function binaryQuery(text) {
+  var raw = String(text === undefined || text === null ? "" : text).trim()
+  if (raw.charAt(0) === FORCE_PREFIX) raw = raw.substring(1).trim()
+  if (raw === "") return ""
+  if (raw.charAt(0) === "-") return ""
+  if (!NAME_RE.test(raw)) return ""
+  return raw
+}
+
 // Lowercased name -> the on-disk spelling, so the query is matched the way the
 // launcher searches (case-insensitively) while the launched argv keeps the
 // real name. Object.create(null) because PATH can hold a binary called
@@ -38,10 +47,37 @@ var NAME_RE = /^[A-Za-z0-9._+-]+$/
 // is the directory a launch would resolve the name to. Case variants are NOT
 // duplicates here - LS and ls are two different files on a case-sensitive
 // filesystem, and the first one PATH reaches is the one a launch would run.
+function binaryIndex(names) {
+  var out = Object.create(null)
+  var list = Array.isArray(names) ? names : []
+  for (var i = 0; i < list.length; i++) {
+    var n = String(list[i] === undefined || list[i] === null ? "" : list[i])
+    if (n === "") continue
+    var key = n.toLowerCase()
+    if (out[key] === undefined) out[key] = n
+  }
+  return out
+}
+
 // The installed spelling of `name`, or "" when PATH holds no such binary.
+function binaryMatch(index, name) {
+  if (index === null || index === undefined) return ""
+  var key = String(name === undefined || name === null ? "" : name).toLowerCase()
+  var hit = index[key]
+  return typeof hit === "string" ? hit : ""
+}
+
 // The two lines the row paints. The label names the command and the sub says
 // what accepting it does, which is the one thing a bare binary name cannot say
 // for itself: that this runs a program rather than opening a desktop entry.
+function launchLabel(name) {
+  return "Launch " + name
+}
+
+function launchSub(name) {
+  return "Launch " + name + " binary"
+}
+
 // Binary-launch plugin for AppLauncher: offers a program on PATH when the
 // query IS that program's name.
 //

@@ -153,6 +153,14 @@ function isOperation(name) {
 // The operations a launcher must name deliberately. Reading this instead of
 // keeping a second list here means a new privileged operation cannot be
 // added to the vocabulary while staying off the launcher's grant table.
+function outsideOperations() {
+  const out = []
+  for (const name of Object.keys(OPERATIONS)) {
+    if (OPERATIONS[name] === true) out.push(name)
+  }
+  return out
+}
+
 // The names a grant asked for that this policy will not honour: either
 // outside the vocabulary, or already the default. Deduplicated so a caller
 // can report a grant table once instead of per row.
@@ -313,3 +321,6 @@ function createPolicy(grants, host) {
 
 // The default posture, named for callers that want it without spelling the
 // argument out.
+function defaultPolicy() {
+  return createPolicy()
+}
