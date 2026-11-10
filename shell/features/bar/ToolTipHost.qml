@@ -4,6 +4,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.common
+import "../../common/math/Range.js" as Range
 
 // ToolTipHost: the single shared tooltip window per BarView (per screen).
 // Modules stop owning tooltip windows; a tiny ToolTipBind per module
@@ -99,7 +100,7 @@ PanelWindow {
     const cap = root._req ? root._req.maxWidth : 260
     if (cap <= 0) return root._verbX
     const avail = cap - 2 * Ui.m - root._lineIconSize - 2 * root._lineGap - root._verbW
-    return Math.max(0, Math.min(root._verbX, Math.floor(avail)))
+    return Range.clamp(Math.floor(avail), 0, root._verbX)
   }
 
   // Reserved space for the widest value the throughput form can ever
@@ -526,7 +527,8 @@ PanelWindow {
     const anchorX = root._req.anchor.mapToItem(root._req.barWindow.contentItem, 0, 0).x
     let x = anchorX + root._req.anchor.width / 2 - w / 2
     let y = root.barPosition === "bottom" ? root.height - barH - h - root.gap : barH + root.gap
-    x = Math.max(root.gap, Math.min(x, root.width - w - root.gap))
+    const right = root.width - w - root.gap
+    x = right >= root.gap ? Range.clamp(x, root.gap, right) : root.gap
     bubble.x = Math.round(x)
     bubble.y = Math.round(y)
   }
