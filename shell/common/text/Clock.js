@@ -37,6 +37,18 @@ function clockLabel(atMs, use12h) {
   return Format.pad2(hours) + ":" + Format.pad2(at.getMinutes()) + suffix
 }
 
+// A wall-clock hour as the weather strip prints it: "9 PM" on the 12-hour
+// dial, "21:00" on the 24-hour one. The hour is data, not a Date, because a
+// forecast entry carries its target-zone wall hour rather than an instant.
+function formatHour(hours, use12h) {
+  var h = Number(hours)
+  if (!isFinite(h)) return ""
+  if (use12h === true) {
+    return foldHour12(h) + (Math.floor(h) % 24 < 12 ? " AM" : " PM")
+  }
+  return Format.pad2(((Math.floor(h) % 24) + 24) % 24) + ":00"
+}
+
 // Memoized day labels: one Intl format per calendar day instead of one per
 // row. A clipboard history or a notification pile that spans more than one
 // day prints the old rows' date with every row, and toLocaleDateString was
@@ -97,6 +109,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     foldHour12: foldHour12,
     clockLabel: clockLabel,
+    formatHour: formatHour,
     formatTime: formatTime
   }
 }

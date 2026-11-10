@@ -6,6 +6,7 @@ import QtQml
 import Quickshell
 import qs.common
 import "Model.js" as Model
+import "../../common/text/Clock.js" as ClockFmt
 
 // Weather service - single source of truth for forecast data. Owns the
 // location file, both fetch trees (wttr.in fallback + Open-Meteo
@@ -428,8 +429,7 @@ Singleton {
   // is the entry's target-zone wall hour.
   function hourLabel(entry) {
     if (!entry) return ""
-    const d = new Date(2000, 0, 1, entry.hour, 0)
-    return root.clockUse12h ? Qt.formatDateTime(d, "h AP") : Qt.formatDateTime(d, "HH:mm")
+    return ClockFmt.formatHour(entry.hour, root.clockUse12h)
   }
 
   function dayDetailsLine(day) {
