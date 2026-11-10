@@ -344,12 +344,12 @@ Item {
 
   property var plan: [
     "", "buffers", "smallFull", "wallBounded", "hugeCostsTheSame",
-    "gateIsLoadBearing", "buildCost", "", "", "settled", "finish"
+    "gateIsLoadBearing", "buildCost", "", "", "", "", "", "settled", "finish"
   ]
 
   Timer {
     id: pump
-    interval: 12
+    interval: 20
     repeat: true
     running: true
     onTriggered: {
