@@ -779,11 +779,18 @@ Item {
 
   function _loadLate() {
     // Order is the bar first (measured: the smallest set is the one on the
-    // critical path), then the services the bar's modules read, then the
-    // feature modules nothing on the first screen needs.
+    // critical path), then the services the bar's modules read.
+    //
+    // The feature half waits for the bar's entrance (see the
+    // bootEntranceSettled handler) instead of loading here. Its compile is the
+    // longest of the three, and it shares the type loader with the bar's
+    // per-module builds: started alongside them it measured as the reason a
+    // bar module that builds in ~5ms took ~30ms each, which is ~570ms on the
+    // bar's path to screen. Nothing on the first screen resolves a feature
+    // type, and the entrance queue drains after the entrance anyway, so the
+    // wait costs the first screen nothing.
     boot._loadBarHalf()
     boot._loadServicesHalf()
-    boot._loadFeaturesHalf()
   }
 
   // One half has landed, or failed and will never land. `heavy` marks a half
@@ -1026,6 +1033,17 @@ Item {
 
   function _beginDrain() {
     if (boot._drainStarted) return
+    // The entrance queue resolves its units through the feature half, so a
+    // release that lands while that half is still compiling would demand types
+    // it cannot dispatch yet: each demand is stashed for the replay, but the
+    // gate records the first failure. The half's adoption calls this again
+    // through _replayNext, and a failed half has already decremented
+    // _halvesPending, so the request is parked only while a landing is still
+    // possible.
+    if (!boot._lateFeatures && boot._halvesPending > 0) {
+      boot._drainRequested = true
+      return
+    }
     // The IPC surface does not wait for the construction milestone. A facade
     // unit's resident half is a singleton whose only job is to answer, and
     // `session` holds the lock/logout verbs, so a keybinding pressed while the
@@ -1554,6 +1572,11 @@ Item {
   Connections {
     target: DesktopLayoutState
     function onBootEntranceSettledChanged() {
+      // The feature half's turn: the bar is on screen, so its compile no longer
+      // competes with the bar's module builds (see _loadLate). The entrance
+      // backstop settles this milestone even when no bar reported, so a shell
+      // whose bar never latches still loads the half.
+      if (DesktopLayoutState.bootEntranceSettled) boot._loadFeaturesHalf()
       if (boot._drainRequested) boot._beginDrain()
       if (DesktopLayoutState.bootEntranceSettled) {
         Log.debug("boot: entrance settled in " + boot._sinceProcessStart() + "ms")

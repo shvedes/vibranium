@@ -730,11 +730,14 @@ Singleton {
   // that guarantees the bar cannot stay held forever (a Loader that errors
   // never reports, so without it one broken module would blank the bar).
   property bool entranceReady: false
-  // Warm frame state (see _latchEntrance). Held slots draw at
-  // entranceWarmOpacity for one frame before the release, so their first
-  // composite is paid while nobody is looking rather than inside it.
-  property bool entranceWarming: false
-  readonly property real entranceWarmOpacity: root.entranceWarming ? 0.004 : 0
+  // The held slots' opacity: invisible on screen, still drawn. A slot at
+  // opacity 0 is culled by the renderer, so a bar held at 0 uploads nothing
+  // while it builds and then pays for every texture and effect shader inside
+  // the first frame of the entrance - measured as an 85ms stall that stretched
+  // a 200ms fade to 299ms. Holding at 0.004 instead (from birth, for the whole
+  // hold) spreads that first composite across the build, so the release itself
+  // needs no warm-up frame.
+  readonly property real entranceWarmOpacity: 0.004
   // The bar's own travel during the entrance: the whole surface starts one
   // bar height outside the screen edge and glides home before the modules
   // fade, so the strip enters instead of being painted in place from the
@@ -781,22 +784,13 @@ Singleton {
 
   function _latchEntrance() {
     if (root.entranceReady) return
-    // A held slot sits at opacity 0, and the renderer culls what is fully
-    // transparent: nothing in a held bar uploads a texture or compiles an
-    // effect shader, and the entrance's first visible frame pays for all of
-    // it. That frame used to land inside the boot animations. Traced on a
-    // cold boot with the wallpaper fade as the yardstick: releasing straight
-    // from opacity 0 stretched a 200ms fade to 299ms with one 85ms stall in
-    // the middle of it; drawing one warm frame first restored the nominal
-    // 200ms. So the release is two steps - draw at an opacity that is
-    // invisible on screen but still drawn, then release.
-    if (!root.entranceWarming) {
-      root.entranceWarming = true
-      entranceWarmFrame.restart()
-      return
-    }
-    // A settle re-check while the warm frame is pending must not jump the gun.
-    if (entranceWarmFrame.running) return
+    // Nothing to wait for here: the held slots draw at entranceWarmOpacity for
+    // their whole hold (see that property), so releasing directly costs no
+    // unwarmed frame. It used to go through a one-shot 16ms timer to draw one
+    // warm frame first, and that timer was starved by the very work it was
+    // queued behind (the last module builds plus the feature half's adoption):
+    // measured at 178-400ms late on a cold boot, on the bar's own path to
+    // screen. The warm composite is paid during the build instead.
     root.entranceReady = true
     // The strip starts at the edge and travels home first; the held slots
     // follow once it has landed (entranceModulesPause below), so the modules
@@ -832,9 +826,8 @@ Singleton {
   // A pause advances on the driver that drives the slots' own tweens, so one
   // spanning the motion plus a frame ends on the first tick after the last
   // frame that drew it, whatever the refresh rate or the timer precision. 16
-  // names a frame at 60Hz, the convention entranceWarmFrame uses below. The
-  // entrance is two motions now - the strip's slide, then the slots' intro -
-  // so the pause spans both.
+  // names a frame at 60Hz. The entrance is two motions now - the strip's
+  // slide, then the slots' intro - so the pause spans both.
   PauseAnimation {
     id: entrancePlayedPause
 
@@ -867,16 +860,6 @@ Singleton {
     to: 0
     duration: Ui.slowMs
     easing.type: Easing.OutCubic
-  }
-
-  // The warm frame itself: one frame is the whole requirement, so the
-  // interval is a frame at 60Hz rather than a tuned duration.
-  Timer {
-    id: entranceWarmFrame
-
-    interval: 16
-    repeat: false
-    onTriggered: root._latchEntrance()
   }
 
   // Is `kind` on the bar, either as a slot of its own or as a member of a
