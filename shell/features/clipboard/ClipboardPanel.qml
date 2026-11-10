@@ -156,8 +156,8 @@ PanelCard {
       // place the user left the bar, it stands there instead of taking a
       // lap of the list, and a settle that holds the view still gives
       // the bar no travel at all. The target is only known after
-      // installRows (see the count below), so a seat that is not the tail
-      // repair drops the pin again in the same turn.
+      // installRows (see the count below), so the pin is taken here and
+      // released only once the commit's repair has landed there.
       if (keepIndex === true && prev >= 0) list.pinHighlight()
       // The tail settle claims the freed row's space BEFORE the write, so
       // the write itself changes nothing about the content's extent: the
@@ -175,12 +175,11 @@ PanelCard {
         const target = n === 0 ? -1 : Math.min(prev, n - 1)
         // Repair seats land: the stillness lease holds the bar across
         // the reflow instead of gliding it from the swap's reset position
-        // at the top of the list. A tail delete has no reflow to hold for,
-        // so its bar stays pinned and is released at the commit, which is
-        // where the one leg it owes is seated (see onDeleteCommitted).
-        const tailDelete = panel.pendingDeleteIndex >= 0
-          && panel.pendingDeleteIndex >= n
-        if (!tailDelete) list.unpinHighlight()
+        // at the top of the list. The pin taken above is kept for every
+        // delete - releasing it here would hand the bar to the swap's
+        // index echo before the commit re-asserts the row, which is the
+        // lap from the top this pin exists to prevent. It is released in
+        // onDeleteCommitted, after the repair.
         if (target >= 0) {
           list.seat(target, "land")
         } else {
@@ -417,21 +416,32 @@ PanelCard {
   // below it, which is the same number the reflow arms the rows below
   // the cut with (see _armSlide).
   property real _settleSpace: 0
+  // Whether the settled removal was the LAST row. Its survivor arrives under
+  // the pinned bar only when the ride is over, so that one holds the pin to
+  // the land; any other removal already has its survivor under the bar and
+  // rides the settle with it (see onDeleteCommitted).
+  property bool _settleTail: false
   function _armSettle(idx) {
     panel._settleSpace = 0
-    // Only the last row settles: any other removal leaves the content's
-    // extent short by a row ABOVE the view, which costs the view nothing.
-    if (idx !== list.count - 1) return
+    panel._settleTail = false
+    if (idx < 0) return
     // Only a list with room to scroll settles. A list that fits has no
     // bottom to stand on, and the space the settle would hold would
     // make a list that did not scroll scroll.
     const bottom = list.clampY(Infinity)
     if (bottom <= 0) return
-    // Only a view that stands ON the bottom settles: anywhere else the
-    // content loses space the view was not using and the bound does not
-    // move under it.
-    if (list.contentY < bottom - 0.5) return
+    // Only a view that stands ON the bottom settles, and there the bound
+    // comes down for ANY removal: the space below the cut is what the
+    // viewport is resting on, so a row removed in the middle takes its
+    // slot off the bottom too. Elsewhere the content loses space the view
+    // was not using and the bound does not move under it. The cursor's
+    // follow target is the question, not contentY: the seat's follow is
+    // deferred a turn, so on the delete's own turn the view may not have
+    // arrived at the bottom the cursor was just seated for.
+    const target = list.centerTarget(idx)
+    if (target < bottom - 0.5) return
     panel._settleSpace = panel._slideOffset
+    panel._settleTail = idx === list.count - 1
   }
   // The write claims the space: the list holds it through the write, so
   // the content's extent is unchanged by it and the view does not move.
@@ -584,6 +594,12 @@ PanelCard {
       list._stillPreempt()
       list.reveal(want, false)
     }
+    // A survivor removal hands the bar over BEFORE the ride: the pin still
+    // stands on the deleted row's slot, the live cursor row is already in
+    // it, and the settle takes it down with the content. The tail keeps its
+    // pin (its survivor arrives under the bar as the ride ends), and the
+    // release below leaves that one to the list's onFinished handover.
+    if (panel._settleTail !== true) list.unpinHighlightNow()
     // The settle ends here: the space the removed row stood in goes back
     // and the content closes over it.
     list.releaseSettle()

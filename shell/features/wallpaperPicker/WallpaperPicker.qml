@@ -896,6 +896,14 @@ Singleton {
     // remove and did not.
     function _abortDelete(fileName, code) {
         root.optimistic.cancel(fileName)
+        // The panel armed the reflow before the request - the slide, the
+        // settle slot and the repair index. A removal that never landed has
+        // to give all of it back: a stale settle would claim a slot for a
+        // row that is still in the list.
+        for (let i = 0; i < root._panels.length; i++) {
+            const p = root._panels[i]
+            if (p && typeof p.onDeleteAborted === "function") p.onDeleteAborted()
+        }
         root._refuse(code)
     }
 

@@ -72,7 +72,7 @@ PanelCard {
 
   Connections {
     target: WallpaperPicker
-    function onFilteredChanged() { panel.syncRows() }
+    function onFilteredChanged() { panel.syncRows(panel.pendingDeleteIndex >= 0) }
     function onVisibleChanged() {
       if (!WallpaperPicker.visible) return
       panel.show()
@@ -82,7 +82,11 @@ PanelCard {
     }
   }
 
-  function syncRows() {
+  // keepIndex is the delete reflow: the row under the cursor is removed and
+  // the surviving row that takes its slot is the one the cursor should be on.
+  // A filter or theme change resets to the top instead - there is no row to
+  // keep there, and the list is a fresh projection.
+  function syncRows(keepIndex) {
     if (panel._rowsPending) return
     panel._rowsPending = true
     Qt.callLater(() => {
@@ -92,9 +96,27 @@ PanelCard {
       panel.closeDelete()
       panel._swapGen++
       const g = panel._swapGen
+      const prev = list.currentIndex
+      const keep = keepIndex === true && prev >= 0
       list.swapRun(g, v => v === panel._swapGen, () => {
+        // Pin the bar before the write, while its row is still live. The
+        // model reset deals the view an index echo a frame later; an
+        // unpinned bar follows that echo to the top and then travels back
+        // to the repair target - the lap this hold exists to prevent.
+        if (keep) list.pinHighlight()
+        if (keep) panel._claimSettle()
         panel.installRows()
-        list.settle(0, true)
+        if (keep) {
+          const n = panel.rows.length
+          if (n === 0) list.seat(-1, "land")
+          else list.seat(Math.min(prev, n - 1), "land")
+        } else {
+          panel._settleSpace = 0
+          panel._settleTail = false
+          panel._settleTheme = ""
+          list.unpinHighlight()
+          list.settle(0, true)
+        }
       })
       Qt.callLater(focusCtrl.reassert)
     })
@@ -264,6 +286,38 @@ PanelCard {
     _slideOffset = (it ? it.height : panel.rowH) + list.spacing
     _slideGen = panel._swapGen + 1
   }
+  // The slot the settle holds, and whether the removed row was the last one.
+  // The list owns the holding; this half knows when a removal settles.
+  property real _settleSpace: 0
+  property bool _settleTail: false
+  property string _settleTheme: ""
+  function _armSettle(idx) {
+    panel._settleSpace = 0
+    panel._settleTail = false
+    panel._settleTheme = WallpaperPicker.currentTheme
+    if (idx < 0) return
+    const bottom = list.clampY(Infinity)
+    if (bottom <= 0) return
+    // The cursor's follow target, not contentY: the seat's follow is
+    // deferred a turn, so the view may not have arrived at the bottom the
+    // cursor was just seated for on the delete's own turn.
+    if (list.centerTarget(idx) < bottom - 0.5) return
+    panel._settleSpace = panel._slideOffset
+    panel._settleTail = idx === list.count - 1
+  }
+  function _claimSettle() {
+    if (panel._settleSpace <= 0) return
+    // A theme switch between the arm and the write retires the reflow: the
+    // rows the slot was measured on are gone, and the new theme must not
+    // inherit a held slot for a row nothing removed.
+    if (panel._settleTheme !== WallpaperPicker.currentTheme) {
+      panel._settleSpace = 0
+      panel._settleTail = false
+      return
+    }
+    list.claimSettle(panel._settleSpace)
+    panel._settleSpace = 0
+  }
   // The affected set comes from the rows that left between the previous sync
   // and this one: the model's own operation report is gone, and the two key
   // sequences answer the same question. The lowest index the previous set
@@ -310,21 +364,45 @@ PanelCard {
     const idx = panel._deleteIndex
     const row = idx >= 0 && idx < panel.rows.length ? panel.rows[idx] : null
     if (row) panel._armSlide(idx)
+    if (row) panel._armSettle(idx)
     panel.closeDelete()
     if (!row || WallpaperPicker.optimistic.isPending(row.value)) return
     pendingDeleteIndex = idx
     WallpaperPicker.requestDelete(row.value)
   }
-  // Runs after the service committed the removal. Queued repair also
-  // wins over syncRows' reset-to-top queued for the same filtered
-  // change.
+  // The removal never landed. The row is still in the list, so there is no
+  // seat to repair and no slot to hold - give back everything acceptDelete
+  // armed, or the next sync claims space for a row that never left.
+  function onDeleteAborted() {
+    if (panel.pendingDeleteIndex < 0 && panel._settleSpace <= 0) return
+    panel.pendingDeleteIndex = -1
+    panel._settleSpace = 0
+    panel._settleTail = false
+    panel._settleTheme = ""
+    list.releaseSettle()
+    list.unpinHighlight()
+  }
+  // Runs after the service committed the removal. syncRows(keepIndex) already
+  // kept the cursor on the surviving row in the same turn as the model write,
+  // so this only repairs a seat that did not land, and releases the pin the
+  // reflow was held with.
   function onDeleteCommitted(fileName) {
     const from = panel.pendingDeleteIndex
     panel.pendingDeleteIndex = -1
-    if (from < 0) return
+    if (from < 0) { list.unpinHighlight(); return }
     Qt.callLater(() => {
       const n = panel.rows.length
-      list.seat(n === 0 ? -1 : Math.min(from, n - 1), "land")
+      const want = n === 0 ? -1 : Math.min(from, n - 1)
+      // A second write on the row syncRows already landed is the flicker.
+      if (list.currentIndex !== want) list.seat(want, "land")
+      // A survivor removal hands the bar over before the settle's ride; the
+      // tail holds its pin until the ride puts the survivor under it.
+      if (panel._settleTail !== true) list.unpinHighlightNow()
+      panel._settleTheme = ""
+      list.releaseSettle()
+      // The repair is done, so the pin has served its purpose. A pin that
+      // outlived its commit would hold the bar at the old row's place.
+      list.unpinHighlight()
     })
   }
 

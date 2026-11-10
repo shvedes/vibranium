@@ -370,6 +370,15 @@ ListView {
     if (root._settleActive) return
     root._hlPin = false
   }
+  // Drop the pin even while a settle stands, for a removal that left a
+  // survivor row in the focus slot. The bar's live row is already under the
+  // pinned geometry there, and the settle's ride takes it down with the
+  // content; holding the pin to the land would drop it a row at the handover.
+  // A tail removal is the one case that wants the opposite - its survivor
+  // arrives under the bar only once the ride is over - and it keeps the pin.
+  function unpinHighlightNow() {
+    root._hlPin = false
+  }
   // Hold the bar's geometry at the cursor's row, so the bar has something to
   // read while that row is not there to be read - the window a model change
   // opens. Returns whether the geometry was captured now: a caller that
