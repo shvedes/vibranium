@@ -7,6 +7,7 @@ import Quickshell
 import Quickshell.Io
 import qs.common
 import "ClipboardLib.js" as CL
+import "../../common/text/StringUtils.js" as SU
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/process/PanelList.js" as PanelList
 
@@ -203,7 +204,7 @@ Singleton {
     atomicWrites: true
     printErrors: false
     }
-  function _historyPath() { return root.cacheDir + "/clipboard.json" }
+  function _historyPath() { return SU.joinPath(root.cacheDir, "clipboard.json") }
   function _load() {
     // Native read - no `cat` shell
     clipboardFile.path = ""
@@ -2043,7 +2044,7 @@ Singleton {
       for (let i = 0; i < names.length; i++) {
         const n = names[i].trim()
         if (n === "") continue
-        const full = root.imgDir + "/" + n
+        const full = SU.joinPath(root.imgDir, n)
         if (live[full] !== true) orphans.push(full)
       }
       if (orphans.length > 0) root._enqueueRmPaths(orphans)

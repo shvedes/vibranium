@@ -7,6 +7,7 @@ import qs.features.bar
 import "ColorMath.js" as ColorMath
 import "../../../../common/math/Range.js" as Range
 import "../../../../common/capture/ShotLib.js" as ShotLib
+import "../../../../common/text/StringUtils.js" as SU
 
 // Color picker module. Left click starts a native pick: a full-screen
 // overlay on this module's screen shows the captured frame through
@@ -50,7 +51,7 @@ BarModule {
   // Cache slots live at <key>.json inside the cache dir, so this is the
   // file the adoption reader below reads. The reader itself is shared, not
   // per output - see _adopt().
-  readonly property string _storePath: Paths.vibraniumCache + "/" + root._storeKey + ".json"
+  readonly property string _storePath: SU.joinPath(Paths.vibraniumCache, root._storeKey + ".json")
 
   // Persisted cap (schema option shell.colorPicker.historySize, 1..50).
   // The UI always shows ten rows regardless; the file itself holds at

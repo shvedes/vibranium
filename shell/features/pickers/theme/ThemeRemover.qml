@@ -10,6 +10,7 @@ import qs.common
 import qs.features.menu
 import "../../../common/text/UnitIpc.js" as UnitIpc
 import "./ThemeScan.js" as ThemeScan
+import "../../../common/text/StringUtils.js" as SU
 
 // Theme remover service. Same looks as the main theme picker (ThemePicker):
 // a Menu page whose rows carry a `palette` array (hex swatches) rendered as
@@ -161,7 +162,7 @@ Singleton {
       const folder = String(name)
       if (official[folder]) continue
       const label = ThemeScan.displayName(folder)
-      const palette = ThemeScan.extractPalette(root._readFile(userRoot + "/" + folder + "/colors.list"))
+      const palette = ThemeScan.extractPalette(root._readFile(SU.joinPath(userRoot, folder + "/colors.list")))
       out.push({ folder: folder, label: label === "" ? folder : label, palette: palette })
     }
 

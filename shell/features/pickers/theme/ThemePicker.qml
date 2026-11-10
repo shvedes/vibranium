@@ -10,6 +10,7 @@ import qs.common
 import qs.features.menu
 import "../../../common/text/UnitIpc.js" as UnitIpc
 import "./ThemeScan.js" as ThemeScan
+import "../../../common/text/StringUtils.js" as SU
 
 // Theme picker service. Mirrors vb-theme-set discovery but entirely in
 // quickshell: enumerates $VIBRANIUM/themes and $XDG_CONFIG_HOME/vibranium/themes,
@@ -284,7 +285,7 @@ Singleton {
       if (seen[folder.toLowerCase()]) continue // user override of official -> skip
       bases.push({
         folder: folder,
-        base: userRoot + "/" + folder,
+        base: SU.joinPath(userRoot, folder),
         isUser: true
       })
     }
