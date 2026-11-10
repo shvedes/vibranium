@@ -170,11 +170,12 @@ function parseSpec(text) {
 
   const named = {}
   let namedAny = false
-  const terms = trimmed.split(",")
-  for (let i = 0; i < terms.length; i++) {
-    const term = terms[i].trim()
-    if (term === "") continue
 
+  // One comma-separated term into the spec, answering whether it named a
+  // level. The grammar is a chain of alternatives whose order matters, so it
+  // stays in one place; the caller only tracks whether any term selected a
+  // global level (`*` included).
+  function applyTerm(term) {
     // <scope>=<level>, the override form. Split on the FIRST `=` so a level
     // is never re-read out of a scope name.
     const eq = term.indexOf("=")
@@ -184,20 +185,20 @@ function parseSpec(text) {
       const level = normalizeLevel(raw)
       if (!isScopeName(scope)) {
         warning(parsed, "term '" + term + "' is not a scope=level pair")
-        continue
+        return false
       }
       if (level === null) {
         warning(parsed, "term '" + term + "' names no known level")
-        continue
+        return false
       }
       const key = scope.toLowerCase()
       parsed.overrides[key] = level
       parsed.labels[key] = scope
-      continue
+      return false
     }
     if (eq === 0) {
       warning(parsed, "term '" + term + "' has no scope before '='")
-      continue
+      return false
     }
 
     // -<level> removes one level, -<scope> silences one subtree. Levels are
@@ -207,28 +208,28 @@ function parseSpec(text) {
       const body = term.slice(1).trim()
       if (body === "") {
         warning(parsed, "term '" + term + "' is empty after '-'")
-        continue
+        return false
       }
       const level = normalizeLevel(body)
       if (level !== null && level !== OFF) {
         parsed.dropped[level] = true
-        continue
+        return false
       }
       if (!isScopeName(body)) {
         warning(parsed, "term '" + term + "' is neither a level nor a scope")
-        continue
+        return false
       }
       const key = body.toLowerCase()
       parsed.silenced[key] = true
       parsed.labels[key] = body
-      continue
+      return false
     }
 
     // Checked before normalizeLevel on purpose: `off` normalizes to "off",
     // which is a spec directive and never a member of the level set.
     if (SILENT.indexOf(term.toLowerCase()) >= 0) {
       parsed.off = true
-      continue
+      return false
     }
 
     // `*` names every band rather than the widest one. `trace` is the widest
@@ -237,22 +238,28 @@ function parseSpec(text) {
     // no debug", which is the opposite of what `*` reads as.
     if (term === WILDCARD) {
       for (let l = 0; l < LEVELS.length; l++) named[LEVELS[l]] = true
-      namedAny = true
-      continue
+      return true
     }
 
     const level = normalizeLevel(term)
     if (level !== null && level !== OFF) {
       named[level] = true
-      namedAny = true
-      continue
+      return true
     }
 
     if (!isScopeName(term)) {
       warning(parsed, "term '" + term + "' is not a level or a scope")
-      continue
+      return false
     }
     parsed.bare.push(term)
+    return false
+  }
+
+  const terms = trimmed.split(",")
+  for (let i = 0; i < terms.length; i++) {
+    const term = terms[i].trim()
+    if (term === "") continue
+    if (applyTerm(term)) namedAny = true
   }
 
   // A spec that named levels replaces the base selection rather than adding
