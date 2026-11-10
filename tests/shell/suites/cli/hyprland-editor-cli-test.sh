@@ -10,10 +10,10 @@
 #   set <path> <value> <file> [...]  prints the RESOLVED PATH
 #
 #   exactly one line on stdout, "err: <message>" on failure, empty means the
-#   command never ran. The usage path is the one case that does not honour that:
-#   it writes the usage block to stderr and nothing at all to stdout
-#   (HyprlandEditorCli.js:44), so a caller's "empty means it never ran" reads a
-#   usage error the same as a failed launch.
+#   command never ran. A usage ERROR honours that too: it writes the block to
+#   stderr and "err: usage" as its one stdout line, so a caller's "empty means
+#   it never ran" can no longer read a usage error as a failed launch. A help
+#   request (-h/--help) is not a result run and keeps stdout empty.
 #
 # A caller in Hyprland's config VM cannot observe a child exit status, so it
 # reads that one line and nothing else. Every case below therefore asserts the
@@ -94,14 +94,14 @@ t_result() {
   t_empty "$label: stderr is empty" "$ERR"
 }
 
-# t_usage <label> <expected-exit> - the usage path, which is the one case that
-# does not write the result line: 15 lines of usage on stderr, nothing on
-# stdout. Asserted on its own so the one-line contract below is never quietly
-# widened to cover it.
+# t_usage <label> <expected-exit> - a usage error: the block on stderr and
+# the one machine-readable stdout line that distinguishes it from a command
+# that never ran.
 t_usage() {
   local label="$1" want_rc="$2"
   t_eq "$label: exit status" "$want_rc" "$RC"
-  t_empty "$label: stdout is empty" "$OUT"
+  t_eq "$label: the one stdout line" "err: usage" "$OUT"
+  t_lines "$label: stdout is exactly one line" 1 "$(out_lines)"
   t_lines "$label: stderr is the usage block" 15 "$(err_lines)"
 }
 
@@ -192,7 +192,8 @@ t_section "usage is the whole argument contract"
 cli
 t_eq "no arguments: the usage block, verbatim" "$USAGE_TEXT" "$ERR"
 t_eq "no arguments: exit status" 1 "$RC"
-t_empty "no arguments: stdout is empty" "$OUT"
+t_eq "no arguments: the one stdout line" "err: usage" "$OUT"
+t_lines "no arguments: stdout is one line" 1 "$(out_lines)"
 t_lines "no arguments: stderr is 15 lines" 15 "$(err_lines)"
 
 cli -h

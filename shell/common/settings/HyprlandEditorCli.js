@@ -5,12 +5,17 @@
 // hl.config/hl.monitor value; the shell's QML stack (HyprlandSettings.qml)
 // runs the same editor in-process instead.
 //
-// Every run writes exactly one line to stdout: the resolved config path on
-// success, or "err: <message>" on failure. That line is the whole result
-// contract, because a caller in Hyprland's config VM cannot observe a child
-// exit status -- os.execute and io.popen both fail to wait on a child there and
-// return ECHILD regardless of what the child did -- so it reads this line.
-// Empty output means the command itself never ran.
+// Every result run writes exactly one line to stdout: the value on a get, the
+// resolved config path on a set, or "err: <message>" on any failure, including
+// a usage error. That line is the whole result contract, because a caller in
+// Hyprland's config VM cannot observe a child exit status -- os.execute and
+// io.popen both fail to wait on a child there and return ECHILD regardless of
+// what the child did -- so it reads this line. Empty output means the command
+// itself never ran.
+//
+// `-h`/`--help` is the one run that is not a result: the block goes to stderr
+// and stdout stays empty, because the caller asked for the text rather than for
+// a value it cannot observe.
 //
 // Usage:
 //   HyprlandEditorCli.js get <path> <file> [options]
@@ -59,6 +64,12 @@ Options:
   -h, --help                 display this help and exit
 `
   );
+  // A usage error still answers on stdout: without the line the caller reads it
+  // as a command that never ran, which is exactly what the result contract
+  // exists to distinguish. The block is for the human; the single line is the
+  // machine-readable half. A help request is not a result run and keeps stdout
+  // empty.
+  if (code !== 0) process.stdout.write("err: usage\n");
   process.exit(code);
 }
 

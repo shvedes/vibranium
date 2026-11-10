@@ -87,21 +87,21 @@ thing to write.
 
 *Reproduced by `suites/js/menu.test.mjs`.*
 
-### 4. `HyprlandEditorCli` does not honour its own one-line stdout contract
+### 4. (fixed) `HyprlandEditorCli` does not honour its own one-line stdout contract
 
-`shell/common/settings/HyprlandEditorCli.js:8-13` states that every run writes
+`shell/common/settings/HyprlandEditorCli.js` states that every run writes
 exactly one line to stdout — the resolved path, or `err: <message>` — and that
-empty output means the command never ran. The usage path (lines 44-45, 62)
-writes **15 lines to stderr and nothing to stdout**.
+empty output means the command never ran. The usage path wrote **15 lines to
+stderr and nothing to stdout**, so a caller in Hyprland's config VM (which
+cannot observe a child exit status) read a usage error as a launch that never
+happened — the exact ambiguity the line was written to remove.
 
-Verified: 0 stdout lines, 15 stderr lines for a no-argument run.
+A usage error now writes `err: usage` as its one stdout line, with the block
+still on stderr for the human. `-h`/`--help` is documented as the one run that
+is not a result: the caller asked for the text, so the block stays on stderr and
+stdout stays empty.
 
-**Consequence:** a caller in Hyprland's config VM cannot observe a child exit
-status, so it reads that one stdout line. A usage error is therefore
-indistinguishable from a launch that never happened — the exact ambiguity the
-line was written to remove.
-
-*Reproduced by `suites/cli/hyprland-editor-cli-test.sh`.*
+*Reproduced and now verified by `suites/cli/hyprland-editor-cli-test.sh`.*
 
 ### 5. (fixed) A failed unlock leaves the password in plain text on the lock screen
 
