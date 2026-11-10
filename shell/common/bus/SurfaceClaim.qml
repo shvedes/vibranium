@@ -2,6 +2,7 @@ pragma Singleton
 pragma ComponentBehavior: Bound
 import QtQml
 import Quickshell
+import "../runtime/ErrorText.js" as ErrorText
 
 // Exclusive surface claim: which of the participating services owns the
 // screen, and how the previous owner is put away when a new one arrives.
@@ -261,12 +262,6 @@ Singleton {
   }
 
   function _errorMessage(error) {
-    try {
-      if (typeof error === "string") return error
-      if (error && typeof error.message === "string") return error.message
-      return String(error)
-    } catch (ignored) {
-      return "Unknown surface claim error"
-    }
+    return ErrorText.message(error, "Unknown surface claim error")
   }
 }

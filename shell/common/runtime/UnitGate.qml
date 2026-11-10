@@ -2,6 +2,7 @@ pragma Singleton
 import QtQml
 import Quickshell
 import qs.common
+import "ErrorText.js" as ErrorText
 
 Singleton {
   id: root
@@ -619,12 +620,6 @@ Singleton {
   }
 
   function _errorMessage(error) {
-    try {
-      if (typeof error === "string") return error
-      if (error && typeof error.message === "string") return error.message
-      return String(error)
-    } catch (ignored) {
-      return "Unknown unit error"
-    }
+    return ErrorText.message(error, "Unknown unit error")
   }
 }
