@@ -2021,6 +2021,10 @@ Singleton {
       cb()
       return
     }
+    root._mkdirOutputDir(cb, flowId, jobId, screen)
+  }
+
+  function _mkdirOutputDir(cb, flowId, jobId, screen) {
     const argv = Exec.setsidTimeoutCmd(["mkdir", "-p",
       Paths.screenshotsDir], 15)
     const proc = mkdirComp.createObject(root, { command: argv })
