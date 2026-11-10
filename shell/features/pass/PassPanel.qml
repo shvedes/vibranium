@@ -6,6 +6,7 @@ import Quickshell
 import qs.common
 import qs.features.pass
 import "Model.js" as Model
+import "../../common/text/StringUtils.js" as SU
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
 
 // Password-manager card over the Pass service: root menu (Browse Vault
@@ -468,7 +469,7 @@ PanelCard {
       const searched = []
       for (let i = 0; i < found.dirs.length; i++) {
         const dp = found.dirs[i]
-        searched.push({ kind: "dir", label: dp.split("/").pop(), sub: dp, icon: "file-folder", name: dp.split("/").pop(), dirPath: dp })
+        searched.push({ kind: "dir", label: SU.basename(dp), sub: dp, icon: "file-folder", name: SU.basename(dp), dirPath: dp })
       }
       for (let j = 0; j < found.entries.length; j++)
         searched.push({ kind: "entry", label: found.entries[j].name, sub: found.entries[j].path, icon: "lock", path: found.entries[j].path })
@@ -885,7 +886,7 @@ PanelCard {
     }
     if (kind === "up") { panel.moveUp(); return }
     if (kind === "move-here") {
-      const base = Pass.selectedPath.split("/").pop()
+      const base = SU.basename(Pass.selectedPath)
       const destinationDir = panel.moveDir
       panel.beginPageTransition(false, true)
       const started = Pass.moveEntry(Pass.selectedPath, panel.joinDir(destinationDir, base))
@@ -929,7 +930,7 @@ PanelCard {
       return
     }
     if (action === "rename") {
-      panel.openEditor("rename", p.split("/").pop())
+      panel.openEditor("rename", SU.basename(p))
       return
     }
   }

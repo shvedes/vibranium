@@ -16,6 +16,7 @@ import qs.features.wallpaper
 import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/text/ImageExts.js" as ImageExts
+import "../../common/text/StringUtils.js" as SU
 import "../../common/process/JobResult.js" as Job
 import "../../common/process/PanelList.js" as PanelList
 
@@ -962,7 +963,7 @@ Singleton {
         Log.info("deleted user wallpaper, total " + root._userFiles.length)
         // Step 2: check if deleted file was the current wallpaper
         const cur = Wallpaper.current
-        const base = cur.split("/").pop()
+        const base = SU.basename(cur)
         if (base === record.file) {
             // The basename comparison is the whole test - `Wallpaper.current`
             // is a path and `record.file` is not, so the strip above is what

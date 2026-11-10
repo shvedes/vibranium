@@ -10,6 +10,7 @@ import qs.common
 import "SettingsLib.js" as SL
 import "HyprlandEditor.js" as HE
 import "../text/UnitIpc.js" as UnitIpc
+import "../text/StringUtils.js" as SU
 
 // Native Hyprland settings store - file-backed + live hyprctl.
 //
@@ -748,7 +749,7 @@ Singleton {
             try { out = readlinkOut.text.trim() } catch(e) {}
             let preset = "default"
             if (out !== "") {
-                const base = out.split("/").pop()
+                const base = SU.basename(out)
                 preset = base.replace(/\.lua$/, "")
             }
             const key = "hypr.animations.preset"
