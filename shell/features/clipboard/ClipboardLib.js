@@ -145,6 +145,13 @@ const NETWORK_PROTO_LABELS = {
   dav: "WebDAV", davs: "WebDAVS", afp: "AFP", s3: "S3", nmb: "NMB"
 }
 
+// Membership in the share-scheme table, case-insensitively. The table is the
+// single place the scheme list lives; isNetworkUri reads it too.
+function isNetworkScheme(s) {
+  if (typeof s !== "string") return false
+  return NETWORK_SCHEMES[s.toLowerCase()] === true
+}
+
 function isNetworkUri(s) {
   const t = String(s).trim()
   const m = t.match(RE_URI_SCHEME_HOST)
@@ -776,6 +783,32 @@ function hex4(n) {
   return ("000" + n.toString(16)).slice(-4)
 }
 
+// The encode half of the codec. No key means no encryption at all, which is
+// why the history writer always generates one; a nullish payload is the empty
+// string rather than the word "null".
+function encryptSecret(s, key) {
+  const text = s === undefined || s === null ? "" : String(s)
+  const k = key === undefined || key === null ? "" : String(key)
+  if (text === "") return ""
+  if (k === "") return text
+  let out = ""
+  for (let i = 0; i < text.length; i++) {
+    out += hex4(text.charCodeAt(i) ^ k.charCodeAt(i % k.length))
+  }
+  return out
+}
+
+// 32 random bytes as lowercase hex. This is the library's only random draw:
+// the key is generated once per install and every other value is derived.
+function generateKey() {
+  let out = ""
+  for (let i = 0; i < 32; i++) {
+    const b = Math.floor(Math.random() * 256)
+    out += (b < 16 ? "0" : "") + b.toString(16)
+  }
+  return out
+}
+
 function decryptSecret(hex, key) {
   key = String(key || "")
   if (key === "") return String(hex)
@@ -844,8 +877,11 @@ function buildCopySecretCmd() {
 function buildCopyUriListCmd() {
   return ["wl-copy", "-n", "--type", "text/uri-list"]
 }
+// The mime argument is accepted and ignored: the bytes already live in a
+// snapshot file, so only a file:// URI is offered - the same fragment an
+// image file re-copy uses.
 function buildCopyImageDataCmd(mime, path) {
-  return ["sh", "-c", "wl-copy -n --type " + sq(mime) + " < " + sq(path)]
+  return buildCopyImageFileCmd(path)
 }
 // Retained shell fragment: the URI list reaches wl-copy as one quoted word
 // instead of a stdin write, because callers route an image re-copy through a
@@ -1242,19 +1278,82 @@ function buildExistenceProbeCmd(paths) {
 // [0, count) appears exactly once, so a truncated or hostile output can
 // never silently drop a path into the open set - an index with no "ok"
 // line lands in missing and is never executed.
+function parseExistenceProbe(text, count) {
+  const n = Number(count)
+  const total = isFinite(n) && n > 0 ? Math.floor(n) : 0
+  const existing = []
+  const missing = []
+  const seen = {}
+  const lines = String(text === undefined || text === null ? "" : text).split("\n")
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^(\d+)\s+(ok|missing)$/.exec(lines[i].trim())
+    if (m === null) continue
+    const idx = Number(m[1])
+    if (idx < 0 || idx >= total || seen[idx] === true) continue
+    seen[idx] = true
+    if (m[2] === "ok") existing.push(idx)
+    else missing.push(idx)
+  }
+  for (let i = 0; i < total; i++) {
+    if (seen[i] !== true) missing.push(i)
+  }
+  return { existing: existing, missing: missing }
+}
+
+// Verdicts for buildExistenceProbeCmd's stdout. Returns
+// { existing: [...indices], missing: [...indices] }: every index in
+// [0, count) appears exactly once, so a truncated or hostile output can
+// never silently drop a path into the open set - an index with no "ok"
+// line lands in missing and is never executed.
 // Open a verified local path in its default app. Same launch discipline
 // as the launcher (AppLauncherController._openPath): xdg-open inside
 // app2unit's transient systemd scope so the process stays session-tracked;
-// execDetached guarantees survival past panel close.
+// execDetached guarantees survival past panel close. Direct argv, no shell.
+function buildOpenCmd(path) {
+  return ["app2unit", "-S", "both", "-s", "app-graphical.slice", "--", "xdg-open", String(path)]
+}
+
 // Local paths Enter should open instead of re-copying. Single-path rows
 // (file/folder/archive/image) yield at most one absolute path; multi-rows
 // (files/folders) yield every absolute path. Everything else (text, url,
 // network, secret) yields [] and keeps the copy behaviour. Image rows
 // prefer the concrete file, then the session snapshot, then the lone
 // filePaths entry - all three are absolute local paths when present.
+function openPathsFor(entry) {
+  if (entry === null || typeof entry !== "object") return []
+  const out = []
+  const push = function (p) {
+    const s = String(p === undefined || p === null ? "" : p)
+    if (s.charAt(0) === "/") out.push(s)
+  }
+  const paths = Array.isArray(entry.filePaths) ? entry.filePaths : []
+  if (entry.type === "image") {
+    if (String(entry.imageFile || "") !== "") push(entry.imageFile)
+    else if (String(entry.imageDataFile || "") !== "") push(entry.imageDataFile)
+    else for (let i = 0; i < paths.length; i++) push(paths[i])
+    return out
+  }
+  if (entry.type === "file" || entry.type === "folder" || entry.type === "archive") {
+    if (paths.length > 0) push(paths[0])
+    return out
+  }
+  if (entry.type === "files" || entry.type === "folders") {
+    for (let i = 0; i < paths.length; i++) push(paths[i])
+    return out
+  }
+  return out
+}
+
 // Notice copy for a failed open-on-Enter existence probe. A single-path
 // row names no count; a multi-row names how many of its paths are gone.
 // Empty when nothing is missing, so only a real verdict ever renders.
+function openMissingText(missing, total) {
+  const n = Number(missing)
+  if (!isFinite(n) || n <= 0) return ""
+  const t = Number(total)
+  if (!isFinite(t) || t <= 1) return "File not found"
+  return n + (n === 1 ? " file not found" : " files not found")
+}
 // Parse the plain `mediainfo` dump into a card payload. Format facts
 // (verified on MediaInfoLib v26.05): section headers sit at column 0,
 // kv lines are "Key<pad> : value" with the key ALSO at column 0, blank
