@@ -1327,6 +1327,7 @@ function search(index, query) {
   // every hit is thousands of short-lived objects on the GUI thread per
   // keypress - garbage the next collection has to walk while the user is still
   // typing. The scan position never has to be stored: it IS the array index.
+  function scanSource() {
   const hitEntries = []
   const hitScores = []
   const n = source.length
@@ -1368,6 +1369,11 @@ function search(index, query) {
       }
     }
   }
+  return { entries: hitEntries, scores: hitScores }
+  }
+  const scanned = scanSource()
+  const hitEntries = scanned.entries
+  const hitScores = scanned.scores
 
   // If we scanned an incremental subset, the subset already respects the
   // previous query's filter, but the full index might contain entries that
