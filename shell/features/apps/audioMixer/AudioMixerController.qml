@@ -355,8 +355,9 @@ Item {
       // the same text, and a second child would be a second fork and a second
       // moment at which the two could disagree about the same stream.
       const capture = String(result.stdout || "")
-      root.pulse = Model.parsePulseObjects(capture)
-      root.routes = Model.parseStreamRoutes(capture)
+      const parsed = Model.parsePactl(capture)
+      root.pulse = parsed.pulse
+      root.routes = parsed.routes
       root.routingAt = Date.now()
       root.routingError = ""
     }

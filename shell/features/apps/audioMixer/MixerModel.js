@@ -727,17 +727,31 @@ function emptyPulseObjects() {
 // Robust by construction: a missing block, a CRLF line ending, a blank line
 // and an unrecognised block kind all leave the maps empty rather than
 // throwing, because this parses text a daemon produced inside a QML handler.
-function parsePulseObjects(input) {
-  const out = emptyPulseObjects()
-  if (typeof input !== "string" || input === "") return out
+//
+// One walk for both answers. The device maps and the stream routes are two
+// questions about the same `pactl list` capture, and the controller reads both
+// from one read, so walking the text twice was scanning (and regex-testing) a
+// thousand lines twice per refresh. The two walkers below keep their own
+// contracts and read their half of this result.
+function parsePactl(input) {
+  const pulse = emptyPulseObjects()
+  const routes = emptyStreamRoutes()
+  if (typeof input !== "string" || input === "") return { pulse: pulse, routes: routes }
 
   const lines = input.split("\n")
   // One block's record, rebuilt at every header. A block's object.id only
   // arrives in its property tail, so the record is committed at the NEXT
   // header rather than at its own.
   let bucket = ""
+  let routeBucket = ""
+  let routeField = ""
   let pulseIndex = -1
+  let deviceIndex = -1
+  // `nodeId` is the pulse map's key and is read from a property or a field;
+  // `propNodeId` is the route map's key and is read from the property tail
+  // alone, which is where the routes walk has always looked.
   let nodeId = ""
+  let propNodeId = ""
   let headerName = ""
   let propName = ""
   let inProps = false
@@ -749,11 +763,18 @@ function parsePulseObjects(input) {
       // from whichever of the two places this block printed it.
       const name = headerName !== "" ? headerName : propName
       const key = (bucket === "sources" && isMonitorName(name)) ? "monitors" : bucket
-      out[key][nodeId] = pulseIndex
+      pulse[key][nodeId] = pulseIndex
+    }
+    if (routeBucket !== "" && propNodeId !== "" && deviceIndex >= 0) {
+      routes[routeBucket][propNodeId] = deviceIndex
     }
     bucket = ""
+    routeBucket = ""
+    routeField = ""
     pulseIndex = -1
+    deviceIndex = -1
     nodeId = ""
+    propNodeId = ""
     headerName = ""
     propName = ""
     inProps = false
@@ -768,6 +789,8 @@ function parsePulseObjects(input) {
     if (header !== null) {
       commit()
       bucket = bucketFor(header[1])
+      routeBucket = bucket === "sinkInputs" || bucket === "sourceOutputs" ? bucket : ""
+      routeField = routeBucket !== "" ? ROUTE_FIELD[routeBucket] : ""
       pulseIndex = parseInt(header[2], 10)
       continue
     }
@@ -786,8 +809,10 @@ function parsePulseObjects(input) {
       if (eq > 0) {
         const key = body.substring(0, eq).trim()
         const value = unquote(body.substring(eq + 1).trim())
-        if (key === "object.id") nodeId = value
-        else if (key === "node.name") propName = value
+        if (key === "object.id") {
+          nodeId = value
+          propNodeId = value
+        } else if (key === "node.name") propName = value
       }
       continue
     }
@@ -803,9 +828,18 @@ function parsePulseObjects(input) {
     const value = body.substring(colon + 1).trim()
     if (field === "Name") headerName = value
     else if (field === "object.id") nodeId = unquote(value)
+    // The route field is matched against the bucket's own word, so a sink's
+    // `Sink Source:` line cannot be read as a sink input's route.
+    if (routeField !== "" && field === routeField && /^\d+$/.test(value)) {
+      deviceIndex = parseInt(value, 10)
+    }
   }
   commit()
-  return out
+  return { pulse: pulse, routes: routes }
+}
+
+function parsePulseObjects(input) {
+  return parsePactl(input).pulse
 }
 
 function unquote(value) {
@@ -880,67 +914,7 @@ function emptyStreamRoutes() {
 // a daemon that prints something else for it leaves that stream unrouted rather
 // than routing it onto an index that means nothing.
 function parseStreamRoutes(input) {
-  const out = emptyStreamRoutes()
-  if (typeof input !== "string" || input === "") return out
-
-  const lines = input.split("\n")
-  let bucket = ""
-  let deviceIndex = -1
-  let nodeId = ""
-  let inProps = false
-
-  function commit() {
-    if (bucket !== "" && nodeId !== "" && deviceIndex >= 0) out[bucket][nodeId] = deviceIndex
-    bucket = ""
-    deviceIndex = -1
-    nodeId = ""
-    inProps = false
-  }
-
-  for (let i = 0; i < lines.length; i++) {
-    // No replace for the CRLF case: it scanned and allocated a line that
-    // almost never carries a CR. A charCode test costs one comparison.
-    const rawLine = lines[i]
-    const line = rawLine.charCodeAt(rawLine.length - 1) === 13 ? rawLine.substring(0, rawLine.length - 1) : rawLine
-    const header = HEADER_RE.exec(line)
-    if (header !== null) {
-      commit()
-      const kind = bucketFor(header[1])
-      bucket = kind === "sinkInputs" || kind === "sourceOutputs" ? kind : ""
-      continue
-    }
-    if (bucket === "") continue
-    // Fields are tab-indented, and a continuation line is indented deeper, so a
-    // line that does not start with a tab is a block separator rather than
-    // anything this walk reads.
-    if (line.charAt(0) !== "\t") continue
-    let tabs = 0
-    while (line.charCodeAt(tabs) === 9) tabs++
-    const body = line.substring(tabs)
-    if (inProps) {
-      const eq = body.indexOf("=")
-      if (eq > 0 && body.substring(0, eq).trim() === "object.id") {
-        nodeId = unquote(body.substring(eq + 1).trim())
-      }
-      continue
-    }
-    if (body === "Properties:") {
-      inProps = true
-      continue
-    }
-    const colon = body.indexOf(":")
-    if (colon < 0) continue
-    // The field name is matched against the bucket's own word, so a sink's
-    // `Sink Source:` line - a different field on a block this walk discards
-    // anyway - cannot be read as a sink input's route, and a source output
-    // carrying a sink field cannot borrow one.
-    if (body.substring(0, colon).trim() !== ROUTE_FIELD[bucket]) continue
-    const raw = body.substring(colon + 1).trim()
-    if (!/^\d+$/.test(raw)) continue
-    deviceIndex = parseInt(raw, 10)
-  }
-  commit()
-  return out
+  return parsePactl(input).routes
 }
 
 // stream node id -> device node id, from the routing map alone: the stream's own
