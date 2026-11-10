@@ -1404,28 +1404,30 @@ Singleton {
       root._startRead(uriProc._types || [])
       return
     }
-    root._offer("uri:" + paths.join("|"), () => {
-      let type
-      if (paths.length === 1) {
-        if (CL.isImageExt(paths[0])) type = "image"
-        else if (CL.isArchive(paths[0])) type = "archive"
-        else type = "file" // stat probe corrects folder-vs-file
-      } else {
-        type = "files"
-      }
-      const e = root._buildEntry(String(uriOut.text).trim(),
-        "text/uri-list", type, paths,
-        paths.length === 1 ? CL.homeTilde(paths[0]) : "")
-      if (type === "image") e.imageFile = paths[0]
-      // Deferred metadata: sizes/folder anatomy always; dimensions for
-      // image files. IDs are stable so late patches land correctly.
-      const eid = e.id
-      Qt.callLater(() => {
-        root._probeFileInfo(eid, paths)
-        if (type === "image") root._probeDims(eid)
-      })
-      return e
+    root._offer("uri:" + paths.join("|"),
+      () => root._pathUriEntry(paths, String(uriOut.text).trim()))
+  }
+
+  function _pathUriEntry(paths, raw) {
+    let type
+    if (paths.length === 1) {
+      if (CL.isImageExt(paths[0])) type = "image"
+      else if (CL.isArchive(paths[0])) type = "archive"
+      else type = "file" // stat probe corrects folder-vs-file
+    } else {
+      type = "files"
+    }
+    const e = root._buildEntry(raw, "text/uri-list", type, paths,
+      paths.length === 1 ? CL.homeTilde(paths[0]) : "")
+    if (type === "image") e.imageFile = paths[0]
+    // Deferred metadata: sizes/folder anatomy always; dimensions for image
+    // files. IDs are stable so late patches land correctly.
+    const eid = e.id
+    Qt.callLater(() => {
+      root._probeFileInfo(eid, paths)
+      if (type === "image") root._probeDims(eid)
     })
+    return e
   }
 
   // --- entry factory ---
