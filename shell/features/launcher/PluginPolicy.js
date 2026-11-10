@@ -31,6 +31,8 @@
 // on its own.
 .pragma library
 
+.import "../../common/text/StringUtils.js" as SU
+
 // Operations a plugin may hold. Every entry is a key on the object the
 // launcher hands over; `outside` marks the ones that leave this process,
 // which is exactly the set the launcher has to name deliberately.
@@ -203,7 +205,7 @@ function underRoot(dir, root) {
   const d = String(dir === null || dir === undefined ? "" : dir)
   const r = String(root === null || root === undefined ? "" : root)
   if (d === "" || r === "") return false
-  return d.indexOf(r + "/") === 0
+  return SU.isUnder(d, r)
 }
 
 // The grant set for one discovered plugin: the table its discovery root owns,
