@@ -5270,7 +5270,9 @@
                 "sub": "Copy currently playing track",
                 "icon": "music",
                 "command": "vb-cmd-copy-track --notify",
-                "when": "{ mpc status 2>/dev/null; playerctl status 2>/dev/null; } | grep -qiE '\\[playing\\]|^Playing'"
+                // Dimmed and unselectable while nothing is playing, the way a
+                // settings cond stays listed and goes muted instead of vanishing.
+                "disabled": "! { mpc status 2>/dev/null; playerctl status 2>/dev/null; } | grep -qiE '\\[playing\\]|^Playing'"
             },
             {
                 "type": "separator"
