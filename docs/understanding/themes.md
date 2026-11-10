@@ -82,6 +82,14 @@ After activation, editor themes follow Vibranium theme changes automatically.
 
     If this behavior is not acceptable, disable the Vibranium extension.
 
+### [ZapFast](https://zapfast.rocks/)
+
+Vibranium creates one `Vibranium.json` link in ZapFast's themes folder the first time ZapFast's configuration exists, and leaves it in place, so the palette always reflects the active theme.
+
+In ZapFast, select the **Vibranium** theme once under **Settings** -> **Appearance**.
+
+After that, every Vibranium theme change updates the same palette, and ZapFast reloads it on Linux without a restart. If ZapFast is installed after the last theme change, the palette appears on the next one.
+
 ## Creating your own theme
 
 Creating a Vibranium theme does not require manually editing every application configuration. 

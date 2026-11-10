@@ -1,0 +1,21 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+if ! command -v zapfast > /dev/null 2>&1; then
+  log Info "zapfast is not installed, skipping"
+  exit 0
+fi
+
+THEME="$VIBRANIUM_STATE/theme/zapfast.json"
+THEMES_DIR="$XDG_CONFIG_HOME/zapfast/themes"
+TARGET="$THEMES_DIR/Vibranium.json"
+
+if [[ ! -f $THEME || ! -d $THEMES_DIR ]]; then
+  log Info "zapfast theme folder or palette missing, skipping"
+  exit 0
+else
+  ln -sfn "$THEME" "$TARGET"
+fi
+
+zapfast reload-themes > /dev/null 2>&1 || true

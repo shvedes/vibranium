@@ -447,9 +447,9 @@ done <<<"$TEMPLATE_TOKENS"
 TEMPLATE_KEYS="$(printf '%s' "$TEMPLATE_KEYS" | LC_ALL=C sort -u | grep -c .)"
 
 t_eq "every placeholder in every template resolves to a palette key" "" "$UNRESOLVED"
-t_count "and the 18 shipped templates hold 181 distinct colour placeholders" \
+t_count "and the 20 shipped templates hold 181 distinct colour placeholders" \
   "181" "$TOKENS_N"
-t_count "default/themed/ holds 18 templates, the whole render set" "18" \
+t_count "default/themed/ holds 20 templates, the whole render set" "20" \
   "$(printf '%s\n' "$THEMED_DIR"/*.tpl | grep -c .)"
 t_contains "and the renderer globs that set rather than naming it" \
   'for tpl in "$tpl_dir"/*.tpl; do' "$(<"$THEME_TEMPLATES")"
