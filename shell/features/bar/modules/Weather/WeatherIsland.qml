@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.services as Core
+import "../../../../common/math/Range.js" as Range
 
 // Weather island: the detail popup behind the bar module. Same information
 // architecture as Omarchy's weather Panel (hero icon + temperature,
@@ -78,7 +79,7 @@ Item {
     if (!w || !w.editingLocation) return
     const n = w.locationSuggestions.length
     if (n === 0) return
-    w.suggestionIndex = Math.max(0, Math.min(w.suggestionIndex + dir, n - 1))
+    w.suggestionIndex = n > 0 ? Range.clamp(w.suggestionIndex + dir, 0, n - 1) : 0
     const v = body.suggestionView ? body.suggestionView : null
     if (v) v.reveal(w.suggestionIndex, false)
   }
