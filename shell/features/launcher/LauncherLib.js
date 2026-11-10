@@ -59,8 +59,17 @@ function indexFingerprint(entryCount, sortMethod, usageSignal, tryExecSignal) {
 // search never touches QObject property lookups.
 function appRecord(entry) {
   const cats = entry.categories ?? []
+  // One walk of the category list answers all three questions the record and
+  // its managed/TUI/PWA verdict ask of it: excluded (this function's own
+  // filter) and the two names the launch classification tests. Each was a
+  // separate indexOf scan of the same short array per entry.
+  let catsTUI = false
+  let catsPWA = false
   for (let i = 0; i < cats.length; i++) {
-    if (BASE_EXCLUDED_CATEGORIES.indexOf(cats[i]) >= 0) return null
+    const cat = cats[i]
+    if (BASE_EXCLUDED_CATEGORIES.indexOf(cat) >= 0) return null
+    if (cat === "TUI") catsTUI = true
+    else if (cat === "PWA") catsPWA = true
   }
   const keywords = entry.keywords ?? []
   const hay = [
@@ -83,15 +92,18 @@ function appRecord(entry) {
   // --app-id=org.vb.term.float flag must never classify a TUI as a
   // webapp. `badge` drives the right-side webapp/tui indicator.
   const _exec = String(entry.execString ?? entry.exec ?? "")
-  const _isTUI = _exec.indexOf("vb-launch-tui") >= 0
-    || cats.indexOf("TUI") >= 0
+  const _isTUI = _exec.indexOf("vb-launch-tui") >= 0 || catsTUI
   const _isPWA = !_isTUI && (_exec.indexOf("vb-launch-webapp") >= 0
     || _exec.indexOf("--app=") >= 0
     || _exec.indexOf("--app-id=") >= 0
-    || cats.indexOf("PWA") >= 0)
-  // isManagedEntry is the single source for removable; the split above is
-  // the same test kept in named form because `badge` needs it.
-  const _removable = isManagedEntry(entry, cats)
+    || catsPWA)
+  // `removable` is isManagedEntry's verdict read off the split above instead
+  // of asked for again: the two named flags ARE that function's test, and
+  // calling it here re-scanned the exec string and the category list for an
+  // answer this record had already produced. isManagedEntry stays the
+  // definition for every other caller (and for the shapes the suite pins),
+  // so the two move together or the suite says so.
+  const _removable = _isTUI || _isPWA
   // Launch handling keeps the original entry: the controller reads its
   // id/exec for activation and usage bumps, and the snapshot stays
   // identity-stable with the DesktopEntries list it came from.
