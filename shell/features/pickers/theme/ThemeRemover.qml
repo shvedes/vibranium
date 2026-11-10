@@ -75,11 +75,11 @@ Singleton {
       }
       // Background refresh recomposes live when the remover is the top frame,
       // so a change that lands while it is open never leaves a stale page up.
-      if (root._cached !== null) root._doScan(Menu.open && Menu.frame && Menu.frame.id === root.pageId)
+      if (root._cached !== null) root._doScan(roots.isPageOpen(root.pageId))
     }
     onChanged: {
       root._cached = null
-      if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) {
+      if (roots.isPageOpen(root.pageId)) {
         if (roots.listed) root._doScan(true)
         else root._pendingShow = true
       } else if (roots.listed) {
@@ -273,7 +273,7 @@ Singleton {
     // summon (single frame) closes outright, which is the `vb-shell menu
     // close` behaviour. Guarded on the page being the current frame, so a
     // deferred scan landing under some other page never pops its frame.
-    if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) {
+    if (roots.isPageOpen(root.pageId)) {
       if (Menu.stack.length > 1) Menu.pop()
       else Menu.close()
     }
@@ -298,7 +298,7 @@ Singleton {
       // filter trims them, and not as answers to a search in every other
       // menu. The page still registers, so navigation and the push/peel
       // below are the same either way.
-      if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) {
+      if (roots.isPageOpen(root.pageId)) {
         // Live update the already-open picker: re-inject the page so the
         // rev/condRev bump re-renders its rows in place. loadText here
         // (a fresh single-frame stack) would drop the chain below and
@@ -334,7 +334,7 @@ Singleton {
   // --- public API ---
 
   function open() {
-    if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) return "ok"
+    if (roots.isPageOpen(root.pageId)) return "ok"
     // The user shelf is external state: a folder added/removed while the
     // remover was closed leaves any served cache stale. The community set
     // is small and the scan is synchronous, so every open re-arms (picks
@@ -358,7 +358,7 @@ Singleton {
   function refresh() {
     if (!roots.listed) return "error"
     root._cached = null
-    root._doScan(Menu.open && Menu.frame && Menu.frame.id === root.pageId)
+    root._doScan(roots.isPageOpen(root.pageId))
     return "ok"
   }
 
@@ -372,14 +372,14 @@ Singleton {
   }
 
   function close() {
-    if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) {
+    if (roots.isPageOpen(root.pageId)) {
       Menu.close()
     }
     return "ok"
   }
 
   function toggle() {
-    if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) {
+    if (roots.isPageOpen(root.pageId)) {
       Menu.close()
       return "ok"
     }

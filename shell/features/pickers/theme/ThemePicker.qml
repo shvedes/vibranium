@@ -195,11 +195,11 @@ Singleton {
       }
       // Background refresh recomposes live when the picker is the top frame,
       // so a change that lands while it is open never leaves a stale page up.
-      if (root._cached !== null) root._doScan(Menu.open && Menu.frame && Menu.frame.id === root.pageId)
+      if (root._cached !== null) root._doScan(roots.isPageOpen(root.pageId))
     }
     onChanged: {
       root._cached = null
-      if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) {
+      if (roots.isPageOpen(root.pageId)) {
         if (roots.listed) root._doScan(true)
         else root._pendingShow = true
       } else if (roots.listed) {
@@ -554,7 +554,7 @@ Singleton {
     }
     const bundleText = JSON.stringify(page)
     try {
-      if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) {
+      if (roots.isPageOpen(root.pageId)) {
         // Live update the already-open picker
         Menu.loadText(bundleText)
       } else {
@@ -567,7 +567,7 @@ Singleton {
   // --- public API ---
 
   function open() {
-    if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) return "ok"
+    if (roots.isPageOpen(root.pageId)) return "ok"
     if (Menu.open) Menu.close()
     if (root._cached !== null) {
       const cached = root._cached.slice()
@@ -614,19 +614,19 @@ Singleton {
   function refresh() {
     if (!roots.listed) return "error"
     root._cached = null
-    root._doScan(Menu.open && Menu.frame && Menu.frame.id === root.pageId)
+    root._doScan(roots.isPageOpen(root.pageId))
     return "ok"
   }
 
   function close() {
-    if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) {
+    if (roots.isPageOpen(root.pageId)) {
       Menu.close()
     }
     return "ok"
   }
 
   function toggle() {
-    if (Menu.open && Menu.frame && Menu.frame.id === root.pageId) {
+    if (roots.isPageOpen(root.pageId)) {
       Menu.close()
       return "ok"
     }

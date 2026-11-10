@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Io
 import Qt.labs.folderlistmodel
 import qs.common
+import qs.features.menu
 
 // The two theme roots as one listing pair: $VIBRANIUM/themes and the user
 // themes root, their FileView watchers, and the settle/re-arm policy that
@@ -24,6 +25,15 @@ import qs.common
 // cache and rescans once per burst.
 Item {
   id: root
+
+  // Whether the menu is showing one of the theme pages right now. Both
+  // pages ask this before closing, rescanning or reopening, and the check
+  // is one expression so the picker and the remover cannot disagree about
+  // what "this page is open" means.
+  function isPageOpen(pageId) {
+    return Menu.open && Menu.frame !== null && Menu.frame !== undefined
+      && Menu.frame.id === pageId
+  }
 
   readonly property string officialRoot: Paths.vibraniumHome + "/themes"
   readonly property string userRoot: Paths.themesUserRoot
