@@ -699,18 +699,22 @@ opens to mean "the settings pages" - is the catalog's own
 
 *Reproduced by `suites/static/settings-catalog-test.sh`.*
 
-### 34. Ten icon names the settings catalog declares resolve to nothing
+### 34. (fixed) Ten icon names the settings catalog declares resolve to nothing
 
 `animation`, `apps`, `blur`, `glow`, `layout`, `mouse`, `scroll`, `shadow`,
 `tools`, `view-grid`.
 
-`Icons.url()` returns `""` for an unrecognised name (`Icons.qml:141`), so each
-of these renders as a correctly sized blank with no warning - the same
-silent-failure shape as finding 3. `main.jsonc` and `utilities.jsonc` are clean,
-so the drift is specific to the settings catalog. Either the names are stale
-options, or the icons were never shipped.
+`Icons.url()` returns `""` for an unrecognised name, so each of these rendered
+as a correctly sized blank with no warning - the same silent-failure shape as
+finding 3. `main.jsonc` and `utilities.jsonc` were clean, so the drift was
+specific to the settings catalog: the names were plausible spellings of icons
+that ship under other names.
 
-*Reproduced by `suites/static/settings-catalog-test.sh`.*
+Each now names a shipped asset: `hypr-animations`, `grid`, `hypr-blur`,
+`hypr-glow`, `hypr-layout-master`, `mice`, `mice`, `hypr-shadow`, `tool`,
+`grid`. The suite's missing-icon note is empty.
+
+*Reproduced and now verified by `suites/static/settings-catalog-test.sh`.*
 
 ### 35. A signal-strength tier that no input can reach
 

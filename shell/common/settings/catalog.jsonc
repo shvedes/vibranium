@@ -540,7 +540,7 @@
         "id": "bar-enabled",
         "label": "Enabled modules",
         "desc": "Which static modules are shown in the bar.",
-        "icon": "apps",
+        "icon": "grid",
         "showItemCount": true,
         "options": [],
         "items": [
@@ -1862,7 +1862,7 @@
         "group": "hypr",
         "id": "hyprland-input-touchpad",
         "label": "Touchpad",
-        "icon": "mouse",
+        "icon": "mice",
         "showItemCount": true,
         "options": [
             {
@@ -2054,7 +2054,7 @@
         "group": "hypr",
         "id": "hyprland-appearance-gaps",
         "label": "Gaps",
-        "icon": "view-grid",
+        "icon": "grid",
         "options": [
             {
                 "key": "hypr.general.gaps_in",
@@ -2147,7 +2147,7 @@
         "group": "hypr",
         "id": "hyprland-appearance-blur",
         "label": "Blur",
-        "icon": "blur",
+        "icon": "hypr-blur",
         "options": [
             {
                 "key": "hypr.decoration.blur.enabled",
@@ -3245,7 +3245,7 @@
         "group": "hypr",
         "id": "hyprland-appearance-glow",
         "label": "Glow",
-        "icon": "glow",
+        "icon": "hypr-glow",
         "options": [
             {
                 "key": "hypr.decoration.glow.enabled",
@@ -3313,7 +3313,7 @@
         "group": "hypr",
         "id": "hyprland-appearance-shadow",
         "label": "Shadows",
-        "icon": "shadow",
+        "icon": "hypr-shadow",
         "options": [
             {
                 "key": "hypr.decoration.shadow.enabled",
@@ -3852,7 +3852,7 @@
         "group": "hypr",
         "id": "hyprland-appearance-animations",
         "label": "Animations",
-        "icon": "animation",
+        "icon": "hypr-animations",
         "options": [
             {
                 "key": "hypr.animations.enabled",
@@ -3928,7 +3928,7 @@
         "id": "hyprland-advanced",
         "label": "Advanced",
         "desc": "Compositor internals and layout engines.",
-        "icon": "tools",
+        "icon": "tool",
         "showItemCount": true,
         "items": [
             {
@@ -4416,7 +4416,7 @@
         "group": "hypr",
         "id": "hyprland-advanced-scrolling",
         "label": "Scrolling",
-        "icon": "scroll",
+        "icon": "mice",
         "options": [
             {
                 "key": "hypr.scrolling.direction",
@@ -4539,7 +4539,7 @@
         "group": "hypr",
         "id": "hyprland-advanced-dwindle",
         "label": "Dwindle",
-        "icon": "layout",
+        "icon": "hypr-layout-master",
         "options": [
             {
                 "key": "hypr.dwindle.force_split",
@@ -4696,7 +4696,7 @@
         "group": "hypr",
         "id": "hyprland-advanced-master",
         "label": "Master",
-        "icon": "layout",
+        "icon": "hypr-layout-master",
         "options": [
             {
                 "key": "hypr.master.orientation",
