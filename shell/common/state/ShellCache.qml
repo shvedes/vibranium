@@ -76,23 +76,15 @@ Singleton {
   }
 
   // Replace a section wholesale and schedule a debounced flush.
-  // Returns false when the name is unusable.
+  // Returns false when the name is unusable. AppState owns the argument
+  // guards, so the facade does not restate them.
   function setSection(name, obj) {
-    if (typeof name !== "string" || name === "") {
-      return false
-    }
     root._ensure()
     return AppState.setSection(root.slotKey, name, obj)
   }
 
   // Shallow-merge `patch` into a section (created when absent).
   function updateSection(name, patch) {
-    if (typeof name !== "string" || name === "") {
-      return false
-    }
-    if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
-      return false
-    }
     root._ensure()
     return AppState.updateSection(root.slotKey, name, patch)
   }
