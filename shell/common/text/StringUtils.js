@@ -48,6 +48,32 @@ function extname(path) {
   return p.substring(dot + 1).toLowerCase()
 }
 
+// Join a directory and an entry name with exactly one separator. An empty
+// directory names the entry itself, so a vault root and a child share one
+// spelling.
+function joinPath(dir, name) {
+  const d = String(dir ?? "")
+  const n = String(name ?? "")
+  if (d === "") return n
+  return d.endsWith("/") ? d + n : d + "/" + n
+}
+
+// True when `path` is a strict descendant of `dir`. A trailing separator on
+// `dir` is tolerated, and "/" is the filesystem root rather than a prefix of
+// "//".
+function isUnder(path, dir) {
+  const p = String(path ?? "")
+  const d = String(dir ?? "")
+  if (d === "") return p !== ""
+  const base = d.endsWith("/") ? d : d + "/"
+  return p.length > base.length && p.startsWith(base)
+}
+
+// True when `path` is `dir` itself or a strict descendant.
+function isAtOrUnder(path, dir) {
+  return String(path ?? "") === String(dir ?? "") || isUnder(path, dir)
+}
+
 function styledMarkup(text) {
   const s = String(text ?? "")
   if (s === "") return ""
