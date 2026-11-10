@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell.Services.Mpris
 import qs.common
 import "../../common/NowPlaying.js" as NP
+import "../../common/math/Range.js" as Range
 
 // Now-playing pill riding the lockscreen's bottom edge. Flat-box language:
 // policy-rounded corners, translucent theme fill, 1px keyline. Album art when the
@@ -160,8 +161,8 @@ Item {
   readonly property int lyricsHeight: 120
   readonly property int targetWidth: root.lyricsUp ? root.lyricsWidth : root.compactWidth
   readonly property int targetHeight: root.lyricsUp ? root.lyricsHeight : root.compactHeight
-  readonly property real lyricsGrowth: Math.max(0, Math.min(1,
-    (root.height - root.compactHeight) / (root.lyricsHeight - root.compactHeight)))
+  readonly property real lyricsGrowth: Range.clamp01(
+    (root.height - root.compactHeight) / (root.lyricsHeight - root.compactHeight))
   // True while the frame is tweening between footprints. The progress fill
   // must track the moving width directly rather than animate toward it.
   readonly property bool _sizeMoving: Math.abs(root.width - root.targetWidth) > 0.5
@@ -471,7 +472,7 @@ Item {
         // Ui.normalMs OutCubic, including seeks while paused (prev-track):
         // the Behavior runs whenever a length exists, the spawn finished and
         // the card is at rest, so a paused jump animates instead of snapping.
-        width: parent.width * Math.min(1, Math.max(0, root.progressRatio)) * root.progressAppear
+        width: parent.width * Range.clamp01(root.progressRatio) * root.progressAppear
         color: Theme.color("accent")
 
         Behavior on width {

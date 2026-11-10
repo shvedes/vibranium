@@ -8,6 +8,7 @@ import Quickshell.Services.Mpris
 import qs.common
 import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/process/CommandSpec.js" as CommandSpec
+import "../../../../common/math/Range.js" as Range
 
 // Fullscreen lyrics surface for the Now Playing island: a left click on the
 // island's cover while its transcript is up asks the module to open this
@@ -157,7 +158,7 @@ PanelWindow {
 
   function seekTo(seconds) {
     if (!root.canSeekPosition) return
-    const t = Math.max(0, Math.min(root.lengthSec, Number(seconds) || 0))
+    const t = Range.clamp(Number(seconds) || 0, 0, root.lengthSec)
     root.player.position = t
     root.shownPosition = t
     if (root.player) root.player.positionChanged()
@@ -360,7 +361,7 @@ PanelWindow {
       availH - padSlot - progressH - 2 * stackGap)
     // Presentation type: the pane's own base sizes multiplied, bounded so a
     // 4K output does not turn one cue into a headline.
-    readonly property real lyricsScale: Math.max(1.5, Math.min(3.2, availH / 460))
+    readonly property real lyricsScale: Range.clamp(availH / 460, 1.5, 3.2)
     readonly property real lyricsX: pad + coverW + gap
     readonly property real lyricsW: Math.max(0, width - lyricsX - pad)
     readonly property real emptyIcon: Math.round(Math.max(64,
@@ -370,7 +371,7 @@ PanelWindow {
     // landed yet is treated as square, which is what the shipped art is.
     readonly property real artAspect: art.status === Image.Ready && art.implicitHeight > 0
       ? art.implicitWidth / art.implicitHeight : 1
-    readonly property real coverBoxW: Math.max(0, Math.min(coverW, artMaxH * artAspect))
+    readonly property real coverBoxW: Range.clamp(artMaxH * artAspect, 0, coverW)
     readonly property real coverBoxH: artAspect > 0 ? coverBoxW / artAspect : coverBoxW
     // Cover, transport and lane are one group centred in the column: a short
     // wide cover leaves no gap above the pads, and a tall one does not push
@@ -668,7 +669,7 @@ PanelWindow {
               if (event.angleDelta.y === 0) return
               if (!root.canSeekPosition) return
               const d = event.angleDelta.y > 0 ? 5 : -5
-              const t = Math.min(root.lengthSec, Math.max(0, root.shownPosition + d))
+              const t = Range.clamp(root.shownPosition + d, 0, root.lengthSec)
               root.player.position = t
               root.shownPosition = t
               if (root.player) root.player.positionChanged()
