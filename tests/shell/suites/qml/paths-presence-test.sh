@@ -658,13 +658,13 @@ assert_tempdir_after "fallback"
 # XDG_CACHE_HOME empty the shell resolves its cache home to $HOME/.cache/<appname>
 # rather than the $XDG_CACHE_HOME that Paths.qml:110 documents the drun cache
 # lives in. The resolved value is pinned so a change to it is visible, and the
-# mismatch is noted; asserting the documented value would be asserting something
-# the code does not do.
-t_section "the cache fallback is not the XDG cache home"
-t_note "Paths.qml:23 falls back to StandardPaths.CacheLocation, which is application-scoped: with XDG_CACHE_HOME empty, cacheHome resolved to $(qp_get paths.cacheHome.fallbackValue), not the \$XDG_CACHE_HOME that Paths.qml:110 documents for the drun cache"
+# the documented value: GenericCacheLocation is the plain $XDG_CACHE_HOME root,
+# so a session without the variable writes where the next one reads.
+t_section "the cache fallback is the XDG cache home"
+t_note "Paths.qml:23 falls back to StandardPaths.GenericCacheLocation: with XDG_CACHE_HOME empty, cacheHome resolves to $(qp_get paths.cacheHome.fallbackValue), the \$XDG_CACHE_HOME root Paths.qml documents for the drun cache, not an application-scoped subdirectory"
 t_eq "the cache fallback is the value the code actually produced" \
   "$(path_value cacheHome)" "$(qp_get paths.cacheHome.fallbackValue)"
-t_eq "the observed fallback is not the XDG cache root" "false" \
+t_eq "the fallback is the XDG cache root" "true" \
   "$(qp_get paths.cacheHome.fallbackIsXdgRoot)"
 
 t_summary

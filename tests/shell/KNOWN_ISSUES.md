@@ -4,11 +4,11 @@ Defects and doc/code drift the test suite found. Every entry here was
 **independently reproduced** before being written down, not taken on an agent's
 word — several plausible claims did not survive that and were dropped.
 
-This file is the actionable list. The suites themselves pin each behaviour as
+Entries marked (fixed) are resolved; the rest are the actionable list. The suites themselves pin each behaviour as
 it currently is, with a comment saying why it is wrong, so a fix turns a suite
 red and forces the record to be updated rather than passing silently.
 
-**37 findings: 6 high, 14 medium, 17 low.** Two thirds of them came from the
+**33 open findings: 2 high, 14 medium, 17 low.** Four high-severity findings are fixed and kept below for the record - the code and its suite now pin the corrected behaviour. Two thirds of them came from the
 behavioural QML component suites (`suites/qml/`), which is the argument for
 having them: the component layer is where the shell's user-visible contracts
 live, and reading the source does not find a `fail()` that forgets to re-mask.
@@ -25,7 +25,7 @@ Severity is about *consequence*, not effort:
 
 ## High
 
-### 1. `Paths.cacheHome` uses the application-scoped fallback
+### 1. (fixed) `Paths.cacheHome` uses the application-scoped fallback
 
 `shell/common/Paths.qml:23` falls back to `StandardPaths.CacheLocation`, which Qt
 defines as *application*-scoped (`GenericCacheLocation + "/" + applicationName`).
@@ -47,7 +47,7 @@ it. The cache silently resets, and where it lands depends on the binary name.
 
 *Reproduced by `suites/qml/paths-presence-test.sh`; pinned there with a note.*
 
-### 2. `PrintersLib` drops every `1setOf` attribute from real IPP output
+### 2. (fixed) `PrintersLib` drops every `1setOf` attribute from real IPP output
 
 `shell/services/system/PrintersLib.js:22` parses attribute lines with
 
@@ -67,7 +67,7 @@ than breaks.
 
 *Reproduced by `suites/js/services-calendar-weather.test.mjs`.*
 
-### 3. `MenuLib.guardLine` emits a bash syntax error for a trailing `;`
+### 3. (fixed) `MenuLib.guardLine` emits a bash syntax error for a trailing `;`
 
 `shell/features/menu/MenuLib.js:687` appends `;` unconditionally and does not
 strip an existing one:
@@ -103,7 +103,7 @@ line was written to remove.
 
 *Reproduced by `suites/cli/hyprland-editor-cli-test.sh`.*
 
-### 5. A failed unlock leaves the password in plain text on the lock screen
+### 5. (fixed) A failed unlock leaves the password in plain text on the lock screen
 
 `shell/common/ui/PasswordBox.qml:44-51`. `fail()` calls `shake()` and restarts
 the failure timer, and `clearFailure()` only stops the timer. Neither of them

@@ -20,7 +20,7 @@ Singleton {
   // platform default. writableLocation may return a file:// URL on some
   // builds, so strip the scheme to keep a plain path.
   readonly property string configHome: root.xdgConfigHome !== "" ? root.xdgConfigHome : String(StandardPaths.writableLocation(StandardPaths.ConfigLocation)).replace(/^file:\/\//, "")
-  readonly property string cacheHome: root.xdgCacheHome !== "" ? root.xdgCacheHome : String(StandardPaths.writableLocation(StandardPaths.CacheLocation)).replace(/^file:\/\//, "")
+  readonly property string cacheHome: root.xdgCacheHome !== "" ? root.xdgCacheHome : String(StandardPaths.writableLocation(StandardPaths.GenericCacheLocation)).replace(/^file:\/\//, "")
   readonly property string themesUserRoot: root.configHome + "/vibranium/themes"
 
   // Shell-managed settings, edited by components themselves.
