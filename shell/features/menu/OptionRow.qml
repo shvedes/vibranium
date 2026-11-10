@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters
 import QtQuick
 import qs.common
+import "../../common/math/Range.js" as Range
 
 // One dropdown option line inside the select expansion. The stored choice
 // is marked by painting its name in the accent, the same way a regular
@@ -28,7 +29,7 @@ Rectangle {
   // exactly as before once the card is done moving.
   property bool settling: false
   readonly property real reveal: settling && optLabel.implicitWidth > 0
-    ? Math.max(0, Math.min(1, midCol.width / optLabel.implicitWidth)) : 1
+    ? Range.clamp01(midCol.width / optLabel.implicitWidth) : 1
 
   signal picked(var value)
 
