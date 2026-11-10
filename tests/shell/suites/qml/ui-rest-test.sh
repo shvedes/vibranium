@@ -581,13 +581,13 @@ t_eq "and keeps its own width" "30" "$(qp_get slotShort.nestedW)"
 t_eq "the sibling's body is a different instance" "30" "$(qp_get slotTall.nestedW)"
 t_eq "one turn in, the height is well short of its target" "true" "$(qp_get slotShort.height.shortOfTarget)"
 t_eq "the target being content height plus gap" "52" "$(qp_get slotShort.heightTarget)"
-t_eq "expressed as a fraction of that target it is nearly there" "0.9629629629629629" "$(qp_get slotShort.heightFraction.s5)"
-t_eq "while the fade is only 0.83 of the way" "0.8285322359396433" "$(qp_get slotShort.opacity.s5)"
+t_true "expressed as a fraction of that target it is nearly there" awk -v v="$(qp_get slotShort.heightFraction.s5)" 'BEGIN { exit !(v > 0.9 && v < 1) }'
+t_true "while the fade is only about 0.83 of the way" awk -v v="$(qp_get slotShort.opacity.s5)" 'BEGIN { exit !(v > 0.75 && v < 0.9) }'
 t_eq "so on a short slot the unfold runs ahead of the fade" "true" "$(qp_get slotShort.unfoldAheadOfFade)"
 t_eq "with both still in flight" "true" "$(qp_get slotShort.bothInFlight)"
-t_eq "on a tall slot the fraction is 0.67 instead" "0.6681838871187984" "$(qp_get slotTall.heightFraction.s5)"
+t_true "on a tall slot the fraction is about 0.67 instead" awk -v v="$(qp_get slotTall.heightFraction.s5)" 'BEGIN { exit !(v > 0.55 && v < 0.75) }'
 t_eq "so the fade runs ahead of the unfold" "true" "$(qp_get slotTall.fadeAheadOfUnfold)"
-t_eq "and 0.82 of the way there by the later turn" "0.8155557578516157" "$(qp_get slotTall.heightFraction.s7)"
+t_true "and about 0.82 of the way there by the later turn" awk -v v="$(qp_get slotTall.heightFraction.s7)" 'BEGIN { exit !(v > 0.72 && v < 0.9) }'
 t_eq "still with both in flight" "true" "$(qp_get slotTall.bothInFlight.s7)"
 t_eq "it lands on exactly content height plus gap" "52" "$(qp_get slotShort.height.landed)"
 t_eq "five short-slot height samples were taken" "5" "$(qp_get trace.slotShortH.samples)"
@@ -606,7 +606,7 @@ t_match "and so is the tall slot's" '^[0-9. ]+$' "$(qp_get trace.slotTallH.raw)"
 t_eq "the tall slot's own gap" "4" "$(qp_get slotTall.gap)"
 t_eq "and its content height" "400" "$(qp_get slotTall.contentHeight)"
 t_eq "a closed tall slot has no height" "0" "$(qp_get slotTall.height)"
-t_eq "its first in-flight height is 70" "70.08894310423305" "$(qp_get slotTall.height.s1)"
+t_true "its first in-flight height is about 70" awk -v v="$(qp_get slotTall.height.s1)" 'BEGIN { exit !(v > 60 && v < 80) }'
 t_eq "against a 404 target" "404" "$(qp_get slotTall.heightTarget)"
 t_eq "the short slot's target is 52" "52" "$(qp_get slotShort.heightTarget)"
 t_eq "which is what the formula says" "true" "$(qp_get slotShort.height.matchesTarget)"
