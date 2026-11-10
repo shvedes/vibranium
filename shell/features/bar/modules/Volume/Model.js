@@ -56,7 +56,7 @@ function nodeProps(node) {
 
 function friendlyDeviceLabel(text) {
   var label = String(text || "").trim()
-  label = label.replace(/^built[- ]?in audio\s+/i, "")
+  label = label.replace(/^built-?in audio\s+/i, "")
   label = label.replace(/\s+Output$/i, "")
   label = label.replace(/\s+Input$/i, "")
   return label
@@ -137,7 +137,7 @@ function appIconName(node) {
 function outputVolumeName(volume, muted) {
   if (muted) return "Muted"
   var p = Math.round(volume * 100)
-  if (p === 0 && volume >= 0) return "Silenced"
+  if (p === 0) return "Silenced"
   if (p >= 100) return "Loud"
   if (p >= 70) return "High"
   if (p >= 40) return "Medium"

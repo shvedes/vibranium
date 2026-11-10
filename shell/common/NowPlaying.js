@@ -241,6 +241,15 @@ function normalizeVolume(volume) {
 // audible. A malformed level above 1 passes too: it is still a number the
 // player reported, and restoring what it said is more faithful than clamping it.
 
+// The write gate beside normalizeVolume: true only when the read is a level
+// the player actually reported. MPRIS reserves a NEGATIVE Volume for "this
+// client does not know its volume", so a clamped negative - or any non-finite
+// read - must never be handed back as the player's own level.
+function volumeKnown(volume) {
+  const n = Number(volume)
+  return isFinite(n) && n >= 0
+}
+
 function volumeUnmuted(currentVolume, nextVolume) {
   return normalizeVolume(currentVolume) <= 0 && normalizeVolume(nextVolume) > 0
 }
