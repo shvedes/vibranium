@@ -353,18 +353,22 @@ function hayFor(entry) {
   // it measured as the single largest cost of a clipboard rebuild (27% of the
   // profile for the rows it was rebuilding).
   //
-  // Keyed by the entry and stamped with the fields, not by the entry alone:
-  // entries are mutated in place (deriveEntry writes title and subLeft back
-  // onto them, a title decode replaces title/content later), so identity does
-  // not say the hay still holds. The stamp is five object reads and a string
-  // compare against a build that lowercases and re-splits the whole text.
+  // Stored on the row and stamped with the fields the hay was built from, not
+  // keyed on identity alone: entries are mutated in place (deriveEntry writes
+  // title and subLeft back onto them, a title decode replaces title/content
+  // later), so identity does not say the hay still holds. The stamp is five
+  // object reads and a string compare against a build that lowercases and
+  // re-splits the whole text.
   //
-  // The cache rides on the function object rather than a module-level `var`,
-  // because a `.pragma library` publishes its top-level declarations and this
-  // is not part of the library's surface.
-  let cache = hayFor._cache
-  if (cache === undefined) cache = hayFor._cache = new WeakMap()
-  const hit = cache.get(entry)
+  // The row owns its cache rather than a side table keyed by the row, because
+  // every derive on a fresh copy (`_promote` and `_patch` both derive an
+  // Object.assign clone) mints a key that dies with that call. A side table
+  // whose keys are that short-lived hands its values back across a collection
+  // boundary, and the strings in them are the row's own display text; the row
+  // holding them keeps them alive exactly as long as the row itself does.
+  // `hayCache` is cache-only: exportEntry and _projectEntry name their fields
+  // explicitly, so it never reaches the persisted document or an IPC reply.
+  const hit = entry.hayCache
   if (hit !== undefined && hit.title === title && hit.subLeft === subLeft
     && hit.preview === preview && hit.mime === mime && hit.type === type)
     return hit.hay
@@ -380,9 +384,9 @@ function hayFor(entry) {
   // stated there - a plain {} drops "constructor" / "__proto__" words).
   const raw = parts.join(" ").toLowerCase()
   const hay = SL.dedupeWords(raw.split(RE_WS_SPLIT)).join(" ")
-  cache.set(entry, {
+  entry.hayCache = {
     title: title, subLeft: subLeft, preview: preview, mime: mime, type: type, hay: hay
-  })
+  }
   return hay
 }
 
