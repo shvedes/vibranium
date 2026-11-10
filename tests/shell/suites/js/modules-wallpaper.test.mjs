@@ -2693,20 +2693,18 @@ group('.git bookkeeping never surfaces', () => {
   // ".git bookkeeping never surfaces on either side."
   eq('a .git dir', PASS.parseFindOutput('', ['d .git']), { files: [], dirs: [] })
   eq('a .git file', PASS.parseFindOutput('', ['f .git/config.gpg']), { files: [], dirs: [] })
-  // The filter is `f === ".git" || f.indexOf(".git/") === 0 ||
-  // f.indexOf("/.git/") !== -1` - all three shapes with a SLASH after .git.
-  // A `find` run that lists the folder itself prints "a/.git", which matches
-  // none of them and surfaces as an empty folder the browser would show.
-  // The two children of that folder ARE filtered, so the folder comes back
-  // empty rather than never: a visible empty folder, not a listing hazard.
-  eq('a nested .git dir is not one of the three filtered shapes', PASS.parseFindOutput('', ['d a/.git']), { files: [], dirs: ['a/.git'] })
-  eq('and its children are filtered, so it reads as empty', PASS.parseFindOutput('', ['d a/.git', 'f a/.git/c.gpg', 'd a/.git/refs']), { files: [], dirs: ['a/.git'] })
+  // The filter matches a `.git` path segment anywhere in the path, so a
+  // nested repository's folder is filtered like its contents. Matching only
+  // a `.git` prefix or a `/.git/` infix let `a/.git` itself through as an
+  // empty folder the browser would show.
+  eq('a nested .git dir is filtered', PASS.parseFindOutput('', ['d a/.git']), { files: [], dirs: [] })
+  eq('and its children are filtered with it', PASS.parseFindOutput('', ['d a/.git', 'f a/.git/c.gpg', 'd a/.git/refs']), { files: [], dirs: [] })
   eq('a nested .git file', PASS.parseFindOutput('', ['f a/.git/x.gpg']), { files: [], dirs: [] })
+  eq('a deeper .git folder is filtered too', PASS.parseFindOutput('', ['d a/b/.git']), { files: [], dirs: [] })
+  eq('a name that merely starts with .git is not a repository', PASS.parseFindOutput('', ['d a/.github']).dirs, ['a/.github'])
   eq('a real sibling survives', PASS.parseFindOutput('', ['f a/b.gpg', 'f a/.git/x.gpg']).files, ['a/b.gpg'])
-  eq('and the .git folder is listed beside the real one', PASS.parseFindOutput('', ['d a/.git', 'd a/b']).dirs, ['a/.git', 'a/b'])
-  // listEntries DOES filter the same three shapes, so the entry list never
-  // carries it - the two filters are not identical in shape.
-  eq('but listEntries filters the same path', PASS.listEntries(['a/.git/c.gpg', 'a/b.gpg']).map((e) => e.path), ['a/b'])
+  eq('only the real folder is listed beside it', PASS.parseFindOutput('', ['d a/.git', 'd a/b']).dirs, ['a/b'])
+  eq('listEntries filters the nested path too', PASS.listEntries(['a/.git/c.gpg', 'a/b.gpg']).map((e) => e.path), ['a/b'])
 })
 group('duplicate folders collapse, and the survivors sort -V', () => {
   eq('a repeated dir', PASS.parseFindOutput('', ['d email', 'd email']).dirs, ['email'])

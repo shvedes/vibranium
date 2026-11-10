@@ -69,7 +69,11 @@ function parseFindOutput(storeDir, lines) {
       if (f === dir) continue;
       if (f.indexOf(dir + "/") === 0) f = f.substring(dir.length + 1);
     }
-    if (f === ".git" || f.indexOf(".git/") === 0 || f.indexOf("/.git/") !== -1)
+    // A `.git` path segment anywhere in the path, so the folder itself and
+    // everything below it are filtered alike. Matching only a `.git` prefix
+    // or a `/.git/` infix let the folder of a nested repository (`a/.git`)
+    // through as an empty entry the browser would show.
+    if (/(^|\/)\.git(\/|$)/.test(f))
       continue;
     if (kind === "f") {
       if (f.length > 4 && f.substring(f.length - 4) === ".gpg") files.push(f);
@@ -105,7 +109,7 @@ function listEntries(a, b) {
       if (f === dir) continue;
       if (f.indexOf(dir + "/") === 0) f = f.substring(dir.length + 1);
     }
-    if (f === ".git" || f.indexOf(".git/") === 0 || f.indexOf("/.git/") !== -1)
+    if (/(^|\/)\.git(\/|$)/.test(f))
       continue;
     if (f.length <= 4 || f.substring(f.length - 4) !== ".gpg") continue;
     var logical = f.substring(0, f.length - 4);
