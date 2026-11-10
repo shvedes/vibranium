@@ -625,36 +625,6 @@ function deviceLinks(links, devices, current) {
   return heldKeys === keys ? held : out
 }
 
-// The pairs one device is an end of. PipeWire carries a separate link per port
-// pair, so two audio ports between the same two nodes are two links and one
-// attachment: deduplicating to one pair per `source -> target` is what a
-// node's own link tracker reports, and what keeps a two-channel stream from
-// being drawn twice.
-function deviceLinkPairs(links, deviceKey) {
-  const out = []
-  if (deviceKey === "" || links === null || links === undefined) return out
-  const raw = links.length
-  const n = typeof raw === "number" && raw >= 0 ? Math.round(raw) : 0
-  const seen = ({})
-  for (let i = 0; i < n; i++) {
-    const link = links[i]
-    if (link === null || link === undefined) continue
-    const source = link.source
-    const target = link.target
-    if (source === undefined || target === undefined) continue
-    if (source === null || target === null) continue
-    const sourceKey = nodeKey(source)
-    const targetKey = nodeKey(target)
-    if (sourceKey !== deviceKey && targetKey !== deviceKey) continue
-    const key = sourceKey + ":" + targetKey
-    if (seen[key] === true) continue
-    seen[key] = true
-    const pair = linkPair(source, target)
-    if (pair !== null) out.push(pair)
-  }
-  return out
-}
-
 // stream node id -> device node id, from the projected device link map. A
 // stream's current target is read from the graph's own link topology rather
 // than from a second `pactl list`: the topology is already projected above,
@@ -934,18 +904,6 @@ function emptyStreamRoutes() {
     sinkInputs: ({}),
     sourceOutputs: ({})
   }
-}
-
-// `pactl list` -> { sinkInputs, sourceOutputs }, each keyed by the STREAM's
-// `object.id` and valued with the DEVICE's Pulse index.
-//
-// The walk is parsePulseObjects()'s with two differences: only the two stream
-// buckets survive, and the index recorded is the block's own `Sink:`/`Source:`
-// field rather than its header. A field that is not decimal commits nothing, so
-// a daemon that prints something else for it leaves that stream unrouted rather
-// than routing it onto an index that means nothing.
-function parseStreamRoutes(input) {
-  return parsePactl(input).routes
 }
 
 // stream node id -> device node id, from the routing map alone: the stream's own
