@@ -868,8 +868,8 @@ BarModule {
     const copyText = copyTextFor(rec, fmt)
     root._copyText(copyText, null)
     if (root.notifyOnPick) {
-      Exec.run(["notify-send", "-r", "3", "-t", "1500", "-a", "Vibranium",
-        "Color Picker", "Color copied to clipboard: " + copyText])
+      Exec.notify("Color Picker", "Color copied to clipboard: " + copyText,
+        { replaceId: 3, timeoutMs: 1500 })
     }
   }
 

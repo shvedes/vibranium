@@ -775,10 +775,12 @@ Singleton {
   }
 
   function _notify(msg, isError) {
-    const args = isError ? ["notify-send", "-u", "critical", "-r", "1", "-a", "Vibranium", "Desktop Background", msg] : ["notify-send", "-r", "1", "-a", "Vibranium", "Desktop Background", msg]
     // A stateless one-shot: Exec owns the child and destroys it on exit, and
     // no callback reads state back, so there is nothing here to gate.
-    Exec.run(args)
+    Exec.notify("Desktop Background", msg, {
+      replaceId: 1,
+      urgency: isError ? "critical" : undefined
+    })
   }
 
   // One toast per refused or failed drop, from one call site. `message` is the

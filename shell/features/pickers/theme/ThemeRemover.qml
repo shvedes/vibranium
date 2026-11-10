@@ -267,7 +267,7 @@ Singleton {
   }
 
   function _notifyEmpty() {
-    Exec.run(["notify-send", "-r", "3", "-t", "2000", "Vibranium", "No community themes installed"])
+    Exec.notify("No community themes installed", null, { replaceId: 3, timeoutMs: 2000 })
     // Last row went away while the page was on top (confirm-stage
     // removal): pushed summon pops back to the chain below; a standalone
     // summon (single frame) closes outright, which is the `vb-shell menu

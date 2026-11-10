@@ -523,8 +523,8 @@ Singleton {
   // repeats replaces the one before it instead of stacking a second copy.
   function _notifyLoopbackFailure(reason) {
     const what = root.loopbackEnabled ? "Hear my voice" : "Audio loopback"
-    Exec.run(["notify-send", "-a", "Vibranium", "-u", "normal", "-r", "2", "-t", "8000",
-      "Audio", what + ": " + reason])
+    Exec.notify("Audio", what + ": " + reason,
+      { urgency: "normal", replaceId: 2, timeoutMs: 8000 })
   }
 
   // --- actions ---
