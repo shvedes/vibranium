@@ -674,8 +674,13 @@ function tokenScore(words, t) {
   for (let w = 0; w < words.length; w++) {
     const word = words[w]
     if (word === t) return 3000 - w
-    if (word.startsWith(t)) return 2000 - w * 10
+    // One scan, not two. `startsWith` and the contained-substring test both
+    // searched the word, and for the common case - a word the token is not in
+    // - the prefix probe found out in three characters and the substring scan
+    // still walked the whole word. indexOf answers both questions: 0 is the
+    // prefix band, >0 the contained band.
     const idx = word.indexOf(t)
+    if (idx === 0) return 2000 - w * 10
     if (idx > 0) return 1000 - idx * 10
   }
   return -1
