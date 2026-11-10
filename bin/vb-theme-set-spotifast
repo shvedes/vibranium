@@ -1,0 +1,21 @@
+#!/bin/bash
+
+source vb-lib-cli
+
+if ! command -v spotifast > /dev/null 2>&1; then
+  log Info "spotifast is not installed, skipping"
+  exit 0
+fi
+
+THEME="$VIBRANIUM_STATE/theme/spotifast.json"
+THEMES_DIR="$XDG_CONFIG_HOME/spotifast/themes"
+TARGET="$THEMES_DIR/Vibranium.json"
+
+if [[ ! -f $THEME || ! -d $THEMES_DIR ]]; then
+  log Info "spotifast theme folder or palette missing, skipping"
+  exit 0
+else
+  ln -sfn "$THEME" "$TARGET"
+fi
+
+spotifast reload-themes > /dev/null 2>&1 || true
