@@ -69,7 +69,12 @@ Singleton {
   // stays visible as an unanswered request rather than reading as a success.
   function reportLock(requestId, code) {
     const id = Number(requestId)
-    if (!isFinite(id) || id <= 0 || id > root._generation) return false
+    if (!isFinite(id) || Math.floor(id) !== id) return false
+    // Only the newest request may be answered. An id below the current
+    // generation is a superseded request's answer arriving late, and
+    // publishing it would make Bus.latest carry the old outcome over the new
+    // one - the overwrite this comment above promises to refuse.
+    if (id !== root._generation) return false
     const answer = Object.freeze({ id: id, code: root._text(code) })
     Bus.publish(root.resultTopic, answer)
     return true
