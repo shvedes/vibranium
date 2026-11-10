@@ -1298,7 +1298,7 @@ ListView {
        let distanceMs = root.stepMs(Math.abs(target - root.contentY))
        if (paceMs > 0) {
          distanceMs = Math.min(distanceMs,
-           Math.max(Ui.fastMs, Math.min(root._sweepMaxMs, Math.round(paceMs))))
+           Range.clamp(Math.round(paceMs), Ui.fastMs, root._sweepMaxMs))
        }
        const handoffMs = root._highlightHandoff && root._sweepMs >= 0
          ? root._sweepMs : 0
@@ -1495,7 +1495,7 @@ ListView {
          const requestedMs = typeof highlightMs === "number" && isFinite(highlightMs)
            ? highlightMs : fromSlotMs
          const focusMs = requestedMs > 0
-           ? Math.max(Ui.fastMs, Math.min(Ui.slowMs, Math.round(requestedMs))) : 0
+           ? Range.clamp(Math.round(requestedMs), Ui.fastMs, Ui.slowMs) : 0
          const handoff = fromSlotMs > 0
            || (typeof highlightMs === "number" && highlightMs > 0)
          root._highlightHandoff = handoff
