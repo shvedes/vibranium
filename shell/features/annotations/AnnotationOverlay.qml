@@ -691,10 +691,10 @@ PanelWindow {
           const stepY = overlay.magScale / fpy
           const fx = overlay.cursorX * fpx
           const fy = overlay.cursorY * fpy
-           const rw = Math.max(1, Math.min(fw, Math.ceil(lens.width / stepX)))
-           const rh = Math.max(1, Math.min(fh, Math.ceil(lens.height / stepY)))
-           const ox = Math.max(0, Math.min(fw - rw, Math.floor(fx - rw / 2)))
-           const oy = Math.max(0, Math.min(fh - rh, Math.floor(fy - rh / 2)))
+           const rw = Range.clamp(Math.ceil(lens.width / stepX), 1, fw)
+           const rh = Range.clamp(Math.ceil(lens.height / stepY), 1, fh)
+           const ox = Range.clamp(Math.floor(fx - rw / 2), 0, fw - rw)
+           const oy = Range.clamp(Math.floor(fy - rh / 2), 0, fh - rh)
           // Literal pixels, content centered on the pointer. The transform
           // carries the DPR, so the destination stays in box pixels and each
           // source pixel still lands as an exact block of device pixels.
@@ -926,8 +926,8 @@ PanelWindow {
     }
     onWheel: wheel => {
       // One notch per 120 delta; integer scale keeps pixels crisp.
-      overlay.magScale = Math.max(2, Math.min(20,
-        overlay.magScale + (wheel.angleDelta.y > 0 ? 1 : -1)))
+      overlay.magScale = Range.clamp(
+        overlay.magScale + (wheel.angleDelta.y > 0 ? 1 : -1), 2, 20)
       wheel.accepted = true
     }
   }
