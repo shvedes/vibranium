@@ -1998,7 +1998,7 @@ group('the scope belongs to the bundle, so it is cached and restored with it', (
   eq('it is written into the cache entry next to the bundle it describes',
     /bundle: root\.bundle,\s*\n\s*index: root\._builtinIndex,\s*\n\s*settingsFamily: root\._settingsFamily/.test(src), true)
   const restores = src.match(/root\._settingsFamily = prevFamily/g) || []
-  eq('every path that restores the bundle restores the scope', restores.length, 2)
+  eq('every path that restores the bundle restores the scope', restores.length, 3)
 })
 
 group('which shipped bundles scope the external half', () => {
