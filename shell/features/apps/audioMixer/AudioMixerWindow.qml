@@ -5,6 +5,7 @@ import QtQuick
 import qs.common
 import "MixerModel.js" as Model
 import "../../../common/math/Range.js" as Range
+import "../../../common/ui/ScrollMath.js" as ScrollMath
 
 // The mixer window: a regular toplevel.
 //
@@ -819,8 +820,8 @@ QtObject {
     // list down under a wheel-up, the touch-style "natural" direction.
     function wheelBy(notches) {
       if (pop.overflows) {
-        const maxY = Math.max(0, list.contentHeight - list.height)
-        list.contentY = Range.clamp(list.contentY - notches * pop.rowH, 0, maxY)
+        list.contentY = ScrollMath.wheelOffset(
+          list.contentY, list.contentHeight, list.height, notches, pop.rowH)
         return
       }
       pop.paged(notches)
@@ -1535,8 +1536,8 @@ QtObject {
         // measured against - so this is the one door a scroll comes through
         // while a list is up, and the scrollbar is the other.
         onPaged: function(notches) {
-          const maxY = Math.max(0, body.contentHeight - body.height)
-          body.contentY = Range.clamp(body.contentY - notches * pop.rowH, 0, maxY)
+          body.contentY = ScrollMath.wheelOffset(
+            body.contentY, body.contentHeight, body.height, notches, pop.rowH)
         }
       }
     }
