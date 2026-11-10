@@ -747,15 +747,25 @@ function typoBudget(t) {
 // that short and turn an unknown filter into a wall of false hits sharing
 // one band - the entries that then fight for a single slot.
 function typoTokenScore(words, t) {
-  const exact = tokenScore(words, t)
-  if (exact >= 0) return exact
-  if (String(t ?? "").length < 2) return -1
-  const budget = typoBudget(t)
+  const token = String(t ?? "")
+  if (token.length < 2) return tokenScore(words, token)
+  const budget = typoBudget(token)
   let best = -1
+  // One walk, not two. tokenScore answers with the FIRST word that matches at
+  // all - exact, then prefix, then substring within that word - so testing the
+  // three bands here in the same order at the same position returns its answer
+  // the moment it is reached, and the words skipped on the way are exactly the
+  // ones the typo loop below has to visit anyway. Running tokenScore first paid
+  // for the whole word list twice on a dead-end query, which is the only query
+  // that reaches this function.
   for (let w = 0; w < words.length; w++) {
     const word = words[w]
-    if (Math.abs(word.length - t.length) > budget) continue
-    const dist = typoDistance(t, word)
+    if (word === token) return 3000 - w
+    if (word.startsWith(token)) return 2000 - w * 10
+    const idx = word.indexOf(token)
+    if (idx > 0) return 1000 - idx * 10
+    if (Math.abs(word.length - token.length) > budget) continue
+    const dist = typoDistance(token, word)
     if (dist < 1 || dist > budget) continue
     const s = (dist === 1 ? 500 : 400) - w
     if (s > best) best = s
@@ -883,7 +893,11 @@ function searchTypo(records, query, cap, tiebreak) {
   const q = SL.normalizeQuery(query)
   if (q === "" || !Array.isArray(records)) return { rows: [], count: 0 }
   const tokens = SL.splitTokens(q)
-  const scored = []
+  // Parallel arrays and an order index, like searchRecords: the scan position
+  // is the push index, so no per-hit {rec, score, idx} object is needed, and
+  // only the returned cap is materialized.
+  const hitRecs = []
+  const hitScores = []
   for (let i = 0; i < records.length; i++) {
     const rec = records[i]
     let total = 0
@@ -893,23 +907,27 @@ function searchTypo(records, query, cap, tiebreak) {
       if (s < 0) ok = false
       else total += s
     }
-    if (ok) scored.push({ rec: rec, score: total, idx: i })
+    if (ok) {
+      hitRecs.push(rec)
+      hitScores.push(total)
+    }
   }
   const tb = typeof tiebreak === "function" ? tiebreak : null
-  scored.sort((a, b) => {
-    if (b.score !== a.score) return b.score - a.score
+  const m = hitRecs.length
+  const order = new Array(m)
+  for (let i = 0; i < m; i++) order[i] = i
+  order.sort((a, b) => {
+    if (hitScores[b] !== hitScores[a]) return hitScores[b] - hitScores[a]
     if (tb) {
-      const d = tb(b.rec) - tb(a.rec)
+      const d = tb(hitRecs[b]) - tb(hitRecs[a])
       if (d !== 0) return d
     }
-    return a.idx - b.idx
+    return a - b
   })
-  const full = new Array(scored.length)
-  for (let i = 0; i < scored.length; i++) full[i] = scored[i].rec
-  const n = Math.min(full.length, cap)
+  const n = Math.min(m, cap)
   const out = new Array(n)
-  for (let i = 0; i < n; i++) out[i] = full[i]
-  return { rows: out, count: full.length }
+  for (let i = 0; i < n; i++) out[i] = hitRecs[order[i]]
+  return { rows: out, count: m }
 }
 
 // Filter counter over a FULL pool so `matched` reflects the true hit
