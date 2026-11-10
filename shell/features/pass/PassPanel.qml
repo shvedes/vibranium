@@ -1101,7 +1101,7 @@ PanelCard {
       if (!Model.isValidName(text)) { panel.flashEditor(); return }
       const p = Pass.selectedPath
       const dir = SU.dirname(p)
-      const dest = dir === "" ? name : dir + "/" + name
+      const dest = dir === "" ? name : SU.joinPath(dir, name)
       if (dest === p) { panel.cancelEditor(); return }
       if (panel.targetExists(dest)) { panel.flashEditor(); return }
       panel.beginPageTransition(false, true)
