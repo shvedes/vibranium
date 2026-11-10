@@ -138,9 +138,10 @@ PanelCard {
     // Row identity shifts on any model change - an open confirm dropdown
     // must not survive it.
     panel.closeDelete()
-    // Model swaps recreate delegates and reset currentIndex: land the
-    // sliding bar instantly, then re-arm the glide for pure focus
-    // moves (MenuPanel bottom-flicker parity).
+    // A row-set write can still move the row under the cursor (a removal
+    // above it, a clamp at the end): land the sliding bar instantly, then
+    // re-arm the glide for pure focus moves (MenuPanel bottom-flicker
+    // parity).
     panel._swapGen++
     const g = panel._swapGen
     const prev = list.currentIndex
@@ -150,9 +151,10 @@ PanelCard {
       // on the row the user was looking at. A tail delete (the focused
       // last entry going away) is the one removal no survivor row moves
       // for, so the repair seat below is the only motion the user sees -
-      // while the swap deals an index adjustment of its own a frame after
-      // this window closes, parking the cursor, and a bar that followed
-      // it, on row 0 until the commit re-asserts the target. Pinned to the
+      // while the write can still deal a cursor adjustment of its own a
+      // frame after this window closes, parking the cursor - and a bar
+      // that followed it - on a row the commit did not choose until it
+      // re-asserts the target. Pinned to the
       // place the user left the bar, it stands there instead of taking a
       // lap of the list, and a settle that holds the view still gives
       // the bar no travel at all. The target is only known after
@@ -174,12 +176,12 @@ PanelCard {
         const n = panel.rows.length
         const target = n === 0 ? -1 : Math.min(prev, n - 1)
         // Repair seats land: the stillness lease holds the bar across
-        // the reflow instead of gliding it from the swap's reset position
-        // at the top of the list. The pin taken above is kept for every
-        // delete - releasing it here would hand the bar to the swap's
-        // index echo before the commit re-asserts the row, which is the
-        // lap from the top this pin exists to prevent. It is released in
-        // onDeleteCommitted, after the repair.
+        // the reflow instead of gliding it from wherever the write left
+        // it. The pin taken above is kept for every delete - releasing it
+        // here would hand the bar to the write's own cursor adjustment
+        // before the commit re-asserts the row, which is the lap this pin
+        // exists to prevent. It is released in onDeleteCommitted, after
+        // the repair.
         if (target >= 0) {
           list.seat(target, "land")
         } else {
@@ -274,16 +276,30 @@ PanelCard {
   property int _swapGen: 0
   property bool _openSeat: false
   // The record array the model shows. installRows is its only writer - one
-  // path, nothing behind it - and the List reads it directly. The records
-  // are the service's own entry objects rather than copies of them.
+  // path, nothing behind it - and the ScriptModel reads it through `values`.
+  // The records are the service's own entry objects rather than copies.
   property var _records: []
+  // Display model: a ScriptModel over `_records`. Reassigning `values` diffs
+  // the row set inside the model instead of resetting the view, so a deletion
+  // removes one delegate and moves the survivors: a path row that was mid-leg
+  // keeps scrolling instead of starting over from the left edge.
+  ScriptModel {
+    id: listModel
+    values: panel._records
+    // The record id is the identity keyedRows() dedupes on, the delete reflow
+    // diffs the two row sets by, and the List height table files heights
+    // under.
+    objectProp: "id"
+    // Identity compares a payload by reference, which is what holding the
+    // service's own entry objects assumes; the default (Structure) would read
+    // a fresh payload object as a different row.
+    comparisonMode: ObjectComparison.Identity
+  }
   // Clipboard rows keyed on the record id for the height table and the
-  // guard. The service assigns that id once and never reuses it. The view
-  // diffs array swaps by index: fresh records rebind each slot in place and
-  // only the tail beyond the new end leaves - no keyed pooled reuse to leave
-  // removed rows visible in one slot. The records reach the delegate whole,
-  // as modelData: there is no wrapper role to unwrap.
-  // Identity epoch for the height table. A plain array reports neither a
+  // guard. The service assigns that id once and never reuses it. The records
+  // reach the delegate whole, as modelData: there is no wrapper role to
+  // unwrap.
+  // Identity epoch for the height table. The ScriptModel reports neither a
   // revision nor a key-set flag, so the panel owns the counter: installRows
   // folds the key sequence into _lastSeq, and every sequence that differs
   // from the last one advances the epoch. A counter and not the sequence
@@ -346,7 +362,8 @@ PanelCard {
     if (rows === null) return
     panel._modelError = ""
     const prev = panel._prevKeys
-    // The model's single write: the view reads panel._records directly.
+    // The model's single write: the ScriptModel reads panel._records through
+    // `values`.
     panel._records = rows
     // The identity epoch, advanced here and nowhere else: this is the model's
     // one write, so it is the only place a new key sequence can appear. The
@@ -451,8 +468,8 @@ PanelCard {
     panel._settleSpace = 0
   }
   // The affected set comes from the rows that left between the previous sync
-  // and this one. A single array assignment carries no operation report,
-  // so the two key sequences answer the same question. A row is "gone"
+  // and this one. The panel's own write carries no operation report, so the
+  // two key sequences answer the same question. A row is "gone"
   // exactly when
   // the previous set held its id and the new one does not, and walking the
   // previous sequence from index 0 makes the first such row the LOWEST
@@ -927,9 +944,10 @@ PanelCard {
           anchors.fill: parent
           // -> 16 is Ui.l, so the gutter reads a token verbatim.
           anchors.rightMargin: Ui.l
-          // Plain array model: filtered syncs assign a new array the view
-          // diffs by index.
-          model: panel._records
+          // Keyed display model: a filtered sync diffs rows by record id, so
+          // survivors keep their delegates - and a title marquee keeps its
+          // place through a delete.
+          model: listModel
           // Non-interactive default (List): no flick re-anchoring, and
           // the library wheel handler steps one entry per notch.
           // highlightMotion glides for focus moves - cursor-row gate
@@ -958,7 +976,7 @@ PanelCard {
           // sync changed the key SEQUENCE, so a payload-only change (a pin
           // flip, a fresh timeStr, a loaded thumbnail) keeps the measured
           // heights while a key-set change advances the epoch and prunes
-          // the rows the new key set drops. A plain array has neither a
+          // the rows the new key set drops. The ScriptModel has neither a
           // key-set flag nor a revision to read, so this is the panel's own
           // counter - see its declaration for why it is a counter and not
           // the sequence.

@@ -2,7 +2,7 @@
 # Suite: qmllint - the reproducible lint baseline from shell/README.md.
 #
 # The README publishes one invocation and a measured baseline: 230 files,
-# 0 errors, 146 warnings, and 72 informational diagnostics. Exit status alone
+# 0 errors, 146 warnings, and 71 informational diagnostics. Exit status alone
 # cannot distinguish a resolved tree from one whose imports became warnings,
 # so this suite checks the diagnostic stream too.
 #
@@ -84,7 +84,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   probe was measured to return the new body where the bare reload returned
 #   the old one.
 #
-# RECORDED_INFO_COUNT: 72 "Info:" diagnostics: 17 `[unused-imports]` and 55
+# RECORDED_INFO_COUNT: 71 "Info:" diagnostics: 17 `[unused-imports]` and 54
 #   untagged "X is a member of a parent element" notes. Untagged at the tail,
 #   and a severity this suite counts separately, so neither reaches the warning
 #   total above.
@@ -95,21 +95,22 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   reported unused. Obeying such a diagnostic is what breaks the file, which
 #   is the state shell/features/polkit/PolkitView.qml:8-18 documents for its own
 #   `import qs.common`; that import is read again and contributes no diagnostic,
-#   so the 18 here are files whose imports are reported unused and are not read,
-#   and one of them (TrayItem) names two. Most are `import qs.common` whose only
-#   reader was a call into the logger, so the diagnostic appeared when those
-#   call sites went and the import was left behind - which is exactly the shape
-#   this count should move by.
-#   A count that falls because an import acquired a reader is the count doing
-#   its job, and a count that rises to accommodate one of these diagnostics
-#   would be accommodating a wrong one. The last one to leave was
-#   common/runtime/UnitGate.qml's: its only reader is the call into the logger
-#   that reports a unit's lifecycle, so the import is one of the "most" this
-#   note names, and putting the calls back is what took the diagnostic with it.
+#   so the 17 here are diagnostics whose imports are reported unused and are
+#   not read, and one of them (TrayItem) names two. Most are `import qs.common`
+#   whose only reader was a call into the logger, so the diagnostic appeared
+#   when those call sites went and the import was left behind - which is
+#   exactly the shape this count should move by. A count that falls because an
+#   import acquired a reader is the count doing its job, and a count that rises
+#   to accommodate one of these diagnostics would be accommodating a wrong one.
+#   The last two to leave: common/runtime/UnitGate.qml's, whose only reader is
+#   the call into the logger that reports a unit's lifecycle, and
+#   features/clipboard/ClipboardPanel.qml's `import Quickshell`, whose new
+#   ScriptModel display reads `ScriptModel` and `ObjectComparison` from it -
+#   the file's first reader of a Quickshell type.
 #
 #   The parent-element note counts a name that resolves through scopes the
 #   delegate scopes up. That naming is deliberate across the bar and menu
-#   surfaces, so 55 is a shape of the tree rather than 55 defects, and it moves
+#   surfaces, so 54 is a shape of the tree rather than 54 defects, and it moves
 #   with those files.
 #   common/LyricsPane.qml is one of them: the delegate's click handler reads
 #   `modelData` through its parent Text, and qmllint reports the same read as
@@ -127,7 +128,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   reason. Do not start a comment line with the tool's name.
 RECORDED_FILE_COUNT=239
 RECORDED_WARNING_COUNT=147
-RECORDED_INFO_COUNT=72
+RECORDED_INFO_COUNT=71
 README_WARNING_COUNT=147
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
