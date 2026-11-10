@@ -602,9 +602,9 @@ Singleton {
       confirm: () => {
         if (!(root.active || root.expired)) return null
         return {
-          stages: 2,
+          stages: 1,
           hint: root.expired ? "Press <b>Enter</b> again to dismiss" : "Press <b>Enter</b> again to stop the timer",
-          armed: root.expired ? "<b><u>Press again to confirm dismissal</u></b>" : "<b><u>Press again to confirm stop</u></b>",
+          armed: "",
           label: root.expired ? "Dismiss" : "Stop timer",
           action: "timerStop"
         }

@@ -1199,14 +1199,14 @@ Singleton {
       },
       widestDisplay: () => "30:00",
       valueActive: () => root.active,
-      // While active the row offers the same two-step stop confirmation
-      // as the timer: first Enter arms, second Enter releases the lock.
+      // While active the row offers the same single-step stop confirmation
+      // as recording: one Enter opens the slot, the next releases the lock.
       confirm: () => {
         if (!root.active) return null
         return {
-          stages: 2,
+          stages: 1,
           hint: "Press <b>Enter</b> again to stop caffeine",
-          armed: "<b><u>Press again to confirm stop</u></b>",
+          armed: "",
           label: "Stop caffeine",
           action: "caffeineStop"
         }
