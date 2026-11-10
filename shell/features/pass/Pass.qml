@@ -11,6 +11,7 @@ import Quickshell.Io
 import qs.common
 import "Model.js" as Model
 import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/security/SecretOwnership.js" as SecretOwnership
 
 // Pass password-manager service in the shell's own process. A
 // resident facade over a demand-loaded controller: the IPC target, the
@@ -158,8 +159,7 @@ Singleton {
     return true
   }
   function _untrackSecret(handle) {
-    if (handle === "") return
-    root._secretHandles = root._secretHandles.filter(h => h !== handle)
+    root._secretHandles = SecretOwnership.untrack(root._secretHandles, handle)
   }
   // Whether the transport would take a value right now. A caller reads this
   // to refuse a read it could not hand off, instead of starting one.
@@ -169,15 +169,10 @@ Singleton {
   // A slot the child never took is released here instead of staying in the
   // store until the session ends.
   function _forgetSecret(handle) {
-    const key = String(handle || "")
-    if (key === "") return
-    SecretStore.drop(key)
-    root._untrackSecret(key)
+    root._secretHandles = SecretOwnership.forget(SecretStore, root._secretHandles, handle)
   }
   function _releaseSecrets() {
-    const owned = root._secretHandles
-    root._secretHandles = []
-    for (let i = 0; i < owned.length; i++) SecretStore.drop(owned[i])
+    root._secretHandles = SecretOwnership.releaseAll(SecretStore, root._secretHandles)
   }
 
   Process {

@@ -8,6 +8,7 @@ import Quickshell
 import Quickshell.Io
 import qs.common
 import "Model.js" as Model
+import "../../common/security/SecretOwnership.js" as SecretOwnership
 
 // Demand-loaded child of the Pass facade: every piece of store work lives
 // here and nothing here survives a close. The binary probe, the store
@@ -139,21 +140,16 @@ Item {
     return true
   }
   function _untrackSecret(handle) {
-    if (handle === "") return
-    root._secretHandles = root._secretHandles.filter(h => h !== handle)
+    root._secretHandles = SecretOwnership.untrack(root._secretHandles, handle)
   }
   // Drops the value and stops tracking it. A handle whose value already left
   // through the write channel is a no-op here, so every terminal path can
   // call it without knowing which one ran.
   function _forgetSecret(handle) {
-    if (handle === "") return
-    SecretStore.drop(handle)
-    root._untrackSecret(handle)
+    root._secretHandles = SecretOwnership.forget(SecretStore, root._secretHandles, handle)
   }
   function _releaseSecrets() {
-    const owned = root._secretHandles
-    root._secretHandles = []
-    for (let i = 0; i < owned.length; i++) SecretStore.drop(owned[i])
+    root._secretHandles = SecretOwnership.releaseAll(SecretStore, root._secretHandles)
   }
 
   // Every child this object starts goes through here, so no call site can set
