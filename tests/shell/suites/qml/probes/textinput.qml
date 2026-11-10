@@ -89,7 +89,10 @@ Window {
   InputField { id: eyeOn; y: 360; sensitive: true; revealable: true }
   InputField { id: locked; y: 400; sensitive: true; revealable: false }
   InputField { id: echoNo; y: 440; echoMode: TextInput.NoEcho }
-  InputField { id: echoNoMasked; y: 480; echoMode: TextInput.NoEcho; sensitive: true }
+  // Revealable on purpose: the truth table below asserts that `revealed` beats
+  // `sensitive` on a field the consumer allows revealing, and the reveal gate
+  // keeps a non-revealable field masked.
+  InputField { id: echoNoMasked; y: 480; echoMode: TextInput.NoEcho; sensitive: true; revealable: true }
   InputField { id: customChar; y: 520; passwordCharacter: "#" }
 
   // Chip chrome, and the input role that stands in for one. `chipFader` is the
@@ -300,8 +303,9 @@ Window {
     kv("echo.noEcho", TextInput.NoEcho)
     kv("echo.password", TextInput.Password)
 
-    // The truth table of InputField.qml:237-238. `revealed` is tested first,
-    // `sensitive` second, and the consumer's own `echoMode` only if neither.
+    // The echo truth table. `revealed` (on a revealable field) is tested
+    // first, `sensitive` second, and the consumer's own `echoMode` only if
+    // neither.
     kv("echo.table.plain", plain.input.echoMode)
     kv("echo.table.plainIsNormal", plain.input.echoMode === TextInput.Normal)
     kv("echo.table.sensitive", masked.input.echoMode)
@@ -332,9 +336,9 @@ Window {
     kv("echo.eye.afterSecondToggle", eyeOn.revealed)
     kv("echo.eye.afterSecondToggleEcho", eyeOn.input.echoMode === TextInput.Password)
 
-    // The claim under test: `revealed` driven directly on a field that is
-    // sensitive but NOT revealable. Recorded either way; the driver carries a
-    // note about which one this is.
+    // `revealed` driven directly on a field that is sensitive but NOT
+    // revealable: the reveal is refused, because revealable gates the state
+    // and not only the affordance.
     kv("echo.locked.revealable", locked.revealable)
     kv("echo.locked.sensitive", locked.sensitive)
     kv("echo.locked.echoBefore", locked.input.echoMode === TextInput.Password)
@@ -506,9 +510,9 @@ Window {
     kv("type.empty.payload", ifEditedLast)
     kv("type.empty.text", plain.text)
 
-    // The clear affordance emits `edited("")`; `clear()` does not. The silent
-    // half is measured here; the button's click is not reachable without a
-    // pointer event, so its half is pinned from the source.
+    // The clear affordance and `clear()` both emit `edited("")`. The method is
+    // measured here; the button's click is not reachable without a pointer
+    // event, so its half is pinned from the source.
     ifEditedCount = 0
     const affordance = clearAffordance(plain)
     plain.text = "typed"

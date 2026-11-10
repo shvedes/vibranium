@@ -136,6 +136,7 @@ Rectangle {
 
   function clear() {
     input.text = ""
+    root.edited("")
   }
 
   // Flip the echo between masked and plain characters (eye click, Ctrl+H).
@@ -317,7 +318,7 @@ Rectangle {
     bottomPadding: 0
     // Revealed unmasks whatever masked mode the field carries; while
     // masked, the ligature freeze below keeps the echo glyphs stable.
-    echoMode: root.revealed ? TextInput.Normal
+    echoMode: root.revealed && root.revealable ? TextInput.Normal
       : (root.sensitive ? TextInput.Password : root.echoMode)
     passwordCharacter: root.passwordCharacter
     inputMethodHints: root.sensitive ? Qt.ImhSensitiveData : Qt.ImhNone

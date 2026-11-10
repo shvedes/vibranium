@@ -171,22 +171,20 @@ t_eq "with the echo following" "true" "$(qp_get echo.eye.afterToggleEcho)"
 t_eq "toggleReveal flips it back off" "false" "$(qp_get echo.eye.afterSecondToggle)"
 t_eq "and the mask returns" "true" "$(qp_get echo.eye.afterSecondToggleEcho)"
 
-t_section "FINDING: revealed does not consult revealable"
-# InputField.qml:237-238 reads `root.revealed` first and never mentions
-# `root.revealable`, so `revealable` gates the affordance (the eye item is
-# `visible: root.revealable` at 406, and the Ctrl+H branch at 284) but not the
-# reveal state itself. A consumer that sets `revealed` on a sensitive,
-# non-revealable field gets plain text.
+t_section "revealed consults revealable"
+# `revealable` gates both the affordance (the eye item is
+# `visible: root.revealable`, and the Ctrl+H branch is gated on it) and the
+# reveal state itself, so a consumer that sets `revealed` on a sensitive,
+# non-revealable field still gets masked text.
 t_eq "the field under test is not revealable" "false" "$(qp_get echo.locked.revealable)"
 t_eq "and is sensitive" "true" "$(qp_get echo.locked.sensitive)"
 t_eq "so it starts masked" "true" "$(qp_get echo.locked.echoBefore)"
-t_eq "revealed is accepted" "true" "$(qp_get echo.locked.revealedAccepted)"
-t_eq "and the echo is no longer Password" "0" "$(qp_get echo.locked.echoAfter)"
-# The line below is the defect, asserted as it behaves.
-t_eq "a non-revealable sensitive field DOES unmask" "false" "$(qp_get echo.locked.stillMasked)"
-t_eq "and drops the ligature freeze with it" "false" "$(qp_get echo.locked.ligaturesFrozen)"
+t_eq "the property itself is still writable" "true" "$(qp_get echo.locked.revealedAccepted)"
+t_eq "the echo is still Password" "2" "$(qp_get echo.locked.echoAfter)"
+t_eq "so a non-revealable sensitive field stays masked" "true" "$(qp_get echo.locked.stillMasked)"
+t_eq "and keeps its ligature freeze" "true" "$(qp_get echo.locked.ligaturesFrozen)"
 t_eq "dropping revealed re-masks it" "true" "$(qp_get echo.locked.echoRestored)"
-t_note "FINDING (medium, defence in depth): InputField.qml:237-238 - echoMode is root.revealed ? Normal : (root.sensitive ? Password : root.echoMode), with no root.revealable term. Setting revealed: true on a { sensitive: true, revealable: false } field unmasks it and unfreezes its ligatures. Not reachable from user input: the only paths to revealed are the eye MouseArea (eyeButton is visible: root.revealable, so it takes no clicks) and the Ctrl+H branch, which is itself gated on root.revealable. Reachable only from a consumer binding or setting the property, so this is a hardening gap in the component, not a live exposure. The gate that would close it is root.revealed && root.revealable."
+t_note "echoMode is `root.revealed && root.revealable ? Normal : (root.sensitive ? Password : root.echoMode)`, so the reveal flag cannot unmask a field the consumer declared un-revealable. Both flags describe one piece of state and the gate reads both."
 
 t_section "the mask glyph and the sensitive input-method hint"
 t_eq "the default mask character is the shared token" "*" "$(qp_get echo.char.default)"
@@ -276,13 +274,13 @@ t_eq "writing the empty string emits too" "3" "$(qp_get type.empty.count)"
 t_empty "carrying the empty string" "$(qp_get type.empty.payload)"
 t_empty "and the text is empty" "$(qp_get type.empty.text)"
 
-t_section "FINDING: clear() is silent where the clear affordance is not"
+t_section "clear() emits edited() like the clear affordance"
 t_eq "the clear affordance exists" "true" "$(qp_get clear.affordance.found)"
 t_eq "and is visible with text" "true" "$(qp_get clear.affordance.visibleWithText)"
 t_eq "clear() empties the text" "" "$(qp_get clear.text)"
-t_eq "but emits no edited()" "0" "$(qp_get clear.edited.count)"
+t_eq "and emits edited()" "1" "$(qp_get clear.edited.count)"
 t_eq "and the affordance goes away with the text" "false" "$(qp_get clear.affordance.visibleAfterClear)"
-t_note "FINDING (low, consumer-visible): InputField.qml:117-119 - clear() assigns input.text = \"\" and nothing else, while the clear affordance's handler at 370-374 assigns the same string and then emits root.edited(\"\") and takes focus. A consumer that mirrors the field through edited() - which is the documented way to consume this component ('Panels simply listen to edited()', 158) - goes stale on every clear() and never learns that the field emptied. A fix that makes clear() emit edited(\"\") turns this assertion red."
+t_note "clear() and the clear affordance now have the same signal contract: both empty the text and emit edited(\"\"). A consumer that mirrors the field through edited() - the documented way to consume this component - learns about a programmatic clear the same way it learns about typing."
 t_note "The other half of that pair, the affordance's own click, is not reachable here: MouseArea's clicked signal cannot be emitted from QML (calling it throws 'Insufficient arguments' and a null argument does not reach onClicked), so the affordance's edited(\"\") is pinned from the source, not measured."
 
 t_section "prefixes: a match flips into chip mode, a miss is a query"
