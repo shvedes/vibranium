@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "ClipboardLib.js" as CL
+import "../../common/math/Range.js" as Range
 
 // Preview pane to the right of the list. Mode precedence:
 //   secret ▸ image ▸ text (file dump | inline) ▸ function graph ▸
@@ -627,7 +628,7 @@ Rectangle {
       : (isInline ? inlineFlick : ((isMediaInfo || isFolderInfo) ? infoFlick : null))
     if (!view) return false
     const maxY = Math.max(0, view.contentHeight - view.height)
-    const next = Math.max(0, Math.min(maxY, view.contentY + delta))
+    const next = Range.clamp(view.contentY + delta, 0, maxY)
     if (next === view.contentY) return false
     view.contentY = next
     return true
