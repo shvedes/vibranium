@@ -7,6 +7,7 @@ import Quickshell.Widgets
 import qs.common
 import qs.services as Core
 import "MixerModel.js" as Model
+import "../../../common/math/Range.js" as Range
 
 // One stream row: the application's own desktop icon, its name, what it is
 // playing, the level with its meter stacked under the fader as one control,
@@ -261,7 +262,7 @@ Item {
 
   function setVolume(v) {
     if (row.audio === null) return
-    row.audio.volume = Math.max(0, Math.min(row.maximum, v))
+    row.audio.volume = Range.clamp(v, 0, row.maximum)
     // Unmute only from a deliberate drag: a change-handler unmute would fire
     // on the graph side too and silently start a stream the user had muted.
     if (v > 0 && row.audio.muted) row.audio.muted = false

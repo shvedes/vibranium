@@ -4,6 +4,7 @@ import QtQuick
 import qs.common
 import qs.services as Core
 import "../../../common/text/Format.js" as Format
+import "../../../common/math/Range.js" as Range
 
 // The mixer's volume slider: the bar volume island's `VSlider` idiom - the
 // shared `ProgressBar` track, the 100% unity mark, clicks gliding to the point
@@ -45,7 +46,7 @@ Item {
   // does not divide by it, and the fill, the unity mark and the drag all
   // follow the one number.
   readonly property real ratio: slider.muted || !(slider.maximum > 0) ? 0
-    : Math.max(0, Math.min(1, slider.value / slider.maximum))
+    : Range.clamp01(slider.value / slider.maximum)
 
   // There is no thumb, and that is a decision rather than an omission: a 6px
   // track with a 12px knob on it is read as a handle that has to be grabbed,
@@ -126,7 +127,7 @@ Item {
     acceptedButtons: Qt.LeftButton
 
     function update(x) {
-      const r = Math.max(0, Math.min(1, x / slider.width))
+      const r = Range.clamp01(x / slider.width)
       slider.moved(r * slider.maximum)
     }
 
@@ -156,12 +157,12 @@ Item {
     onWheel: function(event) {
       const d = event.angleDelta.y > 0 ? slider.step : (event.angleDelta.y < 0 ? -slider.step : 0)
       if (d === 0) return
-      slider.moved(Math.max(0, Math.min(slider.maximum, slider.value + d)))
+      slider.moved(Range.clamp(slider.value + d, 0, slider.maximum))
     }
   }
 
   function _stepBy(delta) {
-    slider.moved(Math.max(0, Math.min(slider.maximum, slider.value + delta)))
+    slider.moved(Range.clamp(slider.value + delta, 0, slider.maximum))
   }
 
   Keys.onPressed: function(event) {

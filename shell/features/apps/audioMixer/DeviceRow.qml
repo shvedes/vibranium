@@ -6,6 +6,7 @@ import QtQuick.Layouts
 import qs.common
 import qs.services as Core
 import "MixerModel.js" as Model
+import "../../../common/math/Range.js" as Range
 
 // One device row, in two modes against one header:
 //
@@ -495,7 +496,7 @@ Item {
 
   function setVolume(v) {
     if (row.audio === null) return
-    row.audio.volume = Math.max(0, Math.min(row.maximum, v))
+    row.audio.volume = Range.clamp(v, 0, row.maximum)
     // Unmute only from a deliberate drag. A change-handler unmute would fire
     // on the hardware side too, so a muted headset whose own volume ring the
     // user then turned would silently start playing.
