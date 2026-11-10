@@ -10,6 +10,7 @@ import qs.services as Core
 import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "PrivacyLib.js" as PrivacyLib
+import "../../common/process/JobResult.js" as Job
 
 // Privacy service - single source of truth for capture indicators (mic,
 // camera, screenshare). Owns the per-app usage ledger, the severed-link
@@ -691,24 +692,11 @@ Singleton {
   // terminal path, which stops the child and lets the registry dispose of the
   // job.
   function _stopJob(job, reason) {
-    if (job === null || job === undefined) return
-    try {
-      if (String(job.state) === "settled") return
-    } catch (ignored) {
-      return
-    }
-    try {
-      job.cancel(reason)
-    } catch (ignored) {
-      return
-    }
+    Job.stopJob(job, reason)
   }
 
   function _jobSucceeded(result) {
-    if (result === null || result === undefined) return false
-    return String(result.code) === "ok" && Number(result.exitCode) === 0
-      && result.timedOut !== true && result.cancelled !== true
-      && result.destroyed !== true
+    return Job.succeeded(result)
   }
 
   // Stable code of the last refused or unlanded operation, or "" (also read

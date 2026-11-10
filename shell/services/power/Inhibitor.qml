@@ -9,6 +9,7 @@ import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/process/ProcProbe.js" as ProcProbe
 import "../../common/text/Format.js" as Format
 import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/process/JobResult.js" as Job
 // Idle + sleep inhibitor backed by org.freedesktop.login1. The Inhibit()
 // call returns a Unix file descriptor — closing it releases the lock —
 // so the busctl process must stay alive while the inhibitor is active.
@@ -287,17 +288,7 @@ Singleton {
   // A settled job owns nothing: the registry already released its child
   // and destroys the job itself, so only a live one is cancelled here.
   function _stopJob(job, reason) {
-    if (job === null || job === undefined) return
-    try {
-      if (String(job.state) === "settled") return
-    } catch (ignored) {
-      return
-    }
-    try {
-      job.cancel(reason)
-    } catch (ignored) {
-      return
-    }
+    Job.stopJob(job, reason)
   }
 
   // Liveness of a registry-owned child is its terminal transition: a job the

@@ -10,6 +10,7 @@ import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/text/ImageExts.js" as ImageExts
 import "../../common/text/DropPayload.js" as DropPayload
+import "../../common/process/JobResult.js" as Job
 
 // Pure-wallpaper renderer. The shell owns the *entire* decision stack: the
 // cycle, per-theme memory and current pointer live in a native JSON cache
@@ -239,26 +240,13 @@ Singleton {
   // A settled job owns nothing: the registry released its child and destroys
   // the job itself, so only a live one is cancelled here.
   function _stopJob(job, reason) {
-    if (job === null || job === undefined) return
-    try {
-      if (String(job.state) === "settled") return
-    } catch (ignored) {
-      return
-    }
-    try {
-      job.cancel(reason)
-    } catch (ignored) {
-      return
-    }
+    Job.stopJob(job, reason)
   }
 
   // Success is the full terminal verdict, not just a zero: a timed out,
   // cancelled or destroyed child never counts as having done its work.
   function _succeeded(result) {
-    if (result === null || result === undefined) return false
-    return String(result.code) === "ok" && Number(result.exitCode) === 0
-      && result.timedOut !== true && result.cancelled !== true
-      && result.destroyed !== true
+    return Job.succeeded(result)
   }
 
   function basename(p) {

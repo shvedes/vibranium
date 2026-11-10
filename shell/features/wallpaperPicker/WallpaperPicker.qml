@@ -16,6 +16,7 @@ import qs.features.wallpaper
 import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/text/ImageExts.js" as ImageExts
+import "../../common/process/JobResult.js" as Job
 
 // Efficient user wallpaper picker – clipboard-like two-pane window.
 //
@@ -237,19 +238,14 @@ Singleton {
     // Success is the whole terminal verdict, not just a zero: a timed out,
     // cancelled or destroyed child never counts as having done its work.
     function _succeeded(result) {
-        if (result === null || result === undefined) return false
-        return String(result.code) === "ok" && Number(result.exitCode) === 0
-          && result.timedOut !== true && result.cancelled !== true
-          && result.destroyed !== true
+        return Job.succeeded(result)
     }
 
     // The stable refusal code for a child that did not report success. It is
     // derived from the job's own terminal code, so a new terminal state
     // becomes a new code instead of collapsing into a success.
     function _jobCode(result) {
-        if (result === null || result === undefined) return "unavailable"
-        const code = String(result.code)
-        return code === "ok" ? "" : code
+        return Job.failedCode(result)
     }
 
     // Image-only gate: backgrounds/ may hold stray non-images (helper
