@@ -135,6 +135,9 @@ Singleton {
         next[key] = v
         root.values = next
         root.rev++
+        const written = Object.assign({}, root._writtenKeys)
+        written[key] = true
+        root._writtenKeys = written
         root.optionChanged(key, v)
         // anim preset or any hypr change triggers reload already; smart gaps also reloads
         return true
@@ -471,6 +474,16 @@ Singleton {
 
     property bool _reloadPending: false
 
+    // Keys this store has written whose own reload has not landed yet. Until
+    // it does, the compositor still answers with the value the write
+    // replaced, and a fetch in that window republishes it: the row flips back
+    // for a turn, and every row gated on that key re-answers from a value the
+    // user has already replaced. On the page that owns the motion switch that
+    // reversal is also the one that reads the old policy, so a fade runs with
+    // animations just switched off. The write owns these keys until the
+    // reload carrying it finishes.
+    property var _writtenKeys: ({})
+
     Timer {
         id: reloadTimer
         interval: 80
@@ -483,6 +496,14 @@ Singleton {
         stdout: StdioCollector {}
         stderr: StdioCollector {}
         onExited: {
+            // The reload carrying the pending writes has landed, so the
+            // compositor is the truth for those keys again - and the last
+            // fetch answered before it, so ask again rather than only opening
+            // the gate.
+            if (Object.keys(root._writtenKeys).length > 0) {
+                root._writtenKeys = ({})
+                root._fetchLive()
+            }
             if (root._reloadPending) root._reloadNow()
         }
     }
@@ -643,6 +664,9 @@ Singleton {
             const fileCache = {}
             for (let i = 0; i < keys.length && i < arr.length; i++) {
                 const key = keys[i]
+                // Still owed its reload: this answer describes the config the
+                // write replaced, not the one it wrote.
+                if (root._writtenKeys[key] === true) continue
                 const ctl = ctls[i]
                 const opt = root._byKey[key]
                 const obj = arr[i]
