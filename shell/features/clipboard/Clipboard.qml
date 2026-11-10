@@ -258,57 +258,9 @@ Singleton {
     const hist = []
     let stranded = 0
     for (let i = 0; i < arr.length; i++) {
-      const o = arr[i]
-      const isSecret = o.type === "secret"
-      const id = o.id || root.nextId
-      let raw = ""
-      let secretHandle = ""
-      let unavailable = false
-      if (isSecret) {
-        // Import read: decode once into the memory-only store, then let
-        // the cipher text die with the next write. A row no key can open
-        // keeps its metadata but no payload, and becomes copyable again only
-        // if the credential is captured afresh.
-        const held = o.raw
-        const ciphered = held && typeof held === "object" && typeof held.ciphered === "string"
-          ? held.ciphered : ""
-        const clear = held === undefined || held === null || typeof held === "object"
-          ? "" : String(held)
-        const plain = ciphered !== ""
-          ? (fileKey === "" ? "" : CL.decryptSecret(ciphered, fileKey))
-          : clear
-        if (plain !== "") {
-          secretHandle = root._secretHandleFor(id)
-          SecretStore.stash(secretHandle, plain)
-        } else {
-          unavailable = ciphered !== "" || clear !== ""
-          if (unavailable) stranded++
-        }
-      } else {
-        raw = String(o.raw == null ? "" : o.raw)
-      }
-      // For preview of secrets, never expose plain
-      const previewVal = isSecret ? "" : String(o.preview == null ? raw : o.preview)
-      const e = {
-        id: id, ts: o.ts || Date.now(), raw: raw,
-        mime: o.mime || "text/plain", type: o.type || "text",
-        pinned: o.pinned === true, filePaths: o.filePaths || [],
-        imageFile: o.imageFile || "", imageDataFile: o.imageDataFile || "",
-        imageSha: o.imageSha || "", fileSize: o.fileSize, totalSize: o.totalSize, folderCount: o.folderCount,
-        foldersCount: o.foldersCount || 0, allFolders: o.allFolders === true,
-        imageW: o.imageW || 0, imageH: o.imageH || 0,
-        folderItems: o.folderItems, pathLike: false,
-        // Persisted folder payload, validated back to absent on anything
-        // but a plain object - presence is the verdict, so shape is the
-        // only thing left to check. A hand-edited document must never
-        // paint rows from a misshapen value.
-        git: (o.git && typeof o.git === "object" && !Array.isArray(o.git)) ? o.git : null,
-        missing: o.missing === true,
-        missingText: String(o.missingText == null ? "" : o.missingText),
-        icon: "", title: "", subLeft: "", hay: "", words: [],
-        preview: previewVal, secretHandle: secretHandle, unavailable: unavailable
-      }
-      CL.deriveEntry(e, TimeFormat.use12h)
+      const imported = root._importEntry(arr[i], fileKey)
+      const e = imported.entry
+      stranded += imported.stranded
       hist.push(e)
       if (e.id >= root.nextId) root.nextId = e.id + 1
     }
@@ -338,6 +290,53 @@ Singleton {
       root._notify("Clipboard", stranded + " stored credential(s) had no usable key and were dropped")
     }
     root._loadDone = true
+  }
+
+  // One persisted row back into the in-memory shape. A secret's payload is
+  // decoded once into the memory-only store; a row no key can open keeps its
+  // metadata but no payload and is counted as stranded.
+  function _importEntry(o, fileKey) {
+    const isSecret = o.type === "secret"
+    const id = o.id || root.nextId
+    let raw = ""
+    let secretHandle = ""
+    let unavailable = false
+    if (isSecret) {
+      const held = o.raw
+      const ciphered = held && typeof held === "object" && typeof held.ciphered === "string"
+        ? held.ciphered : ""
+      const clear = held === undefined || held === null || typeof held === "object"
+        ? "" : String(held)
+      const plain = ciphered !== ""
+        ? (fileKey === "" ? "" : CL.decryptSecret(ciphered, fileKey))
+        : clear
+      if (plain !== "") {
+        secretHandle = root._secretHandleFor(id)
+        SecretStore.stash(secretHandle, plain)
+      } else {
+        unavailable = ciphered !== "" || clear !== ""
+      }
+    } else {
+      raw = String(o.raw == null ? "" : o.raw)
+    }
+    const previewVal = isSecret ? "" : String(o.preview == null ? raw : o.preview)
+    const e = {
+      id: id, ts: o.ts || Date.now(), raw: raw,
+      mime: o.mime || "text/plain", type: o.type || "text",
+      pinned: o.pinned === true, filePaths: o.filePaths || [],
+      imageFile: o.imageFile || "", imageDataFile: o.imageDataFile || "",
+      imageSha: o.imageSha || "", fileSize: o.fileSize, totalSize: o.totalSize, folderCount: o.folderCount,
+      foldersCount: o.foldersCount || 0, allFolders: o.allFolders === true,
+      imageW: o.imageW || 0, imageH: o.imageH || 0,
+      folderItems: o.folderItems, pathLike: false,
+      git: (o.git && typeof o.git === "object" && !Array.isArray(o.git)) ? o.git : null,
+      missing: o.missing === true,
+      missingText: String(o.missingText == null ? "" : o.missingText),
+      icon: "", title: "", subLeft: "", hay: "", words: [],
+      preview: previewVal, secretHandle: secretHandle, unavailable: unavailable
+    }
+    CL.deriveEntry(e, TimeFormat.use12h)
+    return { entry: e, stranded: unavailable ? 1 : 0 }
   }
 
   function _secretHandleFor(id) { return "clipboard:" + id }
@@ -1050,6 +1049,25 @@ Singleton {
     const entry = root.findById(id)
     if (!entry || entry.type === "secret" || entry.unavailable === true) return
     if (entry.type === "image" && !entry.imageDataFile && !entry.imageFile) return
+    const plan = root._copyPlan(entry)
+    if (plan === null) return
+    const cmdArr = plan.cmdArr
+    const sink = plan.sink
+    // Hash-predictable echo suppression for the serve, same shape as a
+    // manual re-copy, so the watcher's echo of our own serve is swallowed
+    // instead of duplicating the row it just stored.
+    root._suppressHash = root._suppressHashFor(entry)
+    root._muting = true
+    muteTimer.restart()
+    root._pendingCopyPaths = CL.entryPaths(entry)
+    pendingCopyTimer.restart()
+    root._startCopy(cmdArr, sink)
+  }
+
+  // The command and stdin writer for one copied row, or null for a row with
+  // no copy form. Keeping this out of _takeOwnership leaves the ownership
+  // bookkeeping and the command shape as two readable steps.
+  function _copyPlan(entry) {
     let cmdArr = null
     let sink = null
     if (entry.type === "network") {
@@ -1080,26 +1098,21 @@ Singleton {
     } else if (entry.type === "image" && entry.imageFile) {
       cmdArr = CL.buildCopyImageFileCmd(entry.imageFile)
     } else {
-      return
+      return null
     }
-    // Hash-predictable echo suppression for the serve, same shape as a
-    // manual re-copy, so the watcher's echo of our own serve is swallowed
-    // instead of duplicating the row it just stored.
-    root._suppressHash = ""
-    if (entry.type === "image" && entry.imageDataFile && !entry.imageFile) {
-      root._suppressHash = "uri:" + CL.toFileUri(entry.imageDataFile)
-    } else if (entry.type === "image" && entry.imageFile) {
-      root._suppressHash = "uri:" + CL.toFileUri(entry.imageFile)
-    } else if (entry.filePaths && entry.filePaths.length > 0) {
-      root._suppressHash = "uri:" + entry.filePaths.join("|")
-    } else {
-      root._suppressHash = "text:" + String(entry.raw || "")
-    }
-    root._muting = true
-    muteTimer.restart()
-    root._pendingCopyPaths = CL.entryPaths(entry)
-    pendingCopyTimer.restart()
-    root._startCopy(cmdArr, sink)
+    return { cmdArr: cmdArr, sink: sink }
+  }
+
+  // The echo hash a copy of this row suppresses: the same value a manual
+  // re-copy computes, so the watcher does not store the row twice.
+  function _suppressHashFor(entry) {
+    if (entry.type === "image" && entry.imageDataFile && !entry.imageFile)
+      return "uri:" + CL.toFileUri(entry.imageDataFile)
+    if (entry.type === "image" && entry.imageFile)
+      return "uri:" + CL.toFileUri(entry.imageFile)
+    if (entry.filePaths && entry.filePaths.length > 0)
+      return "uri:" + entry.filePaths.join("|")
+    return "text:" + String(entry.raw || "")
   }
 
   // --- clipboard change detection ---
@@ -1319,39 +1332,45 @@ Singleton {
       root._completePendingCopy([imgPath])
     }
     root._offer("text:" + t, () => {
-      // A bare path to an image file pasted as text behaves like a real
-      // image copy: full preview and image title semantics.
-      if (imgPath !== "") {
-        const e = root._buildEntry(t, CL.mimeForExt(imgPath), "image",
-          [imgPath], "")
-        e.imageFile = imgPath
-        const eid = e.id
-        Qt.callLater(() => {
-          root._probeDims(eid)
-          root._probeFileInfo(eid, [imgPath])
-        })
-        return e
-      }
-      const type = isSecret ? "secret" : CL.detectType(seen, t, [])
-      // For network storage URIs, keep the URI in filePaths for consistent title/preview handling
-      let fps = []
-      let preview = isSecret ? "" : t
-      if (type === "network") {
-        const nets = CL.extractNetworkUris(t)
-        if (nets.length > 0) fps = nets
-        else fps = [t]
-        preview = fps[0] || t
-      }
-      // A credential row is built empty and reaches SecretStore by handle:
-      // raw stays "", so no projection, model, or export can carry the value.
-      const e = root._buildEntry(isSecret ? "" : t, seen.length > 0 ? seen[0] : "text/plain",
-        type, fps, preview)
-      if (isSecret) {
-        e.secretHandle = root._secretHandleFor(e.id)
-        SecretStore.stash(e.secretHandle, t)
-      }
-      return e
+      if (imgPath !== "") return root._imageTextEntry(t, imgPath)
+      return root._plainTextEntry(seen, t, isSecret)
     })
+  }
+
+  // A bare path to an image file pasted as text behaves like a real image
+  // copy: full preview and image title semantics.
+  function _imageTextEntry(t, imgPath) {
+    const e = root._buildEntry(t, CL.mimeForExt(imgPath), "image", [imgPath], "")
+    e.imageFile = imgPath
+    const eid = e.id
+    Qt.callLater(() => {
+      root._probeDims(eid)
+      root._probeFileInfo(eid, [imgPath])
+    })
+    return e
+  }
+
+  function _plainTextEntry(seen, t, isSecret) {
+    const type = isSecret ? "secret" : CL.detectType(seen, t, [])
+    // For network storage URIs, keep the URI in filePaths for consistent
+    // title/preview handling.
+    let fps = []
+    let preview = isSecret ? "" : t
+    if (type === "network") {
+      const nets = CL.extractNetworkUris(t)
+      if (nets.length > 0) fps = nets
+      else fps = [t]
+      preview = fps[0] || t
+    }
+    // A credential row is built empty and reaches SecretStore by handle:
+    // raw stays "", so no projection, model, or export can carry the value.
+    const e = root._buildEntry(isSecret ? "" : t, seen.length > 0 ? seen[0] : "text/plain",
+      type, fps, preview)
+    if (isSecret) {
+      e.secretHandle = root._secretHandleFor(e.id)
+      SecretStore.stash(e.secretHandle, t)
+    }
+    return e
   }
 
   Process {
