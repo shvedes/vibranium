@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.common
+import "../math/Range.js" as Range
 
 // A themed icon from the shipped SVG set, always rendered at a fixed
 // optical canvas inside a fixed slot so every bar icon carries uniform
@@ -78,10 +79,11 @@ Item {
 
   // Shared token defaults, scaled by the common font token.
   readonly property real _defaultScale: Ui.barScaleWithFont ? Ui.fontScale : 1
-  readonly property real defaultSlotSize: Math.max(12, Math.min(
-    Math.round(Ui.barIconSlot * root._defaultScale), 24))
-  readonly property real defaultCanvasSize: Math.max(8, Math.min(
-    Math.round(Ui.barIconCanvas * root._defaultScale), root.defaultSlotSize - 6))
+  readonly property real defaultSlotSize: Range.clamp(
+    Math.round(Ui.barIconSlot * root._defaultScale), 12, 24)
+  readonly property real defaultCanvasSize: Range.clamp(
+    Math.round(Ui.barIconCanvas * root._defaultScale), 8,
+    Math.max(8, root.defaultSlotSize - 6))
   property real slotSize: root.defaultSlotSize
   property real canvasSize: root.defaultCanvasSize
 
