@@ -1,6 +1,7 @@
 .pragma library
 
 .import "./text/Format.js" as Format
+.import "./math/Range.js" as Range
 
 // Shared NowPlaying helpers: player sort, mm:ss, seek math, the player// volume path (gate, mute/resume memory, and the round-trip probe that
 // finds out whether a player takes a volume write at all).
@@ -128,7 +129,7 @@ function fmtTime(s, ref) {
 
 function clampRatio(x, w) {
   if (!(w > 0)) return 0
-  return Math.min(1, Math.max(0, x / w))
+  return Range.clamp01(x / w)
 }
 
 function canSetPlayerVolume(player) {
@@ -221,7 +222,7 @@ function volumeReadback(output) {
 
 function normalizeVolume(volume) {
   const n = Number(volume)
-  return isFinite(n) ? Math.min(1, Math.max(0, n)) : 0
+  return isFinite(n) ? Range.clamp01(n) : 0
 }
 
 // True when the read is a level the player actually reported, which is the gate
