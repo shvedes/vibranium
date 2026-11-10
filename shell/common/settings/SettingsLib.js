@@ -583,14 +583,17 @@ function parseCatalog(text) {
 
   // Derived page ids must stay unique: identical labels get a numeric
   // suffix so navigation never merges two pages.
-  const seenPages = {}
-  for (let s = 0; s < sections.length; s++) {
-    let page = sections[s].page
-    let n = 2
-    while (seenPages[page] !== undefined) page = sections[s].page + "-" + n++
-    seenPages[page] = true
-    sections[s].page = page
+  function dedupePageIds() {
+    const seenPages = {}
+    for (let s = 0; s < sections.length; s++) {
+      let page = sections[s].page
+      let n = 2
+      while (seenPages[page] !== undefined) page = sections[s].page + "-" + n++
+      seenPages[page] = true
+      sections[s].page = page
+    }
   }
+  dedupePageIds()
 
   pruneShowIf(sections, byKey, true)
 
@@ -1388,14 +1391,17 @@ function buildPages(schema, values) {
   // top-level Settings index, so a nested catalog (Bar -> Enabled modules
   // -> ...) reads as a clean tree instead of every leaf at the surface.
   const childPages = {}
-  for (let c = 0; c < src.length; c++) {
-    const side = src[c].items || []
-    for (let i = 0; i < side.length; i++) {
-      const it = side[i]
-      if (it && it.type === "submenu" && typeof it.page === "string" && it.page !== "")
-        childPages[it.page] = true
+  function collectChildPages() {
+    for (let c = 0; c < src.length; c++) {
+      const side = src[c].items || []
+      for (let i = 0; i < side.length; i++) {
+        const it = side[i]
+        if (it && it.type === "submenu" && typeof it.page === "string" && it.page !== "")
+          childPages[it.page] = true
+      }
     }
   }
+  collectChildPages()
 
   // Generated option rows with the declared custom items woven in. A custom
   // item may name `after` an option key, so it sits under that row instead
