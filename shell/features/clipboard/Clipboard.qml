@@ -856,8 +856,7 @@ Singleton {
 
   // Never carries a value: only counts and fixed phrases reach it.
   function _notify(summary, body) {
-    Exec.run(["notify-send", "-r", "3", "-t", "3000", "-a", "Vibranium",
-      summary, body])
+    Exec.notify(summary, body, { replaceId: 3, timeoutMs: 3000 })
   }
 
   property bool _muting: false

@@ -643,7 +643,7 @@ PanelWindow {
   }
 
   function _daemonNotify(summary, body, appName = "Screenshots") {
-    Exec.run(["notify-send", "-r", "3", "-t", "3000", "-a", appName, summary, body])
+    Exec.notify(summary, body, { app: appName, replaceId: 3, timeoutMs: 3000 })
   }
 
   function _colorName(value) {

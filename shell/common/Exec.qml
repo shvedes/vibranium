@@ -72,6 +72,21 @@ Singleton {
     }
   }
 
+  // A shell notice: the argv the clipboard, pass, screenshot editor and
+  // wallpaper picker each spelled out. `options` carries app, replaceId,
+  // timeoutMs and urgency; a key left out keeps notify-send's own default
+  // rather than inventing one here.
+  function notify(summary, body, options) {
+    const o = options || {}
+    const cmd = ["notify-send", "-a", o.app === undefined ? "Vibranium" : String(o.app)]
+    if (o.urgency !== undefined) cmd.push("-u", String(o.urgency))
+    if (o.replaceId !== undefined) cmd.push("-r", String(o.replaceId))
+    if (o.timeoutMs !== undefined) cmd.push("-t", String(o.timeoutMs))
+    cmd.push(String(summary))
+    if (body !== undefined && body !== null && String(body) !== "") cmd.push(String(body))
+    return root.run(cmd)
+  }
+
   function runJob(command, owner, options) {
     return ProcessRegistry.start(command, owner, options)
   }

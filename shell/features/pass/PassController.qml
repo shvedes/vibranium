@@ -197,8 +197,7 @@ Item {
   }
 
   function _notify(summary, body) {
-    Exec.run(["notify-send", "-r", "3", "-t", "3000", "-a", "Vibranium",
-      summary, body])
+    Exec.notify(summary, body, { replaceId: 3, timeoutMs: 3000 })
   }
 
   // Binary availability: the store (PASSWORD_STORE_DIR) can exist

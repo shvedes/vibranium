@@ -526,8 +526,7 @@ PanelWindow {
     if (proc === null) return
     proc.exited.connect(code => {
       if (code !== 0) return
-      Exec.run(["notify-send", "-r", "3", "-t", "3000", "-a", "Vibranium",
-        "Wallpaper", what])
+      Exec.notify("Wallpaper", what, { replaceId: 3, timeoutMs: 3000 })
     })
   }
 

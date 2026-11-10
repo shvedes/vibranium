@@ -337,8 +337,7 @@ Singleton {
   // The transport needs it for its own timeout; every other message comes
   // from the controller, which owns the flow that failed.
   function _notify(summary, body) {
-    Exec.run(["notify-send", "-r", "3", "-t", "3000", "-a", "Vibranium",
-      summary, body])
+    Exec.notify(summary, body, { replaceId: 3, timeoutMs: 3000 })
   }
 
   // --- open / close ---
