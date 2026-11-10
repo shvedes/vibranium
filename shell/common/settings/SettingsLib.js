@@ -400,21 +400,26 @@ function parseOption(raw, fileNamespace) {
   // a single expansion (see MenuLib flow contract). Passthrough - parsed
   // and validated here, copied onto the menu item in buildItem. Null when
   // absent. Malformed flows are schema errors (fail-soft: option dropped).
-  let flow = null
-  if (raw.flow !== undefined && raw.flow !== null) {
+  function parseFlow() {
+    if (raw.flow === undefined || raw.flow === null) return { flow: null }
     const fres = normalizeFlow(raw.flow, key)
-    if (fres.error) return { error: fres.error }
-    flow = fres.value
+    return fres.error ? { error: fres.error } : { flow: fres.value }
   }
+  const flowResult = parseFlow()
+  if (flowResult.error) return { error: flowResult.error }
+  const flow = flowResult.flow
 
   // Visibility taxonomy: visible rows render, hidden rows validate +
   // persist without rendering (click hooks), internal rows do the same
   // for programmatic state (layout, timers) and are never counted or
   // bundled. `hidden` stays as the derived compat flag.
-  let visibility = "visible"
-  if (typeof raw.visibility === "string" && VISIBILITY[raw.visibility]) visibility = raw.visibility
-  else if (raw.hidden === true) visibility = "hidden"
-  if (type === "layout" || type === "timers") visibility = "internal"
+  function parseVisibility() {
+    if (typeof raw.visibility === "string" && VISIBILITY[raw.visibility]) return raw.visibility
+    if (raw.hidden === true) return "hidden"
+    if (type === "layout" || type === "timers") return "internal"
+    return "visible"
+  }
+  const visibility = parseVisibility()
 
   const opt = {
     key: key,
