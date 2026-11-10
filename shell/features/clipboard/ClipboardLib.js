@@ -680,6 +680,46 @@ function prettyImageName(entry) {
 function buildSubLeft(entry) {
   if (entry && entry.missing === true)
     return String(entry.missingText || "File not found")
+
+  // Network rows: the count, then protocol and host of the single location.
+  // Nested because the type arms below are the only callers.
+  function networkSub() {
+    // Same URI source as the title, so the count and the title agree.
+    const nets = networkUris(entry)
+    if (nets.length > 1) return nets.length + " network locations"
+    const single = nets[0] || ""
+    // Extract protocol and host without URL global (not available in QML JS)
+    const m = String(single).match(RE_URI_SCHEME_HOST)
+    if (m) {
+      const proto = NETWORK_PROTO_LABELS[m[1].toLowerCase()] || m[1].toUpperCase()
+      const host = m[2].split("@").pop().split(":")[0]
+      if (host && proto) return proto + " \u2022 " + host
+      if (host) return host
+      if (proto) return proto + " location"
+    }
+    return "Network storage"
+  }
+
+  // Multi-selection rows: item count, the folder share of it, the recursive
+  // file count and the total size, in that order.
+  function collectionSub() {
+    const n = entry.filePaths ? entry.filePaths.length : (entry.fileCount || 0)
+    const folders = entry.foldersCount || 0
+    const allFolders = entry.allFolders === true
+    let first
+    if (allFolders) first = n + (n === 1 ? " folder" : " folders")
+    else if (folders > 0) first = n + (n === 1 ? " item" : " items")
+    else first = n + (n === 1 ? " file" : " files")
+    const parts = [first]
+    if (!allFolders && folders > 0 && folders < n)
+      parts.push(folders + (folders === 1 ? " folder" : " folders"))
+    if (entry.folderCount !== undefined && entry.folderCount > 0)
+      parts.push(entry.folderCount + " files")
+    if (entry.totalSize !== undefined && entry.totalSize > 0)
+      parts.push(formatSize(entry.totalSize))
+    return parts.join(" \u2022 ")
+  }
+
   switch (entry.type) {
     case "secret":
       return "Credentials • Hidden"
@@ -704,22 +744,8 @@ function buildSubLeft(entry) {
     case "file":
       return entry.fileSize !== undefined && entry.fileSize > 0
         ? formatSize(entry.fileSize) : "File"
-    case "network": {
-      // Same URI source as the title, so the count and the title agree.
-      const nets = networkUris(entry)
-      if (nets.length > 1) return nets.length + " network locations"
-      const single = nets[0] || ""
-      // Extract protocol and host without URL global (not available in QML JS)
-      const m = String(single).match(RE_URI_SCHEME_HOST)
-      if (m) {
-        const proto = NETWORK_PROTO_LABELS[m[1].toLowerCase()] || m[1].toUpperCase()
-        const host = m[2].split("@").pop().split(":")[0]
-        if (host && proto) return proto + " • " + host
-        if (host) return host
-        if (proto) return proto + " location"
-      }
-      return "Network storage"
-    }
+    case "network":
+      return networkSub()
     case "folder": {
       const parts = []
       if (entry.folderCount !== undefined && entry.folderCount !== null)
@@ -729,23 +755,8 @@ function buildSubLeft(entry) {
       return parts.length > 0 ? parts.join(" • ") : "Folder"
     }
     case "files":
-    case "folders": {
-      const n = entry.filePaths ? entry.filePaths.length : (entry.fileCount || 0)
-      const folders = entry.foldersCount || 0
-      const allFolders = entry.allFolders === true
-      let first
-      if (allFolders) first = n + (n === 1 ? " folder" : " folders")
-      else if (folders > 0) first = n + (n === 1 ? " item" : " items")
-      else first = n + (n === 1 ? " file" : " files")
-      const parts = [first]
-      if (!allFolders && folders > 0 && folders < n)
-        parts.push(folders + (folders === 1 ? " folder" : " folders"))
-      if (entry.folderCount !== undefined && entry.folderCount > 0)
-        parts.push(entry.folderCount + " files")
-      if (entry.totalSize !== undefined && entry.totalSize > 0)
-        parts.push(formatSize(entry.totalSize))
-      return parts.join(" • ")
-    }
+    case "folders":
+      return collectionSub()
     default:
       return ""
   }
