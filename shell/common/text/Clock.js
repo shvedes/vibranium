@@ -72,7 +72,12 @@ function dayLabelOf(d) {
 // do the same); when unset it reads as 24-hour, matching the shell default.
 // `now` is injectable so tests stay deterministic.
 function formatTime(ts, now, use12h) {
-  var d = new Date(ts)
+  // A timestamp that is not a number has no clock reading: the label is "",
+  // the same answer clockLabel gives, rather than the "Invalid Date NaN:NaN"
+  // an invalid Date renders as.
+  var ms = Number(ts)
+  if (!isFinite(ms)) return ""
+  var d = new Date(ms)
   var ref = now !== undefined ? new Date(now) : new Date()
   var sameDay = d.getFullYear() === ref.getFullYear()
     && d.getMonth() === ref.getMonth()

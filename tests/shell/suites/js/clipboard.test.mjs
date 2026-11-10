@@ -1849,6 +1849,8 @@ group('formatTime - same day, then the day rides along', () => {
   noThrow('a zero timestamp', () => CL.formatTime(0, TS))
   noThrow('a NaN timestamp', () => CL.formatTime(NaN, TS))
   eq('a NaN timestamp is still a string', typeof CL.formatTime(NaN, TS), 'string')
+  eq('a non-numeric timestamp has no clock reading', CL.formatTime(NaN, TS), '')
+  eq('and neither does a missing one', CL.formatTime(undefined, TS), '')
   noThrow('an invalid now', () => CL.formatTime(TS, NaN))
   eq('an invalid now is not the same day', CL.formatTime(TS, NaN) !== CL.formatTime(TS, TS), true)
   noThrow('undefined for both', () => CL.formatTime(undefined, undefined))
