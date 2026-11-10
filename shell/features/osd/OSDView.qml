@@ -6,6 +6,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.common
 import qs.features.osd
+import "../../common/math/Range.js" as Range
 
 // OSD surface. Passive, click-through, Overlay layer, horizontally
 // centered, vertically fixed at the bottom side of the screen
@@ -43,6 +44,6 @@ PanelWindow {
     maxWidth: Math.max(0, win.width - 24)
     readonly property real preferredY: win.height - card.height - OSD.offset
     readonly property real maxY: Math.max(12, win.height - card.height - 12)
-    y: Math.max(12, Math.min(card.preferredY, card.maxY))
+    y: Range.clamp(card.preferredY, 12, card.maxY)
   }
 }
