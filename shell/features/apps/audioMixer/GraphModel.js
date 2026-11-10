@@ -892,15 +892,18 @@ function layerPlan(nodes, groups) {
   const keys = []
   const kinds = ({})
   const index = ({})
-  for (const node of arrayOf(nodes)) {
-    if (node === null || node === undefined) continue
-    const key = text(node.key)
-    if (key === "") continue
-    if (Object.prototype.hasOwnProperty.call(index, key)) continue
-    index[key] = keys.length
-    keys.push(key)
-    kinds[key] = text(node.kind)
+  function collectNodes() {
+    for (const node of arrayOf(nodes)) {
+      if (node === null || node === undefined) continue
+      const key = text(node.key)
+      if (key === "") continue
+      if (Object.prototype.hasOwnProperty.call(index, key)) continue
+      index[key] = keys.length
+      keys.push(key)
+      kinds[key] = text(node.kind)
+    }
   }
+  collectNodes()
   const total = keys.length
   // Edges from and to each node, de-duplicated. A group repeated by a republish
   // is one edge: a node that feeds a node twice over two links is one node in
@@ -909,24 +912,27 @@ function layerPlan(nodes, groups) {
   const outs = ({})
   const ins = ({})
   const linked = ({})
-  for (const group of arrayOf(groups)) {
-    if (group === null || group === undefined) continue
-    const from = index[text(group.sourceKey)]
-    const to = index[text(group.targetKey)]
-    if (from === undefined || to === undefined || from === to) continue
-    linked[keys[from]] = true
-    linked[keys[to]] = true
-    // Both directions carry flow, so the same pair de-duplicates twice: the
-    // first check is what keeps the edge list free of a republish's repeats and
-    // the second is what keeps a pair that arrives with its two ends the wrong way
-    // round from being two edges. A self edge is dropped rather than counted: a
-    // node cannot feed itself, and counting one would put it a layer right of
-    // itself forever.
-    if (hasOut(outs, keys[from], keys[to])) continue
-    if (hasOut(ins, keys[to], keys[from])) continue
-    pushOut(outs, keys[from], keys[to])
-    pushOut(ins, keys[to], keys[from])
+  function collectEdges() {
+    for (const group of arrayOf(groups)) {
+      if (group === null || group === undefined) continue
+      const from = index[text(group.sourceKey)]
+      const to = index[text(group.targetKey)]
+      if (from === undefined || to === undefined || from === to) continue
+      linked[keys[from]] = true
+      linked[keys[to]] = true
+      // Both directions carry flow, so the same pair de-duplicates twice: the
+      // first check is what keeps the edge list free of a republish's repeats and
+      // the second is what keeps a pair that arrives with its two ends the wrong way
+      // round from being two edges. A self edge is dropped rather than counted: a
+      // node cannot feed itself, and counting one would put it a layer right of
+      // itself forever.
+      if (hasOut(outs, keys[from], keys[to])) continue
+      if (hasOut(ins, keys[to], keys[from])) continue
+      pushOut(outs, keys[from], keys[to])
+      pushOut(ins, keys[to], keys[from])
+    }
   }
+  collectEdges()
 
   // Depth by longest path, over a Kahn walk so a graph with a loop in it
   // terminates: a node's layer is raised only once every node feeding it has
