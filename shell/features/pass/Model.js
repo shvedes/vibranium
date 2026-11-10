@@ -528,8 +528,7 @@ function navigationBack(mode, dir) {
   if (mode === "browse") {
     var d = String(dir || "");
     if (d === "") return { mode: "menu" };
-    var slash = d.lastIndexOf("/");
-    return { mode: "browse", dir: slash === -1 ? "" : d.substring(0, slash) };
+    return { mode: "browse", dir: SU.dirname(d) };
   }
   return { close: true };
 }

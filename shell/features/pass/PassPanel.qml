@@ -262,8 +262,7 @@ PanelCard {
       if (p !== "" && (Pass.currentDir === p || Pass.currentDir.indexOf(p + "/") === 0)) {
         let dir = Pass.currentDir
         while (dir !== "" && (dir === p || dir.indexOf(p + "/") === 0)) {
-          const s = dir.lastIndexOf("/")
-          dir = s === -1 ? "" : dir.substring(0, s)
+          dir = SU.dirname(dir)
         }
         Pass.browseTo(dir)
       }
@@ -854,8 +853,7 @@ PanelCard {
       const next = String(r.dirPath || panel.joinDir(panel.sub === "movepick" ? panel.moveDir : Pass.currentDir, String(r.name || r.label)))
       panel.beginPageTransition(true, false)
       if (panel.sub !== "movepick" && panel.filterText !== "") {
-        const parentSlash = next.lastIndexOf("/")
-        const parentDir = parentSlash === -1 ? "" : next.substring(0, parentSlash)
+        const parentDir = SU.dirname(next)
         panel.seedBrowseTarget(parentDir, next)
       }
       panel.clearQuery()
@@ -870,8 +868,7 @@ PanelCard {
       // Global hits land in context: seat the browser on the entry's
       // parent so Esc shows its folder, not the vault root.
       const full = String(r.path || "")
-      const slash = full.lastIndexOf("/")
-      const parentDir = slash === -1 ? "" : full.substring(0, slash)
+      const parentDir = SU.dirname(full)
       panel.beginPageTransition(true, false)
       if (panel.filterText !== "")
         panel.seedBrowseTarget(parentDir, full)
@@ -924,8 +921,7 @@ PanelCard {
       panel.beginPageTransition(true, false)
       panel.clearQuery()
       panel.sub = "movepick"
-      const slash = p.lastIndexOf("/")
-      panel.moveDir = slash === -1 ? "" : p.substring(0, slash)
+      panel.moveDir = SU.dirname(p)
       panel.rebuild()
       return
     }
@@ -1099,8 +1095,8 @@ PanelCard {
     if (panel.editorMode === "rename") {
       if (!Model.isValidName(text)) { panel.flashEditor(); return }
       const p = Pass.selectedPath
-      const slash = p.lastIndexOf("/")
-      const dest = slash === -1 ? name : p.substring(0, slash) + "/" + name
+      const dir = SU.dirname(p)
+      const dest = dir === "" ? name : dir + "/" + name
       if (dest === p) { panel.cancelEditor(); return }
       if (panel.targetExists(dest)) { panel.flashEditor(); return }
       panel.beginPageTransition(false, true)
@@ -1197,8 +1193,7 @@ PanelCard {
     panel.beginPageTransition(false, true)
     panel.clearQuery()
     if (panel.moveDir !== "") {
-      const s = panel.moveDir.lastIndexOf("/")
-      panel.moveDir = s === -1 ? "" : panel.moveDir.substring(0, s)
+      panel.moveDir = SU.dirname(panel.moveDir)
     } else {
       panel.sub = ""
     }
