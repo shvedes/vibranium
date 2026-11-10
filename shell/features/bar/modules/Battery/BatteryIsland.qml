@@ -34,9 +34,7 @@ Item {
   property var islandHost: null
 
   // Horizontal inset for each device row's content, mirroring the menu
-  // entry insets so rows read like menu entries. Doubles as the
-  // scrollbar gutter: the bar overlays the viewport edge (ArchUpdates
-  // pattern), so rows end at this inset instead of underneath it.
+  // entry insets so rows read like menu entries.
   readonly property real rowPad: 6
 
   // --- UPower state (same filter as the bar module) ---
@@ -128,6 +126,7 @@ Item {
         subtext: Model.rowSubtext({
           percentage: pct,
           charging: charging,
+          stateLabel: stateLabel,
           timeToEmpty: Number(d.timeToEmpty),
           timeToFull: Number(d.timeToFull)
         }),
@@ -202,7 +201,7 @@ Item {
           wrapMode: Text.WordWrap
         }
 
-        // --- DEVICES - one List + ScrollBar for the whole section ---
+        // --- DEVICES - one list, sized to its rows; the island grows with it ---
         Item {
           visible: root.rows.length > 0
           width: parent.width
@@ -254,26 +253,15 @@ Item {
                 // waiting the tween out.
                 pursuitAnimated: true
                 width: parent.width
-                height: Math.min(devicesList.contentHeight, 260)
+                // The list is its content: no viewport cap and no scroll.
+                // The card reads body.implicitHeight, so the window itself
+                // grows with the device rows and the open details.
+                height: devicesList.contentHeight
                 stableModel: root.rows
                 spacing: 0
-                interactive: devicesList.contentHeight > devicesList.height
+                interactive: false
                 delegate: deviceDelegate
 
-              }
-
-              // Overlaid inside the viewport edge (ArchUpdates pattern):
-              // rows already end at rowPad, so nothing runs underneath.
-              ScrollBar {
-                flickable: devicesList
-                anchors.right: parent.right
-                anchors.rightMargin: 1
-                anchors.top: devicesList.top
-                anchors.topMargin: 8
-                anchors.bottom: devicesList.bottom
-                anchors.bottomMargin: 8
-                thickness: 3
-                radius: RoundingPolicy.radius
               }
             }
           }

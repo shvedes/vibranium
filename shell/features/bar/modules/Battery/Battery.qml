@@ -93,6 +93,169 @@ CollapsibleSlot {
     return null
   }
 
+  // --- charging announcement ---
+  //
+  // "Charging" when the adapter is plugged in and the machine starts
+  // charging, "Charged" when the last pack reaches 100%, and "Fully
+  // charged" when the adapter is plugged in while already at 100%. All
+  // three read the laptop packs only: a mouse topping up in its cradle is
+  // not the machine being plugged in. The window is the shared
+  // FlashReveal, so it carries the same 3s span and boot settle gate as
+  // the track and access-point flashes.
+  readonly property bool hasMainBattery: {
+    for (let i = 0; i < root.rows.length; i++) {
+      if (root.rows[i].laptopBattery) return true
+    }
+    return false
+  }
+  readonly property bool mainCharging: {
+    for (let i = 0; i < root.rows.length; i++) {
+      const r = root.rows[i]
+      if (r.laptopBattery && r.charging) return true
+    }
+    return false
+  }
+  readonly property bool mainCharged: {
+    let any = false
+    for (let i = 0; i < root.rows.length; i++) {
+      const r = root.rows[i]
+      if (!r.laptopBattery) continue
+      any = true
+      if (Number(r.percentage) < 100) return false
+    }
+    return any
+  }
+
+  // The first snapshot seeds, so a shell that starts while the charger is
+  // already in never announces a connection nobody made. Seeding on AC
+  // also counts that session as announced, so Pending charge turning into
+  // Charging ten seconds later does not announce a cable that was already
+  // in. rows rebuilds on every UPower change, so the handler sees state
+  // changes even though each device object is a fresh snapshot.
+  property bool _powerSeeded: false
+  property bool _lastMainCharging: false
+  property bool _lastMainCharged: false
+  // AC-session bookkeeping. `UPower.onBattery` is the adapter edge and it
+  // lands at once; the battery's own state can sit at "Pending charge" for
+  // about ten seconds before UPower reports Charging, so waiting for that
+  // would put the flash ten seconds after the cable went in. One
+  // announcement per plug-in: the AC edge speaks for the session and the
+  // later state change does not repeat it.
+  property bool _acSeeded: false
+  property bool _onAc: false
+  property bool _chargeAnnounced: false
+
+  function _observePower(): void {
+    if (!root.hasMainBattery) {
+      root._powerSeeded = false
+      root._chargeAnnounced = false
+      return
+    }
+    const charging = root.mainCharging
+    const charged = root.mainCharged
+    if (!root._powerSeeded) {
+      root._powerSeeded = true
+      root._lastMainCharging = charging
+      root._lastMainCharged = charged
+      root._chargeAnnounced = !root._onAc
+      return
+    }
+    // A pack crossing 100% while charging flips `charging` off in the same
+    // update, so the full state is checked first: the moment reads
+    // "Charged", never a stale "Charging". Only an adapter session can
+    // complete a charge - a battery that reads 100% while running down is
+    // not being charged by an event.
+    if (charged && !root._lastMainCharged) {
+      if (!root._onAc) {
+        root._fireFlash("Charged")
+        root._chargeAnnounced = true
+      }
+    } else if (charging && !root._lastMainCharging && !root._chargeAnnounced) {
+      root._fireFlash(root.mainCharged ? "Fully charged" : "Charging")
+      root._chargeAnnounced = true
+    }
+    root._lastMainCharging = charging
+    root._lastMainCharged = charged
+  }
+
+  onRowsChanged: root._observePower()
+
+  // The adapter edge. A full pack announces "Fully charged" rather than a
+  // second charging event; anything else announces "Charging" at once,
+  // while UPower may still be reporting Pending charge. Booting on AC
+  // seeds here without announcing, and unplugging opens a new session.
+  function _observeAc(): void {
+    const onBattery = UPower.onBattery === true
+    if (!root._acSeeded) {
+      root._acSeeded = true
+      root._onAc = onBattery
+      return
+    }
+    if (onBattery === root._onAc) return
+    root._onAc = onBattery
+    if (onBattery) {
+      root._chargeAnnounced = false
+      return
+    }
+    if (!root.hasMainBattery || !root._powerSeeded || root._chargeAnnounced) return
+    root._fireFlash(root.mainCharged ? "Fully charged" : "Charging")
+    root._chargeAnnounced = true
+  }
+
+  Connections {
+    target: UPower
+
+    function onOnBatteryChanged() { root._observeAc() }
+  }
+
+  FlashReveal {
+    id: chargeFlash
+  }
+  property string flashText: ""
+  readonly property bool flashActive: chargeFlash.active && root.flashText !== ""
+  property real flashSlide: root.flashActive ? 1 : 0
+  Behavior on flashSlide {
+    Glide { duration: Ui.slowMs }
+  }
+
+  function _startFlash(text): void {
+    root.flashText = text
+    chargeFlash.pulse()
+  }
+
+  // Fullscreen defer, the Network/Bluetooth convention: the announcement
+  // must not grow the bar over a fullscreen window. The event parks and
+  // replays when the fullscreen ends; an in-flight flash is parked too.
+  readonly property bool _fsActive: root.barScreen ? FullscreenProbe.screenActive(root.barScreen.name) : FullscreenProbe.anyActive
+  property string _flashPending: ""
+  function _fireFlash(text): void {
+    if (root._fsActive) {
+      root._flashPending = text
+      return
+    }
+    root._startFlash(text)
+  }
+  on_FsActiveChanged: {
+    if (root._fsActive) {
+      if (chargeFlash.active) {
+        root._flashPending = root.flashText
+        chargeFlash.clear()
+      }
+      return
+    }
+    if (root._flashPending !== "") {
+      const text = root._flashPending
+      root._flashPending = ""
+      root._startFlash(text)
+    }
+  }
+  onHasMainBatteryChanged: {
+    if (!root.hasMainBattery) {
+      chargeFlash.clear()
+      root._flashPending = ""
+    }
+  }
+
   // The remembered device: the key the last wheel pick left in
   // shell.battery.device. A raw section outside the schema, like the
   // ColorPicker's format - one opaque selection name, not a catalog option,
@@ -118,6 +281,15 @@ CollapsibleSlot {
     ? root.storedRow
     : (root.builtinSummary !== null ? root.builtinSummary : root.summary)
 
+  // A full pack has nothing to add to the icon: the readout hides at 100%
+  // and returns on the first 99% reading. This only retracts the text -
+  // `showPercentage` still owns the preferred device and the wheel cycle,
+  // so the pill does not jump to another device while it is hidden. The
+  // threshold is the printed one, so "100%" is exactly what disappears.
+  readonly property bool percentageFull: root.preferredRow !== null
+    && Math.round(Number(root.preferredRow.percentage)) >= 100
+  readonly property bool percentageVisible: root.showPercentage && !root.percentageFull
+
   // The readout keeps its device and its text through the whole fade-out:
   // percentageSlide stays above 0 until the reverse slide lands, so icon and
   // number agree for its duration. percentageText is deliberately independent
@@ -133,7 +305,12 @@ CollapsibleSlot {
   // (_landCycle), so no phase draws two devices at once.
   property var paintRow: null
   onDisplayRowChanged: if (!cycleAnim.running) root.paintRow = root.displayRow
-  Component.onCompleted: root.paintRow = root.displayRow
+  Component.onCompleted: {
+    root.paintRow = root.displayRow
+    root._acSeeded = true
+    root._onAc = UPower.onBattery === true
+    root._observePower()
+  }
 
   readonly property var shownRow: root.paintRow !== null ? root.paintRow : root.displayRow
   readonly property real displayPct: root.shownRow ? root.shownRow.percentage : 100
@@ -246,13 +423,31 @@ CollapsibleSlot {
   readonly property bool shown: root.hasDevices
   collapseShown: root.shown
 
-  // Percentage reveal (second axis, local): 1 while the readout is up, 0
-  // icon-only. The slide drives the pill width, so both rest states land
-  // exact and the icon stays flush right when no text is shown.
-  property real percentageSlide: root.showPercentage ? 1 : 0
+  // Percentage reveal (second axis, local): 1 while the readout is up (the
+  // setting is on and the device is not full), 0 icon-only. The slide
+  // drives the pill width, so both rest states land exact and the icon
+  // stays flush right when no text is shown.
+  property real percentageSlide: root.percentageVisible ? 1 : 0
   Behavior on percentageSlide {
     Glide { duration: Ui.slowMs }
   }
+
+  // The text line is one slot. At rest it prints the percentage when that
+  // setting is on; while an announcement runs, the word replaces it. One
+  // width drives both, so the readout dissolves into the word and the pill
+  // slides to whichever is longer instead of showing both side by side.
+  // With the setting off the line is empty at rest, so an announcement
+  // still opens the pill from icon width.
+  readonly property bool textShown: root.percentageVisible || root.flashActive
+  property real textSlide: root.textShown ? 1 : 0
+  Behavior on textSlide {
+    Glide { duration: Ui.slowMs }
+  }
+  // Keep the flash word's width through its fade-out: the label is still
+  // on screen while flashSlide returns to zero, so switching the target
+  // back to the percentage there would snap the pill before it collapses.
+  readonly property real labelWidth: (root.flashActive || root.flashSlide > 0)
+    ? flashLabel.implicitWidth : pctText.implicitWidth
   collapseFull: pill.width
 
   // The battery glyph is horizontal in a 24x24 box and paints only the
@@ -273,7 +468,8 @@ CollapsibleSlot {
 
     anchors.right: parent.right
     anchors.verticalCenter: parent.verticalCenter
-    width: Math.round(Bar.iconSlot + root.percentageSlide * (percentageText.implicitWidth + root.textGap + Bar.slotInset))
+    width: Math.round(Bar.iconSlot
+      + root.textSlide * (root.labelWidth + root.textGap + Bar.slotInset))
     height: root.height
     clip: true
     Behavior on width {
@@ -308,17 +504,33 @@ CollapsibleSlot {
       }
 
       Title {
-        id: percentageText
+        id: pctText
 
         anchors.right: parent.right
         anchors.rightMargin: Bar.slotInset
         anchors.verticalCenter: parent.verticalCenter
-        visible: root.percentageSlide > 0
-        opacity: root.percentageSlide
+        visible: root.percentageSlide > 0 && root.flashSlide < 1
+        opacity: root.percentageSlide * (1 - root.flashSlide)
         level: 3
         font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
         color: Ui.solid(root.iconColor)
         text: root.percentageText
+      }
+
+      // The announcement shares the percentage's slot, so the two cross-
+      // fade instead of widening the pill for both at once.
+      Title {
+        id: flashLabel
+
+        anchors.right: parent.right
+        anchors.rightMargin: Bar.slotInset
+        anchors.verticalCenter: parent.verticalCenter
+        visible: root.flashSlide > 0
+        opacity: root.flashSlide
+        level: 3
+        font.pixelSize: Math.round(Ui.fontM * 0.95 * root.textScale)
+        color: Ui.solid(root.iconColor)
+        text: root.flashText
       }
     }
   }

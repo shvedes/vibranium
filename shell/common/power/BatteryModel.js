@@ -182,10 +182,11 @@ function formatRate(watts) {
   return Format.formatWatts(watts)
 }
 
-// Secondary row line: "85% - 2h 15m left" while running down, and
-// "85% - charging - 1h to full" while on the charger. The island entry
-// gives it one line, so it carries the direction of the charge and the
-// estimate that goes with it and nothing else. The other telemetry -
+// Secondary row line: "85% - 2h 15m left" while running down,
+// "85% - charging - 1h to full" while on the charger, and
+// "100% - Fully charged" once UPower reports the full state. The island
+// entry gives it one line, so it carries the direction of the charge and
+// the estimate that goes with it and nothing else. The other telemetry -
 // charge rate, health and energy - lives in the row's dropdown
 // (detailRows), where there is room for it.
 //
@@ -201,6 +202,8 @@ function rowSubtext(row) {
     text += " - charging"
     var full = formatDuration(r.timeToFull)
     if (full !== "") text += " - " + full + " to full"
+  } else if (String(r.stateLabel || "") === "Fully charged") {
+    text += " - Fully charged"
   } else {
     var left = formatDuration(r.timeToEmpty)
     if (left !== "") text += " - " + left + " left"
