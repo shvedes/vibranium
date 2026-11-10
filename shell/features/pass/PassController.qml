@@ -9,6 +9,7 @@ import Quickshell.Io
 import qs.common
 import "Model.js" as Model
 import "../../common/security/SecretOwnership.js" as SecretOwnership
+import "../../common/text/StringUtils.js" as SU
 
 // Demand-loaded child of the Pass facade: every piece of store work lives
 // here and nothing here survives a close. The binary probe, the store
@@ -392,7 +393,7 @@ Item {
     }
     root.busy = true
     mkdirProc._path = p
-    mkdirProc.command = ["/bin/mkdir", "-p", root.storeDir + "/" + p]
+    mkdirProc.command = ["/bin/mkdir", "-p", SU.joinPath(root.storeDir, p)]
     // Optimistic: the row appears instantly; the dirs probe
     // reconciles (a failed mkdir drops it on the fail refresh).
     const known = root.allDirs.slice()
@@ -559,7 +560,7 @@ Item {
     root._unlockCb = (typeof cb === "function") ? cb : null
     root._withStore(gpgProc)
     gpgProc.command = ["gpg", "-q", "--no-tty", "-d",
-      root.storeDir + "/" + p + ".gpg"]
+      SU.joinPath(root.storeDir, p + ".gpg")]
     root._start(gpgProc)
   }
 
@@ -890,7 +891,7 @@ Item {
       }
       root.busy = true
       rmdirProc._path = p
-      rmdirProc.command = ["/bin/rmdir", root.storeDir + "/" + p]
+      rmdirProc.command = ["/bin/rmdir", SU.joinPath(root.storeDir, p)]
       root._start(rmdirProc)
       return
     }

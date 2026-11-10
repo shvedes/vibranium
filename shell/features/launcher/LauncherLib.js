@@ -1409,7 +1409,7 @@ function timeProbeFormat(tz) {
   const z = String(tz ?? "")
   for (let i = 0; i < H12_ZONES.length; i++) {
     const r = H12_ZONES[i]
-    if (z === r || (z.length > r.length && z.startsWith(r + "/"))) return "%I:%M %p"
+    if (SU.isAtOrUnder(z, r)) return "%I:%M %p"
   }
   return "%H:%M"
 }

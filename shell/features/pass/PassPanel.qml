@@ -259,9 +259,9 @@ PanelCard {
     function onPassBinaryChanged() { panel.rebuild() }
     function onDeleteCommitted(path) {
       const p = String(path || "")
-      if (p !== "" && (Pass.currentDir === p || Pass.currentDir.indexOf(p + "/") === 0)) {
+      if (p !== "" && SU.isAtOrUnder(Pass.currentDir, p)) {
         let dir = Pass.currentDir
-        while (dir !== "" && (dir === p || dir.indexOf(p + "/") === 0)) {
+        while (dir !== "" && SU.isAtOrUnder(dir, p)) {
           dir = SU.dirname(dir)
         }
         Pass.browseTo(dir)
@@ -336,19 +336,13 @@ PanelCard {
         r.push({ kind: "up", label: "..", sub: "parent folder", icon: "arrow" })
       r.push({ kind: "move-here", label: "Move here", sub: dir === "" ? "/" : "/" + dir, icon: "check" })
       r.push({ kind: "delimiter" })
-      for (let i = 0; i < ch.dirs.length; i++)
-        r.push({ kind: "dir", label: ch.dirs[i], sub: panel.dirSub(panel.joinDir(dir, ch.dirs[i])), icon: "file-folder", name: ch.dirs[i], dirPath: panel.joinDir(dir, ch.dirs[i]) })
-      for (let j = 0; j < ch.files.length; j++)
-        r.push({ kind: "entry", label: ch.files[j].name, sub: ch.files[j].dir === "" ? "" : ch.files[j].path, icon: "lock", path: ch.files[j].path })
+      panel.appendFolderRows(r, dir, ch)
       return r.filter(row => String(row.kind || "") !== "dir" || !panel.isGone(row.dirPath || ""))
     }
     r.push({ kind: "create-password", label: "Create password", sub: "Create a new password here", icon: "file", iconColor: "green" })
     r.push({ kind: "create-folder", label: "Create folder", sub: "Create a new folder here", icon: "file-folder", iconColor: "yellow" })
     r.push({ kind: "delimiter" })
-    for (let i = 0; i < ch.dirs.length; i++)
-      r.push({ kind: "dir", label: ch.dirs[i], sub: panel.dirSub(panel.joinDir(dir, ch.dirs[i])), icon: "file-folder", name: ch.dirs[i], dirPath: panel.joinDir(dir, ch.dirs[i]) })
-    for (let j = 0; j < ch.files.length; j++)
-      r.push({ kind: "entry", label: ch.files[j].name, sub: ch.files[j].dir === "" ? "" : ch.files[j].path, icon: "lock", path: ch.files[j].path })
+    panel.appendFolderRows(r, dir, ch)
     if (ch.dirs.length === 0 && ch.files.length === 0)
       r.push({ kind: "note", label: "Empty folder", sub: "create something above", icon: "info" })
     return r.filter(row => String(row.kind || "") !== "dir" || !panel.isGone(row.dirPath || ""))
@@ -772,7 +766,18 @@ PanelCard {
   }
 
   function joinDir(dir, name) {
-    return dir === "" ? name : dir + "/" + name
+    return SU.joinPath(dir, name)
+  }
+
+  // Folder rows carry the same shape in the browse and move-pick pages, so
+  // the two loops that build them live here instead of twice in vaultRows.
+  function appendFolderRows(rows, dir, ch) {
+    for (let i = 0; i < ch.dirs.length; i++) {
+      const next = panel.joinDir(dir, ch.dirs[i])
+      rows.push({ kind: "dir", label: ch.dirs[i], sub: panel.dirSub(next), icon: "file-folder", name: ch.dirs[i], dirPath: next })
+    }
+    for (let j = 0; j < ch.files.length; j++)
+      rows.push({ kind: "entry", label: ch.files[j].name, sub: ch.files[j].dir === "" ? "" : ch.files[j].path, icon: "lock", path: ch.files[j].path })
   }
 
   // Folder size line for dir rows: recursive entry count, "empty"
