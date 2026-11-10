@@ -644,6 +644,14 @@ function bundleFromPages(rawPages) {
   // and byId["_raw"] all resolved as if they were pages, and Menu looks up
   // bundle.byId[it.page] on every submenu row.
   const byId = Object.create(null)
+  // Two pages declaring one id are a uid-space collision, not a harmless
+  // duplicate: suffix the second the way buildPage suffixes a duplicate item
+  // uid. "~" is safe in uid parsing and in a guard line.
+  function dedupePage(page, i) {
+    if (byId[page.id] === undefined) return page
+    return normalizePage(Object.assign({}, rawPages[i], { id: page.id + "~" + (i + 1) }),
+      i === 0 ? "main" : "page" + i)
+  }
   for (let i = 0; i < rawPages.length; i++) {
     let page = normalizePage(rawPages[i], i === 0 ? "main" : "page" + i)
     // Two pages declaring one id are a uid-space collision, not a harmless
@@ -653,9 +661,7 @@ function bundleFromPages(rawPages) {
     // only name one of the pages - leaving the other unreachable while still
     // indexed. Suffix the second, the way buildPage suffixes a duplicate item
     // uid; "~" is safe in uid parsing and in a guard line.
-    if (byId[page.id] !== undefined)
-      page = normalizePage(Object.assign({}, rawPages[i], { id: page.id + "~" + (i + 1) }),
-        i === 0 ? "main" : "page" + i)
+    page = dedupePage(page, i)
     pages.push(page)
     byId[page.id] = page
   }
