@@ -9,6 +9,7 @@ import qs.services as Core
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/audio/AudioLoopback.js" as Loopback
 import "../../common/theme/DeviceIcons.js" as DeviceIcons
+import "../../common/math/Range.js" as Range
 
 // Audio service: volume and microphone policy for the whole shell.
 // Binds Pipewire's default sink/source through the one PipeWire state owner
@@ -533,7 +534,7 @@ Singleton {
     if (!root.sink || !root.sink.audio) return
     root._cancelFade("adjust")
     // Clamp like bash: beyond the cap snaps to the cap instead of refusing.
-    const next = Math.max(0, Math.min(root.maxVolume, root.sink.audio.volume + delta))
+    const next = Range.clamp(root.sink.audio.volume + delta, 0, root.maxVolume)
     // Any step that leaves the level above zero lifts the mute, whichever way
     // the step went: a decrease from a muted device is as much a request to
     // hear it as an increase is, and it is the rule the sliders already use
@@ -549,7 +550,7 @@ Singleton {
     if (!root.source || !root.source.audio) return
     // Same rule as adjustSink: any step that leaves the level above zero lifts
     // the mute, in either direction.
-    const next = Math.max(0, Math.min(root.maxSourceVolume, root.source.audio.volume + delta))
+    const next = Range.clamp(root.source.audio.volume + delta, 0, root.maxSourceVolume)
     if (root.source.audio.muted && next > 0) root.source.audio.muted = false
     root.source.audio.volume = next
     root._showSourceOSD()

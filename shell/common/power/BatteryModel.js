@@ -2,6 +2,7 @@
 
 .import "../text/Format.js" as Format
 .import "../text/Duration.js" as DurationFmt
+.import "../math/Range.js" as Range
 
 // Pure helpers for the Battery bar module: level thresholds, icon and
 // tone selection, device labels/type glyphs and row projections.
@@ -390,7 +391,7 @@ function resolveLevels(warnPct, criticalPct) {
     if (raw === "") return fallback
     var n = Number(raw)
     if (!isFinite(n)) return fallback
-    return Math.min(100, Math.max(1, Math.round(n)))
+    return Range.clamp(Math.round(n), 1, 100)
   }
   var asked = level(criticalPct, 5)
   var warn = level(warnPct, 20)

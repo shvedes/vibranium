@@ -3,6 +3,7 @@
 .import "../../../../common/text/Format.js" as Format
 .import "../../../../common/text/StringUtils.js" as SU
 .import "../../../../common/collections/DeviceList.js" as DeviceList
+.import "../../../../common/math/Range.js" as Range
 
 // Pure helpers for the Network bar module: signal tiers, metric
 // formatting, throughput deltas and wifi row sorting.
@@ -116,7 +117,7 @@ function subtextFor(row) {
   var r = row || {}
   var sig = Number(r.signal)
   if (!isFinite(sig)) sig = 0
-  sig = Math.max(0, Math.min(100, Math.round(sig)))
+  sig = Range.clamp(Math.round(sig), 0, 100)
   var label = r.securityLabel ? r.securityLabel : "Open"
   var out = sig + "% signal \u00b7 " + label
   if (r.known && !r.connected) out += " \u00b7 saved"
