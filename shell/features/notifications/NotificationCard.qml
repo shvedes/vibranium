@@ -7,6 +7,7 @@ import qs.common
 import qs.features.notifications
 import "NotificationsLib.js" as NotificationsLib
 import "../../common/text/StringUtils.js" as SU
+import "../../common/text/Format.js" as Format
 
 // One notification, as a card. Everything drawn here is read off the entry's
 // plain-value snapshot rather than off the Notification itself, and that is not
@@ -598,7 +599,7 @@ Rectangle {
         id: progressLabel
 
         anchors.verticalCenter: parent.verticalCenter
-        text: Math.round(Math.max(0, root.shot.progress) * 100) + "%"
+        text: Format.percent(Math.max(0, root.shot.progress))
         color: Ui.tint("foreground_1", 0.5)
         font.family: Ui.fontFamily
         font.pixelSize: Ui.fontXs

@@ -6,6 +6,7 @@ import Quickshell.Services.Mpris
 import qs.common
 import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
+import "../../../../common/text/Format.js" as Format
 
 // Now Playing island. Lockscreen flat-box language (square corners,
 // translucent theme fill, 1px keyline): large art left, track lines +
@@ -1476,7 +1477,7 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
                 width: root.percentColumnWidth
                 horizontalAlignment: Text.AlignRight
-                text: Math.round(root.playerVolume * 100) + "%"
+                text: Format.percent(root.playerVolume)
                 color: Ui.tint("foreground_1", 0.55)
                 font.pixelSize: Ui.fontXs
                 font.family: Ui.fontFamily

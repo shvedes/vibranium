@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.services as Core
+import "../../../common/text/Format.js" as Format
 
 // The mixer's volume slider: the bar volume island's `VSlider` idiom - the
 // shared `ProgressBar` track, the 100% unity mark, clicks gliding to the point
@@ -203,7 +204,7 @@ Item {
   // this Qt's Accessible attached object has no value/minimum/maximum members
   // (they are proposed, not implemented), so a bound one would be a property
   // that does not exist rather than a value a screen reader could read.
-  Accessible.description: Math.round(slider.value * 100) + "%"
+  Accessible.description: Format.percent(slider.value)
   Accessible.onIncreaseAction: slider._stepBy(slider.step)
   Accessible.onDecreaseAction: slider._stepBy(-slider.step)
 }

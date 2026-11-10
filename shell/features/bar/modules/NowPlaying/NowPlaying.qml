@@ -8,6 +8,7 @@ import qs.features.bar
 import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/capture/ShotLib.js" as ShotLib
+import "../../../../common/text/Format.js" as Format
 
 // Now Playing bar module (opt-in, off by default). Shows the active
 // MPRIS track title in the bar; left click opens the island, right click
@@ -533,7 +534,7 @@ CollapsibleSlot {
     { icon: "music-track", text: root.title !== "" ? root.title : "--" },
     { icon: "music-artist", text: root.artist !== "" ? root.artist : "--" },
     { icon: "music-album", text: root.album !== "" ? root.album : "--" },
-    { icon: "volume-max", text: root.player ? Math.round((root.player.volume ?? 0) * 100) + "%" : "--" }
+    { icon: "volume-max", text: root.player ? Format.percent(root.player.volume ?? 0) : "--" }
   ]
 
   ToolTipBind {
