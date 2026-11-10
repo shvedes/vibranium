@@ -428,7 +428,7 @@ Singleton {
         // A preset present on the user's shelf wins over the bundled copy;
         // everything else resolves to the bundled file.
         const sourceFolder = root._animCustomNames.indexOf(preset) >= 0 ? customFolder : defaultFolder
-        const src = sourceFolder + "/" + preset + ".lua"
+        const src = SU.joinPath(sourceFolder, preset + ".lua")
         // Pure check: does target exist and is not a symlink?
         animProbe.path = ""
         animProbe.path = targetFile
