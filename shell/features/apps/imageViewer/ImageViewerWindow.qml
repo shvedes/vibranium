@@ -278,9 +278,17 @@ QtObject {
     height: hintText.implicitHeight + 10
     // Centred under the control and clamped to the window, so a hint on the
     // first or last button stays on screen.
-    x: Range.clamp(hint.anchorItem.mapToItem(root.win, 0, 0).x
-                   + Math.round((hint.anchorItem.width - width) / 2),
-                   0, Math.max(0, root.win.width - width))
+    // `x` is parent-relative and the bubble is a child of the control, so the
+    // window clamp is computed in scene coordinates and mapped back to the
+    // anchor. The target is the window's content item: `mapToItem` takes an
+    // Item, and a `Window` is not one.
+    x: {
+      const target = root.win.contentItem
+      const anchorX = hint.anchorItem.mapToItem(target, 0, 0).x
+      const parentX = hint.parent !== null ? hint.parent.mapToItem(target, 0, 0).x : 0
+      const wanted = anchorX + Math.round((hint.anchorItem.width - hint.width) / 2)
+      return Range.clamp(wanted, 0, Math.max(0, root.win.width - hint.width)) - parentX
+    }
     y: hint.anchorItem.height + 6
     radius: RoundingPolicy.radius
     color: Ui.tint("background_0", 0.94)
@@ -504,7 +512,7 @@ QtObject {
       if (u.startsWith("/")) return Paths.toFileUrl(u)
       return u
     }
-    if (u.startsWith("file:")) return root._normalizeFileUrl(u)
+    if (u.startsWith("file:")) return Paths.normalizeFileUrl(u)
     return u
   }
 
@@ -527,7 +535,7 @@ QtObject {
     // Next/Prev walk an empty model and appear dead. Measured on this build
     // against the same directory - `file:///tmp/.../gallery` settles at Ready
     // with 4 rows, the bare path stays Loading with 0.
-    const dir = Paths.toFileUrl(path.substring(0, slash))
+    const dir = Paths.toFileUrl(SU.dirname(path))
     if (root.folderModel.folder === dir)
       root.claimIndex(root.pendingFileName)
     else
