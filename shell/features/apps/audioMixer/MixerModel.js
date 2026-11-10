@@ -1241,6 +1241,51 @@ function parseCardProfiles(input) {
     inProfiles = false
   }
 
+  function newCard(header) {
+    return {
+      index: parseInt(header[1], 10),
+      name: "",
+      driver: "",
+      description: "",
+      active: "",
+      objectId: "",
+      alsa: "",
+      key: "",
+      profiles: []
+    }
+  }
+
+  // A one-tab card field. `Active Profile:` is also the line that CLOSES the
+  // profile block, so the state flags are cleared here.
+  function applyField(body) {
+    const colon = body.indexOf(":")
+    if (colon < 0) return
+    const field = body.substring(0, colon).trim()
+    const value = body.substring(colon + 1).trim()
+    if (field === "Name") card.name = value
+    else if (field === "Driver") card.driver = value
+    else if (field === "Active Profile") {
+      card.active = value
+      inProfiles = false
+      inProps = false
+    }
+  }
+
+  // A `key = "value"` property entry. Only the four fields the picker reads
+  // are copied; the rest of a real card's property tail is ignored.
+  function applyProperty(body) {
+    const eq = body.indexOf("=")
+    if (eq <= 0) return
+    const key = body.substring(0, eq).trim()
+    const value = unquote(body.substring(eq + 1).trim())
+    if (key === "object.id") card.objectId = value
+    else if (key === "alsa.card") card.alsa = value
+    else if (key === "device.description") card.description = value
+    else if (key === "device.nick") {
+      if (card.description === "") card.description = value
+    }
+  }
+
   for (let i = 0; i < lines.length; i++) {
     // No replace for the CRLF case: it scanned and allocated a line that
     // almost never carries a CR. A charCode test costs one comparison.
@@ -1249,17 +1294,7 @@ function parseCardProfiles(input) {
     const header = CARD_HEADER_RE.exec(line)
     if (header !== null) {
       commit()
-      card = {
-        index: parseInt(header[1], 10),
-        name: "",
-        driver: "",
-        description: "",
-        active: "",
-        objectId: "",
-        alsa: "",
-        key: "",
-        profiles: []
-      }
+      card = newCard(header)
       continue
     }
     if (card === null) continue
@@ -1286,17 +1321,7 @@ function parseCardProfiles(input) {
         inProps = false
         continue
       }
-      const colon = body.indexOf(":")
-      if (colon < 0) continue
-      const field = body.substring(0, colon).trim()
-      const value = body.substring(colon + 1).trim()
-      if (field === "Name") card.name = value
-      else if (field === "Driver") card.driver = value
-      else if (field === "Active Profile") {
-        card.active = value
-        inProfiles = false
-        inProps = false
-      }
+      applyField(body)
       continue
     }
     if (inProfiles) {
@@ -1312,19 +1337,7 @@ function parseCardProfiles(input) {
       }
       continue
     }
-    if (inProps && indent >= 2) {
-      const eq = body.indexOf("=")
-      if (eq > 0) {
-        const key = body.substring(0, eq).trim()
-        const value = unquote(body.substring(eq + 1).trim())
-        if (key === "object.id") card.objectId = value
-        else if (key === "alsa.card") card.alsa = value
-        else if (key === "device.description") card.description = value
-        else if (key === "device.nick") {
-          if (card.description === "") card.description = value
-        }
-      }
-    }
+    if (inProps && indent >= 2) applyProperty(body)
   }
   commit()
   indexCards(out)
