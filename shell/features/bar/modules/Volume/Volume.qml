@@ -5,6 +5,7 @@ import qs.services as Core
 import qs.common
 import qs.features.bar
 import "Model.js" as Model
+import "../../../../common/text/Format.js" as Format
 
 // Volume module: single volume icon with the microphone pill folded into
 // the same slot. Right-click toggles the shell's audio mixer over IPC
@@ -136,7 +137,7 @@ BarModule {
       { icon: Model.sinkTooltipIcon(root.sink), text: root.sinkLabel !== "" ? root.sinkLabel : "Output" },
       {
         icon: root.outputMuted ? "volume-off" : "volume-max",
-        text: root.outputMuted ? "Muted" : Math.round(root.outputVolume * 100) + "%",
+        text: root.outputMuted ? "Muted" : Format.percent(root.outputVolume),
         dimTiers: root.outputMuted ? 0 : root.volumeDimTiers,
         accentKey: root.outputMuted ? "red" : ""
       }
@@ -144,7 +145,7 @@ BarModule {
   }
   readonly property var micTipLines: [{
     icon: root.micIconName,
-    text: "Microphone - " + (root.inputMuted ? "Muted" : Math.round(root.inputVolume * 100) + "%"),
+    text: "Microphone - " + (root.inputMuted ? "Muted" : Format.percent(root.inputVolume)),
     accentKey: root.inputMuted ? "red" : ""
   }]
 

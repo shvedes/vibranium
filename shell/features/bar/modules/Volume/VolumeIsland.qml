@@ -8,6 +8,7 @@ import Quickshell.Services.Pipewire
 import qs.services as Core
 import qs.common
 import "Model.js" as Model
+import "../../../../common/text/Format.js" as Format
 
 // Volume island: output and input sliders plus per-application mixers.
 // Mirrors the Network/Bluetooth islands: Card chrome from the shared
@@ -919,7 +920,7 @@ Item {
           level: 4
           width: root.pctW
           horizontalAlignment: Text.AlignRight
-          text: root.outputMuted ? "Muted" : Math.round(root.outputVolume * 100) + "%"
+          text: root.outputMuted ? "Muted" : Format.percent(root.outputVolume)
           color: root.devicePctColor(root.outputVolume, root.outputMuted)
           font.bold: true
         }
@@ -1017,7 +1018,7 @@ Item {
           level: 4
           width: root.pctW
           horizontalAlignment: Text.AlignRight
-          text: root.inputMuted ? "Muted" : Math.round(root.inputVolume * 100) + "%"
+          text: root.inputMuted ? "Muted" : Format.percent(root.inputVolume)
           color: root.devicePctColor(root.inputVolume, root.inputMuted)
           font.bold: true
         }
@@ -1303,7 +1304,7 @@ Item {
           Title {
             id: pctText
             level: 4
-            text: row.muted ? "Muted" : Math.round(row.vol * 100) + "%"
+            text: row.muted ? "Muted" : Format.percent(row.vol)
             color: root.streamPctColor(row.vol, row.muted)
             font.bold: true
             anchors.verticalCenter: parent.verticalCenter

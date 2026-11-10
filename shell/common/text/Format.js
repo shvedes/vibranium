@@ -21,6 +21,17 @@ function trim1(n) {
   return s.endsWith(".0") ? s.substring(0, s.length - 2) : s
 }
 
+// A normalized level [0, 1] as the whole-percent label the readouts print
+// ("42%"). Rounds once, so the digits and any threshold color comparing to
+// the same rounded value cannot disagree. Non-numeric input reads as 0%.
+// Canonical home of the Math.round(volume * 100) + "%" readout repeated by
+// the volume module, its island and the now-playing surfaces.
+function percent(ratio) {
+  var n = Number(ratio)
+  if (!isFinite(n)) n = 0
+  return Math.round(n * 100) + "%"
+}
+
 // Byte counters -> "12 B" / "1.5 KB" / "2.0 MB" / "3.25 GB".
 // Canonical home of Network formatBytes. Floors hostile input at 0 so a
 // missing counter reads as empty rather than NaN.
