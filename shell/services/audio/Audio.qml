@@ -529,17 +529,6 @@ Singleton {
 
   // --- actions ---
 
-  function setSinkVolume(v) {
-    if (!root.sink || !root.sink.audio) return
-    root._cancelFade("set-volume")
-    root.sink.audio.volume = Math.max(0, Math.min(root.maxVolume, v))
-  }
-
-  function setSourceVolume(v) {
-    if (!root.source || !root.source.audio) return
-    root.source.audio.volume = Math.max(0, Math.min(root.maxSourceVolume, v))
-  }
-
   function adjustSink(delta) {
     if (!root.sink || !root.sink.audio) return
     root._cancelFade("adjust")
