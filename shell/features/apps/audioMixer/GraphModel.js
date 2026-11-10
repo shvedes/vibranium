@@ -962,18 +962,21 @@ function layerPlan(nodes, groups) {
       if (pending[next] === 0) queue.push(next)
     }
   }
-  const rest = []
-  for (const key of keys) {
-    if (seen[key] !== true) rest.push(key)
-  }
-  rest.sort(compareKeys)
-  for (const key of rest) {
-    let deepest = 0
-    for (const from of listOut(ins, key)) {
-      if (depth[from] + 1 > deepest) deepest = depth[from] + 1
+  function layerRest() {
+    const rest = []
+    for (const key of keys) {
+      if (seen[key] !== true) rest.push(key)
     }
-    depth[key] = deepest
+    rest.sort(compareKeys)
+    for (const key of rest) {
+      let deepest = 0
+      for (const from of listOut(ins, key)) {
+        if (depth[from] + 1 > deepest) deepest = depth[from] + 1
+      }
+      depth[key] = deepest
+    }
   }
+  layerRest()
 
   // The columns, and the two side columns the unlinked cards go on rather than
   // into the band: the one LEFT of the band for a card that is a source by kind
