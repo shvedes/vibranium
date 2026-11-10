@@ -2,8 +2,9 @@
 //
 // The menu sizes its card from the model, before a single delegate exists, and
 // the delegate lays the same row out for real. Those two halves agree because
-// the line box is PINNED (`lineHeightMode: Text.FixedHeight` on
-// `ceil(FontMetrics.height)`) rather than measured per string.
+// the line box is PINNED to a token (`ceil(FontMetrics.height)`) rather than
+// measured per string. Two pairs exist - the primary face's and a taller
+// fallback pair - and a row selects one from the script its copy draws.
 //
 // This probe answers the two questions that decides, with numbers:
 //
@@ -247,11 +248,11 @@ Item {
     mSub.font.pixelSize = subPx
     tmLabel.font.pixelSize = labelPx
     tmSub.font.pixelSize = subPx
+    const primaryLabelLineH = Math.ceil(mLabel.height)
+    const primarySubLineH = Math.ceil(mSub.height)
     const labelLineH = Math.ceil(Math.max(mLabel.height, tmLabel.height))
     const subLineH = Math.ceil(Math.max(mSub.height, tmSub.height))
-    const g = {
-      labelLineH: labelLineH,
-      subLineH: subLineH,
+    const common = {
       swatchH: RowRule.SWATCH_H,
       sepPadV: RowRule.SEP_PAD_V,
       bareSepH: RowRule.BARE_SEP_H,
@@ -259,26 +260,42 @@ Item {
       rowPadV: Math.max(0, Math.round(Ui.rowPadV * scale)),
       scale: scale
     }
+    const gPrimary = Object.assign({ labelLineH: primaryLabelLineH,
+      subLineH: primarySubLineH }, common)
+    const g = Object.assign({ labelLineH: labelLineH, subLineH: subLineH }, common)
     kv(pre + "scale", scale)
     kv(pre + "labelPx", labelPx)
     kv(pre + "subPx", subPx)
     kv(pre + "labelLineH", labelLineH)
     kv(pre + "subLineH", subLineH)
+    kv(pre + "primaryLabelLineH", primaryLabelLineH)
+    kv(pre + "primarySubLineH", primarySubLineH)
     kv(pre + "rowMinH", g.rowMinH)
     kv(pre + "rowPadV", g.rowPadV)
-    // The rule itself, asked the way the singleton asks it.
+    // The rule itself, asked the way the singleton asks it. The fallback pair
+    // is the tall script token; the primary pair is what a Latin-only row
+    // selects, and it is what keeps an ordinary row from taking the page's
+    // tallest line.
     kv(pre + "restLine", RowRule.restH("line", g))
     kv(pre + "restSub", RowRule.restH("sub", g))
     kv(pre + "restTheme", RowRule.restH("theme", g))
     kv(pre + "restSep", RowRule.restSeparator(true, g))
     kv(pre + "restSepBare", RowRule.restSeparator(false, g))
     kv(pre + "colLine", RowRule.colH("line", g))
+    kv(pre + "primaryRestLine", RowRule.restH("line", gPrimary))
+    kv(pre + "primaryRestSub", RowRule.restH("sub", gPrimary))
+    kv(pre + "primaryRestTheme", RowRule.restH("theme", gPrimary))
+    kv(pre + "primaryRestSep", RowRule.restSeparator(true, gPrimary))
     kv(pre + "expectLine", Math.max(g.rowMinH, g.labelLineH + 2 * g.rowPadV))
     kv(pre + "expectSub", Math.max(g.rowMinH,
       g.labelLineH + 1 + g.subLineH + 2 * g.rowPadV))
     kv(pre + "expectTheme", Math.max(g.rowMinH,
       g.labelLineH + 1 + g.swatchH + 2 * g.rowPadV))
     kv(pre + "expectSep", g.subLineH + 2 * g.sepPadV)
+    kv(pre + "expectPrimaryLine", Math.max(gPrimary.rowMinH,
+      gPrimary.labelLineH + 2 * gPrimary.rowPadV))
+    kv(pre + "expectPrimarySub", Math.max(gPrimary.rowMinH,
+      gPrimary.labelLineH + 1 + gPrimary.subLineH + 2 * gPrimary.rowPadV))
 
     natLabel.font.pixelSize = labelPx
     natSub.font.pixelSize = subPx
@@ -406,6 +423,15 @@ Item {
     }
     kv("sample.strings", sample.length)
     kv("sample.cap", root.fixture.length + root.sampleCap)
+
+    // Script classification: which rows may reach a fallback face. A row that
+    // does not must not pay the fallback line's height.
+    kv("script.latin", RowRule.needsFallbackLine("App launcher") ? 1 : 0)
+    kv("script.mgcjk", RowRule.needsFallbackLine("Mg \u65e5\u672c\u8a9e") ? 1 : 0)
+    kv("script.arabic", RowRule.needsFallbackLine("\u0645\u0631\u062d\u0628\u0627") ? 1 : 0)
+    kv("script.hindi", RowRule.needsFallbackLine("\u0939\u093f\u0928\u094d\u0926\u0940") ? 1 : 0)
+    kv("script.emoji", RowRule.needsFallbackLine("\ud83c\udfa8 Emoji") ? 1 : 0)
+    kv("script.accents", RowRule.needsFallbackLine("caf\u00e9 \u00c5\u00c4\u00d6") ? 1 : 0)
 
     for (let s = 0; s < root.scales.length; s++) root.auditScale(s, sample)
   }

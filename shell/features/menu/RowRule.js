@@ -54,3 +54,28 @@ function restH(kind, g) {
 function restSeparator(hasLabel, g) {
   return hasLabel ? g.subLineH + 2 * g.sepPadV : g.bareSepH
 }
+
+// Whether the engine may shape `text` with a fallback face whose line box is
+// taller than the UI face's. This is a script test, not a per-string
+// measurement: punctuation, arrows, symbols and the Latin/Greek/Cyrillic
+// blocks the UI face covers stay on the primary line, so a bullet or a
+// decorated label does not grow its row. Arabic, Hebrew, Indic, CJK, Hangul
+// and supplementary-plane glyphs do reach for a fallback face, and are the
+// scripts whose line box can exceed the primary one.
+function needsFallbackLine(text) {
+  const s = String(text === undefined || text === null ? "" : text)
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i)
+    if (c < 0x0530) continue
+    // Supplementary-plane codepoints (emoji, historic scripts) arrive as
+    // surrogate pairs.
+    if (c >= 0xD800 && c <= 0xDFFF) return true
+    // General punctuation, arrows, math, box drawing and symbols are drawn
+    // from a symbol face, not a script face.
+    if (c >= 0x2000 && c <= 0x2BFF) continue
+    // Variation selectors and combining half marks add no line.
+    if (c >= 0xFE00 && c <= 0xFE2F) continue
+    return true
+  }
+  return false
+}

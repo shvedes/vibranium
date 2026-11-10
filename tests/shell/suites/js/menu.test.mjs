@@ -4011,6 +4011,24 @@ group('the shipped tokens at 1.0 give the shipped heights', () => {
   eq('the column of a bare line is the title line', R.colH('line', g), 17)
 })
 
+group('needsFallbackLine classifies the script, not the string', () => {
+  // The test is a codepoint range walk, not a measurement: it decides which
+  // rows may take the tall token, so the two mistakes are a Latin string
+  // taking it (the page grows again) and a fallback script not taking it
+  // (the line clips).
+  eq('Latin stays on the primary face', R.needsFallbackLine('App launcher'), false)
+  eq('accented Latin too', R.needsFallbackLine('café ÅÄÖ'), false)
+  eq('punctuation and arrows are not a script', R.needsFallbackLine('a > b →'), false)
+  eq('a combining mark adds no face', R.needsFallbackLine('cafe\u0301'), false)
+  eq('Arabic reaches a fallback face', R.needsFallbackLine('مرحبا'), true)
+  eq('Hebrew reaches one', R.needsFallbackLine('עברית'), true)
+  eq('Devanagari reaches one', R.needsFallbackLine('हिन्दी'), true)
+  eq('CJK reaches one', R.needsFallbackLine('日本語'), true)
+  eq('an emoji surrogate pair reaches one', R.needsFallbackLine('🎨'), true)
+  eq('empty copy does not', R.needsFallbackLine(''), false)
+  eq('nor missing copy', R.needsFallbackLine(undefined), false)
+})
+
 group('the same rows hold at 1.0, 1.25, 1.5 and 2.0', () => {
   const rows = catalogRows()
   // A line box scales with its font; these are the two registered sizes the

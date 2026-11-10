@@ -318,12 +318,22 @@ Item {
   // The group path a search separator names, "" for a bare hairline.
   // Plain breadcrumb text ("a > b"), rendered in the sub-line register.
   readonly property string sepLabel: row.isSep ? String(itm?.label ?? "") : ""
+  // Per-row line registers. Copy the primary face covers rests on the
+  // compact token; copy that reaches a fallback face takes the taller one.
+  // The panel's model-side estimate uses the same rule, so the card and the
+  // delegate agree about the row's height.
+  readonly property real labelLineH: row.isSep ? 0 : RowGeometry.labelHFor(row.displayLabel)
+  readonly property real subLineH: row.isSep
+    ? RowGeometry.subHFor(row.sepLabel)
+    : RowGeometry.subHFor(RowGeometry.subSampleFor(itm, row.subText))
+  readonly property real staticRowH: row.isSep ? 0
+    : RowGeometry.restHFor(row.restKind, row.labelLineH, row.subLineH)
   // The separator's rest height, from the shared row rule (RowGeometry): the
   // breadcrumb's pinned line plus its breathing, or the bare hairline. A
   // newborn delegate reports this before its own Text polishes because the
   // number is the shared line token rather than this row's laid-out text.
   readonly property real sepH: !row.isSep ? 0
-    : RowGeometry.restSeparator(row.sepLabel !== "")
+    : RowGeometry.restSeparatorFor(row.sepLabel !== "", row.subLineH)
   readonly property string iconName: itm ? String(itm.icon ?? "") : ""
   // The emoji the row stands for, painted in the icon slot when the row
   // declares no icon NAME. Carried by the emoji picker's bundle as `glyph`
@@ -438,8 +448,7 @@ Item {
   width: ListView.view ? ListView.view.width : 240
   // Progress bars and range tracks live INLINE in the trail cluster, so
   // every row keeps the same height as its neighbors.
-  height: isSep ? sepH
-    : RowGeometry.restH(row.restKind) + descSlot.height + expandSlot.height
+  height: isSep ? sepH : row.staticRowH + descSlot.height + expandSlot.height
   // Guard-disabled rows fade (they stay reachable); an unavailable row keeps
   // its contrast and is muted by its mute box instead, so the two hints stay
   // distinguishable.
@@ -545,7 +554,7 @@ Item {
   // so a dropdown on the last row is scrolled into view in ONE ease that
   // runs alongside the slot's own, instead of being chased frame by frame
   // - chasing it decelerates to a stop at each handover and lurches on.
-  readonly property real restHeight: isSep ? sepH : RowGeometry.restH(row.restKind)
+  readonly property real restHeight: isSep ? sepH : row.staticRowH
   readonly property real settledHeight: isSep ? sepH
     : restHeight + descSlot.settledH + expandSlot.settledH
 
@@ -1065,6 +1074,8 @@ Item {
       anchors.leftMargin: Ui.s / 2
       anchors.verticalCenter: parent.verticalCenter
       width: Math.min(implicitWidth, row.width - 2 * (Ui.m + 2) - Ui.s)
+      height: row.subLineH
+      verticalAlignment: Text.AlignVCenter
       text: row.sepLabel
       // Entry-title tone, bold: the group header reads as a title row
       // rather than a second text tone beside the rows.
@@ -1072,10 +1083,6 @@ Item {
       font.pixelSize: Ui.fontXs
       font.family: Ui.fontFamily
       font.bold: true
-      // The breadcrumb's line is the sub-line token too: the weight changes
-      // the face's width, not the line it is set on.
-      lineHeightMode: Text.FixedHeight
-      lineHeight: RowGeometry.subLineH
       elide: Text.ElideRight
       textFormat: Text.PlainText
     }
@@ -1124,7 +1131,7 @@ Item {
     // creation; the Column below remains THE layout - it settles to this same
     // number a frame later, and the panel's model-side estimate is the same
     // rule asked about the row record.
-      readonly property int labelColH: RowGeometry.colH(row.restKind)
+      readonly property int labelColH: RowGeometry.colHFor(row.restKind, row.labelLineH, row.subLineH)
 
     height: labelColH
 
@@ -1204,14 +1211,17 @@ Item {
           // right, so nothing on this line shares it. Capped at the Column's
           // width so a long name elides instead of running into the trail.
           width: Math.min(implicitWidth, parent.width)
+          // The row reserves this line from RowGeometry, so its height cannot
+          // be a function of this label's glyphs. The item takes the token as
+          // its height and centres the line inside it: lineHeightMode would
+          // make the token the line box itself, leaving a short line at the
+          // top of a fallback-sized box while the icon centres beside it.
+          height: row.labelLineH
+          verticalAlignment: Text.AlignVCenter
           text: row.displayLabel
           color: (row.isThemeRow && row.mark) ? Theme.color("accent") : Theme.color("foreground_0")
           font.pixelSize: Ui.fontL
            font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
-           // Pinned line box: the row reserved this line, so the row's height
-           // cannot be a function of this label's glyphs (see RowGeometry).
-           lineHeightMode: Text.FixedHeight
-           lineHeight: RowGeometry.labelLineH
            elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
            clip: row.textReveal < 1
            opacity: row.textReveal
@@ -1249,7 +1259,7 @@ Item {
           // onto rows that have no subtext at all. A `Text`'s own height can
           // no longer answer it either: every line here is pinned, so the copy
           // itself is the only honest gate.
-          height: row.hasSubLine ? RowGeometry.subLineH : 0
+          height: row.hasSubLine ? row.subLineH : 0
 
           Text {
             id: subLeadEl
@@ -1263,8 +1273,6 @@ Item {
             color: Ui.solid("accent")
             font.pixelSize: Ui.fontXs
             font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
-            lineHeightMode: Text.FixedHeight
-            lineHeight: RowGeometry.subLineH
             elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
             clip: row.textReveal < 1
             opacity: row.textReveal
@@ -1273,6 +1281,10 @@ Item {
 
           Text {
             id: subMain
+            // The Row pins the sub-line height; the copy keeps its natural
+            // line height and centres inside it, so a short Latin line does
+            // not sit at the top of a fallback-sized box.
+            anchors.verticalCenter: parent.verticalCenter
             // Content width (capped), never fill width: neighbors must ride
             // the text's edge, not the row's. Capped at half width like the
             // trail so a long command (lead) always leaves the faint copy
@@ -1303,8 +1315,6 @@ Item {
             color: Ui.tint("foreground_1", 0.55)
             font.pixelSize: Ui.fontXs
             font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
-            lineHeightMode: Text.FixedHeight
-            lineHeight: RowGeometry.subLineH
             elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
             clip: row.textReveal < 1
             opacity: row.textReveal
@@ -1319,8 +1329,6 @@ Item {
             color: Ui.solid("accent")
             font.pixelSize: Ui.fontXs
             font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
-            lineHeightMode: Text.FixedHeight
-            lineHeight: RowGeometry.subLineH
             elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
             clip: row.textReveal < 1
             opacity: row.textReveal

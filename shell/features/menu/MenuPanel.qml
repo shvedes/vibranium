@@ -2143,9 +2143,9 @@ Rectangle {
   readonly property real screenMaxListH: Math.max(availListH,
     hardMaxHeight - panel.regionChromeH)
 
-  // What the layout needs to know about a row's provider, resolved ONCE per
-  // install (see projectRows): the sub line it will draw, the rest kind that
-  // follows from it, and the widest display a value slot can be asked to hold.
+  // What the layout needs to know about a row, resolved ONCE per install (see
+  // projectRows): the sub line it will draw, the widest display a value slot
+  // can be asked to hold, and the rest height its own line registers produce.
   //
   // WHY A SIDE MAP AND NOT KEYS ON THE ROW. The rows are Menu's own records,
   // and a layout fact is not a property of a bundle; stamping it onto the
@@ -2164,17 +2164,37 @@ Rectangle {
     const facts = {}
     for (let i = 0; i < rows.length; i++) {
       const it = rows[i]
-      if (!it || it.type === "separator" || it.uid === undefined || it.uid === null) continue
-      // One provider resolution for both facts (see Menu.rowFactsFor): the
-      // install runs per keystroke over the whole projection.
-      const f = Menu.rowFactsFor(it)
-      facts[String(it.uid)] = {
-        sub: f.sub,
-        kind: MenuLib.restKind(it, f.sub),
-        widest: f.widest
-      }
+      if (!it || it.uid === undefined || it.uid === null) continue
+      facts[String(it.uid)] = panel._factsFor(it)
     }
     panel._rowFacts = facts
+  }
+
+  // One row's layout facts, resolved once per install. The line registers are
+  // the row's own: a Latin-only row takes RowGeometry's primary tokens while
+  // a row that reaches a fallback face takes its taller pair, so one Arabic
+  // label does not inflate every row on the page.
+  function _factsFor(it) {
+    if (it.type === "separator") {
+      const lbl = String(it.label ?? "")
+      const lineH = RowGeometry.subHFor(lbl)
+      return {
+        sub: "",
+        widest: "",
+        restH: RowGeometry.restSeparatorFor(lbl !== "", lineH)
+      }
+    }
+    // One provider resolution for both facts (see Menu.rowFactsFor): the
+    // install runs per keystroke over the whole projection.
+    const f = Menu.rowFactsFor(it)
+    const kind = MenuLib.restKind(it, f.sub)
+    const labelH = RowGeometry.labelHFor(String(it.label ?? ""))
+    const subH = RowGeometry.subHFor(RowGeometry.subSampleFor(it, f.sub))
+    return {
+      sub: f.sub,
+      widest: f.widest,
+      restH: RowGeometry.restHFor(kind, labelH, subH)
+    }
   }
 
   // The projection for one row, with a cold fallback for a row no install has
@@ -2182,15 +2202,13 @@ Rectangle {
   // fallback is the only path here that asks a provider, and it is not on the
   // install path.
   function rowFacts(itm) {
-    if (!itm) return { sub: "", kind: "line", widest: "" }
+    if (!itm) return {
+      sub: "", widest: "",
+      restH: RowGeometry.primaryRestH("line")
+    }
     const hit = panel._rowFacts[String(itm.uid)]
     if (hit !== undefined) return hit
-    const f = Menu.rowFactsFor(itm)
-    return {
-      sub: f.sub,
-      kind: MenuLib.restKind(itm, f.sub),
-      widest: f.widest
-    }
+    return panel._factsFor(itm)
   }
 
   // The card's WIDTH rule (see MenuWidth): the page's rows measured through
@@ -2224,14 +2242,11 @@ Rectangle {
   // on every tick and opened pages half-cut.
   function rowRestHeight(itm) {
     if (!itm) return Ui.rowMinH
-    // Group separators carry the breadcrumb as their label; the delegate
-    // (Entry sepH) reads the same rule, so the two stay one number.
-    if (itm.type === "separator")
-      return RowGeometry.restSeparator(String(itm.label ?? "") !== "")
-    // The kind was decided once, when this row set was installed: the estimate
-    // reads the projection and never re-classifies (or asks a provider) behind
-    // a binding.
-    return RowGeometry.restH(panel.rowFacts(itm).kind)
+    // The height was projected once, when this row set was installed: the
+    // estimate reads the projection and never re-classifies (or asks a
+    // provider) behind a binding. A separator is projected too, so its
+    // breadcrumb and the delegate's sepH stay one number.
+    return panel.rowFacts(itm).restH
   }
 
   // Largest prefix of the MODEL's row heights that fits avail with no

@@ -7,10 +7,11 @@
 # measurement of the row's own strings - hidden probe Texts, cached per label
 # and per sub line - so they agreed only while both shaped the same text.
 #
-# The rule is `features/menu/RowRule.js`: a pinned line box
-# (`ceil(FontMetrics.height)`, `lineHeightMode: Text.FixedHeight`) turns a rest
-# height into arithmetic over a token set, and `RowGeometry` is the singleton
-# that supplies the tokens. This suite is both halves of the claim:
+# The rule is `features/menu/RowRule.js`: pinned line boxes
+# (`ceil(FontMetrics.height)`) turn a rest height into arithmetic over a token
+# set, and `RowGeometry` is the singleton that supplies the tokens - the
+# compact primary pair and the taller fallback pair, selected per row by the
+# script its copy draws. This suite is both halves of the claim:
 #
 #   * MEASURED, in the real engine, over every row of the shipped settings
 #     catalog plus a fallback-face fixture, at 1.0, 1.25, 1.5 and 2.0: the pin
@@ -94,6 +95,31 @@ for i in 0 1 2 3; do
     "$(qp_get "${p}pinSubMin")" "$(qp_get "${p}pinSubMax")"
   t_eq "and it is the shipped sub token" \
     "$(qp_get "${p}subLineH")" "$(qp_get "${p}pinSubMin")"
+done
+
+# ---------------------------------------------------------------------
+t_section "a row takes the register its own script needs"
+
+# The token is selected per row from a script test, not measured per string.
+# A Latin-only row must stay on the primary face: if one Arabic title pushed
+# every row onto the fallback token, the page would be uniformly tall again.
+t_eq "a Latin-only label stays on the primary face" "0" "$(qp_get script.latin)"
+t_eq "accented Latin stays on it too" "0" "$(qp_get script.accents)"
+t_eq "a CJK label reaches a fallback face" "1" "$(qp_get script.mgcjk)"
+t_eq "Arabic reaches one" "1" "$(qp_get script.arabic)"
+t_eq "Devanagari reaches one" "1" "$(qp_get script.hindi)"
+t_eq "emoji reach one" "1" "$(qp_get script.emoji)"
+
+for i in 0 1 2 3; do
+  p="s.$i."
+  t_true "scale $i: the primary title line is no taller than the fallback token" \
+    test "$(qp_get "${p}primaryLabelLineH")" -le "$(qp_get "${p}labelLineH")"
+  t_true "scale $i: nor the primary sub line" \
+    test "$(qp_get "${p}primarySubLineH")" -le "$(qp_get "${p}subLineH")"
+  t_eq "scale $i: a Latin-only one-line row is the primary line arithmetic" \
+    "$(qp_get "${p}expectPrimaryLine")" "$(qp_get "${p}primaryRestLine")"
+  t_eq "scale $i: a Latin-only two-line row is the primary line arithmetic" \
+    "$(qp_get "${p}expectPrimarySub")" "$(qp_get "${p}primaryRestSub")"
 done
 
 # The control: without the pin the same strings take several heights. Only
@@ -186,16 +212,34 @@ t_contains "its line tokens are the font metrics, ceiled over the fallback chain
 t_contains "and it is a module singleton, one instance per process" \
   "singleton RowGeometry 1.0 RowGeometry.qml" "$(<"$MENU_DIR/qmldir")"
 
-t_contains "the delegate takes its rest height from the singleton" \
-  "RowGeometry.restH(row.restKind)" "$ENTRY_SRC"
+t_contains "the delegate takes its rest height from the singleton, per row" \
+  "RowGeometry.restHFor(row.restKind, row.labelLineH, row.subLineH)" "$ENTRY_SRC"
 t_contains "and its text column from the same rule" \
-  "RowGeometry.colH(row.restKind)" "$ENTRY_SRC"
+  "RowGeometry.colHFor(row.restKind, row.labelLineH, row.subLineH)" "$ENTRY_SRC"
 t_contains "and its separator from the same rule" \
-  "RowGeometry.restSeparator(row.sepLabel !== \"\")" "$ENTRY_SRC"
-t_contains "the panel's model-side estimate takes the same rule" \
-  "RowGeometry.restH(panel.rowFacts(itm).kind)" "$MENU_SRC"
+  "RowGeometry.restSeparatorFor(row.sepLabel !== \"\", row.subLineH)" "$ENTRY_SRC"
+t_contains "the panel's model-side estimate reads the projected height" \
+  "panel.rowFacts(itm).restH" "$MENU_SRC"
+t_contains "which the same rule projected at install" \
+  "RowGeometry.restHFor(kind, labelH, subH)" "$MENU_SRC"
 t_contains "and the same separator answer" \
-  "RowGeometry.restSeparator(String(itm.label" "$MENU_SRC"
+  "RowGeometry.restSeparatorFor(lbl !== \"\", lineH)" "$MENU_SRC"
+
+# A row's line tokens are selected from its OWN copy: a Latin-only row rests
+# on the primary face, and only a row that reaches a fallback face takes the
+# taller token. Without this the tallest script on the page sizes every row.
+t_contains "the rule classifies a string by the script it draws" \
+  "function needsFallbackLine(text)" "$RULE_SRC"
+t_contains "and the singleton selects the register per row" \
+  "function labelHFor(text)" "$GEO_SRC"
+t_contains "the delegate asks for its own label register" \
+  "RowGeometry.labelHFor(row.displayLabel)" "$ENTRY_SRC"
+t_contains "and its own sub register" \
+  "RowGeometry.subHFor(RowGeometry.subSampleFor(itm, row.subText))" "$ENTRY_SRC"
+t_contains "the panel projects the same two registers" \
+  "RowGeometry.labelHFor(String(it.label" "$MENU_SRC"
+t_contains "a chrome row (the inline editor) rests on the primary register" \
+  "RowGeometry.primaryRestH(\"line\")" "$(<"$MENU_DIR/InlineEditor.qml")"
 
 # One instance means nobody instantiates one. An Item here would be a second
 # pair of FontMetrics per delegate, which is what the singleton removed.
@@ -211,7 +255,7 @@ t_eq "and only the two readers name it" "3" \
 t_contains "the delegate classifies from the copy it renders" \
   "MenuLib.restKind(itm, row.subText)" "$ENTRY_SRC"
 t_contains "and the panel from the projection it installed" \
-  "kind: MenuLib.restKind(it, f.sub)" "$MENU_SRC"
+  "const kind = MenuLib.restKind(it, f.sub)" "$MENU_SRC"
 
 # ---------------------------------------------------------------------
 t_section "and the per-string height machinery is gone"

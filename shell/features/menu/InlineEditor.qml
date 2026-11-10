@@ -42,7 +42,7 @@ Item {
 
   // Both editors sit at the height of a one-line menu row, so the field
   // reads as the same surface as the entry it opened under.
-  implicitHeight: Math.max(RowGeometry.restH("line"), okButton.height)
+  implicitHeight: Math.max(RowGeometry.primaryRestH("line"), okButton.height)
 
   function takeFocus() {
     if (root.isText) {
@@ -63,7 +63,7 @@ Item {
     anchors.leftMargin: Ui.m
     anchors.rightMargin: Ui.s
     anchors.verticalCenter: parent.verticalCenter
-    height: RowGeometry.restH("line")
+    height: RowGeometry.primaryRestH("line")
     placeholder: root.placeholder
 
     Component.onCompleted: {
@@ -83,7 +83,7 @@ Item {
     anchors.leftMargin: Ui.m
     anchors.rightMargin: Ui.s
     anchors.verticalCenter: parent.verticalCenter
-    height: RowGeometry.restH("line")
+    height: RowGeometry.primaryRestH("line")
     value: root.numericValue
     decimals: root.decimals
     minimum: root.minimum
