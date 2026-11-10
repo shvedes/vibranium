@@ -108,17 +108,6 @@ function count(store) {
   return entries === null ? 0 : Object.keys(entries).length
 }
 
-function validKey(key) {
-  return _key(key)
-}
-
-// A footprint dimension must be a finite positive number. Zero, negative
-// and non-finite sizes are refused by save() so a collapsed measurement
-// can never be frozen into the map.
-function validDimension(value) {
-  return _dimension(value)
-}
-
 function has(store, key) {
   return _entry(store, key) !== null
 }
