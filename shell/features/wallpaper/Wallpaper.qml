@@ -1036,9 +1036,7 @@ Singleton {
     let base = SU.basename(url.split("?")[0].split("#")[0])
     try { base = decodeURIComponent(base) } catch (e) {}
     if (base !== "") base = root._sanitizeBase(base)
-    let ext = ""
-    const dot = base.lastIndexOf(".")
-    if (dot >= 0) ext = base.slice(dot + 1).toLowerCase()
+    let ext = SU.extname(base)
     const named = root._imageExts[ext] === true
     // The recorded basename is stable per URL: the same drop twice lands on
     // the same file and overwrites it instead of minting a new timestamped
@@ -1051,8 +1049,7 @@ Singleton {
       base = "dropped-" + Date.now() + "." + ext
     } else {
       if (base.length > 120) base = base.slice(0, 120)
-      const cut = base.lastIndexOf(".")
-      const stem = cut >= 0 ? base.slice(0, cut) : base
+      const stem = SU.stem(base)
       const stemCut = stem.length > 80 ? stem.slice(0, 80) : stem
       finalBase = stemCut + "-" + root._hash8(url) + "." + ext
       if (finalBase.length > 120) finalBase = finalBase.slice(0, 120)
