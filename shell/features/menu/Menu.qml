@@ -10,6 +10,7 @@ import Quickshell.Io
 import qs.common
 import "MenuLib.js" as MenuLib
 import "../../common/text/StringUtils.js" as SU
+import "../../common/math/Range.js" as Range
 import "../../common/text/UnitIpc.js" as UnitIpc
 
 // Menu service: owns loaded bundles, the page stack, search state and the
@@ -2184,7 +2185,7 @@ Singleton {
     function debugMove(dir: int): string {
       const list = root._debugList()
       if (!list || list.count === undefined) return "no probeSource"
-      const next = Math.max(0, Math.min(list.count - 1, list.currentIndex + dir))
+      const next = list.count > 0 ? Range.clamp(list.currentIndex + dir, 0, list.count - 1) : 0
       list.currentIndex = next
       return "moved to " + next
     }
@@ -2195,7 +2196,7 @@ Singleton {
       if (!row || row.optionIndex === undefined) return "no option row"
       const opts = row.optionCount !== undefined ? row.optionCount : -1
       let next = row.optionIndex + dir
-      if (opts >= 0) next = Math.max(0, Math.min(opts - 1, next))
+      if (opts >= 0) next = opts > 0 ? Range.clamp(next, 0, opts - 1) : 0
       row.optionIndex = next
       return "option " + next
     }
