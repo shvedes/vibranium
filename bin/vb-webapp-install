@@ -531,7 +531,7 @@ if [[ $INT_MODE == true ]]; then
 
   term::enable_input
   while true; do
-    if ! term::prompt_line APP_URL "${Y}[*]${RS} PWA URL: ${B}"; then
+    if ! term::prompt_line APP_URL "${Y}[*]${RS} PWA URL: ${RS}"; then
       webapp_install_canceled
       exit 1
     fi
@@ -671,7 +671,7 @@ if [[ $INT_MODE == true ]]; then
   fi
 
   term::enable_input
-  term::prompt_line EXTRA_KW_RAW "${B}[*]${RS} Additional keywords (space-separated, or Enter to skip): $B" || EXTRA_KW_RAW=""
+  term::prompt_line EXTRA_KW_RAW "${B}[*]${RS} Additional keywords (space-separated, or Enter to skip): $RS" || EXTRA_KW_RAW=""
   term::disable_input
 
   EXTRA_KW=""
