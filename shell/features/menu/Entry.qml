@@ -5,6 +5,7 @@ import QtQuick
 import qs.common
 import qs.features.menu
 import "MenuLib.js" as MenuLib
+import "../../common/math/Range.js" as Range
 
 // Single ListView delegate covering every row type. One flat declarative
 // tree: types are mutually exclusive, so per-type blocks bind `visible`.
@@ -144,7 +145,7 @@ Item {
       }
       row.optionIndex = MenuLib.optionSeedIndex(optList, seed)
     } else {
-      row.optionIndex = Math.max(0, Math.min(row.optionIndex, optList.length - 1))
+      row.optionIndex = optList.length > 0 ? Range.clamp(row.optionIndex, 0, optList.length - 1) : 0
     }
   }
   Component.onCompleted: {
@@ -472,7 +473,7 @@ Item {
   // Rests at 1 whatever the card is doing, so a card that is too narrow for
   // a row at rest elides exactly as before: this is the glide, not the fit.
   readonly property real textReveal: cardSettling && labelNeeded > 0
-    ? Math.max(0, Math.min(1, labelCol.width / labelNeeded)) : 1
+    ? Range.clamp01(labelCol.width / labelNeeded) : 1
   readonly property real descSlotH: descSlot.height
   // How long this row's slots take, for anything that has to move in step with
   // them - the card's own resize, chiefly (MenuPanel's slot region).
@@ -1391,7 +1392,7 @@ Item {
         property bool dirty: false
 
         function seek(x) {
-          const frac = Math.min(1, Math.max(0, x / Math.max(1, width)))
+          const frac = Range.clamp01(x / Math.max(1, width))
           const raw = row.minimum + frac * (row.maximum - row.minimum)
           const snapped = row.minimum
             + Math.round((raw - row.minimum) / row.stepSize) * row.stepSize
