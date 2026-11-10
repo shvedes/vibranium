@@ -295,25 +295,52 @@ function dropTarget(slots, fromIndex, x) {
 // their place; pinned ids are skipped entirely, because the write re-pins
 // them to their zone end and no drag can displace them. Movable ids left
 // over (newly enabled and absent from `full`) append after the dragged
-// block.
+// block. `ordered` is reconciled against the movable set first: ids the
+// caller cannot move, and repeats, are dropped, and a movable id the
+// caller left out is appended in displayed order, so no slot is emitted
+// twice and none is lost.
 //
 // Returns { list, changed }: `list` is the new zone (fresh array, `full`
 // untouched) and `changed` is false when the drop resolved to exactly the
 // order already persisted, so the caller can skip the write.
 function rebuildZoneOrder(full, ordered, displayIds, isPinned, isFixed) {
-  const movable = {}
-  for (let i = 0; i < displayIds.length; i++)
-    if (!isFixed(displayIds[i])) movable[displayIds[i]] = true
+  const movable = Object.create(null)
+  for (let i = 0; i < displayIds.length; i++) {
+    const id = displayIds[i]
+    if (!isFixed(id) && !isPinned(id)) movable[id] = true
+  }
+  // The walk below consumes one `ordered` entry per movable slot, so the
+  // sequence has to name every movable id exactly once. A caller that hands
+  // over a short list, a duplicate, or an id that is fixed or pinned leaves
+  // the walk re-emitting a slot that is already placed, and the leftover
+  // branch used to append a raw entry after it - the same id rendered twice.
+  // Reconcile the sequence first: keep the caller's order for the ids it may
+  // move, drop anything else, then append the movable ids it left out in the
+  // displayed order.
+  const order = []
+  const seen = Object.create(null)
+  for (let i = 0; i < ordered.length; i++) {
+    const id = ordered[i]
+    if (movable[id] !== true || seen[id] === true) continue
+    seen[id] = true
+    order.push(id)
+  }
+  for (let i = 0; i < displayIds.length; i++) {
+    const id = displayIds[i]
+    if (movable[id] !== true || seen[id] === true) continue
+    seen[id] = true
+    order.push(id)
+  }
   const next = []
   let oi = 0
   for (let i = 0; i < full.length; i++) {
     const id = full[i]
     if (isPinned(id)) continue
     if (isFixed(id)) next.push(id)
-    else if (movable[id] && oi < ordered.length) next.push(ordered[oi++])
+    else if (movable[id] && oi < order.length) next.push(order[oi++])
     else next.push(id)
   }
-  for (; oi < ordered.length; oi++) next.push(ordered[oi])
+  for (; oi < order.length; oi++) next.push(order[oi])
   // Compare against the unpinned full list; pinned placement is enforced by
   // normalizeLayout on the write.
   let same = true

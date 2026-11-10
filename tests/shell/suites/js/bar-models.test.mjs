@@ -718,15 +718,17 @@ group('the full list is never mutated', () => {
   B.rebuildZoneOrder(full, ['workspaces', 'clock'], DISPLAY, isPinned, isFixed)
   eq('unchanged', full, FULL)
 })
-group('the movable set and `ordered` must agree, or the wall branch duplicates', () => {
-  // `ordered` is documented as the zone's *reorderable* enabled ids, so a
-  // caller that hands over a short or over-long list breaks the walk: the
-  // leftover branch pushes a raw `ordered` entry at the end even when that id
-  // is fixed, pinned or already emitted. Pinned because the output would
-  // silently render a slot twice rather than fail.
-  eq('a short ordered list duplicates the id it skips', B.rebuildZoneOrder(['a', 'b', 'c'], ['c', 'a'], ['a', 'b', 'c'], nothing, nothing).list, ['c', 'a', 'c'])
-  eq('a fixed id inside ordered is appended verbatim', B.rebuildZoneOrder(['a', 'tray'], ['a', 'tray'], ['a', 'tray'], nothing, isFixed).list, ['a', 'tray', 'tray'])
-  eq('a pinned id inside ordered comes back', B.rebuildZoneOrder(['a', 'volume'], ['a', 'volume'], ['a'], isPinned, nothing), { list: ['a', 'volume'], changed: true })
+group('the movable set and `ordered` are reconciled, never duplicated', () => {
+  // `ordered` is documented as the zone's *reorderable* enabled ids, but a
+  // caller can still hand over a short list, a duplicate, or an id it cannot
+  // move. The sequence is reconciled against the movable set first, so the
+  // walk consumes each movable id once and no slot is emitted twice.
+  const short = B.rebuildZoneOrder(['a', 'b', 'c'], ['c', 'a'], ['a', 'b', 'c'], nothing, nothing)
+  eq('a short ordered list keeps every id once', short.list, ['c', 'a', 'b'])
+  eq('and cannot duplicate one', new Set(short.list).size, short.list.length)
+  eq('a fixed id inside ordered is dropped, not appended', B.rebuildZoneOrder(['a', 'tray'], ['a', 'tray'], ['a', 'tray'], nothing, isFixed), { list: ['a', 'tray'], changed: false })
+  eq('a pinned id inside ordered does not come back', B.rebuildZoneOrder(['a', 'volume'], ['a', 'volume'], ['a'], isPinned, nothing), { list: ['a'], changed: false })
+  eq('a duplicate inside ordered is emitted once', B.rebuildZoneOrder(['a', 'b'], ['b', 'b', 'a'], ['a', 'b'], nothing, nothing).list, ['b', 'a'])
   eq('an ordered id that is not in full at all is appended', B.rebuildZoneOrder(['a'], ['b', 'a'], ['a', 'b'], nothing, nothing).list, ['b', 'a'])
 })
 
