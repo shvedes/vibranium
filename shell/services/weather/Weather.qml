@@ -40,7 +40,7 @@ import "../../common/text/Clock.js" as ClockFmt
 //   - Units: shell.statusbar.weatherUnit override ("auto", "metric",
 //     "imperial") > wttr-reported country > system locale. A cycle that
 //     never reaches wttr.in carries no country, so the locale decides.
-//   - Refresh every shell.statusbar.weatherRefreshMinutes (default 15),
+//   - Refresh every shell.statusbar.weatherRefreshMinutes (default 60),
 //     with a short retry burst so waking with the network down does not
 //     leave a stale icon until the next cycle.
 Singleton {
@@ -150,7 +150,7 @@ Singleton {
   // Hour labels share the bar clock's format: "21:00" in 24h, "9 PM"
   // in 12h. Read off the shared verdict, not the key.
   readonly property bool clockUse12h: TimeFormat.use12h
-  readonly property int refreshMinutes: Math.max(1, parseInt(Settings.value("shell.statusbar.weatherRefreshMinutes"), 10) || 15)
+  readonly property int refreshMinutes: Math.max(1, parseInt(Settings.value("shell.statusbar.weatherRefreshMinutes"), 10) || 60)
   // Verbose forecast rows (per-day feels/wind/humidity/rain), toggled in
   // Settings -> Bar -> Module options -> Weather.
   readonly property bool verbose: Settings.value("shell.statusbar.weatherVerbose") === true

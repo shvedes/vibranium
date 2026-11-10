@@ -887,7 +887,7 @@
             {
                 "key": "shell.statusbar.weatherRefreshMinutes",
                 "type": "int",
-                "default": 15,
+                "default": 60,
                 "label": "Refresh interval",
                 "sub": "Minutes between forecasts",
                 "range": {
