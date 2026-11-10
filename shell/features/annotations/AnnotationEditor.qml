@@ -677,7 +677,7 @@ PanelWindow {
   }
 
   function _isRuntimeOutput(path) {
-    return String(path ?? "").startsWith(editor.runtimeDir + "/")
+    return SU.isUnder(String(path ?? ""), editor.runtimeDir)
   }
 
   function _cleanupExportOutput(path) {
@@ -3427,7 +3427,7 @@ PanelWindow {
     editor._blurPlatePath = ""
     editor.blurPlateUrl = ""
     editor._blurPlatePending = false
-    if (path !== "" && String(path).startsWith(editor.runtimeDir + "/")) Exec.rm(path)
+    if (path !== "" && SU.isUnder(String(path), editor.runtimeDir)) Exec.rm(path)
   }
 
   function _paintStroke(ctx, s, offsetX, offsetY, displayScale) {
