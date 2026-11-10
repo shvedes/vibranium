@@ -126,24 +126,23 @@ function subtextFor(row) {
 // appended - even when the section has no rows - so the scan control is
 // reachable without any discovered devices.
 function listEntries(sorted, includeAvailableHeader) {
-  // `sorted.length` is read unguarded, so the LIST must be an array (null
-  // throws, pinned); a string walks its characters, a number walks
-  // nothing. The section header per row routes through sectionTitleFor,
-  // which tiers through DeviceList.
-  var entries = []
-  var cur = ""
-  for (var i = 0; i < sorted.length; i++) {
-    var t = sectionTitleFor(i, sorted)
-    if (t !== "") {
-      cur = t
-      entries.push({ type: "header", title: t })
-    }
-    entries.push({ type: "device", row: sorted[i] })
-  }
-  if (includeAvailableHeader && cur !== "AVAILABLE DEVICES") {
-    entries.push({ type: "header", title: "AVAILABLE DEVICES" })
-  }
-  return entries
+  // `sorted.length` is read unguarded downstream, so the LIST must be an
+  // array (null throws, pinned); a string walks its characters, a number
+  // walks nothing. The projection is the shared sectioned list with this
+  // module's row type and trailing scan header.
+  return DeviceList.sectionedEntries(
+    sorted,
+    function(row, prev, i) {
+      var tier = row && row.connected ? "connected" : (row && row.known ? "paired" : "available")
+      var before = prev && prev.connected ? "connected" : (prev && prev.known ? "paired" : "available")
+      if (i === 0 || before !== tier) {
+        if (tier === "connected") return "CONNECTED DEVICES"
+        return tier === "paired" ? "PAIRED DEVICES" : "AVAILABLE DEVICES"
+      }
+      return ""
+    },
+    function(row) { return { type: "device", row: row } },
+    includeAvailableHeader ? "AVAILABLE DEVICES" : "")
 }
 
 if (typeof module !== "undefined") {
