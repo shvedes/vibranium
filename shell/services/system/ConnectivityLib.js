@@ -2,6 +2,7 @@
 
 .import "../../common/settings/HyprlandEditor.js" as HyprlandEditor
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/bus/Busctl.js" as Busctl
 
 // Pure policy for the connectivity watcher: the NetworkManager D-Bus value
 // tables, the argv builders and the portal-URL extraction. No Qt imports -
@@ -220,9 +221,8 @@ function escapeMarkup(s) {
 // defaults to the system bus, and --json=short is the pinned reply shape
 // parseUintProp reads.
 function propArgv(prop) {
-  return ["busctl", "get-property", "--json=short",
-    "org.freedesktop.NetworkManager", "/org/freedesktop/NetworkManager",
-    "org.freedesktop.NetworkManager", String(prop)]
+  return Busctl.getPropertyArgv("org.freedesktop.NetworkManager",
+    "/org/freedesktop/NetworkManager", "org.freedesktop.NetworkManager", prop)
 }
 
 // Default-route read behind the tunnel half of the verdict: one `ip`
@@ -452,10 +452,9 @@ function offlineArgv(ssid) {
 // is a failed call and nothing else, so a withdrawal that misses leaves
 // the card for manual dismissal rather than trading it for a toast.
 function closeArgv(id) {
-  return ["busctl", "--user", "call",
-    "org.freedesktop.Notifications", "/org/freedesktop/Notifications",
-    "org.freedesktop.Notifications", "CloseNotification",
-    "u", String(id)]
+  return Busctl.userCallArgv("org.freedesktop.Notifications",
+    "/org/freedesktop/Notifications", "org.freedesktop.Notifications",
+    "CloseNotification", ["u", id])
 }
 
 // First stdout line of a `--print-id` send, 0 when it is not a bare id.

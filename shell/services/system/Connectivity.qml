@@ -8,6 +8,7 @@ import Quickshell.Io
 import Quickshell.Networking
 import qs.common
 import "ConnectivityLib.js" as Lib
+import "../../common/bus/Busctl.js" as Busctl
 import "../../common/process/CommandSpec.js" as CommandSpec
 
 // Connectivity watcher: captive-portal and metered-network announcements
@@ -271,8 +272,8 @@ Singleton {
   // failure). The chain behind the metered card's network name reads
   // through here; the uint verdicts above stay on _readProp.
   function _busProp(object, iface, prop, done) {
-    const spec = CommandSpec.argv(["busctl", "get-property", "--json=short",
-      "org.freedesktop.NetworkManager", object, iface, prop])
+    const spec = CommandSpec.argv(Busctl.getPropertyArgv(
+      "org.freedesktop.NetworkManager", object, iface, prop))
     let job = null
     try {
       job = ProcessRegistry.start(spec, root._scope, {

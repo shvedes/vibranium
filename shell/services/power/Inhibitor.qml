@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.common
+import "../../common/bus/Busctl.js" as Busctl
 import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/process/ProcProbe.js" as ProcProbe
 import "../../common/text/Format.js" as Format
@@ -556,11 +557,9 @@ Singleton {
     const handle = root._handle(generation, root._listKey)
     const run = { handle: handle, job: null }
     root._listRun = run
-    root._spawn(run, root._listKey, CommandSpec.argv([
-      "busctl", "call", "--json=short",
+    root._spawn(run, root._listKey, CommandSpec.argv(Busctl.callArgv(
       "org.freedesktop.login1", "/org/freedesktop/login1",
-      "org.freedesktop.login1.Manager", "ListInhibitors"
-    ]), {
+      "org.freedesktop.login1.Manager", "ListInhibitors")), {
       timeoutMs: root._listTimeoutMs
     }, result => root._listFinished(handle, result))
   }
