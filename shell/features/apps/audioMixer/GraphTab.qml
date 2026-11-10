@@ -99,6 +99,7 @@ import QtQuick.Shapes
 import qs.common
 import "MixerModel.js" as Model
 import "GraphModel.js" as Graph
+import "../../../common/math/Range.js" as Range
 
 Item {
   id: tab
@@ -672,8 +673,8 @@ Item {
     const loY = Math.min(0, edge - h)
     const hiX = Math.max(0, Math.min(tab.viewW - edge, w - edge))
     const hiY = Math.max(0, Math.min(tab.viewH - edge, h - edge))
-    tab.panX = Math.max(loX, Math.min(hiX, tab.panX))
-    tab.panY = Math.max(loY, Math.min(hiY, tab.panY))
+    tab.panX = Range.clamp(tab.panX, loX, hiX)
+    tab.panY = Range.clamp(tab.panY, loY, hiY)
   }
 
   // Zoom about a point of the viewport. `k` is the ratio of the new scale to
