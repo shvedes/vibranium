@@ -315,13 +315,27 @@ function hayFromItem(item, includeMetadata) {
   return LauncherLib.SearchPlumbing.dedupeWords(raw.split(/\s+/)).join(" ")
 }
 
+// Per-row cache of the scoped-filter haystacks below, so a filter keystroke
+// over a page it has already narrowed does not rebuild one hay per row. Weak:
+// the rows of a replaced page are collected with their strings.
+//
+// Keyed by ROW and stamped with the raw visible text the hay was built from,
+// not by row alone. The menu mirrors a live value into its row (`it.value`
+// follows the settings store) without rebuilding the row, so a row can change
+// under the filter; a hay cached against its identity alone would keep
+// matching the value it had when the filter first saw it.
+var _filterHay = new WeakMap()
+
 // Haystack for the "/" in-page quick-filter: ONLY what the row shows at
 // rest (label, subLead, sub, placeholder, unit, current value). Descriptions,
 // warnings and bodies need ctrl+i/expansion to be seen, so matching them
 // trims by invisible text - typing "h" on the main menu kept every row whose
 // description mentions "themes"/"hardware" and felt broken. Cross-page search
 // keeps matching everything via hayFromItem; the trim matches what is there.
-function hayForFilter(item) {
+// The raw (unlowercased, undeduped) visible text of a row: the input the
+// filter hay is built from, and the stamp the cache in scopedFilter compares.
+// Split out so the two cannot drift over which fields count as visible.
+function hayFilterRaw(item) {
   const parts = []
   if (item.label) parts.push(String(item.label))
   if (item.subLead) parts.push(String(item.subLead))
@@ -332,8 +346,16 @@ function hayForFilter(item) {
     const vs = String(item.value).trim()
     if (vs !== "") parts.push(vs)
   }
-  const raw = parts.join(" ").toLowerCase()
-  return LauncherLib.SearchPlumbing.dedupeWords(raw.split(/\s+/)).join(" ")
+  return parts.join(" ")
+}
+
+function hayFilterOf(raw) {
+  const lower = raw.toLowerCase()
+  return LauncherLib.SearchPlumbing.dedupeWords(lower.split(/\s+/)).join(" ")
+}
+
+function hayForFilter(item) {
+  return hayFilterOf(hayFilterRaw(item))
 }
 
 // The key half of a uid, from a declared id or from the row's position.
@@ -406,10 +428,13 @@ function normalizeItem(raw, pageId, index) {
   item.uid = pageId + "#" + item._uidKey
   item.selectable = SELECTABLE[type] === true && item.enabled !== false
   item.hay = hayFromItem(item)
-  // Visible-only form for the "/" quick-filter (see hayForFilter), stamped
-  // once per row so the scoped filter reads it instead of rebuilding it per
-  // row per keystroke.
-  item.hayNoMeta = hayForFilter(item)
+  // The "/" quick-filter's visible-only haystack (hayForFilter) is NOT built
+  // here. Only a scoped filter reads it, and most bundles are never filtered
+  // that way, so building it on every row of every rebuild paid for a second
+  // hay - the same fields lowercased, split and deduped again - for nothing.
+  // scopedFilter builds it for a row the first time it filters one and keeps
+  // it in its own cache (see there), so the cost moves to the keystroke that
+  // actually needs it and is paid once per row.
   return item
 }
 
@@ -1413,10 +1438,24 @@ function scopedFilter(items, query) {
     const it = list[i]
     if (!it || typeof it !== "object") continue
     if (it.type === "separator") continue
-    // Rows stamped by normalizeItem carry the visible-only haystack
-    // (hayForFilter); older or externally built rows fall back to building
-    // it on the fly -> same AND-token substring semantics either way.
-    const hay = typeof it.hayNoMeta === "string" ? it.hayNoMeta : hayForFilter(it)
+    // The visible-only hay (hayForFilter) is built on the first keystroke that
+    // looks at this row and cached against the row object, so every later
+    // keystroke over the same page only pays for the raw join and a compare.
+    // The cache is a WeakMap and not a property on the row: scopedFilter is
+    // documented as read-only over its input, and a row may be a host object
+    // that refuses new fields. Rows that arrive with the hay already stamped
+    // (older call sites) are read as-is.
+    let hay = it.hayNoMeta
+    if (typeof hay !== "string") {
+      const raw = hayFilterRaw(it)
+      const cached = _filterHay.get(it)
+      if (cached !== undefined && cached.raw === raw) {
+        hay = cached.hay
+      } else {
+        hay = hayFilterOf(raw)
+        _filterHay.set(it, { raw: raw, hay: hay })
+      }
+    }
     let ok = true
     for (let t = 0; t < tokens.length; t++) {
       if (hay.indexOf(tokens[t]) < 0) {

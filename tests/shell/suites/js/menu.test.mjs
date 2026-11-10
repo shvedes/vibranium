@@ -177,9 +177,10 @@ suite('menu/MenuLib', 'the menu framework\'s pure layer - 69 functions')
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // 70 functions plus the six search-cache `var`s, which the loader picks up
-  // because a `.pragma library` namespace is its top-level declarations.
-  eq('76 declarations', Object.keys(M).length, 76)
+  // 72 functions plus the seven cache `var`s (the six search caches and the
+  // scoped-filter hay cache), which the loader picks up because a
+  // `.pragma library` namespace is its top-level declarations.
+  eq('79 declarations', Object.keys(M).length, 79)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
   eq('all 69 named functions are callable', missing, [])
   for (const n of SURFACE) {
@@ -201,7 +202,7 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 76 names', Object.keys(F).length, 76)
+  eq('the live view publishes the same 79 names', Object.keys(F).length, 79)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
