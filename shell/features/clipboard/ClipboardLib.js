@@ -1149,6 +1149,26 @@ function parseGitInfoOutput(text) {
   const g = { branch: "", upstream: "", ahead: 0, behind: 0, gone: false, detached: false, staged: 0, unstaged: 0, chash: "", csubject: "", cauthor: "", cemail: "", ctime: "", remote: "" }
   let inStatus = false
   let inCommit = false
+
+  // One labeled commit field per line; anything else (a smuggled newline
+  // inside a name, a truncated tail) matches no key and is dropped.
+  function applyCommitLine(line) {
+    if (line.indexOf("chash ") === 0) g.chash = line.substring(6).trim()
+    else if (line.indexOf("author ") === 0) g.cauthor = line.substring(7).trim()
+    else if (line.indexOf("email ") === 0) g.cemail = line.substring(6).trim()
+    else if (line.indexOf("ctime ") === 0) g.ctime = line.substring(6).trim()
+    else if (line.indexOf("subject ") === 0) g.csubject = line.substring(8).trim()
+  }
+
+  // Porcelain v1 XY columns: staged is X, unstaged is Y. Renames (R),
+  // unmerged (UU/AA) and typechanges (T) all count on the side they appear,
+  // which is exactly what "how much is uncommitted" asks.
+  function applyStatusLine(line) {
+    if (line.length < 2) return
+    const x = line.charAt(0), y = line.charAt(1)
+    if (x !== " " && x !== "?") g.staged++
+    if (y !== " " && y !== "?") g.unstaged++
+  }
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]
     if (line === "---STATUS---") { inStatus = true; inCommit = false; continue }
@@ -1156,24 +1176,11 @@ function parseGitInfoOutput(text) {
     if (line === "---COMMIT---") { inCommit = true; inStatus = false; continue }
     if (line === "---ENDCOMMIT---") { inCommit = false; continue }
     if (inCommit) {
-      // One labeled line each; anything else (a smuggled newline inside a
-      // name, a truncated tail) matches no key and is dropped.
-      if (line.indexOf("chash ") === 0) g.chash = line.substring(6).trim()
-      else if (line.indexOf("author ") === 0) g.cauthor = line.substring(7).trim()
-      else if (line.indexOf("email ") === 0) g.cemail = line.substring(6).trim()
-      else if (line.indexOf("ctime ") === 0) g.ctime = line.substring(6).trim()
-      else if (line.indexOf("subject ") === 0) g.csubject = line.substring(8).trim()
+      applyCommitLine(line)
       continue
     }
     if (inStatus) {
-      // Porcelain v1 XY columns: staged is X, unstaged is Y. Renames (R),
-      // unmerged (UU/AA) and typechanges (T) all count on the side they
-      // appear, which is exactly what "how much is uncommitted" asks.
-      if (line.length >= 2) {
-        const x = line.charAt(0), y = line.charAt(1)
-        if (x !== " " && x !== "?") g.staged++
-        if (y !== " " && y !== "?") g.unstaged++
-      }
+      applyStatusLine(line)
       continue
     }
     const sp = line.indexOf(" ")
