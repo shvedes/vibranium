@@ -6,6 +6,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Io
 import qs.common
+import "../../common/math/Range.js" as Range
 import qs.features.bar
 import qs.features.bar.modules.Clock
 import qs.features.bar.modules.KeyboardLayout
@@ -164,8 +165,8 @@ Singleton {
   // --- live module metrics (F4) ---
   // Bar thickness is a constant, so only the font contributes to the scale
   // (Ui.barScaleWithFont), keeping icons/text in token proportions.
-  readonly property real _requestedScale: Math.max(0.5, Math.min(2.0,
-    Ui.barScaleWithFont ? Ui.fontScale : 1))
+  readonly property real _requestedScale: Range.clamp(
+    Ui.barScaleWithFont ? Ui.fontScale : 1, 0.5, 2.0)
   // Effective scale for icons, canvas AND module text together. Every module
   // grows by this one factor, so the Ui token proportions hold at any bar
   // height and preset; capping the icon scale and the text scale separately
@@ -173,12 +174,12 @@ Singleton {
   readonly property real iconScale: root._requestedScale
   // The slot is the hit target: never smaller than 12, never taller than
   // the bar minus breathing room on both edges.
-  readonly property int iconSlot: Math.max(12, Math.min(
-    Math.round(Ui.barIconSlot * root.iconScale), height - 4))
+  readonly property int iconSlot: Range.clamp(
+    Math.round(Ui.barIconSlot * root.iconScale), 12, Math.max(12, height - 4))
   // The painted canvas sits inside the slot with >=3px inset per edge
   // (~0.54 of the fixed bar height at scale 1 - see the Ui token rule).
-  readonly property int iconCanvas: Math.max(8, Math.min(
-    Math.round(Ui.barIconCanvas * root.iconScale), root.iconSlot - 6))
+  readonly property int iconCanvas: Range.clamp(
+    Math.round(Ui.barIconCanvas * root.iconScale), 8, Math.max(8, root.iconSlot - 6))
   // Label text scale: the SAME scale as the icons, so text modules
   // (the keyboard layout code, the weather readout) grow proportionally
   // with them.
