@@ -9,6 +9,7 @@ import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/capture/ShotLib.js" as ShotLib
 import "../../../../common/text/Format.js" as Format
+import "../../../../common/math/Range.js" as Range
 
 // Now Playing bar module (opt-in, off by default). Shows the active
 // MPRIS track title in the bar; left click opens the island, right click
@@ -605,7 +606,7 @@ CollapsibleSlot {
       const d = event.angleDelta.y > 0 ? step : -step
       const cur = Number(root.player.volume ?? 0)
       if (isNaN(cur)) return
-      const nv = Math.max(0, Math.min(1, cur + d))
+      const nv = Range.clamp01(cur + d)
       root.player.volume = nv
       event.accepted = true
     }
