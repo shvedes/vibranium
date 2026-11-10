@@ -175,8 +175,7 @@ function contains(routes, route) {
 
 function containsEndpoints(routes, route) {
   for (let i = 0; Array.isArray(routes) && i < routes.length; i++) {
-    const candidate = routes[i]
-    if (candidate && candidate.output === route.output && candidate.input === route.input) return true
+    if (sameRoute(routes[i], route)) return true
   }
   return false
 }
