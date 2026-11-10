@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "../math/FuncLib.js" as FuncLib
+import "../math/Range.js" as Range
 
 // Shared live/static function graph: same grid, axes and curve in the
 // AppLauncher dropdown (live, per keystroke) and the Clipboard preview
@@ -75,7 +76,8 @@ Item {
 
   // One sample per pixel column (clamped): live typing recompiles a short
   // expression per frame, trivial next to the paint itself.
-  readonly property int _sampleN: Math.max(80, Math.min(300, Math.round(graphBox.width || root.width || 240)))
+  readonly property int _sampleN: Range.clamp(
+    Math.round(graphBox.width || root.width || 240), 80, 300)
   readonly property var _sample: FuncLib.sampleFunction(root.funcBody, root.xMin, root.xMax, root._sampleN)
   on_SampleChanged: plot.requestPaint()
   // Keystroke debounce: live typing would otherwise recompile + repaint
