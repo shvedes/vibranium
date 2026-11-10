@@ -721,18 +721,24 @@ renders as a one-tier icon rather than the documented full glyph.
 
 *Reproduced by `suites/js/modules-wallpaper.test.mjs`.*
 
-### 36. Bluetooth section headers interleave on a mixed device list
+### 36. (fixed) Bluetooth section headers interleave on a mixed device list
 
-`shell/features/bar/modules/Bluetooth/Model.js:94-105` (`sectionTitleFor`) and
-`:124-139` (`listEntries`) both assume a paired-then-available ordering, but
+`shell/features/bar/modules/Bluetooth/Model.js` (`sectionTitleFor`) and
+(`listEntries`) both assumed a paired-then-available ordering, but
 `sortDeviceRows` tiers **connected first**. Given four rows spanning both
-states, the headers interleave - one header per row rather than two.
+states, the headers interleaved - one header per row rather than two.
 
-Latent only: no caller passes one combined list (`BluetoothIsland.qml:108-116`
-splits into two) and `listEntries` has no caller at all. The functions are
-internally inconsistent, which is a trap for the first caller that tries.
+Latent only: no caller passes one combined list (`BluetoothIsland.qml` splits
+into two) and `listEntries` has no caller at all. The functions were internally
+inconsistent, which is a trap for the first caller that tries.
 
-*Reproduced by `suites/js/modules-wallpaper.test.mjs`.*
+The titles now use the sort's own tiers - `CONNECTED DEVICES`, then `PAIRED
+DEVICES`, then `AVAILABLE DEVICES` - so every section is one contiguous run of
+the sorted order and a header opens exactly at each tier boundary. The island's
+per-section lists keep their two titles unchanged, because a split list never
+contains a connected row beside an unconnected one.
+
+*Reproduced and now verified by `suites/js/modules-wallpaper.test.mjs`.*
 
 ### 37. The pass browser surfaces an empty `.git` folder
 

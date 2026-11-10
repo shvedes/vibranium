@@ -1313,7 +1313,7 @@ group('the degenerate row lists', () => {
   noThrow('a row with no fields at all', () => BT.sortDeviceRows([{}]))
 })
 
-section('Bluetooth/Model.sectionTitleFor - the two section headers')
+section('Bluetooth/Model.sectionTitleFor - the three section headers')
 const BT_SORTED = BT.sortDeviceRows([
   { address: '1', name: 'Bravo', connected: true, known: true },
   { address: '2', name: 'Mike', connected: true, known: false },
@@ -1321,12 +1321,11 @@ const BT_SORTED = BT.sortDeviceRows([
   { address: '4', name: 'Zulu', connected: false, known: false },
 ])
 group('a header opens a section and a continuation is empty', () => {
-  // "Connected first, then remembered, then the rest" - so on a mixed list
-  // the paired and available sections INTERLEAVE, and a header reopens at
-  // every transition rather than once. That is why the island splits the
-  // sorted rows into two lists itself (BluetoothIsland.qml:108-116) instead
-  // of handing this function one list. Pinned as the real shape.
-  eq('the four titles of a four-device sorted list', BT_SORTED.map((_, i) => BT.sectionTitleFor(i, BT_SORTED)), ['PAIRED DEVICES', 'AVAILABLE DEVICES', 'PAIRED DEVICES', 'AVAILABLE DEVICES'])
+  // The tiers are the SORT's own - connected, then remembered, then the rest -
+  // so every section is one contiguous run and the titles never interleave on
+  // a mixed list. Tiering on `known` alone reopened a header at every
+  // transition, which is one header per row.
+  eq('the four titles of a four-device sorted list', BT_SORTED.map((_, i) => BT.sectionTitleFor(i, BT_SORTED)), ['CONNECTED DEVICES', '', 'PAIRED DEVICES', 'AVAILABLE DEVICES'])
   eq('and the paired-first shape a two-list caller sees', [BT.sectionTitleFor(0, [{ known: true }, { known: true }]), BT.sectionTitleFor(0, [{ known: false }, { known: false }])], ['PAIRED DEVICES', 'AVAILABLE DEVICES'])
   eq('the first row of an all-paired list', BT.sectionTitleFor(0, [{ known: true }]), 'PAIRED DEVICES')
   eq('the second row of an all-paired list', BT.sectionTitleFor(1, [{ known: true }, { known: true }]), '')
@@ -1418,17 +1417,17 @@ group('the degenerate rows', () => {
 
 section('Bluetooth/Model.listEntries - the flat header/device projection')
 group('a header entry at each section start, a device entry per row', () => {
-  // On the connected-first sort the sections interleave, so a header entry
-  // appears at EVERY transition: four rows give four headers here. On the
-  // paired-then-available list an island section really is, there is one.
-  eq('the entry types and order', BT.listEntries(BT_SORTED, false).map((e) => e.type), ['header', 'device', 'header', 'device', 'header', 'device', 'header', 'device'])
-  eq('the header titles', BT.listEntries(BT_SORTED, false).filter((e) => e.type === 'header').map((e) => e.title), ['PAIRED DEVICES', 'AVAILABLE DEVICES', 'PAIRED DEVICES', 'AVAILABLE DEVICES'])
+  // One header per contiguous section: the connected run, the paired run and
+  // the available run. The island hands this function one list per section,
+  // where that is a single header.
+  eq('the entry types and order', BT.listEntries(BT_SORTED, false).map((e) => e.type), ['header', 'device', 'device', 'header', 'device', 'header', 'device'])
+  eq('the header titles', BT.listEntries(BT_SORTED, false).filter((e) => e.type === 'header').map((e) => e.title), ['CONNECTED DEVICES', 'PAIRED DEVICES', 'AVAILABLE DEVICES'])
   eq('and a grouped list gives one header and two devices', BT.listEntries([{ name: 'a', known: true }, { name: 'b', known: true }], false).map((e) => e.type), ['header', 'device', 'device'])
   eq('a device entry is { type, row }', Object.keys(BT.listEntries(BT_SORTED, false)[1]), ['type', 'row'])
   eq('a header entry is { type, title }', Object.keys(BT.listEntries(BT_SORTED, false)[0]), ['type', 'title'])
   eq('the row object is the caller\'s, not a copy', BT.listEntries(BT_SORTED, false)[1].row === BT_SORTED[0], true)
-  eq('the entry count is rows + headers', BT.listEntries(BT_SORTED, false).length, 8)
-  eq('one header per section start, so one per row on an interleaved sort', BT.listEntries(BT_SORTED, false).filter((e) => e.type === 'header').length, 4)
+  eq('the entry count is rows + headers', BT.listEntries(BT_SORTED, false).length, 7)
+  eq('one header per contiguous section', BT.listEntries(BT_SORTED, false).filter((e) => e.type === 'header').length, 3)
   eq('and a grouped list is rows + 1', BT.listEntries([{ name: 'a', known: true }, { name: 'b', known: true }], false).length, 3)
 })
 group('the available header is appended on request, even with no rows', () => {

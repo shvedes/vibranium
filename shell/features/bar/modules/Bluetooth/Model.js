@@ -78,16 +78,32 @@ function sortDeviceRows(rows) {
     function(a, b) { return deviceLabel(a).localeCompare(deviceLabel(b)) })
 }
 
-// Section title for a sorted row, tiered through DeviceList. Remembered
-// (paired) devices open "PAIRED DEVICES", anything else opens
-// "AVAILABLE DEVICES".
+// Section title for a sorted row, tiered through DeviceList. A row opens a
+// header when its tier differs from the row above it, and is a continuation
+// otherwise, so every section is one contiguous run of the sorted order.
+//
+// The tiers are the SORT's own - connected, then remembered, then the rest -
+// so a header can never open above a row the sort placed out of that tier's
+// order. Tiering on `known` alone did exactly that: a connected-but-unpaired
+// device sorted ahead of a paired one and opened an AVAILABLE section, which
+// the next row's PAIRED header then closed, giving one header per row on a
+// mixed list.
+//
+// The helpers are nested because a .pragma library publishes every top-level
+// declaration, and this module's surface is pinned by its suite.
 function sectionTitleFor(index, rows) {
+  function tierOf(row) {
+    var r = row || {}
+    if (r.connected) return "connected"
+    return r.known ? "paired" : "available"
+  }
+  function titleOf(tier) {
+    if (tier === "connected") return "CONNECTED DEVICES"
+    return tier === "paired" ? "PAIRED DEVICES" : "AVAILABLE DEVICES"
+  }
   return DeviceList.sectionTitleFor(index, rows, function(row, prev, i) {
-    if (row.known) {
-      if (i === 0 || !prev.known) return "PAIRED DEVICES"
-      return ""
-    }
-    if (i === 0 || (prev && prev.known)) return "AVAILABLE DEVICES"
+    var tier = tierOf(row)
+    if (i === 0 || tierOf(prev) !== tier) return titleOf(tier)
     return ""
   })
 }
