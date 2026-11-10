@@ -151,8 +151,19 @@ for i in 0 1 2 3; do
 done
 
 # The floor is load-bearing in one direction and must not swallow the other.
-t_eq "a one-line row at the shipped scale lands on the Ui.rowMinH floor" \
-  "$(qp_get s.0.rowMinH)" "$(qp_get s.0.restLine)"
+# WHICH SIDE BINDS IS THE FONT'S ANSWER, NOT THE RULE'S: the floor wins only
+# while the title line fits under it, and a host whose fallback face lays a
+# title out taller than Ui.rowMinH legitimately gets a taller one-line row (the
+# rule is max(rowMinH, line), asserted above at every scale). So pin the floor
+# where it binds and the non-undercut where the line has outgrown it.
+if test "$(qp_get s.0.expectLine)" -le "$(qp_get s.0.rowMinH)"; then
+  t_eq "a one-line row at the shipped scale lands on the Ui.rowMinH floor" \
+    "$(qp_get s.0.rowMinH)" "$(qp_get s.0.restLine)"
+else
+  t_true "a one-line row at the shipped scale clears the Ui.rowMinH floor" \
+    test "$(qp_get s.0.restLine)" -ge "$(qp_get s.0.rowMinH)"
+  t_note "a $(qp_get s.0.labelLineH)px title line outgrows the $(qp_get s.0.rowMinH)px floor on this host, so the line sets a one-line row and the floor only guards the shorter rows"
+fi
 t_eq "a bare separator is the hairline, not a row" "$(qp_get s.0.rowMinH)" \
   "$(awk -v v="$(qp_get s.0.restSepBare)" -v f="$(qp_get s.0.rowMinH)" 'BEGIN { print (v < f) ? f : v }')"
 
@@ -170,7 +181,8 @@ t_contains "the arithmetic turns a kind into a column height" "function colH(kin
 t_contains "and a kind into a rest height" "function restH(kind, g)" "$RULE_SRC"
 t_contains "and answers the separator on its own" "function restSeparator(hasLabel, g)" "$RULE_SRC"
 t_contains "the singleton supplies the tokens and asks the rule" "RowRule.restH(kind, root.tokens)" "$GEO_SRC"
-t_contains "its line tokens are the font metrics, ceiled" "Math.ceil(root.labelMetrics.height)" "$GEO_SRC"
+t_contains "its line tokens are the font metrics, ceiled over the fallback chain" \
+  "Math.ceil(Math.max(root.labelMetrics.height, root.labelFallbackMetrics.height))" "$GEO_SRC"
 t_contains "and it is a module singleton, one instance per process" \
   "singleton RowGeometry 1.0 RowGeometry.qml" "$(<"$MENU_DIR/qmldir")"
 
@@ -199,7 +211,7 @@ t_eq "and only the two readers name it" "3" \
 t_contains "the delegate classifies from the copy it renders" \
   "MenuLib.restKind(itm, row.subText)" "$ENTRY_SRC"
 t_contains "and the panel from the projection it installed" \
-  "kind: MenuLib.restKind(it, subText)" "$MENU_SRC"
+  "kind: MenuLib.restKind(it, f.sub)" "$MENU_SRC"
 
 # ---------------------------------------------------------------------
 t_section "and the per-string height machinery is gone"

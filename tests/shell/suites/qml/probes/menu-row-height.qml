@@ -121,6 +121,19 @@ Item {
     id: mSub
   }
 
+  // The fallback samples the shipped token measures, shaped the same way.
+  TextMetrics {
+    id: tmLabel
+    font.family: Ui.fontFamily
+    text: "\u0645\u0631\u062d\u0628\u0627 \u0939\u093f\u0928\u094d\u0926\u0940 \u65e5\u672c\u8a9e"
+  }
+
+  TextMetrics {
+    id: tmSub
+    font.family: Ui.fontFamily
+    text: "\u0645\u0631\u062d\u0628\u0627 \u0939\u093f\u0928\u094d\u0926\u0940 \u65e5\u672c\u8a9e"
+  }
+
   // Natural line boxes - what the engine lays out for a string.
   Text {
     id: natLabel
@@ -232,8 +245,10 @@ Item {
     const subPx = Math.max(1, Math.round(Ui.fontXs * scale))
     mLabel.font.pixelSize = labelPx
     mSub.font.pixelSize = subPx
-    const labelLineH = Math.ceil(mLabel.height)
-    const subLineH = Math.ceil(mSub.height)
+    tmLabel.font.pixelSize = labelPx
+    tmSub.font.pixelSize = subPx
+    const labelLineH = Math.ceil(Math.max(mLabel.height, tmLabel.height))
+    const subLineH = Math.ceil(Math.max(mSub.height, tmSub.height))
     const g = {
       labelLineH: labelLineH,
       subLineH: subLineH,

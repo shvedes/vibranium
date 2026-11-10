@@ -30,8 +30,14 @@ QtObject {
 
   // The two line registers a row draws at rest: its title (fontL) and its sub
   // line - or a separator's breadcrumb - (fontXs).
-  readonly property real labelLineH: Math.ceil(root.labelMetrics.height)
-  readonly property real subLineH: Math.ceil(root.subMetrics.height)
+  //
+  // The pin is ONE number per register, but the engine draws a script with
+  // its fallback face, whose line box can be taller than the primary face's.
+  // Measuring the primary metrics alone under-pins every row that renders a
+  // fallback script (an Arabic title clipped its own line), so the token is
+  // the tallest line the fallback chain produces for a sample per script.
+  readonly property real labelLineH: Math.ceil(Math.max(root.labelMetrics.height, root.labelFallbackMetrics.height))
+  readonly property real subLineH: Math.ceil(Math.max(root.subMetrics.height, root.subFallbackMetrics.height))
 
   // The row constants, read from the rule so the strip, the breathing and the
   // hairline are spelled once.
@@ -64,6 +70,21 @@ QtObject {
   readonly property FontMetrics subMetrics: FontMetrics {
     font.pixelSize: Ui.fontXs
     font.family: Ui.fontFamily
+  }
+
+  // Fallback shaping samples: the scripts the menu corpus actually contains.
+  // TextMetrics shapes the string, so the height it reports is the one the
+  // fallback face would lay out, not the primary face's.
+  readonly property TextMetrics labelFallbackMetrics: TextMetrics {
+    font.pixelSize: Ui.fontL
+    font.family: Ui.fontFamily
+    text: "مرحبا हिन्दी 日本語"
+  }
+
+  readonly property TextMetrics subFallbackMetrics: TextMetrics {
+    font.pixelSize: Ui.fontXs
+    font.family: Ui.fontFamily
+    text: "مرحبا हिन्दी 日本語"
   }
 
   function colH(kind) {
