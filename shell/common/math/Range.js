@@ -7,8 +7,10 @@
 // drifting between copies. Pure JS, pragma library, no Qt imports.
 .pragma library
 
+// The hi side is the outer bound, so inverted bounds answer hi rather than
+// lo - the contract the menu's option stepping was written against.
 function clamp(value, lo, hi) {
-  return Math.max(lo, Math.min(hi, value))
+  return Math.min(hi, Math.max(lo, value))
 }
 
 function clamp01(value) {

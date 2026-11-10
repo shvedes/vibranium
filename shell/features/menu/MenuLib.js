@@ -13,6 +13,7 @@
 .pragma library
 
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/math/Range.js" as Range
 // Filter counting routes through the launcher's own matcher over a full
 // pool (not the menu's cross-word fuzzy search) - those two engines are
 // deliberately different, so the counter reuses the one its caller uses.
@@ -30,7 +31,7 @@ function shellQuote(s) { return SU.shellQuote(s) }
 
 // Clamp v into [lo, hi].
 function clamp(v, lo, hi) {
-  return Math.min(hi, Math.max(lo, v))
+  return Range.clamp(v, lo, hi)
 }
 
 // Directory part of a path, "" when the path carries none. A leading
