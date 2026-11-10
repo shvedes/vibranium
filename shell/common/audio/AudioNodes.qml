@@ -4,7 +4,6 @@ pragma ComponentBehavior: Bound
 import QtQml
 import Quickshell
 import Quickshell.Services.Pipewire
-import "../theme/DeviceIcons.js" as DeviceIcons
 
 // AudioNodes - ONE object tracker over the backend's node set, ONE link
 // tracker per observed node, many observers.
@@ -609,10 +608,4 @@ Singleton {
     }
   }
 
-  // Volume-tier helper: tiered level glyph for a 0..1 fraction, resolved
-  // through the shared common/theme/DeviceIcons.js table so audio views
-  // never hand-roll the volume thirds.
-  function volumeTierIcon(volume, muted) {
-    return DeviceIcons.volumeIconFor(volume, muted)
-  }
 }

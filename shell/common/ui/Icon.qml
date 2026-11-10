@@ -4,7 +4,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.common
-import "../theme/DeviceIcons.js" as DeviceIcons
 
 // A themed icon from the shipped SVG set, always rendered at a fixed
 // optical canvas inside a fixed slot so every bar icon carries uniform
@@ -221,13 +220,6 @@ Item {
     property bool iconLayered: root._layered
     property string iconAnim: root._anim
     property bool iconAnimOn: root._animOn
-  }
-
-  // Volume-tier helper: tiered level glyph for a 0..1 fraction, resolved
-  // through the shared common/theme/DeviceIcons.js table so Icon
-  // instances never hand-roll the volume thirds.
-  function volumeTierIcon(volume, muted) {
-    return DeviceIcons.volumeIconFor(volume, muted)
   }
 
   // --- debug bounds: VIBRANIUM_DEBUG_BAR_ICONS=1 ---
