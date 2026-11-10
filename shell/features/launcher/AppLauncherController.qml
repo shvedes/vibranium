@@ -784,17 +784,7 @@ Item {
     // -> counts snapshotted once per recompute into a Map; the comparator
     // below reads the snapshot instead of calling usageCountFor per
     // comparison, which ran O(n log n) map lookups per sort. Same order.
-    let tie = null
-    if (root.sortMethod === "frequency") {
-      const counts = new Map()
-      const pool = root.appIndex
-      for (let i = 0; i < pool.length; i++) {
-        const rec = pool[i]
-        const id = rec && rec.app ? String(rec.app.id ?? "") : ""
-        if (!counts.has(id)) counts.set(id, LauncherLib.usageCountFor(root.usageMap, id))
-      }
-      tie = rec => counts.get(rec && rec.app ? String(rec.app.id ?? "") : "") ?? 0
-    }
+    const tie = root._tieLookup()
     // filterCounter matches over the WHOLE index and reports the true hit
     // count as `matched` (total = index size), display-capped at 100.
     const res = LauncherLib.filterCounter(root.appIndex, query, 100, tie)
@@ -911,6 +901,22 @@ Item {
       }
     }
     return rows
+  }
+
+  // Frequency mode ranks by druncache in the idle view (see buildAppIndex);
+  // the same counts break equal-relevance ties while filtering. Snapshotted
+  // once per recompute: the comparator reads the map instead of calling
+  // usageCountFor per comparison, which ran O(n log n) lookups per sort.
+  function _tieLookup() {
+    if (root.sortMethod !== "frequency") return null
+    const counts = new Map()
+    const pool = root.appIndex
+    for (let i = 0; i < pool.length; i++) {
+      const rec = pool[i]
+      const id = rec && rec.app ? String(rec.app.id ?? "") : ""
+      if (!counts.has(id)) counts.set(id, LauncherLib.usageCountFor(root.usageMap, id))
+    }
+    return rec => counts.get(rec && rec.app ? String(rec.app.id ?? "") : "") ?? 0
   }
 
   // `preferred` pins the serving plugin (the mode's owner in explicit
