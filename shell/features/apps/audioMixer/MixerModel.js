@@ -122,6 +122,13 @@ function isStreamKind(kind) {
   return kind === "playbackStream" || kind === "captureStream"
 }
 
+// The device half of the same split. A null kind is not a device kind, so a
+// caller that branches on this after a null classification takes the drop
+// path rather than the device path.
+function isDeviceKind(kind) {
+  return kind === "outputDevice" || kind === "inputDevice"
+}
+
 // The palette KEY one kind is drawn in, and the only place that pairing is
 // written down.
 //
@@ -424,6 +431,20 @@ function percentText(volume) {
 
 // "42%" / "42" -> 42; anything else -> null. The inverse of percentText, for
 // the one place a level is read back out of text rather than off the node.
+// The grammar is deliberately narrow: an optional sign, digits with at most
+// one decimal point, and an optional trailing percent sign. Anything the
+// grammar does not cover is refused rather than coerced, because a wrong
+// answer here is written back as a volume.
+function parsePercent(value) {
+  if (typeof value !== "string") return null
+  let s = value.trim()
+  if (s.charAt(s.length - 1) === "%") s = s.substring(0, s.length - 1).trim()
+  if (!/^[+-]?\d+(?:\.\d+)?$/.test(s)) return null
+  const n = Number(s)
+  if (!isFinite(n)) return null
+  return n === 0 ? 0 : n
+}
+
 // --- link projection ---------------------------------------------------
 
 // One link endpoint pair, or "" when either end is unusable. A link group's
