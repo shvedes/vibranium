@@ -56,7 +56,9 @@ function nodeProps(node) {
 
 function friendlyDeviceLabel(text) {
   var label = String(text || "").trim()
-  label = label.replace(/^built-?in audio\s+/i, "")
+  // PipeWire writes the prefix both ways - "Built-in Audio" and "built in
+  // audio" - so the separator is optional and either shape is stripped.
+  label = label.replace(/^built[-\s]?in audio\s+/i, "")
   label = label.replace(/\s+Output$/i, "")
   label = label.replace(/\s+Input$/i, "")
   return label

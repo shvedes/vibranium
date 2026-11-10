@@ -1335,7 +1335,9 @@ group('friendlyDeviceLabel strips the two PipeWire decorations', () => {
 group('the decorations only match in the exact shape they are written for', () => {
   // The prefix regex is /^built-?in audio\s+/i: the optional character is the
   // hyphen, not the space, so "built in audio" is not recognised.
-  eq('"built in audio" with a space is not stripped', VO.friendlyDeviceLabel('built in audio x'), 'built in audio x')
+  eq('"built in audio" with a space is stripped too', VO.friendlyDeviceLabel('built in audio x'), 'x')
+  eq('and the space spelling is case-insensitive', VO.friendlyDeviceLabel('Built In Audio x'), 'x')
+  eq('a mid-string "built in audio" is not a prefix', VO.friendlyDeviceLabel('My built in audio'), 'My built in audio')
   eq('the suffix needs whitespace before it', VO.friendlyDeviceLabel('Output'), 'Output')
   eq('so a bare "Input" survives too', VO.friendlyDeviceLabel('Input'), 'Input')
   eq('a mid-string Output is not a suffix', VO.friendlyDeviceLabel('Output Monitor'), 'Output Monitor')
