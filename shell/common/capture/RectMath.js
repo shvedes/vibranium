@@ -3,8 +3,11 @@
 // clamp. The capture pipeline needs the clamp to map a logical selection
 // onto frame pixels, and the annotation views need the same normalize to
 // turn a drag into a rect, so both resolve it here instead of keeping a
-// second copy. No imports - nothing here touches the shell.
+// second copy. The only import is the shared numeric clamp, which is pure JS
+// and touches no shell state.
 //
+.import "../math/Range.js" as Range
+
 // scaleRect, clampPoint, clampRectInBox and placeBox are the rest of
 // that vocabulary: the one scale a logical selection takes before it is
 // clamped onto frame pixels, the two clamps the selection rects use, and
@@ -53,8 +56,8 @@ function clampRect(rect, fw, fh) {
   const rawH = rect !== null && rect !== undefined && finite(rect.h) ? rect.h : 0
   const rawRight = finite(rawX + rawW) ? rawX + rawW : rawX
   const rawBottom = finite(rawY + rawH) ? rawY + rawH : rawY
-  let x = Math.round(Math.max(0, Math.min(frameW, rawX)))
-  let y = Math.round(Math.max(0, Math.min(frameH, rawY)))
+  let x = Math.round(Range.clamp(rawX, 0, frameW))
+  let y = Math.round(Range.clamp(rawY, 0, frameH))
   let w = Math.round(Math.max(1, Math.min(frameW, rawRight) - x))
   let h = Math.round(Math.max(1, Math.min(frameH, rawBottom) - y))
   if (x + w > frameW) {
@@ -127,8 +130,8 @@ function placeBox(px, py, size, rect, boxW, boxH, gap) {
   const cx = finite(px) ? px : 0
   const cy = finite(py) ? py : 0
   const home = {
-    x: Math.max(0, Math.min(maxX, cx - s / 2)),
-    y: Math.max(0, Math.min(maxY, cy - s / 2))
+    x: Range.clamp(cx - s / 2, 0, maxX),
+    y: Range.clamp(cy - s / 2, 0, maxY)
   }
   if (rect === null || rect === undefined) return home
   if (!(rect.w > 0) && !(rect.h > 0)) return home
@@ -152,8 +155,8 @@ function placeBox(px, py, size, rect, boxW, boxH, gap) {
   let bestCost = Infinity
   for (let i = 0; i < escapes.length; i++) {
     const p = {
-      x: Math.max(0, Math.min(maxX, escapes[i].x)),
-      y: Math.max(0, Math.min(maxY, escapes[i].y))
+      x: Range.clamp(escapes[i].x, 0, maxX),
+      y: Range.clamp(escapes[i].y, 0, maxY)
     }
     if (!clear(p)) continue
     const cost = Math.abs(p.x - home.x) + Math.abs(p.y - home.y)
