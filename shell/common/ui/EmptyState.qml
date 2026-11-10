@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.common
+import "../math/Range.js" as Range
 
 // Library-wide empty state: big background glyph over one line of muted
 // copy. The bar-island pattern (ArchUpdatesIsland error/up-to-date
@@ -37,7 +38,7 @@ Column {
 
   Text {
     anchors.horizontalCenter: parent.horizontalCenter
-    width: Math.max(0, Math.min(parent.width, 320))
+    width: Range.clamp(parent.width, 0, 320)
     horizontalAlignment: Text.AlignHCenter
     wrapMode: Text.WordWrap
     // Icon-only states pass "": collapse so no trailing gap is left.

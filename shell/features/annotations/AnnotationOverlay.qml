@@ -8,6 +8,7 @@ import Quickshell.Wayland
 import qs.common
 import "AnnotationTools.js" as AnnotationTools
 import "../../common/capture/RectMath.js" as RectMath
+import "../../common/math/Range.js" as Range
 import "../../common/capture/ShotLib.js" as ShotLib
 
 // Native region selector: a frozen still frame of one screen with a drag
@@ -329,8 +330,8 @@ PanelWindow {
       overlay.cursorX = overlay.width / 2
       overlay.cursorY = overlay.height / 2
     }
-    overlay.cursorX = Math.max(0, Math.min(overlay.width, overlay.cursorX + dx))
-    overlay.cursorY = Math.max(0, Math.min(overlay.height, overlay.cursorY + dy))
+    overlay.cursorX = Range.clamp(overlay.cursorX + dx, 0, overlay.width)
+    overlay.cursorY = Range.clamp(overlay.cursorY + dy, 0, overlay.height)
     overlay.keyboardMode = true
     if (overlay.keyboardAnchor !== null) {
       const r = AnnotationTools.normRect(overlay.keyboardAnchor.x,
@@ -509,7 +510,7 @@ PanelWindow {
       ? overlay.seedFrameH / overlay.height : view.dpr
     readonly property string label: Math.round(overlay.selW * dprX) + " x " + Math.round(overlay.selH * dprY)
 
-    x: Math.max(0, Math.min(overlay.width - width, overlay.selX))
+    x: Range.clamp(overlay.selX, 0, overlay.width - width)
     y: Math.max(0, overlay.selY - height - 4)
     width: badgeText.width + 12
     height: 20

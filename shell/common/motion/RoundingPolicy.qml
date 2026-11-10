@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.common
+import "../math/Range.js" as Range
 
 Singleton {
   id: root
@@ -15,7 +16,7 @@ Singleton {
     const n = Number(raw)
     if (!isFinite(n))
       return 0
-    return Math.max(0, Math.min(16, Math.round(n)))
+    return Range.clamp(Math.round(n), 0, 16)
   }
 
   // Public value every surface binds. Eases toward the target rather

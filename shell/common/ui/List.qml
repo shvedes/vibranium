@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "NavKeys.js" as NavKeys
+import "../math/Range.js" as Range
 
 // Vertical list over any model, center-lock scrolloff follow policy.
 //
@@ -1358,7 +1359,7 @@ ListView {
     const bound = viewH > 0
       ? Math.max(0, root.tableTotal() - vh)
       : root.clampY(Infinity)
-    return Math.max(0, Math.min(ry + rh / 2 - vh / 2, bound))
+    return Range.clamp(ry + rh / 2 - vh / 2, 0, bound)
   }
   // Pure follow target: the contentY followCursor would seat to, or
   // -1 when it would hold (fits/degenerate/in-margin: no seat coming).
@@ -2101,9 +2102,10 @@ ListView {
     const it = root.autoRevealItem || root.itemAtIndex(index)
     if (!it) {
       const ry = root.rowTop(index)
-      let target = Math.max(0, Math.min(
+      let target = Range.clamp(
         ry + root.rowHeightAt(index) + Ui.s - root.height,
-        root.clampY(Infinity)))
+        0,
+        root.clampY(Infinity))
       if (ry < target) target = ry
       if (target > root.contentY + 0.5
         && (!scrollAnim.running || mine)) {
@@ -2177,9 +2179,10 @@ ListView {
     // instead. There is nothing left for the two writers to alternate over.
     const owed = ry + rh + Ui.s - root.contentY - root.height
     if (owed <= 0.5) return
-    let target = Math.max(0, Math.min(
+    let target = Range.clamp(
       ry + rh + Ui.s - root.height,
-      root.clampY(Infinity)))
+      0,
+      root.clampY(Infinity))
     if (ry < target) target = ry
     if (target <= root.contentY + 0.5) return
 
