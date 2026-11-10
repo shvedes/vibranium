@@ -6,6 +6,7 @@ import Quickshell
 import qs.common
 import qs.features.menu
 import "MenuLib.js" as MenuLib
+import "../../common/math/Range.js" as Range
 import "../../common/text/EditUtils.js" as EditUtils
 import "../../common/ui/RowMetrics.js" as RowMetrics
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
@@ -401,7 +402,7 @@ Rectangle {
   // is the one that repeats under the cursor, so it rides the same tween.
   function _startHeightTransition(target, gen) {
     if (gen >= 0 && (gen !== panel._transitionGen || !panel._transitionActive)) return
-    const next = Math.max(0, Math.min(target, panel.screenMaxListH))
+    const next = Range.clamp(target, 0, panel.screenMaxListH)
     const current = Math.max(0, panel._currentListH())
     // The show gate, honoured here for the first time. The width Behavior
     // below already gates on `shown`, and the comment on the no-Behavior
@@ -482,8 +483,8 @@ Rectangle {
     // growForSlot rather than folded into it - so a slot that opened while
     // a page transition was mid-fit cannot leave the latch holding a
     // dropdown's height after the dropdown closed.
-    return Math.max(0, Math.min(
-      panel.snappedListH(panel.cappedAvailH), panel.screenMaxListH))
+    return Range.clamp(
+      panel.snappedListH(panel.cappedAvailH), 0, panel.screenMaxListH)
   }
 
   function _resolveFit(fit, fitGen, transitionGen) {
@@ -1164,7 +1165,7 @@ Rectangle {
         }
       }
     }
-    const from = Math.min(Math.max(fromIndex, 0), next.length - 1)
+    const from = Range.clamp(fromIndex, 0, next.length - 1)
     for (let i = from; i < next.length; i++) {
       if (panel.isSelectableIndex(i)) return i
     }
@@ -2021,7 +2022,7 @@ Rectangle {
   }
 
   function _snappedRowsH(rows, avail, maxRows) {
-    const limit = Math.max(0, Math.min(avail, panel.screenMaxListH))
+    const limit = Range.clamp(avail, 0, panel.screenMaxListH)
     return RowMetrics.snappedH(rows, maxRows, limit, panel.screenMaxListH,
       panel.rowRestHeight, panel.rowSpacing)
   }
@@ -2238,7 +2239,7 @@ Rectangle {
   // creation and search swaps never change it for the same rows.
   // The inter-row gap is the list's own, read through rowSpacing above.
   function snappedListH(avail, maxRows) {
-    const limit = Math.max(0, Math.min(avail, panel.screenMaxListH))
+    const limit = Range.clamp(avail, 0, panel.screenMaxListH)
     if (panel.gridMode) {
       if (panel.gridSide <= 0 || panel.rowsModel.length === 0) return 0
       if (panel.gridSide > limit)
@@ -3780,7 +3781,7 @@ Rectangle {
   function seatableNear(index) {
     const n = panel.rowsModel.length
     if (n === 0) return -1
-    const start = Math.min(Math.max(0, Math.round(index)), n - 1)
+    const start = Range.clamp(Math.round(index), 0, n - 1)
     for (let i = start; i < n; i++) {
       if (panel.isSelectableIndex(i)) return i
     }
