@@ -340,9 +340,9 @@ PanelWindow {
 
     // Screen-relative margins: a 1080p output and a 3:2 laptop get the same
     // composition instead of the same pixel inset.
-    readonly property real pad: Math.round(Math.max(16, Math.min(48,
-      Math.min(width, height) * 0.055)))
-    readonly property real gap: Math.round(Math.max(20, Math.min(64, width * 0.035)))
+    readonly property real pad: Math.round(Range.clamp(
+      Math.min(width, height) * 0.055, 16, 48))
+    readonly property real gap: Math.round(Range.clamp(width * 0.035, 20, 64))
     readonly property real availW: Math.max(0, width - 2 * pad)
     readonly property real availH: Math.max(0, height - 2 * pad)
     // Cover column share. Capped by the available height so a short, wide
@@ -350,7 +350,7 @@ PanelWindow {
     readonly property real coverW: Math.max(120, Math.min(availW * 0.42, availH * 0.95))
     // Transport pads fill the space between the cover and the lane, sized
     // from the cover column so the whole left group keeps one scale.
-    readonly property real padSlot: Math.round(Math.max(48, Math.min(88, coverW * 0.115)))
+    readonly property real padSlot: Math.round(Range.clamp(coverW * 0.115, 48, 88))
     readonly property real padIcon: Math.round(padSlot * 0.5)
     readonly property real timePx: Math.max(Ui.fontS, Math.round(Ui.fontS * 1.45))
     readonly property real progressH: Math.round(timePx * 1.6)
