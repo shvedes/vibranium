@@ -1684,6 +1684,21 @@ function groupSearchResults(hits, lookup, isVisible, query) {
     })
     for (let s = 0; s < sections.length; s++) rows.push(sections[s])
   }
+  // The group header names where the bucket lives: the first row's
+    // breadcrumb, which is the best hit's location and the page the rest
+    // of the bucket shares it with.
+    function groupHeader(bucket, index) {
+      const head = bucket[0]
+      const headPath = head && Array.isArray(head.path) ? head.path : []
+      const headLabel = headPath.join(" > ")
+      if (headLabel === "") return
+      rows.push({
+        type: "separator",
+        uid: "sep:group" + index,
+        label: headLabel,
+      })
+    }
+
   for (let b = 0; b < buckets.length; b++) {
     // The group header names where the bucket lives: the first row's
     // breadcrumb, which is the best hit's location and the page the rest
@@ -1700,16 +1715,7 @@ function groupSearchResults(hits, lookup, isVisible, query) {
     // bucket simply runs on until the next named header; the absence of a
     // header is not a thing to draw. (An empty bucket, every row of it
     // hoisted into Sections above, opens nothing for the same reason.)
-    const head = buckets[b][0]
-    const headPath = head && Array.isArray(head.path) ? head.path : []
-    const headLabel = headPath.join(" > ")
-    if (headLabel !== "") {
-      rows.push({
-        type: "separator",
-        uid: "sep:group" + b,
-        label: headLabel,
-      })
-    }
+    groupHeader(buckets[b], b)
     for (let j = 0; j < buckets[b].length; j++) {
       rows.push(buckets[b][j])
     }
