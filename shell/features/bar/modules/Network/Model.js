@@ -325,6 +325,15 @@ function requiresCredentials(security, openSecurity, oweSecurity) {
   return security !== openSecurity && security !== oweSecurity
 }
 
+// The interface an `ip route get` reply names, or "" when there is no
+// route. Canonical home of the regex the bar module and its island both
+// ran inline: one spelling keeps "no reply" and "reply without dev" the
+// same answer.
+function routeIface(raw) {
+  var m = /\bdev\s+(\S+)/.exec(String(raw || ""))
+  return m === null ? "" : m[1]
+}
+
 // The poll's raw sample -> the metrics the island renders, as one
 // pure step. `now` is passed in (seconds, like the omarchy reference) so
 // the rate is a pure function of its inputs and the caller keeps the clock.
@@ -531,6 +540,7 @@ if (typeof module !== "undefined") {
     strengthDimTiers: strengthDimTiers,
     parseStats: parseStats,
     throughputState: throughputState,
+    routeIface: routeIface,
     deriveStats: deriveStats,
     formatBytes: formatBytes,
     formatRate: formatRate,

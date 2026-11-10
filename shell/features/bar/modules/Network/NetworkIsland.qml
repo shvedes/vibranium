@@ -1002,8 +1002,7 @@ Item {
   // `ip` that could not start at all are the same answer - no active route -
   // and the library already reads that as the link being down.
   function noteRoute(out) {
-    const m = /\bdev\s+(\S+)/.exec(String(out || ""))
-    const next = m === null ? "" : m[1]
+    const next = Model.routeIface(out)
     if (next === root.statsIface) return
     root.statsIface = next
     if (next === "") {
