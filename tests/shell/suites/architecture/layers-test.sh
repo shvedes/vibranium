@@ -239,7 +239,7 @@ done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
 t_count "features/ holds the 153 files the README publishes" "153" "$(layer_files features)"
 t_count "services/ holds the 25 files the README publishes" "25" "$(layer_files services)"
-t_count "common/ holds the 130 files the README publishes" "130" "$(layer_files common)"
+t_count "common/ holds the 131 files the README publishes" "131" "$(layer_files common)"
 t_count "boot/ holds the 4 files the README publishes" "4" "$(layer_files boot)"
 t_count "the composition root is the single file the README publishes" "1" "$(layer_files composition)"
 

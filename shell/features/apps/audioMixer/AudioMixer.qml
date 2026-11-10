@@ -76,47 +76,44 @@ Singleton {
   }
 
   // --- controller lifecycle ---
-  // One owner string for every demand. UnitGate matches leases by owner, so a
-  // constant owner means the second keypress finds the lease that already
-  // exists instead of minting a parallel one, and it is not Boot's "boot"
-  // nor a bar module's "bar:<id>", so a release here can never take down a
-  // lease someone else is holding.
+  // The lease, the state and the Loader are the shared UnitLease; what each
+  // facade keeps is when to give the controller back.
   readonly property string gateOwner: "audioMixer-facade"
-  property var _lease: null
-  property int _constructions: 0
 
-  // unloaded | loading | ready | unavailable | failed. A verb that cannot
-  // run answers from this instead of vanishing.
-  property string controllerState: "unloaded"
-  property string controllerError: ""
-  readonly property bool controllerReady: root.controllerState === "ready"
+  UnitLease {
+    id: lease
+    unitId: root.unitId
+    owner: root.gateOwner
+    controllerComponent: controllerComp
+  }
+
+  readonly property alias controllerState: lease.phase
+  readonly property alias controllerError: lease.error
+  readonly property bool controllerReady: lease.phase === "ready"
   // The facade is ready as soon as this singleton exists; the boot drain
   // waits for that, not for a controller.
   readonly property bool facadeReady: root.tag !== ""
-  // Controllers built since boot. 0 until the first use, then one per open:
-  // the visible proof that a facade construction does no work and a demand
-  // builds exactly one controller.
-  readonly property int constructions: root._constructions
+  readonly property alias constructions: lease.constructions
 
   // --- public read surface (projected) ---
-  readonly property var _controller: controllerLoader.item
-  readonly property bool routingReady: root._controller !== null
-    ? root._controller.routingReady : false
-  readonly property string routingError: root._controller !== null
-    ? root._controller.routingError : ""
-  readonly property bool routingBusy: root._controller !== null
-    ? root._controller.routingBusy : false
+  readonly property var _controller: lease.controller
+  readonly property bool routingReady: lease.controller !== null
+    ? lease.controller.routingReady : false
+  readonly property string routingError: lease.controller !== null
+    ? lease.controller.routingError : ""
+  readonly property bool routingBusy: lease.controller !== null
+    ? lease.controller.routingBusy : false
   // Devices and streams, as flat arrays. Empty while the controller is gone,
   // which is what a consumer sees between two opens rather than a dangling
   // reference to a window that no longer exists.
-  readonly property var outputDevices: root._controller !== null
-    ? root._controller.outputDevices : []
-  readonly property var inputDevices: root._controller !== null
-    ? root._controller.inputDevices : []
-  readonly property var playbackStreams: root._controller !== null
-    ? root._controller.playbackStreams : []
-  readonly property var captureStreams: root._controller !== null
-    ? root._controller.captureStreams : []
+  readonly property var outputDevices: lease.controller !== null
+    ? lease.controller.outputDevices : []
+  readonly property var inputDevices: lease.controller !== null
+    ? lease.controller.inputDevices : []
+  readonly property var playbackStreams: lease.controller !== null
+    ? lease.controller.playbackStreams : []
+  readonly property var captureStreams: lease.controller !== null
+    ? lease.controller.captureStreams : []
 
   Component.onCompleted: {
     Registry.register("audioMixer", root)
@@ -137,7 +134,7 @@ Singleton {
     // the unit released while its child is still alive. The controller's own
     // destruction drops the node-set observation and the in-flight `pactl`
     // child.
-    root.teardownController()
+    lease.teardown()
     Registry.unregister("audioMixer")
   }
 
@@ -153,7 +150,7 @@ Singleton {
     if (root.visible) return true
     // Demand first: without a controller there is no window to show, so
     // `visible` must not be set either.
-    if (root._demand() === null) return false
+    if (lease.demand() === null) return false
     closeSettle.stop()
     root.visible = true
     return true
@@ -180,92 +177,10 @@ Singleton {
     return root.show()
   }
 
-  // --- demand / teardown ---
-  // Build the controller on first use and keep exactly one. Repeated callers -
-  // a held key, a second IPC verb, the window's own close button - all land
-  // here, and every path out (refused lease, failed construction, unload)
-  // drops the lease again, so a refused or failed caller leaves the next one
-  // a clean unit.
-  function _demand() {
-    if (root.controllerState === "ready" && root._controller !== null) return root._controller
-    const result = UnitGate.ensure(root.unitId, root.gateOwner)
-    if (result === undefined || result === null || result.ok !== true) {
-      // A blocked, failed or unregistered unit still hands back a lease for
-      // two of those three; give it straight back so the record cannot
-      // collect owners for a demand that never loaded.
-      if (result !== undefined && result !== null && result.lease !== undefined && result.lease !== null)
-        root._lease = result.lease
-      root._dropLease()
-      root._setState(result !== undefined && result !== null && result.state === "failed" ? "failed" : "unavailable",
-        result !== undefined && result !== null && result.state === "failed" ? "unit" : "gate")
-      return null
-    }
-    if (result.lease !== root._lease) {
-      root._lease = result.lease
-      // Retained, not merely held: a stray single release (a failed caller
-      // unwinding) must not be able to drop the unit under a live window.
-      UnitGate.retain(result.lease)
-    }
-    root._setState("loading")
-    controllerLoader.active = true
-    if (root._controller === null) {
-      root._unloadFor("unavailable", "load")
-      return null
-    }
-    if (root._controller.startupError !== "") {
-      // A Loader cannot raise a construction error to its caller, so the
-      // controller reports it and the facade answers unavailable and unloads:
-      // the next caller starts from an unloaded unit.
-      root._unloadFor("failed", root._controller.startupError)
-      return null
-    }
-    root._constructions++
-    root._setState("ready")
-    return root._controller
-  }
-
-  // Drop the controller and the lease, then state the outcome. The flag is what
-  // keeps the teardown the gate performs on the way out - it runs
-  // teardownController() from inside the release - from restating "unloaded"
-  // in the middle of a demand that is about to report why it failed, so the
-  // state sequence a consumer sees is the facade's own.
-  property bool _unwinding: false
-
-  function _unloadFor(next, code) {
-    root._unwinding = true
-    root._unload()
-    root._unwinding = false
-    root._setState(next, code)
-  }
-
-  // Drop the controller and the lease without touching the reported state. A
-  // caller that is about to answer unavailable or failed unwinds through here,
-  // so the state it reports is the last one a consumer sees instead of
-  // flapping through "unloaded" on the way there.
-  function _unload() {
-    closeSettle.stop()
-    const held = root._lease !== null || controllerLoader.item !== null
-    controllerLoader.active = false
-    root._dropLease()
-    return held
-  }
-
-  // Idempotent and callable with nothing loaded: Boot's unit teardown hook and
-  // the close settle both land here, and the second call is a no-op rather than
-  // a double release.
+  // Boot's unit teardown hook calls this by name on every facade, so the shared
+  // lease teardown is republished under the name the hook owns.
   function teardownController() {
-    const held = root._unload()
-    if (!root._unwinding) root._setState("unloaded")
-    return held
-  }
-
-  // The gate's teardown hook drops this owner's whole lease set in one call,
-  // so the ensure and the retain that came with it go together and a lost
-  // release cannot leave the record counting an owner nobody holds.
-  function _dropLease() {
-    if (root._lease === null) return false
-    root._lease = null
-    return UnitGate.releaseOwner(root.gateOwner) > 0
+    return lease.teardown()
   }
 
   // --- idle release ---
@@ -280,27 +195,16 @@ Singleton {
     // reports its own state to the next caller, and a timer landing on it
     // would restate that as "unloaded". A window that is up owns its
     // controller outright - the close settle is the path that gives it back.
-    if (root.controllerState !== "ready" || root._controller === null) return false
+    if (root.controllerState !== "ready" || lease.controller === null) return false
     if (root.visible) return false
     // A `pactl list` in flight belongs to the controller and reports through a
     // callback that lives there, so releasing now would drop the parse that
     // was about to publish the routing map.
-    if (root._controller.routingBusy === true) {
+    if (lease.controller.routingBusy === true) {
       idleRelease.restart()
       return false
     }
-    return root.teardownController()
-  }
-
-  function _setState(next, code) {
-    const detail = code || ""
-    if (root.controllerState === next && root.controllerError === detail) return
-    root.controllerState = next
-    root.controllerError = detail
-    // The unit's own ready probe reads controllerReady, and nothing polls a
-    // first_use unit, so the record is settled here instead: the gate must
-    // not sit in "starting" once the controller is up.
-    if (next === "ready") UnitGate.refresh(root.unitId)
+    return lease.teardown()
   }
 
   // --- verbs ---
@@ -335,16 +239,6 @@ Singleton {
   // The controller, and nothing else: a Loader with no source until the first
   // demand, so a facade that is only a registry entry holds no node
   // observation, no peak monitor, no window and no `pactl` child.
-  Loader {
-    id: controllerLoader
-    active: false
-    sourceComponent: controllerComp
-    // Every construction is a demand, so arming here is what covers the demand
-    // that opens no window: the grace starts where the controller arrives, and
-    // an open or a close stops it.
-    onLoaded: idleRelease.restart()
-  }
-
   Component {
     id: controllerComp
 
@@ -357,7 +251,7 @@ Singleton {
     id: closeSettle
     interval: Ui.fastMs + 80
     repeat: false
-    onTriggered: root.teardownController()
+    onTriggered: lease.teardown()
   }
 
   // The grace a demand that opened no window keeps its controller for. Long
