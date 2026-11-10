@@ -514,11 +514,11 @@ function parseSection(raw, fallback, allowId, fileNamespace) {
       section.errors.push("showItemCount must be a boolean")
     else section.showItemCount = raw.showItemCount
   }
-  if (Array.isArray(raw.items)) {
-    // Custom items (actions, submenus, ...) may carry showIf conditions
-    // with the same semantics as options - normalize them now so menu
-    // visibility checks resolve against current values.
-    section.items = raw.items.map(it => {
+  // Custom items (actions, submenus, ...) may carry showIf conditions with
+  // the same semantics as options. Normalizing them here lets the menu's
+  // visibility check resolve against current values.
+  function normalizeItems(items) {
+    return items.map(it => {
       if (!it || typeof it !== "object" || Array.isArray(it)) return it
       if (it.showIf === undefined || it.showIf === null) return it
       const res = normalizeShowIf(it.showIf)
@@ -529,6 +529,7 @@ function parseSection(raw, fallback, allowId, fileNamespace) {
       return Object.assign({}, it, { showIf: res.norm })
     })
   }
+  if (Array.isArray(raw.items)) section.items = normalizeItems(raw.items)
 
   const seen = {}
   const list = Array.isArray(raw.options) ? raw.options : []
