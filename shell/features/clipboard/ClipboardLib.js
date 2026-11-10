@@ -1146,7 +1146,10 @@ function parseGitInfoOutput(text) {
   }
   const lines = String(text || "").split("\n")
   if (lines.length === 0 || lines[0].trim() !== "GIT OK") return null
-  const g = { branch: "", upstream: "", ahead: 0, behind: 0, gone: false, detached: false, staged: 0, unstaged: 0, chash: "", csubject: "", cauthor: "", cemail: "", ctime: "", remote: "" }
+  function emptyGitInfo() {
+    return { branch: "", upstream: "", ahead: 0, behind: 0, gone: false, detached: false, staged: 0, unstaged: 0, chash: "", csubject: "", cauthor: "", cemail: "", ctime: "", remote: "" }
+  }
+  const g = emptyGitInfo()
   let inStatus = false
   let inCommit = false
 
