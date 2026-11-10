@@ -48,23 +48,23 @@ var DAY_LABEL_MAX = 64
 var _dayLabels = ({})
 var _dayLabelCount = 0
 
-function dayLabelOf(at) {
-  var key = at.getFullYear() + "-" + at.getMonth() + "-" + at.getDate()
+function dayLabelOf(d) {
+  var key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate()
   var hit = _dayLabels[key]
   if (hit !== undefined) return hit
-  var label
+  var day
   try {
-    label = at.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    day = d.toLocaleDateString(undefined, { month: "short", day: "numeric" })
   } catch (e) {
-    label = Format.pad2(at.getDate()) + "." + Format.pad2(at.getMonth() + 1)
+    day = Format.pad2(d.getDate()) + "." + Format.pad2(d.getMonth() + 1)
   }
   if (_dayLabelCount >= DAY_LABEL_MAX) {
     _dayLabels = ({})
     _dayLabelCount = 0
   }
-  _dayLabels[key] = label
+  _dayLabels[key] = day
   _dayLabelCount++
-  return label
+  return day
 }
 
 // Copy time. Same calendar day -> clock time, otherwise the day rides along.
