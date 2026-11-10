@@ -11,6 +11,7 @@ import qs.common
 import "../../common/capture/ShotLib.js" as ShotLib
 import "../../common/capture/RectMath.js" as RectMath
 import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/text/StringUtils.js" as SU
 
 // Headless capture protocol, IPC and state owner. A mode resolves its
 // target, grabs one physical frame, probes its decoded size, saves it
@@ -778,7 +779,7 @@ Singleton {
   function _initRuntime() {
     const current = Quickshell.processId
     const clipboardPath = ShotLib.pathFromFileUrl(String(Quickshell.clipboardText ?? ""))
-    const activeFallback = clipboardPath.startsWith(root.fallbackDir + "/")
+    const activeFallback = root.fallbackDir !== "" && SU.isUnder(clipboardPath, root.fallbackDir)
       ? ShotLib.sq(clipboardPath) : "''"
     const mkdirScript = "set -eu; rt=" + ShotLib.sq(Paths.vibraniumRuntime)
       + "; fb=" + ShotLib.sq(root.fallbackDir)
@@ -1228,11 +1229,11 @@ Singleton {
     const suffix = ShotLib.suffixFor(config.fileType)
     const defer = config.autoAnnotate
     const stem = root._nextStem()
-    const cropDst = defer ? root.runtimeDir + "/pending-" + stem + "." + suffix
-      : config.saveToDisk ? Paths.screenshotsDir + "/" + stem + "." + suffix
-      : root.runtimeDir + "/clipboard-" + stem + "." + suffix
+    const cropDst = defer ? SU.joinPath(root.runtimeDir, "pending-" + stem + "." + suffix)
+      : config.saveToDisk ? SU.joinPath(Paths.screenshotsDir, stem + "." + suffix)
+      : SU.joinPath(root.runtimeDir, "clipboard-" + stem + "." + suffix)
     const finalPath = defer && config.saveToDisk
-      ? Paths.screenshotsDir + "/" + stem + "." + suffix : ""
+      ? SU.joinPath(Paths.screenshotsDir, stem + "." + suffix) : ""
     const crop = RectMath.clampRect({
       x: x, y: y, w: w, h: h
     }, seed.frameW, seed.frameH)
@@ -1746,18 +1747,18 @@ Singleton {
     const stem = root._nextStem()
     const isRegion = !isSeed && pendingCrop !== null
     const cropDst = isRegion
-      ? (defer ? root.runtimeDir + "/pending-" + stem + "." + suffix
-        : config.saveToDisk ? Paths.screenshotsDir + "/" + stem + "." + suffix
-        : root.runtimeDir + "/clipboard-" + stem + "." + suffix)
+      ? (defer ? SU.joinPath(root.runtimeDir, "pending-" + stem + "." + suffix)
+        : config.saveToDisk ? SU.joinPath(Paths.screenshotsDir, stem + "." + suffix)
+        : SU.joinPath(root.runtimeDir, "clipboard-" + stem + "." + suffix))
       : ""
-    const fullTemp = isRegion ? root.runtimeDir + "/full-" + stem + "." + suffix : ""
-    const path = isSeed ? root.runtimeDir + "/region-seed-" + stem + ".png"
+    const fullTemp = isRegion ? SU.joinPath(root.runtimeDir, "full-" + stem + "." + suffix) : ""
+    const path = isSeed ? SU.joinPath(root.runtimeDir, "region-seed-" + stem + ".png")
       : isRegion ? fullTemp
-      : defer ? dir + "/pending-" + stem + "." + suffix
-      : config.saveToDisk ? dir + "/" + stem + "." + suffix
-      : dir + "/clipboard-" + stem + "." + suffix
+      : defer ? SU.joinPath(dir, "pending-" + stem + "." + suffix)
+      : config.saveToDisk ? SU.joinPath(dir, stem + "." + suffix)
+      : SU.joinPath(dir, "clipboard-" + stem + "." + suffix)
     const finalPath = defer && config.saveToDisk
-      ? Paths.screenshotsDir + "/" + stem + "." + suffix : ""
+      ? SU.joinPath(Paths.screenshotsDir, stem + "." + suffix) : ""
     // The save plan, before the write. The destination decides the rest of the
     // flow - a deferred temp is consumed by the editor, a clipboard file is
     // deleted after the URI is published, and a seed is deleted when the
@@ -1901,7 +1902,7 @@ Singleton {
       root._setClipboardFallback(path, deleteAfter, fileType, owner, done, failed)
       return
     }
-    if (!String(path).startsWith(root.runtimeDir + "/")) root._forgetPath(path)
+    if (!SU.isUnder(String(path), root.runtimeDir)) root._forgetPath(path)
     const argv = Exec.setsidTimeoutCmd(ShotLib.copyImageCmd(path), 10)
     const proc = copyComp.createObject(root, { command: argv })
     if (proc === null) {
