@@ -606,11 +606,11 @@ Singleton {
   }
 
   function _sinkBar() {
-    return Math.max(0, Math.min(100, Math.round(root.sinkVolume / root.maxVolume * 100)))
+    return Range.clamp(Math.round(root.sinkVolume / root.maxVolume * 100), 0, 100)
   }
 
   function _sourceBar() {
-    return Math.max(0, Math.min(100, Math.round(root.sourceVolume / root.maxSourceVolume * 100)))
+    return Range.clamp(Math.round(root.sourceVolume / root.maxSourceVolume * 100), 0, 100)
   }
 
   function _sinkIcon() {
@@ -735,14 +735,14 @@ Singleton {
     const d = sign * root.step
     if (isSink) {
       root._cancelFade("ipc-adjust")
-      const next = Math.max(0, Math.min(root.maxVolume, root.sinkVolume + d))
+      const next = Range.clamp(root.sinkVolume + d, 0, root.maxVolume)
       // The same rule adjustSink applies: a step that leaves the level above
       // zero lifts the mute, whichever way the step went.
       if (root.sinkMuted && next > 0) root.sink.audio.muted = false
       root.sink.audio.volume = next
       if (!quiet) root._showSinkOSD()
     } else {
-      const next = Math.max(0, Math.min(root.maxSourceVolume, root.sourceVolume + d))
+      const next = Range.clamp(root.sourceVolume + d, 0, root.maxSourceVolume)
       if (root.sourceMuted && next > 0) root.source.audio.muted = false
       root.source.audio.volume = next
       if (!quiet) root._showSourceOSD()
