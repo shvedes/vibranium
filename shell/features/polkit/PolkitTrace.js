@@ -166,23 +166,27 @@ function apply(s, ev) {
   const at = Number(e.at)
   const n = newConversation()
   // Carried across every event, because a rejected turn is the same
-  // conversation as the turn that was rejected.
-  n.action = c.action
-  n.supersedes = c.supersedes
-  n.identities = c.identities
-  n.active = c.active
-  n.closing = c.closing
-  n.waiting = c.waiting
-  n.checking = c.checking
-  n.turns = c.turns
-  n.submits = c.submits
-  n.attempts = c.attempts
-  n.closedBy = c.closedBy
-  n.last = c.last
-  n.by = c.by
-  n.startedAt = c.startedAt
-  n.promptAt = c.promptAt
-  n.submitAt = c.submitAt
+  // conversation as the turn that was rejected. One copy step, so a field
+  // added to the record is carried without touching every event arm.
+  function carry() {
+    n.action = c.action
+    n.supersedes = c.supersedes
+    n.identities = c.identities
+    n.active = c.active
+    n.closing = c.closing
+    n.waiting = c.waiting
+    n.checking = c.checking
+    n.turns = c.turns
+    n.submits = c.submits
+    n.attempts = c.attempts
+    n.closedBy = c.closedBy
+    n.last = c.last
+    n.by = c.by
+    n.startedAt = c.startedAt
+    n.promptAt = c.promptAt
+    n.submitAt = c.submitAt
+  }
+  carry()
 
   switch (String(e.type)) {
     case "request":
