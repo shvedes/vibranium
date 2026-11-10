@@ -6,17 +6,16 @@ import Quickshell.Io
 import qs.common
 import "../text/UnitIpc.js" as UnitIpc
 
-// Watch governor - one FileView per unique path, reference counted,
-// coalesced per tick, echo suppression. Subscribers are notified on
-// file change, creation, or deletion. The governor owns the echo
-// suppression: a write the shell itself made is not dispatched back to
-// the subscribers.
+// Watch governor - one FileView per unique path, reference counted and
+// coalesced per tick. Subscribers are notified on file change, creation,
+// or deletion. The governor never writes a watched file, so every event it
+// dispatches came from another writer.
 Singleton {
   id: root
 
   readonly property string tag: "watch"
 
-  // path -> { subs: [cb], refCount: int, view: FileView, lastWritten: string, pending: bool, eventCount: int }
+  // path -> { subs: [cb], refCount: int, view: FileView, pending: bool, eventCount: int }
   property var _watchers: ({})
 
   // Coalesced dispatch: one event-loop tick batches rapid changes.
@@ -162,7 +161,6 @@ Singleton {
       refCount: 0,
       view: view,
       dirView: dirView,
-      lastWritten: "",
       pending: false,
       eventCount: 0,
       _hasInitial: true,
@@ -203,15 +201,6 @@ Singleton {
       const r = _readView(path, entry.view)
       ok = r.ok
       text = r.text
-      // Echo suppression
-      if (entry.lastWritten !== "" && text === entry.lastWritten) {
-        // Our own write - skip dispatch, but clear the flag after one echo
-        // Keep lastWritten for next comparison, but don't dispatch
-        const next = Object.assign({}, root._watchers)
-        next[path] = entry
-        root._watchers = next
-        continue
-      }
       // Dispatch to subscribers
       for (let i = 0; i < entry.subs.length; i++) {
         entry.subs[i](text)
