@@ -392,7 +392,7 @@ Singleton {
     // The operation is retired before anything visible moves, so a commit
     // cannot be raced by a request that supersedes this one mid-callback.
     root._retire(record.key, "cycle_done")
-    const names = raw.split("\n").filter(l => l).map(l => l.split("/").pop())
+    const names = raw.split("\n").filter(l => l).map(l => SU.basename(l))
     const files = names.filter(f => root._extOk(f)).sort()
     // The theme a listing was issued for has to still be the active one;
     // _onThemeNameChanged retires the cycle outright, and this is the cheap
@@ -1033,7 +1033,7 @@ Singleton {
       root._dropFail("no active theme")
       return
     }
-    let base = url.split("?")[0].split("#")[0].split("/").pop() || ""
+    let base = SU.basename(url.split("?")[0].split("#")[0])
     try { base = decodeURIComponent(base) } catch (e) {}
     if (base !== "") base = root._sanitizeBase(base)
     let ext = ""
