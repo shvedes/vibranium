@@ -39,21 +39,14 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-# Shared settings are loaded only after option validation, so help and invalid
-# argument paths do not source the runtime settings projection.
 source vb-lib-core
 
 log Info "Reloading configuration"
 
-# Restart the configured user units so they reload unit and configuration
-# state; systemctl restart also starts an inactive unit. The target array is
-# expanded as separate arguments for one user restart.
+hyprctl -q reload config-only
+
 SYSTEMD_TARGETS=(vibranium-shell)
 
 if ((${#SYSTEMD_TARGETS[@]} > 0)); then
 	systemctl -q --user restart "${SYSTEMD_TARGETS[@]}"
 fi
-
-# The final Hyprland invocation determines the script status; the earlier
-# service restart is not aggregated into a separate result.
-hyprctl -q reload config-only
