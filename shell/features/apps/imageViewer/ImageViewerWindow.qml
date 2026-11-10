@@ -76,35 +76,9 @@ QtObject {
     if (s.indexOf("://") < 0)
       target = Paths.toFileUrl(s)
     else if (s.startsWith("file:"))
-      target = root._normalizeFileUrl(s)
+      target = Paths.normalizeFileUrl(s)
     root.openFile(Qt.resolvedUrl(target))
     return true
-  }
-
-  // A `file:` URL as a canonical encoded file:// URL, mirroring the facade's
-  // own normalizer: decode to a path and re-encode per segment, so a raw "#"
-  // in a file name lands on "%23" instead of truncating at the fragment
-  // delimiter before the Image ever loads.
-  function _normalizeFileUrl(u) {
-    let p = String(u ?? "")
-    if (p.startsWith("file://")) {
-      p = p.substring(7)
-      if (p.startsWith("localhost/"))
-        p = p.substring(9)
-      else if (p.startsWith("localhost")) {
-        const slash = p.indexOf("/")
-        p = slash >= 0 ? p.substring(slash) : ""
-      }
-      if (p !== "" && p[0] !== "/") p = "/" + p
-    } else if (p.startsWith("file:")) {
-      p = p.substring(5)
-      if (p !== "" && p[0] !== "/") p = "/" + p
-    }
-    try {
-      p = decodeURIComponent(p)
-    } catch (ignored) {
-    }
-    return Paths.toFileUrl(p)
   }
 
   // The loaded file's filesystem path, "" when nothing is loaded. Derived from

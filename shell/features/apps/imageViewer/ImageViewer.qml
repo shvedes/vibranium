@@ -192,35 +192,9 @@ Singleton {
   // whatever happened to sit next to the source file, so the answer refuses and
   // names the reason instead.
   function _asUrl(asked) {
-    if (asked.startsWith("file:")) return root._normalizeFileUrl(asked)
+    if (asked.startsWith("file:")) return Paths.normalizeFileUrl(asked)
     if (asked.startsWith("/")) return Paths.toFileUrl(asked)
     return ""
-  }
-
-  // A `file:` URL as a canonical encoded file:// URL. The remainder is decoded
-  // to a path and re-encoded per segment, so an already-encoded "%23" and a
-  // raw "#" both land on "%23" instead of one double-encoding or the other
-  // truncating at the fragment delimiter.
-  function _normalizeFileUrl(u) {
-    let p = String(u ?? "")
-    if (p.startsWith("file://")) {
-      p = p.substring(7)
-      if (p.startsWith("localhost/"))
-        p = p.substring(9)
-      else if (p.startsWith("localhost")) {
-        const slash = p.indexOf("/")
-        p = slash >= 0 ? p.substring(slash) : ""
-      }
-      if (p !== "" && p[0] !== "/") p = "/" + p
-    } else if (p.startsWith("file:")) {
-      p = p.substring(5)
-      if (p !== "" && p[0] !== "/") p = "/" + p
-    }
-    try {
-      p = decodeURIComponent(p)
-    } catch (ignored) {
-    }
-    return Paths.toFileUrl(p)
   }
 
   // What a demand that could not build reports. The gate's own code is the
