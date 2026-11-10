@@ -1286,26 +1286,26 @@ function search(index, query) {
   // the active cache as well, so the next forward key narrows from these hits
   // instead of falling back to a full scan. Its projection was capped for
   // this exact query length, which is the only input the cap reads.
-  let recent = null
-  for (let i = 0; i < _searchCacheRecent.length; i++) {
-    if (_searchCacheRecent[i].q === q) {
-      recent = _searchCacheRecent[i]
-      break
+  function restoreRecent() {
+    for (let i = 0; i < _searchCacheRecent.length; i++) {
+      const recent = _searchCacheRecent[i]
+      if (recent.q !== q) continue
+      _searchCacheIndex = index
+      _searchCacheLen = index.length
+      _searchCacheQ = q
+      _searchCacheHitSet = recent.hits
+      _searchCacheEntries = recent.rows
+      const at = _searchCacheRecent.indexOf(recent)
+      if (at >= 0) {
+        _searchCacheRecent.splice(at, 1)
+        _searchCacheRecent.push(recent)
+      }
+      return recent.rows.slice()
     }
+    return null
   }
-  if (recent !== null) {
-    _searchCacheIndex = index
-    _searchCacheLen = index.length
-    _searchCacheQ = q
-    _searchCacheHitSet = recent.hits
-    _searchCacheEntries = recent.rows
-    const at = _searchCacheRecent.indexOf(recent)
-    if (at >= 0) {
-      _searchCacheRecent.splice(at, 1)
-      _searchCacheRecent.push(recent)
-    }
-    return recent.rows.slice()
-  }
+  const recentRows = restoreRecent()
+  if (recentRows !== null) return recentRows
 
   // No empty-token guard: `q` is trimmed and non-empty past the check above,
   // and a non-empty string always yields at least one token, so the branch was
@@ -2160,23 +2160,25 @@ function keyRoute(ctx) {
   // through to the shared routes. Delete/Ctrl+D removes a cell that
   // declares a forget command (recents) without closing, so this route
   // is chosen whether or not such a command exists - whether the key is
-  // claimed is the dispatcher's to decide.
-  if (ctx.grid === true && list) {
-    if (k === "deleteKey" || (ctrl && k === "keyD")) return { name: "forget", arg: null }
-    if (k === "left") return { name: "cell", arg: -1 }
-    if (k === "right") return { name: "cell", arg: 1 }
-    if (k === "up") return { name: "gridRow", arg: -1 }
-    if (k === "down") return { name: "gridRow", arg: 1 }
+  // claimed is the dispatcher's to decide. The filter field active on a
+  // grid keeps Left/Right for its caret but still needs Up/Down to jump
+  // rows, so both grid states live in one nested route.
+  function gridRoute() {
+    if (ctx.grid === true && list) {
+      if (k === "deleteKey" || (ctrl && k === "keyD")) return { name: "forget", arg: null }
+      if (k === "left") return { name: "cell", arg: -1 }
+      if (k === "right") return { name: "cell", arg: 1 }
+      if (k === "up") return { name: "gridRow", arg: -1 }
+      if (k === "down") return { name: "gridRow", arg: 1 }
+    }
+    if (ctx.grid === true && !list) {
+      if (k === "up") return { name: "gridRow", arg: -1 }
+      if (k === "down") return { name: "gridRow", arg: 1 }
+    }
+    return null
   }
-
-  // Grid pages with the filter field active: the field owns the caret, so
-  // Left/Right stay unclaimed - but Up/Down must still jump rows, not fall
-  // through to the linear ±1 walk. Without this an emoji query leaves only
-  // Tab for movement and Up/Down steps a single cell instead of a row.
-  if (ctx.grid === true && !list) {
-    if (k === "up") return { name: "gridRow", arg: -1 }
-    if (k === "down") return { name: "gridRow", arg: 1 }
-  }
+  const grid = gridRoute()
+  if (grid !== null) return grid
 
   // Inline editors own navigation: arrows belong to the caret, and list
   // movement must not leak while typing.
