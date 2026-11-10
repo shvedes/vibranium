@@ -113,7 +113,15 @@ Singleton {
   function _unsubscribe(path, cb) {
     const entry = root._watchers[path]
     if (!entry) return
-    entry.subs = entry.subs.filter(s => s !== cb)
+    // Exactly one occurrence. The same callback may be subscribed twice to
+    // the same path, and filtering on identity removed BOTH copies while the
+    // count dropped by one: the other subscription kept the entry alive with
+    // no callback in it, so its events were dispatched to nobody until its
+    // own unsubscribe finally destroyed the view. An unsubscribe this entry
+    // does not hold also must not decrement the count.
+    const index = entry.subs.indexOf(cb)
+    if (index < 0) return
+    entry.subs = entry.subs.slice(0, index).concat(entry.subs.slice(index + 1))
     entry.refCount--
     if (entry.refCount <= 0) {
       // No more subscribers - destroy the FileView
