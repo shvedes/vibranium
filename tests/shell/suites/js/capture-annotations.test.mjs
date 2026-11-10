@@ -2161,8 +2161,8 @@ group('pixelateBox maps the rect corners through the export transform', () => {
   // the mirrored half of the surface.
   eq('a quarter turn', AT.pixelateBox({ x: 0, y: 0, w: 20, h: 10 }, vr, { w: 50, h: 100 }, 90), { x: 40, y: 0, w: 10, h: 20 })
   eq('a quarter turn in the middle', AT.pixelateBox({ x: 30, y: 10, w: 20, h: 10 }, vr, { w: 50, h: 100 }, 90), { x: 30, y: 30, w: 10, h: 20 })
-  eq('a three-quarter turn', AT.pixelateBox({ x: 0, y: 0, w: 20, h: 10 }, vr, { w: 50, h: 100 }, 270), { x: 0, y: 80, w: 11, h: 20 })
-  eq('a half turn', AT.pixelateBox({ x: 0, y: 0, w: 20, h: 10 }, vr, { w: 100, h: 50 }, 180), { x: 80, y: 39, w: 20, h: 11 })
+  eq('a three-quarter turn', AT.pixelateBox({ x: 0, y: 0, w: 20, h: 10 }, vr, { w: 50, h: 100 }, 270), { x: 0, y: 80, w: 10, h: 20 })
+  eq('a half turn', AT.pixelateBox({ x: 0, y: 0, w: 20, h: 10 }, vr, { w: 100, h: 50 }, 180), { x: 80, y: 40, w: 20, h: 10 })
   eq('the whole surface', AT.pixelateBox({ x: 0, y: 0, w: 100, h: 50 }, vr, { w: 100, h: 50 }, 0), { x: 0, y: 0, w: 100, h: 50 })
   eq('a rotated whole surface', AT.pixelateBox({ x: 0, y: 0, w: 100, h: 50 }, vr, { w: 100, h: 50 }, 180), { x: 0, y: 0, w: 100, h: 50 })
   eq('a rect larger than the surface is clipped to it', AT.pixelateBox({ x: 0, y: 0, w: 101, h: 51 }, vr, { w: 100, h: 50 }, 0), { x: 0, y: 0, w: 100, h: 50 })

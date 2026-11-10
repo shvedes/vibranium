@@ -31,6 +31,23 @@ function normRect(x1, y1, x2, y2) {
   return RectMath.normRect(x1, y1, x2, y2)
 }
 
+// Corner pair -> aspect-locked rect (w/h == ratio), dominant axis wins, the
+// quadrant around the anchor preserved. A ratio that is not a positive finite
+// number disables the lock and falls back to normRect.
+function lockRect(x1, y1, x2, y2, ratio) {
+  const base = normRect(x1, y1, x2, y2)
+  if (!_finite(ratio) || ratio <= 0) return base
+  if (base.w === 0 && base.h === 0) return base
+  if (base.w / base.h >= ratio) {
+    base.h = base.w / ratio
+    base.y = y2 >= y1 ? y1 : y1 - base.h
+  } else {
+    base.w = base.h * ratio
+    base.x = x2 >= x1 ? x1 : x1 - base.w
+  }
+  return base
+}
+
 function mapRectToFrame(rect, frameW, frameH, viewW, viewH) {
   if (rect === null || rect === undefined) return _zeroRect()
   const x = _finite(rect.x) ? rect.x : 0
@@ -60,6 +77,210 @@ function mapRectToFrame(rect, frameW, frameH, viewW, viewH) {
 // Intersect with the frame; see RectMath.clampRect.
 function clampRect(rect, fw, fh) {
   return RectMath.clampRect(rect, fw, fh)
+}
+
+// Overlay point -> backing pixels for the export transform: scale the
+// view-relative point, rotate it about the view centre, and re-centre it on
+// the rotated surface.
+function docToBacking(p, vr, k, rot, dw, dh) {
+  const vx = vr.x
+  const vy = vr.y
+  const cx = vr.w / 2
+  const cy = vr.h / 2
+  const a = (_finite(rot) ? rot : 0) * Math.PI / 180
+  const ca = Math.cos(a)
+  const sa = Math.sin(a)
+  const px = k * (p.x - vx) - cx
+  const py = k * (p.y - vy) - cy
+  return {
+    x: px * ca - py * sa + cx,
+    y: px * sa + py * ca + dh / 2
+  }
+}
+
+// The rounded bounding box of a rect's four corners through docToBacking, so
+// getImageData can be handed an integer rect covering the rotated shape.
+function rotBox(rect, vr, k, rot, dw, dh) {
+  const cs = [
+    { x: rect.x, y: rect.y },
+    { x: rect.x + rect.w, y: rect.y },
+    { x: rect.x + rect.w, y: rect.y + rect.h },
+    { x: rect.x, y: rect.y + rect.h }
+  ]
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (let i = 0; i < cs.length; i++) {
+    const q = docToBacking(cs[i], vr, 1, rot, dw, dh)
+    minX = Math.min(minX, q.x)
+    minY = Math.min(minY, q.y)
+    maxX = Math.max(maxX, q.x)
+    maxY = Math.max(maxY, q.y)
+  }
+  return {
+    x: Math.round(minX * k),
+    y: Math.round(minY * k),
+    w: Math.max(1, Math.round((maxX - minX) * k)),
+    h: Math.max(1, Math.round((maxY - minY) * k))
+  }
+}
+
+// The mosaic cell grid for a rect. The grid is anchored to the view origin,
+// so a re-drawn rect mosaics into the same cells, and the step grows with the
+// rect so a full-screen mosaic stays bounded (127 cells on the long axis at
+// most, never finer than 3px).
+function pixelateGrid(rect, vr) {
+  if (rect === null || rect === undefined) return []
+  const x = rect.x, y = rect.y, w = rect.w, h = rect.h
+  if (!_finite(x) || !_finite(y) || !_finite(w) || !_finite(h) || w <= 0 || h <= 0) return []
+  const vx = vr.x, vy = vr.y, vw = vr.w, vh = vr.h
+  if (!_finite(vx) || !_finite(vy) || !_finite(vw) || !_finite(vh)) return []
+  const minX = Math.max(x, vx)
+  const minY = Math.max(y, vy)
+  const maxX = Math.min(x + w, vx + vw)
+  const maxY = Math.min(y + h, vy + vh)
+  if (minX >= maxX || minY >= maxY) return []
+  const step = Math.max(3, Math.ceil(Math.max(w, h) / 127))
+  const firstX = Math.floor((minX - vx) / step)
+  const lastX = Math.ceil((maxX - vx) / step)
+  const firstY = Math.floor((minY - vy) / step)
+  const lastY = Math.ceil((maxY - vy) / step)
+  const cells = []
+  for (let j = firstY; j < lastY; j++) {
+    const cy0 = Math.max(minY, vy + j * step)
+    const cy1 = Math.min(maxY, vy + (j + 1) * step)
+    if (cy1 <= cy0) continue
+    for (let i = firstX; i < lastX; i++) {
+      const cx0 = Math.max(minX, vx + i * step)
+      const cx1 = Math.min(maxX, vx + (i + 1) * step)
+      if (cx1 <= cx0) continue
+      cells.push({
+        rect: { x: cx0, y: cy0, w: cx1 - cx0, h: cy1 - cy0 },
+        center: {
+          x: Math.max(cx0, Math.min(cx1, vx + i * step + step / 2)),
+          y: Math.max(cy0, Math.min(cy1, vy + j * step + step / 2))
+        }
+      })
+    }
+  }
+  return cells
+}
+
+// Map a point through the export rotation into the rotated surface's
+// coordinates. The surface itself is the destination frame: a quarter turn
+// swaps its axes, so the mapping mirrors against the surface edge.
+function _rotPoint(x, y, rot, sw, sh) {
+  const r = ((Number(rot) || 0) % 360 + 360) % 360
+  if (r === 90) return { x: sw - y, y: x }
+  if (r === 180) return { x: sw - x, y: sh - y }
+  if (r === 270) return { x: y, y: sh - x }
+  return { x: x, y: y }
+}
+
+// A view rect -> the pixel box it occupies on the export surface, clipped to
+// the surface. Null when the mapped box lands entirely off the export; a
+// zero-size or NaN surface keeps the NaN box the caller can detect.
+function pixelateBox(rect, vr, surface, rot) {
+  if (!_finite(surface.w) || !_finite(surface.h)) {
+    return { x: NaN, y: NaN, w: NaN, h: NaN }
+  }
+  const x0 = rect.x - vr.x
+  const y0 = rect.y - vr.y
+  const a = _rotPoint(x0, y0, rot, surface.w, surface.h)
+  const b = _rotPoint(x0 + rect.w, y0 + rect.h, rot, surface.w, surface.h)
+  const bx = Math.max(0, Math.floor(Math.min(a.x, b.x)))
+  const by = Math.max(0, Math.floor(Math.min(a.y, b.y)))
+  const ex = Math.min(surface.w, Math.ceil(Math.max(a.x, b.x)))
+  const ey = Math.min(surface.h, Math.ceil(Math.max(a.y, b.y)))
+  const bw = ex - bx
+  const bh = ey - by
+  if (bw < 1 || bh < 1) return null
+  return { x: bx, y: by, w: bw, h: bh }
+}
+
+// One clamped source span per mosaic cell: the span is the cell, not a point
+// in it, so a thin feature inside a cell still contributes to its average.
+// Cells that do not overlap the mapped box carry a null span.
+function pixelateSamples(grid, vr, surface, rot, box) {
+  if (!Array.isArray(grid) || grid.length === 0) return []
+  if (box === null || box === undefined) return []
+  const out = []
+  for (let i = 0; i < grid.length; i++) {
+    const cell = grid[i]
+    const a = _rotPoint(cell.rect.x - vr.x, cell.rect.y - vr.y, rot, surface.w, surface.h)
+    const b = _rotPoint(cell.rect.x + cell.rect.w - vr.x,
+      cell.rect.y + cell.rect.h - vr.y, rot, surface.w, surface.h)
+    const x0 = Math.max(0, Math.floor(Math.min(a.x, b.x) - box.x))
+    const y0 = Math.max(0, Math.floor(Math.min(a.y, b.y) - box.y))
+    const x1 = Math.min(box.w, Math.ceil(Math.max(a.x, b.x) - box.x))
+    const y1 = Math.min(box.h, Math.ceil(Math.max(a.y, b.y) - box.y))
+    out.push({
+      rect: cell.rect,
+      box: x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null
+    })
+  }
+  return out
+}
+
+// The grid's extent in unrotated, view-relative image pixels, clipped to the
+// baked backing. Unrotated because that is the image the blur bakes from.
+function blurSampleBox(grid, vr, imgW, imgH) {
+  if (!Array.isArray(grid) || grid.length === 0) return null
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+  for (let i = 0; i < grid.length; i++) {
+    const r = grid[i].rect
+    minX = Math.min(minX, r.x - vr.x)
+    minY = Math.min(minY, r.y - vr.y)
+    maxX = Math.max(maxX, r.x + r.w - vr.x)
+    maxY = Math.max(maxY, r.y + r.h - vr.y)
+  }
+  const x = Math.max(0, Math.floor(minX))
+  const y = Math.max(0, Math.floor(minY))
+  const w = Math.min(imgW, Math.ceil(maxX)) - x
+  const h = Math.min(imgH, Math.ceil(maxY)) - y
+  if (!(w >= 1) || !(h >= 1)) return null
+  return { x: x, y: y, w: w, h: h }
+}
+
+// The same spans as pixelateSamples, read through the unrotated image
+// mapping: one span per cell, clipped to the baked backing box.
+function blurSamples(grid, vr, box) {
+  if (!Array.isArray(grid) || grid.length === 0) return []
+  if (box === null || box === undefined) return []
+  const out = []
+  for (let i = 0; i < grid.length; i++) {
+    const r = grid[i].rect
+    const x0 = Math.max(box.x, Math.floor(r.x - vr.x))
+    const y0 = Math.max(box.y, Math.floor(r.y - vr.y))
+    const x1 = Math.min(box.x + box.w, Math.ceil(r.x + r.w - vr.x))
+    const y1 = Math.min(box.y + box.h, Math.ceil(r.y + r.h - vr.y))
+    out.push({ rect: r, box: x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null })
+  }
+  return out
+}
+
+// The average colour a cell covers: every pixel in the span, not one texel in
+// it. Returns [r, g, b] or null when the span has no pixels in the block.
+function cellMean(px, box, span) {
+  if (px === null || px === undefined || !px.data) return null
+  if (box === null || box === undefined || span === null || span === undefined) return null
+  const W = px.width, H = px.height
+  if (!_finite(W) || !_finite(H) || W <= 0 || H <= 0) return null
+  if (px.data.length < W * H * 4) return null
+  const x0 = Math.max(0, Math.floor(Math.max(span.x, box.x)))
+  const y0 = Math.max(0, Math.floor(Math.max(span.y, box.y)))
+  const x1 = Math.min(W, Math.ceil(Math.min(span.x + span.w, box.x + box.w)))
+  const y1 = Math.min(H, Math.ceil(Math.min(span.y + span.h, box.y + box.h)))
+  if (x1 <= x0 || y1 <= y0) return null
+  let r = 0, g = 0, b = 0, n = 0
+  for (let y = y0; y < y1; y++) {
+    for (let x = x0; x < x1; x++) {
+      const o = (y * W + x) * 4
+      r += px.data[o]
+      g += px.data[o + 1]
+      b += px.data[o + 2]
+      n++
+    }
+  }
+  return [Math.round(r / n), Math.round(g / n), Math.round(b / n)]
 }
 
 // Shared fit policy for display geometry and input mapping.
@@ -217,9 +438,10 @@ function hitStroke(stroke, px, py, tolerance) {
     const radial = Math.abs(1 - Math.sqrt(nx * nx + ny * ny)) * Math.min(rx, ry)
     return radial <= tolBase
   }
-  if (tool === "blur") {
-    // A blur region is a filled area, not an outline: clicking anywhere in it
-    // erases it, which is the only thing the eraser could mean here.
+  if (tool === "blur" || tool === "pixelate") {
+    // A blur or pixelate region is a filled area, not an outline: clicking
+    // anywhere in it erases it, which is the only thing the eraser could mean
+    // here.
     if (pts.length < 2) return false
     const r = _corners(stroke)
     return px >= r.x - tolBase && px <= r.x + r.w + tolBase
@@ -306,11 +528,35 @@ function _segmentIntersectsRect(a, b, rect) {
     || _segmentsIntersect(a, b, { x: x0, y: y1 }, { x: x0, y: y0 })
 }
 
-// Crop filter for crop-commit: drops fully-outside strokes, keeps the
-// rest VERBATIM in absolute document coordinates. Coordinates are never
-// translated (the view rect owns the origin); translating here as well
+// Crop filter for crop-commit: keeps every stroke that touches the rect -
+// any point inside it, or a segment crossing it - and drops the rest. The
+// survivors stay VERBATIM in absolute document coordinates. Coordinates are
+// never translated (the view rect owns the origin); translating here as well
 // would double-shift every stroke. Partially-outside strokes stay whole -
 // the canvas backing clips them for free.
+function cropDocument(strokes, rect) {
+  if (!Array.isArray(strokes)) return []
+  if (rect === null || rect === undefined) return []
+  if (!_finite(rect.x) || !_finite(rect.y) || !_finite(rect.w) || !_finite(rect.h)) return []
+  const out = []
+  for (let i = 0; i < strokes.length; i++) {
+    const stroke = strokes[i]
+    if (stroke === null || stroke === undefined || !Array.isArray(stroke.points)) continue
+    let kept = false
+    let prev = null
+    for (let j = 0; j < stroke.points.length; j++) {
+      const p = stroke.points[j]
+      if (!_point(p)) continue
+      if (_pointInRect(p, rect) || (prev !== null && _segmentIntersectsRect(prev, p, rect))) {
+        kept = true
+        break
+      }
+      prev = p
+    }
+    if (kept) out.push(stroke)
+  }
+  return out
+}
 // --- document view geometry ---
 // A document rect inside the document view rect, in absolute document
 // pixels. The subtraction is unguarded on purpose: a non-finite field is
