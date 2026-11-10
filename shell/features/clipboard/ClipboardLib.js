@@ -353,7 +353,12 @@ function searchEntries(entries, query, cap) {
   const q = SL.normalizeQuery(query)
   if (q === "") return entries.slice(0, cap !== undefined ? cap : entries.length)
   const tokens = SL.splitTokens(q)
-  const scored = []
+  // Parallel arrays, not one object per hit: a one-character query matches a
+  // large share of the history, and minting a fresh {e, s} per hit is garbage
+  // the next collection has to walk while the user is still typing. The scan
+  // position is the push index, so no per-hit index field is needed either.
+  const hitEntries = []
+  const hitScores = []
   for (let i = 0; i < entries.length; i++) {
     const e = entries[i]
     const hay = e.hay || ""
@@ -361,8 +366,20 @@ function searchEntries(entries, query, cap) {
     // Whole-title exact match wins outright - typing a pinned app name
     // or a file basename lands on it before longer texts that merely
     // contain the same word.
+    //
+    // The lowercased title is kept on the entry, the way the caller already
+    // keeps `hay` and `words` on it: a history of a thousand rows re-lowered
+    // every title on every keystroke, and the title cannot change under a
+    // scan.
     let baseScore = 0
-    if (e.title !== undefined && String(e.title).toLowerCase() === q) baseScore = 600
+    if (e.title !== undefined) {
+      let lower = e.titleLower
+      if (lower === undefined) {
+        lower = String(e.title).toLowerCase()
+        e.titleLower = lower
+      }
+      if (lower === q) baseScore = 600
+    }
     let ok = true
     let total = baseScore
     for (let t = 0; t < tokens.length; t++) {
@@ -392,12 +409,21 @@ function searchEntries(entries, query, cap) {
       if (s < 0) { ok = false; break }
       total += s
     }
-    if (ok) scored.push({ e: e, s: total })
+    if (ok) {
+      hitEntries.push(e)
+      hitScores.push(total)
+    }
   }
-  scored.sort((a, b) => b.s - a.s)
-  const n = Math.min(scored.length, cap !== undefined ? cap : scored.length)
+  // Rank an order array over the hits and materialize only the cap. The
+  // explicit position tiebreak keeps equal scores in scan order instead of
+  // relying on the engine's sort being stable.
+  const m = hitEntries.length
+  const order = new Array(m)
+  for (let i = 0; i < m; i++) order[i] = i
+  order.sort((a, b) => hitScores[b] - hitScores[a] || a - b)
+  const n = Math.min(m, cap !== undefined ? cap : m)
   const out = new Array(n)
-  for (let i = 0; i < n; i++) out[i] = scored[i].e
+  for (let i = 0; i < n; i++) out[i] = hitEntries[order[i]]
   return out
 }
 
