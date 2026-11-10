@@ -570,13 +570,16 @@ function parseCatalog(text) {
 
   const sections = []
   const byKey = {}
-  for (let i = 0; i < rawSections.length; i++) {
-    const section = parseSection(rawSections[i], "section " + (i + 1), allowId, null)
-    sections.push(section)
-    for (let o = 0; o < section.options.length; o++) {
-      byKey[section.options[o].key] = section.options[o]
+  function parseSections() {
+    for (let i = 0; i < rawSections.length; i++) {
+      const section = parseSection(rawSections[i], "section " + (i + 1), allowId, null)
+      sections.push(section)
+      for (let o = 0; o < section.options.length; o++) {
+        byKey[section.options[o].key] = section.options[o]
+      }
     }
   }
+  parseSections()
 
   // Derived page ids must stay unique: identical labels get a numeric
   // suffix so navigation never merges two pages.
