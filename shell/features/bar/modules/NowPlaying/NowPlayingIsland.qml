@@ -8,6 +8,7 @@ import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
 import "../../../../common/text/Format.js" as Format
 import "../../../../common/motion/Marquee.js" as Marquee
+import "../../../../common/math/Range.js" as Range
 
 // Now Playing island. Lockscreen flat-box language (square corners,
 // translucent theme fill, 1px keyline): large art left, track lines +
@@ -1411,7 +1412,7 @@ Item {
                   color: Ui.tint("foreground_1", 0.25)
 
                   Rectangle {
-                    width: parent.width * Math.max(0, Math.min(1, root.playerVolume))
+                    width: parent.width * Range.clamp01(root.playerVolume)
                     height: parent.height
                     color: Ui.solid("accent")
 
