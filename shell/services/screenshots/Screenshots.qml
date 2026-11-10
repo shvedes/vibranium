@@ -387,55 +387,55 @@ Singleton {
     if (job.win !== null && job.win !== undefined) job.win.frameProbe.source = ""
     root._grabResult = null
     if (job.cropTo !== "" && job.cropTo !== undefined && job.crop !== null && job.crop !== undefined) {
-      const c = job.crop
-      const full = String(job.path)
-      const dst = String(job.cropTo)
-      // An external cropper, and deliberately so. The shell-native
-      // equivalent is a QImage-backed Canvas - AnnotationEditor's
-      // exportCanvas does exactly this on save, measured at 18ms against
-      // magick's 88ms here - but a Canvas only reaches onPaint inside a
-      // MAPPED window, and a region capture's window belongs to the
-      // annotation overlay, which the headless service cannot reach.
-      // Hosting the canvas in this file's own shotWin does not help either:
-      // that window is only mapped for a fullscreen capture, which is the
-      // one mode that never crops. So the cut stays a process until either
-      // the overlay performs it (a contract change - the service hands it
-      // the rect and the destination and awaits the file) or the service
-      // maps a window of its own for the cut.
-      const argv = Exec.setsidTimeoutCmd(["magick", full, "-crop",
-        c.w + "x" + c.h + "+" + c.x + "+" + c.y, "+repage", dst], 15)
-      const proc = cropComp.createObject(root, { command: argv })
-      if (proc === null) {
-        root._removeJobPaths(full, dst)
-        root._fail(job.win, "crop process failed", flowId, jobId)
-        return
-      }
-      root._cropProcess = proc
-      root._cropJob = job
-      proc.exited.connect((code) => {
-        const timedOut = code === 124
-        proc.destroy()
-        if (root._cropProcess === proc) root._cropProcess = null
-        if (root._cropJob === job) root._cropJob = null
-        if (!ShotLib.jobLive(jobId, root._activeJob, flowId, root._activeFlow)) {
-          root._removeJobPaths(full, dst)
-          return
-        }
-        if (code !== 0) {
-          root._removeJobPaths(full, dst)
-          root._fail(job.win, timedOut ? "crop timed out" : "crop failed", flowId, jobId)
-          return
-        }
-        Exec.rm(full)
-        root._forgetPath(full)
-        job.path = dst
-        job.cropTo = ""
-        root._deliverTail(job)
-      })
-      proc.running = true
+      root._startCrop(job, String(job.path), String(job.cropTo), flowId, jobId)
       return
     }
     root._deliverTail(job)
+  }
+
+  // An external cropper, and deliberately so. The shell-native equivalent is
+  // a QImage-backed Canvas - AnnotationEditor's exportCanvas does exactly this
+  // on save, measured at 18ms against magick's 88ms here - but a Canvas only
+  // reaches onPaint inside a MAPPED window, and a region capture's window
+  // belongs to the annotation overlay, which the headless service cannot
+  // reach. Hosting the canvas in this file's own shotWin does not help either:
+  // that window is only mapped for a fullscreen capture, which is the one mode
+  // that never crops. So the cut stays a process until either the overlay
+  // performs it (a contract change - the service hands it the rect and the
+  // destination and awaits the file) or the service maps a window of its own.
+  function _startCrop(job, full, dst, flowId, jobId) {
+    const c = job.crop
+    const argv = Exec.setsidTimeoutCmd(["magick", full, "-crop",
+      c.w + "x" + c.h + "+" + c.x + "+" + c.y, "+repage", dst], 15)
+    const proc = cropComp.createObject(root, { command: argv })
+    if (proc === null) {
+      root._removeJobPaths(full, dst)
+      root._fail(job.win, "crop process failed", flowId, jobId)
+      return
+    }
+    root._cropProcess = proc
+    root._cropJob = job
+    proc.exited.connect((code) => {
+      const timedOut = code === 124
+      proc.destroy()
+      if (root._cropProcess === proc) root._cropProcess = null
+      if (root._cropJob === job) root._cropJob = null
+      if (!ShotLib.jobLive(jobId, root._activeJob, flowId, root._activeFlow)) {
+        root._removeJobPaths(full, dst)
+        return
+      }
+      if (code !== 0) {
+        root._removeJobPaths(full, dst)
+        root._fail(job.win, timedOut ? "crop timed out" : "crop failed", flowId, jobId)
+        return
+      }
+      Exec.rm(full)
+      root._forgetPath(full)
+      job.path = dst
+      job.cropTo = ""
+      root._deliverTail(job)
+    })
+    proc.running = true
   }
 
   function _deliverTail(job) {
@@ -448,14 +448,7 @@ Singleton {
     root._activeJob = 0
     root._releaseShot()
     if (job.defer) {
-      root._pendingAnnotate = {
-        temp: job.path, final: job.finalPath, prev: root.lastPath,
-        config: job.config, flowId: job.flowId, screen: job.screen
-      }
-      if (!root.annotate(job.path, job.flowId)) {
-        root._abortPendingAnnotate("Annotator unavailable")
-      }
-      gc()
+      root._deferAnnotate(job)
       return
     }
     root._pendingAnnotate = null
@@ -471,6 +464,19 @@ Singleton {
     root._copyImage(job.path, !job.config.saveToDisk, job.config.fileType, delivery,
       () => root._finishDelivery(delivery),
       () => root._failDelivery(delivery, "Clipboard image copy failed"))
+  }
+
+  // The annotate step of a deferred capture: the temp stays owned by the
+  // pending record until the editor answers.
+  function _deferAnnotate(job) {
+    root._pendingAnnotate = {
+      temp: job.path, final: job.finalPath, prev: root.lastPath,
+      config: job.config, flowId: job.flowId, screen: job.screen
+    }
+    if (!root.annotate(job.path, job.flowId)) {
+      root._abortPendingAnnotate("Annotator unavailable")
+    }
+    gc()
   }
 
   // Deferred-annotation handshake (unique temp file, see _finishTail).
@@ -1701,6 +1707,39 @@ Singleton {
     }
   }
 
+  // The file plan for one capture, before anything is written. `dir` is the
+  // destination root, `cropDst` the region target that the tail consumes,
+  // and `finalPath` the saved destination a deferred capture lands on after
+  // annotation. Pure over the config and the mode, so the two planners do
+  // not have to keep two copies of the pending/clipboard/saved branches in
+  // step.
+  function _planShotPaths(config, mode, pendingCrop, stem) {
+    const suffix = ShotLib.suffixFor(config.fileType)
+    const isSeed = mode === "region-seed"
+    const defer = !isSeed && config.autoAnnotate
+    const dir = defer ? root.runtimeDir
+      : (config.saveToDisk && !isSeed ? Paths.screenshotsDir : root.runtimeDir)
+    const isRegion = !isSeed && pendingCrop !== null
+    const cropDst = isRegion
+      ? (defer ? SU.joinPath(root.runtimeDir, "pending-" + stem + "." + suffix)
+        : config.saveToDisk ? SU.joinPath(Paths.screenshotsDir, stem + "." + suffix)
+        : SU.joinPath(root.runtimeDir, "clipboard-" + stem + "." + suffix))
+      : ""
+    const fullTemp = isRegion ? SU.joinPath(root.runtimeDir, "full-" + stem + "." + suffix) : ""
+    const path = isSeed ? SU.joinPath(root.runtimeDir, "region-seed-" + stem + ".png")
+      : isRegion ? fullTemp
+      : defer ? SU.joinPath(dir, "pending-" + stem + "." + suffix)
+      : config.saveToDisk ? SU.joinPath(dir, stem + "." + suffix)
+      : SU.joinPath(dir, "clipboard-" + stem + "." + suffix)
+    const finalPath = defer && config.saveToDisk
+      ? SU.joinPath(Paths.screenshotsDir, stem + "." + suffix) : ""
+    return {
+      suffix: suffix, dir: dir, isSeed: isSeed, isRegion: isRegion,
+      defer: defer, cropDst: cropDst, fullTemp: fullTemp,
+      path: path, finalPath: finalPath
+    }
+  }
+
   function _finish(win, probeImage, expectedJobId, expectedFlowId) {
     const pending = root._pendingFinish
     const jobId = Number(expectedJobId) || 0
@@ -1738,27 +1777,12 @@ Singleton {
       root._fail(win, "empty frame", flowId, jobId)
       return
     }
-    const ft = config.fileType
-    const suffix = ShotLib.suffixFor(ft)
-    const isSeed = mode === "region-seed"
-    const defer = !isSeed && config.autoAnnotate
-    const dir = defer ? root.runtimeDir
-      : (config.saveToDisk && !isSeed ? Paths.screenshotsDir : root.runtimeDir)
-    const stem = root._nextStem()
-    const isRegion = !isSeed && pendingCrop !== null
-    const cropDst = isRegion
-      ? (defer ? SU.joinPath(root.runtimeDir, "pending-" + stem + "." + suffix)
-        : config.saveToDisk ? SU.joinPath(Paths.screenshotsDir, stem + "." + suffix)
-        : SU.joinPath(root.runtimeDir, "clipboard-" + stem + "." + suffix))
-      : ""
-    const fullTemp = isRegion ? SU.joinPath(root.runtimeDir, "full-" + stem + "." + suffix) : ""
-    const path = isSeed ? SU.joinPath(root.runtimeDir, "region-seed-" + stem + ".png")
-      : isRegion ? fullTemp
-      : defer ? SU.joinPath(dir, "pending-" + stem + "." + suffix)
-      : config.saveToDisk ? SU.joinPath(dir, stem + "." + suffix)
-      : SU.joinPath(dir, "clipboard-" + stem + "." + suffix)
-    const finalPath = defer && config.saveToDisk
-      ? SU.joinPath(Paths.screenshotsDir, stem + "." + suffix) : ""
+    const plan = root._planShotPaths(config, mode, pendingCrop, root._nextStem())
+    const defer = plan.defer
+    const cropDst = plan.cropDst
+    const fullTemp = plan.fullTemp
+    const path = plan.path
+    const finalPath = plan.finalPath
     // The save plan, before the write. The destination decides the rest of the
     // flow - a deferred temp is consumed by the editor, a clipboard file is
     // deleted after the URI is published, and a seed is deleted when the
