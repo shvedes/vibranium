@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import Quickshell.Wayland
 import qs.common
+import "../../common/math/Range.js" as Range
 import qs.features.notifications
 import "NotificationsLib.js" as NotificationsLib
 
@@ -82,7 +83,7 @@ PanelWindow {
   // Narrower than the 360 this started at, because a notification is a line of
   // title plus a line or two of body, and at 360 the body wrapped early enough
   // that most notifications spent a line on nothing.
-  readonly property real cardWidth: Math.max(200, Math.min(330, win.width - 2 * win.margin))
+  readonly property real cardWidth: Range.clamp(win.width - 2 * win.margin, 200, 330)
 
   // Whether the pile has been placed at its dock yet. The box's tween is gated
   // on this so the first layout lands rather than growing up from nothing; see
