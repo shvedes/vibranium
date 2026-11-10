@@ -46,6 +46,9 @@ function truncateText(s, max) {
   const t = String(s).replace(/\s+/g, " ").trim()
   const m = max || 80
   if (t.length <= m) return t
+  // Below the ellipsis budget the cut is the cap itself: "..." is three
+  // characters and would make a short request longer than asked for.
+  if (m <= 3) return t.substring(0, Math.max(0, m))
   return t.substring(0, m - 3) + "..."
 }
 
@@ -56,6 +59,9 @@ function truncatePath(path, max) {
   const p = String(path)
   const m = max || 48
   if (p.length <= m) return p
+  // Below the ellipsis budget there is no room for the marker, so the tail
+  // is the whole answer rather than a string three characters over the cap.
+  if (m <= 3) return p.substring(Math.max(0, p.length - Math.max(0, m)))
   const keep = m - 3 // room for the leading "..."
   const tail = p.substring(p.length - keep)
   const slash = tail.indexOf("/")

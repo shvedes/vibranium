@@ -429,4 +429,13 @@ group('a colour that is not there is simply not written', () => {
   eq('a blank colour', SU.linkMarkup('body', '   ', ''), '<style>a { text-decoration: none; }</style>body')
 })
 
+group('the truncate helpers never return more than the requested cap', () => {
+  eq('truncateText at the cap', SU.truncateText('abcdef', 6), 'abcdef')
+  eq('truncateText above the cap keeps the head and the marker', SU.truncateText('abcdefgh', 6), 'abc...')
+  eq('truncateText below the ellipsis budget cuts to the cap', SU.truncateText('abcdef', 2), 'ab')
+  eq('truncateText at zero falls back to the default width', SU.truncateText('abcdef', 0), 'abcdef')
+  eq('truncatePath at the cap', SU.truncatePath('/a/b', 4), '/a/b')
+  eq('truncatePath below the ellipsis budget keeps the tail', SU.truncatePath('/a/b', 2), '/b')
+})
+
 finish()
