@@ -497,9 +497,6 @@ Item {
     root.player.togglePlaying()
   }
 
-  // mm:ss clock for the textual progress below (shared lib).
-  function fmtTime(s) { return NP.fmtTime(s) }
-
   // Discrete MPRIS position, polled like the lockscreen: the notify
   // re-evaluates shownPosition, the strip width follows. The card polls
   // whichever client it shows, including the active one.
@@ -1229,7 +1226,7 @@ Item {
               Text {
                 anchors.verticalCenter: parent.verticalCenter
                 width: root.timeColumnWidth
-                text: root.lengthSec > 0 ? root.fmtTime(root.shownPosition, root.lengthSec) : "--:--"
+                text: root.lengthSec > 0 ? NP.fmtTime(root.shownPosition, root.lengthSec) : "--:--"
                 color: Ui.tint("foreground_1", 0.55)
                 font.pixelSize: Ui.fontXs
                 font.family: Ui.fontFamily
@@ -1335,7 +1332,7 @@ Item {
               Text {
                 anchors.verticalCenter: parent.verticalCenter
                 width: root.timeColumnWidth
-                text: root.lengthSec > 0 ? root.fmtTime(root.lengthSec, root.lengthSec) : "--:--"
+                text: root.lengthSec > 0 ? NP.fmtTime(root.lengthSec, root.lengthSec) : "--:--"
                 color: Ui.tint("foreground_1", 0.55)
                 font.pixelSize: Ui.fontXs
                 font.family: Ui.fontFamily
