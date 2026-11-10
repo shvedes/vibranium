@@ -9,6 +9,7 @@ import qs.common
 import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/text/Duration.js" as DurationFmt
+import "../../common/math/Range.js" as Range
 
 // Fully internal countdown timer. No state file, no external helper -
 // everything lives in this singleton's memory. The menu's
@@ -354,7 +355,7 @@ Singleton {
   function _backoffMs(fails, baseMs, maxMs) {
     if (!(fails > 0)) return 0
     const delay = baseMs * Math.pow(2, Math.max(1, Math.floor(fails)) - 1)
-    return Math.min(maxMs, Math.max(baseMs, Math.floor(delay)))
+    return Range.clamp(Math.floor(delay), baseMs, maxMs)
   }
 
   // A settled job owns nothing and the registry destroys it on its own
