@@ -6,6 +6,7 @@ import qs.common
 import qs.features.bar
 import "BarLib.js" as BarLib
 import "../../common/collections/ZoneGeometry.js" as ZoneGeometry
+import "../../common/math/Range.js" as Range
 
 // One bar zone (left / center / right). Renders the zone's slots from a
 // single ordered model - layout slots (plain modules and module groups)
@@ -778,7 +779,7 @@ Item {
         if (t.leaving && t.leaving[e.id] !== undefined) continue
         slots.push({ x: t.xForSlot(e.kind, e.id), width: t.widthFor(e.kind, e.id) })
       }
-      idx = Math.max(0, Math.min(BarLib.dropTarget(slots, slots.length, root.overZoneX).to, slots.length))
+      idx = Range.clamp(BarLib.dropTarget(slots, slots.length, root.overZoneX).to, 0, slots.length)
     }
     root.releaseWorkList()
     root.clearDrag()
