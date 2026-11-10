@@ -288,9 +288,9 @@ function _byte(x) {
   return h.length < 2 ? "0" + h : h
 }
 
-// Lowercase #rrggbb, or null when the channels are unusable.
+// Lowercase #rrggbb, or "" when the channels are unusable.
 function hex6(c) {
-  if (!valid(c)) return null
+  if (!valid(c)) return ""
   return "#" + _byte(c.r) + _byte(c.g) + _byte(c.b)
 }
 
