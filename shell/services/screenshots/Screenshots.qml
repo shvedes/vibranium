@@ -1606,6 +1606,13 @@ Singleton {
     }
   }
 
+  function _stopGrabWatchdog() {
+    grabWatchdog.stop()
+    grabWatchdog.win = null
+    grabWatchdog.jobId = 0
+    grabWatchdog.flowId = 0
+  }
+
   // Qt multiplies targetSize by its effective DPR. Convert the physical
   // screencopy source size into that target space before grabbing.
   function _grabView(win, expectedJobId, expectedFlowId) {
@@ -1632,18 +1639,11 @@ Singleton {
     const grab = win.view.grabToImage(result => {
       if (!ShotLib.jobLive(jobId, root._activeJob, flowId, root._activeFlow)
         || Number(win.jobId) !== jobId) {
-        if (grabWatchdog.jobId === jobId && grabWatchdog.flowId === flowId) {
-          grabWatchdog.stop()
-          grabWatchdog.win = null
-          grabWatchdog.jobId = 0
-          grabWatchdog.flowId = 0
-        }
+        if (grabWatchdog.jobId === jobId && grabWatchdog.flowId === flowId)
+          root._stopGrabWatchdog()
         return
       }
-      grabWatchdog.stop()
-      grabWatchdog.win = null
-      grabWatchdog.jobId = 0
-      grabWatchdog.flowId = 0
+      root._stopGrabWatchdog()
       const url = result !== null && result !== undefined && result.url !== undefined
         ? String(result.url) : ""
       if (url === "") {
@@ -1665,10 +1665,7 @@ Singleton {
       // Refused synchronously: nothing was scheduled and the watchdog is
       // the only thing still running, so it is stopped here rather than
       // left to fire a second, misleading failure.
-      grabWatchdog.stop()
-      grabWatchdog.win = null
-      grabWatchdog.jobId = 0
-      grabWatchdog.flowId = 0
+      root._stopGrabWatchdog()
       root._fail(win, "grabToImage refused", flowId, jobId)
     }
   }
