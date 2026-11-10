@@ -254,40 +254,50 @@ QtObject {
     // Below the button, not above. Both bars are anchored near the top of the
     // window, so a hint above runs off the edge and is clipped; below, the
     // middle of the window is there to be drawn on.
-    Rectangle {
-      id: btnHint
+    HintBubble {
+      anchorItem: btn
+      label: btn.tip
+      open: ma.containsMouse
+    }
+  }
 
-      visible: ma.containsMouse && btn.tip !== ""
-      // Width first, and it is written above `x` on purpose: `x` reads `width`,
-      // and `width` reads the label's `implicitWidth`, so evaluating the position
-      // against a zero width would centre the bubble on nothing and pin it to
-      // the left edge until the label had been measured.
-      width: Math.min(btnHintText.implicitWidth + 16, 240)
-      height: btnHintText.implicitHeight + 10
-      // Centred under the button and clamped to the window, so a hint on the
-      // first or last control stays on screen. Measured on a four-button row:
-      // the middle three centre exactly, and only the leftmost clamps - a hint
-      // wider than the space to its left has nowhere else to go.
-      x: Range.clamp(btn.mapToItem(root.win, 0, 0).x + Math.round((btn.width - width) / 2),
-                     0, Math.max(0, root.win.width - width))
-      y: btn.height + 6
-      radius: RoundingPolicy.radius
-      color: Ui.tint("background_0", 0.94)
-      border.width: 1
-      border.color: Ui.tint("foreground_0", 0.26)
-      z: 10
+  // A hover hint below a toolbar control. Plain items rather than
+  // `QtQuick.Controls.ToolTip`, which this tree cannot import. Width is
+  // written above `x` on purpose: `x` reads `width`, and `width` reads the
+  // label's `implicitWidth`, so evaluating the position against a zero width
+  // would centre the bubble on nothing and pin it to the left edge.
+  component HintBubble: Rectangle {
+    id: hint
 
-      Text {
-        id: btnHintText
+    property Item anchorItem
+    property string label: ""
+    property bool open: false
 
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, 224)
-        text: btn.tip
-        color: Ui.solid("foreground_0")
-        font.pixelSize: 11
-        font.family: Ui.fontFamily
-        elide: Text.ElideRight
-      }
+    visible: hint.open && hint.label !== ""
+    width: Math.min(hintText.implicitWidth + 16, 240)
+    height: hintText.implicitHeight + 10
+    // Centred under the control and clamped to the window, so a hint on the
+    // first or last button stays on screen.
+    x: Range.clamp(hint.anchorItem.mapToItem(root.win, 0, 0).x
+                   + Math.round((hint.anchorItem.width - width) / 2),
+                   0, Math.max(0, root.win.width - width))
+    y: hint.anchorItem.height + 6
+    radius: RoundingPolicy.radius
+    color: Ui.tint("background_0", 0.94)
+    border.width: 1
+    border.color: Ui.tint("foreground_0", 0.26)
+    z: 10
+
+    Text {
+      id: hintText
+
+      anchors.centerIn: parent
+      width: Math.min(implicitWidth, 224)
+      text: hint.label
+      color: Ui.solid("foreground_0")
+      font.pixelSize: 11
+      font.family: Ui.fontFamily
+      elide: Text.ElideRight
     }
   }
 
@@ -326,32 +336,10 @@ QtObject {
     // The hover hint, built the same way as `Btn`'s: plain items rather than
     // `QtQuick.Controls.ToolTip`, which this tree cannot import. Below the
     // button, for the reason on `Btn`'s.
-    Rectangle {
-      id: ibtnHint
-
-      visible: ima.containsMouse && ibtn.tip !== ""
-      width: Math.min(ibtnHintText.implicitWidth + 16, 240)
-      height: ibtnHintText.implicitHeight + 10
-      x: Range.clamp(ibtn.mapToItem(root.win, 0, 0).x + Math.round((ibtn.width - width) / 2),
-                     0, Math.max(0, root.win.width - width))
-      y: ibtn.height + 6
-      radius: RoundingPolicy.radius
-      color: Ui.tint("background_0", 0.94)
-      border.width: 1
-      border.color: Ui.tint("foreground_0", 0.26)
-      z: 10
-
-      Text {
-        id: ibtnHintText
-
-        anchors.centerIn: parent
-        width: Math.min(implicitWidth, 224)
-        text: ibtn.tip
-        color: Ui.solid("foreground_0")
-        font.pixelSize: 11
-        font.family: Ui.fontFamily
-        elide: Text.ElideRight
-      }
+    HintBubble {
+      anchorItem: ibtn
+      label: ibtn.tip
+      open: ima.containsMouse
     }
   }
 
