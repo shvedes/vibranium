@@ -357,30 +357,11 @@ function trim1(n) {
 // in common/theme/FileIcons.js is the single table: only the image set
 // differs (a printed document is not a still to decode, so gif stays out),
 // and that difference is named here rather than restated.
-const IMAGE_EXTS = {
-  png: true, jpg: true, jpeg: true, webp: true, gif: true,
-  bmp: true, tiff: true, tif: true, avif: true,
-  heic: true, heif: true
-}
 
 // Leading icon for a job row, picked from the document extension.
 // Never "" : unknown/extensionless names fall back to "file".
 function jobFileIcon(row) {
-  const name = jobTitle(row)
-  const dot = name.lastIndexOf(".")
-  const e = dot > 0 ? name.substring(dot + 1).toLowerCase() : ""
-  if (e === "") return "file"
-  if (e === "pdf") return "file-pdf"
-  if (e === "svg") return "file-svg"
-  if (IMAGE_EXTS[e] === true) return "file-image"
-  if (FileIcons.ARCHIVE_EXTS[e] === 1) return "file-archive"
-  if (FileIcons.SHEET_EXTS[e] === 1) return "file-xls"
-  if (FileIcons.DB_EXTS[e] === 1) return "file-db"
-  if (FileIcons.DIFF_EXTS[e] === 1) return "file-diff"
-  if (FileIcons.FONT_EXTS[e] === 1) return "file-font"
-  if (FileIcons.MUSIC_EXTS[e] === 1) return "file-music"
-  if (FileIcons.CODE_EXTS[e] === 1) return "file-code"
-  return "file"
+  return FileIcons.extIconName(jobTitle(row)) || FileIcons.ICONS.file
 }
 
 // Drop locally cleared history entries (service `dismissed` map,
