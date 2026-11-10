@@ -8,6 +8,7 @@ import Quickshell.Io
 import qs.common
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/theme/DeviceIcons.js" as DeviceIcons
+import "../../common/math/Range.js" as Range
 
 // OSD service: transient screen meters. Holds the visible payload
 // (kind/value/label/icon/muted), the configurable bottom offset and the
@@ -125,8 +126,8 @@ Singleton {
     let v = Number(value)
     if (isNaN(v)) v = 0
     v = Math.round(v)
-    if (k === "brightness") v = Math.max(-90, Math.min(100, v))
-    else v = Math.max(0, Math.min(100, v))
+    if (k === "brightness") v = Range.clamp(v, -90, 100)
+    else v = Range.clamp(v, 0, 100)
     const lb = String(label || "")
     const ic = String(icon || "").trim()
     // A new payload owns the window: cancel a pending linger so a show
