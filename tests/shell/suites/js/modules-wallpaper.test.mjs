@@ -100,7 +100,7 @@ group('all six libraries load and publish a namespace', () => {
   eq('Bluetooth/Model publishes nine', Object.keys(BT).length, 9)
   // 28 functions plus the two table vars the module also declares. QML only
   // ever sees the functions, so the vars are the loader's extra surface.
-  eq('Network/Model publishes thirty-two', Object.keys(NET).length, 32)
+  eq('Network/Model publishes thirty-three', Object.keys(NET).length, 33)
   // 17 pass helpers plus the five that carry the log anonymisation and the two
   // private helpers behind them. The count is what notices if one of the
   // redaction functions is ever inlined away: every one of the seven takes a
@@ -4084,7 +4084,7 @@ const SURFACE = {
     'wifiListViewportHeight', 'wifiDisplayKey', 'deriveWifiState', 'linkNoteText',
     'requiresCredentials', 'deriveStats', 'profileToggles', 'profilePatch', 'escapeHtml',
     'ssidWithStatus', 'initialSpeedScale', 'stepSpeedScale', 'speedScaleLabel',
-    'parseQrOutput', 'parseQrMatrix', 'wifiRowsEqual',
+    'parseQrOutput', 'parseQrMatrix', 'wifiRowsEqual', 'routeIface',
   ],
   'pass/Model': [
     'versionCompare', 'stripGpg', 'splitEntry', 'listEntries', 'parseFindOutput', 'isValidName',
@@ -4125,10 +4125,10 @@ group('the surface lists match the loaded namespaces exactly', () => {
   eq('UnitIpc: 1 export', SURFACE['UnitIpc'].length, 1)
   eq('Battery/Model: 22 exports', SURFACE['Battery/Model'].length, 22)
   eq('Bluetooth/Model: 9 exports', SURFACE['Bluetooth/Model'].length, 9)
-  eq('Network/Model: 30 functions plus 2 table vars', SURFACE['Network/Model'].length + TABLES['Network/Model'].length, 32)
+  eq('Network/Model: 31 functions plus 2 table vars', SURFACE['Network/Model'].length + TABLES['Network/Model'].length, 33)
   eq('pass/Model: 24 exports', SURFACE['pass/Model'].length, 24)
   eq('WallpaperTrans: 18 exports', SURFACE['WallpaperTrans'].length, 18)
-  eq('106 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 106)
+  eq('107 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 107)
   // Six names are genuinely shared between two libraries - deviceLabel,
   // deviceIconName, formatRate, subtextFor, sectionTitleFor and listEntries -
   // and each is called through ITS OWN namespace, so the call check above
@@ -4203,6 +4203,15 @@ group('the ledger itself is not asserting the wrong file', () => {
   eq('the file has exactly six loadLib calls', (selfSource.match(/loadLib\(/g) || []).length, 6)
   notContains('and the excluded library is never one of them', loadCalls, 'HyprlandEditorCli')
   eq('every load goes through the kit SHELL_DIR', (selfSource.match(/loadLib\(/g) || []).length - (selfSource.match(/loadLib\(path\.join\(SHELL_DIR,/g) || []).length, 0)
+})
+
+section('Network/Model.routeIface - the shared route parser')
+group('the interface a route reply names', () => {
+  eq('a v4 route', NET.routeIface('1.2.3.4 dev wlan0 src 10.0.0.2'), 'wlan0')
+  eq('a v6 route', NET.routeIface('::1 dev eth0 table local'), 'eth0')
+  eq('an empty reply is empty', NET.routeIface(''), '')
+  eq('a reply without dev is empty', NET.routeIface('RTNETLINK answers: Network is unreachable'), '')
+  eq('a missing reply is empty', NET.routeIface(null), '')
 })
 
 finish()
