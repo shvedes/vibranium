@@ -1,5 +1,7 @@
 .pragma library
 
+.import "NodeKey.js" as NodeKey
+
 // Pure derivations for the graph tab: what a port line is, which two ports may
 // be connected to each other, what argv a connect or a disconnect is, how the
 // graph's own link objects group into one line per node pair, the bezier a line
@@ -157,18 +159,7 @@ function text(value) {
 }
 
 function nodeKeyOf(node) {
-  if (node === null || node === undefined) return ""
-  let id = null
-  try {
-    id = node.id
-  } catch (ignored) {
-    return ""
-  }
-  if (typeof id === "string") {
-    return /^\d+$/.test(id.trim()) ? id.trim() : ""
-  }
-  if (typeof id !== "number" || !isFinite(id) || id < 0) return ""
-  return String(Math.round(id))
+  return NodeKey.of(node)
 }
 
 // The link id as a number, or -1. `PwLink.id` is a uint and `pw-link -l -I`

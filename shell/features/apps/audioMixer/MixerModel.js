@@ -1,6 +1,7 @@
 .pragma library
 
 .import "../../../common/theme/DeviceIcons.js" as DeviceIcons
+.import "NodeKey.js" as NodeKey
 
 // Pure derivations for the audio mixer: what a node IS, what it is CALLED,
 // what a level prints as, and the `pactl list` parser that turns Pulse
@@ -45,18 +46,7 @@ function props(node) {
 // here. "" for a node without a usable id, because an unkeyable node cannot
 // be looked up and a guessed key would move the wrong stream.
 function nodeKey(node) {
-  if (node === null || node === undefined) return ""
-  let id = null
-  try {
-    id = node.id
-  } catch (ignored) {
-    return ""
-  }
-  if (typeof id === "string") {
-    return /^\d+$/.test(id.trim()) ? id.trim() : ""
-  }
-  if (typeof id !== "number" || !isFinite(id) || id < 0) return ""
-  return String(Math.round(id))
+  return NodeKey.of(node)
 }
 
 function propText(node, key) {
