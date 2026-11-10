@@ -494,7 +494,7 @@ ALIAS_SITES="$(awk -F'|' '{ print $2 "|" $4 "|" $6 }' "$ALIAS_RECORDS" | sort -u
 ALIAS_FILES="$(cut -d'|' -f2 "$ALIAS_RECORDS" | sort -u | wc -l | tr -d ' ')"
 ALIAS_IMPORTS="$(awk -F'|' '$1 == "IMPORTS" && $6 == "alias"' "$RESOLVED" | wc -l | tr -d ' ')"
 t_ne "the resolver found member reads through an alias" "0" "$ALIAS_READS"
-t_count "the tree has 31 aliased \`import qs.* as Alias\` lines" "31" "$ALIAS_IMPORTS"
+t_count "the tree has 28 aliased \`import qs.* as Alias\` lines" "28" "$ALIAS_IMPORTS"
 t_note "$ALIAS_READS reads through $ALIAS_SITES alias/module pairs, across $ALIAS_FILES files; \
 $((ALIAS_IMPORTS - ALIAS_SITES)) of the $ALIAS_IMPORTS aliased imports is never read"
 
