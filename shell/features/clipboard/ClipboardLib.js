@@ -592,6 +592,24 @@ function buildTitleSub(entry) {
     entry.icon = entry.allFolders ? ICONS.folders : ICONS.files
     entry.pathLike = false
   }
+
+  // A path-bearing row: the tilde-folded path is the title, the type picks
+  // the folder/archive/file glyph, and a git work tree keeps the folder shape
+  // but rides the git glyph.
+  function pathTitle() {
+    const p = safePath(stripFileScheme(entry.filePaths && entry.filePaths.length === 1
+      ? entry.filePaths[0] : String(entry.raw)))
+    entry.title = homeTilde(p)
+    if (type === "folder") {
+      const g = entry.git
+      const isGit = g && typeof g === "object"
+        && (String(g.branch || "") !== "" || g.detached === true)
+      entry.icon = isGit ? (ICONS.foldergit || "file-folder-git") : ICONS.folder
+    }
+    else if (type === "archive") entry.icon = ICONS.archive
+    else entry.icon = extIconName(p) || ICONS.file
+    entry.pathLike = true
+  }
   if (type === "secret") {
     entry.title = "Sensitive content"
     entry.icon = ICONS.secret
@@ -627,24 +645,7 @@ function buildTitleSub(entry) {
     entry.pathLike = false
     return
   }
-  if (type === "file" || type === "folder" || type === "archive") {
-    const p = safePath(stripFileScheme(entry.filePaths && entry.filePaths.length === 1
-      ? entry.filePaths[0] : String(entry.raw)))
-    entry.title = homeTilde(p)
-    if (type === "folder") {
-      // A git work tree keeps the folder shape but rides the git glyph:
-      // presence is the verdict, validity is branch-or-detached (same gate
-      // as gitInfoRows), so a hand-shaped or empty payload never flips it.
-      const g = entry.git
-      const isGit = g && typeof g === "object"
-        && (String(g.branch || "") !== "" || g.detached === true)
-      entry.icon = isGit ? (ICONS.foldergit || "file-folder-git") : ICONS.folder
-    }
-    else if (type === "archive") entry.icon = ICONS.archive
-    else entry.icon = extIconName(p) || ICONS.file
-    entry.pathLike = true
-    return
-  }
+  if (type === "file" || type === "folder" || type === "archive") return pathTitle()
   if (type === "network") return networkTitle()
   if (type === "files" || type === "folders") return collectionTitle()
   entry.title = truncateText(entry.raw, 64)
