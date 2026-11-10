@@ -2487,8 +2487,8 @@ group('the blend is over the channels, and the result is opaque', () => {
 // ---------------------------------------------------------------------------
 section('UnitLib - the UNITS table')
 
-group('the table is 360 entries across 24 dimensions with no duplicate symbol', () => {
-  eq('360 entries', UL.UNITS.length, 360)
+group('the table is 361 entries across 24 dimensions with no duplicate symbol', () => {
+  eq('361 entries', UL.UNITS.length, 361)
   eq('the dimensions', [...new Set(UL.UNITS.map((u) => u.dim))],
     ['length', 'mass', 'volume', 'speed', 'temperature', 'area', 'time', 'energy', 'power', 'pressure', 'data', 'angle',
       'frequency', 'force', 'torque', 'fuel', 'concentration', 'molarity', 'fraction', 'flow',
@@ -2810,7 +2810,7 @@ group('an unknown or empty key is null, never a wrong unit', () => {
 
 group('aliasMap is built once and covers every name exactly once', () => {
   const m = UL.aliasMap()
-  eq('1190 aliases', Object.keys(m).length, 1190)
+  eq('1194 aliases', Object.keys(m).length, 1194)
   eq('and it is the cached instance on the second call', UL.aliasMap() === m, true)
   eq('the alias count matches the name count', Object.keys(m).length,
     UL.UNITS.reduce((n, u) => n + u.names.length, 0))
@@ -3036,7 +3036,7 @@ group('preprocess is text only: an arrow, a filler word, a question, a tail', ()
   eq('stripTail leaves a clean string alone', UL.stripTail('5 km in mi'), '5 km in mi')
 })
 
-group('isPotentialUnit wants a leading number and a letter-ish unit char', () => {
+group('isPotentialUnit wants a leading number, or a named constant standing alone', () => {
   eq('5m', UL.isPotentialUnit('5m'), true)
   eq('-5m', UL.isPotentialUnit('-5m'), true)
   eq('+5m', UL.isPotentialUnit('+5m'), true)
@@ -3054,6 +3054,8 @@ group('isPotentialUnit wants a leading number and a letter-ish unit char', () =>
   eq('a speed unit', UL.isPotentialUnit('5m/s'), true)
   eq('an explicit target', UL.isPotentialUnit('5.m in cm'), true)
   eq('thousands grouping', UL.isPotentialUnit('1,000 km'), true)
+  eq('a named constant without a number', UL.isPotentialUnit('speed of sound'), true)
+  eq('and with its article', UL.isPotentialUnit('the speed of sound'), true)
 })
 
 group('the gate runs on the preprocessed text, so a filler word is not a reason to say no', () => {
@@ -3067,6 +3069,7 @@ group('the gate runs on the preprocessed text, so a filler word is not a reason 
   // And the gate's own refusals are unchanged, because preprocess cannot make
   // a number out of an app name or strip an operator.
   eq('an app name', UL.isPotentialUnit('firefox'), false)
+  eq('an ordinary unit still needs a value', UL.isPotentialUnit('km'), false)
   eq('a filler word on its own', UL.isPotentialUnit('convert'), false)
   eq('pure math', UL.isPotentialUnit('2+2'), false)
   eq('time in X', UL.isPotentialUnit('time in X'), false)
@@ -3582,7 +3585,7 @@ group('the twelve newer dimensions: frequency, force, torque, fuel, concentratio
   approx('and a crore is ten million', cvOut('1 crore in item'), 1e7, 1e-3)
 })
 
-group('every one of the 360 rows is structurally sound', () => {
+group('every one of the 361 rows is structurally sound', () => {
   // Three invariants over the WHOLE table, because the interesting failures in a
   // table this size are not wrong answers - they are a row that resolves to
   // nothing, a noun that was never written, or a pair that does not survive the
@@ -3615,7 +3618,7 @@ group('every one of the 360 rows is structurally sound', () => {
       const p = nouns[sym]
       return !Array.isArray(p) || p.length !== 2 || !p[0] || !p[1]
     }), [])
-  // Eighty-nine units are named by their own word - banana, smoot, fortnight,
+  // Ninety units are named by their own word - banana, smoot, fortnight,
   // crore, psi - so the noun equals the symbol and only the plural differs. That
   // is why the fallback in unitWord is a guard rather than a shape, and why a
   // MISSING noun cannot be found by comparing against the symbol: the two would
@@ -3623,7 +3626,7 @@ group('every one of the 360 rows is structurally sound', () => {
   // how much of this table is a plain word rather than a prefixed or compound
   // noun, and it moves whenever the table does.
   eq('and the nouns that are their own symbol, counted not listed',
-    Object.keys(nouns).filter((sym) => nouns[sym][0] === sym).length, 89)
+    Object.keys(nouns).filter((sym) => nouns[sym][0] === sym).length, 90)
   // Twelve of those take no plural at all, and they are the ones where "dozens"
   // or "bars" would be wrong rather than merely clumsy - a gross is a gross and a
   // crore is a crore. Named, because this is the short list that has to stay true.
@@ -3950,6 +3953,23 @@ group('the speed ratios are the published ones', () => {
   approx('1 km/h in ft/s', cvOut('1km/h in ft/s'), 0.9113444152814304, 1e-12)
   approx('1 km/h in kn', cvOut('1km/h in kn'), 0.5399568034557325, 1e-12)
   eq('100km/h in kmh target reads as km/h', cvOk('100km/h in km/h').to, 'km/h')
+})
+
+group('a named constant is its own phrase, with the article and no 1', () => {
+  // "There's only one, the speed of sound." The name is the quantity, so the
+  // bare phrase resolves with an implicit 1 and reads as a subject rather than
+  // as "1 speed of sound".
+  const r = cvOk('speed of sound')
+  eq('the bare phrase resolves', r !== null, true)
+  eq('to the default speed target', r && r.to, 'km/h')
+  eq('with the value of the constant', cvOut('speed of sound in m/s'), 343)
+  eq('the label reads as the subject', r && r.label, 'the speed of sound = 1234.8 km/h')
+  eq('the sub spells the sentence', r && r.phrase,
+    'the speed of sound is 1234.8 kilometres per hour')
+  eq('the article is optional', cvOk('the speed of sound').label, r.label)
+  eq('every compatible unit is a row', UL.tryAll('speed of sound').map((x) => x.to),
+    ['km/h', 'mph', 'm/s', 'kn', 'ft/s', 'm/min'])
+  eq('and an ordinary unit still needs a value', UL.tryConvert('km'), null)
 })
 
 // ---------------------------------------------------------------------------

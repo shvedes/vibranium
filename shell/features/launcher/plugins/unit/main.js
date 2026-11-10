@@ -13,7 +13,9 @@
 //   source      parseSource scans number/unit pairs left to right, so
 //               "6 ft 2 in" is one quantity and "5m" is the same shape as
 //               "5 m". Each further term is converted into the first term's
-//               unit and added.
+//               unit and added. A named constant marked bare ("speed of
+//               sound") may stand alone: the phrase is the quantity, and it
+//               carries an implicit 1.
 //   target      The text after the keyword. A bare query has none, so it
 //               answers with a LIST of targets: pickDefault(value, from)
 //               first, then the dimension's shortlist as far as each reading
@@ -1197,6 +1199,12 @@ addUnit("escape velocity", "speed", 11186, "km/h",
   ["escapevelocity", "escapevelocities", "earthescapevelocity", "earthescapevelocities"],
   ["Earth escape velocity", "Earth escape velocities"]);
 addUnit("iss", "speed", 7660, "km/h", ["iss", "issspeed"], ["ISS orbital speed", "ISS orbital speeds"]);
+// 343 m/s in dry air at 20 \u00b0C - the round figure the phrase means. It is
+// marked bare because there is exactly one speed of sound: the name is the
+// query, so "speed of sound" answers in kilometres per hour with no numeral.
+addUnit("speed of sound", "speed", 343, "km/h",
+  ["speedofsound", "speedsofsound", "soundspeed", "soundspeeds"],
+  ["speed of sound", "speeds of sound"], { bare: true });
 
 // volume
 addUnit("olympic pool", "volume", 2.5e6, "m3",
@@ -1281,9 +1289,14 @@ function unitWord(sym, value) {
 // A noun that opens with the degree sign needs nothing special here: the sign
 // binds to the name and the ordinary space separates the value from the noun,
 // which is what "100 \u00b0Celsius" is.
-function phrase(value, fromSym, out, toSym) {
-  return formatNumber(value) + " " + unitWord(fromSym, value)
-    + " is " + formatNumber(out) + " " + unitWord(toSym, out);
+// `implicit` is the bare named-constant source: its number is the name, so
+// the sentence says "the speed of sound is ..." rather than "1 speed of
+// sound is ...". An ordinary source keeps the number and the noun.
+function phrase(value, fromSym, out, toSym, implicit) {
+  var source = implicit === true
+    ? "the " + unitWord(fromSym, value)
+    : formatNumber(value) + " " + unitWord(fromSym, value);
+  return source + " is " + formatNumber(out) + " " + unitWord(toSym, out);
 }
 
 // A symbol as the label and the clipboard want it: abbreviations stay symbols
@@ -1509,15 +1522,33 @@ function preprocess(query) {
   return s.replace(RE_FILLER, "");
 }
 
+// A named constant that may be asked for as its own phrase. The article is
+// optional, so both "speed of sound" and "the speed of sound" resolve. Only
+// a row flagged bare qualifies: an ordinary unit still needs a value, which
+// keeps a bare "km" an app search rather than a list of conversions.
+function bareUnitName(text) {
+  var t = String(text === undefined || text === null ? "" : text).trim();
+  if (t.substring(0, 4).toLowerCase() === "the ") t = t.substring(4).trim();
+  if (t === "") return null;
+  var u = unitFor(t);
+  return u !== null && u.bare === true ? u : null;
+}
+
 // Cheap gate for the per-keystroke path: the preprocessed input must start
-// with a number and carry a letter-ish unit char. Plain app names
-// ("firefox"), pure math ("2+2") and "time in X" all fail here, and so does
-// a bare "convert". It is a gate and nothing else - tryConvert calls it, so
-// nothing here reaches back into the parser.
+// with a number and carry a letter-ish unit char, or be a bare named constant
+// ("speed of sound"). Plain app names ("firefox"), pure math ("2+2") and
+// "time in X" all fail here, and so does a bare "convert". It is a gate and
+// nothing else - tryConvert calls it, so nothing here reaches back into the
+// parser.
 function isPotentialUnit(query) {
   var t = preprocess(query);
   if (t === "" || t.length > 128) return false;
   if (t.indexOf("\n") >= 0 || t.indexOf("\r") >= 0) return false;
+  if (bareUnitName(t) !== null) return true;
+  // A bare constant with a target ("speed of sound in m/s", or the
+  // half-typed "speed of sound in") carries the number in its head.
+  var sp = splitExplicit(t);
+  if (sp !== null && bareUnitName(sp.head) !== null) return true;
   if (!RE_NUM.test(t)) return false;
   if (!/[a-zA-Z"'\/\u00b0]/.test(t)) return false;
   return true;
@@ -1662,6 +1693,7 @@ function dimNote(a, b) {
 // A word-named unit keeps its plural ("5 bananas", not "5 banana"); an
 // abbreviation stays the symbol ("10 mi", "5 m").
 function termText(term) {
+  if (term.text === "") return displaySym(term.unit.sym, term.value);
   return term.text + " " + displaySym(term.unit.sym, term.value);
 }
 
@@ -1791,7 +1823,11 @@ function parseQuery(query, depth) {
   if (terms === null && split !== null) terms = parseSource(headText + " " + split.key);
   if (terms === null) terms = parseFeetInches(headText);
   if (terms === null && split !== null) terms = parseFeetInches(headText + " " + split.key);
-  if (terms === null) return null;
+  if (terms === null) {
+    var constant = bareUnitName(headText);
+    if (constant === null) return null;
+    terms = [{ value: 1, unit: constant, text: "", implicit: true }];
+  }
   if (tailText === "") {
     // A trailing keyword with no target is mid-typing, unless the keyword was
     // really a unit. "5 m in" is a mid-typing target; "6 ft 2 in" is a
@@ -1813,7 +1849,9 @@ function parseQuery(query, depth) {
       tailText = null;
     } else {
       var open = termText(terms[0]);
-      return { ok: false, error: "incomplete", expr: open, label: open, sub: "Continue typing..." };
+      return { ok: false, error: "incomplete", expr: open,
+        label: terms[0].implicit === true ? "the " + open : open,
+        sub: "Continue typing..." };
     }
   }
   var inputText = terms.map(termText).join(" + ");
@@ -1836,7 +1874,8 @@ function parseQuery(query, depth) {
     value += convertValue(terms[i].value, terms[i].unit, from);
   }
   return { ok: true, value: value, from: from, inputText: inputText,
-    bare: tailText === null, toSpec: tailText };
+    bare: tailText === null, toSpec: tailText,
+    implicit: terms.length === 1 && terms[0].implicit === true };
 }
 
 // One parsed source against one target spec. Everything a conversion can be
@@ -1889,10 +1928,12 @@ function renderTarget(q, toSpec) {
   }
   var formatted = formatNumber(out);
   var copy = formatted + " " + displaySym(to.sym, out);
+  var implicit = q.implicit === true;
   return { ok: true, value: q.value, from: from.sym, to: to.sym,
     out: out, formatted: formatted, copy: copy,
-    phrase: phrase(q.value, from.sym, out, to.sym),
-    label: inputText + " = " + copy, inputText: inputText };
+    phrase: phrase(q.value, from.sym, out, to.sym, implicit),
+    label: (implicit ? "the " : "") + inputText + " = " + copy,
+    inputText: inputText };
 }
 
 // Main entry, see header for the return contract. Never throws:

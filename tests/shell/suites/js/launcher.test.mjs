@@ -6035,7 +6035,7 @@ group('the shared function names are the same set on both sides', () => {
   // gate, mid-typing gate and tryColor. A count that falls means a function
   // left one of the two copies.
   eq('color shares thirty-seven functions', TWINNED.find((p) => p.name === 'color').sharedFns.length, 37)
-  eq('unit shares thirty-three', TWINNED.find((p) => p.name === 'unit').sharedFns.length, 33)
+  eq('unit shares thirty-four', TWINNED.find((p) => p.name === 'unit').sharedFns.length, 34)
   eq('time shares nine', TWINNED.find((p) => p.name === 'time').sharedFns.length, 9)
   eq('fx shares twenty-four', TWINNED.find((p) => p.name === 'fx').sharedFns.length, 24)
 })
@@ -6067,7 +6067,7 @@ group('every shared data table is byte-identical', () => {
     eq(`${p.name}: no data value differs`, p.valueDiffs, [])
   }
   const unit = TWINNED.find((p) => p.name === 'unit')
-  eq('unit: the UNITS table has 360 entries on both sides', unit.libFns.UNITS.length, 360)
+  eq('unit: the UNITS table has 361 entries on both sides', unit.libFns.UNITS.length, 361)
   eq('unit: the same table', unit.plugFns.UNITS.length, unit.libFns.UNITS.length)
   eq('unit: the SPEED_LEN shorthand has five entries', Object.keys(unit.libFns.SPEED_LEN).length, 5)
   eq('unit: the default-target ladders are the two documented shapes', unit.libFns.DEF_LADDER, {
