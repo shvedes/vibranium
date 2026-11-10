@@ -2,6 +2,7 @@ pragma Singleton
 
 import Quickshell
 import QtCore
+import "text/StringUtils.js" as SU
 
 // Resolved XDG/Vibranium paths. Mirrors default/uwsm/env fallbacks so the
 // shell works identically under uwsm and bare sessions.
@@ -72,7 +73,7 @@ Singleton {
   readonly property string wallpaperStateJson: root.vibraniumState + "/wallpaper.json"
 
   function userThemesDir(theme) {
-    return root.themesUserRoot + "/" + theme
+    return SU.joinPath(root.themesUserRoot, theme)
   }
 
   // User-level AppLauncher plugins; scanned after the built-in root.
