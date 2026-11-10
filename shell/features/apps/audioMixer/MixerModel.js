@@ -503,16 +503,15 @@ function samePairs(a, b) {
   if (a === b) return true
   if (!Array.isArray(a) || !Array.isArray(b)) return false
   if (a.length !== b.length) return false
+  // Membership in one pass each way. The nested scan rebuilt the key of every
+  // element of the far list for every element of the near one - quadratic in
+  // the graph tick's link count, and pairKey allocates a string on every call.
+  // Prototype-less, like every other map keyed by a graph id in this file.
+  const present = Object.create(null)
+  for (let j = 0; j < b.length; j++) present[pairKey(b[j])] = true
   for (let i = 0; i < a.length; i++) {
     const key = pairKey(a[i])
-    let found = false
-    for (let j = 0; j < b.length; j++) {
-      if (pairKey(b[j]) === key) {
-        found = true
-        break
-      }
-    }
-    if (!found) return false
+    if (present[key] !== true) return false
   }
   return true
 }
