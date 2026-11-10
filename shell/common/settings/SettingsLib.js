@@ -332,12 +332,13 @@ function parseOption(raw, fileNamespace) {
   }
   if (min !== undefined && type === "bool") return { error: key + ": range not allowed on bool" }
 
-  let values = []
-  if (Array.isArray(raw.values)) {
-    if (type === "string") values = raw.values.filter(v => typeof v === "string" && v !== "")
-    else if (type === "int" || type === "float") values = raw.values.filter(v => typeof v === "number" && isFinite(v))
-    else values = raw.values.filter(v => typeof v === "string" && v !== "")
+  function parseValues() {
+    if (!Array.isArray(raw.values)) return []
+    if (type === "int" || type === "float")
+      return raw.values.filter(v => typeof v === "number" && isFinite(v))
+    return raw.values.filter(v => typeof v === "string" && v !== "")
   }
+  const values = parseValues()
 
   // Conditional visibility against other options' values. Accepted shapes:
   //
@@ -563,10 +564,15 @@ function parseCatalog(text) {
   const allowId = hasPages || Array.isArray(raw)
   // Carried for compatibility with catalogs that declare it; no card is
   // sized from it (see the header note).
-  const rootWidth = typeof raw.width === "number" && raw.width > 0 ? Math.round(raw.width) : 0
-  const rawTitle = typeof raw.title === "string" && raw.title.trim() !== "" ? raw.title.trim()
-    : typeof raw.label === "string" && raw.label.trim() !== "" ? raw.label.trim() : ""
-  const rootTitle = rawTitle
+  function catalogMeta() {
+    const width = typeof raw.width === "number" && raw.width > 0 ? Math.round(raw.width) : 0
+    const title = typeof raw.title === "string" && raw.title.trim() !== "" ? raw.title.trim()
+      : typeof raw.label === "string" && raw.label.trim() !== "" ? raw.label.trim() : ""
+    return { width: width, title: title }
+  }
+  const meta = catalogMeta()
+  const rootWidth = meta.width
+  const rootTitle = meta.title
 
   const sections = []
   const byKey = {}
