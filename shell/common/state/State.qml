@@ -5,6 +5,7 @@ import Quickshell
 import Quickshell.Io
 import qs.common
 import "../text/UnitIpc.js" as UnitIpc
+import "../text/StringUtils.js" as SU
 
 // State - multi-file JSON persistence with coalesced atomic writes and
 // watch-driven external change notification. Each slot is a JSON file at
@@ -195,7 +196,7 @@ Singleton {
   function _ensureSlot(key, defaultValue, scope, file) {
     const dir = scope === "cache" ? Paths.vibraniumCache : Paths.vibraniumState
     const stem = typeof file === "string" && file !== "" ? file : key + ".json"
-    const path = dir + "/" + stem
+    const path = SU.joinPath(dir, stem)
 
     // Single view per slot: atomic writes, watch, reload. The JsonAdapter
     // child owns JSON parse plus stringify plus echo suppression.
