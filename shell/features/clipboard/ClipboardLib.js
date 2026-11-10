@@ -541,6 +541,31 @@ function iconForType(type) {
   return t !== undefined ? t : ICONS.text
 }
 
+// The uri a network entry names: its filePaths when the copy carried them,
+// otherwise the first non-comment line of the raw payload (a uri-list may
+// lead with "#" headers). The title and the subtext both read this, so the
+// two cannot name different locations for one row.
+function firstNetworkUri(entry) {
+  if (entry.filePaths && entry.filePaths.length > 0) return String(entry.filePaths[0])
+  const lines = String(entry.raw || "").split("\n")
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i].trim()
+    if (l !== "" && l.charAt(0) !== "#") return l
+  }
+  return ""
+}
+
+// Every network uri the entry carries, filePaths when present and the raw
+// non-comment lines otherwise.
+function networkUris(entry) {
+  if (entry.filePaths && entry.filePaths.length > 0) {
+    return entry.filePaths.filter(isNetworkUri)
+  }
+  return String(entry.raw || "").split("\n")
+    .map(s => s.trim())
+    .filter(s => s !== "" && s.charAt(0) !== "#" && isNetworkUri(s))
+}
+
 // Title + icon. Mutates entry. Path-bearing rows keep the full tilde-folded
 // path as the title and flag pathLike:true - the row Text then elides from
 // the LEFT so a long location always ends in the visible file name. Only an
@@ -605,16 +630,7 @@ function buildTitleSub(entry) {
     // lines that raw would surface. Strip "proto://" so the title is
     // the share's own path, elided from the left like file rows so a
     // long location always ends in the visible file name.
-    let uri = ""
-    if (entry.filePaths && entry.filePaths.length > 0) {
-      uri = String(entry.filePaths[0])
-    } else {
-      const lines = String(entry.raw || "").trim().split("\n")
-      for (let i = 0; i < lines.length; i++) {
-        const l = lines[i].trim()
-        if (l !== "" && l.charAt(0) !== "#") { uri = l; break }
-      }
-    }
+    const uri = firstNetworkUri(entry)
     const stripped = uri.replace(RE_SCHEME_STRIP, "")
     entry.title = safePath(stripped !== "" ? stripped : uri)
     // Fallback to network-storage generic if still empty
@@ -689,16 +705,8 @@ function buildSubLeft(entry) {
       return entry.fileSize !== undefined && entry.fileSize > 0
         ? formatSize(entry.fileSize) : "File"
     case "network": {
-      // Same URI source as the title: filePaths when present, else the
-      // first non-comment raw line (uri-lists may carry "#" headers).
-      let nets = []
-      if (entry.filePaths && entry.filePaths.length > 0) {
-        nets = entry.filePaths.filter(isNetworkUri)
-      } else {
-        const raw = String(entry.raw || "").trim()
-        const lines = raw.split("\n").map(s => s.trim()).filter(s => s !== "" && s.charAt(0) !== "#")
-        nets = lines.filter(isNetworkUri)
-      }
+      // Same URI source as the title, so the count and the title agree.
+      const nets = networkUris(entry)
       if (nets.length > 1) return nets.length + " network locations"
       const single = nets[0] || ""
       // Extract protocol and host without URL global (not available in QML JS)

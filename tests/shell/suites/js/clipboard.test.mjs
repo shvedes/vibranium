@@ -2574,8 +2574,8 @@ group('the library reads no host global and no clock of its own', () => {
   // This pair is a load-time namespace-leak guard, not an API pin: it fails if
   // evaluating the lib leaves anything behind on its own namespace. It also
   // fails if a function is legitimately added, which is the price.
-  eq('a fresh load of the clipboard lib has 97 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 97)
-  eq('a fresh load of the clipboard lib has 97 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 97)
+  eq('a fresh load of the clipboard lib has 99 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 99)
+  eq('a fresh load of the clipboard lib has 99 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 99)
   // The clipboard lib never calls Math.random outside generateKey.
   eq('and the clipboard lib only has it in generateKey', (SRC.match(/Math\.random/g) || []).length, 1)
 })
