@@ -332,22 +332,13 @@ Item {
   // App rows: red at 126%, a quarter of the way past their own 150% cap.
   function streamPctColor(volume, muted) { return root.pctColor(volume, muted, 126) }
 
+  // The same two-step app lookup the mixer's rows use, so a stream that
+  // the shipped set cannot serve still gets its theme icon (and the answer
+  // is memoized by identity instead of re-walking the theme per row build).
   function streamIconSource(node) {
     var name = Model.appIconName(node)
-    if (name !== "") {
-      var lower = String(name).toLowerCase().trim()
-      // Prefer shell themed asset first (covers some well-known apps)
-      var themed = Icons.url(lower)
-      if (themed !== "") return themed
-      themed = Icons.url(name)
-      if (themed !== "") return themed
-      // Theme icon with explicit fallback - avoids purple checker for missing.
-      // Quickshell.iconPath will return the fallback if lower not found.
-      var themedPath = Quickshell.iconPath(lower, "audio-x-generic")
-      if (themedPath !== "") return themedPath
-      var origPath = Quickshell.iconPath(name, "audio-x-generic")
-      if (origPath !== "") return origPath
-    }
+    var resolved = AppIcons.url(name, "audio-x-generic")
+    if (resolved !== "") return resolved
     return Icons.url("file-music", "foreground_1")
   }
 
