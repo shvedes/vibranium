@@ -6,7 +6,7 @@
 -- `hl` is Hyprland's own Lua API (bind/dispatch/config/window_rule/etc.) --
 -- Vibranium doesn't define it, it's injected by the host process. Everything
 -- in THIS file is Vibranium's sugar layer on top of `hl`, added purely to
--- cut down repetition across binds.lua / animations/*.lua.
+-- cut down repetition across binds.lua.
 --
 -- Quick Lua notes for context (skip if this is old news to you):
 --
@@ -59,7 +59,6 @@ Hypr.Helpers = Hypr.Helpers or {}
 -- namespace added here should go on `Hypr` for the same reason.
 
 Hypr.Guard = {}
-Hypr.Anim = {}
 Hypr.Act = {}
 
 -- ----------------------------------------------------------------------------
@@ -179,35 +178,3 @@ Hypr.Act.send_shortcut = wrap_dispatch(hl.dsp.send_shortcut)
 Hypr.Act.exec_raw = wrap_dispatch(hl.dsp.exec_raw)
 Hypr.Act.exec_cmd = wrap_dispatch(hl.dsp.exec_cmd)
 
--- ----------------------------------------------------------------------------
--- Anim.* -- data-driven animation presets
---
--- Every file in animations/ is currently a wall of near-identical
--- hl.curve(...) / hl.animation(...) calls with different numbers. Anim.apply
--- turns a preset into plain data (two arrays) and does the repetitive calls
--- for you -- adding a new preset becomes "copy a table", not "copy code".
---
--- preset shape:
--- {
---   layer_rules = { { match = {...}, animation = "slide" }, ... },  -- optional
---   curves      = { { "curveName", { type = "bezier", points = {...} } }, ... },
---   animations  = { { leaf = "border", enabled = true, speed = 5.0, bezier = "curveName" }, ... },
--- }
--- ----------------------------------------------------------------------------
-
-function Hypr.Anim.apply(preset)
-  for _, lr in ipairs(preset.layer_rules or {}) do
-    hl.layer_rule(lr)
-  end
-
-  for _, c in ipairs(preset.curves or {}) do
-    -- `c` is a 2-slot array: { name, opts }. Lua doesn't distinguish
-    -- "positional" table entries from named ones -- c[1]/c[2] just mean
-    -- "the first thing in this table" / "the second thing in this table".
-    hl.curve(c[1], c[2])
-  end
-
-  for _, a in ipairs(preset.animations or {}) do
-    hl.animation(a)
-  end
-end
