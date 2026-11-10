@@ -146,18 +146,6 @@ Singleton {
   // (`sinkReady`/`sourceReady` below), so a consumer re-evaluates on its own,
   // and the source link handle is re-pointed by `onSourceChanged`.
 
-  // A list's length as a number, 0 for anything else. The backend's own
-  // `UntypedObjectModel.values` is documented as possibly null before the sync,
-  // and reading `.length` off null inside a binding throws rather than
-  // answering - so the guard is the same one `AudioNodes.countOf` applies,
-  // duplicated rather than imported because a services file may not reach
-  // sideways for it.
-  function countOf(list): int {
-    if (list === null || list === undefined) return 0
-    const n = list.length
-    return typeof n === "number" && n >= 0 ? Math.round(n) : 0
-  }
-
   // The raw backend defaults, ungated. These are what the tracker binds (see
   // the header) and what a caller identifies a device by; they are NOT what a
   // consumer should act on. A device is identified by its own node object and
