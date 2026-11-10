@@ -1391,11 +1391,8 @@ Singleton {
     const netUris = CL.extractNetworkUris(text)
     if (netUris.length > 0 && paths.length === 0) {
       // Pure network storage URIs (ftp/sftp/smb/nfs etc.) - keep as network type
-      root._offer("uri:" + netUris.join("|"), () => {
-        const e = root._buildEntry(String(text).trim(), "text/uri-list", "network", netUris, netUris[0] || "")
-        e.filePaths = netUris.slice()
-        return e
-      })
+      root._offer("uri:" + netUris.join("|"),
+        () => root._networkUriEntry(netUris, String(text).trim()))
       return
     }
     if (paths.length === 0) {
@@ -1406,6 +1403,15 @@ Singleton {
     }
     root._offer("uri:" + paths.join("|"),
       () => root._pathUriEntry(paths, String(uriOut.text).trim()))
+  }
+
+  // Pure network storage URIs (ftp/sftp/smb/nfs etc.) keep the network type
+  // and the URI list as both paths and preview source.
+  function _networkUriEntry(netUris, raw) {
+    const e = root._buildEntry(raw, "text/uri-list", "network", netUris,
+      netUris[0] || "")
+    e.filePaths = netUris.slice()
+    return e
   }
 
   function _pathUriEntry(paths, raw) {
