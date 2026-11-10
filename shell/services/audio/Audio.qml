@@ -543,18 +543,26 @@ Singleton {
   function adjustSink(delta) {
     if (!root.sink || !root.sink.audio) return
     root._cancelFade("adjust")
-    if (root.sink.audio.muted && delta > 0) root.sink.audio.muted = false
-    const next = root.sink.audio.volume + delta
     // Clamp like bash: beyond the cap snaps to the cap instead of refusing.
-    root.sink.audio.volume = Math.max(0, Math.min(root.maxVolume, next))
+    const next = Math.max(0, Math.min(root.maxVolume, root.sink.audio.volume + delta))
+    // Any step that leaves the level above zero lifts the mute, whichever way
+    // the step went: a decrease from a muted device is as much a request to
+    // hear it as an increase is, and it is the rule the sliders already use
+    // (`setOutputVolume`'s `v > 0`). A step down to zero keeps the mute,
+    // because there is nothing to hear and a 0% device should still read as
+    // muted.
+    if (root.sink.audio.muted && next > 0) root.sink.audio.muted = false
+    root.sink.audio.volume = next
     root._showSinkOSD()
   }
 
   function adjustSource(delta) {
     if (!root.source || !root.source.audio) return
-    if (root.source.audio.muted && delta > 0) root.source.audio.muted = false
-    const next = root.source.audio.volume + delta
-    root.source.audio.volume = Math.max(0, Math.min(root.maxSourceVolume, next))
+    // Same rule as adjustSink: any step that leaves the level above zero lifts
+    // the mute, in either direction.
+    const next = Math.max(0, Math.min(root.maxSourceVolume, root.source.audio.volume + delta))
+    if (root.source.audio.muted && next > 0) root.source.audio.muted = false
+    root.source.audio.volume = next
     root._showSourceOSD()
   }
 
@@ -737,12 +745,16 @@ Singleton {
     const d = sign * root.step
     if (isSink) {
       root._cancelFade("ipc-adjust")
-      if (root.sinkMuted && sign > 0) root.sink.audio.muted = false
-      root.sink.audio.volume = Math.max(0, Math.min(root.maxVolume, root.sinkVolume + d))
+      const next = Math.max(0, Math.min(root.maxVolume, root.sinkVolume + d))
+      // The same rule adjustSink applies: a step that leaves the level above
+      // zero lifts the mute, whichever way the step went.
+      if (root.sinkMuted && next > 0) root.sink.audio.muted = false
+      root.sink.audio.volume = next
       if (!quiet) root._showSinkOSD()
     } else {
-      if (root.sourceMuted && sign > 0) root.source.audio.muted = false
-      root.source.audio.volume = Math.max(0, Math.min(root.maxSourceVolume, root.sourceVolume + d))
+      const next = Math.max(0, Math.min(root.maxSourceVolume, root.sourceVolume + d))
+      if (root.sourceMuted && next > 0) root.source.audio.muted = false
+      root.source.audio.volume = next
       if (!quiet) root._showSourceOSD()
     }
     return "ok"
