@@ -46,16 +46,10 @@ Singleton {
   function currentFormatted() {
     if (!root.active && !root.expired) return ""
     if (root.expired) return "Time's up!"
-    return root.formatDuration(root.remaining)
+    return DurationFmt.formatVerboseDuration(root.remaining)
   }
 
   readonly property string formatted: root.currentFormatted()
-
-  // Countdown readout, canonicalized in common/text/Duration.js so the
-  // service and any other reader share one spelling.
-  function formatDuration(secs) {
-    return DurationFmt.formatVerboseDuration(secs)
-  }
 
   // Internal ----------------------------------------------------------------
   // Drift-corrected base for the tick math below; restart on every start.
