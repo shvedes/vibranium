@@ -572,6 +572,26 @@ function networkUris(entry) {
 // extreme cap remains here as haystack/storage hygiene.
 function buildTitleSub(entry) {
   const type = entry.type
+
+  // A share's title: the first real URI, with the scheme stripped so the
+  // row elides from the left toward the visible file name.
+  function networkTitle() {
+    const uri = firstNetworkUri(entry)
+    const stripped = uri.replace(RE_SCHEME_STRIP, "")
+    entry.title = safePath(stripped !== "" ? stripped : uri)
+    if (entry.title.trim() === "" || entry.title === "...") entry.title = "Network storage"
+    entry.icon = ICONS.network
+    entry.pathLike = true
+  }
+
+  // A multi-selection row: the item count and the collection glyph.
+  function collectionTitle() {
+    const n = entry.filePaths ? entry.filePaths.length : 0
+    if (entry.allFolders) entry.title = n > 0 ? n + " folders" : "Folders"
+    else entry.title = n > 0 ? n + " files" : "Files"
+    entry.icon = entry.allFolders ? ICONS.folders : ICONS.files
+    entry.pathLike = false
+  }
   if (type === "secret") {
     entry.title = "Sensitive content"
     entry.icon = ICONS.secret
@@ -625,28 +645,8 @@ function buildTitleSub(entry) {
     entry.pathLike = true
     return
   }
-  if (type === "network") {
-    // Prefer the first real URI - uri-lists may lead with "#" comment
-    // lines that raw would surface. Strip "proto://" so the title is
-    // the share's own path, elided from the left like file rows so a
-    // long location always ends in the visible file name.
-    const uri = firstNetworkUri(entry)
-    const stripped = uri.replace(RE_SCHEME_STRIP, "")
-    entry.title = safePath(stripped !== "" ? stripped : uri)
-    // Fallback to network-storage generic if still empty
-    if (entry.title.trim() === "" || entry.title === "...") entry.title = "Network storage"
-    entry.icon = ICONS.network
-    entry.pathLike = true
-    return
-  }
-  if (type === "files" || type === "folders") {
-    const n = entry.filePaths ? entry.filePaths.length : 0
-    if (entry.allFolders) entry.title = n > 0 ? n + " folders" : "Folders"
-    else entry.title = n > 0 ? n + " files" : "Files"
-    entry.icon = entry.allFolders ? ICONS.folders : ICONS.files
-    entry.pathLike = false
-    return
-  }
+  if (type === "network") return networkTitle()
+  if (type === "files" || type === "folders") return collectionTitle()
   entry.title = truncateText(entry.raw, 64)
   entry.icon = iconForType(type)
   entry.pathLike = false
