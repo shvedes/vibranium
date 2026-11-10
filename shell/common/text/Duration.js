@@ -55,10 +55,17 @@ function formatMediaDuration(s) {
   if (ms !== null) sec += parseInt(ms[1], 10) / 1000
   if (!(sec > 0)) return ""
   var total = Math.floor(sec)
+  var sub = Math.round((sec - total) * 1000)
+  // A fraction that rounds up to a full second carries into the seconds
+  // field. Without the carry the tail prints four digits - 2.9996 s renders
+  // as "0:02.1000" - because the fraction is rounded before the field split.
+  if (sub >= 1000) {
+    sub = 0
+    total += 1
+  }
   var hh = Math.floor(total / 3600)
   var mm = Math.floor((total % 3600) / 60)
   var ss = total % 60
-  var sub = Math.round((sec - total) * 1000)
   if (hh > 0) return hh + ":" + Format.pad2(mm) + ":" + Format.pad2(ss)
   if (total >= 10 || sub === 0) return mm + ":" + Format.pad2(ss)
   return mm + ":" + Format.pad2(ss) + "."

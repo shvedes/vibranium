@@ -1689,6 +1689,8 @@ group('formatMediaDuration', () => {
   eq('at 10 s the fraction is dropped', CL.formatMediaDuration('10 s'), '0:10')
   eq('at 9 s the fraction survives', CL.formatMediaDuration('9 s 999 ms'), '0:09.999')
   eq('a fractional second rounds down below 10 s', CL.formatMediaDuration('59.9 s'), '0:59')
+  eq('a fraction that rounds to a full second carries', CL.formatMediaDuration('2.9996 s'), '0:03')
+  eq('the carry can cross the 10 s fraction cutoff', CL.formatMediaDuration('9.9996 s'), '0:10')
   eq('minutes only', CL.formatMediaDuration('3 min'), '3:00')
   eq('an exact minute', CL.formatMediaDuration('2 min 0 s'), '2:00')
   eq('zero seconds', CL.formatMediaDuration('0 s'), '')
