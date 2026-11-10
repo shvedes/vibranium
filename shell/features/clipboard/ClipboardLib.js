@@ -235,7 +235,7 @@ function isUrl(s) {
 }
 
 function extOf(path) {
-  const base = String(path).split("/").pop() || ""
+  const base = SU.basename(path)
   const dot = base.lastIndexOf(".")
   if (dot <= 0) return ""
   return base.substring(dot + 1).toLowerCase()

@@ -27,6 +27,15 @@ function dirname(path) {
   return i > 0 ? p.substring(0, i) : ""
 }
 
+// Last path segment, "" when the path ends in a separator (the same answer
+// the split("/").pop() idiom gives). A path with no separator is its own
+// basename.
+function basename(path) {
+  const p = String(path ?? "")
+  const i = p.lastIndexOf("/")
+  return p.substring(i + 1)
+}
+
 function styledMarkup(text) {
   const s = String(text ?? "")
   if (s === "") return ""

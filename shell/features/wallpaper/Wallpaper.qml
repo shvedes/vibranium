@@ -9,6 +9,7 @@ import qs.common
 import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/text/ImageExts.js" as ImageExts
+import "../../common/text/StringUtils.js" as SU
 import "../../common/text/DropPayload.js" as DropPayload
 import "../../common/process/JobResult.js" as Job
 
@@ -250,7 +251,7 @@ Singleton {
   }
 
   function basename(p) {
-    return p ? p.split("/").pop() : ""
+    return SU.basename(p)
   }
 
   // A recorded pointer is either state-relative or absolute. Only the

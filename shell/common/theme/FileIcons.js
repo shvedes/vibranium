@@ -7,6 +7,8 @@
 // no Qt imports.
 .pragma library
 
+.import "../text/StringUtils.js" as SU
+
 // Icon basenames under shell/assets/icons (resolved by Icons.url via
 // Menu.resolveIcon in the views). Canonical home of ClipboardLib ICONS.
 var ICONS = {
@@ -122,7 +124,7 @@ function extOf(path) {
 // clipboard suite): the basename only, and a leading dot is not an
 // extension (".ts" -> ""), so a dot in a directory never leaks either.
 function extIconName(path) {
-  var base = String(path || "").split("/").pop() || ""
+  var base = SU.basename(path)
   var dot = base.lastIndexOf(".")
   if (dot <= 0) return ""
   var e = base.slice(dot + 1).toLowerCase()

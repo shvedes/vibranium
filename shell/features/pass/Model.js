@@ -7,6 +7,8 @@
 // status counters cannot leak a credential. Decrypted values live in
 // SecretStore and are reached by handle.
 
+.import "../../common/text/StringUtils.js" as SU
+
 // Approximate `sort -V`: numeric chunks compare by value, the rest by
 // code point. Close enough for stable entry ordering in the panel.
 function versionCompare(a, b) {
@@ -40,9 +42,7 @@ function stripGpg(p) {
 
 function splitEntry(path) {
   var p = String(path || "");
-  var slash = p.lastIndexOf("/");
-  if (slash === -1) return { path: p, dir: "", name: p };
-  return { path: p, dir: p.substring(0, slash), name: p.substring(slash + 1) };
+  return { path: p, dir: SU.dirname(p), name: SU.basename(p) };
 }
 
 // Combined `find` output -> { files, dirs }. The probe prints one line

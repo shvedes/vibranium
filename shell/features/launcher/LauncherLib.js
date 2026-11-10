@@ -1534,7 +1534,7 @@ function pathBasename(path) {
   let p = String(path ?? "")
   while (p.length > 1 && p.charAt(p.length - 1) === "/") p = p.substring(0, p.length - 1)
   if (p === "" || p === "/") return p
-  return p.split("/").pop() || p
+  return SU.basename(p) || p
 }
 
 // Icon basename for the file-opener row, routed through ClipboardLib's
