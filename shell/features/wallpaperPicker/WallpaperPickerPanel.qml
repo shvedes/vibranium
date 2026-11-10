@@ -6,6 +6,7 @@ import Quickshell
 import qs.common
 import qs.features.wallpaper
 import qs.features.wallpaperPicker
+import "../../common/text/StringUtils.js" as SU
 
 // Wallpaper picker card - two-pane layout: list left, preview right.
 // Declarative via PanelCard + PanelFocus; fixed 6-row window.
@@ -609,7 +610,7 @@ PanelCard {
           return panel.rows[idx].value
         }
         readonly property bool isEmpty: curFile === ""
-        readonly property string curPath: curFile !== "" ? WallpaperPicker.backgroundsDir + "/" + curFile : ""
+        readonly property string curPath: curFile !== "" ? SU.joinPath(WallpaperPicker.backgroundsDir, curFile) : ""
         Image {
           id: previewImg
           anchors.fill: parent
