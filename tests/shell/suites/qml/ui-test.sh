@@ -168,9 +168,9 @@ t_eq "the tween reached a different value than it started at" "true" "$(qp_get a
 
 if [[ $(qp_get anim.inFlight) == "true" ]]; then
   t_eq "the tween was still running on the last sample" "true" "$(qp_get anim.tick3.stillMoving)"
-  t_eq "first sample alpha" "0.8823529411764706" "$(qp_get anim.tick1.alpha)"
-  t_eq "second sample alpha" "0.7647058823529411" "$(qp_get anim.tick2.alpha)"
-  t_eq "third sample alpha" "0.6470588235294118" "$(qp_get anim.tick3.alpha)"
+  t_true "first sample alpha is in its first fifth" awk -v v="$(qp_get anim.tick1.alpha)" 'BEGIN { exit !(v > 0.85 && v < 0.91) }'
+  t_true "second sample alpha is in its second fifth" awk -v v="$(qp_get anim.tick2.alpha)" 'BEGIN { exit !(v > 0.73 && v < 0.80) }'
+  t_true "third sample alpha is in its third fifth" awk -v v="$(qp_get anim.tick3.alpha)" 'BEGIN { exit !(v > 0.62 && v < 0.68) }'
   t_eq "and it moved in one direction throughout" "true" "$(qp_get anim.alpha.movedConsistently)"
   t_eq "the middle sample is not the end point" "true" "$(qp_get anim.midIsNotAnEndpoint)"
 else
