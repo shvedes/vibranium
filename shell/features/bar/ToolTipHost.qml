@@ -74,6 +74,34 @@ PanelWindow {
     return Math.ceil(w)
   }
 
+  // Widest verb across two-column rows: the name column has to leave room
+  // for it inside the capped bubble.
+  readonly property real _verbW: {
+    root._linesRev
+    let w = 0
+    const n = linesRep.count
+    for (let i = 0; i < n; i++) {
+      const it = linesRep.itemAt(i)
+      if (it && it.verbW > w) w = it.verbW
+    }
+    return Math.ceil(w)
+  }
+
+  // Rendered name column, shared by every two-column row so verbs still
+  // align. Natural widths feed _linesW (bubble sizing); this clamps the
+  // laid-out column to what the capped bubble can hold beside the widest
+  // verb, so an overlong app name elides inside its column instead of
+  // painting past the bubble and pushing the verb out. A natural bubble
+  // (uncapped, or content within the cap) is never narrower than the
+  // natural column, so the clamp only bites when the cap does.
+  readonly property real _nameColW: {
+    root._linesRev
+    const cap = root._req ? root._req.maxWidth : 260
+    if (cap <= 0) return root._verbX
+    const avail = cap - 2 * Ui.m - root._lineIconSize - 2 * root._lineGap - root._verbW
+    return Math.max(0, Math.min(root._verbX, Math.floor(avail)))
+  }
+
   // Reserved space for the widest value the throughput form can ever
   // produce, so the bubble never widens as a counter moves between units.
   TextMetrics {
@@ -344,6 +372,7 @@ PanelWindow {
           readonly property bool metricRow: lineRow.modelData.icon2 !== undefined
             && lineRow.modelData.icon2 !== null && String(lineRow.modelData.icon2) !== ""
           readonly property real nameW: lineRow.twoCol ? nameText.implicitWidth : 0
+          readonly property real verbW: lineRow.twoCol ? verbText.implicitWidth : 0
           readonly property real metric1W: lineRow.metricRow ? metricText1.implicitWidth : 0
           readonly property real metric2W: lineRow.metricRow ? metricText2.implicitWidth : 0
           width: linesCol.width
@@ -388,11 +417,13 @@ PanelWindow {
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: String(lineRow.modelData.text ?? "")
-            // Opt-in rich text for rows that tint part of their line (the
+            // Opt-in markup for rows that tint part of their line (the
             // privacy tooltip colors the app name and not the verb).
+            // StyledText, not RichText: elide is not available for RichText,
+            // so a markup line in this capped bubble could not be truncated.
             // PlainText by default, so every existing row measures and
             // paints exactly as before.
-            textFormat: lineRow.modelData.markup === true ? Text.RichText : Text.PlainText
+            textFormat: lineRow.modelData.markup === true ? Text.StyledText : Text.PlainText
             color: Ui.solid(String(lineRow.modelData.colorKey ?? "foreground_0"))
             elide: Text.ElideRight
           }
@@ -447,8 +478,9 @@ PanelWindow {
 
           // Lead column of a two-column row: fixed to the shared verb
           // origin, so shorter names leave trailing space and every verb
-          // starts aligned. Never elides - its width is at least its own
-          // natural width by construction of _verbX.
+          // starts aligned. _nameColW is the shared natural width clamped to
+          // the capped bubble, so a name longer than the bubble elides
+          // rather than overlapping the verb.
           Title {
             id: nameText
             level: 5
@@ -456,9 +488,12 @@ PanelWindow {
             anchors.left: lineIcon.right
             anchors.leftMargin: root._lineGap
             anchors.verticalCenter: parent.verticalCenter
-            width: root._verbX
+            width: root._nameColW
             text: String(lineRow.modelData.name ?? "")
-            textFormat: lineRow.modelData.markup === true ? Text.RichText : Text.PlainText
+            // StyledText for the same reason as lineText: RichText ignores
+            // elide, and this column is exactly where an overlong app name
+            // has to be truncated.
+            textFormat: lineRow.modelData.markup === true ? Text.StyledText : Text.PlainText
             color: Ui.solid("foreground_0")
           }
 
@@ -467,7 +502,7 @@ PanelWindow {
             level: 5
             visible: lineRow.twoCol
             anchors.left: lineIcon.right
-            anchors.leftMargin: root._lineGap + root._verbX + root._lineGap
+            anchors.leftMargin: root._lineGap + root._nameColW + root._lineGap
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: String(lineRow.modelData.verb ?? "")
