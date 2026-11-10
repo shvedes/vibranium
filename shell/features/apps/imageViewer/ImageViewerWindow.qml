@@ -8,6 +8,7 @@ import Qt.labs.folderlistmodel
 import "ImageViewerMeta.js" as Meta
 import "../../../common/capture/ShotLib.js" as ShotLib
 import "../../../common/text/StringUtils.js" as SU
+import "../../../common/math/Range.js" as Range
 import qs.common
 import qs.features.wallpaper
 
@@ -267,8 +268,8 @@ QtObject {
       // first or last control stays on screen. Measured on a four-button row:
       // the middle three centre exactly, and only the leftmost clamps - a hint
       // wider than the space to its left has nowhere else to go.
-      x: Math.max(0, Math.min(Math.max(0, root.win.width - width),
-                              btn.mapToItem(root.win, 0, 0).x + Math.round((btn.width - width) / 2)))
+      x: Range.clamp(btn.mapToItem(root.win, 0, 0).x + Math.round((btn.width - width) / 2),
+                     0, Math.max(0, root.win.width - width))
       y: btn.height + 6
       radius: RoundingPolicy.radius
       color: Ui.tint("background_0", 0.94)
@@ -331,8 +332,8 @@ QtObject {
       visible: ima.containsMouse && ibtn.tip !== ""
       width: Math.min(ibtnHintText.implicitWidth + 16, 240)
       height: ibtnHintText.implicitHeight + 10
-      x: Math.max(0, Math.min(Math.max(0, root.win.width - width),
-                              ibtn.mapToItem(root.win, 0, 0).x + Math.round((ibtn.width - width) / 2)))
+      x: Range.clamp(ibtn.mapToItem(root.win, 0, 0).x + Math.round((ibtn.width - width) / 2),
+                     0, Math.max(0, root.win.width - width))
       y: ibtn.height + 6
       radius: RoundingPolicy.radius
       color: Ui.tint("background_0", 0.94)
@@ -1321,8 +1322,8 @@ QtObject {
         entries: root.menuEntries
         // Clamped against the content item, measured after layout, so the card
         // opens fully inside the window whichever edge the pointer is near.
-        x: Math.max(8, Math.min(root.menuX, content.width - width - 8))
-        y: Math.max(8, Math.min(root.menuY, content.height - height - 8))
+        x: Range.clamp(root.menuX, 8, content.width - width - 8)
+        y: Range.clamp(root.menuY, 8, content.height - height - 8)
 
         onActivated: entry => root.runMenuEntry(entry.action)
       }
