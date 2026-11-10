@@ -1,4 +1,10 @@
--- Animation preset: bounce -- Hyprland's own curve and animation calls.
+-- Workspace switching animates on a laptop only: a touchpad swipe between
+-- workspaces reads as stutter without it, while a desktop has no gesture for
+-- the animation to smooth (a VM included). `hostnamectl chassis` answers
+-- "laptop", or "convertible" for a touchscreen laptop; anything else is a
+-- desktop.
+local chassis = (os.getenv("CHASSIS_TYPE") or ""):lower()
+local touchpad = chassis == "laptop" or chassis == "convertible"
 
 hl.curve("easeOutQuint", { type = "bezier", points = { { 0.23, 1 }, { 0.32, 1 } } })
 hl.curve("easeInOutCubic", { type = "bezier", points = { { 0.65, 0.05 }, { 0.36, 1 } } })
@@ -20,5 +26,5 @@ hl.animation({ leaf = "fadeOut", enabled = true, speed = 0.73, bezier = "almostL
 hl.animation({ leaf = "fade", enabled = true, speed = 1.515, bezier = "quick" })
 hl.animation({ leaf = "fadeLayersIn", enabled = true, speed = 0.695, bezier = "almostLinear" })
 hl.animation({ leaf = "fadeLayersOut", enabled = true, speed = 0.695, bezier = "almostLinear" })
-hl.animation({ leaf = "workspaces", enabled = false, speed = 3, spring = "hobbyist", style = "slidevert" })
+hl.animation({ leaf = "workspaces", enabled = touchpad, speed = 3, spring = "hobbyist", style = "slidevert" })
 hl.animation({ leaf = "zoomFactor", enabled = true, speed = 4, bezier = "quick" })
