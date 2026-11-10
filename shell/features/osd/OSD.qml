@@ -59,6 +59,14 @@ Singleton {
   property string iconName: "volume-max"
   property bool muted: false
 
+  // A fresh payload is not a level change: the card appears AT its level
+  // instead of sweeping to it from the last flash's. True only for the turn
+  // that starts a payload which was not already up - a repeat press while
+  // the card is on screen keeps streaming values, and those DO glide - and
+  // cleared on the next turn, which is all the card needs: its fill binds in
+  // this same turn, so this marks the one assignment that must not tween.
+  property bool fillSnap: false
+
   // Placement is fixed: always at the bottom side of the screen,
   // `offset` px above the bottom edge (mirrors OSDs that hover above a
   // bottom bar without overlapping it). Validated against the same check
@@ -126,12 +134,14 @@ Singleton {
     root._cancelLinger()
     exitTimer.stop()
     root.dismissing = false
+    root.fillSnap = !root.payloadVisible
     root.kind = k
     root.value = v
     root.muted = muted === true
     root.label = lb
     root.iconName = ic !== "" ? ic : root._iconFor(k, v, root.muted)
     root.visible = true
+    if (root.fillSnap) Qt.callLater(root._clearFillSnap)
     hideTimer.restart()
     return true
   }
@@ -189,6 +199,10 @@ Singleton {
   function _cancelLinger() {
     lingerTimer.stop()
     root._lingering = false
+  }
+
+  function _clearFillSnap() {
+    root.fillSnap = false
   }
 
   Timer {

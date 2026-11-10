@@ -47,7 +47,51 @@ Rectangle {
   readonly property real clamped: Math.min(100, Math.max(0, root.value))
   readonly property real ratio: root.clamped / 100
 
-  Component.onCompleted: {
+  // The fraction the fill is DRAWN at: the reported level, except while a
+  // level change is gliding toward it.
+  //
+  // The glide lives on this number rather than on the fill's own width,
+  // because that width is geometry as much as level. A bar handed a level in
+  // the pass that builds its card - or one whose level arrives a turn later,
+  // which is every notification delegate, since `modelData` and the entry's
+  // snapshot land after the card completes - would otherwise sweep in from an
+  // empty track: an animation of the bar APPEARING, not of the level moving.
+  // Geometry now follows this fraction, so a bar that is laid out late, or a
+  // card that is built before its snapshot, is already at its level the first
+  // time it is drawn. A re-show at a new level is the host's call (OSD asks
+  // for it with `fillSnap`).
+  property real shownRatio: root.ratio
+
+  // Whether the level's glide is armed.
+  //
+  // Once, after the bar's first placement, and deferred a turn - the same
+  // shape and for the same reason as the pile's `place()` in
+  // NotificationsView, with one turn's grace on top. The deferral is what
+  // covers a delegate: `modelData` and the entry's level are handed to a card
+  // AFTER its `Component.onCompleted`, in its creation turn, so arming at
+  // construction would let that very first level glide in from empty. The
+  // delay clears the creation turn, and everything after it - a streamed
+  // volume, a download's progress - is a level CHANGE and glides.
+  //
+  // Gated on the bar's own width rather than on the level: a bar that appears
+  // empty (a 0% download, an idle mixer channel) is placed all the same, and
+  // its first move must glide like any other.
+  property bool placed: false
+
+  function _armPlaced(): void {
+    root.placed = true
+  }
+
+  function _considerPlace(): void {
+    if (root.placed || root.width <= 0) return
+    Qt.callLater(root._armPlaced)
+  }
+  onWidthChanged: root._considerPlace()
+  Component.onCompleted: root._considerPlace()
+
+  Behavior on shownRatio {
+    enabled: root.animationsEnabled && root.placed
+    Glide { duration: root.glideMs }
   }
 
   Component.onDestruction: {
@@ -64,7 +108,7 @@ Rectangle {
     anchors.top: parent.top
     anchors.bottom: parent.bottom
     visible: !root.indeterminate
-    width: parent.width * root.ratio
+    width: parent.width * root.shownRatio
     color: root.fillColor
     radius: RoundingPolicy.radius
 
@@ -75,13 +119,9 @@ Rectangle {
       ColorAnimation { duration: Ui.fastMs }
     }
 
-    Behavior on width {
-      enabled: root.animationsEnabled
-      Glide { duration: root.glideMs }
-    }
-
-    // The gliding fill, per frame. A sender-streamed bar retunes glideMs
-    // while the fill is moving, and this is where the retune is visible.
+    // The gliding fill, per frame. The tween itself is on `shownRatio` (see
+    // the root), which is what makes a level change animate while a
+    // placement - or a late layout - does not.
   }
 
   Rectangle {

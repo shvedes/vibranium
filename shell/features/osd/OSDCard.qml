@@ -109,7 +109,11 @@ Card {
         // use 100 + value (e.g. -30 -> 70% fill) so deeper dim = less fill.
         value: OSD.kind === "brightness" && OSD.value < 0 ? Math.max(0, 100 + OSD.value) : (OSD.muted ? 0 : OSD.value)
         dimWhenEmpty: false
-        glideMs: 150
+        // A payload that starts this flash is placed, not swept to: the card
+        // fades in already at the level the keypress produced. A repeat press
+        // while the card is up is the same payload streaming, and that one
+        // glides (see OSD.fillSnap).
+        glideMs: OSD.fillSnap ? 0 : 150
         fillColor: OSD.muted ? Ui.solid("red") : Theme.color("accent")
         animationsEnabled: OSD.animationsEnabled
         color: OSD.kind === "brightness" && OSD.value < 0 ? Ui.tint("red", 0.18) : Theme.color("background_2")
@@ -159,7 +163,9 @@ Card {
           anchors.verticalCenter: parent.verticalCenter
           value: OSD.kind === "brightness" && OSD.value < 0 ? Math.max(0, 100 + OSD.value) : (OSD.muted ? 0 : OSD.value)
           dimWhenEmpty: false
-          glideMs: 150
+          // Placed at the level, not swept to it: see the thin bar above and
+          // OSD.fillSnap.
+          glideMs: OSD.fillSnap ? 0 : 150
           fillColor: OSD.muted ? Ui.solid("red") : Theme.color("accent")
           animationsEnabled: OSD.animationsEnabled
           color: OSD.kind === "brightness" && OSD.value < 0 ? Ui.tint("red", 0.18) : Theme.color("background_2")
