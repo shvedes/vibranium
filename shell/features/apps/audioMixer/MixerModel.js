@@ -785,7 +785,13 @@ function parsePactl(input) {
     // almost never carries a CR. A charCode test costs one comparison.
     const rawLine = lines[i]
     const line = rawLine.charCodeAt(rawLine.length - 1) === 13 ? rawLine.substring(0, rawLine.length - 1) : rawLine
-    const header = HEADER_RE.exec(line)
+    // A block header is the only line that starts at column zero with a
+    // capital letter; fields and properties are tab-indented and the rest are
+    // blank. The anchored regex ran on every line of a capture that is mostly
+    // property tails, so the cheap tell now answers "not a header" for them
+    // and the regex still decides the lines that get this far.
+    const first = line.charCodeAt(0)
+    const header = (first >= 65 && first <= 90) ? HEADER_RE.exec(line) : null
     if (header !== null) {
       commit()
       bucket = bucketFor(header[1])
