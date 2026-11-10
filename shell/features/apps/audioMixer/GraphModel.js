@@ -942,26 +942,29 @@ function layerPlan(nodes, groups) {
   // no left-to-right layering at all: the edge that closes it is drawn
   // backwards, and that is the truth about a loop rather than a layout bug.
   const depth = ({})
-  const pending = ({})
-  const queue = []
-  for (const key of keys) {
-    depth[key] = 0
-    pending[key] = countOut(ins, key)
-    if (pending[key] === 0) queue.push(key)
-  }
   const seen = ({})
-  const walk = []
-  while (queue.length > 0) {
-    const key = queue.shift()
-    if (seen[key] === true) continue
-    seen[key] = true
-    walk.push(key)
-    for (const next of listOut(outs, key)) {
-      depth[next] = Math.max(depth[next], depth[key] + 1)
-      pending[next] = pending[next] - 1
-      if (pending[next] === 0) queue.push(next)
+  function depthWalk() {
+    const pending = ({})
+    const queue = []
+    for (const key of keys) {
+      depth[key] = 0
+      pending[key] = countOut(ins, key)
+      if (pending[key] === 0) queue.push(key)
+    }
+    const walk = []
+    while (queue.length > 0) {
+      const key = queue.shift()
+      if (seen[key] === true) continue
+      seen[key] = true
+      walk.push(key)
+      for (const next of listOut(outs, key)) {
+        depth[next] = Math.max(depth[next], depth[key] + 1)
+        pending[next] = pending[next] - 1
+        if (pending[next] === 0) queue.push(next)
+      }
     }
   }
+  depthWalk()
   function layerRest() {
     const rest = []
     for (const key of keys) {
