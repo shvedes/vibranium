@@ -1870,9 +1870,9 @@ group('truncateText - keep the head of a sentence', () => {
   eq('the result is exactly the cap long', CL.truncateText('a'.repeat(200), 20).length, 20)
   eq('a cap of zero falls back to the default', CL.truncateText('short', 0), 'short')
   eq('a nullish cap falls back to the default', CL.truncateText('short', null), 'short')
-  // substring(0, max - 3) with a negative max is a negative index, which
-  // substring treats as 0, so the result is the bare ellipsis.
-  eq('a negative cap collapses to the ellipsis', CL.truncateText('abcdef', -2), '...')
+  // A cap that cannot hold any character yields nothing: the helper never
+  // returns a string longer than the cap it was given.
+  eq('a negative cap yields nothing', CL.truncateText('abcdef', -2), '')
   eq('internal tabs become spaces', CL.truncateText('a\tb'), 'a b')
   eq('internal newlines become spaces', CL.truncateText('a\nb'), 'a b')
   eq('an empty string', CL.truncateText(''), '')
@@ -1906,7 +1906,7 @@ group('truncatePath - cut from the FRONT so the name survives', () => {
   eq('an empty path', CL.truncatePath(''), '')
   eq('undefined is stringified', CL.truncatePath(undefined), 'undefined')
   eq('a zero cap falls back to the default', CL.truncatePath(long, 0).length, 48)
-  eq('a cap below 3 cannot hold an ellipsis plus a tail', CL.truncatePath('abcdefghij', 2), '...')
+  eq('a cap below 3 keeps the tail without an ellipsis', CL.truncatePath('abcdefghij', 2), 'ij')
   noThrow('a very long path', () => CL.truncatePath('/' + 'a'.repeat(10000), 48))
 })
 
