@@ -10,6 +10,7 @@ import Quickshell.Wayland
 import qs.common
 import "AnnotationTools.js" as AnnotationTools
 import "../../common/capture/ShotLib.js" as ShotLib
+import "../../common/text/StringUtils.js" as SU
 
 // Native annotation editor as a modal fullscreen overlay: black veil over
 // the desktop, the shot fitted center, one Canvas painting base image +
@@ -757,7 +758,7 @@ PanelWindow {
   function _finishSavedOutput(output) {
     editor.exporting = false
     editor._saveTargetExisted = true
-    const dir = output.substring(0, Math.max(0, output.lastIndexOf("/")))
+    const dir = SU.dirname(output)
     if (editor.showNotification) editor._daemonNotify("Screenshot Saved", "Saved to " + dir)
     Registry.call("screenshots", "noteSaved", editor._uid, output)
     editor._close()

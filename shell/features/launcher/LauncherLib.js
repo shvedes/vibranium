@@ -351,7 +351,7 @@ function buildPluginConfigs(dirs, persisted, readMeta) {
   const list = []
   for (let i = 0; i < dirs.length; i++) {
     const dir = dirs[i]
-    const id = dir.substring(dir.lastIndexOf("/") + 1)
+    const id = SU.basename(dir)
     if (seen[id] !== undefined) continue
     seen[id] = true
     const cfg = pluginConfigFromMeta(id, dir, readMeta(dir), persisted)

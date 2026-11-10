@@ -4,6 +4,7 @@ import QtQml
 import Quickshell
 import Quickshell.Io
 import qs.common
+import "../text/StringUtils.js" as SU
 import "../text/UnitIpc.js" as UnitIpc
 
 // Watch governor - one FileView per unique path, reference counted and
@@ -149,7 +150,7 @@ Singleton {
     const probe = _readView(path, view)
     const exists = probe.ok
     if (!exists) {
-      const dir = path.substring(0, path.lastIndexOf("/"))
+      const dir = SU.dirname(path)
       if (dir !== "") {
         dirView = dirWatcherComp.createObject(root, { slotKey: path })
         dirView.path = dir

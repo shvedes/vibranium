@@ -194,7 +194,7 @@ Singleton {
       .filter(j => String(j["job-id"] ?? "") !== "")
     for (let i = 0; i < rows.length; i++) {
       const uri = String(rows[i]["job-printer-uri"] || "")
-      rows[i].printer = uri.substring(uri.lastIndexOf("/") + 1)
+      rows[i].printer = Model.baseName(uri)
     }
     rows.sort((a, b) => {
       const aa = Model.isActiveJobState(a["job-state"]) ? 0 : 1

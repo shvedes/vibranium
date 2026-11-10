@@ -7,6 +7,7 @@ import QtQuick.Effects
 import Qt.labs.folderlistmodel
 import "ImageViewerMeta.js" as Meta
 import "../../../common/capture/ShotLib.js" as ShotLib
+import "../../../common/text/StringUtils.js" as SU
 import qs.common
 import qs.features.wallpaper
 
@@ -521,8 +522,7 @@ QtObject {
   function openFile(fileUrl) {
     const normalized = root._normalizeInput(fileUrl)
     const path = root.pathOf(normalized)
-    const slash = path.lastIndexOf("/")
-    root.pendingFileName = path.substring(slash + 1)
+    root.pendingFileName = SU.basename(path)
     root.currentFile = normalized
     root.currentFileName = root.pendingFileName
     root.resetView()

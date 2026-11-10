@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Io
 import qs.common
 import "MenuLib.js" as MenuLib
+import "../../common/text/StringUtils.js" as SU
 import "../../common/text/UnitIpc.js" as UnitIpc
 
 // Menu service: owns loaded bundles, the page stack, search state and the
@@ -257,7 +258,7 @@ Singleton {
     loader.path = filePath
     if (!loader.waitForJob()) return false
     root._lastPath = path
-    root._lastName = filePath.substring(filePath.lastIndexOf("/") + 1)
+    root._lastName = SU.basename(filePath)
     const text = loader.text()
 
     // Repeat-summon cache: parsing/normalizing a bundle costs enough to
