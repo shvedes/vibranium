@@ -364,6 +364,26 @@ function jobFileIcon(row) {
   return FileIcons.extIconName(jobTitle(row)) || FileIcons.ICONS.file
 }
 
+// The sorted rows behind `job-id` report rows: parse the report, keep the
+// rows that name a job, resolve the printer from the job's own URI, and put
+// active work ahead of history, newest first. Pure, so the service only owns
+// assigning the result and the completion diff.
+function jobRows(reportText) {
+  const rows = parseReport(reportText, "job-id")
+    .filter(j => String(j["job-id"] ?? "") !== "")
+  for (let i = 0; i < rows.length; i++) {
+    const uri = String(rows[i]["job-printer-uri"] || "")
+    rows[i].printer = baseName(uri)
+  }
+  rows.sort((a, b) => {
+    const aa = isActiveJobState(a["job-state"]) ? 0 : 1
+    const bb = isActiveJobState(b["job-state"]) ? 0 : 1
+    if (aa !== bb) return aa - bb
+    return Number(b["time-at-creation"] || 0) - Number(a["time-at-creation"] || 0)
+  })
+  return rows
+}
+
 // Drop locally cleared history entries (service `dismissed` map,
 // job-id -> true). Never mutates the input.
 function filterDismissed(rows, dismissed) {
