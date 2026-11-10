@@ -107,7 +107,7 @@ function parseLinks(text) {
 }
 
 function identifyLinks(links, nodes) {
-  const ids = ({})
+  const ids = Object.create(null)
   for (let i = 0; nodes && i < nodes.length; i++) {
     const name = nodeName(nodes[i])
     const id = nodeId(nodes[i])
@@ -116,8 +116,17 @@ function identifyLinks(links, nodes) {
   const out = []
   for (let i = 0; Array.isArray(links) && i < links.length; i++) {
     const link = links[i]
-    const sourceId = ids[link.output.split(":")[0]]
-    const sinkId = ids[link.input.split(":")[0]]
+    // Split at the LAST colon: a node name may itself contain one
+    // ("alsa:foo:capture_FL" serves the node "alsa:foo"), which is the same
+    // shape ports() reads with a prefix match. Splitting at the first colon
+    // reads the name as "alsa" and drops the route.
+    const output = String(link.output)
+    const input = String(link.input)
+    const sourceAt = output.lastIndexOf(":")
+    const sinkAt = input.lastIndexOf(":")
+    if (sourceAt < 0 || sinkAt < 0) continue
+    const sourceId = ids[output.slice(0, sourceAt)]
+    const sinkId = ids[input.slice(0, sinkAt)]
     if (sourceId !== undefined && sinkId !== undefined) {
       out.push({ id: link.id, sourceId: sourceId, sinkId: sinkId,
         output: link.output, input: link.input })

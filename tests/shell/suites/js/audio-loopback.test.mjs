@@ -37,6 +37,16 @@ const nodes = [{ id: 21, name: 'mic' }, { id: 34, name: 'speaker' }]
 deepEqual('link endpoints resolve to stable node identities', L.identifyLinks(links, nodes), [
   { id: '95', sourceId: '21', sinkId: '34', output: 'mic:capture_FL', input: 'speaker:playback_FL' },
 ])
+// ports() reads a node name by prefix because the name may contain a colon;
+// the link table has to make the same split, at the last colon, or the route
+// resolves to a node that does not exist and is dropped.
+deepEqual('a node name containing a colon still resolves', L.identifyLinks(
+  [{ id: '96', output: 'alsa:foo:capture_FL', input: 'sink:playback_FL' }],
+  [{ id: 21, name: 'alsa:foo' }, { id: 34, name: 'sink' }]), [
+  { id: '96', sourceId: '21', sinkId: '34', output: 'alsa:foo:capture_FL', input: 'sink:playback_FL' },
+])
+deepEqual('an endpoint with no port separator is ignored', L.identifyLinks(
+  [{ id: '97', output: 'mic', input: 'speaker:playback_FL' }], nodes), [])
 
 section('owned route recovery')
 const persisted = L.routesForDefault(planned.pairs, '21', '34')
