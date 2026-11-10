@@ -1214,16 +1214,9 @@ QtObject {
           Repeater {
             model: mixer.tab === "devices" ? mixer.outputDevices : []
 
-            delegate: DeviceRow {
-              required property var modelData
-
+            delegate: DeviceTabRow {
               width: columns.width
-              node: modelData
-              linkHandle: mixer.controller.deviceLinks[Model.nodeKey(modelData)]
-              expanded: mixer.isExpanded(Model.nodeKey(modelData))
-              controller: mixer.controller
-              mixerWindow: mixer
-              onToggleExpanded: mixer.toggleDevice(Model.nodeKey(modelData))
+              mixerRef: mixer
             }
           }
 
@@ -1240,16 +1233,9 @@ QtObject {
           Repeater {
             model: mixer.tab === "devices" ? mixer.inputDevices : []
 
-            delegate: DeviceRow {
-              required property var modelData
-
+            delegate: DeviceTabRow {
               width: columns.width
-              node: modelData
-              linkHandle: mixer.controller.deviceLinks[Model.nodeKey(modelData)]
-              expanded: mixer.isExpanded(Model.nodeKey(modelData))
-              controller: mixer.controller
-              mixerWindow: mixer
-              onToggleExpanded: mixer.toggleDevice(Model.nodeKey(modelData))
+              mixerRef: mixer
             }
           }
         }
@@ -1312,17 +1298,9 @@ QtObject {
           Repeater {
             model: mixer.tab === "configuration" ? mixer.outputDevices : []
 
-            delegate: DeviceRow {
-              required property var modelData
-
+            delegate: DeviceConfigRow {
               width: columns.width
-              node: modelData
-              linkHandle: mixer.controller.deviceLinks[Model.nodeKey(modelData)]
-              expanded: mixer.isExpanded(Model.nodeKey(modelData))
-              controller: mixer.controller
-              mixerWindow: mixer
-              configuration: true
-              onToggleExpanded: mixer.toggleDevice(Model.nodeKey(modelData))
+              mixerRef: mixer
             }
           }
 
@@ -1339,17 +1317,9 @@ QtObject {
           Repeater {
             model: mixer.tab === "configuration" ? mixer.inputDevices : []
 
-            delegate: DeviceRow {
-              required property var modelData
-
+            delegate: DeviceConfigRow {
               width: columns.width
-              node: modelData
-              linkHandle: mixer.controller.deviceLinks[Model.nodeKey(modelData)]
-              expanded: mixer.isExpanded(Model.nodeKey(modelData))
-              controller: mixer.controller
-              mixerWindow: mixer
-              configuration: true
-              onToggleExpanded: mixer.toggleDevice(Model.nodeKey(modelData))
+              mixerRef: mixer
             }
           }
         }
@@ -1569,5 +1539,24 @@ QtObject {
         }
       }
     }
+  }
+
+  // The devices tab and the configuration tab list the same two device sets;
+  // a row differs only in whether it offers the profile and level controls.
+  // One inline component each keeps the four Repeaters to a model and a width.
+  component DeviceTabRow: DeviceRow {
+    required property var modelData
+    required property var mixerRef
+
+    node: modelData
+    linkHandle: mixerRef.controller.deviceLinks[Model.nodeKey(modelData)]
+    expanded: mixerRef.isExpanded(Model.nodeKey(modelData))
+    controller: mixerRef.controller
+    mixerWindow: mixerRef
+    onToggleExpanded: mixerRef.toggleDevice(Model.nodeKey(modelData))
+  }
+
+  component DeviceConfigRow: DeviceTabRow {
+    configuration: true
   }
 }
