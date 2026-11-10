@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters
 import QtQuick
 import qs.common
+import "../math/Range.js" as Range
 
 // Standard in-flow dropdown slot shared by every surface that unfolds
 // content under a row: the settings menu (ctrl-i description, select
@@ -154,8 +155,9 @@ Item {
   // the same pacing off the same height, so both directions match; the
   // grace timer below takes the longer of this and the fade, so deferred
   // content never unloads mid-close on a slot of any height.
-  readonly property int slotMs: Math.max(Ui.fastMs, Math.min(Ui.slowMs,
-    Math.round((root.topGap + contentHost.height + root.gap) / Ui.slotVpx * 1000)))
+  readonly property int slotMs: Range.clamp(
+    Math.round((root.topGap + contentHost.height + root.gap) / Ui.slotVpx * 1000),
+    Ui.fastMs, Ui.slowMs)
 
   // True while the slot is being held at its destination because its unfold
   // resizes the region. Not a binding: `settle` is raised imperatively by the
