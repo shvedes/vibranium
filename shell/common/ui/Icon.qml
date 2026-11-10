@@ -139,6 +139,16 @@ Item {
     && indicatorLoader.item.layerReady === true
   readonly property bool ready: icon.status === Image.Ready && (!root._layered || root._layerReady)
 
+  // Whether this layer can take the front of CrossfadeIcon's double buffer:
+  // the raster decoded (and, when layered, the indicator layer did too), or
+  // there is nothing to wait for - no source, or a failed load. A failed load
+  // is allowed to trade through rather than hold a stale glyph on screen
+  // forever. A source that has not been assigned yet reads as "no source"
+  // only within the turn that stages it, which is why the swap check is
+  // deferred (see CrossfadeIcon._tradeIfReady).
+  readonly property bool swapReady: root.ready || icon.status === Image.Error
+    || String(icon.source) === ""
+
   // The slot is the fixed outer target. Consumers size their pill (and the
   // module's hit area) from this so width never varies with the glyph.
   // Explicit geometry mirrors the implicit one so anchor-only parents

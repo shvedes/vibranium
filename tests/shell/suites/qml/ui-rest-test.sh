@@ -241,6 +241,30 @@ t_eq "an unknown name is still not ready 30 turns on" "false" "$(qp_get icon.rea
 t_eq "ready tracks the base image's status" "true" "$(qp_get icon.ready.plain)"
 
 # ---------------------------------------------------------------------
+# CrossfadeIcon: the swap gate that keeps the old glyph painted.
+# ---------------------------------------------------------------------
+t_section "CrossfadeIcon: a swap waits for the incoming raster instead of blanking"
+# The double buffer stages a new name on the hidden layer and trades the front
+# only once that layer reports swapReady. Before the gate the front moved in
+# the same frame, the incoming Image had never decoded - so retainWhileLoading
+# had nothing to retain - and the slot stayed empty until the new data URL
+# landed, which is the gap seen on slower CPUs.
+t_eq "both buffer layers exist" "2" "$(qp_get crossfade.layers)"
+t_eq "the slot starts on the first layer" "true" "$(qp_get crossfade.initial.front)"
+t_eq "and is visible" "true" "$(qp_get crossfade.initial.visible)"
+t_eq "a flip stages the new name on the hidden layer" "true" "$(qp_get crossfade.flip.pending)"
+t_eq "with that name on the hidden layer" "mic-off" "$(qp_get crossfade.flip.staged)"
+t_eq "the front has not moved yet" "true" "$(qp_get crossfade.flip.frontHeld)"
+t_eq "so the outgoing glyph is still at full opacity" "1" "$(qp_get crossfade.flip.outgoingOpacity)"
+t_eq "by the later turn the front has traded" "true" "$(qp_get crossfade.late.traded)"
+t_eq "with the incoming raster ready" "true" "$(qp_get crossfade.late.incomingReady)"
+t_eq "the new front is visible" "1" "$(qp_get crossfade.late.incomingOpacity)"
+t_eq "and the outgoing layer is hidden" "0" "$(qp_get crossfade.late.outgoingOpacity)"
+t_eq "re-asserting the showing name changes nothing" "true" "$(qp_get crossfade.sameName.noop)"
+t_eq "an empty name drops any staged swap" "true" "$(qp_get crossfade.empty.snapped)"
+t_eq "and hides the slot at once" "false" "$(qp_get crossfade.empty.visible)"
+
+# ---------------------------------------------------------------------
 # GridList: the column and row arithmetic.
 # ---------------------------------------------------------------------
 t_section "GridList: cell origins are a prefix sum, and the last column stays inside"

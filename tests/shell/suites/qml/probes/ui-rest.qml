@@ -119,6 +119,11 @@ Item {
   Icon { id: icNoName; x: 520; y: 0; name: "" }
   Icon { id: icNoColorKey; x: 560; y: 0; name: "mic-off"; colorKey: "" }
 
+  // CrossfadeIcon: the double buffer's swap gate. It starts on a resolved
+  // name, so the first flip is a swap into a layer that has never decoded -
+  // the case that used to blank the slot.
+  CrossfadeIcon { id: cfIcon; x: 600; y: 0; name: "clock" }
+
   // GridList: a 3-column grid whose 7 items leave a half-empty final row, a
   // 10-item grid whose last row holds exactly one cell, an empty grid for the
   // count === 0 guards, a short viewport for the wrap sweep, and one laid
@@ -716,6 +721,15 @@ Item {
     const l = loaderOf(ic)
     if (l === null || l.item === null) return null
     return childWith(l.item, "source")
+  }
+  // CrossfadeIcon's two layers in declaration order (a, then b). Marked by
+  // the Icon-only swapReady property, so this cannot pick up the Behaviors.
+  function iconLayers(ci) {
+    const out = []
+    for (let i = 0; i < ci.children.length; i++) {
+      if (ci.children[i].swapReady !== undefined) out.push(ci.children[i])
+    }
+    return out
   }
   // The Qt control inside the ScrollBar wrapper, and the shadow viewport it
   // measures the target through.
@@ -1703,6 +1717,19 @@ Item {
     kv("pc.gate.startHeight", cardGate.height)
     kv("pc.gate.targetHeight", cardGate.cardHeight)
     kv("pc.gate.shrinking", cardGate.cardHeight < root.gateStartH)
+
+    // CrossfadeIcon: flip into a layer that has never decoded. The front has
+    // to stay on the old layer for this turn - that frame is the one that
+    // used to be empty, because the incoming Image had nothing to retain.
+    const layers = iconLayers(cfIcon)
+    kv("crossfade.layers", layers.length)
+    kv("crossfade.initial.front", cfIcon._aFront)
+    kv("crossfade.initial.visible", cfIcon.visible)
+    cfIcon.name = "mic-off"
+    kv("crossfade.flip.pending", cfIcon._swapPending)
+    kv("crossfade.flip.frontHeld", cfIcon._aFront === true)
+    kv("crossfade.flip.staged", cfIcon._bName)
+    kv("crossfade.flip.outgoingOpacity", layers[0].opacity)
   }
 
   // ---- turns 2..8: the tweens, sampled in flight ----------------------
@@ -2046,6 +2073,22 @@ Item {
     kv("bar.fill.s23", barEmpty.children[0].width)
     kv("slotTall.height.s23", slotTall.height)
     kv("slotTall.height.matchesTarget", feq(slotTall.height, slotTall.children[0].height + slotTall.gap))
+
+    // CrossfadeIcon: the staged layer has long since decoded, so the front
+    // has traded and the fade (120ms when motion is on) has finished. Then
+    // the two no-op branches: re-asserting the showing name, and an empty
+    // name, which snaps without staging anything.
+    const late = iconLayers(cfIcon)
+    kv("crossfade.late.traded", cfIcon._aFront === false)
+    kv("crossfade.late.incomingReady", late[1].swapReady)
+    kv("crossfade.late.incomingOpacity", late[1].opacity)
+    kv("crossfade.late.outgoingOpacity", late[0].opacity)
+    const front0 = cfIcon._aFront
+    cfIcon.name = "mic-off"
+    kv("crossfade.sameName.noop", cfIcon._aFront === front0 && cfIcon._swapPending === false)
+    cfIcon.name = ""
+    kv("crossfade.empty.snapped", cfIcon._swapPending === false && cfIcon._aFront === front0)
+    kv("crossfade.empty.visible", cfIcon.visible)
   }
 
   function turn30() {
