@@ -3370,7 +3370,7 @@ group('the open computes before it shows, so the first paint is final', () => {
   notContains('and nothing recomputes after the claim', facade,
     '_claimToken = SurfaceClaim.claim("appLauncher", root.close, root)\n    root._openCompute()')
   contains('the compute no longer waits for visible', facade,
-    'function _openCompute() {\n    const ctrl = root._controller\n    if (ctrl === null) return\n    ctrl.onOpened()')
+    'function _openCompute() {\n    const ctrl = lease.controller\n    if (ctrl === null) return\n    ctrl.onOpened()')
   // The pre-flip recompute schedules a deferred install while hidden; the
   // open seat steals it and installs inline, under the close-armed snap,
   // instead of painting stale first. A non-open caller still bails.
