@@ -214,19 +214,39 @@ function kmhToMph(value) {
   return isNaN(n) ? "" : n * 0.621371
 }
 
+// Peak relative humidity per date, keyed by the hourly time array it was
+// computed from. openMeteoForecastDays asks one date at a time, so the walk
+// below was days x hours over the same series. The series is one response
+// object, so identity plus length is enough to know the map still describes
+// it - the same rule SearchLib.sameCacheIndex uses for its caches.
+var _humMaxTimes = null
+var _humMaxLen = -1
+var _humMaxMap = null
+
 // Peak relative humidity for one calendar date from the hourly series
 // (hourly.time entries are "YYYY-MM-DDTHH:MM" in the requested timezone).
 // "" when the series is absent - verbose rows then omit humidity.
 function humidityMaxForDate(hourly, dateString) {
   var day = String(dateString || "").slice(0, 10)
   if (!day || !hourly || !hourly.time || !hourly.relative_humidity_2m) return ""
-  var best = null
-  for (var i = 0; i < hourly.time.length; i++) {
-    if (String(hourly.time[i] || "").slice(0, 10) !== day) continue
-    var n = parseFloat(String(hourly.relative_humidity_2m[i]))
-    if (!isNaN(n) && (best === null || n > best)) best = n
+  var times = hourly.time
+  if (_humMaxTimes !== times || _humMaxLen !== times.length) {
+    var map = Object.create(null)
+    var hum = hourly.relative_humidity_2m
+    for (var i = 0; i < times.length; i++) {
+      var key = String(times[i] || "").slice(0, 10)
+      if (key === "") continue
+      var n = parseFloat(String(hum[i]))
+      if (isNaN(n)) continue
+      var was = map[key]
+      if (was === undefined || n > was) map[key] = n
+    }
+    _humMaxTimes = times
+    _humMaxLen = times.length
+    _humMaxMap = map
   }
-  return best === null ? "" : String(Math.round(best))
+  var best = _humMaxMap[day]
+  return best === undefined ? "" : String(Math.round(best))
 }
 
 // Next `count` hourly entries starting at the next hour boundary,
