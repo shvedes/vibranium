@@ -1271,6 +1271,15 @@ function parseCardProfiles(input) {
     }
   }
 
+  // One profile entry at the profile indent. Its index is its position in the
+  // card's list, which is what `wpctl set-profile` takes.
+  function applyProfile(body) {
+    const profile = parseProfileLine(body)
+    if (profile === null) return
+    profile.index = card.profiles.length
+    card.profiles.push(profile)
+  }
+
   // A `key = "value"` property entry. Only the four fields the picker reads
   // are copied; the rest of a real card's property tail is ignored.
   function applyProperty(body) {
@@ -1328,13 +1337,7 @@ function parseCardProfiles(input) {
       // Indent and state, not the regex alone: a port line sits at the same
       // indent as a profile line and is separated by the statistics test, and
       // a nested `Properties:` under a port must not be read into the card.
-      if (indent === 2) {
-        const profile = parseProfileLine(body)
-        if (profile !== null) {
-          profile.index = card.profiles.length
-          card.profiles.push(profile)
-        }
-      }
+      if (indent === 2) applyProfile(body)
       continue
     }
     if (inProps && indent >= 2) applyProperty(body)
