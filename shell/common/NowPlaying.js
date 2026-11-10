@@ -448,6 +448,21 @@ function progressPercent(pos, len) {
   return Math.min(100, Math.max(0, normalizePosition(pos, l) / l * 100))
 }
 
+// The position a media surface should show for `player`: its own reading,
+// clamped to `lengthSec` when the track has a length. The bar island, the
+// lyrics overlay and the lock pill each spelled this rule out locally; it is
+// the same clamp `normalizePosition` already owns, with the player read named.
+function reanchorPosition(player, lengthSec) {
+  return normalizePosition(playerPosition(player), lengthSec)
+}
+
+// A scrub preview: the lane fraction at `x` of `w`, in seconds of `lengthSec`.
+// Pure and non-mutating - the caller moves its strip only, and commits to the
+// player once, on release.
+function scrubPosition(x, w, lengthSec) {
+  return clampRatio(x, w) * Math.max(0, Number(lengthSec) || 0)
+}
+
 function fmtDuration(s) {
   const n = Number(s)
   const total = isFinite(n) ? Math.max(0, Math.floor(n)) : 0

@@ -134,13 +134,12 @@ PanelWindow {
   }
 
   function reanchor() {
-    const p = root.player !== null ? root.player.position ?? 0 : 0
-    root.shownPosition = Math.min(root.lengthSec > 0 ? root.lengthSec : p, Math.max(0, p))
+    root.shownPosition = NP.reanchorPosition(root.player, root.lengthSec)
   }
 
   function seekAt(x, w) {
     if (!root.canSeekPosition || w <= 0) return
-    const t = NP.clampRatio(x, w) * root.lengthSec
+    const t = NP.scrubPosition(x, w, root.lengthSec)
     root.player.position = t
     // Optimistic adopt so the lane jumps at once; the daemon's notify
     // corrects it a moment later.
@@ -153,7 +152,7 @@ PanelWindow {
   // commits once, on release.
   function scrubTo(x, w) {
     if (!root.canSeekPosition || w <= 0) return
-    root.shownPosition = NP.clampRatio(x, w) * root.lengthSec
+    root.shownPosition = NP.scrubPosition(x, w, root.lengthSec)
   }
 
   function seekTo(seconds) {

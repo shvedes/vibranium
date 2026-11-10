@@ -1795,7 +1795,7 @@ group('the whole published surface is here, and it is the only copy', () => {
   // the assertion is the full surface: every documented helper publishes, and
   // the set is exactly these - which still catches a helper being dropped.
   const shared = ['sortPlayers', 'isBrowserPlayer', 'filterBrowsers', 'fmtTime', 'clampRatio', 'noteManual', 'manualFresh', 'manualDir']
-  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex', 'canLikePlayer', 'likeShortcutScript', 'playerRating', 'playerLiked', 'toggleLiked', 'parseLrc', 'lyricIndexAt', 'parsePlainLyrics', 'lyricsFromSearch', 'lyricsCacheKey', 'lyricsCacheGet', 'lyricsCachePut', 'lyricsCacheSize', 'lyricsCacheClear']
+  const unique = ['canSetPlayerVolume', 'canSetPlayerPosition', 'normalizeVolume', 'volumeKnown', 'volumeUnmuted', 'adjustedVolume', 'playerVolumeKey', 'setMuteResumePending', 'consumeMuteResume', 'restorePlayerVolume', 'togglePlayerVolume', 'playerKey', 'playerPosition', 'playerLength', 'normalizePosition', 'reanchorPosition', 'scrubPosition', 'progressPercent', 'fmtDuration', 'widestTime', 'volumeProbeStep', 'volumeProbeTarget', 'volumeProbeTook', 'volumeReadback', 'pickPlayerIndex', 'canLikePlayer', 'likeShortcutScript', 'playerRating', 'playerLiked', 'toggleLiked', 'parseLrc', 'lyricIndexAt', 'parsePlainLyrics', 'lyricsFromSearch', 'lyricsCacheKey', 'lyricsCacheGet', 'lyricsCachePut', 'lyricsCacheSize', 'lyricsCacheClear']
   for (const k of shared) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   for (const k of unique) is(`${k} publishes`, CN[k], (v) => typeof v === 'function', 'a function')
   is('BROWSER_TOKENS publishes the client table', CN.BROWSER_TOKENS, (v) => Array.isArray(v) && v.every((t) => t === String(t).toLowerCase()), 'lowercase tokens')
@@ -2288,6 +2288,21 @@ group('normalizePosition never lets the position outrun the length', () => {
   eq('a null length is no bound', CN.normalizePosition(5, null), 5)
   eq('both NaN', CN.normalizePosition(NaN, NaN), 0)
   eq('string fields are coerced', CN.normalizePosition('5', '10'), 5)
+})
+group('reanchorPosition is the player reading, clamped to a known length', () => {
+  eq('no player', CN.reanchorPosition(null, 10), 0)
+  eq('inside the track', CN.reanchorPosition({ position: 5 }, 10), 5)
+  eq('past the end clamps to the length', CN.reanchorPosition({ position: 15 }, 10), 10)
+  eq('a negative reading clamps to zero', CN.reanchorPosition({ position: -2 }, 10), 0)
+  eq('a stream does not bound the reading', CN.reanchorPosition({ position: 15 }, 0), 15)
+  eq('a non-finite reading is zero', CN.reanchorPosition({ position: NaN }, 10), 0)
+})
+group('scrubPosition maps a lane fraction onto seconds', () => {
+  approx('half way', CN.scrubPosition(50, 100, 200), 100, 1e-9)
+  approx('before the lane is the start', CN.scrubPosition(-5, 100, 200), 0, 1e-9)
+  approx('past the lane is the end', CN.scrubPosition(500, 100, 200), 200, 1e-9)
+  eq('a zero width is the start', CN.scrubPosition(50, 0, 200), 0)
+  eq('a missing length is zero seconds', CN.scrubPosition(50, 100, undefined), 0)
 })
 group('progressPercent is 0..100, or -1 when there is no length', () => {
   approx('half way', CN.progressPercent(5, 10), 50, 1e-9)

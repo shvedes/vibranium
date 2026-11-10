@@ -89,7 +89,7 @@ Item {
   property real progressAppear: 0
 
   function reanchor() {
-    root.shownPosition = NP.playerPosition(root.player)
+    root.shownPosition = NP.reanchorPosition(root.player, root.lengthSec)
   }
 
   onPlayerChanged: root.reanchor()

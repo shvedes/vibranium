@@ -313,8 +313,7 @@ Item {
   }
 
   function reanchor() {
-    const p = root.player !== null ? root.player.position ?? 0 : 0
-    root.shownPosition = Math.min(root.lengthSec > 0 ? root.lengthSec : p, Math.max(0, p))
+    root.shownPosition = NP.reanchorPosition(root.player, root.lengthSec)
   }
 
   onPlayerChanged: {
@@ -427,7 +426,7 @@ Item {
   // below corrects on daemon notify.
   function seekAt(x, w) {
     if (!root.canSeekPosition || w <= 0) return
-    const t = NP.clampRatio(x, w) * root.lengthSec
+    const t = NP.scrubPosition(x, w, root.lengthSec)
     root.player.position = t
     // Optimistic adopt so the strip jumps at once; the live
     // onPositionChanged above corrects on daemon notify.
@@ -440,7 +439,7 @@ Item {
   // after release, so a drag commits once, on release.
   function scrubTo(x, w) {
     if (!root.canSeekPosition || w <= 0) return
-    root.shownPosition = NP.clampRatio(x, w) * root.lengthSec
+    root.shownPosition = NP.scrubPosition(x, w, root.lengthSec)
   }
 
   // Active player's own volume (0..1, never the system sink).
