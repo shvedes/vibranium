@@ -115,7 +115,15 @@ PanelCard {
       if (!panel.searching) panel.recalcWidth()
       panel.closeTrailingInfo()
       panel.closeDelete()
-      panel.queueFit()
+      // Deliberately no queueFit() here. `results` is assigned a turn before
+      // the install (syncRows defers it), so a fit armed on this signal sizes
+      // the card from rows the view has NOT shown yet - queueFit writes that
+      // model height into PanelCard's resting fit, the region moves in this
+      // turn, and until the install lands the card's clip edge cuts through a
+      // row that is still on screen. The tail of syncRows arms it in the turn
+      // the rows actually land (the "model NOW, in the same turn as the rows"
+      // contract), and onVisibleChanged/Component.onCompleted cover the open
+      // and the cold construction.
     }
 
     function onVisibleChanged() {
