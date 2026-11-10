@@ -64,15 +64,19 @@ function heavyQueue(packages, enabled) {
 }
 
 // Case-insensitive search over the package name and its repository. An
-// empty query returns the input array itself, not a copy, so an
-// unfiltered island hands the row window the service's array.
+// empty query - including a nullish one - returns the input array itself,
+// not a copy, so an unfiltered island hands the row window the service's
+// array. A non-object entry is skipped for the reason isAur and selKey guard
+// theirs: a delegate mid-teardown or a model swap must not take the search
+// down.
 function filterPackages(packages, query) {
   const pkgs = Array.isArray(packages) ? packages : []
-  const q = String(query).trim().toLowerCase()
+  const q = String(query ?? "").trim().toLowerCase()
   if (q === "") return pkgs
   const out = []
   for (let i = 0; i < pkgs.length; i++) {
     const p = pkgs[i]
+    if (!p || typeof p !== "object") continue
     const name = String(p.name || "").toLowerCase()
     const repo = String(p.repository || "").toLowerCase()
     if (name.indexOf(q) >= 0 || repo.indexOf(q) >= 0) out.push(p)

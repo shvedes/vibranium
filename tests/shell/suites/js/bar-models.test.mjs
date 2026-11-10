@@ -931,13 +931,12 @@ group('a query that matches nothing is trimmed away into "no filter"', () => {
   is('a whitespace-only query is also empty', AU.filterPackages(SEARCH, '   '), (v) => v === SEARCH, 'identity after trim')
   eq('a padded query is trimmed', AU.filterPackages(SEARCH, '  vim  ').map((p) => p.name), ['vim'])
 })
-group('a non-string query is stringified, which is a trap not a shortcut', () => {
-  // `String(query)` with no nullish guard: undefined becomes the literal
-  // "undefined", so an unfiltered call that forgets its argument returns
-  // nothing at all. Pinned because the island always passes a string and a
-  // future caller might not.
-  eq('undefined filters for the word "undefined"', AU.filterPackages(SEARCH, undefined), [])
-  eq('null likewise', AU.filterPackages(SEARCH, null), [])
+group('a non-string query is stringified, except a nullish one', () => {
+  // `String(query ?? "")` keeps a nullish argument blank, the same answer as
+  // an empty query, so an unfiltered call that forgets its argument returns
+  // every package rather than filtering for the literal "undefined".
+  is('undefined is a blank query', AU.filterPackages(SEARCH, undefined), (v) => v === SEARCH, 'identity')
+  is('null likewise', AU.filterPackages(SEARCH, null), (v) => v === SEARCH, 'identity')
   eq('0 filters for "0"', AU.filterPackages([npk('x10')], 0).map((p) => p.name), ['x10'])
   eq('a number that matches nothing', AU.filterPackages(SEARCH, 7), [])
   eq('false filters for "false"', AU.filterPackages(SEARCH, false), [])
@@ -948,13 +947,13 @@ group('a non-array package list reads as empty', () => {
   eq('a string', AU.filterPackages('vim', 'vim'), [])
   eq('an object', AU.filterPackages({ 0: OFFICIAL }, 'vim'), [])
 })
-group('unlike its neighbours, filterPackages does not guard its entries', () => {
+group('a non-object entry is skipped, like every neighbour', () => {
   // isAur, sourceCounts, selKey and rowView all tolerate a non-object entry
-  // ("a delegate mid-teardown, a model swap"); this one reads p.name
-  // unguarded, so a null in the array takes the search down. Asserted as the
-  // real behaviour - see the report.
-  throws('a null entry throws', () => AU.filterPackages([null], 'x'), /name/)
-  throws('an undefined entry throws', () => AU.filterPackages([undefined], 'x'), /name/)
+  // ("a delegate mid-teardown, a model swap"); filterPackages now does too,
+  // so a null in the array cannot take the search down.
+  eq('a null entry is skipped', AU.filterPackages([null], 'x'), [])
+  eq('an undefined entry is skipped', AU.filterPackages([undefined], 'x'), [])
+  eq('and a real entry beside it still matches', AU.filterPackages([null, npk('vim')], 'vim').map((p) => p.name), ['vim'])
   noThrow('an empty query short-circuits before the walk', () => AU.filterPackages([null], ''))
 })
 
