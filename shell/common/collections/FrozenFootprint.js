@@ -19,6 +19,8 @@
 
 .pragma library
 
+.import "Recency.js" as Recency
+
 // Internal alongside the public surface: .pragma library exposes every
 // top-level function to importers, not just the documented one.
 function _capacityOf(value) {
@@ -154,12 +156,7 @@ function keys(store) {
   const entries = _entries(store)
   if (entries === null)
     return []
-  return Object.keys(entries).sort((a, b) => {
-    const delta = entries[a].touch - entries[b].touch
-    if (delta !== 0)
-      return delta
-    return a < b ? -1 : 1
-  })
+  return Recency.keysBy(entries, "touch")
 }
 
 // Record the live size of one opener slot. Every accepted save refreshes

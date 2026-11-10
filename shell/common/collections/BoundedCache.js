@@ -37,6 +37,8 @@
 
 .pragma library
 
+.import "Recency.js" as Recency
+
 // Internal alongside the public surface: .pragma library exposes every
 // top-level function to importers, not just the documented ones.
 function _capacityOf(value) {
@@ -211,12 +213,7 @@ function keys(cache) {
   const entries = _entries(cache)
   if (entries === null)
     return []
-  return Object.keys(entries).sort((a, b) => {
-    const delta = entries[a].stamp - entries[b].stamp
-    if (delta !== 0)
-      return delta
-    return a < b ? -1 : 1
-  })
+  return Recency.keysBy(entries, "stamp")
 }
 
 // What the map holds right now, so a caller can read the bound instead of
