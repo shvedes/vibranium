@@ -11,9 +11,9 @@ import "../../../../common/NowPlaying.js" as NP
 // translucent theme fill, 1px keyline): large art left, track lines +
 // seekable progress + times + control pads in the right column.
 // Player pads stay visible and dim out while a single client is alive.
-// A lyrics pad in the transport row swaps the controls column for the track's
-// synced lyrics, artwork kept; right-clicking the transcript brings the
-// controls back (see LyricsPane).
+// The lyrics pad in the transport row opens the module's fullscreen
+// transcript; the card itself carries no transcript. The cover stays the
+// track link it always was.
 //
 // SPLIT MAP (one owner each, no behavior change): Strip (transport
 // strip: art column, meta column, seek/volume lanes, pads, player
@@ -102,10 +102,9 @@ Item {
   readonly property string artist: root.player !== null ? root.player.trackArtist ?? "" : ""
   readonly property string album: root.player !== null ? root.player.trackAlbum ?? "" : ""
   readonly property string artUrl: root.player !== null ? root.player.trackArtUrl ?? "" : ""
-  // The transcript replaces the controls column, artwork untouched: the
-  // column stays laid out underneath (see sideSlot), so the card keeps its
-  // size and the toggle is a swap inside the column, not a second layout.
-  property bool lyricsMode: false
+  // The lyrics pad asks the module for the fullscreen transcript, which owns
+  // its own window and outlives this island.
+  signal lyricsFullscreenRequested()
   // Set while a cover that has already loaded is waiting for the flash
   // boundary that is allowed to fade it in. See the art frame.
   property bool _artArmed: false
@@ -432,17 +431,6 @@ Item {
     root.player.position = t
     // Optimistic adopt so the strip jumps at once; the live
     // onPositionChanged above corrects on daemon notify.
-    root.shownPosition = t
-    if (root.player) root.player.positionChanged()
-  }
-
-  // Lyric jump: a clicked line names a time rather than a ratio, so this is
-  // the lane's release write with the time already resolved. Adopted at once
-  // like seekAt, then corrected on the daemon's notify.
-  function seekTo(seconds) {
-    if (!root.canSeekPosition) return
-    const t = Math.max(0, Math.min(root.lengthSec, Number(seconds) || 0))
-    root.player.position = t
     root.shownPosition = t
     if (root.player) root.player.positionChanged()
   }
@@ -917,9 +905,8 @@ Item {
           }
         }
 
-        // The column owns its own height, and keeps it whether the controls
-        // or the transcript are showing: the pane fills the slot the controls
-        // stand down from, and nothing on the card resizes on the toggle.
+        // The metadata column's fixed cell: it takes its height from the
+        // column it holds, which the artwork beside it follows top to bottom.
         Item {
           id: sideSlot
 
@@ -932,8 +919,6 @@ Item {
             width: root.metaColumnWidth
             anchors.verticalCenter: parent.verticalCenter
             spacing: 5
-            // Hidden, not unmade: its height still sizes the card.
-            visible: !root.lyricsMode
 
             Column {
               id: metaText
@@ -1714,9 +1699,9 @@ Item {
                 onClicked: root.nextPlayer()
               }
 
-              // The mode pad, last in the row: the transcript takes the column
-              // the controls are in, so this one is only ever the way in - the
-              // way back is a right-click on the words themselves.
+              // The mode pad, last in the row: it opens the fullscreen
+              // transcript, which answers with its own empty state when the
+              // track has no lyrics.
               IconButton {
                 name: "lyrics"
                 iconSize: 20
@@ -1724,25 +1709,10 @@ Item {
                 flat: true
                 cornerRadius: RoundingPolicy.radius
                 animationsEnabled: root.animOn
-                // No lyrics for this track: the pad dims and its hover is the
-                // forbidden cursor, while the transport around it stays live.
-                actionable: !lyricsPane.unavailable
                 opacity: live ? 1 : 0.4
-                onClicked: root.lyricsMode = true
+                onClicked: root.lyricsFullscreenRequested()
               }
             }
-          }
-
-          LyricsPane {
-            id: lyricsPane
-
-            anchors.fill: parent
-            player: root.player
-            position: root.shownPosition
-            active: root.lyricsMode
-            seekable: root.canSeekPosition
-            onDismissed: root.lyricsMode = false
-            onSeekRequested: seconds => root.seekTo(seconds)
           }
         }
       }

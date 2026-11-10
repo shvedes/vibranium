@@ -28,7 +28,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # suite's own measurement. Kept in one place so a diff in the numbers is
 # readable.
 #
-# RECORDED_FILE_COUNT: 235 .qml files under shell/. This is the file set the
+# RECORDED_FILE_COUNT: 236 .qml files under shell/. This is the file set the
 #   README's one-liner hands to the tool and the set the suite hands to it, and
 #   every counted diagnostic is attributed to one of these paths ("every
 #   diagnosed file is one that was linted"), so the count and the warning set
@@ -125,9 +125,9 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   word of it is then read as a category name. The sentence that documents this
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
-RECORDED_FILE_COUNT=235
+RECORDED_FILE_COUNT=236
 RECORDED_WARNING_COUNT=147
-RECORDED_INFO_COUNT=72
+RECORDED_INFO_COUNT=71
 README_WARNING_COUNT=147
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
@@ -153,8 +153,8 @@ id-shadows-member 2
 missing-property 54
 property-override 5
 redundant-optional-chaining 3
-uncreatable-type 3
-unqualified 69
+uncreatable-type 4
+unqualified 68
 unresolved-type 5"
 
 t_section "the tool under test"
@@ -299,7 +299,7 @@ t_note "the recorded warning total is $RECORDED_WARNING_COUNT and the per-kind b
 t_section "the unresolved types are only Quickshell C++ types"
 UNRESOLVED_LINES="$(grep -E '\[(unresolved-type|uncreatable-type)\]$' "$LINT_OUT" || true)"
 UNRESOLVED_COUNT="$(printf '%s\n' "$UNRESOLVED_LINES" | grep -c . || true)"
-t_count "the unresolved/uncreatable count" "8" "$UNRESOLVED_COUNT"
+t_count "the unresolved/uncreatable count" "9" "$UNRESOLVED_COUNT"
 
 # The names, from two different shapes of diagnostic:
 #   Property "adapter" has incomplete type "FileViewAdapter" ...

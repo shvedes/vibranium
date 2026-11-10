@@ -5,14 +5,14 @@ import QtQuick
 import qs.common
 import "NowPlaying.js" as NP
 
-// Synced lyrics over a slot: the bar island's lyrics pad and the lockscreen
-// card both render this pane. MPRIS carries no lyrics, so the text comes from
-// LRCLIB (no key, LRC bodies), with `xesam:asText` as the fallback for a client
-// that publishes its own. The ask starts with the track rather than with the
-// pane, because the island's pad reads `unavailable` to decide whether it opens
-// at all; the lines are centred and the cue under the playhead is the one held
-// in the middle of the slot, driven by the caller's position feed, so this pane
-// needs no clock of its own.
+// Synced lyrics over a slot: the fullscreen Now Playing surface and the
+// lockscreen card both render this pane. MPRIS carries no lyrics, so the text
+// comes from LRCLIB (no key, LRC bodies), with `xesam:asText` as the fallback
+// for a client that publishes its own. The ask starts with the track rather
+// than with the pane, so the answer is ready before a surface shows it; the
+// lines are centred and the cue under the playhead is the one held in the
+// middle of the slot, driven by the caller's position feed, so this pane needs
+// no clock of its own.
 Item {
   id: root
 
@@ -23,6 +23,10 @@ Item {
   required property var player
   property real position: 0
   property bool active: false
+  // Held playback keeps the cue's accent but holds it down to a tint: the
+  // transcript is still live, it just reads as paused rather than as a line
+  // the clock is moving under.
+  property bool playing: true
 
   signal dismissed
   // A clicked line names a time; the caller owns the position write, because
@@ -73,6 +77,10 @@ Item {
   // baseline; a wider surface without artwork can spend that space on larger
   // words.
   property real textScale: 1
+  // Quiet cue size as a scale of the laid-out size. Every row is shaped at
+  // `fontL`, so the geometry never changes and a quiet line is the same words
+  // drawn smaller.
+  readonly property real quietScale: Ui.fontXs / Ui.fontL
   // How many cues on each side of the current one stay on screen. -1 is the
   // island's full transcript; a caller can narrow it to a three-line window.
   property int contextLines: -1
@@ -81,10 +89,15 @@ Item {
   // changes keep moving the accent but stop moving the view, so a line can be
   // read and then clicked to jump to. Scrolling back onto the current line
   // hands the view to the clock again - see the contentY handler on the view.
+  // The clock never takes the view back on its own: a transcript that pulls
+  // itself to the cue after a pause cannot be read ahead in.
   property bool _pinnedByUser: false
   // True for the synchronous moment a placement changes contentY, so that
   // change is not mistaken for the reader scrolling.
   property bool _placing: false
+  // A freshly applied sheet is a cut: its first placement must not glide in
+  // from the scroll offset the previous track left behind.
+  property bool _freshSheet: false
 
   // Asking starts with the track, not with the pane: the lyrics pad reads
   // `unavailable` so the answer has to be known before anyone opens the
@@ -92,7 +105,13 @@ Item {
   // been answered.
   Component.onCompleted: root._load()
   Component.onDestruction: root._abort()
-  onActiveChanged: if (root.active) root._load()
+  onActiveChanged: {
+    if (!root.active) return
+    // A surface opens showing the clock, not whatever the previous showing
+    // left the view scrolled to.
+    root._pinnedByUser = false
+    root._load()
+  }
   onTrackKeyChanged: root._load()
   onPositionChanged: root._track()
   onActiveIndexChanged: Qt.callLater(root._follow)
@@ -193,6 +212,7 @@ Item {
     // A freshly answered track is read from the top of its first cue, not
     // from wherever the last transcript was left.
     root._pinnedByUser = false
+    root._freshSheet = true
     root._track()
     Qt.callLater(root._follow)
   }
@@ -208,8 +228,8 @@ Item {
     // follows again with the view up.
     if (!root.active) return
     if (root.synced && root.currentIndex >= 0) {
-      // The island's transcript yields to a reader who scrolled away; a
-      // presentation surface disables scrolling, so its pin never sets.
+      // A scrolled transcript yields to its reader; a presentation surface
+      // disables scrolling, so its pin never sets.
       if (root._pinnedByUser && root.glide) {
         scrollTo.stop()
         return
@@ -222,6 +242,7 @@ Item {
   }
 
   function _placeBeginning() {
+    root._freshSheet = false
     root._placing = true
     view.positionViewAtBeginning()
     root._placing = false
@@ -235,7 +256,12 @@ Item {
   function _centre(index) {
     const row = view.itemAtIndex(index)
     scrollTo.stop()
-    if (row === null || !root.animOn || !root.glide) {
+    // A fresh sheet is a cut rather than a cue change: it is placed on its
+    // line instead of gliding there from the offset the previous track left.
+    // A row the view has not created yet is the same case - it has only a
+    // guessed y, so the move is the view's own placement.
+    if (root._freshSheet || row === null || !root.animOn || !root.glide) {
+      root._freshSheet = false
       root._placing = true
       view.positionViewAtIndex(index, ListView.Center)
       root._placing = false
@@ -255,6 +281,19 @@ Item {
     property: "contentY"
     duration: Ui.normalMs
     easing.type: Easing.OutCubic
+  }
+
+  // A layout settle - the first delegates, a track's sheet, a weight change on
+  // a wrapped line - moves contentY without the reader touching it. Those
+  // moves are not a scroll and must not claim the view, or a freshly opened
+  // pane would sit off centre until the idle timer handed it back. The timer
+  // restarts on every height change and recentres once the layout is still.
+  Timer {
+    id: settleGuard
+
+    interval: 150
+    repeat: false
+    onTriggered: if (root.synced) root._follow()
   }
 
   function _embeddedText() {
@@ -356,16 +395,23 @@ Item {
         height: Math.max(0, Math.round(view.height / 2) - 13)
       }
       onCountChanged: Qt.callLater(root._follow)
+      onContentHeightChanged: settleGuard.restart()
       // A drag owns the view until the reader comes back to the current line:
       // the transcript must not yank itself away from the line about to be
       // clicked.
-      onMovementStarted: scrollTo.stop()
+      onMovementStarted: {
+        scrollTo.stop()
+        root._pinnedByUser = true
+      }
       // Every contentY change that is not ours is the reader's - a drag, a
-      // flick, or the wheel. Pinned simply means "the current line is not
-      // under the middle of the slot", so scrolling it back there releases
-      // the view without needing a second gesture.
+      // flick, or the wheel. Pinned means "the current line is not under the
+      // middle of the slot", measured in line heights rather than in screen
+      // fractions: moving the transcript by even one row is deliberate, while
+      // a fraction of a tall viewport leaves small scrolls unpinned and the
+      // next cue change free to pull them back. Scrolling the cue under the
+      // middle again - or clicking a line, or a new sheet - releases it.
       onContentYChanged: {
-        if (root._placing || scrollTo.running) return
+        if (root._placing || scrollTo.running || settleGuard.running) return
         if (view.contentHeight <= view.height) return
         const row = root.currentIndex >= 0 ? view.itemAtIndex(root.currentIndex) : null
         if (row === null) {
@@ -373,56 +419,96 @@ Item {
           return
         }
         const off = Math.abs(view.contentY + view.height / 2 - (row.y + row.height / 2))
-        root._pinnedByUser = off > view.height * 0.15
+        root._pinnedByUser = off > Math.max(24, row.height)
       }
 
       delegate: Text {
+        id: line
+
         required property var modelData
         required property int index
 
         readonly property bool inWindow: root.contextLines < 0
           || root.currentIndex < 0
           || Math.abs(index - root.currentIndex) <= root.contextLines
+        // Pointer over a neighbour: a whisper brighter, so the transcript
+        // reads as clickable without a hover competing with the accent.
+        property bool lineHovered: false
         visible: inWindow
         width: view.width
         text: modelData.x
-        // The cue under the playhead is the one the eye is on: bigger and in
-        // the accent, its neighbours two steps down in size and held faint so
-        // the column reads as one line with context rather than as a list.
-        color: index === root.currentIndex ? Ui.solid("accent") : Ui.tint("foreground_1", 0.4)
+        // The cue under the playhead is the one the eye is on: full size and
+        // in the accent, its neighbours drawn down and held faint so the
+        // column reads as one line with context rather than as a list.
+        color: index === root.currentIndex
+          ? Ui.solid("accent")
+          : Ui.tint("foreground_1", lineHovered ? 0.65 : 0.4)
 
         // The cue changing is a colour handover as well as a scroll, so the
         // old line dims as the new one takes the accent instead of both
         // swapping in one frame.
         Behavior on color {
-          enabled: root.animOn
+          // The opening cue is born in the accent: there is no line above it
+          // to have come from, so it must not animate as if there were.
+          enabled: root.animOn && line.index !== 0
           ColorAnimation {
-            duration: Ui.fastMs
+            duration: Ui.normalMs
             easing.type: Easing.OutCubic
           }
         }
-        font.pixelSize: index === root.currentIndex
-          ? Math.round(Ui.fontL * root.textScale)
-          : Math.round(Ui.fontXs * root.textScale)
+        // Held playback is its own transition, separate from the cue handover:
+        // the accent fades toward the surface on pause and back on resume,
+        // whether or not this row animates its colour. Fading alpha over the
+        // same accent is the muted tint, just carried by a property that the
+        // opening row is allowed to animate.
+        opacity: index === root.currentIndex && !root.playing ? 0.55 : 1
+        Behavior on opacity {
+          enabled: root.animOn
+          NumberAnimation {
+            duration: Ui.normalMs
+            easing.type: Easing.OutCubic
+          }
+        }
+        // Every row is shaped at the large size and the quiet ones are drawn
+        // down, so a cue change never re-wraps or re-measures text: the rows
+        // keep their geometry and the growth runs on the scene graph. That
+        // fixed layout is what keeps the transition smooth and the cue still.
+        font.pixelSize: Math.round(Ui.fontL * root.textScale)
+        scale: index === root.currentIndex ? 1 : root.quietScale
+        Behavior on scale {
+          enabled: root.animOn && line.index !== 0
+          NumberAnimation {
+            duration: 320
+            easing.type: Easing.InOutCubic
+          }
+        }
         font.family: Ui.fontFamily
+        // The weight swap is one re-measure at the switch, not a per-frame
+        // re-shape: the size travel above is a transform, so only the layout
+        // pass at the moment the cue moves actually costs anything.
         font.bold: index === root.currentIndex
         horizontalAlignment: Text.AlignHCenter
         wrapMode: Text.Wrap
         textFormat: Text.PlainText
 
-        // Click a timed line to move the track there. A drag still scrolls:
-        // the flickable takes the gesture back once it passes its threshold,
-        // which cancels this click.
-        MouseArea {
-          anchors.fill: parent
-          enabled: root.seekable && root.synced
-          cursorShape: enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
-          onClicked: {
+        // A tap names a line; a drag belongs to the transcript. Handlers
+        // rather than a MouseArea: an area takes the press, so a drag the
+        // flickable has not claimed yet lands as a click on the row under the
+        // pointer - a seek and a recentre instead of a scroll.
+        TapHandler {
+          acceptedButtons: Qt.LeftButton
+          cursorShape: root.seekable && root.synced ? Qt.PointingHandCursor : Qt.ArrowCursor
+          onTapped: {
+            if (!root.seekable || !root.synced) return
             // Acting on a line asks for the clock to take the view back: the
             // seek moves the cue, and following centres it again.
             root._pinnedByUser = false
-            root.seekRequested(modelData.t)
+            root.seekRequested(line.modelData.t)
           }
+        }
+
+        HoverHandler {
+          onHoveredChanged: line.lineHovered = hovered
         }
       }
     }

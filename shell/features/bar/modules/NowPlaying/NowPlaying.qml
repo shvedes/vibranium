@@ -7,6 +7,7 @@ import qs.common
 import qs.features.bar
 import qs.services as Core
 import "../../../../common/NowPlaying.js" as NP
+import "../../../../common/capture/ShotLib.js" as ShotLib
 
 // Now Playing bar module (opt-in, off by default). Shows the active
 // MPRIS track title in the bar; left click opens the island, right click
@@ -547,12 +548,36 @@ CollapsibleSlot {
   Component {
     id: islandComp
 
-    NowPlayingIsland {}
+    NowPlayingIsland {
+      id: island
+
+      // The client the card is actually showing: the island can have switched
+      // away from the module's own pick, and the fullscreen must follow it.
+      onLyricsFullscreenRequested: lyricsOverlay.open(island.player)
+    }
   }
 
   // The island this module opens, declared on the base so openIsland()
   // below is the single call every click handler makes.
   islandComponent: islandComp
+
+  // Fullscreen lyrics, owned here (sibling to the island, like the network
+  // QR overlay): the island's cover asks for it while its transcript is up.
+  // The surface outlives the island, so it is handed the client itself.
+  LyricsFullscreenOverlay {
+    id: lyricsOverlay
+
+    targetScreen: ShotLib.matchScreen(root.barScreen, Ui.validScreens)
+  }
+
+  // A hidden bar must not leave the fullscreen transcript floating on screen.
+  Connections {
+    target: Bar
+
+    function onEnabledChanged() {
+      if (!Bar.enabled) lyricsOverlay.close()
+    }
+  }
 
   // Scroll adjusts the active player's own volume (never the system
   // sink) and stays silent: the tooltip already carries the live

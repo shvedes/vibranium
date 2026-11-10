@@ -413,6 +413,7 @@ Item {
       // re-points the player, and the track key change loads the sheet.
       player: Settings.lockscreenNowPlaying ? root.player : null
       position: root.shownPosition
+      playing: root.playing
       // Always live so the cue under the playhead is already centred when
       // playback starts and the fade only reveals it. `active` drives the
       // island's slide, not this card's crossfade.

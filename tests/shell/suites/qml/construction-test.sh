@@ -208,6 +208,7 @@ qs.features.bar.MoveWindow
 qs.features.bar.PrivacyOverlay
 qs.features.bar.ToolTipHost
 qs.features.bar.modules.ColorPicker.ColorPickerOverlay
+qs.features.bar.modules.NowPlaying.LyricsFullscreenOverlay
 qs.features.bar.modules.Tray.TrayMenu
 qs.features.clipboard.ClipboardView
 qs.features.launcher.AppLauncherView
@@ -345,7 +346,7 @@ supplied.qs.common.LyricsPane=player: null"
 # reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=234
+EXPECTED_DECLARED_COUNT=235
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -366,7 +367,7 @@ EXPECTED_DECLARED_COUNT=234
 # radial gradient, with no singleton and no window behind it.
 EXPECTED_CLEAN_COUNT=110
 EXPECTED_NEEDS_COUNT=101
-EXPECTED_UNCREATABLE_COUNT=22
+EXPECTED_UNCREATABLE_COUNT=23
 
 # --------------------------------------------------------------------------
 # the generated case list
