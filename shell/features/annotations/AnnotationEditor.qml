@@ -11,6 +11,7 @@ import qs.common
 import "AnnotationTools.js" as AnnotationTools
 import "../../common/capture/ShotLib.js" as ShotLib
 import "../../common/text/StringUtils.js" as SU
+import "../../common/math/Range.js" as Range
 
 // Native annotation editor as a modal fullscreen overlay: black veil over
 // the desktop, the shot fitted center, one Canvas painting base image +
@@ -418,7 +419,7 @@ PanelWindow {
   function _zoomAt(mx, my, f) {
     void mx
     void my
-    editor.viewZoom = Math.max(0.25, Math.min(8, editor.viewZoom * f))
+    editor.viewZoom = Range.clamp(editor.viewZoom * f, 0.25, 8)
     editor._settleBoardZoom()
   }
 
@@ -2373,8 +2374,8 @@ PanelWindow {
                 const prev = editor.strokes[editor.selectedIndex]
                 const next = Object.assign({}, prev, { points: editor._clampDocPoints(moved) })
                 if (prev.tool === "text") {
-                  next.fontSize = Math.max(4, Math.min(200,
-                    Math.round((prev.fontSize || 24) * sFont)))
+                  next.fontSize = Range.clamp(
+                    Math.round((prev.fontSize || 24) * sFont), 4, 200)
                 }
                 kept[editor.selectedIndex] = next
                 editor.strokes = kept
@@ -2389,13 +2390,13 @@ PanelWindow {
                   const dx = ox - fx
                   sx = Math.abs(dx) >= 1 ? (p.x - fx) / dx : 1
                   if (!(sx > 0)) sx = 0.05
-                  sx = Math.max(0.05, Math.min(20, sx))
+                  sx = Range.clamp(sx, 0.05, 20)
                 }
                 if (spot.fy !== 0.5) {
                   const dy = oy - fy
                   sy = Math.abs(dy) >= 1 ? (p.y - fy) / dy : 1
                   if (!(sy > 0)) sy = 0.05
-                  sy = Math.max(0.05, Math.min(20, sy))
+                  sy = Range.clamp(sy, 0.05, 20)
                 }
                 applyMoved(movedFor(sx, sy), sx !== 1 ? sx : sy)
               } else {
@@ -2405,7 +2406,7 @@ PanelWindow {
                 const denom = Math.sqrt((ox - fx) * (ox - fx) + (oy - fy) * (oy - fy))
                 if (denom >= 1) {
                   const num = Math.sqrt((p.x - fx) * (p.x - fx) + (p.y - fy) * (p.y - fy))
-                  const s = Math.max(0.05, Math.min(20, num / denom))
+                  const s = Range.clamp(num / denom, 0.05, 20)
                   applyMoved(movedFor(s, s), s)
                 }
               }
@@ -2742,7 +2743,7 @@ PanelWindow {
       else if (event.key === Qt.Key_PageDown) delta = -step * 10
       else if (event.key === Qt.Key_PageUp) delta = step * 10
       if (delta !== 0) {
-        moved(Math.max(from, Math.min(to, value + delta)))
+        moved(Range.clamp(value + delta, from, to))
         event.accepted = true
       }
     }
@@ -2779,9 +2780,10 @@ PanelWindow {
       acceptedButtons: Qt.LeftButton
 
       function update(x) {
-        const r = Math.max(0, Math.min(1, x / width))
-        knob.moved(Math.max(knob.from, Math.min(knob.to,
-          Math.round((knob.from + r * (knob.to - knob.from)) / knob.step) * knob.step)))
+        const r = Range.clamp01(x / width)
+        knob.moved(Range.clamp(
+          Math.round((knob.from + r * (knob.to - knob.from)) / knob.step) * knob.step,
+          knob.from, knob.to))
       }
 
       onPressed: mouse => {
