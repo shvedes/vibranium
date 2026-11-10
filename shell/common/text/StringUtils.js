@@ -17,6 +17,16 @@ function shellQuote(s) {
   return "'" + String(s).replace(/'/g, "'\\''") + "'"
 }
 
+// Directory part of a path, "" when the path carries none. A leading
+// "/name" is a root-level entry with no directory of its own, and a bare
+// name has none either; the caller decides what that absence means.
+// Canonical home of the menu's pathDirname.
+function dirname(path) {
+  const p = String(path ?? "")
+  const i = p.lastIndexOf("/")
+  return i > 0 ? p.substring(0, i) : ""
+}
+
 function styledMarkup(text) {
   const s = String(text ?? "")
   if (s === "") return ""

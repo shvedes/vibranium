@@ -37,8 +37,7 @@ function clamp(v, lo, hi) {
 // "/name" is a root-level entry with no directory of its own, and a bare
 // name has none either; the caller decides what that absence means.
 function pathDirname(p) {
-  const i = p.lastIndexOf("/")
-  return i > 0 ? p.substring(0, i) : ""
+  return SU.dirname(p)
 }
 
 // Round away float drift from stepping/parsing; 3 decimals covers every
