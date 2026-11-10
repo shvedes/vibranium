@@ -1200,9 +1200,8 @@ function formatGitTime(ts) {
   if (isNaN(n) || n <= 0) return ""
   const d = new Date(n * 1000)
   if (isNaN(d.getTime())) return ""
-  const p2 = v => (v < 10 ? "0" : "") + v
-  return d.getFullYear() + "-" + p2(d.getMonth() + 1) + "-" + p2(d.getDate())
-    + " " + p2(d.getHours()) + ":" + p2(d.getMinutes())
+  return d.getFullYear() + "-" + Format.pad2(d.getMonth() + 1) + "-" + Format.pad2(d.getDate())
+    + " " + Format.pad2(d.getHours()) + ":" + Format.pad2(d.getMinutes())
 }
 
 // Folder-card git rows from a parseGitInfoOutput payload, in the same
