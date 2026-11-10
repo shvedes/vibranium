@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "ColorMath.js" as ColorMath
+import "../../../../common/math/Range.js" as Range
 
 // Color picker island: the history section (five fixed rows, overflow
 // under the scrollbar, a red clear-all button below) and the picker
@@ -141,7 +142,7 @@ Item {
   // downstream needed the wrap; only the thumb's position did, and it is
   // the thumb that has to stay under the pointer.
   function setHue(h) {
-    root.hue = Math.min(360, Math.max(0, h))
+    root.hue = Range.clamp(h, 0, 360)
     const s = root.hsv.s <= 0 ? 1 : root.hsv.s
     const v = root.hsv.v <= 0 ? 1 : root.hsv.v
     const c = ColorMath.hsvToRgb(root.hue, s, v)
@@ -525,8 +526,8 @@ Item {
           cursorShape: Qt.CrossCursor
 
           function update(x, y) {
-            const s = Math.max(0, Math.min(1, x / width))
-            const v = 1 - Math.max(0, Math.min(1, y / height))
+            const s = Range.clamp01(x / width)
+            const v = 1 - Range.clamp01(y / height)
             root.setSv(s, v)
           }
 

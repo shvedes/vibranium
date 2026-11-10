@@ -5,6 +5,7 @@ import QtQuick
 import qs.common
 import qs.features.bar
 import "ColorMath.js" as ColorMath
+import "../../../../common/math/Range.js" as Range
 import "../../../../common/capture/ShotLib.js" as ShotLib
 
 // Color picker module. Left click starts a native pick: a full-screen
@@ -126,7 +127,7 @@ BarModule {
       // Both ends are pure red, so a wrapped value and a clamped one paint
       // identically - but a stored 360 restored as 0 would park the thumb at
       // the wrong end of the bar, which is the teleport the clamp prevents.
-      hue: isFinite(hue) ? Math.min(360, Math.max(0, hue)) : 0
+      hue: isFinite(hue) ? Range.clamp(hue, 0, 360) : 0
     }
   }
 
@@ -157,7 +158,7 @@ BarModule {
     for (let i = 0; i < rgb.length; i++) {
       const n = Number(picked[rgb[i]])
       if (!isFinite(n)) return
-      out[rgb[i]] = Math.min(1, Math.max(0, n))
+      out[rgb[i]] = Range.clamp01(n)
     }
     const a = Number(picked.a)
     if (!isFinite(a)) return
@@ -165,7 +166,7 @@ BarModule {
     const h = Number(hue)
     root._pendingWorking = {
       picked: out,
-      hue: isFinite(h) ? Math.min(360, Math.max(0, h)) : 0
+      hue: isFinite(h) ? Range.clamp(h, 0, 360) : 0
     }
     workingFlush.restart()
   }

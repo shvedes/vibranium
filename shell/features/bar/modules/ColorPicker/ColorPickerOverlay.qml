@@ -7,6 +7,7 @@ import Quickshell
 import Quickshell.Wayland
 import qs.common
 import "../../../../common/capture/ShotLib.js" as ShotLib
+import "../../../../common/math/Range.js" as Range
 
 // Full-screen still frame of one screen for the native color pick: the
 // captured frame renders through ScreencopyView (same backend as the
@@ -91,8 +92,8 @@ PanelWindow {
     if (fw <= 0 || fh <= 0 || !(r > 0)) return false
     const px = Math.floor(overlay.aimX * r)
     const py = Math.floor(overlay.aimY * r)
-    const nx = Math.max(0, Math.min(fw - 1, px + dx))
-    const ny = Math.max(0, Math.min(fh - 1, py + dy))
+    const nx = Range.clamp(px + dx, 0, fw - 1)
+    const ny = Range.clamp(py + dy, 0, fh - 1)
     if (nx === px && ny === py) return false
     overlay.aimX = (nx + 0.5) / r
     overlay.aimY = (ny + 0.5) / r
@@ -256,7 +257,7 @@ PanelWindow {
     // the current box, never a lagging value.
     readonly property real rf: {
       const room = Math.min(lensX, width - lensX, lensY, height - lensY)
-      return Math.max(0, Math.min(1, room / half))
+      return Range.clamp01(room / half)
     }
     // Visual radius fraction: rf smoothed for the mask and shadow shape
     // only. Functional math never reads this - a radius that lags the box
@@ -481,8 +482,8 @@ PanelWindow {
     }
     onWheel: wheel => {
       // One notch per 120 delta; integer scale keeps pixels crisp.
-      overlay.magScale = Math.max(2, Math.min(20,
-        overlay.magScale + (wheel.angleDelta.y > 0 ? 1 : -1)))
+      overlay.magScale = Range.clamp(
+        overlay.magScale + (wheel.angleDelta.y > 0 ? 1 : -1), 2, 20)
       wheel.accepted = true
     }
   }
