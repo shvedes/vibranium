@@ -994,15 +994,19 @@ function layerPlan(nodes, groups) {
   // runs from a sink's monitor ports to a device's playback ports, so the sink
   // end has nothing feeding it and the device end has nothing it feeds, and both
   // are at the ends of a chain that exists only while the monitoring does.
-  let widest = -1
-  for (const key of keys) {
-    if (linked[key] === true && depth[key] > widest) widest = depth[key]
+  function assignLayers() {
+    let widest = -1
+    for (const key of keys) {
+      if (linked[key] === true && depth[key] > widest) widest = depth[key]
+    }
+    const layers = ({})
+    for (const key of keys) {
+      layers[key] = linked[key] !== true
+        ? (isSourceKind(kinds[key]) ? -1 : widest + 1) : depth[key]
+    }
+    return layers
   }
-  const layers = ({})
-  for (const key of keys) {
-    layers[key] = linked[key] !== true
-      ? (isSourceKind(kinds[key]) ? -1 : widest + 1) : depth[key]
-  }
+  const layers = assignLayers()
 
   const columns = []
   const byLayer = ({})
