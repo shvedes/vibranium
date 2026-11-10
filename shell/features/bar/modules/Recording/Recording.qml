@@ -5,7 +5,7 @@ import QtQuick
 import Quickshell
 import qs.common
 import qs.features.bar
-import "../../../../common/text/Format.js" as Format
+import "../../../../common/text/Duration.js" as Duration
 // Recording indicator. Owned slot that appears only while a screen
 // recording is ongoing: it paints the red recording-ongoing icon with a
 // tooltip and stops the recording on left click. The module owns no
@@ -35,13 +35,7 @@ CollapsibleSlot {
   readonly property int elapsedSec: root.startedAt > 0 && root.nowMs >= root.startedAt
     ? Math.floor((root.nowMs - root.startedAt) / 1000) : 0
   // m:ss, h:mm:ss past the hour.
-  readonly property string elapsed: {
-    const s = root.elapsedSec
-    const h = Math.floor(s / 3600)
-    const m = Math.floor((s % 3600) / 60)
-    const r = s % 60
-    const mm = h > 0 ? Format.pad2(m) : String(m)
-    return (h > 0 ? h + ":" : "") + mm + ":" + Format.pad2(r)  }
+  readonly property string elapsed: Duration.formatClock(root.elapsedSec)
 
   // Collapsible slot (see CollapsibleSlot.qml): zero width while idle
   // so it leaves no gap.

@@ -8,7 +8,7 @@ import qs.common
 import "../../common/bus/Busctl.js" as Busctl
 import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/process/ProcProbe.js" as ProcProbe
-import "../../common/text/Format.js" as Format
+import "../../common/text/Duration.js" as Duration
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/process/JobResult.js" as Job
 // Idle + sleep inhibitor backed by org.freedesktop.login1. The Inhibit()
@@ -74,10 +74,8 @@ Singleton {
   // current, so a target switch paints instantly instead of lagging a tick.
   function currentFormatted() {
     if (!root.active || root.infinite) return ""
-    const s = Math.max(0, root.remaining)
-    const m = Math.floor(s / 60)
-    const r = s % 60
-    return m + ":" + Format.pad2(r)  }
+    return Duration.formatClock(root.remaining)
+  }
   readonly property string formatted: root.currentFormatted()
 
   // A refusal is a caller mistake rather than a state change: a negative or

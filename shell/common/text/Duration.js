@@ -22,6 +22,20 @@ function formatDuration(seconds) {
   return "<1m"
 }
 
+// Clock-shaped elapsed/remaining time -> "2:05" / "1:02:05".
+// Canonical home of the recording pill's elapsed and the inhibitor's
+// countdown, which each built the same fields and the same zero padding.
+// Whole seconds, floored; non-finite input reads as 0:00.
+function formatClock(seconds) {
+  var n = Number(seconds)
+  var s = isFinite(n) ? Math.max(0, Math.floor(n)) : 0
+  var h = Math.floor(s / 3600)
+  var m = Math.floor((s % 3600) / 60)
+  var r = s % 60
+  if (h > 0) return h + ":" + Format.pad2(m) + ":" + Format.pad2(r)
+  return m + ":" + Format.pad2(r)
+}
+
 // Countdown readout -> "1h 2m 3s" / "2m 5s" / "0s".
 // Canonical home of Timer.qml formatDuration. Floor semantics: a
 // countdown shows whole seconds remaining, never a fraction.
@@ -75,6 +89,7 @@ function formatMediaDuration(s) {
 if (typeof module !== "undefined") {
   module.exports = {
     formatDuration: formatDuration,
+    formatClock: formatClock,
     formatVerboseDuration: formatVerboseDuration,
     formatMediaDuration: formatMediaDuration
   }
