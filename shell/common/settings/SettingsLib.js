@@ -1393,10 +1393,10 @@ function buildPages(schema, values) {
     }
   }
 
-  for (let s = 0; s < src.length; s++) {
-    const section = src[s]
-    if (visibleItemCount(section, schema.byKey, values) === 0) continue
-
+  // Generated option rows with the declared custom items woven in. A custom
+  // item may name `after` an option key, so it sits under that row instead
+  // of after every option on the page.
+  function sectionItems(section) {
     const items = []
     for (let o = 0; o < section.options.length; o++) {
       const item = buildItem(section.options[o], values[section.options[o].key])
@@ -1405,8 +1405,6 @@ function buildPages(schema, values) {
     for (let i = 0; i < section.items.length; i++) {
       const raw = section.items[i]
       if (!raw || typeof raw !== "object") continue
-      // Custom items may declare "after": "<option key>" to sit directly
-      // under that generated row instead of appending after all options.
       if (typeof raw.after === "string" && raw.after !== "") {
         const at = items.findIndex(x => x.var === raw.after || x.id === raw.after)
         if (at >= 0) {
@@ -1416,26 +1414,36 @@ function buildPages(schema, values) {
       }
       items.push(raw)
     }
+    return items
+  }
 
-    pages.push({
-      id: section.page,
-      title: section.label,
-      items: items
-    })
+  // The index row that opens a section. desc is ctrl-i-only copy; the count
+  // sub line is a per-section opt-in and reflects what is visible right now,
+  // so showIf-hidden options do not count.
+  function sectionLink(section) {
     const link = {
       type: "submenu",
       label: section.label,
       icon: section.icon,
       page: section.page
     }
-    // desc is ctrl-i-only copy; it must never render inline. The count
-    // sub line is a separate per-section opt-in and reflects what is
-    // visible RIGHT NOW - showIf-hidden options do not count.
     if (section.desc !== "") link.desc = section.desc
     if (section.showItemCount)
       link.sub = itemCountLabel(section, schema.byKey, values)
+    return link
+  }
+
+  for (let s = 0; s < src.length; s++) {
+    const section = src[s]
+    if (visibleItemCount(section, schema.byKey, values) === 0) continue
+
+    pages.push({
+      id: section.page,
+      title: section.label,
+      items: sectionItems(section)
+    })
     // Children (submenu targets) are only reachable via their parent.
-    if (!childPages[section.page]) indexItems.push(link)
+    if (!childPages[section.page]) indexItems.push(sectionLink(section))
   }
 
   return {
