@@ -22,6 +22,6 @@ common   ──────►  nothing but Qt/Quickshell + sibling common code
 | --- | --- |
 | `boot/` | 4 |
 | `common/` | 130 |
-| `features/` | 152 |
+| `features/` | 153 |
 | `services/` | 25 |
 | `shell.qml` | 1 |

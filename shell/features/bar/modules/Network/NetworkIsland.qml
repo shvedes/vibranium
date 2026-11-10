@@ -74,12 +74,16 @@ Item {
   readonly property real rowPad: 4
 
   // --- metrics ---
-  property bool hasStats: false
-  property real downloadRate: 0
-  property real uploadRate: 0
-  property real totalRxBytes: 0
-  property real totalTxBytes: 0
-  property var prevThroughput: null
+  // Aliased through the shared sampler: the metrics grid and the speedtest
+  // read one name for a reading the tooltip reads too.
+  readonly property alias hasStats: stats.hasStats
+  readonly property alias downloadRate: stats.downloadRate
+  readonly property alias uploadRate: stats.uploadRate
+  readonly property alias totalRxBytes: stats.totalRxBytes
+  readonly property alias totalTxBytes: stats.totalTxBytes
+  readonly property alias statsIface: stats.iface
+
+  StatsSampler { id: stats }
 
   // --- wifi state ---
   // The derived wifi display model as ONE object: exactly what
@@ -441,24 +445,6 @@ Item {
     root.retireStaleFailure()
   }
 
-  // The adapter half of a stats tick: hand the script's raw output plus
-  // the previous sample to the library and land the derived metrics. The
-  // parse, the throughput delta, the link-drop reset and the cumulative
-  // counters are Model.deriveStats; the clock stays here so the rate is
-  // reproducible in a test.
-  function updateStats(raw) {
-    const d = Model.deriveStats({
-      prevThroughput: root.prevThroughput,
-      totalRxBytes: root.totalRxBytes,
-      totalTxBytes: root.totalTxBytes
-    }, raw, Date.now() / 1000)
-    root.hasStats = d.hasStats
-    root.downloadRate = d.downloadRate
-    root.uploadRate = d.uploadRate
-    root.totalRxBytes = d.totalRxBytes
-    root.totalTxBytes = d.totalTxBytes
-    root.prevThroughput = d.prevThroughput
-  }
 
   // --- actions ---
 
@@ -906,7 +892,7 @@ Item {
   Component.onDestruction: {
     root.stopSpeedtest()
     root.clearSpeedtest()
-    root.stopStats()
+    stats.stop()
   }
 
   Timer {
@@ -923,10 +909,10 @@ Item {
       // user's own traffic and a competing child every tick is contention it
       // never needed. The counters below keep being read throughout - they
       // cost no fork, and the graph is what shows the test's own throughput.
-      if (!routeProc.running && !root.speedtestRunning) routeProc.running = true
+      if (!root.speedtestRunning) stats.requestRoute()
       // Counters only: the interface is whatever the last route reply named,
       // so the sample does not wait on the fork to land.
-      if (root.statsIface !== "") root.updateStats(root.counterSample())
+      if (stats.iface !== "") stats.updateStats(stats.counterSample())
       // Freeze the wifi list while a dropdown is open: swapping the model
       // rebuilds the delegates, which steals a half-typed passphrase every
       // tick - and, with the cursor parked on an expanded row's buttons,
@@ -938,93 +924,6 @@ Item {
     }
   }
 
-  // The interface the kernel would route 1.1.1.1 through, or "" while there
-  // is no active route. Resolved by `ip` on its own argv: the interface is
-  // the word after the first `dev` in a reply like "1.1.1.1 dev wlan0 src
-  // 10.0.0.5 uid 1000", so no shell, no pipeline and no `cat` stands between
-  // the tick and the number - one fork per tick where a script cost six.
-  property string statsIface: ""
-
-  Process {
-    id: routeProc
-
-    command: ["ip", "route", "get", "1.1.1.1"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.noteRoute(text)
-    }
-    // `ip` reports a failed lookup on stderr and says nothing on stdout, and
-    // nothing on stdout is the answer this section wants; the collector keeps
-    // that text out of the shell's own log.
-    stderr: StdioCollector {}
-  }
-
-  // The two byte counters, read straight off the tick. A generated sysfs
-  // counter holds content from the moment it exists and raises no filesystem
-  // event when that content moves, so a watcher on it can never fire and
-  // FilePresence would answer a constant "present" - this section needs the
-  // value, and only a read produces it. `blockLoading` keeps the read on the
-  // calling turn, so re-pointing `path` is what makes the next tick see a
-  // fresh number rather than the one it already cached.
-  FileView { id: statsRx; blockLoading: true; printErrors: false }
-  FileView { id: statsTx; blockLoading: true; printErrors: false }
-
-  // One counter, as the digits it holds, or "" when the read did not
-  // complete. The interface name comes from the kernel and cannot contain a
-  // separator, and nothing is handed to a shell here, so an odd name fails
-  // the read instead of reaching a command line.
-  function readCounter(view, name) {
-    view.path = ""
-    view.path = "/sys/class/net/" + root.statsIface + "/statistics/" + name
-    try {
-      if (!view.waitForJob()) return ""
-      return String(view.text()).trim()
-    } catch (e) {
-      return ""
-    }
-  }
-
-  // The same key<TAB>value shape the section hands the library, built from the
-  // two files. A counter this tick could not read is left out rather than
-  // reported as a zero: an omitted key means nobody read it and the library
-  // carries the last figure, while a zero would read as a link that moved
-  // nothing.
-  function counterSample() {
-    let out = "iface\t" + root.statsIface + "\n"
-    const rx = root.readCounter(statsRx, "rx_bytes")
-    if (rx !== "") out += "rx_bytes\t" + rx + "\n"
-    const tx = root.readCounter(statsTx, "tx_bytes")
-    if (tx !== "") out += "tx_bytes\t" + tx + "\n"
-    return out
-  }
-
-  // The route reply, reduced to an interface. A reply with no `dev` and an
-  // `ip` that could not start at all are the same answer - no active route -
-  // and the library already reads that as the link being down.
-  function noteRoute(out) {
-    const next = Model.routeIface(out)
-    if (next === root.statsIface) return
-    root.statsIface = next
-    if (next === "") {
-      // A route that went away has to reach the section as a link-down
-      // reading rather than as a graph frozen on the interface it last saw.
-      root.updateStats("")
-      return
-    }
-    // A route that appeared is the one transition worth sampling at once:
-    // waiting for the next tick would hold the metrics empty for another
-    // 0.5s after the island opens. A changed interface re-seeds the
-    // throughput baseline anyway, so the back-to-back pair cannot manufacture
-    // a rate out of a short interval.
-    root.updateStats(root.counterSample())
-  }
-
-  // Dropped with the island, and explicitly: a child of a destroyed content
-  // tree has no reason to outlive it, and a route reply landing after close
-  // would find state nobody is reading.
-  function stopStats() {
-    if (routeProc.running) routeProc.running = false
-  }
 
   // One direction of the speed test: vb-network-speedtest streams one
   // Mbps line every 0.5s until killed. The 15s timer bounds each phase (down

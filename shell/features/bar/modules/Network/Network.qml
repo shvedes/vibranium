@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import Quickshell.Networking
-import Quickshell.Io
 import qs.common
 import qs.features.bar
 import qs.services as Core
@@ -132,69 +131,16 @@ BarModule {
     && root.connectedWifi.state === ConnectionState.Connecting
 
   // --- tooltip throughput, sampled only while the tooltip is shown ---
-  property bool hasStats: false
-  property real downloadRate: 0
-  property real uploadRate: 0
-  property real totalRxBytes: 0
-  property real totalTxBytes: 0
-  property var prevThroughput: null
-  property string statsIface: ""
+  // Aliased straight through the shared sampler, so the tooltip labels keep
+  // one name for the reading whether it comes from here or from the island.
+  readonly property alias hasStats: stats.hasStats
+  readonly property alias downloadRate: stats.downloadRate
+  readonly property alias uploadRate: stats.uploadRate
+  readonly property alias totalRxBytes: stats.totalRxBytes
+  readonly property alias totalTxBytes: stats.totalTxBytes
+  readonly property alias statsIface: stats.iface
 
-  function updateStats(raw) {
-    const d = Model.deriveStats({
-      prevThroughput: root.prevThroughput,
-      totalRxBytes: root.totalRxBytes,
-      totalTxBytes: root.totalTxBytes
-    }, raw, Date.now() / 1000)
-    root.hasStats = d.hasStats
-    root.downloadRate = d.downloadRate
-    root.uploadRate = d.uploadRate
-    root.totalRxBytes = d.totalRxBytes
-    root.totalTxBytes = d.totalTxBytes
-    root.prevThroughput = d.prevThroughput
-  }
-  function readCounter(view, name) {
-    view.path = ""
-    view.path = "/sys/class/net/" + root.statsIface + "/statistics/" + name
-    try {
-      if (!view.waitForJob()) return ""
-      return String(view.text()).trim()
-    } catch (e) {
-      return ""
-    }
-  }
-  function counterSample() {
-    let out = "iface\t" + root.statsIface + "\n"
-    const rx = root.readCounter(statsRx, "rx_bytes")
-    if (rx !== "") out += "rx_bytes\t" + rx + "\n"
-    const tx = root.readCounter(statsTx, "tx_bytes")
-    if (tx !== "") out += "tx_bytes\t" + tx + "\n"
-    return out
-  }
-  function noteRoute(out) {
-    const next = Model.routeIface(out)
-    if (next === root.statsIface) return
-    root.statsIface = next
-    if (next === "") {
-      root.updateStats("")
-      return
-    }
-    root.updateStats(root.counterSample())
-  }
-
-  FileView { id: statsRx; blockLoading: true; printErrors: false }
-  FileView { id: statsTx; blockLoading: true; printErrors: false }
-
-  Process {
-    id: routeProc
-
-    command: ["ip", "route", "get", "1.1.1.1"]
-    stdout: StdioCollector {
-      waitForEnd: true
-      onStreamFinished: root.noteRoute(text)
-    }
-    stderr: StdioCollector {}
-  }
+  StatsSampler { id: stats }
 
   // Which interface the counters come from only moves when the network does,
   // but the poll re-read the route on every tick - a process spawn twice a
@@ -212,33 +158,26 @@ BarModule {
     running: root.hovered
     onTriggered: {
       root._routeTick++
-      if (root._routeTick % root._routeEveryTicks === 0 && !routeProc.running)
-        routeProc.running = true
-      if (root.statsIface !== "") root.updateStats(root.counterSample())
+      if (root._routeTick % root._routeEveryTicks === 0) stats.requestRoute()
+      if (stats.iface !== "") stats.updateStats(stats.counterSample())
     }
   }
 
   onHoveredChanged: {
     if (root.hovered) {
-      root.prevThroughput = null
-      root.statsIface = ""
-      root.hasStats = false
-      root.downloadRate = 0
-      root.uploadRate = 0
-      root.totalRxBytes = 0
-      root.totalTxBytes = 0
+      stats.reset()
       Qt.callLater(() => {
         if (!root.hovered) return
-        if (!routeProc.running) routeProc.running = true
+        stats.requestRoute()
       })
     } else {
-      if (routeProc.running) routeProc.running = false
+      stats.stop()
     }
   }
 
   Component.onDestruction: {
     statsPoll.stop()
-    if (routeProc.running) routeProc.running = false
+    stats.stop()
   }
 
   // Map the link verdict to the word + color the island uses for the
