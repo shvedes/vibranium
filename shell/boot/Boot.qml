@@ -1508,7 +1508,7 @@ Item {
       }
       boot._refreshUnit(id)
       boot._unitMilestone(id)
-      boot._scheduleRetryFor(id)
+      boot._armRetry()
     }
   }
 
@@ -1762,26 +1762,50 @@ Item {
   // missing path, an unparsable catalog - and retrying them only delays the
   // verdict. The delay is UnitGate's backoff, doubled per attempt and capped
   // by the descriptor.
-  property string _retryUnit: ""
+  //
+  // The due set is the gate's, not a slot here. A single pending id meant two
+  // units failing in the same turn replaced each other - and one unclaimed bus
+  // name fails several services at once - so the unit that lost the slot never
+  // retried at all. Each armed turn asks every failed unit for its own
+  // nextRetryMs instead, and fires when the earliest one is due.
+  property real _retryDue: 0
 
-  function _scheduleRetryFor(id) {
-    const state = UnitGate.state(id)
-    if (!state || state.state !== "failed") return
-    const descriptor = boot._byId[id]
-    if (!descriptor || !descriptor.retry) return
-    if (descriptor.retry.maxAttempts <= 0) return
-    if (state.retryCount >= descriptor.retry.maxAttempts) return
-    boot._retryUnit = id
-    retryPump.interval = Math.max(1, Math.min(descriptor.retry.maxBackoffMs,
-      descriptor.retry.backoffMs * Math.pow(2, state.retryCount)))
+  function _nextRetryAt() {
+    let earliest = 0
+    for (let i = 0; i < boot._catalog.length; i++) {
+      const state = UnitGate.state(boot._catalog[i].id)
+      if (state === null || state.state !== "failed") continue
+      if (state.nextRetryMs <= 0) continue
+      if (earliest === 0 || state.nextRetryMs < earliest) earliest = state.nextRetryMs
+    }
+    return earliest
+  }
+
+  function _armRetry() {
+    const due = boot._nextRetryAt()
+    if (due === 0) {
+      boot._retryDue = 0
+      retryPump.stop()
+      return
+    }
+    // A unit change that moves nothing must not push an armed retry back:
+    // the timer already counts down to this exact instant.
+    if (boot._retryDue === due && retryPump.running) return
+    boot._retryDue = due
+    retryPump.interval = Math.max(1, Math.ceil(due - Date.now()))
     retryPump.restart()
   }
 
   function _retryNow() {
-    const id = boot._retryUnit
-    boot._retryUnit = ""
-    if (id === "") return
-    if (UnitGate.retry(id)) boot._refreshUnit(id)
+    const due = []
+    for (let i = 0; i < boot._catalog.length; i++) {
+      const id = boot._catalog[i].id
+      if (UnitGate.retryDue(id)) due.push(id)
+    }
+    for (let i = 0; i < due.length; i++) {
+      if (UnitGate.retry(due[i])) boot._refreshUnit(due[i])
+    }
+    boot._armRetry()
   }
 
   QQ.Timer {
