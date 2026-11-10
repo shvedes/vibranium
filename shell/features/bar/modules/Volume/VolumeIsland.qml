@@ -9,6 +9,7 @@ import qs.services as Core
 import qs.common
 import "Model.js" as Model
 import "../../../../common/text/Format.js" as Format
+import "../../../../common/math/Range.js" as Range
 
 // Volume island: output and input sliders plus per-application mixers.
 // Mirrors the Network/Bluetooth islands: Card chrome from the shared
@@ -273,13 +274,13 @@ Item {
 
   function setOutputVolume(v) {
     if (!root.sink || !root.sink.audio) return
-    root.sink.audio.volume = Math.max(0, Math.min(root.maxVolume, v))
+    root.sink.audio.volume = Range.clamp(v, 0, root.maxVolume)
     if (v > 0 && root.sink.audio.muted) root.sink.audio.muted = false
   }
 
   function setInputVolume(v) {
     if (!root.source || !root.source.audio) return
-    root.source.audio.volume = Math.max(0, Math.min(root.maxSourceVolume, v))
+    root.source.audio.volume = Range.clamp(v, 0, root.maxSourceVolume)
     if (v > 0 && root.source.audio.muted) root.source.audio.muted = false
   }
 
@@ -422,7 +423,7 @@ Item {
       anchors.left: parent.left
       anchors.top: parent.top
       anchors.bottom: parent.bottom
-      width: parent.width * (slider.muted ? 0 : Math.max(0, Math.min(1, slider.value / slider.maximum)))
+      width: parent.width * (slider.muted ? 0 : Range.clamp01(slider.value / slider.maximum))
       radius: RoundingPolicy.radius
       color: Ui.solid("accent")
       Behavior on width { enabled: !slider.dragging && MotionPolicy.enabled; Glide { duration: Ui.normalMs } }
@@ -459,7 +460,7 @@ Item {
       acceptedButtons: Qt.LeftButton
 
       function update(x) {
-        var r = Math.max(0, Math.min(1, x / width))
+        var r = Range.clamp01(x / width)
         var v = r * slider.maximum
         slider.moved(v)
       }
@@ -489,7 +490,7 @@ Item {
         var st = root.volumeStep
         var d = event.angleDelta.y > 0 ? st : (event.angleDelta.y < 0 ? -st : 0)
         if (d !== 0) {
-          var nx = Math.max(0, Math.min(slider.maximum, slider.value + d))
+          var nx = Range.clamp(slider.value + d, 0, slider.maximum)
           slider.moved(nx)
         }
       }
@@ -1311,7 +1312,7 @@ Item {
           muted: row.muted
           onMoved: v => {
             if (row.node && row.node.audio) {
-              row.node.audio.volume = Math.max(0, Math.min(root.streamMax, v))
+              row.node.audio.volume = Range.clamp(v, 0, root.streamMax)
               if (v > 0 && row.node.audio.muted) row.node.audio.muted = false
             }
           }
