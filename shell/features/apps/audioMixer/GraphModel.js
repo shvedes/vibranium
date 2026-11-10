@@ -1003,22 +1003,26 @@ function layerPlan(nodes, groups) {
 
   const columns = []
   const byLayer = ({})
-  for (const key of keys) {
-    const layer = layers[key]
-    if (byLayer[layer] === undefined) {
-      byLayer[layer] = []
-      columns.push(layer)
+  function assignColumns() {
+    for (const key of keys) {
+      const layer = layers[key]
+      if (byLayer[layer] === undefined) {
+        byLayer[layer] = []
+        columns.push(layer)
+      }
+      byLayer[layer].push(key)
     }
-    byLayer[layer].push(key)
+    columns.sort(numericAscending)
+    let rows = 0
+    for (const layer of columns) {
+      // Key order within a column, so a card's place down it is its own identity
+      // rather than its position in whatever order the graph handed the set over.
+      byLayer[layer].sort(compareKeys)
+      if (byLayer[layer].length > rows) rows = byLayer[layer].length
+    }
+    return rows
   }
-  columns.sort(numericAscending)
-  let rows = 0
-  for (const layer of columns) {
-    // Key order within a column, so a card's place down it is its own identity
-    // rather than its position in whatever order the graph handed the set over.
-    byLayer[layer].sort(compareKeys)
-    if (byLayer[layer].length > rows) rows = byLayer[layer].length
-  }
+  const rows = assignColumns()
   return {
     columns: columns,
     byLayer: byLayer,
