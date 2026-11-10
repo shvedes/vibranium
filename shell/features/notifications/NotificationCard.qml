@@ -113,7 +113,7 @@ Rectangle {
   // became a red panel, which is a louder thing than a notification should
   // be. The crisp signal is the border, which is already the theme's red;
   // this is the warmth under it.
-  readonly property real urgentMix: 0.06
+  readonly property real urgentMix: 0.05
   readonly property color fill: root.urgent
     ? Ui.mix("background_0", "red", root.urgentMix)
     : Ui.solid("background_0")
