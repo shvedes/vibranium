@@ -197,6 +197,14 @@ BarModule {
     stderr: StdioCollector {}
   }
 
+  // Which interface the counters come from only moves when the network does,
+  // but the poll re-read the route on every tick - a process spawn twice a
+  // second for an answer the previous tick already had. The counters stay on
+  // the 500ms tick; the route is refreshed once every ten of them, so a route
+  // change still lands within five seconds of a tooltip being open.
+  property int _routeTick: 0
+  readonly property int _routeEveryTicks: 10
+
   Timer {
     id: statsPoll
 
@@ -204,7 +212,9 @@ BarModule {
     repeat: true
     running: root.hovered
     onTriggered: {
-      if (!routeProc.running) routeProc.running = true
+      root._routeTick++
+      if (root._routeTick % root._routeEveryTicks === 0 && !routeProc.running)
+        routeProc.running = true
       if (root.statsIface !== "") root.updateStats(root.counterSample())
     }
   }
