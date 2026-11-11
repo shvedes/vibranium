@@ -164,15 +164,7 @@ Singleton {
     readonly property int _nameLimit: 96
 
     function _nameError(name): string {
-        const n = name === undefined || name === null ? "" : String(name)
-        if (n === "") return "empty_name"
-        if (n.length > root._nameLimit) return "name_too_long"
-        if (n.indexOf("\0") >= 0) return "name_nul"
-        // Traversal is named before the separator: a name that both
-        // escapes and adds segments is reported as the escape it is.
-        if (n === "." || n.indexOf("..") >= 0) return "name_traversal"
-        if (n.indexOf("/") >= 0) return "name_separator"
-        return ""
+        return PathPolicy.segmentError(name, root._nameLimit)
     }
 
     // The single path gate: the name must be safe, then the candidate must

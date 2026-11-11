@@ -604,6 +604,33 @@ group('a refusal never leaks into an allow', () => {
 })
 
 // ---------------------------------------------------------------------------
+section('PathPolicy.segmentError - one authored name as one path segment')
+group('a usable name answers the empty string', () => {
+  eq('an ordinary name', PP.segmentError('Nord', 96), '')
+  eq('a dotted name that is not traversal', PP.segmentError('nord.dark', 96), '')
+  eq('spaces, quotes and Unicode are data', PP.segmentError('my "theme" / no', 96), 'name_separator')
+  eq('a quote is not a separator', PP.segmentError('my "theme"', 96), '')
+  eq('a Unicode name', PP.segmentError('Nord — bleu', 96), '')
+  eq('the limit is inclusive', PP.segmentError('abcd', 4), '')
+  eq('one over the limit is refused', PP.segmentError('abcde', 4), 'name_too_long')
+  eq('the documented default bound is 96', PP.segmentError('x'.repeat(96)), '')
+  eq('and 97 is over it', PP.segmentError('x'.repeat(97)), 'name_too_long')
+})
+
+group('the first broken rule is named', () => {
+  eq('an empty name', PP.segmentError('', 96), 'empty_name')
+  eq('null', PP.segmentError(null, 96), 'empty_name')
+  eq('undefined', PP.segmentError(undefined, 96), 'empty_name')
+  eq('a number is stringified', PP.segmentError(7, 96), '')
+  eq('a NUL', PP.segmentError('a\u0000b', 96), 'name_nul')
+  eq('a dot is traversal', PP.segmentError('.', 96), 'name_traversal')
+  eq('two dots anywhere is traversal', PP.segmentError('a..b', 96), 'name_traversal')
+  eq('a leading parent is traversal', PP.segmentError('../x', 96), 'name_traversal')
+  eq('traversal outranks a separator', PP.segmentError('a/../b', 96), 'name_traversal')
+  eq('a separator', PP.segmentError('a/b', 96), 'name_separator')
+  eq('an absolute path', PP.segmentError('/etc/passwd', 96), 'name_separator')
+})
+
 section('PathPolicy - the string helpers, called directly')
 // ---------------------------------------------------------------------------
 

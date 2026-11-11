@@ -311,6 +311,23 @@ function denied(base, target, options, code) {
   }
 }
 
+// A path segment authored as data - a theme name, a wallpaper name - is
+// judged before a path is built from it. The first rule broken is the answer:
+// empty, over the caller's length bound, a NUL, traversal, then a separator.
+// Traversal is named before the separator because a name that both escapes and
+// adds segments is reported as the escape it is. An empty answer means the
+// segment may be used as one path component.
+function segmentError(name, limit) {
+  const n = name === undefined || name === null ? "" : String(name)
+  const max = limit === undefined || limit === null ? 96 : Number(limit)
+  if (n === "") return "empty_name"
+  if (isFinite(max) && max > 0 && n.length > max) return "name_too_long"
+  if (n.indexOf("\u0000") >= 0) return "name_nul"
+  if (n === "." || n.indexOf("..") >= 0) return "name_traversal"
+  if (n.indexOf("/") >= 0) return "name_separator"
+  return ""
+}
+
 function invalid(code) {
   return { ok: false, code: code }
 }
