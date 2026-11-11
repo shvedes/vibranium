@@ -2,6 +2,7 @@
 
 .import "../../../../common/math/Range.js" as Range
 .import "../../../../common/collections/StoreGuards.js" as StoreGuards
+.import "../../../../common/text/StringUtils.js" as SU
 
 // Pure model behind the arch updates island: the package search, the
 // official/AUR split, the selection algebra, the per-row projection the
@@ -74,7 +75,7 @@ function heavyQueue(packages, enabled) {
 // down.
 function filterPackages(packages, query) {
   const pkgs = StoreGuards.asList(packages)
-  const q = String(query ?? "").trim().toLowerCase()
+  const q = SU.lowerTrim(query)
   if (q === "") return pkgs
   const out = []
   for (let i = 0; i < pkgs.length; i++) {
