@@ -4,6 +4,7 @@
 .import "../../common/text/Format.js" as Format
 .import "../../common/collections/StoreGuards.js" as StoreGuards
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/text/SearchLib.js" as SL
 // Pure helpers for the Printers service and bar module: ipptool -tv report
 // parsing, state-label formatting, filtering. No Qt imports - node's vm
 // hosts it exactly like QJSEngine does (the
@@ -403,19 +404,12 @@ function filterDismissed(rows, dismissed) {
 // Case-insensitive filter over printer rows: queue name, local alias,
 // model, location. Empty q -> all rows. Never mutates the input.
 function filterPrinters(rows, q, aliases) {
-  if (!q || String(q).trim() === "") return rows
-  const needle = String(q).toLowerCase()
-  const out = []
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-    if (!row || typeof row !== "object") continue
+  return SL.filterRows(rows, q, function(row) {
     const name = textOf(row, "printer-name")
     const alias = aliases && typeof aliases === "object" ? textOf(aliases, name) : ""
-    const hay = name + " " + alias + " " + textOf(row, "printer-make-and-model")
+    return name + " " + alias + " " + textOf(row, "printer-make-and-model")
       + " " + textOf(row, "printer-location")
-    if (hay.toLowerCase().indexOf(needle) !== -1) out.push(row)
-  }
-  return out
+  })
 }
 
 // Case-insensitive filter over job rows (name, user, printer).
@@ -423,21 +417,13 @@ function filterJobs(rows, q) {
   return filterRows(rows, q, ["job-name", "job-originating-user-name", "printer"])
 }
 
-// Case-insensitive filter over job rows (name, user, printer).
+// Case-insensitive filter over job rows by the given attribute keys.
 function filterRows(rows, q, keys) {
-  if (!q || String(q).trim() === "") return rows
-  const needle = String(q).toLowerCase()
-  const out = []
-  for (let i = 0; i < rows.length; i++) {
-    const row = rows[i]
-    for (let k = 0; k < keys.length; k++) {
-      if (textOf(row, keys[k]).toLowerCase().indexOf(needle) !== -1) {
-        out.push(row)
-        break
-      }
-    }
-  }
-  return out
+  return SL.filterRows(rows, q, function(row) {
+    const parts = []
+    for (let k = 0; k < keys.length; k++) parts.push(textOf(row, keys[k]))
+    return parts.join(" ")
+  })
 }
 
 // DD.MM HH:MM from a unix time-at-creation integer (seconds). ""

@@ -107,6 +107,32 @@ function narrowsQuery(sameIndex, cachedQ, q, hits) {
     && q.length > cachedQ.length && q.indexOf(cachedQ) === 0 && hits !== null
 }
 
+// The visible title fields of a row, in display order. Both menu haystacks
+// start from this shape, so the fields a filter and a cross-page search
+// consider visible cannot drift.
+function titleParts(item) {
+  const parts = []
+  if (item.label) parts.push(String(item.label))
+  if (item.subLead) parts.push(String(item.subLead))
+  if (item.sub) parts.push(String(item.sub))
+  return parts
+}
+
+// Rows whose searchable text contains the query, case-insensitively. A blank
+// query answers the input list itself. `hayOf(row)` answers the text a row is
+// searched by; rows that are not objects are skipped. Never mutates the input.
+function filterRows(rows, query, hayOf) {
+  if (!query || String(query).trim() === "") return rows
+  const needle = String(query).toLowerCase()
+  const out = []
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i]
+    if (!row || typeof row !== "object") continue
+    if (String(hayOf(row) ?? "").toLowerCase().indexOf(needle) !== -1) out.push(row)
+  }
+  return out
+}
+
 // Hit indices ordered by descending score, then the caller's tiebreak, then
 // scan order. The launcher's exact and typo searches share this ranking, and
 // a caller that keeps its hits in scan order can reuse it without a copy of
