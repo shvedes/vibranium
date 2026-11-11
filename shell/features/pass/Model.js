@@ -46,14 +46,39 @@ function splitEntry(path) {
   return { path: p, dir: SU.dirname(p), name: SU.basename(p) };
 }
 
+// The store root as the parsers compare it: no trailing slash, and the one
+// empty answer for an absent argument.
+function _storeDir(path) {
+  var dir = String(path || "");
+  if (dir.length > 1 && dir.charAt(dir.length - 1) === "/")
+    dir = dir.substring(0, dir.length - 1);
+  return dir;
+}
+
+// One payload path relative to the store root, or null when the line names
+// nothing listable. Drops the trailing CR a Windows reader leaves, the root
+// itself, and any `.git` path segment - a `.git` segment anywhere filters the
+// folder and everything below it alike, where matching only a prefix or a
+// `/.git/` infix let a nested repository's folder through.
+function _storedPath(dir, raw) {
+  var f = String(raw === undefined || raw === null ? "" : raw);
+  if (f.length > 0 && f.charAt(f.length - 1) === "\r")
+    f = f.substring(0, f.length - 1);
+  if (f === "") return null;
+  if (dir !== "") {
+    if (f === dir) return null;
+    if (f.indexOf(dir + "/") === 0) f = f.substring(dir.length + 1);
+  }
+  if (/(^|\/)\.git(\/|$)/.test(f)) return null;
+  return f;
+}
+
 // Combined `find` output -> { files, dirs }. The probe prints one line
 // per hit prefixed with its kind: "f <rel>" for entries, "d <rel>" for
 // folders (the store root itself prints an empty rel and is dropped).
 // .git bookkeeping never surfaces on either side.
 function parseFindOutput(storeDir, lines) {
-  var dir = String(storeDir || "");
-  if (dir.length > 1 && dir.charAt(dir.length - 1) === "/")
-    dir = dir.substring(0, dir.length - 1);
+  var dir = _storeDir(storeDir);
   var files = [];
   var dirs = [];
   var seen = {};
@@ -64,18 +89,8 @@ function parseFindOutput(storeDir, lines) {
       line = line.substring(0, line.length - 1);
     if (line.length < 3 || line.charAt(1) !== " ") continue;
     var kind = line.charAt(0);
-    var f = line.substring(2);
-    if (f === "") continue;
-    if (dir !== "") {
-      if (f === dir) continue;
-      if (f.indexOf(dir + "/") === 0) f = f.substring(dir.length + 1);
-    }
-    // A `.git` path segment anywhere in the path, so the folder itself and
-    // everything below it are filtered alike. Matching only a `.git` prefix
-    // or a `/.git/` infix let the folder of a nested repository (`a/.git`)
-    // through as an empty entry the browser would show.
-    if (/(^|\/)\.git(\/|$)/.test(f))
-      continue;
+    var f = _storedPath(dir, line.substring(2));
+    if (f === null) continue;
     if (kind === "f") {
       if (f.length > 4 && f.substring(f.length - 4) === ".gpg") files.push(f);
     } else if (kind === "d") {
@@ -95,23 +110,13 @@ function listEntries(a, b) {
   if (Array.isArray(a)) {
     files = a;
   } else {
-    dir = String(a || "");
+    dir = _storeDir(a);
     if (Array.isArray(b)) files = b;
   }
-  if (dir.length > 1 && dir.charAt(dir.length - 1) === "/")
-    dir = dir.substring(0, dir.length - 1);
   var out = [];
   for (var i = 0; i < files.length; i++) {
-    var f = String(files[i] === undefined || files[i] === null ? "" : files[i]);
-    if (f.length > 0 && f.charAt(f.length - 1) === "\r")
-      f = f.substring(0, f.length - 1);
-    if (f === "") continue;
-    if (dir !== "") {
-      if (f === dir) continue;
-      if (f.indexOf(dir + "/") === 0) f = f.substring(dir.length + 1);
-    }
-    if (/(^|\/)\.git(\/|$)/.test(f))
-      continue;
+    var f = _storedPath(dir, files[i]);
+    if (f === null) continue;
     if (f.length <= 4 || f.substring(f.length - 4) !== ".gpg") continue;
     var logical = f.substring(0, f.length - 4);
     if (logical === "") continue;
