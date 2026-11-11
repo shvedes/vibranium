@@ -3,6 +3,7 @@ module qs.features.menu
 singleton Menu 1.0 Menu.qml
 MenuView 1.0 MenuView.qml
 MenuPanel 1.0 MenuPanel.qml
+MenuFilterBar 1.0 MenuFilterBar.qml
 Entry 1.0 Entry.qml
 GridCell 1.0 GridCell.qml
 InlineEditor 1.0 InlineEditor.qml

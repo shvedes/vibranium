@@ -4027,8 +4027,11 @@ Rectangle {
     })
   }
 
-  // Filter block: standalone header component.
-  Item {
+  // Filter block: the header component owns the field's input contract (role,
+  // chip, hint, the four routes); the panel keeps what those routes do and
+  // reads the field through the alias below, so SearchScope's call sites are
+  // unchanged.
+  MenuFilterBar {
     id: filterBar
 
     anchors.top: parent.top
@@ -4036,40 +4039,26 @@ Rectangle {
     anchors.right: parent.right
     anchors.margins: Ui.outerPad
     height: Ui.filterH
+    scoped: panel.scopedSearching
 
-    InputField {
-      id: searchField
-
-      anchors.fill: parent
-       inputRole: panel.scopedSearching ? "filter" : "search"
-      // The filter chip must stay put while the "/" quick-filter is armed,
-      // focused or not: with the default (false) the first Esc (de-focus,
-      // trim kept) hid the chip, gliding it to the field center while the
-      // query slid left - the reported flash. Every other filter bar sets
-      // this true; the menu is the only one that toggles inputRole.
-      filterIconAlways: true
-      clearable: false
-
-      // Ghost hint flips to "Filter" while the "/" in-page quick-filter
-      // is armed, so "Search" never implies the global cross-page search.
-      placeholder: panel.scopedSearching ? "Filter..." : "Search..."
-
-      onEdited: text => panel.onFieldEdited(text)
-      // TextInput consumes Enter to emit accepted; route it here since
-      // it never reaches the panel handler while the field holds focus.
-      onAccepted: text => panel.activateCurrent(false)
-      onEscaped: panel.escapeChain()
-      // Backspace on an empty field leaves Filter mode, like Esc with empty
-      // input does - but never pops or closes (Launcher parity: stepBack
-      // only exits the mode). Regular search already exits via query-empty;
-      // the "/" filter stays armed with an empty query by design, so without
-      // this it could never be left by Backspace.
-      onBackspaceEmpty: panel.backspaceEmptyChain()
-      // Clicking in or out of the field moves focus natively; assert
-      // ownership immediately instead of waiting for the healer.
-      onFocusedChanged: Qt.callLater(panel.reassertFocus)
-    }
+    onEdited: text => panel.onFieldEdited(text)
+    // TextInput consumes Enter to emit accepted; route it here since it
+    // never reaches the panel handler while the field holds focus.
+    onAccepted: text => panel.activateCurrent(false)
+    onEscaped: panel.escapeChain()
+    // Backspace on an empty field leaves Filter mode, like Esc with empty
+    // input does - but never pops or closes (Launcher parity: stepBack
+    // only exits the mode). Regular search already exits via query-empty;
+    // the "/" filter stays armed with an empty query by design, so without
+    // this it could never be left by Backspace.
+    onBackspaceEmpty: panel.backspaceEmptyChain()
+    // Clicking in or out of the field moves focus natively; assert ownership
+    // immediately instead of waiting for the healer.
+    onFocusChanged: Qt.callLater(panel.reassertFocus)
   }
+
+  // The field itself, for the text/focus/word-editing routes below.
+  property alias searchField: filterBar.field
 
   // List box: its own region below the filter, separated by a structural
   // gap. Height = content when short, clamped to the available ceiling.
