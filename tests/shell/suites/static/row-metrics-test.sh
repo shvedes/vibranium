@@ -93,7 +93,7 @@ t_contains "MenuPanel imports the same arithmetic" "RowMetrics.js\" as RowMetric
 # would also fail on the widening this suite should not have to care about.
 t_contains "MenuPanel snaps through it" "RowMetrics.snappedH(rows" "$MENU_SRC"
 t_contains "MenuPanel sums through it" "RowMetrics.contentH(rows" "$MENU_SRC"
-t_contains "and the installed-model caller still names the model" "RowMetrics.contentH(panel.rowsModel" "$MENU_SRC"
+t_contains "and the installed-model caller goes through the shared sum" "panel._sumRowsH(panel.rowsModel || [], 0)" "$MENU_SRC"
 t_not_contains "MenuPanel keeps no hand-written row sum" "total += panel.rowRestHeight" "$MENU_SRC"
 # The grid is the reason MenuPanel stays bespoke, so the local branch has to
 # survive the extraction - an assertion that the delta is still local.
