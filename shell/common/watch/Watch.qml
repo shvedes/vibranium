@@ -17,6 +17,14 @@ Singleton {
   readonly property string tag: "watch"
 
   // path -> { subs: [cb], refCount: int, view: FileView, pending: bool, eventCount: int }
+  //
+  // Mutated in place. Nothing binds to this map: every reader goes through a
+  // function here, and the entries are objects whose subscribers are invoked
+  // directly. The copy-on-write spelling this replaced existed for a change
+  // notification no binding ever observed, and it made every file event - and
+  // every subscription - allocate a fresh map of every watched path. One
+  // dispatch of P pending paths among N watched ones paid P map copies, and
+  // one settings write fires an event per changed file.
   property var _watchers: ({})
 
   // Coalesced dispatch: one event-loop tick batches rapid changes.
@@ -86,10 +94,6 @@ Singleton {
     }
     entry.subs = entry.subs.concat([cb])
     entry.refCount++
-    // Update the map with fresh object for change notification
-    const next = Object.assign({}, root._watchers)
-    next[path] = entry
-    root._watchers = next
 
     // Immediate replay if file exists.
     // Reuses the probe _ensureWatcher already did for a fresh path, so a
@@ -127,13 +131,7 @@ Singleton {
       // No more subscribers - destroy the FileView
       if (entry.view) entry.view.destroy()
       if (entry.dirView) entry.dirView.destroy()
-      const next = Object.assign({}, root._watchers)
-      delete next[path]
-      root._watchers = next
-    } else {
-      const next = Object.assign({}, root._watchers)
-      next[path] = entry
-      root._watchers = next
+      delete root._watchers[path]
     }
   }
 
@@ -168,9 +166,7 @@ Singleton {
       _initialOk: probe.ok,
       _initialText: probe.text
     }
-    const next = Object.assign({}, root._watchers)
-    next[path] = entry
-    root._watchers = next
+    root._watchers[path] = entry
     return entry
   }
 
@@ -183,9 +179,6 @@ Singleton {
     if (root._dispatching) return
     entry.pending = true
     entry.eventCount++
-    const next = Object.assign({}, root._watchers)
-    next[path] = entry
-    root._watchers = next
     root._scheduleDispatch()
   }
 
@@ -206,9 +199,6 @@ Singleton {
       for (let i = 0; i < entry.subs.length; i++) {
         entry.subs[i](text)
       }
-      const next = Object.assign({}, root._watchers)
-      next[path] = entry
-      root._watchers = next
     }
     root._dispatching = false
   }
