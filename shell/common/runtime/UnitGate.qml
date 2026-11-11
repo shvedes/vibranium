@@ -330,14 +330,26 @@ Singleton {
     record.startedAtMs = Date.now()
     record.teardownDone = false
 
+    // A resolver that declines (returns false) could not reach the type it
+    // builds: boot stashes that demand for the half that owns it. Treating
+    // the decline as a construction marked the unit ready with nothing behind
+    // it - the shell reported ready while its lock surface and session verbs
+    // did not exist, and the boot table reported "constructed in 0ms" for a
+    // constructor that never ran. So a decline leaves the unit unstarted and
+    // the demand alive; refresh() is what retries it once the half lands.
+    let available = true
     try {
-      record.descriptor.resolver()
+      available = record.descriptor.resolver() !== false
     } catch (error) {
       record.constructionMs = root._elapsedMs(record.startedAtMs)
       root._fail(record, error)
       return false
     }
     record.constructionMs = root._elapsedMs(record.startedAtMs)
+    if (!available) {
+      root._defer(record)
+      return false
+    }
 
     let ready = true
     try {
@@ -418,6 +430,21 @@ Singleton {
     record.nextRetryMs = Date.now() + delay
   }
 
+  // A declined resolver: nothing was built, so the record carries no
+  // construction figure and the unit is unstarted rather than ready. The lease
+  // that demanded it is untouched, which is what makes the retry a refresh
+  // rather than a second ensure.
+  function _defer(record) {
+    record.state = "not_started"
+    record.health = "unknown"
+    record.constructionMs = 0
+    record.readyMs = 0
+    record.totalMs = 0
+    record.lastError = ""
+    record.nextRetryMs = 0
+    record.startedAtMs = 0
+  }
+
   function _block(record) {
     record.state = "blocked"
     record.health = "unknown"
@@ -470,6 +497,18 @@ Singleton {
   }
 
   function _refreshRecord(record) {
+    // A unit whose resolver declined is owed another attempt: it was demanded
+    // while the half that builds it was still loading, and this refresh is the
+    // landing. Only a live demand keeps it retryable - an undemanded unit has
+    // nothing left to start.
+    if (record.state === "not_started") {
+      if (root._leaseCounts(record).owners === 0) return false
+      if (!root._dependenciesReady(record)) {
+        root._block(record)
+        return false
+      }
+      return root._activate(record, false)
+    }
     if (record.state !== "starting") return false
     let ready = true
     try {
