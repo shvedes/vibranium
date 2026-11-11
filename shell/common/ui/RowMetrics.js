@@ -52,10 +52,19 @@ function heightAt(knownH, key, fallback) {
 // a key two live rows share. A contested key has no single height to learn.
 // One walk of the row set, in the row set's own order.
 function identityOwners(count, rowKey) {
+  const keys = new Array(count)
+  for (let i = 0; i < count; i++) keys[i] = rowKey(i)
+  return identityOwnersOf(keys)
+}
+
+// The same walk over keys the caller has already resolved. A list keeps that
+// array anyway - rowTop and rowHeightAt read it on every seat - so building
+// the owner map from it costs no second callable per row.
+function identityOwnersOf(keys) {
   const owner = Object.create(null)
   let contested = false
-  for (let i = 0; i < count; i++) {
-    const key = rowKey(i)
+  for (let i = 0; i < keys.length; i++) {
+    const key = keys[i]
     if (owner[key] === undefined) owner[key] = i
     else {
       owner[key] = -1

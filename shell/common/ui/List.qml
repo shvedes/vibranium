@@ -602,6 +602,13 @@ ListView {
   // Object.prototype member must not read as a claim.
   property var _idOwner: Object.create(null)
   property string _identityError: ""
+  // The identity of every live row, resolved once per row-set sync. rowTop
+  // and rowHeightAt answer from this array instead of calling rowIdentity per
+  // prefix step: a seat walks the whole prefix, and a restore or a
+  // centerTarget paid that callable (plus a fresh _avg() fold) once per row.
+  // The height table itself stays keyed by identity; this is only the index ->
+  // key projection of the row set the sync just inspected.
+  property var _rowKeys: []
   // Non-empty while the live rows collide on one identity, coded like
   // MenuPanel's _modelError so a consumer can report it verbatim. It
   // catches a consumer that DECLARES identityRevision and still
@@ -731,6 +738,13 @@ ListView {
     const id = root.rowIdentity(index)
     return id === null || id === undefined ? String(index) : String(id)
   }
+  // The row-set projection's key for an index, or a live read when the array
+  // does not cover it (a row set the sync has not seen yet).
+  function _keyAt(index) {
+    const keys = root._rowKeys
+    if (index >= 0 && index < keys.length) return keys[index]
+    return root._rowKey(index)
+  }
   function _clearHeightTable() {
     root._knownH = {}
     root._touchH = Object.create(null)
@@ -739,6 +753,11 @@ ListView {
     // table, so dropping the table drops it too.
     root._idOwner = Object.create(null)
     root._identityError = ""
+    // The projection describes the row generation the table did, so it goes
+    // with it, and the fingerprint is cleared so the next sync rebuilds both
+    // even when the replacement model has the same count and endpoints.
+    root._rowKeys = []
+    root._idFingerprint = ""
     root._sumH = 0
     root._countH = 0
     root._avgH = -1
@@ -758,7 +777,10 @@ ListView {
       root._clearHeightTable()
       return
     }
-    const ids = RowMetrics.identityOwners(root.count, root._rowKey)
+    const keys = new Array(root.count)
+    for (let k = 0; k < keys.length; k++) keys[k] = root._rowKey(k)
+    root._rowKeys = keys
+    const ids = RowMetrics.identityOwnersOf(keys)
     root._idOwner = ids.owner
     root._identityError = ids.contested ? "duplicate_identity" : ""
     let changed = false
@@ -832,6 +854,10 @@ ListView {
   onIdentityRevisionChanged: root._syncIdentitySet()
   onModelChanged: {
     root._clearHeightTable()
+    // Re-project the replacement row set: the clear drops the old array, and
+    // the count may not move (a same-size replacement), so this is the sync
+    // that rebuilds it.
+    root._syncIdentitySet()
     // A model change that did NOT move the cursor leaves it on the same
     // INDEX, which is a different row. That case has no index change to
     // restore from, so it is restored here - and here is late enough to be
@@ -997,7 +1023,7 @@ ListView {
     return live
   }
   function rowHeightAt(index) {
-    return RowMetrics.heightAt(root._knownH, root._rowKey(index), root._avg())
+    return RowMetrics.heightAt(root._knownH, root._keyAt(index), root._avg())
   }
   // Live delegate geometry wins over the table whenever the delegate
   // exists: with full instantiation (small lists) every seat reads engine
@@ -1009,9 +1035,17 @@ ListView {
   function rowTop(index) {
     const live = root.itemAtIndex(index)
     if (live) return live.y
+    // The prefix sum, with the fallback folded once. Calling rowHeightAt per
+    // step re-derived _avg() from count/contentHeight and re-resolved the
+    // identity through rowIdentity for every row walked; the row-set sync has
+    // already resolved those keys into _rowKeys.
+    const fallback = root._avg()
+    const known = root._knownH
+    const keys = root._rowKeys
     let y = 0
     for (let i = 0; i < index; i++) {
-      y += root.rowHeightAt(i)
+      const key = i < keys.length ? keys[i] : root._rowKey(i)
+      y += RowMetrics.heightAt(known, key, fallback)
       y += root.spacing
     }
     return y
@@ -1091,7 +1125,7 @@ ListView {
   // is a guess about rows the view has never shown.
   function rowHeightKnown(index) {
     if (root.itemAtIndex(index)) return true
-    const h = root._knownH[root._rowKey(index)]
+    const h = root._knownH[root._keyAt(index)]
     return typeof h === "number" && isFinite(h) && h > 0
   }
 
