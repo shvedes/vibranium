@@ -47,6 +47,8 @@
 // projected into the env file. `var` inside showIf kept as shim.
 .pragma library
 
+.import "../collections/StoreGuards.js" as StoreGuards
+
 .import "../text/StringUtils.js" as SU
 
 // Canonical helpers live in StringUtils.js; call SU.* directly.
@@ -488,7 +490,7 @@ function parseSection(raw, fallback, allowId, fileNamespace) {
     items: [],
     errors: []
   }
-  if (raw && typeof raw === "object" && !Array.isArray(raw)
+  if (StoreGuards.isPlainObject(raw)
     && typeof raw.group === "string" && raw.group !== "")
     section.group = raw.group
 
@@ -700,8 +702,7 @@ function parseUnifiedCatalog(text) {
   const GROUPS = { shell: true, env: true, hypr: true }
   for (let i = 0; i < rawSections.length; i++) {
     const rawPage = rawSections[i]
-    const g = rawPage && typeof rawPage === "object" && !Array.isArray(rawPage)
-      ? rawPage.group : undefined
+    const g = StoreGuards.isPlainObject(rawPage) ? rawPage.group : undefined
     // Every settings page declares which store owns it. The group doubles
     // as the namespace assertion the old per-file layout gave for free:
     // a hypr key on a shell page (or vice versa) is an authoring error.
@@ -1109,7 +1110,7 @@ function parseUserSource(text) {
 // Pure: neither argument is mutated, and no object in the result is shared
 // with the inputs.
 function composeManaged(schema, raw, validOverrides) {
-  const out = _deepClone(raw !== null && typeof raw === "object" && !Array.isArray(raw) ? raw : {})
+  const out = _deepClone(StoreGuards.isPlainObject(raw) ? raw : {})
   if (!schema || !schema.byKey) return out
   const ov = validOverrides !== null && typeof validOverrides === "object" ? validOverrides : {}
   for (const key in schema.byKey) {
