@@ -73,12 +73,6 @@ function mimeType(fileName) {
   return type === undefined ? "" : type.mime
 }
 
-// A zoom factor as the percentage the status bar and the zoom badge print.
-function percent(scale) {
-  const v = Number(scale)
-  return Math.round((isFinite(v) ? v : 0) * 100) + "%"
-}
-
 // "3 / 12": the open file's place in its folder, "" when the listing has not
 // produced a row for it yet.
 function position(index, count) {
@@ -94,13 +88,6 @@ function dimensions(width, height) {
   const h = Number(height)
   if (!(w > 0) || !(h > 0)) return ""
   return Math.round(w) + " x " + Math.round(h)
-}
-
-// A byte count in binary units at one decimal past bytes, "" for nothing to
-// report. A missing `fileSize` role arrives as undefined, which is the same
-// answer as a zero file.
-function humanSize(bytes) {
-  return Format.formatBinaryFileSize(bytes)
 }
 
 // Decode-size buckets for vector rasters: the long side snaps to one of these,
@@ -130,9 +117,9 @@ function statusItems(index, count, width, height, scale, size) {
   const extent = dimensions(width, height)
   if (extent !== "") cells.push({ kind: "meta", text: extent })
 
-  cells.push({ kind: "zoom", text: percent(scale) })
+  cells.push({ kind: "zoom", text: Format.percent(scale) })
 
-  const bytes = humanSize(size)
+  const bytes = Format.formatBinaryFileSize(size)
   if (bytes !== "") cells.push({ kind: "meta", text: bytes })
 
   const out = []

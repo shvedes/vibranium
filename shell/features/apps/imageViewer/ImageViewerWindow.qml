@@ -6,6 +6,7 @@ import QtQuick.Layouts
 import QtQuick.Effects
 import Qt.labs.folderlistmodel
 import "ImageViewerMeta.js" as Meta
+import "../../../common/text/Format.js" as Format
 import "../../../common/capture/ShotLib.js" as ShotLib
 import "../../../common/text/StringUtils.js" as SU
 import "../../../common/math/Range.js" as Range
@@ -1188,7 +1189,7 @@ QtObject {
           anchors.centerIn: parent
           // The same number the status bar prints, so a zoom badge and the
           // status readout can never report two different scales.
-          text: Meta.percent(root.fitToWindow ? img.fitScale : root.zoomFactor)
+          text: Format.percent(root.fitToWindow ? img.fitScale : root.zoomFactor)
           color: Ui.solid("foreground_0")
           font.pixelSize: 12
           font.family: Ui.fontFamily
