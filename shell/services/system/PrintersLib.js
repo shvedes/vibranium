@@ -391,6 +391,48 @@ function jobRows(reportText) {
 
 // Drop locally cleared history entries (service `dismissed` map,
 // job-id -> true). Never mutates the input.
+// The island's section subtitle: the VM verdict, the empty-store verdict, the
+// default queue (by alias when one is set) and the live queue depth. Pure of
+// the service so every branch is drivable from a row list.
+function sectionSubtitle(printers, defaultPrinter, aliases, shownJobs, vmUnavailable) {
+  if (vmUnavailable === true) return "Not available in a virtual machine"
+  const rows = Array.isArray(printers) ? printers : []
+  const jobs = Array.isArray(shownJobs) ? shownJobs : []
+  if (rows.length === 0 && jobs.length === 0) return "No printers configured"
+  const parts = []
+  if (rows.length > 0) {
+    const name = defaultPrinter === undefined || defaultPrinter === null ? "" : String(defaultPrinter)
+    if (name !== "") {
+      const alias = aliases !== null && aliases !== undefined ? aliases[name] : undefined
+      parts.push("Default: " + (alias !== undefined && alias !== "" ? alias : name))
+    } else {
+      parts.push("No default printer")
+    }
+  }
+  const active = activeJobs(jobs).length
+  if (active > 0) parts.push(active + (active === 1 ? " job" : " jobs"))
+  return parts.join(" - ")
+}
+
+// Skeleton rows that pad the queue to a fixed window, so a short queue lands on
+// laid-out rows instead of growing the section.
+function queueFiller(jobs, window) {
+  const n = Math.max(0, Number(window) - (Array.isArray(jobs) ? jobs.length : 0))
+  const out = []
+  for (let i = 0; i < n; i++) out.push({})
+  return out
+}
+
+// True while any shown job already left the active queue, which is when the
+// clear-history affordance has work to do.
+function hasHistory(jobs) {
+  const rows = Array.isArray(jobs) ? jobs : []
+  for (let i = 0; i < rows.length; i++) {
+    if (!isActiveJobState(rows[i]["job-state"])) return true
+  }
+  return false
+}
+
 function filterDismissed(rows, dismissed) {
   if (!dismissed || typeof dismissed !== "object") return rows
   const out = []

@@ -120,49 +120,22 @@ Item {
       }
       // True while any shown job already left the queue (the clear
       // button below has something to do).
-      readonly property bool hasHistory: {
-        const shown = contentRoot.jobs
-        for (let i = 0; i < shown.length; i++)
-          if (!Model.isActiveJobState(shown[i]["job-state"])) return true
-        return false
-      }
+      readonly property bool hasHistory: Model.hasHistory(contentRoot.jobs)
       // Queue skeleton window: four rows (Volume/Bluetooth pattern).
       // Live rows fill from the top and static skeleton rows pad the
       // rest, so jobs land on laid-out rows instead of growing the
       // section.
       readonly property int queueWindow: 4
-      readonly property var queueFiller: contentRoot._queueFillerRows()
+      readonly property var queueFiller: Model.queueFiller(contentRoot.jobs, contentRoot.queueWindow)
       // Pulse the skeletons only while a reload is in flight with an
       // empty queue; beside real rows they stay fully static.
       readonly property bool queueLoading: Svc.Printers.state === "loading"
         && contentRoot.jobs.length === 0
-      function _queueFillerRows() {
-        const out = []
-        const n = Math.max(0, contentRoot.queueWindow - contentRoot.jobs.length)
-        for (let i = 0; i < n; i++) out.push({})
-        return out
-      }
-
       // Subtitle under the caps header: the default queue plus the
-      // live queue depth.
-      readonly property string subtitleText: {
-        if (Svc.Printers.vmUnavailable) return "Not available in a virtual machine"
-        if (Svc.Printers.printers.length === 0 && Svc.Printers.shownJobs.length === 0)
-          return "No printers configured"
-        const parts = []
-        if (Svc.Printers.printers.length > 0) {
-          if (Svc.Printers.defaultPrinter !== "") {
-            const alias = Svc.Printers.aliases[Svc.Printers.defaultPrinter]
-            parts.push("Default: "
-              + (alias !== undefined && alias !== "" ? alias : Svc.Printers.defaultPrinter))
-          } else {
-            parts.push("No default printer")
-          }
-        }
-        const active = Model.activeJobs(Svc.Printers.shownJobs).length
-        if (active > 0) parts.push(active + (active === 1 ? " job" : " jobs"))
-        return parts.join(" - ")
-      }
+      // live queue depth, from the library's one projection of the state.
+      readonly property string subtitleText: Model.sectionSubtitle(
+        Svc.Printers.printers, Svc.Printers.defaultPrinter,
+        Svc.Printers.aliases, Svc.Printers.shownJobs, Svc.Printers.vmUnavailable)
 
       // Click-anywhere commit: sits beneath the content column so real
       // controls and rows keep their own clicks (ArchUpdates pattern).

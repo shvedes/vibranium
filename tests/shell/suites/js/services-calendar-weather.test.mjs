@@ -1709,6 +1709,35 @@ group('jobTime is DD.MM HH:MM from a unix seconds integer', () => {
   match('a pre-epoch time is not blank', PR.jobTime(-86400), /^\d{2}\.\d{2} \d{2}:\d{2}$/)
 })
 
+section('PrintersLib - the island projections')
+group('sectionSubtitle names the default queue and the live depth', () => {
+  eq('a VM has no queue subtitle', PR.sectionSubtitle([], '', {}, [], true), 'Not available in a virtual machine')
+  eq('an empty store', PR.sectionSubtitle([], '', {}, [], false), 'No printers configured')
+  eq('printers without a default', PR.sectionSubtitle([{ 'printer-name': 'a' }], '', {}, [], false), 'No default printer')
+  eq('the default by queue name', PR.sectionSubtitle([{ 'printer-name': 'a' }], 'a', {}, [], false), 'Default: a')
+  eq('the default by alias', PR.sectionSubtitle([{ 'printer-name': 'a' }], 'a', { a: 'Office' }, [], false), 'Default: Office')
+  eq('an empty alias falls back to the queue name', PR.sectionSubtitle([{ 'printer-name': 'a' }], 'a', { a: '' }, [], false), 'Default: a')
+  const active = [{ 'job-state': 5 }]
+  eq('one active job is singular', PR.sectionSubtitle([{ 'printer-name': 'a' }], 'a', {}, active, false), 'Default: a - 1 job')
+  eq('two active jobs are plural', PR.sectionSubtitle([{ 'printer-name': 'a' }], 'a', {}, [{ 'job-state': 5 }, { 'job-state': 5 }], false), 'Default: a - 2 jobs')
+  eq('jobs without a printer still report the depth', PR.sectionSubtitle([], '', {}, active, false), '1 job')
+  eq('an inactive job is not counted', PR.sectionSubtitle([{ 'printer-name': 'a' }], 'a', {}, [{ 'job-state': 9 }], false), 'Default: a')
+  eq('a non-array is an empty store', PR.sectionSubtitle(null, null, null, null, false), 'No printers configured')
+})
+
+group('queueFiller pads the queue window, hasHistory reads the leftovers', () => {
+  const jobs = [{ 'job-state': 5 }, { 'job-state': 5 }]
+  eq('the filler pads to the window', PR.queueFiller(jobs, 4).length, 2)
+  eq('a full queue needs no filler', PR.queueFiller(jobs, 2), [])
+  eq('a longer queue needs no filler', PR.queueFiller(jobs, 1), [])
+  eq('a zero window', PR.queueFiller(jobs, 0), [])
+  eq('not an array pads the whole window', PR.queueFiller(null, 4).length, 4)
+  eq('active jobs are not history', PR.hasHistory(jobs), false)
+  eq('an inactive job is history', PR.hasHistory(jobs.concat([{ 'job-state': 9 }])), true)
+  eq('an empty queue has no history', PR.hasHistory([]), false)
+  eq('a non-array has no history', PR.hasHistory(null), false)
+})
+
 section('PrintersLib - filtering')
 
 group('filterDismissed drops locally cleared history and mutates nothing', () => {
