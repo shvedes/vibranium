@@ -283,10 +283,15 @@ Singleton {
   // acquirePeaks and diagnostics().peakRefusals.
   readonly property int maxPeakNodes: 64
   property var _peakEntries: ({})
+  property int _peakNodeCount: 0
   property int _peakRefusals: 0
 
   // How many nodes are being read right now, and how many monitors that costs.
-  readonly property int peakActiveNodes: Object.keys(root._peakEntries).length
+  // The node count is maintained at the two entry transitions below; the
+  // handle total stays a walked sum because it is diagnostic-only. Readers
+  // bind to peakActiveNodes, so an Object.keys enumeration per read would be
+  // an allocation per binding evaluation.
+  readonly property int peakActiveNodes: root._peakNodeCount
   readonly property int peakHandleCount: root._totalPeakHandles()
 
   function _totalPeakHandles(): int {
@@ -392,6 +397,7 @@ Singleton {
       }
       entry = { key: key, node: node, monitor: monitor, handles: [] }
       root._peakEntries = Object.assign({}, root._peakEntries, { [key]: entry })
+      root._peakNodeCount += 1
     }
     let handle = null
     try {
@@ -454,6 +460,7 @@ Singleton {
     const next = Object.assign({}, root._peakEntries)
     delete next[key]
     root._peakEntries = next
+    root._peakNodeCount = Math.max(0, root._peakNodeCount - 1)
     return true
   }
 
