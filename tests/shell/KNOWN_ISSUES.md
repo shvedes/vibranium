@@ -533,7 +533,7 @@ directions). This is one host assignment away.
 
 *Reproduced by `suites/qml/calendar-graph-test.sh`.*
 
-### 24. The password glyph model logs one warning per character of every secret
+### 24. (fixed) The password glyph model logs one warning per character of every secret
 
 `shell/common/ui/PasswordBox.qml:286` binds a delegate to
 `passwordInput.text[index]` while the ListModel row count is trimmed separately
@@ -546,6 +546,11 @@ The probe counts 11 for a `set / shorten / clear` sequence, one per character.
 `PolkitView.qml:117`), so a session journal records **the length of every secret
 that was ever on screen**. Fix: carry the character in the model
 (`append({ ch: ... })`, then `text: model.ch`) or guard the index.
+
+**Fixed.** The delegate guards the index (`index < passwordInput.text.length`),
+so the departing rebind reads an empty string instead of `undefined`. The
+character stays read from the live input rather than mirrored into the model,
+which is what keeps a mid-string edit correct.
 
 *Reproduced by `suites/qml/textinput-test.sh`.*
 
@@ -564,16 +569,20 @@ the affordance have one signal contract.
 
 *Reproduced and now verified by `suites/qml/textinput-test.sh`.*
 
-### 26. `PasswordBox.busy` paints a border and does nothing else
+### 26. (fixed) `PasswordBox.busy` paints a border and does nothing else
 
-`shell/common/ui/PasswordBox.qml:100-103` is its only use. With `busy: true`,
-`enabled` and `input.readOnly` are unchanged and keystrokes and Enter still
-land. Both in-tree call sites also bind `enabled` to the same state
-(`PolkitView.qml:210`, `LockscreenSurfaceView.qml:373`), which is what actually
-gates - so this is a false-friend name on a security component rather than a
-hole.
+`shell/common/ui/PasswordBox.qml` fed `busy` only to `border.color`, so a field
+that named the authentication-in-flight state kept taking keystrokes and Enter.
+Both in-tree call sites also bind `enabled` to the same state, so there was no
+live exposure - but the property named after the security-relevant state was
+the one that did nothing.
 
-*Reproduced by `suites/qml/textinput-test.sh`.*
+**Fixed.** The control's enabled state is `root.enabled && !root.busy`, so
+busy gates input while an explicitly disabled box stays disabled. Both
+consumers see the same behaviour they already had; a consumer that sets busy
+alone now gets the gate its name promises.
+
+*Reproduced and now verified by `suites/qml/textinput-test.sh`.*
 
 ### 27. (fixed) A no-op `List.seatTo()` left a stale pursuit claim armed
 
@@ -663,26 +672,23 @@ not what the code does.
 
 *Reproduced by `suites/qml/host-button-test.sh`.*
 
-### 31. A runtime `margin` change does not re-park the card
+### 31. (fixed) A runtime `margin` change does not re-park the card
 
-`shell/common/ui/IslandHost.qml:77` versus `:342-344`. `positionCard` reads
-`root.margin` in both axes, but the only re-park triggers are
-`onOpenChanged`, `onAnchorItemChanged` and `onBarPositionChanged` - there is no
-`onMarginChanged` beside them.
+`shell/common/ui/IslandHost.qml` read `margin` in both axes of `positionCard`
+but had no `onMarginChanged` beside the open, anchor and barPosition triggers,
+so a runtime margin change kept the previous park's offset.
 
 ```
 open the island, then margin = 20 (from the Ui.s default of 8)
 // expected: the card re-parks 12px further from the bar
-// actual:   card.y stays 48 and card.x stays 8, including when margin is put back
+// actual (before): card.y stayed 48 and card.x stayed 8
 ```
 
-The margin *is* a real term in the park - flipping `barPosition` at margin 20
-lands y at 340, where at 8 it would be 352 - so the value is read, just not
-observed as a trigger. No consumer sets `margin` at runtime today
-(`BarView.qml:144-148` sets only `barPosition`), so the visible consequence is
-nil.
+**Fixed.** `onMarginChanged: root.requestPark()` joins the other geometry
+triggers, so the one-per-turn park path applies the new margin. The suite pins
+the new y (60) and x (20) offsets and the re-park when the margin is restored.
 
-*Reproduced by `suites/qml/host-button-test.sh`.*
+*Reproduced and now verified by `suites/qml/host-button-test.sh`.*
 
 ### 32. A slot served by a shared `Component` is never frozen
 

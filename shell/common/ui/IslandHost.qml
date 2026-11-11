@@ -550,6 +550,10 @@ PanelWindow {
   // bar, not just the island being opened.
   onAnchorItemChanged: root.requestPark()
   onBarPositionChanged: root.requestPark()
+  // The park uses `margin` on both axes, so a runtime margin change (a theme
+  // or density switch) has to re-run it. Without this the card keeps the old
+  // offset until some unrelated geometry change parks it again.
+  onMarginChanged: root.requestPark()
 
   // The first positionCard runs while the window is still at its default
   // size (100x100) and cross-window mapping is not yet valid. Re-run once

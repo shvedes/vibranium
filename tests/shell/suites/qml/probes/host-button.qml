@@ -1006,9 +1006,9 @@ ShellRoot {
     const h = root.h1
     try {
       // The margin is the only spacing term positionCard reads, and it is a
-      // public property, so a runtime change is the interesting case. The
-      // component re-parks on open, anchor and barPosition changes but has no
-      // onMarginChanged, so this one does not move the card by itself.
+      // public property, so a runtime change is the interesting case: the
+      // host's onMarginChanged re-parks through the same one-per-turn path
+      // every other geometry trigger uses.
       h.margin = 20
       kv("ih.margin.changed", h.margin)
     } catch (e) {
@@ -1050,8 +1050,8 @@ ShellRoot {
   function onBottomRead() {
     const h = root.h1
     try {
-      // The card keeps the offset the previous park produced, which is the
-      // other half of the missing margin handler.
+      // Restoring the margin re-parks at the restored offset, the same way
+      // setting it did.
       kv("ih.bottom.yAfterMarginRestore", h.card.y)
       kv("ih.resize.settledExact", h.card.height === 400)
       kv("ih.resize.settledValue", h.card.height)

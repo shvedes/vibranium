@@ -470,34 +470,19 @@ change after the content incubates, which is exactly the change the comment is
 about"
 
 # ---------------------------------------------------------------------------
-t_section "finding: a runtime margin change does not re-park the card"
-# positionCard reads root.margin in both axes, and barPosition has an
-# onBarPositionChanged that re-parks it (IslandHost.qml:344). margin is a
-# public property with no such handler, so a change to it is not applied until
-# something else re-parks.
-FINDING_MARGIN="FINDING (IslandHost.qml:77 and :344): a runtime margin change does
-  not re-park the card.
-  Input: an open island, then margin = 20 (from the Ui.s default of 8).
-  Expected: the card re-parks 12px further from the bar, since positionCard reads
-    root.margin in both axes.
-  Actual: card.y stays 48 and card.x stays 8 - the offset the previous park
-    produced - and stays there when the margin is put back, until a barPosition
-    change re-parks it. The re-parks that do exist are onOpenChanged,
-    onAnchorItemChanged and onBarPositionChanged (IslandHost.qml:342-344); there
-    is no onMarginChanged beside them.
-  Scope: no consumer sets margin at runtime today (BarView.qml:144-148 sets only
-    barPosition), so the visible consequence is nil and the risk is the next
-    consumer that does. The margin is still a real term in the park: flipping
-    barPosition with margin 20 lands y at 340, and the default 8 would have
-    landed 352."
-t_note "$FINDING_MARGIN"
+t_section "a runtime margin change re-parks the card"
+# positionCard reads root.margin on both axes. The host re-parks on open,
+# anchor, barPosition and margin changes, so a theme or density switch that
+# writes the margin moves the card with it instead of leaving the previous
+# park's offset in place.
+t_note "The margin is a real term in the park on both axes, and a runtime change re-parks: margin = 20 (from the Ui.s default of 8) moves the card from y 48 to 60 under a top bar and from x 8 to the new 20px edge clamp. Restoring the margin re-parks again: with a bottom bar the same card lands at 352 for margin 8 and 340 for margin 20."
 qp_assert "the margin property did change" "ih.margin.changed" "20"
-qp_assert "but the card did not move" "ih.margin.cardY" "48"
-qp_assert "nor sideways" "ih.margin.cardX" "8"
-qp_assert "a barPosition change does re-park it" "ih.margin.positionFlip" "bottom"
-qp_assert "and the park reads the new margin" "ih.bottom.cardY" "340"
+qp_assert "and the card re-parks 12px further from the bar" "ih.margin.cardY" "60"
+qp_assert "and sideways to the new edge clamp" "ih.margin.cardX" "20"
+qp_assert "a barPosition change re-parks it too" "ih.margin.positionFlip" "bottom"
+qp_assert "and that park reads the new margin" "ih.bottom.cardY" "340"
 qp_assert "restoring the margin is accepted" "ih.bottom.marginRestored" "8"
-qp_assert "and the card still does not move for it" "ih.bottom.yAfterMarginRestore" "340"
+qp_assert "and re-parks at the restored margin" "ih.bottom.yAfterMarginRestore" "352"
 qp_assert "the bar position goes back too" "ih.restore.position" "top"
 
 # ---------------------------------------------------------------------------
