@@ -11,6 +11,7 @@
 // these helpers; nothing here touches items or animations.
 
 .import "../../common/math/Range.js" as Range
+.import "../../common/text/StringUtils.js" as SU
 
 function transitions() {
   return ["none", "fade", "slide", "swipe", "circle", "random"]
@@ -30,7 +31,7 @@ function speeds() {
 // slide keys, grow/outer and all wipe keys. Unknown/hand-edited values
 // fall back to the plain crossfade.
 function normalizeKind(raw) {
-  var k = String(raw || "").trim().toLowerCase()
+  var k = SU.lowerTrim(raw)
   if (k === "wipe" || k === "wipe-horizontal" || k === "wipe-vertical") return "swipe"
   if (k === "slide-left" || k === "slide-right" || k === "slide-top" || k === "slide-bottom") return "slide"
   if (k === "grow" || k === "outer") return "circle"
@@ -43,7 +44,7 @@ function slideDirections() {
 }
 
 function normalizeDirection(raw) {
-  var d = String(raw || "").trim().toLowerCase()
+  var d = SU.lowerTrim(raw)
   return slideDirections().indexOf(d) >= 0 ? d : "left"
 }
 
@@ -60,7 +61,7 @@ function resolveKind(raw, rand01) {
 }
 
 function normalizeSpeed(raw) {
-  var s = String(raw || "").trim().toLowerCase()
+  var s = SU.lowerTrim(raw)
   if (s === "slow" || s === "fast") return s
   return "default"
 }
