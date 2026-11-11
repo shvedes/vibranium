@@ -116,7 +116,11 @@ Singleton {
     if (address === "") return
     const next = root._focused.filter(entry => entry !== address)
     next.push(address)
-    while (next.length > root.focusHistoryLimit) next.shift()
+    // One splice for however many entries the limit drops: decades of shifts
+    // move the same small ring once per dropped address.
+    if (next.length > root.focusHistoryLimit) {
+      next.splice(0, next.length - root.focusHistoryLimit)
+    }
     root._focused = next
   }
 }
