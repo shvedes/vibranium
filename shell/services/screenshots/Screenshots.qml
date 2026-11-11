@@ -525,6 +525,9 @@ Singleton {
     // The flow-id guard runs first: ~20 sites call this, and a late one
     // from a finished flow must not release the claim a newer flow holds.
     if (!ShotLib.flowLive(id, root._activeFlow)) return
+    // A picker handoff that never settled dies with its flow.
+    pickerUnmapTimer.stop()
+    root._pickerUnmapFlow = 0
     root._activeFlow = 0
     root._flow = ""
     root._flowKeep = false
@@ -998,11 +1001,9 @@ Singleton {
   }
 
   // A choice arms the next step rather than running it: the picker goes
-  // first, then the pending pick runs on a fresh tick so the overlay's
-  // exclusive surface is unmapped before a new one is claimed. Deferred
-  // through Qt.callLater, not a 0ms Timer: one deferred call needs no
-  // timer object, and clearing _pendingPick disarms it (the runner
-  // returns on a null pending, so no stop is needed).
+  // first, and the pending pick waits for the compositor to report that
+  // surface unmapped (see _awaitPickerUnmap). Running it on the next tick
+  // instead grabs a frame with the selector still in it.
   function _runPendingPick() {
     const pending = root._pendingPick
     root._pendingPick = null
@@ -1022,9 +1023,9 @@ Singleton {
       const request = AnnotationActions.spec(id)
       const pickerScreen = request !== null ? request.screen : root._targetScreen()
       const flowId = root._activeFlow
-      root._destroyPicker()
       root._pendingPick = { mode: String(outcome.mode), screen: pickerScreen, flowId: flowId }
-      Qt.callLater(() => root._runPendingPick())
+      root._awaitPickerUnmap(flowId)
+      root._destroyPicker()
       return
     }
     if (code === "cancelled" || code === "closed") {
@@ -1035,6 +1036,66 @@ Singleton {
   }
 
   property var _pendingPick: null
+
+  // The picker handoff gate. A layer surface that unmaps is not out of the
+  // picture at that moment: the compositor's own `layersOut` fade keeps
+  // painting the surface it is animating out, and both next stages grab a
+  // frame right after the window is destroyed (the screen capture through
+  // the shot window, the region selector through its own live view). The
+  // picker namespace therefore carries a `no_anim` layer rule - without it
+  // the selector is baked into the very frame it chose a target for - and
+  // the pending pick runs only once the compositor reports that surface
+  // unmapped, plus one frame for the output to be painted without it.
+  //
+  // `pickerUnmapMs` bounds the wait for a compositor that never reports the
+  // unmap, where the handoff proceeds rather than stalling. The flow id is
+  // the guard: _releaseFlow clears it, so a cancelled handoff cannot start a
+  // capture from a late event.
+  readonly property int pickerUnmapMs: 250
+  readonly property int pickerSettleMs: 40
+  property int _pickerUnmapFlow: 0
+
+  Timer {
+    id: pickerUnmapTimer
+
+    interval: root.pickerUnmapMs
+    onTriggered: root._settlePickerUnmap()
+  }
+
+  function _awaitPickerUnmap(flowId) {
+    root._pickerUnmapFlow = flowId
+    pickerUnmapTimer.interval = root.pickerUnmapMs
+    pickerUnmapTimer.restart()
+  }
+
+  // The unmap is reported, but the output still holds the frame that was
+  // composited with the picker in it. One frame's settle, then the handoff.
+  function _pickerUnmapped() {
+    if (root._pickerUnmapFlow === 0) return
+    pickerUnmapTimer.interval = root.pickerSettleMs
+    pickerUnmapTimer.restart()
+  }
+
+  function _settlePickerUnmap() {
+    pickerUnmapTimer.stop()
+    const flowId = root._pickerUnmapFlow
+    root._pickerUnmapFlow = 0
+    if (flowId === 0 || flowId !== root._activeFlow) return
+    root._runPendingPick()
+  }
+
+  // The compositor unmapped a layer surface. Only the picker handoff waits
+  // on it, and only for the picker's own namespace.
+  Connections {
+    target: Hyprland
+
+    function onRawEvent(event) {
+      if (root._pickerUnmapFlow === 0) return
+      if (String(event.name) !== "closelayer") return
+      if (String(event.data).trim() !== AnnotationActions.pickerLayerNamespace) return
+      root._pickerUnmapped()
+    }
+  }
 
   // Open the annotator over a finished shot. File mode (path given) or
   // last-shot mode (path empty). The editor is a fullscreen overlay, so

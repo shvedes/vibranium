@@ -48,7 +48,7 @@ PanelWindow {
   anchors.top: true
   anchors.bottom: true
 
-  WlrLayershell.namespace: "vibranium:screenshot-picker"
+  WlrLayershell.namespace: AnnotationActions.pickerLayerNamespace
   WlrLayershell.layer: WlrLayer.Overlay
   WlrLayershell.keyboardFocus: WlrKeyboardFocus.Exclusive
 

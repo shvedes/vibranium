@@ -48,6 +48,12 @@ Singleton {
 
   readonly property var kinds: Object.freeze(["picker", "region", "editor"])
 
+  // The layer-shell namespace the picker maps with. The capture service
+  // waits for the compositor to report this surface unmapped before a
+  // frame is grabbed, so the name is contract vocabulary rather than a
+  // detail either side may spell for itself.
+  readonly property string pickerLayerNamespace: "vibranium:screenshot-picker"
+
   // One controller answers requests. A second handler is refused so two
   // controllers cannot both claim a request, and identity comparison is
   // what keeps a re-adopt of the same controller idempotent.

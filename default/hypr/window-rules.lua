@@ -176,6 +176,19 @@ hl.layer_rule({
   no_anim = true,
 })
 
+-- The screenshot target picker is a fullscreen dim layer, and the frame the
+-- capture pipeline grabs is requested right after the picker is destroyed.
+-- A `layersOut` fade keeps the compositor painting the surface it is
+-- animating out for the whole animation, which is long enough to be the
+-- frame the shot is made of: the selector would end up inside the
+-- screenshot the selector itself asked for. It is dismissed rather than
+-- animated, so the surface has to leave the scene at the unmap.
+hl.layer_rule({
+  name = "Vibranium Screenshot Picker",
+  match = { namespace = "^vibranium:screenshot-picker$" },
+  no_anim = true,
+})
+
 hl.layer_rule({
   name = "Vibranium Status Bar Blur",
   match = { namespace = "^vibranium:bar$" },
