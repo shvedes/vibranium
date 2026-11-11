@@ -646,12 +646,7 @@ PanelWindow {
   }
 
   function _colorName(value) {
-    const names = {
-      "#ffffff": "white", "#000000": "black", "#ff5555": "red",
-      "#50fa7b": "green", "#8be9fd": "cyan", "#f1fa8c": "yellow",
-      "#bd93f9": "purple", "#ffb86c": "orange"
-    }
-    return names[value] || value
+    return AnnotationTools.colorName(value)
   }
 
   function _saveDialogType() {

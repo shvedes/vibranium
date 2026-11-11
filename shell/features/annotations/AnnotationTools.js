@@ -764,6 +764,19 @@ function selectHandles(b) {
 // Display-px inset for the staged text box, so the caret and the glyphs
 // sit inside it with real margins. Proportional with guards: calm on a
 // giant box, never eats a small one whole.
+// The palette's spoken names, for the one place a tool label names a colour.
+// Anything outside the palette is echoed verbatim, which is what keeps a
+// caller's custom ink readable instead of blank.
+var COLOR_NAMES = {
+  "#ffffff": "white", "#000000": "black", "#ff5555": "red",
+  "#50fa7b": "green", "#8be9fd": "cyan", "#f1fa8c": "yellow",
+  "#bd93f9": "purple", "#ffb86c": "orange"
+}
+
+function colorName(value) {
+  return COLOR_NAMES[value] || value
+}
+
 // Which file type a save dialog's selected name filter asks for, falling back
 // to the editor's own type. The filter is a human-facing label, so both the
 // format word and the extension are read.

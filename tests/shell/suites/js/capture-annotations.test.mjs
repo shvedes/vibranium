@@ -1033,6 +1033,34 @@ group('notifyBody produces the two published label strings', () => {
 })
 
 // ---------------------------------------------------------------------------
+section('ShotLib.echoGuard - one trigger delivered twice')
+group('a press inside the window is an echo', () => {
+  eq('just after the last press', SL.echoGuard(1050, 1000, 100), true)
+  eq('at the boundary the window has closed', SL.echoGuard(1100, 1000, 100), false)
+  eq('well past the window', SL.echoGuard(2000, 1000, 100), false)
+  eq('a first press has no earlier one', SL.echoGuard(1000, 0, 100), false)
+  eq('a clock that went backwards is not an echo', SL.echoGuard(900, 1000, 100), false)
+  eq('a zero window accepts every press', SL.echoGuard(1000, 1000, 0), false)
+  eq('a negative window falls back to 100ms', SL.echoGuard(1050, 1000, -1), true)
+  eq('a non-numeric clock is refused as an echo', SL.echoGuard('x', 1000, 100), true)
+  eq('a non-numeric last press is no echo', SL.echoGuard(1000, 'x', 100), false)
+  eq('a non-numeric window falls back to 100ms', SL.echoGuard(1050, 1000, 'x'), true)
+})
+
+section('AnnotationTools.colorName - the palette name a tool label speaks')
+group('a palette colour has a name, anything else is echoed', () => {
+  eq('white', AT.colorName('#ffffff'), 'white')
+  eq('black', AT.colorName('#000000'), 'black')
+  eq('red', AT.colorName('#ff5555'), 'red')
+  eq('green', AT.colorName('#50fa7b'), 'green')
+  eq('cyan', AT.colorName('#8be9fd'), 'cyan')
+  eq('yellow', AT.colorName('#f1fa8c'), 'yellow')
+  eq('purple', AT.colorName('#bd93f9'), 'purple')
+  eq('orange', AT.colorName('#ffb86c'), 'orange')
+  eq('a custom ink is echoed', AT.colorName('#123456'), '#123456')
+  eq('an empty value is echoed', AT.colorName(''), '')
+})
+
 section('AnnotationTools - the shared rect primitives it re-exports')
 
 group('normRect and clampRect are the RectMath functions, not copies', () => {
