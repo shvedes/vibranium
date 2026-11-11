@@ -1148,20 +1148,12 @@ Item {
     if (!root.showClipSuggestion) return null
     const t = root.clipTarget
     if (!t) return null
+    const rowOptions = {
+      showDescriptions: root.showDescriptions,
+      showIcons: root.showIcons
+    }
     if (t.kind === "url" || t.kind === "uri") {
-      return {
-        kind: "file",
-        uid: "clip:" + t.value,
-        path: t.value,
-        label: "Open URL from the clipboard",
-        // Subtext follows the descriptions option, like app rows -
-        // option off shows the title only.
-        sub: root.showDescriptions ? t.value : "",
-        desc: "",
-        icon: root.showIcons ? "clipboard" : "",
-        clipUrl: true,
-        clip: true
-      }
+      return LauncherLib.clipboardRow(t, "url", rowOptions)
     }
     const st = BoundedCache.get(AppLauncher.statCache, t.value)
     let kind = ""
@@ -1178,16 +1170,7 @@ Item {
       // Verified missing: withhold the row.
       return null
     }
-    return {
-      kind: "file",
-      uid: "clip:" + t.value,
-      path: t.value,
-      label: kind === "dir" ? "Open folder from the clipboard" : "Open file from the clipboard",
-      sub: root.showDescriptions ? t.basename : "",
-      desc: "",
-      icon: root.showIcons ? LauncherLib.pathIconName(kind === "dir", t.value) : "",
-      clip: true
-    }
+    return LauncherLib.clipboardRow(t, kind, rowOptions)
   }
 
   function _fileRow(target, isDir) {

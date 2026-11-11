@@ -988,6 +988,33 @@ group('fileRow is the openable target the fallback slot offers', () => {
   eq('and takes the network glyph', LL.fileRow(uri, false, true).icon, 'network-storage')
 })
 
+group('clipboardRow is the clipboard suggestion the launcher offers', () => {
+  const target = { value: '/home/u/a.txt', basename: 'a.txt', kind: 'local' }
+  const on = LL.clipboardRow(target, 'file', { showDescriptions: true, showIcons: true })
+  eq('the row kind', on.kind, 'file')
+  eq('the identity is the target value', on.uid, 'clip:/home/u/a.txt')
+  eq('the path is the target value', on.path, '/home/u/a.txt')
+  eq('a file opens as a file', on.label, 'Open file from the clipboard')
+  eq('the basename rides the sub line', on.sub, 'a.txt')
+  eq('the icon is the path icon', on.icon, LL.pathIconName(false, '/home/u/a.txt'))
+  eq('the row is a clip suggestion', on.clip, true)
+  eq('a directory opens as a folder', LL.clipboardRow({ ...target, value: '/tmp' }, 'dir', {}).label, 'Open folder from the clipboard')
+  eq('and takes the folder icon', LL.clipboardRow({ ...target, value: '/tmp' }, 'dir', { showIcons: true }).icon, LL.pathIconName(true, '/tmp'))
+  const url = LL.clipboardRow({ value: 'https://x', basename: 'x', kind: 'url' }, 'url', { showDescriptions: true, showIcons: true })
+  eq('a URL row names the clipboard', url.label, 'Open URL from the clipboard')
+  eq('and carries its value as the path', url.path, 'https://x')
+  eq('the URL flag routes the open', url.clipUrl, true)
+  eq('its icon is the clipboard glyph', url.icon, 'clipboard')
+  eq('the sub line follows the option', url.sub, 'https://x')
+  const off = LL.clipboardRow(target, 'file', { showDescriptions: false, showIcons: false })
+  eq('descriptions off empties the sub', off.sub, '')
+  eq('icons off empties the icon', off.icon, '')
+  // The identity and the sub line are verdict-independent: a later verify is
+  // one stable row rather than a swap, so only the label and icon read `kind`.
+  eq('the identity is verdict-independent', LL.clipboardRow(target, 'dir', {}).uid, LL.clipboardRow(target, 'file', {}).uid)
+  eq('and so is the sub line', LL.clipboardRow(target, 'dir', { showDescriptions: true }).sub, 'a.txt')
+})
+
 group('a Power entry is excluded from the index regardless of settings', () => {
   // BASE_EXCLUDED_CATEGORIES: "Power entries are always excluded
   // entries from default mode", and this is now unconditional.
@@ -3380,13 +3407,11 @@ group('the suggestion rides with the open via the copy-time hint', () => {
   contains('the hint travels with the resolved target', controller,
     'LauncherLib.clipEntryKind(entry)')
   // The row identity stays verdict-independent, so the later verify is one
-  // stable row rather than a swap.
-  contains('the uid is the target path, verdict-independent', controller, 'uid: "clip:" + t.value')
-  contains('and so is the sub line', controller, 'sub: root.showDescriptions ? t.basename : ""')
-  contains('only the label and the icon read the kind', controller,
-    'label: kind === "dir" ? "Open folder from the clipboard" : "Open file from the clipboard"')
-  contains('and only the icon names a path as a folder', controller,
-    'LauncherLib.pathIconName(kind === "dir", t.value)')
+  // stable row rather than a swap. The row shape moved into the library; the
+  // controller's remaining job is the verdict, and the shape's own tests hold
+  // the identity, sub line, label and icon rules.
+  contains('the controller builds the suggestion through the library row', controller,
+    'LauncherLib.clipboardRow(t, kind, rowOptions)')
 })
 
 group('the open spawns at its fitted size instead of growing into it', () => {

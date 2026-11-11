@@ -172,6 +172,39 @@ function fileRow(target, isDir, showIcons) {
   }
 }
 
+// The clipboard suggestion's row. `kind` is the resolved target class:
+// "url"/"uri" for a network target, "dir"/"file" for a local one. The sub
+// line and the icon follow the launcher's settings, and a URL row marks
+// clipUrl so activation can route it as a link.
+function clipboardRow(target, kind, options) {
+  const opt = options || {}
+  const showDesc = opt.showDescriptions === true
+  if (kind === "url" || kind === "uri") {
+    return {
+      kind: "file",
+      uid: "clip:" + target.value,
+      path: target.value,
+      label: "Open URL from the clipboard",
+      sub: showDesc ? target.value : "",
+      desc: "",
+      icon: opt.showIcons === true ? "clipboard" : "",
+      clipUrl: true,
+      clip: true
+    }
+  }
+  const isDir = kind === "dir"
+  return {
+    kind: "file",
+    uid: "clip:" + target.value,
+    path: target.value,
+    label: isDir ? "Open folder from the clipboard" : "Open file from the clipboard",
+    sub: showDesc ? target.basename : "",
+    desc: "",
+    icon: opt.showIcons === true ? pathIconName(isDir, target.value) : "",
+    clip: true
+  }
+}
+
 function isManagedEntry(entry, cats) {
   const exec = String(entry.execString ?? entry.exec ?? "")
   const tui = exec.indexOf("vb-launch-tui") >= 0
