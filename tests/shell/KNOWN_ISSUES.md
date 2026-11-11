@@ -8,7 +8,7 @@ Entries marked (fixed) are resolved; the rest are the actionable list. The suite
 it currently is, with a comment saying why it is wrong, so a fix turns a suite
 red and forces the record to be updated rather than passing silently.
 
-**33 open findings: 2 high, 14 medium, 17 low.** Four high-severity findings are fixed and kept below for the record - the code and its suite now pin the corrected behaviour. Two thirds of them came from the
+**30 open findings: 1 high, 12 medium, 17 low.** Five high-severity findings are fixed and kept below for the record - the code and its suite now pin the corrected behaviour. Two thirds of them came from the
 behavioural QML component suites (`suites/qml/`), which is the argument for
 having them: the component layer is where the shell's user-visible contracts
 live, and reading the source does not find a `fail()` that forgets to re-mask.
@@ -131,7 +131,7 @@ leaks.
 
 *Reproduced by `suites/qml/textinput-test.sh`.*
 
-### 6. `FunctionGraph` draws one gridline per integer of domain, uncapped
+### 6. (fixed) `FunctionGraph` draws one gridline per integer of domain, uncapped
 
 `shell/common/ui/FunctionGraph.qml:211`:
 
@@ -161,18 +161,15 @@ advances while `xi <= Infinity` stays true.
 
 **Reachability:** latent. Both in-tree hosts (`LauncherEntry.qml:376-380` and
 `ClipboardPreview.qml:315-319`) leave the domain at `[-10, 10]`, which is 21
-strokes and free. It goes live the moment a host widens the domain.
+strokes and free. It goes live the moment a host widens the domain.**Fixed.** The vertical grid walks nice steps ({1,2,5}x10^k) bounded by the plot's width, so the gridline count is a function of the plot instead of the domain, and a non-finite or reversed domain returns before the loop.
 
-*Reproduced by `suites/qml/calendar-graph-test.sh`, which keeps this as a live
-regression test: it re-runs the probe with a wide domain under a timeout and
-asserts the probe does *not* reach its sentinel. If anyone adds a cap, that
-assertion flips to FAIL.*
+*Verified by `suites/qml/calendar-graph-test.sh`, which now asserts the bounded result: a 1e100-wide domain paints 21 lines, the infinite domain completes, and its step helper stays finite.*
 
 ---
 
 ## Medium
 
-### 6. `ClipboardLib` mints unrecognisable `.svg+xml` snapshot files
+### 6. (fixed) `ClipboardLib` mints unrecognisable `.svg+xml` snapshot files
 
 `shell/features/clipboard/ClipboardLib.js:891-894` inverts a mime type into a
 file extension by taking the subtype verbatim:
@@ -188,7 +185,9 @@ image/svg+xml  -> t123-1.svg+xml     <-- no such extension anywhere
 because `buildTitleSub` reads the mime, but a re-copy routed through the
 extension would be typed PNG.
 
-*Reproduced by `suites/js/clipboard.test.mjs`.*
+**Fixed.** `MIME_EXT` maps `svg+xml` to `svg` and `jpg` to `jpeg` before the generic subtype strip, and a plus-sign subtype falls back to its base, so `snapshotPath` mints `t1-2.svg` and `mimeForExt` reads it back as `image/svg+xml`.
+
+*Verified by `suites/js/clipboard.test.mjs`.*
 
 ### 7. `UnitLib` cannot parse an inch source using the `in` keyword
 
@@ -300,7 +299,7 @@ different verbs produce byte-identical results.
 *Reported by `suites/js/path-process-runtime.test.mjs`, recorded as a skip
 there with the exact discrepancy.*
 
-### 13. `Registry` treats a prototype key as a registered service
+### 13. (fixed) `Registry` treats a prototype key as a registered service
 
 `shell/common/bus/Registry.qml:50, 62` — the `!target` guard cannot fire for a
 name that resolves on the prototype chain:
@@ -318,7 +317,12 @@ registered object until the next `register()` rebuilds the map.
 so that sentinel is unreachable for such a name. Latent only because no service
 is named after a prototype key.
 
-*Reproduced by `suites/qml/registry-bus-test.sh`, which also records that
+**Fixed.** `_registry` and `_offers` are prototype-less maps rebuilt on every
+write, so `constructor`/`__proto__` are ordinary own keys: `get("constructor")`
+answers `undefined`, `register("__proto__")` keys instead of reparenting, and
+`unregister` removes it.
+
+*Verified by `suites/qml/registry-bus-test.sh`, which also records that
 `Bus.publish` has no id guard where `Registry.register` does, so `publish(7, …)`
 and `publish("7", …)` are the same topic.*
 
