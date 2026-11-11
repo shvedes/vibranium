@@ -417,6 +417,14 @@ function applyVolume(audio, value, maximum) {
   return true
 }
 
+// A channel slider's value goes through the controller, which owns the
+// per-channel write. Both row types guard the missing controller first.
+function applyChannelVolume(controller, node, channel, value) {
+  if (controller === null || controller === undefined) return false
+  controller.setChannelVolume(node, channel, value)
+  return true
+}
+
 function volumeText(volume, muted) {
   if (muted === true) return "Muted"
   return percentText(volume)

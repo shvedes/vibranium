@@ -278,8 +278,7 @@ Item {
   }
 
   function setChannelVolume(channel, v) {
-    if (row.controller === null) return
-    row.controller.setChannelVolume(row.node, channel, v)
+    Model.applyChannelVolume(row.controller, row.node, channel, v)
   }
 
   // The one place a device is routed. The list is not closed here: the
