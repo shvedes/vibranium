@@ -2574,10 +2574,18 @@ group('the library reads no host global and no clock of its own', () => {
   // This pair is a load-time namespace-leak guard, not an API pin: it fails if
   // evaluating the lib leaves anything behind on its own namespace. It also
   // fails if a function is legitimately added, which is the price.
-  eq('a fresh load of the clipboard lib has 99 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 99)
-  eq('a fresh load of the clipboard lib has 99 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 99)
+  eq('a fresh load of the clipboard lib has 100 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 100)
+  eq('a fresh load of the clipboard lib has 100 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 100)
   // The clipboard lib never calls Math.random outside generateKey.
   eq('and the clipboard lib only has it in generateKey', (SRC.match(/Math\.random/g) || []).length, 1)
+})
+
+group('stateParses distinguishes a lost document from an empty one', () => {
+  eq('a blank document has nothing to misparse', CL.stateParses(''), true)
+  eq('whitespace too', CL.stateParses('  \n'), true)
+  eq('a JSON object parses', CL.stateParses('{"entries":[]}'), true)
+  eq('a truncated document does not', CL.stateParses('{'), false)
+  eq('a non-JSON line does not', CL.stateParses('garbage'), false)
 })
 
 group('setHome is the one piece of ambient state the library has', () => {

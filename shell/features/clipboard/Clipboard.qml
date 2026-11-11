@@ -217,22 +217,8 @@ Singleton {
     // no entries, and those are a first boot and a lost history respectively.
     // The parse is tried here - the library still decides the shape, and its
     // answer is what the shell runs on.
-    const parsed = root._stateParses(jsonText)
+    const parsed = CL.stateParses(jsonText)
     root._reconstruct(jsonText, ok && !parsed, jsonText.trim() !== "", ok)
-  }
-  // Would this state document parse as JSON? A pure predicate over a string,
-  // which is what makes it testable without a live session and without a
-  // filesystem - and it is deliberately NOT the library's `parseHistoryDocument`,
-  // which answers the shape question and swallows this one.
-  //
-  // An empty document answers true. That is not a claim that "" is JSON: it is
-  // the statement "there was nothing to misparse", which is the case where the
-  // question does not arise and where the caller's `present` flag has already
-  // said everything.
-  function _stateParses(text) {
-    const body = String(text === null || text === undefined ? "" : text).trim()
-    if (body === "") return true
-    try { JSON.parse(body); return true } catch (error) { return false }
   }
 
   function _reconstruct(text, unparsed, present, readOk) {

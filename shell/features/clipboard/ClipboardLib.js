@@ -1690,6 +1690,15 @@ function parseFileInfoReport(text, entryKnown) {
 
 // The persisted history document. Accepted shapes: a bare array, an
 // object keyed entries/history/data, and an object carrying its own `key`.
+// Whether a persisted state document is JSON at all. Empty and blank
+// documents answer true: there was nothing to misparse, and the caller's
+// `present` flag already carries the "file existed" answer.
+function stateParses(text) {
+  const body = String(text === null || text === undefined ? "" : text).trim()
+  if (body === "") return true
+  try { JSON.parse(body); return true } catch (error) { return false }
+}
+
 function parseHistoryDocument(text) {
   const body = String(text)
   let obj = null
