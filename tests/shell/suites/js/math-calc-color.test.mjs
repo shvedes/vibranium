@@ -30,7 +30,8 @@ import {
 const SHELL = path.resolve(import.meta.dirname, '..', '..', '..', '..', 'shell')
 const FL = loadLib(path.join(SHELL, 'common/math/FuncLib.js'))
 const CL = loadLib(path.join(SHELL, 'features/launcher/CalcLib.js'))
-const CM = loadLib(path.join(SHELL, 'features/bar/modules/ColorPicker/ColorMath.js'))
+const CM = loadLib(path.join(SHELL, 'common/math/Color.js'))
+const CH = loadLib(path.join(SHELL, 'features/bar/modules/ColorPicker/ColorHistory.js'))
 const COL = loadLib(path.join(SHELL, 'common/math/Color.js'))
 const UL = loadLib(path.join(SHELL, 'features/launcher/UnitLib.js'))
 
@@ -42,7 +43,7 @@ const CODE_ONLY = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '\n').replace(/^[ \t]*\/
 const SRC = {
   FuncLib: CODE_ONLY(libSource(path.join(SHELL, 'common/math/FuncLib.js'))),
   CalcLib: CODE_ONLY(libSource(path.join(SHELL, 'features/launcher/CalcLib.js'))),
-  ColorMath: CODE_ONLY(libSource(path.join(SHELL, 'features/bar/modules/ColorPicker/ColorMath.js'))),
+  ColorMath: CODE_ONLY(libSource(path.join(SHELL, 'common/math/Color.js'))),
   ColorLib: CODE_ONLY(libSource(path.join(SHELL, 'common/math/Color.js'))),
   UnitLib: CODE_ONLY(libSource(path.join(SHELL, 'features/launcher/UnitLib.js'))),
 }
@@ -2055,64 +2056,64 @@ group('an unusable colour falls back to white text', () => {
 section('ColorMath.recordKey and sanitizeFormats')
 
 group('recordKey is color|alpha|fmt, the one key both consumers use', () => {
-  eq('all three fields', CM.recordKey({ color: '#ff0000', alpha: 0.5, fmt: 'rgb' }), '#ff0000|0.500|rgb')
-  eq('a missing fmt defaults to hex', CM.recordKey({ color: '#ff0000', alpha: 0.5 }), '#ff0000|0.500|hex')
-  eq('a missing alpha defaults to opaque', CM.recordKey({ color: '#ff0000' }), '#ff0000|1.000|hex')
-  eq('a non-string fmt defaults to hex', CM.recordKey({ color: '#fff', fmt: 2 }), '#fff|1.000|hex')
-  eq('a non-object record', CM.recordKey(null), '|1.000|hex')
-  eq('undefined', CM.recordKey(undefined), '|1.000|hex')
-  eq('an empty object', CM.recordKey({}), '|1.000|hex')
-  eq('no color', CM.recordKey({ alpha: 0.5 }), '|0.500|hex')
+  eq('all three fields', CH.recordKey({ color: '#ff0000', alpha: 0.5, fmt: 'rgb' }), '#ff0000|0.500|rgb')
+  eq('a missing fmt defaults to hex', CH.recordKey({ color: '#ff0000', alpha: 0.5 }), '#ff0000|0.500|hex')
+  eq('a missing alpha defaults to opaque', CH.recordKey({ color: '#ff0000' }), '#ff0000|1.000|hex')
+  eq('a non-string fmt defaults to hex', CH.recordKey({ color: '#fff', fmt: 2 }), '#fff|1.000|hex')
+  eq('a non-object record', CH.recordKey(null), '|1.000|hex')
+  eq('undefined', CH.recordKey(undefined), '|1.000|hex')
+  eq('an empty object', CH.recordKey({}), '|1.000|hex')
+  eq('no color', CH.recordKey({ alpha: 0.5 }), '|0.500|hex')
 })
 
 group('the alpha in the key is clamped and fixed to three places', () => {
-  eq('a half', CM.recordKey({ color: '#fff', alpha: 0.5 }), '#fff|0.500|hex')
-  eq('a zero', CM.recordKey({ color: '#fff', alpha: 0 }), '#fff|0.000|hex')
-  eq('one', CM.recordKey({ color: '#fff', alpha: 1 }), '#fff|1.000|hex')
-  eq('above 1 clamps', CM.recordKey({ color: '#fff', alpha: 2 }), '#fff|1.000|hex')
-  eq('below 0 clamps', CM.recordKey({ color: '#fff', alpha: -1 }), '#fff|0.000|hex')
-  eq('NaN is opaque', CM.recordKey({ color: '#fff', alpha: NaN }), '#fff|1.000|hex')
-  eq('a non-numeric string is opaque', CM.recordKey({ color: '#fff', alpha: 'x' }), '#fff|1.000|hex')
-  eq('a numeric string is coerced', CM.recordKey({ color: '#fff', alpha: '0.5' }), '#fff|0.500|hex')
-  eq('rounding to 3dp', CM.recordKey({ color: '#fff', alpha: 0.3335 }), '#fff|0.334|hex')
+  eq('a half', CH.recordKey({ color: '#fff', alpha: 0.5 }), '#fff|0.500|hex')
+  eq('a zero', CH.recordKey({ color: '#fff', alpha: 0 }), '#fff|0.000|hex')
+  eq('one', CH.recordKey({ color: '#fff', alpha: 1 }), '#fff|1.000|hex')
+  eq('above 1 clamps', CH.recordKey({ color: '#fff', alpha: 2 }), '#fff|1.000|hex')
+  eq('below 0 clamps', CH.recordKey({ color: '#fff', alpha: -1 }), '#fff|0.000|hex')
+  eq('NaN is opaque', CH.recordKey({ color: '#fff', alpha: NaN }), '#fff|1.000|hex')
+  eq('a non-numeric string is opaque', CH.recordKey({ color: '#fff', alpha: 'x' }), '#fff|1.000|hex')
+  eq('a numeric string is coerced', CH.recordKey({ color: '#fff', alpha: '0.5' }), '#fff|0.500|hex')
+  eq('rounding to 3dp', CH.recordKey({ color: '#fff', alpha: 0.3335 }), '#fff|0.334|hex')
   // The rounding is what makes the key a dedupe key: two alphas that print
   // the same are the same swatch.
-  eq('two alphas that round alike collide', CM.recordKey({ color: '#fff', alpha: 0.5001 }) === CM.recordKey({ color: '#fff', alpha: 0.5004 }), true)
+  eq('two alphas that round alike collide', CH.recordKey({ color: '#fff', alpha: 0.5001 }) === CH.recordKey({ color: '#fff', alpha: 0.5004 }), true)
 })
 
 group('the key separates on each of the three fields', () => {
-  ne('two colours', CM.recordKey({ color: '#fff' }), CM.recordKey({ color: '#000' }))
-  ne('two alphas', CM.recordKey({ color: '#fff', alpha: 1 }), CM.recordKey({ color: '#fff', alpha: 0.5 }))
-  ne('two formats', CM.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }), CM.recordKey({ color: '#fff', alpha: 1, fmt: 'rgb' }))
-  eq('the same record is the same key', CM.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }), CM.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }))
+  ne('two colours', CH.recordKey({ color: '#fff' }), CH.recordKey({ color: '#000' }))
+  ne('two alphas', CH.recordKey({ color: '#fff', alpha: 1 }), CH.recordKey({ color: '#fff', alpha: 0.5 }))
+  ne('two formats', CH.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }), CH.recordKey({ color: '#fff', alpha: 1, fmt: 'rgb' }))
+  eq('the same record is the same key', CH.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }), CH.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }))
   // The default fmt is indistinguishable from an explicit "hex", which is
   // what lets the store and the history list agree.
-  eq('an explicit hex equals the default', CM.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }), CM.recordKey({ color: '#fff', alpha: 1 }))
+  eq('an explicit hex equals the default', CH.recordKey({ color: '#fff', alpha: 1, fmt: 'hex' }), CH.recordKey({ color: '#fff', alpha: 1 }))
 })
 
 group('sanitizeFormats copies only the known names, dropping the rest', () => {
-  eq('two known names', CM.sanitizeFormats({ hex: '#fff', rgb: 'rgb(1,2,3)' }), { hex: '#fff', rgb: 'rgb(1,2,3)' })
-  eq('an unknown name is dropped', CM.sanitizeFormats({ hex: '#fff', bogus: 'x' }), { hex: '#fff' })
-  eq('an empty string is dropped', CM.sanitizeFormats({ hex: '', rgb: 'rgb(1,2,3)' }), { rgb: 'rgb(1,2,3)' })
-  eq('a non-string is dropped', CM.sanitizeFormats({ hex: 5, rgb: null, hsl: 'hsl(0,0%,0%)' }), { hsl: 'hsl(0,0%,0%)' })
-  eq('all seven survive', CM.sanitizeFormats({
+  eq('two known names', CH.sanitizeFormats({ hex: '#fff', rgb: 'rgb(1,2,3)' }), { hex: '#fff', rgb: 'rgb(1,2,3)' })
+  eq('an unknown name is dropped', CH.sanitizeFormats({ hex: '#fff', bogus: 'x' }), { hex: '#fff' })
+  eq('an empty string is dropped', CH.sanitizeFormats({ hex: '', rgb: 'rgb(1,2,3)' }), { rgb: 'rgb(1,2,3)' })
+  eq('a non-string is dropped', CH.sanitizeFormats({ hex: 5, rgb: null, hsl: 'hsl(0,0%,0%)' }), { hsl: 'hsl(0,0%,0%)' })
+  eq('all seven survive', CH.sanitizeFormats({
     hex: '#fff', rgb: 'rgb(1,2,3)', rgba: 'rgba(1,2,3,1)', hsl: 'hsl(0,0%,0%)',
     hsla: 'hsla(0,0%,0%,1)', hsv: 'hsv(0,0%,0%)', hsva: 'hsva(0,0%,0%,1)',
   }), {
     hex: '#fff', rgb: 'rgb(1,2,3)', rgba: 'rgba(1,2,3,1)', hsl: 'hsl(0,0%,0%)',
     hsla: 'hsla(0,0%,0%,1)', hsv: 'hsv(0,0%,0%)', hsva: 'hsva(0,0%,0%,1)',
   })
-  eq('a non-object is empty', CM.sanitizeFormats(null), {})
-  eq('undefined', CM.sanitizeFormats(undefined), {})
-  eq('a string', CM.sanitizeFormats('nope'), {})
-  eq('a number', CM.sanitizeFormats(5), {})
-  eq('an array', CM.sanitizeFormats(['a']), {})
-  eq('an unknown key only', CM.sanitizeFormats({ nope: 'x' }), {})
-  eq('an empty object', CM.sanitizeFormats({}), {})
+  eq('a non-object is empty', CH.sanitizeFormats(null), {})
+  eq('undefined', CH.sanitizeFormats(undefined), {})
+  eq('a string', CH.sanitizeFormats('nope'), {})
+  eq('a number', CH.sanitizeFormats(5), {})
+  eq('an array', CH.sanitizeFormats(['a']), {})
+  eq('an unknown key only', CH.sanitizeFormats({ nope: 'x' }), {})
+  eq('an empty object', CH.sanitizeFormats({}), {})
   // The key order is FORMATS order regardless of the input order, which
   // keeps a persisted file stable.
-  eq('the key order is FORMATS order', Object.keys(CM.sanitizeFormats({ hsva: 'a', hex: 'b', rgb: 'c' })), ['hex', 'rgb', 'hsva'])
-  noThrow('a hostile map does not throw', () => CM.sanitizeFormats({ hex: { toString() { throw new Error('x') } } }))
+  eq('the key order is FORMATS order', Object.keys(CH.sanitizeFormats({ hsva: 'a', hex: 'b', rgb: 'c' })), ['hex', 'rgb', 'hsva'])
+  noThrow('a hostile map does not throw', () => CH.sanitizeFormats({ hex: { toString() { throw new Error('x') } } }))
 })
 
 // ---------------------------------------------------------------------------
@@ -2126,143 +2127,143 @@ section('ColorMath.parseHistory - the store shapes')
 // empty result back over the file, which is how 18 records became 1.
 group('the slot-wrapped document is unwrapped, not read as JSONL', () => {
   const one = { color: '#ff0000', alpha: 0.5, timestamp: 123 }
-  eq('records under data.records', CM.parseHistory(JSON.stringify({ data: { records: [one] } })), [one])
-  eq('records under a bare data array', CM.parseHistory(JSON.stringify({ data: [one] })), [one])
+  eq('records under data.records', CH.parseHistory(JSON.stringify({ data: { records: [one] } })), [one])
+  eq('records under a bare data array', CH.parseHistory(JSON.stringify({ data: [one] })), [one])
   eq('the real on-disk shape, pretty-printed as the store writes it',
-    CM.parseHistory(JSON.stringify({ data: { records: [one] } }, null, 4)), [one])
+    CH.parseHistory(JSON.stringify({ data: { records: [one] } }, null, 4)), [one])
   eq('a malformed wrapped entry is dropped like any other',
-    CM.parseHistory('{"data":{"records":[{"color":"zzz"},{"color":"#00ff00"}]}}'),
+    CH.parseHistory('{"data":{"records":[{"color":"zzz"},{"color":"#00ff00"}]}}'),
     [{ color: '#00ff00', alpha: 1, timestamp: 0 }])
-  eq('an empty wrapped document is an empty history', CM.parseHistory('{"data":{"records":[]}}'), [])
+  eq('an empty wrapped document is an empty history', CH.parseHistory('{"data":{"records":[]}}'), [])
   // A wrapper carrying no records is unreadable, not empty: the caller
   // writes the parse result back, so this must not silently answer [] for a
   // shape it does not understand.
-  eq('a wrapper with no records key is empty', CM.parseHistory('{"data":{"nope":1}}'), [])
-  eq('a wrapper whose data is null is empty', CM.parseHistory('{"data":null}'), [])
+  eq('a wrapper with no records key is empty', CH.parseHistory('{"data":{"nope":1}}'), [])
+  eq('a wrapper whose data is null is empty', CH.parseHistory('{"data":null}'), [])
   // Not a wrapper: a single JSONL record on one line parses as an object with
   // no `data`, so it must fall through to the line branch, not be unwrapped.
   eq('a one-line JSONL record still reads as JSONL',
-    CM.parseHistory('{"color":"#00ff00","alpha":0.25}'), [{ color: '#00ff00', alpha: 0.25, timestamp: 0 }])
+    CH.parseHistory('{"color":"#00ff00","alpha":0.25}'), [{ color: '#00ff00', alpha: 0.25, timestamp: 0 }])
   eq('a multi-line JSONL document still reads as JSONL',
-    CM.parseHistory('{"color":"#00ff00"}\n{"color":"#0000ff"}'),
+    CH.parseHistory('{"color":"#00ff00"}\n{"color":"#0000ff"}'),
     [{ color: '#00ff00', alpha: 1, timestamp: 0 }, { color: '#0000ff', alpha: 1, timestamp: 0 }])
-  eq('a broken wrapper is an empty history', CM.parseHistory('{"data":'), [])
+  eq('a broken wrapper is an empty history', CH.parseHistory('{"data":'), [])
 })
 
 group('an empty document is an empty history', () => {
-  eq('empty', CM.parseHistory(''), [])
-  eq('spaces', CM.parseHistory('   '), [])
-  eq('newlines', CM.parseHistory('\n\n\n'), [])
-  eq('null', CM.parseHistory(null), [])
-  eq('undefined', CM.parseHistory(undefined), [])
-  eq('a number', CM.parseHistory(42), [])
+  eq('empty', CH.parseHistory(''), [])
+  eq('spaces', CH.parseHistory('   '), [])
+  eq('newlines', CH.parseHistory('\n\n\n'), [])
+  eq('null', CH.parseHistory(null), [])
+  eq('undefined', CH.parseHistory(undefined), [])
+  eq('a number', CH.parseHistory(42), [])
 })
 
 group('the JSON array document is read first when it starts with [', () => {
-  eq('one record', CM.parseHistory('[{"color":"#ff0000","alpha":0.5,"timestamp":123}]'),
+  eq('one record', CH.parseHistory('[{"color":"#ff0000","alpha":0.5,"timestamp":123}]'),
     [{ color: '#ff0000', alpha: 0.5, timestamp: 123 }])
-  eq('a malformed entry is dropped', CM.parseHistory('[{"color":"zzz"},{"color":"#00ff00"}]'),
+  eq('a malformed entry is dropped', CH.parseHistory('[{"color":"zzz"},{"color":"#00ff00"}]'),
     [{ color: '#00ff00', alpha: 1, timestamp: 0 }])
-  eq('a broken document is an empty history', CM.parseHistory('[{"color":'), [])
-  eq('a truncated array is an empty history', CM.parseHistory('[1,2,3'), [])
+  eq('a broken document is an empty history', CH.parseHistory('[{"color":'), [])
+  eq('a truncated array is an empty history', CH.parseHistory('[1,2,3'), [])
   // JSON.parse succeeds on "[]" and on a nested array, and Array.isArray
   // guards the second; a non-array document returns [].
-  eq('an empty array', CM.parseHistory('[]'), [])
-  eq('every entry dropped', CM.parseHistory('[{"color":"zzz"}]'), [])
-  eq('a record with no alpha or timestamp', CM.parseHistory('[{"color":"rgb(255,0,0)"}]'),
+  eq('an empty array', CH.parseHistory('[]'), [])
+  eq('every entry dropped', CH.parseHistory('[{"color":"zzz"}]'), [])
+  eq('a record with no alpha or timestamp', CH.parseHistory('[{"color":"rgb(255,0,0)"}]'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
-  eq('a non-numeric alpha becomes opaque', CM.parseHistory('[{"color":"#fff","alpha":"0.5"}]'),
+  eq('a non-numeric alpha becomes opaque', CH.parseHistory('[{"color":"#fff","alpha":"0.5"}]'),
     [{ color: '#ffffff', alpha: 1, timestamp: 0 }])
-  eq('a non-numeric timestamp becomes 0', CM.parseHistory('[{"color":"#fff","timestamp":"5"}]'),
+  eq('a non-numeric timestamp becomes 0', CH.parseHistory('[{"color":"#fff","timestamp":"5"}]'),
     [{ color: '#ffffff', alpha: 1, timestamp: 0 }])
-  eq('an infinite timestamp becomes 0', CM.parseHistory('[{"color":"#fff","timestamp":1e999}]'),
+  eq('an infinite timestamp becomes 0', CH.parseHistory('[{"color":"#fff","timestamp":1e999}]'),
     [{ color: '#ffffff', alpha: 1, timestamp: 0 }])
-  eq('a negative timestamp is kept', CM.parseHistory('[{"color":"#fff","timestamp":-5}]'),
+  eq('a negative timestamp is kept', CH.parseHistory('[{"color":"#fff","timestamp":-5}]'),
     [{ color: '#ffffff', alpha: 1, timestamp: -5 }])
 })
 
 group('records normalise their colour to hex6', () => {
-  eq('a bare hex in', CM.parseHistory('[{"color":"#336699"}]'), [{ color: '#336699', alpha: 1, timestamp: 0 }])
-  eq('a 3-digit hex is expanded', CM.parseHistory('[{"color":"#f00"}]'), [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
-  eq('a function form is converted', CM.parseHistory('[{"color":"rgb(51, 102, 153)"}]'), [{ color: '#336699', alpha: 1, timestamp: 0 }])
-  eq('an hsl form is converted', CM.parseHistory('[{"color":"hsl(0,100%,50%)"}]'), [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
-  eq('an uppercase hex is lowercased', CM.parseHistory('[{"color":"#FF0000"}]'), [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
+  eq('a bare hex in', CH.parseHistory('[{"color":"#336699"}]'), [{ color: '#336699', alpha: 1, timestamp: 0 }])
+  eq('a 3-digit hex is expanded', CH.parseHistory('[{"color":"#f00"}]'), [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
+  eq('a function form is converted', CH.parseHistory('[{"color":"rgb(51, 102, 153)"}]'), [{ color: '#336699', alpha: 1, timestamp: 0 }])
+  eq('an hsl form is converted', CH.parseHistory('[{"color":"hsl(0,100%,50%)"}]'), [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
+  eq('an uppercase hex is lowercased', CH.parseHistory('[{"color":"#FF0000"}]'), [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
   // The JSONL bare-hex path does carry the hex alpha, but _recordFrom does
   // not: it takes the alpha only from a numeric o.alpha field and otherwise
   // forces 1, so the 8-digit alpha is dropped on the record path. The colour
   // itself still normalises, which is what the store keys on.
-  eq('a hex alpha is dropped by the record path', CM.parseHistory('[{"color":"#ff000080"}]'),
+  eq('a hex alpha is dropped by the record path', CH.parseHistory('[{"color":"#ff000080"}]'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
-  eq('while the bare-hex line path keeps it', CM.parseHistory('#ff000080'),
+  eq('while the bare-hex line path keeps it', CH.parseHistory('#ff000080'),
     [{ color: '#ff0000', alpha: 0.5019607843137255, timestamp: 0 }])
-  eq('an explicit alpha overrides the hex alpha', CM.parseHistory('[{"color":"#ff000080","alpha":0.25}]'),
+  eq('an explicit alpha overrides the hex alpha', CH.parseHistory('[{"color":"#ff000080","alpha":0.25}]'),
     [{ color: '#ff0000', alpha: 0.25, timestamp: 0 }])
-  eq('and an explicit 0 alpha is kept', CM.parseHistory('[{"color":"#ff000080","alpha":0}]'),
+  eq('and an explicit 0 alpha is kept', CH.parseHistory('[{"color":"#ff000080","alpha":0}]'),
     [{ color: '#ff0000', alpha: 0, timestamp: 0 }])
 })
 
 group('the formats and fmt extras are carried through when well formed', () => {
-  eq('a well-formed formats map', CM.parseHistory('[{"color":"#ff0000","formats":{"hex":"#ff0000","rgb":"rgb(255, 0, 0)","bogus":"x"}}]'),
+  eq('a well-formed formats map', CH.parseHistory('[{"color":"#ff0000","formats":{"hex":"#ff0000","rgb":"rgb(255, 0, 0)","bogus":"x"}}]'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0, formats: { hex: '#ff0000', rgb: 'rgb(255, 0, 0)' } }])
-  eq('a known fmt is kept', CM.parseHistory('[{"color":"#ff0000","fmt":"hsl"}]'),
+  eq('a known fmt is kept', CH.parseHistory('[{"color":"#ff0000","fmt":"hsl"}]'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0, fmt: 'hsl' }])
-  eq('an unknown fmt is dropped', CM.parseHistory('[{"color":"#00ff00","fmt":"bogus"}]'),
+  eq('an unknown fmt is dropped', CH.parseHistory('[{"color":"#00ff00","fmt":"bogus"}]'),
     [{ color: '#00ff00', alpha: 1, timestamp: 0 }])
-  eq('an empty formats map is kept as empty', CM.parseHistory('[{"color":"#ff0000","formats":{}}]'),
+  eq('an empty formats map is kept as empty', CH.parseHistory('[{"color":"#ff0000","formats":{}}]'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0, formats: {} }])
-  eq('a non-object formats is dropped', CM.parseHistory('[{"color":"#ff0000","formats":"x"}]'),
+  eq('a non-object formats is dropped', CH.parseHistory('[{"color":"#ff0000","formats":"x"}]'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
-  eq('a non-string fmt is dropped', CM.parseHistory('[{"color":"#ff0000","fmt":5}]'),
+  eq('a non-string fmt is dropped', CH.parseHistory('[{"color":"#ff0000","fmt":5}]'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
   // The formats map is sanitized exactly like sanitizeFormats does, so the
   // two paths cannot disagree.
-  eq('the formats map matches sanitizeFormats', CM.parseHistory('[{"color":"#ff0000","formats":{"hex":"#f00","rgb":"rgb(1, 2, 3)"}}]')[0].formats,
-    CM.sanitizeFormats({ hex: '#f00', rgb: 'rgb(1, 2, 3)' }))
+  eq('the formats map matches sanitizeFormats', CH.parseHistory('[{"color":"#ff0000","formats":{"hex":"#f00","rgb":"rgb(1, 2, 3)"}}]')[0].formats,
+    CH.sanitizeFormats({ hex: '#f00', rgb: 'rgb(1, 2, 3)' }))
 })
 
 group('the one-record-per-line form accepts bare colours and JSON lines', () => {
-  eq('two hex lines', CM.parseHistory('#ff0000\n#00ff00'),
+  eq('two hex lines', CH.parseHistory('#ff0000\n#00ff00'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }, { color: '#00ff00', alpha: 1, timestamp: 0 }])
-  eq('bare hex without the hash', CM.parseHistory('ff0000\n00ff00'),
+  eq('bare hex without the hash', CH.parseHistory('ff0000\n00ff00'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }, { color: '#00ff00', alpha: 1, timestamp: 0 }])
-  eq('a mixed document', CM.parseHistory('#ff0000\n{"color":"#00ff00","alpha":0.5,"timestamp":9}\nnotacolor\n\n#0000ff'),
+  eq('a mixed document', CH.parseHistory('#ff0000\n{"color":"#00ff00","alpha":0.5,"timestamp":9}\nnotacolor\n\n#0000ff'),
     [
       { color: '#ff0000', alpha: 1, timestamp: 0 },
       { color: '#00ff00', alpha: 0.5, timestamp: 9 },
       { color: '#0000ff', alpha: 1, timestamp: 0 },
     ])
-  eq('a broken JSON line is skipped', CM.parseHistory('{"color": bad}\n#ff0000'),
+  eq('a broken JSON line is skipped', CH.parseHistory('{"color": bad}\n#ff0000'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }])
-  eq('a bare hex alpha becomes the record alpha', CM.parseHistory('#ff000080'),
+  eq('a bare hex alpha becomes the record alpha', CH.parseHistory('#ff000080'),
     [{ color: '#ff0000', alpha: 0.5019607843137255, timestamp: 0 }])
-  eq('a 3-digit bare line is a colour', CM.parseHistory('123\n#ff0000'),
+  eq('a 3-digit bare line is a colour', CH.parseHistory('123\n#ff0000'),
     [{ color: '#112233', alpha: 1, timestamp: 0 }, { color: '#ff0000', alpha: 1, timestamp: 0 }])
-  eq('CRLF line endings', CM.parseHistory('#ff0000\r\n#00ff00'),
+  eq('CRLF line endings', CH.parseHistory('#ff0000\r\n#00ff00'),
     [{ color: '#ff0000', alpha: 1, timestamp: 0 }, { color: '#00ff00', alpha: 1, timestamp: 0 }])
   // "bare-hex lines normalize to opaque records at timestamp 0, which
   // preserves the file order" - the order is the property.
-  eq('the file order is preserved', CM.parseHistory('#111111\n#222222\n#333333').map((r) => r.color),
+  eq('the file order is preserved', CH.parseHistory('#111111\n#222222\n#333333').map((r) => r.color),
     ['#111111', '#222222', '#333333'])
-  eq('order survives mixed lines', CM.parseHistory('#ffffff\n#000000').map((r) => r.color), ['#ffffff', '#000000'])
+  eq('order survives mixed lines', CH.parseHistory('#ffffff\n#000000').map((r) => r.color), ['#ffffff', '#000000'])
 })
 
 group('a leading { is a JSONL line, not a document', () => {
   // The array branch keys on "[" alone, so a single JSON object is read by
   // the line reader and produces exactly one record.
-  eq('one object', CM.parseHistory('{"color":"#fff"}'), [{ color: '#ffffff', alpha: 1, timestamp: 0 }])
-  eq('an object with extras', CM.parseHistory('{"color":"#ff0000","alpha":0.5,"timestamp":9}'),
+  eq('one object', CH.parseHistory('{"color":"#fff"}'), [{ color: '#ffffff', alpha: 1, timestamp: 0 }])
+  eq('an object with extras', CH.parseHistory('{"color":"#ff0000","alpha":0.5,"timestamp":9}'),
     [{ color: '#ff0000', alpha: 0.5, timestamp: 9 }])
-  eq('a non-object JSON line is dropped', CM.parseHistory('[1,2,3]'), [])
-  eq('a bare word line is dropped', CM.parseHistory('firefox'), [])
+  eq('a non-object JSON line is dropped', CH.parseHistory('[1,2,3]'), [])
+  eq('a bare word line is dropped', CH.parseHistory('firefox'), [])
 })
 
 group('a parsed record is exactly the four documented keys, in order', () => {
-  eq('a bare line', Object.keys(CM.parseHistory('#ff0000')[0]), ['color', 'alpha', 'timestamp'])
-  eq('a JSON line with formats', Object.keys(CM.parseHistory('{"color":"#ff0000","fmt":"hsl","formats":{"hex":"#f00"}}')[0]),
+  eq('a bare line', Object.keys(CH.parseHistory('#ff0000')[0]), ['color', 'alpha', 'timestamp'])
+  eq('a JSON line with formats', Object.keys(CH.parseHistory('{"color":"#ff0000","fmt":"hsl","formats":{"hex":"#f00"}}')[0]),
     ['color', 'alpha', 'timestamp', 'formats', 'fmt'])
-  eq('formats only', Object.keys(CM.parseHistory('{"color":"#ff0000","formats":{"hex":"#f00"}}')[0]),
+  eq('formats only', Object.keys(CH.parseHistory('{"color":"#ff0000","formats":{"hex":"#f00"}}')[0]),
     ['color', 'alpha', 'timestamp', 'formats'])
-  eq('fmt only', Object.keys(CM.parseHistory('{"color":"#ff0000","fmt":"hsl"}')[0]),
+  eq('fmt only', Object.keys(CH.parseHistory('{"color":"#ff0000","fmt":"hsl"}')[0]),
     ['color', 'alpha', 'timestamp', 'fmt'])
 })
 
@@ -2270,14 +2271,14 @@ group('parseHistory survives a hostile document', () => {
   const bad = ['[', '[]', '{}', '[[]]', '[null]', '[1]', '["#fff"]', '[{"color":null}]',
     '[{"color":{}}]', '[]extra', '\n\n', '   [  ]  ', '[' + '{"color":"#fff"},' + ']']
   for (const v of bad) {
-    noThrow(`parseHistory(${JSON.stringify(v)})`, () => CM.parseHistory(v))
+    noThrow(`parseHistory(${JSON.stringify(v)})`, () => CH.parseHistory(v))
   }
-  eq('[null] drops the entry', CM.parseHistory('[null]'), [])
-  eq('[1] drops the entry', CM.parseHistory('[1]'), [])
-  eq('["#fff"] drops the entry', CM.parseHistory('["#fff"]'), [])
-  eq('[{"color":null}] drops the entry', CM.parseHistory('[{"color":null}]'), [])
-  eq('[]extra yields nothing', CM.parseHistory('[]extra'), [])
-  eq('a spaced empty array', CM.parseHistory('  [  ]  '), [])
+  eq('[null] drops the entry', CH.parseHistory('[null]'), [])
+  eq('[1] drops the entry', CH.parseHistory('[1]'), [])
+  eq('["#fff"] drops the entry', CH.parseHistory('["#fff"]'), [])
+  eq('[{"color":null}] drops the entry', CH.parseHistory('[{"color":null}]'), [])
+  eq('[]extra yields nothing', CH.parseHistory('[]extra'), [])
+  eq('a spaced empty array', CH.parseHistory('  [  ]  '), [])
 })
 
 // ---------------------------------------------------------------------------

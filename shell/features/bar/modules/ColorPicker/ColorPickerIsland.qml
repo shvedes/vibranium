@@ -3,7 +3,8 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters
 import QtQuick
 import qs.common
-import "ColorMath.js" as ColorMath
+import "../../../../common/math/Color.js" as Color
+import "ColorHistory.js" as ColorHistory
 import "../../../../common/math/Range.js" as Range
 
 // Color picker island: the history section (five fixed rows, overflow
@@ -74,10 +75,10 @@ Item {
   // white/black. Seeded from arriving colors in pickRecord().
   // Clamped to 0..360, not wrapped: the rainbow's two ends are both pure
   // red, so the far right is a real position and has to be able to hold it.
-  // ColorMath.hsvToRgb wraps whatever it is given, so 360 paints as red
+  // Color.hsvToRgb wraps whatever it is given, so 360 paints as red
   // either way - the range only has to stop the thumb teleporting.
   property real hue: 0
-  // Active serialization format (ColorMath.FORMATS member). Persisted
+  // Active serialization format (Color.FORMATS member). Persisted
   // as shell.colorPicker.fmt in the raw settings section (not a schema
   // option): restored at boot, rewritten on every chip click.
   property string fmt: "hex"
@@ -87,7 +88,7 @@ Item {
   // matter which chip format was copied.
   property string copiedKey: ""
 
-  readonly property var hsv: ColorMath.rgbToHsv(root.picked.r, root.picked.g, root.picked.b)
+  readonly property var hsv: Color.rgbToHsv(root.picked.r, root.picked.g, root.picked.b)
 
   // Report every preview change to the module, which holds it and flushes
   // on a debounce. The alpha slider reports per pointer move, so this is
@@ -121,7 +122,7 @@ Item {
   }
 
   function setSv(s, v) {
-    const c = ColorMath.hsvToRgb(root.hue, s, v)
+    const c = Color.hsvToRgb(root.hue, s, v)
     if (c === null) return
     root._pickerTookOver()
     root.picked = { r: c.r, g: c.g, b: c.b, a: root.picked.a }
@@ -145,7 +146,7 @@ Item {
     root.hue = Range.clamp(h, 0, 360)
     const s = root.hsv.s <= 0 ? 1 : root.hsv.s
     const v = root.hsv.v <= 0 ? 1 : root.hsv.v
-    const c = ColorMath.hsvToRgb(root.hue, s, v)
+    const c = Color.hsvToRgb(root.hue, s, v)
     if (c === null) return
     root._pickerTookOver()
     root.picked = { r: c.r, g: c.g, b: c.b, a: root.picked.a }
@@ -155,21 +156,21 @@ Item {
     root._pickerTookOver()
     root.picked = {
       r: root.picked.r, g: root.picked.g, b: root.picked.b,
-      a: ColorMath.clampAlpha(a)
+      a: Color.clampAlpha(a)
     }
   }
 
   function pickRecord(rec) {
     if (!rec) return
-    const c = ColorMath.parse(String(rec.color || ""))
+    const c = Color.parse(String(rec.color || ""))
     if (c === null) return
     root._pickerTookOver()
-    root.hue = ColorMath.rgbToHsv(c.r, c.g, c.b).h
-    root.picked = { r: c.r, g: c.g, b: c.b, a: ColorMath.clampAlpha(rec.alpha) }
+    root.hue = Color.rgbToHsv(c.r, c.g, c.b).h
+    root.picked = { r: c.r, g: c.g, b: c.b, a: Color.clampAlpha(rec.alpha) }
     // A colour is the one value in this feature that is safe to print: it is
     // four numbers the user just dragged, it carries nothing about the machine
     // or the account, and a reader diagnosing "why is my accent wrong" needs it.
-    Log.info("picked color " + ColorMath.format(root.picked, "hex", 1))
+    Log.info("picked color " + Color.format(root.picked, "hex", 1))
     // The hex above is rendered with a literal `false` for alpha, and
     // `clampAlpha` reads a non-null `false` as `Number(false)` rather than as
     // "leave the alpha out", so the line ends in `00` for every record whatever
@@ -189,7 +190,7 @@ Item {
     // must not pay for.
     const d = Log.at()
     if (d.allows("debug")) {
-      d.debug("picked color " + String(ColorMath.hex8(root.picked, root.picked.a))
+      d.debug("picked color " + String(Color.hex8(root.picked, root.picked.a))
         + ": alpha " + Math.round(root.picked.a * 255) + "/255, record format "
         + Log.summarize(typeof rec.fmt === "string" ? rec.fmt : "hex"))
     }
@@ -197,7 +198,7 @@ Item {
 
   // The serialized string that Copy/Add put on the clipboard.
   function outputString(): string {
-    const s = ColorMath.format(root.picked, root.fmt, root.picked.a)
+    const s = Color.format(root.picked, root.fmt, root.picked.a)
     return s === null ? "" : s
   }
 
@@ -246,7 +247,7 @@ Item {
   function _codeEdited(text) {
     const t = String(text === undefined || text === null ? "" : text)
     root._codeEditing = true
-    const c = ColorMath.parse(t)
+    const c = Color.parse(t)
     // A code that is not a color is not an error here: it stays in the
     // field, and the settle discards it.
     if (c === null) return
@@ -265,7 +266,7 @@ Item {
   // moves to the spelling the user chose and the choice is persisted
   // like a chip click, because it is the same choice.
   function _adoptFormat(text) {
-    const f = ColorMath.detectFormat(text)
+    const f = Color.detectFormat(text)
     if (f === null) return
     root.setFmt(f)
   }
@@ -273,10 +274,10 @@ Item {
   // The typed code becomes the preview color: channels, alpha and hue, so
   // the sliders and the field agree on one color.
   function _applyCode(c) {
-    root.hue = ColorMath.rgbToHsv(c.r, c.g, c.b).h
+    root.hue = Color.rgbToHsv(c.r, c.g, c.b).h
     root.picked = {
       r: c.r, g: c.g, b: c.b,
-      a: ColorMath.clampAlpha(c.a)
+      a: Color.clampAlpha(c.a)
     }
   }
 
@@ -297,7 +298,7 @@ Item {
   function copyPicked() {
     const s = root.outputString()
     if (s === "" || typeof root.copyColor !== "function") return
-    root.copiedKey = ColorMath.hex8(root.picked, root.picked.a)
+    root.copiedKey = Color.hex8(root.picked, root.picked.a)
     root.copyColor(s)
   }
 
@@ -313,12 +314,12 @@ Item {
     const fmt = typeof rec.fmt === "string" ? rec.fmt : "hex"
     let s = f && typeof f[fmt] === "string" ? f[fmt] : ""
     if (s === "") {
-      const c = ColorMath.parse(String(rec.color || ""))
-      s = c === null ? "" : ColorMath.hex8(c, ColorMath.clampAlpha(rec.alpha))
+      const c = Color.parse(String(rec.color || ""))
+      s = c === null ? "" : Color.hex8(c, Color.clampAlpha(rec.alpha))
     }
     if (s === "" || typeof root.copyColor !== "function") return
     root.promoteRec = rec
-    root.copiedKey = ColorMath.hex8(ColorMath.parse(rec.color), ColorMath.clampAlpha(rec.alpha))
+    root.copiedKey = Color.hex8(Color.parse(rec.color), Color.clampAlpha(rec.alpha))
     root.copyColor(s)
   }
 
@@ -343,14 +344,14 @@ Item {
   // Add the current picker state to the history without copying, stamped
   // with the active chip format and a full serialization snapshot.
   function addPicked() {
-    const s = ColorMath.hex6(root.picked)
+    const s = Color.hex6(root.picked)
     if (s === "" || typeof root.addRecord !== "function") return
     // The sv field, the hue slider and the alpha slider edit `picked`
     // continuously without persisting anything, so the commit point is
     // this button and the hex is read here rather than per mousemove.
     root.addRecord(s, root.picked.a, {
       fmt: root.fmt,
-      formats: ColorMath.allFormats(root.picked, root.picked.a)
+      formats: Color.allFormats(root.picked, root.picked.a)
     })
   }
 
@@ -496,7 +497,7 @@ Item {
       // Pure hue base, from the island's own hue state.
       Rectangle {
         anchors.fill: parent
-        color: ColorMath.hsvToRgb(root.hue, 1, 1)
+        color: Color.hsvToRgb(root.hue, 1, 1)
 
         // White overlay fading right: full saturation at the right edge.
         Rectangle {
@@ -545,7 +546,7 @@ Item {
           width: 14
           height: 14
           radius: RoundingPolicy.radius
-          color: ColorMath.hex6(root.picked)
+          color: Color.hex6(root.picked)
           border.width: 2
           border.color: (root.hsv.v > 0.6 && root.hsv.s < 0.6)
             ? "#000000" : "#ffffff"
@@ -655,8 +656,8 @@ Item {
         gradient: Gradient {
           orientation: Gradient.Horizontal
 
-          GradientStop { position: 0; color: Qt.alpha(ColorMath.hsvToRgb(root.hue, 1, 1), 0) }
-          GradientStop { position: 1; color: ColorMath.hsvToRgb(root.hue, 1, 1) }
+          GradientStop { position: 0; color: Qt.alpha(Color.hsvToRgb(root.hue, 1, 1), 0) }
+          GradientStop { position: 1; color: Color.hsvToRgb(root.hue, 1, 1) }
         }
       }
 
@@ -798,7 +799,7 @@ Item {
           spacing: 4
 
           Repeater {
-            model: ColorMath.FORMATS
+            model: Color.FORMATS
 
             Rectangle {
               id: chip
@@ -903,7 +904,7 @@ Item {
   // left off. A chip click and a typed code both go through here: the
   // chip IS the format preference, so every way of moving it writes it.
   function setFmt(f) {
-    if (ColorMath.FORMATS.indexOf(f) < 0) return
+    if (Color.FORMATS.indexOf(f) < 0) return
     if (root.fmt === f) return
     root.fmt = f
     Settings.setRawSection("colorPicker", "fmt", f)
@@ -914,11 +915,11 @@ Item {
   // open, so an external settings edit is picked up too.
   //
   // A stored value that is not a known format - a hand-edited settings file,
-  // or a format ColorMath.FORMATS does not name - is silently ignored, so the
+  // or a format Color.FORMATS does not name - is silently ignored, so the
   // island copies in hex while the user's settings file says otherwise.
   function restoreFmt() {
     const sec = Settings.rawSection("colorPicker")
     const v = sec && typeof sec.fmt === "string" ? sec.fmt : ""
-    if (ColorMath.FORMATS.indexOf(v) >= 0) root.fmt = v
+    if (Color.FORMATS.indexOf(v) >= 0) root.fmt = v
   }
 }

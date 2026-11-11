@@ -4,7 +4,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import Quickshell
 import qs.common
-import "ColorMath.js" as ColorMath
+import "../../../../common/math/Color.js" as Color
+import "ColorHistory.js" as ColorHistory
 
 // The history list half of the color picker island: a five-row viewport
 // over the full stored history with a scrollbar in a dedicated right
@@ -81,9 +82,9 @@ Item {
   readonly property int identityRevision: root._epoch
 
   // Key on the module's dedupe identity plus the display format;
-  // delegated to ColorMath so store and display never disagree.
+  // delegated to ColorHistory so store and display never disagree.
   function _keyOf(rec) {
-    return ColorMath.recordKey(rec)
+    return ColorHistory.recordKey(rec)
   }
 
   // The swatch checkerboard, as an inline SVG tiled across a swatch: a
@@ -232,12 +233,12 @@ Item {
       // clipboard.
       readonly property var rec: row.modelData ? row.modelData.m : null
       readonly property string hex: row.rec ? String(row.rec.color || "") : ""
-      readonly property var parsed: ColorMath.parse(row.hex)
+      readonly property var parsed: Color.parse(row.hex)
       readonly property real alpha: row.rec && typeof row.rec.alpha === "number"
-        ? ColorMath.clampAlpha(row.rec.alpha) : 1
-      readonly property string fg: ColorMath.contrastText(row.parsed)
+        ? Color.clampAlpha(row.rec.alpha) : 1
+      readonly property string fg: Color.contrastText(row.parsed)
       readonly property string recKey: row.parsed !== null
-        ? ColorMath.hex8(row.parsed, row.alpha) : ""
+        ? Color.hex8(row.parsed, row.alpha) : ""
       readonly property bool copied: root.copiedKey !== ""
         && root.copiedKey === row.recKey
       // The entry shows the format it was stored in - a color copied as
@@ -249,7 +250,7 @@ Item {
         const fmt = row.rec && typeof row.rec.fmt === "string"
           ? row.rec.fmt : "hex"
         if (f !== null && typeof f[fmt] === "string" && f[fmt] !== "") return f[fmt]
-        return ColorMath.hex8(row.parsed, row.alpha)
+        return Color.hex8(row.parsed, row.alpha)
       }
 
       width: ListView.view ? ListView.view.width : 200

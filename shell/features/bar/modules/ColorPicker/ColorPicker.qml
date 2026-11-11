@@ -4,7 +4,8 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import qs.features.bar
-import "ColorMath.js" as ColorMath
+import "../../../../common/math/Color.js" as Color
+import "ColorHistory.js" as ColorHistory
 import "../../../../common/math/Range.js" as Range
 import "../../../../common/capture/ShotLib.js" as ShotLib
 import "../../../../common/text/StringUtils.js" as SU
@@ -74,7 +75,7 @@ BarModule {
   // deletes re-tint in the same frame.
   readonly property bool _tintEnabled: Settings.value("shell.colorPicker.showLastColor") !== false
 
-  // Newest record's "#rrggbb" (ColorMath normalizes every stored
+  // Newest record's "#rrggbb" (Color normalizes every stored
   // color to lowercase #rrggbb); "" when the history is empty. Record
   // alpha is ignored on purpose: a translucent icon would read as
   // broken theming against the bar background.
@@ -122,7 +123,7 @@ BarModule {
     return {
       picked: {
         r: Number(c.r), g: Number(c.g), b: Number(c.b),
-        a: ColorMath.clampAlpha(a)
+        a: Color.clampAlpha(a)
       },
       // Clamped to the same 0..360 the slider uses rather than wrapped to it.
       // Both ends are pure red, so a wrapped value and a clamped one paint
@@ -163,7 +164,7 @@ BarModule {
     }
     const a = Number(picked.a)
     if (!isFinite(a)) return
-    out.a = ColorMath.clampAlpha(a)
+    out.a = Color.clampAlpha(a)
     const h = Number(hue)
     root._pendingWorking = {
       picked: out,
@@ -179,10 +180,10 @@ BarModule {
   property var _storeSeen: null
 
   // Dedupe identity of a record; dedupe, promotion and deletion use
-  // it. Delegates to ColorMath so the store and the history list can
+  // it. Delegates to Color so the store and the history list can
   // never disagree on the key shape.
   function _recKey(rec): string {
-    return ColorMath.recordKey(rec)
+    return ColorHistory.recordKey(rec)
   }
 
   // One store record in canonical form: normalized "#rrggbb", clamped
@@ -192,18 +193,18 @@ BarModule {
   // path go through.
   function _canonical(rec): var {
     if (rec === null || typeof rec !== "object" || Array.isArray(rec)) return null
-    const c = ColorMath.parse(rec.color)
+    const c = Color.parse(rec.color)
     if (c === null) return null
     const out = {
-      color: ColorMath.hex6(c),
-      alpha: typeof rec.alpha === "number" ? ColorMath.clampAlpha(rec.alpha) : 1,
+      color: Color.hex6(c),
+      alpha: typeof rec.alpha === "number" ? Color.clampAlpha(rec.alpha) : 1,
       timestamp: typeof rec.timestamp === "number" && isFinite(rec.timestamp) ? rec.timestamp : 0
     }
     if (rec.formats && typeof rec.formats === "object") {
-      const fmts = ColorMath.sanitizeFormats(rec.formats)
+      const fmts = ColorHistory.sanitizeFormats(rec.formats)
       if (Object.keys(fmts).length > 0) out.formats = fmts
     }
-    if (typeof rec.fmt === "string" && ColorMath.FORMATS.indexOf(rec.fmt) >= 0) {
+    if (typeof rec.fmt === "string" && Color.FORMATS.indexOf(rec.fmt) >= 0) {
       out.fmt = rec.fmt
     }
     return out
@@ -302,7 +303,7 @@ BarModule {
       && payload.data !== undefined
     if (payload === null || wrappedBareArray) {
       const source = String(text === undefined || text === null ? "" : text)
-      const parsed = root._normalize(ColorMath.parseHistory(source))
+      const parsed = root._normalize(ColorHistory.parseHistory(source))
       // A document that does not parse exactly as an empty file does yields []
       // for both, and the slot below writes [] over the user's file either way,
       // so nothing here distinguishes an unreadable history from a first run.
@@ -382,10 +383,10 @@ BarModule {
     const f = rec.formats && typeof rec.formats === "object" ? rec.formats : null
     const fmt = typeof rec.fmt === "string" ? rec.fmt : "hex"
     if (f !== null && typeof f[fmt] === "string" && f[fmt] !== "") return String(f[fmt])
-    const c = ColorMath.parse(String(rec.color || ""))
+    const c = Color.parse(String(rec.color || ""))
     if (c === null) return String(rec.color || "")
-    const a = typeof rec.alpha === "number" ? ColorMath.clampAlpha(rec.alpha) : 1
-    return ColorMath.hex8(c, a)
+    const a = typeof rec.alpha === "number" ? Color.clampAlpha(rec.alpha) : 1
+    return Color.hex8(c, a)
   }
   function _fireCopyFlash(text) {
     const s = String(text === undefined || text === null ? "" : text)
@@ -404,25 +405,25 @@ BarModule {
   // color+alpha+format and move the repeat to the front, starting from the
   // shared history so an add never drops what another output just stored.
   function addRecord(colorHex, alpha, meta) {
-    const c = ColorMath.parse(String(colorHex === undefined ? "" : colorHex))
+    const c = Color.parse(String(colorHex === undefined ? "" : colorHex))
     if (c === null) {
-      // A caller handed the store something ColorMath cannot read. The
+      // A caller handed the store something Color cannot read. The
       // island's own commit points guard this first, so reaching it means a
       // caller changed.
       return false
     }
-    const a = ColorMath.clampAlpha(alpha)
+    const a = Color.clampAlpha(alpha)
     let formats = null
     if (meta && typeof meta === "object" && meta.formats && typeof meta.formats === "object") {
-      formats = ColorMath.sanitizeFormats(meta.formats)
+      formats = ColorHistory.sanitizeFormats(meta.formats)
     }
     const rec = {
-      color: ColorMath.hex6(c),
+      color: Color.hex6(c),
       alpha: a,
       timestamp: Date.now()
     }
     if (formats !== null) rec.formats = formats
-    if (meta && typeof meta.fmt === "string" && ColorMath.FORMATS.indexOf(meta.fmt) >= 0)
+    if (meta && typeof meta.fmt === "string" && Color.FORMATS.indexOf(meta.fmt) >= 0)
       rec.fmt = meta.fmt
     const key = root._recKey(rec)
     const base = root._sharedRecords()
@@ -758,12 +759,12 @@ BarModule {
     // content when shown, else fall back to the persisted preference
     // (the same section restoreFmt() reads).
     const c = host ? host.content : null
-    if (c && typeof c.fmt === "string" && ColorMath.FORMATS.indexOf(c.fmt) >= 0) {
+    if (c && typeof c.fmt === "string" && Color.FORMATS.indexOf(c.fmt) >= 0) {
       root.pickFmt = c.fmt
     } else {
       const sec = Settings.rawSection("colorPicker")
       const v = sec && typeof sec.fmt === "string" ? sec.fmt : ""
-      if (ColorMath.FORMATS.indexOf(v) >= 0) root.pickFmt = v
+      if (Color.FORMATS.indexOf(v) >= 0) root.pickFmt = v
     }
     const gen = RequestGate.begin(root._pickScope, root._pickKey)
     // A refused generation means no overlay.
@@ -846,15 +847,15 @@ BarModule {
     // Teardown, not cancelPick: this pick is committing.
     root._teardownPick()
     const rec = {
-      r: ColorMath.clamp01(r / 255),
-      g: ColorMath.clamp01(g / 255),
-      b: ColorMath.clamp01(b / 255),
+      r: Color.clamp01(r / 255),
+      g: Color.clamp01(g / 255),
+      b: Color.clamp01(b / 255),
       // The screen is opaque; frame alphas a hair under 255 are
       // compositing quantization, not user-visible transparency. Snap
       // them so near-identical picks do not fork into separate entries.
-      a: a === undefined ? 1 : (a >= 254 ? 1 : ColorMath.clamp01(a / 255))
+      a: a === undefined ? 1 : (a >= 254 ? 1 : Color.clamp01(a / 255))
     }
-    const hex = ColorMath.hex6(rec)
+    const hex = Color.hex6(rec)
     if (hex === "") return
     // The pick's single commit point: the click's grab, the frame decode
     // and the pixel read all settle into `hex` here, and a pick cannot
@@ -866,7 +867,7 @@ BarModule {
     // available for later copies.
     const fmt = root.pickFmt
     const alpha = rec.a
-    root.addRecord(hex, alpha, { fmt: fmt, formats: ColorMath.allFormats(rec, alpha) })
+    root.addRecord(hex, alpha, { fmt: fmt, formats: Color.allFormats(rec, alpha) })
     const copyText = copyTextFor(rec, fmt)
     root._copyText(copyText, null)
     if (root.notifyOnPick) {
@@ -877,8 +878,8 @@ BarModule {
 
   // The clipboard string a pick in `fmt` carries.
   function copyTextFor(rec, fmt) {
-    const out = ColorMath.format(rec, fmt, rec.a)
-    return out !== null ? out : ColorMath.hex6(rec)
+    const out = Color.format(rec, fmt, rec.a)
+    return out !== null ? out : Color.hex6(rec)
   }
 
   ColorPickerOverlay {
