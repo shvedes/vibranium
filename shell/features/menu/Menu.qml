@@ -794,30 +794,28 @@ Singleton {
   // Primary panel publishes itself here for `probe` and the debug verbs.
   property var probeSource: null
 
+  // One store write, three stores. `deep` names the stores whose option can
+  // gate a row's `requires:` expression, so only they re-resolve dead links;
+  // the misc store's options are values without conditions behind them.
+  function _optionsChanged(key, value, deep) {
+    Menu.syncBound(key, value)
+    Menu.refreshSectionCounts()
+    if (deep === true) Menu.recomputeDeadLinks()
+  }
+
   Connections {
     target: Settings
-    function onOptionChanged(key, value) {
-      Menu.syncBound(key, value)
-      Menu.refreshSectionCounts()
-      Menu.recomputeDeadLinks()
-    }
+    function onOptionChanged(key, value) { Menu._optionsChanged(key, value, true) }
     function onReadyChanged() { Menu._maybePrewarm() }
   }
   Connections {
     target: HyprlandSettings
-    function onOptionChanged(key, value) {
-      Menu.syncBound(key, value)
-      Menu.refreshSectionCounts()
-      Menu.recomputeDeadLinks()
-    }
+    function onOptionChanged(key, value) { Menu._optionsChanged(key, value, true) }
     function onReadyChanged() { Menu._maybePrewarm() }
   }
   Connections {
     target: MiscSettings
-    function onOptionChanged(key, value) {
-      Menu.syncBound(key, value)
-      Menu.refreshSectionCounts()
-    }
+    function onOptionChanged(key, value) { Menu._optionsChanged(key, value, false) }
     function onReadyChanged() { Menu._maybePrewarm() }
   }
 
