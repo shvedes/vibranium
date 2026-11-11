@@ -30,9 +30,14 @@ Singleton {
   readonly property string posture: root._helperOk ? "helper" : "memory"
   // True only while a validated helper holds values across sessions.
   readonly property bool persistent: root._helperOk
-  readonly property int count: Object.keys(root._slots).length
+  readonly property int count: root._count
 
+  // Maintained alongside _slots: count is read from a binding, and
+  // Object.keys().length rebuilt the key list on every evaluation of every
+  // reader. One increment at the mutation boundary is cheaper than a key
+  // enumeration per read.
   property var _slots: ({})
+  property int _count: 0
   property string _helperState: "absent"
   property bool _helperOk: false
   property string _helperExec: ""
@@ -54,8 +59,10 @@ Singleton {
     const text = asText(value)
     if (key === "" || text === "") return false
     const next = Object.assign({}, root._slots)
+    const added = next[key] === undefined
     next[key] = text
     root._slots = next
+    if (added) root._count += 1
     return true
   }
 
@@ -99,6 +106,7 @@ Singleton {
     const next = Object.assign({}, root._slots)
     delete next[key]
     root._slots = next
+    root._count = Math.max(0, root._count - 1)
     return true
   }
 
@@ -113,8 +121,9 @@ Singleton {
   }
 
   function clear() {
-    const n = root.count
+    const n = root._count
     root._slots = ({})
+    root._count = 0
     return n
   }
 
