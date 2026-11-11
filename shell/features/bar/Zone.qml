@@ -76,28 +76,9 @@ Item {
   // writes back, so nothing visually jumps on release. Retained departures
   // (`leaving`) splice back at their cached display index so the row
   // shrinks in place around them.
-  readonly property var displayOrder: {
-    const out = []
-    const ordered = root.workList !== null
-      ? root.workList : root.zoneLayout
-    let wi = 0
-    const zl = root.zoneLayout
-    for (let i = 0; i < zl.length; i++) {
-      const id = zl[i]
-      let disp
-      if (root.workList !== null && !Bar.isFixedSlot(id)) {
-        disp = wi < ordered.length ? ordered[wi++] : id
-      } else {
-        disp = id
-      }
-      out.push({ kind: root._kindOf(disp), id: disp })
-    }
-    const spots = root._leavingSorted()
-    for (let s = 0; s < spots.length; s++)
-      out.splice(Math.min(spots[s].at, out.length), 0,
-        { kind: spots[s].kind, id: spots[s].id })
-    return out
-  }
+  readonly property var displayOrder: BarLib.displayOrder(
+    root.zoneLayout, root.workList, id => Bar.isFixedSlot(id),
+    id => root._kindOf(id), root.leaving)
 
   // A drag is live on this window - own or sibling zone. Scanned, not
   // shared state: the commit still writes once on release, this only

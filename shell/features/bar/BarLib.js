@@ -425,6 +425,41 @@ function crossDropPositions(cur, displayIds, isFixed, id, fromRegion, toRegion, 
   return next
 }
 
+// The zone's visual order. Resting: the persisted mixed layout as it stands.
+// Dragging: fixed obstacles keep their persisted places while the movable ids
+// stream from the caller's working order, which is the same interleave the
+// commit writes back, so nothing jumps on release. Retained departures are
+// spliced back at their cached display index so the row shrinks in place.
+function displayOrder(zoneLayout, workList, isFixed, kindOf, leaving) {
+  const zl = Array.isArray(zoneLayout) ? zoneLayout : []
+  const ordered = workList === null || workList === undefined ? null : workList
+  const out = []
+  let wi = 0
+  for (let i = 0; i < zl.length; i++) {
+    const id = zl[i]
+    let disp
+    if (ordered !== null && !isFixed(id)) {
+      disp = wi < ordered.length ? ordered[wi++] : id
+    } else {
+      disp = id
+    }
+    out.push({ kind: kindOf(disp), id: disp })
+  }
+  const spots = []
+  if (leaving !== null && leaving !== undefined && typeof leaving === "object") {
+    for (const id in leaving) {
+      const l = leaving[id]
+      if (l) spots.push({ kind: l.kind, id: id, at: l.at })
+    }
+  }
+  spots.sort((a, b) => a.at - b.at)
+  for (let s = 0; s < spots.length; s++) {
+    out.splice(Math.min(spots[s].at, out.length), 0,
+      { kind: spots[s].kind, id: spots[s].id })
+  }
+  return out
+}
+
 // The change signature of a rendered layout. Order inside a zone is behavior,
 // so the object is serialized as it stands; a value that cannot be stringified
 // answers the empty signature, which re-renders rather than freezing the bar.

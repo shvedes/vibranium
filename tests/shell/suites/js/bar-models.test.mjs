@@ -95,7 +95,7 @@ group('the five libraries load and publish a function surface', () => {
   for (const [label, lib] of [['BarLib', B], ['ArchUpdates/Model', AU], ['Volume/Model', VO], ['Workspaces/Model', WSM], ['common/NowPlaying', CN]]) {
     is(`${label} loaded`, lib, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
   }
-  eq('BarLib publishes the eighteen layout helpers plus the shared insert rule', Object.keys(B).length, 19)
+  eq('BarLib publishes the nineteen layout helpers plus the shared insert rule', Object.keys(B).length, 20)
   eq('ArchUpdates/Model publishes the seventeen model functions plus four table vars', Object.keys(AU).length, 21)
   eq('Volume/Model publishes thirteen functions', Object.keys(VO).length, 13)
   eq('Workspaces/Model publishes the number-strip helpers', Object.keys(WSM).length, 3)
@@ -120,6 +120,41 @@ group('the signature is the JSON of the rendered layout', () => {
   ne('a slot moving zone changes the signature', B.layoutSignature({ left: ['a'], center: [], right: [] }), B.layoutSignature({ left: [], center: ['a'], right: [] }))
   eq('a cyclic value falls back to the empty signature', B.layoutSignature((() => { const v = { left: [] }; v.self = v; return v })()), '')
   eq('a value JSON cannot represent is the empty signature', B.layoutSignature(undefined), '')
+})
+
+section('BarLib.displayOrder - the zone order, resting or dragging')
+group('the resting order is the persisted layout', () => {
+  const kind = id => (id === 'owned' ? 'owned' : 'static')
+  const out = B.displayOrder(['a', 'b', 'c'], null, () => false, kind, {})
+  eq('one entry per slot, in order', out, [
+    { kind: 'static', id: 'a' }, { kind: 'static', id: 'b' }, { kind: 'static', id: 'c' },
+  ])
+  eq('the kind travels with the id', B.displayOrder(['owned'], null, () => false, kind, {})[0].kind, 'owned')
+  eq('an empty layout', B.displayOrder([], null, () => false, kind, {}), [])
+  eq('a non-array layout', B.displayOrder(null, null, () => false, kind, {}), [])
+})
+
+group('a working order streams through the movable ids only', () => {
+  const kind = () => 'static'
+  const out = B.displayOrder(['a', 'pin', 'b'], ['b', 'a'],
+    id => id === 'pin', kind, {})
+  eq('the fixed obstacle keeps its persisted place', out[1].id, 'pin')
+  eq('the movable ids stream from the working order', [out[0].id, out[2].id], ['b', 'a'])
+  eq('a short working order falls back to the persisted id', B.displayOrder(['a', 'b'], ['b'], () => false, kind, {})[1].id, 'b')
+})
+
+group('retained departures splice back at their cached index', () => {
+  const kind = () => 'static'
+  const out = B.displayOrder(['a', 'b'], null, () => false, kind, {
+    gone: { kind: 'owned', at: 1 },
+  })
+  eq('the departure is inserted at its index', out.map(e => e.id), ['a', 'gone', 'b'])
+  eq('with its own kind', out[1].kind, 'owned')
+  eq('an index past the end lands at the end', B.displayOrder(['a'], null, () => false, kind, { gone: { kind: 'owned', at: 9 } }).map(e => e.id), ['a', 'gone'])
+  eq('two departures sort by their index', B.displayOrder([], null, () => false, kind, {
+    x: { kind: 'static', at: 1 }, y: { kind: 'static', at: 0 },
+  }).map(e => e.id), ['y', 'x'])
+  eq('a null leaving map is no departure', B.displayOrder(['a'], null, () => false, kind, null).length, 1)
 })
 
 section('BarLib.normZone - three zones, everything else is "right"')
