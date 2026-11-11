@@ -1050,8 +1050,11 @@ function layerPlan(nodes, groups) {
       if (pending[key] === 0) queue.push(key)
     }
     const walk = []
-    while (queue.length > 0) {
-      const key = queue.shift()
+    // Cursor, not shift(): this walk visits every node in the graph, and a
+    // mixer's graph carries a node per device, stream and port leg.
+    let head = 0
+    while (head < queue.length) {
+      const key = queue[head++]
       if (seen[key] === true) continue
       seen[key] = true
       walk.push(key)
