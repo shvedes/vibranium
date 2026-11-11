@@ -11,7 +11,7 @@ bash tests/shell/run-all.sh --baseline         # recorded pre-existing failures
 bash tests/shell/suites/js/menu.test.mjs       # one suite, directly
 ```
 
-Current state: **45 suites, ~29,800 assertions**, in about two minutes.
+Current state: **63 suites, 32,532 assertions**, in about two minutes.
 `baseline.txt` is empty — nothing is waived, so any failure is a regression.
 
 ## What is covered
