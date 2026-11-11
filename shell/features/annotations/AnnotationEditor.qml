@@ -1932,7 +1932,7 @@ PanelWindow {
       // must not fight it.
       onTextChanged: {
         if (editor.textRect === null) {
-          editor.textRectW = Math.max(140, Math.min(stage.width - x - Ui.m, contentWidth + 24))
+          editor.textRectW = Range.clamp(contentWidth + 24, 140, stage.width - x - Ui.m)
         }
         // The staged outline shows only before the first input -
         // typing alone never repaints the board, so kick it here.
@@ -2322,8 +2322,8 @@ PanelWindow {
               drawArea.cropDrag = null
             } else {
               const vr3 = editor.viewRect
-               const nx = Math.max(vr3.x, Math.min(vr3.x + vr3.w - cur.w, dd.ox + p.x - drawArea.anchor.x))
-               const ny = Math.max(vr3.y, Math.min(vr3.y + vr3.h - cur.h, dd.oy + p.y - drawArea.anchor.y))
+               const nx = Range.clamp(dd.ox + p.x - drawArea.anchor.x, vr3.x, vr3.x + vr3.w - cur.w)
+               const ny = Range.clamp(dd.oy + p.y - drawArea.anchor.y, vr3.y, vr3.y + vr3.h - cur.h)
                const moved = editor._clampDocumentRect({ x: nx, y: ny, w: cur.w, h: cur.h })
                if (dd.frame) editor.cropFrame = moved
                else editor.cropRect = moved
@@ -2337,8 +2337,8 @@ PanelWindow {
             // past the edges it is supposed to be cropping within.
             const f = editor.cropFrame
             const vr = editor.viewRect
-             const nx = Math.max(vr.x, Math.min(vr.x + vr.w - f.w, drawArea.cropMoveBase.x + p.x - drawArea.anchor.x))
-             const ny = Math.max(vr.y, Math.min(vr.y + vr.h - f.h, drawArea.cropMoveBase.y + p.y - drawArea.anchor.y))
+             const nx = Range.clamp(drawArea.cropMoveBase.x + p.x - drawArea.anchor.x, vr.x, vr.x + vr.w - f.w)
+             const ny = Range.clamp(drawArea.cropMoveBase.y + p.y - drawArea.anchor.y, vr.y, vr.y + vr.h - f.h)
              editor.cropFrame = editor._clampDocumentRect({ x: nx, y: ny, w: f.w, h: f.h })
             board.requestPaint()
           } else if (editor.tool === "text" && editor.textRect !== null) {
@@ -3000,8 +3000,8 @@ PanelWindow {
     // Corners follow RoundingPolicy (hypr.decoration.rounding).
     radius: RoundingPolicy.radius
     x: anchorItem !== null
-      ? Math.max(8, Math.min(stage.width - width - 8,
-        anchorItem.mapToItem(stage, anchorItem.width / 2, 0).x - width / 2)) : 0
+      ? Range.clamp(anchorItem.mapToItem(stage, anchorItem.width / 2, 0).x - width / 2,
+        8, stage.width - width - 8) : 0
     y: anchorItem !== null
       ? Math.max(8, anchorItem.mapToItem(stage, 0, 0).y - height - 6) : 0
     color: Ui.solid("background_1")
