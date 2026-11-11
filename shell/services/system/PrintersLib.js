@@ -115,7 +115,7 @@ const JOB_STATES = {
 const PRINTER_STATES = { idle: 3, processing: 4, stopped: 5 }
 
 function numState(value, table) {
-  const n = parseInt(String(value ?? ""), 10)
+  const n = parseInt(SU.textOf(value), 10)
   if (isFinite(n)) return n
   const t = SU.lowerTrim(value)
   return table[t] !== undefined ? table[t] : NaN
@@ -221,7 +221,7 @@ function aliasesFrom(sectionObj) {
   const out = {}
   for (const k in s) {
     if (typeof k !== "string" || k === "") continue
-    const v = String(s[k] ?? "")
+    const v = SU.textOf(s[k])
     if (v !== "") out[k] = v
   }
   return out
@@ -304,7 +304,7 @@ function jobIsFailed(state) {
 // Basename of a path ("~/docs/a.pdf" -> "a.pdf"); pass-through when
 // there is no directory part.
 function baseName(p) {
-  const s = String(p ?? "")
+  const s = SU.textOf(p)
   const i = Math.max(s.lastIndexOf("/"), s.lastIndexOf("\\"))
   return i >= 0 ? s.substring(i + 1) : s
 }
@@ -375,7 +375,7 @@ function jobFileIcon(row) {
 // assigning the result and the completion diff.
 function jobRows(reportText) {
   const rows = parseReport(reportText, "job-id")
-    .filter(j => String(j["job-id"] ?? "") !== "")
+    .filter(j => SU.textOf(j["job-id"]) !== "")
   for (let i = 0; i < rows.length; i++) {
     const uri = String(rows[i]["job-printer-uri"] || "")
     rows[i].printer = baseName(uri)
@@ -395,7 +395,7 @@ function filterDismissed(rows, dismissed) {
   if (!dismissed || typeof dismissed !== "object") return rows
   const out = []
   for (let i = 0; i < rows.length; i++) {
-    if (dismissed[String(rows[i]["job-id"] ?? "")] === true) continue
+    if (dismissed[SU.textOf(rows[i]["job-id"])] === true) continue
     out.push(rows[i])
   }
   return out
@@ -527,7 +527,7 @@ function queuedJobs(prevJobs, jobs) {
   }
   const active = activeJobs(clean).length
   for (let i = 0; i < clean.length; i++) {
-    const id = String(clean[i]["job-id"] ?? "")
+    const id = SU.textOf(clean[i]["job-id"])
     if (id === "" || known[id] === true) continue
     out.push({ id: id, printer: String(clean[i].printer || ""), active: active })
   }
