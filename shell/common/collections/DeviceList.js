@@ -8,6 +8,8 @@
 // snapshot rows. Pure JS, pragma library, no Qt imports.
 .pragma library
 
+.import "StoreGuards.js" as StoreGuards
+
 // Connected first, then known/remembered, then the caller's tiebreak.
 // rankOf/knownOf/labelOf read one row; tiebreak(a, b) orders within a
 // tier (localeCompare on a label, signal strength, ...). The input is
@@ -32,8 +34,8 @@ function sortRows(rows, rankOf, knownOf, tiebreak) {
 // resets the ListView model and recreates every delegate, so callers
 // skip the assignment when the keys agree.
 function rowsEqual(a, b, keyOf) {
-  var x = Array.isArray(a) ? a : []
-  var y = Array.isArray(b) ? b : []
+  var x = StoreGuards.asList(a)
+  var y = StoreGuards.asList(b)
   if (x.length !== y.length) return false
   for (var i = 0; i < x.length; i++) {
     var kx = keyOf ? keyOf(x[i], i) : ""
@@ -48,7 +50,7 @@ function rowsEqual(a, b, keyOf) {
 // the label forward (instead of letting ListView paint a blank header
 // for "") stays with the caller - see Network deriveWifiState.
 function sectionTitleFor(index, rows, titleOf) {
-  var list = Array.isArray(rows) ? rows : []
+  var list = StoreGuards.asList(rows)
   if (index < 0 || index >= list.length) return ""
   if (typeof titleOf !== "function") return ""
   var prev = index > 0 ? list[index - 1] : null
@@ -61,7 +63,7 @@ function sectionTitleFor(index, rows, titleOf) {
 // when trailingTitle is set a closing header is always appended even
 // when its section has no rows, so a scan control stays reachable.
 function sectionedEntries(sorted, titleOf, entryOf, trailingTitle) {
-  var list = Array.isArray(sorted) ? sorted : []
+  var list = StoreGuards.asList(sorted)
   var entries = []
   var cur = ""
   for (var i = 0; i < list.length; i++) {
