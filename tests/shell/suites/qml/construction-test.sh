@@ -339,15 +339,15 @@ EXPECTED_SUPPLIED="supplied.qs.common.ScrollBar=flickable: null
 supplied.qs.common.LyricsPane=player: null"
 
 # The counts, for a reader who wants the shape without counting lines.
-# 240 declared entries over 46 qmldir files, one of which is excluded from the
-# work list (boot/Boot.qml), so 237 cases are built. The 125 that are not built
+# 241 declared entries over 46 qmldir files, one of which is excluded from the
+# work list (boot/Boot.qml), so 238 cases are built. The 125 that are not built
 # are the needs-environment and declared-but-uncreatable sets below. A
 # singleton (RowGeometry, Paths) is not creatable either; the probe's case for
 # one names it and lets the engine build it, which is why a singleton that
 # reaches a window lands in needs-environment like any other type.
 # (+2 for the swap library: qs.common.CrossfadeIcon and qs.common.SlideSwap,
 # both clean headless builds - plain items over Icons/Texts.)
-EXPECTED_DECLARED_COUNT=240
+EXPECTED_DECLARED_COUNT=241
 # qs.common.AppIcons is a clean type: it resolves icon names through the
 # static Quickshell.iconPath and BoundedCache, with no window and no
 # environment behind it.
@@ -366,7 +366,7 @@ EXPECTED_DECLARED_COUNT=240
 # window constructs without any environment behind it.
 # qs.common.Vignette is in the same class: a plain Item over a Shape and a
 # radial gradient, with no singleton and no window behind it.
-EXPECTED_CLEAN_COUNT=114
+EXPECTED_CLEAN_COUNT=115
 EXPECTED_NEEDS_COUNT=103
 EXPECTED_UNCREATABLE_COUNT=22
 

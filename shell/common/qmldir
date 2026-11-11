@@ -58,6 +58,7 @@ Chip 1.0 ui/Chip.qml
 ColorAnim 1.0 ui/ColorAnim.qml
 Chevron 1.0 ui/Chevron.qml
 SkeletonPulse 1.0 ui/SkeletonPulse.qml
+SkeletonBar 1.0 ui/SkeletonBar.qml
 Divider 1.0 ui/Divider.qml
 DropdownButton 1.0 ui/DropdownButton.qml
 DropdownSlot 1.0 ui/DropdownSlot.qml

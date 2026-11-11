@@ -1113,19 +1113,11 @@ Item {
           width: parent.width - root._rowInner - root.verColW
           height: parent.height
 
-          Rectangle {
+          SkeletonBar {
             width: parent.width * (0.48 + (skeletonRow.index % 3) * 0.16)
-            height: 8
-            radius: RoundingPolicy.radius
             anchors.verticalCenter: parent.verticalCenter
-            color: Ui.tint("foreground_1", 0.14)
-            opacity: 0.55
-
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: root.skeleton && MotionPolicy.enabled
-              SkeletonPulse { index: skeletonRow.index }
-            }
+            pulse: root.skeleton && MotionPolicy.enabled
+            pulseIndex: skeletonRow.index
           }
         }
 
@@ -1133,20 +1125,13 @@ Item {
           width: root.verColW
           height: parent.height
 
-          Rectangle {
+          SkeletonBar {
             width: parent.width * 0.62
-            height: 8
-            radius: RoundingPolicy.radius
             anchors.verticalCenter: parent.verticalCenter
             anchors.right: parent.right
-            color: Ui.tint("foreground_1", 0.14)
-            opacity: 0.55
-
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: root.skeleton && MotionPolicy.enabled
-              SkeletonPulse { index: skeletonRow.index; offset: 150 }
-            }
+            pulse: root.skeleton && MotionPolicy.enabled
+            pulseIndex: skeletonRow.index
+            pulseOffset: 150
           }
         }
       }
@@ -1247,19 +1232,11 @@ Item {
             opacity: rowCell.barOpacity
             visible: opacity > 0
 
-            Rectangle {
+            SkeletonBar {
               anchors.verticalCenter: parent.verticalCenter
               width: parent.width * (0.48 + (rowCell.index % 3) * 0.16)
-              height: 8
-              radius: RoundingPolicy.radius
-              color: Ui.tint("foreground_1", 0.14)
-              opacity: 0.55
-
-              SequentialAnimation on opacity {
-                loops: Animation.Infinite
-                running: root.skeleton && MotionPolicy.enabled
-                SkeletonPulse { index: rowCell.index }
-              }
+              pulse: root.skeleton && MotionPolicy.enabled
+              pulseIndex: rowCell.index
             }
           }
 
@@ -1288,20 +1265,13 @@ Item {
             opacity: rowCell.barOpacity
             visible: opacity > 0
 
-            Rectangle {
+            SkeletonBar {
               anchors.verticalCenter: parent.verticalCenter
               anchors.right: parent.right
               width: parent.width * 0.62
-              height: 8
-              radius: RoundingPolicy.radius
-              color: Ui.tint("foreground_1", 0.14)
-              opacity: 0.55
-
-              SequentialAnimation on opacity {
-                loops: Animation.Infinite
-                running: root.skeleton && MotionPolicy.enabled
-                SkeletonPulse { index: rowCell.index; offset: 150 }
-              }
+              pulse: root.skeleton && MotionPolicy.enabled
+              pulseIndex: rowCell.index
+              pulseOffset: 150
             }
           }
 

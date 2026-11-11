@@ -265,22 +265,16 @@ Rectangle {
       color: Ui.tint("foreground_1", 0.14)
     }
 
-    Rectangle {
+    SkeletonBar {
       x: Ui.l + Ui.s
       width: miRow.labelW
-      height: 8
-      radius: RoundingPolicy.radius
       anchors.verticalCenter: parent.verticalCenter
-      color: Ui.tint("foreground_1", 0.14)
     }
 
-    Rectangle {
+    SkeletonBar {
       x: Ui.l + Ui.s + 56 + Ui.s
       width: Math.max(0, (parent.width - (Ui.l + Ui.s + 56 + Ui.s)) * miRow.valueFrac)
-      height: 8
-      radius: RoundingPolicy.radius
       anchors.verticalCenter: parent.verticalCenter
-      color: Ui.tint("foreground_1", 0.14)
     }
   }
 

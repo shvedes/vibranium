@@ -794,18 +794,11 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 3
 
-        Rectangle {
-          width: Math.min(skel.labelW, parent.width)
-          height: 8
-          radius: RoundingPolicy.radius
-          color: Ui.tint("foreground_1", 0.14)
-        }
+        SkeletonBar { width: Math.min(skel.labelW, parent.width) }
 
-        Rectangle {
+        SkeletonBar {
           width: Math.min(Math.round(skel.labelW * 0.55), parent.width)
           height: 6
-          radius: RoundingPolicy.radius
-          color: Ui.tint("foreground_1", 0.14)
         }
       }
 
@@ -826,20 +819,15 @@ Item {
       }
 
       // ...and the pct readout reserve (fits "Muted", 32 wide).
-      Rectangle {
+      SkeletonBar {
         anchors.verticalCenter: parent.verticalCenter
         width: 32
-        height: 8
-        radius: RoundingPolicy.radius
-        color: Ui.tint("foreground_1", 0.14)
       }
     }
 
-    Rectangle {
+    SkeletonBar {
       width: parent.width
       height: 6
-      radius: RoundingPolicy.radius
-      color: Ui.tint("foreground_1", 0.14)
     }
   }
 
