@@ -1,7 +1,5 @@
 .pragma library
 
-.import "../math/Range.js" as Range
-
 // Pure color parsing/conversion shared by the bar ColorPicker module and
 // every other consumer (launcher color plugin via build concat per 06).
 //
@@ -16,7 +14,7 @@ var FORMATS = ["hex", "rgb", "rgba", "hsl", "hsla", "hsv", "hsva"]
 // --- validation helpers ---
 
 // The channel clamp bodies are spelled out rather than routed through
-// Range.clampFinite: Color.js is concatenated into the launcher's color
+// the shared clampFinite: Color.js is concatenated into the launcher's color
 // plugin, which is a standalone copy with no Range module, and the twin-file
 // suite requires every shared body to be byte-identical on both sides.
 function clamp01(x) {
