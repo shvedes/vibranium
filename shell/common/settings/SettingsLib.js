@@ -594,23 +594,24 @@ function parseCatalog(text) {
   }
   parseSections()
 
-  // Derived page ids must stay unique: identical labels get a numeric
-  // suffix so navigation never merges two pages.
-  function dedupePageIds() {
-    const seenPages = {}
-    for (let s = 0; s < sections.length; s++) {
-      let page = sections[s].page
-      let n = 2
-      while (seenPages[page] !== undefined) page = sections[s].page + "-" + n++
-      seenPages[page] = true
-      sections[s].page = page
-    }
-  }
-  dedupePageIds()
+  _dedupePageIds(sections)
 
   pruneShowIf(sections, byKey, true)
 
   return { sections: sections, byKey: byKey, rootWidth: rootWidth, rootTitle: rootTitle, pages: sections, allowId: allowId }
+}
+
+// Derived page ids must stay unique: identical labels get a numeric suffix
+// so navigation never merges two pages. Every catalog shape runs this once.
+function _dedupePageIds(sections) {
+  const seenPages = {}
+  for (let s = 0; s < sections.length; s++) {
+    let page = sections[s].page
+    let n = 2
+    while (seenPages[page] !== undefined) page = sections[s].page + "-" + n++
+    seenPages[page] = true
+    sections[s].page = page
+  }
 }
 
 // Reference validation for showIf: every condition var must exist in the
@@ -663,14 +664,7 @@ function parseCatalogDir(fileTexts, fileNamespaces, rootWidth, rootTitle) {
       sections.push(section)
     }
   }
-  const seenPages = {}
-  for (let s = 0; s < sections.length; s++) {
-    let page = sections[s].page
-    let n = 2
-    while (seenPages[page] !== undefined) page = sections[s].page + "-" + n++
-    seenPages[page] = true
-    sections[s].page = page
-  }
+  _dedupePageIds(sections)
   pruneShowIf(sections, byKey, false)
   return {
     sections: sections,
@@ -717,14 +711,7 @@ function parseUnifiedCatalog(text) {
     }
     sections.push(section)
   }
-  const seenPages = {}
-  for (let s = 0; s < sections.length; s++) {
-    let page = sections[s].page
-    let n = 2
-    while (seenPages[page] !== undefined) page = sections[s].page + "-" + n++
-    seenPages[page] = true
-    sections[s].page = page
-  }
+  _dedupePageIds(sections)
   pruneShowIf(sections, byKey, false)
   let menus = null
   if (raw.menus !== undefined && raw.menus !== null) {
