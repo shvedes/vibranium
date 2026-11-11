@@ -1,6 +1,7 @@
 .pragma library
 
 .import "../../../common/theme/DeviceIcons.js" as DeviceIcons
+.import "../../../common/math/Range.js" as Range
 .import "NodeKey.js" as NodeKey
 
 // Pure derivations for the audio mixer: what a node IS, what it is CALLED,
@@ -405,6 +406,17 @@ function appIconName(node) {
 
 // A row's readout. A muted row prints "Muted" and no percentage, because a
 // percentage beside a mute would be rating a level that is not being heard.
+// Apply a row's slider value to its audio node. The two row types share the
+// rule: clamp to the row's own ceiling, and unmute only on a deliberate
+// non-zero value. A change-handler unmute would also fire on the hardware
+// side, silently starting audio the user had muted.
+function applyVolume(audio, value, maximum) {
+  if (audio === null || audio === undefined) return false
+  audio.volume = Range.clamp(Number(value), 0, Number(maximum))
+  if (Number(value) > 0 && audio.muted) audio.muted = false
+  return true
+}
+
 function volumeText(volume, muted) {
   if (muted === true) return "Muted"
   return percentText(volume)

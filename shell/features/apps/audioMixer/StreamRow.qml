@@ -269,11 +269,7 @@ Item {
   height: col.implicitHeight
 
   function setVolume(v) {
-    if (row.audio === null) return
-    row.audio.volume = Range.clamp(v, 0, row.maximum)
-    // Unmute only from a deliberate drag: a change-handler unmute would fire
-    // on the graph side too and silently start a stream the user had muted.
-    if (v > 0 && row.audio.muted) row.audio.muted = false
+    Model.applyVolume(row.audio, v, row.maximum)
   }
 
   function toggleMute() {

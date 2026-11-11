@@ -501,12 +501,7 @@ Item {
   height: col.implicitHeight
 
   function setVolume(v) {
-    if (row.audio === null) return
-    row.audio.volume = Range.clamp(v, 0, row.maximum)
-    // Unmute only from a deliberate drag. A change-handler unmute would fire
-    // on the hardware side too, so a muted headset whose own volume ring the
-    // user then turned would silently start playing.
-    if (v > 0 && row.audio.muted) row.audio.muted = false
+    Model.applyVolume(row.audio, v, row.maximum)
   }
 
   function toggleMute() {
