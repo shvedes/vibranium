@@ -197,28 +197,39 @@ function pixelateBox(rect, vr, surface, rot) {
   return { x: bx, y: by, w: bw, h: bh }
 }
 
-// One clamped source span per mosaic cell: the span is the cell, not a point
-// in it, so a thin feature inside a cell still contributes to its average.
-// Cells that do not overlap the mapped box carry a null span.
-function pixelateSamples(grid, vr, surface, rot, box) {
+// One sample per grid cell: the cell's rect and the span it covers in the
+// target box, or null when the cell does not overlap it. spanOf(cell) answers
+// the unclipped {x0, y0, x1, y1} in box coordinates.
+function _gridSamples(grid, box, spanOf) {
   if (!Array.isArray(grid) || grid.length === 0) return []
   if (box === null || box === undefined) return []
   const out = []
   for (let i = 0; i < grid.length; i++) {
     const cell = grid[i]
-    const a = _rotPoint(cell.rect.x - vr.x, cell.rect.y - vr.y, rot, surface.w, surface.h)
-    const b = _rotPoint(cell.rect.x + cell.rect.w - vr.x,
-      cell.rect.y + cell.rect.h - vr.y, rot, surface.w, surface.h)
-    const x0 = Math.max(0, Math.floor(Math.min(a.x, b.x) - box.x))
-    const y0 = Math.max(0, Math.floor(Math.min(a.y, b.y) - box.y))
-    const x1 = Math.min(box.w, Math.ceil(Math.max(a.x, b.x) - box.x))
-    const y1 = Math.min(box.h, Math.ceil(Math.max(a.y, b.y) - box.y))
+    const s = spanOf(cell)
     out.push({
       rect: cell.rect,
-      box: x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null
+      box: s.x1 > s.x0 && s.y1 > s.y0 ? { x: s.x0, y: s.y0, w: s.x1 - s.x0, h: s.y1 - s.y0 } : null
     })
   }
   return out
+}
+
+// One clamped source span per mosaic cell: the span is the cell, not a point
+// in it, so a thin feature inside a cell still contributes to its average.
+// Cells that do not overlap the mapped box carry a null span.
+function pixelateSamples(grid, vr, surface, rot, box) {
+  return _gridSamples(grid, box, function(cell) {
+    const a = _rotPoint(cell.rect.x - vr.x, cell.rect.y - vr.y, rot, surface.w, surface.h)
+    const b = _rotPoint(cell.rect.x + cell.rect.w - vr.x,
+      cell.rect.y + cell.rect.h - vr.y, rot, surface.w, surface.h)
+    return {
+      x0: Math.max(0, Math.floor(Math.min(a.x, b.x) - box.x)),
+      y0: Math.max(0, Math.floor(Math.min(a.y, b.y) - box.y)),
+      x1: Math.min(box.w, Math.ceil(Math.max(a.x, b.x) - box.x)),
+      y1: Math.min(box.h, Math.ceil(Math.max(a.y, b.y) - box.y))
+    }
+  })
 }
 
 // The grid's extent in unrotated, view-relative image pixels, clipped to the
@@ -244,18 +255,15 @@ function blurSampleBox(grid, vr, imgW, imgH) {
 // The same spans as pixelateSamples, read through the unrotated image
 // mapping: one span per cell, clipped to the baked backing box.
 function blurSamples(grid, vr, box) {
-  if (!Array.isArray(grid) || grid.length === 0) return []
-  if (box === null || box === undefined) return []
-  const out = []
-  for (let i = 0; i < grid.length; i++) {
-    const r = grid[i].rect
-    const x0 = Math.max(box.x, Math.floor(r.x - vr.x))
-    const y0 = Math.max(box.y, Math.floor(r.y - vr.y))
-    const x1 = Math.min(box.x + box.w, Math.ceil(r.x + r.w - vr.x))
-    const y1 = Math.min(box.y + box.h, Math.ceil(r.y + r.h - vr.y))
-    out.push({ rect: r, box: x1 > x0 && y1 > y0 ? { x: x0, y: y0, w: x1 - x0, h: y1 - y0 } : null })
-  }
-  return out
+  return _gridSamples(grid, box, function(cell) {
+    const r = cell.rect
+    return {
+      x0: Math.max(box.x, Math.floor(r.x - vr.x)),
+      y0: Math.max(box.y, Math.floor(r.y - vr.y)),
+      x1: Math.min(box.x + box.w, Math.ceil(r.x + r.w - vr.x)),
+      y1: Math.min(box.y + box.h, Math.ceil(r.y + r.h - vr.y))
+    }
+  })
 }
 
 // The average colour a cell covers: every pixel in the span, not one texel in
