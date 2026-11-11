@@ -127,6 +127,17 @@ Singleton {
     return record.nextRetryMs <= Date.now()
   }
 
+  // When a failed unit is next due, or 0 when it never will be. Boot arms its
+  // retry pump from this on every unit event; state() would answer the same
+  // question by building a public record and counting leases for every unit in
+  // the catalog, which is a per-event walk of the whole boot for one number per
+  // unit that usually is not failed at all.
+  function retryAt(id) {
+    const record = root._findRecord(id)
+    if (record === null || record.state !== "failed") return 0
+    return record.nextRetryMs
+  }
+
   function state(id) {
     const record = root._findRecord(id)
     return record === null ? null : root._publicRecord(record)

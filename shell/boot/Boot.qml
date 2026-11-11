@@ -1809,10 +1809,9 @@ Item {
   function _nextRetryAt() {
     let earliest = 0
     for (let i = 0; i < boot._catalog.length; i++) {
-      const state = UnitGate.state(boot._catalog[i].id)
-      if (state === null || state.state !== "failed") continue
-      if (state.nextRetryMs <= 0) continue
-      if (earliest === 0 || state.nextRetryMs < earliest) earliest = state.nextRetryMs
+      const due = UnitGate.retryAt(boot._catalog[i].id)
+      if (due <= 0) continue
+      if (earliest === 0 || due < earliest) earliest = due
     }
     return earliest
   }
