@@ -92,13 +92,14 @@ var CODE_EXTS = {
 
 // Extension -> MIME value for image previews and snapshots. Anything
 // unknown falls back to image/png. Canonical home of the ClipboardLib
-// IMAGE_MIMES table.
-var IMAGE_MIMES = {
+// IMAGE_MIMES table. Null-prototype: an extension named like an Object
+// member ("constructor") must miss rather than answer with a function.
+var IMAGE_MIMES = Object.assign(Object.create(null), {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg",
   webp: "image/webp", gif: "image/gif", bmp: "image/bmp",
   tiff: "image/tiff", tif: "image/tiff", svg: "image/svg+xml",
   avif: "image/avif", heic: "image/heic", heif: "image/heif"
-}
+})
 
 // Animated stills Qt must not frame-cache: gif and mng decode to every
 // frame in RAM. webp is NOT listed: an animated webp shows its first
