@@ -1111,11 +1111,10 @@ Item {
     } catch (error) {
       ok = false
     }
-    if (ok) {
-      const byId = Object.assign({}, boot._byId)
-      byId[id] = descriptor
-      boot._byId = byId
-    }
+    // Mutated in place: _byId is a lookup table every caller reads through a
+    // function, never a map a binding observes, and copying it per unit made
+    // registering the 51 unit catalog 51 copies of a growing map.
+    if (ok) boot._byId[id] = descriptor
     return ok
   }
 
@@ -1139,19 +1138,20 @@ Item {
       boot._catalogValidationError = graphError
       return false
     }
+    // One pass for both indexes. register() has already filled _byId; this
+    // rebuilds it beside the reverse edges so the two are the catalog's own
+    // view rather than whatever a partial registration left behind.
     const byId = ({})
     const dependents = ({})
     for (let i = 0; i < boot._catalog.length; i++) {
       const descriptor = boot._catalog[i]
       byId[descriptor.id] = descriptor
-      dependents[descriptor.id] = dependents[descriptor.id] || []
-    }
-    for (let i = 0; i < boot._catalog.length; i++) {
-      const descriptor = boot._catalog[i]
-      for (let j = 0; j < descriptor.dependencies.length; j++) {
-        const dependency = descriptor.dependencies[j]
-        if (!dependents[dependency]) dependents[dependency] = []
-        dependents[dependency].push(descriptor.id)
+      if (!dependents[descriptor.id]) dependents[descriptor.id] = []
+      const edges = descriptor.dependencies
+      for (let j = 0; j < edges.length; j++) {
+        const dependency = edges[j]
+        const list = dependents[dependency] || (dependents[dependency] = [])
+        list.push(descriptor.id)
       }
     }
     boot._byId = byId
@@ -1381,9 +1381,10 @@ Item {
     const state = UnitGate.state(id)
     if (state === null || state.state === "not_started") return
     if (boot._milestones[id] === state.state) return
-    const next = Object.assign({}, boot._milestones)
-    next[id] = state.state
-    boot._milestones = next
+    // Mutated in place: the map is this function's record of what it has
+    // already reported, and nothing binds to it. Copying it made every settle
+    // a fresh map of every unit that had settled before.
+    boot._milestones[id] = state.state
     Log.debug("unit " + id + " reached " + state.state + ": constructed in "
       + state.constructionMs + "ms, ready at " + state.readyMs + "ms")
     // The verdict is a function of the essential records alone, so it can only
