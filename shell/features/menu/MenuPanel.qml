@@ -71,7 +71,11 @@ Rectangle {
   // matches Launcher/PowerMenu. Editor rows still win over the field.
   PanelFocus {
     id: focusCtrl
-    searchField: searchField
+    // Qualified by the root id: an unqualified `searchField` here names
+    // PanelFocus's own property, so the assignment was a self-binding the
+    // engine drops as a loop - leaving the gate with no field and the "/"
+    // filter armed but never focused.
+    searchField: panel.searchField
     serviceVisible: Menu.open
   }
   property alias mode: focusCtrl.mode
@@ -4024,7 +4028,7 @@ Rectangle {
     onBackspaceEmpty: panel.backspaceEmptyChain()
     // Clicking in or out of the field moves focus natively; assert ownership
     // immediately instead of waiting for the healer.
-    onFocusChanged: Qt.callLater(panel.reassertFocus)
+    onFieldFocusChanged: Qt.callLater(panel.reassertFocus)
   }
 
   // The field itself, for the text/focus/word-editing routes below.

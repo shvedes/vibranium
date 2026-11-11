@@ -27,7 +27,11 @@ Item {
   signal accepted(string text)
   signal escaped()
   signal backspaceEmpty()
-  signal focusChanged()
+  // Not `focusChanged`: Item already carries that as the notify signal of its
+  // own `focus` property, and redeclaring it is an invalid override the engine
+  // ignores, which would leave the panel's handler bound to a signal the field
+  // never raises.
+  signal fieldFocusChanged()
 
   InputField {
     id: barInput
@@ -41,6 +45,6 @@ Item {
     onAccepted: text => root.accepted(text)
     onEscaped: root.escaped()
     onBackspaceEmpty: root.backspaceEmpty()
-    onFocusedChanged: root.focusChanged()
+    onFocusedChanged: root.fieldFocusChanged()
   }
 }
