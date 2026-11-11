@@ -623,7 +623,6 @@ Singleton {
     root._restorePending = {}
     root.beginRestore(bundle.entry)
     root._states = {}
-    root._closingRows = {}
     root.stack = [{ id: bundle.entry, sel: 0, y: 0 }]
     root._buildCondIndex()
     root.recomputeDeadLinks()
@@ -790,20 +789,16 @@ Singleton {
 
   function _buildCondIndex() {
     const vars = {}
-    const bound = {}
     if (!root.bundle) {
       root._condVars = vars
-      root._boundVars = bound
       return
     }
     for (const page of root.bundle.pages) {
       for (const item of page.items) {
-        if (item.var) bound[item.var] = true
         for (const cond of item.showIf || []) vars[cond.var] = true
       }
     }
     root._condVars = vars
-    root._boundVars = bound
   }
 
   // --- supplemental state ---
@@ -817,7 +812,6 @@ Singleton {
   property int unifiedBarValueW: 0
 
   // Slots the global close easing is still holding (see slotClosing).
-  property var _closingRows: ({})
 
   // Blow-by-blow latch for per-row slot closes, uid -> true. Armed at the
   // collapse choke point (setExpanded/setInfo with value !== true, where
@@ -847,7 +841,6 @@ Singleton {
   // panel re-filters rows on this instead of every rev.
   property int condRev: 0
   property var _condVars: ({})
-  property var _boundVars: ({})
 
   // Primary panel publishes itself here for `probe` and the debug verbs.
   property var probeSource: null
