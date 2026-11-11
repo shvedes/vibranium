@@ -139,8 +139,7 @@ PanelWindow {
   // view rect stay untouched while it lives, so it can be
   // resized later; save/copy honor it for one grab.
   property var cropFrame: null
-  readonly property var _cropDimRect: editor.cropRect !== null && editor.cropRect.w > 1 && editor.cropRect.h > 1
-    ? editor.cropRect : editor.cropFrame
+  readonly property var _cropDimRect: AnnotationTools.cropDimRect(editor.cropRect, editor.cropFrame)
   // Fades the outer dim veil in for both a staged and an applied frame.
   // Canvas paints are one-shot, not declarative, so a Behavior alone does
   // nothing - onCropDimOpacityChanged drives repaints for every frame.

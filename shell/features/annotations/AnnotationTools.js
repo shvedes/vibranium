@@ -587,6 +587,13 @@ function cropDocument(strokes, rect) {
 // A document rect inside the document view rect, in absolute document
 // pixels. The subtraction is unguarded on purpose: a non-finite field is
 // already 0 to clampRect's own guard, so the two agree.
+// The crop overlay's dim area: the live crop while it has area, otherwise
+// the last applied frame. A one-pixel drag is not a selection yet, so it does
+// not replace the committed frame.
+function cropDimRect(cropRect, cropFrame) {
+  return cropRect !== null && cropRect.w > 1 && cropRect.h > 1 ? cropRect : cropFrame
+}
+
 function clampDocumentRect(r, vr) {
   if (r === null || r === undefined) return null
   const c = clampRect({ x: r.x - vr.x, y: r.y - vr.y, w: r.w, h: r.h }, vr.w, vr.h)
