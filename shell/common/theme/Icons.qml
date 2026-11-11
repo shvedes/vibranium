@@ -78,7 +78,11 @@ Singleton {
 
   property int _scanExitCode: -1
   readonly property bool ready: root._scanExitCode === 0
-  readonly property int indexedCount: Object.keys(root._raw).length
+  // Counted as the scan lands rather than listed on every read: `indexedCount`
+  // is a bound property, and Object.keys on a map of every shipped asset is an
+  // allocation per evaluation for a number the scan already knows.
+  property int _indexed: 0
+  readonly property int indexedCount: root._indexed
 
   // layer: "" -> normal URL (default, monochrome or two-tone when
   //        accentKey is set); "base" -> indicators forced transparent;
@@ -339,6 +343,7 @@ Singleton {
     onExited: code => {
       root._features = Object.assign({}, root._features)
       root._raw = Object.assign({}, root._raw)
+      root._indexed = Object.keys(root._raw).length
       root._scanExitCode = code
     }
   }
