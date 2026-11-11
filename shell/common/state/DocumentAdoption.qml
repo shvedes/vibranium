@@ -153,7 +153,7 @@ Singleton {
     const entry = root._entries[path]
     if (entry === undefined) return null
     root._publish(path, Object.assign({}, entry, {
-      handles: entry.handles.concat([handle])
+      handles: EntryMap.attachHandle(entry.handles, handle)
     }))
     return handle
   }
@@ -168,8 +168,8 @@ Singleton {
     const path = String(handle.path)
     const entry = root._entries[path]
     if (entry === undefined) return false
-    const remaining = entry.handles.filter(h => h !== handle)
-    if (remaining.length === entry.handles.length) return false
+    const remaining = EntryMap.detachHandle(entry.handles, handle)
+    if (remaining === null) return false
     if (remaining.length > 0) {
       root._publish(path, Object.assign({}, entry, { handles: remaining }))
       return true

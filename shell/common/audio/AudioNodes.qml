@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQml
 import Quickshell
 import Quickshell.Services.Pipewire
+import "../collections/EntryMap.js" as EntryMap
 
 // AudioNodes - ONE object tracker over the backend's node set, ONE link
 // tracker per observed node, many observers.
@@ -281,11 +282,11 @@ Singleton {
     // count back.
     const entry = root._entries[key]
     if (entry === undefined) return null
-    root._handles = root._handles.concat([handle])
+    root._handles = EntryMap.attachHandle(root._handles, handle)
     root._publish(key, Object.assign({}, entry, {
-      handles: entry.handles.indexOf(handle) >= 0
+      handles: EntryMap.hasHandle(entry.handles, handle)
         ? entry.handles
-        : entry.handles.concat([handle])
+        : EntryMap.attachHandle(entry.handles, handle)
     }))
     return handle
   }
@@ -311,7 +312,7 @@ Singleton {
     // kind, so a node-set-only observation subscribes to the set and never
     // takes it away again on its own.
     root._ensureObjectTracker()
-    root._setHandles = root._setHandles.concat([handle])
+    root._setHandles = EntryMap.attachHandle(root._setHandles, handle)
     return handle
   }
 
@@ -328,8 +329,8 @@ Singleton {
     if (root._handles.indexOf(handle) < 0) return
     const from = root._entryOf(handle)
     if (from !== undefined) {
-      const remaining = from.handles.filter(h => h !== handle)
-      if (remaining.length === from.handles.length) return
+      const remaining = EntryMap.detachHandle(from.handles, handle)
+      if (remaining === null) return
       if (remaining.length > 0) {
         root._publish(from.key, Object.assign({}, from, { handles: remaining }))
       } else {
@@ -365,8 +366,9 @@ Singleton {
     // can already have answered.
     const entry = root._entries[key]
     if (entry === undefined) return
+    const without = EntryMap.detachHandle(entry.handles, handle)
     root._publish(key, Object.assign({}, entry, {
-      handles: entry.handles.filter(h => h !== handle).concat([handle])
+      handles: EntryMap.attachHandle(without === null ? entry.handles : without, handle)
     }))
   }
 
@@ -402,21 +404,22 @@ Singleton {
   // link tracker back. Returns whether anything was dropped, so release()
   // cannot release the object tracker for a handle it did not count.
   function _drop(handle) {
-    const remainingSets = root._setHandles.filter(h => h !== handle)
-    if (remainingSets.length < root._setHandles.length) {
+    const remainingSets = EntryMap.detachHandle(root._setHandles, handle)
+    if (remainingSets !== null) {
       root._setHandles = remainingSets
       return true
     }
     const entry = root._entryOf(handle)
     if (entry === undefined) return false
-    const remaining = root._handles.filter(h => h !== handle)
-    if (remaining.length === root._handles.length) return false
+    const remaining = EntryMap.detachHandle(root._handles, handle)
+    if (remaining === null) return false
     root._handles = remaining
     // The entry's own count decides whether it survives, not the global
     // one: with observers on two nodes, the last observer of the first one
     // must still give that node's link tracker back while the second node
     // is being observed.
-    const held = entry.handles.filter(h => h !== handle)
+    const held = EntryMap.detachHandle(entry.handles, handle)
+    if (held === null) return true
     if (held.length > 0) {
       root._publish(entry.key, Object.assign({}, entry, { handles: held }))
       return true

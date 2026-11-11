@@ -5,6 +5,7 @@ import QtQml
 import Quickshell
 import Quickshell.Services.Pipewire
 import qs.common
+import "../../common/collections/EntryMap.js" as EntryMap
 
 // PipeWireState - the ONE owner of the shell's PipeWire tracker state.
 //
@@ -310,6 +311,11 @@ Singleton {
       property string peakOwner: ""
       property var peakNode: null
       property var peakMonitor: null
+      // The entry this hold is counted in. Release is BY HANDLE, and the
+      // handle already knows the node it was taken for, so carrying the
+      // entry's key turns that release into a lookup instead of a scan of
+      // every metered node.
+      property string peakKey: ""
 
       readonly property string owner: peakOwner
       // A reading is only reported while the monitor is actually enabled.
@@ -392,7 +398,8 @@ Singleton {
       handle = peakHandleComp.createObject(null, {
         peakOwner: owner,
         peakNode: node,
-        peakMonitor: entry.monitor
+        peakMonitor: entry.monitor,
+        peakKey: key
       })
     } catch (ignored) {
       handle = null
@@ -417,37 +424,37 @@ Singleton {
   // so a node nobody reads leaves nothing behind.
   function releasePeaks(handle) {
     if (handle === null || handle === undefined) return false
-    let released = false
-    for (const key in root._peakEntries) {
-      const entry = root._peakEntries[key]
-      if (!entry || !entry.handles || entry.handles.indexOf(handle) < 0) continue
-      const remaining = entry.handles.filter(h => h !== handle)
-      // The handle stops resolving to a live monitor the moment it is
-      // released, so a view that kept a stale handle cannot keep reading a
-      // monitor that is on its way out.
-      handle.peakMonitor = null
-      released = true
-      if (remaining.length > 0) {
-        entry.monitor.peakHandles = remaining
-        root._peakEntries = Object.assign({}, root._peakEntries, {
-          [key]: Object.assign({}, entry, { handles: remaining })
-        })
-        return true
-      }
-      // Last hold for this node: unbind, then destroy.
-      entry.monitor.peakHandles = []
-      entry.monitor.peakTarget = null
-      try {
-        entry.monitor.destroy()
-      } catch (ignored) {
-        // A monitor that is already gone is the outcome we wanted anyway.
-      }
-      const next = Object.assign({}, root._peakEntries)
-      delete next[key]
-      root._peakEntries = next
+    // The hold names the entry it was counted in, so this is the entry's own
+    // lookup rather than a walk of every metered node with a membership test
+    // for each - and a foreign or already-dropped handle allocates nothing.
+    const key = String(handle.peakKey ?? "")
+    const entry = key === "" ? undefined : root._peakEntries[key]
+    if (!entry || EntryMap.handleCount(entry.handles) === 0) return false
+    const remaining = EntryMap.detachHandle(entry.handles, handle)
+    if (remaining === null) return false
+    // The handle stops resolving to a live monitor the moment it is
+    // released, so a view that kept a stale handle cannot keep reading a
+    // monitor that is on its way out.
+    handle.peakMonitor = null
+    if (remaining.length > 0) {
+      entry.monitor.peakHandles = remaining
+      root._peakEntries = Object.assign({}, root._peakEntries, {
+        [key]: Object.assign({}, entry, { handles: remaining })
+      })
       return true
     }
-    return released
+    // Last hold for this node: unbind, then destroy.
+    entry.monitor.peakHandles = []
+    entry.monitor.peakTarget = null
+    try {
+      entry.monitor.destroy()
+    } catch (ignored) {
+      // A monitor that is already gone is the outcome we wanted anyway.
+    }
+    const next = Object.assign({}, root._peakEntries)
+    delete next[key]
+    root._peakEntries = next
+    return true
   }
 
   // --- default-device changes ------------------------------------------

@@ -15,3 +15,41 @@ function withEntry(entries, key, entry) {
   next[key] = entry
   return next
 }
+
+// Handle-list arithmetic for a refcounted entry store.
+//
+// A store's `handles` array IS its reference count: one element per
+// observation, appended when a consumer takes the entry and dropped when it
+// lets go. Five singletons keep that count - file presence, document
+// adoption, the audio node holds, the battery alert and the peak monitors -
+// and the part that has to agree between them is the release: it answers
+// whether an observation was actually dropped, and a handle the entry never
+// held must not read as a drop.
+//
+// `attachHandle` answers a NEW array, because the entry is published and a
+// reader that captured the old one must not see it change underneath.
+// `detachHandle` answers the new array, or null when the handle was not
+// there - so a miss allocates nothing, which the filter spelling it replaces
+// did on every call.
+function attachHandle(handles, handle) {
+  const base = Array.isArray(handles) ? handles : []
+  return base.concat([handle])
+}
+
+function detachHandle(handles, handle) {
+  if (!Array.isArray(handles)) return null
+  const at = handles.indexOf(handle)
+  if (at < 0) return null
+  const next = handles.slice()
+  next.splice(at, 1)
+  return next
+}
+
+function hasHandle(handles, handle) {
+  return Array.isArray(handles) && handles.indexOf(handle) >= 0
+}
+
+// The observation count of an entry, with a missing list reading as none.
+function handleCount(handles) {
+  return Array.isArray(handles) ? handles.length : 0
+}
