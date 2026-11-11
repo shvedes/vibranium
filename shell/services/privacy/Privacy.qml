@@ -109,12 +109,15 @@ Singleton {
 
   // Audio capture streams, mirrored from the microphone module's Model
   // (isCaptureStream): any app holding the mic shows the green dot.
-  readonly property var captureStreams: {
+  // `includeSinkSide` also admits sink-side input streams (an app's Mic/Aux
+  // tap receives from the source instead of sourcing), which is what
+  // attribution needs and what detection must ignore.
+  function _captureNodes(includeSinkSide) {
     var list = []
     for (var i = 0; i < root.nodes.length; i++) {
       var n = root.nodes[i]
       if (!n || !n.isStream) continue
-      if (n.isSink) continue
+      if (!includeSinkSide && n.isSink) continue
       if (String(n.name || "").indexOf("omarchy_speaker_tuning") === 0) continue
       if (!n.audio) continue
       if (!root._isCaptureStream(n)) continue
@@ -123,20 +126,10 @@ Singleton {
     return list
   }
 
-  // Attribution twin of captureStreams for "<app> is using microphone":
-  // also counts sink-side input streams (an app's Mic/Aux tap receives
-  // from the source instead of sourcing), which detection must ignore.
-  readonly property var micAttrStreams: {
-    var list = []
-    for (var i = 0; i < root.nodes.length; i++) {
-      var n = root.nodes[i]
-      if (!n || !n.isStream) continue
-      if (!n.audio) continue
-      if (!root._isCaptureStream(n)) continue
-      list.push(n)
-    }
-    return list
-  }
+  readonly property var captureStreams: root._captureNodes(false)
+
+  // Attribution twin of captureStreams for "<app> is using microphone".
+  readonly property var micAttrStreams: root._captureNodes(true)
 
   // Any link touching a node id (direction-agnostic).
   readonly property var linkedIds: {
