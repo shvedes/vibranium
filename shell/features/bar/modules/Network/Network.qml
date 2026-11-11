@@ -131,54 +131,24 @@ BarModule {
     && root.connectedWifi.state === ConnectionState.Connecting
 
   // --- tooltip throughput, sampled only while the tooltip is shown ---
-  // Aliased straight through the shared sampler, so the tooltip labels keep
-  // one name for the reading whether it comes from here or from the island.
-  readonly property alias hasStats: stats.hasStats
-  readonly property alias downloadRate: stats.downloadRate
-  readonly property alias uploadRate: stats.uploadRate
-  readonly property alias totalRxBytes: stats.totalRxBytes
-  readonly property alias totalTxBytes: stats.totalTxBytes
-  readonly property alias statsIface: stats.iface
-
-  StatsSampler { id: stats }
-
-  // Which interface the counters come from only moves when the network does,
-  // but the poll re-read the route on every tick - a process spawn twice a
-  // second for an answer the previous tick already had. The counters stay on
-  // the 500ms tick; the route is refreshed once every ten of them, so a route
-  // change still lands within five seconds of a tooltip being open.
-  property int _routeTick: 0
-  readonly property int _routeEveryTicks: 10
-
-  Timer {
-    id: statsPoll
-
-    interval: 500
-    repeat: true
-    running: root.hovered
-    onTriggered: {
-      root._routeTick++
-      if (root._routeTick % root._routeEveryTicks === 0) stats.requestRoute()
-      if (stats.iface !== "") stats.updateStats(stats.counterSample())
-    }
-  }
+  // Read off the one sampler singleton. The tooltip and the island share a
+  // single reading, a single route child and a single 500ms tick, and the
+  // sampler polls only while one of them holds a subscription - the module
+  // acquires on hover and releases on leave, the island does the same around
+  // its own lifetime.
+  readonly property bool hasStats: StatsSampler.hasStats
+  readonly property real downloadRate: StatsSampler.downloadRate
+  readonly property real uploadRate: StatsSampler.uploadRate
+  readonly property real totalRxBytes: StatsSampler.totalRxBytes
+  readonly property real totalTxBytes: StatsSampler.totalTxBytes
+  readonly property string statsIface: StatsSampler.iface
 
   onHoveredChanged: {
-    if (root.hovered) {
-      stats.reset()
-      Qt.callLater(() => {
-        if (!root.hovered) return
-        stats.requestRoute()
-      })
-    } else {
-      stats.stop()
-    }
+    if (root.hovered) StatsSampler.acquire()
+    else StatsSampler.release()
   }
 
-  Component.onDestruction: {
-    statsPoll.stop()
-    stats.stop()
-  }
+  Component.onDestruction: StatsSampler.release()
 
   // Map the link verdict to the word + color the island uses for the
   // connected row.

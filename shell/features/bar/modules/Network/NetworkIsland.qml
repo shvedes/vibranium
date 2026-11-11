@@ -74,16 +74,20 @@ Item {
   readonly property real rowPad: 4
 
   // --- metrics ---
-  // Aliased through the shared sampler: the metrics grid and the speedtest
-  // read one name for a reading the tooltip reads too.
-  readonly property alias hasStats: stats.hasStats
-  readonly property alias downloadRate: stats.downloadRate
-  readonly property alias uploadRate: stats.uploadRate
-  readonly property alias totalRxBytes: stats.totalRxBytes
-  readonly property alias totalTxBytes: stats.totalTxBytes
-  readonly property alias statsIface: stats.iface
+  // Read off the one sampler singleton: the metrics grid and the speedtest read
+  // the same reading the tooltip reads, from the same route child and tick.
+  // This surface holds a subscription for its lifetime (see below), so the
+  // sampler polls while it is open and stops when it closes.
+  readonly property bool hasStats: StatsSampler.hasStats
+  readonly property real downloadRate: StatsSampler.downloadRate
+  readonly property real uploadRate: StatsSampler.uploadRate
+  readonly property real totalRxBytes: StatsSampler.totalRxBytes
+  readonly property real totalTxBytes: StatsSampler.totalTxBytes
+  readonly property string statsIface: StatsSampler.iface
 
-  StatsSampler { id: stats }
+  // The sampler's route fork stands down while our speed test owns the link,
+  // and comes back on its own when the test ends.
+  onSpeedtestRunningChanged: StatsSampler.routePaused = root.speedtestRunning
 
   // --- wifi state ---
   // The derived wifi display model as ONE object: exactly what
@@ -861,13 +865,16 @@ Item {
     if (root.actionKind === "connect") otherList.seatTo(0, false, "network-connect")
   }
 
-  // Kick a scan + immediate sync on show, then poll stats + networks.
+  // Kick a scan + immediate sync on show, then poll networks.
   // The content is incubated fresh, so creation is open and every show
   // starts clean: no preserved dropdowns, passphrases, failures,
   // actions or profile state from the last visit. Teardown stops the
   // speedtest traffic and clears its results, so the next open lands on
   // a fresh section instead of stale figures.
   Component.onCompleted: {
+    // This surface is the sampler's second kind of reader: it exists only while
+    // the host shows it, so its lifetime is the subscription.
+    StatsSampler.acquire()
     root.clearAction()
     root.passwordText = ""
     root.failureSsid = ""
@@ -883,7 +890,7 @@ Item {
   Component.onDestruction: {
     root.stopSpeedtest()
     root.clearSpeedtest()
-    stats.stop()
+    StatsSampler.release()
   }
 
   Timer {
@@ -895,15 +902,11 @@ Item {
     // poll is open-gated by lifetime.
     running: true
     onTriggered: {
-      // The route fork is the only child this section runs, and it stays off
-      // the link while a speed test is saturating it: the measurement is the
-      // user's own traffic and a competing child every tick is contention it
-      // never needed. The counters below keep being read throughout - they
-      // cost no fork, and the graph is what shows the test's own throughput.
-      if (!root.speedtestRunning) stats.requestRoute()
-      // Counters only: the interface is whatever the last route reply named,
-      // so the sample does not wait on the fork to land.
-      if (stats.iface !== "") stats.updateStats(stats.counterSample())
+      // Throughput is sampled by the shared sampler's own tick, not here: one
+      // owner for the route child and the sysfs reads, whether the reading is
+      // this island's graph or the bar tooltip's labels. This poll only moves
+      // the wifi list.
+      //
       // Freeze the wifi list while a dropdown is open: swapping the model
       // rebuilds the delegates, which steals a half-typed passphrase every
       // tick - and, with the cursor parked on an expanded row's buttons,

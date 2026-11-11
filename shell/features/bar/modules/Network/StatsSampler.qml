@@ -1,19 +1,38 @@
 // Shared link-throughput sampler for the Network module and its island.
 //
-// Both surfaces read the same two things off the active route: the interface
-// the kernel would use for 1.1.1.1, resolved by `ip` on its own argv, and the
-// two /sys byte counters of that interface. What differs between them is the
-// cadence they ask at, not the reading, so the reading lives here once.
+// ONE owner, not one per surface. The sampler used to be instantiated by the
+// bar module and again by the island's content, each with its own tick, its
+// own `ip route` child and its own pair of sysfs readers - so a hovered
+// tooltip beside an open island polled the same route twice a second and kept
+// two copies of a reading that is a property of the link, not of the surface.
+//
+// A singleton with a subscriber count is the ownership that matches the fact:
+//
+//   acquire()  a surface starts reading (tooltip hover, island open)
+//   release()  it stops; the last one to leave stops the tick and drops the
+//              route child, so nothing polls while no surface is watching
+//
+// The first subscriber resets the reading (a fresh hover must not open on the
+// previous session's rates) and asks for a route immediately; later
+// subscribers share what is already there instead of zeroing it under the
+// surface that is watching.
 //
 // A generated sysfs counter holds content from the moment it exists and raises
 // no filesystem event when that content moves, so a watcher on it can never
 // fire - the value comes from a read, and `blockLoading` keeps that read on the
-// calling turn instead of deferring it behind a job.
+// calling turn instead of deferring it behind a job. The route is a fork, so it
+// is refreshed on a slower cadence than the counters: once a second while a
+// surface is open, which still catches an interface change well inside the
+// window a user would notice.
+pragma Singleton
+
+import QtQml
 import QtQuick
+import Quickshell
 import Quickshell.Io
 import "Model.js" as Model
 
-Item {
+Singleton {
   id: sampler
 
   // The interface the last route reply named, or "" while there is no active
@@ -26,20 +45,39 @@ Item {
   property real totalTxBytes: 0
   property var prevThroughput: null
 
-  // Ask for one route read. The reply lands in noteRoute; a consumer decides
-  // how often it asks, this only refuses to stack two reads.
-  function requestRoute() {
-    if (!routeProc.running) routeProc.running = true
+  // Surfaces currently reading. The tick runs exactly while this is non-zero.
+  property int _subscribers: 0
+  readonly property bool active: sampler._subscribers > 0
+
+  // A speed test saturates the link on purpose; a competing `ip route` every
+  // second is contention the measurement never needed. The island owns that
+  // state, so it sets this while its test runs. The counters keep being read -
+  // they cost no fork, and the graph is what shows the test's own throughput.
+  property bool routePaused: false
+
+  // A surface starts reading. The first one gets a zeroed reading and an
+  // immediate route; a later one inherits the live one.
+  function acquire() {
+    sampler._subscribers++
+    if (sampler._subscribers !== 1) return
+    sampler.reset()
+    sampler._routeTick = 0
+    sampler.requestRoute()
   }
 
-  // Drop the route child. Called when the surface that owns the sampler goes
-  // away: a reply landing after close would find state nobody is reading.
-  function stop() {
+  // A surface stops reading. The last one out stops the child and the tick, so
+  // no process is left sampling a link nobody is looking at.
+  function release() {
+    if (sampler._subscribers === 0) return
+    sampler._subscribers--
+    if (sampler._subscribers > 0) return
+    sampler.reset()
+    sampler.routePaused = false
     if (routeProc.running) routeProc.running = false
   }
 
-  // The zero reading a fresh hover starts from, so the graph never opens on
-  // the previous hover's rates. A cleared interface is the "route unknown"
+  // The zero reading a fresh acquisition starts from, so the graph never opens
+  // on the previous session's rates. A cleared interface is the "route unknown"
   // state noteRoute resolves next.
   function reset() {
     sampler.prevThroughput = null
@@ -49,6 +87,13 @@ Item {
     sampler.uploadRate = 0
     sampler.totalRxBytes = 0
     sampler.totalTxBytes = 0
+  }
+
+  // Ask for one route read. The reply lands in noteRoute; a consumer decides
+  // how often it asks, this only refuses to stack two reads.
+  function requestRoute() {
+    if (sampler.routePaused) return
+    if (!routeProc.running) routeProc.running = true
   }
 
   // One stats tick: hand the raw sample plus the previous one to the library
@@ -96,10 +141,9 @@ Item {
       return
     }
     // A route that appeared is the one transition worth sampling at once:
-    // waiting for the next tick would hold the metrics empty for another 0.5s
-    // after a surface opens. A changed interface re-seeds the throughput
-    // baseline anyway, so the back-to-back pair cannot manufacture a rate out
-    // of a short interval.
+    // waiting for the next tick would hold the metrics empty for another 0.5s.
+    // A changed interface re-seeds the throughput baseline anyway, so the
+    // back-to-back pair cannot manufacture a rate out of a short interval.
     sampler.updateStats(sampler.counterSample())
   }
 
@@ -115,6 +159,21 @@ Item {
       return String(view.text()).trim()
     } catch (e) {
       return ""
+    }
+  }
+
+  // The one sampling tick. Counters every 500ms; the route fork once a second.
+  property int _routeTick: 0
+  readonly property int _routeEveryTicks: 2
+
+  Timer {
+    interval: 500
+    repeat: true
+    running: sampler.active
+    onTriggered: {
+      sampler._routeTick++
+      if (sampler._routeTick % sampler._routeEveryTicks === 0) sampler.requestRoute()
+      if (sampler.iface !== "") sampler.updateStats(sampler.counterSample())
     }
   }
 
