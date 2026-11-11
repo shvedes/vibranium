@@ -2020,9 +2020,8 @@ function leadingNumber(text) {
 function exactOptionIndex(options, query, family) {
   const q = String(query)
   if (q === "") return -1
-  const lower = (v) => v === undefined || v === null ? "" : String(v).toLowerCase().trim()
-  const fam = String(family === undefined || family === null ? "" : family)
-    .toLowerCase().trim()
+  const lower = SU.lowerTrim
+  const fam = SU.lowerTrim(family)
   const list = StoreGuards.asList(options)
   for (let o = 0; o < list.length; o++) {
     const opt = list[o] || {}
@@ -2066,9 +2065,8 @@ function bestOptionIndex(options, query, family) {
   const q = String(query)
   if (q === "") return -1
   // The same fold exactOptionIndex applies, for the same reason it is local.
-  const lower = (v) => v === undefined || v === null ? "" : String(v).toLowerCase().trim()
-  const fam = String(family === undefined || family === null ? "" : family)
-    .toLowerCase().trim()
+  const lower = SU.lowerTrim
+  const fam = SU.lowerTrim(family)
   const list = StoreGuards.asList(options)
   let best = -1
   let bestScore = 0
@@ -2294,7 +2292,7 @@ function keyRoute(ctx) {
   // field's focus off the editor mid-edit, which is how a numeric row ends
   // up behaving like a text field that takes letters.
   if (ctx.editor === true) return { name: "swallow", arg: null }
-  const text = ctx.text === undefined || ctx.text === null ? "" : String(ctx.text)
+  const text = SU.textOf(ctx.text)
   if (!ctrl && !meta && list && text.length === 1 && text.charCodeAt(0) >= 32)
     return { name: text === "/" ? "scoped" : "query", arg: text }
 

@@ -795,8 +795,8 @@ function hex4(n) {
 // why the history writer always generates one; a nullish payload is the empty
 // string rather than the word "null".
 function encryptSecret(s, key) {
-  const text = s === undefined || s === null ? "" : String(s)
-  const k = key === undefined || key === null ? "" : String(key)
+  const text = SU.textOf(s)
+  const k = SU.textOf(key)
   if (text === "") return ""
   if (k === "") return text
   let out = ""

@@ -1,6 +1,7 @@
 .pragma library
 
 .import "../collections/StoreGuards.js" as StoreGuards
+.import "../text/StringUtils.js" as SU
 
 // Secret handle ownership: the tracking list an owner keeps beside
 // SecretStore.
@@ -19,7 +20,7 @@
 // accepted.
 
 function _key(handle) {
-  return handle === undefined || handle === null ? "" : String(handle)
+  return SU.textOf(handle)
 }
 
 function _copy(handles) {

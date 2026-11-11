@@ -3,6 +3,7 @@
 .import "../../common/theme/FileIcons.js" as FileIcons
 .import "../../common/text/Format.js" as Format
 .import "../../common/collections/StoreGuards.js" as StoreGuards
+.import "../../common/text/StringUtils.js" as SU
 // Pure helpers for the Printers service and bar module: ipptool -tv report
 // parsing, state-label formatting, filtering. No Qt imports - node's vm
 // hosts it exactly like QJSEngine does (the
@@ -310,8 +311,7 @@ function baseName(p) {
 // One IPP attribute as display text: an attribute CUPS omits reads as "",
 // never the string "undefined". Every row projection below starts here.
 function textOf(row, key) {
-  const v = row === null || row === undefined ? undefined : row[key]
-  return v === undefined || v === null ? "" : String(v)
+  return SU.textOf(row === null || row === undefined ? undefined : row[key])
 }
 
 // Display title for a job row: the file name. CUPS usually carries the

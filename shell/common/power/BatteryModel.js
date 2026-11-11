@@ -4,6 +4,7 @@
 .import "../text/Duration.js" as DurationFmt
 .import "../math/Range.js" as Range
 .import "../collections/StoreGuards.js" as StoreGuards
+.import "../text/StringUtils.js" as SU
 
 // Pure helpers for the Battery bar module: level thresholds, icon and
 // tone selection, device labels/type glyphs and row projections.
@@ -241,7 +242,7 @@ function detailRows(info) {
   var r = info || {}
   var out = []
   function add(label, value) {
-    var v = String(value === undefined || value === null ? "" : value).trim()
+    var v = SU.textOf(value).trim()
     if (v === "") return
     out.push({ label: label, value: v })
   }

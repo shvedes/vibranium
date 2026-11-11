@@ -7,6 +7,19 @@
 // from any .js module via `.import "StringUtils.js" as SU`.
 .pragma library
 
+// A value as display text: the string itself for a string, "" for null and
+// undefined, String() for everything else. Canonical home of the nullish
+// string guards the row projections kept spelling out.
+function textOf(value) {
+  return value === undefined || value === null ? "" : String(value)
+}
+
+// A value folded for case-insensitive comparison: textOf lowercased and
+// trimmed. Canonical home of the MenuLib option-identity fold.
+function lowerTrim(value) {
+  return textOf(value).toLowerCase().trim()
+}
+
 function stripJsonc(raw) {
   return String(raw || "")
     .replace(/^[ \t]*\/\/[^\n]*(\n|$)/gm, "")

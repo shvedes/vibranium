@@ -3,6 +3,7 @@
 .import "./text/Format.js" as Format
 .import "./text/Duration.js" as DurationFmt
 .import "./math/Range.js" as Range
+.import "./text/StringUtils.js" as SU
 
 // Shared NowPlaying helpers: player sort, mm:ss, seek math, the player// volume path (gate, mute/resume memory, and the round-trip probe that
 // finds out whether a player takes a volume write at all).
@@ -208,7 +209,7 @@ function volumeProbeTook(target, observed, tolerance) {
 // the player dropped, or a differently typed value all answer null, so a
 // transport hiccup can never be read as a dropped write.
 function volumeReadback(output) {
-  const text = output === undefined || output === null ? "" : String(output)
+  const text = SU.textOf(output)
   if (text.trim() === "") return null
   let reply
   try {
