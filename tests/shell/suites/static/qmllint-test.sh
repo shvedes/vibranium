@@ -195,9 +195,29 @@ if (( ${#QML_FILES[@]} != RECORDED_FILE_COUNT )); then
   t_note "shell/README.md's \"$RECORDED_FILE_COUNT files\" is stale: the tree now holds ${#QML_FILES[@]} .qml files"
 fi
 
+# Three whole-tree runs are needed: the baseline, the second run the
+# determinism section compares against, and the broken-import control. They are
+# independent and each costs about seven seconds on this tree, so they run
+# together and cost one run's wall clock. Every assertion below reads a file
+# rather than a live process, so the order they are asserted in is unchanged.
+#
+# The baseline goes through the shared cache in lib.sh, because the import
+# resolver's cross-check wants the identical stream and there is no reason to
+# lint this tree twice for one note.
 LINT_OUT="$WORK/lint.txt"
+LINT_OUT2="$WORK/lint2.txt"
+BAD_OUT="$WORK/lint-broken.txt"
+BAD_IMPORT="$WORK/broken-import"
+mkdir -p "$BAD_IMPORT"
+
 LINT_STATUS=0
-"$QMLLINT_BIN" -I "$WORK" "${QML_FILES[@]}" >"$LINT_OUT" 2>&1 || LINT_STATUS=$?
+LINT_STATUS2=0
+BAD_STATUS=0
+
+qmllint_baseline "$LINT_OUT" & _PID_BASE=$!
+"$QMLLINT_BIN" -I "$WORK" "${QML_FILES[@]}" >"$LINT_OUT2" 2>&1 & _PID_SECOND=$!
+"$QMLLINT_BIN" -I "$BAD_IMPORT" "${QML_FILES[@]}" >"$BAD_OUT" 2>&1 & _PID_BROKEN=$!
+wait "$_PID_BASE" || LINT_STATUS=$?
 
 # A diagnostic header is "Severity: path:line:col: message [kind]". Only
 # headers are counted: a source-echo line that happens to begin with
@@ -349,9 +369,9 @@ else
 fi
 
 t_section "the run is deterministic"
-LINT_OUT2="$WORK/lint2.txt"
-LINT_STATUS2=0
-"$QMLLINT_BIN" -I "$WORK" "${QML_FILES[@]}" >"$LINT_OUT2" 2>&1 || LINT_STATUS2=$?
+# The second run must be a real invocation, not the cache: the claim under test
+# is that two runs of the tool agree, which a cached stream could not show.
+wait "$_PID_SECOND" || LINT_STATUS2=$?
 WARN_SET1="$(grep -E '^(Error|Warning): ' "$LINT_OUT" | LC_ALL=C sort)"
 WARN_SET2="$(grep -E '^(Error|Warning): ' "$LINT_OUT2" | LC_ALL=C sort)"
 t_eq "two runs agree on the exit status" "$LINT_STATUS" "$LINT_STATUS2"
@@ -367,11 +387,7 @@ t_section "the -I baseline is doing the work (deliberate control)"
 # It does not: the diagnostic set grows by an order of magnitude and tags
 # appear that a working baseline never produces. That is the proof the -I
 # baseline is load-bearing.
-BAD_IMPORT="$WORK/broken-import"
-mkdir -p "$BAD_IMPORT"
-BAD_OUT="$WORK/lint-broken.txt"
-BAD_STATUS=0
-"$QMLLINT_BIN" -I "$BAD_IMPORT" "${QML_FILES[@]}" >"$BAD_OUT" 2>&1 || BAD_STATUS=$?
+wait "$_PID_BROKEN" || BAD_STATUS=$?
 BAD_HEADERS="$(count_headers "$BAD_OUT")"
 GOOD_HEADERS="$(count_headers "$LINT_OUT")"
 

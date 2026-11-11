@@ -96,6 +96,74 @@ shell_qmldir_files() {
   find "$SHELL_DIR" -name 'qmldir' -type f | sort
 }
 
+# --- the shared lint baseline ----------------------------------------------
+#
+# qmllint over the whole tree is the most expensive single thing this suite
+# does, and more than one suite reads the identical diagnostic stream: the lint
+# baseline, its determinism run, and the import resolver's cross-check. These
+# two helpers let thems share one run instead of paying for it each.
+
+# _qmllint_run <out-file> - one whole-tree lint, both streams into <out-file>,
+# with the throwaway `qs` import root shell/README.md publishes. Returns
+# qmllint's own exit status.
+_qmllint_run() {
+  local out="$1" cfg rc
+  local -a files
+  mapfile -t files < <(shell_qml_files | LC_ALL=C sort)
+  cfg="$(mktemp -d "${TMPDIR:-/tmp}/vb-qmllint-i.XXXXXX")" || return 1
+  ln -s "$SHELL_DIR" "$cfg/qs"
+  "$QMLLINT_BIN" -I "$cfg" "${files[@]}" >"$out" 2>&1
+  rc=$?
+  rm -rf "$cfg"
+  return $rc
+}
+
+# qmllint_baseline <out-file> - the tree's diagnostic stream, from a cache
+# shared by every suite that wants it.
+#
+# The entry is keyed on the tool's version plus every linted path's mtime and
+# size, so it is never served for a tree or a binary that has changed. Only a
+# run that exited 0 is cached: a red baseline has to stay visible rather than
+# being replayed as green by a later suite. Publishing goes through a private
+# file and rename, so a concurrent reader sees one whole stream, never a
+# half-written one.
+qmllint_baseline() {
+  local out="$1" root entry tmp key rc=0
+  local -a files
+  mapfile -t files < <(shell_qml_files | LC_ALL=C sort)
+
+  root="${SHELL_TEST_CACHE_DIR:-${TMPDIR:-/tmp}/vb-shell-lint-cache}"
+  if ! mkdir -p "$root" 2>/dev/null; then
+    _qmllint_run "$out"
+    return
+  fi
+
+  key="$( {
+    "$QMLLINT_BIN" --version 2>/dev/null || true
+    printf '%s\n' "${files[@]}"
+    find "$SHELL_DIR" -name '*.qml' -type f -printf '%T@ %s %p\n' | LC_ALL=C sort
+  } | cksum | awk '{ print $1 "-" $2 }')"
+  entry="$root/lint-$key.txt"
+
+  if [[ -s $entry ]]; then
+    cp "$entry" "$out"
+    return 0
+  fi
+
+  tmp="$(mktemp "$root/.entry.XXXXXX")" || {
+    _qmllint_run "$out"
+    return
+  }
+  _qmllint_run "$tmp" || rc=$?
+  if ((rc == 0)) && mv -f "$tmp" "$entry" 2>/dev/null; then
+    cp "$entry" "$out"
+  else
+    cp "$tmp" "$out"
+    rm -f "$tmp"
+  fi
+  return $rc
+}
+
 # rel_to_shell turns an absolute path into a shell-relative one for readable
 # diagnostics. Paths outside the tree are printed absolute.
 rel_to_shell() {

@@ -11,8 +11,10 @@ bash tests/shell/run-all.sh --baseline         # recorded pre-existing failures
 bash tests/shell/suites/js/menu.test.mjs       # one suite, directly
 ```
 
-Current state: **63 suites, 32,532 assertions**, in about two minutes.
-`baseline.txt` is empty — nothing is waived, so any failure is a regression.
+Current state: **63 suites, 32,532 assertions**, in 12-15 seconds on a 16-core
+machine - the wall clock is set by the lint suite's whole-tree runs, and
+everything else finishes underneath them. `baseline.txt` is empty - nothing is
+waived, so any failure is a regression.
 
 ## What is covered
 
@@ -144,7 +146,8 @@ tests/shell/
   baseline.txt          recorded pre-existing failures (currently none)
   KNOWN_ISSUES.md       38 verified defects, severity-ordered
   lib/
-    lib.sh              paths, and the Quickshell/Qt platform gate
+    lib.sh              paths, the Quickshell/Qt platform gate, and the
+                        shared whole-tree lint baseline
     harness.sh          bash assertion kit
     qmlloader.mjs       node loader for QML .pragma library scripts
     assert.mjs          JS assertion kit
@@ -223,9 +226,11 @@ beyond its recorded failures is a regression, not an expected state. Entries
 require a reason, because a baseline line without one is indistinguishable
 from a test nobody got round to writing.
 
-Suites run sequentially in a fixed order. The whole run is about half a
-minute; trading that for output that does not depend on scheduling is the
-right way round.
+Suites run up to `--jobs` at a time (default: `nproc`) and are reported in
+discovery order, so the table is byte-identical whatever order they finish in.
+The run is bounded by its slowest suite rather than by their sum: `qmllint`
+runs three whole-tree lint passes concurrently and takes about eight seconds,
+and most of the other 62 suites finish well inside that.
 
 ## Writing a suite
 

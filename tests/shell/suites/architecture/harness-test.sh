@@ -251,7 +251,10 @@ if command -v qs >/dev/null 2>&1 && ! platform_mismatch; then
 import QtQuick
 Item { Component.onCompleted: { this_is_not_defined_xyz() } }
 QML
-  if qp_run "$WORK/dying-probe.qml" 10; then
+  # A probe that throws before its sentinel can never print one, so the timeout
+  # is the whole bound on this case; a short one keeps the suite from spending
+  # ten seconds proving that qp_run does not hang.
+  if qp_run "$WORK/dying-probe.qml" 2; then
     t_no "a probe that throws before its sentinel is reported as unfinished" "qp_run returned 0"
   else
     t_ok "a probe that throws before its sentinel is reported as unfinished"

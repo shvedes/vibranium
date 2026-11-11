@@ -126,7 +126,16 @@ theme_dirs() {
 # parsed the way both readers parse it: the key is everything before the first
 # "=", with the quotes and spaces vb-theme-set-templates:91 strips, and a
 # comment line (a leading #) and a blank line are dropped.
+#
+# Memoised per file: the sections below read the same 30 palettes a dozen times
+# each, and the parse is a while-read loop rather than a cheap builtin.
+declare -A PALETTE_KEYS_CACHE=()
 palette_keys() {
+  local file="$1" line key out=""
+  if [[ -n ${PALETTE_KEYS_CACHE[$file]+set} ]]; then
+    printf '%s' "${PALETTE_KEYS_CACHE[$file]}"
+    return 0
+  fi
   while IFS= read -r line; do
     line="${line#"${line%%[![:space:]]*}"}"
     [[ -z $line || "$line" == \#* ]] && continue
@@ -134,8 +143,10 @@ palette_keys() {
     key="${line%%=*}"
     key="${key//[\"\' ]/}"
     [[ -n $key ]] || continue
-    printf '%s\n' "$key"
-  done <"$1"
+    out+="$key"$'\n'
+  done <"$file"
+  PALETTE_KEYS_CACHE["$file"]="$out"
+  printf '%s' "$out"
 }
 
 # palette_value <file> <key> - the quoted-hex value a colors.list gives one
@@ -514,26 +525,40 @@ t_eq "every documented colour is asked for by some template" "" \
 t_note "with the shades computed there is no unreachable palette entry left: the 14 colours the doc documents are the 14 the templates read, and the derived set and the palette are the same set. Before the ramp the darkest foreground shade was in every colors.list and no template ever rendered it"
 
 t_section "the palette every theme declares, checked key by key"
+# "Every theme declares the same colour names" is one fact about the tree, so
+# the digest of all 30 name sets is computed once. Inside the loop it was 30
+# identical 30-theme digests, which is the quadratic part of this suite.
+NAME_SET_VARIANTS="$(for theme in "${THEMES[@]}"; do
+  palette_keys "$THEMES_DIR/$theme/colors.list" | LC_ALL=C sort -u |
+    md5sum | cut -d' ' -f1
+done | LC_ALL=C sort -u | grep -c .)"
 MISSING_COLOUR=""
 for theme in "${THEMES[@]}"; do
   keys="$(palette_keys "$THEMES_DIR/$theme/colors.list")"
+  # One associative lookup per name in each direction, instead of a grep per
+  # name: 30 themes x 14 names x 2 is most of the process spawns this suite
+  # makes, and the membership test is the same one.
+  declare -A HAVE=() WANT=()
+  while read -r key; do
+    [[ -n $key ]] && HAVE["$key"]=1
+  done <<<"$keys"
+  while read -r key; do
+    [[ -n $key ]] && WANT["$key"]=1
+  done <<<"$DOC_KEYS"
   absent=""
   while read -r key; do
     [[ -n $key ]] || continue
-    printf '%s\n' "$keys" | grep -qxF -- "$key" || absent="$absent $key"
+    [[ -n ${HAVE[$key]+set} ]] || absent="$absent $key"
   done <<<"$DOC_KEYS"
   t_eq "$theme defines all 26 documented colours" "" "$absent"
   extra=""
   while read -r key; do
     [[ -n $key ]] || continue
-    printf '%s\n' "$DOC_KEYS" | grep -qxF -- "$key" || extra="$extra $key"
+    [[ -n ${WANT[$key]+set} ]] || extra="$extra $key"
   done <<<"$keys"
   t_eq "$theme names no colour outside the documented palette" "" "$extra"
   t_eq "$theme's colour-name set is the one every other theme declares" "1" \
-    "$(for t2 in "${THEMES[@]}"; do
-      palette_keys "$THEMES_DIR/$t2/colors.list" | LC_ALL=C sort -u |
-        md5sum | cut -d' ' -f1
-    done | LC_ALL=C sort -u | grep -c .)"
+    "$NAME_SET_VARIANTS"
   MISSING_COLOUR="$MISSING_COLOUR$absent"
 done
 t_eq "no theme is missing a colour the shell reads" "" "$MISSING_COLOUR"

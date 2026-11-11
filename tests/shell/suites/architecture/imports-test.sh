@@ -349,13 +349,14 @@ t_section "cross-check only: qmllint's own import diagnostics"
 # because a binary is absent is not a suite. Recorded so the numbers the
 # README publishes can be read against this run.
 if [[ -x $QMLLINT_BIN ]]; then
-  lint_tmp="$(mktemp -d "${TMPDIR:-/tmp}/vb-imports-lint.XXXXXX")"
-  ln -s "$SHELL_DIR" "$lint_tmp/qs"
-  mapfile -t LINT_FILES < <(shell_qml_files)
-  lint_out="$("$QMLLINT_BIN" -I "$lint_tmp" "${LINT_FILES[@]}" 2>&1 || true)"
-  rm -rf "$lint_tmp"
-  t_note "qmllint on ${#LINT_FILES[@]} files: $(grep -c 'Warning:' <<<"$lint_out") warnings, $(grep -c 'Error:' <<<"$lint_out") errors"
-  t_note "of which unresolved-type/uncreatable-type: $(grep -cE 'unresolved-type|uncreatable-type' <<<"$lint_out")"
+  # The same stream the lint suite reads, from the shared cache in lib.sh: the
+  # note below wants the numbers, not a second seven-second run of the tool.
+  lint_out_file="$WORK/lint.txt"
+  qmllint_baseline "$lint_out_file" || true
+  lint_out="$(<"$lint_out_file")"
+  lint_count="$(shell_qml_files | wc -l | tr -d ' ')"
+  t_note "qmllint on $lint_count files: $(grep -c 'Warning:' <<<"$lint_out") warnings, $(grep -c 'Error:' <<<"$lint_out") errors"
+  t_note "of which unresolved-type/uncreatable-type: $(grep -cE 'unresolved-type|uncreatable-type' <<<"$lint_out" || true)"
 else
   t_note "qmllint is not at $QMLLINT_BIN, so the cross-check is unavailable and nothing is asserted about it"
 fi

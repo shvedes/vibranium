@@ -21,9 +21,10 @@
 # baseline entry is a claim about a defect that no longer exists and should
 # be pruned rather than left to rot.
 #
-# Every suite is run sequentially and in a fixed order. The whole thing takes
-# about half a minute; trading that for a run whose output does not depend on
-# scheduling is the right way round.
+# Suites run up to --jobs at a time (default: nproc) and are reported in
+# discovery order, so the table does not depend on scheduling: execution is
+# parallel, the report is not. The run is bounded by its slowest suite - the
+# lint baseline's whole-tree passes - rather than by the sum of all 63.
 
 set -uo pipefail
 
@@ -384,7 +385,9 @@ fi
 # the table is byte-identical whatever order they finish in.
 #
 # A suite running under offscreen Quickshell or qmllint is memory-hungry, so
-# --jobs is opt-in and the default stays 1.
+# --jobs is capped deliberately: the default is nproc, and the run is bounded
+# by the worst suite rather than by the sum, so more jobs stop paying off well
+# before the core count.
 
 _run_one() {
   local name="$1" path="$2" kind="$3"
