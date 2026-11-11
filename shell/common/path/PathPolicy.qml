@@ -52,6 +52,15 @@ Singleton {
     return root._project(PP.authorize(rootPath, options), true)
   }
 
+  // A name that becomes one path segment - a theme, a wallpaper - judged by
+  // the helper's single rule: empty, over-long, NUL, traversal, then a
+  // separator. An empty answer means the name is usable as a segment; any
+  // other code names the first rule it broke. The QML side cannot import the
+  // helper directly, so this is the projection it needs.
+  function segmentError(name, limit) {
+    return PP.segmentError(name, limit)
+  }
+
   // A request without a usable options object cannot be judged, so a
   // malformed call never reads as a permissive default. An operation outside
   // the helper's vocabulary is refused here, before the lexical pass: the
