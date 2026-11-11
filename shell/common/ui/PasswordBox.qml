@@ -196,6 +196,13 @@ Rectangle {
     horizontalAlignment: TextInput.AlignHCenter
     clip: true
     focus: true
+    // `busy` names the authentication-in-flight state, so it gates the field
+    // it names. Both in-tree consumers also bind `enabled` to the same state,
+    // so this is defence in depth rather than a behaviour change for them - but
+    // a consumer that sets busy alone must not keep taking keystrokes and a
+    // submitted() for the secret being authenticated. Root enabled still wins,
+    // so an explicitly disabled box stays disabled.
+    enabled: root.enabled && !root.busy
     // Kept for its clipboard-masking semantics; rendering ignores it.
     echoMode: (root.hidden && !root.revealed) ? TextInput.Password : TextInput.Normal
     // The style installs an editing context menu whose Cut and Copy write the
@@ -319,7 +326,12 @@ Rectangle {
         Text {
           required property int index
 
-          text: (root.hidden && !root.revealed) ? Ui.passwordEcho : passwordInput.text[index]
+          // A departing glyph's delegate is rebound against the new, shorter
+          // text before the model trims it. Reading past the end would answer
+          // undefined and log one warning per secret character; the guard keeps
+          // the frame silent while the row is already on its way out.
+          text: (root.hidden && !root.revealed) ? Ui.passwordEcho
+            : (index < passwordInput.text.length ? passwordInput.text[index] : "")
           color: Theme.color("foreground_0")
           font.pixelSize: 24
           font.family: Ui.fontFamily
