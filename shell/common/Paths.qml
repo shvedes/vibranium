@@ -3,6 +3,7 @@ pragma Singleton
 import Quickshell
 import QtCore
 import "text/StringUtils.js" as SU
+import "text/FileUri.js" as FileUri
 
 // Resolved XDG/Vibranium paths. Mirrors default/uwsm/env fallbacks so the
 // shell works identically under uwsm and bare sessions.
@@ -96,15 +97,11 @@ Singleton {
 
   // Absolute path to encoded file:// URL, one encodeURIComponent per
   // segment so spaces, "#" and unicode survive (encodeURI leaves those).
-  // Shared by WallpaperView and LockscreenSurfaceView.
+  // Shared by WallpaperView and LockscreenSurfaceView. The empty and root
+  // paths stay the bare scheme, which is the form the directory fields
+  // compare against.
   function toFileUrl(path) {
-    const parts = String(path ?? "").split("/")
-    let url = "file://"
-    for (let i = 0; i < parts.length; i++) {
-      if (parts[i] === "") continue
-      url += "/" + encodeURIComponent(parts[i])
-    }
-    return url
+    return FileUri.toUri(path, { blankNull: true, bareRoot: true })
   }
 
   // A `file:` URL as the canonical encoded file:// URL the Image loader
@@ -112,24 +109,6 @@ Singleton {
   // so an already-encoded "%23" and a raw "#" both land on "%23" instead of
   // one double-encoding or the other truncating at the fragment delimiter.
   function normalizeFileUrl(url) {
-    let p = String(url ?? "")
-    if (p.startsWith("file://")) {
-      p = p.substring(7)
-      if (p.startsWith("localhost/"))
-        p = p.substring(9)
-      else if (p.startsWith("localhost")) {
-        const slash = p.indexOf("/")
-        p = slash >= 0 ? p.substring(slash) : ""
-      }
-      if (p !== "" && p[0] !== "/") p = "/" + p
-    } else if (p.startsWith("file:")) {
-      p = p.substring(5)
-      if (p !== "" && p[0] !== "/") p = "/" + p
-    }
-    try {
-      p = decodeURIComponent(p)
-    } catch (ignored) {
-    }
-    return root.toFileUrl(p)
+    return root.toFileUrl(FileUri.fromUri(url))
   }
 }
