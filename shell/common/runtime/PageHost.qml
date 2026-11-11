@@ -54,8 +54,7 @@ Singleton {
   // existed: state owners are instantiated ahead of the page surface, and a
   // request from that window is honored instead of being dropped.
   function adopt(handler) {
-    if (typeof handler !== "function") return false
-    if (root._handler !== null && root._handler !== handler) return false
+    if (!HandlerSlot.canAdopt(root._handler, handler)) return false
     root._handler = handler
     root._replayPending()
     return true
