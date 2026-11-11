@@ -290,11 +290,7 @@ Singleton {
     Idle.run(() => {
       if (lease.controller !== null) return
       if (root.visible) return
-      const ctrl = lease.demand()
-      if (ctrl !== null) {
-        idleRelease.stop()
-        closeSettle.stop()
-      }
+      if (lease.demand() !== null) idleRelease.stop()
     }, 0, 0, "pass-prewarm")
     // A reload with the panel open lands here with visible already true
     // and no claim (a claim is memory-only), so the open is replayed
@@ -307,7 +303,6 @@ Singleton {
   }
 
   Component.onDestruction: {
-    closeSettle.stop()
     idleRelease.stop()
     // The controller goes before the lease does, so no gate observer ever
     // sees the unit released while its child is still alive.
@@ -334,10 +329,6 @@ Singleton {
     // Demand first: without a controller there is no window to show, so
     // the claim must not be taken and `visible` must not be set.
     if (lease.demand() === null) return false
-    closeSettle.stop()
-    // The new session owns the grace: a flow still reporting from a close
-    // before this one must not extend the wait this close will take.
-    root._flowDeadline = 0
     root.mode = "menu"
     root.currentDir = ""
     root.selectedPath = ""
@@ -367,7 +358,6 @@ Singleton {
     // controller, and the next open inherits a warm scan and only re-probes
     // in the background (see onVisibleChanged). Copy-only demands without a
     // panel still release via idleRelease.
-    root._flowDeadline = 0
   }
   function open() { root.toggle(); return true }
   function close() { root.hidePanel(); return true }
@@ -409,39 +399,11 @@ Singleton {
   // Idempotent and callable with nothing loaded: Boot's unit teardown
   // hook and the close settle both land here, and the second call is a
   // no-op rather than a double release.
-  // How long the close settle waits for a flow the panel started before it
-  // hands the controller back anyway. The window is already gone by then, so
-  // the wait costs the user nothing they can see; the bound is what stops a
-  // child that never exits - an ssh passphrase prompt on a push, a
-  // pinentry nobody answers on a save - from pinning the controller
-  // resident for the rest of the session.
-  readonly property int flowGraceMs: 8000
-  // The tick the wait gives up at, set when the panel hides and cleared by
-  // the settle itself and by any open, so a flow left over from a previous
-  // close can never extend the next one.
-  property double _flowDeadline: 0
 
   // Boot's unit teardown hook calls this by name on every facade, so the
   // shared lease teardown is republished under the name the hook owns.
   function teardownController() {
-    closeSettle.stop()
     return lease.teardown()
-  }
-
-  // The settle, asked whether the controller still owes someone an answer.
-  // A flow reports through an onExited that lives in the controller, so
-  // releasing the tree on the fade destroyed the process that was going to
-  // report: nothing failed and no error was ever raised, a generated
-  // password simply never reached the clipboard and a push or a pull never
-  // notified. Wait for the child instead, then release on its own terms.
-  function _settleClose() {
-    const ctrl = lease.controller
-    if (ctrl !== null && ctrl.childBusy === true && Date.now() < root._flowDeadline) {
-      closeSettle.restart()
-      return false
-    }
-    root._flowDeadline = 0
-    return root.teardownController()
   }
 
   // The gate's teardown hook drops this owner's whole lease set in one
@@ -612,16 +574,6 @@ Singleton {
       onKeysReady: root.keysReady()
       onDeleteCommitted: (path) => root.deleteCommitted(path)
     }
-  }
-
-  // The exit fade is Ui.fastMs long; the settle outlasts it by a frame
-  // and a half so the window is fully faded before the tree goes. Bounded
-  // and one-shot: an open that arrives first stops it.
-  Timer {
-    id: closeSettle
-    interval: Ui.fastMs + 80
-    repeat: false
-    onTriggered: root._settleClose()
   }
 
   // The grace a demand that opened no panel keeps its controller for. Long
