@@ -61,12 +61,11 @@ t_eq "alpha() guards a void colour" "transparent" "$(qp_get alpha.voidUndefined)
 t_eq "alpha() guards an empty colour" "transparent" "$(qp_get alpha.voidEmpty)"
 t_eq "alpha() guards a null colour" "transparent" "$(qp_get alpha.voidNull)"
 t_eq "alpha() passes a real colour through" "#80000000" "$(qp_get alpha.voidTransparent)"
-# Ui.tint and Ui.solid both branch on `Theme.color(key) === undefined`, but
+# Ui.tint and Ui.solid once branched on `Theme.color(key) === undefined`, but
 # Theme.color ends in a fallback map and returns a string for every input, so
-# the "transparent" arm of both is unreachable in the running shell. Pinned
-# here rather than asserted as intended behaviour, because it is a comment
-# (`Ui.qml:133`) that does not match the code.
-t_note "Ui.tint/Ui.solid branch on Theme.color returning undefined, but Theme.color never does (unknown keys come back as a fallback colour), so the 'transparent' fallback is unreachable"
+# that arm was unreachable and has been removed. An unknown key paints the
+# fallback at the requested alpha, which is what the assertions below pin.
+t_note "Ui.tint/Ui.solid no longer guard Theme.color against undefined: the lookup answers every key from its fallback map, so unknown keys paint that fallback"
 t_eq "Theme.color never returns undefined" "string" "$(qp_get theme.color.neverUndefined)"
 t_eq "an unknown key falls back to a colour, not undefined" "#000000" "$(qp_get theme.color.unknownIsBlack)"
 t_eq "so tint() of an unknown key is that fallback at full alpha" "#000000" "$(qp_get tint.unknownKey)"

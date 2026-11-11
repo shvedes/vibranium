@@ -151,18 +151,17 @@ Singleton {
   readonly property real disabledOpacity: 0.45
   readonly property real dimmedOpacity: 0.55
 
-  // Palette color softened by alpha. Resolves to transparent while the
-  // palette has not landed yet, so early binding passes never feed
-  // Qt.alpha a void (setAlphaF nan spam); the binding re-runs on reload.
+  // Palette color softened by alpha. Theme.color answers every key from its
+  // fallback map - an unknown key is "#000000", never undefined - so there is
+  // no pending state to guard here and the lookup is always a real colour.
   function tint(key, a) {
-    const c = Theme.color(key)
-    return c === undefined ? "transparent" : Qt.alpha(c, a)
+    return Qt.alpha(Theme.color(key), a)
   }
 
-  // Solid palette lookup with transparent fallback for boot frames.
+  // Solid palette lookup. Same contract as tint(): the value is always a
+  // colour string, so a boot frame paints the fallback rather than nothing.
   function solid(key) {
-    const c = Theme.color(key)
-    return c === undefined ? "transparent" : c
+    return Theme.color(key)
   }
 
   // The palette color that is `t` of the way from one leaf to another.
