@@ -2,6 +2,7 @@
 
 .import "../../../../common/collections/DeviceList.js" as DeviceList
 .import "../../../../common/theme/DeviceIcons.js" as DeviceIcons
+.import "../../../../common/text/Format.js" as Format
 
 // Pure helpers for the Bluetooth bar module: device projections, sorting,
 // section titles and row subtext. No Qt imports - deterministic and
@@ -113,8 +114,8 @@ function sectionTitleFor(index, rows) {
 function subtextFor(row) {
   var r = row || {}
   if (r.batteryAvailable) {
-    var pct = Math.round(Number(r.battery) * 100)
-    if (isFinite(pct)) return "Battery " + pct + "%"
+    var battery = Number(r.battery)
+    if (isFinite(battery)) return "Battery " + Format.percentInt(battery) + "%"
   }
   return r.known ? "Paired" : "Available"
 }

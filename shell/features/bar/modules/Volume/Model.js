@@ -138,6 +138,9 @@ function appIconName(node) {
 
 function outputVolumeName(volume, muted) {
   if (muted) return "Muted"
+  // The band contract is NaN-propagating: an absent or unparsable level
+  // matches no threshold and reads as Quiet, while an explicit zero reads
+  // as Silenced. percentInt() folds NaN to 0 and would erase that answer.
   var p = Math.round(volume * 100)
   if (p === 0) return "Silenced"
   if (p >= 100) return "Loud"

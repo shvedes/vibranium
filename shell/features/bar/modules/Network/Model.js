@@ -136,7 +136,7 @@ function isOutOfReach(network) {
 // openSecurity/oweSecurity are the WifiSecurityType enums from QML.
 function wifiRow(network, openSecurity, oweSecurity) {
   if (!network) return null
-  var signal = Math.round((network.signalStrength || 0) * 100)
+  var signal = Format.percentInt(network.signalStrength || 0)
   return {
     connected: !!network.connected,
     known: !!network.known,
