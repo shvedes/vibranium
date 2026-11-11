@@ -100,10 +100,12 @@ function clampPoint(p, box) {
 function clampRectInBox(rect, boxW, boxH) {
   const maxX = Math.max(0, boxW)
   const maxY = Math.max(0, boxH)
-  const x = Math.max(0, Math.min(maxX - Math.min(rect.w, maxX), rect.x))
-  const y = Math.max(0, Math.min(maxY - Math.min(rect.h, maxY), rect.y))
-  const w = Math.max(0, Math.min(rect.w, maxX - x))
-  const h = Math.max(0, Math.min(rect.h, maxY - y))
+  const fitW = Math.min(rect.w, maxX)
+  const fitH = Math.min(rect.h, maxY)
+  const x = Range.clamp(rect.x, 0, maxX - fitW)
+  const y = Range.clamp(rect.y, 0, maxY - fitH)
+  const w = Range.clamp(rect.w, 0, maxX - x)
+  const h = Range.clamp(rect.h, 0, maxY - y)
   return { x: x, y: y, w: w, h: h }
 }
 
