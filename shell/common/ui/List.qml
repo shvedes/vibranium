@@ -1315,22 +1315,23 @@ ListView {
     root._syncIdentitySet()
     root._seatEpoch++
     const target = root.clampY(y)
-    // `tag` is the OWNER of the seat, which is what the release below reads.
+    // Claims are released before the no-op return: a seat that lands where
+    // the view already stands starts no tween, so it owns nothing, and a
+    // stale claim left behind lets pursue() mistake a foreign tween for its
+    // own and re-aim it on the next height step.
+    const owner = tag || "seat"
+    if (owner !== "follow") root._followIdx = -1
+    if (owner !== "pursuit") root._pursuitIdx = -1
     if (Math.abs(target - root.contentY) < 0.5) return target
     // Absolute seats (restore/reveal/page/pursuit/reconcile) own an
     // exact position, never a follow: release any in-flight follow so a
     // later layout shift cannot retarget them to the cursor. A pursuit is
     // the one seat that keeps a claim of its own, and every other seat
-    // must leave that claim clear - a foreign tween mistaken for a
-    // pursuit's own would be re-aimed by the next height step.
-    const owner = tag || "seat"
-    // Ownership is recorded only for a seat that moves: a seat that lands
-    // where the view already stands has no opinion about contentY, and the
-    // swap hold below has to be able to tell the two apart.
+    // must leave that claim clear.
+    // Ownership of a WRITE is recorded only for a seat that moves: the swap
+    // hold below has to be able to tell a no-op from a landed seat.
     root._seatWrites++
     root._lastWriteTag = owner
-    if (owner !== "follow") root._followIdx = -1
-    if (owner !== "pursuit") root._pursuitIdx = -1
      if (animated === true) {
        let distanceMs = root.stepMs(Math.abs(target - root.contentY))
        if (paceMs > 0) {

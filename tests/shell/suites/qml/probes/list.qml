@@ -1436,13 +1436,13 @@ Item {
     wall._pursuitIdx = 4
     wall.seatTo(wall.contentY + 40, false)
     kv("st.claimAfterMovingSeat", wall._followIdx + "," + wall._pursuitIdx)
-    // A seat whose target is where the view already is returns before the
-    // ownership reset, so the claims it never owned survive it.
+    // A seat whose target is where the view already is starts no tween, so
+    // it cannot own one: both claims are released before that return.
     wall._followIdx = 4
     wall._pursuitIdx = 4
     wall.seatTo(wall.contentY, false)
     kv("st.claimAfterNoopSeat", wall._followIdx + "," + wall._pursuitIdx)
-    kv("st.noopSeatKeepsClaims", wall._followIdx === 4 && wall._pursuitIdx === 4)
+    kv("st.noopSeatReleasesClaims", wall._followIdx === -1 && wall._pursuitIdx === -1)
     kv("st.noopSeatEpoch", wall._seatEpoch)
     // Classified seats: a land holds the stillness lease while step and
     // click pre-empt it at once. Clearing to -1 takes no lease.

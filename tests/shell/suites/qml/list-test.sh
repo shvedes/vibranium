@@ -432,8 +432,12 @@ qp_assert "a follow claims the tween it started" st.followIdx 4
 qp_assert "and clears any pursuit claim" st.pursuitIdxAfterFollow -1
 qp_assert "a page seat takes the follow claim away" st.followIdxAfterPage -1
 qp_assert "a seat that really moves clears every claim" st.claimAfterMovingSeat "-1,-1"
-qp_assert "a seat that does not move leaves both claims standing" st.claimAfterNoopSeat "4,4"
-t_note "LOW: seatTo() returns at List.qml:507 when the target is already the view position, which is BEFORE the ownership reset at List.qml:515-516. So a no-op seat leaves a stale _followIdx/_pursuitIdx armed. pursue() reads exactly those claims (List.qml:913) to decide whether a running tween is its own, so a claim left behind by a no-op seat can let a pursuit re-aim a tween it does not own. _seatEpoch is still bumped, which is the part the deferred retries guard on."
+qp_assert "a seat that does not move releases both claims" st.claimAfterNoopSeat "-1,-1"
+# A no-op seat starts no tween, so it owns nothing: seatTo() releases the
+# follow/pursuit claims before its already-reached return. Leaving them armed
+# let pursue() mistake a foreign tween for its own and re-aim it on the next
+# height step. _seatEpoch is still bumped, which the deferred retries guard on.
+qp_assert "and the probe sees the release" st.noopSeatReleasesClaims true
 qp_assert "and the epoch was still bumped" st.noopSeatEpoch 19
 
 t_section "seat(): one entry where an index write meets the highlight policy"
