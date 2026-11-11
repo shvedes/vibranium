@@ -217,7 +217,7 @@ function rowSubtext(row) {
 // label. Operates on plain row objects ({ percentage, label, ... }),
 // never on live QObjects.
 function sortRows(rows) {
-  var list = Array.isArray(rows) ? rows.slice() : []
+  var list = StoreGuards.copyList(rows)
   list.sort(function(a, b) {
     var pa = Number(a ? a.percentage : NaN)
     var pb = Number(b ? b.percentage : NaN)

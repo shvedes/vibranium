@@ -15,7 +15,7 @@
 // tier (localeCompare on a label, signal strength, ...). The input is
 // never mutated; a sorted copy is returned.
 function sortRows(rows, rankOf, knownOf, tiebreak) {
-  var list = Array.isArray(rows) ? rows.slice() : []
+  var list = StoreGuards.copyList(rows)
   list.sort(function(a, b) {
     var ra = rankOf ? !!rankOf(a) : false
     var rb = rankOf ? !!rankOf(b) : false

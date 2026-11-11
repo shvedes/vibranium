@@ -1,5 +1,7 @@
 .pragma library
 
+.import "../collections/StoreGuards.js" as StoreGuards
+
 // The panel registry every panel-owning singleton keeps: a list of live panel
 // instances that the singleton walks when it has news for them (selection
 // repair after a delete, keyboard focus truth, delete confirmations).
@@ -23,7 +25,7 @@
  * @returns {Array} A new list with `panel` appended.
  */
 function attach(list, panel) {
-  var next = Array.isArray(list) ? list.slice() : []
+  var next = StoreGuards.copyList(list)
   next.push(panel)
   return next
 }

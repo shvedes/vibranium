@@ -1,5 +1,7 @@
 .pragma library
 
+.import "../collections/StoreGuards.js" as StoreGuards
+
 // Secret handle ownership: the tracking list an owner keeps beside
 // SecretStore.
 //
@@ -21,7 +23,7 @@ function _key(handle) {
 }
 
 function _copy(handles) {
-  return Array.isArray(handles) ? handles.slice() : []
+  return StoreGuards.copyList(handles)
 }
 
 // Remove `handle` from the tracking list without touching the store. This is

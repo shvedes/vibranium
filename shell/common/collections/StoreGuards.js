@@ -32,3 +32,10 @@ function asList(value) {
   return Array.isArray(value) ? value : []
 }
 
+// A mutable copy of a list: the array's own elements in a new array, [] for
+// anything else. The registries and stores here reassign a QML `property var`,
+// so they need a copy rather than the read-only projection asList() returns.
+function copyList(value) {
+  return Array.isArray(value) ? value.slice() : []
+}
+
