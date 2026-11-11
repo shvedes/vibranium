@@ -29,31 +29,20 @@
 // hover has to agree with drop, so the rule lives where both can read it.
 .pragma library
 .import "ImageExts.js" as ImageExts
+.import "FileUri.js" as FileUri
 
 // The two messages every drop target reports. They live here so the four
 // targets cannot drift into four different wordings for one verdict.
 var ERR_MULTI = "Drop failed: drop only one image at a time"
 var ERR_UNSUPPORTED = "Drop failed: unsupported drop type"
 
-// Percent-decode a file:// uri into a filesystem path. A localhost authority
-// is dropped, a relative remainder is anchored at the root, and a malformed
-// escape leaves the text as it arrived rather than throwing: a path is user
-// data here, and refusing to decode is not a reason to refuse the drop.
+// Percent-decode a file:// uri into a filesystem path, canonicalized in
+// common/text/FileUri.js. A localhost authority is dropped, a relative
+// remainder is anchored at the root, and a malformed escape leaves the text as
+// it arrived rather than throwing: a path is user data here, and refusing to
+// decode is not a reason to refuse the drop.
 function decodeFileUri(uri) {
-  let p = String(uri === null || uri === undefined ? "" : uri)
-  if (p.startsWith("file://")) {
-    p = p.substring(7)
-    if (p.startsWith("localhost")) {
-      const slash = p.indexOf("/")
-      p = slash >= 0 ? p.substring(slash) : ""
-    }
-    if (p !== "" && p[0] !== "/") p = "/" + p
-  }
-  try {
-    p = decodeURIComponent(p)
-  } catch (ignored) {
-  }
-  return p
+  return FileUri.fromUri(uri)
 }
 
 // A local filesystem path carried by the payload, or "" for anything that is

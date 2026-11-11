@@ -29,3 +29,29 @@ function toUri(path, options) {
   }
   return "file://" + (out === "" ? "/" : out)
 }
+
+// A `file://` URI as a filesystem path - the inverse of toUri.
+//
+// The scheme is dropped, a localhost authority is discarded, and a relative
+// remainder is anchored at the root. Text that is not a file URI passes
+// through unchanged, which is what the drop path relies on: it hands over the
+// payload entry whether or not it carries the scheme.
+//
+// A malformed escape keeps its text rather than throwing. The value is user
+// data here, and refusing to decode is not a reason to refuse the input.
+function fromUri(uri) {
+  let p = String(uri ?? "")
+  if (p.startsWith("file://")) {
+    p = p.substring(7)
+    if (p.startsWith("localhost")) {
+      const slash = p.indexOf("/")
+      p = slash >= 0 ? p.substring(slash) : ""
+    }
+    if (p !== "" && p[0] !== "/") p = "/" + p
+  }
+  try {
+    p = decodeURIComponent(p)
+  } catch (ignored) {
+  }
+  return p
+}

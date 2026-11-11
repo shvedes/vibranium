@@ -766,24 +766,6 @@ Singleton {
     root._notify("Drop failed: " + message, true)
   }
 
-  function _decodeFileUri(uri) {
-    let p = uri
-    if (p.startsWith("file://")) {
-      p = p.substring(7)
-      if (p.startsWith("localhost")) {
-        const slash = p.indexOf("/")
-        if (slash >= 0) p = p.substring(slash)
-        else p = ""
-      }
-      if (p !== "" && p[0] !== "/") p = "/" + p
-    }
-    try {
-      p = decodeURIComponent(p)
-    } catch (e) {
-    }
-    return p
-  }
-
   // Remote input is https only. Plain http is refused rather than upgraded:
   // the scheme is the transport decision, and silently switching it would put
   // a wallpaper on both destinations that the remote end never authenticated.
@@ -875,7 +857,7 @@ Singleton {
     }
     if (uri.startsWith("file://") || uri.startsWith("/")) {
       let path = uri
-      if (uri.startsWith("file://")) path = root._decodeFileUri(uri)
+      if (uri.startsWith("file://")) path = DropPayload.decodeFileUri(uri)
       if (!path.startsWith("/")) {
         root._dropFail("only absolute paths supported")
         return
