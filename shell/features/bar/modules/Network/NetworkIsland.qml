@@ -409,11 +409,7 @@ Item {
   // --- data plumbing ---
 
   function networkForSsid(ssid) {
-    if (!root.wifiDevice || !root.wifiDevice.networks) return null
-    for (const n of root.wifiDevice.networks.values) {
-      if (n.name === ssid) return n
-    }
-    return null
+    return Model.networkForSsid(root.wifiDevice, ssid)
   }
 
   // The adapter half of a poll tick: walk the backend into plain row
@@ -618,12 +614,7 @@ Item {
   // First settings profile behind a live network, whatever shape the
   // backend hands the list in (JS list or ObjectModel).
   function firstSettings(net) {
-    const l = net ? net.nmSettings : null
-    if (!l) return null
-    if (typeof l.length === "number") return l.length > 0 ? l[0] : null
-    if (typeof l.count === "number" && typeof l.get === "function")
-      return l.count > 0 ? l.get(0) : null
-    return null
+    return Model.firstSettings(net)
   }
 
   function fetchProfile(ssid) {

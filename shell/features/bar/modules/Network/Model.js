@@ -307,6 +307,31 @@ function deriveWifiState(prev, rows) {
 // persistence (it stands until the island reopens or the network connects),
 // so this card only pings - same tag every time, so repeat failures replace
 // rather than stack. No --print-id: there is no recovery to close.
+// The live network behind an SSID on a device, or null when the adapter
+// publishes none. The backend exposes its list as `.values`; a missing device
+// or list is the empty answer rather than a throw.
+function networkForSsid(device, ssid) {
+  if (!device || !device.networks) return null
+  const values = device.networks.values
+  if (!values || typeof values.length !== "number") return null
+  for (let i = 0; i < values.length; i++) {
+    if (values[i] && values[i].name === ssid) return values[i]
+  }
+  return null
+}
+
+// The first NetworkManager settings profile behind a live network, whatever
+// shape the backend hands the list in: a plain JS list or an ObjectModel with
+// count/get.
+function firstSettings(net) {
+  const l = net ? net.nmSettings : null
+  if (!l) return null
+  if (typeof l.length === "number") return l.length > 0 ? l[0] : null
+  if (typeof l.count === "number" && typeof l.get === "function")
+    return l.count > 0 ? l.get(0) : null
+  return null
+}
+
 function authFailureArgv(ssid) {
   const name = escapeHtml(ssid).trim()
   const body = name !== ""
@@ -558,6 +583,8 @@ if (typeof module !== "undefined") {
     failureReasonText: failureReasonText,
     shouldDiscardSecrets: shouldDiscardSecrets,
     authFailureArgv: authFailureArgv,
+    networkForSsid: networkForSsid,
+    firstSettings: firstSettings,
     speedScaleStops: SPEED_SCALE_STOPS,
     initialSpeedScale: initialSpeedScale,
     stepSpeedScale: stepSpeedScale,

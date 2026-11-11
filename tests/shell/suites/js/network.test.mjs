@@ -106,4 +106,24 @@ group('the wrong-password toast is urgent and expiring', () => {
   notContains('no live tag rides it', hostile, '<b>x</b>')
 })
 
+section('Model.networkForSsid / firstSettings - the live adapter lookups')
+group('networkForSsid reads the backend list', () => {
+  const device = { networks: { values: [{ name: 'a' }, { name: 'b' }] } }
+  eq('a hit', NM.networkForSsid(device, 'b').name, 'b')
+  eq('a miss', NM.networkForSsid(device, 'c'), null)
+  eq('no device', NM.networkForSsid(null, 'a'), null)
+  eq('no networks map', NM.networkForSsid({}, 'a'), null)
+  eq('no values list', NM.networkForSsid({ networks: {} }, 'a'), null)
+  eq('a null row is skipped', NM.networkForSsid({ networks: { values: [null] } }, 'a'), null)
+})
+
+group('firstSettings accepts a list or an ObjectModel', () => {
+  eq('a JS list', NM.firstSettings({ nmSettings: [{ id: 1 }] }).id, 1)
+  eq('an empty list', NM.firstSettings({ nmSettings: [] }), null)
+  eq('an ObjectModel', NM.firstSettings({ nmSettings: { count: 1, get: i => ({ id: i + 7 }) } }).id, 7)
+  eq('an empty ObjectModel', NM.firstSettings({ nmSettings: { count: 0, get: () => null } }), null)
+  eq('no network', NM.firstSettings(null), null)
+  eq('no settings list', NM.firstSettings({}), null)
+})
+
 finish()
