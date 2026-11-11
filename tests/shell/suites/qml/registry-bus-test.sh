@@ -325,6 +325,11 @@ t_eq "and a numeric and a string topic collide" "true" "$(qp_get bus.topic.numbe
 t_eq "a boolean topic coerces to \"true\"" "null" "$(qp_get bus.topic.boolKey)"
 t_eq "null coerces to \"null\"" "true" "$(qp_get bus.topic.nullKey)"
 t_eq "undefined coerces to \"undefined\"" "true" "$(qp_get bus.topic.undefinedKey)"
+# The store is prototype-less: an Object.prototype member is not a published
+# topic, and a topic named after one stores like any other.
+t_eq "an unpublished prototype-named topic is a miss" "true" "$(qp_get bus.topic.prototypeUnpublishedIsNull)"
+t_eq "toString is not an inherited topic" "true" "$(qp_get bus.topic.toStringUnpublishedIsNull)"
+t_eq "a prototype-named topic stores its own payload" "true" "$(qp_get bus.topic.prototypeKeyStores)"
 t_note "Bus.publish has no id guard where Registry.register has one, so a non-string topic is silently coerced to a string key and a numeric and a string topic are the same topic. Every topic in the tree is a source literal, so nothing collides today"
 
 # --- the two stores together ------------------------------------------------

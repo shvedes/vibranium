@@ -559,6 +559,15 @@ Item {
     kv("bus.topic.nullKey", Bus.latest("null").fromNull)
     Bus.publish(undefined, { fromUndefined: true })
     kv("bus.topic.undefinedKey", Bus.latest("undefined").fromUndefined)
+
+    // The store is prototype-less, so a topic named after an Object.prototype
+    // member is a miss until it is published. With a plain object literal the
+    // read found the inherited member and latest() answered a Function for a
+    // topic nothing had published.
+    kv("bus.topic.prototypeUnpublishedIsNull", Bus.latest("constructor") === null)
+    kv("bus.topic.toStringUnpublishedIsNull", Bus.latest("toString") === null)
+    Bus.publish("constructor", { own: true })
+    kv("bus.topic.prototypeKeyStores", Bus.latest("constructor").own === true)
   }
 
   // ---------------------------------------------------------------------

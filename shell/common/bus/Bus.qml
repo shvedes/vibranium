@@ -19,7 +19,14 @@ Singleton {
   id: root
 
   // topic -> { payload: any }  (fresh object per write)
-  property var _topics: ({})
+  //
+  // Prototype-less, the same store shape Registry uses. A plain object reads
+  // an inherited member for a topic named "constructor" or "toString", so
+  // latest("constructor") answered a Function for a topic nobody had
+  // published, and a publish to such a name wrote through the inherited
+  // value first. Every topic in the tree is a source literal, but the store
+  // must not depend on that.
+  property var _topics: Object.create(null)
 
   // --- pub/sub ---
   function publish(topic, payload) {
@@ -30,7 +37,7 @@ Singleton {
     // topic.
     const entry = stored || { payload: null }
     entry.payload = payload
-    root._topics = Object.assign({}, root._topics, { [topic]: entry })
+    root._topics = Object.assign(Object.create(null), root._topics, { [topic]: entry })
   }
 
   function latest(topic) {
