@@ -5,6 +5,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "NavKeys.js" as NavKeys
+import "RowMetrics.js" as RowMetrics
 import "../math/Range.js" as Range
 
 // Vertical list over any model, center-lock scrolloff follow policy.
@@ -757,18 +758,9 @@ ListView {
       root._clearHeightTable()
       return
     }
-    const owner = Object.create(null)
-    let contested = false
-    for (let i = 0; i < root.count; i++) {
-      const key = root._rowKey(i)
-      if (owner[key] === undefined) owner[key] = i
-      else {
-        owner[key] = -1
-        contested = true
-      }
-    }
-    root._idOwner = owner
-    root._identityError = contested ? "duplicate_identity" : ""
+    const ids = RowMetrics.identityOwners(root.count, root._rowKey)
+    root._idOwner = ids.owner
+    root._identityError = ids.contested ? "duplicate_identity" : ""
     let changed = false
     const next = {}
     let sum = 0
@@ -800,24 +792,16 @@ ListView {
   function _trimHeightTable() {
     // _countH is the entry count, so the common case allocates nothing.
     if (root._countH <= root.maxKnownH) return 0
-    const keys = Object.keys(root._knownH)
-    const excess = keys.length - root.maxKnownH
-    keys.sort((a, b) => {
-      const delta = (root._touchH[a] || 0) - (root._touchH[b] || 0)
-      if (delta !== 0)
-        return delta
-      return a < b ? -1 : 1
-    })
-    let removed = 0
-    for (let i = 0; i < keys.length && removed < excess; i++) {
-      const key = keys[i]
-      root._sumH -= root._knownH[key]
-      root._countH--
+    const plan = RowMetrics.trimPlan(root._knownH, root._touchH, root.maxKnownH)
+    const removed = plan.keys.length
+    if (removed === 0) return 0
+    for (let i = 0; i < removed; i++) {
+      const key = plan.keys[i]
       delete root._knownH[key]
       delete root._touchH[key]
-      removed++
     }
-    if (removed === 0) return 0
+    root._sumH -= plan.sum
+    root._countH -= removed
     root._avgH = root._countH > 0 ? root._sumH / root._countH : -1
     return removed
   }

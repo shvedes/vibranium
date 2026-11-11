@@ -173,4 +173,57 @@ group('the gap is the caller\'s, not the library\'s', () => {
   eq('a zero gap still answers whole rows', RM.snappedH(uniform(5, 30), 0, 100, 1000, identity, 0), 3 * 30)
 })
 
+section('identityOwners - which row owns each identity')
+
+group('a unique key is owned by its own index', () => {
+  const ids = RM.identityOwners(3, (i) => ['a', 'b', 'c'][i])
+  eq('the owner map', { ...ids.owner }, { a: 0, b: 1, c: 2 })
+  eq('and nothing is contested', ids.contested, false)
+})
+
+group('two live rows on one key have no owner', () => {
+  const ids = RM.identityOwners(3, (i) => ['a', 'a', 'b'][i])
+  eq('the shared key is -1', ids.owner.a, -1)
+  eq('the row set is contested', ids.contested, true)
+  eq('the other key still owns its row', ids.owner.b, 2)
+})
+
+group('the degenerate row counts', () => {
+  const none = RM.identityOwners(0, () => 'x')
+  eq('no rows is an empty map', Object.keys(none.owner), [])
+  eq('and not contested', none.contested, false)
+  const one = RM.identityOwners(1, () => 'x')
+  eq('one row owns its key', one.owner.x, 0)
+  eq('a nullish key is a key like any other', RM.identityOwners(1, () => null).owner['null'], 0)
+})
+
+section('trimPlan - the least-recently-touched rows to drop')
+
+group('a table under its cap drops nothing', () => {
+  eq('two under a cap of three', RM.trimPlan({ a: 10, b: 20 }, { a: 1, b: 2 }, 3), { keys: [], sum: 0 })
+  eq('exactly at the cap', RM.trimPlan({ a: 10, b: 20 }, {}, 2).keys, [])
+  eq('an empty table', RM.trimPlan({}, {}, 5), { keys: [], sum: 0 })
+})
+
+group('the oldest stamps go first, and their heights are summed', () => {
+  const known = { a: 10, b: 20, c: 30 }
+  const plan = RM.trimPlan(known, { a: 3, b: 1, c: 2 }, 1)
+  eq('the two least recently touched', plan.keys, ['b', 'c'])
+  eq('their height sum', plan.sum, 50)
+  eq('the most recent survives', plan.keys.includes('a'), false)
+})
+
+group('a tie is broken by key so the order is deterministic', () => {
+  eq('same stamp sorts by name', RM.trimPlan({ b: 1, a: 1, c: 1 }, {}, 1).keys, ['a', 'b'])
+  eq('an untracked key reads as stamp zero',
+    RM.trimPlan({ b: 1, a: 1 }, { a: 1 }, 1).keys, ['b'])
+})
+
+group('a degenerate cap keeps every row', () => {
+  eq('a negative cap', RM.trimPlan({ a: 1 }, {}, -1).keys, [])
+  eq('a non-numeric cap', RM.trimPlan({ a: 1 }, {}, 'x').keys, [])
+  eq('a zero cap drops every entry, oldest first',
+    RM.trimPlan({ a: 1, b: 2 }, { a: 2, b: 1 }, 0).keys, ['b', 'a'])
+})
+
 finish()

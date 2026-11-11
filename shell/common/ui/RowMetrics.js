@@ -30,6 +30,42 @@
 // Callers ask for "every row" or "the first n" and never for zero rows:
 // a limit of 0 or less means no cap, which is the ordinary case for a
 // card with no row limit of its own.
+// Which row owns each identity: the first index that claims a key, and -1 for
+// a key two live rows share. A contested key has no single height to learn.
+// One walk of the row set, in the row set's own order.
+function identityOwners(count, rowKey) {
+  const owner = Object.create(null)
+  let contested = false
+  for (let i = 0; i < count; i++) {
+    const key = rowKey(i)
+    if (owner[key] === undefined) owner[key] = i
+    else {
+      owner[key] = -1
+      contested = true
+    }
+  }
+  return { owner: owner, contested: contested }
+}
+
+// The least-recently-touched entries a height table must drop to stay under
+// its cap, and the sum of their heights. Keys sort by touch stamp, then by
+// name so an eviction order is deterministic when stamps tie.
+function trimPlan(knownH, touchH, max) {
+  const keys = Object.keys(knownH)
+  const bound = Number(max)
+  if (!isFinite(bound) || bound < 0 || keys.length <= bound) return { keys: [], sum: 0 }
+  const excess = keys.length - bound
+  keys.sort((a, b) => {
+    const delta = (touchH[a] || 0) - (touchH[b] || 0)
+    if (delta !== 0) return delta
+    return a < b ? -1 : 1
+  })
+  const drop = keys.slice(0, excess)
+  let sum = 0
+  for (let i = 0; i < drop.length; i++) sum += knownH[drop[i]]
+  return { keys: drop, sum: sum }
+}
+
 function limitOf(count, cap) {
   return cap > 0 ? Math.min(count, Math.floor(cap)) : count
 }
