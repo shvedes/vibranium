@@ -94,10 +94,10 @@ Rectangle {
   // Sliding-highlight motion gate: the selection bar glides for pure
   // focus shifts between resting rows, including while a query is
   // present - entry-to-entry moves animate the same filtered or not.
-   // The focused row's slot still gates resize tracking, but a move to
-   // another row keeps the native highlight glide while the old slot closes.
-   readonly property bool highlightMotion: MotionPolicy.enabled
-     && !panel.cursorSlotOpen && !panel._swapping
+  // The focused row's slot still gates resize tracking, but a move to
+  // another row keeps the native highlight glide while the old slot closes.
+  readonly property bool highlightMotion: MotionPolicy.enabled
+    && !panel.cursorSlotOpen && !panel._swapping
 
    // Cursor-row slot state (model-level, synchronous): only the focused
    // row's own slot suppresses height animation. A slot left behind on

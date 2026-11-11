@@ -347,17 +347,17 @@ Singleton {
       cache: false
       source: ""
 
-       onStatusChanged: {
-         if (status !== Image.Ready || root._pendingFinish === null) return
-         const pending = root._pendingFinish
-         const jobId = Number(pending.jobId) || 0
-         const flowId = Number(pending.flowId) || 0
-         if (jobId <= 0 || flowId <= 0 || pending.win !== shotWin
-           || jobId !== root._activeJob || flowId !== root._activeFlow
-           || String(frameProbe.source) !== String(pending.url)) return
-         decodeTimer.stop()
-         root._finish(shotWin, frameProbe, jobId, flowId)
-       }
+      onStatusChanged: {
+        if (status !== Image.Ready || root._pendingFinish === null) return
+        const pending = root._pendingFinish
+        const jobId = Number(pending.jobId) || 0
+        const flowId = Number(pending.flowId) || 0
+        if (jobId <= 0 || flowId <= 0 || pending.win !== shotWin
+          || jobId !== root._activeJob || flowId !== root._activeFlow
+          || String(frameProbe.source) !== String(pending.url)) return
+        decodeTimer.stop()
+        root._finish(shotWin, frameProbe, jobId, flowId)
+      }
     }
 
   }

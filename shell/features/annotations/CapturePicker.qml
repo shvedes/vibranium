@@ -29,16 +29,16 @@ PanelWindow {
   // not answered yet, reads as "no motion" rather than "all motion".
   readonly property bool animOn: MotionPolicy.enabled
 
-   function _activate(i) {
-     picker.focusIndex = i
-     picker.chosen(picker.modes[i])
-   }
+  function _activate(i) {
+    picker.focusIndex = i
+    picker.chosen(picker.modes[i])
+  }
 
-   function dismiss() {
-     picker.visible = false
-     veil.opacity = 0
-     pickRow.visible = false
-   }
+  function dismiss() {
+    picker.visible = false
+    veil.opacity = 0
+    pickRow.visible = false
+  }
 
    color: "transparent"
   exclusionMode: ExclusionMode.Ignore

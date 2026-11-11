@@ -310,25 +310,24 @@ PanelWindow {
 
   readonly property string fileUrl: Paths.toFileUrl(editor.shotPath)
 
-   onLoadStateChanged: {
-      if (loadState === "ready") {
-        panel.reveal()
-        editor._commitBoardZoom()
-      }
-     else {
-       slideAnim.stop()
-       panel.visible = false
-     }
-   }
-   onCropFrameChanged: {
-     if (boardReady) board.requestPaint()
-   }
-    onCropRectChanged: {
-      if (boardReady) board.requestPaint()
+  onLoadStateChanged: {
+    if (loadState === "ready") {
+      panel.reveal()
+      editor._commitBoardZoom()
+    } else {
+      slideAnim.stop()
+      panel.visible = false
     }
-    onSelectedIndexChanged: {
-      if (boardReady) board.requestPaint()
-    }
+  }
+  onCropFrameChanged: {
+    if (boardReady) board.requestPaint()
+  }
+  onCropRectChanged: {
+    if (boardReady) board.requestPaint()
+  }
+  onSelectedIndexChanged: {
+    if (boardReady) board.requestPaint()
+  }
 
   color: Ui.solid("background_0")
   exclusionMode: ExclusionMode.Ignore

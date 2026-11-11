@@ -378,21 +378,21 @@ Singleton {
     function ping(): string { return "pong" }
     function toggle(): string { root.toggle(); return "ok" }
     function open(): string { root.open(); return "ok" }
-     function close(): string { root.close(); return "ok" }
-     function status(): string {
-       return JSON.stringify({
-         visible: root.visible,
-         query: root.query,
-         count: root.results.length,
-         total: root.totalCount,
-         filterFocused: root.effectiveFilterFocused,
-         focusMode: root.effectiveFocusMode,
-         configFault: root.configFault,
-         configFaultMessage: root.configFaultMessage,
-         confirmation: root.confirmationAction,
-         dispatchFault: root._dispatchFault
-       })
-     }
+    function close(): string { root.close(); return "ok" }
+    function status(): string {
+      return JSON.stringify({
+        visible: root.visible,
+        query: root.query,
+        count: root.results.length,
+        total: root.totalCount,
+        filterFocused: root.effectiveFilterFocused,
+        focusMode: root.effectiveFocusMode,
+        configFault: root.configFault,
+        configFaultMessage: root.configFaultMessage,
+        confirmation: root.confirmationAction,
+        dispatchFault: root._dispatchFault
+      })
+    }
   }
 
   PowerMenuView {}

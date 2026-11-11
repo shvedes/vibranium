@@ -474,15 +474,15 @@ ListView {
         : (selBar.live && root.currentItem ? root.currentItem.height : 0)
 
       Behavior on y {
-       NumberAnimation {
-         id: highlightMoveAnim
-         duration: root.highlightMoveDuration
-         easing.type: Easing.OutCubic
-         onFinished: {
-           root._highlightHandoff = false
-           if (!scrollAnim.running) root._sweepMs = -1
-         }
-       }
+        NumberAnimation {
+          id: highlightMoveAnim
+          duration: root.highlightMoveDuration
+          easing.type: Easing.OutCubic
+          onFinished: {
+            root._highlightHandoff = false
+            if (!scrollAnim.running) root._sweepMs = -1
+          }
+        }
       }
       Behavior on height {
         NumberAnimation { duration: root.highlightResizeDuration; easing.type: Easing.OutCubic }
