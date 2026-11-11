@@ -597,7 +597,7 @@ const LYRICS_CACHE_TTL_MS = 30 * 60 * 1000
 var _lyricsCache = {}
 
 function lyricsCacheKey(title, artist, album, lengthSec) {
-  const norm = (v) => String(v ?? "").trim().toLowerCase().replace(/\s+/g, " ")
+  const norm = (v) => SU.lowerTrim(v).replace(/\s+/g, " ")
   const n = Number(lengthSec)
   const len = isFinite(n) && n > 0 ? Math.round(n) : 0
   return JSON.stringify([norm(title), norm(artist), norm(album), len])

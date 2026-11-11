@@ -963,7 +963,7 @@ const MIME_EXT = {
 // existing entry, and the sequence keeps two snapshots inside the same
 // millisecond apart.
 function snapshotPath(imgDir, ts, seq, mime) {
-  const raw = (String(mime).split("/")[1] || "png").split(";")[0].trim().toLowerCase()
+  const raw = SU.lowerTrim((String(mime).split("/")[1] || "png").split(";")[0])
   const ext = MIME_EXT[raw] || raw.split("+")[0] || "png"
   return String(imgDir) + "/t" + ts + "-" + seq + "." + ext
 }

@@ -117,7 +117,7 @@ const PRINTER_STATES = { idle: 3, processing: 4, stopped: 5 }
 function numState(value, table) {
   const n = parseInt(String(value ?? ""), 10)
   if (isFinite(n)) return n
-  const t = String(value ?? "").trim().toLowerCase()
+  const t = SU.lowerTrim(value)
   return table[t] !== undefined ? table[t] : NaN
 }
 

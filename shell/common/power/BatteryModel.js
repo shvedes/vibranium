@@ -369,7 +369,7 @@ function cycleKey(rows, currentKey, step) {
 function deviceKey(nativePath, typeString) {
   var n = typeof nativePath === "string" ? nativePath.trim() : ""
   if (n !== "") return n
-  return typeof typeString === "string" ? typeString.trim().toLowerCase() : ""
+  return typeof typeString === "string" ? SU.lowerTrim(typeString) : ""
 }
 
 // The two integer levels an alert service announces at, resolved from
