@@ -7,7 +7,6 @@ import Quickshell.Io
 import qs.common
 import "../../common/bus/Busctl.js" as Busctl
 import "../../common/process/CommandSpec.js" as CommandSpec
-import "../../common/process/ProcProbe.js" as ProcProbe
 import "../../common/text/Duration.js" as Duration
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/math/Range.js" as Range
@@ -689,156 +688,41 @@ Singleton {
 
   // --- login1 signal monitor ---
 
-  // A long-lived gdbus monitor on the system bus matches login1 signals
-  // only (gdbus uses plain match rules, which need no privilege -
-  // dbus-monitor's BecomeMonitor path is denied to normal users). Every
-  // inhibition-state change fires PropertiesChanged (InhibitorAdded/
-  // Removed/PrepareForSleep ride along on the same match); a burst
-  // coalesces into one ListInhibitors readback. A 10s poll would cost
-  // ~8.6k busctl forks/day for freshness that is still one action
-  // behind the event.
-  property int _monitorFails: 0
-  property bool _monitorDegraded: false
-  property var _monitorHandle: null
-  property int _monitorTicks: 0
-
-  // This child cannot be a job: the monitor streams signal lines for the
-  // life of the session and a job reports a finished buffer, so the
-  // owned Process with its SplitParser stays. The generation still owns
-  // it - a deliberate stop retires the generation first, so the exit of a
-  // child this service killed is never read as a failure to respawn.
-  Process {
-    id: _monitorProc
+  // A long-lived gdbus monitor on the system bus matches login1 signals only
+  // (gdbus uses plain match rules, which need no privilege - dbus-monitor's
+  // BecomeMonitor path is denied to normal users). Every inhibition-state
+  // change fires PropertiesChanged (InhibitorAdded/Removed/PrepareForSleep
+  // ride along on the same match); a burst coalesces into one ListInhibitors
+  // readback. A 10s poll would cost ~8.6k busctl forks/day for freshness that
+  // is still one action behind the event.
+  //
+  // The shared guard owns the child, its 1 Hz spawn window and the capped
+  // respawn; this block only says what to run and which line is a signal. Its
+  // generation lives in the same scope as this service's jobs, so the shutdown
+  // order that retires requests is unchanged.
+  StreamGuard {
+    id: _monitorStream
 
     command: ["gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1"]
-    stdout: SplitParser {
-      onRead: data => {
-        // A retired child has no say over the current request.
-        if (!RequestGate.current(root._monitorHandle)) return
-        // Only genuine signal lines re-arm the coalesce window; the
-        // connect banner ("Monitoring signals from...") is ignored.
-        if (data.indexOf("/org/freedesktop/login1:") !== 0) return
-        root._monitorFails = 0
-        root._monitorDegraded = false
-        _coalesceTimer.restart()
-      }
-    }
-    stderr: StdioCollector {}
-    onExited: {
-      root._monitorFailed()
+    scope: root._gateScope
+    key: root._monitorKey
+    pollMs: root._monitorPollMs
+    spawnWatchMs: root._monitorSpawnWatchMs
+    backoffBaseMs: root._backoffBaseMs
+    backoffCapMs: root._backoffCapMs
+    onLine: data => {
+      // Only genuine signal lines re-arm the coalesce window; the connect
+      // banner ("Monitoring signals from...") is ignored.
+      if (data.indexOf("/org/freedesktop/login1:") !== 0) return
+      _monitorStream.noteAlive()
+      _coalesceTimer.restart()
     }
   }
 
-  // `started` is the confirmation the watchdog waits for. `onStarted` is an
-  // invokable on the Process type rather than a notifier, so it cannot be a
-  // handler and the signal is reached through a Connections element naming the
-  // Process as its target. Stopping the watchdog here is what keeps the 1 Hz
-  // sample from running for the life of the session; _startMonitor arms it
-  // again for every generation, so the spawn window still applies to each one,
-  // and a generation that is never confirmed still reaches its deadline.
-  Connections {
-    target: _monitorProc
+  readonly property bool _monitorDegraded: _monitorStream.degraded
 
-    function onStarted() {
-      _monitorWatch.stop()
-    }
-  }
-
-  function _startMonitor() {
-    _monitorRespawn.stop()
-    root._retireMonitor()
-    const generation = RequestGate.begin(root._gateScope, root._monitorKey)
-    if (generation === 0) {
-      root._monitorDegraded = true
-      return
-    }
-    root._monitorHandle = root._handle(generation, root._monitorKey)
-    root._monitorDegraded = false
-    root._monitorTicks = 0
-    try {
-      _monitorProc.running = true
-    } catch (ignored) {
-      root._monitorDegraded = true
-    }
-    _monitorWatch.restart()
-  }
-
-  function _retireMonitor() {
-    _monitorWatch.stop()
-    RequestGate.invalidateScope(root._gateScope, root._monitorKey)
-    root._monitorHandle = null
-    if (!_monitorProc.running) return false
-    // SIGTERM only: the Process is a declared child of this singleton, so
-    // the object tree destroys it with the singleton right after.
-    _monitorProc.running = false
-    return true
-  }
-
-  // One failure path for both ways a monitor generation loses its child: an
-  // exit (bus restart, killed monitor) and a spawn that never produced one
-  // (missing gdbus, no system bus). A child that never started reports no
-  // exit at all, so without the second way the generation would look live
-  // for the rest of the session and the registry would freeze unnoticed.
-  // Either way the generation dies, the registry is degraded, and the next
-  // attempt waits the capped backoff instead of spinning.
-  //
-  // `cause` is the caller's own word for which of the two failure ways this
-  // was, because the two have different fixes and nothing else separates
-  // them: an exit means the bus restarted or the child was killed, and a
-  // spawn that never produced one means there is no gdbus or no system bus at
-  // all. `_monitorWatch` passes "no-child"; an exit arrives with no argument
-  // and is recorded as one.
-  function _monitorFailed(cause) {
-    if (!RequestGate.current(root._monitorHandle)) return false
-    RequestGate.invalidate(root._monitorHandle)
-    root._monitorHandle = null
-    _monitorWatch.stop()
-    root._monitorDegraded = true
-    root._monitorFails++
-    _monitorRespawn.interval = root._backoffMs(root._monitorFails)
-    _monitorRespawn.restart()
-    return true
-  }
-
-  // Owned-resource detection for the monitor child. Samples before the spawn
-  // window only age the generation, so a child that starts slowly is not
-  // read as a failure; a live child is a property read per poll interval, and
-  // a current generation without one is the same failure an exit reports.
-  Timer {
-    id: _monitorWatch
-
-    interval: root._monitorPollMs
-    repeat: true
-    onTriggered: {
-      if (!RequestGate.current(root._monitorHandle)) return
-      root._monitorTicks++
-      if (root._monitorTicks * root._monitorPollMs < root._monitorSpawnWatchMs) return
-      if (root._monitorAlive()) return
-      root._monitorFailed("no-child")
-    }
-  }
-
-  // Liveness of the owned child, read the way the job layer probes one: a
-  // child that was never spawned reports neither a running flag nor a process
-  // id, and neither does one that has already exited. `started` closes the
-  // question, so after it this is not consulted again until the next
-  // generation restarts the watchdog.
-  function _monitorAlive() {
-    return ProcProbe.alive(_monitorProc)
-  }
-
-  // Bounded respawn of the monitor. The delay is recomputed from the
-  // failure count and capped, so a missing gdbus settles at one attempt a
-  // minute rather than a tight restart loop.
-  Timer {
-    id: _monitorRespawn
-
-    interval: 1000
-    onTriggered: {
-      if (_monitorProc.running) return
-      root._startMonitor()
-    }
-  }
+  function _startMonitor() { _monitorStream.start() }
+  function _retireMonitor() { _monitorStream.stop() }
 
   // Coalesce window: a single logind state change can emit several
   // signals (and dbus-monitor prints one block across multiple lines);
@@ -877,41 +761,32 @@ Singleton {
   readonly property int _saLeaseMs: 86400000
   property int _screenSaverCount: 0
   readonly property bool screenSaverBlocked: root._screenSaverCount > 0
-  property int _saFails: 0
-  property bool _saDegraded: false
-  property var _saHandle: null
-  property int _saTicks: 0
+  // The screensaver monitor: the shared guard owns the child, its spawn
+  // watchdog and the capped respawn. The line is still counted here, because a
+  // count over a message stream is this source's own semantics.
+  StreamGuard {
+    id: _saStream
 
-  Process {
-    id: _saProc
-
-    // gdbus monitor only works against an owned name (it takes --dest),
-    // and owning org.freedesktop.ScreenSaver is exactly what is not
-    // guaranteed: a client calls the method whether or not a service
-    // answers. dbus-monitor takes the match rule directly, which is why
-    // this child is the one monitor in the file that is not gdbus.
-    // BecomeMonitor is a privilege the session bus grants a normal user
-    // and the system bus does not, which is the reason the login1 monitor
-    // above is gdbus instead; a bus that refuses it fails the child, and
-    // the source degrades open.
     command: ["dbus-monitor", "--session", root._saMatch]
-    stdout: SplitParser {
-      onRead: data => root._onScreenSaverLine(data)
-    }
-    stderr: StdioCollector {}
-    onExited: {
-      root._saFailed()
+    scope: root._gateScope
+    key: root._saKey
+    pollMs: root._monitorPollMs
+    spawnWatchMs: root._monitorSpawnWatchMs
+    backoffBaseMs: root._backoffBaseMs
+    backoffCapMs: root._backoffCapMs
+    onLine: data => root._onScreenSaverLine(data)
+    // A new generation knows nothing about requests made before it, so it
+    // starts from an empty count rather than inheriting a stale one.
+    onSpawned: root._screenSaverCount = 0
+    // Either failure way drops the count, which reads as "nothing is
+    // inhibited" - the pre-existing behavior, and the safe direction for a
+    // lock timer.
+    onFailed: {
+      _saLease.stop()
+      root._screenSaverCount = 0
     }
   }
-
-  // The screensaver monitor's half of the same pair, for the same reason.
-  Connections {
-    target: _saProc
-
-    function onStarted() {
-      _saWatch.stop()
-    }
-  }
+  readonly property bool _saDegraded: _saStream.degraded
 
   // One message header line, in dbus-monitor's shape (a method call from a
   // player, or a signal where a portal forwards one):
@@ -925,7 +800,6 @@ Singleton {
   // ever read here. A release that arrives with no matching inhibit clamps at
   // zero rather than going negative.
   function _onScreenSaverLine(data) {
-    if (!RequestGate.current(root._saHandle)) return
     if (data.indexOf(root._saInterface) === -1) return
     if (data.indexOf(root._saUnMember) !== -1) {
       root._screenSaverCount = Math.max(0, root._screenSaverCount - 1)
@@ -935,8 +809,7 @@ Singleton {
     } else {
       return
     }
-    root._saFails = 0
-    root._saDegraded = false
+    _saStream.noteAlive()
   }
 
   // The lease expired with the count still positive: the stream stopped
@@ -948,89 +821,8 @@ Singleton {
     root._screenSaverCount = 0
   }
 
-  function _startSaMonitor() {
-    _saRespawn.stop()
-    root._retireSaMonitor()
-    const generation = RequestGate.begin(root._gateScope, root._saKey)
-    if (generation === 0) {
-      root._saDegraded = true
-      return
-    }
-    root._saHandle = root._handle(generation, root._saKey)
-    root._saDegraded = false
-    root._saTicks = 0
-    // A new generation knows nothing about requests made before it, so
-    // it starts from an empty count rather than inheriting a stale one.
-    root._screenSaverCount = 0
-    try {
-      _saProc.running = true
-    } catch (ignored) {
-      root._saDegraded = true
-    }
-    _saWatch.restart()
-  }
-
-  function _retireSaMonitor() {
-    _saWatch.stop()
-    RequestGate.invalidateScope(root._gateScope, root._saKey)
-    root._saHandle = null
-    if (!_saProc.running) return false
-    // SIGTERM only: the Process is a declared child of this singleton, so
-    // the object tree destroys it with the singleton right after.
-    _saProc.running = false
-    return true
-  }
-
-  // Same two failure ways as the login1 monitor: an exit (bus restart,
-  // killed child) and a spawn that never produced one. Either way the
-  // generation dies and the count is dropped, which reads as "nothing is
-  // inhibited" - the pre-existing behavior, and the safe direction for
-  // a lock timer. The count being dropped is the number of block locks that
-  // just stopped being believed.
-  function _saFailed(cause) {
-    if (!RequestGate.current(root._saHandle)) return false
-    RequestGate.invalidate(root._saHandle)
-    root._saHandle = null
-    _saWatch.stop()
-    _saLease.stop()
-    root._screenSaverCount = 0
-    root._saDegraded = true
-    root._saFails++
-    _saRespawn.interval = root._backoffMs(root._saFails)
-    _saRespawn.restart()
-    return true
-  }
-
-  // The screensaver half of the same probe, and `started` closes the question
-  // there too: once the watchdog is stopped this is not consulted again until
-  // the next generation restarts it.
-  function _saAlive() {
-    return ProcProbe.alive(_saProc)
-  }
-
-  Timer {
-    id: _saWatch
-
-    interval: root._monitorPollMs
-    repeat: true
-    onTriggered: {
-      if (!RequestGate.current(root._saHandle)) return
-      root._saTicks++
-      if (root._saTicks * root._monitorPollMs < root._monitorSpawnWatchMs) return
-      if (root._saAlive()) return
-      root._saFailed("no-child")
-    }
-  }
-
-  Timer {
-    id: _saRespawn
-
-    interval: 1000
-    onTriggered: {
-      if (_saProc.running) return
-      root._startSaMonitor()
-    }
-  }
+  function _startSaMonitor() { _saStream.start() }
+  function _retireSaMonitor() { _saStream.stop() }
 
   Timer {
     id: _saLease
@@ -1149,10 +941,6 @@ Singleton {
     _inhibitConfirm.stop()
     _inhibitRetry.stop()
     _listRetry.stop()
-    _monitorRespawn.stop()
-    _monitorWatch.stop()
-    _saRespawn.stop()
-    _saWatch.stop()
     _saLease.stop()
     _coalesceTimer.stop()
     _toggleTimer.stop()

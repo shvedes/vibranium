@@ -39,6 +39,7 @@ singleton DocumentAdoption 1.0 state/DocumentAdoption.qml
 singleton ProcessRegistry 1.0 process/ProcessRegistry.qml
 singleton AudioNodes 1.0 audio/AudioNodes.qml
 ProcessJob 1.0 process/ProcessJob.qml
+StreamGuard 1.0 process/StreamGuard.qml
 singleton Watch 1.0 watch/Watch.qml
 OptimisticSet 1.0 collections/OptimisticSet.qml
 ListFrameState 1.0 collections/ListFrameState.qml
