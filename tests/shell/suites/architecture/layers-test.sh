@@ -225,10 +225,11 @@ EDGES="$(wc -l <"$WORK/resolved.tsv" | tr -d ' ')"
 
 # --------------------------------------------------------------------------
 t_section "the four layers exist, and the README's file counts still hold"
-# The table: composition 1, boot 4, features 161, services 25, common 149.
+# The table: composition 1, boot 4, features 163, services 25, common 149.
 # features/ lost TrayMenuRow and common/ gained ContextMenu when the tray menu
-# moved onto the shared context menu the three menus now use; the tree-wide
-# file count is unchanged.
+# moved onto the shared context menu the three menus now use; features/ then
+# gained MenuIndex and MenuSpawnProbe when the menu's index and spawn-probe
+# rules moved out of Menu.qml and MenuPanel.
 # layer_files counts .qml and .js together, which is the set the README's "Files"
 # column counts and the set the resolver below reads, so a count here says the
 # direction rules are being applied to the tree the README describes. A count that
@@ -237,7 +238,7 @@ for layer in boot common features services; do
   t_true "the $layer/ layer directory exists" test -d "$SHELL_DIR/$layer"
 done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
-t_count "features/ holds the tree's 161 .qml and .js files" "161" "$(layer_files features)"
+t_count "features/ holds the tree's 163 .qml and .js files" "163" "$(layer_files features)"
 t_count "services/ holds the 25 files the README publishes" "25" "$(layer_files services)"
 t_count "common/ holds the 149 files the README publishes" "149" "$(layer_files common)"
 t_count "boot/ holds the 4 files the README publishes" "4" "$(layer_files boot)"
