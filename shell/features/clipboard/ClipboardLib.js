@@ -206,7 +206,7 @@ function textImagePath(text, home) {
   if (RE_ANY_WS.test(t)) return ""
   if (!isImageExt(t)) return ""
   let p = t
-  if (p.indexOf("file://") === 0) {
+  if (FileUri.isFileUri(p)) {
     const parsed = parseUriList(p)
     if (parsed.length !== 1) return ""
     p = parsed[0]
@@ -318,7 +318,7 @@ function stripFileScheme(s) {
   // Seven characters decide this, and the test used to lowercase the WHOLE
   // path to ask - a copy of a multi-kilobyte URI per row per rebuild. The
   // prefix is lowercased instead; the verdict is the same.
-  return t.substring(0, 7).toLowerCase() === "file://" ? t.substring(7) : t
+  return FileUri.isFileUri(t) ? t.substring(7) : t
 }
 
 function countWords(s) {
@@ -766,14 +766,7 @@ function parseUriList(text) {
   for (let i = 0; i < lines.length; i++) {
     let line = lines[i].trim()
     if (line === "" || line.charAt(0) === "#") continue
-    if (line.toLowerCase().indexOf("file://") === 0) {
-      line = line.substring(7)
-      if (line.indexOf("localhost/") === 0) line = line.substring("localhost".length)
-      try {
-        line = decodeURIComponent(line)
-      } catch (e) {
-      }
-    }
+    if (FileUri.isFileUri(line)) line = FileUri.pathOf(line)
     if (line.indexOf("://") > 0) continue // ftp://... etc are not files (handled as network)
     if (line.charAt(0) !== "/") continue
     out.push(line)
@@ -1769,7 +1762,7 @@ function entryPaths(entry) {
   const add = value => {
     const raw = String(value == null ? "" : value)
     if (raw === "") return
-    if (raw.substring(0, 7).toLowerCase() === "file://") {
+    if (FileUri.isFileUri(raw)) {
       const parsed = parseUriList(raw)
       for (let i = 0; i < parsed.length; i++) paths.push(parsed[i])
     } else if (raw.charAt(0) === "/") {
