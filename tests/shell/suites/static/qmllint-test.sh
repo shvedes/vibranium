@@ -35,7 +35,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   below always describe the same tree. A file added here with a root object
 #   Quickshell registers from C++ adds no new unresolved name and no
 #   missing-property, so it can move the file count without moving either.
-# RECORDED_WARNING_COUNT: 147 "Warning:" diagnostics. This is the sum of the
+# RECORDED_WARNING_COUNT: 146 "Warning:" diagnostics. This is the sum of the
 #   per-kind breakdown below and is not an independent figure, so it cannot
 #   distinguish a kind that stopped firing from a kind that started. What makes
 #   the total legible is the breakdown, which is why every kind is pinned
@@ -47,8 +47,8 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   not declare produces exactly one `missing-property` warning, so a defect of
 #   that shape and the total are not independent facts and a total recorded
 #   against a tree that has one is only satisfiable while the defect is there.
-#   54 `missing-property` warnings is the current measured figure, and the
-#   warning total is 147. Eleven additional dynamic/property-access diagnostics
+#   53 `missing-property` warnings is the current measured figure, and the
+#   warning total is 146. Eleven additional dynamic/property-access diagnostics
 #   are retained rather than suppressed; the component probes pin those runtime
 #   contracts separately. A reader who sees the total fall with
 #   `missing-property` should identify the exact reads that changed before
@@ -57,7 +57,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   this file as a new per-kind figure.
 #
 #   Most of them are not defects either. `common/ui/IslandHost.qml` alone
-#   accounts for 17 of the 54, and every one of them is a read of a member on
+#   accounts for 17 of the 53, and every one of them is a read of a member on
 #   an object qmllint cannot resolve to its real type: a `QObject` content
 #   item, a `QuickshellScreenInfo`, a `QQuickLoader::item`. The duck-typed
 #   size contract has always cost one warning per read; the keyboard contract
@@ -127,9 +127,9 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
 RECORDED_FILE_COUNT=239
-RECORDED_WARNING_COUNT=147
+RECORDED_WARNING_COUNT=146
 RECORDED_INFO_COUNT=71
-README_WARNING_COUNT=147
+README_WARNING_COUNT=146
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see
@@ -151,7 +151,7 @@ PanelWindow"
 RECORDED_WARNING_KINDS="confusing-expression-statement 5
 eval 1
 id-shadows-member 2
-missing-property 54
+missing-property 53
 property-override 5
 redundant-optional-chaining 3
 uncreatable-type 4
