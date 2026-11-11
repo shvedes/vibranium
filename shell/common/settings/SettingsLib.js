@@ -540,7 +540,7 @@ function parseSection(raw, fallback, allowId, fileNamespace) {
   if (Array.isArray(raw.items)) section.items = normalizeItems(raw.items)
 
   const seen = {}
-  const list = Array.isArray(raw.options) ? raw.options : []
+  const list = StoreGuards.asList(raw.options)
   for (let i = 0; i < list.length; i++) {
     const res = parseOption(list[i], fileNamespace)
     if (res.error) {
@@ -1151,7 +1151,7 @@ function composeManaged(schema, raw, validOverrides) {
 // parse stays one source. rootWidth/rootTitle pass through as the catalog
 // produced them. Returns a NEW schema.
 function buildSchema(sections, rootWidth, rootTitle) {
-  const secs = Array.isArray(sections) ? sections : []
+  const secs = StoreGuards.asList(sections)
   const byKey = {}
   for (let i = 0; i < secs.length; i++) {
     const section = secs[i]
