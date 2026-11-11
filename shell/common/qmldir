@@ -91,7 +91,6 @@ Title 1.0 ui/Title.qml
 SlideSwap 1.0 ui/SlideSwap.qml
 ZebraRow 1.0 ui/ZebraRow.qml
 EmptyState 1.0 ui/EmptyState.qml
-ImageSkeleton 1.0 ui/ImageSkeleton.qml
 LiveMeter 1.0 ui/LiveMeter.qml
 FlashReveal 1.0 ui/FlashReveal.qml
 Vignette 1.0 ui/Vignette.qml
