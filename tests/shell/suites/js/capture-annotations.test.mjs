@@ -2509,4 +2509,21 @@ group('exportDeleteAfter keeps the source and honours the save option', () => {
   eq('a save to a runtime output still follows the option', AT.exportDeleteAfter('save', '/run.png', '/shot.png', true, true), false)
 })
 
+section('AnnotationTools.shouldRemoveOutput - who owns an exported path')
+group('a clipboard-owned output is kept', () => {
+  eq('owned, even a runtime file', AT.shouldRemoveOutput(true, true, false), false)
+  eq('owned and a newly created target', AT.shouldRemoveOutput(true, false, false), false)
+  eq('owned and an existing target', AT.shouldRemoveOutput(true, false, true), false)
+})
+
+group('the editor removes only what it produced', () => {
+  eq('a runtime output', AT.shouldRemoveOutput(false, true, false), true)
+  eq('a target that did not exist before the export', AT.shouldRemoveOutput(false, false, false), true)
+  eq('an existing target the user saved over', AT.shouldRemoveOutput(false, false, true), false)
+  eq('a runtime output that also existed', AT.shouldRemoveOutput(false, true, true), true)
+  // Numeric 1 is not the boolean true, so none of the flags is honoured and
+  // the editor removes the path: the strict comparison is the contract.
+  eq('the flags are compared strictly', AT.shouldRemoveOutput(1, 1, 1), true)
+})
+
 finish()

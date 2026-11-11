@@ -777,6 +777,14 @@ function colorName(value) {
   return COLOR_NAMES[value] || value
 }
 
+// Whether an exported path may be removed after the offer: a clipboard-owned
+// output is kept, and anything the editor produced itself - a runtime output,
+// or a target that did not exist before this export - belongs to the editor.
+function shouldRemoveOutput(clipboardOwned, runtimeOutput, saveTargetExisted) {
+  if (clipboardOwned === true) return false
+  return runtimeOutput === true || saveTargetExisted !== true
+}
+
 // Which file type a save dialog's selected name filter asks for, falling back
 // to the editor's own type. The filter is a human-facing label, so both the
 // format word and the extension are read.

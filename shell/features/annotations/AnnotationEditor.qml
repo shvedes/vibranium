@@ -671,8 +671,8 @@ PanelWindow {
 
   function _cleanupExportOutput(path) {
     if (String(path ?? "") === "") return
-    if (!editor._outputClipboardOwned
-      && (editor._isRuntimeOutput(path) || editor._saveTargetExisted !== true)) {
+    if (AnnotationTools.shouldRemoveOutput(editor._outputClipboardOwned,
+      editor._isRuntimeOutput(path), editor._saveTargetExisted)) {
       Exec.rm(String(path))
     }
   }
