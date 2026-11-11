@@ -935,7 +935,6 @@ Rectangle {
   property int _swapGen: 0
   property int _swapPendingGen: -1
   property bool _swapping: false
-  property string _modelError: ""
 
   // The key sequence the identity epoch compares on, and the open-time
   // reconcile compares the model against. Folded from the row array this
@@ -986,7 +985,6 @@ Rectangle {
   // dropping - is exactly that case.
   function keyedRows(candidate) {
     const guarded = MenuLib.rowSetGuard(candidate)
-    panel._modelError = guarded.error
     return guarded.rows
   }
 
@@ -3700,7 +3698,6 @@ Rectangle {
 
   // --- search-field word editing (readline parity with LauncherPanel) ---
 
-  readonly property alias _searchInput: searchField.input
 
   function eraseWord() {
     if (panel.mode !== "filter") return

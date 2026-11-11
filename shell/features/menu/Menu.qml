@@ -9,7 +9,6 @@ import Quickshell
 import Quickshell.Io
 import qs.common
 import "MenuLib.js" as MenuLib
-import "../../common/text/StringUtils.js" as SU
 import "../../common/math/Range.js" as Range
 import "../../common/text/UnitIpc.js" as UnitIpc
 
@@ -43,7 +42,6 @@ Singleton {
   // this binding live. Select expansion is gated too, one level down, in
   // the shared DropdownSlot every surface unfolds through. Unknown (store
   // not ready) disables until known, so a cold-boot open never slides.
-  readonly property bool animationsEnabled: MotionPolicy.enabled
 
   // Loaded bundle: entry page id plus pages by id.
   property var bundle: null
@@ -259,7 +257,6 @@ Singleton {
     loader.path = filePath
     if (!loader.waitForJob()) return false
     root._lastPath = path
-    root._lastName = SU.basename(filePath)
     const text = loader.text()
 
     // Repeat-summon cache: parsing/normalizing a bundle costs enough to
@@ -337,7 +334,6 @@ Singleton {
   }
 
   property string _lastPath: ""
-  property string _lastName: ""
   property var _bundleCache: ({})
   property bool _prewarmed: false
   // A prewarm that arrived before the boot entrance finished drawing; the

@@ -606,8 +606,9 @@ ListView {
   // The height table itself stays keyed by identity; this is only the index ->
   // key projection of the row set the sync just inspected.
   property var _rowKeys: []
-  // Non-empty while the live rows collide on one identity, coded like
-  // MenuPanel's _modelError so a consumer can report it verbatim. It
+  // Non-empty while the live rows collide on one identity, coded as a stable
+  // token (not_array / invalid_row / duplicate_key / missing_key) so a consumer
+  // can report it verbatim. It
   // catches a consumer that DECLARES identityRevision and still
   // collides; a consumer that mutates identities without declaring one
   // leaves the fingerprint untouched, so no sync runs and the collision
