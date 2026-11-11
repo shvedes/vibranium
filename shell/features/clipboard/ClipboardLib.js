@@ -233,10 +233,7 @@ function isUrl(s) {
 }
 
 function extOf(path) {
-  const base = SU.basename(path)
-  const dot = base.lastIndexOf(".")
-  if (dot <= 0) return ""
-  return base.substring(dot + 1).toLowerCase()
+  return SU.leafExt(path)
 }
 
 // Shared membership check - every isX(path) below is extOf(path) tested

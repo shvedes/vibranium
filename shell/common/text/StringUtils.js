@@ -58,6 +58,17 @@ function extname(path) {
   return p.substring(dot + 1).toLowerCase()
 }
 
+// Lowercased extension of the path's final segment, "" when it has none.
+// Stricter than extname(): a leading dot names a hidden file rather than an
+// extension (".ts" -> ""), so a dot file never masquerades as a typed one.
+// Canonical home of the ClipboardLib extOf and FileIcons extIconName rule.
+function leafExt(path) {
+  const base = basename(path)
+  const dot = base.lastIndexOf(".")
+  if (dot <= 0) return ""
+  return base.substring(dot + 1).toLowerCase()
+}
+
 // Path with its lowercased final extension removed, dot included, or the
 // path itself when it carries none. Uses the same dot rule as extname(),
 // so a dot in a directory is not an extension.

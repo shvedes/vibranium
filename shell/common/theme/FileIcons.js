@@ -121,10 +121,7 @@ function extOf(path) {
 // clipboard suite): the basename only, and a leading dot is not an
 // extension (".ts" -> ""), so a dot in a directory never leaks either.
 function extIconName(path) {
-  var base = SU.basename(path)
-  var dot = base.lastIndexOf(".")
-  if (dot <= 0) return ""
-  var e = base.slice(dot + 1).toLowerCase()
+  var e = SU.leafExt(path)
   if (e === "") return ""
   if (e === "svg") return ICONS.svg
   if (IMAGE_EXTS[e] === 1 || e === "gif" || e === "avif" || e === "heic" || e === "heif") return ICONS.image
