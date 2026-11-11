@@ -85,7 +85,7 @@ function locationCommit(text, suggestions, selectedIndex) {
   var name = String(text || "").trim()
   if (name === "") return { name: "", latitude: null, longitude: null }
   var choices = suggestions || []
-  var index = Math.max(0, Math.min(parseInt(selectedIndex, 10) || 0, choices.length - 1))
+  var index = Range.clamp(parseInt(selectedIndex, 10) || 0, 0, Math.max(0, choices.length - 1))
   var suggestion = choices[index]
   if (suggestion) return suggestion
   return { name: name, latitude: null, longitude: null }
