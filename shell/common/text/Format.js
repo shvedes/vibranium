@@ -41,6 +41,18 @@ function percentInt(ratio) {
   return Math.round(n * 100)
 }
 
+// A stored file's size: "" when there is nothing to report, whole bytes below
+// a KiB, one trimmed decimal above it. Canonical home of ClipboardLib
+// formatSize. NaN and non-positive input answer "" rather than a zero size.
+function formatFileSize(bytes) {
+  var b = Number(bytes)
+  if (isNaN(b) || b <= 0) return ""
+  if (b < 1024) return b + " B"
+  if (b < 1024 * 1024) return trim1(b / 1024) + " KB"
+  if (b < 1024 * 1024 * 1024) return trim1(b / (1024 * 1024)) + " MB"
+  return trim1(b / (1024 * 1024 * 1024)) + " GB"
+}
+
 // Byte counters -> "12 B" / "1.5 KB" / "2.0 MB" / "3.25 GB".
 // Canonical home of Network formatBytes. Floors hostile input at 0 so a
 // missing counter reads as empty rather than NaN.

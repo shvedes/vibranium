@@ -279,12 +279,7 @@ function pad2(n) {
 }
 
 function formatSize(bytes) {
-  const b = Number(bytes)
-  if (isNaN(b) || b <= 0) return ""
-  if (b < 1024) return b + " B"
-  if (b < 1024 * 1024) return Format.trim1(b / 1024) + " KB"
-  if (b < 1024 * 1024 * 1024) return Format.trim1(b / (1024 * 1024)) + " MB"
-  return Format.trim1(b / (1024 * 1024 * 1024)) + " GB"
+  return Format.formatFileSize(bytes)
 }
 
 // One decimal unless it rounds away, canonicalized in
