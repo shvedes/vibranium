@@ -373,34 +373,6 @@
                 ]
             },
             {
-                "key": "shell.statusbar.showShadow",
-                "type": "bool",
-                "default": true,
-                "label": "Show shadow",
-                "sub": "Add a soft shadow to the bar",
-                "desc": "Adds a subtle shadow along the edge facing the screen.",
-                "showIf": [
-                    {
-                        "key": "shell.statusbar.enabled",
-                        "eq": true
-                    }
-                ]
-            },
-            {
-                "key": "shell.statusbar.blurred",
-                "type": "bool",
-                "default": false,
-                "label": "Transparent",
-                "sub": "Make the bar background translucent",
-                "desc": "Makes the bar background translucent for compositor blur.",
-                "showIf": [
-                    {
-                        "key": "shell.statusbar.enabled",
-                        "eq": true
-                    }
-                ]
-            },
-            {
                 "key": "shell.statusbar.position",
                 "type": "string",
                 "default": "top",

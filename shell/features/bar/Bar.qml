@@ -34,9 +34,9 @@ import "BarLib.js" as BarLib
 import "../../common/text/UnitIpc.js" as UnitIpc
 
 // The bar. Owns the bar's shell-internal settings (the raw "statusbar"
-// section under shell.* in settings.json: enabled, position, showBorder,
-// showShadow, blurred and the zone layout) and exposes them to the per-monitor
-// BarView windows plus the `qs ipc call bar ...` surface.
+// section under shell.* in settings.json: enabled, position, showBorder
+// and the zone layout) and exposes them to the per-monitor BarView windows
+// plus the `qs ipc call bar ...` surface.
 //
 // Zones: three logical areas (left, center, right) hold EVERY known slot
 // id in order - including disabled ones - plus a `disabled` array with
@@ -118,14 +118,12 @@ Singleton {
   // to flip). Resets to false on every shell start.
   property bool hideToggle: false
   // Effective visibility: the persistent master switch AND the transient
-  // hide. Every surface (BarView, MoveWindow, BarShadow) and the published
+  // hide. Every surface (BarView, MoveWindow) and the published
   // desktop layout read this, so a hidden bar frees screen space exactly
   // like a disabled one without touching the persisted `enabled` value.
   readonly property bool effectiveEnabled: root.enabled && !root.hideToggle
   readonly property string position: Settings.statusbarPosition
   readonly property bool showBorder: Settings.statusbarShowBorder
-  readonly property bool showShadow: Settings.statusbarShowShadow
-  readonly property bool blurred: Settings.statusbarBlurred
   // Bar thickness is fixed: no user-facing height setting, no wheel resize.
   readonly property int height: 28
   function publishDesktopLayout() {
@@ -736,11 +734,11 @@ Singleton {
   // The bar's own travel during the entrance: the whole surface starts one
   // bar height outside the screen edge and glides home before the modules
   // fade, so the strip enters instead of being painted in place from the
-  // first frame. BarView translates its backdrop and modules by this and
-  // BarShadow its gradient, which keeps the shadow glued to the strip's
-  // trailing edge while it travels. One bar height is exactly enough to leave
-  // the window empty at the start. It is a distance toward the current screen
-  // edge, so a top/bottom flip mid-entrance re-aims the travel.
+  // first frame. BarView translates its backdrop and modules by this, which
+  // keeps the strip together while it travels. One bar height is exactly
+  // enough to leave the window empty at the start. It is a distance toward
+  // the current screen edge, so a top/bottom flip mid-entrance re-aims the
+  // travel.
   readonly property real entranceSlideFrom: root.position === "top" ? -root.height : root.height
   property real entranceSlide: 0
   // The modules' own release, one step behind the strip: the bar's surface
@@ -1236,10 +1234,6 @@ Singleton {
         return Settings.setOption("shell.statusbar.position", value)
       case "showBorder":
         return Settings.setOption("shell.statusbar.showBorder", value === true)
-      case "showShadow":
-        return Settings.setOption("shell.statusbar.showShadow", value === true)
-      case "blurred":
-        return Settings.setOption("shell.statusbar.blurred", value === true)
       case "layout": {
         const norm = root._normalizeLayout(value)
         if (norm === null) return false
@@ -1612,14 +1606,6 @@ Singleton {
   // the bar-position gesture on its own screen.
   Variants {
     model: root.screens
-    delegate: BarShadow {
-      required property ShellScreen modelData
-      screen: modelData
-    }
-  }
-
-  Variants {
-    model: root.screens
     delegate: BarView {
       required property ShellScreen modelData
       screen: modelData
@@ -1656,7 +1642,7 @@ Singleton {
         { name: "dumpAll", help: "full bar state dump" },
         { name: "enable", help: "(id) enable a bar module" },
         { name: "hideToggle", help: "toggle the transient bar hide (frees screen space, not persisted)" },
-        { name: "set", help: "(key, json) configure the bar (keys: enabled, position, showBorder, showShadow, blurred, layout, hideToggle)" },
+        { name: "set", help: "(key, json) configure the bar (keys: enabled, position, showBorder, layout, hideToggle)" },
         { name: "toggle", help: "toggle the bar itself (hide/show)" },
       ], command)
     }
@@ -1669,8 +1655,6 @@ Singleton {
         effectiveEnabled: root.effectiveEnabled,
         position: root.position,
         showBorder: root.showBorder,
-        showShadow: root.showShadow,
-        blurred: root.blurred,
         height: root.height,
         layout: root.layout,
         storedLayout: root.storedLayout,
@@ -1713,8 +1697,6 @@ Singleton {
         effectiveEnabled: root.effectiveEnabled,
         position: root.position,
         showBorder: root.showBorder,
-        showShadow: root.showShadow,
-        blurred: root.blurred,
         height: root.height,
         layout: root.layout,
         storedLayout: root.storedLayout,

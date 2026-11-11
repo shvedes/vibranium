@@ -483,12 +483,6 @@ PanelWindow {
     }
 
     onClicked: mouse => mouse.accepted = true
-
-    onDoubleClicked: mouse => {
-      if (!root.inputReady || !Bar.enabled || Bar.hideToggle) return
-      Bar.setOption("blurred", !Bar.blurred)
-      mouse.accepted = true
-    }
   }
 
   Component.onDestruction: {

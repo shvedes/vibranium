@@ -189,18 +189,11 @@ hl.layer_rule({
   no_anim = true,
 })
 
-hl.layer_rule({
-  name = "Vibranium Status Bar Blur",
-  match = { namespace = "^vibranium:bar$" },
-  ignore_alpha = 0.2,
-  blur = true
-})
-
--- The fullscreen lyrics surface, the bar's rule applied to its backdrop: at
--- the double-click density the fill is 80% and the desktop reads through it,
--- so what shows through has to be the blur rather than the sharp desktop.
--- `ignore_alpha` is the half that makes this work - without it the rule blurs
--- the fully opaque backdrop too, which is a cost paid for nothing.
+-- The fullscreen lyrics surface: at the double-click density the fill is 80%
+-- and the desktop reads through it, so what shows through has to be the blur
+-- rather than the sharp desktop. `ignore_alpha` is the half that makes this
+-- work - without it the rule blurs the fully opaque backdrop too, which is a
+-- cost paid for nothing.
 hl.layer_rule({
   name = "Vibranium Lyrics Blur",
   match = { namespace = "^vibranium:lyrics$" },

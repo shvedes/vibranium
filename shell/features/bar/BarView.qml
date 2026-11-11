@@ -137,8 +137,7 @@ PanelWindow {
   // Transparent: the backdrop is drawn by barBackdrop below so that it can
   // travel with the boot entrance slide. A surface color is painted by the
   // window itself and cannot move, and it would leave the strip on screen
-  // while the contents slid in. The compositor's blur rule keys on alpha
-  // (ignore_alpha), so the blur follows the backdrop as it enters.
+  // while the contents slid in.
   color: "transparent"
   // exclusiveZone implies ExclusionMode.Normal (reserves space for tiled
   // windows); an explicit Ignore would let windows slide under the bar.
@@ -177,7 +176,7 @@ PanelWindow {
       id: barBackdrop
 
       anchors.fill: parent
-      color: Bar.blurred ? Ui.tint("background_0", 0.8) : Ui.solid("background_0")
+      color: Ui.solid("background_0")
     }
 
     Item {

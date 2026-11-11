@@ -51,7 +51,7 @@ import "../text/UnitIpc.js" as UnitIpc
 //   their typed setters below. A key under shell the schema does not manage
 //   is carried the same way, as a foreign field, whoever once read it. The
 //   statusbar subtree is schema-managed (enabled/position/showBorder/
-//   showShadow/layout + module toggles).
+//   layout + module toggles).
 Singleton {
   id: root
 
@@ -240,8 +240,6 @@ Singleton {
   // before the schema catalog lands.
   readonly property bool statusbarEnabled: root.value("shell.statusbar.enabled") !== false
   readonly property bool statusbarShowBorder: root.value("shell.statusbar.showBorder") === true
-  readonly property bool statusbarShowShadow: root.value("shell.statusbar.showShadow") === true
-  readonly property bool statusbarBlurred: root.value("shell.statusbar.blurred") === true
   // ArchUpdates island heavy-backlog caution (red box + red total).
   // Default on; the island folds every consumer off the same flag.
   readonly property bool statusbarArchUpdatesHeavyWarning: root.value("shell.statusbar.archUpdatesHeavyWarning") !== false
