@@ -335,10 +335,6 @@ Singleton {
     for (let i = 0; i < h.length; i++) SecretStore.drop(String(h[i].secretHandle || ""))
   }
 
-  function _exportEntries() {
-    return CL.exportEntries(root.history)
-  }
-
   property bool _saveDirty: false
   property string _pendingPayload: ""
   property bool _saving: false
@@ -421,7 +417,7 @@ Singleton {
   function _persist() {
     if (root.cacheDir === "") return
     probePersistTimer.stop()
-    root._pendingPayload = JSON.stringify({ version: 2, entries: _exportEntries() })
+    root._pendingPayload = JSON.stringify({ version: 2, entries: CL.exportEntries(root.history) })
     // Held, not lost: the payload is parked in `_pendingPayload` and written
     // the moment `install` reports its exit.
     if (!root._historyPermReady) return
