@@ -8,7 +8,12 @@ Entries marked (fixed) are resolved; the rest are the actionable list. The suite
 it currently is, with a comment saying why it is wrong, so a fix turns a suite
 red and forces the record to be updated rather than passing silently.
 
-**19 open findings: 1 high, 8 medium, 10 low.** Five high-severity findings, the calendar month roll, the password busy gate and glyph warnings, and the island's margin re-park and shared-component freeze are fixed and kept below for the record - the code and its suite now pin the corrected behaviour. Two thirds of them came from the
+**2 open findings, both low and both recorded rather than fixed:** the unused
+icon set (17) and the constructible-type census (38). Everything else below is
+fixed and kept for the record - the code and its suite now pin the corrected
+behaviour - including the high-severity paths, the calendar month roll, the
+password busy gate and glyph warnings, and the island's margin re-park,
+shared-component freeze and first-size snap. Most came from the
 behavioural QML component suites (`suites/qml/`), which is the argument for
 having them: the component layer is where the shell's user-visible contracts
 live, and reading the source does not find a `fail()` that forgets to re-mask.
@@ -189,7 +194,11 @@ extension would be typed PNG.
 
 *Verified by `suites/js/clipboard.test.mjs`.*
 
-### 7. `UnitLib` cannot parse an inch source using the `in` keyword
+### 7. (fixed) `UnitLib` cannot parse an inch source using the `in` keyword
+
+**Resolved.** `splitExplicit` now treats one leading `in` keyword as part of
+the source as well as a trailing one, so `"5 in cm"` converts exactly like
+`"5in in cm"`. The math suite pins that spelling.
 
 `splitExplicit` (`shell/features/launcher/UnitLib.js:283-286`) receives only the
 text *after* the number, so `"5 in cm"` arrives as `" in cm"` — the only keyword
@@ -223,7 +232,11 @@ accepted.
 
 *Reproduced and now verified by `suites/js/math-calc-color.test.mjs`.*
 
-### 9. `isBrowserPlayer` checks the wrong variable on its identity branch
+### 9. (fixed) `isBrowserPlayer` checks the wrong variable on its identity branch
+
+**Resolved.** It tokenises the dbus name and the identity into one word list
+and matches the browser tokens against that union, so a browser whose name
+rides in either variable is filtered - the split no longer decides the answer.
 
 `shell/common/NowPlaying.js`:
 
@@ -250,7 +263,12 @@ This defect used to be recorded against two files: `common/NowPlaying.js` and
 an unimported partial copy at `features/bar/modules/NowPlaying/Model.js`, which
 is since deleted. One fix in one place is now enough.
 
-### 10. `BarLib.rebuildZoneOrder` silently duplicates a slot
+### 10. (fixed) `BarLib.rebuildZoneOrder` silently duplicates a slot
+
+**Resolved.** The sequence is reconciled against the movable set first: ids
+that are unknown, fixed, pinned or repeated are dropped, and movable ids the
+caller omitted are appended in display order. The walk cannot emit a slot
+twice, whatever the caller hands over.
 
 `shell/features/bar/BarLib.js:271-298` — the leftover branch appends a raw
 `ordered` entry even when that id was already emitted, so an `ordered` set
@@ -266,7 +284,11 @@ enforces that `ordered` is exactly the movable set.
 
 *Reproduced by `suites/js/bar-models.test.mjs`.*
 
-### 11. `filterPackages` throws on a null collection
+### 11. (fixed) `filterPackages` throws on a null collection
+
+**Resolved.** The collection goes through `StoreGuards.asList`, the query is
+lowercased once, and any non-object entry is skipped, so a null collection is
+empty input and a missing query is the empty string.
 
 It reads `.name` on its argument with no guard, while its siblings in the
 same files tolerate a missing argument:
@@ -286,7 +308,10 @@ here takes the bar module down with it.
 
 *Reproduced by `suites/js/bar-models.test.mjs`.*
 
-### 12. `PathPolicy` echoes `LEXICAL` instead of the requested verb
+### 12. (fixed) `PathPolicy` echoes `LEXICAL` instead of the requested verb
+
+**Resolved.** All three result constructors read `options.mode` and fall back
+to `LEXICAL` only when the caller names no verb, so the echo is the request.
 
 `shell/common/path/PathPolicy.js:45-46` and its README both state that `mode`
 "names the requested verb and is echoed". In code, `allowed()` (line 187) and
@@ -344,7 +369,10 @@ therefore dead in the running shell.
 
 *Reproduced by `suites/qml/ui-test.sh`.*
 
-### 15. `FuncLib` documents `pix` as supported implicit multiplication
+### 15. (fixed) `FuncLib` documents `pix` as supported implicit multiplication
+
+**Resolved.** The stale example is gone from the header; the implicit
+multiplication list now names only forms the tokenizer accepts.
 
 `shell/common/math/FuncLib.js:26` lists `pix` in the implicit-multiplication
 examples. It fails at two layers: the standalone-`x` regex rejects the trailing
@@ -354,7 +382,12 @@ right and the documented example is stale.
 
 *Reproduced by `suites/js/math-calc-color.test.mjs`.*
 
-### 16. Stale counts and lists in the shell's own documentation
+### 16. (fixed) Stale counts and lists in the shell's own documentation
+
+**Resolved.** Re-measured and corrected: the lint counts and unresolved-type
+list are no longer in `shell/README.md`, `ImageExts` documents its 22-entry
+table, the ipptool README names `$subid`, and the assets README points at
+paths that exist. The static suites pin the values that remain.
 
 Measured, not assumed — each of these is asserted against the real value by a
 suite, so the drift is visible in the test output:
@@ -394,7 +427,13 @@ rather than facts for a test to assert.
 
 *Measured by `suites/static/assets-test.sh`.*
 
-### 18. Undeclared, redundant and untested helpers
+### 18. (fixed) Undeclared, redundant and untested helpers
+
+**Resolved.** The Volume prefix regex is `/^built[-\s]?in audio\s+/i`, so both
+`Built-in Audio` and `built in audio` are stripped; `UnitIpc` is covered by
+the wallpaper suite. A tiny negative volume still reads `Silenced` because
+the rounded percent is compared to zero - that is the documented reading,
+not an accident.
 
 - `shell/features/bar/modules/Volume/Model.js:33-37` — the prefix regex is
   `/^built-?in audio\s+/i`, where the optional character is the **hyphen**, not
@@ -474,7 +513,12 @@ The highlight bar paints a row that cannot be selected, and `move()` returns
 
 *Reproduced by `suites/qml/list-test.sh`.*
 
-### 21. `Calendar.stepMonth` discards input while the slide is in flight
+### 21. (fixed) `Calendar.stepMonth` discards input while the slide is in flight
+
+**Resolved.** A step that arrives mid-slide accumulates into
+`_pendingMonthDelta`, and the slide's `onFinished` replays the total, so a
+fast wheel or key repeat advances the calendar by every step it asked for.
+The calendar suite pins the coalesced result.
 
 `shell/common/ui/Calendar.qml:82` returns early while `root._sliding` is set,
 and `_sliding` is only cleared by `monthSlide.onFinished` after `Ui.fastMs`
@@ -652,7 +696,15 @@ cannot reach, which is how a future reader wastes an afternoon.
 
 # IslandHost and IconButton findings
 
-### 30. `IslandHost`'s first size evaluation grows instead of snapping
+### 30. (fixed) `IslandHost`'s first size evaluation grows instead of snapping
+
+**Resolved.** The height Behavior is gated on a per-open `_sizedForOpen`
+latch instead of on `card.opacity === 1`. The first height of each open is
+applied with the Behavior disabled, so it snaps and the surface maps at its
+final footprint; the card's own `onHeightChanged` arms the tween, and every
+later change - including a content switch on an open host - glides. A reopen
+re-arms the latch. The host suite pins the snap on the turns the grow was
+measured on, plus the resize tween that follows it.
 
 `shell/common/ui/IslandHost.qml:262-266`. The comment promises "a snap instead
 of a grow: the window then maps at its final size", but the first open does not
@@ -768,7 +820,11 @@ Each now names a shipped asset: `hypr-animations`, `grid`, `hypr-blur`,
 
 *Reproduced and now verified by `suites/static/settings-catalog-test.sh`.*
 
-### 35. A signal-strength tier that no input can reach
+### 35. (fixed) A signal-strength tier that no input can reach
+
+**Resolved.** The README that documented tier 0 is gone. The surviving
+module comment states the reachable range - a strength below 25% still draws
+the dot, so the lowest tier is 1 - and the JS suite pins tiers 1..4.
 
 `shell/features/bar/modules/Network/Model.js:16-23` and its `README.md:26-29`
 both document tier `0 = whole glyph`, but the lowest branch is `s < 0.25 -> 1`.
@@ -796,7 +852,11 @@ contains a connected row beside an unconnected one.
 
 *Reproduced and now verified by `suites/js/modules-wallpaper.test.mjs`.*
 
-### 37. The pass browser surfaces an empty `.git` folder
+### 37. (fixed) The pass browser surfaces an empty `.git` folder
+
+**Resolved.** One segment-anchored test - `/(^|\/)\.git(\/|$)/` - filters
+the folder itself, its children and a nested repository's directory, so no
+`.git` bookkeeping reaches either side of the browser.
 
 `shell/features/pass/Model.js:72` filters a directory as
 `f === ".git" || f.indexOf(".git/") === 0 || f.indexOf("/.git/") !== -1`. All
