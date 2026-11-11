@@ -2,6 +2,7 @@ pragma Singleton
 
 import Quickshell
 import qs.common
+import "HandlerSlot.js" as HandlerSlot
 
 // Neutral lock request contract between session-level callers and the resident
 // lock surface. The request path can only engage a session lock; release

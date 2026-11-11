@@ -1,6 +1,7 @@
 pragma Singleton
 
 import Quickshell
+import "../runtime/HandlerSlot.js" as HandlerSlot
 
 // Neutral request/result contract between the headless capture service and
 // the on-demand annotation controller. The service never names an

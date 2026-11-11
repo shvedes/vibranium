@@ -1,6 +1,7 @@
 pragma Singleton
 
 import Quickshell
+import "HandlerSlot.js" as HandlerSlot
 
 // Neutral page-injection contract between a state owner and the resident page
 // surface that renders it. A state owner publishes page descriptors and the
