@@ -32,14 +32,13 @@ Singleton {
   // surfaces cannot both claim the same request, and identity comparison is
   // what keeps a re-adopt of the same surface idempotent.
   function adopt(handler) {
-    if (typeof handler !== "function") return false
-    if (root._handler !== null && root._handler !== handler) return false
+    if (!HandlerSlot.canAdopt(root._handler, handler)) return false
     root._handler = handler
     return true
   }
 
   function release(handler) {
-    if (root._handler !== handler) return false
+    if (!HandlerSlot.canRelease(root._handler, handler)) return false
     root._handler = null
     return true
   }

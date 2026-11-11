@@ -118,14 +118,13 @@ Singleton {
   }
 
   function adopt(handler) {
-    if (typeof handler !== "function") return false
-    if (root._handler !== null && root._handler !== handler) return false
+    if (!HandlerSlot.canAdopt(root._handler, handler)) return false
     root._handler = handler
     return true
   }
 
   function release(handler) {
-    if (root._handler !== handler) return false
+    if (!HandlerSlot.canRelease(root._handler, handler)) return false
     root._handler = null
     return true
   }

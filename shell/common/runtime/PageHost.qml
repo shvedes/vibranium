@@ -61,7 +61,7 @@ Singleton {
   }
 
   function release(handler) {
-    if (root._handler !== handler) return false
+    if (!HandlerSlot.canRelease(root._handler, handler)) return false
     root._handler = null
     return true
   }
