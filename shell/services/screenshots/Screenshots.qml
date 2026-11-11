@@ -884,9 +884,12 @@ Singleton {
   // immediate continuation and any human re-press.
   property double _lastStartMs: 0
 
+  // The 100ms window is the echo guard's own: the shortcut occasionally fires
+  // twice within milliseconds, and the picker's immediate continuation and a
+  // human re-press are both well past it.
   function _debounced(what) {
     const now = Date.now()
-    if (now - root._lastStartMs < 100) return true
+    if (ShotLib.echoGuard(now, root._lastStartMs, 100)) return true
     root._lastStartMs = now
     return false
   }

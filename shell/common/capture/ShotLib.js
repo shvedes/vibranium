@@ -252,6 +252,19 @@ function ensureImageSuffix(path, preferred) {
 
 // Single-quote a shell word. Screenshots, runtime and XDG dirs can contain
 // spaces; every wl-copy invocation below goes through sh -c redirection.
+// The shortcut echo guard: a repeated trigger inside the window is the same
+// press delivered twice, not a second capture. `lastMs` is the caller's own
+// last accepted timestamp; this answers whether the press is an echo and the
+// caller writes the timestamp back when it is not.
+function echoGuard(now, lastMs, windowMs) {
+  const n = Number(now)
+  const last = Number(lastMs)
+  const w = Number(windowMs)
+  if (!isFinite(n)) return true
+  const limit = isFinite(w) && w >= 0 ? w : 100
+  return isFinite(last) && n - last >= 0 && n - last < limit
+}
+
 function sq(s) {
   return SU.shellQuote(s)
 }
