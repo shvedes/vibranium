@@ -34,13 +34,6 @@ function clamp(v, lo, hi) {
   return Range.clamp(v, lo, hi)
 }
 
-// Directory part of a path, "" when the path carries none. A leading
-// "/name" is a root-level entry with no directory of its own, and a bare
-// name has none either; the caller decides what that absence means.
-function pathDirname(p) {
-  return SU.dirname(p)
-}
-
 // Round away float drift from stepping/parsing; 3 decimals covers every
 // shipped step size.
 function quantize(v) {
