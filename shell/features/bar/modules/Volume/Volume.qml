@@ -324,15 +324,11 @@ BarModule {
   // below is the single call every click handler makes.
   islandComponent: islandComp
 
-  // Cold-boot settle gate for the pill's slide behavior (Zone uses the
-  // same 2s grace so the first layout pass never animates).
-  property bool bootSettled: false
-  Timer {
-    interval: 2000
-    running: true
-    repeat: false
-    onTriggered: root.bootSettled = true
-  }
+  // Cold-boot settle gate for the pill's slide behavior: the shared boot
+  // milestone the bar latches once its modules have built (Zone reads the
+  // same one), so the first layout pass never animates and this module arms
+  // no timer of its own per output.
+  readonly property bool bootSettled: DesktopLayoutState.bootEntranceSettled
 
   // An output going away drops its observation; the last output to go drops
   // the shared trackers with it, so a module closed everywhere leaves no

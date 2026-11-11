@@ -138,14 +138,12 @@ Item {
   // Cold-boot grace: the first Settings sync enables always-on slots
   // (workspaces) right after first paint - animating that churn
   // would slide every zone on every boot, so membership motion stays off
-  // until the session settles.
-  property bool bootSettled: false
-  Timer {
-    interval: 2000
-    running: true
-    repeat: false
-    onTriggered: root.bootSettled = true
-  }
+  // until the session settles. The milestone is the shared one the bar
+  // latches once every placed module has built (with the shell's own 2s
+  // backstop behind it), not a per-zone deadline: boot grace is a session
+  // property, and N zones arming N timers for it would each be a copy of a
+  // fact the shell already publishes.
+  readonly property bool bootSettled: DesktopLayoutState.bootEntranceSettled
   Timer {
     id: animTimer
     interval: Ui.slowMs + 120

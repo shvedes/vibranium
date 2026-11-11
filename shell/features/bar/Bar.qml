@@ -746,16 +746,17 @@ Singleton {
   // the held slots run their intro. Without motion it lands with the strip.
   property bool entranceModulesReady: false
 
-  Timer {
-    id: entranceFallback
+  // A module that never builds must not hold the entrance forever. The shared
+  // boot milestone already carries that backstop, so the latch follows it
+  // instead of arming a second deadline here: the milestone settling without
+  // this bar's own report means the backstop fired, which is exactly the case
+  // the local fallback existed for.
+  Connections {
+    target: DesktopLayoutState
 
-    interval: 3000
-    // Stops once the entrance latches early: without the binding the
-    // one-shot still fires at 3s into a _latchEntrance() that returns
-    // immediately - one wasted wakeup per boot.
-    running: !root.entranceReady
-    repeat: false
-    onTriggered: root._latchEntrance()
+    function onBootEntranceSettledChanged() {
+      if (DesktopLayoutState.bootEntranceSettled) root._latchEntrance()
+    }
   }
 
   function _entranceExpectedIds(layout) {
