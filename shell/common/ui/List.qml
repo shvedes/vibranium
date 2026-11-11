@@ -1189,9 +1189,7 @@ ListView {
         if (!lastLive && realMaxY < maxY - 0.5) maxY = realMaxY
       }
     }
-    if (y > maxY) return maxY
-    if (y < 0) return 0
-    return y
+    return Range.clamp(y, 0, maxY)
   }
 
   // --- the tail settle ---
