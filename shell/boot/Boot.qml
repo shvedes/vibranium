@@ -911,6 +911,7 @@ Item {
       boot._halfSettled(true)
       return
     }
+    Log.debug("boot: bar half adopted in " + boot._sinceProcessStart() + "ms")
     boot._startEarly()
     // The demand lives with the half that can serve it: a demand with nothing
     // to dispatch to would leave UnitGate marking the unit ready with the bar
@@ -935,6 +936,14 @@ Item {
       boot._halfSettled(true)
       return
     }
+    Log.debug("boot: services half adopted in " + boot._sinceProcessStart() + "ms")
+    // The early tier is the service singletons and the daemons that answer
+    // IPC, and this half is what builds most of them. Starting it here instead
+    // of only at the bar's adoption is what keeps the bar's module compile off
+    // the readiness path of `session` and `lockscreen`: a demand whose owner
+    // is still compiling is stashed for the replay, so the units this half
+    // does own are built now and the others wait for their own half.
+    boot._startEarly()
     boot._replayNext()
     boot._halfSettled(true)
   }
@@ -949,6 +958,10 @@ Item {
       boot._beginDrain()
       return
     }
+    Log.debug("boot: late half adopted in " + boot._sinceProcessStart() + "ms")
+    // `lockscreen` is essential and lives in this half, so the tier starts here
+    // too when the bar's adoption did not already start it. Idempotent.
+    boot._startEarly()
     annotationLoader.sourceComponent = boot._lateFeatures.annotationComponent()
     boot._replayNext()
     boot._halfSettled()
