@@ -467,11 +467,16 @@ for i in "${!SUITE_NAME[@]}"; do
     # A suite that recorded no assertions at all has not demonstrated
     # anything, whatever its exit status. Reporting it as a pass is the exact
     # failure this guards: a suite that cannot fail, going green forever.
-    if ((rc == 0)); then
+    if ((rc != 77)); then
+      # It never reached its assertions, cleanly or by dying first. Both are
+      # NO-ASSERTIONS, not a baseline: there is no recorded failure label for
+      # the classifier to match, so the baseline branch would report a crashed
+      # suite as red by exactly its recorded entries - of which there are none.
       status_override="EMPTY"
     else
-      # It failed to start. Counting a synthetic failure points at the real
-      # cause rather than reporting an empty-but-green suite.
+      # A BLOCKED suite records its own BLOCKED row; this only covers one that
+      # exited 77 before doing so. Counting a synthetic failure keeps it out of
+      # the empty-green path and lets the 77 branch below classify it.
       n_fail=1
     fi
   fi
