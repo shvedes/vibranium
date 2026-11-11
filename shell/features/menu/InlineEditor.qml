@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.features.menu
 import qs.common
+import "../../common/text/Format.js" as Format
 
 // Expansion editor shell for range/number/text rows: the validating
 // NumberPicker for numeric types, a free-form InputField for text, and
@@ -96,7 +97,7 @@ Item {
       // draws, so a field seeded with "5 min" would be holding a string its
       // own validator rejects - and a QValidator stops applying to a field
       // whose text it already refuses, which is the whole numeric filter.
-      text = root.numericValue.toFixed(root.decimals)
+      text = Format.fixed(root.numericValue, root.decimals)
     }
     onAccepted: value => root.commit(String(value))
     onInvalid: msg => root.invalid(msg)

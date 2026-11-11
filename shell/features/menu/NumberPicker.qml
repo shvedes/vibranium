@@ -5,6 +5,7 @@ import QtQuick
 import qs.common
 import qs.features.menu
 import "MenuLib.js" as MenuLib
+import "../../common/text/Format.js" as Format
 
 // Numeric-only editor box: [-] validated field [+] living inside a
 // bordered input-height rectangle. The validator rejects any non-numeric
@@ -55,7 +56,7 @@ Rectangle {
   }
 
   function formatted(v) {
-    return v.toFixed(decimals)
+    return Format.fixed(v, decimals)
   }
 
   function step(direction) {

@@ -911,7 +911,7 @@ Item {
     if (next === numericValue) return
     Menu.setValue(itm, next)
     if (Menu.handleNumberChange(itm, next)) return
-    Menu.runCommand(itm.onChange, next.toFixed(decimals) + unitSuffix)
+    Menu.runCommand(itm.onChange, Format.fixed(next, decimals) + unitSuffix)
   }
 
   function openEditor() {
@@ -988,13 +988,13 @@ Item {
     if (next === numericValue) {
       if (Menu.handleNumberChange(itm, next)) { collapse(); closeIfArmed(); return }
       if (itm.onChange && itm.onChange !== "")
-        Menu.runCommand(itm.onChange, next.toFixed(decimals) + unitSuffix)
+        Menu.runCommand(itm.onChange, Format.fixed(next, decimals) + unitSuffix)
       collapse()
       return
     }
     Menu.setValue(itm, next)
     if (Menu.handleNumberChange(itm, next)) { collapse(); closeIfArmed(); return }
-    Menu.runCommand(itm.onChange, next.toFixed(decimals) + unitSuffix)
+    Menu.runCommand(itm.onChange, Format.fixed(next, decimals) + unitSuffix)
     collapse()
   }
 

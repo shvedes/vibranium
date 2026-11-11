@@ -41,6 +41,14 @@ function percentInt(ratio) {
   return Math.round(n * 100)
 }
 
+// A numeric field's value at a fixed decimal count. The digit count is
+// floored and clamped at zero, matching the step rules the menu's numeric
+// editors already apply.
+function fixed(value, decimals) {
+  var places = Math.max(0, Math.floor(Number(decimals) || 0))
+  return Number(value).toFixed(places)
+}
+
 // A stored file's size: "" when there is nothing to report, whole bytes below
 // a KiB, one trimmed decimal above it. Canonical home of ClipboardLib
 // formatSize. NaN and non-positive input answer "" rather than a zero size.
