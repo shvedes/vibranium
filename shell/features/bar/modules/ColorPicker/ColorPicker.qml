@@ -8,6 +8,7 @@ import "../../../../common/math/Color.js" as Color
 import "ColorHistory.js" as ColorHistory
 import "../../../../common/math/Range.js" as Range
 import "../../../../common/capture/ShotLib.js" as ShotLib
+import "../../../../common/process/JobResult.js" as Job
 import "../../../../common/text/StringUtils.js" as SU
 
 // Color picker module. Left click starts a native pick: a full-screen
@@ -636,10 +637,7 @@ BarModule {
   }
 
   function _copySettled(result) {
-    if (result === null || result === undefined) return false
-    if (result.cancelled === true || result.destroyed === true) return false
-    if (result.timedOut === true) return false
-    return String(result.code) === "ok" && Number(result.exitCode) === 0
+    return Job.succeeded(result)
   }
 
   // A copy still in flight when the module goes away (a bar reload, the shell
@@ -657,18 +655,7 @@ BarModule {
   }
 
   function _cancelCopy(job, reason) {
-    if (job === null || job === undefined) return false
-    try {
-      if (String(job.state) === "settled") return false
-    } catch (ignored) {
-      return false
-    }
-    try {
-      job.cancel(String(reason))
-      return true
-    } catch (ignored) {
-      return false
-    }
+    return Job.cancelLive(job, reason)
   }
 
   // --- native picking ---

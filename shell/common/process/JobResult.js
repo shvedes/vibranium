@@ -25,18 +25,26 @@ function failedCode(result) {
   return code === "ok" ? "" : code
 }
 
-// Cancel a live registry job. A settled or unreadable job is left alone, and a
-// cancel that throws because the job died between the two reads is not an
-// error. `reason` is the registry's own cancellation label.
+// Cancel a live registry job and answer whether the cancel reached it. A
+// settled or unreadable job is left alone, and a cancel that throws because
+// the job died between the two reads is not an error. `reason` is the
+// registry's own cancellation label.
+function cancelLive(job, reason) {
+  if (job === null || job === undefined) return false
+  try {
+    if (String(job.state) === "settled") return false
+  } catch (ignored) {
+    return false
+  }
+  try {
+    job.cancel(String(reason))
+    return true
+  } catch (ignored) {
+    return false
+  }
+}
+
+// Cancel a live registry job when the caller has no use for the verdict.
 function stopJob(job, reason) {
-  if (job === null || job === undefined) return
-  try {
-    if (String(job.state) === "settled") return
-  } catch (ignored) {
-    return
-  }
-  try {
-    job.cancel(reason)
-  } catch (ignored) {
-  }
+  cancelLive(job, reason)
 }
