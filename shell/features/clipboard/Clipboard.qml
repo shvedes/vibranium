@@ -648,11 +648,15 @@ Singleton {
   }
   // Triple-buffered deletion via OptimisticSet (K3)
   property OptimisticSet optimistic: OptimisticSet {}
+  // The slot `id` holds in `list`, or -1 when it is not there.
+  function _indexOf(id, list) {
+    for (let i = 0; i < list.length; i++)
+      if (list[i].id === id) return i
+    return -1
+  }
   function findById(id) {
-    const h = root.history
-    for (let i = 0; i < h.length; i++)
-      if (h[i].id === id) return h[i]
-    return null
+    const i = root._indexOf(id, root.history)
+    return i < 0 ? null : root.history[i]
   }
   function requestDelete(id) {
     if (root.optimistic.isPending(id)) return false
@@ -672,9 +676,7 @@ Singleton {
     // Entry replaced or gone between stages - abort safely.
     if (root.findById(id) !== captured) { root.finishDelete(id); return }
     const h = root.history.slice()
-    let idx = -1
-    for (let i = 0; i < h.length; i++)
-      if (h[i].id === id) { idx = i; break }
+    const idx = root._indexOf(id, h)
     if (idx < 0) { root.finishDelete(id); return }
     // Captured BEFORE the splice, because after it `h[idx]` is the row that moved
     // into that slot.
@@ -748,9 +750,7 @@ Singleton {
   // Lift an entry to the most-recent slot (used when it is re-copied).
   function _promote(id) {
     const h = root.history.slice()
-    let idx = -1
-    for (let i = 0; i < h.length; i++)
-      if (h[i].id === id) { idx = i; break }
+    const idx = root._indexOf(id, h)
     if (idx < 0) return
     if (idx === 0) {
       // Still refresh timestamp so timeStr updates and persistence reorders.
