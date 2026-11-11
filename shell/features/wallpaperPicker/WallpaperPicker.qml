@@ -237,19 +237,6 @@ Singleton {
         return job
     }
 
-    // Success is the whole terminal verdict, not just a zero: a timed out,
-    // cancelled or destroyed child never counts as having done its work.
-    function _succeeded(result) {
-        return Job.succeeded(result)
-    }
-
-    // The stable refusal code for a child that did not report success. It is
-    // derived from the job's own terminal code, so a new terminal state
-    // becomes a new code instead of collapsing into a success.
-    function _jobCode(result) {
-        return Job.failedCode(result)
-    }
-
     // Image-only gate: backgrounds/ may hold stray non-images (helper
     // scripts like a.sh, READMEs). Only these extensions ever become
     // rows, so the preview Image never tries to open a script.
@@ -568,7 +555,7 @@ Singleton {
             root._runGitLs()
             return
         }
-        if (!root._succeeded(result)) {
+        if (!Job.succeeded(result)) {
             root._failGitList()
             return
         }
@@ -955,8 +942,8 @@ Singleton {
     function _onDeleteDone(record, result) {
         if (root._closing) return
         if (!RequestGate.current(record.handle)) return
-        if (!root._succeeded(result)) {
-            root._abortDelete(record.file, "delete_" + root._jobCode(result))
+        if (!Job.succeeded(result)) {
+            root._abortDelete(record.file, "delete_" + Job.failedCode(result))
             return
         }
         root.optimistic.confirm(record.file)

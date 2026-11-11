@@ -180,7 +180,7 @@ Singleton {
     const next = Object.assign({}, root._runs)
     delete next[key]
     root._runs = next
-    root._stopJob(job, reason)
+    Job.stopJob(job, reason)
     if (temp !== "") root._cleanupPath(temp)
     return true
   }
@@ -216,12 +216,12 @@ Singleton {
     // The refusal callback above can settle the operation synchronously, so
     // currency is re-read before the job is recorded as owned.
     if (!root._live(record)) {
-      root._stopJob(job, "stale")
+      Job.stopJob(job, "stale")
       return false
     }
     const run = root._runs[record.key]
     if (run === undefined) {
-      root._stopJob(job, "stale")
+      Job.stopJob(job, "stale")
       return false
     }
     run.job = job
@@ -236,18 +236,6 @@ Singleton {
     if (run === undefined) return
     run.job = null
     root._spawn(record, spec, timeoutMs, onResult)
-  }
-
-  // A settled job owns nothing: the registry released its child and destroys
-  // the job itself, so only a live one is cancelled here.
-  function _stopJob(job, reason) {
-    Job.stopJob(job, reason)
-  }
-
-  // Success is the full terminal verdict, not just a zero: a timed out,
-  // cancelled or destroyed child never counts as having done its work.
-  function _succeeded(result) {
-    return Job.succeeded(result)
   }
 
   function basename(p) {
@@ -388,7 +376,7 @@ Singleton {
     if (!root._live(record)) return
     // A failed, timed out or refused listing has no output to choose from,
     // which is the same as an empty directory.
-    const raw = root._succeeded(result) ? String(result.stdout || "") : ""
+    const raw = Job.succeeded(result) ? String(result.stdout || "") : ""
     // The operation is retired before anything visible moves, so a commit
     // cannot be raced by a request that supersedes this one mid-callback.
     root._retire(record.key, "cycle_done")
@@ -558,7 +546,7 @@ Singleton {
 
   function _onResolveDone(record, result) {
     if (!root._live(record)) return
-    const abs = root._succeeded(result) ? String(result.stdout || "").trim() : ""
+    const abs = Job.succeeded(result) ? String(result.stdout || "").trim() : ""
     root._retire(record.key, "resolved")
     // A relative argument that will not resolve: a path that is not there,
     // or one the shell may not read. Nothing is published and the caller
@@ -658,7 +646,7 @@ Singleton {
     if (!root._live(record)) return
     const run = root._runs[record.key]
     if (run === undefined) return
-    if (root._succeeded(result)) run.ids[index] = String(result.stdout || "").trim()
+    if (Job.succeeded(result)) run.ids[index] = String(result.stdout || "").trim()
     root._runIdentity(record, index + 1)
   }
 
@@ -723,7 +711,7 @@ Singleton {
 
   function _onCopyChild(record, index, label, result) {
     if (!root._live(record)) return
-    if (!root._succeeded(result)) {
+    if (!Job.succeeded(result)) {
       root._failSet(record, label)
       return
     }
@@ -939,7 +927,7 @@ Singleton {
   function _onDropStat(record, result) {
     if (!root._live(record)) return
     const isTemp = record.temp !== ""
-    if (!root._succeeded(result)) {
+    if (!Job.succeeded(result)) {
       // The dropped file is not there, or could not be read.
       root._retire(record.key, "stat_failed")
       root._dropFail("file not found")
@@ -1068,7 +1056,7 @@ Singleton {
 
   function _onDropMkdir(record, result) {
     if (!root._live(record)) return
-    if (!root._succeeded(result)) {
+    if (!Job.succeeded(result)) {
       root._retire(record.key, "mkdir_failed")
       root._dropFail("cannot create cache dir")
       return
@@ -1088,7 +1076,7 @@ Singleton {
 
   function _onDropCurl(record, result) {
     if (!root._live(record)) return
-    if (!root._succeeded(result)) {
+    if (!Job.succeeded(result)) {
       const err = result === null ? "download failed"
         : (String(result.stderr || "").trim() || "download failed")
       root._retire(record.key, "download_failed")
@@ -1107,7 +1095,7 @@ Singleton {
   // either background directory.
   function _onDropMime(record, result) {
     if (!root._live(record)) return
-    const mime = root._succeeded(result) ? String(result.stdout || "").trim() : ""
+    const mime = Job.succeeded(result) ? String(result.stdout || "").trim() : ""
     if (mime === "") {
       root._retire(record.key, "mime_unknown")
       root._dropFail("cannot detect file type")
@@ -1205,7 +1193,7 @@ Singleton {
       const run = root._runs[keys[i]]
       if (run === undefined || run.job === null || run.job === undefined) continue
       const job = run.job
-      root._stopJob(job, "destroyed")
+      Job.stopJob(job, "destroyed")
       try {
         job.destroy()
       } catch (ignored) {

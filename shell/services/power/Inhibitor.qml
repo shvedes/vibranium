@@ -286,12 +286,6 @@ Singleton {
     return { id: generation, scope: root._gateScope, key: key }
   }
 
-  // A settled job owns nothing: the registry already released its child
-  // and destroys the job itself, so only a live one is cancelled here.
-  function _stopJob(job, reason) {
-    Job.stopJob(job, reason)
-  }
-
   // Liveness of a registry-owned child is its terminal transition: a job the
   // registry has not settled has reported no exit, and a destroyed job cannot
   // be read at all, so an unusable reference reads as no claim rather than as
@@ -347,7 +341,7 @@ Singleton {
     // A refusal settles the request synchronously, so currency is
     // re-read before the job is recorded as owned by the run.
     if (!RequestGate.current(run.handle)) {
-      root._stopJob(job, "stale")
+      Job.stopJob(job, "stale")
       return false
     }
     run.job = job
@@ -506,7 +500,7 @@ Singleton {
     if (run === null) return false
     root._inhibitRun = null
     root._heldAt = 0
-    root._stopJob(run.job, reason)
+    Job.stopJob(run.job, reason)
     return true
   }
 
@@ -609,7 +603,7 @@ Singleton {
     const run = root._listRun
     if (run === null) return false
     root._listRun = null
-    root._stopJob(run.job, reason)
+    Job.stopJob(run.job, reason)
     return true
   }
 
@@ -689,7 +683,7 @@ Singleton {
     const run = root._reapRun
     if (run === null) return false
     root._reapRun = null
-    root._stopJob(run.job, reason)
+    Job.stopJob(run.job, reason)
     return true
   }
 

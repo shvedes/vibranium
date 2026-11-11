@@ -614,7 +614,7 @@ Singleton {
     const run = root._runs[slot]
     if (run !== undefined) {
       const jobs = run.jobs.slice()
-      for (let i = 0; i < jobs.length; i++) root._stopJob(jobs[i], reason)
+      for (let i = 0; i < jobs.length; i++) Job.stopJob(jobs[i], reason)
     }
     root._dropRun(slot)
   }
@@ -675,28 +675,16 @@ Singleton {
       return false
     }
     if (!RequestGate.current(record.handle)) {
-      root._stopJob(job, "stale")
+      Job.stopJob(job, "stale")
       return false
     }
     const run = root._runs[record.slot]
     if (run === undefined) {
-      root._stopJob(job, "stale")
+      Job.stopJob(job, "stale")
       return false
     }
     run.jobs.push(job)
     return true
-  }
-
-  // A settled job owns nothing: the registry released its child and destroys
-  // the job itself, so only a live one is cancelled here. Cancelling runs the
-  // terminal path, which stops the child and lets the registry dispose of the
-  // job.
-  function _stopJob(job, reason) {
-    Job.stopJob(job, reason)
-  }
-
-  function _jobSucceeded(result) {
-    return Job.succeeded(result)
   }
 
   // Stable code of the last refused or unlanded operation, or "" (also read
@@ -747,7 +735,7 @@ Singleton {
   // and it did not.
   function _spawnPhaseCommand(record, phase, spec) {
     root._spawn(record, spec, root._cmdTimeoutMs,
-      (result) => root._countCommand(record, phase, root._jobSucceeded(result)),
+      (result) => root._countCommand(record, phase, Job.succeeded(result)),
       () => root._countCommand(record, phase, false))
   }
 
@@ -796,7 +784,7 @@ Singleton {
   // of this pair and dropped.
   function _onDumpSettled(record, result) {
     if (!RequestGate.current(record.handle)) return
-    const links = root._jobSucceeded(result)
+    const links = Job.succeeded(result)
       ? PrivacyLib.linkQuads(String(result.stdout || ""), record.ids) : []
     const next = Object.assign({}, root.severed)
     next[record.slot] = { links: links }
@@ -904,7 +892,7 @@ Singleton {
       const owned = run.jobs.slice()
       RequestGate.invalidateScope(root._gateScope, root._gateKey(slots[i]))
       for (let j = 0; j < owned.length; j++) {
-        root._stopJob(owned[j], "destroyed")
+        Job.stopJob(owned[j], "destroyed")
         try {
           owned[j].destroy()
         } catch (ignored) {
