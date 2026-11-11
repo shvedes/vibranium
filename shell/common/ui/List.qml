@@ -1103,15 +1103,22 @@ ListView {
     let best = -1
     let prev = -1
     let last = -1
+    // Running table top: rowTop(i) is the sum of every preceding row's table
+    // height plus the gaps, so calling it once per row walked the prefix again
+    // for each one - quadratic in the rows measured, with a rowIdentity call
+    // per step. The same sum carried forward is one addition per row.
+    let tableTop = 0
     for (let i = 0; i < limit; i++) {
       const d = root.itemAtIndex(i)
-      const h = d ? d.height : root.rowHeightAt(i)
+      const tableH = root.rowHeightAt(i)
+      const h = d ? d.height : tableH
       if (!(h > 0)) return -1
-      const bottom = (d ? d.y : root.rowTop(i)) + h
+      const bottom = (d ? d.y : tableTop) + h
       if (bottom > avail + 0.5) return best
       prev = best
       best = bottom
       last = i
+      tableTop += tableH + root.spacing
     }
     if (last < 0) return -1
     const withTrail = best + root.trailSpace
