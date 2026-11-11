@@ -278,12 +278,6 @@ function clockLabel(atMs, use12h) {
   return ClockFmt.clockLabel(atMs, use12h)
 }
 
-// Two-digit zero padding, canonicalized in common/text/Format.js.
-// Declared above its caller because this tree's rule is that a
-// declaration comes before its first use, not after it.
-function pad2(n) {
-  return Format.pad2(n)
-}
 
 // The array unchanged. Index 0 is the oldest, which is the order the
 // controller stores every notification in, and this function names that
