@@ -94,6 +94,14 @@ PanelWindow {
 
   property bool open: false
 
+  // True once the card has taken a height for the current open. The first
+  // size a freshly incubated content declares is applied while the window is
+  // still fading in, and it must be a SNAP: animating it grows the surface
+  // into place, so the window maps narrow and tall for the length of the
+  // tween. Every later change tweens (the height Behavior reads this flag),
+  // and a reopen starts over at false.
+  property bool _sizedForOpen: false
+
   // Read-only: the instantiated content (null while closed).
   readonly property alias content: cardLoader.item
 
@@ -195,6 +203,7 @@ PanelWindow {
   }
 
   function show(anchor, comp) {
+    const reopening = !root.open
     root._key = root._keyFor(anchor)
     root.anchorItem = anchor
     if (root.contentComponent !== comp) {
@@ -207,6 +216,10 @@ PanelWindow {
       // two change handlers would have taken.
       root._saveFrozen()
     }
+    // A reopen maps the window again, so its first size has to snap for the
+    // same reason the very first open does. A switch between two anchors
+    // while already open keeps the latch: that content is already measured.
+    if (reopening) root._sizedForOpen = false
     root.open = true
     root.requestPark()
   }
@@ -434,16 +447,23 @@ PanelWindow {
       // MenuPanel) for discrete content changes. Self-animating content
       // (islandSelfAnimating) steps the Behavior aside so the card tracks
       // the content's own tween frame by frame - one easing only. The
-      // opacity gate keeps the very first size evaluation (during the
+      // `_sizedForOpen` latch keeps the first size of each open (during the
       // fade-in, right after the content incubated) a snap instead of a
-      // grow: the window then maps at its final size. Position is
-      // unaffected: positionCard() owns card.x/y and the vertical park does
-      // not depend on the height, so the card stays put while it grows.
+      // grow: the window then maps at its final size, and every later change
+      // tweens. Position is unaffected: positionCard() owns card.x/y and the
+      // vertical park does not depend on the height, so the card stays put.
       Behavior on height {
-        enabled: root.animationsEnabled && !(root.content && root.content.islandSelfAnimating)
-          && (card.opacity === 1 || !root.open)
+        enabled: root.animationsEnabled && root._sizedForOpen
+          && !(root.content && root.content.islandSelfAnimating)
         Glide { duration: Ui.resizeMs }
       }
+
+      // The first height the card takes after a show is the snap the Behavior
+      // above is disabled for. Latching here - rather than comparing opacity,
+      // which a Behavior on opacity has not necessarily reached when the
+      // content's first size lands - is what makes the first change a snap
+      // deterministically.
+      onHeightChanged: if (root.open) root._sizedForOpen = true
 
       Behavior on opacity {
         enabled: root.animationsEnabled

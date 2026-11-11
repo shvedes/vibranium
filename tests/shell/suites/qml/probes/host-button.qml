@@ -1338,6 +1338,10 @@ ShellRoot {
       // The live card tracks the content, so while it is open it looks right...
       kv("ih.shared.cardWidth", h.card.width)
       kv("ih.shared.cardHeight", h.card.height)
+      // The switch is a discrete content change on an open host, so the height
+      // glides from 140 to the new 90 rather than snapping; the sampled turn
+      // may land anywhere inside that span.
+      kv("ih.shared.cardHeightDropping", h.card.height >= 90 && h.card.height <= 140)
       // ...and the twin's slot is frozen too: show() saves the live size when
       // the component is unchanged, which is the case neither the content
       // change nor the content size change covers.

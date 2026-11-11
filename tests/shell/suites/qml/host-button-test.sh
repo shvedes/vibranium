@@ -169,7 +169,7 @@ qp_assert "open and isOpenFor agree" "ih.agree.afterShow" "true"
 qp_assert "and agree once settled too" "ih.agree.settled" "true"
 qp_assert "the content is live one turn after the show" "ih.show.content" "live"
 qp_assert "the card's width is already final - it has no Behavior" "ih.show.cardWidth" "300"
-qp_assert "while its height is still in flight" "ih.show.cardHeightInFlight" "true"
+qp_assert "and its height snapped with it, so the window maps at its final size" "ih.show.cardHeightInFlight" "false"
 qp_assert "close() closes" "ih.close.open" "false"
 qp_assert "isOpenFor goes false for the served anchor" "ih.close.isOpenForTwin" "false"
 qp_assert "and for the slot's other item" "ih.close.isOpenForVolume" "false"
@@ -382,10 +382,10 @@ qp_assert "and the frozen width never changed" "ih.resize.landedFrozenW" "300"
 # turns is already at its final size.
 if [[ $MOTION_ENABLED == "true" ]]; then
   qp_assert "the card is fading in" "ih.fade.t5.opacityStrict" "true"
-  qp_assert "the height is growing with it" "ih.fade.t5.heightStrict" "true"
-  qp_assert "one turn later the height is still growing" "ih.fade.t6.heightStrict" "true"
-  lt "and it is climbing" "$(qp_get ih.fade.t4.height)" "$(qp_get ih.fade.t7.height)"
-  qp_assert "there was a turn with both tweens in flight" "ih.fade.sawMidFade" "true"
+  qp_assert "while the height is already the content's" "ih.fade.t5.height" "140"
+  qp_assert "with no intermediate height on that turn" "ih.fade.t5.heightStrict" "false"
+  qp_assert "one turn later it is still final" "ih.fade.t6.heightStrict" "false"
+  qp_assert "so the height never ran beside the fade" "ih.fade.sawMidFade" "false"
   qp_assert "the fade completes" "ih.fade.t9.opacity" "1"
   qp_assert "and then opacity is no longer in between" "ih.fade.t9.opacityStrict" "false"
 else
@@ -420,54 +420,37 @@ t_eq "landing on zero" "0" "$(qp_get ih.settle.t32.opacity)"
 t_eq "and the content is gone on that same turn" "null" "$(qp_get ih.settle.t32.content)"
 
 # ---------------------------------------------------------------------------
-t_section "finding: the first size evaluation grows instead of snapping"
-# IslandHost.qml:253-266 documents that the opacity gate keeps the very first
-# size evaluation - the one right after the content incubates, during the
-# fade-in - a snap "instead of a grow", so the window maps at its final size.
-# Measured: the height tween runs from 0 to the content's declared height across
-# the whole fade, on a host whose content is not self-animating, on the same
-# turns a host with animationsEnabled false is already at its final size.
-FINDING_GROW="FINDING (IslandHost.qml:262-266 vs measured): the first size evaluation
-  is a grow, not a snap.
-  Input: show() a content declaring islandContentWidth 300 / islandContentHeight
-    140, on a host with the default animationsEnabled.
-  Expected per the comment: card.height == 140 on the first event-loop turn, so
-    the window maps at its final size.
-  Actual: the card is mid-glide for the whole fade - 37.9 one turn after the
-    show and 140 only nine turns later, on this host, with card.opacity between
-    0.4 and 1 the entire time. The width, which has no Behavior, is 300 on the
-    first turn, so the card grows tall and narrow.
-  Control: the same first open with animationsEnabled false reports height 140
-    and opacity 1 on the same turn (ih.fade.noMotion.snapped), so the grow is
-    the tween and not a slow measurement. The islandSelfAnimating term of the
-    same gate is equally ineffective on that first change
-    (ih.fade.t5.selfStrict), while the animationsEnabled term is honoured - which
-    points at the first-change ordering rather than at the expression."
-t_note "$FINDING_GROW"
-qp_assert "the animating host is mid-glide on the first settle turn" "ih.fade.t4.heightStrict" "true"
-qp_assert "the no-motion control is at its final size on that turn" "ih.fade.t4.noMotionHeight" "140"
+t_section "the first size evaluation snaps, and only the first"
+# IslandHost keeps the first size of each open a snap so the window maps at its
+# final footprint. The latch is `_sizedForOpen`, set by the card's own height
+# change; an opacity comparison could not do it, because a Behavior on opacity
+# has not necessarily reached its end when the content's first size lands -
+# which is what the old opacity gate measured as "still fading, so animate".
+t_note "RESOLVED (IslandHost.qml): the height Behavior is gated on `_sizedForOpen`
+instead of on `card.opacity === 1`. The first height of each open is applied
+while the latch is false, so it snaps; the card's onHeightChanged sets the latch
+and every later change tweens. The samples below pin the corrected contract on
+the same turns the defect was measured on."
+qp_assert "the animating host is at its final height on the first settle turn" "ih.fade.t4.height" "140"
+qp_assert "so no intermediate height was painted" "ih.fade.t4.heightStrict" "false"
+qp_assert "the no-motion control is at the same final size" "ih.fade.t4.noMotionHeight" "140"
 qp_assert "and the control's opacity landed immediately" "ih.fade.noMotion.snapped" "true"
-gt "so the two hosts differ by a long way" "$(qp_get ih.fade.t4.noMotionHeight)" "$(qp_get ih.fade.t4.height)"
-# A sampled height is the host's turn spacing, so the claim is the relationship:
-# the card was mid-glide on a turn where the fade was also in flight, and the
-# height tween lands on a later turn than the opacity tween.
-qp_assert "there was a turn with both tweens in flight" "ih.fade.sawMidFade" "true"
-# Whether the landing turns are DISTINCT is a function of the pump's cadence:
-# both tweens can land between two turns, and then they carry the same index.
-# The ordering that matters is that height never lands first.
+t_eq "so the two hosts agree on height" "$(qp_get ih.fade.t4.noMotionHeight)" "$(qp_get ih.fade.t4.height)"
+# The height lands on the show turn or before the opacity tween does. Whether
+# the landing turns are DISTINCT is a function of the pump's cadence: both can
+# land between two turns and then carry the same index.
+qp_assert "there was never a turn with a height tween beside the fade" "ih.fade.sawMidFade" "false"
 hLanded=$(qp_get ih.fade.heightLandedAt)
 oLanded=$(qp_get ih.fade.opacityLandedAt)
-t_true "and the height tween never lands before the opacity tween" \
-  awk -v a="$hLanded" -v b="$oLanded" 'BEGIN { exit !(a > 0 && b > 0 && a >= b) }'
+t_true "and the height never lands after the opacity tween" \
+  awk -v a="$hLanded" -v b="$oLanded" 'BEGIN { exit !(a > 0 && b > 0 && a <= b) }'
 if [[ "$hLanded" -eq "$oLanded" ]]; then
-  t_note "both tweens landed on the same sampled turn ($hLanded), so a strict ordering was not observable; the fade is the shorter tween"
+  t_note "both landed on the same sampled turn ($hLanded); the snap is not observable as an ordering at this cadence"
 fi
-qp_assert "a self-animating content is mid-glide as well" "ih.fade.t5.selfStrict" "true"
-t_note "the same gate is honoured on every later change: a resize requested while
-the island is fully open tweens (ih.resize.t13.strict) and one requested mid-fade
-snaps, because the gate is false there - so the defect is confined to the first
-change after the content incubates, which is exactly the change the comment is
-about"
+qp_assert "a self-animating content snaps its first size too" "ih.fade.t5.selfStrict" "false"
+t_note "the latch is per open, not a one-off: a resize requested while the island
+is fully open tweens (ih.resize.t13.strict), and a reopen arms it again, so the
+next first size snaps on the same terms as this one"
 
 # ---------------------------------------------------------------------------
 t_section "a runtime margin change re-parks the card"
@@ -514,7 +497,7 @@ qp_assert "under its own key" "ih.shared.keyShared" "shared"
 qp_assert "the first slot froze" "ih.shared.frozenSharedW" "220"
 qp_assert "and so did the second, on the same component" "ih.shared.frozenTwinW" "220"
 qp_assert "while the open card is the content's width" "ih.shared.cardWidth" "220"
-qp_assert "and its height" "ih.shared.cardHeight" "90"
+qp_assert "and its height is gliding to the new content's" "ih.shared.cardHeightDropping" "true"
 qp_assert "isOpenFor moved to the second slot" "ih.shared.isOpenForTwin" "true"
 qp_assert "and left the first" "ih.shared.isOpenForSharedAfter" "false"
 qp_assert "the key moved with it" "ih.shared.keyTwin" "shared-twin"
