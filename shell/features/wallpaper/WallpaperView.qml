@@ -9,6 +9,7 @@ import Quickshell.Wayland
 import qs.common
 import qs.features.wallpaper
 import "../../common/capture/ShotLib.js" as ShotLib
+import "../../common/math/Range.js" as Range
 import "WallpaperTrans.js" as Trans
 
 // Per-screen wallpaper surface living on the background layer. Swaps run

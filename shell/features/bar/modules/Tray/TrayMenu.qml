@@ -7,6 +7,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.common
 import qs.features.bar
+import "../../../../common/math/Range.js" as Range
 
 // DBusMenu popup for a tray item. A transparent full-screen overlay (same
 // pattern as the island and tooltip) parks a card under the clicked item.

@@ -7,6 +7,7 @@ import Quickshell.Hyprland
 import Quickshell.Wayland
 import qs.common
 import "../collections/FrozenFootprint.js" as FP
+import "../math/Range.js" as Range
 
 // IslandHost: the single shared island window per BarView (per screen).
 // Modules stop owning windows; they lend an anchor item plus a content
