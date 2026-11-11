@@ -8,7 +8,7 @@ Entries marked (fixed) are resolved; the rest are the actionable list. The suite
 it currently is, with a comment saying why it is wrong, so a fix turns a suite
 red and forces the record to be updated rather than passing silently.
 
-**30 open findings: 1 high, 12 medium, 17 low.** Five high-severity findings are fixed and kept below for the record - the code and its suite now pin the corrected behaviour. Two thirds of them came from the
+**24 open findings: 1 high, 10 medium, 13 low.** Five high-severity findings are fixed and kept below for the record - the code and its suite now pin the corrected behaviour. Two thirds of them came from the
 behavioural QML component suites (`suites/qml/`), which is the argument for
 having them: the component layer is where the shell's user-visible contracts
 live, and reading the source does not find a `fail()` that forgets to re-mask.
@@ -330,7 +330,12 @@ and `publish("7", …)` are the same topic.*
 
 ## Low
 
-### 14. `Ui.tint` / `Ui.solid` have an unreachable fallback
+### 14. (fixed) `Ui.tint` / `Ui.solid` had an unreachable fallback
+
+**Resolved.** The dead `=== undefined` arm is gone from both functions; they
+now call `Theme.color` directly, which answers every key from its fallback map.
+Unknown keys paint that fallback at the requested alpha, and the ui suite pins
+both the unknown-key colour and its zero-alpha form.
 
 `shell/common/ui/Ui.qml:133` branches on `Theme.color(key) === undefined`, but
 `Theme.color` ends in a fallback map and returns a string for every input — an
@@ -413,7 +418,13 @@ from 19 so the numbering the earlier sections established stays stable.
 
 ## Medium
 
-### 19. `List.qml` ignores `wrap: false` and wraps anyway
+### 19. (fixed) `List.qml` ignored `wrap: false` and wrapped anyway
+
+**Resolved.** `move()` clamps in a `wrap: false` branch before stepping and
+returns false at either end, so the modulo lap no longer runs. The list suite's
+"wrap:false clamps at either end while skipping holes" section pins an up-step
+from row 0 and a down-step from the last row as no-moves, and still pins the
+wrap direction for `wrap: true`.
 
 `shell/common/ui/List.qml:657` computes `i = (i + dir + count) % count`
 unconditionally, so the clamp at `:689` can only fire after the scan has
@@ -441,7 +452,12 @@ the declaration.
 
 *Reproduced by `suites/qml/list-test.sh`.*
 
-### 20. `List.restoreAt()` writes the cursor onto a non-selectable row
+### 20. (fixed) `List.restoreAt()` wrote the cursor onto a non-selectable row
+
+**Resolved.** The scan now writes the selectable index it found back to `i`
+and returns before seating anything when the whole list refuses, which is what
+`settle()` does. The list suite pins an all-refused list left unseated and a
+refused request that writes nothing.
 
 `shell/common/ui/List.qml:789-799`. The request is clamped, the scan loop at
 `:790-796` only reassigns `i` when it finds a selectable row, and `:799` then
@@ -559,7 +575,12 @@ hole.
 
 *Reproduced by `suites/qml/textinput-test.sh`.*
 
-### 27. A no-op `List.seatTo()` leaves a stale pursuit claim armed
+### 27. (fixed) A no-op `List.seatTo()` left a stale pursuit claim armed
+
+**Resolved.** `seatTo()` releases the `_followIdx`/`_pursuitIdx` claims before
+the already-reached return, so a seat that starts no tween owns nothing. The
+swap-hold bookkeeping (`_seatWrites`/`_lastWriteTag`) still records moving
+seats only. The list suite now pins a no-op seat as releasing both claims.
 
 `shell/common/ui/List.qml:507` returns early for an already-reached target
 *before* the `_followIdx`/`_pursuitIdx` reset at `:515-516`. `pursue()` reads
@@ -570,7 +591,12 @@ guard relies on.
 
 *Reproduced by `suites/qml/list-test.sh`.*
 
-### 28. `FunctionGraph._niceStep` lets `Infinity` through
+### 28. (fixed) `FunctionGraph._niceStep` let `Infinity` through
+
+**Resolved.** The guard is `!(span > 0) || !isFinite(span)`, so `Infinity`
+takes the documented degenerate-span answer of 1 instead of producing `NaN`.
+The graph probe pins an infinite step and the degenerate spans as finite and
+positive.
 
 `shell/common/ui/FunctionGraph.qml:88`: `raw = Infinity / 6`, the guard
 `!(raw > 0)` does not fire on `Infinity`, `mag` becomes `Infinity`, `norm`
@@ -583,7 +609,12 @@ correct: 0 -> 1, -1000 -> 1, NaN -> 1.
 
 *Reproduced by `suites/qml/calendar-graph-test.sh`.*
 
-### 29. `Ui.tint`'s and `Icons.url`'s "pending binding" guards are unreachable
+### 29. (fixed) `Ui.tint`'s and `Icons.url`'s "pending binding" guards were unreachable
+
+**Resolved.** `Ui.tint`/`Ui.solid` no longer guard an impossible state (see 14),
+and `Icons.url` documents the real contract instead of promising a pending one:
+the palette always answers, so an unknown key paints the fallback and only a
+missing asset returns `""`. Both ui suites pin those outcomes.
 
 Both the same shape, one layer apart: each guards on a lookup returning
 `undefined`, and each lookup answers every key - including `""` and unknown
