@@ -201,6 +201,7 @@ GEO_SRC="$(<"$MENU_DIR/RowGeometry.qml")"
 RULE_SRC="$(<"$MENU_DIR/RowRule.js")"
 ENTRY_SRC="$(<"$MENU_DIR/Entry.qml")"
 MENU_SRC="$(<"$MENU_DIR/MenuPanel.qml")"
+MENU_LIB_SRC="$(<"$MENU_DIR/MenuLib.js")"
 PANEL_WIDTH_SRC="$(<"$MENU_DIR/MenuWidth.qml")"
 
 t_contains "the arithmetic turns a kind into a column height" "function colH(kind, g)" "$RULE_SRC"
@@ -246,11 +247,15 @@ t_contains "a chrome row (the inline editor) rests on the primary register" \
 t_not_contains "the delegate instantiates no geometry item" "RowGeometry {" "$ENTRY_SRC"
 t_not_contains "nor does the panel" "RowGeometry {" "$MENU_SRC"
 
-# The kind is decided in ONE place. Three files may name it: the rule that
-# decides it, and the two readers. A fourth would be a copy that drifts.
+# The kind is decided in ONE place. Four files may name it: the module that
+# owns the rule (MenuRow.js), the MenuLib facade that publishes it, and the two
+# readers. A fifth would be a copy that drifts; a second definition would be a
+# rule that can disagree with itself.
 t_eq "the row kind is decided in exactly one module file" "1" \
-  "$(grep -l "function restKind" "$MENU_DIR"/*.js | wc -l | tr -d ' ')"
-t_eq "and only the two readers name it" "3" \
+  "$(grep -l "function restKind" "$MENU_DIR"/*.js | grep -v 'MenuLib.js' | wc -l | tr -d ' ')"
+t_contains "and MenuLib publishes it as a one-line delegate" \
+  "function restKind(item, providerSub) { return Row.restKind(item, providerSub) }" "$MENU_LIB_SRC"
+t_eq "and the facade plus the two readers name it in four files" "4" \
   "$(grep -rl "restKind" "$MENU_DIR" --include='*.js' --include='*.qml' | wc -l | tr -d ' ')"
 t_contains "the delegate classifies from the copy it renders" \
   "MenuLib.restKind(itm, row.subText)" "$ENTRY_SRC"
