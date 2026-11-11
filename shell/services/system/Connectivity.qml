@@ -220,25 +220,31 @@ Singleton {
     root._evaluate(ssid, seq)
   }
 
+  // Start a read job under this service's scope and timeout. The registry
+  // start can throw when it refuses a spec; the answer is null in that case,
+  // so the caller's own failure branch runs exactly once.
+  function _startRead(spec, onFinished, onFailed) {
+    try {
+      return ProcessRegistry.start(spec, root._scope, {
+        timeoutMs: root._readTimeoutMs,
+        onFinished: onFinished,
+        onFailed: onFailed
+      })
+    } catch (ignored) {
+      return null
+    }
+  }
+
   // One NM root property read. `done` answers the parsed uint, or -1 on
   // any failure: refusal, missing bus, or a reply outside the pinned
   // `{"type":"u","data":N}` shape.
   function _readProp(prop, done) {
     const spec = CommandSpec.argv(Lib.propArgv(prop))
-    let job = null
-    try {
-      job = ProcessRegistry.start(spec, root._scope, {
-        timeoutMs: root._readTimeoutMs,
-        onFinished: result => {
-          const out = result !== null && result !== undefined && result.code === "ok"
-            ? String(result.stdout ?? "") : ""
-          done(Lib.parseUintProp(out))
-        },
-        onFailed: () => done(-1)
-      })
-    } catch (ignored) {
-      job = null
-    }
+    const job = root._startRead(spec, result => {
+      const out = result !== null && result !== undefined && result.code === "ok"
+        ? String(result.stdout ?? "") : ""
+      done(Lib.parseUintProp(out))
+    }, () => done(-1))
     if (job === null) done(-1)
   }
 
@@ -248,23 +254,14 @@ Singleton {
   // verdict, the same way a failed bus read keeps its reading.
   function _readVpnUp(done) {
     const spec = CommandSpec.argv(Lib.vpnRouteArgv())
-    let job = null
-    try {
-      job = ProcessRegistry.start(spec, root._scope, {
-        timeoutMs: root._readTimeoutMs,
-        onFinished: result => {
-          if (result === null || result === undefined || result.code !== "ok") {
-            done(null, "")
-            return
-          }
-          const table = String(result.stdout ?? "")
-          done(Lib.parseVpnUp(table), table)
-        },
-        onFailed: () => done(null, "")
-      })
-    } catch (ignored) {
-      job = null
-    }
+    const job = root._startRead(spec, result => {
+      if (result === null || result === undefined || result.code !== "ok") {
+        done(null, "")
+        return
+      }
+      const table = String(result.stdout ?? "")
+      done(Lib.parseVpnUp(table), table)
+    }, () => done(null, ""))
     if (job === null) done(null, "")
   }
 
@@ -274,19 +271,10 @@ Singleton {
   function _busProp(object, iface, prop, done) {
     const spec = CommandSpec.argv(Busctl.getPropertyArgv(
       "org.freedesktop.NetworkManager", object, iface, prop))
-    let job = null
-    try {
-      job = ProcessRegistry.start(spec, root._scope, {
-        timeoutMs: root._readTimeoutMs,
-        onFinished: result => {
-          done(result !== null && result !== undefined && result.code === "ok"
-            ? String(result.stdout ?? "") : "")
-        },
-        onFailed: () => done("")
-      })
-    } catch (ignored) {
-      job = null
-    }
+    const job = root._startRead(spec, result => {
+      done(result !== null && result !== undefined && result.code === "ok"
+        ? String(result.stdout ?? "") : "")
+    }, () => done(""))
     if (job === null) done("")
   }
 
