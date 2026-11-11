@@ -238,10 +238,6 @@ Singleton {
     root._spawn(record, spec, timeoutMs, onResult)
   }
 
-  function basename(p) {
-    return SU.basename(p)
-  }
-
   // A recorded pointer is either state-relative or absolute. Only the
   // relative form is a path this shell can judge: it must resolve below
   // $VIBRANIUM_STATE with no parent escape. An absolute pointer is used
@@ -397,7 +393,7 @@ Singleton {
     }
     if (record.mode === "auto") {
       const saved = root._state[record.theme]
-      const recorded = saved ? root.basename(saved) : ""
+      const recorded = saved ? SU.basename(saved) : ""
       if (recorded !== "" && files.indexOf(recorded) >= 0) {
         // Recorded pointer verified present by the listing: publish it
         // without rewriting state. A write here would echo back through
@@ -420,7 +416,7 @@ Singleton {
       // The position this listing holds the outgoing wallpaper at, kept
       // across the fallback below so the discarded fact is reportable rather
       // than lost with the assignment.
-      const found = files.indexOf(root.basename(root.current))
+      const found = files.indexOf(SU.basename(root.current))
       let idx = found
       if (idx < 0) idx = 0
       if (record.mode === "next") idx = (idx + 1) % files.length
@@ -560,7 +556,7 @@ Singleton {
     // _handleHttpUrl): the scratch file carries a timestamped leaf, but the
     // recorded basename is the stable one, so dropping one URL twice
     // overwrites one file instead of cluttering backgrounds/ with copies.
-    const base = (typeof destBase === "string" && destBase !== "") ? destBase : root.basename(src)
+    const base = (typeof destBase === "string" && destBase !== "") ? destBase : SU.basename(src)
     const ext = base.slice(base.lastIndexOf(".") + 1).toLowerCase()
     if (!root._imageExts[ext]) return "error: unsupported format: ." + ext
     const theme = root.activeTheme
