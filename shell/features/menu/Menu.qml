@@ -641,12 +641,14 @@ Singleton {
   }
 
   function _rebuildSearchIndex() {
-    const builtinCount = root._builtinIndex.length
     const merged = root._builtinIndex.slice()
     if (root._settingsFamily) {
       for (const ownerId in root._indexRegistrations) {
         const entries = root._indexRegistrations[ownerId]
-        if (Array.isArray(entries)) merged.push(...entries)
+        if (!Array.isArray(entries)) continue
+        // Appended by index rather than spread: a large registration is one
+        // argument list to push(...), and the engine caps that.
+        for (let i = 0; i < entries.length; i++) merged.push(entries[i])
       }
       // A live dynamic page SHADOWS the bundle page of the same id: pageById
       // resolves that id to the published page, so the bundle's rows for it are
@@ -656,12 +658,21 @@ Singleton {
       // so every query that reached such a page read as a dead search bar while
       // the page's own rows stayed on screen. The Idle page is exactly this
       // case: the schema ships a one-row "idle" page (the toggle) and the idle
-      // daemon publishes the live timer list under the same id. Dropped from
-      // the end so the indices of the rows that stay are never renumbered.
+      // daemon publishes the live timer list under the same id.
+      //
+      // Compacted in one pass and closed with a single splice, rather than a
+      // splice per shadowed row. The index is the bundle plus every machine
+      // picker - thousands of rows - so a shadowed page near the head moved
+      // the whole tail once for each row dropped.
       const regs = root._indexRegistrations
-      for (let i = builtinCount - 1; i >= 0; i--) {
-        if (regs[merged[i].pageId] !== undefined) merged.splice(i, 1)
+      const builtinCount = root._builtinIndex.length
+      let kept = 0
+      for (let i = 0; i < builtinCount; i++) {
+        const row = merged[i]
+        if (regs[row.pageId] !== undefined) continue
+        merged[kept++] = row
       }
+      if (kept < builtinCount) merged.splice(kept, builtinCount - kept)
     }
     root.searchIndex = merged
   }
