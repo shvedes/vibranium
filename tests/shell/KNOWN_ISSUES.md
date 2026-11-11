@@ -8,7 +8,7 @@ Entries marked (fixed) are resolved; the rest are the actionable list. The suite
 it currently is, with a comment saying why it is wrong, so a fix turns a suite
 red and forces the record to be updated rather than passing silently.
 
-**24 open findings: 1 high, 10 medium, 13 low.** Five high-severity findings are fixed and kept below for the record - the code and its suite now pin the corrected behaviour. Two thirds of them came from the
+**19 open findings: 1 high, 8 medium, 10 low.** Five high-severity findings, the calendar month roll, the password busy gate and glyph warnings, and the island's margin re-park and shared-component freeze are fixed and kept below for the record - the code and its suite now pin the corrected behaviour. Two thirds of them came from the
 behavioural QML component suites (`suites/qml/`), which is the argument for
 having them: the component layer is where the shell's user-visible contracts
 live, and reading the source does not find a `fail()` that forgets to re-mask.

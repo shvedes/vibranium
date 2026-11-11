@@ -117,11 +117,20 @@ function formatWatts(watts) {
   return r.toFixed(1) + " W"
 }
 
+// Every public formatter is exported for a node caller. The QML side reaches
+// them through the pragma namespace, but a node test or tool that requires this
+// file sees only this map, and a formatter missing from it would be a function
+// the library documents and no non-QML caller can reach.
 if (typeof module !== "undefined") {
   module.exports = {
+    numberOrNull: numberOrNull,
     pad2: pad2,
     trim1: trim1,
-    numberOrNull: numberOrNull,
+    percent: percent,
+    percentInt: percentInt,
+    fixed: fixed,
+    formatBinaryFileSize: formatBinaryFileSize,
+    formatFileSize: formatFileSize,
     formatBytes: formatBytes,
     formatByteRate: formatByteRate,
     formatWatts: formatWatts
