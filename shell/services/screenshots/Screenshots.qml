@@ -9,6 +9,7 @@ import Quickshell.Wayland
 import Quickshell.Hyprland
 import qs.common
 import "../../common/capture/ShotLib.js" as ShotLib
+import "../../common/process/ProcControl.js" as ProcControl
 import "../../common/capture/RectMath.js" as RectMath
 import "../../common/text/UnitIpc.js" as UnitIpc
 import "../../common/text/StringUtils.js" as SU
@@ -618,11 +619,6 @@ Singleton {
   // SIGKILL to the process group, then the object. A child that outlives a
   // cancel is the failure this exists to prevent, and a capture that leaves a
   // `magick` holding a 4K PNG open is visible in `ps` long after.
-  function _killProcess(proc, what) {
-    if (proc === null || proc === undefined) return
-    proc.signal(9)
-    proc.destroy()
-  }
 
   // A live flow torn down: the user locked the session, a screen vanished,
   // a caller walked away, or the process is going away. The line is
@@ -642,22 +638,22 @@ Singleton {
     root._activeDelivery = null
     if (root._cropProcess !== null) {
       const cropJob = root._cropJob
-      root._killProcess(root._cropProcess, "crop")
+      ProcControl.kill(root._cropProcess, "crop")
       root._cropProcess = null
       root._cropJob = null
       if (cropJob !== null) root._removeJobPaths(cropJob.path, cropJob.cropTo)
     }
     if (root._mkdirProcess !== null) {
-      root._killProcess(root._mkdirProcess, "mkdir")
+      ProcControl.kill(root._mkdirProcess, "mkdir")
       root._mkdirProcess = null
     }
     if (root._sourceStatProcess !== null) {
-      root._killProcess(root._sourceStatProcess, "sourceStat")
+      ProcControl.kill(root._sourceStatProcess, "sourceStat")
       root._sourceStatProcess = null
     }
     const copies = root._copyProcesses.slice()
     root._copyProcesses = []
-    for (let i = 0; i < copies.length; i++) root._killProcess(copies[i], "copy")
+    for (let i = 0; i < copies.length; i++) ProcControl.kill(copies[i], "copy")
     if (root._fallbackTarget !== "") {
       if (!root._fallbackCommitted) {
         Exec.rm(root._fallbackTarget)
@@ -845,7 +841,7 @@ Singleton {
      root._cancelActiveFlow("shutdown")
      SurfaceClaim.releaseOwner(root)
      if (root._startupProcess !== null) {
-       root._killProcess(root._startupProcess, "startup")
+       ProcControl.kill(root._startupProcess, "startup")
        root._startupProcess = null
      }
     Registry.unregister("screenshots")

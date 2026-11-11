@@ -9,6 +9,7 @@ import Quickshell.Io
 import Quickshell.Wayland
 import qs.common
 import "AnnotationTools.js" as AnnotationTools
+import "../../common/process/ProcControl.js" as ProcControl
 import "../../common/capture/ShotLib.js" as ShotLib
 import "../../common/text/StringUtils.js" as SU
 import "../../common/math/Range.js" as Range
@@ -713,16 +714,11 @@ PanelWindow {
     editor._childProcesses = editor._childProcesses.filter(p => p !== proc)
   }
 
-  function _killProcess(proc) {
-    if (proc === null || proc === undefined) return
-    proc.signal(9)
-    proc.destroy()
-  }
 
   function _stopProcesses() {
     const processes = editor._childProcesses.slice()
     editor._childProcesses = []
-    for (let i = 0; i < processes.length; i++) editor._killProcess(processes[i])
+    for (let i = 0; i < processes.length; i++) ProcControl.kill(processes[i])
   }
 
   function _beginExport(kind, target) {
