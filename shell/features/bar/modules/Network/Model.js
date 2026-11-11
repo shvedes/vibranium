@@ -4,6 +4,7 @@
 .import "../../../../common/text/StringUtils.js" as SU
 .import "../../../../common/collections/DeviceList.js" as DeviceList
 .import "../../../../common/math/Range.js" as Range
+.import "../../../../common/collections/StoreGuards.js" as StoreGuards
 
 // Pure helpers for the Network bar module: signal tiers, metric
 // formatting, throughput deltas and wifi row sorting.
@@ -192,8 +193,8 @@ function sortWifiRows(rows) {
 // the ListView model and recreates every delegate (focus loss, scroll
 // pursuit). Skip the assignment when nothing visible changed.
 function wifiRowsEqual(a, b) {
-  var x = Array.isArray(a) ? a : []
-  var y = Array.isArray(b) ? b : []
+  var x = StoreGuards.asList(a)
+  var y = StoreGuards.asList(b)
   if (x.length !== y.length) return false
   for (var i = 0; i < x.length; i++) {
     var r = x[i] || {}
@@ -257,7 +258,7 @@ function wifiDisplayKey(row) {
 // its own blank section header - a phantom gap.
 function deriveWifiState(prev, rows) {
   var p = prev || {}
-  var sorted = sortWifiRows(Array.isArray(rows) ? rows : [])
+  var sorted = sortWifiRows(StoreGuards.asList(rows))
 
   var currentSection = ""
   for (var i = 0; i < sorted.length; i++) {
@@ -266,9 +267,9 @@ function deriveWifiState(prev, rows) {
     sorted[i].section = currentSection
   }
 
-  var prevSorted = Array.isArray(p.sorted) ? p.sorted : []
-  var prevKnown = Array.isArray(p.known) ? p.known : []
-  var prevOther = Array.isArray(p.other) ? p.other : []
+  var prevSorted = StoreGuards.asList(p.sorted)
+  var prevKnown = StoreGuards.asList(p.known)
+  var prevOther = StoreGuards.asList(p.other)
 
   var known = []
   var other = []
