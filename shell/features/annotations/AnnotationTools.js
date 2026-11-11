@@ -12,6 +12,7 @@
 // reads editor properties, so the library stays unit-drivable.
 .pragma library
 .import "../../common/capture/RectMath.js" as RectMath
+.import "../../common/math/Range.js" as Range
 
 function _finite(value) {
   return RectMath.finite(value)
@@ -284,6 +285,31 @@ function cellMean(px, box, span) {
 }
 
 // Shared fit policy for display geometry and input mapping.
+// Blur plate geometry. The plate is the document downscaled so its long side
+// fits `maxSide`; a document already inside the bound keeps scale 1. A
+// missing or non-positive extent reads as 1, the same "no downscale" answer
+// the editor needs before the image has loaded.
+function blurPlateScale(imgW, imgH, maxSide) {
+  const w = Number(imgW)
+  const h = Number(imgH)
+  const m = Number(maxSide)
+  if (!(w > 0) || !(h > 0) || !(m > 0)) return 1
+  return Math.min(1, m / Math.max(w, h))
+}
+
+// One plate side at scale k. At least one pixel: a zero-sized texture is not
+// a blur plate, and Qt would decode nothing into it.
+function blurPlateSide(size, k) {
+  return Math.max(1, Math.round(Number(size) * Number(k)))
+}
+
+// Blur radius in document pixels: ~96 at plate scale, scaled up for large
+// shots and capped. Measured on a text page: 96 and up left nothing legible,
+// 60 left the words readable.
+function blurRadius(k) {
+  return Range.clamp(Math.round(96 / Number(k)), 96, 240)
+}
+
 function fitScale(stageW, stageH, docW, docH, minShortAxis) {
   const sw = _finite(stageW) ? stageW : 0
   const sh = _finite(stageH) ? stageH : 0

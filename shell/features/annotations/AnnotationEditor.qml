@@ -111,14 +111,11 @@ PanelWindow {
   // downscaled plate upscales without visible loss and costs a fraction of a
   // full-resolution layer.
   readonly property int _blurPlateMax: 2048
-  readonly property real _blurPlateK: editor.imgW > 0 && editor.imgH > 0
-    ? Math.min(1, editor._blurPlateMax / Math.max(editor.imgW, editor.imgH)) : 1
-  readonly property int _blurPlateW: Math.max(1, Math.round(editor.imgW * editor._blurPlateK))
-  readonly property int _blurPlateH: Math.max(1, Math.round(editor.imgH * editor._blurPlateK))
-  // Blur radius in document pixels: ~96 at plate scale, scaled up for large
-  // shots and capped. Measured on a text page: 96 and up left nothing legible,
-  // 60 left the words readable.
-  readonly property int _blurRadius: Range.clamp(Math.round(96 / editor._blurPlateK), 96, 240)
+  readonly property real _blurPlateK:
+    AnnotationTools.blurPlateScale(editor.imgW, editor.imgH, editor._blurPlateMax)
+  readonly property int _blurPlateW: AnnotationTools.blurPlateSide(editor.imgW, editor._blurPlateK)
+  readonly property int _blurPlateH: AnnotationTools.blurPlateSide(editor.imgH, editor._blurPlateK)
+  readonly property int _blurRadius: AnnotationTools.blurRadius(editor._blurPlateK)
   property string blurPlateUrl: ""
   property string _blurPlatePath: ""
   property bool _blurPlatePending: false
