@@ -692,11 +692,12 @@ Rectangle {
     fitRetryTimer.fitCallback = null
     const fitGen = ++panel._fitGen
     const transitionGen = panel._transitionGen
+    // The model height is final: publish it without waiting for delegates.
+    const fitModel = () => {
+      fitModel()
+    }
     if (panel.gridMode || rows.length === 0) {
-      panel._latchedListH = -1
-      panel._fitPending = false
-      panel._fitAttempts = 0
-      panel._resolveFit(-1, fitGen, transitionGen)
+      fitModel()
       return
     }
     // Without motion the measured fit cannot be absorbed, so it is not run.
@@ -724,10 +725,7 @@ Rectangle {
     // arithmetic. This is the common keystroke: a search projection has no
     // slots to measure.
     if (panel._restFitReady()) {
-      panel._latchedListH = -1
-      panel._fitPending = false
-      panel._fitAttempts = 0
-      panel._resolveFit(-1, fitGen, transitionGen)
+      fitModel()
       return
     }
     panel._fitPending = true
@@ -736,10 +734,7 @@ Rectangle {
       if (fitGen !== panel._fitGen) return
       fitRetryTimer.stop()
       fitRetryTimer.fitCallback = null
-      panel._latchedListH = -1
-      panel._fitPending = false
-      panel._fitAttempts = 0
-      panel._resolveFit(-1, fitGen, transitionGen)
+      fitModel()
     }
     function retryFit(reason) {
       if (fitGen !== panel._fitGen || !panel._fitPending) return
@@ -778,10 +773,7 @@ Rectangle {
       fitRetryTimer.fitCallback = null
       const current = panel.rowsModel || []
       if (panel.gridMode || current.length === 0) {
-        panel._latchedListH = -1
-        panel._fitPending = false
-        panel._fitAttempts = 0
-        panel._resolveFit(-1, fitGen, transitionGen)
+        fitModel()
         return
       }
       let expanding = panel.expansionNeedH > 0
@@ -810,10 +802,7 @@ Rectangle {
         // correct the estimate once the rows rest. The estimate runs a
         // couple of pixels per row under the real delegates, so the
         // correction is a glide too small to read.
-        panel._latchedListH = -1
-        panel._fitPending = false
-        panel._fitAttempts = 0
-        panel._resolveFit(-1, fitGen, transitionGen)
+        fitModel()
         return
       }
       // Rest-state shortcut: no row open, closing, or holding info
@@ -832,10 +821,7 @@ Rectangle {
         }
       }
       if (!anyOpen) {
-        panel._latchedListH = -1
-        panel._fitPending = false
-        panel._fitAttempts = 0
-        panel._resolveFit(-1, fitGen, transitionGen)
+        fitModel()
         return
       }
       if (list.count !== current.length) {
