@@ -139,15 +139,10 @@ Singleton {
     // The single choke point every scan path passes through. A listing that
     // is not armed is not an empty user themes root, so it produces no
     // uninstall rows and no "no community themes" notice.
-    if (!roots.listed) return
     // The latch above verified the rows, but the flash can land between the
     // latch and a scan. Never scan it: re-arm and hold the pending show
     // for the settle that follows.
-    if (!roots.modelsUsable()) {
-      roots.rearmUnready()
-      root._pendingShow = show
-      return
-    }
+    if (!roots.beginScan()) return
     const t0 = Date.now()
     const official = {}
     for (let i = 0; i < roots.officialModel.count; i++) {

@@ -166,6 +166,18 @@ Item {
     return ou && uu
   }
 
+  // The gate every page's scan passes through: a listing that is not armed
+  // is not an empty root, and a model pair that is not usable is re-aimed and
+  // held for the settle that follows. False means the page must not scan.
+  function beginScan() {
+    if (!root.listed) return false
+    if (!root.modelsUsable()) {
+      root.rearmUnready()
+      return false
+    }
+    return true
+  }
+
   // A themes root that does not exist yet settles its model to Null. Null is
   // terminal - the model will not recover on its own - so it counts as
   // settled and reads as empty while the official themes still list. Only
