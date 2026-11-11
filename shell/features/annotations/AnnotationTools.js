@@ -352,11 +352,10 @@ function boardGeom(stageW, stageH, docW, docH, fit, zoom, pan) {
   }
 }
 
-// Overlay point -> document pixels. geom comes from boardGeom,
-// vr is the view rect {x,y,w,h}, rot is 0/90/180/270.
-function displayToDoc(mx, my, geom, vr, rot) {
-  const x = _finite(mx) ? mx : 0
-  const y = _finite(my) ? my : 0
+// The frame both mappings share: the board origin, the view rect with its
+// one-pixel floor, the rotation's cos/sin and the cover scale the board
+// applies to the rotated document.
+function _frame(geom, vr, rot) {
   const gx = geom !== null && geom !== undefined && _finite(geom.x) ? geom.x : 0
   const gy = geom !== null && geom !== undefined && _finite(geom.y) ? geom.y : 0
   const vx = vr !== null && vr !== undefined && _finite(vr.x) ? vr.x : 0
@@ -374,41 +373,35 @@ function displayToDoc(mx, my, geom, vr, rot) {
     : geom !== null && geom !== undefined && _finite(geom.fit) && geom.fit > 0
       ? geom.fit : 1
   if (!(k > 0) || !_finite(k)) k = 1
-  const bx = (x - gx) / k - dw / 2
-  const by = (y - gy) / k - dh / 2
-  const lx = bx * ca + by * sa + vw / 2
-  const ly = -bx * sa + by * ca + vh / 2
+  return { gx: gx, gy: gy, vx: vx, vy: vy, vw: vw, vh: vh,
+    ca: ca, sa: sa, dw: dw, dh: dh, k: k }
+}
+
+// Overlay point -> document pixels. geom comes from boardGeom,
+// vr is the view rect {x,y,w,h}, rot is 0/90/180/270.
+function displayToDoc(mx, my, geom, vr, rot) {
+  const x = _finite(mx) ? mx : 0
+  const y = _finite(my) ? my : 0
+  const f = _frame(geom, vr, rot)
+  const bx = (x - f.gx) / f.k - f.dw / 2
+  const by = (y - f.gy) / f.k - f.dh / 2
+  const lx = bx * f.ca + by * f.sa + f.vw / 2
+  const ly = -bx * f.sa + by * f.ca + f.vh / 2
   return {
-    x: Range.clamp(lx + vx, vx, vx + vw),
-    y: Range.clamp(ly + vy, vy, vy + vh)
+    x: Range.clamp(lx + f.vx, f.vx, f.vx + f.vw),
+    y: Range.clamp(ly + f.vy, f.vy, f.vy + f.vh)
   }
 }
 
 // Inverse of displayToDoc, same arguments.
 function docToDisplay(p, geom, vr, rot) {
   if (!_point(p)) return { x: 0, y: 0 }
-  const gx = geom !== null && geom !== undefined && _finite(geom.x) ? geom.x : 0
-  const gy = geom !== null && geom !== undefined && _finite(geom.y) ? geom.y : 0
-  const vx = vr !== null && vr !== undefined && _finite(vr.x) ? vr.x : 0
-  const vy = vr !== null && vr !== undefined && _finite(vr.y) ? vr.y : 0
-  const vw = vr !== null && vr !== undefined && _finite(vr.w) && vr.w > 0 ? vr.w : 1
-  const vh = vr !== null && vr !== undefined && _finite(vr.h) && vr.h > 0 ? vr.h : 1
-  const r = _finite(rot) ? rot : 0
-  const a = r * Math.PI / 180
-  const ca = Math.cos(a)
-  const sa = Math.sin(a)
-  const dw = Math.abs(vw * ca) + Math.abs(vh * sa)
-  const dh = Math.abs(vw * sa) + Math.abs(vh * ca)
-  let k = geom !== null && geom !== undefined && _finite(geom.w) && _finite(geom.h)
-    && dw > 0 && dh > 0 ? Math.min(geom.w / dw, geom.h / dh)
-    : geom !== null && geom !== undefined && _finite(geom.fit) && geom.fit > 0
-      ? geom.fit : 1
-  if (!(k > 0) || !_finite(k)) k = 1
-  const cx = p.x - vx - vw / 2
-  const cy = p.y - vy - vh / 2
-  const bx = cx * ca - cy * sa + dw / 2
-  const by = cx * sa + cy * ca + dh / 2
-  return { x: gx + bx * k, y: gy + by * k }
+  const f = _frame(geom, vr, rot)
+  const cx = p.x - f.vx - f.vw / 2
+  const cy = p.y - f.vy - f.vh / 2
+  const bx = cx * f.ca - cy * f.sa + f.dw / 2
+  const by = cx * f.sa + cy * f.ca + f.dh / 2
+  return { x: f.gx + bx * f.k, y: f.gy + by * f.k }
 }
 
 function _segDist2(px, py, ax, ay, bx, by) {
