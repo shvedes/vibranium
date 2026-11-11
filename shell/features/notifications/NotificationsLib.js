@@ -9,6 +9,7 @@
 .import "../../common/math/Range.js" as Range
 .import "../../common/text/Clock.js" as ClockFmt
 .import "../../common/theme/DeviceIcons.js" as DeviceIcons
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 
 // A notification with no deadline at all. The D-Bus `expire_timeout` of 0
 // means "never expire", and a critical notification is persistent whatever it
@@ -287,7 +288,7 @@ function clockLabel(atMs, use12h) {
 // a copy per pile read would be an array the shell then has to garbage
 // collect on every notification.
 function arrivalOrder(entries) {
-  return Array.isArray(entries) ? entries : []
+  return StoreGuards.asList(entries)
 }
 
 // Visual top-to-bottom order of the pile.
@@ -299,7 +300,7 @@ function arrivalOrder(entries) {
 // the same array, unreversed, and reversing it there would stack new
 // notifications at the wrong end of the pile.
 function pileOrder(entries, atTop) {
-  const list = Array.isArray(entries) ? entries : []
+  const list = StoreGuards.asList(entries)
   if (atTop !== true) return list
   return list.slice().reverse()
 }
