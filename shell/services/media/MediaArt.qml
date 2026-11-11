@@ -84,14 +84,25 @@ Singleton {
   // The one place the bound is applied: an entry nothing needs any more
   // goes first, then the oldest survivors past `cap`.
   function _store(next) {
-    for (const key of Object.keys(next)) {
-      if (next[key].refs > 0 || next[key].active) continue
-      delete next[key]
+    // One key list for the whole pass, and a count carried through it: the
+    // bound used to re-list the map in its own loop condition and again inside
+    // every eviction, which is three allocations of the key set per cover that
+    // pushed the cache past its cap.
+    const keys = Object.keys(next)
+    let alive = 0
+    for (let i = 0; i < keys.length; i++) {
+      const entry = next[keys[i]]
+      if (entry.refs > 0 || entry.active) {
+        alive += 1
+        continue
+      }
+      delete next[keys[i]]
     }
-    while (Object.keys(next).length > root.cap) {
+    while (alive > root.cap) {
       const victim = root._coldest(next)
       if (victim === "") break
       delete next[victim]
+      alive -= 1
       root._evicted += 1
     }
     root._entries = next
