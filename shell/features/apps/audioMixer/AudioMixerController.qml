@@ -598,7 +598,17 @@ Item {
       root.profileError = list.error
       return false
     }
-    const argv = Model.setProfileArgv(Model.nodeKey(deviceNode), index)
+    // The id has to be the DEVICE's, not the node's: `wpctl set-profile`
+    // resolves its argument against a device object, and a sink node's own id
+    // is a different object in the graph - the write was refused for every
+    // profile picker on the Configuration tab. The card this list came from
+    // carries the device id (`device.id`, the same join nodeCardKey uses), so
+    // the target is read from there and falls back to the node only when the
+    // card published none.
+    const card = root._cardFor(deviceNode)
+    const target = card !== null && String(card.objectId) !== ""
+      ? card.objectId : Model.nodeKey(deviceNode)
+    const argv = Model.setProfileArgv(target, index)
     if (argv.length === 0) {
       root.profileError = "no such profile"
       return false
