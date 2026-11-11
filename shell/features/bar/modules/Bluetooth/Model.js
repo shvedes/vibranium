@@ -132,15 +132,7 @@ function listEntries(sorted, includeAvailableHeader) {
   // module's row type and trailing scan header.
   return DeviceList.sectionedEntries(
     sorted,
-    function(row, prev, i) {
-      var tier = row && row.connected ? "connected" : (row && row.known ? "paired" : "available")
-      var before = prev && prev.connected ? "connected" : (prev && prev.known ? "paired" : "available")
-      if (i === 0 || before !== tier) {
-        if (tier === "connected") return "CONNECTED DEVICES"
-        return tier === "paired" ? "PAIRED DEVICES" : "AVAILABLE DEVICES"
-      }
-      return ""
-    },
+    function(row, prev, i) { return sectionTitleFor(i, sorted) },
     function(row) { return { type: "device", row: row } },
     includeAvailableHeader ? "AVAILABLE DEVICES" : "")
 }
