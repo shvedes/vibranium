@@ -7,6 +7,7 @@ import qs.common
 import qs.features.menu
 import "MenuLib.js" as MenuLib
 import "MenuLayout.js" as MenuLayout
+import "MenuRows.js" as MenuRows
 import "../../common/math/Range.js" as Range
 import "../../common/ui/RowMetrics.js" as RowMetrics
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
@@ -1016,24 +1017,8 @@ Rectangle {
   // set that is landing, which is what the selectable test must answer for.
   // -1 means there is no row to put it on.
   function cursorIndexAfter(fromIndex, next) {
-    if (!Array.isArray(next) || next.length === 0) return -1
-    if (fromIndex >= 0 && panel._records !== null) {
-      const was = panel._records[fromIndex]
-      const uid = was ? was.uid : null
-      if (uid !== null && uid !== undefined) {
-        for (let i = 0; i < next.length; i++) {
-          if (next[i].uid === uid) return i
-        }
-      }
-    }
-    const from = Range.clamp(fromIndex, 0, next.length - 1)
-    for (let i = from; i < next.length; i++) {
-      if (panel.isSelectableIndex(i)) return i
-    }
-    for (let i = from - 1; i >= 0; i--) {
-      if (panel.isSelectableIndex(i)) return i
-    }
-    return -1
+    return MenuRows.cursorIndexAfter(panel._records, fromIndex, next,
+      (i) => panel.isSelectableIndex(i))
   }
 
   function _writeRecords(records, keepRow) {
@@ -1153,13 +1138,7 @@ Rectangle {
   // resets the native view, whose cursor adjustment paints one wrong frame
   // (the Help tail) with the highlight gliding there and back.
   function _sameRecords(records) {
-    const cur = panel._records
-    if (!Array.isArray(records) || !Array.isArray(cur)
-      || records.length !== cur.length) return false
-    for (let i = 0; i < records.length; i++) {
-      if (records[i] !== cur[i]) return false
-    }
-    return true
+    return MenuRows.sameRecords(panel._records, records)
   }
 
   function _invalidatePendingRows() {
@@ -1199,16 +1178,7 @@ Rectangle {
   // in the payload, never in the view: the view has not adopted the new set
   // yet, so a lookup there answers with whatever row inherited the index.
   function _cursorSurvives(records) {
-    const at = list.currentIndex
-    if (at < 0 || panel._records === null) return false
-    const was = panel._records[at]
-    const uid = was ? was.uid : null
-    if (uid === null || uid === undefined) return false
-    const next = records || []
-    for (let i = 0; i < next.length; i++) {
-      if (next[i] && next[i].uid === uid) return true
-    }
-    return false
+    return MenuRows.cursorSurvives(panel._records, list.currentIndex, records)
   }
 
   function _installRows(records, plan, generation) {

@@ -4139,4 +4139,51 @@ group('every one of the 70 functions was exercised above', () => {
   }
 })
 
+// ---------------------------------------------------------------------------
+// MenuRows.js: the row-set identity questions the card asks around a write
+// ---------------------------------------------------------------------------
+// These moved out of MenuPanel because they are pure over plain arrays: the
+// panel owns the cursor and the selectability rule, so both arrive as
+// parameters. The cases below are the ones the panel's install paths depend on.
+const MR = loadLib(path.join(SHELL_DIR, 'features/menu/MenuRows.js'))
+
+group('MenuRows.sameRecords compares references, not shapes', () => {
+  const a = { uid: 'a' }
+  const b = { uid: 'b' }
+  eq('the same objects in the same order are the same set', MR.sameRecords([a, b], [a, b]), true)
+  eq('a fresh object with the same uid is not', MR.sameRecords([a], [{ uid: 'a' }]), false)
+  eq('a different length is not', MR.sameRecords([a], [a, b]), false)
+  eq('the empty list against itself is the same', MR.sameRecords([], []), true)
+  eq('a non-array candidate is not', MR.sameRecords([a], null), false)
+  eq('a non-array current is not', MR.sameRecords(null, [a]), false)
+})
+
+group('MenuRows.cursorIndexAfter names the row by uid, then scans', () => {
+  const a = { uid: 'a' }
+  const b = { uid: 'b' }
+  const c = { uid: 'c' }
+  const d = { uid: 'd' }
+  const all = () => true
+  eq('the cursor follows its row to the new index', MR.cursorIndexAfter([a, b], 0, [b, a], all), 1)
+  eq('a row that is gone falls forward', MR.cursorIndexAfter([a, b], 0, [c, d], all), 0)
+  eq('forward first, then backward', MR.cursorIndexAfter([a, b], 1, [c, d], (i) => i === 0), 0)
+  eq('no selectable row anywhere is -1', MR.cursorIndexAfter([a, b], 0, [c, d], () => false), -1)
+  eq('an empty next set is -1', MR.cursorIndexAfter([a], 0, [], all), -1)
+  eq('no current set still seats the head', MR.cursorIndexAfter(null, 0, [c, d], (i) => i === 1), 1)
+  eq('a negative index starts at the head', MR.cursorIndexAfter(null, -5, [c], all), 0)
+  eq('an index past the end is clamped to the tail', MR.cursorIndexAfter(null, 99, [c, d], (i) => i === 1), 1)
+  eq('a uid match wins over selectability', MR.cursorIndexAfter([a], 0, [a, b], () => false), 0)
+})
+
+group('MenuRows.cursorSurvives asks the payload, not the view', () => {
+  const a = { uid: 'a' }
+  const b = { uid: 'b' }
+  eq('a row that moved keeps the cursor', MR.cursorSurvives([a, b], 0, [b, a]), true)
+  eq('a row that is gone does not', MR.cursorSurvives([a, b], 0, [b]), false)
+  eq('an unseated cursor does not', MR.cursorSurvives([a, b], -1, [a, b]), false)
+  eq('an index past the old end does not', MR.cursorSurvives([a, b], 2, [b]), false)
+  eq('a null next set does not', MR.cursorSurvives([a], 0, null), false)
+  eq('a null current set does not', MR.cursorSurvives(null, 0, [a]), false)
+})
+
 finish()
