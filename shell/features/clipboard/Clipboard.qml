@@ -746,22 +746,11 @@ Singleton {
     // not decoration - a suppressed line must not walk `removed` at all.
     const d = Log.at()
     if (d.allows("debug")) {
-      const mix = ({})
-      let slots = 0
-      for (let i = 0; i < removed.length; i++) {
-        const e = removed[i]
-        const t = String(e.type)
-        mix[t] = mix[t] === undefined ? 1 : mix[t] + 1
-        if (String(e.secretHandle || "") !== "") slots++
-      }
-      const kinds = Object.keys(mix).sort()
-      let shape = ""
-      for (let i = 0; i < kinds.length; i++)
-        shape += (i > 0 ? ", " : "") + kinds[i] + " " + mix[kinds[i]]
-      d.debug("cleared clipboard: " + removed.length + " of "
-        + (removed.length + kept.length) + " rows dropped (" + shape + "), "
+      const tally = CL.clearTally(removed)
+      d.debug("cleared clipboard: " + tally.count + " of "
+        + (tally.count + kept.length) + " rows dropped (" + tally.shape + "), "
         + kept.length + " pinned kept, snapshot bytes "
-        + root._snapshotBytes(removed) + ", credential slots dropped " + slots)
+        + root._snapshotBytes(removed) + ", credential slots dropped " + tally.slots)
     }
     root._persist()
     root._hideIfEmpty()

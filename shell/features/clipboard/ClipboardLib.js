@@ -1873,6 +1873,26 @@ function promoteEntry(history, id, now, use12h) {
   return h
 }
 
+// The ledger a bulk clear owes: how many rows went, the type mix as one line,
+// and how many credential store slots were released. Counts only - no field of
+// any row's payload reaches this answer.
+function clearTally(rows) {
+  const list = Array.isArray(rows) ? rows : []
+  const mix = {}
+  let slots = 0
+  for (let i = 0; i < list.length; i++) {
+    const e = list[i] || {}
+    const t = String(e.type)
+    mix[t] = mix[t] === undefined ? 1 : mix[t] + 1
+    if (String(e.secretHandle || "") !== "") slots++
+  }
+  const kinds = Object.keys(mix).sort()
+  let shape = ""
+  for (let i = 0; i < kinds.length; i++)
+    shape += (i > 0 ? ", " : "") + kinds[i] + " " + mix[kinds[i]]
+  return { count: list.length, shape: shape, slots: slots }
+}
+
 // One pin flip as data: the history array with one row's `pinned` flag
 // inverted, plus the slot and the previous state so the facade can decide
 // what to log and whether the pinned mode just emptied. A miss is null and

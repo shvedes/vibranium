@@ -2633,6 +2633,22 @@ group('togglePinned - one pin flip as data, or a miss', () => {
   eq('an absent pinned flag reads as unpinned', CL.togglePinned([{ id: 3 }], 3).wasPinned, false)
 })
 
+group('clearTally is the ledger a bulk clear owes', () => {
+  const rows = [
+    { type: 'text' }, { type: 'text' },
+    { type: 'image', secretHandle: 'handle' },
+    { type: 'secret', secretHandle: 'other' },
+  ]
+  const t = CL.clearTally(rows)
+  eq('the row count', t.count, 4)
+  eq('the type mix is sorted and comma-spaced', t.shape, 'image 1, secret 1, text 2')
+  eq('the released credential slots', t.slots, 2)
+  eq('an empty clear', CL.clearTally([]), { count: 0, shape: '', slots: 0 })
+  eq('a non-array clear', CL.clearTally(null), { count: 0, shape: '', slots: 0 })
+  eq('one kind only', CL.clearTally([{ type: 'text' }]).shape, 'text 1')
+  eq('an absent handle is not a slot', CL.clearTally([{ type: 'text', secretHandle: '' }]).slots, 0)
+})
+
 group('promoteEntry lifts a row and refreshes its clock', () => {
   const h = [
     CL.newEntry('a', 1, 'x', 'text/plain', 'text'),
@@ -2666,8 +2682,8 @@ group('the library reads no host global and no clock of its own', () => {
   // This pair is a load-time namespace-leak guard, not an API pin: it fails if
   // evaluating the lib leaves anything behind on its own namespace. It also
   // fails if a function is legitimately added, which is the price.
-  eq('a fresh load of the clipboard lib has 103 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 103)
-  eq('a fresh load of the clipboard lib has 103 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 103)
+  eq('a fresh load of the clipboard lib has 104 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 104)
+  eq('a fresh load of the clipboard lib has 104 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 104)
   // The clipboard lib never calls Math.random outside generateKey.
   eq('and the clipboard lib only has it in generateKey', (SRC.match(/Math\.random/g) || []).length, 1)
 })
