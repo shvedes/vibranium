@@ -766,7 +766,7 @@ ListView {
     let sum = 0
     let n = 0
     for (const k in root._knownH) {
-      const own = owner[k]
+      const own = ids.owner[k]
       // Dead identity, or an identity two live rows share: neither
       // keeps a measured height.
       if (own === undefined || own === -1) {
