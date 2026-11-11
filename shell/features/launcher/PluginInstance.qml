@@ -1,5 +1,4 @@
 import QtQml
-import Quickshell
 
 // Per-plugin JS host: one instance per plugin directory. Evaluating
 // the plugin source inside this instance's own function scope gives

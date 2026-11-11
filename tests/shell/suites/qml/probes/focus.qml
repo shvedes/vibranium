@@ -34,8 +34,9 @@
 // importing the module at all fails to load. Two lines are therefore
 // rewritten and nothing else:
 //
-//   * `import qs.features.menu` - the module load above. NumberPicker
-//     references no type from it; MenuLib arrives on the next line.
+//   * `import qs.features.menu` if the picker grows one - the module load
+//     above. NumberPicker references no type from it; MenuLib arrives on the
+//     next line.
 //   * `import "MenuLib.js"` - the rewritten file is evaluated from the
 //     config root, so a sibling-relative import no longer resolves.
 //

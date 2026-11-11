@@ -53,7 +53,7 @@ t_eq "the probe ran without throwing" "none" "$(qp_get np.error)"
 t_section "the picker under test is NumberPicker.qml itself"
 t_eq "the source was read" "200" "$(qp_get np.status)"
 t_eq "and it is not empty" "true" "$([ "$(qp_get np.len)" -gt 4000 ] && echo true || echo false)"
-t_eq "exactly one module import was dropped" "1" "$(qp_get np.moduleDropped)"
+t_eq "no module import had to be dropped" "0" "$(qp_get np.moduleDropped)"
 t_eq "and both relative script imports were re-rooted" "2" "$(qp_get np.relativeImportsRerooted)"
 t_contains "MenuLib at the config root" 'import "features/menu/MenuLib.js" as MenuLib' \
   "$(qp_get np.relativeImportLines)"
@@ -61,7 +61,7 @@ t_contains "and Format at the config root" 'import "common/text/Format.js" as Fo
   "$(qp_get np.relativeImportLines)"
 t_eq "it constructed" "1" "$(qp_get np.made)"
 t_eq "and measures as the input height" "32" "$(qp_get np.height)"
-t_note "NumberPicker.qml cannot be written out as a type here: qs.features.menu declares 'singleton Menu', and loading the module reaches MenuView -> OverlayWindow -> ScrimWindow -> a PanelWindow backend that offscreen does not have. So the probe drops the one module import - the picker references no type from it - and re-roots every relative script import (MenuLib.js, Format.js) at the config root, which is where the rewritten text is evaluated from. The drop and the re-roots are counted, not pattern-matched silently, so a picker that starts using a module type, or adds another relative import, makes this section red rather than testing something else."  t_note "The probe seeds the row the way the shipped Timer row declares it (shell/common/settings/catalog.jsonc utilities page: type number, min 1, max 180, step 1, value 5, unit \"min\") and then writes the value with the picker's own formatted(), which is what InlineEditor does on completion."
+t_note "NumberPicker.qml cannot be written out as a type here: qs.features.menu declares 'singleton Menu', and loading the module reaches MenuView -> OverlayWindow -> ScrimWindow -> a PanelWindow backend that offscreen does not have. The picker imports no type from that module, so there is nothing to drop; the probe still counts any module import it finds and removes, so a picker that starts using one makes this section red rather than testing something else. Every relative script import (MenuLib.js, Format.js) is re-rooted at the config root, which is where the rewritten text is evaluated from, and that count is asserted too."  t_note "The probe seeds the row the way the shipped Timer row declares it (shell/common/settings/catalog.jsonc utilities page: type number, min 1, max 180, step 1, value 5, unit \"min\") and then writes the value with the picker's own formatted(), which is what InlineEditor does on completion."
 
 # --- the field holds the value; the unit is painted beside it --------------
 

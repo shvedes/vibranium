@@ -1,5 +1,4 @@
 import QtQuick
-import qs.common
 
 // ToolTipBind: per-module tooltip request without a window. Holds
 // the bindings a per-module ToolTip window would hold and

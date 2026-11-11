@@ -4,7 +4,6 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "../../../../common/math/Color.js" as Color
-import "ColorHistory.js" as ColorHistory
 import "../../../../common/math/Range.js" as Range
 
 // Color picker island: the history section (five fixed rows, overflow

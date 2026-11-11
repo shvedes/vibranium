@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
 import qs.features.menu
 import qs.common
 

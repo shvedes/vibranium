@@ -5,7 +5,6 @@ pragma ComponentBehavior: Bound
 import QtQml
 import Quickshell
 import Quickshell.Io
-import Qt.labs.folderlistmodel
 import qs.common
 import qs.features.menu
 import "../../../common/text/UnitIpc.js" as UnitIpc

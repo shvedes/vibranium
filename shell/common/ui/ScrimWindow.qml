@@ -2,7 +2,6 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import Quickshell
-import Quickshell.Wayland
 import qs.common
 
 // Shared scrim window - common PanelWindow chrome for menu, launcher,

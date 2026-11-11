@@ -3,7 +3,6 @@ pragma ComponentBehavior: Bound
 // qmllint disable signal-handler-parameters
 import QtQuick
 import qs.common
-import qs.features.menu
 import "MenuLib.js" as MenuLib
 import "../../common/text/Format.js" as Format
 

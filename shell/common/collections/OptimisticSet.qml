@@ -1,5 +1,4 @@
 import QtQml
-import Quickshell
 
 // OptimisticSet - pendingDeletes pattern for Clipboard + WallpaperPicker.
 // Instances per consumer: Clipboard.optimistic and WallpaperPicker.optimistic

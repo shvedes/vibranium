@@ -1,8 +1,6 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import Quickshell
-import Quickshell.Widgets
 import qs.features.bar
 
 // One status notifier icon. Left-click activates (or opens the menu for
