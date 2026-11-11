@@ -504,8 +504,7 @@ function speedScaleLabel(mbps) {
   var n = Number(mbps)
   if (!isFinite(n) || n <= 0) n = SPEED_SCALE_STOPS[0]
   if (n < 1000) return String(Math.round(n)) + " Mbps"
-  var g = n / 1000
-  return (g % 1 === 0 ? String(g) : g.toFixed(1)) + " Gbps"
+  return Format.trim1(n / 1000) + " Gbps"
 }
 
 // Parses vb-network-qr output: a "meta\t<iface>\t<security>\t<ssid>"
