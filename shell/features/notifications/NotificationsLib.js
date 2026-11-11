@@ -154,7 +154,6 @@ function isHintTrue(hints, key) {
 // the icon takes the red accent, while the lane keeps filling to the level
 // - the OSD's own split (OSD._iconFor vs the value it fills with).
 function volMutedOf(hints) {
-  if (!hints || typeof hints !== "object") return false
   return isHintTrue(hints, "x-vb-vol-muted")
 }
 
@@ -164,7 +163,6 @@ function volMutedOf(hints) {
 // (`-h boolean:x-vb-hide-meta:true`) instead of the daemon growing
 // another global switch with settings UI to house it.
 function hideMetaOf(hints) {
-  if (!hints || typeof hints !== "object") return false
   return isHintTrue(hints, "x-vb-hide-meta")
 }
 
