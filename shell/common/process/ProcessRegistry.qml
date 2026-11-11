@@ -264,7 +264,6 @@ Singleton {
       "backoffMs",
       "maxBackoffMs",
       "spawnWatchdogMs",
-      "spawnPollMs",
       "maxStdoutBytes",
       "maxStderrBytes"
     ]

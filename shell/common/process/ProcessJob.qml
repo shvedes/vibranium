@@ -31,13 +31,11 @@ QtObject {
   property int maxBackoffMs: 5000
   // Spawn confirmation has two halves: `started` confirms a child, and
   // spawnWatchdogMs is the deadline by which the absence of that confirmation
-  // is read as a failure. spawnPollMs is the probe interval driving that
-  // deadline, and it matters only on the failure path - a confirmed child
-  // stops the probe in _onStarted. Central 100ms cadence shared by every
-  // registry job (per-job tunings ride the same watchdog; there are no
-  // per-job polling copies).
+  // is read as a failure. The deadline is the whole mechanism - a confirmed
+  // child stops it in _onStarted - so one wakeup lands exactly when the
+  // verdict becomes decidable instead of a cadence that re-reads the clock for
+  // an answer that cannot change before it.
   property int spawnWatchdogMs: 2000
-  property int spawnPollMs: 100
   property int maxStdoutBytes: 0
   property int maxStderrBytes: 0
   property string outputBackend: "collector"
@@ -71,7 +69,6 @@ QtObject {
   property bool _destroyed: false
   property bool _settled: false
   property bool _stdinFed: false
-  property int _spawnTicks: 0
 
   // The job is a plain QtObject, so its owned process factory, timers, and
   // connection list are declared through an explicit default property.
@@ -88,8 +85,7 @@ QtObject {
 
     Timer {
       id: spawnWatch
-      interval: Math.max(1, root.spawnPollMs)
-      repeat: true
+      repeat: false
       onTriggered: root._pollSpawn()
     },
 
@@ -207,7 +203,7 @@ QtObject {
     root._exitCode = -1
     root._state = "running"
     root._stdinFed = false
-    root._spawnTicks = 0
+    spawnWatch.interval = Math.max(1, root.spawnWatchdogMs)
     spawnWatch.restart()
     if (root.timeoutMs > 0) deadline.restart()
     try {
@@ -226,20 +222,19 @@ QtObject {
   // The other half of spawn confirmation. `started` proves a child was
   // produced and stops this timer; observing that one was NOT produced needs a
   // deadline instead, because Quickshell exposes no error signal and a
-  // property poll cannot tell an unresolvable argv[0] from an instant child
+  // property read cannot tell an unresolvable argv[0] from an instant child
   // that has already exited - both read `running=false, processId=null`. So
   // the window is the deadline, and reaching it unconfirmed is the failure.
+  //
+  // A child that is live when the deadline lands but never reported `started`
+  // is accepted here, exactly as the last poll of a cadence would have
+  // accepted it: the signal is the fast path, the deadline the only verdict.
   function _pollSpawn() {
     if (root._settled || root._proc === null) return
     if (root._alive(root._proc)) {
-      spawnWatch.stop()
       root._feedStdin()
       return
     }
-
-    root._spawnTicks++
-    const waited = root._spawnTicks * Math.max(1, root.spawnPollMs)
-    if (waited < Math.max(1, root.spawnWatchdogMs)) return
     root._exitCode = -1
     if (root._retryable()) {
       root._stopChild()

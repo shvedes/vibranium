@@ -563,7 +563,6 @@ BarModule {
   readonly property string _copyScope: "bar.colorPicker:copy:" + Date.now().toString(36)
     + "-" + Math.floor(Math.random() * 1679616).toString(36)
   readonly property int _copySpawnWindowMs: 1500
-  readonly property int _copySpawnPollMs: 25
   readonly property int _copyDeadlineMs: 5000
 
   
@@ -588,7 +587,6 @@ BarModule {
         maxAttempts: 1,
         timeoutMs: root._copyDeadlineMs,
         spawnWatchdogMs: root._copySpawnWindowMs,
-        spawnPollMs: root._copySpawnPollMs,
         onFinished: (result) => root._copyFinished(id, root._copySettled(result), result),
         onFailed: reason => root._copyFinished(id, false,
           { code: "start_refused", detail: String(reason === undefined ? "" : reason) })

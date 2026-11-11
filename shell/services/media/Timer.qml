@@ -80,7 +80,6 @@ Singleton {
   // child can be observed at all, and an unconfirmed child is reported as
   // unproven rather than as held. The window only has to outlast fork and exec.
   readonly property int _spawnWindowMs: 1500
-  readonly property int _spawnPollMs: 25
 
   // A sound is a few seconds long, so a minute-long alarm child is wedged on a
   // dead sink: terminating it is what lets the next attempt run.
@@ -162,7 +161,6 @@ Singleton {
         maxAttempts: 1,
         timeoutMs: 0,
         spawnWatchdogMs: root._spawnWindowMs,
-        spawnPollMs: root._spawnPollMs,
         // A refusal and a settled child are the same event to a lease: this
         // attempt produced no confirmed hold.
         onFinished: () => root._onInhibitAttemptEnd(handle),
@@ -271,7 +269,6 @@ Singleton {
         maxAttempts: 1,
         timeoutMs: root._alarmTimeoutMs,
         spawnWatchdogMs: root._spawnWindowMs,
-        spawnPollMs: root._spawnPollMs,
         onFinished: (result) => root._onAlarmAttemptEnd(handle, result),
         onFailed: () => root._onAlarmAttemptEnd(handle, null)
       })

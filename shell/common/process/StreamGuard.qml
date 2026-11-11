@@ -20,11 +20,16 @@ import "ProcProbe.js" as ProcProbe
 // stale generation. Lines are emitted only while the generation is current.
 //
 // Failure has two shapes and one path: an exit (`exit`) and a spawn that never
-// produced a child (`no-child`, observed by the watchdog after spawnWatchMs).
+// produced a child (`no-child`, observed by the spawn window after spawnWatchMs).
 // Either way the generation dies, `degraded` rises, the failure count grows and
 // a respawn is scheduled at the capped backoff. `spawned` is emitted for every
 // new generation so an owner with per-generation state can reset it; a genuine
 // line proves the stream works and `noteAlive()` resets the backoff.
+//
+// The spawn window is a deadline, not a cadence: `started` is what confirms a
+// child, and only the absence of it at spawnWatchMs is a failure. A confirmed
+// child needs no supervision - its own `exited` is the terminal event - so the
+// window is armed per generation and stops the moment the child confirms.
 Item {
   id: guard
 
@@ -37,7 +42,6 @@ Item {
 
   // 1 Hz liveness sample and the window a child is given to start before a
   // missing one is read as a failure.
-  property int pollMs: 1000
   property int spawnWatchMs: 5000
 
   // Capped respawn: base, 4x growth, ceiling.
@@ -55,7 +59,6 @@ Item {
 
   property bool _armed: false
   property var _handle: null
-  property int _ticks: 0
 
   function _backoffMs(f) {
     return Math.min(guard.backoffCapMs,
@@ -73,7 +76,6 @@ Item {
     }
     guard._handle = { id: generation, scope: guard.scope, key: guard.key }
     guard.degraded = false
-    guard._ticks = 0
     guard._armed = true
     guard.spawned()
     try {
@@ -139,12 +141,11 @@ Item {
     onExited: guard._fail("exit")
   }
 
-  // `started` is the confirmation the watchdog waits for. It is an invokable on
+  // `started` is the confirmation the window waits for. It is an invokable on
   // the Process type rather than a notifier, so the signal is reached through a
   // Connections element naming the Process as its target. Stopping the watch
-  // here is what keeps the 1 Hz sample from running for the child's lifetime;
-  // start() arms it again for every generation, so the spawn window still
-  // applies to each one.
+  // here is what keeps a confirmed child from ever being sampled; start() arms
+  // it again for every generation, so the window still applies to each one.
   Connections {
     target: proc
 
@@ -153,19 +154,16 @@ Item {
     }
   }
 
-  // Samples before the spawn window only age the generation, so a child that
-  // starts slowly is not read as a failure; a live child is one property read
-  // per interval, and a current generation without one is the same failure an
-  // exit reports.
+  // The spawn window, one deadline per generation. A child that confirms stops
+  // it; one that does not is the same failure an exit reports, and the only
+  // thing that can produce that verdict is the window elapsing.
   Timer {
     id: watch
 
-    interval: guard.pollMs
-    repeat: true
+    interval: Math.max(1, guard.spawnWatchMs)
+    repeat: false
     onTriggered: {
       if (!RequestGate.current(guard._handle)) return
-      guard._ticks++
-      if (guard._ticks * guard.pollMs < guard.spawnWatchMs) return
       if (ProcProbe.alive(proc)) return
       guard._fail("no-child")
     }

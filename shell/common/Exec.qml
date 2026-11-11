@@ -26,9 +26,9 @@ Singleton {
   id: root
 
   property int spawnWatchdogMs: 2000
-  property int spawnPollMs: 200
   property var _watched: []
-  // Mirrors _watched.length so the reap timer can bind to a scalar change.
+  // Mirrors _watched.length, so a reader can tell how many spawns are still
+  // inside their window without reading the list itself.
   property int _pending: 0
 
   Component {
@@ -136,33 +136,51 @@ Singleton {
   // - most callers attach no `exited` handler, so for them the reap is the whole
   // cleanup path. The liveness probe is one pure function shared with the job
   // layer rather than a second copy of it.
+  //
+  // Only a due entry is judged here. A child still inside its window cannot
+  // change the verdict a poll would reach - the window ends at a fixed moment -
+  // so the sweep runs when a deadline is reached rather than on a cadence, and
+  // an entry that is already live is dropped without a probe: its own `exited`
+  // is the path that disposes it.
   function _reapWatchdogs() {
     const now = Date.now()
-    const pass = root._watched.slice()
     const kept = []
-    for (let i = 0; i < pass.length; i++) {
-      const watch = pass[i]
-      if (root._alive(watch.proc)) {
-        continue
-      }
+    for (let i = 0; i < root._watched.length; i++) {
+      const watch = root._watched[i]
       if (now < watch.deadline) {
         kept.push(watch)
         continue
       }
+      if (root._alive(watch.proc)) continue
       root._dispose(watch.proc)
-    }
-    for (let i = 0; i < root._watched.length; i++) {
-      const watch = root._watched[i]
-      if (pass.indexOf(watch) < 0) kept.push(watch)
     }
     root._watched = kept
     root._pending = kept.length
+    root._armSpawnWatch()
+  }
+
+  // The single deadline for the whole list: armed at the earliest live
+  // deadline and re-armed after every sweep, so a spawn costs one wakeup at
+  // the moment its window ends instead of a repeating cadence that re-reads a
+  // clock for a verdict that cannot have changed yet.
+  function _armSpawnWatch() {
+    let next = Infinity
+    for (let i = 0; i < root._watched.length; i++) {
+      if (root._watched[i].deadline < next) next = root._watched[i].deadline
+    }
+    if (!isFinite(next)) {
+      spawnWatch.stop()
+      return
+    }
+    spawnWatch.interval = Math.max(1, next - Date.now())
+    spawnWatch.restart()
   }
 
   function _watch(proc) {
     const watch = { proc: proc, deadline: Date.now() + Math.max(1, root.spawnWatchdogMs) }
     root._watched.push(watch)
     root._pending = root._watched.length
+    root._armSpawnWatch()
     return watch
   }
 
@@ -171,6 +189,7 @@ Singleton {
     if (index < 0) return false
     root._watched.splice(index, 1)
     root._pending = root._watched.length
+    root._armSpawnWatch()
     return true
   }
 
@@ -187,11 +206,12 @@ Singleton {
     return true
   }
 
+  // One deadline, set by _armSpawnWatch() from the earliest live window. Not a
+  // binding: the deadline moves with the list, and a binding on `_pending`
+  // could only restart a cadence, which is the polling this replaces.
   Timer {
     id: spawnWatch
-    interval: Math.max(1, root.spawnPollMs)
-    repeat: true
-    running: root._pending > 0
+    repeat: false
     onTriggered: root._reapWatchdogs()
   }
 }

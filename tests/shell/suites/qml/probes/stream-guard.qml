@@ -28,7 +28,6 @@ Item {
     command: ["sh", "-c", "echo hello; sleep 30"]
     scope: "probe"
     key: "ok"
-    pollMs: 50
     spawnWatchMs: 200
     backoffBaseMs: 100
     backoffCapMs: 400
@@ -40,7 +39,6 @@ Item {
     command: ["sh", "-c", "exit 3"]
     scope: "probe"
     key: "dead"
-    pollMs: 50
     spawnWatchMs: 200
     backoffBaseMs: 100
     backoffCapMs: 400

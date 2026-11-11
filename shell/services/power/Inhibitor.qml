@@ -706,7 +706,6 @@ Singleton {
     command: ["gdbus", "monitor", "--system", "--dest", "org.freedesktop.login1"]
     scope: root._gateScope
     key: root._monitorKey
-    pollMs: root._monitorPollMs
     spawnWatchMs: root._monitorSpawnWatchMs
     backoffBaseMs: root._backoffBaseMs
     backoffCapMs: root._backoffCapMs
@@ -770,7 +769,6 @@ Singleton {
     command: ["dbus-monitor", "--session", root._saMatch]
     scope: root._gateScope
     key: root._saKey
-    pollMs: root._monitorPollMs
     spawnWatchMs: root._monitorSpawnWatchMs
     backoffBaseMs: root._backoffBaseMs
     backoffCapMs: root._backoffCapMs
@@ -893,7 +891,6 @@ Singleton {
   readonly property int _inhibitConfirmMs: root._inhibitSpawnWatchMs + 200
   readonly property int _listTimeoutMs: 5000
   readonly property int _reapTimeoutMs: 2000
-  readonly property int _monitorPollMs: 1000
   readonly property int _monitorSpawnWatchMs: 5000
 
   // Countdown ticker: 1s cadence re-phased to the wall clock on every

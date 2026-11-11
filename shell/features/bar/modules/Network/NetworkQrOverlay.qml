@@ -61,7 +61,6 @@ Item {
   // never finished; _maxAttempts with a doubling backoff caps the sequence.
   // A missing vb-network-qr or vb-network-password therefore settles in
   // about a second instead of leaving the card in its loading state.
-  readonly property int _spawnPollMs: 50
   readonly property int _spawnWatchdogMs: 1500
   readonly property int _timeoutMs: 5000
   readonly property int _maxAttempts: 2
@@ -219,7 +218,6 @@ Item {
         backoffMs: root._backoffMs,
         maxBackoffMs: root._maxBackoffMs,
         spawnWatchdogMs: root._spawnWatchdogMs,
-        spawnPollMs: root._spawnPollMs,
         onFinished: settle,
         onFailed: () => settle(null)
       })
