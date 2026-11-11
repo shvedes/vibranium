@@ -766,25 +766,6 @@ Singleton {
     root._notify("Drop failed: " + message, true)
   }
 
-  // Remote input is https only. Plain http is refused rather than upgraded:
-  // the scheme is the transport decision, and silently switching it would put
-  // a wallpaper on both destinations that the remote end never authenticated.
-  function _isHttpsUrl(s) {
-    return s.startsWith("https://")
-  }
-
-  // Credentials embedded in the authority (`user:password@host`) would be sent
-  // to the remote end and would sit in this process's argv, so an authority
-  // carrying a userinfo separator is refused before anything is fetched. The
-  // authority runs from the scheme to the first path, query, or fragment
-  // delimiter; a percent-encoded `@` is data in a host and stays accepted.
-  function _urlHasCredentials(s) {
-    const rest = s.slice("https://".length)
-    const stop = rest.search(/[\/?#]/)
-    const authority = stop < 0 ? rest : rest.slice(0, stop)
-    return authority.indexOf("@") >= 0
-  }
-
   function _extOk(path) {
     return ImageExts.ok(path)
   }
@@ -877,7 +858,7 @@ Singleton {
       root._dropFail("https:// URLs only")
       return
     }
-    if (root._isHttpsUrl(uri)) {
+    if (DropPayload.isHttpsUrl(uri)) {
       root._handleHttpUrl(uri)
       return
     }
@@ -988,7 +969,7 @@ Singleton {
       root._dropFail("invalid URL")
       return
     }
-    if (root._urlHasCredentials(url)) {
+    if (DropPayload.hasCredentials(url)) {
       // The userinfo separator is the whole reason; the authority itself is
       // not named, because a host is the only part of it that would help
       // and the credentials are the part that must not be shown.

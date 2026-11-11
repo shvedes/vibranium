@@ -67,12 +67,17 @@ function hasCredentials(s) {
   return authority.indexOf("@") >= 0
 }
 
-// Remote input is https only. Plain http is refused rather than upgraded: the
-// scheme is the transport decision, and switching it silently would put a
+// The one accepted remote scheme. Plain http is refused rather than upgraded:
+// the scheme is the transport decision, and switching it silently would put a
 // wallpaper on both destinations that the remote end never authenticated.
+function isHttpsUrl(s) {
+  return String(s ?? "").startsWith("https://")
+}
+
+// Remote input is https only and carries no userinfo.
 function isRemoteUrl(s) {
-  if (!s.startsWith("https://")) return false
-  return !hasCredentials(s)
+  if (!isHttpsUrl(s)) return false
+  return !hasCredentials(String(s))
 }
 
 // Whether the entry names an image by extension. A remote url is judged on
