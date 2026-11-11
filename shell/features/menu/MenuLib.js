@@ -626,31 +626,14 @@ function parseBundle(text) {
 // so the menu takes its `menus` from there instead of stripJsonc + JSON.parse
 // over the same ~5k lines on every container rebuild - which measured as 80%
 // of what was left of a rebuild.
-// Containers from ALREADY-PARSED page objects: the same normalization and the
-// same duplicate-id rule as parseBundle, without the parse. The unified
-// catalog is read and parsed once for the settings stores (SettingsCatalog),
-// so the menu takes its `menus` from there instead of stripJsonc + JSON.parse
-// over the same ~5k lines on every container rebuild - which measured as 80%
-// of what was left of a rebuild.
 //
-// One-entry memo over the parsed page set the last bundle was built from. The
-// unified catalog is parsed once at boot and every menu open hands this
-// function the SAME `catalog.menus` array, so normalizing it again per open
-// rebuilt every page and every row in it for an answer that had not changed.
-// Identity plus length is the key: the array is never appended to in place,
-// and the length term keeps the test honest if it ever is.
-//
-// The memo lives on the function rather than in top-level declarations: this
-// library's published surface is its top-level names, and an internal cache is
-// not one of them. The returned pages are shared, exactly as a store's cached
-// pages are shared by mergePages: callers append pages into a NEW bundle
-// (mergePages copies the shells it adds, applyExtension builds a new bundle),
-// and orderSettingsIndex reorders the settings page the store owns rather than
-// a page held here.
+// Every call returns a fresh bundle. It is tempting to memoize this by the
+// parsed array's identity, and the array really is the same one on every
+// open - but page objects are navigated by the panel and reordered in place
+// by orderSettingsIndex, so a bundle handed to one open must not be the one
+// the next open mutates. The rows are shared through the stores' own cached
+// pages; the containers around them stay per-open.
 function bundleFromPages(rawPages) {
-  if (rawPages === bundleFromPages._src && rawPages.length === bundleFromPages._len
-    && bundleFromPages._bundle !== undefined && bundleFromPages._bundle !== null)
-    return bundleFromPages._bundle
   const pages = []
   // Prototype-less: the keys are page ids, and they come from a file. A page
   // declared `"id": "__proto__"` did not create a key - it assigned byId's
@@ -680,15 +663,11 @@ function bundleFromPages(rawPages) {
     byId[page.id] = page
   }
   if (pages.length === 0) throw new Error("bundle has no pages")
-  const bundle = {
+  return {
     entry: pages[0].id,
     pages: pages,
     byId: byId
   }
-  bundleFromPages._src = rawPages
-  bundleFromPages._len = rawPages.length
-  bundleFromPages._bundle = bundle
-  return bundle
 }
 
 // Top-level settings order, by page id. The misc grab-bag is last.
