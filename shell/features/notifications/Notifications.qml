@@ -737,16 +737,9 @@ Singleton {
   // -> ("Binding loop detected for property y/height/growing").
   function _ensureGeom(): void {
     if (root._geomBuiltFor === root._geomVersion) return
-    const cards = root.pile
-    const byId = {}
-    let y = 0
-    for (let i = 0; i < cards.length; i++) {
-      const e = cards[i]
-      if (e) byId[Number(e.notifId)] = y
-      y += (Number(e ? e.cardHeight : 0) || 0) + root.cardSpacing
-    }
-    root._geomYById = byId
-    root._geomTotal = cards.length === 0 ? 0 : y - root.cardSpacing
+    const geom = NotificationsLib.pileGeometry(root.pile, root.cardSpacing)
+    root._geomYById = geom.byId
+    root._geomTotal = geom.total
     root._geomBuiltFor = root._geomVersion
   }
 

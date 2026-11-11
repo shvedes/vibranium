@@ -265,4 +265,25 @@ group('garbage island numbers fall back to the bar dock', () => {
   eq('a negative bar dock reads as zero', NL.pileDock(-4, true, 500, 8), 508)
 })
 
+section('pileGeometry - one walk for every card offset and the stack height')
+group('the offsets are the stack of card heights and gaps', () => {
+  const cards = [
+    { notifId: 1, cardHeight: 40 },
+    { notifId: 2, cardHeight: 25 },
+    { notifId: 3, cardHeight: 60 },
+  ]
+  const g = NL.pileGeometry(cards, 6)
+  eq('the first card sits at the top', g.byId[1], 0)
+  eq('the second clears the first and one gap', g.byId[2], 46)
+  eq('the third clears both', g.byId[3], 77)
+  eq('the total is the last bottom', g.total, 137)
+  eq('the total is a number on the first card only', NL.pileGeometry([{ notifId: 9, cardHeight: 10 }], 6), { byId: { 9: 0 }, total: 10 })
+  eq('an empty pile has no height', NL.pileGeometry([], 6).total, 0)
+  eq('and no offsets', Object.keys(NL.pileGeometry([], 6).byId), [])
+  eq('a non-array pile is empty', NL.pileGeometry(null, 6).total, 0)
+  eq('a missing height is zero', NL.pileGeometry([{ notifId: 4 }, { notifId: 5, cardHeight: 10 }], 6).byId[5], 6)
+  eq('a non-numeric gap is no gap', NL.pileGeometry(cards, 'x').byId[2], 40)
+  eq('a null card takes its gap but writes no offset', Object.keys(NL.pileGeometry([null, { notifId: 6, cardHeight: 8 }], 4).byId), ['6'])
+})
+
 finish()

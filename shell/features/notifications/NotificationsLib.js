@@ -319,6 +319,24 @@ function pileOrder(entries, atTop) {
 // would keep one row per streamed update and a volume drag would fill the
 // history. One tag, one row - the tag is the notification's identity for
 // history purposes, the server id only its current incarnation.
+// The pile's geometry from its cards: every notifId's top offset plus the
+// stack's own height. One walk per pile version - the caller caches the
+// result and rebuilds it only when a card arrives, leaves, or reports a new
+// height, because the walk is the whole of the layout question.
+function pileGeometry(cards, spacing) {
+  const list = Array.isArray(cards) ? cards : []
+  const gap = Number(spacing)
+  const step = isFinite(gap) ? gap : 0
+  const byId = {}
+  let y = 0
+  for (let i = 0; i < list.length; i++) {
+    const e = list[i]
+    if (e) byId[Number(e.notifId)] = y
+    y += (Number(e ? e.cardHeight : 0) || 0) + step
+  }
+  return { byId: byId, total: list.length === 0 ? 0 : y - step }
+}
+
 function pushHistory(history, snapshot, limit) {
   const list = Array.isArray(history) ? history.slice() : []
   const cap = Number(limit)
