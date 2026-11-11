@@ -770,7 +770,7 @@ Singleton {
 
   // Never carries a value: only counts and fixed phrases reach it.
   function _notify(summary, body) {
-    Exec.notify(summary, body, { replaceId: 3, timeoutMs: 3000 })
+    Exec.notifyStatus(summary, body)
   }
 
   // Echo suppression is exact, not timed: every path that writes the clipboard

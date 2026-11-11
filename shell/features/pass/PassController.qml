@@ -191,7 +191,7 @@ Item {
   }
 
   function _notify(summary, body) {
-    Exec.notify(summary, body, { replaceId: 3, timeoutMs: 3000 })
+    Exec.notifyStatus(summary, body)
   }
 
   // Binary availability: the store (PASSWORD_STORE_DIR) can exist

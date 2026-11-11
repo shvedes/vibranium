@@ -325,7 +325,7 @@ Singleton {
   // The transport needs it for its own timeout; every other message comes
   // from the controller, which owns the flow that failed.
   function _notify(summary, body) {
-    Exec.notify(summary, body, { replaceId: 3, timeoutMs: 3000 })
+    Exec.notifyStatus(summary, body)
   }
 
   // --- open / close ---

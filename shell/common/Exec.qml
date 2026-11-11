@@ -87,6 +87,13 @@ Singleton {
     return root.run(cmd)
   }
 
+  // A short-lived status message for the fixed notification slot the shell's
+  // transient messages share. Callers pass counts and fixed phrases, never a
+  // payload, so one notice replaces the previous one instead of stacking.
+  function notifyStatus(summary, body) {
+    return root.notify(summary, body, { replaceId: 3, timeoutMs: 3000 })
+  }
+
   function runJob(command, owner, options) {
     return ProcessRegistry.start(command, owner, options)
   }
