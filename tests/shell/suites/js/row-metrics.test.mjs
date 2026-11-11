@@ -173,6 +173,30 @@ group('the gap is the caller\'s, not the library\'s', () => {
   eq('a zero gap still answers whole rows', RM.snappedH(uniform(5, 30), 0, 100, 1000, identity, 0), 3 * 30)
 })
 
+section('fallbackRowH / heightAt - the height a row falls back to')
+
+group('a learned average wins', () => {
+  eq('the average', RM.fallbackRowH(24, 10, 500, 18), 24)
+  eq('even beside live content', RM.fallbackRowH(20, 3, 300, 18), 20)
+})
+
+group('with no learned average, the live content answers', () => {
+  eq('three rows in 300', RM.fallbackRowH(-1, 3, 300, 18), 100)
+  eq('the floor beats a tiny average', RM.fallbackRowH(-1, 100, 100, 18), 18)
+  eq('no content is the floor', RM.fallbackRowH(-1, 3, 0, 18), 18)
+  eq('no rows is the floor', RM.fallbackRowH(-1, 0, 500, 18), 18)
+  eq('a nullish average and count', RM.fallbackRowH(null, null, null, 18), 18)
+})
+
+group('heightAt reads the table, else the caller fallback', () => {
+  eq('a measured row', RM.heightAt({ a: 30 }, 'a', 18), 30)
+  eq('an unknown key', RM.heightAt({}, 'a', 18), 18)
+  eq('a zero measurement is not usable', RM.heightAt({ a: 0 }, 'a', 18), 18)
+  eq('a negative measurement is not usable', RM.heightAt({ a: -4 }, 'a', 18), 18)
+  eq('a non-numeric measurement', RM.heightAt({ a: '30' }, 'a', 18), 18)
+  eq('a non-finite measurement', RM.heightAt({ a: Infinity }, 'a', 18), 18)
+})
+
 section('identityOwners - which row owns each identity')
 
 group('a unique key is owned by its own index', () => {

@@ -30,6 +30,24 @@
 // Callers ask for "every row" or "the first n" and never for zero rows:
 // a limit of 0 or less means no cap, which is the ordinary case for a
 // card with no row limit of its own.
+// The fallback row height: the learned average when there is one, else the
+// live content's average, else the tree's floor. A list that has not measured
+// anything yet still answers a usable row.
+function fallbackRowH(avgH, count, contentHeight, rowMinH) {
+  if (avgH > 0) return avgH
+  const n = Number(count)
+  const h = Number(contentHeight)
+  if (n > 0 && h > 0) return Math.max(Number(rowMinH) || 0, h / n)
+  return Number(rowMinH) || 0
+}
+
+// A measured height for one identity, or the caller's fallback when the table
+// has no usable entry for it.
+function heightAt(knownH, key, fallback) {
+  const h = knownH[key]
+  return typeof h === "number" && isFinite(h) && h > 0 ? h : fallback
+}
+
 // Which row owns each identity: the first index that claims a key, and -1 for
 // a key two live rows share. A contested key has no single height to learn.
 // One walk of the row set, in the row set's own order.

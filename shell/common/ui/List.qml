@@ -943,11 +943,8 @@ ListView {
   onAutoCacheChanged: root._noteWindowing()
 
   function _avg() {
-    if (root._avgH > 0) return root._avgH
-    const n = root.count
-    if (n > 0 && root.contentHeight > 0)
-      return Math.max(Ui.rowMinH, root.contentHeight / n)
-    return Ui.rowMinH
+    return RowMetrics.fallbackRowH(root._avgH, root.count,
+      root.contentHeight, Ui.rowMinH)
   }
   // Predicate gating height learning per row. Consumers with in-flow
   // slots (delete confirms, editors, descriptions) report false while
@@ -1000,9 +997,7 @@ ListView {
     return live
   }
   function rowHeightAt(index) {
-    const h = root._knownH[root._rowKey(index)]
-    if (typeof h === "number" && isFinite(h) && h > 0) return h
-    return root._avg()
+    return RowMetrics.heightAt(root._knownH, root._rowKey(index), root._avg())
   }
   // Live delegate geometry wins over the table whenever the delegate
   // exists: with full instantiation (small lists) every seat reads engine
