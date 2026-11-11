@@ -2,6 +2,7 @@
 
 .import "../../common/theme/FileIcons.js" as FileIcons
 .import "../../common/text/Format.js" as Format
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 // Pure helpers for the Printers service and bar module: ipptool -tv report
 // parsing, state-label formatting, filtering. No Qt imports - node's vm
 // hosts it exactly like QJSEngine does (the
@@ -520,8 +521,8 @@ function printerStateTransitions(prev, next) {
 // CUPS's history would otherwise be announced as newly queued.
 function queuedJobs(prevJobs, jobs) {
   const out = []
-  const prev = Array.isArray(prevJobs) ? prevJobs : []
-  const now = Array.isArray(jobs) ? jobs : []
+  const prev = StoreGuards.asList(prevJobs)
+  const now = StoreGuards.asList(jobs)
   if (prev.length === 0) return out
   const known = {}
   for (let i = 0; i < prev.length; i++) {
