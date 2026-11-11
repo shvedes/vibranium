@@ -30,6 +30,8 @@
 // (exponent wins over the `e` constant); bare "2e" means 2*e.
 .pragma library
 
+.import "Range.js" as Range
+
 var FUNCS = {
     "sin": true, "cos": true, "tan": true,
     "asin": true, "acos": true, "atan": true,
@@ -433,7 +435,7 @@ function isFunctionIncomplete(query) {
 function sampleFunction(body, xMin, xMax, n) {
     try {
         var rpn = compileBody(String(body || ""))
-        var count = Math.max(2, Math.min(400, Math.round(n) || 120))
+        var count = Range.clamp(Math.round(n) || 120, 2, 400)
         var lo = Number(xMin), hi = Number(xMax)
         if (!(hi > lo)) return null
         var ys = new Array(count)
