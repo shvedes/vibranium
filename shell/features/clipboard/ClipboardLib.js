@@ -756,11 +756,10 @@ function buildSubLeft(entry) {
 
 // text/uri-list -> local paths ([] when remote URLs ride along).
 function parseUriList(text) {
-  const lines = String(text).split("\n")
+  const lines = SU.uriLines(text)
   const out = []
   for (let i = 0; i < lines.length; i++) {
-    let line = lines[i].trim()
-    if (line === "" || line.charAt(0) === "#") continue
+    let line = lines[i]
     if (FileUri.isFileUri(line)) line = FileUri.pathOf(line)
     if (line.indexOf("://") > 0) continue // ftp://... etc are not files (handled as network)
     if (line.charAt(0) !== "/") continue
@@ -770,12 +769,10 @@ function parseUriList(text) {
 }
 
 function extractNetworkUris(text) {
-  const lines = String(text).split("\n")
+  const lines = SU.uriLines(text)
   const out = []
   for (let i = 0; i < lines.length; i++) {
-    let line = lines[i].trim()
-    if (line === "" || line.charAt(0) === "#") continue
-    if (isNetworkUri(line)) out.push(line)
+    if (isNetworkUri(lines[i])) out.push(lines[i])
   }
   return out
 }

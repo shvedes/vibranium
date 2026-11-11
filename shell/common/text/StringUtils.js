@@ -20,6 +20,20 @@ function lowerTrim(value) {
   return textOf(value).toLowerCase().trim()
 }
 
+// The meaningful lines of a text/uri-list style payload: trimmed, with the
+// empty lines and the `#` comment lines dropped. Canonical home of the
+// ClipboardLib uri-list reading.
+function uriLines(text) {
+  const lines = String(text).split("\n")
+  const out = []
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim()
+    if (line === "" || line.charAt(0) === "#") continue
+    out.push(line)
+  }
+  return out
+}
+
 function stripJsonc(raw) {
   return String(raw || "")
     .replace(/^[ \t]*\/\/[^\n]*(\n|$)/gm, "")
