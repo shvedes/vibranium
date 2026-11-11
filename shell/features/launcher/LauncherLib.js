@@ -741,28 +741,12 @@ function firstFallbackClaiming(plugins, query, itemsFor, order, loadFor) {
 // -> at the top of this file.
 var SearchPlumbing = SL
 
-// Score ONE query token against a record's pre-split words. Word-level
-// matching only: a token hits a word by exact equality, word-start
-// prefix, or contained substring. The menu's cross-word letter-chain
-// matcher is deliberately NOT used here - over thousands of desktop
-// entries it fabricates matches ("calculator" -> "C"hromium + "a"...),
-// and a launcher needs precision more than acronym cleverness.
-//
-// Earlier position ranks higher so header-ish words win ties.
+// Score ONE query token against a record's pre-split words. The bands and
+// the first-hit-wins loop live in SearchLib so the menu's filterCounter and
+// this launcher share one matcher; this name stays for LauncherLib's callers
+// and its suite, and typoTokenScore below reads the same bands inline.
 function tokenScore(words, t) {
-  for (let w = 0; w < words.length; w++) {
-    const word = words[w]
-    if (word === t) return 3000 - w
-    // One scan, not two. `startsWith` and the contained-substring test both
-    // searched the word, and for the common case - a word the token is not in
-    // - the prefix probe found out in three characters and the substring scan
-    // still walked the whole word. indexOf answers both questions: 0 is the
-    // prefix band, >0 the contained band.
-    const idx = word.indexOf(t)
-    if (idx === 0) return 2000 - w * 10
-    if (idx > 0) return 1000 - idx * 10
-  }
-  return -1
+  return SL.tokenScore(words, t)
 }
 
 // Damerau optimal-string-alignment distance capped at two: 0 for identical
@@ -883,89 +867,12 @@ function typoTokenScore(words, t) {
 // order (source index), which keeps results deterministic even on
 // engines without a stable sort.
 //
-// Incremental cache: sequential typing ("f" -> "fi" -> "fir"...) is the
-// common case. When the new query is a string-prefix of the previous one
-// on the SAME records instance, new hits are a subset of previous hits -
-// scan only that subset (typically <10 items) instead of the full index.
-// Invalidated on records identity change (re-index) or query shrink/diverge.
-// -> Identity is length-aware via SearchLib.sameCacheIndex and the hit store
-// -> is scan-order (see SearchLib.narrowsQuery): the canonical policy shared
-// -> with the menu, so ties rank by pool order on every path.
-var _searchCacheRecords = null
-var _searchCacheLen = -1
-var _searchCacheQ = ""
-var _searchCacheHits = null
-var _searchCacheSorted = null
-
+// Tokenized AND-search over a records array. The implementation, its
+// incremental cache and the scan-order hit store live in SearchLib, because
+// the menu's filterCounter reads the same matcher and used to pull this whole
+// library - and ClipboardLib underneath it - into its load graph for it.
 function searchRecords(records, query, cap, tiebreak) {
-  const q = SL.normalizeQuery(query)
-  if (q === "") {
-    _searchCacheRecords = records
-    _searchCacheLen = Array.isArray(records) ? records.length : -1
-    _searchCacheQ = ""
-    _searchCacheHits = []
-    _searchCacheSorted = []
-    return { rows: [], count: 0 }
-  }
-  const sameRecords = SL.sameCacheIndex(_searchCacheRecords, _searchCacheLen, records)
-  if (SL.identicalQuery(sameRecords, _searchCacheQ, q, _searchCacheSorted)) {
-    return { rows: _searchCacheSorted.slice(0, cap), count: _searchCacheSorted.length }
-  }
-  const tokens = SL.splitTokens(q)
-  let source = records
-  // Scan the cached hits instead of the pool when the query grew as a string
-  // prefix AND the pool is the same array instance those hits were scored
-  // from: a longer query matches a subset of what a shorter one matched, so
-  // the pool behind the new hits IS the previous query's hit list.
-  //
-  // Pool identity is the whole test. This cache is module-level and three
-  // surfaces reach it - the launcher, the menu's filterCounter forwarder, the
-  // power menu - so a hit list can belong to a pool other than the one in hand,
-  // and one record the two pools share is no evidence about the rest of either:
-  // a scan that reused it would filter this pool by matches found elsewhere.
-  // Every caller holds its own array between keystrokes (an app index, an
-  // action pool), so identity is exact and cheap; a caller that rebuilds its
-  // pool per keystroke scans in full, the same answer at the full-pool price.
-  // -> The length term and the scan-order store are SearchLib's canonical
-  // -> policy (sameCacheIndex + narrowsQuery): the same array with a different
-  // -> length is a different pool, and the subset is scanned in pool order.
-  if (SL.narrowsQuery(sameRecords, _searchCacheQ, q, _searchCacheHits)) source = _searchCacheHits
-  // Parallel arrays: one {rec, score, idx} per hit was thousands of objects
-  // per keypress on a one-letter query. The scan position is the push index.
-  const hitRecs = []
-  const hitScores = []
-  for (let i = 0; i < source.length; i++) {
-    const rec = source[i]
-    let total = 0
-    let ok = true
-    for (let t = 0; t < tokens.length && ok; t++) {
-      const s = tokenScore(rec.words, tokens[t])
-      if (s < 0) ok = false
-      else total += s
-    }
-    if (ok) {
-      hitRecs.push(rec)
-      hitScores.push(total)
-    }
-  }
-  // Cache the FULL hit set (pre-cap) for incremental filtering; callers
-  // cap via slice, so we keep canonical hits untruncated for the next pass.
-  // -> Two stores: scan-order for the subset scan, sorted for identical-query
-  // -> cap slices. The scan-order copy is taken before the sort, the way the
-  // -> menu keeps its hit set, so ties rank by pool order either way.
-  const hits = hitRecs
-  const order = SL.orderHits(hitRecs, hitScores, tiebreak)
-  const full = new Array(order.length)
-  for (let i = 0; i < order.length; i++) full[i] = hitRecs[order[i]]
-  _searchCacheRecords = records
-  _searchCacheLen = records.length
-  _searchCacheQ = q
-  _searchCacheHits = hits
-  _searchCacheSorted = full
-  const n = Math.min(full.length, cap)
-  const out = new Array(n)
-  for (let i = 0; i < n; i++) out[i] = full[i]
-  return { rows: out, count: full.length }
+  return SL.searchRecords(records, query, cap, tiebreak)
 }
 
 // Typo rescue over a records array: the AND-search shape of searchRecords

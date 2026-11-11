@@ -98,7 +98,7 @@ function liveMenuLib() {
     // libSource drops the .import lines, so the aliases they bound are
     // re-supplied here by hand.
     SU: loadLib(path.join(SHELL_DIR, 'common/text/StringUtils.js')),
-    LauncherLib: loadLib(path.join(SHELL_DIR, 'features/launcher/LauncherLib.js')),
+    SL: loadLib(path.join(SHELL_DIR, 'common/text/SearchLib.js')),
     Settings: loadLib(path.join(SHELL_DIR, 'common/settings/SettingsLib.js')),
   })
   vm.runInContext(src, ctx, { filename: MENU_FILE })

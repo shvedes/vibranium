@@ -171,3 +171,142 @@ function filterCounter(pool, query, cap, searchFn, tiebreak) {
   const res = searchFn(list, query, cap, tiebreak)
   return { total: total, matched: res.count, rows: res.rows }
 }
+
+// --- strict records matcher ---
+//
+// The tokenized AND-search over records whose hay is a pre-split `words`
+// array: the launcher's app index, the menu's page lists, the power menu.
+//
+// It lives here rather than in LauncherLib because the menu needs THIS
+// matcher and nothing else from that library - and LauncherLib imports
+// ClipboardLib for its file-icon mapping, so the menu's load graph used to
+// carry both whole libraries (~3.7k lines) to reach one scoring loop. A
+// matcher is search plumbing, which is what this file is for; the launcher
+// keeps a named delegate so its own callers and suite do not move.
+
+// Score ONE query token against a record's pre-split words. Word-level
+// matching only: a token hits a word by exact equality, word-start prefix,
+// or contained substring. The menu's cross-word letter-chain matcher is
+// deliberately NOT used here - over thousands of desktop entries it
+// fabricates matches ("calculator" -> "C"hromium + "a"...), and a launcher
+// needs precision more than acronym cleverness.
+//
+// Earlier position ranks higher so header-ish words win ties.
+function tokenScore(words, t) {
+  for (let w = 0; w < words.length; w++) {
+    const word = words[w]
+    if (word === t) return 3000 - w
+    // One scan, not two. `startsWith` and the contained-substring test both
+      // searched the word, and for the common case - a word the token is not
+      // in - the prefix probe found out in three characters and the substring
+      // scan still walked the whole word. indexOf answers both questions: 0 is
+      // the prefix band, >0 the contained band.
+    const idx = word.indexOf(t)
+    if (idx === 0) return 2000 - w * 10
+    if (idx > 0) return 1000 - idx * 10
+  }
+  return -1
+}
+
+// Incremental cache: sequential typing ("f" -> "fi" -> "fir"...) is the
+// common case. When the new query is a string-prefix of the previous one on
+// the SAME records instance, new hits are a subset of previous hits - scan
+// only that subset (typically <10 items) instead of the full index.
+// Invalidated on records identity change (re-index) or query shrink/diverge.
+//
+// One cache, because there is one matcher: the launcher and the menu both
+// reach it through this module, and pool identity + length is the whole
+// validity test (see sameCacheIndex), so a hit list from one pool can never
+// be scanned for another.
+var _searchCacheRecords = null
+var _searchCacheLen = -1
+var _searchCacheQ = ""
+var _searchCacheHits = null
+var _searchCacheSorted = null
+
+// Tokenized AND-search over a records array (app index or keyword list):
+// every space-separated token must hit its own best word; totals decide
+// ranking. Returns { rows, count }: `rows` is the scored-sorted top
+// `cap` (the display cap), `count` the full hit total for the
+// matched/total counter. The whole hit set is never copied per
+// keystroke - `cap` bounds both work and allocation.
+//
+// `tiebreak` is an optional rec -> number used when two records score
+// equally (higher wins). The launcher passes its druncache counts when
+// the sort method is "frequency", so most-used wins ties in filtering
+// just like in the idle view. Records still tied after that keep input
+// order (source index), which keeps results deterministic even on
+// engines without a stable sort.
+function searchRecords(records, query, cap, tiebreak) {
+  const q = normalizeQuery(query)
+  if (q === "") {
+    _searchCacheRecords = records
+    _searchCacheLen = Array.isArray(records) ? records.length : -1
+    _searchCacheQ = ""
+    _searchCacheHits = []
+    _searchCacheSorted = []
+    return { rows: [], count: 0 }
+  }
+  const sameRecords = sameCacheIndex(_searchCacheRecords, _searchCacheLen, records)
+  if (identicalQuery(sameRecords, _searchCacheQ, q, _searchCacheSorted)) {
+    return { rows: _searchCacheSorted.slice(0, cap), count: _searchCacheSorted.length }
+  }
+  const tokens = splitTokens(q)
+  let source = records
+  // Scan the cached hits instead of the pool when the query grew as a string
+  // prefix AND the pool is the same array instance those hits were scored
+  // from: a longer query matches a subset of what a shorter one matched, so
+  // the pool behind the new hits IS the previous query's hit list.
+  //
+  // Pool identity is the whole test. This cache is module-level and three
+  // surfaces reach it - the launcher, the menu's filterCounter forwarder, the
+  // power menu - so a hit list can belong to a pool other than the one in hand,
+  // and one record the two pools share is no evidence about the rest of either:
+  // a scan that reused it would filter this pool by matches found elsewhere.
+  // Every caller holds its own array between keystrokes (an app index, an
+  // action pool), so identity is exact and cheap; a caller that rebuilds its
+  // pool per keystroke scans in full, the same answer at the full-pool price.
+  if (narrowsQuery(sameRecords, _searchCacheQ, q, _searchCacheHits)) source = _searchCacheHits
+  // Parallel arrays: one {rec, score, idx} per hit was thousands of objects
+  // per keypress on a one-letter query. The scan position is the push index.
+  const hitRecs = []
+  const hitScores = []
+  for (let i = 0; i < source.length; i++) {
+    const rec = source[i]
+    let total = 0
+    let ok = true
+    for (let t = 0; t < tokens.length && ok; t++) {
+      const s = tokenScore(rec.words, tokens[t])
+      if (s < 0) ok = false
+      else total += s
+    }
+    if (ok) {
+      hitRecs.push(rec)
+      hitScores.push(total)
+    }
+  }
+  // Cache the FULL hit set (pre-cap) for incremental filtering; callers
+  // cap via slice, so we keep canonical hits untruncated for the next pass.
+  // -> Two stores: scan-order for the subset scan, sorted for identical-query
+  // -> cap slices. The scan-order copy is taken before the sort, the way the
+  // -> menu keeps its hit set, so ties rank by pool order either way.
+  const hits = hitRecs
+  const order = orderHits(hitRecs, hitScores, tiebreak)
+  const full = new Array(order.length)
+  for (let i = 0; i < order.length; i++) full[i] = hitRecs[order[i]]
+  _searchCacheRecords = records
+  _searchCacheLen = records.length
+  _searchCacheQ = q
+  _searchCacheHits = hits
+  _searchCacheSorted = full
+  const n = Math.min(full.length, cap)
+  const out = new Array(n)
+  for (let i = 0; i < n; i++) out[i] = full[i]
+  return { rows: out, count: full.length }
+}
+
+// The counter over that matcher: the shape every caller wants without
+// passing the scorer by hand.
+function filterRecords(pool, query, cap, tiebreak) {
+  return filterCounter(pool, query, cap, searchRecords, tiebreak)
+}

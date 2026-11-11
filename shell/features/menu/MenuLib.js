@@ -16,10 +16,12 @@
 .import "../../common/text/Format.js" as Format
 .import "../../common/math/Range.js" as Range
 .import "../../common/collections/StoreGuards.js" as StoreGuards
-// Filter counting routes through the launcher's own matcher over a full
-// pool (not the menu's cross-word fuzzy search) - those two engines are
-// deliberately different, so the counter reuses the one its caller uses.
-.import "../launcher/LauncherLib.js" as LauncherLib
+// Filter counting over a full pool uses the strict records matcher (not the
+// menu's cross-word fuzzy search) - those two engines are deliberately
+// different, so the counter reuses the one its caller uses. That matcher
+// lives in SearchLib, which keeps the launcher - and ClipboardLib under it -
+// out of this file's load graph; nothing else from either is read here.
+.import "../../common/text/SearchLib.js" as SL
 // SettingsLib is NOT imported. The live section counters are
 // Menu.refreshSectionCounts and Menu.recomputeDeadLinks, which walk
 // Menu.isVisible and therefore Menu.conditionsMet, in QML where the store
@@ -282,7 +284,7 @@ function stripForHay(s) {
 }
 
 function hayFromItem(item, includeMetadata) {
-  const parts = LauncherLib.SearchPlumbing.titleParts(item)
+  const parts = SL.titleParts(item)
   if (item.desc) parts.push(stripForHay(item.desc))
   if (item.warning) parts.push(stripForHay(item.warning))
   if (item.body) parts.push(stripForHay(item.body))
@@ -316,11 +318,11 @@ function hayFromItem(item, includeMetadata) {
   // indexOf scans (a word repeated 4x would otherwise inflate the
   // string to ~250 chars). Order of first appearance is preserved so
   // ranking (earlier = higher) stays meaningful. The dedupe itself lives
-  // in SearchLib.dedupeWords, reached here through LauncherLib's
-  // SearchPlumbing alias - a plain {} there is a silent data loss keyed off
+  // in SearchLib.dedupeWords, reached through this file's own SL alias - a
+  // plain {} there is a silent data loss keyed off
   // a word ("constructor" / "__proto__" read as already-seen and dropped).
   const raw = parts.join(" ").toLowerCase()
-  return LauncherLib.SearchPlumbing.dedupeWords(raw.split(/\s+/)).join(" ")
+  return SL.dedupeWords(raw.split(/\s+/)).join(" ")
 }
 
 // Per-row cache of the scoped-filter haystacks below, so a filter keystroke
@@ -344,7 +346,7 @@ var _filterHay = new WeakMap()
 // filter hay is built from, and the stamp the cache in scopedFilter compares.
 // Split out so the two cannot drift over which fields count as visible.
 function hayFilterRaw(item) {
-  const parts = LauncherLib.SearchPlumbing.titleParts(item)
+  const parts = SL.titleParts(item)
   if (item.placeholder) parts.push(String(item.placeholder))
   if (item.unit) parts.push(String(item.unit))
   if (item.value !== undefined && item.value !== null) {
@@ -356,7 +358,7 @@ function hayFilterRaw(item) {
 
 function hayFilterOf(raw) {
   const lower = raw.toLowerCase()
-  return LauncherLib.SearchPlumbing.dedupeWords(lower.split(/\s+/)).join(" ")
+  return SL.dedupeWords(lower.split(/\s+/)).join(" ")
 }
 
 function hayForFilter(item) {
@@ -1260,13 +1262,13 @@ var _searchCacheRecent = []
 function search(index, query) {
   const q = query.toLowerCase().trim()
   // Length-aware identity lives in SearchLib.sameCacheIndex, reached here
-  // through LauncherLib's SearchPlumbing alias: the same array with a
+  // through this file's own SL alias: the same array with a
   // different length is a different index.
   // Menu.indexExternal appends entries into the array it already searched,
   // and an identity-only key answered the next identical query from before
   // the append, without the new rows. The recent map rides the same test: a
   // hit set scored against another index is not evidence about this one.
-  const sameIndex = LauncherLib.SearchPlumbing.sameCacheIndex(_searchCacheIndex, _searchCacheLen, index)
+  const sameIndex = SL.sameCacheIndex(_searchCacheIndex, _searchCacheLen, index)
   if (!sameIndex) {
     _searchCacheRecent = []
   }
@@ -1280,7 +1282,7 @@ function search(index, query) {
   }
 
   // Cache hit: identical query on same index instance.
-  if (LauncherLib.SearchPlumbing.identicalQuery(sameIndex, _searchCacheQ, q, _searchCacheEntries)) {
+  if (SL.identicalQuery(sameIndex, _searchCacheQ, q, _searchCacheEntries)) {
     return _searchCacheEntries.slice()
   }
 
@@ -1311,13 +1313,13 @@ function search(index, query) {
 
   // No empty-token guard: `q` is trimmed and non-empty past the check above,
   // and a non-empty string always yields at least one token, so the branch was
-  // unreachable. (The same dead guard sat in LauncherLib.searchRecords and
+  // unreachable. (The same dead guard sat in SearchLib.searchRecords and
   // ClipboardLib.searchEntries.)
-  const tokens = LauncherLib.SearchPlumbing.splitTokens(q)
+  const tokens = SL.splitTokens(q)
 
   // Decide scan source: full index vs incremental subset.
   let source = index
-  if (LauncherLib.SearchPlumbing.narrowsQuery(sameIndex, _searchCacheQ, q, _searchCacheHitSet)) {
+  if (SL.narrowsQuery(sameIndex, _searchCacheQ, q, _searchCacheHitSet)) {
     // Query grew as a prefix (user typed another char or added a token);
     // new hits are a subset of the previous hits, so scanning the cached
     // hit set is O(hits) instead of O(index) -> the per-keystroke win.
@@ -1342,7 +1344,7 @@ function search(index, query) {
     for (let i = 0; i < n; i++) {
       const entry = source[i]
       const hay = entry.hay
-      if (LauncherLib.SearchPlumbing.lengthReject(tok, hay)) continue
+      if (SL.lengthReject(tok, hay)) continue
       const s = fuzzyScore(hay, entry.words, tok)
       if (s >= 0) {
         hitEntries.push(entry)
@@ -1360,7 +1362,7 @@ function search(index, query) {
       let ok = true
       for (let t = 0; t < tlen; t++) {
         const tok = ordered[t]
-        if (LauncherLib.SearchPlumbing.lengthReject(tok, hay)) { ok = false; break }
+        if (SL.lengthReject(tok, hay)) { ok = false; break }
         const s = fuzzyScore(hay, entry.words, tok)
         if (s < 0) { ok = false; break }
         total += s
@@ -1439,11 +1441,11 @@ function search(index, query) {
 }
 
 // Filter counter shared with the app launcher (its normal + action modes)
-// and the power menu. Single definition lives in LauncherLib (which now
-// shapes it through the shared SearchLib shell); this stays as a forwarder
-// so menu-side callers keep one import.
+// and the power menu. Both the shell and the matcher are SearchLib's, so the
+// menu reaches it directly and the launcher's copy of the pool never enters
+// this file's import graph.
 function filterCounter(pool, query, cap, tiebreak) {
-  return LauncherLib.filterCounter(pool, query, cap, tiebreak)
+  return SL.filterRecords(pool, query, cap, tiebreak)
 }
 
 // Scoped in-page quick-filter for the menu's "/" trigger: narrows the
