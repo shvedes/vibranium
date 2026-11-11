@@ -607,6 +607,12 @@ Singleton {
     return "ok"
   }
 
+  // The row index `index` names, or -1 when it names no timer.
+  function _timerIndex(index) {
+    const i = Number(index)
+    return Number.isInteger(i) && i >= 0 && i < root.timers.length ? i : -1
+  }
+
   // Set (or replace) the command a timer runs; arming the action too
   // so a typed command always fires. A class already declared on the row
   // survives, because the text is still the text that was declared.
@@ -636,8 +642,8 @@ Singleton {
   // its action, so declaring a class there is refused rather than silently
   // ignored.
   function setClass(index, cls) {
-    const i = Number(index)
-    if (!(Number.isInteger(i) && i >= 0 && i < root.timers.length)) {
+    const i = root._timerIndex(index)
+    if (i < 0) {
       return "error: no timer at index " + index
     }
     const c = String(cls ?? "").trim()
@@ -839,8 +845,8 @@ Singleton {
     // Remove by index. Every timer can go, even the last one - an
     // enabled daemon with an empty list simply arms nothing.
     function remove(index: string): string {
-      const i = Number(index)
-      if (!(Number.isInteger(i) && i >= 0 && i < root.timers.length)) {
+      const i = root._timerIndex(index)
+      if (i < 0) {
         return "error: no timer at index " + index
       }
       const next = root.timers.slice()
