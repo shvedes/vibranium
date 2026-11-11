@@ -156,8 +156,8 @@ function pixelateGrid(rect, vr) {
       cells.push({
         rect: { x: cx0, y: cy0, w: cx1 - cx0, h: cy1 - cy0 },
         center: {
-          x: Math.max(cx0, Math.min(cx1, vx + i * step + step / 2)),
-          y: Math.max(cy0, Math.min(cy1, vy + j * step + step / 2))
+          x: Range.clamp(vx + i * step + step / 2, cx0, cx1),
+          y: Range.clamp(vy + j * step + step / 2, cy0, cy1)
         }
       })
     }
