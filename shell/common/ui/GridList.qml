@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "NavKeys.js" as NavKeys
+import "../math/Range.js" as Range
 
 // GridList twin of List (common/ui/List.qml) for layout:"grid" pages.
 // List covers vertical ListView only; grid pages had nowhere to go, so
@@ -143,7 +144,7 @@ GridView {
   function gotoCell(idx) {
     const n = root.count
     if (n === 0) return false
-    idx = Math.min(Math.max(0, idx), n - 1)
+    idx = Range.clamp(idx, 0, n - 1)
     if (idx === root.currentIndex) return false
     root.currentIndex = idx
     root.positionViewAtIndex(idx, GridView.Contain)
@@ -251,7 +252,7 @@ GridView {
     const count = root.count
     if (count === 0) return
     root.cancelSweep()
-    const start = Math.min(Math.max(0, idx), count - 1)
+    const start = Range.clamp(idx, 0, count - 1)
     let target = start
     for (let k = 0; k < count; k++) {
       const probe = (start + k) % count
@@ -292,7 +293,7 @@ GridView {
     // Non-finite step (unlaid-out view, bad factor) degenerates to the
     // top, the rule List.clampY states, because Flickable would hold a
     // NaN offset for the rest of the view's life.
-    const target = isFinite(raw) ? Math.min(Math.max(0, raw), maxY) : 0
+    const target = isFinite(raw) ? Range.clamp(raw, 0, maxY) : 0
     if (Math.abs(target - root.contentY) < 0.5) return
     root.cancelSweep()
     root.contentY = target

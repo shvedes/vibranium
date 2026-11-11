@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import qs.common
+import "../math/Range.js" as Range
 
 // Linear progress bar. Determinate mode fills toward `value` (0-100) with
 // an eased glide so fast update streams read as one sweep; indeterminate
@@ -44,7 +45,7 @@ Rectangle {
   radius: RoundingPolicy.radius
   opacity: root.indeterminate || !root.dimWhenEmpty || root.ratio > 0 ? 1 : 0.4
 
-  readonly property real clamped: Math.min(100, Math.max(0, root.value))
+  readonly property real clamped: Range.clamp(root.value, 0, 100)
   readonly property real ratio: root.clamped / 100
 
   // The fraction the fill is DRAWN at: the reported level, except while a
