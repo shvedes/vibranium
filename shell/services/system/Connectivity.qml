@@ -779,29 +779,27 @@ Singleton {
     for (let i = 0; i < devices.length; i++) {
       if (devices[i]) live.push(devices[i])
     }
-    for (let i = 0; i < live.length; i++) {
-      let found = false
-      for (let j = 0; j < root._devWatchers.length; j++) {
-        if (root._devWatchers[j].device === live[i]) {
-          found = true
-          break
-        }
-      }
-      if (found) continue
-      const watcher = devWatcherComp.createObject(root, { device: live[i] })
-      root._devWatchers = root._devWatchers.concat([
-        { device: live[i], watcher: watcher }
-      ])
+    // One lookup table for the reconcile: the previous pass compared every
+    // live device against every watcher and then every watcher against every
+    // device, so a bare device-set change paid a quadratic membership scan
+    // twice. Entries left in the table after the walk are the departed ones.
+    const byDevice = new Map()
+    for (let i = 0; i < root._devWatchers.length; i++) {
+      byDevice.set(root._devWatchers[i].device, root._devWatchers[i])
     }
     const keep = []
-    for (let k = 0; k < root._devWatchers.length; k++) {
-      const entry = root._devWatchers[k]
-      if (live.indexOf(entry.device) >= 0) {
-        keep.push(entry)
-        continue
+    for (let i = 0; i < live.length; i++) {
+      let entry = byDevice.get(live[i])
+      if (entry === undefined) {
+        entry = { device: live[i], watcher: devWatcherComp.createObject(root, { device: live[i] }) }
+      } else {
+        byDevice.delete(live[i])
       }
-      if (entry.watcher !== null && entry.watcher !== undefined) entry.watcher.destroy()
+      keep.push(entry)
     }
+    byDevice.forEach(entry => {
+      if (entry.watcher !== null && entry.watcher !== undefined) entry.watcher.destroy()
+    })
     root._devWatchers = keep
   }
 
