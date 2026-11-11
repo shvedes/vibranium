@@ -16,16 +16,12 @@ var MS_PER_DAY = 86400000
 
 // ---- keys and week handling ----------------------------------------------
 
-// Two-digit zero padding, canonicalized in common/text/Format.js so the
-// calendar, clipboard and notification clocks share one spelling.
-function pad2(value) {
-  return Format.pad2(value)
-}
-
 // Stable "yyyy-MM-dd" identity for a day, so grid cells compare against
 // today and each other without dragging Date objects through bindings.
+// The padding is Format.pad2, the spelling the calendar, clipboard and
+// notification clocks share.
 function dateKey(year, month, day) {
-  return year + "-" + pad2(Number(month) + 1) + "-" + pad2(day)
+  return year + "-" + Format.pad2(Number(month) + 1) + "-" + Format.pad2(day)
 }
 
 function keyForDate(date) {
