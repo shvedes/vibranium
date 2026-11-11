@@ -1746,6 +1746,52 @@ function deriveEntry(e, use12h) {
   return e
 }
 
+// One persisted row back into the in-memory shape. The secret payload is
+// decoded once and returned as `plain` for the caller to hand to SecretStore;
+// a row no key can open keeps its metadata with `unavailable` set and is
+// counted as stranded. `decrypt` and `now` are passed in so this stays free of
+// the clock and of SecretStore, which is what makes the migration unit-drivable.
+function entryFromStored(o, id, fileKey, use12h, decrypt, now) {
+  const src = (o !== null && typeof o === 'object') ? o : {}
+  const isSecret = src.type === 'secret'
+  const rowId = src.id || id
+  let plain = ''
+  let unavailable = false
+  if (isSecret) {
+    const held = src.raw
+    const ciphered = held && typeof held === 'object' && typeof held.ciphered === 'string'
+      ? held.ciphered : ''
+    const clear = held === undefined || held === null || typeof held === 'object'
+      ? '' : String(held)
+    plain = ciphered !== ''
+      ? (fileKey === '' ? '' : decrypt(ciphered, fileKey))
+      : clear
+    unavailable = plain === '' && (ciphered !== '' || clear !== '')
+  }
+  const raw = isSecret ? '' : String(src.raw == null ? '' : src.raw)
+  const preview = isSecret ? '' : String(src.preview == null ? raw : src.preview)
+  const e = newEntry(rowId, src.ts || now, raw, src.mime || 'text/plain',
+    src.type || 'text', src.filePaths || [], preview)
+  e.pinned = src.pinned === true
+  e.imageFile = src.imageFile || ''
+  e.imageDataFile = src.imageDataFile || ''
+  e.imageSha = src.imageSha || ''
+  e.fileSize = src.fileSize
+  e.totalSize = src.totalSize
+  e.folderCount = src.folderCount
+  e.foldersCount = src.foldersCount || 0
+  e.allFolders = src.allFolders === true
+  e.imageW = src.imageW || 0
+  e.imageH = src.imageH || 0
+  e.folderItems = src.folderItems
+  e.git = (src.git && typeof src.git === 'object' && !Array.isArray(src.git)) ? src.git : null
+  e.missing = src.missing === true
+  e.missingText = String(src.missingText == null ? '' : src.missingText)
+  e.unavailable = unavailable
+  deriveEntry(e, use12h === true)
+  return { entry: e, stranded: unavailable ? 1 : 0, plain: plain }
+}
+
 // Every path this entry references, in the order the snapshot GC and the
 // pending-copy matcher need them. A uri-list in any single slot is expanded
 // to its local paths; a bare absolute path is taken as is.

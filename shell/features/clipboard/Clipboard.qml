@@ -278,51 +278,18 @@ Singleton {
     root._loadDone = true
   }
 
-  // One persisted row back into the in-memory shape. A secret's payload is
-  // decoded once into the memory-only store; a row no key can open keeps its
-  // metadata but no payload and is counted as stranded.
+  // One persisted row back into the in-memory shape. The library owns the
+  // migration's field mapping and the decode decision; this file owns the one
+  // side effect that cannot live there - handing the decoded payload to the
+  // memory-only SecretStore under the row's handle.
   function _importEntry(o, fileKey) {
-    const isSecret = o.type === "secret"
-    const id = o.id || root.nextId
-    let raw = ""
-    let secretHandle = ""
-    let unavailable = false
-    if (isSecret) {
-      const held = o.raw
-      const ciphered = held && typeof held === "object" && typeof held.ciphered === "string"
-        ? held.ciphered : ""
-      const clear = held === undefined || held === null || typeof held === "object"
-        ? "" : String(held)
-      const plain = ciphered !== ""
-        ? (fileKey === "" ? "" : CL.decryptSecret(ciphered, fileKey))
-        : clear
-      if (plain !== "") {
-        secretHandle = root._secretHandleFor(id)
-        SecretStore.stash(secretHandle, plain)
-      } else {
-        unavailable = ciphered !== "" || clear !== ""
-      }
-    } else {
-      raw = String(o.raw == null ? "" : o.raw)
+    const imported = CL.entryFromStored(o, root.nextId, fileKey, TimeFormat.use12h,
+      CL.decryptSecret, Date.now())
+    if (imported.plain !== "") {
+      imported.entry.secretHandle = root._secretHandleFor(imported.entry.id)
+      SecretStore.stash(imported.entry.secretHandle, imported.plain)
     }
-    const previewVal = isSecret ? "" : String(o.preview == null ? raw : o.preview)
-    const e = {
-      id: id, ts: o.ts || Date.now(), raw: raw,
-      mime: o.mime || "text/plain", type: o.type || "text",
-      pinned: o.pinned === true, filePaths: o.filePaths || [],
-      imageFile: o.imageFile || "", imageDataFile: o.imageDataFile || "",
-      imageSha: o.imageSha || "", fileSize: o.fileSize, totalSize: o.totalSize, folderCount: o.folderCount,
-      foldersCount: o.foldersCount || 0, allFolders: o.allFolders === true,
-      imageW: o.imageW || 0, imageH: o.imageH || 0,
-      folderItems: o.folderItems, pathLike: false,
-      git: (o.git && typeof o.git === "object" && !Array.isArray(o.git)) ? o.git : null,
-      missing: o.missing === true,
-      missingText: String(o.missingText == null ? "" : o.missingText),
-      icon: "", title: "", subLeft: "", hay: "", words: [],
-      preview: previewVal, secretHandle: secretHandle, unavailable: unavailable
-    }
-    CL.deriveEntry(e, TimeFormat.use12h)
-    return { entry: e, stranded: unavailable ? 1 : 0 }
+    return { entry: imported.entry, stranded: imported.stranded }
   }
 
   function _secretHandleFor(id) { return "clipboard:" + id }

@@ -2558,6 +2558,64 @@ group('the derived row and the exported row cannot disagree about a secret', () 
 })
 
 // ===========================================================================
+group('entryFromStored - the persisted row back into the in-memory shape', () => {
+  const text = CL.entryFromStored({
+    id: 4, ts: 9, raw: 'body', mime: 'text/plain', type: 'text', pinned: true,
+    filePaths: ['/a'], imageW: 12, imageH: 8, foldersCount: 2, allFolders: true,
+  }, 7, '', false, CL.decryptSecret, 100)
+  eq('the persisted id wins', text.entry.id, 4)
+  eq('the persisted timestamp wins', text.entry.ts, 9)
+  eq('the payload', text.entry.raw, 'body')
+  eq('the mime', text.entry.mime, 'text/plain')
+  eq('the type', text.entry.type, 'text')
+  eq('the pin', text.entry.pinned, true)
+  eq('the paths', text.entry.filePaths, ['/a'])
+  eq('the dimensions', [text.entry.imageW, text.entry.imageH], [12, 8])
+  eq('the folder count', text.entry.foldersCount, 2)
+  eq('the all-folders flag', text.entry.allFolders, true)
+  eq('nothing was stranded', text.stranded, 0)
+  eq('and no plaintext is handed back for a text row', text.plain, '')
+  eq('the display fields are derived', text.entry.title !== '', true)
+  eq('and the preview defaults to the payload', text.entry.preview, 'body')
+})
+
+group('entryFromStored - id, timestamp and preview fallbacks', () => {
+  const e = CL.entryFromStored({ raw: 'x' }, 42, '', false, CL.decryptSecret, 77)
+  eq('the caller id fills an absent one', e.entry.id, 42)
+  eq('the caller clock fills an absent timestamp', e.entry.ts, 77)
+  eq('an absent preview is the raw payload', e.entry.preview, 'x')
+  eq('an absent type is text', e.entry.type, 'text')
+  eq('an absent mime is plain text', e.entry.mime, 'text/plain')
+  eq('an absent pin is false', e.entry.pinned, false)
+  const kept = CL.entryFromStored({ id: 3, ts: 5, raw: 'x', preview: 'shown' }, 42, '', false, CL.decryptSecret, 77)
+  eq('an explicit preview wins over the payload', kept.entry.preview, 'shown')
+  const odd = CL.entryFromStored(null, 8, '', false, CL.decryptSecret, 1)
+  eq('a null row still produces the empty entry', odd.entry.raw, '')
+  eq('with the caller id', odd.entry.id, 8)
+})
+
+group('entryFromStored - the secret decode and its stranded case', () => {
+  const key = CL.generateKey()
+  const cipher = CL.encryptSecret('hunter2', key)
+  const opened = CL.entryFromStored({ type: 'secret', raw: { ciphered: cipher } }, 1, key, false, CL.decryptSecret, 5)
+  eq('the plaintext comes back for the caller to stash', opened.plain, 'hunter2')
+  eq('the row is not stranded', opened.stranded, 0)
+  eq('and the entry itself carries no payload', opened.entry.raw, '')
+  eq('the secret row has no preview', opened.entry.preview, '')
+  const noKey = CL.entryFromStored({ type: 'secret', raw: { ciphered: cipher } }, 1, '', false, CL.decryptSecret, 5)
+  eq('no key decodes nothing', noKey.plain, '')
+  eq('and the row is stranded', noKey.stranded, 1)
+  eq('which the entry reports', noKey.entry.unavailable, true)
+  const clear = CL.entryFromStored({ type: 'secret', raw: 'plain' }, 1, '', false, CL.decryptSecret, 5)
+  eq('an unencrypted stored secret is read as-is', clear.plain, 'plain')
+  const failed = CL.entryFromStored({ type: 'secret', raw: { ciphered: cipher } }, 1, key, false, () => '', 5)
+  eq('a decode that yields nothing is stranded too', failed.stranded, 1)
+  eq('and reports unavailable', failed.entry.unavailable, true)
+  const empty = CL.entryFromStored({ type: 'secret', raw: '' }, 1, key, false, CL.decryptSecret, 5)
+  eq('an empty stored secret is not a stranded one', empty.stranded, 0)
+  eq('and carries no plaintext', empty.plain, '')
+})
+
 section('ClipboardLib - the contracts it upholds on its own')
 // ===========================================================================
 
@@ -2574,8 +2632,8 @@ group('the library reads no host global and no clock of its own', () => {
   // This pair is a load-time namespace-leak guard, not an API pin: it fails if
   // evaluating the lib leaves anything behind on its own namespace. It also
   // fails if a function is legitimately added, which is the price.
-  eq('a fresh load of the clipboard lib has 100 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 100)
-  eq('a fresh load of the clipboard lib has 100 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 100)
+  eq('a fresh load of the clipboard lib has 101 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 101)
+  eq('a fresh load of the clipboard lib has 101 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 101)
   // The clipboard lib never calls Math.random outside generateKey.
   eq('and the clipboard lib only has it in generateKey', (SRC.match(/Math\.random/g) || []).length, 1)
 })
