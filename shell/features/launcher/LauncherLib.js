@@ -1514,14 +1514,7 @@ function localPathCandidate(text, home) {
   const t = String(text ?? "").trim()
   if (t === "" || t.length > 4096) return ""
   if (t.indexOf("\n") >= 0) return ""
-  let p = t
-  if (p === "~") {
-    if (!home || home === "") return ""
-    p = home
-  } else if (p.indexOf("~/") === 0) {
-    if (!home || home === "") return ""
-    p = home + p.substring(1)
-  }
+  let p = SU.expandHome(t, home)
   if (p.charAt(0) !== "/") return ""
   while (p.length > 1 && p.charAt(p.length - 1) === "/") p = p.substring(0, p.length - 1)
   return p

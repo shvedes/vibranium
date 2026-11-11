@@ -79,6 +79,21 @@ function joinPath(dir, name) {
   return d.endsWith("/") ? d + n : d + "/" + n
 }
 
+// A leading "~" or "~/" expanded against `home`.
+//
+// Only the whole-home and home-prefix forms expand; "~user" is not a lookup
+// this shell performs. Missing home leaves the text as it stands, so the
+// caller decides what an unresolvable home means - the file opener refuses
+// the candidate, a clipboard row keeps the text it was copied with.
+function expandHome(text, home) {
+  const p = String(text ?? "")
+  const h = String(home ?? "")
+  if (h === "") return p
+  if (p === "~") return h
+  if (p.startsWith("~/")) return h + p.substring(1)
+  return p
+}
+
 // One path or file-name segment made safe to join onto a directory: every
 // character outside the portable set becomes "_". The wall-clock sanitizer
 // keeps "." and "-" so an extension survives; a separator cannot, because a

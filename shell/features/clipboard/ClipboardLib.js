@@ -212,10 +212,7 @@ function textImagePath(text, home) {
     p = parsed[0]
   }
   if (!isImageExt(p)) return ""
-  if (p.indexOf("~/") === 0) {
-    if (!home || home === "") return ""
-    p = home + p.substring(1)
-  }
+  p = SU.expandHome(p, home)
   if (p.charAt(0) !== "/") return ""
   return p
 }
