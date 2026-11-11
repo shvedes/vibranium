@@ -7,6 +7,7 @@
 
 .import "../../common/text/Format.js" as Format
 .import "../../common/math/Range.js" as Range
+.import "../../common/text/StringUtils.js" as SU
 .import "../../common/text/Clock.js" as ClockFmt
 .import "../../common/theme/DeviceIcons.js" as DeviceIcons
 .import "../../common/collections/StoreGuards.js" as StoreGuards
@@ -263,8 +264,8 @@ const META_SEPARATOR = " - "
 // trimming is what keeps a padded sender name from reading as a wider gap
 // around the separator.
 function metaLine(clock, appName) {
-  const time = String(clock ?? "").trim()
-  const app = String(appName ?? "").trim()
+  const time = SU.textOf(clock).trim()
+  const app = SU.textOf(appName).trim()
   const parts = []
   if (time !== "") parts.push(time)
   if (app !== "") parts.push("from " + app)
