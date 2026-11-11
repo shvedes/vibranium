@@ -178,6 +178,30 @@ Item {
     return true
   }
 
+  // The page verbs both theme pages publish. They are one rule each and the
+  // pages differ only in what open() builds, so the policy lives beside the
+  // page-open test it reads.
+  function refreshPage(page) {
+    if (!root.listed) return "error"
+    page._cached = null
+    page._doScan(root.isPageOpen(page.pageId))
+    return "ok"
+  }
+
+  function closePage(page) {
+    if (root.isPageOpen(page.pageId)) Menu.close()
+    return "ok"
+  }
+
+  function togglePage(page, open) {
+    if (root.isPageOpen(page.pageId)) {
+      Menu.close()
+      return "ok"
+    }
+    if (Menu.open) Menu.close()
+    return open()
+  }
+
   // A themes root that does not exist yet settles its model to Null. Null is
   // terminal - the model will not recover on its own - so it counts as
   // settled and reads as empty while the official themes still list. Only

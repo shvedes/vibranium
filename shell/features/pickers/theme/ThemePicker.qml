@@ -607,28 +607,9 @@ Singleton {
   // open, otherwise just refreshes the cache. A listing that was never
   // armed holds no rows to rescan and answers error, the same answer the
   // not-Ready gate gives while a scan is still in flight.
-  function refresh() {
-    if (!roots.listed) return "error"
-    root._cached = null
-    root._doScan(roots.isPageOpen(root.pageId))
-    return "ok"
-  }
-
-  function close() {
-    if (roots.isPageOpen(root.pageId)) {
-      Menu.close()
-    }
-    return "ok"
-  }
-
-  function toggle() {
-    if (roots.isPageOpen(root.pageId)) {
-      Menu.close()
-      return "ok"
-    }
-    if (Menu.open) Menu.close()
-    return root.open()
-  }
+  function refresh() { return roots.refreshPage(root) }
+  function close() { return roots.closePage(root) }
+  function toggle() { return roots.togglePage(root, function() { return root.open() }) }
 
   function status() {
     return JSON.stringify({
