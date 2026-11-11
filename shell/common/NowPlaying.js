@@ -1,6 +1,7 @@
 .pragma library
 
 .import "./text/Format.js" as Format
+.import "./text/Duration.js" as DurationFmt
 .import "./math/Range.js" as Range
 
 // Shared NowPlaying helpers: player sort, mm:ss, seek math, the player// volume path (gate, mute/resume memory, and the round-trip probe that
@@ -465,13 +466,8 @@ function scrubPosition(x, w, lengthSec) {
 }
 
 function fmtDuration(s) {
-  const n = Number(s)
-  const total = isFinite(n) ? Math.max(0, Math.floor(n)) : 0
-  const hours = Math.floor(total / 3600)
-  const minutes = Math.floor(total % 3600 / 60)
-  const seconds = total % 60
-  const tail = Format.pad2(minutes) + ":" + Format.pad2(seconds)
-  return hours > 0 ? hours + ":" + tail : tail}
+  return DurationFmt.formatTrackClock(s)
+}
 
 // --- synced lyrics ---------------------------------------------------------
 //

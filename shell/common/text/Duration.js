@@ -36,6 +36,20 @@ function formatClock(seconds) {
   return m + ":" + Format.pad2(r)
 }
 
+// Track clock with an always-padded minutes field: "00:05" / "01:01" /
+// "1:01:01". The hour field appears only once the track reaches one, so a
+// column reserved from the track's own length keeps its shape across the
+// hour boundary. Canonical home of NowPlaying fmtDuration.
+function formatTrackClock(seconds) {
+  var n = Number(seconds)
+  var total = isFinite(n) ? Math.max(0, Math.floor(n)) : 0
+  var h = Math.floor(total / 3600)
+  var m = Math.floor((total % 3600) / 60)
+  var s = total % 60
+  var tail = Format.pad2(m) + ":" + Format.pad2(s)
+  return h > 0 ? h + ":" + tail : tail
+}
+
 // Countdown readout -> "1h 2m 3s" / "2m 5s" / "0s".
 // Canonical home of Timer.qml formatDuration. Floor semantics: a
 // countdown shows whole seconds remaining, never a fraction.
@@ -90,6 +104,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     formatDuration: formatDuration,
     formatClock: formatClock,
+    formatTrackClock: formatTrackClock,
     formatVerboseDuration: formatVerboseDuration,
     formatMediaDuration: formatMediaDuration
   }
