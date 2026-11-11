@@ -71,6 +71,20 @@ function _home_dir() {
   }
   return h
 }
+// The value of an environment variable, with the XDG directory defaults
+// spelled out for a session that has not exported them yet.
+function _env_or_xdg(name) {
+  let v = _get_env(name)
+  if (!v) {
+    const home = _home_dir()
+    if (name === "XDG_CONFIG_HOME" && home) v = home + "/.config"
+    else if (name === "XDG_STATE_HOME" && home) v = home + "/.local/state"
+    else if (name === "XDG_CACHE_HOME" && home) v = home + "/.cache"
+    else if (name === "XDG_DATA_HOME" && home) v = home + "/.local/share"
+  }
+  return v
+}
+
 function expand_path(path) {
   let p = String(path)
   // ~ expansion with HOME fallback
@@ -83,25 +97,11 @@ function expand_path(path) {
   }
   // ${VAR} first - with XDG fallbacks
   p = p.replace(/\${([A-Za-z_][A-Za-z0-9_]*)}/g, (m, name) => {
-    let v = _get_env(name)
-    if (!v) {
-      const home = _home_dir()
-      if (name === "XDG_CONFIG_HOME" && home) v = home + "/.config"
-      else if (name === "XDG_STATE_HOME" && home) v = home + "/.local/state"
-      else if (name === "XDG_CACHE_HOME" && home) v = home + "/.cache"
-      else if (name === "XDG_DATA_HOME" && home) v = home + "/.local/share"
-    }
+    const v = _env_or_xdg(name)
     return v ? v : "${" + name + "}"
   })
   p = p.replace(/\$([A-Za-z_][A-Za-z0-9_]*)/g, (m, name) => {
-    let v = _get_env(name)
-    if (!v) {
-      const home = _home_dir()
-      if (name === "XDG_CONFIG_HOME" && home) v = home + "/.config"
-      else if (name === "XDG_STATE_HOME" && home) v = home + "/.local/state"
-      else if (name === "XDG_CACHE_HOME" && home) v = home + "/.cache"
-      else if (name === "XDG_DATA_HOME" && home) v = home + "/.local/share"
-    }
+    const v = _env_or_xdg(name)
     return v ? v : "$" + name
   })
   return p
