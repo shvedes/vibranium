@@ -986,8 +986,9 @@ Item {
     // are owed another turn; the ids that failed are the only ones a turn has
     // actually proved something about.
     let cutShort = false
-    while (boot._replayQueue.length > 0) {
-      const id = boot._replayQueue.shift()
+    let head = 0
+    while (head < boot._replayQueue.length) {
+      const id = boot._replayQueue[head++]
       let resolved = false
       try {
         resolved = boot._resolveLateNow(id)
@@ -1001,11 +1002,12 @@ Item {
         pending.push(id)
       }
       if (Date.now() >= deadline) {
-        cutShort = boot._replayQueue.length > 0
+        cutShort = head < boot._replayQueue.length
         break
       }
     }
-    boot._replayQueue = pending.concat(boot._replayQueue)
+    // Whatever the turn never reached, behind the ids that failed.
+    boot._replayQueue = pending.concat(boot._replayQueue.slice(head))
     if (boot._replayQueue.length > 0) {
       // A turn that ran out of frame budget never looked at what it left, so it
       // comes back for it even when the last half has already settled: the
@@ -1319,8 +1321,10 @@ Item {
     boot._refreshingReadiness = true
     try {
       const worklist = [id]
-      while (worklist.length > 0) {
-        const refreshedId = worklist.shift()
+      // Cursor: the cascade only appends, and every dependent it appends is
+      // visited once.
+      for (let head = 0; head < worklist.length; head++) {
+        const refreshedId = worklist[head]
         UnitGate.refresh(refreshedId)
         const dependentIds = boot._dependents[refreshedId] || []
         for (let k = 0; k < dependentIds.length; k++) {
@@ -1663,10 +1667,20 @@ Item {
   // Returns nothing; callers own the queue and the rescheduling.
   function _budgetedTurn(queue) {
     const deadline = Date.now() + boot.frameBudgetMs
-    while (queue.length > 0) {
-      boot._drainOne(queue.shift())
+    // A cursor, not shift(): a drain is one element per unit of a queue that
+    // may hold the whole catalog, and shift() moves the rest of it per unit.
+    // _drainOne can push onto the same queue (the dependency cascade), and
+    // reading the length each step picks those up exactly as shifting did.
+    let head = 0
+    while (head < queue.length) {
+      boot._drainOne(queue[head++])
       if (Date.now() >= deadline) break
     }
+    // Hand it back holding only what this turn never reached: the callers
+    // decide by its length whether to reschedule, so a consumed head left in
+    // place would look like work still owed. One splice per turn, not a move
+    // per unit.
+    if (head > 0) queue.splice(0, head)
   }
 
   // The early tier: units that exist to answer or to keep machine state (the
