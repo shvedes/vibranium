@@ -29,6 +29,7 @@ const AUDIO_QML = fs.readFileSync(path.join(SHELL_DIR, 'services', 'audio', 'Aud
 const FNS = [
   '_scheduleLoopback',
   '_reconcileLoopback',
+  '_loopbackSuperseded',
   '_readLoopbackPorts',
   '_reconcileLinks',
   '_readLoopback',
