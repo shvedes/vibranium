@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQml
 import Quickshell
 import Quickshell.Io
+import "../collections/EntryMap.js" as EntryMap
 
 // DocumentAdoption - ONE read of a document, many observers, once.
 //
@@ -217,15 +218,11 @@ Singleton {
         revision: entry.revision
       }
     }
-    const next = Object.assign({}, root._entries)
-    next[path] = entry
-    root._entries = next
+    root._entries = EntryMap.withEntry(root._entries, path, entry)
   }
 
   function _store(path, entry) {
-    const next = Object.assign({}, root._entries)
-    next[path] = entry
-    root._entries = next
+    root._entries = EntryMap.withEntry(root._entries, path, entry)
   }
 
   // The single reader per path. A loaded and a failed read are only "the

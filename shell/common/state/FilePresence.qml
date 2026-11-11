@@ -5,6 +5,7 @@ import QtQml
 import Quickshell
 import Quickshell.Io
 import qs.common
+import "../collections/EntryMap.js" as EntryMap
 
 // FilePresence - ONE watched path, ONE watcher, many observers.
 //
@@ -270,15 +271,11 @@ Singleton {
       if (handle === null || handle === undefined) continue
       handle.trackState = { present: entry.present, revision: entry.revision }
     }
-    const next = Object.assign({}, root._entries)
-    next[path] = entry
-    root._entries = next
+    root._entries = EntryMap.withEntry(root._entries, path, entry)
   }
 
   function _store(path, entry) {
-    const next = Object.assign({}, root._entries)
-    next[path] = entry
-    root._entries = next
+    root._entries = EntryMap.withEntry(root._entries, path, entry)
   }
 
   // The single watcher per path. Every watcher event - including a failed
