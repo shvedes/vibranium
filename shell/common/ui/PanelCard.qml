@@ -613,8 +613,8 @@ Rectangle {
         // Ceiled: the column is a whole number of pixels inside an int card
         // width, so a fractional advance that is not rounded up lands the line
         // a pixel over the column reserved for it and the Text elides.
-        w += Math.min(Math.ceil(Math.max(measureLabel.implicitWidth,
-          measureSub.implicitWidth)), root._maxLabelW)
+        w += Range.clamp(Math.ceil(Math.max(measureLabel.implicitWidth,
+          measureSub.implicitWidth)), 0, root._maxLabelW)
         maxRow = Math.max(maxRow, w)
       }
       root.contentW = Math.max(maxRow, root.baseWidth)
