@@ -604,11 +604,16 @@ Singleton {
     const row = { minutes: prev.minutes, action: a }
     if (a === "command") {
       row.command = prev.command !== undefined ? prev.command : ""
-      const declared = String(prev.commandClass ?? "")
-      if (declared === "lock" || declared === "suspend")
-        row.commandClass = declared
+      const declared = root._declaredClass(prev)
+      if (declared !== "") row.commandClass = declared
     }
     return root._commitRow(i, row)
+  }
+
+  // The class a command row may keep: only lock and suspend gate the timer.
+  function _declaredClass(row) {
+    const c = String(row.commandClass ?? "")
+    return c === "lock" || c === "suspend" ? c : ""
   }
 
   // The row index `index` names, or -1 when it names no timer.
@@ -631,8 +636,8 @@ Singleton {
     }
     const prev = root.timers[i]
     const row = { minutes: prev.minutes, action: "command", command: c }
-    const declared = String(prev.commandClass ?? "")
-    if (declared === "lock" || declared === "suspend") row.commandClass = declared
+    const declared = root._declaredClass(prev)
+    if (declared !== "") row.commandClass = declared
     return root._commitRow(i, row)
   }
 
