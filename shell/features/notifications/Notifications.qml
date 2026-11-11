@@ -681,21 +681,11 @@ Singleton {
   // draws rather than off `_tracked`, so `status` reports the visual order
   // and not the storage order.
   function _pileSummaries() {
-    const out = []
-    for (let i = 0; i < root.pile.length; i++) {
-      const shot = root.pile[i] ? root.pile[i].snapshot : null
-      out.push(shot && shot.summary !== undefined ? String(shot.summary) : "")
-    }
-    return out
+    return NotificationsLib.pileSummaries(root.pile)
   }
 
   function _entryById(id) {
-    const wanted = Number(id)
-    if (!isFinite(wanted)) return null
-    for (let i = 0; i < root._tracked.length; i++) {
-      if (Number(root._tracked[i].notifId) === wanted) return root._tracked[i]
-    }
-    return null
+    return NotificationsLib.entryById(root._tracked, id)
   }
 
   // The pile's geometry: one card's y, in the view's coordinates.

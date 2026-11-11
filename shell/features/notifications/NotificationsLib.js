@@ -337,6 +337,32 @@ function pileGeometry(cards, spacing) {
   return { byId: byId, total: list.length === 0 ? 0 : y - step }
 }
 
+// One tracked entry by notification id, or null. The id is the server id,
+// which is what a card action and an IPC verb name; a non-numeric id is no
+// entry rather than a scan for NaN.
+function entryById(tracked, id) {
+  const wanted = Number(id)
+  if (!isFinite(wanted)) return null
+  const list = Array.isArray(tracked) ? tracked : []
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] && Number(list[i].notifId) === wanted) return list[i]
+  }
+  return null
+}
+
+// The pile's summaries top to bottom, read off the drawn pile rather than the
+// storage order. A card without a snapshot contributes the empty string, which
+// keeps the index space aligned with the pile.
+function pileSummaries(pile) {
+  const list = Array.isArray(pile) ? pile : []
+  const out = []
+  for (let i = 0; i < list.length; i++) {
+    const shot = list[i] ? list[i].snapshot : null
+    out.push(shot && shot.summary !== undefined ? String(shot.summary) : "")
+  }
+  return out
+}
+
 function pushHistory(history, snapshot, limit) {
   const list = Array.isArray(history) ? history.slice() : []
   const cap = Number(limit)

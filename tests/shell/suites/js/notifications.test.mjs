@@ -286,4 +286,27 @@ group('the offsets are the stack of card heights and gaps', () => {
   eq('a null card takes its gap but writes no offset', Object.keys(NL.pileGeometry([null, { notifId: 6, cardHeight: 8 }], 4).byId), ['6'])
 })
 
+section('entryById / pileSummaries - the tracked and drawn lookups')
+group('entryById resolves a server id, never NaN', () => {
+  const tracked = [{ notifId: 3, summary: 'a' }, { notifId: '7', summary: 'b' }]
+  eq('a numeric hit', NL.entryById(tracked, 3).summary, 'a')
+  eq('a numeric string id still matches', NL.entryById(tracked, 7).summary, 'b')
+  eq('a miss', NL.entryById(tracked, 9), null)
+  eq('a non-numeric id', NL.entryById(tracked, 'x'), null)
+  eq('a null id is no entry', NL.entryById(tracked, null), null)
+  eq('a null list', NL.entryById(null, 3), null)
+  eq('a null row is skipped', NL.entryById([null, { notifId: 1 }], 1).notifId, 1)
+})
+
+group('pileSummaries reads the drawn order', () => {
+  eq('top to bottom', NL.pileSummaries([
+    { snapshot: { summary: 'first' } }, { snapshot: { summary: 'second' } },
+  ]), ['first', 'second'])
+  eq('a missing summary is empty', NL.pileSummaries([{ snapshot: {} }]), [''])
+  eq('a missing snapshot is empty', NL.pileSummaries([null]), [''])
+  eq('an empty pile', NL.pileSummaries([]), [])
+  eq('a non-array pile', NL.pileSummaries(null), [])
+  eq('a numeric summary is stringified', NL.pileSummaries([{ snapshot: { summary: 7 } }]), ['7'])
+})
+
 finish()
