@@ -3,6 +3,7 @@ pragma Singleton
 import Quickshell
 import qs.common
 import "../text/StringUtils.js" as SU
+import "../collections/StoreGuards.js" as StoreGuards
 
 Singleton {
   id: root
@@ -139,6 +140,6 @@ Singleton {
   }
 
   function _validProvider(provider) {
-    return provider !== null && typeof provider === "object" && !Array.isArray(provider)
+    return StoreGuards.isPlainObject(provider)
   }
 }
