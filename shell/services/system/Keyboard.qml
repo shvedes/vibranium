@@ -46,9 +46,19 @@ Singleton {
 
   function feedDevices(line) {
     root.deviceBuf += line + "\n"
+    // A j/devices reply is one JSON document across many parser lines, and the
+    // only completion signal is a parse that succeeds. Attempting it per line
+    // re-parsed the growing prefix once per line (quadratic in the reply), so
+    // the attempt is gated on the buffer's last non-space byte closing the
+    // document. Inner lines end on a key, a comma or an opener, never on a
+    // closer.
+    const trimmed = root.deviceBuf.replace(/\s+$/, "")
+    if (trimmed === "") return
+    const last = trimmed.charAt(trimmed.length - 1)
+    if (last !== "}" && last !== "]") return
     let data
     try {
-      data = JSON.parse(root.deviceBuf)
+      data = JSON.parse(trimmed)
     } catch (e) {
       return // reply still incomplete
     }
