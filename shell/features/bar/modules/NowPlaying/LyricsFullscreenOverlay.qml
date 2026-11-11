@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 // qmllint disable signal-handler-parameters
 import QtQuick
+import QtQuick.Effects
 import Quickshell
 import Quickshell.Wayland
 import Quickshell.Services.Mpris
@@ -16,9 +17,11 @@ import "../../../../common/math/Range.js" as Range
 // binding to it.
 //
 // The composition is ratio-driven rather than pixel-driven, so 16:9, 16:10
-// and 3:2 outputs all read the same: a cover column on the left with the seek
-// lane under it, and the synced transcript filling the rest. The cover box is
-// derived from the cover's own aspect ratio and centred in its column, so a
+// and 3:2 outputs all read the same: a cover column on the left with the three
+// transport pads and the seek lane centred under it, and the synced transcript
+// running the full height of the screen on the right, its top and bottom edges
+// blurred. The cover box is derived from the cover's own aspect ratio, drawn
+// at 97.75% of the fit its column allows, and centred in the column, so a
 // portrait or wide cover is neither cropped nor left in a letterbox.
 //
 // Esc or the corner minimizer closes it. Right-clicking the island's artwork
@@ -67,17 +70,6 @@ PanelWindow {
   // capability the client publishes false refuses the write and dims its pad.
   readonly property bool hasTrack: root.player !== null
     && String(root.player.trackTitle ?? "") !== ""
-  readonly property bool shuffling: root.player !== null ? (root.player.shuffle ?? false) : false
-  readonly property bool looping: root.player !== null && root.player.loopState !== undefined
-    && root.player.loopState !== MprisLoopState.None
-  readonly property bool loopOne: root.player !== null
-    && root.player.loopState === MprisLoopState.Track
-  readonly property bool canShuffle: root.player !== null
-    && root.player.canControl !== false
-    && root.player.shuffleSupported !== false
-  readonly property bool canLoop: root.player !== null
-    && root.player.canControl !== false
-    && root.player.loopSupported !== false
   readonly property bool canTogglePlaying: root.player !== null
     && root.player.canTogglePlaying !== false
   property real shownPosition: 0
@@ -190,20 +182,6 @@ PanelWindow {
     if (!root.hasTrack || root.player?.canGoNext === false) return
     NP.noteManual("next")
     root.player?.next()
-  }
-
-  function toggleShuffle() {
-    if (!root.canShuffle) return
-    root.player.shuffle = !root.shuffling
-  }
-
-  // none -> repeat-all -> repeat-one -> none, the island's cycle.
-  function cycleLoop() {
-    if (!root.canLoop) return
-    root.player.loopState = root.player.loopState === MprisLoopState.None
-      ? MprisLoopState.Playlist
-      : (root.player.loopState === MprisLoopState.Playlist
-        ? MprisLoopState.Track : MprisLoopState.None)
   }
 
   onOpenedChanged: {
@@ -385,13 +363,25 @@ PanelWindow {
     // landed yet is treated as square, which is what the shipped art is.
     readonly property real artAspect: art.status === Image.Ready && art.implicitHeight > 0
       ? art.implicitWidth / art.implicitHeight : 1
-    readonly property real coverBoxW: Range.clamp(artMaxH * artAspect, 0, coverW)
+    // The cover sits at 97.75% of the fit its column and height allow, which
+    // is the size the transport and the seek lane are measured from.
+    readonly property real artScale: 0.9775
+    readonly property real coverBoxW: Range.clamp(artMaxH * artAspect, 0, coverW) * artScale
     readonly property real coverBoxH: artAspect > 0 ? coverBoxW / artAspect : coverBoxW
     // Cover, transport and lane are one group centred in the column: a short
     // wide cover leaves no gap above the pads, and a tall one does not push
     // them off the bottom.
     readonly property real stackH: coverBoxH + padSlot + progressH + 2 * stackGap
     readonly property real stackY: pad + Math.max(0, Math.round((availH - stackH) / 2))
+    // The blur bands run from each screen edge past the artwork's top and
+    // bottom edges, so they are taller than the cover's own level on the
+    // transcript side. Fractions of the surface height, because the masks
+    // below span the whole surface; the caps keep a sharp centre of at least
+    // 20%.
+    readonly property real blurTop: Math.min(0.40,
+      content.stackY / Math.max(1, height) + 0.10)
+    readonly property real blurBottom: Math.max(0.60,
+      (content.stackY + content.coverBoxH) / Math.max(1, height) - 0.10)
 
     Rectangle {
       id: artFrame
@@ -484,9 +474,8 @@ PanelWindow {
       }
     }
 
-    // Transport: shuffle, previous, play/pause, next, loop. The island's pad
-    // row minus the player switching and the mode pad, at a size that belongs
-    // on this surface rather than in the bar.
+    // Transport: previous, play/pause, next - centred under the cover at a
+    // size that belongs on this surface rather than in the bar.
     Row {
       id: controlsRow
 
@@ -494,19 +483,6 @@ PanelWindow {
       y: content.stackY + content.coverBoxH + content.stackGap
       height: content.padSlot
       spacing: Math.round(content.padSlot * 0.22)
-
-      IconButton {
-        name: "shuffle"
-        iconSize: content.padIcon
-        slotSize: content.padSlot
-        flat: true
-        cornerRadius: RoundingPolicy.radius
-        colorKey: root.shuffling ? "accent" : "foreground_0"
-        animationsEnabled: root.animOn
-        actionable: root.canShuffle
-        opacity: root.canShuffle ? 1 : 0.4
-        onClicked: root.toggleShuffle()
-      }
 
       IconButton {
         name: "skip-back"
@@ -543,30 +519,18 @@ PanelWindow {
         opacity: root.hasTrack ? 1 : 0.4
         onClicked: root.nextTrack()
       }
-
-      IconButton {
-        name: root.loopOne ? "repeat-1" : "repeat"
-        iconSize: content.padIcon
-        slotSize: content.padSlot
-        flat: true
-        cornerRadius: RoundingPolicy.radius
-        colorKey: root.looping ? "accent" : "foreground_0"
-        animationsEnabled: root.animOn
-        actionable: root.canLoop
-        opacity: root.canLoop ? 1 : 0.4
-        onClicked: root.cycleLoop()
-      }
     }
 
     // Elapsed, seek lane, total: the island's lane contract under the cover,
-    // at presentation scale.
+    // at presentation scale. The block is 70% of the artwork's width and
+    // centred on it, which leaves ~15% of free space on each side.
     Item {
       id: progressBlock
 
-      x: content.pad
+      x: content.pad + Math.round((content.coverW - width) / 2)
       y: content.stackY + content.coverBoxH + content.stackGap
         + content.padSlot + content.stackGap
-      width: content.coverW
+      width: Math.round(content.coverBoxW * 0.7)
       height: content.progressH
 
       TextMetrics {
@@ -706,13 +670,16 @@ PanelWindow {
       }
     }
 
+    // The transcript is not a box beside the cover: it runs the full height of
+    // the screen, so the cue under the playhead stays centred while the lines
+    // above and below it reach the edges.
     Item {
       id: lyricsSide
 
       x: content.lyricsX
-      y: content.pad
+      y: 0
       width: content.lyricsW
-      height: content.availH
+      height: root.height
       // Track-switch entrance: the transcript fades in place while the cover
       // crossfades, so a switch reads as one new track rather than one
       // element swapping.
@@ -725,7 +692,14 @@ PanelWindow {
         // state above it says the same thing at presentation scale. With a
         // translucent backdrop that line would read through the cover, so the
         // pane steps out of the way while a cover is over it.
-        opacity: pane.status === "none" || !root.hasTrack ? 0 : 1
+        //
+        // A ready transcript is painted by the effect passes below: the pane
+        // is their capture source, kept at zero opacity so the sharp and
+        // blurred copies are the only transcript on screen. Zero (not
+        // invisible): the item still renders for the capture and still takes
+        // the reader's scroll and taps. Loading and error text stay on the
+        // pane itself.
+        opacity: pane.ready ? 0 : (pane.status === "none" || !root.hasTrack ? 0 : 1)
         player: root.player
         position: root.shownPosition
         active: root.opened
@@ -812,6 +786,156 @@ PanelWindow {
         function onTrackKeyChanged() {
           if (root.opened) trackSwap.restart()
         }
+      }
+    }
+
+    // Edge blur: the transcript is painted from the pane (its capture source,
+    // see its opacity) in four passes. The sharp copy fills the centre; the
+    // three blurred copies stack toward each screen edge with a different
+    // radius, each masked to a shorter band than the one below it. The result
+    // is a gradient of blur strength: light where the transcript meets the
+    // sharp centre, heavy at the edge, with no sharp text left underneath.
+    // The masks are the house MultiEffect idiom: hidden rectangles whose
+    // alpha ramps, softened by the threshold spread.
+    MultiEffect {
+      id: lyricsSharp
+
+      anchors.fill: lyricsSide
+      visible: root.opened && pane.ready
+      opacity: lyricsSide.opacity
+      source: pane
+      autoPaddingEnabled: false
+      maskEnabled: true
+      maskSource: lyricsSharpMask
+      maskThresholdMin: 0.5
+      maskSpreadAtMin: 0.5
+    }
+
+    MultiEffect {
+      id: lyricsBlurLight
+
+      anchors.fill: lyricsSide
+      visible: root.opened && pane.ready
+      opacity: lyricsSide.opacity
+      source: pane
+      autoPaddingEnabled: false
+      blurEnabled: true
+      blur: 0.3
+      blurMax: 32
+      maskEnabled: true
+      maskSource: lyricsBlurLightMask
+      maskThresholdMin: 0.5
+      maskSpreadAtMin: 0.5
+    }
+
+    MultiEffect {
+      id: lyricsBlurMedium
+
+      anchors.fill: lyricsSide
+      visible: root.opened && pane.ready
+      opacity: lyricsSide.opacity
+      source: pane
+      autoPaddingEnabled: false
+      blurEnabled: true
+      blur: 0.6
+      blurMax: 32
+      maskEnabled: true
+      maskSource: lyricsBlurMediumMask
+      maskThresholdMin: 0.5
+      maskSpreadAtMin: 0.5
+    }
+
+    MultiEffect {
+      id: lyricsBlurHeavy
+
+      anchors.fill: lyricsSide
+      visible: root.opened && pane.ready
+      opacity: lyricsSide.opacity
+      source: pane
+      autoPaddingEnabled: false
+      blurEnabled: true
+      blur: 0.95
+      blurMax: 32
+      maskEnabled: true
+      maskSource: lyricsBlurHeavyMask
+      maskThresholdMin: 0.5
+      maskSpreadAtMin: 0.5
+    }
+
+    // Sharp centre: full between the bands, gone where the light blur takes
+    // over.
+    Rectangle {
+      id: lyricsSharpMask
+
+      anchors.fill: lyricsSide
+      visible: false
+      layer.enabled: true
+      layer.smooth: true
+
+      gradient: Gradient {
+        GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 0) }
+        GradientStop { position: content.blurTop * 0.7; color: Qt.rgba(1, 1, 1, 0) }
+        GradientStop { position: content.blurTop; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: content.blurBottom; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.3; color: Qt.rgba(1, 1, 1, 0) }
+        GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 0) }
+      }
+    }
+
+    // Light blur: the whole band, handing over from the sharp copy.
+    Rectangle {
+      id: lyricsBlurLightMask
+
+      anchors.fill: lyricsSide
+      visible: false
+      layer.enabled: true
+      layer.smooth: true
+
+      gradient: Gradient {
+        GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: content.blurTop * 0.7; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: content.blurTop; color: Qt.rgba(1, 1, 1, 0) }
+        GradientStop { position: content.blurBottom; color: Qt.rgba(1, 1, 1, 0) }
+        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.3; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 1) }
+      }
+    }
+
+    // Medium blur: the outer two-thirds of the band.
+    Rectangle {
+      id: lyricsBlurMediumMask
+
+      anchors.fill: lyricsSide
+      visible: false
+      layer.enabled: true
+      layer.smooth: true
+
+      gradient: Gradient {
+        GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: content.blurTop * 0.3; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: content.blurTop * 0.65; color: Qt.rgba(1, 1, 1, 0) }
+        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.35; color: Qt.rgba(1, 1, 1, 0) }
+        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.7; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 1) }
+      }
+    }
+
+    // Heavy blur: the outer edge, where the transcript leaves the screen.
+    Rectangle {
+      id: lyricsBlurHeavyMask
+
+      anchors.fill: lyricsSide
+      visible: false
+      layer.enabled: true
+      layer.smooth: true
+
+      gradient: Gradient {
+        GradientStop { position: 0; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: content.blurTop * 0.12; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: content.blurTop * 0.45; color: Qt.rgba(1, 1, 1, 0) }
+        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.55; color: Qt.rgba(1, 1, 1, 0) }
+        GradientStop { position: content.blurBottom + (1 - content.blurBottom) * 0.88; color: Qt.rgba(1, 1, 1, 1) }
+        GradientStop { position: 1; color: Qt.rgba(1, 1, 1, 1) }
       }
     }
 
