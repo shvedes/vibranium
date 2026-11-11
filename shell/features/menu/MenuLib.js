@@ -1472,16 +1472,9 @@ function search(index, query) {
   // set stays complete either way, because the incremental branch above scans
   // it - anything past the cap is one more keystroke away, never one lost.
   const capLen = q.length >= 5 ? 200 : 40 * q.length
-  const cap = m > capLen ? capLen : m
-  const out = new Array(cap)
-  if (m === 1) {
-    out[0] = hitEntries[0]
-  } else if (m > 1) {
-    const order = new Array(m)
-    for (let i = 0; i < m; i++) order[i] = i
-    order.sort((a, b) => hitScores[b] - hitScores[a] || a - b)
-    for (let i = 0; i < cap; i++) out[i] = hitEntries[order[i]]
-  }
+  // Rank only the returned window. The shared ranking's score/scan-order
+  // tiebreak is exactly the comparator the full sort spelled out here.
+  const out = LauncherLib.SearchPlumbing.rankTop(hitEntries, hitScores, capLen, null)
 
   _searchCacheIndex = index
   _searchCacheLen = index.length

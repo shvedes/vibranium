@@ -152,6 +152,91 @@ function orderHits(hitRecs, hitScores, tiebreak) {
   return order
 }
 
+// Top-`cap` hits in rank order: descending score, then the caller's tiebreak,
+// then scan order. Filtering an unchanged pool still scans every row, but
+// only a cap-sized window is ever shown, and a one-character query matches
+// most of a large pool; sorting every hit to return eight of them is work the
+// user never sees. A bounded worst-of-the-best heap keeps the cap best hits in
+// O(n log cap) and materializes only those rows. The full sort remains for a
+// cap that is a large share of the hits, where the heap's bookkeeping costs
+// more than it saves.
+//
+// The tiebreak is evaluated once per hit rather than once per comparison: it
+// is a caller function and the comparator would otherwise call it n log n
+// times. Ties fall back to scan order, exactly as orderHits does, so the two
+// rankings agree on every input.
+function rankTop(hitRecs, hitScores, cap, tiebreak) {
+  const n = hitRecs.length
+  // A cap of 0 is an empty window, not an absent one: callers that mean
+  // "everything" pass the hit count or nothing at all.
+  const want = cap === undefined || cap === null ? n : Math.floor(Number(cap))
+  if (!isFinite(want) || want <= 0 || n === 0) return []
+  // One hit has nothing to rank: a sort of length one never invokes its
+  // comparator, so neither does this, and a throwing tiebreak still answers
+  // the single row the caller asked for.
+  if (n === 1) return [hitRecs[0]]
+  const limit = want < n ? want : n
+  const tb = typeof tiebreak === "function" ? tiebreak : null
+  const tie = tb === null ? null : new Array(n)
+  if (tb !== null) {
+    for (let i = 0; i < n; i++) {
+      const v = Number(tb(hitRecs[i]))
+      tie[i] = isFinite(v) ? v : 0
+    }
+  }
+  const before = (a, b) => {
+    if (hitScores[a] !== hitScores[b]) return hitScores[a] > hitScores[b]
+    if (tie !== null && tie[a] !== tie[b]) return tie[a] > tie[b]
+    return a < b
+  }
+  if (limit * 8 >= n) {
+    const order = new Array(n)
+    for (let i = 0; i < n; i++) order[i] = i
+    order.sort((a, b) => (before(a, b) ? -1 : 1))
+    const out = new Array(limit)
+    for (let i = 0; i < limit; i++) out[i] = hitRecs[order[i]]
+    return out
+  }
+  // Heap property: the root ranks LAST among the current best. A candidate
+  // replaces the root only when it ranks before it, so a tie keeps the earlier
+  // scan position, which is the full sort's tiebreak too.
+  const heap = []
+  const swap = (i, j) => { const t = heap[i]; heap[i] = heap[j]; heap[j] = t }
+  const siftUp = (pos) => {
+    while (pos > 0) {
+      const parent = (pos - 1) >> 1
+      if (!before(heap[parent], heap[pos])) break
+      swap(parent, pos)
+      pos = parent
+    }
+  }
+  const siftDown = (pos) => {
+    for (;;) {
+      const left = pos * 2 + 1
+      if (left >= heap.length) break
+      const right = left + 1
+      let worst = left
+      if (right < heap.length && before(heap[left], heap[right])) worst = right
+      if (!before(heap[pos], heap[worst])) break
+      swap(pos, worst)
+      pos = worst
+    }
+  }
+  for (let i = 0; i < n; i++) {
+    if (heap.length < limit) {
+      heap.push(i)
+      siftUp(heap.length - 1)
+    } else if (before(i, heap[0])) {
+      heap[0] = i
+      siftDown(0)
+    }
+  }
+  heap.sort((a, b) => (before(a, b) ? -1 : 1))
+  const out = new Array(heap.length)
+  for (let i = 0; i < heap.length; i++) out[i] = hitRecs[heap[i]]
+  return out
+}
+
 // Generic {total, matched, rows} shell over a records-style search.
 // -> searchFn(pool, query, cap, tiebreak) answers {rows, count}; blank
 // -> queries slice the pool and never reach it, so `matched` is the true
