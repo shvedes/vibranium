@@ -16,6 +16,7 @@
 .pragma library
 
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 .import "../../common/text/SearchLib.js" as SL
 // File-opener rows reuse the Clipboard component's extension -> icon
 // mapping verbatim, so a pasted path shows the same glyph it would show
@@ -365,7 +366,7 @@ function buildPluginConfigs(dirs, persisted, readMeta) {
 // entries that name an id, in file order. Settings is the controller's to
 // read; what a section MEANS is here.
 function persistedPluginList(section) {
-  const list = section && Array.isArray(section.plugins) ? section.plugins : []
+  const list = StoreGuards.asList(section && section.plugins)
   return list.filter(p => p && typeof p.id === "string")
 }
 
@@ -1181,7 +1182,7 @@ function tryExecScanArgv(roots, binDir) {
     "exit 0"
   ].join("\n")
   const argv = ["/bin/bash", "-c", script, "tryexec", String(binDir ?? "")]
-  const list = Array.isArray(roots) ? roots : []
+  const list = StoreGuards.asList(roots)
   for (let i = 0; i < list.length; i++) argv.push(String(list[i]))
   return argv
 }
@@ -1262,8 +1263,8 @@ function binariesVerdict(out) {
 // PATH order is deterministic, so two scans of the same PATH print the same
 // sequence, and an index-wise comparison is the honest shape of that.
 function sameNameSet(a, b) {
-  const x = Array.isArray(a) ? a : []
-  const y = Array.isArray(b) ? b : []
+  const x = StoreGuards.asList(a)
+  const y = StoreGuards.asList(b)
   if (x.length !== y.length) return false
   for (let i = 0; i < x.length; i++) {
     if (x[i] !== y[i]) return false
