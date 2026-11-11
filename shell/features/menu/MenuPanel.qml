@@ -8,7 +8,6 @@ import qs.features.menu
 import "MenuLib.js" as MenuLib
 import "MenuLayout.js" as MenuLayout
 import "../../common/math/Range.js" as Range
-import "../../common/text/EditUtils.js" as EditUtils
 import "../../common/ui/RowMetrics.js" as RowMetrics
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
 
