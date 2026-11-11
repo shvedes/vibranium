@@ -45,6 +45,54 @@ Item {
     horizontalAlignment: Text.AlignRight
   }
 
+  // One metrics cell: the live value, the loading skeleton while no sample
+  // has landed, and the "--" placeholder once the sampler has reported
+  // against a link that is down. skeletonIndex staggers the pulse so the
+  // four cells travel instead of blinking as one block.
+  component MetricCell: Item {
+    id: metricCell
+
+    property string value: ""
+    property int skeletonIndex: 0
+
+    readonly property bool loading: !root.hasStats && !root._wifiOff
+    readonly property bool placeholder: !root.metricsLive && (root.hasStats || root._wifiOff)
+
+    Layout.preferredWidth: root.metricValueWidth
+    Layout.preferredHeight: 8
+
+    MetricValue {
+      visible: root.metricsLive
+      text: metricCell.value
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+    }
+
+    Rectangle {
+      visible: metricCell.loading
+      width: parent.width * 0.7
+      height: 8
+      radius: RoundingPolicy.radius
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+      color: Ui.tint("foreground_1", 0.14)
+      opacity: 0.55
+      SequentialAnimation on opacity {
+        loops: Animation.Infinite
+        running: metricCell.loading
+        SkeletonPulse { index: metricCell.skeletonIndex }
+      }
+    }
+
+    MetricValue {
+      visible: metricCell.placeholder
+      text: "--"
+      color: Ui.tint("foreground_1", 0.6)
+      anchors.right: parent.right
+      anchors.verticalCenter: parent.verticalCenter
+    }
+  }
+
   // Widest value that can appear, measured once via a hidden probe so the
   // value column is static regardless of the font in use.
   readonly property real metricValueWidth: Math.round(metricProbe.implicitWidth)
@@ -1075,96 +1123,16 @@ Item {
           rowSpacing: Ui.s
 
           MetricLabel { text: "Receiving" }
-        Item {
-          Layout.preferredWidth: root.metricValueWidth
-          Layout.preferredHeight: 8
-          MetricValue { visible: root.metricsLive; text: Model.formatRate(root.downloadRate); anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
-          Rectangle {
-            visible: !root.hasStats && !root._wifiOff
-            width: parent.width * 0.7
-            height: 8
-            radius: RoundingPolicy.radius
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            color: Ui.tint("foreground_1", 0.14)
-            opacity: 0.55
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: !root.hasStats && !root._wifiOff
-              SkeletonPulse { index: 0 }
-            }
-          }
-          MetricValue { visible: !root.metricsLive && (root.hasStats || root._wifiOff); text: "--"; color: Ui.tint("foreground_1", 0.6); anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
-        }
+          MetricCell { value: Model.formatRate(root.downloadRate); skeletonIndex: 0 }
 
-        MetricLabel { text: "Sending" }
-        Item {
-          Layout.preferredWidth: root.metricValueWidth
-          Layout.preferredHeight: 8
-          MetricValue { visible: root.metricsLive; text: Model.formatRate(root.uploadRate); anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
-          Rectangle {
-            visible: !root.hasStats && !root._wifiOff
-            width: parent.width * 0.7
-            height: 8
-            radius: RoundingPolicy.radius
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            color: Ui.tint("foreground_1", 0.14)
-            opacity: 0.55
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: !root.hasStats && !root._wifiOff
-              SkeletonPulse { index: 1 }
-            }
-          }
-          MetricValue { visible: !root.metricsLive && (root.hasStats || root._wifiOff); text: "--"; color: Ui.tint("foreground_1", 0.6); anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
-        }
+          MetricLabel { text: "Sending" }
+          MetricCell { value: Model.formatRate(root.uploadRate); skeletonIndex: 1 }
 
-        MetricLabel { text: "Downloaded" }
-        Item {
-          Layout.preferredWidth: root.metricValueWidth
-          Layout.preferredHeight: 8
-          MetricValue { visible: root.metricsLive; text: Model.formatBytes(root.totalRxBytes); anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
-          Rectangle {
-            visible: !root.hasStats && !root._wifiOff
-            width: parent.width * 0.7
-            height: 8
-            radius: RoundingPolicy.radius
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            color: Ui.tint("foreground_1", 0.14)
-            opacity: 0.55
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: !root.hasStats && !root._wifiOff
-              SkeletonPulse { index: 2 }
-            }
-          }
-          MetricValue { visible: !root.metricsLive && (root.hasStats || root._wifiOff); text: "--"; color: Ui.tint("foreground_1", 0.6); anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
-        }
+          MetricLabel { text: "Downloaded" }
+          MetricCell { value: Model.formatBytes(root.totalRxBytes); skeletonIndex: 2 }
 
-        MetricLabel { text: "Uploaded" }
-        Item {
-          Layout.preferredWidth: root.metricValueWidth
-          Layout.preferredHeight: 8
-          MetricValue { visible: root.metricsLive; text: Model.formatBytes(root.totalTxBytes); anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
-          Rectangle {
-            visible: !root.hasStats && !root._wifiOff
-            width: parent.width * 0.7
-            height: 8
-            radius: RoundingPolicy.radius
-            anchors.right: parent.right
-            anchors.verticalCenter: parent.verticalCenter
-            color: Ui.tint("foreground_1", 0.14)
-            opacity: 0.55
-            SequentialAnimation on opacity {
-              loops: Animation.Infinite
-              running: !root.hasStats && !root._wifiOff
-              SkeletonPulse { index: 3 }
-            }
-          }
-          MetricValue { visible: !root.metricsLive && (root.hasStats || root._wifiOff); text: "--"; color: Ui.tint("foreground_1", 0.6); anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter }
-        }
+          MetricLabel { text: "Uploaded" }
+          MetricCell { value: Model.formatBytes(root.totalTxBytes); skeletonIndex: 3 }
     }
     }
     // End METRICS: the sections below are body siblings. Metrics
