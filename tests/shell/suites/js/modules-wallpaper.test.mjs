@@ -105,7 +105,12 @@ group('all six libraries load and publish a namespace', () => {
   // private helpers behind them. The count is what notices if one of the
   // redaction functions is ever inlined away: every one of the seven takes a
   // store name and every one is covered by the clusters below.
-  eq('pass/Model publishes twenty-four', Object.keys(PASS).length, 24)
+  // 17 pass helpers, the five that carry the log anonymisation plus the two
+  // private helpers behind them, and the two store-relative path helpers the
+  // parsers below read through. The loader publishes every top-level
+  // declaration, so the private helpers are part of the namespace whether or
+  // not module.exports names them.
+  eq('pass/Model publishes twenty-six', Object.keys(PASS).length, 26)
   // 17 in module.exports plus `fracOr`, which the file never exports but the
   // loader picks up as a top-level declaration.
   eq('WallpaperTrans publishes eighteen', Object.keys(WT).length, 18)
@@ -2664,6 +2669,28 @@ group('the row never carries the value - only the name', () => {
   eq('and no password key', 'password' in row, false)
 })
 
+section('pass/Model._storeDir and _storedPath - the store-relative path rule')
+group('the store root is compared without its trailing slash', () => {
+  eq('a trailing slash is dropped', PASS._storeDir('/store/'), '/store')
+  eq('a bare root stands', PASS._storeDir('/'), '/')
+  eq('no trailing slash is unchanged', PASS._storeDir('/store'), '/store')
+  eq('an absent dir is the empty string', PASS._storeDir(), '')
+  eq('null is the empty string', PASS._storeDir(null), '')
+})
+
+group('one find line becomes a path relative to the store root', () => {
+  eq('a prefixed path is made relative', PASS._storedPath('/store', '/store/a.gpg'), 'a.gpg')
+  eq('a nested prefixed path', PASS._storedPath('/store', '/store/a/b.gpg'), 'a/b.gpg')
+  eq('a path outside the root stands', PASS._storedPath('/store', 'other/a.gpg'), 'other/a.gpg')
+  eq('the root itself names nothing', PASS._storedPath('/store', '/store'), null)
+  eq('a .git segment anywhere drops the line', PASS._storedPath('', 'a/.git/b.gpg'), null)
+  eq('a leading .git segment drops the line', PASS._storedPath('', '.git/config'), null)
+  eq('.gitbook is not a .git segment', PASS._storedPath('', 'a/.gitbook/b.gpg'), 'a/.gitbook/b.gpg')
+  eq('a trailing CR is dropped', PASS._storedPath('', 'a.gpg\r'), 'a.gpg')
+  eq('an empty line names nothing', PASS._storedPath('', ''), null)
+  eq('a null line names nothing', PASS._storedPath('', null), null)
+})
+
 section('pass/Model.parseFindOutput and listEntries - the store scan')
 const FIND_LINES = [
   'd /store',
@@ -4097,6 +4124,10 @@ const SURFACE = {
     // the loader anyway, so the ledger lists them rather than leaving the
     // ledger's own check to complain about them.
     'newTokenMap', 'token', 'redact', 'fieldCounts', 'storeStats', '_swap', '_wordish',
+    // The two store-relative path helpers parseFindOutput and listEntries
+    // read through. Private to the file, published by the loader, and asserted
+    // directly so the path rule has one owner.
+    '_storeDir', '_storedPath',
   ],
   'WallpaperTrans': [
     'transitions', 'randomPool', 'speeds', 'normalizeKind', 'resolveKind', 'normalizeSpeed',
@@ -4127,9 +4158,9 @@ group('the surface lists match the loaded namespaces exactly', () => {
   eq('Battery/Model: 23 exports', SURFACE['Battery/Model'].length, 23)
   eq('Bluetooth/Model: 9 exports', SURFACE['Bluetooth/Model'].length, 9)
   eq('Network/Model: 31 functions plus 2 table vars', SURFACE['Network/Model'].length + TABLES['Network/Model'].length, 33)
-  eq('pass/Model: 24 exports', SURFACE['pass/Model'].length, 24)
+  eq('pass/Model: 26 exports', SURFACE['pass/Model'].length, 26)
   eq('WallpaperTrans: 18 exports', SURFACE['WallpaperTrans'].length, 18)
-  eq('108 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 108)
+  eq('110 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 110)
   // Six names are genuinely shared between two libraries - deviceLabel,
   // deviceIconName, formatRate, subtextFor, sectionTitleFor and listEntries -
   // and each is called through ITS OWN namespace, so the call check above
