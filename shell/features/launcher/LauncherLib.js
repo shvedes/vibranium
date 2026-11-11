@@ -51,7 +51,7 @@ const BASE_EXCLUDED_CATEGORIES = ["Power"]
 // The TryExec term is the sorted id list the scan verdict produces, so its
 // order is deterministic and an unchanged set cannot look like a move.
 function indexFingerprint(entryCount, sortMethod, usageSignal, tryExecSignal) {
-  return (entryCount || 0) + "|" + String(sortMethod ?? "") + "|" + JSON.stringify(usageSignal)
+  return (entryCount || 0) + "|" + SU.textOf(sortMethod) + "|" + JSON.stringify(usageSignal)
     + "|" + JSON.stringify(tryExecSignal ?? [])
 }
 
@@ -112,12 +112,12 @@ function appRecord(entry) {
     kind: "app",
     uid: "app:" + entry.id,
     app: entry,
-    label: String(entry.name ?? ""),
+    label: SU.textOf(entry.name),
     sub: "",
-    desc: String(entry.comment ?? ""),
-    genericName: String(entry.genericName ?? ""),
-    icon: String(entry.icon ?? ""),
-    id: String(entry.id ?? ""),
+    desc: SU.textOf(entry.comment),
+    genericName: SU.textOf(entry.genericName),
+    icon: SU.textOf(entry.icon),
+    id: SU.textOf(entry.id),
     runInTerminal: entry.runInTerminal === true,
     hay: hay,
     words: hay.split(" "),
@@ -154,7 +154,7 @@ function buildAppIndex(entries, sortMethod, usageMap, missingTryExec) {
   const out = []
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i]
-    if (hasHidden && hidden[String(entry.id ?? "")] === true) continue
+    if (hasHidden && hidden[SU.textOf(entry.id)] === true) continue
     const rec = appRecord(entry)
     if (rec && rec.label !== "") out.push(rec)
   }
@@ -207,7 +207,7 @@ function buildAppIndex(entries, sortMethod, usageMap, missingTryExec) {
 // {count} objects (older rows). Anything else reads as unused.
 function usageCountFor(usageMap, id) {
   if (!usageMap || typeof usageMap !== "object") return 0
-  const u = usageMap[String(id ?? "")]
+  const u = usageMap[SU.textOf(id)]
   if (u && typeof u.count === "number") return u.count
   if (typeof u === "number") return u
   return 0
@@ -228,7 +228,7 @@ function usageCountFor(usageMap, id) {
 // same verdict as an empty object. hasHistory is "the file holds at least one
 // key", so a cache that exists but is `{}` reads as no history.
 function parseUsageText(text) {
-  const txt = String(text ?? "")
+  const txt = SU.textOf(text)
   if (txt.trim() === "") return null
   let parsed
   try {
@@ -252,7 +252,7 @@ function serializeUsage(map) {
 // is no counter to write, and the caller must not report an increment that
 // did not happen.
 function bumpUsage(usageMap, id) {
-  const key = String(id ?? "").trim()
+  const key = SU.textOf(id).trim()
   if (key === "") return null
   const next = Object.assign({}, usageMap)
   const cur = next[key]
@@ -399,7 +399,7 @@ function pluginConfigsForPersist(persisted, plugins) {
 // is transient and its tree can be torn down before the scan lands, so a
 // request held only in that tree would go with it.
 function persistedPluginWithState(persisted, id, enabled) {
-  const key = String(id ?? "")
+  const key = SU.textOf(id)
   if (key === "") return persisted
   const out = persisted.slice()
   for (let i = 0; i < out.length; i++) {
@@ -455,7 +455,7 @@ function enabledPrefixes(plugins) {
 // writer and the enablement read all need to find a config that is disabled
 // as much as one that is loaded.
 function pluginById(plugins, id) {
-  const key = String(id ?? "")
+  const key = SU.textOf(id)
   if (key === "") return null
   for (let i = 0; i < plugins.length; i++) {
     if (plugins[i].id === key) return plugins[i]
@@ -707,8 +707,8 @@ function tokenScore(words, t) {
 var _typoDistanceTable = new Int32Array(64)
 
 function typoDistance(a, b) {
-  const x = String(a ?? "")
-  const y = String(b ?? "")
+  const x = SU.textOf(a)
+  const y = SU.textOf(b)
   if (x === y) return 0
   const la = x.length
   const lb = y.length
@@ -749,7 +749,7 @@ function typoDistance(a, b) {
 // guessed: the flat cap rescues nothing extra on short tokens that the
 // strict one misses for a reason.
 function typoBudget(t) {
-  return String(t ?? "").length < 5 ? 1 : 2
+  return SU.textOf(t).length < 5 ? 1 : 2
 }
 
 // One token's typo verdict against pre-split words: the best within-budget
@@ -765,7 +765,7 @@ function typoBudget(t) {
 // that short and turn an unknown filter into a wall of false hits sharing
 // one band - the entries that then fight for a single slot.
 function typoTokenScore(words, t) {
-  const token = String(t ?? "")
+  const token = SU.textOf(t)
   if (token.length < 2) return tokenScore(words, token)
   const budget = typoBudget(token)
   let best = -1
@@ -944,11 +944,11 @@ function filterCounter(pool, query, cap, tiebreak) {
 // Single source for the counter gate, single-row patching and swap-fade
 // regime checks across the service and the panel.
 function isEngineKind(kind) {
-  return ENGINE_ORDER.indexOf(String(kind ?? "")) >= 0
+  return ENGINE_ORDER.indexOf(SU.textOf(kind)) >= 0
 }
 
 function isSynthKind(kind) {
-  const k = String(kind ?? "")
+  const k = SU.textOf(kind)
   return k === "web" || isEngineKind(k)
 }
 
@@ -1015,17 +1015,17 @@ function netBody(record) {
 // is skipped (web rows echo the live query; the patch path owns those).
 function rowContentEqual(a, b, ignoreSub) {
   if (!a || !b) return false
-  if (String(a.label ?? "") !== String(b.label ?? "")) return false
-  if (!ignoreSub && String(a.sub ?? "") !== String(b.sub ?? "")) return false
-  if (String(a.desc ?? "") !== String(b.desc ?? "")) return false
-  if (String(a.icon ?? "") !== String(b.icon ?? "")) return false
-  if (String(a.badge ?? "") !== String(b.badge ?? "")) return false
-  if (String(a.command ?? "") !== String(b.command ?? "")) return false
+  if (SU.textOf(a.label) !== SU.textOf(b.label)) return false
+  if (!ignoreSub && SU.textOf(a.sub) !== SU.textOf(b.sub)) return false
+  if (SU.textOf(a.desc) !== SU.textOf(b.desc)) return false
+  if (SU.textOf(a.icon) !== SU.textOf(b.icon)) return false
+  if (SU.textOf(a.badge) !== SU.textOf(b.badge)) return false
+  if (SU.textOf(a.command) !== SU.textOf(b.command)) return false
   // The fabricated dot of a color row. It is painted instead of an icon rather
   // than beside one, so a swatch that changed under an unchanged label would
   // repaint a row this comparison had called equal.
-  if (String(a.swatch ?? "") !== String(b.swatch ?? "")) return false
-  if (String(a.swatchEdge ?? "") !== String(b.swatchEdge ?? "")) return false
+  if (SU.textOf(a.swatch) !== SU.textOf(b.swatch)) return false
+  if (SU.textOf(a.swatchEdge) !== SU.textOf(b.swatchEdge)) return false
   return true
 }
 
@@ -1047,23 +1047,23 @@ function rowsEqual(a, b, ignoreWebSub) {
     const xp = x.plugin
     const yp = y.plugin
     if ((xp ? 1 : 0) !== (yp ? 1 : 0)) return false
-    if (xp && yp && String(xp.id ?? "") !== String(yp.id ?? "")) return false
+    if (xp && yp && SU.textOf(xp.id) !== SU.textOf(yp.id)) return false
     const xi = x.item
     const yi = y.item
     if ((xi ? 1 : 0) !== (yi ? 1 : 0)) return false
     if (xi && yi) {
-      if (String(xi.copyValue ?? "") !== String(yi.copyValue ?? "")) return false
+      if (SU.textOf(xi.copyValue) !== SU.textOf(yi.copyValue)) return false
       const xd = xi.data
       const yd = yi.data
       if ((xd ? 1 : 0) !== (yd ? 1 : 0)) return false
       if (xd && yd) {
-        if (String(xd.action ?? "") !== String(yd.action ?? "")) return false
-        if (String(xd.exec ?? "") !== String(yd.exec ?? "")) return false
-        if (String(xd.id ?? "") !== String(yd.id ?? "")) return false
+        if (SU.textOf(xd.action) !== SU.textOf(yd.action)) return false
+        if (SU.textOf(xd.exec) !== SU.textOf(yd.exec)) return false
+        if (SU.textOf(xd.id) !== SU.textOf(yd.id)) return false
       }
     }
-    const webPair = ignoreWebSub && String(x.kind ?? "") === "web"
-      && String(y.kind ?? "") === "web"
+    const webPair = ignoreWebSub && SU.textOf(x.kind) === "web"
+      && SU.textOf(y.kind) === "web"
     if (!rowContentEqual(x, y, webPair)) return false
   }
   return true
@@ -1096,10 +1096,10 @@ function pluginScanArgv(builtinRoot, userRoot) {
 // list uses, which is why the TryExec scan walks the same order.
 function desktopEntryRoots(dataHome, dataDirs, home) {
   const out = []
-  const dh = String(dataHome ?? "")
+  const dh = SU.textOf(dataHome)
   if (dh !== "") out.push(dh + "/applications")
-  else if (String(home ?? "") !== "") out.push(String(home) + "/.local/share/applications")
-  const dirs = String(dataDirs ?? "") !== "" ? String(dataDirs) : "/usr/local/share:/usr/share"
+  else if (SU.textOf(home) !== "") out.push(String(home) + "/.local/share/applications")
+  const dirs = SU.textOf(dataDirs) !== "" ? String(dataDirs) : "/usr/local/share:/usr/share"
   const parts = dirs.split(":")
   for (let i = 0; i < parts.length; i++) {
     if (parts[i] !== "") out.push(parts[i] + "/applications")
@@ -1161,7 +1161,7 @@ function tryExecScanArgv(roots, binDir) {
     "done",
     "exit 0"
   ].join("\n")
-  const argv = ["/bin/bash", "-c", script, "tryexec", String(binDir ?? "")]
+  const argv = ["/bin/bash", "-c", script, "tryexec", SU.textOf(binDir)]
   const list = StoreGuards.asList(roots)
   for (let i = 0; i < list.length; i++) argv.push(String(list[i]))
   return argv
@@ -1172,7 +1172,7 @@ function tryExecScanArgv(roots, binDir) {
 // empty list means every entry either has no TryExec or has one that is
 // installed.
 function tryExecVerdict(out) {
-  const text = String(out ?? "")
+  const text = SU.textOf(out)
   if (text === "") return []
   const seen = Object.create(null)
   const ids = []
@@ -1220,7 +1220,7 @@ function binariesArgv() {
 // resolution a launch would pick. The `at` stamp is the caller's: it owns the
 // cache, exactly as it does for timeVerdict.
 function binariesVerdict(out) {
-  const text = String(out ?? "")
+  const text = SU.textOf(out)
   if (text === "") return null
   const seen = Object.create(null)
   const names = []
@@ -1271,7 +1271,7 @@ function statProbeArgv(path, seq) {
 // probing and a late answer would describe a path nobody asked about. A line
 // with no separator, or a generation that is not a number, is never current.
 function statVerdict(out, seq) {
-  const line = String(out ?? "")
+  const line = SU.textOf(out)
   const sp = line.indexOf(" ")
   const seen = sp < 0 ? -1 : parseInt(line.substring(0, sp), 10)
   if (seen !== seq) return null
@@ -1387,7 +1387,7 @@ var H12_ZONES = [
 // reading in the cache is already on the right one and a format change never
 // has to re-probe.
 function timeProbeFormat(tz) {
-  const z = String(tz ?? "")
+  const z = SU.textOf(tz)
   for (let i = 0; i < H12_ZONES.length; i++) {
     const r = H12_ZONES[i]
     if (SU.isAtOrUnder(z, r)) return "%I:%M %p"
@@ -1402,7 +1402,7 @@ function timeProbeFormat(tz) {
 // false for an identical verdict, which is what lets a minute-boundary
 // probe that read the same time rest instead of repainting the row.
 function timeVerdict(line, previous) {
-  const parts = String(line ?? "").trim() === "" ? [] : String(line).trim().split("|")
+  const parts = SU.textOf(line).trim() === "" ? [] : String(line).trim().split("|")
   if (parts.length < 4) return null
   const reading = {
     time: parts[0],
@@ -1441,7 +1441,7 @@ function execArgs(entry) {
   const hasCommand = parsed !== null && typeof parsed === "object" && typeof parsed.length === "number"
   let parts = hasCommand ? parsed : []
   if (parts.length === 0) {
-    const raw = entry ? String(entry.execString ?? "").trim() : ""
+    const raw = entry ? SU.textOf(entry.execString).trim() : ""
     if (raw === "") return []
     parts = raw.split(/\s+/)
   }
@@ -1492,7 +1492,7 @@ function launchArgv(args, runInTerminal) {
 // input is not a path candidate. The caller decides existence via a
 // filesystem probe; this stays pure so it is unit-drivable.
 function localPathCandidate(text, home) {
-  const t = String(text ?? "").trim()
+  const t = SU.textOf(text).trim()
   if (t === "" || t.length > 4096) return ""
   if (t.indexOf("\n") >= 0) return ""
   let p = SU.expandHome(t, home)
@@ -1505,7 +1505,7 @@ function localPathCandidate(text, home) {
 // slashes are stripped here too so untrimmed input still reads right;
 // the filesystem root names itself.
 function pathBasename(path) {
-  let p = String(path ?? "")
+  let p = SU.textOf(path)
   while (p.length > 1 && p.charAt(p.length - 1) === "/") p = p.substring(0, p.length - 1)
   if (p === "" || p === "/") return p
   return SU.basename(p) || p
@@ -1528,7 +1528,7 @@ const RE_URI_TAIL = /^([a-z][a-z0-9+.-]*):\/\/([^\/?#]*)(\/[^?#]*)?/i
 // %XX decoder for URI path segments; malformed sequences keep the raw
 // text (decodeURIComponent throws on them).
 function percentDecode(s) {
-  const t = String(s ?? "")
+  const t = SU.textOf(s)
   if (t.indexOf("%") < 0) return t
   try { return decodeURIComponent(t) } catch (e) { return t }
 }
@@ -1537,7 +1537,7 @@ function percentDecode(s) {
 // local filesystem, anything else is not a local file. Returns the
 // decoded, trailing-slash-stripped path or "".
 function fileUriPath(text) {
-  const t = String(text ?? "").trim()
+  const t = SU.textOf(text).trim()
   if (!RE_FILE_URI.test(t)) return ""
   let rest = t.substring(7)
   if (rest.indexOf("localhost") === 0) rest = rest.substring(9)
@@ -1550,8 +1550,8 @@ function fileUriPath(text) {
 // Human-facing tail of a remote URI for the row title: the last path
 // segment when one exists, else the host. Percent-decoded for display.
 function uriBasename(u) {
-  const m = String(u ?? "").match(RE_URI_TAIL)
-  if (!m) return String(u ?? "")
+  const m = SU.textOf(u).match(RE_URI_TAIL)
+  if (!m) return SU.textOf(u)
   const host = m[2]
   const path = m[3] ? percentDecode(m[3]) : ""
   if (path !== "" && path !== "/") return pathBasename(path)
@@ -1566,7 +1566,7 @@ function uriBasename(u) {
 // dead file:// link falls back to web search); network schemes (ftp,
 // sftp, smb, ssh, ...) and http(s) open as-is via xdg-open.
 function openTarget(text, home) {
-  const t = String(text ?? "").trim()
+  const t = SU.textOf(text).trim()
   if (t === "" || t.length > 4096) return null
   if (t.indexOf("\n") >= 0) return null
   const fp = fileUriPath(t)
@@ -1591,7 +1591,7 @@ function openTarget(text, home) {
 // { kind: "url" | "uri" | "local", value, basename }.
 function clipTargetFor(entry, home) {
   if (!entry) return null
-  const secretType = String(entry.type ?? "")
+  const secretType = SU.textOf(entry.type)
   if (secretType === "secret" || secretType === "credential"
     || secretType === "credentials") return null
   const paths = entry.filePaths
@@ -1603,17 +1603,17 @@ function clipTargetFor(entry, home) {
   }
   const type = String(entry.type ?? "text")
   if (type === "url") {
-    const u = String(entry.raw ?? "").trim()
+    const u = SU.textOf(entry.raw).trim()
     return u === "" ? null : { kind: "url", value: u }
   }
   if (type === "network") {
-    const t = openTarget(String(entry.raw ?? ""), home)
+    const t = openTarget(SU.textOf(entry.raw), home)
     return t && t.kind === "uri"
       ? { kind: "uri", value: t.uri, basename: t.basename } : null
   }
   if (type === "text") {
     // Text that is really a path or protocol URI (terminal copies).
-    const t = openTarget(String(entry.raw ?? ""), home)
+    const t = openTarget(SU.textOf(entry.raw), home)
     if (!t) return null
     return t.kind === "local"
       ? { kind: "local", value: t.path, basename: t.basename }
@@ -1633,11 +1633,11 @@ function clipTargetFor(entry, home) {
 // A path-shaped text entry was never probed, and answers "".
 function clipEntryKind(entry) {
   if (!entry) return ""
-  const secretType = String(entry.type ?? "")
+  const secretType = SU.textOf(entry.type)
   if (secretType === "secret" || secretType === "credential"
     || secretType === "credentials") return ""
   const paths = entry.filePaths
   if (!paths || paths.length !== 1) return ""
   if (String(paths[0]).trim().charAt(0) !== "/") return ""
-  return String(entry.type ?? "") === "folder" ? "dir" : "file"
+  return SU.textOf(entry.type) === "folder" ? "dir" : "file"
 }
