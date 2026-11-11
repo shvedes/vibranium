@@ -729,16 +729,12 @@ function dashRuns(curve, dash, gap) {
   let py = curve.y1
   for (let i = 1; i <= steps; i++) {
     const t = i / steps
-    const u = 1 - t
-    const bx = u * u * u * curve.x1 + 3 * u * u * t * curve.x2
-      + 3 * u * t * t * curve.x3 + t * t * t * curve.x4
-    const by = u * u * u * curve.y1 + 3 * u * u * t * curve.y2
-      + 3 * u * t * t * curve.y3 + t * t * t * curve.y4
-    const dx = bx - px
-    const dy = by - py
+    const p = _cubicAt(curve, t)
+    const dx = p.x - px
+    const dy = p.y - py
     cum[i] = cum[i - 1] + Math.sqrt(dx * dx + dy * dy)
-    px = bx
-    py = by
+    px = p.x
+    py = p.y
   }
   const total = cum[steps]
   if (!(total > 0)) return [curve]
@@ -793,19 +789,27 @@ function dashPoint(value) {
 // How far a point is from a curve, sampled at `curveSamples` points. A
 // click-time hit test and nothing else: sampling a cubic is not a shape's job,
 // and this runs once per click rather than per frame.
+// The point at parameter `t` on a cubic segment. The dash splitter and the
+// click hit test evaluate the same curve, so the polynomial lives once.
+function _cubicAt(curve, t) {
+  const u = 1 - t
+  return {
+    x: u * u * u * curve.x1 + 3 * u * u * t * curve.x2
+      + 3 * u * t * t * curve.x3 + t * t * t * curve.x4,
+    y: u * u * u * curve.y1 + 3 * u * u * t * curve.y2
+      + 3 * u * t * t * curve.y3 + t * t * t * curve.y4
+  }
+}
+
 function curveDistance(px, py, curve) {
   if (curve === null || curve === undefined) return Infinity
   const steps = curveSamples(curve)
   let best = Infinity
   for (let i = 0; i <= steps; i++) {
     const t = i / steps
-    const u = 1 - t
-    const bx = u * u * u * curve.x1 + 3 * u * u * t * curve.x2
-      + 3 * u * t * t * curve.x3 + t * t * t * curve.x4
-    const by = u * u * u * curve.y1 + 3 * u * u * t * curve.y2
-      + 3 * u * t * t * curve.y3 + t * t * t * curve.y4
-    const dx = bx - px
-    const dy = by - py
+    const p = _cubicAt(curve, t)
+    const dx = p.x - px
+    const dy = p.y - py
     const d = dx * dx + dy * dy
     if (d < best) best = d
   }
