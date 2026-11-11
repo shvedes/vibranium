@@ -318,14 +318,14 @@ function textOf(row, key) {
 // fall back to the document attributes, then to a bare "Job #id" so the
 // title never renders blank.
 function jobTitle(row) {
-  const cands = [row ? row["job-name"] : "",
-    row ? row["document-name"] : "",
-    row ? row["document-name-supplied"] : ""]
+  const cands = [textOf(row, "job-name"),
+    textOf(row, "document-name"),
+    textOf(row, "document-name-supplied")]
   for (let i = 0; i < cands.length; i++) {
-    const t = String(cands[i] ?? "").trim()
+    const t = cands[i].trim()
     if (t !== "") return baseName(t)
   }
-  const id = String(row ? row["job-id"] ?? "" : "").trim()
+  const id = textOf(row, "job-id").trim()
   return id !== "" ? "Job " + id : "Untitled job"
 }
 
@@ -337,7 +337,7 @@ function jobTitle(row) {
 // back to the state label so the line is never blank either.
 function jobSub(row, aliases) {
   const parts = []
-  const q = String(row ? row.printer ?? "" : "").trim()
+  const q = textOf(row, "printer").trim()
   let printer = q
   if (q !== "" && aliases && typeof aliases === "object") {
     const a = aliases[q]
