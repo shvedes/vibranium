@@ -719,10 +719,13 @@ PanelWindow {
 
       // The pane's own empty state is one line of text. The fullscreen
       // surface says it at presentation scale instead; the pane stays
-      // underneath so its fetch and cache states are unchanged.
+      // underneath so its fetch and cache states are unchanged. An idle
+      // client has its own surface-level answer below, and its "none" status
+      // is not an answer about lyrics, so this block stays out of the way
+      // there rather than stacking two centred messages on one spot.
       Rectangle {
         anchors.fill: parent
-        visible: pane.status === "none"
+        visible: root.hasTrack && pane.status === "none"
         color: root.backdropColor
 
         Column {
