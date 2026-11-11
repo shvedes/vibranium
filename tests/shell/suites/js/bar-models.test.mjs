@@ -95,7 +95,7 @@ group('the five libraries load and publish a function surface', () => {
   for (const [label, lib] of [['BarLib', B], ['ArchUpdates/Model', AU], ['Volume/Model', VO], ['Workspaces/Model', WSM], ['common/NowPlaying', CN]]) {
     is(`${label} loaded`, lib, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
   }
-  eq('BarLib publishes the seventeen layout helpers plus the shared insert rule', Object.keys(B).length, 18)
+  eq('BarLib publishes the eighteen layout helpers plus the shared insert rule', Object.keys(B).length, 19)
   eq('ArchUpdates/Model publishes the seventeen model functions plus four table vars', Object.keys(AU).length, 21)
   eq('Volume/Model publishes thirteen functions', Object.keys(VO).length, 13)
   eq('Workspaces/Model publishes the number-strip helpers', Object.keys(WSM).length, 3)
@@ -111,6 +111,17 @@ group('assert.mjs SHELL_DIR resolves the shell tree itself', () => {
 })
 
 // ======================================================================
+section('BarLib.layoutSignature - the render change detector')
+group('the signature is the JSON of the rendered layout', () => {
+  const layout = { left: ['clock', 'workspaces'], center: [], right: ['volume'] }
+  eq('the whole object is serialized', B.layoutSignature(layout), JSON.stringify(layout))
+  eq('the same layout signs the same', B.layoutSignature(layout), B.layoutSignature({ left: ['clock', 'workspaces'], center: [], right: ['volume'] }))
+  ne('zone order is part of the signature', B.layoutSignature({ left: ['a', 'b'], center: [], right: [] }), B.layoutSignature({ left: ['b', 'a'], center: [], right: [] }))
+  ne('a slot moving zone changes the signature', B.layoutSignature({ left: ['a'], center: [], right: [] }), B.layoutSignature({ left: [], center: ['a'], right: [] }))
+  eq('a cyclic value falls back to the empty signature', B.layoutSignature((() => { const v = { left: [] }; v.self = v; return v })()), '')
+  eq('a value JSON cannot represent is the empty signature', B.layoutSignature(undefined), '')
+})
+
 section('BarLib.normZone - three zones, everything else is "right"')
 group('the three zone ids pass through unchanged', () => {
   eq('left', B.normZone('left'), 'left')

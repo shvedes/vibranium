@@ -210,13 +210,7 @@ Singleton {
   property string _layoutSig: ""
 
   function _layoutSignature(v) {
-    // Stable signature for change detection: sorted JSON of the three
-    // zones (order inside each zone matters, so not sorted per zone).
-    try {
-      return JSON.stringify(v)
-    } catch (e) {
-      return ""
-    }
+    return BarLib.layoutSignature(v)
   }
 
   function updateLayout() {

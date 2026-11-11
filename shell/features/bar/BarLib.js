@@ -425,6 +425,18 @@ function crossDropPositions(cur, displayIds, isFixed, id, fromRegion, toRegion, 
   return next
 }
 
+// The change signature of a rendered layout. Order inside a zone is behavior,
+// so the object is serialized as it stands; a value that cannot be stringified
+// answers the empty signature, which re-renders rather than freezing the bar.
+function layoutSignature(layout) {
+  try {
+    const sig = JSON.stringify(layout)
+    return sig === undefined ? "" : sig
+  } catch (e) {
+    return ""
+  }
+}
+
 // Hysteresis variant for an active drag: the candidate only flips once
 // the pointer crosses 24px past the midline, so riding the midline
 // never oscillates the preview slabs.
