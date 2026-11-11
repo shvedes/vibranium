@@ -1479,23 +1479,36 @@ function buildBundle(schema, values) {
   return { pages: pages }
 }
 
+// The visible-content walk both counters below share: non-hidden options
+// whose showIf passes, then custom items with separators dropped.
+// `objectItems` is the subset that is a real row rather than a bare marker,
+// so each caller keeps its own answer for those without re-walking.
+function _visibleContent(section, byKey, values) {
+  let options = 0
+  for (let o = 0; o < section.options.length; o++) {
+    const opt = section.options[o]
+    if (opt.hidden) continue
+    if (opt.showIf && !conditionsMet(byKey, values, opt.showIf)) continue
+    options++
+  }
+  let items = 0
+  let objectItems = 0
+  for (let i = 0; i < section.items.length; i++) {
+    const it = section.items[i]
+    if (!it || it.type === "separator") continue
+    items++
+    if (typeof it === "object") objectItems++
+  }
+  return { options: options, items: items, objectItems: objectItems }
+}
+
 // Currently-visible row count of a section: non-hidden options whose
 // showIf passes, plus custom items (separators are chrome, not content).
 // Zero means the submenu hides completely - no page, no link, no search
 // entries. The caller re-derives this when values change.
 function visibleItemCount(section, byKey, values) {
-  let n = 0
-  for (let o = 0; o < section.options.length; o++) {
-    const opt = section.options[o]
-    if (opt.hidden) continue
-    if (opt.showIf && !conditionsMet(byKey, values, opt.showIf)) continue
-    n++
-  }
-  for (let i = 0; i < section.items.length; i++) {
-    const it = section.items[i]
-    if (it && it.type !== "separator") n++
-  }
-  return n
+  const c = _visibleContent(section, byKey, values)
+  return c.options + c.items
 }
 
 // Visible content of a section at the given values: non-hidden options
@@ -1503,22 +1516,9 @@ function visibleItemCount(section, byKey, values) {
 // chrome, not content). The caller re-derives this when values change so
 // the number never drifts from what the section actually shows.
 function itemCountLabel(section, byKey, values) {
-  let n = 0
-  let hasItems = false
-  for (let o = 0; o < section.options.length; o++) {
-    const opt = section.options[o]
-    if (opt.hidden) continue
-    if (opt.showIf && !conditionsMet(byKey, values, opt.showIf)) continue
-    n++
-  }
-  for (let i = 0; i < section.items.length; i++) {
-    const it = section.items[i]
-    if (it && typeof it === "object" && it.type !== "separator") {
-      n++
-      hasItems = true
-    }
-  }
-  const noun = hasItems ? "item" : "option"
+  const c = _visibleContent(section, byKey, values)
+  const n = c.options + c.objectItems
+  const noun = c.objectItems > 0 ? "item" : "option"
   return n === 1 ? "1 " + noun : n + " " + noun + "s"
 }
 
