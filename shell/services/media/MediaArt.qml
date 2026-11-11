@@ -43,6 +43,7 @@ Singleton {
   // the recency stamp eviction reads. Replaced wholesale on every
   // mutation, so a reader re-reads instead of holding a stale entry.
   property var _entries: ({})
+  property int _size: 0
   property int _clock: 0
   property int _evicted: 0
   property int _refused: 0
@@ -60,7 +61,10 @@ Singleton {
     return out
   }
   readonly property var warmUrls: root._plan()
-  readonly property int size: Object.keys(root._entries).length
+  // Maintained by _store, the only writer of _entries: size and atCap are
+  // read from bindings, so an Object.keys enumeration per read would be an
+  // allocation per binding evaluation rather than one count per mutation.
+  readonly property int size: root._size
   readonly property bool atCap: root.size >= root.cap
   readonly property int evictedUrls: root._evicted
   readonly property int refusedRequests: root._refused
@@ -106,6 +110,7 @@ Singleton {
       root._evicted += 1
     }
     root._entries = next
+    root._size = alive
   }
 
   // A surface is about to display this cover. Refused past the cap rather
