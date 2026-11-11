@@ -1052,13 +1052,23 @@ ListView {
     if (last) {
       return last.y + root.rowSettledHeight(last, last.height) + root.trailSpace
     }
-    let total = root.trailSpace
+    return root.trailSpace + root._tableSum()
+  }
+  // The estimated total as one sum rather than a row-at-a-time walk.
+  //
+  // rowHeightAt answers the kept height for an identity in the table and the
+  // fallback height otherwise, and _syncIdentitySet prunes the table to the
+  // identities the current row set claims, so the rows it covers are exactly
+  // the kept entries: their heights are _sumH and every other row contributes
+  // the same fallback. Spacing sits between rows, once per gap. That is the
+  // sum tableTotal's estimated path used to accumulate with a rowIdentity
+  // call per row - and clampY reaches it on every contentY write, so a large
+  // list repaid the whole walk once per scroll frame.
+  function _tableSum() {
     const n = root.count
-    for (let i = 0; i < n; i++) {
-      total += root.rowHeightAt(i)
-      if (i > 0) total += root.spacing
-    }
-    return total
+    if (n <= 0) return 0
+    return root._sumH + (n - root._countH) * root._avg()
+      + root.spacing * (n - 1)
   }
   function tableMaxY() {
     return Math.max(0, root.tableTotal() - root.height)
