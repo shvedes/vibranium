@@ -773,12 +773,10 @@ Singleton {
     Exec.notify(summary, body, { replaceId: 3, timeoutMs: 3000 })
   }
 
-  property bool _muting: false
-  // Echo-mute window after a self-copy: our own wl-copy write would
-  // otherwise come back through the watcher as a new entry. Named so no
-  // bare interval survives (see the interval-naming rule).
-  readonly property int echoMuteMs: 1200
-  Timer { id: muteTimer; interval: root.echoMuteMs; onTriggered: root._muting = false }
+  // Echo suppression is exact, not timed: every path that writes the clipboard
+  // records the hash (or the secret handle) its own write will echo back, and
+  // _offer swallows exactly that once. A time window instead of the hash was
+  // what dropped real copies made shortly after a capture.
 
   // Re-copy executor. The argv carries flags and the mime type only; a
   // payload arrives on the child's write channel, so a credential is never a
@@ -936,8 +934,6 @@ Singleton {
     } else {
       root._suppressHash = "text:" + String(entry.raw || "")
     }
-    root._muting = true
-    muteTimer.restart()
 
     root._pendingCopyPaths = CL.entryPaths(entry)
     pendingCopyTimer.restart()
@@ -968,8 +964,6 @@ Singleton {
     // manual re-copy, so the watcher's echo of our own serve is swallowed
     // instead of duplicating the row it just stored.
     root._suppressHash = root._suppressHashFor(entry)
-    root._muting = true
-    muteTimer.restart()
     root._pendingCopyPaths = CL.entryPaths(entry)
     pendingCopyTimer.restart()
     root._startCopy(cmdArr, sink)
@@ -1099,7 +1093,11 @@ Singleton {
 
   function _poll() {
     root._reapRead()
-    if (listProc.running || root._readProc !== null || uriProc.running) return
+    // Busy is "queue this behind the read", never "drop it": see _pollPending.
+    if (listProc.running || root._readProc !== null || uriProc.running) {
+      root._pollPending = true
+      return
+    }
     listProc.command = CL.buildListTypesCmd()
     listProc.running = true
   }
@@ -1109,6 +1107,18 @@ Singleton {
   // queued is free); Idle.run is only the turn boundary, so the storm of
   // per-event defers collapses into one ordered call each.
   property bool _pollQueued: false
+  // A poll that arrived while a read was already in flight. The watcher fires
+  // once per clipboard WRITE, so a request inside that window is not a
+  // duplicate of the read in flight - it is a newer capture, and dropping it
+  // lost that copy until some later event happened to poll again (the slow
+  // reconciler, or the next copy). It is replayed as soon as the pipeline
+  // drains.
+  property bool _pollPending: false
+  function _drainPendingPoll() {
+    if (!root._pollPending) return
+    root._pollPending = false
+    root.queuePoll()
+  }
   property bool _flushQueued: false
   function queuePoll() {
     if (root._pollQueued) return
@@ -1128,6 +1138,7 @@ Singleton {
     stderr: StdioCollector {}
     onExited: (exitCode, exitStatus) => {
       if (exitCode === 0) root._onListTypes(String(listOut.text))
+      else root._drainPendingPoll()
     }
   }
 
@@ -1168,6 +1179,7 @@ Singleton {
         root._readProc = null
         destroy()
         root._onReadText(text, pasteProc.types)
+        root._drainPendingPoll()
       }
     }
   }
@@ -1216,9 +1228,10 @@ Singleton {
       return
     }
     root._lastHash = hash
-    // The mute window: the copy this shell made is still settling, so
-    // anything arriving now is presumed to be its echo.
-    if (root._muting) return
+    // No blanket "settling" window here: our own write is suppressed by the
+    // exact hash above (or the secret match), and a window long enough to
+    // cover a settling wl-copy also swallowed every real copy made in the
+    // meantime - which is what made fast copying lose entries.
     const entry = buildFn()
     if (!entry) return
     const live = root._addEntry(entry)
@@ -1292,6 +1305,7 @@ Singleton {
     stderr: StdioCollector {}
     onExited: (exitCode, exitStatus) => {
       if (exitCode === 0) root._onReadUri(String(uriOut.text))
+      else root._drainPendingPoll()
     }
   }
 
@@ -1421,9 +1435,16 @@ Singleton {
   // existing entries; sha keys make repeated copies of identical bytes
   // dedupe instead of piling up.
   function _pollImage(mime) {
-    // The snapshot is busy, so this image copy is not read at all and there is
-    // no entry for it.
-    if (imagePipeProc.running || dimProc.running) return
+    // A snapshot already in flight owns `_pendingPath`/`_pendingMime` for the
+    // file its own exit will read, so a second capture queues behind it rather
+    // than overwriting them. The dimension probe reads a snapshot that was
+    // ALREADY written and shares no state with this capture, so it does not
+    // hold one back - letting it do so dropped every image copied while the
+    // previous image's dimensions were still being read.
+    if (imagePipeProc.running) {
+      root._pollPending = true
+      return
+    }
     root.imgSeq++
     root._pendingMime = mime
     root._pendingPath = CL.snapshotPath(root.imgDir, Date.now(), root.imgSeq, mime)
@@ -1453,59 +1474,67 @@ Singleton {
     stdout: StdioCollector { id: pipeOut }
     stderr: StdioCollector {}
     onExited: (exitCode, exitStatus) => {
-      const out = String(pipeOut.text).trim()
-      if (out === "EMPTY" || exitCode !== 0) {
-        root._discardPendingSnapshot()
-        return
+      try {
+        root._onImageSnapshot(exitCode)
+      } finally {
+        // A capture that arrived while this snapshot was in flight was queued;
+        // read the clipboard again now that the pipeline is free.
+        root._drainPendingPoll()
       }
-      // First line: size from stat, second line: "sha  path" from sha1sum
-      const report = CL.parseSnapshotOutput(out)
-      if (report === null) {
-        root._discardPendingSnapshot()
-        return
-      }
-      const sz = report.size
-      const sha = report.sha
-      const hash = "img:" + sha + ":" + sz
-      // Echo suppression / muting / duplicate hash - just record and cleanup
-      if (hash === root._lastHash) {
-        root._discardPendingSnapshot()
-        return
-      }
-      if (root._suppressHash !== "" && hash === root._suppressHash) {
-        root._suppressHash = ""
-        root._lastHash = hash
-        root._discardPendingSnapshot()
-        return
-      }
-      if (root._muting) {
-        root._lastHash = hash
-        root._discardPendingSnapshot()
-        return
-      }
-      // History duplicate - same bytes already stored (opening clipboard re-snapshots same image)
-      for (let i = 0; i < root.history.length; i++) {
-        const h = root.history[i]
-        if (h.type === "image" && h.imageSha === sha && h.fileSize === sz) {
-          // Re-copying bytes already held: the row is lifted, not duplicated,
-          // and the snapshot file this flight wrote is thrown away.
-          root._lastHash = hash
-          root._promote(h.id)
-          root._discardPendingSnapshot()
-          return
-        }
-      }
-      root._offer(hash, () => {
-        const e = root._buildEntry("image:" + root._pendingPath,
-          root._pendingMime, "image", [], "")
-        e.imageDataFile = root._pendingPath
-        e.imageSha = sha
-        e.fileSize = sz
-        const eid = e.id
-        Qt.callLater(() => root._probeDims(eid))
-        return CL.deriveEntry(e, TimeFormat.use12h)
-      })
     }
+  }
+
+  // The snapshot's own verdict: size, hash, echo and duplicate handling, and
+  // the entry it produces. Split out of onExited so the queue drain above runs
+  // on every exit path, including the ones that discard the file and return.
+  function _onImageSnapshot(exitCode) {
+    const out = String(pipeOut.text).trim()
+    if (out === "EMPTY" || exitCode !== 0) {
+      root._discardPendingSnapshot()
+      return
+    }
+    // First line: size from stat, second line: "sha  path" from sha1sum
+    const report = CL.parseSnapshotOutput(out)
+    if (report === null) {
+      root._discardPendingSnapshot()
+      return
+    }
+    const sz = report.size
+    const sha = report.sha
+    const hash = "img:" + sha + ":" + sz
+    // Echo suppression and duplicate hash - just record and cleanup
+    if (hash === root._lastHash) {
+      root._discardPendingSnapshot()
+      return
+    }
+    if (root._suppressHash !== "" && hash === root._suppressHash) {
+      root._suppressHash = ""
+      root._lastHash = hash
+      root._discardPendingSnapshot()
+      return
+    }
+    // History duplicate - same bytes already stored (opening clipboard re-snapshots same image)
+    for (let i = 0; i < root.history.length; i++) {
+      const h = root.history[i]
+      if (h.type === "image" && h.imageSha === sha && h.fileSize === sz) {
+        // Re-copying bytes already held: the row is lifted, not duplicated,
+        // and the snapshot file this flight wrote is thrown away.
+        root._lastHash = hash
+        root._promote(h.id)
+        root._discardPendingSnapshot()
+        return
+      }
+    }
+    root._offer(hash, () => {
+      const e = root._buildEntry("image:" + root._pendingPath,
+        root._pendingMime, "image", [], "")
+      e.imageDataFile = root._pendingPath
+      e.imageSha = sha
+      e.fileSize = sz
+      const eid = e.id
+      Qt.callLater(() => root._probeDims(eid))
+      return CL.deriveEntry(e, TimeFormat.use12h)
+    })
   }
 
   function _probeDims(id) {
