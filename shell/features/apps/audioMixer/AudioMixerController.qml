@@ -89,11 +89,17 @@ Item {
   //
   // So classify() stays exactly as the two documented booleans define it, and
   // the LIST applies the policy. That is where a policy belongs.
+  // A node list that has not arrived yet reads as empty, not as a reason to
+  // answer early and differently.
+  function _nodes(list) {
+    return list === null || list === undefined ? [] : list
+  }
+
   function nodesOfKind(list, kind) {
     const out = []
-    if (list === null || list === undefined) return out
-    for (let i = 0; i < list.length; i++) {
-      const node = list[i]
+    const rows = _nodes(list)
+    for (let i = 0; i < rows.length; i++) {
+      const node = rows[i]
       if (node === null || node === undefined) continue
       if (node.audio === null || node.audio === undefined) continue
       if (Model.isMonitorName(Model.nodeName(node))) continue
@@ -161,9 +167,9 @@ Item {
   // never given a peak handle, and a handle creates another tap.
   function audioNodes(list) {
     const out = []
-    if (list === null || list === undefined) return out
-    for (let i = 0; i < list.length; i++) {
-      const node = list[i]
+    const rows = _nodes(list)
+    for (let i = 0; i < rows.length; i++) {
+      const node = rows[i]
       if (node === null || node === undefined) continue
       if (node.audio === null || node.audio === undefined) continue
       if (Model.isMonitorName(Model.nodeName(node))) continue
