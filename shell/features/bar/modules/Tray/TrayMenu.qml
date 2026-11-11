@@ -223,8 +223,8 @@ PanelWindow {
     const anchorX = root.anchorItem.mapToItem(root.anchorWindow.contentItem, 0, 0).x
     let x = anchorX + root.anchorItem.width / 2 - w / 2
     let y = root.barPosition === "bottom" ? root.height - barH - h - root.margin : barH + root.margin
-    x = Math.max(root.margin, Math.min(x, root.width - w - root.margin))
-    y = Math.max(root.margin, Math.min(y, root.height - h - root.margin))
+    x = Range.clamp(x, root.margin, root.width - w - root.margin)
+    y = Range.clamp(y, root.margin, root.height - h - root.margin)
     card.x = Math.round(x)
     card.y = Math.round(y)
   }

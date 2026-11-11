@@ -513,8 +513,8 @@ PanelWindow {
     // its screen edge regardless of the bar's internal layout), dropping
     // below a top bar or above a bottom one.
     let y = root.barPosition === "bottom" ? screenH - barH - h - root.margin : barH + root.margin
-    x = Math.max(root.margin, Math.min(x, screenW - w - root.margin))
-    y = Math.max(root.margin, Math.min(y, screenH - h - root.margin))
+    x = Range.clamp(x, root.margin, screenW - w - root.margin)
+    y = Range.clamp(y, root.margin, screenH - h - root.margin)
     card.x = Math.round(x)
     card.y = Math.round(y)
     // Clearance for the notification pile: this park's target geometry (the

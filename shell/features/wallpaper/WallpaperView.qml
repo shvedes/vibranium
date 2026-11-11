@@ -587,8 +587,8 @@ PanelWindow {
       id: menuCard
 
       entries: win.menuEntries
-      x: Math.max(Ui.m, Math.min(Math.round(win.menuX), menuWin.width - width - Ui.m))
-      y: Math.max(Ui.m, Math.min(Math.round(win.menuY), menuWin.height - height - Ui.m))
+      x: Range.clamp(Math.round(win.menuX), Ui.m, menuWin.width - width - Ui.m)
+      y: Range.clamp(Math.round(win.menuY), Ui.m, menuWin.height - height - Ui.m)
 
       onActivated: entry => win.runMenuAction(entry.action)
     }
