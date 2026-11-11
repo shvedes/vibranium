@@ -1982,6 +1982,16 @@ Singleton {
 
   // --- expansion slots ---
 
+  // The row's own close latch: `closing` sets it, clearing drops it. The map
+  // is replaced, not mutated, so a binding re-evaluates on assignment.
+  function _setSlotClose(uid, closing) {
+    if (!uid) return
+    const next = Object.assign({}, root._slotCloses)
+    if (closing) next[uid] = true
+    else delete next[uid]
+    root._slotCloses = next
+  }
+
   function setExpanded(item, value) {
     root._rawState(item).expanded = value === true
     root.rev++
@@ -1991,14 +2001,10 @@ Singleton {
       // The row's own close latch: cleared when its slot motion reaches
       // zero (see slotCloseFinished), reconciled on every model install.
       if (item && item.uid) {
-        const next = Object.assign({}, root._slotCloses)
-        next[item.uid] = true
-        root._slotCloses = next
+        root._setSlotClose(item.uid, true)
       }
     } else if (item && item.uid && root._slotCloses[item.uid] !== undefined) {
-      const next = Object.assign({}, root._slotCloses)
-      delete next[item.uid]
-      root._slotCloses = next
+      root._setSlotClose(item.uid, false)
     }
   }
 
@@ -2009,14 +2015,10 @@ Singleton {
       root.slotClosing = true
       root.slotCloseTimer.restart()
       if (item && item.uid) {
-        const next = Object.assign({}, root._slotCloses)
-        next[item.uid] = true
-        root._slotCloses = next
+        root._setSlotClose(item.uid, true)
       }
     } else if (item && item.uid && root._slotCloses[item.uid] !== undefined) {
-      const next = Object.assign({}, root._slotCloses)
-      delete next[item.uid]
-      root._slotCloses = next
+      root._setSlotClose(item.uid, false)
     }
   }
 
