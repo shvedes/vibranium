@@ -716,13 +716,18 @@ Singleton {
     root._editorRequest = 0
   }
 
+  // Whether `uid` is the editor answer this flow is still waiting for.
+  function _ownsEditorAnswer(uid) {
+    return Number(uid) === root._editorUid && root._editorUid >= 0
+  }
+
   // The editor answered. Four outcomes, all of them transitions, and they
   // are the difference between "the user has a screenshot" and "the user
   // dismissed a dialog": a save with a path, a save with no path (the
   // editor closed without writing), a save somewhere other than the path
   // this flow reserved, and a cancel. Only the first publishes.
   function noteSaved(uid, path) {
-    if (Number(uid) !== root._editorUid || root._editorUid < 0) return false
+    if (!root._ownsEditorAnswer(uid)) return false
     const p = String(path ?? "")
     const pend = root._pendingAnnotate
     root._pendingAnnotate = null
@@ -755,7 +760,7 @@ Singleton {
   }
 
   function noteCancelled(uid) {
-    if (Number(uid) !== root._editorUid || root._editorUid < 0) return false
+    if (!root._ownsEditorAnswer(uid)) return false
     const pend = root._pendingAnnotate
     root._pendingAnnotate = null
     root._editorOpen = false
