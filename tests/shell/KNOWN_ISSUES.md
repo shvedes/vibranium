@@ -866,7 +866,7 @@ as an empty directory rather than being hidden.
 
 *Reproduced by `suites/js/modules-wallpaper.test.mjs`.*
 
-### 38. 107 of the 201 constructible types have never been built by any test
+### 38. 125 of the 238 constructed types have never been built by any test
 
 Under `QT_QPA_PLATFORM=offscreen` Quickshell loads **no `PanelWindow` backend at
 all**, so any type that reaches a window cannot be constructed. The widest door
@@ -875,13 +875,14 @@ during singleton construction - and everything that touches it goes with it,
 which is all of `qs.services` (18 entries) plus every feature that reads a
 service.
 
-That is one environmental fact with a very long reach, not 107 separate
-problems. `suites/qml/construction-test.sh` now attempts all 201 and buckets
-them: **94 clean, 86 needs-environment, 21 declared-but-uncreatable, 0 broken**.
+That is one environmental fact with a very long reach, not 125 separate
+problems. `suites/qml/construction-test.sh` now attempts all 239 declared
+entries and buckets the 238 constructible ones: **113 clean, 103
+needs-environment, 22 declared-but-uncreatable, 0 broken**.
 The `broken` bucket being empty is the load-bearing result: there is no genuine
 construction failure in the tree.
 
-The 21 uncreatable types root at 14 x `PanelWindow`, 6 x `Variants` and
+The 22 uncreatable types root at 15 x `PanelWindow`, 6 x `Variants` and
 1 x `WlSessionLockSurface` - the last two are C++-registered too, they are simply
 never used in a position `qmllint` flags, so `shell/README.md`'s list of four is
 incomplete.
