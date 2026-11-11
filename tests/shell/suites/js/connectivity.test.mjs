@@ -545,6 +545,50 @@ group('openUrlArgv hands one URL to the default browser', () => {
 })
 
 // ---------------------------------------------------------------------------
+section('the device scans the link edge reads')
+
+group('anyLinkUp is any associated device', () => {
+  eq('none', CL.anyLinkUp([]), false)
+  eq('one wired', CL.anyLinkUp([{ connected: true }]), true)
+  eq('connected must be exactly true', CL.anyLinkUp([{ connected: 'true' }]), false)
+  eq('a null device is skipped', CL.anyLinkUp([null, { connected: true }]), true)
+  eq('a non-array list', CL.anyLinkUp(null), false)
+})
+
+group('wifiUp is the wifi radio carrying the link', () => {
+  const W = 2
+  eq('a connected wifi device', CL.wifiUp([{ type: W, connected: true }], W), true)
+  eq('a connected wired device is not it', CL.wifiUp([{ type: 1, connected: true }], W), false)
+  eq('a wifi device that is not connected', CL.wifiUp([{ type: W, connected: false }], W), false)
+  eq('a null device', CL.wifiUp([null], W), false)
+})
+
+group('wifiSsid is the associated wifi network name', () => {
+  const W = 2
+  const dev = { type: W, networks: { values: [{ name: 'cafe', connected: true }] } }
+  eq('the name', CL.wifiSsid([dev], W), 'cafe')
+  eq('no associated network',
+    CL.wifiSsid([{ type: W, networks: { values: [{ name: 'x', connected: false }] } }], W), '')
+  eq('a wired device is ignored',
+    CL.wifiSsid([{ type: 1, networks: { values: [{ name: 'x', connected: true }] } }], W), '')
+  eq('a missing networks model', CL.wifiSsid([{ type: W }], W), '')
+  eq('a null network', CL.wifiSsid([{ type: W, networks: { values: [null] } }], W), '')
+  eq('a missing name', CL.wifiSsid([{ type: W, networks: { values: [{ connected: true }] } }], W), '')
+})
+
+group('isSettingUp sees the connecting state and the grace', () => {
+  const CONNECTING = 3
+  eq('the grace alone', CL.isSettingUp([], CONNECTING, true), true)
+  eq('a connecting device', CL.isSettingUp([{ state: CONNECTING }], CONNECTING, false), true)
+  eq('a connecting network',
+    CL.isSettingUp([{ state: 1, networks: { values: [{ state: CONNECTING }] } }], CONNECTING, false), true)
+  eq('a settled device',
+    CL.isSettingUp([{ state: 1, networks: { values: [{ state: 1 }] } }], CONNECTING, false), false)
+  eq('no devices', CL.isSettingUp(null, CONNECTING, false), false)
+  eq('the state is compared strictly', CL.isSettingUp([{ state: 3 }], '3', false), false)
+})
+
+// ---------------------------------------------------------------------------
 section('export surface')
 
 group('every export is covered above', () => {
@@ -558,7 +602,8 @@ group('every export is covered above', () => {
     'GB_BYTES', 'METERED_USAGE_TAG', 'parseDefaultIface', 'usageKey',
     'meteredUsageStep', 'meteredMilestone', 'withMeteredUsage', 'meteredUsageArgv',
     'portalStep', 'meteredStep', 'offlineStep', 'linkLostEdge',
-    'openUrlArgv', 'PORTAL_FALLBACK_URL', 'PORTAL_TAG', 'METERED_TAG', 'OFFLINE_TAG', 'ONLINE_TAG']
+    'openUrlArgv', 'PORTAL_FALLBACK_URL', 'PORTAL_TAG', 'METERED_TAG', 'OFFLINE_TAG', 'ONLINE_TAG',
+    'anyLinkUp', 'wifiUp', 'wifiSsid', 'isSettingUp']
   // Vars are not functions, so they ride module.exports directly; the
   // count below fails if an export is added without a group above.
   eq('the export count', Object.keys(CL).length, names.length)

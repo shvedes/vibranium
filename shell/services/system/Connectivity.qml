@@ -723,55 +723,27 @@ Singleton {
   // extra watchers. Direction-correct on purpose: Disconnecting never
   // counts, so tearing down never reads as setting up.
   function _isSettingUp() {
-    if (graceTimer.running) return true
-    const devices = Networking.devices ? Networking.devices.values : []
-    for (let i = 0; i < devices.length; i++) {
-      const d = devices[i]
-      if (!d) continue
-      if (d.state === ConnectionState.Connecting) return true
-      const nets = d.networks ? d.networks.values : []
-      for (let j = 0; j < nets.length; j++) {
-        if (nets[j] && nets[j].state === ConnectionState.Connecting) return true
-      }
-    }
-    return false
+    return Lib.isSettingUp(Networking.devices ? Networking.devices.values : [],
+      ConnectionState.Connecting, graceTimer.running)
   }
 
   // Any associated device, wifi or wired: the link half of the offline
   // edge. NM's verdict can lag the drop by seconds; this does not.
   function _anyLinkUp() {
-    const devices = Networking.devices ? Networking.devices.values : []
-    for (let i = 0; i < devices.length; i++) {
-      if (devices[i] && devices[i].connected === true) return true
-    }
-    return false
+    return Lib.anyLinkUp(Networking.devices ? Networking.devices.values : [])
   }
 
   // Associated wifi network, or "" when none is. Read off the backend
   // like the bar pill does: no bus round trip, so the join check costs
   // nothing on top of the poll that already ran.
   function _wifiSsid() {
-    const devices = Networking.devices ? Networking.devices.values : []
-    for (let i = 0; i < devices.length; i++) {
-      const d = devices[i]
-      if (!d || d.type !== DeviceType.Wifi) continue
-      const nets = d.networks ? d.networks.values : []
-      for (let j = 0; j < nets.length; j++) {
-        if (nets[j] && nets[j].connected) return String(nets[j].name ?? "")
-      }
-    }
-    return ""
+    return Lib.wifiSsid(Networking.devices ? Networking.devices.values : [], DeviceType.Wifi)
   }
 
   // Whether the wifi radio currently carries the link. Decides if a
   // drop belongs to a radio toggle, independently of signal order.
   function _wifiUp() {
-    const devices = Networking.devices ? Networking.devices.values : []
-    for (let i = 0; i < devices.length; i++) {
-      const d = devices[i]
-      if (d && d.type === DeviceType.Wifi && d.connected === true) return true
-    }
-    return false
+    return Lib.wifiUp(Networking.devices ? Networking.devices.values : [], DeviceType.Wifi)
   }
 
   // Deferred link-loss edge firing: an unexpected drop that survived the

@@ -64,6 +64,63 @@ function linkLostEdge(prevUp, up, prevWifiUp, wifiOn, hasReading, shown) {
   return false
 }
 
+// The device scans the link edge reads. They are pure over the backend's
+// device list, so the service keeps the watchers and the timers while the
+// decisions about what counts as up, as wifi and as configuring are testable.
+
+// Any associated device, wifi or wired: the link half of the offline edge.
+// NM's verdict can lag a drop by seconds; this read does not.
+function anyLinkUp(devices) {
+  const list = Array.isArray(devices) ? devices : []
+  for (let i = 0; i < list.length; i++) {
+    if (list[i] && list[i].connected === true) return true
+  }
+  return false
+}
+
+// Whether the wifi radio currently carries the link. Decides if a drop
+// belongs to a radio toggle, independently of the order two signals land in.
+function wifiUp(devices, wifiType) {
+  const list = Array.isArray(devices) ? devices : []
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i]
+    if (d && d.type === wifiType && d.connected === true) return true
+  }
+  return false
+}
+
+// The associated wifi network's name, or "" when none is. Read off the
+// backend like the bar pill does: no bus round trip.
+function wifiSsid(devices, wifiType) {
+  const list = Array.isArray(devices) ? devices : []
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i]
+    if (!d || d.type !== wifiType) continue
+    const nets = d.networks ? d.networks.values : []
+    for (let j = 0; j < nets.length; j++) {
+      if (nets[j] && nets[j].connected) return String(nets[j].name ?? "")
+    }
+  }
+  return ""
+}
+
+// Whether the link is still being set up: a device or network stuck in the
+// Connecting state, or a fresh link still inside the offline grace.
+function isSettingUp(devices, connectingState, graceRunning) {
+  if (graceRunning === true) return true
+  const list = Array.isArray(devices) ? devices : []
+  for (let i = 0; i < list.length; i++) {
+    const d = list[i]
+    if (!d) continue
+    if (d.state === connectingState) return true
+    const nets = d.networks ? d.networks.values : []
+    for (let j = 0; j < nets.length; j++) {
+      if (nets[j] && nets[j].state === connectingState) return true
+    }
+  }
+  return false
+}
+
 // --- transition policy ---------------------------------------------------
 //
 // The watcher's decisions as pure steps over explicit state, so synthetic
