@@ -357,28 +357,37 @@ Singleton {
     root._reconcileLinks([], generation)
   }
 
+  // A reconcile stage whose generation was superseded parks the loop and asks
+  // for another pass. Every async stage exits through this rule.
+  function _loopbackSuperseded(generation) {
+    if (generation === root._loopbackGeneration) return false
+    root._loopbackBusy = false
+    root._scheduleLoopback()
+    return true
+  }
+
+  // The common failure exit for the loopback loop.
+  function _loopbackFail(reason) {
+    root._loopbackBusy = false
+    root._loopbackError = reason
+  }
+
   function _readLoopbackPorts(generation) {
     const results = { outputs: null, inputs: null, links: null, pending: 3 }
     const adopt = (key, result) => {
       results[key] = result
       results.pending--
       if (results.pending !== 0) return
-      if (generation !== root._loopbackGeneration) {
-        root._loopbackBusy = false
-        root._scheduleLoopback()
-        return
-      }
+      if (root._loopbackSuperseded(generation)) return
       if (results.outputs?.code !== "ok" || results.inputs?.code !== "ok"
         || results.links?.code !== "ok") {
-        root._loopbackBusy = false
-        root._loopbackError = "could not read default audio ports or links"
+        root._loopbackFail("could not read default audio ports or links")
         return
       }
       const plan = Loopback.plan(root._loopbackSourceName, root._loopbackSinkName,
         String(results.outputs.stdout || ""), String(results.inputs.stdout || ""))
       if (plan.error !== "") {
-        root._loopbackBusy = false
-        root._loopbackError = plan.error
+        root._loopbackFail(plan.error)
         return
       }
       const graphLinks = Loopback.identifyLinks(
@@ -406,14 +415,9 @@ Singleton {
     root._loopbackGeneration++
     const generation = root._loopbackGeneration
     root._readLoopback(["pw-link", "-l", "-I"], result => {
-      if (generation !== root._loopbackGeneration) {
-        root._loopbackBusy = false
-        root._scheduleLoopback()
-        return
-      }
+      if (root._loopbackSuperseded(generation)) return
       if (result === null || result === undefined || result.code !== "ok") {
-        root._loopbackBusy = false
-        root._loopbackError = "could not read current audio links"
+        root._loopbackFail("could not read current audio links")
         return
       }
       const links = Loopback.identifyLinks(
@@ -439,8 +443,7 @@ Singleton {
 
   function _runLoopbackCommands(removals, connection, desired, generation) {
     if (connection.error !== "") {
-      root._loopbackBusy = false
-      root._loopbackError = connection.error
+      root._loopbackFail(connection.error)
       return
     }
     root._loopbackRemovals = removals
@@ -450,11 +453,7 @@ Singleton {
   }
 
   function _sendNextLoopbackRemoval(desired, generation) {
-    if (generation !== root._loopbackGeneration) {
-      root._loopbackBusy = false
-      root._scheduleLoopback()
-      return
-    }
+    if (root._loopbackSuperseded(generation)) return
     if (root._loopbackRemovals.length === 0) {
       root._sendNextLoopbackCommand(desired, generation)
       return
@@ -466,8 +465,7 @@ Singleton {
       maxAttempts: 1,
       onFinished: result => {
         if (result === null || result === undefined || result.code !== "ok") {
-          root._loopbackBusy = false
-          root._loopbackError = "pw-link refused to remove the loopback route"
+          root._loopbackFail("pw-link refused to remove the loopback route")
           return
         }
         root._loopbackOwned = Loopback.removeFromOwned(root._loopbackOwned, command)
@@ -475,18 +473,11 @@ Singleton {
         root._sendNextLoopbackRemoval(desired, generation)
       }
     })
-    if (job === null || job === undefined) {
-      root._loopbackBusy = false
-      root._loopbackError = "could not start pw-link"
-    }
+    if (job === null || job === undefined) root._loopbackFail("could not start pw-link")
   }
 
   function _sendNextLoopbackCommand(desired, generation) {
-    if (generation !== root._loopbackGeneration) {
-      root._loopbackBusy = false
-      root._scheduleLoopback()
-      return
-    }
+    if (root._loopbackSuperseded(generation)) return
     if (root._loopbackCommands.length === 0) {
       root._finishLoopback(desired, generation)
       return
@@ -498,8 +489,7 @@ Singleton {
       maxAttempts: 1,
       onFinished: result => {
         if (result === null || result === undefined || result.code !== "ok") {
-          root._loopbackBusy = false
-          root._loopbackError = "pw-link refused to create the loopback route"
+          root._loopbackFail("pw-link refused to create the loopback route")
           return
         }
         root._loopbackOwned = Loopback.addOwned(root._loopbackOwned, root._loopbackDesired, command)
@@ -507,18 +497,11 @@ Singleton {
         root._sendNextLoopbackCommand(desired, generation)
       }
     })
-    if (job === null || job === undefined) {
-      root._loopbackBusy = false
-      root._loopbackError = "could not start pw-link"
-    }
+    if (job === null || job === undefined) root._loopbackFail("could not start pw-link")
   }
 
   function _finishLoopback(desired, generation) {
-    if (generation !== root._loopbackGeneration) {
-      root._loopbackBusy = false
-      root._scheduleLoopback()
-      return
-    }
+    if (root._loopbackSuperseded(generation)) return
     root._loopbackBusy = false
     root._loopbackError = ""
     ShellState.updateSection("audio", { loopbackPairs: Loopback.persistableRoutes(root._loopbackOwned) })
