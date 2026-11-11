@@ -44,6 +44,7 @@
 .pragma library
 
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 
 // --- process boundary -------------------------------------------------------
 
@@ -239,7 +240,7 @@ function ledger(rows, severed) {
       if (e.targets[t].key === meta.key) { claimed = true; break }
     }
     if (claimed) continue
-    const live = Array.isArray(row.linkIds) ? row.linkIds : []
+    const live = StoreGuards.asList(row.linkIds)
     const sev = isSevered(severed, slotKey(app, meta.key), live)
     const act = meta.key === "mic" ? true : (live.length > 0 || sev)
     e.targets.push({
@@ -300,7 +301,7 @@ function tooltipRows(entries, lit, severed, colorOf) {
     share: "is sharing screen",
   }
   const rows = { mic: [], cam: [], share: [] }
-  const list = Array.isArray(entries) ? entries : []
+  const list = StoreGuards.asList(entries)
   for (let i = 0; i < list.length; i++) {
     const e = list[i]
     if (!e || !Array.isArray(e.targets)) continue
@@ -359,7 +360,7 @@ function loopbackRow(icon) {
 }
 
 function hasMicTarget(entries) {
-  const list = Array.isArray(entries) ? entries : []
+  const list = StoreGuards.asList(entries)
   for (let i = 0; i < list.length; i++) {
     const e = list[i]
     if (!e || !Array.isArray(e.targets)) continue
