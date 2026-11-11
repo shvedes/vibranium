@@ -965,14 +965,10 @@ Singleton {
         if (nets.length > 0) uris = nets.join("\n")
         else uris = entry.filePaths.join("\n")
       }
-      // Use text/uri-list for network URIs, fall back to text/plain
-      if (uris.indexOf("://") >= 0) {
-        cmdArr = CL.buildCopyUriListCmd()
-        sink = () => copyProc.write(uris)
-      } else {
-        cmdArr = CL.buildCopyTextCmd()
-        sink = () => copyProc.write(uris)
-      }
+      // Use text/uri-list for network URIs, fall back to text/plain. The
+      // sink is the same either way: only the mime declaration changes.
+      cmdArr = uris.indexOf("://") >= 0 ? CL.buildCopyUriListCmd() : CL.buildCopyTextCmd()
+      sink = () => copyProc.write(uris)
     } else if (entry.type === "text" || entry.type === "url") {
       cmdArr = CL.buildCopyTextCmd()
       sink = () => copyProc.write(String(entry.raw || ""))
