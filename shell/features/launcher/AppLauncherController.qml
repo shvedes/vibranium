@@ -1191,21 +1191,7 @@ Item {
   }
 
   function _fileRow(target, isDir) {
-    const isUri = target.kind === "uri"
-    const open = isUri ? target.uri : target.path
-    let iconName = ""
-    if (root.showIcons) {
-      iconName = isUri ? "network-storage" : LauncherLib.pathIconName(isDir, target.path)
-    }
-    return {
-      kind: "file",
-      uid: "file:" + open,
-      path: open,
-      label: "Open " + target.basename,
-      sub: "Open in default system app",
-      desc: "",
-      icon: iconName
-    }
+    return LauncherLib.fileRow(target, isDir, root.showIcons)
   }
 
   // Open a verified filesystem path (or URI) in its default app. Same

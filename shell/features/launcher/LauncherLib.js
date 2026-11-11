@@ -152,6 +152,26 @@ function appRow(rec, options) {
   }
 }
 
+// The synthetic row that opens a verified path or URI. The icon is gated by
+// the same setting as every other row, and a URI takes the network glyph
+// because there is no local file to classify.
+function fileRow(target, isDir, showIcons) {
+  const isUri = target.kind === "uri"
+  const open = isUri ? target.uri : target.path
+  let iconName = ""
+  if (showIcons === true)
+    iconName = isUri ? "network-storage" : pathIconName(isDir, target.path)
+  return {
+    kind: "file",
+    uid: "file:" + open,
+    path: open,
+    label: "Open " + target.basename,
+    sub: "Open in default system app",
+    desc: "",
+    icon: iconName
+  }
+}
+
 function isManagedEntry(entry, cats) {
   const exec = String(entry.execString ?? entry.exec ?? "")
   const tui = exec.indexOf("vb-launch-tui") >= 0

@@ -971,6 +971,23 @@ group('appRow maps a record into the row the launcher renders', () => {
   eq('a non-string badge is stringified when enabled', LL.appRow(rec, { showBadges: true }).badge, 'webapp')
 })
 
+group('fileRow is the openable target the fallback slot offers', () => {
+  const local = { kind: 'local', path: '/home/u/notes.txt', basename: 'notes.txt' }
+  const row = LL.fileRow(local, false, true)
+  eq('the row kind', row.kind, 'file')
+  eq('the identity is the open target', row.uid, 'file:/home/u/notes.txt')
+  eq('the path', row.path, '/home/u/notes.txt')
+  eq('the label names the basename', row.label, 'Open notes.txt')
+  eq('the sub line states the default app', row.sub, 'Open in default system app')
+  eq('the description is empty', row.desc, '')
+  eq('the icon is the path icon', row.icon, LL.pathIconName(false, '/home/u/notes.txt'))
+  eq('a directory takes the folder icon', LL.fileRow({ kind: 'local', path: '/tmp', basename: 'tmp' }, true, true).icon, LL.pathIconName(true, '/tmp'))
+  eq('icons off leaves the field empty', LL.fileRow(local, false, false).icon, '')
+  const uri = { kind: 'uri', uri: 'https://example.com', basename: 'example.com' }
+  eq('a URI opens by its uri', LL.fileRow(uri, false, true).path, 'https://example.com')
+  eq('and takes the network glyph', LL.fileRow(uri, false, true).icon, 'network-storage')
+})
+
 group('a Power entry is excluded from the index regardless of settings', () => {
   // BASE_EXCLUDED_CATEGORIES: "Power entries are always excluded
   // entries from default mode", and this is now unconditional.
