@@ -196,4 +196,59 @@ group('no direction projects to no step', () => {
   eq('missing arguments', NK.project(undefined, undefined), 0)
 })
 
+// ---------------------------------------------------------------------------
+// PanelKeys.js - the route table the four list panels share
+// ---------------------------------------------------------------------------
+//
+// The four panel key handlers (launcher, clipboard, pass, wallpaper picker)
+// ask this table what a key means. A stand-in Qt object is handed in for the
+// same reason the section above hands in a code table: the library never names
+// a Qt enum, so the indirection is half of what is being tested.
+
+const PK = loadLib(path.join(SHELL_DIR, 'common/ui/PanelKeys.js'))
+const QT = {
+  Key_Down: 101, Key_Tab: 102, Key_Up: 103, Key_Backtab: 104,
+  Key_PageUp: 105, Key_PageDown: 106, Key_Home: 107, Key_End: 108,
+  Key_Return: 109, Key_Enter: 110, Key_Escape: 111, Key_Backspace: 112,
+  Key_Space: 113,
+}
+const route = (key, listMode = true, fieldFocused = false) =>
+  PK.route(key, QT, listMode, fieldFocused)
+
+section('panel-keys - one route table for the four list panels')
+
+group('the movement keys name their routes', () => {
+  eq('down is next', route(QT.Key_Down), 'next')
+  eq('tab is next too', route(QT.Key_Tab), 'next')
+  eq('up is previous', route(QT.Key_Up), 'prev')
+  eq('backtab is previous too', route(QT.Key_Backtab), 'prev')
+  eq('page up', route(QT.Key_PageUp), 'pageUp')
+  eq('page down', route(QT.Key_PageDown), 'pageDown')
+  eq('home is the first row', route(QT.Key_Home), 'first')
+  eq('end is the last row', route(QT.Key_End), 'last')
+})
+
+group('the action keys name their routes', () => {
+  eq('return activates', route(QT.Key_Return), 'activate')
+  eq('the keypad enter activates too', route(QT.Key_Enter), 'activate')
+  eq('escape backs out', route(QT.Key_Escape), 'escape')
+  eq('backspace is the way back', route(QT.Key_Backspace), 'back')
+})
+
+group('space is the query character unless the list owns the key', () => {
+  eq('on a list row it activates', route(QT.Key_Space, true, false), 'activate')
+  eq('with the field focused it is not a route', route(QT.Key_Space, true, true), '')
+  eq('with no list it is not a route', route(QT.Key_Space, false, false), '')
+})
+
+group('a key that is not a panel route answers empty', () => {
+  eq('a letter', route(0x41), '')
+  eq('delete is the panel own business', route(0x01000007), '')
+})
+
+group('a missing Qt table is refused rather than thrown', () => {
+  eq('null', PK.route(1, null, true, false), '')
+  eq('undefined', PK.route(1, undefined, true, false), '')
+})
+
 finish()

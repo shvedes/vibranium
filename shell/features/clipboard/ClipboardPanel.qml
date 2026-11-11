@@ -5,6 +5,7 @@ import QtQuick
 import Quickshell
 import qs.common
 import qs.features.clipboard
+import "../../common/ui/PanelKeys.js" as PanelKeys
 
 // Clipboard card - two-pane layout: list on left, preview on right.
 // Declarative via PanelCard + PanelFocus; a six-row window at rest.
@@ -684,25 +685,17 @@ PanelCard {
 
     if (k === Qt.Key_F && ctrl) { focusCtrl.grabFilter(); event.accepted = true; return }
 
-    switch (k) {
-      case Qt.Key_Down:
-      case Qt.Key_Tab:
-        panel.moveSelection(1); event.accepted = true; return
-      case Qt.Key_Up:
-      case Qt.Key_Backtab:
-        panel.moveSelection(-1); event.accepted = true; return
-      case Qt.Key_PageUp: panel.scrollBy(-0.8); event.accepted = true; return
-      case Qt.Key_PageDown: panel.scrollBy(0.8); event.accepted = true; return
-      case Qt.Key_Home: panel.jumpEnd(false); event.accepted = true; return
-      case Qt.Key_End: panel.jumpEnd(true); event.accepted = true; return
-      case Qt.Key_Return:
-      case Qt.Key_Enter: panel.activateCurrent(); event.accepted = true; return
-      case Qt.Key_Escape: panel.escapeChain(); event.accepted = true; return
-      case Qt.Key_Backspace:
+    switch (PanelKeys.route(k, Qt, focusCtrl.mode === "list", searchField.focused)) {
+      case "next": panel.moveSelection(1); event.accepted = true; return
+      case "prev": panel.moveSelection(-1); event.accepted = true; return
+      case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return
+      case "pageDown": panel.scrollBy(0.8); event.accepted = true; return
+      case "first": panel.jumpEnd(false); event.accepted = true; return
+      case "last": panel.jumpEnd(true); event.accepted = true; return
+      case "activate": panel.activateCurrent(); event.accepted = true; return
+      case "escape": panel.escapeChain(); event.accepted = true; return
+      case "back":
         if (focusCtrl.mode === "list") { focusCtrl.grabFilter(); event.accepted = true; return }
-        break
-      case Qt.Key_Space:
-        if (focusCtrl.mode === "list" && !searchField.focused) { panel.activateCurrent(); event.accepted = true; return }
         break
     }
 

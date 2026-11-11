@@ -7,6 +7,7 @@ import qs.features.launcher
 import qs.features.clipboard
 import "LauncherLib.js" as LauncherLib
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
+import "../../common/ui/PanelKeys.js" as PanelKeys
 
 // The launcher card: search bar over a compact result list, built from the
 // same region math and chrome tokens as MenuPanel so the two surfaces read
@@ -832,34 +833,30 @@ PanelCard {
     if (k === Qt.Key_I && ctrl) { panel.toggleInfoCurrent(); event.accepted = true; return }
     if (k === Qt.Key_F && ctrl) { focusCtrl.grabFilter(); event.accepted = true; return }
 
-    switch (k) {
-      case Qt.Key_Down:
-        if (panel._deleteIndex < 0) { panel.moveSelection(1); event.accepted = true; return }
-        break
-      case Qt.Key_Tab:
-        if (panel._deleteIndex >= 0) panel.closeDelete()
+    switch (PanelKeys.route(k, Qt, focusCtrl.mode === "list", searchField.focused)) {
+      case "next":
+        // A staged delete owns Down/Tab: Tab closes it and moves, Down is
+        // refused so the row under the cursor cannot slip away mid-confirm.
+        if (panel._deleteIndex >= 0) {
+          if (k !== Qt.Key_Tab) break
+          panel.closeDelete()
+        }
         panel.moveSelection(1); event.accepted = true; return
-      case Qt.Key_Up:
-        if (panel._deleteIndex < 0) { panel.moveSelection(-1); event.accepted = true; return }
-        break
-      case Qt.Key_Backtab:
-        if (panel._deleteIndex >= 0) panel.closeDelete()
+      case "prev":
+        if (panel._deleteIndex >= 0) {
+          if (k !== Qt.Key_Backtab) break
+          panel.closeDelete()
+        }
         panel.moveSelection(-1); event.accepted = true; return
-      case Qt.Key_PageUp: panel.scrollBy(-0.8); event.accepted = true; return
-      case Qt.Key_PageDown: panel.scrollBy(0.8); event.accepted = true; return
-      case Qt.Key_Home: panel.jumpEnd(false); event.accepted = true; return
-      case Qt.Key_End: panel.jumpEnd(true); event.accepted = true; return
-      case Qt.Key_Return:
-      case Qt.Key_Enter: panel.activateCurrent(); event.accepted = true; return
-      case Qt.Key_Escape: panel.escapeChain(); event.accepted = true; return
-      case Qt.Key_Backspace:
-      case Qt.Key_Delete:
+      case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return
+      case "pageDown": panel.scrollBy(0.8); event.accepted = true; return
+      case "first": panel.jumpEnd(false); event.accepted = true; return
+      case "last": panel.jumpEnd(true); event.accepted = true; return
+      case "activate": panel.activateCurrent(); event.accepted = true; return
+      case "escape": panel.escapeChain(); event.accepted = true; return
+      case "back":
         if (panel._deleteIndex >= 0) { panel.closeDelete(); event.accepted = true; return }
         if (focusCtrl.mode === "list") { focusCtrl.grabFilter(); event.accepted = true; return }
-        break
-      case Qt.Key_Space:
-        // in list mode, Space activates like Enter (menu parity) except when filtering
-        if (focusCtrl.mode === "list" && !searchField.focused) { panel.activateCurrent(); event.accepted = true; return }
         break
     }
 

@@ -8,6 +8,7 @@ import qs.features.pass
 import "Model.js" as Model
 import "../../common/text/StringUtils.js" as SU
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
+import "../../common/ui/PanelKeys.js" as PanelKeys
 
 // Password-manager card over the Pass service: root menu (Browse Vault
 // + git), folder browser with leading create rows, per-entry actions and
@@ -1296,35 +1297,29 @@ PanelCard {
     // "/" focuses the filter like the other menus' prefix habit.
     if (k === Qt.Key_Slash && !ctrl && !meta) { panel.beginPageFilter(); event.accepted = true; return }
 
-    switch (k) {
-      case Qt.Key_Down:
-      case Qt.Key_Tab:
-        panel.moveSelection(1); event.accepted = true; return
-      case Qt.Key_Up:
-      case Qt.Key_Backtab:
-        panel.moveSelection(-1); event.accepted = true; return
-      case Qt.Key_PageUp: panel.scrollBy(-0.8); event.accepted = true; return
-      case Qt.Key_PageDown: panel.scrollBy(0.8); event.accepted = true; return
-      case Qt.Key_Home: panel.jumpEnd(false); event.accepted = true; return
-      case Qt.Key_End: panel.jumpEnd(true); event.accepted = true; return
-      case Qt.Key_Return:
-      case Qt.Key_Enter:
+    // Escape is handled above, before the field and package guards, so that
+    // route is not repeated here.
+    switch (PanelKeys.route(k, Qt, true, searchField.focused)) {
+      case "next": panel.moveSelection(1); event.accepted = true; return
+      case "prev": panel.moveSelection(-1); event.accepted = true; return
+      case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return
+      case "pageDown": panel.scrollBy(0.8); event.accepted = true; return
+      case "first": panel.jumpEnd(false); event.accepted = true; return
+      case "last": panel.jumpEnd(true); event.accepted = true; return
+      case "activate":
         // `focused`, not `activeFocus`: InputField is a wrapper Rectangle and
         // the focus lives on the inner TextField it exposes as `focused`, so
         // `activeFocus` on the wrapper is permanently false and this guard
         // never stood down.
         if (searchField.focused) return
         panel.activateCurrent(); event.accepted = true; return
-      case Qt.Key_Backspace:
+      case "back":
         // The way back, not the filter trigger - matching MenuLib.keyRoute.
         // With the field active the caret has the key (and an empty field
         // escapes through onBackspaceEmpty, below); with it inactive this
         // walks the same chain Escape walks.
         if (searchField.focused) return
         panel.escapeChain(); event.accepted = true; return
-      case Qt.Key_Space:
-        if (searchField.focused) return
-        panel.activateCurrent(); event.accepted = true; return
     }
 
     // List-first typing feeds the filter, launcher parity.

@@ -7,6 +7,7 @@ import qs.common
 import qs.features.wallpaper
 import qs.features.wallpaperPicker
 import "../../common/text/StringUtils.js" as SU
+import "../../common/ui/PanelKeys.js" as PanelKeys
 
 // Wallpaper picker card - two-pane layout: list left, preview right.
 // Declarative via PanelCard + PanelFocus; fixed 6-row window.
@@ -431,26 +432,17 @@ PanelCard {
       return
     }
     if (k === Qt.Key_F && ctrl) { focusCtrl.grabFilter(); event.accepted = true; return }
-    switch (k) {
-      case Qt.Key_Down:
-      case Qt.Key_Tab:
-        panel.moveSelection(1); event.accepted = true; return
-      case Qt.Key_Up:
-      case Qt.Key_Backtab:
-        panel.moveSelection(-1); event.accepted = true; return
-      case Qt.Key_PageUp: panel.scrollBy(-0.8); event.accepted = true; return
-      case Qt.Key_PageDown: panel.scrollBy(0.8); event.accepted = true; return
-      case Qt.Key_Home: list.seat(0, "step"); event.accepted = true; return
-      case Qt.Key_End: list.seat(panel.rows.length - 1, "step"); event.accepted = true; return
-      case Qt.Key_Return:
-      case Qt.Key_Enter: panel.activateCurrent(); event.accepted = true; return
-      case Qt.Key_Escape: panel.escapeChain(); event.accepted = true; return
-      case Qt.Key_Backspace:
-      case Qt.Key_Delete:
+    switch (PanelKeys.route(k, Qt, focusCtrl.mode === "list", searchField.focused)) {
+      case "next": panel.moveSelection(1); event.accepted = true; return
+      case "prev": panel.moveSelection(-1); event.accepted = true; return
+      case "pageUp": panel.scrollBy(-0.8); event.accepted = true; return
+      case "pageDown": panel.scrollBy(0.8); event.accepted = true; return
+      case "first": list.seat(0, "step"); event.accepted = true; return
+      case "last": list.seat(panel.rows.length - 1, "step"); event.accepted = true; return
+      case "activate": panel.activateCurrent(); event.accepted = true; return
+      case "escape": panel.escapeChain(); event.accepted = true; return
+      case "back":
         if (focusCtrl.mode === "list") { focusCtrl.grabFilter(); event.accepted = true; return }
-        break
-      case Qt.Key_Space:
-        if (focusCtrl.mode === "list" && !searchField.focused) { panel.activateCurrent(); event.accepted = true; return }
         break
     }
     if (!ctrl && !meta && event.text.length === 1 && event.text.charCodeAt(0) >= 32) {
