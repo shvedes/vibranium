@@ -44,30 +44,35 @@ Singleton {
   })
   readonly property string tag: "theme"
 
+  // Minimal defaults matching qs.json; keep in sync with theme generation.
+  // Built once rather than per miss: color() is what every palette binding
+  // goes through (Ui.tint and Ui.solid among them), so a table allocated on
+  // the miss path was garbage for every unknown key and for each early-boot
+  // lookup before the palette landed.
+  readonly property var fallbacks: ({
+    background_0: "#141414",
+    background_1: "#242424",
+    background_2: "#393939",
+    background_3: "#434343",
+    foreground_0: "#dfdfdf",
+    foreground_1: "#d5d5d5",
+    accent: "#8a8a8a",
+    red: "#877070",
+    green: "#728872",
+    yellow: "#8d8872",
+    blue: "#728391",
+    cyan: "#728b8d",
+    orange: "#8f7d70",
+    purple: "#7d7691"
+  })
+
   function color(key) {
     const v = root.colors[key]
     // Fallback to avoid "Unable to assign [undefined] to QColor" during
     // early boot when paletteFile hasn't loaded yet. The real palette
     // arrives within milliseconds and rebins the binding.
     if (v !== undefined) return v
-    // Minimal defaults matching qs.json; keep in sync with theme generation.
-    const fallbacks = {
-      background_0: "#141414",
-      background_1: "#242424",
-      background_2: "#393939",
-      background_3: "#434343",
-      foreground_0: "#dfdfdf",
-      foreground_1: "#d5d5d5",
-      accent: "#8a8a8a",
-      red: "#877070",
-      green: "#728872",
-      yellow: "#8d8872",
-      blue: "#728391",
-      cyan: "#728b8d",
-      orange: "#8f7d70",
-      purple: "#7d7691"
-    }
-    return fallbacks[key] !== undefined ? fallbacks[key] : "#000000"
+    return root.fallbacks[key] !== undefined ? root.fallbacks[key] : "#000000"
   }
 
   // Forced fresh read; called on boot and by the renderer's refresh poke.

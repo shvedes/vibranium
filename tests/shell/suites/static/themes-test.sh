@@ -547,8 +547,8 @@ ADAPTER_KEYS="$(sed -n '/id: paletteAdapter/,/^    }/p' "$THEME_QML" |
   sed -n 's/^      property string \([A-Za-z0-9_]*\):.*/\1/p' | LC_ALL=C sort -u)"
 t_eq "Theme.qml's JsonAdapter declares the same 14" \
   "$QS_KEYS" "$ADAPTER_KEYS"
-FALLBACK_KEYS="$(sed -n '/const fallbacks = {/,/^    }/p' "$THEME_QML" |
-  sed -n 's/^      \([A-Za-z0-9_]*\):.*/\1/p' | LC_ALL=C sort -u)"
+FALLBACK_KEYS="$(sed -n '/property var fallbacks/,/^  })/p' "$THEME_QML" |
+  sed -n 's/^ *\([A-Za-z0-9_]*\):.*/\1/p' | LC_ALL=C sort -u)"
 t_eq "and the color() fallbacks are the same 14 again" "$QS_KEYS" "$FALLBACK_KEYS"
 t_contains "which is why a missing key is a bug to surface" \
   'a missing key is a bug to surface' "$(<"$THEME_QML")"
