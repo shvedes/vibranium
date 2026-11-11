@@ -16,3 +16,12 @@ function capacityOf(value) {
 function isKey(value) {
   return typeof value === "string" && value.length > 0
 }
+
+// A value that can be treated as a record: a non-null object that is not an
+// array. The settings sections, the cached payloads and the bus replies all
+// ask this before copying or reading a field, and stating it once keeps
+// "null", "array" and "undefined" from being three different answers.
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+}
+

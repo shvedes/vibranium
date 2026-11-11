@@ -25,6 +25,8 @@
 // decoded name again.
 .pragma library
 
+.import "../collections/StoreGuards.js" as StoreGuards
+
 const LEXICAL = "lexical"
 const MODES = ["create", "write", "replace", "read", "rename_dest"]
 const RECURSIVE = ["recursive_delete", "recursive_copy", "recursive_move"]
@@ -246,7 +248,7 @@ function singleSegment(value) {
 }
 
 function isOptions(options) {
-  return options !== null && typeof options === "object" && !Array.isArray(options)
+  return StoreGuards.isPlainObject(options)
 }
 
 // Exact membership, so a near-miss spelling of a recursive or private

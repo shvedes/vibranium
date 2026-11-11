@@ -2,6 +2,7 @@
 
 .import "../../common/settings/HyprlandEditor.js" as HyprlandEditor
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 .import "../../common/bus/Busctl.js" as Busctl
 
 // Pure policy for the connectivity watcher: the NetworkManager D-Bus value
@@ -397,21 +398,18 @@ function mutedKey(ssid) {
 
 // Whether the cache section mutes metered cards for this network.
 function isMuted(section, ssid) {
-  const s = section !== null && typeof section === "object" && !Array.isArray(section)
-    ? section : null
+  const s = StoreGuards.isPlainObject(section) ? section : null
   if (s === null) return false
   const muted = s.mutedMetered
-  if (muted === null || typeof muted !== "object" || Array.isArray(muted)) return false
+  if (!StoreGuards.isPlainObject(muted)) return false
   return muted[mutedKey(ssid)] === true
 }
 
 // Section copy with this network muted. Pure: the service writes the
 // result back through ShellCache.
 function withMuted(section, ssid) {
-  const s = section !== null && typeof section === "object" && !Array.isArray(section)
-    ? section : {}
-  const muted = s.mutedMetered !== null && typeof s.mutedMetered === "object" && !Array.isArray(s.mutedMetered)
-    ? s.mutedMetered : {}
+  const s = StoreGuards.isPlainObject(section) ? section : {}
+  const muted = StoreGuards.isPlainObject(s.mutedMetered) ? s.mutedMetered : {}
   const nextMuted = Object.assign({}, muted)
   nextMuted[mutedKey(ssid)] = true
   const next = Object.assign({}, s)
@@ -548,13 +546,10 @@ function meteredMilestone(total, notified, threshold) {
 // Pure, like withMuted: the caller writes the result back through the cache,
 // and the mute map rides along untouched.
 function withMeteredUsage(section, key, total, notified) {
-  const s = section !== null && typeof section === "object" && !Array.isArray(section)
-    ? section : {}
+  const s = StoreGuards.isPlainObject(section) ? section : {}
   const next = Object.assign({}, s)
-  const usage = s.meteredUsage !== null && typeof s.meteredUsage === "object" && !Array.isArray(s.meteredUsage)
-    ? s.meteredUsage : {}
-  const notifiedMap = s.meteredUsageNotified !== null && typeof s.meteredUsageNotified === "object" && !Array.isArray(s.meteredUsageNotified)
-    ? s.meteredUsageNotified : {}
+  const usage = StoreGuards.isPlainObject(s.meteredUsage) ? s.meteredUsage : {}
+  const notifiedMap = StoreGuards.isPlainObject(s.meteredUsageNotified) ? s.meteredUsageNotified : {}
   const filed = String(key === undefined || key === null ? "" : key)
   next.meteredUsage = Object.assign({}, usage)
   next.meteredUsage[filed] = total

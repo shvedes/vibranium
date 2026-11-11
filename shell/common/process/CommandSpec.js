@@ -18,6 +18,8 @@
 // source, so metacharacters stay data in every form.
 .pragma library
 
+.import "../collections/StoreGuards.js" as StoreGuards
+
 const ARGV = "argv"
 const TEMPLATE = "template"
 const TRUSTED_SHELL = "trusted_shell"
@@ -42,7 +44,7 @@ function argv(command) {
 
 function trustedShell(script, options) {
   if (typeof script !== "string" || script.trim() === "") return invalid("invalid_script")
-  if (!isObject(options)) return invalid("invalid_options")
+  if (!StoreGuards.isPlainObject(options)) return invalid("invalid_options")
   if (options.trusted !== true) return invalid("untrusted_shell")
   if (options.trusted_env === true && !validEnv(options.env)) return invalid("invalid_env")
   if (options.trusted_interpolation === true && !validHoles(options.holes)) {
@@ -90,8 +92,10 @@ function isData(value) {
   return typeof value === "string" && value !== "" && value.indexOf("\0") < 0
 }
 
+// Public predicate name kept for the module's callers and its suite; the
+// record rule itself lives in StoreGuards with the other store guards.
 function isObject(value) {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
+  return StoreGuards.isPlainObject(value)
 }
 
 function invalid(code) {
@@ -110,7 +114,7 @@ function shellArgv(script, source) {
 
 function validEnv(env) {
   if (env === undefined) return true
-  if (!isObject(env)) return false
+  if (!StoreGuards.isPlainObject(env)) return false
   const names = Object.keys(env)
   for (let i = 0; i < names.length; i++) {
     if (!isIdentifier(names[i])) return false

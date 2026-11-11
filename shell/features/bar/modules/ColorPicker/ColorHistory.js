@@ -1,6 +1,7 @@
 .pragma library
 
 .import "../../../../common/math/Color.js" as Color
+.import "../../../../common/collections/StoreGuards.js" as StoreGuards
 
 // The picker's stored-history shapes: the dedupe key a record is matched by,
 // the formats map the store accepts, and the parser that turns the persisted
@@ -65,12 +66,10 @@ function parseHistory(text) {
   if (s.charAt(0) === "{") {
     let wrap = null
     try { wrap = JSON.parse(s) } catch (e) { wrap = null }
-    if (wrap !== null && typeof wrap === "object" && !Array.isArray(wrap)
-      && wrap.data !== undefined) {
+    if (StoreGuards.isPlainObject(wrap) && wrap.data !== undefined) {
       const inner = wrap.data
       if (Array.isArray(inner)) return _recordsFromArray(inner)
-      if (inner !== null && typeof inner === "object" && !Array.isArray(inner)
-        && Array.isArray(inner.records)) return _recordsFromArray(inner.records)
+      if (StoreGuards.isPlainObject(inner) && Array.isArray(inner.records)) return _recordsFromArray(inner.records)
       return []
     }
   }
