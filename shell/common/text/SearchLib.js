@@ -15,6 +15,8 @@
 // plumbing routes through here.
 .pragma library
 
+.import "../collections/StoreGuards.js" as StoreGuards
+
 // Lowercase + trim the raw query -> the string every search compares.
 // -> String(query ?? "") so a nullish query is blank instead of a throw;
 // -> a direct query.toLowerCase() throws on null, so the guard belongs
@@ -112,7 +114,7 @@ function narrowsQuery(sameIndex, cachedQ, q, hits) {
 // -> A blank query with cap 0, past the pool, or undefined falls back to
 // -> the whole pool; a filtered query caps rows but never the count.
 function filterCounter(pool, query, cap, searchFn, tiebreak) {
-  const list = Array.isArray(pool) ? pool : []
+  const list = StoreGuards.asList(pool)
   const total = list.length
   if (normalizeQuery(query) === "") {
     const n = cap > 0 && cap < total ? cap : total
