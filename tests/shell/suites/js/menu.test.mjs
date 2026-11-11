@@ -4283,6 +4283,32 @@ group('MenuState close-latch maps are copy-on-write', () => {
   ne('and is a new map', gone, base)
 })
 
+const SP = loadLib(path.join(SHELL_DIR, 'features/menu/MenuSpawnProbe.js'))
+
+group('MenuSpawnProbe names a spawn that inherited the previous box', () => {
+  const carried = SP.verdict(400, 400.2, 200)
+  eq('a first frame at the previous height that settles elsewhere is carried', carried.carried, true)
+  eq('and its drift is the gap the user saw', carried.drift, 200)
+  eq('while the previous height is echoed back', carried.prevH, 400)
+  const own = SP.verdict(400, 200, 200)
+  eq('a spawn born at its own size is not carried', own.carried, false)
+  eq('and drifts by nothing', own.drift, 0)
+  const cold = SP.verdict(-1, 200, 200)
+  eq('a cold card reports no verdict', cold.cold, true)
+  eq('so it can never be carried', cold.carried, false)
+  eq('and reports the missing previous height as -1', cold.prevH, -1)
+  const coldCarry = SP.verdict(-1, -1, 200)
+  eq('a cold card whose first frame was also unread is still not carried', coldCarry.carried, false)
+  eq('with no first height', coldCarry.firstH, -1)
+  eq('and no drift to report', coldCarry.drift, -1)
+  const half = SP.verdict(400, 400, -1)
+  eq('a spawn that never settled has no drift', half.drift, -1)
+  eq('and is not called carried without a resting size', half.carried, false)
+  const rounded = SP.verdict(400.4, 400.2, 200.7)
+  eq('heights are reported rounded', rounded.prevH + '/' + rounded.firstH + '/' + rounded.settledH, '400/400/201')
+  eq('a sub-pixel match is still the same box', rounded.carried, true)
+})
+
 group('MenuState.pruneSlotCloses keeps only rows the model still lists', () => {
   const map = { a: true, b: true }
   is('a full model prunes nothing, so the map is reused',

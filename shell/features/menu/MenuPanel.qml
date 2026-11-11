@@ -9,6 +9,7 @@ import "MenuLib.js" as MenuLib
 import "MenuLayout.js" as MenuLayout
 import "MenuRows.js" as MenuRows
 import "MenuQuiesce.js" as MenuQuiesce
+import "MenuSpawnProbe.js" as MenuSpawnProbe
 import "../../common/math/Range.js" as Range
 import "../../common/ui/RowMetrics.js" as RowMetrics
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
@@ -2703,7 +2704,6 @@ Rectangle {
   property real _spawnLayoutH: -1
   property real _spawnSettledH: -1
   property bool _spawnArmed: false
-  readonly property bool _spawnCold: panel._spawnPrevH < 0
 
   // Armed on the summon edge and disarmed by the transition's own end, so
   // the probe measures the spawn and cannot keep sampling a card that has
@@ -2755,27 +2755,15 @@ Rectangle {
   }
 
   // The verdict, as a number and a boolean. `drift` is the gap the user saw:
-  // how far the first frame sat from where the card came to rest.
+  // how far the first frame sat from where the card came to rest; the rule
+  // itself is MenuSpawnProbe's.
   function probeSpawn() {
-    const settled = panel._spawnSettledH
-    const first = panel._spawnLayoutH
-    return {
-      // False once the spawn has settled, which is the normal state between
-      // summons: the record below is a completed verdict, not a live one.
-      armed: panel._spawnArmed,
-      cold: panel._spawnCold,
-      prevH: Math.round(panel._spawnPrevH),
-      firstH: first < 0 ? -1 : Math.round(first),
-      settledH: settled < 0 ? -1 : Math.round(settled),
-      // Positive means the first frame was TALLER than the resting size, the
-      // direction a spawn that inherited a longer previous menu drifts.
-      drift: (first < 0 || settled < 0) ? -1 : Math.round(first - settled),
-      // A carried box, named as one: the first frame matched the previous
-      // menu's height while the card went on to settle somewhere else.
-      carried: !panel._spawnCold && first >= 0 && settled >= 0
-        && Math.abs(first - panel._spawnPrevH) < 0.5
-        && Math.abs(settled - panel._spawnPrevH) >= 0.5
-    }
+    const v = MenuSpawnProbe.verdict(panel._spawnPrevH, panel._spawnLayoutH,
+      panel._spawnSettledH)
+    // False once the spawn has settled, which is the normal state between
+    // summons: the record is a completed verdict, not a live one.
+    v.armed = panel._spawnArmed
+    return v
   }
 
   color: Ui.solid("background_0")
