@@ -449,17 +449,34 @@ Singleton {
         return true
     }
 
-    // One reload per settled change, not one per write.
+    // One reload per interval, not one per write.
     //
     // A range row commits on every pointer move (Entry.seek -> Menu.setValue ->
-    // setOption -> _commitHypr), and each commit used to spawn `hyprctl reload
-    // config-only` immediately: measured at 8.6ms of process per call here, plus
-    // a full compositor config reload, so one drag across the bar ran dozens of
-    // them. The file writes stay immediate - they are one read plus one atomic
-    // write, 0.02ms - and only the reload coalesces, trailing-edge, so the last
-    // value written is the one that lands. A toggle now applies 80ms later,
-    // which is below noticing, and a drag applies once instead of per pixel.
+    // setOption -> _commitHypr) and a held +/- key commits on every key repeat
+    // (Entry.stepBy), so a commit must not spawn `hyprctl reload config-only`
+    // immediately: measured at 8.6ms of process per call here, plus a full
+    // compositor config reload. The file writes stay immediate - one read plus
+    // one atomic write, 0.02ms - and only the reload coalesces.
+    //
+    // It coalesces as a leading-edge throttle with a trailing flush: the first
+    // change of a burst reloads at once, changes inside the interval collapse
+    // into the next tick, and the last value always lands. A pure trailing
+    // debounce restarted on every write, which is exactly what a held key
+    // produces, so nothing reached the compositor until the key came up and the
+    // gaps only moved after the press ended.
+    property bool _reloadDirty: false
+
     function _reloadHyprland() {
+        root._reloadDirty = true
+        if (!reloadTimer.running) root._flushReloads()
+    }
+
+    // The reload owed since the last tick, plus the interval that rate-limits
+    // the next one.
+    function _flushReloads() {
+        if (!root._reloadDirty) return
+        root._reloadDirty = false
+        root._reloadNow()
         reloadTimer.restart()
     }
 
@@ -489,7 +506,7 @@ Singleton {
         id: reloadTimer
         interval: 80
         repeat: false
-        onTriggered: root._reloadNow()
+        onTriggered: root._flushReloads()
     }
 
     Process {
