@@ -371,8 +371,8 @@ function displayToDoc(mx, my, geom, vr, rot) {
   const lx = bx * ca + by * sa + vw / 2
   const ly = -bx * sa + by * ca + vh / 2
   return {
-    x: Math.max(vx, Math.min(vx + vw, lx + vx)),
-    y: Math.max(vy, Math.min(vy + vh, ly + vy))
+    x: Range.clamp(lx + vx, vx, vx + vw),
+    y: Range.clamp(ly + vy, vy, vy + vh)
   }
 }
 
@@ -410,7 +410,7 @@ function _segDist2(px, py, ax, ay, bx, by) {
   const dy = by - ay
   const len2 = dx * dx + dy * dy
   let t = len2 > 0 ? ((px - ax) * dx + (py - ay) * dy) / len2 : 0
-  t = Math.max(0, Math.min(1, t))
+  t = Range.clamp01(t)
   const cx = ax + t * dx - px
   const cy = ay + t * dy - py
   return cx * cx + cy * cy
