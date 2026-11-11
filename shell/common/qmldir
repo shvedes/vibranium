@@ -25,6 +25,8 @@ singleton WindowFocus 1.0 window/WindowFocus.qml
 singleton WindowScreen 1.0 window/WindowScreen.qml
 singleton FullscreenProbe 1.0 window/FullscreenProbe.qml
 singleton DesktopLayoutState 1.0 state/DesktopLayoutState.qml
+singleton PlaybackClock 1.0 state/PlaybackClock.qml
+PlaybackClockHold 1.0 state/PlaybackClockHold.qml
 singleton FilePresence 1.0 state/FilePresence.qml
 singleton OptionHost 1.0 runtime/OptionHost.qml
 singleton ProviderHost 1.0 runtime/ProviderHost.qml

@@ -282,14 +282,17 @@ PanelWindow {
     artNext.source = root.artUrl
   }
 
-  // The transcript follows the clock the way the island's does: one position
-  // poll per second while the client plays, plus the daemon's own notify. The
-  // pane needs no clock of its own.
-  Timer {
-    interval: 1000
-    repeat: true
-    running: root.opened && root.playing && !root._seeking && root.player !== null
-    onTriggered: if (root.player) root.player.positionChanged()
+  // The transcript follows the shared playback clock the way the island does:
+  // one position advance per second while the client plays, plus the daemon's
+  // own notify. The pane holds the clock only while it is open on a playing
+  // client, so a sheet left closed costs no wakeup.
+  PlaybackClockHold {
+    wanted: root.opened && root.playing && !root._seeking && root.player !== null
+  }
+
+  Connections {
+    target: PlaybackClock
+    function onTick() { if (root.player) root.player.positionChanged() }
   }
 
   Connections {

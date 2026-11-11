@@ -120,20 +120,18 @@ Item {
     if (!root.playing) root._lockPauseSettled = true
   }
 
-  // Keep position fresh while playing - MPRIS only pushes on seeks,
-  // so we poll via positionChanged() as recommended in the docs.
-  //
-  // The pill polls whichever client it shows, including the active one:
-  // nothing else ticks that player, and the pinned client can fall out of
-  // the head mid-lock (a newcomer starts playing).
-  Timer {
-    id: poll
-    interval: 1000
-    running: root.playing && root.player !== null
-    repeat: true
-    onTriggered: {
-      if (root.player) root.player.positionChanged()
-    }
+  // Keep position fresh while playing - MPRIS only pushes on seeks, so the
+  // position needs a 1 Hz nudge. That nudge is the shared playback clock's
+  // tick, held only while this pill is tracking a playing client: the pill
+  // pins whichever client it shows, including the active one, because nothing
+  // else may tick that player while the lock holds it.
+  PlaybackClockHold {
+    wanted: root.playing && root.player !== null
+  }
+
+  Connections {
+    target: PlaybackClock
+    function onTick() { if (root.player) root.player.positionChanged() }
   }
 
   Connections {

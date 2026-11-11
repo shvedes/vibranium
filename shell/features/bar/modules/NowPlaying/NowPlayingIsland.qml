@@ -499,16 +499,18 @@ Item {
     root.player.togglePlaying()
   }
 
-  // Discrete MPRIS position, polled like the lockscreen: the notify
-  // re-evaluates shownPosition, the strip width follows. The card polls
-  // whichever client it shows, including the active one.
-  Timer {
-    interval: 1000
-    running: root.playing && !root._seeking && root.player !== null
-    repeat: true
-    onTriggered: {
-      if (root.player) root.player.positionChanged()
-    }
+  // Discrete MPRIS position, driven by the shared playback clock: the notify
+  // re-evaluates shownPosition and the strip width follows. The card tracks
+  // whichever client it shows, including the active one, and holds the clock
+  // only while it is actually advancing a position - a paused or scrubbed
+  // card takes no tick at all.
+  PlaybackClockHold {
+    wanted: root.playing && !root._seeking && root.player !== null
+  }
+
+  Connections {
+    target: PlaybackClock
+    function onTick() { if (root.player) root.player.positionChanged() }
   }
 
   Connections {
