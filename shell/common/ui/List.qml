@@ -214,9 +214,8 @@ ListView {
       // move the user just made. The gesture is the newer intent, so it
       // ends the arm rather than feeding it.
       root._keepCursor = false
-    } else {
-      if (index === -1) {
-      } else if (index >= 0 && index < root.count) {
+    } else if (index !== -1) {
+      if (index >= 0 && index < root.count) {
         root._stillAcquire()
         if (snap === true && index <= 0) root.seatTo(0, false, "seat")
       } else {
