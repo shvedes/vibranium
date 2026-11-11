@@ -787,7 +787,7 @@ function _toNumber(v) {
 // layout value: object with array zones of deduped non-empty id strings.
 // Unknown keys are ignored. Returns {value} (normalized) or {error}.
 function validateLayout(v) {
-  if (v === null || typeof v !== "object" || Array.isArray(v))
+  if (!StoreGuards.isPlainObject(v))
     return { error: "expected an object" }
   const zones = { left: [], center: [], right: [], disabled: [] }
   const names = ["left", "center", "right", "disabled"]
@@ -896,7 +896,7 @@ function normalizeIdleTimers(list) {
   const out = []
   for (let i = 0; i < list.length; i++) {
     const r = list[i]
-    if (typeof r !== "object" || r === null || Array.isArray(r)) return list
+    if (!StoreGuards.isPlainObject(r)) return list
     if (r.action === "command" && declaredIdleClass(r) === "" && typeof r.command === "string") {
       const found = IDLE_VERB_CLASS[String(r.command).trim()]
       if (found !== undefined) {
@@ -1089,7 +1089,7 @@ function parseUserSource(text) {
   } catch (e) {
     return { raw: {}, fault: "malformed" }
   }
-  if (data === null || typeof data !== "object" || Array.isArray(data))
+  if (!StoreGuards.isPlainObject(data))
     return { raw: {}, fault: "malformed" }
   return { raw: data, fault: "" }
 }
