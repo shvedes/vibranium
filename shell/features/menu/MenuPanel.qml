@@ -192,12 +192,6 @@ Rectangle {
   // Written by beginPageTransition and by both branches of
   // _startHeightTransition/finishHeightTransition.
   //
-  // NOTHING READS IT. listRegionH's pending-fit branch asks _currentListH,
-  // which is the same number by another route and also covers a tween
-  // already in flight; preferring the latched number here is the
-  // filter-expand jump. It is kept written because it is part of the hold's
-  // bookkeeping, but nothing depends on it, so treat it as removable.
-  property real _heldListH: -1
   property real _committedListH: -1
   property real _animatedListH: -1
   property real _heightTargetH: -1
@@ -247,7 +241,6 @@ Rectangle {
     fitRetryTimer.stop()
     fitRetryTimer.fitCallback = null
     panel._pendingSlideDepth = -1
-    panel._heldListH = -1
     panel._animatedListH = -1
     // The resting size this surface was showing when it closed, and the
     // measurement that produced it, describe the menu that was open. Carried
@@ -307,7 +300,6 @@ Rectangle {
     fitRetryTimer.fitCallback = null
     heightAnim.stop()
     slideAnim.stop()
-    panel._heldListH = held
     panel._animatedListH = held
     // The hold has captured whatever the card is showing, open slot included,
     // so the claim about the page being left can go: the transition owns the
@@ -376,7 +368,6 @@ Rectangle {
       panel._heightTargetH = next
       panel._animatedListH = next
       panel._committedListH = next
-      panel._heldListH = next
       if (gen >= 0) Qt.callLater(() => panel._finishPageTransition(gen))
       return
     }
@@ -414,7 +405,6 @@ Rectangle {
     panel._heightAnimating = false
     panel._animatedListH = target
     panel._committedListH = target
-    panel._heldListH = target
     if (gen >= 0) Qt.callLater(() => panel._finishPageTransition(gen))
   }
 

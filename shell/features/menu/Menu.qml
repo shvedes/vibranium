@@ -624,7 +624,6 @@ Singleton {
     root.beginRestore(bundle.entry)
     root._states = {}
     root._closingRows = {}
-    root._closePending = 0
     root.stack = [{ id: bundle.entry, sel: 0, y: 0 }]
     root._buildCondIndex()
     root.recomputeDeadLinks()
@@ -819,7 +818,6 @@ Singleton {
 
   // Slots the global close easing is still holding (see slotClosing).
   property var _closingRows: ({})
-  property int _closePending: 0
 
   // Blow-by-blow latch for per-row slot closes, uid -> true. Armed at the
   // collapse choke point (setExpanded/setInfo with value !== true, where
