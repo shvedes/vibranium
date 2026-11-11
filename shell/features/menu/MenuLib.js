@@ -13,6 +13,7 @@
 .pragma library
 
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/text/Format.js" as Format
 .import "../../common/math/Range.js" as Range
 .import "../../common/collections/StoreGuards.js" as StoreGuards
 // Filter counting routes through the launcher's own matcher over a full
@@ -66,8 +67,8 @@ function widestValueString(item) {
   if (item.type === "range" || item.type === "number") {
     const lo = Number(item.min ?? 0)
     const hi = Number(item.max ?? 100)
-    const loStr = lo.toFixed(dec)
-    const hiStr = hi.toFixed(dec)
+    const loStr = Format.fixed(lo, dec)
+    const hiStr = Format.fixed(hi, dec)
     // If range straddles zero, the negative side may be longest even when
     // hi has more digits - e.g. -1.00 (5) vs 1.00 (4). Pick longest of lo/hi.
     let longest = loStr.length >= hiStr.length ? loStr : hiStr
