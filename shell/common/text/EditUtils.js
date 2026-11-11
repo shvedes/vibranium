@@ -5,9 +5,11 @@
 // QML panels can import it as `EditUtils` and keep keyboard parity.
 .pragma library
 
+.import "../math/Range.js" as Range
+
 function boundaryBackward(text, from) {
   const t = String(text ?? "")
-  let i = Math.min(Math.max(0, from), t.length)
+  let i = Range.clamp(from, 0, t.length)
   while (i > 0 && /\s/.test(t[i - 1])) i--
   while (i > 0 && !/\s/.test(t[i - 1])) i--
   return i
@@ -16,7 +18,7 @@ function boundaryBackward(text, from) {
 function boundaryForward(text, from) {
   const t = String(text ?? "")
   const n = t.length
-  let i = Math.min(Math.max(0, from), n)
+  let i = Range.clamp(from, 0, n)
   while (i < n && !/\s/.test(t[i])) i++
   while (i < n && /\s/.test(t[i])) i++
   return i

@@ -277,8 +277,8 @@ Item {
           ctx.fillStyle = root._label
           ctx.font = Ui.fontXs + "px \"" + Ui.fontFamily + "\""
           ctx.textBaseline = "alphabetic"
-          var yTopTxt = (Math.round(y1 * 100) / 100).toString()
-          var yBotTxt = (Math.round(y0 * 100) / 100).toString()
+          var yTopTxt = Range.round(y1, 2).toString()
+          var yBotTxt = Range.round(y0, 2).toString()
           ctx.fillText(yTopTxt, 4, 11)
           ctx.fillText(yBotTxt, 4, H - 4)
           var xL = x0.toString(), xR = x1.toString()

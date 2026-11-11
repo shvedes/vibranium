@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 import QtQuick
 import qs.common
 import "./RowMetrics.js" as RowMetrics
+import "../math/Range.js" as Range
 
 // Declarative card frame that replaces the triplicated region geometry,
 // shown-gate animation and width/height chrome in every panel.
@@ -351,7 +352,7 @@ Rectangle {
       // that is neither measured nor row-aligned, and the one that wins the
       // max whenever it counts a row the real geometry does not fit.
       const floorH = Math.min(root.snappedListH(avail), root.screenMaxListH)
-      return Math.min(Math.max(root._restingFitH, floorH), root.screenMaxListH)
+      return Range.clamp(root._restingFitH, floorH, root.screenMaxListH)
     }
     if (root.rowLimit > 0) return root.rowLimitRegion(avail)
     const modelH = modelContentH()
@@ -376,7 +377,7 @@ Rectangle {
     const base = root.restingListH
     const want = root.slotRegionH
     if (!(want > 0)) return base
-    return Math.min(Math.max(base, want), root.screenMaxListH)
+    return Range.clamp(base, want, root.screenMaxListH)
   }
 
   readonly property real cardHeight: Math.min(
@@ -504,7 +505,7 @@ Rectangle {
   // Pre-layout floor: parent.width reads 0 before the first polish,
   // which would cap the width at -64 and offset the centered card for
   // a frame. Uncapped base until laid out; identical after.
-  width: parent && parent.width > 64 ? Math.min(Math.max(root.contentW, root.baseWidth), parent.width - 64) : Math.max(root.contentW, root.baseWidth)
+  width: parent && parent.width > 64 ? Range.clamp(root.contentW, root.baseWidth, parent.width - 64) : Math.max(root.contentW, root.baseWidth)
   height: root.cardHeight
   color: Ui.solid("background_0")
   radius: RoundingPolicy.radius

@@ -10,6 +10,8 @@
 // the bar modules' Model.js files. The view binds thin wrappers around
 // these helpers; nothing here touches items or animations.
 
+.import "../../common/math/Range.js" as Range
+
 function transitions() {
   return ["none", "fade", "slide", "swipe", "circle", "random"]
 }
@@ -173,19 +175,11 @@ function discDiameter(progress, w, h, centerFracX, centerFracY, invert) {
 }
 
 function fracOr(v, fallback) {
-  var n = Number(v)
-  if (isNaN(n)) return fallback
-  if (n < 0) return 0
-  if (n > 1) return 1
-  return n
+  return Range.clampOr(v, 0, 1, fallback)
 }
 
 function clamp01(v) {
-  var n = Number(v)
-  if (isNaN(n)) return 0
-  if (n < 0) return 0
-  if (n > 1) return 1
-  return n
+  return Range.clampOr(v, 0, 1, 0)
 }
 
 if (typeof module !== "undefined") {

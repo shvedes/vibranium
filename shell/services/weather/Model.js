@@ -13,6 +13,8 @@
 // Callers pass todayString ("yyyy-MM-dd") and formatters in; the module
 // never reads the clock itself.
 
+.import "../../common/math/Range.js" as Range
+
 // A latitude/longitude pair is usable only when both members are finite
 // numbers inside their real range. An isNaN-only check is not enough:
 // parseFloat("Infinity") succeeds, and an out-of-range pair is a
@@ -117,7 +119,7 @@ function oneDecimal(value) {
   if (value === undefined || value === null || value === "") return ""
   var n = parseFloat(String(value))
   if (isNaN(n)) return ""
-  return String(Math.round(n * 10) / 10)
+  return String(Range.round(n, 1))
 }
 
 // Both providers report pressure in hPa (wttr.in calls it mbar, the same
@@ -127,14 +129,14 @@ function hpaToInHg(value) {
   if (value === undefined || value === null || value === "") return ""
   var n = parseFloat(String(value))
   if (isNaN(n)) return ""
-  return String(Math.round(n / 33.8639 * 100) / 100)
+  return String(Range.round(n / 33.8639, 2))
 }
 
 function mmToInches(value) {
   if (value === undefined || value === null || value === "") return ""
   var n = parseFloat(String(value))
   if (isNaN(n)) return ""
-  return String(Math.round(n / 25.4 * 100) / 100)
+  return String(Range.round(n / 25.4, 2))
 }
 
 function normalizedUnit(value) {

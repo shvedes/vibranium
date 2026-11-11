@@ -44,7 +44,7 @@ function pathDirname(p) {
 // Round away float drift from stepping/parsing; 3 decimals covers every
 // shipped step size.
 function quantize(v) {
-  return Math.round(v * 1000) / 1000
+  return Range.round(v, 3)
 }
 
 // Decimal digits implied by a step spec ("0.05" -> 2, "1" -> 0).

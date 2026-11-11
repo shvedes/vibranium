@@ -10,6 +10,7 @@ import "../../common/process/CommandSpec.js" as CommandSpec
 import "../../common/process/ProcProbe.js" as ProcProbe
 import "../../common/text/Duration.js" as Duration
 import "../../common/text/UnitIpc.js" as UnitIpc
+import "../../common/math/Range.js" as Range
 import "../../common/process/JobResult.js" as Job
 // Idle + sleep inhibitor backed by org.freedesktop.login1. The Inhibit()
 // call returns a Unix file descriptor — closing it releases the lock —
@@ -277,7 +278,8 @@ Singleton {
   readonly property int _backoffCapMs: 60000
 
   function _backoffMs(fails) {
-    return Math.min(root._backoffCapMs, root._backoffBaseMs * Math.pow(4, Math.max(0, fails - 1)))
+    return Range.clamp(root._backoffBaseMs * Math.pow(4, Math.max(0, fails - 1)), 0,
+      root._backoffCapMs)
   }
 
   function _handle(generation, key) {

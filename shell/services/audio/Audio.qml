@@ -221,7 +221,7 @@ Singleton {
     root._fadeFrom = from
     root._fadeTo = target
     root._fadeStart = Date.now()
-    root._fadeDur = Math.min(900, Math.max(150, 150 + 500 * span))
+    root._fadeDur = Range.clamp(150 + 500 * span, 150, 900)
     root._fading = true
     root._boostFadeReason = ""
     fadeTimer.restart()

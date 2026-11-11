@@ -1,5 +1,7 @@
 .pragma library
 
+.import "../math/Range.js" as Range
+
 // How tall a slot-bearing region's card should be, for ONE list, given one
 // resting region. This is the whole decision, and it lives here because one
 // rule has to be written once: two copies drift the moment the claim changes
@@ -100,5 +102,5 @@ function regionForSlot(list, base, ceiling, margin) {
   // card. The claim is then handed back to the list, which scrolls the rest.
   if (need > ceiling) return base
 
-  return Math.min(Math.max(base, need), ceiling)
+  return Range.clamp(base, need, ceiling)
 }

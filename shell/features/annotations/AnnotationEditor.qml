@@ -118,7 +118,7 @@ PanelWindow {
   // Blur radius in document pixels: ~96 at plate scale, scaled up for large
   // shots and capped. Measured on a text page: 96 and up left nothing legible,
   // 60 left the words readable.
-  readonly property int _blurRadius: Math.min(240, Math.max(96, Math.round(96 / editor._blurPlateK)))
+  readonly property int _blurRadius: Range.clamp(Math.round(96 / editor._blurPlateK), 96, 240)
   property string blurPlateUrl: ""
   property string _blurPlatePath: ""
   property bool _blurPlatePending: false

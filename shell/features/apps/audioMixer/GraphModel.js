@@ -1,6 +1,7 @@
 .pragma library
 
 .import "NodeKey.js" as NodeKey
+.import "../../../common/math/Range.js" as Range
 
 // Pure derivations for the graph tab: what a port line is, which two ports may
 // be connected to each other, what argv a connect or a disconnect is, how the
@@ -582,7 +583,7 @@ function curveBetween(x1, y1, x2, y2) {
 function curveSamples(curve) {
   const poly = polyLength(curve)
   if (!isFinite(poly) || poly <= 0) return 24
-  return Math.min(1024, Math.max(24, Math.ceil(poly / 4)))
+  return Range.clamp(Math.ceil(poly / 4), 24, 1024)
 }
 
 // The length of a curve's control POLYGON: the three straight legs of the hull,
@@ -721,7 +722,7 @@ function dashRuns(curve, dash, gap) {
   // handful of lines, and a step finer than a world unit buys an error no eye
   // resolves on a two-unit stroke.
   const perStep = Math.max(1, on / 8)
-  const steps = Math.min(4096, Math.max(64, Math.ceil(poly / perStep)))
+  const steps = Range.clamp(Math.ceil(poly / perStep), 64, 4096)
   const cum = new Array(steps + 1)
   cum[0] = 0
   let px = curve.x1
@@ -786,7 +787,7 @@ function dashPath(runs, originX, originY) {
 
 function dashPoint(value) {
   if (!isFinite(value)) return "0"
-  return String(Math.round(value * 100) / 100)
+  return String(Range.round(value, 2))
 }
 
 // How far a point is from a curve, sampled at `curveSamples` points. A

@@ -1,5 +1,7 @@
 .pragma library
 
+.import "../math/Range.js" as Range
+
 // Pure color parsing/conversion shared by the bar ColorPicker module and
 // every other consumer (launcher color plugin via build concat per 06).
 //
@@ -15,17 +17,13 @@ var FORMATS = ["hex", "rgb", "rgba", "hsl", "hsla", "hsv", "hsva"]
 // --- validation helpers ---
 
 function clamp01(x) {
-  const n = Number(x)
-  if (!isFinite(n)) return 0
-  return n < 0 ? 0 : n > 1 ? 1 : n
+  return Range.clampFinite(x, 0, 1, 0)
 }
 
 // Clamp any incoming alpha to [0, 1]; absent or non-numeric is opaque.
 function clampAlpha(a) {
   if (a === undefined || a === null) return 1
-  const n = Number(a)
-  if (!isFinite(n)) return 1
-  return n < 0 ? 0 : n > 1 ? 1 : n
+  return Range.clampFinite(a, 0, 1, 1)
 }
 
 function valid(c) {
