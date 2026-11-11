@@ -1,6 +1,7 @@
 .pragma library
 
 .import "../../../../common/math/Range.js" as Range
+.import "../../../../common/collections/StoreGuards.js" as StoreGuards
 
 // Pure model behind the arch updates island: the package search, the
 // official/AUR split, the selection algebra, the per-row projection the
@@ -42,7 +43,7 @@ function selKey(pkg) {
 // One walk for both per-source totals: every package is either official
 // or AUR, so the two always sum to the array length.
 function sourceCounts(packages) {
-  const pkgs = Array.isArray(packages) ? packages : []
+  const pkgs = StoreGuards.asList(packages)
   let official = 0
   let aur = 0
   for (let i = 0; i < pkgs.length; i++) {
@@ -72,7 +73,7 @@ function heavyQueue(packages, enabled) {
 // theirs: a delegate mid-teardown or a model swap must not take the search
 // down.
 function filterPackages(packages, query) {
-  const pkgs = Array.isArray(packages) ? packages : []
+  const pkgs = StoreGuards.asList(packages)
   const q = String(query ?? "").trim().toLowerCase()
   if (q === "") return pkgs
   const out = []
@@ -101,7 +102,7 @@ function selectedCount(selected) {
 // Membership, not count: a key left over from outside the filter must not
 // read as "everything is selected", and an empty filter never does.
 function allSelected(filtered, selected) {
-  const f = Array.isArray(filtered) ? filtered : []
+  const f = StoreGuards.asList(filtered)
   if (f.length === 0) return false
   for (let i = 0; i < f.length; i++) if (!selected[selKey(f[i])]) return false
   return true
@@ -138,7 +139,7 @@ function toggleKey(selected, key) {
 // filter survive, so searching away from a row never drops it.
 function selectAll(selected, filtered) {
   const next = Object.assign({}, selected)
-  const f = Array.isArray(filtered) ? filtered : []
+  const f = StoreGuards.asList(filtered)
   for (let i = 0; i < f.length; i++) {
     const k = selKey(f[i])
     if (k !== "") next[k] = true
@@ -156,7 +157,7 @@ function toggleAll(selected, allSelectedNow, filtered) {
 // leaves the property alone instead of reassigning an equal map and
 // re-running every delegate binding for nothing.
 function pruneKeys(selected, packages) {
-  const pkgs = Array.isArray(packages) ? packages : []
+  const pkgs = StoreGuards.asList(packages)
   const live = {}
   for (let i = 0; i < pkgs.length; i++) {
     const p = pkgs[i]
