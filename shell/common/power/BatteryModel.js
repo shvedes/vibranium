@@ -509,6 +509,19 @@ function alertToneFor(level) {
   return String(level) === "critical" ? "red" : "orange"
 }
 
+// The UPower device-type enum as the string the row stores: the enum's own
+// toString when the host has it, "" when the value is absent or the enum
+// refuses it. The string is what every type-keyed projection reads, so this is
+// the one place the enum is consulted.
+function deviceTypeLabel(type, upowerDeviceType) {
+  if (upowerDeviceType === undefined || upowerDeviceType === null) return ""
+  try {
+    return String(upowerDeviceType.toString(type))
+  } catch (e) {
+    return ""
+  }
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     normalizePct: normalizePct,
@@ -532,6 +545,7 @@ if (typeof module !== "undefined") {
     resolveLevels: resolveLevels,
     alertFor: alertFor,
     notifyArgv: notifyArgv,
-    alertToneFor: alertToneFor
+    alertToneFor: alertToneFor,
+    deviceTypeLabel: deviceTypeLabel
   }
 }

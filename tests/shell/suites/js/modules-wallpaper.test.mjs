@@ -96,7 +96,7 @@ group('all six libraries load and publish a namespace', () => {
   // The counts are the ledger's own inputs, asserted here so a change to a
   // library's surface is a visible diff rather than a silent ledger shrink.
   eq('UnitIpc publishes one helper', Object.keys(UI).length, 1)
-  eq('Battery/Model publishes twenty-two', Object.keys(BAT).length, 22)
+  eq('Battery/Model publishes twenty-three', Object.keys(BAT).length, 23)
   eq('Bluetooth/Model publishes nine', Object.keys(BT).length, 9)
   // 28 functions plus the two table vars the module also declares. QML only
   // ever sees the functions, so the vars are the loader's extra surface.
@@ -4072,6 +4072,8 @@ const SURFACE = {
     // they are listed here (the surface check is about the namespace) and
     // covered in services-power.test.mjs - see COVERED_ELSEWHERE.
     'deviceKey', 'resolveLevels', 'alertFor', 'isRunningDown', 'notifyArgv', 'alertToneFor',
+    // The UPower enum -> row string rule, shared by the bar module and island.
+    'deviceTypeLabel',
   ],
   'Bluetooth/Model': [
     'deviceLabel', 'isKnown', 'deviceRow', 'deviceRowsEqual', 'deviceIconName',
@@ -4123,12 +4125,12 @@ group('the surface lists match the loaded namespaces exactly', () => {
     for (const t of TABLES[label]) eq(`${label}.${t} is an array`, Array.isArray(ns[t]), true)
   }
   eq('UnitIpc: 1 export', SURFACE['UnitIpc'].length, 1)
-  eq('Battery/Model: 22 exports', SURFACE['Battery/Model'].length, 22)
+  eq('Battery/Model: 23 exports', SURFACE['Battery/Model'].length, 23)
   eq('Bluetooth/Model: 9 exports', SURFACE['Bluetooth/Model'].length, 9)
   eq('Network/Model: 31 functions plus 2 table vars', SURFACE['Network/Model'].length + TABLES['Network/Model'].length, 33)
   eq('pass/Model: 24 exports', SURFACE['pass/Model'].length, 24)
   eq('WallpaperTrans: 18 exports', SURFACE['WallpaperTrans'].length, 18)
-  eq('107 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 107)
+  eq('108 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 108)
   // Six names are genuinely shared between two libraries - deviceLabel,
   // deviceIconName, formatRate, subtextFor, sectionTitleFor and listEntries -
   // and each is called through ITS OWN namespace, so the call check above
@@ -4158,6 +4160,14 @@ group('the surface lists match the loaded namespaces exactly', () => {
 // services-power.test.mjs is where those three contracts are held. The
 // call check still runs for every name - it reads the file that owns the
 // call instead, which is a stronger claim than skipping the assertion.
+group('Battery/Model - the UPower device type label', () => {
+  const ENUM = { toString: (v) => v === 2 ? 'Battery' : 'Unknown' }
+  eq('a known enum value', BAT.deviceTypeLabel(2, ENUM), 'Battery')
+  eq('a value the enum still stringifies', BAT.deviceTypeLabel(9, ENUM), 'Unknown')
+  eq('a missing enum is no label', BAT.deviceTypeLabel(2, null), '')
+  eq('an enum that throws is no label', BAT.deviceTypeLabel(2, { toString: () => { throw new Error('x') } }), '')
+})
+
 const COVERED_ELSEWHERE = { 'Battery/Model': ['deviceKey', 'resolveLevels', 'alertFor', 'isRunningDown', 'notifyArgv', 'alertToneFor'] }
 const OWNER_SOURCE = fs.readFileSync(path.join(import.meta.dirname, 'services-power.test.mjs'), 'utf8')
 group('every export is called by this suite', () => {

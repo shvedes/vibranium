@@ -52,14 +52,14 @@ CollapsibleSlot {
         order: out.length,
         // The identity the wheel pick is stored under (Model.deviceKey):
         // native path first, then the lowercased type string.
-        key: Model.deviceKey(d.nativePath, root.typeString(d.type)),
-        label: Model.deviceLabel(d.model, root.typeString(d.type), d.nativePath),
+        key: Model.deviceKey(d.nativePath, Model.deviceTypeLabel(d.type, UPowerDeviceType)),
+        label: Model.deviceLabel(d.model, Model.deviceTypeLabel(d.type, UPowerDeviceType), d.nativePath),
         percentage: Model.normalizePct(d.percentage),
         charging: d.state === UPowerDeviceState.Charging,
         // Feeds the tooltip's "charging" + "time to full" fragments.
         timeToFull: Number(d.timeToFull),
         laptopBattery: d.isLaptopBattery === true,
-        typeString: root.typeString(d.type)
+        typeString: Model.deviceTypeLabel(d.type, UPowerDeviceType)
       })
     }
     return Model.sortRows(out)
@@ -321,14 +321,6 @@ CollapsibleSlot {
   readonly property string iconName: Model.batteryIconFor(root.displayPct, root.displayCharging)
   readonly property string iconColor: Model.batteryColorFor(root.displayPct, root.displayCharging)
   readonly property string iconAccent: Model.batteryAccentFor(root.displayPct, root.displayCharging)
-
-  function typeString(type): string {
-    try {
-      return String(UPowerDeviceType.toString(type))
-    } catch (e) {
-      return ""
-    }
-  }
 
   // --- wheel cycling ---
   //

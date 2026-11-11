@@ -41,14 +41,6 @@ Item {
 
   readonly property var allDevices: UPower.devices ? UPower.devices.values : []
 
-  function typeString(type): string {
-    try {
-      return String(UPowerDeviceType.toString(type))
-    } catch (e) {
-      return ""
-    }
-  }
-
   function stateString(state): string {
     try {
       return String(UPowerDeviceState.toString(state))
@@ -96,7 +88,7 @@ Item {
       // keyed on: a skipped device (the AC adapter, an absent battery)
       // must not shift the rows below it.
       var order = out.length
-      var typeStr = root.typeString(d.type)
+      var typeStr = Model.deviceTypeLabel(d.type, UPowerDeviceType)
       var nativePath = String(d.nativePath || "")
       var pct = Model.normalizePct(d.percentage)
       // healthPercentage arrives on the SAME 0..1 scale as percentage
