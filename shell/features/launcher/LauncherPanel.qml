@@ -1077,7 +1077,6 @@ PanelCard {
         // the viewport middle while scrolling is possible (menu parity
         // with MenuPanel/PassPanel). Steps ease while animations run,
         // jump while off.
-        centerCursor: true
         smoothScroll: MotionPolicy.enabled
         // Separator rows (clipboard-suggestion divider) never take the
         // keyboard cursor - move()/settle() walk straight past them.

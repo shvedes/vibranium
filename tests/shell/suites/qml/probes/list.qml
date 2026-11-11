@@ -559,7 +559,6 @@ Item {
     kv("d.emptyInitialIndex", empty.currentIndex)
     kv("d.soloInitialIndex", solo.currentIndex)
     kv("d.wrap", base.wrap)
-    kv("d.centerCursor", base.centerCursor)
     kv("d.smoothScroll", base.smoothScroll)
     kv("d.scrolloff", base.scrolloff)
     kv("d.selectionHighlight", base.selectionHighlight)
@@ -600,11 +599,6 @@ Item {
     kv("d.slowMs", Ui.slowMs)
     kv("d.rowMinH", Ui.rowMinH)
     kv("d.s", Ui.s)
-    // centreCursor is documented as advisory: setting it must change nothing.
-    smooth.centerCursor = false
-    kv("d.centerCursor.advisory", smooth.centerCursor === false)
-    smooth.centerCursor = true
-    kv("d.centerCursor.restored", smooth.centerCursor)
   }
 
   // The duration-from-distance function on a short table, where scrollVel()

@@ -54,7 +54,6 @@ qp_assert "and it is a real delegate, not a null placeholder" d.initialItem live
 qp_assert "an empty model has no cursor" d.emptyInitialIndex -1
 qp_assert "a one-row model seats row 0" d.soloInitialIndex 0
 qp_assert "wrap defaults to on" d.wrap true
-qp_assert "centerCursor is retained" d.centerCursor true
 qp_assert "smoothScroll defaults off" d.smoothScroll false
 qp_assert "scrolloff defaults to a pure centre hold" d.scrolloff 0
 qp_assert "the selection bar is on" d.selectionHighlight true
@@ -102,9 +101,6 @@ qp_assert "the slow duration token is 260ms" d.slowMs 260
 qp_assert "the minimum row height is 34" d.rowMinH 34
 qp_assert "the spacing unit is 8" d.s 8
 t_note "List.qml sets no delegate, and a QQuickListView that has never been given one never receives its model: count, currentIndex and contentHeight all stay 0/-1 and every step function reports a no-op with no warning. Every list here supplies one, as every real consumer does."
-t_note "centerCursor is documented as advisory, and setting it false changes nothing the engine does"
-qp_assert "turning it off is accepted" d.centerCursor.advisory true
-qp_assert "and putting it back works" d.centerCursor.restored true
 
 # --- stepMs and scrollVel ----------------------------------------------------
 

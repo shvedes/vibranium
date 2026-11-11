@@ -1997,7 +1997,6 @@ Rectangle {
   // Diagnostic only since the per-text estimate cache landed: sizing reads
   // modelContentH() because sampled contentHeight extrapolates mid-layout
   // and latches stale on static pages. Kept for probe comparison.
-  property real restingBufH: 0
 
   // Absolute ceiling from the screen (injected by MenuView); the normal
   // resting cap stays maxHeight. Only the growth path may exceed it.
@@ -4197,7 +4196,6 @@ Rectangle {
         // Center-lock scrolloff: keyboard steps keep the cursor riding
         // the viewport middle while scrolling is possible. Steps ease
         // while animations run, jump while off.
-        centerCursor: true
         smoothScroll: MotionPolicy.enabled
         // Row-set motion is library-driven (see common/ui/List): the
         // transitions and the emerge-from-behind effect live there, so every
@@ -4288,8 +4286,6 @@ Rectangle {
           const it = index >= 0 && index < panel.rowsModel.length ? panel.rowsModel[index] : null
           return it ? (!Menu.isSlotClosing(it) && !Menu.infoOpen(it) && !Menu.isExpanded(it)) : true
         }
-
-        Component.onCompleted: panel.restingBufH = contentHeight
 
         onCurrentIndexChanged: {
           panel.closeTrailingInfo()

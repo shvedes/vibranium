@@ -472,7 +472,6 @@ PanelCard {
       // overflow, every step then scrolls, and each one landed instantly.
       // That instant seat IS the jump: same follow policy as the menu, with
       // the tween switched off.
-      centerCursor: true
       smoothScroll: MotionPolicy.enabled
       interactive: false
       // Library highlight glides for focus moves, filtered or not

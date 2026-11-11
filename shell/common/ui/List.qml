@@ -62,9 +62,6 @@ ListView {
   // Whether keyboard navigation wraps at the ends (menu-style).
   // Launcher stops at the last row instead of looping.
   property bool wrap: true
-  // Compat: the follow policy is always center-lock.
-  // Retained because consumers assign it; the value is advisory.
-  property bool centerCursor: true
   // Smooth-scroll seat motion when the consumer's animation gate is
   // on; instant otherwise. User-driven motion always wins.
   property bool smoothScroll: false

@@ -1475,7 +1475,6 @@ PanelCard {
       // Center-lock scrolloff: keyboard steps keep the cursor riding
       // the viewport middle while scrolling is possible (menu parity).
       // Steps ease while animations run, jump while off.
-      centerCursor: true
       smoothScroll: MotionPolicy.enabled
       // Cursor-row gate (menu parity): the bar snaps only while the
       // focused row stages delete/editor (tracks it 1:1); a staged row
