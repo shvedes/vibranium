@@ -5,25 +5,32 @@
 // Pure color parsing/conversion shared by the bar ColorPicker module and
 // every other consumer (launcher color plugin via build concat per 06).
 //
-// Canonical home of the verbatim color triple (ColorMath.js =
-// ColorLib.js = plugins/color/main.js). Channels stay normalized in
-// [0, 1]; every entry point returns null (or "") on malformed input
-// instead of throwing or emitting a CSS string a browser would have to
-// reject.
+// Canonical home of the verbatim color triple (ColorLib.js =
+// plugins/color/main.js). Channels stay normalized in [0, 1]; every entry
+// point returns null (or "") on malformed input instead of throwing or
+// emitting a CSS string a browser would have to reject.
 
 // Supported output formats, in chip order.
 var FORMATS = ["hex", "rgb", "rgba", "hsl", "hsla", "hsv", "hsva"]
 
 // --- validation helpers ---
 
+// The channel clamp bodies are spelled out rather than routed through
+// Range.clampFinite: Color.js is concatenated into the launcher's color
+// plugin, which is a standalone copy with no Range module, and the twin-file
+// suite requires every shared body to be byte-identical on both sides.
 function clamp01(x) {
-  return Range.clampFinite(x, 0, 1, 0)
+  const n = Number(x)
+  if (!isFinite(n)) return 0
+  return n < 0 ? 0 : n > 1 ? 1 : n
 }
 
 // Clamp any incoming alpha to [0, 1]; absent or non-numeric is opaque.
 function clampAlpha(a) {
   if (a === undefined || a === null) return 1
-  return Range.clampFinite(a, 0, 1, 1)
+  const n = Number(a)
+  if (!isFinite(n)) return 1
+  return n < 0 ? 0 : n > 1 ? 1 : n
 }
 
 function valid(c) {
