@@ -803,31 +803,16 @@ Item {
         rows.push({ kind: "separator" })
       }
     }
-    // One mapping for exact and rescued rows alike: a typo hit IS the
-    // same desktop entry, so it renders, keys and activates identically -
-    // only the `typo` flag tells how it was found.
-    const toRow = rec => ({
-      kind: "app",
-      uid: rec.uid,
-      label: rec.label,
-      // Description ownership follows the settings option. Inline
-      // (option on): the description IS the sub line - missing ones get
-      // an explicit placeholder - and ctrl-i has nothing to open.
-      // Option off: no subtitle at all, ctrl-i opens the description.
-      sub: root.showDescriptions
-        ? (rec.desc !== "" ? rec.desc : root.noDescriptionText)
-        : "",
-      desc: root.showDescriptions ? "" : rec.desc,
-      icon: root.showIcons ? rec.icon : "",
-      // PWA/TUI marker for the right-side badge; gated by the same
-      // setting that fills it, so a disabled badge ships empty rows.
-      badge: root.showBadges ? String(rec.badge ?? "") : "",
-      app: rec.app,
-      // Terminal=true entries (yazi) must open in a terminal; everything
-      // else routes through vb-launch-cmd on selection.
-      runInTerminal: rec.runInTerminal === true,
-      removable: rec.removable === true
-    })
+    // One mapping for exact and rescued rows alike, owned by the library so
+    // the row shape - description ownership, icon/badge gating, the terminal
+    // and removable flags - has one definition.
+    const rowOptions = {
+      showDescriptions: root.showDescriptions,
+      noDescriptionText: root.noDescriptionText,
+      showIcons: root.showIcons,
+      showBadges: root.showBadges
+    }
+    const toRow = rec => LauncherLib.appRow(rec, rowOptions)
     for (let i = 0; i < shown; i++) {
       rows.push(toRow(res.rows[i]))
     }

@@ -937,6 +937,40 @@ group('the haystack is name + genericName + comment + id + keywords + categories
   eq('a missing comment reads as empty desc', LL.appRecord({ name: 'x', id: 'i' }).desc, '')
 })
 
+group('appRow maps a record into the row the launcher renders', () => {
+  const rec = {
+    kind: 'app', uid: 'app:x', label: 'X', desc: 'does x', icon: 'x-icon',
+    badge: 'webapp', app: FIREFOX, runInTerminal: true, removable: true,
+  }
+  const on = LL.appRow(rec, {
+    showDescriptions: true, noDescriptionText: 'No description',
+    showIcons: true, showBadges: true,
+  })
+  eq('the row kind', on.kind, 'app')
+  eq('the identity', on.uid, 'app:x')
+  eq('the label', on.label, 'X')
+  eq('the description rides the sub line when inline', on.sub, 'does x')
+  eq('and the expandable slot is empty', on.desc, '')
+  eq('the icon', on.icon, 'x-icon')
+  eq('the badge', on.badge, 'webapp')
+  eq('the entry is kept for launch handling', on.app, FIREFOX)
+  eq('the terminal flag', on.runInTerminal, true)
+  eq('the removable flag', on.removable, true)
+  const missing = LL.appRow({ uid: 'app:y', label: 'Y', desc: '' }, {
+    showDescriptions: true, noDescriptionText: 'No description',
+  })
+  eq('a missing description gets the caller placeholder', missing.sub, 'No description')
+  const off = LL.appRow(rec, { showDescriptions: false, showIcons: false, showBadges: false })
+  eq('with the option off the sub is empty', off.sub, '')
+  eq('and the description is expandable', off.desc, 'does x')
+  eq('a disabled icon is empty', off.icon, '')
+  eq('a disabled badge is empty', off.badge, '')
+  const bare = LL.appRow({ uid: 'app:z', label: 'Z' })
+  eq('no options at all reads as every option off', [bare.sub, bare.desc, bare.icon, bare.badge], ['', '', '', ''])
+  eq('and the boolean flags default to false', [bare.runInTerminal, bare.removable], [false, false])
+  eq('a non-string badge is stringified when enabled', LL.appRow(rec, { showBadges: true }).badge, 'webapp')
+})
+
 group('a Power entry is excluded from the index regardless of settings', () => {
   // BASE_EXCLUDED_CATEGORIES: "Power entries are always excluded
   // entries from default mode", and this is now unconditional.

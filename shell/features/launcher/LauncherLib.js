@@ -127,6 +127,31 @@ function appRecord(entry) {
   }
 }
 
+// The row one app record renders as. One mapping for exact and rescued
+// records alike: a typo hit IS the same desktop entry, so it renders, keys and
+// activates identically. Description ownership follows the settings option -
+// inline descriptions fill the sub line (with the caller's placeholder for a
+// missing one) and leave nothing for ctrl-i; with the option off the sub stays
+// empty and the description moves to the expandable slot. Icons and badges are
+// gated by the same settings that fill them, so a disabled one ships empty.
+function appRow(rec, options) {
+  const opt = options || {}
+  const showDesc = opt.showDescriptions === true
+  const desc = SU.textOf(rec && rec.desc)
+  return {
+    kind: "app",
+    uid: rec.uid,
+    label: rec.label,
+    sub: showDesc ? (desc !== "" ? desc : String(opt.noDescriptionText ?? "")) : "",
+    desc: showDesc ? "" : desc,
+    icon: opt.showIcons === true ? rec.icon : "",
+    badge: opt.showBadges === true ? String(rec.badge ?? "") : "",
+    app: rec.app,
+    runInTerminal: rec.runInTerminal === true,
+    removable: rec.removable === true
+  }
+}
+
 function isManagedEntry(entry, cats) {
   const exec = String(entry.execString ?? entry.exec ?? "")
   const tui = exec.indexOf("vb-launch-tui") >= 0
