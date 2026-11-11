@@ -87,10 +87,6 @@ Item {
     }
   }
 
-  // The press scale, per frame. The Behavior above tweens it and the frame
-  // loop produces the values, so this is where a press is visible as a curve
-  // rather than as two end states.
-
   // The pointer: an inert button (the soft `actionable` gate) reads as a
   // refusal. A HoverHandler rather than a MouseArea, because the native
   // control owns the press; the hard `enabled` lock is out of hover delivery
@@ -99,22 +95,9 @@ Item {
     cursorShape: root.live ? Qt.ArrowCursor : Qt.ForbiddenCursor
   }
 
-  // The interaction edges the native control reports. The wrapper already
-  // gates its own chrome on them - `hovered` reads through `live`, because
-  // Qt keeps hovering a disabled control - so these lines are the record of
-  // what that gate saw rather than a parallel state machine. The label is
-  // shell chrome declared in the source, not anything the user typed.
-
-  on_FocusedChanged: {
-  }
-
   // The wrapper's OWN clicked signal, not the native one: a consumer's
   // handler is attached here, so this is the edge a consumer of the
   // primitive sees. The native edge re-emits into it from `btn` below.
-
-  // The label is the button's width, so a width change IS a label or icon
-  // change - the layout pass a consumer of this primitive actually sees.
-
   Ctl.Button {
     id: btn
 

@@ -115,33 +115,16 @@ Item {
     }
   }
 
-  // The press scale, per frame, for the reason Glide.qml gives for having no
-  // tick of its own: the animation clone has no signal to hang one on, and
-  // the frame loop on the item is where the curve is actually visible.
-
-  // The slot is the button's size in both content modes, so a size change is
-  // the token move every consumer of this primitive makes.
-
   // The interaction edges. `hovered` and `pressed` are already gated through
   // `live` above, so these lines report the gated value the chrome used and
   // not Qt's raw one - which is why a disabled button logs no hover at all.
-
   onHoveredChanged: {
     root._syncTip()
-  }
-
-  on_FocusedChanged: {
   }
 
   // The wrapper's OWN clicked signal, not the native one: a consumer's
   // handler is attached here, so this is the edge a consumer of the
   // primitive sees. The native edge re-emits into it from `btn` below.
-
-  // The hover bubble, and the 350ms hover delay that arms it. A bubble that
-  // never appears on an island button is either a missing tipText or the
-  // `live` gate, and these are the two lines that tell them apart.
-  on_TipShownChanged: {
-  }
 
   // The pointer: a live slot reads as a click, an inert one (the soft
   // `actionable` gate) as a refusal. A HoverHandler rather than a MouseArea,
