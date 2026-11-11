@@ -14,6 +14,7 @@
 
 .import "../../common/text/StringUtils.js" as SU
 .import "../../common/math/Range.js" as Range
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 // Filter counting routes through the launcher's own matcher over a full
 // pool (not the menu's cross-word fuzzy search) - those two engines are
 // deliberately different, so the counter reuses the one its caller uses.
@@ -453,7 +454,7 @@ function normalizeItem(raw, pageId, index) {
 function buildPage(id, title, width, rawItems, opts) {
   opts = opts || {}
   const items = []
-  const list = Array.isArray(rawItems) ? rawItems : []
+  const list = StoreGuards.asList(rawItems)
   const seenUid = {}
   for (let i = 0; i < list.length; i++) {
     // A row that is not an object cannot be a row. It is skipped, so one
@@ -536,7 +537,7 @@ function buildOptionsPage(sel) {
   const parent = sel || {}
   const uid = parent.uid
   const id = String(uid) + "::options"
-  const list = Array.isArray(parent.options) ? parent.options : []
+  const list = StoreGuards.asList(parent.options)
   const items = []
   for (let i = 0; i < list.length; i++) {
     // A null option is a throw, not a skipped row: the bundle named a choice
@@ -551,7 +552,7 @@ function buildOptionsPage(sel) {
       value: o.value,
       onSelect: parent.onSelect,
       onCall: parent.onCall,
-      palette: Array.isArray(o.palette) ? o.palette : [],
+      palette: StoreGuards.asList(o.palette),
       light: typeof o.light === "string" ? o.light : ""
     }, id, i)
     // The back-link is a page fact, not a row field: it names the select this
@@ -605,7 +606,7 @@ function normalizePage(raw, fallbackId) {
       ? uidKey(raw.id, "").replace(/^-+$/, "") : "") || fallbackId,
     title,
     typeof raw.width === "number" ? raw.width : 0,
-    Array.isArray(raw.items) ? raw.items : [],
+    StoreGuards.asList(raw.items),
     { layout: raw.layout, cell: raw.cell, maxHeight: raw.maxHeight, command: raw.command, filterDefault: raw.filterDefault }
   )
 }
@@ -807,7 +808,7 @@ function applyExtension(base, extText) {
       continue
     }
 
-    const mergedRaw = mergeRawItems(existing._raw, Array.isArray(extPage.items) ? extPage.items : [])
+    const mergedRaw = mergeRawItems(existing._raw, StoreGuards.asList(extPage.items))
     const merged = buildPage(existing.id, mergedLabel(extPage.title, existing.label), mergedWidth(extPage.width, existing.width), mergedRaw, mergedPageOpts(extPage, existing))
     pages = replacePage(pages, merged)
     byId[merged.id] = merged
@@ -1450,7 +1451,7 @@ function filterCounter(pool, query, cap, tiebreak) {
 // page - no breadcrumbs, no grouping, just a live trim of what's already
 // on screen. `items` should already be guard-visible.
 function scopedFilter(items, query) {
-  const list = Array.isArray(items) ? items : []
+  const list = StoreGuards.asList(items)
   const q = (query ?? "").toLowerCase().trim()
   if (q === "") return list.slice()
   const tokens = q.split(/\s+/).filter(t => t !== "")
@@ -1689,7 +1690,7 @@ function groupSearchResults(hits, lookup, isVisible, query) {
     // of the bucket shares it with.
     function groupHeader(bucket, index) {
       const head = bucket[0]
-      const headPath = head && Array.isArray(head.path) ? head.path : []
+      const headPath = StoreGuards.asList(head && head.path)
       const headLabel = headPath.join(" > ")
       if (headLabel === "") return
       rows.push({
@@ -2021,7 +2022,7 @@ function exactOptionIndex(options, query, family) {
   const lower = (v) => v === undefined || v === null ? "" : String(v).toLowerCase().trim()
   const fam = String(family === undefined || family === null ? "" : family)
     .toLowerCase().trim()
-  const list = Array.isArray(options) ? options : []
+  const list = StoreGuards.asList(options)
   for (let o = 0; o < list.length; o++) {
     const opt = list[o] || {}
     // The fold, not `|| ""`: a value of 0 (the "never" of a timeout) is
@@ -2067,7 +2068,7 @@ function bestOptionIndex(options, query, family) {
   const lower = (v) => v === undefined || v === null ? "" : String(v).toLowerCase().trim()
   const fam = String(family === undefined || family === null ? "" : family)
     .toLowerCase().trim()
-  const list = Array.isArray(options) ? options : []
+  const list = StoreGuards.asList(options)
   let best = -1
   let bestScore = 0
   let tied = false
