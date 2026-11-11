@@ -282,10 +282,7 @@ function stripForHay(s) {
 }
 
 function hayFromItem(item, includeMetadata) {
-  const parts = []
-  if (item.label) parts.push(String(item.label))
-  if (item.subLead) parts.push(String(item.subLead))
-  if (item.sub) parts.push(String(item.sub))
+  const parts = LauncherLib.SearchPlumbing.titleParts(item)
   if (item.desc) parts.push(stripForHay(item.desc))
   if (item.warning) parts.push(stripForHay(item.warning))
   if (item.body) parts.push(stripForHay(item.body))
@@ -347,10 +344,7 @@ var _filterHay = new WeakMap()
 // filter hay is built from, and the stamp the cache in scopedFilter compares.
 // Split out so the two cannot drift over which fields count as visible.
 function hayFilterRaw(item) {
-  const parts = []
-  if (item.label) parts.push(String(item.label))
-  if (item.subLead) parts.push(String(item.subLead))
-  if (item.sub) parts.push(String(item.sub))
+  const parts = LauncherLib.SearchPlumbing.titleParts(item)
   if (item.placeholder) parts.push(String(item.placeholder))
   if (item.unit) parts.push(String(item.unit))
   if (item.value !== undefined && item.value !== null) {
