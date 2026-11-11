@@ -242,7 +242,7 @@
                 "default": "alphabetical",
                 "label": "Sort order (idle)",
                 "sub": "Sorting method",
-                "desc": "How to sort apps. Search results are always <u>by relevance</u>.",
+                "desc": "How to sort apps. Search results follow the same order.",
                 "values": [
                     "alphabetical",
                     "frequency"

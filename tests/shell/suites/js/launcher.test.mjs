@@ -2060,6 +2060,30 @@ group('the tiebreak callback decides equal scores, input order decides the rest'
   eq('score outranks the tiebreak', LL.searchRecords(S(), 'web', 10, (r) => (r.label === 'low-high-usage' ? 99 : 0)).rows.map((r) => r.label), ['exact', 'low-high-usage'])
 })
 
+group('tiebreakFirst makes the tiebreak key the primary order', () => {
+  // Frequency mode asks for this: the druncache count is the order the user
+  // chose, and relevance separates only equally-used apps. Every other caller
+  // leaves the flag off, where the score still leads.
+  const tb = (r) => (r.label === 'low-high-usage' ? 99 : 0)
+  const S = () => [rec('low-high-usage', ['a', 'b', 'c', 'd', 'web']), rec('exact', ['web'])]
+  eq('the flag moves usage above score', LL.searchRecords(S(), 'web', 10, tb, true).rows.map((r) => r.label), ['low-high-usage', 'exact'])
+  eq('a false flag keeps the score leading', LL.searchRecords(S(), 'web', 10, tb, false).rows.map((r) => r.label), ['exact', 'low-high-usage'])
+  eq('a flag without a tiebreak changes nothing',
+    LL.searchRecords(S(), 'web', 10, null, true).rows.map((r) => r.label), ['exact', 'low-high-usage'])
+  // Rows whose usage ties under the primary key fall back to relevance,
+  // not to input order.
+  const U = () => [rec('buried', ['a', 'b', 'c', 'd', 'web']), rec('exact', ['web'])]
+  eq('a usage tie falls back to relevance',
+    LL.searchRecords(U(), 'web', 10, () => 0, true).rows.map((r) => r.label), ['exact', 'buried'])
+  // The flag is part of the cache key: the same pool and query must not be
+  // served from an order computed under the other primary key.
+  const P = [rec('low-high-usage', ['a', 'b', 'c', 'd', 'web']), rec('exact', ['web'])]
+  eq('a score-first call warms the cache', LL.searchRecords(P, 'web', 10, tb).rows.map((r) => r.label), ['exact', 'low-high-usage'])
+  eq('the other key rescans instead of reusing that order',
+    LL.searchRecords(P, 'web', 10, tb, true).rows.map((r) => r.label), ['low-high-usage', 'exact'])
+  eq('and back again is also a rescan', LL.searchRecords(P, 'web', 10, tb).rows.map((r) => r.label), ['exact', 'low-high-usage'])
+})
+
 group('the incremental cache is a subset scan, and it is only valid when it may be', () => {
   // Sequential typing is the common case, so a grown query is scanned against
   // the previous hits only. That is sound because new hits are a subset of
@@ -2154,6 +2178,12 @@ group('searchTypo is an AND over tokens with no incremental cache', () => {
     LL.searchTypo(T(), 'axc', 10, (r) => (r.label === 'second' ? 5 : 0)).rows.map((r) => r.label), ['second', 'first'])
   eq('a non-function tiebreak is ignored',
     LL.searchTypo(T(), 'axc', 10, 5).rows.map((r) => r.label), ['first', 'second'])
+  // The typo pass ranks by the same rule, including the primary-key swap.
+  const P = () => [rec('first', ['zzz', 'abc']), rec('second', ['abc'])]
+  eq('the typo score leads by default',
+    LL.searchTypo(P(), 'axc', 10).rows.map((r) => r.label), ['second', 'first'])
+  eq('tiebreakFirst makes usage primary in the typo pass',
+    LL.searchTypo(P(), 'axc', 10, (r) => (r.label === 'first' ? 5 : 0), true).rows.map((r) => r.label), ['first', 'second'])
   eq('hands back the caller own record objects', (() => {
     const rr = R()
     return LL.searchTypo(rr, 'sotify', 10).rows[0] === rr[0]
@@ -2208,6 +2238,9 @@ group('filterCounter forwards the tiebreak to searchRecords', () => {
   eq('the tiebreak reorders the rendered rows',
     LL.filterCounter(R(), 'web', 10, (r) => (r.label === 'second' ? 5 : 0)).rows.map((r) => r.label), ['second', 'first'])
   eq('and does not change matched', LL.filterCounter(R(), 'web', 10, () => 0).matched, 2)
+  const S = () => [rec('low-high-usage', ['a', 'b', 'c', 'd', 'web']), rec('exact', ['web'])]
+  eq('the flag reaches searchRecords and leads the order',
+    LL.filterCounter(S(), 'web', 10, (r) => (r.label === 'low-high-usage' ? 5 : 0), true).rows.map((r) => r.label), ['low-high-usage', 'exact'])
 })
 
 group('isSynthKind is the counter gate: one synthetic row, never a filterable pool', () => {

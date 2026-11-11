@@ -236,14 +236,13 @@ function buildAppIndex(entries, sortMethod, usageMap, missingTryExec) {
     const rec = appRecord(entry)
     if (rec && rec.label !== "") out.push(rec)
   }
-  // Base order for the idle view (no query). Search results re-rank by
-  // relevance on top of this; equal relevance falls back to this order
-  // via the searchRecords tiebreak, so "Most used" also governs
-  // filtering and not just the resting list.
+  // Base order for the idle view (no query). Filtered search follows it in
+  // frequency mode: the druncache count is the primary key there, with
+  // relevance separating equally-used apps. Alphabetical mode ranks filtered
+  // search by fuzzy relevance alone, which is the strict matcher's order.
   // - alphabetical: classic A→Z (default)
   // - frequency: most-used first (cached across sessions),
-  //   tie → alphabetical. Only affects the
-  //   blank view; filtered search is always by fuzzy relevance.
+  //   tie → alphabetical.
   //
   // The comparator runs O(n log n) times, so its inputs are computed once per
   // record instead of per comparison: a lowercase label and, on the frequency
@@ -860,19 +859,20 @@ function typoTokenScore(words, t) {
 // matched/total counter. The whole hit set is never copied per
 // keystroke - `cap` bounds both work and allocation.
 //
-// `tiebreak` is an optional rec -> number used when two records score
-// equally (higher wins). The launcher passes its druncache counts when
-// the sort method is "frequency", so most-used wins ties in filtering
-// just like in the idle view. Records still tied after that keep input
-// order (source index), which keeps results deterministic even on
-// engines without a stable sort.
+// `tiebreak` is an optional rec -> number key (higher wins), and
+// `tiebreakFirst` makes that key the primary order instead of the score.
+// The launcher passes its druncache counts when the sort method is
+// "frequency", so filtering follows the idle view's order; relevance then
+// separates equally-used apps. Records still tied after both keep input
+// order (source index), which keeps results deterministic even on engines
+// without a stable sort.
 //
 // Tokenized AND-search over a records array. The implementation, its
 // incremental cache and the scan-order hit store live in SearchLib, because
 // the menu's filterCounter reads the same matcher and used to pull this whole
 // library - and ClipboardLib underneath it - into its load graph for it.
-function searchRecords(records, query, cap, tiebreak) {
-  return SL.searchRecords(records, query, cap, tiebreak)
+function searchRecords(records, query, cap, tiebreak, tiebreakFirst) {
+  return SL.searchRecords(records, query, cap, tiebreak, tiebreakFirst)
 }
 
 // Typo rescue over a records array: the AND-search shape of searchRecords
@@ -882,7 +882,7 @@ function searchRecords(records, query, cap, tiebreak) {
 // drop rows - every call scans the pool. Called only when the exact search
 // reports zero, so the full scan lands on dead-end keystrokes alone, and
 // the counter reads the true hit total the same way.
-function searchTypo(records, query, cap, tiebreak) {
+function searchTypo(records, query, cap, tiebreak, tiebreakFirst) {
   const q = SL.normalizeQuery(query)
   if (q === "" || !Array.isArray(records)) return { rows: [], count: 0 }
   const tokens = SL.splitTokens(q)
@@ -906,7 +906,7 @@ function searchTypo(records, query, cap, tiebreak) {
     }
   }
   const m = hitRecs.length
-  const order = SL.orderHits(hitRecs, hitScores, tiebreak)
+  const order = SL.orderHits(hitRecs, hitScores, tiebreak, tiebreakFirst)
   const n = Math.min(m, cap)
   const out = new Array(n)
   for (let i = 0; i < n; i++) out[i] = hitRecs[order[i]]
@@ -920,9 +920,9 @@ function searchTypo(records, query, cap, tiebreak) {
 // SearchLib; the scorer stays this library's own searchRecords - the menu
 // side forwards here for the same reason, and through the same shell.
 // The optional `tiebreak` (rec -> number, higher wins) breaks equal
-// relevance scores.
-function filterCounter(pool, query, cap, tiebreak) {
-  return SL.filterCounter(pool, query, cap, searchRecords, tiebreak)
+// relevance scores, and `tiebreakFirst` makes it the primary order.
+function filterCounter(pool, query, cap, tiebreak, tiebreakFirst) {
+  return SL.filterCounter(pool, query, cap, searchRecords, tiebreak, tiebreakFirst)
 }
 
 // Kinds rendered as a synthetic row by design (never a filterable pool).

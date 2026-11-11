@@ -137,13 +137,24 @@ function filterRows(rows, query, hayOf) {
 // scan order. The launcher's exact and typo searches share this ranking, and
 // a caller that keeps its hits in scan order can reuse it without a copy of
 // the comparator.
-function orderHits(hitRecs, hitScores, tiebreak) {
+//
+// `tiebreakFirst` swaps those two keys: the tiebreak leads and the score
+// only separates rows that tie on it. The launcher asks for that in
+// frequency mode, where "most used" is the user's chosen order and relevance
+// is the fallback among equally-used apps. Without it the score always wins,
+// which is the default every other caller wants.
+function orderHits(hitRecs, hitScores, tiebreak, tiebreakFirst) {
   const tb = typeof tiebreak === "function" ? tiebreak : null
+  const tbFirst = tb !== null && tiebreakFirst === true
   const order = new Array(hitRecs.length)
   for (let i = 0; i < order.length; i++) order[i] = i
   order.sort((a, b) => {
+    if (tbFirst) {
+      const d = tb(hitRecs[b]) - tb(hitRecs[a])
+      if (d !== 0) return d
+    }
     if (hitScores[b] !== hitScores[a]) return hitScores[b] - hitScores[a]
-    if (tb) {
+    if (tb && !tbFirst) {
       const d = tb(hitRecs[b]) - tb(hitRecs[a])
       if (d !== 0) return d
     }
@@ -153,12 +164,13 @@ function orderHits(hitRecs, hitScores, tiebreak) {
 }
 
 // Generic {total, matched, rows} shell over a records-style search.
-// -> searchFn(pool, query, cap, tiebreak) answers {rows, count}; blank
-// -> queries slice the pool and never reach it, so `matched` is the true
-// -> hit total (never the display cap) and `total` is the pool size.
-// -> A blank query with cap 0, past the pool, or undefined falls back to
-// -> the whole pool; a filtered query caps rows but never the count.
-function filterCounter(pool, query, cap, searchFn, tiebreak) {
+// -> searchFn(pool, query, cap, tiebreak, tiebreakFirst) answers
+// -> {rows, count}; blank queries slice the pool and never reach it, so
+// -> `matched` is the true hit total (never the display cap) and `total` is
+// -> the pool size. A blank query with cap 0, past the pool, or undefined
+// -> falls back to the whole pool; a filtered query caps rows but never the
+// -> count.
+function filterCounter(pool, query, cap, searchFn, tiebreak, tiebreakFirst) {
   const list = StoreGuards.asList(pool)
   const total = list.length
   if (normalizeQuery(query) === "") {
@@ -168,7 +180,7 @@ function filterCounter(pool, query, cap, searchFn, tiebreak) {
     // pool per open to hand back the same entries. A capped one still slices.
     return { total: total, matched: total, rows: n === total ? list : list.slice(0, n) }
   }
-  const res = searchFn(list, query, cap, tiebreak)
+  const res = searchFn(list, query, cap, tiebreak, tiebreakFirst)
   return { total: total, matched: res.count, rows: res.rows }
 }
 
@@ -223,6 +235,7 @@ var _searchCacheLen = -1
 var _searchCacheQ = ""
 var _searchCacheHits = null
 var _searchCacheSorted = null
+var _searchCacheTbFirst = false
 
 // Tokenized AND-search over a records array (app index or keyword list):
 // every space-separated token must hit its own best word; totals decide
@@ -231,23 +244,29 @@ var _searchCacheSorted = null
 // matched/total counter. The whole hit set is never copied per
 // keystroke - `cap` bounds both work and allocation.
 //
-// `tiebreak` is an optional rec -> number used when two records score
-// equally (higher wins). The launcher passes its druncache counts when
-// the sort method is "frequency", so most-used wins ties in filtering
-// just like in the idle view. Records still tied after that keep input
-// order (source index), which keeps results deterministic even on
-// engines without a stable sort.
-function searchRecords(records, query, cap, tiebreak) {
+// `tiebreak` is an optional rec -> number key (higher wins). The launcher
+// passes its druncache counts when the sort method is "frequency", so
+// filtering follows the idle view's order. With `tiebreakFirst` that key is
+// the primary order and the score breaks ties; without it the score leads
+// and the tiebreak only separates equal scores. Records still tied after
+// both keep input order (source index), which keeps results deterministic
+// even on engines without a stable sort.
+function searchRecords(records, query, cap, tiebreak, tiebreakFirst) {
   const q = normalizeQuery(query)
+  const tbFirst = tiebreakFirst === true
   if (q === "") {
     _searchCacheRecords = records
     _searchCacheLen = Array.isArray(records) ? records.length : -1
     _searchCacheQ = ""
     _searchCacheHits = []
     _searchCacheSorted = []
+    _searchCacheTbFirst = tbFirst
     return { rows: [], count: 0 }
   }
+  // The ranking mode is part of the cache key: the same pool and query under
+  // a different primary key is a different answer, not a cache hit.
   const sameRecords = sameCacheIndex(_searchCacheRecords, _searchCacheLen, records)
+    && _searchCacheTbFirst === tbFirst
   if (identicalQuery(sameRecords, _searchCacheQ, q, _searchCacheSorted)) {
     return { rows: _searchCacheSorted.slice(0, cap), count: _searchCacheSorted.length }
   }
@@ -291,7 +310,7 @@ function searchRecords(records, query, cap, tiebreak) {
   // -> cap slices. The scan-order copy is taken before the sort, the way the
   // -> menu keeps its hit set, so ties rank by pool order either way.
   const hits = hitRecs
-  const order = orderHits(hitRecs, hitScores, tiebreak)
+  const order = orderHits(hitRecs, hitScores, tiebreak, tbFirst)
   const full = new Array(order.length)
   for (let i = 0; i < order.length; i++) full[i] = hitRecs[order[i]]
   _searchCacheRecords = records
@@ -299,6 +318,7 @@ function searchRecords(records, query, cap, tiebreak) {
   _searchCacheQ = q
   _searchCacheHits = hits
   _searchCacheSorted = full
+  _searchCacheTbFirst = tbFirst
   const n = Math.min(full.length, cap)
   const out = new Array(n)
   for (let i = 0; i < n; i++) out[i] = full[i]
@@ -307,6 +327,6 @@ function searchRecords(records, query, cap, tiebreak) {
 
 // The counter over that matcher: the shape every caller wants without
 // passing the scorer by hand.
-function filterRecords(pool, query, cap, tiebreak) {
-  return filterCounter(pool, query, cap, searchRecords, tiebreak)
+function filterRecords(pool, query, cap, tiebreak, tiebreakFirst) {
+  return filterCounter(pool, query, cap, searchRecords, tiebreak, tiebreakFirst)
 }

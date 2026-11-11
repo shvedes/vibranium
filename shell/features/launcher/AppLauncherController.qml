@@ -777,17 +777,19 @@ Item {
     // ~20 visible rows.
     const blank = query === ""
     // Frequency mode ranks by druncache in the idle view (see
-    // buildAppIndex); the same counts break equal-relevance ties while
-    // filtering, so a heavily used "Spotify" outranks a rarely used
-    // "SpotiFLAC" on a tied query like "spo". Alphabetical mode passes
-    // no tiebreak and keeps pure relevance order.
+    // buildAppIndex), and filtered rows follow that order: the counts are
+    // the primary key, with relevance separating equally-used apps, so a
+    // heavily used "Spotify" outranks a rarely used "SpotiFLAC" even when
+    // its match scores lower. Alphabetical mode passes no tiebreak and
+    // keeps pure relevance order.
     // -> counts snapshotted once per recompute into a Map; the comparator
     // below reads the snapshot instead of calling usageCountFor per
     // comparison, which ran O(n log n) map lookups per sort. Same order.
     const tie = root._tieLookup()
+    const tieFirst = root.sortMethod === "frequency"
     // filterCounter matches over the WHOLE index and reports the true hit
     // count as `matched` (total = index size), display-capped at 100.
-    const res = LauncherLib.filterCounter(root.appIndex, query, 100, tie)
+    const res = LauncherLib.filterCounter(root.appIndex, query, 100, tie, tieFirst)
     root.matchedCount = res.matched
     root.totalCount = res.total
     const shown = res.rows.length
@@ -827,7 +829,7 @@ Item {
     // and the auto-select below refuses: firing on a fuzzy single match
     // would launch an app the user never named.
     if (!forced && !blank && res.matched === 0 && !CalcLib.isPotentialCalc(query)) {
-      const ty = LauncherLib.searchTypo(root.appIndex, query, 100, tie)
+      const ty = LauncherLib.searchTypo(root.appIndex, query, 100, tie, tieFirst)
       if (ty.count > 0) {
         root.matchedCount = ty.count
         for (let i = 0; i < ty.rows.length; i++) {
@@ -897,9 +899,10 @@ Item {
   }
 
   // Frequency mode ranks by druncache in the idle view (see buildAppIndex);
-  // the same counts break equal-relevance ties while filtering. Snapshotted
-  // once per recompute: the comparator reads the map instead of calling
-  // usageCountFor per comparison, which ran O(n log n) lookups per sort.
+  // the same counts are the primary order while filtering, with relevance
+  // breaking ties among equally-used apps. Snapshotted once per recompute:
+  // the comparator reads the map instead of calling usageCountFor per
+  // comparison, which ran O(n log n) lookups per sort.
   function _tieLookup() {
     if (root.sortMethod !== "frequency") return null
     const counts = new Map()
