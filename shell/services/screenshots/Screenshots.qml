@@ -626,14 +626,21 @@ Singleton {
   // time - because the question after a cancel is "what did it cancel",
   // and the answer is a list of the parts that were running, not a list of
   // the parts that were null.
-  function _cancelActiveFlow(reason) {
-    const id = root._activeFlow
-    if (id === 0) return
+  // Stop the timers every live flow holds and clear the state that only a
+  // running decode needs. Both the cancel path and the loud-failure path
+  // start with exactly this.
+  function _stopFlowTimers() {
     grabWatchdog.stop()
     decodeTimer.stop()
     frameTimer.stop()
     root._pendingFinish = null
     root._decodeAttempts = 0
+  }
+
+  function _cancelActiveFlow(reason) {
+    const id = root._activeFlow
+    if (id === 0) return
+    root._stopFlowTimers()
     root._activeJob = 0
     root._activeDelivery = null
     if (root._cropProcess !== null) {
@@ -2019,11 +2026,7 @@ Singleton {
     const expectedJob = Number(jobId) || 0
     if (requestedFlow > 0 && requestedFlow !== root._activeFlow) return
     if (expectedJob > 0 && expectedJob !== root._activeJob) return
-    grabWatchdog.stop()
-    decodeTimer.stop()
-    frameTimer.stop()
-    root._pendingFinish = null
-    root._decodeAttempts = 0
+    root._stopFlowTimers()
     root._pendingCrop = null
     if (root._pendingAnnotate !== null) {
       const pending = root._pendingAnnotate
