@@ -1453,17 +1453,16 @@ group('the degenerate inputs', () => {
   // caller always passes the output of sortDeviceRows, which is one.
   noThrow('a string flag', () => BT.listEntries([{ name: 'a', known: true }], 'yes'))
   eq('a truthy string flag is honoured', BT.listEntries([{ name: 'a', known: true }], 'yes').map((e) => e.type), ['header', 'device', 'header'])
-  throws('a null list', () => BT.listEntries(null, true), /length/)
-  throws('an undefined list', () => BT.listEntries(undefined, false), /length/)
-  throws('no argument at all', () => BT.listEntries(), /length/)
+  eq('a null list still gets the trailing header', BT.listEntries(null, true), [{ type: 'header', title: 'AVAILABLE DEVICES' }])
+  eq('an undefined list', BT.listEntries(undefined, false), [])
+  eq('no argument at all', BT.listEntries(), [])
   noThrow('an empty list', () => BT.listEntries([], true))
-  // A number has no `.length`, so the loop is a no-op and the answer is an
-  // empty list. A STRING has a length, so the loop runs over its characters
-  // and each one is pushed as a device row with the character itself as the
-  // row. Neither is a real input - the island passes sortDeviceRows output -
-  // but both are pinned because they are what the unguarded loop does.
+  // DeviceList.sectionedEntries only walks a real array, so a number and a
+  // string both answer an empty list instead of walking characters. The
+  // island passes sortDeviceRows output, so neither is a real input; they are
+  // pinned because a non-array must not reach the row builder.
   eq('a number list walks nothing', BT.listEntries(7, false), [])
-  eq('a string list walks its characters', BT.listEntries('xy', false), [{ type: 'device', row: 'x' }, { type: 'device', row: 'y' }])
+  eq('a string list walks nothing', BT.listEntries('xy', false), [])
   // The input array is only read, so a caller can hold on to it.
   eq('the input list is not mutated', (() => { const rows = [{ name: 'a', known: true }]; BT.listEntries(rows, true); return rows.length })(), 1)
 })
