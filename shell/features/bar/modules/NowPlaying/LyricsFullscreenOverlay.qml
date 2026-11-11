@@ -339,7 +339,7 @@ PanelWindow {
     readonly property real availH: Math.max(0, height - 2 * pad)
     // Cover column share. Capped by the available height so a short, wide
     // output does not hand the transcript a sliver.
-    readonly property real coverW: Math.max(120, Math.min(availW * 0.42, availH * 0.95))
+    readonly property real coverW: Range.clamp(availH * 0.95, 120, availW * 0.42)
     // Transport pads fill the space between the cover and the lane, sized
     // from the cover column so the whole left group keeps one scale.
     readonly property real padSlot: Math.round(Range.clamp(coverW * 0.115, 48, 88))
