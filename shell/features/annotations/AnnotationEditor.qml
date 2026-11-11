@@ -1939,11 +1939,11 @@ PanelWindow {
         board.requestPaint()
       }
       x: editor.textAnchor !== null
-        ? Math.max(0, Math.min(stage.width - width,
-          editor._textFieldInner !== null ? editor._textFieldInner.x : editor._toDisplay(editor.textAnchor).x)) : 0
+        ? Range.clamp(editor._textFieldInner !== null ? editor._textFieldInner.x : editor._toDisplay(editor.textAnchor).x,
+          0, stage.width - width) : 0
       y: editor.textAnchor !== null
-        ? Math.max(0, Math.min(stage.height - height,
-          editor._textFieldInner !== null ? editor._textFieldInner.y : editor._toDisplay(editor.textAnchor).y)) : 0
+        ? Range.clamp(editor._textFieldInner !== null ? editor._textFieldInner.y : editor._toDisplay(editor.textAnchor).y,
+          0, stage.height - height) : 0
       onAccepted: editor._finishText(true)
       onVisibleChanged: {
         if (visible) forceActiveFocus()
