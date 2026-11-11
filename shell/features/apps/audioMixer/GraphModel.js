@@ -586,6 +586,67 @@ function curveSamples(curve) {
   return Range.clamp(Math.ceil(poly / 4), 24, 1024)
 }
 
+// --- view math ---------------------------------------------------------
+
+// The pan clamp: keep at least a corner of the world reachable. A world
+// smaller than the viewport is pinned at the origin rather than flung off it.
+function clampPan(panX, panY, viewW, viewH, worldW, worldH, zoom, margin) {
+  const w = worldW * zoom
+  const h = worldH * zoom
+  const edge = margin
+  const loX = Math.min(0, edge - w)
+  const loY = Math.min(0, edge - h)
+  const hiX = Range.clamp(w - edge, 0, Math.max(0, viewW - edge))
+  const hiY = Range.clamp(h - edge, 0, Math.max(0, viewH - edge))
+  return { x: Range.clamp(panX, loX, hiX), y: Range.clamp(panY, loY, hiY) }
+}
+
+// Zoom about a viewport point. `notches` is the wheel delta and `step` the
+// per-notch log scale, so the world point under the pointer stays under it.
+function zoomPan(panX, panY, zoom, notches, step, minZoom, maxZoom, atX, atY) {
+  let next = zoom * Math.exp(notches * step)
+  if (next > maxZoom) next = maxZoom
+  if (next < minZoom) next = minZoom
+  if (next === zoom) return { zoom: zoom, panX: panX, panY: panY }
+  const k = next / zoom
+  return { zoom: next, panX: atX - (atX - panX) * k, panY: atY - (atY - panY) * k }
+}
+
+// The cards' own extent in world units, or null when there are none. One walk
+// of the position map, which is what the view is fitted to.
+function contentBox(positions, cardW, cardH) {
+  let minX = Infinity
+  let minY = Infinity
+  let maxX = -Infinity
+  let maxY = -Infinity
+  for (const k in positions) {
+    const at = positions[k]
+    if (at === undefined || at === null) continue
+    if (at.x < minX) minX = at.x
+    if (at.y < minY) minY = at.y
+    if (at.x + cardW > maxX) maxX = at.x + cardW
+    if (at.y + cardH > maxY) maxY = at.y + cardH
+  }
+  if (!isFinite(minX) || !isFinite(minY)) return null
+  return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+}
+
+// The whole graph in the viewport, and never larger than 1:1. A null box is
+// the identity view, which is what an empty graph resets to.
+function fitView(box, viewW, viewH, pad, minZoom, maxZoom) {
+  if (box === null || box === undefined) return { zoom: 1, panX: 0, panY: 0 }
+  const w = box.w + 2 * pad
+  const h = box.h + 2 * pad
+  let z = Math.min(viewW / Math.max(1, w), viewH / Math.max(1, h), 1)
+  if (z < minZoom) z = minZoom
+  if (z > maxZoom) z = maxZoom
+  return {
+    zoom: z,
+    panX: (viewW - box.w * z) / 2 - box.x * z,
+    panY: (viewH - box.h * z) / 2 - box.y * z
+  }
+}
+
 // The length of a curve's control POLYGON: the three straight legs of the hull,
 // which bound the arc and need no arc-length pass to know. Stated once because
 // three functions reason about a curve's size and a second copy of the sum is a

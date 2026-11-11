@@ -666,15 +666,10 @@ Item {
   // the pan agree about how much edge to leave behind: the bound is stated once
   // and the world's own padding is built out of it.
   function _clampPan() {
-    const edge = tab.margin
-    const w = tab.worldW * tab.zoom
-    const h = tab.worldH * tab.zoom
-    const loX = Math.min(0, edge - w)
-    const loY = Math.min(0, edge - h)
-    const hiX = Range.clamp(w - edge, 0, Math.max(0, tab.viewW - edge))
-    const hiY = Range.clamp(h - edge, 0, Math.max(0, tab.viewH - edge))
-    tab.panX = Range.clamp(tab.panX, loX, hiX)
-    tab.panY = Range.clamp(tab.panY, loY, hiY)
+    const p = Model.clampPan(tab.panX, tab.panY, tab.viewW, tab.viewH,
+      tab.worldW, tab.worldH, tab.zoom, tab.margin)
+    tab.panX = p.x
+    tab.panY = p.y
   }
 
   // Zoom about a point of the viewport. `k` is the ratio of the new scale to
@@ -688,14 +683,12 @@ Item {
   // already as immediate as the compositor allows.
   function zoomBy(notches, atX, atY, fine) {
     const step = fine === true ? tab.zoomStepFine : tab.zoomStep
-    let next = tab.zoom * Math.exp(notches * step)
-    if (next > tab.maxZoom) next = tab.maxZoom
-    if (next < tab.minZoom) next = tab.minZoom
-    if (next === tab.zoom) return
-    const k = next / tab.zoom
-    tab.panX = atX - (atX - tab.panX) * k
-    tab.panY = atY - (atY - tab.panY) * k
-    tab.zoom = next
+    const next = Model.zoomPan(tab.panX, tab.panY, tab.zoom, notches, step,
+      tab.minZoom, tab.maxZoom, atX, atY)
+    if (next.zoom === tab.zoom) return
+    tab.zoom = next.zoom
+    tab.panX = next.panX
+    tab.panY = next.panY
     tab._clampPan()
   }
 
@@ -703,20 +696,7 @@ Item {
   // of the position map, which is what the view is fitted to and what the pan
   // clamp's own bound stands in for.
   function _contentBox() {
-    let minX = Infinity
-    let minY = Infinity
-    let maxX = -Infinity
-    let maxY = -Infinity
-    for (const k in tab._positions) {
-      const at = tab._positions[k]
-      if (at === undefined || at === null) continue
-      if (at.x < minX) minX = at.x
-      if (at.y < minY) minY = at.y
-      if (at.x + tab.cardW > maxX) maxX = at.x + tab.cardW
-      if (at.y + tab.cardH > maxY) maxY = at.y + tab.cardH
-    }
-    if (!isFinite(minX) || !isFinite(minY)) return null
-    return { x: minX, y: minY, w: maxX - minX, h: maxY - minY }
+    return Model.contentBox(tab._positions, tab.cardW, tab.cardH)
   }
 
   // The whole graph in the viewport, and never larger than 1:1.
@@ -727,23 +707,11 @@ Item {
   // connected from where the user is looking. The fit never zooms IN past 1:1,
   // because a small graph blown up is not more readable than a small graph.
   function resetView() {
-    const box = tab._contentBox()
-    if (box === null) {
-      tab.zoom = 1
-      tab.panX = 0
-      tab.panY = 0
-      tab._clampPan()
-      return
-    }
-    const pad = Ui.m
-    const w = box.w + 2 * pad
-    const h = box.h + 2 * pad
-    let z = Math.min(tab.viewW / Math.max(1, w), tab.viewH / Math.max(1, h), 1)
-    if (z < tab.minZoom) z = tab.minZoom
-    if (z > tab.maxZoom) z = tab.maxZoom
-    tab.zoom = z
-    tab.panX = (tab.viewW - box.w * z) / 2 - box.x * z
-    tab.panY = (tab.viewH - box.h * z) / 2 - box.y * z
+    const fit = Model.fitView(tab._contentBox(), tab.viewW, tab.viewH,
+      Ui.m, tab.minZoom, tab.maxZoom)
+    tab.zoom = fit.zoom
+    tab.panX = fit.panX
+    tab.panY = fit.panY
     tab._clampPan()
   }
 
