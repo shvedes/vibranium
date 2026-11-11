@@ -2149,6 +2149,25 @@ function selectableEdge(rows, isSelectable, last) {
 // belongs to the route, so a Space in filter mode, an Enter under the
 // field and a Left in filter mode all stay unclaimed without the caller
 // re-deriving a mode check per route.
+// --- grid geometry ------------------------------------------------------
+
+// The cell side a grid page asks for, with the floor that keeps a degenerate
+// declaration usable.
+function gridCellSpec(page) {
+  return page && typeof page.cell === "number" && page.cell > 16 ? page.cell : 46
+}
+
+// Grid geometry from the card width and the outer padding. Columns fit the
+// inner width; the side stretches so the cells fill that width exactly, which
+// is what keeps a grid page's last column flush with the card.
+function gridGeometry(width, outerPad, cellSpec) {
+  const innerW = Math.max(0, Number(width) - 2 * Number(outerPad))
+  const spec = Number(cellSpec) > 0 ? Number(cellSpec) : 46
+  const cols = Math.max(1, Math.floor(innerW / spec))
+  const side = cols > 0 ? Math.floor(innerW / cols) : spec
+  return { innerW: innerW, cols: cols, side: side }
+}
+
 // --- row-set identity ---------------------------------------------------
 
 // The uid sequence a row set is identified by. NUL is the separator because

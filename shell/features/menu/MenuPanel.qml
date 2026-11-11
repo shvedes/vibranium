@@ -129,19 +129,17 @@ Rectangle {
     return !!pg && pg.layout === "grid"
   }
 
-  // Cell side hint from the layout page; a floor keeps degenerate
-  // declarations usable.
-  readonly property real gridCellSpec: {
-    const pg = panel.layoutPage()
-    return pg && typeof pg.cell === "number" && pg.cell > 16 ? pg.cell : 46
-  }
+  // Cell side hint from the layout page; the library owns the floor that
+  // keeps a degenerate declaration usable.
+  readonly property real gridCellSpec: MenuLib.gridCellSpec(panel.layoutPage())
 
   // Columns fit the card's inner width; cells stretch to fill it exactly,
   // staying square-ish via the shared side length.
-  readonly property real gridInnerW: Math.max(0, panel.width - 2 * Ui.outerPad)
-  readonly property int gridCols: Math.max(1, Math.floor(panel.gridInnerW / panel.gridCellSpec))
-  readonly property real gridSide: panel.gridCols > 0
-    ? Math.floor(panel.gridInnerW / panel.gridCols) : panel.gridCellSpec
+  readonly property var gridGeometry: MenuLib.gridGeometry(
+    panel.width, Ui.outerPad, panel.gridCellSpec)
+  readonly property real gridInnerW: panel.gridGeometry.innerW
+  readonly property int gridCols: panel.gridGeometry.cols
+  readonly property real gridSide: panel.gridGeometry.side
 
   readonly property int gridRows: Math.ceil(panel.rowsModel.length / panel.gridCols)
   readonly property real gridContentH: panel.gridRows * panel.gridSide
