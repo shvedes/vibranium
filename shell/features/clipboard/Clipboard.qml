@@ -709,21 +709,8 @@ Singleton {
   }
   // Lift an entry to the most-recent slot (used when it is re-copied).
   function _promote(id) {
-    const h = root.history.slice()
-    const idx = root._indexOf(id, h)
-    if (idx < 0) return
-    if (idx === 0) {
-      // Still refresh timestamp so timeStr updates and persistence reorders.
-      const e0 = Object.assign({}, h[0], { ts: Date.now() })
-      h[0] = CL.deriveEntry(e0, TimeFormat.use12h)
-      root.history = h
-      root._recompute()
-      root._persist()
-      return
-    }
-    const e = Object.assign({}, h[idx], { ts: Date.now() })
-    h.splice(idx, 1)
-    h.unshift(CL.deriveEntry(e, TimeFormat.use12h))
+    const h = CL.promoteEntry(root.history, id, Date.now(), TimeFormat.use12h)
+    if (h === null) return
     root.history = h
     root._recompute()
     root._persist()

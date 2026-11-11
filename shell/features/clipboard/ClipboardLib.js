@@ -1850,6 +1850,29 @@ function exportEntry(e) {
   return o
 }
 
+// Lift an entry to the most-recent slot with a fresh timestamp. The row is
+// copied rather than mutated and its display fields are recomputed for the new
+// clock. A miss is null; an already-first row is refreshed in place.
+function promoteEntry(history, id, now, use12h) {
+  const h = (Array.isArray(history) ? history : []).slice()
+  let idx = -1
+  for (let i = 0; i < h.length; i++) {
+    if (h[i] && h[i].id === id) {
+      idx = i
+      break
+    }
+  }
+  if (idx < 0) return null
+  if (idx === 0) {
+    h[0] = deriveEntry(Object.assign({}, h[0], { ts: now }), use12h === true)
+    return h
+  }
+  const e = deriveEntry(Object.assign({}, h[idx], { ts: now }), use12h === true)
+  h.splice(idx, 1)
+  h.unshift(e)
+  return h
+}
+
 // One pin flip as data: the history array with one row's `pinned` flag
 // inverted, plus the slot and the previous state so the facade can decide
 // what to log and whether the pinned mode just emptied. A miss is null and

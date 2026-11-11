@@ -2633,6 +2633,23 @@ group('togglePinned - one pin flip as data, or a miss', () => {
   eq('an absent pinned flag reads as unpinned', CL.togglePinned([{ id: 3 }], 3).wasPinned, false)
 })
 
+group('promoteEntry lifts a row and refreshes its clock', () => {
+  const h = [
+    CL.newEntry('a', 1, 'x', 'text/plain', 'text'),
+    CL.newEntry('b', 2, 'y', 'text/plain', 'text'),
+  ]
+  const next = CL.promoteEntry(h, 'b', 99, false)
+  eq('the promoted row is first', next.map(e => e.id), ['b', 'a'])
+  eq('with a fresh timestamp', next[0].ts, 99)
+  eq('the input array is not mutated', h[1].id, 'b')
+  const first = CL.promoteEntry(h, 'a', 99, false)
+  eq('an already-first row stays first', first.map(e => e.id), ['a', 'b'])
+  eq('and its clock is refreshed', first[0].ts, 99)
+  eq('a miss is null', CL.promoteEntry(h, 'z', 99, false), null)
+  eq('a non-array history is a miss', CL.promoteEntry(null, 'a', 99, false), null)
+  eq('the display fields are re-derived', typeof first[0].timeStr, 'string')
+})
+
 section('ClipboardLib - the contracts it upholds on its own')
 // ===========================================================================
 
@@ -2649,8 +2666,8 @@ group('the library reads no host global and no clock of its own', () => {
   // This pair is a load-time namespace-leak guard, not an API pin: it fails if
   // evaluating the lib leaves anything behind on its own namespace. It also
   // fails if a function is legitimately added, which is the price.
-  eq('a fresh load of the clipboard lib has 102 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 102)
-  eq('a fresh load of the clipboard lib has 102 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 102)
+  eq('a fresh load of the clipboard lib has 103 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 103)
+  eq('a fresh load of the clipboard lib has 103 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 103)
   // The clipboard lib never calls Math.random outside generateKey.
   eq('and the clipboard lib only has it in generateKey', (SRC.match(/Math\.random/g) || []).length, 1)
 })
