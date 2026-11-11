@@ -1011,8 +1011,11 @@ function scopeBundle(base, entryId, extraIds) {
   const seen = Object.create(null)
   const queue = seeds.slice()
   for (let i = 0; i < seeds.length; i++) seen[seeds[i]] = true
-  while (queue.length > 0) {
-    const id = queue.shift()
+  // Cursor, not shift(): a page graph this walks is the opened menu's whole
+  // reachable set, and shifting moves the tail of the queue for every page.
+  let head = 0
+  while (head < queue.length) {
+    const id = queue[head++]
     const pg = base.byId[id]
     if (!pg || !Array.isArray(pg.items)) continue
     for (let i = 0; i < pg.items.length; i++) {
@@ -1062,8 +1065,11 @@ function buildIndex(bundle) {
   }]
   const seen = Object.create(null)
   seen[bundle.entry] = true
-  while (queue.length > 0) {
-    const cur = queue.shift()
+  // Cursor, not shift(), for the reason scopeBundle states: the walk visits
+  // every reachable page and shifting costs the queue's tail per page.
+  let head = 0
+  while (head < queue.length) {
+    const cur = queue[head++]
     const kids = childrenOf[cur.id]
     if (!kids) continue
     for (const kidId in kids) {
