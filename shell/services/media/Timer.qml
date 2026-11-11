@@ -187,8 +187,7 @@ Singleton {
   // The counter is only reset by a confirmed hold, so a child that keeps
   // dying keeps growing the backoff and can never spin.
   function _onInhibitAttemptEnd(handle) {
-    if (handle === null || handle === undefined) return
-    if (!RequestGate.current(handle)) return
+    if (!root._ownsAttempt(handle)) return
     root._inhibitJob = null
     inhibitConfirm.stop()
     root._inhibitUnproven = true
@@ -294,8 +293,7 @@ Singleton {
   // paplay that returns at once on a dead sink has delivered nothing, and
   // letting it reset the counter would repeat it with no gap at all.
   function _onAlarmAttemptEnd(handle, result) {
-    if (handle === null || handle === undefined) return
-    if (!RequestGate.current(handle)) return
+    if (!root._ownsAttempt(handle)) return
     root._alarmJob = null
     alarmConfirm.stop()
     if (root._succeeded(result) && !root._alarmUnproven) root._alarmFails = 0
@@ -353,6 +351,11 @@ Singleton {
   // deferred path, so only a live job is cancelled here.
   function _cancelJob(job, reason) {
     return Job.cancelLive(job, reason)
+  }
+
+  // True while this attempt still owns its request generation.
+  function _ownsAttempt(handle) {
+    return handle !== null && handle !== undefined && RequestGate.current(handle)
   }
 
   // Claim a freshly started job for a request generation. A job whose
