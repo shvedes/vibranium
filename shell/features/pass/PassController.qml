@@ -180,10 +180,7 @@ Item {
   }
 
   function _resolveStoreDir() {
-    var d = Model.storeDir(root._env())
-    if (d.length > 1 && d.charAt(d.length - 1) === "/")
-      d = d.substring(0, d.length - 1)
-    root.storeDir = d
+    root.storeDir = Model.storeDirPath(root._env())
   }
 
   // Every pass/git Process inherits this override so the resolved store

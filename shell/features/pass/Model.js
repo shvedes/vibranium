@@ -48,6 +48,12 @@ function splitEntry(path) {
 
 // The store root as the parsers compare it: no trailing slash, and the one
 // empty answer for an absent argument.
+// The store root as every caller addresses it: the resolved store with a
+// trailing slash removed, except the filesystem root itself.
+function storeDirPath(env) {
+  return _storeDir(storeDir(env))
+}
+
 function _storeDir(path) {
   var dir = String(path || "");
   if (dir.length > 1 && dir.charAt(dir.length - 1) === "/")

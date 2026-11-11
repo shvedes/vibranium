@@ -110,7 +110,7 @@ group('all six libraries load and publish a namespace', () => {
   // parsers below read through. The loader publishes every top-level
   // declaration, so the private helpers are part of the namespace whether or
   // not module.exports names them.
-  eq('pass/Model publishes twenty-six', Object.keys(PASS).length, 26)
+  eq('pass/Model publishes twenty-seven', Object.keys(PASS).length, 27)
   // 17 in module.exports plus `fracOr`, which the file never exports but the
   // loader picks up as a top-level declaration.
   eq('WallpaperTrans publishes eighteen', Object.keys(WT).length, 18)
@@ -2691,6 +2691,15 @@ group('one find line becomes a path relative to the store root', () => {
   eq('a null line names nothing', PASS._storedPath('', null), null)
 })
 
+group('storeDirPath is the store root every caller addresses', () => {
+  eq('a trailing slash is dropped', PASS.storeDirPath({ PASSWORD_STORE_DIR: '/store/' }), '/store')
+  eq('the filesystem root survives', PASS.storeDirPath({ PASSWORD_STORE_DIR: '/' }), '/')
+  eq('an unexported store falls back to XDG', PASS.storeDirPath({ XDG_DATA_HOME: '/data' }), '/data/password-store')
+  eq('and then to HOME', PASS.storeDirPath({ HOME: '/home/u' }), '/home/u/.local/share/password-store')
+  eq('with nothing exported it is the documented tilde path', PASS.storeDirPath({}), '~/.local/share/password-store')
+  eq('a null env still answers', PASS.storeDirPath(null).length > 0, true)
+})
+
 section('pass/Model.parseFindOutput and listEntries - the store scan')
 const FIND_LINES = [
   'd /store',
@@ -4126,8 +4135,9 @@ const SURFACE = {
     'newTokenMap', 'token', 'redact', 'fieldCounts', 'storeStats', '_swap', '_wordish',
     // The two store-relative path helpers parseFindOutput and listEntries
     // read through. Private to the file, published by the loader, and asserted
-    // directly so the path rule has one owner.
-    '_storeDir', '_storedPath',
+    // directly so the path rule has one owner. storeDirPath is the public
+    // projection the controller addresses the store by.
+    '_storeDir', '_storedPath', 'storeDirPath',
   ],
   'WallpaperTrans': [
     'transitions', 'randomPool', 'speeds', 'normalizeKind', 'resolveKind', 'normalizeSpeed',
@@ -4158,9 +4168,9 @@ group('the surface lists match the loaded namespaces exactly', () => {
   eq('Battery/Model: 23 exports', SURFACE['Battery/Model'].length, 23)
   eq('Bluetooth/Model: 9 exports', SURFACE['Bluetooth/Model'].length, 9)
   eq('Network/Model: 31 functions plus 2 table vars', SURFACE['Network/Model'].length + TABLES['Network/Model'].length, 33)
-  eq('pass/Model: 26 exports', SURFACE['pass/Model'].length, 26)
+  eq('pass/Model: 27 exports', SURFACE['pass/Model'].length, 27)
   eq('WallpaperTrans: 18 exports', SURFACE['WallpaperTrans'].length, 18)
-  eq('110 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 110)
+  eq('111 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 111)
   // Six names are genuinely shared between two libraries - deviceLabel,
   // deviceIconName, formatRate, subtextFor, sectionTitleFor and listEntries -
   // and each is called through ITS OWN namespace, so the call check above
