@@ -3,7 +3,6 @@ import QtQml
 import QtQuick
 import qs.features.menu
 import qs.features.launcher
-import qs.features.lock
 import qs.features.clipboard
 import qs.features.polkit
 import qs.features.osd
@@ -50,7 +49,6 @@ Item {
 
   function resolve(id) {
     switch (id) {
-      case "lockscreen":       void Lockscreen.locked; break
       case "clipboard":        void Clipboard.tag; break
       case "osd":              void OSD.tag; break
       case "notifications":    void Notifications.tag; break

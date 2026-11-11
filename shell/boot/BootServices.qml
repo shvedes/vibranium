@@ -3,6 +3,7 @@ import QtQml
 import QtQuick
 import qs.services
 import qs.services as Services
+import qs.features.lock
 
 // Services half of the late boot: the singleton set in qs.services, and
 // nothing else.
@@ -23,10 +24,12 @@ import qs.services as Services
 // answers the resolvers, so a demand that arrives before it lands is stashed
 // for the replay like any other.
 //
-// Every case here is a type from qs.services. A unit whose type lives in a
-// feature module belongs in BootLate.qml, and the bar itself belongs in
-// BootBar.qml: resolve() answers false for an id it does not own, and Boot
-// stashes that demand for the half that does.
+// Every case here is a type from qs.services, plus the session lock: it is an
+// essential unit whose module is small and whose absence is what holds the
+// shell's readiness, so it rides this half rather than the feature half. A
+// unit whose type lives in any other feature module belongs in BootLate.qml,
+// and the bar itself belongs in BootBar.qml: resolve() answers false for an id
+// it does not own, and Boot stashes that demand for the half that does.
 Item {
   id: late
 
@@ -36,6 +39,14 @@ Item {
 
   function resolve(id) {
     switch (id) {
+      // The session lock is essential - a lock request and the shell's own
+      // readiness verdict both wait on it - and its module set is small, so it
+      // resolves here instead of with the feature half. Behind the feature half
+      // it could not land until the menu, launcher, apps and picker sets had
+      // compiled and the entrance had settled; here it lands when the services
+      // do. `qs.features.lock` imports `qs.services` already, so this shares
+      // that compile rather than repeating it in a fourth half.
+      case "lockscreen":    void Lockscreen.locked; break
       // Timer, ArchUpdates and Connectivity are prefixed because qs.services
       // shares those names with the bar's own modules and with QtQuick's
       // Timer; the qualified name is the one that cannot resolve to the wrong
