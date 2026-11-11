@@ -318,9 +318,14 @@ Singleton {
       nextRetryMs: 0,
       startedAtMs: 0,
       teardownDone: false,
-      // What the last emitted event said. See _changed.
-      emittedState: "",
-      emittedHealth: "",
+      // What the last emitted event said. See _changed. Seeded with the
+      // record's own initial state and health: a registration is not a
+      // transition, and leaving these empty made _changed announce all 51
+      // registrations of a boot - a unitChanged per unit before a single one
+      // had been activated, which boot turns into a dependency walk and a
+      // milestone read for an arrival that has not happened.
+      emittedState: "not_started",
+      emittedHealth: "unknown",
       emittedError: "",
       emittedRetryCount: 0
     }
