@@ -8,12 +8,13 @@ import Quickshell.Io
 import qs.common
 import "../../../common/text/UnitIpc.js" as UnitIpc
 
-// Emoji picker service. The picker is a single static list with all
-// emojis as-is (no Recent / All sections). The bundle at emojis.jsonc
-// carries the full set and is opened on demand by `menu toggleFile`,
-// which parses and caches it; this unit names the bundle and answers IPC,
-// so a session that never picks an emoji parses nothing. No usage
-// tracking, no dynamic shadowing.
+// Emoji picker service. The entry page lists the face emojis only; the
+// rest of the set sits on a second page that no row links to, so it is
+// reachable through search alone. The bundle at emojis.jsonc carries both
+// pages and is opened on demand by `menu toggleFile`, which parses and
+// caches it; this unit names the bundle and answers IPC, so a session that
+// never picks an emoji parses nothing. No usage tracking, no dynamic
+// shadowing.
 Singleton {
   id: root
 

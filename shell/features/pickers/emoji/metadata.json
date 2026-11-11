@@ -1,5 +1,5 @@
 {
   "id": "emoji-picker",
   "name": "Emoji Picker",
-  "description": "MenuLib-driven emoji list: the full set ships as a single list bundle and inserts into the focused window."
+  "description": "MenuLib-driven emoji list: the faces are listed, the rest of the set is search-only, and picks insert into the focused window."
 }
