@@ -332,12 +332,14 @@ function manualDir() {
 function playerKey(p) {
   if (!p) return ""
   const md = p.metadata && typeof p.metadata === "object" ? p.metadata : {}
+  // An explicit null is a present id here: only undefined is absent, so a
+  // null trackid still suppresses the title fallback.
   const trackid = md["mpris:trackid"] === undefined ? "" : String(md["mpris:trackid"])
   const uid = p.uniqueId === undefined ? "" : String(p.uniqueId)
   const fallback = uid === "" && trackid === ""
-    ? [p.trackTitle, p.trackArtist, p.trackAlbum].map(v => String(v ?? "")).join("\u001f")
+    ? [p.trackTitle, p.trackArtist, p.trackAlbum].map(v => SU.textOf(v)).join("\u001f")
     : ""
-  return JSON.stringify([String(p.dbusName ?? ""), uid, trackid, fallback])
+  return JSON.stringify([SU.textOf(p.dbusName), uid, trackid, fallback])
 }
 
 // --- track likes -----------------------------------------------------------
