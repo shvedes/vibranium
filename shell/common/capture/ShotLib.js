@@ -81,10 +81,10 @@ function sourceSizeMatches(expectedW, expectedH, actualW, actualH, tolerance) {
 // a hotplug mid-capture would resolve to a stale object. "name:" alone is
 // the unusable answer - an unnamed screen with no serial matches nothing.
 function screenKey(candidate, other) {
-  const aSerial = String(candidate.serialNumber ?? "")
-  const bSerial = String(other.serialNumber ?? "")
+  const aSerial = SU.textOf(candidate.serialNumber)
+  const bSerial = SU.textOf(other.serialNumber)
   if (aSerial !== "" && bSerial !== "") return "serial:" + aSerial + "|" + bSerial
-  return "name:" + String(candidate.name ?? "")
+  return "name:" + SU.textOf(candidate.name)
 }
 
 // The live screen object for a captured one, or null when it is gone.
@@ -228,14 +228,14 @@ function mimeFor(fileType) {
 // that refusal, and the path itself comes from the shared FileUri decode so the
 // localhost authority and the reserved characters are read one way only.
 function pathFromFileUrl(value) {
-  const raw = String(value ?? "")
+  const raw = SU.textOf(value)
   if (!FileUri.isFileUri(raw)) return ""
   try { decodeURIComponent(raw) } catch (e) { return "" }
   return FileUri.pathOf(raw)
 }
 
 function mimeForPath(path) {
-  const s = String(path ?? "").toLowerCase()
+  const s = SU.textOf(path).toLowerCase()
   if (/\.(jpg|jpeg)$/.test(s)) return "image/jpeg"
   if (/\.webp$/.test(s)) return "image/webp"
   if (/\.bmp$/.test(s)) return "image/bmp"
@@ -245,7 +245,7 @@ function mimeForPath(path) {
 }
 
 function ensureImageSuffix(path, preferred) {
-  const value = String(path ?? "")
+  const value = SU.textOf(path)
   if (/\.(png|jpg|jpeg|webp|bmp|tif|tiff)$/i.test(value)) return value
   return value + "." + suffixFor(preferred)
 }
