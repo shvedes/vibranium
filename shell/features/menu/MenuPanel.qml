@@ -2121,8 +2121,7 @@ Rectangle {
     // arithmetic on the row's kind, so a four-digit page costs a walk and no
     // shaping. The head-sample extrapolation this used to carry existed only
     // to keep per-string measurement off a giant page.
-    return RowMetrics.contentH(panel.rowsModel || [], 0, panel.rowRestHeight,
-      panel.rowSpacing)
+    return panel._sumRowsH(panel.rowsModel || [], 0)
   }
 
   readonly property real listRegionH: {
@@ -2581,7 +2580,6 @@ Rectangle {
     // the tween it should have started was never armed).
     if (panel._slotRegionH < 0) panel._slotRegionH = panel._restingFallbackH()
     if (Math.abs(target - panel._slotRegionH) < 0.5) return
-    panel._armSlotRegion(target)
     panel._armSlotRegion(target)
   }
 
