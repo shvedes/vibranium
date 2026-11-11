@@ -3,6 +3,7 @@
 .import "../../../common/theme/DeviceIcons.js" as DeviceIcons
 .import "../../../common/math/Range.js" as Range
 .import "../../../common/collections/StoreGuards.js" as StoreGuards
+.import "../../../common/text/StringUtils.js" as SU
 .import "NodeKey.js" as NodeKey
 
 // Pure derivations for the audio mixer: what a node IS, what it is CALLED,
@@ -381,7 +382,7 @@ function iconName(node) {
   // Strip the direction suffix and keep the leading segment, which is the
   // application's own token: "firefox.monitor" -> "firefox",
   // "Chromium Web Content" -> "chromium".
-  const head = own.split(".")[0].trim().toLowerCase()
+  const head = SU.lowerTrim(own.split(".")[0])
   return head === "" ? "" : head
 }
 
