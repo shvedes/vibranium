@@ -764,6 +764,26 @@ function selectHandles(b) {
 // Display-px inset for the staged text box, so the caret and the glyphs
 // sit inside it with real margins. Proportional with guards: calm on a
 // giant box, never eats a small one whole.
+// Which file type a save dialog's selected name filter asks for, falling back
+// to the editor's own type. The filter is a human-facing label, so both the
+// format word and the extension are read.
+function saveDialogType(filter, fallback) {
+  const f = String(filter ?? "").toLowerCase()
+  if (f.indexOf("jpeg") >= 0 || f.indexOf(".jpg") >= 0) return "jpeg"
+  if (f.indexOf("png") >= 0) return "png"
+  return fallback === "jpeg" ? "jpeg" : "png"
+}
+
+// Whether an exported file may be removed after it is offered. A copy may
+// remove a file it produced, but never the source itself unless that source is
+// a one-shot runtime output; a save keeps the target only when the user asked
+// for it on disk.
+function exportDeleteAfter(kind, output, shotPath, oneShot, saveToDisk) {
+  return kind === "copy"
+    ? (output !== shotPath || oneShot === true)
+    : saveToDisk !== true
+}
+
 function textPad(dispH) {
   return Range.clamp(Math.round(dispH * 0.15), 2, 12)
 }

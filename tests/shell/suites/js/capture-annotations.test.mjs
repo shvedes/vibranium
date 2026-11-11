@@ -2460,4 +2460,25 @@ group('dragging past the fixed side flips the rect through min/max', () => {
   eq('the return shape is x,y,w,h', Object.keys(AT.resizeFromHandle(O, { fx: 0, fy: 0 }, 5, 5)), ['x', 'y', 'w', 'h'])
 })
 
+section('AnnotationTools - the export decisions')
+group('saveDialogType reads the chosen filter, then the editor type', () => {
+  eq('a jpeg filter', AT.saveDialogType('JPEG image', 'png'), 'jpeg')
+  eq('a dot-jpg filter', AT.saveDialogType('*.jpg', 'png'), 'jpeg')
+  eq('a png filter', AT.saveDialogType('PNG image', 'jpeg'), 'png')
+  eq('an unknown filter falls back to the editor type', AT.saveDialogType('All files', 'jpeg'), 'jpeg')
+  eq('and to png for the default', AT.saveDialogType('', 'png'), 'png')
+  eq('no filter at all', AT.saveDialogType(undefined, undefined), 'png')
+  eq('the filter reads case-insensitively', AT.saveDialogType('JpEg', 'png'), 'jpeg')
+  eq('a filter naming both prefers jpeg', AT.saveDialogType('PNG and JPEG', 'png'), 'jpeg')
+})
+
+group('exportDeleteAfter keeps the source and honours the save option', () => {
+  eq('a copy of a produced file is removed', AT.exportDeleteAfter('copy', '/out.png', '/shot.png', false, true), true)
+  eq('a copy of the source itself is kept', AT.exportDeleteAfter('copy', '/shot.png', '/shot.png', false, true), false)
+  eq('unless the source is a one-shot runtime output', AT.exportDeleteAfter('copy', '/shot.png', '/shot.png', true, true), true)
+  eq('a save to disk keeps the target', AT.exportDeleteAfter('save', '/out.png', '/shot.png', false, true), false)
+  eq('a save without the disk option removes it', AT.exportDeleteAfter('save', '/out.png', '/shot.png', false, false), true)
+  eq('a save to a runtime output still follows the option', AT.exportDeleteAfter('save', '/run.png', '/shot.png', true, true), false)
+})
+
 finish()

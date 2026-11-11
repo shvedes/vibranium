@@ -655,10 +655,7 @@ PanelWindow {
   }
 
   function _saveDialogType() {
-    const filter = String(saveDialog.selectedNameFilter ?? "").toLowerCase()
-    if (filter.indexOf("jpeg") >= 0 || filter.indexOf(".jpg") >= 0) return "jpeg"
-    if (filter.indexOf("png") >= 0) return "png"
-    return editor.fileType === "jpeg" ? "jpeg" : "png"
+    return AnnotationTools.saveDialogType(saveDialog.selectedNameFilter, editor.fileType)
   }
 
   function _openSaveDialog() {
@@ -760,7 +757,8 @@ PanelWindow {
 
   function _finishFileOffer(kind, output) {
     const oneShot = editor._isRuntimeOutput(output)
-    const deleteAfter = kind === "copy" ? (output !== editor.shotPath || oneShot) : !editor.saveToDisk
+    const deleteAfter = AnnotationTools.exportDeleteAfter(kind, output,
+      editor.shotPath, oneShot, editor.saveToDisk)
     if (!deleteAfter && !oneShot) editor._outputClipboardOwned = true
     const onCopyFailed = () => {
       if (kind === "save" && editor.saveToDisk) {
