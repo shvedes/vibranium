@@ -1850,6 +1850,23 @@ function exportEntry(e) {
   return o
 }
 
+// One pin flip as data: the history array with one row's `pinned` flag
+// inverted, plus the slot and the previous state so the facade can decide
+// what to log and whether the pinned mode just emptied. A miss is null and
+// persists nothing: the panel and the IPC verb can both name a row another
+// path removed first.
+function togglePinned(history, id) {
+  const h = (Array.isArray(history) ? history : []).slice()
+  for (let i = 0; i < h.length; i++) {
+    if (h[i].id === id) {
+      const wasPinned = h[i].pinned === true
+      h[i] = Object.assign({}, h[i], { pinned: !wasPinned })
+      return { history: h, slot: i, wasPinned: wasPinned }
+    }
+  }
+  return null
+}
+
 function exportEntries(history) {
   const out = []
   for (let i = 0; i < (history || []).length; i++) {

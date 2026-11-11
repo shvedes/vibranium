@@ -2616,6 +2616,23 @@ group('entryFromStored - the secret decode and its stranded case', () => {
   eq('and carries no plaintext', empty.plain, '')
 })
 
+group('togglePinned - one pin flip as data, or a miss', () => {
+  const rows = [{ id: 1, pinned: false }, { id: 2, pinned: true }]
+  const flipped = CL.togglePinned(rows, 1)
+  eq('the slot is reported', flipped.slot, 0)
+  eq('with the previous state', flipped.wasPinned, false)
+  eq('the row is pinned', flipped.history[0].pinned, true)
+  eq('the other row is untouched', flipped.history[1].pinned, true)
+  eq('the input array is not mutated', rows[0].pinned, false)
+  const unpin = CL.togglePinned(rows, 2)
+  eq('an unpin reports the previous state', unpin.wasPinned, true)
+  eq('and clears the flag', unpin.history[1].pinned, false)
+  eq('a miss is null', CL.togglePinned(rows, 9), null)
+  eq('a miss on an empty history is null', CL.togglePinned([], 1), null)
+  eq('a non-array history is a miss', CL.togglePinned(null, 1), null)
+  eq('an absent pinned flag reads as unpinned', CL.togglePinned([{ id: 3 }], 3).wasPinned, false)
+})
+
 section('ClipboardLib - the contracts it upholds on its own')
 // ===========================================================================
 
@@ -2632,8 +2649,8 @@ group('the library reads no host global and no clock of its own', () => {
   // This pair is a load-time namespace-leak guard, not an API pin: it fails if
   // evaluating the lib leaves anything behind on its own namespace. It also
   // fails if a function is legitimately added, which is the price.
-  eq('a fresh load of the clipboard lib has 101 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 101)
-  eq('a fresh load of the clipboard lib has 101 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 101)
+  eq('a fresh load of the clipboard lib has 102 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 102)
+  eq('a fresh load of the clipboard lib has 102 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 102)
   // The clipboard lib never calls Math.random outside generateKey.
   eq('and the clipboard lib only has it in generateKey', (SRC.match(/Math\.random/g) || []).length, 1)
 })

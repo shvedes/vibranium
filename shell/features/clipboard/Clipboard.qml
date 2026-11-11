@@ -552,20 +552,13 @@ Singleton {
     return true
   }
   function togglePin(id) {
-    let wasPinned = false
-    let slot = -1
-    const h = root.history.slice()
-    for (let i = 0; i < h.length; i++) {
-      if (h[i].id === id) {
-        wasPinned = h[i].pinned === true
-        slot = i
-        h[i] = Object.assign({}, h[i], { pinned: !h[i].pinned })
-        break
-      }
-    }
     // A miss persists nothing: the panel and the IPC verb can both name a
     // row another path removed first, and that must not rewrite the file.
-    if (slot < 0) return
+    const flipped = CL.togglePinned(root.history, id)
+    if (flipped === null) return
+    const wasPinned = flipped.wasPinned
+    const slot = flipped.slot
+    const h = flipped.history
     root.history = h
     root._recompute()
     // Only a row that was actually found gets a line. An id no longer in
