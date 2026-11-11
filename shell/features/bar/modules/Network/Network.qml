@@ -228,8 +228,10 @@ BarModule {
     if (root.connectedNetwork) {
       const dlSpeed = root.hasStats ? Model.formatRate(root.downloadRate) : "--"
       const ulSpeed = root.hasStats ? Model.formatRate(root.uploadRate) : "--"
-      const dlTotal = root.totalRxBytes > 0 ? Model.formatBytes(root.totalRxBytes) : (root.hasStats ? Model.formatBytes(root.totalRxBytes) : "--")
-      const ulTotal = root.totalTxBytes > 0 ? Model.formatBytes(root.totalTxBytes) : (root.hasStats ? Model.formatBytes(root.totalTxBytes) : "--")
+      // The counters are only meaningful once the sampler has a reading;
+      // formatBytes already renders a zero counter as "0 B".
+      const dlTotal = root.hasStats ? Model.formatBytes(root.totalRxBytes) : "--"
+      const ulTotal = root.hasStats ? Model.formatBytes(root.totalTxBytes) : "--"
       lines.push({
         icon: "download",
         iconColor: "blue",
