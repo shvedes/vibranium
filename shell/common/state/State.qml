@@ -6,6 +6,7 @@ import Quickshell.Io
 import qs.common
 import "../text/UnitIpc.js" as UnitIpc
 import "../text/StringUtils.js" as SU
+import "../collections/StoreGuards.js" as StoreGuards
 
 // State - multi-file JSON persistence with coalesced atomic writes and
 // watch-driven external change notification. Each slot is a JSON file at
@@ -83,7 +84,7 @@ Singleton {
     if (typeof key !== "string" || key === "") {
       return null
     }
-    const def = defaultValue !== undefined && defaultValue !== null && typeof defaultValue === "object" && !Array.isArray(defaultValue)
+    const def = StoreGuards.isPlainObject(defaultValue)
       ? Object.assign({}, defaultValue) : (defaultValue !== undefined ? defaultValue : {})
     if (root._slots[key] !== undefined) {
       return root._slots[key].data
@@ -111,7 +112,7 @@ Singleton {
     if (!slot) {
       return false
     }
-    const clean = data !== undefined && data !== null && typeof data === "object" && !Array.isArray(data)
+    const clean = StoreGuards.isPlainObject(data)
       ? Object.assign({}, data) : data
     if (slot.view) {
       slot.view.slotData = clean
@@ -167,9 +168,9 @@ Singleton {
   function setSection(key, name, obj) {
     if (typeof name !== "string" || name === "") return false
     const cur = root.value(key)
-    const base = cur !== null && typeof cur === "object" && !Array.isArray(cur) ? cur : {}
+    const base = StoreGuards.isPlainObject(cur) ? cur : {}
     const next = Object.assign({}, base)
-    next[name] = obj !== undefined && obj !== null && typeof obj === "object" && !Array.isArray(obj)
+    next[name] = StoreGuards.isPlainObject(obj)
       ? Object.assign({}, obj) : obj
     return root.set(key, next)
   }
@@ -179,7 +180,7 @@ Singleton {
     if (typeof name !== "string" || name === "") return false
     if (!patch || typeof patch !== "object" || Array.isArray(patch)) return false
     const cur = root.section(key, name)
-    const base = cur !== null && typeof cur === "object" && !Array.isArray(cur) ? cur : {}
+    const base = StoreGuards.isPlainObject(cur) ? cur : {}
     return root.setSection(key, name, Object.assign({}, base, patch))
   }
 
@@ -202,7 +203,7 @@ Singleton {
     // child owns JSON parse plus stringify plus echo suppression.
     const view = slotComp.createObject(root, { slotKey: key })
     const def = defaultValue !== undefined ? defaultValue : {}
-    const defClone = def !== null && typeof def === "object" && !Array.isArray(def)
+    const defClone = StoreGuards.isPlainObject(def)
       ? Object.assign({}, def) : def
     view.slotData = defClone
     view.path = path

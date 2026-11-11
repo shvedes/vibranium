@@ -4,6 +4,7 @@ pragma ComponentBehavior: Bound
 import QtQml
 import Quickshell
 import qs.common
+import "../collections/StoreGuards.js" as StoreGuards
 
 // ShellCache - one general JSON cache file owned by the whole shell:
 // $VIBRANIUM_CACHE/shell.json, namespaced by section
@@ -55,13 +56,13 @@ Singleton {
     const hasArch = stateData.archUpdates !== undefined
     if (!hasAudio && !hasArch) return
     const cur = AppState.value(root.slotKey)
-    const base = cur !== null && typeof cur === "object" && !Array.isArray(cur) ? cur : {}
+    const base = StoreGuards.isPlainObject(cur) ? cur : {}
     const next = Object.assign({}, base)
     if (hasAudio && next.audio === undefined) next.audio = stateData.audio
     if (hasArch && next.archUpdates === undefined) next.archUpdates = stateData.archUpdates
     if (!AppState.set(root.slotKey, next)) return
     const sCur = AppState.value("shell")
-    const sBase = sCur !== null && typeof sCur === "object" && !Array.isArray(sCur) ? sCur : {}
+    const sBase = StoreGuards.isPlainObject(sCur) ? sCur : {}
     const sNext = Object.assign({}, sBase)
     delete sNext.audio
     delete sNext.archUpdates
