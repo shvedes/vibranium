@@ -8,6 +8,7 @@
 // SecretStore and are reached by handle.
 
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 
 // Approximate `sort -V`: numeric chunks compare by value, the rest by
 // code point. Close enough for stable entry ordering in the panel.
@@ -169,7 +170,7 @@ function childrenOf(entries, dir, extraDirs) {
   var dirs = [];
   var seen = {};
   var files = [];
-  var extra = Array.isArray(extraDirs) ? extraDirs : [];
+  var extra = StoreGuards.asList(extraDirs);
   var i, e, rest, head;
   var consider = function (dirPath) {
     if (dirPath === d) return;
@@ -214,9 +215,9 @@ function childrenOf(entries, dir, extraDirs) {
 // ("mail" vs "mail2") apart. dir "" counts the whole vault.
 function countUnder(entries, dir) {
   var d = String(dir || "");
-  if (d === "") return (Array.isArray(entries) ? entries : []).length;
+  if (d === "") return StoreGuards.asList(entries).length;
   var n = 0;
-  var arr = Array.isArray(entries) ? entries : [];
+  var arr = StoreGuards.asList(entries);
   for (var i = 0; i < arr.length; i++) {
     var e = arr[i];
     if (!e) continue;
@@ -250,7 +251,7 @@ function searchVault(entries, allDirs, query) {
   }
   hits.sort(function (x, y) { return versionCompare(x.path, y.path); });
   var ds = [];
-  var dirs = Array.isArray(allDirs) ? allDirs : [];
+  var dirs = StoreGuards.asList(allDirs);
   for (var j = 0; j < dirs.length; j++) {
     var d = String(dirs[j] || "");
     if (d !== "" && d.toLowerCase().indexOf(q) !== -1) ds.push(d);
@@ -471,8 +472,8 @@ function fieldCounts(text) {
 // something - the difference between a small vault and a broken scan, which
 // is otherwise the same two numbers.
 function storeStats(files, dirs) {
-  var farr = Array.isArray(files) ? files : []
-  var darr = Array.isArray(dirs) ? dirs : []
+  var farr = StoreGuards.asList(files)
+  var darr = StoreGuards.asList(dirs)
   var depth = 0
   function depthOf(p) {
     var s = String(p === null || p === undefined ? "" : p)
