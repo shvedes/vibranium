@@ -2149,6 +2149,19 @@ function selectableEdge(rows, isSelectable, last) {
 // belongs to the route, so a Space in filter mode, an Enter under the
 // field and a Left in filter mode all stay unclaimed without the caller
 // re-deriving a mode check per route.
+// The page whose layout rules the card is currently drawing. Search results
+// inherit the ENTRY page's mode (an emoji bundle filters within its own grid),
+// otherwise the page the panel installed beside the row set decides, and only
+// then the navigation singleton's current page. The installed page is read
+// before the singleton because the latter is a cached binding that still names
+// the outgoing page inside a change handler.
+function layoutPageOf(bundle, searching, installedPage, pageById, currentPageId) {
+  if (!bundle) return null
+  if (searching === true) return bundle.byId[bundle.entry] || null
+  if (installedPage) return installedPage
+  return pageById(currentPageId)
+}
+
 // --- grid geometry ------------------------------------------------------
 
 // The cell side a grid page asks for, with the floor that keeps a degenerate

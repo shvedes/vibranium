@@ -111,17 +111,8 @@ Rectangle {
   // the ENTRY page's mode (an emoji bundle filters within its own grid);
   // otherwise the current page decides.
   function layoutPage() {
-    if (!Menu.bundle) return null
-    // Search results inherit the ENTRY page's mode (an emoji bundle filters
-    // within its own grid), so that branch keeps its own answer.
-    if (panel.searching) return Menu.bundle.byId[Menu.bundle.entry] || null
-    // Otherwise the page this panel LAID OUT: the record installed beside the
-    // row set, not the navigation singleton. currentPageId is a cached binding
-    // that hands back the previous page inside a change handler - the class of
-    // staleness that sized the card from the page it was leaving - and this is
-    // the one accessor the grid rules read.
-    if (panel.installedPage) return panel.installedPage
-    return Menu.pageById(panel.currentPageId)
+    return MenuLib.layoutPageOf(Menu.bundle, panel.searching, panel.installedPage,
+      Menu.pageById, panel.currentPageId)
   }
 
   readonly property bool gridMode: {

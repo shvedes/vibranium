@@ -138,7 +138,7 @@ const catalogRows = () => {
   return rows
 }
 
-// The 72-function public surface, named once so the coverage claim is
+// The 73-function public surface, named once so the coverage claim is
 // checkable rather than asserted in prose.
 const SURFACE = [
   'stripJsonc', 'styledMarkup', 'shellQuote', 'clamp', 'quantize',
@@ -157,6 +157,7 @@ const SURFACE = [
   'exactOptionIndex', 'bestOptionIndex', 'selectableEdge', 'keyRoute',
   'rowKeySeq', 'rowSetGuard',
   'gridCellSpec', 'gridGeometry',
+  'layoutPageOf',
 ]
 
 // keyRoute: one context factory and three projections over the route it picks.
@@ -173,19 +174,19 @@ const routeName = (over) => {
   return r === null ? null : r.name
 }
 
-suite('menu/MenuLib', 'the menu framework\'s pure layer - 72 functions')
+suite('menu/MenuLib', 'the menu framework\'s pure layer - 73 functions')
 
 // ======================================================================
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // The 72-name ledger plus ten top-level declarations the suite reads
+  // The 73-name ledger plus ten top-level declarations the suite reads
   // separately: the three filter-hay builders and the seven cache `var`s (the
   // six search caches and the scoped-filter hay cache), which the loader picks
   // up because a `.pragma library` namespace is its top-level declarations.
-  eq('82 declarations', Object.keys(M).length, 82)
+  eq('83 declarations', Object.keys(M).length, 83)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
-  eq('all 72 named functions are callable', missing, [])
+  eq('all 73 named functions are callable', missing, [])
   for (const n of SURFACE) {
     is(`${n} is a function`, M[n], (v) => typeof v === 'function', 'a function')
   }
@@ -205,7 +206,7 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 82 names', Object.keys(F).length, 82)
+  eq('the live view publishes the same 83 names', Object.keys(F).length, 83)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
@@ -4043,6 +4044,22 @@ group('the same rows hold at 1.0, 1.25, 1.5 and 2.0', () => {
     R.restH('sub', g2) > R.restH('line', g2), true)
 })
 
+section('layoutPageOf - the page whose layout rules the card follows')
+group('searching inherits the entry page', () => {
+  const bundle = { entry: 'entry', byId: { entry: { id: 'entry', layout: 'grid' } } }
+  eq('the entry page', M.layoutPageOf(bundle, true, { id: 'installed' }, () => null, 'other').id, 'entry')
+  eq('an absent entry page is no page', M.layoutPageOf({ entry: 'x', byId: {} }, true, null, () => null, ''), null)
+})
+
+group('resting reads the installed page before the singleton', () => {
+  const installed = { id: 'installed' }
+  const bundle = { entry: 'entry', byId: {} }
+  eq('the installed page wins', M.layoutPageOf(bundle, false, installed, () => ({ id: 'current' }), 'current'), installed)
+  eq('and the singleton is the fallback', M.layoutPageOf(bundle, false, null, () => ({ id: 'current' }), 'current').id, 'current')
+  eq('no bundle at all', M.layoutPageOf(null, false, installed, () => null, ''), null)
+  eq('the page lookup is asked by id', M.layoutPageOf(bundle, false, null, id => ({ id: id }), 'p').id, 'p')
+})
+
 section('grid geometry - the cell side and the columns a card fits')
 group('a grid cell side has a usable floor', () => {
   eq('a declared side', M.gridCellSpec({ cell: 64 }), 64)
@@ -4108,8 +4125,8 @@ group('every one of the 70 functions was exercised above', () => {
   // each name is required to appear in this file's OWN source as a call - so
   // removing a function, renaming one, or dropping a cluster turns this group
   // red rather than quietly shrinking the coverage.
-  eq('the surface list is 72 long', SURFACE.length, 72)
-  eq('with no duplicates', new Set(SURFACE).size, 72)
+  eq('the surface list is 73 long', SURFACE.length, 73)
+  eq('with no duplicates', new Set(SURFACE).size, 73)
   eq('and all of them resolve on the namespace', SURFACE.filter(n => typeof M[n] !== 'function'), [])
   const selfSource = fs.readFileSync(path.join(import.meta.dirname, 'menu.test.mjs'), 'utf8')
   for (const name of SURFACE) {
