@@ -136,7 +136,8 @@ Item {
 
   // Expansion (editors / info body) syncs imperatively from the service
   // store: rev bumps re-apply the canonical value immune to delegate
-  // lifecycle churn.
+  // lifecycle churn. The property exists to raise on_RevEchoChanged; it has no
+  // other reader.
   property int _revEcho: Menu.rev
 
   on_RevEchoChanged: {

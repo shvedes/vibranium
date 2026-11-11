@@ -135,7 +135,6 @@ Rectangle {
   // staying square-ish via the shared side length.
   readonly property var gridGeometry: MenuLib.gridGeometry(
     panel.width, Ui.outerPad, panel.gridCellSpec)
-  readonly property real gridInnerW: panel.gridGeometry.innerW
   readonly property int gridCols: panel.gridGeometry.cols
   readonly property real gridSide: panel.gridGeometry.side
 
