@@ -907,27 +907,9 @@ function searchRecords(records, query, cap, tiebreak) {
     _searchCacheSorted = []
     return { rows: [], count: 0 }
   }
-  // The projection contract is a caller-visible one: a missing or negative cap
-  // used to allocate an array of that size, so it threw rather than silently
-  // meaning "unlimited". Keep the refusal, and state it instead of relying on
-  // an Array constructor's RangeError.
-  if (typeof cap !== "number" || !isFinite(cap) || cap < 0)
-    throw new RangeError("Invalid array length")
   const sameRecords = SL.sameCacheIndex(_searchCacheRecords, _searchCacheLen, records)
   if (SL.identicalQuery(sameRecords, _searchCacheQ, q, _searchCacheSorted)) {
-    // The cached projection is only as wide as the cap it was built for. A
-    // wider request re-ranks the cached scan-order hits, whose scores travel
-    // with the projection, instead of rescanning the pool. A narrower one
-    // slices the same rows.
-    const cached = _searchCacheSorted
-    if (cap <= cached._cap) return { rows: cached.slice(0, cap), count: cached._count }
-    const wider = SL.rankTop(cached._hits, cached._scores, cap, tiebreak)
-    Object.defineProperty(wider, "_hits", { value: cached._hits })
-    Object.defineProperty(wider, "_scores", { value: cached._scores })
-    Object.defineProperty(wider, "_cap", { value: cap })
-    Object.defineProperty(wider, "_count", { value: cached._count })
-    _searchCacheSorted = wider
-    return { rows: wider, count: wider._count }
+    return { rows: _searchCacheSorted.slice(0, cap), count: _searchCacheSorted.length }
   }
   const tokens = SL.splitTokens(q)
   let source = records
@@ -966,26 +948,24 @@ function searchRecords(records, query, cap, tiebreak) {
       hitScores.push(total)
     }
   }
-  // Cache the FULL hit set (pre-cap) for incremental filtering. The projection
-  // is only the cap the caller asked for: ranking every hit to return a
-  // screenful was the same full sort the menu and clipboard paid for. Its
-  // scan-order hits and scores ride along on the array (properties, not
-  // top-level state) so an identical query with a wider cap re-ranks them
-  // without rescanning the pool.
+  // Cache the FULL hit set (pre-cap) for incremental filtering; callers
+  // cap via slice, so we keep canonical hits untruncated for the next pass.
+  // -> Two stores: scan-order for the subset scan, sorted for identical-query
+  // -> cap slices. The scan-order copy is taken before the sort, the way the
+  // -> menu keeps its hit set, so ties rank by pool order either way.
   const hits = hitRecs
-  const rows = SL.rankTop(hitRecs, hitScores, cap, tiebreak)
-  // Non-enumerable: these are the projection's own bookkeeping, not rows a
-  // caller can observe when it inspects or serializes the array.
-  Object.defineProperty(rows, "_hits", { value: hits })
-  Object.defineProperty(rows, "_scores", { value: hitScores })
-  Object.defineProperty(rows, "_cap", { value: cap })
-  Object.defineProperty(rows, "_count", { value: hits.length })
+  const order = SL.orderHits(hitRecs, hitScores, tiebreak)
+  const full = new Array(order.length)
+  for (let i = 0; i < order.length; i++) full[i] = hitRecs[order[i]]
   _searchCacheRecords = records
   _searchCacheLen = records.length
   _searchCacheQ = q
   _searchCacheHits = hits
-  _searchCacheSorted = rows
-  return { rows: rows, count: hits.length }
+  _searchCacheSorted = full
+  const n = Math.min(full.length, cap)
+  const out = new Array(n)
+  for (let i = 0; i < n; i++) out[i] = full[i]
+  return { rows: out, count: full.length }
 }
 
 // Typo rescue over a records array: the AND-search shape of searchRecords
@@ -1019,7 +999,11 @@ function searchTypo(records, query, cap, tiebreak) {
     }
   }
   const m = hitRecs.length
-  return { rows: SL.rankTop(hitRecs, hitScores, cap, tiebreak), count: m }
+  const order = SL.orderHits(hitRecs, hitScores, tiebreak)
+  const n = Math.min(m, cap)
+  const out = new Array(n)
+  for (let i = 0; i < n; i++) out[i] = hitRecs[order[i]]
+  return { rows: out, count: m }
 }
 
 // Filter counter over a FULL pool so `matched` reflects the true hit

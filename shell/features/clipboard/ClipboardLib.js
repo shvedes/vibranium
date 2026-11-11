@@ -452,9 +452,17 @@ function searchEntries(entries, query, cap) {
       hitScores.push(total)
     }
   }
-  // Rank only the cap-sized window that is shown. The shared ranking keeps
-  // equal scores in scan order, the same tiebreak the full sort used.
-  return SL.rankTop(hitEntries, hitScores, cap !== undefined ? cap : hitEntries.length, null)
+  // Rank an order array over the hits and materialize only the cap. The
+  // explicit position tiebreak keeps equal scores in scan order instead of
+  // relying on the engine's sort being stable.
+  const m = hitEntries.length
+  const order = new Array(m)
+  for (let i = 0; i < m; i++) order[i] = i
+  order.sort((a, b) => hitScores[b] - hitScores[a] || a - b)
+  const n = Math.min(m, cap !== undefined ? cap : m)
+  const out = new Array(n)
+  for (let i = 0; i < n; i++) out[i] = hitEntries[order[i]]
+  return out
 }
 
 // Credential hint mimes, as one predicate. The read path decides from this

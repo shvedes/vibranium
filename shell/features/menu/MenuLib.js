@@ -626,13 +626,6 @@ function parseBundle(text) {
 // so the menu takes its `menus` from there instead of stripJsonc + JSON.parse
 // over the same ~5k lines on every container rebuild - which measured as 80%
 // of what was left of a rebuild.
-//
-// Every call returns a fresh bundle. It is tempting to memoize this by the
-// parsed array's identity, and the array really is the same one on every
-// open - but page objects are navigated by the panel and reordered in place
-// by orderSettingsIndex, so a bundle handed to one open must not be the one
-// the next open mutates. The rows are shared through the stores' own cached
-// pages; the containers around them stay per-open.
 function bundleFromPages(rawPages) {
   const pages = []
   // Prototype-less: the keys are page ids, and they come from a file. A page
@@ -1109,32 +1102,11 @@ function buildIndex(bundle) {
 // externally indexed row is indistinguishable to search() and jumpTo().
 function buildPageIndex(page, path, into) {
   if (!page || !Array.isArray(page.items) || !Array.isArray(into)) return into
-  // The split of a row's own hay, kept per row across index rebuilds. A menu
-  // open rebuilds the index, but the rows are shared with the store's cached
-  // pages and with the memoized catalog bundle above, so the same row is split
-  // again on every open unless the words are remembered. Weak so a replaced
-  // page's rows go with it. Held on the function for the same reason as the
-  // bundle memo: this library's published surface is its top-level names.
-  if (buildPageIndex._words === undefined) buildPageIndex._words = new WeakMap()
-  if (buildPageIndex._hays === undefined) buildPageIndex._hays = new WeakMap()
-  const wordCache = buildPageIndex._words
-  const hayCache = buildPageIndex._hays
-  function wordsOf(item) {
-    let words = wordCache.get(item)
-    if (words === undefined) {
-      words = item.hay.split(" ")
-      wordCache.set(item, words)
-    }
-    return words
-  }
   const breadcrumb = Array.isArray(path) ? path : [page.label]
   // Path words join the haystack so location terms work as search
   // tokens ("ins pack" finds Arch Package via its Install breadcrumb).
   const hayBase = breadcrumb.join(" ")
   const hayBaseLower = hayBase.toLowerCase()
-  // Split once per page rather than once per row: every entry on a page
-  // carries the same breadcrumb.
-  const pathWords = hayBaseLower === "" ? null : hayBaseLower.split(" ")
   // Deduplicate path words already present in item.hay by building
   // a quick Set per entry? Instead keep it simple: the per-item hay
   // is already deduped, concatenating the already-lowercased base
@@ -1147,23 +1119,7 @@ function buildPageIndex(page, path, into) {
     if (!item.selectable || item.label === "") continue
     // item.hay is already lowercased and deduped; hayBaseLower is
     // lowercased once per page.
-    // The joined hay and its split are a pure function of the row and of the
-    // page's lowercased breadcrumb, and both objects outlive the index: the
-    // row belongs to the store cache, the breadcrumb to the page. Cached per
-    // (row, breadcrumb) so a rebuild after a settings write or a menu reopen
-    // reuses the string and the words instead of allocating both again.
-    let perPath = hayCache.get(item)
-    let combined = perPath === undefined ? undefined : perPath.get(hayBaseLower)
-    if (combined === undefined) {
-      combined = hayBaseLower === ""
-        ? { hay: item.hay, words: wordsOf(item) }
-        : { hay: item.hay + " " + hayBaseLower, words: wordsOf(item).concat(pathWords) }
-      if (perPath === undefined) {
-        perPath = new Map()
-        hayCache.set(item, perPath)
-      }
-      perPath.set(hayBaseLower, combined)
-    }
+    const hay = hayBaseLower !== "" ? item.hay + " " + hayBaseLower : item.hay
     into.push({
       pageId: page.id,
       // No pageTitle: the entry carried one and nothing read it. The group
@@ -1173,8 +1129,8 @@ function buildPageIndex(page, path, into) {
       path: breadcrumb,
       row: i,
       label: item.label,
-      hay: combined.hay,
-      words: combined.words
+      hay: hay,
+      words: hay.split(" ")
     })
   }
   return into
@@ -1451,9 +1407,16 @@ function search(index, query) {
   // set stays complete either way, because the incremental branch above scans
   // it - anything past the cap is one more keystroke away, never one lost.
   const capLen = q.length >= 5 ? 200 : 40 * q.length
-  // Rank only the returned window. The shared ranking's score/scan-order
-  // tiebreak is exactly the comparator the full sort spelled out here.
-  const out = LauncherLib.SearchPlumbing.rankTop(hitEntries, hitScores, capLen, null)
+  const cap = m > capLen ? capLen : m
+  const out = new Array(cap)
+  if (m === 1) {
+    out[0] = hitEntries[0]
+  } else if (m > 1) {
+    const order = new Array(m)
+    for (let i = 0; i < m; i++) order[i] = i
+    order.sort((a, b) => hitScores[b] - hitScores[a] || a - b)
+    for (let i = 0; i < cap; i++) out[i] = hitEntries[order[i]]
+  }
 
   _searchCacheIndex = index
   _searchCacheLen = index.length
