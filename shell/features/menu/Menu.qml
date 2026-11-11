@@ -1891,8 +1891,13 @@ Singleton {
   // with an empty query it shows the full visible page so the first
   // keystroke simply narrows it.
   function beginScoped() {
-    root.scopedActive = true
+    // The rows first, the flag second. Arming re-projects the panel's row set
+    // off `scopedRows`, and publishing the flag while that still holds the
+    // previous (or the initial empty) set installs a projection of nothing:
+    // the card drops to its empty state and restores a beat later. Computing
+    // the same visible set first leaves the recompute with nothing to install.
     root.setScopedQuery("")
+    root.scopedActive = true
   }
 
   function setScopedQuery(q) {
