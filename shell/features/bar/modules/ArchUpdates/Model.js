@@ -63,7 +63,7 @@ var HEAVY_QUEUE_MIN = 200
 
 function heavyQueue(packages, enabled) {
   if (!enabled) return false
-  return (Array.isArray(packages) ? packages.length : 0) > HEAVY_QUEUE_MIN
+  return StoreGuards.asList(packages).length > HEAVY_QUEUE_MIN
 }
 
 // Case-insensitive search over the package name and its repository. An
@@ -177,7 +177,7 @@ function pruneKeys(selected, packages) {
 // window the input array is returned as-is: the padding would be dead
 // and a copy would churn the list's stableModel for nothing.
 function rowWindow(rows, windowSize) {
-  const r = Array.isArray(rows) ? rows : []
+  const r = StoreGuards.asList(rows)
   if (r.length >= windowSize) return r
   const out = r.slice()
   for (let i = r.length; i < windowSize; i++) out.push({ _filler: true })
