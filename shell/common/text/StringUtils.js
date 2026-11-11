@@ -79,6 +79,13 @@ function joinPath(dir, name) {
   return d.endsWith("/") ? d + n : d + "/" + n
 }
 
+// An identifier usable as a registry/claim key: a string with something other
+// than whitespace in it. The registries reject everything else, and stating
+// that once keeps "empty" and "blank" from being two different answers.
+function isNonEmptyId(value) {
+  return typeof value === "string" && value.trim() !== ""
+}
+
 // True when `path` is a strict descendant of `dir`. A trailing separator on
 // `dir` is tolerated, and "/" is the filesystem root rather than a prefix of
 // "//".

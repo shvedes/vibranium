@@ -3,6 +3,7 @@ pragma ComponentBehavior: Bound
 import QtQml
 import Quickshell
 import "../runtime/ErrorText.js" as ErrorText
+import "../text/StringUtils.js" as SU
 
 // Exclusive surface claim: which of the participating services owns the
 // screen, and how the previous owner is put away when a new one arrives.
@@ -251,7 +252,7 @@ Singleton {
   }
 
   function _validId(id) {
-    return typeof id === "string" && id.trim() !== ""
+    return SU.isNonEmptyId(id)
   }
 
   // An owner is an opaque object handle, never a string: a string is only as

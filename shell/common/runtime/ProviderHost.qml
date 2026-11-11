@@ -2,6 +2,7 @@ pragma Singleton
 
 import Quickshell
 import qs.common
+import "../text/StringUtils.js" as SU
 
 Singleton {
   id: root
@@ -134,7 +135,7 @@ Singleton {
   }
 
   function _validId(id) {
-    return typeof id === "string" && id.trim() !== ""
+    return SU.isNonEmptyId(id)
   }
 
   function _validProvider(provider) {

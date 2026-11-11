@@ -3,6 +3,7 @@ import QtQml
 import Quickshell
 import qs.common
 import "ErrorText.js" as ErrorText
+import "../text/StringUtils.js" as SU
 
 Singleton {
   id: root
@@ -590,7 +591,7 @@ Singleton {
   }
 
   function _validId(id) {
-    return typeof id === "string" && id.trim() !== ""
+    return SU.isNonEmptyId(id)
   }
 
   function _validOwner(owner) {
