@@ -107,8 +107,8 @@ t_eq "the image-extension table holds 22 entries" "22" "${#EXT_OK[@]}"
 t_contains "and both the wallpaper picker and the cycler gate on ok()" \
   'function ok(name)' "$(<"$IMAGE_EXTS")"
 t_contains "the cycler filters its find listing through it" \
-  '.filter(f => root._extOk(f))' \
-  "$(grep -m1 '_extOk(f)' "$SHELL_DIR/features/wallpaper/Wallpaper.qml")"
+  '.filter(f => ImageExts.ok(f))' \
+  "$(grep -m1 'ImageExts.ok(f)' "$SHELL_DIR/features/wallpaper/Wallpaper.qml")"
 t_note "gif and mng are deliberately absent from ImageExts.js: Qt caches every decoded frame as RGBA, so a small gif costs gigabytes of RAM. No theme ships either, so the exclusion costs nothing here"
 
 # --------------------------------------------------------------------------
@@ -703,7 +703,7 @@ t_eq "the wallpapers are only jpg and png" "jpg png" \
   "$(find "$THEMES_DIR" -path '*/backgrounds/*' -type f -printf '%f\n' |
     sed 's/.*\.//' | LC_ALL=C sort -u | paste -sd' ' -)"
 t_contains "the cycler sorts the listing it chose from, so a rename changes the pick" \
-  '.sort()' "$(grep -m1 'filter(f => root._extOk(f)).sort()' "$SHELL_DIR/features/wallpaper/Wallpaper.qml")"
+  '.sort()' "$(grep -m1 'filter(f => ImageExts.ok(f)).sort()' "$SHELL_DIR/features/wallpaper/Wallpaper.qml")"
 t_contains "and commits the recorded path as theme/backgrounds/<name>" \
   'const rel = "theme/backgrounds/" + base' \
   "$(<"$SHELL_DIR/features/wallpaper/Wallpaper.qml")"
