@@ -4140,6 +4140,30 @@ group('every one of the 70 functions was exercised above', () => {
 })
 
 // ---------------------------------------------------------------------------
+// MenuPage.js: the declared bundle, loadable without MenuLib around it
+// ---------------------------------------------------------------------------
+// These moved out of MenuLib because they read bundle text and plain page
+// objects only: no search index, no guard emission, no keyboard. The suite
+// loads the module directly so the new boundary is a fact about the file, not
+// just about MenuLib's forwarders.
+const MP = loadLib(path.join(SHELL_DIR, 'features/menu/MenuPage.js'))
+
+group('MenuPage publishes the bundle vocabulary on its own', () => {
+  is('MenuPage loaded', MP, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
+  const names = ['defaultsFor', 'stripForHay', 'hayFromItem', 'uidKey', 'normalizeItem',
+    'buildPage', 'buildOptionsPage', 'mergedPageOpts', 'normalizePage', 'parseBundle',
+    'bundleFromPages', 'orderSettingsIndex', 'normalizePages', 'mergePages',
+    'applyExtension', 'mergedLabel', 'mergedWidth', 'replacePage', 'mergeRawItems']
+  eq('every page entry point is callable without MenuLib',
+    names.filter((n) => typeof MP[n] !== 'function'), [])
+  const b = MP.parseBundle('{"id":"main","items":[{"type":"action","id":"a","label":"A"}]}')
+  eq('it parses and normalizes a bundle on its own', b.pages[0].items[0].uid, 'main#a')
+  eq('and the parsed row is the one MenuLib would hand the panel',
+    MP.parseBundle('{"id":"main","items":[{"type":"action","id":"a","label":"A"}]}').pages[0].items[0].label,
+    bundle('{"id":"main","items":[{"type":"action","id":"a","label":"A"}]}').pages[0].items[0].label)
+})
+
+// ---------------------------------------------------------------------------
 // MenuRows.js: the row-set identity questions the card asks around a write
 // ---------------------------------------------------------------------------
 // These moved out of MenuPanel because they are pure over plain arrays: the

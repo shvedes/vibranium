@@ -39,6 +39,7 @@ about one of them:
 | `OptionRow.qml` | One option row inside a select's expansion (what `buildOptionsPage` builds a page of). |
 | `NumberPicker.qml` | The inline numeric and range editor. |
 | `InlineEditor.qml` | The inline text editor. |
+| `MenuPage.js` | The declared bundle: a row's default shape, page assembly, the parse, and the extension merge. Re-exported by `MenuLib`. |
 | `MenuLib.js` | The pure layer: item/page normalization, search, staged flows, option geometry, keyboard routing, the provider value contract. Re-exports the guard emitters below. |
 | `MenuGuard.js` | Guard emission: the one bash script answering every `when:`/`checked:`/`disabled:`/`requires:` expression, and the quoting its verdict tokens carry. |
 | `MenuRow.js` | Row presentation: staged flows, the rest shape, the copy a stage overrides, the value slot and the inline dropdown's geometry. Re-exported by `MenuLib`. |
