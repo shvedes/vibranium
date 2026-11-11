@@ -28,7 +28,6 @@ With **Save to disk** on, a screenshot without auto-annotate is saved to `~/Pict
 | Auto-annotate | Open the annotation overlay after every capture (see below) |
 | Save to disk | On by default. Off = clipboard only. Listed under Auto-annotate, so it appears only while that is off |
 | Capture cursor | Include the cursor in the image |
-| Annotator UI size | Toolbar scale: small, medium, large |
 
 JPEG quality and PPM are retired: the native encoder writes JPEG at its default quality, and no QML encoder writes PPM.
 

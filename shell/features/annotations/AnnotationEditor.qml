@@ -240,14 +240,6 @@ PanelWindow {
     select: { icon: "cursor", glyph: "V", key: "V", tip: "Select (V)" }
   })
 
-  // Toolbar scale factor (shell.screenshots.uiSize): small 1, medium
-  // 1.25, large 1.5. Applies to toolbar metrics only, never the canvas.
-  readonly property real uiScale: {
-    Settings.rev
-    const v = Settings.value("shell.screenshots.uiSize")
-    return v === "large" ? 1.5 : v === "medium" ? 1.25 : 1
-  }
-
   // Whether this surface moves at all: MotionPolicy.enabled, the one
   // shared compositor-wide switch (Hyprland Appearance -> Animations), so
   // the hover fades and the slide-in read the same answer as the rest of
@@ -256,6 +248,12 @@ PanelWindow {
   // that has not answered yet, reads as "no motion" rather than
   // "all motion".
   readonly property bool animOn: MotionPolicy.enabled
+
+  // True while the toolbar is sliding in. A plate grab and a full-size canvas
+  // repaint both render on the main thread, and both are scheduled a fraction
+  // of a second after the reveal starts - the middle of the slide - so each
+  // one stalls it where it lands. They wait for this to clear instead.
+  readonly property bool _revealing: slideAnim.running
 
   // Free view over the fitted document: zoom multiplier plus display
   // pan offset. The backing stays document pixels (save is unaffected);
@@ -267,14 +265,26 @@ PanelWindow {
   // screen captures alike. `0` returns here (not to 1), so reset
   // always matches what the user opened with.
   readonly property real _openZoom: 1 / editor._wheelStep
+  // The zoom the view is heading for. Every wheel event moves this one, so no
+  // event sits queued behind an earlier one.
   property real viewZoom: editor._openZoom
-  property real _zoomAnim: editor.viewZoom
-  property real _boardZoom: editor._openZoom
-  Behavior on _zoomAnim {
-    enabled: editor.animOn
-    NumberAnimation { duration: 260; easing.type: Easing.OutQuad }
+  // The scale actually drawn. A single detent snaps it straight to the target,
+  // because one notch has to answer in its own frame; a burst is spent over
+  // the following frames. Applied whole, a burst is a jump whose size grows
+  // with the zoom - a fast scroll delivers several detents between two frames,
+  // and at high magnification that reads as the view lagging the wheel. The
+  // follower moves toward the target and never past it, so a reversal turns in
+  // the frame it arrives and nothing keeps travelling afterwards.
+  property real _shownZoom: editor._openZoom
+  FrameAnimation {
+    running: editor.viewZoom !== editor._shownZoom
+    onTriggered: editor._stepZoom()
   }
-  on_ZoomAnimChanged: editor._settleBoardZoom()
+  // The zoom the ink backing was last built for. A full-size backing cannot
+  // be reallocated per wheel event at 8x, so it is rebuilt once the gesture
+  // settles (`_zoomSettle`) and the existing one is scaled by `_boardScale`
+  // until then.
+  property real _boardZoom: editor._openZoom
   property var viewPan: ({ x: 0, y: 0 })
 
   // Display geometry. No device ratio appears anywhere in the display
@@ -292,7 +302,7 @@ PanelWindow {
   // were correct. Only a marker document measured on screen settles it.
   // _bufPerPx below keeps stroke widths a constant on-screen thickness
   // across zooms.
-  readonly property real _paintK: editor._fit * editor._zoomAnim
+  readonly property real _paintK: editor._fit * editor._shownZoom
   // Doc-space size of one backing pixel under the K transform above -
   // draw line widths at this so they come out ~1px regardless of zoom,
   // instead of getting thicker/thinner as K changes.
@@ -303,7 +313,7 @@ PanelWindow {
    onLoadStateChanged: {
       if (loadState === "ready") {
         panel.reveal()
-        editor._settleBoardZoom()
+        editor._commitBoardZoom()
       }
      else {
        slideAnim.stop()
@@ -379,22 +389,26 @@ PanelWindow {
     stage.width, stage.height, editor._docW, editor._docH, editor._minAxisPx)
   readonly property real _boardPaintK: editor._fit * editor._boardZoom
   readonly property real _boardScale: editor._boardZoom > 0
-    ? editor._zoomAnim / editor._boardZoom : 1
+    ? editor._shownZoom / editor._boardZoom : 1
   readonly property var _boardGeom: AnnotationTools.boardGeom(
     stage.width, stage.height, editor._docW, editor._docH,
     editor._fit, editor._boardZoom, editor.viewPan)
 
   // The picture's own display size, before rotation: the view rect at the
-  // same fit and board zoom the box above is built with. The box is this
-  // rect ROTATED, so the picture must never be sized from the box itself.
+  // zoom in effect. The box is this rect ROTATED, so the picture must never be
+  // sized from the box itself. The live zoom, not the committed ink zoom: an
+  // Image is drawn from its decoded texture into whatever rect it is given, so
+  // laying it out per step keeps the shot sharp through the gesture instead of
+  // showing it upscaled from the last committed size until the backing
+  // catches up.
   readonly property var _pictureSize: AnnotationTools.pictureSize(
-    editor.viewRect, editor._fit, editor._boardZoom)
+    editor.viewRect, editor._fit, editor._shownZoom)
 
   // Live board geometry from synchronous state only. Every mapping
   // read goes through here so handlers never mix binding generations.
   readonly property var _geom: AnnotationTools.boardGeom(
     stage.width, stage.height, editor._docW, editor._docH,
-    editor._fit, editor._zoomAnim, editor.viewPan)
+    editor._fit, editor._shownZoom, editor.viewPan)
 
   // Eight resize spots (corners + edge midpoints) with their cursors,
   // shared by the select and crop-frame handle visuals and resize math.
@@ -411,26 +425,55 @@ PanelWindow {
     return AnnotationTools.selectHandles(editor._strokeBounds(editor.strokes[editor.selectedIndex]))
   }
 
-  // Free zoom about the stage center; pan is middle-drag's job
-  // and is never touched here, so repeated zooms cannot walk.
-  function _zoomAt(mx, my, f) {
-    void mx
-    void my
-    editor.viewZoom = Range.clamp(editor.viewZoom * f, 0.25, 8)
-    editor._settleBoardZoom()
+  // Free zoom about the stage center; pan is middle-drag's job and is never
+  // touched here, so repeated zooms cannot walk. `notches` is signed and may
+  // be fractional: it is what the event delivered.
+  function _zoomApply(notches) {
+    const next = Range.clamp(
+      editor.viewZoom * Math.pow(editor._wheelStep, notches), 0.25, 8)
+    if (next === editor.viewZoom) return
+    editor.viewZoom = next
   }
 
-  function _settleBoardZoom() {
+  // One frame behind `viewZoom`. A change of at most one detent lands whole, so
+  // a single notch is drawn in the frame that carried it; anything larger came
+  // from more than one detent between two frames and is halved toward the
+  // target each frame until it is down to a single step, then snapped.
+  function _stepZoom() {
+    const target = editor.viewZoom
+    const diff = target - editor._shownZoom
+    if (diff === 0) return
+    if (Math.abs(diff) <= target * (editor._wheelStep - 1) * 1.05) {
+      editor._shownZoom = target
+      editor._zoomSettle()
+      return
+    }
+    editor._shownZoom = editor._shownZoom + diff * 0.5
+  }
+
+  // Arm the backing rebuild for the end of the gesture: every restart pushes
+  // it out to the next idle gap, so the zoom being walked does not rebuild a
+  // canvas per event and the last step still lands.
+  function _zoomSettle() {
     if (!editor.boardReady) return
-    if (Math.abs(editor._zoomAnim - editor.viewZoom) > 0.0001) return
-    editor._boardZoom = editor.viewZoom
+    zoomSettleTimer.restart()
+  }
+
+  // Rebuild the ink backing at the zoom being drawn. `_boardScale` carries the
+  // difference meanwhile, so strokes stay on the picture through the gesture
+  // and one repaint lands when it ends. Taking the drawn scale, not the target,
+  // means the rebuild never moves the ink on screen.
+  function _commitBoardZoom() {
+    if (!editor.boardReady) return
+    editor._boardZoom = editor._shownZoom
     board.requestPaint()
   }
 
   function _resetView() {
     editor.viewZoom = editor._openZoom
+    editor._shownZoom = editor._openZoom
     editor.viewPan = { x: 0, y: 0 }
-    editor._settleBoardZoom()
+    editor._commitBoardZoom()
   }
 
   function _clampDocumentRect(r) {
@@ -599,7 +642,7 @@ PanelWindow {
     editor.textAnchor = null
     textField.text = ""
     editor.textRectW = 220
-    editor.textPx = editor.fontSize * editor._fit * editor._zoomAnim
+    editor.textPx = editor.fontSize * editor._fit * editor._shownZoom
     editor.selectedIndex = -1
     editor.clearArmed = false
     board.requestPaint()
@@ -626,7 +669,7 @@ PanelWindow {
   function _finishText(commit) {
     if (editor.textAnchor === null) return
     if (commit === true && textField.text !== "") {
-      const fs = AnnotationTools.commitFontSize(editor.textPx, editor._fit * editor._zoomAnim)
+      const fs = AnnotationTools.commitFontSize(editor.textPx, editor._fit * editor._shownZoom)
       editor._commit({
         tool: "text",
         color: editor.ink,
@@ -1164,6 +1207,16 @@ PanelWindow {
     onTriggered: editor.discardArmed = false
   }
 
+  // Delay between the last zoom step and the backing rebuild, in ms. Long
+  // enough to span a trackpad's momentum gaps, short enough that a stopped
+  // wheel is followed by a crisp repaint within a couple of frames.
+  Timer {
+    id: zoomSettleTimer
+
+    interval: 140
+    onTriggered: editor._commitBoardZoom()
+  }
+
   Timer {
     id: clearTimer
 
@@ -1304,36 +1357,6 @@ PanelWindow {
       }
     }
 
-    // Drop shadow under the board: hidden source rect, MultiEffect
-    // shadow item above it. Separates the shot from the flat background
-    // without any border chrome.
-    Rectangle {
-      id: boardShadow
-
-      x: board.x
-      y: board.y
-      width: board.width * board.scale
-      height: board.height * board.scale
-      visible: false
-      color: "#000000"
-    }
-
-    MultiEffect {
-      x: board.x
-      y: board.y
-      width: board.width * board.scale
-      height: board.height * board.scale
-      visible: editor.imgW > 0
-      source: boardShadow
-      shadowEnabled: true
-      // Soft halo only: scaling the shadow shape (shadowScale) enlarges
-      // its hard source edge faster than the blur softens it, which
-      // reads as a thick black outline instead of a shadow. Max blur
-      // at source size is the wide soft cast.
-      shadowBlur: 1.0
-      shadowColor: "#a0000000"
-    }
-
     // The picture, placed by ordinary item geometry. Painting it into the
     // board canvas would make its on-screen size depend on the canvas backing
     // lining up with the item's rect under a fractional
@@ -1342,19 +1365,20 @@ PanelWindow {
     // picture is either short of the item (black bars down the right and
     // bottom) or past it (enlarged, running off the edges). An Image has no
     // backing and no second transform: it fills exactly the rect below.
-    // Outer box carries the zoom about the top-left, exactly as the canvas
-    // does; the image inside carries the rotation about the centre, which is
-    // the pivot the canvas rotates its paint around. transformOrigin is one
-    // value per item, so the two transforms need two items.
+    // The picture's own box: the live view rect, so a wheel step moves and
+    // resizes the shot in the frame that delivered it. Only the ink canvas is
+    // built at the committed zoom and scaled into place - a Canvas has a
+    // backing to reallocate, a picture has nothing. The image inside carries
+    // the rotation about the centre, which is the pivot the canvas rotates its
+    // paint around; transformOrigin is one value per item, so the two
+    // transforms need two items.
     Item {
       id: boardImageBox
 
-      x: editor._geom.x + (editor._geom.w - width * editor._boardScale) / 2
-      y: editor._geom.y + (editor._geom.h - height * editor._boardScale) / 2
-      width: Math.max(1, Math.round(editor._boardGeom.w))
-      height: Math.max(1, Math.round(editor._boardGeom.h))
-      scale: editor._boardScale
-      transformOrigin: Item.TopLeft
+      x: editor._geom.x
+      y: editor._geom.y
+      width: Math.max(1, Math.round(editor._geom.w))
+      height: Math.max(1, Math.round(editor._geom.h))
 
       Image {
         id: boardImage
@@ -1438,6 +1462,27 @@ PanelWindow {
           blur: 1.0
         }
       }
+    }
+
+    // Drop shadow under the picture: the shot separated from the flat
+    // background without any border chrome.
+    //
+    // A fixed pixel `blur` on an item placed from the live view geometry and
+    // never inside the scaled box. A shadow whose source is resized by the
+    // zoom re-derives its fade at every step, and one stretched by the box's
+    // scale factor mid-gesture snaps back when the zoom commits - the soft
+    // edge swells, loses its falloff, and its source rectangle shows past the
+    // shot. This type casts the fade from a signed distance instead, so it
+    // costs the same at any size and paints no plate of its own.
+    RectangularShadow {
+      x: editor._geom.x
+      y: editor._geom.y
+      width: Math.max(1, editor._geom.w)
+      height: Math.max(1, editor._geom.h)
+      visible: editor.imgW > 0 && editor.boardReady
+      color: "#a0000000"
+      blur: 32
+      z: -2
     }
 
     // Blur regions: the picture blurred inside each committed rectangle, sitting
@@ -1606,8 +1651,19 @@ PanelWindow {
       //
       // Pinned explicitly rather than left to the default: the box resizes
       // with the zoom, and a trailing canvasSize addresses a stale backing.
-      canvasSize: Qt.size(Math.max(1, Math.round(width)),
-        Math.max(1, Math.round(height)))
+      //
+      // Capped at the document's own pixels. Past that the ink can only be an
+      // upscale of detail the file does not have, while an uncapped backing at
+      // 8x on a 4K shot is a ~140 MB repaint, and a repaint that long holds the
+      // wheel events arriving behind it - the view then answers a whole
+      // queued burst at once, which reads as lagging behind a buffer. The
+      // canvas presents its backing scaled to this item, so the cap costs
+      // sharpness only beyond the document's own resolution.
+      readonly property real _backingK: width > 0 && editor.imgW > 0 && editor.imgH > 0
+        ? Math.min(1, editor.imgW / width, editor.imgH / height) : 1
+      canvasSize: Qt.size(
+        Math.max(1, Math.round(width * _backingK)),
+        Math.max(1, Math.round(height * _backingK)))
 
       // A fresh overlay window configures fullscreen asynchronously:
       // the probe/load/paint sequence above can run while the stage
@@ -1639,6 +1695,12 @@ PanelWindow {
         interval: 80
         repeat: false
         onTriggered: {
+          // Same reason as the plate grab above: this repaint covers the whole
+          // ink backing, and it lands 80 ms into the reveal.
+          if (editor._revealing) {
+            paintCooldown.restart()
+            return
+          }
           board.requestPaint()
         }
       }
@@ -1651,11 +1713,13 @@ PanelWindow {
          ctx.save()
          ctx.setTransform(1, 0, 0, 1, 0, 0)
          ctx.clearRect(0, 0, board.canvasSize.width, board.canvasSize.height)
-         // _boardPaintK maps document pixels onto backing pixels 1:1 (see
+         // _boardPaintK maps document pixels onto canvas pixels 1:1 (see
          // canvasSize), over the item's own rect, so a document point lands
-         // on the same screen pixel the cursor is over.
-          ctx.setTransform(editor._boardPaintK, 0, 0,
-            editor._boardPaintK, 0, 0)
+         // on the same screen pixel the cursor is over. _backingK folds in the
+         // resolution cap: the canvas is that much smaller than the item and
+         // is presented stretched to it.
+          ctx.setTransform(editor._boardPaintK * board._backingK, 0, 0,
+            editor._boardPaintK * board._backingK, 0, 0)
         // The document backing rotates continuously with _rotAnim;
         // strokes stay in original coordinates and ride the transform
         // (keeps hit tests, crops and grids free of remapping math).
@@ -1693,8 +1757,8 @@ PanelWindow {
         // ---- above this line: strokes (clipped), over boardImage
         // ---- below this line: chrome, never clipped by the frame
         ctx.save()
-        ctx.setTransform(editor._boardPaintK, 0, 0,
-            editor._boardPaintK, 0, 0)
+        ctx.setTransform(editor._boardPaintK * board._backingK, 0, 0,
+            editor._boardPaintK * board._backingK, 0, 0)
         ctx.translate(editor._docW / 2, editor._docH / 2)
         ctx.rotate(editor._rotAnim * Math.PI / 180)
         ctx.translate(-vr.w / 2, -vr.h / 2)
@@ -2436,14 +2500,14 @@ PanelWindow {
             // preview, commit and outline all share one size.
             const ti = editor._textFieldInner
             editor.textPx = ti !== null ? ti.font
-              : Math.max(1, t.h * editor._fit * editor._zoomAnim / 1.2)
+              : Math.max(1, t.h * editor._fit * editor._shownZoom / 1.2)
             editor.textAnchor = { x: t.x, y: t.y }
           } else {
             // Click-placed: no box, the field floats at the point and
             // grows as you type.
             editor.textRect = null
             editor.textRectW = 220
-            editor.textPx = editor.fontSize * editor._fit * editor._zoomAnim
+            editor.textPx = editor.fontSize * editor._fit * editor._shownZoom
             editor.textAnchor = p
           }
           textField.text = ""
@@ -2484,8 +2548,15 @@ PanelWindow {
           drawArea.cropMoveBase = null
         }
       onWheel: wheel => {
-        editor._zoomAt(wheel.x, wheel.y, wheel.angleDelta.y > 0
-          ? editor._wheelStep : 1 / editor._wheelStep)
+        // The notch count this event carries, not its sign: a wheel delivers
+        // 120 units per notch while a touchpad delivers a stream of small
+        // ones, and reading only the sign turned every momentum tick into a
+        // full step, so the view kept zooming after the fingers stopped. One
+        // event is bounded so a stray delta cannot spend the whole range at
+        // once; a genuine burst is spread over the next frames by the follower.
+        const notches = Range.clamp(wheel.angleDelta.y / 120, -10, 10)
+        if (notches === 0) return
+        editor._zoomApply(notches)
         wheel.accepted = true
       }
       onClicked: mouse => {
@@ -2616,8 +2687,8 @@ PanelWindow {
     readonly property bool live: enabled && actionable
     signal activated()
 
-    width: Math.round(27 * editor.uiScale)
-    height: Math.round(27 * editor.uiScale)
+    width: 27
+    height: 27
     activeFocusOnTab: true
     enabled: !editor.interactionLocked
 
@@ -2653,7 +2724,7 @@ PanelWindow {
       visible: iconName !== ""
       name: iconName
       colorKey: iconColor
-      size: Math.round(14 * editor.uiScale)
+      size: 14
     }
 
     Text {
@@ -2661,7 +2732,7 @@ PanelWindow {
       visible: iconName === ""
       text: iconGlyph
       color: active ? Theme.color("accent") : Theme.color("foreground_1")
-      font.pixelSize: Math.round(Ui.fontXs * editor.uiScale)
+      font.pixelSize: Ui.fontXs
       font.family: Ui.fontFamily
       textFormat: Text.PlainText
     }
@@ -2700,7 +2771,7 @@ PanelWindow {
     signal moved(real v)
 
     width: 100
-    height: Math.round(27 * editor.uiScale)
+    height: 27
     activeFocusOnTab: true
     enabled: !editor.interactionLocked
     opacity: editor.tool === "select" ? 0.5 : 1
@@ -2805,9 +2876,12 @@ PanelWindow {
      visible: false
      property real revealOffset: 0
      x: Math.round((editor.width - width) / 2)
-     y: editor.height - height - Ui.m + revealOffset
+     // Rounded: this is a pixel offset, and a fractional one is re-quantised
+     // by the renderer every frame, which shows as shimmer while the easing
+     // slows down.
+     y: Math.round(editor.height - height - Ui.m + revealOffset)
     width: toolRow.width + midRow.width + actRow.width + Ui.m * 3 + Ui.s
-    height: Math.round(44 * editor.uiScale)
+    height: 44
     // Corners follow RoundingPolicy (hypr.decoration.rounding).
     radius: RoundingPolicy.radius
     color: Ui.solid("background_1")
@@ -2836,7 +2910,10 @@ PanelWindow {
           target: panel
           property: "revealOffset"
         duration: Ui.slowMs
-        easing.type: Easing.OutExpo
+        // OutCubic, not OutExpo: an exponential tail spends the last fifth of
+        // the duration covering a handful of pixels, so the island holds still
+        // and then hops into place instead of finishing in one move.
+        easing.type: Easing.OutCubic
       }
 
     Row {
@@ -2894,8 +2971,8 @@ PanelWindow {
           Keys.onEnterPressed: editor.applyColor(swatch.modelData)
           Keys.onSpacePressed: editor.applyColor(swatch.modelData)
 
-          width: Math.round(27 * editor.uiScale)
-          height: Math.round(27 * editor.uiScale)
+          width: 27
+          height: 27
           radius: RoundingPolicy.radius
           anchors.verticalCenter: parent.verticalCenter
           color: swatch.modelData
@@ -2913,7 +2990,7 @@ PanelWindow {
       }
 
       Knob {
-        width: Math.round(100 * editor.uiScale)
+        width: 100
         anchors.verticalCenter: parent.verticalCenter
         from: 1
         to: 24
@@ -3358,6 +3435,13 @@ PanelWindow {
   // Blur the plate once and keep it as a PNG. This grab is the only pixel
   // readback in the blur path - once per shot, never per stroke.
   function _grabBlurPlate() {
+    // Held until the toolbar has landed: the grab renders and PNG-encodes the
+    // plate on the main thread, and its timer fires 150 ms into a 260 ms
+    // reveal, which is the stall that reads as the island stopping halfway.
+    if (editor._revealing) {
+      blurPlateTimer.restart()
+      return
+    }
     if (editor._blurPlatePending || editor._blurPlateDone
       || editor.imgW <= 0 || editor._blurPlateW < 16) return
     // The source must be decoded at the plate's size: a status that reads

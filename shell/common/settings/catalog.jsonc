@@ -1035,24 +1035,6 @@
                 "label": "Capture cursor",
                 "sub": "Capture mouse cursor",
                 "desc": "Whether to capture mouse cursor."
-            },
-            {
-                "key": "shell.screenshots.uiSize",
-                "type": "string",
-                "default": "small",
-                "label": "Annotator UI size",
-                "sub": "Toolbar scale",
-                "desc": "Toolbar scale in the annotation overlay.",
-                "values": [
-                    "small",
-                    "medium",
-                    "large"
-                ],
-                "valueLabels": {
-                    "small": "Small",
-                    "medium": "Medium",
-                    "large": "Large"
-                }
             }
         ]
     },

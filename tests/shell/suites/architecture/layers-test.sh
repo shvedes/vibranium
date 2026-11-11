@@ -237,7 +237,7 @@ for layer in boot common features services; do
   t_true "the $layer/ layer directory exists" test -d "$SHELL_DIR/$layer"
 done
 t_true "the composition root shell.qml exists" test -f "$SHELL_DIR/shell.qml"
-t_count "features/ holds the 155 files the README publishes" "155" "$(layer_files features)"
+t_count "features/ holds the tree's 154 .qml files" "154" "$(layer_files features)"
 t_count "services/ holds the 25 files the README publishes" "25" "$(layer_files services)"
 t_count "common/ holds the 147 files the README publishes" "147" "$(layer_files common)"
 t_count "boot/ holds the 4 files the README publishes" "4" "$(layer_files boot)"

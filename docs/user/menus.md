@@ -28,7 +28,7 @@ Press ++ctrl+alt+v++ (or the `Tools` key if your keyboard has one) and the Vibra
 | **Recording** | FPS, quality, container, codec, framerate mode, audio capture |
 | **Brightness** | Step size and notification behavior |
 | **Night Light** | The hyprsunset-based screen temperature controls |
-| **Screenshots** | File type, save to disk, notifications, auto-annotate, cursor capture, annotator UI size |
+| **Screenshots** | File type, save to disk, notifications, auto-annotate, cursor capture |
 | **App Launcher** | Launcher behavior: icons, webapps, auto-select, search engine, PWAs |
 | **Color Picker** | HEX preview, history size, notifications |
 | **Media Controls** | Fade duration, browser filtering |

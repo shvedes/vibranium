@@ -2,7 +2,7 @@
 # Suite: qmllint - the reproducible lint baseline from shell/README.md.
 #
 # The README publishes one invocation and a measured baseline: 230 files,
-# 0 errors, 146 warnings, and 71 informational diagnostics. Exit status alone
+# 0 errors, 144 warnings, and 71 informational diagnostics. Exit status alone
 # cannot distinguish a resolved tree from one whose imports became warnings,
 # so this suite checks the diagnostic stream too.
 #
@@ -28,14 +28,14 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 # suite's own measurement. Kept in one place so a diff in the numbers is
 # readable.
 #
-# RECORDED_FILE_COUNT: 236 .qml files under shell/. This is the file set the
+# RECORDED_FILE_COUNT: 239 .qml files under shell/. This is the file set the
 #   README's one-liner hands to the tool and the set the suite hands to it, and
 #   every counted diagnostic is attributed to one of these paths ("every
 #   diagnosed file is one that was linted"), so the count and the warning set
 #   below always describe the same tree. A file added here with a root object
 #   Quickshell registers from C++ adds no new unresolved name and no
 #   missing-property, so it can move the file count without moving either.
-# RECORDED_WARNING_COUNT: 146 "Warning:" diagnostics. This is the sum of the
+# RECORDED_WARNING_COUNT: 144 "Warning:" diagnostics. This is the sum of the
 #   per-kind breakdown below and is not an independent figure, so it cannot
 #   distinguish a kind that stopped firing from a kind that started. What makes
 #   the total legible is the breakdown, which is why every kind is pinned
@@ -48,7 +48,7 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   that shape and the total are not independent facts and a total recorded
 #   against a tree that has one is only satisfiable while the defect is there.
 #   53 `missing-property` warnings is the current measured figure, and the
-#   warning total is 146. Eleven additional dynamic/property-access diagnostics
+#   warning total is 144. Eleven additional dynamic/property-access diagnostics
 #   are retained rather than suppressed; the component probes pin those runtime
 #   contracts separately. A reader who sees the total fall with
 #   `missing-property` should identify the exact reads that changed before
@@ -126,10 +126,10 @@ t_init "qmllint" "lint baseline: 0 errors, classified warnings, deterministic"
 #   word of it is then read as a category name. The sentence that documents this
 #   in shell/features/polkit/PolkitView.qml is written around it for that
 #   reason. Do not start a comment line with the tool's name.
-RECORDED_FILE_COUNT=240
-RECORDED_WARNING_COUNT=146
+RECORDED_FILE_COUNT=239
+RECORDED_WARNING_COUNT=144
 RECORDED_INFO_COUNT=71
-README_WARNING_COUNT=146
+README_WARNING_COUNT=144
 
 # The unresolved-type / uncreatable-type names this tree is allowed to leave
 # unresolved: Quickshell types registered from C++, which qmllint cannot see
@@ -148,13 +148,13 @@ PanelWindow"
 # must land in exactly one of these buckets, and each bucket's count is
 # pinned: a moved number then names the kind that moved, which a bare total
 # would not.
-RECORDED_WARNING_KINDS="confusing-expression-statement 5
+RECORDED_WARNING_KINDS="confusing-expression-statement 4
 eval 1
 id-shadows-member 2
 missing-property 53
 property-override 5
 redundant-optional-chaining 3
-uncreatable-type 4
+uncreatable-type 3
 unqualified 68
 unresolved-type 5"
 
@@ -300,7 +300,7 @@ t_note "the recorded warning total is $RECORDED_WARNING_COUNT and the per-kind b
 t_section "the unresolved types are only Quickshell C++ types"
 UNRESOLVED_LINES="$(grep -E '\[(unresolved-type|uncreatable-type)\]$' "$LINT_OUT" || true)"
 UNRESOLVED_COUNT="$(printf '%s\n' "$UNRESOLVED_LINES" | grep -c . || true)"
-t_count "the unresolved/uncreatable count" "9" "$UNRESOLVED_COUNT"
+t_count "the unresolved/uncreatable count" "8" "$UNRESOLVED_COUNT"
 
 # The names, from two different shapes of diagnostic:
 #   Property "adapter" has incomplete type "FileViewAdapter" ...
