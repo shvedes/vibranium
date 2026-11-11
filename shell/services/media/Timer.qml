@@ -175,10 +175,7 @@ Singleton {
       root._onInhibitAttemptEnd(handle)
       return
     }
-    if (!RequestGate.current(handle)) {
-      root._cancelJob(job, "stale")
-      return
-    }
+    if (!root._claimJob(handle, job)) return
     root._inhibitJob = job
     root._inhibitUnproven = true
     inhibitConfirm.restart()
@@ -286,10 +283,7 @@ Singleton {
       root._onAlarmAttemptEnd(handle, null)
       return
     }
-    if (!RequestGate.current(handle)) {
-      root._cancelJob(job, "stale")
-      return
-    }
+    if (!root._claimJob(handle, job)) return
     root._alarmJob = job
     root._alarmUnproven = true
     alarmConfirm.restart()
@@ -359,6 +353,15 @@ Singleton {
   // deferred path, so only a live job is cancelled here.
   function _cancelJob(job, reason) {
     return Job.cancelLive(job, reason)
+  }
+
+  // Claim a freshly started job for a request generation. A job whose
+  // generation was superseded while it spawned is cancelled instead of being
+  // stored, so no callback from the previous generation touches this state.
+  function _claimJob(handle, job) {
+    if (RequestGate.current(handle)) return true
+    root._cancelJob(job, "stale")
+    return false
   }
 
   // Teardown: both generations die first so a callback racing the shutdown
