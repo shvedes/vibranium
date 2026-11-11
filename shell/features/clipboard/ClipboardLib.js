@@ -1898,6 +1898,23 @@ function clearTally(rows) {
 // what to log and whether the pinned mode just emptied. A miss is null and
 // persists nothing: the panel and the IPC verb can both name a row another
 // path removed first.
+// The slot `id` holds in `list`, or -1. The one lookup the facade uses for a
+// pin flip and for a delete; the id is compared verbatim because it is derived
+// from the payload and never coerced.
+function indexOfId(list, id) {
+  const rows = Array.isArray(list) ? list : []
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i] && rows[i].id === id) return i
+  }
+  return -1
+}
+
+// The row `id` names, or null.
+function entryById(list, id) {
+  const i = indexOfId(list, id)
+  return i < 0 ? null : list[i]
+}
+
 function togglePinned(history, id) {
   const h = (Array.isArray(history) ? history : []).slice()
   for (let i = 0; i < h.length; i++) {

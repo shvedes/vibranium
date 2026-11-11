@@ -2649,6 +2649,19 @@ group('clearTally is the ledger a bulk clear owes', () => {
   eq('an absent handle is not a slot', CL.clearTally([{ type: 'text', secretHandle: '' }]).slots, 0)
 })
 
+group('indexOfId and entryById are the one row lookup', () => {
+  const rows = [{ id: 'a' }, { id: 'b' }]
+  eq('a hit', CL.indexOfId(rows, 'b'), 1)
+  eq('a miss', CL.indexOfId(rows, 'z'), -1)
+  eq('an empty list', CL.indexOfId([], 'a'), -1)
+  eq('a non-array list', CL.indexOfId(null, 'a'), -1)
+  eq('a null row is skipped', CL.indexOfId([null, { id: 'a' }], 'a'), 1)
+  eq('the id is compared verbatim', CL.indexOfId([{ id: 5 }], '5'), -1)
+  eq('entryById returns the row', CL.entryById(rows, 'a').id, 'a')
+  eq('entryById on a miss', CL.entryById(rows, 'z'), null)
+  eq('entryById on an empty list', CL.entryById([], 'a'), null)
+})
+
 group('promoteEntry lifts a row and refreshes its clock', () => {
   const h = [
     CL.newEntry('a', 1, 'x', 'text/plain', 'text'),
@@ -2682,8 +2695,8 @@ group('the library reads no host global and no clock of its own', () => {
   // This pair is a load-time namespace-leak guard, not an API pin: it fails if
   // evaluating the lib leaves anything behind on its own namespace. It also
   // fails if a function is legitimately added, which is the price.
-  eq('a fresh load of the clipboard lib has 104 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 104)
-  eq('a fresh load of the clipboard lib has 104 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 104)
+  eq('a fresh load of the clipboard lib has 106 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 106)
+  eq('a fresh load of the clipboard lib has 106 names', Object.keys(loadLib(path.join(SHELL_DIR, 'features/clipboard/ClipboardLib.js'))).length, 106)
   // The clipboard lib never calls Math.random outside generateKey.
   eq('and the clipboard lib only has it in generateKey', (SRC.match(/Math\.random/g) || []).length, 1)
 })

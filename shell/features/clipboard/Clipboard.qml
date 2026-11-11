@@ -610,13 +610,10 @@ Singleton {
   property OptimisticSet optimistic: OptimisticSet {}
   // The slot `id` holds in `list`, or -1 when it is not there.
   function _indexOf(id, list) {
-    for (let i = 0; i < list.length; i++)
-      if (list[i].id === id) return i
-    return -1
+    return CL.indexOfId(list, id)
   }
   function findById(id) {
-    const i = root._indexOf(id, root.history)
-    return i < 0 ? null : root.history[i]
+    return CL.entryById(root.history, id)
   }
   function requestDelete(id) {
     if (root.optimistic.isPending(id)) return false
