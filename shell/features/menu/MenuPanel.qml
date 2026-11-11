@@ -647,15 +647,25 @@ Rectangle {
   // retries for a number the model already knows exactly. A ranked search
   // projection is the shape this matters most for: it never renders a slot,
   // and it re-installs on every keystroke.
+  // Whether any installed row is open, closing or holding its description.
+  // The resting-fit shortcut and the retry probe both have to answer this,
+  // and they have to answer it the same way: a row one of them counts as
+  // resting and the other does not is a card sized from a delegate the other
+  // is still waiting for. Model-level, so it covers rows no delegate shows.
+  function _anyRowOpen(rows) {
+    const pool = Array.isArray(rows) ? rows : []
+    for (let i = 0; i < pool.length; i++) {
+      const it = pool[i]
+      if (it && (Menu.isExpanded(it) || Menu.infoOpen(it) || Menu.isSlotClosing(it)))
+        return true
+    }
+    return false
+  }
+
   function _restFitReady() {
     if (panel.expansionNeedH > 0) return false
     if (Menu.slotClosing || panel._rowsMoving || list._inSwap) return false
-    const rows = panel.rowsModel || []
-    for (let i = 0; i < rows.length; i++) {
-      const it = rows[i]
-      if (it && (Menu.isExpanded(it) || Menu.infoOpen(it) || Menu.isSlotClosing(it)))
-        return false
-    }
+    if (panel._anyRowOpen(panel.rowsModel)) return false
     if (panel._anyRowMoving()) return false
     return true
   }
@@ -796,16 +806,7 @@ Rectangle {
       // behind filtering. Live delegates are covered by the expanding
       // scan above; the store covers rows no delegate shows yet. Pages
       // with an open slot keep the measured path below.
-      let anyOpen = false
-      for (let i = 0; i < current.length; i++) {
-        const st = current[i]
-        if (!st) continue
-        if (Menu.isExpanded(st) || Menu.isSlotClosing(st) || Menu.infoOpen(st)) {
-          anyOpen = true
-          break
-        }
-      }
-      if (!anyOpen) {
+      if (!panel._anyRowOpen(current)) {
         fitModel()
         return
       }
