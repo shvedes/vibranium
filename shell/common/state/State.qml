@@ -70,10 +70,17 @@ Singleton {
     }
   }
 
-  // key -> { path, data, defaultValue, view, flushPending }
+  // key -> { path, data, defaultValue, view }
   // data mirrors the slot adapter payload; view is the single FileView
   // owning atomic writes, watch and reload for that path.
   property var _slots: ({})
+
+  // Keys already armed for a flush, kept off the published map on purpose.
+  // Nothing binds to it: a flush pending is the store's own bookkeeping. Held
+  // in `_slots` it republished every slot twice per write - arming and
+  // disarming - and each of those republications re-evaluated every slot
+  // reader in the shell, for a boolean none of them reads.
+  property var _flushArmed: ({})
 
   // --- public API ---
 
@@ -213,8 +220,7 @@ Singleton {
       path: path,
       data: defClone,
       defaultValue: def,
-      view: view,
-      flushPending: false
+      view: view
     }
     root._slots = nextSlots
 
@@ -292,19 +298,15 @@ Singleton {
   // what a persistor would add; the rest is what it cannot do.
   function _scheduleFlush(key) {
     const slot = root._slots[key]
-    if (!slot || slot.flushPending) return
-    const nextSlots = Object.assign({}, root._slots)
-    nextSlots[key] = Object.assign({}, slot, { flushPending: true })
-    root._slots = nextSlots
+    if (!slot || root._flushArmed[key] === true) return
+    root._flushArmed[key] = true
     Qt.callLater(() => root._flush(key))
   }
 
   function _flush(key) {
     const slot = root._slots[key]
     if (!slot) return
-    const nextSlots = Object.assign({}, root._slots)
-    nextSlots[key] = Object.assign({}, slot, { flushPending: false })
-    root._slots = nextSlots
+    root._flushArmed[key] = false
     // Ensure watcher is armed for next external change; FileView with
     // watchChanges fires onFileChanged when the file appears.
     if (slot.view) slot.view.writeAdapter()
