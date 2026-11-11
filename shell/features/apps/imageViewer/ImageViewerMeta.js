@@ -54,22 +54,17 @@ function nameFilters() {
   return out
 }
 
-// The lower-case extension of a file name, "" when it has none.
-function extensionOf(fileName) {
-  return SU.extname(fileName)
-}
-
 // The palette key for a file's format family, "" for a format with no family
 // entry (the status dot then falls back to a neutral tone).
 function typeKey(fileName) {
-  const type = TYPES[extensionOf(fileName)]
+  const type = TYPES[SU.extname(fileName)]
   return type === undefined ? "" : type.key
 }
 
 // The media type the file's own bytes are offered under, "" for a format the
 // table does not name.
 function mimeType(fileName) {
-  const type = TYPES[extensionOf(fileName)]
+  const type = TYPES[SU.extname(fileName)]
   return type === undefined ? "" : type.mime
 }
 
