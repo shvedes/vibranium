@@ -2620,12 +2620,12 @@ PanelWindow {
     }
 
     Repeater {
-      model: drawArea._handles.length
+      model: _handles.length
 
       delegate: Rectangle {
         required property int index
 
-        readonly property var corner: drawArea._handles[index]
+        readonly property var corner: _handles[index]
 
         x: (corner !== null ? corner.x : -100) - 5
         y: (corner !== null ? corner.y : -100) - 5
