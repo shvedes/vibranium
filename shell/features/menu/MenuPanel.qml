@@ -3455,10 +3455,13 @@ Rectangle {
   }
 
   function activateCurrent(shift) {
-    // A debounced scoped query may still be pending: apply it now and
-    // re-drive activation once the install it queues has landed, so Enter
-    // never picks from a set the field has already left behind.
-    if (Menu.flushScoped()) {
+    // A coalesced global query or a debounced scoped query may still be
+    // pending: apply it now and re-drive activation once the install it
+    // queues has landed, so Enter never picks from a set the field has
+    // already left behind.
+    const flushedQuery = Menu.flushQuery()
+    const flushedScoped = Menu.flushScoped()
+    if (flushedQuery || flushedScoped) {
       Qt.callLater(() => panel.activateCurrent(shift))
       return
     }
