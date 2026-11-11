@@ -1,6 +1,7 @@
 .pragma library
 
 .import "../../common/math/Range.js" as Range
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 
 // Local Bar library: pure helpers behind the bar's "owned module" API.
 // No Qt state here - the owned-module list stays reactive in Bar.qml and
@@ -35,8 +36,7 @@ function removeOwned(owned, id) {
 
 // Group key id -> ordered member module ids.
 function groupMembers(groups, id) {
-  const m = groups ? groups[id] : undefined
-  return Array.isArray(m) ? m : []
+  return StoreGuards.asList(groups ? groups[id] : undefined)
 }
 
 function isGroup(groups, id) {
