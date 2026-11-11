@@ -1,5 +1,7 @@
 .pragma library
 
+.import "../../common/math/Range.js" as Range
+
 // Local Bar library: pure helpers behind the bar's "owned module" API.
 // No Qt state here - the owned-module list stays reactive in Bar.qml and
 // these functions return fresh descriptors (or null) so Bar can decide
@@ -382,7 +384,7 @@ function crossDropPositions(cur, displayIds, isFixed, id, fromRegion, toRegion, 
   let movables = 0
   for (let i = 0; i < display.length; i++)
     if (!isFixed(display[i])) movables++
-  const at = Math.max(0, Math.min(toIndex, movables))
+  const at = Range.clamp(toIndex, 0, movables)
   const next = {
     left: cur.left.slice(),
     center: cur.center.slice(),
