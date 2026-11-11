@@ -24,7 +24,7 @@ BarModule {
   // --- live bluetooth state (Quickshell.Bluetooth, BlueZ backend) ---
 
   readonly property var adapter: Bluetooth.defaultAdapter
-  readonly property var devices: Bluetooth.devices ? Bluetooth.devices.values : []
+  readonly property var devices: Ui.trackerValues(Bluetooth.devices)
   readonly property var connectedDevice: {
     for (const d of root.devices) if (d.connected) return d
     return null

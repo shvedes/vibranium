@@ -39,7 +39,7 @@ Item {
 
   // --- UPower state (same filter as the bar module) ---
 
-  readonly property var allDevices: UPower.devices ? UPower.devices.values : []
+  readonly property var allDevices: Ui.trackerValues(UPower.devices)
 
   function stateString(state): string {
     try {

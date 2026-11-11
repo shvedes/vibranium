@@ -69,6 +69,10 @@ Singleton {
   readonly property int buttonHeight: 28
   readonly property int inputHeight: 32
   readonly property int expandMs: 140
+  // One refresh per burst of bus events: logind emits several signals for a
+  // single state change, and a CUPS submit fires JobCreated + JobState +
+  // printer events. Shared so both services coalesce at the same cadence.
+  readonly property int coalesceMs: 250
 
   // The rhythm of every pointer-driven menu in the tree: the tray's DBusMenu,
   // the wallpaper's context menu and the image viewer's, all three drawn by
@@ -174,6 +178,13 @@ Singleton {
   function mix(keyA, keyB, t) {
     const mixed = Color.mix(Theme.color(keyA), Theme.color(keyB), t)
     return mixed === "" ? root.solid(keyA) : mixed
+  }
+
+  // A tracker-backed model's value list, or [] while the tracker itself is
+  // absent. The bar modules read their device sets through this fold, so the
+  // two-step null guard has one home instead of one copy per module.
+  function trackerValues(tracker) {
+    return tracker && tracker.values ? tracker.values : []
   }
 
   // Alpha helper that guards void inputs (e.g. Theme.color before palette lands).

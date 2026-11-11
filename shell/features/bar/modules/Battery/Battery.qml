@@ -20,7 +20,7 @@ CollapsibleSlot {
 
   // --- live UPower state (Quickshell.Services.UPower) ---
 
-  readonly property var allDevices: UPower.devices ? UPower.devices.values : []
+  readonly property var allDevices: Ui.trackerValues(UPower.devices)
 
   // The one walk of the device set, and the one snapshot: every device
   // worth showing becomes a plain row with its label and normalized

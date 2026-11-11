@@ -25,10 +25,9 @@ CollapsibleSlot {
   readonly property bool blockBrowsers: Settings.value("shell.osd.blockBrowsers") !== false
   // The MPRIS set, named once. `Mpris.players` is a model that is briefly
   // absent while the bus is still answering, and `values` is briefly absent
-  // on the model itself, so the two-step fold belongs to one place: written
-  // out twice, the two copies are free to drift and the branch below would
-  // silently filter one set and sort another.
-  readonly property var allPlayers: Mpris.players ? Mpris.players.values ?? [] : []
+  // on the model itself; Ui.trackerValues owns that two-step fold so the
+  // branch below cannot filter one set and sort another.
+  readonly property var allPlayers: Ui.trackerValues(Mpris.players)
   readonly property var players: NP.sortPlayers(
     root.blockBrowsers ? NP.filterBrowsers(root.allPlayers) : root.allPlayers,
     p => p.playbackState === MprisPlaybackState.Playing)

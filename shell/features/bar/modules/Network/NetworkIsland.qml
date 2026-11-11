@@ -393,7 +393,7 @@ Item {
     WifiClientFailed: ConnectionFailReason.WifiClientFailed
   })
 
-  readonly property var devices: Networking.devices ? Networking.devices.values : []
+  readonly property var devices: Ui.trackerValues(Networking.devices)
   readonly property var wifiDevice: {
     for (const d of root.devices) if (d.type === DeviceType.Wifi) return d
     return null

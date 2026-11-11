@@ -46,7 +46,7 @@ Item {
 
   // --- bluetooth state ---
   readonly property var adapter: Bluetooth.defaultAdapter
-  readonly property var devices: Bluetooth.devices ? Bluetooth.devices.values : []
+  readonly property var devices: Ui.trackerValues(Bluetooth.devices)
 
   readonly property string connectedDeviceName: {
     for (const d of root.devices) {
