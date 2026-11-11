@@ -193,18 +193,24 @@ Singleton {
 
   // Ids of share sources that currently feed something (touched by ≥1
   // link). A session nobody consumes is not a sharing indicator.
+  //
+  // One set of the sources, then one walk of the link list. The nested form
+  // this replaces asked every link about every source, which is the same
+  // answer at O(links x sources) on a graph that changes once per link event.
   readonly property var liveShareSourceIds: {
+    var wanted = {}
+    var srcs = root.shareSources
+    for (var w = 0; w < srcs.length; w++) {
+      if (srcs[w]) wanted[srcs[w].id] = true
+    }
     var ids = {}
     for (var l = 0; l < root.links.length; l++) {
       var lk = root.links[l]
       if (!lk) continue
       var s = lk.source
       var t = lk.target
-      for (var k = 0; k < root.shareSources.length; k++) {
-        var src = root.shareSources[k]
-        if (!src) continue
-        if ((s && s.id === src.id) || (t && t.id === src.id)) ids[src.id] = true
-      }
+      if (s && wanted[s.id] === true) ids[s.id] = true
+      if (t && wanted[t.id] === true) ids[t.id] = true
     }
     return ids
   }
@@ -290,31 +296,38 @@ Singleton {
 
   // Screenshare subset of the video nodes (see _isShareStream): portal
   // sources themselves are covered by shareSourceLive and excluded here.
-  readonly property var shareStreams: {
-    var list = []
-    for (var k = 0; k < root.videoNodes.length; k++) {
-      var n = root.videoNodes[k]
+  //
+  // One classification pass for both subsets. Each used to walk the whole
+  // video node set and run both predicates on every node, and the predicates
+  // read node properties and the link graph, so the second walk recomputed
+  // answers the first had already produced. shareSources is deliberately not
+  // folded in: it is an input to _isShareStream (through liveShareSourceIds),
+  // so deriving it here would make the two bindings circular.
+  readonly property var _videoPartition: {
+    var streams = []
+    var cams = []
+    for (var i = 0; i < root.videoNodes.length; i++) {
+      var n = root.videoNodes[i]
       if (root._isShareSource(n)) continue
-      if (root._isShareStream(n)) list.push(n)
+      if (root._isShareStream(n)) streams.push(n)
+      else cams.push(n)
     }
-    return list
+    return { streams: streams, cams: cams }
   }
 
-  // Camera: only capture streams that are actually being used. A role-tagged
-  // node with media.role=camera is included only when something links it.
-  // Dormant devices must stay dark even though the device node itself always
-  // sits in the graph. Share sources and share streams are excluded above.
+  readonly property var shareStreams: root._videoPartition.streams
+
+  // Camera: only capture streams that are actually being used. A dormant
+  // device node always sits in the graph, so nothing links it and it stays
+  // dark. Share sources and share streams are excluded by the partition
+  // above; the media.role tag the old loop re-read is not consulted here
+  // because its camera branch and its fallback branch pushed on exactly the
+  // same link test.
   readonly property var camStreams: {
     var list = []
-    for (var l = 0; l < root.videoNodes.length; l++) {
-      var m = root.videoNodes[l]
-      if (root._isShareSource(m)) continue
-      if (root._isShareStream(m)) continue
-      var role = String(root._nodeProps(m)["media.role"] || "").toLowerCase()
-      if (role === "camera") {
-        if (root.linkedIds[m.id]) list.push(m)
-        continue
-      }
+    var cams = root._videoPartition.cams
+    for (var i = 0; i < cams.length; i++) {
+      var m = cams[i]
       if (root.linkedIds[m.id]) list.push(m)
     }
     return list
@@ -949,7 +962,10 @@ Singleton {
     return null
   }
 
-  function _shareSourceIdSet() {
+  // The source-id set once per source-list evaluation. _isShareStream asked
+  // for it again on every video node, rebuilding the same map up to once per
+  // node, and the answer is a function of the source list alone.
+  readonly property var shareSourceIds: {
     var set = {}
     for (var i = 0; i < root.shareSources.length; i++)
       if (root.shareSources[i]) set[root.shareSources[i].id] = true
@@ -965,7 +981,7 @@ Singleton {
     if (role.indexOf("camera") !== -1) return false
     // 2. Pinned to a portal source (node.target / driver id).
     var target = String(props["node.target"] || "")
-    if (target !== "" && root._shareSourceIdSet()[target]) return true
+    if (target !== "" && root.shareSourceIds[target] === true) return true
     // 3. Linked to a live portal screencast source (covers bare "Discord"
     // style streams with no telling description).
     if (root._streamShareSource(node) !== null) return true
