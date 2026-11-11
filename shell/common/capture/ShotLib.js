@@ -17,6 +17,7 @@
 .pragma library
 .import "../text/StringUtils.js" as SU
 .import "../text/Format.js" as Format
+.import "../text/FileUri.js" as FileUri
 
 function _pad(n) {
   return Format.pad2(n)
@@ -251,15 +252,7 @@ function sq(s) {
 }
 
 function fileUri(path) {
-  const value = String(path ?? "")
-  if (value.startsWith("file://")) return value
-  const parts = value.split("/")
-  let uri = "file://"
-  for (let i = 0; i < parts.length; i++) {
-    if (parts[i] === "") continue
-    uri += "/" + encodeURIComponent(parts[i])
-  }
-  return uri === "file://" ? "file:///" : uri
+  return FileUri.toUri(path, { keepExisting: true, blankNull: true })
 }
 
 // URI-list clipboard offer: paste targets receive a persistent file URI.

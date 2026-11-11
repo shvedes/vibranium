@@ -11,6 +11,7 @@
 .import "../../common/text/Clock.js" as ClockFmt
 .import "../../common/text/Duration.js" as DurationFmt
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/text/FileUri.js" as FileUri
 .import "../../common/theme/FileIcons.js" as FileIcons
 
 // Icon basenames under shell/assets/icons, canonicalized in
@@ -864,14 +865,7 @@ function decryptSecret(hex, key) {
 // spaces, "#" and unicode survive the trip through any consumer.
 // Root must serialize as the canonical triple-slash form.
 function toFileUri(path) {
-  const p = String(path)
-  const parts = p.split("/")
-  let u = ""
-  for (let i = 0; i < parts.length; i++) {
-    if (parts[i] === "") continue
-    u += "/" + encodeURIComponent(parts[i])
-  }
-  return "file://" + (u === "" ? "/" : u)
+  return FileUri.toUri(path)
 }
 
 // --- shell quoting and native helpers (always in memory) ---
