@@ -197,7 +197,16 @@ PanelWindow {
   function show(anchor, comp) {
     root._key = root._keyFor(anchor)
     root.anchorItem = anchor
-    if (root.contentComponent !== comp) root.contentComponent = comp
+    if (root.contentComponent !== comp) {
+      root.contentComponent = comp
+    } else {
+      // A second slot served by the SAME component produces neither a content
+      // change nor a content size change - the Loader keeps its item - so the
+      // footprint would never be written under the new key. The live size is
+      // that component's own, so freezing it here is the same measurement the
+      // two change handlers would have taken.
+      root._saveFrozen()
+    }
     root.open = true
     root.requestPark()
   }

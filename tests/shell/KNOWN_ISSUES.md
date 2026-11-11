@@ -512,7 +512,7 @@ unmask a field whose consumer refused the reveal.
 
 *Reproduced and now verified by `suites/qml/textinput-test.sh`.*
 
-### 23. `Calendar.viewMonth` is a writable int with no normalisation
+### 23. (fixed) `Calendar.viewMonth` is a writable int with no normalisation
 
 `shell/common/ui/Calendar.qml:31-32` declares `viewYear`/`viewMonth` as plain
 ints. `monthGrid` compares `cellMonth === month` against the raw value, so an
@@ -531,7 +531,13 @@ viewMonth: -1   -> reads -1, grid is 2023-11-27..2024-01-07, 0 cells in month
 `CalendarLib.stepMonth`, which rolls the year correctly (verified in both
 directions). This is one host assignment away.
 
-*Reproduced by `suites/qml/calendar-graph-test.sh`.*
+**Fixed.** The declared ints stay the writable input, and the grid, title and
+step read a derived pair: `viewMonthIndex` folds into 0..11 and
+`viewYearRolled` carries the year the fold crossed. A raw `viewMonth: 12` now
+renders January 2025 with all 31 January cells in month; `-1` renders December
+2023. The suite pins both, plus the declared values staying as written.
+
+*Reproduced and now verified by `suites/qml/calendar-graph-test.sh`.*
 
 ### 24. (fixed) The password glyph model logs one warning per character of every secret
 
@@ -690,7 +696,7 @@ the new y (60) and x (20) offsets and the re-park when the margin is restored.
 
 *Reproduced and now verified by `suites/qml/host-button-test.sh`.*
 
-### 32. A slot served by a shared `Component` is never frozen
+### 32. (fixed) A slot served by a shared `Component` is never frozen
 
 `shell/common/ui/IslandHost.qml:157-163` with `:294-309`, against the frozen
 footprint contract in the header at `:89-92`.
@@ -702,12 +708,17 @@ show(anchorShared, compTall) then show(anchorSharedTwin, compTall)
 //         and once the host closes, that card settles to 0x0
 ```
 
-`show()` only assigns `contentComponent` when it differs (`:160`), and the
-`Loader` keeps its item, so neither a content change nor a content size change
-fires and `_saveFrozen` has nothing to hang off. Needs two slots sharing one
-`Component`: the live card hides it, the closed card shows it.
+`show()` only assigned `contentComponent` when it differed, and the `Loader`
+keeps its item, so neither a content change nor a content size change fired
+and `_saveFrozen` had nothing to hang off. The live card hid it; the closed
+card showed it.
 
-*Reproduced by `suites/qml/host-button-test.sh`.*
+**Fixed.** When the component is unchanged, `show()` freezes the live size
+under the new key: it is that component's own size, and it is the measurement
+the two change handlers would have taken. The suite pins the twin's 220x90
+footprint, the fifth store entry, and the closed card settling to 90.
+
+*Reproduced and now verified by `suites/qml/host-button-test.sh`.*
 
 ---
 

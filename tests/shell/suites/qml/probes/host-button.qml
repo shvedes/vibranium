@@ -1338,8 +1338,9 @@ ShellRoot {
       // The live card tracks the content, so while it is open it looks right...
       kv("ih.shared.cardWidth", h.card.width)
       kv("ih.shared.cardHeight", h.card.height)
-      // ...but the twin's slot was never frozen, because _saveFrozen only runs
-      // on a content change or a content size change and neither happened.
+      // ...and the twin's slot is frozen too: show() saves the live size when
+      // the component is unchanged, which is the case neither the content
+      // change nor the content size change covers.
       kv("ih.shared.frozenSharedW", h._frozenW("shared"))
       kv("ih.shared.frozenTwinW", h._frozenW("shared-twin"))
       kv("ih.shared.count", h.diagnostics().count)
@@ -1352,7 +1353,7 @@ ShellRoot {
   function onSharedClosed() {
     const h = root.h1
     try {
-      // With the content gone, the twin's card has nothing to size from.
+      // With the content gone, the twin's card sizes from its own frozen slot.
       kv("ih.shared.closedTwinW", h.card.width)
       kv("ih.shared.closedTwinH", h.card.height)
       kv("ih.shared.closedSharedW", h._frozenW("shared"))
