@@ -27,7 +27,6 @@ Singleton {
 
   property int _holders: 0
 
-  readonly property int holders: root._holders
   readonly property bool ticking: root._holders > 0
 
   // One tick for every holder. A holder that also needs to know which surface
