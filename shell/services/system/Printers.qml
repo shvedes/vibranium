@@ -602,6 +602,7 @@ Singleton {
 
   property var _subs: ({})       // printerName -> subId
   property var _subWork: []      // printer names still to check
+  property int _subHead: 0       // how many of them this pass has started
 
   function _ensureSubscriptions() {
     if (root.vmUnavailable) return
@@ -620,12 +621,15 @@ Singleton {
     }
     if (changed) root._subs = next
     root._subWork = Object.keys(live)
+    root._subHead = 0
     root._subNext()
   }
 
   function _subNext() {
-    if (root._subWork.length === 0) return
-    const name = root._subWork.shift()
+    // A cursor: one subscription is started per completed probe, and shifting
+    // moved the rest of the pass on every one of them.
+    if (root._subHead >= root._subWork.length) return
+    const name = root._subWork[root._subHead++]
     const puri = "ipp://localhost/printers/" + name
     root.runIpp("sub-list.test", { user: root._userName(), puri: puri }, puri,
       (code, text) => root._applySubList(code, text, name))
