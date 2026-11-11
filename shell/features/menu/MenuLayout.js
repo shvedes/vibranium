@@ -39,6 +39,32 @@ function headerFor(pool, section) {
   return pool.headers[section]
 }
 
+// The install plan for a row set. A wholesale install cannot glide: its rows
+// arrive through one model write, so there is no gap or displaced row for a
+// transition to describe. A ranked search re-orders most rows per keystroke,
+// so it installs instantly too. The caller supplies the live flags because
+// the panel and the menu singleton own them.
+function rowSyncPlan(input) {
+  const wideProjection = input.searching && input.rowCount > input.fullRows
+  const reveal = input.intent === "reveal"
+  const scopedGiant = reveal && input.scopedActive && !input.searching
+    && input.sourceCount > input.fullRows
+  const wholesale = !reveal || wideProjection
+  const ranked = input.searching
+  const glide = !wholesale && !ranked && !scopedGiant
+    && input.rowCount <= input.fullRows && input.animationsEnabled
+  const blocker = reveal
+    ? (wideProjection ? "wide-projection"
+      : (ranked ? "ranked-projection" : ""))
+    : input.intent
+  return {
+    intent: input.intent,
+    wholesale: wholesale,
+    glide: glide,
+    blocker: blocker
+  }
+}
+
 function composeGridRows(pool, items, cols) {
   const c = Math.max(1, Math.floor(Number(cols) || 1))
   const out = []

@@ -526,49 +526,16 @@ Rectangle {
     // outside this panel writes the model - so an incremental install is
     // refused here because the projection is too wide to show, not because
     // the model is behind.
-    const wideProjection = panel.searching && rowCount > Ui.listFullRows
-    const reveal = intent === "reveal"
-    // Scoped filtering on a giant page churns the whole installed set per
-    // keystroke; animating that reads as shimmer and gaps, so it installs
-    // incrementally (the cursor reseat is explicit) but without motion.
-    // Small pages keep the reveal motion.
-    // The page the rows being planned belong to, taken from the last install's
-    // record rather than from the frame: a plan is decided for a ROW SET, and
-    // the frame can still name the page being left while that decision runs.
     const srcPage = panel.installedPage
-    const scopedGiant = reveal && Menu.scopedActive && !panel.searching
-      && !!srcPage && Array.isArray(srcPage.items) && srcPage.items.length > Ui.listFullRows
-    const wholesale = !reveal || wideProjection
-    // A ranked search projection is not an in-place delta: every keystroke
-    // re-ranks the whole hit set, so most rows change slot and the ones
-    // that survive are reordered around them. Animating that leaves the
-    // list mid-flight when the next keystroke lands - rows easing into
-    // slots that have moved on, a removed row's gap still occupied by the
-    // delegate that is leaving it, neighbours gliding to positions the
-    // re-rank is about to invalidate. Search installs instantly instead.
-    // The "/" quick-filter keeps its motion on small pages: it only removes
-    // rows, which is the case the transitions were built for.
-    const ranked = panel.searching
-    // The motion policy is part of the ANSWER, not only a term in the
-    // transition's own enabled binding: the row-motion latch must not
-    // hold the fit open for motion the kill-switch has just removed.
-    // Giant installs never glide, whatever the intent: a fade per added
-    // row plus a glide per displaced one reads as shimmer across a hundred
-    // rows (translucent rows, travelling gaps) instead of a reveal, so
-    // they land instantly like a wholesale install. Small sets keep the
-    // motion. The latch and the published flag both read glide, so gating
-    // here keeps them as one.
-    const glide = !wholesale && !ranked && !scopedGiant && rowCount <= Ui.listFullRows && MotionPolicy.enabled
-    const blocker = reveal
-      ? (wideProjection ? "wide-projection"
-        : (ranked ? "ranked-projection" : ""))
-      : intent
-    return {
+    return MenuLayout.rowSyncPlan({
       intent: intent,
-      wholesale: wholesale,
-      glide: glide,
-      blocker: blocker
-    }
+      rowCount: rowCount,
+      searching: panel.searching,
+      scopedActive: Menu.scopedActive,
+      sourceCount: !!srcPage && Array.isArray(srcPage.items) ? srcPage.items.length : 0,
+      fullRows: Ui.listFullRows,
+      animationsEnabled: MotionPolicy.enabled
+    })
   }
 
   // Diagnostic: the plan the most recent install was resolved with. Not
