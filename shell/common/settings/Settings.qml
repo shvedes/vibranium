@@ -136,11 +136,22 @@ Singleton {
     return m
   }
 
+  // key -> shard index. The hash walks every character of the key and the
+  // keys are catalog literals, so the mapping is a pure function of a string
+  // that never changes; value() asked for it again on every binding
+  // re-evaluation (62 call sites, re-run per rev) for an answer already
+  // known. Mutated in place, not published, for the reason the other maps
+  // here are: this is a lookup table, not state a binding observes.
+  property var _shardMemo: Object.create(null)
+
   function _shardOf(key) {
-    let h = 0
     const s = String(key)
+    const hit = root._shardMemo[s]
+    if (hit !== undefined) return hit
+    let h = 0
     for (let i = 0; i < s.length; i++)
       h = (h * 31 + s.charCodeAt(i)) & 7
+    root._shardMemo[s] = h
     return h
   }
 
