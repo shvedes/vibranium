@@ -2,6 +2,7 @@
 
 .import "NodeKey.js" as NodeKey
 .import "../../../common/math/Range.js" as Range
+.import "../../../common/collections/StoreGuards.js" as StoreGuards
 
 // Pure derivations for the graph tab: what a port line is, which two ports may
 // be connected to each other, what argv a connect or a disconnect is, how the
@@ -130,8 +131,7 @@ function portsOf(map, nodeName) {
   if (map === null || map === undefined || typeof map !== "object") return []
   const key = typeof nodeName === "string" ? nodeName : ""
   if (key === "") return []
-  const held = map[key]
-  return Array.isArray(held) ? held : []
+  return StoreGuards.asList(map[key])
 }
 
 // --- channel pairing ---------------------------------------------------
@@ -1142,7 +1142,7 @@ function hasOut(map, key, value) {
 }
 
 function arrayOf(list) {
-  return Array.isArray(list) ? list : []
+  return StoreGuards.asList(list)
 }
 
 function numberOf(holder, name, fallback) {
