@@ -1634,6 +1634,24 @@ Singleton {
     }
   }
 
+  // The layout half of the bar's reported state, shared by `status` and
+  // `dumpAll` so the two IPC verbs cannot describe different bars.
+  function stateSnapshot(): var {
+    return {
+      enabled: root.enabled,
+      hideToggle: root.hideToggle,
+      effectiveEnabled: root.effectiveEnabled,
+      position: root.position,
+      showBorder: root.showBorder,
+      height: root.height,
+      layout: root.layout,
+      storedLayout: root.storedLayout,
+      disabled: root.disabledModules,
+      positions: root.positions,
+      enabledModules: root.enabledModules
+    }
+  }
+
   IpcHandler {
     target: "bar"
     function help(command: string): string {
@@ -1650,19 +1668,7 @@ Singleton {
     function ping(): string { return "pong" }
 
     function status(): string {
-      return JSON.stringify({
-        enabled: root.enabled,
-        hideToggle: root.hideToggle,
-        effectiveEnabled: root.effectiveEnabled,
-        position: root.position,
-        showBorder: root.showBorder,
-        height: root.height,
-        layout: root.layout,
-        storedLayout: root.storedLayout,
-        disabled: root.disabledModules,
-        positions: root.positions,
-        enabledModules: root.enabledModules
-      })
+      return JSON.stringify(root.stateSnapshot())
     }
 
     function set(key: string, json: string): string {
@@ -1692,21 +1698,10 @@ Singleton {
     }
 
     function dumpAll(): string {
-      return JSON.stringify({
-        enabled: root.enabled,
-        hideToggle: root.hideToggle,
-        effectiveEnabled: root.effectiveEnabled,
-        position: root.position,
-        showBorder: root.showBorder,
-        height: root.height,
-        layout: root.layout,
-        storedLayout: root.storedLayout,
-        disabled: root.disabledModules,
-        positions: root.positions,
-        enabledModules: root.enabledModules,
+      return JSON.stringify(Object.assign(root.stateSnapshot(), {
         modules: Object.keys(root._components),
         owned: Object.keys(root._ownedComps)
-      })
+      }))
     }
 
     function dump(): string {
