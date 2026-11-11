@@ -984,8 +984,8 @@ BarModule {
       // covers is the one containing the pointer, which is floor of the
       // click's frame coordinate. Rounding to the nearest pixel centre reads
       // the neighbour on half of all clicks.
-      const gx = Math.max(0, Math.min(fw - 1, Math.floor(p.x * p.ratio)))
-      const gy = Math.max(0, Math.min(fh - 1, Math.floor(p.y * p.ratio)))
+      const gx = Range.clamp(Math.floor(p.x * p.ratio), 0, fw - 1)
+      const gy = Range.clamp(Math.floor(p.y * p.ratio), 0, fh - 1)
       ctx.clearRect(0, 0, 1, 1)
       ctx.drawImage(frameProbe, gx, gy, 1, 1, 0, 0, 1, 1)
       const px = ctx.getImageData(0, 0, 1, 1)
