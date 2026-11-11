@@ -571,6 +571,13 @@ Singleton {
     return "ok"
   }
 
+  // Replace row `i` with `row` and commit, returning the commit's verdict.
+  function _commitRow(i, row) {
+    const next = root.timers.slice()
+    next[i] = row
+    return root._commitTimers(next)
+  }
+
   // --- actions ----
   //
   // Callable on the singleton root because the menu's onCall/editCall
@@ -579,32 +586,29 @@ Singleton {
   // serves the external `qs ipc call` CLI and wraps these same methods.
 
   function setAction(index, action) {
-    const i = Number(index)
+    const i = root._timerIndex(index)
     const a = action === "lock" || action === "suspend" || action === "command"
       ? action : ""
-    if (!(Number.isInteger(i) && i >= 0 && i < root.timers.length)) {
+    if (i < 0) {
       return "error: no timer at index " + index
     }
     if (a === "") {
       return "error: action must be lock, suspend or command"
     }
-    const next = root.timers.slice()
     // Switching away from a command row drops its command and the class it
     // declared - the action is the declaration now. Arming a command row
     // keeps any text already collected so the transition is lossless, and
     // keeps a declared class only while the text still is what it was
     // declared for, so the guard can never outlive its reason.
-    const row = { minutes: next[i].minutes, action: a }
+    const prev = root.timers[i]
+    const row = { minutes: prev.minutes, action: a }
     if (a === "command") {
-      row.command = next[i].command !== undefined ? next[i].command : ""
-      const declared = String(next[i].commandClass ?? "")
+      row.command = prev.command !== undefined ? prev.command : ""
+      const declared = String(prev.commandClass ?? "")
       if (declared === "lock" || declared === "suspend")
         row.commandClass = declared
     }
-    next[i] = row
-    const err = root._commitTimers(next)
-    if (err !== "") return err
-    return "ok"
+    return root._commitRow(i, row)
   }
 
   // The row index `index` names, or -1 when it names no timer.
@@ -617,22 +621,19 @@ Singleton {
   // so a typed command always fires. A class already declared on the row
   // survives, because the text is still the text that was declared.
   function setCommand(index, command) {
-    const i = Number(index)
+    const i = root._timerIndex(index)
     const c = String(command ?? "")
-    if (!(Number.isInteger(i) && i >= 0 && i < root.timers.length)) {
+    if (i < 0) {
       return "error: no timer at index " + index
     }
     if (c.trim() === "") {
       return "error: command cannot be empty"
     }
-    const next = root.timers.slice()
-    const row = { minutes: next[i].minutes, action: "command", command: c }
-    const declared = String(next[i].commandClass ?? "")
+    const prev = root.timers[i]
+    const row = { minutes: prev.minutes, action: "command", command: c }
+    const declared = String(prev.commandClass ?? "")
     if (declared === "lock" || declared === "suspend") row.commandClass = declared
-    next[i] = row
-    const err = root._commitTimers(next)
-    if (err !== "") return err
-    return "ok"
+    return root._commitRow(i, row)
   }
 
   // Declare what a command timer does to the session, which is the only
@@ -659,13 +660,9 @@ Singleton {
       return "error: '" + String(row.command).trim()
         + "' is one of Vibranium's own session verbs, so it stays declared"
     }
-    const next = root.timers.slice()
-    const written = { minutes: next[i].minutes, action: "command", command: next[i].command }
+    const written = { minutes: row.minutes, action: "command", command: row.command }
     if (value !== "") written.commandClass = value
-    next[i] = written
-    const err = root._commitTimers(next)
-    if (err !== "") return err
-    return "ok"
+    return root._commitRow(i, written)
   }
 
   // Registry-routed entry point for the Add wizard's onCall template:
