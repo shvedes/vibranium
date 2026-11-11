@@ -1603,7 +1603,7 @@ ListView {
       Idle.run(() => retry(0), 2)
       return
     }
-    let i = Math.min(Math.max(0, index), count - 1)
+    let i = Range.clamp(index, 0, count - 1)
     for (let n = 0; n <= count; n++) {
       const probe = (i + n) % count
       if (root.isSelectable(probe)) {
@@ -1664,7 +1664,7 @@ ListView {
   // Shared page motions: page steps clamp contentY by viewport height
   // factor; end jumps seat the cursor at the ends and follow.
   function pageBy(factor) {
-    const target = Math.min(Math.max(0, root.contentY + root.height * factor),
+    const target = Range.clamp(root.contentY + root.height * factor, 0,
       root.clampY(Infinity))
     root.seatTo(target, root.smoothScroll)
   }
@@ -1695,7 +1695,7 @@ ListView {
   function restoreAt(index, y) {
     const count = root.count
     if (count <= 0) return
-    let i = Math.min(Math.max(0, index), count - 1)
+    let i = Range.clamp(index, 0, count - 1)
     let found = false
     for (let n = 0; n < count; n++) {
       const probe = (i + n) % count
@@ -1826,7 +1826,7 @@ ListView {
   // answering 0 and pulling the view to the top.
   function _swapWant() {
     if (root.contentHeight <= 0) return -1
-    return Math.min(root._swapY, Math.max(0, root.contentHeight - root.height))
+    return Range.clamp(root._swapY, 0, root.contentHeight - root.height)
   }
   function _swapRestore() {
     if (!root._swapHold) return

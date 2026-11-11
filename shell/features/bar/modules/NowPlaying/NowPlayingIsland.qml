@@ -1309,7 +1309,7 @@ Item {
                     if (event.angleDelta.y === 0) return
                     if (!root.canSeekPosition) return
                     const d = event.angleDelta.y > 0 ? 5 : -5
-                    const t = Math.min(root.lengthSec, Math.max(0, root.shownPosition + d))
+                    const t = Range.clamp(root.shownPosition + d, 0, root.lengthSec)
                     root.player.position = t
                     root.shownPosition = t
                     if (root.player) root.player.positionChanged()

@@ -1,5 +1,7 @@
 .pragma library
 
+.import "../../../../common/math/Range.js" as Range
+
 // Pure model behind the arch updates island: the package search, the
 // official/AUR split, the selection algebra, the per-row projection the
 // delegates render, the padded row window and the capped column widths.
@@ -211,8 +213,8 @@ function rowView(pkg, selected) {
 // Every cap arrives as an argument. The numbers are the island's chrome,
 // not a table-wide policy.
 function columnWidths(nameWidth, verWidth, viewport, rowChrome, caps) {
-  const ver = Math.min(Math.max(Math.ceil(verWidth) + caps.verPad, caps.minVer), caps.verCap)
-  const name = Math.min(Math.max(Math.ceil(nameWidth), caps.minName),
+  const ver = Range.clamp(Math.ceil(verWidth) + caps.verPad, caps.minVer, caps.verCap)
+  const name = Range.clamp(Math.ceil(nameWidth), caps.minName,
     Math.max(caps.minName, viewport - rowChrome - ver))
   return { name: name, ver: ver }
 }

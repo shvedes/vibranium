@@ -6,6 +6,7 @@
 .pragma library
 
 .import "../../common/text/Format.js" as Format
+.import "../../common/math/Range.js" as Range
 .import "../../common/text/Clock.js" as ClockFmt
 .import "../../common/theme/DeviceIcons.js" as DeviceIcons
 
@@ -102,7 +103,7 @@ function progressOf(hints) {
   // Clamped rather than trusted: a sender that streams past 1 must not fill
   // more than the bar, and one that streams below 0 must not run it
   // backwards. The value is still a fraction either way.
-  return Math.min(1, Math.max(0, n))
+  return Range.clamp01(n)
 }
 
 // No volume lane: the `vol` snapshot field's answer when the sender sent no
@@ -129,7 +130,7 @@ function volOf(hints) {
   if (raw === undefined || raw === null) return VOL_NONE
   const n = Number(raw)
   if (!isFinite(n)) return VOL_NONE
-  return Math.round(Math.min(100, Math.max(0, n)))
+  return Math.round(Range.clamp(n, 0, 100))
 }
 
 // Lenient truth test for a hand-set boolean-ish hint: a boolean, a
