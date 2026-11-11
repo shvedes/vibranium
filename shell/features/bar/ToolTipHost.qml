@@ -61,32 +61,27 @@ PanelWindow {
   readonly property real _lineIconSize: 14
   readonly property real _lineGap: 6
 
-  // Widest lead name across two-column rows, so their verbs align on it.
-  // Same staleness contract as _linesW below: refreshed on row add/remove,
-  // which is the only way row content arrives.
-  readonly property real _verbX: {
+  // Widest `widthOf` over the live delegates, refreshed by _linesRev.
+  // Every measure pass below is this walk with a different row field.
+  function _maxRowWidth(widthOf) {
     root._linesRev
     let w = 0
     const n = linesRep.count
     for (let i = 0; i < n; i++) {
       const it = linesRep.itemAt(i)
-      if (it && it.nameW > w) w = it.nameW
+      if (it && widthOf(it) > w) w = widthOf(it)
     }
     return Math.ceil(w)
   }
 
+  // Widest lead name across two-column rows, so their verbs align on it.
+  // Same staleness contract as _linesW below: refreshed on row add/remove,
+  // which is the only way row content arrives.
+  readonly property real _verbX: root._maxRowWidth(it => it.nameW)
+
   // Widest verb across two-column rows: the name column has to leave room
   // for it inside the capped bubble.
-  readonly property real _verbW: {
-    root._linesRev
-    let w = 0
-    const n = linesRep.count
-    for (let i = 0; i < n; i++) {
-      const it = linesRep.itemAt(i)
-      if (it && it.verbW > w) w = it.verbW
-    }
-    return Math.ceil(w)
-  }
+  readonly property real _verbW: root._maxRowWidth(it => it.verbW)
 
   // Rendered name column, shared by every two-column row so verbs still
   // align. Natural widths feed _linesW (bubble sizing); this clamps the
@@ -116,41 +111,14 @@ PanelWindow {
   // Widest value in each column of a two-icon metric row: both value
   // columns stay at least this wide, so a changing number or unit never
   // narrows the next column's start.
-  readonly property real _metricCol1W: {
-    root._linesRev
-    let w = 0
-    const n = linesRep.count
-    for (let i = 0; i < n; i++) {
-      const it = linesRep.itemAt(i)
-      if (it && it.metricRow && it.metric1W > w) w = it.metric1W
-    }
-    return Math.ceil(w)
-  }
-  readonly property real _metricCol2W: {
-    root._linesRev
-    let w = 0
-    const n = linesRep.count
-    for (let i = 0; i < n; i++) {
-      const it = linesRep.itemAt(i)
-      if (it && it.metricRow && it.metric2W > w) w = it.metric2W
-    }
-    return Math.ceil(w)
-  }
+  readonly property real _metricCol1W: root._maxRowWidth(it => it.metricRow ? it.metric1W : 0)
+  readonly property real _metricCol2W: root._maxRowWidth(it => it.metricRow ? it.metric2W : 0)
 
   // Widest row (glyph + gap + natural text width). The bubble sizes
   // from this, never from the rows' laid-out widths: each row stretches
   // to the column so overlong lines elide, and sizing the bubble from
   // content that sizes from the bubble settles at zero.
-  readonly property real _linesW: {
-    root._linesRev
-    let w = 0
-    const n = linesRep.count
-    for (let i = 0; i < n; i++) {
-      const it = linesRep.itemAt(i)
-      if (it && it.implicitWidth > w) w = it.implicitWidth
-    }
-    return Math.ceil(w)
-  }
+  readonly property real _linesW: root._maxRowWidth(it => it.implicitWidth)
 
   // Exact rendered height: row heights plus the column spacing.
   readonly property real _linesH: {
