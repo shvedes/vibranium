@@ -100,7 +100,7 @@ group('all six libraries load and publish a namespace', () => {
   eq('Bluetooth/Model publishes nine', Object.keys(BT).length, 9)
   // 28 functions plus the two table vars the module also declares. QML only
   // ever sees the functions, so the vars are the loader's extra surface.
-  eq('Network/Model publishes thirty-three', Object.keys(NET).length, 33)
+  eq('Network/Model publishes thirty-five', Object.keys(NET).length, 35)
   // 17 pass helpers plus the five that carry the log anonymisation and the two
   // private helpers behind them. The count is what notices if one of the
   // redaction functions is ever inlined away: every one of the seven takes a
@@ -2003,6 +2003,20 @@ group('a network with no identity is refused, not projected', () => {
   eq('null', NET.wifiRow(null, OPEN_SEC, OWE_SEC), null)
   eq('undefined', NET.wifiRow(undefined, OPEN_SEC, OWE_SEC), null)
   eq('zero', NET.wifiRow(0, OPEN_SEC, OWE_SEC), null)
+})
+group('networkForSsid reads the live network list by name', () => {
+  const device = { networks: { values: [{ name: 'A' }, { name: 'B' }] } }
+  eq('a present ssid is returned by identity', NET.networkForSsid(device, 'B'), device.networks.values[1])
+  eq('a missing ssid is null', NET.networkForSsid(device, 'C'), null)
+  eq('no device is null', NET.networkForSsid(null, 'A'), null)
+  eq('no network list is null', NET.networkForSsid({}, 'A'), null)
+})
+group('firstSettings takes the first profile whatever shape the backend hands over', () => {
+  eq('a plain array', NET.firstSettings({ nmSettings: [{ id: 1 }, { id: 2 }] }), { id: 1 })
+  eq('an empty array', NET.firstSettings({ nmSettings: [] }), null)
+  eq('a count/get model', NET.firstSettings({ nmSettings: { count: 2, get: (i) => ({ i: i }) } }), { i: 0 })
+  eq('an empty count/get model', NET.firstSettings({ nmSettings: { count: 0, get: () => null } }), null)
+  eq('no network is null', NET.firstSettings(null), null)
   eq('an empty string', NET.wifiRow('', OPEN_SEC, OWE_SEC), null)
   noThrow('an empty object is not refused', () => NET.wifiRow({}, OPEN_SEC, OWE_SEC))
   eq('a nameless network keeps an empty ssid', NET.wifiRow({}, OPEN_SEC, OWE_SEC).ssid, '')
@@ -4122,6 +4136,7 @@ const SURFACE = {
     'requiresCredentials', 'deriveStats', 'profileToggles', 'profilePatch', 'escapeHtml',
     'ssidWithStatus', 'initialSpeedScale', 'stepSpeedScale', 'speedScaleLabel',
     'parseQrOutput', 'parseQrMatrix', 'wifiRowsEqual', 'routeIface',
+    'networkForSsid', 'firstSettings',
   ],
   'pass/Model': [
     'versionCompare', 'stripGpg', 'splitEntry', 'listEntries', 'parseFindOutput', 'isValidName',
@@ -4167,10 +4182,10 @@ group('the surface lists match the loaded namespaces exactly', () => {
   eq('UnitIpc: 1 export', SURFACE['UnitIpc'].length, 1)
   eq('Battery/Model: 23 exports', SURFACE['Battery/Model'].length, 23)
   eq('Bluetooth/Model: 9 exports', SURFACE['Bluetooth/Model'].length, 9)
-  eq('Network/Model: 31 functions plus 2 table vars', SURFACE['Network/Model'].length + TABLES['Network/Model'].length, 33)
+  eq('Network/Model: 33 functions plus 2 table vars', SURFACE['Network/Model'].length + TABLES['Network/Model'].length, 35)
   eq('pass/Model: 27 exports', SURFACE['pass/Model'].length, 27)
   eq('WallpaperTrans: 18 exports', SURFACE['WallpaperTrans'].length, 18)
-  eq('111 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 111)
+  eq('113 exports across the six files', Object.values(SURFACE).reduce((n, a) => n + a.length, 0) + Object.values(TABLES).reduce((n, a) => n + a.length, 0), 113)
   // Six names are genuinely shared between two libraries - deviceLabel,
   // deviceIconName, formatRate, subtextFor, sectionTitleFor and listEntries -
   // and each is called through ITS OWN namespace, so the call check above
