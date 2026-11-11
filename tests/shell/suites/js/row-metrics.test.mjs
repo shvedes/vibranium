@@ -197,30 +197,6 @@ group('heightAt reads the table, else the caller fallback', () => {
   eq('a non-finite measurement', RM.heightAt({ a: Infinity }, 'a', 18), 18)
 })
 
-section('identityOwners - which row owns each identity')
-
-group('a unique key is owned by its own index', () => {
-  const ids = RM.identityOwners(3, (i) => ['a', 'b', 'c'][i])
-  eq('the owner map', { ...ids.owner }, { a: 0, b: 1, c: 2 })
-  eq('and nothing is contested', ids.contested, false)
-})
-
-group('two live rows on one key have no owner', () => {
-  const ids = RM.identityOwners(3, (i) => ['a', 'a', 'b'][i])
-  eq('the shared key is -1', ids.owner.a, -1)
-  eq('the row set is contested', ids.contested, true)
-  eq('the other key still owns its row', ids.owner.b, 2)
-})
-
-group('the degenerate row counts', () => {
-  const none = RM.identityOwners(0, () => 'x')
-  eq('no rows is an empty map', Object.keys(none.owner), [])
-  eq('and not contested', none.contested, false)
-  const one = RM.identityOwners(1, () => 'x')
-  eq('one row owns its key', one.owner.x, 0)
-  eq('a nullish key is a key like any other', RM.identityOwners(1, () => null).owner['null'], 0)
-})
-
 section('trimPlan - the least-recently-touched rows to drop')
 
 group('a table under its cap drops nothing', () => {

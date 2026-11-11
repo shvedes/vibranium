@@ -150,7 +150,7 @@ const SURFACE = [
   'buildPageIndex', 'fuzzyScore', 'search',
   'filterCounter', 'scopedFilter', 'substitute', 'substituteQuoted',
   'groupSearchResults',
-  'hookValue', 'hookBool', 'hookRan', 'resolveConfirm', 'isFlow', 'flowStep', 'flowCount',
+  'hookValue', 'hookBool', 'resolveConfirm', 'isFlow', 'flowStep', 'flowCount',
   'nextFlowIndex', 'stageText', 'stageUnitSuffix', 'stageSeedText', 'restKind', 'numberDisplay', 'valueSlotW',
   'optionLabelFor', 'optionSeedIndex', 'optionColumnCount', 'optionRowCount',
   'optionColumnStride', 'optionCellCol', 'optionCellRow', 'leadingNumber',
@@ -174,19 +174,19 @@ const routeName = (over) => {
   return r === null ? null : r.name
 }
 
-suite('menu/MenuLib', 'the menu framework\'s pure layer - 73 functions')
+suite('menu/MenuLib', 'the menu framework\'s pure layer - 72 functions')
 
 // ======================================================================
 section('the harness contract')
 group('the library loads and publishes its whole surface', () => {
   is('MenuLib loaded', M, (v) => v && typeof v === 'object' && Object.keys(v).length > 0, 'a non-empty namespace')
-  // The 73-name ledger plus ten top-level declarations the suite reads
+  // The 72-name ledger plus ten top-level declarations the suite reads
   // separately: the three filter-hay builders and the seven cache `var`s (the
   // six search caches and the scoped-filter hay cache), which the loader picks
   // up because a `.pragma library` namespace is its top-level declarations.
-  eq('83 declarations', Object.keys(M).length, 83)
+  eq('82 declarations', Object.keys(M).length, 82)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
-  eq('all 73 named functions are callable', missing, [])
+  eq('all 72 named functions are callable', missing, [])
   for (const n of SURFACE) {
     is(`${n} is a function`, M[n], (v) => typeof v === 'function', 'a function')
   }
@@ -206,7 +206,7 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 83 names', Object.keys(F).length, 83)
+  eq('the live view publishes the same 82 names', Object.keys(F).length, 82)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
@@ -3052,25 +3052,6 @@ group('hookBool accepts only true and false', () => {
   throws('a throwing hook propagates', () => M.hookBool({ f: () => { throw new Error('nope') } }, 'f', {}, {}, 'FB'), /nope/)
 })
 
-group('hookRan answers true only when the surface owned the action', () => {
-  eq('true means the surface owned it', M.hookRan({ f: () => true }, 'f', {}, 'ARG', {}), true)
-  eq('false means it declined', M.hookRan({ f: () => false }, 'f', {}, 'ARG', {}), false)
-  eq('a truthy stand-in declines', M.hookRan({ f: () => 1 }, 'f', {}, 'ARG', {}), false)
-  eq('undefined declines', M.hookRan({ f: () => undefined }, 'f', {}, 'ARG', {}), false)
-  eq('null declines', M.hookRan({ f: () => null }, 'f', {}, 'ARG', {}), false)
-  eq('no provider means it did not run', M.hookRan(null, 'f', {}, 'ARG', {}), false)
-  eq('no hook means it did not run', M.hookRan({}, 'f', {}, 'ARG', {}), false)
-  eq('a non-function hook means it did not run', M.hookRan({ f: 1 }, 'f', {}, 'ARG', {}), false)
-  eq('and there is no fallback to hand back', M.hookRan({}, 'f', {}, 'ARG', {}), false)
-  // "`arg` is the action's own payload (the new number, the staged values,
-  // the requested toggle state) and rides ahead of the context."
-  eq('the arguments are (item, arg, ctx)', M.hookRan({ f: (i, a, c) => i === 'I' && a === 'A' && c === 'C' }, 'f', 'I', 'A', 'C'), true)
-  eq('so the arg cannot be confused with the context', M.hookRan({ f: (i, a) => a === 'A' }, 'f', 'I', 'A', 'C'), true)
-  eq('`this` is the surface', M.hookRan({ v: true, f: function () { return this.v } }, 'f', {}, 'A', {}), true)
-  eq('an inherited hook counts as a hook', M.hookRan(Object.create({ f: () => true }), 'f', {}, 'A', {}), true)
-  throws('a throwing hook propagates - "it ran" is not a catch', () => M.hookRan({ f: () => { throw new Error('nope') } }, 'f', {}, 'A', {}), /nope/)
-})
-
 // ======================================================================
 section('the staged flow: copy, stages and transitions')
 group('resolveConfirm lets the surface overrule the bundle', () => {
@@ -4125,8 +4106,8 @@ group('every one of the 70 functions was exercised above', () => {
   // each name is required to appear in this file's OWN source as a call - so
   // removing a function, renaming one, or dropping a cluster turns this group
   // red rather than quietly shrinking the coverage.
-  eq('the surface list is 73 long', SURFACE.length, 73)
-  eq('with no duplicates', new Set(SURFACE).size, 73)
+  eq('the surface list is 72 long', SURFACE.length, 72)
+  eq('with no duplicates', new Set(SURFACE).size, 72)
   eq('and all of them resolve on the namespace', SURFACE.filter(n => typeof M[n] !== 'function'), [])
   const selfSource = fs.readFileSync(path.join(import.meta.dirname, 'menu.test.mjs'), 'utf8')
   for (const name of SURFACE) {

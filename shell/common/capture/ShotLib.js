@@ -214,12 +214,6 @@ function suffixFor(fileType) {
   return fileType === "jpeg" ? "jpg" : "png"
 }
 
-// The MIME type that goes with suffixFor: a saved .jpg must be announced as
-// image/jpeg, so the two tables answer from the same comparison.
-function mimeFor(fileType) {
-  return fileType === "jpeg" ? "image/jpeg" : "image/png"
-}
-
 // Decode local FileDialog URLs without treating reserved characters as
 // path separators.
 //

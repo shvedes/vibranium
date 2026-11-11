@@ -57,8 +57,5 @@ eq('only the old persisted pair is removed after a default switch',
   L.removalSteps(currentGraph, persisted, goneSink).length, 2)
 eq('already linked desired routes do not get duplicated',
   L.connectionSteps(currentGraph, persisted, persisted).length, 0)
-eq('explicit unlink commands remove only owned pairs',
-  L.applyCommand(persisted, { argv: ['pw-link', '-d', persisted[0].output, persisted[0].input] }, [])
-    .length, 1)
 
 finish()

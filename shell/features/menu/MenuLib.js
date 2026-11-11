@@ -955,22 +955,6 @@ function hookBool(provider, name, item, ctx, fallback) {
   return r === true || r === false ? r : fallback
 }
 
-// Ran-or-not: true means the surface owned the action, false means it
-// declined and the caller keeps the default. `arg` is the action's own
-// payload (the new number, the staged values, the requested toggle state)
-// and rides ahead of the context.
-//
-// There is no fallback to hand back, and `false` is the answer for every
-// reason a hook did not run: "it ran" is not something to be toggled by a
-// truthy stand-in, and a caller that needs to tell "declined" from "absent"
-// asks hookValue instead.
-function hookRan(provider, name, item, arg, ctx) {
-  if (!provider) return false
-  const hook = provider[name]
-  if (typeof hook !== "function") return false
-  return hook.call(provider, item, arg, ctx) === true
-}
-
 // A row's staged-confirmation descriptor. A surface's own descriptor wins
 // over the one the bundle declared: the surface knows the row's live state
 // and can refuse a confirmation the bundle would otherwise arm. Absent

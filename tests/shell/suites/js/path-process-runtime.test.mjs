@@ -1193,7 +1193,6 @@ group('nothing here throws, whatever the caller passes', () => {
   noThrow('templateShell with no arguments', () => CS.templateShell())
   noThrow('trustedShell with no arguments', () => CS.trustedShell())
   noThrow('isData on a nullish value', () => CS.isData(null))
-  noThrow('isObject on a nullish value', () => CS.isObject(null))
   noThrow('normalizeEnv on undefined', () => CS.normalizeEnv(undefined))
   // normalizeEnv is the one helper that is not total: `Object.keys(null)` is a
   // TypeError. It is unreachable through the public builders, because

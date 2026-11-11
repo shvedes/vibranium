@@ -92,12 +92,6 @@ function isData(value) {
   return typeof value === "string" && value !== "" && value.indexOf("\0") < 0
 }
 
-// Public predicate name kept for the module's callers and its suite; the
-// record rule itself lives in StoreGuards with the other store guards.
-function isObject(value) {
-  return StoreGuards.isPlainObject(value)
-}
-
 function invalid(code) {
   return { ok: false, code: code }
 }

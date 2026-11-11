@@ -841,15 +841,6 @@ group('the suffix is the one Canvas.save checks, and it is jpg not jpeg', () => 
   eq('JPEG is not jpeg', SL.suffixFor('JPEG'), 'png')
   eq('an empty type', SL.suffixFor(''), 'png')
   eq('no arguments at all', SL.suffixFor(), 'png')
-  eq('mimeFor jpeg', SL.mimeFor('jpeg'), 'image/jpeg')
-  eq('mimeFor anything else', SL.mimeFor('webp'), 'image/png')
-  eq('mimeFor null', SL.mimeFor(null), 'image/png')
-  // The two tables have to agree, or a saved .jpg would be announced as PNG.
-  for (const type of ['jpeg', 'png', 'webp', 'JPEG', '', null, undefined]) {
-    is(`suffixFor(${show(type)}) and mimeFor(${show(type)}) agree on one format`,
-      [SL.suffixFor(type), SL.mimeFor(type)],
-      (v) => (v[0] === 'jpg') === (v[1] === 'image/jpeg'), 'jpg <=> image/jpeg')
-  }
 })
 
 group('ensureImageSuffix appends only when the suffix is not already an image', () => {

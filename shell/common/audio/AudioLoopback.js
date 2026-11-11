@@ -228,17 +228,6 @@ function addOwned(owned, desired, command) {
   return routes
 }
 
-// Apply one finished command to the owned set: a `-d` removal drops the pair
-// it names, and a create adds the desired route whose endpoints the command
-// carries. The caller keeps the returned set, so a failed child never mutates
-// the routes the shell believes it owns.
-function applyCommand(owned, command, desired) {
-  if (command && Array.isArray(command.argv) && command.argv[1] === "-d") {
-    return removeFromOwned(owned, command)
-  }
-  return addOwned(owned, desired, command)
-}
-
 function persistableRoutes(routes) {
   const out = []
   const valid = validRoutes(routes)
