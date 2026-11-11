@@ -87,9 +87,11 @@ function scaleRect(rect, k) {
 // NaN would silently place a point at the frame origin instead of letting
 // the caller see that the mapping broke.
 function clampPoint(p, box) {
+  // A negative-size box collapses to its origin rather than its far edge, so
+  // the upper bound is the origin when the box runs backwards.
   return {
-    x: Math.max(box.x, Math.min(box.x + box.w, p.x)),
-    y: Math.max(box.y, Math.min(box.y + box.h, p.y))
+    x: Range.clamp(p.x, box.x, Math.max(box.x, box.x + box.w)),
+    y: Range.clamp(p.y, box.y, Math.max(box.y, box.y + box.h))
   }
 }
 
