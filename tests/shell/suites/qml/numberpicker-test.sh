@@ -54,10 +54,14 @@ t_section "the picker under test is NumberPicker.qml itself"
 t_eq "the source was read" "200" "$(qp_get np.status)"
 t_eq "and it is not empty" "true" "$([ "$(qp_get np.len)" -gt 4000 ] && echo true || echo false)"
 t_eq "exactly one module import was dropped" "1" "$(qp_get np.moduleDropped)"
-t_eq "and the sibling MenuLib import was re-rooted" "1" "$(qp_get np.siblingRerooted)"
+t_eq "and both relative script imports were re-rooted" "2" "$(qp_get np.relativeImportsRerooted)"
+t_contains "MenuLib at the config root" 'import "features/menu/MenuLib.js" as MenuLib' \
+  "$(qp_get np.relativeImportLines)"
+t_contains "and Format at the config root" 'import "common/text/Format.js" as Format' \
+  "$(qp_get np.relativeImportLines)"
 t_eq "it constructed" "1" "$(qp_get np.made)"
 t_eq "and measures as the input height" "32" "$(qp_get np.height)"
-t_note "NumberPicker.qml cannot be written out as a type here: qs.features.menu declares 'singleton Menu', and loading the module reaches MenuView -> OverlayWindow -> ScrimWindow -> a PanelWindow backend that offscreen does not have. So the probe drops the one module import - the picker references no type from it, MenuLib arrives on the next line - and re-roots 'import \"MenuLib.js\"' at the config root, which is where the rewritten text is evaluated from. The drop is counted, not pattern-matched silently, so a picker that starts using a module type makes this section red rather than testing something else."  t_note "The probe seeds the row the way the shipped Timer row declares it (shell/common/settings/catalog.jsonc utilities page: type number, min 1, max 180, step 1, value 5, unit \"min\") and then writes the value with the picker's own formatted(), which is what InlineEditor does on completion."
+t_note "NumberPicker.qml cannot be written out as a type here: qs.features.menu declares 'singleton Menu', and loading the module reaches MenuView -> OverlayWindow -> ScrimWindow -> a PanelWindow backend that offscreen does not have. So the probe drops the one module import - the picker references no type from it - and re-roots every relative script import (MenuLib.js, Format.js) at the config root, which is where the rewritten text is evaluated from. The drop and the re-roots are counted, not pattern-matched silently, so a picker that starts using a module type, or adds another relative import, makes this section red rather than testing something else."  t_note "The probe seeds the row the way the shipped Timer row declares it (shell/common/settings/catalog.jsonc utilities page: type number, min 1, max 180, step 1, value 5, unit \"min\") and then writes the value with the picker's own formatted(), which is what InlineEditor does on completion."
 
 # --- the field holds the value; the unit is painted beside it --------------
 
@@ -130,7 +134,7 @@ EDITOR_SRC="$(<"$INLINE_EDITOR")"
 ENTRY_SRC="$(<"$SHELL_DIR/features/menu/Entry.qml")"
 t_file "the editor file is there to read" "$INLINE_EDITOR"
 t_contains "the editor seeds its field from the value" \
-  "text = root.numericValue.toFixed(root.decimals)" "$EDITOR_SRC"
+  "text = Format.fixed(root.numericValue, root.decimals)" "$EDITOR_SRC"
 t_not_contains "and not from a display string that carries the unit" \
   "text = root.numericDisplay" "$EDITOR_SRC"
 t_not_contains "the editor no longer declares a numericDisplay at all" \

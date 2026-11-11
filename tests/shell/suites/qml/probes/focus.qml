@@ -78,7 +78,8 @@ Window {
   property string pickerSource: ""
   property int pickerSourceStatus: 0
   property int moduleImportDropped: 0
-  property int siblingImportRerooted: 0
+  property int relativeImportsRerooted: 0
+  property string relativeImportLines: ""
   property int pickerMade: 0
   property var picker: null
 
@@ -133,6 +134,31 @@ Window {
     root.pickerSource = xhr.responseText || ""
   }
 
+  // A QML object created with Qt.createQmlObject resolves its imports against
+  // the config root, not against the directory the source file lives in, so
+  // every relative script import is resolved from `fromDir` and re-rooted
+  // there. Counted and reported, so a new import cannot silently break the
+  // rewrite.
+  function rerootRelativeImports(text, fromDir) {
+    const rerooted = []
+    const out = text.replace(/^import "([^"]+\.js)"( as [A-Za-z0-9_]+)?$/gm,
+      function (line, path, alias) {
+        const parts = (fromDir + "/" + path).split("/")
+        const stack = []
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i] === "" || parts[i] === ".") continue
+          if (parts[i] === "..") stack.pop()
+          else stack.push(parts[i])
+        }
+        const next = 'import "' + stack.join("/") + '"' + (alias || "")
+        rerooted.push(next)
+        return next
+      })
+    root.relativeImportsRerooted = rerooted.length
+    root.relativeImportLines = rerooted.join("|")
+    return out
+  }
+
   function buildPicker() {
     const src = root.pickerSource
     // The module import: dropped whole lines, counted, and asserted.
@@ -146,12 +172,9 @@ Window {
       }
       kept.push(lines[i])
     }
-    const stripped = kept.join("\n")
-    // The sibling import: re-rooted at the config root, because that is where
+    // The sibling imports: re-rooted at the config root, because that is where
     // the rewritten text is evaluated from.
-    const rerooted = stripped.replace('import "MenuLib.js" as MenuLib',
-      'import "features/menu/MenuLib.js" as MenuLib')
-    root.siblingImportRerooted = rerooted === stripped ? 0 : 1
+    const rerooted = rerootRelativeImports(kept.join("\n"), "features/menu")
     root.picker = Qt.createQmlObject(rerooted, root, "headless_number_picker.qml")
     root.picker.x = 0
     root.picker.y = 160
@@ -283,7 +306,8 @@ Window {
       kv("focus.picker.status", root.pickerSourceStatus)
       kv("focus.picker.len", root.pickerSource.length)
       kv("focus.picker.moduleImportsDropped", root.moduleImportDropped)
-      kv("focus.picker.siblingRerooted", root.siblingImportRerooted)
+      kv("focus.picker.relativeImportsRerooted", root.relativeImportsRerooted)
+      kv("focus.picker.relativeImportLines", root.relativeImportLines)
       kv("focus.picker.height", root.picker.height)
       // Before anything has asked for focus: Qt hands the window's content
       // item its placeholder focus at creation. The probe has asked for

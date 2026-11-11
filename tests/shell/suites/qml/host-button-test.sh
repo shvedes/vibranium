@@ -70,6 +70,11 @@ t_eq "the real component's root type is what the rewrite keys on" "true" "$(qp_g
 t_eq "and the rewritten root is a constructible Item" "true" "$(qp_get hl.rootTypeIsItem)"
 t_eq "window-only properties and the full visibility handler were removed" "16" "$(qp_get hl.droppedCount)"
 t_eq "the whole HyprlandFocusGrab block was removed" "5" "$(qp_get hl.grabLines)"
+t_eq "both relative script imports were re-rooted" "2" "$(qp_get hl.relativeImportsRerooted)"
+t_contains "FrozenFootprint at the config root" \
+  'import "common/collections/FrozenFootprint.js" as FP' "$(qp_get hl.relativeImportLines)"
+t_contains "and Range at the config root" \
+  'import "common/math/Range.js" as Range' "$(qp_get hl.relativeImportLines)"
 t_eq "the focus grab is gone from the evaluated text" "true" "$(qp_get hl.dropsGrab)"
 t_eq "so is every layershell line" "true" "$(qp_get hl.dropsLayershell)"
 t_contains "including the screen binding" "screen: root.anchorScreen()" "$(qp_get hl.droppedLines)"

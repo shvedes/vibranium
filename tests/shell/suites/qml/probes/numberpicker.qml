@@ -53,7 +53,8 @@ Window {
   property string pickerSource: ""
   property int pickerSourceStatus: 0
   property int moduleImportDropped: 0
-  property int siblingImportRerooted: 0
+  property int relativeImportsRerooted: 0
+  property string relativeImportLines: ""
   property int pickerMade: 0
   property var picker: null
   property var input: null
@@ -99,6 +100,31 @@ Window {
     root.pickerSource = xhr.responseText || ""
   }
 
+  // A QML object created with Qt.createQmlObject resolves its imports against
+  // the config root, not against the directory the source file lives in, so
+  // every relative script import is resolved from `fromDir` and re-rooted
+  // there. Counted and reported, so a new import cannot silently break the
+  // rewrite.
+  function rerootRelativeImports(text, fromDir) {
+    const rerooted = []
+    const out = text.replace(/^import "([^"]+\.js)"( as [A-Za-z0-9_]+)?$/gm,
+      function (line, path, alias) {
+        const parts = (fromDir + "/" + path).split("/")
+        const stack = []
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i] === "" || parts[i] === ".") continue
+          if (parts[i] === "..") stack.pop()
+          else stack.push(parts[i])
+        }
+        const next = 'import "' + stack.join("/") + '"' + (alias || "")
+        rerooted.push(next)
+        return next
+      })
+    root.relativeImportsRerooted = rerooted.length
+    root.relativeImportLines = rerooted.join("|")
+    return out
+  }
+
   function buildPicker() {
     const kept = []
     root.moduleImportDropped = 0
@@ -109,10 +135,7 @@ Window {
       }
       kept.push(l)
     }
-    const stripped = kept.join("\n")
-    const rerooted = stripped.replace('import "MenuLib.js" as MenuLib',
-      'import "features/menu/MenuLib.js" as MenuLib')
-    root.siblingImportRerooted = rerooted === stripped ? 0 : 1
+    const rerooted = rerootRelativeImports(kept.join("\n"), "features/menu")
     root.picker = Qt.createQmlObject(rerooted, root, "headless_number_picker.qml")
     root.pickerMade = 1
   }
@@ -265,7 +288,8 @@ Window {
       kv("np.status", root.pickerSourceStatus)
       kv("np.len", root.pickerSource.length)
       kv("np.moduleDropped", root.moduleImportDropped)
-      kv("np.siblingRerooted", root.siblingImportRerooted)
+      kv("np.relativeImportsRerooted", root.relativeImportsRerooted)
+      kv("np.relativeImportLines", root.relativeImportLines)
       kv("np.made", root.pickerMade)
       root.picker.accepted.connect(v => { root.acceptedCount++; root.acceptedLast = String(v) })
       root.picker.escaped.connect(() => { root.escapedCount++ })

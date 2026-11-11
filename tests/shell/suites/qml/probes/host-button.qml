@@ -535,6 +535,8 @@ ShellRoot {
   property string droppedLines: ""
   property string keptFunctions: ""
   property string hostText: ""
+  property int relativeImportsRerooted: 0
+  property string relativeImportLines: ""
   property var hosts: []
   property int opacityLandedAt: 0
   property int heightLandedAt: 0
@@ -604,12 +606,25 @@ ShellRoot {
       }
       kept.push(l)
     }
+    // A QML object created with Qt.createQmlObject resolves its imports
+    // against the config root, not against common/ui, so every relative
+    // script import is resolved from there and re-rooted.
+    const rerooted = []
     const text = kept.join("\n")
-      // The one import that has to move: the rewritten file is evaluated from
-      // the config root, not from common/ui.
-      .replace('import "../collections/FrozenFootprint.js" as FP',
-        'import "common/collections/FrozenFootprint.js" as FP')
-   
+      .replace(/^import "([^"]+\.js)"( as [A-Za-z0-9_]+)?$/gm,
+        function (line, path, alias) {
+          const parts = ("common/ui/" + path).split("/")
+          const stack = []
+          for (let i = 0; i < parts.length; i++) {
+            if (parts[i] === "" || parts[i] === ".") continue
+            if (parts[i] === "..") stack.pop()
+            else stack.push(parts[i])
+          }
+          const next = 'import "' + stack.join("/") + '"' + (alias || "")
+          rerooted.push(next)
+          return next
+        })
+
     const fns = []
     const re = /^[ \t]*function ([A-Za-z_][A-Za-z0-9_]*)/gm
     let m = re.exec(text)
@@ -622,7 +637,8 @@ ShellRoot {
       dropped: dropped.sort(),
       dropCount: dropped.length,
       grabLines: grab,
-      functions: fns.sort()
+      functions: fns.sort(),
+      rerooted: rerooted
     }
   }
 
@@ -650,6 +666,8 @@ ShellRoot {
     kv("hl.keepsVisible", root.hostText.indexOf("visible: root.open || card.opacity > 0") >= 0)
     kv("hl.keepsPositionCard", root.hostText.indexOf("function positionCard()") >= 0)
     kv("hl.keepsKeyFor", root.hostText.indexOf("function _keyFor(anchor)") >= 0)
+    kv("hl.relativeImportsRerooted", root.relativeImportsRerooted)
+    kv("hl.relativeImportLines", root.relativeImportLines)
     kv("hl.dropsGrab", !/^  HyprlandFocusGrab \{/m.test(root.hostText))
     kv("hl.dropsLayershell", root.hostText.indexOf("WlrLayershell") < 0)
   }
@@ -772,6 +790,8 @@ ShellRoot {
       root.droppedLines = root.list(info.dropped)
       root.grabLines = info.grabLines
       root.keptFunctions = root.list(info.functions)
+      root.relativeImportsRerooted = info.rerooted.length
+      root.relativeImportLines = info.rerooted.join("|")
       root.reportRewrite()
       root.h1 = root.makeHost("main")
       root.h2 = root.makeHost("second")

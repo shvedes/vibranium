@@ -53,13 +53,17 @@ t_eq "the probe ran without throwing" "none" "$(qp_get focus.error)"
 
 # --- the number picker under test is the shell's own file -------------------
 
-t_section "the number picker is the shell's own bytes, with two imports rewritten"
+t_section "the number picker is the shell's own bytes, with its imports rewritten"
 t_eq "the source was read" "200" "$(qp_get focus.picker.status)"
 t_eq "and it is not empty" "true" "$([ "$(qp_get focus.picker.len)" -gt 4000 ] && echo true || echo false)"
 t_eq "exactly one module import was dropped" "1" "$(qp_get focus.picker.moduleImportsDropped)"
-t_eq "and the sibling MenuLib import was re-rooted" "1" "$(qp_get focus.picker.siblingRerooted)"
+t_eq "and both relative script imports were re-rooted" "2" "$(qp_get focus.picker.relativeImportsRerooted)"
+t_contains "MenuLib at the config root" 'import "features/menu/MenuLib.js" as MenuLib' \
+  "$(qp_get focus.picker.relativeImportLines)"
+t_contains "and Format at the config root" 'import "common/text/Format.js" as Format' \
+  "$(qp_get focus.picker.relativeImportLines)"
 t_eq "it measures as the input height, so it is the real component" "32" "$(qp_get focus.picker.height)"
-t_note "NumberPicker.qml cannot be written out as a type here: qs.features.menu declares 'singleton Menu', and loading the module reaches MenuView -> OverlayWindow -> ScrimWindow -> ScrimWindow's PanelWindow backend, which offscreen does not have ('No PanelWindow backend loaded'). So the probe drops the one module import - NumberPicker uses no type from it, MenuLib arrives on the next line - and re-roots 'import \"MenuLib.js\"' at the config root, because that is where the rewritten text is evaluated from. The drop is counted rather than pattern-matched silently, so a NumberPicker that starts using a module type makes this section red instead of testing something else."
+t_note "NumberPicker.qml cannot be written out as a type here: qs.features.menu declares 'singleton Menu', and loading the module reaches MenuView -> OverlayWindow -> ScrimWindow -> ScrimWindow's PanelWindow backend, which offscreen does not have ('No PanelWindow backend loaded'). So the probe drops the one module import - NumberPicker uses no type from it - and re-roots every relative script import (MenuLib.js, Format.js) at the config root, because that is where the rewritten text is evaluated from. The drop and the re-roots are counted rather than pattern-matched silently, so a NumberPicker that starts using a module type, or adds another relative import, makes this section red instead of testing something else."
 
 # --- the heal: a panel left holding nothing ---------------------------------
 

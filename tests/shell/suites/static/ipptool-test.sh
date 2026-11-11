@@ -176,9 +176,11 @@ lib_reads() {
 }
 
 # parse_report_anchors - the anchor argument of every parseReport call in the
-# service, read straight out of Printers.qml rather than hard-coded.
+# service and in the library it delegates to, read straight out of the sources
+# rather than hard-coded.
 parse_report_anchors() {
-  sed -n 's/.*parseReport(text, "\([a-z-]*\)").*/\1/p' "$PRINTERS_QML" | LC_ALL=C sort -u
+  sed -n 's/.*parseReport([^,]*, "\([a-z-]*\)").*/\1/p' \
+    "$PRINTERS_QML" "$PRINTERS_LIB" | LC_ALL=C sort -u
 }
 
 # callback_of <template> - the service function the template's response is
@@ -226,10 +228,31 @@ callback_of() {
     '
 }
 
-# anchors_in <function> - every parseReport anchor the function filters on.
+# lib_anchors_in <function> - every parseReport anchor a PrintersLib helper
+# filters on.
+lib_anchors_in() {
+  sed -n "/^function $1(/,/^}$/p" "$PRINTERS_LIB" |
+    sed -n 's/.*parseReport([^,]*, "\([a-z-]*\)").*/\1/p' | LC_ALL=C sort -u
+}
+
+# anchors_in <function> - every parseReport anchor the function filters on,
+# following a `Model.<helper>` delegation one level into PrintersLib.js. A
+# response parsed by a lib helper is parsed with that helper's anchor, so the
+# template contract holds whether the call sits in the service or below it.
 anchors_in() {
-  sed -n "/^  function $1(/,/^  }$/p" "$PRINTERS_QML" |
-    sed -n 's/.*parseReport(text, "\([a-z-]*\)").*/\1/p' | LC_ALL=C sort -u
+  local body direct
+  body="$(sed -n "/^  function $1(/,/^  }$/p" "$PRINTERS_QML")"
+  direct="$(printf '%s\n' "$body" |
+    sed -n 's/.*parseReport(text, "\([a-z-]*\)").*/\1/p' | LC_ALL=C sort -u)"
+  if [[ -n $direct ]]; then
+    printf '%s\n' "$direct"
+    return
+  fi
+  printf '%s\n' "$body" |
+    sed -n 's/.*Model\.\([A-Za-z0-9_]*\)(.*/\1/p' | LC_ALL=C sort -u |
+    while read -r helper; do
+      [[ -n $helper ]] && lib_anchors_in "$helper"
+    done | LC_ALL=C sort -u
 }
 
 # --------------------------------------------------------------------------
