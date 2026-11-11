@@ -220,13 +220,16 @@ function mimeFor(fileType) {
 
 // Decode local FileDialog URLs without treating reserved characters as
 // path separators.
+//
+// The dialog hands over a URI it built, so a malformed escape means the value
+// is not the URL it claims to be: the whole raw string is decoded first to keep
+// that refusal, and the path itself comes from the shared FileUri decode so the
+// localhost authority and the reserved characters are read one way only.
 function pathFromFileUrl(value) {
   const raw = String(value ?? "")
-  if (!raw.startsWith("file://")) return ""
-  let path = raw.slice(7)
-  if (path.startsWith("localhost/")) path = path.slice("localhost".length)
-  try { path = decodeURIComponent(path) } catch (e) { return "" }
-  return path
+  if (!FileUri.isFileUri(raw)) return ""
+  try { decodeURIComponent(raw) } catch (e) { return "" }
+  return FileUri.pathOf(raw)
 }
 
 function mimeForPath(path) {
