@@ -9,6 +9,8 @@
 // Pure JS, no Qt imports: the arithmetic is unit-drivable.
 .pragma library
 
+.import "../math/Range.js" as Range
+
 var BASE_MS = 1800
 var PER_PIXEL_MS = 24
 var MIN_MS = 1800
@@ -21,7 +23,7 @@ function legMs(overflow) {
   var n = Number(overflow)
   if (!isFinite(n)) n = 0
   var travel = BASE_MS + Math.max(0, n) * PER_PIXEL_MS
-  return Math.max(MIN_MS, Math.min(MAX_MS, Math.round(travel)))
+  return Range.clamp(Math.round(travel), MIN_MS, MAX_MS)
 }
 
 if (typeof module !== "undefined") {
