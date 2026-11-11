@@ -27,6 +27,16 @@ function dirname(path) {
   return i > 0 ? p.substring(0, i) : ""
 }
 
+// Parent directory with the filesystem root kept distinct: "/name" answers
+// "/" rather than the "" dirname() gives for an entry whose directory is the
+// root itself. A bare name has no parent and answers "".
+function parentDir(path) {
+  const p = String(path ?? "")
+  const i = p.lastIndexOf("/")
+  if (i < 0) return ""
+  return i === 0 ? "/" : p.substring(0, i)
+}
+
 // Last path segment, "" when the path ends in a separator (the same answer
 // the split("/").pop() idiom gives). A path with no separator is its own
 // basename.

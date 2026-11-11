@@ -32,6 +32,15 @@ function percent(ratio) {
   return Math.round(n * 100) + "%"
 }
 
+// A normalized level as the integer percent a colour band and a readout
+// compare. Unlike percent(), the scale is not clamped: a boosted level may
+// legitimately read above 100. Non-numeric input reads as 0.
+function percentInt(ratio) {
+  var n = Number(ratio)
+  if (!isFinite(n)) n = 0
+  return Math.round(n * 100)
+}
+
 // Byte counters -> "12 B" / "1.5 KB" / "2.0 MB" / "3.25 GB".
 // Canonical home of Network formatBytes. Floors hostile input at 0 so a
 // missing counter reads as empty rather than NaN.

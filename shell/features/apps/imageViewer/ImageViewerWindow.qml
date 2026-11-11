@@ -630,11 +630,7 @@ QtObject {
   // `currentPath` is already decoded, so this is the plain directory path a
   // file manager takes as an argument.
   function containingFolder() {
-    const path = root.currentPath
-    if (path === "") return ""
-    const slash = path.lastIndexOf("/")
-    if (slash < 0) return ""
-    return slash === 0 ? "/" : path.substring(0, slash)
+    return SU.parentDir(root.currentPath)
   }
 
   // Every entry below answers whether it had anything to act on, so a caller

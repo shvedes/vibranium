@@ -7,6 +7,7 @@ import qs.common
 import qs.services as Core
 import "MixerModel.js" as Model
 import "../../../common/math/Range.js" as Range
+import "../../../common/text/Format.js" as Format
 
 // One device row, in two modes against one header:
 //
@@ -977,7 +978,7 @@ Item {
         text: row.muted ? "Muted" : Model.volumeText(row.volume, false)
         color: {
           if (row.muted) return Ui.tint("foreground_1", 0.6)
-          const pct = Math.round(row.volume * 100)
+          const pct = Format.percentInt(row.volume)
           if (pct >= 151) return Ui.solid("red")
           if (pct >= 101) return Ui.solid("yellow")
           return Ui.tint("foreground_1", 0.6)

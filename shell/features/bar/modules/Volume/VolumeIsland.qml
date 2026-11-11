@@ -323,7 +323,7 @@ Item {
   // would be rating a level it is not showing.
   function pctColor(volume, muted, redFrom) {
     if (muted) return Ui.tint("foreground_1", 0.6)
-    var pct = Math.round(Number(volume) * 100)
+    var pct = Format.percentInt(volume)
     if (pct >= redFrom) return Ui.solid("red")
     if (pct >= 101) return Ui.solid("yellow")
     return Ui.tint("foreground_1", 0.6)

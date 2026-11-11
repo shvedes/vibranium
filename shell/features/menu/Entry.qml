@@ -5,6 +5,7 @@ import QtQuick
 import qs.common
 import qs.features.menu
 import "MenuLib.js" as MenuLib
+import "../../common/text/Format.js" as Format
 import "../../common/math/Range.js" as Range
 
 // Single ListView delegate covering every row type. One flat declarative
@@ -1454,7 +1455,7 @@ Item {
       height: 18
       verticalAlignment: Text.AlignVCenter
       horizontalAlignment: Text.AlignRight
-      text: Math.round(row.ratio * 100) + " %"
+      text: Format.percentInt(row.ratio) + " %"
       color: Ui.tint("foreground_1", 0.75)
       font.pixelSize: Ui.fontS
       font.family: Ui.fontFamily
