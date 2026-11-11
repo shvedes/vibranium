@@ -32,6 +32,7 @@
 .pragma library
 
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 
 // Operations a plugin may hold. Every entry is a key on the object the
 // launcher hands over; `outside` marks the ones that leave this process,
@@ -169,7 +170,7 @@ function outsideOperations() {
 function normalize(grants) {
   const out = []
   const seen = {}
-  const list = Array.isArray(grants) ? grants : []
+  const list = StoreGuards.asList(grants)
   for (let i = 0; i < list.length; i++) {
     const name = list[i]
     if (!isOperation(name) || seen[name] === true) continue
