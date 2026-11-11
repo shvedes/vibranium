@@ -10,6 +10,7 @@ import qs.common
 import "Model.js" as Model
 import "../../../../common/text/Format.js" as Format
 import "../../../../common/math/Range.js" as Range
+import "../../../../common/audio/LevelBand.js" as LevelBand
 
 // Volume island: output and input sliders plus per-application mixers.
 // Mirrors the Network/Bluetooth islands: Card chrome from the shared
@@ -323,9 +324,9 @@ Item {
   // would be rating a level it is not showing.
   function pctColor(volume, muted, redFrom) {
     if (muted) return Ui.tint("foreground_1", 0.6)
-    var pct = Format.percentInt(volume)
-    if (pct >= redFrom) return Ui.solid("red")
-    if (pct >= 101) return Ui.solid("yellow")
+    const band = LevelBand.band(volume, 101, redFrom)
+    if (band === "red") return Ui.solid("red")
+    if (band === "yellow") return Ui.solid("yellow")
     return Ui.tint("foreground_1", 0.6)
   }
 

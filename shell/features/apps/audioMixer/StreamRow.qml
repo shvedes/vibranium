@@ -9,6 +9,7 @@ import qs.services as Core
 import "MixerModel.js" as Model
 import "../../../common/math/Range.js" as Range
 import "../../../common/text/Format.js" as Format
+import "../../../common/audio/LevelBand.js" as LevelBand
 
 // One stream row: the application's own desktop icon, its name, what it is
 // playing, the level with its meter stacked under the fader as one control,
@@ -257,10 +258,12 @@ Item {
   // the way past its own ceiling. The bands read the same rounded percentage
   // the text prints, so the colour and the digits cannot disagree.
   readonly property string pctText: row.muted ? "Muted" : Model.volumeText(row.volume, false)
-  readonly property color pctColor: row.muted ? Ui.tint("foreground_1", 0.6)
-    : (Format.percentInt(row.volume) >= 126 ? Ui.solid("red")
-      : (Format.percentInt(row.volume) >= 101 ? Ui.solid("yellow")
-        : Ui.tint("foreground_1", 0.6)))
+  readonly property color pctColor: {
+    if (row.muted) return Ui.tint("foreground_1", 0.6)
+    const band = LevelBand.band(row.volume, 101, 126)
+    return band === "red" ? Ui.solid("red")
+      : band === "yellow" ? Ui.solid("yellow") : Ui.tint("foreground_1", 0.6)
+  }
 
   implicitHeight: col.implicitHeight
   height: col.implicitHeight
