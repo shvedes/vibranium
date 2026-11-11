@@ -11,6 +11,7 @@
 .import "../../common/text/Clock.js" as ClockFmt
 .import "../../common/text/Duration.js" as DurationFmt
 .import "../../common/text/StringUtils.js" as SU
+.import "../../common/collections/StoreGuards.js" as StoreGuards
 .import "../../common/text/FileUri.js" as FileUri
 .import "../../common/theme/FileIcons.js" as FileIcons
 
@@ -1340,7 +1341,7 @@ function openPathsFor(entry) {
     const s = String(p === undefined || p === null ? "" : p)
     if (s.charAt(0) === "/") out.push(s)
   }
-  const paths = Array.isArray(entry.filePaths) ? entry.filePaths : []
+  const paths = StoreGuards.asList(entry.filePaths)
   if (entry.type === "image") {
     if (String(entry.imageFile || "") !== "") push(entry.imageFile)
     else if (String(entry.imageDataFile || "") !== "") push(entry.imageDataFile)
@@ -1503,7 +1504,7 @@ function folderInfoRows(entry) {
   // count, file count and total size. The entry keeps its "files" type,
   // flagged allFolders so the shape is not confused with mixed selections.
   if (entry && entry.allFolders === true) {
-    const paths = Array.isArray(entry.filePaths) ? entry.filePaths : []
+    const paths = StoreGuards.asList(entry.filePaths)
     if (paths.length > 0)
       rows.push({ icon: "file-folders", label: "Folders",
         value: paths.length + (paths.length === 1 ? " folder" : " folders") })
