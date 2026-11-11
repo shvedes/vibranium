@@ -79,6 +79,17 @@ function joinPath(dir, name) {
   return d.endsWith("/") ? d + n : d + "/" + n
 }
 
+// One path or file-name segment made safe to join onto a directory: every
+// character outside the portable set becomes "_". The wall-clock sanitizer
+// keeps "." and "-" so an extension survives; a separator cannot, because a
+// remote name must stay a single leaf under the destination directory.
+//
+// Canonical home of the wallpaper drop's _sanitizeBase and the per-screen
+// file-name segment the bar view builds.
+function sanitizeSegment(name) {
+  return String(name ?? "").replace(/[^A-Za-z0-9._-]/g, "_")
+}
+
 // An identifier usable as a registry/claim key: a string with something other
 // than whitespace in it. The registries reject everything else, and stating
 // that once keeps "empty" and "blank" from being two different answers.

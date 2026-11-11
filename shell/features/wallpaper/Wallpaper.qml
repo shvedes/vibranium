@@ -377,7 +377,7 @@ Singleton {
     // cannot be raced by a request that supersedes this one mid-callback.
     root._retire(record.key, "cycle_done")
     const names = raw.split("\n").filter(l => l).map(l => SU.basename(l))
-    const files = names.filter(f => root._extOk(f)).sort()
+    const files = names.filter(f => ImageExts.ok(f)).sort()
     // The theme a listing was issued for has to still be the active one;
     // _onThemeNameChanged retires the cycle outright, and this is the cheap
     // invariant that keeps a commit from ever naming another theme.
@@ -766,10 +766,6 @@ Singleton {
     root._notify("Drop failed: " + message, true)
   }
 
-  function _extOk(path) {
-    return ImageExts.ok(path)
-  }
-
   // Hover-time acceptance test shared by every drop target (the two
   // DropAreas here, the picker's preview, and both halves of the bar).
   // The rule is "exactly one image", not "exactly one entry", and it lives
@@ -787,10 +783,6 @@ Singleton {
   function _droppedUri(drop) {
     const verdict = DropPayload.resolve(drop)
     return verdict.ok === true ? String(verdict.uri) : ""
-  }
-
-  function _sanitizeBase(name) {
-    return name.replace(/[^A-Za-z0-9._-]/g, "_")
   }
 
   // Short deterministic hash of a remote URL, so a repeated drop of one URL
@@ -843,7 +835,7 @@ Singleton {
         root._dropFail("only absolute paths supported")
         return
       }
-      if (!root._extOk(path)) {
+      if (!ImageExts.ok(path)) {
         root._dropFail("unsupported format")
         return
       }
@@ -982,7 +974,7 @@ Singleton {
     }
     let base = SU.basename(url.split("?")[0].split("#")[0])
     try { base = decodeURIComponent(base) } catch (e) {}
-    if (base !== "") base = root._sanitizeBase(base)
+    if (base !== "") base = SU.sanitizeSegment(base)
     let ext = SU.extname(base)
     const named = root._imageExts[ext] === true
     // The recorded basename is stable per URL: the same drop twice lands on
