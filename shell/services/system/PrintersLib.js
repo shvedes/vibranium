@@ -342,17 +342,13 @@ function jobSub(row, aliases) {
   const kb = Number(row ? row["job-k-octets"] ?? NaN : NaN)
   if (isFinite(kb) && kb > 0) {
     parts.push(kb >= 1024
-      ? trim1(kb / 1024) + " MB"
+      ? Format.trim1(kb / 1024) + " MB"
       : String(Math.round(kb)) + " KB")
   }
   if (parts.length > 0) return parts.join(" - ")
   return jobStateLabel(row ? row["job-state"] : 0)
 }
 
-// One decimal unless it rounds away ("1024.0" -> "1024").
-function trim1(n) {
-  return Format.trim1(n)
-}
 // Extension sets steering the job row's file icon. The shared vocabulary
 // in common/theme/FileIcons.js is the single table: only the image set
 // differs (a printed document is not a still to decode, so gif stays out),
