@@ -2593,65 +2593,40 @@ PanelWindow {
       }
     }
 
-    // Selection resize handles: accent squares on the selected bounds
-    // corners and edge midpoints (select tool only).
-    Repeater {
-      model: editor.tool === "select" && editor.selectedIndex >= 0 ? 8 : 0
-
-      delegate: Rectangle {
-        required property int index
-
-        property var corner: {
-          const cs = drawArea._selectCorners()
-          return cs !== null ? cs[index] : null
+    // Resize handles: the same accent square on the eight corners and edge
+    // midpoints of whatever bounds the active tool owns - the selection
+    // (select), the applied crop frame, or the staged crop rect. One
+    // repeater paints all three so the grab geometry cannot drift between
+    // them; a staged rect sits on top of an applied frame, so both sets are
+    // listed while it is being adjusted.
+    readonly property var _handles: {
+      const out = []
+      if (editor.tool === "select") {
+        if (editor.selectedIndex >= 0) {
+          const sel = drawArea._selectCorners()
+          if (sel !== null) for (let i = 0; i < sel.length; i++) out.push(sel[i])
         }
-
-        x: (corner !== null ? corner.x : -100) - 5
-        y: (corner !== null ? corner.y : -100) - 5
-        width: 10
-        height: 10
-        color: Ui.solid("accent")
-        border.color: Ui.solid("background_0")
-        border.width: 1
+        return out
       }
+      if (editor.tool !== "crop") return out
+      if (editor.cropFrame !== null) {
+        const frame = drawArea._cropCorners()
+        if (frame !== null) for (let i = 0; i < frame.length; i++) out.push(frame[i])
+      }
+      if (editor.cropRect !== null && editor.cropRect.w > 1 && editor.cropRect.h > 1) {
+        const rect = drawArea._cropRectCorners()
+        if (rect !== null) for (let i = 0; i < rect.length; i++) out.push(rect[i])
+      }
+      return out
     }
 
-    // Crop frame handles: accent squares on the applied frame
-    // corners and edge midpoints (crop tool only).
     Repeater {
-      model: editor.tool === "crop" && editor.cropFrame !== null ? 8 : 0
+      model: drawArea._handles.length
 
       delegate: Rectangle {
         required property int index
 
-        property var corner: {
-          const cs = drawArea._cropCorners()
-          return cs !== null ? cs[index] : null
-        }
-
-        x: (corner !== null ? corner.x : -100) - 5
-        y: (corner !== null ? corner.y : -100) - 5
-        width: 10
-        height: 10
-        color: Ui.solid("accent")
-        border.color: Ui.solid("background_0")
-        border.width: 1
-      }
-    }
-
-    // Staged crop rect handles: same 8 grabs, so a selected area is
-    // only ever extended by grabs, never re-dragged from inside.
-    Repeater {
-      model: editor.tool === "crop" && editor.cropRect !== null
-        && editor.cropRect.w > 1 && editor.cropRect.h > 1 ? 8 : 0
-
-      delegate: Rectangle {
-        required property int index
-
-        property var corner: {
-          const cs = drawArea._cropRectCorners()
-          return cs !== null ? cs[index] : null
-        }
+        readonly property var corner: drawArea._handles[index]
 
         x: (corner !== null ? corner.x : -100) - 5
         y: (corner !== null ? corner.y : -100) - 5
