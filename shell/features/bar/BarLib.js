@@ -188,7 +188,7 @@ function normalizeLayout(raw, zones, isStandalone, isOwned, permanent, alwaysOn,
       out[zone].push(id)
     }
   }
-  const dis = Array.isArray(raw.disabled) ? raw.disabled : []
+  const dis = StoreGuards.asList(raw.disabled)
   for (const id of dis) {
     if (typeof id !== "string" || id === "") continue
     if (out.disabled.indexOf(id) >= 0) continue
@@ -379,7 +379,7 @@ function crossDropPositions(cur, displayIds, isFixed, id, fromRegion, toRegion, 
   if (!cur || !Array.isArray(cur[fromRegion]) || !Array.isArray(cur[toRegion])) return null
   if (fromRegion === toRegion) return null
   if (cur[fromRegion].indexOf(id) < 0) return null
-  const display = Array.isArray(displayIds) ? displayIds : []
+  const display = StoreGuards.asList(displayIds)
   if (display.indexOf(id) >= 0) return null
   let movables = 0
   for (let i = 0; i < display.length; i++)
