@@ -14,6 +14,7 @@
 // never reads the clock itself.
 
 .import "../../common/math/Range.js" as Range
+.import "../../common/text/Format.js" as Format
 
 // A latitude/longitude pair is usable only when both members are finite
 // numbers inside their real range. An isNaN-only check is not enough:
@@ -97,15 +98,13 @@ function isFutureForecastDate(dateString, todayString) {
 }
 
 function roundedTemp(value) {
-  if (value === undefined || value === null || value === "") return ""
-  var n = parseFloat(String(value))
-  return isNaN(n) ? "" : String(Math.round(n))
+  var n = Format.numberOrNull(value)
+  return n === null ? "" : String(Math.round(n))
 }
 
 function celsiusToFahrenheit(value) {
-  if (value === undefined || value === null || value === "") return ""
-  var n = parseFloat(String(value))
-  return isNaN(n) ? "" : (n * 9 / 5) + 32
+  var n = Format.numberOrNull(value)
+  return n === null ? "" : (n * 9 / 5) + 32
 }
 
 function formatTemp(value, useImperial) {
@@ -116,27 +115,21 @@ function formatTemp(value, useImperial) {
 // One decimal, for readings whose integer part alone is too coarse to be
 // honest: 0.4 mm of rain rounds to no rain at all.
 function oneDecimal(value) {
-  if (value === undefined || value === null || value === "") return ""
-  var n = parseFloat(String(value))
-  if (isNaN(n)) return ""
-  return String(Range.round(n, 1))
+  var n = Format.numberOrNull(value)
+  return n === null ? "" : String(Range.round(n, 1))
 }
 
 // Both providers report pressure in hPa (wttr.in calls it mbar, the same
 // unit under its older name); imperial reads it in inHg. The divisor
 // spells the constant rather than carrying a pre-multiplied factor.
 function hpaToInHg(value) {
-  if (value === undefined || value === null || value === "") return ""
-  var n = parseFloat(String(value))
-  if (isNaN(n)) return ""
-  return String(Range.round(n / 33.8639, 2))
+  var n = Format.numberOrNull(value)
+  return n === null ? "" : String(Range.round(n / 33.8639, 2))
 }
 
 function mmToInches(value) {
-  if (value === undefined || value === null || value === "") return ""
-  var n = parseFloat(String(value))
-  if (isNaN(n)) return ""
-  return String(Range.round(n / 25.4, 2))
+  var n = Format.numberOrNull(value)
+  return n === null ? "" : String(Range.round(n / 25.4, 2))
 }
 
 function normalizedUnit(value) {
@@ -211,9 +204,8 @@ function openMeteoForecastDays(dailyForecastReport, todayString, count) {
 
 // km/h -> mph, ""-tolerant like the temperature helpers.
 function kmhToMph(value) {
-  if (value === undefined || value === null || value === "") return ""
-  var n = parseFloat(String(value))
-  return isNaN(n) ? "" : n * 0.621371
+  var n = Format.numberOrNull(value)
+  return n === null ? "" : n * 0.621371
 }
 
 // Peak relative humidity per date, keyed by the hourly time array it was

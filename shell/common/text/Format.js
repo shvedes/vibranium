@@ -7,6 +7,16 @@
 // `.import "Format.js" as Format`, or from QML via `import ... as Format`.
 .pragma library
 
+// A numeric reading, or null when the field is absent or not a number. An
+// empty string counts as absent: the providers omit a field by writing ""
+// as often as by leaving it out. Canonical home of the parse-and-reject
+// guard the weather projections repeat for every measured value.
+function numberOrNull(value) {
+  if (value === undefined || value === null || value === "") return null
+  var n = parseFloat(String(value))
+  return isNaN(n) ? null : n
+}
+
 // Two-digit zero padding. Canonical home of the CalendarLib /
 // ClipboardLib / NotificationsLib pad2 triple.
 function pad2(value) {
@@ -111,6 +121,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     pad2: pad2,
     trim1: trim1,
+    numberOrNull: numberOrNull,
     formatBytes: formatBytes,
     formatByteRate: formatByteRate,
     formatWatts: formatWatts
