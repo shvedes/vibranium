@@ -163,7 +163,10 @@ function filterCounter(pool, query, cap, searchFn, tiebreak) {
   const total = list.length
   if (normalizeQuery(query) === "") {
     const n = cap > 0 && cap < total ? cap : total
-    return { total: total, matched: total, rows: list.slice(0, n) }
+    // An uncapped blank query answers the pool itself: every caller opens on
+    // this path (an empty search box), and the slice copied a whole result
+    // pool per open to hand back the same entries. A capped one still slices.
+    return { total: total, matched: total, rows: n === total ? list : list.slice(0, n) }
   }
   const res = searchFn(list, query, cap, tiebreak)
   return { total: total, matched: res.count, rows: res.rows }
