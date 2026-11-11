@@ -306,6 +306,13 @@ function baseName(p) {
   return i >= 0 ? s.substring(i + 1) : s
 }
 
+// One IPP attribute as display text: an attribute CUPS omits reads as "",
+// never the string "undefined". Every row projection below starts here.
+function textOf(row, key) {
+  const v = row === null || row === undefined ? undefined : row[key]
+  return v === undefined || v === null ? "" : String(v)
+}
+
 // Display title for a job row: the file name. CUPS usually carries the
 // document name in job-name (sometimes a full path, hence the basename);
 // fall back to the document attributes, then to a bare "Job #id" so the
@@ -401,10 +408,10 @@ function filterPrinters(rows, q, aliases) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     if (!row || typeof row !== "object") continue
-    const name = String(row["printer-name"] ?? "")
-    const alias = aliases && typeof aliases === "object" ? String(aliases[name] ?? "") : ""
-    const hay = name + " " + alias + " " + String(row["printer-make-and-model"] ?? "")
-      + " " + String(row["printer-location"] ?? "")
+    const name = textOf(row, "printer-name")
+    const alias = aliases && typeof aliases === "object" ? textOf(aliases, name) : ""
+    const hay = name + " " + alias + " " + textOf(row, "printer-make-and-model")
+      + " " + textOf(row, "printer-location")
     if (hay.toLowerCase().indexOf(needle) !== -1) out.push(row)
   }
   return out
@@ -423,7 +430,7 @@ function filterRows(rows, q, keys) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     for (let k = 0; k < keys.length; k++) {
-      if (String(row[keys[k]] ?? "").toLowerCase().indexOf(needle) !== -1) {
+      if (textOf(row, keys[k]).toLowerCase().indexOf(needle) !== -1) {
         out.push(row)
         break
       }
@@ -466,7 +473,7 @@ function printerStates(rows) {
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i]
     if (!row || typeof row !== "object") continue
-    const name = String(row["printer-name"] ?? "")
+    const name = textOf(row, "printer-name")
     if (name === "") continue
     out[name] = printerStateLabel(row["printer-state"])
   }
