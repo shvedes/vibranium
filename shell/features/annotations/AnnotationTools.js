@@ -762,7 +762,7 @@ function selectHandles(b) {
 // sit inside it with real margins. Proportional with guards: calm on a
 // giant box, never eats a small one whole.
 function textPad(dispH) {
-  return Math.max(2, Math.min(12, Math.round(dispH * 0.15)))
+  return Range.clamp(Math.round(dispH * 0.15), 2, 12)
 }
 
 // Font size to commit, from the on-screen text size and the scale it was
