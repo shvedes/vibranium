@@ -4211,6 +4211,36 @@ group('MenuRows.cursorSurvives asks the payload, not the view', () => {
 })
 
 // ---------------------------------------------------------------------------
+// MenuQuiesce.js: when a motionless install may write
+// ---------------------------------------------------------------------------
+// The rule is a property of one ListView applying one array, so it can only be
+// observed through the panel by driving a live view across turns. Extracted,
+// the four values are ordinary arguments and every arm of the rule is askable.
+const MQ = loadLib(path.join(SHELL_DIR, 'features/menu/MenuQuiesce.js'))
+
+group('MenuQuiesce gates a motionless install on the previous one landing', () => {
+  const idleGate = MQ.idle()
+  eq('an idle gate lets any write through', MQ.check(idleGate, 0, 2000).ready, true)
+  is('and hands the gate back unchanged', MQ.check(idleGate, 0, 2000).state, (v) => v === idleGate, 'the same object')
+  const armedGate = MQ.armed(1000)
+  eq('an armed gate with no churn since the arm is already settled',
+    MQ.check(armedGate, 1500, 2000).ready, true)
+  eq('a settled gate disarms itself, because that write landed',
+    MQ.check(armedGate, 1500, 2000).state.armed, false)
+  const churned = MQ.note(armedGate)
+  const held = MQ.check(churned, 1500, 2000)
+  eq('a structural change since the arm holds the next write', held.ready, false)
+  eq('the hold records what it has seen', held.state.seen, 1)
+  eq('and keeps the arm timestamp it was given', held.state.armedAt, 1000)
+  eq('a second look with no further churn lets it through',
+    MQ.check(held.state, 1600, 2000).ready, true)
+  eq('the bounded wait releases the write rather than freezing it',
+    MQ.check(MQ.note(armedGate), 3001, 2000).ready, true)
+  eq('noting churn on an idle gate counts nothing', MQ.note(idleGate).events, 0)
+  eq('and check answers a missing state as idle', MQ.check(null, 0, 2000).ready, true)
+})
+
+// ---------------------------------------------------------------------------
 // MenuState.js: the per-item record shape and the close latch
 // ---------------------------------------------------------------------------
 // These are the parts of Menu's item store that are pure: what a row starts

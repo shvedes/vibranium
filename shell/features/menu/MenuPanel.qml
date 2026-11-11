@@ -8,6 +8,7 @@ import qs.features.menu
 import "MenuLib.js" as MenuLib
 import "MenuLayout.js" as MenuLayout
 import "MenuRows.js" as MenuRows
+import "MenuQuiesce.js" as MenuQuiesce
 import "../../common/math/Range.js" as Range
 import "../../common/ui/RowMetrics.js" as RowMetrics
 import "../../common/ui/SlotGrowth.js" as SlotGrowth
@@ -1090,18 +1091,31 @@ Rectangle {
   property double _quiesceArmedAt: 0
   readonly property int _quiesceWaitMs: 2000
 
+  // The four gate values the rules read, and the write that puts a decided
+  // state back. MenuQuiesce owns what they become; these properties are the
+  // reactive half.
+  function _quiesceLoad() {
+    return {
+      armed: panel._quiesceArmed,
+      events: panel._quiesceEvents,
+      seen: panel._quiesceSeen,
+      armedAt: panel._quiesceArmedAt
+    }
+  }
+
+  function _quiesceStore(state) {
+    panel._quiesceArmed = state.armed
+    panel._quiesceEvents = state.events
+    panel._quiesceSeen = state.seen
+    panel._quiesceArmedAt = state.armedAt
+  }
+
   function _quiesceDisarm() {
-    panel._quiesceArmed = false
-    panel._quiesceEvents = 0
-    panel._quiesceSeen = 0
-    panel._quiesceArmedAt = 0
+    panel._quiesceStore(MenuQuiesce.idle())
   }
 
   function _quiesceArm() {
-    panel._quiesceArmed = true
-    panel._quiesceEvents = 0
-    panel._quiesceSeen = 0
-    panel._quiesceArmedAt = Date.now()
+    panel._quiesceStore(MenuQuiesce.armed(Date.now()))
   }
 
   // True when a motionless install may write: nothing outstanding, the
@@ -1109,20 +1123,17 @@ Rectangle {
   // check), or the wait ran out. Callers re-queue through the normal
   // coalescing when held, so the latest wins and nothing freezes.
   function _quiesceReady() {
-    if (!panel._quiesceArmed) return true
-    if (panel._quiesceEvents === panel._quiesceSeen
-      || Date.now() - panel._quiesceArmedAt > panel._quiesceWaitMs) {
-      panel._quiesceDisarm()
-      return true
-    }
-    panel._quiesceSeen = panel._quiesceEvents
-    return false
+    const verdict = MenuQuiesce.check(panel._quiesceLoad(), Date.now(),
+      panel._quiesceWaitMs)
+    panel._quiesceStore(verdict.state)
+    return verdict.ready
   }
 
   Connections {
     target: list.contentItem
     function onChildrenChanged() {
-      if (panel._quiesceArmed) panel._quiesceEvents++
+      if (panel._quiesceArmed)
+        panel._quiesceStore(MenuQuiesce.note(panel._quiesceLoad()))
     }
   }
 

@@ -46,5 +46,6 @@ about one of them:
 | `MenuLayout.js` | Grid composition: section-header weaving and the identity-stable chrome-slot pool. |
 | `MenuRows.js` | Row-set identity: the uid sequence an install is keyed on, the guard that refuses a set two rows share one identity on, whether two installs hold the same records, whether the cursor's row survives, and where the cursor lands after a count change. |
 | `MenuState.js` | Per-item state records: the shape a row starts with and the copy-on-write rules for the slot-close latch. |
+| `MenuQuiesce.js` | The quiesce handshake: when a motionless row install may write while the view is still applying the previous one, and the bounded wait that keeps typing from freezing. |
 | `metadata.json` | Bundle metadata read by the loader. |
 | `qmldir` | Module declaration for `qs.features.menu`. |
