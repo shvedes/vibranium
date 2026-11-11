@@ -1,6 +1,7 @@
 .pragma library
 
 .import "../../../common/text/StringUtils.js" as SU
+.import "../../../common/text/Format.js" as Format
 
 // Metadata for the image viewer: which formats it opens, what colour each
 // format family gets, and the strings its status bar prints.
@@ -99,16 +100,7 @@ function dimensions(width, height) {
 // report. A missing `fileSize` role arrives as undefined, which is the same
 // answer as a zero file.
 function humanSize(bytes) {
-  const n = Number(bytes)
-  if (!isFinite(n) || n <= 0) return ""
-  const units = ["B", "KiB", "MiB", "GiB", "TiB"]
-  let i = 0
-  let v = n
-  while (v >= 1024 && i < units.length - 1) {
-    v /= 1024
-    i++
-  }
-  return (i === 0 ? v : v.toFixed(1)) + " " + units[i]
+  return Format.formatBinaryFileSize(bytes)
 }
 
 // Decode-size buckets for vector rasters: the long side snaps to one of these,

@@ -49,6 +49,22 @@ function fixed(value, decimals) {
   return Number(value).toFixed(places)
 }
 
+// A byte count in binary units: "12 B" / "1.5 KiB" / "2.0 MiB". The byte
+// field stays whole, every larger unit keeps one decimal, and a non-positive
+// or non-finite count reads as "" so a caller can skip the fragment.
+function formatBinaryFileSize(bytes) {
+  var n = Number(bytes)
+  if (!isFinite(n) || n <= 0) return ""
+  var units = ["B", "KiB", "MiB", "GiB", "TiB"]
+  var i = 0
+  var v = n
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024
+    i++
+  }
+  return (i === 0 ? v : v.toFixed(1)) + " " + units[i]
+}
+
 // A stored file's size: "" when there is nothing to report, whole bytes below
 // a KiB, one trimmed decimal above it. Canonical home of ClipboardLib
 // formatSize. NaN and non-positive input answer "" rather than a zero size.
