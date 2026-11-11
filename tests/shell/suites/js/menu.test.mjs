@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 // Suite: shell/features/menu/MenuLib.js - the menu framework's pure layer.
 //
-// This is the largest single-library surface in the shell: 69 functions over
+// This is the largest single-library surface in the shell: 68 functions over
 // four concerns that only meet at the panel boundary.
 //
-//   text/paths    clamp, pathDirname, quantize, decimalsOf, unitSuffix,
+//   text/paths    clamp, quantize, decimalsOf, unitSuffix,
 //                 widestValueString, stripForHay, hayFromItem
 //   page build    defaultsFor, normalizeItem, buildPage, buildOptionsPage,
 //                 normalizePage, parseBundle, orderSettingsIndex, and the
@@ -138,10 +138,10 @@ const catalogRows = () => {
   return rows
 }
 
-// The 67-function public surface, named once so the coverage claim is
+// The 68-function public surface, named once so the coverage claim is
 // checkable rather than asserted in prose.
 const SURFACE = [
-  'stripJsonc', 'styledMarkup', 'shellQuote', 'clamp', 'pathDirname', 'quantize',
+  'stripJsonc', 'styledMarkup', 'shellQuote', 'clamp', 'quantize',
   'decimalsOf', 'unitSuffix', 'widestValueString', 'defaultsFor', 'stripForHay',
   'hayFromItem', 'hayForFilter', 'normalizeItem', 'buildOptionsPage', 'buildPage', 'mergedPageOpts',
   'normalizePage', 'normalizePages', 'parseBundle', 'bundleFromPages', 'orderSettingsIndex', 'mergePages', 'applyExtension',
@@ -171,7 +171,7 @@ const routeName = (over) => {
   return r === null ? null : r.name
 }
 
-suite('menu/MenuLib', 'the menu framework\'s pure layer - 69 functions')
+suite('menu/MenuLib', 'the menu framework\'s pure layer - 68 functions')
 
 // ======================================================================
 section('the harness contract')
@@ -180,9 +180,9 @@ group('the library loads and publishes its whole surface', () => {
   // 72 functions plus the seven cache `var`s (the six search caches and the
   // scoped-filter hay cache), which the loader picks up because a
   // `.pragma library` namespace is its top-level declarations.
-  eq('79 declarations', Object.keys(M).length, 79)
+  eq('78 declarations', Object.keys(M).length, 78)
   const missing = SURFACE.filter(n => typeof M[n] !== 'function')
-  eq('all 69 named functions are callable', missing, [])
+  eq('all 68 named functions are callable', missing, [])
   for (const n of SURFACE) {
     is(`${n} is a function`, M[n], (v) => typeof v === 'function', 'a function')
   }
@@ -202,7 +202,7 @@ group('the four search-cache vars are exported but frozen at their load value', 
   M.search(indexOf([['Cache probe', 'cache probe needle']]), 'cache probe needle')
   eq('so a real search does NOT move the frozen snapshot', M._searchCacheIndex, null)
   const F = liveMenuLib()
-  eq('the live view publishes the same 79 names', Object.keys(F).length, 79)
+  eq('the live view publishes the same 78 names', Object.keys(F).length, 78)
   eq('the live view agrees on every value the frozen one reports', [
     F._searchCacheIndex, F._searchCacheQ, F._searchCacheEntries, F._searchCacheHitSet,
   ], [null, '', null, null])
@@ -275,7 +275,7 @@ group('the delegating bodies are one-liners, so the source cannot drift silently
 })
 
 // ======================================================================
-section('clamp, pathDirname, quantize, decimalsOf, unitSuffix')
+section('clamp, quantize, decimalsOf, unitSuffix')
 group('clamp folds a value into [lo, hi]', () => {
   eq('above the ceiling', M.clamp(5, 0, 3), 3)
   eq('below the floor', M.clamp(-5, 0, 3), 0)
@@ -301,22 +301,6 @@ group('clamp has no guard for a non-numeric value', () => {
   is('no arguments at all', M.clamp(), (v) => Number.isNaN(v), 'NaN')
   is('undefined bounds', M.clamp(1, undefined, undefined), (v) => Number.isNaN(v), 'NaN')
   noThrow('but it never throws', () => M.clamp('x', 0, 3))
-})
-
-group('pathDirname returns the directory part, or "" when there is none', () => {
-  eq('nested', M.pathDirname('/a/b'), '/a')
-  eq('two levels', M.pathDirname('/a/b/c'), '/a/b')
-  eq('relative with a directory', M.pathDirname('a/b'), 'a')
-  // The header: 'A leading "/name" is a root-level entry with no directory of
-  // its own, and a bare name has none either; the caller decides what that
-  // absence means.' i > 0 is the whole rule.
-  eq('a root-level entry has no directory', M.pathDirname('/a'), '')
-  eq('a bare name has none', M.pathDirname('a'), '')
-  eq('the empty string', M.pathDirname(''), '')
-  eq('the root itself', M.pathDirname('/'), '')
-  eq('a trailing slash is not its own segment', M.pathDirname('/a/b/'), '/a/b')
-  eq('a doubled separator is a literal character', M.pathDirname('//a//b'), '//a/')
-  eq('a dotted name is not a path', M.pathDirname('a.txt'), '')
 })
 
 group('quantize rounds to three decimals - the widest shipped step', () => {
@@ -4068,14 +4052,14 @@ group('the same rows hold at 1.0, 1.25, 1.5 and 2.0', () => {
 })
 
 section('coverage ledger')
-group('every one of the 69 functions was exercised above', () => {
+group('every one of the 68 functions was exercised above', () => {
   // A machine-checkable statement, not a claim in prose. The surface list at
   // the top of this file is checked against the loaded namespace, and then
   // each name is required to appear in this file's OWN source as a call - so
   // removing a function, renaming one, or dropping a cluster turns this group
   // red rather than quietly shrinking the coverage.
-  eq('the surface list is 69 long', SURFACE.length, 69)
-  eq('with no duplicates', new Set(SURFACE).size, 69)
+  eq('the surface list is 68 long', SURFACE.length, 68)
+  eq('with no duplicates', new Set(SURFACE).size, 68)
   eq('and all of them resolve on the namespace', SURFACE.filter(n => typeof M[n] !== 'function'), [])
   const selfSource = fs.readFileSync(path.join(import.meta.dirname, 'menu.test.mjs'), 'utf8')
   for (const name of SURFACE) {

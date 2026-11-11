@@ -1686,16 +1686,6 @@ group('jobSub is printer - time - size, with empty parts skipped', () => {
     (v) => v.every(s => !s.startsWith(' - ') && !s.endsWith(' - ') && !s.includes(' -  ')), 'no dangling separator')
 })
 
-group('trim1 keeps one decimal unless it rounds away', () => {
-  eq('a whole number', PR.trim1(1), '1')
-  eq('a whole number written with a fraction', PR.trim1(1.0), '1')
-  eq('one decimal', PR.trim1(1.3), '1.3')
-  eq('a second decimal rounds away', PR.trim1(1.04), '1')
-  eq('two digits', PR.trim1(10), '10')
-  eq('zero', PR.trim1(0), '0')
-  eq('a large value keeps one decimal', PR.trim1(1024.5), '1024.5')
-})
-
 group('jobTime is DD.MM HH:MM from a unix seconds integer', () => {
   // The formatter uses local time, so the expectation is computed from the
   // same local Date rather than pinned to a timezone: what is asserted is
