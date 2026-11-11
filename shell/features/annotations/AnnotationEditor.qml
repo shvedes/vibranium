@@ -361,8 +361,9 @@ PanelWindow {
   Behavior on _rotAnim {
     enabled: editor.animOn
     // Fast start, slow settle - no bounce/overshoot, just a curve
-    // instead of a straight linear ramp.
-    NumberAnimation { duration: 500; easing.type: Easing.OutExpo }
+    // instead of a straight linear ramp. Named because its own end is the
+    // event a pending export waits for (see _finishExportSettle).
+    NumberAnimation { id: rotAnim; duration: 500; easing.type: Easing.OutExpo }
   }
 
   // Bounding box of the (unrotated) view rect at the current animated
@@ -765,7 +766,12 @@ PanelWindow {
     exportSettle.kind = kind
     exportSettle.target = target
     exportSettle.seq = editor._exportSeq
-    exportSettle.attempts = 0
+    // Already settled: there is no tween to wait for, so the export starts on
+    // this turn instead of waiting out the backstop that only exists for one.
+    if (Math.abs(editor._rotAnim - editor.docRot) <= 0.1) {
+      editor._finishExportSettle()
+      return true
+    }
     exportSettle.restart()
     return true
   }
@@ -866,28 +872,41 @@ PanelWindow {
     editor._beginExport("copy", target)
   }
 
+  // The export waits for the document's rotation tween to land: every frame is
+  // drawn from `_rotAnim`, so exporting mid-tween writes a half-rotated image.
+  // The tween's own value changes are the events that say where it is, so the
+  // landing is read off the change that reaches `docRot` instead of a 16 ms
+  // poll that asked the same question up to 47 times.
+  //
+  // The deadline stays behind it as a backstop: a tween that is retargeted or
+  // dropped never reports the target value, and a save must not hang on it.
+  readonly property int exportSettleMs: 750
+
   Timer {
     id: exportSettle
 
     property string kind: ""
     property string target: ""
     property int seq: -1
-    property int attempts: 0
 
-    interval: 16
-    repeat: true
-    onTriggered: {
-      if (!editor.exporting || seq !== editor._exportSeq) {
-        exportSettle.stop()
-        return
-      }
-      if (Math.abs(editor._rotAnim - editor.docRot) <= 0.1 || exportSettle.attempts >= 47) {
-        exportSettle.stop()
-        editor._performExport(exportSettle.kind, exportSettle.target, exportSettle.seq)
-        return
-      }
-      exportSettle.attempts++
+    interval: editor.exportSettleMs
+    repeat: false
+    onTriggered: editor._finishExportSettle()
+  }
+
+  // The tween's own end, not a poll: the export waits for exactly this.
+  Connections {
+    target: rotAnim
+    function onStopped() { editor._finishExportSettle() }
+  }
+
+  function _finishExportSettle() {
+    if (!editor.exporting || exportSettle.seq !== editor._exportSeq) {
+      exportSettle.stop()
+      return
     }
+    exportSettle.stop()
+    editor._performExport(exportSettle.kind, exportSettle.target, exportSettle.seq)
   }
 
   Timer {
