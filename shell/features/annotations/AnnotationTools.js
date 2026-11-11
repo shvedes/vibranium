@@ -302,7 +302,7 @@ function blurPlateScale(imgW, imgH, maxSide) {
   const h = Number(imgH)
   const m = Number(maxSide)
   if (!(w > 0) || !(h > 0) || !(m > 0)) return 1
-  return Math.min(1, m / Math.max(w, h))
+  return Range.clamp01(m / Math.max(w, h))
 }
 
 // One plate side at scale k. At least one pixel: a zero-sized texture is not
@@ -658,6 +658,8 @@ function clampDocPoint(p, vr, cropFrame) {
     x1 = Math.min(x1, cropFrame.x + cropFrame.w)
     y1 = Math.min(y1, cropFrame.y + cropFrame.h)
   }
+  // An inverted interval (a frame that misses the view) leaves the point
+  // alone rather than snapping it to an unrelated edge.
   return { x: Math.max(x0, Math.min(x1, p.x)), y: Math.max(y0, Math.min(y1, p.y)) }
 }
 
