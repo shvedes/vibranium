@@ -671,8 +671,8 @@ Item {
     const h = tab.worldH * tab.zoom
     const loX = Math.min(0, edge - w)
     const loY = Math.min(0, edge - h)
-    const hiX = Math.max(0, Math.min(tab.viewW - edge, w - edge))
-    const hiY = Math.max(0, Math.min(tab.viewH - edge, h - edge))
+    const hiX = Range.clamp(w - edge, 0, Math.max(0, tab.viewW - edge))
+    const hiY = Range.clamp(h - edge, 0, Math.max(0, tab.viewH - edge))
     tab.panX = Range.clamp(tab.panX, loX, hiX)
     tab.panY = Range.clamp(tab.panY, loY, hiY)
   }
