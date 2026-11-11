@@ -174,38 +174,30 @@ function linkNote(connectivity, metered, hasReading, vpnUp, configuring) {
   return ""
 }
 
-// `busctl get-property --json=short` answers {"type":"u","data":2}. -1 when
-// the reply is anything else: an unreadable bus is unknown, never a state
-// to announce, and the watcher keeps its previous reading instead.
+// `busctl get-property --json=short` answers {"type":"u","data":2}. The
+// envelope is Busctl's to unwrap; null here is the "no reading" answer all
+// three property parsers share.
+
+// A uint property, -1 when the reply is anything else: an unreadable bus is
+// unknown, never a state to announce, and the watcher keeps its previous
+// reading instead.
 function parseUintProp(stdout) {
-  let reply
-  try {
-    reply = JSON.parse(String(stdout))
-  } catch (e) {
-    return -1
-  }
-  if (!reply || typeof reply !== "object") return -1
+  const reply = Busctl.parseReply(stdout)
+  if (reply === null) return -1
   const n = Number(reply.data)
   if (!isFinite(n) || n < 0 || Math.floor(n) !== n) return -1
   return n
 }
 
-// Same envelope, string payload: {"type":"s","data":"MyWifi"}. "" when the
-// reply is anything else - an unreadable name is no name, and the card
-// falls back to its generic body.
+// A string property, "" when the reply is anything else - an unreadable name
+// is no name, and the card falls back to its generic body.
 function parseStringProp(stdout) {
-  let reply
-  try {
-    reply = JSON.parse(String(stdout))
-  } catch (e) {
-    return ""
-  }
-  if (!reply || typeof reply !== "object") return ""
-  return typeof reply.data === "string" ? reply.data : ""
+  const reply = Busctl.parseReply(stdout)
+  return reply !== null && typeof reply.data === "string" ? reply.data : ""
 }
 
-// Same envelope, object-path payload: {"type":"o","data":"/org/..."}.
-// "/" is the bus spelling of "no object", which reads as "" here.
+// An object-path property: {"type":"o","data":"/org/..."}. "/" is the bus
+// spelling of "no object", which reads as "" here.
 function parseObjectPath(stdout) {
   const path = parseStringProp(stdout)
   return path === "/" ? "" : path
@@ -498,8 +490,10 @@ function parseDefaultIface(table) {
   return ""
 }
 
+// The metered-usage record is keyed by the same network identity the mute
+// map uses, so one spelling of "this SSID" serves both stores.
 function usageKey(ssid) {
-  return "ssid:" + String(ssid === undefined || ssid === null ? "" : ssid)
+  return mutedKey(ssid)
 }
 
 // One metered poll: the byte counters are sysfs totals for the default-route
