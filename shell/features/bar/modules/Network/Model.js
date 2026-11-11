@@ -271,6 +271,27 @@ function deriveWifiState(prev, rows) {
   var prevKnown = StoreGuards.asList(p.known)
   var prevOther = StoreGuards.asList(p.other)
 
+  // The poll rebuilds the same rows every tick, so the common answer is
+  // "nothing changed". When the sorted set is equal, the known/other split
+  // is equal too (it is a partition of that set), so the three equality
+  // walks collapse to one and the previous arrays are handed back rather
+  // than rebuilt and discarded. The rows themselves are the fresh
+  // snapshots - only the split arrays are reused.
+  var sortedUnchanged = wifiRowsEqual(prevSorted, sorted)
+  if (sortedUnchanged
+    && prevKnown.length + prevOther.length === sorted.length) {
+    return {
+      sorted: sorted,
+      known: prevKnown,
+      other: prevOther,
+      display: sorted.slice(),
+      changed: false,
+      knownChanged: false,
+      otherChanged: false,
+      grew: false
+    }
+  }
+
   var known = []
   var other = []
   for (var j = 0; j < sorted.length; j++) {
@@ -296,7 +317,7 @@ function deriveWifiState(prev, rows) {
     known: known,
     other: other,
     display: sorted.slice(),
-    changed: !wifiRowsEqual(prevSorted, sorted),
+    changed: !sortedUnchanged,
     knownChanged: !wifiRowsEqual(prevKnown, known),
     otherChanged: !wifiRowsEqual(prevOther, other),
     grew: grew
