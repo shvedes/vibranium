@@ -672,13 +672,22 @@ Rectangle {
       if (it && (Menu.isExpanded(it) || Menu.infoOpen(it) || Menu.isSlotClosing(it)))
         return false
     }
+    if (root._anyRowMoving()) return false
+    return true
+  }
+
+  // Whether any live row delegate is still opening, closing or moving its
+  // slot. Those fields live on the delegates only, so the model cannot answer
+  // this and the resting-fit shortcut and the retry probe must ask the same
+  // question.
+  function _anyRowMoving() {
     const kids = list.contentItem ? list.contentItem.children : []
     for (let i = 0; i < kids.length; i++) {
       const d = kids[i]
       if (!(d instanceof Entry)) continue
-      if (d.slotMotionMs > 0 || d.descSlotH > 0 || d.expandSlotH > 0) return false
+      if (d.slotMotionMs > 0 || d.descSlotH > 0 || d.expandSlotH > 0) return true
     }
-    return true
+    return false
   }
 
   function queueFit() {
@@ -776,18 +785,7 @@ Rectangle {
         fitModel()
         return
       }
-      let expanding = panel.expansionNeedH > 0
-      if (!expanding) {
-        const kids = list.contentItem.children
-        for (let i = 0; i < kids.length; i++) {
-          const d = kids[i]
-          if (!(d instanceof Entry)) continue
-          if (d.slotMotionMs > 0 || d.descSlotH > 0 || d.expandSlotH > 0) {
-            expanding = true
-            break
-          }
-        }
-      }
+      const expanding = panel.expansionNeedH > 0 || root._anyRowMoving()
       if (list._inSwap || Menu.slotClosing || expanding) {
         retrySettle()
         return
