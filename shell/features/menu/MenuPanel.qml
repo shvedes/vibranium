@@ -672,7 +672,7 @@ Rectangle {
       if (it && (Menu.isExpanded(it) || Menu.infoOpen(it) || Menu.isSlotClosing(it)))
         return false
     }
-    if (root._anyRowMoving()) return false
+    if (panel._anyRowMoving()) return false
     return true
   }
 
@@ -703,7 +703,10 @@ Rectangle {
     const transitionGen = panel._transitionGen
     // The model height is final: publish it without waiting for delegates.
     const fitModel = () => {
-      fitModel()
+      panel._latchedListH = -1
+      panel._fitPending = false
+      panel._fitAttempts = 0
+      panel._resolveFit(-1, fitGen, transitionGen)
     }
     if (panel.gridMode || rows.length === 0) {
       fitModel()
@@ -785,7 +788,7 @@ Rectangle {
         fitModel()
         return
       }
-      const expanding = panel.expansionNeedH > 0 || root._anyRowMoving()
+      const expanding = panel.expansionNeedH > 0 || panel._anyRowMoving()
       if (list._inSwap || Menu.slotClosing || expanding) {
         retrySettle()
         return
