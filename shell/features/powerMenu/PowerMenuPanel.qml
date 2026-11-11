@@ -412,14 +412,14 @@ PanelCard {
         if (focusCtrl.mode === "list" && !searchField.focused) { panel.activateCurrent(); event.accepted = true; return }
         break
     }
-     if (!ctrl && !meta && event.text.length === 1 && event.text.charCodeAt(0) >= 32) {
-       if (focusCtrl.mode === "list") {
-         PowerMenu.submit(event.text)
-         searchField.text = event.text
-         focusCtrl.grabFilter()
-         event.accepted = true
-       }
-     }
+    if (!ctrl && !meta && event.text.length === 1 && event.text.charCodeAt(0) >= 32) {
+      if (focusCtrl.mode === "list") {
+        PowerMenu.submit(event.text)
+        searchField.text = event.text
+        focusCtrl.grabFilter()
+        event.accepted = true
+      }
+    }
 
   }
   Keys.onPressed: event => panel.handleKey(event)
@@ -436,12 +436,12 @@ PanelCard {
     InputField {
       id: searchField
       anchors.fill: parent
-       implicitHeight: panel.filterH
-       placeholder: "Filter power actions..."
-       inputRole: "filter"
-       filterIconAlways: true
+      implicitHeight: panel.filterH
+      placeholder: "Filter power actions..."
+      inputRole: "filter"
+      filterIconAlways: true
       clearable: false
-       onEdited: text => PowerMenu.submit(text)
+      onEdited: text => PowerMenu.submit(text)
 
       onAccepted: panel.activateCurrent()
       onEscaped: panel.escapeChain()

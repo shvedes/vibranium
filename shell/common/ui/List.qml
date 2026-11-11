@@ -497,25 +497,25 @@ ListView {
     target: root
     property: "contentY"
     easing.type: Easing.OutCubic
-     onFinished: {
-       if (!root._highlightHandoff) root._sweepMs = -1
-       root._followIdx = -1
-       // A landed pursuit is not tracking anything, so a later reveal for
-       // this row is a real scroll again and may ease. Without this the
-       // claim outlives its own tween and every following seek on the row
-       // would seat geometrically.
-       root._pursuitIdx = -1
-       root.contentY = root.clampY(root.contentY)
-       // A pursuit that landed short of a target which kept moving has a
-       // remainder, and nothing else re-arms it: the row has stopped
-       // changing, so its height handler is quiet. Re-run the chase, so the
-       // last few pixels arrive as one more eased leg - a smooth push, not a
-       // snap, and not a leftover gap under the dropdown. With nothing left
-       // to do the target is unchanged and seatTo returns without arming, so
-       // this cannot loop.
-       if (root.autoRevealIndex >= 0) root.pursue()
-       root.motionFinished()
-     }
+    onFinished: {
+      if (!root._highlightHandoff) root._sweepMs = -1
+      root._followIdx = -1
+      // A landed pursuit is not tracking anything, so a later reveal for
+      // this row is a real scroll again and may ease. Without this the
+      // claim outlives its own tween and every following seek on the row
+      // would seat geometrically.
+      root._pursuitIdx = -1
+      root.contentY = root.clampY(root.contentY)
+      // A pursuit that landed short of a target which kept moving has a
+      // remainder, and nothing else re-arms it: the row has stopped
+      // changing, so its height handler is quiet. Re-run the chase, so the
+      // last few pixels arrive as one more eased leg - a smooth push, not a
+      // snap, and not a leftover gap under the dropdown. With nothing left
+      // to do the target is unchanged and seatTo returns without arming, so
+      // this cannot loop.
+      if (root.autoRevealIndex >= 0) root.pursue()
+      root.motionFinished()
+    }
   }
 
   // Traverse velocity for scroll tweens: px per second, scaled up with
@@ -1297,17 +1297,17 @@ ListView {
 
   // Single programmatic writer for contentY. Every seat - keyboard
   // step, wheel step, page, restore, pursuit, reconciliation - routes
-   // through here. Direct `contentY =` writes outside this function
-   // are forbidden.
-   //
-   // paceMs overrides the distance-paced duration for a seat that must
-   // land together with another motion: a pursuit chasing an open slot
-   // passes the claimed row's own slot pace, so a long scroll runs with
-   // the unfold and the region's growth instead of arriving after them.
-   // Capped at the distance pace, never slower than it: a remainder is
-   // not a full unfold, and pacing one at the full slot duration would
-   // crawl. Absent (or not positive) the seat keeps the distance-paced
-   // duration.
+  // through here. Direct `contentY =` writes outside this function
+  // are forbidden.
+  //
+  // paceMs overrides the distance-paced duration for a seat that must
+  // land together with another motion: a pursuit chasing an open slot
+  // passes the claimed row's own slot pace, so a long scroll runs with
+  // the unfold and the region's growth instead of arriving after them.
+  // Capped at the distance pace, never slower than it: a remainder is
+  // not a full unfold, and pacing one at the full slot duration would
+  // crawl. Absent (or not positive) the seat keeps the distance-paced
+  // duration.
   function seatTo(y, animated, tag, paceMs) {
     root._syncIdentitySet()
     root._seatEpoch++
@@ -1329,33 +1329,33 @@ ListView {
     // hold below has to be able to tell a no-op from a landed seat.
     root._seatWrites++
     root._lastWriteTag = owner
-     if (animated === true) {
-       let distanceMs = root.stepMs(Math.abs(target - root.contentY))
-       if (paceMs > 0) {
-         distanceMs = Math.min(distanceMs,
-           Range.clamp(Math.round(paceMs), Ui.fastMs, root._sweepMaxMs))
-       }
-       const handoffMs = root._highlightHandoff && root._sweepMs >= 0
-         ? root._sweepMs : 0
-       scrollAnim.duration = Math.max(distanceMs, handoffMs)
-       scrollAnim.to = target
-       // Re-aiming a running tween by moving `to` alone does NOT work in
-       // this engine: the endpoints are captured when the animation
-       // starts, so a retarget is silently ignored and the tween lands on
-       // the target it was armed with. Every restart is therefore a new
-       // ease from zero velocity, which is what a stutter looks like.
+    if (animated === true) {
+      let distanceMs = root.stepMs(Math.abs(target - root.contentY))
+      if (paceMs > 0) {
+        distanceMs = Math.min(distanceMs,
+          Range.clamp(Math.round(paceMs), Ui.fastMs, root._sweepMaxMs))
+      }
+      const handoffMs = root._highlightHandoff && root._sweepMs >= 0
+        ? root._sweepMs : 0
+      scrollAnim.duration = Math.max(distanceMs, handoffMs)
+      scrollAnim.to = target
+      // Re-aiming a running tween by moving `to` alone does NOT work in
+      // this engine: the endpoints are captured when the animation
+      // starts, so a retarget is silently ignored and the tween lands on
+      // the target it was armed with. Every restart is therefore a new
+      // ease from zero velocity, which is what a stutter looks like.
 
-       scrollAnim.restart()
-       // Bar/content sync: the highlight tween runs the same duration on
-       // the same curve (see _sweepMs), so both land together with no
-       // end-of-glide wobble. Assigned after restart: a synchronously
-       // firing finish from the superseded run must not clear it first.
-       root._sweepMs = scrollAnim.duration
-     } else {
-       scrollAnim.stop()
-       if (!root._highlightHandoff) root._sweepMs = -1
-       root.contentY = target
-     }
+      scrollAnim.restart()
+      // Bar/content sync: the highlight tween runs the same duration on
+      // the same curve (see _sweepMs), so both land together with no
+      // end-of-glide wobble. Assigned after restart: a synchronously
+      // firing finish from the superseded run must not clear it first.
+      root._sweepMs = scrollAnim.duration
+    } else {
+      scrollAnim.stop()
+      if (!root._highlightHandoff) root._sweepMs = -1
+      root.contentY = target
+    }
     return target
   }
 
@@ -1526,20 +1526,20 @@ ListView {
         // highlight tween launches on the assignment with whatever
         // duration is current (mid-flight duration changes are ignored).
         // followTarget returns -1 on holds: default glide then.
-         const ft = root.followTarget(i)
-         const requestedMs = typeof highlightMs === "number" && isFinite(highlightMs)
-           ? highlightMs : fromSlotMs
-         const focusMs = requestedMs > 0
-           ? Range.clamp(Math.round(requestedMs), Ui.fastMs, Ui.slowMs) : 0
-         const handoff = fromSlotMs > 0
-           || (typeof highlightMs === "number" && highlightMs > 0)
-         root._highlightHandoff = handoff
-         root._sweepMs = focusMs > 0 ? focusMs
-           : (ft < 0 ? Ui.fastMs : root.stepMs(Math.abs(ft - root.contentY)))
-         root.seat(i, "step")
-         // No seat started (hold/no-op/instant) - release the pre-arm so
-         // the bar keeps its default glide instead of a stale sweep.
-         if (!scrollAnim.running && !root._highlightHandoff) root._sweepMs = -1
+        const ft = root.followTarget(i)
+        const requestedMs = typeof highlightMs === "number" && isFinite(highlightMs)
+          ? highlightMs : fromSlotMs
+        const focusMs = requestedMs > 0
+          ? Range.clamp(Math.round(requestedMs), Ui.fastMs, Ui.slowMs) : 0
+        const handoff = fromSlotMs > 0
+          || (typeof highlightMs === "number" && highlightMs > 0)
+        root._highlightHandoff = handoff
+        root._sweepMs = focusMs > 0 ? focusMs
+          : (ft < 0 ? Ui.fastMs : root.stepMs(Math.abs(ft - root.contentY)))
+        root.seat(i, "step")
+        // No seat started (hold/no-op/instant) - release the pre-arm so
+        // the bar keeps its default glide instead of a stale sweep.
+        if (!scrollAnim.running && !root._highlightHandoff) root._sweepMs = -1
         return true
       }
       if (!root.wrap && n === count - 1) return false
@@ -1792,7 +1792,7 @@ ListView {
 
   // --- swap machinery ---
 
-   // Scroll position across a swap. Replacing the model resets the view to
+  // Scroll position across a swap. Replacing the model resets the view to
   // the top of a list that was scrolled somewhere else, and the view puts
   // the old offset back a frame later - so a list with room to scroll
   // paints its first entry for a frame and then snaps back down. This is
@@ -1827,20 +1827,20 @@ ListView {
   property int _swapHoldWrites: 0
 
   function beginSwap() {
-     root._swapToken++
-     root._inSwap = true
-     root._highlightHandoff = false
-     root._sweepMs = -1
-     scrollAnim.stop()
-     root._swapY = root.contentY
-     // A swap supersedes any hold still running: the offset it captured is
-     // the one this write is about to move.
-     root._swapRelease()
-     // Last moment the cursor row still exists: hold the bar's geometry
-     // here, so the frames a model swap spends without a row to read keep
-     // the plate instead of collapsing it to nothing and popping it back.
-     if (root.selectionHighlight) root._holdHighlight()
-     return root._swapToken
+    root._swapToken++
+    root._inSwap = true
+    root._highlightHandoff = false
+    root._sweepMs = -1
+    scrollAnim.stop()
+    root._swapY = root.contentY
+    // A swap supersedes any hold still running: the offset it captured is
+    // the one this write is about to move.
+    root._swapRelease()
+    // Last moment the cursor row still exists: hold the bar's geometry
+    // here, so the frames a model swap spends without a row to read keep
+    // the plate instead of collapsing it to nothing and popping it back.
+    if (root.selectionHighlight) root._holdHighlight()
+    return root._swapToken
   }
   function endSwap() {
     root._inSwap = false
@@ -2337,11 +2337,11 @@ ListView {
   onMovingChanged: {
     if (root.moving) {
       root._seatEpoch++
-       scrollAnim.stop()
-       root._highlightHandoff = false
-       root._sweepMs = -1
-       root._followIdx = -1
-       root._pursuitIdx = -1
+      scrollAnim.stop()
+      root._highlightHandoff = false
+      root._sweepMs = -1
+      root._followIdx = -1
+      root._pursuitIdx = -1
       // A grab suspends pursuit, it does not renounce it: pursue() skips
       // every step while `moving` is set, so a claim that outlives the
       // drag is picked up again on the first height step after release.

@@ -1917,9 +1917,9 @@ Item {
   }
 
   function _audit() {
-     const warnings = []
-     if (!boot._catalogValid) warnings.push("catalog: " + (boot._catalogValidationError || "invalid"))
-     const ids = Registry.offers()
+    const warnings = []
+    if (!boot._catalogValid) warnings.push("catalog: " + (boot._catalogValidationError || "invalid"))
+    const ids = Registry.offers()
     for (let i = 0; i < ids.length; i++) {
       const meta = Registry._offers[ids[i]]
       if (!meta.verbNames || meta.verbNames.length === 0) warnings.push(ids[i] + ": no verbs offered")

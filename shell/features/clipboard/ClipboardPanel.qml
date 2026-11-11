@@ -868,14 +868,14 @@ PanelCard {
       implicitHeight: panel.filterH
       basePadding: Ui.l
       focusColor: Ui.solid("accent")
-       placeholder: Clipboard.showPinned ? "Filter pinned..." : "Filter clipboard..."
-       inputRole: "filter"
-       filterIconAlways: true
+      placeholder: Clipboard.showPinned ? "Filter pinned..." : "Filter clipboard..."
+      inputRole: "filter"
+      filterIconAlways: true
       // Dead while the viewed source is empty: no query to take, no
       // focus to hold. "@" still enters pinned mode from list keys.
       enabled: !panel.filterDead
       clearable: false
-       chipActive: Clipboard.showPinned
+      chipActive: Clipboard.showPinned
 
       // Pinned mode swaps the boxed "@ pinned" chip for the bare pin glyph,
       // the same way the launcher's web-search mode swaps "Web:" for its

@@ -400,7 +400,7 @@ QtObject {
                           fr.width + 2 * fr.pad, fr.height + 2 * fr.pad)
       smooth: true
       textureSize: Qt.size(Math.max(1, Math.round((fr.width + 2 * fr.pad) / 4)),
-                           Math.max(1, Math.round((fr.height + 2 * fr.pad) / 4)))
+                          Math.max(1, Math.round((fr.height + 2 * fr.pad) / 4)))
     }
 
     MultiEffect {
@@ -874,8 +874,8 @@ QtObject {
           // size for raster as before.
           sourceSize: root.isVector && vecRaster.width > 0 ? vecRaster : undefined
           width: root.isVector
-                 ? (vectorProbe.implicitWidth > 0 ? vectorProbe.implicitWidth : 1)
-                 : (sourceSize.width > 0 ? sourceSize.width : 1)
+                ? (vectorProbe.implicitWidth > 0 ? vectorProbe.implicitWidth : 1)
+                : (sourceSize.width > 0 ? sourceSize.width : 1)
           height: root.isVector
                   ? (vectorProbe.implicitHeight > 0 ? vectorProbe.implicitHeight : 1)
                   : (sourceSize.height > 0 ? sourceSize.height : 1)
@@ -1332,8 +1332,8 @@ QtObject {
 
         anchors.horizontalCenter: parent.horizontalCenter
         y: (root.chromeVisible || root.hoverNearBottom || statusbarHoverHandler.hovered)
-           ? parent.height - height - 14
-           : parent.height + 8
+          ? parent.height - height - 14
+          : parent.height + 8
         // The live window width, not the seed: a cap written against the seed
         // size would let the bar run past the edge after a resize.
         width: Math.min(root.win.width - 32, statusRow.implicitWidth + 32)
@@ -1365,8 +1365,8 @@ QtObject {
               anchors.verticalCenter: parent.verticalCenter
               width: 6; height: 6; radius: 3
               color: !root.hasFile
-                     ? Ui.tint("foreground_0", 0.40)
-                     : (root.fileTypeKey !== "" ? Ui.solid(root.fileTypeKey)
+                    ? Ui.tint("foreground_0", 0.40)
+                    : (root.fileTypeKey !== "" ? Ui.solid(root.fileTypeKey)
                                                 : Ui.tint("foreground_0", 0.55))
             }
             Text {

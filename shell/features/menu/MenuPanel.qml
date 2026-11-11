@@ -99,11 +99,11 @@ Rectangle {
   readonly property bool highlightMotion: MotionPolicy.enabled
     && !panel.cursorSlotOpen && !panel._swapping
 
-   // Cursor-row slot state (model-level, synchronous): only the focused
-   // row's own slot suppresses height animation. A slot left behind on
-   // another row must not freeze the bar mid-move; the handoff uses the
-   // closing slot duration and finishes natively. Reads the model, never
-   // delegates, so it flips the same tick as the index.
+  // Cursor-row slot state (model-level, synchronous): only the focused
+  // row's own slot suppresses height animation. A slot left behind on
+  // another row must not freeze the bar mid-move; the handoff uses the
+  // closing slot duration and finishes natively. Reads the model, never
+  // delegates, so it flips the same tick as the index.
   readonly property bool cursorSlotOpen: {
     Menu.rev
     const view = panel.listView
@@ -1224,45 +1224,45 @@ Rectangle {
         if (plan.glide) panel._quiesceDisarm()
         else panel._quiesceArm()
       }
-       if (generation !== panel._pendingGen) return
-       // A re-ranked projection has no cursor worth keeping: the write holds
-       // the current ITEM and only shifts its index, so a cursor parked on a
-       // hit that survived the re-rank followed it down the ranking - often
-       // past the fold, leaving the selection bar nowhere near the row the
-       // user just typed. Both search modes seat the head here instead,
-       // where the new order is already installed - which is why the write
-       // above does not ask the view to keep the cursor's row either: the
-       // two answers are opposites, and the head is the one this path wants.
-       if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
-       // A launch still settling. The launch wants the head of the row set as
-       // it stands, and the head is what a re-seat names - a dead link coming
-       // back or a guard verdict landing above the head leaves the highlight
-       // one row too low with nothing left to correct it, so the wholesale
-       // path already re-asserts, and the summons that break are exactly the
-       // ones whose last install is this one. Deferred, because the view
-       // applies the array swap after this returns.
-       else if (panel._summonSeat) Idle.run(() => panel._reseatFrameSel(), 2)
-       // A reveal with no launch in it: a showIf verdict, a guard verdict, a
-       // "/" filter. The row set moved under the cursor, and the cursor goes
-       // with the row it was on: the row that appeared or disappeared above
-       // it must not move it, and the row it was on must not be lost. The
-       // view owns that - a replaced model takes the cursor with it, and
-       // List gives the row back by identity.
-       panel.queueFit()
-       return
+      if (generation !== panel._pendingGen) return
+      // A re-ranked projection has no cursor worth keeping: the write holds
+      // the current ITEM and only shifts its index, so a cursor parked on a
+      // hit that survived the re-rank followed it down the ranking - often
+      // past the fold, leaving the selection bar nowhere near the row the
+      // user just typed. Both search modes seat the head here instead,
+      // where the new order is already installed - which is why the write
+      // above does not ask the view to keep the cursor's row either: the
+      // two answers are opposites, and the head is the one this path wants.
+      if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
+      // A launch still settling. The launch wants the head of the row set as
+      // it stands, and the head is what a re-seat names - a dead link coming
+      // back or a guard verdict landing above the head leaves the highlight
+      // one row too low with nothing left to correct it, so the wholesale
+      // path already re-asserts, and the summons that break are exactly the
+      // ones whose last install is this one. Deferred, because the view
+      // applies the array swap after this returns.
+      else if (panel._summonSeat) Idle.run(() => panel._reseatFrameSel(), 2)
+      // A reveal with no launch in it: a showIf verdict, a guard verdict, a
+      // "/" filter. The row set moved under the cursor, and the cursor goes
+      // with the row it was on: the row that appeared or disappeared above
+      // it must not move it, and the row it was on must not be lost. The
+      // view owns that - a replaced model takes the cursor with it, and
+      // List gives the row back by identity.
+      panel.queueFit()
+      return
     }
 
-     // The same answer as the incremental path above: park the view at the
-     // head before the write, so the swap captures and restores the top
-     // rather than the offset the previous query was scrolled to.
-     if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
-     panel._swapGen++
-     const g = panel._swapGen
-     const sameContent = panel._sameRecords(records)
-     if (!sameContent) {
-       list.beginSwap()
-       panel._swapping = true
-     }
+    // The same answer as the incremental path above: park the view at the
+    // head before the write, so the swap captures and restores the top
+    // rather than the offset the previous query was scrolled to.
+    if (panel.searching || panel.scopedSearching) panel.seatFilteredHead()
+    panel._swapGen++
+    const g = panel._swapGen
+    const sameContent = panel._sameRecords(records)
+    if (!sameContent) {
+      list.beginSwap()
+      panel._swapping = true
+    }
       panel._swapPendingGen = generation
       panel._clearCursorForSwap(records)
       if (!sameContent) {
@@ -1295,20 +1295,20 @@ Rectangle {
           panel._reseatFrameSel()
           return
         }
-         panel._swapping = false
-         panel._swapPendingGen = -1
-         list.endSwap()
-         if (panel._swapGen !== g || panel._pendingGen !== generation) {
-           panel._reseatFrameSel()
-           return
-         }
+        panel._swapping = false
+        panel._swapPendingGen = -1
+        list.endSwap()
+        if (panel._swapGen !== g || panel._pendingGen !== generation) {
+          panel._reseatFrameSel()
+          return
+        }
 
         panel.queueFit()
         if (!panel.searching && !panel.scopedSearching) {
-           panel.applyFrameState()
-           if (list && typeof list.unpinHighlight === "function") list.unpinHighlight()
-           if (list) list._keepCursor = false
-         }
+          panel.applyFrameState()
+          if (list && typeof list.unpinHighlight === "function") list.unpinHighlight()
+          if (list) list._keepCursor = false
+        }
         // The install's own landing, checked once more - but on a later
         // turn, because that is when the moves land. applyFrameState seats
         // the row it was asked for, yet the view carries the cursor across
@@ -1328,22 +1328,22 @@ Rectangle {
     }
     panel._pendingCandidate = records
     panel._pendingPlan = plan
-     panel._pendingGen++
-     if (panel._swapping && panel._swapPendingGen !== panel._pendingGen)
-       panel._releaseSwap()
-     if (panel._rowsPending) return
-     panel._rowsPending = true
-     Idle.run(() => {
-       if (!panel._rowsPending) return
-       const generation = panel._pendingGen
-       const candidate = panel._pendingCandidate
-       const install = panel._pendingPlan
-       panel._pendingCandidate = null
-       panel._pendingPlan = null
-       panel._rowsPending = false
-       if (candidate === null || generation !== panel._pendingGen) return
-       panel._installRows(candidate, install, generation)
-     })
+    panel._pendingGen++
+    if (panel._swapping && panel._swapPendingGen !== panel._pendingGen)
+      panel._releaseSwap()
+    if (panel._rowsPending) return
+    panel._rowsPending = true
+    Idle.run(() => {
+      if (!panel._rowsPending) return
+      const generation = panel._pendingGen
+      const candidate = panel._pendingCandidate
+      const install = panel._pendingPlan
+      panel._pendingCandidate = null
+      panel._pendingPlan = null
+      panel._rowsPending = false
+      if (candidate === null || generation !== panel._pendingGen) return
+      panel._installRows(candidate, install, generation)
+    })
   }
 
   // Arm the latch and start its window together: the sync that arms it is
@@ -1573,13 +1573,13 @@ Rectangle {
       panel.recomputeRows("reveal")
     }
 
-     function onResultsChanged() {
-       // The projection is the caller's row set here, and whether it is
-       // wide enough to install wholesale is the plan's business, not
-       // this handler's. Off-search the candidate is the page's own rows
-       // and compares equal, so the early return keeps this inert.
-       panel.recomputeRows("reveal")
-     }
+    function onResultsChanged() {
+      // The projection is the caller's row set here, and whether it is
+      // wide enough to install wholesale is the plan's business, not
+      // this handler's. Off-search the candidate is the page's own rows
+      // and compares equal, so the early return keeps this inert.
+      panel.recomputeRows("reveal")
+    }
 
     function onScopedActiveChanged() {
       // The "/" filter trims the page it was armed on, so the launch that
@@ -1605,11 +1605,11 @@ Rectangle {
       panel.recomputeRows("reveal")
     }
 
-     function onScopedRowsChanged() {
-       panel.recomputeRows("reveal")
-     }
+    function onScopedRowsChanged() {
+      panel.recomputeRows("reveal")
+    }
 
-     function onBundleChanged() {
+    function onBundleChanged() {
       // Cache-reuse summons reassign the SAME containers, so a rebuild here
       // would burn hundreds of ms re-appending four-digit row counts.
       // Only genuinely new containers (different page objects) rebuild;
@@ -4040,7 +4040,7 @@ Rectangle {
     anchors.leftMargin: Ui.outerPad
     anchors.right: parent.right
     anchors.rightMargin: Ui.outerPad
-     height: panel.layoutListH
+    height: panel.layoutListH
 
     // Submenu navigation slide: entering pushes content in from the
     // right, popping brings it back from the left. One container-level
@@ -4094,9 +4094,9 @@ Rectangle {
       pageHost.opacity = 0
       slideX.from = dir * 48
       slideX.to = 0
-       slideFade.from = 0
-       slideFade.to = 1
-       slideAnim.restart()
+      slideFade.from = 0
+      slideFade.to = 1
+      slideAnim.restart()
     }
 
     NumberAnimation {
@@ -4114,24 +4114,24 @@ Rectangle {
 
         NumberAnimation {
           id: slideX
-           target: pageHost
-           property: "x"
-           to: 0
-           duration: Ui.fastMs + 20
-           easing.type: Easing.OutCubic
+          target: pageHost
+          property: "x"
+          to: 0
+          duration: Ui.fastMs + 20
+          easing.type: Easing.OutCubic
         }
         NumberAnimation {
           id: slideFade
-           target: pageHost
-           property: "opacity"
-           to: 1
-           duration: Ui.fastMs + 20
-           easing.type: Easing.OutCubic
-       }
-     }
+          target: pageHost
+          property: "opacity"
+          to: 1
+          duration: Ui.fastMs + 20
+          easing.type: Easing.OutCubic
+      }
+    }
 
-     Item {
-       id: pageHost
+    Item {
+      id: pageHost
 
       x: 0
       y: 0
@@ -4161,8 +4161,8 @@ Rectangle {
         // launcher): a far-end wrap target always has a live delegate,
         // so the follow tweens to measured geometry instead of snapping
         // through positionViewAtIndex on a missing item.
-         autoCache: true
-         // Sliding selection lives in common/ui/List (library-driven):
+        autoCache: true
+        // Sliding selection lives in common/ui/List (library-driven):
         // one bar gliding behind transparent delegates. Only the motion
         // gate stays here - it snaps while searching and while any slot
         // is open or closing.
@@ -4178,8 +4178,8 @@ Rectangle {
         // The list is the reveal mechanism for open slots in every
         // regime - the card only grows when the slot cannot fit, so
         // pursuit must be able to scroll the open row into view even on
-         // hugging pages. Pursuit follows the open row's live geometry
-         // while a slot is open (autoRevealIndex >= 0).
+        // hugging pages. Pursuit follows the open row's live geometry
+        // while a slot is open (autoRevealIndex >= 0).
         autoRevealEnabled: true
         // An open slot must be chased, not snapped: the pursuit re-derives
         // its bottom-align seat on every height step and bends the tween

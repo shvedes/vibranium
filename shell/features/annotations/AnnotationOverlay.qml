@@ -82,8 +82,8 @@ PanelWindow {
   property real origY: 0
   property real origW: 0
   property real origH: 0
-   property int dragHandle: -1
-   property bool resizeMoved: false
+  property int dragHandle: -1
+  property bool resizeMoved: false
 
   // The window's own effective DPR: the ratio Qt renders a grabToImage target
   // and a Canvas backing at, read off the object that owns the property, so a
@@ -129,7 +129,7 @@ PanelWindow {
     // surface with, so the grabbed PNG ends up a few percent smaller
     // than the real frame. Passed as an explicit targetSize below
     // instead of trusting the default.
-     property int grabAttempt: 0
+    property int grabAttempt: 0
     // The compositor's scale for this monitor: how a frame pixel relates to
     // a surface pixel. It is NOT the ratio that maps this window's logical
     // pixels onto the frame - the window's logical size already carries
@@ -143,15 +143,15 @@ PanelWindow {
     // surface with, so the grabbed PNG ends up a few percent smaller
     // than the real frame. Passed as an explicit targetSize below
     // instead of trusting the default.
-     readonly property real dpr: {
-       let scale = 0
-       try {
-         const m = overlay.screen !== null && overlay.screen !== undefined
-           ? Hyprland.monitorFor(overlay.screen) : null
-         scale = m !== null && m !== undefined ? m.scale : 0
-       } catch (e) { scale = 0 }
-       return ShotLib.compositorScale(scale, Screen.devicePixelRatio)
-     }
+    readonly property real dpr: {
+      let scale = 0
+      try {
+        const m = overlay.screen !== null && overlay.screen !== undefined
+          ? Hyprland.monitorFor(overlay.screen) : null
+        scale = m !== null && m !== undefined ? m.scale : 0
+      } catch (e) { scale = 0 }
+      return ShotLib.compositorScale(scale, Screen.devicePixelRatio)
+    }
 
     anchors.fill: parent
     captureSource: overlay.visible && !overlay.seeded ? overlay.screen : null
@@ -167,40 +167,40 @@ PanelWindow {
     // content) while keeping it invisible to the user, same as before.
     visible: true
     opacity: 0
-     onHasContentChanged: {
-       if (!hasContent) return
-       // The grab below already runs off this signal, so capTimer is only
-       // the backstop behind it - but its own act on a landed frame is to
-       // notice and stop, and left alone it notices at the end of the
-       // interval it is part-way through, up to 250ms later, while the
-       // view stays armed. Collapse the interval so it stops on the next
-       // tick. 1ms, not 0: a QML Timer given a runtime-assigned interval
-       // of 0 keeps reporting running and never fires again. `running` is
-       // the guard because the immediate path arms the timer inside
-       // Qt.callLater, and a frame landing before it is armed must not
-       // restart a timer that is not polling for it.
-       if (capTimer.running) {
-         capTimer.interval = 1
-         capTimer.restart()
-       }
-       if (overlay.seeded) {
-         grabWatchdog.stop()
-         overlay._grabPending = false
-         return
-       }
-       const attempt = ++view.grabAttempt
-       const source = ShotLib.grabSourceSize(view.width, view.height, view.dpr,
-         view.sourceSize.width, view.sourceSize.height)
-       const target = ShotLib.grabTargetSize(source.width, source.height, overlay.reportedDpr)
-       // The frame the pipeline cuts in is the SAVED IMAGE, not the target:
-       // Qt writes the target scaled by the window own DPR, and the two
-       // differ by exactly that ratio. Both the selection mapping below and
-       // the service clamp work in this grid, so publishing the target put
-       // them on a smaller one than the file they address - a selection
-       // landed anchored top-left and short of what the pointer drew.
-       const saved = ShotLib.grabResultSize(target.width, target.height, overlay.reportedDpr)
-       overlay.grabFrameW = saved.width
-       overlay.grabFrameH = saved.height
+    onHasContentChanged: {
+      if (!hasContent) return
+      // The grab below already runs off this signal, so capTimer is only
+      // the backstop behind it - but its own act on a landed frame is to
+      // notice and stop, and left alone it notices at the end of the
+      // interval it is part-way through, up to 250ms later, while the
+      // view stays armed. Collapse the interval so it stops on the next
+      // tick. 1ms, not 0: a QML Timer given a runtime-assigned interval
+      // of 0 keeps reporting running and never fires again. `running` is
+      // the guard because the immediate path arms the timer inside
+      // Qt.callLater, and a frame landing before it is armed must not
+      // restart a timer that is not polling for it.
+      if (capTimer.running) {
+        capTimer.interval = 1
+        capTimer.restart()
+      }
+      if (overlay.seeded) {
+        grabWatchdog.stop()
+        overlay._grabPending = false
+        return
+      }
+      const attempt = ++view.grabAttempt
+      const source = ShotLib.grabSourceSize(view.width, view.height, view.dpr,
+        view.sourceSize.width, view.sourceSize.height)
+      const target = ShotLib.grabTargetSize(source.width, source.height, overlay.reportedDpr)
+      // The frame the pipeline cuts in is the SAVED IMAGE, not the target:
+      // Qt writes the target scaled by the window own DPR, and the two
+      // differ by exactly that ratio. Both the selection mapping below and
+      // the service clamp work in this grid, so publishing the target put
+      // them on a smaller one than the file they address - a selection
+      // landed anchored top-left and short of what the pointer drew.
+      const saved = ShotLib.grabResultSize(target.width, target.height, overlay.reportedDpr)
+      overlay.grabFrameW = saved.width
+      overlay.grabFrameH = saved.height
         overlay._grabPending = true
         grabWatchdog.restart()
         const grabbed = view.grabToImage(r => {
@@ -220,7 +220,7 @@ PanelWindow {
           overlay._grabPending = false
           overlay.failed("region preview capture failed")
         }
-     }
+    }
 
     // The compositor ended the stream, which is a reason no frame is coming
     // rather than a reason to wait out the next 250ms interval. `visible` is
@@ -274,20 +274,20 @@ PanelWindow {
     overlay._grabResult = null
     frameImg.source = overlay.seeded ? overlay.seedUrl : ""
     overlay._clearSelection()
-     if (visible && !overlay.seeded) {
-       view.attempts = 0
-       if (overlay.immediate) {
-         capTimer.stop()
-         Qt.callLater(() => {
-           if (!overlay.visible || overlay.seeded) return
-           view.captureFrame()
-           capTimer.interval = 250
-           capTimer.restart()
-         })
-       } else {
-         capTimer.interval = 120
-         capTimer.restart()
-       }
+    if (visible && !overlay.seeded) {
+      view.attempts = 0
+      if (overlay.immediate) {
+        capTimer.stop()
+        Qt.callLater(() => {
+          if (!overlay.visible || overlay.seeded) return
+          view.captureFrame()
+          capTimer.interval = 250
+          capTimer.restart()
+        })
+      } else {
+        capTimer.interval = 120
+        capTimer.restart()
+      }
     } else {
       capTimer.stop()
     }
@@ -381,26 +381,26 @@ PanelWindow {
   // selection mapping above keeps it positionally correct regardless.
   // Re-grab for sharpness while no frame is ready yet and nothing is
   // selected - never disturb a finished selection.
-   function _reframe() {
-     if (!overlay.visible || overlay.seeded || overlay.hasSelection) return
-     const expected = ShotLib.grabItemSize(overlay.width, overlay.height, view.dpr)
-     if (view.sourceSize.width > 0 && view.sourceSize.height > 0
-       && !ShotLib.sourceSizeMatches(expected.width, expected.height,
-         view.sourceSize.width, view.sourceSize.height, 1)) {
-       view.grabAttempt++
-       frameImg.source = ""
+  function _reframe() {
+    if (!overlay.visible || overlay.seeded || overlay.hasSelection) return
+    const expected = ShotLib.grabItemSize(overlay.width, overlay.height, view.dpr)
+    if (view.sourceSize.width > 0 && view.sourceSize.height > 0
+      && !ShotLib.sourceSizeMatches(expected.width, expected.height,
+        view.sourceSize.width, view.sourceSize.height, 1)) {
+      view.grabAttempt++
+      frameImg.source = ""
       overlay._grabResult = null
       view.destroyContextWithUpdate()
     }
-     view.attempts = 0
-     // 1ms, not 0: a QML Timer given a runtime-assigned interval of 0 keeps
-     // reporting running and never fires again, and says nothing when it
-     // stops - so an immediate-mode re-grab would leave capTimer armed but
-     // mute, `attempts` frozen, and the ladder's give-up unreachable, with
-     // grabWatchdog the only thing left able to end this grab. 1ms is the
-     // finest a Timer carries and polls on the next tick.
-     capTimer.interval = overlay.immediate ? 1 : 120
-     capTimer.restart()
+    view.attempts = 0
+    // 1ms, not 0: a QML Timer given a runtime-assigned interval of 0 keeps
+    // reporting running and never fires again, and says nothing when it
+    // stops - so an immediate-mode re-grab would leave capTimer armed but
+    // mute, `attempts` frozen, and the ladder's give-up unreachable, with
+    // grabWatchdog the only thing left able to end this grab. 1ms is the
+    // finest a Timer carries and polls on the next tick.
+    capTimer.interval = overlay.immediate ? 1 : 120
+    capTimer.restart()
   }
 
   onWidthChanged: overlay._reframe()
@@ -446,7 +446,7 @@ PanelWindow {
     y: 0
     width: overlay.width
     height: overlay.height
-     visible: !overlay.capturing && (overlay.immediate || frameImg.status === Image.Ready)
+    visible: !overlay.capturing && (overlay.immediate || frameImg.status === Image.Ready)
       && !overlay.showCutout
     color: "#000000"
     opacity: 0.35
@@ -585,33 +585,33 @@ PanelWindow {
         onPressed: mouse => {
           const p = handleArea.overlayPoint(mouse)
           overlay.dragMode = "resize"
-           overlay.dragHandle = index
-           overlay.dragStartX = p.x
-           overlay.dragStartY = p.y
-           overlay.resizeMoved = false
-           overlay.origX = overlay.selX
+          overlay.dragHandle = index
+          overlay.dragStartX = p.x
+          overlay.dragStartY = p.y
+          overlay.resizeMoved = false
+          overlay.origX = overlay.selX
           overlay.origY = overlay.selY
           overlay.origW = overlay.selW
           overlay.origH = overlay.selH
           mouse.accepted = true
         }
         onPositionChanged: mouse => {
-           if (!pressed) return
-           const p = handleArea.overlayPoint(mouse)
-           if (Math.abs(p.x - overlay.dragStartX) + Math.abs(p.y - overlay.dragStartY) >= 1) {
-             overlay.resizeMoved = true
-           }
-           if (overlay.resizeMoved) overlay._resizeTo(p.x, p.y)
+          if (!pressed) return
+          const p = handleArea.overlayPoint(mouse)
+          if (Math.abs(p.x - overlay.dragStartX) + Math.abs(p.y - overlay.dragStartY) >= 1) {
+            overlay.resizeMoved = true
+          }
+          if (overlay.resizeMoved) overlay._resizeTo(p.x, p.y)
         }
         onReleased: mouse => {
-           if (mouse.button !== Qt.LeftButton) return
-           if (overlay.resizeMoved) {
-             const p = handleArea.overlayPoint(mouse)
-             overlay._resizeTo(p.x, p.y)
-           }
-           if (!overlay.hasSelection) overlay._clearSelection()
-           overlay.resizeMoved = false
-           overlay.dragMode = ""
+          if (mouse.button !== Qt.LeftButton) return
+          if (overlay.resizeMoved) {
+            const p = handleArea.overlayPoint(mouse)
+            overlay._resizeTo(p.x, p.y)
+          }
+          if (!overlay.hasSelection) overlay._clearSelection()
+          overlay.resizeMoved = false
+          overlay.dragMode = ""
           mouse.accepted = true
         }
         onCanceled: {
@@ -691,10 +691,10 @@ PanelWindow {
           const stepY = overlay.magScale / fpy
           const fx = overlay.cursorX * fpx
           const fy = overlay.cursorY * fpy
-           const rw = Range.clamp(Math.ceil(lens.width / stepX), 1, fw)
-           const rh = Range.clamp(Math.ceil(lens.height / stepY), 1, fh)
-           const ox = Range.clamp(Math.floor(fx - rw / 2), 0, fw - rw)
-           const oy = Range.clamp(Math.floor(fy - rh / 2), 0, fh - rh)
+          const rw = Range.clamp(Math.ceil(lens.width / stepX), 1, fw)
+          const rh = Range.clamp(Math.ceil(lens.height / stepY), 1, fh)
+          const ox = Range.clamp(Math.floor(fx - rw / 2), 0, fw - rw)
+          const oy = Range.clamp(Math.floor(fy - rh / 2), 0, fh - rh)
           // Literal pixels, content centered on the pointer. The transform
           // carries the DPR, so the destination stays in box pixels and each
           // source pixel still lands as an exact block of device pixels.
@@ -919,9 +919,9 @@ PanelWindow {
     }
     onReleased: mouse => {
       if (mouse.button !== Qt.LeftButton) return
-       if (overlay.dragMode === "resize") overlay._resizeTo(mouse.x, mouse.y)
-       overlay._clampSelection()
-       if (!overlay.hasSelection) overlay._clearSelection()
+      if (overlay.dragMode === "resize") overlay._resizeTo(mouse.x, mouse.y)
+      overlay._clampSelection()
+      if (!overlay.hasSelection) overlay._clearSelection()
       overlay.dragMode = ""
     }
     onWheel: wheel => {

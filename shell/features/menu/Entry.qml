@@ -281,7 +281,7 @@ Item {
   // "") wins over provider and top-level while its step renders, so the
   // wizard narrates each input; rev capture flips it on stage changes.
   // Gated on expanded: collapsed rows always show the top-level copy.
-   readonly property string subText: {
+  readonly property string subText: {
     if (searchResult) {
       // Search rows keep their own copy: the group header above names the
       // breadcrumb, so repeating it under every row would restate the
@@ -1124,7 +1124,7 @@ Item {
     anchors.rightMargin: Ui.m
     anchors.top: parent.top
     anchors.topMargin: Ui.rowPadV
-     // Synchronous line-stack height. ListView displaces neighbors during
+    // Synchronous line-stack height. ListView displaces neighbors during
     // incremental inserts using creation-time geometry, but a Column only
     // reports its height after its first polish pass - one frame late,
     // which made revealed rows overlap the entry under them by exactly
@@ -1222,11 +1222,11 @@ Item {
           text: row.displayLabel
           color: (row.isThemeRow && row.mark) ? Theme.color("accent") : Theme.color("foreground_0")
           font.pixelSize: Ui.fontL
-           font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
-           elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
-           clip: row.textReveal < 1
-           opacity: row.textReveal
-           textFormat: Text.PlainText
+          font.family: row.previewFontFamily !== "" ? row.previewFontFamily : Ui.fontFamily
+          elide: row.textReveal < 1 ? Text.ElideNone : Text.ElideRight
+          clip: row.textReveal < 1
+          opacity: row.textReveal
+          textFormat: Text.PlainText
         }
 
         // Sizing row kept for height compat, hidden

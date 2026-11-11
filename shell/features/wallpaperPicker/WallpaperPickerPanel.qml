@@ -529,13 +529,13 @@ PanelCard {
       implicitHeight: panel.filterH
       basePadding: Ui.l
       focusColor: Ui.solid("accent")
-       placeholder: "Filter wallpapers..."
-       inputRole: "filter"
-       filterIconAlways: true
+      placeholder: "Filter wallpapers..."
+      inputRole: "filter"
+      filterIconAlways: true
       // Dead while the vault is empty: no query to take, no focus to hold.
       enabled: !panel.filterDead
       clearable: false
-       counterVisible: true
+      counterVisible: true
       counterMatched: WallpaperPicker.filtered.length
       counterTotal: WallpaperPicker._userFiles.length
       onEdited: text => WallpaperPicker.submit(text)
@@ -608,8 +608,8 @@ PanelCard {
           trailSpace: 0
           clip: true
           autoRevealEnabled: true
-           delegate: WallpaperEntry {
-             deleteOpen: panel._deleteIndex === index
+          delegate: WallpaperEntry {
+            deleteOpen: panel._deleteIndex === index
             deleteStage: panel._deleteIndex === index ? panel._deleteStage : 0
             onActivated: () => panel.activateCurrent()
             onDeleteConfirm: () => panel.toggleDeleteCurrent()

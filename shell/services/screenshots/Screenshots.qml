@@ -850,12 +850,12 @@ Singleton {
   }
 
   Component.onDestruction: {
-     root._cancelActiveFlow("shutdown")
-     SurfaceClaim.releaseOwner(root)
-     if (root._startupProcess !== null) {
-       ProcControl.kill(root._startupProcess, "startup")
-       root._startupProcess = null
-     }
+    root._cancelActiveFlow("shutdown")
+    SurfaceClaim.releaseOwner(root)
+    if (root._startupProcess !== null) {
+      ProcControl.kill(root._startupProcess, "startup")
+      root._startupProcess = null
+    }
     Registry.unregister("screenshots")
   }
 
@@ -1239,24 +1239,24 @@ Singleton {
       if (root._runtimeFailed || Number(existingFlow) > 0) return false
       return root._queueStart(() => root.openRegionSelect(screen, existingFlow, immediate))
     }
-     if (Number(existingFlow) > 0 && root._activeFlow !== Number(existingFlow)) return false
-     if (!(Number(existingFlow) > 0)
-       && (root._regionRequest !== 0 || root._liveRegion !== null
-         || root._pickerRequest !== 0 || root._pendingPick !== null)) {
-       root._cancelActiveFlow("toggle-dismissed")
-       return true
-     }
-     if (Number(existingFlow) === 0 && immediate !== true && root._debounced("region")) return false
-     const flowId = Number(existingFlow) > 0 ? Number(existingFlow) : root._claimFlow("region")
-     if (flowId === 0) return false
-     const target = screen !== undefined && screen !== null ? screen : root._targetScreen()
-     if (!root._screenValid(target)) {
+    if (Number(existingFlow) > 0 && root._activeFlow !== Number(existingFlow)) return false
+    if (!(Number(existingFlow) > 0)
+      && (root._regionRequest !== 0 || root._liveRegion !== null
+        || root._pickerRequest !== 0 || root._pendingPick !== null)) {
+      root._cancelActiveFlow("toggle-dismissed")
+      return true
+    }
+    if (Number(existingFlow) === 0 && immediate !== true && root._debounced("region")) return false
+    const flowId = Number(existingFlow) > 0 ? Number(existingFlow) : root._claimFlow("region")
+    if (flowId === 0) return false
+    const target = screen !== undefined && screen !== null ? screen : root._targetScreen()
+    if (!root._screenValid(target)) {
       root._releaseFlow(flowId)
       return false
     }
-     if (immediate === true) return root._openLiveRegion(target)
-     root._armShot(target, "region-seed", false)
-     return true
+    if (immediate === true) return root._openLiveRegion(target)
+    root._armShot(target, "region-seed", false)
+    return true
   }
 
   // A window closed from outside the editor's own save and cancel paths.
@@ -1551,14 +1551,14 @@ Singleton {
       if (root._runtimeFailed || Number(existingFlow) > 0) return false
       return root._queueStart(() => root.capture(mode, screen, existingFlow, immediate, keepSurfaces))
     }
-     const supplied = Number(existingFlow) || 0
-     if (supplied > 0 && root._activeFlow !== supplied) return false
-     if (supplied === 0 && immediate !== true && root._debounced("capture")) return false
-     const flowId = supplied > 0 ? supplied : root._claimFlow("capture", keepSurfaces)
-     if (flowId === 0) return false
-     const targetScreen = screen !== undefined && screen !== null
-       ? screen : root._targetScreen()
-     if (!root._screenValid(targetScreen)) {
+    const supplied = Number(existingFlow) || 0
+    if (supplied > 0 && root._activeFlow !== supplied) return false
+    if (supplied === 0 && immediate !== true && root._debounced("capture")) return false
+    const flowId = supplied > 0 ? supplied : root._claimFlow("capture", keepSurfaces)
+    if (flowId === 0) return false
+    const targetScreen = screen !== undefined && screen !== null
+      ? screen : root._targetScreen()
+    if (!root._screenValid(targetScreen)) {
       root._releaseFlow(flowId)
       return false
     }
