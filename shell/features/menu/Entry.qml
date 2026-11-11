@@ -69,10 +69,23 @@ Item {
   readonly property bool infoOnly: itm && itm.infoOnly === true
   readonly property bool hasStepper: isNumber || isRange
 
+  // The choices the open dropdown shows: a flow stage's own list while that
+  // stage renders, else the row's declared options. Every reader below - the
+  // seed, the stepper, the picker and the dropdown's own layout - goes through
+  // this one property, so a stage declaring options cannot be sized from the
+  // parent row's list.
+  readonly property var optionList: {
+    const stage = row.isFlow ? row.flowStep : null
+    const declared = stage && stage.options !== undefined ? stage.options
+      : (itm && itm.options !== undefined && itm.options !== null ? itm.options : [])
+    if (Array.isArray(declared)) return declared
+    return declared && declared.length !== undefined
+      ? Array.prototype.slice.call(declared) : []
+  }
   // Left/Right pages the inline dropdown by this stride, which the
   // library derives from the option count; a single-column dropdown has
   // no stride (0 = key falls through).
-  readonly property int optionCount: itm ? (itm.options ?? []).length : 0
+  readonly property int optionCount: row.optionList.length
   readonly property int optionColumnStride: MenuLib.optionColumnStride(optionCount)
   readonly property bool hasEditor: hasStepper || isText
 
@@ -129,25 +142,13 @@ Item {
   on_RevEchoChanged: {
     syncExpanded()
     if (!row.dropdownOpen) return
-    const current = !searchResult && itm
-      ? (Menu.itemByUid(itm.uid) || itm) : itm
-    const opts = row.isFlow && row.flowStep && row.flowStep.options
-      ? row.flowStep.options : current ? current.options ?? [] : []
-    const optList = Array.isArray(opts) ? opts : Array.prototype.slice.call(opts)
+    const optList = row.optionList
     if (optList.length === 0) {
       row.optionIndex = -1
       return
     }
-    if (row.optionIndex < 0) {
-      let seed = row.st ? row.st.value : undefined
-      if (row.isFlow) {
-        const stored = Menu.flowValuesOf(row.itm)[String(row.flowIndex)]
-        if (stored !== undefined) seed = stored
-      }
-      row.optionIndex = MenuLib.optionSeedIndex(optList, seed)
-    } else {
-      row.optionIndex = optList.length > 0 ? Range.clamp(row.optionIndex, 0, optList.length - 1) : 0
-    }
+    if (row.optionIndex < 0) row.optionIndex = MenuLib.optionSeedIndex(optList, row.optionSeed())
+    else row.optionIndex = Range.clamp(row.optionIndex, 0, optList.length - 1)
   }
   Component.onCompleted: {
     syncExpanded()
@@ -232,24 +233,24 @@ Item {
   // Enter re-picks it without touching the arrows.
   property int optionIndex: -1
 
+  // The value the dropdown cursor should open on. Flow rows seed from the
+  // stored stage value so Back lands on the picked option; plain rows seed
+  // from live state. `st` can be null (search hits, or a row with no state
+  // yet) and a null seed is the library's own decline, so the cursor falls to
+  // the first option rather than to no option at all.
+  function optionSeed() {
+    if (row.isFlow) {
+      const stored = Menu.flowValuesOf(row.itm)[String(row.flowIndex)]
+      if (stored !== undefined) return stored
+    }
+    return row.st ? row.st.value : undefined
+  }
+
   onDropdownOpenChanged: {
     if (!dropdownOpen) return
-    const opts = row.isFlow && row.flowStep && row.flowStep.options
-      ? row.flowStep.options : itm ? itm.options ?? [] : []
-    const optList = Array.isArray(opts) ? opts : Array.prototype.slice.call(opts)
-
-    // Flow rows seed the cursor from the stored stage value so Back
-    // lands on the picked option; plain rows seed from live state.
-    // `st` can be null (search hits, or a row with no state yet), and a
-    // throw here leaves optionIndex at -1, so the dropdown renders with
-    // its cursor on no option until the user steps once.
-    let seed = st ? st.value : undefined
-    if (row.isFlow) {
-      const stored = Menu.flowValuesOf(itm)[String(row.flowIndex)]
-      if (stored !== undefined) seed = stored
-    }
-    if (optList.length === 0) optionIndex = -1
-    else optionIndex = MenuLib.optionSeedIndex(optList, seed)
+    const optList = row.optionList
+    optionIndex = optList.length === 0
+      ? -1 : MenuLib.optionSeedIndex(optList, row.optionSeed())
   }
 
   // --- payload views ---
@@ -756,8 +757,7 @@ Item {
 
   // Panel-driven dropdown navigation; returns true when consumed.
   function moveOption(direction) {
-    const opts = row.isFlow && row.flowStep && row.flowStep.options
-      ? row.flowStep.options : itm ? itm.options ?? [] : []
+    const opts = row.optionList
     if (!dropdownOpen || opts.length === 0) return false
     // A dropdown that has just been opened (or whose cursor was cleared)
     // starts with no option selected (-1). Stepping from -1 must land on
@@ -772,8 +772,7 @@ Item {
 
   function pickCurrent() {
     if (!dropdownOpen || !itm) return false
-    const opts = row.isFlow && row.flowStep && row.flowStep.options
-      ? row.flowStep.options : itm.options ?? []
+    const opts = row.optionList
     if (optionIndex < 0 || optionIndex >= opts.length) return false
     pick(opts[optionIndex].value)
     return true
