@@ -48,5 +48,6 @@ about one of them:
 | `MenuState.js` | Per-item state records: the shape a row starts with and the copy-on-write rules for the slot-close latch. |
 | `MenuQuiesce.js` | The quiesce handshake: when a motionless row install may write while the view is still applying the previous one, and the bounded wait that keeps typing from freezing. |
 | `MenuSpawnProbe.js` | The spawn-probe verdict: whether a summoned card's first laid-out height was the previous menu's box rather than the summoned row set's own size. |
+| `MenuIndex.js` | Search-index and condition-index construction: the registration merge with republished pages shadowing the bundle, and the store vars any `showIf` gates on. |
 | `metadata.json` | Bundle metadata read by the loader. |
 | `qmldir` | Module declaration for `qs.features.menu`. |

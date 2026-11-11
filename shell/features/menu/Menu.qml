@@ -9,6 +9,7 @@ import Quickshell
 import Quickshell.Io
 import qs.common
 import "MenuLib.js" as MenuLib
+import "MenuIndex.js" as MenuIndex
 import "MenuState.js" as MenuState
 import "../../common/math/Range.js" as Range
 import "../../common/settings/SettingsLib.js" as SettingsLib
@@ -636,41 +637,12 @@ Singleton {
     return root._settingsFamily === true
   }
 
+  // The index a query scans: the bundle's own entries plus every live owner's,
+  // with a republished page shadowing the bundle's copy of it. The merge is
+  // MenuIndex.sectionRows' (shadowing, ordering and the empty cases).
   function _rebuildSearchIndex() {
-    const merged = root._builtinIndex.slice()
-    if (root._settingsFamily) {
-      for (const ownerId in root._indexRegistrations) {
-        const entries = root._indexRegistrations[ownerId]
-        if (!Array.isArray(entries)) continue
-        // Appended by index rather than spread: a large registration is one
-        // argument list to push(...), and the engine caps that.
-        for (let i = 0; i < entries.length; i++) merged.push(entries[i])
-      }
-      // A live dynamic page SHADOWS the bundle page of the same id: pageById
-      // resolves that id to the published page, so the bundle's rows for it are
-      // entries for a page the id no longer names. Keeping both put the same
-      // (pageId, row) pair in the index twice - two hits for one row - and the
-      // projection's keyed model refuses the WHOLE install on a repeated key,
-      // so every query that reached such a page read as a dead search bar while
-      // the page's own rows stayed on screen. The Idle page is exactly this
-      // case: the schema ships a one-row "idle" page (the toggle) and the idle
-      // daemon publishes the live timer list under the same id.
-      //
-      // Compacted in one pass and closed with a single splice, rather than a
-      // splice per shadowed row. The index is the bundle plus every machine
-      // picker - thousands of rows - so a shadowed page near the head moved
-      // the whole tail once for each row dropped.
-      const regs = root._indexRegistrations
-      const builtinCount = root._builtinIndex.length
-      let kept = 0
-      for (let i = 0; i < builtinCount; i++) {
-        const row = merged[i]
-        if (regs[row.pageId] !== undefined) continue
-        merged[kept++] = row
-      }
-      if (kept < builtinCount) merged.splice(kept, builtinCount - kept)
-    }
-    root.searchIndex = merged
+    root.searchIndex = MenuIndex.sectionRows(root._builtinIndex,
+      root._indexRegistrations, root._settingsFamily)
   }
 
   // Global search publishes every keystroke.
@@ -736,18 +708,10 @@ Singleton {
     root.resetSearch()
   }
 
+  // Every store variable a row's `showIf` names, collected once. The walk is
+  // MenuIndex.conditionVars' (deduplication and the absent-array cases).
   function _buildCondIndex() {
-    const vars = {}
-    if (!root.bundle) {
-      root._condVars = vars
-      return
-    }
-    for (const page of root.bundle.pages) {
-      for (const item of page.items) {
-        for (const cond of item.showIf || []) vars[cond.var] = true
-      }
-    }
-    root._condVars = vars
+    root._condVars = MenuIndex.conditionVars(root.bundle)
   }
 
   // --- supplemental state ---

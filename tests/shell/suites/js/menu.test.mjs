@@ -1951,10 +1951,10 @@ const linksSettingsFamily = (b) => b.pages.length === 1 && b.pages[0].items.leng
 
 group('the two index halves merge together, or not at all', () => {
   const src = menuSource()
-  eq('_rebuildSearchIndex reads the scope before touching the registrations',
-    /if \(root\._settingsFamily\) \{\s*\n\s*for \(const ownerId in root\._indexRegistrations\)/.test(src), true)
-  eq('the builtin half is concatenated unconditionally (scope cannot shrink a bundle)',
-    /const merged = root\._builtinIndex\.slice\(\)\s*\n\s*if \(root\._settingsFamily\)/.test(src), true)
+  eq('_rebuildSearchIndex hands the scope to the one merge rule',
+    /MenuIndex\.sectionRows\(root\._builtinIndex,\s*\n\s*root\._indexRegistrations, root\._settingsFamily\)/.test(src), true)
+  eq('and the merge is not re-implemented beside it',
+    /root\._builtinIndex\.slice\(\)/.test(src), false)
   eq('the scope is recorded from the merge decision, not computed a second way',
     /root\._settingsFamily = linksSettings/.test(src), true)
   eq('and the registrations themselves are never dropped - only unmerged',
@@ -4284,6 +4284,39 @@ group('MenuState close-latch maps are copy-on-write', () => {
 })
 
 const SP = loadLib(path.join(SHELL_DIR, 'features/menu/MenuSpawnProbe.js'))
+const MI = loadLib(path.join(SHELL_DIR, 'features/menu/MenuIndex.js'))
+
+group('MenuIndex merges registrations and shadows the pages they republish', () => {
+  const builtin = [
+    { pageId: 'main', row: 0 },
+    { pageId: 'idle', row: 0 },
+    { pageId: 'weather', row: 0 },
+  ]
+  const regs = { idle: [{ pageId: 'idle', row: 0 }, { pageId: 'idle', row: 1 }] }
+  const merged = MI.sectionRows(builtin, regs, true)
+  eq('the bundle rows of a republished page are dropped', merged.length, 4)
+  eq('and only the published rows remain', merged.filter(r => r.pageId === 'idle').length, 2)
+  eq('while unshadowed rows keep their order', merged[0].pageId + '/' + merged[1].pageId, 'main/weather')
+  eq('a standalone bundle takes only its own rows', MI.sectionRows(builtin, regs, false).length, 3)
+  eq('a non-array registration is skipped', MI.sectionRows([], { p: null }, true).length, 0)
+  eq('a missing registration map is empty input', MI.sectionRows(builtin, null, true).length, 3)
+  eq('an absent builtin index is empty input', MI.sectionRows(null, {}, true).length, 0)
+  is('row objects are carried by reference', MI.sectionRows(builtin, null, true)[0], (v) => v === builtin[0])
+})
+
+group('MenuIndex collects the vars any showIf gates on', () => {
+  const b = { pages: [
+    { items: [{ showIf: [{ var: 'a' }, { var: 'b' }] }, { showIf: [{ var: 'a' }] }] },
+    { items: [] },
+    {},
+  ] }
+  eq('each var is collected once', Object.keys(MI.conditionVars(b)).sort().join(','), 'a,b')
+  eq('a null bundle has no vars', Object.keys(MI.conditionVars(null)).length, 0)
+  eq('pages without items contribute nothing',
+    Object.keys(MI.conditionVars({ pages: [{}, { items: [{}] }, { items: null }] })).length, 0)
+  eq('a malformed showIf is skipped',
+    Object.keys(MI.conditionVars({ pages: [{ items: [{ showIf: 'x' }, { showIf: [null] }] }] })).length, 0)
+})
 
 group('MenuSpawnProbe names a spawn that inherited the previous box', () => {
   const carried = SP.verdict(400, 400.2, 200)
