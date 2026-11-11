@@ -673,66 +673,35 @@ Singleton {
     root.searchIndex = merged
   }
 
-  // Trailing coalescing window for global search on a large index.
+  // Global search publishes every keystroke.
   //
   // A keystroke is a whole pipeline: scan the index, rank the hits, reinstall
   // the panel's row projection (up to the 200-row cap), remeasure the card and
-  // resize the window. On an index made of bundle rows PLUS the machine's
-  // pickers, a one- or two-character query matches most of it, so every
-  // keypress installs a screenful-plus of freshly copied rows and restarts a
-  // height tween - typing fast queued installs faster than the card could
-  // follow, which reads as the menu and the window lagging. The scan itself is
-  // a fraction of a millisecond; the churn is what hurts.
+  // resize the window. That pipeline used to be paced behind a trailing
+  // coalescing window (a Ui.fastMs timer) on a large index to keep the churn
+  // down - but the window is longer than the gap between two typed keys, so
+  // every key after the first of a burst sat unpublished for up to 120ms: the
+  // bar echoed the text while the results trailed it. The scan is cheap: a
+  // cold full scan of a 3,000-entry index measures 0.8-1.7 ms, and a key that
+  // grows the query (the usual case between two keystrokes) narrows the
+  // previous hit set at ~0.005 ms. The install is keyed and incremental, and a
+  // stale row set is the thing the user actually sees - so the query is
+  // applied on every keystroke instead.
   //
-  // The FIELD still echoes every keystroke. Only the applied query paces
-  // itself: the first key of a burst applies at once (leading edge, so the
-  // bar never trails the typing on its first press), and keys that land inside
-  // the window collapse into one apply of the newest text. The window does not
-  // restart, so a long burst still refreshes about every fastMs instead of
-  // stalling until the user stops.
-  //
-  // Below Ui.listFullRows entries the entire pipeline is cheaper than the wait
-  // it would add, so small bundles (Utilities and every standalone picker)
-  // stay per-keystroke - the same split the "/" scoped filter makes. An empty
-  // query always applies at once: clearing the bar must not wait a beat.
-  readonly property int searchCoalesceMs: Ui.fastMs
-  readonly property bool _searchCoalesced: root.searchIndex.length > Ui.listFullRows
-  property string _queryPending: ""
-  property double _queryAppliedAt: 0
-  property Qml.Timer searchTimer: Qml.Timer {
-    interval: root.searchCoalesceMs
-
-    onTriggered: root.flushQuery()
-  }
-
+  // An empty query needs no special case here: _applyQuery publishes it and
+  // drops the ranked window, which is what clearing the bar means.
   function setQuery(q) {
     if (root.frame && root.hasDynamicPage(root.frame.id)) {
       if (!root.scopedActive) root.beginScoped()
       root.setScopedQuery(q)
       return
     }
-    const text = String(q ?? "")
-    if (text === "" || !root._searchCoalesced) {
-      root.searchTimer.stop()
-      root._applyQuery(text)
-      return
-    }
-    if (Date.now() - root._queryAppliedAt >= root.searchCoalesceMs) {
-      root.searchTimer.stop()
-      root._applyQuery(text)
-      return
-    }
-    root._queryPending = text
-    if (!root.searchTimer.running) root.searchTimer.start()
+    root._applyQuery(String(q ?? ""))
   }
 
   // Publish one query: the applied text, its ranked window, and any provider
-  // that wants the scan deferred until its rows exist. Separate from setQuery
-  // because a coalesced keystroke runs this on the timer instead.
+  // that wants the scan deferred until its rows exist.
   function _applyQuery(q) {
-    root.searchTimer.stop()
-    root._queryPending = ""
-    root._queryAppliedAt = Date.now()
     root.query = q
     root.results = q !== "" ? MenuLib.search(root.searchIndex, q) : []
     const provider = root._indexProviderFor(q)
@@ -751,21 +720,6 @@ Singleton {
     }
   }
 
-  // Apply a coalesced query now. True when one was pending, so callers can
-  // re-drive what they came to do after the projection catches up (Enter must
-  // never pick from a row set the field has already left behind).
-  //
-  // The pending text is what decides, never the timer's `running`: a Qml.Timer
-  // reports running false inside its own onTriggered, so a guard on it made the
-  // timer's own call bail and the last keystroke of every burst went
-  // unpublished.
-  function flushQuery() {
-    const q = root._queryPending
-    if (q === "") return false
-    root._applyQuery(q)
-    return true
-  }
-
   function _indexProviderFor(q) {
     const needle = String(q || "").trim()
     if (needle === "") return null
@@ -778,10 +732,7 @@ Singleton {
   }
 
   function clearQuery() {
-    // A query that is still inside the coalescing window is applied text as
-    // far as this question is concerned: it has to be cancelled too, or the
-    // timer lands it after the dismissal.
-    if (root.query === "" && root._queryPending === "") return
+    if (root.query === "") return
     root.resetSearch()
   }
 
@@ -923,12 +874,7 @@ Singleton {
   }
 
   // Search state resets together everywhere: navigation, close, reload.
-  // The coalescing timer goes with it: a pending apply that outlived the
-  // reset would publish a query the user has already dismissed.
   function resetSearch() {
-    root.searchTimer.stop()
-    root._queryPending = ""
-    root._queryAppliedAt = 0
     root.clearScoped()
     root.query = ""
     root.results = []
